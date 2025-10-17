@@ -1,0 +1,38 @@
+#!/bin/bash
+set -e
+
+# Colors
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+echo -e "${BLUE}=== Deploying Monitoring Stack ===${NC}"
+
+# Deploy Prometheus
+echo -e "${GREEN}1. Deploying Prometheus...${NC}"
+kubectl apply -f k8s/prometheus/
+
+# Wait for Prometheus
+echo -e "${YELLOW}Waiting for Prometheus to be ready...${NC}"
+kubectl wait --for=condition=ready pod -l app=prometheus -n monitoring-demo --timeout=120s || true
+
+# Deploy Grafana
+echo -e "${GREEN}2. Deploying Grafana...${NC}"
+kubectl apply -f k8s/grafana/
+
+# Wait for Grafana
+echo -e "${YELLOW}Waiting for Grafana to be ready...${NC}"
+kubectl wait --for=condition=ready pod -l app=grafana -n monitoring-demo --timeout=120s || true
+
+# Check status
+echo ""
+echo -e "${GREEN}=== Monitoring Stack Status ===${NC}"
+kubectl get pods -n monitoring-demo
+kubectl get svc -n monitoring-demo
+
+echo ""
+echo -e "${GREEN}✓ Monitoring stack deployed successfully!${NC}"
+echo -e "${BLUE}Prometheus: http://localhost:9090${NC}"
+echo -e "${BLUE}Grafana:    http://localhost:3000 (admin/admin)${NC}"
+

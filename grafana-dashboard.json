@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "Dashboard gi\u00e1m s\u00e1t to\u00e0n di\u1ec7n cho Go REST API v\u1edbi 25 panels: Response Time (p50/p95/p99), RPS, Apdex Score, Error Rate, Request Rate per Endpoint/Method, Error Rate by Method, Memory/CPU, Network Traffic, GC Performance, v\u00e0 nhi\u1ec1u h\u01a1n n\u1eefa. H\u1ed7 tr\u1ee3 multi-app monitoring v\u1edbi filters \u0111\u1ed9ng theo namespace v\u00e0 app version.",
+  "description": "Monitoring dashboard for Go REST API microservices with 27 panels covering response time, RPS, error rates, resource usage, and performance metrics.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -69,7 +69,8 @@
         }
       ],
       "title": "99th Percentile Response Success",
-      "type": "stat"
+      "type": "stat",
+      "description": "99% of requests complete faster than this. Detects worst-case latency and outliers."
     },
     {
       "datasource": {
@@ -130,7 +131,8 @@
         }
       ],
       "title": "95th Percentile Response Success",
-      "type": "stat"
+      "type": "stat",
+      "description": "95% of requests complete faster than this. Key metric for user experience."
     },
     {
       "datasource": {
@@ -191,7 +193,8 @@
         }
       ],
       "title": "50th Percentile Response Success",
-      "type": "stat"
+      "type": "stat",
+      "description": "Median response time. Represents typical user experience."
     },
     {
       "datasource": {
@@ -213,7 +216,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "reqps"
         }
       },
       "gridPos": {
@@ -243,8 +246,241 @@
           "refId": "A"
         }
       ],
-      "title": "RPS",
-      "type": "stat"
+      "title": "Total RPS (All Requests)",
+      "type": "stat",
+      "description": "Total requests per second including all HTTP status codes (2xx, 4xx, 5xx). Use this to monitor overall traffic volume."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 4
+      },
+      "id": 26,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", code=~\"2..\"}[$rate]))",
+          "refId": "A"
+        }
+      ],
+      "title": "Success RPS (2xx)",
+      "type": "stat",
+      "description": "Successful requests per second (HTTP 2xx responses). This represents productive traffic."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 4
+      },
+      "id": 27,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", code=~\"4..|5..\"}[$rate]))",
+          "refId": "A"
+        }
+      ],
+      "title": "Error RPS (4xx/5xx)",
+      "type": "stat",
+      "description": "Failed requests per second (HTTP 4xx/5xx responses). Monitor this to detect issues quickly."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 95
+              },
+              {
+                "color": "green",
+                "value": 99
+              }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 4
+      },
+      "id": 28,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "(\n  sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", code=~\"2..\"}[$rate]))\n  /\n  sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}[$rate]))\n) * 100",
+          "refId": "A"
+        }
+      ],
+      "title": "Success Rate %",
+      "type": "stat",
+      "description": "Percentage of successful requests (2xx / total)."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 4
+      },
+      "id": 30,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "(\n  sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", code=~\"4..|5..\"}[$rate]))\n  /\n  sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}[$rate]))\n) * 100",
+          "refId": "A"
+        }
+      ],
+      "title": "Error Rate %",
+      "type": "stat",
+      "description": "Percentage of failed requests (4xx/5xx / total)."
     },
     {
       "datasource": {
@@ -297,7 +533,8 @@
         }
       ],
       "title": "Total Request",
-      "type": "stat"
+      "type": "stat",
+      "description": "Total requests in selected time range. Correlate with traffic spikes or incidents."
     },
     {
       "datasource": {
@@ -358,7 +595,8 @@
         }
       ],
       "title": "Apdex Score",
-      "type": "stat"
+      "type": "stat",
+      "description": "User satisfaction score (0-1). Based on response time thresholds."
     },
     {
       "datasource": {
@@ -411,7 +649,8 @@
         }
       ],
       "title": "Up Instances",
-      "type": "stat"
+      "type": "stat",
+      "description": "Number of healthy application instances. Monitor for scaling and failures."
     },
     {
       "datasource": {
@@ -472,7 +711,8 @@
         }
       ],
       "title": "Restarts",
-      "type": "stat"
+      "type": "stat",
+      "description": "Pod restarts in time range. Frequent restarts indicate OOM or crashes."
     },
     {
       "datasource": {
@@ -496,7 +736,7 @@
       },
       "gridPos": {
         "h": 9,
-        "w": 8,
+        "w": 12,
         "x": 0,
         "y": 8
       },
@@ -529,7 +769,8 @@
         }
       ],
       "title": "Status Code Distribution",
-      "type": "piechart"
+      "type": "piechart",
+      "description": "HTTP status code breakdown since pod start. Expected: ~95% codes 2xx."
     },
     {
       "datasource": {
@@ -553,8 +794,8 @@
       },
       "gridPos": {
         "h": 9,
-        "w": 8,
-        "x": 8,
+        "w": 12,
+        "x": 12,
         "y": 8
       },
       "id": 10,
@@ -586,86 +827,8 @@
         }
       ],
       "title": "Total Requests by Endpoint",
-      "type": "piechart"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 8,
-        "x": 16,
-        "y": 8
-      },
-      "id": 11,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}[$rate])) by (app)",
-          "legendFormat": "{{app}}",
-          "refId": "A"
-        }
-      ],
-      "title": "RPS per Pod",
-      "type": "timeseries"
+      "type": "piechart",
+      "description": "Request distribution across endpoints. Identifies hot paths and traffic patterns."
     },
     {
       "datasource": {
@@ -749,7 +912,8 @@
         }
       ],
       "title": "Request Rate by Endpoint",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Request rate per endpoint over time. Detects traffic spikes per API."
     },
     {
       "datasource": {
@@ -1005,13 +1169,14 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}[$rate])) by (path, code)",
-          "legendFormat": "{{code}} {{path}}",
+          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}[$rate])) by (path)",
+          "legendFormat": "{{path}}",
           "refId": "A"
         }
       ],
-      "title": "RPS Trends",
-      "type": "timeseries"
+      "title": "RPS by Endpoint",
+      "type": "timeseries",
+      "description": "Request rate per endpoint path. Shows traffic distribution across different API endpoints over time."
     },
     {
       "datasource": {
@@ -1095,7 +1260,8 @@
         }
       ],
       "title": "Response time 95th percentile",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "p95 response time per endpoint. Identifies slow APIs."
     },
     {
       "datasource": {
@@ -1179,7 +1345,8 @@
         }
       ],
       "title": "Response time 50th percentile",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Median response time per endpoint. Shows typical performance baseline."
     },
     {
       "datasource": {
@@ -1263,7 +1430,8 @@
         }
       ],
       "title": "Response time 99th percentile",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "p99 response time per endpoint. Highlights tail latency issues."
     },
     {
       "datasource": {
@@ -1347,7 +1515,8 @@
         }
       ],
       "title": "Memory usage per pods",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Memory allocation by app. Monitor for leaks and OOM risk."
     },
     {
       "datasource": {
@@ -1431,7 +1600,8 @@
         }
       ],
       "title": "CPU usage per pods",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "CPU usage by app. Indicates load and scaling needs."
     },
     {
       "datasource": {
@@ -1519,7 +1689,8 @@
         }
       ],
       "title": "Total Network Traffic",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Network I/O by app. Detects bandwidth usage and anomalies."
     },
     {
       "datasource": {
@@ -1603,7 +1774,8 @@
         }
       ],
       "title": "Requests In Flight",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Requests currently processing. High values signal slow processing or traffic surge."
     },
     {
       "datasource": {
@@ -1687,7 +1859,8 @@
         }
       ],
       "title": "Go GC Performance",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Garbage collection duration by app. High GC time causes latency spikes."
     },
     {
       "datasource": {
@@ -1776,7 +1949,8 @@
         }
       ],
       "title": "Go Routines",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Goroutine count by app. Steadily increasing count indicates goroutine leak."
     },
     {
       "datasource": {
@@ -1860,7 +2034,8 @@
         }
       ],
       "title": "Memory Allocations",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Memory churn rate by app. High rate indicates inefficient memory usage."
     }
   ],
   "refresh": false,

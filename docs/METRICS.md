@@ -95,9 +95,9 @@ Dự án này expose **6 custom application metrics** và tận dụng **Go runt
 
 ---
 
-## 25 Dashboard Panels - Phân Tích Chi Tiết
+## 26 Dashboard Panels - Phân Tích Chi Tiết
 
-### 📊 Hàng 1: Chỉ Số Hiệu Suất Chính (8 Stat Panels)
+### 📊 Hàng 1: Chỉ Số Hiệu Suất Chính (9 Stat Panels)
 
 #### 1. **Response Time - p50 (median)**
 
@@ -147,7 +147,7 @@ histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{app=~"$app", n
 
 ---
 
-#### 4. **RPS (Requests per Second)**
+#### 4. **Total RPS (All Requests)**
 
 **Query:**
 ```promql
@@ -155,19 +155,92 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$r
 ```
 
 **Phân tích:**
-- **Ý nghĩa:** Tổng số requests mỗi giây của tất cả pods
+- **Ý nghĩa:** Tổng số requests mỗi giây bao gồm TẤT CẢ status codes (2xx, 4xx, 5xx)
 - **Aggregation:** `sum()` - tổng hợp tất cả pods
-- **Quan trọng:** Metric cốt lõi để đánh giá traffic
+- **Unit:** `reqps` (requests per second)
+- **Quan trọng:** Metric cốt lõi để đánh giá tổng traffic volume
 - **Filter:** Khi chọn "App = All" sẽ hiện tổng RPS của cả 3 versions (v1+v2+v3)
 - **Expected:**
   - V1 (4 pods): ~3.8 RPS (228 req/min)
   - V2 (2 pods): ~3.2 RPS (194 req/min)
   - V3 (1 pod): ~3.2 RPS (194 req/min)
   - **Total: ~10.2 RPS** khi chọn "All"
+- **Description:** "Total requests per second including all HTTP status codes (2xx, 4xx, 5xx). Use this to monitor overall traffic volume."
 
 ---
 
-#### 5. **Total Request**
+#### 5. **Success RPS (2xx)** ⭐ NEW
+
+**Query:**
+```promql
+sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", code=~"2.."}[$rate]))
+```
+
+**Phân tích:**
+- **Ý nghĩa:** Số requests thành công mỗi giây (chỉ HTTP 2xx responses)
+- **Aggregation:** `sum()` - tổng hợp tất cả pods
+- **Unit:** `reqps` (requests per second)
+- **Color:** Green (success)
+- **Quan trọng:** Đại diện cho productive traffic - traffic có ích
+- **Expected:**
+  - V1 (4 pods): ~3.6 RPS (216 req/min) - 95% success rate
+  - V2 (2 pods): ~3.0 RPS (180 req/min) - 95% success rate
+  - V3 (1 pod): ~3.0 RPS (180 req/min) - 95% success rate
+  - **Total: ~9.6 RPS** khi chọn "All"
+- **Description:** "Successful requests per second (HTTP 2xx responses). This represents productive traffic."
+
+---
+
+#### 6. **Error RPS (4xx/5xx)** ⭐ NEW
+
+**Query:**
+```promql
+sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", code=~"4..|5.."}[$rate]))
+```
+
+**Phân tích:**
+- **Ý nghĩa:** Số requests lỗi mỗi giây (HTTP 4xx và 5xx responses)
+- **Aggregation:** `sum()` - tổng hợp tất cả pods
+- **Unit:** `reqps` (requests per second)
+- **Color:** Red (error)
+- **Quan trọng:** Monitor để phát hiện issues nhanh chóng
+- **Expected:**
+  - V1 (4 pods): ~0.2 RPS (12 req/min) - 5% error rate
+  - V2 (2 pods): ~0.2 RPS (12 req/min) - 5% error rate
+  - V3 (1 pod): ~0.2 RPS (12 req/min) - 5% error rate
+  - **Total: ~0.6 RPS** khi chọn "All"
+- **Description:** "Failed requests per second (HTTP 4xx/5xx responses). Monitor this to detect issues quickly."
+
+---
+
+#### 7. **Success Rate %** ⭐ NEW
+
+**Query:**
+```promql
+(
+  sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", code=~"2.."}[$rate]))
+  /
+  sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$rate]))
+) * 100
+```
+
+**Phân tích:**
+- **Ý nghĩa:** Phần trăm requests thành công (2xx / total)
+- **Aggregation:** `sum()` - tổng hợp tất cả pods
+- **Unit:** `percent`
+- **Color thresholds:**
+  - Red: < 95% (critical)
+  - Yellow: 95-99% (warning)
+  - Green: ≥ 99% (good)
+- **Quan trọng:** SLI chính cho SLO implementation
+- **Expected:**
+  - Target: ≥ 99% cho production systems
+  - Current: ~95% (do có simulated errors)
+- **Description:** "Percentage of successful requests (2xx / total). Target: ≥ 99% for production systems."
+
+---
+
+#### 8. **Total Request**
 
 **Query:**
 ```promql

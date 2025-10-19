@@ -204,6 +204,7 @@ kubectl create job --from=cronjob/demo-loadtest manual-test-$(date +%s) -n monit
 | **[K6_LOAD_TESTING.md](./docs/K6_LOAD_TESTING.md)** | 🚀 **k6 continuous load generator setup & configuration** |
 | **[SLO_IMPLEMENTATION.md](./slo/docs/SLO_IMPLEMENTATION.md)** | 🎯 **SRE practices: SLI/SLO definitions, error budgets, burn rate alerts** |
 | **[PROMETHEUS_RATE_EXPLAINED.md](./docs/PROMETHEUS_RATE_EXPLAINED.md)** | 📊 Chi tiết về `rate()`, `increase()` và counter resets |
+| **[TIME_RANGE_AND_RATE_INTERVAL.md](./docs/TIME_RANGE_AND_RATE_INTERVAL.md)** | ⏱️ **Time Range vs Rate Interval: Hướng dẫn chi tiết về Time Range và $rate variable** |
 | **[SETUP.md](./docs/SETUP.md)** | Step-by-step deployment guide |
 | **[VARIABLES_REGEX.md](./docs/VARIABLES_REGEX.md)** | 🎯 Dashboard variables & regex patterns |
 

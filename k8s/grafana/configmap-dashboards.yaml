@@ -17,4 +17,14 @@ data:
         options:
           path: /var/lib/grafana/dashboards
           foldersFromFilesStructure: false
+      - name: 'SLO Dashboards'
+        orgId: 1
+        folder: 'SRE'
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 10
+        allowUiUpdates: true
+        options:
+          path: /var/lib/grafana/slo-dashboards
+          foldersFromFilesStructure: false
 

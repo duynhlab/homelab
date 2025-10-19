@@ -1,0 +1,235 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-slo-rules
+  namespace: monitoring-demo
+  labels:
+    app: prometheus
+    component: slo-rules
+data:
+  slo-error-budget.yaml: |
+    groups:
+    # ========================================================================
+    # ERROR BUDGET TRACKING RULES
+    # ========================================================================
+    - name: error_budget_tracking
+      interval: 1m
+      rules:
+      
+      # ------------------------------------------------------------------------
+      # 1. AVAILABILITY SLI (30-day rolling)
+      # ------------------------------------------------------------------------
+      - record: slo:availability:success_rate_30d
+        expr: |
+          1 - (
+            sum(rate(request_duration_seconds_count{app=~"demo-go-api.*", code=~"5.."}[30d]))
+            /
+            sum(rate(request_duration_seconds_count{app=~"demo-go-api.*"}[30d]))
+          )
+        labels:
+          slo: "availability"
+          window: "30d"
+      
+      - record: slo:availability:success_rate_7d
+        expr: |
+          1 - (
+            sum(rate(request_duration_seconds_count{app=~"demo-go-api.*", code=~"5.."}[7d]))
+            /
+            sum(rate(request_duration_seconds_count{app=~"demo-go-api.*"}[7d]))
+          )
+        labels:
+          slo: "availability"
+          window: "7d"
+      
+      # Error budget remaining (0-1 scale, 1 = 100% budget left)
+      - record: slo:availability:error_budget_remaining_30d
+        expr: |
+          1 - (
+            (1 - slo:availability:success_rate_30d) / (1 - 0.995)
+          )
+        labels:
+          slo: "availability"
+          window: "30d"
+          target: "99.5"
+      
+      - record: slo:availability:error_budget_remaining_7d
+        expr: |
+          1 - (
+            (1 - slo:availability:success_rate_7d) / (1 - 0.99)
+          )
+        labels:
+          slo: "availability"
+          window: "7d"
+          target: "99.0"
+      
+      # Error budget in hours remaining
+      - record: slo:availability:error_budget_hours_30d
+        expr: |
+          slo:availability:error_budget_remaining_30d * 720 * (1 - 0.995)
+        labels:
+          slo: "availability"
+          window: "30d"
+      
+      - record: slo:availability:error_budget_hours_7d
+        expr: |
+          slo:availability:error_budget_remaining_7d * 168 * (1 - 0.99)
+        labels:
+          slo: "availability"
+          window: "7d"
+      
+      # ------------------------------------------------------------------------
+      # 2. LATENCY SLI (30-day rolling)
+      # ------------------------------------------------------------------------
+      - record: slo:latency:success_rate_30d
+        expr: |
+          sum(rate(request_duration_seconds_bucket{app=~"demo-go-api.*", le="0.5"}[30d]))
+          /
+          sum(rate(request_duration_seconds_count{app=~"demo-go-api.*"}[30d]))
+        labels:
+          slo: "latency"
+          window: "30d"
+          threshold: "500ms"
+      
+      - record: slo:latency:success_rate_7d
+        expr: |
+          sum(rate(request_duration_seconds_bucket{app=~"demo-go-api.*", le="0.5"}[7d]))
+          /
+          sum(rate(request_duration_seconds_count{app=~"demo-go-api.*"}[7d]))
+        labels:
+          slo: "latency"
+          window: "7d"
+          threshold: "500ms"
+      
+      - record: slo:latency:error_budget_remaining_30d
+        expr: |
+          1 - (
+            (1 - slo:latency:success_rate_30d) / (1 - 0.95)
+          )
+        labels:
+          slo: "latency"
+          window: "30d"
+          target: "95.0"
+      
+      - record: slo:latency:error_budget_remaining_7d
+        expr: |
+          1 - (
+            (1 - slo:latency:success_rate_7d) / (1 - 0.90)
+          )
+        labels:
+          slo: "latency"
+          window: "7d"
+          target: "90.0"
+      
+      # ------------------------------------------------------------------------
+      # 3. ERROR RATE SLI (30-day rolling)
+      # ------------------------------------------------------------------------
+      - record: slo:error_rate:success_rate_30d
+        expr: |
+          1 - (
+            sum(rate(request_duration_seconds_count{app=~"demo-go-api.*", code=~"4..|5.."}[30d]))
+            /
+            sum(rate(request_duration_seconds_count{app=~"demo-go-api.*"}[30d]))
+          )
+        labels:
+          slo: "error_rate"
+          window: "30d"
+      
+      - record: slo:error_rate:success_rate_7d
+        expr: |
+          1 - (
+            sum(rate(request_duration_seconds_count{app=~"demo-go-api.*", code=~"4..|5.."}[7d]))
+            /
+            sum(rate(request_duration_seconds_count{app=~"demo-go-api.*"}[7d]))
+          )
+        labels:
+          slo: "error_rate"
+          window: "7d"
+      
+      - record: slo:error_rate:error_budget_remaining_30d
+        expr: |
+          1 - (
+            (1 - slo:error_rate:success_rate_30d) / (1 - 0.99)
+          )
+        labels:
+          slo: "error_rate"
+          window: "30d"
+          target: "99.0"
+      
+      - record: slo:error_rate:error_budget_remaining_7d
+        expr: |
+          1 - (
+            (1 - slo:error_rate:success_rate_7d) / (1 - 0.98)
+          )
+        labels:
+          slo: "error_rate"
+          window: "7d"
+          target: "98.0"
+      
+      # ------------------------------------------------------------------------
+      # 4. BURN RATE CALCULATIONS
+      # ------------------------------------------------------------------------
+      # Burn rate = how fast we're consuming error budget compared to target rate
+      # 1x = consuming at target rate (will exhaust in 30d)
+      # 2x = consuming 2x faster (will exhaust in 15d)
+      # 15x = consuming 15x faster (will exhaust in 2d) - CRITICAL!
+      
+      # Availability burn rate (multiple windows for multi-window alerts)
+      - record: slo:availability:burn_rate_1h
+        expr: |
+          (1 - slo:availability:success_rate_1h) / (1 - 0.995)
+        labels:
+          slo: "availability"
+          window: "1h"
+      
+      - record: slo:availability:burn_rate_6h
+        expr: |
+          (1 - 
+            (1 - (
+              sum(rate(request_duration_seconds_count{app=~"demo-go-api.*", code=~"5.."}[6h]))
+              /
+              sum(rate(request_duration_seconds_count{app=~"demo-go-api.*"}[6h]))
+            ))
+          ) / (1 - 0.995)
+        labels:
+          slo: "availability"
+          window: "6h"
+      
+      - record: slo:availability:burn_rate_3d
+        expr: |
+          (1 - 
+            (1 - (
+              sum(rate(request_duration_seconds_count{app=~"demo-go-api.*", code=~"5.."}[3d]))
+              /
+              sum(rate(request_duration_seconds_count{app=~"demo-go-api.*"}[3d]))
+            ))
+          ) / (1 - 0.995)
+        labels:
+          slo: "availability"
+          window: "3d"
+      
+      # Helper for 1h window (needed for burn rate)
+      - record: slo:availability:success_rate_1h
+        expr: |
+          1 - (
+            sum(rate(request_duration_seconds_count{app=~"demo-go-api.*", code=~"5.."}[1h]))
+            /
+            sum(rate(request_duration_seconds_count{app=~"demo-go-api.*"}[1h]))
+          )
+        labels:
+          slo: "availability"
+          window: "1h"
+      
+      # ------------------------------------------------------------------------
+      # 5. TIME TO EXHAUSTION
+      # ------------------------------------------------------------------------
+      # Estimate hours until error budget is fully consumed at current burn rate
+      
+      - record: slo:availability:time_to_exhaustion_hours
+        expr: |
+          slo:availability:error_budget_hours_30d 
+          / 
+          (slo:availability:burn_rate_1h + 0.001)
+        labels:
+          slo: "availability"
+          window: "30d"
+

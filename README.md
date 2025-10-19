@@ -202,9 +202,51 @@ kubectl create job --from=cronjob/demo-loadtest manual-test-$(date +%s) -n monit
 |----------|-------------|
 | **[METRICS.md](./docs/METRICS.md)** | ⭐ **Complete guide với phân tích chi tiết tất cả 25 panels** (bao gồm HTTP Method panels, namespace support) |
 | **[K6_LOAD_TESTING.md](./docs/K6_LOAD_TESTING.md)** | 🚀 **k6 continuous load generator setup & configuration** |
+| **[SLO_IMPLEMENTATION.md](./slo/docs/SLO_IMPLEMENTATION.md)** | 🎯 **SRE practices: SLI/SLO definitions, error budgets, burn rate alerts** |
 | **[PROMETHEUS_RATE_EXPLAINED.md](./docs/PROMETHEUS_RATE_EXPLAINED.md)** | 📊 Chi tiết về `rate()`, `increase()` và counter resets |
 | **[SETUP.md](./docs/SETUP.md)** | Step-by-step deployment guide |
 | **[VARIABLES_REGEX.md](./docs/VARIABLES_REGEX.md)** | 🎯 Dashboard variables & regex patterns |
+
+---
+
+## 🎯 SRE Practices
+
+### SLI/SLO Implementation
+
+This project includes comprehensive SRE practices with **Service Level Objectives (SLOs)** and **Error Budget** tracking:
+
+**📊 SLI Definitions:**
+- **Availability**: 99.5% (30d), 99.0% (7d) - Non-5xx responses
+- **Latency**: 95% (30d), 90% (7d) - Requests < 500ms  
+- **Error Rate**: 99% (30d), 98% (7d) - Non-4xx/5xx responses
+
+**💰 Error Budget Policy:**
+- **30-day Budget**: 0.5% of total requests
+- **7-day Budget**: 1.0% of total requests
+- **Burn Rate Alerts**: 15x (critical), 4x (warning), 1x (info)
+
+**🚨 Multi-Window Alerts:**
+- Critical: Budget exhausted in 2 days (15x burn rate)
+- Warning: Budget exhausted in 7 days (4x burn rate)
+- Info: Budget below 20%
+
+**📈 SLO Dashboard:**
+- Real-time error budget tracking
+- Burn rate monitoring (1h, 6h, 3d windows)
+- Time to exhaustion estimates
+- SLI trend analysis
+
+**🤖 Automated Runbooks:**
+- `diagnose-latency.sh` - Latency issue analysis
+- `error-budget-alert.sh` - Budget alert response
+- Auto-classification of incidents by severity
+
+**🚀 One-Command Deployment:**
+```bash
+./slo/scripts/deploy-slo.sh
+```
+
+**📖 Full Documentation:** [SLO_IMPLEMENTATION.md](./slo/docs/SLO_IMPLEMENTATION.md)
 
 ---
 

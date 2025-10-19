@@ -43,6 +43,8 @@ spec:
           mountPath: /etc/grafana/provisioning/dashboards
         - name: grafana-dashboard-json
           mountPath: /var/lib/grafana/dashboards
+        - name: slo-dashboard-json
+          mountPath: /var/lib/grafana/slo-dashboards
         - name: grafana-storage
           mountPath: /var/lib/grafana
         resources:
@@ -62,6 +64,9 @@ spec:
       - name: grafana-dashboard-json
         configMap:
           name: grafana-dashboard-json
+      - name: slo-dashboard-json
+        configMap:
+          name: slo-dashboard-json
       - name: grafana-storage
         emptyDir: {}
 

@@ -1,0 +1,237 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-slo-alerts
+  namespace: monitoring-demo
+  labels:
+    app: prometheus
+    component: slo-alerts
+data:
+  slo-alerts.yaml: |
+    groups:
+    # ========================================================================
+    # SLO ALERTS - Multi-window burn rate alerts (Google SRE methodology)
+    # ========================================================================
+    - name: slo_availability_alerts
+      rules:
+      
+      # ------------------------------------------------------------------------
+      # CRITICAL: 15x burn rate (budget exhausted in 2 days)
+      # ------------------------------------------------------------------------
+      - alert: SLOAvailabilityCritical
+        expr: |
+          (
+            slo:availability:burn_rate_1h > 15
+          ) or (
+            slo:availability:burn_rate_6h > 6
+          )
+        for: 2m
+        labels:
+          severity: critical
+          category: availability
+          slo: "availability"
+          burn_rate: "15x"
+        annotations:
+          summary: "CRITICAL: Availability SLO burning through error budget at 15x rate"
+          description: |
+            Availability SLO is burning through error budget at {{ $value }}x rate.
+            At this rate, the 30-day error budget will be exhausted in ~2 days.
+            
+            Current availability: {{ printf "%.2f" (slo:availability:success_rate_30d * 100) }}%
+            Target: 99.5%
+            Error budget remaining: {{ printf "%.1f" (slo:availability:error_budget_remaining_30d * 100) }}%
+            
+            Action required: Immediate investigation and mitigation.
+          runbook_url: "https://github.com/your-org/project-monitoring-golang/blob/main/slo/runbooks/error-budget-alert.sh"
+      
+      # ------------------------------------------------------------------------
+      # WARNING: 4x burn rate (budget exhausted in 7 days)
+      # ------------------------------------------------------------------------
+      - alert: SLOAvailabilityWarning
+        expr: |
+          (
+            slo:availability:burn_rate_1h > 4
+          ) or (
+            slo:availability:burn_rate_6h > 2
+          )
+        for: 5m
+        labels:
+          severity: warning
+          category: availability
+          slo: "availability"
+          burn_rate: "4x"
+        annotations:
+          summary: "WARNING: Availability SLO burning through error budget at 4x rate"
+          description: |
+            Availability SLO is burning through error budget at {{ $value }}x rate.
+            At this rate, the 30-day error budget will be exhausted in ~7 days.
+            
+            Current availability: {{ printf "%.2f" (slo:availability:success_rate_30d * 100) }}%
+            Target: 99.5%
+            Error budget remaining: {{ printf "%.1f" (slo:availability:error_budget_remaining_30d * 100) }}%
+            
+            Monitor closely and investigate if trend continues.
+          runbook_url: "https://github.com/your-org/project-monitoring-golang/blob/main/slo/runbooks/error-budget-alert.sh"
+      
+      # ------------------------------------------------------------------------
+      # INFO: Error budget < 20%
+      # ------------------------------------------------------------------------
+      - alert: SLOAvailabilityBudgetLow
+        expr: |
+          slo:availability:error_budget_remaining_30d < 0.2
+        for: 1m
+        labels:
+          severity: info
+          category: availability
+          slo: "availability"
+          budget_remaining: "low"
+        annotations:
+          summary: "INFO: Availability error budget below 20%"
+          description: |
+            Availability error budget is running low.
+            
+            Budget remaining: {{ printf "%.1f" (slo:availability:error_budget_remaining_30d * 100) }}%
+            Time to exhaustion: {{ printf "%.1f" slo:availability:time_to_exhaustion_hours }} hours
+            
+            Consider pausing deployments or increasing monitoring.
+      
+      # ------------------------------------------------------------------------
+      # CRITICAL: Time to exhaustion < 24 hours
+      # ------------------------------------------------------------------------
+      - alert: SLOAvailabilityTimeToExhaustion
+        expr: |
+          slo:availability:time_to_exhaustion_hours < 24
+        for: 1m
+        labels:
+          severity: critical
+          category: availability
+          slo: "availability"
+          time_to_exhaustion: "critical"
+        annotations:
+          summary: "CRITICAL: Availability error budget will be exhausted in {{ printf "%.1f" slo:availability:time_to_exhaustion_hours }} hours"
+          description: |
+            Availability error budget is critically low and will be exhausted soon.
+            
+            Time to exhaustion: {{ printf "%.1f" slo:availability:time_to_exhaustion_hours }} hours
+            Budget remaining: {{ printf "%.1f" (slo:availability:error_budget_remaining_30d * 100) }}%
+            Current burn rate: {{ printf "%.1f" slo:availability:burn_rate_1h }}x
+            
+            IMMEDIATE ACTION REQUIRED: Stop deployments, investigate root cause.
+
+    # ========================================================================
+    # LATENCY SLO ALERTS
+    # ========================================================================
+    - name: slo_latency_alerts
+      rules:
+      
+      - alert: SLOLatencyCritical
+        expr: |
+          slo:latency:error_budget_remaining_30d < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          category: latency
+          slo: "latency"
+        annotations:
+          summary: "CRITICAL: Latency SLO error budget critically low"
+          description: |
+            Latency SLO error budget is critically low.
+            
+            Current latency success rate: {{ printf "%.2f" (slo:latency:success_rate_30d * 100) }}%
+            Target: 95.0%
+            Budget remaining: {{ printf "%.1f" (slo:latency:error_budget_remaining_30d * 100) }}%
+            
+            Investigate slow endpoints and performance issues.
+          runbook_url: "https://github.com/your-org/project-monitoring-golang/blob/main/slo/runbooks/diagnose-latency.sh"
+      
+      - alert: SLOLatencyWarning
+        expr: |
+          slo:latency:error_budget_remaining_30d < 0.3
+        for: 10m
+        labels:
+          severity: warning
+          category: latency
+          slo: "latency"
+        annotations:
+          summary: "WARNING: Latency SLO error budget running low"
+          description: |
+            Latency SLO error budget is running low.
+            
+            Current latency success rate: {{ printf "%.2f" (slo:latency:success_rate_30d * 100) }}%
+            Target: 95.0%
+            Budget remaining: {{ printf "%.1f" (slo:latency:error_budget_remaining_30d * 100) }}%
+            
+            Monitor latency trends and investigate performance issues.
+
+    # ========================================================================
+    # ERROR RATE SLO ALERTS
+    # ========================================================================
+    - name: slo_error_rate_alerts
+      rules:
+      
+      - alert: SLOErrorRateCritical
+        expr: |
+          slo:error_rate:error_budget_remaining_30d < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          category: error_rate
+          slo: "error_rate"
+        annotations:
+          summary: "CRITICAL: Error rate SLO error budget critically low"
+          description: |
+            Error rate SLO error budget is critically low.
+            
+            Current error rate success: {{ printf "%.2f" (slo:error_rate:success_rate_30d * 100) }}%
+            Target: 99.0%
+            Budget remaining: {{ printf "%.1f" (slo:error_rate:error_budget_remaining_30d * 100) }}%
+            
+            Investigate error patterns and root causes.
+      
+      - alert: SLOErrorRateWarning
+        expr: |
+          slo:error_rate:error_budget_remaining_30d < 0.3
+        for: 10m
+        labels:
+          severity: warning
+          category: error_rate
+          slo: "error_rate"
+        annotations:
+          summary: "WARNING: Error rate SLO error budget running low"
+          description: |
+            Error rate SLO error budget is running low.
+            
+            Current error rate success: {{ printf "%.2f" (slo:error_rate:success_rate_30d * 100) }}%
+            Target: 99.0%
+            Budget remaining: {{ printf "%.1f" (slo:error_rate:error_budget_remaining_30d * 100) }}%
+            
+            Monitor error trends and investigate issues.
+
+    # ========================================================================
+    # COMPOSITE SLO ALERTS (Multiple SLOs failing)
+    # ========================================================================
+    - name: slo_composite_alerts
+      rules:
+      
+      - alert: SLOCompositeCritical
+        expr: |
+          (
+            slo:availability:error_budget_remaining_30d < 0.2
+          ) and (
+            slo:latency:error_budget_remaining_30d < 0.3
+          )
+        for: 2m
+        labels:
+          severity: critical
+          category: composite
+          slo: "multiple"
+        annotations:
+          summary: "CRITICAL: Multiple SLOs failing simultaneously"
+          description: |
+            Multiple SLOs are failing simultaneously, indicating a systemic issue.
+            
+            Availability budget: {{ printf "%.1f" (slo:availability:error_budget_remaining_30d * 100) }}%
+            Latency budget: {{ printf "%.1f" (slo:latency:error_budget_remaining_30d * 100) }}%
+            
+            This suggests a fundamental problem affecting both reliability and performance.
+            IMMEDIATE ESCALATION REQUIRED.

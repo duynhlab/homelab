@@ -11,6 +11,10 @@ data:
       external_labels:
         cluster: 'kind-monitoring-demo'
 
+    # SLO recording rules and alerts
+    rule_files:
+      - "/etc/prometheus/slo-rules/*.yaml"
+
     scrape_configs:
       # Kubernetes API server
       - job_name: 'kubernetes-apiservers'

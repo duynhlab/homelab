@@ -33,6 +33,8 @@ spec:
           mountPath: /etc/prometheus
         - name: prometheus-storage
           mountPath: /prometheus
+        - name: slo-rules
+          mountPath: /etc/prometheus/slo-rules
         resources:
           requests:
             memory: "512Mi"
@@ -46,4 +48,7 @@ spec:
           name: prometheus-config
       - name: prometheus-storage
         emptyDir: {}
+      - name: slo-rules
+        configMap:
+          name: prometheus-slo-rules
 

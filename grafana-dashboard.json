@@ -2467,12 +2467,9 @@
   "schemaVersion": 38,
   "style": "dark",
   "tags": [
-    "golang",
     "prometheus",
     "monitoring",
-    "rest-api",
-    "kubernetes",
-    "apdex"
+    "kubernetes"
   ],
   "templating": {
     "list": [
@@ -2647,8 +2644,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Go REST API Monitoring",
-  "uid": "go-monitoring-demo",
+  "title": "Microservices Monitoring & Performance Applications",
+  "uid": "microservices-monitoring-001",
   "version": 1,
   "weekStart": ""
 }

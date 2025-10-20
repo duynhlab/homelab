@@ -1,42 +1,45 @@
 # Go REST API Monitoring Demo
 
-**Complete monitoring solution with 25 Grafana panels** - Kubernetes-ready with Prometheus & Grafana
+**Complete monitoring solution with 32 Grafana panels in 5 row groups** - Kubernetes-ready with Prometheus & Grafana
 
 ---
 
 ## 🎯 What You Get
 
-### 25 Grafana Dashboard Panels
+### 32 Panels Organized in 5 Row Groups
 
-**Performance Metrics (8 panels)**
+**📊 Row 1: Overview & Key Metrics (12 panels)**
 - Response time percentiles (P50, P95, P99)
-- RPS (Requests Per Second)
-- Total requests
+- Total RPS, Success RPS (2xx), Error RPS (4xx/5xx)
+- Success Rate % & Error Rate %
 - Apdex Score
-- Latency trends by endpoint
-- Response time heatmaps
+- Total Requests, Up Instances, Restarts
 
-**Traffic Analysis (6 panels)**
-- Status code distribution
-- Requests by endpoint
-- RPS per pod
-- Traffic patterns
-- 🆕 **Request Rate by HTTP Method + Endpoint** - Detailed breakdown by GET/POST/PUT/DELETE
-- 🆕 **Error Rate by HTTP Method + Endpoint** - Pinpoint exact failing methods
+**🚀 Row 2: Traffic & Requests (4 panels)**
+- Status code distribution (pie chart)
+- Requests by endpoint (pie chart)
+- Request Rate by Endpoint (time series)
+- RPS by Endpoint
 
-**Resource Monitoring (6 panels)**
-- Memory usage (Go heap)
-- CPU usage
+**⚠️ Row 3: Errors & Performance (5 panels)**
+- Request Rate by HTTP Method + Endpoint
+- Error Rate by HTTP Method + Endpoint
+- Response time per endpoint (P95, P50, P99)
+
+**🔧 Row 4: Go Runtime & Memory (6 panels) - Memory Leak Detection**
+- 🆕 **Heap Allocated Memory** - Detect heap memory leaks
+- 🆕 **Heap In-Use Memory** - Monitor heap usage baseline
+- 🆕 **Process Memory (RSS)** - OS-level memory tracking
+- Goroutines & Threads - Detect goroutine leaks
+- GC Duration - Monitor GC performance
+- 🆕 **GC Frequency** - Track GC pressure
+
+**🖥️ Row 5: Resources & Infrastructure (5 panels)**
+- Memory usage per pods
+- CPU usage per pods
 - Network I/O
-- Go routines & threads
-- GC performance
-- Memory allocations
-
-**Reliability (5 panels)**
-- Up instances
-- Pod restarts
 - Requests in flight
-- Error rates
+- Memory allocations
 
 ---
 
@@ -103,6 +106,36 @@ Open Grafana → **"Go REST API Monitoring - Demo"** dashboard is auto-loaded!
 - Frequent restarts
 - Memory leak
 
+### 🔬 Memory Leak Detection
+
+**Row 4: Go Runtime & Memory** provides comprehensive leak detection with 6 panels:
+
+**Detection Strategy:**
+
+1. **Check Heap Metrics (3 panels):**
+   - Heap Allocated ↑ continuously? 
+   - Heap In-Use ↑ not returning to baseline?
+   - Process RSS ↑ continuously?
+   → All 3 increasing = **Heap Memory Leak**
+
+2. **Check Goroutines (1 panel):**
+   - Goroutines ↑ continuously?
+   → **Goroutine Leak** (forgotten defer, unclosed channels)
+
+3. **Check GC Metrics (2 panels):**
+   - GC Duration + GC Frequency both ↑?
+   → If heap also ↑ = **Leak confirmed**
+   → If heap stable = **High load** (not a leak)
+
+**Quick Decision Matrix:**
+
+| Heap | Goroutines | GC | Diagnosis |
+|------|------------|-----|-----------|
+| ↑↑↑ | → | ↑↑ | **Heap Memory Leak** |
+| →/↑ | ↑↑↑ | → | **Goroutine Leak** |
+| ↑↓ | ↑↓ | ↑↑ | **High Load** (OK) |
+| → | → | → | **Healthy** |
+
 ---
 
 ## 🔍 Understanding the Metrics
@@ -141,8 +174,7 @@ Automatically exposed by `prometheus/client_golang`:
 - `go_gc_duration_seconds` - GC pause times
 - `process_cpu_seconds_total` - CPU time
 
-**📖 For detailed metrics documentation, see [docs/METRICS.md](./docs/METRICS.md)**  
-**🆕 NEW: HTTP Method dimension panels - see [docs/NEW_METHOD_PANELS.md](./docs/NEW_METHOD_PANELS.md)**
+**📖 For detailed metrics documentation, see [docs/METRICS.md](./docs/METRICS.md)**
 
 ---
 
@@ -185,7 +217,7 @@ kubectl create job --from=cronjob/demo-loadtest manual-test-$(date +%s) -n monit
        │
 ┌──────▼──────────┐
 │    Grafana      │ ← Queries Prometheus
-│   (1 pod)       │   Displays 23 panels
+│   (1 pod)       │   Displays 32 panels in 5 row groups
 └─────────────────┘
 ```
 
@@ -200,7 +232,7 @@ kubectl create job --from=cronjob/demo-loadtest manual-test-$(date +%s) -n monit
 
 | Document | Description |
 |----------|-------------|
-| **[METRICS.md](./docs/METRICS.md)** | ⭐ **Complete guide với phân tích chi tiết tất cả 25 panels** (bao gồm HTTP Method panels, namespace support) |
+| **[METRICS.md](./docs/METRICS.md)** | ⭐ **Complete guide với phân tích chi tiết tất cả 32 panels** (5 row groups, memory leak detection) |
 | **[K6_LOAD_TESTING.md](./docs/K6_LOAD_TESTING.md)** | 🚀 **k6 continuous load generator setup & configuration** |
 | **[SLO_IMPLEMENTATION.md](./slo/docs/SLO_IMPLEMENTATION.md)** | 🎯 **SRE practices: SLI/SLO definitions, error budgets, burn rate alerts** |
 | **[PROMETHEUS_RATE_EXPLAINED.md](./docs/PROMETHEUS_RATE_EXPLAINED.md)** | 📊 Chi tiết về `rate()`, `increase()` và counter resets |

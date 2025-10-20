@@ -2,7 +2,7 @@
 
 ## Tổng Quan
 
-Dự án này expose **6 custom application metrics** và tận dụng **Go runtime metrics** để cung cấp **25 Grafana dashboard panels** cho việc giám sát toàn diện.
+Dự án này expose **6 custom application metrics** và tận dụng **Go runtime metrics** để cung cấp **32 Grafana dashboard panels trong 5 row groups** cho việc giám sát toàn diện, bao gồm phát hiện memory leak.
 
 ---
 
@@ -95,9 +95,9 @@ Dự án này expose **6 custom application metrics** và tận dụng **Go runt
 
 ---
 
-## 26 Dashboard Panels - Phân Tích Chi Tiết
+## 32 Dashboard Panels trong 5 Row Groups - Phân Tích Chi Tiết
 
-### 📊 Hàng 1: Chỉ Số Hiệu Suất Chính (9 Stat Panels)
+### 📊 Row 1: Overview & Key Metrics (12 Stat Panels)
 
 #### 1. **Response Time - p50 (median)**
 
@@ -625,9 +625,152 @@ sum(go_memstats_frees_total{app=~"$app", namespace=~"$namespace"}) by (app)
 
 ---
 
-### 🔧 Hàng 4: Hiệu Suất Go Runtime (3 Panels)
+### 🔧 Row 4: Go Runtime & Memory (6 Panels) - Memory Leak Detection
 
-#### 19. **Go GC Performance**
+**Mục đích:** Phát hiện memory leak toàn diện với 3 nhóm metrics: Memory Heap, Goroutines, và GC Performance
+
+#### Sub-group 1: 💾 Memory Heap (3 panels MỚI)
+
+#### 19. **Heap Allocated Memory** 🆕
+
+**Query:**
+```promql
+sum(go_memstats_alloc_bytes{app=~"$app", namespace=~"$namespace"}) by (app)
+```
+
+**Phân tích:**
+- **Ý nghĩa:** Memory hiện tại được allocated trên heap (bytes)
+- **Nguồn:** Go runtime metrics (`go_memstats_alloc_bytes`)
+- **Loại panel:** Time series
+- **Legend:** `{{app}}` (aggregated by app)
+- **Aggregation:** ✅ `sum(...) by (app)` - Tổng heap memory của tất cả pods trong 1 app
+- **Unit:** bytes
+- **Memory Leak Pattern:**
+  - ✅ **Healthy:** Tăng giảm theo pattern (sawtooth), giảm sau GC
+  - ⚠️ **Warning:** Tăng dần, baseline tăng cao dần sau mỗi GC
+  - 🔴 **Leak:** Tăng liên tục không giảm, đường thẳng lên
+- **Use case:**
+  - **Bằng chứng chính** của heap memory leak
+  - Theo dõi sau GC - nếu không drop xuống → leak
+  - Correlate với GC frequency và duration
+- **Mong đợi:**
+  - Normal: 20-50 MiB với pattern lên xuống
+  - Leak: Tăng từ 50 MiB → 100 MiB → 200 MiB liên tục
+
+---
+
+#### 20. **Heap In-Use Memory** 🆕
+
+**Query:**
+```promql
+sum(go_memstats_heap_inuse_bytes{app=~"$app", namespace=~"$namespace"}) by (app)
+```
+
+**Phân tích:**
+- **Ý nghĩa:** Heap memory đang được app sử dụng (bytes)
+- **Nguồn:** Go runtime metrics (`go_memstats_heap_inuse_bytes`)
+- **Loại panel:** Time series
+- **Legend:** `{{app}}` (aggregated by app)
+- **Aggregation:** ✅ `sum(...) by (app)`
+- **Unit:** bytes
+- **So sánh với Heap Allocated:**
+  - `heap_inuse` ≥ `alloc` (inuse bao gồm fragmentation)
+  - `heap_inuse` là heap **thực tế giữ**, `alloc` là **đang dùng**
+- **Memory Leak Pattern:**
+  - ✅ **Healthy:** Về baseline sau GC (ví dụ: 30 MiB baseline)
+  - ⚠️ **Warning:** Baseline tăng dần: 30 MiB → 40 MiB → 50 MiB
+  - 🔴 **Leak:** Không giảm về baseline, tăng liên tục
+- **Use case:**
+  - Xác nhận leak khi `alloc` tăng
+  - Phát hiện **memory fragmentation** (inuse >> alloc)
+  - Monitor heap capacity usage
+- **Mong đợi:**
+  - Healthy: Baseline ổn định (30-40 MiB)
+  - Leak: Baseline tăng liên tục
+
+---
+
+#### 21. **Process Memory (RSS)** 🆕
+
+**Query:**
+```promql
+sum(process_resident_memory_bytes{app=~"$app", namespace=~"$namespace"}) by (app)
+```
+
+**Phân tích:**
+- **Ý nghĩa:** Tổng physical memory (RAM) mà process đang dùng
+- **Nguồn:** Process metrics (`process_resident_memory_bytes`)
+- **Loại panel:** Time series
+- **Legend:** `{{app}}` (aggregated by app)
+- **Aggregation:** ✅ `sum(...) by (app)`
+- **Unit:** bytes
+- **So sánh với Heap metrics:**
+  - `process_resident` > `heap_inuse` (bao gồm stack, Go runtime, off-heap)
+  - RSS = Heap + Stack + Go runtime + CGO memory
+- **Memory Leak Pattern:**
+  - ✅ **Healthy:** Ổn định hoặc tăng/giảm nhẹ (< 20%)
+  - ⚠️ **Warning:** Tăng dần theo thời gian (VD: 100 MB → 150 MB → 200 MB)
+  - 🔴 **Leak:** Tăng liên tục không dừng, risk OOMKilled
+- **Use case:**
+  - **Bằng chứng vật lý** ở OS level
+  - Phát hiện leak cả heap + off-heap (CGO, mmap)
+  - Monitor OOM risk (so với pod memory limits)
+  - Detect memory leak không phải từ Go heap
+- **Mong đợi:**
+  - Normal: 100-200 MiB, ổn định
+  - Leak: Tăng liên tục, tiến tới memory limit
+- **⚠️ OOM Risk:**
+  - Nếu RSS → pod memory limit (ví dụ: 512 MiB) → OOMKilled sắp xảy ra
+
+---
+
+#### Sub-group 2: 🧵 Goroutines (1 panel - IMPROVED)
+
+#### 22. **Goroutines & Threads** ♻️ (Improved)
+
+**Query:**
+```promql
+# Goroutines
+sum(go_goroutines{app=~"$app", namespace=~"$namespace"}) by (app)
+
+# OS Threads
+sum(go_threads{app=~"$app", namespace=~"$namespace"}) by (app)
+```
+
+**Phân tích:**
+- **Ý nghĩa:** Số goroutines và OS threads đang chạy
+- **Nguồn:** Go runtime metrics
+- **Loại panel:** Time series với 2 queries
+- **Legend:**
+  - `{{app}} Goroutines` → lightweight Go concurrency (aggregated)
+  - `{{app}} Threads` → actual OS threads (aggregated)
+- **Aggregation:** ✅ `sum(...) by (app)` - Tổng goroutines/threads của tất cả pods
+- **Goroutine Leak Pattern:**
+  - ✅ **Healthy:** Ổn định, dao động theo load (50-200)
+  - ⚠️ **Warning:** Tăng dần nhưng chậm (200 → 500 → 1000)
+  - 🔴 **Leak:** Tăng liên tục không dừng (1000 → 5000 → 10,000+)
+- **Nguyên nhân Goroutine Leak:**
+  - Quên `defer cancel()` khi dùng context
+  - Channel không được close
+  - Goroutine chờ channel/lock vô hạn
+  - HTTP client requests không có timeout
+- **Use case:**
+  - **Phát hiện goroutine leak** (leak pattern quan trọng)
+  - Monitor concurrent request handling capacity
+  - Detect blocking operations
+- **Mong đợi:**
+  - Goroutines: 10-200 (normal REST API under load)
+  - Threads: 5-15 (thấp hơn nhiều so với goroutines)
+- **Cảnh báo:**
+  - Goroutines > 10,000 → **Goroutine leak confirmed**
+  - Threads tăng liên tục → thread leak (rare)
+- **Description (Updated):** "Goroutine and OS thread count. Steadily increasing goroutines indicates goroutine leak (forgotten defer, unclosed channels). Stable count is normal."
+
+---
+
+#### Sub-group 3: 🗑️ Garbage Collection (2 panels)
+
+#### 23. **GC Duration** ♻️ (Improved)
 
 **Query:**
 ```promql
@@ -640,20 +783,59 @@ sum(increase(go_gc_duration_seconds_sum{app=~"$app", namespace=~"$namespace"}[5m
 - **Loại panel:** Time series
 - **Legend:** `{{app}}` (aggregated)
 - **Aggregation:** ✅ `sum(...) by (app)` - Tổng GC time của tất cả pods
-  - **Lý do:** GC overhead ảnh hưởng **toàn bộ service performance**
-  - **Ví dụ:** V1 có 3 pods → Show tổng GC time để đánh giá service health
-  - **Use case:** Identify GC pressure, optimize memory usage
-- **Mong đợi:**
-  - Tốt: < 0.001s (1ms)
-  - Cảnh báo: > 0.01s (10ms)
-  - Xấu: > 0.1s (100ms) - GC pause ảnh hưởng performance
+- **GC Duration Pattern:**
+  - ✅ **Healthy:** < 0.001s (1ms), ổn định
+  - ⚠️ **Warning:** 0.001-0.01s (1-10ms), tăng dần
+  - 🔴 **High Pressure:** > 0.01s (10ms+), GC pause ảnh hưởng latency
+- **Correlate với Memory Leak:**
+  - GC Duration ↑ + Heap Allocated ↑ = **Heap memory leak**
+  - GC Duration ↑ + Heap Allocated ổn định = **High load** (not leak)
 - **Use case:**
-  - Theo dõi GC overhead
-  - Phát hiện nếu GC quá nhiều (memory pressure)
+  - Monitor GC overhead impact on performance
+  - Confirm leak khi correlate với heap metrics
+  - Identify memory pressure requiring optimization
+- **Mong đợi:**
+  - Normal: < 0.001s với heap ổn định
+  - Leak: > 0.01s với heap tăng liên tục
+- **Description (Updated):** "GC pause duration. High values indicate memory pressure. Increases when heap is large."
 
 ---
 
-#### 20. **Go Routines**
+#### 24. **GC Frequency** 🆕
+
+**Query:**
+```promql
+sum(rate(go_gc_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[5m])) by (app)
+```
+
+**Phân tích:**
+- **Ý nghĩa:** Số lần GC chạy mỗi giây
+- **Nguồn:** Go runtime metrics (`go_gc_duration_seconds_count`)
+- **Loại panel:** Time series
+- **Legend:** `{{app}}` (aggregated by app)
+- **Aggregation:** ✅ `sum(...) by (app)`
+- **Unit:** GC runs per second
+- **GC Frequency Pattern:**
+  - ✅ **Healthy:** 0.1-0.5 GC/s (GC mỗi 2-10 giây)
+  - ⚠️ **Warning:** 0.5-1 GC/s (GC mỗi 1-2 giây)
+  - 🔴 **High Pressure:** > 1 GC/s (GC liên tục)
+- **Correlate với Memory Leak:**
+  - GC Frequency ↑ + Heap ↑ = **Memory leak** (GC cố free memory nhưng không được)
+  - GC Frequency ↑ + Heap ổn định = **High allocation rate** (not leak, cần optimize)
+- **Use case:**
+  - Phát hiện memory pressure sớm
+  - Confirm heap leak pattern
+  - Optimize allocation strategy nếu GC quá thường xuyên
+- **Mong đợi:**
+  - Normal: 0.1-0.3 GC/s
+  - Leak: > 1 GC/s với heap không giảm
+- **Description:** "GC runs per second. High frequency indicates memory pressure or insufficient heap size."
+
+---
+
+### 🖥️ Row 5: Resources & Infrastructure (5 Panels)
+
+#### 25. **Memory usage per pods**
 
 **Query:**
 ```promql
@@ -915,6 +1097,249 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$r
 - **Khuyến nghị:**
   - High traffic: 1m-5m (responsive, real-time)
   - Low traffic: 30m-1h (smoother, less noise)
+
+---
+
+## 🔬 Memory Leak Detection Strategy
+
+**Row 4 (Go Runtime & Memory)** cung cấp 6 panels để phát hiện memory leak một cách chính xác và toàn diện.
+
+### Workflow: Phát hiện Memory Leak
+
+#### **Step 1: Check Memory Heap Panels (3 panels)**
+
+Xem 3 panels:
+- **Heap Allocated** - Tăng liên tục?
+- **Heap In-Use** - Tăng không về baseline sau GC?
+- **Process RSS** - Tăng liên tục?
+
+**Decision:**
+```
+Nếu CẢ 3 đều tăng đều = 🔴 HEAP MEMORY LEAK
+```
+
+**Ví dụ Heap Leak:**
+```
+Time      | Heap Alloc | Heap InUse | Process RSS
+----------|------------|------------|------------
+10:00     | 50 MiB     | 55 MiB     | 120 MiB
+10:30     | 80 MiB     | 90 MiB     | 180 MiB
+11:00     | 110 MiB    | 120 MiB    | 240 MiB
+11:30     | 140 MiB    | 150 MiB    | 300 MiB ← Tăng liên tục
+
+Diagnosis: HEAP MEMORY LEAK ✅
+```
+
+---
+
+#### **Step 2: Check Goroutines Panel (1 panel)**
+
+Xem 1 panel:
+- **Goroutines & Threads** - Goroutines tăng liên tục không giảm?
+
+**Decision:**
+```
+Nếu Goroutines tăng liên tục = 🔴 GOROUTINE LEAK
+```
+
+**Ví dụ Goroutine Leak:**
+```
+Time      | Goroutines | Threads
+----------|------------|--------
+10:00     | 120        | 12
+10:30     | 500        | 14
+11:00     | 1,200      | 16
+11:30     | 5,000      | 18 ← Tăng không dừng
+
+Diagnosis: GOROUTINE LEAK ✅
+Likely cause: Forgotten defer cancel(), unclosed channels
+```
+
+---
+
+#### **Step 3: Check GC Panels (2 panels)**
+
+Xem 2 panels:
+- **GC Duration** - Tăng cao?
+- **GC Frequency** - Tăng cao?
+
+**Decision:**
+```
+Nếu cả 2 tăng + Heap tăng = 🔴 Heap leak
+Nếu cả 2 tăng + Heap OK   = ⚠️ High load (không phải leak)
+```
+
+**Ví dụ GC confirming Heap Leak:**
+```
+Time      | Heap Alloc | GC Duration | GC Frequency
+----------|------------|-------------|-------------
+10:00     | 50 MiB     | 0.001s      | 0.2 GC/s
+10:30     | 100 MiB    | 0.005s      | 0.5 GC/s
+11:00     | 150 MiB    | 0.010s      | 1.0 GC/s
+11:30     | 200 MiB    | 0.015s      | 1.5 GC/s ← GC tăng nhưng không free được memory
+
+Diagnosis: Heap leak + GC không thể free ✅
+```
+
+**Ví dụ High Load (NOT leak):**
+```
+Time      | Heap Alloc | GC Duration | GC Frequency
+----------|------------|-------------|-------------
+10:00     | 40 MiB     | 0.001s      | 0.3 GC/s
+10:30     | 45 MiB     | 0.008s      | 0.8 GC/s
+11:00     | 42 MiB     | 0.006s      | 0.7 GC/s
+11:30     | 44 MiB     | 0.005s      | 0.6 GC/s ← Heap stable, GC temporary spike
+
+Diagnosis: High load period, NOT leak ✅
+```
+
+---
+
+### Decision Matrix: Leak Detection
+
+| Heap | Goroutines | GC | Diagnosis | Action |
+|------|------------|-----|-----------|--------|
+| ↑↑↑ | → | ↑↑ | **Heap Memory Leak** | Check code for: data structures holding references, global caches, unclosed resources |
+| →/↑ | ↑↑↑ | → | **Goroutine Leak** | Check code for: forgotten `defer cancel()`, unclosed channels, blocking operations |
+| ↑↓ | ↑↓ | ↑↑ | **High Load** (OK) | Normal - traffic increased, app handling load |
+| → | → | → | **Healthy** | No action needed |
+
+---
+
+### Common Leak Causes & Fixes
+
+#### **1. Heap Memory Leak**
+
+**Causes:**
+- Global maps/slices growing indefinitely
+- Cache without eviction policy
+- HTTP client không reuse connections
+- Unclosed file descriptors
+
+**Example Leak Code:**
+```go
+// ❌ BAD: Global cache growing forever
+var userCache = make(map[string]*User)
+
+func GetUser(id string) *User {
+    if user, ok := userCache[id]; ok {
+        return user
+    }
+    user := fetchUserFromDB(id)
+    userCache[id] = user  // ← Never removed!
+    return user
+}
+```
+
+**Fixed Code:**
+```go
+// ✅ GOOD: LRU cache with size limit
+var userCache = lru.New(1000)  // Max 1000 items
+
+func GetUser(id string) *User {
+    if val, ok := userCache.Get(id); ok {
+        return val.(*User)
+    }
+    user := fetchUserFromDB(id)
+    userCache.Add(id, user)  // ← Auto evicts old entries
+    return user
+}
+```
+
+---
+
+#### **2. Goroutine Leak**
+
+**Causes:**
+- Context không cancel
+- Channel không close
+- HTTP request không timeout
+- Goroutine chờ vô hạn
+
+**Example Leak Code:**
+```go
+// ❌ BAD: Goroutine leak
+func ProcessUsers() {
+    ctx := context.Background()
+    for _, user := range users {
+        go func(u User) {
+            // Goroutine chạy mãi, không bao giờ exit!
+            for {
+                select {
+                case <-ctx.Done():
+                    return  // ← ctx.Done() never called
+                default:
+                    processUser(u)
+                    time.Sleep(1 * time.Second)
+                }
+            }
+        }(user)
+    }
+}
+```
+
+**Fixed Code:**
+```go
+// ✅ GOOD: Proper context cancellation
+func ProcessUsers() {
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()  // ← Ensures all goroutines exit
+    
+    for _, user := range users {
+        go func(u User) {
+            for {
+                select {
+                case <-ctx.Done():
+                    return  // ← Now properly exits
+                default:
+                    processUser(u)
+                    time.Sleep(1 * time.Second)
+                }
+            }
+        }(user)
+    }
+}
+```
+
+---
+
+### Monitoring Best Practices
+
+1. **Set up alerts:**
+   ```yaml
+   # Alert when heap grows > 500MB
+   - alert: HeapMemoryLeak
+     expr: go_memstats_alloc_bytes > 500_000_000
+     for: 30m
+     annotations:
+       summary: "Potential heap memory leak detected"
+   
+   # Alert when goroutines > 10,000
+   - alert: GoroutineLeak
+     expr: go_goroutines > 10000
+     for: 15m
+     annotations:
+       summary: "Goroutine leak detected"
+   ```
+
+2. **Monitor trends over days/weeks:**
+   - Set time range to 7d or 30d
+   - Check if baseline is increasing
+
+3. **Correlate metrics:**
+   - Heap ↑ + GC ↑ = Leak likely
+   - Goroutines ↑ + Requests ↑ = Normal (if proportional)
+
+4. **Use pprof when leak detected:**
+   ```bash
+   # Get heap profile
+   curl http://localhost:6060/debug/pprof/heap > heap.prof
+   go tool pprof -http=:8080 heap.prof
+   
+   # Get goroutine profile
+   curl http://localhost:6060/debug/pprof/goroutine > goroutine.prof
+   go tool pprof -http=:8080 goroutine.prof
+   ```
 
 ---
 

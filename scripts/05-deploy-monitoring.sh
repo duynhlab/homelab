@@ -34,7 +34,7 @@ echo ""
 echo -e "${GREEN}=== Monitoring Stack Status ===${NC}"
 kubectl get pods -n monitoring
 kubectl get svc -n monitoring
-kubectl get servicemonitor -n monitoring
+# kubectl get servicemonitor -n monitoring
 
 echo ""
 echo -e "${GREEN}✓ Monitoring stack deployed successfully!${NC}"

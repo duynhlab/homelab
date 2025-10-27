@@ -27,7 +27,7 @@ fi
 
 # Create cluster
 echo -e "${GREEN}Creating Kind cluster with 3 nodes...${NC}"
-kind create cluster --config kind/cluster-config.yaml
+kind create cluster --config ./kind/cluster-config.yaml
 
 # Wait for cluster to be ready
 echo -e "${YELLOW}Waiting for cluster to be ready...${NC}"

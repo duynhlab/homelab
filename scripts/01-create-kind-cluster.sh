@@ -20,9 +20,9 @@ if ! command -v kind &> /dev/null; then
 fi
 
 # Delete existing cluster if exists
-if kind get clusters | grep -q monitoring-demo; then
+if kind get clusters | grep -q monitoring-local; then
     echo -e "${YELLOW}Deleting existing cluster...${NC}"
-    kind delete cluster --name monitoring-demo
+    kind delete cluster --name monitoring-local
 fi
 
 # Create cluster

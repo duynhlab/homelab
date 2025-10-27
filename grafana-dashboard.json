@@ -1220,14 +1220,14 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", code=~\"4..|5..\"}[$rate])) by (method, path) / sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}[$rate])) by (method, path)) * 100",
+          "expr": "(sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", code=~\"4..|5..\"}[$rate])) by (method, path) / sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}[$rate])) by (method, path)) * 100 > 0",
           "legendFormat": "{{method}} {{path}}",
           "refId": "A"
         }
       ],
       "title": "Error Rate by Method and Endpoint",
       "type": "timeseries",
-      "description": "Percentage of 4xx and 5xx responses among all responses, grouped by HTTP method and endpoint. Quickly pinpoint which method-endpoint combinations have high error rates."
+      "description": "Percentage of 4xx/5xx errors by HTTP method and endpoint. Only displays combinations with error rate > 0%. Use this to quickly identify problematic endpoints."
     },
     {
       "datasource": {
@@ -2030,7 +2030,7 @@
       },
       "id": 104,
       "panels": [],
-      "title": "🖥️ Resources & Infrastructure",
+      "title": "🖥️ Resources & Infrastructure (Service-Level)",
       "type": "row"
     },
     {
@@ -2114,9 +2114,9 @@
           "refId": "A"
         }
       ],
-      "title": "Memory usage per pods",
+      "title": "Total Memory per Service",
       "type": "timeseries",
-      "description": "Memory allocation by app. Monitor for leaks and OOM risk."
+      "description": "Total memory allocated by ALL pods in the service (aggregated). Example: user-service with 2 pods shows sum of both pods. Use for capacity planning and cost analysis."
     },
     {
       "datasource": {
@@ -2199,9 +2199,9 @@
           "refId": "A"
         }
       ],
-      "title": "CPU usage per pods",
+      "title": "Total CPU per Service",
       "type": "timeseries",
-      "description": "CPU usage by app. Indicates load and scaling needs."
+      "description": "Total CPU usage by ALL pods in the service (aggregated). Use for scaling decisions: 'Should we add more pods?' Higher values indicate need for horizontal scaling."
     },
     {
       "datasource": {
@@ -2288,9 +2288,9 @@
           "refId": "B"
         }
       ],
-      "title": "Total Network Traffic",
+      "title": "Total Network Traffic per Service",
       "type": "timeseries",
-      "description": "Network I/O by app. Detects bandwidth usage and anomalies."
+      "description": "Total HTTP traffic (TX/RX) by ALL pods in the service. Use for bandwidth planning and cost estimation. Note: Only HTTP body size, not TCP/IP overhead."
     },
     {
       "datasource": {
@@ -2373,9 +2373,9 @@
           "refId": "A"
         }
       ],
-      "title": "Requests In Flight",
+      "title": "Total Requests In Flight per Service",
       "type": "timeseries",
-      "description": "Requests currently processing. High values signal slow processing or traffic surge."
+      "description": "Total concurrent requests being processed by ALL pods in the service. High values indicate saturation (4 Golden Signals). Use to detect bottlenecks and validate service capacity."
     },
     {
       "datasource": {
@@ -2458,9 +2458,9 @@
           "refId": "A"
         }
       ],
-      "title": "Memory Allocations",
+      "title": "Total Memory Allocations per Service",
       "type": "timeseries",
-      "description": "Memory churn rate by app. High rate indicates inefficient memory usage."
+      "description": "Total memory frees by ALL pods in the service. Indicates GC activity. Use with GC Duration panel to detect memory pressure or allocation issues."
     }
   ],
   "refresh": false,
@@ -2505,7 +2505,7 @@
         "hide": 0,
         "includeAll": true,
         "label": "App",
-        "multi": false,
+        "multi": true,
         "name": "app",
         "options": [],
         "query": "label_values(request_duration_seconds_count, app)",
@@ -2513,7 +2513,8 @@
         "regex": "",
         "skipUrlSync": false,
         "sort": 0,
-        "type": "query"
+        "type": "query",
+        "allValue": ".*"
       },
       {
         "current": {
@@ -2527,9 +2528,9 @@
         },
         "definition": "label_values(kube_pod_info, namespace)",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "Namespace",
-        "multi": false,
+        "multi": true,
         "name": "namespace",
         "options": [],
         "query": "label_values(kube_pod_info, namespace)",
@@ -2537,7 +2538,8 @@
         "regex": "/^(?!kube-|default$).*/",
         "skipUrlSync": false,
         "sort": 0,
-        "type": "query"
+        "type": "query",
+        "allValue": ".*"
       },
       {
         "current": {

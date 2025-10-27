@@ -1,6 +1,6 @@
-# Go REST API Monitoring Demo
+# Microservices Monitoring & Performance Applications
 
-**Complete monitoring solution with 32 Grafana panels in 5 row groups** - Kubernetes-ready with Prometheus & Grafana
+**Complete microservices monitoring solution with 32 Grafana panels in 5 row groups** - Kubernetes-ready with Prometheus & Grafana
 
 ---
 
@@ -43,24 +43,82 @@
 
 ---
 
+## 🏗️ Architecture
+
+### Microservices (9 Services)
+- **auth-service** - Authentication API (`/api/v1/auth/*`, `/api/v2/auth/*`)
+- **user-service** - User management API (`/api/v1/users/*`, `/api/v2/users/*`)
+- **product-service** - Product catalog API (`/api/v1/products/*`, `/api/v2/catalog/*`)
+- **cart-service** - Shopping cart API (`/api/v1/cart/*`, `/api/v2/carts/*`)
+- **order-service** - Order management API (`/api/v1/orders/*`, `/api/v2/orders/*`)
+- **review-service** - Product reviews API (`/api/v1/reviews/*`, `/api/v2/reviews/*`)
+- **notification-service** - Notifications API (`/api/v1/notify/*`, `/api/v2/notifications/*`)
+- **shipping-service** - Shipping tracking API (`/api/v1/shipping/*`)
+- **shipping-service-v2** - Enhanced shipping API (`/api/v2/shipments/*`)
+
+### Monitoring Stack
+- **Prometheus** - Metrics collection & storage
+- **Grafana** - Visualization & dashboards
+- **k6** - Load testing & performance validation
+
 ## 🚀 Quick Start
 
-### Deploy (5 minutes)
+### Step-by-Step Deployment
 
 ```bash
 git clone <repo-url>
 cd project-monitoring-golang
 
-# One command to deploy everything
-./scripts/deploy-all.sh
+# Make scripts executable
+chmod +x scripts/*.sh
+
+# Step 1: Create Kind cluster
+./scripts/01-create-kind-cluster.sh
+
+# Step 2: Install metrics infrastructure
+./scripts/02-install-metrics.sh
+
+# Step 3: Build microservices (IMPORTANT: Must build before deploy)
+./scripts/03-build-microservices.sh
+
+# Step 4: Deploy microservices
+./scripts/04-deploy-microservices.sh
+
+# Step 5: Deploy monitoring stack
+./scripts/05-deploy-monitoring.sh
+
+# Step 6: Deploy k6 load testing
+./scripts/06-deploy-k6-testing.sh
+
+# Step 7: Setup access (port forwarding)
+./scripts/07-setup-access.sh
 ```
 
-### Access
+### Access Services
+
+```bash
+# Port-forward all services
+kubectl port-forward -n monitoring-demo svc/user-service-v1 8081:8080 &
+kubectl port-forward -n monitoring-demo svc/product-service-v1 8082:8080 &
+kubectl port-forward -n monitoring-demo svc/checkout-service-v1 8083:8080 &
+kubectl port-forward -n monitoring-demo svc/order-service-v2 8084:8080 &
+kubectl port-forward -n monitoring-demo svc/unified-service-v3 8085:8080 &
+
+# Access monitoring
+kubectl port-forward -n monitoring-demo svc/grafana 3000:3000 &
+kubectl port-forward -n monitoring-demo svc/prometheus 9090:9090 &
+```
+
+### Access URLs
 
 ```
 📊 Grafana:    http://localhost:3000 (admin/admin)
 📈 Prometheus: http://localhost:9090
-🔧 API:        http://localhost:8080
+🔧 User API:   http://localhost:8081/api/v1/users
+🔧 Product API: http://localhost:8082/api/v1/products
+🔧 Checkout API: http://localhost:8083/api/v1/checkout
+🔧 Order API:  http://localhost:8084/api/v2/orders
+🔧 Unified API: http://localhost:8085/api/v3/*
 ```
 
 ### View Dashboard
@@ -239,6 +297,9 @@ kubectl create job --from=cronjob/demo-loadtest manual-test-$(date +%s) -n monit
 | **[TIME_RANGE_AND_RATE_INTERVAL.md](./docs/TIME_RANGE_AND_RATE_INTERVAL.md)** | ⏱️ **Time Range vs Rate Interval: Hướng dẫn chi tiết về Time Range và $rate variable** |
 | **[SETUP.md](./docs/SETUP.md)** | Step-by-step deployment guide |
 | **[VARIABLES_REGEX.md](./docs/VARIABLES_REGEX.md)** | 🎯 Dashboard variables & regex patterns |
+| **[AGENT.md](./AGENT.md)** | 🤖 **AI Agent Documentation: Project overview for AI agents** |
+| **[Claude Commands](./.claude/commands/)** | 📋 **AI workflow commands: plan, implement, analyze, review, deploy, document** |
+| **[Cursor Rules](./.cursor/rules/)** | 🔧 **Development guidelines: Kubernetes, Grafana, Prometheus, SLO, Go** |
 
 ---
 
@@ -350,7 +411,7 @@ MyMetric.WithLabelValues("value").Inc()
 
 - Edit `grafana-dashboard.json`
 - Update ConfigMap: `kubectl create configmap grafana-dashboard-json --from-file=...`
-- Restart Grafana: `kubectl rollout restart deployment grafana -n monitoring-demo`
+- Restart Grafana: `kubectl rollout restart deployment grafana -n monitoring`
 
 ---
 
@@ -361,10 +422,56 @@ MyMetric.WithLabelValues("value").Inc()
 ./scripts/cleanup.sh
 
 # Or manual
-kind delete cluster --name monitoring-demo
+kind delete cluster --name monitoring-local
 ```
 
 ---
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+**1. ImagePullBackOff Errors**
+```bash
+# This happens when you skip Step 3 (build microservices)
+# Solution: Always run Step 3 before Step 4
+./scripts/03-build-microservices.sh
+./scripts/04-deploy-microservices.sh
+
+# Or manually for specific service
+docker build -f docker/<service-name>.Dockerfile -t <service-name>:latest .
+kind load docker-image <service-name>:latest --name monitoring-local
+kubectl rollout restart deployment -n <namespace> -l app=<service-name>
+```
+
+**2. Port Forwarding Not Working**
+```bash
+# Kill existing port forwards
+pkill -f "kubectl port-forward"
+
+# Restart port forwarding
+kubectl port-forward -n monitoring svc/grafana 3000:3000 &
+kubectl port-forward -n monitoring svc/prometheus 9090:9090 &
+kubectl port-forward -n user svc/user-service 8081:8080 &
+```
+
+**3. Pods Not Starting**
+```bash
+# Check pod status
+kubectl get pods --all-namespaces
+
+# Check pod logs
+kubectl logs -n <namespace> <pod-name>
+```
+
+**4. Grafana Dashboard Not Loading**
+```bash
+# Restart Grafana
+kubectl rollout restart deployment/grafana -n monitoring
+
+# Check Grafana logs
+kubectl logs -n monitoring -l app=grafana
+```
 
 ## ❓ FAQ
 
@@ -386,6 +493,9 @@ A: Generate traffic first! CronJob runs every 2 minutes automatically, or trigge
 
 **Q: What's Apdex Score?**
 A: Application Performance Index. 0-1 scale measuring user satisfaction based on response times.
+
+**Q: Scripts not executable?**
+A: Run `chmod +x scripts/*.sh` to make all scripts executable.
 
 ---
 

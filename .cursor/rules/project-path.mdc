@@ -1,0 +1,50 @@
+---
+description: Project working directory and path context
+globs:
+alwaysApply: true
+---
+
+# Project Path Context
+
+## Working Directory
+**Root Path**: `Mics/Github/project-monitoring-golang`
+
+**Absolute Path**: `/mnt/c/Users/duy.do/OneDrive - OPSWAT/Working/Mics/Github/project-monitoring-golang`
+
+## Important Context
+- When creating files, always use path relative to project root: `Mics/Github/project-monitoring-golang/`
+- Terminal commands should `cd` to project root first
+- All file operations should be within project directory
+
+## Directory Structure
+```
+Mics/Github/project-monitoring-golang/
+├── cmd/                    # Service entry points
+│   ├── user-service-v1/
+│   ├── product-service-v1/
+│   ├── checkout-service-v1/
+│   ├── order-service-v2/
+│   └── unified-service-v3/
+├── internal/              # Domain logic
+│   ├── user/
+│   ├── product/
+│   ├── checkout/
+│   └── order/
+├── pkg/                   # Shared packages
+│   └── middleware/
+├── k8s/                   # Kubernetes manifests
+├── docker/                # Dockerfiles
+├── scripts/              # Build & deploy scripts
+├── docs/                 # Documentation
+├── slo/                  # SLO/SRE configurations
+└── grafana-dashboard.json # Main dashboard
+```
+
+## File Creation Rules
+- **ALWAYS** prepend `Mics/Github/project-monitoring-golang/` to file paths
+- Example: `Mics/Github/project-monitoring-golang/cmd/user-service-v1/main.go`
+- Example: `Mics/Github/project-monitoring-golang/internal/user/handler.go`
+
+## Terminal Commands
+- First command should always be: `cd Mics/Github/project-monitoring-golang`
+- Then execute commands from project root

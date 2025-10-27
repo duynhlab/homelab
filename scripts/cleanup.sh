@@ -12,16 +12,20 @@ echo -e "${YELLOW}=== Cleaning Up Kind Cluster ===${NC}"
 echo ""
 
 # Ask for confirmation
-read -p "Are you sure you want to delete the Kind cluster? (y/N) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo -e "${BLUE}Cleanup cancelled.${NC}"
-    exit 0
-fi
+# read -p "Are you sure you want to delete the Kind cluster? (y/N) " -n 1 -r
+# echo
+# if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+#     echo -e "${BLUE}Cleanup cancelled.${NC}"
+#     exit 0
+# fi
 
 # Delete Kind cluster
 echo -e "${GREEN}Deleting Kind cluster...${NC}"
-kind delete cluster --name monitoring-demo
+kind delete cluster --name monitoring-local
+
+# Delete all namespaces
+echo -e "${GREEN}Deleting all namespaces...${NC}"
+kubectl delete namespace auth user product cart order review notification shipping monitoring --ignore-not-found=true
 
 # Clean up Hey test results
 echo -e "${GREEN}Cleaning up test results...${NC}"
@@ -37,6 +41,6 @@ echo ""
 echo -e "${GREEN}✓ Cleanup complete!${NC}"
 echo ""
 echo -e "${BLUE}To redeploy:${NC}"
-echo "  ./scripts/deploy-all.sh"
+echo "  ./scripts/deploy-from-scratch.sh"
 echo ""
 

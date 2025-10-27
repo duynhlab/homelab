@@ -1,5 +1,7 @@
 # Tài Liệu Metrics
 
+> 🤖 **AI Agents**: See [AGENT.md](../AGENT.md) for project overview and [.cursor/rules/](../.cursor/rules/) for development guidelines
+
 ## Tổng Quan
 
 Dự án này expose **6 custom application metrics** và tận dụng **Go runtime metrics** để cung cấp **32 Grafana dashboard panels trong 5 row groups** cho việc giám sát toàn diện, bao gồm phát hiện memory leak.

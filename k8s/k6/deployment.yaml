@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: k6-load-generator
-  namespace: monitoring-demo
+  namespace: monitoring
   labels:
     app: k6-load-generator
 spec:
@@ -17,18 +17,25 @@ spec:
     spec:
       containers:
       - name: k6
-        image: k6-prometheus:v4
+        image: grafana/k6:latest
         imagePullPolicy: IfNotPresent
         command:
         - k6
         - run
         - /scripts/load-test.js
+        volumeMounts:
+        - name: k6-scripts
+          mountPath: /scripts
         resources:
           requests:
-            memory: 512Mi
-            cpu: 500m
+            memory: 256Mi
+            cpu: 200m
           limits:
-            memory: 2Gi
-            cpu: 2000m
+            memory: 1Gi
+            cpu: 1000m
+      volumes:
+      - name: k6-scripts
+        configMap:
+          name: k6-load-test
       restartPolicy: Always
 

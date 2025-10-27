@@ -1,75 +1,65 @@
 package middleware
 
 import (
-	"net/http"
 	"os"
 	"strconv"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
-	// Get app name from environment or use default
-	appName = getAppName()
-
-	// RequestLatency tracks HTTP request duration in seconds
-	RequestLatency = promauto.NewHistogramVec(
+	requestDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name: "request_duration_seconds",
-			Help: "Latency of HTTP requests in seconds",
-			// Buckets optimized for Apdex score calculation
+			Name:    "request_duration_seconds",
+			Help:    "Duration of HTTP requests in seconds",
 			Buckets: []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
 		},
-		[]string{"app", "method", "path", "code"},
+		[]string{"app", "namespace", "method", "path", "code"},
 	)
 
-	// RequestTotal counts total number of HTTP requests
-	RequestTotal = promauto.NewCounterVec(
+	requestTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "requests_total",
 			Help: "Total number of HTTP requests",
 		},
-		[]string{"app", "method", "path", "code"},
+		[]string{"app", "namespace", "method", "path", "code"},
 	)
 
-	// RequestsInFlight tracks concurrent requests
-	RequestsInFlight = promauto.NewGaugeVec(
+	requestsInFlight = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "requests_in_flight",
-			Help: "Number of requests currently being processed",
+			Help: "Number of HTTP requests currently being processed",
 		},
-		[]string{"app", "method", "path"},
+		[]string{"app", "namespace", "method", "path"},
 	)
 
-	// RequestSize tracks HTTP request body size
-	RequestSize = promauto.NewHistogramVec(
+	requestSize = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "request_size_bytes",
-			Help:    "Size of HTTP request bodies in bytes",
-			Buckets: []float64{0, 100, 500, 1000, 5000, 10000, 50000},
+			Help:    "Size of HTTP requests in bytes",
+			Buckets: []float64{100, 1000, 10000, 100000, 1000000},
 		},
-		[]string{"app", "method", "path"},
+		[]string{"app", "namespace", "method", "path", "code"},
 	)
 
-	// ResponseSize tracks HTTP response body size
-	ResponseSize = promauto.NewHistogramVec(
+	responseSize = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "response_size_bytes",
-			Help:    "Size of HTTP response bodies in bytes",
-			Buckets: []float64{0, 100, 500, 1000, 5000, 10000, 50000},
+			Help:    "Size of HTTP responses in bytes",
+			Buckets: []float64{100, 1000, 10000, 100000, 1000000},
 		},
-		[]string{"app", "method", "path", "code"},
+		[]string{"app", "namespace", "method", "path", "code"},
 	)
 
-	// ErrorRateTotal counts HTTP errors (4xx, 5xx)
-	ErrorRateTotal = promauto.NewCounterVec(
+	errorRate = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "error_rate_total",
-			Help: "Total number of HTTP requests with errors (4xx, 5xx)",
+			Help: "Total number of HTTP errors",
 		},
-		[]string{"app", "method", "path", "code"},
+		[]string{"app", "namespace", "method", "path", "code"},
 	)
 )
 
@@ -80,58 +70,48 @@ func getAppName() string {
 	return "demo-go-api"
 }
 
-// responseWriter wraps http.ResponseWriter to capture status code and size
-type responseWriter struct {
-	http.ResponseWriter
-	statusCode int
-	size       int
+func getNamespace() string {
+	if ns := os.Getenv("NAMESPACE"); ns != "" {
+		return ns
+	}
+	return "default"
 }
 
-func (rw *responseWriter) WriteHeader(code int) {
-	rw.statusCode = code
-	rw.ResponseWriter.WriteHeader(code)
-}
-
-func (rw *responseWriter) Write(b []byte) (int, error) {
-	size, err := rw.ResponseWriter.Write(b)
-	rw.size += size
-	return size, err
-}
-
-// PrometheusMiddleware wraps HTTP handlers to collect metrics
-func PrometheusMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func PrometheusMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
 		start := time.Now()
-
-		// Track requests in flight
-		RequestsInFlight.WithLabelValues(appName, r.Method, r.URL.Path).Inc()
-		defer RequestsInFlight.WithLabelValues(appName, r.Method, r.URL.Path).Dec()
-
-		// Track request size
-		RequestSize.WithLabelValues(appName, r.Method, r.URL.Path).Observe(float64(r.ContentLength))
-
-		// Wrap response writer to capture status code and response size
-		rw := &responseWriter{
-			ResponseWriter: w,
-			statusCode:     http.StatusOK,
-		}
-
-		// Call the next handler
-		next.ServeHTTP(rw, r)
-
+		
+		appName := getAppName()
+		namespace := getNamespace()
+		method := c.Request.Method
+		path := c.Request.URL.Path
+		
+		// Increment in-flight requests
+		requestsInFlight.WithLabelValues(appName, namespace, method, path).Inc()
+		
+		// Record request size
+		requestSize.WithLabelValues(appName, namespace, method, path, "").Observe(float64(c.Request.ContentLength))
+		
+		// Process request
+		c.Next()
+		
 		// Calculate duration
 		duration := time.Since(start).Seconds()
-		statusCode := strconv.Itoa(rw.statusCode)
-
+		statusCode := strconv.Itoa(c.Writer.Status())
+		
 		// Record metrics
-		RequestLatency.WithLabelValues(appName, r.Method, r.URL.Path, statusCode).Observe(duration)
-		RequestTotal.WithLabelValues(appName, r.Method, r.URL.Path, statusCode).Inc()
-		ResponseSize.WithLabelValues(appName, r.Method, r.URL.Path, statusCode).Observe(float64(rw.size))
-
-		// Track errors (4xx, 5xx)
-		if rw.statusCode >= 400 {
-			ErrorRateTotal.WithLabelValues(appName, r.Method, r.URL.Path, statusCode).Inc()
+		requestDuration.WithLabelValues(appName, namespace, method, path, statusCode).Observe(duration)
+		requestTotal.WithLabelValues(appName, namespace, method, path, statusCode).Inc()
+		
+		// Record response size
+		responseSize.WithLabelValues(appName, namespace, method, path, statusCode).Observe(float64(c.Writer.Size()))
+		
+		// Record errors (5xx)
+		if c.Writer.Status() >= 500 {
+			errorRate.WithLabelValues(appName, namespace, method, path, statusCode).Inc()
 		}
-	})
+		
+		// Decrement in-flight requests
+		requestsInFlight.WithLabelValues(appName, namespace, method, path).Dec()
+	}
 }
-

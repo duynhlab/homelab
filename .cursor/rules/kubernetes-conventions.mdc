@@ -1,0 +1,67 @@
+---
+description: Kubernetes manifests conventions and best practices
+globs: ["k8s/**/*.yaml"]
+alwaysApply: false
+---
+
+# Kubernetes Conventions
+
+## Namespace Convention
+- Always use `monitoring-demo` namespace
+- Apply to all resources: `kubectl apply -f k8s/namespace.yaml`
+
+## Label Standards
+- `app`: Application name (demo-go-api, demo-go-api-v2, demo-go-api-v3)
+- `version`: Application version (v1, v2, v3)
+- `component`: Component type (api, monitoring, load-test)
+
+## Resource Limits
+- **Memory**: 256Mi-512Mi for apps, 2Gi for k6 load generator
+- **CPU**: 100m-500m for apps, 2000m for k6 load generator
+- **Example**:
+  ```yaml
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  ```
+
+## ConfigMap Naming
+- Pattern: `{component}-{type}`
+- Examples:
+  - `grafana-dashboard-json`
+  - `grafana-datasources`
+  - `prometheus-config`
+
+## Service Naming
+- Match deployment name exactly
+- Examples:
+  - `demo-go-api` deployment → `demo-go-api` service
+  - `grafana` deployment → `grafana` service
+
+## Deployment Strategy
+- Use `RollingUpdate` strategy
+- Set `replicas: 1` for demo environment
+- Example:
+  ```yaml
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  ```
+
+## ServiceMonitor Requirements
+- Must have `prometheus.io/scrape: "true"` annotation
+- Must specify correct port and path
+- Example:
+  ```yaml
+  metadata:
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "8080"
+      prometheus.io/path: "/metrics"
+  ```

@@ -7,31 +7,36 @@ const errorRate = new Rate('k6_errors');
 const requestDuration = new Trend('k6_request_duration');
 const requestsTotal = new Counter('k6_requests_total');
 
-// Load test configuration - MASSIVE SCALE
-// Target: 2-3 million requests in 1 hour
+// Load test configuration - 9 Microservices
+// Target: Sustainable load across all services
 export const options = {
   stages: [
-    { duration: '1m', target: 100 },   // Ramp-up to 100 VUs
-    { duration: '2m', target: 200 },   // Ramp-up to 200 VUs
-    { duration: '5m', target: 300 },   // Ramp-up to 300 VUs
-    { duration: '20m', target: 300 },  // Stay at 300 VUs (peak load)
-    { duration: '10m', target: 500 },  // Ramp-up to 500 VUs (stress test)
-    { duration: '15m', target: 500 },  // Stay at 500 VUs (max load)
-    { duration: '3m', target: 200 },   // Ramp-down to 200 VUs
-    { duration: '3m', target: 50 },    // Ramp-down to 50 VUs
+    { duration: '1m', target: 20 },    // Ramp-up to 20 VUs
+    { duration: '2m', target: 50 },    // Ramp-up to 50 VUs
+    { duration: '5m', target: 100 },   // Ramp-up to 100 VUs
+    { duration: '10m', target: 100 },  // Stay at 100 VUs (sustainable load)
+    { duration: '2m', target: 50 },    // Ramp-down to 50 VUs
     { duration: '1m', target: 0 },     // Ramp-down to 0
   ],
   thresholds: {
-    http_req_duration: ['p(95)<1500', 'p(99)<3000'], // More lenient for high load
-    http_req_failed: ['rate<0.20'], // Allow 20% error rate under stress
-    http_reqs: ['rate>200'], // At least 200 req/s (massive scale)
+    http_req_duration: ['p(95)<500', 'p(99)<1000'], // Reasonable response times
+    http_req_failed: ['rate<0.05'], // Allow 5% error rate
+    http_reqs: ['rate>50'], // At least 50 req/s across all services
   },
 };
 
-// Base URLs for each service
-const BASE_URL_V1 = 'http://demo-go-api.monitoring-demo.svc.cluster.local:8080';
-const BASE_URL_V2 = 'http://demo-go-api-v2.monitoring-demo.svc.cluster.local:8080';
-const BASE_URL_V3 = 'http://demo-go-api-v3.monitoring-demo.svc.cluster.local:8080';
+// Service URLs for 9 microservices
+const SERVICES = {
+  auth: 'http://auth-service.auth.svc.cluster.local:8080',
+  user: 'http://user-service.user.svc.cluster.local:8080',
+  product: 'http://product-service.product.svc.cluster.local:8080',
+  cart: 'http://cart-service.cart.svc.cluster.local:8080',
+  order: 'http://order-service.order.svc.cluster.local:8080',
+  review: 'http://review-service.review.svc.cluster.local:8080',
+  notification: 'http://notification-service.notification.svc.cluster.local:8080',
+  shipping: 'http://shipping-service.shipping.svc.cluster.local:8080',
+  shippingV2: 'http://shipping-service-v2.shipping.svc.cluster.local:8080',
+};
 
 // Helper function to make requests with proper tagging
 function makeRequest(method, url, body, tags) {
@@ -68,144 +73,208 @@ function makeRequest(method, url, body, tags) {
   return response;
 }
 
-// V1 API scenarios
-function testV1APIs() {
-  const tags = { version: 'v1', service: 'demo-go-api' };
+// Auth Service Tests
+function testAuthService() {
+  const tags = { service: 'auth', version: 'v1' };
   
-  // GET /api/users (80% of traffic)
-  for (let i = 0; i < 8; i++) {
-    makeRequest('GET', `${BASE_URL_V1}/api/users`, null, { ...tags, endpoint: '/api/users', method: 'GET' });
-    sleep(0.1);
-  }
+  // POST /api/v1/auth/login (50% of auth traffic)
+  makeRequest('POST', `${SERVICES.auth}/api/v1/auth/login`, {
+    username: 'admin',
+    password: 'password',
+  }, { ...tags, endpoint: '/api/v1/auth/login', method: 'POST' });
+  sleep(0.1);
   
-  // POST /api/users (10% of traffic)
-  makeRequest('POST', `${BASE_URL_V1}/api/users`, {
-    name: `User-${__VU}-${Date.now()}`,
+  // POST /api/v2/auth/register (50% of auth traffic)
+  makeRequest('POST', `${SERVICES.auth}/api/v2/auth/register`, {
+    username: `user${__VU}`,
     email: `user${__VU}@example.com`,
-  }, { ...tags, endpoint: '/api/users', method: 'POST' });
+    password: 'password123',
+  }, { ...tags, endpoint: '/api/v2/auth/register', method: 'POST' });
+  sleep(0.1);
+}
+
+// User Service Tests
+function testUserService() {
+  const tags = { service: 'user', version: 'v1' };
+  
+  // GET /api/v1/users (70% of user traffic)
+  makeRequest('GET', `${SERVICES.user}/api/v1/users`, null, { ...tags, endpoint: '/api/v1/users', method: 'GET' });
   sleep(0.1);
   
-  // POST /api/v1/checkout (10% of traffic)
-  makeRequest('POST', `${BASE_URL_V1}/api/v1/checkout`, {
-    user_id: `user-${__VU}`,
+  // GET /api/v2/users/:id (20% of user traffic)
+  makeRequest('GET', `${SERVICES.user}/api/v2/users/1`, null, { ...tags, endpoint: '/api/v2/users/:id', method: 'GET' });
+  sleep(0.1);
+  
+  // POST /api/v1/users (10% of user traffic)
+  makeRequest('POST', `${SERVICES.user}/api/v1/users`, {
+    username: `user${__VU}`,
+    email: `user${__VU}@example.com`,
+    name: `User ${__VU}`,
+  }, { ...tags, endpoint: '/api/v1/users', method: 'POST' });
+  sleep(0.1);
+}
+
+// Product Service Tests
+function testProductService() {
+  const tags = { service: 'product', version: 'v1' };
+  
+  // GET /api/v1/products (60% of product traffic)
+  makeRequest('GET', `${SERVICES.product}/api/v1/products`, null, { ...tags, endpoint: '/api/v1/products', method: 'GET' });
+  sleep(0.1);
+  
+  // GET /api/v2/catalog/items (30% of product traffic)
+  makeRequest('GET', `${SERVICES.product}/api/v2/catalog/items`, null, { ...tags, endpoint: '/api/v2/catalog/items', method: 'GET' });
+  sleep(0.1);
+  
+  // POST /api/v1/products (10% of product traffic)
+  makeRequest('POST', `${SERVICES.product}/api/v1/products`, {
+    name: `Product ${__VU}`,
+    price: Math.random() * 100,
+    description: 'Test product',
+    category: 'electronics',
+  }, { ...tags, endpoint: '/api/v1/products', method: 'POST' });
+  sleep(0.1);
+}
+
+// Cart Service Tests
+function testCartService() {
+  const tags = { service: 'cart', version: 'v1' };
+  
+  // GET /api/v1/cart (70% of cart traffic)
+  makeRequest('GET', `${SERVICES.cart}/api/v1/cart`, null, { ...tags, endpoint: '/api/v1/cart', method: 'GET' });
+  sleep(0.1);
+  
+  // POST /api/v2/carts/:cartId/items (30% of cart traffic)
+  makeRequest('POST', `${SERVICES.cart}/api/v2/carts/cart-${__VU}/items`, {
+    productId: `prod-${Math.floor(Math.random() * 10)}`,
+    quantity: Math.floor(Math.random() * 3) + 1,
+  }, { ...tags, endpoint: '/api/v2/carts/:cartId/items', method: 'POST' });
+  sleep(0.1);
+}
+
+// Order Service Tests
+function testOrderService() {
+  const tags = { service: 'order', version: 'v1' };
+  
+  // GET /api/v1/orders (50% of order traffic)
+  makeRequest('GET', `${SERVICES.order}/api/v1/orders`, null, { ...tags, endpoint: '/api/v1/orders', method: 'GET' });
+  sleep(0.1);
+  
+  // GET /api/v2/orders/:orderId/status (30% of order traffic)
+  makeRequest('GET', `${SERVICES.order}/api/v2/orders/order-${__VU}/status`, null, { ...tags, endpoint: '/api/v2/orders/:orderId/status', method: 'GET' });
+  sleep(0.1);
+  
+  // POST /api/v1/orders (20% of order traffic)
+  makeRequest('POST', `${SERVICES.order}/api/v1/orders`, {
     items: [
-      { product_id: 'prod-1', quantity: 2 },
-      { product_id: 'prod-2', quantity: 1 },
+      { productId: 'prod-1', quantity: 2, price: 100 },
+      { productId: 'prod-2', quantity: 1, price: 50 },
     ],
-    total: 99.99,
-  }, { ...tags, endpoint: '/api/v1/checkout', method: 'POST' });
+  }, { ...tags, endpoint: '/api/v1/orders', method: 'POST' });
+  sleep(0.1);
 }
 
-// V2 API scenarios
-function testV2APIs() {
-  const tags = { version: 'v2', service: 'demo-go-api-v2' };
+// Review Service Tests
+function testReviewService() {
+  const tags = { service: 'review', version: 'v1' };
   
-  // GET /api/products (70% of traffic)
-  for (let i = 0; i < 7; i++) {
-    makeRequest('GET', `${BASE_URL_V2}/api/products`, null, { ...tags, endpoint: '/api/products', method: 'GET' });
-    sleep(0.1);
-  }
-  
-  // POST /api/products (15% of traffic)
-  for (let i = 0; i < 2; i++) {
-    makeRequest('POST', `${BASE_URL_V2}/api/products`, {
-      name: `Product-${__VU}-${Date.now()}`,
-      price: Math.random() * 100,
-      category: 'electronics',
-    }, { ...tags, endpoint: '/api/products', method: 'POST' });
-    sleep(0.1);
-  }
-  
-  // GET /api/v2/orders (10% of traffic)
-  makeRequest('GET', `${BASE_URL_V2}/api/v2/orders`, null, { ...tags, endpoint: '/api/v2/orders', method: 'GET' });
+  // GET /api/v1/reviews (60% of review traffic)
+  makeRequest('GET', `${SERVICES.review}/api/v1/reviews`, null, { ...tags, endpoint: '/api/v1/reviews', method: 'GET' });
   sleep(0.1);
   
-  // POST /api/v2/orders (5% of traffic)
-  if (Math.random() < 0.5) {
-    makeRequest('POST', `${BASE_URL_V2}/api/v2/orders`, {
-      user_id: `user-${__VU}`,
-      product_id: `prod-${Math.floor(Math.random() * 100)}`,
-      quantity: Math.floor(Math.random() * 5) + 1,
-      total: Math.random() * 500,
-    }, { ...tags, endpoint: '/api/v2/orders', method: 'POST' });
-  }
+  // GET /api/v2/reviews/:reviewId (30% of review traffic)
+  makeRequest('GET', `${SERVICES.review}/api/v2/reviews/review-${__VU}`, null, { ...tags, endpoint: '/api/v2/reviews/:reviewId', method: 'GET' });
+  sleep(0.1);
+  
+  // POST /api/v1/reviews (10% of review traffic)
+  makeRequest('POST', `${SERVICES.review}/api/v1/reviews`, {
+    productId: `prod-${Math.floor(Math.random() * 10)}`,
+    userId: `user-${__VU}`,
+    rating: Math.floor(Math.random() * 5) + 1,
+    comment: 'Great product!',
+  }, { ...tags, endpoint: '/api/v1/reviews', method: 'POST' });
+  sleep(0.1);
 }
 
-// V3 API scenarios
-function testV3APIs() {
-  const tags = { version: 'v3', service: 'demo-go-api-v3' };
+// Notification Service Tests
+function testNotificationService() {
+  const tags = { service: 'notification', version: 'v1' };
   
-  // GET /api/v3/users (30% of traffic)
-  for (let i = 0; i < 3; i++) {
-    makeRequest('GET', `${BASE_URL_V3}/api/v3/users`, null, { ...tags, endpoint: '/api/v3/users', method: 'GET' });
-    sleep(0.1);
-  }
-  
-  // GET /api/v3/products (30% of traffic)
-  for (let i = 0; i < 3; i++) {
-    makeRequest('GET', `${BASE_URL_V3}/api/v3/products`, null, { ...tags, endpoint: '/api/v3/products', method: 'GET' });
-    sleep(0.1);
-  }
-  
-  // POST /api/v3/users (10% of traffic)
-  makeRequest('POST', `${BASE_URL_V3}/api/v3/users`, {
-    name: `V3User-${__VU}-${Date.now()}`,
-    email: `v3user${__VU}@example.com`,
-    role: 'customer',
-  }, { ...tags, endpoint: '/api/v3/users', method: 'POST' });
+  // POST /api/v1/notify/email (50% of notification traffic)
+  makeRequest('POST', `${SERVICES.notification}/api/v1/notify/email`, {
+    to: `user${__VU}@example.com`,
+    subject: 'Test Email',
+    body: 'This is a test email notification',
+  }, { ...tags, endpoint: '/api/v1/notify/email', method: 'POST' });
   sleep(0.1);
   
-  // POST /api/v3/products (10% of traffic)
-  makeRequest('POST', `${BASE_URL_V3}/api/v3/products`, {
-    name: `V3Product-${__VU}`,
-    price: Math.random() * 200,
-    stock: Math.floor(Math.random() * 100),
-  }, { ...tags, endpoint: '/api/v3/products', method: 'POST' });
+  // GET /api/v2/notifications (50% of notification traffic)
+  makeRequest('GET', `${SERVICES.notification}/api/v2/notifications`, null, { ...tags, endpoint: '/api/v2/notifications', method: 'GET' });
   sleep(0.1);
+}
+
+// Shipping Service Tests
+function testShippingService() {
+  const tags = { service: 'shipping', version: 'v1' };
   
-  // GET /api/v3/orders (10% of traffic)
-  makeRequest('GET', `${BASE_URL_V3}/api/v3/orders`, null, { ...tags, endpoint: '/api/v3/orders', method: 'GET' });
+  // GET /api/v1/shipping/track (100% of shipping traffic)
+  makeRequest('GET', `${SERVICES.shipping}/api/v1/shipping/track?trackingId=TRK${__VU}`, null, { ...tags, endpoint: '/api/v1/shipping/track', method: 'GET' });
   sleep(0.1);
+}
+
+// Shipping Service V2 Tests
+function testShippingServiceV2() {
+  const tags = { service: 'shipping-v2', version: 'v2' };
   
-  // POST /api/v3/orders (5% of traffic)
-  if (Math.random() < 0.5) {
-    makeRequest('POST', `${BASE_URL_V3}/api/v3/orders`, {
-      user_id: `v3user-${__VU}`,
-      items: [
-        { product_id: `v3prod-${Math.floor(Math.random() * 50)}`, quantity: 2 },
-      ],
-      total: Math.random() * 300,
-    }, { ...tags, endpoint: '/api/v3/orders', method: 'POST' });
-  }
+  // GET /api/v2/shipments/estimate (100% of shipping-v2 traffic)
+  makeRequest('GET', `${SERVICES.shippingV2}/api/v2/shipments/estimate`, {
+    origin: 'New York',
+    destination: 'Los Angeles',
+    weight: Math.random() * 10 + 1,
+  }, { ...tags, endpoint: '/api/v2/shipments/estimate', method: 'GET' });
   sleep(0.1);
-  
-  // POST /api/v3/checkout (5% of traffic)
-  if (Math.random() < 0.5) {
-    makeRequest('POST', `${BASE_URL_V3}/api/v3/checkout`, {
-      user_id: `v3user-${__VU}`,
-      payment_method: 'credit_card',
-      total: Math.random() * 500,
-    }, { ...tags, endpoint: '/api/v3/checkout', method: 'POST' });
-  }
 }
 
 // Main test function
 export default function() {
-  // Health check first
-  http.get(`${BASE_URL_V1}/health`, { tags: { endpoint: '/health', method: 'GET' } });
+  // Health check first - test all services
+  const healthChecks = [
+    `${SERVICES.auth}/health`,
+    `${SERVICES.user}/health`,
+    `${SERVICES.product}/health`,
+    `${SERVICES.cart}/health`,
+    `${SERVICES.order}/health`,
+    `${SERVICES.review}/health`,
+    `${SERVICES.notification}/health`,
+    `${SERVICES.shipping}/health`,
+    `${SERVICES.shippingV2}/health`,
+  ];
   
-  // Randomize which APIs to test (simulate real user behavior)
+  // Random health check
+  const healthUrl = healthChecks[Math.floor(Math.random() * healthChecks.length)];
+  http.get(healthUrl, { tags: { endpoint: '/health', method: 'GET' } });
+  
+  // Randomize which service to test (simulate real user behavior)
   const rand = Math.random();
   
-  if (rand < 0.33) {
-    // 33% - Focus on V1
-    testV1APIs();
+  if (rand < 0.11) {
+    testAuthService();
+  } else if (rand < 0.22) {
+    testUserService();
+  } else if (rand < 0.33) {
+    testProductService();
+  } else if (rand < 0.44) {
+    testCartService();
+  } else if (rand < 0.55) {
+    testOrderService();
   } else if (rand < 0.66) {
-    // 33% - Focus on V2
-    testV2APIs();
+    testReviewService();
+  } else if (rand < 0.77) {
+    testNotificationService();
+  } else if (rand < 0.88) {
+    testShippingService();
   } else {
-    // 34% - Focus on V3
-    testV3APIs();
+    testShippingServiceV2();
   }
   
   // Think time between iterations
@@ -216,9 +285,15 @@ export default function() {
 export function setup() {
   console.log('🚀 k6 Load Test Starting...');
   console.log('Target services:');
-  console.log(`  - V1: ${BASE_URL_V1}`);
-  console.log(`  - V2: ${BASE_URL_V2}`);
-  console.log(`  - V3: ${BASE_URL_V3}`);
+  console.log(`  - Auth: ${SERVICES.auth}`);
+  console.log(`  - User: ${SERVICES.user}`);
+  console.log(`  - Product: ${SERVICES.product}`);
+  console.log(`  - Cart: ${SERVICES.cart}`);
+  console.log(`  - Order: ${SERVICES.order}`);
+  console.log(`  - Review: ${SERVICES.review}`);
+  console.log(`  - Notification: ${SERVICES.notification}`);
+  console.log(`  - Shipping: ${SERVICES.shipping}`);
+  console.log(`  - Shipping V2: ${SERVICES.shippingV2}`);
 }
 
 // Teardown function (runs once at the end)

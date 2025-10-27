@@ -1,0 +1,69 @@
+---
+description: SLO/SRE practices and conventions
+globs: ["slo/**/*"]
+alwaysApply: false
+---
+
+# SLO/SRE Guidelines
+
+## SLI Definitions
+- **Availability**: Success rate (2xx responses / total responses)
+- **Latency**: P95 response time
+- **Error Rate**: 4xx/5xx responses / total responses
+
+## SLO Targets
+- **Availability**: 99.9% (0.1% error budget)
+- **Latency**: P95 < 500ms
+- **Error Rate**: < 0.1%
+
+## Error Budget
+- **Window**: 30-day rolling window
+- **Calculation**: `slo:availability:error_budget_hours_30d`
+- **Remaining**: `slo:availability:error_budget_remaining_30d`
+
+## Burn Rate Windows
+- **Critical**: 1h (>14.4x burn rate)
+- **Warning**: 6h (>6x burn rate)
+- **Info**: 24h (>3x burn rate)
+
+## Alert Severity
+- **SEV1**: >14.4x burn rate (1h window)
+- **SEV2**: >6x burn rate (6h window)
+- **SEV3**: >3x burn rate (24h window)
+
+## Recording Rules
+- **Update Frequency**: Every 1m
+- **Naming Pattern**: `slo:{sli}:{metric}_{window}`
+- **Examples**:
+  - `slo:availability:error_budget_remaining_30d`
+  - `slo:availability:burn_rate_1h`
+  - `slo:availability:time_to_exhaustion_hours`
+
+## Multi-Window Burn Rate Alerts
+- **Critical**: `slo:availability:burn_rate_1h > 14.4`
+- **Warning**: `slo:availability:burn_rate_6h > 6`
+- **Info**: `slo:availability:burn_rate_24h > 3`
+
+## Documentation
+- **Language**: Vietnamese for SLO concepts
+- **Files**:
+  - `slo/docs/SLO_CONCEPTS_VI.md`
+  - `slo/docs/SLO_CALCULATIONS_VI.md`
+  - `slo/docs/SLO_EXAMPLES_VI.md`
+  - `slo/docs/SLO_ALERT_RESPONSE_VI.md`
+  - `slo/docs/SLO_QUICK_REFERENCE.md`
+
+## Runbooks
+- **Location**: `slo/runbooks/`
+- **Files**:
+  - `diagnose-latency.sh`
+  - `error-budget-alert.sh`
+  - `incident-classifier/`
+
+## Deployment
+- **Script**: `slo/scripts/deploy-slo.sh`
+- **Components**:
+  - Recording rules
+  - Alert rules
+  - SLO dashboard
+  - Runbooks

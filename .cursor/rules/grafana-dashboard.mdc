@@ -1,0 +1,58 @@
+---
+description: Grafana dashboard development guidelines
+globs: ["grafana-dashboard.json", "slo/dashboards/*.json"]
+alwaysApply: false
+---
+
+# Grafana Dashboard Guidelines
+
+## Dashboard Configuration
+- **UID**: `microservices-monitoring-001`
+- **Title**: "Microservices Monitoring & Performance Applications"
+- **Tags**: prometheus, monitoring, kubernetes
+
+## Template Variables
+- `$app`: Application filter (demo-go-api, demo-go-api-v2, demo-go-api-v3)
+- `$namespace`: Namespace filter (monitoring-demo)
+- `$rate`: Rate interval (5m, 15m, 1h, 6h, 12h, 1d)
+
+## Panel Layout
+- **Width**: 12 (half) or 24 (full)
+- **Height**: 8 (standard)
+- **Row Groups**: Overview, Traffic, Errors, Runtime, Resources
+
+## Legend Configuration
+- **Display Mode**: Table
+- **Placement**: Right
+- **Calculations**: Mean, Max
+- **Sort By**: Max (descending)
+
+## Panel Descriptions
+- **Required**: All panels must have descriptions
+- **Format**: Concise and actionable
+- **Content**: What it shows, why it matters, what to look for
+
+## Color Thresholds
+- **Green**: Good performance (0-1% error rate, < 300ms latency)
+- **Yellow**: Warning (1-5% error rate, 300-1000ms latency)
+- **Red**: Critical (> 5% error rate, > 1000ms latency)
+
+## Units
+- **Bytes**: Memory usage, network traffic
+- **Short**: Counters, totals
+- **reqps**: Requests per second
+- **percent**: Success/error rates
+- **ms**: Response times
+
+## Query Patterns
+- **Rate Queries**: Always use `$rate` variable
+- **Aggregation**: `sum(...) by (app)` for overview
+- **Filtering**: `{app=~"$app", namespace=~"$namespace"}`
+- **Histogram Quantiles**: `histogram_quantile(0.95, sum(rate(...)) by (le))`
+
+## Row Groups
+1. **Overview & Key Metrics** (12 panels)
+2. **Traffic & Requests** (4 panels)
+3. **Errors & Performance** (5 panels)
+4. **Go Runtime & Memory** (6 panels)
+5. **Resources & Infrastructure** (5 panels)

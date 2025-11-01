@@ -1577,7 +1577,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(go_memstats_alloc_bytes{app=~\"$app\", namespace=~\"$namespace\"}) by (app)",
+          "expr": "sum(go_memstats_alloc_bytes{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}) by (app)",
           "legendFormat": "{{app}}",
           "refId": "A"
         }
@@ -1662,7 +1662,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(go_memstats_heap_inuse_bytes{app=~\"$app\", namespace=~\"$namespace\"}) by (app)",
+          "expr": "sum(go_memstats_heap_inuse_bytes{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}) by (app)",
           "legendFormat": "{{app}}",
           "refId": "A"
         }
@@ -1747,7 +1747,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(process_resident_memory_bytes{app=~\"$app\", namespace=~\"$namespace\"}) by (app)",
+          "expr": "sum(process_resident_memory_bytes{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}) by (app)",
           "legendFormat": "{{app}}",
           "refId": "A"
         }
@@ -1832,12 +1832,12 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(go_goroutines{app=~\"$app\", namespace=~\"$namespace\"}) by (app)",
+          "expr": "sum(go_goroutines{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}) by (app)",
           "legendFormat": "{{app}} Goroutines",
           "refId": "A"
         },
         {
-          "expr": "sum(go_threads{app=~\"$app\", namespace=~\"$namespace\"}) by (app)",
+          "expr": "sum(go_threads{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}) by (app)",
           "legendFormat": "{{app}} Threads",
           "refId": "B"
         }
@@ -1922,7 +1922,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(increase(go_gc_duration_seconds_sum{app=~\"$app\", namespace=~\"$namespace\"}[5m])) by (app) / 300",
+          "expr": "sum(increase(go_gc_duration_seconds_sum{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[5m])) by (app) / 300",
           "legendFormat": "{{app}}",
           "refId": "A"
         }
@@ -2007,7 +2007,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(rate(go_gc_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}[5m])) by (app)",
+          "expr": "sum(rate(go_gc_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[5m])) by (app)",
           "legendFormat": "{{app}}",
           "refId": "A"
         }
@@ -2109,7 +2109,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(go_memstats_alloc_bytes{app=~\"$app\", namespace=~\"$namespace\"}) by (app)",
+          "expr": "sum(go_memstats_alloc_bytes{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}) by (app)",
           "legendFormat": "{{app}}",
           "refId": "A"
         }
@@ -2194,7 +2194,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(rate(process_cpu_seconds_total{app=~\"$app\", namespace=~\"$namespace\"}[5m])) by (app) * 100",
+          "expr": "sum(rate(process_cpu_seconds_total{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[5m])) by (app) * 100",
           "legendFormat": "{{app}}",
           "refId": "A"
         }
@@ -2453,7 +2453,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(go_memstats_frees_total{app=~\"$app\", namespace=~\"$namespace\"}) by (app)",
+          "expr": "sum(go_memstats_frees_total{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}) by (app)",
           "legendFormat": "{{app}}",
           "refId": "A"
         }

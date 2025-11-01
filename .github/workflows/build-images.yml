@@ -66,7 +66,7 @@ jobs:
         run: |
           echo "Running Go lint for ${{ matrix.service }}..."
           go vet ./cmd/${{ matrix.service }} || true
-          go fmt -d ./cmd/${{ matrix.service }} || true
+          gofmt -l ./cmd/${{ matrix.service }} || true
           echo "✓ Lint check completed for ${{ matrix.service }}"
 
       - name: Set up Docker Buildx

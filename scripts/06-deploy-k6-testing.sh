@@ -1,34 +1,75 @@
 #!/bin/bash
 set -e
 
-# Colors
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
+echo "=== Deploying k6 Load Testing ==="
 
-echo -e "${BLUE}=== Deploying k6 Load Testing ===${NC}"
+# Parse command line arguments
+DEPLOY_MODE="${1:-both}"  # Options: legacy, multiple, both (default: both)
 
-# Create ConfigMap from k6 load test script
-echo -e "${GREEN}1. Creating k6 load test ConfigMap...${NC}"
-kubectl create configmap k6-load-test --from-file=k6/load-test.js -n monitoring --dry-run=client -o yaml | kubectl apply -f -
+echo "Deploy mode: ${DEPLOY_MODE}"
 
-# Deploy k6 load generator
-echo -e "${GREEN}2. Deploying k6 load generator...${NC}"
-kubectl apply -f k8s/k6/
+# Create ConfigMap from both k6 load test scripts
+echo "1. Creating k6 load test ConfigMap (both files)..."
+kubectl create configmap k6-load-test \
+  --from-file=k6/load-test.js \
+  --from-file=k6/load-test-multiple-scenarios.js \
+  -n monitoring \
+  --dry-run=client -o yaml | kubectl apply -f -
 
-# Wait for k6 pod to be ready
-echo -e "${YELLOW}3. Waiting for k6 pod to be ready...${NC}"
-kubectl wait --for=condition=ready pod -l app=k6-load-generator -n monitoring --timeout=120s || true
+# Deploy k6 load generators based on mode
+if [ "$DEPLOY_MODE" = "legacy" ] || [ "$DEPLOY_MODE" = "both" ]; then
+  echo "2. Deploying k6 legacy load generator..."
+  kubectl apply -f k8s/k6/deployment-legacy.yaml
+fi
+
+if [ "$DEPLOY_MODE" = "multiple" ] || [ "$DEPLOY_MODE" = "both" ]; then
+  echo "3. Deploying k6 multiple-scenarios load generator..."
+  kubectl apply -f k8s/k6/deployment-multiple-scenarios.yaml
+fi
+
+# Wait for k6 pods to be ready
+echo "4. Waiting for k6 pods to be ready..."
+if [ "$DEPLOY_MODE" = "legacy" ] || [ "$DEPLOY_MODE" = "both" ]; then
+  kubectl wait --for=condition=ready pod -l app=k6-load-generator-legacy -n monitoring --timeout=120s || true
+fi
+if [ "$DEPLOY_MODE" = "multiple" ] || [ "$DEPLOY_MODE" = "both" ]; then
+  kubectl wait --for=condition=ready pod -l app=k6-load-generator-scenarios -n monitoring --timeout=120s || true
+fi
 
 # Check k6 pod status
-echo -e "${GREEN}4. Checking k6 pod status...${NC}"
-kubectl get pods -n monitoring -l app=k6-load-generator
+echo "5. Checking k6 pod status..."
+kubectl get pods -n monitoring -l 'app in (k6-load-generator-legacy,k6-load-generator-scenarios)'
 
 echo ""
-echo -e "${GREEN}✅ k6 load testing deployed successfully!${NC}"
-echo -e "${BLUE}To view k6 logs:${NC}"
-echo "  kubectl logs -n monitoring -l app=k6-load-generator -f"
+echo "✅ k6 load testing deployed successfully!"
 echo ""
-echo -e "${BLUE}To check load test progress:${NC}"
-echo "  kubectl exec -n monitoring -l app=k6-load-generator -- ps aux"
+if [ "$DEPLOY_MODE" = "both" ]; then
+  echo "Both load generators are running:"
+  echo "  - Legacy random testing (k6-load-generator-legacy)"
+  echo "  - Multiple scenarios (k6-load-generator-scenarios)"
+elif [ "$DEPLOY_MODE" = "legacy" ]; then
+  echo "Legacy random testing is running"
+elif [ "$DEPLOY_MODE" = "multiple" ]; then
+  echo "Multiple scenarios testing is running"
+fi
+echo ""
+echo "To view k6 logs:"
+if [ "$DEPLOY_MODE" = "legacy" ] || [ "$DEPLOY_MODE" = "both" ]; then
+  echo "  kubectl logs -n monitoring -l app=k6-load-generator-legacy -f"
+fi
+if [ "$DEPLOY_MODE" = "multiple" ] || [ "$DEPLOY_MODE" = "both" ]; then
+  echo "  kubectl logs -n monitoring -l app=k6-load-generator-scenarios -f"
+fi
+echo ""
+echo "To check load test progress:"
+if [ "$DEPLOY_MODE" = "legacy" ] || [ "$DEPLOY_MODE" = "both" ]; then
+  echo "  kubectl exec -n monitoring -l app=k6-load-generator-legacy -- ps aux"
+fi
+if [ "$DEPLOY_MODE" = "multiple" ] || [ "$DEPLOY_MODE" = "both" ]; then
+  echo "  kubectl exec -n monitoring -l app=k6-load-generator-scenarios -- ps aux"
+fi
+echo ""
+echo "Usage:"
+echo "  ./scripts/06-deploy-k6-testing.sh both        # Deploy both (default)"
+echo "  ./scripts/06-deploy-k6-testing.sh legacy      # Deploy only legacy"
+echo "  ./scripts/06-deploy-k6-testing.sh multiple    # Deploy only multiple scenarios"

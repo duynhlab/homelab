@@ -439,7 +439,7 @@ kind delete cluster --name monitoring-local
 ./scripts/04-deploy-microservices.sh
 
 # Or manually for specific service
-docker build -f docker/<service-name>.Dockerfile -t <service-name>:latest .
+docker build --build-arg SERVICE_NAME=<service-name> -f Dockerfile -t <service-name>:latest .
 kind load docker-image <service-name>:latest --name monitoring-local
 kubectl rollout restart deployment -n <namespace> -l app=<service-name>
 ```

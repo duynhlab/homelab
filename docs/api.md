@@ -93,16 +93,7 @@ project-monitoring-golang/
 │   ├── shipping-service-v2/
 │   └── monitoring/
 │       └── servicemonitors.yaml (update namespaces)
-├── docker/
-│   ├── auth-service.Dockerfile
-│   ├── user-service.Dockerfile
-│   ├── product-service.Dockerfile
-│   ├── cart-service.Dockerfile
-│   ├── order-service.Dockerfile
-│   ├── review-service.Dockerfile
-│   ├── notification-service.Dockerfile
-│   ├── shipping-service.Dockerfile
-│   └── shipping-service-v2.Dockerfile
+├── Dockerfile                       # Unified Dockerfile for all services
 └── k6/
     └── load-test.js (update endpoints)
 ```
@@ -635,11 +626,11 @@ cmd/order-service-v2/
 cmd/unified-service-v3/
 
 # Old dockerfiles - DELETE
-docker/user-service-v1.Dockerfile
-docker/product-service-v1.Dockerfile
-docker/checkout-service-v1.Dockerfile
-docker/order-service-v2.Dockerfile
-docker/unified-service-v3.Dockerfile
+docker build --build-arg SERVICE_NAME=user-service -f Dockerfile -t user-service:latest .
+docker build --build-arg SERVICE_NAME=product-service -f Dockerfile -t product-service:latest .
+docker build --build-arg SERVICE_NAME=cart-service -f Dockerfile -t cart-service:latest .
+docker build --build-arg SERVICE_NAME=order-service -f Dockerfile -t order-service:latest .
+docker build --build-arg SERVICE_NAME=review-service -f Dockerfile -t review-service:latest .
 ```
 
 ## Benefits

@@ -233,12 +233,12 @@ spec:
 #### Step 3: Rebuild & Redeploy
 
 ```bash
-# Rebuild all images
-docker build -t user-service-v1:latest -f docker/user-service-v1.Dockerfile .
-docker build -t product-service-v1:latest -f docker/product-service-v1.Dockerfile .
-docker build -t checkout-service-v1:latest -f docker/checkout-service-v1.Dockerfile .
-docker build -t order-service-v2:latest -f docker/order-service-v2.Dockerfile .
-docker build -t unified-service-v3:latest -f docker/unified-service-v3.Dockerfile .
+# Rebuild all images using unified Dockerfile
+docker build --build-arg SERVICE_NAME=user-service -f Dockerfile -t user-service:latest .
+docker build --build-arg SERVICE_NAME=product-service -f Dockerfile -t product-service:latest .
+docker build --build-arg SERVICE_NAME=cart-service -f Dockerfile -t cart-service:latest .
+docker build --build-arg SERVICE_NAME=order-service -f Dockerfile -t order-service:latest .
+docker build --build-arg SERVICE_NAME=review-service -f Dockerfile -t review-service:latest .
 
 # Load into Kind
 kind load docker-image user-service-v1:latest --name monitoring-demo

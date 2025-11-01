@@ -1,28 +1,30 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: k6-load-generator
+  name: k6-load-generator-legacy
   namespace: monitoring
   labels:
-    app: k6-load-generator
+    app: k6-load-generator-legacy
+    test-mode: legacy
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: k6-load-generator
+      app: k6-load-generator-legacy
   template:
     metadata:
       labels:
-        app: k6-load-generator
+        app: k6-load-generator-legacy
+        test-mode: legacy
     spec:
       containers:
       - name: k6
         image: grafana/k6:latest
         imagePullPolicy: IfNotPresent
         command:
-        - k6
-        - run
-        - /scripts/load-test.js
+        - /bin/sh
+        - -c
+        - k6 run /scripts/load-test.js
         volumeMounts:
         - name: k6-scripts
           mountPath: /scripts

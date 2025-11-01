@@ -1,51 +1,45 @@
 #!/bin/bash
 set -e
 
-# Colors
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-echo -e "${BLUE}=== Deploying All Microservices ===${NC}"
+echo "=== Deploying All Microservices ==="
 
 # Deploy namespaces first
-echo -e "${GREEN}1. Creating namespaces...${NC}"
+echo "1. Creating namespaces..."
 kubectl apply -f k8s/namespaces.yaml
 
 # Deploy each service to its namespace
-echo -e "${GREEN}2. Deploying auth-service to auth namespace...${NC}"
+echo "2. Deploying auth-service to auth namespace..."
 kubectl apply -f k8s/auth-service/
 
-echo -e "${GREEN}3. Deploying user-service to user namespace...${NC}"
+echo "3. Deploying user-service to user namespace..."
 kubectl apply -f k8s/user-service/
 
-echo -e "${GREEN}4. Deploying product-service to product namespace...${NC}"
+echo "4. Deploying product-service to product namespace..."
 kubectl apply -f k8s/product-service/
 
-echo -e "${GREEN}5. Deploying cart-service to cart namespace...${NC}"
+echo "5. Deploying cart-service to cart namespace..."
 kubectl apply -f k8s/cart-service/
 
-echo -e "${GREEN}6. Deploying order-service to order namespace...${NC}"
+echo "6. Deploying order-service to order namespace..."
 kubectl apply -f k8s/order-service/
 
-echo -e "${GREEN}7. Deploying review-service to review namespace...${NC}"
+echo "7. Deploying review-service to review namespace..."
 kubectl apply -f k8s/review-service/
 
-echo -e "${GREEN}8. Deploying notification-service to notification namespace...${NC}"
+echo "8. Deploying notification-service to notification namespace..."
 kubectl apply -f k8s/notification-service/
 
-echo -e "${GREEN}9. Deploying shipping-service to shipping namespace...${NC}"
+echo "9. Deploying shipping-service to shipping namespace..."
 kubectl apply -f k8s/shipping-service/
 
-echo -e "${GREEN}10. Deploying shipping-service-v2 to shipping namespace...${NC}"
+echo "10. Deploying shipping-service-v2 to shipping namespace..."
 kubectl apply -f k8s/shipping-service-v2/
 
 echo ""
-echo -e "${GREEN}🎉 All 9 services deployed!${NC}"
+echo "🎉 All 9 services deployed!"
 
 # Wait for pods to be ready
-echo -e "${YELLOW}Waiting for pods to be ready...${NC}"
+echo "Waiting for pods to be ready..."
 kubectl wait --for=condition=ready pod -l app=auth-service -n auth --timeout=60s || true
 kubectl wait --for=condition=ready pod -l app=user-service -n user --timeout=60s || true
 kubectl wait --for=condition=ready pod -l app=product-service -n product --timeout=60s || true
@@ -57,7 +51,7 @@ kubectl wait --for=condition=ready pod -l app=shipping-service -n shipping --tim
 kubectl wait --for=condition=ready pod -l app=shipping-service-v2 -n shipping --timeout=60s || true
 
 echo ""
-echo -e "${GREEN}📊 Pod Status Summary:${NC}"
+echo "📊 Pod Status Summary:"
 kubectl get pods -n auth
 kubectl get pods -n user
 kubectl get pods -n product

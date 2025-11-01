@@ -1,14 +1,20 @@
 #!/bin/bash
 set -e
 
-# Colors
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m'
+echo "=== Building All Microservices ==="
 
-echo -e "${BLUE}=== Building All Microservices ===${NC}"
+# Parse command line arguments
+NO_CACHE="false"
+FORCE="false"
+
+if [ "$1" = "--no-cache" ] || [ "$1" = "--force" ]; then
+    NO_CACHE="true"
+fi
+
+if [ "$1" = "--force" ]; then
+    FORCE="true"
+    NO_CACHE="true"
+fi
 
 SERVICES=(
     "auth-service"
@@ -34,36 +40,51 @@ wait_for_pods() {
     local app_label=$2
     local timeout=${3:-60}
     
-    echo -e "${YELLOW}Waiting for $app_label pods in $namespace namespace...${NC}"
+    echo "Waiting for $app_label pods in $namespace namespace..."
     kubectl wait --for=condition=ready pod -l app=$app_label -n $namespace --timeout=${timeout}s || {
-        echo -e "${RED}❌ $app_label pods not ready after ${timeout}s${NC}"
-        echo -e "${YELLOW}Checking pod status:${NC}"
+        echo "❌ $app_label pods not ready after ${timeout}s"
+        echo "Checking pod status:"
         kubectl get pods -n $namespace -l app=$app_label
-        echo -e "${YELLOW}Pod logs:${NC}"
+        echo "Pod logs:"
         kubectl logs -n $namespace -l app=$app_label --tail=10
         return 1
     }
-    echo -e "${GREEN}✅ $app_label pods are ready${NC}"
+    echo "✅ $app_label pods are ready"
 }
 
 for service in "${SERVICES[@]}"; do
-    echo -e "${GREEN}Building $service...${NC}"
+    echo "Building $service..."
     
-    # Check if image already exists in Kind
-    if check_image_in_kind $service; then
-        echo -e "${YELLOW}⚠️  $service image already exists in Kind, skipping build${NC}"
+    # Check if image already exists in Kind (skip only if not forcing rebuild)
+    # Always rebuild if --no-cache or --force is specified
+    if [ "$FORCE" != "true" ] && [ "$NO_CACHE" != "true" ] && check_image_in_kind $service; then
+        echo "⚠️  $service image already exists in Kind, skipping build"
+        echo "   Use --no-cache or --force to rebuild anyway"
         continue
     fi
     
+    # If --no-cache or --force, always rebuild (skip check above)
+    if [ "$NO_CACHE" = "true" ] || [ "$FORCE" = "true" ]; then
+        echo "   Rebuilding $service (--no-cache flag detected)"
+    fi
+    
+    # Build command with optional --no-cache flag
+    BUILD_CMD="docker build --build-arg SERVICE_NAME=$service -f Dockerfile -t $service:latest"
+    if [ "$NO_CACHE" = "true" ]; then
+        BUILD_CMD="$BUILD_CMD --no-cache"
+        echo "   Building with --no-cache flag"
+    fi
+    BUILD_CMD="$BUILD_CMD ."
+    
     # Build with retry mechanism
     for attempt in 1 2 3; do
-        if docker build --build-arg SERVICE_NAME=$service -f docker/Dockerfile -t $service:latest .; then
-            echo -e "${GREEN}✅ $service built successfully${NC}"
+        if eval $BUILD_CMD; then
+            echo "✅ $service built successfully"
             break
         else
-            echo -e "${YELLOW}⚠️  Build attempt $attempt failed, retrying...${NC}"
+            echo "⚠️  Build attempt $attempt failed, retrying..."
             if [ $attempt -eq 3 ]; then
-                echo -e "${RED}❌ Failed to build $service after 3 attempts${NC}"
+                echo "❌ Failed to build $service after 3 attempts"
                 exit 1
             fi
         fi
@@ -72,12 +93,12 @@ for service in "${SERVICES[@]}"; do
     # Load to Kind with retry
     for attempt in 1 2 3; do
         if kind load docker-image $service:latest --name monitoring-local; then
-            echo -e "${GREEN}✅ $service loaded to Kind${NC}"
+            echo "✅ $service loaded to Kind"
             break
         else
-            echo -e "${YELLOW}⚠️  Load attempt $attempt failed, retrying...${NC}"
+            echo "⚠️  Load attempt $attempt failed, retrying..."
             if [ $attempt -eq 3 ]; then
-                echo -e "${RED}❌ Failed to load $service to Kind after 3 attempts${NC}"
+                echo "❌ Failed to load $service to Kind after 3 attempts"
                 exit 1
             fi
         fi
@@ -85,12 +106,17 @@ for service in "${SERVICES[@]}"; do
     
     # Verify image is loaded in Kind
     if check_image_in_kind $service; then
-        echo -e "${GREEN}✅ $service image verified in Kind cluster${NC}"
+        echo "✅ $service image verified in Kind cluster"
     else
-        echo -e "${RED}❌ $service image not found in Kind cluster${NC}"
+        echo "❌ $service image not found in Kind cluster"
         exit 1
     fi
 done
 
 echo ""
-echo -e "${GREEN}🎉 All 9 services built and loaded to Kind cluster!${NC}"
+echo "🎉 All 9 services built and loaded to Kind cluster!"
+echo ""
+echo "Usage:"
+echo "  ./scripts/03-build-microservices.sh              # Normal build (use cache, skip existing)"
+echo "  ./scripts/03-build-microservices.sh --no-cache   # Rebuild without cache"
+echo "  ./scripts/03-build-microservices.sh --force      # Force rebuild all (no cache, skip checks)"

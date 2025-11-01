@@ -53,12 +53,7 @@ project-monitoring-golang/
 │   └── middleware/
 │       └── prometheus.go          # Prometheus metrics middleware
 │
-├── docker/                        # Dockerfiles
-│   ├── user-service-v1.Dockerfile
-│   ├── product-service-v1.Dockerfile
-│   ├── checkout-service-v1.Dockerfile
-│   ├── order-service-v2.Dockerfile
-│   └── unified-service-v3.Dockerfile
+├── Dockerfile                     # Unified Dockerfile for all services (uses ARG SERVICE_NAME)
 │
 ├── k8s/                           # Kubernetes manifests
 │   ├── user-service-v1/
@@ -157,7 +152,7 @@ This script:
 ### Manual Build & Deploy
 ```bash
 # Build single service
-docker build -f docker/user-service-v1.Dockerfile -t user-service-v1:latest .
+docker build --build-arg SERVICE_NAME=user-service -f Dockerfile -t user-service:latest .
 kind load docker-image user-service-v1:latest --name monitoring-demo
 
 # Deploy single service

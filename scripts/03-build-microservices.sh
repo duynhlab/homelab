@@ -57,7 +57,7 @@ for service in "${SERVICES[@]}"; do
     
     # Build with retry mechanism
     for attempt in 1 2 3; do
-        if docker build -f docker/$service.Dockerfile -t $service:latest .; then
+        if docker build --build-arg SERVICE_NAME=$service -f docker/Dockerfile -t $service:latest .; then
             echo -e "${GREEN}✅ $service built successfully${NC}"
             break
         else

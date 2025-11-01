@@ -24,12 +24,15 @@ WORKDIR /root/
 # Build argument needed in this stage too
 ARG SERVICE_NAME
 
+# Set ENV from ARG so it can be used in CMD
+ENV SERVICE_NAME=${SERVICE_NAME}
+
 # Copy the binary from builder stage
 COPY --from=builder /app/${SERVICE_NAME} .
 
 # Expose port
 EXPOSE 8080
 
-# Run the binary
-CMD ["./${SERVICE_NAME}"]
+# Run the binary using shell form so ENV variable is resolved
+CMD ./${SERVICE_NAME}
 

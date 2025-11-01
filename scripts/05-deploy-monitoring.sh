@@ -1,43 +1,37 @@
 #!/bin/bash
 set -e
 
-# Colors
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-echo -e "${BLUE}=== Deploying Monitoring Stack ===${NC}"
+echo "=== Deploying Monitoring Stack ==="
 
 # Deploy Prometheus (simple deployment)
-echo -e "${GREEN}1. Deploying Prometheus...${NC}"
+echo "1. Deploying Prometheus..."
 kubectl apply -f k8s/prometheus/
 
 # Wait for Prometheus
-echo -e "${YELLOW}Waiting for Prometheus to be ready...${NC}"
+echo "Waiting for Prometheus to be ready..."
 kubectl wait --for=condition=ready pod -l app=prometheus -n monitoring --timeout=120s || true
 
 # Create Grafana dashboard ConfigMap
-echo -e "${GREEN}2. Creating Grafana dashboard ConfigMap...${NC}"
+echo "2. Creating Grafana dashboard ConfigMap..."
 kubectl create configmap grafana-dashboard-json --from-file=grafana-dashboard.json -n monitoring --dry-run=client -o yaml | kubectl apply -f -
 
 # Deploy Grafana
-echo -e "${GREEN}3. Deploying Grafana...${NC}"
+echo "3. Deploying Grafana..."
 kubectl apply -f k8s/grafana/
 
 # Wait for Grafana
-echo -e "${YELLOW}Waiting for Grafana to be ready...${NC}"
+echo "Waiting for Grafana to be ready..."
 kubectl wait --for=condition=ready pod -l app=grafana -n monitoring --timeout=120s || true
 
 # Check status
 echo ""
-echo -e "${GREEN}=== Monitoring Stack Status ===${NC}"
+echo "=== Monitoring Stack Status ==="
 kubectl get pods -n monitoring
 kubectl get svc -n monitoring
 # kubectl get servicemonitor -n monitoring
 
 echo ""
-echo -e "${GREEN}✓ Monitoring stack deployed successfully!${NC}"
-echo -e "${BLUE}Prometheus: http://localhost:9090${NC}"
-echo -e "${BLUE}Grafana:    http://localhost:3000 (admin/admin)${NC}"
+echo "✓ Monitoring stack deployed successfully!"
+echo "Prometheus: http://localhost:9090"
+echo "Grafana:    http://localhost:3000 (admin/admin)"
 

@@ -81,7 +81,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", code=~\"2..\"}[$rate])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", code=~\"2..\"}[$rate])) by (le))",
           "refId": "A"
         }
       ],
@@ -143,7 +143,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", code=~\"2..\"}[$rate])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", code=~\"2..\"}[$rate])) by (le))",
           "refId": "A"
         }
       ],
@@ -205,7 +205,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.5, sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", code=~\"2..\"}[$rate])) by (le))",
+          "expr": "histogram_quantile(0.5, sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", code=~\"2..\"}[$rate])) by (le))",
           "refId": "A"
         }
       ],
@@ -259,7 +259,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}[$rate]))",
+          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[$rate]))",
           "refId": "A"
         }
       ],
@@ -313,7 +313,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", code=~\"2..\"}[$rate]))",
+          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", code=~\"2..\"}[$rate]))",
           "refId": "A"
         }
       ],
@@ -367,7 +367,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", code=~\"4..|5..\"}[$rate]))",
+          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", code=~\"4..|5..\"}[$rate]))",
           "refId": "A"
         }
       ],
@@ -429,7 +429,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(\n  sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", code=~\"2..\"}[$rate]))\n  /\n  sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}[$rate]))\n) * 100",
+          "expr": "(\n  sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", code=~\"2..\"}[$rate]))\n  /\n  sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[$rate]))\n) * 100",
           "refId": "A"
         }
       ],
@@ -491,7 +491,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(\n  sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", code=~\"4..|5..\"}[$rate]))\n  /\n  sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}[$rate]))\n) * 100",
+          "expr": "(\n  sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", code=~\"4..|5..\"}[$rate]))\n  /\n  sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[$rate]))\n) * 100",
           "refId": "A"
         }
       ],
@@ -553,7 +553,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", le=\"0.5\"}[$rate])) + (sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", le=\"2\"}[$rate])) - sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", le=\"0.5\"}[$rate]))) / 2) / sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}[$rate]))",
+          "expr": "(sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", le=\"0.5\"}[$rate])) + (sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", le=\"2\"}[$rate])) - sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", le=\"0.5\"}[$rate]))) / 2) / sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[$rate]))",
           "refId": "A"
         }
       ],
@@ -607,7 +607,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(increase(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}[$__range]))",
+          "expr": "sum(increase(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[$__range]))",
           "refId": "A"
         }
       ],
@@ -797,7 +797,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}) by (code)",
+          "expr": "sum(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}) by (code)",
           "legendFormat": "REST.{{code}}",
           "refId": "A"
         }
@@ -855,7 +855,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(increase(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}[$__range])) by (path)",
+          "expr": "sum(increase(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[$__range])) by (path)",
           "legendFormat": "{{path}}",
           "refId": "A"
         }
@@ -940,7 +940,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}[$rate])) by (path)",
+          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[$rate])) by (path)",
           "legendFormat": "{{path}}",
           "refId": "A"
         }
@@ -1025,7 +1025,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}[$rate])) by (path)",
+          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[$rate])) by (path)",
           "legendFormat": "{{path}}",
           "refId": "A"
         }
@@ -1127,7 +1127,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}[$rate])) by (method, path)",
+          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[$rate])) by (method, path)",
           "legendFormat": "{{method}} {{path}}",
           "refId": "A"
         }
@@ -1220,7 +1220,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", code=~\"4..|5..\"}[$rate])) by (method, path) / sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\"}[$rate])) by (method, path)) * 100 > 0",
+          "expr": "(sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", code=~\"4..|5..\"}[$rate])) by (method, path) / sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[$rate])) by (method, path)) * 100 > 0",
           "legendFormat": "{{method}} {{path}}",
           "refId": "A"
         }
@@ -1305,7 +1305,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\"}[$rate])) by (le, path, code))",
+          "expr": "histogram_quantile(0.95, sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[$rate])) by (le, path, code))",
           "legendFormat": "{{code}} {{path}}",
           "refId": "A"
         }
@@ -1390,7 +1390,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\"}[$rate])) by (le, path, code))",
+          "expr": "histogram_quantile(0.50, sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[$rate])) by (le, path, code))",
           "legendFormat": "{{code}} {{path}}",
           "refId": "A"
         }
@@ -1475,7 +1475,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\"}[$rate])) by (le, path, code))",
+          "expr": "histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[$rate])) by (le, path, code))",
           "legendFormat": "{{code}} {{path}}",
           "refId": "A"
         }
@@ -2278,12 +2278,12 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(rate(response_size_bytes_sum{app=~\"$app\", namespace=~\"$namespace\"}[5m])) by (app)",
+          "expr": "sum(rate(response_size_bytes_sum{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[5m])) by (app)",
           "legendFormat": "{{app}} TX",
           "refId": "A"
         },
         {
-          "expr": "sum(rate(request_size_bytes_sum{app=~\"$app\", namespace=~\"$namespace\"}[5m])) by (app)",
+          "expr": "sum(rate(request_size_bytes_sum{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[5m])) by (app)",
           "legendFormat": "{{app}} RX",
           "refId": "B"
         }
@@ -2368,7 +2368,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(requests_in_flight{app=~\"$app\", namespace=~\"$namespace\"}) by (app)",
+          "expr": "sum(requests_in_flight{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}) by (app)",
           "legendFormat": "{{app}}",
           "refId": "A"
         }

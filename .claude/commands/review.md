@@ -10,6 +10,7 @@ Review code, configs, or dashboard changes
 4. Validate Kubernetes manifest syntax
 5. Check for hardcoded values (should use variables)
 6. Verify aggregation strategies (by app vs by pod)
+7. Verify namespace structure matches current conventions
 
 ## Review Checklist
 
@@ -20,22 +21,26 @@ Review code, configs, or dashboard changes
 - [ ] Units correct (bytes, short, reqps, percent, ms)
 - [ ] GridPos layout logical and not overlapping
 - [ ] Template variables used (`$rate`, `$namespace`, `$app`)
+- [ ] Dashboard UID: `microservices-monitoring-001`
 
 ### Prometheus Query Review
 - [ ] `rate()` used for counters with `$rate` variable
+- [ ] `job=~"microservices"` filter present in all queries
 - [ ] Aggregation strategy appropriate (`sum(...) by (app)` for overview)
 - [ ] Namespace filtering: `{namespace=~"$namespace"}`
 - [ ] App filtering: `{app=~"$app"}`
 - [ ] Histogram quantiles: `histogram_quantile(0.95, sum(rate(...)) by (le))`
 - [ ] No hardcoded time windows (use `$rate`)
+- [ ] No hardcoded namespace values
 
 ### Kubernetes Manifest Review
-- [ ] Namespace: `monitoring-demo`
-- [ ] Labels: `app`, `version`, `component`
-- [ ] Resource limits appropriate (memory: 256Mi-512Mi, CPU: 100m-500m)
+- [ ] Namespace: Service-specific (`auth`, `user`, `product`, etc.) or `monitoring` for monitoring components
+- [ ] Labels: `app`, `component` (version label removed)
+- [ ] Resource limits appropriate (memory: 64Mi-128Mi for services, larger for monitoring)
 - [ ] ConfigMap naming: `{component}-{type}`
 - [ ] Service naming matches deployment
 - [ ] Deployment strategy: RollingUpdate
+- [ ] Service selector matches pod labels
 
 ### Code Review
 - [ ] Go code follows conventions
@@ -52,3 +57,18 @@ Review code, configs, or dashboard changes
 - [ ] Burn rate windows: 1h (critical), 6h (warning), 24h (info)
 - [ ] Alert severity levels defined
 - [ ] Recording rules update every 1m
+- [ ] SLO files in `slo/definitions/{service-name}.yaml`
+
+### Service Structure Review
+- [ ] Service has own namespace (auth, user, product, etc.)
+- [ ] Service code in `cmd/{service-name}/` and `internal/{service-name}/`
+- [ ] K8s manifests in `k8s/{service-name}/`
+- [ ] SLO definition in `slo/definitions/{service-name}.yaml`
+- [ ] Build script includes service
+- [ ] Deploy script includes service
+
+### Script Review
+- [ ] Scripts use numbered prefixes (01-13)
+- [ ] Scripts follow naming convention: `{number}-{purpose}.sh`
+- [ ] Scripts reference correct namespaces
+- [ ] SLO scripts use correct paths: `slo/definitions/`, `slo/generated/`

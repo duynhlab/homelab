@@ -31,6 +31,11 @@ spec:
         volumeMounts:
         - name: prometheus-config
           mountPath: /etc/prometheus
+        - name: prometheus-slo-rules
+          mountPath: /etc/prometheus/slo-rules
+          readOnly: true
+          # Each ConfigMap file will be mounted as slo-rules.yaml
+          # We need to rename them to service-specific names
         - name: prometheus-storage
           mountPath: /prometheus
         resources:
@@ -44,6 +49,65 @@ spec:
       - name: prometheus-config
         configMap:
           name: prometheus-config
+      - name: prometheus-slo-rules
+        projected:
+          sources:
+          # Mount all service-specific SLO rule ConfigMaps
+          # Each ConfigMap has a key like "auth-service-rules.yaml" which maps to the file name
+          - configMap:
+              name: prometheus-slo-rules-auth-service
+              items:
+              - key: auth-service-rules.yaml
+                path: auth-service-rules.yaml
+              optional: true
+          - configMap:
+              name: prometheus-slo-rules-user-service
+              items:
+              - key: user-service-rules.yaml
+                path: user-service-rules.yaml
+              optional: true
+          - configMap:
+              name: prometheus-slo-rules-product-service
+              items:
+              - key: product-service-rules.yaml
+                path: product-service-rules.yaml
+              optional: true
+          - configMap:
+              name: prometheus-slo-rules-cart-service
+              items:
+              - key: cart-service-rules.yaml
+                path: cart-service-rules.yaml
+              optional: true
+          - configMap:
+              name: prometheus-slo-rules-order-service
+              items:
+              - key: order-service-rules.yaml
+                path: order-service-rules.yaml
+              optional: true
+          - configMap:
+              name: prometheus-slo-rules-review-service
+              items:
+              - key: review-service-rules.yaml
+                path: review-service-rules.yaml
+              optional: true
+          - configMap:
+              name: prometheus-slo-rules-notification-service
+              items:
+              - key: notification-service-rules.yaml
+                path: notification-service-rules.yaml
+              optional: true
+          - configMap:
+              name: prometheus-slo-rules-shipping-service
+              items:
+              - key: shipping-service-rules.yaml
+                path: shipping-service-rules.yaml
+              optional: true
+          - configMap:
+              name: prometheus-slo-rules-shipping-service-v2
+              items:
+              - key: shipping-service-v2-rules.yaml
+                path: shipping-service-v2-rules.yaml
+              optional: true
       - name: prometheus-storage
         emptyDir: {}
 

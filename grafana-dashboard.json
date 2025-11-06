@@ -2519,8 +2519,8 @@
       {
         "current": {
           "selected": true,
-          "text": "monitoring-demo",
-          "value": "monitoring-demo"
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",

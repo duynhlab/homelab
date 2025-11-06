@@ -1,6 +1,6 @@
 ---
 description: Grafana dashboard development guidelines
-globs: ["grafana-dashboard.json", "slo/dashboards/*.json"]
+globs: ["grafana-dashboard.json"]
 alwaysApply: false
 ---
 
@@ -12,8 +12,8 @@ alwaysApply: false
 - **Tags**: prometheus, monitoring, kubernetes
 
 ## Template Variables
-- `$app`: Application filter (demo-go-api, demo-go-api-v2, demo-go-api-v3)
-- `$namespace`: Namespace filter (monitoring-demo)
+- `$app`: Application filter (auth-service, user-service, product-service, cart-service, order-service, review-service, notification-service, shipping-service, shipping-service-v2)
+- `$namespace`: Namespace filter (service namespaces: auth, user, product, cart, order, review, notification, shipping, or monitoring for monitoring components)
 - `$rate`: Rate interval (5m, 15m, 1h, 6h, 12h, 1d)
 
 ## Panel Layout

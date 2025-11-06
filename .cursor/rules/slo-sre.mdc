@@ -45,25 +45,29 @@ alwaysApply: false
 - **Info**: `slo:availability:burn_rate_24h > 3`
 
 ## Documentation
-- **Language**: Vietnamese for SLO concepts
+- **Location**: `docs/slo/`
 - **Files**:
-  - `slo/docs/SLO_CONCEPTS_VI.md`
-  - `slo/docs/SLO_CALCULATIONS_VI.md`
-  - `slo/docs/SLO_EXAMPLES_VI.md`
-  - `slo/docs/SLO_ALERT_RESPONSE_VI.md`
-  - `slo/docs/SLO_QUICK_REFERENCE.md`
+  - `README.md` - SLO system overview
+  - `GETTING_STARTED.md` - Setup guide
+  - `SLI_DEFINITIONS.md` - SLI specifications
+  - `SLO_TARGETS.md` - SLO targets per service
+  - `ALERTING.md` - Alert configuration
+  - `ERROR_BUDGET_POLICY.md` - Budget management
+
+## Scripts
+- **Location**: `scripts/09-11` (SLO management)
+- **Files**:
+  - `09-validate-slo.sh` - Validate SLO definitions
+  - `10-generate-slo-rules.sh` - Generate Prometheus rules
+  - `11-deploy-slo.sh` - Deploy SLO system
 
 ## Runbooks
-- **Location**: `slo/runbooks/`
+- **Location**: `scripts/12-13`
 - **Files**:
-  - `diagnose-latency.sh`
-  - `error-budget-alert.sh`
-  - `incident-classifier/`
+  - `12-diagnose-latency.sh` - Latency diagnostics
+  - `13-error-budget-alert.sh` - Error budget response
 
-## Deployment
-- **Script**: `slo/scripts/deploy-slo.sh`
-- **Components**:
-  - Recording rules
-  - Alert rules
-  - SLO dashboard
-  - Runbooks
+## Data Files
+- **Definitions**: `slo/definitions/*.yaml` (9 services)
+- **Generated Rules**: `slo/generated/*.yaml`
+- **K8s Manifests**: `k8s/slo/sloth-job.yaml`

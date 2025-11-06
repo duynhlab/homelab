@@ -1,0 +1,126 @@
+# SLO Definitions for UserService
+# Generated using Sloth (https://sloth.dev)
+# This file defines SLOs for user-service following Google SRE best practices
+
+version: "prometheus/v1"
+service: "user-service"
+labels:
+  team: "platform"
+  env: "demo"
+  service: "user-service"
+  namespace: "user"
+
+slos:
+  - name: "availability"
+    objective: 99.5
+    description: "Availability measures the ratio of successful requests (non-5xx) to total requests"
+    sli:
+      events:
+        error_query: |
+          sum(rate(request_duration_seconds_count{
+            app="user-service",
+            namespace="user",
+            job=~"microservices",
+            code=~"5.."
+          }[{{.window}}]))
+        total_query: |
+          sum(rate(request_duration_seconds_count{
+            app="user-service",
+            namespace="user",
+            job=~"microservices"
+          }[{{.window}}]))
+    alerting:
+      name: UserServiceHighErrorRate
+      labels:
+        severity: critical
+        category: availability
+        service: "user-service"
+      annotations:
+        summary: "High 5xx error rate detected on user-service"
+        description: "Availability SLO is at risk. Current error rate is impacting UserService."
+      page_alert:
+        labels:
+          severity: page
+          channel: "#alerts"
+      ticket_alert:
+        labels:
+          severity: ticket
+          channel: "#incidents"
+
+  - name: "latency"
+    objective: 95.0
+    description: "Latency measures the ratio of requests faster than 500ms to total requests"
+    sli:
+      events:
+        error_query: |
+          sum(rate(request_duration_seconds_count{
+            app="user-service",
+            namespace="user",
+            job=~"microservices"
+          }[{{.window}}]))
+          -
+          sum(rate(request_duration_seconds_bucket{
+            app="user-service",
+            namespace="user",
+            job=~"microservices",
+            le="0.5"
+          }[{{.window}}]))
+        total_query: |
+          sum(rate(request_duration_seconds_count{
+            app="user-service",
+            namespace="user",
+            job=~"microservices"
+          }[{{.window}}]))
+    alerting:
+      name: UserServiceHighLatency
+      labels:
+        severity: warning
+        category: latency
+        service: "user-service"
+      annotations:
+        summary: "High latency detected on user-service"
+        description: "More than 5% of requests are slower than 500ms threshold."
+      page_alert:
+        labels:
+          severity: page
+          channel: "#alerts"
+      ticket_alert:
+        labels:
+          severity: ticket
+          channel: "#incidents"
+
+  - name: "error-rate"
+    objective: 99.0
+    description: "Error rate measures the ratio of successful requests (non-4xx/5xx) to total requests"
+    sli:
+      events:
+        error_query: |
+          sum(rate(request_duration_seconds_count{
+            app="user-service",
+            namespace="user",
+            job=~"microservices",
+            code=~"4..|5.."
+          }[{{.window}}]))
+        total_query: |
+          sum(rate(request_duration_seconds_count{
+            app="user-service",
+            namespace="user",
+            job=~"microservices"
+          }[{{.window}}]))
+    alerting:
+      name: UserServiceHighOverallErrorRate
+      labels:
+        severity: warning
+        category: errors
+        service: "user-service"
+      annotations:
+        summary: "High overall error rate (4xx + 5xx) on user-service"
+        description: "More than 1% of requests are returning errors."
+      page_alert:
+        labels:
+          severity: page
+          channel: "#alerts"
+      ticket_alert:
+        labels:
+          severity: ticket
+          channel: "#incidents"

@@ -19,22 +19,30 @@ alwaysApply: true
 ## Directory Structure
 ```
 Mics/Github/project-monitoring-golang/
-├── cmd/                    # Service entry points
-│   ├── user-service-v1/
-│   ├── product-service-v1/
-│   ├── checkout-service-v1/
-│   ├── order-service-v2/
-│   └── unified-service-v3/
+├── cmd/                    # Service entry points (9 services)
+│   ├── auth-service/
+│   ├── user-service/
+│   ├── product-service/
+│   ├── cart-service/
+│   ├── order-service/
+│   ├── review-service/
+│   ├── notification-service/
+│   ├── shipping-service/
+│   └── shipping-service-v2/
 ├── internal/              # Domain logic
+│   ├── auth/
 │   ├── user/
 │   ├── product/
-│   ├── checkout/
-│   └── order/
+│   ├── cart/
+│   ├── order/
+│   ├── review/
+│   ├── notification/
+│   └── shipping/
 ├── pkg/                   # Shared packages
 │   └── middleware/
 ├── k8s/                   # Kubernetes manifests
-├── docker/                # Dockerfiles
-├── scripts/              # Build & deploy scripts
+├── Dockerfile             # Unified Dockerfile for all services
+├── scripts/              # Build & deploy scripts (numbered 01-13)
 ├── docs/                 # Documentation
 ├── slo/                  # SLO/SRE configurations
 └── grafana-dashboard.json # Main dashboard
@@ -42,8 +50,8 @@ Mics/Github/project-monitoring-golang/
 
 ## File Creation Rules
 - **ALWAYS** prepend `Mics/Github/project-monitoring-golang/` to file paths
-- Example: `Mics/Github/project-monitoring-golang/cmd/user-service-v1/main.go`
-- Example: `Mics/Github/project-monitoring-golang/internal/user/handler.go`
+- Example: `Mics/Github/project-monitoring-golang/cmd/auth-service/main.go`
+- Example: `Mics/Github/project-monitoring-golang/internal/auth/handler.go`
 
 ## Terminal Commands
 - First command should always be: `cd Mics/Github/project-monitoring-golang`

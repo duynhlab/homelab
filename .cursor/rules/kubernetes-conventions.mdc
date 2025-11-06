@@ -7,26 +7,26 @@ alwaysApply: false
 # Kubernetes Conventions
 
 ## Namespace Convention
-- Always use `monitoring-demo` namespace
-- Apply to all resources: `kubectl apply -f k8s/namespace.yaml`
+- **Service namespaces**: Each microservice has its own namespace (auth, user, product, cart, order, review, notification, shipping)
+- **Monitoring namespace**: `monitoring` for Prometheus, Grafana, k6, and SLO components
+- Apply namespaces: `kubectl apply -f k8s/namespaces.yaml`
 
 ## Label Standards
-- `app`: Application name (demo-go-api, demo-go-api-v2, demo-go-api-v3)
-- `version`: Application version (v1, v2, v3)
+- `app`: Service name (auth-service, user-service, product-service, cart-service, order-service, review-service, notification-service, shipping-service)
 - `component`: Component type (api, monitoring, load-test)
 
 ## Resource Limits
-- **Memory**: 256Mi-512Mi for apps, 2Gi for k6 load generator
-- **CPU**: 100m-500m for apps, 2000m for k6 load generator
+- **Memory**: 64Mi-128Mi for services, larger for monitoring components, 2Gi for k6 load generator
+- **CPU**: 50m-100m for services, larger for monitoring components, 2000m for k6 load generator
 - **Example**:
   ```yaml
   resources:
     requests:
-      memory: "256Mi"
-      cpu: "100m"
+      memory: "64Mi"
+      cpu: "50m"
     limits:
-      memory: "512Mi"
-      cpu: "500m"
+      memory: "128Mi"
+      cpu: "100m"
   ```
 
 ## ConfigMap Naming
@@ -39,7 +39,8 @@ alwaysApply: false
 ## Service Naming
 - Match deployment name exactly
 - Examples:
-  - `demo-go-api` deployment → `demo-go-api` service
+  - `auth-service` deployment → `auth-service` service
+  - `user-service` deployment → `user-service` service
   - `grafana` deployment → `grafana` service
 
 ## Deployment Strategy

@@ -17,16 +17,20 @@ Analyze dashboard, metrics, or system health
    - Parse `grafana-dashboard.json`
    - Extract panel queries and configurations
    - Identify panel types and layouts
+   - Dashboard UID: `microservices-monitoring-001`
 
 2. **Query Analysis**
    - Check Prometheus query syntax
    - Verify variable usage (`$rate`, `$namespace`, `$app`)
+   - Verify `job=~"microservices"` filter is present
+   - Check namespace filtering: `namespace=~"$namespace"`
    - Identify potential performance issues
 
 3. **Metrics Availability**
    - Check if metrics exist in Prometheus
-   - Verify label consistency
+   - Verify label consistency (app, namespace, method, path, code)
    - Test queries with `promtool query instant`
+   - Check service-specific namespaces: `auth`, `user`, `product`, etc.
 
 ### Gap Analysis
 1. **RED Method Coverage**
@@ -44,6 +48,7 @@ Analyze dashboard, metrics, or system health
    - Identify gaps in monitoring coverage
    - Suggest additional panels
    - Recommend alerting rules
+   - Check service-specific metrics per namespace
 
 ### Best Practices Comparison
 1. **Nginx Monitoring**
@@ -60,3 +65,9 @@ Analyze dashboard, metrics, or system health
    - SLI/SLO definitions
    - Error budget tracking
    - Burn rate alerts
+
+### Documentation References
+- Metrics guide: `docs/monitoring/METRICS.md`
+- SLO documentation: `docs/slo/README.md`
+- API reference: `docs/api/API_REFERENCE.md`
+- Setup guide: `docs/getting-started/SETUP.md`

@@ -35,8 +35,8 @@
 - **API**: `kubectl port-forward -n monitoring-demo svc/demo-go-api 8080:8080`
 
 ## Deploy SLO
-1. Update rules in `slo/k8s/`
-2. Run deploy script: `./slo/scripts/deploy-slo.sh`
+1. Update SLO definitions in `slo/definitions/`
+2. Run deploy script: `./scripts/11-deploy-slo.sh`
 3. Verify: `kubectl exec -n monitoring-demo deployment/prometheus -- promtool query instant 'slo:availability:error_budget_remaining_30d'`
 
 ## Restart Deployments

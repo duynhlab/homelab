@@ -22,8 +22,8 @@ Production-ready monitoring solution with Prometheus, Grafana, k6, and SLO track
 ## Architecture Patterns
 - **Metrics Collection**: Pull-based (Prometheus scraping pods via ServiceMonitor)
 - **Dashboard Provisioning**: ConfigMap-based auto-loading
-- **Multi-version Deployment**: 3 app versions (v1, v2, v3) for A/B testing
-- **Namespace Isolation**: monitoring-demo namespace
+- **API Versioning**: Each service supports v1/v2 API endpoints (URL-based versioning)
+- **Namespace Isolation**: Each microservice has its own namespace (auth, user, product, etc.), monitoring components in `monitoring` namespace
 
 ## Key Components
 - **32 Grafana Panels** in 5 row groups (Overview, Traffic, Errors, Runtime, Resources)
@@ -35,12 +35,14 @@ Production-ready monitoring solution with Prometheus, Grafana, k6, and SLO track
 ## Key File Locations
 - `grafana-dashboard.json` - Main dashboard (32 panels)
 - `k8s/prometheus/configmap.yaml` - Prometheus configuration
-- `slo/k8s/` - SLO rules and alerts
-- `docs/METRICS.md` - Comprehensive metrics documentation
-- `AGENT.md` - AI agent documentation
+- `k8s/slo/sloth-job.yaml` - SLO Kubernetes manifests
+- `slo/definitions/` - SLO definition files (9 services)
+- `slo/generated/` - Generated Prometheus rules
+- `docs/monitoring/METRICS.md` - Comprehensive metrics documentation
+- `AGENTS.md` - AI agent guide
 
 ## Quick Reference
-- Namespace: `monitoring-demo`
+- Namespaces: Service-specific (auth, user, product, etc.) and `monitoring` for monitoring components
 - Dashboard UID: `microservices-monitoring-001`
 - Port forward: Grafana (3000), Prometheus (9090), API (8080)
 - Deploy: `./scripts/deploy-all.sh`

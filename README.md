@@ -98,15 +98,15 @@ chmod +x scripts/*.sh
 
 ```bash
 # Port-forward all services
-kubectl port-forward -n monitoring-demo svc/user-service-v1 8081:8080 &
-kubectl port-forward -n monitoring-demo svc/product-service-v1 8082:8080 &
-kubectl port-forward -n monitoring-demo svc/checkout-service-v1 8083:8080 &
-kubectl port-forward -n monitoring-demo svc/order-service-v2 8084:8080 &
-kubectl port-forward -n monitoring-demo svc/unified-service-v3 8085:8080 &
+kubectl port-forward -n auth svc/auth-service 8081:8080 &
+kubectl port-forward -n user svc/user-service 8082:8080 &
+kubectl port-forward -n product svc/product-service 8083:8080 &
+kubectl port-forward -n order svc/order-service 8084:8080 &
+kubectl port-forward -n cart svc/cart-service 8085:8080 &
 
 # Access monitoring
-kubectl port-forward -n monitoring-demo svc/grafana 3000:3000 &
-kubectl port-forward -n monitoring-demo svc/prometheus 9090:9090 &
+kubectl port-forward -n monitoring svc/grafana 3000:3000 &
+kubectl port-forward -n monitoring svc/prometheus 9090:9090 &
 ```
 
 ### Access URLs
@@ -125,7 +125,7 @@ kubectl port-forward -n monitoring-demo svc/prometheus 9090:9090 &
 
 Open Grafana → **"Go REST API Monitoring - Demo"** dashboard is auto-loaded!
 
-**Direct link**: http://localhost:3000/d/go-monitoring-demo/
+**Direct link**: http://localhost:3000/d/microservices-monitoring-001/
 
 ---
 
@@ -232,7 +232,7 @@ Automatically exposed by `prometheus/client_golang`:
 - `go_gc_duration_seconds` - GC pause times
 - `process_cpu_seconds_total` - CPU time
 
-**📖 For detailed metrics documentation, see [docs/METRICS.md](./docs/METRICS.md)**
+**📖 For detailed metrics documentation, see [docs/monitoring/METRICS.md](./docs/monitoring/METRICS.md)**
 
 ---
 
@@ -243,7 +243,7 @@ Automatically exposed by `prometheus/client_golang`:
 A Kubernetes CronJob generates traffic every 2 minutes:
 
 ```bash
-kubectl get cronjob -n monitoring-demo
+kubectl get cronjob -n monitoring
 # demo-loadtest runs every */2 * * * *
 ```
 
@@ -254,7 +254,7 @@ kubectl get cronjob -n monitoring-demo
 for i in {1..100}; do curl http://localhost:8080/api/users & done
 
 # Or trigger CronJob manually
-kubectl create job --from=cronjob/demo-loadtest manual-test-$(date +%s) -n monitoring-demo
+kubectl create job --from=cronjob/demo-loadtest manual-test-$(date +%s) -n monitoring
 ```
 
 ---
@@ -290,14 +290,16 @@ kubectl create job --from=cronjob/demo-loadtest manual-test-$(date +%s) -n monit
 
 | Document | Description |
 |----------|-------------|
-| **[METRICS.md](./docs/METRICS.md)** | ⭐ **Complete guide với phân tích chi tiết tất cả 32 panels** (5 row groups, memory leak detection) |
-| **[K6_LOAD_TESTING.md](./docs/K6_LOAD_TESTING.md)** | 🚀 **k6 continuous load generator setup & configuration** |
-| **[SLO_IMPLEMENTATION.md](./slo/docs/SLO_IMPLEMENTATION.md)** | 🎯 **SRE practices: SLI/SLO definitions, error budgets, burn rate alerts** |
-| **[PROMETHEUS_RATE_EXPLAINED.md](./docs/PROMETHEUS_RATE_EXPLAINED.md)** | 📊 Chi tiết về `rate()`, `increase()` và counter resets |
-| **[TIME_RANGE_AND_RATE_INTERVAL.md](./docs/TIME_RANGE_AND_RATE_INTERVAL.md)** | ⏱️ **Time Range vs Rate Interval: Hướng dẫn chi tiết về Time Range và $rate variable** |
-| **[SETUP.md](./docs/SETUP.md)** | Step-by-step deployment guide |
-| **[VARIABLES_REGEX.md](./docs/VARIABLES_REGEX.md)** | 🎯 Dashboard variables & regex patterns |
-| **[AGENT.md](./AGENT.md)** | 🤖 **AI Agent Documentation: Project overview for AI agents** |
+| **[METRICS.md](./docs/monitoring/METRICS.md)** | ⭐ **Complete guide với phân tích chi tiết tất cả 32 panels** (5 row groups, memory leak detection) |
+| **[K6_LOAD_TESTING.md](./docs/load-testing/K6_LOAD_TESTING.md)** | 🚀 **k6 continuous load generator setup & configuration** |
+| **[SLO Documentation](./docs/slo/README.md)** | 🎯 **SRE practices: SLI/SLO definitions, error budgets, burn rate alerts** |
+| **[SETUP.md](./docs/getting-started/SETUP.md)** | Step-by-step deployment guide |
+| **[API Reference](./docs/api/API_REFERENCE.md)** | Complete API documentation for all 9 microservices |
+| **[Documentation Index](./docs/README.md)** | Complete documentation index with learning path |
+| **[Prometheus Rate Explained](./docs/monitoring/PROMETHEUS_RATE_EXPLAINED.md)** | 📊 Chi tiết về `rate()`, `increase()` và counter resets |
+| **[Time Range & Rate Interval](./docs/monitoring/TIME_RANGE_AND_RATE_INTERVAL.md)** | ⏱️ **Time Range vs Rate Interval: Hướng dẫn chi tiết về Time Range và $rate variable** |
+| **[Variables & Regex](./docs/monitoring/VARIABLES_REGEX.md)** | 🎯 Dashboard variables & regex patterns |
+| **[AGENTS.md](./AGENTS.md)** | 🤖 **AI Agent Guide: Comprehensive navigation and workflows for AI agents** |
 | **[Claude Commands](./.claude/commands/)** | 📋 **AI workflow commands: plan, implement, analyze, review, deploy, document** |
 | **[Cursor Rules](./.cursor/rules/)** | 🔧 **Development guidelines: Kubernetes, Grafana, Prometheus, SLO, Go** |
 
@@ -337,10 +339,10 @@ This project includes comprehensive SRE practices with **Service Level Objective
 
 **🚀 One-Command Deployment:**
 ```bash
-./slo/scripts/deploy-slo.sh
+./scripts/11-deploy-slo.sh
 ```
 
-**📖 Full Documentation:** [SLO_IMPLEMENTATION.md](./slo/docs/SLO_IMPLEMENTATION.md)
+**📖 Full Documentation:** [SLO Documentation](./docs/slo/README.md)
 
 ---
 
@@ -526,4 +528,4 @@ If this helps you understand monitoring, please ⭐ star the repository!
 🚀 **Happy Monitoring!**
 
 
-kubectl port-forward -n monitoring-demo svc/grafana 3000:3000
+kubectl port-forward -n monitoring svc/grafana 3000:3000

@@ -17,6 +17,7 @@ rules:
   - services
   - endpoints
   - pods
+  - configmaps
   verbs: ["get", "list", "watch"]
 - apiGroups:
   - extensions

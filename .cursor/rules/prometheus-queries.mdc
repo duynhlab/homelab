@@ -1,6 +1,6 @@
 ---
 description: Prometheus query best practices and patterns
-globs: ["k8s/prometheus/*.yaml", "slo/k8s/*.yaml"]
+globs: ["k8s/prometheus/*.yaml", "k8s/slo/*.yaml"]
 alwaysApply: false
 ---
 
@@ -34,11 +34,11 @@ alwaysApply: false
   - `slo:availability:time_to_exhaustion_hours`
 
 ## Alert Rule Naming
-- **Pattern**: `{component}_{severity}_{condition}`
+- **Pattern**: `{service}_{severity}_{condition}`
 - **Examples**:
-  - `demo_go_api_critical_high_error_rate`
-  - `demo_go_api_warning_high_latency`
-  - `demo_go_api_info_memory_usage_high`
+  - `auth_service_critical_high_error_rate`
+  - `user_service_warning_high_latency`
+  - `product_service_info_memory_usage_high`
 
 ## SLO Calculations
 - **Availability**: `sum(rate(request_duration_seconds_count{code=~"2.."}[5m])) / sum(rate(request_duration_seconds_count[5m]))`

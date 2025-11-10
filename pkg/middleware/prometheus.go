@@ -67,7 +67,7 @@ func getAppName() string {
 	if name := os.Getenv("APP_NAME"); name != "" {
 		return name
 	}
-	return "demo-go-api"
+	return "unknown"
 }
 
 func getNamespace() string {

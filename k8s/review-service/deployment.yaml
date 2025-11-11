@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: review-service
-        image: review-service:latest
+        image: ghcr.io/duyne-me/review-service:latest
         imagePullPolicy: IfNotPresent
         env:
         - name: APP_NAME

@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: shipping-service
-        image: shipping-service:latest
+        image: ghcr.io/duyne-me/shipping-service:latest
         imagePullPolicy: IfNotPresent
         env:
         - name: APP_NAME

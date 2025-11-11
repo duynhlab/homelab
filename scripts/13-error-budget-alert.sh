@@ -9,36 +9,29 @@ set -e
 NAMESPACE="monitoring"
 PROMETHEUS_URL="http://prometheus.monitoring.svc.cluster.local:9090"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
 print_header() {
-    echo -e "${BLUE}================================${NC}"
-    echo -e "${BLUE}  ERROR BUDGET ALERT REPORT${NC}"
-    echo -e "${BLUE}  $(date)${NC}"
-    echo -e "${BLUE}================================${NC}"
+    echo "================================="
+    echo "  ERROR BUDGET ALERT REPORT"
+    echo "  $(date)"
+    echo "================================="
     echo ""
 }
 
 print_section() {
-    echo -e "${GREEN}📊 $1${NC}"
+    echo "📊 $1"
     echo "----------------------------------------"
 }
 
 print_finding() {
-    echo -e "${YELLOW}🔍 $1${NC}"
+    echo "🔍 $1"
 }
 
 print_critical() {
-    echo -e "${RED}🚨 $1${NC}"
+    echo "🚨 $1"
 }
 
 print_ok() {
-    echo -e "${GREEN}✅ $1${NC}"
+    echo "✅ $1"
 }
 
 # Function to query Prometheus

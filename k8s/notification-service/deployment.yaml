@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: notification-service
-        image: notification-service:latest
+        image: ghcr.io/duyne-me/notification-service:latest
         imagePullPolicy: IfNotPresent
         env:
         - name: APP_NAME

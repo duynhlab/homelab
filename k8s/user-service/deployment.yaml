@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: user-service
-        image: user-service:latest
+        image: ghcr.io/duyne-me/user-service:latest
         imagePullPolicy: IfNotPresent
         env:
         - name: APP_NAME

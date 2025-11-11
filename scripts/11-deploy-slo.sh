@@ -9,7 +9,8 @@ set -e
 
 NAMESPACE="monitoring"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEFINITIONS_DIR="$PROJECT_ROOT/slo/definitions"
 GENERATED_DIR="$PROJECT_ROOT/slo/generated"
 RULES_FILE="$GENERATED_DIR/prometheus-rules.yaml"

@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: auth-service
-        image: auth-service:latest
+        image: ghcr.io/duyne-me/auth-service:latest
         imagePullPolicy: IfNotPresent
         env:
         - name: APP_NAME

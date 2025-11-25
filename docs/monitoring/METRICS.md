@@ -19,7 +19,7 @@ Dự án này expose **6 custom application metrics** và tận dụng **Go runt
 **Buckets:** `0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10`
 
 **Labels:**
-- `app` - Tên ứng dụng (demo-go-api, demo-go-api-v2, demo-go-api-v3)
+- `app` - Tên ứng dụng (auth-service, user-service, product-service, cart-service, order-service, review-service, notification-service, shipping-service, shipping-service-v2)
 - `namespace` - Kubernetes namespace
 - `method` - HTTP method (GET, POST, PUT, DELETE)
 - `path` - Request path (/api/users, /api/products)
@@ -325,7 +325,7 @@ sum(kube_pod_container_status_restarts_total{namespace=~"$namespace", pod=~"^$ap
   - `^$app-`: Bắt đầu bằng app name + dash
   - `[a-z0-9]+-`: ReplicaSet hash + dash
   - `[a-z0-9]+$`: Pod hash, kết thúc
-  - **Quan trọng:** Pattern này tránh việc "demo-go-api" match cả "demo-go-api-v2" và "demo-go-api-v3"
+  - **Quan trọng:** Pattern này tránh việc "auth-service" match cả "auth-service-v2" (nếu có) và các service khác
 - **Lưu ý quan trọng:**
   - **Chỉ đếm container crashes**, không đếm:
     - Rolling updates (kubectl rollout)
@@ -334,10 +334,10 @@ sum(kube_pod_container_status_restarts_total{namespace=~"$namespace", pod=~"^$ap
   - Counter tích lũy từ khi deploy pod
 - **Namespace filter:** Chỉ đếm pods trong namespace được chọn (exclude `kube-system`, `default`)
 - **App filter:** ✅ Đã fix regex để filter chính xác:
-  - Chọn `demo-go-api`: **Chỉ** hiện restarts của v1 pods (4 pods, mỗi pod 0 restart = **0 total**)
-  - Chọn `demo-go-api-v2`: **Chỉ** hiện restarts của v2 pods (2 pods, mỗi pod 1 restart = **2 total**)
-  - Chọn `demo-go-api-v3`: **Chỉ** hiện restarts của v3 pod (1 pod, 1 restart = **1 total**)
-  - Chọn `All`: Hiện tổng restarts của tất cả pods (**3 total**)
+  - Chọn `auth-service`: **Chỉ** hiện restarts của auth-service pods
+  - Chọn `user-service`: **Chỉ** hiện restarts của user-service pods
+  - Chọn `product-service`: **Chỉ** hiện restarts của product-service pods
+  - Chọn `All`: Hiện tổng restarts của tất cả pods từ tất cả services
 - **Expected theo pods hiện tại:**
   - V1 (4 pods): 0 restarts
   - V2 (2 pods): 2 restarts (1 restart/pod)
@@ -430,7 +430,7 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$_
 - **Ý nghĩa:** RPS của từng app version (time series)
 - **Loại panel:** Time series graph
 - **Aggregation:** `by (app)` → 1 line per app
-- **Legend:** `{{app}}` → demo-go-api, demo-go-api-v2, demo-go-api-v3
+- **Legend:** `{{app}}` → auth-service, user-service, product-service, cart-service, order-service, review-service, notification-service, shipping-service, shipping-service-v2
 - **Quan trọng:** Kiểm tra load balancing giữa các versions
 - **Mong đợi:**
   - V1 line: ~3.8 RPS (cao nhất vì 4 pods)
@@ -495,7 +495,7 @@ sum(go_memstats_alloc_bytes{app=~"$app", namespace=~"$namespace"}) by (app)
 - **Legend:** `{{app}}` → 1 line per app (aggregated)
 - **Aggregation:** ✅ `sum(...) by (app)` - Tổng memory của tất cả pods trong 1 app
   - **Lý do:** Capacity planning cần biết **total memory per service**, không phải per pod
-  - **Ví dụ:** V1 có 3 pods (8+9+8=25 MiB) → Show 1 line "demo-go-api: 25 MiB"
+  - **Ví dụ:** auth-service có 3 pods (8+9+8=25 MiB) → Show 1 line "auth-service: 25 MiB"
   - **Alternative:** Individual pods → 3 lines riêng lẻ (harder to read when scaling)
 - **⚠️ Lưu ý quan trọng:**
   - **KHÔNG phải container memory** từ Kubernetes
@@ -553,8 +553,8 @@ sum(rate(request_size_bytes_sum{app=~"$app", namespace=~"$namespace"}[5m])) by (
 - **Nguồn:** Custom histogram metrics từ Go app
 - **Loại panel:** Time series với 2 queries
 - **Legend:** 
-  - `{{app}} TX` → demo-go-api TX (outbound/response, aggregated)
-  - `{{app}} RX` → demo-go-api RX (inbound/request, aggregated)
+  - `{{app}} TX` → auth-service TX (outbound/response, aggregated)
+  - `{{app}} RX` → auth-service RX (inbound/request, aggregated)
 - **Aggregation:** ✅ `sum(rate(...)) by (app)` - Tổng HTTP traffic của tất cả pods
   - **Lý do:** Network bandwidth planning cần **total throughput per service**
   - **Ví dụ:** V1 có 3 pods → Show tổng TX/RX để monitor bandwidth usage
@@ -1057,7 +1057,7 @@ Dashboard hỗ trợ **multi-namespace deployment** với 3 biến filters:
 ### `$app` - Application Filter
 - **Loại:** Multi-select với tùy chọn "All"
 - **Query:** `label_values(request_duration_seconds_count, app)`
-- **Options:** `demo-go-api`, `demo-go-api-v2`, `demo-go-api-v3`, `All`
+- **Options:** `auth-service`, `user-service`, `product-service`, `cart-service`, `order-service`, `review-service`, `notification-service`, `shipping-service`, `shipping-service-v2`, `All`
 - **Mặc định:** `All`
 - **Regex filter:** `/^(?!kube-|default$).*/` (loại trừ system apps)
 - **Use case:** Filter metrics theo app version cụ thể
@@ -1078,7 +1078,7 @@ Dashboard hỗ trợ **multi-namespace deployment** với 3 biến filters:
 static_configs:
 - targets: ['auth-service.auth.svc.cluster.local:8080'] (example for auth-service)
   labels:
-    app: 'demo-go-api'
+    app: 'auth-service'
     namespace: 'auth'  # ← Label này (service-specific namespace)
 ```
 

@@ -2,7 +2,7 @@
 
 ## Vấn Đề Hiện Tại
 
-**Root Cause**: Go application hardcode `app="demo-go-api"` trong metrics, trong khi dashboard filter theo tên service mới (`user-service`, `product-service`, etc.)
+**Root Cause**: Go application hardcode `app="auth-service"` (hoặc tên service cũ) trong metrics, trong khi dashboard filter theo tên service mới (`user-service`, `product-service`, etc.)
 
 **Impact**: 
 - ✅ Go runtime metrics có data (vì không dùng custom `app` label)
@@ -12,7 +12,7 @@
 **Hiện tại**:
 ```promql
 # Metrics từ app
-request_duration_seconds_count{app="demo-go-api", exported_app="demo-go-api"}
+request_duration_seconds_count{app="auth-service", exported_app="auth-service"}
 
 # Dashboard query
 request_duration_seconds_count{app=~"$app"}  # $app = "user-service"
@@ -240,12 +240,12 @@ docker build --build-arg SERVICE_NAME=cart-service -f Dockerfile -t cart-service
 docker build --build-arg SERVICE_NAME=order-service -f Dockerfile -t order-service:latest .
 docker build --build-arg SERVICE_NAME=review-service -f Dockerfile -t review-service:latest .
 
-# Load into Kind
-kind load docker-image user-service-v1:latest --name monitoring-demo
-kind load docker-image product-service-v1:latest --name monitoring-demo
-kind load docker-image checkout-service-v1:latest --name monitoring-demo
-kind load docker-image order-service-v2:latest --name monitoring-demo
-kind load docker-image unified-service-v3:latest --name monitoring-demo
+# Load into Kind (replace {cluster-name} with your actual Kind cluster name)
+kind load docker-image user-service:latest --name {cluster-name}
+kind load docker-image product-service:latest --name {cluster-name}
+kind load docker-image cart-service:latest --name {cluster-name}
+kind load docker-image order-service:latest --name {cluster-name}
+kind load docker-image review-service:latest --name {cluster-name}
 
 # Restart deployments
 kubectl rollout restart deployment/user-service-v1 -n user
@@ -517,7 +517,7 @@ git checkout HEAD~1 pkg/middleware/prometheus.go
 A: Go runtime metrics (go_memstats, go_goroutines) không có custom `app` label, nên không bị ảnh hưởng bởi mismatch.
 
 **Q: ServiceMonitor metricRelabelings có hoạt động không?**
-A: Có, nhưng nó chỉ **add thêm** labels, không **overwrite** labels có sẵn từ app. Nếu app export `app="demo-go-api"`, Prometheus sẽ giữ nguyên.
+A: Có, nhưng nó chỉ **add thêm** labels, không **overwrite** labels có sẵn từ app. Nếu app export `app="auth-service"` (hoặc tên service cũ), Prometheus sẽ giữ nguyên.
 
 **Q: Giải pháp nào nhanh nhất?**
 A: Solution 3 (Static Env) - 5 phút. Nhưng không scalable.

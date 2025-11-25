@@ -9,36 +9,29 @@ set -e
 NAMESPACE="monitoring"
 PROMETHEUS_URL="http://prometheus.monitoring.svc.cluster.local:9090"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
 print_header() {
-    echo -e "${BLUE}================================${NC}"
-    echo -e "${BLUE}  LATENCY DIAGNOSIS REPORT${NC}"
-    echo -e "${BLUE}  $(date)${NC}"
-    echo -e "${BLUE}================================${NC}"
+    echo "================================="
+    echo "  LATENCY DIAGNOSIS REPORT"
+    echo "  $(date)"
+    echo "================================="
     echo ""
 }
 
 print_section() {
-    echo -e "${GREEN}📊 $1${NC}"
+    echo "📊 $1"
     echo "----------------------------------------"
 }
 
 print_finding() {
-    echo -e "${YELLOW}🔍 $1${NC}"
+    echo "🔍 $1"
 }
 
 print_critical() {
-    echo -e "${RED}🚨 $1${NC}"
+    echo "🚨 $1"
 }
 
 print_ok() {
-    echo -e "${GREEN}✅ $1${NC}"
+    echo "✅ $1"
 }
 
 # Function to query Prometheus
@@ -54,7 +47,7 @@ query_prometheus() {
 get_slow_endpoints() {
     print_section "Top 10 Slowest Endpoints (P95)"
     
-    local query='topk(10, histogram_quantile(0.95, rate(request_duration_seconds_bucket{app=~"demo-go-api.*"}[5m])))'
+    local query='topk(10, histogram_quantile(0.95, rate(request_duration_seconds_bucket{app=~".*-service.*", job=~"microservices"}[5m])))'
     
     echo "Querying slowest endpoints..."
     curl -s "$PROMETHEUS_URL/api/v1/query" \
@@ -69,8 +62,8 @@ get_slow_endpoints() {
 check_gc_activity() {
     print_section "Go GC Activity Analysis"
     
-    local gc_duration=$(query_prometheus 'avg(rate(go_gc_duration_seconds_sum{app=~"demo-go-api.*"}[5m]))')
-    local gc_count=$(query_prometheus 'avg(rate(go_gc_duration_seconds_count{app=~"demo-go-api.*"}[5m]))')
+    local gc_duration=$(query_prometheus 'avg(rate(go_gc_duration_seconds_sum{app=~".*-service.*", job=~"microservices"}[5m]))')
+    local gc_count=$(query_prometheus 'avg(rate(go_gc_duration_seconds_count{app=~".*-service.*", job=~"microservices"}[5m]))')
     
     if [ "$gc_duration" != "N/A" ] && [ "$gc_count" != "N/A" ]; then
         local avg_gc_duration=$(echo "$gc_duration * 1000" | bc -l)
@@ -100,7 +93,7 @@ check_resource_throttling() {
     print_section "Resource Throttling Analysis"
     
     # Check CPU throttling
-    local cpu_throttle=$(query_prometheus 'avg(rate(container_cpu_cfs_throttled_seconds_total{container!="POD",pod=~"demo-go-api.*"}[5m]))')
+    local cpu_throttle=$(query_prometheus 'avg(rate(container_cpu_cfs_throttled_seconds_total{container!="POD",pod=~".*-service.*"}[5m]))')
     
     if [ "$cpu_throttle" != "N/A" ]; then
         echo "CPU Throttling Rate: ${cpu_throttle}"
@@ -115,7 +108,7 @@ check_resource_throttling() {
     fi
     
     # Check memory pressure
-    local memory_usage=$(query_prometheus 'avg(go_memstats_alloc_bytes{app=~"demo-go-api.*"} / go_memstats_sys_bytes{app=~"demo-go-api.*"})')
+    local memory_usage=$(query_prometheus 'avg(go_memstats_alloc_bytes{app=~".*-service.*", job=~"microservices"} / go_memstats_sys_bytes{app=~".*-service.*", job=~"microservices"})')
     
     if [ "$memory_usage" != "N/A" ]; then
         local memory_percent=$(echo "$memory_usage * 100" | bc -l)
@@ -138,8 +131,8 @@ check_resource_throttling() {
 check_concurrent_requests() {
     print_section "Concurrent Request Analysis"
     
-    local in_flight=$(query_prometheus 'avg(requests_in_flight{app=~"demo-go-api.*"})')
-    local max_in_flight=$(query_prometheus 'max(requests_in_flight{app=~"demo-go-api.*"})')
+    local in_flight=$(query_prometheus 'avg(requests_in_flight{app=~".*-service.*", job=~"microservices"})')
+    local max_in_flight=$(query_prometheus 'max(requests_in_flight{app=~".*-service.*", job=~"microservices"})')
     
     if [ "$in_flight" != "N/A" ] && [ "$max_in_flight" != "N/A" ]; then
         echo "Average In-Flight Requests: ${in_flight}"
@@ -162,7 +155,7 @@ check_concurrent_requests() {
 check_error_patterns() {
     print_section "Error Pattern Analysis"
     
-    local error_rate=$(query_prometheus 'sum(rate(request_duration_seconds_count{app=~"demo-go-api.*", code=~"4..|5.."}[5m])) / sum(rate(request_duration_seconds_count{app=~"demo-go-api.*"}[5m]))')
+    local error_rate=$(query_prometheus 'sum(rate(request_duration_seconds_count{app=~".*-service.*", job=~"microservices", code=~"4..|5.."}[5m])) / sum(rate(request_duration_seconds_count{app=~".*-service.*", job=~"microservices"}[5m]))')
     
     if [ "$error_rate" != "N/A" ]; then
         local error_percent=$(echo "$error_rate * 100" | bc -l)

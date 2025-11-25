@@ -24,8 +24,15 @@ Regex: (none) - shows all apps
 
 Options:
   - All (shows combined metrics from all apps)
-  - demo-go-api (v1)
-  - demo-go-api-v2 (v2)
+  - auth-service
+  - user-service
+  - product-service
+  - cart-service
+  - order-service
+  - review-service
+  - notification-service
+  - shipping-service
+  - shipping-service-v2
   - (auto-discover new apps)
 ```
 
@@ -35,7 +42,7 @@ Options:
 sum(rate(request_duration_seconds_count{app=~"$app"}[$rate]))
 
 # When "All" selected: app=~".*"
-# When specific app: app=~"demo-go-api"
+# When specific app: app=~"auth-service"
 ```
 
 ---
@@ -98,8 +105,9 @@ Sort: Alphabetical (1)
 
 Options:
   - All
-  - demo-go-api-xxx-yyy
-  - demo-go-api-v2-xxx-yyy
+  - auth-service-xxx-yyy
+  - user-service-xxx-yyy
+  - product-service-xxx-yyy
   - (auto-discover pods in selected namespace)
 ```
 
@@ -126,7 +134,7 @@ Options:
 - `kube-state-metrics-*`
 - `metrics-server-*`
 
-**Result:** Chỉ hiển thị **application pods** (demo-go-api, demo-go-api-v2, v.v.)
+**Result:** Chỉ hiển thị **application pods** (auth-service, user-service, product-service, etc.)
 
 **Usage in queries:**
 ```promql
@@ -137,8 +145,8 @@ sum(rate(request_duration_seconds_count{
 }[$rate])) by (kubernetes_pod_name)
 
 # Multi-select example:
-# When selected: demo-go-api-xxx, demo-go-api-yyy
-# Result: kubernetes_pod_name=~"demo-go-api-xxx|demo-go-api-yyy"
+# When selected: auth-service-xxx, auth-service-yyy
+# Result: kubernetes_pod_name=~"auth-service-xxx|auth-service-yyy"
 ```
 
 ---
@@ -209,7 +217,7 @@ sum(rate(request_duration_seconds_count{app=~"$app"}[$rate]))
 ### **4. Complex Combinations**
 ```regex
 # Production apps, not test, in specific regions
-/^demo-.*-(us|eu)(?!.*-test).*/
+/^.*-service.*-(us|eu)(?!.*-test).*/
 
 # Version 2+ only
 /.*(v[2-9]|v\d{2,})$/
@@ -256,9 +264,9 @@ $rate (independent)
 
 **Example Flow:**
 1. Select namespace: `auth`, `user`, `product`, etc. (service-specific) or `monitoring` (for monitoring components)
-2. App dropdown refreshes → shows: `demo-go-api`, `demo-go-api-v2`
-3. Select app: `demo-go-api`
-4. Pod dropdown refreshes → shows only v1 pods
+2. App dropdown refreshes → shows: `auth-service`, `user-service`, `product-service`, etc.
+3. Select app: `auth-service`
+4. Pod dropdown refreshes → shows only auth-service pods
 5. Queries update automatically
 
 ---
@@ -307,9 +315,9 @@ $rate (independent)
 /^(?!.*prometheus|.*grafana).*/
 ```
 
-### Only demo apps:
+### Only service apps:
 ```regex
-/^demo-.*/
+/^.*-service.*/
 ```
 
 ### Production only:

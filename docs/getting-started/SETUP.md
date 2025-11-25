@@ -204,7 +204,7 @@ curl http://localhost:3000/api/health
 kubectl get pods -n auth
 kubectl get pods -n user
 kubectl get pods -n product -l app=k6-load-generator
-kubectl logs -n monitoring-demo -l app=k6-load-generator
+kubectl logs -n monitoring -l app=k6-load-generator
 ```
 
 ---
@@ -345,13 +345,13 @@ If NodePort doesn't work (WSL2/Windows issues):
 
 ```bash
 # Forward Grafana
-kubectl port-forward svc/grafana 3000:3000 -n monitoring-demo &
+kubectl port-forward svc/grafana 3000:3000 -n monitoring &
 
 # Forward Prometheus
-kubectl port-forward svc/prometheus 9090:9090 -n monitoring-demo &
+kubectl port-forward svc/prometheus 9090:9090 -n monitoring &
 
-# Forward Go API
-kubectl port-forward svc/auth-service 8080:8080 -n monitoring-demo &
+# Forward Go API (example: auth-service)
+kubectl port-forward svc/auth-service 8080:8080 -n auth &
 ```
 
 ---
@@ -426,7 +426,7 @@ kubectl get pods -n user
 kubectl get pods -n product -l app=k6-load-generator
 
 # View logs
-kubectl logs -n monitoring-demo -l app=k6-load-generator
+kubectl logs -n monitoring -l app=k6-load-generator
 ```
 
 ### Manual Testing

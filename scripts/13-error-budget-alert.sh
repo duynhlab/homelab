@@ -9,36 +9,29 @@ set -e
 NAMESPACE="monitoring"
 PROMETHEUS_URL="http://prometheus.monitoring.svc.cluster.local:9090"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
 print_header() {
-    echo -e "${BLUE}================================${NC}"
-    echo -e "${BLUE}  ERROR BUDGET ALERT REPORT${NC}"
-    echo -e "${BLUE}  $(date)${NC}"
-    echo -e "${BLUE}================================${NC}"
+    echo "================================="
+    echo "  ERROR BUDGET ALERT REPORT"
+    echo "  $(date)"
+    echo "================================="
     echo ""
 }
 
 print_section() {
-    echo -e "${GREEN}📊 $1${NC}"
+    echo "📊 $1"
     echo "----------------------------------------"
 }
 
 print_finding() {
-    echo -e "${YELLOW}🔍 $1${NC}"
+    echo "🔍 $1"
 }
 
 print_critical() {
-    echo -e "${RED}🚨 $1${NC}"
+    echo "🚨 $1"
 }
 
 print_ok() {
-    echo -e "${GREEN}✅ $1${NC}"
+    echo "✅ $1"
 }
 
 # Function to query Prometheus
@@ -96,7 +89,7 @@ get_error_budget_status() {
 get_top_error_endpoints() {
     print_section "Top Error-Generating Endpoints"
     
-    local query='topk(10, sum(rate(request_duration_seconds_count{app=~"demo-go-api.*", code=~"4..|5.."}[5m])) by (path))'
+    local query='topk(10, sum(rate(request_duration_seconds_count{app=~".*-service.*", job=~"microservices", code=~"4..|5.."}[5m])) by (path))'
     
     echo "Querying top error endpoints..."
     curl -s "$PROMETHEUS_URL/api/v1/query" \
@@ -112,7 +105,7 @@ check_recent_deployments() {
     print_section "Recent Deployment Analysis"
     
     # Check for recent pod restarts (indicator of deployments)
-    local restart_count=$(query_prometheus 'sum(increase(kube_pod_container_status_restarts_total{pod=~"demo-go-api.*"}[1h]))')
+    local restart_count=$(query_prometheus 'sum(increase(kube_pod_container_status_restarts_total{pod=~".*-service.*"}[1h]))')
     
     if [ "$restart_count" != "N/A" ]; then
         echo "Pod Restarts (last 1h): ${restart_count}"
@@ -128,7 +121,7 @@ check_recent_deployments() {
     fi
     
     # Check deployment age
-    local deployment_age=$(query_prometheus 'time() - kube_deployment_created{deployment=~"demo-go-api.*"}')
+    local deployment_age=$(query_prometheus 'time() - kube_deployment_created{deployment=~".*-service.*"}')
     
     if [ "$deployment_age" != "N/A" ]; then
         local age_hours=$(echo "$deployment_age / 3600" | bc -l)
@@ -150,9 +143,9 @@ analyze_error_patterns() {
     print_section "Error Pattern Analysis"
     
     # Check error rate by status code
-    local error_4xx=$(query_prometheus 'sum(rate(request_duration_seconds_count{app=~"demo-go-api.*", code=~"4.."}[5m]))')
-    local error_5xx=$(query_prometheus 'sum(rate(request_duration_seconds_count{app=~"demo-go-api.*", code=~"5.."}[5m]))')
-    local total_requests=$(query_prometheus 'sum(rate(request_duration_seconds_count{app=~"demo-go-api.*"}[5m]))')
+    local error_4xx=$(query_prometheus 'sum(rate(request_duration_seconds_count{app=~".*-service.*", job=~"microservices", code=~"4.."}[5m]))')
+    local error_5xx=$(query_prometheus 'sum(rate(request_duration_seconds_count{app=~".*-service.*", job=~"microservices", code=~"5.."}[5m]))')
+    local total_requests=$(query_prometheus 'sum(rate(request_duration_seconds_count{app=~".*-service.*", job=~"microservices"}[5m]))')
     
     if [ "$error_4xx" != "N/A" ] && [ "$error_5xx" != "N/A" ] && [ "$total_requests" != "N/A" ]; then
         local error_4xx_percent=$(echo "($error_4xx / $total_requests) * 100" | bc -l)
@@ -182,8 +175,8 @@ check_system_health() {
     print_section "System Health Check"
     
     # Check pod status
-    local running_pods=$(query_prometheus 'sum(kube_pod_status_phase{pod=~"demo-go-api.*", phase="Running"})')
-    local total_pods=$(query_prometheus 'sum(kube_pod_status_phase{pod=~"demo-go-api.*"})')
+    local running_pods=$(query_prometheus 'sum(kube_pod_status_phase{pod=~".*-service.*", phase="Running"})')
+    local total_pods=$(query_prometheus 'sum(kube_pod_status_phase{pod=~".*-service.*"})')
     
     if [ "$running_pods" != "N/A" ] && [ "$total_pods" != "N/A" ]; then
         echo "Running Pods: ${running_pods}/${total_pods}"
@@ -199,8 +192,8 @@ check_system_health() {
     fi
     
     # Check resource usage
-    local cpu_usage=$(query_prometheus 'avg(rate(process_cpu_seconds_total{app=~"demo-go-api.*"}[5m])) * 100')
-    local memory_usage=$(query_prometheus 'avg(go_memstats_alloc_bytes{app=~"demo-go-api.*"} / 1024 / 1024)')
+    local cpu_usage=$(query_prometheus 'avg(rate(process_cpu_seconds_total{app=~".*-service.*", job=~"microservices"}[5m])) * 100')
+    local memory_usage=$(query_prometheus 'avg(go_memstats_alloc_bytes{app=~".*-service.*", job=~"microservices"} / 1024 / 1024)')
     
     if [ "$cpu_usage" != "N/A" ]; then
         echo "Average CPU Usage: ${cpu_usage}%"

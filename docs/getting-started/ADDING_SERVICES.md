@@ -10,153 +10,182 @@ Your service will automatically appear in monitoring if it meets these requireme
 
 ### 1. Expose Metrics Endpoint
 - Service must expose `/metrics` endpoint with Prometheus format
-- Port should be 8080 (or update ServiceMonitor if different)
+- Port should be 8080 (or update values.yaml if different)
 
-### 2. Kubernetes Labels
-Your service deployment and service must have these labels:
+### 2. Use Prometheus Middleware
+Your Go service should use the shared Prometheus middleware:
 
-```yaml
-metadata:
-  labels:
-    app: your-service-name        # Service name without version
-    version: v1                   # Version tag (v1, v2, v3, etc.)
-    component: api                # Always 'api' for API services
+```go
+import "github.com/demo/monitoring-golang/pkg/middleware"
+
+func main() {
+    r := gin.Default()
+    r.Use(middleware.PrometheusMiddleware())
+    // ... rest of setup
+}
 ```
 
-### 3. Service Configuration
-Your Kubernetes Service must have the same labels:
+### 3. Create Helm Values File
+Create a values file for your service in `charts/values/`:
 
 ```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: your-service-v1
-  namespace: your-namespace
-  labels:
-    app: your-service-name
-    version: v1
-    component: api
-spec:
-  selector:
-    app: your-service-name
-    version: v1
-  ports:
-  - port: 8080
-    targetPort: 8080
-    protocol: TCP
+# charts/values/payment.yaml
+name: payment-service
+namespace: payment
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/duynhne
+  name: payment
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
   type: ClusterIP
-```
+  port: 8080
+  targetPort: 8080
 
-### 4. Namespace Inclusion
-Your service's namespace must be included in the ServiceMonitor's `namespaceSelector`:
+containerPort: 8080
 
-```yaml
-# In k8s/monitoring/servicemonitors.yaml
-spec:
-  namespaceSelector:
-    matchNames:
-    - user
-    - product
-    - checkout
-    - order
-    - unified
-    - your-new-namespace  # Add your namespace here
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "50m"
+  limits:
+    memory: "128Mi"
+    cpu: "100m"
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 5
+
+labels:
+  component: api
 ```
 
 ## Example: Adding Payment Service
 
-### Step 1: Create Namespace
+### Step 1: Create Service Code
+
 ```bash
-kubectl create namespace payment
+mkdir -p cmd/payment-service
+mkdir -p internal/payment/{v1,v2,domain}
 ```
 
-### Step 2: Deploy Service
-```yaml
-# k8s/payment-service-v1/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: payment-service-v1
-  namespace: payment
-  labels:
-    app: payment-service
-    version: v1
-    component: api
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: payment-service
-      version: v1
-  template:
-    metadata:
-      labels:
-        app: payment-service
-        version: v1
-        component: api
-    spec:
-      containers:
-      - name: payment-service
-        image: payment-service-v1:latest
-        ports:
-        - containerPort: 8080
-        # ... rest of container config
+Create the main entry point:
+
+```go
+// cmd/payment-service/main.go
+package main
+
+import (
+    "github.com/gin-gonic/gin"
+    "github.com/prometheus/client_golang/prometheus/promhttp"
+    "github.com/demo/monitoring-golang/pkg/middleware"
+)
+
+func main() {
+    r := gin.Default()
+    r.Use(middleware.PrometheusMiddleware())
+    
+    r.GET("/health", func(c *gin.Context) {
+        c.JSON(200, gin.H{"status": "ok"})
+    })
+    r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+    
+    // Add your API routes here
+    
+    r.Run(":8080")
+}
 ```
 
-### Step 3: Create Service
+### Step 2: Create Helm Values
+
 ```yaml
-# k8s/payment-service-v1/service.yaml
+# charts/values/payment.yaml
+name: payment-service
+namespace: payment
+
+image:
+  repository: ghcr.io/duynhne
+  name: payment
+  tag: latest
+```
+
+### Step 3: Update Deployment Script
+
+Add the service to `scripts/04-deploy-microservices.sh`:
+
+```bash
+SERVICES=(
+  # ... existing services ...
+  "payment-service:payment:payment"
+)
+```
+
+### Step 4: Update Build Script
+
+Add the service to `scripts/03-build-microservices.sh`:
+
+```bash
+SERVICES=(
+  # ... existing services ...
+  "payment"
+)
+```
+
+### Step 5: Update Namespaces
+
+Add the namespace to `k8s/namespaces.yaml`:
+
+```yaml
+---
 apiVersion: v1
-kind: Service
+kind: Namespace
 metadata:
-  name: payment-service-v1
-  namespace: payment
-  labels:
-    app: payment-service
-    version: v1
-    component: api
-spec:
-  selector:
-    app: payment-service
-    version: v1
-  ports:
-  - port: 8080
-    targetPort: 8080
-    protocol: TCP
-  type: ClusterIP
+  name: payment
 ```
 
-### Step 4: Update ServiceMonitor
-Add your namespace to the ServiceMonitor:
+### Step 6: Build and Deploy
 
-```yaml
-# k8s/monitoring/servicemonitors.yaml
-spec:
-  namespaceSelector:
-    matchNames:
-    - user
-    - product
-    - checkout
-    - order
-    - unified
-    - payment  # Add this line
-```
-
-### Step 5: Apply Changes
 ```bash
-kubectl apply -f k8s/payment-service-v1/
-kubectl apply -f k8s/monitoring/servicemonitors.yaml
+# Build the new service
+./scripts/03-build-microservices.sh
+
+# Deploy using Helm
+./scripts/04-deploy-microservices.sh --local
+```
+
+Or deploy manually:
+
+```bash
+helm upgrade --install payment-service charts/ \
+  -f charts/values/payment.yaml \
+  -n payment --create-namespace
 ```
 
 ## Automatic Discovery
 
 Once deployed, your service will automatically:
 
-✅ **Appear in Grafana dashboard** - No dashboard changes needed
-✅ **Show in app dropdown** - Service name appears in filter
-✅ **Display metrics** - All 32 panels show data for your service
-✅ **Support filtering** - Filter by service, namespace, version
-✅ **Scale monitoring** - Works with any number of replicas
+- **Appear in Grafana dashboard** - No dashboard changes needed
+- **Show in app dropdown** - Service name appears in filter
+- **Display metrics** - All 32 panels show data for your service
+- **Support filtering** - Filter by service, namespace, version
+- **Scale monitoring** - Works with any number of replicas
 
 ## Dashboard Features
 
@@ -173,9 +202,9 @@ Your new service will have access to all monitoring features:
 
 ### Service Not Appearing in Dashboard
 
-1. **Check labels**: Ensure `component: api` label is present
-2. **Verify namespace**: Check if namespace is in ServiceMonitor
-3. **Check metrics endpoint**: Test `/metrics` endpoint manually
+1. **Check Helm release**: `helm list -n payment`
+2. **Verify pod is running**: `kubectl get pods -n payment`
+3. **Check metrics endpoint**: `kubectl port-forward -n payment svc/payment-service 8080:8080` then `curl localhost:8080/metrics`
 4. **Prometheus targets**: Check http://localhost:9090/targets
 
 ### No Data in Panels
@@ -196,15 +225,15 @@ var customCounter = prometheus.NewCounterVec(
         Name: "custom_operations_total",
         Help: "Total number of custom operations",
     },
-    []string{"app", "namespace", "operation"},
+    []string{"operation"},
 )
 ```
 
 ## Best Practices
 
-1. **Consistent Naming**: Use `service-name-v1` pattern
+1. **Consistent Naming**: Use `service-name` pattern (e.g., `payment-service`)
 2. **Namespace per Service**: One namespace per service type
-3. **Label Consistency**: Always include required labels
+3. **Use Helm Values**: Don't hardcode configuration
 4. **Metrics Quality**: Use meaningful metric names and labels
 5. **Documentation**: Document your service's metrics
 
@@ -212,6 +241,6 @@ var customCounter = prometheus.NewCounterVec(
 
 For questions or issues:
 1. Check this documentation
-2. Review existing service examples
+2. Review existing service examples in `charts/values/`
 3. Check Prometheus targets page
 4. Verify Grafana dashboard configuration

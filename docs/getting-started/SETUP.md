@@ -53,6 +53,10 @@ Dashboard:  http://localhost:3000/d/microservices-monitoring-001/
 
 - **Docker** - Container runtime
 - **kubectl** - Kubernetes CLI
+- **Helm** - Kubernetes package manager (v3.14+):
+  ```bash
+  curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  ```
 - **Kind** - Kubernetes in Docker (auto-installed by script or manual):
   ```bash
   curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
@@ -121,13 +125,13 @@ kubectl get pods -n kube-system | grep -E "(kube-state|metrics-server)"
 - Verifies image availability
 
 **Services built:**
-- auth-service, user-service, product-service
-- cart-service, order-service, review-service
-- notification-service, shipping-service, shipping-service-v2
+- auth, user, product
+- cart, order, review
+- notification, shipping, shipping-v2
 
 **Verify:**
 ```bash
-docker images | grep -E "(auth-service|user-service|product-service)"
+docker images | grep -E "(auth|user|product)"
 # Expected: 9 service images
 ```
 
@@ -136,17 +140,28 @@ docker images | grep -E "(auth-service|user-service|product-service)"
 ### Step 4: Deploy All Microservices
 
 ```bash
-./scripts/04-deploy-microservices.sh
+# Deploy using local Helm chart (default)
+./scripts/04-deploy-microservices.sh --local
+
+# Or deploy from OCI registry (if chart is published)
+./scripts/04-deploy-microservices.sh --registry
 ```
 
 **What it does:**
 - Creates all service namespaces (auth, user, product, cart, order, review, notification, shipping) and `monitoring` namespace
-- Deploys all 9 microservices with Kubernetes Deployments
+- Deploys all 9 microservices using Helm chart with per-service values
 - Creates Services for each microservice
-- Sets up ServiceMonitors for Prometheus discovery
+- Sets up proper labels for Prometheus discovery
+
+**Deployment modes:**
+- `--local` (default): Uses local `charts/` directory
+- `--registry`: Uses `oci://ghcr.io/duynhne/charts/microservice`
 
 **Verify:**
 ```bash
+# Check Helm releases
+helm list -A
+
 kubectl get pods -n auth
 kubectl get pods -n user
 kubectl get pods -n product
@@ -155,7 +170,7 @@ kubectl get pods -n product
 kubectl get svc -n auth
 kubectl get svc -n user
 kubectl get svc -n product
-# Expected: 9 services + prometheus + grafana
+# Expected: 9 services
 ```
 
 ---
@@ -245,7 +260,7 @@ kubectl logs -n monitoring -l app=k6-load-generator
 
 Adjust filters in Grafana dashboard header:
 
-- **App**: Select service (auth-service, user-service, etc.) or "All"
+- **App**: Select service (auth, user, etc.) or "All"
 - **Namespace**: Select service namespace (auth, user, product, etc.) or monitoring for monitoring components
 - **Rate**: Query interval (1m, 5m, 10m, 30m, 1h, etc.)
 
@@ -264,15 +279,15 @@ kubectl get pods -n product
 Expected output:
 ```
 NAME                                    READY   STATUS    RESTARTS   AGE
-auth-service-xxx                        1/1     Running   0          2m
-user-service-xxx                        1/1     Running   0          2m
-product-service-xxx                     1/1     Running   0          2m
-cart-service-xxx                        1/1     Running   0          2m
-order-service-xxx                        1/1     Running   0          2m
-review-service-xxx                      1/1     Running   0          2m
-notification-service-xxx                1/1     Running   0          2m
-shipping-service-xxx                    1/1     Running   0          2m
-shipping-service-v2-xxx                  1/1     Running   0          2m
+auth-xxx                                1/1     Running   0          2m
+user-xxx                                1/1     Running   0          2m
+product-xxx                             1/1     Running   0          2m
+cart-xxx                                1/1     Running   0          2m
+order-xxx                               1/1     Running   0          2m
+review-xxx                              1/1     Running   0          2m
+notification-xxx                        1/1     Running   0          2m
+shipping-xxx                            1/1     Running   0          2m
+shipping-v2-xxx                         1/1     Running   0          2m
 prometheus-xxx                          1/1     Running   0          2m
 grafana-xxx                             1/1     Running   0          2m
 k6-load-generator-xxx                   1/1     Running   0          2m
@@ -330,13 +345,13 @@ kubectl get pods -n user
 kubectl get pods -n product -w
 
 # Pod logs (follow)
-kubectl logs -f deployment/auth-service -n auth
+kubectl logs -f deployment/auth -n auth
 
 # Exec into pod
 kubectl exec -it <pod-name> -n <namespace> -- sh
 
 # Scale application
-kubectl scale deployment auth-service --replicas=3 -n auth
+kubectl scale deployment auth --replicas=3 -n auth
 ```
 
 ### Port Forwarding
@@ -350,8 +365,8 @@ kubectl port-forward svc/grafana 3000:3000 -n monitoring &
 # Forward Prometheus
 kubectl port-forward svc/prometheus 9090:9090 -n monitoring &
 
-# Forward Go API (example: auth-service)
-kubectl port-forward svc/auth-service 8080:8080 -n auth &
+# Forward Go API (example: auth)
+kubectl port-forward svc/auth 8080:8080 -n auth &
 ```
 
 ---
@@ -367,7 +382,7 @@ kubectl port-forward svc/auth-service 8080:8080 -n auth &
 ./scripts/03-build-microservices.sh
 
 # Force recreation
-kubectl delete pods -l app=auth-service -n auth
+kubectl delete pods -l app=auth -n auth
 ```
 
 ### Dashboard No Data

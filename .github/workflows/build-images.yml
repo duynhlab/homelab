@@ -3,26 +3,26 @@ name: Build Docker Images
 on:
   push:
     branches:
-      - v2
-      - develop
+      - v4
+      - main
     paths:
-      - 'Dockerfile'
-      - 'go.mod'
-      - 'go.sum'
-      - 'cmd/**'
-      - 'internal/**'
-      - 'pkg/**'
+      - 'services/Dockerfile'
+      - 'services/go.mod'
+      - 'services/go.sum'
+      - 'services/cmd/**'
+      - 'services/internal/**'
+      - 'services/pkg/**'
       - '.github/workflows/build-images.yml'
   pull_request:
     branches:
-      - v2
-      - develop
+      - v4
+      - main
     paths:
-      - 'go.mod'
-      - 'go.sum'
-      - 'cmd/**'
-      - 'internal/**'
-      - 'pkg/**'
+      - 'services/go.mod'
+      - 'services/go.sum'
+      - 'services/cmd/**'
+      - 'services/internal/**'
+      - 'services/pkg/**'
       - '.github/workflows/build-images.yml'
   workflow_dispatch:
 
@@ -40,34 +40,44 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service:
-          - auth-service
-          - user-service
-          - product-service
-          - cart-service
-          - order-service
-          - review-service
-          - notification-service
-          - shipping-service
-          - shipping-service-v2
+        include:
+          - name: auth
+            path: auth-service
+          - name: user
+            path: user-service
+          - name: product
+            path: product-service
+          - name: cart
+            path: cart-service
+          - name: order
+            path: order-service
+          - name: review
+            path: review-service
+          - name: notification
+            path: notification-service
+          - name: shipping
+            path: shipping-service
+          - name: shipping-v2
+            path: shipping-service-v2
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-          cache-dependency-path: go.sum
+          cache-dependency-path: services/go.sum
 
       - name: Run Go lint (PR only)
         if: github.event_name == 'pull_request'
+        working-directory: services
         run: |
-          echo "Running Go lint for ${{ matrix.service }}..."
-          go vet ./cmd/${{ matrix.service }} || true
-          gofmt -l ./cmd/${{ matrix.service }} || true
-          echo "✓ Lint check completed for ${{ matrix.service }}"
+          echo "Running Go lint for ${{ matrix.name }}..."
+          go vet ./cmd/${{ matrix.path }} || true
+          gofmt -l ./cmd/${{ matrix.path }} || true
+          echo "✓ Lint check completed for ${{ matrix.name }}"
 
       - name: Set up Docker Buildx
         if: github.event_name != 'pull_request'
@@ -86,7 +96,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.name }}
           tags: |
             type=raw,value=latest
 
@@ -95,10 +105,10 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: ./Dockerfile
+          context: ./services
+          file: ./services/Dockerfile
           build-args: |
-            SERVICE_NAME=${{ matrix.service }}
+            SERVICE_NAME=${{ matrix.path }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

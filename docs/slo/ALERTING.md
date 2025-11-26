@@ -44,7 +44,7 @@ Example:
 
 **Example Alert**:
 ```
-Alert: AuthServiceHighErrorRate (Page)
+Alert: AuthHighErrorRate (Page)
 Severity: page
 Burn Rate: 15x
 Time to Exhaustion: 2 days
@@ -62,7 +62,7 @@ Time to Exhaustion: 2 days
 
 **Example Alert**:
 ```
-Alert: AuthServiceHighErrorRate (Ticket)
+Alert: AuthHighErrorRate (Ticket)
 Severity: ticket
 Burn Rate: 4x
 Time to Exhaustion: 7 days
@@ -89,7 +89,7 @@ alerting:
 ### Alert Labels
 
 All alerts include:
-- `service`: Service name (e.g., "auth-service")
+- `service`: Service name (e.g., "auth")
 - `severity`: Alert severity (page, ticket)
 - `category`: SLO category (availability, latency, error-rate)
 - `slo`: SLO name (availability, latency, error-rate)
@@ -105,7 +105,7 @@ Alerts include:
 
 ### Availability Alert Runbook
 
-**Triggered by**: `AuthServiceHighErrorRate`
+**Triggered by**: `AuthHighErrorRate`
 
 **Steps**:
 1. Check error rate in Grafana
@@ -118,7 +118,7 @@ Alerts include:
 
 ### Latency Alert Runbook
 
-**Triggered by**: `AuthServiceHighLatency`
+**Triggered by**: `AuthHighLatency`
 
 **Steps**:
 1. Check p95 latency in Grafana

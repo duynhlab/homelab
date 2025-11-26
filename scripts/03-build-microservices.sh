@@ -69,12 +69,12 @@ for service in "${SERVICES[@]}"; do
     fi
     
     # Build command with optional --no-cache flag
-    BUILD_CMD="docker build --build-arg SERVICE_NAME=$service -f Dockerfile -t $service:latest"
+    BUILD_CMD="docker build --build-arg SERVICE_NAME=$service -f services/Dockerfile -t $service:latest"
     if [ "$NO_CACHE" = "true" ]; then
         BUILD_CMD="$BUILD_CMD --no-cache"
         echo "   Building with --no-cache flag"
     fi
-    BUILD_CMD="$BUILD_CMD ."
+    BUILD_CMD="$BUILD_CMD services/"
     
     # Build with retry mechanism
     for attempt in 1 2 3; do

@@ -20,7 +20,7 @@ fi
 
 # Create cluster
 echo "Creating Kind cluster with 3 nodes..."
-kind create cluster --config ./kind/cluster-config.yaml
+kind create cluster --config ./k8s/kind/cluster-config.yaml
 
 # Wait for cluster to be ready
 echo "Waiting for cluster to be ready..."

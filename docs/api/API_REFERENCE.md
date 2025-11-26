@@ -2,289 +2,315 @@
 
 ## Overview
 
-This project provides 5 microservices with RESTful APIs for a complete e-commerce system.
+This project provides 9 microservices with RESTful APIs. Each service exposes v1 and v2 API endpoints.
 
 ## Services
 
-### 1. User Service V1
-**Port**: 8080  
-**Base URL**: `http://localhost:8081/api/v1`
+| Service | Namespace | Port | Base URL |
+|---------|-----------|------|----------|
+| auth-service | auth | 8080 | `/api/v1`, `/api/v2` |
+| user-service | user | 8080 | `/api/v1`, `/api/v2` |
+| product-service | product | 8080 | `/api/v1`, `/api/v2` |
+| cart-service | cart | 8080 | `/api/v1`, `/api/v2` |
+| order-service | order | 8080 | `/api/v1`, `/api/v2` |
+| review-service | review | 8080 | `/api/v1`, `/api/v2` |
+| notification-service | notification | 8080 | `/api/v1`, `/api/v2` |
+| shipping-service | shipping | 8080 | `/api/v1` |
+| shipping-service-v2 | shipping | 8080 | `/api/v2` |
 
-#### Endpoints
+---
 
-| Method | Endpoint | Description | Request Body | Response |
-|--------|----------|-------------|--------------|----------|
-| `GET` | `/users` | Get all users | - | `[]User` |
-| `GET` | `/users/{id}` | Get user by ID | - | `User` |
-| `POST` | `/users` | Create new user | `User` | `User` |
-| `PUT` | `/users/{id}` | Update user | `User` | `User` |
-| `DELETE` | `/users/{id}` | Delete user | - | `204 No Content` |
+## Auth Service
 
-#### Models
+### Endpoints
 
-```go
-type User struct {
-    ID    int    `json:"id"`
-    Name  string `json:"name"`
-    Email string `json:"email"`
-}
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/auth/login` | User login |
+| `POST` | `/api/v1/auth/register` | User registration |
+| `POST` | `/api/v2/auth/login` | User login (v2) |
+| `POST` | `/api/v2/auth/register` | User registration (v2) |
+
+### Examples
+
+```bash
+# Login
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"user1","password":"pass123"}'
+
+# Register
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"newuser","email":"new@example.com","password":"pass123"}'
 ```
 
-#### Examples
+---
+
+## User Service
+
+### Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/users` | Get all users |
+| `GET` | `/api/v1/users/{id}` | Get user by ID |
+| `POST` | `/api/v1/users` | Create new user |
+| `PUT` | `/api/v1/users/{id}` | Update user |
+| `DELETE` | `/api/v1/users/{id}` | Delete user |
+
+### Examples
 
 ```bash
 # Get all users
-curl http://localhost:8081/api/v1/users
+curl http://localhost:8080/api/v1/users
 
 # Create user
-curl -X POST http://localhost:8081/api/v1/users \
+curl -X POST http://localhost:8080/api/v1/users \
   -H "Content-Type: application/json" \
   -d '{"name":"John Doe","email":"john@example.com"}'
-
-# Get user by ID
-curl http://localhost:8081/api/v1/users/1
 ```
 
 ---
 
-### 2. Product Service V1
-**Port**: 8080  
-**Base URL**: `http://localhost:8082/api/v1`
+## Product Service
 
-#### Endpoints
+### Endpoints
 
-| Method | Endpoint | Description | Request Body | Response |
-|--------|----------|-------------|--------------|----------|
-| `GET` | `/products` | Get all products | - | `[]Product` |
-| `GET` | `/products/{id}` | Get product by ID | - | `Product` |
-| `POST` | `/products` | Create new product | `Product` | `Product` |
-| `PUT` | `/products/{id}` | Update product | `Product` | `Product` |
-| `DELETE` | `/products/{id}` | Delete product | - | `204 No Content` |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/products` | Get all products |
+| `GET` | `/api/v1/products/{id}` | Get product by ID |
+| `POST` | `/api/v1/products` | Create new product |
+| `PUT` | `/api/v1/products/{id}` | Update product |
+| `DELETE` | `/api/v1/products/{id}` | Delete product |
 
-#### Models
-
-```go
-type Product struct {
-    ID    int     `json:"id"`
-    Name  string  `json:"name"`
-    Price float64 `json:"price"`
-    Stock int     `json:"stock"`
-}
-```
-
-#### Examples
+### Examples
 
 ```bash
 # Get all products
-curl http://localhost:8082/api/v1/products
+curl http://localhost:8080/api/v1/products
 
 # Create product
-curl -X POST http://localhost:8082/api/v1/products \
+curl -X POST http://localhost:8080/api/v1/products \
   -H "Content-Type: application/json" \
   -d '{"name":"Laptop","price":999.99,"stock":10}'
-
-# Get product by ID
-curl http://localhost:8082/api/v1/products/1
 ```
 
 ---
 
-### 3. Checkout Service V1
-**Port**: 8080  
-**Base URL**: `http://localhost:8083/api/v1`
+## Cart Service
 
-#### Endpoints
+### Endpoints
 
-| Method | Endpoint | Description | Request Body | Response |
-|--------|----------|-------------|--------------|----------|
-| `POST` | `/checkout` | Process checkout | `CheckoutRequest` | `CheckoutResponse` |
-| `GET` | `/checkout/{id}` | Get checkout status | - | `CheckoutResponse` |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/cart` | Get cart |
+| `POST` | `/api/v1/cart/items` | Add item to cart |
+| `DELETE` | `/api/v1/cart/items/{id}` | Remove item from cart |
+| `DELETE` | `/api/v1/cart` | Clear cart |
 
-#### Models
-
-```go
-type CheckoutRequest struct {
-    UserID    string  `json:"user_id"`
-    ProductID string  `json:"product_id"`
-    Quantity  int     `json:"quantity"`
-    Amount    float64 `json:"amount"`
-}
-
-type CheckoutResponse struct {
-    TransactionID string  `json:"transaction_id"`
-    Status        string  `json:"status"`
-    Amount        float64 `json:"amount"`
-    Timestamp     string  `json:"timestamp"`
-}
-```
-
-#### Examples
+### Examples
 
 ```bash
-# Process checkout
-curl -X POST http://localhost:8083/api/v1/checkout \
-  -H "Content-Type: application/json" \
-  -d '{"user_id":"user123","product_id":"prod456","quantity":2,"amount":199.98}'
+# Get cart
+curl http://localhost:8080/api/v1/cart
 
-# Get checkout status
-curl http://localhost:8083/api/v1/checkout/TXN-123456
+# Add item
+curl -X POST http://localhost:8080/api/v1/cart/items \
+  -H "Content-Type: application/json" \
+  -d '{"product_id":"prod123","quantity":2}'
 ```
 
 ---
 
-### 4. Order Service V2
-**Port**: 8080  
-**Base URL**: `http://localhost:8084/api/v2`
+## Order Service
 
-#### Endpoints
+### Endpoints
 
-| Method | Endpoint | Description | Request Body | Response |
-|--------|----------|-------------|--------------|----------|
-| `GET` | `/orders` | Get all orders | - | `[]Order` |
-| `GET` | `/orders/{id}` | Get order by ID | - | `Order` |
-| `POST` | `/orders` | Create new order | `CreateOrderRequest` | `Order` |
-| `PUT` | `/orders/{id}` | Update order | `UpdateOrderRequest` | `Order` |
-| `DELETE` | `/orders/{id}` | Delete order | - | `204 No Content` |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/orders` | Get all orders |
+| `GET` | `/api/v1/orders/{id}` | Get order by ID |
+| `POST` | `/api/v1/orders` | Create new order |
+| `PUT` | `/api/v1/orders/{id}` | Update order status |
+| `DELETE` | `/api/v1/orders/{id}` | Cancel order |
 
-#### Models
-
-```go
-type Order struct {
-    ID         string    `json:"id"`
-    UserID     string    `json:"user_id"`
-    Items      []string  `json:"items"`
-    TotalPrice float64   `json:"total_price"`
-    Status     string    `json:"status"`
-    CreatedAt  time.Time `json:"created_at"`
-}
-
-type CreateOrderRequest struct {
-    UserID     string   `json:"user_id"`
-    Items      []string `json:"items"`
-    TotalPrice float64  `json:"total_price"`
-}
-
-type UpdateOrderRequest struct {
-    Status     string   `json:"status"`
-    Items      []string `json:"items"`
-    TotalPrice float64  `json:"total_price"`
-}
-```
-
-#### Examples
+### Examples
 
 ```bash
 # Get all orders
-curl http://localhost:8084/api/v2/orders
+curl http://localhost:8080/api/v1/orders
 
 # Create order
-curl -X POST http://localhost:8084/api/v2/orders \
+curl -X POST http://localhost:8080/api/v1/orders \
   -H "Content-Type: application/json" \
-  -d '{"user_id":"user123","items":["prod1","prod2"],"total_price":299.98}'
-
-# Update order status
-curl -X PUT http://localhost:8084/api/v2/orders/ORD-123456 \
-  -H "Content-Type: application/json" \
-  -d '{"status":"shipped"}'
+  -d '{"user_id":"user123","items":[{"product_id":"prod1","quantity":2}]}'
 ```
 
 ---
 
-### 5. Unified Service V3
-**Port**: 8080  
-**Base URL**: `http://localhost:8085/api/v3`
+## Review Service
 
-This service provides all endpoints from the above services under a single API.
+### Endpoints
 
-#### Available Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/reviews` | Get all reviews |
+| `GET` | `/api/v1/reviews/{id}` | Get review by ID |
+| `GET` | `/api/v1/products/{id}/reviews` | Get reviews for product |
+| `POST` | `/api/v1/reviews` | Create new review |
+| `DELETE` | `/api/v1/reviews/{id}` | Delete review |
 
-**Users**: `/api/v3/users` (same as User Service V1)  
-**Products**: `/api/v3/products` (same as Product Service V1)  
-**Checkout**: `/api/v3/checkout` (same as Checkout Service V1)  
-**Orders**: `/api/v3/orders` (same as Order Service V2)
-
-#### Examples
+### Examples
 
 ```bash
-# All user operations
-curl http://localhost:8085/api/v3/users
-curl -X POST http://localhost:8085/api/v3/users -d '{"name":"Jane","email":"jane@example.com"}'
+# Get reviews for product
+curl http://localhost:8080/api/v1/products/prod123/reviews
 
-# All product operations
-curl http://localhost:8085/api/v3/products
-curl -X POST http://localhost:8085/api/v3/products -d '{"name":"Phone","price":599.99,"stock":5}'
-
-# All checkout operations
-curl -X POST http://localhost:8085/api/v3/checkout -d '{"user_id":"u1","product_id":"p1","quantity":1,"amount":99.99}'
-
-# All order operations
-curl http://localhost:8085/api/v3/orders
-curl -X POST http://localhost:8085/api/v3/orders -d '{"user_id":"u1","items":["p1"],"total_price":99.99}'
+# Create review
+curl -X POST http://localhost:8080/api/v1/reviews \
+  -H "Content-Type: application/json" \
+  -d '{"product_id":"prod123","user_id":"user1","rating":5,"comment":"Great product!"}'
 ```
 
 ---
 
-## Health Checks
+## Notification Service
 
-All services provide a health check endpoint:
+### Endpoints
 
-```bash
-# Health check for any service
-curl http://localhost:8081/health  # User Service
-curl http://localhost:8082/health  # Product Service
-curl http://localhost:8083/health  # Checkout Service
-curl http://localhost:8084/health  # Order Service
-curl http://localhost:8085/health  # Unified Service
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/notifications` | Get all notifications |
+| `GET` | `/api/v1/notifications/{id}` | Get notification by ID |
+| `POST` | `/api/v1/notifications` | Send notification |
+| `PUT` | `/api/v1/notifications/{id}/read` | Mark as read |
 
-Response: `200 OK` with body `"OK"`
-
-## Metrics
-
-All services expose Prometheus metrics at `/metrics`:
+### Examples
 
 ```bash
-# Metrics for any service
-curl http://localhost:8081/metrics  # User Service
-curl http://localhost:8082/metrics  # Product Service
-curl http://localhost:8083/metrics  # Checkout Service
-curl http://localhost:8084/metrics  # Order Service
-curl http://localhost:8085/metrics  # Unified Service
+# Get notifications
+curl http://localhost:8080/api/v1/notifications
+
+# Send notification
+curl -X POST http://localhost:8080/api/v1/notifications \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"user123","type":"email","message":"Your order has shipped!"}'
 ```
+
+---
+
+## Shipping Service
+
+### Endpoints (v1)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/shipments` | Get all shipments |
+| `GET` | `/api/v1/shipments/{id}` | Get shipment by ID |
+| `POST` | `/api/v1/shipments` | Create shipment |
+| `PUT` | `/api/v1/shipments/{id}` | Update shipment status |
+
+### Endpoints (v2 - shipping-service-v2)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v2/shipments` | Get all shipments (enhanced) |
+| `GET` | `/api/v2/shipments/{id}` | Get shipment with tracking |
+| `POST` | `/api/v2/shipments` | Create shipment with tracking |
+| `GET` | `/api/v2/shipments/{id}/track` | Real-time tracking |
+
+### Examples
+
+```bash
+# Create shipment (v1)
+curl -X POST http://localhost:8080/api/v1/shipments \
+  -H "Content-Type: application/json" \
+  -d '{"order_id":"ord123","address":"123 Main St"}'
+
+# Track shipment (v2)
+curl http://localhost:8080/api/v2/shipments/ship123/track
+```
+
+---
+
+## Common Endpoints
+
+All services provide these common endpoints:
+
+### Health Check
+
+```bash
+curl http://localhost:8080/health
+# Response: {"status":"ok"}
+```
+
+### Metrics
+
+```bash
+curl http://localhost:8080/metrics
+# Response: Prometheus metrics format
+```
+
+---
 
 ## Error Handling
 
 All services return standard HTTP status codes:
 
-- `200 OK` - Success
-- `201 Created` - Resource created
-- `204 No Content` - Resource deleted
-- `400 Bad Request` - Invalid request data
-- `404 Not Found` - Resource not found
-- `500 Internal Server Error` - Server error
+| Code | Description |
+|------|-------------|
+| `200 OK` | Success |
+| `201 Created` | Resource created |
+| `204 No Content` | Resource deleted |
+| `400 Bad Request` | Invalid request data |
+| `404 Not Found` | Resource not found |
+| `500 Internal Server Error` | Server error |
 
-Error responses include a JSON body with error details:
+Error response format:
 
 ```json
 {
-  "error": "User not found"
+  "error": "Error message here"
 }
 ```
 
-## Rate Limiting & Performance
+---
 
-- All services include realistic processing delays (50-800ms)
-- Random error simulation (2-5% failure rate)
-- Prometheus metrics for monitoring performance
-- Health checks for Kubernetes readiness/liveness probes
+## Accessing Services
+
+### Via Helm Deployment
+
+```bash
+# Deploy services
+./scripts/04-deploy-microservices.sh --local
+
+# Port forward specific service
+kubectl port-forward -n auth svc/auth-service 8080:8080
+kubectl port-forward -n user svc/user-service 8081:8080
+kubectl port-forward -n product svc/product-service 8082:8080
+```
+
+### Port Forwarding Guide
+
+```bash
+# Setup all port forwards
+./scripts/07-setup-access.sh
+```
+
+---
 
 ## Load Testing
 
 Use k6 to test all services:
 
 ```bash
-# Run load tests
-kubectl exec -n monitoring deployment/k6-load-generator -- k6 run /scripts/load-test.js
+# Deploy k6 load generators
+./scripts/06-deploy-k6-testing.sh
+
+# View k6 logs
+kubectl logs -n monitoring -l app=k6-load-generator-scenarios -f
 ```
 
-The load test covers all services with realistic scenarios and performance thresholds.
+See [K6_LOAD_TESTING.md](../load-testing/K6_LOAD_TESTING.md) for detailed load testing documentation.

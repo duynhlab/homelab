@@ -59,15 +59,15 @@ This script:
 
 All 9 microservices have SLO definitions:
 
-1. **auth-service** - Authentication service
-2. **user-service** - User management service
-3. **product-service** - Product catalog service
-4. **cart-service** - Shopping cart service
-5. **order-service** - Order processing service
-6. **review-service** - Product review service
-7. **notification-service** - Notification service
-8. **shipping-service** - Shipping service (v1)
-9. **shipping-service-v2** - Shipping service (v2)
+1. **auth** - Authentication service
+2. **user** - User management service
+3. **product** - Product catalog service
+4. **cart** - Shopping cart service
+5. **order** - Order processing service
+6. **review** - Product review service
+7. **notification** - Notification service
+8. **shipping** - Shipping service (v1)
+9. **shipping-v2** - Shipping service (v2)
 
 ## SLO Types
 

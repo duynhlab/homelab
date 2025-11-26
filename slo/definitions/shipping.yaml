@@ -1,0 +1,127 @@
+# SLO Definitions for Shipping
+# Generated using Sloth (https://sloth.dev)
+# This file defines SLOs for shipping following Google SRE best practices
+
+version: "prometheus/v1"
+service: "shipping"
+labels:
+  team: "platform"
+  env: "demo"
+  service: "shipping"
+  namespace: "shipping"
+
+slos:
+  - name: "availability"
+    objective: 99.5
+    description: "Availability measures the ratio of successful requests (non-5xx) to total requests"
+    sli:
+      events:
+        error_query: |
+          sum(rate(request_duration_seconds_count{
+            app="shipping",
+            namespace="shipping",
+            job=~"microservices",
+            code=~"5.."
+          }[{{.window}}]))
+        total_query: |
+          sum(rate(request_duration_seconds_count{
+            app="shipping",
+            namespace="shipping",
+            job=~"microservices"
+          }[{{.window}}]))
+    alerting:
+      name: ShippingHighErrorRate
+      labels:
+        severity: critical
+        category: availability
+        service: "shipping"
+      annotations:
+        summary: "High 5xx error rate detected on shipping"
+        description: "Availability SLO is at risk. Current error rate is impacting shipping service."
+      page_alert:
+        labels:
+          severity: page
+          channel: "#alerts"
+      ticket_alert:
+        labels:
+          severity: ticket
+          channel: "#incidents"
+
+  - name: "latency"
+    objective: 95.0
+    description: "Latency measures the ratio of requests faster than 500ms to total requests"
+    sli:
+      events:
+        error_query: |
+          sum(rate(request_duration_seconds_count{
+            app="shipping",
+            namespace="shipping",
+            job=~"microservices"
+          }[{{.window}}]))
+          -
+          sum(rate(request_duration_seconds_bucket{
+            app="shipping",
+            namespace="shipping",
+            job=~"microservices",
+            le="0.5"
+          }[{{.window}}]))
+        total_query: |
+          sum(rate(request_duration_seconds_count{
+            app="shipping",
+            namespace="shipping",
+            job=~"microservices"
+          }[{{.window}}]))
+    alerting:
+      name: ShippingHighLatency
+      labels:
+        severity: warning
+        category: latency
+        service: "shipping"
+      annotations:
+        summary: "High latency detected on shipping"
+        description: "More than 5% of requests are slower than 500ms threshold."
+      page_alert:
+        labels:
+          severity: page
+          channel: "#alerts"
+      ticket_alert:
+        labels:
+          severity: ticket
+          channel: "#incidents"
+
+  - name: "error-rate"
+    objective: 99.0
+    description: "Error rate measures the ratio of successful requests (non-4xx/5xx) to total requests"
+    sli:
+      events:
+        error_query: |
+          sum(rate(request_duration_seconds_count{
+            app="shipping",
+            namespace="shipping",
+            job=~"microservices",
+            code=~"4..|5.."
+          }[{{.window}}]))
+        total_query: |
+          sum(rate(request_duration_seconds_count{
+            app="shipping",
+            namespace="shipping",
+            job=~"microservices"
+          }[{{.window}}]))
+    alerting:
+      name: ShippingHighOverallErrorRate
+      labels:
+        severity: warning
+        category: errors
+        service: "shipping"
+      annotations:
+        summary: "High overall error rate (4xx + 5xx) on shipping"
+        description: "More than 1% of requests are returning errors."
+      page_alert:
+        labels:
+          severity: page
+          channel: "#alerts"
+      ticket_alert:
+        labels:
+          severity: ticket
+          channel: "#incidents"
+

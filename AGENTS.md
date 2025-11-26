@@ -23,78 +23,127 @@ This guide provides comprehensive information for AI agents working with this co
 
 ```
 project-monitoring-golang/
-├── cmd/                    # Microservice entry points (9 services)
-├── internal/              # Domain logic (private packages)
-├── pkg/                   # Shared packages (public)
+├── services/              # All Go application code
+│   ├── cmd/               # Microservice entry points (9 services)
+│   ├── internal/          # Domain logic (private packages)
+│   ├── pkg/               # Shared packages (public)
+│   ├── Dockerfile         # Unified Dockerfile for all services
+│   ├── go.mod
+│   └── go.sum
+├── charts/                # Helm chart for microservices deployment
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   ├── values/            # Per-service values (auth.yaml, user.yaml, etc.)
+│   └── templates/
 ├── k8s/                   # Kubernetes manifests
+│   ├── prometheus/
+│   ├── grafana/
+│   ├── k6/
+│   ├── kind/              # Kind cluster configuration
+│   └── namespaces.yaml
 ├── scripts/               # Deployment and utility scripts (numbered 01-13)
 ├── docs/                  # Documentation
 ├── slo/                   # SLO data files (definitions, generated rules)
 ├── k6/                    # k6 load test scripts
-├── Dockerfile             # Unified Dockerfile for all services
 ├── grafana-dashboard.json # Main Grafana dashboard (32 panels)
 ├── README.md              # Project overview
-├── CLAUDE.md              # Reference to AGENTS.md (for AI agent discovery)
+├── CHANGELOG.md           # Version changelog
 └── AGENTS.md              # This file (source of truth for AI agent instructions)
 ```
 
 ### Directory Details
 
-#### `cmd/` - Microservice Entry Points
+#### `services/` - Go Application Code
 
-Contains 9 microservices, each with its own `main.go`:
+All Go source code is organized under the `services/` directory:
 
-- `auth-service/` - Authentication API (v1/v2)
-- `user-service/` - User management API (v1/v2)
-- `product-service/` - Product catalog API (v1/v2)
-- `cart-service/` - Shopping cart API (v1/v2)
-- `order-service/` - Order management API (v1/v2)
-- `review-service/` - Product reviews API (v1/v2)
-- `notification-service/` - Notifications API (v1/v2)
-- `shipping-service/` - Shipping API (v1 only)
-- `shipping-service-v2/` - Enhanced shipping API (v2 only)
+```
+services/
+├── cmd/                   # Microservice entry points (9 services)
+│   ├── auth-service/
+│   ├── user-service/
+│   ├── product-service/
+│   ├── cart-service/
+│   ├── order-service/
+│   ├── review-service/
+│   ├── notification-service/
+│   ├── shipping-service/
+│   └── shipping-service-v2/
+├── internal/              # Domain logic (private packages)
+│   ├── auth/
+│   ├── user/
+│   ├── product/
+│   ├── cart/
+│   ├── order/
+│   ├── review/
+│   ├── notification/
+│   └── shipping/
+├── pkg/                   # Shared packages
+│   └── middleware/
+├── Dockerfile
+├── go.mod
+└── go.sum
+```
+
+**Services** (9 microservices):
+- `auth` - Authentication API (v1/v2)
+- `user` - User management API (v1/v2)
+- `product` - Product catalog API (v1/v2)
+- `cart` - Shopping cart API (v1/v2)
+- `order` - Order management API (v1/v2)
+- `review` - Product reviews API (v1/v2)
+- `notification` - Notifications API (v1/v2)
+- `shipping` - Shipping API (v1 only)
+- `shipping-v2` - Enhanced shipping API (v2 only)
 
 **Pattern**: Each service has versioned API endpoints (`/api/v1/*`, `/api/v2/*`) handled in `internal/{service}/v1/` and `internal/{service}/v2/` handlers.
 
-#### `internal/` - Domain Logic
+**Shared Code**: `pkg/middleware/prometheus.go` - Prometheus metrics middleware (auto-collects request metrics)
 
-Private packages organized by service:
+#### `charts/` - Helm Chart
+
+Generic Helm chart for deploying all microservices:
 
 ```
-internal/
-├── auth/
-│   ├── v1/handler.go      # v1 API handlers
-│   ├── v2/handler.go      # v2 API handlers
-│   └── domain/user.go     # Domain models
-├── user/
-│   ├── v1/handler.go
-│   ├── v2/handler.go
-│   └── domain/user.go
-├── product/
-├── cart/
-├── order/
-├── review/
-├── notification/
-└── shipping/
+charts/
+├── Chart.yaml             # Chart metadata (name: microservice, version: 0.1.0)
+├── values.yaml            # Default values
+├── values/                # Per-service value overrides
+│   ├── auth.yaml
+│   ├── user.yaml
+│   ├── product.yaml
+│   ├── cart.yaml
+│   ├── order.yaml
+│   ├── review.yaml
+│   ├── notification.yaml
+│   ├── shipping.yaml
+│   └── shipping-v2.yaml
+└── templates/
+    ├── _helpers.tpl       # Template helpers
+    ├── deployment.yaml    # Deployment template
+    └── service.yaml       # Service template
 ```
 
-**Pattern**: Each service has `v1/` and `v2/` handler directories, plus a `domain/` directory for data models.
+**Usage:**
+```bash
+# Local deployment
+./scripts/04-deploy-microservices.sh --local
 
-#### `pkg/` - Shared Packages
+# From OCI registry
+./scripts/04-deploy-microservices.sh --registry
 
-Public packages used across services:
+# Manual Helm install
+helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-namespace
+```
 
-- `pkg/middleware/prometheus.go` - Prometheus metrics middleware (auto-collects request metrics)
+**OCI Registry:** `oci://ghcr.io/duynhne/charts/microservice`
 
 #### `k8s/` - Kubernetes Manifests
 
-Organized by component:
+Kubernetes manifests for monitoring and infrastructure components:
 
 ```
 k8s/
-├── {service-name}/        # Individual service deployments (9 services)
-│   ├── deployment.yaml
-│   └── service.yaml
 ├── prometheus/           # Prometheus configuration
 │   ├── configmap.yaml     # Prometheus config (scrape configs, rule_files)
 │   ├── deployment.yaml    # Prometheus deployment
@@ -108,10 +157,10 @@ k8s/
 ├── k6/                   # Load testing deployments
 │   ├── deployment-legacy.yaml
 │   └── deployment-multiple-scenarios.yaml
-├── slo/                  # SLO Kubernetes manifests
-│   └── sloth-job.yaml     # Sloth generation job
 └── namespaces.yaml        # Namespace definitions
 ```
+
+**Note**: Microservices are deployed via Helm chart (`charts/`), not raw YAML manifests.
 
 **Namespaces**:
 - `monitoring-demo` - All microservices and monitoring components
@@ -127,7 +176,7 @@ Numbered scripts (01-13) for deployment and operations:
 
 **Build & Deploy (03-07):**
 - `03-build-microservices.sh` - Build Docker images for all 9 services
-- `04-deploy-microservices.sh` - Deploy all microservices to Kubernetes
+- `04-deploy-microservices.sh` - Deploy all microservices using Helm (`--local` or `--registry`)
 - `05-deploy-monitoring.sh` - Deploy Prometheus and Grafana
 - `06-deploy-k6-testing.sh` - Deploy k6 load generators
 - `07-setup-access.sh` - Setup port-forwarding for services
@@ -165,10 +214,10 @@ Numbered scripts (01-13) for deployment and operations:
 #### `slo/` - SLO Data Files
 
 **Structure:**
-- `slo/definitions/` - 9 SLO definition YAML files (one per service)
-- `slo/generated/` - Generated Prometheus rules (10 files: 9 service rules + 1 merged)
+- `slo/definitions/` - 9 SLO definition YAML files (one per service, source of truth)
+- `slo/generated/` - Generated Prometheus rules (gitignored, created by `./scripts/10-generate-slo-rules.sh`)
 
-**Note**: SLO Kubernetes manifests moved to `k8s/slo/`, scripts moved to `scripts/09-11`, docs moved to `docs/slo/`.
+**Note**: Generated files are not tracked in git. Run `./scripts/10-generate-slo-rules.sh` to create them.
 
 #### `k6/` - Load Testing
 
@@ -183,10 +232,13 @@ Numbered scripts (01-13) for deployment and operations:
 
 | File | Purpose | Location |
 |------|---------|----------|
+| Helm Chart | Microservices deployment chart | `charts/` |
+| Helm Values | Per-service configuration | `charts/values/*.yaml` |
 | Prometheus Config | Scrape configs, rule files | `k8s/prometheus/configmap.yaml` |
 | Grafana Datasources | Prometheus datasource | `k8s/grafana/configmap-datasources.yaml` |
 | Grafana Dashboards | Dashboard provisioning | `k8s/grafana/configmap-dashboards.yaml` |
-| Dockerfile | Unified build for all services | `Dockerfile` (root) |
+| Dockerfile | Unified build for all services | `services/Dockerfile` |
+| Go Modules | Go dependencies | `services/go.mod` |
 
 ### Dashboard Files
 
@@ -209,8 +261,7 @@ Numbered scripts (01-13) for deployment and operations:
 | File Type | Location | Count |
 |-----------|----------|-------|
 | SLO Definitions | `slo/definitions/*.yaml` | 9 files (one per service) |
-| Generated Rules | `slo/generated/*.yaml` | 10 files (9 service + 1 merged) |
-| K8s Manifests | `k8s/slo/sloth-job.yaml` | 1 file |
+| Generated Rules | `slo/generated/*.yaml` | gitignored (run `./scripts/10-generate-slo-rules.sh`) |
 
 ### Documentation Files
 
@@ -369,10 +420,20 @@ kubectl logs -n monitoring -l app=k6-load-generator
 | Create cluster | `./scripts/01-create-kind-cluster.sh` | Create Kind Kubernetes cluster |
 | Install metrics | `./scripts/02-install-metrics.sh` | Install kube-state-metrics |
 | Build images | `./scripts/03-build-microservices.sh` | Build all 9 service Docker images |
-| Deploy services | `./scripts/04-deploy-microservices.sh` | Deploy all microservices |
+| Deploy services (local) | `./scripts/04-deploy-microservices.sh --local` | Deploy using local Helm chart |
+| Deploy services (registry) | `./scripts/04-deploy-microservices.sh --registry` | Deploy from OCI registry |
 | Deploy monitoring | `./scripts/05-deploy-monitoring.sh` | Deploy Prometheus & Grafana |
 | Deploy k6 | `./scripts/06-deploy-k6-testing.sh` | Deploy k6 load generators |
 | Setup access | `./scripts/07-setup-access.sh` | Setup port-forwarding |
+
+### Helm Commands
+
+| Command | Purpose |
+|---------|---------|
+| `helm list -A` | List all Helm releases |
+| `helm upgrade --install <name> charts/ -f charts/values/<service>.yaml -n <ns>` | Install/upgrade service |
+| `helm uninstall <name> -n <namespace>` | Uninstall a service |
+| `helm pull oci://ghcr.io/duynhne/charts/microservice` | Pull chart from OCI registry |
 
 ### Monitoring Commands
 
@@ -421,14 +482,14 @@ kubectl logs -n monitoring -l app=k6-load-generator
 
 - **`monitoring`** - Monitoring components (Prometheus, Grafana, k6) and SLO system
 - **Service namespaces** - Each microservice has its own namespace:
-  - `auth` - auth-service
-  - `user` - user-service
-  - `product` - product-service
-  - `cart` - cart-service
-  - `order` - order-service
-  - `review` - review-service
-  - `notification` - notification-service
-  - `shipping` - shipping-service, shipping-service-v2
+  - `auth` - auth
+  - `user` - user
+  - `product` - product
+  - `cart` - cart
+  - `order` - order
+  - `review` - review
+  - `notification` - notification
+  - `shipping` - shipping, shipping-v2
 
 ### Script Naming
 
@@ -443,10 +504,10 @@ kubectl logs -n monitoring -l app=k6-load-generator
 
 ### File Organization Patterns
 
-- **Services**: `cmd/{service}/main.go` + `internal/{service}/{v1,v2,domain}/`
+- **Services**: `services/cmd/{service}/main.go` + `services/internal/{service}/{v1,v2,domain}/`
 - **Kubernetes**: `k8s/{component}/{deployment,service}.yaml`
 - **Scripts**: `scripts/{number}-{purpose}.sh`
-- **SLO**: `slo/definitions/*.yaml` → `slo/generated/*.yaml` → `k8s/slo/`
+- **SLO**: `slo/definitions/*.yaml` → (generate) → `slo/generated/*.yaml` → (deploy as ConfigMaps)
 
 ### Metric Naming Conventions
 
@@ -459,7 +520,7 @@ kubectl logs -n monitoring -l app=k6-load-generator
 ### Label Requirements
 
 **Required labels for all metrics:**
-- `app` - Service name (e.g., `auth-service`, `user-service`)
+- `app` - Service name (e.g., `auth`, `user`)
 - `namespace` - Kubernetes namespace
 - `job=~"microservices"` - Prometheus job filter
 
@@ -470,7 +531,7 @@ kubectl logs -n monitoring -l app=k6-load-generator
 
 ### Go Code Conventions
 
-- **Middleware**: `pkg/middleware/prometheus.go` - Centralized metrics collection
+- **Middleware**: `services/pkg/middleware/prometheus.go` - Centralized metrics collection
 - **Handlers**: Separate `v1/` and `v2/` directories for API versioning
 - **Domain models**: `domain/` directory for data structures
 - **Memory leak prevention**: Always use `defer cancel()`, close channels, set timeouts
@@ -489,8 +550,8 @@ kubectl logs -n monitoring -l app=k6-load-generator
 ### Find Files by Purpose
 
 **Add a new service:**
-- Service code: `cmd/{service}/`, `internal/{service}/`
-- K8s manifests: `k8s/{service}/`
+- Service code: `services/cmd/{service}/`, `services/internal/{service}/`
+- Helm values: `charts/values/{service}.yaml`
 - SLO definition: `slo/definitions/{service}.yaml`
 
 **Update monitoring:**
@@ -500,8 +561,7 @@ kubectl logs -n monitoring -l app=k6-load-generator
 
 **Modify SLOs:**
 - Definitions: `slo/definitions/*.yaml`
-- Generated rules: `slo/generated/*.yaml`
-- K8s manifests: `k8s/slo/sloth-job.yaml`
+- Generated rules: `slo/generated/*.yaml` (gitignored, run `./scripts/10-generate-slo-rules.sh`)
 
 **Load testing:**
 - k6 scripts: `k6/load-test*.js`
@@ -535,4 +595,4 @@ kubectl logs -n monitoring -l app=k6-load-generator
 
 ---
 
-**Last Updated**: Reflects current project structure after SLO reorganization (November 2024)
+**Last Updated**: Reflects current project structure with Helm chart deployment (November 2024)

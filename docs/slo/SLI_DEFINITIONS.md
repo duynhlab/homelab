@@ -143,7 +143,7 @@ sum(rate(request_duration_seconds_count{
 
 All queries use these labels:
 
-- `app`: Service name (e.g., "auth-service")
+- `app`: Service name (e.g., "auth")
 - `namespace`: Kubernetes namespace (e.g., "auth")
 - `job`: Prometheus job name (must be "microservices")
 - `code`: HTTP status code (e.g., "200", "404", "500")

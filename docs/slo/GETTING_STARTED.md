@@ -32,8 +32,8 @@ Expected output:
 ```
 🔍 Validating SLO definitions...
 📋 Found 9 SLO definition files:
-  auth-service.yaml
-  cart-service.yaml
+  auth.yaml
+  cart.yaml
   ...
 ✅ All SLO definitions are valid!
 ```
@@ -93,7 +93,7 @@ Check Prometheus rules:
 kubectl port-forward -n monitoring svc/prometheus 9090:9090
 
 # Query SLO metrics
-curl "http://localhost:9090/api/v1/query?query=slo:sli_error:ratio_rate5m{service=\"auth-service\"}"
+curl "http://localhost:9090/api/v1/query?query=slo:sli_error:ratio_rate5m{service=\"auth\"}"
 ```
 
 ## First SLO Definition
@@ -101,14 +101,14 @@ curl "http://localhost:9090/api/v1/query?query=slo:sli_error:ratio_rate5m{servic
 Example: Creating a new SLO for a service
 
 ```yaml
-# slo/definitions/my-service.yaml
+# slo/definitions/myapp.yaml
 version: "prometheus/v1"
-service: "my-service"
+service: "myapp"
 labels:
   team: "platform"
   env: "demo"
-  service: "my-service"
-  namespace: "my-namespace"
+  service: "myapp"
+  namespace: "myapp"
 
 slos:
   - name: "availability"
@@ -118,19 +118,19 @@ slos:
       events:
         error_query: |
           sum(rate(request_duration_seconds_count{
-            app="my-service",
-            namespace="my-namespace",
+            app="myapp",
+            namespace="myapp",
             job=~"microservices",
             code=~"5.."
           }[{{.window}}]))
         total_query: |
           sum(rate(request_duration_seconds_count{
-            app="my-service",
-            namespace="my-namespace",
+            app="myapp",
+            namespace="myapp",
             job=~"microservices"
           }[{{.window}}]))
     alerting:
-      name: MyServiceHighErrorRate
+      name: MyappHighErrorRate
       # ... alert configuration
 ```
 
@@ -148,13 +148,13 @@ Query SLO metrics:
 
 ```promql
 # SLI error ratio
-slo:sli_error:ratio_rate5m{service="auth-service"}
+slo:sli_error:ratio_rate5m{service="auth"}
 
 # Error budget remaining
-slo:error_budget_remaining:ratio{service="auth-service"}
+slo:error_budget_remaining:ratio{service="auth"}
 
 # Burn rate
-slo:error_budget_burn_rate:ratio{service="auth-service"}
+slo:error_budget_burn_rate:ratio{service="auth"}
 ```
 
 ### Check Alerts
@@ -162,8 +162,8 @@ slo:error_budget_burn_rate:ratio{service="auth-service"}
 1. Open Prometheus UI: http://localhost:9090
 2. Go to Alerts
 3. Look for alerts like:
-   - `AuthServiceHighErrorRate`
-   - `UserServiceHighLatency`
+   - `AuthHighErrorRate`
+   - `UserHighLatency`
    - etc.
 
 ## Troubleshooting
@@ -190,7 +190,7 @@ slo:error_budget_burn_rate:ratio{service="auth-service"}
 **Solution**:
 1. Verify source metrics exist:
    ```promql
-   request_duration_seconds_count{app="auth-service", job=~"microservices"}
+   request_duration_seconds_count{app="auth", job=~"microservices"}
    ```
 2. Check time range (SLOs need 30 days of data for full accuracy)
 3. Verify labels match in SLO definition

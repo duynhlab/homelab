@@ -1,0 +1,76 @@
+# Default values for microservice chart
+# This is a YAML-formatted file.
+
+# Service name (required when installing)
+name: ""
+
+# Namespace to deploy to
+namespace: ""
+
+# Number of replicas
+replicaCount: 2
+
+# Container image configuration
+image:
+  repository: ghcr.io/duynhne
+  name: ""  # Short image name (e.g., auth, user, product)
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+
+# Container port
+containerPort: 8080
+
+# Resource limits and requests
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "50m"
+  limits:
+    memory: "128Mi"
+    cpu: "100m"
+
+# Liveness probe configuration
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+# Readiness probe configuration
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 5
+
+# Additional environment variables
+env: []
+# - name: MY_VAR
+#   value: "my-value"
+
+# Labels to add to all resources
+labels:
+  component: api
+
+# Pod annotations
+podAnnotations: {}
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+

@@ -1,62 +1,97 @@
 #!/bin/bash
 set -e
 
-echo "=== Deploying All Microservices ==="
+# =============================================================================
+# Deploy All Microservices using Helm
+# =============================================================================
+# Usage:
+#   ./04-deploy-microservices.sh              # Local mode (default)
+#   ./04-deploy-microservices.sh --local      # Local mode (explicit)
+#   ./04-deploy-microservices.sh --registry   # From ghcr.io OCI registry
+# =============================================================================
+
+# Configuration
+REGISTRY="oci://ghcr.io/duynhne/charts/microservice"
+LOCAL_CHART="charts/"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Parse arguments
+MODE="${1:---local}"
+
+if [[ "$MODE" == "--registry" ]]; then
+  CHART_REF="$REGISTRY"
+  echo "=== Deploying All Microservices from OCI Registry ==="
+  echo "Chart: $CHART_REF"
+else
+  CHART_REF="$PROJECT_ROOT/$LOCAL_CHART"
+  echo "=== Deploying All Microservices from Local Chart ==="
+  echo "Chart: $CHART_REF"
+fi
+
+echo ""
+
+# Service definitions: release-name:namespace:values-file
+SERVICES=(
+  "auth:auth:auth"
+  "user:user:user"
+  "product:product:product"
+  "cart:cart:cart"
+  "order:order:order"
+  "review:review:review"
+  "notification:notification:notification"
+  "shipping:shipping:shipping"
+  "shipping-v2:shipping:shipping-v2"
+)
 
 # Deploy namespaces first
 echo "1. Creating namespaces..."
-kubectl apply -f k8s/namespaces.yaml
+kubectl apply -f "$PROJECT_ROOT/k8s/namespaces.yaml"
+echo ""
 
-# Deploy each service to its namespace
-echo "2. Deploying auth-service to auth namespace..."
-kubectl apply -f k8s/auth-service/
-
-echo "3. Deploying user-service to user namespace..."
-kubectl apply -f k8s/user-service/
-
-echo "4. Deploying product-service to product namespace..."
-kubectl apply -f k8s/product-service/
-
-echo "5. Deploying cart-service to cart namespace..."
-kubectl apply -f k8s/cart-service/
-
-echo "6. Deploying order-service to order namespace..."
-kubectl apply -f k8s/order-service/
-
-echo "7. Deploying review-service to review namespace..."
-kubectl apply -f k8s/review-service/
-
-echo "8. Deploying notification-service to notification namespace..."
-kubectl apply -f k8s/notification-service/
-
-echo "9. Deploying shipping-service to shipping namespace..."
-kubectl apply -f k8s/shipping-service/
-
-echo "10. Deploying shipping-service-v2 to shipping namespace..."
-kubectl apply -f k8s/shipping-service-v2/
+# Deploy each service
+COUNT=2
+for entry in "${SERVICES[@]}"; do
+  IFS=':' read -r SERVICE NAMESPACE VALUES <<< "$entry"
+  
+  echo "$COUNT. Deploying $SERVICE to $NAMESPACE namespace..."
+  
+  helm upgrade --install "$SERVICE" "$CHART_REF" \
+    -f "$PROJECT_ROOT/charts/values/${VALUES}.yaml" \
+    -n "$NAMESPACE" \
+    --create-namespace \
+    --wait \
+    --timeout 60s || true
+  
+  COUNT=$((COUNT + 1))
+done
 
 echo ""
 echo "🎉 All 9 services deployed!"
 
 # Wait for pods to be ready
+echo ""
 echo "Waiting for pods to be ready..."
-kubectl wait --for=condition=ready pod -l app=auth-service -n auth --timeout=60s || true
-kubectl wait --for=condition=ready pod -l app=user-service -n user --timeout=60s || true
-kubectl wait --for=condition=ready pod -l app=product-service -n product --timeout=60s || true
-kubectl wait --for=condition=ready pod -l app=cart-service -n cart --timeout=60s || true
-kubectl wait --for=condition=ready pod -l app=order-service -n order --timeout=60s || true
-kubectl wait --for=condition=ready pod -l app=review-service -n review --timeout=60s || true
-kubectl wait --for=condition=ready pod -l app=notification-service -n notification --timeout=60s || true
-kubectl wait --for=condition=ready pod -l app=shipping-service -n shipping --timeout=60s || true
-kubectl wait --for=condition=ready pod -l app=shipping-service-v2 -n shipping --timeout=60s || true
+for entry in "${SERVICES[@]}"; do
+  IFS=':' read -r SERVICE NAMESPACE VALUES <<< "$entry"
+  kubectl wait --for=condition=ready pod -l app="$SERVICE" -n "$NAMESPACE" --timeout=60s 2>/dev/null || true
+done
 
 echo ""
 echo "📊 Pod Status Summary:"
-kubectl get pods -n auth
-kubectl get pods -n user
-kubectl get pods -n product
-kubectl get pods -n cart
-kubectl get pods -n order
-kubectl get pods -n review
-kubectl get pods -n notification
-kubectl get pods -n shipping
+echo ""
+
+NAMESPACES=("auth" "user" "product" "cart" "order" "review" "notification" "shipping")
+for NS in "${NAMESPACES[@]}"; do
+  echo "--- $NS namespace ---"
+  kubectl get pods -n "$NS" 2>/dev/null || echo "No pods found"
+  echo ""
+done
+
+echo "=== Deployment Complete ==="
+echo ""
+echo "To check Helm releases:"
+echo "  helm list -A"
+echo ""
+echo "To uninstall a service:"
+echo "  helm uninstall <service-name> -n <namespace>"

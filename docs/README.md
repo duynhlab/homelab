@@ -113,6 +113,8 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 ## Quick Reference
 
 ### Key Concepts
+- **Helm Chart** - Generic chart for all microservices (`charts/`)
+- **OCI Registry** - `oci://ghcr.io/duynhne/charts/microservice`
 - **32 Grafana Panels** - Complete monitoring dashboard
 - **6 Custom Metrics** - Application-level metrics
 - **9 Microservices** - All services with v1/v2 APIs
@@ -125,10 +127,20 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 ./scripts/01-create-kind-cluster.sh
 ./scripts/02-install-metrics.sh
 ./scripts/03-build-microservices.sh
-./scripts/04-deploy-microservices.sh
+./scripts/04-deploy-microservices.sh --local   # Uses local Helm chart
 ./scripts/05-deploy-monitoring.sh
 ./scripts/06-deploy-k6-testing.sh
 ./scripts/07-setup-access.sh
+```
+
+**Deploy from OCI registry:**
+```bash
+./scripts/04-deploy-microservices.sh --registry  # Uses oci://ghcr.io/duynhne/charts/microservice
+```
+
+**Manual Helm deployment:**
+```bash
+helm upgrade --install auth-service charts/ -f charts/values/auth.yaml -n auth --create-namespace
 ```
 
 **Deploy SLOs:**

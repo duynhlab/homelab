@@ -16,16 +16,19 @@ if [ "$1" = "--force" ]; then
     NO_CACHE="true"
 fi
 
+# Service definitions: image-name:folder-name
+# Image name is used for Docker tagging (matches Helm values)
+# Folder name is the cmd/ directory name
 SERVICES=(
-    "auth-service"
-    "user-service"
-    "product-service"
-    "cart-service"
-    "order-service"
-    "review-service"
-    "notification-service"
-    "shipping-service"
-    "shipping-service-v2"
+    "auth:auth-service"
+    "user:user-service"
+    "product:product-service"
+    "cart:cart-service"
+    "order:order-service"
+    "review:review-service"
+    "notification:notification-service"
+    "shipping:shipping-service"
+    "shipping-v2:shipping-service-v2"
 )
 
 # Function to check if image exists in Kind cluster
@@ -52,24 +55,28 @@ wait_for_pods() {
     echo "✅ $app_label pods are ready"
 }
 
-for service in "${SERVICES[@]}"; do
-    echo "Building $service..."
+for entry in "${SERVICES[@]}"; do
+    # Parse image-name:folder-name format
+    IFS=':' read -r IMAGE_NAME FOLDER_NAME <<< "$entry"
+    
+    echo "Building $IMAGE_NAME (from cmd/$FOLDER_NAME)..."
     
     # Check if image already exists in Kind (skip only if not forcing rebuild)
     # Always rebuild if --no-cache or --force is specified
-    if [ "$FORCE" != "true" ] && [ "$NO_CACHE" != "true" ] && check_image_in_kind $service; then
-        echo "⚠️  $service image already exists in Kind, skipping build"
+    if [ "$FORCE" != "true" ] && [ "$NO_CACHE" != "true" ] && check_image_in_kind $IMAGE_NAME; then
+        echo "⚠️  $IMAGE_NAME image already exists in Kind, skipping build"
         echo "   Use --no-cache or --force to rebuild anyway"
         continue
     fi
     
     # If --no-cache or --force, always rebuild (skip check above)
     if [ "$NO_CACHE" = "true" ] || [ "$FORCE" = "true" ]; then
-        echo "   Rebuilding $service (--no-cache flag detected)"
+        echo "   Rebuilding $IMAGE_NAME (--no-cache flag detected)"
     fi
     
     # Build command with optional --no-cache flag
-    BUILD_CMD="docker build --build-arg SERVICE_NAME=$service -f services/Dockerfile -t $service:latest"
+    # SERVICE_NAME uses folder name (for cmd/ path), image tag uses short name
+    BUILD_CMD="docker build --build-arg SERVICE_NAME=$FOLDER_NAME -f services/Dockerfile -t $IMAGE_NAME:latest"
     if [ "$NO_CACHE" = "true" ]; then
         BUILD_CMD="$BUILD_CMD --no-cache"
         echo "   Building with --no-cache flag"
@@ -79,12 +86,12 @@ for service in "${SERVICES[@]}"; do
     # Build with retry mechanism
     for attempt in 1 2 3; do
         if eval $BUILD_CMD; then
-            echo "✅ $service built successfully"
+            echo "✅ $IMAGE_NAME built successfully"
             break
         else
             echo "⚠️  Build attempt $attempt failed, retrying..."
             if [ $attempt -eq 3 ]; then
-                echo "❌ Failed to build $service after 3 attempts"
+                echo "❌ Failed to build $IMAGE_NAME after 3 attempts"
                 exit 1
             fi
         fi
@@ -92,23 +99,23 @@ for service in "${SERVICES[@]}"; do
     
     # Load to Kind with retry
     for attempt in 1 2 3; do
-        if kind load docker-image $service:latest --name monitoring-local; then
-            echo "✅ $service loaded to Kind"
+        if kind load docker-image $IMAGE_NAME:latest --name monitoring-local; then
+            echo "✅ $IMAGE_NAME loaded to Kind"
             break
         else
             echo "⚠️  Load attempt $attempt failed, retrying..."
             if [ $attempt -eq 3 ]; then
-                echo "❌ Failed to load $service to Kind after 3 attempts"
+                echo "❌ Failed to load $IMAGE_NAME to Kind after 3 attempts"
                 exit 1
             fi
         fi
     done
     
     # Verify image is loaded in Kind
-    if check_image_in_kind $service; then
-        echo "✅ $service image verified in Kind cluster"
+    if check_image_in_kind $IMAGE_NAME; then
+        echo "✅ $IMAGE_NAME image verified in Kind cluster"
     else
-        echo "❌ $service image not found in Kind cluster"
+        echo "❌ $IMAGE_NAME image not found in Kind cluster"
         exit 1
     fi
 done

@@ -41,25 +41,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: auth
-            path: auth-service
-          - name: user
-            path: user-service
-          - name: product
-            path: product-service
-          - name: cart
-            path: cart-service
-          - name: order
-            path: order-service
-          - name: review
-            path: review-service
-          - name: notification
-            path: notification-service
-          - name: shipping
-            path: shipping-service
-          - name: shipping-v2
-            path: shipping-service-v2
+        service:
+          - auth
+          - user
+          - product
+          - cart
+          - order
+          - review
+          - notification
+          - shipping
+          - shipping-v2
 
     steps:
       - name: Checkout code
@@ -75,10 +66,10 @@ jobs:
         if: github.event_name == 'pull_request'
         working-directory: services
         run: |
-          echo "Running Go lint for ${{ matrix.name }}..."
-          go vet ./cmd/${{ matrix.path }} || true
-          gofmt -l ./cmd/${{ matrix.path }} || true
-          echo "✓ Lint check completed for ${{ matrix.name }}"
+          echo "Running Go lint for ${{ matrix.service }}..."
+          go vet ./cmd/${{ matrix.service }} || true
+          gofmt -l ./cmd/${{ matrix.service }} || true
+          echo "✓ Lint check completed for ${{ matrix.service }}"
 
       - name: Set up Docker Buildx
         if: github.event_name != 'pull_request'
@@ -97,7 +88,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.name }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}
           tags: |
             type=raw,value=latest
 
@@ -109,7 +100,7 @@ jobs:
           context: ./services
           file: ./services/Dockerfile
           build-args: |
-            SERVICE_NAME=${{ matrix.path }}
+            SERVICE_NAME=${{ matrix.service }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

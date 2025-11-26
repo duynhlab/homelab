@@ -60,15 +60,15 @@ All Go source code is organized under the `services/` directory:
 ```
 services/
 ├── cmd/                   # Microservice entry points (9 services)
-│   ├── auth-service/
-│   ├── user-service/
-│   ├── product-service/
-│   ├── cart-service/
-│   ├── order-service/
-│   ├── review-service/
-│   ├── notification-service/
-│   ├── shipping-service/
-│   └── shipping-service-v2/
+│   ├── auth/
+│   ├── user/
+│   ├── product/
+│   ├── cart/
+│   ├── order/
+│   ├── review/
+│   ├── notification/
+│   ├── shipping/
+│   └── shipping-v2/
 ├── internal/              # Domain logic (private packages)
 │   ├── auth/
 │   ├── user/
@@ -282,20 +282,20 @@ Numbered scripts (01-13) for deployment and operations:
 
 1. **Create service structure:**
    ```bash
-   mkdir -p cmd/new-service
-   mkdir -p internal/new-service/{v1,v2,domain}
+   mkdir -p services/cmd/myapp
+   mkdir -p services/internal/myapp/{v1,v2,domain}
    ```
 
 2. **Add service code:**
-   - `cmd/new-service/main.go` - Entry point
-   - `internal/new-service/v1/handler.go` - v1 handlers
-   - `internal/new-service/v2/handler.go` - v2 handlers
-   - `internal/new-service/domain/model.go` - Domain models
+   - `services/cmd/myapp/main.go` - Entry point
+   - `services/internal/myapp/v1/handler.go` - v1 handlers
+   - `services/internal/myapp/v2/handler.go` - v2 handlers
+   - `services/internal/myapp/domain/model.go` - Domain models
 
-3. **Create Kubernetes manifests:**
+3. **Create Helm values file:**
    ```bash
-   mkdir -p k8s/new-service
-   # Create deployment.yaml and service.yaml
+   cp charts/values/auth.yaml charts/values/myapp.yaml
+   # Edit myapp.yaml with service-specific values
    ```
 
 4. **Update build script:**
@@ -303,7 +303,7 @@ Numbered scripts (01-13) for deployment and operations:
    - Add deployment to `scripts/04-deploy-microservices.sh`
 
 5. **Add SLO definition:**
-   - Create `slo/definitions/new-service.yaml`
+   - Create `slo/definitions/myapp.yaml`
    - Run `./scripts/09-validate-slo.sh`
    - Run `./scripts/10-generate-slo-rules.sh`
    - Run `./scripts/11-deploy-slo.sh`

@@ -19,29 +19,33 @@ alwaysApply: true
 ## Directory Structure
 ```
 Mics/Github/project-monitoring-golang/
-├── cmd/                    # Service entry points (9 services)
-│   ├── auth-service/
-│   ├── user-service/
-│   ├── product-service/
-│   ├── cart-service/
-│   ├── order-service/
-│   ├── review-service/
-│   ├── notification-service/
-│   ├── shipping-service/
-│   └── shipping-service-v2/
-├── internal/              # Domain logic
-│   ├── auth/
-│   ├── user/
-│   ├── product/
-│   ├── cart/
-│   ├── order/
-│   ├── review/
-│   ├── notification/
-│   └── shipping/
-├── pkg/                   # Shared packages
-│   └── middleware/
-├── k8s/                   # Kubernetes manifests
-├── Dockerfile             # Unified Dockerfile for all services
+├── services/              # Go application code
+│   ├── cmd/              # Service entry points (9 services)
+│   │   ├── auth/
+│   │   ├── user/
+│   │   ├── product/
+│   │   ├── cart/
+│   │   ├── order/
+│   │   ├── review/
+│   │   ├── notification/
+│   │   ├── shipping/
+│   │   └── shipping-v2/
+│   ├── internal/         # Domain logic
+│   │   ├── auth/
+│   │   ├── user/
+│   │   ├── product/
+│   │   ├── cart/
+│   │   ├── order/
+│   │   ├── review/
+│   │   ├── notification/
+│   │   └── shipping/
+│   ├── pkg/              # Shared packages
+│   │   └── middleware/
+│   ├── Dockerfile        # Unified Dockerfile for all services
+│   ├── go.mod
+│   └── go.sum
+├── k8s/                  # Kubernetes manifests
+├── charts/               # Helm chart for microservices
 ├── scripts/              # Build & deploy scripts (numbered 01-13)
 ├── docs/                 # Documentation
 ├── slo/                  # SLO/SRE configurations
@@ -50,8 +54,8 @@ Mics/Github/project-monitoring-golang/
 
 ## File Creation Rules
 - **ALWAYS** prepend `Mics/Github/project-monitoring-golang/` to file paths
-- Example: `Mics/Github/project-monitoring-golang/cmd/auth-service/main.go`
-- Example: `Mics/Github/project-monitoring-golang/internal/auth/handler.go`
+- Example: `Mics/Github/project-monitoring-golang/services/cmd/auth/main.go`
+- Example: `Mics/Github/project-monitoring-golang/services/internal/auth/handler.go`
 
 ## Terminal Commands
 - First command should always be: `cd Mics/Github/project-monitoring-golang`

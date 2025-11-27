@@ -46,15 +46,15 @@
 ## 🏗️ Architecture
 
 ### Microservices (9 Services)
-- **auth-service** - Authentication API (`/api/v1/auth/*`, `/api/v2/auth/*`)
-- **user-service** - User management API (`/api/v1/users/*`, `/api/v2/users/*`)
-- **product-service** - Product catalog API (`/api/v1/products/*`, `/api/v2/catalog/*`)
-- **cart-service** - Shopping cart API (`/api/v1/cart/*`, `/api/v2/carts/*`)
-- **order-service** - Order management API (`/api/v1/orders/*`, `/api/v2/orders/*`)
-- **review-service** - Product reviews API (`/api/v1/reviews/*`, `/api/v2/reviews/*`)
-- **notification-service** - Notifications API (`/api/v1/notify/*`, `/api/v2/notifications/*`)
-- **shipping-service** - Shipping tracking API (`/api/v1/shipping/*`)
-- **shipping-service-v2** - Enhanced shipping API (`/api/v2/shipments/*`)
+- **auth** - Authentication API (`/api/v1/auth/*`, `/api/v2/auth/*`)
+- **user** - User management API (`/api/v1/users/*`, `/api/v2/users/*`)
+- **product** - Product catalog API (`/api/v1/products/*`, `/api/v2/catalog/*`)
+- **cart** - Shopping cart API (`/api/v1/cart/*`, `/api/v2/carts/*`)
+- **order** - Order management API (`/api/v1/orders/*`, `/api/v2/orders/*`)
+- **review** - Product reviews API (`/api/v1/reviews/*`, `/api/v2/reviews/*`)
+- **notification** - Notifications API (`/api/v1/notify/*`, `/api/v2/notifications/*`)
+- **shipping** - Shipping tracking API (`/api/v1/shipping/*`)
+- **shipping-v2** - Enhanced shipping API (`/api/v2/shipments/*`)
 
 ### Monitoring Stack
 - **Prometheus** - Metrics collection & storage
@@ -98,11 +98,11 @@ chmod +x scripts/*.sh
 
 ```bash
 # Port-forward all services
-kubectl port-forward -n auth svc/auth-service 8081:8080 &
-kubectl port-forward -n user svc/user-service 8082:8080 &
-kubectl port-forward -n product svc/product-service 8083:8080 &
-kubectl port-forward -n order svc/order-service 8084:8080 &
-kubectl port-forward -n cart svc/cart-service 8085:8080 &
+kubectl port-forward -n auth svc/auth 8081:8080 &
+kubectl port-forward -n user svc/user 8082:8080 &
+kubectl port-forward -n product svc/product 8083:8080 &
+kubectl port-forward -n order svc/order 8084:8080 &
+kubectl port-forward -n cart svc/cart 8085:8080 &
 
 # Access monitoring
 kubectl port-forward -n monitoring svc/grafana 3000:3000 &
@@ -441,9 +441,9 @@ kind delete cluster --name monitoring-local
 ./scripts/04-deploy-microservices.sh
 
 # Or manually for specific service
-docker build --build-arg SERVICE_NAME=<service-name> -f Dockerfile -t <service-name>:latest .
-kind load docker-image <service-name>:latest --name monitoring-local
-kubectl rollout restart deployment -n <namespace> -l app=<service-name>
+docker build --build-arg SERVICE_NAME=auth -f services/Dockerfile -t ghcr.io/duynhne/auth:latest services/
+kind load docker-image ghcr.io/duynhne/auth:latest --name monitoring-local
+kubectl rollout restart deployment -n auth -l app=auth
 ```
 
 **2. Port Forwarding Not Working**
@@ -454,7 +454,7 @@ pkill -f "kubectl port-forward"
 # Restart port forwarding
 kubectl port-forward -n monitoring svc/grafana 3000:3000 &
 kubectl port-forward -n monitoring svc/prometheus 9090:9090 &
-kubectl port-forward -n user svc/user-service 8081:8080 &
+kubectl port-forward -n user svc/user 8081:8080 &
 ```
 
 **3. Pods Not Starting**

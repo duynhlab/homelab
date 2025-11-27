@@ -12,7 +12,7 @@ alwaysApply: false
 - Apply namespaces: `kubectl apply -f k8s/namespaces.yaml`
 
 ## Label Standards
-- `app`: Service name (auth-service, user-service, product-service, cart-service, order-service, review-service, notification-service, shipping-service)
+- `app`: Service name (auth, user, product, cart, order, review, notification, shipping, shipping-v2)
 - `component`: Component type (api, monitoring, load-test)
 
 ## Resource Limits
@@ -37,10 +37,10 @@ alwaysApply: false
   - `prometheus-config`
 
 ## Service Naming
-- Match deployment name exactly
+- Match deployment name exactly (Helm release name)
 - Examples:
-  - `auth-service` deployment → `auth-service` service
-  - `user-service` deployment → `user-service` service
+  - `auth` deployment → `auth` service
+  - `user` deployment → `user` service
   - `grafana` deployment → `grafana` service
 
 ## Deployment Strategy

@@ -23,7 +23,7 @@ kubectl port-forward -n monitoring svc/prometheus 9090:9090 > /dev/null 2>&1 &
 
 # User Service
 echo "Starting User Service port forward (8081)..."
-kubectl port-forward -n user svc/user-service 8081:8080 > /dev/null 2>&1 &
+kubectl port-forward -n user svc/user 8081:8080 > /dev/null 2>&1 &
 
 # Wait for port forwards to be ready
 echo "Waiting for port forwards to be ready..."

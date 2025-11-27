@@ -23,22 +23,22 @@ Deploy changes to Kubernetes cluster
 **Option 2: Manual Build**
 Build individual service using unified Dockerfile:
 ```bash
-# Build auth-service
-docker build --build-arg SERVICE_NAME=auth-service -t auth-service:latest .
+# Build auth
+docker build --build-arg SERVICE_NAME=auth -f services/Dockerfile -t ghcr.io/duynhne/auth:latest services/
 
 # Build other services similarly
-docker build --build-arg SERVICE_NAME=user-service -t user-service:latest .
-docker build --build-arg SERVICE_NAME=product-service -t product-service:latest .
+docker build --build-arg SERVICE_NAME=user -f services/Dockerfile -t ghcr.io/duynhne/user:latest services/
+docker build --build-arg SERVICE_NAME=product -f services/Dockerfile -t ghcr.io/duynhne/product:latest services/
 # ... etc for all 9 services
 ```
 
 **Load to Kind (if using Kind)**
 ```bash
 # Load all images at once
-kind load docker-image auth-service:latest user-service:latest product-service:latest --name <cluster-name>
+kind load docker-image ghcr.io/duynhne/auth:latest ghcr.io/duynhne/user:latest ghcr.io/duynhne/product:latest --name <cluster-name>
 
 # Or load individually
-kind load docker-image auth-service:latest --name <cluster-name>
+kind load docker-image ghcr.io/duynhne/auth:latest --name <cluster-name>
 ```
 
 ### Apply Kubernetes Manifests
@@ -67,21 +67,21 @@ kind load docker-image auth-service:latest --name <cluster-name>
 ./scripts/07-setup-access.sh
 ```
 
-**Option 2: Manual Deployment**
+**Option 2: Manual Deployment (Helm)**
 ```bash
 # Apply namespaces
 kubectl apply -f k8s/namespaces.yaml
 
-# Deploy services (each in its own namespace)
-kubectl apply -f k8s/auth-service/
-kubectl apply -f k8s/user-service/
-kubectl apply -f k8s/product-service/
-kubectl apply -f k8s/cart-service/
-kubectl apply -f k8s/order-service/
-kubectl apply -f k8s/review-service/
-kubectl apply -f k8s/notification-service/
-kubectl apply -f k8s/shipping-service/
-kubectl apply -f k8s/shipping-service-v2/
+# Deploy services using Helm (each in its own namespace)
+helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-namespace
+helm upgrade --install user charts/ -f charts/values/user.yaml -n user --create-namespace
+helm upgrade --install product charts/ -f charts/values/product.yaml -n product --create-namespace
+helm upgrade --install cart charts/ -f charts/values/cart.yaml -n cart --create-namespace
+helm upgrade --install order charts/ -f charts/values/order.yaml -n order --create-namespace
+helm upgrade --install review charts/ -f charts/values/review.yaml -n review --create-namespace
+helm upgrade --install notification charts/ -f charts/values/notification.yaml -n notification --create-namespace
+helm upgrade --install shipping charts/ -f charts/values/shipping.yaml -n shipping --create-namespace
+helm upgrade --install shipping-v2 charts/ -f charts/values/shipping-v2.yaml -n shipping --create-namespace
 
 # Deploy monitoring components
 kubectl apply -f k8s/prometheus/
@@ -116,8 +116,8 @@ kubectl get svc -n monitoring
 
 **Check Logs**
 ```bash
-# Service logs (example: auth-service)
-kubectl logs -l app=auth-service -n auth
+# Service logs (example: auth)
+kubectl logs -l app=auth -n auth
 
 # Monitoring logs
 kubectl logs -l app=prometheus -n monitoring
@@ -137,9 +137,9 @@ kubectl port-forward -n monitoring svc/grafana 3000:3000
 kubectl port-forward -n monitoring svc/prometheus 9090:9090
 ```
 
-**API Services (example: auth-service)**
+**API Services (example: auth)**
 ```bash
-kubectl port-forward -n auth svc/auth-service 8080:8080
+kubectl port-forward -n auth svc/auth 8080:8080
 ```
 
 ### Restart Deployments (if ConfigMaps changed)
@@ -154,7 +154,7 @@ kubectl port-forward -n auth svc/auth-service 8080:8080
 kubectl rollout restart deployment/prometheus -n monitoring
 ```
 
-**Service Restart (example: auth-service)**
+**Service Restart (example: auth)**
 ```bash
-kubectl rollout restart deployment/auth-service -n auth
+kubectl rollout restart deployment/auth -n auth
 ```

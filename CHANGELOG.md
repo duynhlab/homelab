@@ -11,17 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Project structure reorganized** for cleaner root directory:
   - Moved Go code (`cmd/`, `internal/`, `pkg/`, `Dockerfile`, `go.mod`, `go.sum`) into `services/` folder
   - Moved `kind/` folder into `k8s/kind/`
+  - Renamed service folders: `services/cmd/auth-service/` → `services/cmd/auth/` (and all 9 services)
 - Updated GitHub Actions workflows for new paths
 - Updated build scripts (`03-build-microservices.sh`, `01-create-kind-cluster.sh`)
 - **SLO folder simplified**:
   - `slo/generated/` now gitignored (generated files created on-demand by `./scripts/10-generate-slo-rules.sh`)
   - SLO definitions remain in `slo/definitions/` as source of truth
 - **Service naming simplified** - Removed "-service" suffix everywhere:
+  - Service folders: `cmd/auth-service/` → `cmd/auth/`
   - Helm values: `name: auth-service` → `name: auth`
   - SLO definitions: `auth-service.yaml` → `auth.yaml`
   - App labels: `app="auth-service"` → `app="auth"`
   - Alert names: `AuthServiceHighErrorRate` → `AuthHighErrorRate`
-  - Updated all documentation to reflect new naming
+  - Service URLs in k6 scripts: `auth-service.auth.svc.cluster.local` → `auth.auth.svc.cluster.local`
+  - Kubernetes service names: `svc/auth-service` → `svc/auth`
+  - Prometheus SLO ConfigMaps: `prometheus-slo-rules-auth-service` → `prometheus-slo-rules-auth`
+  - Go log messages: `"Starting auth-service"` → `"Starting auth"`
+  - Updated all documentation (README.md, API_REFERENCE.md, METRICS_LABEL_SOLUTIONS.md, etc.)
 
 ### Removed
 - `k8s/slo/sloth-job.yaml` - Unused Kubernetes Job for Sloth (scripts run Sloth locally instead)

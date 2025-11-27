@@ -2116,7 +2116,7 @@
       ],
       "title": "Total Memory per Service",
       "type": "timeseries",
-      "description": "Total memory allocated by ALL pods in the service (aggregated). Example: user-service with 2 pods shows sum of both pods. Use for capacity planning and cost analysis."
+      "description": "Total memory allocated by ALL pods in the service (aggregated). Example: user with 2 pods shows sum of both pods. Use for capacity planning and cost analysis."
     },
     {
       "datasource": {

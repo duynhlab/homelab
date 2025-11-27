@@ -9,15 +9,15 @@ const requestsTotal = new Counter('k6_requests_total');
 
 // Service URLs for 9 microservices
 const SERVICES = {
-  auth: 'http://auth-service.auth.svc.cluster.local:8080',
-  user: 'http://user-service.user.svc.cluster.local:8080',
-  product: 'http://product-service.product.svc.cluster.local:8080',
-  cart: 'http://cart-service.cart.svc.cluster.local:8080',
-  order: 'http://order-service.order.svc.cluster.local:8080',
-  review: 'http://review-service.review.svc.cluster.local:8080',
-  notification: 'http://notification-service.notification.svc.cluster.local:8080',
-  shipping: 'http://shipping-service.shipping.svc.cluster.local:8080',
-  shippingV2: 'http://shipping-service-v2.shipping.svc.cluster.local:8080',
+  auth: 'http://auth.auth.svc.cluster.local:8080',
+  user: 'http://user.user.svc.cluster.local:8080',
+  product: 'http://product.product.svc.cluster.local:8080',
+  cart: 'http://cart.cart.svc.cluster.local:8080',
+  order: 'http://order.order.svc.cluster.local:8080',
+  review: 'http://review.review.svc.cluster.local:8080',
+  notification: 'http://notification.notification.svc.cluster.local:8080',
+  shipping: 'http://shipping.shipping.svc.cluster.local:8080',
+  shippingV2: 'http://shipping-v2.shipping.svc.cluster.local:8080',
 };
 
 // Helper function to make requests with proper tagging

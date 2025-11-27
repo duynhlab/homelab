@@ -45,6 +45,6 @@ func main() {
 		port = "8080"
 	}
 
-	log.Printf("Starting auth-service on :%s", port)
+	log.Printf("Starting auth on :%s", port)
 	log.Fatal(r.Run(":" + port))
 }

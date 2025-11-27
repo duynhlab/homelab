@@ -45,6 +45,6 @@ func main() {
 		port = "8080"
 	}
 
-	log.Printf("Starting review-service on :%s", port)
+	log.Printf("Starting review on :%s", port)
 	log.Fatal(r.Run(":" + port))
 }

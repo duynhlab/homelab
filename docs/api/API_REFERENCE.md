@@ -8,15 +8,15 @@ This project provides 9 microservices with RESTful APIs. Each service exposes v1
 
 | Service | Namespace | Port | Base URL |
 |---------|-----------|------|----------|
-| auth-service | auth | 8080 | `/api/v1`, `/api/v2` |
-| user-service | user | 8080 | `/api/v1`, `/api/v2` |
-| product-service | product | 8080 | `/api/v1`, `/api/v2` |
-| cart-service | cart | 8080 | `/api/v1`, `/api/v2` |
-| order-service | order | 8080 | `/api/v1`, `/api/v2` |
-| review-service | review | 8080 | `/api/v1`, `/api/v2` |
-| notification-service | notification | 8080 | `/api/v1`, `/api/v2` |
-| shipping-service | shipping | 8080 | `/api/v1` |
-| shipping-service-v2 | shipping | 8080 | `/api/v2` |
+| auth | auth | 8080 | `/api/v1`, `/api/v2` |
+| user | user | 8080 | `/api/v1`, `/api/v2` |
+| product | product | 8080 | `/api/v1`, `/api/v2` |
+| cart | cart | 8080 | `/api/v1`, `/api/v2` |
+| order | order | 8080 | `/api/v1`, `/api/v2` |
+| review | review | 8080 | `/api/v1`, `/api/v2` |
+| notification | notification | 8080 | `/api/v1`, `/api/v2` |
+| shipping | shipping | 8080 | `/api/v1` |
+| shipping-v2 | shipping | 8080 | `/api/v2` |
 
 ---
 
@@ -212,7 +212,7 @@ curl -X POST http://localhost:8080/api/v1/notifications \
 | `POST` | `/api/v1/shipments` | Create shipment |
 | `PUT` | `/api/v1/shipments/{id}` | Update shipment status |
 
-### Endpoints (v2 - shipping-service-v2)
+### Endpoints (v2 - shipping-v2)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -287,9 +287,9 @@ Error response format:
 ./scripts/04-deploy-microservices.sh --local
 
 # Port forward specific service
-kubectl port-forward -n auth svc/auth-service 8080:8080
-kubectl port-forward -n user svc/user-service 8081:8080
-kubectl port-forward -n product svc/product-service 8082:8080
+kubectl port-forward -n auth svc/auth 8080:8080
+kubectl port-forward -n user svc/user 8081:8080
+kubectl port-forward -n product svc/product 8082:8080
 ```
 
 ### Port Forwarding Guide

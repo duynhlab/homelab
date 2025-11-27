@@ -94,6 +94,75 @@ chmod +x scripts/*.sh
 ./scripts/07-setup-access.sh
 ```
 
+### 📋 Script Options & Usage
+
+Các scripts hỗ trợ nhiều tùy chọn để phù hợp với các use cases khác nhau:
+
+#### Build Options (`03-build-microservices.sh`)
+
+**Default behavior**: Normal build (uses Docker cache, skips existing images in Kind)
+
+**Available options:**
+```bash
+# Normal build (default) - uses cache, skips existing images
+./scripts/03-build-microservices.sh
+
+# Rebuild without Docker cache
+./scripts/03-build-microservices.sh --no-cache
+
+# Force rebuild all (no cache, skip checks)
+./scripts/03-build-microservices.sh --force
+```
+
+**When to use:**
+- **Default**: For normal development workflow (fast, uses cache)
+- **`--no-cache`**: When you want fresh builds without using cached layers
+- **`--force`**: When you want to rebuild everything from scratch, ignoring existing images
+
+#### Deploy Options (`04-deploy-microservices.sh`)
+
+**Default behavior**: Deploy from local Helm chart (`charts/`)
+
+**Available options:**
+```bash
+# Deploy from local chart (default)
+./scripts/04-deploy-microservices.sh
+
+# Deploy from local chart (explicit)
+./scripts/04-deploy-microservices.sh --local
+
+# Deploy from ghcr.io OCI registry
+./scripts/04-deploy-microservices.sh --registry
+```
+
+**When to use:**
+- **`--local`** (default): For local development - uses Helm chart from `charts/` directory
+- **`--registry`**: When deploying from published Helm chart in OCI registry (`oci://ghcr.io/duynhne/charts/microservice`)
+
+#### k6 Testing Options (`06-deploy-k6-testing.sh`)
+
+**Default behavior**: Deploy both legacy and multiple-scenarios load generators
+
+**Available options:**
+```bash
+# Deploy both (default)
+./scripts/06-deploy-k6-testing.sh
+
+# Deploy both (explicit)
+./scripts/06-deploy-k6-testing.sh both
+
+# Deploy only legacy load generator
+./scripts/06-deploy-k6-testing.sh legacy
+
+# Deploy only multiple-scenarios load generator
+./scripts/06-deploy-k6-testing.sh multiple
+```
+
+**When to use:**
+- **`legacy`**: For simple random testing across all services
+- **`multiple`**: For realistic user personas (Browser, Shopping, Registered, API Client, Admin)
+- **`both`** (default): For comprehensive testing with both approaches
+
 ### Access Services
 
 ```bash

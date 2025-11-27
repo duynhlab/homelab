@@ -36,6 +36,6 @@ func main() {
 		port = "8080"
 	}
 
-	log.Printf("Starting shipping-service-v2 on :%s", port)
+	log.Printf("Starting shipping-v2 on :%s", port)
 	log.Fatal(r.Run(":" + port))
 }

@@ -58,7 +58,7 @@ All custom metrics include these labels:
 
 | Label | Source | Example |
 |-------|--------|---------|
-| `app` | `APP_NAME` env var (from pod label) | `auth-service` |
+| `app` | `APP_NAME` env var (from pod label) | `auth` |
 | `namespace` | `NAMESPACE` env var (from pod metadata) | `auth` |
 | `method` | HTTP request method | `GET`, `POST` |
 | `path` | Request path | `/api/v1/users` |
@@ -91,24 +91,24 @@ The 6 custom metrics defined in `pkg/middleware/prometheus.go`:
 
 When adding a new service, the labels are automatically configured through Helm:
 
-1. Create values file (`charts/values/new-service.yaml`):
+1. Create values file (`charts/values/myapp.yaml`):
 
 ```yaml
-name: new-service
-namespace: new
+name: myapp
+namespace: myapp
 
 image:
   repository: ghcr.io/duynhne
-  name: new-service
+  name: myapp
   tag: latest
 ```
 
 2. Deploy with Helm:
 
 ```bash
-helm upgrade --install new-service charts/ \
-  -f charts/values/new-service.yaml \
-  -n new --create-namespace
+helm upgrade --install myapp charts/ \
+  -f charts/values/myapp.yaml \
+  -n myapp --create-namespace
 ```
 
 The Helm chart automatically:
@@ -120,18 +120,18 @@ The Helm chart automatically:
 
 ```bash
 # Check pod labels
-kubectl get pod -n auth -l app=auth-service -o jsonpath='{.items[0].metadata.labels}'
+kubectl get pod -n auth -l app=auth -o jsonpath='{.items[0].metadata.labels}'
 
 # Check env vars in pod
-kubectl exec -n auth deployment/auth-service -- env | grep -E "(APP_NAME|NAMESPACE)"
+kubectl exec -n auth deployment/auth -- env | grep -E "(APP_NAME|NAMESPACE)"
 # Output:
-# APP_NAME=auth-service
+# APP_NAME=auth
 # NAMESPACE=auth
 
 # Check metrics labels
-kubectl port-forward -n auth svc/auth-service 8080:8080
+kubectl port-forward -n auth svc/auth 8080:8080
 curl -s http://localhost:8080/metrics | grep request_duration_seconds | head -1
-# Output: request_duration_seconds_bucket{app="auth-service",namespace="auth",method="GET",path="/health",code="200",le="0.005"} 10
+# Output: request_duration_seconds_bucket{app="auth",namespace="auth",method="GET",path="/health",code="200",le="0.005"} 10
 ```
 
 ## Troubleshooting
@@ -142,8 +142,8 @@ curl -s http://localhost:8080/metrics | grep request_duration_seconds | head -1
 
 **Solution**: Verify Helm deployment is correct:
 ```bash
-helm get values auth-service -n auth
-kubectl describe pod -n auth -l app=auth-service | grep -A5 "Environment:"
+helm get values auth -n auth
+kubectl describe pod -n auth -l app=auth | grep -A5 "Environment:"
 ```
 
 ### Dashboard Shows No Data

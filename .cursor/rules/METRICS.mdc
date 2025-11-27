@@ -70,7 +70,7 @@ sum(rate(...)) by (path)          # Endpoint analysis
 ## Label Requirements
 
 **Required for all metrics:**
-- `app` - Service name (e.g., `auth-service`, `user-service`)
+- `app` - Service name (e.g., `auth`, `user`)
 - `namespace` - Kubernetes namespace (service-specific: auth, user, product, etc., or `monitoring` for monitoring components)
 - `job=~"microservices"` - Prometheus job filter
 

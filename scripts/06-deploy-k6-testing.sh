@@ -11,8 +11,8 @@ echo "Deploy mode: ${DEPLOY_MODE}"
 # Create ConfigMap from both k6 load test scripts
 echo "1. Creating k6 load test ConfigMap (both files)..."
 kubectl create configmap k6-load-test \
-  --from-file=k6/load-test.js \
-  --from-file=k6/load-test-multiple-scenarios.js \
+  --from-file=k8s/k6/load-test.js \
+  --from-file=k8s/k6/load-test-multiple-scenarios.js \
   -n monitoring \
   --dry-run=client -o yaml | kubectl apply -f -
 

@@ -45,6 +45,6 @@ func main() {
 		port = "8080"
 	}
 
-	log.Printf("Starting notification-service on :%s", port)
+	log.Printf("Starting notification on :%s", port)
 	log.Fatal(r.Run(":" + port))
 }

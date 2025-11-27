@@ -47,6 +47,6 @@ func main() {
 		port = "8080"
 	}
 
-	log.Printf("Starting user-service on :%s", port)
+	log.Printf("Starting user on :%s", port)
 	log.Fatal(r.Run(":" + port))
 }

@@ -6,8 +6,8 @@ k6 chạy như **continuous load generator** để tạo traffic cho tất cả 
 
 ## Files
 
-- **k6/load-test.js** - Legacy test (random testing tất cả services)
-- **k6/load-test-multiple-scenarios.js** - Multiple scenarios test (5 user personas)
+- **k8s/k6/load-test.js** - Legacy test (random testing tất cả services)
+- **k8s/k6/load-test-multiple-scenarios.js** - Multiple scenarios test (5 user personas)
 - **k8s/k6/deployment-legacy.yaml** - Deployment cho legacy test
 - **k8s/k6/deployment-multiple-scenarios.yaml** - Deployment cho multiple scenarios test
 - **scripts/06-deploy-k6-testing.sh** - Script deploy (hỗ trợ 3 modes)
@@ -127,7 +127,7 @@ kubectl logs -n monitoring -l app=k6-load-generator-scenarios
 
 ## Update Test Script
 
-1. Edit `k6/load-test.js` hoặc `k6/load-test-multiple-scenarios.js`
+1. Edit `k8s/k6/load-test.js` hoặc `k8s/k6/load-test-multiple-scenarios.js`
 2. Redeploy: `./scripts/06-deploy-k6-testing.sh both`
 3. ConfigMap tự động update, pods sẽ restart
 

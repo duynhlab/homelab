@@ -502,7 +502,7 @@ spec:
 ## k6 Load Test Update
 
 ```javascript
-// k6/load-test.js
+// k8s/k6/load-test.js
 import http from "k6/http";
 import { check } from "k6";
 

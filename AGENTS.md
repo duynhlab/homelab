@@ -44,7 +44,6 @@ project-monitoring-golang/
 ├── scripts/               # Deployment and utility scripts (numbered 01-13)
 ├── docs/                  # Documentation
 ├── slo/                   # SLO data files (definitions, generated rules)
-├── k6/                    # k6 load test scripts
 ├── grafana-dashboard.json # Main Grafana dashboard (32 panels)
 ├── README.md              # Project overview
 ├── CHANGELOG.md           # Version changelog
@@ -154,7 +153,9 @@ k8s/
 │   ├── configmap-datasources.yaml
 │   ├── deployment.yaml
 │   └── service.yaml
-├── k6/                   # Load testing deployments
+├── k6/                   # Load testing (scripts and deployments)
+│   ├── load-test.js
+│   ├── load-test-multiple-scenarios.js
 │   ├── deployment-legacy.yaml
 │   └── deployment-multiple-scenarios.yaml
 └── namespaces.yaml        # Namespace definitions
@@ -219,10 +220,12 @@ Numbered scripts (01-13) for deployment and operations:
 
 **Note**: Generated files are not tracked in git. Run `./scripts/10-generate-slo-rules.sh` to create them.
 
-#### `k6/` - Load Testing
+#### `k8s/k6/` - Load Testing
 
 - `load-test.js` - Legacy single-scenario load test
 - `load-test-multiple-scenarios.js` - Multiple user personas (Browser, Shopping, Registered, API Client, Admin)
+- `deployment-legacy.yaml` - Kubernetes deployment for legacy test
+- `deployment-multiple-scenarios.yaml` - Kubernetes deployment for multiple scenarios test
 
 ---
 
@@ -564,8 +567,7 @@ kubectl logs -n monitoring -l app=k6-load-generator
 - Generated rules: `slo/generated/*.yaml` (gitignored, run `./scripts/10-generate-slo-rules.sh`)
 
 **Load testing:**
-- k6 scripts: `k6/load-test*.js`
-- Deployments: `k8s/k6/deployment-*.yaml`
+- k6 scripts and deployments: `k8s/k6/load-test*.js` and `k8s/k6/deployment-*.yaml`
 
 ### Find Scripts by Task
 

@@ -63,105 +63,69 @@
 
 ## 🚀 Quick Start
 
-### Step-by-Step Deployment
+### Basic Setup (Steps 1-7)
 
 ```bash
 git clone <repo-url>
 cd project-monitoring-golang
-
-# Make scripts executable
 chmod +x scripts/*.sh
 
-# Step 1: Create Kind cluster
-./scripts/01-create-kind-cluster.sh
-
-# Step 2: Install metrics infrastructure
-./scripts/02-install-metrics.sh
-
-# Step 3: Build microservices (IMPORTANT: Must build before deploy)
-./scripts/03-build-microservices.sh
-
-# Step 4: Deploy microservices
-./scripts/04-deploy-microservices.sh
-
-# Step 5: Deploy monitoring stack
-./scripts/05-deploy-monitoring.sh
-
-# Step 6: Deploy k6 load testing
-./scripts/06-deploy-k6-testing.sh
-
-# Step 7: Setup access (port forwarding)
-./scripts/07-setup-access.sh
+./scripts/01-create-kind-cluster.sh      # Create Kind cluster
+./scripts/02-install-metrics.sh          # Install metrics infrastructure
+./scripts/03-build-microservices.sh      # Build Docker images
+./scripts/04-deploy-microservices.sh     # Deploy microservices
+./scripts/05-deploy-monitoring.sh        # Deploy Prometheus & Grafana
+./scripts/06-deploy-k6-testing.sh        # Deploy load generators
+./scripts/07-setup-access.sh             # Setup port forwarding
 ```
 
-### 📋 Script Options & Usage
+### SLO Deployment (Steps 9-11)
 
-Các scripts hỗ trợ nhiều tùy chọn để phù hợp với các use cases khác nhau:
+Deploy Service Level Objectives for error budget tracking:
 
-#### Build Options (`03-build-microservices.sh`)
-
-**Default behavior**: Normal build (uses Docker cache, skips existing images in Kind)
-
-**Available options:**
 ```bash
-# Normal build (default) - uses cache, skips existing images
-./scripts/03-build-microservices.sh
-
-# Rebuild without Docker cache
-./scripts/03-build-microservices.sh --no-cache
-
-# Force rebuild all (no cache, skip checks)
-./scripts/03-build-microservices.sh --force
+# One-command deployment (validates, generates, and deploys)
+./scripts/11-deploy-slo.sh
 ```
 
-**When to use:**
-- **Default**: For normal development workflow (fast, uses cache)
-- **`--no-cache`**: When you want fresh builds without using cached layers
-- **`--force`**: When you want to rebuild everything from scratch, ignoring existing images
-
-#### Deploy Options (`04-deploy-microservices.sh`)
-
-**Default behavior**: Deploy from local Helm chart (`charts/`)
-
-**Available options:**
+**Manual steps:**
 ```bash
-# Deploy from local chart (default)
-./scripts/04-deploy-microservices.sh
-
-# Deploy from local chart (explicit)
-./scripts/04-deploy-microservices.sh --local
-
-# Deploy from ghcr.io OCI registry
-./scripts/04-deploy-microservices.sh --registry
+./scripts/09-validate-slo.sh      # Validate SLO definitions
+./scripts/10-generate-slo-rules.sh # Generate Prometheus rules
+./scripts/11-deploy-slo.sh         # Deploy SLO system
 ```
 
-**When to use:**
-- **`--local`** (default): For local development - uses Helm chart from `charts/` directory
-- **`--registry`**: When deploying from published Helm chart in OCI registry (`oci://ghcr.io/duynhne/charts/microservice`)
+📖 [Full SLO Documentation](./docs/slo/README.md)
 
-#### k6 Testing Options (`06-deploy-k6-testing.sh`)
+### Optional Steps
 
-**Default behavior**: Deploy both legacy and multiple-scenarios load generators
-
-**Available options:**
+**Reload Dashboard (Step 8):**
 ```bash
-# Deploy both (default)
-./scripts/06-deploy-k6-testing.sh
-
-# Deploy both (explicit)
-./scripts/06-deploy-k6-testing.sh both
-
-# Deploy only legacy load generator
-./scripts/06-deploy-k6-testing.sh legacy
-
-# Deploy only multiple-scenarios load generator
-./scripts/06-deploy-k6-testing.sh multiple
+./scripts/08-reload-dashboard.sh  # Reload Grafana dashboard after updates
 ```
 
-**When to use:**
-- **`legacy`**: For simple random testing across all services
-- **`multiple`**: For realistic user personas (Browser, Shopping, Registered, API Client, Admin)
-- **`both`** (default): For comprehensive testing with both approaches
+**Runbooks (Steps 12-13):**
+```bash
+./scripts/12-diagnose-latency.sh      # Diagnose latency issues
+./scripts/13-error-budget-alert.sh    # Error budget alert response
+```
+
+### Script Options
+
+**Build Options:**
+```bash
+./scripts/03-build-microservices.sh [--no-cache|--force]
+```
+
+**Deploy Options:**
+```bash
+./scripts/04-deploy-microservices.sh [--local|--registry]
+```
+
+**k6 Options:**
+```bash
+./scripts/06-deploy-k6-testing.sh [legacy|multiple|both]
+```
 
 ### Access Services
 

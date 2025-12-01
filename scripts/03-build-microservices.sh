@@ -57,8 +57,8 @@ wait_for_pods() {
 }
 
 for SERVICE in "${SERVICES[@]}"; do
-    # Full image path (matches Helm values: ghcr.io/duynhne/<name>:latest)
-    FULL_IMAGE="$REGISTRY/$SERVICE:latest"
+    # Full image path (matches Helm values: ghcr.io/duynhne/<name>:v5)
+    FULL_IMAGE="$REGISTRY/$SERVICE:v5"
     
     echo "Building $FULL_IMAGE (from cmd/$SERVICE)..."
     

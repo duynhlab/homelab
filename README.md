@@ -69,13 +69,14 @@
 
 ## 🚀 Quick Start
 
-### Basic Setup (Steps 1-7)
+### Complete Deployment (All Steps)
 
 ```bash
 git clone <repo-url>
 cd project-monitoring-golang
 chmod +x scripts/*.sh
 
+# Basic Setup (Steps 1-7)
 ./scripts/01-create-kind-cluster.sh      # Create Kind cluster
 ./scripts/02-install-metrics.sh          # Install metrics infrastructure
 ./scripts/03-build-microservices.sh      # Build Docker images
@@ -83,43 +84,40 @@ chmod +x scripts/*.sh
 ./scripts/05-deploy-monitoring.sh        # Deploy Prometheus & Grafana
 ./scripts/06-deploy-k6-testing.sh        # Deploy load generators
 ./scripts/07-setup-access.sh             # Setup port forwarding
+
+# SLO Deployment (Steps 9-11) - Optional
+./scripts/11-deploy-slo.sh               # Deploy SLO system (validates, generates, deploys)
+
+# APM Deployment (Steps 14-17) - Optional
+./scripts/17-deploy-apm.sh               # Deploy all APM components (Tempo, Pyroscope, Loki, Vector)
 ```
 
-### SLO Deployment (Steps 9-11)
+### Deployment Options
 
-Deploy Service Level Objectives for error budget tracking:
-
+**SLO Deployment Options:**
 ```bash
-# One-command deployment (validates, generates, and deploys)
+# One-command (recommended)
 ./scripts/11-deploy-slo.sh
-```
 
-**Manual steps:**
-```bash
+# Manual steps (if you need more control)
 ./scripts/09-validate-slo.sh      # Validate SLO definitions
 ./scripts/10-generate-slo-rules.sh # Generate Prometheus rules
 ./scripts/11-deploy-slo.sh         # Deploy SLO system
 ```
-
 📖 [Full SLO Documentation](./docs/slo/README.md)
 
-### APM Deployment (Steps 14-17)
-
-Deploy Application Performance Monitoring stack:
-
+**APM Deployment Options:**
 ```bash
-# Deploy all APM components (Tempo, Pyroscope, Loki, Vector)
+# One-command (recommended) - Deploys all APM components
 ./scripts/17-deploy-apm.sh
-```
 
-**Individual deployments:**
-```bash
+# Individual deployments (if you need specific components)
 ./scripts/14-deploy-tempo.sh      # Deploy Grafana Tempo (tracing)
 ./scripts/15-deploy-pyroscope.sh  # Deploy Pyroscope (profiling)
 ./scripts/16-deploy-loki.sh       # Deploy Loki + Vector (logging)
 ```
 
-**What you get:**
+**What APM provides:**
 - **Distributed Tracing**: End-to-end request tracing across all microservices
 - **Structured Logging**: JSON logs with trace-id correlation
 - **Continuous Profiling**: CPU, heap, goroutine, and lock profiling
@@ -170,6 +168,11 @@ kubectl port-forward -n cart svc/cart 8085:8080 &
 # Access monitoring
 kubectl port-forward -n monitoring svc/grafana 3000:3000 &
 kubectl port-forward -n monitoring svc/prometheus 9090:9090 &
+
+# Access APM services (after Step 17)
+kubectl port-forward -n monitoring svc/tempo 3200:3200 &
+kubectl port-forward -n monitoring svc/pyroscope 4040:4040 &
+kubectl port-forward -n monitoring svc/loki 3100:3100 &
 ```
 
 ### Access URLs
@@ -182,6 +185,11 @@ kubectl port-forward -n monitoring svc/prometheus 9090:9090 &
 🔧 Checkout API: http://localhost:8083/api/v1/checkout
 🔧 Order API:  http://localhost:8084/api/v2/orders
 🔧 Unified API: http://localhost:8085/api/v3/*
+
+🔍 APM Services (after Step 17):
+   📊 Tempo:      http://localhost:3200 (distributed tracing)
+   🔬 Pyroscope:  http://localhost:4040 (continuous profiling)
+   📝 Loki:       http://localhost:3100 (log aggregation)
 ```
 
 ### View Dashboard

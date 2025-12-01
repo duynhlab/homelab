@@ -38,7 +38,7 @@ replicaCount: 2
 image:
   repository: ghcr.io/duynhne
   name: payment
-  tag: latest
+  tag: v5
   pullPolicy: IfNotPresent
 
 service:
@@ -167,7 +167,7 @@ namespace: payment
 image:
   repository: ghcr.io/duynhne
   name: payment
-  tag: latest
+  tag: v5
 ```
 
 ### Step 3: Update Deployment Script

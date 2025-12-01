@@ -504,8 +504,8 @@ kind delete cluster --name monitoring-local
 ./scripts/04-deploy-microservices.sh
 
 # Or manually for specific service
-docker build --build-arg SERVICE_NAME=auth -f services/Dockerfile -t ghcr.io/duynhne/auth:latest services/
-kind load docker-image ghcr.io/duynhne/auth:latest --name monitoring-local
+docker build --build-arg SERVICE_NAME=auth -f services/Dockerfile -t ghcr.io/duynhne/auth:v5 services/
+kind load docker-image ghcr.io/duynhne/auth:v5 --name monitoring-local
 kubectl rollout restart deployment -n auth -l app=auth
 ```
 

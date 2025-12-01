@@ -37,7 +37,7 @@ Time    Counter Value   Event
 
 ### **Query:**
 ```promql
-request_duration_seconds_count{app="auth-service"}
+request_duration_seconds_count{app="auth"}
 ```
 
 ### **Grafana hiển thị:**
@@ -69,7 +69,7 @@ rate(counter[time_range]) = (value_end - value_start) / time_range_seconds
 
 ### **Query:**
 ```promql
-rate(request_duration_seconds_count{app="auth-service"}[5m])
+rate(request_duration_seconds_count{app="auth"}[5m])
 ```
 
 ### **Cách Prometheus xử lý counter reset:**
@@ -128,7 +128,7 @@ increase(counter[time_range]) = rate(counter[time_range]) * time_range_seconds
 
 ### **Query:**
 ```promql
-increase(request_duration_seconds_count{app="auth-service"}[5m])
+increase(request_duration_seconds_count{app="auth"}[5m])
 ```
 
 ### **Cách Prometheus xử lý:**
@@ -178,7 +178,7 @@ Requests (5m window)
 
 **Query:**
 ```promql
-sum(request_duration_seconds_count{app="auth-service"})
+sum(request_duration_seconds_count{app="auth"})
 ```
 
 | Aspect | Value |
@@ -203,7 +203,7 @@ Total Requests: 0      ← Mất hết!
 
 **Query:**
 ```promql
-sum(rate(request_duration_seconds_count{app="auth-service"}[5m]))
+sum(rate(request_duration_seconds_count{app="auth"}[5m]))
 ```
 
 | Aspect | Value |
@@ -229,7 +229,7 @@ RPS: 4.8 req/s         ← Tự phục hồi!
 
 **Query:**
 ```promql
-sum(increase(request_duration_seconds_count{app="auth-service"}[$__range]))
+sum(increase(request_duration_seconds_count{app="auth"}[$__range]))
 ```
 
 | Aspect | Value |

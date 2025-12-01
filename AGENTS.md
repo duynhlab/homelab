@@ -39,9 +39,13 @@ project-monitoring-golang/
 │   ├── prometheus/
 │   ├── grafana/
 │   ├── k6/
+│   ├── tempo/             # Grafana Tempo (distributed tracing)
+│   ├── pyroscope/         # Pyroscope (continuous profiling)
+│   ├── loki/              # Loki (log storage)
+│   ├── vector/            # Vector (log collection)
 │   ├── kind/              # Kind cluster configuration
 │   └── namespaces.yaml
-├── scripts/               # Deployment and utility scripts (numbered 01-13)
+├── scripts/               # Deployment and utility scripts (numbered 01-17)
 ├── docs/                  # Documentation
 ├── slo/                   # SLO data files (definitions, generated rules)
 ├── grafana-dashboard.json # Main Grafana dashboard (32 panels)
@@ -70,6 +74,14 @@ services/
 │   └── shipping-v2/
 ├── internal/              # Domain logic (private packages)
 │   ├── auth/
+│   │   ├── web/           # HTTP handlers layer
+│   │   │   ├── v1/
+│   │   │   └── v2/
+│   │   ├── logic/         # Business logic layer
+│   │   │   ├── v1/
+│   │   │   └── v2/
+│   │   └── core/          # Core domain layer
+│   │       └── domain/
 │   ├── user/
 │   ├── product/
 │   ├── cart/
@@ -95,9 +107,16 @@ services/
 - `shipping` - Shipping API (v1 only)
 - `shipping-v2` - Enhanced shipping API (v2 only)
 
-**Pattern**: Each service has versioned API endpoints (`/api/v1/*`, `/api/v2/*`) handled in `internal/{service}/v1/` and `internal/{service}/v2/` handlers.
+**Pattern**: Each service has versioned API endpoints (`/api/v1/*`, `/api/v2/*`) with 3-layer architecture:
+- `web/v1/`, `web/v2/` - HTTP handlers (Gin handlers)
+- `logic/v1/`, `logic/v2/` - Business logic layer
+- `core/domain/` - Domain models
 
-**Shared Code**: `pkg/middleware/prometheus.go` - Prometheus metrics middleware (auto-collects request metrics)
+**Shared Code**: 
+- `pkg/middleware/prometheus.go` - Prometheus metrics middleware (auto-collects request metrics)
+- `pkg/middleware/logging.go` - Structured logging middleware with trace-id correlation
+- `pkg/middleware/tracing.go` - OpenTelemetry distributed tracing middleware
+- `pkg/middleware/profiling.go` - Pyroscope continuous profiling middleware
 
 #### `charts/` - Helm Chart
 
@@ -194,6 +213,12 @@ Numbered scripts (01-13) for deployment and operations:
 - `12-diagnose-latency.sh` - Diagnostic script for latency issues
 - `13-error-budget-alert.sh` - Error budget alert response script
 
+**APM Deployment (14-17):**
+- `14-deploy-tempo.sh` - Deploy Grafana Tempo (distributed tracing)
+- `15-deploy-pyroscope.sh` - Deploy Pyroscope (continuous profiling)
+- `16-deploy-loki.sh` - Deploy Loki + Vector (log aggregation)
+- `17-deploy-apm.sh` - Deploy all APM components (one-command)
+
 **Utilities:**
 - `cleanup.sh` - Clean up Kind cluster and resources
 
@@ -258,6 +283,7 @@ Numbered scripts (01-13) for deployment and operations:
 | Monitoring | 08 | Dashboard reload |
 | SLO Management | 09-11 | Validate, generate rules, deploy SLOs |
 | Runbooks | 12-13 | Diagnostic and alert response scripts |
+| APM Deployment | 14-17 | Deploy Tempo, Pyroscope, Loki, Vector |
 
 ### SLO Files
 
@@ -271,6 +297,10 @@ Numbered scripts (01-13) for deployment and operations:
 | Document | Location | Purpose |
 |----------|----------|---------|
 | Metrics Guide | `docs/monitoring/METRICS.md` | Complete metrics documentation |
+| APM Guide | `docs/apm/README.md` | APM system overview |
+| Tracing Guide | `docs/apm/TRACING.md` | Distributed tracing guide |
+| Logging Guide | `docs/apm/LOGGING.md` | Structured logging guide |
+| Profiling Guide | `docs/apm/PROFILING.md` | Continuous profiling guide |
 | SLO Guide | `docs/slo/README.md` | SLO system overview |
 | Setup Guide | `docs/getting-started/SETUP.md` | Deployment instructions |
 | API Reference | `docs/api/API_REFERENCE.md` | API endpoints |
@@ -286,14 +316,18 @@ Numbered scripts (01-13) for deployment and operations:
 1. **Create service structure:**
    ```bash
    mkdir -p services/cmd/myapp
-   mkdir -p services/internal/myapp/{v1,v2,domain}
+   mkdir -p services/internal/myapp/web/{v1,v2}
+   mkdir -p services/internal/myapp/logic/{v1,v2}
+   mkdir -p services/internal/myapp/core/domain
    ```
 
 2. **Add service code:**
    - `services/cmd/myapp/main.go` - Entry point
-   - `services/internal/myapp/v1/handler.go` - v1 handlers
-   - `services/internal/myapp/v2/handler.go` - v2 handlers
-   - `services/internal/myapp/domain/model.go` - Domain models
+   - `services/internal/myapp/web/v1/handler.go` - v1 HTTP handlers
+   - `services/internal/myapp/web/v2/handler.go` - v2 HTTP handlers
+   - `services/internal/myapp/logic/v1/service.go` - v1 business logic
+   - `services/internal/myapp/logic/v2/service.go` - v2 business logic
+   - `services/internal/myapp/core/domain/model.go` - Domain models
 
 3. **Create Helm values file:**
    ```bash
@@ -483,7 +517,7 @@ kubectl logs -n monitoring -l app=k6-load-generator
 
 ### Namespace Conventions
 
-- **`monitoring`** - Monitoring components (Prometheus, Grafana, k6) and SLO system
+- **`monitoring`** - Monitoring components (Prometheus, Grafana, k6, Tempo, Pyroscope, Loki, Vector) and SLO system
 - **Service namespaces** - Each microservice has its own namespace:
   - `auth` - auth
   - `user` - user
@@ -496,7 +530,7 @@ kubectl logs -n monitoring -l app=k6-load-generator
 
 ### Script Naming
 
-- **Numbered prefixes (01-13)** - Execution order and categorization
+- **Numbered prefixes (01-17)** - Execution order and categorization
 - **Format**: `{number}-{purpose}.sh`
 - **Categories**:
   - 01-02: Infrastructure
@@ -504,6 +538,7 @@ kubectl logs -n monitoring -l app=k6-load-generator
   - 08: Monitoring
   - 09-11: SLO Management
   - 12-13: Runbooks
+  - 14-17: APM Deployment
 
 ### File Organization Patterns
 

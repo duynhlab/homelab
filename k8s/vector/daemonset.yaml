@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vector
+  namespace: monitoring
+  labels:
+    app: vector
+spec:
+  selector:
+    matchLabels:
+      app: vector
+  template:
+    metadata:
+      labels:
+        app: vector
+    spec:
+      serviceAccountName: vector
+      containers:
+      - name: vector
+        image: timberio/vector:0.34.0-distroless-libc
+        args:
+          - --config-dir
+          - /etc/vector
+        ports:
+        - name: http
+          containerPort: 8686
+        volumeMounts:
+        - name: vector-config
+          mountPath: /etc/vector
+        - name: varlog
+          mountPath: /var/log
+          readOnly: true
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: vector-data-dir
+          mountPath: /vector-data-dir
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8686
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8686
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: vector-config
+        configMap:
+          name: vector-config
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: vector-data-dir
+        emptyDir: {}
+      tolerations:
+      - effect: NoSchedule
+        operator: Exists
+

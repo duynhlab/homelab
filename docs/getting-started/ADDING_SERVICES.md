@@ -16,7 +16,7 @@ Your service will automatically appear in monitoring if it meets these requireme
 Your Go service should use the shared Prometheus middleware:
 
 ```go
-import "github.com/demo/monitoring-golang/pkg/middleware"
+import "github.com/duynhne/monitoring/pkg/middleware"
 
 func main() {
     r := gin.Default()
@@ -30,7 +30,7 @@ Create a values file for your service in `charts/values/`:
 
 ```yaml
 # charts/values/payment.yaml
-name: payment-service
+name: payment
 namespace: payment
 
 replicaCount: 2
@@ -81,34 +81,79 @@ labels:
 ### Step 1: Create Service Code
 
 ```bash
-mkdir -p cmd/payment-service
-mkdir -p internal/payment/{v1,v2,domain}
+mkdir -p services/cmd/payment
+mkdir -p services/internal/payment/web/{v1,v2}
+mkdir -p services/internal/payment/logic/{v1,v2}
+mkdir -p services/internal/payment/core/domain
 ```
 
 Create the main entry point:
 
 ```go
-// cmd/payment-service/main.go
+// services/cmd/payment/main.go
 package main
 
 import (
+    "context"
+    "os"
+
     "github.com/gin-gonic/gin"
     "github.com/prometheus/client_golang/prometheus/promhttp"
-    "github.com/demo/monitoring-golang/pkg/middleware"
+    "go.uber.org/zap"
+
+    v1 "github.com/duynhne/monitoring/internal/payment/web/v1"
+    v2 "github.com/duynhne/monitoring/internal/payment/web/v2"
+    "github.com/duynhne/monitoring/pkg/middleware"
 )
 
 func main() {
+    // Initialize structured logger
+    logger, _ := middleware.NewLogger()
+    defer logger.Sync()
+
+    // Initialize OpenTelemetry tracing
+    tp, _ := middleware.InitTracing()
+    if tp != nil {
+        defer tp.Shutdown(context.Background())
+    }
+
+    // Initialize Pyroscope profiling
+    middleware.InitProfiling()
+    defer middleware.StopProfiling()
+
     r := gin.Default()
+
+    // Middleware chain
+    r.Use(middleware.TracingMiddleware())
+    r.Use(middleware.LoggingMiddleware(logger))
     r.Use(middleware.PrometheusMiddleware())
-    
+
     r.GET("/health", func(c *gin.Context) {
         c.JSON(200, gin.H{"status": "ok"})
     })
     r.GET("/metrics", gin.WrapH(promhttp.Handler()))
-    
-    // Add your API routes here
-    
-    r.Run(":8080")
+
+    // API v1
+    apiV1 := r.Group("/api/v1")
+    {
+        // Add your v1 routes here
+        // apiV1.POST("/payment", v1.ProcessPayment)
+    }
+
+    // API v2
+    apiV2 := r.Group("/api/v2")
+    {
+        // Add your v2 routes here
+        // apiV2.POST("/payment", v2.ProcessPayment)
+    }
+
+    port := os.Getenv("PORT")
+    if port == "" {
+        port = "8080"
+    }
+
+    logger.Info("Starting payment service", zap.String("port", port))
+    r.Run(":" + port)
 }
 ```
 
@@ -116,7 +161,7 @@ func main() {
 
 ```yaml
 # charts/values/payment.yaml
-name: payment-service
+name: payment
 namespace: payment
 
 image:
@@ -132,7 +177,7 @@ Add the service to `scripts/04-deploy-microservices.sh`:
 ```bash
 SERVICES=(
   # ... existing services ...
-  "payment-service:payment:payment"
+  "payment:payment:payment"
 )
 ```
 
@@ -172,7 +217,7 @@ metadata:
 Or deploy manually:
 
 ```bash
-helm upgrade --install payment-service charts/ \
+helm upgrade --install payment charts/ \
   -f charts/values/payment.yaml \
   -n payment --create-namespace
 ```
@@ -204,7 +249,7 @@ Your new service will have access to all monitoring features:
 
 1. **Check Helm release**: `helm list -n payment`
 2. **Verify pod is running**: `kubectl get pods -n payment`
-3. **Check metrics endpoint**: `kubectl port-forward -n payment svc/payment-service 8080:8080` then `curl localhost:8080/metrics`
+3. **Check metrics endpoint**: `kubectl port-forward -n payment svc/payment 8080:8080` then `curl localhost:8080/metrics`
 4. **Prometheus targets**: Check http://localhost:9090/targets
 
 ### No Data in Panels
@@ -231,7 +276,7 @@ var customCounter = prometheus.NewCounterVec(
 
 ## Best Practices
 
-1. **Consistent Naming**: Use `service-name` pattern (e.g., `payment-service`)
+1. **Consistent Naming**: Use `service-name` pattern (e.g., `payment`) without `-service` suffix
 2. **Namespace per Service**: One namespace per service type
 3. **Use Helm Values**: Don't hardcode configuration
 4. **Metrics Quality**: Use meaningful metric names and labels

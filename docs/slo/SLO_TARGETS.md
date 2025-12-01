@@ -16,47 +16,47 @@ All services have the same SLO targets for consistency:
 
 ## Per-Service Targets
 
-### auth-service
+### auth
 - **Availability**: 99.5% (critical for authentication)
 - **Latency**: 95% < 500ms (auth should be fast)
 - **Error Rate**: 99% success
 
-### user-service
+### user
 - **Availability**: 99.5%
 - **Latency**: 95% < 500ms
 - **Error Rate**: 99% success
 
-### product-service
+### product
 - **Availability**: 99.5%
 - **Latency**: 95% < 500ms (read-heavy, should be fast)
 - **Error Rate**: 99% success
 
-### cart-service
+### cart
 - **Availability**: 99.5%
 - **Latency**: 95% < 500ms
 - **Error Rate**: 99% success
 
-### order-service
+### order
 - **Availability**: 99.5% (critical for business)
 - **Latency**: 95% < 500ms
 - **Error Rate**: 99% success
 
-### review-service
+### review
 - **Availability**: 99.5%
 - **Latency**: 95% < 500ms
 - **Error Rate**: 99% success
 
-### notification-service
+### notification
 - **Availability**: 99.5%
 - **Latency**: 95% < 500ms (can tolerate slightly higher latency)
 - **Error Rate**: 99% success
 
-### shipping-service
+### shipping
 - **Availability**: 99.5%
 - **Latency**: 95% < 500ms
 - **Error Rate**: 99% success
 
-### shipping-service-v2
+### shipping-v2
 - **Availability**: 99.5%
 - **Latency**: 95% < 500ms
 - **Error Rate**: 99% success
@@ -91,21 +91,21 @@ To establish baseline, monitor services for 1-2 weeks and analyze:
 ```promql
 # Current availability (30-day)
 1 - (
-  sum(rate(request_duration_seconds_count{app="auth-service", code=~"5.."}[30d]))
+  sum(rate(request_duration_seconds_count{app="auth", code=~"5.."}[30d]))
   /
-  sum(rate(request_duration_seconds_count{app="auth-service"}[30d]))
+  sum(rate(request_duration_seconds_count{app="auth"}[30d]))
 )
 
 # Current latency success rate (30-day)
-sum(rate(request_duration_seconds_bucket{app="auth-service", le="0.5"}[30d]))
+sum(rate(request_duration_seconds_bucket{app="auth", le="0.5"}[30d]))
 /
-sum(rate(request_duration_seconds_count{app="auth-service"}[30d]))
+sum(rate(request_duration_seconds_count{app="auth"}[30d]))
 
 # Current error rate (30-day)
 1 - (
-  sum(rate(request_duration_seconds_count{app="auth-service", code=~"4..|5.."}[30d]))
+  sum(rate(request_duration_seconds_count{app="auth", code=~"4..|5.."}[30d]))
   /
-  sum(rate(request_duration_seconds_count{app="auth-service"}[30d]))
+  sum(rate(request_duration_seconds_count{app="auth"}[30d]))
 )
 ```
 

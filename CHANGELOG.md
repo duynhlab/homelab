@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **3-Layer Architecture Refactor**: Refactored all services into web → logic → core layers
+  - `web/v1/`, `web/v2/` - HTTP handlers (Gin handlers) with tracing and logging
+  - `logic/v1/`, `logic/v2/` - Business logic layer with spans for each operation
+  - `core/domain/` - Domain models (moved from `domain/` to `core/domain/`)
+  - All 9 services refactored: auth, user, product, cart, order, review, notification, shipping
+  - Layer tracing: Each layer creates spans with `layer` attribute for better observability
+- **Import Path Update**: Changed module path from `github.com/demo/monitoring-golang` to `github.com/duynhne/monitoring`
+  - Updated all Go source files (42 files)
+  - Updated `services/go.mod`
+  - Updated documentation references
 - **Project structure reorganized** for cleaner root directory:
   - Moved Go code (`cmd/`, `internal/`, `pkg/`, `Dockerfile`, `go.mod`, `go.sum`) into `services/` folder
   - Moved `kind/` folder into `k8s/kind/`

@@ -3,8 +3,7 @@ name: Build Docker Images
 on:
   push:
     branches:
-      - v4
-      - main
+      - v5
     paths:
       - 'services/Dockerfile'
       - 'services/go.mod'
@@ -15,8 +14,7 @@ on:
       - '.github/workflows/build-images.yml'
   pull_request:
     branches:
-      - v4
-      - main
+      - v5
     paths:
       - 'services/Dockerfile'
       - 'services/go.mod'
@@ -59,7 +57,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.23'
           cache-dependency-path: services/go.sum
 
       - name: Run Go lint (PR only)

@@ -1,18 +1,51 @@
 package main
 
 import (
-	"log"
+	"context"
 	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
 
-	v1 "github.com/demo/monitoring-golang/internal/shipping/v1"
-	"github.com/demo/monitoring-golang/pkg/middleware"
+	v1 "github.com/duynhne/monitoring/internal/shipping/web/v1"
+	"github.com/duynhne/monitoring/pkg/middleware"
 )
 
 func main() {
+	// Initialize structured logger
+	logger, err := middleware.NewLogger()
+	if err != nil {
+		panic("Failed to initialize logger: " + err.Error())
+	}
+	defer logger.Sync()
+
+	// Initialize OpenTelemetry tracing
+	tp, err := middleware.InitTracing()
+	if err != nil {
+		logger.Warn("Failed to initialize tracing", zap.Error(err))
+	} else {
+		defer func() {
+			if err := tp.Shutdown(context.Background()); err != nil {
+				logger.Error("Error shutting down tracer provider", zap.Error(err))
+			}
+		}()
+	}
+
+	// Initialize Pyroscope profiling
+	if err := middleware.InitProfiling(); err != nil {
+		logger.Warn("Failed to initialize profiling", zap.Error(err))
+	} else {
+		defer middleware.StopProfiling()
+	}
+
 	r := gin.Default()
+
+	// Tracing middleware (must be first for context propagation)
+	r.Use(middleware.TracingMiddleware())
+
+	// Logging middleware (must be before Prometheus middleware)
+	r.Use(middleware.LoggingMiddleware(logger))
 
 	// Prometheus middleware
 	r.Use(middleware.PrometheusMiddleware())
@@ -36,6 +69,8 @@ func main() {
 		port = "8080"
 	}
 
-	log.Printf("Starting shipping on :%s", port)
-	log.Fatal(r.Run(":" + port))
+	logger.Info("Starting shipping service", zap.String("port", port))
+	if err := r.Run(":" + port); err != nil {
+		logger.Fatal("Failed to start server", zap.Error(err))
+	}
 }

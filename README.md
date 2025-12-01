@@ -61,6 +61,12 @@
 - **Grafana** - Visualization & dashboards
 - **k6** - Load testing & performance validation
 
+### APM Stack (Application Performance Monitoring)
+- **Grafana Tempo** - Distributed tracing backend
+- **Loki** - Log aggregation and storage
+- **Vector** - Log collection and processing
+- **Pyroscope** - Continuous profiling (CPU, heap, goroutines, locks)
+
 ## 🚀 Quick Start
 
 ### Basic Setup (Steps 1-7)
@@ -96,6 +102,30 @@ Deploy Service Level Objectives for error budget tracking:
 ```
 
 📖 [Full SLO Documentation](./docs/slo/README.md)
+
+### APM Deployment (Steps 14-17)
+
+Deploy Application Performance Monitoring stack:
+
+```bash
+# Deploy all APM components (Tempo, Pyroscope, Loki, Vector)
+./scripts/17-deploy-apm.sh
+```
+
+**Individual deployments:**
+```bash
+./scripts/14-deploy-tempo.sh      # Deploy Grafana Tempo (tracing)
+./scripts/15-deploy-pyroscope.sh  # Deploy Pyroscope (profiling)
+./scripts/16-deploy-loki.sh       # Deploy Loki + Vector (logging)
+```
+
+**What you get:**
+- **Distributed Tracing**: End-to-end request tracing across all microservices
+- **Structured Logging**: JSON logs with trace-id correlation
+- **Continuous Profiling**: CPU, heap, goroutine, and lock profiling
+- **Full Correlation**: Trace-to-logs, trace-to-metrics, trace-to-profiles
+
+📖 [Full APM Documentation](./docs/apm/README.md)
 
 ### Optional Steps
 

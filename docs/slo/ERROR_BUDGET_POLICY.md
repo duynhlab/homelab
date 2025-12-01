@@ -110,10 +110,10 @@ Query error budget remaining:
 
 ```promql
 # Error budget remaining (0-1 scale)
-slo:error_budget_remaining:ratio{service="auth-service"}
+slo:error_budget_remaining:ratio{service="auth"}
 
 # Error budget remaining (percentage)
-slo:error_budget_remaining:ratio{service="auth-service"} * 100
+slo:error_budget_remaining:ratio{service="auth"} * 100
 ```
 
 ### Burn Rate Monitoring
@@ -122,10 +122,10 @@ Query burn rate:
 
 ```promql
 # Current burn rate
-slo:error_budget_burn_rate:ratio{service="auth-service"}
+slo:error_budget_burn_rate:ratio{service="auth"}
 
 # Time to exhaustion (hours)
-slo:time_to_exhaustion_hours{service="auth-service"}
+slo:time_to_exhaustion_hours{service="auth"}
 ```
 
 ## Budget Consumption by Team
@@ -136,10 +136,10 @@ Track budget consumption by team/service:
 
 ```promql
 # Budget consumed by service
-1 - slo:error_budget_remaining:ratio{service="auth-service"}
+1 - slo:error_budget_remaining:ratio{service="auth"}
 
 # Budget consumed percentage
-(1 - slo:error_budget_remaining:ratio{service="auth-service"}) * 100
+(1 - slo:error_budget_remaining:ratio{service="auth"}) * 100
 ```
 
 ### Reporting

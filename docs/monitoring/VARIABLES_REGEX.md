@@ -24,15 +24,15 @@ Regex: (none) - shows all apps
 
 Options:
   - All (shows combined metrics from all apps)
-  - auth-service
-  - user-service
-  - product-service
-  - cart-service
-  - order-service
-  - review-service
-  - notification-service
-  - shipping-service
-  - shipping-service-v2
+  - auth
+  - user
+  - product
+  - cart
+  - order
+  - review
+  - notification
+  - shipping
+  - shipping-v2
   - (auto-discover new apps)
 ```
 
@@ -42,7 +42,7 @@ Options:
 sum(rate(request_duration_seconds_count{app=~"$app"}[$rate]))
 
 # When "All" selected: app=~".*"
-# When specific app: app=~"auth-service"
+# When specific app: app=~"auth"
 ```
 
 ---
@@ -105,9 +105,9 @@ Sort: Alphabetical (1)
 
 Options:
   - All
-  - auth-service-xxx-yyy
-  - user-service-xxx-yyy
-  - product-service-xxx-yyy
+  - auth-xxx-yyy
+  - user-xxx-yyy
+  - product-xxx-yyy
   - (auto-discover pods in selected namespace)
 ```
 
@@ -134,7 +134,7 @@ Options:
 - `kube-state-metrics-*`
 - `metrics-server-*`
 
-**Result:** Chỉ hiển thị **application pods** (auth-service, user-service, product-service, etc.)
+**Result:** Chỉ hiển thị **application pods** (auth, user, product, etc.)
 
 **Usage in queries:**
 ```promql
@@ -145,8 +145,8 @@ sum(rate(request_duration_seconds_count{
 }[$rate])) by (kubernetes_pod_name)
 
 # Multi-select example:
-# When selected: auth-service-xxx, auth-service-yyy
-# Result: kubernetes_pod_name=~"auth-service-xxx|auth-service-yyy"
+# When selected: auth-xxx, auth-yyy
+# Result: kubernetes_pod_name=~"auth-xxx|auth-yyy"
 ```
 
 ---
@@ -264,9 +264,9 @@ $rate (independent)
 
 **Example Flow:**
 1. Select namespace: `auth`, `user`, `product`, etc. (service-specific) or `monitoring` (for monitoring components)
-2. App dropdown refreshes → shows: `auth-service`, `user-service`, `product-service`, etc.
-3. Select app: `auth-service`
-4. Pod dropdown refreshes → shows only auth-service pods
+2. App dropdown refreshes → shows: `auth`, `user`, `product`, etc.
+3. Select app: `auth`
+4. Pod dropdown refreshes → shows only auth pods
 5. Queries update automatically
 
 ---
@@ -315,7 +315,7 @@ $rate (independent)
 /^(?!.*prometheus|.*grafana).*/
 ```
 
-### Only service apps:
+### Only service apps (if using -service suffix):
 ```regex
 /^.*-service.*/
 ```

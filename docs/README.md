@@ -140,7 +140,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 
 **Manual Helm deployment:**
 ```bash
-helm upgrade --install auth-service charts/ -f charts/values/auth.yaml -n auth --create-namespace
+helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-namespace
 ```
 
 **Deploy SLOs:**

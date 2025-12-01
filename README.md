@@ -79,8 +79,8 @@ chmod +x scripts/*.sh
 # Basic Setup (Steps 1-7)
 ./scripts/01-create-kind-cluster.sh      # Create Kind cluster
 ./scripts/02-install-metrics.sh          # Install metrics infrastructure
-./scripts/03-build-microservices.sh      # Build Docker images
-./scripts/04-deploy-microservices.sh     # Deploy microservices
+./scripts/03-build-microservices.sh      # Build Docker images on Local
+./scripts/04-deploy-microservices.sh     # Deploy microservices on Local and Registry
 ./scripts/05-deploy-monitoring.sh        # Deploy Prometheus & Grafana
 ./scripts/06-deploy-k6-testing.sh        # Deploy load generators
 ./scripts/07-setup-access.sh             # Setup port forwarding
@@ -145,9 +145,13 @@ chmod +x scripts/*.sh
 ./scripts/03-build-microservices.sh [--no-cache|--force]
 ```
 
-**Deploy Options:**
+**Deploy Options (Helm):**
 ```bash
-./scripts/04-deploy-microservices.sh [--local|--registry]
+# Deploy using local Helm chart (default)
+./scripts/04-deploy-microservices.sh --local
+
+# Deploy from OCI registry
+./scripts/04-deploy-microservices.sh --registry
 ```
 
 **k6 Options:**

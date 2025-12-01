@@ -1,0 +1,49 @@
+{
+  "name": "Monitoring Microservices Dev Container",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+  
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "dockerDashComposeVersion": "v2"
+    }
+  },
+
+  "postCreateCommand": "bash -c 'curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64 && chmod +x ./kind && sudo mv ./kind /usr/local/bin/kind && chmod +x scripts/*.sh && echo \"✓ Kind installed and scripts made executable\" && kind version'",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "redhat.vscode-yaml",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "go.useLanguageServer": true
+      }
+    }
+  },
+
+  "forwardPorts": [3000, 9090, 8080],
+  "portsAttributes": {
+    "3000": {
+      "label": "Grafana",
+      "onAutoForward": "notify"
+    },
+    "9090": {
+      "label": "Prometheus",
+      "onAutoForward": "notify"
+    },
+    "8080": {
+      "label": "API Gateway",
+      "onAutoForward": "notify"
+    }
+  },
+
+  "remoteUser": "vscode",
+  "remoteEnv": {
+    "DOCKER_BUILDKIT": "1"
+  }
+}
+

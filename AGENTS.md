@@ -190,10 +190,10 @@ k8s/
 
 #### `scripts/` - Deployment Scripts
 
-Numbered scripts (01-17) for deployment and operations:
+Numbered scripts (01-12) for deployment and operations:
 
 **Deployment Order:**
-1. Infrastructure (01-02) → 2. Monitoring (05) → 3. APM (14-17) → 4. Build & Deploy Apps (03-04) → 5. Load Testing (06) → 6. SLO (09-11) → 7. Access Setup (07)
+1. Infrastructure (01-02) → 2. Monitoring (03) → 3. APM (04) → 4. Build & Deploy Apps (05-06) → 5. Load Testing (07) → 6. SLO (08) → 7. Access Setup (09)
 
 **Infrastructure (01-02):**
 - `01-create-kind-cluster.sh` - Create Kind Kubernetes cluster
@@ -549,15 +549,17 @@ Numbered scripts (01-17) for deployment and operations:
 
 ### Script Naming
 
-- **Numbered prefixes (01-17)** - Execution order and categorization
+- **Numbered prefixes (01-12)** - Execution order and categorization
 - **Format**: `{number}-{purpose}.sh`
 - **Categories**:
   - 01-02: Infrastructure
-  - 03-07: Build & Deploy
-  - 08: Monitoring
-  - 09-11: SLO Management
-  - 12-13: Runbooks
-  - 14-17: APM Deployment
+  - 03: Monitoring Stack
+  - 04, 04a-c: APM Stack
+  - 05-06: Build & Deploy Apps
+  - 07: Load Testing
+  - 08, 08a-b: SLO Management
+  - 09: Access Setup
+  - 10-12: Utilities
 
 ### File Organization Patterns
 
@@ -653,4 +655,4 @@ Numbered scripts (01-17) for deployment and operations:
 
 ---
 
-**Last Updated**: Reflects current project structure with Helm chart deployment (November 2024)
+**Last Updated**: Reflects current project structure with Helm chart deployment (December 2024)

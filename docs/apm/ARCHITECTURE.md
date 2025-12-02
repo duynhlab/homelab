@@ -152,9 +152,13 @@ APM collects four types of observability data at different layers:
 
 ### Mermaid Diagram: APM Data Flow
 
+#### Option 1: Top-Bottom Central Flow
+
+Request flow goes top to bottom in center, APM components branch out to the right.
+
 ```mermaid
-graph LR
-    subgraph "HTTP Request Flow"
+graph TB
+    subgraph REQ[" "]
         A[HTTP Request] --> B[Middleware]
         B --> C[Web Layer]
         C --> D[Logic Layer]
@@ -162,39 +166,37 @@ graph LR
         E --> F[Response]
     end
     
-    subgraph "Tracing (OpenTelemetry)"
-        B --> T1[Root Span<br/>HTTP Request]
-        C --> T2[Web Span<br/>layer=web]
-        D --> T3[Logic Span<br/>layer=logic]
-        T1 --> T2
-        T2 --> T3
-        T3 --> TEMPO[Tempo<br/>OTLP HTTP]
-    end
+    B -->|Creates| T1[Root Span<br/>HTTP Request]
+    C -->|Creates| T2[Web Span<br/>layer=web]
+    D -->|Creates| T3[Logic Span<br/>layer=logic]
+    T1 --> T2
+    T2 --> T3
+    T3 --> TEMPO[Tempo<br/>OTLP HTTP]
     
-    subgraph "Logging (Zap)"
-        B --> L1[Request Log<br/>trace-id extracted]
-        C --> L2[Handler Log<br/>trace-id included]
-        D --> L3[Business Log<br/>trace-id included]
-        L1 --> VECTOR[Vector<br/>Log Collector]
-        L2 --> VECTOR
-        L3 --> VECTOR
-        VECTOR --> LOKI[Loki<br/>Log Storage]
-    end
+    B -->|Emits| L1[Request Log<br/>trace-id]
+    C -->|Emits| L2[Handler Log<br/>trace-id]
+    D -->|Emits| L3[Business Log<br/>trace-id]
+    L1 --> VECTOR[Vector<br/>Log Collector]
+    L2 --> VECTOR
+    L3 --> VECTOR
+    VECTOR --> LOKI[Loki<br/>Log Storage]
     
-    subgraph "Metrics (Prometheus)"
-        B --> M1[HTTP Metrics<br/>request_duration_seconds<br/>requests_total<br/>requests_in_flight]
-        M1 --> PROM[Prometheus<br/>Scrape /metrics]
-    end
+    B -->|Collects| M1[HTTP Metrics<br/>duration, total, in_flight]
+    M1 --> PROM[Prometheus<br/>Scrape /metrics]
     
-    subgraph "Profiling (Pyroscope)"
-        B --> P1[CPU Profile]
-        C --> P2[Heap Profile]
-        D --> P3[Goroutine Profile]
-        P1 --> PYRO[Pyroscope<br/>Continuous Profiling]
-        P2 --> PYRO
-        P3 --> PYRO
-    end
+    B -->|Profiles| P1[CPU Profile]
+    C -->|Profiles| P2[Heap Profile]
+    D -->|Profiles| P3[Goroutine Profile]
+    P1 --> PYRO[Pyroscope<br/>Continuous Profiling]
+    P2 --> PYRO
+    P3 --> PYRO
     
+    style A fill:#f9f9f9
+    style B fill:#f9f9f9
+    style C fill:#f9f9f9
+    style D fill:#f9f9f9
+    style E fill:#f9f9f9
+    style F fill:#f9f9f9
     style T1 fill:#e1f5ff
     style T2 fill:#e1f5ff
     style T3 fill:#e1f5ff
@@ -202,6 +204,83 @@ graph LR
     style L1 fill:#fff4e1
     style L2 fill:#fff4e1
     style L3 fill:#fff4e1
+    style VECTOR fill:#e1bee7
+    style LOKI fill:#ffe0b2
+    style M1 fill:#ffe1f5
+    style PROM fill:#f8bbd0
+    style P1 fill:#e1ffe1
+    style P2 fill:#e1ffe1
+    style P3 fill:#e1ffe1
+    style PYRO fill:#c8e6c9
+```
+
+#### Option 2: Two-Column Layout (Recommended)
+
+Left column shows request processing flow, right column shows APM data collection with clear horizontal connections.
+
+```mermaid
+graph LR
+    subgraph LEFT["Request Processing Flow"]
+        A[HTTP Request] --> B[Middleware]
+        B --> C[Web Layer]
+        C --> D[Logic Layer]
+        D --> E[Core Layer]
+        E --> F[Response]
+    end
+    
+    subgraph RIGHT["APM Data Collection"]
+        subgraph TRACE["🔵 Tracing (OpenTelemetry)"]
+            T1[Root Span] --> T2[Web Span]
+            T2 --> T3[Logic Span]
+            T3 --> TEMPO[Tempo]
+        end
+        
+        subgraph LOG["🟠 Logging (Zap)"]
+            L1[Request Log] --> VECTOR[Vector]
+            L2[Handler Log] --> VECTOR
+            L3[Business Log] --> VECTOR
+            VECTOR --> LOKI[Loki]
+        end
+        
+        subgraph METRIC["🟣 Metrics (Prometheus)"]
+            M1[HTTP Metrics] --> PROM[Prometheus]
+        end
+        
+        subgraph PROF["🟢 Profiling (Pyroscope)"]
+            P1[CPU Profile] --> PYRO[Pyroscope]
+            P2[Heap Profile] --> PYRO
+            P3[Goroutine Profile] --> PYRO
+        end
+    end
+    
+    B -->|Creates| T1
+    C -->|Creates| T2
+    D -->|Creates| T3
+    
+    B -->|Emits| L1
+    C -->|Emits| L2
+    D -->|Emits| L3
+    
+    B -->|Collects| M1
+    
+    B -->|Profiles| P1
+    C -->|Profiles| P2
+    D -->|Profiles| P3
+    
+    style A fill:#f9f9f9
+    style B fill:#f9f9f9
+    style C fill:#f9f9f9
+    style D fill:#f9f9f9
+    style E fill:#f9f9f9
+    style F fill:#f9f9f9
+    style T1 fill:#e1f5ff
+    style T2 fill:#e1f5ff
+    style T3 fill:#e1f5ff
+    style TEMPO fill:#b3e5fc
+    style L1 fill:#fff4e1
+    style L2 fill:#fff4e1
+    style L3 fill:#fff4e1
+    style VECTOR fill:#e1bee7
     style LOKI fill:#ffe0b2
     style M1 fill:#ffe1f5
     style PROM fill:#f8bbd0

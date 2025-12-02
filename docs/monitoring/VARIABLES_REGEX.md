@@ -1,5 +1,26 @@
 # Grafana Dashboard Variables & Regex Patterns
 
+## Quick Summary
+
+**Objectives:**
+- Understand Grafana dashboard variables and their configuration
+- Learn regex patterns for filtering and transforming variable values
+- Configure dynamic filtering for multi-service dashboards
+
+**Learning Outcomes:**
+- Dashboard variable types (datasource, query, custom)
+- Regex patterns for variable transformation
+- Multi-select and include-all options
+- Label value extraction from Prometheus metrics
+
+**Keywords:**
+Grafana Variables, Dashboard Variables, Regex Patterns, Label Values, Multi-select, Filtering, Dynamic Dashboards
+
+**Technologies:**
+- Grafana (dashboard variables)
+- PromQL (label extraction)
+- Regular Expressions
+
 ## 📊 Dashboard Variables Overview
 
 Dashboard này sử dụng **4 variables động** để filter và customize metrics display:

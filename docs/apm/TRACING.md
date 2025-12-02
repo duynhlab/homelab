@@ -1,5 +1,28 @@
 # Distributed Tracing Guide
 
+## Quick Summary
+
+**Objectives:**
+- Implement distributed tracing across microservices
+- Propagate trace context using W3C Trace Context standard
+- Correlate traces with logs and metrics
+
+**Learning Outcomes:**
+- Distributed tracing concepts and benefits
+- W3C Trace Context propagation
+- OpenTelemetry instrumentation
+- Span creation and context propagation
+- Trace-to-logs and trace-to-metrics correlation
+
+**Keywords:**
+Distributed Tracing, OpenTelemetry, Spans, Trace Context, W3C Trace Context, Trace-ID, OTLP, Tempo, Trace Propagation, Correlation
+
+**Technologies:**
+- OpenTelemetry (tracing standard)
+- Grafana Tempo (trace storage)
+- OTLP HTTP protocol
+- W3C Trace Context headers
+
 ## Overview
 
 Distributed tracing is implemented using **OpenTelemetry** and **Grafana Tempo**. All HTTP requests are automatically traced across microservices.

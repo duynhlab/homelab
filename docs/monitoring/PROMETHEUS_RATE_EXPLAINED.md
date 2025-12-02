@@ -1,5 +1,26 @@
 # Prometheus: Counter, rate() và increase() - Giải Thích Chi Tiết
 
+## Quick Summary
+
+**Objectives:**
+- Understand Prometheus Counter metrics and their behavior
+- Learn the difference between rate() and increase() functions
+- Handle counter resets correctly in queries
+
+**Learning Outcomes:**
+- Counter metric characteristics (monotonic, resets on restart)
+- rate() function: calculates per-second rate
+- increase() function: calculates total increase over time range
+- Handling counter resets in PromQL queries
+- Best practices for counter metrics
+
+**Keywords:**
+Prometheus Counter, rate(), increase(), Counter Reset, Monotonic, Per-second Rate, Time Range, PromQL Functions
+
+**Technologies:**
+- Prometheus (counter metrics)
+- PromQL (rate, increase functions)
+
 ## 📚 **Nguồn Tham Khảo**
 
 Tài liệu này dựa trên:

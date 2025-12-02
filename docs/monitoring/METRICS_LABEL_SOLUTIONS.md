@@ -1,5 +1,26 @@
 # Metrics App Label Solutions
 
+## Quick Summary
+
+**Objectives:**
+- Understand how application labels are automatically set from Kubernetes metadata
+- Learn the Kubernetes Downward API integration
+- Configure metrics labels correctly for multi-service deployments
+
+**Learning Outcomes:**
+- Kubernetes Downward API for environment variables
+- Automatic label injection from pod metadata
+- Helm template configuration for labels
+- Prometheus middleware label usage
+
+**Keywords:**
+Kubernetes Labels, Downward API, APP_NAME, Pod Metadata, Helm Templates, Metrics Labels, Service Identification
+
+**Technologies:**
+- Kubernetes (Downward API)
+- Helm (templates)
+- Prometheus Go Client (label configuration)
+
 ## Overview
 
 This document explains how the application metrics labels work and how they're configured in this project.

@@ -1,5 +1,27 @@
 # Time Range vs Rate Interval - Hướng dẫn chi tiết
 
+## Quick Summary
+
+**Objectives:**
+- Understand the difference between Time Range and Rate Interval in Grafana
+- Learn how to optimize dashboard settings for different use cases
+- Configure appropriate intervals for accurate monitoring
+
+**Learning Outcomes:**
+- Time Range: controls how far back to display data
+- Rate Interval: controls calculation granularity
+- Relationship between time range and rate interval
+- Best practices for different monitoring scenarios
+- Troubleshooting data display issues
+
+**Keywords:**
+Time Range, Rate Interval, Grafana Dashboard, Data Granularity, Monitoring Optimization, Query Resolution
+
+**Technologies:**
+- Grafana (dashboard settings)
+- Prometheus (scrape intervals)
+- PromQL (rate calculations)
+
 ## Tổng quan
 
 Trong Grafana dashboard, có 2 khái niệm quan trọng ảnh hưởng đến cách hiển thị dữ liệu:

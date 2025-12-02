@@ -1,5 +1,28 @@
 # Structured Logging Guide
 
+## Quick Summary
+
+**Objectives:**
+- Implement structured JSON logging with trace-id correlation
+- Configure Vector for log collection and Loki for log storage
+- Query and correlate logs with traces in Grafana
+
+**Learning Outcomes:**
+- Structured logging best practices with Zap
+- Trace-ID propagation and correlation
+- LogQL query syntax for Loki
+- Vector log collection and transformation
+- Log-to-trace correlation patterns
+
+**Keywords:**
+Structured Logging, JSON Logs, Trace-ID, Log Correlation, LogQL, Log Aggregation, Vector, Loki, Zap Logger, Log Levels, Log Queries
+
+**Technologies:**
+- Zap (Go structured logger)
+- Vector (log collection agent)
+- Loki (log storage and querying)
+- Grafana (log visualization)
+
 ## Overview
 
 All services use **structured JSON logging** with **trace-id correlation**. Logs are collected by **Vector** and stored in **Loki**.

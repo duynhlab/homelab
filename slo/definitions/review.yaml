@@ -6,7 +6,7 @@ version: "prometheus/v1"
 service: "review"
 labels:
   team: "platform"
-  env: "demo"
+  env: "monitoring"
   service: "review"
   namespace: "review"
 

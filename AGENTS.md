@@ -284,6 +284,22 @@ Numbered scripts (01-12) for deployment and operations:
 |------|---------|----------|
 | Main Dashboard | 32 panels in 5 row groups | `grafana-dashboard.json` |
 
+**Dashboard Details:**
+- **UID**: `microservices-monitoring-001`
+- **Title**: "Microservices Monitoring & Performance Applications"
+- **Structure**: 32 panels organized in 5 row groups:
+  1. **📊 Overview & Key Metrics** (12 panels) - Response time percentiles (P50, P95, P99), Total RPS, Success RPS (2xx), Error RPS (4xx/5xx), Success Rate %, Error Rate %, Apdex Score, Total Requests, Up Instances, Restarts
+  2. **🚀 Traffic & Requests** (4 panels) - Status code distribution (pie chart), Total requests by endpoint (pie chart), Request rate by endpoint (time series), RPS by endpoint
+  3. **⚠️ Errors & Performance** (5 panels) - Request rate by HTTP method + endpoint, Error rate by HTTP method + endpoint, Response time per endpoint (P95, P50, P99)
+  4. **🔧 Go Runtime & Memory** (6 panels) - Heap allocated memory, Heap in-use memory, Process memory (RSS), Goroutines & threads, GC duration, GC frequency (memory leak detection)
+  5. **🖥️ Resources & Infrastructure** (5 panels) - Total memory per service, Total CPU per service, Total network traffic per service, Total requests in flight per service, Total memory allocations per service
+- **Variables**:
+  - `$app` - Multi-select service filter (auth, user, product, cart, order, review, notification, shipping) with "All" option
+  - `$namespace` - Multi-select namespace filter (with regex to exclude kube-* and default namespaces)
+  - `$rate` - Rate interval selector (1m, 2m, 3m, 5m, 10m, 30m, 1h, 2h, 4h, 8h, 16h, 1d, 2d, 3d, 5d, 7d) - default: 5m
+  - `$DS_PROMETHEUS` - Prometheus datasource selector
+- **Access**: http://localhost:3000/d/microservices-monitoring-001/ (after port-forward: `kubectl port-forward -n monitoring svc/grafana 3000:3000`)
+
 ### Script Files by Category
 
 **Deployment Order:** Infrastructure (01-02) → Monitoring (05) → APM (14-17) → Apps (03-04) → Load Testing (06) → SLO (09-11) → Access (07)
@@ -370,16 +386,26 @@ Numbered scripts (01-12) for deployment and operations:
 1. **Edit dashboard:**
    - Edit `grafana-dashboard.json`
    - Validate JSON syntax
+   - Dashboard structure: 32 panels in 5 row groups (see Dashboard Files section above)
 
 2. **Reload dashboard:**
    ```bash
    ./scripts/10-reload-dashboard.sh
    ```
+   This script updates the ConfigMap and restarts Grafana to load the new dashboard.
 
 3. **Verify:**
    - Port-forward Grafana: `kubectl port-forward -n monitoring svc/grafana 3000:3000`
    - Open http://localhost:3000
-   - Check dashboard UID: `microservices-monitoring-001`
+   - Navigate to dashboard UID: `microservices-monitoring-001`
+   - Or use direct link: http://localhost:3000/d/microservices-monitoring-001/
+
+**Dashboard Variables Usage:**
+- Use `$app` to filter by service (e.g., select "auth" to see only auth service metrics)
+- Use `$namespace` to filter by Kubernetes namespace (e.g., select "auth" namespace to see only auth namespace pods)
+- Use `$rate` to adjust rate calculation interval (default: 5m, use longer intervals like 1h or 1d for smoother graphs over longer time periods)
+- All panels automatically respect these variable filters
+- Variables are located at the top of the dashboard for easy access
 
 ### Modifying Prometheus Configuration
 
@@ -614,7 +640,7 @@ Numbered scripts (01-12) for deployment and operations:
 - SLO definition: `slo/definitions/{service}.yaml`
 
 **Update monitoring:**
-- Dashboard: `grafana-dashboard.json`
+- Dashboard: `grafana-dashboard.json` (32 panels, 5 row groups, UID: microservices-monitoring-001)
 - Prometheus config: `k8s/prometheus/configmap.yaml`
 - Grafana config: `k8s/grafana/configmap-*.yaml`
 

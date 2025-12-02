@@ -6,7 +6,7 @@ version: "prometheus/v1"
 service: "product"
 labels:
   team: "platform"
-  env: "demo"
+  env: "monitoring"
   service: "product"
   namespace: "product"
 

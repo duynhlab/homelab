@@ -77,6 +77,10 @@ kubectl logs -n monitoring -l app=k6-load-generator-scenarios -f
 - Tests all 9 microservices (equal distribution)
 - 70-80% GET, 20-30% POST
 - Think time: 0.1-0.2s between requests
+- Health checks: Only 10% of iterations (monitoring, not load testing)
+  - Prometheus/Kubernetes probes already handle health monitoring
+  - Reduces noise in Grafana metrics by 90%
+  - Focuses load testing on actual business API endpoints
 
 **Thresholds:**
 - p95 < 500ms, p99 < 1000ms
@@ -96,6 +100,13 @@ kubectl logs -n monitoring -l app=k6-load-generator-scenarios -f
 - Same stages as legacy (peak: 100 VUs total)
 - Distribution: 40 + 30 + 15 + 10 + 5 VUs
 - Each scenario có flow riêng
+
+**Traffic:**
+- Health checks: Only 10% of iterations per scenario (monitoring, not load testing)
+  - Prometheus/Kubernetes probes already handle health monitoring
+  - Reduces noise in Grafana metrics by 90%
+  - Focuses load testing on actual business API endpoints
+- Note: `/metrics` endpoint is NOT tested by k6 (only Prometheus scrapes it)
 
 **Thresholds:**
 - Per-scenario thresholds (API client: p95 < 300ms)
@@ -130,8 +141,3 @@ kubectl logs -n monitoring -l app=k6-load-generator-scenarios
 1. Edit `k8s/k6/load-test.js` hoặc `k8s/k6/load-test-multiple-scenarios.js`
 2. Redeploy: `./scripts/07-deploy-k6-testing.sh both`
 3. ConfigMap tự động update, pods sẽ restart
-
----
-
-**Status**: ✅ Active  
-**Last Updated**: 2025-01-15

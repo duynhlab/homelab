@@ -20,13 +20,13 @@ spec:
         image: pyroscope/pyroscope:latest
         args:
           - server
-          - --config-path=/etc/pyroscope/config.yaml
+          - --storage-path=/var/lib/pyroscope
+          - --retention=24h
+          - --api-bind-addr=:4040
         ports:
         - name: http
           containerPort: 4040
         volumeMounts:
-        - name: pyroscope-config
-          mountPath: /etc/pyroscope
         - name: pyroscope-storage
           mountPath: /var/lib/pyroscope
         resources:
@@ -49,9 +49,6 @@ spec:
           initialDelaySeconds: 10
           periodSeconds: 5
       volumes:
-      - name: pyroscope-config
-        configMap:
-          name: pyroscope-config
       - name: pyroscope-storage
         emptyDir: {}
 

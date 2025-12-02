@@ -123,7 +123,7 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "📋 Next steps:"
     echo "   1. Review generated rules: cat $OUTPUT_FILE"
-    echo "   2. Apply to Prometheus: ./scripts/11-deploy-slo.sh"
+    echo "   2. Apply to Prometheus: ./scripts/08-deploy-slo.sh"
     echo ""
 else
     echo "❌ Failed to generate rules!"

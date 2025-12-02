@@ -572,7 +572,7 @@ A: Yes! This is a production-ready template. Add:
 A: Add handlers in `handlers/` directory. Metrics are auto-collected via middleware.
 
 **Q: Dashboard shows no data?**
-A: Generate traffic first! CronJob runs every 2 minutes automatically, or trigger manually with `kubectl create job --from=cronjob/demo-loadtest test-now -n monitoring-demo`
+A: Generate traffic first! CronJob runs every 2 minutes automatically, or trigger manually with `kubectl create job --from=cronjob/demo-loadtest test-now -n monitoring`
 
 **Q: What's Apdex Score?**
 A: Application Performance Index. 0-1 scale measuring user satisfaction based on response times.
@@ -592,12 +592,6 @@ Contributions welcome! Areas to improve:
 
 ---
 
-## 📝 License
-
-MIT License - Use freely!
-
----
-
 ## 🌟 Star This Repo!
 
 If this helps you understand monitoring, please ⭐ star the repository!
@@ -607,6 +601,3 @@ If this helps you understand monitoring, please ⭐ star the repository!
 **Built with ❤️ for learning observability**
 
 🚀 **Happy Monitoring!**
-
-
-kubectl port-forward -n monitoring svc/grafana 3000:3000

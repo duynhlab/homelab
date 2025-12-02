@@ -1,6 +1,6 @@
 # AI Agent Guide
 
-> **IMPORTANT**: AGENTS.md files are the source of truth for AI agent instructions. Always update the relevant AGENTS.md file when adding or modifying agent guidance. do not add to CLAUDE.md or cursor rules
+> **IMPORTANT**: AGENTS.md files are the source of truth for AI agent instructions. Always update the relevant AGENTS.md file when adding or modifying agent guidance.
 
 ## Overview
 
@@ -22,7 +22,7 @@ This guide provides comprehensive information for AI agents working with this co
 ### Root Directory
 
 ```
-project-monitoring-golang/
+monitoring/
 ├── services/              # All Go application code
 │   ├── cmd/               # Microservice entry points (9 services)
 │   ├── internal/          # Domain logic (private packages)
@@ -50,6 +50,7 @@ project-monitoring-golang/
 ├── slo/                   # SLO data files (definitions, generated rules)
 ├── grafana-dashboard.json # Main Grafana dashboard (32 panels)
 ├── README.md              # Project overview
+├── CLAUDE.md              # Link to  AGENTS.md for Claude (Anthropic) still uses CLAUDE.md
 ├── CHANGELOG.md           # Version changelog
 └── AGENTS.md              # This file (source of truth for AI agent instructions)
 ```
@@ -183,8 +184,9 @@ k8s/
 **Note**: Microservices are deployed via Helm chart (`charts/`), not raw YAML manifests.
 
 **Namespaces**:
-- `monitoring-demo` - All microservices and monitoring components
-- `monitoring` - SLO system (Prometheus rules)
+- `monitoring` - Monitoring components (Prometheus, Grafana, k6, Tempo, Pyroscope, Loki) and SLO system
+- `kube-system` - Vector (log collection DaemonSet)
+- Service namespaces - Each microservice has its own namespace: `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`
 
 #### `scripts/` - Deployment Scripts
 
@@ -388,7 +390,7 @@ Numbered scripts (01-17) for deployment and operations:
 2. **Apply changes:**
    ```bash
    kubectl apply -f k8s/prometheus/configmap.yaml
-   kubectl rollout restart deployment/prometheus -n monitoring-demo
+   kubectl rollout restart deployment/prometheus -n monitoring
    ```
 
 3. **Verify:**
@@ -429,8 +431,8 @@ Numbered scripts (01-17) for deployment and operations:
 
 2. **Check load generator pods:**
    ```bash
-kubectl get pods -n monitoring -l app=k6-load-generator
-kubectl logs -n monitoring -l app=k6-load-generator
+   kubectl get pods -n monitoring -l app=k6-load-generator
+   kubectl logs -n monitoring -l app=k6-load-generator
    ```
 
 3. **Monitor metrics:**
@@ -533,16 +535,17 @@ kubectl logs -n monitoring -l app=k6-load-generator
 
 ### Namespace Conventions
 
-- **`monitoring`** - Monitoring components (Prometheus, Grafana, k6, Tempo, Pyroscope, Loki, Vector) and SLO system
+- **`monitoring`** - Monitoring components (Prometheus, Grafana, k6, Tempo, Pyroscope, Loki) and SLO system
+- **`kube-system`** - Vector (log collection DaemonSet)
 - **Service namespaces** - Each microservice has its own namespace:
-  - `auth` - auth
-  - `user` - user
-  - `product` - product
-  - `cart` - cart
-  - `order` - order
-  - `review` - review
-  - `notification` - notification
-  - `shipping` - shipping, shipping-v2
+  - `auth` - auth service
+  - `user` - user service
+  - `product` - product service
+  - `cart` - cart service
+  - `order` - order service
+  - `review` - review service
+  - `notification` - notification service
+  - `shipping` - shipping and shipping-v2 services
 
 ### Script Naming
 
@@ -645,8 +648,8 @@ kubectl logs -n monitoring -l app=k6-load-generator
 ## Additional Resources
 
 - **Project README**: `README.md` - Project overview and quick start
-- **Cursor Rules**: `.cursor/rules/` - Development guidelines (Go, Kubernetes, Grafana, Prometheus, SLO)
 - **Claude Commands**: `.claude/commands/` - AI workflow commands (plan, implement, analyze, deploy, document)
+- **Claude Skills**: `.claude/skill/` - Skill
 
 ---
 

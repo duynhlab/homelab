@@ -1444,7 +1444,7 @@ func ProcessUsers() {
 **Ưu điểm:**
 - ✅ Đơn giản, không cần RBAC phức tạp
 - ✅ Hoạt động ngay trong Kind
-- ✅ Đủ cho demo và monitoring app-level metrics
+- ✅ Đủ cho development và monitoring app-level metrics
 - ✅ Chính xác cho Go runtime behavior
 
 **Nhược điểm:**
@@ -1461,7 +1461,7 @@ func ProcessUsers() {
 - Cần alerts dựa trên container limits (80% memory used)
 
 **Go metrics đủ khi:**
-- Demo/development environment
+- Development environment
 - Focus vào application performance
 - Monitor Go-specific behavior (GC, goroutines)
 - Không cần infrastructure-level metrics

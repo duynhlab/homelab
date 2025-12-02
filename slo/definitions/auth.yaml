@@ -6,7 +6,7 @@ version: "prometheus/v1"
 service: "auth"
 labels:
   team: "platform"
-  env: "demo"
+  env: "monitoring"
   service: "auth"
   namespace: "auth"
 

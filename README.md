@@ -204,7 +204,7 @@ kubectl port-forward -n monitoring svc/loki 3100:3100 &
 
 ### View Dashboard
 
-Open Grafana → **"Go REST API Monitoring - Demo"** dashboard is auto-loaded!
+Open Grafana → **"Microservices Monitoring & Performance Applications"** dashboard is auto-loaded!
 
 **Direct link**: http://localhost:3000/d/microservices-monitoring-001/
 
@@ -319,13 +319,15 @@ Automatically exposed by `prometheus/client_golang`:
 
 ## 🧪 Load Testing
 
-### Automatic Testing
-
-A Kubernetes CronJob generates traffic every 2 minutes:
+k6 load generators run continuously to generate traffic for all microservices:
 
 ```bash
-kubectl get cronjob -n monitoring
-# demo-loadtest runs every */2 * * * *
+# Check k6 load generator pods
+kubectl get pods -n monitoring -l 'app in (k6-load-generator-legacy,k6-load-generator-scenarios)'
+
+# View k6 logs
+kubectl logs -n monitoring -l app=k6-load-generator-legacy -f
+kubectl logs -n monitoring -l app=k6-load-generator-scenarios -f
 ```
 
 ### Manual Testing
@@ -334,8 +336,8 @@ kubectl get cronjob -n monitoring
 # Quick test (100 requests)
 for i in {1..100}; do curl http://localhost:8080/api/users & done
 
-# Or trigger CronJob manually
-kubectl create job --from=cronjob/demo-loadtest manual-test-$(date +%s) -n monitoring
+# Or deploy k6 load generators
+./scripts/07-deploy-k6-testing.sh
 ```
 
 ---
@@ -500,30 +502,6 @@ github.com/grafana/pyroscope-go v1.2.7
 
 ---
 
-## 🎯 Use Cases
-
-### Demo & Presentation
-- Show complete monitoring solution
-- Explain observability concepts
-- Demo real-time metrics
-
-### Learning
-- Understand Prometheus metrics
-- Learn PromQL queries
-- Practice K8s deployments
-
-### Development
-- Monitor local services
-- Test performance
-- Debug issues
-
-### Production-Ready Template
-- Copy & modify for real apps
-- Add custom metrics
-- Setup alerting
-
----
-
 ## 🔧 Customization
 
 ### Add Custom Metrics
@@ -628,7 +606,7 @@ A: Yes! This is a production-ready template. Add:
 A: Add handlers in `handlers/` directory. Metrics are auto-collected via middleware.
 
 **Q: Dashboard shows no data?**
-A: Generate traffic first! CronJob runs every 2 minutes automatically, or trigger manually with `kubectl create job --from=cronjob/demo-loadtest test-now -n monitoring`
+A: Generate traffic first! Deploy k6 load generators with `./scripts/07-deploy-k6-testing.sh` or generate traffic manually.
 
 **Q: What's Apdex Score?**
 A: Application Performance Index. 0-1 scale measuring user satisfaction based on response times.

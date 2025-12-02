@@ -15,7 +15,7 @@ Execute implementation following best practices
 
 ### Dashboard Changes
 1. Edit `grafana-dashboard.json`
-2. Use reload script: `./scripts/08-reload-dashboard.sh`
+2. Use reload script: `./scripts/10-reload-dashboard.sh`
    - Script handles ConfigMap creation/update and Grafana restart
 3. Verify: Access Grafana at http://localhost:3000 and check dashboard UID: `microservices-monitoring-001`
 
@@ -42,9 +42,9 @@ Execute implementation following best practices
 
 ### SLO Changes
 1. Edit SLO definitions in `slo/definitions/{service-name}.yaml`
-2. Validate: `./scripts/09-validate-slo.sh`
-3. Generate rules: `./scripts/10-generate-slo-rules.sh`
-4. Deploy: `./scripts/11-deploy-slo.sh`
+2. Validate: `./scripts/08a-validate-slo.sh`
+3. Generate rules: `./scripts/08b-generate-slo-rules.sh`
+4. Deploy: `./scripts/08-deploy-slo.sh`
    - Script validates, generates, and deploys SLO rules
 5. Verify rules loaded:
    ```bash
@@ -59,8 +59,8 @@ Execute implementation following best practices
 2. Create K8s manifests: `k8s/{service-name}/deployment.yaml`, `service.yaml`
 3. Add namespace: Update `k8s/namespaces.yaml`
 4. Create SLO definition: `slo/definitions/{service-name}.yaml`
-5. Update build script: Add service to `scripts/03-build-microservices.sh`
-6. Update deploy script: Add service to `scripts/04-deploy-microservices.sh`
+5. Update build script: Add service to `scripts/05-build-microservices.sh`
+6. Update deploy script: Add service to `scripts/06-deploy-microservices.sh`
 
 ## Testing
 - Always verify changes work before marking complete

@@ -209,8 +209,10 @@ export function browserUserScenario() {
     sleep(Math.random() * 1 + 1); // 1-2 seconds
   }
   
-  // Health check
-  http.get(`${SERVICES.product}/health`, { tags: { ...tags, endpoint: '/health' } });
+  // Health check - only 10% of iterations (monitoring, not load testing)
+  if (Math.random() < 0.1) {
+    http.get(`${SERVICES.product}/health`, { tags: { ...tags, endpoint: '/health' } });
+  }
 }
 
 // Scenario 2: Shopping User - Complete shopping flow
@@ -265,8 +267,10 @@ export function shoppingUserScenario() {
     sleep(Math.random() * 2 + 1);
   }
   
-  // Health check
-  http.get(`${SERVICES.cart}/health`, { tags: { ...tags, endpoint: '/health' } });
+  // Health check - only 10% of iterations (monitoring, not load testing)
+  if (Math.random() < 0.1) {
+    http.get(`${SERVICES.cart}/health`, { tags: { ...tags, endpoint: '/health' } });
+  }
 }
 
 // Scenario 3: Registered User - Authenticated user actions
@@ -316,8 +320,10 @@ export function registeredUserScenario() {
     sleep(Math.random() * 1 + 1);
   }
   
-  // Health check
-  http.get(`${SERVICES.user}/health`, { tags: { ...tags, endpoint: '/health' } });
+  // Health check - only 10% of iterations (monitoring, not load testing)
+  if (Math.random() < 0.1) {
+    http.get(`${SERVICES.user}/health`, { tags: { ...tags, endpoint: '/health' } });
+  }
 }
 
 // Scenario 4: API Client - High volume, all endpoints
@@ -397,8 +403,10 @@ export function adminUserScenario() {
     sleep(Math.random() * 1 + 1);
   }
   
-  // Health check
-  http.get(`${SERVICES.user}/health`, { tags: { ...tags, endpoint: '/health' } });
+  // Health check - only 10% of iterations (monitoring, not load testing)
+  if (Math.random() < 0.1) {
+    http.get(`${SERVICES.user}/health`, { tags: { ...tags, endpoint: '/health' } });
+  }
 }
 
 // ============================================================================

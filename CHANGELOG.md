@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added Quick Summary sections to all Monitoring documentation files (METRICS.md, VARIABLES_REGEX.md, PROMETHEUS_RATE_EXPLAINED.md, METRICS_LABEL_SOLUTIONS.md, TIME_RANGE_AND_RATE_INTERVAL.md)
   - Each Quick Summary includes: Objectives, Learning Outcomes, Keywords, and Technologies
   - Improves documentation discoverability and helps readers quickly understand what they'll learn
+- **k6 Load Test Optimization**:
+  - Reduced health check frequency from 100% to 10% of iterations in both test scripts (`load-test.js` and `load-test-multiple-scenarios.js`)
+  - 90% reduction in health check traffic (from ~200 to ~20 health checks per iteration cycle with 200 VUs)
+  - Health checks are for monitoring, not load testing; Prometheus/Kubernetes probes already handle health monitoring
+  - Cleaner Grafana metrics focused on actual business API endpoints
 
 ## [0.3.0] - 2025-12-02
 

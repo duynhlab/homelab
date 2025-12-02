@@ -237,22 +237,24 @@ function testShippingServiceV2() {
 
 // Main test function
 export default function() {
-  // Health check first - test all services
-  const healthChecks = [
-    `${SERVICES.auth}/health`,
-    `${SERVICES.user}/health`,
-    `${SERVICES.product}/health`,
-    `${SERVICES.cart}/health`,
-    `${SERVICES.order}/health`,
-    `${SERVICES.review}/health`,
-    `${SERVICES.notification}/health`,
-    `${SERVICES.shipping}/health`,
-    `${SERVICES.shippingV2}/health`,
-  ];
-  
-  // Random health check
-  const healthUrl = healthChecks[Math.floor(Math.random() * healthChecks.length)];
-  http.get(healthUrl, { tags: { endpoint: '/health', method: 'GET' } });
+  // Health check - only 10% of iterations (monitoring, not load testing)
+  if (Math.random() < 0.1) {
+    const healthChecks = [
+      `${SERVICES.auth}/health`,
+      `${SERVICES.user}/health`,
+      `${SERVICES.product}/health`,
+      `${SERVICES.cart}/health`,
+      `${SERVICES.order}/health`,
+      `${SERVICES.review}/health`,
+      `${SERVICES.notification}/health`,
+      `${SERVICES.shipping}/health`,
+      `${SERVICES.shippingV2}/health`,
+    ];
+    
+    // Random health check
+    const healthUrl = healthChecks[Math.floor(Math.random() * healthChecks.length)];
+    http.get(healthUrl, { tags: { endpoint: '/health', method: 'GET' } });
+  }
   
   // Randomize which service to test (simulate real user behavior)
   const rand = Math.random();

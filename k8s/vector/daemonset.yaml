@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: vector
-  namespace: monitoring
+  namespace: kube-system
   labels:
     app: vector
 spec:
@@ -21,6 +21,11 @@ spec:
         args:
           - --config-dir
           - /etc/vector
+        env:
+        - name: VECTOR_SELF_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
         ports:
         - name: http
           containerPort: 8686

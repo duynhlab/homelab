@@ -46,31 +46,31 @@ print_status "Connected to cluster: $(kubectl config current-context)"
 
 # 1. Validate SLO definitions
 print_status "Validating SLO definitions..."
-if [ -f "$SCRIPT_DIR/09-validate-slo.sh" ]; then
-    if ! "$SCRIPT_DIR/09-validate-slo.sh"; then
+if [ -f "$SCRIPT_DIR/08a-validate-slo.sh" ]; then
+    if ! "$SCRIPT_DIR/08a-validate-slo.sh"; then
         print_error "SLO validation failed!"
         exit 1
     fi
 else
-    print_warning "09-validate-slo.sh not found, skipping validation"
+    print_warning "08a-validate-slo.sh not found, skipping validation"
 fi
 
 # 2. Generate Prometheus rules using Sloth
 print_status "Generating Prometheus rules using Sloth..."
-if [ -f "$SCRIPT_DIR/10-generate-slo-rules.sh" ]; then
-    if ! "$SCRIPT_DIR/10-generate-slo-rules.sh"; then
+if [ -f "$SCRIPT_DIR/08b-generate-slo-rules.sh" ]; then
+    if ! "$SCRIPT_DIR/08b-generate-slo-rules.sh"; then
         print_error "Failed to generate rules!"
         exit 1
     fi
 else
-    print_warning "10-generate-slo-rules.sh not found, skipping rule generation"
-    print_warning "Please run: ./scripts/10-generate-slo-rules.sh manually"
+    print_warning "08b-generate-slo-rules.sh not found, skipping rule generation"
+    print_warning "Please run: ./scripts/08b-generate-slo-rules.sh manually"
 fi
 
 # Check if rules file exists
 if [ ! -f "$RULES_FILE" ]; then
     print_error "Generated rules file not found: $RULES_FILE"
-    print_error "Please run: ./scripts/10-generate-slo-rules.sh first"
+    print_error "Please run: ./scripts/08b-generate-slo-rules.sh first"
     exit 1
 fi
 
@@ -81,7 +81,7 @@ print_status "Deploying SLO recording rules to Prometheus..."
 # Check if file exists and has content
 if [ ! -s "$RULES_FILE" ]; then
     print_error "Generated rules file is empty or doesn't exist: $RULES_FILE"
-    print_error "Please run: ./scripts/10-generate-slo-rules.sh first"
+    print_error "Please run: ./scripts/08b-generate-slo-rules.sh first"
     exit 1
 fi
 

@@ -18,20 +18,26 @@ chmod +x scripts/*.sh
 # Step 2: Install metrics infrastructure
 ./scripts/02-install-metrics.sh
 
-# Step 3: Build all microservices
-./scripts/03-build-microservices.sh
+# Step 3: Deploy monitoring stack (BEFORE apps to collect metrics)
+./scripts/03-deploy-monitoring.sh
 
-# Step 4: Deploy all microservices
-./scripts/04-deploy-microservices.sh
+# Step 4: Deploy APM stack (BEFORE apps to collect traces/logs/profiles immediately)
+./scripts/04-deploy-apm.sh
 
-# Step 5: Deploy monitoring stack
-./scripts/05-deploy-monitoring.sh
+# Step 5: Build all microservices
+./scripts/05-build-microservices.sh
 
-# Step 6: Deploy k6 load testing (optional)
-./scripts/06-deploy-k6-testing.sh
+# Step 6: Deploy all microservices
+./scripts/06-deploy-microservices.sh
 
-# Step 7: Setup port forwarding
-./scripts/07-setup-access.sh
+# Step 7: Deploy k6 load testing (AFTER apps to test them)
+./scripts/07-deploy-k6-testing.sh
+
+# Step 8: Deploy SLO system (Required for SRE practices)
+./scripts/08-deploy-slo.sh
+
+# Step 9: Setup port forwarding
+./scripts/09-setup-access.sh
 ```
 
 Wait 5 minutes. Then access:
@@ -113,10 +119,64 @@ kubectl get pods -n kube-system | grep -E "(kube-state|metrics-server)"
 
 ---
 
-### Step 3: Build All Microservices
+### Step 3: Deploy Monitoring Stack
 
 ```bash
-./scripts/03-build-microservices.sh
+./scripts/03-deploy-monitoring.sh
+```
+
+**What it does:**
+- Deploys Prometheus with RBAC permissions
+- Deploys Grafana with auto-provisioning
+- Creates ConfigMaps for dashboards and datasources
+- Configures Prometheus scrape configs
+
+**Why before apps:** Prometheus needs to be ready to collect metrics immediately when apps start.
+
+**Verify:**
+```bash
+kubectl get pods -n monitoring | grep -E "(prometheus|grafana)"
+# Expected: prometheus and grafana pods running
+
+curl http://localhost:9090/-/healthy
+# Expected: Prometheus is Healthy.
+
+curl http://localhost:3000/api/health
+# Expected: {"database":"ok"}
+```
+
+---
+
+### Step 4: Deploy APM Stack
+
+```bash
+./scripts/04-deploy-apm.sh
+```
+
+**What it does:**
+- Deploys Grafana Tempo (distributed tracing)
+- Deploys Pyroscope (continuous profiling)
+- Deploys Loki + Vector (log aggregation)
+- Updates Grafana datasources
+
+**Why before apps:** APM components need to be ready BEFORE apps start to:
+- Receive traces from Tempo endpoint (`http://tempo.monitoring.svc.cluster.local:4318`)
+- Receive profiles from Pyroscope endpoint (`http://pyroscope.monitoring.svc.cluster.local:4040`)
+- Vector collects logs from pods immediately when apps start
+
+**Verify:**
+```bash
+kubectl get pods -n monitoring | grep -E "(tempo|pyroscope|loki)"
+kubectl get pods -n kube-system -l app=vector
+# Expected: All APM components running
+```
+
+---
+
+### Step 5: Build All Microservices
+
+```bash
+./scripts/05-build-microservices.sh
 ```
 
 **What it does:**
@@ -137,14 +197,14 @@ docker images | grep -E "(auth|user|product)"
 
 ---
 
-### Step 4: Deploy All Microservices
+### Step 6: Deploy All Microservices
 
 ```bash
 # Deploy using local Helm chart (default)
-./scripts/04-deploy-microservices.sh --local
+./scripts/06-deploy-microservices.sh --local
 
 # Or deploy from OCI registry (if chart is published)
-./scripts/04-deploy-microservices.sh --registry
+./scripts/06-deploy-microservices.sh --registry
 ```
 
 **What it does:**
@@ -175,38 +235,10 @@ kubectl get svc -n product
 
 ---
 
-### Step 5: Deploy Monitoring Stack
+### Step 7: Deploy k6 Load Testing
 
 ```bash
-./scripts/05-deploy-monitoring.sh
-```
-
-**What it does:**
-- Deploys Prometheus with RBAC permissions
-- Deploys Grafana with auto-provisioning
-- Creates ConfigMaps for dashboards and datasources
-- Configures Prometheus scrape configs
-
-**Verify:**
-```bash
-kubectl get pods -n auth
-kubectl get pods -n user
-kubectl get pods -n product | grep -E "(prometheus|grafana)"
-# Expected: prometheus and grafana pods running
-
-curl http://localhost:9090/-/healthy
-# Expected: Prometheus is Healthy.
-
-curl http://localhost:3000/api/health
-# Expected: {"database":"ok"}
-```
-
----
-
-### Step 6: Deploy k6 Load Testing (Optional)
-
-```bash
-./scripts/06-deploy-k6-testing.sh
+./scripts/07-deploy-k6-testing.sh
 ```
 
 **What it does:**
@@ -214,26 +246,54 @@ curl http://localhost:3000/api/health
 - Creates ConfigMap with k6 test scripts
 - Generates continuous load on all services
 
+**Why after apps:** k6 needs applications to exist before it can generate load.
+
 **Verify:**
 ```bash
-kubectl get pods -n auth
-kubectl get pods -n user
-kubectl get pods -n product -l app=k6-load-generator
-kubectl logs -n monitoring -l app=k6-load-generator
+kubectl get pods -n monitoring -l 'app in (k6-load-generator-legacy,k6-load-generator-scenarios)'
+kubectl logs -n monitoring -l app=k6-load-generator-legacy
 ```
 
 ---
 
-### Step 7: Setup Port Forwarding
+### Step 8: Deploy SLO System
 
 ```bash
-./scripts/07-setup-access.sh
+./scripts/08-deploy-slo.sh
+```
+
+**What it does:**
+- Validates SLO definition files
+- Generates Prometheus recording rules using Sloth
+- Deploys SLO rules to Prometheus
+- Sets up error budget tracking
+
+**Why after monitoring and apps:** SLO system needs Prometheus and metrics data to work.
+
+**Verify:**
+```bash
+kubectl get configmap -n monitoring | grep prometheus-slo-rules
+# Expected: SLO rules ConfigMaps created
+
+# Check Prometheus rules
+kubectl port-forward -n monitoring svc/prometheus 9090:9090 &
+curl http://localhost:9090/api/v1/rules
+# Expected: SLO rules visible
+```
+
+---
+
+### Step 9: Setup Port Forwarding
+
+```bash
+./scripts/09-setup-access.sh
 ```
 
 **What it does:**
 - Sets up port-forwarding for Grafana (3000)
 - Sets up port-forwarding for Prometheus (9090)
 - Sets up port-forwarding for API services (8080)
+- Sets up port-forwarding for APM services (Tempo: 3200, Pyroscope: 4040, Loki: 3100)
 
 **Note:** Script runs port-forwarding in background. Access services via localhost.
 
@@ -379,7 +439,7 @@ kubectl port-forward svc/auth 8080:8080 -n auth &
 
 ```bash
 # Rebuild and reload images
-./scripts/03-build-microservices.sh
+./scripts/05-build-microservices.sh
 
 # Force recreation
 kubectl delete pods -l app=auth -n auth
@@ -411,7 +471,7 @@ kubectl logs deployment/prometheus -n monitoring
 kubectl get configmap -n monitoring | grep grafana
 
 # Reload dashboard
-./scripts/08-reload-dashboard.sh
+./scripts/10-reload-dashboard.sh
 
 # Restart Grafana
 kubectl rollout restart deployment grafana -n monitoring
@@ -423,7 +483,7 @@ kubectl rollout restart deployment grafana -n monitoring
 
 ```bash
 # Use port-forwarding instead
-./scripts/07-setup-access.sh
+./scripts/09-setup-access.sh
 ```
 
 ---

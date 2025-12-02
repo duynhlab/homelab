@@ -9,13 +9,13 @@ This SLO (Service Level Objective) system provides comprehensive monitoring and 
 ### 1. Validate SLO Definitions
 
 ```bash
-./scripts/09-validate-slo.sh
+./scripts/08a-validate-slo.sh
 ```
 
 ### 2. Generate Prometheus Rules
 
 ```bash
-./scripts/10-generate-slo-rules.sh
+./scripts/08b-generate-slo-rules.sh
 ```
 
 This generates Prometheus recording rules and alerts from all SLO definitions in `slo/definitions/`.
@@ -23,7 +23,7 @@ This generates Prometheus recording rules and alerts from all SLO definitions in
 ### 3. Deploy SLO System
 
 ```bash
-./scripts/11-deploy-slo.sh
+./scripts/08-deploy-slo.sh
 ```
 
 This script:

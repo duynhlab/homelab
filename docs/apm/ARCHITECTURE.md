@@ -1,5 +1,30 @@
 # 3-Layer Architecture & APM Integration
 
+## Quick Summary
+
+**Objectives:**
+- Understand the 3-layer architecture (web → logic → core)
+- Learn how APM integrates at each layer
+- Visualize data flow and correlation patterns
+
+**Learning Outcomes:**
+- Clean architecture principles (separation of concerns)
+- Middleware chain ordering and responsibilities
+- APM data flow through layers
+- Trace, log, metric, and profile correlation
+- Mermaid diagram creation for architecture visualization
+
+**Keywords:**
+3-Layer Architecture, Clean Architecture, Web Layer, Logic Layer, Core Layer, Middleware Chain, APM Integration, Data Flow, Correlation, Mermaid Diagrams
+
+**Technologies:**
+- Gin (HTTP framework)
+- OpenTelemetry (tracing)
+- Zap (logging)
+- Prometheus (metrics)
+- Pyroscope (profiling)
+- Mermaid (diagram syntax)
+
 ## Overview
 
 This document visualizes the 3-layer architecture (web → logic → core) and how APM (Application Performance Monitoring) integrates with each layer to provide comprehensive observability.

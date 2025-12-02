@@ -1,5 +1,29 @@
 # APM (Application Performance Monitoring) Documentation
 
+## Quick Summary
+
+**Objectives:**
+- Understand the complete APM stack (Metrics, Tracing, Logging, Profiling)
+- Learn how to deploy and configure all APM components
+- Integrate APM into microservices for comprehensive observability
+
+**Learning Outcomes:**
+- 4 pillars of observability: Metrics, Traces, Logs, Profiles
+- How APM components work together (correlation)
+- Service integration patterns with middleware
+- Accessing and querying APM data in Grafana
+
+**Keywords:**
+APM, Observability, Metrics, Distributed Tracing, Structured Logging, Continuous Profiling, Correlation, Trace-ID, OpenTelemetry, Tempo, Loki, Vector, Pyroscope, Grafana
+
+**Technologies:**
+- Grafana Tempo (distributed tracing)
+- Vector + Loki (log aggregation)
+- Pyroscope (continuous profiling)
+- OpenTelemetry (tracing standard)
+- Zap (structured logging)
+- Prometheus (metrics - already implemented)
+
 ## Overview
 
 This project implements a comprehensive APM solution with four pillars:

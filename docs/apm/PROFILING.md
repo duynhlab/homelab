@@ -1,5 +1,27 @@
 # Continuous Profiling Guide
 
+## Quick Summary
+
+**Objectives:**
+- Enable continuous profiling for performance analysis
+- Identify CPU, memory, and concurrency bottlenecks
+- Use flamegraphs to visualize performance data
+
+**Learning Outcomes:**
+- Continuous profiling concepts
+- CPU, heap, goroutine, and mutex profiling
+- Flamegraph interpretation
+- Performance optimization techniques
+- Production profiling best practices
+
+**Keywords:**
+Continuous Profiling, CPU Profiling, Heap Profiling, Goroutine Profiling, Mutex Profiling, Flamegraph, Performance Analysis, Optimization, Pyroscope
+
+**Technologies:**
+- Pyroscope (continuous profiling)
+- Go pprof (profiling format)
+- Flamegraph visualization
+
 ## Overview
 
 **Pyroscope** provides continuous profiling for all services, enabling performance analysis and optimization.

@@ -2,6 +2,29 @@
 
 > 🤖 **AI Agents**: See [AGENTS.md](../../AGENTS.md) for project overview and [.cursor/rules/](../../.cursor/rules/) for development guidelines
 
+## Quick Summary
+
+**Objectives:**
+- Understand the 6 custom application metrics and Go runtime metrics
+- Learn how to use metrics for monitoring and detecting issues (memory leaks, latency)
+- Configure and query Prometheus metrics in Grafana dashboards
+
+**Learning Outcomes:**
+- Custom metrics: request_duration_seconds, requests_total, requests_in_flight, etc.
+- Go runtime metrics: goroutines, memory, GC, etc.
+- PromQL queries for percentiles, rates, and aggregations
+- 32 Grafana dashboard panels across 5 row groups
+- Memory leak detection patterns
+
+**Keywords:**
+Prometheus, Metrics, Histogram, Counter, Gauge, PromQL, Percentiles, Apdex, RPS, Latency, Memory Leak, Go Runtime Metrics, Grafana Dashboard
+
+**Technologies:**
+- Prometheus (metrics collection)
+- Prometheus Go Client Library
+- Grafana (visualization)
+- PromQL (query language)
+
 ## Tổng Quan
 
 Dự án này expose **6 custom application metrics** và tận dụng **Go runtime metrics** để cung cấp **32 Grafana dashboard panels trong 5 row groups** cho việc giám sát toàn diện, bao gồm phát hiện memory leak.

@@ -76,20 +76,26 @@ git clone <repo-url>
 cd project-monitoring-golang
 chmod +x scripts/*.sh
 
-# Basic Setup (Steps 1-7)
+# Infrastructure & Monitoring (Steps 1-3)
 ./scripts/01-create-kind-cluster.sh      # Create Kind cluster
 ./scripts/02-install-metrics.sh          # Install metrics infrastructure
-./scripts/03-build-microservices.sh      # Build Docker images on Local
-./scripts/04-deploy-microservices.sh     # Deploy microservices on Local and Registry
-./scripts/05-deploy-monitoring.sh        # Deploy Prometheus & Grafana
-./scripts/06-deploy-k6-testing.sh        # Deploy load generators
-./scripts/07-setup-access.sh             # Setup port forwarding
+./scripts/03-deploy-monitoring.sh        # Deploy Prometheus & Grafana (BEFORE apps to collect metrics)
 
-# SLO Deployment (Steps 9-11) - Optional
-./scripts/11-deploy-slo.sh               # Deploy SLO system (validates, generates, deploys)
+# APM Stack (Step 4) - Required for full observability (BEFORE apps to collect traces/logs/profiles)
+./scripts/04-deploy-apm.sh               # Deploy all APM components (Tempo, Pyroscope, Loki, Vector)
 
-# APM Deployment (Steps 14-17) - Optional
-./scripts/17-deploy-apm.sh               # Deploy all APM components (Tempo, Pyroscope, Loki, Vector)
+# Build & Deploy Applications (Steps 5-6)
+./scripts/05-build-microservices.sh      # Build Docker images on Local
+./scripts/06-deploy-microservices.sh     # Deploy microservices on Local and Registry
+
+# Load Testing (Step 7)
+./scripts/07-deploy-k6-testing.sh        # Deploy load generators (AFTER apps to test them)
+
+# SLO System (Step 8) - Required for SRE practices
+./scripts/08-deploy-slo.sh               # Deploy SLO system (validates, generates, deploys)
+
+# Access Setup (Step 9)
+./scripts/09-setup-access.sh             # Setup port forwarding
 ```
 
 ### Deployment Options
@@ -97,24 +103,24 @@ chmod +x scripts/*.sh
 **SLO Deployment Options:**
 ```bash
 # One-command (recommended)
-./scripts/11-deploy-slo.sh
+./scripts/08-deploy-slo.sh
 
 # Manual steps (if you need more control)
-./scripts/09-validate-slo.sh      # Validate SLO definitions
-./scripts/10-generate-slo-rules.sh # Generate Prometheus rules
-./scripts/11-deploy-slo.sh         # Deploy SLO system
+./scripts/08a-validate-slo.sh      # Validate SLO definitions
+./scripts/08b-generate-slo-rules.sh # Generate Prometheus rules
+./scripts/08-deploy-slo.sh         # Deploy SLO system
 ```
 📖 [Full SLO Documentation](./docs/slo/README.md)
 
 **APM Deployment Options:**
 ```bash
 # One-command (recommended) - Deploys all APM components
-./scripts/17-deploy-apm.sh
+./scripts/04-deploy-apm.sh
 
 # Individual deployments (if you need specific components)
-./scripts/14-deploy-tempo.sh      # Deploy Grafana Tempo (tracing)
-./scripts/15-deploy-pyroscope.sh  # Deploy Pyroscope (profiling)
-./scripts/16-deploy-loki.sh       # Deploy Loki + Vector (logging)
+./scripts/04a-deploy-tempo.sh      # Deploy Grafana Tempo (distributed tracing)
+./scripts/04b-deploy-pyroscope.sh  # Deploy Pyroscope (continuous profiling)
+./scripts/04c-deploy-loki.sh       # Deploy Loki + Vector (log aggregation)
 ```
 
 **What APM provides:**
@@ -125,38 +131,38 @@ chmod +x scripts/*.sh
 
 📖 [Full APM Documentation](./docs/apm/README.md)
 
-### Optional Steps
+### Utility Scripts
 
 **Reload Dashboard (Step 8):**
 ```bash
-./scripts/08-reload-dashboard.sh  # Reload Grafana dashboard after updates
+./scripts/10-reload-dashboard.sh  # Reload Grafana dashboard after updates
 ```
 
 **Runbooks (Steps 12-13):**
 ```bash
-./scripts/12-diagnose-latency.sh      # Diagnose latency issues
-./scripts/13-error-budget-alert.sh    # Error budget alert response
+./scripts/11-diagnose-latency.sh      # Diagnose latency issues
+./scripts/12-error-budget-alert.sh    # Error budget alert response
 ```
 
 ### Script Options
 
 **Build Options:**
 ```bash
-./scripts/03-build-microservices.sh [--no-cache|--force]
+./scripts/05-build-microservices.sh [--no-cache|--force]
 ```
 
 **Deploy Options (Helm):**
 ```bash
 # Deploy using local Helm chart (default)
-./scripts/04-deploy-microservices.sh --local
+./scripts/06-deploy-microservices.sh --local
 
 # Deploy from OCI registry
-./scripts/04-deploy-microservices.sh --registry
+./scripts/06-deploy-microservices.sh --registry
 ```
 
 **k6 Options:**
 ```bash
-./scripts/06-deploy-k6-testing.sh [legacy|multiple|both]
+./scripts/07-deploy-k6-testing.sh [legacy|multiple|both]
 ```
 
 ### Access Services
@@ -414,7 +420,7 @@ This project includes comprehensive SRE practices with **Service Level Objective
 
 **🚀 One-Command Deployment:**
 ```bash
-./scripts/11-deploy-slo.sh
+./scripts/08-deploy-slo.sh
 ```
 
 **📖 Full Documentation:** [SLO Documentation](./docs/slo/README.md)
@@ -512,8 +518,8 @@ kind delete cluster --name monitoring-local
 ```bash
 # This happens when you skip Step 3 (build microservices)
 # Solution: Always run Step 3 before Step 4
-./scripts/03-build-microservices.sh
-./scripts/04-deploy-microservices.sh
+./scripts/05-build-microservices.sh
+./scripts/06-deploy-microservices.sh
 
 # Or manually for specific service
 docker build --build-arg SERVICE_NAME=auth -f services/Dockerfile -t ghcr.io/duynhne/auth:v5 services/

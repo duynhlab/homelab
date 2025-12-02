@@ -35,8 +35,3 @@ data:
           max_workers: 100
           queue_depth: 10000
 
-    overrides:
-      defaults:
-        ingestion_burst_size_mb: 16
-        ingestion_rate_limit_mb: 16
-

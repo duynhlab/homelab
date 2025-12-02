@@ -70,6 +70,6 @@ if [ "$DEPLOY_MODE" = "multiple" ] || [ "$DEPLOY_MODE" = "both" ]; then
 fi
 echo ""
 echo "Usage:"
-echo "  ./scripts/06-deploy-k6-testing.sh both        # Deploy both (default)"
-echo "  ./scripts/06-deploy-k6-testing.sh legacy      # Deploy only legacy"
-echo "  ./scripts/06-deploy-k6-testing.sh multiple    # Deploy only multiple scenarios"
+echo "  ./scripts/07-deploy-k6-testing.sh both        # Deploy both (default)"
+echo "  ./scripts/07-deploy-k6-testing.sh legacy      # Deploy only legacy"
+echo "  ./scripts/07-deploy-k6-testing.sh multiple    # Deploy only multiple scenarios"

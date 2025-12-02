@@ -18,7 +18,7 @@ echo "Waiting for Loki to be ready..."
 kubectl wait --for=condition=available --timeout=300s deployment/loki -n monitoring
 
 echo "Waiting for Vector DaemonSet to be ready..."
-kubectl wait --for=condition=ready --timeout=300s daemonset/vector -n monitoring
+kubectl wait --for=condition=ready --timeout=300s daemonset/vector -n kube-system
 
 echo "Loki and Vector deployed successfully!"
 echo "Loki API: http://loki.monitoring.svc.cluster.local:3100"

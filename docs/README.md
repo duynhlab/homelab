@@ -126,16 +126,16 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 ```bash
 ./scripts/01-create-kind-cluster.sh
 ./scripts/02-install-metrics.sh
-./scripts/03-build-microservices.sh
-./scripts/04-deploy-microservices.sh --local   # Uses local Helm chart
-./scripts/05-deploy-monitoring.sh
-./scripts/06-deploy-k6-testing.sh
-./scripts/07-setup-access.sh
+./scripts/05-build-microservices.sh
+./scripts/06-deploy-microservices.sh --local   # Uses local Helm chart
+./scripts/03-deploy-monitoring.sh
+./scripts/07-deploy-k6-testing.sh
+./scripts/09-setup-access.sh
 ```
 
 **Deploy from OCI registry:**
 ```bash
-./scripts/04-deploy-microservices.sh --registry  # Uses oci://ghcr.io/duynhne/charts/microservice
+./scripts/06-deploy-microservices.sh --registry  # Uses oci://ghcr.io/duynhne/charts/microservice
 ```
 
 **Manual Helm deployment:**
@@ -145,9 +145,9 @@ helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-
 
 **Deploy SLOs:**
 ```bash
-./scripts/09-validate-slo.sh
-./scripts/10-generate-slo-rules.sh
-./scripts/11-deploy-slo.sh
+./scripts/08a-validate-slo.sh
+./scripts/08b-generate-slo-rules.sh
+./scripts/08-deploy-slo.sh
 ```
 
 **Access services:**

@@ -25,7 +25,7 @@
 Before generating rules, validate all SLO definition files:
 
 ```bash
-./scripts/09-validate-slo.sh
+./scripts/08a-validate-slo.sh
 ```
 
 Expected output:
@@ -43,7 +43,7 @@ Expected output:
 Generate Prometheus recording rules and alerts:
 
 ```bash
-./scripts/10-generate-slo-rules.sh
+./scripts/08b-generate-slo-rules.sh
 ```
 
 This creates `slo/generated/prometheus-rules.yaml` with:
@@ -57,7 +57,7 @@ This creates `slo/generated/prometheus-rules.yaml` with:
 Deploy all SLO components:
 
 ```bash
-./scripts/11-deploy-slo.sh
+./scripts/08-deploy-slo.sh
 ```
 
 This script:

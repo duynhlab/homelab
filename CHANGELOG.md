@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.3.1] - 2025-12-02
+
+### Changed
+- **Documentation Updates**:
+  - Updated README.md Technology Stack: Go 1.21 → 1.23, Gorilla Mux → Gin, added APM dependencies (OpenTelemetry, Zap, Pyroscope)
+  - Updated README.md Architecture section: Replaced simple diagram with comprehensive 3-layer architecture + APM stack diagram
+  - Fixed deployment order in docs/README.md "Deploy Everything" section to match actual sequence
+  - Updated AGENTS.md script naming categories to reflect new script numbers (03, 04, 05-06, 07, 08, 09, 10-12)
+  - Updated AGENTS.md deployment order comment to reflect correct script numbers
+  - Updated AGENTS.md "Last Updated" date from November 2024 to December 2024
+
 ## [0.3.0] - 2025-12-02
 
 ### Changed

@@ -77,7 +77,7 @@ Triển khai Grafana Annotations để track các events quan trọng:
 #### 1. Deployments (Màu xanh #5c4ee5)
 - Tag: `deployment`
 - Dùng khi: Deploy version mới
-- Example: "Deployed demo-go-api v2.1.0 to production"
+- Example: "Deployed auth v2.1.0 to production"
 
 #### 2. k6 Load Tests (Màu cam #ff6b6b)
 - Tag: `k6-loadtest`
@@ -238,7 +238,7 @@ curl -X POST "${GRAFANA_URL}/api/annotations" \
 kubectl apply -f k8s/deployment-v2.yaml
 
 # Gửi annotation
-export APP_NAME="demo-go-api-v2"
+export APP_NAME="auth"
 export VERSION="v2.1.0"
 export ENV="production"
 ./scripts/send-deployment-annotation.sh
@@ -294,7 +294,7 @@ export SEVERITY="SEV1"
 ### Use Case 1: "Deployment có làm tăng error rate không?"
 
 **Scenario:**
-- Deploy demo-go-api-v2 lúc 10:00
+- Deploy auth service lúc 10:00
 - Muốn xem có ảnh hưởng gì không
 
 **Workflow:**
@@ -372,7 +372,7 @@ export INCIDENT_START=$(date +%s%3N -d "10:30")
 
 **Bước 1:** Truy cập Grafana
 ```bash
-kubectl port-forward -n monitoring-demo svc/grafana 3000:3000
+kubectl port-forward -n monitoring svc/grafana 3000:3000
 # Mở: http://localhost:3000
 ```
 
@@ -452,7 +452,7 @@ kubectl apply -f k8s/deployment-v2.yaml
 echo "✓ Deployed"
 
 # Bước 2: Đánh dấu deployment
-export APP_NAME="demo-go-api-v2"
+export APP_NAME="auth"
 export VERSION="v2.1.0"
 export ENV="dev"
 ./scripts/send-deployment-annotation.sh

@@ -106,7 +106,7 @@ version: "prometheus/v1"
 service: "myapp"
 labels:
   team: "platform"
-  env: "demo"
+  env: "monitoring"
   service: "myapp"
   namespace: "myapp"
 

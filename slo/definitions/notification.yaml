@@ -6,7 +6,7 @@ version: "prometheus/v1"
 service: "notification"
 labels:
   team: "platform"
-  env: "demo"
+  env: "monitoring"
   service: "notification"
   namespace: "notification"
 

@@ -1,4 +1,4 @@
-# Setup Guide - Kubernetes Monitoring Demo
+# Setup Guide - Kubernetes Monitoring
 
 Complete guide to deploy Go REST API monitoring on Kind (Kubernetes in Docker).
 

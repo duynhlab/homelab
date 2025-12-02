@@ -6,7 +6,7 @@ version: "prometheus/v1"
 service: "cart"
 labels:
   team: "platform"
-  env: "demo"
+  env: "monitoring"
   service: "cart"
   namespace: "cart"
 

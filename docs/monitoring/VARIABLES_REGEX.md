@@ -214,7 +214,7 @@ sum(rate(request_duration_seconds_count{app=~"$app"}[$rate]))
 /.*-prod$/
 
 # Only specific prefix
-/^demo-.*/
+/^monitoring-.*/
 
 # Only versions
 /.*(v1|v2|v3)$/

@@ -2,10 +2,15 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: vector-config
-  namespace: monitoring
+  namespace: kube-system
 data:
   vector.yaml: |
     data_dir: /vector-data-dir
+
+    api:
+      enabled: true
+      address: 0.0.0.0:8686
+      playground: false
 
     sources:
       kubernetes_logs:
@@ -14,43 +19,41 @@ data:
         extra_label_selector: ""
 
     transforms:
-      parse_json:
+      add_labels:
         type: remap
         inputs:
           - kubernetes_logs
         source: |
-          # Parse JSON logs
-          if match(.message, r'^\s*\{') {
-            parsed, err = parse_json(.message)
-            if err == null {
-              . = merge(., parsed)
-            }
-          }
-          
-          # Extract trace_id from log message or parsed JSON
-          if exists(.trace_id) {
-            .trace_id = string(.trace_id)
-          } else if exists(.traceId) {
-            .trace_id = string(.traceId)
-          } else if exists(.traceid) {
-            .trace_id = string(.traceid)
-          }
-          
-          # Add service name from pod labels
+          # Add service from pod label (use pod_name as fallback to avoid too many "unknown" streams)
           if exists(.pod_labels."app") {
             .service = .pod_labels."app"
+          } else if exists(.pod_name) {
+            .service = .pod_name
+          } else {
+            .service = "system"
           }
           
-          # Add namespace
+          # Add namespace (always use pod_namespace if available)
           if exists(.pod_namespace) {
             .namespace = .pod_namespace
+          } else {
+            .namespace = "kube-system"
+          }
+          
+          # Ensure pod_name and container_name exist (use actual values, not "unknown")
+          if !exists(.pod_name) {
+            .pod_name = "unknown-pod"
+          }
+          
+          if !exists(.container_name) {
+            .container_name = "unknown-container"
           }
 
     sinks:
       loki:
         type: loki
         inputs:
-          - parse_json
+          - add_labels
         endpoint: http://loki.monitoring.svc.cluster.local:3100
         encoding:
           codec: json
@@ -59,7 +62,13 @@ data:
           namespace: "{{ namespace }}"
           pod: "{{ pod_name }}"
           container: "{{ container_name }}"
-          trace_id: "{{ trace_id }}"
+        out_of_order_action: accept
+        batch:
+          max_bytes: 3145728
+          timeout_secs: 5
+        request:
+          rate_limit_duration_secs: 1
+          rate_limit_num: 100
         healthcheck:
           enabled: true
 

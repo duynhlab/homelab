@@ -185,12 +185,12 @@ Logs are stored in Loki with labels:
 
 1. Check Vector pods:
    ```bash
-   kubectl get pods -n monitoring -l app=vector
+   kubectl get pods -n kube-system -l app=vector
    ```
 
 2. Check Vector logs:
    ```bash
-   kubectl logs -n monitoring -l app=vector
+   kubectl logs -n kube-system -l app=vector
    ```
 
 3. Check Loki status:

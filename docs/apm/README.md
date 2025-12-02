@@ -47,7 +47,7 @@ This project implements a comprehensive APM solution with four pillars:
 
 **Deployment**:
 ```bash
-./scripts/14-deploy-tempo.sh
+./scripts/04a-deploy-tempo.sh
 ```
 
 ### 2. Structured Logging (Vector + Loki)
@@ -69,7 +69,7 @@ This project implements a comprehensive APM solution with four pillars:
 
 **Deployment**:
 ```bash
-./scripts/16-deploy-loki.sh
+./scripts/04c-deploy-loki.sh
 ```
 
 ### 3. Continuous Profiling (Pyroscope)
@@ -91,7 +91,7 @@ This project implements a comprehensive APM solution with four pillars:
 
 **Deployment**:
 ```bash
-./scripts/15-deploy-pyroscope.sh
+./scripts/04b-deploy-pyroscope.sh
 ```
 
 ## Quick Start
@@ -99,7 +99,7 @@ This project implements a comprehensive APM solution with four pillars:
 Deploy all APM components:
 
 ```bash
-./scripts/17-deploy-apm.sh
+./scripts/04-deploy-apm.sh
 ```
 
 This will deploy:

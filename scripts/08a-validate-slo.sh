@@ -73,7 +73,7 @@ if [ "$VALIDATION_FAILED" -eq 0 ]; then
     echo ""
     echo "✅ Ready to generate Prometheus rules!"
     echo ""
-    echo "Next step: ./scripts/10-generate-slo-rules.sh"
+    echo "Next step: ./scripts/08b-generate-slo-rules.sh"
     exit 0
 else
     echo ""

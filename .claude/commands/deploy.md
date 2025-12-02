@@ -17,7 +17,7 @@ Deploy changes to Kubernetes cluster
 
 **Option 1: Use Build Script (Recommended)**
 ```bash
-./scripts/03-build-microservices.sh
+./scripts/05-build-microservices.sh
 ```
 
 **Option 2: Manual Build**
@@ -51,20 +51,26 @@ kind load docker-image ghcr.io/duynhne/auth:latest --name <cluster-name>
 # Step 2: Install metrics infrastructure
 ./scripts/02-install-metrics.sh
 
-# Step 3: Build microservices (already done above)
-./scripts/03-build-microservices.sh
+# Step 3: Deploy monitoring stack (BEFORE apps to collect metrics immediately)
+./scripts/03-deploy-monitoring.sh
 
-# Step 4: Deploy all microservices
-./scripts/04-deploy-microservices.sh
+# Step 4: Deploy APM stack (BEFORE apps to collect traces/logs/profiles immediately)
+./scripts/04-deploy-apm.sh
 
-# Step 5: Deploy monitoring stack
-./scripts/05-deploy-monitoring.sh
+# Step 5: Build microservices
+./scripts/05-build-microservices.sh
 
-# Step 6: Deploy k6 load testing (optional)
-./scripts/06-deploy-k6-testing.sh
+# Step 6: Deploy all microservices
+./scripts/06-deploy-microservices.sh
 
-# Step 7: Setup port forwarding
-./scripts/07-setup-access.sh
+# Step 7: Deploy k6 load testing (AFTER apps to test them)
+./scripts/07-deploy-k6-testing.sh
+
+# Step 8: Deploy SLO system (Required for SRE practices)
+./scripts/08-deploy-slo.sh
+
+# Step 9: Setup port forwarding
+./scripts/09-setup-access.sh
 ```
 
 **Option 2: Manual Deployment (Helm)**
@@ -92,7 +98,7 @@ kubectl apply -f k8s/k6/
 ### Deploy SLO Components
 ```bash
 # Use SLO deployment script (validates, generates, deploys)
-./scripts/11-deploy-slo.sh
+./scripts/08-deploy-slo.sh
 ```
 
 ### Verify Deployment
@@ -146,7 +152,7 @@ kubectl port-forward -n auth svc/auth 8080:8080
 
 **Dashboard Changes**
 ```bash
-./scripts/08-reload-dashboard.sh
+./scripts/10-reload-dashboard.sh
 ```
 
 **Prometheus Config Changes**

@@ -172,7 +172,7 @@ image:
 
 ### Step 3: Update Deployment Script
 
-Add the service to `scripts/04-deploy-microservices.sh`:
+Add the service to `scripts/06-deploy-microservices.sh`:
 
 ```bash
 SERVICES=(
@@ -183,7 +183,7 @@ SERVICES=(
 
 ### Step 4: Update Build Script
 
-Add the service to `scripts/03-build-microservices.sh`:
+Add the service to `scripts/05-build-microservices.sh`:
 
 ```bash
 SERVICES=(
@@ -208,10 +208,10 @@ metadata:
 
 ```bash
 # Build the new service
-./scripts/03-build-microservices.sh
+./scripts/05-build-microservices.sh
 
 # Deploy using Helm
-./scripts/04-deploy-microservices.sh --local
+./scripts/06-deploy-microservices.sh --local
 ```
 
 Or deploy manually:

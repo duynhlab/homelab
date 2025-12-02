@@ -124,13 +124,15 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 
 **Deploy everything:**
 ```bash
-./scripts/01-create-kind-cluster.sh
-./scripts/02-install-metrics.sh
-./scripts/05-build-microservices.sh
-./scripts/06-deploy-microservices.sh --local   # Uses local Helm chart
-./scripts/03-deploy-monitoring.sh
-./scripts/07-deploy-k6-testing.sh
-./scripts/09-setup-access.sh
+./scripts/01-create-kind-cluster.sh      # Step 1: Infrastructure
+./scripts/02-install-metrics.sh          # Step 2: Infrastructure
+./scripts/03-deploy-monitoring.sh        # Step 3: Monitoring (BEFORE apps)
+./scripts/04-deploy-apm.sh               # Step 4: APM (BEFORE apps)
+./scripts/05-build-microservices.sh      # Step 5: Build images
+./scripts/06-deploy-microservices.sh --local   # Step 6: Deploy (uses local Helm chart)
+./scripts/07-deploy-k6-testing.sh        # Step 7: Load testing (AFTER apps)
+./scripts/08-deploy-slo.sh               # Step 8: SLO system
+./scripts/09-setup-access.sh             # Step 9: Access setup
 ```
 
 **Deploy from OCI registry:**

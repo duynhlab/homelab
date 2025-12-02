@@ -342,25 +342,75 @@ kubectl create job --from=cronjob/demo-loadtest manual-test-$(date +%s) -n monit
 
 ## 🏗️ Architecture
 
+### 3-Layer Architecture
+
+All microservices follow a clean 3-layer architecture pattern:
+
 ```
-┌─────────────┐
-│   Go API    │ ← HTTP Requests
-│   (3 pods)  │
-└──────┬──────┘
-       │ :8080/metrics
-       │
-┌──────▼──────────┐
-│   Prometheus    │ ← Scrapes metrics every 15s
-│   (1 pod)       │
-└──────┬──────────┘
-       │
-┌──────▼──────────┐
-│    Grafana      │ ← Queries Prometheus
-│   (1 pod)       │   Displays 32 panels in 5 row groups
-└─────────────────┘
+┌─────────────────────────────────────────┐
+│         HTTP Request (Gin)              │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│      Middleware Chain                   │
+│  ┌──────────────────────────────────┐   │
+│  │ 1. TracingMiddleware()           │   │
+│  │ 2. LoggingMiddleware()           │   │
+│  │ 3. PrometheusMiddleware()        │   │
+│  └──────────────────────────────────┘   │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│   Layer 1: Web (HTTP Handlers)          │
+│   internal/{service}/web/v1/            │
+│   internal/{service}/web/v2/            │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│   Layer 2: Logic (Business Logic)       │
+│   internal/{service}/logic/v1/          │
+│   internal/{service}/logic/v2/          │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│   Layer 3: Core (Domain Models)         │
+│   internal/{service}/core/domain/       │
+└─────────────────────────────────────────┘
 ```
 
-**Kubernetes Components:**
+### APM Stack Integration
+
+Each layer integrates with the APM stack for comprehensive observability:
+
+```
+┌─────────────────────────────────────────┐
+│   Microservices (9 services)            │
+│   ┌──────────┐  ┌──────────┐           │
+│   │  Web     │→ │  Logic   │→ │ Core   │
+│   │  Layer   │  │  Layer   │  │ Layer  │
+│   └────┬─────┘  └────┬─────┘  └────────┘
+│        │             │                  │
+│        ├─ Traces ────┼──► Tempo         │
+│        ├─ Logs ──────┼──► Vector → Loki │
+│        ├─ Metrics ───┼──► Prometheus    │
+│        └─ Profiles ──┼──► Pyroscope     │
+└─────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────┐
+│            Grafana                      │
+│   (Unified observability dashboard)     │
+└─────────────────────────────────────────┘
+```
+
+📖 **For detailed architecture diagrams with mermaid visualizations, see [docs/apm/ARCHITECTURE.md](./docs/apm/ARCHITECTURE.md)**
+
+### Kubernetes Components
+
 - **Kind** - Local 3-node cluster (1 control-plane + 2 workers)
 - **kube-state-metrics** - K8s object metrics
 - **metrics-server** - Resource usage data
@@ -429,17 +479,23 @@ This project includes comprehensive SRE practices with **Service Level Objective
 
 ## 🛠️ Technology Stack
 
-- **Go 1.21** - Application runtime
-- **Gorilla Mux** - HTTP router
+- **Go 1.23** - Application runtime
+- **Gin** - HTTP web framework
 - **Prometheus** - Metrics collection
-- **Grafana** - Visualization
+- **Grafana** - Visualization & dashboards
+- **OpenTelemetry** - Distributed tracing
+- **Zap** - Structured logging
+- **Pyroscope** - Continuous profiling
 - **Kind** - Local Kubernetes
 
 ### Dependencies
 
 ```go
-github.com/gorilla/mux v1.8.1
-github.com/prometheus/client_golang v1.19.0
+github.com/gin-gonic/gin v1.10.1
+github.com/prometheus/client_golang v1.17.0
+go.opentelemetry.io/otel v1.38.0
+go.uber.org/zap v1.27.0
+github.com/grafana/pyroscope-go v1.2.7
 ```
 
 ---

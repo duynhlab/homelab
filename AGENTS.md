@@ -48,7 +48,6 @@ monitoring/
 ├── scripts/               # Deployment and utility scripts (numbered 01-17)
 ├── docs/                  # Documentation
 ├── slo/                   # SLO data files (definitions, generated rules)
-├── grafana-dashboard.json # Main Grafana dashboard (32 panels)
 ├── README.md              # Project overview
 ├── CLAUDE.md              # Link to  AGENTS.md for Claude (Anthropic) still uses CLAUDE.md
 ├── CHANGELOG.md           # Version changelog
@@ -275,7 +274,7 @@ Numbered scripts (01-12) for deployment and operations:
 | Helm Values | Per-service configuration | `charts/values/*.yaml` |
 | Prometheus Config | Scrape configs, rule files | `k8s/prometheus/configmap.yaml` |
 | Grafana Datasources | Prometheus datasource | `k8s/grafana-operator/datasource-prometheus.yaml` |
-| Grafana Dashboards | Operator-managed dashboards (microservices + SLO) | `k8s/grafana-operator/dashboards/` (Note: `microservices-dashboard.json` is a copy from root `grafana-dashboard.json` due to Kustomize security restrictions) |
+| Grafana Dashboards | Operator-managed dashboards (microservices + SLO) | `k8s/grafana-operator/dashboards/` (`microservices-dashboard.json` is the source of truth) |
 | Dockerfile | Unified build for all services | `services/Dockerfile` |
 | Go Modules | Go dependencies | `services/go.mod` |
 
@@ -283,7 +282,7 @@ Numbered scripts (01-12) for deployment and operations:
 
 | File | Purpose | Location |
 |------|---------|----------|
-| Main Dashboard | 32 panels in 5 row groups | `grafana-dashboard.json` |
+| Main Dashboard | 32 panels in 5 row groups | `k8s/grafana-operator/dashboards/microservices-dashboard.json` |
 
 **Dashboard Details:**
 - **UID**: `microservices-monitoring-001`
@@ -385,16 +384,10 @@ Numbered scripts (01-12) for deployment and operations:
 ### Updating Grafana Dashboard
 
 1. **Edit dashboard JSON:**
-   - Update `grafana-dashboard.json` (32 panels / 5 row groups).
+   - Update `k8s/grafana-operator/dashboards/microservices-dashboard.json` (32 panels / 5 row groups).
    - Keep UID `microservices-monitoring-001`.
 
-2. **Sync to Kustomize directory:**
-   ```bash
-   cp grafana-dashboard.json k8s/grafana-operator/dashboards/microservices-dashboard.json
-   ```
-   **Important**: Kustomize security restrictions prevent referencing files outside its directory tree, so we maintain a copy in the dashboards folder.
-
-3. **Reload dashboards via Grafana Operator:**
+2. **Reload dashboards via Grafana Operator:**
    ```bash
    ./scripts/10-reload-dashboard.sh
    ```

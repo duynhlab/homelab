@@ -19,8 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Monitoring Deployment Script**:
   - Added Grafana Operator CRDs status check to `scripts/03-deploy-monitoring.sh`
   - Now displays `Grafana`, `GrafanaDatasource`, and `GrafanaDashboard` resources after deployment
-  - Fixed pod wait label selectors: `app.kubernetes.io/name=grafana-operator` and `app.kubernetes.io/name=grafana`
+  - Fixed pod wait labels: `app.kubernetes.io/name=grafana-operator` for operator, `app=grafana` for Grafana instance
   - Improved visibility of Grafana Operator managed resources
+- **APM Deployment Script Refactoring**:
+  - Updated `scripts/04-deploy-apm.sh` to use Grafana Operator datasources
+  - Created GrafanaDatasource CRs for APM stack: `datasource-tempo.yaml`, `datasource-loki.yaml`, `datasource-pyroscope.yaml`
+  - Removed dependency on legacy `k8s/grafana/` folder
+  - APM datasources now managed declaratively via Grafana Operator CRs
+  - Deleted empty `k8s/grafana/` folder
 
 ### Fixed
 - **Grafana Operator Deployment**:

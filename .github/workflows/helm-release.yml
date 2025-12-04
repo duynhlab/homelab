@@ -93,6 +93,6 @@ jobs:
           echo "helm pull oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/${{ env.CHART_NAME }} --version ${{ steps.chart_version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "# Install with values file" >> $GITHUB_STEP_SUMMARY
-          echo "helm install auth-service oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/${{ env.CHART_NAME }} -f values/auth.yaml -n auth" >> $GITHUB_STEP_SUMMARY
+          echo "helm install auth oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/${{ env.CHART_NAME }} -f values/auth.yaml -n auth" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 

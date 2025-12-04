@@ -16,9 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `disable_login_form: true` → `disable_login_form: "true"`
     - `auth.anonymous.enabled: true` → `auth.anonymous.enabled: "true"`
   - The Grafana Operator `v1beta1` API requires all config values to be strings, not native YAML booleans
-  - Fixed dashboard path in `k8s/grafana-operator/dashboards/kustomization.yaml`: 
-    - `../../grafana-dashboard.json` → `../../../grafana-dashboard.json`
-    - Corrected relative path from `k8s/grafana-operator/dashboards/` to project root
+  - Fixed Kustomize security restriction for dashboard file:
+    - Copied `grafana-dashboard.json` to `k8s/grafana-operator/dashboards/microservices-dashboard.json`
+    - Updated `kustomization.yaml` to reference local file instead of parent directory
+    - Kustomize security policy prevents accessing files outside current directory tree
   - For local development, port-forwarding is used: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`
 - **Monitoring Deployment Script**:
   - Fixed typo in `scripts/03-deploy-monitoring.sh` line 2: `Aset -euo pipefail` → `set -euo pipefail`

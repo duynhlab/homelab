@@ -107,9 +107,9 @@ kubectl get nodes
 ```
 
 **What it does:**
-- Installs `kube-state-metrics` - Exposes K8s object metrics
-- Installs `metrics-server` - Provides resource usage data
-- Patches metrics-server for Kind compatibility
+- Installs `kube-state-metrics` (via `prometheus-community/kube-state-metrics` Helm chart) to expose Kubernetes object metrics
+- Installs `metrics-server` (via `metrics-server/metrics-server` Helm chart) with `--kubelet-insecure-tls` for Kind clusters
+- Ensures both components run in the `kube-system` namespace
 
 **Verify:**
 ```bash
@@ -126,10 +126,9 @@ kubectl get pods -n kube-system | grep -E "(kube-state|metrics-server)"
 ```
 
 **What it does:**
-- Deploys Prometheus with RBAC permissions
-- Deploys Grafana with auto-provisioning
-- Creates ConfigMaps for dashboards and datasources
-- Configures Prometheus scrape configs
+- Deploys Prometheus (RBAC + scrape configs)
+- Installs the Grafana Operator and reconciles Grafana (anonymous auth, dark theme) plus the Prometheus datasource
+- Auto-provisions the microservices + Sloth SLO dashboards via `GrafanaDashboard` CRs (no manual imports)
 
 **Why before apps:** Prometheus needs to be ready to collect metrics immediately when apps start.
 

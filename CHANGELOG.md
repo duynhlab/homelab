@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated scripts/03-deploy-monitoring.sh to install the operator and apply CRs automatically
   - Deprecated legacy `k8s/grafana/` manifests and switched scripts/10-reload-dashboard.sh to reapply operator resources
   - Updated documentation (`docs/slo/GETTING_STARTED.md`, `README.md`, `AGENTS.md`) to describe the operator-based workflow
+- **Metrics Infrastructure via Helm**:
+  - `scripts/02-install-metrics.sh` now installs kube-state-metrics and metrics-server via their Helm charts with versioned values in `k8s/metrics/`
+  - `scripts/03-deploy-monitoring.sh` ensures the `monitoring` namespace exists before applying Prometheus and Grafana Operator resources
+  - `docs/getting-started/SETUP.md` updated to reflect the Helm-based workflow
 
 ## [0.3.1] - 2025-12-02
 

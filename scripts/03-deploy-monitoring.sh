@@ -1,9 +1,10 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 echo "=== Deploying Monitoring Stack ==="
 
-# Deploy Prometheus (simple deployment)
+echo "Ensuring 'monitoring' namespace exists..."
+kubectl get namespace monitoring >/dev/null 2>&1 || kubectl create namespace monitoring
 echo "1. Deploying Prometheus..."
 kubectl apply -f k8s/prometheus/
 

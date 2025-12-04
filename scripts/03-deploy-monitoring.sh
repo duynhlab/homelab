@@ -11,17 +11,27 @@ kubectl apply -f k8s/prometheus/
 echo "Waiting for Prometheus to be ready..."
 kubectl wait --for=condition=ready pod -l app=prometheus -n monitoring --timeout=120s || true
 
-# Create Grafana dashboard ConfigMap
-echo "2. Creating Grafana dashboard ConfigMap..."
-kubectl create configmap grafana-dashboard-json --from-file=grafana-dashboard.json -n monitoring --dry-run=client -o yaml | kubectl apply -f -
+# Deploy or upgrade Grafana Operator + resources
+echo "2. Installing/Upgrading Grafana Operator (Helm)..."
+if command -v helm >/dev/null 2>&1; then
+  helm repo add grafana-operator https://grafana.github.io/helm-charts >/dev/null 2>&1 || true
+  helm repo update >/dev/null 2>&1 || true
+  helm upgrade --install grafana-operator grafana-operator/grafana-operator \
+    --namespace monitoring \
+    --create-namespace \
+    -f k8s/grafana-operator/values.yaml
+else
+  echo "⚠️  Helm is not installed. Please install the operator manually:"
+  echo "    See k8s/grafana-operator/README.md"
+fi
 
-# Deploy Grafana
-echo "3. Deploying Grafana..."
-kubectl apply -f k8s/grafana/
-
-# Wait for Grafana
-echo "Waiting for Grafana to be ready..."
-kubectl wait --for=condition=ready pod -l app=grafana -n monitoring --timeout=120s || true
+echo "3. Applying Grafana CRDs (instance, datasource, dashboards)..."
+kubectl apply -f k8s/grafana-operator/grafana.yaml
+kubectl apply -f k8s/grafana-operator/datasource-prometheus.yaml
+kubectl apply -k k8s/grafana-operator/dashboards/
+echo "Waiting for Grafana Operator managed instance to be ready..."
+kubectl wait --for=condition=ready pod -l app=grafana-operator -n monitoring --timeout=120s || true
+kubectl wait --for=condition=ready pod -l dashboards=grafana -n monitoring --timeout=120s || true
 
 # Check status
 echo ""
@@ -33,5 +43,5 @@ kubectl get svc -n monitoring
 echo ""
 echo "✓ Monitoring stack deployed successfully!"
 echo "Prometheus: http://localhost:9090"
-echo "Grafana:    http://localhost:3000 (admin/admin)"
+echo "Grafana:    http://localhost:3000 (anonymous access enabled)"
 

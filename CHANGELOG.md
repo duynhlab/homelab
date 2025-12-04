@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.4.0] - 2025-01-06
+
+### Changed
+- **Project Naming Cleanup**:
+  - Replaced all "demo" references with "monitoring" or appropriate values throughout the codebase
+  - Updated all 9 SLO definition files: changed `env: "demo"` → `env: "monitoring"`
+  - Updated Prometheus config: changed cluster name from `kind-monitoring-demo` → `kind-monitoring`
+  - Updated README.md: fixed dashboard title and replaced outdated `demo-loadtest` references with k6 load testing
+  - Updated documentation files: SETUP.md title, GETTING_STARTED.md examples, VARIABLES_REGEX.md patterns
+  - Updated archive files: GRAFANA_ANNOTATIONS_PLAN.md examples and namespace references
+  - Updated METRICS.md: replaced "demo" with "development" in environment descriptions
+- **AGENTS.md Dashboard Documentation**:
+  - Added comprehensive dashboard documentation section with structure, variables, and usage instructions
+  - Documented 32 panels in 5 row groups with detailed descriptions
+  - Added dashboard variables usage guide (`$app`, `$namespace`, `$rate`, `$DS_PROMETHEUS`)
+  - Enhanced "Updating Grafana Dashboard" workflow with variable usage examples
+- **Grafana Operator Migration**:
+  - Added `k8s/grafana-operator/` with Helm values, Grafana CR, Prometheus datasource CR, and dashboard manifests
+  - Provisioned Sloth SLO dashboards (IDs 14643 & 14348) via `GrafanaDashboard` CRs—no more manual import
+  - Updated scripts/03-deploy-monitoring.sh to install the operator and apply CRs automatically
+  - Deprecated legacy `k8s/grafana/` manifests and switched scripts/10-reload-dashboard.sh to reapply operator resources
+  - Updated documentation (`docs/slo/GETTING_STARTED.md`, `README.md`, `AGENTS.md`) to describe the operator-based workflow
+
 ## [0.3.1] - 2025-12-02
 
 ### Changed
@@ -27,19 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 90% reduction in health check traffic (from ~200 to ~20 health checks per iteration cycle with 200 VUs)
   - Health checks are for monitoring, not load testing; Prometheus/Kubernetes probes already handle health monitoring
   - Cleaner Grafana metrics focused on actual business API endpoints
-- **Project Naming Cleanup**:
-  - Replaced all "demo" references with "monitoring" or appropriate values throughout the codebase
-  - Updated all 9 SLO definition files: changed `env: "demo"` → `env: "monitoring"`
-  - Updated Prometheus config: changed cluster name from `kind-monitoring-demo` → `kind-monitoring`
-  - Updated README.md: fixed dashboard title and replaced outdated `demo-loadtest` references with k6 load testing
-  - Updated documentation files: SETUP.md title, GETTING_STARTED.md examples, VARIABLES_REGEX.md patterns
-  - Updated archive files: GRAFANA_ANNOTATIONS_PLAN.md examples and namespace references
-  - Updated METRICS.md: replaced "demo" with "development" in environment descriptions
-- **AGENTS.md Dashboard Documentation**:
-  - Added comprehensive dashboard documentation section with structure, variables, and usage instructions
-  - Documented 32 panels in 5 row groups with detailed descriptions
-  - Added dashboard variables usage guide (`$app`, `$namespace`, `$rate`, `$DS_PROMETHEUS`)
-  - Enhanced "Updating Grafana Dashboard" workflow with variable usage examples
 
 ## [0.3.0] - 2025-12-02
 

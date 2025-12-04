@@ -372,7 +372,7 @@ export INCIDENT_START=$(date +%s%3N -d "10:30")
 
 **Bước 1:** Truy cập Grafana
 ```bash
-kubectl port-forward -n monitoring svc/grafana 3000:3000
+kubectl port-forward -n monitoring svc/grafana-service 3000:3000
 # Mở: http://localhost:3000
 ```
 

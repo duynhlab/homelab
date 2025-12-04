@@ -68,21 +68,16 @@ This script:
 
 **Note:** Dashboards should be imported manually via Grafana UI (see Step 4).
 
-### Step 4: Import Sloth Dashboards
+### Step 4: Access Sloth Dashboards (auto-provisioned)
 
-Import recommended Sloth dashboards via Grafana UI:
+Grafana is now managed by the Grafana Operator and the Sloth dashboards are provisioned automatically through `GrafanaDashboard` CRs.
 
-```bash
-# Port-forward Grafana
-kubectl port-forward -n monitoring svc/grafana 3000:3000
-```
-
-1. Open Grafana UI: http://localhost:3000
-2. Go to **Dashboards** → **Import**
-3. Import by ID:
-   - **Detailed SLOs**: ID `14348`
-   - **Overview**: ID `14643`
-4. Select datasource: **Prometheus** (UID: `prometheus`)
+1. Ensure the operator resources are applied (`k8s/grafana-operator/README.md`).
+2. Open Grafana (port-forward if needed): `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`
+3. Look for the dashboards under the **SLO** folder:
+   - **Sloth SLO Overview** (Grafana.com ID `14643`)
+   - **Sloth SLO Detailed** (Grafana.com ID `14348`)
+4. Both dashboards are pre-wired to the Prometheus datasource UID `prometheus`.
 
 ### Step 5: Verify Deployment
 

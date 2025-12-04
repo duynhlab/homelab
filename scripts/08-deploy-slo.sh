@@ -182,7 +182,7 @@ fi
 print_status "🎉 SLO deployment completed successfully!"
 echo ""
 echo "📊 Access your services:"
-echo "   Grafana:     kubectl port-forward -n $NAMESPACE svc/grafana 3000:3000"
+echo "   Grafana:     kubectl port-forward -n $NAMESPACE svc/grafana-service 3000:3000"
 echo "   Prometheus:  kubectl port-forward -n $NAMESPACE svc/prometheus 9090:9090"
 echo ""
 echo "📈 Import Sloth Dashboards (Manual):"

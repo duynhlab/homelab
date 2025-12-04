@@ -1,0 +1,19 @@
+operator:
+  ## Deploy the operator inside the monitoring namespace
+  namespace: monitoring
+
+  ## Only watch resources in the monitoring namespace
+  watchNamespaces:
+    - monitoring
+
+  ## Reduce noise in demo environments
+  logLevel: info
+
+  ## Controller image (keep default from chart)
+  image:
+    repository: quay.io/grafana-operator/grafana-operator
+
+## CRDs are installed automatically by the chart (default behaviour)
+crds:
+  install: true
+

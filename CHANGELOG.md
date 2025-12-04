@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.1] - 2025-12-04
 
+### Changed
+- **Dashboard Sync Workflow**:
+  - Updated `scripts/10-reload-dashboard.sh` to automatically sync `grafana-dashboard.json` to `k8s/grafana-operator/dashboards/microservices-dashboard.json`
+  - Updated `AGENTS.md` "Updating Grafana Dashboard" workflow to document the sync step
+  - Eliminates manual copy step when updating dashboards
+
 ### Fixed
 - **Grafana Operator Deployment**:
   - Fixed `BadRequest` error in `k8s/grafana-operator/grafana.yaml`: Removed unsupported `spec.ingress.enabled` field
@@ -20,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Copied `grafana-dashboard.json` to `k8s/grafana-operator/dashboards/microservices-dashboard.json`
     - Updated `kustomization.yaml` to reference local file instead of parent directory
     - Kustomize security policy prevents accessing files outside current directory tree
+  - Fixed `GrafanaDashboard` API validation errors in all dashboard CRs:
+    - Removed unsupported `spec.datasources[0].datasourceUid` field from 3 dashboard files
+    - `v1beta1` API only requires `datasourceName`, not `datasourceUid`
+    - Affected files: `grafana-dashboard-main.yaml`, `grafana-dashboard-slo-overview.yaml`, `grafana-dashboard-slo-detailed.yaml`
   - For local development, port-forwarding is used: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`
 - **Monitoring Deployment Script**:
   - Fixed typo in `scripts/03-deploy-monitoring.sh` line 2: `Aset -euo pipefail` → `set -euo pipefail`

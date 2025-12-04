@@ -3,10 +3,14 @@ set -e
 
 echo "=== Reloading Grafana Dashboards (Operator Managed) ==="
 
-echo "1. Re-applying dashboard ConfigMap + GrafanaDashboard CRs..."
+echo "1. Syncing dashboard JSON to Kustomize directory..."
+cp grafana-dashboard.json k8s/grafana-operator/dashboards/microservices-dashboard.json
+echo "   ✓ Copied grafana-dashboard.json → k8s/grafana-operator/dashboards/microservices-dashboard.json"
+
+echo "2. Re-applying dashboard ConfigMap + GrafanaDashboard CRs..."
 kubectl apply -k k8s/grafana-operator/dashboards/
 
-echo "2. Triggering dashboard reconciliation..."
+echo "3. Triggering dashboard reconciliation..."
 kubectl annotate grafanadashboard \
   -n monitoring \
   --overwrite \

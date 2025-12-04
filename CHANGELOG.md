@@ -34,6 +34,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **DevContainer Configuration**:
   - Added Go 1.23 feature to `.devcontainer/devcontainer.json`
   - Ensures consistent Go version across development environments
+- **K6 Load Testing Refactoring**:
+  - Refactored k6 to use Helm chart (reuse `charts/` like microservices)
+  - Created unified `k6/Dockerfile` with ARG pattern (giống `services/Dockerfile`)
+  - Build 2 k6 images: `ghcr.io/duynhne/k6:legacy` and `ghcr.io/duynhne/k6:scenarios`
+  - Created Helm values: `charts/values/k6-legacy.yaml` and `charts/values/k6-scenarios.yaml`
+  - Updated Helm templates: conditional service creation and probes (`.enabled | default true`)
+  - New deployment script: `scripts/07-deploy-k6.sh` (replaces `07-deploy-k6-testing.sh`)
+  - K6 now deploys to dedicated `k6` namespace (separated from `monitoring`)
+  - Deleted old raw YAML deployments and ConfigMap-based approach
+  - Created separate GitHub Actions workflow `.github/workflows/build-k6-images.yml` for k6 builds
+  - Consistent deployment pattern across all services
 
 ### Fixed
 - **Grafana Operator Deployment**:

@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed dependency on legacy `k8s/grafana/` folder
   - APM datasources now managed declaratively via Grafana Operator CRs
   - Deleted empty `k8s/grafana/` folder
+- **Namespace Management**:
+  - Removed `monitoring` namespace from `k8s/namespaces.yaml`
+  - `monitoring` namespace is now created by `scripts/03-deploy-monitoring.sh` only
+  - Eliminates duplicate namespace creation and kubectl warnings
+- **DevContainer Configuration**:
+  - Added Go 1.23 feature to `.devcontainer/devcontainer.json`
+  - Ensures consistent Go version across development environments
 
 ### Fixed
 - **Grafana Operator Deployment**:

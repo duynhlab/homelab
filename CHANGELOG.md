@@ -10,10 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.1] - 2025-12-04
 
 ### Changed
-- **Dashboard Sync Workflow**:
-  - Updated `scripts/10-reload-dashboard.sh` to automatically sync `grafana-dashboard.json` to `k8s/grafana-operator/dashboards/microservices-dashboard.json`
-  - Updated `AGENTS.md` "Updating Grafana Dashboard" workflow to document the sync step
-  - Eliminates manual copy step when updating dashboards
+- **Dashboard File Consolidation**:
+  - Removed duplicate `grafana-dashboard.json` from root directory
+  - Dashboard source of truth is now `k8s/grafana-operator/dashboards/microservices-dashboard.json`
+  - Updated `scripts/10-reload-dashboard.sh` to remove unnecessary copy step
+  - Updated `AGENTS.md` documentation to reflect single dashboard file location
+  - Simplifies dashboard management by maintaining only one file
+- **Monitoring Deployment Script**:
+  - Added Grafana Operator CRDs status check to `scripts/03-deploy-monitoring.sh`
+  - Now displays `Grafana`, `GrafanaDatasource`, and `GrafanaDashboard` resources after deployment
+  - Fixed pod wait label selectors: `app.kubernetes.io/name=grafana-operator` and `app.kubernetes.io/name=grafana`
+  - Improved visibility of Grafana Operator managed resources
 
 ### Fixed
 - **Grafana Operator Deployment**:

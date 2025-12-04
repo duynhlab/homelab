@@ -31,15 +31,20 @@ kubectl apply -f k8s/grafana-operator/grafana.yaml
 kubectl apply -f k8s/grafana-operator/datasource-prometheus.yaml
 kubectl apply -k k8s/grafana-operator/dashboards/
 echo "Waiting for Grafana Operator managed instance to be ready..."
-kubectl wait --for=condition=ready pod -l app=grafana-operator -n monitoring --timeout=120s || true
-kubectl wait --for=condition=ready pod -l dashboards=grafana -n monitoring --timeout=120s || true
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=grafana-operator -n monitoring --timeout=60s || true
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=grafana -n monitoring --timeout=60s || true
 
 # Check status
 echo ""
 echo "=== Monitoring Stack Status ==="
 kubectl get pods -n monitoring
 kubectl get svc -n monitoring
-# kubectl get servicemonitor -n monitoring
+
+echo ""
+echo "=== Grafana Operator Resources ==="
+kubectl get grafana -n monitoring
+kubectl get grafanadatasource -n monitoring
+kubectl get grafanadashboard -n monitoring
 
 echo ""
 echo "✓ Monitoring stack deployed successfully!"

@@ -275,7 +275,7 @@ Numbered scripts (01-12) for deployment and operations:
 | Helm Values | Per-service configuration | `charts/values/*.yaml` |
 | Prometheus Config | Scrape configs, rule files | `k8s/prometheus/configmap.yaml` |
 | Grafana Datasources | Prometheus datasource | `k8s/grafana-operator/datasource-prometheus.yaml` |
-| Grafana Dashboards | Operator-managed dashboards (microservices + SLO) | `k8s/grafana-operator/dashboards/` |
+| Grafana Dashboards | Operator-managed dashboards (microservices + SLO) | `k8s/grafana-operator/dashboards/` (Note: `microservices-dashboard.json` is a copy from root `grafana-dashboard.json` due to Kustomize security restrictions) |
 | Dockerfile | Unified build for all services | `services/Dockerfile` |
 | Go Modules | Go dependencies | `services/go.mod` |
 
@@ -388,7 +388,13 @@ Numbered scripts (01-12) for deployment and operations:
    - Update `grafana-dashboard.json` (32 panels / 5 row groups).
    - Keep UID `microservices-monitoring-001`.
 
-2. **Reload dashboards via Grafana Operator:**
+2. **Sync to Kustomize directory:**
+   ```bash
+   cp grafana-dashboard.json k8s/grafana-operator/dashboards/microservices-dashboard.json
+   ```
+   **Important**: Kustomize security restrictions prevent referencing files outside its directory tree, so we maintain a copy in the dashboards folder.
+
+3. **Reload dashboards via Grafana Operator:**
    ```bash
    ./scripts/10-reload-dashboard.sh
    ```

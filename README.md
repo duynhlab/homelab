@@ -89,10 +89,10 @@ chmod +x scripts/*.sh
 ./scripts/06-deploy-microservices.sh     # Deploy microservices on Local and Registry
 
 # Load Testing (Step 7)
-./scripts/07-deploy-k6-testing.sh        # Deploy load generators (AFTER apps to test them)
+./scripts/07-deploy-k6.sh                # Deploy K6 load generators via Helm (AFTER apps to test them)
 
 # SLO System (Step 8) - Required for SRE practices
-./scripts/08-deploy-slo.sh               # Deploy SLO system (validates, generates, deploys)
+./scripts/08-deploy-slo.sh               # Deploy Sloth Operator and SLO CRDs
 
 # Access Setup (Step 9)
 ./scripts/09-setup-access.sh             # Setup port forwarding
@@ -100,15 +100,23 @@ chmod +x scripts/*.sh
 
 ### Deployment Options
 
-**SLO Deployment Options:**
+**K6 Deployment Options:**
 ```bash
-# One-command (recommended)
-./scripts/08-deploy-slo.sh
+# Deploy both load tests (recommended)
+./scripts/07-deploy-k6.sh both
 
-# Manual steps (if you need more control)
-./scripts/08a-validate-slo.sh      # Validate SLO definitions
-./scripts/08b-generate-slo-rules.sh # Generate Prometheus rules
-./scripts/08-deploy-slo.sh         # Deploy SLO system
+# Deploy only legacy test
+./scripts/07-deploy-k6.sh legacy
+
+# Deploy only multiple scenarios test
+./scripts/07-deploy-k6.sh scenarios
+```
+📖 [Full K6 Documentation](./docs/load-testing/K6_LOAD_TESTING.md)
+
+**SLO Deployment (Sloth Operator):**
+```bash
+# One-command deployment via Helm
+./scripts/08-deploy-slo.sh
 ```
 📖 [Full SLO Documentation](./docs/slo/README.md)
 
@@ -162,7 +170,7 @@ chmod +x scripts/*.sh
 
 **k6 Options:**
 ```bash
-./scripts/07-deploy-k6-testing.sh [legacy|multiple|both]
+./scripts/07-deploy-k6.sh [both|legacy|scenarios]
 ```
 
 ### Access Services
@@ -485,20 +493,15 @@ This project includes comprehensive SRE practices with **Service Level Objective
 - **Gin** - HTTP web framework
 - **Prometheus** - Metrics collection
 - **Grafana** - Visualization & dashboards
+- **Grafana Operator** - Manages Grafana resources (dashboards, datasources)
+- **Sloth Operator v0.15.0** - SLO management (automatic rule generation)
 - **OpenTelemetry** - Distributed tracing
 - **Zap** - Structured logging
 - **Pyroscope** - Continuous profiling
+- **k6** - Load testing
 - **Kind** - Local Kubernetes
+- **Helm** - Package management
 
-### Dependencies
-
-```go
-github.com/gin-gonic/gin v1.10.1
-github.com/prometheus/client_golang v1.17.0
-go.opentelemetry.io/otel v1.38.0
-go.uber.org/zap v1.27.0
-github.com/grafana/pyroscope-go v1.2.7
-```
 
 ---
 

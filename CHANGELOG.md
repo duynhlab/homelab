@@ -7,7 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
-## [0.4.1] - 2025-12-04
+## [0.4.1] - 2025-12-05
+
+### Documentation Review and Updates
+
+**Context**: After significant architectural changes (K6 Helm deployment, Sloth Operator SLO management, APM deployment, Grafana Operator migration), all documentation needed comprehensive review and updates.
+
+**Changes**:
+
+1. **AGENTS.md** - Comprehensive review and updates
+   - Corrected outdated "Last Updated" date from 2024 to "December 5, 2025"
+   - Updated directory structure (`k8s/` section) to show correct hierarchy
+   - Fixed namespace conventions (added `k6` namespace)
+   - Updated deployment order and script references
+   - Removed deprecated K6 and bash SLO script references (`08a`, `08b`)
+   - Updated workflows for K6, SLO, and microservice management
+   - Updated "Quick Navigation" sections
+
+2. **docs/getting-started/SETUP.md** - Updated deployment workflows
+   - Changed script reference from `07-deploy-k6-testing.sh` to `07-deploy-k6.sh`
+   - Updated Step 4 description to mention "Grafana Operator datasources"
+   - Updated Step 7 (K6) to reflect Helm deployment with namespace `k6`
+   - Updated Step 8 (SLO) to describe Sloth Operator deployment via Helm
+   - Updated verification commands to use `prometheusservicelevels` and `prometheusrules`
+   - Updated load testing section to use `k6` namespace
+
+3. **docs/load-testing/K6_LOAD_TESTING.md** - K6 architecture updates
+   - Added "Architecture" section explaining Helm-based deployment
+   - Updated file structure to reflect new locations (`k6/`, `charts/values/`)
+   - Changed script reference to `07-deploy-k6.sh`
+   - Updated namespace references from `monitoring` to `k6`
+   - Added Helm release checking commands
+   - Updated troubleshooting section with Helm-specific commands
+
+4. **docs/slo/GETTING_STARTED.md** - Sloth Operator migration
+   - Rewritten to focus on Sloth Kubernetes Operator (v0.15.0)
+   - Added "Overview" and "Architecture" sections
+   - Removed manual Sloth CLI installation instructions
+   - Updated all workflows to use PrometheusServiceLevel CRDs
+   - Updated verification commands to check operator, CRDs, and generated rules
+   - Updated "Creating a New SLO" section with CRD YAML format
+   - Updated metric query examples to use `sloth_service` label
+   - Expanded troubleshooting section with operator-specific guidance
+
+5. **docs/slo/*.md** - SLO conceptual documentation
+   - Reviewed `SLI_DEFINITIONS.md` - No changes needed (implementation-agnostic)
+   - Reviewed `SLO_TARGETS.md` - No changes needed (implementation-agnostic)
+   - Reviewed `ALERTING.md` - No changes needed (implementation-agnostic)
+   - Reviewed `ERROR_BUDGET_POLICY.md` - No changes needed (implementation-agnostic)
+
+6. **docs/README.md** - Documentation index updates
+   - Updated script reference to `07-deploy-k6.sh`
+   - Simplified SLO deployment commands (removed `08a`, `08b` scripts)
+   - Added "APM" section with 5 documentation files
+   - Updated "Key Concepts" to mention Sloth Operator, APM Stack, and k6 Helm
+   - Updated "Last Updated" to "December 2025"
+
+7. **docs/apm/*.md** - APM documentation review
+   - Reviewed all 5 APM documentation files
+   - No changes needed - references to Grafana and datasources are implementation-agnostic
+
+**Impact**: All documentation now accurately reflects the current architecture and deployment workflows. Users can follow documentation without encountering outdated script names, incorrect namespaces, or deprecated commands.
+
+## [0.4.0] - 2025-12-04
 
 ### Changed
 - **Dashboard File Consolidation**:
@@ -45,6 +107,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Deleted old raw YAML deployments and ConfigMap-based approach
   - Created separate GitHub Actions workflow `.github/workflows/build-k6-images.yml` for k6 builds
   - Consistent deployment pattern across all services
+- **SLO System Refactoring**:
+  - Modernized SLO to use Sloth Operator v0.15.0 (Helm deployment)
+  - Replaced bash scripts with PrometheusServiceLevel CRDs (9 services)
+  - Operator automatically generates and deploys Prometheus rules
+  - Sloth dashboards already deployed via Grafana Operator (IDs 14348, 14643)
+  - Clean architecture: `k8s/sloth/{values.yaml, crds/, README.md}`
+  - Deleted `scripts/08a-validate-slo.sh`, `scripts/08b-generate-slo-rules.sh`
+  - New simple `scripts/08-deploy-slo.sh` wrapper script (Helm-based)
+  - Removed manual rule_files from Prometheus ConfigMap
+  - `slo/definitions/` kept as source of truth (backup reference)
+  - No more `slo/generated/` folder - Sloth Operator handles rule generation
+  - CRD-based, Kubernetes-native SLO management
 
 ### Fixed
 - **Grafana Operator Deployment**:

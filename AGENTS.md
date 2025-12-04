@@ -38,7 +38,7 @@ monitoring/
 ├── k8s/                   # Kubernetes manifests
 │   ├── prometheus/
 │   ├── grafana-operator/
-│   ├── k6/
+│   ├── sloth/             # Sloth Operator (SLO management)
 │   ├── tempo/             # Grafana Tempo (distributed tracing)
 │   ├── pyroscope/         # Pyroscope (continuous profiling)
 │   ├── loki/              # Loki (log storage)
@@ -48,6 +48,7 @@ monitoring/
 ├── scripts/               # Deployment and utility scripts (numbered 01-17)
 ├── docs/                  # Documentation
 ├── slo/                   # SLO data files (definitions, generated rules)
+├── k6/                    # K6 load testing (Dockerfile + scripts)
 ├── README.md              # Project overview
 ├── CLAUDE.md              # Link to  AGENTS.md for Claude (Anthropic) still uses CLAUDE.md
 ├── CHANGELOG.md           # Version changelog
@@ -171,21 +172,26 @@ k8s/
 │   ├── README.md         # Helm install instructions
 │   ├── values.yaml       # Operator Helm values
 │   ├── grafana.yaml      # Grafana CR (anonymous auth, dark theme)
-│   ├── datasource-prometheus.yaml
+│   ├── datasource-*.yaml # Datasource CRs (Prometheus, Tempo, Loki, Pyroscope)
 │   └── dashboards/       # Kustomize (ConfigMap + GrafanaDashboard CRs)
-├── k6/                   # Load testing (scripts and deployments)
-│   ├── load-test.js
-│   ├── load-test-multiple-scenarios.js
-│   ├── deployment-legacy.yaml
-│   └── deployment-multiple-scenarios.yaml
-└── namespaces.yaml        # Namespace definitions
+├── sloth/                # Sloth Operator (SLO management)
+│   ├── values.yaml       # Helm values for Sloth Operator
+│   ├── README.md
+│   └── crds/             # PrometheusServiceLevel CRDs (9 services)
+├── tempo/                # Grafana Tempo (distributed tracing)
+├── pyroscope/            # Pyroscope (continuous profiling)
+├── loki/                 # Loki (log storage)
+├── vector/               # Vector (log collection)
+├── kind/                 # Kind cluster configuration
+└── namespaces.yaml       # Namespace definitions
 ```
 
 **Note**: Microservices are deployed via Helm chart (`charts/`), not raw YAML manifests. Grafana is managed via the Grafana Operator (`k8s/grafana-operator/`).
 
 **Namespaces**:
-- `monitoring` - Monitoring components (Prometheus, Grafana, k6, Tempo, Pyroscope, Loki) and SLO system
+- `monitoring` - Monitoring components (Prometheus, Grafana, Tempo, Pyroscope, Loki) and SLO system
 - `kube-system` - Vector (log collection DaemonSet)
+- `k6` - K6 load testing
 - Service namespaces - Each microservice has its own namespace: `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`
 
 #### `scripts/` - Deployment Scripts
@@ -212,24 +218,19 @@ Numbered scripts (01-12) for deployment and operations:
 - `05-build-microservices.sh` - Build Docker images for all 9 services
 - `06-deploy-microservices.sh` - Deploy all microservices using Helm (`--local` or `--registry`)
 
-**Load Testing (06):**
-- `07-deploy-k6-testing.sh` - Deploy k6 load generators (deploy AFTER apps to test them)
+**Load Testing (07):**
+- `07-deploy-k6.sh` - Deploy k6 load generators via Helm (deploy AFTER apps to test them)
 
-**SLO System (09-11) - Required:**
-- `08a-validate-slo.sh` - Validate SLO definition files
-- `08b-generate-slo-rules.sh` - Generate Prometheus rules using Sloth
-- `08-deploy-slo.sh` - Deploy SLO system (validates, generates, deploys)
+**SLO System (08) - Required:**
+- `08-deploy-slo.sh` - Deploy Sloth Operator and SLO CRDs (automatic validation & rule generation)
 
-**Access Setup (07):**
+**Access Setup (09):**
 - `09-setup-access.sh` - Setup port-forwarding for services
 
 **Utilities:**
 - `10-reload-dashboard.sh` - Reapply Grafana Operator dashboards (microservices + SLO)
 - `11-diagnose-latency.sh` - Diagnostic script for latency issues
 - `12-error-budget-alert.sh` - Error budget alert response script
-- `cleanup.sh` - Clean up Kind cluster and resources
-
-**Utilities:**
 - `cleanup.sh` - Clean up Kind cluster and resources
 
 #### `docs/` - Documentation
@@ -250,17 +251,47 @@ Numbered scripts (01-12) for deployment and operations:
 #### `slo/` - SLO Data Files
 
 **Structure:**
-- `slo/definitions/` - 9 SLO definition YAML files (one per service, source of truth)
-- `slo/generated/` - Generated Prometheus rules (gitignored, created by `./scripts/08b-generate-slo-rules.sh`)
+- `slo/definitions/` - 9 SLO definition YAML files (one per service, **backup only**)
 
-**Note**: Generated files are not tracked in git. Run `./scripts/08b-generate-slo-rules.sh` to create them.
+**Note**: Active SLO definitions are now PrometheusServiceLevel CRDs in `k8s/sloth/crds/*.yaml`, managed by Sloth Operator. The files in `slo/definitions/` are kept as backup/reference.
 
-#### `k8s/k6/` - Load Testing
+#### `k6/` - Load Testing
 
-- `load-test.js` - Legacy single-scenario load test
-- `load-test-multiple-scenarios.js` - Multiple user personas (Browser, Shopping, Registered, API Client, Admin)
-- `deployment-legacy.yaml` - Kubernetes deployment for legacy test
-- `deployment-multiple-scenarios.yaml` - Kubernetes deployment for multiple scenarios test
+```
+k6/
+├── Dockerfile                           # Unified Dockerfile (ARG-based)
+├── load-test.js                         # Legacy load test script
+└── load-test-multiple-scenarios.js      # Multiple scenarios script
+```
+
+**K6 Deployment**: Helm-based (reuses `charts/`)
+- Build 2 images: `ghcr.io/duynhne/k6:legacy`, `ghcr.io/duynhne/k6:scenarios`
+- Deploy to `k6` namespace
+- Helm values: `charts/values/k6-legacy.yaml`, `charts/values/k6-scenarios.yaml`
+
+#### `k8s/sloth/` - SLO Management (Sloth Operator)
+
+```
+k8s/sloth/
+├── values.yaml           # Helm values for Sloth Operator
+├── README.md             # Deployment instructions
+└── crds/                 # PrometheusServiceLevel CRDs (9 services)
+    ├── auth-slo.yaml
+    ├── user-slo.yaml
+    ├── product-slo.yaml
+    ├── cart-slo.yaml
+    ├── order-slo.yaml
+    ├── review-slo.yaml
+    ├── notification-slo.yaml
+    ├── shipping-slo.yaml
+    └── shipping-v2-slo.yaml
+```
+
+**Sloth Operator**: Kubernetes-native SLO management
+- Helm deployment: `sloth/sloth` chart v0.15.0
+- Automatic Prometheus rule generation
+- PrometheusServiceLevel CRDs (one per service)
+- No more bash scripts for validation/generation
 
 ---
 
@@ -302,25 +333,27 @@ Numbered scripts (01-12) for deployment and operations:
 
 ### Script Files by Category
 
-**Deployment Order:** Infrastructure (01-02) → Monitoring (05) → APM (14-17) → Apps (03-04) → Load Testing (06) → SLO (09-11) → Access (07)
+**Deployment Order:** Infrastructure → Monitoring → APM → Apps → Load Testing → SLO → Access
 
 | Category | Scripts | Purpose | Order |
 |----------|---------|---------|-------|
 | Infrastructure | 01-02 | Cluster setup, metrics installation | 1-2 |
-| Monitoring Stack | 05 | Deploy Prometheus & Grafana (BEFORE apps) | 3 |
-| APM Stack | 14-17 | Deploy Tempo, Pyroscope, Loki, Vector (BEFORE apps) | 4 |
-| Build & Deploy Apps | 03-04 | Build images, deploy services | 5-6 |
-| Load Testing | 06 | Deploy k6 load generators (AFTER apps) | 7 |
-| SLO System | 09-11 | Validate, generate rules, deploy SLOs (Required) | 8 |
-| Access Setup | 07 | Setup port-forwarding | 9 |
-| Utilities | 08, 12-13 | Dashboard reload, runbooks | - |
+| Monitoring Stack | 03 | Deploy Prometheus & Grafana (BEFORE apps) | 3 |
+| APM Stack | 04, 04a-c | Deploy Tempo, Pyroscope, Loki, Vector (BEFORE apps) | 4 |
+| Build & Deploy Apps | 05-06 | Build images (including k6), deploy services | 5-6 |
+| Load Testing | 07 | Deploy k6 load generators via Helm (AFTER apps) | 7 |
+| SLO System | 08 | Deploy Sloth Operator and SLO CRDs (Required) | 8 |
+| Access Setup | 09 | Setup port-forwarding | 9 |
+| Utilities | 10-12 | Dashboard reload, runbooks | - |
 
 ### SLO Files
 
 | File Type | Location | Count |
 |-----------|----------|-------|
-| SLO Definitions | `slo/definitions/*.yaml` | 9 files (one per service) |
-| Generated Rules | `slo/generated/*.yaml` | gitignored (run `./scripts/08b-generate-slo-rules.sh`) |
+| SLO Definitions | `slo/definitions/*.yaml` | 9 files (backup only) |
+| SLO CRDs | `k8s/sloth/crds/*.yaml` | 9 PrometheusServiceLevel CRDs (active) |
+
+**Note**: Active SLOs are `k8s/sloth/crds/*.yaml` managed by Sloth Operator. Files in `slo/definitions/` are backup/reference only.
 
 ### Documentation Files
 
@@ -370,10 +403,8 @@ Numbered scripts (01-12) for deployment and operations:
    - Add deployment to `scripts/06-deploy-microservices.sh`
 
 5. **Add SLO definition:**
-   - Create `slo/definitions/myapp.yaml`
-   - Run `./scripts/08a-validate-slo.sh`
-   - Run `./scripts/08b-generate-slo-rules.sh`
-   - Run `./scripts/08-deploy-slo.sh`
+   - Create PrometheusServiceLevel CRD: `k8s/sloth/crds/myapp-slo.yaml`
+   - Apply: `kubectl apply -f k8s/sloth/crds/myapp-slo.yaml`
 
 6. **Build and deploy:**
    ```bash
@@ -422,39 +453,35 @@ Numbered scripts (01-12) for deployment and operations:
 
 ### Deploying SLO Changes
 
-1. **Edit SLO definitions:**
-   - Edit files in `slo/definitions/*.yaml`
+1. **Edit SLO CRDs:**
+   - Edit PrometheusServiceLevel CRDs in `k8s/sloth/crds/*.yaml`
 
-2. **Validate:**
+2. **Apply changes:**
    ```bash
-   ./scripts/08a-validate-slo.sh
+   kubectl apply -f k8s/sloth/crds/
    ```
 
-3. **Generate rules:**
-   ```bash
-   ./scripts/08b-generate-slo-rules.sh
-   ```
-
-4. **Deploy:**
-   ```bash
-   ./scripts/08-deploy-slo.sh
-   ```
-
-5. **Verify:**
+3. **Verify:**
+   - Check PrometheusServiceLevels: `kubectl get prometheusservicelevels -n monitoring`
+   - Check generated rules: `kubectl get prometheusrules -n monitoring`
    - Check Prometheus rules: http://localhost:9090/api/v1/rules
-   - Check Grafana dashboards (import manually: IDs 14348, 14643)
+   - View SLO dashboards in Grafana (folder: SLO)
 
 ### Running Load Tests
 
 1. **Deploy k6:**
    ```bash
-   ./scripts/07-deploy-k6-testing.sh
+   ./scripts/07-deploy-k6.sh
+   # Or deploy specific variant:
+   # ./scripts/07-deploy-k6.sh legacy
+   # ./scripts/07-deploy-k6.sh scenarios
    ```
 
 2. **Check load generator pods:**
    ```bash
-   kubectl get pods -n monitoring -l app=k6-load-generator
-   kubectl logs -n monitoring -l app=k6-load-generator
+   kubectl get pods -n k6
+   kubectl logs -n k6 -l app=k6-legacy -f
+   kubectl logs -n k6 -l app=k6-scenarios -f
    ```
 
 3. **Monitor metrics:**
@@ -500,8 +527,8 @@ Numbered scripts (01-12) for deployment and operations:
 | Build images | `./scripts/05-build-microservices.sh` | Build all 9 service Docker images | 5 |
 | Deploy services (local) | `./scripts/06-deploy-microservices.sh --local` | Deploy using local Helm chart | 6 |
 | Deploy services (registry) | `./scripts/06-deploy-microservices.sh --registry` | Deploy from OCI registry | 6 |
-| Deploy k6 | `./scripts/07-deploy-k6-testing.sh` | Deploy k6 load generators (AFTER apps) | 7 |
-| Deploy SLO | `./scripts/08-deploy-slo.sh` | Deploy SLO system (validates, generates, deploys) | 8 |
+| Deploy k6 | `./scripts/07-deploy-k6.sh` | Deploy k6 load generators via Helm (AFTER apps) | 7 |
+| Deploy SLO | `./scripts/08-deploy-slo.sh` | Deploy Sloth Operator and SLO CRDs | 8 |
 | Setup access | `./scripts/09-setup-access.sh` | Setup port-forwarding | 9 |
 
 ### Helm Commands
@@ -523,9 +550,9 @@ Numbered scripts (01-12) for deployment and operations:
 
 | Script | Command | Purpose |
 |--------|---------|---------|
-| Validate SLOs | `./scripts/08a-validate-slo.sh` | Validate SLO definition files |
-| Generate rules | `./scripts/08b-generate-slo-rules.sh` | Generate Prometheus rules using Sloth |
-| Deploy SLOs | `./scripts/08-deploy-slo.sh` | Full SLO deployment (validate + generate + deploy) |
+| Deploy SLOs | `./scripts/08-deploy-slo.sh` | Full SLO deployment via Sloth Operator (Helm) |
+
+**Note**: Validation and rule generation are now handled automatically by Sloth Operator. No more manual bash scripts.
 
 ### Runbook Commands
 
@@ -558,8 +585,9 @@ Numbered scripts (01-12) for deployment and operations:
 
 ### Namespace Conventions
 
-- **`monitoring`** - Monitoring components (Prometheus, Grafana, k6, Tempo, Pyroscope, Loki) and SLO system
+- **`monitoring`** - Monitoring components (Prometheus, Grafana, Tempo, Pyroscope, Loki) and SLO system
 - **`kube-system`** - Vector (log collection DaemonSet)
+- **`k6`** - K6 load testing
 - **Service namespaces** - Each microservice has its own namespace:
   - `auth` - auth service
   - `user` - user service
@@ -579,8 +607,8 @@ Numbered scripts (01-12) for deployment and operations:
   - 03: Monitoring Stack
   - 04, 04a-c: APM Stack
   - 05-06: Build & Deploy Apps
-  - 07: Load Testing
-  - 08, 08a-b: SLO Management
+  - 07: Load Testing (K6)
+  - 08: SLO Management (Sloth Operator)
   - 09: Access Setup
   - 10-12: Utilities
 
@@ -589,7 +617,7 @@ Numbered scripts (01-12) for deployment and operations:
 - **Services**: `services/cmd/{service}/main.go` + `services/internal/{service}/{v1,v2,domain}/`
 - **Kubernetes**: `k8s/{component}/{deployment,service}.yaml`
 - **Scripts**: `scripts/{number}-{purpose}.sh`
-- **SLO**: `slo/definitions/*.yaml` → (generate) → `slo/generated/*.yaml` → (deploy as ConfigMaps)
+- **SLO**: `k8s/sloth/crds/*.yaml` (PrometheusServiceLevel CRDs managed by Sloth Operator)
 
 ### Metric Naming Conventions
 
@@ -634,19 +662,21 @@ Numbered scripts (01-12) for deployment and operations:
 **Add a new service:**
 - Service code: `services/cmd/{service}/`, `services/internal/{service}/`
 - Helm values: `charts/values/{service}.yaml`
-- SLO definition: `slo/definitions/{service}.yaml`
+- SLO CRD: `k8s/sloth/crds/{service}-slo.yaml`
 
 **Update monitoring:**
-- Dashboard JSON: `grafana-dashboard.json` (32 panels, 5 row groups, UID: microservices-monitoring-001)
+- Dashboard JSON: `k8s/grafana-operator/dashboards/microservices-dashboard.json`
 - Prometheus config: `k8s/prometheus/configmap.yaml`
-- Grafana Operator resources: `k8s/grafana-operator/` (Grafana CR, datasource, dashboards)
+- Grafana Operator resources: `k8s/grafana-operator/` (Grafana CR, datasources, dashboards)
 
 **Modify SLOs:**
-- Definitions: `slo/definitions/*.yaml`
-- Generated rules: `slo/generated/*.yaml` (gitignored, run `./scripts/08b-generate-slo-rules.sh`)
+- Edit CRDs: `k8s/sloth/crds/*.yaml` (PrometheusServiceLevel CRDs)
+- Apply: `kubectl apply -f k8s/sloth/crds/`
 
 **Load testing:**
-- k6 scripts and deployments: `k8s/k6/load-test*.js` and `k8s/k6/deployment-*.yaml`
+- K6 scripts: `k6/load-test.js`, `k6/load-test-multiple-scenarios.js`
+- K6 Dockerfile: `k6/Dockerfile`
+- K6 Helm values: `charts/values/k6-legacy.yaml`, `charts/values/k6-scenarios.yaml`
 
 ### Find Scripts by Task
 
@@ -654,8 +684,8 @@ Numbered scripts (01-12) for deployment and operations:
 - **Deploy monitoring**: `03-deploy-monitoring.sh` (BEFORE apps)
 - **Deploy APM**: `04-deploy-apm.sh` (BEFORE apps - Tempo, Pyroscope, Loki, Vector)
 - **Build & deploy apps**: `05-build-microservices.sh`, `06-deploy-microservices.sh`
-- **Load testing**: `07-deploy-k6-testing.sh` (AFTER apps)
-- **SLO system**: `08-deploy-slo.sh` (Required - validates, generates, deploys)
+- **Load testing**: `07-deploy-k6.sh` (AFTER apps)
+- **SLO system**: `08-deploy-slo.sh` (Sloth Operator + CRDs)
 - **Access setup**: `09-setup-access.sh`
 - **Utilities**: `10-reload-dashboard.sh`, `11-diagnose-latency.sh`, `12-error-budget-alert.sh`
 
@@ -678,4 +708,4 @@ Numbered scripts (01-12) for deployment and operations:
 
 ---
 
-**Last Updated**: Reflects current project structure with Helm chart deployment (December 2024)
+**Last Updated**: December 5, 2025 - Reflects K6 Helm deployment, Sloth Operator SLO management, and Grafana Operator integration

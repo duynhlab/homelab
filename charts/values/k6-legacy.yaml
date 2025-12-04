@@ -1,0 +1,35 @@
+# Values for k6-legacy
+name: k6-legacy
+namespace: k6
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/duynhne
+  name: k6
+  tag: legacy
+  pullPolicy: IfNotPresent
+
+service:
+  enabled: false  # k6 không cần service
+
+containerPort: 8080  # Dummy port (k6 không listen)
+
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "200m"
+  limits:
+    memory: "1Gi"
+    cpu: "1000m"
+
+livenessProbe:
+  enabled: false  # k6 không có health endpoint
+
+readinessProbe:
+  enabled: false
+
+labels:
+  component: load-testing
+  test-mode: legacy
+

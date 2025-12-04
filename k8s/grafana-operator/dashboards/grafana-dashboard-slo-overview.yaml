@@ -1,0 +1,14 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: slo-overview
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "SLO"
+  url: https://grafana.com/api/dashboards/14643/revisions/latest/download
+  datasources:
+    - inputName: DS_PROMETHEUS
+      datasourceName: Prometheus
+

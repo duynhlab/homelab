@@ -1,4 +1,4 @@
-@SKILL.md# Docker Basics
+# Docker Basics
 
 Core concepts and workflows for Docker containerization.
 

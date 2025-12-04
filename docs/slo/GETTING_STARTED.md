@@ -1,187 +1,253 @@
 # Getting Started with SLO System
 
+## Overview
+
+The SLO (Service Level Objective) system is managed by the **Sloth Kubernetes Operator** (v0.15.0), which provides Kubernetes-native SLO management via Custom Resource Definitions (CRDs). This replaces manual bash scripts with automated validation and rule generation.
+
 ## Prerequisites
 
-1. **Sloth Tool**: Install Sloth CLI
-   ```bash
-   # Using Homebrew (macOS)
-   brew install sloth
-   
-   # Using Go
-   go install github.com/slok/sloth/cmd/sloth@latest
-   
-   # Using Docker
-   docker pull ghcr.io/slok/sloth:latest
-   ```
+1. **Kubernetes Cluster**: Access to a Kubernetes cluster with Prometheus deployed
+2. **kubectl**: Configured to access your cluster
+3. **Helm**: v3.14+ for deploying the Sloth Operator
 
-2. **Kubernetes Cluster**: Access to a Kubernetes cluster with Prometheus and Grafana deployed
+**Note**: You do NOT need to install the Sloth CLI locally. The Sloth Operator handles all validation and rule generation automatically.
 
-3. **kubectl**: Configured to access your cluster
+## Architecture
+
+The SLO system uses:
+- **Sloth Operator**: Kubernetes operator for managing SLOs (`sloth/sloth` Helm chart v0.15.0)
+- **PrometheusServiceLevel CRDs**: Kubernetes-native SLO definitions (one per service)
+- **PrometheusRule CRs**: Automatically generated Prometheus recording rules and alerts
+- **Grafana Dashboards**: Auto-provisioned via Grafana Operator (`GrafanaDashboard` CRs)
 
 ## Installation Steps
 
-### Step 1: Validate SLO Definitions
+### Step 1: Deploy Sloth Operator and SLO CRDs
 
-Before generating rules, validate all SLO definition files:
-
-```bash
-./scripts/08a-validate-slo.sh
-```
-
-Expected output:
-```
-🔍 Validating SLO definitions...
-📋 Found 9 SLO definition files:
-  auth.yaml
-  cart.yaml
-  ...
-✅ All SLO definitions are valid!
-```
-
-### Step 2: Generate Prometheus Rules
-
-Generate Prometheus recording rules and alerts:
-
-```bash
-./scripts/08b-generate-slo-rules.sh
-```
-
-This creates `slo/generated/prometheus-rules.yaml` with:
-- SLI recording rules
-- Error budget rules
-- Burn rate rules
-- Multi-window multi-burn-rate alerts
-
-### Step 3: Deploy to Cluster
-
-Deploy all SLO components:
+Deploy the complete SLO system:
 
 ```bash
 ./scripts/08-deploy-slo.sh
 ```
 
 This script:
-1. Validates definitions
-2. Generates rules
-3. Creates Prometheus ConfigMap
-4. Updates Prometheus deployment
+1. Installs the Sloth Operator via Helm to the `monitoring` namespace
+2. Applies all 9 PrometheusServiceLevel CRDs from `k8s/sloth/crds/`
+3. Waits for the operator to become ready
+4. Automatically generates Prometheus recording rules and alerts
 
-**Note:** Dashboards should be imported manually via Grafana UI (see Step 4).
+Expected output:
+```
+🚀 Deploying Sloth SLO System...
 
-### Step 4: Import Sloth Dashboards
+1. Installing Sloth Operator (Helm)...
+Release "sloth" installed successfully
 
-Import recommended Sloth dashboards via Grafana UI:
+2. Applying PrometheusServiceLevel CRDs (9 services)...
+prometheusservicelevel.sloth.slok.dev/auth-slo created
+prometheusservicelevel.sloth.slok.dev/user-slo created
+...
 
-```bash
-# Port-forward Grafana
-kubectl port-forward -n monitoring svc/grafana 3000:3000
+✅ Sloth SLO system deployed successfully!
 ```
 
-1. Open Grafana UI: http://localhost:3000
-2. Go to **Dashboards** → **Import**
-3. Import by ID:
-   - **Detailed SLOs**: ID `14348`
-   - **Overview**: ID `14643`
-4. Select datasource: **Prometheus** (UID: `prometheus`)
+### Step 2: Verify Deployment
 
-### Step 5: Verify Deployment
+Check that all components are deployed:
 
-Check Prometheus rules:
+```bash
+# Check Sloth Operator pod
+kubectl get pods -n monitoring -l app.kubernetes.io/name=sloth
+
+# Check PrometheusServiceLevel CRDs
+kubectl get prometheusservicelevels -n monitoring
+
+# Check generated PrometheusRules
+kubectl get prometheusrules -n monitoring
+
+# Describe a specific SLO
+kubectl describe prometheusservicelevel auth-slo -n monitoring
+```
+
+### Step 3: Access Sloth Dashboards
+
+Grafana dashboards are automatically provisioned via the Grafana Operator:
+
+1. Port-forward Grafana: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`
+2. Open Grafana: http://localhost:3000 (anonymous access enabled)
+3. Look for dashboards under the **SLO** folder:
+   - **Sloth SLO Overview** (Grafana.com ID `14643`) - High-level view of all SLOs
+   - **Sloth SLO Detailed** (Grafana.com ID `14348`) - Detailed per-service SLO metrics
+4. Both dashboards are pre-configured with the Prometheus datasource
+
+### Step 4: Verify Metrics
+
+Check that SLO metrics are being collected:
 
 ```bash
 # Port-forward Prometheus
 kubectl port-forward -n monitoring svc/prometheus 9090:9090
 
-# Query SLO metrics
-curl "http://localhost:9090/api/v1/query?query=slo:sli_error:ratio_rate5m{service=\"auth\"}"
+# Query SLO metrics (examples)
+curl "http://localhost:9090/api/v1/query?query=slo:sli_error:ratio_rate5m{sloth_service=\"auth\"}"
+curl "http://localhost:9090/api/v1/query?query=slo:error_budget_remaining:ratio{sloth_service=\"auth\"}"
 ```
 
-## First SLO Definition
+Open Prometheus UI (http://localhost:9090) and navigate to:
+- **Status → Rules**: Verify SLO rules are loaded
+- **Alerts**: Check for SLO-related alerts (e.g., error budget burn rate alerts)
 
-Example: Creating a new SLO for a service
+## Creating a New SLO
+
+To add a new SLO for a service, create a PrometheusServiceLevel CRD:
 
 ```yaml
-# slo/definitions/myapp.yaml
-version: "prometheus/v1"
-service: "myapp"
-labels:
-  team: "platform"
-  env: "monitoring"
+# k8s/sloth/crds/myapp-slo.yaml
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: myapp-slo
+  namespace: monitoring
+spec:
   service: "myapp"
-  namespace: "myapp"
-
-slos:
-  - name: "availability"
-    objective: 99.5
-    description: "Availability measures the ratio of successful requests (non-5xx) to total requests"
-    sli:
-      events:
-        error_query: |
-          sum(rate(request_duration_seconds_count{
-            app="myapp",
-            namespace="myapp",
-            job=~"microservices",
-            code=~"5.."
-          }[{{.window}}]))
-        total_query: |
-          sum(rate(request_duration_seconds_count{
-            app="myapp",
-            namespace="myapp",
-            job=~"microservices"
-          }[{{.window}}]))
-    alerting:
-      name: MyappHighErrorRate
-      # ... alert configuration
+  labels:
+    team: "platform"
+    env: "monitoring"
+    namespace: "myapp"
+  slos:
+    - name: "availability"
+      objective: 99.5
+      description: "Availability measures the ratio of successful requests (non-5xx) to total requests"
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(request_duration_seconds_count{
+              app="myapp",
+              namespace="myapp",
+              job=~"microservices",
+              code=~"5.."
+            }[{{.window}}]))
+          totalQuery: |
+            sum(rate(request_duration_seconds_count{
+              app="myapp",
+              namespace="myapp",
+              job=~"microservices"
+            }[{{.window}}]))
+      alerting:
+        name: MyappHighErrorRate
+        labels:
+          category: "availability"
+        annotations:
+          summary: "High error rate on myapp service"
+        pageAlert:
+          labels:
+            severity: critical
+        ticketAlert:
+          labels:
+            severity: warning
 ```
+
+Apply the CRD:
+
+```bash
+kubectl apply -f k8s/sloth/crds/myapp-slo.yaml
+```
+
+The Sloth Operator will automatically:
+1. Validate the SLO definition
+2. Generate Prometheus recording rules
+3. Create PrometheusRule CRs
+4. Set up error budget tracking and alerts
 
 ## Verification
 
 ### Check Rules in Prometheus
 
 1. Open Prometheus UI: http://localhost:9090
-2. Go to Status → Rules
-3. Verify SLO rules are loaded
+2. Go to **Status → Rules**
+3. Look for rule groups like:
+   - `sloth-slo-sli-recordings-auth-availability`
+   - `sloth-slo-meta-recordings-auth-availability`
+   - `sloth-slo-alerts-auth-availability`
 
 ### Check Metrics
 
-Query SLO metrics:
+Query SLO metrics in Prometheus:
 
 ```promql
-# SLI error ratio
-slo:sli_error:ratio_rate5m{service="auth"}
+# SLI error ratio (5-minute window)
+slo:sli_error:ratio_rate5m{sloth_service="auth"}
 
 # Error budget remaining
-slo:error_budget_remaining:ratio{service="auth"}
+slo:error_budget_remaining:ratio{sloth_service="auth"}
 
 # Burn rate
-slo:error_budget_burn_rate:ratio{service="auth"}
+slo:current_burn_rate:ratio{sloth_service="auth"}
+
+# List all SLO services
+count by (sloth_service) (slo:sli_error:ratio_rate5m)
 ```
 
 ### Check Alerts
 
 1. Open Prometheus UI: http://localhost:9090
-2. Go to Alerts
-3. Look for alerts like:
-   - `AuthHighErrorRate`
-   - `UserHighLatency`
-   - etc.
+2. Go to **Alerts**
+3. Look for Sloth-generated alerts:
+   - `AuthHighErrorRate` (Page)
+   - `AuthHighErrorRate` (Ticket)
+   - Similar alerts for other services
 
 ## Troubleshooting
 
-### Rules Not Loading
+### Sloth Operator Not Running
 
-**Problem**: Prometheus shows "No rules found"
+**Problem**: Operator pod is not starting
 
 **Solution**:
-1. Check ConfigMap exists:
+```bash
+# Check operator status
+kubectl get pods -n monitoring -l app.kubernetes.io/name=sloth
+kubectl logs -n monitoring -l app.kubernetes.io/name=sloth
+
+# Check Helm release
+helm list -n monitoring | grep sloth
+
+# Reinstall if needed
+helm uninstall sloth -n monitoring
+./scripts/08-deploy-slo.sh
+```
+
+### PrometheusServiceLevel Not Reconciling
+
+**Problem**: CRD applied but rules not generated
+
+**Solution**:
+```bash
+# Check PrometheusServiceLevel status
+kubectl describe prometheusservicelevel auth-slo -n monitoring
+
+# Check operator logs for errors
+kubectl logs -n monitoring -l app.kubernetes.io/name=sloth | grep -i error
+
+# Check if PrometheusRule was created
+kubectl get prometheusrules -n monitoring | grep auth
+```
+
+### Rules Not Loading in Prometheus
+
+**Problem**: PrometheusRules exist but Prometheus shows "No rules found"
+
+**Solution**:
+1. Check if Prometheus is configured to discover PrometheusRule CRs:
    ```bash
-   kubectl get configmap prometheus-slo-rules -n monitoring
+   kubectl logs deployment/prometheus -n monitoring | grep -i rule
    ```
-2. Check Prometheus logs:
+2. **Note**: This project uses standalone Prometheus (not Prometheus Operator), so PrometheusRule CRs are not automatically discovered. The Sloth Operator generates rules, but they need to be manually extracted or the Prometheus setup needs to be updated to support rule discovery.
+
+3. Alternative: Check if rules are in ConfigMaps:
    ```bash
-   kubectl logs deployment/prometheus -n monitoring
+   kubectl get configmap -n monitoring | grep rule
    ```
-3. Verify rule file path in Prometheus config
 
 ### Metrics Not Appearing
 
@@ -192,18 +258,25 @@ slo:error_budget_burn_rate:ratio{service="auth"}
    ```promql
    request_duration_seconds_count{app="auth", job=~"microservices"}
    ```
-2. Check time range (SLOs need 30 days of data for full accuracy)
-3. Verify labels match in SLO definition
+2. Check time range (SLOs need data to calculate ratios)
+3. Verify labels match in PrometheusServiceLevel definition:
+   ```bash
+   kubectl get prometheusservicelevel auth-slo -n monitoring -o yaml
+   ```
 
-### Validation Errors
+### CRD Validation Errors
 
-**Problem**: `sloth validate` fails
+**Problem**: `kubectl apply` fails with validation errors
 
 **Solution**:
-1. Check YAML syntax
-2. Verify all required fields are present
+1. Check YAML syntax and indentation
+2. Verify all required fields are present (see example above)
 3. Check PromQL query syntax
-4. Ensure metric names exist
+4. Ensure metric names and labels exist in your Prometheus
+5. Review Sloth CRD schema:
+   ```bash
+   kubectl explain prometheusservicelevel.spec.slos
+   ```
 
 ## Next Steps
 

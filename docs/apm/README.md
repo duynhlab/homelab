@@ -184,7 +184,7 @@ Trace-IDs are:
 
 ### Grafana
 ```bash
-kubectl port-forward -n monitoring svc/grafana 3000:3000
+kubectl port-forward -n monitoring svc/grafana-service 3000:3000
 # Open http://localhost:3000
 ```
 

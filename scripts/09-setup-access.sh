@@ -13,9 +13,9 @@ sleep 2
 # Start port forwards
 echo "Starting port forwards..."
 
-# Grafana
+# Grafana (operator managed)
 echo "Starting Grafana port forward (3000)..."
-kubectl port-forward -n monitoring svc/grafana 3000:3000 > /dev/null 2>&1 &
+kubectl port-forward -n monitoring svc/grafana-service 3000:3000 > /dev/null 2>&1 &
 
 # Prometheus
 echo "Starting Prometheus port forward (9090)..."
@@ -33,7 +33,7 @@ echo ""
 echo "✅ Port forwarding setup complete!"
 echo ""
 echo "Access URLs:"
-echo "📊 Grafana:    http://localhost:3000 (admin/admin)"
+echo "📊 Grafana:    http://localhost:3000 (anonymous access enabled)"
 echo "📈 Prometheus: http://localhost:9090"
 echo "🔧 User API:   http://localhost:8081/api/v1/users"
 echo ""

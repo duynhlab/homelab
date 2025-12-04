@@ -1,0 +1,41 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: Grafana
+metadata:
+  name: grafana
+  namespace: monitoring
+  labels:
+    dashboards: grafana
+spec:
+  config:
+    log:
+      mode: console
+    auth:
+      disable_login_form: true
+    auth.anonymous:
+      enabled: true
+      org_role: Admin
+    users:
+      default_theme: dark
+  deployment:
+    spec:
+      replicas: 1
+      template:
+        spec:
+          containers:
+            - name: grafana
+              image: grafana/grafana:latest
+              imagePullPolicy: IfNotPresent
+  service:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      type: ClusterIP
+      ports:
+        - name: http
+          port: 3000
+          targetPort: 3000
+          protocol: TCP
+  ingress:
+    enabled: false
+

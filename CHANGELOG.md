@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
-## [0.4.0] - 2025-01-06
+## [0.4.1] - 2025-12-04
+
+### Fixed
+- **Grafana Operator Deployment**:
+  - Fixed `BadRequest` error in `k8s/grafana-operator/grafana.yaml`: Removed unsupported `spec.ingress.enabled` field
+  - The Grafana Operator `v1beta1` API does not support the `ingress` field; ingress configuration should be managed separately if needed
+  - For local development, port-forwarding is used instead: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`
+- **Monitoring Deployment Script**:
+  - Fixed typo in `scripts/03-deploy-monitoring.sh` line 2: `Aset -euo pipefail` → `set -euo pipefail`
+  - This typo was causing the script to fail immediately with "command not found" error
+
+## [0.4.0] - 2025-12-03
 
 ### Changed
 - **Project Naming Cleanup**:
@@ -33,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `scripts/02-install-metrics.sh` now installs kube-state-metrics and metrics-server via their Helm charts with versioned values in `k8s/metrics/`
   - `scripts/03-deploy-monitoring.sh` ensures the `monitoring` namespace exists before applying Prometheus and Grafana Operator resources
   - `docs/getting-started/SETUP.md` updated to reflect the Helm-based workflow
+- **Helm & Documentation Fixes**:
+  - Updated the Helm release workflow summary to instruct `helm install auth ...` (matching the new service naming convention)
+  - Cleaned `.claude/skills/devops/SKILL.md` by fixing the `Docker Basics` heading formatting artifact
 
 ## [0.3.1] - 2025-12-02
 

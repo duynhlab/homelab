@@ -66,9 +66,22 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
     - Endpoints, models, examples
     - Health checks and metrics
 
+### 🔍 Application Performance Monitoring (APM)
+
+16. **[APM Overview](./apm/README.md)** - Complete APM system overview
+    - Distributed tracing with Tempo
+    - Continuous profiling with Pyroscope
+    - Log aggregation with Loki + Vector
+    - Grafana Operator datasource integration
+
+17. **[APM Architecture](./apm/ARCHITECTURE.md)** - System architecture
+18. **[Distributed Tracing](./apm/TRACING.md)** - Tempo integration guide
+19. **[Continuous Profiling](./apm/PROFILING.md)** - Pyroscope setup
+20. **[Log Aggregation](./apm/LOGGING.md)** - Loki + Vector configuration
+
 ### 🚦 Load Testing
 
-15. **[k6 Load Testing](./load-testing/K6_LOAD_TESTING.md)** - Load testing setup
+21. **[k6 Load Testing](./load-testing/K6_LOAD_TESTING.md)** - Load testing setup
     - Multiple scenarios
     - Deployment configurations
     - Monitoring load tests
@@ -99,6 +112,13 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 ### API
 - [API Reference](./api/API_REFERENCE.md) - Complete API documentation
 
+### APM
+- [APM Overview](./apm/README.md) - Complete APM system overview
+- [APM Architecture](./apm/ARCHITECTURE.md) - System architecture
+- [Distributed Tracing](./apm/TRACING.md) - Tempo integration
+- [Continuous Profiling](./apm/PROFILING.md) - Pyroscope setup
+- [Log Aggregation](./apm/LOGGING.md) - Loki + Vector
+
 ### Load Testing
 - [k6 Load Testing](./load-testing/K6_LOAD_TESTING.md) - Load testing guide
 
@@ -118,7 +138,9 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 - **32 Grafana Panels** - Complete monitoring dashboard
 - **6 Custom Metrics** - Application-level metrics
 - **9 Microservices** - All services with v1/v2 APIs
-- **SLO System** - Error budgets and burn rate alerts
+- **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
+- **APM Stack** - Tempo (tracing), Pyroscope (profiling), Loki + Vector (logging)
+- **k6 Load Testing** - Helm-managed load generators
 
 ### Common Tasks
 
@@ -130,7 +152,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 ./scripts/04-deploy-apm.sh               # Step 4: APM (BEFORE apps)
 ./scripts/05-build-microservices.sh      # Step 5: Build images
 ./scripts/06-deploy-microservices.sh --local   # Step 6: Deploy (uses local Helm chart)
-./scripts/07-deploy-k6-testing.sh        # Step 7: Load testing (AFTER apps)
+./scripts/07-deploy-k6.sh               # Step 7: Load testing (AFTER apps)
 ./scripts/08-deploy-slo.sh               # Step 8: SLO system
 ./scripts/09-setup-access.sh             # Step 9: Access setup
 ```
@@ -147,8 +169,6 @@ helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-
 
 **Deploy SLOs:**
 ```bash
-./scripts/08a-validate-slo.sh
-./scripts/08b-generate-slo-rules.sh
 ./scripts/08-deploy-slo.sh
 ```
 
@@ -167,5 +187,5 @@ helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-
 
 ---
 
-**Last Updated**: November 2024
+**Last Updated**: December 2025
 

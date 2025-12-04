@@ -169,27 +169,27 @@ graph TB
     B -->|Creates| T1[Root Span<br/>HTTP Request]
     C -->|Creates| T2[Web Span<br/>layer=web]
     D -->|Creates| T3[Logic Span<br/>layer=logic]
-    T1 --> T2
-    T2 --> T3
-    T3 --> TEMPO[Tempo<br/>OTLP HTTP]
+        T1 --> T2
+        T2 --> T3
+        T3 --> TEMPO[Tempo<br/>OTLP HTTP]
     
     B -->|Emits| L1[Request Log<br/>trace-id]
     C -->|Emits| L2[Handler Log<br/>trace-id]
     D -->|Emits| L3[Business Log<br/>trace-id]
-    L1 --> VECTOR[Vector<br/>Log Collector]
-    L2 --> VECTOR
-    L3 --> VECTOR
-    VECTOR --> LOKI[Loki<br/>Log Storage]
+        L1 --> VECTOR[Vector<br/>Log Collector]
+        L2 --> VECTOR
+        L3 --> VECTOR
+        VECTOR --> LOKI[Loki<br/>Log Storage]
     
     B -->|Collects| M1[HTTP Metrics<br/>duration, total, in_flight]
-    M1 --> PROM[Prometheus<br/>Scrape /metrics]
+        M1 --> PROM[Prometheus<br/>Scrape /metrics]
     
     B -->|Profiles| P1[CPU Profile]
     C -->|Profiles| P2[Heap Profile]
     D -->|Profiles| P3[Goroutine Profile]
-    P1 --> PYRO[Pyroscope<br/>Continuous Profiling]
-    P2 --> PYRO
-    P3 --> PYRO
+        P1 --> PYRO[Pyroscope<br/>Continuous Profiling]
+        P2 --> PYRO
+        P3 --> PYRO
     
     style A fill:#f9f9f9
     style B fill:#f9f9f9

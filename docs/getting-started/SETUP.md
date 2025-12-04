@@ -420,7 +420,7 @@ If NodePort doesn't work (WSL2/Windows issues):
 
 ```bash
 # Forward Grafana
-kubectl port-forward svc/grafana 3000:3000 -n monitoring &
+kubectl port-forward svc/grafana-service 3000:3000 -n monitoring &
 
 # Forward Prometheus
 kubectl port-forward svc/prometheus 9090:9090 -n monitoring &

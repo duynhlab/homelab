@@ -176,7 +176,7 @@ kubectl port-forward -n order svc/order 8084:8080 &
 kubectl port-forward -n cart svc/cart 8085:8080 &
 
 # Access monitoring
-kubectl port-forward -n monitoring svc/grafana 3000:3000 &
+kubectl port-forward -n monitoring svc/grafana-service 3000:3000 &
 kubectl port-forward -n monitoring svc/prometheus 9090:9090 &
 
 # Access APM services (after Step 17)
@@ -527,8 +527,8 @@ MyMetric.WithLabelValues("value").Inc()
 ### Modify Dashboard
 
 - Edit `grafana-dashboard.json`
-- Update ConfigMap: `kubectl create configmap grafana-dashboard-json --from-file=...`
-- Restart Grafana: `kubectl rollout restart deployment grafana -n monitoring`
+- Reapply dashboards via operator: `./scripts/10-reload-dashboard.sh`
+- Port-forward Grafana: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`
 
 ---
 
@@ -567,7 +567,7 @@ kubectl rollout restart deployment -n auth -l app=auth
 pkill -f "kubectl port-forward"
 
 # Restart port forwarding
-kubectl port-forward -n monitoring svc/grafana 3000:3000 &
+kubectl port-forward -n monitoring svc/grafana-service 3000:3000 &
 kubectl port-forward -n monitoring svc/prometheus 9090:9090 &
 kubectl port-forward -n user svc/user 8081:8080 &
 ```

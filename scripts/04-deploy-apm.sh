@@ -41,6 +41,6 @@ echo "  - Pyroscope (profiles)"
 echo "  - Loki (logs)"
 echo ""
 echo "Access Grafana to view APM dashboards:"
-echo "  kubectl port-forward -n monitoring svc/grafana 3000:3000"
+echo "  kubectl port-forward -n monitoring svc/grafana-service 3000:3000"
 echo "  Then open http://localhost:3000"
 

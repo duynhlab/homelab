@@ -37,7 +37,7 @@ monitoring/
 │   └── templates/
 ├── k8s/                   # Kubernetes manifests
 │   ├── prometheus/
-│   ├── grafana/
+│   ├── grafana-operator/
 │   ├── k6/
 │   ├── tempo/             # Grafana Tempo (distributed tracing)
 │   ├── pyroscope/         # Pyroscope (continuous profiling)
@@ -168,11 +168,12 @@ k8s/
 │   ├── deployment.yaml    # Prometheus deployment
 │   ├── service.yaml
 │   └── rbac.yaml         # RBAC for Prometheus ServiceAccount
-├── grafana/              # Grafana configuration
-│   ├── configmap-dashboards.yaml
-│   ├── configmap-datasources.yaml
-│   ├── deployment.yaml
-│   └── service.yaml
+├── grafana-operator/     # Grafana Operator resources
+│   ├── README.md         # Helm install instructions
+│   ├── values.yaml       # Operator Helm values
+│   ├── grafana.yaml      # Grafana CR (anonymous auth, dark theme)
+│   ├── datasource-prometheus.yaml
+│   └── dashboards/       # Kustomize (ConfigMap + GrafanaDashboard CRs)
 ├── k6/                   # Load testing (scripts and deployments)
 │   ├── load-test.js
 │   ├── load-test-multiple-scenarios.js
@@ -181,7 +182,7 @@ k8s/
 └── namespaces.yaml        # Namespace definitions
 ```
 
-**Note**: Microservices are deployed via Helm chart (`charts/`), not raw YAML manifests.
+**Note**: Microservices are deployed via Helm chart (`charts/`), not raw YAML manifests. Grafana is managed via the Grafana Operator (`k8s/grafana-operator/`).
 
 **Namespaces**:
 - `monitoring` - Monitoring components (Prometheus, Grafana, k6, Tempo, Pyroscope, Loki) and SLO system
@@ -200,7 +201,7 @@ Numbered scripts (01-12) for deployment and operations:
 - `02-install-metrics.sh` - Install metrics infrastructure (kube-state-metrics, etc.)
 
 **Monitoring Stack (05):**
-- `03-deploy-monitoring.sh` - Deploy Prometheus and Grafana (deploy BEFORE apps to collect metrics immediately)
+- `03-deploy-monitoring.sh` - Deploy Prometheus and install Grafana Operator (BEFORE apps to collect metrics immediately)
 
 **APM Stack (14-17) - Required:**
 - `04a-deploy-tempo.sh` - Deploy Grafana Tempo (distributed tracing)
@@ -224,7 +225,7 @@ Numbered scripts (01-12) for deployment and operations:
 - `09-setup-access.sh` - Setup port-forwarding for services
 
 **Utilities:**
-- `10-reload-dashboard.sh` - Reload Grafana dashboard ConfigMap
+- `10-reload-dashboard.sh` - Reapply Grafana Operator dashboards (microservices + SLO)
 - `11-diagnose-latency.sh` - Diagnostic script for latency issues
 - `12-error-budget-alert.sh` - Error budget alert response script
 - `cleanup.sh` - Clean up Kind cluster and resources
@@ -273,8 +274,8 @@ Numbered scripts (01-12) for deployment and operations:
 | Helm Chart | Microservices deployment chart | `charts/` |
 | Helm Values | Per-service configuration | `charts/values/*.yaml` |
 | Prometheus Config | Scrape configs, rule files | `k8s/prometheus/configmap.yaml` |
-| Grafana Datasources | Prometheus datasource | `k8s/grafana/configmap-datasources.yaml` |
-| Grafana Dashboards | Dashboard provisioning | `k8s/grafana/configmap-dashboards.yaml` |
+| Grafana Datasources | Prometheus datasource | `k8s/grafana-operator/datasource-prometheus.yaml` |
+| Grafana Dashboards | Operator-managed dashboards (microservices + SLO) | `k8s/grafana-operator/dashboards/` |
 | Dockerfile | Unified build for all services | `services/Dockerfile` |
 | Go Modules | Go dependencies | `services/go.mod` |
 
@@ -298,7 +299,7 @@ Numbered scripts (01-12) for deployment and operations:
   - `$namespace` - Multi-select namespace filter (with regex to exclude kube-* and default namespaces)
   - `$rate` - Rate interval selector (1m, 2m, 3m, 5m, 10m, 30m, 1h, 2h, 4h, 8h, 16h, 1d, 2d, 3d, 5d, 7d) - default: 5m
   - `$DS_PROMETHEUS` - Prometheus datasource selector
-- **Access**: http://localhost:3000/d/microservices-monitoring-001/ (after port-forward: `kubectl port-forward -n monitoring svc/grafana 3000:3000`)
+- **Access**: http://localhost:3000/d/microservices-monitoring-001/ (after port-forward: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`)
 
 ### Script Files by Category
 
@@ -383,29 +384,25 @@ Numbered scripts (01-12) for deployment and operations:
 
 ### Updating Grafana Dashboard
 
-1. **Edit dashboard:**
-   - Edit `grafana-dashboard.json`
-   - Validate JSON syntax
-   - Dashboard structure: 32 panels in 5 row groups (see Dashboard Files section above)
+1. **Edit dashboard JSON:**
+   - Update `grafana-dashboard.json` (32 panels / 5 row groups).
+   - Keep UID `microservices-monitoring-001`.
 
-2. **Reload dashboard:**
+2. **Reload dashboards via Grafana Operator:**
    ```bash
    ./scripts/10-reload-dashboard.sh
    ```
-   This script updates the ConfigMap and restarts Grafana to load the new dashboard.
+   The script reapplies `k8s/grafana-operator/dashboards/` (ConfigMap + `GrafanaDashboard` CR). The Grafana Operator automatically reconciles the new JSON.
 
 3. **Verify:**
-   - Port-forward Grafana: `kubectl port-forward -n monitoring svc/grafana 3000:3000`
-   - Open http://localhost:3000
-   - Navigate to dashboard UID: `microservices-monitoring-001`
-   - Or use direct link: http://localhost:3000/d/microservices-monitoring-001/
+   - Port-forward Grafana: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`
+   - Open http://localhost:3000/d/microservices-monitoring-001/
 
 **Dashboard Variables Usage:**
-- Use `$app` to filter by service (e.g., select "auth" to see only auth service metrics)
-- Use `$namespace` to filter by Kubernetes namespace (e.g., select "auth" namespace to see only auth namespace pods)
-- Use `$rate` to adjust rate calculation interval (default: 5m, use longer intervals like 1h or 1d for smoother graphs over longer time periods)
-- All panels automatically respect these variable filters
-- Variables are located at the top of the dashboard for easy access
+- `$app`: filter by service
+- `$namespace`: filter by Kubernetes namespace
+- `$rate`: Prometheus rate interval selector (default 5m)
+- All panels respect these filters automatically.
 
 ### Modifying Prometheus Configuration
 
@@ -468,8 +465,9 @@ Numbered scripts (01-12) for deployment and operations:
 ### Troubleshooting Common Issues
 
 **Dashboard not updating:**
-- Restart Grafana: `kubectl rollout restart deployment/grafana -n monitoring`
-- Check ConfigMap: `kubectl get configmap grafana-dashboard-json -n monitoring`
+- Re-apply dashboards: `kubectl apply -k k8s/grafana-operator/dashboards/`
+- Check GrafanaDashboard status: `kubectl get grafanadashboards -n monitoring`
+- Inspect Grafana Operator logs: `kubectl logs -n monitoring deployment/grafana-operator`
 
 **Prometheus not scraping:**
 - Check ServiceMonitor: `kubectl get servicemonitor -n {namespace}` (check in each service namespace)
@@ -543,7 +541,7 @@ Numbered scripts (01-12) for deployment and operations:
 |---------|---------|
 | `kubectl get pods -n {namespace}` | List pods in namespace (e.g., auth, user, monitoring) |
 | `kubectl logs -l app={service-name} -n {namespace}` | View service logs |
-| `kubectl port-forward -n monitoring svc/grafana 3000:3000` | Port-forward Grafana |
+| `kubectl port-forward -n monitoring svc/grafana-service 3000:3000` | Port-forward Grafana |
 | `kubectl port-forward -n monitoring svc/prometheus 9090:9090` | Port-forward Prometheus |
 | `kubectl rollout restart deployment/{name} -n {namespace}` | Restart deployment |
 
@@ -640,9 +638,9 @@ Numbered scripts (01-12) for deployment and operations:
 - SLO definition: `slo/definitions/{service}.yaml`
 
 **Update monitoring:**
-- Dashboard: `grafana-dashboard.json` (32 panels, 5 row groups, UID: microservices-monitoring-001)
+- Dashboard JSON: `grafana-dashboard.json` (32 panels, 5 row groups, UID: microservices-monitoring-001)
 - Prometheus config: `k8s/prometheus/configmap.yaml`
-- Grafana config: `k8s/grafana/configmap-*.yaml`
+- Grafana Operator resources: `k8s/grafana-operator/` (Grafana CR, datasource, dashboards)
 
 **Modify SLOs:**
 - Definitions: `slo/definitions/*.yaml`

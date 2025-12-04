@@ -31,7 +31,7 @@ chmod +x scripts/*.sh
 ./scripts/06-deploy-microservices.sh
 
 # Step 7: Deploy k6 load testing (AFTER apps to test them)
-./scripts/07-deploy-k6-testing.sh
+./scripts/07-deploy-k6.sh
 
 # Step 8: Deploy SLO system (Required for SRE practices)
 ./scripts/08-deploy-slo.sh
@@ -107,9 +107,9 @@ kubectl get nodes
 ```
 
 **What it does:**
-- Installs `kube-state-metrics` - Exposes K8s object metrics
-- Installs `metrics-server` - Provides resource usage data
-- Patches metrics-server for Kind compatibility
+- Installs `kube-state-metrics` (via `prometheus-community/kube-state-metrics` Helm chart) to expose Kubernetes object metrics
+- Installs `metrics-server` (via `metrics-server/metrics-server` Helm chart) with `--kubelet-insecure-tls` for Kind clusters
+- Ensures both components run in the `kube-system` namespace
 
 **Verify:**
 ```bash
@@ -126,10 +126,9 @@ kubectl get pods -n kube-system | grep -E "(kube-state|metrics-server)"
 ```
 
 **What it does:**
-- Deploys Prometheus with RBAC permissions
-- Deploys Grafana with auto-provisioning
-- Creates ConfigMaps for dashboards and datasources
-- Configures Prometheus scrape configs
+- Deploys Prometheus (RBAC + scrape configs)
+- Installs the Grafana Operator and reconciles Grafana (anonymous auth, dark theme) plus the Prometheus datasource
+- Auto-provisions the microservices + Sloth SLO dashboards via `GrafanaDashboard` CRs (no manual imports)
 
 **Why before apps:** Prometheus needs to be ready to collect metrics immediately when apps start.
 
@@ -157,7 +156,7 @@ curl http://localhost:3000/api/health
 - Deploys Grafana Tempo (distributed tracing)
 - Deploys Pyroscope (continuous profiling)
 - Deploys Loki + Vector (log aggregation)
-- Updates Grafana datasources
+- Creates Grafana Operator datasources (Tempo, Loki, Pyroscope)
 
 **Why before apps:** APM components need to be ready BEFORE apps start to:
 - Receive traces from Tempo endpoint (`http://tempo.monitoring.svc.cluster.local:4318`)
@@ -238,20 +237,26 @@ kubectl get svc -n product
 ### Step 7: Deploy k6 Load Testing
 
 ```bash
-./scripts/07-deploy-k6-testing.sh
+# Deploy all k6 variants (default)
+./scripts/07-deploy-k6.sh
+
+# Or deploy specific variant:
+# ./scripts/07-deploy-k6.sh legacy
+# ./scripts/07-deploy-k6.sh scenarios
 ```
 
 **What it does:**
-- Deploys k6 load generators (legacy and multiple scenarios)
-- Creates ConfigMap with k6 test scripts
+- Deploys k6 load generators via Helm (k6-legacy, k6-scenarios)
+- Creates `k6` namespace
 - Generates continuous load on all services
 
 **Why after apps:** k6 needs applications to exist before it can generate load.
 
 **Verify:**
 ```bash
-kubectl get pods -n monitoring -l 'app in (k6-load-generator-legacy,k6-load-generator-scenarios)'
-kubectl logs -n monitoring -l app=k6-load-generator-legacy
+kubectl get pods -n k6
+kubectl logs -n k6 -l app=k6-legacy -f
+kubectl logs -n k6 -l app=k6-scenarios -f
 ```
 
 ---
@@ -263,17 +268,23 @@ kubectl logs -n monitoring -l app=k6-load-generator-legacy
 ```
 
 **What it does:**
-- Validates SLO definition files
-- Generates Prometheus recording rules using Sloth
-- Deploys SLO rules to Prometheus
-- Sets up error budget tracking
+- Installs Sloth Operator via Helm (`sloth/sloth` chart v0.15.0)
+- Applies PrometheusServiceLevel CRDs (9 services)
+- Automatically generates Prometheus recording rules
+- Sets up error budget tracking via Kubernetes-native SLO management
 
 **Why after monitoring and apps:** SLO system needs Prometheus and metrics data to work.
 
 **Verify:**
 ```bash
-kubectl get configmap -n monitoring | grep prometheus-slo-rules
-# Expected: SLO rules ConfigMaps created
+# Check Sloth Operator
+kubectl get pods -n monitoring -l app.kubernetes.io/name=sloth
+
+# Check PrometheusServiceLevel CRDs
+kubectl get prometheusservicelevels -n monitoring
+
+# Check generated PrometheusRules
+kubectl get prometheusrules -n monitoring
 
 # Check Prometheus rules
 kubectl port-forward -n monitoring svc/prometheus 9090:9090 &
@@ -420,7 +431,7 @@ If NodePort doesn't work (WSL2/Windows issues):
 
 ```bash
 # Forward Grafana
-kubectl port-forward svc/grafana 3000:3000 -n monitoring &
+kubectl port-forward svc/grafana-service 3000:3000 -n monitoring &
 
 # Forward Prometheus
 kubectl port-forward svc/prometheus 9090:9090 -n monitoring &
@@ -492,16 +503,15 @@ kubectl rollout restart deployment grafana -n monitoring
 
 ### Automatic (k6 Deployment)
 
-k6 load generators run continuously:
+k6 load generators run continuously in the `k6` namespace:
 
 ```bash
 # Check k6 pods
-kubectl get pods -n auth
-kubectl get pods -n user
-kubectl get pods -n product -l app=k6-load-generator
+kubectl get pods -n k6
 
 # View logs
-kubectl logs -n monitoring -l app=k6-load-generator
+kubectl logs -n k6 -l app=k6-legacy -f
+kubectl logs -n k6 -l app=k6-scenarios -f
 ```
 
 ### Manual Testing

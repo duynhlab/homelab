@@ -130,7 +130,7 @@ Logs are stored in Loki with labels:
 
 1. Port-forward Grafana:
    ```bash
-   kubectl port-forward -n monitoring svc/grafana 3000:3000
+   kubectl port-forward -n monitoring svc/grafana-service 3000:3000
    ```
 
 2. Open Grafana: http://localhost:3000

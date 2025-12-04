@@ -16,13 +16,15 @@ echo "Deploying Pyroscope..."
 echo "Deploying Loki and Vector..."
 ./scripts/04c-deploy-loki.sh
 
-# Update Grafana datasources
-echo "Updating Grafana datasources..."
-kubectl apply -f k8s/grafana/configmap-datasources.yaml
-kubectl rollout restart deployment/grafana -n monitoring
+# Apply APM datasources to Grafana Operator
+echo "Applying APM datasources to Grafana Operator..."
+kubectl apply -f k8s/grafana-operator/datasource-tempo.yaml
+kubectl apply -f k8s/grafana-operator/datasource-loki.yaml
+kubectl apply -f k8s/grafana-operator/datasource-pyroscope.yaml
 
-echo "Waiting for Grafana to restart..."
-kubectl wait --for=condition=available --timeout=300s deployment/grafana -n monitoring
+echo "Waiting for datasources to sync..."
+sleep 5
+kubectl get grafanadatasource -n monitoring
 
 echo ""
 echo "=========================================="
@@ -35,12 +37,12 @@ echo "  - Pyroscope (Profiling): http://pyroscope.monitoring.svc.cluster.local:4
 echo "  - Loki (Logs): http://loki.monitoring.svc.cluster.local:3100"
 echo "  - Vector (Log Collection): Running as DaemonSet"
 echo ""
-echo "Grafana datasources have been updated with:"
+echo "Grafana datasources created via Grafana Operator:"
 echo "  - Tempo (traces)"
 echo "  - Pyroscope (profiles)"
 echo "  - Loki (logs)"
 echo ""
 echo "Access Grafana to view APM dashboards:"
-echo "  kubectl port-forward -n monitoring svc/grafana 3000:3000"
+echo "  kubectl port-forward -n monitoring svc/grafana-service 3000:3000"
 echo "  Then open http://localhost:3000"
 

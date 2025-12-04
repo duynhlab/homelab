@@ -1,0 +1,14 @@
+# Values for metrics-server
+# Installed via scripts/02-install-metrics.sh (Helm)
+
+args:
+  - --kubelet-insecure-tls
+  - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+
+# Ensure we deploy into kube-system
+rbac:
+  create: true
+
+serviceAccount:
+  create: true
+

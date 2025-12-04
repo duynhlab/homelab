@@ -1,3 +1,4 @@
+{{- if .Values.service.enabled | default true }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -14,4 +15,5 @@ spec:
       targetPort: {{ .Values.service.targetPort }}
       protocol: TCP
       name: http
+{{- end }}
 

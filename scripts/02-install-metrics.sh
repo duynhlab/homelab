@@ -1,37 +1,39 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-echo "=== Installing Metrics Infrastructure ==="
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Install kube-state-metrics
-echo "1. Installing kube-state-metrics..."
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/kube-state-metrics/master/examples/standard/service-account.yaml
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/kube-state-metrics/master/examples/standard/cluster-role.yaml
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/kube-state-metrics/master/examples/standard/cluster-role-binding.yaml
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/kube-state-metrics/master/examples/standard/deployment.yaml
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/kube-state-metrics/master/examples/standard/service.yaml
+echo "=== Installing Metrics Infrastructure (Helm) ==="
 
-# Install metrics-server
-echo "2. Installing metrics-server..."
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+if ! command -v helm >/dev/null 2>&1; then
+  echo "❌ Helm is required. Please install Helm v3+ and rerun this script."
+  exit 1
+fi
 
-# Patch metrics-server for Kind (insecure TLS)
-echo "Patching metrics-server for Kind..."
-kubectl patch deployment metrics-server -n kube-system --type='json' \
-  -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
+echo "Adding/Updating Helm repositories..."
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
+helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/ >/dev/null 2>&1 || true
+helm repo update >/dev/null
 
-# Wait for kube-state-metrics
+echo "1. Installing kube-state-metrics (Helm)..."
+helm upgrade --install kube-state-metrics prometheus-community/kube-state-metrics \
+  --namespace kube-system \
+  -f "${ROOT_DIR}/k8s/metrics/kube-state-metrics-values.yaml"
+
+echo "2. Installing metrics-server (Helm)..."
+helm upgrade --install metrics-server metrics-server/metrics-server \
+  --namespace kube-system \
+  -f "${ROOT_DIR}/k8s/metrics/metrics-server-values.yaml"
+
 echo "Waiting for kube-state-metrics..."
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=kube-state-metrics -n kube-system --timeout=120s || true
 
-# Wait for metrics-server
 echo "Waiting for metrics-server..."
-kubectl wait --for=condition=ready pod -l k8s-app=metrics-server -n kube-system --timeout=120s || true
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=metrics-server -n kube-system --timeout=120s || true
 
 echo ""
 echo "=== Metrics Infrastructure Status ==="
-kubectl get pods -n kube-system | grep -E "(kube-state-metrics|metrics-server)"
+kubectl get pods -n kube-system | grep -E "(kube-state-metrics|metrics-server)" || true
 
 echo ""
 echo "✓ Metrics infrastructure installed successfully!"
-

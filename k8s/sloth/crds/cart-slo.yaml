@@ -1,0 +1,130 @@
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: cart-slo
+  namespace: monitoring
+spec:
+  service: "cart"
+  labels:
+    team: "platform"
+    env: "monitoring"
+    service: "cart"
+    namespace: "cart"
+  slos:
+    # SLO 1: Availability (Success Rate - 5xx errors)
+    - name: "availability"
+      objective: 99.5
+      description: "Availability measures the ratio of successful requests (non-5xx) to total requests"
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(request_duration_seconds_count{
+              app="cart",
+              namespace="cart",
+              job=~"microservices",
+              code=~"5.."
+            }[{{.window}}]))
+          totalQuery: |
+            sum(rate(request_duration_seconds_count{
+              app="cart",
+              namespace="cart",
+              job=~"microservices"
+            }[{{.window}}]))
+      alerting:
+        name: CartHighErrorRate
+        labels:
+          severity: critical
+          category: availability
+          service: "cart"
+        annotations:
+          summary: "High 5xx error rate detected on cart"
+          description: "Availability SLO is at risk. Current error rate is impacting user cartentication."
+        pageAlert:
+          labels:
+            severity: page
+            channel: "#alerts"
+        ticketAlert:
+          labels:
+            severity: ticket
+            channel: "#incidents"
+
+    # SLO 2: Latency (P95 < 500ms)
+    - name: "latency"
+      objective: 95.0
+      description: "Latency measures the ratio of requests faster than 500ms to total requests"
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(request_duration_seconds_count{
+              app="cart",
+              namespace="cart",
+              job=~"microservices"
+            }[{{.window}}]))
+            -
+            sum(rate(request_duration_seconds_bucket{
+              app="cart",
+              namespace="cart",
+              job=~"microservices",
+              le="0.5"
+            }[{{.window}}]))
+          totalQuery: |
+            sum(rate(request_duration_seconds_count{
+              app="cart",
+              namespace="cart",
+              job=~"microservices"
+            }[{{.window}}]))
+      alerting:
+        name: CartHighLatency
+        labels:
+          severity: warning
+          category: latency
+          service: "cart"
+        annotations:
+          summary: "High latency detected on cart"
+          description: "More than 5% of requests are slower than 500ms threshold."
+        pageAlert:
+          labels:
+            severity: page
+            channel: "#alerts"
+        ticketAlert:
+          labels:
+            severity: ticket
+            channel: "#incidents"
+
+    # SLO 3: Overall Error Rate (4xx + 5xx)
+    - name: "error-rate"
+      objective: 99.0
+      description: "Error rate measures the ratio of successful requests (non-4xx/5xx) to total requests"
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(request_duration_seconds_count{
+              app="cart",
+              namespace="cart",
+              job=~"microservices",
+              code=~"4..|5.."
+            }[{{.window}}]))
+          totalQuery: |
+            sum(rate(request_duration_seconds_count{
+              app="cart",
+              namespace="cart",
+              job=~"microservices"
+            }[{{.window}}]))
+      alerting:
+        name: CartHighOverallErrorRate
+        labels:
+          severity: warning
+          category: errors
+          service: "cart"
+        annotations:
+          summary: "High overall error rate (4xx + 5xx) on cart"
+          description: "More than 1% of requests are returning errors."
+        pageAlert:
+          labels:
+            severity: page
+            channel: "#alerts"
+        ticketAlert:
+          labels:
+            severity: ticket
+            channel: "#incidents"
+

@@ -8,7 +8,7 @@ generatorOptions:
 configMapGenerator:
   - name: grafana-dashboard-main
     files:
-      - microservices-dashboard.json=../../grafana-dashboard.json
+      - microservices-dashboard.json=../../../grafana-dashboard.json
 
 resources:
   - grafana-dashboard-main.yaml

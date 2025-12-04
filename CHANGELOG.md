@@ -12,8 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Grafana Operator Deployment**:
   - Fixed `BadRequest` error in `k8s/grafana-operator/grafana.yaml`: Removed unsupported `spec.ingress.enabled` field
-  - The Grafana Operator `v1beta1` API does not support the `ingress` field; ingress configuration should be managed separately if needed
-  - For local development, port-forwarding is used instead: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`
+  - Fixed validation error: Changed boolean values to strings in `spec.config` section
+    - `disable_login_form: true` → `disable_login_form: "true"`
+    - `auth.anonymous.enabled: true` → `auth.anonymous.enabled: "true"`
+  - The Grafana Operator `v1beta1` API requires all config values to be strings, not native YAML booleans
+  - For local development, port-forwarding is used: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`
 - **Monitoring Deployment Script**:
   - Fixed typo in `scripts/03-deploy-monitoring.sh` line 2: `Aset -euo pipefail` → `set -euo pipefail`
   - This typo was causing the script to fail immediately with "command not found" error

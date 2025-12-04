@@ -30,9 +30,9 @@ echo "3. Applying Grafana CRDs (instance, datasource, dashboards)..."
 kubectl apply -f k8s/grafana-operator/grafana.yaml
 kubectl apply -f k8s/grafana-operator/datasource-prometheus.yaml
 kubectl apply -k k8s/grafana-operator/dashboards/
-echo "Waiting for Grafana Operator managed instance to be ready..."
+echo "Waiting for Grafana Operator and Grafana instance to be ready..."
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=grafana-operator -n monitoring --timeout=60s || true
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=grafana -n monitoring --timeout=60s || true
+kubectl wait --for=condition=ready pod -l app=grafana -n monitoring --timeout=60s || true
 
 # Check status
 echo ""

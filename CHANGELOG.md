@@ -7,6 +7,169 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.4.1] - 2025-12-05
+
+### Documentation Review and Updates
+
+**Context**: After significant architectural changes (K6 Helm deployment, Sloth Operator SLO management, APM deployment, Grafana Operator migration), all documentation needed comprehensive review and updates.
+
+**Changes**:
+
+1. **AGENTS.md** - Comprehensive review and updates
+   - Corrected outdated "Last Updated" date from 2024 to "December 5, 2025"
+   - Updated directory structure (`k8s/` section) to show correct hierarchy
+   - Fixed namespace conventions (added `k6` namespace)
+   - Updated deployment order and script references
+   - Removed deprecated K6 and bash SLO script references (`08a`, `08b`)
+   - Updated workflows for K6, SLO, and microservice management
+   - Updated "Quick Navigation" sections
+
+2. **docs/getting-started/SETUP.md** - Updated deployment workflows
+   - Changed script reference from `07-deploy-k6-testing.sh` to `07-deploy-k6.sh`
+   - Updated Step 4 description to mention "Grafana Operator datasources"
+   - Updated Step 7 (K6) to reflect Helm deployment with namespace `k6`
+   - Updated Step 8 (SLO) to describe Sloth Operator deployment via Helm
+   - Updated verification commands to use `prometheusservicelevels` and `prometheusrules`
+   - Updated load testing section to use `k6` namespace
+
+3. **docs/load-testing/K6_LOAD_TESTING.md** - K6 architecture updates
+   - Added "Architecture" section explaining Helm-based deployment
+   - Updated file structure to reflect new locations (`k6/`, `charts/values/`)
+   - Changed script reference to `07-deploy-k6.sh`
+   - Updated namespace references from `monitoring` to `k6`
+   - Added Helm release checking commands
+   - Updated troubleshooting section with Helm-specific commands
+
+4. **docs/slo/GETTING_STARTED.md** - Sloth Operator migration
+   - Rewritten to focus on Sloth Kubernetes Operator (v0.15.0)
+   - Added "Overview" and "Architecture" sections
+   - Removed manual Sloth CLI installation instructions
+   - Updated all workflows to use PrometheusServiceLevel CRDs
+   - Updated verification commands to check operator, CRDs, and generated rules
+   - Updated "Creating a New SLO" section with CRD YAML format
+   - Updated metric query examples to use `sloth_service` label
+   - Expanded troubleshooting section with operator-specific guidance
+
+5. **docs/slo/*.md** - SLO conceptual documentation
+   - Reviewed `SLI_DEFINITIONS.md` - No changes needed (implementation-agnostic)
+   - Reviewed `SLO_TARGETS.md` - No changes needed (implementation-agnostic)
+   - Reviewed `ALERTING.md` - No changes needed (implementation-agnostic)
+   - Reviewed `ERROR_BUDGET_POLICY.md` - No changes needed (implementation-agnostic)
+
+6. **docs/README.md** - Documentation index updates
+   - Updated script reference to `07-deploy-k6.sh`
+   - Simplified SLO deployment commands (removed `08a`, `08b` scripts)
+   - Added "APM" section with 5 documentation files
+   - Updated "Key Concepts" to mention Sloth Operator, APM Stack, and k6 Helm
+   - Updated "Last Updated" to "December 2025"
+
+7. **docs/apm/*.md** - APM documentation review
+   - Reviewed all 5 APM documentation files
+   - No changes needed - references to Grafana and datasources are implementation-agnostic
+
+**Impact**: All documentation now accurately reflects the current architecture and deployment workflows. Users can follow documentation without encountering outdated script names, incorrect namespaces, or deprecated commands.
+
+## [0.4.0] - 2025-12-04
+
+### Changed
+- **Dashboard File Consolidation**:
+  - Removed duplicate `grafana-dashboard.json` from root directory
+  - Dashboard source of truth is now `k8s/grafana-operator/dashboards/microservices-dashboard.json`
+  - Updated `scripts/10-reload-dashboard.sh` to remove unnecessary copy step
+  - Updated `AGENTS.md` documentation to reflect single dashboard file location
+  - Simplifies dashboard management by maintaining only one file
+- **Monitoring Deployment Script**:
+  - Added Grafana Operator CRDs status check to `scripts/03-deploy-monitoring.sh`
+  - Now displays `Grafana`, `GrafanaDatasource`, and `GrafanaDashboard` resources after deployment
+  - Fixed pod wait labels: `app.kubernetes.io/name=grafana-operator` for operator, `app=grafana` for Grafana instance
+  - Improved visibility of Grafana Operator managed resources
+- **APM Deployment Script Refactoring**:
+  - Updated `scripts/04-deploy-apm.sh` to use Grafana Operator datasources
+  - Created GrafanaDatasource CRs for APM stack: `datasource-tempo.yaml`, `datasource-loki.yaml`, `datasource-pyroscope.yaml`
+  - Removed dependency on legacy `k8s/grafana/` folder
+  - APM datasources now managed declaratively via Grafana Operator CRs
+  - Deleted empty `k8s/grafana/` folder
+- **Namespace Management**:
+  - Removed `monitoring` namespace from `k8s/namespaces.yaml`
+  - `monitoring` namespace is now created by `scripts/03-deploy-monitoring.sh` only
+  - Eliminates duplicate namespace creation and kubectl warnings
+- **DevContainer Configuration**:
+  - Added Go 1.23 feature to `.devcontainer/devcontainer.json`
+  - Ensures consistent Go version across development environments
+- **K6 Load Testing Refactoring**:
+  - Refactored k6 to use Helm chart (reuse `charts/` like microservices)
+  - Created unified `k6/Dockerfile` with ARG pattern (giống `services/Dockerfile`)
+  - Build 2 k6 images: `ghcr.io/duynhne/k6:legacy` and `ghcr.io/duynhne/k6:scenarios`
+  - Created Helm values: `charts/values/k6-legacy.yaml` and `charts/values/k6-scenarios.yaml`
+  - Updated Helm templates: conditional service creation and probes (`.enabled | default true`)
+  - New deployment script: `scripts/07-deploy-k6.sh` (replaces `07-deploy-k6-testing.sh`)
+  - K6 now deploys to dedicated `k6` namespace (separated from `monitoring`)
+  - Deleted old raw YAML deployments and ConfigMap-based approach
+  - Created separate GitHub Actions workflow `.github/workflows/build-k6-images.yml` for k6 builds
+  - Consistent deployment pattern across all services
+- **SLO System Refactoring**:
+  - Modernized SLO to use Sloth Operator v0.15.0 (Helm deployment)
+  - Replaced bash scripts with PrometheusServiceLevel CRDs (9 services)
+  - Operator automatically generates and deploys Prometheus rules
+  - Sloth dashboards already deployed via Grafana Operator (IDs 14348, 14643)
+  - Clean architecture: `k8s/sloth/{values.yaml, crds/, README.md}`
+  - Deleted `scripts/08a-validate-slo.sh`, `scripts/08b-generate-slo-rules.sh`
+  - New simple `scripts/08-deploy-slo.sh` wrapper script (Helm-based)
+  - Removed manual rule_files from Prometheus ConfigMap
+  - `slo/definitions/` kept as source of truth (backup reference)
+  - No more `slo/generated/` folder - Sloth Operator handles rule generation
+  - CRD-based, Kubernetes-native SLO management
+
+### Fixed
+- **Grafana Operator Deployment**:
+  - Fixed `BadRequest` error in `k8s/grafana-operator/grafana.yaml`: Removed unsupported `spec.ingress.enabled` field
+  - Fixed validation error: Changed boolean values to strings in `spec.config` section
+    - `disable_login_form: true` → `disable_login_form: "true"`
+    - `auth.anonymous.enabled: true` → `auth.anonymous.enabled: "true"`
+  - The Grafana Operator `v1beta1` API requires all config values to be strings, not native YAML booleans
+  - Fixed Kustomize security restriction for dashboard file:
+    - Copied `grafana-dashboard.json` to `k8s/grafana-operator/dashboards/microservices-dashboard.json`
+    - Updated `kustomization.yaml` to reference local file instead of parent directory
+    - Kustomize security policy prevents accessing files outside current directory tree
+  - Fixed `GrafanaDashboard` API validation errors in all dashboard CRs:
+    - Removed unsupported `spec.datasources[0].datasourceUid` field from 3 dashboard files
+    - `v1beta1` API only requires `datasourceName`, not `datasourceUid`
+    - Affected files: `grafana-dashboard-main.yaml`, `grafana-dashboard-slo-overview.yaml`, `grafana-dashboard-slo-detailed.yaml`
+  - For local development, port-forwarding is used: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`
+- **Monitoring Deployment Script**:
+  - Fixed typo in `scripts/03-deploy-monitoring.sh` line 2: `Aset -euo pipefail` → `set -euo pipefail`
+  - This typo was causing the script to fail immediately with "command not found" error
+
+## [0.4.0] - 2025-12-03
+
+### Changed
+- **Project Naming Cleanup**:
+  - Replaced all "demo" references with "monitoring" or appropriate values throughout the codebase
+  - Updated all 9 SLO definition files: changed `env: "demo"` → `env: "monitoring"`
+  - Updated Prometheus config: changed cluster name from `kind-monitoring-demo` → `kind-monitoring`
+  - Updated README.md: fixed dashboard title and replaced outdated `demo-loadtest` references with k6 load testing
+  - Updated documentation files: SETUP.md title, GETTING_STARTED.md examples, VARIABLES_REGEX.md patterns
+  - Updated archive files: GRAFANA_ANNOTATIONS_PLAN.md examples and namespace references
+  - Updated METRICS.md: replaced "demo" with "development" in environment descriptions
+- **AGENTS.md Dashboard Documentation**:
+  - Added comprehensive dashboard documentation section with structure, variables, and usage instructions
+  - Documented 32 panels in 5 row groups with detailed descriptions
+  - Added dashboard variables usage guide (`$app`, `$namespace`, `$rate`, `$DS_PROMETHEUS`)
+  - Enhanced "Updating Grafana Dashboard" workflow with variable usage examples
+- **Grafana Operator Migration**:
+  - Added `k8s/grafana-operator/` with Helm values, Grafana CR, Prometheus datasource CR, and dashboard manifests
+  - Provisioned Sloth SLO dashboards (IDs 14643 & 14348) via `GrafanaDashboard` CRs—no more manual import
+  - Updated scripts/03-deploy-monitoring.sh to install the operator and apply CRs automatically
+  - Deprecated legacy `k8s/grafana/` manifests and switched scripts/10-reload-dashboard.sh to reapply operator resources
+  - Updated documentation (`docs/slo/GETTING_STARTED.md`, `README.md`, `AGENTS.md`) to describe the operator-based workflow
+- **Metrics Infrastructure via Helm**:
+  - `scripts/02-install-metrics.sh` now installs kube-state-metrics and metrics-server via their Helm charts with versioned values in `k8s/metrics/`
+  - `scripts/03-deploy-monitoring.sh` ensures the `monitoring` namespace exists before applying Prometheus and Grafana Operator resources
+  - `docs/getting-started/SETUP.md` updated to reflect the Helm-based workflow
+- **Helm & Documentation Fixes**:
+  - Updated the Helm release workflow summary to instruct `helm install auth ...` (matching the new service naming convention)
+  - Cleaned `.claude/skills/devops/SKILL.md` by fixing the `Docker Basics` heading formatting artifact
+
 ## [0.3.1] - 2025-12-02
 
 ### Changed
@@ -27,19 +190,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 90% reduction in health check traffic (from ~200 to ~20 health checks per iteration cycle with 200 VUs)
   - Health checks are for monitoring, not load testing; Prometheus/Kubernetes probes already handle health monitoring
   - Cleaner Grafana metrics focused on actual business API endpoints
-- **Project Naming Cleanup**:
-  - Replaced all "demo" references with "monitoring" or appropriate values throughout the codebase
-  - Updated all 9 SLO definition files: changed `env: "demo"` → `env: "monitoring"`
-  - Updated Prometheus config: changed cluster name from `kind-monitoring-demo` → `kind-monitoring`
-  - Updated README.md: fixed dashboard title and replaced outdated `demo-loadtest` references with k6 load testing
-  - Updated documentation files: SETUP.md title, GETTING_STARTED.md examples, VARIABLES_REGEX.md patterns
-  - Updated archive files: GRAFANA_ANNOTATIONS_PLAN.md examples and namespace references
-  - Updated METRICS.md: replaced "demo" with "development" in environment descriptions
-- **AGENTS.md Dashboard Documentation**:
-  - Added comprehensive dashboard documentation section with structure, variables, and usage instructions
-  - Documented 32 panels in 5 row groups with detailed descriptions
-  - Added dashboard variables usage guide (`$app`, `$namespace`, `$rate`, `$DS_PROMETHEUS`)
-  - Enhanced "Updating Grafana Dashboard" workflow with variable usage examples
 
 ## [0.3.0] - 2025-12-02
 

@@ -58,10 +58,10 @@ data:
         encoding:
           codec: json
         labels:
-          service: "{{ service }}"
-          namespace: "{{ namespace }}"
-          pod: "{{ pod_name }}"
-          container: "{{ container_name }}"
+          service: "{{service}}"
+          namespace: "{{namespace}}"
+          pod: "{{pod_name}}"
+          container: "{{container_name}}"
         out_of_order_action: accept
         batch:
           max_bytes: 3145728

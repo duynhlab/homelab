@@ -50,7 +50,7 @@ spec:
           ports:
             - containerPort: {{ .Values.containerPort }}
               name: http
-          {{- if .Values.livenessProbe.enabled }}
+          {{- if .Values.livenessProbe.enabled | default true }}
           livenessProbe:
             httpGet:
               path: {{ .Values.livenessProbe.httpGet.path }}
@@ -58,7 +58,7 @@ spec:
             initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
           {{- end }}
-          {{- if .Values.readinessProbe.enabled }}
+          {{- if .Values.readinessProbe.enabled | default true }}
           readinessProbe:
             httpGet:
               path: {{ .Values.readinessProbe.httpGet.path }}

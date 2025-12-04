@@ -121,7 +121,28 @@ for SERVICE in "${SERVICES[@]}"; do
 done
 
 echo ""
-echo "🎉 All 9 services built and loaded to Kind cluster!"
+echo "=== Building K6 Load Testing Images ==="
+
+# K6 Legacy
+echo "Building k6:legacy..."
+docker build --build-arg SCRIPT_NAME=load-test \
+  -f k6/Dockerfile \
+  -t $REGISTRY/k6:legacy \
+  k6/
+kind load docker-image $REGISTRY/k6:legacy --name monitoring-local
+echo "✅ k6:legacy built and loaded"
+
+# K6 Scenarios  
+echo "Building k6:scenarios..."
+docker build --build-arg SCRIPT_NAME=load-test-multiple-scenarios \
+  -f k6/Dockerfile \
+  -t $REGISTRY/k6:scenarios \
+  k6/
+kind load docker-image $REGISTRY/k6:scenarios --name monitoring-local
+echo "✅ k6:scenarios built and loaded"
+
+echo ""
+echo "🎉 All 9 services + 2 k6 images built and loaded to Kind cluster!"
 echo ""
 echo "Usage:"
 echo "  ./scripts/05-build-microservices.sh              # Normal build (use cache, skip existing)"

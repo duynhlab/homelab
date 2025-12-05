@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - K6 pods now start without health check errors
    - Applies to all services using `livenessProbe.enabled: false` or `readinessProbe.enabled: false`
 
+4. **Sloth Git-sync CrashLoopBackOff** (`k8s/sloth/values.yaml`)
+   - Fixed git-sync sidecar container failing with "read-only file system" error
+   - Removed `securityContext.container.readOnlyRootFilesystem: true` constraint
+   - Git-sync requires write access to `/tmp` for temporary gitconfig files
+   - Now using Helm chart default (`securityContext: null`) which allows git-sync to function
+   - **Impact**: All 9 PrometheusServiceLevel CRs now generate PrometheusRules successfully
+   - **Result**: Sloth Operator fully operational, SLO rules validated and loaded into Prometheus
+
 ### Changed
 
 1. **GitHub Actions Workflows** - Added support for `v5-refactor` branch

@@ -61,12 +61,15 @@ customSloConfig:
   enabled: false  # Use default windows
 
 # Security context
-securityContext:
-  pod:
-    runAsNonRoot: true
-    runAsUser: 65534
-    fsGroup: 65534
-  container:
-    allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: true
+# Note: Using Helm chart default (securityContext: null) to allow git-sync container
+# to write temporary files to /tmp. The readOnlyRootFilesystem: true constraint
+# prevents git-sync from creating gitconfig files, causing CrashLoopBackOff.
+# securityContext:
+#   pod:
+#     runAsNonRoot: true
+#     runAsUser: 65534
+#     fsGroup: 65534
+#   container:
+#     allowPrivilegeEscalation: false
+#     readOnlyRootFilesystem: true
 

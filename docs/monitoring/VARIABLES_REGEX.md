@@ -57,6 +57,9 @@ Options:
   - (auto-discover new apps)
 ```
 
+**Label Source (v0.5.0+):**
+> **Note**: The `app` label is automatically added by Prometheus during scrape from the pod's `app` label via ServiceMonitor relabel_configs. Applications do not emit this label themselves.
+
 **Usage in queries:**
 ```promql
 # Example: RPS
@@ -85,6 +88,9 @@ Options:
   - monitoring
   - (any user namespaces, excluding system ones)
 ```
+
+**Label Source (v0.5.0+):**
+> **Note**: The `namespace` label is automatically added by Prometheus during scrape from the pod's namespace via ServiceMonitor relabel_configs. Applications do not emit this label themselves.
 
 **Regex Breakdown:**
 ```regex

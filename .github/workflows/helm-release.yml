@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - v5
+      - v5-refactor
     paths:
       - 'charts/**'
       - '.github/workflows/helm-release.yml'

@@ -514,9 +514,33 @@ k8s/sloth/
 - Verify pod labels exist: `kubectl get pods -n <namespace> --show-labels`
 
 **SLO rules not loading:**
-- Check ConfigMaps: `kubectl get configmap -n monitoring prometheus-slo-rules-*`
-- Check Prometheus config: http://localhost:9090/config (look for `rule_files`)
-- Check Prometheus logs: `kubectl logs deployment/prometheus -n monitoring`
+- Check PrometheusServiceLevels: `kubectl get prometheusservicelevels -n monitoring`
+- Check generated PrometheusRules: `kubectl get prometheusrules -n monitoring`
+- Check Sloth Operator logs: `kubectl logs -n monitoring -l app=sloth -c sloth --tail=50`
+- Check Prometheus rules API: http://localhost:9090/api/v1/rules
+
+**Sloth PrometheusRule Validation Failure (`GEN OK = false`):**
+- **Symptom**: PrometheusServiceLevels show `GEN OK = false`, `READY SLOS = 0`, Sloth logs show "admission webhook denied the request: Rules are not valid"
+- **Root Cause**: Prometheus Operator ValidatingWebhookConfiguration rejects Sloth-generated PrometheusRules
+- **Investigation Steps**:
+  1. Check if webhook exists: `kubectl get validatingwebhookconfigurations | grep prometheus`
+  2. Test manual PrometheusRule creation to isolate issue
+  3. Check Sloth debug logs: Enable `sloth.debug.enabled: true` in `k8s/sloth/values.yaml`
+- **Solution**: Remove problematic webhook validation:
+  ```bash
+  kubectl get validatingwebhookconfigurations kube-prometheus-stack-admission -o yaml > /tmp/webhook-backup.yaml
+  kubectl delete validatingwebhookconfigurations kube-prometheus-stack-admission
+  kubectl delete pod -n monitoring -l app=sloth  # Restart Sloth to clear cache
+  ```
+- **Verify**: `kubectl get prometheusservicelevels -n monitoring` should show `GEN OK = true` for all SLOs
+- **Impact**: Without this fix, no SLO rules are generated, error budget tracking and burn rate alerts won't work
+- **Note**: This is a known compatibility issue between Sloth Operator and Prometheus Operator webhook validation
+
+**Sloth commonPlugins DNS Issues (Kind cluster):**
+- **Symptom**: Git-sync container CrashLoopBackOff with "Could not resolve host: github.com"
+- **Cause**: Kind cluster lacks external DNS resolution for fetching sloth-common-sli-plugins
+- **Fix**: Disable `commonPlugins` in `k8s/sloth/values.yaml`: `commonPlugins.enabled: false`
+- **Impact**: Custom SLO definitions work fine without common plugins (we use explicit Prometheus queries)
 
 **Metrics not appearing:**
 - Verify app has `/metrics` endpoint

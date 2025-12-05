@@ -56,35 +56,35 @@ spec:
           ports:
             - containerPort: {{ .Values.containerPort }}
               name: http
-          {{- with .Values.livenessProbe }}
-          {{- if .enabled | default true }}
+          {{- if .Values.livenessProbe }}
+          {{- if ne (.Values.livenessProbe.enabled | toString) "false" }}
           livenessProbe:
             httpGet:
-              path: {{ .httpGet.path }}
-              port: {{ .httpGet.port }}
-            initialDelaySeconds: {{ .initialDelaySeconds }}
-            periodSeconds: {{ .periodSeconds }}
-            {{- if .timeoutSeconds }}
-            timeoutSeconds: {{ .timeoutSeconds }}
+              path: {{ .Values.livenessProbe.httpGet.path }}
+              port: {{ .Values.livenessProbe.httpGet.port }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            {{- if .Values.livenessProbe.timeoutSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
             {{- end }}
-            {{- if .failureThreshold }}
-            failureThreshold: {{ .failureThreshold }}
+            {{- if .Values.livenessProbe.failureThreshold }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
             {{- end }}
           {{- end }}
           {{- end }}
-          {{- with .Values.readinessProbe }}
-          {{- if .enabled | default true }}
+          {{- if .Values.readinessProbe }}
+          {{- if ne (.Values.readinessProbe.enabled | toString) "false" }}
           readinessProbe:
             httpGet:
-              path: {{ .httpGet.path }}
-              port: {{ .httpGet.port }}
-            initialDelaySeconds: {{ .initialDelaySeconds }}
-            periodSeconds: {{ .periodSeconds }}
-            {{- if .timeoutSeconds }}
-            timeoutSeconds: {{ .timeoutSeconds }}
+              path: {{ .Values.readinessProbe.httpGet.path }}
+              port: {{ .Values.readinessProbe.httpGet.port }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            {{- if .Values.readinessProbe.timeoutSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
             {{- end }}
-            {{- if .failureThreshold }}
-            failureThreshold: {{ .failureThreshold }}
+            {{- if .Values.readinessProbe.failureThreshold }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
             {{- end }}
           {{- end }}
           {{- end }}

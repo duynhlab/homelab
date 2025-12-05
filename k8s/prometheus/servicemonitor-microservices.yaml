@@ -18,10 +18,11 @@ spec:
       - notification
       - shipping
   
-  # Match services with app label (all microservices have this from Helm chart)
+  # Match all services in selected namespaces (all microservices have app label from Helm chart)
   selector:
-    matchLabels:
-      app: {}
+    matchExpressions:
+      - key: app
+        operator: Exists
   
   # Scrape configuration
   endpoints:
@@ -36,5 +37,6 @@ spec:
       # Add app label from service label
       - sourceLabels: [__meta_kubernetes_service_label_app]
         targetLabel: app
+
 
 

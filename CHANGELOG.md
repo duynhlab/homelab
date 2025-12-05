@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - No longer labels namespaces with `monitoring=enabled` (not used by ServiceMonitor)
    - Simplified deployment steps from 6 to 5
 
+3. **K6 Health Check Probes** (`charts/templates/deployment.yaml`)
+   - Fixed Helm template logic for health probe `enabled: false` handling
+   - Changed from `{{- if .enabled | default true }}` to `{{- if ne (.enabled | toString) "false" }}`
+   - K6 pods now start without health check errors
+   - Applies to all services using `livenessProbe.enabled: false` or `readinessProbe.enabled: false`
+
 ### Changed
 
 1. **GitHub Actions Workflows** - Added support for `v5-refactor` branch

@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"os"
 	"strconv"
 	"time"
 
@@ -17,7 +16,7 @@ var (
 			Help:    "Duration of HTTP requests in seconds",
 			Buckets: []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
 		},
-		[]string{"app", "namespace", "method", "path", "code"},
+		[]string{"method", "path", "code"},
 	)
 
 	requestTotal = promauto.NewCounterVec(
@@ -25,7 +24,7 @@ var (
 			Name: "requests_total",
 			Help: "Total number of HTTP requests",
 		},
-		[]string{"app", "namespace", "method", "path", "code"},
+		[]string{"method", "path", "code"},
 	)
 
 	requestsInFlight = promauto.NewGaugeVec(
@@ -33,7 +32,7 @@ var (
 			Name: "requests_in_flight",
 			Help: "Number of HTTP requests currently being processed",
 		},
-		[]string{"app", "namespace", "method", "path"},
+		[]string{"method", "path"},
 	)
 
 	requestSize = promauto.NewHistogramVec(
@@ -42,7 +41,7 @@ var (
 			Help:    "Size of HTTP requests in bytes",
 			Buckets: []float64{100, 1000, 10000, 100000, 1000000},
 		},
-		[]string{"app", "namespace", "method", "path", "code"},
+		[]string{"method", "path", "code"},
 	)
 
 	responseSize = promauto.NewHistogramVec(
@@ -51,7 +50,7 @@ var (
 			Help:    "Size of HTTP responses in bytes",
 			Buckets: []float64{100, 1000, 10000, 100000, 1000000},
 		},
-		[]string{"app", "namespace", "method", "path", "code"},
+		[]string{"method", "path", "code"},
 	)
 
 	errorRate = promauto.NewCounterVec(
@@ -59,38 +58,22 @@ var (
 			Name: "error_rate_total",
 			Help: "Total number of HTTP errors",
 		},
-		[]string{"app", "namespace", "method", "path", "code"},
+		[]string{"method", "path", "code"},
 	)
 )
-
-func getAppName() string {
-	if name := os.Getenv("APP_NAME"); name != "" {
-		return name
-	}
-	return "unknown"
-}
-
-func getNamespace() string {
-	if ns := os.Getenv("NAMESPACE"); ns != "" {
-		return ns
-	}
-	return "default"
-}
 
 func PrometheusMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		
-		appName := getAppName()
-		namespace := getNamespace()
 		method := c.Request.Method
 		path := c.Request.URL.Path
 		
 		// Increment in-flight requests
-		requestsInFlight.WithLabelValues(appName, namespace, method, path).Inc()
+		requestsInFlight.WithLabelValues(method, path).Inc()
 		
 		// Record request size
-		requestSize.WithLabelValues(appName, namespace, method, path, "").Observe(float64(c.Request.ContentLength))
+		requestSize.WithLabelValues(method, path, "").Observe(float64(c.Request.ContentLength))
 		
 		// Process request
 		c.Next()
@@ -100,18 +83,18 @@ func PrometheusMiddleware() gin.HandlerFunc {
 		statusCode := strconv.Itoa(c.Writer.Status())
 		
 		// Record metrics
-		requestDuration.WithLabelValues(appName, namespace, method, path, statusCode).Observe(duration)
-		requestTotal.WithLabelValues(appName, namespace, method, path, statusCode).Inc()
+		requestDuration.WithLabelValues(method, path, statusCode).Observe(duration)
+		requestTotal.WithLabelValues(method, path, statusCode).Inc()
 		
 		// Record response size
-		responseSize.WithLabelValues(appName, namespace, method, path, statusCode).Observe(float64(c.Writer.Size()))
+		responseSize.WithLabelValues(method, path, statusCode).Observe(float64(c.Writer.Size()))
 		
 		// Record errors (5xx)
 		if c.Writer.Status() >= 500 {
-			errorRate.WithLabelValues(appName, namespace, method, path, statusCode).Inc()
+			errorRate.WithLabelValues(method, path, statusCode).Inc()
 		}
 		
 		// Decrement in-flight requests
-		requestsInFlight.WithLabelValues(appName, namespace, method, path).Dec()
+		requestsInFlight.WithLabelValues(method, path).Dec()
 	}
 }

@@ -9,23 +9,19 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
-var tracer trace.Tracer
+var (
+	tracer          trace.Tracer
+	tracerProvider  *sdktrace.TracerProvider
+	detectedService string
+)
 
-// InitTracing initializes OpenTelemetry tracing
+// InitTracing initializes OpenTelemetry tracing with automatic resource detection
 func InitTracing() (*sdktrace.TracerProvider, error) {
-	// Get service name from environment
-	serviceName := getAppName()
-	if serviceName == "" {
-		serviceName = "unknown-service"
-	}
-
-	// Get Tempo endpoint from environment (default to localhost for development)
+	// Get Tempo endpoint from environment
 	tempoEndpoint := os.Getenv("TEMPO_ENDPOINT")
 	if tempoEndpoint == "" {
 		tempoEndpoint = "http://tempo.monitoring.svc.cluster.local:4318"
@@ -41,27 +37,25 @@ func InitTracing() (*sdktrace.TracerProvider, error) {
 		return nil, err
 	}
 
-	// Create resource with service information
-	res, err := resource.New(
-		context.Background(),
-		resource.WithAttributes(
-			semconv.ServiceNameKey.String(serviceName),
-			semconv.ServiceNamespaceKey.String(getNamespace()),
-		),
-	)
+	// Auto-detect service information from Kubernetes environment
+	// This eliminates the need for manual APP_NAME/NAMESPACE env vars
+	res, err := createResource()
 	if err != nil {
 		return nil, err
 	}
+	
+	// Store detected service name for middleware usage
+	detectedService = GetServiceName(res)
 
 	// Create tracer provider
-	tp := sdktrace.NewTracerProvider(
+	tracerProvider = sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exporter),
 		sdktrace.WithResource(res),
 		sdktrace.WithSampler(sdktrace.AlwaysSample()), // Sample all traces for now
 	)
 
 	// Set global tracer provider
-	otel.SetTracerProvider(tp)
+	otel.SetTracerProvider(tracerProvider)
 
 	// Set global propagator for trace context propagation
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
@@ -69,24 +63,33 @@ func InitTracing() (*sdktrace.TracerProvider, error) {
 		propagation.Baggage{},
 	))
 
-	// Create tracer for this service
-	tracer = otel.Tracer(serviceName)
+	// Create tracer for this service using auto-detected name
+	tracer = otel.Tracer(detectedService)
 
-	return tp, nil
+	return tracerProvider, nil
 }
 
 // TracingMiddleware returns a Gin middleware for OpenTelemetry tracing
+// Service name is automatically detected, no manual configuration needed
 func TracingMiddleware() gin.HandlerFunc {
+	serviceName := detectedService
+	if serviceName == "" {
+		serviceName = "unknown-service"
+	}
 	return otelgin.Middleware(
-		getAppName(),
+		serviceName,
 		otelgin.WithTracerProvider(otel.GetTracerProvider()),
 	)
 }
 
-// GetTracer returns the tracer instance
+// GetTracer returns the tracer instance with auto-detected service name
 func GetTracer() trace.Tracer {
 	if tracer == nil {
-		tracer = otel.Tracer(getAppName())
+		serviceName := detectedService
+		if serviceName == "" {
+			serviceName = "unknown-service"
+		}
+		tracer = otel.Tracer(serviceName)
 	}
 	return tracer
 }

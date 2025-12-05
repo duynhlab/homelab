@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - v5
+      - v5-refactor
     paths:
       - 'services/Dockerfile'
       - 'services/go.mod'
@@ -15,6 +16,7 @@ on:
   pull_request:
     branches:
       - v5
+      - v5-refactor
     paths:
       - 'services/Dockerfile'
       - 'services/go.mod'

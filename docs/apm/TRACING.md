@@ -54,11 +54,25 @@ If no trace context is present, a new trace-id is automatically generated.
 
 ## Configuration
 
+### Automatic Service Detection
+
+Service name and namespace are **automatically detected** from the Kubernetes environment using OpenTelemetry's resource detection:
+
+1. **OTEL_SERVICE_NAME** env var (if set)
+2. **Pod name extraction** - extracts service name from pod name pattern (e.g., `auth-75c98b4b9c-kdv2n` → `auth`)
+3. **Hostname** - fallback to hostname
+4. **Namespace detection**:
+   - Reads from `/var/run/secrets/kubernetes.io/serviceaccount/namespace` (automatically mounted by Kubernetes)
+   - Falls back to `OTEL_RESOURCE_ATTRIBUTES` if set
+   - Falls back to `default`
+
+**No manual configuration needed!** The middleware automatically detects service information from the pod environment.
+
 ### Environment Variables
 
 - `TEMPO_ENDPOINT`: Tempo OTLP HTTP endpoint (default: `http://tempo.monitoring.svc.cluster.local:4318`)
-- `APP_NAME`: Service name (from Kubernetes pod label)
-- `NAMESPACE`: Kubernetes namespace (from pod metadata)
+- `OTEL_SERVICE_NAME`: (Optional) Override auto-detected service name
+- `OTEL_RESOURCE_ATTRIBUTES`: (Optional) Additional resource attributes (e.g., `service.namespace=production`)
 
 ### Service Initialization
 

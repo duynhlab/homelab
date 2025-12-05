@@ -22,6 +22,7 @@ service:
   type: ClusterIP
   port: 8080
   targetPort: 8080
+  portName: http  # Name of the port (http, grpc, metrics, etc.)
 
 # Container port
 containerPort: 8080
@@ -73,4 +74,20 @@ tolerations: []
 
 # Affinity
 affinity: {}
+
+# Pod security context
+podSecurityContext: {}
+  # fsGroup: 1000
+  # runAsUser: 1000
+  # runAsNonRoot: true
+
+# Container security context
+securityContext: {}
+  # allowPrivilegeEscalation: false
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+  # capabilities:
+  #   drop:
+  #     - ALL
 

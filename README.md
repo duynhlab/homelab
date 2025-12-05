@@ -57,8 +57,10 @@
 - **shipping-v2** - Enhanced shipping API (`/api/v2/shipments/*`)
 
 ### Monitoring Stack
-- **Prometheus** - Metrics collection & storage
-- **Grafana** - Visualization & dashboards
+- **Prometheus Operator** - Kubernetes-native Prometheus management via CRDs
+- **kube-prometheus-stack** - Full monitoring stack with Prometheus, Operator, and integrations
+- **Grafana Operator** - Kubernetes-native Grafana management
+- **ServiceMonitor** - Automatic service discovery (namespace-based, scales to 1000+ pods)
 - **k6** - Load testing & performance validation
 
 ### APM Stack (Application Performance Monitoring)
@@ -79,7 +81,7 @@ chmod +x scripts/*.sh
 # Infrastructure & Monitoring (Steps 1-3)
 ./scripts/01-create-kind-cluster.sh      # Create Kind cluster
 ./scripts/02-install-metrics.sh          # Install metrics infrastructure
-./scripts/03-deploy-monitoring.sh        # Deploy Prometheus & Grafana (BEFORE apps to collect metrics)
+./scripts/03-deploy-monitoring.sh        # Deploy Prometheus Operator + Grafana Operator (BEFORE apps)
 
 # APM Stack (Step 4) - Required for full observability (BEFORE apps to collect traces/logs/profiles)
 ./scripts/04-deploy-apm.sh               # Deploy all APM components (Tempo, Pyroscope, Loki, Vector)

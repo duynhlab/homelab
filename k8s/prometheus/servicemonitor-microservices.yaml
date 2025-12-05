@@ -1,0 +1,24 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: microservices-api
+  namespace: monitoring
+  labels:
+    prometheus: kube-prometheus
+spec:
+  # Match all namespaces with monitoring=enabled label
+  namespaceSelector:
+    matchLabels:
+      monitoring: enabled
+  
+  # Match all services (they have app label from Helm chart)
+  selector:
+    matchLabels: {}
+  
+  # Scrape configuration
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s
+    scrapeTimeout: 10s
+

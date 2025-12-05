@@ -48,9 +48,9 @@ monitoring/
 │   ├── vector/            # Vector (log collection)
 │   ├── kind/              # Kind cluster configuration
 │   └── namespaces.yaml
-├── scripts/               # Deployment and utility scripts (numbered 01-17)
+├── scripts/               # Deployment and utility scripts (numbered 01-12)
 ├── docs/                  # Documentation
-├── slo/                   # SLO data files (definitions, generated rules)
+├── slo/                   # SLO data files (backup definitions)
 ├── k6/                    # K6 load testing (Dockerfile + scripts)
 ├── README.md              # Project overview
 ├── CLAUDE.md              # Link to  AGENTS.md for Claude (Anthropic) still uses CLAUDE.md
@@ -207,16 +207,16 @@ Numbered scripts (01-12) for deployment and operations:
 - `01-create-kind-cluster.sh` - Create Kind Kubernetes cluster
 - `02-install-metrics.sh` - Install metrics infrastructure (kube-state-metrics, etc.)
 
-**Monitoring Stack (05):**
+**Monitoring Stack (03):**
 - `03-deploy-monitoring.sh` - Deploy Prometheus and install Grafana Operator (BEFORE apps to collect metrics immediately)
 
-**APM Stack (14-17) - Required:**
+**APM Stack (04) - Required:**
 - `04a-deploy-tempo.sh` - Deploy Grafana Tempo (distributed tracing)
 - `04b-deploy-pyroscope.sh` - Deploy Pyroscope (continuous profiling)
 - `04c-deploy-loki.sh` - Deploy Loki + Vector (log aggregation)
 - `04-deploy-apm.sh` - Deploy all APM components (deploy BEFORE apps to collect traces/logs/profiles immediately)
 
-**Build & Deploy Applications (03-04):**
+**Build & Deploy Applications (05-06):**
 - `05-build-microservices.sh` - Build Docker images for all 9 services
 - `06-deploy-microservices.sh` - Deploy all microservices using Helm (`--local` or `--registry`)
 
@@ -553,7 +553,7 @@ k8s/sloth/
 
 ### Deployment Commands
 
-**Deployment Order:** Infrastructure → Monitoring → Apps → Load Testing → APM → SLO → Access
+**Deployment Order:** Infrastructure → Monitoring → APM → Apps → Load Testing → SLO → Access
 
 | Script | Command | Purpose | Order |
 |--------|---------|---------|-------|

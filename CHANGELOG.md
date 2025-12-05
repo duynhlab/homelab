@@ -154,9 +154,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 1. **AGENTS.md** - Comprehensive review and updates
    - Corrected outdated "Last Updated" date from 2024 to "December 5, 2025"
+   - Fixed script numbering references (changed "01-17" to "01-12")
+   - Updated `slo/` directory description to reflect removal of `generated/` folder
+   - Fixed section numbering inconsistencies (Monitoring Stack, APM Stack, Build & Deploy)
+   - Corrected deployment order to "Infrastructure → Monitoring → APM → Apps → Load Testing → SLO → Access"
    - Updated directory structure (`k8s/` section) to show correct hierarchy
    - Fixed namespace conventions (added `k6` namespace)
-   - Updated deployment order and script references
    - Removed deprecated K6 and bash SLO script references (`08a`, `08b`)
    - Updated workflows for K6, SLO, and microservice management
    - Updated "Quick Navigation" sections

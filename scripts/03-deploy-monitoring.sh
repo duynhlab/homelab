@@ -7,20 +7,8 @@ echo "=== Deploying Monitoring Stack with Prometheus Operator ==="
 echo "Ensuring 'monitoring' namespace exists..."
 kubectl get namespace monitoring >/dev/null 2>&1 || kubectl create namespace monitoring
 
-# Label microservice namespaces for ServiceMonitor discovery
-echo "1. Labeling microservice namespaces for monitoring..."
-NAMESPACES=("auth" "user" "product" "cart" "order" "review" "notification" "shipping")
-for ns in "${NAMESPACES[@]}"; do
-  if kubectl get namespace "$ns" >/dev/null 2>&1; then
-    kubectl label namespace "$ns" monitoring=enabled --overwrite
-    echo "  ✓ Labeled namespace: $ns"
-  else
-    echo "  ⚠ Namespace $ns does not exist yet (will be created when deploying microservices)"
-  fi
-done
-
 # Install Prometheus Operator via kube-prometheus-stack
-echo "2. Installing Prometheus Operator (kube-prometheus-stack)..."
+echo "1. Installing Prometheus Operator (kube-prometheus-stack)..."
 if command -v helm >/dev/null 2>&1; then
   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
   helm repo update >/dev/null 2>&1 || true
@@ -39,16 +27,16 @@ else
 fi
 
 # Wait for Prometheus Operator CRDs to be ready
-echo "3. Waiting for Prometheus Operator CRDs..."
+echo "2. Waiting for Prometheus Operator CRDs..."
 sleep 10
 
 # Apply ServiceMonitor for microservices
-echo "4. Applying ServiceMonitor for microservices..."
+echo "3. Applying ServiceMonitor for microservices..."
 kubectl apply -f k8s/prometheus/servicemonitor-microservices.yaml
 echo "  ✓ ServiceMonitor created"
 
 # Deploy Grafana Operator + resources
-echo "5. Installing/Upgrading Grafana Operator..."
+echo "4. Installing/Upgrading Grafana Operator..."
 helm repo add grafana-operator https://grafana.github.io/helm-charts >/dev/null 2>&1 || true
 helm repo update >/dev/null 2>&1 || true
 helm upgrade --install grafana-operator grafana-operator/grafana-operator \
@@ -56,7 +44,7 @@ helm upgrade --install grafana-operator grafana-operator/grafana-operator \
   --create-namespace \
   -f k8s/grafana-operator/values.yaml
 
-echo "6. Applying Grafana CRDs (instance, datasources, dashboards)..."
+echo "5. Applying Grafana CRDs (instance, datasources, dashboards)..."
 kubectl apply -f k8s/grafana-operator/grafana.yaml
 kubectl apply -f k8s/grafana-operator/datasource-prometheus.yaml
 kubectl apply -f k8s/grafana-operator/datasource-tempo.yaml

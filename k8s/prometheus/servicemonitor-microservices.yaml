@@ -6,14 +6,22 @@ metadata:
   labels:
     prometheus: kube-prometheus
 spec:
-  # Match all namespaces with monitoring=enabled label
+  # Select specific microservice namespaces
   namespaceSelector:
-    matchLabels:
-      monitoring: enabled
+    matchNames:
+      - auth
+      - user
+      - product
+      - cart
+      - order
+      - review
+      - notification
+      - shipping
   
-  # Match all services (they have app label from Helm chart)
+  # Match services with app label (all microservices have this from Helm chart)
   selector:
-    matchLabels: {}
+    matchLabels:
+      app: {}
   
   # Scrape configuration
   endpoints:
@@ -21,4 +29,12 @@ spec:
     path: /metrics
     interval: 15s
     scrapeTimeout: 10s
+    relabelings:
+      # Add namespace label from pod metadata
+      - sourceLabels: [__meta_kubernetes_namespace]
+        targetLabel: namespace
+      # Add app label from service label
+      - sourceLabels: [__meta_kubernetes_service_label_app]
+        targetLabel: app
+
 

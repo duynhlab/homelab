@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [Unreleased] - 2025-12-05
+
+### Fixed
+
+1. **ServiceMonitor Configuration** (`k8s/prometheus/servicemonitor-microservices.yaml`)
+   - Fixed `namespaceSelector` field error: Changed from `matchLabels` to `matchNames`
+   - `matchLabels` is not supported by ServiceMonitor API
+   - Now explicitly lists all microservice namespaces: auth, user, product, cart, order, review, notification, shipping
+   - Added explicit relabeling for `namespace` and `app` labels
+
+2. **Monitoring Deployment Script** (`scripts/03-deploy-monitoring.sh`)
+   - Removed unnecessary namespace labeling logic
+   - No longer labels namespaces with `monitoring=enabled` (not used by ServiceMonitor)
+   - Simplified deployment steps from 6 to 5
+
+### Changed
+
+1. **GitHub Actions Workflows** - Added support for `v5-refactor` branch
+   - `.github/workflows/build-images.yml`: Added `v5-refactor` to push/PR triggers
+   - `.github/workflows/build-k6-images.yml`: Added `v5-refactor` to push/PR triggers
+   - `.github/workflows/helm-release.yml`: Added `v5-refactor` to push trigger
+   - **Note**: PR workflows still only run lint checks, no build/push on PR
+
 ## [0.5.0] - 2025-12-05
 
 ### Migration to Prometheus Operator

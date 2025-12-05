@@ -270,6 +270,7 @@ k6/
 - Build 2 images: `ghcr.io/duynhne/k6:legacy`, `ghcr.io/duynhne/k6:scenarios`
 - Deploy to `k6` namespace
 - Helm values: `charts/values/k6-legacy.yaml`, `charts/values/k6-scenarios.yaml`
+- Health checks disabled: K6 is a load testing tool with no HTTP health endpoint
 
 #### `k8s/sloth/` - SLO Management (Sloth Operator)
 

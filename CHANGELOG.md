@@ -7,6 +7,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.5.0] - 2025-12-05
+
+### Migration to Prometheus Operator
+
+**Context**: Migrated from standalone Prometheus deployment to Prometheus Operator (kube-prometheus-stack) to support Sloth Operator, enable namespace-based service discovery, and simplify metrics labeling.
+
+**Breaking Changes**:
+
+1. **Metrics Labeling Refactored**
+   - **Removed** `app` and `namespace` labels from application-level metrics
+   - Prometheus now auto-injects these labels during scrape (via relabel_configs)
+   - Metrics now only have: `method`, `path`, `code` labels at application level
+   - Final metrics still have `app`, `namespace`, `job`, `instance` (added by Prometheus)
+   - **Why**: Eliminates label duplication, follows best practices, simplifies application code
+
+2. **Prometheus Deployment Changed**
+   - **Old**: Standalone Prometheus Deployment with manual ConfigMap scrape configs
+   - **New**: Prometheus Operator with ServiceMonitor-based auto-discovery
+   - Service name changed: `prometheus` → `prometheus-kube-prometheus-prometheus`
+
+**Added**:
+
+1. **Prometheus Operator Stack**
+   - Installed via `kube-prometheus-stack` Helm chart
+   - Includes: Prometheus Operator, Prometheus, node-exporter
+   - Configuration: `k8s/prometheus/values.yaml`
+   - Supports: ServiceMonitor, PodMonitor, PrometheusRule CRDs
+
+2. **Namespace-Based Service Discovery**
+   - Created single `ServiceMonitor` for all microservices
+   - Uses namespace selector: `monitoring: enabled` label
+   - Scales efficiently to 1000+ pods
+   - File: `k8s/prometheus/servicemonitor-microservices.yaml`
+
+3. **Sloth Operator Support**
+   - PodMonitor CRD now available (required by Sloth)
+   - `./scripts/08-deploy-slo.sh` now works correctly
+   - No more "unknown kind PodMonitor" errors
+
+**Changed**:
+
+1. **Application Code**
+   - **`services/pkg/middleware/prometheus.go`**: Removed `app` and `namespace` from all metric label arrays (3 labels instead of 5)
+   - **`services/pkg/middleware/resource.go`** (NEW): Automatic resource detection from Kubernetes
+     - Detects service name from pod name pattern (e.g., `auth-75c98b4b9c-kdv2n` → `auth`)
+     - Reads namespace from `/var/run/secrets/kubernetes.io/serviceaccount/namespace`
+     - Supports `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` overrides
+     - Shared by tracing and profiling for consistent detection
+   - **`services/pkg/middleware/tracing.go`**: Uses automatic resource detection
+     - OpenTelemetry automatically detects service name, namespace, pod, container info
+     - No manual env var reading
+   - **`services/pkg/middleware/profiling.go`**: Uses automatic resource detection
+     - Pyroscope automatically tagged with detected service and namespace
+     - No manual env var reading
+
+2. **Helm Chart** (`charts/`)
+   - **deployment.yaml**: **REMOVED** `APP_NAME`, `NAMESPACE` env var injection completely
+   - No manual configuration needed - everything is auto-detected
+   - **values.yaml**: Removed `defaultEnv` section (no longer used)
+   - **values/*.yaml**: Removed redundant `labels: component: api` from all 9 service values files
+
+3. **Deployment Script** (`scripts/03-deploy-monitoring.sh`)
+   - Rewrote to install Prometheus Operator first
+   - Labels microservice namespaces with `monitoring: enabled`
+   - Applies ServiceMonitor after Operator installation
+   - Still deploys Grafana Operator (unchanged)
+
+4. **Grafana Datasource** (`k8s/grafana-operator/datasource-prometheus.yaml`)
+   - Updated URL from `http://prometheus:9090`
+   - To: `http://prometheus-kube-prometheus-prometheus:9090`
+
+**Removed/Archived**:
+
+- Moved to `k8s/prometheus/backup/`:
+  - `deployment.yaml` (old standalone Prometheus)
+  - `configmap.yaml` (old manual scrape configs)
+  - `service.yaml`
+  - `rbac.yaml`
+
+**Documentation**:
+
+- Updated `README.md` - Monitoring Stack section
+- Updated `AGENTS.md` - Prometheus configuration details
+- Updated `docs/getting-started/SETUP.md` - Deployment instructions
+- Created `MIGRATION_SUMMARY.md` - Detailed migration guide
+
+**Migration Steps for Users**:
+
+1. Rebuild all microservices: `./scripts/05-build-microservices.sh`
+2. Deploy new monitoring: `./scripts/03-deploy-monitoring.sh`
+3. Redeploy microservices: `./scripts/06-deploy-microservices.sh --local`
+4. Deploy SLO: `./scripts/08-deploy-slo.sh` (now works!)
+
 ## [0.4.1] - 2025-12-05
 
 ### Documentation Review and Updates

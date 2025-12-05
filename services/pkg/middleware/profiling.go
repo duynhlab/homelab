@@ -8,13 +8,11 @@ import (
 
 var profiler *pyroscope.Profiler
 
-// InitProfiling initializes Pyroscope profiling
+// InitProfiling initializes Pyroscope profiling with automatic service detection
 func InitProfiling() error {
-	// Get service name from environment
-	serviceName := getAppName()
-	if serviceName == "" {
-		serviceName = "unknown-service"
-	}
+	// Auto-detect service name and namespace from Kubernetes environment
+	// This eliminates the need for manual APP_NAME/NAMESPACE env vars
+	serviceName, namespace := detectServiceInfo()
 
 	// Get Pyroscope endpoint from environment
 	pyroscopeEndpoint := os.Getenv("PYROSCOPE_ENDPOINT")
@@ -22,10 +20,7 @@ func InitProfiling() error {
 		pyroscopeEndpoint = "http://pyroscope.monitoring.svc.cluster.local:4040"
 	}
 
-	// Get namespace from environment
-	namespace := getNamespace()
-
-	// Configure Pyroscope
+	// Configure Pyroscope with auto-detected service information
 	cfg := pyroscope.Config{
 		ApplicationName: serviceName,
 		ServerAddress:   pyroscopeEndpoint,

@@ -43,11 +43,25 @@ The following profile types are collected:
 
 ## Configuration
 
+### Automatic Service Detection
+
+Service name and namespace are **automatically detected** from the Kubernetes environment:
+
+1. **OTEL_SERVICE_NAME** env var (if set)
+2. **Pod name extraction** - extracts service name from pod name pattern (e.g., `auth-75c98b4b9c-kdv2n` → `auth`)
+3. **Hostname** - fallback to hostname
+4. **Namespace detection**:
+   - Reads from `/var/run/secrets/kubernetes.io/serviceaccount/namespace` (automatically mounted by Kubernetes)
+   - Falls back to `OTEL_RESOURCE_ATTRIBUTES` if set
+   - Falls back to `default`
+
+**No manual configuration needed!** Pyroscope automatically uses the detected service information for profile tagging.
+
 ### Environment Variables
 
 - `PYROSCOPE_ENDPOINT`: Pyroscope server endpoint (default: `http://pyroscope.monitoring.svc.cluster.local:4040`)
-- `APP_NAME`: Service name (from Kubernetes pod label)
-- `NAMESPACE`: Kubernetes namespace (from pod metadata)
+- `OTEL_SERVICE_NAME`: (Optional) Override auto-detected service name
+- `OTEL_RESOURCE_ATTRIBUTES`: (Optional) Additional resource attributes
 
 ### Service Initialization
 

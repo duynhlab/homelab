@@ -1,0 +1,106 @@
+# kube-prometheus-stack Helm values
+# This configures Prometheus Operator for microservices monitoring
+
+# Disable components we don't need (using Grafana Operator instead)
+grafana:
+  enabled: false
+
+alertmanager:
+  enabled: false
+
+# Prometheus configuration
+prometheus:
+  enabled: true
+  
+  prometheusSpec:
+    # Retention and storage
+    retention: 7d
+    retentionSize: "10GB"
+    
+    # Resources
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "100m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+    
+    # Storage
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi
+    
+    # ServiceMonitor selector - match all ServiceMonitors
+    serviceMonitorSelector: {}
+    serviceMonitorNamespaceSelector: {}
+    
+    # PodMonitor selector - for Sloth Operator
+    podMonitorSelector: {}
+    podMonitorNamespaceSelector: {}
+    
+    # PrometheusRule selector - for SLO rules
+    ruleSelector: {}
+    ruleNamespaceSelector: {}
+    
+    # External labels
+    externalLabels:
+      cluster: 'kind-monitoring'
+    
+    # Enable features
+    enableFeatures:
+      - exemplar-storage
+    
+    # Scrape interval
+    evaluationInterval: 15s
+    scrapeInterval: 15s
+
+# Prometheus Operator configuration
+prometheusOperator:
+  enabled: true
+  
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+# Node Exporter (for node metrics)
+nodeExporter:
+  enabled: true
+
+# Kube State Metrics (already installed via script 02)
+kubeStateMetrics:
+  enabled: false
+
+# Default ServiceMonitors and PrometheusRules
+defaultRules:
+  create: false
+
+kubeApiServer:
+  enabled: true
+
+kubelet:
+  enabled: true
+
+kubeControllerManager:
+  enabled: false
+
+coreDns:
+  enabled: true
+
+kubeEtcd:
+  enabled: false
+
+kubeScheduler:
+  enabled: false
+
+kubeProxy:
+  enabled: false
+

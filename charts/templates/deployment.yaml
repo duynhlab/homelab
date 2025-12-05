@@ -19,6 +19,10 @@ spec:
       labels:
         {{- include "microservice.labels" . | nindent 8 }}
     spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -35,36 +39,54 @@ spec:
         - name: {{ include "microservice.name" . }}
           image: {{ include "microservice.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          env:
-            - name: APP_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.labels['app']
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            {{- with .Values.env }}
+          {{- with .Values.securityContext }}
+          securityContext:
             {{- toYaml . | nindent 12 }}
-            {{- end }}
+          {{- end }}
+          {{- if .Values.command }}
+          command: {{- toYaml .Values.command | nindent 12 }}
+          {{- end }}
+          {{- if .Values.args }}
+          args: {{- toYaml .Values.args | nindent 12 }}
+          {{- end }}
+          {{- with .Values.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
             - containerPort: {{ .Values.containerPort }}
               name: http
-          {{- if .Values.livenessProbe.enabled | default true }}
+          {{- with .Values.livenessProbe }}
+          {{- if .enabled | default true }}
           livenessProbe:
             httpGet:
-              path: {{ .Values.livenessProbe.httpGet.path }}
-              port: {{ .Values.livenessProbe.httpGet.port }}
-            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
-            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+              path: {{ .httpGet.path }}
+              port: {{ .httpGet.port }}
+            initialDelaySeconds: {{ .initialDelaySeconds }}
+            periodSeconds: {{ .periodSeconds }}
+            {{- if .timeoutSeconds }}
+            timeoutSeconds: {{ .timeoutSeconds }}
+            {{- end }}
+            {{- if .failureThreshold }}
+            failureThreshold: {{ .failureThreshold }}
+            {{- end }}
           {{- end }}
-          {{- if .Values.readinessProbe.enabled | default true }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          {{- if .enabled | default true }}
           readinessProbe:
             httpGet:
-              path: {{ .Values.readinessProbe.httpGet.path }}
-              port: {{ .Values.readinessProbe.httpGet.port }}
-            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
-            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+              path: {{ .httpGet.path }}
+              port: {{ .httpGet.port }}
+            initialDelaySeconds: {{ .initialDelaySeconds }}
+            periodSeconds: {{ .periodSeconds }}
+            {{- if .timeoutSeconds }}
+            timeoutSeconds: {{ .timeoutSeconds }}
+            {{- end }}
+            {{- if .failureThreshold }}
+            failureThreshold: {{ .failureThreshold }}
+            {{- end }}
+          {{- end }}
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

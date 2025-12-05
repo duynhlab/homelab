@@ -29,6 +29,19 @@ Prometheus, Metrics, Histogram, Counter, Gauge, PromQL, Percentiles, Apdex, RPS,
 
 Dự án này expose **6 custom application metrics** và tận dụng **Go runtime metrics** để cung cấp **32 Grafana dashboard panels trong 5 row groups** cho việc giám sát toàn diện, bao gồm phát hiện memory leak.
 
+### Metrics Architecture
+
+**Label Injection Strategy (v0.5.0+):**
+- **Application level**: Chỉ emit metrics với labels: `method`, `path`, `code`
+- **Prometheus level**: Auto-inject `app`, `namespace`, `job`, `instance` labels during scrape
+- **Why**: Eliminates label duplication, follows Prometheus best practices, simplifies application code
+
+**Service Discovery:**
+- **Prometheus Operator**: Manages Prometheus via CRDs
+- **ServiceMonitor**: Single resource for all microservices (namespace-based discovery)
+- **Namespace selector**: `monitoring: enabled` label
+- **Scalability**: Efficiently handles 1000+ pods without manual configuration
+
 ---
 
 ## Custom Application Metrics
@@ -42,11 +55,11 @@ Dự án này expose **6 custom application metrics** và tận dụng **Go runt
 **Buckets:** `0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10`
 
 **Labels:**
-- `app` - Tên ứng dụng (auth, user, product, cart, order, review, notification, shipping, shipping-v2)
-- `namespace` - Kubernetes namespace
 - `method` - HTTP method (GET, POST, PUT, DELETE)
 - `path` - Request path (/api/users, /api/products)
 - `code` - HTTP status code (200, 404, 500)
+
+**Note:** `app` and `namespace` labels are automatically added by Prometheus during scrape (via relabel_configs), not by the application.
 
 **Công dụng:** Dùng để tính toán percentiles (p50, p95, p99) và Apdex score
 
@@ -58,7 +71,9 @@ Dự án này expose **6 custom application metrics** và tận dụng **Go runt
 
 **Loại:** Counter
 
-**Labels:** Giống với `request_duration_seconds`
+**Labels:** `method`, `path`, `code` (giống với `request_duration_seconds`)
+
+**Note:** `app` and `namespace` labels are automatically added by Prometheus during scrape.
 
 **Công dụng:** Tính toán RPS (requests per second), tổng traffic
 
@@ -71,10 +86,10 @@ Dự án này expose **6 custom application metrics** và tận dụng **Go runt
 **Loại:** Gauge
 
 **Labels:**
-- `app`
-- `namespace`
-- `method`
-- `path`
+- `method` - HTTP method
+- `path` - Request path
+
+**Note:** `app` and `namespace` labels are automatically added by Prometheus during scrape.
 
 **Công dụng:** Theo dõi concurrent requests, phát hiện bottlenecks
 
@@ -88,7 +103,9 @@ Dự án này expose **6 custom application metrics** và tận dụng **Go runt
 
 **Buckets:** `100, 1000, 10000, 100000, 1000000`
 
-**Labels:** Giống với `request_duration_seconds`
+**Labels:** `method`, `path`, `code`
+
+**Note:** `app` and `namespace` labels are automatically added by Prometheus during scrape.
 
 **Công dụng:** Giám sát kích thước request payload
 
@@ -102,7 +119,9 @@ Dự án này expose **6 custom application metrics** và tận dụng **Go runt
 
 **Buckets:** `100, 1000, 10000, 100000, 1000000`
 
-**Labels:** Giống với `request_duration_seconds`
+**Labels:** `method`, `path`, `code`
+
+**Note:** `app` and `namespace` labels are automatically added by Prometheus during scrape.
 
 **Công dụng:** Giám sát kích thước response payload
 
@@ -114,7 +133,9 @@ Dự án này expose **6 custom application metrics** và tận dụng **Go runt
 
 **Loại:** Counter
 
-**Labels:** Giống với `request_duration_seconds`
+**Labels:** `method`, `path`, `code`
+
+**Note:** `app` and `namespace` labels are automatically added by Prometheus during scrape.
 
 **Công dụng:** Theo dõi lỗi ứng dụng
 

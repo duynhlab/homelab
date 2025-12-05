@@ -37,6 +37,9 @@ monitoring/
 │   └── templates/
 ├── k8s/                   # Kubernetes manifests
 │   ├── prometheus/
+│   │   ├── values.yaml             # kube-prometheus-stack Helm values
+│   │   ├── servicemonitor-microservices.yaml  # Single ServiceMonitor for all services
+│   │   └── backup/                 # Old standalone Prometheus manifests (archived)
 │   ├── grafana-operator/
 │   ├── sloth/             # Sloth Operator (SLO management)
 │   ├── tempo/             # Grafana Tempo (distributed tracing)
@@ -114,7 +117,7 @@ services/
 - `core/domain/` - Domain models
 
 **Shared Code**: 
-- `pkg/middleware/prometheus.go` - Prometheus metrics middleware (auto-collects request metrics)
+- `pkg/middleware/prometheus.go` - Prometheus metrics middleware (collects metrics with `method`, `path`, `code` labels; `app`, `namespace` added by Prometheus during scrape)
 - `pkg/middleware/logging.go` - Structured logging middleware with trace-id correlation
 - `pkg/middleware/tracing.go` - OpenTelemetry distributed tracing middleware
 - `pkg/middleware/profiling.go` - Pyroscope continuous profiling middleware
@@ -163,11 +166,10 @@ Kubernetes manifests for monitoring and infrastructure components:
 
 ```
 k8s/
-├── prometheus/           # Prometheus configuration
-│   ├── configmap.yaml     # Prometheus config (scrape configs, rule_files)
-│   ├── deployment.yaml    # Prometheus deployment
-│   ├── service.yaml
-│   └── rbac.yaml         # RBAC for Prometheus ServiceAccount
+├── prometheus/           # Prometheus Operator configuration
+│   ├── values.yaml       # kube-prometheus-stack Helm values
+│   ├── servicemonitor-microservices.yaml  # Single ServiceMonitor for all services
+│   └── backup/           # Old standalone Prometheus manifests (archived)
 ├── grafana-operator/     # Grafana Operator resources
 │   ├── README.md         # Helm install instructions
 │   ├── values.yaml       # Operator Helm values
@@ -303,7 +305,8 @@ k8s/sloth/
 |------|---------|----------|
 | Helm Chart | Microservices deployment chart | `charts/` |
 | Helm Values | Per-service configuration | `charts/values/*.yaml` |
-| Prometheus Config | Scrape configs, rule files | `k8s/prometheus/configmap.yaml` |
+| Prometheus Operator Values | kube-prometheus-stack Helm values | `k8s/prometheus/values.yaml` |
+| ServiceMonitor | Auto-discovery for all microservices | `k8s/prometheus/servicemonitor-microservices.yaml` |
 | Grafana Datasources | Prometheus datasource | `k8s/grafana-operator/datasource-prometheus.yaml` |
 | Grafana Dashboards | Operator-managed dashboards (microservices + SLO) | `k8s/grafana-operator/dashboards/` (`microservices-dashboard.json` is the source of truth) |
 | Dockerfile | Unified build for all services | `services/Dockerfile` |
@@ -436,20 +439,27 @@ k8s/sloth/
 
 ### Modifying Prometheus Configuration
 
-1. **Edit config:**
-   - Edit `k8s/prometheus/configmap.yaml`
-   - Add/modify scrape configs or rule files
+**Note**: Since v0.5.0, Prometheus is managed by Prometheus Operator. Configuration is via Helm values and ServiceMonitor CRDs.
 
-2. **Apply changes:**
+1. **Edit Prometheus Operator values:**
+   - Edit `k8s/prometheus/values.yaml` (retention, resources, etc.)
+   
+2. **Update via Helm:**
    ```bash
-   kubectl apply -f k8s/prometheus/configmap.yaml
-   kubectl rollout restart deployment/prometheus -n monitoring
+   helm upgrade prometheus-kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+     -n monitoring \
+     -f k8s/prometheus/values.yaml
    ```
 
-3. **Verify:**
-   - Port-forward Prometheus: `kubectl port-forward -n monitoring svc/prometheus 9090:9090`
+3. **Add/modify service discovery:**
+   - Edit `k8s/prometheus/servicemonitor-microservices.yaml`
+   - Apply: `kubectl apply -f k8s/prometheus/servicemonitor-microservices.yaml`
+
+4. **Verify:**
+   - Port-forward Prometheus: `kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090`
    - Check config: http://localhost:9090/config
    - Check targets: http://localhost:9090/targets
+   - Check ServiceMonitors: `kubectl get servicemonitors -A`
 
 ### Deploying SLO Changes
 
@@ -496,9 +506,11 @@ k8s/sloth/
 - Inspect Grafana Operator logs: `kubectl logs -n monitoring deployment/grafana-operator`
 
 **Prometheus not scraping:**
-- Check ServiceMonitor: `kubectl get servicemonitor -n {namespace}` (check in each service namespace)
+- Check ServiceMonitor: `kubectl get servicemonitor -n monitoring` (single ServiceMonitor for all services)
+- Check namespace labels: `kubectl get ns --show-labels | grep monitoring=enabled`
 - Check Prometheus targets: http://localhost:9090/targets
-- Check pod labels match ServiceMonitor selector
+- Check Prometheus Operator logs: `kubectl logs -n monitoring -l app.kubernetes.io/name=kube-prometheus-stack-operator`
+- Verify pod labels exist: `kubectl get pods -n <namespace> --show-labels`
 
 **SLO rules not loading:**
 - Check ConfigMaps: `kubectl get configmap -n monitoring prometheus-slo-rules-*`
@@ -629,15 +641,18 @@ k8s/sloth/
 
 ### Label Requirements
 
-**Required labels for all metrics:**
-- `app` - Service name (e.g., `auth`, `user`)
-- `namespace` - Kubernetes namespace
-- `job=~"microservices"` - Prometheus job filter
+**Required labels for metrics (after Prometheus scrape):**
+- `app` - Service name (e.g., `auth`, `user`) - **Added by Prometheus**
+- `namespace` - Kubernetes namespace - **Added by Prometheus**
+- `job` - Prometheus job name - **Added by Prometheus**
+- `instance` - Pod IP:port - **Added by Prometheus**
 
-**HTTP metrics additional labels:**
+**Application-level labels (emitted by app):**
 - `method` - HTTP method (GET, POST, PUT, DELETE)
 - `path` - Request path (e.g., `/api/v1/users`)
 - `code` - HTTP status code (200, 404, 500)
+
+**Important**: Since v0.5.0, applications DO NOT emit `app` and `namespace` labels. Prometheus adds these during scrape via relabel_configs from ServiceMonitor.
 
 ### Go Code Conventions
 
@@ -666,7 +681,8 @@ k8s/sloth/
 
 **Update monitoring:**
 - Dashboard JSON: `k8s/grafana-operator/dashboards/microservices-dashboard.json`
-- Prometheus config: `k8s/prometheus/configmap.yaml`
+- Prometheus Operator values: `k8s/prometheus/values.yaml`
+- ServiceMonitor: `k8s/prometheus/servicemonitor-microservices.yaml`
 - Grafana Operator resources: `k8s/grafana-operator/` (Grafana CR, datasources, dashboards)
 
 **Modify SLOs:**
@@ -708,4 +724,4 @@ k8s/sloth/
 
 ---
 
-**Last Updated**: December 5, 2025 - Reflects K6 Helm deployment, Sloth Operator SLO management, and Grafana Operator integration
+**Last Updated**: December 5, 2025 - Reflects Prometheus Operator migration (v0.5.0), K6 Helm deployment, Sloth Operator SLO management, and Grafana Operator integration

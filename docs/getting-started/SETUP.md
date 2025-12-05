@@ -18,7 +18,7 @@ chmod +x scripts/*.sh
 # Step 2: Install metrics infrastructure
 ./scripts/02-install-metrics.sh
 
-# Step 3: Deploy monitoring stack (BEFORE apps to collect metrics)
+# Step 3: Deploy monitoring stack (Prometheus Operator + Grafana Operator)
 ./scripts/03-deploy-monitoring.sh
 
 # Step 4: Deploy APM stack (BEFORE apps to collect traces/logs/profiles immediately)

@@ -1,0 +1,8 @@
+Deployed: {{ .Values.name }}
+Namespace: {{ include "microservice.namespace" . }}
+Replicas: {{ .Values.replicaCount }}
+
+View logs:
+  kubectl logs -n {{ include "microservice.namespace" . }} -l app={{ include "microservice.name" . }} -f
+
+

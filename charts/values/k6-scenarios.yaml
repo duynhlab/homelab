@@ -11,7 +11,10 @@ image:
   pullPolicy: IfNotPresent
 
 service:
-  enabled: false  # k6 không cần service
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  portName: http
 
 containerPort: 8080  # Dummy port (k6 không listen)
 
@@ -32,4 +35,8 @@ readinessProbe:
 labels:
   component: load-testing
   test-mode: multiple-scenarios
+
+# Override command for k6 (distroless image doesn't have shell)
+command: ["k6"]
+args: ["run", "/scripts/script.js"]
 

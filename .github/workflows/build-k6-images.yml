@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - v5
+      - v5-refactor
     paths:
       - 'k6/Dockerfile'
       - 'k6/*.js'
@@ -11,6 +12,7 @@ on:
   pull_request:
     branches:
       - v5
+      - v5-refactor
     paths:
       - 'k6/Dockerfile'
       - 'k6/*.js'

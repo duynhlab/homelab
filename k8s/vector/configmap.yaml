@@ -17,6 +17,11 @@ data:
         type: kubernetes_logs
         extra_field_selector: ""
         extra_label_selector: ""
+        exclude_paths_glob_patterns:
+          - "**/*.gz"
+          - "**/*.tmp"
+          - "**/*.log.*"
+          - "**/containers/*/checkpoints/**"
 
     transforms:
       add_labels:
@@ -70,5 +75,5 @@ data:
           rate_limit_duration_secs: 1
           rate_limit_num: 100
         healthcheck:
-          enabled: true
+          enabled: false
 

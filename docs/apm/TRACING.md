@@ -50,33 +50,29 @@ Distributed tracing is implemented using **OpenTelemetry** and **Grafana Tempo**
 
 ### How It Works
 
-```
-┌─────────────┐
-│   Request   │
-└──────┬──────┘
-       │ traceparent header
-       ▼
-┌─────────────────────────────────┐
-│  Tracing Middleware (10%)       │
-│  - Creates span automatically   │
-│  - Filters health/metrics       │
-│  - Propagates context          │
-└──────┬──────────────────────────┘
-       │
-       ▼
-┌─────────────────────────────────┐
-│  Business Logic                 │
-│  - Add attributes (optional)    │
-│  - Record errors                │
-│  - Create child spans          │
-└──────┬──────────────────────────┘
-       │
-       ▼
-┌─────────────────────────────────┐
-│  Tempo (Storage)                │
-│  - Stores traces                │
-│  - Queryable in Grafana        │
-└─────────────────────────────────┘
+```mermaid
+flowchart TD
+    A[Request<br/>traceparent header] --> B[Tracing Middleware 10%]
+    
+    B --> B1[Create span automatically]
+    B1 --> B2[Filter health/metrics]
+    B2 --> B3[Propagate context]
+    
+    B3 --> C[Business Logic]
+    
+    C --> C1[Add attributes optional]
+    C1 --> C2[Record errors]
+    C2 --> C3[Create child spans]
+    
+    C3 --> D[Tempo Storage]
+    
+    D --> D1[Stores traces]
+    D1 --> D2[Queryable in Grafana]
+    
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style C fill:#ffe1f5
+    style D fill:#e1ffe1
 ```
 
 ### Quick Setup

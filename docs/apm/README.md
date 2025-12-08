@@ -86,18 +86,21 @@ This project implements a comprehensive APM solution with four pillars:
 
 **Purpose**: Centralized log aggregation with trace-id correlation
 
-**Technology**: Vector (log collection) + Loki (log storage)
+**Technology**: Vector (log collection) + Loki v3.6.2 (log storage with pattern ingestion)
 
 **Features**:
 - JSON log parsing
 - Trace-id extraction and enrichment
 - Service name and namespace labels
 - Log-to-trace correlation
+- Pattern ingestion for Grafana Logs Drilldown
+- Automatic log level detection
 
 **Configuration**:
 - Vector collects logs from all pods
 - Parses JSON logs and extracts trace-id
 - Sends to Loki with labels for correlation
+- Loki v3.6.2 with pattern ingestion and level detection enabled
 
 **Deployment**:
 ```bash

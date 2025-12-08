@@ -2,7 +2,11 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -80,8 +84,40 @@ func main() {
 		port = "8080"
 	}
 
-	logger.Info("Starting product service", zap.String("port", port))
-	if err := r.Run(":" + port); err != nil {
-		logger.Fatal("Failed to start server", zap.Error(err))
+	// Create HTTP server
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: r,
 	}
+
+	// Start server in a goroutine
+	go func() {
+		logger.Info("Starting product service", zap.String("port", port))
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Fatal("Failed to start server", zap.Error(err))
+		}
+	}()
+
+	// Graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	logger.Info("Shutting down server...")
+
+	// Shutdown context with timeout
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Shutdown tracing (flush pending spans)
+	if err := middleware.Shutdown(shutdownCtx); err != nil {
+		logger.Error("Error shutting down tracer", zap.Error(err))
+	}
+
+	// Shutdown HTTP server
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Fatal("Server forced to shutdown", zap.Error(err))
+	}
+
+	logger.Info("Server exited gracefully")
 }

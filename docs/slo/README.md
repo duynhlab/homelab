@@ -208,7 +208,7 @@ kubectl get prometheusrules -n monitoring | grep sloth
 ### Query SLO Metrics
 
 ```bash
-kubectl port-forward -n monitoring svc/prometheus 9090:9090
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090
 curl 'http://localhost:9090/api/v1/query?query=slo:sli_error:ratio_rate5m'
 ```
 
@@ -235,7 +235,7 @@ kubectl logs -n monitoring -l app.kubernetes.io/name=sloth --tail=100
 
 ```bash
 # Check Prometheus rules
-kubectl port-forward -n monitoring svc/prometheus 9090:9090
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090
 # Open http://localhost:9090/rules
 
 # Check source metrics

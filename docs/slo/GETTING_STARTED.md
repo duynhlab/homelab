@@ -86,7 +86,7 @@ Check that SLO metrics are being collected:
 
 ```bash
 # Port-forward Prometheus
-kubectl port-forward -n monitoring svc/prometheus 9090:9090
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090
 
 # Query SLO metrics (examples)
 curl "http://localhost:9090/api/v1/query?query=slo:sli_error:ratio_rate5m{sloth_service=\"auth\"}"

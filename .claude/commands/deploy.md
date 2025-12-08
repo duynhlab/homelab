@@ -64,7 +64,7 @@ kind load docker-image ghcr.io/duynhne/auth:latest --name <cluster-name>
 ./scripts/06-deploy-microservices.sh
 
 # Step 7: Deploy k6 load testing (AFTER apps to test them)
-./scripts/07-deploy-k6-testing.sh
+./scripts/07-deploy-k6.sh
 
 # Step 8: Deploy SLO system (Required for SRE practices)
 ./scripts/08-deploy-slo.sh

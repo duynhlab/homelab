@@ -6,6 +6,45 @@
 
 This guide provides comprehensive information for AI agents working with this codebase. Use it to navigate the project structure, understand conventions, and execute common workflows.
 
+## Documentation Standards
+
+### Diagram Requirements
+
+**MANDATORY**: All architecture diagrams, flowcharts, and system visualizations MUST use Mermaid syntax.
+
+**Rules**:
+1. ❌ **NEVER** use ASCII art diagrams (boxes with `┌─┐`, arrows with `│`, `→`, `▼`, etc.)
+2. ✅ **ALWAYS** use Mermaid diagrams for:
+   - Architecture diagrams (`flowchart`, `graph`)
+   - Sequence diagrams (`sequenceDiagram`)
+   - State diagrams (`stateDiagram`)
+   - Entity relationship diagrams (`erDiagram`)
+   - Class diagrams (`classDiagram`)
+   - Gantt charts (`gantt`)
+
+**Examples**:
+
+```mermaid
+# Architecture diagram
+flowchart TD
+    A[Component A] --> B[Component B]
+    B --> C[Component C]
+```
+
+```mermaid
+# Sequence diagram
+sequenceDiagram
+    Client->>API: Request
+    API->>Database: Query
+    Database-->>API: Response
+    API-->>Client: Result
+```
+
+**Enforcement**: When reviewing or creating documentation:
+- Replace existing ASCII diagrams with Mermaid equivalents
+- Ensure all new diagrams use Mermaid syntax
+- Use appropriate Mermaid diagram types for the content
+
 ## Quick Navigation
 
 - [Project Structure](#project-structure-for-agent-navigation) - Directory organization and purpose
@@ -211,10 +250,16 @@ Numbered scripts (01-12) for deployment and operations:
 - `03-deploy-monitoring.sh` - Deploy Prometheus and install Grafana Operator (BEFORE apps to collect metrics immediately)
 
 **APM Stack (04) - Required:**
-- `04a-deploy-tempo.sh` - Deploy Grafana Tempo (distributed tracing)
+- `04a-deploy-tempo.sh` - Deploy Grafana Tempo (distributed tracing with 10% sampling)
 - `04b-deploy-pyroscope.sh` - Deploy Pyroscope (continuous profiling)
 - `04c-deploy-loki.sh` - Deploy Loki + Vector (log aggregation)
 - `04-deploy-apm.sh` - Deploy all APM components (deploy BEFORE apps to collect traces/logs/profiles immediately)
+
+**APM Configuration:**
+- Tracing sampling: 10% (production), 100% (development) - configurable via `OTEL_SAMPLE_RATE`
+- Request filtering: health/metrics endpoints automatically skipped
+- Graceful shutdown: automatic span flushing on termination
+- Service detection: automatic from Kubernetes pod metadata
 
 **Build & Deploy Applications (05-06):**
 - `05-build-microservices.sh` - Build Docker images for all 9 services
@@ -605,7 +650,7 @@ k8s/sloth/
 | `kubectl get pods -n {namespace}` | List pods in namespace (e.g., auth, user, monitoring) |
 | `kubectl logs -l app={service-name} -n {namespace}` | View service logs |
 | `kubectl port-forward -n monitoring svc/grafana-service 3000:3000` | Port-forward Grafana |
-| `kubectl port-forward -n monitoring svc/prometheus 9090:9090` | Port-forward Prometheus |
+| `kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090` | Port-forward Prometheus |
 | `kubectl rollout restart deployment/{name} -n {namespace}` | Restart deployment |
 
 ### Access Points

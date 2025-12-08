@@ -307,7 +307,7 @@ Use k6 to test all services:
 
 ```bash
 # Deploy k6 load generators
-./scripts/07-deploy-k6-testing.sh
+./scripts/07-deploy-k6.sh
 
 # View k6 logs
 kubectl logs -n monitoring -l app=k6-load-generator-scenarios -f

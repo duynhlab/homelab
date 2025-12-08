@@ -19,7 +19,7 @@ kubectl port-forward -n monitoring svc/grafana-service 3000:3000 > /dev/null 2>&
 
 # Prometheus
 echo "Starting Prometheus port forward (9090)..."
-kubectl port-forward -n monitoring svc/prometheus 9090:9090 > /dev/null 2>&1 &
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090 > /dev/null 2>&1 &
 
 # User Service
 echo "Starting User Service port forward (8081)..."

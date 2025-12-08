@@ -29,28 +29,33 @@ data:
         inputs:
           - kubernetes_logs
         source: |
-          # Add service from pod label (use pod_name as fallback to avoid too many "unknown" streams)
-          if exists(.pod_labels."app") {
-            .service = .pod_labels."app"
-          } else if exists(.pod_name) {
-            .service = .pod_name
+          # Extract service from kubernetes.pod_labels.app
+          if exists(.kubernetes.pod_labels."app") {
+            .service = to_string!(.kubernetes.pod_labels."app")
+          } else if exists(.kubernetes.pod_name) {
+            .service = to_string!(.kubernetes.pod_name)
           } else {
             .service = "system"
           }
           
-          # Add namespace (always use pod_namespace if available)
-          if exists(.pod_namespace) {
-            .namespace = .pod_namespace
+          # Extract namespace from kubernetes.pod_namespace
+          if exists(.kubernetes.pod_namespace) {
+            .namespace = to_string!(.kubernetes.pod_namespace)
           } else {
             .namespace = "kube-system"
           }
           
-          # Ensure pod_name and container_name exist (use actual values, not "unknown")
-          if !exists(.pod_name) {
+          # Extract pod_name from kubernetes.pod_name
+          if exists(.kubernetes.pod_name) {
+            .pod_name = to_string!(.kubernetes.pod_name)
+          } else {
             .pod_name = "unknown-pod"
           }
           
-          if !exists(.container_name) {
+          # Extract container_name from kubernetes.container_name
+          if exists(.kubernetes.container_name) {
+            .container_name = to_string!(.kubernetes.container_name)
+          } else {
             .container_name = "unknown-container"
           }
 

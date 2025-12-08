@@ -22,6 +22,9 @@ data:
           - "**/*.tmp"
           - "**/*.log.*"
           - "**/containers/*/checkpoints/**"
+      
+      internal_metrics:
+        type: internal_metrics
 
     transforms:
       add_labels:
@@ -81,4 +84,11 @@ data:
           rate_limit_num: 100
         healthcheck:
           enabled: false
+      
+      prometheus_exporter:
+        type: prometheus_exporter
+        inputs:
+          - internal_metrics
+        address: 0.0.0.0:9090
+        default_namespace: vector
 

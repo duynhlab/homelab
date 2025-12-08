@@ -43,6 +43,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - Commented out restrictive `securityContext` settings (kept for reference)
    - Enabled debug logging temporarily for troubleshooting (now reverted to default)
 
+6. **Grafana Datasource URL** (`k8s/grafana-operator/datasource-prometheus.yaml`)
+   - Fixed Prometheus service name after Prometheus Operator migration
+   - Changed from: `prometheus-kube-prometheus-prometheus` → `kube-prometheus-stack-prometheus`
+   - **Impact**: Grafana can now connect to Prometheus, dashboards load data correctly
+
+7. **Port-forward Script** (`scripts/09-setup-access.sh`)
+   - Fixed Prometheus service name for port-forwarding
+   - Changed from: `svc/prometheus` → `svc/kube-prometheus-stack-prometheus`
+   - **Impact**: `http://localhost:9090` now accessible
+
+8. **ServiceMonitor Label** (`k8s/prometheus/servicemonitor-microservices.yaml`)
+   - Fixed label selector to match Prometheus Operator expectations
+   - Changed from: `prometheus: kube-prometheus` → `release: kube-prometheus-stack`
+   - **Impact**: Prometheus now discovers and scrapes all 18 microservice pod targets
+
+9. **ServiceMonitor Job Label** (`k8s/prometheus/servicemonitor-microservices.yaml`)
+   - Added relabeling to set `job="microservices"` for all targets
+   - Preserves original service name in `service` label
+   - **Impact**: Dashboard queries with `job=~"microservices"` filter now work correctly
+   - **Note**: See `docs/monitoring/METRICS_LABEL_SOLUTIONS.md` for alternative approach (Option B)
+
 ### Changed
 
 1. **GitHub Actions Workflows** - Added support for `v5-refactor` branch

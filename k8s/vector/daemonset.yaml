@@ -27,8 +27,12 @@ spec:
             fieldRef:
               fieldPath: spec.nodeName
         ports:
-        - name: http
+        - name: api
           containerPort: 8686
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
         volumeMounts:
         - name: vector-config
           mountPath: /etc/vector

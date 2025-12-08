@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "Monitoring dashboard for Go REST API microservices with 32 panels in 5 row groups covering response time, RPS, error rates, resource usage, Go runtime health, and memory leak detection.",
+  "description": "Production-grade monitoring dashboard for Go microservices. 32 panels covering RED metrics, response time percentiles (P50/P95/P99), error rates, Apdex score, Go runtime health, memory leak detection, and service-level resource aggregation. Multi-service filtering with dynamic variables.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -661,7 +661,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "count(up{app=~\"$app\", namespace=~\"$namespace\"})",
+          "expr": "count(up{job=~\"microservices\", app=~\"$app\", namespace=~\"$namespace\"})",
           "refId": "A"
         }
       ],
@@ -2468,8 +2468,10 @@
   "style": "dark",
   "tags": [
     "prometheus",
-    "monitoring",
-    "kubernetes"
+    "kubernetes",
+    "microservices",
+    "go",
+    "observability"
   ],
   "templating": {
     "list": [

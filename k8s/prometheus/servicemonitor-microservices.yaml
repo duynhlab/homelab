@@ -4,7 +4,7 @@ metadata:
   name: microservices-api
   namespace: monitoring
   labels:
-    prometheus: kube-prometheus
+    release: kube-prometheus-stack
 spec:
   # Select specific microservice namespaces
   namespaceSelector:
@@ -31,6 +31,12 @@ spec:
     interval: 15s
     scrapeTimeout: 10s
     relabelings:
+      # Set job label to "microservices" for all targets (for dashboard queries)
+      - targetLabel: job
+        replacement: microservices
+      # Preserve original service name in "service" label
+      - sourceLabels: [__meta_kubernetes_service_name]
+        targetLabel: service
       # Add namespace label from pod metadata
       - sourceLabels: [__meta_kubernetes_namespace]
         targetLabel: namespace

@@ -65,9 +65,17 @@ This project implements a comprehensive APM solution with four pillars:
 - Trace-to-metrics correlation
 
 **Configuration**:
-- Tempo endpoint: `http://tempo.monitoring.svc.cluster.local:4318`
+- Tempo endpoint: `tempo.monitoring.svc.cluster.local:4318`
 - OTLP HTTP protocol
-- Service name from `APP_NAME` environment variable
+- Service name: auto-detected from Kubernetes pod
+- Sampling: 10% (production), 100% (development)
+- Request filtering: health/metrics endpoints skipped
+- Graceful shutdown: automatic span flushing
+
+**Environment Variables**:
+- `OTEL_SAMPLE_RATE`: Sampling rate (0.0-1.0, default: 0.1)
+- `ENV`: Environment (development=100% sampling, others=10%)
+- `TEMPO_ENDPOINT`: Override Tempo endpoint
 
 **Deployment**:
 ```bash

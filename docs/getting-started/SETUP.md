@@ -287,7 +287,7 @@ kubectl get prometheusservicelevels -n monitoring
 kubectl get prometheusrules -n monitoring
 
 # Check Prometheus rules
-kubectl port-forward -n monitoring svc/prometheus 9090:9090 &
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090 &
 curl http://localhost:9090/api/v1/rules
 # Expected: SLO rules visible
 ```
@@ -367,7 +367,7 @@ k6-load-generator-xxx                   1/1     Running   0          2m
 ### Check Prometheus Targets
 
 ```bash
-kubectl port-forward -n monitoring svc/prometheus 9090:9090 &
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090 &
 # Open http://localhost:9090/targets
 ```
 
@@ -434,7 +434,7 @@ If NodePort doesn't work (WSL2/Windows issues):
 kubectl port-forward svc/grafana-service 3000:3000 -n monitoring &
 
 # Forward Prometheus
-kubectl port-forward svc/prometheus 9090:9090 -n monitoring &
+kubectl port-forward svc/kube-prometheus-stack-prometheus 9090:9090 -n monitoring &
 
 # Forward Go API (example: auth)
 kubectl port-forward svc/auth 8080:8080 -n auth &

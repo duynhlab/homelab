@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.6.8] - 2025-12-08
+
+### Changed
+
+1. **Tempo Upgrade - 2.3.1 → 2.9.0**
+   - Upgraded Grafana Tempo from v2.3.1 to v2.9.0
+   - Enabled metrics-generator for TraceQL rate() queries
+   - Added service graphs and span metrics generation
+   - Added metrics port (9090) for Prometheus scraping
+   - **Impact**: Fixes TraceQL rate() query 404 errors in Grafana Logs Drilldown
+   - **Files**: `k8s/tempo/deployment.yaml`, `k8s/tempo/configmap.yaml`, `k8s/tempo/service.yaml`
+
+### Fixed
+
+1. **TraceQL Rate Query 404 Error**
+   - **Symptom**: `rate()` queries fail with "404 page not found" in Grafana Logs Drilldown
+   - **Root Cause**: Metrics-generator was not enabled in Tempo configuration
+   - **Solution**: Enabled metrics-generator with service graphs and span metrics processors
+   - **Verification**: TraceQL queries like `{resource.service.name != nil} | rate() by(resource.service.name)` now work correctly
+   - **Benefits**: 
+     - Enables Grafana Logs → Traces correlation
+     - Automatic service dependency mapping via service graphs
+     - RED metrics (Rate, Errors, Duration) from traces
+     - Trace-to-metrics correlation for faster troubleshooting
+
+---
+
 ## [0.6.7] - 2025-12-08
 
 ### Changed

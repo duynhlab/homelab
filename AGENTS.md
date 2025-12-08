@@ -166,8 +166,8 @@ Generic Helm chart for deploying all microservices:
 
 ```
 charts/
-├── Chart.yaml             # Chart metadata (name: microservice, version: 0.1.0)
-├── values.yaml            # Default values
+├── Chart.yaml             # Chart metadata (name: microservice, version: 0.2.0)
+├── values.yaml            # Default values (includes extraEnv pattern)
 ├── values/                # Per-service value overrides
 │   ├── auth.yaml
 │   ├── user.yaml
@@ -180,7 +180,7 @@ charts/
 │   └── shipping-v2.yaml
 └── templates/
     ├── _helpers.tpl       # Template helpers
-    ├── deployment.yaml    # Deployment template
+    ├── deployment.yaml    # Deployment template (unified env block)
     └── service.yaml       # Service template
 ```
 
@@ -252,7 +252,7 @@ Numbered scripts (01-12) for deployment and operations:
 - `03-deploy-monitoring.sh` - Deploy Prometheus and install Grafana Operator (BEFORE apps to collect metrics immediately)
 
 **APM Stack (04) - Required:**
-- `04a-deploy-tempo.sh` - Deploy Grafana Tempo (distributed tracing with 10% sampling)
+- `04a-deploy-tempo.sh` - Deploy Grafana Tempo v2.9.0 (distributed tracing with metrics-generator for TraceQL rate() queries)
 - `04b-deploy-pyroscope.sh` - Deploy Pyroscope (continuous profiling)
 - `04c-deploy-loki.sh` - Deploy Loki + Vector (log aggregation)
 - `04-deploy-apm.sh` - Deploy all APM components (deploy BEFORE apps to collect traces/logs/profiles immediately)
@@ -800,4 +800,4 @@ k8s/sloth/
 
 ---
 
-**Last Updated**: December 8, 2025 - Reflects Vector self-monitoring (v0.6.1), Loki v3.6.2 upgrade, and Grafana dashboards expansion
+**Last Updated**: December 8, 2025 - Tempo v2.9.0 with metrics-generator for TraceQL rate() queries (v0.6.8)

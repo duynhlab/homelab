@@ -520,6 +520,140 @@ Too many unique label combinations (e.g., unique `path` values)
 
 ---
 
+## Job Label Strategy: Two Approaches
+
+### Current Approach: Option A - Unified `job="microservices"` Label
+
+**Implementation:** ServiceMonitor relabeling sets `job="microservices"` for all microservice targets.
+
+**Configuration** (`k8s/prometheus/servicemonitor-microservices.yaml`):
+```yaml
+endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s
+    scrapeTimeout: 10s
+    relabelings:
+      # Set job label to "microservices" for all targets
+      - targetLabel: job
+        replacement: microservices
+      # Preserve original service name in "service" label
+      - sourceLabels: [__meta_kubernetes_service_name]
+        targetLabel: service
+      # Add namespace and app labels
+      - sourceLabels: [__meta_kubernetes_namespace]
+        targetLabel: namespace
+      - sourceLabels: [__meta_kubernetes_service_label_app]
+        targetLabel: app
+```
+
+**Labels after scrape:**
+```
+job="microservices"          # Same for all services
+app="auth"                   # Service identifier
+service="auth"               # Original service name
+namespace="auth"             # Kubernetes namespace
+instance="10.244.1.6:8080"   # Pod IP:port
+```
+
+**Dashboard Queries:**
+```promql
+# Works with job filter
+sum(rate(request_duration_seconds_count{job=~"microservices", app=~"$app", namespace=~"$namespace"}[5m]))
+
+# Filters out system metrics (kubelet, node-exporter, etc.)
+up{job="microservices"}
+```
+
+**Advantages:**
+- ✅ Backward compatible with existing dashboard queries
+- ✅ Clear separation: microservices vs system metrics vs monitoring stack
+- ✅ Scalable: new services auto-discovered, queries work immediately
+- ✅ Consistent with pre-v0.5.0 convention (before Prometheus Operator migration)
+- ✅ Single filter to identify all microservices: `job="microservices"`
+
+**Use Case:** When you have multiple service types (microservices, databases, monitoring stack) and want clear grouping.
+
+---
+
+### Alternative Approach: Option B - Individual Job Labels
+
+**Implementation:** Let ServiceMonitor use default behavior (job = service name).
+
+**Configuration** (`k8s/prometheus/servicemonitor-microservices.yaml`):
+```yaml
+endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s
+    scrapeTimeout: 10s
+    relabelings:
+      # Only inject namespace and app, let job default to service name
+      - sourceLabels: [__meta_kubernetes_namespace]
+        targetLabel: namespace
+      - sourceLabels: [__meta_kubernetes_service_label_app]
+        targetLabel: app
+```
+
+**Labels after scrape:**
+```
+job="auth"                   # Service name (Prometheus default)
+app="auth"                   # Service identifier
+namespace="auth"             # Kubernetes namespace
+instance="10.244.1.6:8080"   # Pod IP:port
+```
+
+**Dashboard Queries:**
+```promql
+# Remove job filter (or use regex for all services)
+sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[5m]))
+
+# Or match multiple jobs explicitly
+sum(rate(request_duration_seconds_count{job=~"auth|user|product|cart|order|review|notification|shipping|shipping-v2", app=~"$app"}[5m]))
+```
+
+**Advantages:**
+- ✅ Simpler configuration (fewer relabel rules)
+- ✅ Follows Prometheus convention: `job` = scrape target identity
+- ✅ Each service is independently identifiable by `job` label
+
+**Disadvantages:**
+- ❌ Requires updating all dashboard queries (30+ panels)
+- ❌ Harder to filter microservices vs system metrics
+- ❌ If adding non-microservice apps later, queries might pick up unwanted metrics
+
+**Use Case:** When you only have microservices and want Prometheus defaults with minimal customization.
+
+---
+
+### Migration Path: Option A → Option B
+
+If you later want to switch from Option A to Option B:
+
+1. **Update ServiceMonitor** - Remove `job` relabeling:
+   ```bash
+   # Edit k8s/prometheus/servicemonitor-microservices.yaml
+   # Remove the "targetLabel: job" relabeling rule
+   kubectl apply -f k8s/prometheus/servicemonitor-microservices.yaml
+   ```
+
+2. **Update Dashboard Queries** - Remove `job` filter:
+   ```bash
+   # Edit k8s/grafana-operator/dashboards/microservices-dashboard.json
+   # Replace all instances of:
+   #   {job=~"microservices", app=~"$app", namespace=~"$namespace"}
+   # With:
+   #   {app=~"$app", namespace=~"$namespace"}
+   
+   ./scripts/10-reload-dashboard.sh
+   ```
+
+3. **Verify** - Check panels load data correctly after Prometheus/Grafana reload.
+
+**Estimated effort:** 30-45 minutes (editing 30+ queries in dashboard JSON).
+
+---
+
 ## Related Documentation
 
 - [METRICS.md](./METRICS.md) - Complete metrics documentation
@@ -530,4 +664,4 @@ Too many unique label combinations (e.g., unique `path` values)
 
 ---
 
-**Last Updated**: December 5, 2025 - v0.5.0 (Prometheus Operator migration)
+**Last Updated**: December 7, 2025 - v0.5.0 (Added job label strategy documentation)

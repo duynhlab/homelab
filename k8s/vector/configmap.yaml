@@ -61,6 +61,14 @@ data:
           } else {
             .container_name = "unknown-container"
           }
+          
+          # Parse JSON message and extract level field
+          if exists(.message) {
+            parsed, err = parse_json(.message)
+            if err == null && exists(parsed.level) {
+              .level = to_string!(parsed.level)
+            }
+          }
 
     sinks:
       loki:

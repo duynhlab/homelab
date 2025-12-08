@@ -187,7 +187,7 @@ kubectl port-forward -n cart svc/cart 8085:8080 &
 
 # Access monitoring
 kubectl port-forward -n monitoring svc/grafana-service 3000:3000 &
-kubectl port-forward -n monitoring svc/prometheus 9090:9090 &
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090 &
 
 # Access APM services (after Step 17)
 kubectl port-forward -n monitoring svc/tempo 3200:3200 &
@@ -347,7 +347,7 @@ kubectl logs -n monitoring -l app=k6-load-generator-scenarios -f
 for i in {1..100}; do curl http://localhost:8080/api/users & done
 
 # Or deploy k6 load generators
-./scripts/07-deploy-k6-testing.sh
+./scripts/07-deploy-k6.sh
 ```
 
 ---
@@ -358,65 +358,79 @@ for i in {1..100}; do curl http://localhost:8080/api/users & done
 
 All microservices follow a clean 3-layer architecture pattern:
 
-```
-┌─────────────────────────────────────────┐
-│         HTTP Request (Gin)              │
-└──────────────┬──────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────┐
-│      Middleware Chain                   │
-│  ┌──────────────────────────────────┐   │
-│  │ 1. TracingMiddleware()           │   │
-│  │ 2. LoggingMiddleware()           │   │
-│  │ 3. PrometheusMiddleware()        │   │
-│  └──────────────────────────────────┘   │
-└──────────────┬──────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────┐
-│   Layer 1: Web (HTTP Handlers)          │
-│   internal/{service}/web/v1/            │
-│   internal/{service}/web/v2/            │
-└──────────────┬──────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────┐
-│   Layer 2: Logic (Business Logic)       │
-│   internal/{service}/logic/v1/          │
-│   internal/{service}/logic/v2/          │
-└──────────────┬──────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────┐
-│   Layer 3: Core (Domain Models)         │
-│   internal/{service}/core/domain/       │
-└─────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A[HTTP Request - Gin] --> B[Middleware Chain]
+    
+    subgraph Middleware
+        B --> B1[1. TracingMiddleware]
+        B1 --> B2[2. LoggingMiddleware]
+        B2 --> B3[3. PrometheusMiddleware]
+    end
+    
+    B3 --> C[Layer 1: Web - HTTP Handlers]
+    
+    subgraph Web["Web Layer"]
+        C --> C1[internal/{service}/web/v1/]
+        C --> C2[internal/{service}/web/v2/]
+    end
+    
+    C --> D[Layer 2: Logic - Business Logic]
+    
+    subgraph Logic["Logic Layer"]
+        D --> D1[internal/{service}/logic/v1/]
+        D --> D2[internal/{service}/logic/v2/]
+    end
+    
+    D --> E[Layer 3: Core - Domain Models]
+    
+    subgraph Core["Core Layer"]
+        E --> E1[internal/{service}/core/domain/]
+    end
+    
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style C fill:#ffe1f5
+    style D fill:#f5e1ff
+    style E fill:#e1ffe1
 ```
 
 ### APM Stack Integration
 
 Each layer integrates with the APM stack for comprehensive observability:
 
-```
-┌─────────────────────────────────────────┐
-│   Microservices (9 services)            │
-│   ┌──────────┐  ┌──────────┐           │
-│   │  Web     │→ │  Logic   │→ │ Core   │
-│   │  Layer   │  │  Layer   │  │ Layer  │
-│   └────┬─────┘  └────┬─────┘  └────────┘
-│        │             │                  │
-│        ├─ Traces ────┼──► Tempo         │
-│        ├─ Logs ──────┼──► Vector → Loki │
-│        ├─ Metrics ───┼──► Prometheus    │
-│        └─ Profiles ──┼──► Pyroscope     │
-└─────────────────────────────────────────┘
-                │
-                ▼
-┌─────────────────────────────────────────┐
-│            Grafana                      │
-│   (Unified observability dashboard)     │
-└─────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Services["Microservices (9 services)"]
+        Web[Web Layer<br/>HTTP Handlers] --> Logic[Logic Layer<br/>Business Logic]
+        Logic --> Core[Core Layer<br/>Domain Models]
+    end
+    
+    Web -.Traces.-> Tempo[(Tempo<br/>Distributed Tracing)]
+    Logic -.Traces.-> Tempo
+    
+    Web -.Logs.-> Vector[Vector<br/>Log Collector]
+    Logic -.Logs.-> Vector
+    Vector --> Loki[(Loki<br/>Log Storage)]
+    
+    Web -.Metrics.-> Prometheus[(Prometheus<br/>Metrics)]
+    Logic -.Metrics.-> Prometheus
+    
+    Web -.Profiles.-> Pyroscope[(Pyroscope<br/>Continuous Profiling)]
+    Logic -.Profiles.-> Pyroscope
+    
+    Tempo --> Grafana[Grafana<br/>Unified Observability Dashboard]
+    Loki --> Grafana
+    Prometheus --> Grafana
+    Pyroscope --> Grafana
+    
+    style Services fill:#e1f5ff
+    style Tempo fill:#ff9999
+    style Loki fill:#99ccff
+    style Prometheus fill:#ffcc99
+    style Pyroscope fill:#cc99ff
+    style Grafana fill:#99ff99
+    style Vector fill:#cccccc
 ```
 
 📖 **For detailed architecture diagrams with mermaid visualizations, see [docs/apm/ARCHITECTURE.md](./docs/apm/ARCHITECTURE.md)**
@@ -573,7 +587,7 @@ pkill -f "kubectl port-forward"
 
 # Restart port forwarding
 kubectl port-forward -n monitoring svc/grafana-service 3000:3000 &
-kubectl port-forward -n monitoring svc/prometheus 9090:9090 &
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090 &
 kubectl port-forward -n user svc/user 8081:8080 &
 ```
 
@@ -611,7 +625,7 @@ A: Yes! This is a production-ready template. Add:
 A: Add handlers in `handlers/` directory. Metrics are auto-collected via middleware.
 
 **Q: Dashboard shows no data?**
-A: Generate traffic first! Deploy k6 load generators with `./scripts/07-deploy-k6-testing.sh` or generate traffic manually.
+A: Generate traffic first! Deploy k6 load generators with `./scripts/07-deploy-k6.sh` or generate traffic manually.
 
 **Q: What's Apdex Score?**
 A: Application Performance Index. 0-1 scale measuring user satisfaction based on response times.

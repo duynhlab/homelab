@@ -58,7 +58,7 @@ Analyze requirements and create implementation plan
 
 ## Scripts Reference
 - Infrastructure: `01-create-kind-cluster.sh`, `02-install-metrics.sh`
-- Build & Deploy: `05-build-microservices.sh`, `06-deploy-microservices.sh`, `03-deploy-monitoring.sh`, `07-deploy-k6-testing.sh`, `09-setup-access.sh`
+- Build & Deploy: `05-build-microservices.sh`, `06-deploy-microservices.sh`, `03-deploy-monitoring.sh`, `07-deploy-k6.sh`, `09-setup-access.sh`
 - Monitoring: `10-reload-dashboard.sh`
-- SLO: `08a-validate-slo.sh`, `08b-generate-slo-rules.sh`, `08-deploy-slo.sh`
+- SLO: `08-deploy-slo.sh`
 - Runbooks: `11-diagnose-latency.sh`, `12-error-budget-alert.sh`

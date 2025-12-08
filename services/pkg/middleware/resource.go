@@ -74,13 +74,14 @@ func detectServiceInfo() (serviceName, namespace string) {
 	return serviceName, namespace
 }
 
-// createResource creates an OpenTelemetry resource with auto-detected attributes
-func createResource() (*resource.Resource, error) {
+// CreateResource creates an OpenTelemetry resource with auto-detected attributes
+// This function is exported for use by other middleware (tracing, profiling)
+func CreateResource(ctx context.Context) (*resource.Resource, error) {
 	serviceName, namespace := detectServiceInfo()
 	
 	// Create resource with detected attributes
 	res, err := resource.New(
-		context.Background(),
+		ctx,
 		resource.WithFromEnv(),      // Read OTEL_* env vars if set
 		resource.WithProcess(),       // Add process info (PID, executable path)
 		resource.WithOS(),            // Add OS info

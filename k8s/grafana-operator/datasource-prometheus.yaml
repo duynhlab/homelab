@@ -11,7 +11,7 @@ spec:
     name: Prometheus
     type: prometheus
     access: proxy
-    url: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+    url: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
     isDefault: true
     uid: prometheus
     jsonData:

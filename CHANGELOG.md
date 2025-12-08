@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.6.1] - 2025-12-08
+
+### Changed
+
+1. **Documentation - ASCII to Mermaid Diagrams**
+   - Converted all ASCII art diagrams to Mermaid syntax for better rendering
+   - Updated `README.md`: 2 architecture diagrams (3-Layer + APM Stack)
+   - Updated `docs/apm/ARCHITECTURE.md`: Removed duplicate ASCII diagram (Mermaid already existed)
+   - Updated `docs/apm/TRACING.md`: Converted tracing flow diagram
+   - Added mandatory diagram standards to `AGENTS.md`
+   - **Benefit**: Better GitHub rendering, responsive, version control friendly, maintainable
+
+2. **Loki Upgrade - v2.9.2 → v3.6.2**
+   - Upgraded Loki image from `grafana/loki:2.9.2` to `grafana/loki:3.6.2`
+   - Enabled pattern ingestion for Grafana Logs Drilldown (`--pattern-ingester.enabled=true`)
+   - Enabled log level detection (`--validation.discover-log-levels=true`)
+   - Added `discover_log_levels: true` to `limits_config`
+   - **Benefit**: Supports Grafana Logs Drilldown (Grafana 11.6+, requires Loki 3.2+)
+   - **Features**: Automatic pattern detection, log level detection, volume queries
+   - **Files**: `k8s/loki/deployment.yaml`, `k8s/loki/configmap.yaml`
+   - **Documentation**: Updated `docs/apm/README.md`, `docs/apm/LOGGING.md`, `AGENTS.md`
+
+### Removed
+
+1. **Cleanup Deprecated Backup Files**
+   - Removed `slo/definitions/` - SLO definitions migrated to Sloth Operator CRDs (`k8s/sloth/crds/`)
+   - Removed `k8s/prometheus/backup/` - Standalone Prometheus manifests replaced by Prometheus Operator
+   - **Benefit**: Cleaner codebase, no confusion between old and new configs
+   - Added `internal_metrics` source to collect Vector's internal metrics
+   - Added `prometheus_exporter` sink to expose metrics on port 9090
+   - Created Vector Service (`k8s/vector/service.yaml`) for ClusterIP access
+   - Created ServiceMonitor (`k8s/vector/servicemonitor.yaml`) for Prometheus scraping
+   - **Grafana Dashboard**: Imported official Vector dashboard (ID: 21954) for comprehensive monitoring
+   - **Metrics namespace**: `vector_*` (events processed, errors, throughput, buffer utilization)
+   - **Benefits**: Monitor logging pipeline health, detect issues early, capacity planning
+   - **Files**: `k8s/vector/configmap.yaml`, `k8s/vector/daemonset.yaml`, `k8s/vector/service.yaml`, `k8s/vector/servicemonitor.yaml`, `k8s/grafana-operator/dashboards/grafana-dashboard-vector.yaml`
+   - **Script**: Updated `scripts/04c-deploy-loki.sh` to deploy Vector service and ServiceMonitor
+   - **Documentation**: Added "Vector Monitoring" section to `docs/apm/LOGGING.md`
+
+---
+
 ## [0.6.0] - 2025-12-08
 
 ### Production-Ready OpenTelemetry Tracing

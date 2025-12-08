@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.6.7] - 2025-12-08
+
+### Changed
+
+1. **Helm Chart - extraEnv Pattern Implementation**
+   - **Chart Version**: Bumped from `0.1.0` → `0.2.0` (minor version for new feature + bug fix)
+   - **Added `extraEnv` field** to `charts/values.yaml` for flexible environment variable management
+   - Follows industry standard pattern (Bitnami/popular Helm charts)
+   - Users can now add custom env vars without modifying templates
+   - Example usage:
+     ```yaml
+     extraEnv:
+       - name: MY_CUSTOM_VAR
+         value: "custom_value"
+       - name: SECRET_KEY
+         valueFrom:
+           secretKeyRef:
+             name: my-secret
+             key: key
+     ```
+   - **Files**: `charts/Chart.yaml`, `charts/values.yaml`
+
+### Fixed
+
+1. **Helm Deployment Template - Duplicate Env Blocks Bug**
+   - Fixed critical bug where duplicate `env:` blocks were generated when both `.Values.env` and `.Values.tracing.enabled` were true
+   - **Root Cause**: Template had two separate `env:` block definitions that created invalid YAML
+   - **Solution**: Unified env block with conditional merging logic:
+     - Single `{{- if or .Values.env .Values.extraEnv .Values.tracing.enabled }}` condition
+     - Merges in order: `.Values.env` → tracing vars → `.Values.extraEnv`
+     - All env vars in single block, no duplicates
+   - **Impact**: Fixes deployment failures caused by invalid Kubernetes manifests
+   - **Files**: `charts/templates/deployment.yaml` (lines 52-66)
+
+### Benefits
+
+- ✅ **Single Source of Truth**: One `env:` block merges all environment variable sources
+- ✅ **Flexible Configuration**: Users can add custom env vars via `extraEnv` without template modifications
+- ✅ **Industry Standard**: Follows Bitnami/popular charts pattern for env var management
+- ✅ **Backwards Compatible**: No breaking changes (no existing services use `.Values.env`)
+- ✅ **Production Ready**: Tracing vars auto-injected when enabled, custom vars via `extraEnv`
+
+---
+
+## [0.6.5] - 2025-12-08
+
+### Changed
+
+1. **OpenTelemetry Tracing Configuration - Production Best Practices**
+   - **Helm Chart Integration**: Moved Tempo endpoint from hardcoded to Helm values
+     - Added `tracing.enabled`, `tracing.endpoint`, `tracing.sampleRate` to `charts/values.yaml`
+     - All 9 microservice values files updated with tracing config (10% sampling by default)
+     - Deployment template injects `TEMPO_ENDPOINT` and `OTEL_SAMPLE_RATE` as environment variables
+   - **Context Timeout for Exporter**: Added 10s timeout for OTLP exporter creation
+     - Prevents indefinite hangs if Tempo is unreachable during startup
+     - Uses `context.WithTimeout()` instead of `context.Background()`
+   - **Gzip Compression**: Enabled compression for OTLP HTTP export
+     - Reduces network bandwidth by ~60% (especially important at scale)
+     - Added `otlptracehttp.WithCompression(otlptracehttp.GzipCompression)`
+   - **Configuration Priority**: Runtime env vars > Helm values > Code defaults
+   - **Benefits**: More flexible, production-ready, follows 12-factor app principles
+   - **Files**: `services/pkg/middleware/tracing.go`, `charts/values.yaml`, `charts/templates/deployment.yaml`, `charts/values/*.yaml` (9 services)
+   - **Documentation**: Updated `docs/apm/TRACING.md` with Helm configuration section
+
+### Fixed
+
+1. **Helm Deployment Template - Conditional Environment Variables**
+   - Fixed env var injection to handle cases where `.Values.env` is empty
+   - Prevents YAML syntax errors when tracing config is enabled but no custom env vars exist
+   - **Files**: `charts/templates/deployment.yaml`
+
+---
+
 ## [0.6.1] - 2025-12-08
 
 ### Changed
@@ -24,10 +97,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - Enabled pattern ingestion for Grafana Logs Drilldown (`--pattern-ingester.enabled=true`)
    - Enabled log level detection (`--validation.discover-log-levels=true`)
    - Added `discover_log_levels: true` to `limits_config`
+   - Fixed v3.6.2 compatibility issues:
+     - Removed deprecated `compactor.shared_store` field
+     - Replaced `chunk_store_config.max_look_back_period` with `query_range.max_query_length`
+     - Added required `compactor.delete_request_store: filesystem` for retention
    - **Benefit**: Supports Grafana Logs Drilldown (Grafana 11.6+, requires Loki 3.2+)
    - **Features**: Automatic pattern detection, log level detection, volume queries
    - **Files**: `k8s/loki/deployment.yaml`, `k8s/loki/configmap.yaml`
    - **Documentation**: Updated `docs/apm/README.md`, `docs/apm/LOGGING.md`, `AGENTS.md`
+
+3. **Vector JSON Parsing for Log Level Detection**
+   - Added JSON parsing in Vector's `add_labels` transform
+   - Automatically extracts `level` field from structured log messages (e.g., `{"level":"info",...}`)
+   - Promotes `level` from nested JSON to top-level field for Loki's `discover_log_levels` feature
+   - **Benefit**: Loki can now detect log levels (info, warn, error) from application logs
+   - **Files**: `k8s/vector/configmap.yaml`
+   - **Documentation**: Updated `docs/apm/LOGGING.md`
 
 ### Removed
 

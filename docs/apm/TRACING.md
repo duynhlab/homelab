@@ -106,14 +106,50 @@ kubectl port-forward -n monitoring svc/grafana-service 3000:3000
 
 ## Configuration
 
+### Helm Chart Configuration (Recommended)
+
+Configure tracing via Helm values (`charts/values/*.yaml`):
+
+```yaml
+tracing:
+  enabled: true
+  endpoint: "tempo.monitoring.svc.cluster.local:4318"
+  sampleRate: "0.1"  # 10% sampling (0.0-1.0)
+```
+
+**Per-service customization:**
+```yaml
+# charts/values/user.yaml
+tracing:
+  enabled: true
+  endpoint: "tempo.monitoring.svc.cluster.local:4318"
+  sampleRate: "0.5"  # 50% sampling for high-traffic service
+```
+
+**Deployment example:**
+```bash
+# Deploy with custom tracing config
+helm upgrade --install user charts/ \
+  -f charts/values/user.yaml \
+  --set tracing.sampleRate=0.2 \
+  -n user
+```
+
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OTEL_SAMPLE_RATE` | `0.1` (10%) | Trace sampling rate (0.0-1.0) |
-| `ENV` | `production` | Environment: `development`=100% sampling, others=10% |
-| `TEMPO_ENDPOINT` | `tempo.monitoring.svc.cluster.local:4318` | Tempo OTLP endpoint |
-| `OTEL_SERVICE_NAME` | (auto-detected) | Override service name |
+| Variable | Default | Description | Helm Override |
+|----------|---------|-------------|---------------|
+| `TEMPO_ENDPOINT` | `tempo.monitoring.svc.cluster.local:4318` | Tempo OTLP HTTP endpoint | `tracing.endpoint` |
+| `OTEL_SAMPLE_RATE` | `0.1` (10%) | Trace sampling rate (0.0-1.0) | `tracing.sampleRate` |
+| `ENV` | `production` | Environment: `development`=100%, others=10% | - |
+| `OTEL_SERVICE_NAME` | (auto-detected) | Override service name | - |
+
+**Configuration Priority** (highest to lowest):
+1. Runtime environment variables (`TEMPO_ENDPOINT`, `OTEL_SAMPLE_RATE`)
+2. Helm chart values (`tracing.endpoint`, `tracing.sampleRate`)
+3. Code defaults (10% sampling, Tempo in monitoring namespace)
+
+**Best Practice**: Use Helm values for static config, environment variables for runtime overrides.
 
 ### Sampling Configuration
 

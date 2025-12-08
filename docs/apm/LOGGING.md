@@ -194,12 +194,16 @@ sum by (service) (count_over_time({namespace="auth"}[5m]))
 
 ### Configuration
 
-Pattern ingestion and level detection are enabled via Loki startup flags:
-- `--pattern-ingester.enabled=true`
-- `--validation.discover-log-levels=true`
+Pattern ingestion and level detection are enabled via:
 
-And config:
+**Loki config:**
+- `--pattern-ingester.enabled=true` - Enable pattern detection
+- `--validation.discover-log-levels=true` - Enable log level detection
 - `discover_log_levels: true` in `limits_config`
+
+**Vector config:**
+- JSON parsing in `add_labels` transform - Extracts `level` field from structured log messages
+- Automatically promotes `level` from nested JSON to top-level field for Loki detection
 
 ## Vector Monitoring
 

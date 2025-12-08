@@ -29,7 +29,7 @@ sloth:
     managed-by: sloth-operator
   defaultSloPeriod: "30d"        # Default SLO period (30 days)
   debug:
-    enabled: false
+    enabled: true
   logger: default                # Or "json" for structured logs
 
 # Common SLI plugins (useful for standard SLIs)

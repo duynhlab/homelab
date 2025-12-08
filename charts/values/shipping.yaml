@@ -42,3 +42,8 @@ readinessProbe:
   initialDelaySeconds: 5
   periodSeconds: 5
 
+tracing:
+  enabled: true
+  endpoint: "tempo.monitoring.svc.cluster.local:4318"
+  sampleRate: "0.1"
+

@@ -12,7 +12,9 @@ kubectl apply -f k8s/loki/service.yaml
 # Deploy Vector
 kubectl apply -f k8s/vector/rbac.yaml
 kubectl apply -f k8s/vector/configmap.yaml
+kubectl apply -f k8s/vector/service.yaml
 kubectl apply -f k8s/vector/daemonset.yaml
+kubectl apply -f k8s/vector/servicemonitor.yaml
 
 echo "Waiting for Loki to be ready..."
 kubectl wait --for=condition=available --timeout=300s deployment/loki -n monitoring

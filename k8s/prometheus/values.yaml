@@ -70,6 +70,10 @@ prometheusOperator:
     limits:
       memory: "256Mi"
       cpu: "200m"
+  
+  # DISABLE ADMISSION WEBHOOKS - Fix for Sloth compatibility
+  admissionWebhooks:
+    enabled: false  # Completely disable webhook validation
 
 # Node Exporter (for node metrics)
 nodeExporter:
@@ -103,4 +107,3 @@ kubeScheduler:
 
 kubeProxy:
   enabled: false
-

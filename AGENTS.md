@@ -667,17 +667,22 @@ k8s/sloth/
 ### Label Requirements
 
 **Required labels for metrics (after Prometheus scrape):**
-- `app` - Service name (e.g., `auth`, `user`) - **Added by Prometheus**
-- `namespace` - Kubernetes namespace - **Added by Prometheus**
-- `job` - Prometheus job name - **Added by Prometheus**
-- `instance` - Pod IP:port - **Added by Prometheus**
+- `job` - Scrape job name - **Added by ServiceMonitor relabeling** (set to `"microservices"` for all services)
+- `app` - Service name (e.g., `auth`, `user`) - **Added by ServiceMonitor relabeling** (from service label)
+- `service` - Original service name - **Added by ServiceMonitor relabeling** (from Kubernetes service metadata)
+- `namespace` - Kubernetes namespace - **Added by ServiceMonitor relabeling** (from pod metadata)
+- `instance` - Pod IP:port - **Added by Prometheus** (automatic)
 
 **Application-level labels (emitted by app):**
 - `method` - HTTP method (GET, POST, PUT, DELETE)
 - `path` - Request path (e.g., `/api/v1/users`)
 - `code` - HTTP status code (200, 404, 500)
 
-**Important**: Since v0.5.0, applications DO NOT emit `app` and `namespace` labels. Prometheus adds these during scrape via relabel_configs from ServiceMonitor.
+**Important Notes:**
+- Since v0.5.0, applications DO NOT emit `app`, `namespace`, or `job` labels
+- All service identification labels are injected by Prometheus during scrape via ServiceMonitor `relabelings`
+- `job="microservices"` is set via relabeling (not Kubernetes label) to enable dashboard filtering
+- Alternative: Let `job` default to service name (see `docs/monitoring/METRICS_LABEL_SOLUTIONS.md` for Option B)
 
 ### Go Code Conventions
 

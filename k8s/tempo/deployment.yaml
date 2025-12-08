@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: tempo
-        image: grafana/tempo:2.3.1
+        image: grafana/tempo:2.9.0
         args:
           - -config.file=/etc/tempo/tempo.yaml
         ports:
@@ -29,11 +29,15 @@ spec:
           containerPort: 4317
         - name: grpc
           containerPort: 9095
+        - name: metrics
+          containerPort: 9090
         volumeMounts:
         - name: tempo-config
           mountPath: /etc/tempo
         - name: tempo-storage
           mountPath: /var/tempo
+        - name: tempo-generator
+          mountPath: /var/tempo/generator
         resources:
           requests:
             memory: "256Mi"
@@ -58,5 +62,7 @@ spec:
         configMap:
           name: tempo-config
       - name: tempo-storage
+        emptyDir: {}
+      - name: tempo-generator
         emptyDir: {}
 

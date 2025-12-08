@@ -102,11 +102,16 @@ func InitTracingWithConfig(config TracingConfig) (*sdktrace.TracerProvider, erro
 		tempoEndpoint = endpoint
 	}
 
-	// Create OTLP HTTP exporter
+	// Create context with timeout for exporter initialization
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Create OTLP HTTP exporter with compression
 	exporter, err := otlptracehttp.New(
-		context.Background(),
+		ctx,
 		otlptracehttp.WithEndpoint(tempoEndpoint),
 		otlptracehttp.WithInsecure(), // Use TLS in production
+		otlptracehttp.WithCompression(otlptracehttp.GzipCompression),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OTLP exporter: %w", err)

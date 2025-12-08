@@ -21,6 +21,35 @@ data:
     ingester:
       max_block_duration: 5m
 
+    metrics_generator:
+      # Enable metrics-generator processor
+      processor:
+        service_graphs:
+          dimensions:
+            - resource.service.name
+            - resource.cluster
+            - resource.namespace
+            - resource.pod
+        span_metrics:
+          dimensions:
+            - resource.service.name
+            - resource.cluster
+            - resource.namespace
+            - resource.pod
+            - http.method
+            - http.status_code
+      # Store metrics locally (no remote write needed for rate() queries)
+      storage:
+        path: /var/tempo/generator/wal
+        remote_write: []
+      # Enable trace-to-metrics correlation
+      registry:
+        external_labels:
+          source: tempo
+      # Optional: configure dimensions
+      traces_storage:
+        path: /var/tempo/generator/traces
+
     compactor:
       compaction:
         block_retention: 1h

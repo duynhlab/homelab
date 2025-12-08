@@ -156,6 +156,124 @@ Logs are stored in Loki with labels:
 2. Click on a log entry with trace_id
 3. Click "Query with Tempo" to view the trace
 
+## Grafana Logs Drilldown
+
+**Available in**: Grafana 11.6+ (you have 12.1.4) with Loki v3.2+ (you have 3.6.2)
+
+Grafana Logs Drilldown uses **pattern ingestion** and **level detection** to automatically analyze log patterns and identify common structures in your logs.
+
+### Features
+
+1. **Pattern Detection**: Automatically identifies recurring log patterns
+2. **Level Detection**: Automatically detects log levels (INFO, WARN, ERROR, etc.)
+3. **Volume Queries**: Query log volumes for capacity planning
+
+### Usage
+
+1. Navigate to **Explore** in Grafana
+2. Select **Loki** datasource
+3. Use the **Patterns** tab (new in Grafana 11.6+)
+4. Loki will show detected patterns and frequencies
+
+### Example Queries
+
+**Pattern analysis**:
+```logql
+{service="auth"} | pattern "<timestamp> <level> <message>"
+```
+
+**Volume queries** (enabled by `volume_enabled: true`):
+```logql
+sum by (service) (count_over_time({namespace="auth"}[5m]))
+```
+
+**Level detection** (automatic with `discover_log_levels: true`):
+```logql
+{service="auth", detected_level="error"}
+```
+
+### Configuration
+
+Pattern ingestion and level detection are enabled via Loki startup flags:
+- `--pattern-ingester.enabled=true`
+- `--validation.discover-log-levels=true`
+
+And config:
+- `discover_log_levels: true` in `limits_config`
+
+## Vector Monitoring
+
+Vector exports internal metrics about its own performance to Prometheus. This allows you to monitor the health and performance of the logging pipeline.
+
+### Available Metrics
+
+Key Vector metrics available in Prometheus:
+
+- **`vector_events_processed_total`** - Total events processed by each component
+- **`vector_component_errors_total`** - Total errors by component  
+- **`vector_component_sent_bytes_total`** - Bytes sent to sinks (e.g. Loki)
+- **`vector_component_received_bytes_total`** - Bytes received from sources
+- **`vector_buffer_events`** - Events currently in buffer
+- **`vector_utilization`** - Component utilization (0.0-1.0)
+
+### Querying Vector Metrics
+
+**Check Vector health**:
+```promql
+up{job="vector"}
+```
+
+**Events processed per second**:
+```promql
+rate(vector_events_processed_total[5m])
+```
+
+**Error rate**:
+```promql
+rate(vector_component_errors_total[5m])
+```
+
+**Loki sink throughput** (bytes/sec):
+```promql
+rate(vector_component_sent_bytes_total{component_name="loki"}[5m])
+```
+
+**Buffer utilization**:
+```promql
+vector_buffer_events
+```
+
+### Monitoring Vector in Grafana
+
+**Option 1: Pre-built Dashboard** (Recommended)
+
+1. Navigate to **Dashboards** in Grafana
+2. Open the **Vector** dashboard (imported from Grafana.com ID: 21954)
+3. View comprehensive Vector metrics:
+   - Events per second by component
+   - Component error rates
+   - Buffer utilization
+   - Throughput (bytes/sec)
+   - Component health status
+
+**Option 2: Manual Queries via Explore**
+
+1. Navigate to **Explore** in Grafana
+2. Select **Prometheus** datasource
+3. Query Vector metrics (namespace: `vector_*`)
+
+**Recommended Alerts**:
+- High error rate: `rate(vector_component_errors_total[5m]) > 10`
+- Buffer overflow: `vector_buffer_events > 10000`
+- Low throughput: `rate(vector_events_processed_total[5m]) < 100`
+
+### Configuration
+
+Vector self-monitoring is configured via:
+- **Source**: `internal_metrics` (collects Vector's internal metrics)
+- **Sink**: `prometheus_exporter` (exposes metrics on port 9090)
+- **ServiceMonitor**: Automatic Prometheus scraping (30s interval)
+
 ## Log Queries
 
 ### By Service

@@ -77,13 +77,12 @@ monitoring/
 ├── k8s/                   # Kubernetes manifests
 │   ├── prometheus/
 │   │   ├── values.yaml             # kube-prometheus-stack Helm values
-│   │   ├── servicemonitor-microservices.yaml  # Single ServiceMonitor for all services
-│   │   └── backup/                 # Old standalone Prometheus manifests (archived)
+│   │   └── servicemonitor-microservices.yaml  # Single ServiceMonitor for all services
 │   ├── grafana-operator/
 │   ├── sloth/             # Sloth Operator (SLO management)
 │   ├── tempo/             # Grafana Tempo (distributed tracing)
 │   ├── pyroscope/         # Pyroscope (continuous profiling)
-│   ├── loki/              # Loki (log storage)
+│   ├── loki/              # Loki v3.6.2 (log storage with pattern ingestion)
 │   ├── vector/            # Vector (log collection)
 │   ├── kind/              # Kind cluster configuration
 │   └── namespaces.yaml
@@ -207,8 +206,7 @@ Kubernetes manifests for monitoring and infrastructure components:
 k8s/
 ├── prometheus/           # Prometheus Operator configuration
 │   ├── values.yaml       # kube-prometheus-stack Helm values
-│   ├── servicemonitor-microservices.yaml  # Single ServiceMonitor for all services
-│   └── backup/           # Old standalone Prometheus manifests (archived)
+│   └── servicemonitor-microservices.yaml  # Single ServiceMonitor for all services
 ├── grafana-operator/     # Grafana Operator resources
 │   ├── README.md         # Helm install instructions
 │   ├── values.yaml       # Operator Helm values
@@ -221,8 +219,12 @@ k8s/
 │   └── crds/             # PrometheusServiceLevel CRDs (9 services)
 ├── tempo/                # Grafana Tempo (distributed tracing)
 ├── pyroscope/            # Pyroscope (continuous profiling)
-├── loki/                 # Loki (log storage)
-├── vector/               # Vector (log collection)
+├── loki/                 # Loki v3.6.2 (log storage with pattern ingestion)
+├── vector/               # Vector (log collection with self-monitoring)
+│   ├── configmap.yaml    # Vector config (internal_metrics + prometheus_exporter)
+│   ├── service.yaml      # Expose metrics on port 9090
+│   ├── servicemonitor.yaml # Auto-discovery for Prometheus
+│   └── rbac.yaml         # Permissions for log collection
 ├── kind/                 # Kind cluster configuration
 └── namespaces.yaml       # Namespace definitions
 ```
@@ -297,10 +299,7 @@ Numbered scripts (01-12) for deployment and operations:
 
 #### `slo/` - SLO Data Files
 
-**Structure:**
-- `slo/definitions/` - 9 SLO definition YAML files (one per service, **backup only**)
-
-**Note**: Active SLO definitions are now PrometheusServiceLevel CRDs in `k8s/sloth/crds/*.yaml`, managed by Sloth Operator. The files in `slo/definitions/` are kept as backup/reference.
+**Note**: SLO definitions have been migrated to PrometheusServiceLevel CRDs in `k8s/sloth/crds/*.yaml`, managed by Sloth Operator. This directory is now empty.
 
 #### `k6/` - Load Testing
 
@@ -354,7 +353,7 @@ k8s/sloth/
 | Prometheus Operator Values | kube-prometheus-stack Helm values | `k8s/prometheus/values.yaml` |
 | ServiceMonitor | Auto-discovery for all microservices | `k8s/prometheus/servicemonitor-microservices.yaml` |
 | Grafana Datasources | Prometheus datasource | `k8s/grafana-operator/datasource-prometheus.yaml` |
-| Grafana Dashboards | Operator-managed dashboards (microservices + SLO) | `k8s/grafana-operator/dashboards/` (`microservices-dashboard.json` is the source of truth) |
+| Grafana Dashboards | Operator-managed dashboards (microservices + SLO + Vector) | `k8s/grafana-operator/dashboards/` (`microservices-dashboard.json` is the source of truth) |
 | Dockerfile | Unified build for all services | `services/Dockerfile` |
 | Go Modules | Go dependencies | `services/go.mod` |
 
@@ -363,6 +362,9 @@ k8s/sloth/
 | File | Purpose | Location |
 |------|---------|----------|
 | Main Dashboard | 32 panels in 5 row groups | `k8s/grafana-operator/dashboards/microservices-dashboard.json` |
+| Vector Dashboard | Vector self-monitoring (ID: 21954) | `k8s/grafana-operator/dashboards/grafana-dashboard-vector.yaml` |
+| SLO Overview | SLO summary dashboard (ID: 14643) | `k8s/grafana-operator/dashboards/grafana-dashboard-slo-overview.yaml` |
+| SLO Detailed | Detailed SLO metrics (ID: 14348) | `k8s/grafana-operator/dashboards/grafana-dashboard-slo-detailed.yaml` |
 
 **Dashboard Details:**
 - **UID**: `microservices-monitoring-001`
@@ -399,10 +401,9 @@ k8s/sloth/
 
 | File Type | Location | Count |
 |-----------|----------|-------|
-| SLO Definitions | `slo/definitions/*.yaml` | 9 files (backup only) |
 | SLO CRDs | `k8s/sloth/crds/*.yaml` | 9 PrometheusServiceLevel CRDs (active) |
 
-**Note**: Active SLOs are `k8s/sloth/crds/*.yaml` managed by Sloth Operator. Files in `slo/definitions/` are backup/reference only.
+**Note**: SLO definitions are managed by Sloth Operator via PrometheusServiceLevel CRDs in `k8s/sloth/crds/*.yaml`.
 
 ### Documentation Files
 
@@ -799,4 +800,4 @@ k8s/sloth/
 
 ---
 
-**Last Updated**: December 5, 2025 - Reflects Prometheus Operator migration (v0.5.0), K6 Helm deployment, Sloth Operator SLO management, and Grafana Operator integration
+**Last Updated**: December 8, 2025 - Reflects Vector self-monitoring (v0.6.1), Loki v3.6.2 upgrade, and Grafana dashboards expansion

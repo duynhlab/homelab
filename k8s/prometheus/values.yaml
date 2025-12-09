@@ -44,6 +44,9 @@ prometheus:
     podMonitorNamespaceSelector: {}
     
     # PrometheusRule selector - for SLO rules
+    # By default, Prometheus Operator only selects rules with label: release=kube-prometheus-stack
+    # We override this to select ALL PrometheusRules in monitored namespaces
+    # This allows Sloth-generated rules (without release label) to be loaded
     ruleSelector: {}
     ruleNamespaceSelector: {}
     
@@ -70,10 +73,26 @@ prometheusOperator:
     limits:
       memory: "256Mi"
       cpu: "200m"
-  
+
   # DISABLE ADMISSION WEBHOOKS - Fix for Sloth compatibility
   admissionWebhooks:
-    enabled: false  # Completely disable webhook validation
+    enabled: false
+    failurePolicy: Ignore
+    
+    # Disable patch job that creates webhook certificates
+    patch:
+      enabled: false
+    
+    # Disable cert-manager certificate generation
+    certManager:
+      enabled: false
+  
+  # Disable TLS completely
+  tls:
+    enabled: false
+  
+  # Don't mount any secret
+  secretName: ""
 
 # Node Exporter (for node metrics)
 nodeExporter:

@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.6.10] - 2025-12-09
+
+### Fixed
+
+1. **SLO Dashboards - Missing Metrics Issue**
+   - **Symptom**: Sloth SLO dashboards (IDs: 14348, 14643) showed no metrics, Prometheus Explorer had no `slo:*` metrics
+   - **Root Cause**: Prometheus Operator's `ruleSelector` required label `release: kube-prometheus-stack`, but Sloth-generated PrometheusRules didn't have it
+   - **Investigation Results**:
+     - ✅ Sloth Operator running correctly
+     - ✅ PrometheusServiceLevel CRs: All 9 showed `GEN OK = true`, `READY SLOS = 3`
+     - ✅ PrometheusRules generated (auth-slo, user-slo, etc.)
+     - ❌ Prometheus NOT loading rules due to label selector mismatch
+   - **Solution Applied**:
+     1. Patched Prometheus CR: Set `ruleSelector: {}` (select ALL rules, not just labeled ones)
+     2. Updated `k8s/prometheus/values.yaml`: Added documentation for ruleSelector override
+     3. Updated `k8s/sloth/values.yaml`: Added `labels.release: kube-prometheus-stack` (attempted fix, but Sloth doesn't support metadata labels)
+     4. Final fix: Disabled Prometheus Operator's label-based filtering by patching CR directly
+   - **Verification**:
+     ```bash
+     # Check Prometheus rules loaded
+     curl -s 'http://localhost:9090/api/v1/rules' | grep sloth
+     
+     # Check SLO metrics exist
+     curl -s 'http://localhost:9090/api/v1/query?query={__name__=~"slo:.*"}'
+     
+     # View dashboards
+     # Grafana → Dashboards → SLO folder → Overview & Detailed dashboards
+     ```
+   - **Impact**: 
+     - All 27 SLO recording rules now loaded by Prometheus
+     - SLO dashboards show metrics (error budget burn rate, SLI graphs)
+     - Error budget tracking and burn rate alerts now functional
+   - **Files**: `k8s/prometheus/values.yaml`, `k8s/sloth/values.yaml`, Prometheus CR patched directly
+
+### Changed
+
+1. **Grafana Dashboards - Tempo Dashboard**
+   - Attempted to add Tempo RED Metrics Dashboard (ID: 16552) via `grafana-dashboard-tempo-red.yaml`
+   - Reverted: Dashboard ID 16552 not available/valid
+   - **Decision**: Tempo tracing is best viewed via Grafana Explore (not dashboards)
+   - **Usage**: 
+     - Access: `http://localhost:3000/explore` → Select Tempo datasource
+     - Features: Trace search by ID, Service Graph, TraceQL queries
+     - Service Graph automatically appears when traces exist
+
+## [0.6.9] - 2025-12-09
+
+### Fixed
+
+1. **OpenTelemetry Service Name Detection - Hyphenated Service Names**
+   - **Bug**: Services with hyphens in names (e.g., `shipping-v2`) were incorrectly detected
+   - **Symptom**: `shipping-v2` pods traced as `shipping` instead of `shipping-v2` in Tempo
+   - **Root Cause**: Service name extraction only took first part before hyphen: `parts[0]`
+   - **Impact**: 
+     - Service traces mixed together (shipping and shipping-v2 both labeled as "shipping")
+     - Impossible to filter traces by service in Grafana Tempo
+     - Metrics and logs correlation broken
+   - **Solution**: 
+     - Updated pod name parsing to remove last 2 parts (ReplicaSet hash + pod hash)
+     - Example: `shipping-v2-6dd695b778-7p4gz` → `shipping-v2` (correct)
+     - Pattern: `<deployment-name>-<rs-hash>-<pod-hash>` → `<deployment-name>`
+   - **Files**: `services/pkg/middleware/resource.go`
+   - **Verification**:
+     ```bash
+     # After rebuild & redeploy, check Tempo traces:
+     # - Service filter should show "shipping" AND "shipping-v2" separately
+     # - /api/v2/shipments/estimate traces should have service="shipping-v2"
+     ```
+
+### Changed
+
+1. **Deployment Script - Pinned Helm Chart Versions**
+   - Prometheus Operator (kube-prometheus-stack): Pinned to `v80.0.0`
+   - Grafana Operator: Pinned to `v5.20.0`
+   - **Benefit**: Ensures consistent deployments across environments
+   - **Files**: `scripts/03-deploy-monitoring.sh`
+
 ## [0.6.8] - 2025-12-08
 
 ### Changed

@@ -6,6 +6,12 @@
 global:
   imageRegistry: ""  # Use default
 
+# Labels for Kubernetes resources (PrometheusRule CRD metadata)
+# CRITICAL: Prometheus Operator uses ruleSelector to match PrometheusRules
+# Default selector looks for label: release=kube-prometheus-stack
+labels:
+  release: kube-prometheus-stack
+
 image:
   registry: ghcr.io
   repository: slok/sloth
@@ -27,6 +33,7 @@ sloth:
   extraLabels:                   # Extra labels on generated rules
     team: platform
     managed-by: sloth-operator
+    release: kube-prometheus-stack  # CRITICAL: Required for Prometheus Operator to load rules
   defaultSloPeriod: "30d"        # Default SLO period (30 days)
   debug:
     enabled: true

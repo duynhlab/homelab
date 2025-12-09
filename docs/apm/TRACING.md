@@ -2,191 +2,185 @@
 
 ## Quick Summary
 
-**Objectives:**
-- Implement distributed tracing across microservices
-- Propagate trace context using W3C Trace Context standard
-- Correlate traces with logs and metrics
+**What is Distributed Tracing?**
+Track requests as they flow through multiple microservices to understand performance bottlenecks, debug errors, and visualize service dependencies.
 
-**Learning Outcomes:**
-- Distributed tracing concepts and benefits
-- W3C Trace Context propagation
-- OpenTelemetry instrumentation
-- Span creation and context propagation
-- Trace-to-logs and trace-to-metrics correlation
-
-**Keywords:**
-Distributed Tracing, OpenTelemetry, Spans, Trace Context, W3C Trace Context, Trace-ID, OTLP, Tempo, Trace Propagation, Correlation
+**Key Capabilities:**
+- ✅ Track request journey across 9 microservices
+- ✅ Identify slow services and bottlenecks
+- ✅ Debug cross-service errors with full context
+- ✅ Correlate traces with logs (via trace_id)
+- ✅ 10% sampling (configurable) for cost-effectiveness
 
 **Technologies:**
-- OpenTelemetry (tracing standard)
-- Grafana Tempo (trace storage)
-- OTLP HTTP protocol
-- W3C Trace Context headers
+- **OpenTelemetry**: Industry-standard tracing instrumentation
+- **Grafana Tempo**: Distributed tracing backend (v2.9.0 with metrics-generator)
+- **W3C Trace Context**: Standard for trace propagation between services
 
 ---
 
 ## Table of Contents
 
-1. [Getting Started](#getting-started) - Quick start guide
-2. [Configuration](#configuration) - Environment variables and settings
-3. [Basic Usage](#basic-usage) - Common tracing patterns
-4. [Advanced Usage](#advanced-usage) - Helper functions and patterns
-5. [Best Practices](#best-practices) - Production recommendations
-6. [Troubleshooting](#troubleshooting) - Common issues and solutions
-7. [Reference](#reference) - API documentation
+1. [Why Distributed Tracing?](#why-distributed-tracing) - Real-world use cases
+2. [How It Works](#how-it-works) - System architecture
+3. [Configuration](#configuration) - Setup and tuning
+4. [Usage Patterns](#usage-patterns) - When to use what
+5. [Best Practices](#best-practices) - Production guidelines
+6. [Troubleshooting](#troubleshooting) - Common issues
 
 ---
 
-## Getting Started
+## Why Distributed Tracing?
 
-### Overview
+### Real-World Use Cases
 
-Distributed tracing is implemented using **OpenTelemetry** and **Grafana Tempo**. All HTTP requests are automatically traced across microservices with:
+#### 1. **Debugging Cross-Service Issues** 🔍
+**Problem**: User reports "checkout is slow" but you have 9 microservices involved.
 
-- ✅ **10% sampling** by default (configurable)
-- ✅ **Automatic request filtering** (health/metrics endpoints skipped)
-- ✅ **Graceful shutdown** (zero lost spans)
-- ✅ **W3C Trace Context** propagation
+**Without Tracing**: Check logs of all 9 services manually, guess which service is slow.
 
-### How It Works
+**With Tracing**: 
+- See the entire request flow: `Gateway → Order → Payment → Inventory → Shipping`
+- Identify bottleneck: **Payment service took 2000ms** (everything else < 100ms)
+- Jump to Payment logs using `trace_id` to see exact error
+
+#### 2. **Performance Optimization** ⚡
+**Scenario**: Dashboard shows `/api/v1/orders` P95 latency = 800ms (SLO target: 500ms).
+
+**With Tracing**:
+- Find slowest spans: Database query (600ms), External API call (150ms)
+- Add database index → latency drops to 300ms
+- Verify improvement with trace comparison
+
+#### 3. **Error Budget Investigation** 🚨
+**Alert**: `order` service SLO burn rate critical (1.5% error rate, budget: 1%).
+
+**With Tracing**:
+- Filter traces with `http.status_code=500`
+- See error pattern: `Order → Inventory → TIMEOUT`
+- Root cause: Inventory service timeout (30s → need circuit breaker)
+
+#### 4. **Service Dependency Mapping** 🗺️
+**Question**: "If I update `payment` service, which services will be affected?"
+
+**With Tracing (Service Graph)**:
+- Visualize dependencies: `Order → Payment`, `Shipping → Payment`
+- Plan deployment order: Update `Payment` last
+- Monitor impact with trace sampling
+
+---
+
+## How It Works
+
+### Architecture
 
 ```mermaid
-flowchart TD
-    A[Request<br/>traceparent header] --> B[Tracing Middleware 10%]
+flowchart LR
+    A[User Request] -->|1. HTTP Request| B[Auth Service]
+    B -->|2. W3C traceparent header| C[Order Service]
+    C -->|3. traceparent propagated| D[Payment Service]
     
-    B --> B1[Create span automatically]
-    B1 --> B2[Filter health/metrics]
-    B2 --> B3[Propagate context]
+    B -.->|Spans| E[Tempo]
+    C -.->|Spans| E
+    D -.->|Spans| E
     
-    B3 --> C[Business Logic]
-    
-    C --> C1[Add attributes optional]
-    C1 --> C2[Record errors]
-    C2 --> C3[Create child spans]
-    
-    C3 --> D[Tempo Storage]
-    
-    D --> D1[Stores traces]
-    D1 --> D2[Queryable in Grafana]
+    E -->|TraceQL queries| F[Grafana]
     
     style A fill:#e1f5ff
-    style B fill:#fff4e1
-    style C fill:#ffe1f5
-    style D fill:#e1ffe1
+    style E fill:#ffe1e1
+    style F fill:#e1ffe1
 ```
 
-### Quick Setup
+### Trace Flow
 
-**1. Service initialization** (already configured in all services):
+1. **Request arrives** → Auth service creates **root span** with `trace_id`
+2. **W3C Trace Context** header (`traceparent`) propagated to downstream services
+3. Each service creates **child spans** for its operations
+4. **10% sampling** decision made at root span (statistically significant)
+5. Spans exported to **Tempo** via OTLP HTTP (batch export every 5s)
+6. **Grafana** queries Tempo for trace visualization
 
-```go
-// Initialize tracing
-tp, err := middleware.InitTracing()
-if err != nil {
-    logger.Warn("Failed to initialize tracing", zap.Error(err))
-}
+### Automatic Features
 
-// Add middleware
-r.Use(middleware.TracingMiddleware())
-```
+| Feature | What It Does | Benefit |
+|---------|--------------|---------|
+| **10% Sampling** | Only trace 10% of requests | Cost-effective, production-ready |
+| **Request Filtering** | Skip `/health`, `/metrics` | Reduces noise by 30-40% |
+| **Service Detection** | Auto-detect service name from pod name | No manual config needed |
+| **Graceful Shutdown** | Flush pending spans on SIGTERM | Zero data loss during rollouts |
+| **Error Recording** | Automatically mark error spans | Easy error filtering in Grafana |
 
-**2. View traces in Grafana**:
+### Accessing Traces
 
+**Grafana Explore:**
 ```bash
 kubectl port-forward -n monitoring svc/grafana-service 3000:3000
-# Open http://localhost:3000 → Explore → Tempo
+# Open http://localhost:3000 → Explore → Tempo datasource
 ```
 
-**3. Search traces by**:
-- Service name (e.g., `auth`, `user`)
-- Trace ID (from logs)
-- Tags (HTTP status, duration)
+**Search Options:**
+- By service: `{resource.service.name="auth"}`
+- By trace ID: `trace_id` from logs
+- By status: `{status=error}`
+- By duration: `{duration > 500ms}`
 
 ---
 
 ## Configuration
 
-### Helm Chart Configuration (Recommended)
+### Quick Configuration via Helm
 
-Configure tracing via Helm values (`charts/values/*.yaml`):
+All tracing configuration is managed via Helm chart values (`charts/values/*.yaml`):
 
 ```yaml
+# charts/values/auth.yaml
 tracing:
   enabled: true
   endpoint: "tempo.monitoring.svc.cluster.local:4318"
   sampleRate: "0.1"  # 10% sampling (0.0-1.0)
 ```
 
-**Per-service customization:**
-```yaml
-# charts/values/user.yaml
-tracing:
-  enabled: true
-  endpoint: "tempo.monitoring.svc.cluster.local:4318"
-  sampleRate: "0.5"  # 50% sampling for high-traffic service
-```
-
-**Deployment example:**
+**Deploy with custom sampling:**
 ```bash
-# Deploy with custom tracing config
-helm upgrade --install user charts/ \
-  -f charts/values/user.yaml \
-  --set tracing.sampleRate=0.2 \
-  -n user
+helm upgrade --install auth charts/ \
+  -f charts/values/auth.yaml \
+  --set tracing.sampleRate=0.5 \
+  -n auth
 ```
 
 ### Environment Variables
 
-| Variable | Default | Description | Helm Override |
-|----------|---------|-------------|---------------|
-| `TEMPO_ENDPOINT` | `tempo.monitoring.svc.cluster.local:4318` | Tempo OTLP HTTP endpoint | `tracing.endpoint` |
-| `OTEL_SAMPLE_RATE` | `0.1` (10%) | Trace sampling rate (0.0-1.0) | `tracing.sampleRate` |
-| `ENV` | `production` | Environment: `development`=100%, others=10% | - |
-| `OTEL_SERVICE_NAME` | (auto-detected) | Override service name | - |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TEMPO_ENDPOINT` | `tempo.monitoring.svc.cluster.local:4318` | Tempo OTLP HTTP endpoint |
+| `OTEL_SAMPLE_RATE` | `0.1` (10%) | Trace sampling rate (0.0-1.0) |
+| `ENV` | `production` | Auto-adjust sampling: `development`=100%, others=10% |
 
-**Configuration Priority** (highest to lowest):
-1. Runtime environment variables (`TEMPO_ENDPOINT`, `OTEL_SAMPLE_RATE`)
-2. Helm chart values (`tracing.endpoint`, `tracing.sampleRate`)
-3. Code defaults (10% sampling, Tempo in monitoring namespace)
+### Sampling Strategy
 
-**Best Practice**: Use Helm values for static config, environment variables for runtime overrides.
+| Environment | Sample Rate | Use Case | Cost Impact |
+|-------------|-------------|----------|-------------|
+| **Production** | 10% | Cost-effective, statistically valid | Low |
+| **Staging** | 50% | More coverage for testing | Medium |
+| **Development** | 100% | Full debugging visibility | High |
 
-### Sampling Configuration
+**Why 10% is enough:**
+- Statistically significant for performance analysis
+- Sufficient for error pattern detection
+- Reduces storage cost by 90%
+- Still captures ~144 traces/hour at 400 RPS
 
-| Environment | Sample Rate | Use Case |
-|-------------|-------------|----------|
-| **Production** | 10% (`0.1`) | Cost-effective, statistically significant |
-| **Staging** | 50% (`0.5`) | Balance cost and coverage |
-| **Development** | 100% (`1.0`) | Full visibility for debugging |
+### Request Filtering (Automatic)
 
-**Example:**
-```bash
-# 50% sampling for staging
-export OTEL_SAMPLE_RATE=0.5
-```
-
-### Request Filtering
-
-Automatically skipped (reduces volume by 30-40%):
+These endpoints are **never traced** (reduces volume by 30-40%):
 
 | Path | Reason |
 |------|--------|
-| `/health`, `/healthz`, `/readyz`, `/livez` | Health checks (high frequency, low value) |
-| `/metrics` | Prometheus metrics endpoint |
-| `/favicon.ico` | Browser requests |
+| `/health`, `/healthz`, `/readyz`, `/livez` | High frequency, low value |
+| `/metrics` | Prometheus scrape endpoint |
+| `/favicon.ico` | Browser noise |
 
-**Custom filtering:**
-```go
-config := middleware.TracingConfig{
-    SkipPaths: []string{
-        "/health",
-        "/admin/internal",  // Add custom paths
-    },
-}
-tp, err := middleware.InitTracingWithConfig(config)
-```
-
-### Automatic Service Detection
+### Service Auto-Detection
 
 Service name and namespace are **auto-detected** from:
 
@@ -199,568 +193,218 @@ Service name and namespace are **auto-detected** from:
 
 ---
 
-## Basic Usage
+## Usage Patterns
 
-### 1. Automatic Tracing
+### When to Use Tracing
 
-HTTP requests are **automatically traced** by the middleware. No code changes needed!
+| Scenario | How Tracing Helps |
+|----------|-------------------|
+| 🔍 **Debugging slow requests** | See which service/operation is slow |
+| ⚠️ **Investigating errors** | Full context of error flow across services |
+| 📊 **SLO budget burn** | Find root cause of latency/error spikes |
+| 🗺️ **Dependency mapping** | Understand service call patterns |
+| ⚡ **Performance optimization** | Identify bottlenecks (DB queries, external APIs) |
 
-```go
-// This handler is automatically traced
-func GetUser(c *gin.Context) {
-    // Your business logic
-    c.JSON(200, user)
-}
-```
+### What Traces Automatically Capture
 
-### 2. Recording Errors
+Every traced HTTP request includes:
 
-Always record errors for debugging:
+**Automatic Attributes:**
+- Service name, namespace, pod name
+- HTTP method, path, status code
+- Request duration (start → end)
+- Parent span ID (for service correlation)
 
-```go
-result, err := processOrder(ctx, order)
-if err != nil {
-    middleware.RecordError(ctx, err)  // ← Add this
-    return err
-}
-```
+**From Middleware:**
+- User-Agent, Remote IP
+- Error status and messages
+- W3C Trace Context propagation
 
-**What it does:**
-- ✅ Records error in span
-- ✅ Sets span status to `Error`
-- ✅ Adds error message
+### Helper Functions (Optional Enhancement)
 
-### 3. Adding Business Context
-
-Add relevant business attributes:
+Use these to **add business context** to traces:
 
 ```go
-func CreateOrder(c *gin.Context) {
-    ctx := c.Request.Context()
-    
-    middleware.AddSpanAttributes(ctx,
-        attribute.String("user.id", userID),
-        attribute.String("order.id", orderID),
-        attribute.Int("order.items", itemCount),
-    )
-    
-    // Your business logic...
-}
-```
+// Record errors for debugging
+middleware.RecordError(ctx, err)
 
-### 4. Marking Milestones
+// Add business context
+middleware.AddSpanAttributes(ctx,
+    attribute.String("user.id", userID),
+    attribute.String("order.id", orderID),
+)
 
-Track significant events:
-
-```go
-middleware.AddSpanEvent(ctx, "order.validated")
+// Mark important events
 middleware.AddSpanEvent(ctx, "payment.approved")
-middleware.AddSpanEvent(ctx, "inventory.reserved")
+
+// Create child spans for complex operations
+ctx, span := middleware.StartSpan(ctx, "validate-inventory")
+defer span.End()
 ```
 
-### 5. Creating Child Spans
-
-For complex operations:
-
-```go
-func ProcessOrder(ctx context.Context, order Order) error {
-    // Create child span
-    ctx, span := middleware.StartSpan(ctx, "validate-inventory")
-    defer span.End()
-    
-    // Your logic...
-    return nil
-}
-```
-
----
-
-## Advanced Usage
-
-### Helper Functions Reference
-
-| Function | Use Case | Example |
-|----------|----------|---------|
-| `AddSpanAttributes(ctx, attrs...)` | Add metadata | User ID, order ID, request params |
-| `RecordError(ctx, err)` | Record errors | API errors, validation failures |
-| `AddSpanEvent(ctx, name, attrs...)` | Mark milestones | State transitions, decisions |
-| `SetSpanStatus(ctx, code, desc)` | Set status | Success/failure conditions |
-| `StartSpan(ctx, name)` | Create child span | Complex operations |
-
-### When to Use Each Helper
-
-#### AddSpanAttributes
-
-**✅ Good:**
-```go
-middleware.AddSpanAttributes(ctx,
-    attribute.String("user.id", userID),        // ✅ User identification
-    attribute.String("order.id", orderID),      // ✅ Business entity
-    attribute.Int("page", pageNum),             // ✅ Request parameter
-    attribute.Bool("is_premium", isPremium),    // ✅ Business context
-)
-```
-
-**❌ Bad:**
-```go
-middleware.AddSpanAttributes(ctx,
-    attribute.String("password", password),        // ❌ Sensitive data
-    attribute.String("request_body", fullBody),    // ❌ Large payload
-    attribute.String("timestamp", time.Now()),     // ❌ High cardinality
-)
-```
-
-#### AddSpanEvent
-
-**✅ Good:**
-```go
-middleware.AddSpanEvent(ctx, "order.validated")           // ✅ State transition
-middleware.AddSpanEvent(ctx, "cache.hit")                 // ✅ Decision point
-middleware.AddSpanEvent(ctx, "database.query.started")    // ✅ External call
-```
-
-**❌ Bad:**
-```go
-middleware.AddSpanEvent(ctx, "variable.assigned")    // ❌ Trivial operation
-for _, item := range items {
-    middleware.AddSpanEvent(ctx, "item.processed")  // ❌ In loop
-}
-```
-
-### Complete Examples
-
-#### Example 1: Order Processing Handler
-
-```go
-func CreateOrder(c *gin.Context) {
-    ctx := c.Request.Context()
-    
-    // 1. Add request context
-    middleware.AddSpanAttributes(ctx,
-        attribute.String("user.id", getUserID(c)),
-        attribute.String("user.role", getUserRole(c)),
-    )
-    
-    // 2. Parse request
-    var req OrderRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        middleware.RecordError(ctx, err)
-        c.JSON(400, gin.H{"error": "Invalid request"})
-        return
-    }
-    
-    middleware.AddSpanEvent(ctx, "request.parsed")
-    middleware.AddSpanAttributes(ctx,
-        attribute.Int("order.items", len(req.Items)),
-        attribute.Float64("order.total", req.Total),
-    )
-    
-    // 3. Validate with child span
-    ctx, span := middleware.StartSpan(ctx, "validate-inventory")
-    valid, err := checkInventory(ctx, req.Items)
-    span.End()
-    
-    if err != nil {
-        middleware.RecordError(ctx, err)
-        c.JSON(500, gin.H{"error": "Inventory check failed"})
-        return
-    }
-    
-    if !valid {
-        middleware.AddSpanEvent(ctx, "inventory.insufficient")
-        c.JSON(400, gin.H{"error": "Insufficient inventory"})
-        return
-    }
-    
-    // 4. Create order
-    order, err := createOrder(ctx, req)
-    if err != nil {
-        middleware.RecordError(ctx, err)
-        c.JSON(500, gin.H{"error": "Failed to create order"})
-        return
-    }
-    
-    // 5. Success
-    middleware.AddSpanAttributes(ctx,
-        attribute.String("order.id", order.ID),
-    )
-    middleware.SetSpanStatus(ctx, codes.Ok, "Order created")
-    
-    c.JSON(200, order)
-}
-```
-
-#### Example 2: External API Call
-
-```go
-func callPaymentGateway(ctx context.Context, amount float64) error {
-    ctx, span := middleware.StartSpan(ctx, "payment-api-call")
-    defer span.End()
-    
-    // Add semantic attributes
-    middleware.AddSpanAttributes(ctx,
-        attribute.String("http.method", "POST"),
-        attribute.String("http.url", "https://payment.example.com/charge"),
-        attribute.Float64("payment.amount", amount),
-    )
-    
-    resp, err := http.Post(endpoint, "application/json", body)
-    if err != nil {
-        middleware.RecordError(ctx, err)
-        return err
-    }
-    defer resp.Body.Close()
-    
-    middleware.AddSpanAttributes(ctx,
-        attribute.Int("http.status_code", resp.StatusCode),
-    )
-    
-    if resp.StatusCode != 200 {
-        err := fmt.Errorf("payment failed: %d", resp.StatusCode)
-        middleware.RecordError(ctx, err)
-        return err
-    }
-    
-    middleware.SetSpanStatus(ctx, codes.Ok, "Payment successful")
-    return nil
-}
-```
-
-#### Example 3: Database Query
-
-```go
-func getUserByID(ctx context.Context, userID string) (*User, error) {
-    ctx, span := middleware.StartSpan(ctx, "db-get-user")
-    defer span.End()
-    
-    // Follow OpenTelemetry semantic conventions
-    middleware.AddSpanAttributes(ctx,
-        attribute.String("db.system", "postgresql"),
-        attribute.String("db.operation", "SELECT"),
-        attribute.String("db.table", "users"),
-    )
-    
-    var user User
-    err := db.QueryRowContext(ctx, "SELECT * FROM users WHERE id = $1", userID).Scan(&user)
-    
-    if err == sql.ErrNoRows {
-        middleware.AddSpanEvent(ctx, "user.not_found")
-        return nil, fmt.Errorf("user not found: %s", userID)
-    }
-    
-    if err != nil {
-        middleware.RecordError(ctx, err)
-        return nil, err
-    }
-    
-    middleware.SetSpanStatus(ctx, codes.Ok, "User retrieved")
-    return &user, nil
-}
-```
+**When to use:**
+- ✅ Recording errors (always do this!)
+- ✅ Adding user/order IDs for filtering
+- ✅ Marking state transitions (payment approved, inventory reserved)
+- ❌ Don't trace in tight loops (performance impact)
+- ❌ Don't add sensitive data (passwords, credit cards)
 
 ---
 
 ## Best Practices
 
-### 🎯 Production Recommendations
+### Production Recommendations
 
-| Practice | Why | How |
-|----------|-----|-----|
-| **Use 10% sampling** | Cost-effective, statistically significant | `OTEL_SAMPLE_RATE=0.1` |
-| **Filter health checks** | Reduces noise by 30-40% | Automatic (default) |
-| **Record all errors** | Essential for debugging | `RecordError(ctx, err)` |
-| **Add business context** | Makes traces meaningful | `AddSpanAttributes(ctx, ...)` |
-| **Graceful shutdown** | Zero lost spans | Automatic (configured) |
+| Practice | Why | Implementation |
+|----------|-----|----------------|
+| **10% sampling** | Balance cost vs visibility | `tracing.sampleRate: "0.1"` (Helm) |
+| **Auto-filter health checks** | Reduce noise by 30-40% | Automatic (middleware) |
+| **Always record errors** | Critical for debugging | `RecordError(ctx, err)` |
+| **Graceful shutdown** | Zero lost spans during rollouts | Automatic (all services) |
+| **Correlate with logs** | Jump from trace to logs via `trace_id` | Automatic (logging middleware) |
 
-### ✅ Do's
+### Do's ✅
 
-1. **Always record errors:**
-   ```go
-   if err != nil {
-       middleware.RecordError(ctx, err)  // ✅ Do this
-       return err
-   }
-   ```
+1. **Record all errors** for debugging context
+2. **Add business IDs** (user_id, order_id) for filtering
+3. **Use child spans** for distinct operations (DB queries, external API calls)
+4. **Monitor trace volume** with Prometheus: `rate(tempo_spans_received_total[5m])`
 
-2. **Add meaningful attributes:**
-   ```go
-   middleware.AddSpanAttributes(ctx,
-       attribute.String("user.id", userID),      // ✅ Useful
-       attribute.String("order.id", orderID),    // ✅ Useful
-   )
-   ```
+### Don'ts ❌
 
-3. **Use child spans for distinct operations:**
-   ```go
-   ctx, span := middleware.StartSpan(ctx, "validate-payment")  // ✅ Good
-   defer span.End()
-   ```
+1. **Don't trace in loops** (creates span explosion)
+2. **Don't add sensitive data** (passwords, tokens, PII)
+3. **Don't sample 100% in production** (cost/performance impact)
+4. **Don't skip error recording** (loses debugging context)
 
-### ❌ Don'ts
+### Correlation with Logs
 
-1. **Don't trace in loops:**
-   ```go
-   // ❌ BAD
-   for _, item := range items {
-       ctx, span := tracer.Start(ctx, "process-item")
-       processItem(item)
-       span.End()
-   }
-   
-   // ✅ GOOD
-   ctx, span := tracer.Start(ctx, "process-items")
-   defer span.End()
-   for _, item := range items {
-       processItem(item)  // No tracing in loop
-   }
-   ```
+**Automatic correlation** via `trace_id` in structured logs:
 
-2. **Don't add sensitive data:**
-   ```go
-   // ❌ BAD
-   middleware.AddSpanAttributes(ctx,
-       attribute.String("password", password),     // ❌ Never!
-       attribute.String("credit_card", cc),        // ❌ Never!
-   )
-   
-   // ✅ GOOD
-   middleware.AddSpanAttributes(ctx,
-       attribute.String("user.id", userID),        // ✅ OK
-       attribute.Bool("payment.success", true),    // ✅ OK
-   )
-   ```
+**Example log:**
+```json
+{
+  "level": "error",
+  "msg": "Payment failed",
+  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+  "user_id": "123",
+  "error": "timeout"
+}
+```
 
-3. **Don't sample 100% in production:**
-   ```go
-   // ❌ BAD - Causes performance issues
-   sdktrace.WithSampler(sdktrace.AlwaysSample())
-   
-   // ✅ GOOD - 10% is sufficient
-   sdktrace.WithSampler(sdktrace.TraceIDRatioBased(0.1))
-   ```
-
-### 📋 Production Checklist
-
-Before deploying, verify:
-
-- ✅ Sampling configured (10% or environment-based)
-- ✅ Request filtering enabled (automatic)
-- ✅ Graceful shutdown implemented (automatic)
-- ✅ Errors recorded with `RecordError()`
-- ✅ Business context added with `AddSpanAttributes()`
-- ✅ No sensitive data in spans
-- ✅ No tracing in tight loops
-- ✅ Semantic conventions followed
-- ✅ Traces visible in Grafana
+**Find trace in Grafana:**
+- Copy `trace_id` from log
+- Grafana Explore → Tempo → Search by Trace ID
+- See full request flow across all services
 
 ---
 
 ## Troubleshooting
 
-### 🔍 Common Issues
+### Problem: No traces appearing in Grafana
 
-#### Problem: No traces appearing
-
-**Symptoms:** Grafana shows no traces for your service
-
-**Solutions:**
-
-1. Check sampling rate:
+**Possible Causes:**
+1. **Sampling too low** → Temporarily increase to 100% for debugging:
    ```bash
-   # If too low, increase temporarily for debugging
-   export OTEL_SAMPLE_RATE=1.0
+   kubectl set env deployment/auth OTEL_SAMPLE_RATE=1.0 -n auth
    ```
 
-2. Verify Tempo is running:
+2. **Tempo not running**:
    ```bash
    kubectl get pods -n monitoring -l app=tempo
    kubectl logs -n monitoring deployment/tempo
    ```
 
-3. Check service logs:
+3. **Service not sending traces**:
    ```bash
-   kubectl logs -n <namespace> -l app=<service> | grep -i trace
+   kubectl logs -n auth -l app=auth | grep -i "trace\|tempo"
    ```
 
-#### Problem: Low trace volume
+### Problem: Trace volume too low
 
-**Symptoms:** Expected 10% of requests but seeing much less
+**Expected:** `trace_count ≈ request_count * sample_rate`
 
-**Solutions:**
-
-1. Verify sampling rate:
+**Check:**
+1. **Verify sampling rate**:
    ```bash
-   # Expected: trace_count ≈ request_count * 0.1
+   kubectl get deployment auth -n auth -o yaml | grep OTEL_SAMPLE_RATE
    ```
 
-2. Check request filtering:
-   - Health checks are filtered (expected)
-   - Verify business endpoints are traced
+2. **Check request filtering** (health checks automatically skipped)
 
-3. Monitor Tempo:
+3. **Monitor Tempo ingestion**:
    ```promql
    rate(tempo_spans_received_total[5m])
    ```
 
-#### Problem: High memory usage
-
-**Symptoms:** Service consuming too much memory
+### Problem: High memory usage
 
 **Solutions:**
+1. **Reduce sampling**: `OTEL_SAMPLE_RATE=0.05` (5%)
+2. **Verify no tracing in loops**: `grep -r "StartSpan.*for.*range" services/`
+3. **Check batch timeout** (default 5s is optimal)
 
-1. Reduce sampling rate:
+### Problem: Missing traces during pod restarts
+
+**Solution:** Graceful shutdown is already configured (automatic span flushing). If still missing:
+
+1. **Check shutdown logs**:
    ```bash
-   export OTEL_SAMPLE_RATE=0.05  # 5%
+   kubectl logs -n auth <pod> | grep -i shutdown
    ```
 
-2. Check batch timeout (default 5s is optimal):
-   ```go
-   // Only if you have very high traffic
-   config.BatchTimeout = 2 * time.Second
-   ```
-
-3. Verify no tracing in loops:
-   ```bash
-   # Search your code for patterns like:
-   grep -r "StartSpan.*for.*range" services/
-   ```
-
-#### Problem: Spans not flushed on shutdown
-
-**Symptoms:** Missing traces during pod restarts
-
-**Solutions:**
-
-1. Verify graceful shutdown:
-   ```bash
-   kubectl logs -n <namespace> <pod> | grep -i "shutdown"
-   # Should see: "Shutting down server..." and "Server exited gracefully"
-   ```
-
-2. Increase shutdown timeout if needed:
+2. **Increase shutdown timeout** (if needed):
    ```go
    shutdownCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
    ```
 
-3. Check Tempo connectivity during shutdown:
-   ```bash
-   kubectl describe pod -n <namespace> <pod>
-   ```
-
-### 📊 Debugging Commands
+### Debugging Commands
 
 ```bash
 # View traces in Grafana
 kubectl port-forward -n monitoring svc/grafana-service 3000:3000
-# Open http://localhost:3000 → Explore → Tempo
 
 # Check Tempo metrics
-kubectl port-forward -n monitoring svc/tempo 3200:3200
-# Open http://localhost:3200/metrics
+kubectl port-forward -n monitoring svc/tempo 9090:9090
+curl http://localhost:9090/metrics | grep tempo_spans
 
 # View service logs with trace IDs
-kubectl logs -n <namespace> -l app=<service> | jq '.trace_id'
+kubectl logs -n auth -l app=auth | jq '.trace_id'
 
-# Check sampling rate in deployment
-kubectl get deployment <service> -n <namespace> -o yaml | grep OTEL_SAMPLE_RATE
+# Check sampling config
+kubectl describe deployment auth -n auth | grep -A 5 "Environment"
 ```
 
 ---
 
 ## Reference
 
-### API Documentation
+### Key Concepts
 
-#### TracingConfig
+| Term | Definition |
+|------|------------|
+| **Trace** | Complete journey of a request across services |
+| **Span** | Single operation within a trace (e.g., HTTP request, DB query) |
+| **Trace ID** | Unique identifier for entire trace (128-bit) |
+| **Span ID** | Unique identifier for single span (64-bit) |
+| **W3C Trace Context** | Standard header format: `traceparent: 00-<trace-id>-<span-id>-<flags>` |
+| **Sampling** | Percentage of requests to trace (10% = 1 in 10 requests) |
 
-```go
-type TracingConfig struct {
-    ServiceName      string        // Service name (auto-detected)
-    ServiceNamespace string        // Kubernetes namespace (auto-detected)
-    TempoEndpoint    string        // Tempo OTLP endpoint
-    Insecure         bool          // Use insecure connection
-    SampleRate       float64       // Sampling rate (0.0-1.0)
-    ExportTimeout    time.Duration // Export timeout (default: 30s)
-    BatchTimeout     time.Duration // Batch timeout (default: 5s)
-    SkipPaths        []string      // Paths to skip tracing
-}
-```
+### Semantic Conventions (OpenTelemetry)
 
-#### Helper Functions
-
-```go
-// Initialize tracing with default config
-func InitTracing() (*sdktrace.TracerProvider, error)
-
-// Initialize with custom config
-func InitTracingWithConfig(config TracingConfig) (*sdktrace.TracerProvider, error)
-
-// Graceful shutdown
-func Shutdown(ctx context.Context) error
-
-// Start a child span
-func StartSpan(ctx context.Context, name string) (context.Context, trace.Span)
-
-// Add attributes to current span
-func AddSpanAttributes(ctx context.Context, attrs ...attribute.KeyValue)
-
-// Record error in current span
-func RecordError(ctx context.Context, err error)
-
-// Add event to current span
-func AddSpanEvent(ctx context.Context, name string, attrs ...attribute.KeyValue)
-
-// Set span status
-func SetSpanStatus(ctx context.Context, code codes.Code, description string)
-```
-
-### W3C Trace Context
-
-Traces use the W3C Trace Context standard:
-
-```
-traceparent: 00-<trace-id>-<parent-id>-<flags>
-```
-
-**Fallback:** `X-Trace-ID` header if `traceparent` not present.
-
-### Semantic Conventions
-
-Follow [OpenTelemetry Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/):
-
-**HTTP:**
+**HTTP Attributes:**
 ```go
 attribute.String("http.method", "POST")
 attribute.String("http.route", "/api/v1/orders")
 attribute.Int("http.status_code", 200)
 ```
 
-**Database:**
+**Database Attributes:**
 ```go
 attribute.String("db.system", "postgresql")
 attribute.String("db.operation", "SELECT")
 attribute.String("db.table", "users")
 ```
-
-**RPC:**
-```go
-attribute.String("rpc.system", "grpc")
-attribute.String("rpc.service", "OrderService")
-attribute.String("rpc.method", "CreateOrder")
-```
-
-### Graceful Shutdown
-
-All services are configured with graceful shutdown:
-
-**Sequence:**
-1. Receive SIGINT/SIGTERM
-2. Stop accepting new requests
-3. Flush pending spans (via `middleware.Shutdown()`)
-4. Shutdown HTTP server
-5. Exit
-
-**Timeout:** 10 seconds (configurable)
 
 ### Performance Characteristics
 
@@ -768,13 +412,17 @@ All services are configured with graceful shutdown:
 |--------|-------|-------|
 | Sampling overhead | < 1% CPU | At 10% sampling |
 | Memory overhead | < 50MB | Per service |
-| Export latency | < 100ms p99 | To Tempo |
+| Export latency | < 100ms P99 | To Tempo |
 | Trace volume reduction | 90% | vs 100% sampling |
 | Request filtering reduction | 30-40% | Health/metrics skipped |
 
-### External References
+### External Resources
 
-- [OpenTelemetry Go Documentation](https://opentelemetry.io/docs/instrumentation/go/)
-- [Grafana Tempo Documentation](https://grafana.com/docs/tempo/latest/)
-- [W3C Trace Context Specification](https://www.w3.org/TR/trace-context/)
+- [OpenTelemetry Go SDK](https://opentelemetry.io/docs/instrumentation/go/)
+- [Grafana Tempo Docs](https://grafana.com/docs/tempo/latest/)
+- [W3C Trace Context Spec](https://www.w3.org/TR/trace-context/)
 - [OpenTelemetry Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/)
+
+---
+
+**Last Updated**: December 9, 2025 - Tempo v2.9.0 with metrics-generator (v0.6.9)

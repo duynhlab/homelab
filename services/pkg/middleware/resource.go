@@ -29,11 +29,22 @@ func detectServiceInfo() (serviceName, namespace string) {
 		}
 		
 		// Extract service name from pod name pattern
-		// Example: "auth-75c98b4b9c-kdv2n" -> "auth"
+		// Kubernetes pod naming: <deployment-name>-<replicaset-hash>-<pod-hash>
+		// Examples:
+		//   "auth-75c98b4b9c-kdv2n" -> "auth"
+		//   "shipping-v2-6dd695b778-7p4gz" -> "shipping-v2"
+		//   "user-service-abc123-xyz456" -> "user-service"
+		//
+		// Strategy: Remove last 2 parts (replicaset-hash and pod-hash)
+		// - Replicaset hash: 10 chars (e.g., "75c98b4b9c")
+		// - Pod hash: 5 chars (e.g., "kdv2n")
 		if podName != "" {
 			parts := strings.Split(podName, "-")
-			// Take the first part before deployment hash
-			if len(parts) > 0 {
+			if len(parts) >= 3 {
+				// Remove last 2 parts (hashes), keep everything before
+				serviceName = strings.Join(parts[:len(parts)-2], "-")
+			} else if len(parts) > 0 {
+				// Fallback to first part if pattern doesn't match
 				serviceName = parts[0]
 			}
 		}

@@ -8,19 +8,20 @@ echo "Ensuring 'monitoring' namespace exists..."
 kubectl get namespace monitoring >/dev/null 2>&1 || kubectl create namespace monitoring
 
 # Install Prometheus Operator via kube-prometheus-stack
-echo "1. Installing Prometheus Operator (kube-prometheus-stack)..."
+echo "1. Installing Prometheus Operator (kube-prometheus-stack v80.0.0)..."
 if command -v helm >/dev/null 2>&1; then
   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
   helm repo update >/dev/null 2>&1 || true
   
   helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+    --version 80.0.0 \
     --namespace monitoring \
     --create-namespace \
     -f k8s/prometheus/values.yaml \
     --wait \
     --timeout 5m
   
-  echo "  ✓ Prometheus Operator installed"
+  echo "  ✓ Prometheus Operator v80.0.0 installed"
 else
   echo "  ✗ Helm is required but not installed!"
   exit 1
@@ -36,10 +37,11 @@ kubectl apply -f k8s/prometheus/servicemonitor-microservices.yaml
 echo "  ✓ ServiceMonitor created"
 
 # Deploy Grafana Operator + resources
-echo "4. Installing/Upgrading Grafana Operator..."
+echo "4. Installing/Upgrading Grafana Operator v5.20.0..."
 helm repo add grafana-operator https://grafana.github.io/helm-charts >/dev/null 2>&1 || true
 helm repo update >/dev/null 2>&1 || true
 helm upgrade --install grafana-operator grafana-operator/grafana-operator \
+  --version v5.20.0 \
   --namespace monitoring \
   --create-namespace \
   -f k8s/grafana-operator/values.yaml

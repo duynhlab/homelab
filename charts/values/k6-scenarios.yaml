@@ -20,11 +20,11 @@ containerPort: 8080  # Dummy port (k6 không listen)
 
 resources:
   requests:
-    memory: "256Mi"
-    cpu: "200m"
+    memory: "2Gi"      # Conservative: 250 VUs (50% of 500 VUs)
+    cpu: "1000m"       # Conservative: 250 VUs
   limits:
-    memory: "1Gi"
-    cpu: "1000m"
+    memory: "4Gi"      # Conservative: 250 VUs
+    cpu: "2000m"       # Conservative: 250 VUs
 
 livenessProbe:
   enabled: false  # k6 không có health endpoint

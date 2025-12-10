@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -38,7 +39,15 @@ func SendEmail(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to send email", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		
+		switch {
+		case errors.Is(err, logicv1.ErrInvalidRecipient):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid recipient"})
+		case errors.Is(err, logicv1.ErrDeliveryFailed):
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Delivery failed"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
 		return
 	}
 

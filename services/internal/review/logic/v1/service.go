@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/duynhne/monitoring/internal/review/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
@@ -35,6 +36,12 @@ func (s *ReviewService) CreateReview(ctx context.Context, req domain.CreateRevie
 	))
 	defer span.End()
 
+	// Mock logic: validate rating range
+	if req.Rating < 1 || req.Rating > 5 {
+		span.SetAttributes(attribute.Bool("review.created", false))
+		return nil, fmt.Errorf("create review for product %q with rating %d: %w", req.ProductID, req.Rating, ErrInvalidRating)
+	}
+
 	review := &domain.Review{
 		ID:        "new-review",
 		ProductID: req.ProductID,
@@ -42,7 +49,10 @@ func (s *ReviewService) CreateReview(ctx context.Context, req domain.CreateRevie
 		Rating:    req.Rating,
 		Comment:   req.Comment,
 	}
-	span.SetAttributes(attribute.String("review.id", review.ID))
+	span.SetAttributes(
+		attribute.String("review.id", review.ID),
+		attribute.Bool("review.created", true),
+	)
 	return review, nil
 }
 

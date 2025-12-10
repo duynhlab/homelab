@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -66,7 +67,15 @@ func AddItem(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to add item", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		
+		switch {
+		case errors.Is(err, logicv2.ErrInvalidQuantity):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid quantity"})
+		case errors.Is(err, logicv2.ErrCartNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "Cart not found"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
 		return
 	}
 

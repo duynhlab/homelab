@@ -2,6 +2,7 @@ package v2
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/duynhne/monitoring/internal/notification/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
@@ -37,12 +38,19 @@ func (s *NotificationService) GetNotification(ctx context.Context, id string) (*
 	))
 	defer span.End()
 
+	// Mock logic: simulate notification not found
+	if id == "999" {
+		span.SetAttributes(attribute.Bool("notification.found", false))
+		return nil, fmt.Errorf("get notification by id %q: %w", id, ErrNotificationNotFound)
+	}
+
 	notification := &domain.Notification{
 		ID:      id,
 		Type:    "email",
 		Message: "Notification details",
 		Status:  "sent",
 	}
+	span.SetAttributes(attribute.Bool("notification.found", true))
 	return notification, nil
 }
 

@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/duynhne/monitoring/internal/user/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
@@ -24,6 +25,12 @@ func (s *UserService) GetUser(ctx context.Context, id string) (*domain.User, err
 		attribute.String("user.id", id),
 	))
 	defer span.End()
+
+	// Mock logic: simulate user not found for id "999"
+	if id == "999" {
+		span.SetAttributes(attribute.Bool("user.found", false))
+		return nil, fmt.Errorf("get user by id %q: %w", id, ErrUserNotFound)
+	}
 
 	user := &domain.User{
 		ID:       id,
@@ -61,6 +68,18 @@ func (s *UserService) CreateUser(ctx context.Context, req domain.CreateUserReque
 		attribute.String("email", req.Email),
 	))
 	defer span.End()
+
+	// Mock logic: simulate duplicate user for username "duplicate"
+	if req.Username == "duplicate" {
+		span.SetAttributes(attribute.Bool("user.created", false))
+		return nil, fmt.Errorf("create user %q: %w", req.Username, ErrUserExists)
+	}
+
+	// Mock logic: validate email
+	if req.Email == "invalid" {
+		span.SetAttributes(attribute.Bool("user.created", false))
+		return nil, fmt.Errorf("validate email %q for user %q: %w", req.Email, req.Username, ErrInvalidEmail)
+	}
 
 	user := &domain.User{
 		ID:       "new-" + req.Username,

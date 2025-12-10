@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/duynhne/monitoring/internal/order/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
@@ -35,12 +36,19 @@ func (s *OrderService) GetOrder(ctx context.Context, id string) (*domain.Order, 
 	))
 	defer span.End()
 
+	// Mock logic: simulate order not found
+	if id == "999" {
+		span.SetAttributes(attribute.Bool("order.found", false))
+		return nil, fmt.Errorf("get order by id %q: %w", id, ErrOrderNotFound)
+	}
+
 	order := &domain.Order{
 		ID:     id,
 		Status: "pending",
 		Items:  []domain.OrderItem{{ProductID: "1", Quantity: 2, Price: 100}},
 		Total:  200,
 	}
+	span.SetAttributes(attribute.Bool("order.found", true))
 	return order, nil
 }
 

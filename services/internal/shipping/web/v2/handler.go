@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -39,7 +40,15 @@ func EstimateShipment(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to estimate shipment", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		
+		switch {
+		case errors.Is(err, logicv2.ErrInvalidAddress):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid address"})
+		case errors.Is(err, logicv2.ErrCarrierUnavailable):
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Carrier unavailable"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
 		return
 	}
 

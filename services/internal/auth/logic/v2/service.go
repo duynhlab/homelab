@@ -2,6 +2,7 @@ package v2
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/duynhne/monitoring/internal/auth/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
@@ -49,9 +50,10 @@ func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*doma
 		return response, nil
 	}
 
+	// Authentication failed - wrap sentinel error with context
 	span.SetAttributes(attribute.Bool("auth.success", false))
 	span.AddEvent("authentication.failed")
-	return nil, &AuthError{Message: "Invalid credentials", Code: "INVALID_CREDENTIALS"}
+	return nil, fmt.Errorf("authenticate user %q: %w", req.Username, ErrInvalidCredentials)
 }
 
 // Register handles user registration business logic with enhanced validation
@@ -84,15 +86,5 @@ func (s *AuthService) Register(ctx context.Context, req domain.RegisterRequest) 
 	span.AddEvent("user.registered.v2")
 
 	return response, nil
-}
-
-// AuthError represents an authentication error
-type AuthError struct {
-	Message string
-	Code    string
-}
-
-func (e *AuthError) Error() string {
-	return e.Message
 }
 

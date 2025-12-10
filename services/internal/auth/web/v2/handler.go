@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -52,14 +53,23 @@ func Login(c *gin.Context) {
 	response, err := authService.Login(ctx, req)
 	if err != nil {
 		span.RecordError(err)
-		zapLogger.Error("Login failed", zap.Error(err), zap.String("username", req.Username))
+		// Log the full error with context (error chain includes username)
+		zapLogger.Error("Login failed", zap.Error(err))
 		
-		if authErr, ok := err.(*logicv2.AuthError); ok && authErr.Code == "INVALID_CREDENTIALS" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": authErr.Message})
-			return
+		// Check error type using errors.Is() and map to appropriate HTTP response
+		switch {
+		case errors.Is(err, logicv2.ErrInvalidCredentials):
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		case errors.Is(err, logicv2.ErrUserNotFound):
+			// Don't reveal that user doesn't exist (security best practice)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		case errors.Is(err, logicv2.ErrPasswordExpired):
+			c.JSON(http.StatusForbidden, gin.H{"error": "Password expired"})
+		case errors.Is(err, logicv2.ErrAccountLocked):
+			c.JSON(http.StatusForbidden, gin.H{"error": "Account locked"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		}
-		
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 

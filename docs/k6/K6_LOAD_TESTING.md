@@ -6,11 +6,123 @@ k6 runs as a **continuous load generator** with realistic user journey functions
 
 ## Architecture
 
+### System Architecture (v0.6.14+)
+
+```mermaid
+flowchart TB
+    subgraph "K6 Load Test (250 VUs)"
+        K6[K6 Scenarios<br/>✅ NO health checks]
+    end
+    
+    subgraph "Traffic Generation (CLEAN)"
+        Business[Business APIs<br/>100% - ~800K requests ✅]
+    end
+    
+    subgraph "Microservices (9 Services)"
+        Auth[Auth Service]
+        User[User Service]
+        Product[Product Service]
+        Others[6 Other Services]
+    end
+    
+    subgraph "Middleware Pipeline (FILTERED)"
+        Tracing[Tracing Middleware<br/>✅ Filters /health + /metrics]
+        Prometheus[Prometheus Middleware<br/>✅ Filters /health + /metrics]
+        Logging[Logging Middleware]
+    end
+    
+    subgraph "Observability Stack (CLEAN)"
+        Tempo[Tempo<br/>100% business spans ✅]
+        PromDB[Prometheus<br/>100% business metrics ✅]
+        Grafana[Grafana Dashboard<br/>Shows accurate distribution ✅]
+    end
+    
+    subgraph "Infrastructure Monitoring (INDEPENDENT)"
+        K8sProbes[Kubernetes Probes<br/>Every 5-10s<br/>✅ Still works]
+        PromScraper[Prometheus ServiceMonitor<br/>Every 15s<br/>✅ Still works]
+    end
+    
+    K6 --> Business
+    
+    Business --> Auth
+    Business --> User
+    Business --> Product
+    Business --> Others
+    
+    Auth --> Tracing
+    User --> Tracing
+    Product --> Tracing
+    Others --> Tracing
+    
+    Tracing --> Prometheus
+    Prometheus --> Logging
+    
+    Prometheus --> PromDB
+    Tracing --> Tempo
+    
+    PromDB --> Grafana
+    Tempo --> Grafana
+    
+    K8sProbes -.->|Filtered at middleware| Auth
+    K8sProbes -.->|Filtered at middleware| User
+    PromScraper -.->|Filtered at middleware| Auth
+    PromScraper -.->|Filtered at middleware| User
+    
+    style Business fill:#9f9,stroke:#333,stroke-width:2px
+    style Prometheus fill:#9f9,stroke:#333,stroke-width:2px
+    style Tracing fill:#9f9,stroke:#333,stroke-width:2px
+    style Grafana fill:#9f9,stroke:#333,stroke-width:2px
+    style Tempo fill:#9f9,stroke:#333,stroke-width:2px
+```
+
+**Key Design Principles:**
+- ✅ K6 only calls business APIs - realistic traffic simulation
+- ✅ Prometheus middleware filters infrastructure endpoints - defense in depth
+- ✅ Tracing middleware filters infrastructure endpoints - cleaner traces
+- ✅ Grafana shows 100% business traffic - accurate metrics
+- ✅ Tempo has 0% health check spans - 79% storage savings
+- ✅ Kubernetes probes still work - filtered at middleware, not blocked
+
+**Traffic Flow:**
+```
+k6 → Business APIs → Microservices → Middleware (filters /health, /metrics) → Observability Stack
+                                                                              ↓
+                                          Kubernetes Probes → /health → Filtered (not recorded)
+```
+
+### Deployment Architecture
+
 k6 is deployed using:
 - **Helm Chart**: Reuses the same generic chart (`charts/`) used for microservices
 - **Docker Image**: `ghcr.io/duynhne/k6:scenarios` (built from `k6/Dockerfile`)
 - **Namespace**: Dedicated `k6` namespace
 - **GitHub Actions**: Automated image builds via `.github/workflows/build-k6-images.yml`
+
+### Request Flow Comparison
+
+**Business Traffic (Recorded):**
+```
+k6 → /api/v1/users → Gin Handler → Prometheus Middleware ✅ Records metrics
+                                  → Tracing Middleware ✅ Creates span
+                                  → Logging Middleware ✅ Logs request
+                                  → Response
+```
+
+**Infrastructure Traffic (Filtered):**
+```
+Kubernetes Probe → /health → Gin Handler → Prometheus Middleware ⏭️ SKIPS (early return)
+                                          → Tracing Middleware ⏭️ SKIPS (filtered)
+                                          → Logging Middleware ⏭️ Optional skip
+                                          → Response ✅ Still returns 200 OK
+```
+
+**Result:**
+- Business APIs: Full observability (metrics + traces + logs)
+- Infrastructure endpoints: Still functional, just not recorded
+- Storage: 75% reduction in datapoints
+- Accuracy: 100% business traffic in metrics
+
+---
 
 ## Files
 
@@ -71,6 +183,17 @@ helm list -n k6
   - Timeout/Retry Journey - Tests resilience
   - Concurrent Operations Journey - Tests race conditions
   - Error Handling Journey - Tests invalid inputs
+
+**Traffic Focus (NEW in v0.6.14):**
+- **Business traffic only** - No health checks or metrics endpoints
+- **Separation of concerns**: 
+  - Load testing → Simulates realistic user behavior
+  - Infrastructure monitoring → Handled by Kubernetes probes
+- **Why this matters**:
+  - Metrics reflect actual user experience (not polluted by health checks)
+  - APM traces show only business transactions
+  - Storage efficiency (~75% reduction in Prometheus data)
+  - Accurate SLO tracking
 
 **Use Cases:**
 - Production readiness validation
@@ -262,6 +385,70 @@ kubectl describe pod -n k6
 - Or uninstall specific release:
   - `helm uninstall k6-legacy -n k6`
   - `helm uninstall k6-scenarios -n k6`
+
+## Best Practices (v0.6.14+)
+
+### What to Include in Load Tests
+
+✅ **DO include**:
+- Business API endpoints (`/api/v1/*`, `/api/v2/*`)
+- Realistic user journeys (multi-service flows)
+- Edge cases (timeouts, retries, errors)
+- Different user personas (browser, API, admin)
+- Production-like load patterns
+
+❌ **DO NOT include**:
+- Health check endpoints (`/health`, `/readiness`, `/liveness`)
+- Metrics endpoints (`/metrics`)
+- Infrastructure monitoring endpoints
+
+### Why Separate Infrastructure from Load Testing?
+
+**Kubernetes Handles Infrastructure Monitoring:**
+- Liveness probes check container health
+- Readiness probes check service availability
+- Load balancers perform health checks
+- Prometheus scrapes `/metrics` automatically
+
+**Load Testing Should Simulate Users:**
+- Real users don't call `/health` endpoints
+- Health checks create misleading metrics (79% traffic in v0.6.13!)
+- APM traces get polluted with infrastructure calls
+- Storage costs increase (millions of unnecessary datapoints)
+
+**Result:**
+- Metrics reflect actual user experience
+- Accurate response time percentiles (P50, P95, P99)
+- Clean APM traces (only business transactions)
+- Lower storage costs (~75% reduction)
+- Accurate SLO tracking
+
+### Middleware Filtering (v0.6.14+)
+
+Even if infrastructure endpoints are accidentally called, they are filtered at the middleware level:
+
+```go
+// services/pkg/middleware/prometheus.go
+func shouldCollectMetrics(path string) bool {
+    infrastructurePaths := []string{
+        "/health", "/metrics", "/readiness", "/liveness",
+    }
+    for _, skipPath := range infrastructurePaths {
+        if strings.HasPrefix(path, skipPath) {
+            return false
+        }
+    }
+    return true
+}
+```
+
+**Benefits:**
+- Prevents metric pollution at collection time
+- Consistent with distributed tracing filtering
+- Efficient (early return, no overhead)
+- Easy to extend (add new paths to filter)
+
+---
 
 ## Update Test Scripts
 

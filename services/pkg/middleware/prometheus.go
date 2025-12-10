@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -62,12 +63,43 @@ var (
 	)
 )
 
+// shouldCollectMetrics determines if metrics should be collected for a given path
+// Infrastructure endpoints (health checks, metrics) are excluded to prevent:
+// - High cardinality in Prometheus (millions of /health datapoints)
+// - Skewed metrics (79% of traffic was health checks in k6 tests)
+// - Storage waste (infrastructure traffic has no business value)
+func shouldCollectMetrics(path string) bool {
+	// Skip infrastructure endpoints
+	infrastructurePaths := []string{
+		"/health",
+		"/metrics",
+		"/readiness",
+		"/liveness",
+	}
+	
+	for _, skipPath := range infrastructurePaths {
+		if strings.HasPrefix(path, skipPath) {
+			return false
+		}
+	}
+	
+	return true
+}
+
 func PrometheusMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		
 		method := c.Request.Method
 		path := c.Request.URL.Path
+		
+		// Skip metrics collection for infrastructure endpoints
+		// These are handled by Kubernetes probes and monitoring systems
+		// Not representative of actual user/business traffic
+		if !shouldCollectMetrics(path) {
+			c.Next()
+			return
+		}
 		
 		// Increment in-flight requests
 		requestsInFlight.WithLabelValues(method, path).Inc()

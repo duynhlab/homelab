@@ -113,7 +113,7 @@ chmod +x scripts/*.sh
 # Deploy only multiple scenarios test
 ./scripts/07-deploy-k6.sh scenarios
 ```
-📖 [Full K6 Documentation](./docs/load-testing/K6_LOAD_TESTING.md)
+📖 [Full K6 Documentation](./docs/k6/K6_LOAD_TESTING.md)
 
 **SLO Deployment (Sloth Operator):**
 ```bash
@@ -448,7 +448,7 @@ flowchart TB
 | Document | Description |
 |----------|-------------|
 | **[METRICS.md](./docs/monitoring/METRICS.md)** | ⭐ **Complete guide với phân tích chi tiết tất cả 32 panels** (5 row groups, memory leak detection) |
-| **[K6_LOAD_TESTING.md](./docs/load-testing/K6_LOAD_TESTING.md)** | 🚀 **k6 continuous load generator setup & configuration** |
+| **[K6_LOAD_TESTING.md](./docs/k6/K6_LOAD_TESTING.md)** | 🚀 **k6 continuous load generator setup & configuration** |
 | **[SLO Documentation](./docs/slo/README.md)** | 🎯 **SRE practices: SLI/SLO definitions, error budgets, burn rate alerts** |
 | **[SETUP.md](./docs/getting-started/SETUP.md)** | Step-by-step deployment guide |
 | **[API Reference](./docs/api/API_REFERENCE.md)** | Complete API documentation for all 9 microservices |

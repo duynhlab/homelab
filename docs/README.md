@@ -79,12 +79,13 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 19. **[Continuous Profiling](./apm/PROFILING.md)** - Pyroscope setup
 20. **[Log Aggregation](./apm/LOGGING.md)** - Loki + Vector configuration
 
-### 🚦 Load Testing
+### 🚦 k6 Load Testing
 
-21. **[k6 Load Testing](./load-testing/K6_LOAD_TESTING.md)** - Load testing setup
-    - Multiple scenarios
+21. **[k6 Load Testing](./k6/K6_LOAD_TESTING.md)** - Load testing setup and architecture
+    - System architecture with filtering
+    - Multiple scenarios (5 user personas)
     - Deployment configurations
-    - Monitoring load tests
+    - Best practices (v0.6.14+)
 
 ---
 
@@ -119,8 +120,8 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 - [Continuous Profiling](./apm/PROFILING.md) - Pyroscope setup
 - [Log Aggregation](./apm/LOGGING.md) - Loki + Vector
 
-### Load Testing
-- [k6 Load Testing](./load-testing/K6_LOAD_TESTING.md) - Load testing guide
+### k6 Load Testing
+- [k6 Load Testing](./k6/K6_LOAD_TESTING.md) - Complete load testing guide with architecture
 
 ### Archive
 - [Microservices Refactoring](./archive/MICROSERVICES_REFACTORING.md) - Historical architecture document

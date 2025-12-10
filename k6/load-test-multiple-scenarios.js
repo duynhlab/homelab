@@ -693,10 +693,8 @@ export function browserUserScenario() {
     sleep(Math.random() * 2 + 2);
   }
   
-  // Health check - only 10% of iterations (monitoring, not load testing)
-  if (Math.random() < 0.1) {
-    http.get(`${SERVICES.product}/health`, { tags: { ...tags, endpoint: '/health' } });
-  }
+  // Health checks removed - Kubernetes probes handle infrastructure monitoring
+  // Load testing should only simulate realistic business traffic
 }
 
 // Scenario 2: Shopping User - Complete shopping flow
@@ -766,10 +764,7 @@ export function shoppingUserScenario() {
     sleep(Math.random() * 2 + 1);
   }
   
-  // Health check - only 10% of iterations (monitoring, not load testing)
-  if (Math.random() < 0.1) {
-    http.get(`${SERVICES.cart}/health`, { tags: { ...tags, endpoint: '/health' } });
-  }
+  // Health checks removed - separate concern from load testing
 }
 
 // Scenario 3: Registered User - Authenticated user actions
@@ -839,10 +834,7 @@ export function registeredUserScenario() {
     sleep(Math.random() * 1 + 1);
   }
   
-  // Health check - only 10% of iterations (monitoring, not load testing)
-  if (Math.random() < 0.1) {
-    http.get(`${SERVICES.user}/health`, { tags: { ...tags, endpoint: '/health' } });
-  }
+  // Health checks removed
 }
 
 // Scenario 4: API Client - High volume, all endpoints
@@ -888,8 +880,8 @@ export function apiClientScenario() {
     sleep(0.1); // Fast API client (100ms between requests)
   });
   
-  // Health check
-  http.get(`${SERVICES.product}/health`, { tags: { ...tags, endpoint: '/health' } });
+  // Health check removed - this was unconditional (always executed)
+  // Highest impact deletion - generated most health check traffic
 }
 
 // Scenario 5: Admin User - Management operations

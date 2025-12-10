@@ -2,6 +2,7 @@ package v2
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/duynhne/monitoring/internal/cart/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
@@ -43,11 +44,18 @@ func (s *CartService) AddItem(ctx context.Context, cartId string, req domain.Add
 	))
 	defer span.End()
 
+	// Mock logic: validate quantity
+	if req.Quantity <= 0 {
+		span.SetAttributes(attribute.Bool("item.added", false))
+		return nil, fmt.Errorf("add product %q to cart %q with quantity %d: %w", req.ProductID, cartId, req.Quantity, ErrInvalidQuantity)
+	}
+
 	item := &domain.CartItem{
 		ProductID: req.ProductID,
 		Quantity:  req.Quantity,
 		Price:     100,
 	}
+	span.SetAttributes(attribute.Bool("item.added", true))
 	return item, nil
 }
 

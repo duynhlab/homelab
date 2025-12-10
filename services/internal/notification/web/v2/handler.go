@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -52,8 +53,14 @@ func GetNotification(c *gin.Context) {
 	notification, err := notificationService.GetNotification(ctx, id)
 	if err != nil {
 		span.RecordError(err)
-		zapLogger.Error("Failed to get notification", zap.Error(err), zap.String("notification_id", id))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		zapLogger.Error("Failed to get notification", zap.Error(err))
+		
+		switch {
+		case errors.Is(err, logicv2.ErrNotificationNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "Notification not found"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
 		return
 	}
 

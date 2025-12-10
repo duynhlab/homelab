@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/duynhne/monitoring/internal/notification/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
@@ -22,12 +23,19 @@ func (s *NotificationService) SendEmail(ctx context.Context, req domain.SendEmai
 	))
 	defer span.End()
 
+	// Mock logic: validate recipient
+	if req.To == "" || req.To == "invalid" {
+		span.SetAttributes(attribute.Bool("email.sent", false))
+		return nil, fmt.Errorf("send email to %q: %w", req.To, ErrInvalidRecipient)
+	}
+
 	notification := &domain.Notification{
 		ID:      "email-1",
 		Type:    "email",
 		Message: req.Subject,
 		Status:  "sent",
 	}
+	span.SetAttributes(attribute.Bool("email.sent", true))
 	return notification, nil
 }
 

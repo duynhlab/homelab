@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -51,8 +52,14 @@ func GetProduct(c *gin.Context) {
 	product, err := productService.GetProduct(ctx, id)
 	if err != nil {
 		span.RecordError(err)
-		zapLogger.Error("Failed to get product", zap.Error(err), zap.String("product_id", id))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		zapLogger.Error("Failed to get product", zap.Error(err))
+		
+		switch {
+		case errors.Is(err, logicv1.ErrProductNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
 		return
 	}
 
@@ -84,7 +91,15 @@ func CreateProduct(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to create product", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		
+		switch {
+		case errors.Is(err, logicv1.ErrInvalidPrice):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid price"})
+		case errors.Is(err, logicv1.ErrInsufficientStock):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
 		return
 	}
 

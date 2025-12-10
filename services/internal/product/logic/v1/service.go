@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/duynhne/monitoring/internal/product/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
@@ -36,6 +37,12 @@ func (s *ProductService) GetProduct(ctx context.Context, id string) (*domain.Pro
 	))
 	defer span.End()
 
+	// Mock logic: simulate product not found for id "999"
+	if id == "999" {
+		span.SetAttributes(attribute.Bool("product.found", false))
+		return nil, fmt.Errorf("get product by id %q: %w", id, ErrProductNotFound)
+	}
+
 	product := &domain.Product{
 		ID:          id,
 		Name:        "Product " + id,
@@ -43,6 +50,7 @@ func (s *ProductService) GetProduct(ctx context.Context, id string) (*domain.Pro
 		Description: "Description for product " + id,
 		Category:    "Electronics",
 	}
+	span.SetAttributes(attribute.Bool("product.found", true))
 	return product, nil
 }
 
@@ -53,6 +61,12 @@ func (s *ProductService) CreateProduct(ctx context.Context, req domain.CreatePro
 	))
 	defer span.End()
 
+	// Mock logic: validate price
+	if req.Price <= 0 {
+		span.SetAttributes(attribute.Bool("product.created", false))
+		return nil, fmt.Errorf("validate price %.2f for product %q: %w", req.Price, req.Name, ErrInvalidPrice)
+	}
+
 	product := &domain.Product{
 		ID:          "new-" + req.Name,
 		Name:        req.Name,
@@ -60,7 +74,10 @@ func (s *ProductService) CreateProduct(ctx context.Context, req domain.CreatePro
 		Description: req.Description,
 		Category:    req.Category,
 	}
-	span.SetAttributes(attribute.String("product.id", product.ID))
+	span.SetAttributes(
+		attribute.String("product.id", product.ID),
+		attribute.Bool("product.created", true),
+	)
 	return product, nil
 }
 

@@ -2,6 +2,7 @@ package v2
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/duynhne/monitoring/pkg/middleware"
 	"go.opentelemetry.io/otel/attribute"
@@ -54,6 +55,12 @@ func (s *ProductService) GetItem(ctx context.Context, itemId string) (*Item, err
 	))
 	defer span.End()
 
+	// Mock logic: simulate item not found
+	if itemId == "999" {
+		span.SetAttributes(attribute.Bool("item.found", false))
+		return nil, fmt.Errorf("get item by id %q: %w", itemId, ErrProductNotFound)
+	}
+
 	item := &Item{
 		ItemID:      itemId,
 		Name:        "Item " + itemId,
@@ -62,6 +69,7 @@ func (s *ProductService) GetItem(ctx context.Context, itemId string) (*Item, err
 		Category:    "Electronics",
 		SKU:         "SKU-" + itemId,
 	}
+	span.SetAttributes(attribute.Bool("item.found", true))
 	return item, nil
 }
 
@@ -73,6 +81,12 @@ func (s *ProductService) CreateItem(ctx context.Context, req CreateItemRequest) 
 	))
 	defer span.End()
 
+	// Mock logic: validate price
+	if req.Price <= 0 {
+		span.SetAttributes(attribute.Bool("item.created", false))
+		return nil, fmt.Errorf("validate price %.2f for item %q: %w", req.Price, req.Name, ErrInvalidPrice)
+	}
+
 	item := &Item{
 		ItemID:      "item-" + req.SKU,
 		Name:        req.Name,
@@ -81,7 +95,10 @@ func (s *ProductService) CreateItem(ctx context.Context, req CreateItemRequest) 
 		Category:    req.Category,
 		SKU:         req.SKU,
 	}
-	span.SetAttributes(attribute.String("item.id", item.ItemID))
+	span.SetAttributes(
+		attribute.String("item.id", item.ItemID),
+		attribute.Bool("item.created", true),
+	)
 	return item, nil
 }
 

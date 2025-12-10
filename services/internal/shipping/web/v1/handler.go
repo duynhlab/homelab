@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -28,8 +29,16 @@ func TrackShipment(c *gin.Context) {
 	shipment, err := shippingService.TrackShipment(ctx, trackingID)
 	if err != nil {
 		span.RecordError(err)
-		zapLogger.Error("Failed to track shipment", zap.Error(err), zap.String("tracking_id", trackingID))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		zapLogger.Error("Failed to track shipment", zap.Error(err))
+		
+		switch {
+		case errors.Is(err, logicv1.ErrShipmentNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "Shipment not found"})
+		case errors.Is(err, logicv1.ErrCarrierUnavailable):
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Carrier unavailable"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
 		return
 	}
 

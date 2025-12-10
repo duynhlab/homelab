@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -40,8 +41,14 @@ func GetUser(c *gin.Context) {
 	user, err := userService.GetUser(ctx, id)
 	if err != nil {
 		span.RecordError(err)
-		zapLogger.Error("Failed to get user", zap.Error(err), zap.String("user_id", id))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		zapLogger.Error("Failed to get user", zap.Error(err))
+		
+		switch {
+		case errors.Is(err, logicv1.ErrUserNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
 		return
 	}
 
@@ -73,7 +80,13 @@ func GetProfile(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to get profile", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		
+		switch {
+		case errors.Is(err, logicv1.ErrUnauthorized):
+			c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized access"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
 		return
 	}
 
@@ -115,8 +128,16 @@ func CreateUser(c *gin.Context) {
 	user, err := userService.CreateUser(ctx, req)
 	if err != nil {
 		span.RecordError(err)
-		zapLogger.Error("Failed to create user", zap.Error(err), zap.String("username", req.Username))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		zapLogger.Error("Failed to create user", zap.Error(err))
+		
+		switch {
+		case errors.Is(err, logicv1.ErrUserExists):
+			c.JSON(http.StatusConflict, gin.H{"error": "User already exists"})
+		case errors.Is(err, logicv1.ErrInvalidEmail):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email address"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
 		return
 	}
 

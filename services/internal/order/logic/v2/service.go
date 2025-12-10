@@ -2,6 +2,7 @@ package v2
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/duynhne/monitoring/internal/order/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
@@ -37,11 +38,18 @@ func (s *OrderService) GetOrderStatus(ctx context.Context, orderId string) (map[
 	))
 	defer span.End()
 
+	// Mock logic: simulate order not found
+	if orderId == "999" {
+		span.SetAttributes(attribute.Bool("order.found", false))
+		return nil, fmt.Errorf("get order status for id %q: %w", orderId, ErrOrderNotFound)
+	}
+
 	status := map[string]interface{}{
 		"orderId":  orderId,
 		"status":   "shipped",
 		"tracking": "TRK123456",
 	}
+	span.SetAttributes(attribute.Bool("order.found", true))
 	return status, nil
 }
 

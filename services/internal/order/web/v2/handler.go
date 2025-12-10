@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -53,8 +54,14 @@ func GetOrderStatus(c *gin.Context) {
 	status, err := orderService.GetOrderStatus(ctx, orderId)
 	if err != nil {
 		span.RecordError(err)
-		zapLogger.Error("Failed to get order status", zap.Error(err), zap.String("order_id", orderId))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		zapLogger.Error("Failed to get order status", zap.Error(err))
+		
+		switch {
+		case errors.Is(err, logicv2.ErrOrderNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
 		return
 	}
 

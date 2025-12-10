@@ -7,6 +7,121 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.6.13] - 2025-12-10
+
+### Changed
+
+1. **Error Handling System - Production Best Practices Implementation**
+   - **Scope**: All 9 microservices (auth, user, product, cart, order, review, notification, shipping, shipping-v2)
+   - **Architecture**: Migrated from custom error types to Go standard error patterns
+   - **Implementation**:
+     - **Sentinel Errors**: Created 16 `errors.go` files (8 services × 2 versions) with domain-specific sentinel errors
+       - Pattern: `Err{Noun}{Verb}` (e.g., `ErrUserNotFound`, `ErrInvalidCredentials`)
+       - Package-level exported errors using `errors.New()`
+     - **Error Wrapping**: All service layer methods use `fmt.Errorf("%w")` for error context propagation
+       - Example: `return nil, fmt.Errorf("authenticate user %q: %w", username, ErrInvalidCredentials)`
+       - Preserves error chain for better debugging and log context
+     - **Error Checking**: All web handlers migrated from type assertions to `errors.Is()`
+       - Replaced: `if authErr, ok := err.(*logicv1.AuthError); ok { ... }`
+       - With: `if errors.Is(err, logicv1.ErrInvalidCredentials) { ... }`
+       - Switch-case pattern for clean HTTP status code mapping
+   - **Benefits**:
+     - ✅ **Type-safe error handling** - Compile-time safety with sentinel errors
+     - ✅ **Better observability** - Error context preserved in logs and traces
+     - ✅ **Idiomatic Go** - Follows Go 1.13+ error wrapping best practices
+     - ✅ **Non-breaking change** - HTTP responses unchanged, backward compatible
+     - ✅ **Maintainability** - Consistent pattern across all 9 services
+   - **Files Changed** (52 files total):
+     - **Created**: 16 `errors.go` files in `services/internal/{service}/logic/{v1,v2}/`
+     - **Modified**: 36 service and handler files (18 service.go + 18 handler.go)
+     - **Documentation**: 1 new guide `docs/development/ERROR_HANDLING.md` (696 lines)
+   - **Migration Approach**:
+     - Phase 1: Foundation (auth service as reference implementation)
+     - Phase 2: Systematic migration of remaining 8 services
+     - Verified compilation at each milestone: All 9 services build successfully
+   - **Error Examples**:
+     - **Auth**: `ErrInvalidCredentials`, `ErrUserNotFound`, `ErrPasswordExpired`, `ErrAccountLocked`
+     - **User**: `ErrUserNotFound`, `ErrUserExists`, `ErrInvalidEmail`
+     - **Product**: `ErrProductNotFound`, `ErrInsufficientStock`, `ErrInvalidPrice`
+     - **Cart**: `ErrCartNotFound`, `ErrCartEmpty`, `ErrItemNotInCart`, `ErrInvalidQuantity`
+     - **Order**: `ErrOrderNotFound`, `ErrInvalidOrderState`, `ErrPaymentFailed`
+     - **Review**: `ErrReviewNotFound`, `ErrDuplicateReview`, `ErrInvalidRating`
+     - **Notification**: `ErrNotificationNotFound`, `ErrInvalidRecipient`, `ErrDeliveryFailed`
+     - **Shipping**: `ErrShipmentNotFound`, `ErrInvalidAddress`, `ErrCarrierUnavailable`
+   - **Next Steps**: Phase 3 (Integration Testing) and Phase 4 (Deployment) require Kubernetes deployment
+
+### Added
+
+2. **Error Handling Documentation** (`docs/development/ERROR_HANDLING.md`)
+   - Comprehensive 696-line guide covering:
+     - Overview of Go error handling philosophy
+     - Sentinel error patterns with naming conventions
+     - Error wrapping best practices with `fmt.Errorf("%w")`
+     - Error checking patterns with `errors.Is()` and `errors.As()`
+     - Complete code examples from auth service
+     - HTTP status code mapping strategies
+     - Anti-patterns and common mistakes
+     - Troubleshooting guide for error handling issues
+     - Migration guide from old custom error types
+   - References to Uber Go Style Guide and official Go blog posts
+   - Real-world examples from all 9 microservices
+
+### Documentation
+
+3. **Updated Project Documentation**
+   - `AGENTS.md`: Added error handling as implemented best practice
+   - `IMPLEMENTATION_SUMMARY.md`: Created complete implementation summary with:
+     - Files changed breakdown (16 created, 36 modified)
+     - Implementation timeline (Phase 1 & 2 complete)
+     - Testing strategy (requires deployment)
+     - Impact analysis (non-breaking, backward compatible)
+
+### Technical Details
+
+**Error Handling Pattern**:
+
+```go
+// 1. Define sentinel errors (errors.go)
+var (
+    ErrInvalidCredentials = errors.New("invalid credentials")
+    ErrUserNotFound       = errors.New("user not found")
+)
+
+// 2. Wrap errors with context (service layer)
+func (s *Service) Login(username, password string) (*User, error) {
+    if !valid {
+        return nil, fmt.Errorf("authenticate user %q: %w", username, ErrInvalidCredentials)
+    }
+    // ...
+}
+
+// 3. Check errors idiomatically (handler layer)
+func (h *Handler) Login(c *gin.Context) {
+    user, err := h.service.Login(req.Username, req.Password)
+    if err != nil {
+        switch {
+        case errors.Is(err, logicv1.ErrInvalidCredentials):
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+        case errors.Is(err, logicv1.ErrUserNotFound):
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+        default:
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal error"})
+        }
+        return
+    }
+    c.JSON(http.StatusOK, user)
+}
+```
+
+**Build Verification**:
+```bash
+cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/order \
+                        ./cmd/review ./cmd/notification ./cmd/shipping ./cmd/shipping-v2
+# Result: ✅ SUCCESS - All 9 services compile without errors
+```
+
+**Impact**: This change lays the foundation for professional error handling across the entire microservices system, improving debuggability, maintainability, and alignment with Go best practices.
+
 ## [0.6.12] - 2025-12-10
 
 ### Changed

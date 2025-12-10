@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -60,7 +61,15 @@ func CreateReview(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to create review", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		
+		switch {
+		case errors.Is(err, logicv1.ErrInvalidRating):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid rating (must be 1-5)"})
+		case errors.Is(err, logicv1.ErrDuplicateReview):
+			c.JSON(http.StatusConflict, gin.H{"error": "Review already exists"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
 		return
 	}
 

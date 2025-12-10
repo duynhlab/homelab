@@ -1,4 +1,4 @@
-name: Build K6 Images
+name: Build K6 Image
 
 on:
   push:
@@ -30,15 +30,6 @@ jobs:
       contents: read
       packages: write
 
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - variant: legacy
-            script: load-test
-          - variant: scenarios
-            script: load-test-multiple-scenarios
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -62,7 +53,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/k6
           tags: |
-            type=raw,value=${{ matrix.variant }}
+            type=raw,value=scenarios
 
       - name: Build and push K6 image
         id: build
@@ -72,7 +63,7 @@ jobs:
           context: ./k6
           file: ./k6/Dockerfile
           build-args: |
-            SCRIPT_NAME=${{ matrix.script }}
+            SCRIPT_NAME=load-test-multiple-scenarios
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -80,4 +71,3 @@ jobs:
       - name: Image digest
         if: github.event_name != 'pull_request'
         run: echo ${{ steps.build.outputs.digest }}
-

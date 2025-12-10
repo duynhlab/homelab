@@ -305,15 +305,14 @@ Numbered scripts (01-12) for deployment and operations:
 
 ```
 k6/
-├── Dockerfile                           # Unified Dockerfile (ARG-based)
-├── load-test.js                         # Legacy load test script
-└── load-test-multiple-scenarios.js      # Multiple scenarios script
+├── Dockerfile                           # Dockerfile for k6 image
+└── load-test-multiple-scenarios.js      # Test script with user journeys
 ```
 
 **K6 Deployment**: Helm-based (reuses `charts/`)
-- Build 2 images: `ghcr.io/duynhne/k6:legacy`, `ghcr.io/duynhne/k6:scenarios`
+- Build image: `ghcr.io/duynhne/k6:scenarios`
 - Deploy to `k6` namespace
-- Helm values: `charts/values/k6-legacy.yaml`, `charts/values/k6-scenarios.yaml`
+- Helm values: `charts/values/k6-scenarios.yaml`
 - Health checks disabled: K6 is a load testing tool with no HTTP health endpoint
 
 #### `k8s/sloth/` - SLO Management (Sloth Operator)
@@ -534,10 +533,9 @@ k8s/sloth/
    # ./scripts/07-deploy-k6.sh scenarios
    ```
 
-2. **Check load generator pods:**
+2. **Check load generator pod:**
    ```bash
    kubectl get pods -n k6
-   kubectl logs -n k6 -l app=k6-legacy -f
    kubectl logs -n k6 -l app=k6-scenarios -f
    ```
 
@@ -766,9 +764,9 @@ k8s/sloth/
 - Apply: `kubectl apply -f k8s/sloth/crds/`
 
 **Load testing:**
-- K6 scripts: `k6/load-test.js`, `k6/load-test-multiple-scenarios.js`
+- K6 script: `k6/load-test-multiple-scenarios.js`
 - K6 Dockerfile: `k6/Dockerfile`
-- K6 Helm values: `charts/values/k6-legacy.yaml`, `charts/values/k6-scenarios.yaml`
+- K6 Helm values: `charts/values/k6-scenarios.yaml`
 
 ### Find Scripts by Task
 

@@ -7,6 +7,163 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.6.12] - 2025-12-10
+
+### Changed
+
+1. **K6 Load Testing - Professional High-Volume Configuration (Conservative)**
+   - **Duration**: 21 minutes → 6.5 hours (390 minutes) - Extended overnight soak test
+   - **Peak VUs**: 100 → 250 (2.5x increase, conservative resource usage)
+   - **RPS**: 50-80 → 250-1000 (5-12x increase)
+   - **Total Requests**: ~100K → 3-4 million (30-40x increase)
+   - **Load Pattern**: Added realistic time-based patterns with extended phases
+   - **Test Type**: Simple ramp → Production simulation with 8 load phases (45-90 min each)
+   - **Resource Limits**: k6 pod set to 2 CPU / 4GB RAM (conservative for overnight testing)
+   - **Thresholds**: Adjusted for higher load (p95 < 800ms, p99 < 1500ms, 10% error tolerance)
+
+### Added
+
+2. **K6 Load Testing - Edge Case Journeys**
+   - **Timeout/Retry Journey**: Tests system resilience with slow responses and exponential backoff
+   - **Concurrent Operations Journey**: Tests race conditions with parallel cart operations
+   - **Error Handling Journey**: Tests invalid inputs (404, 400 errors)
+   - **Integration**: Edge cases integrated into existing scenarios (10-15% probability)
+
+3. **K6 Load Testing - Professional Monitoring**
+   - Setup message includes detailed configuration summary
+   - Load pattern phases with percentage indicators
+   - Estimated RPS and total request count
+   - Journey type breakdown (8 journeys total)
+   - Test duration and monitoring instructions
+
+## [0.6.11] - 2025-12-09
+
+### Removed
+
+1. **K6 Load Testing - k6-legacy Deprecated and Removed**
+   - **Reason**: k6-legacy was using incorrect HTTP methods (GET instead of POST) causing errors
+   - **Symptoms**: 
+     - shipping-v2 logs showed "Invalid request" (EOF error), status 400
+     - k6-legacy sending GET to POST-only endpoints like `/api/v2/shipments/estimate`
+     - Error: `c.ShouldBindJSON(&req)` fails when no body is provided
+   - **Root Cause**: k6-legacy test script (`load-test.js`) used GET for all endpoints without checking handler requirements
+   - **Impact Before Removal**:
+     - 400 errors in shipping-v2 and potentially other v2 services
+     - Conflicting traffic patterns (legacy vs scenarios)
+     - Redundant load (200 VUs total: 100 legacy + 100 scenarios)
+   - **Solution**: Removed k6-legacy entirely, keeping only k6-scenarios
+   - **Benefits After Removal**:
+     - ✅ No more HTTP method mismatch errors (400s eliminated)
+     - ✅ Cleaner, more realistic traffic patterns (journey-based only)
+     - ✅ Simpler deployment (one k6 variant instead of two)
+     - ✅ Better distributed tracing (multi-service journey functions)
+     - ✅ Reduced cluster load (100 VUs instead of 200)
+   - **Files Removed**:
+     - `k6/load-test.js` - Legacy test script
+     - `charts/values/k6-legacy.yaml` - Legacy Helm values
+   - **Files Updated**:
+     - `scripts/07-deploy-k6.sh` - Simplified to single deployment mode
+     - `.github/workflows/build-k6-images.yml` - Removed legacy build matrix
+     - `docs/load-testing/K6_LOAD_TESTING.md` - Removed legacy documentation
+   - **Migration**: No action needed - k6-scenarios provides superior coverage with user journeys
+   - **Verification**:
+     ```bash
+     # Check only k6-scenarios is running:
+     kubectl get pods -n k6
+     
+     # Check shipping-v2 logs (should see no 400 errors):
+     kubectl logs -n shipping -l app=shipping-v2 --tail=50 | grep "400"
+     
+     # Should only see POST requests for estimate endpoint:
+     kubectl logs -n shipping -l app=shipping-v2 --tail=50 | grep "POST.*estimate"
+     ```
+
+### Added
+
+1. **K6 Load Testing - Realistic User Journey Functions**
+   - **Goal**: Create deeper, more realistic distributed traces spanning multiple microservices
+   - **What Was Missing**:
+     - ❌ Shallow traces: Only 2 layers per service (web → logic)
+     - ❌ Isolated service calls: Each request was independent
+     - ❌ No multi-service user journeys
+     - ❌ Incorrect HTTP method for shipping-v2: Was using GET instead of POST
+   - **What Was Added**: 5 comprehensive user journey functions
+     1. **E-commerce Shopping Journey** (9 services):
+        - Flow: Auth → User → Product → Cart → Shipping-v2 → Order → Notification
+        - Covers complete purchase flow from login to order confirmation
+        - **Fixes shipping-v2 calls**: Now uses POST with request body (origin, destination, weight)
+     2. **Product Review Journey** (5 services):
+        - Flow: Auth → User → Product → Review
+        - User logs in, views product, reads reviews, writes review
+     3. **Order Tracking Journey** (6 services):
+        - Flow: Auth → User → Order → Shipping → Notification
+        - User tracks existing orders and shipments
+     4. **Quick Browse Journey** (4 services):
+        - Flow: Product → Shipping-v2 → Cart (abandoned)
+        - User browses, checks shipping, adds to cart but abandons
+     5. **API Monitoring Journey** (7 services):
+        - Flow: Auth, User, Product, Cart, Order, Review, Notification
+        - API client health checks and data fetching
+   - **Integration into Scenarios**:
+     - **Browser User (40%)**: 60% Quick Browse Journey, 40% simple browsing
+     - **Shopping User (30%)**: 80% E-commerce Journey (9 services), 20% simple shopping
+     - **Registered User (15%)**: 50% Order Tracking, 30% Product Review, 20% legacy flow
+     - **API Client (10%)**: 70% API Monitoring Journey, 30% fast endpoint testing
+     - **Admin User (5%)**: Management operations (unchanged)
+   - **Journey Features**:
+     - Console logging for debugging (step-by-step progress)
+     - Session tracking (`session_id`, `user_id` tags)
+     - Flow step tracking (`flow_step` tag: `1_login`, `2_profile`, etc.)
+     - Realistic think times between steps (0.3s - 2s)
+     - Service target tracking (`service_target` tag)
+   - **Expected Results**:
+     - **Before**: 2-layer traces (web → logic) per service, isolated calls
+     - **After**: 6-9 service traces per journey, connected temporally
+     - **Tempo**: Traces searchable by `session_id`, `journey`, `flow_step`
+     - **Metrics**: Increased request depth, more realistic traffic patterns
+     - **shipping-v2**: Now receives proper POST requests with JSON body, appears in traces
+   - **Files**:
+     - `k6/load-test-multiple-scenarios.js` (MODIFIED) - Added 5 journey functions, integrated into scenarios
+   - **Deployment**:
+     ```bash
+     # Rebuild and deploy k6:
+     cd k6
+     docker build --build-arg SCRIPT_FILE=load-test-multiple-scenarios.js -t ghcr.io/duynhne/k6:scenarios .
+     kind load docker-image ghcr.io/duynhne/k6:scenarios --name monitoring-local
+     kubectl delete deployment k6-scenarios -n k6
+     helm upgrade --install k6-scenarios charts/ -f charts/values/k6-scenarios.yaml -n k6 --create-namespace
+     
+     # View logs:
+     kubectl logs -n k6 -l app=k6-scenarios -f
+     ```
+   - **Verification**:
+     ```bash
+     # Check shipping-v2 logs for POST requests:
+     kubectl logs -n shipping -l app=shipping-v2 --tail=50 | grep "POST.*estimate"
+     
+     # Tempo: Search for journey traces
+     # Grafana Explore → Tempo → TraceQL query:
+     # {resource.service.name="shipping-v2"} (should now appear)
+     # {.session_id=~".+"} (view all journey traces)
+     ```
+   - **Impact**:
+     - ✅ Deeper distributed traces (6-9 services per journey)
+     - ✅ More realistic user behavior patterns
+     - ✅ shipping-v2 traces now correctly labeled and searchable
+     - ✅ Better observability demo for APM capabilities
+     - ✅ Improved load testing realism
+
+### Fixed
+
+1. **K6 Load Testing - shipping-v2 Endpoint HTTP Method**
+   - **Bug**: `browserUserScenario` was calling `/api/v2/shipments/estimate` with GET instead of POST
+   - **Symptom**: shipping-v2 logs showed "Invalid request" errors (400 status, "EOF" error)
+   - **Root Cause**: Handler expects POST with JSON body (`EstimateRequest`), but k6 was sending GET
+   - **Solution**: 
+     - Created journey functions that use POST with proper request body
+     - Example: `{ origin: 'New York', destination: 'Los Angeles', weight: 5.2 }`
+   - **Files**: `k6/load-test-multiple-scenarios.js`
+
 ## [0.6.10] - 2025-12-09
 
 ### Fixed
@@ -41,16 +198,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
      - Error budget tracking and burn rate alerts now functional
    - **Files**: `k8s/prometheus/values.yaml`, `k8s/sloth/values.yaml`, Prometheus CR patched directly
 
+### Added
+
+1. **Tempo Observability Dashboard - Custom 8-Panel Dashboard**
+   - Created comprehensive Tempo dashboard for distributed tracing observability
+   - **8 Panels** organized in 4 row groups:
+     - **Search & Overview**: TraceQL Search (traces panel), Top 10 Slow Spans (table with P99 latency)
+     - **Performance Metrics**: Latency Percentiles (P50/P90/P95/P99), Error Rate %, Request Throughput RPS
+     - **Detailed Analysis**: Service Operations Table (latency, error rate, request count), Exemplars Graph (click-to-trace)
+     - **Logs & Traces Correlation**: Logs with Trace ID (Loki integration)
+   - **Variables**: `$service` (multi-select), `$operation` (multi-select), `$namespace` for filtering
+   - **Datasources**: Prometheus (span metrics), Tempo (TraceQL search), Loki (log correlation)
+   - **Features**:
+     - Exemplars enabled: Click graph points to jump directly to traces in Explore
+     - Real-time metrics from Tempo metrics-generator
+     - Auto-refresh every 30s
+   - **Dashboard UID**: `tempo-obs-001`
+   - **Location**: Grafana → Dashboards → Observability → "Tempo - Distributed Tracing Observability"
+   - **Pattern**: Uses ConfigMapGenerator (same as microservices dashboard)
+   - **Files**: 
+     - `k8s/tempo/servicemonitor.yaml` (NEW) - Enable Prometheus scraping of Tempo metrics
+     - `k8s/grafana-operator/dashboards/tempo-observability-dashboard.json` (NEW) - Dashboard JSON with 8 panels
+     - `k8s/grafana-operator/dashboards/grafana-dashboard-tempo.yaml` (NEW) - GrafanaDashboard CR
+     - `k8s/grafana-operator/dashboards/kustomization.yaml` (MODIFIED) - Added ConfigMapGenerator + resource
+   - **Note**: Span metrics (`traces_spanmetrics_*`) appear after traces are ingested by Tempo
+
 ### Changed
 
-1. **Grafana Dashboards - Tempo Dashboard**
-   - Attempted to add Tempo RED Metrics Dashboard (ID: 16552) via `grafana-dashboard-tempo-red.yaml`
+1. **Grafana Dashboards - Tempo Dashboard Evolution**
+   - Initially attempted to add Tempo RED Metrics Dashboard (ID: 16552) via `grafana-dashboard-tempo-red.yaml`
    - Reverted: Dashboard ID 16552 not available/valid
-   - **Decision**: Tempo tracing is best viewed via Grafana Explore (not dashboards)
-   - **Usage**: 
+   - **Final Solution**: Created custom 8-panel Tempo dashboard (see "Added" section above)
+   - **Grafana Explore**: Still recommended for ad-hoc trace search and detailed trace analysis
      - Access: `http://localhost:3000/explore` → Select Tempo datasource
      - Features: Trace search by ID, Service Graph, TraceQL queries
-     - Service Graph automatically appears when traces exist
 
 ## [0.6.9] - 2025-12-09
 

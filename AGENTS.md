@@ -416,7 +416,7 @@ k8s/sloth/
 | SLO Guide | `docs/slo/README.md` | SLO system overview |
 | Setup Guide | `docs/getting-started/SETUP.md` | Deployment instructions |
 | API Reference | `docs/api/API_REFERENCE.md` | API endpoints |
-| k6 Load Testing | `docs/load-testing/K6_LOAD_TESTING.md` | Load testing guide |
+| k6 Load Testing | `docs/k6/K6_LOAD_TESTING.md` | Load testing guide |
 | Docs Index | `docs/README.md` | Complete documentation index |
 
 ---
@@ -785,7 +785,7 @@ k8s/sloth/
 - **SLO**: `docs/slo/README.md`, `docs/slo/GETTING_STARTED.md`
 - **API**: `docs/api/API_REFERENCE.md`
 - **Setup**: `docs/getting-started/SETUP.md`
-- **k6**: `docs/load-testing/K6_LOAD_TESTING.md`
+- **k6**: `docs/k6/K6_LOAD_TESTING.md`
 - **Docs Index**: `docs/README.md`
 
 ---

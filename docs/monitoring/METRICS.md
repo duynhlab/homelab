@@ -1195,11 +1195,11 @@ Dashboard hỗ trợ **multi-namespace deployment** với 3 biến filters:
 
 ### `$app` - Application Filter
 - **Loại:** Multi-select với tùy chọn "All"
-- **Query:** `label_values(request_duration_seconds_count, app)`
+- **Query:** `label_values(request_duration_seconds_count{namespace=~"$namespace"}, app)` ← **MUST cascade from namespace (v0.6.15+)**
 - **Options:** `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`, `shipping-v2`, `All`
 - **Mặc định:** `All`
-- **Regex filter:** `/^(?!kube-|default$).*/` (loại trừ system apps)
-- **Use case:** Filter metrics theo app version cụ thể
+- **Sort:** Alphabetical (`sort: 1`)
+- **Use case:** Filter metrics theo app cụ thể trong namespace đã chọn
 
 ### `$namespace` - Namespace Filter
 - **Loại:** Multi-select
@@ -1238,6 +1238,110 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$r
 - **Khuyến nghị:**
   - High traffic: 1m-5m (responsive, real-time)
   - Low traffic: 30m-1h (smoother, less noise)
+
+### Variable Cascading Best Practices (v0.6.15+)
+
+**Critical Fix**: Dashboard variables MUST be ordered correctly for proper cascading behavior.
+
+**Correct Variable Order**:
+1. `$DS_PROMETHEUS` - Datasource selector (independent)
+2. `$namespace` - Namespace filter (independent) ← **MUST be before $app**
+3. `$app` - App/service filter (depends on namespace)
+4. `$rate` - Rate interval (independent)
+
+**Variable Dependencies**:
+
+```mermaid
+flowchart LR
+    A[DS_PROMETHEUS] --> B[namespace]
+    B --> C[app]
+    A --> D[rate]
+    
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style C fill:#ffe1e1
+    style D fill:#e1ffe1
+```
+
+**Why This Matters**:
+- ❌ **Wrong order** (app before namespace): App dropdown shows ALL services from ALL namespaces
+- ✅ **Correct order** (namespace before app): App dropdown filters by selected namespace(s)
+
+**Implementation Pattern**:
+
+```json
+// Correct variable definitions in dashboard JSON
+{
+  "templating": {
+    "list": [
+      // 1. Datasource (independent)
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus"
+      },
+      // 2. Namespace (independent - queries kube_pod_info)
+      {
+        "name": "namespace",
+        "type": "query",
+        "query": "label_values(kube_pod_info, namespace)",
+        "regex": "/^(?!kube-|default$).*/",  // Exclude system namespaces
+        "refresh": 1,
+        "sort": 0,
+        "includeAll": true,
+        "multi": true
+      },
+      // 3. App (dependent - cascades from namespace)
+      {
+        "name": "app",
+        "type": "query",
+        "query": "label_values(request_duration_seconds_count{namespace=~\"$namespace\"}, app)",  // ← Namespace filter!
+        "refresh": 1,  // ← Refresh on dashboard load
+        "sort": 1,     // ← Alphabetical sort
+        "includeAll": true,
+        "multi": true
+      },
+      // 4. Rate (independent)
+      {
+        "name": "rate",
+        "type": "custom",
+        "query": "1m,2m,3m,5m,10m,30m,1h,2h,4h,8h,16h,1d,2d,3d,5d,7d"
+      }
+    ]
+  }
+}
+```
+
+**Key Requirements for Cascading**:
+- ✅ **Namespace variable MUST use `kube_pod_info`** (more reliable than app metrics)
+- ✅ **App variable query MUST include `{namespace=~"$namespace"}`** filter
+- ✅ **App variable MUST have `refresh: 1`** (trigger update on dashboard load)
+- ✅ **Variable order in JSON array determines UI order** (namespace before app)
+
+**Query Pattern in Panels**:
+
+All panel queries MUST include both filters:
+
+```promql
+rate(
+  request_duration_seconds_count{
+    app=~"$app",             # Filter by selected app(s)
+    namespace=~"$namespace", # Filter by selected namespace(s)
+    job=~"microservices"     # Filter by job label
+  }[$rate]
+)
+```
+
+**Troubleshooting Variable Cascading**:
+
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| Namespace filter stuck on "All" | Variable order wrong | Reorder variables: namespace before app |
+| App dropdown doesn't update when namespace changes | App query missing `{namespace=~"$namespace"}` | Add namespace filter to app query |
+| App dropdown shows services from other namespaces | Same as above | Same as above |
+| App dropdown empty | No metrics for selected namespace | Check Prometheus targets, verify services running |
+
+**See Also**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed debugging steps
 
 ---
 

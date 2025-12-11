@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.6.16] - 2025-12-11
+
+### Fixed
+
+1. **Dashboard Namespace Variable - Empty Dropdown Issue**
+   - **Problem**: Namespace dropdown only showed "All" option, no actual namespaces visible
+     - Variable query used: `label_values(kube_pod_info, namespace)`
+     - Metric `kube_pod_info` didn't exist in Prometheus (kube-state-metrics not providing it)
+     - Impact: Users couldn't filter by namespace, variable cascading appeared broken
+   
+   - **Root Cause**: kube-state-metrics metric not available or not being scraped
+     - Prometheus query: `kube_pod_info` → 0 results
+     - Namespace label query: `label_values(kube_pod_info, namespace)` → empty array
+   
+   - **Solution**: Changed namespace variable to use microservices metrics
+     - **Before**: `label_values(kube_pod_info, namespace)`
+     - **After**: `label_values(request_duration_seconds_count, namespace)`
+     - Uses metrics that are always available (microservices generate them)
+     - Regex filter still applies: `/^(?!kube-|default$).*/` (excludes system namespaces)
+   
+   - **Verification**:
+     ```bash
+     # Query returns 8 microservice namespaces:
+     kubectl exec -n monitoring prometheus-kube-prometheus-stack-prometheus-0 -c prometheus -- \
+       wget -q -O- 'http://localhost:9090/api/v1/label/namespace/values?match[]=request_duration_seconds_count'
+     # Result: ["auth", "cart", "notification", "order", "product", "review", "shipping", "user"]
+     ```
+   
+   - **Impact**:
+     - ✅ **Namespace dropdown populated**: Shows all 8 microservice namespaces
+     - ✅ **Variable cascading works**: Selecting namespace filters app dropdown correctly
+     - ✅ **Reliable metric source**: Uses microservices' own metrics (always available)
+     - ✅ **All panels render**: Dashboard queries work with proper namespace filtering
+   
+   - **Files Changed** (1 file):
+     - **Modified**: `k8s/grafana-operator/dashboards/microservices-dashboard.json`
+       - Line 2506: `"definition": "label_values(request_duration_seconds_count, namespace)"`
+       - Line 2513: `"query": "label_values(request_duration_seconds_count, namespace)"`
+   
+   - **Deployment**:
+     ```bash
+     # Applied via Grafana Operator:
+     ./scripts/10-reload-dashboard.sh
+     
+     # Grafana Operator reconciled ConfigMap and updated dashboard automatically
+     # Hard refresh browser (Ctrl+Shift+R) to see changes
+     ```
+
+### Technical Details
+
+- **Deployment Method**: Via Grafana Operator ConfigMapGenerator
+- **Reconciliation Time**: ~30 seconds (Grafana Operator sync interval)
+- **Dashboard UID**: `microservices-monitoring-001` (unchanged)
+- **Breaking Changes**: None (backward compatible, only variable query changed)
+- **Related Fix**: Completes v0.6.15 variable cascading fix (namespace now populates correctly)
+
 ## [0.6.15] - 2025-12-11
 
 ### Fixed

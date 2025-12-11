@@ -44,9 +44,27 @@ prometheus:
     podMonitorNamespaceSelector: {}
     
     # PrometheusRule selector - for SLO rules
-    # By default, Prometheus Operator only selects rules with label: release=kube-prometheus-stack
-    # We override this to select ALL PrometheusRules in monitored namespaces
-    # This allows Sloth-generated rules (without release label) to be loaded
+    # 
+    # 🎯 ROOT CAUSE: Sloth-Prometheus Label Mismatch
+    # -----------------------------------------------
+    # Problem:
+    #   1. Sloth Operator generates PrometheusRule CRDs WITHOUT label: release=kube-prometheus-stack
+    #   2. Prometheus Operator default ruleSelector ONLY loads rules WITH that label
+    #   3. Result: Prometheus doesn't load SLO rules → No SLO metrics
+    # 
+    # Why Sloth can't add labels:
+    #   - Sloth Helm chart v0.15.0 does NOT support adding custom labels to PrometheusRule CRD metadata
+    #   - commonLabels: Only applies to Helm-managed resources (Deployment, Service), NOT controller-generated CRDs
+    #   - extraLabels: Only applies to rule labels INSIDE PrometheusRule spec, NOT metadata.labels
+    #   - No field in values.yaml exists to add metadata labels to generated CRDs
+    # 
+    # Solution (CURRENT):
+    #   - Set ruleSelector: {} to match ALL PrometheusRules (most flexible, production-ready)
+    #   - Prometheus will load Sloth-generated SLO rules without requiring specific labels
+    # 
+    # Alternative Solutions (NOT RECOMMENDED):
+    #   - Manually label PrometheusRules after creation (not automated)
+    #   - Wait for future Sloth versions with native metadata label support
     ruleSelector: {}
     ruleNamespaceSelector: {}
     

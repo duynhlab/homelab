@@ -374,11 +374,21 @@ k8s/sloth/
   3. **⚠️ Errors & Performance** (5 panels) - Request rate by HTTP method + endpoint, Error rate by HTTP method + endpoint, Response time per endpoint (P95, P50, P99)
   4. **🔧 Go Runtime & Memory** (6 panels) - Heap allocated memory, Heap in-use memory, Process memory (RSS), Goroutines & threads, GC duration, GC frequency (memory leak detection)
   5. **🖥️ Resources & Infrastructure** (5 panels) - Total memory per service, Total CPU per service, Total network traffic per service, Total requests in flight per service, Total memory allocations per service
-- **Variables**:
-  - `$app` - Multi-select service filter (auth, user, product, cart, order, review, notification, shipping) with "All" option
-  - `$namespace` - Multi-select namespace filter (with regex to exclude kube-* and default namespaces)
-  - `$rate` - Rate interval selector (1m, 2m, 3m, 5m, 10m, 30m, 1h, 2h, 4h, 8h, 16h, 1d, 2d, 3d, 5d, 7d) - default: 5m
-  - `$DS_PROMETHEUS` - Prometheus datasource selector
+- **Variables** (CORRECT ORDER - v0.6.15+):
+  - `$DS_PROMETHEUS` - Prometheus datasource selector (position 1)
+  - `$namespace` - Multi-select namespace filter (**position 2 - MUST be before $app**)
+    - Query: `label_values(kube_pod_info, namespace)`
+    - Regex filter: `/^(?!kube-|default$).*/` (exclude system namespaces)
+    - Independent variable (queries kube-state-metrics)
+  - `$app` - Multi-select service filter (**position 3 - cascades from namespace**)
+    - Query: `label_values(request_duration_seconds_count{namespace=~"$namespace"}, app)`
+    - Options: auth, user, product, cart, order, review, notification, shipping with "All" option
+    - **Cascades from $namespace** (filters by selected namespace)
+  - `$rate` - Rate interval selector (1m, 2m, 3m, 5m, 10m, 30m, 1h, 2h, 4h, 8h, 16h, 1d, 2d, 3d, 5d, 7d) - default: 5m (position 4)
+- **Variable Cascading**:
+  - `$namespace` filters `$app` via query: `{namespace=~"$namespace"}`
+  - Order matters: namespace must be defined before app in JSON
+  - All panels use both filters: `{app=~"$app", namespace=~"$namespace"}`
 - **Access**: http://localhost:3000/d/microservices-monitoring-001/ (after port-forward: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`)
 
 ### Script Files by Category

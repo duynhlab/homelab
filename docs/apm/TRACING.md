@@ -227,19 +227,19 @@ Use these to **add business context** to traces:
 ```go
 // Record errors for debugging
 middleware.RecordError(ctx, err)
-
+    
 // Add business context
-middleware.AddSpanAttributes(ctx,
-    attribute.String("user.id", userID),
-    attribute.String("order.id", orderID),
-)
-
+    middleware.AddSpanAttributes(ctx,
+        attribute.String("user.id", userID),
+        attribute.String("order.id", orderID),
+    )
+    
 // Mark important events
 middleware.AddSpanEvent(ctx, "payment.approved")
 
 // Create child spans for complex operations
-ctx, span := middleware.StartSpan(ctx, "validate-inventory")
-defer span.End()
+    ctx, span := middleware.StartSpan(ctx, "validate-inventory")
+    defer span.End()
 ```
 
 **When to use:**

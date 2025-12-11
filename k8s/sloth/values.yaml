@@ -6,11 +6,20 @@
 global:
   imageRegistry: ""  # Use default
 
-# Labels for Kubernetes resources (PrometheusRule CRD metadata)
-# CRITICAL: Prometheus Operator uses ruleSelector to match PrometheusRules
-# Default selector looks for label: release=kube-prometheus-stack
-labels:
-  release: kube-prometheus-stack
+# IMPORTANT: Sloth-generated PrometheusRule CRDs and Label Compatibility
+# -------------------------------------------------------------------------
+# Problem: Sloth Operator v0.15.0 does NOT support adding custom labels to generated PrometheusRule CRD metadata
+# - commonLabels: Only applies to Helm-managed resources (Deployment, ServiceAccount), NOT controller-generated CRDs
+# - extraLabels: Only applies to rule labels INSIDE PrometheusRule spec, NOT metadata.labels
+#
+# Solution: Configure Prometheus Operator to match ALL PrometheusRules
+# - Set ruleSelector: {} in kube-prometheus-stack Helm values (already configured in k8s/prometheus/values.yaml)
+# - This allows Prometheus to load Sloth-generated rules without requiring specific labels
+#
+# Alternative (if strict ruleSelector needed):
+# - Manually label PrometheusRules after creation (not recommended for production)
+# - Use Sloth SLOPlugin to inject labels (requires custom plugin development)
+# - Wait for future Sloth versions with native metadata label support
 
 image:
   registry: ghcr.io
@@ -30,10 +39,9 @@ sloth:
   workers: 2                     # Concurrent workers (2 services per worker)
   labelSelector: ""              # Process all PrometheusServiceLevel CRs
   namespace: "monitoring"        # Only watch monitoring namespace
-  extraLabels:                   # Extra labels on generated rules
+  extraLabels:                   # Extra labels INSIDE PrometheusRule spec.labels (for recording rules)
     team: platform
     managed-by: sloth-operator
-    release: kube-prometheus-stack  # CRITICAL: Required for Prometheus Operator to load rules
   defaultSloPeriod: "30d"        # Default SLO period (30 days)
   debug:
     enabled: true

@@ -216,6 +216,13 @@ kubectl port-forward -n monitoring svc/loki 3100:3100 &
 
 Open Grafana → **"Microservices Monitoring & Performance Applications"** dashboard is auto-loaded!
 
+**Dashboard Variables**:
+- **Namespace**: Filter by Kubernetes namespace (e.g., auth, user, product)
+- **App**: Filter by service (automatically updates based on selected namespace)
+- **Rate**: Prometheus rate() interval (default: 5m)
+
+**💡 Tip**: Select namespace first, then app will show only services in that namespace.
+
 **Direct link**: http://localhost:3000/d/microservices-monitoring-001/
 
 ---

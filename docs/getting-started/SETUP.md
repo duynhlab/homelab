@@ -15,29 +15,26 @@ chmod +x scripts/*.sh
 # Step 1: Create Kind cluster
 ./scripts/01-create-kind-cluster.sh
 
-# Step 2: Install metrics infrastructure
-./scripts/02-install-metrics.sh
-
-# Step 3: Deploy monitoring stack (Prometheus Operator + Grafana Operator)
-./scripts/03-deploy-monitoring.sh
+# Step 2: Deploy monitoring stack (Prometheus Operator + Grafana Operator + metrics)
+./scripts/02-deploy-monitoring.sh
 
 # Step 4: Deploy APM stack (BEFORE apps to collect traces/logs/profiles immediately)
-./scripts/04-deploy-apm.sh
+./scripts/03-deploy-apm.sh
 
 # Step 5: Build all microservices
-./scripts/05-build-microservices.sh
+./scripts/04-build-microservices.sh
 
 # Step 6: Deploy all microservices
-./scripts/06-deploy-microservices.sh
+./scripts/05-deploy-microservices.sh
 
 # Step 7: Deploy k6 load testing (AFTER apps to test them)
-./scripts/07-deploy-k6.sh
+./scripts/06-deploy-k6.sh
 
 # Step 8: Deploy SLO system (Required for SRE practices)
-./scripts/08-deploy-slo.sh
+./scripts/07-deploy-slo.sh
 
 # Step 9: Setup port forwarding
-./scripts/09-setup-access.sh
+./scripts/08-setup-access.sh
 ```
 
 Wait 5 minutes. Then access:
@@ -100,35 +97,24 @@ kubectl get nodes
 
 ---
 
-### Step 2: Install Metrics Infrastructure
+### Step 2: Deploy Monitoring Stack
 
 ```bash
-./scripts/02-install-metrics.sh
+./scripts/02-deploy-monitoring.sh
 ```
 
 **What it does:**
-- Installs `kube-state-metrics` (via `prometheus-community/kube-state-metrics` Helm chart) to expose Kubernetes object metrics
-- Installs `metrics-server` (via `metrics-server/metrics-server` Helm chart) with `--kubelet-insecure-tls` for Kind clusters
-- Ensures both components run in the `kube-system` namespace
+- Deploys Prometheus Operator (kube-prometheus-stack) with kube-state-metrics included
+- Installs `metrics-server` (via Helm chart) with `--kubelet-insecure-tls` for Kind clusters
+- Installs the Grafana Operator and reconciles Grafana (anonymous auth, dark theme) plus datasources
+- Auto-provisions the microservices + Sloth SLO dashboards via `GrafanaDashboard` CRs (no manual imports)
 
 **Verify:**
 ```bash
-kubectl get pods -n kube-system | grep -E "(kube-state|metrics-server)"
-# Expected: 2 pods running
+kubectl get pods -n monitoring | grep kube-state-metrics
+kubectl get pods -n kube-system | grep metrics-server
+# Expected: Both pods running
 ```
-
----
-
-### Step 3: Deploy Monitoring Stack
-
-```bash
-./scripts/03-deploy-monitoring.sh
-```
-
-**What it does:**
-- Deploys Prometheus (RBAC + scrape configs)
-- Installs the Grafana Operator and reconciles Grafana (anonymous auth, dark theme) plus the Prometheus datasource
-- Auto-provisions the microservices + Sloth SLO dashboards via `GrafanaDashboard` CRs (no manual imports)
 
 **Why before apps:** Prometheus needs to be ready to collect metrics immediately when apps start.
 
@@ -146,10 +132,10 @@ curl http://localhost:3000/api/health
 
 ---
 
-### Step 4: Deploy APM Stack
+### Step 3: Deploy APM Stack
 
 ```bash
-./scripts/04-deploy-apm.sh
+./scripts/03-deploy-apm.sh
 ```
 
 **What it does:**
@@ -172,10 +158,10 @@ kubectl get pods -n kube-system -l app=vector
 
 ---
 
-### Step 5: Build All Microservices
+### Step 4: Build All Microservices
 
 ```bash
-./scripts/05-build-microservices.sh
+./scripts/04-build-microservices.sh
 ```
 
 **What it does:**
@@ -196,14 +182,14 @@ docker images | grep -E "(auth|user|product)"
 
 ---
 
-### Step 6: Deploy All Microservices
+### Step 5: Deploy All Microservices
 
 ```bash
 # Deploy using local Helm chart (default)
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 
 # Or deploy from OCI registry (if chart is published)
-./scripts/06-deploy-microservices.sh --registry
+./scripts/05-deploy-microservices.sh --registry
 ```
 
 **What it does:**
@@ -234,15 +220,15 @@ kubectl get svc -n product
 
 ---
 
-### Step 7: Deploy k6 Load Testing
+### Step 6: Deploy k6 Load Testing
 
 ```bash
 # Deploy all k6 variants (default)
-./scripts/07-deploy-k6.sh
+./scripts/06-deploy-k6.sh
 
 # Or deploy specific variant:
-# ./scripts/07-deploy-k6.sh legacy
-# ./scripts/07-deploy-k6.sh scenarios
+# ./scripts/06-deploy-k6.sh legacy
+# ./scripts/06-deploy-k6.sh scenarios
 ```
 
 **What it does:**
@@ -261,10 +247,10 @@ kubectl logs -n k6 -l app=k6-scenarios -f
 
 ---
 
-### Step 8: Deploy SLO System
+### Step 7: Deploy SLO System
 
 ```bash
-./scripts/08-deploy-slo.sh
+./scripts/07-deploy-slo.sh
 ```
 
 **What it does:**
@@ -294,10 +280,10 @@ curl http://localhost:9090/api/v1/rules
 
 ---
 
-### Step 9: Setup Port Forwarding
+### Step 8: Setup Port Forwarding
 
 ```bash
-./scripts/09-setup-access.sh
+./scripts/08-setup-access.sh
 ```
 
 **What it does:**
@@ -450,7 +436,7 @@ kubectl port-forward svc/auth 8080:8080 -n auth &
 
 ```bash
 # Rebuild and reload images
-./scripts/05-build-microservices.sh
+./scripts/04-build-microservices.sh
 
 # Force recreation
 kubectl delete pods -l app=auth -n auth
@@ -482,7 +468,7 @@ kubectl logs deployment/prometheus -n monitoring
 kubectl get configmap -n monitoring | grep grafana
 
 # Reload dashboard
-./scripts/10-reload-dashboard.sh
+./scripts/09-reload-dashboard.sh
 
 # Restart Grafana
 kubectl rollout restart deployment grafana -n monitoring
@@ -494,7 +480,7 @@ kubectl rollout restart deployment grafana -n monitoring
 
 ```bash
 # Use port-forwarding instead
-./scripts/09-setup-access.sh
+./scripts/08-setup-access.sh
 ```
 
 ---

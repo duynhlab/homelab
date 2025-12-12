@@ -1,5 +1,5 @@
 # Values for notification service
-fullnameOverride: "notification"
+name: notification
 
 replicaCount: 2
 

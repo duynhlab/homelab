@@ -1,5 +1,5 @@
 # Values for order service
-fullnameOverride: "order"
+name: order
 
 replicaCount: 2
 

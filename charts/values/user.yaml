@@ -1,5 +1,5 @@
 # Values for user service
-fullnameOverride: "user"
+name: user
 
 replicaCount: 2
 

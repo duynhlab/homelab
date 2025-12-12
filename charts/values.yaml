@@ -7,17 +7,13 @@
 # Service name (required when installing)
 name: ""
 
-# Namespace to deploy to
-namespace: ""
-
 # Number of replicas
 replicaCount: 2
 
 # --- Container Image Configuration ---
 
 image:
-  repository: ghcr.io/duynhne
-  name: ""  # Short image name (e.g., auth, user, product)
+  repository: ""  # Full image path (e.g., ghcr.io/duynhne/auth)
   tag: v5
   pullPolicy: IfNotPresent
 

@@ -1234,7 +1234,7 @@ Since this change is **100% backward compatible**, rollback is straightforward:
 git revert <commit-hash>
 
 # Deploy
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 ```
 
 #### Option 2: Redeploy Previous Version
@@ -1243,8 +1243,8 @@ git revert <commit-hash>
 git checkout <previous-tag>
 
 # Rebuild and deploy
-./scripts/05-build-microservices.sh
-./scripts/06-deploy-microservices.sh --local
+./scripts/04-build-microservices.sh
+./scripts/05-deploy-microservices.sh --local
 ```
 
 #### Option 3: Helm Rollback

@@ -85,9 +85,6 @@ Set kubectl context to "kind-monitoring-cluster"
 ```
 
 **Step 4: Install Metrics Infrastructure**
-```bash
-./scripts/02-install-metrics.sh
-```
 
 ---
 
@@ -100,36 +97,35 @@ Set kubectl context to "kind-monitoring-cluster"
 ```bash
 # Phase 1: Infrastructure (Steps 1-2) - Already done in setup
 # ./scripts/01-create-kind-cluster.sh  # ✅ Done
-# ./scripts/02-install-metrics.sh      # ✅ Done
 
 # Phase 2: Monitoring Stack (Step 3) - BEFORE apps
-./scripts/03-deploy-monitoring.sh
+./scripts/02-deploy-monitoring.sh
 
 # Phase 3: APM Stack (Step 4) - BEFORE apps
-./scripts/04-deploy-apm.sh
+./scripts/03-deploy-apm.sh
 
 # Phase 4: Build & Deploy Applications (Steps 5-6)
-./scripts/05-build-microservices.sh    # Build Docker images
-./scripts/06-deploy-microservices.sh   # Deploy via Helm
+./scripts/04-build-microservices.sh    # Build Docker images
+./scripts/05-deploy-microservices.sh   # Deploy via Helm
 
 # Phase 5: Load Testing (Step 7) - AFTER apps
-./scripts/07-deploy-k6.sh
+./scripts/06-deploy-k6.sh
 
 # Phase 6: SLO System (Step 8)
-./scripts/08-deploy-slo.sh
+./scripts/07-deploy-slo.sh
 
 # Phase 7: Access Setup (Step 9)
-./scripts/09-setup-access.sh
+./scripts/08-setup-access.sh
 ```
 
 **Total time**: 10-15 minutes (depending on internet speed)
 
 ### Build Docker Images
 
-**Script**: `scripts/05-build-microservices.sh`
+**Script**: `scripts/04-build-microservices.sh`
 
 ```bash
-./scripts/05-build-microservices.sh
+./scripts/04-build-microservices.sh
 ```
 
 **What it does:**
@@ -147,16 +143,16 @@ docker build \
 
 ### Deploy Microservices
 
-**Script**: `scripts/06-deploy-microservices.sh`
+**Script**: `scripts/05-deploy-microservices.sh`
 
 **Deploy from local chart:**
 ```bash
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 ```
 
 **Deploy from OCI registry:**
 ```bash
-./scripts/06-deploy-microservices.sh --registry
+./scripts/05-deploy-microservices.sh --registry
 ```
 
 **What it does:**
@@ -234,7 +230,7 @@ curl -X POST http://localhost:8080/api/v2/auth/login \
 
 **Deploy K6:**
 ```bash
-./scripts/07-deploy-k6.sh
+./scripts/06-deploy-k6.sh
 ```
 
 **Check K6 logs:**
@@ -331,7 +327,7 @@ kubectl describe pod <pod-name> -n <namespace>
 **Solution**:
 ```bash
 # Build image locally
-./scripts/05-build-microservices.sh
+./scripts/04-build-microservices.sh
 
 # Load image into Kind cluster
 kind load docker-image ghcr.io/duynhne/auth:v5 --name monitoring-cluster
@@ -512,18 +508,18 @@ spec:
 **Step 5: Build and deploy**
 ```bash
 # Add to build script
-# Edit scripts/05-build-microservices.sh
+# Edit scripts/04-build-microservices.sh
 # Add "newservice" to SERVICES array
 
 # Build
-./scripts/05-build-microservices.sh
+./scripts/04-build-microservices.sh
 
 # Add to deploy script
-# Edit scripts/06-deploy-microservices.sh
+# Edit scripts/05-deploy-microservices.sh
 # Add "newservice" to SERVICES array
 
 # Deploy
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 
 # Apply SLO
 kubectl apply -f k8s/sloth/crds/newservice-slo.yaml
@@ -548,7 +544,7 @@ vi k8s/grafana-operator/dashboards/microservices-dashboard.json
 
 **Step 2: Reload dashboard**
 ```bash
-./scripts/10-reload-dashboard.sh
+./scripts/09-reload-dashboard.sh
 ```
 
 **Step 3: Verify**
@@ -613,12 +609,12 @@ kind get clusters
 
 **Run diagnostic script:**
 ```bash
-./scripts/11-diagnose-latency.sh <service-name>
+./scripts/10-diagnose-latency.sh <service-name>
 ```
 
 **Example:**
 ```bash
-./scripts/11-diagnose-latency.sh auth
+./scripts/10-diagnose-latency.sh auth
 ```
 
 **What it checks:**
@@ -633,12 +629,12 @@ kind get clusters
 
 **Run runbook script:**
 ```bash
-./scripts/12-error-budget-alert.sh <service-name> <burn-rate>
+./scripts/11-error-budget-alert.sh <service-name> <burn-rate>
 ```
 
 **Example:**
 ```bash
-./scripts/12-error-budget-alert.sh auth 5.2
+./scripts/11-error-budget-alert.sh auth 5.2
 ```
 
 **What it does:**

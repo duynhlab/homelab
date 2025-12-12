@@ -339,7 +339,7 @@
 ### Build Docker Images
 
 - [ ] **Build all microservice images** (30 min)
-  - Run: `./scripts/05-build-microservices.sh`
+  - Run: `./scripts/04-build-microservices.sh`
   - Acceptance: All 9 services built successfully
 
 - [ ] **Verify images created** (5 min)
@@ -349,7 +349,7 @@
 ### Deploy to Kubernetes
 
 - [ ] **Deploy all services via Helm** (1 hour)
-  - Run: `./scripts/06-deploy-microservices.sh --local`
+  - Run: `./scripts/05-deploy-microservices.sh --local`
   - Acceptance: All 9 services deployed successfully
 
 - [ ] **Verify all pods running** (10 min)

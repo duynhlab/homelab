@@ -1020,7 +1020,7 @@ echo "=== Integration Test: Traffic Filtering ==="
 
 # 1. Deploy services with new middleware
 echo "Step 1: Deploying services..."
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 
 # 2. Wait for rollout
 echo "Step 2: Waiting for pods to be ready..."
@@ -1133,7 +1133,7 @@ echo "=== Load Test: K6 Health Check Removal ==="
 
 # 1. Deploy k6 with new script
 echo "Step 1: Deploying k6..."
-./scripts/07-deploy-k6.sh
+./scripts/06-deploy-k6.sh
 
 # 2. Wait for k6 to start generating traffic
 echo "Step 2: Waiting for k6 to start..."
@@ -1308,7 +1308,7 @@ kind load docker-image ghcr.io/duynhne/k6:scenarios --name monitoring-local
 
 # 2. Build all microservices (middleware changed)
 cd ..
-./scripts/05-build-microservices.sh
+./scripts/04-build-microservices.sh
 
 # Expected output:
 # Building 9 microservices...
@@ -1326,7 +1326,7 @@ cd ..
 
 ```bash
 # 1. Deploy microservices (rolling update)
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 
 # Monitor rollout
 watch -n 2 'kubectl get pods -A | grep -E "(auth|user|product)"'
@@ -1634,7 +1634,7 @@ kind load docker-image ghcr.io/duynhne/k6:scenarios --name monitoring-local
 
 # 2. Rebuild all microservices (old middleware)
 cd ..
-./scripts/05-build-microservices.sh
+./scripts/04-build-microservices.sh
 ```
 
 ---
@@ -1643,7 +1643,7 @@ cd ..
 
 ```bash
 # 1. Redeploy microservices
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 
 # 2. Redeploy k6
 kubectl delete deployment k6-scenarios -n k6

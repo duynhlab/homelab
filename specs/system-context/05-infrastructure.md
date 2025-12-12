@@ -501,8 +501,7 @@ docker build --build-arg SERVICE_NAME=auth -t ghcr.io/duynhne/auth:v5 -f service
 ```
 scripts/
 ├── 01-create-kind-cluster.sh       # Infrastructure
-├── 02-install-metrics.sh           # Infrastructure
-├── 03-deploy-monitoring.sh         # Monitoring Stack
+├── 03-deploy-monitoring.sh         # Monitoring Stack (includes metrics)
 ├── 04-deploy-apm.sh                # APM Stack (all components)
 ├── 04a-deploy-tempo.sh             # APM Stack (Tempo only)
 ├── 04b-deploy-pyroscope.sh         # APM Stack (Pyroscope only)
@@ -594,10 +593,10 @@ echo "✅ All services deployed successfully!"
 **Usage**:
 ```bash
 # Deploy from local chart
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 
 # Deploy from OCI registry
-./scripts/06-deploy-microservices.sh --registry
+./scripts/05-deploy-microservices.sh --registry
 ```
 
 ---

@@ -1234,7 +1234,7 @@ func TestAuthService_Login_ErrorWrapping(t *testing.T) {
 
 ```bash
 # Build all 9 services
-./scripts/05-build-microservices.sh
+./scripts/04-build-microservices.sh
 
 # Expected output:
 # Building auth...
@@ -1254,7 +1254,7 @@ func TestAuthService_Login_ErrorWrapping(t *testing.T) {
 
 ```bash
 # Deploy all services with local Helm chart
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 
 # Expected output:
 # Deploying auth...
@@ -1648,12 +1648,12 @@ go vet ./services/...
 
 **Build all services:**
 ```bash
-./scripts/05-build-microservices.sh
+./scripts/04-build-microservices.sh
 ```
 
 **Deploy all services:**
 ```bash
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 ```
 
 **Check deployment status:**

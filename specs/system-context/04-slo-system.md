@@ -59,7 +59,7 @@
 
 ### Deployment
 
-**Script**: `scripts/08-deploy-slo.sh`
+**Script**: `scripts/07-deploy-slo.sh`
 
 ```bash
 #!/bin/bash
@@ -382,7 +382,7 @@ annotations:
   runbook_url: "https://runbooks.example.com/{{$labels.sloth_service}}-high-error-rate"
 ```
 
-**Runbook script**: `scripts/12-error-budget-alert.sh`
+**Runbook script**: `scripts/11-error-budget-alert.sh`
 
 ```bash
 #!/bin/bash

@@ -116,9 +116,9 @@ prometheusOperator:
 nodeExporter:
   enabled: true
 
-# Kube State Metrics (already installed via script 02)
+# Kube State Metrics (included in kube-prometheus-stack)
 kubeStateMetrics:
-  enabled: false
+  enabled: true
 
 # Default ServiceMonitors and PrometheusRules
 defaultRules:

@@ -1169,7 +1169,7 @@ Validate that error handling improvements have zero performance impact.
 **Testing Commands**:
 ```bash
 # Deploy k6 load test
-./scripts/07-deploy-k6.sh
+./scripts/06-deploy-k6.sh
 
 # Monitor in Grafana
 kubectl port-forward -n monitoring svc/grafana-service 3000:3000
@@ -1209,7 +1209,7 @@ Build Docker images for all 9 services with error handling improvements.
 **Commands**:
 ```bash
 # Build all services
-./scripts/05-build-microservices.sh
+./scripts/04-build-microservices.sh
 
 # Expected output:
 # Building auth...
@@ -1253,7 +1253,7 @@ Deploy all services to Kubernetes cluster using Helm.
 **Commands**:
 ```bash
 # Deploy all services
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 
 # Verify deployment
 kubectl get pods -A | grep -E "(auth|user|product|cart|order|review|notification|shipping)"
@@ -1498,10 +1498,10 @@ for svc in auth user product cart order review notification shipping; do
 done
 
 # Build all services
-./scripts/05-build-microservices.sh
+./scripts/04-build-microservices.sh
 
 # Deploy all services
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 
 # Check progress
 find services/internal -name "errors.go" | wc -l  # Should be 18

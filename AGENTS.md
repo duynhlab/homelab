@@ -78,6 +78,8 @@ monitoring/
 │   ├── prometheus/
 │   │   ├── values.yaml             # kube-prometheus-stack Helm values
 │   │   └── servicemonitor-microservices.yaml  # Single ServiceMonitor for all services
+│   ├── metrics/           # Metrics infrastructure
+│   │   └── metrics-server-values.yaml  # metrics-server Helm values for Kind
 │   ├── grafana-operator/
 │   ├── sloth/             # Sloth Operator (SLO management)
 │   ├── tempo/             # Grafana Tempo (distributed tracing)
@@ -187,10 +189,10 @@ charts/
 **Usage:**
 ```bash
 # Local deployment
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 
 # From OCI registry
-./scripts/06-deploy-microservices.sh --registry
+./scripts/05-deploy-microservices.sh --registry
 
 # Manual Helm install
 helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-namespace
@@ -207,6 +209,8 @@ k8s/
 ├── prometheus/           # Prometheus Operator configuration
 │   ├── values.yaml       # kube-prometheus-stack Helm values
 │   └── servicemonitor-microservices.yaml  # Single ServiceMonitor for all services
+├── metrics/              # Metrics infrastructure
+│   └── metrics-server-values.yaml  # metrics-server configuration for Kind clusters
 ├── grafana-operator/     # Grafana Operator resources
 │   ├── README.md         # Helm install instructions
 │   ├── values.yaml       # Operator Helm values
@@ -242,20 +246,19 @@ k8s/
 Numbered scripts (01-12) for deployment and operations:
 
 **Deployment Order:**
-1. Infrastructure (01-02) → 2. Monitoring (03) → 3. APM (04) → 4. Build & Deploy Apps (05-06) → 5. Load Testing (07) → 6. SLO (08) → 7. Access Setup (09)
+1. Infrastructure (01) → 2. Monitoring (02) → 3. APM (03) → 4. Build & Deploy Apps (04-05) → 5. Load Testing (06) → 6. SLO (07) → 7. Access Setup (08)
 
-**Infrastructure (01-02):**
+**Infrastructure (01):**
 - `01-create-kind-cluster.sh` - Create Kind Kubernetes cluster
-- `02-install-metrics.sh` - Install metrics infrastructure (kube-state-metrics, etc.)
 
-**Monitoring Stack (03):**
-- `03-deploy-monitoring.sh` - Deploy Prometheus and install Grafana Operator (BEFORE apps to collect metrics immediately)
+**Monitoring Stack (02):**
+- `02-deploy-monitoring.sh` - Deploy Prometheus, Grafana, kube-state-metrics (via kube-prometheus-stack), and metrics-server (via Helm) (BEFORE apps)
 
-**APM Stack (04) - Required:**
-- `04a-deploy-tempo.sh` - Deploy Grafana Tempo v2.9.0 (distributed tracing with metrics-generator for TraceQL rate() queries)
-- `04b-deploy-pyroscope.sh` - Deploy Pyroscope (continuous profiling)
-- `04c-deploy-loki.sh` - Deploy Loki + Vector (log aggregation)
-- `04-deploy-apm.sh` - Deploy all APM components (deploy BEFORE apps to collect traces/logs/profiles immediately)
+**APM Stack (03) - Required:**
+- `03a-deploy-tempo.sh` - Deploy Grafana Tempo v2.9.0 (distributed tracing with metrics-generator for TraceQL rate() queries)
+- `03b-deploy-pyroscope.sh` - Deploy Pyroscope (continuous profiling)
+- `03c-deploy-loki.sh` - Deploy Loki + Vector (log aggregation)
+- `03-deploy-apm.sh` - Deploy all APM components (deploy BEFORE apps to collect traces/logs/profiles immediately)
 
 **APM Configuration:**
 - Tracing sampling: 10% (production), 100% (development) - configurable via `OTEL_SAMPLE_RATE`
@@ -263,23 +266,23 @@ Numbered scripts (01-12) for deployment and operations:
 - Graceful shutdown: automatic span flushing on termination
 - Service detection: automatic from Kubernetes pod metadata
 
-**Build & Deploy Applications (05-06):**
-- `05-build-microservices.sh` - Build Docker images for all 9 services
-- `06-deploy-microservices.sh` - Deploy all microservices using Helm (`--local` or `--registry`)
+**Build & Deploy Applications (04-05):**
+- `04-build-microservices.sh` - Build Docker images for all 9 services
+- `05-deploy-microservices.sh` - Deploy all microservices using Helm (`--local` or `--registry`)
 
-**Load Testing (07):**
-- `07-deploy-k6.sh` - Deploy k6 load generators via Helm (deploy AFTER apps to test them)
+**Load Testing (06):**
+- `06-deploy-k6.sh` - Deploy k6 load generators via Helm (deploy AFTER apps to test them)
 
-**SLO System (08) - Required:**
-- `08-deploy-slo.sh` - Deploy Sloth Operator and SLO CRDs (automatic validation & rule generation)
+**SLO System (07) - Required:**
+- `07-deploy-slo.sh` - Deploy Sloth Operator and SLO CRDs (automatic validation & rule generation)
 
-**Access Setup (09):**
-- `09-setup-access.sh` - Setup port-forwarding for services
+**Access Setup (08):**
+- `08-setup-access.sh` - Setup port-forwarding for services
 
 **Utilities:**
-- `10-reload-dashboard.sh` - Reapply Grafana Operator dashboards (microservices + SLO)
-- `11-diagnose-latency.sh` - Diagnostic script for latency issues
-- `12-error-budget-alert.sh` - Error budget alert response script
+- `09-reload-dashboard.sh` - Reapply Grafana Operator dashboards (microservices + SLO)
+- `10-diagnose-latency.sh` - Diagnostic script for latency issues
+- `11-error-budget-alert.sh` - Error budget alert response script
 - `cleanup.sh` - Clean up Kind cluster and resources
 
 #### `docs/` - Documentation
@@ -351,6 +354,7 @@ k8s/sloth/
 | Helm Values | Per-service configuration | `charts/values/*.yaml` |
 | Prometheus Operator Values | kube-prometheus-stack Helm values | `k8s/prometheus/values.yaml` |
 | ServiceMonitor | Auto-discovery for all microservices | `k8s/prometheus/servicemonitor-microservices.yaml` |
+| metrics-server Values | metrics-server configuration for Kind | `k8s/metrics/metrics-server-values.yaml` |
 | Grafana Datasources | Prometheus datasource | `k8s/grafana-operator/datasource-prometheus.yaml` |
 | Grafana Dashboards | Operator-managed dashboards (microservices + SLO + Vector) | `k8s/grafana-operator/dashboards/` (`microservices-dashboard.json` is the source of truth) |
 | Dockerfile | Unified build for all services | `services/Dockerfile` |
@@ -397,10 +401,10 @@ k8s/sloth/
 
 | Category | Scripts | Purpose | Order |
 |----------|---------|---------|-------|
-| Infrastructure | 01-02 | Cluster setup, metrics installation | 1-2 |
-| Monitoring Stack | 03 | Deploy Prometheus & Grafana (BEFORE apps) | 3 |
-| APM Stack | 04, 04a-c | Deploy Tempo, Pyroscope, Loki, Vector (BEFORE apps) | 4 |
-| Build & Deploy Apps | 05-06 | Build images (including k6), deploy services | 5-6 |
+| Infrastructure | 01 | Cluster setup | 1 |
+| Monitoring Stack | 02 | Deploy Prometheus, Grafana, metrics (includes kube-state-metrics + metrics-server) | 2 |
+| APM Stack | 03, 03a-c | Deploy Tempo, Pyroscope, Loki, Vector (BEFORE apps) | 3 |
+| Build & Deploy Apps | 04-05 | Build images (including k6), deploy services | 4-5 |
 | Load Testing | 07 | Deploy k6 load generators via Helm (AFTER apps) | 7 |
 | SLO System | 08 | Deploy Sloth Operator and SLO CRDs (Required) | 8 |
 | Access Setup | 09 | Setup port-forwarding | 9 |
@@ -458,8 +462,8 @@ k8s/sloth/
    ```
 
 4. **Update build script:**
-   - Add service to `scripts/05-build-microservices.sh`
-   - Add deployment to `scripts/06-deploy-microservices.sh`
+   - Add service to `scripts/04-build-microservices.sh`
+   - Add deployment to `scripts/05-deploy-microservices.sh`
 
 5. **Add SLO definition:**
    - Create PrometheusServiceLevel CRD: `k8s/sloth/crds/myapp-slo.yaml`
@@ -467,8 +471,8 @@ k8s/sloth/
 
 6. **Build and deploy:**
    ```bash
-   ./scripts/05-build-microservices.sh
-   ./scripts/06-deploy-microservices.sh
+   ./scripts/04-build-microservices.sh
+   ./scripts/05-deploy-microservices.sh
    ```
 
 ### Updating Grafana Dashboard
@@ -479,7 +483,7 @@ k8s/sloth/
 
 2. **Reload dashboards via Grafana Operator:**
    ```bash
-   ./scripts/10-reload-dashboard.sh
+   ./scripts/09-reload-dashboard.sh
    ```
    The script reapplies `k8s/grafana-operator/dashboards/` (ConfigMap + `GrafanaDashboard` CR). The Grafana Operator automatically reconciles the new JSON.
 
@@ -537,10 +541,10 @@ k8s/sloth/
 
 1. **Deploy k6:**
    ```bash
-   ./scripts/07-deploy-k6.sh
+   ./scripts/06-deploy-k6.sh
    # Or deploy specific variant:
-   # ./scripts/07-deploy-k6.sh legacy
-   # ./scripts/07-deploy-k6.sh scenarios
+   # ./scripts/06-deploy-k6.sh legacy
+   # ./scripts/06-deploy-k6.sh scenarios
    ```
 
 2. **Check load generator pod:**
@@ -612,15 +616,14 @@ k8s/sloth/
 | Script | Command | Purpose | Order |
 |--------|---------|---------|-------|
 | Create cluster | `./scripts/01-create-kind-cluster.sh` | Create Kind Kubernetes cluster | 1 |
-| Install metrics | `./scripts/02-install-metrics.sh` | Install kube-state-metrics | 2 |
-| Deploy monitoring | `./scripts/03-deploy-monitoring.sh` | Deploy Prometheus & Grafana (BEFORE apps) | 3 |
-| Deploy APM | `./scripts/04-deploy-apm.sh` | Deploy all APM components (BEFORE apps - Tempo, Pyroscope, Loki, Vector) | 4 |
-| Build images | `./scripts/05-build-microservices.sh` | Build all 9 service Docker images | 5 |
-| Deploy services (local) | `./scripts/06-deploy-microservices.sh --local` | Deploy using local Helm chart | 6 |
-| Deploy services (registry) | `./scripts/06-deploy-microservices.sh --registry` | Deploy from OCI registry | 6 |
-| Deploy k6 | `./scripts/07-deploy-k6.sh` | Deploy k6 load generators via Helm (AFTER apps) | 7 |
-| Deploy SLO | `./scripts/08-deploy-slo.sh` | Deploy Sloth Operator and SLO CRDs | 8 |
-| Setup access | `./scripts/09-setup-access.sh` | Setup port-forwarding | 9 |
+| Deploy monitoring | `./scripts/02-deploy-monitoring.sh` | Deploy Prometheus, Grafana, metrics (includes kube-state-metrics + metrics-server) | 2 |
+| Deploy APM | `./scripts/03-deploy-apm.sh` | Deploy all APM components (BEFORE apps - Tempo, Pyroscope, Loki, Vector) | 3 |
+| Build images | `./scripts/04-build-microservices.sh` | Build all 9 service Docker images | 4 |
+| Deploy services (local) | `./scripts/05-deploy-microservices.sh --local` | Deploy using local Helm chart | 6 |
+| Deploy services (registry) | `./scripts/05-deploy-microservices.sh --registry` | Deploy from OCI registry | 6 |
+| Deploy k6 | `./scripts/06-deploy-k6.sh` | Deploy k6 load generators via Helm (AFTER apps) | 7 |
+| Deploy SLO | `./scripts/07-deploy-slo.sh` | Deploy Sloth Operator and SLO CRDs | 8 |
+| Setup access | `./scripts/08-setup-access.sh` | Setup port-forwarding | 8 |
 
 ### Helm Commands
 
@@ -635,13 +638,13 @@ k8s/sloth/
 
 | Script | Command | Purpose |
 |--------|---------|---------|
-| Reload dashboard | `./scripts/10-reload-dashboard.sh` | Reload Grafana dashboard ConfigMap |
+| Reload dashboard | `./scripts/09-reload-dashboard.sh` | Reload Grafana dashboard ConfigMap |
 
 ### SLO Commands
 
 | Script | Command | Purpose |
 |--------|---------|---------|
-| Deploy SLOs | `./scripts/08-deploy-slo.sh` | Full SLO deployment via Sloth Operator (Helm) |
+| Deploy SLOs | `./scripts/07-deploy-slo.sh` | Full SLO deployment via Sloth Operator (Helm) |
 
 **Note**: Validation and rule generation are now handled automatically by Sloth Operator. No more manual bash scripts.
 
@@ -649,8 +652,8 @@ k8s/sloth/
 
 | Script | Command | Purpose |
 |--------|---------|---------|
-| Diagnose latency | `./scripts/11-diagnose-latency.sh` | Analyze latency issues |
-| Error budget alert | `./scripts/12-error-budget-alert.sh` | Respond to error budget alerts |
+| Diagnose latency | `./scripts/10-diagnose-latency.sh` | Analyze latency issues |
+| Error budget alert | `./scripts/11-error-budget-alert.sh` | Respond to error budget alerts |
 
 ### kubectl Shortcuts
 
@@ -780,14 +783,14 @@ k8s/sloth/
 
 ### Find Scripts by Task
 
-- **Setup cluster**: `01-create-kind-cluster.sh`, `02-install-metrics.sh`
-- **Deploy monitoring**: `03-deploy-monitoring.sh` (BEFORE apps)
-- **Deploy APM**: `04-deploy-apm.sh` (BEFORE apps - Tempo, Pyroscope, Loki, Vector)
-- **Build & deploy apps**: `05-build-microservices.sh`, `06-deploy-microservices.sh`
+- **Setup cluster**: `01-create-kind-cluster.sh`
+- **Deploy monitoring**: `02-deploy-monitoring.sh` (Prometheus, Grafana, kube-state-metrics, metrics-server - BEFORE apps)
+- **Deploy APM**: `03-deploy-apm.sh` (BEFORE apps - Tempo, Pyroscope, Loki, Vector)
+- **Build & deploy apps**: `04-build-microservices.sh`, `05-deploy-microservices.sh`
 - **Load testing**: `07-deploy-k6.sh` (AFTER apps)
 - **SLO system**: `08-deploy-slo.sh` (Sloth Operator + CRDs)
-- **Access setup**: `09-setup-access.sh`
-- **Utilities**: `10-reload-dashboard.sh`, `11-diagnose-latency.sh`, `12-error-budget-alert.sh`
+- **Access setup**: `08-setup-access.sh`
+- **Utilities**: `09-reload-dashboard.sh`, `10-diagnose-latency.sh`, `11-error-budget-alert.sh`
 
 ### Find Documentation by Topic
 

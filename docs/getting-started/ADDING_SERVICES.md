@@ -36,9 +36,9 @@ namespace: payment
 replicaCount: 2
 
 image:
-  repository: ghcr.io/duynhne
-  name: payment
+  repository: ghcr.io/duynhne/payment  # Full image path
   tag: v5
+  pullPolicy: IfNotPresent
   pullPolicy: IfNotPresent
 
 service:

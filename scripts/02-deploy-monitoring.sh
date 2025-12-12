@@ -1,14 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "=== Deploying Monitoring Stack with Prometheus Operator ==="
+echo "=== Deploying Monitoring Stack (Prometheus + Grafana + Metrics Infrastructure) ==="
+echo "This includes: kube-prometheus-stack (with kube-state-metrics) + metrics-server"
+echo ""
 
 # Ensure monitoring namespace exists
 echo "Ensuring 'monitoring' namespace exists..."
 kubectl get namespace monitoring >/dev/null 2>&1 || kubectl create namespace monitoring
 
 # Install Prometheus Operator via kube-prometheus-stack
-echo "1. Installing Prometheus Operator (kube-prometheus-stack v80.0.0)..."
+echo "Step 1: Installing kube-prometheus-stack v80.0.0 (includes kube-state-metrics)..."
 if command -v helm >/dev/null 2>&1; then
   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
   helm repo update >/dev/null 2>&1 || true

@@ -5,9 +5,9 @@ set -e
 # Deploy All Microservices using Helm
 # =============================================================================
 # Usage:
-#   ./06-deploy-microservices.sh              # Local mode (default)
-#   ./06-deploy-microservices.sh --local      # Local mode (explicit)
-#   ./06-deploy-microservices.sh --registry   # From ghcr.io OCI registry
+#   ./05-deploy-microservices.sh              # Local mode (default)
+#   ./05-deploy-microservices.sh --local      # Local mode (explicit)
+#   ./05-deploy-microservices.sh --registry   # From ghcr.io OCI registry
 # =============================================================================
 
 # Configuration

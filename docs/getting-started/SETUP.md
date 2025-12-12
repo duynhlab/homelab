@@ -104,31 +104,31 @@ kubectl get nodes
 ```
 
 **What it does:**
-- Deploys Prometheus Operator (kube-prometheus-stack) with kube-state-metrics included
-- Installs `metrics-server` (via Helm chart) with `--kubelet-insecure-tls` for Kind clusters
-- Installs the Grafana Operator and reconciles Grafana (anonymous auth, dark theme) plus datasources
-- Auto-provisions the microservices + Sloth SLO dashboards via `GrafanaDashboard` CRs (no manual imports)
+- Deploys Prometheus Operator (kube-prometheus-stack v80.0.0) with kube-state-metrics
+- Installs metrics-server (via Helm) with Kind-specific configuration (`--kubelet-insecure-tls`)
+- Deploys Grafana Operator and reconciles Grafana instance
+- Auto-provisions microservices + SLO dashboards via GrafanaDashboard CRs
 
 **Verify:**
 ```bash
-kubectl get pods -n monitoring | grep kube-state-metrics
-kubectl get pods -n kube-system | grep metrics-server
-# Expected: Both pods running
-```
-
-**Why before apps:** Prometheus needs to be ready to collect metrics immediately when apps start.
-
-**Verify:**
-```bash
+# Check Prometheus and Grafana
 kubectl get pods -n monitoring | grep -E "(prometheus|grafana)"
 # Expected: prometheus and grafana pods running
 
-curl http://localhost:9090/-/healthy
-# Expected: Prometheus is Healthy.
+# Check kube-state-metrics (included in kube-prometheus-stack)
+kubectl get pods -n monitoring | grep kube-state-metrics
 
-curl http://localhost:3000/api/health
-# Expected: {"database":"ok"}
+# Check metrics-server (in kube-system namespace)
+kubectl get pods -n kube-system | grep metrics-server
+# Expected: metrics-server pod running
+
+# Test metrics-server API
+kubectl top nodes
+kubectl top pods -n auth
+# Expected: Resource usage metrics
 ```
+
+**Why before apps:** Prometheus needs to be ready to collect metrics immediately when apps start.
 
 ---
 

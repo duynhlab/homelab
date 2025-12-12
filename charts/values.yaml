@@ -1,5 +1,8 @@
 # Default values for microservice chart
 # This is a YAML-formatted file.
+# See charts/README.md for complete documentation on configuration patterns.
+
+# --- Core Service Configuration ---
 
 # Service name (required when installing)
 name: ""
@@ -10,14 +13,16 @@ namespace: ""
 # Number of replicas
 replicaCount: 2
 
-# Container image configuration
+# --- Container Image Configuration ---
+
 image:
   repository: ghcr.io/duynhne
   name: ""  # Short image name (e.g., auth, user, product)
   tag: v5
   pullPolicy: IfNotPresent
 
-# Service configuration
+# --- Service Configuration ---
+
 service:
   type: ClusterIP
   port: 8080
@@ -27,7 +32,8 @@ service:
 # Container port
 containerPort: 8080
 
-# Resource limits and requests
+# --- Resource Configuration ---
+
 resources:
   requests:
     memory: "64Mi"
@@ -35,6 +41,8 @@ resources:
   limits:
     memory: "128Mi"
     cpu: "100m"
+
+# --- Health Checks ---
 
 # Liveness probe configuration
 livenessProbe:
@@ -54,10 +62,45 @@ readinessProbe:
   initialDelaySeconds: 5
   periodSeconds: 5
 
-# Additional environment variables
+# --- Environment Variables Configuration ---
+# See charts/README.md for env vs extraEnv decision matrix
+
+# Core application configuration (chart-managed)
+# Use for: SERVICE_NAME, PORT, ENV, TEMPO_ENDPOINT, PYROSCOPE_ENDPOINT, LOG_LEVEL
+# Supports Helm templating: {{ .Values.tracing.endpoint }}
 env: []
-# - name: MY_VAR
-#   value: "my-value"
+# Example (see charts/values/auth.yaml for complete example):
+# - name: SERVICE_NAME
+#   value: "auth"
+# - name: PORT
+#   value: "8080"
+# - name: ENV
+#   value: "production"
+# - name: TEMPO_ENDPOINT
+#   value: "tempo.monitoring.svc.cluster.local:4318"
+# - name: OTEL_SAMPLE_RATE
+#   value: "0.1"
+# - name: PYROSCOPE_ENDPOINT
+#   value: "http://pyroscope.monitoring.svc.cluster.local:4040"
+# - name: LOG_LEVEL
+#   value: "info"
+
+# Service-specific configuration (ad-hoc variables)
+# Use for: REDIS_HOST, KAFKA_BROKER, feature flags, secrets (via valueFrom)
+# No Helm templating support (just YAML passthrough)
+extraEnv: []
+# Example:
+# - name: REDIS_HOST
+#   value: "redis.auth.svc.cluster.local:6379"
+# - name: ENABLE_2FA
+#   value: "true"
+# - name: JWT_SECRET
+#   valueFrom:
+#     secretKeyRef:
+#       name: auth-secrets
+#       key: jwt-secret
+
+# --- Kubernetes Configuration ---
 
 # Labels to add to all resources
 labels:
@@ -74,24 +117,6 @@ tolerations: []
 
 # Affinity
 affinity: {}
-
-# Extra environment variables
-# Example:
-# extraEnv:
-#   - name: MY_CUSTOM_VAR
-#     value: "custom_value"
-#   - name: SECRET_KEY
-#     valueFrom:
-#       secretKeyRef:
-#         name: my-secret
-#         key: key
-extraEnv: []
-
-# Tracing configuration
-tracing:
-  enabled: true
-  endpoint: "tempo.monitoring.svc.cluster.local:4318"
-  sampleRate: "0.1"  # 10% sampling (0.0 to 1.0)
 
 # Pod security context
 podSecurityContext: {}

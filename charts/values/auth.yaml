@@ -1,12 +1,10 @@
-# Values for auth
-name: auth
-namespace: auth
+# Values for auth service
+fullnameOverride: "auth"
 
 replicaCount: 2
 
 image:
-  repository: ghcr.io/duynhne
-  name: auth
+  repository: ghcr.io/duynhne/auth
   tag: v5
   pullPolicy: IfNotPresent
 
@@ -17,6 +15,45 @@ service:
   portName: http
 
 containerPort: 8080
+
+# Core configuration (chart-managed via env)
+# See charts/README.md for complete guide on env vs extraEnv
+env:
+  - name: SERVICE_NAME
+    value: "auth"
+  - name: PORT
+    value: "8080"
+  - name: ENV
+    value: "production"
+  - name: TEMPO_ENDPOINT
+    value: "tempo.monitoring.svc.cluster.local:4318"
+  - name: OTEL_SAMPLE_RATE
+    value: "0.1"  # 10% sampling for production
+  - name: PYROSCOPE_ENDPOINT
+    value: "http://pyroscope.monitoring.svc.cluster.local:4040"
+  - name: LOG_LEVEL
+    value: "info"
+  - name: LOG_FORMAT
+    value: "json"
+  - name: TRACING_ENABLED
+    value: "true"
+  - name: PROFILING_ENABLED
+    value: "true"
+  - name: METRICS_ENABLED
+    value: "true"
+
+# Service-specific configuration (if needed)
+# Example: Database connections, feature flags, secrets
+extraEnv: []
+# - name: REDIS_HOST
+#   value: "redis.auth.svc.cluster.local:6379"
+# - name: ENABLE_2FA
+#   value: "true"
+# - name: JWT_SECRET
+#   valueFrom:
+#     secretKeyRef:
+#       name: auth-secrets
+#       key: jwt-secret
 
 resources:
   requests:
@@ -41,9 +78,3 @@ readinessProbe:
     port: 8080
   initialDelaySeconds: 5
   periodSeconds: 5
-
-tracing:
-  enabled: true
-  endpoint: "tempo.monitoring.svc.cluster.local:4318"
-  sampleRate: "0.1"
-

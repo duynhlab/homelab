@@ -1,5 +1,5 @@
 # Values for cart service
-fullnameOverride: "cart"
+name: cart
 
 replicaCount: 2
 

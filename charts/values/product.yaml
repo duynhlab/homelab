@@ -1,5 +1,5 @@
 # Values for product service
-fullnameOverride: "product"
+name: product
 
 replicaCount: 2
 

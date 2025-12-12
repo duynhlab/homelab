@@ -1,5 +1,5 @@
 # Values for shipping-v2 service (v2 only)
-fullnameOverride: "shipping-v2"
+name: shipping-v2
 
 replicaCount: 2
 

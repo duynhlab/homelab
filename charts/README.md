@@ -200,8 +200,9 @@ env:
     value: "http://pyroscope.monitoring.svc.cluster.local:4040"
 
 image:
-  repository: ghcr.io/duynhne/myservice
+  repository: ghcr.io/duynhne/myservice  # Full image path
   tag: "latest"
+  pullPolicy: IfNotPresent
 ```
 
 ### Advanced Service Configuration
@@ -251,8 +252,9 @@ extraEnv:
     value: "false"
 
 image:
-  repository: ghcr.io/duynhne/order
+  repository: ghcr.io/duynhne/order  # Full image path
   tag: "v1.2.3"
+  pullPolicy: IfNotPresent
 ```
 
 ---

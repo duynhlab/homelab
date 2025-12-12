@@ -3,10 +3,10 @@ package middleware
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
+	"github.com/duynhne/monitoring/pkg/config"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel"
@@ -16,7 +16,6 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
-	"strconv"
 )
 
 var (
@@ -25,81 +24,26 @@ var (
 	detectedService string
 )
 
-// TracingConfig holds configuration for OpenTelemetry tracing
-type TracingConfig struct {
-	ServiceName      string
-	ServiceNamespace string
-	TempoEndpoint    string
-	Insecure         bool
-	SampleRate       float64
-	ExportTimeout    time.Duration
-	BatchTimeout     time.Duration
-	SkipPaths        []string
-}
-
-// DefaultTracingConfig returns default tracing configuration
-func DefaultTracingConfig() TracingConfig {
-	// Default to 10% sampling for production, 100% for development
-	sampleRate := 0.1
-	env := os.Getenv("ENV")
-	if env == "development" || env == "dev" {
-		sampleRate = 1.0
+// InitTracing initializes OpenTelemetry tracing using centralized config package
+// Configuration is loaded from environment variables via config.Load()
+//
+// Example:
+//
+//	cfg := config.Load()
+//	tp, err := middleware.InitTracing(cfg)
+//	defer tp.Shutdown(context.Background())
+func InitTracing(cfg *config.Config) (*sdktrace.TracerProvider, error) {
+	// Skip tracing initialization if disabled
+	if !cfg.Tracing.Enabled {
+		return nil, fmt.Errorf("tracing is disabled (TRACING_ENABLED=false)")
 	}
 
-	// Allow override via environment variable
-	if rate := os.Getenv("OTEL_SAMPLE_RATE"); rate != "" {
-		if parsed, err := strconv.ParseFloat(rate, 64); err == nil {
-			sampleRate = parsed
-		}
+	// Validate tracing configuration
+	if cfg.Tracing.Endpoint == "" {
+		return nil, fmt.Errorf("TEMPO_ENDPOINT is required when tracing is enabled")
 	}
-
-	return TracingConfig{
-		TempoEndpoint: "tempo.monitoring.svc.cluster.local:4318",
-		Insecure:      true,
-		SampleRate:    sampleRate,
-		ExportTimeout: 30 * time.Second,
-		BatchTimeout:  5 * time.Second,
-		SkipPaths: []string{
-			"/health", "/healthz", "/readyz", "/livez",
-			"/metrics", "/favicon.ico",
-		},
-	}
-}
-
-// Validate validates the tracing configuration
-func (c TracingConfig) Validate() error {
-	if c.SampleRate < 0 || c.SampleRate > 1 {
-		return fmt.Errorf("invalid sample rate: %f (must be between 0 and 1)", c.SampleRate)
-	}
-	if c.TempoEndpoint == "" {
-		return fmt.Errorf("tempo endpoint cannot be empty")
-	}
-	if c.ExportTimeout <= 0 {
-		return fmt.Errorf("export timeout must be positive")
-	}
-	if c.BatchTimeout <= 0 {
-		return fmt.Errorf("batch timeout must be positive")
-	}
-	return nil
-}
-
-// InitTracing initializes OpenTelemetry tracing with default configuration
-func InitTracing() (*sdktrace.TracerProvider, error) {
-	config := DefaultTracingConfig()
-	return InitTracingWithConfig(config)
-}
-
-// InitTracingWithConfig initializes OpenTelemetry tracing with custom configuration
-func InitTracingWithConfig(config TracingConfig) (*sdktrace.TracerProvider, error) {
-	// Validate configuration
-	if err := config.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid tracing configuration: %w", err)
-	}
-
-	// Get Tempo endpoint from config or environment
-	tempoEndpoint := config.TempoEndpoint
-	if endpoint := os.Getenv("TEMPO_ENDPOINT"); endpoint != "" {
-		tempoEndpoint = endpoint
+	if cfg.Tracing.SampleRate < 0 || cfg.Tracing.SampleRate > 1.0 {
+		return nil, fmt.Errorf("OTEL_SAMPLE_RATE must be between 0.0 and 1.0, got: %.2f", cfg.Tracing.SampleRate)
 	}
 
 	// Create context with timeout for exporter initialization
@@ -107,9 +51,10 @@ func InitTracingWithConfig(config TracingConfig) (*sdktrace.TracerProvider, erro
 	defer cancel()
 
 	// Create OTLP HTTP exporter with compression
+	// Tempo endpoint: tempo.monitoring.svc.cluster.local:4318 (OTLP HTTP)
 	exporter, err := otlptracehttp.New(
 		ctx,
-		otlptracehttp.WithEndpoint(tempoEndpoint),
+		otlptracehttp.WithEndpoint(cfg.Tracing.Endpoint),
 		otlptracehttp.WithInsecure(), // Use TLS in production
 		otlptracehttp.WithCompression(otlptracehttp.GzipCompression),
 	)
@@ -118,6 +63,7 @@ func InitTracingWithConfig(config TracingConfig) (*sdktrace.TracerProvider, erro
 	}
 
 	// Auto-detect service information from Kubernetes environment
+	// Falls back to cfg.Service.Name if Kubernetes metadata is unavailable
 	res, err := CreateResource(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource: %w", err)
@@ -125,21 +71,28 @@ func InitTracingWithConfig(config TracingConfig) (*sdktrace.TracerProvider, erro
 
 	// Store detected service name for middleware usage
 	detectedService = GetServiceName(res)
+	if detectedService == "" || detectedService == "unknown-service" {
+		detectedService = cfg.Service.Name
+	}
 
 	// Create tracer provider with batch export configuration
+	// BatchTimeout: How often to flush spans (default: 5s)
+	// ExportTimeout: Max time to wait for export (default: 30s)
+	// SampleRate: Percentage of traces to sample (10% production, 100% dev)
 	tracerProvider = sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exporter,
-			sdktrace.WithBatchTimeout(config.BatchTimeout),
-			sdktrace.WithExportTimeout(config.ExportTimeout),
+			sdktrace.WithBatchTimeout(5*time.Second),
+			sdktrace.WithExportTimeout(30*time.Second),
+			sdktrace.WithMaxExportBatchSize(cfg.Tracing.MaxExportBatchSize),
 		),
 		sdktrace.WithResource(res),
-		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(config.SampleRate)),
+		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(cfg.Tracing.SampleRate)),
 	)
 
 	// Set global tracer provider
 	otel.SetTracerProvider(tracerProvider)
 
-	// Set global propagator for trace context propagation
+	// Set global propagator for trace context propagation (W3C Trace Context)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},
@@ -152,9 +105,13 @@ func InitTracingWithConfig(config TracingConfig) (*sdktrace.TracerProvider, erro
 }
 
 // shouldTrace determines if a request should be traced based on path
+// Skips health checks, metrics endpoints, and static resources
 func shouldTrace(path string) bool {
-	config := DefaultTracingConfig()
-	for _, skip := range config.SkipPaths {
+	skipPaths := []string{
+		"/health", "/healthz", "/readyz", "/livez",
+		"/metrics", "/favicon.ico",
+	}
+	for _, skip := range skipPaths {
 		if strings.HasPrefix(path, skip) {
 			return false
 		}
@@ -163,7 +120,12 @@ func shouldTrace(path string) bool {
 }
 
 // TracingMiddleware returns a Gin middleware for OpenTelemetry tracing
-// Service name is automatically detected, no manual configuration needed
+// Service name is automatically detected from Kubernetes metadata
+//
+// Usage:
+//
+//	r := gin.Default()
+//	r.Use(middleware.TracingMiddleware())
 func TracingMiddleware() gin.HandlerFunc {
 	serviceName := detectedService
 	if serviceName == "" {
@@ -201,11 +163,28 @@ func GetTracer() trace.Tracer {
 }
 
 // StartSpan starts a new span with the given name
+//
+// Usage:
+//
+//	ctx, span := middleware.StartSpan(ctx, "database.query")
+//	defer span.End()
 func StartSpan(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
 	return GetTracer().Start(ctx, name, opts...)
 }
 
 // Shutdown gracefully shuts down the tracer provider, flushing any pending spans
+// Call this in main() before application exits to ensure all traces are exported
+//
+// Usage (Go 1.25 WaitGroup.Go):
+//
+//	var wg sync.WaitGroup
+//	wg.Go(func() {
+//	    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+//	    defer cancel()
+//	    if err := middleware.Shutdown(ctx); err != nil {
+//	        log.Error("Failed to shutdown tracing", zap.Error(err))
+//	    }
+//	})
 func Shutdown(ctx context.Context) error {
 	if tracerProvider == nil {
 		return nil
@@ -227,6 +206,13 @@ func Shutdown(ctx context.Context) error {
 // Helper Functions
 
 // AddSpanAttributes adds attributes to the current span if it's recording
+//
+// Usage:
+//
+//	middleware.AddSpanAttributes(ctx,
+//	    attribute.String("user.id", userID),
+//	    attribute.Int("order.items", len(items)),
+//	)
 func AddSpanAttributes(ctx context.Context, attrs ...attribute.KeyValue) {
 	span := trace.SpanFromContext(ctx)
 	if span.IsRecording() {
@@ -235,6 +221,12 @@ func AddSpanAttributes(ctx context.Context, attrs ...attribute.KeyValue) {
 }
 
 // AddSpanEvent adds an event to the current span if it's recording
+//
+// Usage:
+//
+//	middleware.AddSpanEvent(ctx, "cache.hit",
+//	    attribute.String("cache.key", key),
+//	)
 func AddSpanEvent(ctx context.Context, name string, attrs ...attribute.KeyValue) {
 	span := trace.SpanFromContext(ctx)
 	if span.IsRecording() {
@@ -243,6 +235,13 @@ func AddSpanEvent(ctx context.Context, name string, attrs ...attribute.KeyValue)
 }
 
 // RecordError records an error in the current span if it's recording
+//
+// Usage:
+//
+//	if err != nil {
+//	    middleware.RecordError(ctx, err)
+//	    return err
+//	}
 func RecordError(ctx context.Context, err error) {
 	span := trace.SpanFromContext(ctx)
 	if span.IsRecording() {
@@ -252,6 +251,10 @@ func RecordError(ctx context.Context, err error) {
 }
 
 // SetSpanStatus sets the status of the current span if it's recording
+//
+// Usage:
+//
+//	middleware.SetSpanStatus(ctx, codes.Ok, "request successful")
 func SetSpanStatus(ctx context.Context, code codes.Code, description string) {
 	span := trace.SpanFromContext(ctx)
 	if span.IsRecording() {

@@ -284,7 +284,7 @@ Error response format:
 
 ```bash
 # Deploy services
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 
 # Port forward specific service
 kubectl port-forward -n auth svc/auth 8080:8080
@@ -296,7 +296,7 @@ kubectl port-forward -n product svc/product 8082:8080
 
 ```bash
 # Setup all port forwards
-./scripts/09-setup-access.sh
+./scripts/08-setup-access.sh
 ```
 
 ---
@@ -307,7 +307,7 @@ Use k6 to test all services:
 
 ```bash
 # Deploy k6 load generators
-./scripts/07-deploy-k6.sh
+./scripts/06-deploy-k6.sh
 
 # View k6 logs
 kubectl logs -n monitoring -l app=k6-load-generator-scenarios -f

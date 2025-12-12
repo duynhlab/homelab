@@ -129,12 +129,12 @@ Kubernetes Probe → /health → Gin Handler → Prometheus Middleware ⏭️ SK
 - **k6/Dockerfile** - Dockerfile for k6 image
 - **k6/load-test-multiple-scenarios.js** - Test script with 5 user personas and journey functions
 - **charts/values/k6-scenarios.yaml** - Helm values
-- **scripts/07-deploy-k6.sh** - Deployment script
+- **scripts/06-deploy-k6.sh** - Deployment script
 
 ## Deployment
 
 ```bash
-./scripts/07-deploy-k6.sh
+./scripts/06-deploy-k6.sh
 ```
 
 **Result:**
@@ -453,6 +453,6 @@ func shouldCollectMetrics(path string) bool {
 ## Update Test Scripts
 
 1. Edit `k6/load-test.js` or `k6/load-test-multiple-scenarios.js`
-2. Rebuild k6 images: `./scripts/05-build-microservices.sh` (includes k6 builds)
-3. Redeploy: `./scripts/07-deploy-k6.sh`
+2. Rebuild k6 images: `./scripts/04-build-microservices.sh` (includes k6 builds)
+3. Redeploy: `./scripts/06-deploy-k6.sh`
 4. Pods will automatically use new images (ImagePullPolicy: Never for local images)

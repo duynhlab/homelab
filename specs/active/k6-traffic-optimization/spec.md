@@ -615,14 +615,14 @@ kind load docker-image ghcr.io/duynhne/k6:scenarios --name monitoring-local
 
 # 2. Build all microservices (middleware changed)
 cd ..
-./scripts/05-build-microservices.sh
+./scripts/04-build-microservices.sh
 # Builds all 9 services
 ```
 
 **Phase 3: Deploy** (30 min)
 ```bash
 # 1. Deploy microservices
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 # Rolling update, zero downtime
 
 # 2. Redeploy k6
@@ -965,7 +965,7 @@ func TestTracingMiddleware_FiltersHealthAndMetrics(t *testing.T) {
 # File: tests/integration/test_filtered_traffic.sh
 
 # 1. Deploy services with middleware changes
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 
 # 2. Wait for rollout
 kubectl wait --for=condition=available --timeout=300s \
@@ -1050,7 +1050,7 @@ kubectl logs -n k6 -l app=k6-scenarios --tail=1000 | grep "/health"
 **Test 2: K6 Load Test Runs Successfully**
 ```bash
 # Deploy k6
-./scripts/07-deploy-k6.sh
+./scripts/06-deploy-k6.sh
 
 # Check k6 pod status
 kubectl get pods -n k6 -l app=k6-scenarios
@@ -1257,13 +1257,13 @@ kind load docker-image ghcr.io/duynhne/k6:scenarios --name monitoring-local
 
 # Rebuild microservices (old middleware)
 cd ..
-./scripts/05-build-microservices.sh
+./scripts/04-build-microservices.sh
 ```
 
 **Step 3: Redeploy** (10 min)
 ```bash
 # Redeploy microservices
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 
 # Redeploy k6
 kubectl delete deployment k6-scenarios -n k6

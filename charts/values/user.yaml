@@ -1,12 +1,10 @@
-# Values for user
-name: user
-namespace: user
+# Values for user service
+fullnameOverride: "user"
 
 replicaCount: 2
 
 image:
-  repository: ghcr.io/duynhne
-  name: user
+  repository: ghcr.io/duynhne/user
   tag: v5
   pullPolicy: IfNotPresent
 
@@ -17,6 +15,33 @@ service:
   portName: http
 
 containerPort: 8080
+
+# Core configuration (chart-managed via env)
+env:
+  - name: SERVICE_NAME
+    value: "user"
+  - name: PORT
+    value: "8080"
+  - name: ENV
+    value: "production"
+  - name: TEMPO_ENDPOINT
+    value: "tempo.monitoring.svc.cluster.local:4318"
+  - name: OTEL_SAMPLE_RATE
+    value: "0.1"
+  - name: PYROSCOPE_ENDPOINT
+    value: "http://pyroscope.monitoring.svc.cluster.local:4040"
+  - name: LOG_LEVEL
+    value: "info"
+  - name: LOG_FORMAT
+    value: "json"
+  - name: TRACING_ENABLED
+    value: "true"
+  - name: PROFILING_ENABLED
+    value: "true"
+  - name: METRICS_ENABLED
+    value: "true"
+
+extraEnv: []
 
 resources:
   requests:
@@ -41,9 +66,3 @@ readinessProbe:
     port: 8080
   initialDelaySeconds: 5
   periodSeconds: 5
-
-tracing:
-  enabled: true
-  endpoint: "tempo.monitoring.svc.cluster.local:4318"
-  sampleRate: "0.1"
-

@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.7.1] - 2025-12-12
+
+### Fixed
+
+**Helm Chart Image Format (BREAKING CHANGE):**
+- Fixed InvalidImageName error after Go 1.25 upgrade
+- Updated `_helpers.tpl` image template to use simplified format only
+- Image repository now includes full path: `ghcr.io/duynhne/auth` instead of separate `repository` + `name`
+- All 10 values files updated to new format (9 services + k6-scenarios)
+- Removed backward compatibility - only new format supported
+- **Migration**: If using custom values, change from:
+  ```yaml
+  image:
+    repository: ghcr.io/duynhne
+    name: myservice
+    tag: v5
+  ```
+  To:
+  ```yaml
+  image:
+    repository: ghcr.io/duynhne/myservice
+    tag: v5
+  ```
+
+### Changed
+
+- Updated documentation: `charts/README.md`, `charts/values.yaml`, `docs/getting-started/ADDING_SERVICES.md`
+- All examples now use new simplified image format
+- Template helper simplified (no conditional logic needed)
+
 ## [0.7.0] - 2025-12-12
 
 ### Added

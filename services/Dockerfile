@@ -1,4 +1,5 @@
-FROM golang:1.23-alpine AS builder
+# Build stage - Go 1.25 with static binary compilation
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
@@ -13,9 +14,12 @@ COPY . .
 ARG SERVICE_NAME
 
 # Build the application
+# CGO_ENABLED=0: Create fully static binary (no C dependencies) - perfect for minimal containers
+# GOOS=linux: Target Linux platform
+# Note: -ldflags="-s -w" is NOT used to preserve stack traces for debugging
 RUN CGO_ENABLED=0 GOOS=linux go build -o ${SERVICE_NAME} ./cmd/${SERVICE_NAME}
 
-# Final stage
+# Final stage - minimal runtime image
 FROM alpine:latest
 
 RUN apk --no-cache add ca-certificates

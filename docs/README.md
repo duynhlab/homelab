@@ -154,6 +154,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 - **32 Grafana Panels** - Complete monitoring dashboard
 - **6 Custom Metrics** - Application-level metrics
 - **9 Microservices** - All services with v1/v2 APIs
+- **Monitoring Stack** - Prometheus Operator + Grafana Operator + kube-state-metrics + metrics-server
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
 - **APM Stack** - Tempo (tracing), Pyroscope (profiling), Loki + Vector (logging)
 - **k6 Load Testing** - Helm-managed load generators

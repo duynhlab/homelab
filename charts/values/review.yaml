@@ -1,5 +1,5 @@
 # Values for review service
-fullnameOverride: "review"
+name: review
 
 replicaCount: 2
 

@@ -485,7 +485,7 @@ kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 909
 
 3. Reload dashboard:
    ```bash
-   ./scripts/10-reload-dashboard.sh
+   ./scripts/09-reload-dashboard.sh
    ```
 
 ### Issue: High Cardinality Warning
@@ -645,7 +645,7 @@ If you later want to switch from Option A to Option B:
    # With:
    #   {app=~"$app", namespace=~"$namespace"}
    
-   ./scripts/10-reload-dashboard.sh
+   ./scripts/09-reload-dashboard.sh
    ```
 
 3. **Verify** - Check panels load data correctly after Prometheus/Grafana reload.

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -14,10 +15,17 @@ import (
 
 	v1 "github.com/duynhne/monitoring/internal/notification/web/v1"
 	v2 "github.com/duynhne/monitoring/internal/notification/web/v2"
+	"github.com/duynhne/monitoring/pkg/config"
 	"github.com/duynhne/monitoring/pkg/middleware"
 )
 
 func main() {
+	// Load configuration from environment variables (with .env file support for local dev)
+	cfg := config.Load()
+	if err := cfg.Validate(); err != nil {
+		panic("Configuration validation failed: " + err.Error())
+	}
+
 	// Initialize structured logger
 	logger, err := middleware.NewLogger()
 	if err != nil {
@@ -25,23 +33,41 @@ func main() {
 	}
 	defer logger.Sync()
 
-	// Initialize OpenTelemetry tracing
-	tp, err := middleware.InitTracing()
-	if err != nil {
-		logger.Warn("Failed to initialize tracing", zap.Error(err))
+	logger.Info("Service starting",
+		zap.String("service", cfg.Service.Name),
+		zap.String("version", cfg.Service.Version),
+		zap.String("env", cfg.Service.Env),
+		zap.String("port", cfg.Service.Port),
+	)
+
+	// Initialize OpenTelemetry tracing with centralized config
+	var tp interface{ Shutdown(context.Context) error }
+	if cfg.Tracing.Enabled {
+		tp, err = middleware.InitTracing(cfg)
+		if err != nil {
+			logger.Warn("Failed to initialize tracing", zap.Error(err))
+		} else {
+			logger.Info("Tracing initialized",
+				zap.String("endpoint", cfg.Tracing.Endpoint),
+				zap.Float64("sample_rate", cfg.Tracing.SampleRate),
+			)
+		}
 	} else {
-		defer func() {
-			if err := tp.Shutdown(context.Background()); err != nil {
-				logger.Error("Error shutting down tracer provider", zap.Error(err))
-			}
-		}()
+		logger.Info("Tracing disabled (TRACING_ENABLED=false)")
 	}
 
 	// Initialize Pyroscope profiling
-	if err := middleware.InitProfiling(); err != nil {
-		logger.Warn("Failed to initialize profiling", zap.Error(err))
+	if cfg.Profiling.Enabled {
+		if err := middleware.InitProfiling(); err != nil {
+			logger.Warn("Failed to initialize profiling", zap.Error(err))
+		} else {
+			logger.Info("Profiling initialized",
+				zap.String("endpoint", cfg.Profiling.Endpoint),
+			)
+			defer middleware.StopProfiling()
+		}
 	} else {
-		defer middleware.StopProfiling()
+		logger.Info("Profiling disabled (PROFILING_ENABLED=false)")
 	}
 
 	r := gin.Default()
@@ -77,20 +103,15 @@ func main() {
 		apiV2.GET("/notifications/:id", v2.GetNotification)
 	}
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
 	// Create HTTP server
 	srv := &http.Server{
-		Addr:    ":" + port,
+		Addr:    ":" + cfg.Service.Port,
 		Handler: r,
 	}
 
 	// Start server in a goroutine
 	go func() {
-		logger.Info("Starting notification service", zap.String("port", port))
+		logger.Info("Starting notification service", zap.String("port", cfg.Service.Port))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Fatal("Failed to start server", zap.Error(err))
 		}
@@ -107,15 +128,33 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// Parallel shutdown with WaitGroup
+	var wg sync.WaitGroup
+
 	// Shutdown tracing (flush pending spans)
-	if err := middleware.Shutdown(shutdownCtx); err != nil {
-		logger.Error("Error shutting down tracer", zap.Error(err))
+	if tp != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := tp.Shutdown(shutdownCtx); err != nil {
+				logger.Error("Error shutting down tracer", zap.Error(err))
+			} else {
+				logger.Info("Tracer shutdown complete")
+			}
+		}()
 	}
 
 	// Shutdown HTTP server
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Fatal("Server forced to shutdown", zap.Error(err))
-	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			logger.Error("Server forced to shutdown", zap.Error(err))
+		} else {
+			logger.Info("HTTP server shutdown complete")
+		}
+	}()
 
+	wg.Wait()
 	logger.Info("Server exited gracefully")
 }

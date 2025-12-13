@@ -7,6 +7,281 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.7.1] - 2025-12-12
+
+### Fixed
+
+**Helm Chart Image Format (BREAKING CHANGE):**
+- Fixed InvalidImageName error after Go 1.25 upgrade
+- Updated `_helpers.tpl` image template to use simplified format only
+- Image repository now includes full path: `ghcr.io/duynhne/auth` instead of separate `repository` + `name`
+- All 10 values files updated to new format (9 services + k6-scenarios)
+- Removed backward compatibility - only new format supported
+- **Migration**: If using custom values, change from:
+  ```yaml
+  image:
+    repository: ghcr.io/duynhne
+    name: myservice
+    tag: v5
+  ```
+  To:
+  ```yaml
+  image:
+    repository: ghcr.io/duynhne/myservice
+    tag: v5
+  ```
+
+### Changed
+
+- Updated documentation: `charts/README.md`, `charts/values.yaml`, `docs/getting-started/ADDING_SERVICES.md`
+- All examples now use new simplified image format
+- Template helper simplified (no conditional logic needed)
+
+## [0.7.0] - 2025-12-12
+
+### Added
+
+1. **Infrastructure Optimization** - Metrics installation restructure for cleaner deployment
+
+**Metrics Installation Restructure:**
+
+Breaking Changes:
+- Removed `scripts/02-install-metrics.sh` (consolidated into script 03)
+- `kube-state-metrics` now managed by kube-prometheus-stack (enabled via Helm values)
+- `metrics-server` installation moved to `scripts/02-deploy-monitoring.sh`
+
+What Changed:
+- `k8s/prometheus/values.yaml`: `kubeStateMetrics.enabled: false` → `true`
+- Created `k8s/metrics/metrics-server-values.yaml` with Kind-specific configuration
+- `scripts/02-deploy-monitoring.sh`: Added metrics-server installation via Helm
+- Deleted `scripts/02-install-metrics.sh` (consolidated into monitoring script)
+- Deleted redundant kube-state-metrics values (now managed by kube-prometheus-stack)
+- Renamed `scripts/03-deploy-monitoring.sh` → `scripts/02-deploy-monitoring.sh`
+- All subsequent scripts renumbered sequentially for clean numbering:
+  - 03-deploy-apm.sh (was 04), 03a-c (was 04a-c)
+  - 04-build-microservices.sh (was 05)
+  - 05-deploy-microservices.sh (was 06)
+  - 06-deploy-k6.sh (was 07)
+  - 07-deploy-slo.sh (was 08)
+  - 08-setup-access.sh (was 09)
+  - 09-reload-dashboard.sh (was 10)
+  - 10-diagnose-latency.sh (was 11)
+  - 11-error-budget-alert.sh (was 12)
+- Deployment now has clean sequential numbering: 01, 02, 03, 03a-c, 04-11, cleanup
+
+Benefits:
+- More professional: All monitoring components deployed atomically
+- Simpler workflow: One less script to run (9 scripts → 8 scripts)
+- Better organization: Metrics infrastructure grouped logically with Prometheus
+- Standard practice: Follows kube-prometheus-stack conventions
+- kubectl top support: metrics-server enables resource monitoring (`kubectl top nodes/pods`)
+
+Migration:
+```bash
+# OLD workflow (with gap in numbering)
+./scripts/01-create-kind-cluster.sh
+./scripts/02-install-metrics.sh      # ← REMOVED
+./scripts/03-deploy-monitoring.sh
+
+# NEW workflow (clean sequential numbering)
+./scripts/01-create-kind-cluster.sh
+./scripts/02-deploy-monitoring.sh    # ← Renamed from 03, includes kube-state-metrics + metrics-server
+```
+
+For existing clusters:
+- No action needed if already deployed
+- For fresh deployments, skip script 02 (no longer exists)
+- All documentation updated to reflect new deployment order
+
+### Added
+
+1. **Go 1.25 Upgrade + Configuration Modernization** - Major refactoring for better developer experience
+   - **Go Version**: Upgraded from Go 1.23.0 to Go 1.25
+     - Updated `services/go.mod` and `services/Dockerfile`
+     - Future-ready for Go 1.25 features (`sync.WaitGroup.Go()`, Green Tea GC, enhanced nil-pointer detection)
+     - Build flags documented: `CGO_ENABLED=0`, `GOOS=linux` (no `-ldflags="-s -w"` to preserve stack traces)
+   
+   - **Centralized Configuration Package**: New `services/pkg/config/config.go` (360 lines)
+     - Type-safe configuration structs (`Config`, `ServiceConfig`, `TracingConfig`, `ProfilingConfig`, `LoggingConfig`, `MetricsConfig`)
+     - 12-factor app compliance (configuration via environment)
+     - Comprehensive validation with clear error messages
+     - `.env` file support via `godotenv` for local development
+     - Auto-defaults: `OTEL_SAMPLE_RATE=1.0` when `ENV=development`
+     - Helper methods: `IsDevelopment()`, `IsProduction()`
+   
+   - **Configuration Sources (Priority)**:
+     1. Default values (hardcoded in `config.go`)
+     2. `.env` file (local development only)
+     3. Environment variables (Kubernetes runtime)
+     4. Helm values → `env`/`extraEnv` → container environment
+   
+   - **Middleware Refactoring**: `services/pkg/middleware/tracing.go`
+     - Updated `InitTracing(cfg *config.Config)` to accept config parameter
+     - Removed deprecated `DefaultTracingConfig()` and no-arg `InitTracing()`
+     - Enhanced comments for SRE/DevOps teams
+     - Conditional initialization based on `cfg.Tracing.Enabled` flag
+   
+   - **All 9 Services Updated**: Consistent configuration pattern
+     - auth, user, product, cart, order, review, notification, shipping, shipping-v2
+     - Configuration loading via `config.Load()` with validation
+     - Structured logging at startup (service name, version, env, port)
+     - Conditional APM initialization (tracing, profiling)
+     - Parallel graceful shutdown with WaitGroup
+     - Clear error messages for debugging
+
+2. **Comprehensive Documentation**
+   - **New**: `charts/README.md` (800+ lines) - Helm chart configuration guide
+     - `env` vs `extraEnv` decision matrix (7 use cases with table)
+     - Configuration management flow (Mermaid diagram)
+     - Per-service values examples (minimal + advanced)
+     - Common patterns (dev vs prod, secrets, multi-region)
+     - 4 deployment examples + best practices (7 DOs, 6 DON'Ts)
+     - Troubleshooting section (3 common issues with solutions)
+   
+   - **New**: `docs/development/CONFIG_GUIDE.md` (600+ lines) - Complete configuration management guide
+     - Configuration sources and priority
+     - Environment variables reference table (15+ variables)
+     - Local development setup (`.env` file)
+     - Production deployment patterns (Kubernetes/Helm)
+     - Validation rules and error messages
+     - Troubleshooting guide (5 common issues)
+   
+   - **Updated**: `docs/getting-started/ADDING_SERVICES.md`
+     - Updated example code to use new `config.Load()` pattern
+     - Updated Helm values examples with `env`/`extraEnv` structure
+     - Added configuration management section
+     - Added links to CONFIG_GUIDE.md and charts/README.md
+   
+   - **Updated**: `docs/README.md`
+     - Added "Development" section with CONFIG_GUIDE.md link
+     - Renumbered documentation index (23 total documents)
+
+### Changed
+
+- **Breaking**: `middleware.InitTracing()` signature changed
+  - **Before**: `tp, err := middleware.InitTracing()` (no arguments)
+  - **After**: `tp, err := middleware.InitTracing(cfg)` (requires `*config.Config`)
+  - **Migration**: Add `cfg := config.Load()` before `InitTracing(cfg)`
+
+- **Breaking**: Helm values `tracing:` section removed
+  - **Before**: Configuration via `tracing.enabled`, `tracing.endpoint`, `tracing.sampleRate`
+  - **After**: Configuration via `env` block (see migration guide)
+  - **Reason**: Centralized configuration management via `env` is clearer and more flexible
+  - **Migration**: See Helm values migration guide below
+
+- **Dependency**: Added `github.com/joho/godotenv v1.5.1` for `.env` file support
+
+### Technical Details
+
+- **Files Created**: 3
+  - `services/pkg/config/config.go` (centralized configuration)
+  - `charts/README.md` (Helm chart guide)
+  - `docs/development/CONFIG_GUIDE.md` (configuration management guide)
+
+- **Files Modified**: 27
+  - `services/go.mod` (Go 1.25 + godotenv)
+  - `services/Dockerfile` (Go 1.25-alpine)
+  - `services/pkg/middleware/tracing.go` (config integration)
+  - 9x `services/cmd/*/main.go` (all services updated)
+  - `charts/values.yaml` (removed tracing section, added env examples)
+  - 9x `charts/values/*.yaml` (removed tracing section, added env configuration)
+  - `charts/templates/deployment.yaml` (removed .Values.tracing logic)
+  - `docs/README.md` (index update)
+  - `docs/getting-started/ADDING_SERVICES.md` (example updates)
+  - `docs/apm/TRACING.md` (updated Helm configuration examples)
+  - `CHANGELOG.md` (this file)
+
+- **Total Lines Added**: ~4,000 lines
+  - Config package: 360 lines
+  - Helm README: 800 lines
+  - Config guide: 600 lines
+  - Service main.go updates: ~700 lines (across 9 services)
+  - Helm values updates: ~900 lines (10 values files)
+  - Documentation updates: ~600 lines
+
+- **Documentation**: 2,000+ lines of new/updated documentation
+
+### Migration Guide
+
+**For Service Developers:**
+
+1. **Update service code**:
+   ```go
+   // Before (Go 1.23)
+   tp, err := middleware.InitTracing()
+   port := os.Getenv("PORT")
+   
+   // After (Go 1.25)
+   cfg := config.Load()
+   cfg.Validate()  // Required!
+   tp, err := middleware.InitTracing(cfg)
+   port := cfg.Service.Port
+   ```
+
+2. **Create .env file for local development** (optional):
+   ```bash
+   cat > services/.env <<EOF
+   SERVICE_NAME=myservice
+   PORT=8080
+   ENV=development
+   OTEL_SAMPLE_RATE=1.0
+   LOG_LEVEL=debug
+   EOF
+   ```
+
+3. **Update Helm values** (if using custom config):
+   ```yaml
+   # Use 'env' for core configuration
+   env:
+     - name: SERVICE_NAME
+       value: "myservice"
+     - name: PORT
+       value: "8080"
+   
+   # Use 'extraEnv' for service-specific config
+   extraEnv:
+     - name: REDIS_HOST
+       value: "redis:6379"
+   ```
+
+**For SRE/DevOps:**
+
+1. **Review Helm values**: See `charts/README.md` for `env` vs `extraEnv` decision matrix
+2. **Update deployment scripts**: No changes required (backward compatible)
+3. **Verify configuration**: Check logs for "Service starting" message with config details
+
+**Helm Values Migration** (if using custom config):
+
+```yaml
+# Before (DEPRECATED - removed in v0.7.0)
+tracing:
+  enabled: true
+  endpoint: "tempo.monitoring.svc.cluster.local:4318"
+  sampleRate: "0.1"
+
+# After (v0.7.0+)
+env:
+  - name: TRACING_ENABLED
+    value: "true"
+  - name: TEMPO_ENDPOINT
+    value: "tempo.monitoring.svc.cluster.local:4318"
+  - name: OTEL_SAMPLE_RATE
+    value: "0.1"
+  - name: PYROSCOPE_ENDPOINT
+    value: "http://pyroscope.monitoring.svc.cluster.local:4040"
+  - name: LOG_LEVEL
+    value: "info"
+```
+
+**Important**: All service-specific values files (`charts/values/*.yaml`) have been updated with the new `env` configuration. If you have custom values files, update them accordingly.
+
+### Related Resources
+
+- **Implementation Summary**: `specs/active/go125-config-modernization/IMPLEMENTATION_SUMMARY.md`
+- **Research**: `specs/active/go125-config-modernization/research.md`
+- **Specification**: `specs/active/go125-config-modernization/spec.md`
+- **Implementation Plan**: `specs/active/go125-config-modernization/plan.md`
+
 ## [0.6.16] - 2025-12-11
 
 ### Fixed
@@ -49,7 +324,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - **Deployment**:
      ```bash
      # Applied via Grafana Operator:
-     ./scripts/10-reload-dashboard.sh
+     ./scripts/09-reload-dashboard.sh
      
      # Grafana Operator reconciled ConfigMap and updated dashboard automatically
      # Hard refresh browser (Ctrl+Shift+R) to see changes
@@ -430,7 +705,7 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
      - `k6/load-test.js` - Legacy test script
      - `charts/values/k6-legacy.yaml` - Legacy Helm values
    - **Files Updated**:
-     - `scripts/07-deploy-k6.sh` - Simplified to single deployment mode
+     - `scripts/06-deploy-k6.sh` - Simplified to single deployment mode
      - `.github/workflows/build-k6-images.yml` - Removed legacy build matrix
      - `docs/k6/K6_LOAD_TESTING.md` - Removed legacy documentation
    - **Migration**: No action needed - k6-scenarios provides superior coverage with user journeys
@@ -631,7 +906,7 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
    - Prometheus Operator (kube-prometheus-stack): Pinned to `v80.0.0`
    - Grafana Operator: Pinned to `v5.20.0`
    - **Benefit**: Ensures consistent deployments across environments
-   - **Files**: `scripts/03-deploy-monitoring.sh`
+   - **Files**: `scripts/02-deploy-monitoring.sh`
 
 ## [0.6.8] - 2025-12-08
 
@@ -781,7 +1056,7 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
    - **Metrics namespace**: `vector_*` (events processed, errors, throughput, buffer utilization)
    - **Benefits**: Monitor logging pipeline health, detect issues early, capacity planning
    - **Files**: `k8s/vector/configmap.yaml`, `k8s/vector/daemonset.yaml`, `k8s/vector/service.yaml`, `k8s/vector/servicemonitor.yaml`, `k8s/grafana-operator/dashboards/grafana-dashboard-vector.yaml`
-   - **Script**: Updated `scripts/04c-deploy-loki.sh` to deploy Vector service and ServiceMonitor
+   - **Script**: Updated `scripts/03c-deploy-loki.sh` to deploy Vector service and ServiceMonitor
    - **Documentation**: Added "Vector Monitoring" section to `docs/apm/LOGGING.md`
 
 ---
@@ -845,12 +1120,12 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
 
 1. **Rebuild services** (tracing middleware changes):
    ```bash
-   ./scripts/05-build-microservices.sh
+   ./scripts/04-build-microservices.sh
    ```
 
 2. **Redeploy services**:
    ```bash
-   ./scripts/06-deploy-microservices.sh --local
+   ./scripts/05-deploy-microservices.sh --local
    ```
 
 3. **Verify tracing** (new default: 10% sampling):
@@ -888,7 +1163,7 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
    - Now explicitly lists all microservice namespaces: auth, user, product, cart, order, review, notification, shipping
    - Added explicit relabeling for `namespace` and `app` labels
 
-2. **Monitoring Deployment Script** (`scripts/03-deploy-monitoring.sh`)
+2. **Monitoring Deployment Script** (`scripts/02-deploy-monitoring.sh`)
    - Removed unnecessary namespace labeling logic
    - No longer labels namespaces with `monitoring=enabled` (not used by ServiceMonitor)
    - Simplified deployment steps from 6 to 5
@@ -919,7 +1194,7 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
    - Changed from: `prometheus-kube-prometheus-prometheus` → `kube-prometheus-stack-prometheus`
    - **Impact**: Grafana can now connect to Prometheus, dashboards load data correctly
 
-7. **Port-forward Script** (`scripts/09-setup-access.sh`)
+7. **Port-forward Script** (`scripts/08-setup-access.sh`)
    - Fixed Prometheus service name for port-forwarding
    - Changed from: `svc/prometheus` → `svc/kube-prometheus-stack-prometheus`
    - **Impact**: `http://localhost:9090` now accessible
@@ -979,7 +1254,7 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
 
 3. **Sloth Operator Support**
    - PodMonitor CRD now available (required by Sloth)
-   - `./scripts/08-deploy-slo.sh` now works correctly
+   - `./scripts/07-deploy-slo.sh` now works correctly
    - No more "unknown kind PodMonitor" errors
 
 **Changed**:
@@ -1004,7 +1279,7 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
    - **values.yaml**: Removed `defaultEnv` section (no longer used)
    - **values/*.yaml**: Removed redundant `labels: component: api` from all 9 service values files
 
-3. **Deployment Script** (`scripts/03-deploy-monitoring.sh`)
+3. **Deployment Script** (`scripts/02-deploy-monitoring.sh`)
    - Rewrote to install Prometheus Operator first
    - Labels microservice namespaces with `monitoring: enabled`
    - Applies ServiceMonitor after Operator installation
@@ -1031,10 +1306,10 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
 
 **Migration Steps for Users**:
 
-1. Rebuild all microservices: `./scripts/05-build-microservices.sh`
-2. Deploy new monitoring: `./scripts/03-deploy-monitoring.sh`
-3. Redeploy microservices: `./scripts/06-deploy-microservices.sh --local`
-4. Deploy SLO: `./scripts/08-deploy-slo.sh` (now works!)
+1. Rebuild all microservices: `./scripts/04-build-microservices.sh`
+2. Deploy new monitoring: `./scripts/02-deploy-monitoring.sh`
+3. Redeploy microservices: `./scripts/05-deploy-microservices.sh --local`
+4. Deploy SLO: `./scripts/07-deploy-slo.sh` (now works!)
 
 ## [0.4.1] - 2025-12-05
 
@@ -1107,23 +1382,23 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
 - **Dashboard File Consolidation**:
   - Removed duplicate `grafana-dashboard.json` from root directory
   - Dashboard source of truth is now `k8s/grafana-operator/dashboards/microservices-dashboard.json`
-  - Updated `scripts/10-reload-dashboard.sh` to remove unnecessary copy step
+  - Updated `scripts/09-reload-dashboard.sh` to remove unnecessary copy step
   - Updated `AGENTS.md` documentation to reflect single dashboard file location
   - Simplifies dashboard management by maintaining only one file
 - **Monitoring Deployment Script**:
-  - Added Grafana Operator CRDs status check to `scripts/03-deploy-monitoring.sh`
+  - Added Grafana Operator CRDs status check to `scripts/02-deploy-monitoring.sh`
   - Now displays `Grafana`, `GrafanaDatasource`, and `GrafanaDashboard` resources after deployment
   - Fixed pod wait labels: `app.kubernetes.io/name=grafana-operator` for operator, `app=grafana` for Grafana instance
   - Improved visibility of Grafana Operator managed resources
 - **APM Deployment Script Refactoring**:
-  - Updated `scripts/04-deploy-apm.sh` to use Grafana Operator datasources
+  - Updated `scripts/03-deploy-apm.sh` to use Grafana Operator datasources
   - Created GrafanaDatasource CRs for APM stack: `datasource-tempo.yaml`, `datasource-loki.yaml`, `datasource-pyroscope.yaml`
   - Removed dependency on legacy `k8s/grafana/` folder
   - APM datasources now managed declaratively via Grafana Operator CRs
   - Deleted empty `k8s/grafana/` folder
 - **Namespace Management**:
   - Removed `monitoring` namespace from `k8s/namespaces.yaml`
-  - `monitoring` namespace is now created by `scripts/03-deploy-monitoring.sh` only
+  - `monitoring` namespace is now created by `scripts/02-deploy-monitoring.sh` only
   - Eliminates duplicate namespace creation and kubectl warnings
 - **DevContainer Configuration**:
   - Added Go 1.23 feature to `.devcontainer/devcontainer.json`
@@ -1134,7 +1409,7 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
   - Build 2 k6 images: `ghcr.io/duynhne/k6:legacy` and `ghcr.io/duynhne/k6:scenarios`
   - Created Helm values: `charts/values/k6-legacy.yaml` and `charts/values/k6-scenarios.yaml`
   - Updated Helm templates: conditional service creation and probes (`.enabled | default true`)
-  - New deployment script: `scripts/07-deploy-k6.sh` (replaces `06-deploy-k6-testing.sh`)
+  - New deployment script: `scripts/06-deploy-k6.sh` (replaces `06-deploy-k6-testing.sh`)
   - K6 now deploys to dedicated `k6` namespace (separated from `monitoring`)
   - Deleted old raw YAML deployments and ConfigMap-based approach
   - Created separate GitHub Actions workflow `.github/workflows/build-k6-images.yml` for k6 builds
@@ -1146,7 +1421,7 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
   - Sloth dashboards already deployed via Grafana Operator (IDs 14348, 14643)
   - Clean architecture: `k8s/sloth/{values.yaml, crds/, README.md}`
   - Deleted `scripts/08a-validate-slo.sh`, `scripts/08b-generate-slo-rules.sh`
-  - New simple `scripts/08-deploy-slo.sh` wrapper script (Helm-based)
+  - New simple `scripts/07-deploy-slo.sh` wrapper script (Helm-based)
   - Removed manual rule_files from Prometheus ConfigMap
   - `slo/definitions/` kept as source of truth (backup reference)
   - No more `slo/generated/` folder - Sloth Operator handles rule generation
@@ -1169,7 +1444,7 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
     - Affected files: `grafana-dashboard-main.yaml`, `grafana-dashboard-slo-overview.yaml`, `grafana-dashboard-slo-detailed.yaml`
   - For local development, port-forwarding is used: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`
 - **Monitoring Deployment Script**:
-  - Fixed typo in `scripts/03-deploy-monitoring.sh` line 2: `Aset -euo pipefail` → `set -euo pipefail`
+  - Fixed typo in `scripts/02-deploy-monitoring.sh` line 2: `Aset -euo pipefail` → `set -euo pipefail`
   - This typo was causing the script to fail immediately with "command not found" error
 
 ## [0.4.0] - 2025-12-03
@@ -1191,12 +1466,12 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
 - **Grafana Operator Migration**:
   - Added `k8s/grafana-operator/` with Helm values, Grafana CR, Prometheus datasource CR, and dashboard manifests
   - Provisioned Sloth SLO dashboards (IDs 14643 & 14348) via `GrafanaDashboard` CRs—no more manual import
-  - Updated scripts/03-deploy-monitoring.sh to install the operator and apply CRs automatically
-  - Deprecated legacy `k8s/grafana/` manifests and switched scripts/10-reload-dashboard.sh to reapply operator resources
+  - Updated scripts/02-deploy-monitoring.sh to install the operator and apply CRs automatically
+  - Deprecated legacy `k8s/grafana/` manifests and switched scripts/09-reload-dashboard.sh to reapply operator resources
   - Updated documentation (`docs/slo/GETTING_STARTED.md`, `README.md`, `AGENTS.md`) to describe the operator-based workflow
 - **Metrics Infrastructure via Helm**:
   - `scripts/02-install-metrics.sh` now installs kube-state-metrics and metrics-server via their Helm charts with versioned values in `k8s/metrics/`
-  - `scripts/03-deploy-monitoring.sh` ensures the `monitoring` namespace exists before applying Prometheus and Grafana Operator resources
+  - `scripts/02-deploy-monitoring.sh` ensures the `monitoring` namespace exists before applying Prometheus and Grafana Operator resources
   - `docs/getting-started/SETUP.md` updated to reflect the Helm-based workflow
 - **Helm & Documentation Fixes**:
   - Updated the Helm release workflow summary to instruct `helm install auth ...` (matching the new service naming convention)
@@ -1367,6 +1642,6 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
 
 3. **Or use the deployment script**:
    ```bash
-   ./scripts/06-deploy-microservices.sh --local
+   ./scripts/05-deploy-microservices.sh --local
    ```
 

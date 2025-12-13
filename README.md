@@ -58,7 +58,8 @@
 
 ### Monitoring Stack
 - **Prometheus Operator** - Kubernetes-native Prometheus management via CRDs
-- **kube-prometheus-stack** - Full monitoring stack with Prometheus, Operator, and integrations
+- **kube-prometheus-stack** - Full monitoring stack (Prometheus + kube-state-metrics)
+- **metrics-server** - Resource metrics API (for kubectl top and HPA)
 - **Grafana Operator** - Kubernetes-native Grafana management
 - **ServiceMonitor** - Automatic service discovery (namespace-based, scales to 1000+ pods)
 - **k6** - Load testing & performance validation
@@ -78,26 +79,25 @@ git clone <repo-url>
 cd project-monitoring-golang
 chmod +x scripts/*.sh
 
-# Infrastructure & Monitoring (Steps 1-3)
+# Infrastructure & Monitoring (Steps 1-2)
 ./scripts/01-create-kind-cluster.sh      # Create Kind cluster
-./scripts/02-install-metrics.sh          # Install metrics infrastructure
-./scripts/03-deploy-monitoring.sh        # Deploy Prometheus Operator + Grafana Operator (BEFORE apps)
+./scripts/02-deploy-monitoring.sh        # Deploy Prometheus + Grafana + kube-state-metrics + metrics-server (BEFORE apps)
 
 # APM Stack (Step 4) - Required for full observability (BEFORE apps to collect traces/logs/profiles)
-./scripts/04-deploy-apm.sh               # Deploy all APM components (Tempo, Pyroscope, Loki, Vector)
+./scripts/03-deploy-apm.sh               # Deploy all APM components (Tempo, Pyroscope, Loki, Vector)
 
 # Build & Deploy Applications (Steps 5-6)
-./scripts/05-build-microservices.sh      # Build Docker images on Local
-./scripts/06-deploy-microservices.sh     # Deploy microservices on Local and Registry
+./scripts/04-build-microservices.sh      # Build Docker images on Local
+./scripts/05-deploy-microservices.sh     # Deploy microservices on Local and Registry
 
 # Load Testing (Step 7)
-./scripts/07-deploy-k6.sh                # Deploy K6 load generators via Helm (AFTER apps to test them)
+./scripts/06-deploy-k6.sh                # Deploy K6 load generators via Helm (AFTER apps to test them)
 
 # SLO System (Step 8) - Required for SRE practices
-./scripts/08-deploy-slo.sh               # Deploy Sloth Operator and SLO CRDs
+./scripts/07-deploy-slo.sh               # Deploy Sloth Operator and SLO CRDs
 
 # Access Setup (Step 9)
-./scripts/09-setup-access.sh             # Setup port forwarding
+./scripts/08-setup-access.sh             # Setup port forwarding
 ```
 
 ### Deployment Options
@@ -105,32 +105,32 @@ chmod +x scripts/*.sh
 **K6 Deployment Options:**
 ```bash
 # Deploy both load tests (recommended)
-./scripts/07-deploy-k6.sh both
+./scripts/06-deploy-k6.sh both
 
 # Deploy only legacy test
-./scripts/07-deploy-k6.sh legacy
+./scripts/06-deploy-k6.sh legacy
 
 # Deploy only multiple scenarios test
-./scripts/07-deploy-k6.sh scenarios
+./scripts/06-deploy-k6.sh scenarios
 ```
 📖 [Full K6 Documentation](./docs/k6/K6_LOAD_TESTING.md)
 
 **SLO Deployment (Sloth Operator):**
 ```bash
 # One-command deployment via Helm
-./scripts/08-deploy-slo.sh
+./scripts/07-deploy-slo.sh
 ```
 📖 [Full SLO Documentation](./docs/slo/README.md)
 
 **APM Deployment Options:**
 ```bash
 # One-command (recommended) - Deploys all APM components
-./scripts/04-deploy-apm.sh
+./scripts/03-deploy-apm.sh
 
 # Individual deployments (if you need specific components)
-./scripts/04a-deploy-tempo.sh      # Deploy Grafana Tempo (distributed tracing)
-./scripts/04b-deploy-pyroscope.sh  # Deploy Pyroscope (continuous profiling)
-./scripts/04c-deploy-loki.sh       # Deploy Loki + Vector (log aggregation)
+./scripts/03a-deploy-tempo.sh      # Deploy Grafana Tempo (distributed tracing)
+./scripts/03b-deploy-pyroscope.sh  # Deploy Pyroscope (continuous profiling)
+./scripts/03c-deploy-loki.sh       # Deploy Loki + Vector (log aggregation)
 ```
 
 **What APM provides:**
@@ -145,34 +145,34 @@ chmod +x scripts/*.sh
 
 **Reload Dashboard (Step 8):**
 ```bash
-./scripts/10-reload-dashboard.sh  # Reload Grafana dashboard after updates
+./scripts/09-reload-dashboard.sh  # Reload Grafana dashboard after updates
 ```
 
 **Runbooks (Steps 12-13):**
 ```bash
-./scripts/11-diagnose-latency.sh      # Diagnose latency issues
-./scripts/12-error-budget-alert.sh    # Error budget alert response
+./scripts/10-diagnose-latency.sh      # Diagnose latency issues
+./scripts/11-error-budget-alert.sh    # Error budget alert response
 ```
 
 ### Script Options
 
 **Build Options:**
 ```bash
-./scripts/05-build-microservices.sh [--no-cache|--force]
+./scripts/04-build-microservices.sh [--no-cache|--force]
 ```
 
 **Deploy Options (Helm):**
 ```bash
 # Deploy using local Helm chart (default)
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 
 # Deploy from OCI registry
-./scripts/06-deploy-microservices.sh --registry
+./scripts/05-deploy-microservices.sh --registry
 ```
 
 **k6 Options:**
 ```bash
-./scripts/07-deploy-k6.sh [both|legacy|scenarios]
+./scripts/06-deploy-k6.sh [both|legacy|scenarios]
 ```
 
 ### Access Services
@@ -354,7 +354,7 @@ kubectl logs -n monitoring -l app=k6-load-generator-scenarios -f
 for i in {1..100}; do curl http://localhost:8080/api/users & done
 
 # Or deploy k6 load generators
-./scripts/07-deploy-k6.sh
+./scripts/06-deploy-k6.sh
 ```
 
 ---
@@ -503,7 +503,7 @@ This project includes comprehensive SRE practices with **Service Level Objective
 
 **🚀 One-Command Deployment:**
 ```bash
-./scripts/08-deploy-slo.sh
+./scripts/07-deploy-slo.sh
 ```
 
 **📖 Full Documentation:** [SLO Documentation](./docs/slo/README.md)
@@ -553,7 +553,7 @@ MyMetric.WithLabelValues("value").Inc()
 ### Modify Dashboard
 
 - Edit `grafana-dashboard.json`
-- Reapply dashboards via operator: `./scripts/10-reload-dashboard.sh`
+- Reapply dashboards via operator: `./scripts/09-reload-dashboard.sh`
 - Port-forward Grafana: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`
 
 ---
@@ -578,8 +578,8 @@ kind delete cluster --name monitoring-local
 ```bash
 # This happens when you skip Step 3 (build microservices)
 # Solution: Always run Step 3 before Step 4
-./scripts/05-build-microservices.sh
-./scripts/06-deploy-microservices.sh
+./scripts/04-build-microservices.sh
+./scripts/05-deploy-microservices.sh
 
 # Or manually for specific service
 docker build --build-arg SERVICE_NAME=auth -f services/Dockerfile -t ghcr.io/duynhne/auth:v5 services/
@@ -632,7 +632,7 @@ A: Yes! This is a production-ready template. Add:
 A: Add handlers in `handlers/` directory. Metrics are auto-collected via middleware.
 
 **Q: Dashboard shows no data?**
-A: Generate traffic first! Deploy k6 load generators with `./scripts/07-deploy-k6.sh` or generate traffic manually.
+A: Generate traffic first! Deploy k6 load generators with `./scripts/06-deploy-k6.sh` or generate traffic manually.
 
 **Q: What's Apdex Score?**
 A: Application Performance Index. 0-1 scale measuring user satisfaction based on response times.

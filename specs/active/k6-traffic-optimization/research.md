@@ -482,10 +482,10 @@ kind load docker-image ghcr.io/duynhne/k6:scenarios --name monitoring-local
 
 # 2. Rebuild all microservices (middleware changed)
 cd ..
-./scripts/05-build-microservices.sh
+./scripts/04-build-microservices.sh
 
 # 3. Redeploy microservices
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 
 # 4. Redeploy k6
 kubectl delete deployment k6-scenarios -n k6

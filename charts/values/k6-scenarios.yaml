@@ -1,12 +1,10 @@
 # Values for k6-scenarios
 name: k6-scenarios
-namespace: k6
 
 replicaCount: 1
 
 image:
-  repository: ghcr.io/duynhne
-  name: k6
+  repository: ghcr.io/duynhne/k6
   tag: scenarios
   pullPolicy: IfNotPresent
 

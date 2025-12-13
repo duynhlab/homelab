@@ -40,7 +40,7 @@ k8s/sloth/
 
 ```bash
 # Using deployment script (recommended)
-./scripts/08-deploy-slo.sh
+./scripts/07-deploy-slo.sh
 
 # Or manually
 helm repo add sloth https://slok.github.io/sloth

@@ -157,6 +157,24 @@ helm version --short
 - Automatic scrape config generation
 - Multi-namespace monitoring
 
+#### metrics-server
+
+**Version**: Latest (from metrics-server Helm repo)
+**Namespace**: kube-system
+**Purpose**: Resource metrics API (CPU/memory usage)
+
+**Configuration**: `k8s/metrics/metrics-server-values.yaml`
+
+**Key Features**:
+- kubectl top nodes/pods support
+- Horizontal Pod Autoscaler (HPA) data source
+- Kind-specific configuration (`--kubelet-insecure-tls`)
+- 15-second metric resolution
+
+**Resources**:
+- Requests: 50m CPU, 64Mi memory
+- Limits: 100m CPU, 128Mi memory
+
 #### Grafana Operator
 
 **Chart**: `grafana/grafana-operator`
@@ -396,6 +414,9 @@ kube-prometheus-stack v80.0.0
 ├── node-exporter
 ├── kube-state-metrics v2.x
 └── grafana v11.x (optional, disabled in our setup)
+
+metrics-server (separate chart)
+└── metrics-server latest (deployed to kube-system)
 ```
 
 **Grafana Operator:**

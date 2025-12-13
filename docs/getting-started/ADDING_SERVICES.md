@@ -36,9 +36,9 @@ namespace: payment
 replicaCount: 2
 
 image:
-  repository: ghcr.io/duynhne
-  name: payment
+  repository: ghcr.io/duynhne/payment  # Full image path
   tag: v5
+  pullPolicy: IfNotPresent
   pullPolicy: IfNotPresent
 
 service:
@@ -95,7 +95,12 @@ package main
 
 import (
     "context"
+    "net/http"
     "os"
+    "os/signal"
+    "sync"
+    "syscall"
+    "time"
 
     "github.com/gin-gonic/gin"
     "github.com/prometheus/client_golang/prometheus/promhttp"
@@ -103,57 +108,142 @@ import (
 
     v1 "github.com/duynhne/monitoring/internal/payment/web/v1"
     v2 "github.com/duynhne/monitoring/internal/payment/web/v2"
+    "github.com/duynhne/monitoring/pkg/config"
     "github.com/duynhne/monitoring/pkg/middleware"
 )
 
 func main() {
+    // Load configuration from environment variables (with .env file support for local dev)
+    cfg := config.Load()
+    if err := cfg.Validate(); err != nil {
+        panic("Configuration validation failed: " + err.Error())
+    }
+
     // Initialize structured logger
-    logger, _ := middleware.NewLogger()
+    logger, err := middleware.NewLogger()
+    if err != nil {
+        panic("Failed to initialize logger: " + err.Error())
+    }
     defer logger.Sync()
 
-    // Initialize OpenTelemetry tracing
-    tp, _ := middleware.InitTracing()
-    if tp != nil {
-        defer tp.Shutdown(context.Background())
+    logger.Info("Service starting",
+        zap.String("service", cfg.Service.Name),
+        zap.String("version", cfg.Service.Version),
+        zap.String("env", cfg.Service.Env),
+        zap.String("port", cfg.Service.Port),
+    )
+
+    // Initialize OpenTelemetry tracing with centralized config
+    var tp interface{ Shutdown(context.Context) error }
+    if cfg.Tracing.Enabled {
+        tp, err = middleware.InitTracing(cfg)
+        if err != nil {
+            logger.Warn("Failed to initialize tracing", zap.Error(err))
+        } else {
+            logger.Info("Tracing initialized",
+                zap.String("endpoint", cfg.Tracing.Endpoint),
+                zap.Float64("sample_rate", cfg.Tracing.SampleRate),
+            )
+        }
     }
 
     // Initialize Pyroscope profiling
-    middleware.InitProfiling()
-    defer middleware.StopProfiling()
+    if cfg.Profiling.Enabled {
+        if err := middleware.InitProfiling(); err != nil {
+            logger.Warn("Failed to initialize profiling", zap.Error(err))
+        } else {
+            logger.Info("Profiling initialized",
+                zap.String("endpoint", cfg.Profiling.Endpoint),
+            )
+            defer middleware.StopProfiling()
+        }
+    }
 
     r := gin.Default()
 
-    // Middleware chain
-    r.Use(middleware.TracingMiddleware())
-    r.Use(middleware.LoggingMiddleware(logger))
-    r.Use(middleware.PrometheusMiddleware())
+    // Middleware chain (order matters!)
+    r.Use(middleware.TracingMiddleware())    // First: context propagation
+    r.Use(middleware.LoggingMiddleware(logger)) // Second: logging with trace-id
+    r.Use(middleware.PrometheusMiddleware())  // Third: metrics collection
 
+    // Health check
     r.GET("/health", func(c *gin.Context) {
         c.JSON(200, gin.H{"status": "ok"})
     })
+
+    // Metrics endpoint
     r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
     // API v1
     apiV1 := r.Group("/api/v1")
     {
         // Add your v1 routes here
-        // apiV1.POST("/payment", v1.ProcessPayment)
+        apiV1.POST("/payment", v1.ProcessPayment)
+        apiV1.GET("/payment/:id", v1.GetPayment)
     }
 
     // API v2
     apiV2 := r.Group("/api/v2")
     {
         // Add your v2 routes here
-        // apiV2.POST("/payment", v2.ProcessPayment)
+        apiV2.POST("/payment", v2.ProcessPayment)
+        apiV2.GET("/payment/:id", v2.GetPaymentStatus)
     }
 
-    port := os.Getenv("PORT")
-    if port == "" {
-        port = "8080"
+    // Create HTTP server
+    srv := &http.Server{
+        Addr:    ":" + cfg.Service.Port,
+        Handler: r,
     }
 
-    logger.Info("Starting payment service", zap.String("port", port))
-    r.Run(":" + port)
+    // Start server in a goroutine
+    go func() {
+        logger.Info("Starting payment service", zap.String("port", cfg.Service.Port))
+        if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+            logger.Fatal("Failed to start server", zap.Error(err))
+        }
+    }()
+
+    // Graceful shutdown
+    quit := make(chan os.Signal, 1)
+    signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+    <-quit
+
+    logger.Info("Shutting down server...")
+
+    // Shutdown context with timeout
+    shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+
+    // Parallel shutdown with WaitGroup
+    var wg sync.WaitGroup
+
+    // Shutdown tracing (flush pending spans)
+    if tp != nil {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            if err := tp.Shutdown(shutdownCtx); err != nil {
+                logger.Error("Error shutting down tracer", zap.Error(err))
+            } else {
+                logger.Info("Tracer shutdown complete")
+            }
+        }()
+    }
+
+    // Shutdown HTTP server
+    wg.Add(1)
+    go func() {
+        defer wg.Done()
+        if err := srv.Shutdown(shutdownCtx); err != nil {
+            logger.Error("Server forced to shutdown", zap.Error(err))
+        } else {
+            logger.Info("HTTP server shutdown complete")
+        }
+    }()
+
+    wg.Wait()
+    logger.Info("Server exited gracefully")
 }
 ```
 
@@ -161,18 +251,54 @@ func main() {
 
 ```yaml
 # charts/values/payment.yaml
-name: payment
-namespace: payment
+fullnameOverride: "payment"
+
+env:
+  - name: SERVICE_NAME
+    value: "payment"
+  - name: PORT
+    value: "8080"
+  - name: ENV
+    value: "production"
+  - name: TEMPO_ENDPOINT
+    value: "tempo.monitoring.svc.cluster.local:4318"
+  - name: OTEL_SAMPLE_RATE
+    value: "0.1"  # 10% sampling for production
+  - name: PYROSCOPE_ENDPOINT
+    value: "http://pyroscope.monitoring.svc.cluster.local:4040"
+  - name: LOG_LEVEL
+    value: "info"
+
+# Add service-specific configuration if needed
+extraEnv:
+  # Example: Payment gateway integration
+  - name: STRIPE_API_ENDPOINT
+    value: "https://api.stripe.com"
+  - name: STRIPE_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: payment-secrets
+        key: stripe-api-key
 
 image:
-  repository: ghcr.io/duynhne
-  name: payment
-  tag: v5
+  repository: ghcr.io/duynhne/payment
+  tag: "v1.0.0"
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "50m"
+  limits:
+    memory: "128Mi"
+    cpu: "100m"
 ```
+
+**Important**: See [charts/README.md](../../charts/README.md) for complete guide on `env` vs `extraEnv` usage.
 
 ### Step 3: Update Deployment Script
 
-Add the service to `scripts/06-deploy-microservices.sh`:
+Add the service to `scripts/05-deploy-microservices.sh`:
 
 ```bash
 SERVICES=(
@@ -183,7 +309,7 @@ SERVICES=(
 
 ### Step 4: Update Build Script
 
-Add the service to `scripts/05-build-microservices.sh`:
+Add the service to `scripts/04-build-microservices.sh`:
 
 ```bash
 SERVICES=(
@@ -208,10 +334,10 @@ metadata:
 
 ```bash
 # Build the new service
-./scripts/05-build-microservices.sh
+./scripts/04-build-microservices.sh
 
 # Deploy using Helm
-./scripts/06-deploy-microservices.sh --local
+./scripts/05-deploy-microservices.sh --local
 ```
 
 Or deploy manually:
@@ -227,10 +353,50 @@ helm upgrade --install payment charts/ \
 Once deployed, your service will automatically:
 
 - **Appear in Grafana dashboard** - No dashboard changes needed
-- **Show in app dropdown** - Service name appears in filter
+- **Show in app dropdown** - Service name appears in filter (via `$app` variable)
 - **Display metrics** - All 32 panels show data for your service
-- **Support filtering** - Filter by service, namespace, version
+- **Support filtering** - Filter by service (`$app`), namespace (`$namespace`), rate interval (`$rate`)
 - **Scale monitoring** - Works with any number of replicas
+- **APM Integration** - Distributed tracing (Tempo), profiling (Pyroscope), logging (Loki)
+
+## Configuration Management
+
+Your new service automatically benefits from centralized configuration:
+
+### Local Development (.env file)
+
+```bash
+# Create .env file in services/ directory
+cat > services/.env <<EOF
+SERVICE_NAME=payment
+PORT=8080
+ENV=development
+OTEL_SAMPLE_RATE=1.0  # 100% sampling for dev
+LOG_LEVEL=debug
+LOG_FORMAT=console
+
+# Service-specific config
+STRIPE_API_ENDPOINT=https://api.stripe.com/test
+EOF
+
+# Run service
+go run services/cmd/payment/main.go
+```
+
+### Production (Helm Values)
+
+Configuration is loaded from Helm values → Kubernetes environment → `config.Load()`:
+
+```yaml
+env:
+  - name: SERVICE_NAME
+    value: "payment"
+  - name: ENV
+    value: "production"
+  # ... see charts/values/payment.yaml for full config
+```
+
+**See**: [docs/development/CONFIG_GUIDE.md](../development/CONFIG_GUIDE.md) for complete configuration guide.
 
 ## Dashboard Features
 

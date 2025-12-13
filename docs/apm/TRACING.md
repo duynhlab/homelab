@@ -134,17 +134,22 @@ All tracing configuration is managed via Helm chart values (`charts/values/*.yam
 
 ```yaml
 # charts/values/auth.yaml
-tracing:
-  enabled: true
-  endpoint: "tempo.monitoring.svc.cluster.local:4318"
-  sampleRate: "0.1"  # 10% sampling (0.0-1.0)
+env:
+  - name: SERVICE_NAME
+    value: "auth"
+  - name: TEMPO_ENDPOINT
+    value: "tempo.monitoring.svc.cluster.local:4318"
+  - name: OTEL_SAMPLE_RATE
+    value: "0.1"  # 10% sampling (0.0-1.0)
+  - name: TRACING_ENABLED
+    value: "true"
 ```
 
 **Deploy with custom sampling:**
 ```bash
 helm upgrade --install auth charts/ \
   -f charts/values/auth.yaml \
-  --set tracing.sampleRate=0.5 \
+  --set env[4].value="0.5" \
   -n auth
 ```
 

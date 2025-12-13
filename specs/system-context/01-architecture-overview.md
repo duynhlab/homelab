@@ -84,7 +84,7 @@ flowchart TB
 - Communication: HTTP/JSON
 
 **Layer 2: Observability Layer (6 Components)**
-- **Metrics**: Prometheus Operator + Grafana
+- **Metrics**: Prometheus Operator + Grafana + kube-state-metrics + metrics-server
 - **Tracing**: Tempo with OpenTelemetry
 - **Logging**: Loki + Vector
 - **Profiling**: Pyroscope
@@ -128,6 +128,10 @@ flowchart TD
 
         subgraph "kube-system Namespace"
             Vector[Vector DaemonSet]
+            MetricsServer[metrics-server]
+        end
+
+        subgraph "Monitoring Namespace (Metrics)"
             KubeStateMetrics[kube-state-metrics]
         end
 
@@ -261,7 +265,6 @@ monitoring/
 │   └── kind/              # Kind cluster config
 ├── scripts/               # Deployment automation (01-12)
 │   ├── 01-create-kind-cluster.sh
-│   ├── 02-install-metrics.sh
 │   ├── 03-deploy-monitoring.sh
 │   ├── 04-deploy-apm.sh
 │   ├── 05-build-microservices.sh
@@ -318,8 +321,8 @@ services/
 | Namespace | Purpose | Components | Pods | Labels |
 |-----------|---------|------------|------|--------|
 | **default** | Kubernetes default | - | 0 | - |
-| **kube-system** | System components | Vector DaemonSet, kube-state-metrics | ~10 | `monitoring=enabled` |
-| **monitoring** | Observability stack | Prometheus, Grafana, Tempo, Loki, Pyroscope, Sloth | ~15 | `monitoring=enabled` |
+| **kube-system** | System components | Vector DaemonSet, metrics-server | ~10 | `monitoring=enabled` |
+| **monitoring** | Observability stack | Prometheus, Grafana, Tempo, Loki, Pyroscope, Sloth, kube-state-metrics | ~15 | `monitoring=enabled` |
 | **auth** | Auth service | auth-deployment (2 replicas) | 2 | `monitoring=enabled`, `app=auth` |
 | **user** | User service | user-deployment (2 replicas) | 2 | `monitoring=enabled`, `app=user` |
 | **product** | Product service | product-deployment (2 replicas) | 2 | `monitoring=enabled`, `app=product` |
@@ -521,7 +524,7 @@ flowchart LR
 - **Generic Chart**: `charts/Chart.yaml` (v0.2.0)
 - **Per-Service Values**: `charts/values/*.yaml` (9 files)
 - **extraEnv Pattern**: Flexible environment variable injection
-- **Unified Deployment**: `./scripts/06-deploy-microservices.sh` deploys all services
+- **Unified Deployment**: `./scripts/05-deploy-microservices.sh` deploys all services
 
 ### Decision 7: Observability-First Middleware
 
@@ -559,38 +562,37 @@ flowchart LR
 **Phase 1: Infrastructure (Steps 1-2)**
 ```bash
 ./scripts/01-create-kind-cluster.sh      # Create Kind Kubernetes cluster
-./scripts/02-install-metrics.sh          # Install kube-state-metrics
 ```
 
 **Phase 2: Monitoring Stack (Step 3)**
 ```bash
-./scripts/03-deploy-monitoring.sh        # Deploy Prometheus + Grafana Operators (BEFORE apps)
+./scripts/02-deploy-monitoring.sh        # Deploy Prometheus + Grafana Operators (BEFORE apps)
 ```
 
 **Phase 3: APM Stack (Step 4)**
 ```bash
-./scripts/04-deploy-apm.sh               # Deploy Tempo, Pyroscope, Loki, Vector (BEFORE apps)
+./scripts/03-deploy-apm.sh               # Deploy Tempo, Pyroscope, Loki, Vector (BEFORE apps)
 ```
 
 **Phase 4: Build & Deploy Applications (Steps 5-6)**
 ```bash
-./scripts/05-build-microservices.sh      # Build Docker images (9 services + k6)
-./scripts/06-deploy-microservices.sh     # Deploy all 9 microservices via Helm
+./scripts/04-build-microservices.sh      # Build Docker images (9 services + k6)
+./scripts/05-deploy-microservices.sh     # Deploy all 9 microservices via Helm
 ```
 
 **Phase 5: Load Testing (Step 7)**
 ```bash
-./scripts/07-deploy-k6.sh                # Deploy k6 load generators (AFTER apps)
+./scripts/06-deploy-k6.sh                # Deploy k6 load generators (AFTER apps)
 ```
 
 **Phase 6: SLO System (Step 8)**
 ```bash
-./scripts/08-deploy-slo.sh               # Deploy Sloth Operator + SLO CRDs
+./scripts/07-deploy-slo.sh               # Deploy Sloth Operator + SLO CRDs
 ```
 
 **Phase 7: Access Setup (Step 9)**
 ```bash
-./scripts/09-setup-access.sh             # Setup port-forwarding for Grafana/Prometheus
+./scripts/08-setup-access.sh             # Setup port-forwarding for Grafana/Prometheus
 ```
 
 **Important Notes:**

@@ -6,15 +6,15 @@ echo "Deploying all APM components..."
 
 # Deploy Tempo
 echo "Deploying Tempo..."
-./scripts/04a-deploy-tempo.sh
+./scripts/03a-deploy-tempo.sh
 
 # Deploy Pyroscope
 echo "Deploying Pyroscope..."
-./scripts/04b-deploy-pyroscope.sh
+./scripts/03b-deploy-pyroscope.sh
 
 # Deploy Loki and Vector
 echo "Deploying Loki and Vector..."
-./scripts/04c-deploy-loki.sh
+./scripts/03c-deploy-loki.sh
 
 # Apply APM datasources to Grafana Operator
 echo "Applying APM datasources to Grafana Operator..."

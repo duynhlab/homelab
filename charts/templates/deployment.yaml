@@ -49,16 +49,10 @@ spec:
           {{- if .Values.args }}
           args: {{- toYaml .Values.args | nindent 12 }}
           {{- end }}
-          {{- if or .Values.env .Values.extraEnv .Values.tracing.enabled }}
+          {{- if or .Values.env .Values.extraEnv }}
           env:
           {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- if .Values.tracing.enabled }}
-            - name: TEMPO_ENDPOINT
-              value: {{ .Values.tracing.endpoint | quote }}
-            - name: OTEL_SAMPLE_RATE
-              value: {{ .Values.tracing.sampleRate | quote }}
           {{- end }}
           {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}

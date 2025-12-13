@@ -1,24 +1,15 @@
 #!/bin/bash
 set -e
 
-echo "=== Reloading Grafana Dashboards (Operator Managed) ==="
+echo "🔄 Reloading Grafana Dashboards..."
 
-echo "1. Re-applying dashboard ConfigMap + GrafanaDashboard CRs..."
+# Delete and recreate to force update
+kubectl delete configmap grafana-dashboard-main grafana-dashboard-tempo -n monitoring --ignore-not-found
+kubectl delete grafanadashboard microservices-monitoring -n monitoring --ignore-not-found
 kubectl apply -k k8s/grafana-operator/dashboards/
-
-echo "2. Triggering dashboard reconciliation..."
-kubectl annotate grafanadashboard \
-  -n monitoring \
-  --overwrite \
-  --all \
-  reload-time=$(date +%s)
-
-echo ""
-echo "✓ Dashboards will be reconciled by the Grafana Operator."
-echo "Check status:"
-echo "  kubectl get grafanadashboards -n monitoring"
-echo ""
-echo "Access Grafana (operator managed):"
-echo "  kubectl port-forward -n monitoring svc/grafana-service 3000:3000"
-echo "  http://localhost:3000"
+kubectl rollout restart deployment/grafana-deployment -n monitoring
+# Wait for reconciliation
+sleep 5
+echo "✅ Dashboard reloaded. Wait 30s for Grafana Operator to sync."
+echo "   Access: http://localhost:3000 (clear cache if needed)"
 

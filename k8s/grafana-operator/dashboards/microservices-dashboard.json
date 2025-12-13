@@ -553,13 +553,13 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", le=\"0.5\"}[$rate])) + (sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", le=\"2\"}[$rate])) - sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", le=\"0.5\"}[$rate]))) / 2) / sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[$rate]))",
+          "expr": "(sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", le=\"0.5\"}[$rate])) + 0.5 * (sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", le=\"2\"}[$rate])) - sum(rate(request_duration_seconds_bucket{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", le=\"0.5\"}[$rate])))) / (sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[$rate])) > 0 or vector(1))",
           "refId": "A"
         }
       ],
       "title": "Apdex Score",
       "type": "stat",
-      "description": "User satisfaction score (0-1). Based on response time thresholds."
+      "description": "User satisfaction score (0-1). Satisfying: <0.5s, Tolerating: 0.5-2s, Frustrated: >2s. Formula: (satisfying + 0.5 * tolerating) / total requests. Handles zero traffic gracefully."
     },
     {
       "datasource": {
@@ -797,14 +797,14 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}) by (code)",
+          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\"}[$rate])) by (code)",
           "legendFormat": "REST.{{code}}",
           "refId": "A"
         }
       ],
       "title": "Status Code Distribution",
       "type": "piechart",
-      "description": "HTTP status code breakdown since pod start. Expected: ~95% codes 2xx."
+      "description": "HTTP status code distribution by rate (req/sec). Shows real-time traffic breakdown by response code. Expected: ~95% codes 2xx."
     },
     {
       "datasource": {
@@ -1237,6 +1237,194 @@
       "fieldConfig": {
         "defaults": {
           "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "orange",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 52
+      },
+      "id": 201,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "last",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", code=~\"4..\"}[$rate])) by (app)",
+          "legendFormat": "{{app}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Client Errors (4xx)",
+      "type": "timeseries",
+      "description": "Client-side errors (400-499) in req/sec by service. High 4xx rates indicate API misuse, invalid requests, authentication issues, or bad client behavior. Common codes: 400 (Bad Request), 401 (Unauthorized), 403 (Forbidden), 404 (Not Found), 429 (Rate Limited)."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.5
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 52
+      },
+      "id": 202,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "last",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "sum(rate(request_duration_seconds_count{app=~\"$app\", namespace=~\"$namespace\", job=~\"microservices\", code=~\"5..\"}[$rate])) by (app)",
+          "legendFormat": "{{app}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Server Errors (5xx)",
+      "type": "timeseries",
+      "description": "Server-side errors (500-599) in req/sec by service. High 5xx rates indicate service degradation, bugs, infrastructure issues, or dependency failures. Common codes: 500 (Internal Server Error), 502 (Bad Gateway), 503 (Service Unavailable), 504 (Gateway Timeout). Requires immediate investigation."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
             "mode": "palette-classic"
           },
           "custom": {
@@ -1284,7 +1472,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 52
+        "y": 60
       },
       "id": 13,
       "options": {
@@ -1369,7 +1557,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 52
+        "y": 60
       },
       "id": 14,
       "options": {
@@ -1454,7 +1642,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 60
+        "y": 68
       },
       "id": 15,
       "options": {
@@ -1494,7 +1682,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 68
+        "y": 76
       },
       "id": 103,
       "panels": [],
@@ -1556,7 +1744,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 69
+        "y": 77
       },
       "id": 31,
       "options": {
@@ -1641,7 +1829,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 69
+        "y": 77
       },
       "id": 32,
       "options": {
@@ -2026,7 +2214,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 93
+        "y": 101
       },
       "id": 104,
       "panels": [],
@@ -2088,7 +2276,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 94
+        "y": 102
       },
       "id": 16,
       "options": {
@@ -2173,7 +2361,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 94
+        "y": 102
       },
       "id": 17,
       "options": {
@@ -2258,7 +2446,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 102
+        "y": 110
       },
       "id": 18,
       "options": {
@@ -2347,7 +2535,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 102
+        "y": 110
       },
       "id": 19,
       "options": {
@@ -2432,7 +2620,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 110
+        "y": 118
       },
       "id": 22,
       "options": {

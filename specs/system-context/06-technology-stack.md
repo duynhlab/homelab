@@ -16,7 +16,7 @@
 
 ## Programming Languages & Frameworks
 
-### Go 1.23.0
+### Go 1.25
 
 **Primary language** for all 9 microservices
 
@@ -451,7 +451,7 @@ sloth v0.15.0
 
 ## Upgrade Notes
 
-### Go 1.23.0 → 1.24.x
+### Go 1.25 (Current)
 
 **Safe**: Minor version upgrades usually backward compatible
 **Steps**:

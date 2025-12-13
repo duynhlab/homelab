@@ -44,7 +44,7 @@ A **production-ready microservices monitoring platform** built with Go, Kubernet
 ### Technology Stack Overview
 
 **Core Technologies:**
-- **Language**: Go 1.23.0
+- **Language**: Go 1.25
 - **Framework**: Gin (HTTP), Zap (logging), OpenTelemetry (tracing)
 - **Platform**: Kubernetes (Kind for local), Helm 3, Docker
 

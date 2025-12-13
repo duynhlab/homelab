@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.7.2] - 2025-12-13
+
+### Fixed
+
+**Helm Chart Deployment Names:**
+- Fixed pod names showing generic `microservice-xxx` instead of service-specific names
+- **Root Cause**: Template helpers used `.Values.name` but values files used `fullnameOverride`
+- **Solution**: Reverted all 9 microservice values files from `fullnameOverride` to `name` field
+- Removed redundant `namespace` field (Helm already passes via `-n` flag)
+- **Files Changed**: 10 values files (9 services + k6-scenarios)
+  ```yaml
+  # Fixed format
+  name: auth  # (was: fullnameOverride: "auth")
+  # namespace field removed (redundant)
+  ```
+
+**Documentation:**
+- Fixed README.md Mermaid diagram syntax error (curly braces in node labels)
+- Updated Go version references from 1.23 to 1.25 across documentation
+  - README.md Technology Stack
+  - specs/system-context/06-technology-stack.md
+  - specs/system-context/README.md
+  - specs/system-context/08-development-workflow.md
+
 ## [0.7.1] - 2025-12-12
 
 ### Fixed

@@ -372,10 +372,10 @@ k8s/sloth/
 **Dashboard Details:**
 - **UID**: `microservices-monitoring-001`
 - **Title**: "Microservices Monitoring & Performance Applications"
-- **Structure**: 32 panels organized in 5 row groups:
+- **Structure**: 34 panels organized in 5 row groups:
   1. **📊 Overview & Key Metrics** (12 panels) - Response time percentiles (P50, P95, P99), Total RPS, Success RPS (2xx), Error RPS (4xx/5xx), Success Rate %, Error Rate %, Apdex Score, Total Requests, Up Instances, Restarts
-  2. **🚀 Traffic & Requests** (4 panels) - Status code distribution (pie chart), Total requests by endpoint (pie chart), Request rate by endpoint (time series), RPS by endpoint
-  3. **⚠️ Errors & Performance** (5 panels) - Request rate by HTTP method + endpoint, Error rate by HTTP method + endpoint, Response time per endpoint (P95, P50, P99)
+  2. **🚀 Traffic & Requests** (4 panels) - Status code distribution (pie chart) ⚠️ UPDATED, Total requests by endpoint (pie chart), Request rate by endpoint (time series), RPS by endpoint
+  3. **⚠️ Errors & Performance** (8 panels) - Request rate by HTTP method + endpoint, Error rate by HTTP method + endpoint, **Client Errors (4xx)** ✨ NEW, **Server Errors (5xx)** ✨ NEW, Response time per endpoint (P95, P50, P99)
   4. **🔧 Go Runtime & Memory** (6 panels) - Heap allocated memory, Heap in-use memory, Process memory (RSS), Goroutines & threads, GC duration, GC frequency (memory leak detection)
   5. **🖥️ Resources & Infrastructure** (5 panels) - Total memory per service, Total CPU per service, Total network traffic per service, Total requests in flight per service, Total memory allocations per service
 - **Variables** (CORRECT ORDER - v0.6.15+):
@@ -389,6 +389,11 @@ k8s/sloth/
     - Options: auth, user, product, cart, order, review, notification, shipping with "All" option
     - **Cascades from $namespace** (filters by selected namespace)
   - `$rate` - Rate interval selector (1m, 2m, 3m, 5m, 10m, 30m, 1h, 2h, 4h, 8h, 16h, 1d, 2d, 3d, 5d, 7d) - default: 5m (position 4)
+- **Dashboard Updates (v0.7.3)**:
+  - ✨ **NEW Panels**: Client Errors (4xx) and Server Errors (5xx) for better error categorization
+  - ⚠️ **UPDATED Panel**: Status Code Distribution now uses `rate()` instead of cumulative counter (real-time traffic distribution)
+  - ⚠️ **UPDATED Panel**: Apdex Score with defensive division to prevent NaN on zero traffic
+  - 📚 **NEW Documentation**: Complete [Dashboard Panels Guide](docs/development/DASHBOARD_PANELS_GUIDE.md) with query analysis, troubleshooting, and SRE best practices for all 34 panels
 - **Variable Cascading**:
   - `$namespace` filters `$app` via query: `{namespace=~"$namespace"}`
   - Order matters: namespace must be defined before app in JSON

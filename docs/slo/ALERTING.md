@@ -114,7 +114,7 @@ Alerts include:
 4. Review application logs
 5. Check dependencies
 
-**Runbook**: `./scripts/12-error-budget-alert.sh`
+**Runbook**: `./scripts/11-error-budget-alert.sh`
 
 ### Latency Alert Runbook
 
@@ -127,7 +127,7 @@ Alerts include:
 4. Review resource usage (CPU/memory)
 5. Check concurrent requests
 
-**Runbook**: `./scripts/11-diagnose-latency.sh`
+**Runbook**: `./scripts/10-diagnose-latency.sh`
 
 ## Escalation Procedures
 

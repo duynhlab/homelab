@@ -79,9 +79,20 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 19. **[Continuous Profiling](./apm/PROFILING.md)** - Pyroscope setup
 20. **[Log Aggregation](./apm/LOGGING.md)** - Loki + Vector configuration
 
+### 💻 Development
+
+21. **[Configuration Guide](./development/CONFIG_GUIDE.md)** - Complete configuration management guide
+    - Configuration sources (.env, environment variables, Helm values)
+    - `env` vs `extraEnv` decision matrix
+    - Local development setup
+    - Production deployment patterns
+    - Validation rules and troubleshooting
+
+22. **[Error Handling](./development/ERROR_HANDLING.md)** - Error handling patterns
+
 ### 🚦 k6 Load Testing
 
-21. **[k6 Load Testing](./k6/K6_LOAD_TESTING.md)** - Load testing setup and architecture
+23. **[k6 Load Testing](./k6/K6_LOAD_TESTING.md)** - Load testing setup and architecture
     - System architecture with filtering
     - Multiple scenarios (5 user personas)
     - Deployment configurations
@@ -120,6 +131,10 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 - [Continuous Profiling](./apm/PROFILING.md) - Pyroscope setup
 - [Log Aggregation](./apm/LOGGING.md) - Loki + Vector
 
+### Development
+- [Configuration Guide](./development/CONFIG_GUIDE.md) - Complete configuration management
+- [Error Handling](./development/ERROR_HANDLING.md) - Error handling patterns
+
 ### k6 Load Testing
 - [k6 Load Testing](./k6/K6_LOAD_TESTING.md) - Complete load testing guide with architecture
 
@@ -139,6 +154,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 - **32 Grafana Panels** - Complete monitoring dashboard
 - **6 Custom Metrics** - Application-level metrics
 - **9 Microservices** - All services with v1/v2 APIs
+- **Monitoring Stack** - Prometheus Operator + Grafana Operator + kube-state-metrics + metrics-server
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
 - **APM Stack** - Tempo (tracing), Pyroscope (profiling), Loki + Vector (logging)
 - **k6 Load Testing** - Helm-managed load generators
@@ -148,19 +164,18 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 **Deploy everything:**
 ```bash
 ./scripts/01-create-kind-cluster.sh      # Step 1: Infrastructure
-./scripts/02-install-metrics.sh          # Step 2: Infrastructure
-./scripts/03-deploy-monitoring.sh        # Step 3: Monitoring (BEFORE apps)
-./scripts/04-deploy-apm.sh               # Step 4: APM (BEFORE apps)
-./scripts/05-build-microservices.sh      # Step 5: Build images
-./scripts/06-deploy-microservices.sh --local   # Step 6: Deploy (uses local Helm chart)
-./scripts/07-deploy-k6.sh               # Step 7: Load testing (AFTER apps)
-./scripts/08-deploy-slo.sh               # Step 8: SLO system
-./scripts/09-setup-access.sh             # Step 9: Access setup
+./scripts/02-deploy-monitoring.sh        # Step 2: Monitoring + metrics (BEFORE apps)
+./scripts/03-deploy-apm.sh               # Step 3: APM (BEFORE apps)
+./scripts/04-build-microservices.sh      # Step 4: Build images
+./scripts/05-deploy-microservices.sh --local   # Step 6: Deploy (uses local Helm chart)
+./scripts/06-deploy-k6.sh               # Step 7: Load testing (AFTER apps)
+./scripts/07-deploy-slo.sh               # Step 8: SLO system
+./scripts/08-setup-access.sh             # Step 9: Access setup
 ```
 
 **Deploy from OCI registry:**
 ```bash
-./scripts/06-deploy-microservices.sh --registry  # Uses oci://ghcr.io/duynhne/charts/microservice
+./scripts/05-deploy-microservices.sh --registry  # Uses oci://ghcr.io/duynhne/charts/microservice
 ```
 
 **Manual Helm deployment:**
@@ -170,7 +185,7 @@ helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-
 
 **Deploy SLOs:**
 ```bash
-./scripts/08-deploy-slo.sh
+./scripts/07-deploy-slo.sh
 ```
 
 **Access services:**

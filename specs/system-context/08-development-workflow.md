@@ -61,7 +61,7 @@ kind version
 
 # Check Go
 go version
-# go version go1.23.0
+# go version go1.25
 ```
 
 **Step 3: Create Kind Cluster**

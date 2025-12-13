@@ -377,29 +377,23 @@ flowchart TD
     
     B3 --> C[Layer 1: Web - HTTP Handlers]
     
-    subgraph Web["Web Layer"]
-        C --> C1[internal/{service}/web/v1/]
-        C --> C2[internal/{service}/web/v2/]
+    subgraph WebLayer[Web Layer]
+        C --> C1[internal/service/web/v1/]
+        C --> C2[internal/service/web/v2/]
     end
     
     C --> D[Layer 2: Logic - Business Logic]
     
-    subgraph Logic["Logic Layer"]
-        D --> D1[internal/{service}/logic/v1/]
-        D --> D2[internal/{service}/logic/v2/]
+    subgraph LogicLayer[Logic Layer]
+        D --> D1[internal/service/logic/v1/]
+        D --> D2[internal/service/logic/v2/]
     end
     
     D --> E[Layer 3: Core - Domain Models]
     
-    subgraph Core["Core Layer"]
-        E --> E1[internal/{service}/core/domain/]
+    subgraph CoreLayer[Core Layer]
+        E --> E1[internal/service/core/domain/]
     end
-    
-    style A fill:#e1f5ff
-    style B fill:#fff4e1
-    style C fill:#ffe1f5
-    style D fill:#f5e1ff
-    style E fill:#e1ffe1
 ```
 
 ### APM Stack Integration
@@ -512,7 +506,7 @@ This project includes comprehensive SRE practices with **Service Level Objective
 
 ## 🛠️ Technology Stack
 
-- **Go 1.23** - Application runtime
+- **Go 1.25** - Application runtime
 - **Gin** - HTTP web framework
 - **Prometheus** - Metrics collection
 - **Grafana** - Visualization & dashboards

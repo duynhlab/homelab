@@ -240,6 +240,8 @@ This pattern matches the existing tracing middleware:
 
 ### 📊 Row 1: Overview & Key Metrics (12 Stat Panels)
 
+> **📖 Complete Panel Reference**: See [Dashboard Panels Guide](../development/DASHBOARD_PANELS_GUIDE.md) for detailed query analysis, troubleshooting scenarios, and SRE best practices for all 34 panels.
+
 #### 1. **Response Time - p50 (median)**
 
 **Query:**
@@ -403,25 +405,25 @@ sum(increase(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"
 
 ---
 
-#### 6. **Apdex Score**
+#### 6. **Apdex Score** ⚠️ UPDATED (v0.7.3)
 
 **Query:**
 ```promql
-(sum(rate(request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", le="0.5"}[$rate])) + 
-(sum(rate(request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", le="2"}[$rate])) - 
-sum(rate(request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", le="0.5"}[$rate]))) / 2) / 
-sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$rate]))
+(sum(rate(request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", job=~"microservices", le="0.5"}[$rate])) + 0.5 * (sum(rate(request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", job=~"microservices", le="2"}[$rate])) - sum(rate(request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", job=~"microservices", le="0.5"}[$rate])))) / (sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices"}[$rate])) > 0 or vector(1))
 ```
 
 **Phân tích:**
 - **Ý nghĩa:** Đo lường mức độ hài lòng của người dùng (0.0 - 1.0)
 - **Công thức:**
   ```
-  Apdex = (Satisfied + Tolerating/2) / Total
+  Apdex = (Satisfied + 0.5 * Tolerating) / Total
   - Satisfied: ≤ 0.5s (ngưỡng T)
   - Tolerating: 0.5s < t ≤ 2s (4T)
   - Frustrated: > 2s
   ```
+- **BEFORE/AFTER Fix (v0.7.3):**
+  - **BEFORE:** `... / 2)` caused division issues, no zero-traffic handling → NaN values
+  - **AFTER:** `* 0.5` cleaner syntax, defensive division `(... > 0 or vector(1))` → Returns 0.0 on zero traffic
 - **Thang đo:**
   - 1.00 - 0.94: Xuất sắc (Excellent)
   - 0.93 - 0.85: Tốt (Good)
@@ -508,27 +510,31 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$r
 
 ---
 
-#### 10. **Status Code Distribution**
+#### 10. **Status Code Distribution** ⚠️ UPDATED (v0.7.3)
 
 **Query:**
 ```promql
-sum(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}) by (code)
+sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices"}[$rate])) by (code)
 ```
 
 **Phân tích:**
-- **Ý nghĩa:** Tổng số requests theo từng status code **từ khi pod khởi động**
+- **Ý nghĩa:** Phân bố traffic theo status code theo thời gian thực (req/sec)
 - **Loại panel:** Pie chart
 - **Aggregation:** `by (code)` → separate slices cho 200, 404, etc
 - **Legend:** 
   - Table format với columns: Name | Value | Percent
-  - Ví dụ: `200 | 15432 | 92.5%`
-- **Lưu ý:** 
-  - Giá trị **tích lũy** từ pod start, không phải time range
-  - Reset khi pod restart
+  - Ví dụ: `REST.200 | 9.2 req/s | 95%`
+- **BEFORE/AFTER Fix (v0.7.3):**
+  - **BEFORE:** `sum(request_duration_seconds_count{...}) by (code)` (cumulative counter)
+    - Problem: Ever-increasing totals since pod start
+    - Result: Misleading percentages based on historical data
+  - **AFTER:** `sum(rate(..._count{...}[$rate])) by (code)` (rate-based)
+    - Benefit: Shows current traffic distribution (req/sec)
+    - Industry standard: Google SRE, Prometheus best practices
 - **Phân bố mong đợi:**
-  - 200: ~98% (success)
-  - 404: ~1% (not found từ edge cases)
-  - 500: ~1% (simulated errors)
+  - 200: ~95% (success)
+  - 404: ~3% (not found)
+  - 500: ~2% (errors)
 
 ---
 
@@ -618,7 +624,51 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$r
 
 ---
 
-### 🖥️ Hàng 3: Giám Sát Tài Nguyên (5 Panels)
+### ⚠️ Row 3: Errors & Performance (8 Panels) - NEW PANELS (v0.7.3)
+
+#### 201. **Client Errors (4xx)** ✨ NEW
+
+**Query:**
+```promql
+sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices", code=~"4.."}[$rate])) by (app)
+```
+
+**Phân tích:**
+- **Ý nghĩa:** Client-side errors (400-499) in req/sec by service
+- **Loại panel:** Time series
+- **Aggregation:** `by (app)` - Show 4xx rate per service
+- **Common codes:** 400 (Bad Request), 401 (Unauthorized), 403 (Forbidden), 404 (Not Found), 429 (Rate Limited)
+- **Thresholds:**
+  - Green: < 0.5 req/s (normal)
+  - Yellow: 0.5-1 req/s (elevated)
+  - Orange: 1-5 req/s (high)
+- **Use case:** Separate client errors from server errors, track API misuse
+- **Note:** 4xx errors may or may not consume error budget (depends on SLO definition)
+
+---
+
+#### 202. **Server Errors (5xx)** ✨ NEW
+
+**Query:**
+```promql
+sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices", code=~"5.."}[$rate])) by (app)
+```
+
+**Phân tích:**
+- **Ý nghĩa:** Server-side errors (500-599) in req/sec by service
+- **Loại panel:** Time series
+- **Aggregation:** `by (app)` - Show 5xx rate per service
+- **Common codes:** 500 (Internal Server Error), 502 (Bad Gateway), 503 (Service Unavailable), 504 (Gateway Timeout)
+- **Thresholds:**
+  - Green: 0 req/s (perfect)
+  - Orange: 0.1-0.5 req/s (concerning)
+  - Red: > 0.5 req/s (critical)
+- **Use case:** Direct indicator of service health, always counts against SLO
+- **Quan trọng:** Any 5xx errors require immediate investigation
+
+---
+
+### 🖥️ Row 4: Go Runtime & Memory (6 Panels) - Formerly Row 3
 
 #### 14. **Memory usage per pods**
 
@@ -975,6 +1025,13 @@ sum(rate(go_gc_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[5m])
 ---
 
 ### 🖥️ Row 5: Resources & Infrastructure (5 Panels)
+
+> **Note**: Panel structure updated in v0.7.3:
+> - Row 3 now contains 8 panels (added Client Errors 4xx, Server Errors 5xx)
+> - Status Code Distribution and Apdex Score queries fixed
+> - See [Dashboard Panels Guide](../development/DASHBOARD_PANELS_GUIDE.md) for complete reference
+
+---
 
 #### 25. **Memory usage per pods**
 

@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.7.3] - 2025-12-13
+
+### Added
+
+**Dashboard Panels Guide (docs/development/DASHBOARD_PANELS_GUIDE.md):**
+- Complete SRE/DevOps reference documentation for all 34 Grafana dashboard panels
+- Detailed PromQL query analysis with explanations for each function and operator
+- Troubleshooting scenarios with "What to Do When" actionable steps
+- Industry best practices from Google SRE Workbook and Prometheus documentation
+- Cross-panel correlation guides for root cause analysis
+- Threshold definitions with reasoning and SRE runbooks
+- Common PromQL patterns section with reusable techniques
+- Quick reference tables: health checklist, investigation paths, PromQL functions
+
+**New Dashboard Panels:**
+- **Client Errors (4xx) Panel** (ID: 201): Separate 4xx tracking with rate-based query
+  - Shows client-side errors in req/sec by service
+  - Common codes: 400 (Bad Request), 401 (Unauthorized), 403 (Forbidden), 404 (Not Found), 429 (Rate Limited)
+  - Thresholds: Green < 0.5 req/s, Yellow 0.5-1 req/s, Orange 1-5 req/s
+- **Server Errors (5xx) Panel** (ID: 202): Separate 5xx tracking with rate-based query
+  - Shows server-side errors in req/sec by service
+  - Common codes: 500 (Internal Server Error), 502 (Bad Gateway), 503 (Service Unavailable), 504 (Gateway Timeout)
+  - Thresholds: Green 0 req/s, Orange 0.1-0.5 req/s, Red > 0.5 req/s
+
+### Changed
+
+**Dashboard Metrics Consistency (v0.7.3):**
+- **Status Code Distribution Panel** (ID: 9): Fixed query from cumulative counter to rate-based
+  - **BEFORE**: `sum(request_duration_seconds_count{...}) by (code)` (cumulative, misleading percentages)
+  - **AFTER**: `sum(rate(request_duration_seconds_count{...}[$rate])) by (code)` (real-time distribution)
+  - **Industry Standard**: Follows Google SRE and Prometheus best practices
+  - **Benefit**: Shows current traffic distribution in req/sec, not historical totals
+- **Apdex Score Panel** (ID: 6): Fixed calculation and added defensive division
+  - **BEFORE**: `... / 2)` caused division issues, NaN on zero traffic
+  - **AFTER**: `* 0.5` cleaner syntax, `(... > 0 or vector(1))` prevents NaN
+  - **Benefit**: Robust against zero traffic, returns 0.0 instead of NaN
+- **Row 3 Structure**: Now contains 8 panels (was 5) - added 2 new error panels, better error categorization
+- **Dashboard Total**: 34 panels (was 32)
+
+**Documentation Updates:**
+- `docs/README.md`: Added Dashboard Panels Guide to Development section (#23) and Documentation by Category
+- `docs/monitoring/METRICS.md`: Updated panel descriptions with v0.7.3 changes, added cross-references to new guide
+- `AGENTS.md`: Updated dashboard structure (34 panels), added v0.7.3 changelog notes
+
+### Fixed
+
+**Dashboard Reload Script (scripts/09-reload-dashboard.sh):**
+- Simplified to explicitly delete and re-create ConfigMaps and GrafanaDashboard CRs
+- Removed operator restart logic (not needed with delete/apply approach)
+- Most robust way to force Grafana Operator reconciliation
+- Ensures dashboard changes apply immediately
+
+**Why**: ConfigMaps with `disableNameSuffixHash: true` aren't automatically reloaded by Grafana Operator when only content changes. Delete/apply forces reconciliation.
+
 ## [0.7.2] - 2025-12-13
 
 ### Fixed

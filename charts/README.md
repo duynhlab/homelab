@@ -86,7 +86,7 @@ flowchart TD
 | Use Case | Use `env` | Use `extraEnv` | Reason |
 |----------|-----------|----------------|---------|
 | **Core service config** (SERVICE_NAME, PORT, ENV) | ✅ Yes | ❌ No | Always required, common across services |
-| **Tracing config** (TEMPO_ENDPOINT, OTEL_SAMPLE_RATE) | ✅ Yes | ❌ No | Managed by chart, needs Helm templating |
+| **Tracing config** (OTEL_COLLECTOR_ENDPOINT, OTEL_SAMPLE_RATE) | ✅ Yes | ❌ No | Managed by chart, needs Helm templating |
 | **Profiling config** (PYROSCOPE_ENDPOINT) | ✅ Yes | ❌ No | Managed by chart, needs Helm templating |
 | **Quick testing** (ADD_DEBUG_VAR=true) | ❌ No | ✅ Yes | Temporary, ad-hoc variables |
 | **Secrets** (API_KEY, DB_PASSWORD) | ❌ No | ✅ Yes | Injected via Secrets, not hardcoded |
@@ -114,8 +114,8 @@ env:
     value: "8080"
   - name: ENV
     value: "production"
-  - name: TEMPO_ENDPOINT
-    value: "tempo.monitoring.svc.cluster.local:4318"
+  - name: OTEL_COLLECTOR_ENDPOINT
+    value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
   - name: OTEL_SAMPLE_RATE
     value: "0.1"
   - name: PYROSCOPE_ENDPOINT
@@ -126,7 +126,7 @@ env:
 
 **When to use `env`**:
 - Core service configuration (SERVICE_NAME, PORT, ENV)
-- APM configuration (TEMPO_ENDPOINT, PYROSCOPE_ENDPOINT)
+- APM configuration (OTEL_COLLECTOR_ENDPOINT, PYROSCOPE_ENDPOINT)
 - Logging configuration (LOG_LEVEL, LOG_FORMAT)
 - Variables that need Helm templating
 - Configuration that should be versioned with the chart
@@ -192,8 +192,8 @@ env:
     value: "8080"
   - name: ENV
     value: "production"
-  - name: TEMPO_ENDPOINT
-    value: "tempo.monitoring.svc.cluster.local:4318"
+  - name: OTEL_COLLECTOR_ENDPOINT
+    value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
   - name: OTEL_SAMPLE_RATE
     value: "0.1"
   - name: PYROSCOPE_ENDPOINT
@@ -448,7 +448,7 @@ If you see `Configuration validation failed` in logs:
    - SERVICE_NAME
    - PORT
    - ENV
-   - TEMPO_ENDPOINT (if tracing enabled)
+   - OTEL_COLLECTOR_ENDPOINT (if tracing enabled)
    - PYROSCOPE_ENDPOINT (if profiling enabled)
 
 2. **Verify value formats**:

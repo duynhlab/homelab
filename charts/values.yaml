@@ -62,7 +62,7 @@ readinessProbe:
 # See charts/README.md for env vs extraEnv decision matrix
 
 # Core application configuration (chart-managed)
-# Use for: SERVICE_NAME, PORT, ENV, TEMPO_ENDPOINT, PYROSCOPE_ENDPOINT, LOG_LEVEL
+# Use for: SERVICE_NAME, PORT, ENV, OTEL_COLLECTOR_ENDPOINT, PYROSCOPE_ENDPOINT, LOG_LEVEL
 # Supports Helm templating: {{ .Values.tracing.endpoint }}
 env: []
 # Example (see charts/values/auth.yaml for complete example):
@@ -72,8 +72,8 @@ env: []
 #   value: "8080"
 # - name: ENV
 #   value: "production"
-# - name: TEMPO_ENDPOINT
-#   value: "tempo.monitoring.svc.cluster.local:4318"
+# - name: OTEL_COLLECTOR_ENDPOINT
+#   value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
 # - name: OTEL_SAMPLE_RATE
 #   value: "0.1"
 # - name: PYROSCOPE_ENDPOINT

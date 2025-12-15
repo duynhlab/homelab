@@ -44,8 +44,8 @@ Expected output:
 Release "sloth" installed successfully
 
 2. Applying PrometheusServiceLevel CRDs (9 services)...
-prometheusservicelevel.sloth.slok.dev/auth-slo created
-prometheusservicelevel.sloth.slok.dev/user-slo created
+prometheusservicelevel.sloth.slok.dev/auth created
+prometheusservicelevel.sloth.slok.dev/user created
 ...
 
 ✅ Sloth SLO system deployed successfully!
@@ -66,7 +66,7 @@ kubectl get prometheusservicelevels -n monitoring
 kubectl get prometheusrules -n monitoring
 
 # Describe a specific SLO
-kubectl describe prometheusservicelevel auth-slo -n monitoring
+kubectl describe prometheusservicelevel auth -n monitoring
 ```
 
 ### Step 3: Access Sloth Dashboards
@@ -224,7 +224,7 @@ helm uninstall sloth -n monitoring
 **Solution**:
 ```bash
 # Check PrometheusServiceLevel status
-kubectl describe prometheusservicelevel auth-slo -n monitoring
+kubectl describe prometheusservicelevel auth -n monitoring
 
 # Check operator logs for errors
 kubectl logs -n monitoring -l app.kubernetes.io/name=sloth | grep -i error
@@ -261,7 +261,7 @@ kubectl get prometheusrules -n monitoring | grep auth
 2. Check time range (SLOs need data to calculate ratios)
 3. Verify labels match in PrometheusServiceLevel definition:
    ```bash
-   kubectl get prometheusservicelevel auth-slo -n monitoring -o yaml
+   kubectl get prometheusservicelevel auth -n monitoring -o yaml
    ```
 
 ### CRD Validation Errors

@@ -40,7 +40,7 @@ func InitTracing(cfg *config.Config) (*sdktrace.TracerProvider, error) {
 
 	// Validate tracing configuration
 	if cfg.Tracing.Endpoint == "" {
-		return nil, fmt.Errorf("TEMPO_ENDPOINT is required when tracing is enabled")
+		return nil, fmt.Errorf("OTEL_COLLECTOR_ENDPOINT is required when tracing is enabled")
 	}
 	if cfg.Tracing.SampleRate < 0 || cfg.Tracing.SampleRate > 1.0 {
 		return nil, fmt.Errorf("OTEL_SAMPLE_RATE must be between 0.0 and 1.0, got: %.2f", cfg.Tracing.SampleRate)
@@ -51,7 +51,7 @@ func InitTracing(cfg *config.Config) (*sdktrace.TracerProvider, error) {
 	defer cancel()
 
 	// Create OTLP HTTP exporter with compression
-	// Tempo endpoint: tempo.monitoring.svc.cluster.local:4318 (OTLP HTTP)
+	// OTel Collector endpoint: otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318 (OTLP HTTP)
 	exporter, err := otlptracehttp.New(
 		ctx,
 		otlptracehttp.WithEndpoint(cfg.Tracing.Endpoint),

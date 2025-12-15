@@ -47,10 +47,10 @@ type ServiceConfig struct {
 }
 
 // TracingConfig defines OpenTelemetry tracing configuration
-// Traces are sent to Grafana Tempo for distributed tracing analysis
+// Traces are sent to OpenTelemetry Collector for distributed tracing analysis
 type TracingConfig struct {
 	Enabled       bool    // Enable tracing (default: true) - from TRACING_ENABLED env
-	Endpoint      string  // Tempo OTLP endpoint - from TEMPO_ENDPOINT env
+	Endpoint      string  // OTel Collector endpoint - from OTEL_COLLECTOR_ENDPOINT env
 	SampleRate    float64 // Trace sampling rate (0.0-1.0) - from OTEL_SAMPLE_RATE env
 	ServiceName   string  // Service name for traces (defaults to ServiceConfig.Name)
 	MaxExportBatchSize int // Max spans per batch (default: 512)
@@ -94,7 +94,7 @@ func Load() *Config {
 		},
 		Tracing: TracingConfig{
 			Enabled:            getEnvBool("TRACING_ENABLED", true),
-			Endpoint:           getEnv("TEMPO_ENDPOINT", "tempo.monitoring.svc.cluster.local:4318"),
+			Endpoint:           getEnv("OTEL_COLLECTOR_ENDPOINT", "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"),
 			SampleRate:         getEnvFloat("OTEL_SAMPLE_RATE", 0.1), // 10% default (production)
 			ServiceName:        getEnv("SERVICE_NAME", "unknown"),
 			MaxExportBatchSize: getEnvInt("OTEL_BATCH_SIZE", 512),
@@ -140,7 +140,7 @@ func (c *Config) Validate() error {
 	// Tracing validation
 	if c.Tracing.Enabled {
 		if c.Tracing.Endpoint == "" {
-			errors = append(errors, "TEMPO_ENDPOINT is required when tracing is enabled")
+			errors = append(errors, "OTEL_COLLECTOR_ENDPOINT is required when tracing is enabled")
 		}
 		if c.Tracing.SampleRate < 0 || c.Tracing.SampleRate > 1.0 {
 			errors = append(errors, fmt.Sprintf("OTEL_SAMPLE_RATE must be between 0.0 and 1.0, got: %.2f", c.Tracing.SampleRate))

@@ -1,0 +1,137 @@
+# Jaeger Helm values for all-in-one deployment (Jaeger v2)
+# Chart: jaegertracing/jaeger
+# Docs: https://github.com/jaegertracing/helm-charts
+
+# All-in-one deployment strategy (suitable for dev/POC)
+# Jaeger v2 uses OpenTelemetry Collector architecture with OTLP enabled by default
+provisionDataStore:
+  cassandra: false
+  elasticsearch: false
+  kafka: false
+
+# Jaeger v2 OpenTelemetry Collector configuration
+# This enables OTLP receiver to accept traces from OTel Collector
+config:
+  service:
+    extensions: [jaeger_storage, jaeger_query, healthcheckv2]
+    pipelines:
+      traces:
+        receivers: [otlp, jaeger, zipkin]
+        processors: [batch]
+        exporters: [jaeger_storage_exporter]
+  
+  extensions:
+    healthcheckv2:
+      use_v2: true
+      http:
+        endpoint: 0.0.0.0:13133
+    
+    jaeger_query:
+      storage:
+        traces: primary_store
+    
+    jaeger_storage:
+      backends:
+        primary_store:
+          memory:
+            max_traces: 100000
+  
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+    jaeger:
+      protocols:
+        grpc:
+    zipkin:
+  
+  processors:
+    batch:
+  
+  exporters:
+    jaeger_storage_exporter:
+      trace_storage: primary_store
+
+# Use all-in-one deployment (collector + query + agent in one pod)
+allInOne:
+  enabled: true
+  replicas: 1
+  image:
+    # Jaeger v2 uses jaegertracing/jaeger (not all-in-one)
+    # tag defaults to chart appVersion when empty
+    repository: jaegertracing/jaeger
+    tag: ""
+    pullPolicy: IfNotPresent
+  
+  # No extraEnv needed - Jaeger v2 has OTLP enabled by default
+  extraEnv: []
+  
+  # Resource limits
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    # Collector ports
+    collector:
+      grpc:
+        port: 14250
+      http:
+        port: 14268
+      otlp:
+        grpc:
+          port: 4317
+        http:
+          port: 4318
+    # Query port (UI)
+    query:
+      port: 16686
+
+# Disable standalone components (using all-in-one instead)
+collector:
+  enabled: false
+
+query:
+  enabled: false
+
+agent:
+  enabled: false
+
+# Storage configuration (in-memory for POC)
+storage:
+  type: memory
+  # For persistent storage, use badger:
+  # type: badger
+  # badger:
+  #   ephemeral: false
+  #   directory: /badger
+
+# Ingress (disabled - use port-forward for local access)
+ingress:
+  enabled: false
+
+# Service account
+serviceAccount:
+  create: true
+  name: jaeger
+
+# Pod annotations
+podAnnotations: {}
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}

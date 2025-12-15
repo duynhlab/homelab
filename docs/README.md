@@ -69,15 +69,17 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 ### 🔍 Application Performance Monitoring (APM)
 
 16. **[APM Overview](./apm/README.md)** - Complete APM system overview
-    - Distributed tracing with Tempo
+    - Distributed tracing with Tempo + Jaeger
+    - OpenTelemetry Collector for trace fan-out
     - Continuous profiling with Pyroscope
     - Log aggregation with Loki + Vector
     - Grafana Operator datasource integration
 
 17. **[APM Architecture](./apm/ARCHITECTURE.md)** - System architecture
 18. **[Distributed Tracing](./apm/TRACING.md)** - Tempo integration guide
-19. **[Continuous Profiling](./apm/PROFILING.md)** - Pyroscope setup
-20. **[Log Aggregation](./apm/LOGGING.md)** - Loki + Vector configuration
+19. **[Jaeger Guide](./apm/JAEGER.md)** - Jaeger UI usage, comparison with Tempo
+20. **[Continuous Profiling](./apm/PROFILING.md)** - Pyroscope setup
+21. **[Log Aggregation](./apm/LOGGING.md)** - Loki + Vector configuration
 
 ### 💻 Development
 
@@ -134,6 +136,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 - [APM Overview](./apm/README.md) - Complete APM system overview
 - [APM Architecture](./apm/ARCHITECTURE.md) - System architecture
 - [Distributed Tracing](./apm/TRACING.md) - Tempo integration
+- [Jaeger Guide](./apm/JAEGER.md) - Jaeger UI usage, comparison with Tempo
 - [Continuous Profiling](./apm/PROFILING.md) - Pyroscope setup
 - [Log Aggregation](./apm/LOGGING.md) - Loki + Vector
 
@@ -163,7 +166,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 - **9 Microservices** - All services with v1/v2 APIs
 - **Monitoring Stack** - Prometheus Operator + Grafana Operator + kube-state-metrics + metrics-server
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
-- **APM Stack** - Tempo (tracing), Pyroscope (profiling), Loki + Vector (logging)
+- **APM Stack** - Tempo + Jaeger (tracing), OTel Collector (fan-out), Pyroscope (profiling), Loki + Vector (logging)
 - **k6 Load Testing** - Helm-managed load generators
 
 ### Common Tasks
@@ -198,6 +201,7 @@ helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-
 **Access services:**
 - Grafana: http://localhost:3000 (admin/admin)
 - Prometheus: http://localhost:9090
+- Jaeger UI: http://localhost:16686
 - API: http://localhost:8080
 
 ---

@@ -260,7 +260,7 @@ env:
     value: "8080"
   - name: ENV
     value: "production"
-  - name: TEMPO_ENDPOINT
+  - name: OTEL_COLLECTOR_ENDPOINT
     value: "tempo.monitoring.svc.cluster.local:4318"
   - name: OTEL_SAMPLE_RATE
     value: "0.1"  # 10% sampling for production

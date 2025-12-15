@@ -1,15 +1,15 @@
 apiVersion: sloth.slok.dev/v1
 kind: PrometheusServiceLevel
 metadata:
-  name: order-slo
+  name: shipping
   namespace: monitoring
 spec:
-  service: "order"
+  service: "shipping"
   labels:
     team: "platform"
     env: "monitoring"
-    service: "order"
-    namespace: "order"
+    service: "shipping"
+    namespace: "shipping"
   slos:
     # SLO 1: Availability (Success Rate - 5xx errors)
     - name: "availability"
@@ -19,26 +19,26 @@ spec:
         events:
           errorQuery: |
             sum(rate(request_duration_seconds_count{
-              app="order",
-              namespace="order",
+              app="shipping",
+              namespace="shipping",
               job=~"microservices",
               code=~"5.."
             }[{{.window}}]))
           totalQuery: |
             sum(rate(request_duration_seconds_count{
-              app="order",
-              namespace="order",
+              app="shipping",
+              namespace="shipping",
               job=~"microservices"
             }[{{.window}}]))
       alerting:
-        name: OrderHighErrorRate
+        name: ShippingHighErrorRate
         labels:
           severity: critical
           category: availability
-          service: "order"
+          service: "shipping"
         annotations:
-          summary: "High 5xx error rate detected on order"
-          description: "Availability SLO is at risk. Current error rate is impacting user orderentication."
+          summary: "High 5xx error rate detected on shipping"
+          description: "Availability SLO is at risk. Current error rate is impacting user shippingentication."
         pageAlert:
           labels:
             severity: page
@@ -56,31 +56,31 @@ spec:
         events:
           errorQuery: |
             sum(rate(request_duration_seconds_count{
-              app="order",
-              namespace="order",
+              app="shipping",
+              namespace="shipping",
               job=~"microservices"
             }[{{.window}}]))
             -
             sum(rate(request_duration_seconds_bucket{
-              app="order",
-              namespace="order",
+              app="shipping",
+              namespace="shipping",
               job=~"microservices",
               le="0.5"
             }[{{.window}}]))
           totalQuery: |
             sum(rate(request_duration_seconds_count{
-              app="order",
-              namespace="order",
+              app="shipping",
+              namespace="shipping",
               job=~"microservices"
             }[{{.window}}]))
       alerting:
-        name: OrderHighLatency
+        name: ShippingHighLatency
         labels:
           severity: warning
           category: latency
-          service: "order"
+          service: "shipping"
         annotations:
-          summary: "High latency detected on order"
+          summary: "High latency detected on shipping"
           description: "More than 5% of requests are slower than 500ms threshold."
         pageAlert:
           labels:
@@ -99,25 +99,25 @@ spec:
         events:
           errorQuery: |
             sum(rate(request_duration_seconds_count{
-              app="order",
-              namespace="order",
+              app="shipping",
+              namespace="shipping",
               job=~"microservices",
               code=~"4..|5.."
             }[{{.window}}]))
           totalQuery: |
             sum(rate(request_duration_seconds_count{
-              app="order",
-              namespace="order",
+              app="shipping",
+              namespace="shipping",
               job=~"microservices"
             }[{{.window}}]))
       alerting:
-        name: OrderHighOverallErrorRate
+        name: ShippingHighOverallErrorRate
         labels:
           severity: warning
           category: errors
-          service: "order"
+          service: "shipping"
         annotations:
-          summary: "High overall error rate (4xx + 5xx) on order"
+          summary: "High overall error rate (4xx + 5xx) on shipping"
           description: "More than 1% of requests are returning errors."
         pageAlert:
           labels:
@@ -127,4 +127,3 @@ spec:
           labels:
             severity: ticket
             channel: "#incidents"
-

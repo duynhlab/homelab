@@ -16,15 +16,15 @@ Sloth is a Kubernetes operator that automatically generates Prometheus recording
 k8s/sloth/
 ├── values.yaml          # Helm values for Sloth Operator
 ├── crds/                # PrometheusServiceLevel CRDs (9 services)
-│   ├── auth-slo.yaml
-│   ├── user-slo.yaml
-│   ├── product-slo.yaml
-│   ├── cart-slo.yaml
-│   ├── order-slo.yaml
-│   ├── review-slo.yaml
-│   ├── notification-slo.yaml
-│   ├── shipping-slo.yaml
-│   └── shipping-v2-slo.yaml
+│   ├── auth.yaml
+│   ├── user.yaml
+│   ├── product.yaml
+│   ├── cart.yaml
+│   ├── order.yaml
+│   ├── review.yaml
+│   ├── notification.yaml
+│   ├── shipping.yaml
+│   └── shipping-v2.yaml
 └── README.md            # This file
 ```
 

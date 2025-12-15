@@ -66,6 +66,8 @@
 
 ### APM Stack (Application Performance Monitoring)
 - **Grafana Tempo** - Distributed tracing backend
+- **Jaeger** - Distributed tracing (alternative UI)
+- **OpenTelemetry Collector** - Trace fan-out to Tempo + Jaeger
 - **Loki** - Log aggregation and storage
 - **Vector** - Log collection and processing
 - **Pyroscope** - Continuous profiling (CPU, heap, goroutines, locks)
@@ -191,6 +193,7 @@ kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:909
 
 # Access APM services (after Step 17)
 kubectl port-forward -n monitoring svc/tempo 3200:3200 &
+kubectl port-forward -n monitoring svc/jaeger-all-in-one 16686:16686 &
 kubectl port-forward -n monitoring svc/pyroscope 4040:4040 &
 kubectl port-forward -n monitoring svc/loki 3100:3100 &
 ```
@@ -208,6 +211,7 @@ kubectl port-forward -n monitoring svc/loki 3100:3100 &
 
 🔍 APM Services (after Step 17):
    📊 Tempo:      http://localhost:3200 (distributed tracing)
+   🔍 Jaeger:     http://localhost:16686 (distributed tracing - alternative UI)
    🔬 Pyroscope:  http://localhost:4040 (continuous profiling)
    📝 Loki:       http://localhost:3100 (log aggregation)
 ```
@@ -512,7 +516,10 @@ This project includes comprehensive SRE practices with **Service Level Objective
 - **Grafana** - Visualization & dashboards
 - **Grafana Operator** - Manages Grafana resources (dashboards, datasources)
 - **Sloth Operator v0.15.0** - SLO management (automatic rule generation)
-- **OpenTelemetry** - Distributed tracing
+- **OpenTelemetry** - Distributed tracing standard
+- **OpenTelemetry Collector** - Trace fan-out to multiple backends
+- **Grafana Tempo** - Distributed tracing backend
+- **Jaeger** - Distributed tracing (alternative UI)
 - **Zap** - Structured logging
 - **Pyroscope** - Continuous profiling
 - **k6** - Load testing

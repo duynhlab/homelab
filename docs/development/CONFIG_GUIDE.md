@@ -25,7 +25,7 @@ cat > services/.env <<EOF
 SERVICE_NAME=auth
 PORT=8080
 ENV=development
-TEMPO_ENDPOINT=localhost:4318
+OTEL_COLLECTOR_ENDPOINT=localhost:4318
 OTEL_SAMPLE_RATE=1.0
 PYROSCOPE_ENDPOINT=http://localhost:4040
 LOG_LEVEL=debug
@@ -100,7 +100,7 @@ func Load() *Config {
         },
         Tracing: TracingConfig{
             Enabled:            getEnvBool("TRACING_ENABLED", true),
-            Endpoint:           getEnv("TEMPO_ENDPOINT", "tempo.monitoring.svc.cluster.local:4318"),
+            Endpoint:           getEnv("OTEL_COLLECTOR_ENDPOINT", "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"),
             SampleRate:         getEnvFloat("OTEL_SAMPLE_RATE", 0.1),
             MaxExportBatchSize: getEnvInt("OTEL_BATCH_SIZE", 512),
         },
@@ -123,7 +123,7 @@ ENV=development
 
 # Tracing (100% sampling for dev)
 TRACING_ENABLED=true
-TEMPO_ENDPOINT=localhost:4318
+OTEL_COLLECTOR_ENDPOINT=localhost:4318
 OTEL_SAMPLE_RATE=1.0
 
 # Profiling
@@ -218,7 +218,7 @@ extraEnv:
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `TRACING_ENABLED` | bool | `true` | Enable/disable distributed tracing |
-| `TEMPO_ENDPOINT` | string | `"tempo.monitoring.svc.cluster.local:4318"` | Tempo OTLP HTTP endpoint |
+| `OTEL_COLLECTOR_ENDPOINT` | string | `"otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"` | OTel Collector OTLP HTTP endpoint |
 | `OTEL_SAMPLE_RATE` | float | `0.1` (10%) | Trace sampling rate (0.0-1.0) |
 | `OTEL_BATCH_SIZE` | int | `512` | Max spans per batch |
 
@@ -254,7 +254,7 @@ extraEnv:
 | Use Case | Use `env` | Use `extraEnv` | Reason |
 |----------|-----------|----------------|---------|
 | Core service config (SERVICE_NAME, PORT) | ✅ Yes | ❌ No | Common across all services |
-| APM config (TEMPO_ENDPOINT, PYROSCOPE_ENDPOINT) | ✅ Yes | ❌ No | Managed by chart |
+| APM config (OTEL_COLLECTOR_ENDPOINT, PYROSCOPE_ENDPOINT) | ✅ Yes | ❌ No | Managed by chart |
 | Service-specific dependencies (REDIS_HOST) | ❌ No | ✅ Yes | Service-specific |
 | Secrets (API_KEY, DB_PASSWORD) | ❌ No | ✅ Yes | Use `valueFrom.secretKeyRef` |
 | Feature flags (ENABLE_BETA_FEATURE) | ❌ No | ✅ Yes | Service-specific |
@@ -326,7 +326,7 @@ curl http://localhost:8080/health
        value: "8080"
      - name: ENV
        value: "production"
-     - name: TEMPO_ENDPOINT
+     - name: OTEL_COLLECTOR_ENDPOINT
        value: "tempo.monitoring.svc.cluster.local:4318"
      - name: OTEL_SAMPLE_RATE
        value: "0.1"
@@ -428,7 +428,7 @@ func (c *Config) Validate() error {
 - `ENV`
 
 **Required if tracing enabled** (`TRACING_ENABLED=true`):
-- `TEMPO_ENDPOINT`
+- `OTEL_COLLECTOR_ENDPOINT`
 - `OTEL_SAMPLE_RATE` (must be 0.0-1.0)
 
 **Required if profiling enabled** (`PROFILING_ENABLED=true`):
@@ -491,7 +491,7 @@ env:
 
 **Checklist**:
 1. ✅ `TRACING_ENABLED=true` (default)
-2. ✅ `TEMPO_ENDPOINT` is correct
+2. ✅ `OTEL_COLLECTOR_ENDPOINT` is correct
 3. ✅ `OTEL_SAMPLE_RATE` is between 0.0 and 1.0
 4. ✅ Tempo service is running: `kubectl get pods -n monitoring | grep tempo`
 

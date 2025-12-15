@@ -1,15 +1,15 @@
 apiVersion: sloth.slok.dev/v1
 kind: PrometheusServiceLevel
 metadata:
-  name: notification-slo
+  name: shipping-v2
   namespace: monitoring
 spec:
-  service: "notification"
+  service: "shipping-v2"
   labels:
     team: "platform"
     env: "monitoring"
-    service: "notification"
-    namespace: "notification"
+    service: "shipping-v2"
+    namespace: "shipping-v2"
   slos:
     # SLO 1: Availability (Success Rate - 5xx errors)
     - name: "availability"
@@ -19,26 +19,26 @@ spec:
         events:
           errorQuery: |
             sum(rate(request_duration_seconds_count{
-              app="notification",
-              namespace="notification",
+              app="shipping-v2",
+              namespace="shipping-v2",
               job=~"microservices",
               code=~"5.."
             }[{{.window}}]))
           totalQuery: |
             sum(rate(request_duration_seconds_count{
-              app="notification",
-              namespace="notification",
+              app="shipping-v2",
+              namespace="shipping-v2",
               job=~"microservices"
             }[{{.window}}]))
       alerting:
-        name: NotificationHighErrorRate
+        name: ShippingV2HighErrorRate
         labels:
           severity: critical
           category: availability
-          service: "notification"
+          service: "shipping-v2"
         annotations:
-          summary: "High 5xx error rate detected on notification"
-          description: "Availability SLO is at risk. Current error rate is impacting user notificationentication."
+          summary: "High 5xx error rate detected on shipping-v2"
+          description: "Availability SLO is at risk. Current error rate is impacting user shipping-v2entication."
         pageAlert:
           labels:
             severity: page
@@ -56,31 +56,31 @@ spec:
         events:
           errorQuery: |
             sum(rate(request_duration_seconds_count{
-              app="notification",
-              namespace="notification",
+              app="shipping-v2",
+              namespace="shipping-v2",
               job=~"microservices"
             }[{{.window}}]))
             -
             sum(rate(request_duration_seconds_bucket{
-              app="notification",
-              namespace="notification",
+              app="shipping-v2",
+              namespace="shipping-v2",
               job=~"microservices",
               le="0.5"
             }[{{.window}}]))
           totalQuery: |
             sum(rate(request_duration_seconds_count{
-              app="notification",
-              namespace="notification",
+              app="shipping-v2",
+              namespace="shipping-v2",
               job=~"microservices"
             }[{{.window}}]))
       alerting:
-        name: NotificationHighLatency
+        name: ShippingV2HighLatency
         labels:
           severity: warning
           category: latency
-          service: "notification"
+          service: "shipping-v2"
         annotations:
-          summary: "High latency detected on notification"
+          summary: "High latency detected on shipping-v2"
           description: "More than 5% of requests are slower than 500ms threshold."
         pageAlert:
           labels:
@@ -99,25 +99,25 @@ spec:
         events:
           errorQuery: |
             sum(rate(request_duration_seconds_count{
-              app="notification",
-              namespace="notification",
+              app="shipping-v2",
+              namespace="shipping-v2",
               job=~"microservices",
               code=~"4..|5.."
             }[{{.window}}]))
           totalQuery: |
             sum(rate(request_duration_seconds_count{
-              app="notification",
-              namespace="notification",
+              app="shipping-v2",
+              namespace="shipping-v2",
               job=~"microservices"
             }[{{.window}}]))
       alerting:
-        name: NotificationHighOverallErrorRate
+        name: ShippingV2HighOverallErrorRate
         labels:
           severity: warning
           category: errors
-          service: "notification"
+          service: "shipping-v2"
         annotations:
-          summary: "High overall error rate (4xx + 5xx) on notification"
+          summary: "High overall error rate (4xx + 5xx) on shipping-v2"
           description: "More than 1% of requests are returning errors."
         pageAlert:
           labels:
@@ -127,4 +127,3 @@ spec:
           labels:
             severity: ticket
             channel: "#incidents"
-

@@ -42,7 +42,7 @@ func main() {
 	)
 
 	// Initialize OpenTelemetry tracing with centralized config
-	// Tracing config: TRACING_ENABLED, TEMPO_ENDPOINT, OTEL_SAMPLE_RATE
+	// Tracing config: TRACING_ENABLED, OTEL_COLLECTOR_ENDPOINT, OTEL_SAMPLE_RATE
 	var tp interface{ Shutdown(context.Context) error }
 	if cfg.Tracing.Enabled {
 		tp, err = middleware.InitTracing(cfg)

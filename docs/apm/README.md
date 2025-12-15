@@ -18,6 +18,8 @@ APM, Observability, Metrics, Distributed Tracing, Structured Logging, Continuous
 
 **Technologies:**
 - Grafana Tempo (distributed tracing)
+- Jaeger (distributed tracing - alternative UI)
+- OpenTelemetry Collector (trace fan-out)
 - Vector + Loki (log aggregation)
 - Pyroscope (continuous profiling)
 - OpenTelemetry (tracing standard)
@@ -35,37 +37,66 @@ This project implements a comprehensive APM solution with four pillars:
 
 ## Architecture
 
+```mermaid
+flowchart LR
+    subgraph Apps["Microservices (9 services)"]
+        Services[auth, user, product, ...]
+    end
+    
+    subgraph Collector["OpenTelemetry Collector"]
+        OTel[OTLP Receiver + Fan-out]
+    end
+    
+    subgraph TracingBackends["Tracing Backends"]
+        Tempo[(Tempo)]
+        Jaeger[(Jaeger)]
+    end
+    
+    subgraph LoggingStack["Logging Stack"]
+        Vector[Vector]
+        Loki[(Loki)]
+    end
+    
+    Apps -->|Metrics| Prometheus[(Prometheus)]
+    Apps -->|Traces| OTel
+    OTel --> Tempo
+    OTel --> Jaeger
+    Apps -->|Logs| Vector --> Loki
+    Apps -->|Profiles| Pyroscope[(Pyroscope)]
+    
+    Prometheus --> Grafana[Grafana]
+    Tempo --> Grafana
+    Jaeger --> Grafana
+    Loki --> Grafana
+    Pyroscope --> Grafana
 ```
-┌─────────────┐
-│ Microservices│
-│  (9 services)│
-└──────┬──────┘
-       │
-       ├─── Metrics ────► Prometheus ────► Grafana
-       │
-       ├─── Traces ─────► Tempo ─────────► Grafana
-       │
-       ├─── Logs ───────► Vector ────────► Loki ──────► Grafana
-       │
-       └─── Profiles ───► Pyroscope ─────► Grafana
-```
+
+**Key Points:**
+- Applications send traces to OpenTelemetry Collector
+- OTel Collector fans out traces to both Tempo and Jaeger
+- Both tracing backends are accessible via Grafana datasources
+- Jaeger also has its own standalone UI at http://localhost:16686
 
 ## Components
 
-### 1. Distributed Tracing (Tempo)
+### 1. Distributed Tracing (Tempo + Jaeger)
 
 **Purpose**: End-to-end request tracing across microservices
 
-**Technology**: Grafana Tempo + OpenTelemetry
+**Technology**: 
+- Grafana Tempo - Primary tracing backend with TraceQL
+- Jaeger - Alternative UI with service dependency graph
+- OpenTelemetry Collector - Trace fan-out layer
 
 **Features**:
 - Automatic span creation for HTTP requests
 - W3C Trace Context propagation
 - Trace-to-logs correlation
 - Trace-to-metrics correlation
+- Dual backend support (Tempo + Jaeger)
 
 **Configuration**:
-- Tempo endpoint: `tempo.monitoring.svc.cluster.local:4318`
+- OTel Collector endpoint: `otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318`
 - OTLP HTTP protocol
 - Service name: auto-detected from Kubernetes pod
 - Sampling: 10% (production), 100% (development)
@@ -75,12 +106,22 @@ This project implements a comprehensive APM solution with four pillars:
 **Environment Variables**:
 - `OTEL_SAMPLE_RATE`: Sampling rate (0.0-1.0, default: 0.1)
 - `ENV`: Environment (development=100% sampling, others=10%)
-- `TEMPO_ENDPOINT`: Override Tempo endpoint
+- `OTEL_COLLECTOR_ENDPOINT`: OTel Collector endpoint (not Tempo directly)
 
 **Deployment**:
 ```bash
+# Deploy Tempo
 ./scripts/03a-deploy-tempo.sh
+
+# Deploy Jaeger + OTel Collector
+./scripts/03d-deploy-jaeger.sh
 ```
+
+**Access**:
+- Tempo via Grafana: http://localhost:3000 (Explore > Tempo)
+- Jaeger UI: http://localhost:16686
+
+📖 See [JAEGER.md](./JAEGER.md) for Jaeger-specific documentation
 
 ### 2. Structured Logging (Vector + Loki)
 
@@ -138,9 +179,10 @@ Deploy all APM components:
 ```
 
 This will deploy:
-1. Tempo (tracing)
-2. Pyroscope (profiling)
-3. Loki + Vector (logging)
+1. Tempo (tracing backend)
+2. Jaeger + OTel Collector (alternative tracing UI with fan-out)
+3. Pyroscope (profiling)
+4. Loki + Vector (logging)
 
 ## Service Integration
 
@@ -202,6 +244,7 @@ kubectl port-forward -n monitoring svc/grafana-service 3000:3000
 **Datasources**:
 - Prometheus (metrics)
 - Tempo (traces)
+- Jaeger (traces - alternative)
 - Loki (logs)
 - Pyroscope (profiles)
 
@@ -209,6 +252,9 @@ kubectl port-forward -n monitoring svc/grafana-service 3000:3000
 ```bash
 # Tempo
 kubectl port-forward -n monitoring svc/tempo 3200:3200
+
+# Jaeger UI
+kubectl port-forward -n monitoring svc/jaeger-all-in-one 16686:16686
 
 # Pyroscope
 kubectl port-forward -n monitoring svc/pyroscope 4040:4040
@@ -221,14 +267,17 @@ kubectl port-forward -n monitoring svc/loki 3100:3100
 
 - [Architecture Guide](./ARCHITECTURE.md) - ⭐ **3-layer architecture & APM integration diagrams**
 - [Tracing Guide](./TRACING.md) - Distributed tracing details
+- [Jaeger Guide](./JAEGER.md) - Jaeger UI usage, comparison with Tempo
 - [Logging Guide](./LOGGING.md) - Structured logging guide
 - [Profiling Guide](./PROFILING.md) - Continuous profiling guide
 
 ## Troubleshooting
 
 ### Traces not appearing
+- Check OTel Collector pod logs: `kubectl logs -n monitoring -l app.kubernetes.io/name=opentelemetry-collector`
 - Check Tempo pod logs: `kubectl logs -n monitoring deployment/tempo`
-- Verify service has `TEMPO_ENDPOINT` env var or default is correct
+- Check Jaeger pod logs: `kubectl logs -n monitoring -l app.kubernetes.io/name=jaeger`
+- Verify service has `OTEL_COLLECTOR_ENDPOINT` pointing to OTel Collector
 - Check OpenTelemetry initialization in service logs
 
 ### Logs not appearing in Loki

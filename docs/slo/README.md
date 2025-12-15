@@ -151,7 +151,7 @@ Multi-window multi-burn-rate alerts:
 1. Create PrometheusServiceLevel CRD:
 
 ```bash
-cp k8s/sloth/crds/auth-slo.yaml k8s/sloth/crds/mynewservice-slo.yaml
+cp k8s/sloth/crds/auth.yaml k8s/sloth/crds/mynewservice.yaml
 # Edit with service-specific values
 ```
 
@@ -168,13 +168,13 @@ Sloth Operator automatically generates rules!
 1. Edit the PrometheusServiceLevel CRD:
 
 ```bash
-vim k8s/sloth/crds/auth-slo.yaml
+vim k8s/sloth/crds/auth.yaml
 ```
 
 2. Apply changes:
 
 ```bash
-kubectl apply -f k8s/sloth/crds/auth-slo.yaml
+kubectl apply -f k8s/sloth/crds/auth.yaml
 ```
 
 Sloth Operator reconciles automatically.
@@ -182,7 +182,7 @@ Sloth Operator reconciles automatically.
 ### Delete an SLO
 
 ```bash
-kubectl delete -f k8s/sloth/crds/auth-slo.yaml
+kubectl delete -f k8s/sloth/crds/auth.yaml
 ```
 
 ## Verification

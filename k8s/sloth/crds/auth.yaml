@@ -1,15 +1,15 @@
 apiVersion: sloth.slok.dev/v1
 kind: PrometheusServiceLevel
 metadata:
-  name: user-slo
+  name: auth
   namespace: monitoring
 spec:
-  service: "user"
+  service: "auth"
   labels:
     team: "platform"
     env: "monitoring"
-    service: "user"
-    namespace: "user"
+    service: "auth"
+    namespace: "auth"
   slos:
     # SLO 1: Availability (Success Rate - 5xx errors)
     - name: "availability"
@@ -19,26 +19,26 @@ spec:
         events:
           errorQuery: |
             sum(rate(request_duration_seconds_count{
-              app="user",
-              namespace="user",
+              app="auth",
+              namespace="auth",
               job=~"microservices",
               code=~"5.."
             }[{{.window}}]))
           totalQuery: |
             sum(rate(request_duration_seconds_count{
-              app="user",
-              namespace="user",
+              app="auth",
+              namespace="auth",
               job=~"microservices"
             }[{{.window}}]))
       alerting:
-        name: UserHighErrorRate
+        name: AuthHighErrorRate
         labels:
           severity: critical
           category: availability
-          service: "user"
+          service: "auth"
         annotations:
-          summary: "High 5xx error rate detected on user"
-          description: "Availability SLO is at risk. Current error rate is impacting user userentication."
+          summary: "High 5xx error rate detected on auth"
+          description: "Availability SLO is at risk. Current error rate is impacting user authentication."
         pageAlert:
           labels:
             severity: page
@@ -56,31 +56,31 @@ spec:
         events:
           errorQuery: |
             sum(rate(request_duration_seconds_count{
-              app="user",
-              namespace="user",
+              app="auth",
+              namespace="auth",
               job=~"microservices"
             }[{{.window}}]))
             -
             sum(rate(request_duration_seconds_bucket{
-              app="user",
-              namespace="user",
+              app="auth",
+              namespace="auth",
               job=~"microservices",
               le="0.5"
             }[{{.window}}]))
           totalQuery: |
             sum(rate(request_duration_seconds_count{
-              app="user",
-              namespace="user",
+              app="auth",
+              namespace="auth",
               job=~"microservices"
             }[{{.window}}]))
       alerting:
-        name: UserHighLatency
+        name: AuthHighLatency
         labels:
           severity: warning
           category: latency
-          service: "user"
+          service: "auth"
         annotations:
-          summary: "High latency detected on user"
+          summary: "High latency detected on auth"
           description: "More than 5% of requests are slower than 500ms threshold."
         pageAlert:
           labels:
@@ -99,25 +99,25 @@ spec:
         events:
           errorQuery: |
             sum(rate(request_duration_seconds_count{
-              app="user",
-              namespace="user",
+              app="auth",
+              namespace="auth",
               job=~"microservices",
               code=~"4..|5.."
             }[{{.window}}]))
           totalQuery: |
             sum(rate(request_duration_seconds_count{
-              app="user",
-              namespace="user",
+              app="auth",
+              namespace="auth",
               job=~"microservices"
             }[{{.window}}]))
       alerting:
-        name: UserHighOverallErrorRate
+        name: AuthHighOverallErrorRate
         labels:
           severity: warning
           category: errors
-          service: "user"
+          service: "auth"
         annotations:
-          summary: "High overall error rate (4xx + 5xx) on user"
+          summary: "High overall error rate (4xx + 5xx) on auth"
           description: "More than 1% of requests are returning errors."
         pageAlert:
           labels:
@@ -127,4 +127,3 @@ spec:
           labels:
             severity: ticket
             channel: "#incidents"
-

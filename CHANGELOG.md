@@ -7,6 +7,131 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.8.2] - 2025-12-14
+
+### Changed
+
+**SLO CRD File and Resource Naming:**
+- Renamed SLO CRD files from `*-slo.yaml` to `*.yaml` (e.g., `auth-slo.yaml` → `auth.yaml`)
+- Updated `metadata.name` in all PrometheusServiceLevel CRDs from `{service}-slo` to `{service}`
+- Updated all documentation references to new file names and CRD names
+
+**Files Renamed (9 files):**
+- `k8s/sloth/crds/auth-slo.yaml` → `auth.yaml`
+- `k8s/sloth/crds/user-slo.yaml` → `user.yaml`
+- `k8s/sloth/crds/product-slo.yaml` → `product.yaml`
+- `k8s/sloth/crds/cart-slo.yaml` → `cart.yaml`
+- `k8s/sloth/crds/order-slo.yaml` → `order.yaml`
+- `k8s/sloth/crds/review-slo.yaml` → `review.yaml`
+- `k8s/sloth/crds/notification-slo.yaml` → `notification.yaml`
+- `k8s/sloth/crds/shipping-slo.yaml` → `shipping.yaml`
+- `k8s/sloth/crds/shipping-v2-slo.yaml` → `shipping-v2.yaml`
+
+**Rationale:**
+- Simpler naming convention (no redundant `-slo` suffix)
+- CRD name matches service name directly
+- Cleaner file structure
+
+**Breaking Change:**
+- Existing PrometheusServiceLevel CRDs will have different names
+- Need to delete old CRDs and apply new ones:
+  ```bash
+  kubectl delete prometheusservicelevel -n monitoring --all
+  kubectl apply -f k8s/sloth/crds/
+  ```
+- PrometheusRules will be regenerated with new names
+
+## [0.8.1] - 2025-12-14
+
+### Changed
+
+**Environment Variable Rename:**
+- Renamed `TEMPO_ENDPOINT` → `OTEL_COLLECTOR_ENDPOINT` for better clarity
+- Updated in all 9 service Helm values files (`charts/values/*.yaml`)
+- Updated Go code: `services/pkg/config/config.go`, `services/pkg/middleware/tracing.go`
+- Updated default value to point to OTel Collector endpoint
+- Updated all documentation files
+
+**Rationale:**
+- Previous name was misleading (suggested direct connection to Tempo)
+- New name accurately reflects it's the OpenTelemetry Collector endpoint
+- Collector fans out to both Tempo and Jaeger, not just Tempo
+
+**Breaking Change:**
+- All services must be redeployed with new env var name
+- Old `TEMPO_ENDPOINT` will no longer work
+- Requires rebuild and redeploy of all microservices
+
+## [0.8.0] - 2025-12-14
+
+### Added
+
+**Jaeger Distributed Tracing (Alternative UI):**
+- Jaeger all-in-one deployment via Helm (`k8s/jaeger/values.yaml`)
+- Standalone tracing UI at http://localhost:16686
+- Features: trace search, compare traces, service dependency graph
+- Storage: in-memory (default) or Badger (persistent)
+
+**OpenTelemetry Collector (Trace Fan-out):**
+- OTel Collector deployment via Helm (`k8s/otel-collector/values.yaml`)
+- Receives traces from all microservices
+- Fans out to both Tempo and Jaeger simultaneously
+- Batch processing and memory limiting
+- No application code changes required
+
+**New Deployment Script:**
+- `scripts/03d-deploy-jaeger.sh` - Deploys Jaeger + OTel Collector
+- Integrated into `scripts/03-deploy-apm.sh`
+- Automatic Grafana datasource configuration
+
+**Grafana Datasource:**
+- `k8s/grafana-operator/datasource-jaeger.yaml` - Jaeger datasource for Grafana
+- Trace-to-logs and trace-to-metrics correlation configured
+
+**Documentation:**
+- `k8s/jaeger/README.md` - Jaeger installation and configuration guide
+- `k8s/otel-collector/README.md` - OTel Collector configuration guide
+- `docs/apm/JAEGER.md` - Jaeger UI usage guide, comparison with Tempo
+- Updated `docs/apm/README.md` with new architecture diagram
+- Updated `docs/README.md` Documentation Index
+- Updated `AGENTS.md` with new components and access points
+
+### Changed
+
+**Trace Collection Architecture:**
+- Applications now send traces to OTel Collector (not Tempo directly)
+- OTel Collector fans out to both Tempo and Jaeger
+- **OTEL_COLLECTOR_ENDPOINT** (renamed from TEMPO_ENDPOINT in v0.8.1) in all 9 service values files:
+  - FROM: `tempo.monitoring.svc.cluster.local:4318`
+  - TO: `otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318`
+
+**Documentation Updates:**
+- `README.md`: Added Jaeger to Architecture and Technology Stack
+- `AGENTS.md`: Updated Project Structure, Access Points, Script Files
+
+### Migration Notes
+
+**For existing deployments:**
+1. Run `./scripts/03d-deploy-jaeger.sh` to deploy Jaeger + OTel Collector
+2. Redeploy microservices to pick up new endpoint:
+   ```bash
+   ./scripts/05-deploy-microservices.sh --local
+   ```
+3. Or restart deployments manually:
+   ```bash
+   kubectl rollout restart deployment -n auth
+   kubectl rollout restart deployment -n user
+   # ... repeat for other namespaces
+   ```
+
+**Access Jaeger UI:**
+```bash
+kubectl port-forward -n monitoring svc/jaeger-all-in-one 16686:16686
+# Open http://localhost:16686
+```
+
+---
+
 ## [0.7.3] - 2025-12-13
 
 ### Added
@@ -895,7 +1020,7 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
    - **Investigation Results**:
      - ✅ Sloth Operator running correctly
      - ✅ PrometheusServiceLevel CRs: All 9 showed `GEN OK = true`, `READY SLOS = 3`
-     - ✅ PrometheusRules generated (auth-slo, user-slo, etc.)
+     - ✅ PrometheusRules generated (auth, user, etc.)
      - ❌ Prometheus NOT loading rules due to label selector mismatch
    - **Solution Applied**:
      1. Patched Prometheus CR: Set `ruleSelector: {}` (select ALL rules, not just labeled ones)

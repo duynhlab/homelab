@@ -83,6 +83,8 @@ monitoring/
 │   ├── grafana-operator/
 │   ├── sloth/             # Sloth Operator (SLO management)
 │   ├── tempo/             # Grafana Tempo (distributed tracing)
+│   ├── jaeger/            # Jaeger (distributed tracing - alternative UI)
+│   ├── otel-collector/    # OpenTelemetry Collector (trace fan-out)
 │   ├── pyroscope/         # Pyroscope (continuous profiling)
 │   ├── loki/              # Loki v3.6.2 (log storage with pattern ingestion)
 │   ├── vector/            # Vector (log collection)
@@ -215,13 +217,17 @@ k8s/
 │   ├── README.md         # Helm install instructions
 │   ├── values.yaml       # Operator Helm values
 │   ├── grafana.yaml      # Grafana CR (anonymous auth, dark theme)
-│   ├── datasource-*.yaml # Datasource CRs (Prometheus, Tempo, Loki, Pyroscope)
+│   ├── datasource-*.yaml # Datasource CRs (Prometheus, Tempo, Loki, Pyroscope, Jaeger)
 │   └── dashboards/       # Kustomize (ConfigMap + GrafanaDashboard CRs)
 ├── sloth/                # Sloth Operator (SLO management)
 │   ├── values.yaml       # Helm values for Sloth Operator
 │   ├── README.md
 │   └── crds/             # PrometheusServiceLevel CRDs (9 services)
 ├── tempo/                # Grafana Tempo (distributed tracing)
+├── jaeger/               # Jaeger (distributed tracing - alternative UI)
+│   └── values.yaml       # Helm values for Jaeger all-in-one
+├── otel-collector/       # OpenTelemetry Collector (trace fan-out to Tempo + Jaeger)
+│   └── values.yaml       # Helm values for OTel Collector
 ├── pyroscope/            # Pyroscope (continuous profiling)
 ├── loki/                 # Loki v3.6.2 (log storage with pattern ingestion)
 ├── vector/               # Vector (log collection with self-monitoring)
@@ -236,7 +242,7 @@ k8s/
 **Note**: Microservices are deployed via Helm chart (`charts/`), not raw YAML manifests. Grafana is managed via the Grafana Operator (`k8s/grafana-operator/`).
 
 **Namespaces**:
-- `monitoring` - Monitoring components (Prometheus, Grafana, Tempo, Pyroscope, Loki) and SLO system
+- `monitoring` - Monitoring components (Prometheus, Grafana, Tempo, Jaeger, OTel Collector, Pyroscope, Loki) and SLO system
 - `kube-system` - Vector (log collection DaemonSet)
 - `k6` - K6 load testing
 - Service namespaces - Each microservice has its own namespace: `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`
@@ -258,6 +264,7 @@ Numbered scripts (01-12) for deployment and operations:
 - `03a-deploy-tempo.sh` - Deploy Grafana Tempo v2.9.0 (distributed tracing with metrics-generator for TraceQL rate() queries)
 - `03b-deploy-pyroscope.sh` - Deploy Pyroscope (continuous profiling)
 - `03c-deploy-loki.sh` - Deploy Loki + Vector (log aggregation)
+- `03d-deploy-jaeger.sh` - Deploy Jaeger + OpenTelemetry Collector (alternative tracing UI with fan-out)
 - `03-deploy-apm.sh` - Deploy all APM components (deploy BEFORE apps to collect traces/logs/profiles immediately)
 
 **APM Configuration:**
@@ -265,6 +272,7 @@ Numbered scripts (01-12) for deployment and operations:
 - Request filtering: health/metrics endpoints automatically skipped
 - Graceful shutdown: automatic span flushing on termination
 - Service detection: automatic from Kubernetes pod metadata
+- Trace fan-out: Applications send traces to OTel Collector, which fans out to both Tempo and Jaeger
 
 **Build & Deploy Applications (04-05):**
 - `04-build-microservices.sh` - Build Docker images for all 9 services
@@ -325,15 +333,15 @@ k8s/sloth/
 ├── values.yaml           # Helm values for Sloth Operator
 ├── README.md             # Deployment instructions
 └── crds/                 # PrometheusServiceLevel CRDs (9 services)
-    ├── auth-slo.yaml
-    ├── user-slo.yaml
-    ├── product-slo.yaml
-    ├── cart-slo.yaml
-    ├── order-slo.yaml
-    ├── review-slo.yaml
-    ├── notification-slo.yaml
-    ├── shipping-slo.yaml
-    └── shipping-v2-slo.yaml
+    ├── auth.yaml
+    ├── user.yaml
+    ├── product.yaml
+    ├── cart.yaml
+    ├── order.yaml
+    ├── review.yaml
+    ├── notification.yaml
+    ├── shipping.yaml
+    └── shipping-v2.yaml
 ```
 
 **Sloth Operator**: Kubernetes-native SLO management
@@ -668,6 +676,7 @@ k8s/sloth/
 | `kubectl logs -l app={service-name} -n {namespace}` | View service logs |
 | `kubectl port-forward -n monitoring svc/grafana-service 3000:3000` | Port-forward Grafana |
 | `kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090` | Port-forward Prometheus |
+| `kubectl port-forward -n monitoring svc/jaeger-all-in-one 16686:16686` | Port-forward Jaeger UI |
 | `kubectl rollout restart deployment/{name} -n {namespace}` | Restart deployment |
 
 ### Access Points
@@ -676,6 +685,8 @@ k8s/sloth/
 |---------|-----|-------------|
 | Grafana | http://localhost:3000 | admin/admin |
 | Prometheus | http://localhost:9090 | - |
+| Jaeger UI | http://localhost:16686 | - |
+| Tempo | http://localhost:3200 | - |
 | API (via port-forward) | http://localhost:8080 | - |
 
 ---
@@ -816,4 +827,4 @@ k8s/sloth/
 
 ---
 
-**Last Updated**: December 8, 2025 - Tempo v2.9.0 with metrics-generator for TraceQL rate() queries (v0.6.8)
+**Last Updated**: December 14, 2025 - Added Jaeger + OpenTelemetry Collector for dual tracing backends (v0.8.0)

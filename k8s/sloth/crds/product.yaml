@@ -1,7 +1,7 @@
 apiVersion: sloth.slok.dev/v1
 kind: PrometheusServiceLevel
 metadata:
-  name: product-slo
+  name: product
   namespace: monitoring
 spec:
   service: "product"
@@ -127,4 +127,3 @@ spec:
           labels:
             severity: ticket
             channel: "#incidents"
-

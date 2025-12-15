@@ -137,8 +137,8 @@ All tracing configuration is managed via Helm chart values (`charts/values/*.yam
 env:
   - name: SERVICE_NAME
     value: "auth"
-  - name: TEMPO_ENDPOINT
-    value: "tempo.monitoring.svc.cluster.local:4318"
+  - name: OTEL_COLLECTOR_ENDPOINT
+    value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
   - name: OTEL_SAMPLE_RATE
     value: "0.1"  # 10% sampling (0.0-1.0)
   - name: TRACING_ENABLED
@@ -157,7 +157,7 @@ helm upgrade --install auth charts/ \
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TEMPO_ENDPOINT` | `tempo.monitoring.svc.cluster.local:4318` | Tempo OTLP HTTP endpoint |
+| `OTEL_COLLECTOR_ENDPOINT` | `otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318` | OTel Collector OTLP HTTP endpoint |
 | `OTEL_SAMPLE_RATE` | `0.1` (10%) | Trace sampling rate (0.0-1.0) |
 | `ENV` | `production` | Auto-adjust sampling: `development`=100%, others=10% |
 

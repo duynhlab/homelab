@@ -1,7 +1,7 @@
 apiVersion: sloth.slok.dev/v1
 kind: PrometheusServiceLevel
 metadata:
-  name: cart-slo
+  name: cart
   namespace: monitoring
 spec:
   service: "cart"
@@ -127,4 +127,3 @@ spec:
           labels:
             severity: ticket
             channel: "#incidents"
-

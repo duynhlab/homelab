@@ -1,15 +1,15 @@
 apiVersion: sloth.slok.dev/v1
 kind: PrometheusServiceLevel
 metadata:
-  name: shipping-v2-slo
+  name: user
   namespace: monitoring
 spec:
-  service: "shipping-v2"
+  service: "user"
   labels:
     team: "platform"
     env: "monitoring"
-    service: "shipping-v2"
-    namespace: "shipping-v2"
+    service: "user"
+    namespace: "user"
   slos:
     # SLO 1: Availability (Success Rate - 5xx errors)
     - name: "availability"
@@ -19,26 +19,26 @@ spec:
         events:
           errorQuery: |
             sum(rate(request_duration_seconds_count{
-              app="shipping-v2",
-              namespace="shipping-v2",
+              app="user",
+              namespace="user",
               job=~"microservices",
               code=~"5.."
             }[{{.window}}]))
           totalQuery: |
             sum(rate(request_duration_seconds_count{
-              app="shipping-v2",
-              namespace="shipping-v2",
+              app="user",
+              namespace="user",
               job=~"microservices"
             }[{{.window}}]))
       alerting:
-        name: ShippingV2HighErrorRate
+        name: UserHighErrorRate
         labels:
           severity: critical
           category: availability
-          service: "shipping-v2"
+          service: "user"
         annotations:
-          summary: "High 5xx error rate detected on shipping-v2"
-          description: "Availability SLO is at risk. Current error rate is impacting user shipping-v2entication."
+          summary: "High 5xx error rate detected on user"
+          description: "Availability SLO is at risk. Current error rate is impacting user userentication."
         pageAlert:
           labels:
             severity: page
@@ -56,31 +56,31 @@ spec:
         events:
           errorQuery: |
             sum(rate(request_duration_seconds_count{
-              app="shipping-v2",
-              namespace="shipping-v2",
+              app="user",
+              namespace="user",
               job=~"microservices"
             }[{{.window}}]))
             -
             sum(rate(request_duration_seconds_bucket{
-              app="shipping-v2",
-              namespace="shipping-v2",
+              app="user",
+              namespace="user",
               job=~"microservices",
               le="0.5"
             }[{{.window}}]))
           totalQuery: |
             sum(rate(request_duration_seconds_count{
-              app="shipping-v2",
-              namespace="shipping-v2",
+              app="user",
+              namespace="user",
               job=~"microservices"
             }[{{.window}}]))
       alerting:
-        name: ShippingV2HighLatency
+        name: UserHighLatency
         labels:
           severity: warning
           category: latency
-          service: "shipping-v2"
+          service: "user"
         annotations:
-          summary: "High latency detected on shipping-v2"
+          summary: "High latency detected on user"
           description: "More than 5% of requests are slower than 500ms threshold."
         pageAlert:
           labels:
@@ -99,25 +99,25 @@ spec:
         events:
           errorQuery: |
             sum(rate(request_duration_seconds_count{
-              app="shipping-v2",
-              namespace="shipping-v2",
+              app="user",
+              namespace="user",
               job=~"microservices",
               code=~"4..|5.."
             }[{{.window}}]))
           totalQuery: |
             sum(rate(request_duration_seconds_count{
-              app="shipping-v2",
-              namespace="shipping-v2",
+              app="user",
+              namespace="user",
               job=~"microservices"
             }[{{.window}}]))
       alerting:
-        name: ShippingV2HighOverallErrorRate
+        name: UserHighOverallErrorRate
         labels:
           severity: warning
           category: errors
-          service: "shipping-v2"
+          service: "user"
         annotations:
-          summary: "High overall error rate (4xx + 5xx) on shipping-v2"
+          summary: "High overall error rate (4xx + 5xx) on user"
           description: "More than 1% of requests are returning errors."
         pageAlert:
           labels:
@@ -127,4 +127,3 @@ spec:
           labels:
             severity: ticket
             channel: "#incidents"
-

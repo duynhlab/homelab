@@ -40,7 +40,28 @@ env:
   - name: METRICS_ENABLED
     value: "true"
 
-extraEnv: []
+# Service-specific database configuration (via extraEnv)
+# ⚠️ IMPORTANT: Tách riêng các env vars, KHÔNG dùng DATABASE_URL string
+extraEnv:
+  - name: DB_HOST
+    value: "pgcat.transaction.svc.cluster.local"  # PgCat pooler endpoint
+  - name: DB_PORT
+    value: "5432"
+  - name: DB_NAME
+    value: "order"
+  - name: DB_USER
+    value: "order"
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: transaction-db-secret
+        key: password
+  - name: DB_SSLMODE
+    value: "disable"
+  - name: DB_POOL_MAX_CONNECTIONS
+    value: "30"
+  - name: DB_POOLER_TYPE
+    value: "pgcat"
 
 resources:
   requests:
@@ -65,3 +86,9 @@ readinessProbe:
     port: 8080
   initialDelaySeconds: 5
   periodSeconds: 5
+
+# Database migrations (Flyway init container)
+migrations:
+  enabled: true
+  image: ghcr.io/duynhne/init-order:v5
+  imagePullPolicy: IfNotPresent

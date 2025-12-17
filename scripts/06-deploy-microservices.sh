@@ -84,7 +84,7 @@ for entry in "${SERVICES[@]}"; do
 done
 
 echo ""
-echo "🎉 All 9 services deployed!"
+echo "SUCCESS: All 9 services deployed!"
 
 # Wait for pods to be ready
 echo ""
@@ -95,7 +95,7 @@ for entry in "${SERVICES[@]}"; do
 done
 
 echo ""
-echo "📊 Pod Status Summary:"
+echo "Pod Status Summary:"
 echo ""
 
 NAMESPACES=("auth" "user" "product" "cart" "order" "review" "notification" "shipping")

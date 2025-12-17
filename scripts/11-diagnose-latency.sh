@@ -31,7 +31,7 @@ echo "5. Checking for slow queries (if postgres_exporter deployed)..."
 echo "   Query Prometheus: pg_stat_statements_max_time"
 echo ""
 
-echo "✅ Diagnostic complete!"
+echo "SUCCESS: Diagnostic complete!"
 echo ""
 echo "Next steps:"
 echo "  - Check service logs: kubectl logs -n <namespace> <pod-name>"

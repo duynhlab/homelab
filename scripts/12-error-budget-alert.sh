@@ -31,7 +31,7 @@ echo "5. Checking database connections..."
 echo "   Query Prometheus: pg_stat_database_numbackends"
 echo ""
 
-echo "✅ Error budget analysis complete!"
+echo "SUCCESS: Error budget analysis complete!"
 echo ""
 echo "Next steps:"
 echo "  - Review SLO dashboards in Grafana"

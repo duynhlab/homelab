@@ -9,7 +9,7 @@ if ! command -v kind &> /dev/null; then
     curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
     chmod +x ./kind
     sudo mv ./kind /usr/local/bin/kind
-    echo "✓ Kind installed"
+    echo "SUCCESS: Kind installed"
 fi
 
 # Delete existing cluster if exists
@@ -34,5 +34,5 @@ echo ""
 kubectl get nodes
 
 echo ""
-echo "✓ Kind cluster created successfully!"
+echo "SUCCESS: Kind cluster created successfully!"
 

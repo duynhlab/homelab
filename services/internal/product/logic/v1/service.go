@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/duynhne/monitoring/internal/product/core/database"
+	database "github.com/duynhne/monitoring/internal/product/core"
 	"github.com/duynhne/monitoring/internal/product/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
 	"go.opentelemetry.io/otel/attribute"
@@ -50,21 +50,22 @@ func (s *ProductService) ListProducts(ctx context.Context) ([]domain.Product, er
 		var product domain.Product
 		var category sql.NullString
 		var price float64
+		var id int
 
-		err := rows.Scan(&product.ID, &product.Name, &product.Description, &price, &category)
+		err := rows.Scan(&id, &product.Name, &product.Description, &price, &category)
 		if err != nil {
 			span.RecordError(err)
 			continue
 		}
 
+		// Convert ID to string
+		product.ID = strconv.Itoa(id)
 		product.Price = price
 		if category.Valid {
 			product.Category = category.String
 		} else {
 			product.Category = "Uncategorized"
 		}
-		// Convert ID to string
-		product.ID = strconv.Itoa(int(product.ID.(int)))
 
 		products = append(products, product)
 	}
@@ -213,4 +214,3 @@ func (s *ProductService) CreateProduct(ctx context.Context, req domain.CreatePro
 
 	return product, nil
 }
-

@@ -13,9 +13,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
+	database "github.com/duynhne/monitoring/internal/auth/core"
 	v1 "github.com/duynhne/monitoring/internal/auth/web/v1"
 	v2 "github.com/duynhne/monitoring/internal/auth/web/v2"
-	"github.com/duynhne/monitoring/internal/auth/core/database"
 	"github.com/duynhne/monitoring/pkg/config"
 	"github.com/duynhne/monitoring/pkg/middleware"
 )

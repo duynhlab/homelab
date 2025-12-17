@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/duynhne/monitoring/internal/product/core/database"
+	database "github.com/duynhne/monitoring/internal/product/core"
 	"github.com/duynhne/monitoring/pkg/middleware"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -186,4 +186,3 @@ func (s *ProductService) CreateItem(ctx context.Context, req CreateItemRequest) 
 
 	return item, nil
 }
-

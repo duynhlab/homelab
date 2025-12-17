@@ -1,9 +1,9 @@
 package domain
 
 type Cart struct {
-	ID    string    `json:"id"`
+	ID    string     `json:"id"`
 	Items []CartItem `json:"items"`
-	Total float64   `json:"total"`
+	Total float64    `json:"total"`
 }
 
 type CartItem struct {

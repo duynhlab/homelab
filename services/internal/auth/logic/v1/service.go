@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/duynhne/monitoring/internal/auth/core/database"
+	"github.com/duynhne/monitoring/internal/auth/core"
 	"github.com/duynhne/monitoring/internal/auth/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
 	"go.opentelemetry.io/otel/attribute"
@@ -180,4 +180,3 @@ func (s *AuthService) Register(ctx context.Context, req domain.RegisterRequest) 
 
 	return response, nil
 }
-

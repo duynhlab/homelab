@@ -13,8 +13,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
+	database "github.com/duynhne/monitoring/internal/shipping/core"
 	v1 "github.com/duynhne/monitoring/internal/shipping/web/v1"
-	"github.com/duynhne/monitoring/internal/shipping/core/database"
 	"github.com/duynhne/monitoring/pkg/config"
 	"github.com/duynhne/monitoring/pkg/middleware"
 )

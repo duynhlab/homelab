@@ -44,16 +44,27 @@ env:
 
 # Service-specific configuration (if needed)
 # Example: Database connections, feature flags, secrets
-extraEnv: []
-# - name: REDIS_HOST
-#   value: "redis.auth.svc.cluster.local:6379"
-# - name: ENABLE_2FA
-#   value: "true"
-# - name: JWT_SECRET
-#   valueFrom:
-#     secretKeyRef:
-#       name: auth-secrets
-#       key: jwt-secret
+# ⚠️ IMPORTANT: Tách riêng các env vars, KHÔNG dùng DATABASE_URL string
+extraEnv:
+  - name: DB_HOST
+    value: "auth-db-pooler.postgres-operator.svc.cluster.local"  # PgBouncer pooler endpoint
+  - name: DB_PORT
+    value: "5432"
+  - name: DB_NAME
+    value: "auth"
+  - name: DB_USER
+    value: "auth"
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: auth-db-secret
+        key: password
+  - name: DB_SSLMODE
+    value: "disable"
+  - name: DB_POOL_MAX_CONNECTIONS
+    value: "25"  # PgBouncer pool size
+  - name: DB_POOL_MODE
+    value: "transaction"  # PgBouncer transaction pooling
 
 resources:
   requests:
@@ -78,3 +89,9 @@ readinessProbe:
     port: 8080
   initialDelaySeconds: 5
   periodSeconds: 5
+
+# Database migrations (Flyway init container)
+migrations:
+  enabled: true
+  image: ghcr.io/duynhne/init-auth:v5
+  imagePullPolicy: IfNotPresent

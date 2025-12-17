@@ -15,6 +15,7 @@ on:
   pull_request:
     branches:
       - v5-refactor
+      - feat/go-1.25
     paths:
       - 'services/Dockerfile'
       - 'services/go.mod'

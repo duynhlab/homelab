@@ -10,6 +10,7 @@ on:
   pull_request:
     branches:
       - v5-refactor
+      - feat/go-1.25
     paths:
       - 'services/migrations/**'
       - '.github/workflows/build-init-images.yml'

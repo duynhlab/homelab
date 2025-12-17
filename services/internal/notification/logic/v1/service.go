@@ -2,11 +2,10 @@ package v1
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strconv"
 
-	"github.com/duynhne/monitoring/internal/notification/core/database"
+	database "github.com/duynhne/monitoring/internal/notification/core"
 	"github.com/duynhne/monitoring/internal/notification/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
 	"go.opentelemetry.io/otel/attribute"
@@ -101,4 +100,3 @@ func (s *NotificationService) SendSMS(ctx context.Context, req domain.SendSMSReq
 
 	return notification, nil
 }
-

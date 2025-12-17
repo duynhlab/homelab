@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/duynhne/monitoring/internal/order/core/database"
+	database "github.com/duynhne/monitoring/internal/order/core"
 	"github.com/duynhne/monitoring/internal/order/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
 	"go.opentelemetry.io/otel/attribute"
@@ -250,4 +250,3 @@ func (s *OrderService) CreateOrder(ctx context.Context, req domain.CreateOrderRe
 
 	return order, nil
 }
-

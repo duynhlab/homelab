@@ -41,4 +41,3 @@ func (s *ShippingService) EstimateShipment(ctx context.Context, req domain.Estim
 	span.SetAttributes(attribute.Bool("estimate.created", true))
 	return estimate, nil
 }
-

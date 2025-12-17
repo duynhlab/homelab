@@ -4,10 +4,10 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/duynhne/monitoring/internal/user/core/domain"
 	logicv1 "github.com/duynhne/monitoring/internal/user/logic/v1"
 	"github.com/duynhne/monitoring/pkg/middleware"
+	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -42,7 +42,7 @@ func GetUser(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to get user", zap.Error(err))
-		
+
 		switch {
 		case errors.Is(err, logicv1.ErrUserNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
@@ -80,7 +80,7 @@ func GetProfile(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to get profile", zap.Error(err))
-		
+
 		switch {
 		case errors.Is(err, logicv1.ErrUnauthorized):
 			c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized access"})
@@ -129,7 +129,7 @@ func CreateUser(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to create user", zap.Error(err))
-		
+
 		switch {
 		case errors.Is(err, logicv1.ErrUserExists):
 			c.JSON(http.StatusConflict, gin.H{"error": "User already exists"})
@@ -144,4 +144,3 @@ func CreateUser(c *gin.Context) {
 	zapLogger.Info("User created", zap.String("user_id", user.ID))
 	c.JSON(http.StatusCreated, user)
 }
-

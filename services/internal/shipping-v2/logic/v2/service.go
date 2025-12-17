@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/duynhne/monitoring/internal/shipping-v2/core/database"
+	database "github.com/duynhne/monitoring/internal/shipping-v2/core"
 	"github.com/duynhne/monitoring/internal/shipping-v2/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
 	"go.opentelemetry.io/otel/attribute"
@@ -49,11 +49,11 @@ func (s *ShippingService) EstimateShipment(ctx context.Context, req domain.Estim
 		ORDER BY created_at DESC
 		LIMIT 1
 	`
-	
+
 	var cost float64
 	var estimatedDays int
 	var carrier sql.NullString
-	
+
 	err := db.QueryRowContext(ctx, query, req.Origin, req.Destination, req.Weight).Scan(&cost, &estimatedDays, &carrier)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -64,7 +64,7 @@ func (s *ShippingService) EstimateShipment(ctx context.Context, req domain.Estim
 				"destination": req.Destination,
 				"weight":      req.Weight,
 				"cost":        25.99, // Default cost
-				"days":        3,      // Default days
+				"days":        3,     // Default days
 			}
 			span.SetAttributes(attribute.Bool("estimate.created", true))
 			return estimate, nil

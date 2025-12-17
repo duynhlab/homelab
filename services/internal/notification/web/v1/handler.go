@@ -4,10 +4,10 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/duynhne/monitoring/internal/notification/core/domain"
 	logicv1 "github.com/duynhne/monitoring/internal/notification/logic/v1"
 	"github.com/duynhne/monitoring/pkg/middleware"
+	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -39,7 +39,7 @@ func SendEmail(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to send email", zap.Error(err))
-		
+
 		switch {
 		case errors.Is(err, logicv1.ErrInvalidRecipient):
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid recipient"})
@@ -86,4 +86,3 @@ func SendSMS(c *gin.Context) {
 	zapLogger.Info("SMS sent", zap.String("notification_id", notification.ID))
 	c.JSON(http.StatusOK, notification)
 }
-

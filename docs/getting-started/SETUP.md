@@ -75,6 +75,43 @@ Dashboard:  http://localhost:3000/d/microservices-monitoring-001/
 
 ---
 
+## Local Build Verification
+
+Before deploying or pushing code, verify your changes build correctly:
+
+```bash
+./scripts/00-verify-build.sh
+```
+
+**What it checks:**
+1. Go module synchronization (`go.mod`/`go.sum`)
+2. Code formatting (`gofmt`)
+3. Static analysis (`go vet`)
+4. Build all 9 services
+5. Tests (optional - use `--skip-tests` to skip)
+
+**Usage:**
+```bash
+# Run all checks including tests
+./scripts/00-verify-build.sh
+
+# Skip tests (faster, for quick verification)
+./scripts/00-verify-build.sh --skip-tests
+```
+
+**Optional: Git Hook Setup**
+
+To automatically run verification before each commit:
+
+```bash
+cp .githooks/pre-commit .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
+**Note:** See [`AGENTS.md`](../../AGENTS.md#local-build-verification) for detailed usage and troubleshooting.
+
+---
+
 ## Step-by-Step Deployment
 
 ### Step 1: Create Kind Cluster

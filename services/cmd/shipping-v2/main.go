@@ -13,7 +13,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
-	v2 "github.com/duynhne/monitoring/internal/shipping/web/v2"
+	v2 "github.com/duynhne/monitoring/internal/shipping-v2/web/v2"
+	"github.com/duynhne/monitoring/internal/shipping-v2/core/database"
 	"github.com/duynhne/monitoring/pkg/config"
 	"github.com/duynhne/monitoring/pkg/middleware"
 )
@@ -38,6 +39,14 @@ func main() {
 		zap.String("env", cfg.Service.Env),
 		zap.String("port", cfg.Service.Port),
 	)
+
+	// Initialize database connection
+	db, err := database.Connect()
+	if err != nil {
+		logger.Fatal("Failed to connect to database", zap.Error(err))
+	}
+	defer db.Close()
+	logger.Info("Database connection established")
 
 	// Initialize OpenTelemetry tracing with centralized config
 	var tp interface{ Shutdown(context.Context) error }

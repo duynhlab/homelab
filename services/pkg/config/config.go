@@ -31,11 +31,12 @@ import (
 
 // Config holds all configuration for a microservice
 type Config struct {
-	Service  ServiceConfig  // Service-specific settings (port, name, version)
-	Tracing  TracingConfig  // OpenTelemetry/Tempo configuration
+	Service   ServiceConfig   // Service-specific settings (port, name, version)
+	Tracing   TracingConfig   // OpenTelemetry/Tempo configuration
 	Profiling ProfilingConfig // Pyroscope continuous profiling
-	Logging  LoggingConfig  // Structured logging (Zap)
-	Metrics  MetricsConfig  // Prometheus metrics
+	Logging   LoggingConfig   // Structured logging (Zap)
+	Metrics   MetricsConfig   // Prometheus metrics
+	Database  DatabaseConfig  // PostgreSQL database configuration
 }
 
 // ServiceConfig defines basic service configuration
@@ -49,11 +50,11 @@ type ServiceConfig struct {
 // TracingConfig defines OpenTelemetry tracing configuration
 // Traces are sent to OpenTelemetry Collector for distributed tracing analysis
 type TracingConfig struct {
-	Enabled       bool    // Enable tracing (default: true) - from TRACING_ENABLED env
-	Endpoint      string  // OTel Collector endpoint - from OTEL_COLLECTOR_ENDPOINT env
-	SampleRate    float64 // Trace sampling rate (0.0-1.0) - from OTEL_SAMPLE_RATE env
-	ServiceName   string  // Service name for traces (defaults to ServiceConfig.Name)
-	MaxExportBatchSize int // Max spans per batch (default: 512)
+	Enabled            bool    // Enable tracing (default: true) - from TRACING_ENABLED env
+	Endpoint           string  // OTel Collector endpoint - from OTEL_COLLECTOR_ENDPOINT env
+	SampleRate         float64 // Trace sampling rate (0.0-1.0) - from OTEL_SAMPLE_RATE env
+	ServiceName        string  // Service name for traces (defaults to ServiceConfig.Name)
+	MaxExportBatchSize int     // Max spans per batch (default: 512)
 }
 
 // ProfilingConfig defines Pyroscope continuous profiling configuration
@@ -73,6 +74,27 @@ type LoggingConfig struct {
 type MetricsConfig struct {
 	Enabled bool   // Enable metrics (default: true) - from METRICS_ENABLED env
 	Path    string // Metrics endpoint path (default: "/metrics") - from METRICS_PATH env
+}
+
+// DatabaseConfig defines PostgreSQL database configuration
+// All database connections use separate environment variables (not DATABASE_URL string)
+type DatabaseConfig struct {
+	Host           string // Database host - from DB_HOST env
+	Port           string // Database port - from DB_PORT env (default: "5432")
+	Name           string // Database name - from DB_NAME env
+	User           string // Database user - from DB_USER env
+	Password       string // Database password - from DB_PASSWORD env
+	SSLMode        string // SSL mode - from DB_SSLMODE env (default: "disable")
+	MaxConnections int    // Max connections - from DB_POOL_MAX_CONNECTIONS env (default: 25)
+	PoolMode       string // Pool mode - from DB_POOL_MODE env (optional)
+	PoolerType     string // Pooler type - from DB_POOLER_TYPE env (optional)
+}
+
+// BuildDSN constructs PostgreSQL connection string from config
+func (c *DatabaseConfig) BuildDSN() string {
+	// Format: postgresql://user:password@host:port/dbname?sslmode=disable
+	return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s",
+		c.User, c.Password, c.Host, c.Port, c.Name, c.SSLMode)
 }
 
 // Load reads configuration from environment variables with defaults
@@ -111,6 +133,17 @@ func Load() *Config {
 		Metrics: MetricsConfig{
 			Enabled: getEnvBool("METRICS_ENABLED", true),
 			Path:    getEnv("METRICS_PATH", "/metrics"),
+		},
+		Database: DatabaseConfig{
+			Host:           getEnv("DB_HOST", ""),
+			Port:           getEnv("DB_PORT", "5432"),
+			Name:           getEnv("DB_NAME", ""),
+			User:           getEnv("DB_USER", ""),
+			Password:       getEnv("DB_PASSWORD", ""),
+			SSLMode:        getEnv("DB_SSLMODE", "disable"),
+			MaxConnections: getEnvInt("DB_POOL_MAX_CONNECTIONS", 25),
+			PoolMode:       getEnv("DB_POOL_MODE", ""),
+			PoolerType:     getEnv("DB_POOLER_TYPE", ""),
 		},
 	}
 }
@@ -168,6 +201,25 @@ func (c *Config) Validate() error {
 	validLogFormats := []string{"json", "console"}
 	if !contains(validLogFormats, strings.ToLower(c.Logging.Format)) {
 		errors = append(errors, fmt.Sprintf("LOG_FORMAT must be one of %v, got: %s", validLogFormats, c.Logging.Format))
+	}
+
+	// Database validation (if database is configured)
+	if c.Database.Host != "" {
+		if c.Database.Name == "" {
+			errors = append(errors, "DB_NAME is required when DB_HOST is set")
+		}
+		if c.Database.User == "" {
+			errors = append(errors, "DB_USER is required when DB_HOST is set")
+		}
+		if c.Database.Password == "" {
+			errors = append(errors, "DB_PASSWORD is required when DB_HOST is set")
+		}
+		// Validate port is a valid number
+		if c.Database.Port != "" {
+			if _, err := strconv.Atoi(c.Database.Port); err != nil {
+				errors = append(errors, fmt.Sprintf("DB_PORT must be a valid number, got: %s", c.Database.Port))
+			}
+		}
 	}
 
 	if len(errors) > 0 {
@@ -247,4 +299,3 @@ func contains(slice []string, item string) bool {
 	}
 	return false
 }
-

@@ -16,7 +16,7 @@
 
 ## Programming Languages & Frameworks
 
-### Go 1.25
+### Go 1.25.5
 
 **Primary language** for all 9 microservices
 
@@ -129,7 +129,7 @@ helm version --short
 
 **Images**:
 - `alpine:latest` (base image)
-- `golang:1.23.0-alpine` (builder image)
+- `golang:1.25.5-alpine` (builder image)
 - `ghcr.io/duynhne/*:v5` (microservices)
 
 ---
@@ -437,7 +437,7 @@ sloth v0.15.0
 
 | Component | Version | Requires | Compatible With |
 |-----------|---------|----------|-----------------|
-| Go | 1.23.0 | - | All dependencies |
+| Go | 1.25.5 | - | All dependencies |
 | Gin | v1.10.1 | Go 1.21+ | - |
 | OpenTelemetry | v1.38.0 | Go 1.21+ | Tempo v2.9.0 |
 | Prometheus Operator | v80.0.0 | Kubernetes 1.25+ | Sloth v0.15.0 |
@@ -451,14 +451,14 @@ sloth v0.15.0
 
 ## Upgrade Notes
 
-### Go 1.25 (Current)
+### Go 1.25.5 (Current)
 
-**Safe**: Minor version upgrades usually backward compatible
+**Safe**: Patch version upgrades are backward compatible
 **Steps**:
-1. Update `go.mod`: `go 1.24`
-2. Update Dockerfile: `FROM golang:1.24.0-alpine`
-3. Run `go mod tidy`
-4. Test locally
+1. Update Dockerfile: `FROM golang:1.25.5-alpine`
+2. Update CI workflow: `go-version: '1.25.5'`
+3. Run `go mod tidy` (no changes expected for patch version)
+4. Test locally with `./scripts/00-verify-build.sh`
 
 ### Prometheus Operator v80 → v81
 

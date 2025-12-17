@@ -3,7 +3,6 @@ name: Build Docker Images
 on:
   push:
     branches:
-      - v5
       - v5-refactor
     paths:
       - 'services/Dockerfile'
@@ -15,8 +14,8 @@ on:
       - '.github/workflows/build-images.yml'
   pull_request:
     branches:
-      - v5
       - v5-refactor
+      - feat/go-1.25
     paths:
       - 'services/Dockerfile'
       - 'services/go.mod'
@@ -59,17 +58,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.25.5'
           cache-dependency-path: services/go.sum
 
-      - name: Run Go lint (PR only)
+      - name: Verify build (PR only)
         if: github.event_name == 'pull_request'
         working-directory: services
         run: |
-          echo "Running Go lint for ${{ matrix.service }}..."
-          go vet ./cmd/${{ matrix.service }} || true
-          gofmt -l ./cmd/${{ matrix.service }} || true
-          echo "✓ Lint check completed for ${{ matrix.service }}"
+          bash ../.github/scripts/verify-build.sh ${{ matrix.service }}
 
       - name: Set up Docker Buildx
         if: github.event_name != 'pull_request'

@@ -4,9 +4,9 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	logicv1 "github.com/duynhne/monitoring/internal/shipping/logic/v1"
 	"github.com/duynhne/monitoring/pkg/middleware"
+	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -30,7 +30,7 @@ func TrackShipment(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to track shipment", zap.Error(err))
-		
+
 		switch {
 		case errors.Is(err, logicv1.ErrShipmentNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "Shipment not found"})
@@ -45,4 +45,3 @@ func TrackShipment(c *gin.Context) {
 	zapLogger.Info("Shipment tracked", zap.String("tracking_id", trackingID))
 	c.JSON(http.StatusOK, shipment)
 }
-

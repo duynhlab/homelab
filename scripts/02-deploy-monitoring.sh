@@ -23,9 +23,9 @@ if command -v helm >/dev/null 2>&1; then
     --wait \
     --timeout 5m
   
-  echo "  ✓ Prometheus Operator v80.0.0 installed (includes kube-state-metrics)"
+  echo "  SUCCESS: Prometheus Operator v80.0.0 installed (includes kube-state-metrics)"
 else
-  echo "  ✗ Helm is required but not installed!"
+  echo "  ERROR: Helm is required but not installed!"
   exit 1
 fi
 
@@ -38,7 +38,7 @@ helm upgrade --install metrics-server metrics-server/metrics-server \
   --wait \
   --timeout 2m
 
-echo "  ✓ metrics-server installed"
+echo "  SUCCESS: metrics-server installed"
 echo ""
 
 # Wait for Prometheus Operator CRDs to be ready
@@ -48,7 +48,7 @@ sleep 10
 # Apply ServiceMonitor for microservices
 echo "4. Applying ServiceMonitor for microservices..."
 kubectl apply -f k8s/prometheus/servicemonitor-microservices.yaml
-echo "  ✓ ServiceMonitor created"
+echo "  SUCCESS: ServiceMonitor created"
 
 # Deploy Grafana Operator + resources
 echo "5. Installing/Upgrading Grafana Operator v5.20.0..."
@@ -92,7 +92,7 @@ kubectl get grafanadatasources -n monitoring
 kubectl get grafanadashboards -n monitoring
 
 echo ""
-echo "✓ Monitoring stack deployed successfully!"
+echo "SUCCESS: Monitoring stack deployed successfully!"
 echo "  - Prometheus Operator with kube-state-metrics"
 echo "  - Grafana Operator with dashboards"
 echo "  - metrics-server for kubectl top / HPA"

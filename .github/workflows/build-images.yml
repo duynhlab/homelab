@@ -3,7 +3,6 @@ name: Build Docker Images
 on:
   push:
     branches:
-      - v5
       - v5-refactor
     paths:
       - 'services/Dockerfile'
@@ -15,7 +14,6 @@ on:
       - '.github/workflows/build-images.yml'
   pull_request:
     branches:
-      - v5
       - v5-refactor
     paths:
       - 'services/Dockerfile'

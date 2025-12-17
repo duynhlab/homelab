@@ -57,17 +57,42 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.25.5'
           cache-dependency-path: services/go.sum
 
-      - name: Run Go lint (PR only)
+      - name: Verify build (PR only)
         if: github.event_name == 'pull_request'
         working-directory: services
         run: |
-          echo "Running Go lint for ${{ matrix.service }}..."
-          go vet ./cmd/${{ matrix.service }} || true
-          gofmt -l ./cmd/${{ matrix.service }} || true
-          echo "✓ Lint check completed for ${{ matrix.service }}"
+          echo "=== Verifying build for ${{ matrix.service }} ==="
+          
+          # Go module check
+          echo "1. Running go mod tidy..."
+          go mod tidy
+          git diff --exit-code go.mod go.sum || {
+            echo "❌ go.mod or go.sum changed. Run 'go mod tidy' and commit changes."
+            exit 1
+          }
+          
+          # Formatting check
+          echo "2. Checking code formatting..."
+          UNFORMATTED=$(gofmt -l . | grep -v vendor || true)
+          if [ -n "$UNFORMATTED" ]; then
+            echo "❌ Code not formatted. Run 'gofmt -w .'"
+            echo "Files needing formatting:"
+            echo "$UNFORMATTED"
+            exit 1
+          }
+          
+          # Static analysis
+          echo "3. Running go vet..."
+          go vet ./...
+          
+          # Build service
+          echo "4. Building ${{ matrix.service }}..."
+          go build -o /dev/null ./cmd/${{ matrix.service }}
+          
+          echo "✅ All checks passed for ${{ matrix.service }}"
 
       - name: Set up Docker Buildx
         if: github.event_name != 'pull_request'

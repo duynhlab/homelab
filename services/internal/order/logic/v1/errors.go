@@ -35,4 +35,3 @@ var (
 	// HTTP Status: 403 Forbidden
 	ErrUnauthorized = errors.New("unauthorized access")
 )
-

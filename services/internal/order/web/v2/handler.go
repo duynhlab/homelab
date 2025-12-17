@@ -4,10 +4,10 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/duynhne/monitoring/internal/order/core/domain"
 	logicv2 "github.com/duynhne/monitoring/internal/order/logic/v2"
 	"github.com/duynhne/monitoring/pkg/middleware"
+	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -55,7 +55,7 @@ func GetOrderStatus(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to get order status", zap.Error(err))
-		
+
 		switch {
 		case errors.Is(err, logicv2.ErrOrderNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
@@ -101,4 +101,3 @@ func CreateOrder(c *gin.Context) {
 	zapLogger.Info("Order created", zap.String("order_id", order.ID))
 	c.JSON(http.StatusCreated, order)
 }
-

@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
+	database "github.com/duynhne/monitoring/internal/notification/core"
 	v1 "github.com/duynhne/monitoring/internal/notification/web/v1"
 	v2 "github.com/duynhne/monitoring/internal/notification/web/v2"
 	"github.com/duynhne/monitoring/pkg/config"
@@ -69,6 +70,14 @@ func main() {
 	} else {
 		logger.Info("Profiling disabled (PROFILING_ENABLED=false)")
 	}
+
+	// Initialize database connection
+	db, err := database.Connect()
+	if err != nil {
+		logger.Fatal("Failed to connect to database", zap.Error(err))
+	}
+	defer db.Close()
+	logger.Info("Database connection established")
 
 	r := gin.Default()
 

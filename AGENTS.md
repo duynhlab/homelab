@@ -4,7 +4,7 @@
 
 ## Overview
 
-This guide provides comprehensive information for AI agents working with this codebase. Use it to navigate the project structure, understand conventions, and execute common workflows.
+This guide provides quick reference for AI agents working with this codebase. For detailed documentation, see [`docs/`](docs/README.md) - start with [`docs/development/`](docs/development/) for development workflows.
 
 ## Documentation Standards
 
@@ -25,14 +25,12 @@ This guide provides comprehensive information for AI agents working with this co
 **Examples**:
 
 ```mermaid
-# Architecture diagram
 flowchart TD
     A[Component A] --> B[Component B]
     B --> C[Component C]
 ```
 
 ```mermaid
-# Sequence diagram
 sequenceDiagram
     Client->>API: Request
     API->>Database: Query
@@ -45,598 +43,215 @@ sequenceDiagram
 - Ensure all new diagrams use Mermaid syntax
 - Use appropriate Mermaid diagram types for the content
 
-## Quick Navigation
+---
 
-- [Project Structure](#project-structure-for-agent-navigation) - Directory organization and purpose
-- [Key Files](#key-files-and-locations) - Important files by category
-- [Common Workflows](#common-workflows) - Step-by-step guides for frequent tasks
-- [Command Reference](#command-reference) - Scripts and commands organized by purpose
-- [Conventions](#conventions-and-standards) - Naming, namespace, and pattern standards
-- [Quick Lookup](#quick-navigation) - Find files by purpose
+## Development Commands
+
+Quick Go commands for local development (no Docker/Kubernetes needed):
+
+```bash
+# Run service locally
+cd services
+go run cmd/{service}/main.go
+
+# Run tests
+go test ./...
+go test ./internal/{service}/...
+
+# Build binary (no Docker needed for dev)
+go build -o bin/{service} cmd/{service}/main.go
+```
+
+**Detailed Configuration**: See [`docs/development/CONFIG_GUIDE.md`](docs/development/CONFIG_GUIDE.md) for environment variables, `.env` files, and local setup.
+
+**Deployment**: Docker/Kubernetes deployment details in [`docs/getting-started/SETUP.md`](docs/getting-started/SETUP.md)
 
 ---
 
-## Project Structure for Agent Navigation
+## Architecture Overview
 
-### Root Directory
+### 3-Layer Architecture
+
+All microservices follow a consistent 3-layer architecture:
+
+```mermaid
+flowchart TD
+    subgraph Web["Web Layer (web/v1/, web/v2/)"]
+        Handler[HTTP Handlers<br/>Request/Response<br/>Validation]
+    end
+    
+    subgraph Logic["Logic Layer (logic/v1/, logic/v2/)"]
+        Service[Business Logic<br/>Orchestration<br/>Database Queries]
+    end
+    
+    subgraph Core["Core Layer (core/)"]
+        Domain[Domain Models]
+        Database[Database Connection<br/>core/database.go]
+    end
+    
+    Handler -->|calls| Service
+    Service -->|uses| Domain
+    Service -->|queries| Database
+    Database -->|PostgreSQL| DB[(Database)]
+```
+
+**Layer Responsibilities**:
+- **Web Layer** (`web/v1/`, `web/v2/`): HTTP handlers, request/response, validation
+- **Logic Layer** (`logic/v1/`, `logic/v2/`): Business logic, orchestration, database queries
+- **Core Layer** (`core/domain/`, `core/database.go`): Domain models, database connections
+
+**Detailed Architecture**: See [`docs/apm/ARCHITECTURE.md`](docs/apm/ARCHITECTURE.md) for middleware chain and APM integration. Full system architecture in [`specs/system-context/01-architecture-overview.md`](specs/system-context/01-architecture-overview.md)
+
+---
+
+## Key Design Patterns
+
+- **Clean Architecture**: 3-layer separation (web → logic → core) with clear boundaries
+- **API Versioning**: Parallel v1/v2 endpoints, no breaking changes, gradual migration path
+- **Microservices**: 9 independent services with bounded contexts, each in own namespace
+- **Middleware Chain**: Ordered middleware (tracing → logging → metrics) for observability
+
+**Middleware Details**: See [`docs/development/TRACING_ARCHITECTURE.md`](docs/development/TRACING_ARCHITECTURE.md) for middleware chain ordering and responsibilities.
+
+---
+
+## Technology Stack
+
+- **Runtime**: Go 1.25
+- **Database**: PostgreSQL (5 clusters via Zalando/CrunchyData operators)
+  - Connection poolers: PgBouncer, PgCat
+  - Migrations: Flyway 11.19.0 (8 migration images)
+- **HTTP Framework**: Gin
+- **Observability**: OpenTelemetry (traces, metrics, logs)
+- **Deployment**: Kubernetes (Kind), Helm 3
+- **Monitoring**: Prometheus, Grafana, Tempo, Loki, Pyroscope, Jaeger
+
+**Observability Details**: See [`docs/apm/README.md`](docs/apm/README.md) for complete APM system overview. Metrics documentation in [`docs/monitoring/METRICS.md`](docs/monitoring/METRICS.md)
+
+---
+
+## Observability with OpenTelemetry
+
+The application includes comprehensive observability using OpenTelemetry:
+
+- **Traces**: OTLP → OpenTelemetry Collector → Tempo + Jaeger (distributed tracing)
+- **Metrics**: Prometheus (custom business + infrastructure metrics)
+- **Logs**: Structured logging with zap, correlated via trace_id/span_id
+- **Configuration**: Environment variables (`OTEL_COLLECTOR_ENDPOINT`, `OTEL_SAMPLE_RATE`)
+- **Logging**: Automatic trace context injection, log levels: debug, info, warn, error, fatal, panic
+
+**Detailed Guides**:
+- Tracing: [`docs/apm/TRACING.md`](docs/apm/TRACING.md)
+- Logging: [`docs/apm/LOGGING.md`](docs/apm/LOGGING.md)
+- Metrics: [`docs/monitoring/METRICS.md`](docs/monitoring/METRICS.md)
+
+---
+
+## Project Structure
 
 ```
 monitoring/
-├── services/              # All Go application code
-│   ├── cmd/               # Microservice entry points (9 services)
-│   ├── internal/          # Domain logic (private packages)
-│   ├── pkg/               # Shared packages (public)
-│   ├── Dockerfile         # Unified Dockerfile for all services
-│   ├── go.mod
-│   └── go.sum
-├── charts/                # Helm chart for microservices deployment
-│   ├── Chart.yaml
-│   ├── values.yaml
-│   ├── values/            # Per-service values (auth.yaml, user.yaml, etc.)
-│   └── templates/
-├── k8s/                   # Kubernetes manifests
-│   ├── prometheus/
-│   │   ├── values.yaml             # kube-prometheus-stack Helm values
-│   │   └── servicemonitor-microservices.yaml  # Single ServiceMonitor for all services
-│   ├── metrics/           # Metrics infrastructure
-│   │   └── metrics-server-values.yaml  # metrics-server Helm values for Kind
-│   ├── grafana-operator/
-│   ├── sloth/             # Sloth Operator (SLO management)
-│   ├── tempo/             # Grafana Tempo (distributed tracing)
-│   ├── jaeger/            # Jaeger (distributed tracing - alternative UI)
-│   ├── otel-collector/    # OpenTelemetry Collector (trace fan-out)
-│   ├── pyroscope/         # Pyroscope (continuous profiling)
-│   ├── loki/              # Loki v3.6.2 (log storage with pattern ingestion)
-│   ├── vector/            # Vector (log collection)
-│   ├── kind/              # Kind cluster configuration
-│   └── namespaces.yaml
-├── scripts/               # Deployment and utility scripts (numbered 01-12)
-├── docs/                  # Documentation
-├── slo/                   # SLO data files (backup definitions)
-├── k6/                    # K6 load testing (Dockerfile + scripts)
-├── README.md              # Project overview
-├── CLAUDE.md              # Link to  AGENTS.md for Claude (Anthropic) still uses CLAUDE.md
-├── CHANGELOG.md           # Version changelog
-└── AGENTS.md              # This file (source of truth for AI agent instructions)
+├── services/          # Go application code (9 microservices)
+├── charts/            # Helm chart for microservices
+├── k8s/               # Kubernetes manifests
+├── scripts/           # Deployment scripts (01-12)
+├── docs/              # Documentation (starting point for details)
+├── k6/                # K6 load testing
+└── specs/             # Specifications and research
 ```
 
-### Directory Details
+**Full Documentation Index**: See [`docs/README.md`](docs/README.md) for complete documentation structure.
 
-#### `services/` - Go Application Code
+---
 
-All Go source code is organized under the `services/` directory:
+## API Endpoints
 
-```
-services/
-├── cmd/                   # Microservice entry points (9 services)
-│   ├── auth/
-│   ├── user/
-│   ├── product/
-│   ├── cart/
-│   ├── order/
-│   ├── review/
-│   ├── notification/
-│   ├── shipping/
-│   └── shipping-v2/
-├── internal/              # Domain logic (private packages)
-│   ├── auth/
-│   │   ├── web/           # HTTP handlers layer
-│   │   │   ├── v1/
-│   │   │   └── v2/
-│   │   ├── logic/         # Business logic layer
-│   │   │   ├── v1/
-│   │   │   └── v2/
-│   │   └── core/          # Core domain layer
-│   │       └── domain/
-│   ├── user/
-│   ├── product/
-│   ├── cart/
-│   ├── order/
-│   ├── review/
-│   ├── notification/
-│   └── shipping/
-├── pkg/                   # Shared packages
-│   └── middleware/
-├── Dockerfile
-├── go.mod
-└── go.sum
-```
+9 microservices with RESTful APIs:
 
-**Services** (9 microservices):
-- `auth` - Authentication API (v1/v2)
-- `user` - User management API (v1/v2)
-- `product` - Product catalog API (v1/v2)
-- `cart` - Shopping cart API (v1/v2)
-- `order` - Order management API (v1/v2)
-- `review` - Product reviews API (v1/v2)
-- `notification` - Notifications API (v1/v2)
-- `shipping` - Shipping API (v1 only)
-- `shipping-v2` - Enhanced shipping API (v2 only)
+| Service | Namespace | Base URLs |
+|---------|-----------|-----------|
+| auth | auth | `/api/v1/*`, `/api/v2/*` |
+| user | user | `/api/v1/*`, `/api/v2/*` |
+| product | product | `/api/v1/*`, `/api/v2/*` |
+| cart | cart | `/api/v1/*`, `/api/v2/*` |
+| order | order | `/api/v1/*`, `/api/v2/*` |
+| review | review | `/api/v1/*`, `/api/v2/*` |
+| notification | notification | `/api/v1/*`, `/api/v2/*` |
+| shipping | shipping | `/api/v1/*` (v1 only) |
+| shipping-v2 | shipping | `/api/v2/*` (v2 only) |
 
-**Pattern**: Each service has versioned API endpoints (`/api/v1/*`, `/api/v2/*`) with 3-layer architecture:
-- `web/v1/`, `web/v2/` - HTTP handlers (Gin handlers)
-- `logic/v1/`, `logic/v2/` - Business logic layer
-- `core/domain/` - Domain models
+**Complete API Documentation**: See [`docs/api/API_REFERENCE.md`](docs/api/API_REFERENCE.md) for all endpoints, request/response models, and examples.
 
-**Shared Code**: 
-- `pkg/middleware/prometheus.go` - Prometheus metrics middleware (collects metrics with `method`, `path`, `code` labels; `app`, `namespace` added by Prometheus during scrape)
-- `pkg/middleware/logging.go` - Structured logging middleware with trace-id correlation
-- `pkg/middleware/tracing.go` - OpenTelemetry distributed tracing middleware
-- `pkg/middleware/profiling.go` - Pyroscope continuous profiling middleware
+---
 
-#### `charts/` - Helm Chart
+## Important Notes
 
-Generic Helm chart for deploying all microservices:
+### Deployment Order
 
-```
-charts/
-├── Chart.yaml             # Chart metadata (name: microservice, version: 0.2.0)
-├── values.yaml            # Default values (includes extraEnv pattern)
-├── values/                # Per-service value overrides
-│   ├── auth.yaml
-│   ├── user.yaml
-│   ├── product.yaml
-│   ├── cart.yaml
-│   ├── order.yaml
-│   ├── review.yaml
-│   ├── notification.yaml
-│   ├── shipping.yaml
-│   └── shipping-v2.yaml
-└── templates/
-    ├── _helpers.tpl       # Template helpers
-    ├── deployment.yaml    # Deployment template (unified env block)
-    └── service.yaml       # Service template
-```
+Infrastructure → Monitoring → APM → **Databases** → Apps → Load Testing → SLO → Access
 
-**Usage:**
-```bash
-# Local deployment
-./scripts/05-deploy-microservices.sh --local
+1. Infrastructure (01) - Kind cluster
+2. Monitoring (02) - Prometheus, Grafana, metrics (BEFORE apps)
+3. APM (03) - Tempo, Pyroscope, Loki, Vector (BEFORE apps)
+4. **Databases (04)** - PostgreSQL operators, clusters, poolers (BEFORE apps)
+5. Build & Deploy Apps (05-06) - Build images, deploy services
+6. Load Testing (07) - K6 load generators (AFTER apps)
+7. SLO (08) - Sloth Operator and SLO CRDs
+8. Access Setup (09) - Port-forwarding
 
-# From OCI registry
-./scripts/05-deploy-microservices.sh --registry
+### Scripts
 
-# Manual Helm install
-helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-namespace
-```
+Numbered scripts (01-12) execute in order. See [`docs/getting-started/SETUP.md`](docs/getting-started/SETUP.md) for deployment guide.
 
-**OCI Registry:** `oci://ghcr.io/duynhne/charts/microservice`
+### Namespaces
 
-#### `k8s/` - Kubernetes Manifests
-
-Kubernetes manifests for monitoring and infrastructure components:
-
-```
-k8s/
-├── prometheus/           # Prometheus Operator configuration
-│   ├── values.yaml       # kube-prometheus-stack Helm values
-│   └── servicemonitor-microservices.yaml  # Single ServiceMonitor for all services
-├── metrics/              # Metrics infrastructure
-│   └── metrics-server-values.yaml  # metrics-server configuration for Kind clusters
-├── grafana-operator/     # Grafana Operator resources
-│   ├── README.md         # Helm install instructions
-│   ├── values.yaml       # Operator Helm values
-│   ├── grafana.yaml      # Grafana CR (anonymous auth, dark theme)
-│   ├── datasource-*.yaml # Datasource CRs (Prometheus, Tempo, Loki, Pyroscope, Jaeger)
-│   └── dashboards/       # Kustomize (ConfigMap + GrafanaDashboard CRs)
-├── sloth/                # Sloth Operator (SLO management)
-│   ├── values.yaml       # Helm values for Sloth Operator
-│   ├── README.md
-│   └── crds/             # PrometheusServiceLevel CRDs (9 services)
-├── tempo/                # Grafana Tempo (distributed tracing)
-├── jaeger/               # Jaeger (distributed tracing - alternative UI)
-│   └── values.yaml       # Helm values for Jaeger all-in-one
-├── otel-collector/       # OpenTelemetry Collector (trace fan-out to Tempo + Jaeger)
-│   └── values.yaml       # Helm values for OTel Collector
-├── pyroscope/            # Pyroscope (continuous profiling)
-├── loki/                 # Loki v3.6.2 (log storage with pattern ingestion)
-├── vector/               # Vector (log collection with self-monitoring)
-│   ├── configmap.yaml    # Vector config (internal_metrics + prometheus_exporter)
-│   ├── service.yaml      # Expose metrics on port 9090
-│   ├── servicemonitor.yaml # Auto-discovery for Prometheus
-│   └── rbac.yaml         # Permissions for log collection
-├── kind/                 # Kind cluster configuration
-└── namespaces.yaml       # Namespace definitions
-```
-
-**Note**: Microservices are deployed via Helm chart (`charts/`), not raw YAML manifests. Grafana is managed via the Grafana Operator (`k8s/grafana-operator/`).
-
-**Namespaces**:
-- `monitoring` - Monitoring components (Prometheus, Grafana, Tempo, Jaeger, OTel Collector, Pyroscope, Loki) and SLO system
-- `kube-system` - Vector (log collection DaemonSet)
+- `monitoring` - Monitoring components (Prometheus, Grafana, Tempo, Jaeger, Pyroscope, Loki) and SLO system
+- Service namespaces - Each microservice has own namespace: `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`
 - `k6` - K6 load testing
-- Service namespaces - Each microservice has its own namespace: `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`
+- `kube-system` - Vector (log collection)
 
-#### `scripts/` - Deployment Scripts
+### Database
 
-Numbered scripts (01-12) for deployment and operations:
+- **5 PostgreSQL Clusters**: review-db, auth-db, supporting-db (shared: user + notification + shipping-v2), product-db, transaction-db
+- **Connection Poolers**: PgBouncer (Auth), PgCat (Product, Cart+Order)
+- **Migrations**: Flyway 11.19.0 with 8 migration images (auth, user, product, cart, order, review, notification, shipping-v2)
+- **Operators**: Zalando Postgres Operator (v1.15.0), CrunchyData Postgres Operator (v5.7.0)
 
-**Deployment Order:**
-1. Infrastructure (01) → 2. Monitoring (02) → 3. APM (03) → 4. Build & Deploy Apps (04-05) → 5. Load Testing (06) → 6. SLO (07) → 7. Access Setup (08)
+### SLO
 
-**Infrastructure (01):**
-- `01-create-kind-cluster.sh` - Create Kind Kubernetes cluster
+Managed via Sloth Operator (PrometheusServiceLevel CRDs). See [`docs/slo/README.md`](docs/slo/README.md) for SLO system overview.
 
-**Monitoring Stack (02):**
-- `02-deploy-monitoring.sh` - Deploy Prometheus, Grafana, kube-state-metrics (via kube-prometheus-stack), and metrics-server (via Helm) (BEFORE apps)
+### CI/CD
 
-**APM Stack (03) - Required:**
-- `03a-deploy-tempo.sh` - Deploy Grafana Tempo v2.9.0 (distributed tracing with metrics-generator for TraceQL rate() queries)
-- `03b-deploy-pyroscope.sh` - Deploy Pyroscope (continuous profiling)
-- `03c-deploy-loki.sh` - Deploy Loki + Vector (log aggregation)
-- `03d-deploy-jaeger.sh` - Deploy Jaeger + OpenTelemetry Collector (alternative tracing UI with fan-out)
-- `03-deploy-apm.sh` - Deploy all APM components (deploy BEFORE apps to collect traces/logs/profiles immediately)
-
-**APM Configuration:**
-- Tracing sampling: 10% (production), 100% (development) - configurable via `OTEL_SAMPLE_RATE`
-- Request filtering: health/metrics endpoints automatically skipped
-- Graceful shutdown: automatic span flushing on termination
-- Service detection: automatic from Kubernetes pod metadata
-- Trace fan-out: Applications send traces to OTel Collector, which fans out to both Tempo and Jaeger
-
-**Build & Deploy Applications (04-05):**
-- `04-build-microservices.sh` - Build Docker images for all 9 services
-- `05-deploy-microservices.sh` - Deploy all microservices using Helm (`--local` or `--registry`)
-
-**Load Testing (06):**
-- `06-deploy-k6.sh` - Deploy k6 load generators via Helm (deploy AFTER apps to test them)
-
-**SLO System (07) - Required:**
-- `07-deploy-slo.sh` - Deploy Sloth Operator and SLO CRDs (automatic validation & rule generation)
-
-**Access Setup (08):**
-- `08-setup-access.sh` - Setup port-forwarding for services
-
-**Utilities:**
-- `09-reload-dashboard.sh` - Reapply Grafana Operator dashboards (microservices + SLO)
-- `10-diagnose-latency.sh` - Diagnostic script for latency issues
-- `11-error-budget-alert.sh` - Error budget alert response script
-- `cleanup.sh` - Clean up Kind cluster and resources
-
-#### `docs/` - Documentation
-
-- `METRICS.md` - Comprehensive metrics documentation (32 panels, 6 custom metrics)
-- `K6_LOAD_TESTING.md` - k6 load testing setup
-- `SETUP.md` - Step-by-step deployment guide
-- `API_REFERENCE.md` - API endpoint documentation
-- `PROMETHEUS_RATE_EXPLAINED.md` - Prometheus rate() and increase() explained
-- `slo/` - SLO documentation (6 files):
-  - `README.md` - SLO system overview
-  - `GETTING_STARTED.md` - SLO setup guide
-  - `SLI_DEFINITIONS.md` - SLI specifications
-  - `SLO_TARGETS.md` - SLO targets per service
-  - `ALERTING.md` - Alert configuration
-  - `ERROR_BUDGET_POLICY.md` - Error budget management
-
-#### `slo/` - SLO Data Files
-
-**Note**: SLO definitions have been migrated to PrometheusServiceLevel CRDs in `k8s/sloth/crds/*.yaml`, managed by Sloth Operator. This directory is now empty.
-
-#### `k6/` - Load Testing
-
-```
-k6/
-├── Dockerfile                           # Dockerfile for k6 image
-└── load-test-multiple-scenarios.js      # Test script with user journeys
-```
-
-**K6 Deployment**: Helm-based (reuses `charts/`)
-- Build image: `ghcr.io/duynhne/k6:scenarios`
-- Deploy to `k6` namespace
-- Helm values: `charts/values/k6-scenarios.yaml`
-- Health checks disabled: K6 is a load testing tool with no HTTP health endpoint
-
-#### `k8s/sloth/` - SLO Management (Sloth Operator)
-
-```
-k8s/sloth/
-├── values.yaml           # Helm values for Sloth Operator
-├── README.md             # Deployment instructions
-└── crds/                 # PrometheusServiceLevel CRDs (9 services)
-    ├── auth.yaml
-    ├── user.yaml
-    ├── product.yaml
-    ├── cart.yaml
-    ├── order.yaml
-    ├── review.yaml
-    ├── notification.yaml
-    ├── shipping.yaml
-    └── shipping-v2.yaml
-```
-
-**Sloth Operator**: Kubernetes-native SLO management
-- Helm deployment: `sloth/sloth` chart v0.15.0
-- Automatic Prometheus rule generation
-- PrometheusServiceLevel CRDs (one per service)
-- No more bash scripts for validation/generation
-
----
-
-## Key Files and Locations
-
-### Configuration Files
-
-| File | Purpose | Location |
-|------|---------|----------|
-| Helm Chart | Microservices deployment chart | `charts/` |
-| Helm Values | Per-service configuration | `charts/values/*.yaml` |
-| Prometheus Operator Values | kube-prometheus-stack Helm values | `k8s/prometheus/values.yaml` |
-| ServiceMonitor | Auto-discovery for all microservices | `k8s/prometheus/servicemonitor-microservices.yaml` |
-| metrics-server Values | metrics-server configuration for Kind | `k8s/metrics/metrics-server-values.yaml` |
-| Grafana Datasources | Prometheus datasource | `k8s/grafana-operator/datasource-prometheus.yaml` |
-| Grafana Dashboards | Operator-managed dashboards (microservices + SLO + Vector) | `k8s/grafana-operator/dashboards/` (`microservices-dashboard.json` is the source of truth) |
-| Dockerfile | Unified build for all services | `services/Dockerfile` |
-| Go Modules | Go dependencies | `services/go.mod` |
-
-### Dashboard Files
-
-| File | Purpose | Location |
-|------|---------|----------|
-| Main Dashboard | 32 panels in 5 row groups | `k8s/grafana-operator/dashboards/microservices-dashboard.json` |
-| Vector Dashboard | Vector self-monitoring (ID: 21954) | `k8s/grafana-operator/dashboards/grafana-dashboard-vector.yaml` |
-| SLO Overview | SLO summary dashboard (ID: 14643) | `k8s/grafana-operator/dashboards/grafana-dashboard-slo-overview.yaml` |
-| SLO Detailed | Detailed SLO metrics (ID: 14348) | `k8s/grafana-operator/dashboards/grafana-dashboard-slo-detailed.yaml` |
-
-**Dashboard Details:**
-- **UID**: `microservices-monitoring-001`
-- **Title**: "Microservices Monitoring & Performance Applications"
-- **Structure**: 34 panels organized in 5 row groups:
-  1. **📊 Overview & Key Metrics** (12 panels) - Response time percentiles (P50, P95, P99), Total RPS, Success RPS (2xx), Error RPS (4xx/5xx), Success Rate %, Error Rate %, Apdex Score, Total Requests, Up Instances, Restarts
-  2. **🚀 Traffic & Requests** (4 panels) - Status code distribution (pie chart) ⚠️ UPDATED, Total requests by endpoint (pie chart), Request rate by endpoint (time series), RPS by endpoint
-  3. **⚠️ Errors & Performance** (8 panels) - Request rate by HTTP method + endpoint, Error rate by HTTP method + endpoint, **Client Errors (4xx)** ✨ NEW, **Server Errors (5xx)** ✨ NEW, Response time per endpoint (P95, P50, P99)
-  4. **🔧 Go Runtime & Memory** (6 panels) - Heap allocated memory, Heap in-use memory, Process memory (RSS), Goroutines & threads, GC duration, GC frequency (memory leak detection)
-  5. **🖥️ Resources & Infrastructure** (5 panels) - Total memory per service, Total CPU per service, Total network traffic per service, Total requests in flight per service, Total memory allocations per service
-- **Variables** (CORRECT ORDER - v0.6.15+):
-  - `$DS_PROMETHEUS` - Prometheus datasource selector (position 1)
-  - `$namespace` - Multi-select namespace filter (**position 2 - MUST be before $app**)
-    - Query: `label_values(kube_pod_info, namespace)`
-    - Regex filter: `/^(?!kube-|default$).*/` (exclude system namespaces)
-    - Independent variable (queries kube-state-metrics)
-  - `$app` - Multi-select service filter (**position 3 - cascades from namespace**)
-    - Query: `label_values(request_duration_seconds_count{namespace=~"$namespace"}, app)`
-    - Options: auth, user, product, cart, order, review, notification, shipping with "All" option
-    - **Cascades from $namespace** (filters by selected namespace)
-  - `$rate` - Rate interval selector (1m, 2m, 3m, 5m, 10m, 30m, 1h, 2h, 4h, 8h, 16h, 1d, 2d, 3d, 5d, 7d) - default: 5m (position 4)
-- **Dashboard Updates (v0.7.3)**:
-  - ✨ **NEW Panels**: Client Errors (4xx) and Server Errors (5xx) for better error categorization
-  - ⚠️ **UPDATED Panel**: Status Code Distribution now uses `rate()` instead of cumulative counter (real-time traffic distribution)
-  - ⚠️ **UPDATED Panel**: Apdex Score with defensive division to prevent NaN on zero traffic
-  - 📚 **NEW Documentation**: Complete [Dashboard Panels Guide](docs/development/DASHBOARD_PANELS_GUIDE.md) with query analysis, troubleshooting, and SRE best practices for all 34 panels
-- **Variable Cascading**:
-  - `$namespace` filters `$app` via query: `{namespace=~"$namespace"}`
-  - Order matters: namespace must be defined before app in JSON
-  - All panels use both filters: `{app=~"$app", namespace=~"$namespace"}`
-- **Access**: http://localhost:3000/d/microservices-monitoring-001/ (after port-forward: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`)
-
-### Script Files by Category
-
-**Deployment Order:** Infrastructure → Monitoring → APM → Apps → Load Testing → SLO → Access
-
-| Category | Scripts | Purpose | Order |
-|----------|---------|---------|-------|
-| Infrastructure | 01 | Cluster setup | 1 |
-| Monitoring Stack | 02 | Deploy Prometheus, Grafana, metrics (includes kube-state-metrics + metrics-server) | 2 |
-| APM Stack | 03, 03a-c | Deploy Tempo, Pyroscope, Loki, Vector (BEFORE apps) | 3 |
-| Build & Deploy Apps | 04-05 | Build images (including k6), deploy services | 4-5 |
-| Load Testing | 07 | Deploy k6 load generators via Helm (AFTER apps) | 7 |
-| SLO System | 08 | Deploy Sloth Operator and SLO CRDs (Required) | 8 |
-| Access Setup | 09 | Setup port-forwarding | 9 |
-| Utilities | 10-12 | Dashboard reload, runbooks | - |
-
-### SLO Files
-
-| File Type | Location | Count |
-|-----------|----------|-------|
-| SLO CRDs | `k8s/sloth/crds/*.yaml` | 9 PrometheusServiceLevel CRDs (active) |
-
-**Note**: SLO definitions are managed by Sloth Operator via PrometheusServiceLevel CRDs in `k8s/sloth/crds/*.yaml`.
-
-### Documentation Files
-
-| Document | Location | Purpose |
-|----------|----------|---------|
-| Metrics Guide | `docs/monitoring/METRICS.md` | Complete metrics documentation |
-| APM Guide | `docs/apm/README.md` | APM system overview |
-| Tracing Guide | `docs/apm/TRACING.md` | Distributed tracing guide |
-| Logging Guide | `docs/apm/LOGGING.md` | Structured logging guide |
-| Profiling Guide | `docs/apm/PROFILING.md` | Continuous profiling guide |
-| SLO Guide | `docs/slo/README.md` | SLO system overview |
-| Setup Guide | `docs/getting-started/SETUP.md` | Deployment instructions |
-| API Reference | `docs/api/API_REFERENCE.md` | API endpoints |
-| k6 Load Testing | `docs/k6/K6_LOAD_TESTING.md` | Load testing guide |
-| Docs Index | `docs/README.md` | Complete documentation index |
-
----
-
-## Common Workflows
-
-### Adding a New Microservice
-
-1. **Create service structure:**
-   ```bash
-   mkdir -p services/cmd/myapp
-   mkdir -p services/internal/myapp/web/{v1,v2}
-   mkdir -p services/internal/myapp/logic/{v1,v2}
-   mkdir -p services/internal/myapp/core/domain
-   ```
-
-2. **Add service code:**
-   - `services/cmd/myapp/main.go` - Entry point
-   - `services/internal/myapp/web/v1/handler.go` - v1 HTTP handlers
-   - `services/internal/myapp/web/v2/handler.go` - v2 HTTP handlers
-   - `services/internal/myapp/logic/v1/service.go` - v1 business logic
-   - `services/internal/myapp/logic/v2/service.go` - v2 business logic
-   - `services/internal/myapp/core/domain/model.go` - Domain models
-
-3. **Create Helm values file:**
-   ```bash
-   cp charts/values/auth.yaml charts/values/myapp.yaml
-   # Edit myapp.yaml with service-specific values
-   ```
-
-4. **Update build script:**
-   - Add service to `scripts/04-build-microservices.sh`
-   - Add deployment to `scripts/05-deploy-microservices.sh`
-
-5. **Add SLO definition:**
-   - Create PrometheusServiceLevel CRD: `k8s/sloth/crds/myapp-slo.yaml`
-   - Apply: `kubectl apply -f k8s/sloth/crds/myapp-slo.yaml`
-
-6. **Build and deploy:**
-   ```bash
-   ./scripts/04-build-microservices.sh
-   ./scripts/05-deploy-microservices.sh
-   ```
-
-### Updating Grafana Dashboard
-
-1. **Edit dashboard JSON:**
-   - Update `k8s/grafana-operator/dashboards/microservices-dashboard.json` (32 panels / 5 row groups).
-   - Keep UID `microservices-monitoring-001`.
-
-2. **Reload dashboards via Grafana Operator:**
-   ```bash
-   ./scripts/09-reload-dashboard.sh
-   ```
-   The script reapplies `k8s/grafana-operator/dashboards/` (ConfigMap + `GrafanaDashboard` CR). The Grafana Operator automatically reconciles the new JSON.
-
-3. **Verify:**
-   - Port-forward Grafana: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`
-   - Open http://localhost:3000/d/microservices-monitoring-001/
-
-**Dashboard Variables Usage:**
-- `$app`: filter by service
-- `$namespace`: filter by Kubernetes namespace
-- `$rate`: Prometheus rate interval selector (default 5m)
-- All panels respect these filters automatically.
-
-### Modifying Prometheus Configuration
-
-**Note**: Since v0.5.0, Prometheus is managed by Prometheus Operator. Configuration is via Helm values and ServiceMonitor CRDs.
-
-1. **Edit Prometheus Operator values:**
-   - Edit `k8s/prometheus/values.yaml` (retention, resources, etc.)
-   
-2. **Update via Helm:**
-   ```bash
-   helm upgrade prometheus-kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-     -n monitoring \
-     -f k8s/prometheus/values.yaml
-   ```
-
-3. **Add/modify service discovery:**
-   - Edit `k8s/prometheus/servicemonitor-microservices.yaml`
-   - Apply: `kubectl apply -f k8s/prometheus/servicemonitor-microservices.yaml`
-
-4. **Verify:**
-   - Port-forward Prometheus: `kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090`
-   - Check config: http://localhost:9090/config
-   - Check targets: http://localhost:9090/targets
-   - Check ServiceMonitors: `kubectl get servicemonitors -A`
-
-### Deploying SLO Changes
-
-1. **Edit SLO CRDs:**
-   - Edit PrometheusServiceLevel CRDs in `k8s/sloth/crds/*.yaml`
-
-2. **Apply changes:**
-   ```bash
-   kubectl apply -f k8s/sloth/crds/
-   ```
-
-3. **Verify:**
-   - Check PrometheusServiceLevels: `kubectl get prometheusservicelevels -n monitoring`
-   - Check generated rules: `kubectl get prometheusrules -n monitoring`
-   - Check Prometheus rules: http://localhost:9090/api/v1/rules
-   - View SLO dashboards in Grafana (folder: SLO)
-
-### Running Load Tests
-
-1. **Deploy k6:**
-   ```bash
-   ./scripts/06-deploy-k6.sh
-   # Or deploy specific variant:
-   # ./scripts/06-deploy-k6.sh legacy
-   # ./scripts/06-deploy-k6.sh scenarios
-   ```
-
-2. **Check load generator pod:**
-   ```bash
-   kubectl get pods -n k6
-   kubectl logs -n k6 -l app=k6-scenarios -f
-   ```
-
-3. **Monitor metrics:**
-   - View Grafana dashboard for traffic patterns
-   - Check Prometheus for metrics: `request_duration_seconds_count`
-
-### Troubleshooting Common Issues
-
-**Dashboard not updating:**
-- Re-apply dashboards: `kubectl apply -k k8s/grafana-operator/dashboards/`
-- Check GrafanaDashboard status: `kubectl get grafanadashboards -n monitoring`
-- Inspect Grafana Operator logs: `kubectl logs -n monitoring deployment/grafana-operator`
-
-**Prometheus not scraping:**
-- Check ServiceMonitor: `kubectl get servicemonitor -n monitoring` (single ServiceMonitor for all services)
-- Check namespace labels: `kubectl get ns --show-labels | grep monitoring=enabled`
-- Check Prometheus targets: http://localhost:9090/targets
-- Check Prometheus Operator logs: `kubectl logs -n monitoring -l app.kubernetes.io/name=kube-prometheus-stack-operator`
-- Verify pod labels exist: `kubectl get pods -n <namespace> --show-labels`
-
-**SLO rules not loading:**
-- Check PrometheusServiceLevels: `kubectl get prometheusservicelevels -n monitoring`
-- Check generated PrometheusRules: `kubectl get prometheusrules -n monitoring`
-- Check Sloth Operator logs: `kubectl logs -n monitoring -l app=sloth -c sloth --tail=50`
-- Check Prometheus rules API: http://localhost:9090/api/v1/rules
-
-**Sloth PrometheusRule Validation Failure (`GEN OK = false`):**
-- **Symptom**: PrometheusServiceLevels show `GEN OK = false`, `READY SLOS = 0`, Sloth logs show "admission webhook denied the request: Rules are not valid"
-- **Root Cause**: Prometheus Operator ValidatingWebhookConfiguration rejects Sloth-generated PrometheusRules
-- **Investigation Steps**:
-  1. Check if webhook exists: `kubectl get validatingwebhookconfigurations | grep prometheus`
-  2. Test manual PrometheusRule creation to isolate issue
-  3. Check Sloth debug logs: Enable `sloth.debug.enabled: true` in `k8s/sloth/values.yaml`
-- **Solution**: Remove problematic webhook validation:
-  ```bash
-  kubectl get validatingwebhookconfigurations kube-prometheus-stack-admission -o yaml > /tmp/webhook-backup.yaml
-  kubectl delete validatingwebhookconfigurations kube-prometheus-stack-admission
-  kubectl delete pod -n monitoring -l app=sloth  # Restart Sloth to clear cache
-  ```
-- **Verify**: `kubectl get prometheusservicelevels -n monitoring` should show `GEN OK = true` for all SLOs
-- **Impact**: Without this fix, no SLO rules are generated, error budget tracking and burn rate alerts won't work
-- **Note**: This is a known compatibility issue between Sloth Operator and Prometheus Operator webhook validation
-
-**Sloth commonPlugins DNS Issues (Kind cluster):**
-- **Symptom**: Git-sync container CrashLoopBackOff with "Could not resolve host: github.com"
-- **Cause**: Kind cluster lacks external DNS resolution for fetching sloth-common-sli-plugins
-- **Fix**: Disable `commonPlugins` in `k8s/sloth/values.yaml`: `commonPlugins.enabled: false`
-- **Impact**: Custom SLO definitions work fine without common plugins (we use explicit Prometheus queries)
-
-**Metrics not appearing:**
-- Verify app has `/metrics` endpoint
-- Check Prometheus scrape config includes the service
-- Verify labels match (app, namespace, job)
+GitHub Actions workflows:
+- `.github/workflows/build-images.yml` - Build microservice images
+- `.github/workflows/build-init-images.yml` - Build Flyway init images
+- `.github/workflows/build-k6-images.yml` - Build k6 images
+- `.github/workflows/helm-release.yml` - Helm chart release
 
 ---
 
 ## Command Reference
 
-### Deployment Commands
-
-**Deployment Order:** Infrastructure → Monitoring → APM → Apps → Load Testing → SLO → Access
+### Deployment Scripts
 
 | Script | Command | Purpose | Order |
 |--------|---------|---------|-------|
 | Create cluster | `./scripts/01-create-kind-cluster.sh` | Create Kind Kubernetes cluster | 1 |
-| Deploy monitoring | `./scripts/02-deploy-monitoring.sh` | Deploy Prometheus, Grafana, metrics (includes kube-state-metrics + metrics-server) | 2 |
-| Deploy APM | `./scripts/03-deploy-apm.sh` | Deploy all APM components (BEFORE apps - Tempo, Pyroscope, Loki, Vector) | 3 |
-| Build images | `./scripts/04-build-microservices.sh` | Build all 9 service Docker images | 4 |
-| Deploy services (local) | `./scripts/05-deploy-microservices.sh --local` | Deploy using local Helm chart | 6 |
-| Deploy services (registry) | `./scripts/05-deploy-microservices.sh --registry` | Deploy from OCI registry | 6 |
-| Deploy k6 | `./scripts/06-deploy-k6.sh` | Deploy k6 load generators via Helm (AFTER apps) | 7 |
-| Deploy SLO | `./scripts/07-deploy-slo.sh` | Deploy Sloth Operator and SLO CRDs | 8 |
-| Setup access | `./scripts/08-setup-access.sh` | Setup port-forwarding | 8 |
+| Deploy monitoring | `./scripts/02-deploy-monitoring.sh` | Deploy Prometheus, Grafana, metrics | 2 |
+| Deploy APM | `./scripts/03-deploy-apm.sh` | Deploy all APM components (BEFORE apps) | 3 |
+| Deploy databases | `./scripts/04-deploy-databases.sh` | Deploy PostgreSQL operators, clusters, poolers | 4 |
+| Build images | `./scripts/05-build-microservices.sh` | Build all 9 service Docker images + 8 migration images | 5 |
+| Deploy services (local) | `./scripts/06-deploy-microservices.sh --local` | Deploy using local Helm chart | 6 |
+| Deploy services (registry) | `./scripts/06-deploy-microservices.sh --registry` | Deploy from OCI registry | 6 |
+| Deploy k6 | `./scripts/07-deploy-k6.sh` | Deploy k6 load generators (AFTER apps) | 7 |
+| Deploy SLO | `./scripts/08-deploy-slo.sh` | Deploy Sloth Operator and SLO CRDs | 8 |
+| Setup access | `./scripts/09-setup-access.sh` | Setup port-forwarding | 9 |
+| Reload dashboard | `./scripts/10-reload-dashboard.sh` | Reapply Grafana dashboards | - |
+| Diagnose latency | `./scripts/11-diagnose-latency.sh` | Analyze latency issues | - |
+| Error budget alert | `./scripts/12-error-budget-alert.sh` | Respond to error budget alerts | - |
+
+**Detailed Deployment Guide**: See [`docs/getting-started/SETUP.md`](docs/getting-started/SETUP.md)
 
 ### Helm Commands
 
@@ -647,32 +262,11 @@ k8s/sloth/
 | `helm uninstall <name> -n <namespace>` | Uninstall a service |
 | `helm pull oci://ghcr.io/duynhne/charts/microservice` | Pull chart from OCI registry |
 
-### Monitoring Commands
-
-| Script | Command | Purpose |
-|--------|---------|---------|
-| Reload dashboard | `./scripts/09-reload-dashboard.sh` | Reload Grafana dashboard ConfigMap |
-
-### SLO Commands
-
-| Script | Command | Purpose |
-|--------|---------|---------|
-| Deploy SLOs | `./scripts/07-deploy-slo.sh` | Full SLO deployment via Sloth Operator (Helm) |
-
-**Note**: Validation and rule generation are now handled automatically by Sloth Operator. No more manual bash scripts.
-
-### Runbook Commands
-
-| Script | Command | Purpose |
-|--------|---------|---------|
-| Diagnose latency | `./scripts/10-diagnose-latency.sh` | Analyze latency issues |
-| Error budget alert | `./scripts/11-error-budget-alert.sh` | Respond to error budget alerts |
-
 ### kubectl Shortcuts
 
 | Command | Purpose |
 |---------|---------|
-| `kubectl get pods -n {namespace}` | List pods in namespace (e.g., auth, user, monitoring) |
+| `kubectl get pods -n {namespace}` | List pods in namespace |
 | `kubectl logs -l app={service-name} -n {namespace}` | View service logs |
 | `kubectl port-forward -n monitoring svc/grafana-service 3000:3000` | Port-forward Grafana |
 | `kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090` | Port-forward Prometheus |
@@ -691,88 +285,6 @@ k8s/sloth/
 
 ---
 
-## Conventions and Standards
-
-### Namespace Conventions
-
-- **`monitoring`** - Monitoring components (Prometheus, Grafana, Tempo, Pyroscope, Loki) and SLO system
-- **`kube-system`** - Vector (log collection DaemonSet)
-- **`k6`** - K6 load testing
-- **Service namespaces** - Each microservice has its own namespace:
-  - `auth` - auth service
-  - `user` - user service
-  - `product` - product service
-  - `cart` - cart service
-  - `order` - order service
-  - `review` - review service
-  - `notification` - notification service
-  - `shipping` - shipping and shipping-v2 services
-
-### Script Naming
-
-- **Numbered prefixes (01-12)** - Execution order and categorization
-- **Format**: `{number}-{purpose}.sh`
-- **Categories**:
-  - 01-02: Infrastructure
-  - 03: Monitoring Stack
-  - 04, 04a-c: APM Stack
-  - 05-06: Build & Deploy Apps
-  - 07: Load Testing (K6)
-  - 08: SLO Management (Sloth Operator)
-  - 09: Access Setup
-  - 10-12: Utilities
-
-### File Organization Patterns
-
-- **Services**: `services/cmd/{service}/main.go` + `services/internal/{service}/{v1,v2,domain}/`
-- **Kubernetes**: `k8s/{component}/{deployment,service}.yaml`
-- **Scripts**: `scripts/{number}-{purpose}.sh`
-- **SLO**: `k8s/sloth/crds/*.yaml` (PrometheusServiceLevel CRDs managed by Sloth Operator)
-
-### Metric Naming Conventions
-
-- **Pattern**: `{domain}_{metric}_{unit}`
-- **Examples**:
-  - `request_duration_seconds` (histogram)
-  - `requests_total` (counter)
-  - `requests_in_flight` (gauge)
-
-### Label Requirements
-
-**Required labels for metrics (after Prometheus scrape):**
-- `job` - Scrape job name - **Added by ServiceMonitor relabeling** (set to `"microservices"` for all services)
-- `app` - Service name (e.g., `auth`, `user`) - **Added by ServiceMonitor relabeling** (from service label)
-- `service` - Original service name - **Added by ServiceMonitor relabeling** (from Kubernetes service metadata)
-- `namespace` - Kubernetes namespace - **Added by ServiceMonitor relabeling** (from pod metadata)
-- `instance` - Pod IP:port - **Added by Prometheus** (automatic)
-
-**Application-level labels (emitted by app):**
-- `method` - HTTP method (GET, POST, PUT, DELETE)
-- `path` - Request path (e.g., `/api/v1/users`)
-- `code` - HTTP status code (200, 404, 500)
-
-**Important Notes:**
-- Since v0.5.0, applications DO NOT emit `app`, `namespace`, or `job` labels
-- All service identification labels are injected by Prometheus during scrape via ServiceMonitor `relabelings`
-- `job="microservices"` is set via relabeling (not Kubernetes label) to enable dashboard filtering
-- Alternative: Let `job` default to service name (see `docs/monitoring/METRICS_LABEL_SOLUTIONS.md` for Option B)
-
-### Go Code Conventions
-
-- **Middleware**: `services/pkg/middleware/prometheus.go` - Centralized metrics collection
-- **Handlers**: Separate `v1/` and `v2/` directories for API versioning
-- **Domain models**: `domain/` directory for data structures
-- **Memory leak prevention**: Always use `defer cancel()`, close channels, set timeouts
-
-### Dashboard Conventions
-
-- **UID**: `microservices-monitoring-001`
-- **Variables**: `$app`, `$namespace`, `$rate`
-- **Panel descriptions**: Concise and actionable
-- **Query filters**: Always include `job=~"microservices"` and `namespace=~"$namespace"`
-
----
-
 ## Quick Navigation
 
 ### Find Files by Purpose
@@ -781,12 +293,13 @@ k8s/sloth/
 - Service code: `services/cmd/{service}/`, `services/internal/{service}/`
 - Helm values: `charts/values/{service}.yaml`
 - SLO CRD: `k8s/sloth/crds/{service}-slo.yaml`
+- Migration: `services/migrations/{service}/Dockerfile` + `sql/V1__Initial_schema.sql`
 
 **Update monitoring:**
 - Dashboard JSON: `k8s/grafana-operator/dashboards/microservices-dashboard.json`
 - Prometheus Operator values: `k8s/prometheus/values.yaml`
 - ServiceMonitor: `k8s/prometheus/servicemonitor-microservices.yaml`
-- Grafana Operator resources: `k8s/grafana-operator/` (Grafana CR, datasources, dashboards)
+- Grafana Operator resources: `k8s/grafana-operator/`
 
 **Modify SLOs:**
 - Edit CRDs: `k8s/sloth/crds/*.yaml` (PrometheusServiceLevel CRDs)
@@ -800,31 +313,163 @@ k8s/sloth/
 ### Find Scripts by Task
 
 - **Setup cluster**: `01-create-kind-cluster.sh`
-- **Deploy monitoring**: `02-deploy-monitoring.sh` (Prometheus, Grafana, kube-state-metrics, metrics-server - BEFORE apps)
-- **Deploy APM**: `03-deploy-apm.sh` (BEFORE apps - Tempo, Pyroscope, Loki, Vector)
-- **Build & deploy apps**: `04-build-microservices.sh`, `05-deploy-microservices.sh`
+- **Deploy monitoring**: `02-deploy-monitoring.sh` (BEFORE apps)
+- **Deploy APM**: `03-deploy-apm.sh` (BEFORE apps)
+- **Deploy databases**: `04-deploy-databases.sh` (BEFORE apps)
+- **Build & deploy apps**: `05-build-microservices.sh`, `06-deploy-microservices.sh`
 - **Load testing**: `07-deploy-k6.sh` (AFTER apps)
-- **SLO system**: `08-deploy-slo.sh` (Sloth Operator + CRDs)
-- **Access setup**: `08-setup-access.sh`
-- **Utilities**: `09-reload-dashboard.sh`, `10-diagnose-latency.sh`, `11-error-budget-alert.sh`
+- **SLO system**: `08-deploy-slo.sh`
+- **Access setup**: `09-setup-access.sh`
+- **Utilities**: `10-reload-dashboard.sh`, `11-diagnose-latency.sh`, `12-error-budget-alert.sh`
 
 ### Find Documentation by Topic
 
-- **Metrics**: `docs/monitoring/METRICS.md`
-- **SLO**: `docs/slo/README.md`, `docs/slo/GETTING_STARTED.md`
-- **API**: `docs/api/API_REFERENCE.md`
-- **Setup**: `docs/getting-started/SETUP.md`
-- **k6**: `docs/k6/K6_LOAD_TESTING.md`
-- **Docs Index**: `docs/README.md`
+- **Getting Started**: [`docs/getting-started/SETUP.md`](docs/getting-started/SETUP.md), [`docs/getting-started/ADDING_SERVICES.md`](docs/getting-started/ADDING_SERVICES.md)
+- **Development**: [`docs/development/CONFIG_GUIDE.md`](docs/development/CONFIG_GUIDE.md), [`docs/development/ERROR_HANDLING.md`](docs/development/ERROR_HANDLING.md), [`docs/development/TRACING_ARCHITECTURE.md`](docs/development/TRACING_ARCHITECTURE.md)
+- **Monitoring**: [`docs/monitoring/METRICS.md`](docs/monitoring/METRICS.md), [`docs/monitoring/TROUBLESHOOTING.md`](docs/monitoring/TROUBLESHOOTING.md)
+- **APM**: [`docs/apm/README.md`](docs/apm/README.md), [`docs/apm/TRACING.md`](docs/apm/TRACING.md), [`docs/apm/LOGGING.md`](docs/apm/LOGGING.md), [`docs/apm/PROFILING.md`](docs/apm/PROFILING.md)
+- **SLO**: [`docs/slo/README.md`](docs/slo/README.md), [`docs/slo/GETTING_STARTED.md`](docs/slo/GETTING_STARTED.md)
+- **API**: [`docs/api/API_REFERENCE.md`](docs/api/API_REFERENCE.md)
+- **k6**: [`docs/k6/K6_LOAD_TESTING.md`](docs/k6/K6_LOAD_TESTING.md)
+- **Docs Index**: [`docs/README.md`](docs/README.md)
 
 ---
 
-## Additional Resources
+## Conventions and Standards
 
-- **Project README**: `README.md` - Project overview and quick start
-- **Claude Commands**: `.claude/commands/` - AI workflow commands (plan, implement, analyze, deploy, document)
-- **Claude Skills**: `.claude/skill/` - Skill
+### Namespace Conventions
+
+- **`monitoring`** - Monitoring components and SLO system
+- **Service namespaces** - Each microservice has own namespace: `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`
+- **`k6`** - K6 load testing
+- **`kube-system`** - Vector (log collection)
+
+### Script Naming
+
+- **Numbered prefixes (01-12)** - Execution order
+- **Format**: `{number}-{purpose}.sh`
+- **Categories**: Infrastructure (01-02), Monitoring (02), APM (03), Databases (04), Apps (05-06), Load Testing (07), SLO (08), Access (09), Utilities (10-12)
+
+### File Organization Patterns
+
+- **Services**: `services/cmd/{service}/main.go` + `services/internal/{service}/{v1,v2,core}/`
+- **Kubernetes**: `k8s/{component}/`
+- **Scripts**: `scripts/{number}-{purpose}.sh`
+- **SLO**: `k8s/sloth/crds/*.yaml` (PrometheusServiceLevel CRDs)
+- **Migrations**: `services/migrations/{service}/Dockerfile` + `sql/V1__Initial_schema.sql`
+
+### Metric Naming Conventions
+
+- **Pattern**: `{domain}_{metric}_{unit}`
+- **Examples**: `request_duration_seconds` (histogram), `requests_total` (counter), `requests_in_flight` (gauge)
+
+### Label Requirements
+
+**Required labels for metrics (after Prometheus scrape):**
+- `job` - Set to `"microservices"` via ServiceMonitor relabeling
+- `app` - Service name (from service label)
+- `namespace` - Kubernetes namespace (from pod metadata)
+- `instance` - Pod IP:port (automatic)
+
+**Application-level labels (emitted by app):**
+- `method` - HTTP method (GET, POST, PUT, DELETE)
+- `path` - Request path (e.g., `/api/v1/users`)
+- `code` - HTTP status code (200, 404, 500)
+
+**Note**: Applications DO NOT emit `app`, `namespace`, or `job` labels. All service identification labels are injected by Prometheus during scrape via ServiceMonitor `relabelings`.
+
+### Go Code Conventions
+
+- **Middleware**: `services/pkg/middleware/` - Centralized observability middleware
+- **Handlers**: Separate `v1/` and `v2/` directories for API versioning
+- **Domain models**: `core/domain/` directory for data structures
+- **Database**: `core/database.go` for database connections
+- **Memory leak prevention**: Always use `defer cancel()`, close channels, set timeouts
+
+### Dashboard Conventions
+
+- **UID**: `microservices-monitoring-001`
+- **Variables**: `$app`, `$namespace`, `$rate`
+- **Query filters**: Always include `job=~"microservices"` and `namespace=~"$namespace"`
+
+**Dashboard Details**: See [`docs/development/DASHBOARD_PANELS_GUIDE.md`](docs/development/DASHBOARD_PANELS_GUIDE.md) for complete dashboard reference (34 panels).
 
 ---
 
-**Last Updated**: December 14, 2025 - Added Jaeger + OpenTelemetry Collector for dual tracing backends (v0.8.0)
+### Local Build Verification
+
+**Before pushing code, run:**
+```bash
+./scripts/00-verify-build.sh
+```
+
+**What it checks:**
+1. Go module synchronization (`go.mod`/`go.sum`)
+2. Code formatting (`gofmt`)
+3. Static analysis (`go vet`)
+4. Build all 9 services
+5. Tests (optional - use `--skip-tests` to skip)
+
+**Usage:**
+```bash
+# Run all checks including tests
+./scripts/00-verify-build.sh
+
+# Skip tests (faster, for quick verification)
+./scripts/00-verify-build.sh --skip-tests
+```
+
+**If script fails:**
+- Fix the reported error
+- Re-run the script
+- Commit changes only after all checks pass
+
+**Optional: Git Hook Setup**
+
+To automatically run verification before each commit:
+
+```bash
+# Install git hook
+cp .githooks/pre-commit .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
+**Note:** Git hook is optional. You can skip it with `git commit --no-verify` if needed.
+
+**Troubleshooting:**
+- **"go.mod or go.sum changed"**: Run `go mod tidy` and commit the changes
+- **"Code not formatted"**: Run `gofmt -w .` to auto-format
+- **"Failed to build [service]"**: Check compilation errors in that service
+- **"go vet found issues"**: Review and fix the reported issues
+
+---
+## Troubleshooting
+
+Common issues and quick fixes. For detailed troubleshooting, see [`docs/monitoring/TROUBLESHOOTING.md`](docs/monitoring/TROUBLESHOOTING.md).
+
+**Dashboard not updating:**
+- Re-apply: `kubectl apply -k k8s/grafana-operator/dashboards/`
+- Check status: `kubectl get grafanadashboards -n monitoring`
+
+**Prometheus not scraping:**
+- Check ServiceMonitor: `kubectl get servicemonitor -n monitoring`
+- Check targets: http://localhost:9090/targets
+
+**SLO rules not loading:**
+- Check CRDs: `kubectl get prometheusservicelevels -n monitoring`
+- Check rules: `kubectl get prometheusrules -n monitoring`
+
+**Metrics not appearing:**
+- Verify `/metrics` endpoint exists
+- Check ServiceMonitor configuration
+- Verify labels match (app, namespace, job)
+
+---
+
+## Changelog
+
+See [`CHANGELOG.md`](CHANGELOG.md) for complete version history.
+
+**Important for AI Agents**: Do NOT modify existing entries in [`CHANGELOG.md`](CHANGELOG.md). ONLY add new entries at the top. Never edit or remove historical changelog entries.
+
+---

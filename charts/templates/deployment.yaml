@@ -35,6 +35,36 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if and .Values.migrations.enabled .Values.migrations.image }}
+      initContainers:
+        - name: flyway-migrate
+          image: {{ .Values.migrations.image }}
+          imagePullPolicy: {{ .Values.migrations.imagePullPolicy | default "IfNotPresent" }}
+          env:
+            {{- /* Pass all DB_* environment variables to Flyway init container */}}
+            {{- range .Values.extraEnv }}
+            {{- if hasPrefix .name "DB_" }}
+            - name: {{ .name }}
+              {{- if .value }}
+              value: {{ .value | quote }}
+              {{- end }}
+              {{- if .valueFrom }}
+              valueFrom:
+                {{- toYaml .valueFrom | nindent 16 }}
+              {{- end }}
+            {{- end }}
+            {{- end }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Build FLYWAY_URL from environment variables
+              export FLYWAY_URL="jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE:-disable}"
+              export FLYWAY_USER="${DB_USER}"
+              export FLYWAY_PASSWORD="${DB_PASSWORD}"
+              # Run Flyway migration
+              flyway migrate
+      {{- end }}
       containers:
         - name: {{ include "microservice.name" . }}
           image: {{ include "microservice.image" . }}

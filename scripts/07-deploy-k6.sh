@@ -16,7 +16,7 @@ helm upgrade --install k6-scenarios "$CHART_REF" \
   --wait --timeout 60s || true
 
 echo ""
-echo "✅ K6 deployed successfully!"
+echo "SUCCESS: K6 deployed successfully!"
 echo ""
 kubectl get pods -n k6
 echo ""

@@ -55,4 +55,3 @@ func StopProfiling() {
 		profiler.Stop()
 	}
 }
-

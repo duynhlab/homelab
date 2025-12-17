@@ -4,10 +4,10 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/duynhne/monitoring/internal/cart/core/domain"
 	logicv1 "github.com/duynhne/monitoring/internal/cart/logic/v1"
 	"github.com/duynhne/monitoring/pkg/middleware"
+	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -61,7 +61,7 @@ func AddToCart(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to add to cart", zap.Error(err))
-		
+
 		switch {
 		case errors.Is(err, logicv1.ErrInvalidQuantity):
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid quantity"})
@@ -76,4 +76,3 @@ func AddToCart(c *gin.Context) {
 	zapLogger.Info("Item added to cart", zap.String("product_id", item.ProductID))
 	c.JSON(http.StatusCreated, item)
 }
-

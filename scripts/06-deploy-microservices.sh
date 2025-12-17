@@ -5,9 +5,9 @@ set -e
 # Deploy All Microservices using Helm
 # =============================================================================
 # Usage:
-#   ./05-deploy-microservices.sh              # Local mode (default)
-#   ./05-deploy-microservices.sh --local      # Local mode (explicit)
-#   ./05-deploy-microservices.sh --registry   # From ghcr.io OCI registry
+#   ./06-deploy-microservices.sh              # Local mode (default)
+#   ./06-deploy-microservices.sh --local      # Local mode (explicit)
+#   ./06-deploy-microservices.sh --registry   # From ghcr.io OCI registry
 # =============================================================================
 
 # Configuration
@@ -84,7 +84,7 @@ for entry in "${SERVICES[@]}"; do
 done
 
 echo ""
-echo "🎉 All 9 services deployed!"
+echo "SUCCESS: All 9 services deployed!"
 
 # Wait for pods to be ready
 echo ""
@@ -95,7 +95,7 @@ for entry in "${SERVICES[@]}"; do
 done
 
 echo ""
-echo "📊 Pod Status Summary:"
+echo "Pod Status Summary:"
 echo ""
 
 NAMESPACES=("auth" "user" "product" "cart" "order" "review" "notification" "shipping")

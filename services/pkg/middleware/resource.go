@@ -18,7 +18,7 @@ import (
 func detectServiceInfo() (serviceName, namespace string) {
 	// Try OTEL_SERVICE_NAME first (standard OpenTelemetry env var)
 	serviceName = os.Getenv("OTEL_SERVICE_NAME")
-	
+
 	// If not set, try to extract from Kubernetes pod name
 	if serviceName == "" {
 		// Try POD_NAME env var (if injected via Downward API)
@@ -27,7 +27,7 @@ func detectServiceInfo() (serviceName, namespace string) {
 			// Fallback to hostname (Kubernetes sets this to pod name)
 			podName, _ = os.Hostname()
 		}
-		
+
 		// Extract service name from pod name pattern
 		// Kubernetes pod naming: <deployment-name>-<replicaset-hash>-<pod-hash>
 		// Examples:
@@ -49,12 +49,12 @@ func detectServiceInfo() (serviceName, namespace string) {
 			}
 		}
 	}
-	
+
 	// Fallback if still empty
 	if serviceName == "" {
 		serviceName = "unknown-service"
 	}
-	
+
 	// Detect namespace
 	// 1. OTEL_RESOURCE_ATTRIBUTES (e.g., "service.namespace=production")
 	if attrs := os.Getenv("OTEL_RESOURCE_ATTRIBUTES"); attrs != "" {
@@ -66,20 +66,20 @@ func detectServiceInfo() (serviceName, namespace string) {
 			}
 		}
 	}
-	
+
 	// 2. Read from Kubernetes service account namespace file
 	// This file is automatically mounted by Kubernetes
 	if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
 		namespace = strings.TrimSpace(string(data))
 		return serviceName, namespace
 	}
-	
+
 	// 3. POD_NAMESPACE env var (if injected via Downward API)
 	if ns := os.Getenv("POD_NAMESPACE"); ns != "" {
 		namespace = ns
 		return serviceName, namespace
 	}
-	
+
 	// Fallback
 	namespace = "default"
 	return serviceName, namespace
@@ -89,22 +89,22 @@ func detectServiceInfo() (serviceName, namespace string) {
 // This function is exported for use by other middleware (tracing, profiling)
 func CreateResource(ctx context.Context) (*resource.Resource, error) {
 	serviceName, namespace := detectServiceInfo()
-	
+
 	// Create resource with detected attributes
 	res, err := resource.New(
 		ctx,
-		resource.WithFromEnv(),      // Read OTEL_* env vars if set
-		resource.WithProcess(),       // Add process info (PID, executable path)
-		resource.WithOS(),            // Add OS info
-		resource.WithContainer(),     // Add container ID if running in container
-		resource.WithHost(),          // Add hostname
+		resource.WithFromEnv(),   // Read OTEL_* env vars if set
+		resource.WithProcess(),   // Add process info (PID, executable path)
+		resource.WithOS(),        // Add OS info
+		resource.WithContainer(), // Add container ID if running in container
+		resource.WithHost(),      // Add hostname
 		resource.WithAttributes(
 			// Service identification (these will override if detection finds them)
 			semconv.ServiceNameKey.String(serviceName),
 			semconv.ServiceNamespaceKey.String(namespace),
 		),
 	)
-	
+
 	if err != nil {
 		// If resource creation fails, create minimal resource
 		return resource.NewWithAttributes(
@@ -113,7 +113,7 @@ func CreateResource(ctx context.Context) (*resource.Resource, error) {
 			semconv.ServiceNamespaceKey.String(namespace),
 		), nil
 	}
-	
+
 	return res, nil
 }
 
@@ -126,4 +126,3 @@ func GetServiceName(res *resource.Resource) string {
 	}
 	return "unknown-service"
 }
-

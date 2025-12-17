@@ -1,5 +1,5 @@
-# Build stage - Go 1.25 with static binary compilation
-FROM golang:1.25-alpine AS builder
+# Build stage - Go 1.25.5 with static binary compilation
+FROM golang:1.25.5-alpine AS builder
 
 WORKDIR /app
 

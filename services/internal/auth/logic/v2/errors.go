@@ -51,5 +51,8 @@ var (
 	// ErrUnauthorized indicates the user is not authorized to perform the operation.
 	// HTTP Status: 403 Forbidden
 	ErrUnauthorized = errors.New("unauthorized access")
-)
 
+	// ErrUserExists indicates the username or email already exists in the system.
+	// HTTP Status: 409 Conflict
+	ErrUserExists = errors.New("user already exists")
+)

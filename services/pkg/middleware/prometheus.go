@@ -76,23 +76,23 @@ func shouldCollectMetrics(path string) bool {
 		"/readiness",
 		"/liveness",
 	}
-	
+
 	for _, skipPath := range infrastructurePaths {
 		if strings.HasPrefix(path, skipPath) {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
 func PrometheusMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-		
+
 		method := c.Request.Method
 		path := c.Request.URL.Path
-		
+
 		// Skip metrics collection for infrastructure endpoints
 		// These are handled by Kubernetes probes and monitoring systems
 		// Not representative of actual user/business traffic
@@ -100,32 +100,32 @@ func PrometheusMiddleware() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		
+
 		// Increment in-flight requests
 		requestsInFlight.WithLabelValues(method, path).Inc()
-		
+
 		// Record request size
 		requestSize.WithLabelValues(method, path, "").Observe(float64(c.Request.ContentLength))
-		
+
 		// Process request
 		c.Next()
-		
+
 		// Calculate duration
 		duration := time.Since(start).Seconds()
 		statusCode := strconv.Itoa(c.Writer.Status())
-		
+
 		// Record metrics
 		requestDuration.WithLabelValues(method, path, statusCode).Observe(duration)
 		requestTotal.WithLabelValues(method, path, statusCode).Inc()
-		
+
 		// Record response size
 		responseSize.WithLabelValues(method, path, statusCode).Observe(float64(c.Writer.Size()))
-		
+
 		// Record errors (5xx)
 		if c.Writer.Status() >= 500 {
 			errorRate.WithLabelValues(method, path, statusCode).Inc()
 		}
-		
+
 		// Decrement in-flight requests
 		requestsInFlight.WithLabelValues(method, path).Dec()
 	}

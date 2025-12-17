@@ -4,10 +4,10 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/duynhne/monitoring/internal/review/core/domain"
 	logicv1 "github.com/duynhne/monitoring/internal/review/logic/v1"
 	"github.com/duynhne/monitoring/pkg/middleware"
+	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -61,7 +61,7 @@ func CreateReview(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to create review", zap.Error(err))
-		
+
 		switch {
 		case errors.Is(err, logicv1.ErrInvalidRating):
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid rating (must be 1-5)"})
@@ -76,4 +76,3 @@ func CreateReview(c *gin.Context) {
 	zapLogger.Info("Review created", zap.String("review_id", review.ID))
 	c.JSON(http.StatusCreated, review)
 }
-

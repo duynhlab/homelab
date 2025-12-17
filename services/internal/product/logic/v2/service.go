@@ -2,8 +2,11 @@ package v2
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"strconv"
 
+	"github.com/duynhne/monitoring/internal/product/core/database"
 	"github.com/duynhne/monitoring/pkg/middleware"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -55,20 +58,57 @@ func (s *ProductService) GetItem(ctx context.Context, itemId string) (*Item, err
 	))
 	defer span.End()
 
-	// Mock logic: simulate item not found
-	if itemId == "999" {
+	// Get database connection
+	db := database.GetDB()
+	if db == nil {
+		return nil, fmt.Errorf("database connection not available")
+	}
+
+	// Convert string ID to int
+	productID, err := strconv.Atoi(itemId)
+	if err != nil {
 		span.SetAttributes(attribute.Bool("item.found", false))
-		return nil, fmt.Errorf("get item by id %q: %w", itemId, ErrProductNotFound)
+		return nil, fmt.Errorf("invalid item id %q: %w", itemId, ErrProductNotFound)
+	}
+
+	// Query product
+	query := `
+		SELECT p.id, p.name, p.description, p.price, COALESCE(c.name, 'Uncategorized') as category
+		FROM products p
+		LEFT JOIN categories c ON p.category_id = c.id
+		WHERE p.id = $1
+	`
+	var name, description sql.NullString
+	var price float64
+	var category sql.NullString
+
+	err = db.QueryRowContext(ctx, query, productID).Scan(&productID, &name, &description, &price, &category)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			span.SetAttributes(attribute.Bool("item.found", false))
+			return nil, fmt.Errorf("get item by id %q: %w", itemId, ErrProductNotFound)
+		}
+		span.RecordError(err)
+		return nil, fmt.Errorf("query item: %w", err)
 	}
 
 	item := &Item{
-		ItemID:      itemId,
-		Name:        "Item " + itemId,
-		Price:       100,
-		Description: "Description for item " + itemId,
-		Category:    "Electronics",
-		SKU:         "SKU-" + itemId,
+		ItemID: strconv.Itoa(productID),
+		Price:  price,
+		SKU:    "SKU-" + strconv.Itoa(productID),
 	}
+	if name.Valid {
+		item.Name = name.String
+	}
+	if description.Valid {
+		item.Description = description.String
+	}
+	if category.Valid {
+		item.Category = category.String
+	} else {
+		item.Category = "Uncategorized"
+	}
+
 	span.SetAttributes(attribute.Bool("item.found", true))
 	return item, nil
 }
@@ -81,24 +121,69 @@ func (s *ProductService) CreateItem(ctx context.Context, req CreateItemRequest) 
 	))
 	defer span.End()
 
-	// Mock logic: validate price
+	// Get database connection
+	db := database.GetDB()
+	if db == nil {
+		return nil, fmt.Errorf("database connection not available")
+	}
+
+	// Validate price
 	if req.Price <= 0 {
 		span.SetAttributes(attribute.Bool("item.created", false))
 		return nil, fmt.Errorf("validate price %.2f for item %q: %w", req.Price, req.Name, ErrInvalidPrice)
 	}
 
+	// Get or create category
+	var categoryID sql.NullInt64
+	if req.Category != "" {
+		var catID int
+		checkCatQuery := `SELECT id FROM categories WHERE name = $1`
+		err := db.QueryRowContext(ctx, checkCatQuery, req.Category).Scan(&catID)
+		if err == sql.ErrNoRows {
+			createCatQuery := `INSERT INTO categories (name, description) VALUES ($1, $2) RETURNING id`
+			err = db.QueryRowContext(ctx, createCatQuery, req.Category, "").Scan(&catID)
+			if err != nil {
+				span.RecordError(err)
+				return nil, fmt.Errorf("create category: %w", err)
+			}
+		} else if err != nil {
+			span.RecordError(err)
+			return nil, fmt.Errorf("check category: %w", err)
+		}
+		categoryID = sql.NullInt64{Int64: int64(catID), Valid: true}
+	}
+
+	// Insert product
+	insertQuery := `INSERT INTO products (name, description, price, category_id) VALUES ($1, $2, $3, $4) RETURNING id`
+	var productID int
+	err := db.QueryRowContext(ctx, insertQuery, req.Name, req.Description, req.Price, categoryID).Scan(&productID)
+	if err != nil {
+		span.RecordError(err)
+		return nil, fmt.Errorf("insert item: %w", err)
+	}
+
+	// Create inventory
+	inventoryQuery := `INSERT INTO inventory (product_id, quantity) VALUES ($1, $2)`
+	_, err = db.ExecContext(ctx, inventoryQuery, productID, 0)
+	if err != nil {
+		span.RecordError(fmt.Errorf("create inventory: %w", err))
+	}
+
 	item := &Item{
-		ItemID:      "item-" + req.SKU,
+		ItemID:      strconv.Itoa(productID),
 		Name:        req.Name,
 		Price:       req.Price,
 		Description: req.Description,
 		Category:    req.Category,
 		SKU:         req.SKU,
 	}
+
 	span.SetAttributes(
 		attribute.String("item.id", item.ItemID),
 		attribute.Bool("item.created", true),
 	)
+	span.AddEvent("item.created.v2")
+
 	return item, nil
 }
 

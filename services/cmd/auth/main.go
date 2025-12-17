@@ -15,6 +15,7 @@ import (
 
 	v1 "github.com/duynhne/monitoring/internal/auth/web/v1"
 	v2 "github.com/duynhne/monitoring/internal/auth/web/v2"
+	"github.com/duynhne/monitoring/internal/auth/core/database"
 	"github.com/duynhne/monitoring/pkg/config"
 	"github.com/duynhne/monitoring/pkg/middleware"
 )
@@ -72,6 +73,15 @@ func main() {
 	} else {
 		logger.Info("Profiling disabled (PROFILING_ENABLED=false)")
 	}
+
+	// Initialize database connection
+	// Database config: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, DB_SSLMODE, DB_POOL_MAX_CONNECTIONS
+	db, err := database.Connect()
+	if err != nil {
+		logger.Fatal("Failed to connect to database", zap.Error(err))
+	}
+	defer db.Close()
+	logger.Info("Database connection established")
 
 	r := gin.Default()
 

@@ -25,7 +25,7 @@
 | kubectl | 1.25+ | Kubernetes CLI | https://kubernetes.io/docs/tasks/tools/ |
 | Helm | 3.x | Package manager | https://helm.sh/docs/intro/install/ |
 | Kind | 0.20+ | Local Kubernetes | `brew install kind` or `go install sigs.k8s.io/kind@latest` |
-| Go | 1.23.0 | Development | https://go.dev/dl/ |
+| Go | 1.25.5 | Development | https://go.dev/dl/ |
 
 **System Requirements:**
 - **CPU**: 8 cores minimum (12 cores recommended)
@@ -61,7 +61,7 @@ kind version
 
 # Check Go
 go version
-# go version go1.25
+# go version go1.25.5
 ```
 
 **Step 3: Create Kind Cluster**

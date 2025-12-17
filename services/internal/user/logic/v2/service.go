@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/duynhne/monitoring/internal/user/core/database"
+	database "github.com/duynhne/monitoring/internal/user/core"
 	"github.com/duynhne/monitoring/internal/user/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
 	"go.opentelemetry.io/otel/attribute"
@@ -75,7 +75,7 @@ func (s *UserService) GetUser(ctx context.Context, id string) (*domain.User, err
 
 	user := &domain.User{
 		ID:       id,
-		Username: "user" + id, // In production, fetch from auth service
+		Username: "user" + id,                  // In production, fetch from auth service
 		Email:    "user" + id + "@example.com", // In production, fetch from auth service
 		Name:     name,
 	}
@@ -132,7 +132,7 @@ func (s *UserService) GetProfile(ctx context.Context) (*domain.User, error) {
 
 	user := &domain.User{
 		ID:       strconv.Itoa(userID),
-		Username: "current_user_v2", // In production, fetch from auth service
+		Username: "current_user_v2",     // In production, fetch from auth service
 		Email:    "current@example.com", // In production, fetch from auth service
 		Name:     name,
 	}
@@ -212,4 +212,3 @@ func (s *UserService) CreateUser(ctx context.Context, req domain.CreateUserReque
 
 	return user, nil
 }
-

@@ -31,12 +31,12 @@ import (
 
 // Config holds all configuration for a microservice
 type Config struct {
-	Service  ServiceConfig  // Service-specific settings (port, name, version)
-	Tracing  TracingConfig  // OpenTelemetry/Tempo configuration
+	Service   ServiceConfig   // Service-specific settings (port, name, version)
+	Tracing   TracingConfig   // OpenTelemetry/Tempo configuration
 	Profiling ProfilingConfig // Pyroscope continuous profiling
-	Logging  LoggingConfig  // Structured logging (Zap)
-	Metrics  MetricsConfig  // Prometheus metrics
-	Database DatabaseConfig // PostgreSQL database configuration
+	Logging   LoggingConfig   // Structured logging (Zap)
+	Metrics   MetricsConfig   // Prometheus metrics
+	Database  DatabaseConfig  // PostgreSQL database configuration
 }
 
 // ServiceConfig defines basic service configuration
@@ -50,11 +50,11 @@ type ServiceConfig struct {
 // TracingConfig defines OpenTelemetry tracing configuration
 // Traces are sent to OpenTelemetry Collector for distributed tracing analysis
 type TracingConfig struct {
-	Enabled       bool    // Enable tracing (default: true) - from TRACING_ENABLED env
-	Endpoint      string  // OTel Collector endpoint - from OTEL_COLLECTOR_ENDPOINT env
-	SampleRate    float64 // Trace sampling rate (0.0-1.0) - from OTEL_SAMPLE_RATE env
-	ServiceName   string  // Service name for traces (defaults to ServiceConfig.Name)
-	MaxExportBatchSize int // Max spans per batch (default: 512)
+	Enabled            bool    // Enable tracing (default: true) - from TRACING_ENABLED env
+	Endpoint           string  // OTel Collector endpoint - from OTEL_COLLECTOR_ENDPOINT env
+	SampleRate         float64 // Trace sampling rate (0.0-1.0) - from OTEL_SAMPLE_RATE env
+	ServiceName        string  // Service name for traces (defaults to ServiceConfig.Name)
+	MaxExportBatchSize int     // Max spans per batch (default: 512)
 }
 
 // ProfilingConfig defines Pyroscope continuous profiling configuration
@@ -79,15 +79,15 @@ type MetricsConfig struct {
 // DatabaseConfig defines PostgreSQL database configuration
 // All database connections use separate environment variables (not DATABASE_URL string)
 type DatabaseConfig struct {
-	Host           string  // Database host - from DB_HOST env
-	Port           string  // Database port - from DB_PORT env (default: "5432")
-	Name           string  // Database name - from DB_NAME env
-	User           string  // Database user - from DB_USER env
-	Password       string  // Database password - from DB_PASSWORD env
-	SSLMode        string  // SSL mode - from DB_SSLMODE env (default: "disable")
-	MaxConnections int     // Max connections - from DB_POOL_MAX_CONNECTIONS env (default: 25)
-	PoolMode       string  // Pool mode - from DB_POOL_MODE env (optional)
-	PoolerType     string  // Pooler type - from DB_POOLER_TYPE env (optional)
+	Host           string // Database host - from DB_HOST env
+	Port           string // Database port - from DB_PORT env (default: "5432")
+	Name           string // Database name - from DB_NAME env
+	User           string // Database user - from DB_USER env
+	Password       string // Database password - from DB_PASSWORD env
+	SSLMode        string // SSL mode - from DB_SSLMODE env (default: "disable")
+	MaxConnections int    // Max connections - from DB_POOL_MAX_CONNECTIONS env (default: 25)
+	PoolMode       string // Pool mode - from DB_POOL_MODE env (optional)
+	PoolerType     string // Pooler type - from DB_POOLER_TYPE env (optional)
 }
 
 // BuildDSN constructs PostgreSQL connection string from config
@@ -299,4 +299,3 @@ func contains(slice []string, item string) bool {
 	}
 	return false
 }
-

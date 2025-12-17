@@ -4,10 +4,10 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/duynhne/monitoring/internal/auth/core/domain"
 	logicv2 "github.com/duynhne/monitoring/internal/auth/logic/v2"
 	"github.com/duynhne/monitoring/pkg/middleware"
+	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -55,7 +55,7 @@ func Login(c *gin.Context) {
 		span.RecordError(err)
 		// Log the full error with context (error chain includes username)
 		zapLogger.Error("Login failed", zap.Error(err))
-		
+
 		// Check error type using errors.Is() and map to appropriate HTTP response
 		switch {
 		case errors.Is(err, logicv2.ErrInvalidCredentials):
@@ -116,7 +116,7 @@ func Register(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Registration failed", zap.Error(err), zap.String("username", req.Username))
-		
+
 		// Check error type and map to appropriate HTTP response
 		switch {
 		case errors.Is(err, logicv2.ErrUserExists):

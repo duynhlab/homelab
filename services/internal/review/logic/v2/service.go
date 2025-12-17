@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/duynhne/monitoring/internal/review/core/database"
+	database "github.com/duynhne/monitoring/internal/review/core"
 	"github.com/duynhne/monitoring/internal/review/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
 	"go.opentelemetry.io/otel/attribute"
@@ -104,4 +104,3 @@ func (s *ReviewService) CreateReview(ctx context.Context, req domain.CreateRevie
 
 	return review, nil
 }
-

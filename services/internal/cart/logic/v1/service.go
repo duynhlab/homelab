@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/duynhne/monitoring/internal/cart/core/database"
+	database "github.com/duynhne/monitoring/internal/cart/core"
 	"github.com/duynhne/monitoring/internal/cart/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
 	"go.opentelemetry.io/otel/attribute"
@@ -162,4 +162,3 @@ func (s *CartService) AddToCart(ctx context.Context, req domain.AddToCartRequest
 
 	return item, nil
 }
-

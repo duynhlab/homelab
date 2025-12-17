@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/duynhne/monitoring/internal/notification/core/database"
+	database "github.com/duynhne/monitoring/internal/notification/core"
 	"github.com/duynhne/monitoring/internal/notification/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
 	"go.opentelemetry.io/otel/attribute"
@@ -133,4 +133,3 @@ func (s *NotificationService) GetNotification(ctx context.Context, id string) (*
 	span.SetAttributes(attribute.Bool("notification.found", true))
 	return notification, nil
 }
-

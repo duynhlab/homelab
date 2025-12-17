@@ -56,4 +56,3 @@ var (
 	// HTTP Status: 409 Conflict
 	ErrUserExists = errors.New("user already exists")
 )
-

@@ -4,9 +4,9 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	logicv2 "github.com/duynhne/monitoring/internal/notification/logic/v2"
 	"github.com/duynhne/monitoring/pkg/middleware"
+	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -54,7 +54,7 @@ func GetNotification(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to get notification", zap.Error(err))
-		
+
 		switch {
 		case errors.Is(err, logicv2.ErrNotificationNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "Notification not found"})
@@ -67,4 +67,3 @@ func GetNotification(c *gin.Context) {
 	zapLogger.Info("Notification retrieved", zap.String("notification_id", id))
 	c.JSON(http.StatusOK, notification)
 }
-

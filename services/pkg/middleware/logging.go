@@ -70,14 +70,14 @@ func LoggingMiddleware(logger *zap.Logger) gin.HandlerFunc {
 
 		// Get or generate trace-id
 		traceID := GetTraceID(c)
-		
+
 		// Store trace-id in context for handlers to use
 		c.Set("trace_id", traceID)
-		
+
 		// Store logger in context for handlers to use
 		loggerWithTrace := logger.With(zap.String("trace_id", traceID))
 		c.Set("logger", loggerWithTrace)
-		
+
 		// Add trace-id to response header
 		c.Header(TraceIDHeader, traceID)
 
@@ -142,7 +142,7 @@ func NewLogger() (*zap.Logger, error) {
 	config.EncoderConfig.MessageKey = "message"
 	config.EncoderConfig.LevelKey = "level"
 	config.EncoderConfig.CallerKey = "caller"
-	
+
 	return config.Build()
 }
 
@@ -152,4 +152,3 @@ func NewDevelopmentLogger() (*zap.Logger, error) {
 	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	return config.Build()
 }
-

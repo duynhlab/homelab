@@ -34,9 +34,4 @@ var (
 	// ErrUnauthorized indicates the user is not authorized to perform the operation.
 	// HTTP Status: 403 Forbidden
 	ErrUnauthorized = errors.New("unauthorized access")
-
-	// ErrDuplicateReview indicates the user has already reviewed this product.
-	// HTTP Status: 409 Conflict
-	ErrDuplicateReview = errors.New("duplicate review")
 )
-

@@ -4,10 +4,10 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/duynhne/monitoring/internal/shipping-v2/core/domain"
 	logicv2 "github.com/duynhne/monitoring/internal/shipping-v2/logic/v2"
 	"github.com/duynhne/monitoring/pkg/middleware"
+	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -40,7 +40,7 @@ func EstimateShipment(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to estimate shipment", zap.Error(err))
-		
+
 		switch {
 		case errors.Is(err, logicv2.ErrInvalidAddress):
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid address"})

@@ -12,7 +12,7 @@ type Shipment struct {
 }
 
 type EstimateRequest struct {
-	Origin      string `json:"origin" binding:"required"`
-	Destination string `json:"destination" binding:"required"`
+	Origin      string  `json:"origin" binding:"required"`
+	Destination string  `json:"destination" binding:"required"`
 	Weight      float64 `json:"weight" binding:"required"`
 }

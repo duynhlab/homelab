@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/duynhne/monitoring/internal/shipping/core/database"
+	database "github.com/duynhne/monitoring/internal/shipping/core"
 	"github.com/duynhne/monitoring/internal/shipping/core/domain"
 	"github.com/duynhne/monitoring/pkg/middleware"
 	"go.opentelemetry.io/otel/attribute"
@@ -88,4 +88,3 @@ func (s *ShippingService) TrackShipment(ctx context.Context, trackingNumber stri
 
 	return shipment, nil
 }
-

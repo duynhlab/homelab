@@ -4,10 +4,10 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/duynhne/monitoring/internal/product/core/domain"
 	logicv1 "github.com/duynhne/monitoring/internal/product/logic/v1"
 	"github.com/duynhne/monitoring/pkg/middleware"
+	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -53,7 +53,7 @@ func GetProduct(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to get product", zap.Error(err))
-		
+
 		switch {
 		case errors.Is(err, logicv1.ErrProductNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
@@ -91,7 +91,7 @@ func CreateProduct(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to create product", zap.Error(err))
-		
+
 		switch {
 		case errors.Is(err, logicv1.ErrInvalidPrice):
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid price"})
@@ -106,4 +106,3 @@ func CreateProduct(c *gin.Context) {
 	zapLogger.Info("Product created", zap.String("product_id", product.ID))
 	c.JSON(http.StatusCreated, product)
 }
-

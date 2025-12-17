@@ -50,7 +50,7 @@ if ! kubectl get crd postgresqls.acid.zalan.do &> /dev/null; then
     exit 1
 fi
 
-echo "✅ Zalando Postgres Operator deployed"
+echo "SUCCESS: Zalando Postgres Operator deployed"
 
 # Deploy CrunchyData Postgres Operator
 echo "Deploying CrunchyData Postgres Operator..."
@@ -76,7 +76,7 @@ if ! kubectl get crd postgresclusters.postgres-operator.crunchydata.com &> /dev/
     exit 1
 fi
 
-echo "✅ CrunchyData Postgres Operator deployed"
+echo "SUCCESS: CrunchyData Postgres Operator deployed"
 
 # Create database clusters
 echo "Creating database clusters..."
@@ -132,7 +132,7 @@ for cluster in product-db transaction-db; do
     }
 done
 
-echo "✅ Database clusters created"
+echo "SUCCESS: Database clusters created"
 
 # Deploy PgCat poolers
 echo "Deploying PgCat connection poolers..."
@@ -159,7 +159,7 @@ kubectl wait --for=condition=ready pod \
     echo "WARN: PgCat Transaction may not be ready yet"
 }
 
-echo "✅ PgCat poolers deployed"
+echo "SUCCESS: PgCat poolers deployed"
 
 # Print summary
 echo ""
@@ -182,10 +182,10 @@ echo "PgCat Poolers:"
 kubectl get pods -n product -l app=pgcat-product
 kubectl get pods -n cart -l app=pgcat-transaction
 echo ""
-echo "⚠️  Next Steps:"
+echo "Next Steps:"
 echo "1. Create Kubernetes Secrets for database passwords (see k8s/secrets/README.md)"
 echo "2. Run database migrations (init containers will handle this)"
 echo "3. Deploy microservices with database configuration"
 echo "=========================================="
 echo ""
-echo "✅ Database deployment completed!"
+echo "SUCCESS: Database deployment completed!"

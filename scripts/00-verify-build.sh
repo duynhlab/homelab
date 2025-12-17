@@ -47,7 +47,7 @@ if [ ! -d "services" ]; then
     exit 1
 fi
 
-echo "✓ Environment OK"
+echo "SUCCESS: Environment OK"
 echo ""
 
 # Change to services directory
@@ -62,7 +62,7 @@ if ! git diff --exit-code go.mod go.sum > /dev/null 2>&1; then
     echo "ERROR: go.mod or go.sum changed. Run 'go mod tidy' and commit changes."
     exit 1
 fi
-echo "✓ Go modules OK"
+echo "SUCCESS: Go modules OK"
 
 # Check 2: Code Formatting
 echo ""
@@ -75,7 +75,7 @@ if [ -n "$UNFORMATTED" ]; then
     echo "$UNFORMATTED"
     exit 1
 fi
-echo "✓ Code formatting OK"
+echo "SUCCESS: Code formatting OK"
 
 # Check 3: Static Analysis
 echo ""
@@ -84,7 +84,7 @@ if ! go vet ./...; then
     echo "ERROR: go vet found issues"
     exit 1
 fi
-echo "✓ Static analysis OK"
+echo "SUCCESS: Static analysis OK"
 
 # Check 4: Build All Services
 echo ""
@@ -96,7 +96,7 @@ for SERVICE in "${SERVICES[@]}"; do
         exit 1
     fi
 done
-echo "✓ All services build OK"
+echo "SUCCESS: All services build OK"
 
 # Check 5: Tests (Optional)
 echo ""
@@ -106,7 +106,7 @@ if [ "$SKIP_TESTS" = "false" ]; then
         echo "ERROR: Tests failed"
         exit 1
     fi
-    echo "✓ Tests OK"
+    echo "SUCCESS: Tests OK"
 else
     echo "5. Skipping tests (--skip-tests flag)"
 fi

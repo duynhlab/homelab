@@ -1042,6 +1042,8 @@ func ExampleUsage() {
 - ✅ GC duration reduces by >10% (with Green Tea GC)
 - ✅ No increase in error rate
 
+**Note (December 17, 2025):** Go 1.25.5 is now available with critical security patches (CVE-2025-61729, CVE-2025-61727). See `research-go1255.md` for details. All services should be upgraded to Go 1.25.5 immediately for security fixes.
+
 **Configuration Modernization:**
 - ✅ Config validation catches at least 1 typo in staging
 - ✅ Development setup time reduces from 10min → 5min (with .env)

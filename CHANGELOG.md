@@ -7,6 +7,183 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.10.0] - 2025-12-15
+
+### Added
+
+**Helm Chart - Database Migration InitContainer:**
+- **InitContainer Support**: Added Flyway init container for automatic database migrations on pod startup
+  - New `migrations` section in `charts/values.yaml` with configuration:
+    - `enabled`: Enable/disable migrations (default: false)
+    - `image`: Flyway migration Docker image (e.g., `ghcr.io/duynhne/init-auth:v5`)
+    - `imagePullPolicy`: Image pull policy (default: IfNotPresent)
+  - InitContainer automatically passes all `DB_*` environment variables from `extraEnv` to Flyway container
+  - Builds `FLYWAY_URL` from individual DB environment variables (not DATABASE_URL string)
+  - Runs `flyway migrate` before main container starts
+  - Conditional rendering: Only creates initContainer when `migrations.enabled=true` and `migrations.image` is set
+  - Updated `charts/templates/deployment.yaml` with initContainer template
+  - All service values files updated with migrations configuration (auth, user, product, cart, order, review, notification, shipping, shipping-v2)
+
+### Changed
+- **Project Renamed**: "Microservices Monitoring & Performance Applications" → "Microservices Observability Platform"
+  - Updated project title in `README.md`
+  - Updated Grafana dashboard title in `k8s/grafana-operator/dashboards/microservices-dashboard.json`
+  - Updated dashboard reference in `docs/development/DASHBOARD_PANELS_GUIDE.md`
+  - Reflects expanded scope: full observability platform with database, APM, SLO, and SRE practices
+- **Docker Image Naming Standardization**:
+  - Migration images renamed: `migrations-{service}` → `init-{service}` (e.g., `migrations-auth` → `init-auth`)
+  - Migration image tags updated: `v1` → `v5` (aligned with application images)
+  - k6 image tag updated: `scenarios` → `v5`
+  - GitHub Actions workflow renamed: `build-migration-images.yml` → `build-init-images.yml`
+  - Updated all Helm chart values files (8 service files + `charts/values.yaml`)
+  - Updated GitHub Actions workflows to build images with new names and tags
+- **Shipping-v2 Service Refactor** (Complete Independence):
+  - **Refactored shipping-v2 to be completely independent from shipping service** (for learning purposes)
+  - Created separate 3-layer architecture for shipping-v2:
+    - `services/internal/shipping-v2/core/domain/shipping.go` - Domain models (EstimateRequest, ShipmentEstimate, Shipment, ShipmentTrackingHistory)
+    - `services/internal/shipping-v2/logic/v2/service.go` - Business logic with database integration (queries `shipment_estimates` table)
+    - `services/internal/shipping-v2/web/v2/handler.go` - HTTP handlers (independent from shipping/web/v2)
+  - Updated `services/cmd/shipping-v2/main.go` to use `shipping-v2/web/v2` instead of shared `shipping/web/v2`
+  - Logic layer now uses database from `shipping-v2/core/database.go` instead of mock data
+  - Complete separation: shipping-v2 no longer shares any code with shipping service
+- **Helm Chart Updates**:
+  - Added migrations section to `charts/values/shipping.yaml` (enabled: false - shipping v1 doesn't use database)
+  - Updated `charts/values/k6-scenarios.yaml`: tag changed from `scenarios` to `v5`
+- **Shipping Service v1 Database Integration**:
+  - **Replaced mock data with real database queries** for shipping service v1
+  - Created Flyway migration: `services/migrations/shipping/sql/V1__Initial_schema.sql` (shipments table)
+  - Updated domain model: `Shipment` struct now matches database schema (id, order_id, tracking_number, carrier, status, estimated_delivery, timestamps)
+  - Updated logic layer: `TrackShipment()` now queries `shipments` table by `tracking_number` instead of mock data
+  - Added database connection initialization in `services/cmd/shipping/main.go`
+  - Enabled Flyway migrations in `charts/values/shipping.yaml` (init-shipping:v5 image)
+  - Added database environment variables to shipping service Helm values (supporting-db cluster)
+- **k6 Image Tag Standardization**:
+  - Removed k6:legacy image build (no longer used)
+  - Changed k6:scenarios → k6:v5 (consistent with service tags)
+  - Updated `scripts/05-build-microservices.sh` to build k6:v5 instead of k6:scenarios
+- **Build Script Improvements**:
+  - Renamed "migration images" → "init images" throughout build script
+  - Updated variable names: `MIGRATION_SERVICES` → `INIT_SERVICES`, `MIGRATION_IMAGE` → `INIT_IMAGE`
+  - Updated all echo messages and comments to use "init images" terminology
+  - Updated summary message: "9 migration images" → "9 init images", "2 k6 images" → "1 k6 image"
+
+## [0.9.0] - 2025-12-14
+
+### Added
+
+**PostgreSQL Database Integration:**
+- **Database Infrastructure**: Complete PostgreSQL setup for all 9 microservices
+  - **Zalando Postgres Operator** (v1.15.0): For simpler clusters (Review, Auth, User+Notification)
+  - **CrunchyData Postgres Operator** (v5.7.0): For advanced HA clusters with Patroni (Product, Cart+Order)
+  - **5 Database Clusters**: 
+    - `review-db` (Zalando, single instance)
+    - `auth-db` (Zalando, with PgBouncer connection pooler)
+    - `supporting-db` (Zalando, shared: user + notification databases)
+    - `product-db` (CrunchyData, 1 primary + 1 replica)
+    - `transaction-db` (CrunchyData, 1 primary + 2 replicas with Patroni HA)
+  - **Connection Poolers**:
+    - **PgBouncer**: Integrated sidecar for Auth service (transaction pooling, 25 pool size)
+    - **PgCat**: Standalone poolers for Product (read replica routing) and Cart+Order (multi-database routing)
+  - **Database Schemas**: SQL migration scripts (`services/migrations/{service}/001_init_schema.sql`) for all 8 services
+  - **Init Containers**: Automatic database migrations on pod startup (planned)
+  - **Database Configuration**: Centralized `DatabaseConfig` struct in `services/pkg/config/config.go`
+    - Individual environment variables: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSLMODE`, `DB_POOL_MAX_CONNECTIONS`, `DB_POOL_MODE`, `DB_POOLER_TYPE`
+    - No `DATABASE_URL` string (as requested)
+  - **Database Connection Code**: New `services/internal/{service}/core/database.go` files for all 9 services
+    - `Connect()` function to establish database connections
+    - Connection pooling configuration
+    - Error handling and connection testing
+  - **Helm Chart Integration**: Updated all 7 service values files with `extraEnv` database configuration
+    - Database credentials via Kubernetes Secrets
+    - Connection pooler endpoints configured
+    - SSL mode and pool settings
+  - **Deployment Script**: `scripts/04-deploy-databases.sh` - One-command database infrastructure deployment
+    - Deploys both PostgreSQL operators
+    - Creates all 5 database clusters
+    - Deploys PgCat connection poolers
+    - Waits for cluster readiness
+    - Comprehensive error handling and status reporting
+  - **Monitoring Setup** (planned): `postgres_exporter` Helm values and ServiceMonitor configuration
+  - **Documentation**: 
+    - `k8s/secrets/README.md` - Secret creation guide
+    - `k8s/secrets/.gitignore` - Prevents committing secrets
+    - Updated `AGENTS.md` with database deployment order
+
+**Script Renumbering for Correct Deployment Order:**
+- **New Script**: `04-deploy-databases.sh` - Database infrastructure (step 4, before build)
+- **Renamed Scripts** (to maintain logical deployment order):
+  - `04-build-microservices.sh` → `05-build-microservices.sh`
+  - `05-deploy-microservices.sh` → `06-deploy-microservices.sh`
+  - `06-deploy-k6.sh` → `07-deploy-k6.sh`
+  - `07-deploy-slo.sh` → `08-deploy-slo.sh`
+  - `08-setup-access.sh` → `09-setup-access.sh`
+  - `09-reload-dashboard.sh` → `10-reload-dashboard.sh`
+  - `10-diagnose-latency.sh` → `11-diagnose-latency.sh`
+  - `11-error-budget-alert.sh` → `12-error-budget-alert.sh`
+- **Deployment Order** (Final):
+  1. Infrastructure (01)
+  2. Monitoring (02)
+  3. APM (03)
+  4. **Databases (04)** ← NEW
+  5. Build (05)
+  6. Deploy Apps (06)
+  7. Load Testing (07)
+  8. SLO (08)
+  9. Access (09)
+  10-12. Utilities (10-12)
+
+### Changed
+
+**Configuration Management:**
+- **`services/pkg/config/config.go`**: Added `DatabaseConfig` struct and `BuildDSN()` method
+  - Supports individual environment variables (not `DATABASE_URL` string)
+  - Connection pooling configuration
+  - SSL mode support
+- **Helm Values**: Updated 7 service values files (`auth`, `review`, `product`, `cart`, `order`, `user`, `notification`)
+  - Added `extraEnv` section with database configuration
+  - Kubernetes Secrets integration for passwords
+  - Connection pooler endpoint configuration
+
+**Documentation Updates:**
+- **`AGENTS.md`**: Updated deployment order, script references, database infrastructure section
+- **`README.md`**: Updated script numbers, added database deployment step
+- **`CHANGELOG.md`**: This entry
+
+### Migration Notes
+
+**For existing deployments:**
+
+1. **Deploy databases first** (new step 4):
+   ```bash
+   ./scripts/04-deploy-databases.sh
+   ```
+
+2. **Create Kubernetes Secrets** (required before deploying apps):
+   ```bash
+   kubectl create secret generic auth-db-secret --from-literal=password='postgres' -n auth
+   kubectl create secret generic review-db-secret --from-literal=password='postgres' -n review
+   # ... (see k8s/secrets/README.md for all 5 secrets)
+   ```
+
+3. **Add PostgreSQL driver** (one-time):
+   ```bash
+   cd services && go get github.com/lib/pq
+   ```
+
+4. **Rebuild and redeploy services** (to include database code):
+   ```bash
+   ./scripts/05-build-microservices.sh
+   ./scripts/06-deploy-microservices.sh --local
+   ```
+
+**Breaking Changes**: None (database integration is additive, services still work with mock data until database code is implemented)
+
+**Next Steps** (Implementation pending):
+- Update service handlers to use database (Task 4.3)
+- Create init containers for migrations (Task 3.3)
+- Deploy postgres_exporter for monitoring (Task 6.1-6.2)
+- Test database connections and k6 load testing (Task 8.1-8.2)
+
 ## [0.8.2] - 2025-12-14
 
 ### Changed

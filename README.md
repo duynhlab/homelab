@@ -1,661 +1,229 @@
-# Microservices Monitoring & Performance Applications
+# Microservices Observability Platform
 
-**Complete microservices monitoring solution with 32 Grafana panels in 5 row groups** - Kubernetes-ready with Prometheus & Grafana
-
----
-
-## 🎯 What You Get
-
-### 32 Panels Organized in 5 Row Groups
-
-**📊 Row 1: Overview & Key Metrics (12 panels)**
-- Response time percentiles (P50, P95, P99)
-- Total RPS, Success RPS (2xx), Error RPS (4xx/5xx)
-- Success Rate % & Error Rate %
-- Apdex Score
-- Total Requests, Up Instances, Restarts
-
-**🚀 Row 2: Traffic & Requests (4 panels)**
-- Status code distribution (pie chart)
-- Requests by endpoint (pie chart)
-- Request Rate by Endpoint (time series)
-- RPS by Endpoint
-
-**⚠️ Row 3: Errors & Performance (5 panels)**
-- Request Rate by HTTP Method + Endpoint
-- Error Rate by HTTP Method + Endpoint
-- Response time per endpoint (P95, P50, P99)
-
-**🔧 Row 4: Go Runtime & Memory (6 panels) - Memory Leak Detection**
-- 🆕 **Heap Allocated Memory** - Detect heap memory leaks
-- 🆕 **Heap In-Use Memory** - Monitor heap usage baseline
-- 🆕 **Process Memory (RSS)** - OS-level memory tracking
-- Goroutines & Threads - Detect goroutine leaks
-- GC Duration - Monitor GC performance
-- 🆕 **GC Frequency** - Track GC pressure
-
-**🖥️ Row 5: Resources & Infrastructure (5 panels)**
-- Memory usage per pods
-- CPU usage per pods
-- Network I/O
-- Requests in flight
-- Memory allocations
+**Complete microservices observability solution** - Kubernetes-ready with Prometheus, Grafana, and full observability stack.
 
 ---
 
-## 🏗️ Architecture
+## Overview
 
-### Microservices (9 Services)
-- **auth** - Authentication API (`/api/v1/auth/*`, `/api/v2/auth/*`)
-- **user** - User management API (`/api/v1/users/*`, `/api/v2/users/*`)
-- **product** - Product catalog API (`/api/v1/products/*`, `/api/v2/catalog/*`)
-- **cart** - Shopping cart API (`/api/v1/cart/*`, `/api/v2/carts/*`)
-- **order** - Order management API (`/api/v1/orders/*`, `/api/v2/orders/*`)
-- **review** - Product reviews API (`/api/v1/reviews/*`, `/api/v2/reviews/*`)
-- **notification** - Notifications API (`/api/v1/notify/*`, `/api/v2/notifications/*`)
-- **shipping** - Shipping tracking API (`/api/v1/shipping/*`)
-- **shipping-v2** - Enhanced shipping API (`/api/v2/shipments/*`)
+Production-ready microservices monitoring platform with 9 Go services, complete observability (metrics, traces, logs, profiles), PostgreSQL database integration, and SRE practices (SLO tracking, error budgets).
 
-### Monitoring Stack
-- **Prometheus Operator** - Kubernetes-native Prometheus management via CRDs
-- **kube-prometheus-stack** - Full monitoring stack (Prometheus + kube-state-metrics)
-- **metrics-server** - Resource metrics API (for kubectl top and HPA)
-- **Grafana Operator** - Kubernetes-native Grafana management
-- **ServiceMonitor** - Automatic service discovery (namespace-based, scales to 1000+ pods)
-- **k6** - Load testing & performance validation
+**Key Features:**
+- 9 microservices with v1/v2 APIs
+- 34 Grafana dashboard panels (5 row groups)
+- Complete observability stack (Prometheus, Tempo, Jaeger, Loki, Pyroscope)
+- PostgreSQL database integration (5 clusters, Flyway migrations)
+- SLO management via Sloth Operator
+- k6 load testing
 
-### APM Stack (Application Performance Monitoring)
-- **Grafana Tempo** - Distributed tracing backend
-- **Jaeger** - Distributed tracing (alternative UI)
-- **OpenTelemetry Collector** - Trace fan-out to Tempo + Jaeger
-- **Loki** - Log aggregation and storage
-- **Vector** - Log collection and processing
-- **Pyroscope** - Continuous profiling (CPU, heap, goroutines, locks)
+**For detailed documentation, see [`docs/README.md`](docs/README.md)**
 
-## 🚀 Quick Start
+---
 
-### Complete Deployment (All Steps)
+## Quick Start
+
+### Complete Deployment
 
 ```bash
 git clone <repo-url>
-cd project-monitoring-golang
+cd monitoring
 chmod +x scripts/*.sh
 
-# Infrastructure & Monitoring (Steps 1-2)
+# Infrastructure & Monitoring
 ./scripts/01-create-kind-cluster.sh      # Create Kind cluster
-./scripts/02-deploy-monitoring.sh        # Deploy Prometheus + Grafana + kube-state-metrics + metrics-server (BEFORE apps)
+./scripts/02-deploy-monitoring.sh        # Deploy Prometheus + Grafana
 
-# APM Stack (Step 4) - Required for full observability (BEFORE apps to collect traces/logs/profiles)
-./scripts/03-deploy-apm.sh               # Deploy all APM components (Tempo, Pyroscope, Loki, Vector)
+# APM Stack
+./scripts/03-deploy-apm.sh               # Deploy Tempo, Pyroscope, Loki, Vector
 
-# Build & Deploy Applications (Steps 5-6)
-./scripts/04-build-microservices.sh      # Build Docker images on Local
-./scripts/05-deploy-microservices.sh     # Deploy microservices on Local and Registry
+# Database Infrastructure
+./scripts/04-deploy-databases.sh         # Deploy PostgreSQL operators, clusters, poolers
 
-# Load Testing (Step 7)
-./scripts/06-deploy-k6.sh                # Deploy K6 load generators via Helm (AFTER apps to test them)
+# Build & Deploy Applications
+./scripts/05-build-microservices.sh      # Build Docker images
+./scripts/06-deploy-microservices.sh --local  # Deploy services
 
-# SLO System (Step 8) - Required for SRE practices
-./scripts/07-deploy-slo.sh               # Deploy Sloth Operator and SLO CRDs
+# Load Testing (AFTER apps)
+./scripts/07-deploy-k6.sh                # Deploy k6 load generators
 
-# Access Setup (Step 9)
-./scripts/08-setup-access.sh             # Setup port forwarding
+# SLO System
+./scripts/08-deploy-slo.sh               # Deploy Sloth Operator and SLO CRDs
+
+# Access Setup
+./scripts/09-setup-access.sh             # Setup port-forwarding
 ```
 
-### Deployment Options
-
-**K6 Deployment Options:**
-```bash
-# Deploy both load tests (recommended)
-./scripts/06-deploy-k6.sh both
-
-# Deploy only legacy test
-./scripts/06-deploy-k6.sh legacy
-
-# Deploy only multiple scenarios test
-./scripts/06-deploy-k6.sh scenarios
-```
-📖 [Full K6 Documentation](./docs/k6/K6_LOAD_TESTING.md)
-
-**SLO Deployment (Sloth Operator):**
-```bash
-# One-command deployment via Helm
-./scripts/07-deploy-slo.sh
-```
-📖 [Full SLO Documentation](./docs/slo/README.md)
-
-**APM Deployment Options:**
-```bash
-# One-command (recommended) - Deploys all APM components
-./scripts/03-deploy-apm.sh
-
-# Individual deployments (if you need specific components)
-./scripts/03a-deploy-tempo.sh      # Deploy Grafana Tempo (distributed tracing)
-./scripts/03b-deploy-pyroscope.sh  # Deploy Pyroscope (continuous profiling)
-./scripts/03c-deploy-loki.sh       # Deploy Loki + Vector (log aggregation)
-```
-
-**What APM provides:**
-- **Distributed Tracing**: End-to-end request tracing across all microservices
-- **Structured Logging**: JSON logs with trace-id correlation
-- **Continuous Profiling**: CPU, heap, goroutine, and lock profiling
-- **Full Correlation**: Trace-to-logs, trace-to-metrics, trace-to-profiles
-
-📖 [Full APM Documentation](./docs/apm/README.md)
-
-### Utility Scripts
-
-**Reload Dashboard (Step 8):**
-```bash
-./scripts/09-reload-dashboard.sh  # Reload Grafana dashboard after updates
-```
-
-**Runbooks (Steps 12-13):**
-```bash
-./scripts/10-diagnose-latency.sh      # Diagnose latency issues
-./scripts/11-error-budget-alert.sh    # Error budget alert response
-```
-
-### Script Options
-
-**Build Options:**
-```bash
-./scripts/04-build-microservices.sh [--no-cache|--force]
-```
-
-**Deploy Options (Helm):**
-```bash
-# Deploy using local Helm chart (default)
-./scripts/05-deploy-microservices.sh --local
-
-# Deploy from OCI registry
-./scripts/05-deploy-microservices.sh --registry
-```
-
-**k6 Options:**
-```bash
-./scripts/06-deploy-k6.sh [both|legacy|scenarios]
-```
-
-### Access Services
-
-```bash
-# Port-forward all services
-kubectl port-forward -n auth svc/auth 8081:8080 &
-kubectl port-forward -n user svc/user 8082:8080 &
-kubectl port-forward -n product svc/product 8083:8080 &
-kubectl port-forward -n order svc/order 8084:8080 &
-kubectl port-forward -n cart svc/cart 8085:8080 &
-
-# Access monitoring
-kubectl port-forward -n monitoring svc/grafana-service 3000:3000 &
-kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090 &
-
-# Access APM services (after Step 17)
-kubectl port-forward -n monitoring svc/tempo 3200:3200 &
-kubectl port-forward -n monitoring svc/jaeger-all-in-one 16686:16686 &
-kubectl port-forward -n monitoring svc/pyroscope 4040:4040 &
-kubectl port-forward -n monitoring svc/loki 3100:3100 &
-```
-
-### Access URLs
-
-```
-📊 Grafana:    http://localhost:3000 (admin/admin)
-📈 Prometheus: http://localhost:9090
-🔧 User API:   http://localhost:8081/api/v1/users
-🔧 Product API: http://localhost:8082/api/v1/products
-🔧 Checkout API: http://localhost:8083/api/v1/checkout
-🔧 Order API:  http://localhost:8084/api/v2/orders
-🔧 Unified API: http://localhost:8085/api/v3/*
-
-🔍 APM Services (after Step 17):
-   📊 Tempo:      http://localhost:3200 (distributed tracing)
-   🔍 Jaeger:     http://localhost:16686 (distributed tracing - alternative UI)
-   🔬 Pyroscope:  http://localhost:4040 (continuous profiling)
-   📝 Loki:       http://localhost:3100 (log aggregation)
-```
-
-### View Dashboard
-
-Open Grafana → **"Microservices Monitoring & Performance Applications"** dashboard is auto-loaded!
-
-**Dashboard Variables**:
-- **Namespace**: Filter by Kubernetes namespace (e.g., auth, user, product)
-- **App**: Filter by service (automatically updates based on selected namespace)
-- **Rate**: Prometheus rate() interval (default: 5m)
-
-**💡 Tip**: Select namespace first, then app will show only services in that namespace.
-
-**Direct link**: http://localhost:3000/d/microservices-monitoring-001/
+**Detailed Setup Guide**: See [`docs/getting-started/SETUP.md`](docs/getting-started/SETUP.md) for step-by-step instructions, prerequisites, and troubleshooting.
 
 ---
 
-## 📊 Dashboard Highlights
-
-### Key Metrics at a Glance
-
-| Panel | What It Shows | Why It Matters |
-|-------|--------------|----------------|
-| **P99 Response Time** | 99% of requests complete within this time | Tail latency - worst user experience |
-| **RPS** | Requests per second | System throughput |
-| **Apdex Score** | User satisfaction (0-1 scale) | Overall performance health |
-| **Error Rate** | 4xx + 5xx responses | Reliability indicator |
-| **Memory Usage** | Go heap allocation | Detect memory leaks |
-| **CPU Usage** | Process CPU consumption | Resource utilization |
-
-### Health Indicators
-
-**🟢 Healthy System:**
-- P95 < 300ms, P99 < 1s
-- Apdex > 0.85
-- Error rate < 1%
-- 0 restarts
-- Stable memory
-
-**🟡 Warning:**
-- P99 > 1s
-- Apdex 0.7-0.85
-- Error rate 1-5%
-- Memory slowly growing
-
-**🔴 Critical:**
-- P99 > 2s
-- Apdex < 0.7
-- Error rate > 5%
-- Frequent restarts
-- Memory leak
-
-### 🔬 Memory Leak Detection
-
-**Row 4: Go Runtime & Memory** provides comprehensive leak detection with 6 panels:
-
-**Detection Strategy:**
-
-1. **Check Heap Metrics (3 panels):**
-   - Heap Allocated ↑ continuously? 
-   - Heap In-Use ↑ not returning to baseline?
-   - Process RSS ↑ continuously?
-   → All 3 increasing = **Heap Memory Leak**
-
-2. **Check Goroutines (1 panel):**
-   - Goroutines ↑ continuously?
-   → **Goroutine Leak** (forgotten defer, unclosed channels)
-
-3. **Check GC Metrics (2 panels):**
-   - GC Duration + GC Frequency both ↑?
-   → If heap also ↑ = **Leak confirmed**
-   → If heap stable = **High load** (not a leak)
-
-**Quick Decision Matrix:**
-
-| Heap | Goroutines | GC | Diagnosis |
-|------|------------|-----|-----------|
-| ↑↑↑ | → | ↑↑ | **Heap Memory Leak** |
-| →/↑ | ↑↑↑ | → | **Goroutine Leak** |
-| ↑↓ | ↑↓ | ↑↑ | **High Load** (OK) |
-| → | → | → | **Healthy** |
-
----
-
-## 🔍 Understanding the Metrics
-
-### Custom Application Metrics
-
-The Go application exposes **6 custom metrics**:
-
-1. **`request_duration_seconds`** (Histogram)
-   - HTTP request latency
-   - Powers P50/P95/P99 calculations
-   - Buckets optimized for Apdex
-
-2. **`requests_total`** (Counter)
-   - Total HTTP requests
-   - Used for RPS calculation
-
-3. **`requests_in_flight`** (Gauge)
-   - Concurrent requests
-   - Detects traffic spikes
-
-4. **`request_size_bytes`** (Histogram)
-   - Incoming data volume
-
-5. **`response_size_bytes`** (Histogram)
-   - Outgoing data volume
-
-6. **`error_rate_total`** (Counter)
-   - Failed requests (4xx, 5xx)
-
-### Go Runtime Metrics
-
-Automatically exposed by `prometheus/client_golang`:
-- `go_memstats_*` - Memory statistics
-- `go_goroutines` - Goroutine count
-- `go_gc_duration_seconds` - GC pause times
-- `process_cpu_seconds_total` - CPU time
-
-**📖 For detailed metrics documentation, see [docs/monitoring/METRICS.md](./docs/monitoring/METRICS.md)**
-
----
-
-## 🧪 Load Testing
-
-k6 load generators run continuously to generate traffic for all microservices:
-
-```bash
-# Check k6 load generator pods
-kubectl get pods -n monitoring -l 'app in (k6-load-generator-legacy,k6-load-generator-scenarios)'
-
-# View k6 logs
-kubectl logs -n monitoring -l app=k6-load-generator-legacy -f
-kubectl logs -n monitoring -l app=k6-load-generator-scenarios -f
-```
-
-### Manual Testing
-
-```bash
-# Quick test (100 requests)
-for i in {1..100}; do curl http://localhost:8080/api/users & done
-
-# Or deploy k6 load generators
-./scripts/06-deploy-k6.sh
-```
-
----
-
-## 🏗️ Architecture
+## Architecture
 
 ### 3-Layer Architecture
 
-All microservices follow a clean 3-layer architecture pattern:
+All microservices follow a consistent 3-layer architecture:
 
 ```mermaid
 flowchart TD
-    A[HTTP Request - Gin] --> B[Middleware Chain]
-    
-    subgraph Middleware
-        B --> B1[1. TracingMiddleware]
-        B1 --> B2[2. LoggingMiddleware]
-        B2 --> B3[3. PrometheusMiddleware]
+    subgraph Web["Web Layer (web/v1/, web/v2/)"]
+        Handler[HTTP Handlers<br/>Request/Response<br/>Validation]
     end
     
-    B3 --> C[Layer 1: Web - HTTP Handlers]
-    
-    subgraph WebLayer[Web Layer]
-        C --> C1[internal/service/web/v1/]
-        C --> C2[internal/service/web/v2/]
+    subgraph Logic["Logic Layer (logic/v1/, logic/v2/)"]
+        Service[Business Logic<br/>Orchestration<br/>Database Queries]
     end
     
-    C --> D[Layer 2: Logic - Business Logic]
-    
-    subgraph LogicLayer[Logic Layer]
-        D --> D1[internal/service/logic/v1/]
-        D --> D2[internal/service/logic/v2/]
+    subgraph Core["Core Layer (core/)"]
+        Domain[Domain Models]
+        Database[Database Connection<br/>core/database.go]
     end
     
-    D --> E[Layer 3: Core - Domain Models]
-    
-    subgraph CoreLayer[Core Layer]
-        E --> E1[internal/service/core/domain/]
-    end
+    Handler -->|calls| Service
+    Service -->|uses| Domain
+    Service -->|queries| Database
+    Database -->|PostgreSQL| DB[(Database)]
 ```
 
-### APM Stack Integration
+**Detailed Architecture**: See [`docs/apm/ARCHITECTURE.md`](docs/apm/ARCHITECTURE.md) for middleware chain and APM integration. Full system architecture in [`specs/system-context/01-architecture-overview.md`](specs/system-context/01-architecture-overview.md)
 
-Each layer integrates with the APM stack for comprehensive observability:
+### Microservices
 
-```mermaid
-flowchart TB
-    subgraph Services["Microservices (9 services)"]
-        Web[Web Layer<br/>HTTP Handlers] --> Logic[Logic Layer<br/>Business Logic]
-        Logic --> Core[Core Layer<br/>Domain Models]
-    end
-    
-    Web -.Traces.-> Tempo[(Tempo<br/>Distributed Tracing)]
-    Logic -.Traces.-> Tempo
-    
-    Web -.Logs.-> Vector[Vector<br/>Log Collector]
-    Logic -.Logs.-> Vector
-    Vector --> Loki[(Loki<br/>Log Storage)]
-    
-    Web -.Metrics.-> Prometheus[(Prometheus<br/>Metrics)]
-    Logic -.Metrics.-> Prometheus
-    
-    Web -.Profiles.-> Pyroscope[(Pyroscope<br/>Continuous Profiling)]
-    Logic -.Profiles.-> Pyroscope
-    
-    Tempo --> Grafana[Grafana<br/>Unified Observability Dashboard]
-    Loki --> Grafana
-    Prometheus --> Grafana
-    Pyroscope --> Grafana
-    
-    style Services fill:#e1f5ff
-    style Tempo fill:#ff9999
-    style Loki fill:#99ccff
-    style Prometheus fill:#ffcc99
-    style Pyroscope fill:#cc99ff
-    style Grafana fill:#99ff99
-    style Vector fill:#cccccc
-```
+| Service | Namespace | API Versions |
+|---------|-----------|--------------|
+| auth | auth | v1, v2 |
+| user | user | v1, v2 |
+| product | product | v1, v2 |
+| cart | cart | v1, v2 |
+| order | order | v1, v2 |
+| review | review | v1, v2 |
+| notification | notification | v1, v2 |
+| shipping | shipping | v1 only |
+| shipping-v2 | shipping | v2 only |
 
-📖 **For detailed architecture diagrams with mermaid visualizations, see [docs/apm/ARCHITECTURE.md](./docs/apm/ARCHITECTURE.md)**
-
-### Kubernetes Components
-
-- **Kind** - Local 3-node cluster (1 control-plane + 2 workers)
-- **kube-state-metrics** - K8s object metrics
-- **metrics-server** - Resource usage data
+**Complete API Documentation**: See [`docs/api/API_REFERENCE.md`](docs/api/API_REFERENCE.md)
 
 ---
 
-## 📚 Documentation
+## Technology Stack
+
+- **Runtime**: Go 1.25
+- **Database**: PostgreSQL (5 clusters via Zalando/CrunchyData operators)
+  - Connection poolers: PgBouncer, PgCat
+  - Migrations: Flyway 11.19.0 (8 migration images)
+- **HTTP Framework**: Gin
+- **Observability**: OpenTelemetry (traces, metrics, logs)
+- **Deployment**: Kubernetes (Kind), Helm 3
+- **Monitoring**: Prometheus, Grafana, Tempo, Loki, Pyroscope, Jaeger
+
+**Observability Details**: See [`docs/apm/README.md`](docs/apm/README.md) for complete APM system overview.
+
+---
+
+## Dashboard
+
+**Grafana Dashboard**: `microservices-monitoring-001`
+
+- **34 panels** organized in 5 row groups
+- **Access**: http://localhost:3000/d/microservices-monitoring-001/ (after port-forward)
+- **Variables**: `$namespace`, `$app`, `$rate`
+
+**Complete Dashboard Reference**: See [`docs/development/DASHBOARD_PANELS_GUIDE.md`](docs/development/DASHBOARD_PANELS_GUIDE.md) for all 34 panels with query analysis and troubleshooting.
+
+**Metrics Documentation**: See [`docs/monitoring/METRICS.md`](docs/monitoring/METRICS.md) for complete metrics guide (6 custom metrics, 34 panels).
+
+---
+
+## Access Points
+
+After running `./scripts/09-setup-access.sh` or manual port-forwarding:
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| Grafana | http://localhost:3000 | admin/admin |
+| Prometheus | http://localhost:9090 | - |
+| Jaeger UI | http://localhost:16686 | - |
+| Tempo | http://localhost:3200 | - |
+| API (via port-forward) | http://localhost:8080 | - |
+
+**Port-Forwarding Guide**: See [`docs/getting-started/SETUP.md`](docs/getting-started/SETUP.md)
+
+---
+
+## Documentation
 
 | Document | Description |
 |----------|-------------|
-| **[METRICS.md](./docs/monitoring/METRICS.md)** | ⭐ **Complete guide với phân tích chi tiết tất cả 32 panels** (5 row groups, memory leak detection) |
-| **[K6_LOAD_TESTING.md](./docs/k6/K6_LOAD_TESTING.md)** | 🚀 **k6 continuous load generator setup & configuration** |
-| **[SLO Documentation](./docs/slo/README.md)** | 🎯 **SRE practices: SLI/SLO definitions, error budgets, burn rate alerts** |
-| **[SETUP.md](./docs/getting-started/SETUP.md)** | Step-by-step deployment guide |
-| **[API Reference](./docs/api/API_REFERENCE.md)** | Complete API documentation for all 9 microservices |
-| **[Documentation Index](./docs/README.md)** | Complete documentation index with learning path |
-| **[Prometheus Rate Explained](./docs/monitoring/PROMETHEUS_RATE_EXPLAINED.md)** | 📊 Chi tiết về `rate()`, `increase()` và counter resets |
-| **[Time Range & Rate Interval](./docs/monitoring/TIME_RANGE_AND_RATE_INTERVAL.md)** | ⏱️ **Time Range vs Rate Interval: Hướng dẫn chi tiết về Time Range và $rate variable** |
-| **[Variables & Regex](./docs/monitoring/VARIABLES_REGEX.md)** | 🎯 Dashboard variables & regex patterns |
-| **[AGENTS.md](./AGENTS.md)** | 🤖 **AI Agent Guide: Comprehensive navigation and workflows for AI agents** |
-| **[Claude Commands](./.claude/commands/)** | 📋 **AI workflow commands: plan, implement, analyze, review, deploy, document** |
-| **[Cursor Rules](./.cursor/rules/)** | 🔧 **Development guidelines: Kubernetes, Grafana, Prometheus, SLO, Go** |
+| **[Setup Guide](docs/getting-started/SETUP.md)** | Complete deployment instructions |
+| **[Metrics Guide](docs/monitoring/METRICS.md)** | Complete metrics documentation (6 custom metrics, 34 panels) |
+| **[Dashboard Panels Guide](docs/development/DASHBOARD_PANELS_GUIDE.md)** | Complete dashboard reference (34 panels) |
+| **[APM Overview](docs/apm/README.md)** | Complete APM system overview |
+| **[SLO Documentation](docs/slo/README.md)** | SRE practices: SLI/SLO definitions, error budgets |
+| **[API Reference](docs/api/API_REFERENCE.md)** | Complete API documentation for all 9 microservices |
+| **[k6 Load Testing](docs/k6/K6_LOAD_TESTING.md)** | k6 load testing setup and configuration |
+| **[Documentation Index](docs/README.md)** | Complete documentation index with learning path |
+| **[AGENTS.md](AGENTS.md)** | AI Agent Guide for navigating the codebase |
 
 ---
 
-## 🎯 SRE Practices
+## Key Features
 
-### SLI/SLO Implementation
+### Observability
 
-This project includes comprehensive SRE practices with **Service Level Objectives (SLOs)** and **Error Budget** tracking:
+- **Traces**: Distributed tracing with Tempo + Jaeger (via OpenTelemetry Collector)
+- **Metrics**: Prometheus (custom business + infrastructure metrics)
+- **Logs**: Structured logging with zap, correlated via trace_id/span_id (Loki + Vector)
+- **Profiles**: Continuous profiling with Pyroscope (CPU, heap, goroutines, locks)
 
-**📊 SLI Definitions:**
-- **Availability**: 99.5% (30d), 99.0% (7d) - Non-5xx responses
-- **Latency**: 95% (30d), 90% (7d) - Requests < 500ms  
-- **Error Rate**: 99% (30d), 98% (7d) - Non-4xx/5xx responses
+**APM Details**: See [`docs/apm/README.md`](docs/apm/README.md)
 
-**💰 Error Budget Policy:**
-- **30-day Budget**: 0.5% of total requests
-- **7-day Budget**: 1.0% of total requests
-- **Burn Rate Alerts**: 15x (critical), 4x (warning), 1x (info)
+### Database
 
-**🚨 Multi-Window Alerts:**
-- Critical: Budget exhausted in 2 days (15x burn rate)
-- Warning: Budget exhausted in 7 days (4x burn rate)
-- Info: Budget below 20%
+- **5 PostgreSQL Clusters**: review-db, auth-db, supporting-db (shared: user + notification + shipping-v2), product-db, transaction-db
+- **Connection Poolers**: PgBouncer (Auth), PgCat (Product, Cart+Order)
+- **Migrations**: Flyway 11.19.0 with 8 migration images
+- **Operators**: Zalando Postgres Operator (v1.15.0), CrunchyData Postgres Operator (v5.7.0)
 
-**📈 SLO Dashboard:**
-- Real-time error budget tracking
-- Burn rate monitoring (1h, 6h, 3d windows)
-- Time to exhaustion estimates
-- SLI trend analysis
+### SLO Management
 
-**🤖 Automated Runbooks:**
-- `diagnose-latency.sh` - Latency issue analysis
-- `error-budget-alert.sh` - Budget alert response
-- Auto-classification of incidents by severity
+- **Sloth Operator**: Kubernetes-native SLO management
+- **Error Budget Tracking**: Real-time error budget monitoring
+- **Burn Rate Alerts**: Multi-window multi-burn-rate alerts
+- **Automated Runbooks**: Latency diagnosis and error budget alert response
 
-**🚀 One-Command Deployment:**
-```bash
-./scripts/07-deploy-slo.sh
-```
-
-**📖 Full Documentation:** [SLO Documentation](./docs/slo/README.md)
+**SLO Details**: See [`docs/slo/README.md`](docs/slo/README.md)
 
 ---
 
-## 🛠️ Technology Stack
+## Troubleshooting
 
-- **Go 1.25** - Application runtime
-- **Gin** - HTTP web framework
-- **Prometheus** - Metrics collection
-- **Grafana** - Visualization & dashboards
-- **Grafana Operator** - Manages Grafana resources (dashboards, datasources)
-- **Sloth Operator v0.15.0** - SLO management (automatic rule generation)
-- **OpenTelemetry** - Distributed tracing standard
-- **OpenTelemetry Collector** - Trace fan-out to multiple backends
-- **Grafana Tempo** - Distributed tracing backend
-- **Jaeger** - Distributed tracing (alternative UI)
-- **Zap** - Structured logging
-- **Pyroscope** - Continuous profiling
-- **k6** - Load testing
-- **Kind** - Local Kubernetes
-- **Helm** - Package management
+Common issues and quick fixes. For detailed troubleshooting, see [`docs/monitoring/TROUBLESHOOTING.md`](docs/monitoring/TROUBLESHOOTING.md).
 
+**Dashboard not loading:**
+- Check port-forward: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`
+- Re-apply dashboards: `./scripts/10-reload-dashboard.sh`
 
----
+**Pods not starting:**
+- Check pod status: `kubectl get pods -A`
+- Check logs: `kubectl logs -n <namespace> <pod-name>`
 
-## 🔧 Customization
+**Metrics not appearing:**
+- Generate traffic: Deploy k6 with `./scripts/07-deploy-k6.sh`
+- Check ServiceMonitor: `kubectl get servicemonitor -n monitoring`
 
-### Add Custom Metrics
-
-1. Define metric in `pkg/middleware/prometheus.go`:
-```go
-var MyMetric = promauto.NewCounterVec(
-    prometheus.CounterOpts{
-        Name: "my_metric_total",
-        Help: "My custom metric",
-    },
-    []string{"label"},
-)
-```
-
-2. Use in code:
-```go
-MyMetric.WithLabelValues("value").Inc()
-```
-
-3. Add panel to `grafana-dashboard.json`
-
-### Modify Dashboard
-
-- Edit `grafana-dashboard.json`
-- Reapply dashboards via operator: `./scripts/09-reload-dashboard.sh`
-- Port-forward Grafana: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`
+**Database connection issues:**
+- Verify databases are deployed: `./scripts/04-deploy-databases.sh`
+- Check secrets: `kubectl get secrets -n <namespace>`
+- See `k8s/secrets/README.md` for secret creation
 
 ---
 
-## 🧹 Cleanup
-
-```bash
-# Delete everything
-./scripts/cleanup.sh
-
-# Or manual
-kind delete cluster --name monitoring-local
-```
-
----
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-**1. ImagePullBackOff Errors**
-```bash
-# This happens when you skip Step 3 (build microservices)
-# Solution: Always run Step 3 before Step 4
-./scripts/04-build-microservices.sh
-./scripts/05-deploy-microservices.sh
-
-# Or manually for specific service
-docker build --build-arg SERVICE_NAME=auth -f services/Dockerfile -t ghcr.io/duynhne/auth:v5 services/
-kind load docker-image ghcr.io/duynhne/auth:v5 --name monitoring-local
-kubectl rollout restart deployment -n auth -l app=auth
-```
-
-**2. Port Forwarding Not Working**
-```bash
-# Kill existing port forwards
-pkill -f "kubectl port-forward"
-
-# Restart port forwarding
-kubectl port-forward -n monitoring svc/grafana-service 3000:3000 &
-kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090 &
-kubectl port-forward -n user svc/user 8081:8080 &
-```
-
-**3. Pods Not Starting**
-```bash
-# Check pod status
-kubectl get pods --all-namespaces
-
-# Check pod logs
-kubectl logs -n <namespace> <pod-name>
-```
-
-**4. Grafana Dashboard Not Loading**
-```bash
-# Restart Grafana
-kubectl rollout restart deployment/grafana -n monitoring
-
-# Check Grafana logs
-kubectl logs -n monitoring -l app=grafana
-```
-
-## ❓ FAQ
-
-**Q: Why Kind instead of Docker Compose?**
-A: Kind provides real Kubernetes metrics. Docker Compose only gives 13/23 panels. Kind gives all 23!
-
-**Q: Can I use this in production?**
-A: Yes! This is a production-ready template. Add:
-- TLS/ingress
-- Persistent storage
-- Alerting rules
-- Authentication
-
-**Q: How do I add more endpoints?**
-A: Add handlers in `handlers/` directory. Metrics are auto-collected via middleware.
-
-**Q: Dashboard shows no data?**
-A: Generate traffic first! Deploy k6 load generators with `./scripts/06-deploy-k6.sh` or generate traffic manually.
-
-**Q: What's Apdex Score?**
-A: Application Performance Index. 0-1 scale measuring user satisfaction based on response times.
-
-**Q: Scripts not executable?**
-A: Run `chmod +x scripts/*.sh` to make all scripts executable.
-
----
-
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! Areas to improve:
-- Add more metrics
-- New dashboard panels
-- Additional endpoints
-- Documentation
-
----
-
-## 🌟 Star This Repo!
-
-If this helps you understand monitoring, please ⭐ star the repository!
+- Additional metrics and dashboard panels
+- New microservices
+- Documentation improvements
+- Performance optimizations
 
 ---
 

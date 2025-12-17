@@ -58,7 +58,7 @@ jobs:
       - name: Build and push K6 image
         id: build
         if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./k6
           file: ./k6/Dockerfile

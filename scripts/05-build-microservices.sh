@@ -193,7 +193,7 @@ kind load docker-image $REGISTRY/k6:v5 --name monitoring-local
 echo "k6:v5 built and loaded"
 
 echo ""
-echo "🎉 All 9 services + 9 init images + 1 k6 image built and loaded to Kind cluster!"
+echo "SUCCESS: All 9 services + 9 init images + 1 k6 image built and loaded to Kind cluster!"
 echo ""
 echo "Usage:"
 echo "  ./scripts/05-build-microservices.sh              # Normal build (use cache, skip existing)"

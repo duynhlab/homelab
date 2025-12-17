@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.10.1] - 2025-12-17
+
+### Added
+
+**Local Build Verification Script:**
+- **New Script**: `scripts/00-verify-build.sh` - Comprehensive local build verification before pushing code
+  - **Checks**: Go module synchronization, code formatting, static analysis, build all services, optional tests
+  - **Usage**: `./scripts/00-verify-build.sh` or `./scripts/00-verify-build.sh --skip-tests`
+  - **Git Hook**: Optional pre-commit hook available at `.githooks/pre-commit`
+  - **Purpose**: Catch build errors locally before CI, ensure code quality standards
+  - **Integration**: CI workflow uses same checks for PR verification
+
+### Changed
+
+**Go 1.25.5 Security Upgrade:**
+- **Upgraded Go from 1.25/1.23 to 1.25.5** - Critical security patches applied
+  - **CI/CD Pipeline**: Updated `.github/workflows/build-images.yml` to use `go-version: '1.25.5'` (was 1.23)
+  - **Docker Build**: Updated `services/Dockerfile` to use `golang:1.25.5-alpine` (was 1.25-alpine)
+  - **Security Patches**: Includes fixes for CVE-2025-61729 and CVE-2025-61727 (crypto/x509 vulnerabilities)
+    - **CVE-2025-61729**: Fixed resource exhaustion vulnerability in `HostnameError.Error()`
+    - **CVE-2025-61727**: Fixed domain exclusion constraint bypass for wildcard SAN entries
+  - **Impact**: All 9 microservices now protected from crypto/x509 security vulnerabilities
+  - **Compatibility**: 100% backward compatible (patch release, no breaking changes)
+  - **Verification**: All services build successfully, tests pass, no regressions detected
+
+**Documentation Updates:**
+- Updated `README.md` - Go version requirement to 1.25.5
+- Updated `specs/system-context/06-technology-stack.md` - Version tables and compatibility matrix
+- Updated `specs/system-context/08-development-workflow.md` - Prerequisites and examples
+- Updated `specs/active/go125-config-modernization/research.md` - Added Go 1.25.5 availability note
+- All version references now consistently show Go 1.25.5
+
+**Files Modified:**
+- `.github/workflows/build-images.yml` - CI workflow Go version
+- `services/Dockerfile` - Docker base image version
+- `README.md` - Technology stack version
+- `specs/system-context/06-technology-stack.md` - Version documentation
+- `specs/system-context/08-development-workflow.md` - Prerequisites documentation
+- `specs/active/go125-config-modernization/research.md` - Research notes
+
+**Migration Notes:**
+- No code changes required (patch release)
+- `go.mod` unchanged (patch versions don't require go.mod update)
+- All dependencies compatible (verified)
+- Local development: Install Go 1.25.5 for consistency
+- CI/CD: Automatically uses Go 1.25.5 after merge
+
 ## [0.10.0] - 2025-12-15
 
 ### Added

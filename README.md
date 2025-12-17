@@ -106,7 +106,7 @@ flowchart TD
 
 ## Technology Stack
 
-- **Runtime**: Go 1.25
+- **Runtime**: Go 1.25.5
 - **Database**: PostgreSQL (5 clusters via Zalando/CrunchyData operators)
   - Connection poolers: PgBouncer, PgCat
   - Migrations: Flyway 11.19.0 (8 migration images)

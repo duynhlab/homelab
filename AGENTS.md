@@ -396,6 +396,53 @@ GitHub Actions workflows:
 
 ---
 
+### Local Build Verification
+
+**Before pushing code, run:**
+```bash
+./scripts/00-verify-build.sh
+```
+
+**What it checks:**
+1. Go module synchronization (`go.mod`/`go.sum`)
+2. Code formatting (`gofmt`)
+3. Static analysis (`go vet`)
+4. Build all 9 services
+5. Tests (optional - use `--skip-tests` to skip)
+
+**Usage:**
+```bash
+# Run all checks including tests
+./scripts/00-verify-build.sh
+
+# Skip tests (faster, for quick verification)
+./scripts/00-verify-build.sh --skip-tests
+```
+
+**If script fails:**
+- Fix the reported error
+- Re-run the script
+- Commit changes only after all checks pass
+
+**Optional: Git Hook Setup**
+
+To automatically run verification before each commit:
+
+```bash
+# Install git hook
+cp .githooks/pre-commit .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
+**Note:** Git hook is optional. You can skip it with `git commit --no-verify` if needed.
+
+**Troubleshooting:**
+- **"go.mod or go.sum changed"**: Run `go mod tidy` and commit the changes
+- **"Code not formatted"**: Run `gofmt -w .` to auto-format
+- **"Failed to build [service]"**: Check compilation errors in that service
+- **"go vet found issues"**: Review and fix the reported issues
+
+---
 ## Troubleshooting
 
 Common issues and quick fixes. For detailed troubleshooting, see [`docs/monitoring/TROUBLESHOOTING.md`](docs/monitoring/TROUBLESHOOTING.md).

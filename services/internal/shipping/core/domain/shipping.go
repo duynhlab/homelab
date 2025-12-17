@@ -1,10 +1,14 @@
 package domain
 
 type Shipment struct {
-	ID          string `json:"id"`
-	TrackingID  string `json:"trackingId"`
-	Status      string `json:"status"`
-	Destination string `json:"destination"`
+	ID                int     `json:"id"`
+	OrderID           int     `json:"order_id"`
+	TrackingNumber    string  `json:"tracking_number"`
+	Carrier           string  `json:"carrier,omitempty"`
+	Status            string  `json:"status"`
+	EstimatedDelivery *string `json:"estimated_delivery,omitempty"`
+	CreatedAt         string  `json:"created_at,omitempty"`
+	UpdatedAt         string  `json:"updated_at,omitempty"`
 }
 
 type EstimateRequest struct {

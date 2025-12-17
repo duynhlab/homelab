@@ -116,7 +116,14 @@ func Register(c *gin.Context) {
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Registration failed", zap.Error(err), zap.String("username", req.Username))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		
+		// Check error type and map to appropriate HTTP response
+		switch {
+		case errors.Is(err, logicv2.ErrUserExists):
+			c.JSON(http.StatusConflict, gin.H{"error": "Username or email already exists"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
 		return
 	}
 

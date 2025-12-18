@@ -1,8 +1,8 @@
--- V1__Initial_schema.sql
+-- 001__init_schema.sql
 -- Review Database Schema - Initial Setup
 
 -- Reviews table
-CREATE TABLE reviews (
+CREATE TABLE IF NOT EXISTS reviews (
     id SERIAL PRIMARY KEY,
     product_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,  -- References auth.users.id (cross-cluster, no FK)
@@ -14,6 +14,7 @@ CREATE TABLE reviews (
 );
 
 -- Indexes
-CREATE INDEX idx_reviews_product ON reviews(product_id);
-CREATE INDEX idx_reviews_user ON reviews(user_id);
-CREATE INDEX idx_reviews_rating ON reviews(rating);
+CREATE INDEX IF NOT EXISTS idx_reviews_product ON reviews(product_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_user ON reviews(user_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_rating ON reviews(rating);
+

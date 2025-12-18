@@ -1,0 +1,34 @@
+# Review Database Cluster (Zalando Operator)
+# Direct connection, no pooler
+apiVersion: acid.zalan.do/v1
+kind: postgresql
+metadata:
+  name: review-db
+  namespace: review
+spec:
+  teamId: "platform"
+  
+  # Volume configuration
+  volume:
+    size: 5Gi
+  
+  # Single instance (no HA)
+  numberOfInstances: 1
+  
+  # Database and user configuration
+  databases:
+    review: review
+  
+  users:
+    review:  # Database owner
+      - createdb
+  
+  # No connection pooler (direct connection)
+  connectionPooler:
+    numberOfInstances: 0
+  
+  # PostgreSQL parameters
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "128MB"

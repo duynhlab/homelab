@@ -1,0 +1,79 @@
+# CrunchyData Postgres Operator Helm Values
+# Chart: postgres-operator/postgres-operator (CrunchyData)
+# Version: v5.7.0 (adjust as needed)
+# Docs: https://github.com/CrunchyData/postgres-operator
+
+# Operator image configuration
+image:
+  registry: registry.developers.crunchydata.com
+  repository: crunchydata/postgres-operator
+  tag: v5.7.0  # ⚠️ Fix version here for stability
+  pullPolicy: IfNotPresent
+
+# Operator configuration
+config:
+  # Kubernetes API connection
+  kubernetes:
+    cluster_name: "kind-cluster"
+  
+  # PostgreSQL configuration
+  postgresql:
+    # Default PostgreSQL version
+    default_postgres_version: "15"
+    
+    # Default parameters for all PostgreSQL instances
+    parameters:
+      max_connections: "200"
+      shared_buffers: "256MB"
+      effective_cache_size: "512MB"
+      maintenance_work_mem: "128MB"
+      checkpoint_completion_target: "0.9"
+      wal_buffers: "16MB"
+      default_statistics_target: "100"
+      random_page_cost: "4.0"
+      effective_io_concurrency: "2"
+      work_mem: "8MB"
+      min_wal_size: "1GB"
+      max_wal_size: "4GB"
+  
+  # High Availability (Patroni) configuration
+  patroni:
+    # Enable Patroni for HA clusters
+    enabled: true
+    # Leader election via Kubernetes API
+    kubernetes:
+      use_endpoints: true
+      # Failover timeout (seconds)
+      failover_timeout: 30
+
+# Operator resources
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "200m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+
+# Service account
+serviceAccount:
+  create: true
+  name: "postgres-operator-crunchydata"
+
+# RBAC
+rbac:
+  create: true
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# Security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false  # Operator needs write access
+  capabilities:
+    drop:
+      - ALL

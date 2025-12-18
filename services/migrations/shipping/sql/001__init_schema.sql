@@ -1,8 +1,8 @@
--- V1__Initial_schema.sql
+-- 001__init_schema.sql
 -- Shipping Database Schema - Initial Setup
 
 -- Shipments table
-CREATE TABLE shipments (
+CREATE TABLE IF NOT EXISTS shipments (
     id SERIAL PRIMARY KEY,
     order_id INTEGER NOT NULL,  -- References order.orders.id (cross-cluster, no FK)
     tracking_number VARCHAR(100) NOT NULL UNIQUE,
@@ -14,6 +14,7 @@ CREATE TABLE shipments (
 );
 
 -- Indexes
-CREATE INDEX idx_shipments_order ON shipments(order_id);
-CREATE INDEX idx_shipments_tracking ON shipments(tracking_number);
-CREATE INDEX idx_shipments_status ON shipments(status);
+CREATE INDEX IF NOT EXISTS idx_shipments_order ON shipments(order_id);
+CREATE INDEX IF NOT EXISTS idx_shipments_tracking ON shipments(tracking_number);
+CREATE INDEX IF NOT EXISTS idx_shipments_status ON shipments(status);
+

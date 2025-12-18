@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.10.5] - 2025-12-18
+
+### Changed
+
+**Init Container Image Naming Refactoring:**
+- **Unified Image Repositories**: Changed from separate `init-{service}:v5` images to tag-based naming `{service}:v5-init`
+  - **Before**: `ghcr.io/duynhne/init-auth:v5` (separate repository)
+  - **After**: `ghcr.io/duynhne/auth:v5-init` (same repository, different tag)
+  - **Benefits**: Single repository per service, cleaner organization, more professional
+  - **Impact**: Reduced from 18 repositories (9 app + 9 init) to 9 repositories (one per service)
+  - **Files Updated**: 
+    - `.github/workflows/build-init-images.yml` - Build with `v5-init` tag
+    - `scripts/05-build-microservices.sh` - Build script updated
+    - All 9 Helm values files - Image references updated
+    - `charts/templates/deployment.yaml` - Container name changed from `flyway-migrate` → `flyway-init`
+  - **Migration**: Existing `init-{service}:v5` images deprecated, rebuild required with new naming
+
+**Flyway Migration Updates:**
+- **Installation Method**: Changed from Alpine `apk` package to GitHub releases download
+  - **Reason**: `flyway` package no longer available in Alpine repositories
+  - **Implementation**: Download Flyway 11.19.0 from GitHub releases, extract to `/opt/flyway`, symlink to `/usr/local/bin`
+  - **Impact**: All 9 migration Dockerfiles updated (auth, user, product, cart, order, review, notification, shipping, shipping-v2)
+- **Migration File Naming**: Renamed from `V1__Initial_schema.sql` to `001__init_schema.sql`
+  - **Format**: Simplified naming convention (removed `V` prefix, lowercase `init`)
+  - **Files**: All 9 migration SQL files renamed and updated
+- **Idempotent Migrations**: Added `IF NOT EXISTS` to all `CREATE TABLE` and `CREATE INDEX` statements
+  - **Safety**: Prevents errors when running migrations multiple times
+  - **Coverage**: All tables and indexes now use idempotent syntax
+- **Cleanup**: Removed duplicate `001_init_schema.sql` files from migration root directories
+  - **Result**: Single source of truth in `sql/` directories
+
+**GitHub Actions Workflow Improvements:**
+- **Build Verification**: Extracted inline bash script to `.github/scripts/verify-build.sh`
+  - **Before**: 30+ lines of inline bash in workflow YAML
+  - **After**: Single line script invocation, cleaner and more maintainable
+  - **Workflow**: `.github/workflows/build-images.yml` now calls external script
+
+**Files Modified:**
+- `.github/workflows/build-init-images.yml` - Init image naming changed to tag-based (`{service}:v5-init`)
+- `.github/workflows/build-images.yml` - CI workflow Go version, extracted build verification to script
+- `.github/scripts/verify-build.sh` - New build verification script (extracted from workflow)
+- `scripts/05-build-microservices.sh` - Init image naming updated to tag-based format
+- `services/migrations/*/Dockerfile` - All 9 migration Dockerfiles updated (Flyway installation from GitHub releases)
+- `services/migrations/*/sql/001__init_schema.sql` - All 9 migration SQL files renamed and updated (added IF NOT EXISTS)
+- `charts/values/*.yaml` - All 9 Helm values files updated (init image references changed to tag-based)
+- `charts/values.yaml` - Example comments updated
+- `charts/README.md` - Documentation examples updated
+- `charts/templates/deployment.yaml` - Container name changed from `flyway-migrate` → `flyway-init`
+- `AGENTS.md` - Updated migration file references
+- `CHANGELOG.md` - This entry
+
+**Migration Notes:**
+- **Init Images**: Rebuild required after image naming change (`init-{service}:v5` → `{service}:v5-init`)
+- **Migration Images**: Rebuild required after Flyway installation method change
+- **Helm Values**: Update any custom values files to use new init image naming format
+
 ## [0.10.1] - 2025-12-17
 
 ### Added
@@ -47,10 +103,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Files Modified:**
 - `.github/workflows/build-images.yml` - CI workflow Go version, extracted build verification to script
+- `.github/workflows/build-init-images.yml` - Init image naming changed to tag-based (`{service}:v5-init`)
 - `.github/scripts/verify-build.sh` - New build verification script (extracted from workflow)
+- `scripts/05-build-microservices.sh` - Init image naming updated to tag-based format
 - `services/Dockerfile` - Docker base image version
 - `services/migrations/*/Dockerfile` - All 9 migration Dockerfiles updated (Flyway installation from GitHub releases)
 - `services/migrations/*/sql/001__init_schema.sql` - All 9 migration SQL files renamed and updated (added IF NOT EXISTS)
+- `charts/values/*.yaml` - All 9 Helm values files updated (init image references changed to tag-based)
+- `charts/values.yaml` - Example comments updated
+- `charts/README.md` - Documentation examples updated
+- `charts/templates/deployment.yaml` - Container name changed from `flyway-migrate` → `flyway-init`
 - `AGENTS.md` - Updated migration file references
 - `README.md` - Technology stack version
 - `specs/system-context/06-technology-stack.md` - Version documentation
@@ -76,6 +138,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Before**: 30+ lines of inline bash in workflow YAML
   - **After**: Single line script invocation, cleaner and more maintainable
   - **Workflow**: `.github/workflows/build-images.yml` now calls external script
+
+**Init Container Image Naming Refactoring:**
+- **Unified Image Repositories**: Changed from separate `init-{service}:v5` images to tag-based naming `{service}:v5-init`
+  - **Before**: `ghcr.io/duynhne/init-auth:v5` (separate repository)
+  - **After**: `ghcr.io/duynhne/auth:v5-init` (same repository, different tag)
+  - **Benefits**: Single repository per service, cleaner organization, more professional
+  - **Impact**: Reduced from 18 repositories (9 app + 9 init) to 9 repositories (one per service)
+  - **Files Updated**: 
+    - `.github/workflows/build-init-images.yml` - Build with `v5-init` tag
+    - `scripts/05-build-microservices.sh` - Build script updated
+    - All 9 Helm values files - Image references updated
+    - `charts/templates/deployment.yaml` - Container name changed from `flyway-migrate` → `flyway-init`
+  - **Migration**: Existing `init-{service}:v5` images deprecated, rebuild required with new naming
 
 **Migration Notes:**
 - No code changes required (patch release)

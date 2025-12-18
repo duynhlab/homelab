@@ -90,5 +90,5 @@ readinessProbe:
 # Database migrations (Flyway init container)
 migrations:
   enabled: true
-  image: ghcr.io/duynhne/init-product:v5
+  image: ghcr.io/duynhne/product:v5-init
   imagePullPolicy: IfNotPresent

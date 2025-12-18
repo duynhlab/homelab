@@ -96,7 +96,7 @@ Enable Flyway init container for automatic database migrations:
 ```yaml
 migrations:
   enabled: true
-  image: ghcr.io/duynhne/init-auth:v5
+  image: ghcr.io/duynhne/auth:v5-init
   imagePullPolicy: IfNotPresent
 ```
 

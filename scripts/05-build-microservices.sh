@@ -60,11 +60,11 @@ wait_for_pods() {
 echo "=== Building Init Images ==="
 INIT_SERVICES=("auth" "user" "product" "cart" "order" "review" "notification" "shipping" "shipping-v2")
 for SERVICE in "${INIT_SERVICES[@]}"; do
-    INIT_IMAGE="$REGISTRY/init-$SERVICE:v5"
+    INIT_IMAGE="$REGISTRY/$SERVICE:v5-init"
     echo "Building init image: $INIT_IMAGE"
     
     # Check if image already exists in Kind (skip only if not forcing rebuild)
-    if [ "$FORCE" != "true" ] && [ "$NO_CACHE" != "true" ] && check_image_in_kind "$REGISTRY/init-$SERVICE"; then
+    if [ "$FORCE" != "true" ] && [ "$NO_CACHE" != "true" ] && check_image_in_kind "$REGISTRY/$SERVICE"; then
         echo "$INIT_IMAGE already exists in Kind, skipping build"
         echo "   Use --no-cache or --force to rebuild anyway"
         continue

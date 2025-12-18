@@ -62,11 +62,11 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/init-${{ matrix.service }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}
           tags: |
-            type=raw,value=v5
+            type=raw,value=v5-init
 
-      - name: Build and push migration image
+      - name: Build and push init image
         id: build
         if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v6

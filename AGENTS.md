@@ -293,7 +293,7 @@ GitHub Actions workflows:
 - Service code: `services/cmd/{service}/`, `services/internal/{service}/`
 - Helm values: `charts/values/{service}.yaml`
 - SLO CRD: `k8s/sloth/crds/{service}-slo.yaml`
-- Migration: `services/migrations/{service}/Dockerfile` + `sql/V1__Initial_schema.sql`
+- Migration: `services/migrations/{service}/Dockerfile` + `sql/001__init_schema.sql`
 
 **Update monitoring:**
 - Dashboard JSON: `k8s/grafana-operator/dashboards/microservices-dashboard.json`
@@ -356,7 +356,7 @@ GitHub Actions workflows:
 - **Kubernetes**: `k8s/{component}/`
 - **Scripts**: `scripts/{number}-{purpose}.sh`
 - **SLO**: `k8s/sloth/crds/*.yaml` (PrometheusServiceLevel CRDs)
-- **Migrations**: `services/migrations/{service}/Dockerfile` + `sql/V1__Initial_schema.sql`
+- **Migrations**: `services/migrations/{service}/Dockerfile` + `sql/001__init_schema.sql`
 
 ### Metric Naming Conventions
 

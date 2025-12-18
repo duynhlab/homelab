@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Purpose**: Catch build errors locally before CI, ensure code quality standards
   - **Integration**: CI workflow uses same checks for PR verification
 
+**GitHub Actions Build Verification Script:**
+- **New Script**: `.github/scripts/verify-build.sh` - Extracted build verification logic from workflow
+  - **Purpose**: Reusable script for PR verification in CI/CD pipeline
+  - **Usage**: Called automatically by `.github/workflows/build-images.yml` for PR builds
+  - **Benefits**: Cleaner workflow files, easier maintenance, reusable across workflows
+
 ### Changed
 
 **Go 1.25.5 Security Upgrade:**
@@ -40,12 +46,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All version references now consistently show Go 1.25.5
 
 **Files Modified:**
-- `.github/workflows/build-images.yml` - CI workflow Go version
+- `.github/workflows/build-images.yml` - CI workflow Go version, extracted build verification to script
+- `.github/scripts/verify-build.sh` - New build verification script (extracted from workflow)
 - `services/Dockerfile` - Docker base image version
+- `services/migrations/*/Dockerfile` - All 9 migration Dockerfiles updated (Flyway installation from GitHub releases)
+- `services/migrations/*/sql/001__init_schema.sql` - All 9 migration SQL files renamed and updated (added IF NOT EXISTS)
+- `AGENTS.md` - Updated migration file references
 - `README.md` - Technology stack version
 - `specs/system-context/06-technology-stack.md` - Version documentation
 - `specs/system-context/08-development-workflow.md` - Prerequisites documentation
 - `specs/active/go125-config-modernization/research.md` - Research notes
+
+**Flyway Migration Updates:**
+- **Installation Method**: Changed from Alpine `apk` package to GitHub releases download
+  - **Reason**: `flyway` package no longer available in Alpine repositories
+  - **Implementation**: Download Flyway 11.19.0 from GitHub releases, extract to `/opt/flyway`, symlink to `/usr/local/bin`
+  - **Impact**: All 9 migration Dockerfiles updated (auth, user, product, cart, order, review, notification, shipping, shipping-v2)
+- **Migration File Naming**: Renamed from `V1__Initial_schema.sql` to `001__init_schema.sql`
+  - **Format**: Simplified naming convention (removed `V` prefix, lowercase `init`)
+  - **Files**: All 9 migration SQL files renamed and updated
+- **Idempotent Migrations**: Added `IF NOT EXISTS` to all `CREATE TABLE` and `CREATE INDEX` statements
+  - **Safety**: Prevents errors when running migrations multiple times
+  - **Coverage**: All tables and indexes now use idempotent syntax
+- **Cleanup**: Removed duplicate `001_init_schema.sql` files from migration root directories
+  - **Result**: Single source of truth in `sql/` directories
+
+**GitHub Actions Workflow Improvements:**
+- **Build Verification**: Extracted inline bash script to `.github/scripts/verify-build.sh`
+  - **Before**: 30+ lines of inline bash in workflow YAML
+  - **After**: Single line script invocation, cleaner and more maintainable
+  - **Workflow**: `.github/workflows/build-images.yml` now calls external script
 
 **Migration Notes:**
 - No code changes required (patch release)
@@ -53,6 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All dependencies compatible (verified)
 - Local development: Install Go 1.25.5 for consistency
 - CI/CD: Automatically uses Go 1.25.5 after merge
+- **Migration Images**: Rebuild required after Flyway installation method change
 
 ## [0.10.0] - 2025-12-15
 

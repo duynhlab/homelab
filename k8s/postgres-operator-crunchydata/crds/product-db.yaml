@@ -1,0 +1,47 @@
+# Product Database Cluster (CrunchyData Operator)
+# With read replicas for high traffic
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: product-db
+  namespace: product
+spec:
+  # PostgreSQL version
+  postgresVersion: 15
+  
+  # Instance configuration (primary + replica)
+  instances:
+    - name: instance1
+      replicas: 2  # 1 primary + 1 replica
+      dataVolumeClaimSpec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu: "200m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+  
+  # Database configuration
+  database: product
+  
+  # User configuration
+  users:
+    - name: product
+      databases:
+        - product
+      options: "CREATEDB"
+  
+  # PostgreSQL parameters
+  patroni:
+    dynamicConfiguration:
+      postgresql:
+        parameters:
+          max_connections: "200"
+          shared_buffers: "256MB"
+          effective_cache_size: "512MB"

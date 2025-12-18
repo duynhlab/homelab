@@ -1,0 +1,19 @@
+# PgCat Service for Transaction Services
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgcat
+  namespace: cart
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+  - port: 9930
+    targetPort: 9930
+    protocol: TCP
+    name: admin
+  selector:
+    app: pgcat-transaction

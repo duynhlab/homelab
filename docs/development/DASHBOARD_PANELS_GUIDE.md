@@ -1,7 +1,7 @@
 # Dashboard Panels Reference Guide
 
 > **Audience**: SRE/DevOps Engineers  
-> **Dashboard**: Microservices Monitoring & Performance Applications  
+> **Dashboard**: Microservices Observability Platform  
 > **Total Panels**: 34 panels across 5 row groups  
 > **Last Updated**: 2025-12-13
 

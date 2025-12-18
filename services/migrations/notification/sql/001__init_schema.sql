@@ -1,5 +1,5 @@
--- Notification Database Schema
--- Idempotent migration script
+-- 001__init_schema.sql
+-- Notification Database Schema - Initial Setup
 
 -- Notifications table
 CREATE TABLE IF NOT EXISTS notifications (
@@ -16,3 +16,4 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
 CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at);
+

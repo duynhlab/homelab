@@ -1,0 +1,38 @@
+# postgres_exporter Helm Values
+# Chart: prometheus-community/prometheus-postgres-exporter
+# Version: v0.15.0 (adjust as needed)
+# Docs: https://github.com/prometheus-community/postgres_exporter
+
+# Image configuration
+image:
+  registry: quay.io
+  repository: prometheuscommunity/postgres-exporter
+  tag: v0.15.0  # ⚠️ Fix version here for stability
+  pullPolicy: IfNotPresent
+
+# Service account
+serviceAccount:
+  create: true
+  name: "postgres-exporter"
+
+# RBAC
+rbac:
+  create: true
+
+# Resources
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "50m"
+  limits:
+    memory: "128Mi"
+    cpu: "100m"
+
+# Security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL

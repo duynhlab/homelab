@@ -1,0 +1,31 @@
+# PgCat Configuration for Product Service
+# Routes to Product database with read replica load balancing
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgcat-product-config
+  namespace: product
+data:
+  pgcat.toml: |
+    # PgCat Configuration for Product Database
+    [admin]
+    host = "0.0.0.0"
+    port = 9930
+    
+    # Product database pool
+    [pools.product]
+    host = "product-db-primary.postgres-operator.svc.cluster.local"
+    port = 5432
+    database = "product"
+    user = "product"
+    password = "${PRODUCT_DB_PASSWORD}"
+    pool_size = 50
+    load_balance = true
+    
+    # Read replicas for load balancing
+    replicas = [
+      {
+        host = "product-db-replica-1.postgres-operator.svc.cluster.local"
+        port = 5432
+      }
+    ]

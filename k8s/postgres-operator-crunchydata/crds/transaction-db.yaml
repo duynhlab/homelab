@@ -1,0 +1,60 @@
+# Transaction Database Cluster (CrunchyData Operator)
+# Cart + Order services with Patroni HA
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: transaction-db
+  namespace: cart
+spec:
+  # PostgreSQL version
+  postgresVersion: 15
+  
+  # Instance configuration (HA with Patroni)
+  instances:
+    - name: instance1
+      replicas: 2  # 1 primary + 1 replica for HA
+      dataVolumeClaimSpec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu: "200m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+  
+  # Multiple databases (cart and order)
+  database: cart  # Default database
+  
+  # User configuration (multiple users)
+  users:
+    - name: cart
+      databases:
+        - cart
+      options: "CREATEDB"
+    - name: order
+      databases:
+        - order
+      options: "CREATEDB"
+  
+  # Create additional database for order
+  databases:
+    - name: order
+  
+  # Patroni HA configuration
+  patroni:
+    dynamicConfiguration:
+      postgresql:
+        parameters:
+          max_connections: "200"
+          shared_buffers: "256MB"
+          effective_cache_size: "512MB"
+    # Leader election via Kubernetes API
+    kubernetes:
+      use_endpoints: true
+      # Failover timeout (seconds)
+      failover_timeout: 30

@@ -1,0 +1,39 @@
+# PgCat Configuration for Transaction Services (Cart + Order)
+# Multi-database routing
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgcat-transaction-config
+  namespace: cart
+data:
+  pgcat.toml: |
+    # PgCat Configuration for Transaction Databases
+    [admin]
+    host = "0.0.0.0"
+    port = 9930
+    
+    # Cart database pool
+    [pools.cart]
+    host = "transaction-db-primary.postgres-operator.svc.cluster.local"
+    port = 5432
+    database = "cart"
+    user = "cart"
+    password = "${CART_DB_PASSWORD}"
+    pool_size = 30
+    
+    # Order database pool
+    [pools.order]
+    host = "transaction-db-primary.postgres-operator.svc.cluster.local"
+    port = 5432
+    database = "order"
+    user = "order"
+    password = "${ORDER_DB_PASSWORD}"
+    pool_size = 30
+    
+    # Read replicas for load balancing
+    replicas = [
+      {
+        host = "transaction-db-replica-1.postgres-operator.svc.cluster.local"
+        port = 5432
+      }
+    ]

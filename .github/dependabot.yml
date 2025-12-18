@@ -18,3 +18,12 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
+
+  # Docker - monitor base images in services/Dockerfile
+  - package-ecosystem: "docker"
+    directory: "/services"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "docker"

@@ -1,5 +1,5 @@
--- User Database Schema
--- Idempotent migration script
+-- 001__init_schema.sql
+-- User Database Schema - Initial Setup
 
 -- User profiles table
 CREATE TABLE IF NOT EXISTS user_profiles (
@@ -15,3 +15,4 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_user_profiles_user ON user_profiles(user_id);
+

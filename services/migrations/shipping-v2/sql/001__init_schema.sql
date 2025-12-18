@@ -1,8 +1,8 @@
--- V1__Initial_schema.sql
+-- 001__init_schema.sql
 -- Shipping-v2 Database Schema - Initial Setup
 
 -- Shipment estimates table (for shipping cost estimates)
-CREATE TABLE shipment_estimates (
+CREATE TABLE IF NOT EXISTS shipment_estimates (
     id SERIAL PRIMARY KEY,
     origin VARCHAR(255) NOT NULL,
     destination VARCHAR(255) NOT NULL,
@@ -14,12 +14,12 @@ CREATE TABLE shipment_estimates (
 );
 
 -- Indexes
-CREATE INDEX idx_shipment_estimates_origin ON shipment_estimates(origin);
-CREATE INDEX idx_shipment_estimates_destination ON shipment_estimates(destination);
-CREATE INDEX idx_shipment_estimates_created ON shipment_estimates(created_at);
+CREATE INDEX IF NOT EXISTS idx_shipment_estimates_origin ON shipment_estimates(origin);
+CREATE INDEX IF NOT EXISTS idx_shipment_estimates_destination ON shipment_estimates(destination);
+CREATE INDEX IF NOT EXISTS idx_shipment_estimates_created ON shipment_estimates(created_at);
 
 -- Shipments table (for tracking shipments)
-CREATE TABLE shipments (
+CREATE TABLE IF NOT EXISTS shipments (
     id SERIAL PRIMARY KEY,
     tracking_id VARCHAR(255) NOT NULL UNIQUE,
     order_id INTEGER,  -- References order.orders.id (cross-cluster, no FK)
@@ -34,13 +34,13 @@ CREATE TABLE shipments (
 );
 
 -- Indexes
-CREATE INDEX idx_shipments_tracking_id ON shipments(tracking_id);
-CREATE INDEX idx_shipments_order_id ON shipments(order_id);
-CREATE INDEX idx_shipments_status ON shipments(status);
-CREATE INDEX idx_shipments_created ON shipments(created_at);
+CREATE INDEX IF NOT EXISTS idx_shipments_tracking_id ON shipments(tracking_id);
+CREATE INDEX IF NOT EXISTS idx_shipments_order_id ON shipments(order_id);
+CREATE INDEX IF NOT EXISTS idx_shipments_status ON shipments(status);
+CREATE INDEX IF NOT EXISTS idx_shipments_created ON shipments(created_at);
 
 -- Shipment tracking history (for tracking status changes)
-CREATE TABLE shipment_tracking_history (
+CREATE TABLE IF NOT EXISTS shipment_tracking_history (
     id SERIAL PRIMARY KEY,
     shipment_id INTEGER REFERENCES shipments(id) ON DELETE CASCADE,
     status VARCHAR(50) NOT NULL,
@@ -50,5 +50,6 @@ CREATE TABLE shipment_tracking_history (
 );
 
 -- Indexes
-CREATE INDEX idx_tracking_history_shipment ON shipment_tracking_history(shipment_id);
-CREATE INDEX idx_tracking_history_created ON shipment_tracking_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_tracking_history_shipment ON shipment_tracking_history(shipment_id);
+CREATE INDEX IF NOT EXISTS idx_tracking_history_created ON shipment_tracking_history(created_at);
+

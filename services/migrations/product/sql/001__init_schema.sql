@@ -1,8 +1,8 @@
--- V1__Initial_schema.sql
+-- 001__init_schema.sql
 -- Product Database Schema - Initial Setup
 
 -- Categories table
-CREATE TABLE categories (
+CREATE TABLE IF NOT EXISTS categories (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
     description TEXT,
@@ -10,7 +10,7 @@ CREATE TABLE categories (
 );
 
 -- Products table
-CREATE TABLE products (
+CREATE TABLE IF NOT EXISTS products (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     description TEXT,
@@ -22,11 +22,11 @@ CREATE TABLE products (
 );
 
 -- Indexes
-CREATE INDEX idx_products_category ON products(category_id);
-CREATE INDEX idx_products_name ON products(name);
+CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
+CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
 
 -- Inventory table (for stock tracking)
-CREATE TABLE inventory (
+CREATE TABLE IF NOT EXISTS inventory (
     id SERIAL PRIMARY KEY,
     product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
     quantity INTEGER NOT NULL,
@@ -35,4 +35,5 @@ CREATE TABLE inventory (
 );
 
 -- Indexes
-CREATE INDEX idx_inventory_product ON inventory(product_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_product ON inventory(product_id);
+

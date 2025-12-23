@@ -1,0 +1,140 @@
+# CloudNativePG Operator Helm Values
+# Chart: cnpg/cloudnative-pg
+# Version: 1.28.0 (operator image version)
+# Docs: https://cloudnative-pg.io
+# GitHub: https://github.com/cloudnative-pg/cloudnative-pg
+# Helm Repo: https://cloudnative-pg.github.io/charts
+#
+# This chart installs the CloudNativePG operator to manage PostgreSQL clusters.
+# There are 3 charts available:
+# 1. cloudnative-pg - Operator chart (this file)
+# 2. cluster - Cluster chart (for deploying PostgreSQL clusters)
+# 3. plugin-barman-cloud - Plugin chart (for backup/restore)
+
+# Operator image configuration
+# Use official CloudNativePG image from GitHub Container Registry
+image:
+  repository: ghcr.io/cloudnative-pg/cloudnative-pg
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  # Set to "1.28.0" to pin version, or leave empty to use chart appVersion
+  tag: "1.28.0"
+
+# Operator configuration
+config:
+  # Specifies whether the secret should be created
+  create: true
+  # The name of the configmap/secret to use
+  name: cnpg-controller-manager-config
+  # Specifies whether it should be stored in a secret, instead of a configmap
+  secret: false
+  # Cluster-wide mode (true) or single-namespace mode (false)
+  # true: Operator can manage clusters in all namespaces (default)
+  # false: Operator only manages clusters in its own namespace
+  clusterWide: true
+  # The content of the configmap/secret
+  # See https://cloudnative-pg.io/documentation/current/operator_conf/#available-options
+  data: {}
+  # The maximum number of concurrent reconciles. Defaults to 10.
+  maxConcurrentReconciles: 10
+
+# Webhook configuration
+webhook:
+  port: 9443
+  mutating:
+    create: true
+    failurePolicy: Fail
+  validating:
+    create: true
+    failurePolicy: Fail
+  livenessProbe:
+    initialDelaySeconds: 3
+  readinessProbe:
+    initialDelaySeconds: 3
+  startupProbe:
+    failureThreshold: 6
+    periodSeconds: 5
+
+# CRDs configuration
+crds:
+  # Specifies whether the CRDs should be created when installing the chart
+  create: true
+
+# Service account
+serviceAccount:
+  # Specifies whether the service account should be created
+  create: true
+  # The name of the service account to use
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# RBAC
+rbac:
+  # Specifies whether ClusterRole and ClusterRoleBinding should be created
+  create: true
+  # Aggregate ClusterRoles to Kubernetes default user-facing roles
+  aggregateClusterRoles: false
+
+# Operator resources
+# Leave empty to use chart defaults, or uncomment to customize
+resources: {}
+  # If you want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  #
+  # limits:
+  #   cpu: 100m
+  #   memory: 200Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 100Mi
+
+# Container Security Context
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+  capabilities:
+    drop:
+      - "ALL"
+
+# Security Context for the whole pod
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+  # fsGroup: 2000
+
+# Node selector (optional, for Kind cluster)
+nodeSelector: {}
+
+# Tolerations (optional)
+tolerations: []
+
+# Affinity (optional)
+affinity: {}
+
+# Monitoring configuration
+monitoring:
+  # Specifies whether the monitoring should be enabled. Requires Prometheus Operator CRDs.
+  podMonitorEnabled: false
+  # Metrics relabel configurations to apply to samples before ingestion.
+  podMonitorMetricRelabelings: []
+  # Relabel configurations to apply to samples before scraping.
+  podMonitorRelabelings: []
+  # Additional labels for the podMonitor
+  podMonitorAdditionalLabels: {}
+
+  grafanaDashboard:
+    create: false
+    # Allows overriding the namespace where the ConfigMap will be created
+    namespace: ""
+    # The name of the ConfigMap containing the dashboard
+    configMapName: "cnpg-grafana-dashboard"
+    # Labels that ConfigMaps should have to get configured in Grafana
+    labels: {}
+    # Annotations that ConfigMaps can have to get configured in Grafana
+    annotations: {}
+

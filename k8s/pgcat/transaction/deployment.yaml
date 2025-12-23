@@ -16,23 +16,12 @@ spec:
     spec:
       containers:
       - name: pgcat
-        image: postgresml/pgcat:latest
+        image: ghcr.io/postgresml/pgcat:v1.2.0
         ports:
         - containerPort: 5432
           name: postgres
         - containerPort: 9930
           name: admin
-        env:
-        - name: CART_DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: transaction-db-secret
-              key: cart-password
-        - name: ORDER_DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: transaction-db-secret
-              key: order-password
         volumeMounts:
         - name: config
           mountPath: /etc/pgcat

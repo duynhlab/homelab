@@ -34,8 +34,9 @@ spec:
         cpu: 100m
         memory: 128Mi
   
-  # PostgreSQL parameters
+  # PostgreSQL version and parameters
   postgresql:
+    version: "15"
     parameters:
       max_connections: "100"
       shared_buffers: "128MB"

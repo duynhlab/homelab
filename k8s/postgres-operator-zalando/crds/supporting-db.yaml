@@ -31,11 +31,11 @@ spec:
       - createdb
   
   # No connection pooler (direct connection, low traffic)
-  connectionPooler:
-    numberOfInstances: 0
+  # Note: To disable pooler, omit connectionPooler section entirely
   
-  # PostgreSQL parameters
+  # PostgreSQL version and parameters
   postgresql:
+    version: "15"
     parameters:
       max_connections: "100"
       shared_buffers: "128MB"

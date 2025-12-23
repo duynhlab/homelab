@@ -1,0 +1,87 @@
+# Transaction Database Cluster (CloudNativePG Operator)
+# Cart + Order services with Patroni HA and etcd
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: transaction-db
+  namespace: cart
+spec:
+  # Number of instances (HA with Patroni)
+  instances: 2  # 1 primary + 1 replica for HA
+  
+  # PostgreSQL parameters and HA configuration
+  postgresql:
+    parameters:
+      max_connections: "200"
+      shared_buffers: "256MB"
+      effective_cache_size: "512MB"
+      maintenance_work_mem: "128MB"
+      checkpoint_completion_target: "0.9"
+      wal_buffers: "16MB"
+      default_statistics_target: "100"
+      random_page_cost: "4.0"
+      effective_io_concurrency: "2"
+      work_mem: "8MB"
+      min_wal_size: "1GB"
+      max_wal_size: "4GB"
+    # High Availability configuration with Patroni
+    # CloudNativePG uses Patroni internally for HA
+    # Note: syncReplicaElectionConstraint requires nodeLabelsAntiAffinity when enabled
+    # For Kind cluster (learning), we disable it to avoid node label requirements
+    # In production, enable with proper node labels for anti-affinity
+    syncReplicaElectionConstraint:
+      enabled: false  # Disabled for Kind cluster (no node labels configured)
+      # To enable in production with node labels:
+      # enabled: true
+      # nodeLabelsAntiAffinity:
+      #   - key: topology.kubernetes.io/zone
+      #     values: ["zone-a", "zone-b"]
+  
+  # Bootstrap configuration
+  bootstrap:
+    initdb:
+      database: cart  # Default database
+      owner: cart
+      secret:
+        name: transaction-db-secret
+      dataChecksums: true
+      encoding: "UTF8"
+      localeCType: "C"
+      localeCollate: "C"
+  
+  # Storage configuration
+  storage:
+    size: 10Gi
+    storageClass: standard  # Use default storage class for Kind
+  
+  # Resource requests and limits
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  
+  # Patroni configuration for etcd (learning purpose)
+  # Note: CloudNativePG uses Kubernetes API for leader election by default
+  # For etcd integration, we can configure Patroni via postgresql.parameters
+  # This is documented for learning and interview preparation
+  # Reference: https://patroni.readthedocs.io/en/latest/etcd.html
+  #
+  # To use etcd with Patroni in CloudNativePG:
+  # 1. Deploy etcd cluster
+  # 2. Configure Patroni DCS (Distributed Configuration Store) to use etcd
+  # 3. Update postgresql.parameters with Patroni etcd configuration
+  #
+  # Example Patroni etcd config (for reference):
+  # patroni:
+  #   etcd:
+  #     hosts: etcd-0.etcd:2379
+  #     scope: transaction-db
+  #     ttl: 30
+  
+  # Additional databases (order database)
+  # Note: CloudNativePG creates databases via initdb or via separate resources
+  # For simplicity, we'll create order database via init script in migration
+

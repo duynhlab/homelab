@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+
+## [0.10.7y] - 2025-12-17
+
+### Changed
+
+**Database Documentation: Patroni Clarification**
+- **Updated DATABASE_GUIDE.md**: Clarified Patroni usage across all PostgreSQL clusters
+  - **Key Changes**:
+    - Clarified that **all clusters** (Zalando and CloudNativePG) use Patroni internally
+    - Removed misleading "Patroni + etcd" references (etcd not implemented, Patroni uses Kubernetes API)
+    - Updated Quick Summary: Changed from "Patroni + etcd" to "Patroni via Kubernetes API"
+    - Updated Technologies section: Both operators now explicitly mention Patroni
+    - Updated Operator Distribution table: All clusters show Patroni HA pattern
+    - Updated Cluster Details: All 5 clusters now document Patroni usage
+    - Updated Troubleshooting: Added comprehensive Patroni failover section with both operators
+  - **Clarifications**:
+    - Zalando Postgres Operator: "powered by Patroni" (uses Patroni internally)
+    - CloudNativePG Operator: "uses Patroni internally" (via Kubernetes API)
+    - Patroni uses Kubernetes API as Distributed Configuration Store (DCS), not etcd
+    - No separate etcd cluster needed - Kubernetes serves as coordination layer
+  - **Files Updated**: `docs/development/DATABASE_GUIDE.md`
+  - **Impact**: Documentation now accurately reflects actual implementation (Patroni via K8s API, not etcd)
+
+**Database Operator Migration: CrunchyData → CloudNativePG**
+- **Replaced CrunchyData Postgres Operator with CloudNativePG**: Migrated from CrunchyData operator to CloudNativePG for Product and Cart+Order clusters
+  - **Reason**: CrunchyData operator deployment issues (Helm repo inaccessible), CloudNativePG is open source CNCF project, easier deployment
+  - **Operator Version**: CloudNativePG v1.24.0 (fixed version)
+  - **Helm Chart**: `cloudnative-pg/cloudnative-pg` from `https://cloudnative-pg.github.io/charts`
+  - **CRD Changes**: 
+    - Before: `postgrescluster.postgres-operator.crunchydata.com/v1beta1`
+    - After: `Cluster` (postgresql.cnpg.io/v1)
+  - **Namespace**: Operators now deployed in dedicated `database` namespace (separate from `monitoring`)
+  - **Clusters Affected**: 
+    - Product cluster: CloudNativePG with read replicas
+    - Cart+Order cluster: CloudNativePG with Patroni HA (etcd support for learning)
+  - **Files Removed**: 
+    - `k8s/postgres-operator-crunchydata/` directory (values.yaml, CRDs)
+  - **Files Created**:
+    - `k8s/postgres-operator-cloudnativepg/values.yaml`
+    - `k8s/postgres-operator-cloudnativepg/crds/product-db.yaml`
+    - `k8s/postgres-operator-cloudnativepg/crds/transaction-db.yaml`
+  - **Script Updates**: `scripts/04-deploy-databases.sh` updated to deploy CloudNativePG operator
+  - **Documentation Updates**: 
+    - `specs/active/postgres-database-integration/spec.md` - Updated FR-003, architecture diagrams
+    - `specs/active/postgres-database-integration/plan.md` - Updated technology stack, tasks, architecture
+    - `AGENTS.md` - Updated operator references
+    - `README.md` - Updated operator references
+  - **Secrets**: Added automatic secret creation in deployment script for CloudNativePG databases
+  - **Learning Focus**: Patroni HA with etcd configuration documented for interview preparation
+
+### Added
+
+**Database Secrets Management:**
+- **Automatic Secret Creation**: Deployment script now automatically creates database secrets
+  - Secrets created for all 5 clusters (product-db-secret, transaction-db-secret, review-db-secret, auth-db-secret, supporting-db-secret)
+  - Default password: `postgres` (for learning/development)
+  - Secrets are idempotent (can be re-run safely)
+  - **Files**: `k8s/secrets/product-db-secret.yaml`, `k8s/secrets/transaction-db-secret.yaml` (gitignored)
+
+**Database Namespace Isolation:**
+- **Dedicated Namespace**: Database operators now deployed in `database` namespace
+  - Separates database operators from monitoring components
+  - Better organization and resource isolation
+  - Updated in deployment script and documentation
+
 ## [0.10.5] - 2025-12-18
 
 ### Changed

@@ -92,7 +92,13 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 
 22. **[Error Handling](./development/ERROR_HANDLING.md)** - Error handling patterns
 
-23. **[Dashboard Panels Guide](./development/DASHBOARD_PANELS_GUIDE.md)** - Complete dashboard reference for SRE/DevOps
+23. **[Database Guide](./development/DATABASE_GUIDE.md)** - PostgreSQL database integration guide
+    - 5 PostgreSQL clusters architecture
+    - Connection patterns (direct, PgBouncer, PgCat)
+    - Environment variables and Helm configuration
+    - Troubleshooting and monitoring
+
+24. **[Dashboard Panels Guide](./development/DASHBOARD_PANELS_GUIDE.md)** - Complete dashboard reference for SRE/DevOps
     - All 34 panels with query analysis and troubleshooting
     - PromQL patterns and best practices (Google SRE, Prometheus docs)
     - Before/After comparisons for updated panels (Status Code, Apdex, 4xx/5xx)
@@ -143,6 +149,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 ### Development
 - [Configuration Guide](./development/CONFIG_GUIDE.md) - Complete configuration management
 - [Error Handling](./development/ERROR_HANDLING.md) - Error handling patterns
+- [Database Guide](./development/DATABASE_GUIDE.md) - PostgreSQL database integration guide
 - [Dashboard Panels Guide](./development/DASHBOARD_PANELS_GUIDE.md) - Complete SRE/DevOps dashboard reference (34 panels)
 
 ### k6 Load Testing

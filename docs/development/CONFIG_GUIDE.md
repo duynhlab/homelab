@@ -245,6 +245,48 @@ extraEnv:
 | `METRICS_ENABLED` | bool | `true` | Enable/disable Prometheus metrics |
 | `METRICS_PATH` | string | `"/metrics"` | Metrics endpoint path |
 
+### Database Configuration (PostgreSQL)
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `DB_HOST` | string | - | Database host (pooler or direct endpoint) |
+| `DB_PORT` | string | `"5432"` | Database port |
+| `DB_NAME` | string | - | Database name |
+| `DB_USER` | string | - | Database user |
+| `DB_PASSWORD` | string | - | Database password (from Secret) |
+| `DB_SSLMODE` | string | `"disable"` | SSL mode (disable for Kind cluster) |
+| `DB_POOL_MAX_CONNECTIONS` | int | `25` | Max connections in pool |
+| `DB_POOL_MODE` | string | `"transaction"` | Pool mode (for PgBouncer) |
+
+**Important Notes:**
+- All database connections use **separate environment variables** (NOT a single `DATABASE_URL` string)
+- `DB_PASSWORD` must be provided via Kubernetes Secret (`valueFrom.secretKeyRef`)
+- `DB_HOST` points to pooler endpoint (if using pooler) or direct database endpoint
+- See [Database Guide](./DATABASE_GUIDE.md) for complete database configuration details
+
+**Example Configuration:**
+```yaml
+# Helm values (charts/values/auth.yaml)
+extraEnv:
+  - name: DB_HOST
+    value: "auth-db-pooler.postgres-operator.svc.cluster.local"
+  - name: DB_PORT
+    value: "5432"
+  - name: DB_NAME
+    value: "auth"
+  - name: DB_USER
+    value: "auth"
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: auth-db-secret
+        key: password
+  - name: DB_SSLMODE
+    value: "disable"
+  - name: DB_POOL_MAX_CONNECTIONS
+    value: "25"
+```
+
 ---
 
 ## Helm Chart Configuration
@@ -256,6 +298,7 @@ extraEnv:
 | Core service config (SERVICE_NAME, PORT) | ✅ Yes | ❌ No | Common across all services |
 | APM config (OTEL_COLLECTOR_ENDPOINT, PYROSCOPE_ENDPOINT) | ✅ Yes | ❌ No | Managed by chart |
 | Service-specific dependencies (REDIS_HOST) | ❌ No | ✅ Yes | Service-specific |
+| Database config (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD) | ❌ No | ✅ Yes | Service-specific, use `valueFrom.secretKeyRef` for password |
 | Secrets (API_KEY, DB_PASSWORD) | ❌ No | ✅ Yes | Use `valueFrom.secretKeyRef` |
 | Feature flags (ENABLE_BETA_FEATURE) | ❌ No | ✅ Yes | Service-specific |
 
@@ -287,7 +330,21 @@ See [charts/README.md](../../charts/README.md) for complete Helm chart documenta
    OTEL_SAMPLE_RATE=1.0
    LOG_LEVEL=debug
    LOG_FORMAT=console
+   
+   # Database configuration (for local development)
+   DB_HOST=localhost
+   DB_PORT=5432
+   DB_NAME=auth
+   DB_USER=auth
+   DB_PASSWORD=postgres
+   DB_SSLMODE=disable
+   DB_POOL_MAX_CONNECTIONS=25
    EOF
+   ```
+   
+   **Note**: For local development, you can port-forward the database:
+   ```bash
+   kubectl port-forward -n auth svc/auth-db-pooler 5432:5432
    ```
 
 4. **Run service**:
@@ -548,6 +605,7 @@ SERVICE_NAME=auth PORT=8080 go run cmd/auth/main.go
 
 ## Related Documentation
 
+- **[Database Guide](./DATABASE_GUIDE.md)** - Complete database integration guide (connection patterns, troubleshooting)
 - **[charts/README.md](../../charts/README.md)** - Helm chart configuration guide (`env` vs `extraEnv`)
 - **[pkg/config/config.go](../../services/pkg/config/config.go)** - Centralized configuration package
 - **[AGENTS.md](../../AGENTS.md)** - Project structure and conventions

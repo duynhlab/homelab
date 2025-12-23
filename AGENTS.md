@@ -95,6 +95,8 @@ flowchart TD
     Database -->|PostgreSQL| DB[(Database)]
 ```
 
+**Database Integration**: See [`docs/development/DATABASE_GUIDE.md`](docs/development/DATABASE_GUIDE.md) for database architecture, connection patterns (direct, PgBouncer, PgCat), and configuration.
+
 **Layer Responsibilities**:
 - **Web Layer** (`web/v1/`, `web/v2/`): HTTP handlers, request/response, validation
 - **Logic Layer** (`logic/v1/`, `logic/v2/`): Business logic, orchestration, database queries
@@ -118,9 +120,10 @@ flowchart TD
 ## Technology Stack
 
 - **Runtime**: Go 1.25
-- **Database**: PostgreSQL (5 clusters via Zalando/CrunchyData operators)
+- **Database**: PostgreSQL (5 clusters via Zalando/CloudNativePG operators)
   - Connection poolers: PgBouncer, PgCat
   - Migrations: Flyway 11.19.0 (8 migration images)
+  - **Database Documentation**: [`docs/development/DATABASE_GUIDE.md`](docs/development/DATABASE_GUIDE.md)
 - **HTTP Framework**: Gin
 - **Observability**: OpenTelemetry (traces, metrics, logs)
 - **Deployment**: Kubernetes (Kind), Helm 3
@@ -215,7 +218,7 @@ Numbered scripts (01-12) execute in order. See [`docs/getting-started/SETUP.md`]
 - **5 PostgreSQL Clusters**: review-db, auth-db, supporting-db (shared: user + notification + shipping-v2), product-db, transaction-db
 - **Connection Poolers**: PgBouncer (Auth), PgCat (Product, Cart+Order)
 - **Migrations**: Flyway 11.19.0 with 8 migration images (auth, user, product, cart, order, review, notification, shipping-v2)
-- **Operators**: Zalando Postgres Operator (v1.15.0), CrunchyData Postgres Operator (v5.7.0)
+- **Operators**: Zalando Postgres Operator (v1.15.0), CloudNativePG Operator (v1.24.0)
 
 ### SLO
 

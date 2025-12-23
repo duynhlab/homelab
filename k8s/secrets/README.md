@@ -19,13 +19,15 @@ kubectl create secret generic review-db-secret \
   --from-literal=password='your-password-here' \
   -n review
 
-# Example: Product database secret
+# Example: Product database secret (CloudNativePG)
 kubectl create secret generic product-db-secret \
+  --from-literal=username=product \
   --from-literal=password='your-password-here' \
   -n product
 
-# Example: Transaction database secret (for cart and order)
+# Example: Transaction database secret (CloudNativePG, for cart and order)
 kubectl create secret generic transaction-db-secret \
+  --from-literal=username=cart \
   --from-literal=password='your-password-here' \
   -n cart
 
@@ -37,11 +39,13 @@ kubectl create secret generic supporting-db-secret \
 
 ## Secret Names
 
-- `auth-db-secret` - Auth database password
-- `review-db-secret` - Review database password
-- `product-db-secret` - Product database password
-- `transaction-db-secret` - Transaction database password (cart + order)
-- `supporting-db-secret` - Supporting database password (user + notification)
+- `auth-db-secret` - Auth database password (Zalando operator)
+- `review-db-secret` - Review database password (Zalando operator)
+- `product-db-secret` - Product database password (CloudNativePG operator, includes username)
+- `transaction-db-secret` - Transaction database password (CloudNativePG operator, cart + order, includes username)
+- `supporting-db-secret` - Supporting database password (Zalando operator, user + notification)
+
+**Note**: CloudNativePG secrets require both `username` and `password` keys, while Zalando secrets only need `password`.
 
 ## For Learning/Development
 

@@ -1,4 +1,4 @@
--- 001__init_schema.sql
+-- V1__init_schema.sql
 -- Order Database Schema - Initial Setup
 
 -- Orders table

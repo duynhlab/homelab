@@ -107,7 +107,7 @@ flowchart TD
 ## Technology Stack
 
 - **Runtime**: Go 1.25.5
-- **Database**: PostgreSQL (5 clusters via Zalando/CrunchyData operators)
+- **Database**: PostgreSQL (5 clusters via Zalando/CloudNativePG operators)
   - Connection poolers: PgBouncer, PgCat
   - Migrations: Flyway 11.19.0 (8 migration images)
 - **HTTP Framework**: Gin
@@ -181,7 +181,7 @@ After running `./scripts/09-setup-access.sh` or manual port-forwarding:
 - **5 PostgreSQL Clusters**: review-db, auth-db, supporting-db (shared: user + notification + shipping-v2), product-db, transaction-db
 - **Connection Poolers**: PgBouncer (Auth), PgCat (Product, Cart+Order)
 - **Migrations**: Flyway 11.19.0 with 8 migration images
-- **Operators**: Zalando Postgres Operator (v1.15.0), CrunchyData Postgres Operator (v5.7.0)
+- **Operators**: Zalando Postgres Operator (v1.15.0), CloudNativePG Operator (v1.24.0)
 
 ### SLO Management
 

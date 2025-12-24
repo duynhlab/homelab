@@ -37,7 +37,7 @@ spec:
       {{- end }}
       {{- if and .Values.migrations.enabled .Values.migrations.image }}
       initContainers:
-        - name: flyway-init
+        - name: init
           image: {{ .Values.migrations.image }}
           imagePullPolicy: {{ .Values.migrations.imagePullPolicy | default "IfNotPresent" }}
           env:

@@ -50,7 +50,7 @@ extraEnv:
   - name: DB_NAME
     value: "order"
   - name: DB_USER
-    value: "order"
+    value: "cart"  # Use cart user (same as cart service) - order database owned by cart user
   - name: DB_PASSWORD
     valueFrom:
       secretKeyRef:

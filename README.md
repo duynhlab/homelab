@@ -41,7 +41,7 @@ chmod +x scripts/*.sh
 
 # Build & Deploy Applications
 ./scripts/05-build-microservices.sh      # Build Docker images
-./scripts/06-deploy-microservices.sh --local  # Deploy services
+./scripts/06-deploy-microservices.sh --registry   # Deploy services - Default --local | registry ghcr.io OCI registry
 
 # Load Testing (AFTER apps)
 ./scripts/07-deploy-k6.sh                # Deploy k6 load generators
@@ -139,7 +139,7 @@ After running `./scripts/09-setup-access.sh` or manual port-forwarding:
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| Grafana | http://localhost:3000 | admin/admin |
+| Grafana | http://localhost:3000 | - |
 | Prometheus | http://localhost:9090 | - |
 | Jaeger UI | http://localhost:16686 | - |
 | Tempo | http://localhost:3200 | - |
@@ -214,16 +214,6 @@ Common issues and quick fixes. For detailed troubleshooting, see [`docs/monitori
 - Verify databases are deployed: `./scripts/04-deploy-databases.sh`
 - Check secrets: `kubectl get secrets -n <namespace>`
 - See `k8s/secrets/README.md` for secret creation
-
----
-
-## Contributing
-
-Contributions welcome! Areas to improve:
-- Additional metrics and dashboard panels
-- New microservices
-- Documentation improvements
-- Performance optimizations
 
 ---
 

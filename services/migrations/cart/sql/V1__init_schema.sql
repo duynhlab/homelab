@@ -1,4 +1,4 @@
--- 001__init_schema.sql
+-- V1__init_schema.sql
 -- Cart Database Schema - Initial Setup
 
 -- Cart items table

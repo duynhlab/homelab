@@ -1,0 +1,57 @@
+# Product Database Cluster (CloudNativePG Operator)
+# With read replicas for high traffic
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: product-db
+  namespace: product
+spec:
+  # Number of instances (1 primary + 1 replica)
+  instances: 2
+  
+  # PostgreSQL parameters
+  postgresql:
+    parameters:
+      max_connections: "200"
+      shared_buffers: "256MB"
+      effective_cache_size: "512MB"
+      maintenance_work_mem: "128MB"
+      checkpoint_completion_target: "0.9"
+      wal_buffers: "16MB"
+      default_statistics_target: "100"
+      random_page_cost: "4.0"
+      effective_io_concurrency: "2"
+      work_mem: "8MB"
+      min_wal_size: "1GB"
+      max_wal_size: "4GB"
+    # High Availability configuration
+    # Allow async replicas for read scaling (no sync replication)
+    syncReplicaElectionConstraint:
+      enabled: false  # Allow async replicas for read scaling
+  
+  # Bootstrap configuration
+  bootstrap:
+    initdb:
+      database: product
+      owner: product
+      secret:
+        name: product-db-secret
+      dataChecksums: true
+      encoding: "UTF8"
+      localeCType: "C"
+      localeCollate: "C"
+  
+  # Storage configuration
+  storage:
+    size: 10Gi
+    storageClass: standard  # Use default storage class for Kind
+  
+  # Resource requests and limits
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+

@@ -1,0 +1,42 @@
+# Auth Database Cluster (Zalando Operator)
+# With PgBouncer connection pooler
+apiVersion: acid.zalan.do/v1
+kind: postgresql
+metadata:
+  name: auth-db
+  namespace: auth
+spec:
+  teamId: "platform"
+  
+  # Volume configuration
+  volume:
+    size: 5Gi
+  
+  # Single instance
+  numberOfInstances: 1
+  
+  # Database and user configuration
+  databases:
+    auth: auth
+  
+  users:
+    auth:  # Database owner
+      - createdb
+  
+  # Connection pooler (PgBouncer) configuration
+  connectionPooler:
+    numberOfInstances: 2
+    schema: pooler
+    user: pooler
+    mode: transaction  # Transaction pooling for short-lived connections
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+  
+  # PostgreSQL version and parameters
+  postgresql:
+    version: "15"
+    parameters:
+      max_connections: "100"
+      shared_buffers: "128MB"

@@ -1,0 +1,41 @@
+# Supporting Database Cluster (Zalando Operator)
+# Shared database for User, Notification, and Shipping-v2 services
+apiVersion: acid.zalan.do/v1
+kind: postgresql
+metadata:
+  name: supporting-db
+  namespace: user
+spec:
+  teamId: "platform"
+  
+  # Volume configuration
+  volume:
+    size: 5Gi
+  
+  # Single instance
+  numberOfInstances: 1
+  
+  # Multiple databases (shared cluster)
+  databases:
+    user: user
+    notification: notification
+    shipping: shipping  # Database for shipping-v2 service
+  
+  # Multiple users (one per database)
+  users:
+    user:  # Database owner for user database
+      - createdb
+    notification:  # Database owner for notification database
+      - createdb
+    shipping:  # Database owner for shipping database
+      - createdb
+  
+  # No connection pooler (direct connection, low traffic)
+  # Note: To disable pooler, omit connectionPooler section entirely
+  
+  # PostgreSQL version and parameters
+  postgresql:
+    version: "15"
+    parameters:
+      max_connections: "100"
+      shared_buffers: "128MB"

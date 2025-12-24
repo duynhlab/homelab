@@ -3,6 +3,7 @@ FROM alpine:3.19
 
 # Install Java and required tools
 RUN apk add --no-cache \
+    bash \
     openjdk17 \
     wget \
     tar \

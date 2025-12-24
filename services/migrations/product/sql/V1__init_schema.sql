@@ -1,4 +1,4 @@
--- 001__init_schema.sql
+-- V1__init_schema.sql
 -- Product Database Schema - Initial Setup
 
 -- Categories table

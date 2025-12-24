@@ -1,4 +1,4 @@
--- 001__init_schema.sql
+-- V1__init_schema.sql
 -- Shipping-v2 Database Schema - Initial Setup
 
 -- Shipment estimates table (for shipping cost estimates)

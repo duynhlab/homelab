@@ -1,4 +1,4 @@
--- 001__init_schema.sql
+-- V1__init_schema.sql
 -- Review Database Schema - Initial Setup
 
 -- Reviews table

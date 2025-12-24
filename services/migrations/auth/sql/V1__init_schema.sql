@@ -1,4 +1,4 @@
--- 001__init_schema.sql
+-- V1__init_schema.sql
 -- Auth Database Schema - Initial Setup
 
 -- Users table (for authentication)

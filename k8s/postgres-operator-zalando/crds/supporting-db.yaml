@@ -39,3 +39,13 @@ spec:
     parameters:
       max_connections: "100"
       shared_buffers: "128MB"
+  
+  # Patroni configuration for pg_hba.conf
+  # Default Zalando operator requires SSL, but we allow unencrypted for simplicity
+  # Note: Must include local entries for Patroni to connect via Unix socket
+  patroni:
+    pg_hba:
+      - "local all all peer"              # Local Unix socket connections (required for Patroni)
+      - "host all all 127.0.0.1/32 md5"   # Localhost TCP connections
+      - "host all all 10.244.0.0/16 md5"  # Allow unencrypted connections from pod network (Kind default CIDR)
+      - "host all all 172.19.0.0/16 md5"  # Allow unencrypted connections from Kind bridge network

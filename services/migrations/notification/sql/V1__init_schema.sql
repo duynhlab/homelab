@@ -1,4 +1,4 @@
--- 001__init_schema.sql
+-- V1__init_schema.sql
 -- Notification Database Schema - Initial Setup
 
 -- Notifications table

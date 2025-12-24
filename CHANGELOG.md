@@ -8,7 +8,104 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
-## [0.10.7y] - 2025-12-17
+## [0.10.10] - 2025-12-24
+
+### Changed
+
+**Helm Chart Configuration - Consolidated `extraEnv` into `env`:**
+- **Breaking Change**: Removed `extraEnv` section, all environment variables now use `env` section
+  - **Rationale**: Simplifies configuration - no need to separate core vs service-specific vars
+  - **Impact**: All service values files updated to use `env` only
+  - **Migration**: Move all entries from `extraEnv` to `env` in your values files
+- **Helm Template**: Updated `charts/templates/deployment.yaml` to only use `env` for main container
+- **Chart Version**: Bumped from `0.3.0` to `0.4.0`
+- **Files Changed**:
+  - `charts/templates/deployment.yaml` - Removed `extraEnv` logic
+  - `charts/values.yaml` - Removed `extraEnv` section and comments
+  - All 9 service values files (`charts/values/*.yaml`) - Gộp `extraEnv` vào `env`
+  - `charts/README.md` - Updated documentation, removed `env vs extraEnv` section
+  - `docs/development/CONFIG_GUIDE.md` - Removed decision matrix, updated examples
+  - `docs/development/DATABASE_GUIDE.md` - Updated all examples from `extraEnv` to `env`
+  - `docs/getting-started/ADDING_SERVICES.md` - Updated examples
+  - `docs/README.md` - Removed `extraEnv` mention
+  - `docs/apm/JAEGER.md` - Updated example
+- **Database Migrations**: Init container still uses `migrations.env` (unchanged)
+- **Action Required**: 
+  - Update any custom values files to move `extraEnv` entries to `env`
+  - Redeploy services: `./scripts/06-deploy-microservices.sh --registry`
+
+## [0.10.9] - 2025-12-24
+
+### Fixed
+
+**Flyway Init Container Dockerfiles - Missing Java Installation:**
+- **Critical Bug Fix**: All 9 migration Dockerfiles were missing Java installation, causing init containers to fail with exit code 127 (command not found)
+  - **Root Cause**: Dockerfiles had comment "Install Java and required tools" but only installed `wget` and `tar`
+  - **Symptom**: Init containers crashed with `CrashLoopBackOff` when trying to run `flyway migrate`
+  - **Impact**: All services using `--registry` deployment mode failed to start (migrations couldn't run)
+- **Solution**: Added `openjdk17` to `apk add` command in all 9 migration Dockerfiles
+  - **Files Fixed**: 
+    - `services/migrations/auth/Dockerfile`
+    - `services/migrations/user/Dockerfile`
+    - `services/migrations/product/Dockerfile`
+    - `services/migrations/cart/Dockerfile`
+    - `services/migrations/order/Dockerfile`
+    - `services/migrations/review/Dockerfile`
+    - `services/migrations/notification/Dockerfile`
+    - `services/migrations/shipping/Dockerfile`
+    - `services/migrations/shipping-v2/Dockerfile`
+  - **Change Applied**: Added `openjdk17 \` to package installation list
+  - **Why OpenJDK 17**: Flyway 11.19.0 requires Java 11+, OpenJDK 17 is the Alpine package name
+- **Verification**: After rebuild, init containers can successfully run `flyway migrate` command
+- **Action Required**: 
+  - Rebuild init images: `./scripts/05-build-microservices.sh --force`
+  - Push to registry: Images will be pushed automatically (or manually: `docker push ghcr.io/duynhne/{service}:v5-init`)
+  - Redeploy services: `./scripts/06-deploy-microservices.sh --registry`
+
+### Changed
+
+**Init Container Naming Simplification:**
+- **Renamed init container**: Changed from `flyway-init` to `init` for cleaner naming
+  - **File**: `charts/templates/deployment.yaml`
+  - **Before**: `name: flyway-init`
+  - **After**: `name: init`
+  - **Impact**: Simpler container names in pod descriptions and logs
+  - **Note**: Container name change only, no functional impact
+
+## [0.10.8] - 2025-12-23
+
+### Changed
+
+**Database Verification Script Improvements:**
+- **Enhanced `scripts/04a-verify-databases.sh`**: Improved database verification with better output and simplified logic
+  - **Full Database Listing**: `list_databases()` function now shows complete `psql -c "\l"` output instead of parsed names
+    - Users can see all database details (owner, encoding, locale, access privileges) in formatted table
+    - Removed verbose INFO messages, cleaner output
+  - **Fixed PgBouncer Detection**: Corrected pod label selector for Zalando operator pooler
+    - **Before**: `application=spilo,spilo-role=master,version=auth-db` (incorrect)
+    - **After**: `application=db-connection-pooler,cluster-name=auth-db` (correct)
+    - PgBouncer pods now correctly detected and reported
+  - **Improved PgCat Error Detection**: Only checks recent errors to avoid false positives
+    - Changed from checking last 50 lines to last 10 lines only
+    - Prevents false alarms from old errors (e.g., when order database didn't exist initially)
+    - Removed detailed config check (simplified verification)
+  - **Simplified Database Checks**: Merged `check_database_exists()` and `test_connection()` into single `check_database()` function
+    - Single function now checks both existence and connectivity
+    - Reduces code duplication and simplifies maintenance
+    - Output: "Database 'X' exists and accessible" (single message)
+  - **Reduced Output Verbosity**: Removed unnecessary INFO messages and simplified summary section
+    - Script output reduced from ~390 lines to ~250 lines
+    - Cleaner, more focused verification results
+    - Summary section simplified to single completion message
+  - **Files Modified**: `scripts/04a-verify-databases.sh`
+  - **Impact**: 
+    - ✅ More informative database listings (full table output)
+    - ✅ Correct PgBouncer detection (no more false warnings)
+    - ✅ Accurate PgCat status (only recent errors reported)
+    - ✅ Cleaner, easier-to-read output
+    - ✅ Faster execution (fewer checks, simpler logic)
+
+## [0.10.7] - 2025-12-17
 
 ### Changed
 

@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Build-time configuration reduces runtime complexity
   - Easier to maintain (single source of truth for SQL location)
 - **Impact**: No breaking changes - migrations continue to work as before, with improved maintainability
+- **Helm Chart**: Bumped chart version from `0.4.0` to `0.4.1` (`charts/Chart.yaml`)
 
 ## [0.10.15] - 2025-12-24
 

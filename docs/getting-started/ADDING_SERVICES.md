@@ -269,8 +269,7 @@ env:
   - name: LOG_LEVEL
     value: "info"
 
-# Add service-specific configuration if needed
-extraEnv:
+  # Add service-specific configuration
   # Example: Payment gateway integration
   - name: STRIPE_API_ENDPOINT
     value: "https://api.stripe.com"
@@ -294,7 +293,7 @@ resources:
     cpu: "100m"
 ```
 
-**Important**: See [charts/README.md](../../charts/README.md) for complete guide on `env` vs `extraEnv` usage.
+**Important**: See [charts/README.md](../../charts/README.md) for complete Helm chart configuration guide.
 
 ### Step 3: Update Deployment Script
 

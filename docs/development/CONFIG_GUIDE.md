@@ -63,7 +63,7 @@ flowchart TD
     C --> E[Read Environment Variables]
     D --> E
     E --> F[Helm Values charts/values/]
-    F --> G[deployment.yaml env/extraEnv]
+    F --> G[deployment.yaml env]
     G --> H[Pod Environment]
     H --> I[config.Load]
     I --> J{cfg.Validate}
@@ -76,7 +76,7 @@ flowchart TD
 1. **Default values** - Hardcoded in `pkg/config/config.go`
 2. **`.env` file** - Local development only (via `godotenv`)
 3. **Environment variables** - Set directly in shell or Kubernetes
-4. **Helm values** - `charts/values/*.yaml` → `env`/`extraEnv`
+4. **Helm values** - `charts/values/*.yaml` → `env`
 
 **Key Principle**: Higher priority sources override lower ones.
 
@@ -184,8 +184,7 @@ env:
     value: "0.1"
   - name: PYROSCOPE_ENDPOINT
     value: "http://pyroscope.monitoring.svc.cluster.local:4040"
-
-extraEnv:
+  # Service-specific configuration
   - name: REDIS_HOST
     value: "redis.auth.svc.cluster.local:6379"
   - name: JWT_SECRET
@@ -267,7 +266,12 @@ extraEnv:
 **Example Configuration:**
 ```yaml
 # Helm values (charts/values/auth.yaml)
-extraEnv:
+env:
+  - name: SERVICE_NAME
+    value: "auth"
+  - name: PORT
+    value: "8080"
+  # Database configuration
   - name: DB_HOST
     value: "auth-db-pooler.postgres-operator.svc.cluster.local"
   - name: DB_PORT
@@ -291,16 +295,13 @@ extraEnv:
 
 ## Helm Chart Configuration
 
-### env vs extraEnv Decision Matrix
-
-| Use Case | Use `env` | Use `extraEnv` | Reason |
-|----------|-----------|----------------|---------|
-| Core service config (SERVICE_NAME, PORT) | ✅ Yes | ❌ No | Common across all services |
-| APM config (OTEL_COLLECTOR_ENDPOINT, PYROSCOPE_ENDPOINT) | ✅ Yes | ❌ No | Managed by chart |
-| Service-specific dependencies (REDIS_HOST) | ❌ No | ✅ Yes | Service-specific |
-| Database config (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD) | ❌ No | ✅ Yes | Service-specific, use `valueFrom.secretKeyRef` for password |
-| Secrets (API_KEY, DB_PASSWORD) | ❌ No | ✅ Yes | Use `valueFrom.secretKeyRef` |
-| Feature flags (ENABLE_BETA_FEATURE) | ❌ No | ✅ Yes | Service-specific |
+All environment variables are configured in the `env` section, including:
+- Core service configuration (SERVICE_NAME, PORT, ENV)
+- APM configuration (OTEL_COLLECTOR_ENDPOINT, PYROSCOPE_ENDPOINT)
+- Database configuration (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD)
+- Service-specific dependencies (REDIS_HOST, KAFKA_BROKER)
+- Secrets (via `valueFrom.secretKeyRef`)
+- Feature flags
 
 See [charts/README.md](../../charts/README.md) for complete Helm chart documentation.
 

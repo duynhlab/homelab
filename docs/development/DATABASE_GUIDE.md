@@ -216,7 +216,7 @@ sequenceDiagram
 **Configuration**:
 ```yaml
 # Helm values (charts/values/review.yaml)
-extraEnv:
+env:
   - name: DB_HOST
     value: "review-db.postgres-operator.svc.cluster.local"
   - name: DB_PORT
@@ -251,7 +251,7 @@ cfg := &DatabaseConfig{
 **Configuration**:
 ```yaml
 # Helm values (charts/values/auth.yaml)
-extraEnv:
+env:
   - name: DB_HOST
     value: "auth-db-pooler.postgres-operator.svc.cluster.local"  # PgBouncer endpoint
   - name: DB_PORT
@@ -287,7 +287,7 @@ connectionPooler:
 **Configuration**:
 ```yaml
 # Helm values (charts/values/product.yaml)
-extraEnv:
+env:
   - name: DB_HOST
     value: "pgcat-product.product.svc.cluster.local"  # PgCat service
   - name: DB_PORT
@@ -485,12 +485,12 @@ func LoadConfig() (*DatabaseConfig, error) {
 
 ### Database Environment Variables in Helm
 
-Database configuration uses `extraEnv` section (not `env`) because it's service-specific and includes secrets.
+Database configuration is included in the `env` section along with other environment variables.
 
 **Pattern**:
 ```yaml
 # charts/values/{service}.yaml
-extraEnv:
+env:
   - name: DB_HOST
     value: "<pooler-or-direct-endpoint>"
   - name: DB_PORT
@@ -532,7 +532,7 @@ extraEnv:
 #### Auth Service (PgBouncer)
 ```yaml
 # charts/values/auth.yaml
-extraEnv:
+env:
   - name: DB_HOST
     value: "auth-db-pooler.postgres-operator.svc.cluster.local"
   - name: DB_PORT
@@ -557,7 +557,7 @@ extraEnv:
 #### Product Service (PgCat)
 ```yaml
 # charts/values/product.yaml
-extraEnv:
+env:
   - name: DB_HOST
     value: "pgcat-product.product.svc.cluster.local"
   - name: DB_PORT
@@ -580,7 +580,7 @@ extraEnv:
 #### Review Service (Direct)
 ```yaml
 # charts/values/review.yaml
-extraEnv:
+env:
   - name: DB_HOST
     value: "review-db.postgres-operator.svc.cluster.local"
   - name: DB_PORT

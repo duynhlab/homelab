@@ -1,0 +1,39 @@
+# PgCat Configuration for Product Service
+# Routes to Product database
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgcat-product-config
+  namespace: product
+data:
+  pgcat.toml: |
+    # PgCat Configuration for Product Database
+    [general]
+    host = "0.0.0.0"
+    port = 5432
+    pool_mode = "transaction"
+    log_level = "info"
+    admin_username = "admin"
+    admin_password = "admin"
+    
+    [admin]
+    host = "0.0.0.0"
+    port = 9930
+    
+    # Product database pool
+    [pools.product]
+    pool_size = 50
+    
+    [pools.product.users]
+    product = { username = "product", password = "postgres", pool_size = 50 }
+    
+    # Primary shard (numbered starting at 0)
+    [pools.product.shards.0]
+    database = "product"
+    
+    [[pools.product.shards.0.servers]]
+    host = "product-db-rw.product.svc.cluster.local"
+    port = 5432
+    user = "product"
+    password = "postgres"
+    role = "primary"

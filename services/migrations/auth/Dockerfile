@@ -5,6 +5,7 @@ FROM alpine:3.19
 
 # Install Java and required tools
 RUN apk add --no-cache \
+    openjdk17 \
     wget \
     tar \
     && rm -rf /var/cache/apk/*

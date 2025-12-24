@@ -8,6 +8,177 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+## [0.10.16] - 2025-12-24
+
+### Changed
+
+**Flyway Migration Dockerfile Optimization:**
+- **Optimization**: Simplified Flyway migration Dockerfiles to use `$FLYWAY_HOME/sql` directly instead of separate `/flyway/sql` directory
+- **Changes**:
+  - Updated all 9 migration Dockerfiles to copy SQL files to `$FLYWAY_HOME/sql/` (consistent with Flyway installation path)
+  - Removed `RUN mkdir -p /flyway/sql` from all Dockerfiles (no longer needed)
+  - Set `ENV FLYWAY_LOCATIONS="filesystem:$FLYWAY_HOME/sql"` in Dockerfiles (build-time configuration)
+  - This ensures Flyway reads migration location from Dockerfile ENV, eliminating need for runtime configuration
+- **Files Updated**:
+  - All 9 migration Dockerfiles: `services/migrations/*/Dockerfile`
+    - `services/migrations/user/Dockerfile`
+    - `services/migrations/auth/Dockerfile`
+    - `services/migrations/product/Dockerfile`
+    - `services/migrations/cart/Dockerfile`
+    - `services/migrations/order/Dockerfile`
+    - `services/migrations/review/Dockerfile`
+    - `services/migrations/notification/Dockerfile`
+    - `services/migrations/shipping/Dockerfile`
+    - `services/migrations/shipping-v2/Dockerfile`
+- **Benefits**:
+  - Cleaner Dockerfile structure (no separate directory creation)
+  - Consistent with Flyway installation path (`/opt/flyway/11.8.2/sql`)
+  - Build-time configuration reduces runtime complexity
+  - Easier to maintain (single source of truth for SQL location)
+- **Impact**: No breaking changes - migrations continue to work as before, with improved maintainability
+
+## [0.10.15] - 2025-12-24
+
+### Fixed
+
+**Flyway Migration SQL File Location and Naming:**
+- **Problem**: SQL files were copied to `$FLYWAY_HOME/sql/` but Flyway default location is `/flyway/sql/`, and files were named `001__init_schema.sql` instead of Flyway convention `V1__init_schema.sql`
+- **Solution**: 
+  - Updated all 9 migration Dockerfiles to copy SQL files to `/flyway/sql/` (Flyway default location)
+  - Renamed all SQL files from `001__init_schema.sql` to `V1__init_schema.sql` (Flyway naming convention)
+  - Added `FLYWAY_LOCATIONS="filesystem:/flyway/sql"` environment variable in Helm template
+- **Files Updated**:
+  - All 9 migration Dockerfiles: `services/migrations/*/Dockerfile`
+  - All 9 SQL files: `services/migrations/*/sql/V1__init_schema.sql` (renamed from `001__init_schema.sql`)
+  - Helm template: `charts/templates/deployment.yaml`
+- **Impact**: Flyway can now detect and run migrations correctly
+- **Documentation**: Added "Flyway Migration Issues" troubleshooting section with debug commands
+
+## [0.10.14] - 2025-12-24
+
+### Fixed
+
+**Zalando Postgres Operator Secret Names:**
+- **Problem**: Helm charts were using manual secrets (`supporting-db-secret`, `review-db-secret`, `auth-db-secret`) with password `postgres`, but Zalando operator auto-generates secrets with random passwords for each user
+- **Solution**: Updated all Helm values files to use Zalando operator auto-generated secrets:
+  - **User service**: `user.supporting-db.credentials.postgresql.acid.zalan.do`
+  - **Notification service**: `notification.supporting-db.credentials.postgresql.acid.zalan.do`
+  - **Shipping services**: `shipping.supporting-db.credentials.postgresql.acid.zalan.do`
+  - **Review service**: `review.review-db.credentials.postgresql.acid.zalan.do`
+  - **Auth service**: `auth.auth-db.credentials.postgresql.acid.zalan.do`
+- **Secret Format**: Zalando operator creates secrets with format `{username}.{cluster-name}.credentials.postgresql.acid.zalan.do` containing `username` and `password` keys
+- **Files Updated**:
+  - `charts/values/user.yaml` - Updated main container and migration init container
+  - `charts/values/notification.yaml` - Updated main container and migration init container
+  - `charts/values/shipping.yaml` - Updated main container and migration init container
+  - `charts/values/shipping-v2.yaml` - Updated main container and migration init container
+  - `charts/values/review.yaml` - Updated main container and migration init container
+  - `charts/values/auth.yaml` - Updated main container and migration init container
+- **Impact**: Migration init containers can now authenticate with correct passwords
+- **Note**: Manual secrets (`supporting-db-secret`, `review-db-secret`, `auth-db-secret`) are no longer used and can be deleted
+
+## [0.10.13] - 2025-12-24
+
+### Fixed
+
+**Zalando Postgres Operator SSL Connection Issue:**
+- **Problem**: Zalando operator defaults require SSL, causing `pg_hba.conf rejects connection for host "10.244.2.37", user "user", database "user", no encryption` errors
+- **Additional Issue**: Patroni cannot connect via Unix socket due to missing local entries: `no pg_hba.conf entry for host "[local]", user "postgres", database "postgres", no encryption`
+- **Solution**: Added custom `patroni.pg_hba` configuration to all Zalando operator CRDs:
+  - **Local connections** (required for Patroni):
+    - `local all all peer` - Unix socket connections for Patroni management
+    - `host all all 127.0.0.1/32 md5` - Localhost TCP connections
+  - **Network connections** (for application pods):
+    - `host all all 10.244.0.0/16 md5` - Pod network CIDR (Kind default)
+    - `host all all 172.19.0.0/16 md5` - Kind bridge network
+  - Uses `md5` authentication (password-based) for network connections, `peer` for local
+  - **Note**: Zalando operator uses `spec.patroni.pg_hba` (not `spec.postgresql.pg_hba`) for pg_hba.conf configuration
+- **Files Updated**:
+  - `k8s/postgres-operator-zalando/crds/supporting-db.yaml`
+  - `k8s/postgres-operator-zalando/crds/review-db.yaml`
+  - `k8s/postgres-operator-zalando/crds/auth-db.yaml`
+- **Impact**: Migration init containers can now connect to Zalando-managed databases without SSL
+- **Action Required**: 
+  - CRDs already applied: `kubectl apply -f k8s/postgres-operator-zalando/crds/`
+  - Restart database pods to reload pg_hba.conf: `kubectl delete pod supporting-db-0 -n user` (and similar for review-db-0, auth-db-0)
+  - Operator will automatically recreate pods with new pg_hba.conf configuration
+
+## [0.10.12] - 2025-12-24
+
+### Fixed
+
+**Database Service Namespace Corrections - Main Containers and Migrations:**
+- **Fixed DB_HOST namespace errors** in Helm values files for **main containers** (runtime):
+  - `auth.yaml`: Changed `auth-db-pooler.postgres-operator.svc.cluster.local` → `auth-db-pooler.auth.svc.cluster.local` (PgBouncer pooler)
+  - `cart.yaml`: Changed `pgcat.transaction.svc.cluster.local` → `pgcat.cart.svc.cluster.local` (PgCat pooler)
+  - `order.yaml`: Changed `pgcat.transaction.svc.cluster.local` → `pgcat.cart.svc.cluster.local` (PgCat pooler)
+  - `user.yaml`: Changed `supporting-db.postgres-operator.svc.cluster.local` → `supporting-db.user.svc.cluster.local` (direct connection)
+  - `notification.yaml`: Changed `supporting-db.postgres-operator.svc.cluster.local` → `supporting-db.user.svc.cluster.local` (direct connection)
+  - `shipping.yaml`: Changed `supporting-db.postgres-operator.svc.cluster.local` → `supporting-db.user.svc.cluster.local` (direct connection)
+  - `shipping-v2.yaml`: Changed `supporting-db.postgres-operator.svc.cluster.local` → `supporting-db.user.svc.cluster.local` (direct connection)
+  - `review.yaml`: Changed `review-db.postgres-operator.svc.cluster.local` → `review-db.review.svc.cluster.local` (direct connection)
+- **Fixed DB_HOST namespace errors** for **migration init containers**:
+  - `auth.yaml`: Changed `auth-db.postgres-operator.svc.cluster.local` → `auth-db.auth.svc.cluster.local` (direct connection for migrations)
+  - `notification.yaml`: Changed `supporting-db.postgres-operator.svc.cluster.local` → `supporting-db.user.svc.cluster.local`
+  - `shipping.yaml`: Changed `supporting-db.postgres-operator.svc.cluster.local` → `supporting-db.user.svc.cluster.local`
+  - `shipping-v2.yaml`: Changed `supporting-db.postgres-operator.svc.cluster.local` → `supporting-db.user.svc.cluster.local`
+  - `review.yaml`: Changed `review-db.postgres-operator.svc.cluster.local` → `review-db.review.svc.cluster.local`
+- **Root Cause**: Database clusters and poolers are deployed in their own namespaces, so service FQDNs must include the correct namespace
+- **Impact**: 
+  - Main containers can now connect via poolers correctly (Auth via PgBouncer, Cart/Order/Product via PgCat)
+  - Migration init containers can connect directly to databases correctly
+- **Pooler Configuration Summary**:
+  - **Auth**: Main container uses PgBouncer pooler (`auth-db-pooler.auth.svc.cluster.local`), migrations use direct (`auth-db.auth.svc.cluster.local`)
+  - **Product**: Main container uses PgCat pooler (`pgcat.product.svc.cluster.local`), migrations use direct (`product-db-rw.product.svc.cluster.local`)
+  - **Cart/Order**: Main containers use PgCat pooler (`pgcat.cart.svc.cluster.local`), migrations use direct (`transaction-db-rw.cart.svc.cluster.local`)
+  - **Review/User/Notification/Shipping**: Direct connection only (no pooler)
+- **Documentation**: Updated `docs/development/DATABASE_GUIDE.md` with namespace mapping table and corrected all service endpoint examples
+
+**Migration Dockerfile Pattern Standardization:**
+- **Standardized all 8 migration Dockerfiles** to match user's pattern:
+  - Base image: `alpine` (instead of `eclipse-temurin:17-jre-jammy`)
+  - Java: `openjdk17-jre` (via apk)
+  - Flyway version: `11.8.2` (consistent across all services)
+  - FLYWAY_HOME: `/opt/flyway/$FLYWAY_VERSION`
+  - No ENTRYPOINT (let Helm override command)
+- **Files Updated**: 
+  - `services/migrations/auth/Dockerfile`
+  - `services/migrations/product/Dockerfile`
+  - `services/migrations/cart/Dockerfile`
+  - `services/migrations/order/Dockerfile`
+  - `services/migrations/review/Dockerfile`
+  - `services/migrations/notification/Dockerfile`
+  - `services/migrations/shipping/Dockerfile`
+  - `services/migrations/shipping-v2/Dockerfile`
+- **Note**: `user/Dockerfile` already had the correct pattern
+- **Action Required**: Rebuild all migration images to apply changes
+
+### Changed
+
+**Flyway Migration Dockerfiles - Base Image Change, Version Upgrade and ENTRYPOINT Pattern:**
+- **Base Image Change**: Migrated from `alpine:3.19` to `eclipse-temurin:17-jre-jammy`
+  - **Reason**: Flyway script requires Java at `/opt/flyway/jre/bin/java` which is not available in Alpine. Eclipse Temurin base image already includes Java 17 JRE
+  - **Benefits**: 
+    - No need to install Java manually (simpler Dockerfiles)
+    - More reliable Java runtime (official Eclipse Temurin distribution)
+    - Smaller Dockerfiles (removed Java installation steps)
+  - **Files Updated**: All 9 migration Dockerfiles in `services/migrations/*/Dockerfile`
+- **Flyway Version Upgrade**: Updated from 11.19.0 to 11.20.0 in all 9 migration Dockerfiles
+  - **Benefits**: Latest Flyway features and bug fixes from version 11.20.0
+- **ENTRYPOINT Pattern**: Adopted ENTRYPOINT pattern that runs `baseline migrate info` commands
+  - **Before**: `CMD ["flyway", "migrate"]`
+  - **After**: `ENTRYPOINT ["/bin/sh", "-c", "flyway baseline migrate info"]`
+  - **Benefits**:
+    - `baseline` - Handles existing databases gracefully (marks existing schema as baseline)
+    - `migrate` - Runs pending migrations
+    - `info` - Shows migration status (useful for debugging and visibility)
+  - **Note**: Flyway automatically reads connection details from environment variables (FLYWAY_URL, FLYWAY_USER, FLYWAY_PASSWORD) set by Helm template
+- **Documentation**: Updated `docs/development/DATABASE_GUIDE.md` to mention Flyway 11.20.0
+- **Action Required**: 
+  - Rebuild all migration images: `./scripts/05-build-microservices.sh --force`
+  - Push to registry (if using --registry mode)
+  - Redeploy services: `./scripts/06-deploy-microservices.sh --registry`
+
 ## [0.10.10] - 2025-12-24
 
 ### Changed

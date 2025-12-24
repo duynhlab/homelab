@@ -59,11 +59,11 @@ readinessProbe:
   periodSeconds: 5
 
 # --- Environment Variables Configuration ---
-# See charts/README.md for env vs extraEnv decision matrix
 
-# Core application configuration (chart-managed)
-# Use for: SERVICE_NAME, PORT, ENV, OTEL_COLLECTOR_ENDPOINT, PYROSCOPE_ENDPOINT, LOG_LEVEL
+# All environment variables (core + service-specific)
+# Use for: SERVICE_NAME, PORT, ENV, OTEL_COLLECTOR_ENDPOINT, database config, secrets, etc.
 # Supports Helm templating: {{ .Values.tracing.endpoint }}
+# Supports secrets via valueFrom.secretKeyRef
 env: []
 # Example (see charts/values/auth.yaml for complete example):
 # - name: SERVICE_NAME
@@ -80,21 +80,13 @@ env: []
 #   value: "http://pyroscope.monitoring.svc.cluster.local:4040"
 # - name: LOG_LEVEL
 #   value: "info"
-
-# Service-specific configuration (ad-hoc variables)
-# Use for: REDIS_HOST, KAFKA_BROKER, feature flags, secrets (via valueFrom)
-# No Helm templating support (just YAML passthrough)
-extraEnv: []
-# Example:
-# - name: REDIS_HOST
-#   value: "redis.auth.svc.cluster.local:6379"
-# - name: ENABLE_2FA
-#   value: "true"
-# - name: JWT_SECRET
+# - name: DB_HOST
+#   value: "db-host.svc.cluster.local"
+# - name: DB_PASSWORD
 #   valueFrom:
 #     secretKeyRef:
-#       name: auth-secrets
-#       key: jwt-secret
+#       name: db-secret
+#       key: password
 
 # --- Kubernetes Configuration ---
 
@@ -140,4 +132,19 @@ migrations:
   # This image should contain the migration SQL files in /flyway/sql/
   image: ""  # e.g., ghcr.io/duynhne/auth:v5-init
   imagePullPolicy: IfNotPresent
+  # Environment variables for migration init container (key-value pairs)
+  env: {}
+  # Example:
+  # env:
+  #   DB_HOST: "postgres.example.com"
+  #   DB_PORT: "5432"
+  #   DB_NAME: "mydb"
+  #   DB_USER: "user"
+  #   DB_SSLMODE: "disable"
+  # Environment variables from ConfigMap or Secret (optional)
+  envFrom: {}
+  # Example:
+  # envFrom:
+  #   configMapRef: "migration-config"
+  #   secretRef: "db-secret"  # Will be used for DB_PASSWORD
 

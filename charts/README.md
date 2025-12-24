@@ -23,7 +23,7 @@ helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-
 
 ```
 charts/
-├── Chart.yaml             # Chart metadata (version: 0.3.0)
+├── Chart.yaml             # Chart metadata (version: 0.4.0)
 ├── values.yaml            # Default values template
 ├── values/                # Per-service value overrides
 │   ├── auth.yaml
@@ -50,23 +50,20 @@ charts/
 1. Default values (hardcoded in `pkg/config/config.go`)
 2. `.env` file (local development only)
 3. Environment variables (Kubernetes runtime)
-4. **Helm values** → `env`/`extraEnv` → container environment
+4. **Helm values** → `env` → container environment
 
 **Key Point**: Helm values override all previous configuration layers.
 
-### `env` vs `extraEnv`
+### Environment Variables (`env`)
 
-**`env`** - Core configuration (common across all services):
-- SERVICE_NAME, PORT, ENV
-- APM config (OTEL_COLLECTOR_ENDPOINT, PYROSCOPE_ENDPOINT)
-- Logging config (LOG_LEVEL, LOG_FORMAT)
-- Supports Helm templating
-
-**`extraEnv`** - Service-specific variables:
-- Database connections (DB_HOST, DB_USER, DB_PASSWORD)
-- External services (REDIS_HOST, KAFKA_BROKER)
+All environment variables are configured in the `env` section:
+- Core configuration: SERVICE_NAME, PORT, ENV
+- APM config: OTEL_COLLECTOR_ENDPOINT, PYROSCOPE_ENDPOINT
+- Logging config: LOG_LEVEL, LOG_FORMAT
+- Database configuration: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
+- External services: REDIS_HOST, KAFKA_BROKER
 - Feature flags, secrets (via `valueFrom.secretKeyRef`)
-- No Helm templating (YAML passthrough)
+- Supports Helm templating
 
 **Example**:
 
@@ -76,15 +73,24 @@ env:
     value: "auth"
   - name: PORT
     value: "8080"
-
-extraEnv:
+  - name: ENV
+    value: "production"
+  # Database configuration
   - name: DB_HOST
     value: "auth-db.postgres-operator.svc.cluster.local"
+  - name: DB_PORT
+    value: "5432"
+  - name: DB_NAME
+    value: "auth"
+  - name: DB_USER
+    value: "auth"
   - name: DB_PASSWORD
     valueFrom:
       secretKeyRef:
         name: auth-db-secret
         key: password
+  - name: DB_SSLMODE
+    value: "disable"
 ```
 
 ---
@@ -100,10 +106,28 @@ migrations:
   imagePullPolicy: IfNotPresent
 ```
 
-InitContainer automatically:
-- Passes all `DB_*` environment variables from `extraEnv`
+InitContainer configuration:
+- Uses `migrations.env` for database connection (direct connection, no pooler)
+- Uses `migrations.envFrom.secretRef` for DB_PASSWORD from secret
 - Builds `FLYWAY_URL` from individual DB env vars
 - Runs `flyway migrate` before main container starts
+
+**Example**:
+
+```yaml
+migrations:
+  enabled: true
+  image: ghcr.io/duynhne/auth:v5-init
+  imagePullPolicy: IfNotPresent
+  env:
+    DB_HOST: "auth-db.postgres-operator.svc.cluster.local"  # Direct connection
+    DB_PORT: "5432"
+    DB_NAME: "auth"
+    DB_USER: "auth"
+    DB_SSLMODE: "disable"
+  envFrom:
+    secretRef: "auth-db-secret"  # For DB_PASSWORD
+```
 
 ---
 
@@ -126,31 +150,38 @@ env:
     value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
   - name: PYROSCOPE_ENDPOINT
     value: "http://pyroscope.monitoring.svc.cluster.local:4040"
-
-image:
-  repository: ghcr.io/duynhne/myservice
-  tag: "v5"
-  pullPolicy: IfNotPresent
-
-extraEnv:
+  # Database configuration
   - name: DB_HOST
     value: "db-host.svc.cluster.local"
+  - name: DB_PORT
+    value: "5432"
+  - name: DB_NAME
+    value: "myservice"
+  - name: DB_USER
+    value: "myservice"
   - name: DB_PASSWORD
     valueFrom:
       secretKeyRef:
         name: db-secret
         key: password
+  - name: DB_SSLMODE
+    value: "disable"
+
+image:
+  repository: ghcr.io/duynhne/myservice
+  tag: "v5"
+  pullPolicy: IfNotPresent
 ```
 
 ---
 
 ## Best Practices
 
-- Use `env` for core configuration common across services
-- Use `extraEnv` for service-specific dependencies (databases, queues, caches)
+- Use `env` for all environment variables (core + service-specific)
 - Use Secrets for sensitive data (via `valueFrom.secretKeyRef`)
 - Don't hardcode secrets in values files
-- Don't use Helm templating in `extraEnv`
+- Use `migrations.env` for init container database configuration (direct connection, no pooler)
+- Main container uses pooler endpoints (if configured), init container uses direct database connection
 
 ---
 
@@ -164,4 +195,4 @@ extraEnv:
 
 ---
 
-**Last Updated**: December 2025 - Version 0.3.0 (InitContainer support)
+**Last Updated**: December 2025 - Version 0.4.0 (Consolidated env configuration)

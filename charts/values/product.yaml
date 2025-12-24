@@ -39,10 +39,7 @@ env:
     value: "true"
   - name: METRICS_ENABLED
     value: "true"
-
-# Service-specific database configuration (via extraEnv)
-# ⚠️ IMPORTANT: Tách riêng các env vars, KHÔNG dùng DATABASE_URL string
-extraEnv:
+  # Database configuration
   - name: DB_HOST
     value: "pgcat.product.svc.cluster.local"  # PgCat pooler endpoint
   - name: DB_PORT
@@ -92,3 +89,11 @@ migrations:
   enabled: true
   image: ghcr.io/duynhne/product:v5-init
   imagePullPolicy: IfNotPresent
+  env:
+    DB_HOST: "product-db-rw.product.svc.cluster.local"  # Direct connection, no pooler
+    DB_PORT: "5432"
+    DB_NAME: "product"
+    DB_USER: "product"
+    DB_SSLMODE: "disable"
+  envFrom:
+    secretRef: "product-db-secret"

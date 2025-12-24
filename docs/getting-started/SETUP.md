@@ -18,23 +18,26 @@ chmod +x scripts/*.sh
 # Step 2: Deploy monitoring stack (Prometheus Operator + Grafana Operator + metrics)
 ./scripts/02-deploy-monitoring.sh
 
-# Step 4: Deploy APM stack (BEFORE apps to collect traces/logs/profiles immediately)
+# Step 3: Deploy APM stack (BEFORE apps to collect traces/logs/profiles immediately)
 ./scripts/03-deploy-apm.sh
 
+# Step 4: Deploy databases (PostgreSQL operators, clusters, poolers - BEFORE apps)
+./scripts/04-deploy-databases.sh
+
 # Step 5: Build all microservices
-./scripts/04-build-microservices.sh
+./scripts/05-build-microservices.sh
 
 # Step 6: Deploy all microservices
-./scripts/05-deploy-microservices.sh
+./scripts/06-deploy-microservices.sh
 
 # Step 7: Deploy k6 load testing (AFTER apps to test them)
-./scripts/06-deploy-k6.sh
+./scripts/07-deploy-k6.sh
 
 # Step 8: Deploy SLO system (Required for SRE practices)
-./scripts/07-deploy-slo.sh
+./scripts/08-deploy-slo.sh
 
 # Step 9: Setup port forwarding
-./scripts/08-setup-access.sh
+./scripts/09-setup-access.sh
 ```
 
 Wait 5 minutes. Then access:
@@ -195,10 +198,59 @@ kubectl get pods -n kube-system -l app=vector
 
 ---
 
-### Step 4: Build All Microservices
+### Step 4: Deploy Databases
 
 ```bash
-./scripts/04-build-microservices.sh
+./scripts/04-deploy-databases.sh
+```
+
+**What it does:**
+- Deploys Zalando Postgres Operator (v1.15.0) for 3 clusters (Review, Auth, Supporting)
+- Deploys CloudNativePG Operator (v1.28.0) for 2 clusters (Product, Transaction)
+- Creates 5 PostgreSQL database clusters:
+  - `review-db` (Review service)
+  - `auth-db` (Auth service)
+  - `supporting-db` (User, Notification, Shipping-v2 services)
+  - `product-db` (Product service)
+  - `transaction-db` (Cart and Order services)
+- Deploys connection poolers:
+  - PgBouncer for Auth database (transaction pooling)
+  - PgCat for Product and Transaction databases (multi-database routing, read replica load balancing)
+- Deploys `postgres_exporter` for all clusters (Prometheus metrics)
+- Creates Kubernetes Secrets for database passwords
+
+**Why before apps:** Databases must exist before microservices can connect. Database migrations run as init containers when services start.
+
+**Verify:**
+```bash
+# Check operators
+kubectl get pods -n database | grep -E "(postgres-operator|cloudnative-pg)"
+
+# Check database clusters
+kubectl get postgresql -A  # Zalando clusters
+kubectl get cluster -A      # CloudNativePG clusters
+
+# Check database pods
+kubectl get pods -n review | grep review-db
+kubectl get pods -n auth | grep auth-db
+kubectl get pods -n user | grep supporting-db
+kubectl get pods -n product | grep product-db
+kubectl get pods -n cart | grep transaction-db
+
+# Verify database readiness and connections
+./scripts/04a-verify-databases.sh
+```
+
+**Detailed Documentation:**
+- Database architecture: [`docs/development/DATABASE_GUIDE.md`](../development/DATABASE_GUIDE.md)
+- Database verification: [`docs/development/DATABASE_VERIFICATION.md`](../development/DATABASE_VERIFICATION.md)
+
+---
+
+### Step 5: Build All Microservices
+
+```bash
+./scripts/05-build-microservices.sh
 ```
 
 **What it does:**
@@ -219,14 +271,14 @@ docker images | grep -E "(auth|user|product)"
 
 ---
 
-### Step 5: Deploy All Microservices
+### Step 6: Deploy All Microservices
 
 ```bash
 # Deploy using local Helm chart (default)
-./scripts/05-deploy-microservices.sh --local
+./scripts/06-deploy-microservices.sh --local
 
 # Or deploy from OCI registry (if chart is published)
-./scripts/05-deploy-microservices.sh --registry
+./scripts/06-deploy-microservices.sh --registry
 ```
 
 **What it does:**
@@ -257,15 +309,15 @@ kubectl get svc -n product
 
 ---
 
-### Step 6: Deploy k6 Load Testing
+### Step 7: Deploy k6 Load Testing
 
 ```bash
 # Deploy all k6 variants (default)
-./scripts/06-deploy-k6.sh
+./scripts/07-deploy-k6.sh
 
 # Or deploy specific variant:
-# ./scripts/06-deploy-k6.sh legacy
-# ./scripts/06-deploy-k6.sh scenarios
+# ./scripts/07-deploy-k6.sh legacy
+# ./scripts/07-deploy-k6.sh scenarios
 ```
 
 **What it does:**
@@ -284,10 +336,10 @@ kubectl logs -n k6 -l app=k6-scenarios -f
 
 ---
 
-### Step 7: Deploy SLO System
+### Step 8: Deploy SLO System
 
 ```bash
-./scripts/07-deploy-slo.sh
+./scripts/08-deploy-slo.sh
 ```
 
 **What it does:**
@@ -317,10 +369,10 @@ curl http://localhost:9090/api/v1/rules
 
 ---
 
-### Step 8: Setup Port Forwarding
+### Step 9: Setup Port Forwarding
 
 ```bash
-./scripts/08-setup-access.sh
+./scripts/09-setup-access.sh
 ```
 
 **What it does:**
@@ -473,7 +525,7 @@ kubectl port-forward svc/auth 8080:8080 -n auth &
 
 ```bash
 # Rebuild and reload images
-./scripts/04-build-microservices.sh
+./scripts/05-build-microservices.sh
 
 # Force recreation
 kubectl delete pods -l app=auth -n auth
@@ -505,7 +557,7 @@ kubectl logs deployment/prometheus -n monitoring
 kubectl get configmap -n monitoring | grep grafana
 
 # Reload dashboard
-./scripts/09-reload-dashboard.sh
+./scripts/10-reload-dashboard.sh
 
 # Restart Grafana
 kubectl rollout restart deployment grafana -n monitoring
@@ -517,7 +569,7 @@ kubectl rollout restart deployment grafana -n monitoring
 
 ```bash
 # Use port-forwarding instead
-./scripts/08-setup-access.sh
+./scripts/09-setup-access.sh
 ```
 
 ---

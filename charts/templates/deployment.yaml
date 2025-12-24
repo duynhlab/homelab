@@ -40,20 +40,28 @@ spec:
         - name: init
           image: {{ .Values.migrations.image }}
           imagePullPolicy: {{ .Values.migrations.imagePullPolicy | default "IfNotPresent" }}
+          {{- /* Environment variables for migration init container */}}
+          {{- if or .Values.migrations.env .Values.migrations.envFrom }}
           env:
-            {{- /* Pass all DB_* environment variables to Flyway init container */}}
-            {{- range .Values.extraEnv }}
-            {{- if hasPrefix .name "DB_" }}
-            - name: {{ .name }}
-              {{- if .value }}
-              value: {{ .value | quote }}
-              {{- end }}
-              {{- if .valueFrom }}
+            {{- if .Values.migrations.env }}
+            {{- range $key, $value := .Values.migrations.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.migrations.envFrom.secretRef }}
+            - name: DB_PASSWORD
               valueFrom:
-                {{- toYaml .valueFrom | nindent 16 }}
-              {{- end }}
+                secretKeyRef:
+                  name: {{ .Values.migrations.envFrom.secretRef }}
+                  key: password
             {{- end }}
-            {{- end }}
+          {{- if .Values.migrations.envFrom.configMapRef }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.migrations.envFrom.configMapRef }}
+          {{- end }}
+          {{- end }}
           command:
             - /bin/sh
             - -c
@@ -79,14 +87,9 @@ spec:
           {{- if .Values.args }}
           args: {{- toYaml .Values.args | nindent 12 }}
           {{- end }}
-          {{- if or .Values.env .Values.extraEnv }}
+          {{- if .Values.env }}
           env:
-          {{- with .Values.env }}
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- with .Values.extraEnv }}
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+            {{- toYaml .Values.env | nindent 12 }}
           {{- end }}
           ports:
             - containerPort: {{ .Values.containerPort }}

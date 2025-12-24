@@ -2,7 +2,7 @@ apiVersion: v2
 name: microservice
 description: A generic Helm chart for deploying Go microservices
 type: application
-version: 0.3.0
+version: 0.4.0
 appVersion: "1.0.0"
 maintainers:
   - name: duynhne

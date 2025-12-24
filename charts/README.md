@@ -23,7 +23,7 @@ helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-
 
 ```
 charts/
-├── Chart.yaml             # Chart metadata (version: 0.4.0)
+├── Chart.yaml             # Chart metadata (version: 0.4.1)
 ├── values.yaml            # Default values template
 ├── values/                # Per-service value overrides
 │   ├── auth.yaml
@@ -195,4 +195,4 @@ image:
 
 ---
 
-**Last Updated**: December 2025 - Version 0.4.0 (Consolidated env configuration)
+**Last Updated**: December 2025 - Version 0.4.1 (Flyway Dockerfile optimization)

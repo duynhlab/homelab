@@ -41,7 +41,7 @@ env:
     value: "true"
   # Database configuration
   - name: DB_HOST
-    value: "review-db.postgres-operator.svc.cluster.local"  # Direct connection, no pooler
+    value: "review-db.review.svc.cluster.local"  # Direct connection, no pooler - review-db is in review namespace
   - name: DB_PORT
     value: "5432"
   - name: DB_NAME
@@ -51,7 +51,7 @@ env:
   - name: DB_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: review-db-secret
+        name: review.review-db.credentials.postgresql.acid.zalan.do  # Zalando operator auto-generated secret
         key: password
   - name: DB_SSLMODE
     value: "disable"
@@ -86,12 +86,12 @@ readinessProbe:
 migrations:
   enabled: true
   image: ghcr.io/duynhne/review:v5-init
-  imagePullPolicy: IfNotPresent
+  imagePullPolicy: Always #IfNotPresent
   env:
-    DB_HOST: "review-db.postgres-operator.svc.cluster.local"  # Direct connection, no pooler
+    DB_HOST: "review-db.review.svc.cluster.local"  # Direct connection, no pooler - review-db is in review namespace
     DB_PORT: "5432"
     DB_NAME: "review"
     DB_USER: "review"
     DB_SSLMODE: "disable"
   envFrom:
-    secretRef: "review-db-secret"
+    secretRef: "review.review-db.credentials.postgresql.acid.zalan.do"  # Zalando operator auto-generated secret

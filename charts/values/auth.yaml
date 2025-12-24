@@ -43,7 +43,7 @@ env:
     value: "true"
   # Database configuration
   - name: DB_HOST
-    value: "auth-db-pooler.postgres-operator.svc.cluster.local"  # PgBouncer pooler endpoint
+    value: "auth-db-pooler.auth.svc.cluster.local"  # PgBouncer pooler endpoint - auth-db is in auth namespace
   - name: DB_PORT
     value: "5432"
   - name: DB_NAME
@@ -53,7 +53,7 @@ env:
   - name: DB_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: auth-db-secret
+        name: auth.auth-db.credentials.postgresql.acid.zalan.do  # Zalando operator auto-generated secret
         key: password
   - name: DB_SSLMODE
     value: "disable"
@@ -90,12 +90,12 @@ readinessProbe:
 migrations:
   enabled: true
   image: ghcr.io/duynhne/auth:v5-init
-  imagePullPolicy: IfNotPresent
+  imagePullPolicy: Always #IfNotPresent
   env:
-    DB_HOST: "auth-db.postgres-operator.svc.cluster.local"  # Direct connection, no pooler
+    DB_HOST: "auth-db.auth.svc.cluster.local"  # Direct connection for migrations - auth-db is in auth namespace
     DB_PORT: "5432"
     DB_NAME: "auth"
     DB_USER: "auth"
     DB_SSLMODE: "disable"
   envFrom:
-    secretRef: "auth-db-secret"
+    secretRef: "auth.auth-db.credentials.postgresql.acid.zalan.do"  # Zalando operator auto-generated secret

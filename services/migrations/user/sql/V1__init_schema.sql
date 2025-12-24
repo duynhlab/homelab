@@ -1,4 +1,4 @@
--- 001__init_schema.sql
+-- V1__init_schema.sql
 -- User Database Schema - Initial Setup
 
 -- User profiles table

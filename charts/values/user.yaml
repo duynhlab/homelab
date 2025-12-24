@@ -42,7 +42,7 @@ env:
     value: "true"
   # Database configuration
   - name: DB_HOST
-    value: "supporting-db.postgres-operator.svc.cluster.local"  # Shared database
+    value: "supporting-db.user.svc.cluster.local"  # Shared database - supporting-db is in user namespace
   - name: DB_PORT
     value: "5432"
   - name: DB_NAME
@@ -52,7 +52,7 @@ env:
   - name: DB_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: supporting-db-secret
+        name: user.supporting-db.credentials.postgresql.acid.zalan.do  # Zalando operator auto-generated secret
         key: password
   - name: DB_SSLMODE
     value: "disable"
@@ -89,10 +89,10 @@ migrations:
   image: ghcr.io/duynhne/user:v5-init
   imagePullPolicy: IfNotPresent
   env:
-    DB_HOST: "supporting-db.postgres-operator.svc.cluster.local"
+    DB_HOST: "supporting-db.user.svc.cluster.local"
     DB_PORT: "5432"
     DB_NAME: "user"
     DB_USER: "user"
     DB_SSLMODE: "disable"
   envFrom:
-    secretRef: "supporting-db-secret"
+    secretRef: "user.supporting-db.credentials.postgresql.acid.zalan.do"  # Zalando operator auto-generated secret

@@ -88,7 +88,7 @@ readinessProbe:
 migrations:
   enabled: true
   image: ghcr.io/duynhne/product:v5-init
-  imagePullPolicy: IfNotPresent
+  imagePullPolicy: Always #IfNotPresent
   env:
     DB_HOST: "product-db-rw.product.svc.cluster.local"  # Direct connection, no pooler
     DB_PORT: "5432"

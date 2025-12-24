@@ -41,7 +41,7 @@ env:
     value: "true"
   # Database configuration
   - name: DB_HOST
-    value: "pgcat.transaction.svc.cluster.local"  # PgCat pooler endpoint
+    value: "pgcat.cart.svc.cluster.local"  # PgCat pooler endpoint - pgcat service is in cart namespace
   - name: DB_PORT
     value: "5432"
   - name: DB_NAME
@@ -88,7 +88,7 @@ readinessProbe:
 migrations:
   enabled: true
   image: ghcr.io/duynhne/cart:v5-init
-  imagePullPolicy: IfNotPresent
+  imagePullPolicy: Always #IfNotPresent
   env:
     DB_HOST: "transaction-db-rw.cart.svc.cluster.local"  # Direct connection, no pooler
     DB_PORT: "5432"

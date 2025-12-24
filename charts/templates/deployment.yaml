@@ -70,7 +70,7 @@ spec:
               export FLYWAY_URL="jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE:-disable}"
               export FLYWAY_USER="${DB_USER}"
               export FLYWAY_PASSWORD="${DB_PASSWORD}"
-              # Run Flyway migration
+              # Run Flyway migration (FLYWAY_LOCATIONS is set in Dockerfile)
               flyway migrate
       {{- end }}
       containers:

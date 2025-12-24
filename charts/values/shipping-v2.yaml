@@ -41,7 +41,7 @@ env:
     value: "true"
   # Database configuration
   - name: DB_HOST
-    value: "supporting-db.postgres-operator.svc.cluster.local"  # Shared database
+    value: "supporting-db.user.svc.cluster.local"  # Shared database - supporting-db is in user namespace
   - name: DB_PORT
     value: "5432"
   - name: DB_NAME
@@ -51,7 +51,7 @@ env:
   - name: DB_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: supporting-db-secret
+        name: shipping.supporting-db.credentials.postgresql.acid.zalan.do  # Zalando operator auto-generated secret
         key: password
   - name: DB_SSLMODE
     value: "disable"
@@ -86,12 +86,12 @@ readinessProbe:
 migrations:
   enabled: true
   image: ghcr.io/duynhne/shipping-v2:v5-init
-  imagePullPolicy: IfNotPresent
+  imagePullPolicy: Always #IfNotPresent
   env:
-    DB_HOST: "supporting-db.postgres-operator.svc.cluster.local"  # Direct connection, no pooler
+    DB_HOST: "supporting-db.user.svc.cluster.local"  # Direct connection, no pooler - supporting-db is in user namespace
     DB_PORT: "5432"
     DB_NAME: "shipping"
     DB_USER: "shipping"
     DB_SSLMODE: "disable"
   envFrom:
-    secretRef: "supporting-db-secret"
+    secretRef: "shipping.supporting-db.credentials.postgresql.acid.zalan.do"  # Zalando operator auto-generated secret

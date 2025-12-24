@@ -19,7 +19,7 @@ PostgreSQL database integration enables microservices to persist data, execute r
 - **PgBouncer**: Transaction pooling for Auth service (Zalando built-in sidecar)
 - **PgCat**: Modern connection pooler for Product and Cart+Order (standalone)
 - **Patroni**: High availability manager (used by both Zalando and CloudNativePG operators via Kubernetes API)
-- **Flyway**: Database migrations (8 migration images)
+- **Flyway**: Database migrations (9 migration images, Flyway 11.8.2)
 
 **Note on Patroni:**
 - Both Zalando and CloudNativePG operators use **Patroni internally** for HA and leader election
@@ -96,6 +96,21 @@ flowchart TD
 | **Cart+Order** | Cart, Order | **CloudNativePG** | **PgCat** (standalone) | **Patroni HA** (2 instances) | **Multi-database routing, Patroni failover** |
 | **Supporting** | User, Notification, Shipping-v2 | **Zalando** | **None** (direct) | **Patroni** (single instance) | **Shared database pattern, Patroni basics** |
 
+### Zalando Operator Secret Names
+
+Zalando Postgres Operator automatically creates secrets for each database user with the following naming convention:
+`{username}.{cluster-name}.credentials.postgresql.acid.zalan.do`
+
+| Service | Secret Name |
+|---------|-------------|
+| **User** | `user.supporting-db.credentials.postgresql.acid.zalan.do` |
+| **Notification** | `notification.supporting-db.credentials.postgresql.acid.zalan.do` |
+| **Shipping** | `shipping.supporting-db.credentials.postgresql.acid.zalan.do` |
+| **Review** | `review.review-db.credentials.postgresql.acid.zalan.do` |
+| **Auth** | `auth.auth-db.credentials.postgresql.acid.zalan.do` |
+
+**Note**: These secrets contain `username` and `password` keys. Helm charts reference these secrets directly - no manual secret creation needed for Zalando-managed databases.
+
 ### Cluster Details
 
 #### 1. Product Database (CloudNativePG + PgCat)
@@ -145,7 +160,8 @@ flowchart TD
 - Built-in PgBouncer sidecar (Zalando operator feature)
 - Transaction pooling for short-lived connections
 - Pool size: 25 connections
-- Service endpoint: `auth-db-pooler.postgres-operator.svc.cluster.local`
+- Service endpoint: `auth-db-pooler.auth.svc.cluster.local` (for main container via pooler)
+- Direct endpoint: `auth-db.auth.svc.cluster.local` (for migrations, direct connection)
 
 #### 4. Transaction Database (CloudNativePG + PgCat + Patroni)
 
@@ -218,7 +234,7 @@ sequenceDiagram
 # Helm values (charts/values/review.yaml)
 env:
   - name: DB_HOST
-    value: "review-db.postgres-operator.svc.cluster.local"
+    value: "review-db.review.svc.cluster.local"  # review-db is in review namespace
   - name: DB_PORT
     value: "5432"
   - name: DB_NAME
@@ -228,7 +244,7 @@ env:
   - name: DB_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: review-db-secret
+        name: review.review-db.credentials.postgresql.acid.zalan.do
         key: password
 ```
 
@@ -236,7 +252,7 @@ env:
 ```go
 // Direct connection - no pooler
 cfg := &DatabaseConfig{
-    Host:     getEnv("DB_HOST", ""),  // review-db.postgres-operator.svc.cluster.local
+    Host:     getEnv("DB_HOST", ""),  // review-db.review.svc.cluster.local
     Port:     getEnv("DB_PORT", "5432"),
     Name:     getEnv("DB_NAME", ""),  // review
     User:     getEnv("DB_USER", ""),  // review
@@ -253,7 +269,7 @@ cfg := &DatabaseConfig{
 # Helm values (charts/values/auth.yaml)
 env:
   - name: DB_HOST
-    value: "auth-db-pooler.postgres-operator.svc.cluster.local"  # PgBouncer endpoint
+    value: "auth-db-pooler.auth.svc.cluster.local"  # PgBouncer endpoint - auth-db is in auth namespace
   - name: DB_PORT
     value: "5432"
   - name: DB_NAME
@@ -263,7 +279,7 @@ env:
   - name: DB_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: auth-db-secret
+        name: auth.auth-db.credentials.postgresql.acid.zalan.do
         key: password
   - name: DB_POOL_MODE
     value: "transaction"  # PgBouncer transaction pooling
@@ -420,7 +436,7 @@ All database connections use **separate environment variables** (NOT a single `D
 
 #### Auth Service (PgBouncer)
 ```bash
-DB_HOST=auth-db-pooler.postgres-operator.svc.cluster.local
+DB_HOST=auth-db-pooler.auth.svc.cluster.local
 DB_PORT=5432
 DB_NAME=auth
 DB_USER=auth
@@ -443,7 +459,7 @@ DB_POOL_MAX_CONNECTIONS=50
 
 #### Review Service (Direct)
 ```bash
-DB_HOST=review-db.postgres-operator.svc.cluster.local
+DB_HOST=review-db.review.svc.cluster.local
 DB_PORT=5432
 DB_NAME=review
 DB_USER=review
@@ -515,11 +531,11 @@ env:
 **Never hardcode passwords**. Always use `valueFrom.secretKeyRef`:
 
 ```yaml
-# ✅ CORRECT: Use Secret reference
+# ✅ CORRECT: Use Secret reference (Zalando auto-generated secret)
 - name: DB_PASSWORD
   valueFrom:
     secretKeyRef:
-      name: auth-db-secret
+      name: auth.auth-db.credentials.postgresql.acid.zalan.do
       key: password
 
 # ❌ WRONG: Hardcoded password
@@ -534,7 +550,7 @@ env:
 # charts/values/auth.yaml
 env:
   - name: DB_HOST
-    value: "auth-db-pooler.postgres-operator.svc.cluster.local"
+    value: "auth-db-pooler.auth.svc.cluster.local"  # auth-db is in auth namespace
   - name: DB_PORT
     value: "5432"
   - name: DB_NAME
@@ -544,7 +560,7 @@ env:
   - name: DB_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: auth-db-secret
+        name: auth.auth-db.credentials.postgresql.acid.zalan.do
         key: password
   - name: DB_SSLMODE
     value: "disable"
@@ -582,7 +598,7 @@ env:
 # charts/values/review.yaml
 env:
   - name: DB_HOST
-    value: "review-db.postgres-operator.svc.cluster.local"
+    value: "review-db.review.svc.cluster.local"  # review-db is in review namespace
   - name: DB_PORT
     value: "5432"
   - name: DB_NAME
@@ -592,7 +608,7 @@ env:
   - name: DB_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: review-db-secret
+        name: review.review-db.credentials.postgresql.acid.zalan.do
         key: password
   - name: DB_SSLMODE
     value: "disable"
@@ -668,7 +684,7 @@ Test database connection manually:
 psql -h localhost -p 5432 -U auth -d auth
 
 # Using kubectl exec (from within cluster)
-kubectl exec -it -n auth deployment/auth -- psql -h auth-db-pooler.postgres-operator.svc.cluster.local -U auth -d auth
+kubectl exec -it -n auth deployment/auth -- psql -h auth-db-pooler.auth.svc.cluster.local -U auth -d auth
 ```
 
 ---
@@ -681,7 +697,7 @@ kubectl exec -it -n auth deployment/auth -- psql -h auth-db-pooler.postgres-oper
 
 **Symptoms**:
 ```
-ERROR   Failed to connect to database    {"error": "dial tcp: lookup auth-db-pooler.postgres-operator.svc.cluster.local: no such host"}
+ERROR   Failed to connect to database    {"error": "dial tcp: lookup auth-db-pooler.auth.svc.cluster.local: no such host"}
 ```
 
 **Diagnosis**:
@@ -693,7 +709,7 @@ kubectl get pods -n auth -l app=postgres
 kubectl get svc -n auth auth-db-pooler
 
 # Check DNS resolution
-kubectl run -it --rm debug --image=busybox --restart=Never -- nslookup auth-db-pooler.postgres-operator.svc.cluster.local
+kubectl run -it --rm debug --image=busybox --restart=Never -- nslookup auth-db-pooler.auth.svc.cluster.local
 ```
 
 **Solutions**:
@@ -710,20 +726,20 @@ ERROR   Database authentication failed    {"error": "password authentication fai
 
 **Diagnosis**:
 ```bash
-# Check Secret exists
-kubectl get secret auth-db-secret -n auth
+# Check Secret exists (Zalando auto-generated secret)
+kubectl get secret auth.auth-db.credentials.postgresql.acid.zalan.do -n auth
 
 # Check Secret content (base64 decoded)
-kubectl get secret auth-db-secret -n auth -o jsonpath='{.data.password}' | base64 -d
+kubectl get secret auth.auth-db.credentials.postgresql.acid.zalan.do -n auth -o jsonpath='{.data.password}' | base64 -d && echo ""
 
 # Verify Secret is referenced in Helm values
 helm get values auth -n auth | grep -A 5 DB_PASSWORD
 ```
 
 **Solutions**:
-1. Verify Secret exists: `kubectl get secret auth-db-secret -n auth`
+1. Verify Secret exists: `kubectl get secret auth.auth-db.credentials.postgresql.acid.zalan.do -n auth`
 2. Check Secret key name matches (`password` vs `username`)
-3. Recreate Secret if needed: `kubectl create secret generic auth-db-secret --from-literal=password=postgres -n auth`
+3. **Note**: Zalando operator auto-generates secrets - no manual creation needed. If secret doesn't exist, check Zalando operator logs.
 
 #### Error: "Connection timeout"
 
@@ -741,7 +757,7 @@ kubectl get pods -n auth -l app=postgres
 kubectl logs -n auth -l app=postgres --tail=50
 
 # Test connectivity from pod
-kubectl run -it --rm test --image=postgres:15-alpine --restart=Never -- psql -h auth-db-pooler.postgres-operator.svc.cluster.local -U auth -d auth
+kubectl run -it --rm test --image=postgres:15-alpine --restart=Never -- psql -h auth-db-pooler.auth.svc.cluster.local -U auth -d auth
 ```
 
 **Solutions**:
@@ -795,6 +811,132 @@ kubectl get cluster product-db -n product
 1. Verify database cluster is Ready: `kubectl get cluster product-db -n product`
 2. Check PgCat configmap: `kubectl get configmap pgcat-product-config -n product -o yaml`
 3. Restart PgCat: `kubectl rollout restart deployment/pgcat-product -n product`
+
+### Flyway Migration Issues
+
+#### Error: "No migrations found" or "Migrations not detected"
+
+**Symptoms**:
+```
+WARNING: No migrations found. Are your locations set up correctly?
+1 SQL migrations were detected but not run because they did not follow the filename convention.
+```
+
+**Diagnosis**:
+
+**1. Check SQL files in migration image:**
+```bash
+# List SQL files in migration image (SQL files are in $FLYWAY_HOME/sql/)
+docker run --rm --entrypoint /bin/sh ghcr.io/duynhne/user:v5-init -c "ls -la /opt/flyway/11.8.2/sql/ 2>/dev/null || echo 'Directory not found'; echo '---'; find /opt/flyway -name '*.sql' 2>/dev/null | head -5 || echo 'No SQL files found'"
+
+# Check if files follow naming convention (must be V{version}__{description}.sql)
+docker run --rm --entrypoint /bin/sh ghcr.io/duynhne/user:v5-init -c "ls -la /opt/flyway/11.8.2/sql/ && echo '---' && file /opt/flyway/11.8.2/sql/*.sql"
+
+# Verify FLYWAY_LOCATIONS environment variable (should be set in Dockerfile)
+docker run --rm --entrypoint /bin/sh ghcr.io/duynhne/user:v5-init -c "echo \$FLYWAY_LOCATIONS"
+```
+
+**2. Check init container logs:**
+```bash
+# Check for migration errors and status
+kubectl logs -n user -l app=user -c init --tail=50
+
+# View full migration output
+kubectl logs -n user -l app=user -c init --tail=100
+```
+
+**3. Get database password for manual testing:**
+```bash
+# Zalando operator secrets (format: {username}.{cluster-name}.credentials.postgresql.acid.zalan.do)
+kubectl get secret -n user user.supporting-db.credentials.postgresql.acid.zalan.do -o jsonpath='{.data.password}' | base64 -d && echo ""
+
+# CloudNativePG secrets
+kubectl get secret -n product product-db-secret -o jsonpath='{.data.password}' | base64 -d && echo ""
+
+# Test database connection manually (Zalando operator)
+PASSWORD=$(kubectl get secret -n user user.supporting-db.credentials.postgresql.acid.zalan.do -o jsonpath='{.data.password}' | base64 -d)
+kubectl exec -n user supporting-db-0 -- bash -c "PGPASSWORD='$PASSWORD' psql -h 127.0.0.1 -U user -d user -c 'SELECT * FROM flyway_schema_history;'"
+```
+
+**4. Check Flyway schema history table:**
+```bash
+# Get password and check migration history (Zalando operator)
+PASSWORD=$(kubectl get secret -n user user.supporting-db.credentials.postgresql.acid.zalan.do -o jsonpath='{.data.password}' | base64 -d)
+kubectl exec -n user supporting-db-0 -- bash -c "PGPASSWORD='$PASSWORD' psql -h 127.0.0.1 -U user -d user -c 'SELECT version, description, type, installed_on, success FROM flyway_schema_history ORDER BY installed_rank;'"
+
+# For CloudNativePG clusters (e.g., product-db)
+PASSWORD=$(kubectl get secret -n product product-db-secret -o jsonpath='{.data.password}' | base64 -d)
+kubectl exec -n product product-db-1 -- bash -c "PGPASSWORD='$PASSWORD' psql -h 127.0.0.1 -U product -d product -c 'SELECT version, description, type, installed_on, success FROM flyway_schema_history ORDER BY installed_rank;'"
+```
+
+**5. Verify database initialization (check tables and structure):**
+```bash
+# List all tables in database (Zalando operator)
+PASSWORD=$(kubectl get secret -n user user.supporting-db.credentials.postgresql.acid.zalan.do -o jsonpath='{.data.password}' | base64 -d)
+kubectl exec -n user supporting-db-0 -- bash -c "PGPASSWORD='$PASSWORD' psql -h 127.0.0.1 -U user -d user -c '\dt'"
+
+# Check table structure (example: user_profiles)
+kubectl exec -n user supporting-db-0 -- bash -c "PGPASSWORD='$PASSWORD' psql -h 127.0.0.1 -U user -d user -c '\d user_profiles'"
+
+# Count tables in public schema
+kubectl exec -n user supporting-db-0 -- bash -c "PGPASSWORD='$PASSWORD' psql -h 127.0.0.1 -U user -d user -c 'SELECT COUNT(*) as table_count FROM information_schema.tables WHERE table_schema = '\''public'\'' AND table_type = '\''BASE TABLE'\'';'"
+
+# List all columns in public schema tables
+kubectl exec -n user supporting-db-0 -- bash -c "PGPASSWORD='$PASSWORD' psql -h 127.0.0.1 -U user -d user -c 'SELECT table_name, column_name, data_type FROM information_schema.columns WHERE table_schema = '\''public'\'' ORDER BY table_name, ordinal_position;'"
+
+# For CloudNativePG clusters (e.g., product-db)
+PASSWORD=$(kubectl get secret -n product product-db-secret -o jsonpath='{.data.password}' | base64 -d)
+kubectl exec -n product product-db-1 -- bash -c "PGPASSWORD='$PASSWORD' psql -h 127.0.0.1 -U product -d product -c '\dt'"
+```
+
+**Solutions**:
+1. **Verify SQL file naming**: Files must follow `V{version}__{description}.sql` format (e.g., `V1__init_schema.sql`)
+   - ✅ Correct: `V1__init_schema.sql`, `V2__add_index.sql`
+   - ❌ Wrong: `001__init_schema.sql`, `v1__init_schema.sql`, `V1_init_schema.sql`
+2. **Verify SQL files are in image**: Rebuild migration image after renaming files
+   ```bash
+   cd services/migrations/user
+   docker build -t ghcr.io/duynhne/user:v5-init .
+   kind load docker-image ghcr.io/duynhne/user:v5-init --name monitoring-local
+   ```
+3. **Check FLYWAY_LOCATIONS**: Verify environment variable is set correctly (should be `filesystem:/opt/flyway/11.8.2/sql`)
+   ```bash
+   # Check FLYWAY_LOCATIONS in init container
+   kubectl exec -n user -l app=user -c init -- env | grep FLYWAY
+   
+   # Expected output: FLYWAY_LOCATIONS=filesystem:/opt/flyway/11.8.2/sql
+   # Note: This is set in Dockerfile at build-time, not in Helm template
+   ```
+4. **Verify SQL files location**: Check if SQL files exist in expected location
+   ```bash
+   # List SQL files in init container
+   kubectl exec -n user -l app=user -c init -- ls -la /opt/flyway/11.8.2/sql/
+   
+   # Verify WORKDIR (should be /opt/flyway/11.8.2)
+   kubectl exec -n user -l app=user -c init -- pwd
+   ```
+
+#### Error: "Multiple pods running migrations simultaneously"
+
+**Symptoms**:
+```
+ERROR: Migration failed - another migration is in progress
+```
+
+**Diagnosis**:
+```bash
+# Check how many pods are running init containers
+kubectl get pods -n user -l app=user -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.initContainerStatuses[*].state}{"\n"}{end}'
+
+# Check Flyway lock table
+PASSWORD=$(kubectl get secret -n user user.supporting-db.credentials.postgresql.acid.zalan.do -o jsonpath='{.data.password}' | base64 -d)
+kubectl exec -n user supporting-db-0 -- bash -c "PGPASSWORD='$PASSWORD' psql -h localhost -U user -d user -c 'SELECT * FROM flyway_schema_history WHERE type='\''MIGRATION'\'' ORDER BY installed_rank DESC LIMIT 5;'"
+```
+
+**Solutions**:
+1. **Flyway handles concurrency**: Uses database locks, only one pod can migrate at a time
+2. **Other pods wait**: If one pod is migrating, others wait for completion
+3. **This is expected behavior**: No action needed, Flyway manages it automatically
 
 #### PgCat: TOML Configuration Errors
 
@@ -949,7 +1091,7 @@ helm upgrade --install postgres-exporter prometheus-community/prometheus-postgre
 ```yaml
 config:
   datasource:
-    host: auth-db.postgres-operator.svc.cluster.local
+    host: auth-db.auth.svc.cluster.local
     port: "5432"
     database: auth
     user: postgres

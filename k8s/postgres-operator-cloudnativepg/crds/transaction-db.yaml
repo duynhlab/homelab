@@ -48,6 +48,12 @@ spec:
       encoding: "UTF8"
       localeCType: "C"
       localeCollate: "C"
+      # Create order database after cluster initialization
+      # CloudNativePG runs postInitSQL as superuser (postgres)
+      # postInitSQL executes SQL statements after the default database is created
+      # Note: CREATE DATABASE can be executed from any database when running as superuser
+      postInitSQL:
+        - CREATE DATABASE "order" OWNER cart;
   
   # Storage configuration
   storage:
@@ -82,6 +88,6 @@ spec:
   #     ttl: 30
   
   # Additional databases (order database)
-  # Note: CloudNativePG creates databases via initdb or via separate resources
-  # For simplicity, we'll create order database via init script in migration
+  # Order database is created via postInitSQL in bootstrap.initdb section above
+  # This runs as superuser (postgres) during cluster initialization
 

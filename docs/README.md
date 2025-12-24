@@ -85,7 +85,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 
 21. **[Configuration Guide](./development/CONFIG_GUIDE.md)** - Complete configuration management guide
     - Configuration sources (.env, environment variables, Helm values)
-    - `env` vs `extraEnv` decision matrix
+    - Environment variable configuration
     - Local development setup
     - Production deployment patterns
     - Validation rules and troubleshooting
@@ -97,6 +97,12 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
     - Connection patterns (direct, PgBouncer, PgCat)
     - Environment variables and Helm configuration
     - Troubleshooting and monitoring
+
+24. **[Database Verification](./development/DATABASE_VERIFICATION.md)** - Database readiness and connection testing
+    - Automated verification script
+    - Manual verification commands
+    - Quick health checks
+    - Troubleshooting connection issues
 
 24. **[Dashboard Panels Guide](./development/DASHBOARD_PANELS_GUIDE.md)** - Complete dashboard reference for SRE/DevOps
     - All 34 panels with query analysis and troubleshooting

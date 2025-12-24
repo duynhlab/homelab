@@ -148,7 +148,7 @@ Located at: `k8s/jaeger/values.yaml`
 ```yaml
 allInOne:
   enabled: true
-  extraEnv:
+  env:
     - name: COLLECTOR_OTLP_ENABLED
       value: "true"
 

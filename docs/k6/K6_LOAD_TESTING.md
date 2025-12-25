@@ -453,6 +453,6 @@ func shouldCollectMetrics(path string) bool {
 ## Update Test Scripts
 
 1. Edit `k6/load-test.js` or `k6/load-test-multiple-scenarios.js`
-2. Rebuild k6 images: `./scripts/04-build-microservices.sh` (includes k6 builds)
+2. k6 images are built automatically by GitHub Actions on push (`.github/workflows/build-k6-images.yml`)
 3. Redeploy: `./scripts/06-deploy-k6.sh`
 4. Pods will automatically use new images (ImagePullPolicy: Never for local images)

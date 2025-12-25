@@ -212,6 +212,36 @@ env:
 | `VERSION` | string | `"dev"` | Service version |
 | `ENV` | string | `"development"` | Environment (development, staging, production) |
 
+### Graceful Shutdown Configuration
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `SHUTDOWN_TIMEOUT` | duration | `"10s"` | Graceful shutdown timeout (Go duration format: "10s", "30s", etc.) |
+
+**Details:**
+- **Format**: Go duration format (e.g., `"10s"`, `"30s"`, `"1m"`)
+- **Validation**: Must be positive and ≤ 60 seconds (safety limit)
+- **Behavior**: Invalid values fall back to default (10s) silently for startup safety
+- **Usage**: Controls how long the application waits for in-flight requests to complete during shutdown
+- **Kubernetes**: Should be less than `terminationGracePeriodSeconds` (default: 30s) to allow buffer time
+
+**Example Configuration:**
+```yaml
+# Helm values (charts/values/auth.yaml)
+env:
+  # Graceful shutdown configuration
+  - name: SHUTDOWN_TIMEOUT
+    value: "10s"  # Default shutdown timeout (can be overridden)
+
+# Kubernetes graceful shutdown configuration
+terminationGracePeriodSeconds: 30  # Shutdown timeout (10s) + buffer (20s)
+```
+
+**Best Practices:**
+- Set `SHUTDOWN_TIMEOUT` to expected maximum request processing time
+- Set `terminationGracePeriodSeconds` to `SHUTDOWN_TIMEOUT + buffer` (recommended buffer: 20s)
+- Monitor shutdown duration in production to tune these values
+
 ### Tracing Configuration (OpenTelemetry/Tempo)
 
 | Variable | Type | Default | Description |
@@ -261,7 +291,7 @@ env:
 - All database connections use **separate environment variables** (NOT a single `DATABASE_URL` string)
 - `DB_PASSWORD` must be provided via Kubernetes Secret (`valueFrom.secretKeyRef`)
 - `DB_HOST` points to pooler endpoint (if using pooler) or direct database endpoint
-- See [Database Guide](./DATABASE_GUIDE.md) for complete database configuration details
+- See [Database Guide](./DATABASE.md) for complete database configuration details
 
 **Example Configuration:**
 ```yaml
@@ -606,11 +636,11 @@ SERVICE_NAME=auth PORT=8080 go run cmd/auth/main.go
 
 ## Related Documentation
 
-- **[Database Guide](./DATABASE_GUIDE.md)** - Complete database integration guide (connection patterns, troubleshooting)
-- **[charts/README.md](../../charts/README.md)** - Helm chart configuration guide (`env` vs `extraEnv`)
+- **[Database Guide](./DATABASE.md)** - Complete database integration guide (connection patterns, troubleshooting)
+- **[charts/README.md](../../charts/README.md)** - Helm chart configuration guide
 - **[pkg/config/config.go](../../services/pkg/config/config.go)** - Centralized configuration package
 - **[AGENTS.md](../../AGENTS.md)** - Project structure and conventions
-- **[SETUP.md](../getting-started/SETUP.md)** - Complete deployment guide
+- **[Setup Guide](./SETUP.md)** - Complete deployment guide
 
 ---
 

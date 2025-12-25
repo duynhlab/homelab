@@ -25,18 +25,20 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 )
 
 // Config holds all configuration for a microservice
 type Config struct {
-	Service   ServiceConfig   // Service-specific settings (port, name, version)
-	Tracing   TracingConfig   // OpenTelemetry/Tempo configuration
-	Profiling ProfilingConfig // Pyroscope continuous profiling
-	Logging   LoggingConfig   // Structured logging (Zap)
-	Metrics   MetricsConfig   // Prometheus metrics
-	Database  DatabaseConfig  // PostgreSQL database configuration
+	Service        ServiceConfig   // Service-specific settings (port, name, version)
+	Tracing        TracingConfig   // OpenTelemetry/Tempo configuration
+	Profiling      ProfilingConfig // Pyroscope continuous profiling
+	Logging        LoggingConfig   // Structured logging (Zap)
+	Metrics        MetricsConfig   // Prometheus metrics
+	Database       DatabaseConfig  // PostgreSQL database configuration
+	ShutdownTimeout int            // Graceful shutdown timeout in seconds - from SHUTDOWN_TIMEOUT env (default: 10)
 }
 
 // ServiceConfig defines basic service configuration
@@ -145,6 +147,7 @@ func Load() *Config {
 			PoolMode:       getEnv("DB_POOL_MODE", ""),
 			PoolerType:     getEnv("DB_POOLER_TYPE", ""),
 		},
+		ShutdownTimeout: getEnvDurationSeconds("SHUTDOWN_TIMEOUT", 10),
 	}
 }
 
@@ -288,6 +291,43 @@ func getEnvFloat(key string, defaultValue float64) float64 {
 		return defaultValue
 	}
 	return floatValue
+}
+
+// getEnvDurationSeconds reads a duration environment variable and returns seconds as int
+// Accepts Go duration format (e.g., "10s", "30s", "1m")
+// Default: 10 seconds
+// Max: 60 seconds (safety limit)
+// Returns default on invalid values (silent fallback for startup safety)
+func getEnvDurationSeconds(key string, defaultValueSeconds int) int {
+	const maxSeconds = 60
+
+	timeoutStr := os.Getenv(key)
+	if timeoutStr == "" {
+		return defaultValueSeconds
+	}
+
+	timeout, err := time.ParseDuration(timeoutStr)
+	if err != nil {
+		// Invalid format - use default (silent fallback for startup safety)
+		return defaultValueSeconds
+	}
+
+	// Convert to seconds
+	seconds := int(timeout.Seconds())
+
+	// Validate: must be positive and within reasonable limit
+	if seconds <= 0 || seconds > maxSeconds {
+		// Invalid value - use default (silent fallback for startup safety)
+		return defaultValueSeconds
+	}
+
+	return seconds
+}
+
+// GetShutdownTimeoutDuration returns shutdown timeout as time.Duration
+// Convenience method for use in main.go
+func (c *Config) GetShutdownTimeoutDuration() time.Duration {
+	return time.Duration(c.ShutdownTimeout) * time.Second
 }
 
 // contains checks if a string slice contains a specific value

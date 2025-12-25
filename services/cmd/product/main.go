@@ -3,10 +3,8 @@ package main
 import (
 	"context"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

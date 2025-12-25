@@ -58,6 +58,12 @@ env:
     value: "disable"
   - name: DB_POOL_MAX_CONNECTIONS
     value: "10"  # Low traffic, smaller pool
+  # Graceful shutdown configuration
+  - name: SHUTDOWN_TIMEOUT
+    value: "10s"  # Default shutdown timeout (can be overridden)
+
+# Kubernetes graceful shutdown configuration
+terminationGracePeriodSeconds: 30  # Shutdown timeout (10s) + buffer (20s)
 
 resources:
   requests:

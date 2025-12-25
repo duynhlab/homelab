@@ -5,34 +5,22 @@ set -e
 # Deploy All Microservices using Helm
 # =============================================================================
 # Usage:
-#   ./06-deploy-microservices.sh              # Local mode (default)
-#   ./06-deploy-microservices.sh --local      # Local mode (explicit)
-#   ./06-deploy-microservices.sh --registry   # From ghcr.io OCI registry
+#   ./06-deploy-microservices.sh   # Deploy from ghcr.io OCI registry
 # =============================================================================
 
 # Configuration
 REGISTRY="oci://ghcr.io/duynhne/charts/microservice"
-LOCAL_CHART="charts/"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Get chart version from Chart.yaml
 CHART_VERSION=$(grep '^version:' "$PROJECT_ROOT/charts/Chart.yaml" | awk '{print $2}')
 
-# Parse arguments
-MODE="${1:---local}"
-
-if [[ "$MODE" == "--registry" ]]; then
-  CHART_REF="$REGISTRY"
-  echo "=== Deploying All Microservices from OCI Registry ==="
-  echo "Chart: $CHART_REF"
-  echo "Version: $CHART_VERSION"
-else
-  CHART_REF="$PROJECT_ROOT/$LOCAL_CHART"
-  echo "=== Deploying All Microservices from Local Chart ==="
-  echo "Chart: $CHART_REF"
-  echo "Version: $CHART_VERSION"
-fi
+# Always deploy from OCI registry
+CHART_REF="$REGISTRY"
+echo "=== Deploying All Microservices from OCI Registry ==="
+echo "Chart: $CHART_REF"
+echo "Version: $CHART_VERSION"
 
 echo ""
 
@@ -61,24 +49,14 @@ for entry in "${SERVICES[@]}"; do
   
   echo "$COUNT. Deploying $SERVICE to $NAMESPACE namespace (chart v$CHART_VERSION)..."
   
-  if [[ "$MODE" == "--registry" ]]; then
-    # Registry mode: specify version explicitly
-    helm upgrade --install "$SERVICE" "$CHART_REF" \
-      --version "$CHART_VERSION" \
-      -f "$PROJECT_ROOT/charts/values/${VALUES}.yaml" \
-      -n "$NAMESPACE" \
-      --create-namespace \
-      --wait \
-      --timeout 60s || true
-  else
-    # Local mode: no version flag needed
-    helm upgrade --install "$SERVICE" "$CHART_REF" \
-      -f "$PROJECT_ROOT/charts/values/${VALUES}.yaml" \
-      -n "$NAMESPACE" \
-      --create-namespace \
-      --wait \
-      --timeout 60s || true
-  fi
+  # Deploy from OCI registry with version
+  helm upgrade --install "$SERVICE" "$CHART_REF" \
+    --version "$CHART_VERSION" \
+    -f "$PROJECT_ROOT/charts/values/${VALUES}.yaml" \
+    -n "$NAMESPACE" \
+    --create-namespace \
+    --wait \
+    --timeout 60s || true
   
   COUNT=$((COUNT + 1))
 done

@@ -24,19 +24,16 @@ chmod +x scripts/*.sh
 # Step 4: Deploy databases (PostgreSQL operators, clusters, poolers - BEFORE apps)
 ./scripts/04-deploy-databases.sh
 
-# Step 5: Build all microservices
-./scripts/05-build-microservices.sh
-
-# Step 6: Deploy all microservices
+# Step 5: Deploy all microservices (from OCI registry)
 ./scripts/06-deploy-microservices.sh
 
-# Step 7: Deploy k6 load testing (AFTER apps to test them)
+# Step 6: Deploy k6 load testing (AFTER apps to test them)
 ./scripts/07-deploy-k6.sh
 
-# Step 8: Deploy SLO system (Required for SRE practices)
+# Step 7: Deploy SLO system (Required for SRE practices)
 ./scripts/08-deploy-slo.sh
 
-# Step 9: Setup port forwarding
+# Step 8: Setup port forwarding
 ./scripts/09-setup-access.sh
 ```
 
@@ -111,7 +108,7 @@ cp .githooks/pre-commit .git/hooks/pre-commit
 chmod +x .git/hooks/pre-commit
 ```
 
-**Note:** See [`AGENTS.md`](../../AGENTS.md#local-build-verification) for detailed usage and troubleshooting.
+**Note:** See [`docs/guides/CONVENTIONS.md`](CONVENTIONS.md#local-build-verification) for detailed usage and troubleshooting.
 
 ---
 
@@ -242,54 +239,23 @@ kubectl get pods -n cart | grep transaction-db
 ```
 
 **Detailed Documentation:**
-- Database architecture: [`docs/development/DATABASE_GUIDE.md`](../development/DATABASE_GUIDE.md)
-- Database verification: [`docs/development/DATABASE_VERIFICATION.md`](../development/DATABASE_VERIFICATION.md)
+- Database architecture: [`docs/guides/DATABASE.md`](../guides/DATABASE.md)
 
 ---
 
-### Step 5: Build All Microservices
+### Step 5: Deploy All Microservices
 
 ```bash
-./scripts/05-build-microservices.sh
-```
-
-**What it does:**
-- Builds Docker images for all 9 microservices using unified Dockerfile
-- Loads images into Kind cluster nodes
-- Verifies image availability
-
-**Services built:**
-- auth, user, product
-- cart, order, review
-- notification, shipping, shipping-v2
-
-**Verify:**
-```bash
-docker images | grep -E "(auth|user|product)"
-# Expected: 9 service images
-```
-
----
-
-### Step 6: Deploy All Microservices
-
-```bash
-# Deploy using local Helm chart (default)
-./scripts/06-deploy-microservices.sh --local
-
-# Or deploy from OCI registry (if chart is published)
-./scripts/06-deploy-microservices.sh --registry
+./scripts/06-deploy-microservices.sh
 ```
 
 **What it does:**
 - Creates all service namespaces (auth, user, product, cart, order, review, notification, shipping) and `monitoring` namespace
-- Deploys all 9 microservices using Helm chart with per-service values
+- Deploys all 9 microservices using Helm chart from OCI registry (`oci://ghcr.io/duynhne/charts/microservice`)
 - Creates Services for each microservice
 - Sets up proper labels for Prometheus discovery
 
-**Deployment modes:**
-- `--local` (default): Uses local `charts/` directory
-- `--registry`: Uses `oci://ghcr.io/duynhne/charts/microservice`
+**Note:** Images are automatically built by GitHub Actions workflows when code is pushed. The deployment script pulls images from the OCI registry.
 
 **Verify:**
 ```bash
@@ -309,7 +275,7 @@ kubectl get svc -n product
 
 ---
 
-### Step 7: Deploy k6 Load Testing
+### Step 6: Deploy k6 Load Testing
 
 ```bash
 # Deploy all k6 variants (default)
@@ -336,7 +302,7 @@ kubectl logs -n k6 -l app=k6-scenarios -f
 
 ---
 
-### Step 8: Deploy SLO System
+### Step 7: Deploy SLO System
 
 ```bash
 ./scripts/08-deploy-slo.sh
@@ -369,7 +335,7 @@ curl http://localhost:9090/api/v1/rules
 
 ---
 
-### Step 9: Setup Port Forwarding
+### Step 8: Setup Port Forwarding
 
 ```bash
 ./scripts/09-setup-access.sh
@@ -524,10 +490,12 @@ kubectl port-forward svc/auth 8080:8080 -n auth &
 **Issue:** ImagePullBackOff
 
 ```bash
-# Rebuild and reload images
-./scripts/05-build-microservices.sh
+# Images are built automatically by GitHub Actions on push
+# Ensure images exist in registry: ghcr.io/duynhne/<service>:v5
+# Check if images are available:
+docker pull ghcr.io/duynhne/auth:v5
 
-# Force recreation
+# Force pod recreation to retry image pull
 kubectl delete pods -l app=auth -n auth
 ```
 
@@ -680,5 +648,5 @@ After successful deployment:
 **Ready to monitor!** 🚀
 
 For detailed metrics explanation, see [METRICS.md](../monitoring/METRICS.md).
-For API reference, see [API_REFERENCE.md](../api/API_REFERENCE.md).
+For API reference, see [API_REFERENCE.md](./API_REFERENCE.md).
 

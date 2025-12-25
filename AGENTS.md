@@ -2,9 +2,36 @@
 
 > **IMPORTANT**: AGENTS.md files are the source of truth for AI agent instructions. Always update the relevant AGENTS.md file when adding or modifying agent guidance.
 
+> **CRITICAL**: **ALWAYS READ THIS FILE FIRST** before starting any task. This file contains essential patterns, conventions, and best practices that must be followed.
+
 ## Overview
 
-This guide provides quick reference for AI agents working with this codebase. For detailed documentation, see [`docs/`](docs/README.md) - start with [`docs/development/`](docs/development/) for development workflows.
+This guide provides quick reference for AI agents working with this codebase. For detailed documentation, see [`docs/`](docs/README.md) - start with [`docs/guides/`](docs/guides/) for development workflows.
+
+---
+
+## Agent Workflow
+
+### Before Starting Any Task
+
+1. **Read AGENTS.md FIRST** - This file contains essential patterns, conventions, and best practices
+2. **Read relevant docs** - Check `docs/guides/` for existing documentation
+3. **Research if needed** - For API/architecture work, research industry patterns (see [`docs/guides/RESEARCH_PATTERNS.md`](docs/guides/RESEARCH_PATTERNS.md))
+4. **Plan before coding** - Understand the problem, propose solution, get approval
+5. **Follow conventions** - Use existing patterns, don't reinvent
+
+### Code Quality Standards
+
+- **Consistency**: Follow existing code patterns (see [`docs/guides/CONVENTIONS.md`](docs/guides/CONVENTIONS.md))
+- **Documentation**: Update relevant docs when adding features
+- **Testing**: Write tests for new functionality
+- **Error Handling**: Use consistent error patterns
+- **Logging**: Use structured logging with appropriate levels (see [`docs/apm/LOGGING.md`](docs/apm/LOGGING.md))
+- **API Patterns**: Research industry best practices before implementing (see [`docs/guides/RESEARCH_PATTERNS.md`](docs/guides/RESEARCH_PATTERNS.md))
+- **APM Patterns**: Follow established observability patterns (see [`docs/apm/`](docs/apm/))
+- **Database Patterns**: Research database patterns, reference [`docs/guides/DATABASE.md`](docs/guides/DATABASE.md)
+
+---
 
 ## Documentation Standards
 
@@ -62,9 +89,9 @@ go test ./internal/{service}/...
 go build -o bin/{service} cmd/{service}/main.go
 ```
 
-**Detailed Configuration**: See [`docs/development/CONFIG_GUIDE.md`](docs/development/CONFIG_GUIDE.md) for environment variables, `.env` files, and local setup.
+**Detailed Configuration**: See [`docs/guides/CONFIGURATION.md`](docs/guides/CONFIGURATION.md) for environment variables, `.env` files, and local setup.
 
-**Deployment**: Docker/Kubernetes deployment details in [`docs/getting-started/SETUP.md`](docs/getting-started/SETUP.md)
+**Deployment**: Docker/Kubernetes deployment details in [`docs/guides/SETUP.md`](docs/guides/SETUP.md)
 
 ---
 
@@ -95,7 +122,7 @@ flowchart TD
     Database -->|PostgreSQL| DB[(Database)]
 ```
 
-**Database Integration**: See [`docs/development/DATABASE_GUIDE.md`](docs/development/DATABASE_GUIDE.md) for database architecture, connection patterns (direct, PgBouncer, PgCat), and configuration.
+**Database Integration**: See [`docs/guides/DATABASE.md`](docs/guides/DATABASE.md) for database architecture, connection patterns (direct, PgBouncer, PgCat), and configuration.
 
 **Layer Responsibilities**:
 - **Web Layer** (`web/v1/`, `web/v2/`): HTTP handlers, request/response, validation
@@ -113,7 +140,7 @@ flowchart TD
 - **Microservices**: 9 independent services with bounded contexts, each in own namespace
 - **Middleware Chain**: Ordered middleware (tracing → logging → metrics) for observability
 
-**Middleware Details**: See [`docs/development/TRACING_ARCHITECTURE.md`](docs/development/TRACING_ARCHITECTURE.md) for middleware chain ordering and responsibilities.
+**Middleware Details**: See [`docs/guides/TRACING_ARCHITECTURE.md`](docs/guides/TRACING_ARCHITECTURE.md) for middleware chain ordering and responsibilities.
 
 ---
 
@@ -123,30 +150,13 @@ flowchart TD
 - **Database**: PostgreSQL (5 clusters via Zalando/CloudNativePG operators)
   - Connection poolers: PgBouncer, PgCat
   - Migrations: Flyway 11.19.0 (8 migration images)
-  - **Database Documentation**: [`docs/development/DATABASE_GUIDE.md`](docs/development/DATABASE_GUIDE.md)
+  - **Database Documentation**: [`docs/guides/DATABASE.md`](docs/guides/DATABASE.md)
 - **HTTP Framework**: Gin
 - **Observability**: OpenTelemetry (traces, metrics, logs)
 - **Deployment**: Kubernetes (Kind), Helm 3
 - **Monitoring**: Prometheus, Grafana, Tempo, Loki, Pyroscope, Jaeger
 
 **Observability Details**: See [`docs/apm/README.md`](docs/apm/README.md) for complete APM system overview. Metrics documentation in [`docs/monitoring/METRICS.md`](docs/monitoring/METRICS.md)
-
----
-
-## Observability with OpenTelemetry
-
-The application includes comprehensive observability using OpenTelemetry:
-
-- **Traces**: OTLP → OpenTelemetry Collector → Tempo + Jaeger (distributed tracing)
-- **Metrics**: Prometheus (custom business + infrastructure metrics)
-- **Logs**: Structured logging with zap, correlated via trace_id/span_id
-- **Configuration**: Environment variables (`OTEL_COLLECTOR_ENDPOINT`, `OTEL_SAMPLE_RATE`)
-- **Logging**: Automatic trace context injection, log levels: debug, info, warn, error, fatal, panic
-
-**Detailed Guides**:
-- Tracing: [`docs/apm/TRACING.md`](docs/apm/TRACING.md)
-- Logging: [`docs/apm/LOGGING.md`](docs/apm/LOGGING.md)
-- Metrics: [`docs/monitoring/METRICS.md`](docs/monitoring/METRICS.md)
 
 ---
 
@@ -183,7 +193,7 @@ monitoring/
 | shipping | shipping | `/api/v1/*` (v1 only) |
 | shipping-v2 | shipping | `/api/v2/*` (v2 only) |
 
-**Complete API Documentation**: See [`docs/api/API_REFERENCE.md`](docs/api/API_REFERENCE.md) for all endpoints, request/response models, and examples.
+**Complete API Documentation**: See [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md) for all endpoints, request/response models, and examples.
 
 ---
 
@@ -197,98 +207,35 @@ Infrastructure → Monitoring → APM → **Databases** → Apps → Load Testin
 2. Monitoring (02) - Prometheus, Grafana, metrics (BEFORE apps)
 3. APM (03) - Tempo, Pyroscope, Loki, Vector (BEFORE apps)
 4. **Databases (04)** - PostgreSQL operators, clusters, poolers (BEFORE apps)
-5. Build & Deploy Apps (05-06) - Build images, deploy services
-6. Load Testing (07) - K6 load generators (AFTER apps)
-7. SLO (08) - Sloth Operator and SLO CRDs
-8. Access Setup (09) - Port-forwarding
+5. Deploy Apps (05) - Deploy services from OCI registry (images built by GitHub Actions)
+6. Load Testing (06) - K6 load generators (AFTER apps)
+7. SLO (07) - Sloth Operator and SLO CRDs
+8. Access Setup (08) - Port-forwarding
 
-### Scripts
+**Detailed Deployment Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md)
 
-Numbered scripts (01-12) execute in order. See [`docs/getting-started/SETUP.md`](docs/getting-started/SETUP.md) for deployment guide.
+### Key Infrastructure
 
-### Namespaces
-
-- `monitoring` - Monitoring components (Prometheus, Grafana, Tempo, Jaeger, Pyroscope, Loki) and SLO system
-- Service namespaces - Each microservice has own namespace: `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`
-- `k6` - K6 load testing
-- `kube-system` - Vector (log collection)
-
-### Database
-
-- **5 PostgreSQL Clusters**: review-db, auth-db, supporting-db (shared: user + notification + shipping-v2), product-db, transaction-db
+- **5 PostgreSQL Clusters**: review-db, auth-db, supporting-db, product-db, transaction-db
 - **Connection Poolers**: PgBouncer (Auth), PgCat (Product, Cart+Order)
-- **Migrations**: Flyway 11.19.0 with 8 migration images (auth, user, product, cart, order, review, notification, shipping-v2)
+- **Migrations**: Flyway 11.19.0 with 8 migration images
 - **Operators**: Zalando Postgres Operator (v1.15.0), CloudNativePG Operator (v1.24.0)
-
-### SLO
-
-Managed via Sloth Operator (PrometheusServiceLevel CRDs). See [`docs/slo/README.md`](docs/slo/README.md) for SLO system overview.
-
-### CI/CD
-
-GitHub Actions workflows:
-- `.github/workflows/build-images.yml` - Build microservice images
-- `.github/workflows/build-init-images.yml` - Build Flyway init images
-- `.github/workflows/build-k6-images.yml` - Build k6 images
-- `.github/workflows/helm-release.yml` - Helm chart release
-
----
-
-## Command Reference
-
-### Deployment Scripts
-
-| Script | Command | Purpose | Order |
-|--------|---------|---------|-------|
-| Create cluster | `./scripts/01-create-kind-cluster.sh` | Create Kind Kubernetes cluster | 1 |
-| Deploy monitoring | `./scripts/02-deploy-monitoring.sh` | Deploy Prometheus, Grafana, metrics | 2 |
-| Deploy APM | `./scripts/03-deploy-apm.sh` | Deploy all APM components (BEFORE apps) | 3 |
-| Deploy databases | `./scripts/04-deploy-databases.sh` | Deploy PostgreSQL operators, clusters, poolers | 4 |
-| Build images | `./scripts/05-build-microservices.sh` | Build all 9 service Docker images + 8 migration images | 5 |
-| Deploy services (local) | `./scripts/06-deploy-microservices.sh --local` | Deploy using local Helm chart | 6 |
-| Deploy services (registry) | `./scripts/06-deploy-microservices.sh --registry` | Deploy from OCI registry | 6 |
-| Deploy k6 | `./scripts/07-deploy-k6.sh` | Deploy k6 load generators (AFTER apps) | 7 |
-| Deploy SLO | `./scripts/08-deploy-slo.sh` | Deploy Sloth Operator and SLO CRDs | 8 |
-| Setup access | `./scripts/09-setup-access.sh` | Setup port-forwarding | 9 |
-| Reload dashboard | `./scripts/10-reload-dashboard.sh` | Reapply Grafana dashboards | - |
-| Diagnose latency | `./scripts/11-diagnose-latency.sh` | Analyze latency issues | - |
-| Error budget alert | `./scripts/12-error-budget-alert.sh` | Respond to error budget alerts | - |
-
-**Detailed Deployment Guide**: See [`docs/getting-started/SETUP.md`](docs/getting-started/SETUP.md)
-
-### Helm Commands
-
-| Command | Purpose |
-|---------|---------|
-| `helm list -A` | List all Helm releases |
-| `helm upgrade --install <name> charts/ -f charts/values/<service>.yaml -n <ns>` | Install/upgrade service |
-| `helm uninstall <name> -n <namespace>` | Uninstall a service |
-| `helm pull oci://ghcr.io/duynhne/charts/microservice` | Pull chart from OCI registry |
-
-### kubectl Shortcuts
-
-| Command | Purpose |
-|---------|---------|
-| `kubectl get pods -n {namespace}` | List pods in namespace |
-| `kubectl logs -l app={service-name} -n {namespace}` | View service logs |
-| `kubectl port-forward -n monitoring svc/grafana-service 3000:3000` | Port-forward Grafana |
-| `kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090` | Port-forward Prometheus |
-| `kubectl port-forward -n monitoring svc/jaeger-all-in-one 16686:16686` | Port-forward Jaeger UI |
-| `kubectl rollout restart deployment/{name} -n {namespace}` | Restart deployment |
-
-### Access Points
-
-| Service | URL | Credentials |
-|---------|-----|-------------|
-| Grafana | http://localhost:3000 | admin/admin |
-| Prometheus | http://localhost:9090 | - |
-| Jaeger UI | http://localhost:16686 | - |
-| Tempo | http://localhost:3200 | - |
-| API (via port-forward) | http://localhost:8080 | - |
+- **SLO**: Managed via Sloth Operator (PrometheusServiceLevel CRDs)
+- **CI/CD**: GitHub Actions workflows (build-images, build-init-images, build-k6-images, helm-release)
 
 ---
 
 ## Quick Navigation
+
+### Detailed Guides
+
+- **Research Patterns**: [`docs/guides/RESEARCH_PATTERNS.md`](docs/guides/RESEARCH_PATTERNS.md) - API, APM, Database research patterns
+- **Command Reference**: [`docs/guides/COMMAND_REFERENCE.md`](docs/guides/COMMAND_REFERENCE.md) - Deployment scripts, Helm, kubectl commands
+- **Conventions**: [`docs/guides/CONVENTIONS.md`](docs/guides/CONVENTIONS.md) - Naming conventions, code standards, build verification
+- **API Reference**: [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md) - Complete API documentation
+- **Setup Guide**: [`docs/guides/SETUP.md`](docs/guides/SETUP.md) - Deployment instructions
+- **Configuration**: [`docs/guides/CONFIGURATION.md`](docs/guides/CONFIGURATION.md) - Environment variables and config
+- **Database**: [`docs/guides/DATABASE.md`](docs/guides/DATABASE.md) - Database architecture and patterns
 
 ### Find Files by Purpose
 
@@ -302,150 +249,23 @@ GitHub Actions workflows:
 - Dashboard JSON: `k8s/grafana-operator/dashboards/microservices-dashboard.json`
 - Prometheus Operator values: `k8s/prometheus/values.yaml`
 - ServiceMonitor: `k8s/prometheus/servicemonitor-microservices.yaml`
-- Grafana Operator resources: `k8s/grafana-operator/`
 
 **Modify SLOs:**
 - Edit CRDs: `k8s/sloth/crds/*.yaml` (PrometheusServiceLevel CRDs)
 - Apply: `kubectl apply -f k8s/sloth/crds/`
 
-**Load testing:**
-- K6 script: `k6/load-test-multiple-scenarios.js`
-- K6 Dockerfile: `k6/Dockerfile`
-- K6 Helm values: `charts/values/k6-scenarios.yaml`
-
-### Find Scripts by Task
-
-- **Setup cluster**: `01-create-kind-cluster.sh`
-- **Deploy monitoring**: `02-deploy-monitoring.sh` (BEFORE apps)
-- **Deploy APM**: `03-deploy-apm.sh` (BEFORE apps)
-- **Deploy databases**: `04-deploy-databases.sh` (BEFORE apps)
-- **Build & deploy apps**: `05-build-microservices.sh`, `06-deploy-microservices.sh`
-- **Load testing**: `07-deploy-k6.sh` (AFTER apps)
-- **SLO system**: `08-deploy-slo.sh`
-- **Access setup**: `09-setup-access.sh`
-- **Utilities**: `10-reload-dashboard.sh`, `11-diagnose-latency.sh`, `12-error-budget-alert.sh`
-
 ### Find Documentation by Topic
 
-- **Getting Started**: [`docs/getting-started/SETUP.md`](docs/getting-started/SETUP.md), [`docs/getting-started/ADDING_SERVICES.md`](docs/getting-started/ADDING_SERVICES.md)
-- **Development**: [`docs/development/CONFIG_GUIDE.md`](docs/development/CONFIG_GUIDE.md), [`docs/development/ERROR_HANDLING.md`](docs/development/ERROR_HANDLING.md), [`docs/development/TRACING_ARCHITECTURE.md`](docs/development/TRACING_ARCHITECTURE.md)
+- **Getting Started**: [`docs/guides/SETUP.md`](docs/guides/SETUP.md), [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md)
+- **Development**: [`docs/guides/CONFIGURATION.md`](docs/guides/CONFIGURATION.md), [`docs/guides/ERROR_HANDLING.md`](docs/guides/ERROR_HANDLING.md), [`docs/guides/TRACING_ARCHITECTURE.md`](docs/guides/TRACING_ARCHITECTURE.md)
 - **Monitoring**: [`docs/monitoring/METRICS.md`](docs/monitoring/METRICS.md), [`docs/monitoring/TROUBLESHOOTING.md`](docs/monitoring/TROUBLESHOOTING.md)
 - **APM**: [`docs/apm/README.md`](docs/apm/README.md), [`docs/apm/TRACING.md`](docs/apm/TRACING.md), [`docs/apm/LOGGING.md`](docs/apm/LOGGING.md), [`docs/apm/PROFILING.md`](docs/apm/PROFILING.md)
 - **SLO**: [`docs/slo/README.md`](docs/slo/README.md), [`docs/slo/GETTING_STARTED.md`](docs/slo/GETTING_STARTED.md)
-- **API**: [`docs/api/API_REFERENCE.md`](docs/api/API_REFERENCE.md)
 - **k6**: [`docs/k6/K6_LOAD_TESTING.md`](docs/k6/K6_LOAD_TESTING.md)
 - **Docs Index**: [`docs/README.md`](docs/README.md)
 
 ---
 
-## Conventions and Standards
-
-### Namespace Conventions
-
-- **`monitoring`** - Monitoring components and SLO system
-- **Service namespaces** - Each microservice has own namespace: `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`
-- **`k6`** - K6 load testing
-- **`kube-system`** - Vector (log collection)
-
-### Script Naming
-
-- **Numbered prefixes (01-12)** - Execution order
-- **Format**: `{number}-{purpose}.sh`
-- **Categories**: Infrastructure (01-02), Monitoring (02), APM (03), Databases (04), Apps (05-06), Load Testing (07), SLO (08), Access (09), Utilities (10-12)
-
-### File Organization Patterns
-
-- **Services**: `services/cmd/{service}/main.go` + `services/internal/{service}/{v1,v2,core}/`
-- **Kubernetes**: `k8s/{component}/`
-- **Scripts**: `scripts/{number}-{purpose}.sh`
-- **SLO**: `k8s/sloth/crds/*.yaml` (PrometheusServiceLevel CRDs)
-- **Migrations**: `services/migrations/{service}/Dockerfile` + `sql/001__init_schema.sql`
-
-### Metric Naming Conventions
-
-- **Pattern**: `{domain}_{metric}_{unit}`
-- **Examples**: `request_duration_seconds` (histogram), `requests_total` (counter), `requests_in_flight` (gauge)
-
-### Label Requirements
-
-**Required labels for metrics (after Prometheus scrape):**
-- `job` - Set to `"microservices"` via ServiceMonitor relabeling
-- `app` - Service name (from service label)
-- `namespace` - Kubernetes namespace (from pod metadata)
-- `instance` - Pod IP:port (automatic)
-
-**Application-level labels (emitted by app):**
-- `method` - HTTP method (GET, POST, PUT, DELETE)
-- `path` - Request path (e.g., `/api/v1/users`)
-- `code` - HTTP status code (200, 404, 500)
-
-**Note**: Applications DO NOT emit `app`, `namespace`, or `job` labels. All service identification labels are injected by Prometheus during scrape via ServiceMonitor `relabelings`.
-
-### Go Code Conventions
-
-- **Middleware**: `services/pkg/middleware/` - Centralized observability middleware
-- **Handlers**: Separate `v1/` and `v2/` directories for API versioning
-- **Domain models**: `core/domain/` directory for data structures
-- **Database**: `core/database.go` for database connections
-- **Memory leak prevention**: Always use `defer cancel()`, close channels, set timeouts
-
-### Dashboard Conventions
-
-- **UID**: `microservices-monitoring-001`
-- **Variables**: `$app`, `$namespace`, `$rate`
-- **Query filters**: Always include `job=~"microservices"` and `namespace=~"$namespace"`
-
-**Dashboard Details**: See [`docs/development/DASHBOARD_PANELS_GUIDE.md`](docs/development/DASHBOARD_PANELS_GUIDE.md) for complete dashboard reference (34 panels).
-
----
-
-### Local Build Verification
-
-**Before pushing code, run:**
-```bash
-./scripts/00-verify-build.sh
-```
-
-**What it checks:**
-1. Go module synchronization (`go.mod`/`go.sum`)
-2. Code formatting (`gofmt`)
-3. Static analysis (`go vet`)
-4. Build all 9 services
-5. Tests (optional - use `--skip-tests` to skip)
-
-**Usage:**
-```bash
-# Run all checks including tests
-./scripts/00-verify-build.sh
-
-# Skip tests (faster, for quick verification)
-./scripts/00-verify-build.sh --skip-tests
-```
-
-**If script fails:**
-- Fix the reported error
-- Re-run the script
-- Commit changes only after all checks pass
-
-**Optional: Git Hook Setup**
-
-To automatically run verification before each commit:
-
-```bash
-# Install git hook
-cp .githooks/pre-commit .git/hooks/pre-commit
-chmod +x .git/hooks/pre-commit
-```
-
-**Note:** Git hook is optional. You can skip it with `git commit --no-verify` if needed.
-
-**Troubleshooting:**
-- **"go.mod or go.sum changed"**: Run `go mod tidy` and commit the changes
-- **"Code not formatted"**: Run `gofmt -w .` to auto-format
-- **"Failed to build [service]"**: Check compilation errors in that service
-- **"go vet found issues"**: Review and fix the reported issues
-
----
 ## Troubleshooting
 
 Common issues and quick fixes. For detailed troubleshooting, see [`docs/monitoring/TROUBLESHOOTING.md`](docs/monitoring/TROUBLESHOOTING.md).

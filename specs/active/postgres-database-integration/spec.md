@@ -174,13 +174,23 @@ sequenceDiagram
 **FR-001: Deploy 5 PostgreSQL Clusters with Different Configurations**
 - **Description**: Implement Scenario 0 (Service-Specific Multi-Cluster) from research with 5 distinct PostgreSQL clusters, each tailored to specific service characteristics
 - **Acceptance Criteria**:
-  - Cluster 1 (Product): CrunchyData operator + PgCat pooler + read replicas
+  - Cluster 1 (Product): CloudNativePG operator + PgCat pooler + read replicas
   - Cluster 2 (Review): Zalando operator + NO pooler (direct connection)
   - Cluster 3 (Auth): Zalando operator + PgBouncer pooler
-  - Cluster 4 (Cart+Order): CrunchyData operator + PgCat pooler + Patroni HA
+  - Cluster 4 (Cart+Order): CloudNativePG operator + PgCat pooler + Patroni HA (with etcd)
   - Cluster 5 (User+Notification): Zalando operator + NO pooler (shared database)
   - All clusters are accessible from their respective microservices
   - All clusters have unique names and namespaces
+
+**Final Operator Distribution:**
+
+| Cluster | Services | Operator | Pooler | HA Pattern | Learning Focus |
+|---------|----------|----------|--------|------------|----------------|
+| **Product** | Product | **CloudNativePG** | **PgCat** (standalone) | Read replicas | Read scaling, PgCat routing |
+| **Review** | Review | **Zalando** | **None** (direct) | Single instance | Simple setup, direct connection |
+| **Auth** | Auth | **Zalando** | **PgBouncer** (sidecar) | Single instance | Transaction pooling, Zalando built-in pooler |
+| **Cart+Order** | Cart, Order | **CloudNativePG** | **PgCat** (standalone) | **Patroni + etcd** | **HA với etcd, multi-database routing** |
+| **Supporting** | User, Notification, Shipping-v2 | **Zalando** | **None** (direct) | Single instance | **Shared database pattern** |
 
 **FR-002: Deploy Zalando Postgres Operator**
 - **Description**: Install and configure Zalando postgres-operator for 3 clusters (Review, Auth, User+Notification)
@@ -190,15 +200,17 @@ sequenceDiagram
   - Operator has proper RBAC permissions
   - Operator can create PostgreSQL instances via CRDs
   - Operator logs are accessible for troubleshooting
+  - Operator deployed in dedicated `database` namespace
 
-**FR-003: Deploy CrunchyData Postgres Operator**
-- **Description**: Install and configure CrunchyData postgres-operator for 2 clusters (Product, Cart+Order)
+**FR-003: Deploy CloudNativePG Operator**
+- **Description**: Install and configure CloudNativePG operator for 2 clusters (Product, Cart+Order)
 - **Acceptance Criteria**:
-  - Operator deployed via Helm with fixed version in `k8s/postgres-operator-crunchydata/values.yaml`
-  - Operator version fixed (e.g., v5.7.0)
+  - Operator deployed via Helm with fixed version in `k8s/postgres-operator-cloudnativepg/values.yaml`
+  - Operator version fixed (e.g., v1.24.0)
   - Operator has proper RBAC permissions
-  - Operator can create PostgresCluster CRDs
-  - Operator supports Patroni HA configuration
+  - Operator can create Cluster CRDs (cloudnative-pg.io/v1)
+  - Operator supports Patroni HA configuration with etcd
+  - Operator deployed in dedicated `database` namespace
 
 **FR-004: Deploy PgBouncer Connection Pooler**
 - **Description**: Configure PgBouncer for Auth service with transaction pooling
@@ -219,13 +231,15 @@ sequenceDiagram
   - Services connect via PgCat endpoint
 
 **FR-006: Configure Patroni High Availability**
-- **Description**: Enable Patroni HA for Cart+Order cluster with automatic failover
+- **Description**: Enable Patroni HA for Cart+Order cluster with automatic failover using etcd
 - **Acceptance Criteria**:
-  - Patroni integrated with CrunchyData operator
+  - Patroni integrated with CloudNativePG operator
+  - etcd used for leader election (learning purpose)
   - 2+ replicas configured for HA
   - Automatic failover works (< 30 seconds)
-  - Leader election via Kubernetes API
+  - Leader election via etcd (Kubernetes-native approach)
   - Failover events are logged and observable
+  - Patroni configuration documented for interview preparation
 
 #### Microservices Integration
 
@@ -365,14 +379,15 @@ sequenceDiagram
 
 ### US-001: Deploy Multiple PostgreSQL Operators
 **As a** DevOps engineer  
-**I want** to deploy both Zalando and CrunchyData PostgreSQL operators  
+**I want** to deploy both Zalando and CloudNativePG PostgreSQL operators  
 **So that** I can learn the differences between operator approaches and choose the right one for different use cases
 
 **Acceptance Criteria:**
-- Zalando operator deployed and functional for 3 clusters
-- CrunchyData operator deployed and functional for 2 clusters
+- Zalando operator deployed and functional for 3 clusters (Review, Auth, Supporting)
+- CloudNativePG operator deployed and functional for 2 clusters (Product, Cart+Order)
 - Both operators have fixed versions in values.yaml files
 - Both operators can create PostgreSQL instances via CRDs
+- Both operators deployed in dedicated `database` namespace
 - Operator differences documented (pros/cons, use cases)
 
 **Priority:** High  
@@ -476,8 +491,9 @@ sequenceDiagram
 
 - ✅ **All operators functional**
   - Zalando operator can create PostgreSQL instances
-  - CrunchyData operator can create PostgresCluster instances
+  - CloudNativePG operator can create Cluster instances
   - Operator logs show no errors
+  - Operators deployed in dedicated `database` namespace
 
 ### Integration Metrics
 - ✅ **All 9 microservices successfully connect to databases**
@@ -620,9 +636,10 @@ sequenceDiagram
 - **Microservices Codebase**: Existing 9 microservices need to be updated
 
 ### External Dependencies
-- **PostgreSQL Operators**: Zalando and CrunchyData operators from Helm repositories
-- **Connection Poolers**: PgBouncer and PgCat (may require manual deployment)
+- **PostgreSQL Operators**: Zalando and CloudNativePG operators from Helm repositories
+- **Connection Poolers**: PgBouncer (Zalando built-in) and PgCat (standalone deployment)
 - **PostgreSQL Driver**: `github.com/lib/pq` Go package (needs to be added to go.mod)
+- **etcd**: For Patroni HA leader election (learning purpose)
 
 ### Deployment Order Dependencies
 1. **Operators** must be deployed before database clusters

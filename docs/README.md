@@ -8,12 +8,12 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 
 ### 🚀 Getting Started (New Users)
 
-1. **[Setup Guide](./getting-started/SETUP.md)** - Complete deployment guide
+1. **[Setup Guide](./guides/SETUP.md)** - Complete deployment guide
    - Quick start (5 minutes)
    - Step-by-step instructions
    - Troubleshooting common issues
 
-2. **[Adding Services](./getting-started/ADDING_SERVICES.md)** - How to add new microservices
+2. **[API Reference](./guides/API_REFERENCE.md)** - API endpoints and adding new microservices
    - Requirements and conventions
    - Step-by-step guide
    - Automatic monitoring setup
@@ -61,7 +61,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 
 ### 🔌 API Reference
 
-14. **[API Reference](./api/API_REFERENCE.md)** - Complete API documentation
+14. **[API Reference](./guides/API_REFERENCE.md)** - Complete API documentation
     - All 9 microservices
     - Endpoints, models, examples
     - Health checks and metrics
@@ -81,30 +81,27 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 20. **[Continuous Profiling](./apm/PROFILING.md)** - Pyroscope setup
 21. **[Log Aggregation](./apm/LOGGING.md)** - Loki + Vector configuration
 
-### 💻 Development
+### 💻 Development Guides
 
-21. **[Configuration Guide](./development/CONFIG_GUIDE.md)** - Complete configuration management guide
+21. **[Configuration Guide](./guides/CONFIGURATION.md)** - Complete configuration management guide
     - Configuration sources (.env, environment variables, Helm values)
     - Environment variable configuration
     - Local development setup
     - Production deployment patterns
     - Validation rules and troubleshooting
 
-22. **[Error Handling](./development/ERROR_HANDLING.md)** - Error handling patterns
+22. **[Error Handling](./guides/ERROR_HANDLING.md)** - Error handling patterns
 
-23. **[Database Guide](./development/DATABASE_GUIDE.md)** - PostgreSQL database integration guide
+23. **[Database Guide](./guides/DATABASE.md)** - PostgreSQL database integration guide
     - 5 PostgreSQL clusters architecture
     - Connection patterns (direct, PgBouncer, PgCat)
     - Environment variables and Helm configuration
-    - Troubleshooting and monitoring
+    - Database verification and troubleshooting
+    - Monitoring and best practices
 
-24. **[Database Verification](./development/DATABASE_VERIFICATION.md)** - Database readiness and connection testing
-    - Automated verification script
-    - Manual verification commands
-    - Quick health checks
-    - Troubleshooting connection issues
+24. **[Tracing Architecture](./guides/TRACING_ARCHITECTURE.md)** - Distributed tracing architecture
 
-24. **[Dashboard Panels Guide](./development/DASHBOARD_PANELS_GUIDE.md)** - Complete dashboard reference for SRE/DevOps
+25. **[Dashboard Panels Guide](./guides/DASHBOARD_PANELS.md)** - Complete dashboard reference for SRE/DevOps
     - All 34 panels with query analysis and troubleshooting
     - PromQL patterns and best practices (Google SRE, Prometheus docs)
     - Before/After comparisons for updated panels (Status Code, Apdex, 4xx/5xx)
@@ -123,8 +120,8 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 ## Documentation by Category
 
 ### Getting Started
-- [Setup Guide](./getting-started/SETUP.md) - Complete deployment instructions
-- [Adding Services](./getting-started/ADDING_SERVICES.md) - How to add new microservices
+- [Setup Guide](./guides/SETUP.md) - Complete deployment instructions
+- [API Reference](./guides/API_REFERENCE.md) - API endpoints and adding new microservices
 
 ### Monitoring
 - [Metrics Guide](./monitoring/METRICS.md) - Comprehensive metrics documentation
@@ -142,7 +139,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 - [Error Budget Policy](./slo/ERROR_BUDGET_POLICY.md) - Budget management
 
 ### API
-- [API Reference](./api/API_REFERENCE.md) - Complete API documentation
+- [API Reference](./guides/API_REFERENCE.md) - Complete API documentation
 
 ### APM
 - [APM Overview](./apm/README.md) - Complete APM system overview
@@ -152,11 +149,12 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 - [Continuous Profiling](./apm/PROFILING.md) - Pyroscope setup
 - [Log Aggregation](./apm/LOGGING.md) - Loki + Vector
 
-### Development
-- [Configuration Guide](./development/CONFIG_GUIDE.md) - Complete configuration management
-- [Error Handling](./development/ERROR_HANDLING.md) - Error handling patterns
-- [Database Guide](./development/DATABASE_GUIDE.md) - PostgreSQL database integration guide
-- [Dashboard Panels Guide](./development/DASHBOARD_PANELS_GUIDE.md) - Complete SRE/DevOps dashboard reference (34 panels)
+### Development Guides
+- [Configuration Guide](./guides/CONFIGURATION.md) - Complete configuration management
+- [Error Handling](./guides/ERROR_HANDLING.md) - Error handling patterns
+- [Database Guide](./guides/DATABASE.md) - PostgreSQL database integration guide
+- [Tracing Architecture](./guides/TRACING_ARCHITECTURE.md) - Distributed tracing architecture
+- [Dashboard Panels Guide](./guides/DASHBOARD_PANELS.md) - Complete SRE/DevOps dashboard reference (34 panels)
 
 ### k6 Load Testing
 - [k6 Load Testing](./k6/K6_LOAD_TESTING.md) - Complete load testing guide with architecture
@@ -189,16 +187,11 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 ./scripts/01-create-kind-cluster.sh      # Step 1: Infrastructure
 ./scripts/02-deploy-monitoring.sh        # Step 2: Monitoring + metrics (BEFORE apps)
 ./scripts/03-deploy-apm.sh               # Step 3: APM (BEFORE apps)
-./scripts/04-build-microservices.sh      # Step 4: Build images
-./scripts/05-deploy-microservices.sh --local   # Step 6: Deploy (uses local Helm chart)
-./scripts/06-deploy-k6.sh               # Step 7: Load testing (AFTER apps)
-./scripts/07-deploy-slo.sh               # Step 8: SLO system
-./scripts/08-setup-access.sh             # Step 9: Access setup
-```
-
-**Deploy from OCI registry:**
-```bash
-./scripts/05-deploy-microservices.sh --registry  # Uses oci://ghcr.io/duynhne/charts/microservice
+./scripts/04-deploy-databases.sh         # Step 4: Databases (BEFORE apps)
+./scripts/06-deploy-microservices.sh     # Step 5: Deploy (from OCI registry, images built by GitHub Actions)
+./scripts/07-deploy-k6.sh               # Step 6: Load testing (AFTER apps)
+./scripts/08-deploy-slo.sh               # Step 7: SLO system
+./scripts/09-setup-access.sh             # Step 8: Access setup
 ```
 
 **Manual Helm deployment:**

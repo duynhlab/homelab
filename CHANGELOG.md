@@ -8,6 +8,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+## [0.10.24] - 2025-12-25
+
+### Added
+
+**Production-Ready k6 Load Testing Strategy:**
+- **Arrival-Rate Executors**: Migrated all 5 user scenarios from `ramping-vus` to `ramping-arrival-rate` executors
+  - Realistic production traffic simulation (RPS-based instead of VU-based)
+  - Time-based load patterns with morning/evening peaks and lunch dip
+  - Configurable RPS targets via environment variables
+  - Auto-scaling VUs based on RPS requirements (up to 300 VUs)
+- **Full User Journey Testing**: Added registration step to all journeys
+  - Complete user lifecycle: Register → Login → Browse → Purchase
+  - Error handling for registration conflicts (409 retry logic)
+  - 4 journeys updated: E-commerce Shopping, Product Review, Order Tracking, Quick Browse
+  - Tests full user flow from account creation to purchase
+- **Stack Layer & Operation Tags**: Enhanced makeRequest function with automatic tagging
+  - `stack_layer` tag: web, logic, database (for layer-based analysis)
+  - `operation` tag: db_read, db_write, api_call (for operation-based analysis)
+  - Enables full-stack performance analysis in Prometheus/Grafana
+  - Consistent tagging across all journeys
+- **Production Traffic Pattern Scenarios**: Added 4 new scenarios
+  - `baseline_traffic`: Steady 30 RPS background traffic (constant-arrival-rate, 24h)
+  - `peak_hours`: Time-based patterns with morning/evening peaks (ramping-arrival-rate, 24h)
+  - `flash_sale`: Sudden burst pattern (0 → 200 RPS in 30s, sustain 5m)
+  - `marketing_campaign`: Gradual ramp-up/down pattern (0 → 300 RPS over 5h)
+  - All scenarios run concurrently to simulate realistic production traffic
+- **Environment Variable Configuration**: Externalized RPS targets and timing
+  - `BASELINE_RPS`, `PEAK_RPS`, `BURST_RPS` for traffic targets
+  - `BURST_DURATION`, `BURST_TIMING` for pattern configuration
+  - Configured via Helm values (`charts/values/k6-scenarios.yaml`)
+  - Allows RPS adjustment without code changes
+
+### Changed
+
+**k6 Load Testing Architecture:**
+- **Executor Migration**: All scenarios now use arrival-rate executors
+  - Before: `ramping-vus` executor with VU-based stages
+  - After: `ramping-arrival-rate` or `constant-arrival-rate` with RPS-based stages
+  - Benefits: More realistic production traffic simulation, better capacity planning
+- **Journey Enhancement**: All journeys now include registration step
+  - Before: Journeys started with login (assumed existing users)
+  - After: Complete user lifecycle from registration to purchase
+  - Benefits: Tests full user flow, validates account creation, database write operations
+- **Tagging Enhancement**: Automatic stack layer and operation tagging
+  - Before: Manual tagging in journey functions
+  - After: Automatic tagging in makeRequest function with defaults
+  - Benefits: Consistent tagging, full-stack analysis, easier filtering
+- **Load Pattern Duration**: Extended from 21 minutes to 24 hours
+  - Before: Short test cycles (21 minutes) with auto-restart
+  - After: Extended production simulation (24 hours) with realistic traffic patterns
+  - Benefits: Better production readiness validation, overnight testing capability
+
+### Benefits
+
+- **Realistic Traffic Simulation**: Arrival-rate executors simulate production traffic patterns accurately
+- **Full Stack Testing**: Stack layer and operation tags enable comprehensive performance analysis
+- **Production-Ready Patterns**: Baseline, peak, and burst scenarios simulate real-world traffic
+- **Configurable**: Environment variables allow RPS adjustment without code changes
+- **Complete User Lifecycle**: Registration step ensures full flow testing from account creation
+- **Better Capacity Planning**: RPS-based load patterns provide accurate capacity requirements
+
+### Files Modified
+
+- `k6/load-test-multiple-scenarios.js` - Executor migration, journey enhancement, tagging, new scenarios
+- `charts/values/k6-scenarios.yaml` - Environment variables configuration
+- `docs/k6/K6_LOAD_TESTING.md` - Comprehensive documentation updates
+- `CHANGELOG.md` - This entry
+
 ## [0.10.23] - 2025-12-25
 
 ### Changed

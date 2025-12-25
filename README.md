@@ -39,9 +39,8 @@ chmod +x scripts/*.sh
 # Database Infrastructure
 ./scripts/04-deploy-databases.sh         # Deploy PostgreSQL operators, clusters, poolers
 
-# Build & Deploy Applications
-./scripts/05-build-microservices.sh      # Build Docker images
-./scripts/06-deploy-microservices.sh --registry   # Deploy services - Default --local | registry ghcr.io OCI registry
+# Deploy Applications (from OCI registry, images built by GitHub Actions)
+./scripts/06-deploy-microservices.sh     # Deploy all microservices from ghcr.io OCI registry
 
 # Load Testing (AFTER apps)
 ./scripts/07-deploy-k6.sh                # Deploy k6 load generators
@@ -53,7 +52,7 @@ chmod +x scripts/*.sh
 ./scripts/09-setup-access.sh             # Setup port-forwarding
 ```
 
-**Detailed Setup Guide**: See [`docs/getting-started/SETUP.md`](docs/getting-started/SETUP.md) for step-by-step instructions, prerequisites, and troubleshooting.
+**Detailed Setup Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md) for step-by-step instructions, prerequisites, and troubleshooting.
 
 ---
 
@@ -100,7 +99,7 @@ flowchart TD
 | shipping | shipping | v1 only |
 | shipping-v2 | shipping | v2 only |
 
-**Complete API Documentation**: See [`docs/api/API_REFERENCE.md`](docs/api/API_REFERENCE.md)
+**Complete API Documentation**: See [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md)
 
 ---
 
@@ -109,7 +108,7 @@ flowchart TD
 - **Runtime**: Go 1.25.5
 - **Database**: PostgreSQL (5 clusters via Zalando/CloudNativePG operators)
   - Connection poolers: PgBouncer, PgCat
-  - Migrations: Flyway 11.19.0 (8 migration images)
+  - Migrations: Flyway 11.8.2 (8 migration images)
 - **HTTP Framework**: Gin
 - **Observability**: OpenTelemetry (traces, metrics, logs)
 - **Deployment**: Kubernetes (Kind), Helm 3
@@ -127,7 +126,7 @@ flowchart TD
 - **Access**: http://localhost:3000/d/microservices-monitoring-001/ (after port-forward)
 - **Variables**: `$namespace`, `$app`, `$rate`
 
-**Complete Dashboard Reference**: See [`docs/development/DASHBOARD_PANELS_GUIDE.md`](docs/development/DASHBOARD_PANELS_GUIDE.md) for all 34 panels with query analysis and troubleshooting.
+**Complete Dashboard Reference**: See [`docs/guides/DASHBOARD_PANELS.md`](docs/guides/DASHBOARD_PANELS.md) for all 34 panels with query analysis and troubleshooting.
 
 **Metrics Documentation**: See [`docs/monitoring/METRICS.md`](docs/monitoring/METRICS.md) for complete metrics guide (6 custom metrics, 34 panels).
 
@@ -145,7 +144,7 @@ After running `./scripts/09-setup-access.sh` or manual port-forwarding:
 | Tempo | http://localhost:3200 | - |
 | API (via port-forward) | http://localhost:8080 | - |
 
-**Port-Forwarding Guide**: See [`docs/getting-started/SETUP.md`](docs/getting-started/SETUP.md)
+**Port-Forwarding Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md)
 
 ---
 
@@ -153,12 +152,12 @@ After running `./scripts/09-setup-access.sh` or manual port-forwarding:
 
 | Document | Description |
 |----------|-------------|
-| **[Setup Guide](docs/getting-started/SETUP.md)** | Complete deployment instructions |
+| **[Setup Guide](docs/guides/SETUP.md)** | Complete deployment instructions |
 | **[Metrics Guide](docs/monitoring/METRICS.md)** | Complete metrics documentation (6 custom metrics, 34 panels) |
-| **[Dashboard Panels Guide](docs/development/DASHBOARD_PANELS_GUIDE.md)** | Complete dashboard reference (34 panels) |
+| **[Dashboard Panels Guide](docs/guides/DASHBOARD_PANELS.md)** | Complete dashboard reference (34 panels) |
 | **[APM Overview](docs/apm/README.md)** | Complete APM system overview |
 | **[SLO Documentation](docs/slo/README.md)** | SRE practices: SLI/SLO definitions, error budgets |
-| **[API Reference](docs/api/API_REFERENCE.md)** | Complete API documentation for all 9 microservices |
+| **[API Reference](docs/guides/API_REFERENCE.md)** | Complete API documentation for all 9 microservices |
 | **[k6 Load Testing](docs/k6/K6_LOAD_TESTING.md)** | k6 load testing setup and configuration |
 | **[Documentation Index](docs/README.md)** | Complete documentation index with learning path |
 | **[AGENTS.md](AGENTS.md)** | AI Agent Guide for navigating the codebase |
@@ -180,8 +179,8 @@ After running `./scripts/09-setup-access.sh` or manual port-forwarding:
 
 - **5 PostgreSQL Clusters**: review-db, auth-db, supporting-db (shared: user + notification + shipping-v2), product-db, transaction-db
 - **Connection Poolers**: PgBouncer (Auth), PgCat (Product, Cart+Order)
-- **Migrations**: Flyway 11.19.0 with 8 migration images
-- **Operators**: Zalando Postgres Operator (v1.15.0), CloudNativePG Operator (v1.24.0)
+- **Migrations**: Flyway 11.8.2 with 8 migration images
+- **Operators**: Zalando Postgres Operator (v1.15.0), CloudNativePG Operator (v1.28.0)
 
 ### SLO Management
 

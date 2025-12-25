@@ -98,11 +98,21 @@ sequenceDiagram
 
 The PostgreSQL integration implements **Scenario 0: Service-Specific Multi-Cluster** setup with 5 distinct PostgreSQL clusters, each optimized for specific service characteristics:
 
-1. **Cluster 1 (Product)**: CrunchyData operator + PgCat pooler + read replicas
+1. **Cluster 1 (Product)**: CloudNativePG operator + PgCat pooler + read replicas
 2. **Cluster 2 (Review)**: Zalando operator + NO pooler (direct connection)
 3. **Cluster 3 (Auth)**: Zalando operator + PgBouncer pooler
-4. **Cluster 4 (Cart+Order)**: CrunchyData operator + PgCat pooler + Patroni HA
+4. **Cluster 4 (Cart+Order)**: CloudNativePG operator + PgCat pooler + Patroni HA (with etcd)
 5. **Cluster 5 (User+Notification)**: Zalando operator + NO pooler (shared database)
+
+**Final Operator Distribution:**
+
+| Cluster | Services | Operator | Pooler | HA Pattern | Learning Focus |
+|---------|----------|----------|--------|------------|----------------|
+| **Product** | Product | **CloudNativePG** | **PgCat** (standalone) | Read replicas | Read scaling, PgCat routing |
+| **Review** | Review | **Zalando** | **None** (direct) | Single instance | Simple setup, direct connection |
+| **Auth** | Auth | **Zalando** | **PgBouncer** (sidecar) | Single instance | Transaction pooling, Zalando built-in pooler |
+| **Cart+Order** | Cart, Order | **CloudNativePG** | **PgCat** (standalone) | **Patroni + etcd** | **HA với etcd, multi-database routing** |
+| **Supporting** | User, Notification, Shipping-v2 | **Zalando** | **None** (direct) | Single instance | **Shared database pattern** |
 
 ### Architecture Diagram
 
@@ -111,11 +121,11 @@ flowchart TB
     subgraph "Kubernetes Cluster (Kind)"
         subgraph "Operators"
             ZO[Zalando Postgres Operator]
-            CO[CrunchyData Postgres Operator]
+            CNPG[CloudNativePG Operator]
         end
         
         subgraph "Cluster 1: Product"
-            PDB[(Product DB<br/>CrunchyData)]
+            PDB[(Product DB<br/>CloudNativePG)]
             PDBR[(Product DB Replica)]
             PCAT[PgCat Pooler]
             PCAT --> PDB
@@ -133,7 +143,7 @@ flowchart TB
         end
         
         subgraph "Cluster 4: Cart+Order"
-            TDB[(Transaction DB<br/>CrunchyData<br/>Patroni HA)]
+            TDB[(Transaction DB<br/>CloudNativePG<br/>Patroni + etcd)]
             TDBR[(Transaction DB Replica)]
             TCAT[PgCat Pooler]
             TCAT --> TDB
@@ -172,8 +182,8 @@ flowchart TB
         ZO --> RDB
         ZO --> ADB
         ZO --> SDB
-        CO --> PDB
-        CO --> TDB
+        CNPG --> PDB
+        CNPG --> TDB
         
         AUTH_SVC --> PB
         USER_SVC --> SDB
@@ -266,13 +276,14 @@ flowchart TB
 - **Features**: Built-in PgBouncer, Patroni integration, simple CRD model
 - **Justification**: Simpler than CrunchyData, good for learning, production-proven
 
-**CrunchyData Postgres Operator**
-- **Version**: v5.7.0 (fixed in values.yaml)
-- **Helm Chart**: `postgres-operator/postgres-operator` (different from Zalando)
-- **Repository**: `registry.developers.crunchydata.com/crunchydata/postgres-operator`
+**CloudNativePG Operator**
+- **Version**: v1.24.0 (fixed in values.yaml)
+- **Helm Chart**: `cloudnative-pg/cloudnative-pg`
+- **Repository**: `ghcr.io/cloudnative-pg/cloudnative-pg`
 - **Use Cases**: Product, Cart+Order clusters
-- **Features**: Advanced HA with Patroni, better multi-cluster support, enterprise features
-- **Justification**: Better for HA scenarios, more features for complex setups
+- **Features**: Kubernetes-native PostgreSQL management, built-in HA with Patroni, etcd support, CNCF project
+- **Justification**: Open source, easier deployment, Kubernetes-native approach, supports Patroni HA with etcd (learning purpose)
+- **Namespace**: Deployed in dedicated `database` namespace
 
 ### Connection Poolers
 
@@ -293,10 +304,11 @@ flowchart TB
 ### High Availability
 
 **Patroni**
-- **Version**: Integrated with CrunchyData operator
-- **Type**: Built into CrunchyData operator
+- **Version**: Integrated with CloudNativePG operator
+- **Type**: Built into CloudNativePG operator
 - **Use Case**: Cart+Order cluster (transaction-heavy, requires HA)
-- **Justification**: Production-grade HA, automatic failover, Kubernetes-native
+- **Leader Election**: etcd (for learning and interview preparation)
+- **Justification**: Production-grade HA, automatic failover, Kubernetes-native, etcd integration for learning
 
 ### Monitoring
 
@@ -599,14 +611,16 @@ initContainers:
 **Dependencies**: None
 
 **Steps:**
-1. Create `k8s/postgres-operator-zalando/values.yaml` with fixed version (v1.15.0)
-2. Add Helm repository: `postgres-operator/postgres-operator`
-3. Deploy operator: `helm upgrade --install postgres-operator postgres-operator/postgres-operator -f k8s/postgres-operator-zalando/values.yaml -n monitoring --create-namespace --wait`
-4. Verify operator pod is running: `kubectl get pods -n monitoring -l app.kubernetes.io/name=postgres-operator`
-5. Verify CRD exists: `kubectl get crd postgresqls.acid.zalan.do`
+1. Create `database` namespace: `kubectl create namespace database`
+2. Create `k8s/postgres-operator-zalando/values.yaml` with fixed version (v1.15.0)
+3. Add Helm repository: `postgres-operator/postgres-operator`
+4. Deploy operator: `helm upgrade --install postgres-operator postgres-operator/postgres-operator -f k8s/postgres-operator-zalando/values.yaml -n database --create-namespace --wait`
+5. Verify operator pod is running: `kubectl get pods -n database -l app.kubernetes.io/name=postgres-operator`
+6. Verify CRD exists: `kubectl get crd postgresqls.acid.zalan.do`
 
 **Acceptance Criteria:**
-- Operator pod is Running
+- `database` namespace created
+- Operator pod is Running in `database` namespace
 - CRD `postgresqls.acid.zalan.do` exists
 - Operator logs show no errors
 
@@ -615,25 +629,27 @@ initContainers:
 
 ---
 
-#### Task 1.2: Deploy CrunchyData Postgres Operator
+#### Task 1.2: Deploy CloudNativePG Operator
 **Priority**: High  
 **Effort**: 1-2 hours  
 **Dependencies**: None
 
 **Steps:**
-1. Create `k8s/postgres-operator-crunchydata/values.yaml` with fixed version (v5.7.0)
-2. Add Helm repository: `postgres-operator/postgres-operator` (CrunchyData)
-3. Deploy operator: `helm upgrade --install postgres-operator-crunchydata postgres-operator/postgres-operator -f k8s/postgres-operator-crunchydata/values.yaml -n monitoring --create-namespace --wait`
-4. Verify operator pod is running
-5. Verify CRD exists: `kubectl get crd postgresclusters.postgres-operator.crunchydata.com`
+1. Ensure `database` namespace exists: `kubectl create namespace database --dry-run=client -o yaml | kubectl apply -f -`
+2. Create `k8s/postgres-operator-cloudnativepg/values.yaml` with fixed version (v1.24.0)
+3. Add Helm repository: `helm repo add cloudnative-pg https://cloudnative-pg.github.io/charts`
+4. Update Helm repo: `helm repo update cloudnative-pg`
+5. Deploy operator: `helm upgrade --install cloudnative-pg cloudnative-pg/cloudnative-pg -f k8s/postgres-operator-cloudnativepg/values.yaml -n database --create-namespace --wait`
+6. Verify operator pod is running: `kubectl get pods -n database -l app.kubernetes.io/name=cloudnative-pg`
+7. Verify CRD exists: `kubectl get crd clusters.postgresql.cnpg.io`
 
 **Acceptance Criteria:**
-- Operator pod is Running
-- CRD `postgresclusters.postgres-operator.crunchydata.com` exists
+- Operator pod is Running in `database` namespace
+- CRD `clusters.postgresql.cnpg.io` exists
 - Operator logs show no errors
 
 **Files to Create:**
-- `k8s/postgres-operator-crunchydata/values.yaml`
+- `k8s/postgres-operator-cloudnativepg/values.yaml`
 
 ---
 
@@ -727,14 +743,14 @@ initContainers:
 
 ---
 
-#### Task 1.6: Create Product Cluster (CrunchyData, with PgCat)
+#### Task 1.6: Create Product Cluster (CloudNativePG, with PgCat)
 **Priority**: High  
 **Effort**: 2-3 hours  
 **Dependencies**: Task 1.2
 
 **Steps:**
-1. Create `k8s/postgres-operator-crunchydata/crds/product-db.yaml`
-2. Define PostgresCluster CRD with:
+1. Create `k8s/postgres-operator-cloudnativepg/crds/product-db.yaml`
+2. Define Cluster CRD (cloudnative-pg.io/v1) with:
    - Name: `product-db`
    - Namespace: `product`
    - Instances: 1 primary + 1 replica (for read scaling)
@@ -759,35 +775,36 @@ initContainers:
 
 ---
 
-#### Task 1.7: Create Cart+Order Cluster (CrunchyData, PgCat, Patroni HA)
+#### Task 1.7: Create Cart+Order Cluster (CloudNativePG, PgCat, Patroni HA with etcd)
 **Priority**: High  
 **Effort**: 2-3 hours  
 **Dependencies**: Task 1.2
 
 **Steps:**
-1. Create `k8s/postgres-operator-crunchydata/crds/transaction-db.yaml`
-2. Define PostgresCluster CRD with:
+1. Create `k8s/postgres-operator-cloudnativepg/crds/transaction-db.yaml`
+2. Define Cluster CRD (cloudnative-pg.io/v1) with:
    - Name: `transaction-db`
-   - Namespace: `cart` (or dedicated namespace)
+   - Namespace: `cart`
    - Instances: 2 replicas (for HA)
-   - Patroni HA enabled
+   - Patroni HA enabled with etcd (for learning)
    - Multiple databases: `cart`, `order`
    - Multiple users: `cart`, `order`
    - PostgreSQL version: 15
 3. Apply CRD
 4. Wait for cluster to be ready (primary + replica)
-5. Verify Patroni leader election
+5. Verify Patroni leader election via etcd
 6. Test failover (optional, can be done in Phase 8)
 
 **Acceptance Criteria:**
 - Primary PostgreSQL pod is Running
 - Replica PostgreSQL pod is Running
-- Patroni leader is elected
+- Patroni leader is elected via etcd
 - Databases `cart` and `order` exist
 - HA failover works (< 30 seconds)
+- etcd integration documented for learning
 
 **Files to Create:**
-- `k8s/postgres-operator-crunchydata/crds/transaction-db.yaml`
+- `k8s/postgres-operator-cloudnativepg/crds/transaction-db.yaml`
 
 ---
 
@@ -1280,8 +1297,9 @@ initContainers:
 1. Create `scripts/04-deploy-databases.sh` (step 4, before build/deploy)
 2. Follow existing script pattern (see `scripts/03-deploy-apm.sh`)
 3. Script should:
-   - Deploy Zalando operator
-   - Deploy CrunchyData operator
+   - Create `database` namespace for operators
+   - Deploy Zalando operator (in `database` namespace)
+   - Deploy CloudNativePG operator (in `database` namespace)
    - Wait for operators to be ready
    - Create all 5 database clusters
    - Wait for clusters to be ready
@@ -1302,20 +1320,26 @@ set -e
 echo "Deploying PostgreSQL infrastructure..."
 
 # Deploy operators
+# Create database namespace
+echo "Creating database namespace..."
+kubectl create namespace database --dry-run=client -o yaml | kubectl apply -f -
+
 echo "Deploying Zalando Postgres Operator..."
 helm upgrade --install postgres-operator postgres-operator/postgres-operator \
   -f k8s/postgres-operator-zalando/values.yaml \
-  -n monitoring --create-namespace --wait
+  -n database --create-namespace --wait
 
-echo "Deploying CrunchyData Postgres Operator..."
-helm upgrade --install postgres-operator-crunchydata postgres-operator/postgres-operator \
-  -f k8s/postgres-operator-crunchydata/values.yaml \
-  -n monitoring --create-namespace --wait
+echo "Deploying CloudNativePG Operator..."
+helm repo add cloudnative-pg https://cloudnative-pg.github.io/charts
+helm repo update cloudnative-pg
+helm upgrade --install cloudnative-pg cloudnative-pg/cloudnative-pg \
+  -f k8s/postgres-operator-cloudnativepg/values.yaml \
+  -n database --create-namespace --wait
 
 # Create clusters
 echo "Creating database clusters..."
 kubectl apply -f k8s/postgres-operator-zalando/crds/
-kubectl apply -f k8s/postgres-operator-crunchydata/crds/
+kubectl apply -f k8s/postgres-operator-cloudnativepg/crds/
 
 # Wait for clusters
 echo "Waiting for clusters to be ready..."

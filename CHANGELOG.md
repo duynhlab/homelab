@@ -8,6 +8,185 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+## [0.10.23] - 2025-12-25
+
+### Changed
+
+**Documentation Refactoring:**
+- **AGENTS.md**: Refactored from 619 lines to ~250 lines for better readability and maintainability
+  - Extracted Research Patterns to `docs/guides/RESEARCH_PATTERNS.md` (~150 lines)
+  - Extracted Command Reference to `docs/guides/COMMAND_REFERENCE.md` (~100 lines)
+  - Extracted Conventions to `docs/guides/CONVENTIONS.md` (~150 lines)
+  - Condensed remaining sections with links to detailed guides
+  - Maintained all critical information (workflow, architecture, patterns)
+  - Improved navigation with clear links to detailed guides
+
+**New Guide Files:**
+- **RESEARCH_PATTERNS.md**: Complete research patterns for API, APM, and Database design
+- **COMMAND_REFERENCE.md**: All deployment scripts, Helm commands, kubectl shortcuts, and access points
+- **CONVENTIONS.md**: Naming conventions, code standards, file organization, and build verification
+
+**Documentation Updates:**
+- **SETUP.md**: Updated reference from AGENTS.md to CONVENTIONS.md for build verification
+- All guide files include proper cross-references to AGENTS.md and related documentation
+
+### Benefits
+
+- **Improved Readability**: AGENTS.md reduced by 60% while maintaining all essential information
+- **Better Organization**: Detailed guides separated by topic for easier maintenance
+- **Consistent Structure**: Follows existing `docs/guides/` pattern
+- **Preserved Content**: All information retained, just reorganized for better discoverability
+
+## [0.10.22] - 2025-12-25
+
+### Added
+
+**AI Agent Guide Enhancements:**
+- **Research Patterns**: Added "Research and Learning Patterns" section to `AGENTS.md` with industry best practices guidance
+- **API Design Research**: Added guidance to research patterns from Uber, Twitch, Dropbox, SoundCloud, Grab, Shopee when working on API features
+- **APM Patterns**: Added APM section referencing `docs/apm/` documentation for observability features
+- **Agent Workflow**: Added "Before Starting Any Task" checklist and "Code Quality Standards" section
+- **Critical Notice**: Added prominent notice at top of `AGENTS.md` reminding agents to always read the file first
+
+### Changed
+
+**Documentation:**
+- **AGENTS.md**: Enhanced with research patterns, APM references, and workflow guidance
+- **Code Quality Standards**: Updated to include API patterns research and APM patterns references
+
+**Research Guidance:**
+- **API Features**: Agents should research industry patterns (Uber, Twitch, Dropbox, etc.) before implementing
+- **APM Features**: Agents should reference `docs/apm/` documentation and follow established middleware patterns
+- **Workflow**: Added 5-step checklist for agents before starting tasks
+
+## [0.10.21] - 2025-12-25
+
+### Added
+
+**Graceful Shutdown Enhancement:**
+- **Centralized Configuration**: Added `ShutdownTimeout` to `pkg/config/config.go` for consistent config management
+- **Modern Signal Handling**: Migrated all 9 services from channel-based (`signal.Notify`) to context-based (`signal.NotifyContext`) signal handling
+- **Configurable Shutdown Timeout**: Added `SHUTDOWN_TIMEOUT` environment variable (default: 10s, max: 60s)
+- **Explicit Cleanup Sequence**: Implemented sequential cleanup order (HTTP Server → Database → Tracer) for predictable shutdown
+- **Kubernetes Integration**: Added `terminationGracePeriodSeconds: 30` to all Helm values and deployment template
+- **Helper Method**: Added `GetShutdownTimeoutDuration()` method to `Config` struct for easy access
+
+### Changed
+
+**Code Consistency:**
+- **Refactored**: Moved `getShutdownTimeout()` helper function from individual services to centralized `pkg/config/config.go`
+- **Updated**: All 9 services now use `cfg.GetShutdownTimeoutDuration()` instead of local helper functions
+- **Improved**: Shutdown timeout configuration now follows same pattern as other config (Tracing, Profiling, Database)
+
+**Services Updated:**
+- auth, user, product, cart, order, review, notification, shipping, shipping-v2
+
+**Helm Chart:**
+- Added `SHUTDOWN_TIMEOUT` environment variable to all 9 service Helm values files
+- Added `terminationGracePeriodSeconds` support to `charts/templates/deployment.yaml`
+- Set default `terminationGracePeriodSeconds: 30` in all Helm values files
+
+**Documentation:**
+- Added graceful shutdown configuration section to `docs/guides/CONFIGURATION.md`
+- Documented `SHUTDOWN_TIMEOUT` environment variable with format, validation rules, and examples
+- Documented Kubernetes `terminationGracePeriodSeconds` configuration and best practices
+
+### Technical Details
+
+- **Signal Handling**: Uses `signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)` for modern Go patterns
+- **Cleanup Order**: Sequential shutdown ensures predictable behavior: HTTP Server → Database → Tracer
+- **Timeout Validation**: Validates duration format, positive values, and 60s maximum limit
+- **Error Handling**: Silent fallback to default (10s) on invalid values for startup safety
+- **Kubernetes**: `terminationGracePeriodSeconds` set to 30s (shutdown_timeout 10s + 20s buffer)
+
+## [0.10.20] - 2025-12-25
+
+### Changed
+
+**Documentation Consolidation:**
+- **Merged**: `docs/guides/ADDING_SERVICES.md` → `docs/guides/API_REFERENCE.md`
+- **Added**: Complete "Adding New Services" section to API Reference documentation
+- **Structure**: API Reference now includes both existing services endpoints and guide for adding new services
+- **Updated References**: All files referencing `ADDING_SERVICES.md` updated to `API_REFERENCE.md`
+- **Deleted**: `docs/guides/ADDING_SERVICES.md` (content merged into API_REFERENCE.md)
+
+## [0.10.19] - 2025-12-24
+
+### Changed
+
+**API Reference Documentation:**
+- **Moved**: `docs/api/API_REFERENCE.md` → `docs/guides/API_REFERENCE.md`
+- **Updated**: All API endpoints to match actual code implementation
+- **Fixed Endpoints**:
+  - **User Service**: Added `/users/profile` endpoint, added all v2 endpoints, removed non-existent PUT/DELETE
+  - **Product Service**: Added v2 `/catalog/items` endpoints, removed non-existent PUT/DELETE
+  - **Cart Service**: Updated paths (`/cart` instead of `/cart/items`), added v2 `/carts/:cartId` endpoints
+  - **Order Service**: Added v2 endpoints (`/orders/:orderId/status`), removed non-existent PUT/DELETE
+  - **Review Service**: Updated paths, added v2 endpoints
+  - **Notification Service**: Updated to `/notify/email` and `/notify/sms`, added v2 endpoints
+  - **Shipping Service**: Updated to `/shipping/track` (single endpoint)
+  - **Shipping-v2 Service**: Updated to `/shipments/estimate` (single endpoint)
+- **Updated References**: All files referencing `docs/api/API_REFERENCE.md` updated to `docs/guides/API_REFERENCE.md`
+- **Deleted**: Empty `docs/api/` folder
+
+## [0.10.18] - 2025-12-24
+
+### Changed
+
+**Documentation Structure Consolidation:**
+- **Consolidated**: Merged `docs/getting-started/` and `docs/development/` into single `docs/guides/` folder
+- **Renamed Files**: 
+  - `CONFIG_GUIDE.md` → `CONFIGURATION.md`
+  - `DATABASE_GUIDE.md` → `DATABASE.md`
+  - `DASHBOARD_PANELS_GUIDE.md` → `DASHBOARD_PANELS.md`
+- **Merged**: `DATABASE_VERIFICATION.md` content integrated into `DATABASE.md` as "Database Verification" section
+- **Benefits**: 
+  - Simpler structure (one folder instead of two)
+  - Consistent naming (no `_GUIDE` suffixes)
+  - Less duplication (verification merged into main guide)
+  - Easier navigation (all guides in one place)
+- **Files Updated**:
+  - Created: `docs/guides/` directory with all consolidated guides
+  - Updated: `docs/README.md` - All paths updated to `guides/`
+  - Updated: `AGENTS.md` - All paths updated to `guides/`
+  - Updated: All guide files - Internal cross-references updated
+  - Deleted: `docs/getting-started/` and `docs/development/` folders
+
+## [0.10.17] - 2025-12-24
+
+### Removed
+
+**Local Build Script and --local Deploy Flag:**
+- **Removed**: `scripts/05-build-microservices.sh` - Local Docker image building script
+- **Removed**: `--local` flag from `scripts/06-deploy-microservices.sh` - Local Helm chart deployment option
+- **Reason**: 
+  - GitHub Actions workflows automatically build images on push (`.github/workflows/build-images.yml`, `.github/workflows/build-init-images.yml`, `.github/workflows/build-k6-images.yml`)
+  - `00-verify-build.sh` verifies code before pushing (Go build, formatting, static analysis)
+  - Deployment should always use OCI registry for consistency and reproducibility
+- **Changes**:
+  - Deleted `scripts/05-build-microservices.sh` entirely
+  - Refactored `scripts/06-deploy-microservices.sh` to always deploy from OCI registry (`oci://ghcr.io/duynhne/charts/microservice`)
+  - Removed `MODE` parsing logic and conditional deployment paths
+  - Simplified script to registry-only deployment
+- **Files Updated**:
+  - Deleted: `scripts/05-build-microservices.sh`
+  - Modified: `scripts/06-deploy-microservices.sh`
+  - Updated: `docs/getting-started/SETUP.md` - Removed Step 5 (build), updated Step 6 (deploy), renumbered steps
+  - Updated: `AGENTS.md` - Removed build step from deployment order, updated scripts table
+  - Updated: `docs/README.md` - Removed build script references
+  - Updated: `docs/getting-started/ADDING_SERVICES.md` - Removed build step
+  - Updated: `docs/api/API_REFERENCE.md` - Updated deployment commands
+  - Updated: `docs/development/DATABASE_GUIDE.md` - Updated troubleshooting to mention GitHub Actions builds
+  - Updated: `docs/k6/K6_LOAD_TESTING.md` - Updated image build references
+- **Migration Path**:
+  - Before: `./scripts/05-build-microservices.sh && ./scripts/06-deploy-microservices.sh --local`
+  - After: Push code → GitHub Actions builds images → `./scripts/06-deploy-microservices.sh`
+- **Impact**: 
+  - Simpler deployment workflow (one less step)
+  - Consistent image builds via CI/CD
+  - No local Docker/Kind image loading needed
+  - All deployments use published OCI registry charts
+
 ## [0.10.16] - 2025-12-24
 
 ### Changed

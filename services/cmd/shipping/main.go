@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
@@ -117,44 +116,46 @@ func main() {
 		}
 	}()
 
-	// Graceful shutdown
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	// Graceful shutdown - modern signal handling with context
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
 
-	logger.Info("Shutting down server...")
+	// Wait for shutdown signal
+	<-ctx.Done()
+	logger.Info("Shutdown signal received")
 
-	// Shutdown context with timeout
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// Shutdown context with configurable timeout
+	shutdownTimeout := cfg.GetShutdownTimeoutDuration()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
-	// Parallel shutdown with WaitGroup
-	var wg sync.WaitGroup
+	logger.Info("Shutting down server...", zap.Duration("timeout", shutdownTimeout))
 
-	// Shutdown tracing (flush pending spans)
-	if tp != nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := tp.Shutdown(shutdownCtx); err != nil {
-				logger.Error("Error shutting down tracer", zap.Error(err))
-			} else {
-				logger.Info("Tracer shutdown complete")
-			}
-		}()
+	// Explicit cleanup sequence: HTTP Server → Database → Tracer
+	// This ensures predictable shutdown order and easier debugging
+
+	// 1. Shutdown HTTP server (stop accepting new connections, wait for in-flight requests)
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Error("HTTP server shutdown error", zap.Error(err))
+	} else {
+		logger.Info("HTTP server shutdown complete")
 	}
 
-	// Shutdown HTTP server
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := srv.Shutdown(shutdownCtx); err != nil {
-			logger.Error("Server forced to shutdown", zap.Error(err))
-		} else {
-			logger.Info("HTTP server shutdown complete")
-		}
-	}()
+	// 2. Close database connections (explicit cleanup + defer for safety)
+	if err := db.Close(); err != nil {
+		logger.Error("Database close error", zap.Error(err))
+	} else {
+		logger.Info("Database closed")
+	}
 
-	wg.Wait()
-	logger.Info("Server exited gracefully")
+	// 3. Shutdown tracer (flush pending spans)
+	if tp != nil {
+		if err := tp.Shutdown(shutdownCtx); err != nil {
+			logger.Error("Tracer shutdown error", zap.Error(err))
+		} else {
+			logger.Info("Tracer shutdown complete")
+		}
+	}
+
+	logger.Info("Graceful shutdown complete")
 }

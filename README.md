@@ -58,46 +58,96 @@ chmod +x scripts/*.sh
 
 ## Architecture
 
-### 3-Layer Architecture
+### System Architecture
 
-All microservices follow a consistent 3-layer architecture:
+Complete system architecture showing k6 load testing, microservices stack (3-layer architecture), data layer, and observability:
 
 ```mermaid
-flowchart TD
-    subgraph Web["Web Layer (web/v1/, web/v2/)"]
-        Handler[HTTP Handlers<br/>Request/Response<br/>Validation]
+flowchart TB
+    subgraph "k6 Load Generator"
+        K6[k6 Pod<br/>Arrival-Rate Executors]
+        Script[k6 Script<br/>load-test-multiple-scenarios.js]
+        Journeys[Journey Functions<br/>8 journey types]
     end
     
-    subgraph Logic["Logic Layer (logic/v1/, logic/v2/)"]
-        Service[Business Logic<br/>Orchestration<br/>Database Queries]
+    subgraph "Traffic Patterns"
+        Baseline[Baseline Traffic<br/>constant-arrival-rate<br/>30 RPS]
+        Peak[Peak Hours<br/>ramping-arrival-rate<br/>100 RPS]
+        Burst[Burst Scenarios<br/>ramping-arrival-rate<br/>200+ RPS]
     end
     
-    subgraph Core["Core Layer (core/)"]
-        Domain[Domain Models]
-        Database[Database Connection<br/>core/database.go]
+    subgraph "Microservices Stack - 3-Layer Architecture"
+        Web[Web Layer<br/>web/v1/, web/v2/<br/>HTTP Handlers<br/>Request/Response]
+        Logic[Logic Layer<br/>logic/v1/, logic/v2/<br/>Business Logic<br/>Orchestration]
+        Core[Core Layer<br/>core/domain/<br/>Domain Models<br/>core/database.go<br/>DB Connection]
     end
     
-    Handler -->|calls| Service
-    Service -->|uses| Domain
-    Service -->|queries| Database
-    Database -->|PostgreSQL| DB[(Database)]
+    subgraph "Data Layer"
+        Pooler[Connection Poolers<br/>PgBouncer / PgCat]
+        Database[(PostgreSQL<br/>5 Clusters)]
+    end
+    
+    subgraph "Observability"
+        Tempo[Distributed Tracing<br/>Tempo]
+        Prometheus[Metrics<br/>Prometheus]
+        Grafana[Dashboards<br/>Grafana]
+    end
+    
+    K6 --> Script
+    Script --> Journeys
+    
+    Journeys --> Baseline
+    Journeys --> Peak
+    Journeys --> Burst
+    
+    Baseline --> Web
+    Peak --> Web
+    Burst --> Web
+    
+    Web -->|calls| Logic
+    Logic -->|uses| Core
+    Logic -->|queries| Core
+    Core -->|connects via| Pooler
+    Pooler -->|routes to| Database
+    Database -->|returns data| Core
+    Core -->|returns| Logic
+    Logic -->|returns| Web
+    
+    Web --> Tempo
+    Logic --> Tempo
+    Core --> Tempo
+    
+    Web --> Prometheus
+    Logic --> Prometheus
+    
+    Prometheus --> Grafana
+    Tempo --> Grafana
+    
+    style K6 fill:#9f9,stroke:#333,stroke-width:2px
+    style Baseline fill:#9ff,stroke:#333,stroke-width:2px
+    style Peak fill:#9ff,stroke:#333,stroke-width:2px
+    style Burst fill:#9ff,stroke:#333,stroke-width:2px
+    style Web fill:#e1f5ff,stroke:#333,stroke-width:2px
+    style Logic fill:#fff4e1,stroke:#333,stroke-width:2px
+    style Core fill:#e8f5e9,stroke:#333,stroke-width:2px
+    style Database fill:#ff9,stroke:#333,stroke-width:2px
 ```
 
 **Detailed Architecture**: See [`docs/apm/ARCHITECTURE.md`](docs/apm/ARCHITECTURE.md) for middleware chain and APM integration. Full system architecture in [`specs/system-context/01-architecture-overview.md`](specs/system-context/01-architecture-overview.md)
 
 ### Microservices
 
-| Service | Namespace | API Versions |
-|---------|-----------|--------------|
-| auth | auth | v1, v2 |
-| user | user | v1, v2 |
-| product | product | v1, v2 |
-| cart | cart | v1, v2 |
-| order | order | v1, v2 |
-| review | review | v1, v2 |
-| notification | notification | v1, v2 |
-| shipping | shipping | v1 only |
-| shipping-v2 | shipping | v2 only |
+| Service | Language | Description | Namespace | API Versions |
+|---------|----------|-------------|-----------|--------------|
+| auth | Go | Authentication & registration | auth | v1, v2 |
+| user | Go | User management & profiles | user | v1, v2 |
+| product | Go | Product catalog management | product | v1, v2 |
+| cart | Go | Shopping cart operations | cart | v1, v2 |
+| order | Go | Order processing & tracking | order | v1, v2 |
+| review | Go | Product reviews & ratings | review | v1, v2 |
+| notification | Go | Notification delivery | notification | v1, v2 |
+| shipping | Go | Shipping tracking (legacy) | shipping | v1 only |
+| shipping-v2 | Go | Enhanced shipping API | shipping | v2 only |
 
 **Complete API Documentation**: See [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md)
 

@@ -32,13 +32,13 @@ import (
 
 // Config holds all configuration for a microservice
 type Config struct {
-	Service        ServiceConfig   // Service-specific settings (port, name, version)
-	Tracing        TracingConfig   // OpenTelemetry/Tempo configuration
-	Profiling      ProfilingConfig // Pyroscope continuous profiling
-	Logging        LoggingConfig   // Structured logging (Zap)
-	Metrics        MetricsConfig   // Prometheus metrics
-	Database       DatabaseConfig  // PostgreSQL database configuration
-	ShutdownTimeout int            // Graceful shutdown timeout in seconds - from SHUTDOWN_TIMEOUT env (default: 10)
+	Service         ServiceConfig   // Service-specific settings (port, name, version)
+	Tracing         TracingConfig   // OpenTelemetry/Tempo configuration
+	Profiling       ProfilingConfig // Pyroscope continuous profiling
+	Logging         LoggingConfig   // Structured logging (Zap)
+	Metrics         MetricsConfig   // Prometheus metrics
+	Database        DatabaseConfig  // PostgreSQL database configuration
+	ShutdownTimeout int             // Graceful shutdown timeout in seconds - from SHUTDOWN_TIMEOUT env (default: 10)
 }
 
 // ServiceConfig defines basic service configuration

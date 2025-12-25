@@ -38,3 +38,20 @@ labels:
 command: ["k6"]
 args: ["run", "/scripts/script.js"]
 
+# Environment variables for k6 configuration
+# Allows external configuration of RPS targets and traffic patterns without code changes
+env:
+  # RPS Targets (requests per second)
+  - name: BASELINE_RPS
+    value: "30"              # Baseline traffic: 30 RPS (steady background)
+  - name: PEAK_RPS
+    value: "100"             # Peak traffic: 100 RPS (morning/evening peaks)
+  - name: BURST_RPS
+    value: "200"             # Burst traffic: 200 RPS (flash sales, spikes)
+  
+  # Traffic Pattern Timing
+  - name: BURST_DURATION
+    value: "5m"              # Duration to sustain burst traffic (default: 5 minutes)
+  - name: BURST_TIMING
+    value: "10:00-14:00"     # Timing window for burst scenarios (example: 10 AM - 2 PM)
+

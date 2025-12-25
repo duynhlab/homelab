@@ -10,8 +10,8 @@ k6 runs as a **continuous load generator** with realistic user journey functions
 
 ```mermaid
 flowchart TB
-    subgraph "K6 Load Test (250 VUs)"
-        K6[K6 Scenarios<br/>✅ NO health checks]
+    subgraph "K6 Load Test (RPS-Based)"
+        K6[K6 Scenarios<br/>Arrival-Rate Executors<br/>✅ NO health checks]
     end
     
     subgraph "Traffic Generation (CLEAN)"
@@ -139,9 +139,10 @@ Kubernetes Probe → /health → Gin Handler → Prometheus Middleware ⏭️ SK
 
 **Result:**
 - 1 pod running in `k6` namespace
-- 5 user personas with realistic journey functions
-- Peak: 100 VUs (40 browser + 30 shopping + 15 registered + 10 API + 5 admin)
-- Duration: 21 minutes per cycle (auto-restart)
+- 9 scenarios total: 5 user personas + 4 production traffic patterns
+- Peak: Up to 100 RPS (configurable via environment variables)
+- Duration: 24 hours (production simulation)
+- Arrival-rate executors for realistic traffic patterns
 
 ## Verify
 
@@ -160,22 +161,28 @@ helm list -n k6
 
 ### Professional High-Volume Test Configuration
 
-**Duration:** 6.5 hours (390 minutes) - Extended overnight soak test
+**Duration:** 24 hours - Extended production simulation with realistic traffic patterns
+
+**Load Pattern (Production Simulation - RPS-Based):**
+- **Arrival-Rate Executors**: All scenarios use `ramping-arrival-rate` or `constant-arrival-rate` executors for realistic production traffic simulation
+- **RPS-Based Load**: Traffic is controlled by requests per second (RPS) rather than virtual users (VUs)
+- **Benefits**: More accurate production simulation, better capacity planning, realistic traffic patterns
 
 **Peak Load:**
-- 250 VUs total (100 browser + 75 shopping + 37 registered + 25 API + 13 admin)
-- 250-1000 RPS sustained (avg ~400 RPS)
-- 3-4 million total requests
+- **Total RPS**: Up to 100 RPS peak (configurable via `PEAK_RPS` environment variable)
+- **Baseline RPS**: 30 RPS steady background traffic (configurable via `BASELINE_RPS`)
+- **Burst RPS**: Up to 200 RPS during flash sales (configurable via `BURST_RPS`)
+- **Max VUs**: 300 VUs allocated to handle peak traffic (auto-scaled by k6)
 
-**Load Pattern (Production Simulation):**
-1. Morning Ramp-Up (45m): 0% → 60% load
-2. Morning Peak (90m): 60% → 100% load (peak traffic)
-3. Lunch Dip (45m): 100% → 70% load (reduced activity)
-4. Afternoon Recovery (45m): 70% → 90% load
-5. Evening Peak (90m): 90% → 100% load (second peak)
-6. Evening Wind-Down (45m): 100% → 50% load
-7. Night Low (22m): 50% → 20% load (minimal traffic)
-8. Graceful Shutdown (8m): 20% → 0% load
+**Load Pattern Stages (Production Simulation):**
+1. Morning Ramp-Up (30m): 0% → 60% RPS
+2. Morning Peak (60m): 60% → 100% RPS (peak traffic)
+3. Lunch Dip (30m): 100% → 70% RPS (reduced activity)
+4. Afternoon Recovery (30m): 70% → 90% RPS
+5. Evening Peak (60m): 90% → 100% RPS (second peak)
+6. Evening Wind-Down (30m): 100% → 50% RPS
+7. Night Low (15m): 50% → 20% RPS (minimal traffic)
+8. Graceful Shutdown (5m): 20% → 0% RPS
 
 **Journey Types (8 total):**
 - 5 realistic user journeys (existing)
@@ -204,51 +211,65 @@ helm list -n k6
 - Overnight testing (conservative resource usage)
 
 **Resource Requirements:**
-- Cluster resources: 250 VUs requires ~4GB RAM, 2 CPU cores for k6 pod
+- Cluster resources: Up to 300 VUs (auto-scaled) requires ~4GB RAM, 2 CPU cores for k6 pod
 - Microservices: 9 services * 3 replicas * (500MB RAM + 200m CPU) = ~13.5GB RAM, 5.4 CPU cores
 - Total: ~17.5GB RAM, ~7.5 CPU cores for duration of test
+- **Note**: VUs are auto-scaled by k6 based on RPS requirements, not manually configured
 
 ---
 
 ### Multiple Scenarios Test (`load-test-multiple-scenarios.js`)
 
 **Overview:**
-- **5 user personas** with different behaviors and traffic distribution
-- **8 user journey functions** for realistic multi-service traces (5 existing + 3 edge cases NEW in v0.6.12)
-- **Total: 250 VUs peak** (100 browser + 75 shopping + 37 registered + 25 API + 13 admin) - Conservative configuration
+- **9 scenarios total**: 5 user personas + 4 production traffic patterns
+- **8 user journey functions** for realistic multi-service traces (5 existing + 3 edge cases)
+- **Arrival-Rate Executors**: All scenarios use RPS-based executors for realistic production simulation
+- **Full User Lifecycle**: All journeys include registration step (complete user flow from account creation)
+- **Stack Layer & Operation Tags**: Automatic tagging for full-stack performance analysis
 
 ---
 
 #### User Journey Functions
 
-**Purpose:** Create deeper, more realistic distributed traces spanning multiple microservices, including edge case testing for resilience and error handling.
+**Purpose:** Create deeper, more realistic distributed traces spanning multiple microservices, including:
+- **Complete user lifecycle testing**: All journeys start with registration (full flow from account creation)
+- **Edge case testing**: Resilience, error handling, and race condition scenarios
+- **Full-stack coverage**: Tests web, logic, and database layers with automatic tagging
+- **Production-ready patterns**: Realistic user behavior with proper error handling
 
 **Journey Types:**
 
 1. **E-commerce Shopping Journey** (9 services)
    - **Flow**: Auth → User → Product → Cart → Shipping-v2 → Order → Notification
-   - **Steps**: Login → Profile → Browse catalog → View product → Add to cart → View cart → Estimate shipping (POST) → Create order → Send notification
-   - **Duration**: ~7 seconds per journey
+   - **Steps**: **Register** → Login → Profile → Browse catalog → View product → Add to cart → View cart → Estimate shipping (POST) → Create order → Send notification
+   - **Duration**: ~8 seconds per journey (includes registration)
    - **Features**:
+     - **Complete user lifecycle**: Starts with registration (full flow from account creation)
+     - Error handling for registration conflicts (409 retry logic)
      - Covers complete purchase flow
      - **Fixes shipping-v2**: Uses POST with JSON body `{origin, destination, weight}`
      - Session tracking (`session_id`, `user_id` tags)
-     - Flow step tags (`1_login`, `2_profile`, ..., `9_notification`)
+     - Flow step tags (`1_register`, `2_login`, `3_profile`, ..., `10_notification`)
+     - Stack layer tags: `database` for DB operations, `web` for API calls
+     - Operation tags: `db_write` for registration/orders, `db_read` for queries
 
 2. **Product Review Journey** (5 services)
    - **Flow**: Auth → User → Product → Review
-   - **Steps**: Login → Profile → View product → Read reviews → Write review
-   - **Duration**: ~4 seconds per journey
+   - **Steps**: **Register** → Login → Profile → View product → Read reviews → Write review
+   - **Duration**: ~5 seconds per journey (includes registration)
+   - **Features**: Complete user lifecycle with registration, stack layer and operation tags
 
 3. **Order Tracking Journey** (6 services)
    - **Flow**: Auth → User → Order → Shipping → Notification
-   - **Steps**: Login → Profile → View orders → Order details → Track shipment → Check notifications
-   - **Duration**: ~5 seconds per journey
+   - **Steps**: **Register** → Login → Profile → View orders → Order details → Track shipment → Check notifications
+   - **Duration**: ~6 seconds per journey (includes registration)
+   - **Features**: Complete user lifecycle with registration, stack layer and operation tags
 
 4. **Quick Browse Journey** (4 services)
    - **Flow**: Product → Shipping-v2 → Cart (abandoned)
-   - **Steps**: Browse catalog → View product → Check shipping (POST) → Add to cart (abandon)
-   - **Duration**: ~4 seconds per journey
+   - **Steps**: **Register** → Browse catalog → View product → Check shipping (POST) → Add to cart (abandon)
+   - **Duration**: ~5 seconds per journey (includes registration)
+   - **Features**: Complete user lifecycle with registration, stack layer and operation tags
 
 5. **API Monitoring Journey** (7 services)
    - **Flow**: Auth, User, Product, Cart, Order, Review, Notification
@@ -302,34 +323,265 @@ helm list -n k6
 
 ---
 
-#### Virtual Users & Stages
+#### Arrival-Rate Executors & RPS Stages
 
-- Same stages as legacy test (peak: 100 VUs total)
-- Ramp-up: 1m→20, 2m→50, 5m→100 VUs
-- Sustained: 10m at 100 VUs
-- Ramp-down: 2m→50, 1m→0
-- **Duration: 21 minutes** (auto-restart)
-- Distribution: 40 + 30 + 15 + 10 + 5 VUs
+**Executor Types:**
+- **`ramping-arrival-rate`**: Used for 5 user personas and 3 production traffic patterns
+  - RPS-based load control (more realistic than VU-based)
+  - Time-based stages with configurable RPS targets
+  - Auto-scales VUs based on RPS requirements
+- **`constant-arrival-rate`**: Used for baseline traffic scenario
+  - Steady RPS throughout the day (30 RPS default)
+  - 24-hour duration for continuous background traffic
+
+**RPS-Based Load Patterns:**
+- **Browser User**: 0 → 40 RPS peak (configurable via `PEAK_RPS` env var)
+- **Shopping User**: 0 → 30 RPS peak
+- **Registered User**: 0 → 15 RPS peak
+- **API Client**: 0 → 10 RPS peak
+- **Admin User**: 0 → 5 RPS peak
+- **Baseline Traffic**: 30 RPS constant (24h duration)
+- **Peak Hours**: 20 → 100 RPS (time-based patterns)
+- **Flash Sale**: 0 → 200 RPS burst (configurable via `BURST_RPS`)
+- **Marketing Campaign**: 0 → 300 RPS gradual ramp
+
+**Load Pattern Stages (Production Simulation):**
+- Morning Ramp-Up (30m): 0% → 60% RPS
+- Morning Peak (60m): 60% → 100% RPS
+- Lunch Dip (30m): 100% → 70% RPS
+- Afternoon Recovery (30m): 70% → 90% RPS
+- Evening Peak (60m): 90% → 100% RPS
+- Evening Wind-Down (30m): 100% → 50% RPS
+- Night Low (15m): 50% → 20% RPS
+- Graceful Shutdown (5m): 20% → 0% RPS
+
+**VU Allocation:**
+- Pre-allocated VUs: 20% of peak (for efficiency)
+- Max VUs: Auto-scaled by k6 based on RPS requirements (up to 300 VUs)
+- VUs are dynamically allocated based on arrival rate, not manually configured
 
 **Traffic:**
 - Journey-based traffic (80% multi-service journeys, 20% legacy behavior)
-- Think times: 10-15 seconds between journeys (realistic user pauses)
-- Health checks: Only 10% of iterations per scenario (monitoring, not load testing)
-  - Prometheus/Kubernetes probes already handle health monitoring
-  - Reduces noise in Grafana metrics by 90%
+- **Full user lifecycle**: All journeys start with registration (complete flow testing)
+- Think times: 0.3-2 seconds between steps (realistic user pauses)
+- **Stack layer & operation tags**: Automatic tagging for full-stack analysis
+- Health checks: Removed from load tests (infrastructure monitoring handled separately)
+  - Prometheus/Kubernetes probes handle health monitoring
+  - 100% business traffic in metrics and traces
   - Focuses load testing on actual business API endpoints
-- Note: `/metrics` endpoint is NOT tested by k6 (only Prometheus scrapes it)
 
 **Thresholds:**
 - Per-scenario thresholds (API client: p95 < 300ms)
 - Shopping flow: p95 < 1000ms (có thể chậm hơn)
 
+## Full Stack Testing Tags
+
+k6 automatically tags all requests with `stack_layer` and `operation` tags for comprehensive full-stack performance analysis.
+
+### Stack Layer Tags
+
+**Purpose**: Identify which layer of the 3-layer architecture is being tested
+
+**Values:**
+- `web`: Web layer (HTTP handlers, request/response)
+- `logic`: Logic layer (business logic, orchestration)
+- `database`: Database layer (queries, transactions)
+
+**Usage**: Filter metrics by layer to identify bottlenecks
+```promql
+# Database layer performance
+rate(request_duration_seconds_count{stack_layer="database"}[5m])
+
+# Web layer performance
+rate(request_duration_seconds_count{stack_layer="web"}[5m])
+```
+
+### Operation Tags
+
+**Purpose**: Identify the type of operation being performed
+
+**Values:**
+- `db_read`: Database read operations (SELECT queries)
+- `db_write`: Database write operations (INSERT, UPDATE, DELETE)
+- `api_call`: API calls without database operations
+
+**Usage**: Filter metrics by operation type to analyze read vs write performance
+```promql
+# Database write performance
+rate(request_duration_seconds_count{operation="db_write"}[5m])
+
+# Database read performance
+rate(request_duration_seconds_count{operation="db_read"}[5m])
+```
+
+### Automatic Tagging
+
+The `makeRequest()` function automatically adds these tags to all requests:
+
+```javascript
+// Automatic tagging in makeRequest function
+makeRequest('POST', url, body, tags, 'database', 'db_write');
+// Adds: stack_layer="database", operation="db_write"
+
+makeRequest('GET', url, null, tags, 'database', 'db_read');
+// Adds: stack_layer="database", operation="db_read"
+```
+
+**Benefits:**
+- Consistent tagging across all journeys
+- Full-stack performance analysis in Prometheus/Grafana
+- Easy filtering by layer or operation type
+- Identify bottlenecks at specific layers or operations
+
 ## Metrics Flow
 
-1. **k6** → Generates HTTP traffic
-2. **Go apps** → Export metrics (duration, RPS, errors, etc.)
-3. **Prometheus** → Scrapes metrics mỗi 15s
-4. **Grafana** → Visualizes trong dashboard (32 panels)
+1. **k6** → Generates HTTP traffic with stack_layer and operation tags
+2. **Go apps** → Export metrics (duration, RPS, errors, etc.) with tags
+3. **Prometheus** → Scrapes metrics mỗi 15s (preserves tags)
+4. **Grafana** → Visualizes trong dashboard (32 panels) with tag-based filtering
+
+## Configuration
+
+### Environment Variables
+
+k6 load testing configuration can be externalized via environment variables, allowing RPS targets and traffic patterns to be adjusted without code changes.
+
+#### RPS Targets
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BASELINE_RPS` | `30` | Baseline traffic: Steady background RPS throughout the day |
+| `PEAK_RPS` | `100` | Peak traffic: Maximum RPS during morning/evening peaks |
+| `BURST_RPS` | `200` | Burst traffic: Maximum RPS during flash sales or traffic spikes |
+
+#### Traffic Pattern Timing
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BURST_DURATION` | `5m` | Duration to sustain burst traffic (e.g., `5m`, `10m`) |
+| `BURST_TIMING` | `10:00-14:00` | Timing window for burst scenarios (e.g., `10:00-14:00` for 10 AM - 2 PM) |
+
+### Configuration via Helm Values
+
+Environment variables are configured in `charts/values/k6-scenarios.yaml`:
+
+```yaml
+env:
+  - name: BASELINE_RPS
+    value: "30"
+  - name: PEAK_RPS
+    value: "100"
+  - name: BURST_RPS
+    value: "200"
+  - name: BURST_DURATION
+    value: "5m"
+  - name: BURST_TIMING
+    value: "10:00-14:00"
+```
+
+### Updating Configuration
+
+To change RPS targets or traffic patterns:
+
+1. **Update Helm values:**
+   ```bash
+   # Edit charts/values/k6-scenarios.yaml
+   # Change environment variable values
+   ```
+
+2. **Apply changes:**
+   ```bash
+   helm upgrade k6-scenarios charts/ -f charts/values/k6-scenarios.yaml -n k6
+   ```
+
+3. **Verify configuration:**
+   ```bash
+   kubectl exec -n k6 <k6-pod> -- env | grep -E "BASELINE_RPS|PEAK_RPS|BURST_RPS"
+   ```
+
+### Traffic Pattern Scenarios
+
+The k6 script includes 4 production traffic pattern scenarios that run concurrently with user persona scenarios:
+
+#### 1. Baseline Traffic (`baseline_traffic`)
+
+**Purpose**: Simulate steady background traffic throughout the day
+
+**Configuration:**
+- **Executor**: `constant-arrival-rate`
+- **RPS**: 30 RPS (configurable via `BASELINE_RPS` environment variable)
+- **Duration**: 24 hours
+- **Pre-allocated VUs**: 50
+- **Max VUs**: 200
+
+**Use Case**: Continuous background load to test system stability and resource usage
+
+#### 2. Peak Hours (`peak_hours`)
+
+**Purpose**: Simulate realistic production traffic with morning/evening peaks and lunch dip
+
+**Configuration:**
+- **Executor**: `ramping-arrival-rate`
+- **Start Rate**: 20 RPS (night low)
+- **Peak Rate**: 100 RPS (configurable via `PEAK_RPS` environment variable)
+- **Duration**: 24 hours
+- **Pre-allocated VUs**: 50
+- **Max VUs**: 300
+
+**Stages:**
+- Morning Peak (3h): 9 AM - 12 PM → Ramp to 100 RPS
+- Lunch Dip (2h): 12 PM - 2 PM → Drop to 60 RPS
+- Afternoon Recovery (4h): 2 PM - 6 PM → Ramp to 90 RPS
+- Evening Peak (4h): 6 PM - 10 PM → Peak at 100 RPS
+- Night Low (8h): 10 PM - 6 AM → Drop to 20 RPS
+- Morning Ramp-Up (3h): 6 AM - 9 AM → Ramp to 100 RPS
+
+**Use Case**: Production traffic pattern simulation for capacity planning
+
+#### 3. Flash Sale (`flash_sale`)
+
+**Purpose**: Simulate sudden traffic spikes during flash sales or viral events
+
+**Configuration:**
+- **Executor**: `ramping-arrival-rate`
+- **Burst RPS**: 200 RPS (configurable via `BURST_RPS` environment variable)
+- **Burst Duration**: 5 minutes (configurable via `BURST_DURATION` environment variable)
+- **Pre-allocated VUs**: 50
+- **Max VUs**: 400
+
+**Stages:**
+- Pre-event (30m): 0 → 50 RPS (anticipation)
+- Burst (30s): 50 → 200 RPS (sudden spike)
+- Sustain (5m): 200 RPS (peak load)
+- Drop (2m): 200 → 100 RPS (gradual decrease)
+- Post-event (30m): 100 → 20 RPS (return to baseline)
+
+**Use Case**: Stress testing for sudden traffic spikes, flash sale events
+
+#### 4. Marketing Campaign (`marketing_campaign`)
+
+**Purpose**: Simulate gradual traffic increase from marketing campaigns
+
+**Configuration:**
+- **Executor**: `ramping-arrival-rate`
+- **Peak RPS**: 300 RPS
+- **Pre-allocated VUs**: 50
+- **Max VUs**: 500
+
+**Stages:**
+- Campaign Start (1h): 0 → 50 RPS (campaign launch)
+- Gradual Ramp-Up (3h): 50 → 200 RPS (viral spread)
+- Peak Engagement (2h): 200 → 300 RPS (peak interest)
+- Sustained Interest (3h): 300 RPS (maintained engagement)
+- Gradual Wind-Down (2h): 300 → 150 RPS (interest fading)
+- Return to Baseline (1h): 150 → 30 RPS (campaign ends)
+
+**Use Case**: Marketing campaign simulation, gradual traffic growth testing
+
+**Concurrent Execution:**
+All 4 traffic pattern scenarios run concurrently with the 5 user persona scenarios, simulating realistic production traffic with multiple load patterns overlapping.
+
+---
 
 ## Troubleshooting
 

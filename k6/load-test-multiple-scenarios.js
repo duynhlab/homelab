@@ -7,6 +7,19 @@ const errorRate = new Rate('k6_errors');
 const requestDuration = new Trend('k6_request_duration');
 const requestsTotal = new Counter('k6_requests_total');
 
+// Configuration from environment variables (with defaults)
+// Allows external configuration without code changes
+const CONFIG = {
+  // RPS Targets (configurable via environment variables)
+  BASELINE_RPS: parseInt(__ENV.BASELINE_RPS || '30', 10),
+  PEAK_RPS: parseInt(__ENV.PEAK_RPS || '100', 10),
+  BURST_RPS: parseInt(__ENV.BURST_RPS || '200', 10),
+  
+  // Traffic Pattern Timing (configurable)
+  BURST_DURATION: __ENV.BURST_DURATION || '5m',
+  BURST_TIMING: __ENV.BURST_TIMING || '10:00-14:00', // Example: 10 AM - 2 PM
+};
+
 // Service URLs for 9 microservices
 const SERVICES = {
   auth: 'http://auth.auth.svc.cluster.local:8080',
@@ -21,10 +34,24 @@ const SERVICES = {
 };
 
 // Helper function to make requests with proper tagging
-function makeRequest(method, url, body, tags) {
+// Enhanced with stack_layer and operation tags for full stack performance analysis
+// @param {string} method - HTTP method (GET, POST, PUT, DELETE)
+// @param {string} url - Request URL
+// @param {object} body - Request body (null for GET/DELETE)
+// @param {object} tags - Tags object (may include stack_layer and operation)
+// @param {string} stack_layer - Stack layer: 'web', 'logic', or 'database' (default: 'web')
+// @param {string} operation - Operation type: 'db_read', 'db_write', or 'api_call' (default: 'api_call')
+function makeRequest(method, url, body, tags = {}, stack_layer = 'web', operation = 'api_call') {
+  // Merge stack_layer and operation into tags with defaults
+  const enhancedTags = {
+    ...tags,
+    stack_layer: tags.stack_layer || stack_layer,
+    operation: tags.operation || operation,
+  };
+  
   const params = {
     headers: { 'Content-Type': 'application/json' },
-    tags: tags,
+    tags: enhancedTags,
   };
   
   let response;
@@ -42,10 +69,10 @@ function makeRequest(method, url, body, tags) {
   
   const duration = new Date().getTime() - startTime;
   
-  // Record custom metrics
-  requestDuration.add(duration, tags);
-  requestsTotal.add(1, tags);
-  errorRate.add(response.status >= 400, tags);
+  // Record custom metrics with enhanced tags
+  requestDuration.add(duration, enhancedTags);
+  requestsTotal.add(1, enhancedTags);
+  errorRate.add(response.status >= 400, enhancedTags);
   
   // Check response
   const checkResult = check(response, {
@@ -60,9 +87,12 @@ function makeRequest(method, url, body, tags) {
 // ============================================================================
 
 // Journey 1: E-commerce Shopping Journey
+// Complete user lifecycle: Register → Login → Profile → Browse → View Product → Add Cart → View Cart → Shipping → Order → Notification
 // Touches 9 services: Auth → User → Product → Cart → Shipping-v2 → Order → Notification
 function ecommerceShoppingJourney() {
-  const userId = `user-${__VU}`;
+  // Generate unique user ID with timestamp to avoid conflicts
+  const userId = `user-${__VU}-${Date.now()}`;
+  const userEmail = `${userId}@test.com`;
   const sessionId = `session-${__VU}-${Date.now()}`;
   const tags = { 
     scenario: 'shopping_user', 
@@ -73,81 +103,109 @@ function ecommerceShoppingJourney() {
   
   console.log(`[${userId}] Starting e-commerce shopping journey (session: ${sessionId})`);
   
-  // Step 1: Auth - Login
-  console.log(`[${userId}] Step 1/9: Logging in...`);
-  makeRequest('POST', `${SERVICES.auth}/api/v1/auth/login`, {
+  // Step 1: Auth - Register (NEW - Full user lifecycle starts here)
+  console.log(`[${userId}] Step 1/10: Registering new account...`);
+  const registerResponse = makeRequest('POST', `${SERVICES.auth}/api/v2/auth/register`, {
     username: userId,
-    password: 'password',
-  }, { ...tags, flow_step: '1_login', service_target: 'auth' });
+    email: userEmail,
+    password: 'password123',
+  }, { ...tags, flow_step: '1_register', service_target: 'auth' }, 'database', 'db_write');
+  
+  // Handle registration conflicts (409) - retry with different username
+  if (registerResponse.status === 409) {
+    const retryUserId = `${userId}-retry-${Date.now()}`;
+    const retryEmail = `${retryUserId}@test.com`;
+    console.log(`[${userId}] Registration conflict (409), retrying with ${retryUserId}...`);
+    makeRequest('POST', `${SERVICES.auth}/api/v2/auth/register`, {
+      username: retryUserId,
+      email: retryEmail,
+      password: 'password123',
+    }, { ...tags, flow_step: '1_register_retry', service_target: 'auth' }, 'database', 'db_write');
+    // Update userId for rest of journey
+    userId = retryUserId;
+    userEmail = retryEmail;
+    tags.user_id = retryUserId;
+  }
   sleep(0.5);
   
-  // Step 2: User - Get Profile
-  console.log(`[${userId}] Step 2/9: Loading user profile...`);
+  // Step 2: Auth - Login
+  console.log(`[${userId}] Step 2/10: Logging in...`);
+  makeRequest('POST', `${SERVICES.auth}/api/v1/auth/login`, {
+    username: userId,
+    password: 'password123',
+  }, { ...tags, flow_step: '2_login', service_target: 'auth' }, 'database', 'db_read');
+  sleep(0.5);
+  
+  // Step 3: User - Get Profile
+  console.log(`[${userId}] Step 3/10: Loading user profile...`);
   makeRequest('GET', `${SERVICES.user}/api/v2/users/${userId}`, null, 
-    { ...tags, flow_step: '2_profile', service_target: 'user' });
+    { ...tags, flow_step: '3_profile', service_target: 'user' }, 'database', 'db_read');
   sleep(0.3);
   
-  // Step 3: Product - Browse Catalog
-  console.log(`[${userId}] Step 3/9: Browsing product catalog...`);
+  // Step 4: Product - Browse Catalog
+  console.log(`[${userId}] Step 4/10: Browsing product catalog...`);
   makeRequest('GET', `${SERVICES.product}/api/v2/catalog/items`, null, 
-    { ...tags, flow_step: '3_browse', service_target: 'product' });
+    { ...tags, flow_step: '4_browse', service_target: 'product' }, 'database', 'db_read');
   sleep(2.0);
   
-  // Step 4: Product - View Product Details
+  // Step 5: Product - View Product Details
   const productId = `prod-${Math.floor(Math.random() * 100)}`;
-  console.log(`[${userId}] Step 4/9: Viewing product ${productId}...`);
+  console.log(`[${userId}] Step 5/10: Viewing product ${productId}...`);
   makeRequest('GET', `${SERVICES.product}/api/v1/products/${productId}`, null, 
-    { ...tags, flow_step: '4_view_product', service_target: 'product', product_id: productId });
+    { ...tags, flow_step: '5_view_product', service_target: 'product', product_id: productId }, 'database', 'db_read');
   sleep(1.5);
   
-  // Step 5: Cart - Add to Cart
-  console.log(`[${userId}] Step 5/9: Adding product to cart...`);
+  // Step 6: Cart - Add to Cart
+  console.log(`[${userId}] Step 6/10: Adding product to cart...`);
   const quantity = Math.floor(Math.random() * 3) + 1;
   makeRequest('POST', `${SERVICES.cart}/api/v2/carts/cart-${userId}/items`, {
     productId: productId,
     quantity: quantity,
-  }, { ...tags, flow_step: '5_add_to_cart', service_target: 'cart', product_id: productId });
+  }, { ...tags, flow_step: '6_add_to_cart', service_target: 'cart', product_id: productId }, 'database', 'db_write');
   sleep(0.5);
   
-  // Step 6: Cart - View Cart
-  console.log(`[${userId}] Step 6/9: Viewing cart...`);
+  // Step 7: Cart - View Cart
+  console.log(`[${userId}] Step 7/10: Viewing cart...`);
   makeRequest('GET', `${SERVICES.cart}/api/v1/cart`, null, 
-    { ...tags, flow_step: '6_view_cart', service_target: 'cart' });
+    { ...tags, flow_step: '7_view_cart', service_target: 'cart' }, 'database', 'db_read');
   sleep(1.0);
   
-  // Step 7: Shipping-v2 - Estimate Shipping (POST with body!)
-  console.log(`[${userId}] Step 7/9: Estimating shipping cost...`);
+  // Step 8: Shipping-v2 - Estimate Shipping (POST with body!)
+  console.log(`[${userId}] Step 8/10: Estimating shipping cost...`);
   makeRequest('POST', `${SERVICES.shippingV2}/api/v2/shipments/estimate`, {
     origin: 'New York',
     destination: 'Los Angeles',
     weight: Math.random() * 10 + 1,
-  }, { ...tags, flow_step: '7_shipping_estimate', service_target: 'shipping-v2' });
+  }, { ...tags, flow_step: '8_shipping_estimate', service_target: 'shipping-v2' }, 'web', 'api_call');
   sleep(0.8);
   
-  // Step 8: Order - Create Order
-  console.log(`[${userId}] Step 8/9: Creating order...`);
+  // Step 9: Order - Create Order
+  console.log(`[${userId}] Step 9/10: Creating order...`);
   makeRequest('POST', `${SERVICES.order}/api/v1/orders`, {
     items: [{ productId: productId, quantity: quantity, price: 99.99 }],
     userId: userId,
-  }, { ...tags, flow_step: '8_create_order', service_target: 'order', product_id: productId });
+  }, { ...tags, flow_step: '9_create_order', service_target: 'order', product_id: productId }, 'database', 'db_write');
   sleep(0.5);
   
-  // Step 9: Notification - Order Confirmation
-  console.log(`[${userId}] Step 9/9: Sending order confirmation...`);
+  // Step 10: Notification - Order Confirmation
+  console.log(`[${userId}] Step 10/10: Sending order confirmation...`);
   makeRequest('POST', `${SERVICES.notification}/api/v2/notifications`, {
     userId: userId,
     type: 'order_confirmation',
     message: 'Your order has been placed successfully!',
-  }, { ...tags, flow_step: '9_notification', service_target: 'notification' });
+  }, { ...tags, flow_step: '10_notification', service_target: 'notification' }, 'database', 'db_write');
   sleep(0.3);
   
-  console.log(`[${userId}] ✅ E-commerce shopping journey completed (9 services touched)`);
+  console.log(`[${userId}] ✅ E-commerce shopping journey completed (10 steps: Register → Login → Purchase)`);
 }
 
 // Journey 2: Product Review Journey
+// Complete user lifecycle: Register → Login → Profile → View Product → Read Reviews → Write Review
 // Touches 5 services: Auth → User → Product → Review → Notification
 function productReviewJourney() {
-  const userId = `reviewer-${__VU}`;
+  // Generate unique user ID with timestamp to avoid conflicts
+  const userId = `reviewer-${__VU}-${Date.now()}`;
+  const userEmail = `${userId}@test.com`;
   const sessionId = `session-${__VU}-${Date.now()}`;
   const tags = { 
     scenario: 'registered_user', 
@@ -158,50 +216,62 @@ function productReviewJourney() {
   
   console.log(`[${userId}] Starting product review journey (session: ${sessionId})`);
   
-  // Step 1: Auth - Login
-  console.log(`[${userId}] Step 1/5: Logging in...`);
-  makeRequest('POST', `${SERVICES.auth}/api/v1/auth/login`, {
+  // Step 1: Auth - Register (NEW - Full user lifecycle starts here)
+  console.log(`[${userId}] Step 1/6: Registering new account...`);
+  makeRequest('POST', `${SERVICES.auth}/api/v2/auth/register`, {
     username: userId,
-    password: 'password',
-  }, { ...tags, flow_step: '1_login', service_target: 'auth' });
+    email: userEmail,
+    password: 'password123',
+  }, { ...tags, flow_step: '1_register', service_target: 'auth' }, 'database', 'db_write');
   sleep(0.5);
   
-  // Step 2: User - Get Profile
-  console.log(`[${userId}] Step 2/5: Loading profile...`);
-  makeRequest('GET', `${SERVICES.user}/api/v1/users/profile`, null, 
-    { ...tags, flow_step: '2_profile', service_target: 'user' });
+  // Step 2: Auth - Login
+  console.log(`[${userId}] Step 2/6: Logging in...`);
+  makeRequest('POST', `${SERVICES.auth}/api/v1/auth/login`, {
+    username: userId,
+    password: 'password123',
+  }, { ...tags, flow_step: '2_login', service_target: 'auth' }, 'database', 'db_read');
+  sleep(0.5);
+  
+  // Step 3: User - Get Profile
+  console.log(`[${userId}] Step 3/6: Loading profile...`);
+  makeRequest('GET', `${SERVICES.user}/api/v2/users/${userId}`, null, 
+    { ...tags, flow_step: '3_profile', service_target: 'user' }, 'database', 'db_read');
   sleep(0.3);
   
-  // Step 3: Product - View Product
+  // Step 4: Product - View Product
   const productId = `prod-${Math.floor(Math.random() * 100)}`;
-  console.log(`[${userId}] Step 3/5: Viewing product ${productId}...`);
+  console.log(`[${userId}] Step 4/6: Viewing product ${productId}...`);
   makeRequest('GET', `${SERVICES.product}/api/v1/products/${productId}`, null, 
-    { ...tags, flow_step: '3_view_product', service_target: 'product', product_id: productId });
+    { ...tags, flow_step: '4_view_product', service_target: 'product', product_id: productId }, 'database', 'db_read');
   sleep(1.0);
   
-  // Step 4: Review - Read existing reviews
-  console.log(`[${userId}] Step 4/5: Reading reviews...`);
+  // Step 5: Review - Read existing reviews
+  console.log(`[${userId}] Step 5/6: Reading reviews...`);
   makeRequest('GET', `${SERVICES.review}/api/v1/reviews`, null, 
-    { ...tags, flow_step: '4_read_reviews', service_target: 'review' });
+    { ...tags, flow_step: '5_read_reviews', service_target: 'review' }, 'database', 'db_read');
   sleep(2.0);
   
-  // Step 5: Review - Write review
-  console.log(`[${userId}] Step 5/5: Writing review...`);
+  // Step 6: Review - Write review
+  console.log(`[${userId}] Step 6/6: Writing review...`);
   makeRequest('POST', `${SERVICES.review}/api/v2/reviews`, {
     productId: productId,
     rating: Math.floor(Math.random() * 3) + 3, // 3-5 stars
     comment: `Great product! Review from ${userId}`,
     userId: userId,
-  }, { ...tags, flow_step: '5_write_review', service_target: 'review', product_id: productId });
+  }, { ...tags, flow_step: '6_write_review', service_target: 'review', product_id: productId }, 'database', 'db_write');
   sleep(0.5);
   
-  console.log(`[${userId}] ✅ Product review journey completed (5 services touched)`);
+  console.log(`[${userId}] ✅ Product review journey completed (6 steps: Register → Login → Review)`);
 }
 
 // Journey 3: Order Tracking Journey
+// Complete user lifecycle: Register → Login → Profile → View Orders → Order Details → Track Shipping → Check Notifications
 // Touches 6 services: Auth → User → Order → Shipping → Notification
 function orderTrackingJourney() {
-  const userId = `tracker-${__VU}`;
+  // Generate unique user ID with timestamp to avoid conflicts
+  const userId = `tracker-${__VU}-${Date.now()}`;
+  const userEmail = `${userId}@test.com`;
   const sessionId = `session-${__VU}-${Date.now()}`;
   const trackingId = `TRK-${__VU}-${Date.now()}`;
   const tags = { 
@@ -213,52 +283,64 @@ function orderTrackingJourney() {
   
   console.log(`[${userId}] Starting order tracking journey (session: ${sessionId})`);
   
-  // Step 1: Auth - Login
-  console.log(`[${userId}] Step 1/6: Logging in...`);
+  // Step 1: Auth - Register (NEW - Full user lifecycle starts here)
+  console.log(`[${userId}] Step 1/7: Registering new account...`);
+  makeRequest('POST', `${SERVICES.auth}/api/v2/auth/register`, {
+    username: userId,
+    email: userEmail,
+    password: 'password123',
+  }, { ...tags, flow_step: '1_register', service_target: 'auth' }, 'database', 'db_write');
+  sleep(0.5);
+  
+  // Step 2: Auth - Login
+  console.log(`[${userId}] Step 2/7: Logging in...`);
   makeRequest('POST', `${SERVICES.auth}/api/v1/auth/login`, {
     username: userId,
-    password: 'password',
-  }, { ...tags, flow_step: '1_login', service_target: 'auth' });
+    password: 'password123',
+  }, { ...tags, flow_step: '2_login', service_target: 'auth' }, 'database', 'db_read');
   sleep(0.5);
   
-  // Step 2: User - Get Profile
-  console.log(`[${userId}] Step 2/6: Loading profile...`);
-  makeRequest('GET', `${SERVICES.user}/api/v1/users/profile`, null, 
-    { ...tags, flow_step: '2_profile', service_target: 'user' });
+  // Step 3: User - Get Profile
+  console.log(`[${userId}] Step 3/7: Loading profile...`);
+  makeRequest('GET', `${SERVICES.user}/api/v2/users/${userId}`, null, 
+    { ...tags, flow_step: '3_profile', service_target: 'user' }, 'database', 'db_read');
   sleep(0.3);
   
-  // Step 3: Order - View Orders List
-  console.log(`[${userId}] Step 3/6: Viewing orders list...`);
+  // Step 4: Order - View Orders List
+  console.log(`[${userId}] Step 4/7: Viewing orders list...`);
   makeRequest('GET', `${SERVICES.order}/api/v1/orders`, null, 
-    { ...tags, flow_step: '3_view_orders', service_target: 'order' });
+    { ...tags, flow_step: '4_view_orders', service_target: 'order' }, 'database', 'db_read');
   sleep(1.5);
   
-  // Step 4: Order - Get Order Details
+  // Step 5: Order - Get Order Details
   const orderId = `order-${__VU}`;
-  console.log(`[${userId}] Step 4/6: Getting order ${orderId} details...`);
+  console.log(`[${userId}] Step 5/7: Getting order ${orderId} details...`);
   makeRequest('GET', `${SERVICES.order}/api/v2/orders/${orderId}`, null, 
-    { ...tags, flow_step: '4_order_details', service_target: 'order', order_id: orderId });
+    { ...tags, flow_step: '5_order_details', service_target: 'order', order_id: orderId }, 'database', 'db_read');
   sleep(1.0);
   
-  // Step 5: Shipping - Track Shipment
-  console.log(`[${userId}] Step 5/6: Tracking shipment ${trackingId}...`);
+  // Step 6: Shipping - Track Shipment
+  console.log(`[${userId}] Step 6/7: Tracking shipment ${trackingId}...`);
   makeRequest('GET', `${SERVICES.shipping}/api/v1/shipping/track?trackingId=${trackingId}`, null, 
-    { ...tags, flow_step: '5_track_shipping', service_target: 'shipping', tracking_id: trackingId });
+    { ...tags, flow_step: '6_track_shipping', service_target: 'shipping', tracking_id: trackingId }, 'database', 'db_read');
   sleep(1.0);
   
-  // Step 6: Notification - Check notifications
-  console.log(`[${userId}] Step 6/6: Checking notifications...`);
+  // Step 7: Notification - Check notifications
+  console.log(`[${userId}] Step 7/7: Checking notifications...`);
   makeRequest('GET', `${SERVICES.notification}/api/v1/notifications?userId=${userId}`, null, 
-    { ...tags, flow_step: '6_check_notifications', service_target: 'notification' });
+    { ...tags, flow_step: '7_check_notifications', service_target: 'notification' }, 'database', 'db_read');
   sleep(0.5);
   
-  console.log(`[${userId}] ✅ Order tracking journey completed (6 services touched)`);
+  console.log(`[${userId}] ✅ Order tracking journey completed (7 steps: Register → Login → Track)`);
 }
 
 // Journey 4: Quick Browse Journey (Abandoned Cart)
-// Touches 3 services: Product → Cart → Shipping-v2
+// Complete user lifecycle: Register → Browse → View Product → Shipping Check → Add Cart
+// Touches 4 services: Auth → Product → Shipping-v2 → Cart
 function quickBrowseJourney() {
-  const userId = `browser-${__VU}`;
+  // Generate unique user ID with timestamp to avoid conflicts
+  const userId = `browser-${__VU}-${Date.now()}`;
+  const userEmail = `${userId}@test.com`;
   const sessionId = `session-${__VU}-${Date.now()}`;
   const tags = { 
     scenario: 'browser_user', 
@@ -269,37 +351,46 @@ function quickBrowseJourney() {
   
   console.log(`[${userId}] Starting quick browse journey (session: ${sessionId})`);
   
-  // Step 1: Product - Browse Catalog
-  console.log(`[${userId}] Step 1/4: Browsing catalog...`);
+  // Step 1: Auth - Register (NEW - Full user lifecycle starts here)
+  console.log(`[${userId}] Step 1/5: Registering new account...`);
+  makeRequest('POST', `${SERVICES.auth}/api/v2/auth/register`, {
+    username: userId,
+    email: userEmail,
+    password: 'password123',
+  }, { ...tags, flow_step: '1_register', service_target: 'auth' }, 'database', 'db_write');
+  sleep(0.5);
+  
+  // Step 2: Product - Browse Catalog
+  console.log(`[${userId}] Step 2/5: Browsing catalog...`);
   makeRequest('GET', `${SERVICES.product}/api/v2/catalog/items`, null, 
-    { ...tags, flow_step: '1_browse', service_target: 'product' });
+    { ...tags, flow_step: '2_browse', service_target: 'product' }, 'database', 'db_read');
   sleep(1.5);
   
-  // Step 2: Product - View Product
+  // Step 3: Product - View Product
   const productId = `prod-${Math.floor(Math.random() * 100)}`;
-  console.log(`[${userId}] Step 2/4: Viewing product ${productId}...`);
+  console.log(`[${userId}] Step 3/5: Viewing product ${productId}...`);
   makeRequest('GET', `${SERVICES.product}/api/v1/products/${productId}`, null, 
-    { ...tags, flow_step: '2_view_product', service_target: 'product', product_id: productId });
+    { ...tags, flow_step: '3_view_product', service_target: 'product', product_id: productId }, 'database', 'db_read');
   sleep(2.0);
   
-  // Step 3: Shipping-v2 - Quick shipping estimate
-  console.log(`[${userId}] Step 3/4: Checking shipping cost...`);
+  // Step 4: Shipping-v2 - Quick shipping estimate
+  console.log(`[${userId}] Step 4/5: Checking shipping cost...`);
   makeRequest('POST', `${SERVICES.shippingV2}/api/v2/shipments/estimate`, {
     origin: 'New York',
     destination: 'Los Angeles',
     weight: Math.random() * 5 + 1,
-  }, { ...tags, flow_step: '3_shipping_check', service_target: 'shipping-v2' });
+  }, { ...tags, flow_step: '4_shipping_check', service_target: 'shipping-v2' }, 'web', 'api_call');
   sleep(0.5);
   
-  // Step 4: Cart - Add to cart then abandon
-  console.log(`[${userId}] Step 4/4: Adding to cart (will abandon)...`);
+  // Step 5: Cart - Add to cart then abandon
+  console.log(`[${userId}] Step 5/5: Adding to cart (will abandon)...`);
   makeRequest('POST', `${SERVICES.cart}/api/v2/carts/cart-${userId}/items`, {
     productId: productId,
     quantity: 1,
-  }, { ...tags, flow_step: '4_add_cart_abandon', service_target: 'cart', product_id: productId });
+  }, { ...tags, flow_step: '5_add_cart_abandon', service_target: 'cart', product_id: productId }, 'database', 'db_write');
   sleep(0.3);
   
-  console.log(`[${userId}] ✅ Quick browse journey completed (4 services touched, cart abandoned)`);
+  console.log(`[${userId}] ✅ Quick browse journey completed (5 steps: Register → Browse → Abandon)`);
 }
 
 // Journey 5: API Client Monitoring Journey
@@ -332,7 +423,7 @@ function apiMonitoringJourney() {
       ...tags,
       flow_step: `${index + 1}_fetch_${svc.name}`,
       service_target: svc.name,
-    });
+    }, 'database', 'db_read');
     sleep(0.1); // Fast API client
   });
   
@@ -355,13 +446,13 @@ function timeoutRetryJourney() {
   
   // Attempt slow endpoint (will likely timeout)
   makeRequest('GET', `${SERVICES.product}/api/v1/products?delay=3`, null, 
-    { ...tags, flow_step: '1_slow_request', service_target: 'product' });
+    { ...tags, flow_step: '1_slow_request', service_target: 'product' }, 'database', 'db_read');
   sleep(0.5);
   
   // Retry with exponential backoff
   for (let i = 0; i < 3; i++) {
     makeRequest('GET', `${SERVICES.product}/api/v1/products`, null, 
-      { ...tags, flow_step: `2_retry_${i+1}`, service_target: 'product', retry_count: i+1 });
+      { ...tags, flow_step: `2_retry_${i+1}`, service_target: 'product', retry_count: i+1 }, 'database', 'db_read');
     sleep(Math.pow(2, i) * 0.5); // 0.5s, 1s, 2s
   }
   
@@ -394,15 +485,17 @@ function concurrentOperationsJourney() {
   
   // Send all requests at once
   requests.forEach((req, index) => {
+    const isWrite = req[0] === 'POST' || req[0] === 'PUT';
     makeRequest(req[0], req[1], req[2], 
-      { ...tags, flow_step: `concurrent_op_${index+1}`, service_target: 'cart' });
+      { ...tags, flow_step: `concurrent_op_${index+1}`, service_target: 'cart' }, 
+      'database', isWrite ? 'db_write' : 'db_read');
   });
   
   sleep(1.0);
   
   // Verify cart state
   makeRequest('GET', `${SERVICES.cart}/api/v1/cart`, null, 
-    { ...tags, flow_step: 'verify_cart', service_target: 'cart' });
+    { ...tags, flow_step: 'verify_cart', service_target: 'cart' }, 'database', 'db_read');
   
   console.log(`[${userId}] ✅ Concurrent operations journey completed`);
 }
@@ -423,17 +516,17 @@ function errorHandlingJourney() {
   
   // Invalid product ID (should return 404)
   makeRequest('GET', `${SERVICES.product}/api/v1/products/invalid-id-99999`, null, 
-    { ...tags, flow_step: '1_invalid_product', service_target: 'product', expected_error: '404' });
+    { ...tags, flow_step: '1_invalid_product', service_target: 'product', expected_error: '404' }, 'database', 'db_read');
   sleep(0.3);
   
   // Invalid cart operation (empty cart)
   makeRequest('POST', `${SERVICES.cart}/api/v2/carts/empty-cart/items`, { productId: '', quantity: 0 }, 
-    { ...tags, flow_step: '2_invalid_cart', service_target: 'cart', expected_error: '400' });
+    { ...tags, flow_step: '2_invalid_cart', service_target: 'cart', expected_error: '400' }, 'web', 'api_call');
   sleep(0.3);
   
   // Invalid order (missing fields)
   makeRequest('POST', `${SERVICES.order}/api/v1/orders`, { items: [] }, 
-    { ...tags, flow_step: '3_invalid_order', service_target: 'order', expected_error: '400' });
+    { ...tags, flow_step: '3_invalid_order', service_target: 'order', expected_error: '400' }, 'web', 'api_call');
   sleep(0.3);
   
   console.log(`[${userId}] ✅ Error handling journey completed`);
@@ -473,6 +566,7 @@ const LOAD_PATTERN = {
 };
 
 // Peak VU counts (100% load) - Conservative configuration
+// NOTE: These are used for maxVUs calculation in arrival-rate executors
 const PEAK_VUS = {
   browser_user: 100,      // 40% of 250 VUs
   shopping_user: 75,      // 30% of 250 VUs
@@ -482,9 +576,34 @@ const PEAK_VUS = {
   // Total: 250 VUs at peak
 };
 
-// Helper function to calculate VU target based on load percentage
+// Peak RPS targets (100% load) - For arrival-rate executors
+// Based on 40% of total traffic for browser_user, 30% for shopping_user, etc.
+// Assuming ~0.4 RPS per VU average (with think times)
+// Peak RPS targets (100% load) - For arrival-rate executors
+// Based on 40% of total traffic for browser_user, 30% for shopping_user, etc.
+// Values can be overridden via CONFIG.PEAK_RPS environment variable
+const totalPeakRps = CONFIG.PEAK_RPS; // Default: 100 RPS (configurable)
+const PEAK_RPS = {
+  browser_user: Math.ceil(totalPeakRps * 0.4),       // 40% of total RPS
+  shopping_user: Math.ceil(totalPeakRps * 0.3),      // 30% of total RPS
+  registered_user: Math.ceil(totalPeakRps * 0.15),   // 15% of total RPS
+  api_client: Math.ceil(totalPeakRps * 0.10),         // 10% of total RPS
+  admin_user: Math.ceil(totalPeakRps * 0.05),         // 5% of total RPS
+  // Total: ~100 RPS at peak (configurable via CONFIG.PEAK_RPS)
+};
+
+// Baseline RPS - Steady background traffic (configurable via CONFIG.BASELINE_RPS)
+// This represents steady baseline traffic throughout the day
+const BASELINE_RPS = CONFIG.BASELINE_RPS; // Default: 30 RPS (configurable)
+
+// Helper function to calculate VU target based on load percentage (legacy, kept for reference)
 function calculateTarget(peakVUs, loadPercentage) {
   return Math.ceil(peakVUs * loadPercentage);
+}
+
+// Helper function to calculate RPS target based on load percentage
+function calculateRpsTarget(peakRps, loadPercentage) {
+  return Math.ceil(peakRps * loadPercentage);
 }
 
 // ============================================================================
@@ -495,138 +614,238 @@ export const options = {
   // Use scenarios - Multiple user personas with different behaviors
   scenarios: {
     // Scenario 1: Browser User (40% of traffic) - Browse & Read
+    // Migrated to ramping-arrival-rate executor for realistic production traffic simulation
     browser_user: {
-      executor: 'ramping-vus',
-      startVUs: 0,
+      executor: 'ramping-arrival-rate',
+      startRate: 0,                    // Start at 0 RPS
+      timeUnit: '1s',                  // Rate per second
+      preAllocatedVUs: 20,              // Pre-allocate VUs for efficiency (20% of peak)
+      maxVUs: PEAK_VUS.browser_user,   // Max VUs: 100 (same as previous peak VUs)
       stages: [
-        // Morning Ramp-Up: 0% → 60% (0 → 120 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.browser_user, 0.6) },
-        // Morning Peak: 60% → 100% (120 → 200 VUs)
-        { duration: '60m', target: calculateTarget(PEAK_VUS.browser_user, 1.0) },
-        // Lunch Dip: 100% → 70% (200 → 140 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.browser_user, 0.7) },
-        // Afternoon Recovery: 70% → 90% (140 → 180 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.browser_user, 0.9) },
-        // Evening Peak: 90% → 100% (180 → 200 VUs)
-        { duration: '60m', target: calculateTarget(PEAK_VUS.browser_user, 1.0) },
-        // Evening Wind-Down: 100% → 50% (200 → 100 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.browser_user, 0.5) },
-        // Night Low: 50% → 20% (100 → 40 VUs)
-        { duration: '15m', target: calculateTarget(PEAK_VUS.browser_user, 0.2) },
-        // Graceful Shutdown: 20% → 0% (40 → 0 VUs)
+        // Morning Ramp-Up: 0% → 60% (0 → 24 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.browser_user, 0.6) },
+        // Morning Peak: 60% → 100% (24 → 40 RPS)
+        { duration: '60m', target: calculateRpsTarget(PEAK_RPS.browser_user, 1.0) },
+        // Lunch Dip: 100% → 70% (40 → 28 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.browser_user, 0.7) },
+        // Afternoon Recovery: 70% → 90% (28 → 36 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.browser_user, 0.9) },
+        // Evening Peak: 90% → 100% (36 → 40 RPS)
+        { duration: '60m', target: calculateRpsTarget(PEAK_RPS.browser_user, 1.0) },
+        // Evening Wind-Down: 100% → 50% (40 → 20 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.browser_user, 0.5) },
+        // Night Low: 50% → 20% (20 → 8 RPS)
+        { duration: '15m', target: calculateRpsTarget(PEAK_RPS.browser_user, 0.2) },
+        // Graceful Shutdown: 20% → 0% (8 → 0 RPS)
         { duration: '5m', target: 0 },
       ],
-      gracefulRampDown: '1m',
       exec: 'browserUserScenario',
       tags: { scenario: 'browser_user' },
     },
 
     // Scenario 2: Shopping User (30% of traffic) - Complete Shopping Flow
+    // Migrated to ramping-arrival-rate executor for realistic production traffic simulation
     shopping_user: {
-      executor: 'ramping-vus',
-      startVUs: 0,
+      executor: 'ramping-arrival-rate',
+      startRate: 0,                    // Start at 0 RPS
+      timeUnit: '1s',                  // Rate per second
+      preAllocatedVUs: 15,              // Pre-allocate VUs for efficiency (20% of peak)
+      maxVUs: PEAK_VUS.shopping_user,   // Max VUs: 75 (same as previous peak VUs)
       stages: [
-        // Morning Ramp-Up: 0% → 60% (0 → 90 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.shopping_user, 0.6) },
-        // Morning Peak: 60% → 100% (90 → 150 VUs)
-        { duration: '60m', target: calculateTarget(PEAK_VUS.shopping_user, 1.0) },
-        // Lunch Dip: 100% → 70% (150 → 105 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.shopping_user, 0.7) },
-        // Afternoon Recovery: 70% → 90% (105 → 135 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.shopping_user, 0.9) },
-        // Evening Peak: 90% → 100% (135 → 150 VUs)
-        { duration: '60m', target: calculateTarget(PEAK_VUS.shopping_user, 1.0) },
-        // Evening Wind-Down: 100% → 50% (150 → 75 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.shopping_user, 0.5) },
-        // Night Low: 50% → 20% (75 → 30 VUs)
-        { duration: '15m', target: calculateTarget(PEAK_VUS.shopping_user, 0.2) },
-        // Graceful Shutdown: 20% → 0% (30 → 0 VUs)
+        // Morning Ramp-Up: 0% → 60% (0 → 18 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.shopping_user, 0.6) },
+        // Morning Peak: 60% → 100% (18 → 30 RPS)
+        { duration: '60m', target: calculateRpsTarget(PEAK_RPS.shopping_user, 1.0) },
+        // Lunch Dip: 100% → 70% (30 → 21 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.shopping_user, 0.7) },
+        // Afternoon Recovery: 70% → 90% (21 → 27 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.shopping_user, 0.9) },
+        // Evening Peak: 90% → 100% (27 → 30 RPS)
+        { duration: '60m', target: calculateRpsTarget(PEAK_RPS.shopping_user, 1.0) },
+        // Evening Wind-Down: 100% → 50% (30 → 15 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.shopping_user, 0.5) },
+        // Night Low: 50% → 20% (15 → 6 RPS)
+        { duration: '15m', target: calculateRpsTarget(PEAK_RPS.shopping_user, 0.2) },
+        // Graceful Shutdown: 20% → 0% (6 → 0 RPS)
         { duration: '5m', target: 0 },
       ],
-      gracefulRampDown: '1m',
       exec: 'shoppingUserScenario',
       tags: { scenario: 'shopping_user' },
     },
 
     // Scenario 3: Registered User (15% of traffic) - Authenticated Actions
+    // Migrated to ramping-arrival-rate executor for realistic production traffic simulation
     registered_user: {
-      executor: 'ramping-vus',
-      startVUs: 0,
+      executor: 'ramping-arrival-rate',
+      startRate: 0,                    // Start at 0 RPS
+      timeUnit: '1s',                  // Rate per second
+      preAllocatedVUs: 8,               // Pre-allocate VUs for efficiency (20% of peak)
+      maxVUs: PEAK_VUS.registered_user, // Max VUs: 37 (same as previous peak VUs)
       stages: [
-        // Morning Ramp-Up: 0% → 60% (0 → 45 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.registered_user, 0.6) },
-        // Morning Peak: 60% → 100% (45 → 75 VUs)
-        { duration: '60m', target: calculateTarget(PEAK_VUS.registered_user, 1.0) },
-        // Lunch Dip: 100% → 70% (75 → 53 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.registered_user, 0.7) },
-        // Afternoon Recovery: 70% → 90% (53 → 68 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.registered_user, 0.9) },
-        // Evening Peak: 90% → 100% (68 → 75 VUs)
-        { duration: '60m', target: calculateTarget(PEAK_VUS.registered_user, 1.0) },
-        // Evening Wind-Down: 100% → 50% (75 → 38 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.registered_user, 0.5) },
-        // Night Low: 50% → 20% (38 → 15 VUs)
-        { duration: '15m', target: calculateTarget(PEAK_VUS.registered_user, 0.2) },
-        // Graceful Shutdown: 20% → 0% (15 → 0 VUs)
+        // Morning Ramp-Up: 0% → 60% (0 → 9 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.registered_user, 0.6) },
+        // Morning Peak: 60% → 100% (9 → 15 RPS)
+        { duration: '60m', target: calculateRpsTarget(PEAK_RPS.registered_user, 1.0) },
+        // Lunch Dip: 100% → 70% (15 → 11 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.registered_user, 0.7) },
+        // Afternoon Recovery: 70% → 90% (11 → 14 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.registered_user, 0.9) },
+        // Evening Peak: 90% → 100% (14 → 15 RPS)
+        { duration: '60m', target: calculateRpsTarget(PEAK_RPS.registered_user, 1.0) },
+        // Evening Wind-Down: 100% → 50% (15 → 8 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.registered_user, 0.5) },
+        // Night Low: 50% → 20% (8 → 3 RPS)
+        { duration: '15m', target: calculateRpsTarget(PEAK_RPS.registered_user, 0.2) },
+        // Graceful Shutdown: 20% → 0% (3 → 0 RPS)
         { duration: '5m', target: 0 },
       ],
-      gracefulRampDown: '1m',
       exec: 'registeredUserScenario',
       tags: { scenario: 'registered_user' },
     },
 
     // Scenario 4: API Client (10% of traffic) - High Volume
+    // Migrated to ramping-arrival-rate executor for realistic production traffic simulation
     api_client: {
-      executor: 'ramping-vus',
-      startVUs: 0,
+      executor: 'ramping-arrival-rate',
+      startRate: 0,                    // Start at 0 RPS
+      timeUnit: '1s',                  // Rate per second
+      preAllocatedVUs: 5,               // Pre-allocate VUs for efficiency (20% of peak)
+      maxVUs: PEAK_VUS.api_client,      // Max VUs: 25 (same as previous peak VUs)
       stages: [
-        // Morning Ramp-Up: 0% → 60% (0 → 30 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.api_client, 0.6) },
-        // Morning Peak: 60% → 100% (30 → 50 VUs)
-        { duration: '60m', target: calculateTarget(PEAK_VUS.api_client, 1.0) },
-        // Lunch Dip: 100% → 70% (50 → 35 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.api_client, 0.7) },
-        // Afternoon Recovery: 70% → 90% (35 → 45 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.api_client, 0.9) },
-        // Evening Peak: 90% → 100% (45 → 50 VUs)
-        { duration: '60m', target: calculateTarget(PEAK_VUS.api_client, 1.0) },
-        // Evening Wind-Down: 100% → 50% (50 → 25 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.api_client, 0.5) },
-        // Night Low: 50% → 20% (25 → 10 VUs)
-        { duration: '15m', target: calculateTarget(PEAK_VUS.api_client, 0.2) },
-        // Graceful Shutdown: 20% → 0% (10 → 0 VUs)
+        // Morning Ramp-Up: 0% → 60% (0 → 6 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.api_client, 0.6) },
+        // Morning Peak: 60% → 100% (6 → 10 RPS)
+        { duration: '60m', target: calculateRpsTarget(PEAK_RPS.api_client, 1.0) },
+        // Lunch Dip: 100% → 70% (10 → 7 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.api_client, 0.7) },
+        // Afternoon Recovery: 70% → 90% (7 → 9 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.api_client, 0.9) },
+        // Evening Peak: 90% → 100% (9 → 10 RPS)
+        { duration: '60m', target: calculateRpsTarget(PEAK_RPS.api_client, 1.0) },
+        // Evening Wind-Down: 100% → 50% (10 → 5 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.api_client, 0.5) },
+        // Night Low: 50% → 20% (5 → 2 RPS)
+        { duration: '15m', target: calculateRpsTarget(PEAK_RPS.api_client, 0.2) },
+        // Graceful Shutdown: 20% → 0% (2 → 0 RPS)
         { duration: '5m', target: 0 },
       ],
-      gracefulRampDown: '1m',
       exec: 'apiClientScenario',
       tags: { scenario: 'api_client' },
     },
 
     // Scenario 5: Admin User (5% of traffic) - Management Operations
+    // Migrated to ramping-arrival-rate executor for realistic production traffic simulation
     admin_user: {
-      executor: 'ramping-vus',
-      startVUs: 0,
+      executor: 'ramping-arrival-rate',
+      startRate: 0,                    // Start at 0 RPS
+      timeUnit: '1s',                  // Rate per second
+      preAllocatedVUs: 3,               // Pre-allocate VUs for efficiency (20% of peak)
+      maxVUs: PEAK_VUS.admin_user,      // Max VUs: 13 (same as previous peak VUs)
       stages: [
-        // Morning Ramp-Up: 0% → 60% (0 → 15 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.admin_user, 0.6) },
-        // Morning Peak: 60% → 100% (15 → 25 VUs)
-        { duration: '60m', target: calculateTarget(PEAK_VUS.admin_user, 1.0) },
-        // Lunch Dip: 100% → 70% (25 → 18 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.admin_user, 0.7) },
-        // Afternoon Recovery: 70% → 90% (18 → 23 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.admin_user, 0.9) },
-        // Evening Peak: 90% → 100% (23 → 25 VUs)
-        { duration: '60m', target: calculateTarget(PEAK_VUS.admin_user, 1.0) },
-        // Evening Wind-Down: 100% → 50% (25 → 13 VUs)
-        { duration: '30m', target: calculateTarget(PEAK_VUS.admin_user, 0.5) },
-        // Night Low: 50% → 20% (13 → 5 VUs)
-        { duration: '15m', target: calculateTarget(PEAK_VUS.admin_user, 0.2) },
-        // Graceful Shutdown: 20% → 0% (5 → 0 VUs)
+        // Morning Ramp-Up: 0% → 60% (0 → 3 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.admin_user, 0.6) },
+        // Morning Peak: 60% → 100% (3 → 5 RPS)
+        { duration: '60m', target: calculateRpsTarget(PEAK_RPS.admin_user, 1.0) },
+        // Lunch Dip: 100% → 70% (5 → 4 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.admin_user, 0.7) },
+        // Afternoon Recovery: 70% → 90% (4 → 5 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.admin_user, 0.9) },
+        // Evening Peak: 90% → 100% (5 → 5 RPS)
+        { duration: '60m', target: calculateRpsTarget(PEAK_RPS.admin_user, 1.0) },
+        // Evening Wind-Down: 100% → 50% (5 → 3 RPS)
+        { duration: '30m', target: calculateRpsTarget(PEAK_RPS.admin_user, 0.5) },
+        // Night Low: 50% → 20% (3 → 1 RPS)
+        { duration: '15m', target: calculateRpsTarget(PEAK_RPS.admin_user, 0.2) },
+        // Graceful Shutdown: 20% → 0% (1 → 0 RPS)
         { duration: '5m', target: 0 },
       ],
-      gracefulRampDown: '1m',
       exec: 'adminUserScenario',
       tags: { scenario: 'admin_user' },
+    },
+
+    // Scenario 6: Baseline Traffic - Steady background traffic
+    // Uses constant-arrival-rate executor for steady RPS throughout the day
+    baseline_traffic: {
+      executor: 'constant-arrival-rate',
+      rate: BASELINE_RPS,               // 30 RPS total (baseline)
+      timeUnit: '1s',                   // Rate per second
+      duration: '24h',                  // Run for 24 hours
+      preAllocatedVUs: 50,               // Pre-allocate VUs for efficiency
+      maxVUs: 200,                       // Max VUs to handle baseline traffic
+      exec: 'browserUserScenario',       // Use browser user scenario for baseline traffic
+      tags: { scenario: 'baseline_traffic' },
+    },
+
+    // Scenario 7: Peak Hours - Time-based traffic patterns
+    // Simulates realistic production traffic with morning/evening peaks and lunch dip
+    peak_hours: {
+      executor: 'ramping-arrival-rate',
+      startRate: 20,                     // Start at 20 RPS (night low)
+      timeUnit: '1s',                    // Rate per second
+      preAllocatedVUs: 50,               // Pre-allocate VUs for efficiency
+      maxVUs: 300,                       // Max VUs to handle peak traffic (100 RPS)
+      stages: [
+        // Morning Peak: 9 AM - 12 PM (3 hours) - Ramp to 100 RPS
+        { duration: '3h', target: 100 },
+        // Lunch Dip: 12 PM - 2 PM (2 hours) - Drop to 60 RPS
+        { duration: '2h', target: 60 },
+        // Afternoon Recovery: 2 PM - 6 PM (4 hours) - Ramp to 90 RPS
+        { duration: '4h', target: 90 },
+        // Evening Peak: 6 PM - 10 PM (4 hours) - Peak at 100 RPS
+        { duration: '4h', target: 100 },
+        // Night Low: 10 PM - 6 AM (8 hours) - Drop to 20 RPS
+        { duration: '8h', target: 20 },
+        // Morning Ramp-Up: 6 AM - 9 AM (3 hours) - Ramp to 100 RPS
+        { duration: '3h', target: 100 },
+      ],
+      exec: 'shoppingUserScenario',      // Use shopping user scenario for peak hours
+      tags: { scenario: 'peak_hours' },
+    },
+
+    // Scenario 8: Flash Sale Burst - Sudden traffic spike simulation
+    // Simulates flash sale pattern: pre-event → sudden burst → sustain → quick drop → post-event
+    flash_sale: {
+      executor: 'ramping-arrival-rate',
+      startRate: 0,                       // Start at 0 RPS (pre-event)
+      timeUnit: '1s',                     // Rate per second
+      preAllocatedVUs: 200,                // Pre-allocate VUs for efficiency (ready for burst)
+      maxVUs: 500,                         // Max VUs to handle 200 RPS burst
+      stages: [
+        // Pre-event: 0 RPS for 2 hours (waiting period)
+        { duration: '2h', target: 0 },
+        // Sudden burst: Ramp to target RPS in 30 seconds (configurable via CONFIG.BURST_RPS)
+        { duration: '30s', target: CONFIG.BURST_RPS },
+        // Sustain: Maintain target RPS for configured duration (default: 5m)
+        { duration: CONFIG.BURST_DURATION, target: CONFIG.BURST_RPS },
+        // Quick drop: Drop to 50 RPS in 30 seconds
+        { duration: '30s', target: 50 },
+        // Post-event: 0 RPS for 1 hour (cooling down)
+        { duration: '1h', target: 0 },
+      ],
+      exec: 'shoppingUserScenario',       // Use shopping user scenario for flash sale
+      tags: { scenario: 'flash_sale' },
+    },
+
+    // Scenario 9: Marketing Campaign Burst - Gradual ramp-up/down pattern
+    // Simulates marketing campaign: gradual ramp-up → peak → gradual ramp-down
+    marketing_campaign: {
+      executor: 'ramping-arrival-rate',
+      startRate: 0,                       // Start at 0 RPS
+      timeUnit: '1s',                     // Rate per second
+      preAllocatedVUs: 50,                 // Pre-allocate VUs for efficiency
+      maxVUs: 400,                         // Max VUs to handle 300 RPS peak
+      stages: [
+        // Gradual ramp-up: 0 → 100 RPS over 30 minutes
+        { duration: '30m', target: 100 },
+        // Peak stage: 100-300 RPS sustained for 1-4 hours (configurable)
+        { duration: '2h', target: 200 },   // Ramp to 200 RPS
+        { duration: '1h', target: 300 },   // Peak at 300 RPS
+        { duration: '1h', target: 200 },   // Sustain at 200 RPS
+        // Gradual ramp-down: Peak → 0 RPS over 30 minutes
+        { duration: '30m', target: 0 },
+      ],
+      exec: 'browserUserScenario',        // Use browser user scenario for marketing campaign
+      tags: { scenario: 'marketing_campaign' },
     },
   },
 

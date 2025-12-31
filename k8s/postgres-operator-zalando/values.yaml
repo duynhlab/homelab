@@ -5,52 +5,55 @@
 
 # Operator image configuration
 image:
-  registry: registry.opensource.zalan.do
-  repository: acid/postgres-operator
-  tag: v1.15.0  # ⚠️ Fix version here for stability
-  pullPolicy: IfNotPresent
+  registry: ghcr.io
+  repository: zalando/postgres-operator
+  tag: v1.15.1
+  pullPolicy: "IfNotPresent"
 
-# Operator configuration
-config:
-  # Kubernetes API connection
-  kubernetes:
-    cluster_name: "kind-cluster"
-  
-  # PostgreSQL configuration
-  postgresql:
-    # Default parameters for all PostgreSQL instances
-    parameters:
-      max_connections: "100"
-      shared_buffers: "128MB"
-      effective_cache_size: "256MB"
-      maintenance_work_mem: "64MB"
-      checkpoint_completion_target: "0.9"
-      wal_buffers: "16MB"
-      default_statistics_target: "100"
-      random_page_cost: "4.0"
-      effective_io_concurrency: "2"
-      work_mem: "4MB"
-      min_wal_size: "1GB"
-      max_wal_size: "4GB"
-  
-  # Connection pooler (PgBouncer) configuration
-  connection_pooler:
-    # Default PgBouncer settings
-    default_parameters:
-      pool_mode: "transaction"
-      max_client_conn: "100"
-      default_pool_size: "25"
-      reserve_pool_size: "5"
-      reserve_pool_timeout: "3"
-      max_db_connections: "0"  # 0 = no limit
-      max_user_connections: "0"
-  
-  # Backup configuration
-  backup:
-    # WAL-E backup settings (if enabled)
-    wal_s3_bucket: ""  # Leave empty for no backup (learning project)
-  
-  # Monitoring
+# Operator configuration (flat structure - NOT nested under config:)
+# Helm chart expects flat top-level keys: configKubernetes, configGeneral, configPostgresql, etc.
+
+# Kubernetes API connection
+configKubernetes:
+  cluster_name: "kind-cluster"
+  enable_cross_namespace_secret: true  # Enable cross-namespace secret creation for supporting-db cluster
+
+# PostgreSQL configuration
+configPostgresql:
+  # Default parameters for all PostgreSQL instances
+  parameters:
+    max_connections: "100"
+    shared_buffers: "128MB"
+    effective_cache_size: "256MB"
+    maintenance_work_mem: "64MB"
+    checkpoint_completion_target: "0.9"
+    wal_buffers: "16MB"
+    default_statistics_target: "100"
+    random_page_cost: "4.0"
+    effective_io_concurrency: "2"
+    work_mem: "4MB"
+    min_wal_size: "1GB"
+    max_wal_size: "4GB"
+
+# Connection pooler (PgBouncer) configuration
+configConnectionPooler:
+  # Default PgBouncer settings
+  default_parameters:
+    pool_mode: "transaction"
+    max_client_conn: "100"
+    default_pool_size: "25"
+    reserve_pool_size: "5"
+    reserve_pool_timeout: "3"
+    max_db_connections: "0"  # 0 = no limit
+    max_user_connections: "0"
+
+# Backup configuration
+configBackup:
+  # WAL-E backup settings (if enabled)
+  wal_s3_bucket: ""  # Leave empty for no backup (learning project)
+
+# General configuration
+configGeneral:
   enable_pgversion_env_var: true
 
 # Operator resources

@@ -110,6 +110,31 @@ chmod +x .git/hooks/pre-commit
 
 **Note:** See [`docs/guides/CONVENTIONS.md`](CONVENTIONS.md#local-build-verification) for detailed usage and troubleshooting.
 
+### Local Development Setup
+
+1. **Create `.env` file** (optional):
+   ```bash
+   cat > services/.env <<EOF
+   SERVICE_NAME=auth
+   PORT=8080
+   ENV=development
+   OTEL_SAMPLE_RATE=1.0
+   LOG_LEVEL=debug
+   LOG_FORMAT=console
+   EOF
+   ```
+
+2. **Port-forward database** (if needed):
+   ```bash
+   kubectl port-forward -n auth svc/auth-db-pooler 5432:5432
+   ```
+
+3. **Run service**:
+   ```bash
+   cd services
+   go run cmd/auth/main.go
+   ```
+
 ---
 
 ## Step-by-Step Deployment
@@ -250,8 +275,8 @@ kubectl get pods -n cart | grep transaction-db
 ```
 
 **What it does:**
-- Creates all service namespaces (auth, user, product, cart, order, review, notification, shipping) and `monitoring` namespace
 - Deploys all 9 microservices using Helm chart from OCI registry (`oci://ghcr.io/duynhne/charts/microservice`)
+- Creates namespaces automatically via Helm's `--create-namespace` flag (or reuses existing namespaces from database deployment)
 - Creates Services for each microservice
 - Sets up proper labels for Prometheus discovery
 
@@ -348,6 +373,95 @@ curl http://localhost:9090/api/v1/rules
 - Sets up port-forwarding for APM services (Tempo: 3200, Pyroscope: 4040, Loki: 3100)
 
 **Note:** Script runs port-forwarding in background. Access services via localhost.
+
+---
+
+## Configuration
+
+### Configuration Sources
+
+Configuration priority (lowest to highest):
+1. **Default values** - Hardcoded in `pkg/config/config.go`
+2. **`.env` file** - Local development only (via `godotenv`)
+3. **Environment variables** - Set directly in shell or Kubernetes
+4. **Helm values** - `charts/values/*.yaml` → `env`
+
+### Local Development (.env file)
+
+Create a `.env` file in `services/` directory:
+
+```bash
+# services/.env
+SERVICE_NAME=auth
+PORT=8080
+ENV=development
+OTEL_SAMPLE_RATE=1.0
+LOG_LEVEL=debug
+LOG_FORMAT=console
+
+# Database (port-forward from Kubernetes)
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=auth
+DB_USER=auth
+DB_PASSWORD=postgres
+```
+
+**Port-forward database for local dev:**
+```bash
+kubectl port-forward -n auth svc/auth-db-pooler 5432:5432
+```
+
+### Environment Variables
+
+**Core Configuration:**
+- `SERVICE_NAME` - Service identifier (required)
+- `PORT` - HTTP server port (default: `8080`)
+- `ENV` - Environment: development, staging, production (default: `development`)
+
+**APM Configuration:**
+- `TRACING_ENABLED` - Enable tracing (default: `true`)
+- `OTEL_COLLECTOR_ENDPOINT` - Tempo endpoint (default: `otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318`)
+- `OTEL_SAMPLE_RATE` - Sampling rate 0.0-1.0 (default: `0.1`, auto `1.0` in development)
+- `PROFILING_ENABLED` - Enable profiling (default: `true`)
+- `PYROSCOPE_ENDPOINT` - Pyroscope endpoint (default: `http://pyroscope.monitoring.svc.cluster.local:4040`)
+- `LOG_LEVEL` - Log level: debug, info, warn, error (default: `info`)
+- `LOG_FORMAT` - Log format: json, console (default: `json`)
+
+**Database Configuration:**
+- `DB_HOST` - Database host (pooler or direct endpoint)
+- `DB_PORT` - Database port (default: `5432`)
+- `DB_NAME` - Database name (required)
+- `DB_USER` - Database user (required)
+- `DB_PASSWORD` - Database password (from Secret)
+- `DB_SSLMODE` - SSL mode (default: `disable` for Kind)
+- `DB_POOL_MAX_CONNECTIONS` - Max connections (default: `25`)
+
+**See**: [`docs/guides/DATABASE.md`](./DATABASE.md) for complete database configuration.
+
+### Helm Chart Configuration
+
+All configuration is set via Helm values files (`charts/values/*.yaml`):
+
+```yaml
+# charts/values/auth.yaml
+env:
+  - name: SERVICE_NAME
+    value: "auth"
+  - name: PORT
+    value: "8080"
+  - name: ENV
+    value: "production"
+  - name: DB_HOST
+    value: "auth-db-pooler.auth.svc.cluster.local"
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: auth.auth-db.credentials.postgresql.acid.zalan.do
+        key: password
+```
+
+**See**: [`charts/README.md`](../../charts/README.md) for complete Helm chart documentation.
 
 ---
 
@@ -538,6 +652,39 @@ kubectl rollout restart deployment grafana -n monitoring
 ```bash
 # Use port-forwarding instead
 ./scripts/09-setup-access.sh
+```
+
+### Configuration Issues
+
+**Issue:** `SERVICE_NAME is required` error
+
+**Solution**: Ensure `SERVICE_NAME` is set in Helm values:
+```yaml
+env:
+  - name: SERVICE_NAME
+    value: "auth"
+```
+
+**Issue:** Configuration not taking effect
+
+**Check**:
+```bash
+# Verify Helm values
+helm get values auth -n auth
+
+# Check pod environment
+kubectl exec -n auth deployment/auth -- env | grep SERVICE_NAME
+```
+
+**Issue:** Tracing not working
+
+**Check**:
+```bash
+# Verify Tempo is running
+kubectl get pods -n monitoring -l app.kubernetes.io/name=tempo
+
+# Check endpoint connectivity
+kubectl exec -n auth deployment/auth -- nc -zv tempo.monitoring.svc.cluster.local 4318
 ```
 
 ---

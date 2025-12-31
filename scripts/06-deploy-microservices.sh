@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # =============================================================================
 # Deploy All Microservices using Helm
@@ -37,26 +37,26 @@ SERVICES=(
   "shipping-v2:shipping:shipping-v2"
 )
 
-# Deploy namespaces first
-echo "1. Creating namespaces..."
-kubectl apply -f "$PROJECT_ROOT/k8s/namespaces.yaml"
-echo ""
-
 # Deploy each service
-COUNT=2
+# Note: Namespaces are created automatically by Helm's --create-namespace flag
+# or already exist from database deployment script (04-deploy-databases.sh)
+COUNT=1
 for entry in "${SERVICES[@]}"; do
   IFS=':' read -r SERVICE NAMESPACE VALUES <<< "$entry"
   
   echo "$COUNT. Deploying $SERVICE to $NAMESPACE namespace (chart v$CHART_VERSION)..."
   
   # Deploy from OCI registry with version
-  helm upgrade --install "$SERVICE" "$CHART_REF" \
+  # Note: Increased timeout to 5m to accommodate init container migrations (Flyway)
+  if ! helm upgrade --install "$SERVICE" "$CHART_REF" \
     --version "$CHART_VERSION" \
     -f "$PROJECT_ROOT/charts/values/${VALUES}.yaml" \
     -n "$NAMESPACE" \
     --create-namespace \
     --wait \
-    --timeout 60s || true
+    --timeout 5m; then
+    echo "  WARN: Failed to deploy $SERVICE (continuing with other services)..."
+  fi
   
   COUNT=$((COUNT + 1))
 done
@@ -69,7 +69,10 @@ echo ""
 echo "Waiting for pods to be ready..."
 for entry in "${SERVICES[@]}"; do
   IFS=':' read -r SERVICE NAMESPACE VALUES <<< "$entry"
-  kubectl wait --for=condition=ready pod -l app="$SERVICE" -n "$NAMESPACE" --timeout=60s 2>/dev/null || true
+  # Increased timeout to 5m to accommodate init container migrations (Flyway)
+  if ! kubectl wait --for=condition=ready pod -l app="$SERVICE" -n "$NAMESPACE" --timeout=5m 2>/dev/null; then
+    echo "  WARN: Pods for $SERVICE not ready yet (continuing)..."
+  fi
 done
 
 echo ""

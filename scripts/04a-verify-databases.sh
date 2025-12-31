@@ -74,17 +74,57 @@ check_cluster_status() {
     fi
 }
 
+# Function to get Zalando secret password
+# Handles both regular format (username.cluster) and cross-namespace format (namespace.username.cluster)
+get_zalando_password() {
+    local username=$1
+    local cluster=$2
+    local namespace=$3
+    
+    # Check if username contains namespace (cross-namespace format: namespace.username)
+    if [[ "$username" == *"."* ]]; then
+        # Cross-namespace format: namespace.username.cluster.credentials.postgresql.acid.zalan.do
+        # Secret is in the cluster's namespace (user namespace for supporting-db)
+        local secret_name="${username}.${cluster}.credentials.postgresql.acid.zalan.do"
+        # For supporting-db, secrets are in 'user' namespace
+        if [ "$cluster" == "supporting-db" ]; then
+            kubectl get secret "$secret_name" -n "user" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || echo ""
+        else
+            kubectl get secret "$secret_name" -n "$namespace" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || echo ""
+        fi
+    else
+        # Regular format: username.cluster.credentials.postgresql.acid.zalan.do
+        local secret_name="${username}.${cluster}.credentials.postgresql.acid.zalan.do"
+        kubectl get secret "$secret_name" -n "$namespace" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || echo ""
+    fi
+}
+
 # Function to list databases in cluster
 list_databases() {
     local cluster=$1
     local namespace=$2
     local operator=$3
+    local username=$4  # Required for Zalando clusters
+    
+    echo "    Listing databases..."
     
     if [ "$operator" == "zalando" ]; then
         local pod_name="${cluster}-0"
         if kubectl get pod "$pod_name" -n "$namespace" &> /dev/null; then
-            kubectl exec -n "$namespace" "$pod_name" -- psql -U postgres -d postgres -c "\l" 2>/dev/null | sed 's/^/    /'
-            return 0
+            # Get password from Zalando-generated secret and use TCP connection
+            local password=$(get_zalando_password "$username" "$cluster" "$namespace")
+            if [ -z "$password" ]; then
+                echo "    WARN: Could not retrieve password from Zalando secret"
+                return 1
+            fi
+            local output=$(timeout 10 kubectl exec -n "$namespace" "$pod_name" -- env PGPASSWORD="$password" psql -h 127.0.0.1 -U "$username" -d postgres -tAc "SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname;" 2>&1)
+            if [ $? -eq 0 ] && [ -n "$output" ]; then
+                echo "$output" | sed 's/^/      - /'
+                return 0
+            else
+                echo "    WARN: Could not list databases (timeout or error)"
+                return 1
+            fi
         fi
     else
         local primary_pod=$(kubectl get pods -n "$namespace" -l cnpg.io/cluster="$cluster",role=primary -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
@@ -92,8 +132,15 @@ list_databases() {
             primary_pod=$(kubectl get pods -n "$namespace" -l cnpg.io/cluster="$cluster" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
         fi
         if [ -n "$primary_pod" ]; then
-            kubectl exec -n "$namespace" "$primary_pod" -- psql -U postgres -d postgres -c "\l" 2>/dev/null | sed 's/^/    /'
-            return 0
+            # Add timeout and better error handling
+            local output=$(timeout 10 kubectl exec -n "$namespace" "$primary_pod" -- psql -U postgres -d postgres -tAc "SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname;" 2>&1)
+            if [ $? -eq 0 ] && [ -n "$output" ]; then
+                echo "$output" | sed 's/^/      - /'
+                return 0
+            else
+                echo "    WARN: Could not list databases (timeout or error)"
+                return 1
+            fi
         fi
     fi
     return 1
@@ -109,7 +156,13 @@ check_database() {
     
     if [ "$operator" == "zalando" ]; then
         local pod_name="${cluster}-0"
-        if kubectl exec -n "$namespace" "$pod_name" -- psql -U "$user" -d "$database" -c "SELECT 1;" &> /dev/null; then
+        # Get password from Zalando-generated secret and use TCP connection
+        local password=$(get_zalando_password "$user" "$cluster" "$namespace")
+        if [ -z "$password" ]; then
+            echo "    ERROR: Could not retrieve password from Zalando secret"
+            return 1
+        fi
+        if timeout 10 kubectl exec -n "$namespace" "$pod_name" -- env PGPASSWORD="$password" psql -h 127.0.0.1 -U "$user" -d "$database" -tAc "SELECT 1;" &> /dev/null; then
             echo "    SUCCESS: Database '$database' exists and accessible"
             return 0
         else
@@ -132,13 +185,13 @@ check_database() {
             local password=$(kubectl get secret "$secret_name" -n "$namespace" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
             
             if [ -n "$password" ]; then
-                if kubectl exec -n "$namespace" "$primary_pod" -- env PGPASSWORD="$password" psql -h localhost -U "$user" -d "$database" -c "SELECT 1;" &> /dev/null; then
+                if timeout 10 kubectl exec -n "$namespace" "$primary_pod" -- env PGPASSWORD="$password" psql -h localhost -U "$user" -d "$database" -tAc "SELECT 1;" &> /dev/null; then
                     echo "    SUCCESS: Database '$database' exists and accessible"
                     return 0
                 fi
             fi
             # Fallback to postgres user
-            if kubectl exec -n "$namespace" "$primary_pod" -- psql -U postgres -d "$database" -c "SELECT 1;" &> /dev/null; then
+            if timeout 10 kubectl exec -n "$namespace" "$primary_pod" -- psql -U postgres -d "$database" -tAc "SELECT 1;" &> /dev/null; then
                 echo "    SUCCESS: Database '$database' exists and accessible"
                 return 0
             fi
@@ -185,7 +238,7 @@ check_pgcat_pooler() {
     fi
     
     # Test connection from PgCat pod to database (verify PgCat can connect)
-    local test_result=$(kubectl exec -n "$namespace" "$pgcat_pod" -- bash -c "PGPASSWORD=postgres psql -h $db_host -U $pool_name -d $database -c 'SELECT current_database();' 2>&1" || echo "")
+    local test_result=$(timeout 10 kubectl exec -n "$namespace" "$pgcat_pod" -- bash -c "PGPASSWORD=postgres psql -h $db_host -U $pool_name -d $database -tAc 'SELECT current_database();' 2>&1" || echo "")
     
     if echo "$test_result" | grep -q "$database"; then
         echo "    SUCCESS: PgCat connection verified (database: $database)"
@@ -203,16 +256,16 @@ echo ""
 # Review database
 echo "1. Review Database:"
 if check_cluster_status "review-db" "review" "zalando"; then
-    list_databases "review-db" "review" "zalando"
-    check_database "review-db" "review" "review" "review" "zalando"
+    list_databases "review-db" "review" "zalando" "review" || true
+    check_database "review-db" "review" "review" "review" "zalando" || true
 fi
 echo ""
 
 # Auth database
 echo "2. Auth Database:"
 if check_cluster_status "auth-db" "auth" "zalando"; then
-    list_databases "auth-db" "auth" "zalando"
-    check_database "auth-db" "auth" "auth" "auth" "zalando"
+    list_databases "auth-db" "auth" "zalando" "auth" || true
+    check_database "auth-db" "auth" "auth" "auth" "zalando" || true
     pooler_pod=$(kubectl get pods -n auth -l application=db-connection-pooler,cluster-name=auth-db -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
     if [ -n "$pooler_pod" ]; then
         echo "    SUCCESS: PgBouncer available"
@@ -225,10 +278,11 @@ echo ""
 # Supporting database
 echo "3. Supporting Database (User + Notification + Shipping-v2):"
 if check_cluster_status "supporting-db" "user" "zalando"; then
-    list_databases "supporting-db" "user" "zalando"
-    check_database "supporting-db" "user" "user" "user" "zalando"
-    check_database "supporting-db" "user" "notification" "notification" "zalando"
-    check_database "supporting-db" "user" "shipping" "shipping" "zalando"
+    list_databases "supporting-db" "user" "zalando" "user" || true
+    check_database "supporting-db" "user" "user" "user" "zalando" || true
+    # Notification and shipping use cross-namespace format: namespace.username
+    check_database "supporting-db" "user" "notification" "notification.notification" "zalando" || true
+    check_database "supporting-db" "user" "shipping" "shipping.shipping" "zalando" || true
 fi
 echo ""
 
@@ -239,22 +293,22 @@ echo ""
 # Product database
 echo "4. Product Database:"
 if check_cluster_status "product-db" "product" "cloudnativepg"; then
-    list_databases "product-db" "product" "cloudnativepg"
-    check_database "product-db" "product" "product" "product" "cloudnativepg"
-    check_pgcat_pooler "pgcat-product" "product" "product" "product"
+    list_databases "product-db" "product" "cloudnativepg" "" || true
+    check_database "product-db" "product" "product" "product" "cloudnativepg" || true
+    check_pgcat_pooler "pgcat-product" "product" "product" "product" || true
 fi
 echo ""
 
 # Transaction database (Cart + Order)
 echo "5. Transaction Database (Cart + Order):"
 if check_cluster_status "transaction-db" "cart" "cloudnativepg"; then
-    list_databases "transaction-db" "cart" "cloudnativepg"
-    check_database "transaction-db" "cart" "cart" "cart" "cloudnativepg"
+    list_databases "transaction-db" "cart" "cloudnativepg" "" || true
+    check_database "transaction-db" "cart" "cart" "cart" "cloudnativepg" || true
     if ! check_database "transaction-db" "cart" "order" "cart" "cloudnativepg"; then
         echo "    WARN: Order database missing - recreate cluster: kubectl delete cluster transaction-db -n cart && kubectl apply -f k8s/postgres-operator-cloudnativepg/crds/transaction-db.yaml"
     fi
-    check_pgcat_pooler "pgcat-transaction" "cart" "cart" "cart"
-    check_pgcat_pooler "pgcat-transaction" "cart" "cart" "order"
+    check_pgcat_pooler "pgcat-transaction" "cart" "cart" "cart" || true
+    check_pgcat_pooler "pgcat-transaction" "cart" "cart" "order" || true
 fi
 echo ""
 

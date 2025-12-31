@@ -56,7 +56,7 @@ env:
         name: auth.auth-db.credentials.postgresql.acid.zalan.do  # Zalando operator auto-generated secret
         key: password
   - name: DB_SSLMODE
-    value: "disable"
+    value: "require"  # PgBouncer requires SSL connections
   - name: DB_POOL_MAX_CONNECTIONS
     value: "25"  # PgBouncer pool size
   - name: DB_POOL_MODE

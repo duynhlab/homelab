@@ -37,6 +37,14 @@ data:
     password = "postgres"
     role = "primary"
     
+    # Replica server for read queries
+    [[pools.cart.shards.0.servers]]
+    host = "transaction-db-r.cart.svc.cluster.local"
+    port = 5432
+    user = "cart"
+    password = "postgres"
+    role = "replica"
+    
     # Order database pool
     [pools.order]
     pool_size = 30
@@ -53,3 +61,11 @@ data:
     user = "cart"
     password = "postgres"
     role = "primary"
+    
+    # Replica server for read queries
+    [[pools.order.shards.0.servers]]
+    host = "transaction-db-r.cart.svc.cluster.local"
+    port = 5432
+    user = "cart"
+    password = "postgres"
+    role = "replica"

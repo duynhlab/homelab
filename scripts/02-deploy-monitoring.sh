@@ -45,10 +45,14 @@ echo ""
 echo "3. Waiting for Prometheus Operator CRDs..."
 sleep 10
 
-# Apply ServiceMonitor for microservices
-echo "4. Applying ServiceMonitor for microservices..."
-kubectl apply -f k8s/prometheus/servicemonitor-microservices.yaml
-echo "  SUCCESS: ServiceMonitor created"
+# Apply ServiceMonitors
+echo "4. Applying ServiceMonitors..."
+if [ -d "k8s/prometheus/servicemonitors" ]; then
+    kubectl apply -f k8s/prometheus/servicemonitors/
+    echo "  SUCCESS: ServiceMonitors deployed"
+else
+    echo "  WARN: k8s/prometheus/servicemonitors directory not found, skipping ServiceMonitor deployment"
+fi
 
 # Deploy Grafana Operator + resources
 echo "5. Installing/Upgrading Grafana Operator v5.20.0..."

@@ -4,9 +4,9 @@
 # This script deploys:
 # 1. Zalando Postgres Operator
 # 2. CloudNativePG Operator
-# 3. All 5 database clusters
+# 3. All 5 database clusters (with postgres_exporter sidecars for Zalando clusters)
 # 4. PgCat connection poolers
-# 5. postgres_exporter for monitoring
+# 5. PodMonitors for Prometheus Operator to scrape metrics from sidecars
 #
 # Usage: ./scripts/04-deploy-databases.sh
 
@@ -40,7 +40,7 @@ fi
 helm upgrade --install postgres-operator postgres-operator/postgres-operator \
     -f "$PROJECT_ROOT/k8s/postgres-operator-zalando/values.yaml" \
     -n database \
-    --create-namespace \
+    --version v1.15.1 \
     --wait \
     --timeout 5m
 
@@ -66,7 +66,6 @@ fi
 helm upgrade --install cloudnative-pg cnpg/cloudnative-pg \
     -f "$PROJECT_ROOT/k8s/postgres-operator-cloudnativepg/values.yaml" \
     -n database \
-    --create-namespace \
     --wait \
     --timeout 5m
 
@@ -86,7 +85,7 @@ echo "SUCCESS: CloudNativePG Operator deployed"
 echo "Creating database clusters..."
 
 # Create namespaces
-for ns in auth review product cart user; do
+for ns in auth review product cart order user; do
     if ! kubectl get namespace "$ns" &> /dev/null; then
         kubectl create namespace "$ns"
     fi
@@ -95,32 +94,38 @@ done
 # Create database secrets BEFORE applying CRDs
 # CloudNativePG requires secrets to exist during bootstrap
 echo "Creating database secrets..."
-echo "Creating secrets for CloudNativePG databases..."
+echo "Applying secrets for CloudNativePG databases from YAML files..."
 
+# Apply secrets from YAML files (declarative approach)
 # Product database secret
-if ! kubectl get secret product-db-secret -n product &> /dev/null; then
-    kubectl create secret generic product-db-secret \
-        --from-literal=username=product \
-        --from-literal=password=postgres \
-        -n product
-    echo "Created product-db-secret"
+if [ -f "$PROJECT_ROOT/k8s/secrets/product-db-secret.yaml" ]; then
+    kubectl apply -f "$PROJECT_ROOT/k8s/secrets/product-db-secret.yaml"
+    echo "Applied product-db-secret from YAML"
 else
-    echo "product-db-secret already exists, skipping"
+    echo "WARN: product-db-secret.yaml not found, skipping"
 fi
 
-# Transaction database secret (cart + order)
-if ! kubectl get secret transaction-db-secret -n cart &> /dev/null; then
-    kubectl create secret generic transaction-db-secret \
-        --from-literal=username=cart \
-        --from-literal=password=postgres \
-        -n cart
-    echo "Created transaction-db-secret"
+# Transaction database secrets (cart + order - separate files)
+if [ -f "$PROJECT_ROOT/k8s/secrets/transaction-db-secret-cart.yaml" ]; then
+    kubectl apply -f "$PROJECT_ROOT/k8s/secrets/transaction-db-secret-cart.yaml"
+    echo "Applied transaction-db-secret to cart namespace"
 else
-    echo "transaction-db-secret already exists, skipping"
+    echo "WARN: transaction-db-secret-cart.yaml not found, skipping"
 fi
 
-echo "SUCCESS: CloudNativePG database secrets created"
+if [ -f "$PROJECT_ROOT/k8s/secrets/transaction-db-secret-order.yaml" ]; then
+    kubectl apply -f "$PROJECT_ROOT/k8s/secrets/transaction-db-secret-order.yaml"
+    echo "Applied transaction-db-secret to order namespace"
+else
+    echo "WARN: transaction-db-secret-order.yaml not found, skipping"
+fi
+
+echo "SUCCESS: CloudNativePG database secrets created from YAML files"
 echo "NOTE: Zalando operator will auto-generate secrets when CRDs are applied"
+
+# Note: OperatorConfiguration is managed by Helm chart (postgres-operator CRD)
+# Configuration is set via k8s/postgres-operator-zalando/values.yaml
+# The operator-configuration.yaml file is not used (operator reads postgres-operator CRD from Helm)
 
 # Apply Zalando CRDs
 echo "Applying Zalando database CRDs..."
@@ -157,7 +162,7 @@ for cluster in review-db auth-db supporting-db; do
     if kubectl wait --for=condition=ready pod "$pod_name" \
         -n "$namespace" \
         --timeout=300s 2>/dev/null; then
-        echo "✓ $cluster pod is ready"
+        echo "SUCCESS: $cluster pod is ready"
     else
         echo "WARN: $cluster pod may not be ready yet. Check with: kubectl get pod $pod_name -n $namespace"
     fi
@@ -175,7 +180,7 @@ for cluster in product-db transaction-db; do
     if kubectl wait --for=condition=Ready cluster "$cluster" \
         -n "$namespace" \
         --timeout=300s 2>/dev/null; then
-        echo "✓ $cluster is ready"
+        echo "SUCCESS: $cluster is ready"
     else
         echo "WARN: $cluster may not be ready yet. Check with: kubectl get cluster $cluster -n $namespace"
         echo "      Or check pods: kubectl get pods -n $namespace -l cnpg.io/cluster=$cluster"
@@ -183,6 +188,10 @@ for cluster in product-db transaction-db; do
 done
 
 echo "SUCCESS: Database clusters created (or in progress)"
+
+# Note: Zalando operator with enable_cross_namespace_secret: true automatically creates secrets
+# in target namespaces when users are defined with namespace.username format (e.g., notification.notification)
+# Secrets are created automatically - no manual sync needed
 
 # Deploy PgCat poolers
 echo "Deploying PgCat connection poolers..."
@@ -210,6 +219,15 @@ kubectl wait --for=condition=ready pod \
 }
 
 echo "SUCCESS: PgCat poolers deployed"
+
+# Deploy PodMonitors for postgres_exporter sidecars (all clusters)
+echo "Deploying PodMonitors for postgres_exporter sidecars..."
+if [ -d "$PROJECT_ROOT/k8s/prometheus/podmonitors" ]; then
+    kubectl apply -f "$PROJECT_ROOT/k8s/prometheus/podmonitors/"
+    echo "SUCCESS: PodMonitors deployed"
+else
+    echo "WARN: k8s/prometheus/podmonitors directory not found, skipping PodMonitor deployment"
+fi
 
 # Print summary
 echo ""
@@ -253,20 +271,28 @@ echo "    - product-db-secret (product namespace)"
 echo "    - transaction-db-secret (cart namespace)"
 echo "  Zalando (auto-generated by operator):"
 echo "    - user.supporting-db.credentials.postgresql.acid.zalan.do (user namespace)"
-echo "    - notification.supporting-db.credentials.postgresql.acid.zalan.do (user namespace)"
-echo "    - shipping.supporting-db.credentials.postgresql.acid.zalan.do (user namespace)"
+echo "    - notification.notification.supporting-db.credentials.postgresql.acid.zalan.do (notification namespace, auto-created by operator)"
+echo "    - shipping.shipping.supporting-db.credentials.postgresql.acid.zalan.do (shipping namespace, auto-created by operator)"
 echo "    - review.review-db.credentials.postgresql.acid.zalan.do (review namespace)"
 echo "    - auth.auth-db.credentials.postgresql.acid.zalan.do (auth namespace)"
 echo ""
 
+echo "Monitoring:"
+echo "  - postgres_exporter runs as sidecar in all Zalando PostgreSQL pods"
+echo "  - PodMonitors deployed for Prometheus Operator to scrape metrics"
+echo "  - Metrics available on port 9187 in each pod"
+echo ""
 echo "Next Steps:"
 echo "1. Zalando operator auto-generates secrets when CRDs are applied"
-echo "2. Run database migrations (init containers will handle this)"
-echo "3. Deploy microservices with database configuration"
+echo "2. Supporting-db secrets are automatically created in notification and shipping namespaces (via enable_cross_namespace_secret)"
+echo "3. Run database migrations (init containers will handle this)"
+echo "4. Deploy microservices with database configuration"
 echo ""
 echo "⚠️  IMPORTANT NOTES:"
 echo "  - Order database is created via postInitSQL in transaction-db CRD"
 echo "  - Order service uses cart user (shared user approach)"
+echo "  - Supporting-db secrets are automatically created in target namespaces by Zalando operator (enable_cross_namespace_secret: true)"
+echo "  - postgres_exporter runs as sidecar in PostgreSQL pods (no separate monitoring user needed)"
 echo ""
 echo "Verification:"
 echo "  Run verification script: ./scripts/04a-verify-databases.sh"
@@ -274,6 +300,10 @@ echo "  Or check manually:"
 echo "    - Cluster status: kubectl get cluster -A && kubectl get postgresql -A"
 echo "    - Order database: kubectl exec -n cart transaction-db-1 -- psql -U cart -d postgres -c \"\\l\" | grep order"
 echo "    - PgCat logs: kubectl logs -n cart -l app=pgcat-transaction --tail=50"
+echo "    - Sidecar exporters: kubectl get pod -n auth auth-db-0 -o jsonpath='{.spec.containers[*].name}'"
+echo "    - Sidecar logs: kubectl logs -n auth auth-db-0 -c exporter"
+echo "    - Test metrics: kubectl port-forward -n auth auth-db-0 9187:9187 & curl http://localhost:9187/metrics | grep pg_up"
+echo "    - PodMonitors: kubectl get podmonitor -A"
 echo "=========================================="
 echo ""
 echo "SUCCESS: Database deployment completed!"

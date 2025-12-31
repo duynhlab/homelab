@@ -47,11 +47,11 @@ env:
   - name: DB_NAME
     value: "shipping"
   - name: DB_USER
-    value: "shipping"
+    value: "shipping.shipping"  # Cross-namespace format: namespace.username
   - name: DB_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: shipping.supporting-db.credentials.postgresql.acid.zalan.do  # Zalando operator auto-generated secret
+        name: shipping.shipping.supporting-db.credentials.postgresql.acid.zalan.do  # Zalando operator cross-namespace secret (in shipping namespace)
         key: password
   - name: DB_SSLMODE
     value: "disable"
@@ -97,8 +97,8 @@ migrations:
     DB_HOST: "supporting-db.user.svc.cluster.local"  # Direct connection, no pooler - supporting-db is in user namespace
     DB_PORT: "5432"
     DB_NAME: "shipping"
-    DB_USER: "shipping"
+    DB_USER: "shipping.shipping"  # Cross-namespace format: namespace.username
     DB_SSLMODE: "disable"
   envFrom:
-    secretRef: "shipping.supporting-db.credentials.postgresql.acid.zalan.do"  # Zalando operator auto-generated secret
+    secretRef: "shipping.shipping.supporting-db.credentials.postgresql.acid.zalan.do"  # Zalando operator cross-namespace secret (in shipping namespace)
 

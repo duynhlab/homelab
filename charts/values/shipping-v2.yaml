@@ -45,13 +45,13 @@ env:
   - name: DB_PORT
     value: "5432"
   - name: DB_NAME
-    value: "shipping"  # Different schema/database
+    value: "shipping"  # Same database as shipping service
   - name: DB_USER
-    value: "shipping"
+    value: "shipping.shipping"  # Use namespace.username format for cross-namespace secret
   - name: DB_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: shipping.supporting-db.credentials.postgresql.acid.zalan.do  # Zalando operator auto-generated secret
+        name: shipping.shipping.supporting-db.credentials.postgresql.acid.zalan.do  # Zalando operator cross-namespace secret (in shipping namespace)
         key: password
   - name: DB_SSLMODE
     value: "disable"
@@ -89,15 +89,8 @@ readinessProbe:
   periodSeconds: 5
 
 # Database migrations (Flyway init container)
+# Disabled: shipping-v2 shares database "shipping" with shipping service
+# Schema already exists from shipping service migration, no new migration needed
+# This prevents Flyway checksum mismatch errors
 migrations:
-  enabled: true
-  image: ghcr.io/duynhne/shipping-v2:v5-init
-  imagePullPolicy: Always #IfNotPresent
-  env:
-    DB_HOST: "supporting-db.user.svc.cluster.local"  # Direct connection, no pooler - supporting-db is in user namespace
-    DB_PORT: "5432"
-    DB_NAME: "shipping"
-    DB_USER: "shipping"
-    DB_SSLMODE: "disable"
-  envFrom:
-    secretRef: "shipping.supporting-db.credentials.postgresql.acid.zalan.do"  # Zalando operator auto-generated secret
+  enabled: false

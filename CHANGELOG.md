@@ -8,6 +8,463 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+## [0.10.38] - 2025-12-30
+
+### Added
+
+**PgCat High Availability Integration for Transaction Database:**
+- **Added**: Replica server configuration to PgCat ConfigMap for HA read routing
+  - **File**: `k8s/pgcat/transaction/configmap.yaml`
+  - **Configuration**: Added replica servers for both `cart` and `order` database pools
+  - **Primary Server**: `transaction-db-rw.cart.svc.cluster.local` (handles writes - INSERT, UPDATE, DELETE, DDL)
+  - **Replica Server**: `transaction-db-r.cart.svc.cluster.local` (handles reads - SELECT queries, load balanced)
+  - **CloudNativePG Services**: Uses auto-created services by CloudNativePG Operator:
+    - `transaction-db-rw`: Read-write endpoint pointing to current primary instance
+    - `transaction-db-r`: Read-only endpoint load balancing across all replica instances
+  - **Query Routing**: PgCat automatically routes queries based on SQL type:
+    - SELECT queries → Replica servers (load balanced)
+    - Write queries → Primary server
+  - **Failover**: Automatic failover with 60s ban_time for unhealthy replicas
+- **Added**: ServiceMonitor for PgCat metrics collection
+  - **File**: `k8s/prometheus/servicemonitors/servicemonitor-pgcat-transaction.yaml`
+  - **Purpose**: Enables Prometheus to scrape PgCat metrics from HTTP admin endpoint (port 9930, path `/metrics`)
+  - **Deployment**: Automatically applied by `scripts/02-deploy-monitoring.sh` (applies all ServiceMonitors from directory)
+  - **Key Metrics**: `pgcat_pools_active_connections`, `pgcat_servers_health`, `pgcat_queries_total`, `pgcat_errors_total`
+- **Added**: Comprehensive configuration analysis document
+  - **File**: `specs/active/connection-poolers-deepdive/configmap-analysis.md`
+  - **Content**: Detailed explanation of PgCat ConfigMap structure, CloudNativePG services, query routing logic, health checks, and failover behavior
+
+### Changed
+
+**Database Documentation:**
+- **Updated**: `docs/guides/DATABASE.md` - Added High Availability Integration section for Transaction Database
+  - **New Section**: "High Availability Integration" under PgCat Standalone section
+  - **Content**: 
+    - CloudNativePG services explanation (`transaction-db-rw`, `transaction-db-r`)
+    - Replica server configuration details
+    - Query routing logic (SELECT → replicas, writes → primary)
+    - Load balancing algorithm (default "random")
+    - Automatic failover behavior
+    - Health checks and ban_time configuration
+    - Monitoring setup (ServiceMonitor)
+    - Troubleshooting guide for HA scenarios
+  - **Updated**: Architecture diagram to reflect PgCat HA integration
+    - Shows CloudNativePG services (`transaction-db-rw`, `transaction-db-r`)
+    - Shows PgCat deployment with 2 replicas
+    - Shows query routing (SELECT → replicas, writes → primary)
+    - Shows ServiceMonitor and Prometheus scraping
+  - **Updated**: Transaction Database features list to include PgCat HA integration
+
+## [0.10.37] - 2025-12-30
+
+### Fixed
+
+**shipping-v2 Service Secret Access and Flyway Checksum Mismatch:**
+- **Fixed**: Updated `shipping-v2` service to use `shipping.shipping` user (with namespace prefix)
+  - **Issue**: `shipping-v2` service was configured to use user `shipping` (without namespace prefix), which creates secret in `user` namespace
+  - **Problem**: `shipping-v2` service runs in `shipping` namespace and cannot access secrets from `user` namespace via `secretKeyRef`
+  - **Solution**: Updated `charts/values/shipping-v2.yaml` to use user `shipping.shipping` (same as `shipping` v1 service)
+  - **Result**: Both `shipping` and `shipping-v2` services now share the same secret `shipping.shipping.supporting-db.credentials.postgresql.acid.zalan.do` in `shipping` namespace (automatically created by operator) ✅
+  - **Removed**: User `shipping` (without prefix) from CRD - no longer needed
+- **Fixed**: Flyway checksum mismatch error for `shipping-v2` service
+  - **Issue**: `shipping` service init trước, chạy migration V1 với checksum `627811648`. `shipping-v2` service có migration V1 khác với checksum `-966428788`. Cả 2 dùng chung database `shipping` → Flyway phát hiện checksum mismatch
+  - **Solution**: Disabled migration cho `shipping-v2` service (`migrations.enabled: false`) vì schema đã được tạo bởi `shipping` service
+  - **Result**: `shipping-v2` service starts successfully without Flyway errors ✅
+- **Updated**: `docs/guides/DATABASE.md` - Removed incorrect references to manual secret copy, documented that both shipping services share the same secret automatically
+
+## [0.10.36] - 2025-12-30
+
+### Fixed
+
+**Zalando Postgres Operator Cross-Namespace Secret Configuration:**
+- **Fixed**: Corrected Helm values structure in `k8s/postgres-operator-zalando/values.yaml`
+  - **Root Cause**: Helm values used incorrect nested structure (`config.kubernetes.enable_cross_namespace_secret`) instead of flat structure (`configKubernetes.enable_cross_namespace_secret`) as required by Helm chart defaults
+  - **Impact**: Operator could not read `enable_cross_namespace_secret` setting, preventing automatic secret creation in target namespaces
+  - **Fix**: Restructured values.yaml to use flat top-level keys:
+    - `config.kubernetes` → `configKubernetes:`
+    - `config.postgresql` → `configPostgresql:`
+    - `config.connection_pooler` → `configConnectionPooler:`
+    - `config.backup` → `configBackup:`
+    - `enable_pgversion_env_var` → `configGeneral.enable_pgversion_env_var:`
+- **Result**: Cross-namespace secret feature now works correctly ✅
+  - Secrets automatically created in target namespaces:
+    - `notification.notification.supporting-db.credentials.postgresql.acid.zalan.do` in `notification` namespace ✅
+    - `shipping.shipping.supporting-db.credentials.postgresql.acid.zalan.do` in `shipping` namespace ✅
+    - `shipping.supporting-db.credentials.postgresql.acid.zalan.do` in `user` namespace (for shipping-v2 service) ✅
+- **Updated**: `k8s/postgres-operator-zalando/crds/supporting-db.yaml` - Added missing `shipping` user (without namespace prefix) for shipping-v2 service
+- **Removed**: Fallback secret application section from `scripts/04-deploy-databases.sh` (not needed - operator creates secrets automatically)
+- **Updated**: `docs/guides/DATABASE.md` - Documented configuration fix and verified secret creation
+
+### Changed
+
+**Database Documentation:**
+- **Updated**: `docs/guides/DATABASE.md` - Cross-namespace secrets section
+  - Documented Helm values structure fix (flat vs nested)
+  - Updated secret creation verification steps
+  - Added note about shipping-v2 service secret location
+
+## [0.10.35] - 2025-12-30
+
+### Changed
+
+**Database Documentation Refactoring:**
+- **Refactored**: Reorganized `docs/guides/DATABASE.md` structure for better maintainability
+  - Grouped content by operator (CloudNativePG, Zalando) instead of by topic
+  - Created dedicated "Shared Topics" section for common content (Environment Variables, Helm Chart Configuration, Local Development, Database Verification, Best Practices)
+  - Improved navigation with clearer section hierarchy
+  - Removed duplicate sections and consolidated troubleshooting content
+  - Updated all internal links and cross-references
+
+## [0.10.34] - 2025-12-30
+
+### Changed
+
+**Prometheus Monitor Organization:**
+- **Refactored**: Organized PodMonitors and ServiceMonitors into dedicated folders
+  - Created `k8s/prometheus/podmonitors/` folder for all PodMonitor resources
+  - Created `k8s/prometheus/servicemonitors/` folder for all ServiceMonitor resources
+  - Moved 5 PodMonitor files: `podmonitor-auth-db.yaml`, `podmonitor-product-db.yaml`, `podmonitor-review-db.yaml`, `podmonitor-supporting-db.yaml`, `podmonitor-transaction-db.yaml`
+  - Moved 1 ServiceMonitor file: `servicemonitor-microservices.yaml`
+- **Simplified**: Deployment scripts now use `kubectl apply -f` on folders instead of looping through individual files
+  - `scripts/04-deploy-databases.sh`: Replaced loop with `kubectl apply -f k8s/prometheus/podmonitors/`
+  - `scripts/02-deploy-monitoring.sh`: Updated to use `kubectl apply -f k8s/prometheus/servicemonitors/`
+  - Benefits: Simpler, more maintainable, automatically applies all monitors, future-proof for new monitors
+- **Updated**: All documentation with new file paths
+  - `docs/guides/DATABASE.md`: Updated PodMonitor file paths
+  - `specs/active/cloudnativepg-operator/`: Updated all spec files with new paths
+  - Task 3.3 marked as completed (script now handles PodMonitor deployment automatically)
+
+## [0.10.33] - 2025-12-29
+
+### Fixed
+
+**CloudNativePG Configuration Validation Errors:**
+- **Fixed**: Removed fixed parameters that cannot be set by users:
+  - `log_filename` - Managed by CloudNativePG operator
+  - `log_rotation_age` - Managed by CloudNativePG operator
+  - `log_rotation_size` - Managed by CloudNativePG operator
+- **Fixed**: Logical replication slot sync configuration for PostgreSQL 18:
+  - Changed from `pg_failover_slots` extension (not available in image) to `sync_replication_slots: 'on'` parameter
+  - PostgreSQL 17+ uses native `sync_replication_slots` parameter (no extension needed)
+  - Removed `pg_failover_slots` extension creation from postInitSQL (not needed for PostgreSQL 17+)
+  - CloudNativePG requires either `sync_replication_slots` (PostgreSQL 17+) or `pg_failover_slots` extension (PostgreSQL 15/16)
+- **Fixed**: Missing `order` namespace in deployment script:
+  - Added `order` namespace to namespace creation list in `scripts/04-deploy-databases.sh`
+
+### Added
+
+**Production-Ready CloudNativePG Configuration for Transaction-DB Cluster:**
+- **High Availability (3 Nodes)**: Upgraded transaction-db cluster from 2 to 3 instances
+  - 1 primary + 2 replicas for enhanced HA and read scaling
+  - Synchronous replication configured for zero data loss (`dataDurability: required`)
+  - Automatic failover via Patroni (< 30 seconds)
+- **Logical Replication Slot Synchronization**: Enabled for CDC clients (Debezium, Kafka Connect)
+  - Prevents data loss during failover for logical replication consumers
+  - Configuration: `replicationSlots.highAvailability.synchronizeLogicalDecoding: true`
+- **Production PostgreSQL Tuning**: Comprehensive performance optimization
+  - Memory: `shared_buffers: 512MB`, `effective_cache_size: 1.5GB` (adjusted for 2Gi pod memory)
+  - WAL: `wal_level: logical`, `max_wal_size: 8GB`, `min_wal_size: 2GB`, `checkpoint_timeout: 15min`
+  - Parallelism: Enabled (`max_parallel_workers: 8`, `max_parallel_workers_per_gather: 4`)
+  - Autovacuum: Aggressive tuning for high-write workloads (6 parameters)
+  - Logging: Comprehensive logging (12 parameters for production debugging and auditing)
+  - SSD Optimization: `random_page_cost: 1.1`, `effective_io_concurrency: 200`
+  - Security: `password_encryption: scram-sha-256`
+- **Resource Limits**: Updated to production-ready values
+  - Requests: `memory: 1Gi`, `cpu: 500m`
+  - Limits: `memory: 2Gi`, `cpu: 1000m`
+- **Storage**: Increased from 10Gi to 100Gi for production workloads
+- **Monitoring Integration**: PodMonitor CRDs for Prometheus metrics collection
+  - `k8s/prometheus/podmonitor-transaction-db.yaml` (cart namespace)
+  - `k8s/prometheus/podmonitor-product-db.yaml` (product namespace)
+  - Enables automatic metrics scraping from postgres_exporter sidecars
+
+### Changed
+
+- **Updated**: `k8s/postgres-operator-cloudnativepg/crds/transaction-db.yaml`
+  - Upgraded to 3 instances with synchronous replication
+  - Applied comprehensive production tuning parameters
+  - Updated resource limits and storage configuration
+  - Commented out `syncReplicaElectionConstraint` (not needed for current setup)
+- **Updated**: `docs/guides/DATABASE.md`
+  - Updated transaction-db architecture diagram to show 3-node HA configuration
+  - Added production-ready features documentation
+- **Updated**: `specs/active/cloudnativepg-operator/research.md`
+  - Marked HA, logical replication slot sync, production tuning, and monitoring as implemented
+
+### Files Modified
+- `k8s/postgres-operator-cloudnativepg/crds/transaction-db.yaml` - Production-ready configuration
+- `k8s/prometheus/podmonitor-transaction-db.yaml` - NEW: PodMonitor for transaction-db
+- `k8s/prometheus/podmonitor-product-db.yaml` - NEW: PodMonitor for product-db
+- `docs/guides/DATABASE.md` - Updated architecture diagram and documentation
+- `specs/active/cloudnativepg-operator/research.md` - Implementation status updated
+- `CHANGELOG.md` - This entry
+
+## [0.10.32] - 2025-12-29
+
+### Fixed
+
+**Cross-Namespace Secret Configuration Fix:**
+- **Fixed**: Zalando Postgres Operator was reading wrong OperatorConfiguration CRD
+  - **Root Cause**: Operator reads `postgres-operator` CRD (created by Helm chart) via `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` environment variable
+  - This CRD had `enable_cross_namespace_secret: false`, preventing automatic secret creation in target namespaces
+  - Our custom `postgresql-operator-configuration` CRD with `enable_cross_namespace_secret: true` was not being read
+- **Immediate Fix**: Patched `postgres-operator` CRD to enable cross-namespace secret feature
+- **Long-term Fix**: Updated Helm values (`k8s/postgres-operator-zalando/values.yaml`) to set `enable_cross_namespace_secret: true` under `config.kubernetes`
+  - This ensures configuration persists across Helm upgrades
+- **Removed**: Manual secret sync function from `scripts/04-deploy-databases.sh` (no longer needed - operator handles it automatically)
+- **Updated**: `docs/guides/DATABASE.md` - Clarified which OperatorConfiguration CRD is active (Helm-managed `postgres-operator`)
+  - Removed mention of unused `postgresql-operator-configuration` CRD
+  - Updated troubleshooting section with operator configuration verification steps
+- **Removed**: `k8s/postgres-operator-zalando/operator-configuration.yaml` - File was not used by operator (operator reads `postgres-operator` CRD from Helm chart)
+
+### Changed
+
+- **Updated**: `k8s/postgres-operator-zalando/values.yaml` - Added `enable_cross_namespace_secret: true` under `config.kubernetes`
+- **Updated**: `scripts/04-deploy-databases.sh` - Removed `sync_supporting_db_secrets()` function and updated summary messages
+  - Script now documents that operator automatically creates secrets in target namespaces
+  - Updated secret names in summary to reflect correct format (`notification.notification.*` instead of `notification.*`)
+
+### Files Modified
+- `k8s/postgres-operator-zalando/values.yaml` - Added cross-namespace secret configuration
+- `scripts/04-deploy-databases.sh` - Removed manual sync logic, updated documentation
+- `docs/guides/DATABASE.md` - Updated configuration documentation and troubleshooting
+- `CHANGELOG.md` - This entry
+
+## [0.10.31] - 2025-12-29
+
+### Added
+
+**Production-Ready PostgreSQL Configuration for Auth-DB Cluster:**
+- **PostgreSQL Performance Tuning**: Applied comprehensive performance tuning parameters to `auth-db` cluster
+  - Memory settings: `shared_buffers: 512MB`, `effective_cache_size: 1536MB`, `work_mem: 8MB`, `maintenance_work_mem: 128MB`
+  - WAL settings: `wal_level: replica`, `checkpoint_timeout: 15min`, `max_wal_size: 2GB`, `min_wal_size: 512MB`
+  - Query planner: `random_page_cost: 1.1`, `effective_io_concurrency: 200`, `default_statistics_target: 100`
+  - Parallelism: `max_worker_processes: 4`, `max_parallel_workers: 4`, `max_parallel_workers_per_gather: 2`
+  - Autovacuum: `autovacuum_max_workers: 2`, `autovacuum_vacuum_scale_factor: 0.1`
+  - Logging: `log_statement: mod`, `log_min_duration_statement: 5000`, connection/disconnection logging
+- **High Availability**: Configured 3-node HA setup (1 leader + 2 standbys)
+- **Resource Limits**: Set production-ready limits (CPU: 1 core, Memory: 2Gi - small, conservative)
+- **Security**: Upgraded password encryption to `scram-sha-256`, increased `max_connections` to 200
+
+**Password Rotation Documentation:**
+- Added comprehensive Password Rotation section to `docs/guides/DATABASE.md`
+- Documented native Zalando password rotation procedure with step-by-step guide
+- Documented zero-downtime rotation strategy using dual password approach
+- Added External Secrets Operator (ESO) integration guide for future implementation
+- Included rotation schedule (infrastructure: 90 days, application users: 180 days)
+- Added troubleshooting guide for password rotation issues
+
+**Backup Strategy Documentation:**
+- Added comprehensive Backup Strategy section to `docs/guides/DATABASE.md`
+- Documented WAL-E/WAL-G backup configuration for S3/GCS/Azure (future implementation)
+- Documented Point-in-Time Recovery (PITR) procedures with step-by-step guide
+- Created disaster recovery plan with 3 recovery scenarios
+- Defined RTO/RPO targets (4 hours / 15 minutes)
+- Documented backup retention policies (WAL: 7 days, daily: 30 days, weekly: 12 weeks, monthly: 12 months)
+- Added backup monitoring and health check procedures
+
+### Changed
+
+- **Updated**: `k8s/postgres-operator-zalando/crds/auth-db.yaml` - Production-ready PostgreSQL configuration
+  - Changed `numberOfInstances` from `1` to `3` for High Availability
+  - Added comprehensive PostgreSQL performance tuning parameters
+  - Added production-ready resource limits (requests: cpu: 100m, memory: 512Mi; limits: cpu: 1, memory: 2Gi)
+  - Updated `wal_level` to `replica` for HA support
+  - Enhanced security with `password_encryption: scram-sha-256`
+- **Updated**: `docs/guides/DATABASE.md` - Added Password Rotation and Backup Strategy sections
+  - Added Table of Contents entries for new sections
+  - Updated last modified date
+
+### Files Modified
+- `k8s/postgres-operator-zalando/crds/auth-db.yaml` - Production-ready PostgreSQL configuration
+- `docs/guides/DATABASE.md` - Added Password Rotation and Backup Strategy sections
+- `CHANGELOG.md` - This entry
+
+### Notes
+- **Deployment Required**: CRD application and verification (Tasks 1.4-1.5) require manual cluster deployment
+- **Monitoring Required**: Performance baseline and validation (Tasks 4.1-4.2) require cluster deployment and monitoring setup
+- **Future Implementation**: WAL-E/WAL-G backup and External Secrets Operator integration are documented but not yet implemented (requires cloud credentials)
+
+---
+
+## [0.10.30] - 2025-12-29
+
+### Changed
+
+**Auth Service Database SSL Configuration:**
+- **Updated**: `charts/values/auth.yaml` - Changed `DB_SSLMODE` from `"disable"` to `"require"` for PgBouncer connections
+  - **Reason**: PgBouncer pooler requires SSL connections for security
+  - **Impact**: Auth service now connects to PgBouncer with SSL encryption
+  - **Note**: Init container (Flyway migrations) still uses `DB_SSLMODE: "disable"` for direct PostgreSQL connections
+- **Documentation**: Updated `docs/guides/DATABASE.md` to reflect SSL mode requirements
+  - Documented PgBouncer SSL requirement (`sslmode=require`)
+  - Clarified direct connection SSL mode (`sslmode=disable` for init containers)
+- **Files Modified**:
+  - `charts/values/auth.yaml` - Updated `DB_SSLMODE` to `"require"`
+  - `docs/guides/DATABASE.md` - Updated Auth Database diagram and configuration examples
+  - `CHANGELOG.md` - This entry
+
+## [0.10.29] - 2025-12-26
+
+### Added
+
+**PostgreSQL Monitoring with Sidecar Exporter (Zalando Operator):**
+- **Sidecar Approach**: Deployed `postgres_exporter` as sidecar containers in PostgreSQL pods (production-ready approach)
+  - **Benefits**: No infrastructure roles needed, uses PostgreSQL pod credentials automatically, per-cluster isolation, simpler setup
+  - **Image**: `quay.io/prometheuscommunity/postgres-exporter:v0.18.1`
+  - **Configuration**: Sidecar runs in same pod as PostgreSQL, uses `localhost` connection with `sslmode=require`
+  - **Resources**: Minimal overhead (`cpu: 500m/100m`, `memory: 256M/256M`)
+  - **Auto-discovery**: `PG_EXPORTER_AUTO_DISCOVER_DATABASES: "true"` enables automatic database discovery
+- **PodMonitors**: Created PodMonitor CRDs for Prometheus Operator to scrape metrics from sidecars
+  - **Files Created**: `k8s/prometheus/podmonitor-auth-db.yaml`, `podmonitor-review-db.yaml`, `podmonitor-supporting-db.yaml`
+  - **Configuration**: Per-cluster PodMonitors (production-ready isolation), scrape interval `15s`, timeout `10s`
+  - **Integration**: Prometheus Operator automatically discovers and scrapes metrics from sidecar exporters
+- **Deployment Script**: Updated `scripts/04-deploy-databases.sh` to automatically deploy PodMonitors
+  - Applies all 3 PodMonitors after database clusters are ready
+  - Includes error handling and verification steps
+- **Documentation**: Updated `docs/guides/DATABASE.md` with Sidecar Monitoring section
+  - Documented sidecar approach, configuration, and benefits
+  - Explained per-cluster isolation and production-ready patterns
+  - Added troubleshooting guide for sidecar monitoring
+- **Benefits**:
+  - ✅ **No Infrastructure Roles**: Uses PostgreSQL pod credentials automatically
+  - ✅ **No Permission Grants**: Uses database owner credentials (has full access)
+  - ✅ **Per-Cluster Isolation**: Production-ready approach, failure in one cluster doesn't affect others
+  - ✅ **Simpler Setup**: Just add sidecar to CRD and create PodMonitor
+  - ✅ **Better Reliability**: Co-located exporter, no network hop, automatic restart
+- **Files Created**:
+  - `k8s/prometheus/podmonitor-auth-db.yaml` - PodMonitor for auth-db cluster
+  - `k8s/prometheus/podmonitor-review-db.yaml` - PodMonitor for review-db cluster
+  - `k8s/prometheus/podmonitor-supporting-db.yaml` - PodMonitor for supporting-db cluster
+- **Files Modified**:
+  - `k8s/postgres-operator-zalando/crds/auth-db.yaml` - Added sidecar configuration
+  - `k8s/postgres-operator-zalando/crds/review-db.yaml` - Added sidecar configuration
+  - `k8s/postgres-operator-zalando/crds/supporting-db.yaml` - Added sidecar configuration
+  - `scripts/04-deploy-databases.sh` - Added PodMonitor deployment step
+  - `docs/guides/DATABASE.md` - Added Sidecar Monitoring section
+  - `CHANGELOG.md` - This entry
+
+### Changed
+
+**PostgreSQL Monitoring Approach:**
+- **Migrated from Infrastructure Roles to Sidecar Approach**: Changed monitoring strategy from infrastructure roles (standalone exporter) to sidecar containers (production-ready)
+  - **Removed**: Infrastructure roles configuration, monitoring user secrets, standalone postgres_exporter deployment
+  - **Removed Files**: `scripts/04c-setup-monitoring-user.sh`, `k8s/secrets/postgresql-monitoring-user.yaml`, `k8s/secrets/postgres-exporter-monitoring-secret.yaml`, `k8s/postgres-exporter/values.yaml` (not used - Zalando clusters use sidecar approach, CloudNativePG clusters don't have monitoring setup yet)
+  - **Updated**: `k8s/postgres-operator-zalando/operator-configuration.yaml` - Removed `infrastructure_roles_secrets` section
+  - **Updated**: `docs/guides/SETUP.md` - Removed Step 4c (monitoring user setup script)
+  - **Reason**: Sidecar approach is production-ready, simpler, and provides better isolation
+
+## [0.10.28] - 2025-12-26
+
+### Changed
+
+**Database Architecture Documentation Enhancement:**
+- **Overview Diagram**: Enhanced database architecture overview with comprehensive Mermaid diagram
+  - Shows 2 operators (Zalando, CloudNativePG) with cluster counts
+  - Displays all 8 microservices organized by namespace
+  - Visualizes connection poolers (PgBouncer, PgCat) with their relationships
+  - Shows all 5 PostgreSQL clusters with namespace information
+  - Color-coded by operator type for better visual distinction
+- **Individual Cluster Diagrams**: Added detailed architecture diagrams for each of the 5 clusters
+  - **Product Database**: CloudNativePG operator, PgCat pooler, Primary+Replica instances, secret location
+  - **Review Database**: Zalando operator, direct connection, single instance, auto-generated secret
+  - **Auth Database**: Zalando operator, PgBouncer sidecar (2 instances), service endpoints (pooler + direct), auto-generated secret
+  - **Transaction Database**: CloudNativePG operator, PgCat pooler with multi-database routing, Primary+Replica instances, shared by Cart and Order services, secret location
+  - **Supporting Database**: Zalando operator with cross-namespace secrets, 3 services from 3 namespaces, cross-namespace secret flow, OperatorConfiguration CRD, operator v1.15.0 limitations visualized
+- **Secret Names Table**: Enhanced secret names table with namespace and format columns
+  - Added "Namespace" column showing where secrets are located
+  - Added "Format" column distinguishing Regular vs Cross-namespace format
+  - Complete listing of all secret names with `namespace.username` format for cross-namespace secrets
+- **Benefits**:
+  - ✅ **Visual Clarity**: Comprehensive diagrams make architecture easy to understand at a glance
+  - ✅ **Cluster-Specific Details**: Each cluster has its own diagram showing connections, secrets, and patterns
+  - ✅ **Cross-Namespace Secrets**: Supporting-db diagram clearly shows the cross-namespace secret pattern and limitations
+  - ✅ **Better Onboarding**: New team members can quickly understand database architecture
+  - ✅ **Troubleshooting**: Diagrams help identify connection issues and secret locations
+- **Files Modified**:
+  - `docs/guides/DATABASE.md` - Enhanced with overview diagram, 5 individual cluster diagrams, updated secret names table
+  - `CHANGELOG.md` - This entry
+
+## [0.10.27] - 2025-12-26
+
+### Changed
+
+**Zalando Postgres Operator Cross-Namespace Secret Configuration:**
+- **Enabled**: `enable_cross_namespace_secret` feature in Zalando Postgres Operator via OperatorConfiguration CRD (recommended method)
+- **Updated**: Database CRD (`supporting-db.yaml`) to use `namespace.username` format (`notification.notification`, `shipping.shipping`)
+- **Updated**: Helm values for `notification` and `shipping` services:
+  - Secret names: `notification.supporting-db...` → `notification.notification.supporting-db...`
+  - Secret names: `shipping.supporting-db...` → `shipping.shipping.supporting-db...`
+  - DB_USER values: `notification` → `notification.notification`, `shipping` → `shipping.shipping`
+- **Removed**: Sync script (`scripts/04b-sync-supporting-db-secrets.sh`) and its call from deployment script (replaced with native operator feature)
+- **Known Limitation**: Operator v1.15.0 may create secrets in cluster namespace (`user`) instead of target namespaces - manual copy workaround documented
+- **Impact**:
+  - Services now use cross-namespace secret format
+  - Database users use `namespace.username` format (e.g., `notification.notification`)
+  - Documentation updated with troubleshooting and manual copy instructions
+- **Files Modified**:
+  - **New**: `k8s/postgres-operator-zalando/operator-configuration.yaml` - OperatorConfiguration CRD (active configuration)
+  - `k8s/postgres-operator-zalando/crds/supporting-db.yaml` - Updated with namespace notation
+  - `charts/values/notification.yaml` - Updated secret references and DB_USER
+  - `charts/values/shipping.yaml` - Updated secret references and DB_USER
+  - `scripts/04-deploy-databases.sh` - Removed sync script call
+  - `docs/guides/DATABASE.md` - Updated cross-namespace secrets documentation
+  - `CHANGELOG.md` - This entry
+
+## [0.10.26] - 2025-12-26
+
+### Fixed
+
+**Cross-Namespace Secrets for Shared Supporting Database:**
+- **Problem**: Services using the shared `supporting-db` cluster (Notification, Shipping-v2) failed to start with "secret not found" errors because Zalando operator creates secrets in the `user` namespace (where the cluster exists), but services deploy in their own namespaces (`notification`, `shipping`)
+- **Root Cause**: Kubernetes secrets are namespace-scoped and cannot be directly referenced across namespaces. The Zalando operator creates secrets in the same namespace as the database cluster (`user`), but services need secrets in their own namespaces
+- **Solution**: 
+  - Created `scripts/04b-sync-supporting-db-secrets.sh` to automatically sync secrets from `user` namespace to `notification` and `shipping` namespaces
+  - Updated `scripts/04-deploy-databases.sh` to automatically run the sync script after database clusters are ready
+  - Added documentation in `docs/guides/DATABASE.md` explaining the shared database pattern and cross-namespace secret handling
+- **Impact**:
+  - Notification and Shipping-v2 services can now successfully deploy and connect to the shared database
+  - Secrets are automatically synced during database deployment
+  - Clear documentation for troubleshooting cross-namespace secret issues
+- **Files Modified**:
+  - **New**: `scripts/04b-sync-supporting-db-secrets.sh` - Secret sync script
+  - `scripts/04-deploy-databases.sh` - Added automatic secret sync step
+  - `docs/guides/DATABASE.md` - Added shared database pattern and cross-namespace secrets documentation
+  - `CHANGELOG.md` - This entry
+
+## [0.10.25] - 2025-12-25
+
+### Fixed
+
+**Namespace Duplication Warning in Deployment Script:**
+- **Problem**: Script `06-deploy-microservices.sh` was applying namespaces from `k8s/namespaces.yaml` using `kubectl apply`, causing warnings when namespaces were already created by `04-deploy-databases.sh` using `kubectl create namespace`
+- **Root Cause**: Namespaces created with `kubectl create` don't have `kubectl.kubernetes.io/last-applied-configuration` annotation, causing `kubectl apply` to show warnings
+- **Solution**: Removed redundant namespace creation step from `06-deploy-microservices.sh` because:
+  - Helm's `--create-namespace` flag automatically creates namespaces if they don't exist
+  - Existing namespaces (from database deployment) are reused without conflicts
+  - Eliminates warnings and simplifies deployment workflow
+- **Impact**: 
+  - Cleaner deployment output (no namespace warnings)
+  - Simpler script (removed redundant step)
+  - Helm handles namespace creation automatically
+
+**Helm Deployment Timeout for Init Containers:**
+- **Problem**: Helm deployment was timing out after 60s when services have init containers (Flyway migrations), causing "context deadline exceeded" errors
+- **Root Cause**: Init containers (Flyway migrations) can take 1-3 minutes to complete, but Helm timeout was only 60s
+- **Solution**: 
+  - Increased Helm and kubectl wait timeouts from 60s to 5m (300s) to accommodate init container execution
+  - Improved error handling: Changed from `set -e` + `|| true` to `set -euo pipefail` + explicit `if !` checks for better error messages
+  - Added warning messages when deployments fail (script continues with other services)
+- **Impact**:
+  - Deployments no longer timeout prematurely
+  - Init containers (migrations) have sufficient time to complete
+  - More reliable deployment process
+  - Better error visibility (warnings instead of silent failures)
+  - Script continues deploying remaining services even if one fails
+- **Files Modified**:
+  - `scripts/06-deploy-microservices.sh` - Increased Helm timeout to 5m, improved error handling with explicit checks
+  - `CHANGELOG.md` - This entry
+
 ## [0.10.24] - 2025-12-25
 
 ### Added
@@ -2756,6 +3213,10 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
 
 3. **Or use the deployment script**:
    ```bash
+   ./scripts/05-deploy-microservices.sh --local
+   ```
+
+
    ./scripts/05-deploy-microservices.sh --local
    ```
 

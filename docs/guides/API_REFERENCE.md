@@ -625,7 +625,7 @@ kubectl get pods -n auth -w
 
 - **Centralized Config**: `SHUTDOWN_TIMEOUT` is managed in `pkg/config/config.go`
 - **Helm Values**: All services have `SHUTDOWN_TIMEOUT` and `terminationGracePeriodSeconds` configured
-- **Documentation**: See [Configuration Guide](./CONFIGURATION.md) for complete config reference
+- **Documentation**: See [Setup Guide](./SETUP.md) for complete configuration guide
 
 ---
 
@@ -940,7 +940,7 @@ SERVICES=(
 
 #### Step 4: Update Namespaces
 
-Add the namespace to `k8s/namespaces.yaml`:
+**Note**: Namespaces are created automatically by Helm's `--create-namespace` flag during deployment. However, you can optionally add the namespace to `k8s/namespaces.yaml` for documentation purposes:
 
 ```yaml
 ---
@@ -1013,7 +1013,7 @@ env:
   # ... see charts/values/payment.yaml for full config
 ```
 
-**See**: [docs/guides/CONFIGURATION.md](./CONFIGURATION.md) for complete configuration guide.
+**See**: [Setup Guide](./SETUP.md) for complete configuration guide.
 
 ### Dashboard Features
 
@@ -1159,7 +1159,7 @@ See [K6_LOAD_TESTING.md](../k6/K6_LOAD_TESTING.md) for detailed load testing doc
 ## Related Documentation
 
 - **[Setup Guide](./SETUP.md)** - Complete deployment instructions
-- **[Configuration Guide](./CONFIGURATION.md)** - Environment variables and configuration
+- **[Setup Guide](./SETUP.md)** - Complete deployment and configuration guide
 - **[Database Guide](./DATABASE.md)** - Database integration details
 - **[Error Handling Guide](./ERROR_HANDLING.md)** - Error handling patterns
 

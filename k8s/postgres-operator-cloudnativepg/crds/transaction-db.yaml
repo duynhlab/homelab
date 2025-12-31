@@ -1,41 +1,103 @@
 # Transaction Database Cluster (CloudNativePG Operator)
-# Cart + Order services with Patroni HA and etcd
+# Cart + Order services with Patroni HA - Production-Ready Configuration
+# Features: 3-node HA, Synchronous Replication, Logical Replication Slot Sync, Production Tuning
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: transaction-db
   namespace: cart
 spec:
-  # Number of instances (HA with Patroni)
-  instances: 2  # 1 primary + 1 replica for HA
+  # Number of instances (HA with Patroni) - Production-Ready: 3 nodes
+  instances: 3  # 1 primary + 2 replicas for HA with synchronous replication
+  
+  # Logical Replication Slot Synchronization
+  # Required for CDC clients (Debezium, Kafka Connect) - slots synchronized across replicas during failover
+  replicationSlots:
+    highAvailability:
+      synchronizeLogicalDecoding: true
   
   # PostgreSQL parameters and HA configuration
   postgresql:
+    # Synchronous Replication Configuration
+    # Zero data loss with at least 1 synchronous replica required
+    synchronous:
+      method: any  # Quorum-based synchronous replication
+      number: 1  # At least 1 synchronous replica required
+      dataDurability: required  # Zero data loss guarantee
+    
     parameters:
+      # Connection settings
       max_connections: "200"
-      shared_buffers: "256MB"
-      effective_cache_size: "512MB"
-      maintenance_work_mem: "128MB"
-      checkpoint_completion_target: "0.9"
+      
+      # Memory settings (adjusted for 2Gi pod memory)
+      shared_buffers: "512MB"  # 25% of 2GB (was: 256MB)
+      effective_cache_size: "1.5GB"  # 75% of 2GB (was: 512MB)
+      maintenance_work_mem: "512MB"  # (was: 128MB)
+      work_mem: "32MB"  # (was: 8MB)
+      
+      # WAL settings (for high-write workloads + logical replication)
       wal_buffers: "16MB"
+      wal_level: "logical"  # Required for logical replication
+      min_wal_size: "2GB"  # (was: 1GB)
+      max_wal_size: "8GB"  # (was: 4GB)
+      checkpoint_completion_target: "0.9"
+      checkpoint_timeout: "15min"
+      
+      # Query planner (SSD optimization)
+      random_page_cost: "1.1"  # (was: 4.0) - Optimized for SSD storage
+      effective_io_concurrency: "200"  # (was: 2) - Optimized for SSD storage
       default_statistics_target: "100"
-      random_page_cost: "4.0"
-      effective_io_concurrency: "2"
-      work_mem: "8MB"
-      min_wal_size: "1GB"
-      max_wal_size: "4GB"
+      
+      # Parallelism settings
+      max_worker_processes: "8"
+      max_parallel_workers_per_gather: "4"
+      max_parallel_workers: "8"
+      max_parallel_maintenance_workers: "4"
+      
+      # Autovacuum tuning (for high-write workloads)
+      autovacuum: "on"
+      autovacuum_max_workers: "3"
+      autovacuum_vacuum_scale_factor: "0.1"
+      autovacuum_analyze_scale_factor: "0.05"
+      autovacuum_vacuum_cost_delay: "10ms"
+      autovacuum_vacuum_cost_limit: "200"
+      
+      # Logging (comprehensive for production monitoring and auditing)
+      # Note: log_filename, log_rotation_age, log_rotation_size are FIXED parameters
+      # managed by CloudNativePG operator - cannot be set by users
+      log_statement: "mod"  # Log DDL and DML statements
+      log_min_duration_statement: "1000"  # Log queries > 1 second
+      log_checkpoints: "on"
+      log_lock_waits: "on"
+      log_temp_files: "0"  # Log all temporary files
+      log_autovacuum_min_duration: "1000"  # Log autovacuum operations > 1 second
+      log_connections: "on"  # Log all connections
+      log_disconnections: "on"  # Log all disconnections
+      logging_collector: "on"
+      
+      # Security
+      password_encryption: "scram-sha-256"  # More secure than MD5
+      
+      # Replication (for logical replication slot sync)
+      # For PostgreSQL 17+: Use sync_replication_slots parameter (native PostgreSQL feature)
+      # For PostgreSQL 15/16: Use pg_failover_slots extension (not available in all images)
+      hot_standby_feedback: "on"
+      sync_replication_slots: "on"  # PostgreSQL 17+ native feature (required for synchronizeLogicalDecoding)
+      # Note: For PostgreSQL 15/16, use pg_failover_slots extension instead
+      # But since we're using PostgreSQL 18, sync_replication_slots is the correct approach
+    
     # High Availability configuration with Patroni
     # CloudNativePG uses Patroni internally for HA
     # Note: syncReplicaElectionConstraint requires nodeLabelsAntiAffinity when enabled
-    # For Kind cluster (learning), we disable it to avoid node label requirements
+    # For Kind cluster (learning), we comment it out to avoid node label requirements
     # In production, enable with proper node labels for anti-affinity
-    syncReplicaElectionConstraint:
-      enabled: false  # Disabled for Kind cluster (no node labels configured)
-      # To enable in production with node labels:
-      # enabled: true
-      # nodeLabelsAntiAffinity:
-      #   - key: topology.kubernetes.io/zone
-      #     values: ["zone-a", "zone-b"]
+    # syncReplicaElectionConstraint:
+    #   enabled: false  # Commented out - not needed for current setup
+    #   # To enable in production with node labels:
+    #   # enabled: true
+    #   # nodeLabelsAntiAffinity:
+    #   #   - key: topology.kubernetes.io/zone
+    #   #     values: ["zone-a", "zone-b", "zone-c"]
   
   # Bootstrap configuration
   bootstrap:
@@ -54,20 +116,23 @@ spec:
       # Note: CREATE DATABASE can be executed from any database when running as superuser
       postInitSQL:
         - CREATE DATABASE "order" OWNER cart;
+        # Note: For PostgreSQL 17+, sync_replication_slots parameter is used (set above)
+        # For PostgreSQL 15/16, pg_failover_slots extension would be needed here
+        # But since we're using PostgreSQL 18, no extension creation needed
   
   # Storage configuration
   storage:
-    size: 10Gi
-    storageClass: standard  # Use default storage class for Kind
+    size: 100Gi  # Increased from 10Gi for production workloads
+    storageClass: standard  # Use standard storage class (not fast-ssd - not available in Kind)
   
-  # Resource requests and limits
+  # Resource requests and limits (production-ready, cost-optimized)
   resources:
     requests:
-      memory: "256Mi"
-      cpu: "200m"
+      memory: "1Gi"  # Increased from 256Mi
+      cpu: "500m"  # Increased from 200m
     limits:
-      memory: "512Mi"
-      cpu: "500m"
+      memory: "2Gi"  # Increased from 512Mi
+      cpu: "1000m"  # Increased from 500m
   
   # Patroni configuration for etcd (learning purpose)
   # Note: CloudNativePG uses Kubernetes API for leader election by default

@@ -20,42 +20,6 @@ Production-ready microservices monitoring platform with 9 Go services, complete 
 
 ---
 
-## Quick Start
-
-### Complete Deployment
-
-```bash
-git clone <repo-url>
-cd monitoring
-chmod +x scripts/*.sh
-
-# Infrastructure & Monitoring
-./scripts/01-create-kind-cluster.sh      # Create Kind cluster
-./scripts/02-deploy-monitoring.sh        # Deploy Prometheus + Grafana
-
-# APM Stack
-./scripts/03-deploy-apm.sh               # Deploy Tempo, Pyroscope, Loki, Vector
-
-# Database Infrastructure
-./scripts/04-deploy-databases.sh         # Deploy PostgreSQL operators, clusters, poolers
-
-# Deploy Applications (from OCI registry, images built by GitHub Actions)
-./scripts/06-deploy-microservices.sh     # Deploy all microservices from ghcr.io OCI registry
-
-# Load Testing (AFTER apps)
-./scripts/07-deploy-k6.sh                # Deploy k6 load generators
-
-# SLO System
-./scripts/08-deploy-slo.sh               # Deploy Sloth Operator and SLO CRDs
-
-# Access Setup
-./scripts/09-setup-access.sh             # Setup port-forwarding
-```
-
-**Detailed Setup Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md) for step-by-step instructions, prerequisites, and troubleshooting.
-
----
-
 ## Architecture
 
 ### System Architecture
@@ -153,6 +117,38 @@ flowchart TB
 
 ---
 
+## Quick Start
+
+### Complete Deployment
+
+```bash
+# Infrastructure & Monitoring
+./scripts/01-create-kind-cluster.sh      # Create Kind cluster
+./scripts/02-deploy-monitoring.sh        # Deploy Prometheus + Grafana
+
+# APM Stack
+./scripts/03-deploy-apm.sh               # Deploy Tempo, Pyroscope, Loki, Vector
+
+# Database Infrastructure
+./scripts/04-deploy-databases.sh         # Deploy PostgreSQL operators, clusters, poolers
+
+# Deploy Applications (from OCI registry, images built by GitHub Actions)
+./scripts/06-deploy-microservices.sh     # Deploy all microservices from ghcr.io OCI registry
+
+# Load Testing (AFTER apps)
+./scripts/07-deploy-k6.sh                # Deploy k6 load generators
+
+# SLO System
+./scripts/08-deploy-slo.sh               # Deploy Sloth Operator and SLO CRDs
+
+# Access Setup
+./scripts/09-setup-access.sh             # Setup port-forwarding
+```
+
+**Detailed Setup Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md) for step-by-step instructions, prerequisites, and troubleshooting.
+
+---
+
 ## Technology Stack
 
 - **Runtime**: Go 1.25.5
@@ -228,9 +224,13 @@ After running `./scripts/09-setup-access.sh` or manual port-forwarding:
 ### Database
 
 - **5 PostgreSQL Clusters**: review-db, auth-db, supporting-db (shared: user + notification + shipping-v2), product-db, transaction-db
+- **Architecture Diagrams**: Comprehensive Mermaid diagrams showing overview and individual cluster details
 - **Connection Poolers**: PgBouncer (Auth), PgCat (Product, Cart+Order)
 - **Migrations**: Flyway 11.8.2 with 8 migration images
 - **Operators**: Zalando Postgres Operator (v1.15.0), CloudNativePG Operator (v1.28.0)
+- **Cross-Namespace Secrets**: Zalando operator configured for shared database pattern
+
+**Database Details**: See [`docs/guides/DATABASE.md`](docs/guides/DATABASE.md) for complete architecture diagrams and configuration
 
 ### SLO Management
 

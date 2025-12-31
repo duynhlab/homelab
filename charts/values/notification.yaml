@@ -47,11 +47,11 @@ env:
   - name: DB_NAME
     value: "notification"  # Different schema/database
   - name: DB_USER
-    value: "notification"
+    value: "notification.notification"  # Cross-namespace format: namespace.username
   - name: DB_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: notification.supporting-db.credentials.postgresql.acid.zalan.do  # Zalando operator auto-generated secret
+        name: notification.notification.supporting-db.credentials.postgresql.acid.zalan.do  # Zalando operator auto-generated secret (cross-namespace)
         key: password
   - name: DB_SSLMODE
     value: "disable"
@@ -97,7 +97,7 @@ migrations:
     DB_HOST: "supporting-db.user.svc.cluster.local"  # Direct connection, no pooler - supporting-db is in user namespace
     DB_PORT: "5432"
     DB_NAME: "notification"
-    DB_USER: "notification"
+    DB_USER: "notification.notification"  # Cross-namespace format: namespace.username
     DB_SSLMODE: "disable"
   envFrom:
-    secretRef: "notification.supporting-db.credentials.postgresql.acid.zalan.do"  # Zalando operator auto-generated secret
+    secretRef: "notification.notification.supporting-db.credentials.postgresql.acid.zalan.do"  # Zalando operator cross-namespace secret (in notification namespace)

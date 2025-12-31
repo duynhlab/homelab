@@ -83,17 +83,19 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 
 ### 💻 Development Guides
 
-21. **[Configuration Guide](./guides/CONFIGURATION.md)** - Complete configuration management guide
-    - Configuration sources (.env, environment variables, Helm values)
-    - Environment variable configuration
+21. **[Setup Guide](./guides/SETUP.md)** - Complete deployment and configuration guide
+    - Step-by-step deployment instructions
+    - Configuration management (.env, environment variables, Helm values)
     - Local development setup
-    - Production deployment patterns
-    - Validation rules and troubleshooting
+    - Troubleshooting common issues
 
 22. **[Error Handling](./guides/ERROR_HANDLING.md)** - Error handling patterns
 
 23. **[Database Guide](./guides/DATABASE.md)** - PostgreSQL database integration guide
-    - 5 PostgreSQL clusters architecture
+    - 5 PostgreSQL clusters architecture with comprehensive diagrams
+    - Overview diagram showing operators, services, poolers, and clusters
+    - Individual cluster diagrams with secrets, connections, and patterns
+    - Cross-namespace secrets visualization for supporting-db
     - Connection patterns (direct, PgBouncer, PgCat)
     - Environment variables and Helm configuration
     - Database verification and troubleshooting
@@ -150,7 +152,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 - [Log Aggregation](./apm/LOGGING.md) - Loki + Vector
 
 ### Development Guides
-- [Configuration Guide](./guides/CONFIGURATION.md) - Complete configuration management
+- [Setup Guide](./guides/SETUP.md) - Complete deployment and configuration guide
 - [Error Handling](./guides/ERROR_HANDLING.md) - Error handling patterns
 - [Database Guide](./guides/DATABASE.md) - PostgreSQL database integration guide
 - [Tracing Architecture](./guides/TRACING_ARCHITECTURE.md) - Distributed tracing architecture

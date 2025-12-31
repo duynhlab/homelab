@@ -16,11 +16,12 @@ PostgreSQL database integration enables microservices to persist data, execute r
 
 **Technologies:**
 - **Zalando Postgres Operator**: PostgreSQL management powered by Patroni for 3 clusters (Review, Auth, Supporting)
-- **CloudNativePG Operator**: Kubernetes-native PostgreSQL with Patroni for 2 clusters (Product, Cart+Order)
+- **CloudNativePG Operator**: Kubernetes-native PostgreSQL with Patroni for 2 clusters (Product DB, Transaction DB)
 - **PgBouncer**: Transaction pooling for Auth service (Zalando built-in sidecar)
-- **PgCat**: Modern connection pooler for Product and Cart+Order (standalone)
+- **PgCat**: Modern connection pooler deployed as standalone deployments (2 replicas each) for Product DB and Transaction DB clusters
 - **Patroni**: High availability manager (used by both Zalando and CloudNativePG operators via Kubernetes API)
 - **Flyway**: Database schema management via init containers (9 init container images, Flyway 11.8.2)
+  - **Note**: `shipping-v2` service has migrations disabled (`migrations.enabled: false`) because it shares the `shipping` database with `shipping` service. The schema is already created by `shipping` service, preventing Flyway checksum mismatch errors.
 
 **Note on Patroni:**
 - Both Zalando and CloudNativePG operators use **Patroni internally** for HA and leader election
@@ -64,23 +65,40 @@ flowchart TB
     
     subgraph Poolers[Connection Poolers]
         PgBouncer[PgBouncer Sidecar<br/>Auth - Built-in]
-        PgCatProduct[PgCat Standalone<br/>Product]
-        PgCatTransaction[PgCat Standalone<br/>Cart+Order]
+        PgCatProduct[PgCat Standalone<br/>Product DB]
+        subgraph PgCatTransactionDeployment["PgCat Transaction<br/>2 Replicas + HA"]
+            PgCatTransaction[PgCat Standalone<br/>Transaction DB<br/>Read Replica Routing]
+        end
     end
     
     subgraph Clusters["PostgreSQL Clusters"]
         AuthDB[(auth-db<br/>Zalando<br/>PostgreSQL 15<br/>HA: 3 nodes<br/>namespace: auth)]
         ProductDB[(product-db<br/>CloudNativePG<br/>PostgreSQL 18<br/>HA: 2 instances<br/>namespace: product)]
-        TransactionDB[(transaction-db<br/>CloudNativePG<br/>PostgreSQL 18<br/>HA: 3 instances<br/>namespace: cart)]
+        subgraph TransactionDBCluster["transaction-db Cluster<br/>HA: 3 Instances"]
+            TransactionPrimary[(Primary<br/>PostgreSQL 18<br/>Read-Write)]
+            TransactionReplica1[(Replica 1<br/>PostgreSQL 18<br/>Read-Only)]
+            TransactionReplica2[(Replica 2<br/>PostgreSQL 18<br/>Read-Only)]
+        end
         ReviewDB[(review-db<br/>Zalando<br/>PostgreSQL 15<br/>Single Instance<br/>namespace: review)]
         SupportingDB[(supporting-db<br/>Zalando<br/>PostgreSQL 15<br/>Shared DB<br/>namespace: user)]
+    end
+    
+    subgraph CloudNativePGServices["CloudNativePG Services<br/>Auto-created"]
+        TransactionRW[transaction-db-rw<br/>Primary Endpoint]
+        TransactionR[transaction-db-r<br/>Replica Endpoint<br/>Load Balanced]
     end
     
     Zalando --> AuthDB
     Zalando --> ReviewDB
     Zalando --> SupportingDB
-    CloudNativePG --> ProductDB
-    CloudNativePG --> TransactionDB
+    CloudNativePG --> TransactionDBCluster
+    CloudNativePG --> CloudNativePGServices
+    
+    CloudNativePGServices --> TransactionRW
+    CloudNativePGServices --> TransactionR
+    TransactionRW --> TransactionPrimary
+    TransactionR --> TransactionReplica1
+    TransactionR --> TransactionReplica2
     
     AuthSvc -->|via pooler| PgBouncer
     PgBouncer --> AuthDB
@@ -88,7 +106,10 @@ flowchart TB
     PgCatProduct --> ProductDB
     CartSvc -->|via pooler| PgCatTransaction
     OrderSvc -->|via pooler| PgCatTransaction
-    PgCatTransaction --> TransactionDB
+    PgCatTransaction -->|SELECT queries| TransactionR
+    PgCatTransaction -->|Write queries| TransactionRW
+    TransactionPrimary -.->|Synchronous Replication| TransactionReplica1
+    TransactionPrimary -.->|Synchronous Replication| TransactionReplica2
     ReviewSvc -->|direct| ReviewDB
     UserSvc -->|direct| SupportingDB
     NotificationSvc -->|direct| SupportingDB
@@ -100,17 +121,22 @@ flowchart TB
     style AuthDB fill:#e1f5ff
     style ReviewDB fill:#e1f5ff
     style ProductDB fill:#fff4e1
-    style TransactionDB fill:#fff4e1
+    style TransactionDBCluster fill:#fff4e1
+    style TransactionPrimary fill:#fff4e1
+    style TransactionReplica1 fill:#e1f5ff
+    style TransactionReplica2 fill:#e1f5ff
+    style PgCatTransactionDeployment fill:#e1ffe1
+    style CloudNativePGServices fill:#fff4e1
 ```
 
 ### Operator Distribution
 
 | Cluster | Services | Operator | PostgreSQL Version | Pooler | HA Pattern | Learning Focus |
 |---------|----------|----------|-------------------|--------|------------|----------------|
-| **Product** | Product | **CloudNativePG** | **18** (default) | **PgCat** (standalone) | **Patroni HA** (2 instances) | Read scaling, PgCat routing, Patroni failover |
+| **Product** | Product | **CloudNativePG** | **18** (default) | **PgCat** (standalone, 2 replicas) | **Patroni HA** (2 instances) | Read scaling, PgCat routing, Patroni failover |
 | **Review** | Review | **Zalando** | **15** | **None** (direct) | **Patroni** (single instance) | Simple setup, direct connection, Patroni basics |
 | **Auth** | Auth | **Zalando** | **15** | **PgBouncer** (sidecar) | **Patroni HA** (3 instances) | Production-ready HA, transaction pooling, Zalando built-in pooler, Patroni failover |
-| **Cart+Order** | Cart, Order | **CloudNativePG** | **18** (default) | **PgCat** (standalone) | **Patroni HA** (3 instances) | **Multi-database routing, Patroni failover, synchronous replication** |
+| **Transaction** | Cart, Order | **CloudNativePG** | **18** (default) | **PgCat** (standalone, 2 replicas) | **Patroni HA** (3 instances) | **Multi-database routing, Patroni failover, synchronous replication, read replica routing** |
 | **Supporting** | User, Notification, Shipping-v2 | **Zalando** | **15** | **None** (direct) | **Patroni** (single instance) | **Shared database pattern, Patroni basics** |
 
 ### Cluster Details
@@ -119,8 +145,8 @@ This section provides a brief overview of all 5 PostgreSQL clusters. For detaile
 
 | Cluster | Operator | PostgreSQL Version | Instances | Pooler | HA Pattern | Namespace | Services |
 |---------|----------|-------------------|-----------|--------|------------|-----------|----------|
-| **Product** | CloudNativePG | 18 | 2 (1 primary + 1 replica) | PgCat (standalone) | Patroni HA | `product` | Product |
-| **Transaction** | CloudNativePG | 18 | 3 (1 primary + 2 replicas) | PgCat (standalone) | Patroni HA (Synchronous) | `cart` | Cart, Order |
+| **Product** | CloudNativePG | 18 | 2 (1 primary + 1 replica) | PgCat (standalone, 2 replicas) | Patroni HA | `product` | Product |
+| **Transaction** | CloudNativePG | 18 | 3 (1 primary + 2 replicas) | PgCat (standalone, 2 replicas) | Patroni HA (Synchronous) | `cart` | Cart, Order |
 | **Review** | Zalando | 15 | 1 (single instance) | None (direct) | Patroni (single) | `review` | Review |
 | **Auth** | Zalando | 15 | 3 (1 leader + 2 standbys) | PgBouncer (sidecar) | Patroni HA | `auth` | Auth |
 | **Supporting** | Zalando | 15 | 1 (single instance) | None (direct) | Patroni (single) | `user` | User, Notification, Shipping-v2 |
@@ -172,7 +198,7 @@ Both operators integrate with Prometheus for metrics collection:
 - **Product Database** (`product-db`) - 2 instances (1 primary + 1 replica)
 - **Transaction Database** (`transaction-db`) - 3 instances (1 primary + 2 replicas) with synchronous replication
 
-**Connection Pooler:** PgCat standalone (v1.2.0) for both clusters
+**Connection Pooler:** PgCat standalone deployment (v1.2.0, 2 replicas each) for both clusters
 
 ### Clusters
 
@@ -182,7 +208,7 @@ Both operators integrate with Prometheus for metrics collection:
 - **PostgreSQL Version**: 18 (CloudNativePG default image)
 - **Instances**: 2 (1 primary + 1 replica)
 - **HA**: Patroni via Kubernetes API (automatic failover)
-- **Pooler**: PgCat standalone v1.2.0 (`ghcr.io/postgresml/pgcat:v1.2.0`)
+- **Pooler**: PgCat standalone deployment v1.2.0 (`ghcr.io/postgresml/pgcat:v1.2.0`) with 2 replicas for HA
 - **Namespace**: `product`
 - **CRD**: `k8s/postgres-operator-cloudnativepg/crds/product-db.yaml`
 - **Pooler Config**: `k8s/pgcat/product/configmap.yaml`
@@ -235,7 +261,7 @@ flowchart TB
 - **Instances**: 3 (1 primary + 2 replicas) - **Production-Ready HA**
 - **HA**: Patroni via Kubernetes API (automatic failover < 30 seconds)
 - **Replication**: Synchronous replication with logical replication slot synchronization
-- **Pooler**: PgCat standalone v1.2.0 (`ghcr.io/postgresml/pgcat:v1.2.0`)
+- **Pooler**: PgCat standalone deployment v1.2.0 (`ghcr.io/postgresml/pgcat:v1.2.0`) with 2 replicas for HA
 - **Namespace**: `cart`
 - **CRD**: `k8s/postgres-operator-cloudnativepg/crds/transaction-db.yaml`
 - **Pooler Config**: `k8s/pgcat/transaction/configmap.yaml`

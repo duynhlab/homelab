@@ -15,6 +15,7 @@ data:
     log_level = "info"
     admin_username = "admin"
     admin_password = "admin"
+    enable_prometheus_exporter = true
     
     [admin]
     host = "0.0.0.0"

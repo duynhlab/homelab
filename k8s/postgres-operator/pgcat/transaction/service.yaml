@@ -4,6 +4,8 @@ kind: Service
 metadata:
   name: pgcat
   namespace: cart
+  labels:
+    app: pgcat-transaction
 spec:
   type: ClusterIP
   ports:
@@ -15,5 +17,9 @@ spec:
     targetPort: 9930
     protocol: TCP
     name: admin
+  - port: 9187
+    targetPort: 9187
+    protocol: TCP
+    name: metrics
   selector:
     app: pgcat-transaction

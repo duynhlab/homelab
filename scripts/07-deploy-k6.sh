@@ -8,9 +8,9 @@ CHART_REF="charts/"
 # Ensure k6 namespace exists
 kubectl get namespace k6 >/dev/null 2>&1 || kubectl create namespace k6
 
-echo "Deploying k6-scenarios..."
-helm upgrade --install k6-scenarios "$CHART_REF" \
-  -f charts/values/k6-scenarios.yaml \
+echo "Deploying k6..."
+helm upgrade --install k6 "$CHART_REF" \
+  -f charts/values/k6.yaml \
   -n k6 \
   --create-namespace \
   --wait --timeout 60s || true
@@ -21,5 +21,5 @@ echo ""
 kubectl get pods -n k6
 echo ""
 echo "To view logs:"
-echo "  kubectl logs -n k6 -l app=k6-scenarios -f"
+echo "  kubectl logs -n k6 -l app=k6 -f"
 echo ""

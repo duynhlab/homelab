@@ -53,7 +53,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/k6
           tags: |
-            type=raw,value=scenarios
+            type=raw,value=v5
 
       - name: Build and push K6 image
         id: build

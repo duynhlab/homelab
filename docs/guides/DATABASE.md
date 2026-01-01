@@ -48,7 +48,7 @@ The system uses **5 PostgreSQL clusters** distributed across different operators
 ```mermaid
 flowchart TB
     subgraph Operators["PostgreSQL Operators"]
-        Zalando[Zalando Operator<br/>v1.15.0<br/>3 clusters]
+        Zalando[Zalando Operator<br/>v1.15.1<br/>3 clusters]
         CloudNativePG[CloudNativePG Operator<br/>v1.28.0<br/>2 clusters]
     end
     
@@ -695,7 +695,7 @@ PodMonitors are automatically deployed by `scripts/04-deploy-databases.sh` after
 
 ### Overview
 
-**Zalando Postgres Operator** (v1.15.0) is a Kubernetes operator for PostgreSQL that uses Patroni internally for high availability management. It provides comprehensive PostgreSQL cluster management with built-in features like PgBouncer sidecar and automatic secret generation.
+**Zalando Postgres Operator** (v1.15.1) is a Kubernetes operator for PostgreSQL that uses Patroni internally for high availability management. It provides comprehensive PostgreSQL cluster management with built-in features like PgBouncer sidecar and automatic secret generation.
 
 **Key Features:**
 - Kubernetes-native CRDs for cluster management
@@ -717,7 +717,7 @@ PodMonitors are automatically deployed by `scripts/04-deploy-databases.sh` after
 
 #### Review Database
 
-- **Operator**: Zalando Postgres Operator (v1.15.0) - powered by Patroni
+- **Operator**: Zalando Postgres Operator (v1.15.1) - powered by Patroni
 - **PostgreSQL Version**: 15 (explicitly configured in CRD)
 - **Instances**: 1 (single instance, no HA)
 - **HA**: Patroni via Kubernetes API (single instance, no failover needed)
@@ -762,7 +762,7 @@ flowchart TB
 
 #### Auth Database
 
-- **Operator**: Zalando Postgres Operator (v1.15.0) - powered by Patroni
+- **Operator**: Zalando Postgres Operator (v1.15.1) - powered by Patroni
 - **PostgreSQL Version**: 15 (explicitly configured in CRD)
 - **Instances**: 3 (HA: 1 leader + 2 standbys)
 - **HA**: Patroni HA via Kubernetes API (automatic failover < 30 seconds)
@@ -869,7 +869,7 @@ flowchart TB
 
 #### Supporting Database
 
-- **Operator**: Zalando Postgres Operator (v1.15.0) - powered by Patroni
+- **Operator**: Zalando Postgres Operator (v1.15.1) - powered by Patroni
 - **PostgreSQL Version**: 15 (explicitly configured in CRD)
 - **Instances**: 1 (single instance, no HA)
 - **HA**: Patroni via Kubernetes API (single instance, no failover needed)
@@ -889,36 +889,30 @@ flowchart TB
         end
         
         UserSecret[user.supporting-db.credentials...<br/>username: user<br/>password: auto-generated<br/>Created in user namespace]
-        
-        NotifSecretUser[notification.notification.supporting-db...<br/>Created in user namespace<br/>⚠️ Operator v1.15.0 limitation]
-        ShippingSecretUser[shipping.shipping.supporting-db...<br/>Created in shipping namespace<br/>✅ Operator v1.15.1+ with cross-namespace support]
     end
     
     subgraph NotificationNS["namespace: notification"]
         NotificationSvc[Notification Service<br/>Pod]
         
-        NotifSecret[notification.notification.supporting-db...<br/>username: notification.notification<br/>password: auto-generated<br/>Should be created here]
+        NotifSecret[notification.notification.supporting-db...<br/>username: notification.notification<br/>password: auto-generated<br/>Created in notification namespace]
     end
     
     subgraph ShippingNS["namespace: shipping"]
         ShippingSvc[Shipping-v2 Service<br/>Pod]
         
-        ShippingSecret[shipping.shipping.supporting-db...<br/>username: shipping.shipping<br/>password: auto-generated<br/>Should be created here]
+        ShippingSecret[shipping.shipping.supporting-db...<br/>username: shipping.shipping<br/>password: auto-generated<br/>Created in shipping namespace]
     end
     
     subgraph ZalandoOp["Zalando Operator"]
-        Operator[Operator Controller<br/>namespace: database]
+        Operator[Operator Controller<br/>namespace: database<br/>v1.15.1]
         Config[OperatorConfiguration CRD<br/>enable_cross_namespace_secret: true]
     end
     
     Config --> Operator
     Operator -->|Creates & Manages| SupportingDB
     Operator -->|Auto-generates| UserSecret
-    Operator -->|Auto-generates<br/>namespace.username format| NotifSecretUser
-    Operator -->|Auto-generates<br/>namespace.username format| ShippingSecretUser
-    
-    Operator -.->|Should create in target namespace<br/>⚠️ v1.15.0 limitation| NotifSecret
-    Operator -.->|Should create in target namespace<br/>⚠️ v1.15.0 limitation| ShippingSecret
+    Operator -->|Auto-generates<br/>namespace.username format<br/>Cross-namespace| NotifSecret
+    Operator -->|Auto-generates<br/>namespace.username format<br/>Cross-namespace| ShippingSecret
     
     UserSvc -->|Reads| UserSecret
     UserSvc -->|Direct Connection<br/>Port 5432| Instance
@@ -933,8 +927,6 @@ flowchart TB
     style UserSecret fill:#ffe1f5
     style NotifSecret fill:#ffe1f5
     style ShippingSecret fill:#ffe1f5
-    style NotifSecretUser fill:#ffcccc
-    style ShippingSecretUser fill:#ffcccc
 ```
 
 **Features:**
@@ -953,7 +945,7 @@ flowchart TB
 - **User Service**: Uses regular secret `user.supporting-db.credentials.postgresql.acid.zalan.do` in `user` namespace (same namespace)
 - **Notification Service**: Uses cross-namespace secret `notification.notification.supporting-db.credentials.postgresql.acid.zalan.do` (should be in `notification` namespace)
 - **Shipping Service**: Uses cross-namespace secret `shipping.shipping.supporting-db.credentials.postgresql.acid.zalan.do` (should be in `shipping` namespace)
-- **Note**: Operator v1.15.0 creates secrets in cluster namespace (`user`) - manual copy to target namespaces may be needed (see troubleshooting section)
+- **Note**: Operator v1.15.1 automatically creates secrets in target namespaces (`notification`, `shipping`) when `enable_cross_namespace_secret: true` is configured
 
 ### Features & Capabilities
 

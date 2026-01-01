@@ -108,7 +108,7 @@ When working on database features, migrations, connection pooling, or system arc
 See [`docs/guides/DATABASE.md`](DATABASE.md) for complete database architecture:
 - **5 PostgreSQL Clusters**: review-db, auth-db, supporting-db, product-db, transaction-db
 - **Connection Poolers**: PgBouncer (Auth), PgCat (Product, Cart+Order)
-- **Operators**: Zalando Postgres Operator (v1.15.0), CloudNativePG Operator (v1.24.0)
+- **Operators**: Zalando Postgres Operator (v1.15.1), CloudNativePG Operator (v1.24.0)
 - **Migrations**: Flyway 11.19.0 with 8 migration images
 - **Connection Patterns**: Direct connections, PgBouncer pool mode, PgCat sharding
 

@@ -8,6 +8,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+## [0.11.0] - 2026-01-01
+
+### Fixed
+
+**PgCat Prometheus Metrics Scraping:**
+- **Fixed**: PgCat metrics not being scraped by Prometheus
+  - **Root Cause**: Missing `enable_prometheus_exporter = true` configuration in PgCat ConfigMaps
+  - **Solution**: Added `enable_prometheus_exporter = true` to `[general]` section in both PgCat ConfigMaps:
+    - `k8s/postgres-operator/pgcat/transaction/configmap.yaml`
+    - `k8s/postgres-operator/pgcat/product/configmap.yaml`
+  - **Result**: PgCat now exposes HTTP metrics endpoint on port 9930 (`/metrics`) ✅
+- **Fixed**: Missing ServiceMonitor for PgCat Product pooler
+  - **Added**: `k8s/prometheus/servicemonitors/servicemonitor-pgcat-product.yaml`
+  - **Purpose**: Enables Prometheus to scrape metrics from PgCat Product instance
+  - **Configuration**: Matches PgCat Product service by label `app: pgcat-product`
+- **Fixed**: ServiceMonitor port configuration
+  - **Updated**: Both ServiceMonitors to use correct port name `admin` (port 9930)
+  - **Files**: 
+    - `k8s/prometheus/servicemonitors/servicemonitor-pgcat-transaction.yaml`
+    - `k8s/prometheus/servicemonitors/servicemonitor-pgcat-product.yaml`
+
+### Changed
+
+**PgCat Deployment Configuration:**
+- **Added**: Port 9187 (metrics) to PgCat deployments and services (for future use)
+  - **Files**: 
+    - `k8s/postgres-operator/pgcat/transaction/deployment.yaml`
+    - `k8s/postgres-operator/pgcat/transaction/service.yaml`
+    - `k8s/postgres-operator/pgcat/product/deployment.yaml`
+    - `k8s/postgres-operator/pgcat/product/service.yaml`
+  - **Note**: Currently using port 9930 (admin port) for metrics, port 9187 reserved for future use
+
+### Documentation
+
+- **Updated**: `docs/guides/DATABASE.md` - PgCat Metrics section
+  - **Added**: Configuration requirement for `enable_prometheus_exporter = true`
+  - **Updated**: Troubleshooting section with steps to verify Prometheus exporter configuration
+  - **Updated**: Port documentation to clarify metrics endpoint uses port 9930
+
 ## [0.10.39] - 2026-01-01
 
 ### Changed

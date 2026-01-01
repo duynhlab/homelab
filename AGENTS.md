@@ -22,7 +22,7 @@ This guide provides quick reference for AI agents working with this codebase. Fo
 
 ### Code Quality Standards
 
-- **Consistency**: Follow existing code patterns (see [`docs/guides/CONVENTIONS.md`](docs/guides/CONVENTIONS.md))
+- **Consistency**: Follow existing code patterns (see [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md#conventions-and-standards))
 - **Documentation**: Update relevant docs when adding features
 - **Testing**: Write tests for new functionality
 - **Error Handling**: Use consistent error patterns
@@ -231,7 +231,7 @@ Infrastructure → Monitoring → APM → **Databases** → Apps → Load Testin
 
 - **Research Patterns**: [`docs/guides/RESEARCH_PATTERNS.md`](docs/guides/RESEARCH_PATTERNS.md) - API, APM, Database research patterns
 - **Command Reference**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md#command-reference) - Deployment scripts, Helm, kubectl commands
-- **Conventions**: [`docs/guides/CONVENTIONS.md`](docs/guides/CONVENTIONS.md) - Naming conventions, code standards, build verification
+- **Conventions**: [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md#conventions-and-standards) - Naming conventions, code standards, build verification
 - **API Reference**: [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md) - Complete API documentation
 - **Setup Guide**: [`docs/guides/SETUP.md`](docs/guides/SETUP.md) - Deployment instructions
 - **Configuration**: [`docs/guides/CONFIGURATION.md`](docs/guides/CONFIGURATION.md) - Environment variables and config
@@ -257,7 +257,7 @@ Infrastructure → Monitoring → APM → **Databases** → Apps → Load Testin
 ### Find Documentation by Topic
 
 - **Getting Started**: [`docs/guides/SETUP.md`](docs/guides/SETUP.md), [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md)
-- **Development**: [`docs/guides/CONFIGURATION.md`](docs/guides/CONFIGURATION.md), [`docs/guides/ERROR_HANDLING.md`](docs/guides/ERROR_HANDLING.md), [`docs/guides/TRACING_ARCHITECTURE.md`](docs/guides/TRACING_ARCHITECTURE.md)
+- **Development**: [`docs/guides/CONFIGURATION.md`](docs/guides/CONFIGURATION.md), [`docs/guides/API_REFERENCE.md#error-handling`](docs/guides/API_REFERENCE.md#error-handling), [`docs/guides/TRACING_ARCHITECTURE.md`](docs/guides/TRACING_ARCHITECTURE.md)
 - **Monitoring**: [`docs/monitoring/METRICS.md`](docs/monitoring/METRICS.md), [`docs/monitoring/TROUBLESHOOTING.md`](docs/monitoring/TROUBLESHOOTING.md)
 - **APM**: [`docs/apm/README.md`](docs/apm/README.md), [`docs/apm/TRACING.md`](docs/apm/TRACING.md), [`docs/apm/LOGGING.md`](docs/apm/LOGGING.md), [`docs/apm/PROFILING.md`](docs/apm/PROFILING.md)
 - **SLO**: [`docs/slo/README.md`](docs/slo/README.md), [`docs/slo/GETTING_STARTED.md`](docs/slo/GETTING_STARTED.md)

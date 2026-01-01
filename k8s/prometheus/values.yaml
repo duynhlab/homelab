@@ -20,11 +20,11 @@ prometheus:
     # Resources
     resources:
       requests:
-        memory: "512Mi"
+        memory: "1Gi"
         cpu: "100m"
       limits:
-        memory: "1Gi"
-        cpu: "1000m"
+        memory: "2Gi"
+        cpu: "500m"
     
     # Storage
     storageSpec:

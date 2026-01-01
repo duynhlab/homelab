@@ -108,7 +108,7 @@ cp .githooks/pre-commit .git/hooks/pre-commit
 chmod +x .git/hooks/pre-commit
 ```
 
-**Note:** See [`docs/guides/CONVENTIONS.md`](CONVENTIONS.md#local-build-verification) for detailed usage and troubleshooting.
+**Note:** See [`docs/guides/API_REFERENCE.md`](API_REFERENCE.md#local-build-verification) for detailed usage and troubleshooting.
 
 ### Local Development Setup
 
@@ -312,7 +312,7 @@ kubectl get svc -n product
 ```
 
 **What it does:**
-- Deploys k6 load generators via Helm (k6-legacy, k6-scenarios)
+- Deploys k6 load generators via Helm (k6)
 - Creates `k6` namespace
 - Generates continuous load on all services
 
@@ -321,8 +321,7 @@ kubectl get svc -n product
 **Verify:**
 ```bash
 kubectl get pods -n k6
-kubectl logs -n k6 -l app=k6-legacy -f
-kubectl logs -n k6 -l app=k6-scenarios -f
+kubectl logs -n k6 -l app=k6 -f
 ```
 
 ---
@@ -832,8 +831,7 @@ k6 load generators run continuously in the `k6` namespace:
 kubectl get pods -n k6
 
 # View logs
-kubectl logs -n k6 -l app=k6-legacy -f
-kubectl logs -n k6 -l app=k6-scenarios -f
+kubectl logs -n k6 -l app=k6 -f
 ```
 
 ### Manual Testing

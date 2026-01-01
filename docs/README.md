@@ -25,16 +25,13 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
    - 32 Grafana dashboard panels
    - Memory leak detection strategy
 
-4. **[Prometheus Rate Explained](./monitoring/PROMETHEUS_RATE_EXPLAINED.md)** - Understanding `rate()` and `increase()`
-   - Counter resets
+4. **[PromQL Guide](./monitoring/PROMQL_GUIDE.md)** - Complete guide to PromQL functions
+   - `rate()` vs `increase()` functions
+   - Counter resets handling
    - Time range vs rate interval
-   - Best practices
+   - Best practices and troubleshooting
 
-5. **[Time Range & Rate Interval](./monitoring/TIME_RANGE_AND_RATE_INTERVAL.md)** - Dashboard variables guide
-   - When to use different intervals
-   - Smoothing vs responsiveness
-
-6. **[Variables & Regex](./monitoring/VARIABLES_REGEX.md)** - Dashboard variable patterns
+5. **[Variables & Regex](./monitoring/VARIABLES_REGEX.md)** - Dashboard variable patterns
    - Filter configurations
    - Multi-select patterns
 
@@ -89,7 +86,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
     - Local development setup
     - Troubleshooting common issues
 
-22. **[Error Handling](./guides/ERROR_HANDLING.md)** - Error handling patterns
+22. **[Error Handling](./guides/API_REFERENCE.md#error-handling)** - Error handling patterns
 
 23. **[Database Guide](./guides/DATABASE.md)** - PostgreSQL database integration guide
     - 5 PostgreSQL clusters architecture with comprehensive diagrams
@@ -103,11 +100,12 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 
 24. **[Tracing Architecture](./guides/TRACING_ARCHITECTURE.md)** - Distributed tracing architecture
 
-25. **[Dashboard Panels Guide](./guides/DASHBOARD_PANELS.md)** - Complete dashboard reference for SRE/DevOps
+25. **[Grafana Dashboard Guide](./guides/GRAFANA_DASHBOARD.md)** - Complete dashboard reference for SRE/DevOps
     - All 34 panels with query analysis and troubleshooting
     - PromQL patterns and best practices (Google SRE, Prometheus docs)
     - Before/After comparisons for updated panels (Status Code, Apdex, 4xx/5xx)
     - SRE runbooks and incident response scenarios
+    - Grafana Annotations planning (planned feature)
 
 ### 🚦 k6 Load Testing
 
@@ -127,8 +125,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 
 ### Monitoring
 - [Metrics Guide](./monitoring/METRICS.md) - Comprehensive metrics documentation
-- [Prometheus Rate Explained](./monitoring/PROMETHEUS_RATE_EXPLAINED.md) - Understanding rate functions
-- [Time Range & Rate Interval](./monitoring/TIME_RANGE_AND_RATE_INTERVAL.md) - Dashboard variables
+- [PromQL Guide](./monitoring/PROMQL_GUIDE.md) - Complete guide to PromQL functions, time range vs rate interval, and counter handling
 - [Variables & Regex](./monitoring/VARIABLES_REGEX.md) - Filter patterns
 - [Metrics Label Solutions](./monitoring/METRICS_LABEL_SOLUTIONS.md) - Label configuration
 
@@ -153,17 +150,16 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 
 ### Development Guides
 - [Setup Guide](./guides/SETUP.md) - Complete deployment and configuration guide
-- [Error Handling](./guides/ERROR_HANDLING.md) - Error handling patterns
+- [Error Handling](./guides/API_REFERENCE.md#error-handling) - Error handling patterns
 - [Database Guide](./guides/DATABASE.md) - PostgreSQL database integration guide
 - [Tracing Architecture](./guides/TRACING_ARCHITECTURE.md) - Distributed tracing architecture
-- [Dashboard Panels Guide](./guides/DASHBOARD_PANELS.md) - Complete SRE/DevOps dashboard reference (34 panels)
+- [Grafana Dashboard Guide](./guides/GRAFANA_DASHBOARD.md) - Complete SRE/DevOps dashboard reference (34 panels + annotations planning)
 
 ### k6 Load Testing
 - [k6 Load Testing](./k6/K6_LOAD_TESTING.md) - Complete load testing guide with architecture
 
 ### Archive
 - [Microservices Refactoring](./archive/MICROSERVICES_REFACTORING.md) - Historical architecture document
-- [Grafana Annotations Plan](./archive/GRAFANA_ANNOTATIONS_PLAN.md) - Planning document
 - [Deployment Plan](./archive/plan.deploy.md) - Historical deployment plan
 - [API Architecture](./archive/api.md) - Architecture planning document
 
@@ -203,7 +199,7 @@ helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-
 
 **Deploy SLOs:**
 ```bash
-./scripts/07-deploy-slo.sh
+./scripts/08-deploy-slo.sh
 ```
 
 **Access services:**

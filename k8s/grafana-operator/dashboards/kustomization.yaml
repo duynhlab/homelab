@@ -12,6 +12,9 @@ configMapGenerator:
   - name: grafana-dashboard-tempo
     files:
       - tempo-observability-dashboard.json
+  - name: grafana-dashboard-pgcat
+    files:
+      - pgcat.json
 
 resources:
   - grafana-dashboard-main.yaml
@@ -19,4 +22,5 @@ resources:
   - grafana-dashboard-slo-detailed.yaml
   - grafana-dashboard-vector.yaml
   - grafana-dashboard-tempo.yaml
+  - grafana-dashboard-pgcat.yaml
 

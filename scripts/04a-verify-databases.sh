@@ -305,7 +305,7 @@ if check_cluster_status "transaction-db" "cart" "cloudnativepg"; then
     list_databases "transaction-db" "cart" "cloudnativepg" "" || true
     check_database "transaction-db" "cart" "cart" "cart" "cloudnativepg" || true
     if ! check_database "transaction-db" "cart" "order" "cart" "cloudnativepg"; then
-        echo "    WARN: Order database missing - recreate cluster: kubectl delete cluster transaction-db -n cart && kubectl apply -f k8s/postgres-operator-cloudnativepg/crds/transaction-db.yaml"
+        echo "    WARN: Order database missing - recreate cluster: kubectl delete cluster transaction-db -n cart && kubectl apply -f k8s/postgres-operator/cloudnativepg/crds/transaction-db.yaml"
     fi
     check_pgcat_pooler "pgcat-transaction" "cart" "cart" "cart" || true
     check_pgcat_pooler "pgcat-transaction" "cart" "cart" "order" || true

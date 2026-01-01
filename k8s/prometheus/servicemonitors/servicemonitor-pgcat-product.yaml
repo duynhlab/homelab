@@ -1,0 +1,36 @@
+# ServiceMonitor for PgCat Product Pooler
+# Enables Prometheus to scrape PgCat metrics from HTTP admin endpoint
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pgcat-product
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  # Select the product namespace where PgCat service is located
+  namespaceSelector:
+    matchNames:
+      - product
+  
+  # Match the PgCat service by app label
+  selector:
+    matchLabels:
+      app: pgcat-product
+  
+  # Scrape configuration
+  endpoints:
+  - port: admin  # Port name from PgCat service (9930)
+    path: /metrics
+    interval: 15s
+    scrapeTimeout: 10s
+    relabelings:
+      # Set job label to "pgcat-product" for all targets
+      - targetLabel: job
+        replacement: pgcat-product
+      # Preserve original service name in "service" label
+      - sourceLabels: [__meta_kubernetes_service_name]
+        targetLabel: service
+      # Add namespace label from pod metadata
+      - sourceLabels: [__meta_kubernetes_namespace]
+        targetLabel: namespace

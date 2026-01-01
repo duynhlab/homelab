@@ -22,6 +22,8 @@ spec:
           name: postgres
         - containerPort: 9930
           name: admin
+        - containerPort: 9187
+          name: metrics
         volumeMounts:
         - name: config
           mountPath: /etc/pgcat

@@ -27,7 +27,7 @@ The SLO system uses:
 Deploy the complete SLO system:
 
 ```bash
-./scripts/07-deploy-slo.sh
+./scripts/08-deploy-slo.sh
 ```
 
 This script:
@@ -214,7 +214,7 @@ helm list -n monitoring | grep sloth
 
 # Reinstall if needed
 helm uninstall sloth -n monitoring
-./scripts/07-deploy-slo.sh
+./scripts/08-deploy-slo.sh
 ```
 
 ### PrometheusServiceLevel Not Reconciling

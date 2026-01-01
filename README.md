@@ -172,7 +172,7 @@ flowchart TB
 - **Access**: http://localhost:3000/d/microservices-monitoring-001/ (after port-forward)
 - **Variables**: `$namespace`, `$app`, `$rate`
 
-**Complete Dashboard Reference**: See [`docs/guides/DASHBOARD_PANELS.md`](docs/guides/DASHBOARD_PANELS.md) for all 34 panels with query analysis and troubleshooting.
+**Complete Dashboard Reference**: See [`docs/guides/GRAFANA_DASHBOARD.md`](docs/guides/GRAFANA_DASHBOARD.md) for all 34 panels with query analysis and troubleshooting.
 
 **Metrics Documentation**: See [`docs/monitoring/METRICS.md`](docs/monitoring/METRICS.md) for complete metrics guide (6 custom metrics, 34 panels).
 
@@ -200,7 +200,7 @@ After running `./scripts/09-setup-access.sh` or manual port-forwarding:
 |----------|-------------|
 | **[Setup Guide](docs/guides/SETUP.md)** | Complete deployment instructions |
 | **[Metrics Guide](docs/monitoring/METRICS.md)** | Complete metrics documentation (6 custom metrics, 34 panels) |
-| **[Dashboard Panels Guide](docs/guides/DASHBOARD_PANELS.md)** | Complete dashboard reference (34 panels) |
+| **[Grafana Dashboard Guide](docs/guides/GRAFANA_DASHBOARD.md)** | Complete dashboard reference (34 panels + annotations planning) |
 | **[APM Overview](docs/apm/README.md)** | Complete APM system overview |
 | **[SLO Documentation](docs/slo/README.md)** | SRE practices: SLI/SLO definitions, error budgets |
 | **[API Reference](docs/guides/API_REFERENCE.md)** | Complete API documentation for all 9 microservices |

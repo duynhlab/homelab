@@ -230,7 +230,7 @@ Infrastructure → Monitoring → APM → **Databases** → Apps → Load Testin
 ### Detailed Guides
 
 - **Research Patterns**: [`docs/guides/RESEARCH_PATTERNS.md`](docs/guides/RESEARCH_PATTERNS.md) - API, APM, Database research patterns
-- **Command Reference**: [`docs/guides/COMMAND_REFERENCE.md`](docs/guides/COMMAND_REFERENCE.md) - Deployment scripts, Helm, kubectl commands
+- **Command Reference**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md#command-reference) - Deployment scripts, Helm, kubectl commands
 - **Conventions**: [`docs/guides/CONVENTIONS.md`](docs/guides/CONVENTIONS.md) - Naming conventions, code standards, build verification
 - **API Reference**: [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md) - Complete API documentation
 - **Setup Guide**: [`docs/guides/SETUP.md`](docs/guides/SETUP.md) - Deployment instructions

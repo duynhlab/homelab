@@ -16,7 +16,7 @@ This SLO (Service Level Objective) system provides comprehensive monitoring and 
 ### Deploy SLO System
 
 ```bash
-./scripts/07-deploy-slo.sh
+./scripts/08-deploy-slo.sh
 ```
 
 This script:

@@ -485,7 +485,7 @@ kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 909
 
 3. Reload dashboard:
    ```bash
-   ./scripts/09-reload-dashboard.sh
+   ./scripts/10-reload-dashboard.sh
    ```
 
 ### Issue: High Cardinality Warning
@@ -645,7 +645,7 @@ If you later want to switch from Option A to Option B:
    # With:
    #   {app=~"$app", namespace=~"$namespace"}
    
-   ./scripts/09-reload-dashboard.sh
+   ./scripts/10-reload-dashboard.sh
    ```
 
 3. **Verify** - Check panels load data correctly after Prometheus/Grafana reload.
@@ -657,7 +657,7 @@ If you later want to switch from Option A to Option B:
 ## Related Documentation
 
 - [METRICS.md](./METRICS.md) - Complete metrics documentation
-- [PROMETHEUS_RATE_EXPLAINED.md](./PROMETHEUS_RATE_EXPLAINED.md) - rate() and increase() functions
+- [PromQL Guide](./PROMQL_GUIDE.md) - rate() and increase() functions, time range vs rate interval
 - [VARIABLES_REGEX.md](./VARIABLES_REGEX.md) - Dashboard variables and filtering
 - [Prometheus Operator](https://prometheus-operator.dev/) - Official documentation
 - [ServiceMonitor API](https://prometheus-operator.dev/docs/operator/api/#monitoring.coreos.com/v1.ServiceMonitor) - CRD reference

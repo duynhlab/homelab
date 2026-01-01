@@ -128,13 +128,13 @@ Kubernetes Probe → /health → Gin Handler → Prometheus Middleware ⏭️ SK
 
 - **k6/Dockerfile** - Dockerfile for k6 image
 - **k6/load-test-multiple-scenarios.js** - Test script with 5 user personas and journey functions
-- **charts/values/k6-scenarios.yaml** - Helm values
-- **scripts/06-deploy-k6.sh** - Deployment script
+- **charts/values/k6.yaml** - Helm values
+- **scripts/07-deploy-k6.sh** - Deployment script
 
 ## Deployment
 
 ```bash
-./scripts/06-deploy-k6.sh
+./scripts/07-deploy-k6.sh
 ```
 
 **Result:**
@@ -151,7 +151,7 @@ Kubernetes Probe → /health → Gin Handler → Prometheus Middleware ⏭️ SK
 kubectl get pods -n k6
 
 # View logs
-kubectl logs -n k6 -l app=k6-scenarios -f
+kubectl logs -n k6 -l app=k6 -f
 
 # Check Helm release
 helm list -n k6
@@ -463,7 +463,7 @@ k6 load testing configuration can be externalized via environment variables, all
 
 ### Configuration via Helm Values
 
-Environment variables are configured in `charts/values/k6-scenarios.yaml`:
+Environment variables are configured in `charts/values/k6.yaml`:
 
 ```yaml
 env:
@@ -485,13 +485,13 @@ To change RPS targets or traffic patterns:
 
 1. **Update Helm values:**
    ```bash
-   # Edit charts/values/k6-scenarios.yaml
+   # Edit charts/values/k6.yaml
    # Change environment variable values
    ```
 
 2. **Apply changes:**
    ```bash
-   helm upgrade k6-scenarios charts/ -f charts/values/k6-scenarios.yaml -n k6
+   helm upgrade k6 charts/ -f charts/values/k6.yaml -n k6
    ```
 
 3. **Verify configuration:**
@@ -587,7 +587,7 @@ All 4 traffic pattern scenarios run concurrently with the 5 user persona scenari
 
 **Pod not running:**
 ```bash
-kubectl logs -n k6 -l app=k6-scenarios
+kubectl logs -n k6 -l app=k6
 kubectl describe pod -n k6
 ```
 
@@ -631,12 +631,10 @@ kubectl describe pod -n k6
 
 **High resource usage:**
 - Reduce VUs in test scripts (edit `k6/*.js`)
-- Scale down specific deployment:
-  - `kubectl scale deployment k6-legacy --replicas=0 -n k6`
-  - `kubectl scale deployment k6-scenarios --replicas=0 -n k6`
-- Or uninstall specific release:
-  - `helm uninstall k6-legacy -n k6`
-  - `helm uninstall k6-scenarios -n k6`
+- Scale down deployment:
+  - `kubectl scale deployment k6 --replicas=0 -n k6`
+- Or uninstall release:
+  - `helm uninstall k6 -n k6`
 
 ## Best Practices (v0.6.14+)
 
@@ -706,5 +704,5 @@ func shouldCollectMetrics(path string) bool {
 
 1. Edit `k6/load-test.js` or `k6/load-test-multiple-scenarios.js`
 2. k6 images are built automatically by GitHub Actions on push (`.github/workflows/build-k6-images.yml`)
-3. Redeploy: `./scripts/06-deploy-k6.sh`
+3. Redeploy: `./scripts/07-deploy-k6.sh`
 4. Pods will automatically use new images (ImagePullPolicy: Never for local images)

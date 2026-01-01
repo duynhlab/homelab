@@ -38,7 +38,7 @@ if ! helm repo list | grep -q "postgres-operator"; then
 fi
 
 helm upgrade --install postgres-operator postgres-operator/postgres-operator \
-    -f "$PROJECT_ROOT/k8s/postgres-operator-zalando/values.yaml" \
+    -f "$PROJECT_ROOT/k8s/postgres-operator/zalando/values.yaml" \
     -n database \
     --version v1.15.1 \
     --wait \
@@ -64,7 +64,7 @@ if ! helm repo list | grep -q "cnpg"; then
 fi
 
 helm upgrade --install cloudnative-pg cnpg/cloudnative-pg \
-    -f "$PROJECT_ROOT/k8s/postgres-operator-cloudnativepg/values.yaml" \
+    -f "$PROJECT_ROOT/k8s/postgres-operator/cloudnativepg/values.yaml" \
     -n database \
     --wait \
     --timeout 5m
@@ -124,16 +124,16 @@ echo "SUCCESS: CloudNativePG database secrets created from YAML files"
 echo "NOTE: Zalando operator will auto-generate secrets when CRDs are applied"
 
 # Note: OperatorConfiguration is managed by Helm chart (postgres-operator CRD)
-# Configuration is set via k8s/postgres-operator-zalando/values.yaml
+# Configuration is set via k8s/postgres-operator/zalando/values.yaml
 # The operator-configuration.yaml file is not used (operator reads postgres-operator CRD from Helm)
 
 # Apply Zalando CRDs
 echo "Applying Zalando database CRDs..."
-kubectl apply -f "$PROJECT_ROOT/k8s/postgres-operator-zalando/crds/"
+kubectl apply -f "$PROJECT_ROOT/k8s/postgres-operator/zalando/crds/"
 
 # Apply CloudNativePG CRDs
 echo "Applying CloudNativePG database CRDs..."
-kubectl apply -f "$PROJECT_ROOT/k8s/postgres-operator-cloudnativepg/crds/"
+kubectl apply -f "$PROJECT_ROOT/k8s/postgres-operator/cloudnativepg/crds/"
 
 # Wait for clusters to be ready
 echo "Waiting for database clusters to be ready (this may take 5-10 minutes)..."
@@ -197,10 +197,10 @@ echo "SUCCESS: Database clusters created (or in progress)"
 echo "Deploying PgCat connection poolers..."
 
 echo "Deploying PgCat for Product service..."
-kubectl apply -f "$PROJECT_ROOT/k8s/pgcat/product/"
+kubectl apply -f "$PROJECT_ROOT/k8s/postgres-operator/pgcat/product/"
 
 echo "Deploying PgCat for Transaction services..."
-kubectl apply -f "$PROJECT_ROOT/k8s/pgcat/transaction/"
+kubectl apply -f "$PROJECT_ROOT/k8s/postgres-operator/pgcat/transaction/"
 
 # Wait for PgCat pods
 echo "Waiting for PgCat pods to be ready..."

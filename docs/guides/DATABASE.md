@@ -210,9 +210,9 @@ Both operators integrate with Prometheus for metrics collection:
 - **HA**: Patroni via Kubernetes API (automatic failover)
 - **Pooler**: PgCat standalone deployment v1.2.0 (`ghcr.io/postgresml/pgcat:v1.2.0`) with 2 replicas for HA
 - **Namespace**: `product`
-- **CRD**: `k8s/postgres-operator-cloudnativepg/crds/product-db.yaml`
-- **Pooler Config**: `k8s/pgcat/product/configmap.yaml`
-- **Pooler Deployment**: `k8s/pgcat/product/deployment.yaml`
+- **CRD**: `k8s/postgres-operator/cloudnativepg/crds/product-db.yaml`
+- **Pooler Config**: `k8s/postgres-operator/pgcat/product/configmap.yaml`
+- **Pooler Deployment**: `k8s/postgres-operator/pgcat/product/deployment.yaml`
 
 **Architecture Diagram:**
 
@@ -263,9 +263,9 @@ flowchart TB
 - **Replication**: Synchronous replication with logical replication slot synchronization
 - **Pooler**: PgCat standalone deployment v1.2.0 (`ghcr.io/postgresml/pgcat:v1.2.0`) with 2 replicas for HA
 - **Namespace**: `cart`
-- **CRD**: `k8s/postgres-operator-cloudnativepg/crds/transaction-db.yaml`
-- **Pooler Config**: `k8s/pgcat/transaction/configmap.yaml`
-- **Pooler Deployment**: `k8s/pgcat/transaction/deployment.yaml`
+- **CRD**: `k8s/postgres-operator/cloudnativepg/crds/transaction-db.yaml`
+- **Pooler Config**: `k8s/postgres-operator/pgcat/transaction/configmap.yaml`
+- **Pooler Deployment**: `k8s/postgres-operator/pgcat/transaction/deployment.yaml`
 - **Production-Ready**: Comprehensive PostgreSQL performance tuning, synchronous replication, logical replication slot sync
 
 **Architecture Diagram:**
@@ -422,7 +422,7 @@ env:
         key: password
 ```
 
-**PgCat Configuration** (`k8s/pgcat/product/configmap.yaml`):
+**PgCat Configuration** (`k8s/postgres-operator/pgcat/product/configmap.yaml`):
 ```toml
 # PgCat Configuration for Product Database
 [general]
@@ -461,10 +461,10 @@ role = "primary"
 - **CloudNativePG Services**: CloudNativePG automatically creates services:
   - `{cluster-name}-rw` (read-write endpoint) → `product-db-rw.product.svc.cluster.local`
   - `{cluster-name}-r` (read-only endpoint) → `product-db-r.product.svc.cluster.local` (for future replica routing)
-- **Deployment**: `k8s/pgcat/product/deployment.yaml` with 2 replicas
+- **Deployment**: `k8s/postgres-operator/pgcat/product/deployment.yaml` with 2 replicas
 - Currently configured with primary server only; replicas can be added later for read balancing
 
-**Transaction Database PgCat Configuration** (`k8s/pgcat/transaction/configmap.yaml`):
+**Transaction Database PgCat Configuration** (`k8s/postgres-operator/pgcat/transaction/configmap.yaml`):
 ```toml
 # PgCat Configuration for Transaction Databases (Cart + Order)
 [general]
@@ -629,8 +629,8 @@ ServiceMonitor is automatically deployed by `scripts/02-deploy-monitoring.sh` (a
 
 **CRD Examples:**
 
-Product DB CRD location: `k8s/postgres-operator-cloudnativepg/crds/product-db.yaml`
-Transaction DB CRD location: `k8s/postgres-operator-cloudnativepg/crds/transaction-db.yaml`
+Product DB CRD location: `k8s/postgres-operator/cloudnativepg/crds/product-db.yaml`
+Transaction DB CRD location: `k8s/postgres-operator/cloudnativepg/crds/transaction-db.yaml`
 
 **Key Configuration Parameters:**
 - `instances`: Number of PostgreSQL instances (2 for Product, 3 for Transaction)
@@ -723,7 +723,7 @@ PodMonitors are automatically deployed by `scripts/04-deploy-databases.sh` after
 - **HA**: Patroni via Kubernetes API (single instance, no failover needed)
 - **Pooler**: None (direct connection)
 - **Namespace**: `review` (same namespace as review service - no cross-namespace secrets needed)
-- **CRD**: `k8s/postgres-operator-zalando/crds/review-db.yaml`
+- **CRD**: `k8s/postgres-operator/zalando/crds/review-db.yaml`
 
 **Architecture Diagram:**
 
@@ -768,7 +768,7 @@ flowchart TB
 - **HA**: Patroni HA via Kubernetes API (automatic failover < 30 seconds)
 - **Pooler**: PgBouncer sidecar (2 instances, transaction mode)
 - **Namespace**: `auth` (same namespace as auth service - no cross-namespace secrets needed)
-- **CRD**: `k8s/postgres-operator-zalando/crds/auth-db.yaml`
+- **CRD**: `k8s/postgres-operator/zalando/crds/auth-db.yaml`
 - **Production-Ready**: Comprehensive PostgreSQL performance tuning, optimized resource limits, enhanced logging
 
 **Architecture Diagram:**
@@ -875,7 +875,7 @@ flowchart TB
 - **HA**: Patroni via Kubernetes API (single instance, no failover needed)
 - **Pooler**: None (direct connection)
 - **Namespace**: `user` (cluster location)
-- **CRD**: `k8s/postgres-operator-zalando/crds/supporting-db.yaml`
+- **CRD**: `k8s/postgres-operator/zalando/crds/supporting-db.yaml`
 
 **Architecture Diagram:**
 
@@ -1031,7 +1031,7 @@ env:
     value: "transaction"  # PgBouncer transaction pooling
 ```
 
-**CRD Configuration** (`k8s/postgres-operator-zalando/crds/auth-db.yaml`):
+**CRD Configuration** (`k8s/postgres-operator/zalando/crds/auth-db.yaml`):
 ```yaml
 connectionPooler:
   numberOfInstances: 2
@@ -1085,7 +1085,7 @@ The **Supporting Database** (`supporting-db`) cluster uses a **shared database p
 **OperatorConfiguration CRD** - **Helm-managed CRD (`postgres-operator`) is the active configuration**:
 
 - **CRD Name**: `postgres-operator` (created automatically by Helm chart)
-- **Configuration Source**: `k8s/postgres-operator-zalando/values.yaml`:
+- **Configuration Source**: `k8s/postgres-operator/zalando/values.yaml`:
 ```yaml
    # Flat structure (NOT nested under config:)
    configKubernetes:
@@ -1094,11 +1094,11 @@ The **Supporting Database** (`supporting-db`) cluster uses a **shared database p
    ```
 - **Important**: Helm chart expects **flat structure** (`configKubernetes:`, `configPostgresql:`, etc.) as top-level keys, NOT nested under `config:`
 - **How Operator Reads It**: Operator reads this CRD via `POSTGRES_OPERATOR_CONFIGURATION_OBJECT: postgres-operator` environment variable (set by Helm chart)
-- **To Update Configuration**: Edit `values.yaml` and run `helm upgrade postgres-operator postgres-operator/postgres-operator -n database -f k8s/postgres-operator-zalando/values.yaml`
+- **To Update Configuration**: Edit `values.yaml` and run `helm upgrade postgres-operator postgres-operator/postgres-operator -n database -f k8s/postgres-operator/zalando/values.yaml`
 
 **Note:** The Helm chart automatically creates the `postgres-operator` OperatorConfiguration CRD from the values file. This is the only configuration method used.
 
-**Database CRD** (`k8s/postgres-operator-zalando/crds/supporting-db.yaml`):
+**Database CRD** (`k8s/postgres-operator/zalando/crds/supporting-db.yaml`):
    ```yaml
    databases:
      user: user
@@ -1154,16 +1154,16 @@ If a service fails to start with "secret not found" error:
 
 The cross-namespace secret feature was fixed by correcting the Helm values structure:
 - **Issue**: Helm values used nested structure (`config.kubernetes.enable_cross_namespace_secret`) instead of flat structure (`configKubernetes.enable_cross_namespace_secret`)
-- **Fix**: Restructured `k8s/postgres-operator-zalando/values.yaml` to use flat top-level keys (`configKubernetes:`, `configPostgresql:`, `configConnectionPooler:`, `configBackup:`, `configGeneral:`)
+- **Fix**: Restructured `k8s/postgres-operator/zalando/values.yaml` to use flat top-level keys (`configKubernetes:`, `configPostgresql:`, `configConnectionPooler:`, `configBackup:`, `configGeneral:`)
 - **Result**: Operator now correctly reads `enable_cross_namespace_secret: true` and creates secrets in target namespaces automatically ✅
 
 ### Configuration
 
 **CRD Examples:**
 
-Review DB CRD location: `k8s/postgres-operator-zalando/crds/review-db.yaml`
-Auth DB CRD location: `k8s/postgres-operator-zalando/crds/auth-db.yaml`
-Supporting DB CRD location: `k8s/postgres-operator-zalando/crds/supporting-db.yaml`
+Review DB CRD location: `k8s/postgres-operator/zalando/crds/review-db.yaml`
+Auth DB CRD location: `k8s/postgres-operator/zalando/crds/auth-db.yaml`
+Supporting DB CRD location: `k8s/postgres-operator/zalando/crds/supporting-db.yaml`
 
 **Key Configuration Parameters:**
 - `numberOfInstances`: Number of PostgreSQL instances (1 for Review/Supporting, 3 for Auth)
@@ -1173,7 +1173,7 @@ Supporting DB CRD location: `k8s/postgres-operator-zalando/crds/supporting-db.ya
 - `volume.size`: Persistent volume size
 
 **Operator Configuration:**
-- Managed via Helm values: `k8s/postgres-operator-zalando/values.yaml`
+- Managed via Helm values: `k8s/postgres-operator/zalando/values.yaml`
 - OperatorConfiguration CRD: `postgres-operator` (auto-created by Helm)
 - Key settings: `enable_cross_namespace_secret: true`
 
@@ -1203,7 +1203,7 @@ PostgreSQL metrics are exposed via `postgres_exporter` sidecar containers for Za
 
 **Step 1: Add Sidecar to PostgreSQL CRD**
 ```yaml
-# k8s/postgres-operator-zalando/crds/auth-db.yaml
+# k8s/postgres-operator/zalando/crds/auth-db.yaml
 apiVersion: "acid.zalan.do/v1"
 kind: postgresql
 metadata:
@@ -1427,7 +1427,7 @@ Production databases require robust backup strategies including:
 
 **Current Configuration:**
 ```yaml
-# k8s/postgres-operator-zalando/values.yaml
+# k8s/postgres-operator/zalando/values.yaml
 config:
   backup:
     wal_s3_bucket: ""  # Leave empty for no backup (learning project)
@@ -1761,9 +1761,9 @@ Services using the shared `supporting-db` cluster (Notification, Shipping-v2) de
    kubectl get operatorconfiguration postgres-operator -n database -o jsonpath='{.configuration.kubernetes.enable_cross_namespace_secret}'
    # Should output: true
    ```
-   If false, update `k8s/postgres-operator-zalando/values.yaml` and run:
+   If false, update `k8s/postgres-operator/zalando/values.yaml` and run:
    ```bash
-   helm upgrade postgres-operator postgres-operator/postgres-operator -n database -f k8s/postgres-operator-zalando/values.yaml
+   helm upgrade postgres-operator postgres-operator/postgres-operator -n database -f k8s/postgres-operator/zalando/values.yaml
    ```
 
 2. **Check Secret Location**: 
@@ -1779,7 +1779,7 @@ Services using the shared `supporting-db` cluster (Notification, Shipping-v2) de
    ```
 
 4. **Verify Cross-Namespace Secret Configuration**: With Zalando operator v1.15.1+ and correct Helm values structure (flat top-level keys), secrets are automatically created in target namespaces. If secrets are still missing:
-   - Verify `configKubernetes.enable_cross_namespace_secret: true` in `k8s/postgres-operator-zalando/values.yaml`
+   - Verify `configKubernetes.enable_cross_namespace_secret: true` in `k8s/postgres-operator/zalando/values.yaml`
    - Verify Helm values use flat structure (not nested `config:`)
    - Check operator logs for errors: `kubectl logs -n database -l app.kubernetes.io/name=postgres-operator | grep -i "cross\|namespace\|secret"`
    - **Note**: Manual secret copy is no longer needed with correct configuration. Operator automatically creates secrets in target namespaces when using `namespace.username` format.
@@ -1981,7 +1981,7 @@ kubectl get pods -n auth
    - Verify cluster connectivity: `kubectl cluster-info`
    - Check operator can access K8s API: `kubectl get pods -n database`
 3. **Verify cluster configuration**: 
-   - Zalando: Check `k8s/postgres-operator-zalando/crds/auth-db.yaml` (should show `numberOfInstances: 3` for HA)
+   - Zalando: Check `k8s/postgres-operator/zalando/crds/auth-db.yaml` (should show `numberOfInstances: 3` for HA)
 4. **Review operator logs**:
    - Zalando: `kubectl logs -n database -l app.kubernetes.io/name=postgres-operator`
 5. **Check for resource constraints**: Insufficient CPU/memory can prevent failover

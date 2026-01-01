@@ -8,6 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+## [0.10.39] - 2026-01-01
+
+### Changed
+
+**Refactored k8s Postgres Operator Directory Structure:**
+- **Consolidated**: Moved `postgres-operator-cloudnativepg/`, `postgres-operator-zalando/`, and `pgcat/` into unified `postgres-operator/` directory structure
+- **New Structure**: 
+  - `k8s/postgres-operator/cloudnativepg/` (CRDs and values.yaml)
+  - `k8s/postgres-operator/zalando/` (CRDs and values.yaml)
+  - `k8s/postgres-operator/pgcat/` (product/ and transaction/ pooler configs)
+- **Updated**: All script references in `scripts/04-deploy-databases.sh` and `scripts/04a-verify-databases.sh`
+- **Updated**: All documentation references in `docs/guides/DATABASE.md` (~29 path updates)
+- **Updated**: Architecture overview in `specs/system-context/01-architecture-overview.md` to reflect new directory structure
+- **Removed**: Old directories `k8s/postgres-operator-cloudnativepg/`, `k8s/postgres-operator-zalando/`, `k8s/pgcat/`
+- **Impact**: Improved organization by grouping all PostgreSQL-related operators and poolers under single directory. No functional changes - pure refactoring.
+
+### Documentation
+
+- **Merged COMMAND_REFERENCE.md into SETUP.md**: Consolidated command reference documentation into the main setup guide to reduce duplication and improve maintainability. The "Command Reference" section in SETUP.md now includes deployment scripts table, Helm commands, kubectl shortcuts, access points, and quick commands by task.
+- **Updated AGENTS.md**: Updated reference from `docs/guides/COMMAND_REFERENCE.md` to `docs/guides/SETUP.md#command-reference`.
+
 ## [0.10.38] - 2025-12-30
 
 ### Added

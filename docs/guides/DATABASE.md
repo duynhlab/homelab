@@ -588,10 +588,15 @@ role = "replica"
 
 **Monitoring:**
 
-PgCat metrics are exposed via HTTP endpoint (`/metrics` on port 9930) and scraped by Prometheus using a **ServiceMonitor**:
+PgCat metrics are exposed via HTTP endpoint (`/metrics` on port 9930) and scraped by Prometheus using **ServiceMonitors**.
 
-**ServiceMonitor File:**
-- `k8s/prometheus/servicemonitors/servicemonitor-pgcat-transaction.yaml`
+**Configuration Requirement:**
+- PgCat config must have `enable_prometheus_exporter = true` in `[general]` section to expose HTTP metrics endpoint
+- ConfigMaps: `k8s/postgres-operator/pgcat/transaction/configmap.yaml` and `k8s/postgres-operator/pgcat/product/configmap.yaml`
+
+**ServiceMonitor Files:**
+- `k8s/prometheus/servicemonitors/servicemonitor-pgcat-product.yaml` - For Product DB PgCat
+- `k8s/prometheus/servicemonitors/servicemonitor-pgcat-transaction.yaml` - For Transaction DB PgCat
 
 **Key Metrics:**
 - `pgcat_pools_active_connections{pool="cart"}` - Active connections per pool
@@ -621,9 +626,11 @@ ServiceMonitor is automatically deployed by `scripts/02-deploy-monitoring.sh` (a
 - Monitor failover events: `pgcat_servers_health{status="unhealthy"}`
 
 **Issue: Metrics not available in Prometheus**
-- Verify ServiceMonitor exists: `kubectl get servicemonitor -n monitoring pgcat-transaction`
+- Verify `enable_prometheus_exporter = true` is set in PgCat config: `kubectl get configmap pgcat-transaction-config -n cart -o yaml | grep enable_prometheus`
+- Verify ServiceMonitors exist: `kubectl get servicemonitor -n monitoring | grep pgcat`
 - Check Prometheus targets: Port-forward to Prometheus UI and check `/targets` page
 - Verify PgCat service has correct labels: `kubectl get svc -n cart pgcat -o yaml | grep -A 5 labels`
+- Test metrics endpoint directly: `kubectl port-forward -n cart svc/pgcat 9930:9930` then `curl http://localhost:9930/metrics`
 
 ### Configuration
 
@@ -2377,6 +2384,6 @@ kubectl run -it --rm test-pgcat-order --image=postgres:18-alpine --restart=Never
 ## Related Documentation
 
 - **[Setup Guide](./SETUP.md)** - Complete deployment and configuration guide
-- **[Error Handling](./ERROR_HANDLING.md)** - Database error handling patterns
+- **[Error Handling](./API_REFERENCE.md#error-handling)** - Database error handling patterns
 - **[API Reference](./API_REFERENCE.md)** - API endpoints using database
 

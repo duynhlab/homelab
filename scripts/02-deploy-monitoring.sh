@@ -1,13 +1,23 @@
 #!/bin/bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+echo "=== Creating All Kubernetes Namespaces ==="
+echo "Creating all namespaces..."
+kubectl apply -f "$PROJECT_ROOT/k8s/namespaces.yaml"
+echo ""
+
 echo "=== Deploying Monitoring Stack (Prometheus + Grafana + Metrics Infrastructure) ==="
 echo "This includes: kube-prometheus-stack (with kube-state-metrics) + metrics-server"
 echo ""
 
-# Ensure monitoring namespace exists
-echo "Ensuring 'monitoring' namespace exists..."
-kubectl get namespace monitoring >/dev/null 2>&1 || kubectl create namespace monitoring
+# Verify monitoring namespace exists (should exist now)
+if ! kubectl get namespace monitoring &> /dev/null; then
+    echo "ERROR: 'monitoring' namespace does not exist after creation."
+    exit 1
+fi
 
 # Install Prometheus Operator via kube-prometheus-stack
 echo "Step 1: Installing kube-prometheus-stack v80.0.0 (includes kube-state-metrics)..."
@@ -18,7 +28,6 @@ if command -v helm >/dev/null 2>&1; then
   helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
     --version 80.0.0 \
     --namespace monitoring \
-    --create-namespace \
     -f k8s/prometheus/values.yaml \
     --wait \
     --timeout 5m
@@ -61,7 +70,6 @@ helm repo update >/dev/null 2>&1 || true
 helm upgrade --install grafana-operator grafana-operator/grafana-operator \
   --version v5.20.0 \
   --namespace monitoring \
-  --create-namespace \
   -f k8s/grafana-operator/values.yaml
 
 echo "6. Applying Grafana CRDs (instance, datasources, dashboards)..."

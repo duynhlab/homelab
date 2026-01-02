@@ -26,9 +26,6 @@ if ! command -v kubectl &> /dev/null; then
     exit 1
 fi
 
-# Create database namespace for operators
-echo "Creating database namespace..."
-kubectl create namespace database --dry-run=client -o yaml | kubectl apply -f -
 
 # Deploy Zalando Postgres Operator
 echo "Deploying Zalando Postgres Operator..."
@@ -55,6 +52,27 @@ if ! kubectl get crd postgresqls.acid.zalan.do &> /dev/null; then
 fi
 
 echo "SUCCESS: Zalando Postgres Operator deployed"
+
+# Deploy Postgres Operator UI (optional component)
+echo "Deploying Postgres Operator UI..."
+if ! helm repo list | grep -q "postgres-operator-ui-charts"; then
+    helm repo add postgres-operator-ui-charts https://opensource.zalando.com/postgres-operator/charts/postgres-operator-ui
+    helm repo update postgres-operator-ui-charts
+fi
+
+helm upgrade --install postgres-operator-ui postgres-operator-ui-charts/postgres-operator-ui \
+    -f "$PROJECT_ROOT/k8s/postgres-operator/zalando/ui-values.yaml" \
+    -n database \
+    --version 1.15.1 \
+    --wait \
+    --timeout 5m || echo "WARNING: Postgres Operator UI deployment failed (optional component)"
+
+kubectl wait --for=condition=ready pod \
+    -l app.kubernetes.io/name=postgres-operator-ui \
+    -n database \
+    --timeout=300s || echo "WARNING: Postgres Operator UI pod not ready (optional component)"
+
+echo "SUCCESS: Postgres Operator UI deployed (if enabled)"
 
 # Deploy CloudNativePG Operator
 echo "Deploying CloudNativePG Operator..."
@@ -83,13 +101,6 @@ echo "SUCCESS: CloudNativePG Operator deployed"
 
 # Create database clusters
 echo "Creating database clusters..."
-
-# Create namespaces
-for ns in auth review product cart order user; do
-    if ! kubectl get namespace "$ns" &> /dev/null; then
-        kubectl create namespace "$ns"
-    fi
-done
 
 # Create database secrets BEFORE applying CRDs
 # CloudNativePG requires secrets to exist during bootstrap

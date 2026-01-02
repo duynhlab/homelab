@@ -2,6 +2,8 @@
 
 > **IMPORTANT**: AGENTS.md files are the source of truth for AI agent instructions. Always update the relevant AGENTS.md file when adding or modifying agent guidance.
 
+> **IMPORTANT**: This project is directly related to the user's day-to-day work as a Senior DevOps / SRE. Recommendations should prioritize production-grade, scalable, and maintainable solutions.
+
 > **CRITICAL**: **ALWAYS READ THIS FILE FIRST** before starting any task. This file contains essential patterns, conventions, and best practices that must be followed.
 
 ## Overview
@@ -89,7 +91,7 @@ go test ./internal/{service}/...
 go build -o bin/{service} cmd/{service}/main.go
 ```
 
-**Detailed Configuration**: See [`docs/guides/CONFIGURATION.md`](docs/guides/CONFIGURATION.md) for environment variables, `.env` files, and local setup.
+**Detailed Configuration**: See [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md) for environment variables, `.env` files, and local setup.
 
 **Deployment**: Docker/Kubernetes deployment details in [`docs/guides/SETUP.md`](docs/guides/SETUP.md)
 
@@ -204,13 +206,13 @@ monitoring/
 Infrastructure → Monitoring → APM → **Databases** → Apps → Load Testing → SLO → Access
 
 1. Infrastructure (01) - Kind cluster
-2. Monitoring (02) - Prometheus, Grafana, metrics (BEFORE apps)
+2. Monitoring (02) - **Create all namespaces** + Prometheus, Grafana, metrics (BEFORE apps)
 3. APM (03) - Tempo, Pyroscope, Loki, Vector (BEFORE apps)
 4. **Databases (04)** - PostgreSQL operators, clusters, poolers (BEFORE apps)
-5. Deploy Apps (05) - Deploy services from OCI registry (images built by GitHub Actions)
-6. Load Testing (06) - K6 load generators (AFTER apps)
-7. SLO (07) - Sloth Operator and SLO CRDs
-8. Access Setup (08) - Port-forwarding
+5. Deploy Apps (06) - Deploy services from OCI registry (images built by GitHub Actions)
+6. Load Testing (07) - K6 load generators (AFTER apps)
+7. SLO (08) - Sloth Operator and SLO CRDs
+8. Access Setup (09) - Port-forwarding
 
 **Detailed Deployment Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md)
 
@@ -219,7 +221,7 @@ Infrastructure → Monitoring → APM → **Databases** → Apps → Load Testin
 - **5 PostgreSQL Clusters**: review-db, auth-db, supporting-db, product-db, transaction-db
 - **Connection Poolers**: PgBouncer (Auth), PgCat (Product, Cart+Order)
 - **Migrations**: Flyway 11.19.0 with 8 migration images
-- **Operators**: Zalando Postgres Operator (v1.15.0), CloudNativePG Operator (v1.24.0)
+- **Operators**: Zalando Postgres Operator (v1.15.1), CloudNativePG Operator (v1.28.0)
 - **SLO**: Managed via Sloth Operator (PrometheusServiceLevel CRDs)
 - **CI/CD**: GitHub Actions workflows (build-images, build-init-images, build-k6-images, helm-release)
 
@@ -234,7 +236,7 @@ Infrastructure → Monitoring → APM → **Databases** → Apps → Load Testin
 - **Conventions**: [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md#conventions-and-standards) - Naming conventions, code standards, build verification
 - **API Reference**: [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md) - Complete API documentation
 - **Setup Guide**: [`docs/guides/SETUP.md`](docs/guides/SETUP.md) - Deployment instructions
-- **Configuration**: [`docs/guides/CONFIGURATION.md`](docs/guides/CONFIGURATION.md) - Environment variables and config
+- **Configuration**: [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md) - Environment variables and config
 - **Database**: [`docs/guides/DATABASE.md`](docs/guides/DATABASE.md) - Database architecture and patterns
 
 ### Find Files by Purpose
@@ -257,35 +259,12 @@ Infrastructure → Monitoring → APM → **Databases** → Apps → Load Testin
 ### Find Documentation by Topic
 
 - **Getting Started**: [`docs/guides/SETUP.md`](docs/guides/SETUP.md), [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md)
-- **Development**: [`docs/guides/CONFIGURATION.md`](docs/guides/CONFIGURATION.md), [`docs/guides/API_REFERENCE.md#error-handling`](docs/guides/API_REFERENCE.md#error-handling), [`docs/guides/TRACING_ARCHITECTURE.md`](docs/guides/TRACING_ARCHITECTURE.md)
-- **Monitoring**: [`docs/monitoring/METRICS.md`](docs/monitoring/METRICS.md), [`docs/monitoring/TROUBLESHOOTING.md`](docs/monitoring/TROUBLESHOOTING.md)
+- **Development**: [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md), [`docs/guides/API_REFERENCE.md#error-handling`](docs/guides/API_REFERENCE.md#error-handling), [`docs/guides/TRACING_ARCHITECTURE.md`](docs/guides/TRACING_ARCHITECTURE.md)
+- **Monitoring**: [`docs/monitoring/METRICS.md`](docs/monitoring/METRICS.md)
 - **APM**: [`docs/apm/README.md`](docs/apm/README.md), [`docs/apm/TRACING.md`](docs/apm/TRACING.md), [`docs/apm/LOGGING.md`](docs/apm/LOGGING.md), [`docs/apm/PROFILING.md`](docs/apm/PROFILING.md)
 - **SLO**: [`docs/slo/README.md`](docs/slo/README.md), [`docs/slo/GETTING_STARTED.md`](docs/slo/GETTING_STARTED.md)
 - **k6**: [`docs/k6/K6_LOAD_TESTING.md`](docs/k6/K6_LOAD_TESTING.md)
 - **Docs Index**: [`docs/README.md`](docs/README.md)
-
----
-
-## Troubleshooting
-
-Common issues and quick fixes. For detailed troubleshooting, see [`docs/monitoring/TROUBLESHOOTING.md`](docs/monitoring/TROUBLESHOOTING.md).
-
-**Dashboard not updating:**
-- Re-apply: `kubectl apply -k k8s/grafana-operator/dashboards/`
-- Check status: `kubectl get grafanadashboards -n monitoring`
-
-**Prometheus not scraping:**
-- Check ServiceMonitor: `kubectl get servicemonitor -n monitoring`
-- Check targets: http://localhost:9090/targets
-
-**SLO rules not loading:**
-- Check CRDs: `kubectl get prometheusservicelevels -n monitoring`
-- Check rules: `kubectl get prometheusrules -n monitoring`
-
-**Metrics not appearing:**
-- Verify `/metrics` endpoint exists
-- Check ServiceMonitor configuration
-- Verify labels match (app, namespace, job)
 
 ---
 

@@ -8,7 +8,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+## [0.11.1] - 2026-01-02
+
+### Fixed
+
+**PgCat ServiceMonitor Configuration:**
+- **Fixed**: PgCat ServiceMonitors not scraping metrics due to relabelings configuration
+  - **Root Cause**: Relabelings section was causing issues with Prometheus scraping
+  - **Solution**: Removed `relabelings` section from both PgCat ServiceMonitors
+  - **Files Updated**:
+    - `k8s/prometheus/servicemonitors/servicemonitor-pgcat-transaction.yaml`
+    - `k8s/prometheus/servicemonitors/servicemonitor-pgcat-product.yaml`
+  - **Result**: Prometheus now successfully scrapes PgCat metrics using default Kubernetes service discovery labels ✅
+- **Improved**: Port name clarity in PgCat Services and Deployments
+  - **Changed**: Port name from `admin` to `metrics` for better clarity
+  - **Reason**: Port 9930 serves both admin interface and Prometheus metrics endpoint, but ServiceMonitor uses it primarily for metrics
+  - **Files Updated**:
+    - `k8s/postgres-operator/pgcat/transaction/service.yaml`
+    - `k8s/postgres-operator/pgcat/transaction/deployment.yaml`
+    - `k8s/postgres-operator/pgcat/product/service.yaml`
+    - `k8s/postgres-operator/pgcat/product/deployment.yaml`
+    - `k8s/prometheus/servicemonitors/servicemonitor-pgcat-transaction.yaml`
+    - `k8s/prometheus/servicemonitors/servicemonitor-pgcat-product.yaml`
+  - **Note**: Port 9930 still serves both admin interface and metrics endpoint, but port name now reflects primary use case (metrics scraping)
+
+**Namespace Management Consolidation:**
+- **Fixed**: Zalando operator failing to create cross-namespace secrets because `notification` and `shipping` namespaces didn't exist
+  - **Error**: `could not create secret for user notification.notification: in namespace notification: namespaces "notification" not found`
+  - **Root Cause**: Namespaces were created inconsistently across scripts, missing `notification` and `shipping` in database deployment script
+  - **Solution**: Centralized namespace management with single source of truth
+- **Updated**: `k8s/namespaces.yaml` - Added `database` and `monitoring` namespaces (previously missing)
+- **Updated**: `scripts/02-deploy-monitoring.sh` - Added namespace creation at the beginning (simple `kubectl apply -f k8s/namespaces.yaml`)
+- **Updated**: `scripts/04-deploy-databases.sh` - Removed inline namespace creation, now verifies namespaces exist
+- **Updated**: `scripts/07-deploy-k6.sh` - Removed inline namespace creation, now verifies namespace exists
+- **Updated**: `scripts/06-deploy-microservices.sh` - Updated comment to reference monitoring script
+- **Deleted**: `scripts/00.5-create-namespaces.sh` - Removed separate script, namespace creation integrated into monitoring script
+- **Result**: All namespaces created before deployments, Zalando operator can create secrets in target namespaces ✅
+
+### Changed
+
+**Deployment Order:**
+- **Updated**: Namespace creation integrated into monitoring deployment script
+  - Order: Infrastructure (01) → Monitoring (02) **[creates all namespaces]** → APM (03) → Databases (04) → Apps (06) → ...
+  - Simpler approach: No separate namespace script needed, just `kubectl apply` in monitoring script
+- **Updated**: `docs/guides/SETUP.md` - Removed Step 1.5, updated Step 2 to mention namespace creation
+- **Updated**: `AGENTS.md` - Updated deployment order (namespaces created by monitoring script)
+
+### Documentation
+
+- **Updated**: `docs/guides/SETUP.md` - Removed Step 1.5, updated Step 2 to mention namespace creation happens first
+- **Updated**: `docs/guides/SETUP.md` - Updated command reference table to remove separate namespace script
+
 ## [0.11.0] - 2026-01-01
+
+### Added
+
+**Postgres Operator UI Component:**
+- **Added**: Postgres Operator UI deployment for graphical database cluster management
+  - **Helm Values**: `k8s/postgres-operator/zalando/ui-values.yaml`
+  - **Chart**: `postgres-operator-ui-charts/postgres-operator-ui` v1.15.1
+  - **Image**: `ghcr.io/zalando/postgres-operator-ui:v1.15.1`
+  - **Namespace**: `database` (same as operator)
+  - **Configuration**: 
+    - Operator API URL: `http://postgres-operator.database.svc.cluster.local:8080`
+    - Target Namespace: `"*"` (view all namespaces)
+    - Service Type: `ClusterIP` on port `80`
+- **Updated**: `scripts/04-deploy-databases.sh` - Added UI deployment step after Zalando operator
+- **Updated**: `scripts/09-setup-access.sh` - Added port-forward for UI on port 8082
+  - Access URL: `http://localhost:8082`
+- **Purpose**: Provides web-based interface for viewing and managing PostgreSQL clusters without kubectl
 
 ### Fixed
 
@@ -32,13 +100,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 **PgCat Deployment Configuration:**
-- **Added**: Port 9187 (metrics) to PgCat deployments and services (for future use)
-  - **Files**: 
+- **Removed**: Port 9187 (metrics) from PgCat deployments and services
+  - **Reason**: PgCat exposes metrics on port 9930 (admin port) via HTTP endpoint `/metrics`, not on a separate port
+  - **Files Updated**: 
     - `k8s/postgres-operator/pgcat/transaction/deployment.yaml`
     - `k8s/postgres-operator/pgcat/transaction/service.yaml`
     - `k8s/postgres-operator/pgcat/product/deployment.yaml`
     - `k8s/postgres-operator/pgcat/product/service.yaml`
-  - **Note**: Currently using port 9930 (admin port) for metrics, port 9187 reserved for future use
+  - **Note**: Metrics endpoint is `http://<pgcat-service>:9930/metrics` (admin port with `/metrics` path)
 
 ### Documentation
 

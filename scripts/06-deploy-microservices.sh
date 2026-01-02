@@ -38,8 +38,8 @@ SERVICES=(
 )
 
 # Deploy each service
-# Note: Namespaces are created automatically by Helm's --create-namespace flag
-# or already exist from database deployment script (04-deploy-databases.sh)
+# Note: Namespaces are created by script 02-deploy-monitoring.sh (runs before this script)
+# --create-namespace flag is kept as safety net but namespaces should already exist
 COUNT=1
 for entry in "${SERVICES[@]}"; do
   IFS=':' read -r SERVICE NAMESPACE VALUES <<< "$entry"

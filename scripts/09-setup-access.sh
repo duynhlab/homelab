@@ -37,6 +37,10 @@ kubectl port-forward -n monitoring svc/pyroscope 4040:4040 > /dev/null 2>&1 &
 echo "Starting User Service port forward (8081)..."
 kubectl port-forward -n user svc/user 8081:8080 > /dev/null 2>&1 &
 
+# Postgres Operator UI
+echo "Starting Postgres Operator UI port forward (8082)..."
+kubectl port-forward -n database svc/postgres-operator-ui 8082:80 > /dev/null 2>&1 &
+
 # Wait for port forwards to be ready
 echo "Waiting for port forwards to be ready..."
 sleep 5
@@ -45,11 +49,12 @@ echo ""
 echo "SUCCESS: Port forwarding setup complete!"
 echo ""
 echo "Access URLs:"
-echo "Grafana:    http://localhost:3000 (anonymous access enabled)"
-echo "Prometheus: http://localhost:9090"
-echo "Jaeger:     http://localhost:16686"
-echo "Tempo:      http://localhost:3200"
-echo "Pyroscope:  http://localhost:4040"
-echo "User API:   http://localhost:8081/api/v1/users"
+echo "Grafana:            http://localhost:3000 (anonymous access enabled)"
+echo "Prometheus:         http://localhost:9090"
+echo "Jaeger:             http://localhost:16686"
+echo "Tempo:              http://localhost:3200"
+echo "Pyroscope:          http://localhost:4040"
+echo "User API:           http://localhost:8081/api/v1/users"
+echo "Postgres Operator UI: http://localhost:8082"
 echo ""
 echo "To stop port forwarding: pkill -f 'kubectl port-forward'"

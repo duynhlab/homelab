@@ -318,7 +318,7 @@ The dashboard uses **4 variables** for filtering and customization:
 > **📖 See [Variables & Regex Guide](./VARIABLES_REGEX.md)** for detailed variable configuration, regex patterns, and cascading best practices.
 
 **Troubleshooting:**
-> **📖 See [Troubleshooting Guide](./TROUBLESHOOTING.md)** for common variable cascading issues and solutions.
+> **📖 See [Grafana Dashboard Guide](../guides/GRAFANA_DASHBOARD.md)** for troubleshooting dashboard issues.
 
 ---
 
@@ -716,7 +716,7 @@ func ProcessUsers() {
 - **[Metrics Label Solutions](./METRICS_LABEL_SOLUTIONS.md)** - Label injection strategy, ServiceMonitor configuration, and auto-discovery
 
 ### Troubleshooting
-- **[Troubleshooting Guide](./TROUBLESHOOTING.md)** - Common issues, variable cascading problems, and solutions
+- **[Grafana Dashboard Guide](../guides/GRAFANA_DASHBOARD.md)** - Dashboard troubleshooting and best practices
 
 ---
 

@@ -15,7 +15,7 @@ chmod +x scripts/*.sh
 # Step 1: Create Kind cluster
 ./scripts/01-create-kind-cluster.sh
 
-# Step 2: Deploy monitoring stack (Prometheus Operator + Grafana Operator + metrics)
+# Step 2: Deploy monitoring stack (creates all namespaces + Prometheus Operator + Grafana Operator + metrics)
 ./scripts/02-deploy-monitoring.sh
 
 # Step 3: Deploy APM stack (BEFORE apps to collect traces/logs/profiles immediately)
@@ -77,63 +77,15 @@ Dashboard:  http://localhost:3000/d/microservices-monitoring-001/
 
 ## Local Build Verification
 
-Before deploying or pushing code, verify your changes build correctly:
+Before deploying, verify your changes build correctly:
 
 ```bash
 ./scripts/00-verify-build.sh
 ```
 
-**What it checks:**
-1. Go module synchronization (`go.mod`/`go.sum`)
-2. Code formatting (`gofmt`)
-3. Static analysis (`go vet`)
-4. Build all 9 services
-5. Tests (optional - use `--skip-tests` to skip)
+Checks: Go modules, formatting (`gofmt`), static analysis (`go vet`), builds all 9 services, tests (optional with `--skip-tests`).
 
-**Usage:**
-```bash
-# Run all checks including tests
-./scripts/00-verify-build.sh
-
-# Skip tests (faster, for quick verification)
-./scripts/00-verify-build.sh --skip-tests
-```
-
-**Optional: Git Hook Setup**
-
-To automatically run verification before each commit:
-
-```bash
-cp .githooks/pre-commit .git/hooks/pre-commit
-chmod +x .git/hooks/pre-commit
-```
-
-**Note:** See [`docs/guides/API_REFERENCE.md`](API_REFERENCE.md#local-build-verification) for detailed usage and troubleshooting.
-
-### Local Development Setup
-
-1. **Create `.env` file** (optional):
-   ```bash
-   cat > services/.env <<EOF
-   SERVICE_NAME=auth
-   PORT=8080
-   ENV=development
-   OTEL_SAMPLE_RATE=1.0
-   LOG_LEVEL=debug
-   LOG_FORMAT=console
-   EOF
-   ```
-
-2. **Port-forward database** (if needed):
-   ```bash
-   kubectl port-forward -n auth svc/auth-db-pooler 5432:5432
-   ```
-
-3. **Run service**:
-   ```bash
-   cd services
-   go run cmd/auth/main.go
-   ```
+**See**: [`docs/guides/API_REFERENCE.md`](API_REFERENCE.md#local-build-verification) for detailed usage, troubleshooting, and local development setup.
 
 ---
 
@@ -166,31 +118,17 @@ kubectl get nodes
 ```
 
 **What it does:**
+- Creates all namespaces from `k8s/namespaces.yaml` (auth, user, product, cart, order, review, notification, shipping, k6, database, monitoring)
 - Deploys Prometheus Operator (kube-prometheus-stack v80.0.0) with kube-state-metrics
-- Installs metrics-server (via Helm) with Kind-specific configuration (`--kubelet-insecure-tls`)
-- Deploys Grafana Operator and reconciles Grafana instance
-- Auto-provisions microservices + SLO dashboards via GrafanaDashboard CRs
+- Deploys Grafana Operator with dashboards
+- Deploys metrics-server for kubectl top / HPA
 
-**Verify:**
-```bash
-# Check Prometheus and Grafana
-kubectl get pods -n monitoring | grep -E "(prometheus|grafana)"
-# Expected: prometheus and grafana pods running
+**Why namespaces are created here:**
+- Ensures all namespaces exist before deployments
+- Required for Zalando operator to create cross-namespace secrets (notification, shipping)
+- Single source of truth for namespace management (`k8s/namespaces.yaml`)
 
-# Check kube-state-metrics (included in kube-prometheus-stack)
-kubectl get pods -n monitoring | grep kube-state-metrics
-
-# Check metrics-server (in kube-system namespace)
-kubectl get pods -n kube-system | grep metrics-server
-# Expected: metrics-server pod running
-
-# Test metrics-server API
-kubectl top nodes
-kubectl top pods -n auth
-# Expected: Resource usage metrics
-```
-
-**Why before apps:** Prometheus needs to be ready to collect metrics immediately when apps start.
+**Verify:** `kubectl get pods -n monitoring | grep -E "(prometheus|grafana)"`
 
 ---
 
@@ -206,17 +144,7 @@ kubectl top pods -n auth
 - Deploys Loki + Vector (log aggregation)
 - Creates Grafana Operator datasources (Tempo, Loki, Pyroscope)
 
-**Why before apps:** APM components need to be ready BEFORE apps start to:
-- Receive traces from Tempo endpoint (`http://tempo.monitoring.svc.cluster.local:4318`)
-- Receive profiles from Pyroscope endpoint (`http://pyroscope.monitoring.svc.cluster.local:4040`)
-- Vector collects logs from pods immediately when apps start
-
-**Verify:**
-```bash
-kubectl get pods -n monitoring | grep -E "(tempo|pyroscope|loki)"
-kubectl get pods -n kube-system -l app=vector
-# Expected: All APM components running
-```
+**Verify:** `kubectl get pods -n monitoring | grep -E "(tempo|pyroscope|loki)"`
 
 ---
 
@@ -241,30 +169,9 @@ kubectl get pods -n kube-system -l app=vector
 - Deploys `postgres_exporter` for all clusters (Prometheus metrics)
 - Creates Kubernetes Secrets for database passwords
 
-**Why before apps:** Databases must exist before microservices can connect. Database migrations run as init containers when services start.
+**Verify:** `kubectl get postgresql -A && kubectl get cluster -A` or `./scripts/04a-verify-databases.sh`
 
-**Verify:**
-```bash
-# Check operators
-kubectl get pods -n database | grep -E "(postgres-operator|cloudnative-pg)"
-
-# Check database clusters
-kubectl get postgresql -A  # Zalando clusters
-kubectl get cluster -A      # CloudNativePG clusters
-
-# Check database pods
-kubectl get pods -n review | grep review-db
-kubectl get pods -n auth | grep auth-db
-kubectl get pods -n user | grep supporting-db
-kubectl get pods -n product | grep product-db
-kubectl get pods -n cart | grep transaction-db
-
-# Verify database readiness and connections
-./scripts/04a-verify-databases.sh
-```
-
-**Detailed Documentation:**
-- Database architecture: [`docs/guides/DATABASE.md`](../guides/DATABASE.md)
+**See**: [`docs/guides/DATABASE.md`](./DATABASE.md) for architecture details.
 
 ---
 
@@ -280,23 +187,9 @@ kubectl get pods -n cart | grep transaction-db
 - Creates Services for each microservice
 - Sets up proper labels for Prometheus discovery
 
-**Note:** Images are automatically built by GitHub Actions workflows when code is pushed. The deployment script pulls images from the OCI registry.
+**Note:** Images built by GitHub Actions, pulled from OCI registry.
 
-**Verify:**
-```bash
-# Check Helm releases
-helm list -A
-
-kubectl get pods -n auth
-kubectl get pods -n user
-kubectl get pods -n product
-# Expected: 9 microservice pods running
-
-kubectl get svc -n auth
-kubectl get svc -n user
-kubectl get svc -n product
-# Expected: 9 services
-```
+**Verify:** `helm list -A && kubectl get pods -n auth -n user -n product`
 
 ---
 
@@ -311,18 +204,9 @@ kubectl get svc -n product
 # ./scripts/07-deploy-k6.sh scenarios
 ```
 
-**What it does:**
-- Deploys k6 load generators via Helm (k6)
-- Creates `k6` namespace
-- Generates continuous load on all services
+**What it does:** Deploys k6 load generators via Helm, generates continuous load.
 
-**Why after apps:** k6 needs applications to exist before it can generate load.
-
-**Verify:**
-```bash
-kubectl get pods -n k6
-kubectl logs -n k6 -l app=k6 -f
-```
+**Verify:** `kubectl get pods -n k6`
 
 ---
 
@@ -338,24 +222,7 @@ kubectl logs -n k6 -l app=k6 -f
 - Automatically generates Prometheus recording rules
 - Sets up error budget tracking via Kubernetes-native SLO management
 
-**Why after monitoring and apps:** SLO system needs Prometheus and metrics data to work.
-
-**Verify:**
-```bash
-# Check Sloth Operator
-kubectl get pods -n monitoring -l app.kubernetes.io/name=sloth
-
-# Check PrometheusServiceLevel CRDs
-kubectl get prometheusservicelevels -n monitoring
-
-# Check generated PrometheusRules
-kubectl get prometheusrules -n monitoring
-
-# Check Prometheus rules
-kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090 &
-curl http://localhost:9090/api/v1/rules
-# Expected: SLO rules visible
-```
+**Verify:** `kubectl get prometheusservicelevels -n monitoring && kubectl get prometheusrules -n monitoring`
 
 ---
 
@@ -377,90 +244,9 @@ curl http://localhost:9090/api/v1/rules
 
 ## Configuration
 
-### Configuration Sources
+Configuration priority (lowest to highest): Default values → `.env` file → Environment variables → Helm values (`charts/values/*.yaml`).
 
-Configuration priority (lowest to highest):
-1. **Default values** - Hardcoded in `pkg/config/config.go`
-2. **`.env` file** - Local development only (via `godotenv`)
-3. **Environment variables** - Set directly in shell or Kubernetes
-4. **Helm values** - `charts/values/*.yaml` → `env`
-
-### Local Development (.env file)
-
-Create a `.env` file in `services/` directory:
-
-```bash
-# services/.env
-SERVICE_NAME=auth
-PORT=8080
-ENV=development
-OTEL_SAMPLE_RATE=1.0
-LOG_LEVEL=debug
-LOG_FORMAT=console
-
-# Database (port-forward from Kubernetes)
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=auth
-DB_USER=auth
-DB_PASSWORD=postgres
-```
-
-**Port-forward database for local dev:**
-```bash
-kubectl port-forward -n auth svc/auth-db-pooler 5432:5432
-```
-
-### Environment Variables
-
-**Core Configuration:**
-- `SERVICE_NAME` - Service identifier (required)
-- `PORT` - HTTP server port (default: `8080`)
-- `ENV` - Environment: development, staging, production (default: `development`)
-
-**APM Configuration:**
-- `TRACING_ENABLED` - Enable tracing (default: `true`)
-- `OTEL_COLLECTOR_ENDPOINT` - Tempo endpoint (default: `otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318`)
-- `OTEL_SAMPLE_RATE` - Sampling rate 0.0-1.0 (default: `0.1`, auto `1.0` in development)
-- `PROFILING_ENABLED` - Enable profiling (default: `true`)
-- `PYROSCOPE_ENDPOINT` - Pyroscope endpoint (default: `http://pyroscope.monitoring.svc.cluster.local:4040`)
-- `LOG_LEVEL` - Log level: debug, info, warn, error (default: `info`)
-- `LOG_FORMAT` - Log format: json, console (default: `json`)
-
-**Database Configuration:**
-- `DB_HOST` - Database host (pooler or direct endpoint)
-- `DB_PORT` - Database port (default: `5432`)
-- `DB_NAME` - Database name (required)
-- `DB_USER` - Database user (required)
-- `DB_PASSWORD` - Database password (from Secret)
-- `DB_SSLMODE` - SSL mode (default: `disable` for Kind)
-- `DB_POOL_MAX_CONNECTIONS` - Max connections (default: `25`)
-
-**See**: [`docs/guides/DATABASE.md`](./DATABASE.md) for complete database configuration.
-
-### Helm Chart Configuration
-
-All configuration is set via Helm values files (`charts/values/*.yaml`):
-
-```yaml
-# charts/values/auth.yaml
-env:
-  - name: SERVICE_NAME
-    value: "auth"
-  - name: PORT
-    value: "8080"
-  - name: ENV
-    value: "production"
-  - name: DB_HOST
-    value: "auth-db-pooler.auth.svc.cluster.local"
-  - name: DB_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: auth.auth-db.credentials.postgresql.acid.zalan.do
-        key: password
-```
-
-**See**: [`charts/README.md`](../../charts/README.md) for complete Helm chart documentation.
+**See**: [`docs/guides/API_REFERENCE.md`](./API_REFERENCE.md) for environment variables and [`docs/guides/DATABASE.md`](./DATABASE.md) for database configuration.
 
 ---
 
@@ -493,52 +279,11 @@ Adjust filters in Grafana dashboard header:
 
 ## Verification
 
-### Check Pod Status
+**Check Pods:** `kubectl get pods -n auth -n user -n product` (all 9 microservices should be Running)
 
-```bash
-kubectl get pods -n auth
-kubectl get pods -n user
-kubectl get pods -n product
-```
+**Check Prometheus Targets:** `http://localhost:9090/targets` (all services should be UP)
 
-Expected output:
-```
-NAME                                    READY   STATUS    RESTARTS   AGE
-auth-xxx                                1/1     Running   0          2m
-user-xxx                                1/1     Running   0          2m
-product-xxx                             1/1     Running   0          2m
-cart-xxx                                1/1     Running   0          2m
-order-xxx                               1/1     Running   0          2m
-review-xxx                              1/1     Running   0          2m
-notification-xxx                        1/1     Running   0          2m
-shipping-xxx                            1/1     Running   0          2m
-shipping-v2-xxx                         1/1     Running   0          2m
-prometheus-xxx                          1/1     Running   0          2m
-grafana-xxx                             1/1     Running   0          2m
-k6-load-generator-xxx                   1/1     Running   0          2m
-```
-
-### Check Prometheus Targets
-
-```bash
-kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090 &
-# Open http://localhost:9090/targets
-```
-
-All microservices should show as "UP" in Prometheus targets.
-
-### Test APIs
-
-```bash
-# Test User Service
-curl http://localhost:8080/api/v1/users
-
-# Test Product Service
-curl http://localhost:8080/api/v1/products
-
-# Test Health Endpoint
-curl http://localhost:8080/health
-```
+**Test APIs:** `curl http://localhost:8080/api/v1/users` or `curl http://localhost:8080/health`
 
 ---
 
@@ -551,7 +296,7 @@ Numbered scripts (01-12) execute in order. See [Step-by-Step Deployment](#step-b
 | Script | Command | Purpose | Order |
 |--------|---------|---------|-------|
 | Create cluster | `./scripts/01-create-kind-cluster.sh` | Create Kind Kubernetes cluster | 1 |
-| Deploy monitoring | `./scripts/02-deploy-monitoring.sh` | Deploy Prometheus, Grafana, metrics | 2 |
+| Deploy monitoring | `./scripts/02-deploy-monitoring.sh` | Create all namespaces + Deploy Prometheus, Grafana, metrics | 2 |
 | Deploy APM | `./scripts/03-deploy-apm.sh` | Deploy all APM components (BEFORE apps) | 3 |
 | Deploy databases | `./scripts/04-deploy-databases.sh` | Deploy PostgreSQL operators, clusters, poolers | 4 |
 | Deploy services | `./scripts/06-deploy-microservices.sh` | Deploy from OCI registry (images built by GitHub Actions) | 5 |
@@ -569,19 +314,6 @@ Numbered scripts (01-12) execute in order. See [Step-by-Step Deployment](#step-b
 | `helm list -A` | List all Helm releases |
 | `helm upgrade --install <name> charts/ -f charts/values/<service>.yaml -n <ns>` | Install/upgrade service |
 | `helm uninstall <name> -n <namespace>` | Uninstall a service |
-| `helm pull oci://ghcr.io/duynhne/charts/microservice` | Pull chart from OCI registry |
-
-**Example:**
-```bash
-# Install/upgrade auth service
-helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-namespace
-
-# List all releases
-helm list -A
-
-# Uninstall a service
-helm uninstall auth -n auth
-```
 
 ### kubectl Shortcuts
 
@@ -591,23 +323,7 @@ helm uninstall auth -n auth
 | `kubectl logs -l app={service-name} -n {namespace}` | View service logs |
 | `kubectl port-forward -n monitoring svc/grafana-service 3000:3000` | Port-forward Grafana |
 | `kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090` | Port-forward Prometheus |
-| `kubectl port-forward -n monitoring svc/jaeger-all-in-one 16686:16686` | Port-forward Jaeger UI |
 | `kubectl rollout restart deployment/{name} -n {namespace}` | Restart deployment |
-
-**Examples:**
-```bash
-# List all pods in auth namespace
-kubectl get pods -n auth
-
-# View auth service logs
-kubectl logs -l app=auth -n auth -f
-
-# Port-forward Grafana
-kubectl port-forward -n monitoring svc/grafana-service 3000:3000
-
-# Restart auth deployment
-kubectl rollout restart deployment/auth -n auth
-```
 
 ### Access Points
 
@@ -615,233 +331,33 @@ kubectl rollout restart deployment/auth -n auth
 |---------|-----|-------------|
 | Grafana | http://localhost:3000 | admin/admin |
 | Prometheus | http://localhost:9090 | - |
-| Jaeger UI | http://localhost:16686 | - |
-| Tempo | http://localhost:3200 | - |
 | API (via port-forward) | http://localhost:8080 | - |
 
-**Setup Access:**
-```bash
-# Run setup script to port-forward all services
-./scripts/09-setup-access.sh
-
-# Or manually port-forward specific service
-kubectl port-forward -n auth svc/auth 8080:8080
-```
-
-### Quick Commands by Task
-
-#### Check Service Status
-```bash
-# List pods in namespace
-kubectl get pods -n {namespace}
-
-# Check pod logs
-kubectl logs -l app={service-name} -n {namespace} -f
-
-# Describe pod for troubleshooting
-kubectl describe pod {pod-name} -n {namespace}
-```
-
-#### Deploy Service
-```bash
-# Deploy single service
-helm upgrade --install {service} charts/ -f charts/values/{service}.yaml -n {service} --create-namespace
-
-# Deploy all services
-./scripts/06-deploy-microservices.sh
-```
-
-#### Access Monitoring
-```bash
-# Port-forward Grafana
-kubectl port-forward -n monitoring svc/grafana-service 3000:3000
-
-# Port-forward Prometheus
-kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090
-
-# Port-forward Jaeger
-kubectl port-forward -n monitoring svc/jaeger-all-in-one 16686:16686
-```
-
-#### Cluster Management
-```bash
-# List clusters
-kind get clusters
-
-# Cluster info
-kubectl cluster-info
-
-# All resources in namespace
-kubectl get all -n auth
-kubectl get all -n monitoring
-
-# Delete cluster
-kind delete cluster --name <cluster-name>
-```
-
-#### Pod Management
-```bash
-# Watch pods
-kubectl get pods -n auth
-kubectl get pods -n user
-kubectl get pods -n product -w
-
-# Pod logs (follow)
-kubectl logs -f deployment/auth -n auth
-
-# Exec into pod
-kubectl exec -it <pod-name> -n <namespace> -- sh
-
-# Scale application
-kubectl scale deployment auth --replicas=3 -n auth
-```
-
-#### Port Forwarding
-
-If NodePort doesn't work (WSL2/Windows issues):
-
-```bash
-# Forward Grafana
-kubectl port-forward svc/grafana-service 3000:3000 -n monitoring &
-
-# Forward Prometheus
-kubectl port-forward svc/kube-prometheus-stack-prometheus 9090:9090 -n monitoring &
-
-# Forward Go API (example: auth)
-kubectl port-forward svc/auth 8080:8080 -n auth &
-```
-
-#### Troubleshooting Commands
-```bash
-# Check deployment status
-kubectl get deployment {service-name} -n {namespace}
-
-# View events
-kubectl get events -n {namespace} --sort-by='.lastTimestamp'
-
-# Check ServiceMonitor
-kubectl get servicemonitor -n monitoring
-
-# Check Prometheus targets
-# Access Prometheus UI and navigate to Status > Targets
-```
+**Setup:** `./scripts/09-setup-access.sh` or manually port-forward services.
 
 ---
 
 ## Troubleshooting
 
-### Pods Not Starting
+**Pods Not Starting (ImagePullBackOff):** Images built by GitHub Actions. Check: `docker pull ghcr.io/duynhne/auth:v5`. Fix: `kubectl delete pods -l app=auth -n auth`
 
-**Issue:** ImagePullBackOff
+**Dashboard No Data:** Check Prometheus targets: `http://localhost:9090/targets`. Query: `request_duration_seconds_count{job=~"microservices"}`. Check logs: `kubectl logs deployment/prometheus -n monitoring`
 
-```bash
-# Images are built automatically by GitHub Actions on push
-# Ensure images exist in registry: ghcr.io/duynhne/<service>:v5
-# Check if images are available:
-docker pull ghcr.io/duynhne/auth:v5
+**Grafana Dashboard Empty:** Reload: `./scripts/10-reload-dashboard.sh`. Restart: `kubectl rollout restart deployment grafana -n monitoring`
 
-# Force pod recreation to retry image pull
-kubectl delete pods -l app=auth -n auth
-```
+**Services Not Accessible:** Use port-forwarding: `./scripts/09-setup-access.sh`
 
-### Dashboard No Data
+**Configuration Issues:** Verify Helm values: `helm get values auth -n auth`. Check pod env: `kubectl exec -n auth deployment/auth -- env | grep SERVICE_NAME`
 
-**Issue:** Metrics not collected
-
-```bash
-# 1. Check Prometheus targets
-open http://localhost:9090/targets
-# All services should be UP
-
-# 2. Run query
-open http://localhost:9090/graph
-# Query: request_duration_seconds_count{job=~"microservices"}
-
-# 3. Check Prometheus logs
-kubectl logs deployment/prometheus -n monitoring
-```
-
-### Grafana Dashboard Empty
-
-**Issue:** Dashboard not provisioned
-
-```bash
-# Check ConfigMaps
-kubectl get configmap -n monitoring | grep grafana
-
-# Reload dashboard
-./scripts/10-reload-dashboard.sh
-
-# Restart Grafana
-kubectl rollout restart deployment grafana -n monitoring
-```
-
-### Services Not Accessible
-
-**Issue:** NodePort not working (WSL2)
-
-```bash
-# Use port-forwarding instead
-./scripts/09-setup-access.sh
-```
-
-### Configuration Issues
-
-**Issue:** `SERVICE_NAME is required` error
-
-**Solution**: Ensure `SERVICE_NAME` is set in Helm values:
-```yaml
-env:
-  - name: SERVICE_NAME
-    value: "auth"
-```
-
-**Issue:** Configuration not taking effect
-
-**Check**:
-```bash
-# Verify Helm values
-helm get values auth -n auth
-
-# Check pod environment
-kubectl exec -n auth deployment/auth -- env | grep SERVICE_NAME
-```
-
-**Issue:** Tracing not working
-
-**Check**:
-```bash
-# Verify Tempo is running
-kubectl get pods -n monitoring -l app.kubernetes.io/name=tempo
-
-# Check endpoint connectivity
-kubectl exec -n auth deployment/auth -- nc -zv tempo.monitoring.svc.cluster.local 4318
-```
+**Tracing Not Working:** Check Tempo: `kubectl get pods -n monitoring -l app.kubernetes.io/name=tempo`. Test connectivity: `kubectl exec -n auth deployment/auth -- nc -zv tempo.monitoring.svc.cluster.local 4318`
 
 ---
 
 ## Load Testing
 
-### Automatic (k6 Deployment)
+k6 load generators run continuously in the `k6` namespace. Check: `kubectl get pods -n k6`. View logs: `kubectl logs -n k6 -l app=k6 -f`
 
-k6 load generators run continuously in the `k6` namespace:
-
-```bash
-# Check k6 pods
-kubectl get pods -n k6
-
-# View logs
-kubectl logs -n k6 -l app=k6 -f
-```
-
-### Manual Testing
-
-```bash
-# Test endpoints
-for i in {1..100}; do curl -s http://localhost:8080/api/v1/users & done
-for i in {1..50}; do curl -s http://localhost:8080/api/v1/products & done
-wait
-```
+**See**: [`docs/k6/K6_LOAD_TESTING.md`](../k6/K6_LOAD_TESTING.md) for detailed scenarios and manual testing.
 
 ---
 

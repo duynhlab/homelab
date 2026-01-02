@@ -33,6 +33,9 @@ spec:
       requests:
         cpu: 100m
         memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi  # Set limit to match request to avoid warning
   
   # PostgreSQL version and production-ready parameters
   postgresql:
@@ -87,15 +90,38 @@ spec:
       log_rotation_size: "128MB"
   
   # Patroni configuration for pg_hba.conf
-  # Default Zalando operator requires SSL, but we allow unencrypted for simplicity
-  # Note: Must include local entries for Patroni to connect via Unix socket
+  # CRITICAL: Order matters! Replication entries must come BEFORE reject rules
+  # Replicas need to connect via non-SSL for basebackup, so replication entries must allow non-SSL
   patroni:
     pg_hba:
-      - "local all all peer"              # Local Unix socket connections (required for Patroni)
-      - "host all all 127.0.0.1/32 md5"   # Localhost TCP connections
-      - "host all all 10.244.0.0/16 md5"  # Allow unencrypted connections from pod network (Kind default CIDR)
-      - "host all all 172.19.0.0/16 md5"  # Allow unencrypted connections from Kind bridge network
-  
+      # Local connections (required for Patroni)
+      - local     all          all                        trust
+      - local     replication  standby                    trust
+      
+      # Replication connections (MUST be before reject rules)
+      # Allow non-SSL replication from pod network (required for basebackup)
+      - host      replication  standby   10.244.0.0/16    md5
+      - host      replication  standby   172.19.0.0/16    md5
+      - host      replication  standby   10.0.0.0/8       md5
+      # Allow SSL replication (preferred)
+      - hostssl   replication  standby   all              md5
+      
+      # Application connections from internal network (allow non-SSL for metrics scraping)
+      - host      all          all       10.0.0.0/8       trust
+      - host      all          all       127.0.0.1/32     md5
+      - host      all          all       ::1/128          md5
+      
+      # SSL connections (zalandos users use PAM)
+      - hostssl   all          +zalandos 127.0.0.1/32     pam
+      - hostssl   all          +zalandos ::1/128          pam
+      - hostssl   all          +zalandos all              pam
+      
+      # Reject non-SSL connections (except those allowed above)
+      - hostnossl all          all       all              reject
+      
+      # All other SSL connections require md5 password
+      - hostssl   all          all       all              md5
+
   # Production-ready resource limits (small, conservative)
   resources:
     requests:

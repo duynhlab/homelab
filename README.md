@@ -243,29 +243,6 @@ After running `./scripts/09-setup-access.sh` or manual port-forwarding:
 
 ---
 
-## Troubleshooting
-
-Common issues and quick fixes. For detailed troubleshooting, see [`docs/monitoring/TROUBLESHOOTING.md`](docs/monitoring/TROUBLESHOOTING.md).
-
-**Dashboard not loading:**
-- Check port-forward: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`
-- Re-apply dashboards: `./scripts/10-reload-dashboard.sh`
-
-**Pods not starting:**
-- Check pod status: `kubectl get pods -A`
-- Check logs: `kubectl logs -n <namespace> <pod-name>`
-
-**Metrics not appearing:**
-- Generate traffic: Deploy k6 with `./scripts/07-deploy-k6.sh`
-- Check ServiceMonitor: `kubectl get servicemonitor -n monitoring`
-
-**Database connection issues:**
-- Verify databases are deployed: `./scripts/04-deploy-databases.sh`
-- Check secrets: `kubectl get secrets -n <namespace>`
-- See `k8s/secrets/README.md` for secret creation
-
----
-
 **Built with ❤️ for learning observability**
 
 🚀 **Happy Monitoring!**

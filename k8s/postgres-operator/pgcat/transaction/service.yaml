@@ -16,10 +16,6 @@ spec:
   - port: 9930
     targetPort: 9930
     protocol: TCP
-    name: admin
-  - port: 9187
-    targetPort: 9187
-    protocol: TCP
-    name: metrics
+    name: metrics  # Admin port (9930) serves both admin interface and Prometheus metrics endpoint (/metrics)
   selector:
     app: pgcat-transaction

@@ -20,17 +20,7 @@ spec:
   
   # Scrape configuration
   endpoints:
-  - port: admin  # Port name from PgCat service (9930)
+  - port: metrics  # Port 9930 (admin port) serves both admin interface and Prometheus metrics endpoint
     path: /metrics
     interval: 15s
     scrapeTimeout: 10s
-    relabelings:
-      # Set job label to "pgcat-transaction" for all targets
-      - targetLabel: job
-        replacement: pgcat-transaction
-      # Preserve original service name in "service" label
-      - sourceLabels: [__meta_kubernetes_service_name]
-        targetLabel: service
-      # Add namespace label from pod metadata
-      - sourceLabels: [__meta_kubernetes_namespace]
-        targetLabel: namespace

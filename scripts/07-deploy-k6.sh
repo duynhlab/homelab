@@ -5,9 +5,6 @@ echo "=== Deploying K6 Load Testing via Helm ==="
 
 CHART_REF="charts/"
 
-# Ensure k6 namespace exists
-kubectl get namespace k6 >/dev/null 2>&1 || kubectl create namespace k6
-
 echo "Deploying k6..."
 helm upgrade --install k6 "$CHART_REF" \
   -f charts/values/k6.yaml \

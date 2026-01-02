@@ -21,9 +21,7 @@ spec:
         - containerPort: 5432
           name: postgres
         - containerPort: 9930
-          name: admin
-        - containerPort: 9187
-          name: metrics
+          name: metrics  # Admin port (9930) serves both admin interface and Prometheus metrics endpoint (/metrics)
         volumeMounts:
         - name: config
           mountPath: /etc/pgcat

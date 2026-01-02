@@ -34,7 +34,7 @@ PostgreSQL database integration enables microservices to persist data, execute r
 
 1. [Database Architecture](#database-architecture) - 5 clusters overview
 2. [CloudNativePG Operator](#cloudnativepg-operator) - Product DB, Transaction DB, PgCat, PodMonitor
-3. [Zalando Postgres Operator](#zalando-postgres-operator) - Review DB, Auth DB, Supporting DB, PgBouncer, Secrets, Monitoring, Password Rotation, Backup
+3. [Zalando Postgres Operator](#zalando-postgres-operator) - Review DB, Auth DB, Supporting DB, PgBouncer, Secrets, Monitoring, Password Rotation, Backup, UI Component, Cluster Management
 4. [Shared Topics](#shared-topics) - Environment Variables, Helm Config, Local Dev, Verification, Best Practices
 
 ---
@@ -154,29 +154,6 @@ This section provides a brief overview of all 5 PostgreSQL clusters. For detaile
 **Detailed Information:**
 - **CloudNativePG Clusters** (Product, Transaction): See [CloudNativePG Operator](#cloudnativepg-operator) section
 - **Zalando Clusters** (Review, Auth, Supporting): See [Zalando Postgres Operator](#zalando-postgres-operator) section
-
-### Monitoring Overview
-
-Both operators integrate with Prometheus for metrics collection:
-
-**CloudNativePG Operator:**
-- Uses **PodMonitor** CRDs to scrape metrics from `postgres_exporter` sidecars
-- PodMonitors located in: `k8s/prometheus/podmonitors/`
-- Metrics exposed on port `9187` (named `metrics`)
-- See [CloudNativePG Operator - Monitoring](#monitoring) for detailed setup
-
-**Zalando Postgres Operator:**
-- Uses **PodMonitor** CRDs to scrape metrics from `postgres_exporter` sidecars
-- PodMonitors located in: `k8s/prometheus/podmonitors/`
-- Metrics exposed on port `9187` (named `exporter`)
-- See [Zalando Postgres Operator - Monitoring](#monitoring) for detailed setup
-
-**Key Metrics:**
-- `pg_up` - Database availability
-- `pg_stat_database_*` - Database statistics
-- `pg_stat_activity_*` - Active connections
-- `pg_replication_*` - Replication lag
-
 ---
 
 ## CloudNativePG Operator
@@ -712,6 +689,7 @@ PodMonitors are automatically deployed by `scripts/04-deploy-databases.sh` after
 - Automatic secret generation
 - Cross-namespace secret support
 - Built-in `postgres_exporter` sidecar for metrics
+- **Optional UI Component**: Web-based graphical interface for cluster management
 
 **Clusters Managed:**
 - **Review Database** (`review-db`) - 1 instance (single instance)
@@ -1120,206 +1098,6 @@ The **Supporting Database** (`supporting-db`) cluster uses a **shared database p
       - createdb
    ```
 
-**Secret Names Generated**:
-   - `notification.notification.supporting-db.credentials.postgresql.acid.zalan.do` (created in `notification` namespace) ✅
-   - `shipping.shipping.supporting-db.credentials.postgresql.acid.zalan.do` (created in `shipping` namespace, shared by both `shipping` and `shipping-v2` services) ✅
-
-**Secret Creation:**
-
-The Zalando operator (v1.15.1+) creates secrets with the correct names in the target namespaces when `enable_cross_namespace_secret: true` is configured and Helm values use the correct flat structure. Secrets are automatically created in:
-- `notification` namespace: `notification.notification.supporting-db.credentials.postgresql.acid.zalan.do` ✅
-- `shipping` namespace: `shipping.shipping.supporting-db.credentials.postgresql.acid.zalan.do` ✅
-
-**Note on shipping-v2 Service:**
-- Both `shipping` (v1) and `shipping-v2` (v2) services run in the `shipping` namespace
-- Both services use the same user `shipping.shipping` (with namespace prefix) and database `shipping`
-- Secret `shipping.shipping.supporting-db.credentials.postgresql.acid.zalan.do` is automatically created in the `shipping` namespace by the operator
-- **Migration**: `shipping-v2` service has migrations disabled (`migrations.enabled: false`) because the database schema is already created by `shipping` service. This prevents Flyway checksum mismatch errors when both services share the same database.
-
-**Verification:**
-
-```bash
-# Check secrets in target namespaces
-kubectl get secret notification.notification.supporting-db.credentials.postgresql.acid.zalan.do -n notification
-kubectl get secret shipping.shipping.supporting-db.credentials.postgresql.acid.zalan.do -n shipping
-
-# Verify secret keys
-kubectl get secret notification.notification.supporting-db.credentials.postgresql.acid.zalan.do -n notification -o jsonpath='{.data}' | jq 'keys'
-```
-
-**Troubleshooting:**
-
-If a service fails to start with "secret not found" error:
-1. Verify the operator configuration: `kubectl get operatorconfiguration postgresql-operator-configuration -n database`
-2. Check that `enable_cross_namespace_secret: true` is set
-3. Verify the database CRD uses namespace notation: `kubectl get postgresql supporting-db -n user -o yaml | grep -A 5 "users:"`
-4. Check that secrets exist in target namespaces: `kubectl get secret -n <namespace> | grep supporting-db`
-5. Verify Helm values reference the correct secret name: `notification.notification.supporting-db.credentials.postgresql.acid.zalan.do`
-6. Check operator logs: `kubectl logs -n database -l app.kubernetes.io/name=postgres-operator | grep -i "secret\|cross\|namespace"`
-
-**Configuration Fix (2025-12-30):**
-
-The cross-namespace secret feature was fixed by correcting the Helm values structure:
-- **Issue**: Helm values used nested structure (`config.kubernetes.enable_cross_namespace_secret`) instead of flat structure (`configKubernetes.enable_cross_namespace_secret`)
-- **Fix**: Restructured `k8s/postgres-operator/zalando/values.yaml` to use flat top-level keys (`configKubernetes:`, `configPostgresql:`, `configConnectionPooler:`, `configBackup:`, `configGeneral:`)
-- **Result**: Operator now correctly reads `enable_cross_namespace_secret: true` and creates secrets in target namespaces automatically ✅
-
-### Configuration
-
-**CRD Examples:**
-
-Review DB CRD location: `k8s/postgres-operator/zalando/crds/review-db.yaml`
-Auth DB CRD location: `k8s/postgres-operator/zalando/crds/auth-db.yaml`
-Supporting DB CRD location: `k8s/postgres-operator/zalando/crds/supporting-db.yaml`
-
-**Key Configuration Parameters:**
-- `numberOfInstances`: Number of PostgreSQL instances (1 for Review/Supporting, 3 for Auth)
-- `postgresql.version`: PostgreSQL version (15)
-- `connectionPooler`: PgBouncer sidecar configuration (Auth DB)
-- `resources`: CPU and memory limits
-- `volume.size`: Persistent volume size
-
-**Operator Configuration:**
-- Managed via Helm values: `k8s/postgres-operator/zalando/values.yaml`
-- OperatorConfiguration CRD: `postgres-operator` (auto-created by Helm)
-- Key settings: `enable_cross_namespace_secret: true`
-
-### Monitoring
-
-#### Sidecar Monitoring - Production-Ready Approach
-
-PostgreSQL metrics are exposed via `postgres_exporter` sidecar containers for Zalando-managed clusters (auth-db, review-db, supporting-db).
-
-**Overview:**
-`postgres_exporter` runs as a **sidecar container** in each PostgreSQL pod managed by Zalando Postgres Operator. This production-ready approach provides per-cluster isolation, simpler setup, and better reliability.
-
-**Benefits:**
-- ✅ **No Infrastructure Roles Needed** - Uses PostgreSQL pod credentials automatically
-- ✅ **No Permission Grants Needed** - Uses database owner credentials (has full access)
-- ✅ **Per-Cluster Isolation** - Production-ready approach, failure in one cluster doesn't affect others
-- ✅ **Simpler Setup** - Just add sidecar to CRD and create PodMonitor
-- ✅ **Better Reliability** - Co-located exporter, no network hop, automatic restart
-
-**How It Works:**
-1. Add `sidecars` section to PostgreSQL CRD with `postgres_exporter` configuration
-2. Sidecar uses PostgreSQL pod's environment variables (`POSTGRES_USER`, `POSTGRES_PASSWORD`) automatically
-3. Create `PodMonitor` CRD for each cluster to enable Prometheus Operator scraping
-4. Prometheus Operator automatically discovers and scrapes metrics from sidecar exporters
-
-**Configuration:**
-
-**Step 1: Add Sidecar to PostgreSQL CRD**
-```yaml
-# k8s/postgres-operator/zalando/crds/auth-db.yaml
-apiVersion: "acid.zalan.do/v1"
-kind: postgresql
-metadata:
-  name: auth-db
-spec:
-  # ... existing config ...
-  
-  sidecars:
-    - name: exporter
-      image: quay.io/prometheuscommunity/postgres-exporter:v0.18.1
-      ports:
-        - name: exporter
-          containerPort: 9187
-          protocol: TCP
-      resources:
-        limits:
-          cpu: 500m
-          memory: 256M
-        requests:
-          cpu: 100m
-          memory: 256M
-      env:
-        - name: "DATA_SOURCE_URI"
-          value: "localhost/postgres?sslmode=require"
-        - name: "DATA_SOURCE_USER"
-          value: "$(POSTGRES_USER)"
-        - name: "DATA_SOURCE_PASS"
-          value: "$(POSTGRES_PASSWORD)"
-        - name: "PG_EXPORTER_AUTO_DISCOVER_DATABASES"
-          value: "true"
-```
-
-**Step 2: Create PodMonitor per Cluster**
-```yaml
-# k8s/prometheus/podmonitors/podmonitor-auth-db.yaml
-apiVersion: monitoring.coreos.com/v1
-kind: PodMonitor
-metadata:
-  name: postgresql-auth-db
-  namespace: auth
-spec:
-  selector:
-    matchLabels:
-      application: spilo  # Zalando operator default label
-      cluster-name: auth-db  # Cluster-specific label
-  podTargetLabels:
-    - spilo-role
-    - cluster-name
-    - team
-  podMetricsEndpoints:
-    - port: exporter
-      interval: 15s
-      scrapeTimeout: 10s
-```
-
-**Step 3: Verify Sidecar and Metrics**
-```bash
-# Check sidecar is running (check all 3 pods)
-kubectl get pod -n auth auth-db-0 -o jsonpath='{.spec.containers[*].name}'
-# Should show: postgres exporter
-kubectl get pod -n auth auth-db-1 -o jsonpath='{.spec.containers[*].name}'
-kubectl get pod -n auth auth-db-2 -o jsonpath='{.spec.containers[*].name}'
-
-# Check sidecar logs (check all 3 pods)
-kubectl logs -n auth auth-db-0 -c exporter
-kubectl logs -n auth auth-db-1 -c exporter
-kubectl logs -n auth auth-db-2 -c exporter
-
-# Test metrics endpoint (test any pod)
-kubectl port-forward -n auth auth-db-0 9187:9187 &
-curl http://localhost:9187/metrics | grep pg_up
-kill %1
-
-# Check PodMonitors
-kubectl get podmonitor -A
-```
-
-**Key Configuration Details:**
-- **Image**: `quay.io/prometheuscommunity/postgres-exporter:v0.18.1`
-- **Connection**: `localhost/postgres?sslmode=require` (same pod network namespace)
-- **Credentials**: Uses PostgreSQL pod environment variables automatically
-- **Port**: `9187` named `exporter` (for PodMonitor)
-- **Resources**: Minimal overhead (`cpu: 500m/100m`, `memory: 256M/256M`)
-- **Auto-discovery**: `PG_EXPORTER_AUTO_DISCOVER_DATABASES: "true"` enables automatic database discovery
-
-**Per-Cluster PodMonitors:**
-Each cluster needs its own PodMonitor (production-ready approach):
-- `k8s/prometheus/podmonitors/podmonitor-auth-db.yaml` in `auth` namespace
-- `k8s/prometheus/podmonitors/podmonitor-review-db.yaml` in `review` namespace
-- `k8s/prometheus/podmonitors/podmonitor-supporting-db.yaml` in `user` namespace
-
-**Why Per-Cluster PodMonitors?**
-- ✅ **Isolation** - Each cluster's metrics are independently scraped
-- ✅ **Reliability** - Failure in one cluster doesn't affect others
-- ✅ **Granularity** - Can configure different scrape intervals per cluster
-- ✅ **Labeling** - Better metric labeling with cluster-specific labels
-- ✅ **Troubleshooting** - Easier to identify which cluster has issues
-
-**Deployment:**
-PodMonitors are automatically deployed by `scripts/04-deploy-databases.sh` after database clusters are ready.
-
-**Grafana Dashboards:**
-
-PostgreSQL metrics are available in Grafana with key metrics:
-- `pg_stat_database_*` - Database statistics
-- `pg_stat_activity_*` - Active connections
-- `pg_replication_*` - Replication lag
-- `pg_up` - Database availability
-
 ### Password Rotation
 
 **Purpose:** Secure password rotation procedures for Zalando Postgres Operator-managed database credentials, ensuring zero-downtime updates and compliance with security policies.
@@ -1422,26 +1200,6 @@ Production databases require robust backup strategies including:
 - **RTO (Recovery Time Objective)**: 4 hours
 - **RPO (Recovery Point Objective)**: 15 minutes (WAL archive frequency)
 
-**Reference:** For detailed backup configuration and procedures, see [`specs/active/Zalando-operator/research.md`](../../specs/active/Zalando-operator/research.md#backup-strategy-for-production-deployment).
-
-#### Zalando Operator Backup Support
-
-**Built-in Backup Options:**
-
-1. **WAL-E / WAL-G** - Continuous WAL archiving to S3/GCS/Azure
-2. **Logical backups** - pg_dump via Kubernetes Jobs
-3. **Physical backups** - pg_basebackup via sidecar containers
-
-**Current Configuration:**
-```yaml
-# k8s/postgres-operator/zalando/values.yaml
-config:
-  backup:
-    wal_s3_bucket: ""  # Leave empty for no backup (learning project)
-```
-
-**Note:** Backup implementation requires cloud credentials (S3/GCS/Azure). Configuration is documented below for future implementation.
-
 #### WAL-E/WAL-G Backup Configuration (Future Implementation)
 
 **Architecture:**
@@ -1453,125 +1211,6 @@ WAL-E/WAL-G Sidecar Container
 AWS S3 / GCS / Azure Blob Storage
     ↓ (retention policies)
 Long-term Storage
-```
-
-**Configuration Steps:**
-
-**Step 1: Configure S3 Bucket**
-```bash
-# Create S3 bucket for backups
-aws s3 mb s3://postgres-backups-prod --region us-east-1
-
-# Configure lifecycle policies
-aws s3api put-bucket-lifecycle-configuration \
-  --bucket postgres-backups-prod \
-  --lifecycle-configuration file://lifecycle.json
-```
-
-**Step 2: Create S3 Credentials Secret**
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: wal-e-s3-credentials
-  namespace: database
-type: Opaque
-stringData:
-  AWS_ACCESS_KEY_ID: "your-access-key"
-  AWS_SECRET_ACCESS_KEY: "your-secret-key"
-  WALE_S3_PREFIX: "s3://postgres-backups-prod/auth-db/"
-```
-
-**Step 3: Configure Database CRD**
-```yaml
-# In auth-db.yaml (when credentials available)
-apiVersion: "acid.zalan.do/v1"
-kind: postgresql
-metadata:
-  name: auth-db
-  namespace: auth
-spec:
-  # ... existing config ...
-  
-  # Backup configuration
-  enableLogicalBackup: true
-  logicalBackupSchedule: "30 00 * * *"  # Daily at 00:30 UTC
-  
-  # WAL-E/WAL-G configuration (via environment variables in Spilo)
-  env:
-    - name: WAL_S3_BUCKET
-      value: "postgres-backups-prod"
-    - name: USE_WALG_BACKUP
-      value: "true"  # Use WAL-G instead of WAL-E (newer, faster)
-    - name: WALG_S3_PREFIX
-      value: "s3://postgres-backups-prod/auth-db/"
-    - name: AWS_ACCESS_KEY_ID
-    valueFrom:
-      secretKeyRef:
-          name: wal-e-s3-credentials
-          key: AWS_ACCESS_KEY_ID
-    - name: AWS_SECRET_ACCESS_KEY
-      valueFrom:
-        secretKeyRef:
-          name: wal-e-s3-credentials
-          key: AWS_SECRET_ACCESS_KEY
-```
-
-#### Backup Retention Policies
-
-**Recommended Retention:**
-
-| Backup Type | Retention | Purpose |
-|-------------|-----------|---------|
-| **WAL Archives** | 7 days | Point-in-time recovery window |
-| **Daily Backups** | 30 days | Recent recovery needs |
-| **Weekly Backups** | 12 weeks (3 months) | Medium-term recovery |
-| **Monthly Backups** | 12 months (1 year) | Long-term compliance |
-
-**S3 Lifecycle Configuration:**
-```json
-{
-  "Rules": [
-    {
-      "Id": "WAL-Archives-7Days",
-      "Status": "Enabled",
-      "Prefix": "wal/",
-      "Expiration": {
-        "Days": 7
-      }
-    },
-    {
-      "Id": "Daily-Backups-30Days",
-      "Status": "Enabled",
-      "Prefix": "base/daily/",
-      "Expiration": {
-        "Days": 30
-      }
-    },
-    {
-      "Id": "Weekly-Backups-12Weeks",
-      "Status": "Enabled",
-      "Prefix": "base/weekly/",
-      "Expiration": {
-        "Days": 84
-      }
-    },
-    {
-      "Id": "Monthly-Backups-12Months",
-      "Status": "Enabled",
-      "Prefix": "base/monthly/",
-      "Expiration": {
-        "Days": 365
-      },
-      "Transitions": [
-        {
-          "Days": 90,
-          "StorageClass": "GLACIER"
-        }
-      ]
-    }
-  ]
-}
 ```
 
 #### Point-in-Time Recovery (PITR)
@@ -1617,769 +1256,406 @@ recovery_target_action = 'promote'
 tail -f /var/log/postgresql/recovery.log
 ```
 
-#### Disaster Recovery Plan
+### Postgres Operator UI Component
 
-**Recovery Scenarios:**
+**Overview:**
 
-**Scenario 1: Single Cluster Failure**
-1. Identify failed cluster
-2. Restore from latest backup to new cluster
-3. Update service endpoints
-4. Verify data integrity
+The Zalando Postgres Operator includes an **optional UI component** (`postgres-operator-ui`) that provides a graphical web interface for managing PostgreSQL clusters. This enables DevOps/SRE teams and developers to view, create, and manage database clusters through a convenient web interface without requiring kubectl access.
 
-**Scenario 2: Complete Region Failure**
-1. Restore from S3 backups in secondary region
-2. Provision new Kubernetes cluster
-3. Restore all database clusters
-4. Update DNS/service endpoints
-5. Verify application connectivity
+**Features:**
+- ✅ Web-based cluster management interface
+- ✅ View all PostgreSQL clusters across namespaces
+- ✅ Monitor cluster status and health
+- ✅ Create new clusters via UI (if enabled)
+- ✅ Multi-namespace cluster visibility
 
-**Scenario 3: Data Corruption**
-1. Identify corruption point (via logs/metrics)
-2. Restore to point before corruption
-3. Replay WAL up to corruption point (exclude corrupted transactions)
-4. Verify data integrity
+**Deployment:**
 
-**Recovery Testing:**
-- **Monthly**: Test restore from latest backup
-- **Quarterly**: Full disaster recovery drill
-- **Document**: Update recovery procedures based on test results
-
-#### Backup Monitoring and Health Checks
-
-**Key Metrics:**
-
-1. **Backup Success Rate** - Percentage of successful backups
-2. **Backup Age** - Time since last successful backup
-3. **Backup Size** - Monitor for anomalies (sudden size changes)
-4. **WAL Archive Lag** - Delay in WAL archiving
-5. **Restore Test Success** - Periodic restore validation
-
-**Monitoring Queries:**
-```sql
--- Check last backup time (if using pg_stat_backup)
-SELECT * FROM pg_stat_backup;
-
--- Check WAL archive status
-SELECT * FROM pg_stat_archiver;
-
--- Check replication lag (for HA setups)
-SELECT * FROM pg_stat_replication;
-```
-
-**Grafana Dashboard Panels:**
-- Last backup timestamp
-- Backup size trend
-- WAL archive lag
-- Backup success/failure rate
-- Storage usage (S3 bucket size)
-
-**Alerts:**
-- **Backup failed** - Last backup > 24 hours ago
-- **WAL archive lag** - Archive lag > 1 hour
-- **Backup size anomaly** - Backup size changed > 50%
-- **Storage full** - S3 bucket > 90% capacity
-
-#### Backup Best Practices
+The UI component is deployed automatically by `scripts/04-deploy-databases.sh` after the Zalando operator is deployed.
 
 **Configuration:**
-- ✅ **Enable WAL archiving** - Required for PITR
-- ✅ **Multiple backup types** - WAL-E + logical backups
-- ✅ **Off-site storage** - S3 in different region
-- ✅ **Encryption** - Encrypt backups at rest (S3 SSE)
-- ✅ **Access control** - Limit backup access (IAM policies)
 
-**Operations:**
-- ✅ **Automated backups** - No manual intervention
-- ✅ **Regular testing** - Monthly restore tests
-- ✅ **Monitoring** - Alert on backup failures
-- ✅ **Documentation** - Document recovery procedures
-- ✅ **Retention policies** - Balance storage cost vs recovery needs
+**File**: `k8s/postgres-operator/zalando/ui-values.yaml`
 
-**Security:**
-- ✅ **Encrypted backups** - Use S3 server-side encryption
-- ✅ **Access logging** - Enable S3 access logging
-- ✅ **IAM roles** - Use IAM roles instead of access keys
-- ✅ **Backup verification** - Verify backup integrity
+```yaml
+replicaCount: 1
 
-### Troubleshooting
+image:
+  registry: ghcr.io
+  repository: zalando/postgres-operator-ui
+  tag: v1.15.1
+  pullPolicy: IfNotPresent
 
-#### Error: "Failed to connect to database"
+envs:
+  appUrl: "http://localhost:8081"
+  operatorApiUrl: "http://postgres-operator.database.svc.cluster.local:8080"
+  operatorClusterNameLabel: "cluster-name"
+  resourcesVisible: "False"
+  targetNamespace: "*"  # View all namespaces
+  teams:
+    - "acid"
 
-**Symptoms:**
-```
-ERROR   Failed to connect to database    {"error": "dial tcp: lookup auth-db-pooler.auth.svc.cluster.local: no such host"}
+service:
+  type: ClusterIP
+  port: 80
 ```
 
-**Diagnosis:**
+**Key Configuration:**
+- **Operator API URL**: `http://postgres-operator.database.svc.cluster.local:8080` - Full FQDN for cross-namespace access
+- **Target Namespace**: `"*"` - View/manage clusters in ALL namespaces
+- **Service Type**: `ClusterIP` on port `80`
+- **Namespace**: `database` (same as operator)
+
+
+**Architecture:**
+
+```mermaid
+flowchart LR
+    subgraph Kubernetes["Kubernetes Cluster"]
+        subgraph DatabaseNS["Database Namespace"]
+            UIPod["Postgres Operator UI<br/>(Port 80)"]
+            OperatorPod["Postgres Operator<br/>(API Port 8080)"]
+        end
+        
+        subgraph DBNamespaces["Database Namespaces"]
+            AuthDB["auth-db"]
+            ReviewDB["review-db"]
+            SupportingDB["supporting-db"]
+        end
+    end
+    
+    User["DevOps/SRE User"] -->|"HTTP<br/>Port-forward"| UIPod
+    UIPod -->|"HTTP API<br/>http://postgres-operator:8080"| OperatorPod
+    OperatorPod -->|"Manages"| AuthDB
+    OperatorPod -->|"Manages"| ReviewDB
+    OperatorPod -->|"Manages"| SupportingDB
+    
+    style UIPod fill:#e1f5ff
+    style OperatorPod fill:#fff4e1
+```
+
+### Cluster Management & Verification
+
+**Overview:**
+
+This section provides practical commands for managing and verifying Zalando Postgres Operator clusters directly from within the pods. These commands are essential for DevOps/SRE teams to diagnose issues, monitor cluster health, and perform administrative tasks.
+
+#### Accessing the Pod
+
+**Exec into the leader pod:**
 ```bash
-# Check if database pod is running
-kubectl get pods -n auth -l app=postgres
+# Access the leader pod (auth-db-0 for auth-db cluster)
+kubectl exec -it auth-db-0 -n auth -- /bin/bash
 
-# Check database service
-kubectl get svc -n auth auth-db-pooler
-
-# Check DNS resolution
-kubectl run -it --rm debug --image=busybox --restart=Never -- nslookup auth-db-pooler.auth.svc.cluster.local
+# Default container is "postgres" (you'll see the Spilo banner)
+# Container is managed by runit - use 'sv' command for service management
 ```
 
-**Solutions:**
-1. Verify database cluster is ready: `kubectl get postgresql auth-db -n auth`
-2. Check service endpoints: `kubectl get endpoints -n auth auth-db-pooler`
-3. Verify namespace: Ensure service is in correct namespace
-
-#### Error: "Database authentication failed"
-
-**Symptoms:**
-```
-ERROR   Database authentication failed    {"error": "password authentication failed for user \"auth\""}
-```
-
-**Diagnosis:**
+**Note:** The container is managed by `runit`. To stop/start services, use `sv`:
 ```bash
-# Check Secret exists (Zalando auto-generated secret)
-kubectl get secret auth.auth-db.credentials.postgresql.acid.zalan.do -n auth
-
-# Check Secret content (base64 decoded)
-kubectl get secret auth.auth-db.credentials.postgresql.acid.zalan.do -n auth -o jsonpath='{.data.password}' | base64 -d && echo ""
-
-# Verify Secret is referenced in Helm values
-helm get values auth -n auth | grep -A 5 DB_PASSWORD
+sv stop cron
+sv restart patroni
+sv status /etc/service/*  # Check all service status
 ```
 
-**Solutions:**
-1. Verify Secret exists: `kubectl get secret auth.auth-db.credentials.postgresql.acid.zalan.do -n auth`
-2. Check Secret key name matches (`password` vs `username`)
-3. **Note**: Zalando operator auto-generates secrets - no manual creation needed. If secret doesn't exist, check Zalando operator logs.
+#### Checking Patroni Cluster Status
 
-#### Error: "Secret not found" (Cross-Namespace Issue)
-
-**Symptoms:**
-```
-Error: secret "notification.notification.supporting-db.credentials.postgresql.acid.zalan.do" not found
-```
-
-**Root Cause**: 
-Services using the shared `supporting-db` cluster (Notification, Shipping-v2) deploy in their own namespaces, but secrets may not be created in target namespaces.
-
-**Solutions:**
-1. **Verify Operator Configuration**: Check that `enable_cross_namespace_secret: true` is set in Helm-managed CRD:
-   ```bash
-   kubectl get operatorconfiguration postgres-operator -n database -o jsonpath='{.configuration.kubernetes.enable_cross_namespace_secret}'
-   # Should output: true
-   ```
-   If false, update `k8s/postgres-operator/zalando/values.yaml` and run:
-   ```bash
-   helm upgrade postgres-operator postgres-operator/postgres-operator -n database -f k8s/postgres-operator/zalando/values.yaml
-   ```
-
-2. **Check Secret Location**: 
-   ```bash
-   # Check if secret exists in target namespace (should be created automatically)
-   kubectl get secret notification.notification.supporting-db.credentials.postgresql.acid.zalan.do -n notification
-   kubectl get secret shipping.shipping.supporting-db.credentials.postgresql.acid.zalan.do -n shipping
-   ```
-
-3. **Check Operator Logs**: If secrets are not created, check operator logs:
-   ```bash
-   kubectl logs -n database -l app.kubernetes.io/name=postgres-operator | grep -i "cross\|namespace\|secret"
-   ```
-
-4. **Verify Cross-Namespace Secret Configuration**: With Zalando operator v1.15.1+ and correct Helm values structure (flat top-level keys), secrets are automatically created in target namespaces. If secrets are still missing:
-   - Verify `configKubernetes.enable_cross_namespace_secret: true` in `k8s/postgres-operator/zalando/values.yaml`
-   - Verify Helm values use flat structure (not nested `config:`)
-   - Check operator logs for errors: `kubectl logs -n database -l app.kubernetes.io/name=postgres-operator | grep -i "cross\|namespace\|secret"`
-   - **Note**: Manual secret copy is no longer needed with correct configuration. Operator automatically creates secrets in target namespaces when using `namespace.username` format.
-
-**See Also**: [Zalando Postgres Operator - Secret Management](#secret-management) section for complete configuration and troubleshooting details.
-
-#### Error: "Connection timeout"
-
-**Symptoms:**
-```
-ERROR   Failed to ping database    {"error": "context deadline exceeded"}
-```
-
-**Diagnosis:**
+**View cluster members and their roles:**
 ```bash
-# Check database pod status
-kubectl get pods -n auth -l app=postgres
+# Inside the pod, run patronictl
+patronictl list
 
-# Check database logs
-kubectl logs -n auth -l app=postgres --tail=50
-
-# Test connectivity from pod
-kubectl run -it --rm test --image=postgres:15-alpine --restart=Never -- psql -h auth-db-pooler.auth.svc.cluster.local -U auth -d auth
+# Output example:
+# + Cluster: auth-db (7590618934038925375) --------------+----+-----------+
+# | Member    | Host        | Role    | State            | TL | Lag in MB |
+# +-----------+-------------+---------+------------------+----+-----------+
+# | auth-db-0 | 10.244.1.5  | Leader  | running          |  1 |           |
+# | auth-db-1 | 10.244.3.10 | Replica | creating replica |    |   unknown |
+# | auth-db-2 | 10.244.2.17 | Replica | creating replica |    |   unknown |
+# +-----------+-------------+---------+------------------+----+-----------+
 ```
 
-**Solutions:**
-1. Verify database pods are Running: `kubectl get pods -n auth -l application=spilo,cluster-name=auth-db` (should show 3 pods: auth-db-0, auth-db-1, auth-db-2)
-2. Check database logs for errors: `kubectl logs -n auth auth-db-0` (leader) or `kubectl logs -n auth auth-db-1` (standby)
-3. Verify network policies (if any): `kubectl get networkpolicies -n auth`
+**Key Information:**
+- **Member**: Pod name
+- **Host**: Pod IP address
+- **Role**: `Leader` (primary) or `Replica` (standby)
+- **State**: `running`, `creating replica`, `stopped`, etc.
+- **TL**: Timeline (WAL timeline number)
+- **Lag in MB**: Replication lag (for replicas)
 
-#### PgBouncer: "Pool exhausted"
+#### Connecting to PostgreSQL
 
-**Symptoms:**
-```
-ERROR   Database connection pool exhausted
-```
-
-**Diagnosis:**
+**Switch to postgres user and connect:**
 ```bash
-# Check PgBouncer pool stats
-kubectl exec -n auth deployment/auth-db-pooler -- psql -h localhost -U pooler -d pgbouncer -c "SHOW POOLS;"
+# Inside the pod, switch to postgres user
+su - postgres
 
-# Check active connections
-kubectl exec -n auth deployment/auth-db-pooler -- psql -h localhost -U pooler -d pgbouncer -c "SHOW CLIENTS;"
+# Connect to PostgreSQL
+psql -d postgres
+
+# Or connect to a specific database
+psql -d auth
 ```
 
-**Solutions:**
-1. Increase pool size: Update `DB_POOL_MAX_CONNECTIONS` in Helm values
-2. Check for connection leaks: Review service code for unclosed connections
-3. Restart pooler: `kubectl rollout restart deployment/auth-db-pooler -n auth`
+**List databases:**
+```sql
+-- Inside psql
+\l
 
-#### Error: "No migrations found" or "Migrations not detected"
-
-**Symptoms:**
+-- Output example:
+--    Name    |  Owner   | Encoding | Locale Provider |   Collate   |    Ctype    | Locale | ICU Rules |   Access privileges
+-- -----------+----------+----------+-----------------+-------------+-------------+--------+-----------+-----------------------
+--  auth      | auth     | UTF8     | libc            | en_US.utf-8 | en_US.utf-8 |        |           |
+--  postgres  | postgres | UTF8     | libc            | en_US.utf-8 | en_US.utf-8 |        |           |
+--  template0 | postgres | UTF8     | libc            | en_US.utf-8 | en_US.utf-8 |        |           | =c/postgres          +
+--            |          |          |                 |             |             |        |           | postgres=CTc/postgres
+--  template1 | postgres | UTF8     | libc            | en_US.utf-8 | en_US.utf-8 |        |           | =c/postgres          +
+--            |          |          |                 |             |             |        |           | postgres=CTc/postgres
 ```
-WARNING: No migrations found. Are your locations set up correctly?
-1 SQL migrations were detected but not run because they did not follow the filename convention.
+
+#### Useful PostgreSQL Commands
+
+**Check connection info:**
+```sql
+-- Current database and user
+SELECT current_database(), current_user;
+
+-- Connection info
+\conninfo
+
+-- List all databases
+\l
+
+-- List tables in current database
+\dt
+
+-- List schemas
+\dn
+
+-- Describe a table
+\d table_name
+
+-- Exit psql
+\q
 ```
 
-**Note**: This error occurs in the init container. Init containers run Flyway to execute database schema changes before the main container starts.
+**Check replication status (from leader):**
+```sql
+-- Check replication slots
+SELECT * FROM pg_replication_slots;
 
-**Diagnosis:**
+-- Check replication statistics
+SELECT * FROM pg_stat_replication;
 
-**1. Check SQL files in init container image:**
+-- Check WAL sender processes
+SELECT * FROM pg_stat_activity WHERE application_name LIKE '%replication%';
+```
+
+**Check cluster configuration:**
+```sql
+-- PostgreSQL version
+SELECT version();
+
+-- Check PostgreSQL configuration
+SHOW all;
+
+-- Check specific parameter
+SHOW max_connections;
+SHOW shared_buffers;
+```
+
+#### Service Management (runit)
+
+**Check service status:**
 ```bash
-# List SQL files in migration image (SQL files are in $FLYWAY_HOME/sql/)
-docker run --rm --entrypoint /bin/sh ghcr.io/duynhne/user:v5-init -c "ls -la /opt/flyway/11.8.2/sql/ 2>/dev/null || echo 'Directory not found'; echo '---'; find /opt/flyway -name '*.sql' 2>/dev/null | head -5 || echo 'No SQL files found'"
+# List all services and their status
+sv status /etc/service/*
 
-# Check if files follow naming convention (must be V{version}__{description}.sql)
-docker run --rm --entrypoint /bin/sh ghcr.io/duynhne/user:v5-init -c "ls -la /opt/flyway/11.8.2/sql/ && echo '---' && file /opt/flyway/11.8.2/sql/*.sql"
+# Check specific service
+sv status /etc/service/patroni
+sv status /etc/service/pgqd
 
-# Verify FLYWAY_LOCATIONS environment variable (should be set in Dockerfile)
-docker run --rm --entrypoint /bin/sh ghcr.io/duynhne/user:v5-init -c "echo \$FLYWAY_LOCATIONS"
+# Restart a service
+sv restart patroni
+sv restart cron
+
+# Stop a service (use with caution)
+sv stop patroni
+
+# Start a service
+sv start patroni
 ```
 
-**2. Check init container logs:**
+**Common Services:**
+- `patroni`: Patroni HA manager
+- `pgqd`: PgQ daemon (if enabled)
+- `cron`: Cron scheduler
+
+#### Troubleshooting Commands
+
+**Check Patroni logs:**
 ```bash
-# Check init container status and errors
-kubectl logs -n user -l app=user -c init --tail=50
+# From outside the pod
+kubectl logs -n auth auth-db-0 -c postgres | grep -i patroni
 
-# View full init container output
-kubectl logs -n user -l app=user -c init --tail=100
+# From inside the pod
+tail -f /var/log/postgresql/patroni.log
 ```
 
-**3. Get database password for manual testing:**
+**Check PostgreSQL logs:**
 ```bash
-# Zalando operator secrets (format: {username}.{cluster-name}.credentials.postgresql.acid.zalan.do)
-kubectl get secret -n user user.supporting-db.credentials.postgresql.acid.zalan.do -o jsonpath='{.data.password}' | base64 -d && echo ""
+# From outside the pod
+kubectl logs -n auth auth-db-0 -c postgres | grep -i postgres
 
-# Test database connection manually (Zalando operator)
-PASSWORD=$(kubectl get secret -n user user.supporting-db.credentials.postgresql.acid.zalan.do -o jsonpath='{.data.password}' | base64 -d)
-kubectl exec -n user supporting-db-0 -- bash -c "PGPASSWORD='$PASSWORD' psql -h 127.0.0.1 -U user -d user -c 'SELECT * FROM flyway_schema_history;'"
+# From inside the pod
+tail -f /var/log/postgresql/postgresql.log
 ```
 
-**4. Check Flyway schema history table:**
+**Check disk usage:**
 ```bash
-# Get password and check init container execution history (Zalando operator)
-PASSWORD=$(kubectl get secret -n user user.supporting-db.credentials.postgresql.acid.zalan.do -o jsonpath='{.data.password}' | base64 -d)
-kubectl exec -n user supporting-db-0 -- bash -c "PGPASSWORD='$PASSWORD' psql -h 127.0.0.1 -U user -d user -c 'SELECT version, description, type, installed_on, success FROM flyway_schema_history ORDER BY installed_rank;'"
+# Inside the pod
+df -h /home/postgres/pgdata
+
+# Check WAL directory size
+du -sh /home/postgres/pgdata/pgroot/pg_wal
 ```
 
-**5. Verify database initialization (check tables and structure):**
+**Check process status:**
 ```bash
-# List all tables in database (Zalando operator)
-PASSWORD=$(kubectl get secret -n user user.supporting-db.credentials.postgresql.acid.zalan.do -o jsonpath='{.data.password}' | base64 -d)
-kubectl exec -n user supporting-db-0 -- bash -c "PGPASSWORD='$PASSWORD' psql -h 127.0.0.1 -U user -d user -c '\dt'"
+# Check PostgreSQL process
+ps aux | grep postgres
 
-# Check table structure (example: user_profiles)
-kubectl exec -n user supporting-db-0 -- bash -c "PGPASSWORD='$PASSWORD' psql -h 127.0.0.1 -U user -d user -c '\d user_profiles'"
-
-# Count tables in public schema
-kubectl exec -n user supporting-db-0 -- bash -c "PGPASSWORD='$PASSWORD' psql -h 127.0.0.1 -U user -d user -c 'SELECT COUNT(*) as table_count FROM information_schema.tables WHERE table_schema = '\''public'\'' AND table_type = '\''BASE TABLE'\'';'"
+# Check Patroni process
+ps aux | grep patroni
 ```
 
-**Solutions:**
-1. **Verify SQL file naming**: Files must follow `V{version}__{description}.sql` format (e.g., `V1__init_schema.sql`)
-   - ✅ Correct: `V1__init_schema.sql`, `V2__add_index.sql`
-   - ❌ Wrong: `001__init_schema.sql`, `v1__init_schema.sql`, `V1_init_schema.sql`
-2. **Verify init container image**: Init container images are built automatically by GitHub Actions on push
-   - Images are available at `ghcr.io/duynhne/<service>:v5-init`
-   - To rebuild locally for testing (not needed for deployment):
-     ```bash
-     cd services/migrations/user
-     docker build -t ghcr.io/duynhne/user:v5-init .
-     ```
-   - For deployment, push code to trigger GitHub Actions build workflow
-3. **Check FLYWAY_LOCATIONS**: Verify environment variable is set correctly in init container (should be `filesystem:/opt/flyway/11.8.2/sql`)
-   ```bash
-   # Check FLYWAY_LOCATIONS in init container
-   kubectl exec -n user -l app=user -c init -- env | grep FLYWAY
-   
-   # Expected output: FLYWAY_LOCATIONS=filesystem:/opt/flyway/11.8.2/sql
-   # Note: This is set in Dockerfile at build-time, not in Helm template
-   ```
-4. **Verify SQL files location**: Check if SQL files exist in expected location in init container
-   ```bash
-   # List SQL files in init container
-   kubectl exec -n user -l app=user -c init -- ls -la /opt/flyway/11.8.2/sql/
-   
-   # Verify WORKDIR (should be /opt/flyway/11.8.2)
-   kubectl exec -n user -l app=user -c init -- pwd
-   ```
+#### Quick Verification Checklist
 
-#### Error: "Multiple pods running init containers simultaneously"
+**For a healthy cluster:**
+1. ✅ All members show in `patronictl list`
+2. ✅ Leader shows `running` state
+3. ✅ Replicas show `running` or `streaming` state (not `creating replica` or `stopped`)
+4. ✅ Replication lag is minimal (< 1 MB for healthy replicas)
+5. ✅ All databases are accessible via `psql`
+6. ✅ Patroni service is running (`sv status /etc/service/patroni` shows `run`)
 
-**Symptoms:**
-```
-ERROR: Migration failed - another migration is in progress
-```
-
-**Note**: This occurs when multiple pods' init containers try to execute database changes simultaneously.
-
-**Diagnosis:**
-```bash
-# Check how many pods are running init containers
-kubectl get pods -n user -l app=user -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.initContainerStatuses[*].state}{"\n"}{end}'
-
-# Check Flyway lock table (Flyway uses database locks for concurrency control)
-PASSWORD=$(kubectl get secret -n user user.supporting-db.credentials.postgresql.acid.zalan.do -o jsonpath='{.data.password}' | base64 -d)
-kubectl exec -n user supporting-db-0 -- bash -c "PGPASSWORD='$PASSWORD' psql -h localhost -U user -d user -c 'SELECT * FROM flyway_schema_history WHERE type='\''MIGRATION'\'' ORDER BY installed_rank DESC LIMIT 5;'"
-```
-
-**Solutions:**
-1. **Flyway handles concurrency**: Uses database locks, only one init container can execute changes at a time
-2. **Other init containers wait**: If one init container is executing, others wait for completion
-3. **This is expected behavior**: No action needed, Flyway manages concurrency automatically
-
-#### Patroni: Failover not working
-
-**Symptoms:**
-- Primary database fails, but no failover occurs
-- Services cannot connect after primary failure
-- Cluster status shows unhealthy state
-
-**Diagnosis:**
-```bash
-# Check cluster status (Zalando)
-kubectl get postgresql auth-db -n auth -o yaml | grep -A 10 status
-
-# Check Patroni logs (Zalando - Patroni runs in Spilo image)
-# Check leader pod (auth-db-0)
-kubectl logs -n auth auth-db-0 --tail=50
-# Check standby pods (auth-db-1, auth-db-2)
-kubectl logs -n auth auth-db-1 --tail=50
-kubectl logs -n auth auth-db-2 --tail=50
-
-# Check which pod is leader
-kubectl get pods -n auth -l application=spilo,cluster-name=auth-db -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.labels.spilo-role}{"\n"}{end}'
-
-# Check Kubernetes API connectivity (Patroni uses K8s API as DCS)
-kubectl get nodes
-kubectl get pods -n auth
-```
-
-**Solutions:**
-1. **Verify Patroni is running**: Zalando uses Patroni internally
-   - Patroni runs in Spilo container (part of Zalando operator)
-2. **Check Kubernetes API connectivity**: Patroni uses K8s API as Distributed Configuration Store
-   - Verify cluster connectivity: `kubectl cluster-info`
-   - Check operator can access K8s API: `kubectl get pods -n database`
-3. **Verify cluster configuration**: 
-   - Zalando: Check `k8s/postgres-operator/zalando/crds/auth-db.yaml` (should show `numberOfInstances: 3` for HA)
-4. **Review operator logs**:
-   - Zalando: `kubectl logs -n database -l app.kubernetes.io/name=postgres-operator`
-5. **Check for resource constraints**: Insufficient CPU/memory can prevent failover
-   - Zalando (auth-db): Check all 3 pods: `kubectl describe pod auth-db-0 -n auth`, `kubectl top pod auth-db-0 -n auth`
-6. **Verify HA setup**: For auth-db, ensure all 3 pods are running
-   - `kubectl get pods -n auth -l application=spilo,cluster-name=auth-db` (should show 3 pods)
-   - Check leader election: `kubectl get pods -n auth -l application=spilo,cluster-name=auth-db -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.labels.spilo-role}{"\n"}{end}'`
-
-**Note**: Patroni uses Kubernetes API (not etcd) for leader election. No separate etcd cluster is needed.
+**Common Issues:**
+- **Replicas stuck in "creating replica"**: Check `pg_hba.conf` replication entries (see [Troubleshooting Guide](../troubleshooting/zalando-operator-pod-labels-error.md#issue-2-replica-cannot-connect))
+- **High replication lag**: Check network connectivity, disk I/O, or WAL generation rate
+- **Patroni service not running**: Check logs and restart with `sv restart patroni`
 
 ---
 
-## Shared Topics
+## Connection Poolers
 
 ### Overview
 
-This section covers topics that apply to both CloudNativePG and Zalando operators, including environment variables, Helm chart configuration, local development, database verification, and best practices.
+Connection poolers solve the "too many connections" problem by reusing PostgreSQL connections, allowing applications to handle 1000+ client connections with only 25-50 database connections. This section covers the three poolers used in this project: **PgBouncer** (Zalando sidecar), **PgCat** (standalone), and **PgDog** (alternative for sharding).
 
-### Environment Variables
+**Why Use Connection Poolers?**
+- PostgreSQL has limited connections (`max_connections` typically 100-200)
+- Each connection consumes ~10MB memory
+- Opening/closing connections is expensive (network overhead)
+- High connection churn causes performance degradation
 
-#### Database Configuration Variables
+**Benefits:**
+- ✅ **Reduce Connection Overhead**: Reuse connections instead of creating new ones
+- ✅ **Lower Memory Usage**: Fewer PostgreSQL connections = less memory
+- ✅ **Better Performance**: Faster connection establishment (from pool)
+- ✅ **Connection Limits**: Handle 1000+ client connections with 25-50 PostgreSQL connections
 
-All database connections use **separate environment variables** (NOT a single `DATABASE_URL` string) for flexibility and debugging.
+### Comparison Matrix
 
-| Variable | Type | Default | Description | Required |
-|----------|------|---------|-------------|----------|
-| `DB_HOST` | string | - | Database host (pooler or direct endpoint) | ✅ Yes |
-| `DB_PORT` | string | `"5432"` | Database port | ❌ No |
-| `DB_NAME` | string | - | Database name | ✅ Yes |
-| `DB_USER` | string | - | Database user | ✅ Yes |
-| `DB_PASSWORD` | string | - | Database password (from Secret) | ✅ Yes |
-| `DB_SSLMODE` | string | `"disable"` | SSL mode (disable for Kind cluster) | ❌ No |
-| `DB_POOL_MAX_CONNECTIONS` | int | `25` | Max connections in pool | ❌ No |
-| `DB_POOL_MODE` | string | `"transaction"` | Pool mode (for PgBouncer) | ❌ No |
+| Criteria | PgBouncer | PgCat | PgDog |
+|----------|-----------|-------|-------|
+| **Architecture** | Single-threaded (C) | Multi-threaded (Rust) | Multi-threaded (Rust) |
+| **Performance (<50 conn)** | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐⭐⭐ Very Good | ⭐⭐⭐⭐ Very Good |
+| **Performance (>50 conn)** | ⭐⭐ Degrades | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐⭐⭐⭐ Excellent |
+| **Load Balancing** | ❌ No | ✅ Yes (read replicas) | ✅ Yes (multiple strategies) |
+| **Automatic Failover** | ❌ No | ✅ Yes | ✅ Yes |
+| **Sharding** | ❌ No | ✅ Yes (experimental) | ✅ Yes (production-grade) |
+| **Monitoring** | Admin DB only | Prometheus + Admin DB | OpenMetrics + Admin DB |
+| **Zalando Integration** | ✅ Built-in sidecar | ❌ Standalone | ❌ Standalone |
+| **CloudNativePG Fit** | ❌ No built-in | ✅ Standalone | ✅ Standalone |
+| **Complexity** | ⭐⭐ Simple | ⭐⭐⭐ Moderate | ⭐⭐⭐⭐ Advanced |
 
-#### Per-Service Configuration Examples
+### When to Use Each Pooler
 
-**Auth Service (PgBouncer):**
-```bash
-DB_HOST=auth-db-pooler.auth.svc.cluster.local
-DB_PORT=5432
-DB_NAME=auth
-DB_USER=auth
-DB_PASSWORD=<from-secret>
-DB_SSLMODE=require  # PgBouncer requires SSL connections
-DB_POOL_MAX_CONNECTIONS=25
-DB_POOL_MODE=transaction
-```
+**Use PgBouncer when:**
+- ✅ Using Zalando operator (built-in integration)
+- ✅ Low-to-medium connection counts (<50 concurrent)
+- ✅ Simple pooling needs (no load balancing, sharding)
 
-**Product Service (PgCat):**
-```bash
-DB_HOST=pgcat-product.product.svc.cluster.local
-DB_PORT=5432
-DB_NAME=product
-DB_USER=product
-DB_PASSWORD=<from-secret>
-DB_SSLMODE=disable
-DB_POOL_MAX_CONNECTIONS=50
-```
+**Use PgCat when:**
+- ✅ Using CloudNativePG operator (standalone deployment)
+- ✅ High connection counts (>50 concurrent)
+- ✅ Need read replica load balancing
+- ✅ Need automatic failover
+- ✅ Multi-database routing (cart + order)
 
-**Review Service (Direct):**
-```bash
-DB_HOST=review-db.review.svc.cluster.local
-DB_PORT=5432
-DB_NAME=review
-DB_USER=review
-DB_PASSWORD=<from-secret>
-DB_SSLMODE=disable
-DB_POOL_MAX_CONNECTIONS=25
-```
+**Use PgDog when:**
+- ✅ Need advanced sharding with two-phase commit
+- ✅ Need pub/sub (LISTEN/NOTIFY) support
+- ✅ 200+ microservices with sharding requirements
 
-#### Configuration Validation
+### Current Implementation
 
-Database configuration is validated on service startup. Missing required variables cause the service to fail with a clear error:
+#### PgBouncer (Auth DB)
 
-```go
-// services/internal/{service}/core/database.go
-func LoadConfig() (*DatabaseConfig, error) {
-    cfg := &DatabaseConfig{
-        Host:     getEnv("DB_HOST", ""),
-        Port:     getEnv("DB_PORT", "5432"),
-        Name:     getEnv("DB_NAME", ""),
-        User:     getEnv("DB_USER", ""),
-        Password: getEnv("DB_PASSWORD", ""),
-        SSLMode:  getEnv("DB_SSLMODE", "disable"),
-    }
+**Deployment:** Built-in sidecar via Zalando operator
 
-    // Validate required fields
-    if cfg.Host == "" {
-        return nil, fmt.Errorf("DB_HOST environment variable is required")
-    }
-    if cfg.Name == "" {
-        return nil, fmt.Errorf("DB_NAME environment variable is required")
-    }
-    // ... more validation
-}
-```
-
-### Helm Chart Configuration
-
-#### Database Environment Variables in Helm
-
-Database configuration is included in the `env` section along with other environment variables.
-
-**Pattern:**
+**Configuration:**
 ```yaml
-# charts/values/{service}.yaml
-env:
-  - name: DB_HOST
-    value: "<pooler-or-direct-endpoint>"
-  - name: DB_PORT
-    value: "5432"
-  - name: DB_NAME
-    value: "<database-name>"
-  - name: DB_USER
-    value: "<database-user>"
-  - name: DB_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: <service>-db-secret
-        key: password
-  - name: DB_SSLMODE
-    value: "disable"
-  - name: DB_POOL_MAX_CONNECTIONS
-    value: "<pool-size>"
+# k8s/postgres-operator/zalando/crds/auth-db.yaml
+connectionPooler:
+  numberOfInstances: 2
+  schema: pooler
+  user: pooler
+  mode: transaction
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
 ```
 
-#### Secret References
+**Service Endpoint:**
+- `auth-db-pooler.auth.svc.cluster.local:5432`
+- Requires SSL: `DB_SSLMODE=require`
 
-**Never hardcode passwords**. Always use `valueFrom.secretKeyRef`:
-
-```yaml
-# ✅ CORRECT: Use Secret reference (Zalando auto-generated secret)
-- name: DB_PASSWORD
-  valueFrom:
-    secretKeyRef:
-      name: auth.auth-db.credentials.postgresql.acid.zalan.do
-      key: password
-
-# ❌ WRONG: Hardcoded password
-- name: DB_PASSWORD
-  value: "postgres"  # NEVER DO THIS
+**Monitoring:**
+```sql
+-- Connect to admin database
+psql -h auth-db-pooler.auth.svc.cluster.local -U pooler -d pgbouncer
+SHOW POOLS;
+SHOW STATS;
 ```
 
-#### Service-Specific Examples
+#### PgCat (Product & Transaction DB)
 
-**Auth Service (PgBouncer):**
-```yaml
-# charts/values/auth.yaml
-env:
-  - name: DB_HOST
-    value: "auth-db-pooler.auth.svc.cluster.local"  # auth-db is in auth namespace
-  - name: DB_PORT
-    value: "5432"
-  - name: DB_NAME
-    value: "auth"
-  - name: DB_USER
-    value: "auth"
-  - name: DB_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: auth.auth-db.credentials.postgresql.acid.zalan.do
-        key: password
-  - name: DB_SSLMODE
-    value: "require"  # PgBouncer requires SSL connections
-  - name: DB_POOL_MAX_CONNECTIONS
-    value: "25"
-  - name: DB_POOL_MODE
-    value: "transaction"
+**Deployment:** Standalone Kubernetes Deployment (2 replicas)
+
+**Configuration:**
+```toml
+# k8s/postgres-operator/pgcat/product/configmap.yaml
+[general]
+host = "0.0.0.0"
+port = 5432
+pool_mode = "transaction"
+enable_prometheus_exporter = true
+
+[pools.product]
+pool_size = 30
 ```
 
-**Product Service (PgCat):**
-```yaml
-# charts/values/product.yaml
-env:
-  - name: DB_HOST
-    value: "pgcat-product.product.svc.cluster.local"
-  - name: DB_PORT
-    value: "5432"
-  - name: DB_NAME
-    value: "product"
-  - name: DB_USER
-    value: "product"
-  - name: DB_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: product-db-secret
-        key: password
-  - name: DB_SSLMODE
-    value: "disable"
-  - name: DB_POOL_MAX_CONNECTIONS
-    value: "50"
-```
+**Service Endpoints:**
+- Product: `pgcat-product.product.svc.cluster.local:5432`
+- Transaction: `pgcat.cart.svc.cluster.local:5432`
 
-**Review Service (Direct):**
-```yaml
-# charts/values/review.yaml
-env:
-  - name: DB_HOST
-    value: "review-db.review.svc.cluster.local"  # review-db is in review namespace
-  - name: DB_PORT
-    value: "5432"
-  - name: DB_NAME
-    value: "review"
-  - name: DB_USER
-    value: "review"
-  - name: DB_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: review.review-db.credentials.postgresql.acid.zalan.do
-        key: password
-  - name: DB_SSLMODE
-    value: "disable"
-  - name: DB_POOL_MAX_CONNECTIONS
-    value: "25"
-```
+**Monitoring:**
+- Prometheus metrics: `http://pgcat-product.product.svc.cluster.local:9930/metrics`
+- Admin database: `psql -h pgcat-product.product.svc.cluster.local -p 9930 -U admin -d pgbouncer`
 
-### Local Development
-
-#### .env File Setup
-
-Create a `.env` file in `services/` directory for local development:
-
-```bash
-# services/.env
-SERVICE_NAME=auth
-PORT=8080
-ENV=development
-LOG_LEVEL=debug
-LOG_FORMAT=console
-
-# Database configuration (local PostgreSQL or port-forward)
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=auth
-DB_USER=auth
-DB_PASSWORD=postgres
-DB_SSLMODE=disable
-DB_POOL_MAX_CONNECTIONS=25
-DB_POOL_MODE=transaction
-```
-
-#### Port-Forwarding Database
-
-To connect to a database in Kubernetes from local machine:
-
-```bash
-# Port-forward Auth database (via PgBouncer)
-kubectl port-forward -n auth svc/auth-db-pooler 5432:5432
-
-# Port-forward Product database (via PgCat)
-kubectl port-forward -n product svc/pgcat-product 5432:5432
-
-# Port-forward Transaction database (via PgCat for Cart+Order)
-kubectl port-forward -n cart svc/pgcat 5432:5432
-
-# Port-forward Review database (direct)
-kubectl port-forward -n review svc/review-db 5432:5432
-```
-
-#### Testing Connection
-
-Test database connection from Go code:
-
-```bash
-cd services
-go run cmd/auth/main.go
-```
-
-Expected output:
-```
-INFO    Database connection successful    {"host": "localhost:5432", "database": "auth"}
-```
-
-#### Connection Testing Script
-
-Test database connection manually:
-
-```bash
-# Using psql (if installed)
-psql -h localhost -p 5432 -U auth -d auth
-
-# Using kubectl exec (from within cluster)
-kubectl exec -it -n auth deployment/auth -- psql -h auth-db-pooler.auth.svc.cluster.local -U auth -d auth
-```
-
-### Database Verification
-
-#### Check Cluster Status
-
-**Zalando Clusters:**
-```bash
-# Check all Zalando clusters
-kubectl get postgresql -A
-
-# Check specific cluster status
-kubectl get postgresql auth-db -n auth -o yaml | grep -A 10 status
-kubectl get postgresql review-db -n review -o yaml | grep -A 10 status
-kubectl get postgresql supporting-db -n user -o yaml | grep -A 10 status
-```
-
-**CloudNativePG Clusters:**
-```bash
-# Check all CloudNativePG clusters
-kubectl get cluster -A
-
-# Check specific cluster status
-kubectl get cluster product-db -n product -o yaml | grep -A 10 status
-kubectl get cluster transaction-db -n cart -o yaml | grep -A 10 status
-```
-
-#### Verify Databases Exist
-
-**Zalando Clusters:**
-```bash
-# Get password and connect to database
-PASSWORD=$(kubectl get secret -n auth auth.auth-db.credentials.postgresql.acid.zalan.do -o jsonpath='{.data.password}' | base64 -d)
-kubectl exec -n auth auth-db-0 -- bash -c "PGPASSWORD='$PASSWORD' psql -h 127.0.0.1 -U auth -d auth -c '\l'"
-```
-
-**CloudNativePG Clusters:**
-```bash
-# Get password and connect to database
-PASSWORD=$(kubectl get secret -n product product-db-secret -o jsonpath='{.data.password}' | base64 -d)
-kubectl exec -n product product-db-1 -- bash -c "PGPASSWORD='$PASSWORD' psql -h 127.0.0.1 -U product -d product -c '\l'"
-```
-
-#### Test Database Connections
-
-**From within cluster:**
-```bash
-# Test Auth DB connection (via PgBouncer)
-kubectl run -it --rm test-auth --image=postgres:15-alpine --restart=Never -- psql -h auth-db-pooler.auth.svc.cluster.local -U auth -d auth
-
-# Test Product DB connection (via PgCat)
-kubectl run -it --rm test-product --image=postgres:18-alpine --restart=Never -- psql -h pgcat-product.product.svc.cluster.local -U product -d product
-```
-
-**From local machine (with port-forward):**
-```bash
-# Port-forward first
-kubectl port-forward -n auth svc/auth-db-pooler 5432:5432 &
-
-# Then connect
-psql -h localhost -p 5432 -U auth -d auth
-```
-
-#### Check Order Database (Critical)
-
-The `transaction-db` cluster hosts both `cart` and `order` databases. Verify both exist:
-
-```bash
-# Get password
-PASSWORD=$(kubectl get secret -n cart transaction-db-secret -o jsonpath='{.data.password}' | base64 -d)
-
-# Check databases exist
-kubectl exec -n cart transaction-db-1 -- bash -c "PGPASSWORD='$PASSWORD' psql -h 127.0.0.1 -U cart -d postgres -c '\l' | grep -E '(cart|order)'"
-
-# Verify order database exists
-kubectl exec -n cart transaction-db-1 -- bash -c "PGPASSWORD='$PASSWORD' psql -h 127.0.0.1 -U cart -d order -c 'SELECT current_database();'"
-```
-
-#### Verify PgCat Poolers
-
-**Product PgCat:**
-```bash
-# Check PgCat pod status
-kubectl get pods -n product -l app=pgcat-product
-
-# Check PgCat service
-kubectl get svc -n product pgcat-product
-
-# Test connection via PgCat
-kubectl run -it --rm test-pgcat --image=postgres:18-alpine --restart=Never -- psql -h pgcat-product.product.svc.cluster.local -U product -d product
-```
-
-**Transaction PgCat:**
-```bash
-# Check PgCat pod status
-kubectl get pods -n cart -l app=pgcat
-
-# Check PgCat service
-kubectl get svc -n cart pgcat
-
-# Test connection via PgCat (cart database)
-kubectl run -it --rm test-pgcat-cart --image=postgres:18-alpine --restart=Never -- psql -h pgcat.cart.svc.cluster.local -U cart -d cart
-
-# Test connection via PgCat (order database)
-kubectl run -it --rm test-pgcat-order --image=postgres:18-alpine --restart=Never -- psql -h pgcat.cart.svc.cluster.local -U cart -d order
-```
----
+**ServiceMonitor:** Configured for Prometheus scraping (see `k8s/prometheus/servicemonitors/`)
 
 ## Related Documentation
 

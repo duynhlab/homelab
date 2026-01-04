@@ -12,6 +12,9 @@ Complete guide to deploy Go REST API monitoring on Kind (Kubernetes in Docker).
 cd project-monitoring-golang
 chmod +x scripts/*.sh
 
+# Step 0: Verify builds (optional but recommended)
+./scripts/00-verify-build.sh
+
 # Step 1: Create Kind cluster
 ./scripts/01-create-kind-cluster.sh
 
@@ -25,16 +28,16 @@ chmod +x scripts/*.sh
 ./scripts/04-deploy-databases.sh
 
 # Step 5: Deploy all microservices (from OCI registry)
-./scripts/06-deploy-microservices.sh
+./scripts/05-deploy-microservices.sh
 
 # Step 6: Deploy k6 load testing (AFTER apps to test them)
-./scripts/07-deploy-k6.sh
+./scripts/06-deploy-k6.sh
 
 # Step 7: Deploy SLO system (Required for SRE practices)
-./scripts/08-deploy-slo.sh
+./scripts/07-deploy-slo.sh
 
 # Step 8: Setup port forwarding
-./scripts/09-setup-access.sh
+./scripts/08-setup-access.sh
 ```
 
 Wait 5 minutes. Then access:
@@ -178,7 +181,7 @@ kubectl get nodes
 ### Step 5: Deploy All Microservices
 
 ```bash
-./scripts/06-deploy-microservices.sh
+./scripts/05-deploy-microservices.sh
 ```
 
 **What it does:**
@@ -197,11 +200,11 @@ kubectl get nodes
 
 ```bash
 # Deploy all k6 variants (default)
-./scripts/07-deploy-k6.sh
+./scripts/06-deploy-k6.sh
 
 # Or deploy specific variant:
-# ./scripts/07-deploy-k6.sh legacy
-# ./scripts/07-deploy-k6.sh scenarios
+# ./scripts/06-deploy-k6.sh legacy
+# ./scripts/06-deploy-k6.sh scenarios
 ```
 
 **What it does:** Deploys k6 load generators via Helm, generates continuous load.
@@ -213,7 +216,7 @@ kubectl get nodes
 ### Step 7: Deploy SLO System
 
 ```bash
-./scripts/08-deploy-slo.sh
+./scripts/07-deploy-slo.sh
 ```
 
 **What it does:**
@@ -229,7 +232,7 @@ kubectl get nodes
 ### Step 8: Setup Port Forwarding
 
 ```bash
-./scripts/09-setup-access.sh
+./scripts/08-setup-access.sh
 ```
 
 **What it does:**
@@ -291,21 +294,27 @@ Adjust filters in Grafana dashboard header:
 
 ### Deployment Scripts
 
-Numbered scripts (01-12) execute in order. See [Step-by-Step Deployment](#step-by-step-deployment) for detailed guide.
+Numbered scripts (00-10) execute in order. See [Step-by-Step Deployment](#step-by-step-deployment) for detailed guide.
 
 | Script | Command | Purpose | Order |
 |--------|---------|---------|-------|
+| Verify build | `./scripts/00-verify-build.sh` | Verify local builds before deployment | 0 |
 | Create cluster | `./scripts/01-create-kind-cluster.sh` | Create Kind Kubernetes cluster | 1 |
 | Deploy monitoring | `./scripts/02-deploy-monitoring.sh` | Create all namespaces + Deploy Prometheus, Grafana, metrics | 2 |
 | Deploy APM | `./scripts/03-deploy-apm.sh` | Deploy all APM components (BEFORE apps) | 3 |
+| Deploy Tempo | `./scripts/03a-deploy-tempo.sh` | Deploy Tempo (APM sub-component) | 3a |
+| Deploy Pyroscope | `./scripts/03b-deploy-pyroscope.sh` | Deploy Pyroscope (APM sub-component) | 3b |
+| Deploy Loki | `./scripts/03c-deploy-loki.sh` | Deploy Loki (APM sub-component) | 3c |
+| Deploy Jaeger | `./scripts/03d-deploy-jaeger.sh` | Deploy Jaeger (APM sub-component) | 3d |
 | Deploy databases | `./scripts/04-deploy-databases.sh` | Deploy PostgreSQL operators, clusters, poolers | 4 |
-| Deploy services | `./scripts/06-deploy-microservices.sh` | Deploy from OCI registry (images built by GitHub Actions) | 5 |
-| Deploy k6 | `./scripts/07-deploy-k6.sh` | Deploy k6 load generators (AFTER apps) | 6 |
-| Deploy SLO | `./scripts/08-deploy-slo.sh` | Deploy Sloth Operator and SLO CRDs | 7 |
-| Setup access | `./scripts/09-setup-access.sh` | Setup port-forwarding | 8 |
-| Reload dashboard | `./scripts/10-reload-dashboard.sh` | Reapply Grafana dashboards | - |
-| Diagnose latency | `./scripts/11-diagnose-latency.sh` | Analyze latency issues | - |
-| Error budget alert | `./scripts/12-error-budget-alert.sh` | Respond to error budget alerts | - |
+| Verify databases | `./scripts/04a-verify-databases.sh` | Verify database deployment | 4a |
+| Deploy services | `./scripts/05-deploy-microservices.sh` | Deploy from OCI registry (images built by GitHub Actions) | 5 |
+| Deploy k6 | `./scripts/06-deploy-k6.sh` | Deploy k6 load generators (AFTER apps) | 6 |
+| Deploy SLO | `./scripts/07-deploy-slo.sh` | Deploy Sloth Operator and SLO CRDs | 7 |
+| Setup access | `./scripts/08-setup-access.sh` | Setup port-forwarding | 8 |
+| Reload dashboard | `./scripts/09-reload-dashboard.sh` | Reapply Grafana dashboards | 9 |
+| Error budget alert | `./scripts/10-error-budget-alert.sh` | Respond to error budget alerts | 10 |
+| Cleanup | `./scripts/cleanup.sh` | Complete cleanup (delete cluster, volumes, etc.) | - |
 
 ### Helm Commands
 
@@ -333,7 +342,7 @@ Numbered scripts (01-12) execute in order. See [Step-by-Step Deployment](#step-b
 | Prometheus | http://localhost:9090 | - |
 | API (via port-forward) | http://localhost:8080 | - |
 
-**Setup:** `./scripts/09-setup-access.sh` or manually port-forward services.
+**Setup:** `./scripts/08-setup-access.sh` or manually port-forward services.
 
 ---
 
@@ -343,9 +352,9 @@ Numbered scripts (01-12) execute in order. See [Step-by-Step Deployment](#step-b
 
 **Dashboard No Data:** Check Prometheus targets: `http://localhost:9090/targets`. Query: `request_duration_seconds_count{job=~"microservices"}`. Check logs: `kubectl logs deployment/prometheus -n monitoring`
 
-**Grafana Dashboard Empty:** Reload: `./scripts/10-reload-dashboard.sh`. Restart: `kubectl rollout restart deployment grafana -n monitoring`
+**Grafana Dashboard Empty:** Reload: `./scripts/09-reload-dashboard.sh`. Restart: `kubectl rollout restart deployment grafana -n monitoring`
 
-**Services Not Accessible:** Use port-forwarding: `./scripts/09-setup-access.sh`
+**Services Not Accessible:** Use port-forwarding: `./scripts/08-setup-access.sh`
 
 **Configuration Issues:** Verify Helm values: `helm get values auth -n auth`. Check pod env: `kubectl exec -n auth deployment/auth -- env | grep SERVICE_NAME`
 

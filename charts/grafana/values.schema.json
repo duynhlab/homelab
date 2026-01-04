@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "properties": {
+    "nameOverride": {
+      "type": "string",
+      "description": "Override the chart name"
+    },
+    "fullnameOverride": {
+      "type": "string",
+      "description": "Override the full name of the chart"
+    },
+    "namespace": {
+      "type": "string",
+      "description": "Namespace where ConfigMap and GrafanaDashboard CRD will be created",
+      "default": "monitoring"
+    },
+    "instanceSelector": {
+      "type": "object",
+      "description": "Grafana instance selector configuration",
+      "properties": {
+        "matchLabels": {
+          "type": "object",
+          "description": "Match labels for Grafana instance",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {
+            "dashboards": "grafana"
+          }
+        }
+      }
+    },
+    "crdName": {
+      "type": "string",
+      "description": "GrafanaDashboard CRD name",
+      "default": "microservices-monitoring"
+    },
+    "grafanaDashboard": {
+      "type": "object",
+      "description": "Grafana dashboard configuration",
+      "properties": {
+        "configMapName": {
+          "type": "string",
+          "description": "The name of the ConfigMap containing the dashboard JSON",
+          "default": "grafana-dashboard-main"
+        },
+        "fileName": {
+          "type": "string",
+          "description": "The name of the JSON file in the chart's files/ directory",
+          "default": "microservices-dashboard.json"
+        },
+        "folder": {
+          "type": "string",
+          "description": "Folder name in Grafana UI where dashboard will appear",
+          "default": "Observability"
+        },
+        "datasources": {
+          "type": "array",
+          "description": "Datasource mappings for dashboard template variables",
+          "items": {
+            "type": "object",
+            "properties": {
+              "inputName": {
+                "type": "string",
+                "description": "Template variable name in dashboard JSON"
+              },
+              "datasourceName": {
+                "type": "string",
+                "description": "Grafana datasource name"
+              }
+            },
+            "required": ["inputName", "datasourceName"]
+          },
+          "default": [
+            {
+              "inputName": "DS_PROMETHEUS",
+              "datasourceName": "Prometheus"
+            }
+          ]
+        },
+        "labels": {
+          "type": "object",
+          "description": "Labels that ConfigMap should have",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {
+            "grafana_dashboard": "1"
+          }
+        },
+        "annotations": {
+          "type": "object",
+          "description": "Annotations that ConfigMap can have",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        }
+      },
+      "required": ["configMapName", "fileName", "folder", "datasources"]
+    }
+  }
+}

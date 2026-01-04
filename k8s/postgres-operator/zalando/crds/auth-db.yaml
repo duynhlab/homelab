@@ -35,7 +35,7 @@ spec:
         memory: 128Mi
       limits:
         cpu: 200m
-        memory: 128Mi  # Set limit to match request to avoid warning
+        memory: "256Mi"
   
   # PostgreSQL version and production-ready parameters
   postgresql:

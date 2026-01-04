@@ -49,7 +49,14 @@ spec:
       - "host all all 127.0.0.1/32 md5"   # Localhost TCP connections
       - "host all all 10.244.0.0/16 md5"  # Allow unencrypted connections from pod network (Kind default CIDR)
       - "host all all 172.19.0.0/16 md5"  # Allow unencrypted connections from Kind bridge network
-  
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
   # Sidecar: postgres_exporter for Prometheus metrics collection
   sidecars:
     - name: exporter

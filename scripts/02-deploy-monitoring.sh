@@ -72,7 +72,18 @@ helm upgrade --install grafana-operator grafana-operator/grafana-operator \
   --namespace monitoring \
   -f k8s/grafana-operator/values.yaml
 
-echo "6. Applying Grafana CRDs (instance, datasources, dashboards)..."
+# Install CloudNativePG Grafana Dashboard via Helm Chart
+echo "6. Installing CloudNativePG Grafana Dashboard (Helm Chart)..."
+helm repo add cnpg-grafana https://cloudnative-pg.github.io/grafana-dashboards >/dev/null 2>&1 || true
+helm repo update >/dev/null 2>&1 || true
+helm upgrade --install cnpg-grafana-cluster cnpg-grafana/cluster \
+  --namespace monitoring \
+  -f k8s/grafana-operator/cloudnative-pg-values.yaml \
+  --wait \
+  --timeout 2m
+echo "  SUCCESS: CloudNativePG Grafana Dashboard installed via Helm chart"
+
+echo "7. Applying Grafana CRDs (instance, datasources, dashboards)..."
 kubectl apply -f k8s/grafana-operator/grafana.yaml
 kubectl apply -f k8s/grafana-operator/datasource-prometheus.yaml
 kubectl apply -f k8s/grafana-operator/datasource-tempo.yaml

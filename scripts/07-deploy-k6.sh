@@ -3,11 +3,11 @@ set -e
 
 echo "=== Deploying K6 Load Testing via Helm ==="
 
-CHART_REF="charts/"
+CHART_REF="charts/mop"
 
 echo "Deploying k6..."
 helm upgrade --install k6 "$CHART_REF" \
-  -f charts/values/k6.yaml \
+  -f charts/mop/values/k6.yaml \
   -n k6 \
   --create-namespace \
   --wait --timeout 60s || true

@@ -182,14 +182,20 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 
 **Deploy everything:**
 ```bash
-./scripts/01-create-kind-cluster.sh      # Step 1: Infrastructure
-./scripts/02-deploy-monitoring.sh        # Step 2: Monitoring + metrics (BEFORE apps)
-./scripts/03-deploy-apm.sh               # Step 3: APM (BEFORE apps)
-./scripts/04-deploy-databases.sh         # Step 4: Databases (BEFORE apps)
-./scripts/06-deploy-microservices.sh     # Step 5: Deploy (from OCI registry, images built by GitHub Actions)
-./scripts/07-deploy-k6.sh               # Step 6: Load testing (AFTER apps)
-./scripts/08-deploy-slo.sh               # Step 7: SLO system
-./scripts/09-setup-access.sh             # Step 8: Access setup
+./scripts/00-verify-build.sh              # Step 0: Verify local builds (optional)
+./scripts/01-create-kind-cluster.sh        # Step 1: Infrastructure
+./scripts/02-deploy-monitoring.sh          # Step 2: Monitoring + metrics (BEFORE apps)
+./scripts/03-deploy-apm.sh                 # Step 3: APM (BEFORE apps)
+# Sub-scripts: 03a-tempo, 03b-pyroscope, 03c-loki, 03d-jaeger
+./scripts/04-deploy-databases.sh           # Step 4: Databases (BEFORE apps)
+./scripts/04a-verify-databases.sh          # Step 4a: Verify databases
+./scripts/05-deploy-microservices.sh      # Step 5: Deploy (from OCI registry, images built by GitHub Actions)
+./scripts/06-deploy-k6.sh                 # Step 6: Load testing (AFTER apps)
+./scripts/07-deploy-slo.sh                # Step 7: SLO system
+./scripts/08-setup-access.sh               # Step 8: Access setup
+./scripts/09-reload-dashboard.sh           # Step 9: Reload dashboards (utility)
+./scripts/10-error-budget-alert.sh         # Step 10: Error budget alerts (utility)
+./scripts/cleanup.sh                       # Cleanup everything
 ```
 
 **Manual Helm deployment:**
@@ -199,7 +205,7 @@ helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-
 
 **Deploy SLOs:**
 ```bash
-./scripts/08-deploy-slo.sh
+./scripts/07-deploy-slo.sh
 ```
 
 **Access services:**

@@ -1,6 +1,6 @@
 name: Release Helm Charts
 
-run-name: 📦 Release Helm Charts
+run-name: Release Helm Charts
 
 on:
   push:
@@ -11,48 +11,14 @@ on:
       - 'charts/**'
 
 permissions:
-  contents: write # publish chart to gh-pages branch
   packages: write # publish chart to ghcr.io
 
 jobs:
-  release-gh-pages:
+  release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 #v5
-        with:
-          fetch-depth: 0
-
-      - name: Configure Git
-        run: |
-          git config --local user.email "duynebot@users.noreply.github.com"
-          git config --local user.name "Auto Release Bot"
-
-      - name: Install Helm
-        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 #v4.3.1
-        with:
-          version: v3.9.0
-          
-      # Publish charts to gh-pages branch
-      - name: Publish charts to GitHub Pages
-        uses: helm/chart-releaser-action@3e001cb8c68933439c7e721650f20a07a1a5c61e #v1.7.0
-        with:
-          config: .github/configs/cr.yaml
-        env:
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-
-  release-ghcr:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 #v5
-        with:
-          fetch-depth: 0
-
-      - name: Configure Git
-        run: |
-          git config --local user.email "duynebot@users.noreply.github.com"
-          git config --local user.name "Auto Release Bot"
 
       - name: Install Helm
         uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 #v4.3.1

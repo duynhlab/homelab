@@ -32,12 +32,6 @@ helm install auth oci://ghcr.io/duynhne/charts/mop \
 ```bash
 # Preview all rendered templates
 helm template auth charts/mop -f charts/mop/values/auth.yaml
-
-# Preview specific resource
-helm template auth charts/mop -f charts/mop/values/auth.yaml | grep -A 20 "kind: Deployment"
-
-# Preview with debug output
-helm template auth charts/mop -f charts/mop/values/auth.yaml --debug
 ```
 
 ### Dry-Run Installation
@@ -67,11 +61,6 @@ helm template auth charts/mop \
   --set image.tag=v5 \
   --set replicaCount=3
 
-# Combine with values file
-helm template auth charts/mop \
-  -f charts/mop/values/auth.yaml \
-  --set replicaCount=3 \
-  --set resources.limits.memory=256Mi
 ```
 
 ---

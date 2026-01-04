@@ -747,8 +747,7 @@ extraEnv:
 
 **Monitoring (3 files):**
 3. ✅ `monitoring/METRICS.md` - Core metrics documentation
-4. ✅ `monitoring/PROMETHEUS_RATE_EXPLAINED.md` - Essential concept
-5. ✅ `monitoring/TIME_RANGE_AND_RATE_INTERVAL.md` - Dashboard usage
+4. ✅ `monitoring/PROMQL_GUIDE.md` - Complete PromQL guide (merged PROMETHEUS_RATE_EXPLAINED.md and TIME_RANGE_AND_RATE_INTERVAL.md)
 
 **SLO (5 files):**
 6. ✅ `slo/README.md` - SLO system overview

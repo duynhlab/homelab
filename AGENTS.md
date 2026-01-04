@@ -169,7 +169,7 @@ monitoring/
 ├── services/          # Go application code (9 microservices)
 ├── charts/            # Helm chart for microservices
 ├── k8s/               # Kubernetes manifests
-├── scripts/           # Deployment scripts (01-12)
+├── scripts/           # Deployment scripts
 ├── docs/              # Documentation (starting point for details)
 ├── k6/                # K6 load testing
 └── specs/             # Specifications and research
@@ -203,16 +203,26 @@ monitoring/
 
 ### Deployment Order
 
-Infrastructure → Monitoring → APM → **Databases** → Apps → Load Testing → SLO → Access
+Infrastructure → Build Verification → Monitoring → APM → **Databases** → Apps → Load Testing → SLO → Access → Utilities
 
-1. Infrastructure (01) - Kind cluster
-2. Monitoring (02) - **Create all namespaces** + Prometheus, Grafana, metrics (BEFORE apps)
-3. APM (03) - Tempo, Pyroscope, Loki, Vector (BEFORE apps)
-4. **Databases (04)** - PostgreSQL operators, clusters, poolers (BEFORE apps)
-5. Deploy Apps (06) - Deploy services from OCI registry (images built by GitHub Actions)
-6. Load Testing (07) - K6 load generators (AFTER apps)
-7. SLO (08) - Sloth Operator and SLO CRDs
-8. Access Setup (09) - Port-forwarding
+1. Build Verification (00) - Verify local builds before deployment
+2. Infrastructure (01) - Kind cluster
+3. Monitoring (02) - **Create all namespaces** + Prometheus, Grafana, metrics (BEFORE apps)
+4. APM (03) - Tempo, Pyroscope, Loki, Vector (BEFORE apps)
+   - 03a-deploy-tempo.sh - Tempo deployment
+   - 03b-deploy-pyroscope.sh - Pyroscope deployment
+   - 03c-deploy-loki.sh - Loki deployment
+   - 03d-deploy-jaeger.sh - Jaeger deployment
+5. **Databases (04)** - PostgreSQL operators, clusters, poolers (BEFORE apps)
+   - 04a-verify-databases.sh - Database verification
+6. Deploy Apps (05) - Deploy services from OCI registry (images built by GitHub Actions)
+7. Load Testing (06) - K6 load generators (AFTER apps)
+8. SLO (07) - Sloth Operator and SLO CRDs
+9. Access Setup (08) - Port-forwarding
+10. Utilities:
+    - 09-reload-dashboard.sh - Reload Grafana dashboards
+    - 10-error-budget-alert.sh - Error budget alert handling
+    - cleanup.sh - Complete cleanup
 
 **Detailed Deployment Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md)
 

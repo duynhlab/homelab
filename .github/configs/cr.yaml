@@ -1,6 +1,0 @@
-# Chart Releaser configuration
-# See: https://github.com/helm/chart-releaser-action
-owner: duynhne
-git-repo-url: https://github.com/duynhne/monitoring
-charts-repo: https://duynhne.github.io/monitoring
-packages-with-index: true

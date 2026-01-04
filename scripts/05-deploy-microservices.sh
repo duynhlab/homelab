@@ -38,8 +38,6 @@ SERVICES=(
 )
 
 # Deploy each service
-# Note: Namespaces are created by script 02-deploy-monitoring.sh (runs before this script)
-# --create-namespace flag is kept as safety net but namespaces should already exist
 COUNT=1
 for entry in "${SERVICES[@]}"; do
   IFS=':' read -r SERVICE NAMESPACE VALUES <<< "$entry"
@@ -47,12 +45,10 @@ for entry in "${SERVICES[@]}"; do
   echo "$COUNT. Deploying $SERVICE to $NAMESPACE namespace (chart v$CHART_VERSION)..."
   
   # Deploy from OCI registry with version
-  # Note: Increased timeout to 5m to accommodate init container migrations (Flyway)
   if ! helm upgrade --install "$SERVICE" "$CHART_REF" \
     --version "$CHART_VERSION" \
     -f "$PROJECT_ROOT/charts/mop/values/${VALUES}.yaml" \
     -n "$NAMESPACE" \
-    --create-namespace \
     --wait \
     --timeout 5m; then
     echo "  WARN: Failed to deploy $SERVICE (continuing with other services)..."
@@ -69,8 +65,7 @@ echo ""
 echo "Waiting for pods to be ready..."
 for entry in "${SERVICES[@]}"; do
   IFS=':' read -r SERVICE NAMESPACE VALUES <<< "$entry"
-  # Increased timeout to 5m to accommodate init container migrations (Flyway)
-  if ! kubectl wait --for=condition=ready pod -l app="$SERVICE" -n "$NAMESPACE" --timeout=5m 2>/dev/null; then
+  if ! kubectl wait --for=condition=ready pod -l app="$SERVICE" -n "$NAMESPACE" --timeout=5m; then
     echo "  WARN: Pods for $SERVICE not ready yet (continuing)..."
   fi
 done
@@ -82,7 +77,7 @@ echo ""
 NAMESPACES=("auth" "user" "product" "cart" "order" "review" "notification" "shipping")
 for NS in "${NAMESPACES[@]}"; do
   echo "--- $NS namespace ---"
-  kubectl get pods -n "$NS" 2>/dev/null || echo "No pods found"
+  kubectl get pods -n "$NS"
   echo ""
 done
 

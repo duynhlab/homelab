@@ -9,7 +9,6 @@ echo "Deploying k6..."
 helm upgrade --install k6 "$CHART_REF" \
   -f charts/mop/values/k6.yaml \
   -n k6 \
-  --create-namespace \
   --wait --timeout 60s || true
 
 echo ""

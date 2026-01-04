@@ -8,6 +8,175 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+## [0.11.4] - 2026-01-04
+
+### Changed
+
+**Helm Release Workflow Migration to Chart Releaser Pattern:**
+- **Changed**: Migrated Helm release workflow to use chart-releaser-action pattern for dual publishing (GitHub Pages + OCI registry)
+  - **Before**: Complex matrix strategy with path detection, selective chart release, manual version handling
+  - **After**: Simplified loop-based approach that packages and publishes all charts automatically
+  - **Benefits**:
+    - ✅ Dual publishing: Both GitHub Pages (Helm chart repository) and OCI registry (ghcr.io)
+    - ✅ Automatic chart discovery: Loops through `charts/*` to package all charts
+    - ✅ Standard tooling: Uses official `helm/chart-releaser-action` for GitHub Pages
+    - ✅ Simpler workflow: No complex path detection or conditional logic
+    - ✅ Pinned action versions: Uses specific commit SHAs for stability
+  - **Files Created**:
+    - `.github/configs/cr.yaml` - Chart releaser configuration for GitHub Pages publishing
+  - **Files Updated**:
+    - `.github/workflows/helm-release.yml` - Complete rewrite with 2 jobs:
+      - `release-gh-pages`: Publishes charts to GitHub Pages branch using chart-releaser-action
+      - `release-ghcr`: Packages and publishes charts to OCI registry (ghcr.io/duynhne/charts)
+  - **Removed Features**:
+    - Path detection job (`detect-changes`)
+    - Lint job with matrix strategy
+    - Selective chart release (now releases all charts)
+    - Manual version input via workflow_dispatch
+    - Summary step
+  - **Trigger**: Push to `v5` or `v5-refactor` branches with changes in `charts/**`
+  - **Registry**: `oci://ghcr.io/duynhne/charts` (updated from dynamic `${{ github.repository_owner }}`)
+
+**Chart README Documentation Updates:**
+- **Changed**: Updated both `charts/mop/README.md` and `charts/grafana/README.md` with comprehensive Helm template examples
+  - **Added**: Helm template examples section with:
+    - Preview rendered templates (`helm template`)
+    - Dry-run installation (`helm install --dry-run`)
+    - Chart validation (`helm lint`)
+    - Template with custom values (`--set` flags)
+  - **Updated**: Chart paths and references:
+    - `charts/mop/README.md`: Updated from `charts/` to `charts/mop/`, chart name from "microservice" to "mop"
+    - OCI registry path: `oci://ghcr.io/duynhne/charts/mop` (updated from `microservice`)
+    - Version: Updated to 0.4.2
+    - Chart structure: Added `k6.yaml` and `NOTES.txt` to structure
+  - **Added**: Best practices section recommending `helm template` for preview before applying
+  - **Files Updated**:
+    - `charts/mop/README.md` - Complete update with template examples, corrected paths, and version
+    - `charts/grafana/README.md` - Added Helm template examples section
+
+## [0.11.3] - 2026-01-04
+
+### Fixed
+
+**CloudNativePG Grafana Dashboard Deprecation Warning:**
+- **Fixed**: Deprecation warning about `grafanaDashboard.sidecarLabel` by using `grafanaDashboard.labels` instead
+  - **Root Cause**: Helm chart uses deprecated `sidecarLabel` and `sidecarLabelValue` settings
+  - **Solution**: Created values file (`k8s/grafana-operator/cloudnative-pg-values.yaml`) to override with `labels` instead
+  - **Files Created**:
+    - `k8s/grafana-operator/cloudnative-pg-values.yaml` - Values file with `grafanaDashboard.labels` configuration
+  - **Files Updated**:
+    - `scripts/02-deploy-monitoring.sh` - Added `-f k8s/grafana-operator/cloudnative-pg-values.yaml` to Helm install command
+  - **Result**: No more deprecation warnings when installing Helm chart
+  - **Note**: Warning does not affect functionality (we use GrafanaDashboard CRD, not sidecar discovery), but fixed for cleanliness
+
+**CloudNativePG Grafana Dashboard ConfigMap Key Fix:**
+- **Fixed**: GrafanaDashboard CRD referenced wrong ConfigMap key
+  - **Root Cause**: Helm chart uses `cnp.json` as key, but CRD was using `grafana-dashboard.json`
+  - **Solution**: Updated CRD to use correct key `cnp.json`
+  - **Files Updated**:
+    - `k8s/grafana-operator/dashboards/grafana-dashboard-cloudnative-pg.yaml` - Changed key from `grafana-dashboard.json` to `cnp.json`
+  - **Result**: Dashboard now loads correctly from Helm chart ConfigMap
+
+### Changed
+
+**CloudNativePG Grafana Dashboard Migration to Helm Chart:**
+- **Changed**: Migrated CloudNativePG Grafana dashboard from manual ConfigMap to Helm chart installation
+  - **Before**: Manual ConfigMap (`configmap-cloudnative-pg.yaml`) with 281KB JSON content, causing annotations size limit issues
+  - **After**: Helm chart (`cnpg-grafana-cluster`) automatically creates ConfigMap, eliminating size limit problems
+  - **Benefits**:
+    - ✅ No size limit issues (Helm chart handles large ConfigMap without annotation problems)
+    - ✅ Easy updates via `helm upgrade cnpg-grafana-cluster`
+    - ✅ Cleaner setup (no manual ConfigMap management)
+    - ✅ Official CloudNativePG support
+  - **Files Updated**:
+    - `scripts/02-deploy-monitoring.sh` - Added Helm chart installation (repo add + install)
+    - `k8s/grafana-operator/dashboards/grafana-dashboard-cloudnative-pg.yaml` - Updated to reference Helm chart ConfigMap (`cnpg-grafana-dashboard`)
+    - `k8s/grafana-operator/dashboards/kustomization.yaml` - Removed manual ConfigMap reference
+    - `scripts/10-reload-dashboard.sh` - Simplified (removed manual ConfigMap handling)
+  - **Files Deleted**:
+    - `k8s/grafana-operator/dashboards/configmap-cloudnative-pg.yaml` - No longer needed (Helm chart creates ConfigMap)
+    - `k8s/grafana-operator/dashboards/cloudnative-pg.json` - No longer needed (Helm chart includes dashboard JSON)
+  - **Helm Chart Details**:
+    - Chart: `cnpg-grafana/cluster` from `https://cloudnative-pg.github.io/grafana-dashboards`
+    - Release name: `cnpg-grafana-cluster`
+    - Namespace: `monitoring`
+    - ConfigMap created: `cnpg-grafana-dashboard` with key `grafana-dashboard.json`
+
+## [0.11.2] - 2026-01-02
+
+### Added
+
+**CloudNativePG Monitoring Integration (Manual PodMonitor + Grafana Dashboard):**
+- **Added**: Manual PodMonitor support for CloudNativePG clusters (official recommended approach)
+  - Created manual PodMonitor CRDs for transaction-db and product-db clusters
+  - Uses `cnpg.io/cluster: <cluster-name>` selector (required label pattern)
+  - Port: `metrics` (9187) with configurable scrape intervals and timeouts
+  - Prometheus Operator auto-discovers and scrapes metrics from manual PodMonitors
+  - **Files Created**:
+    - `k8s/prometheus/podmonitors/podmonitor-transaction-db.yaml` - Manual PodMonitor for transaction-db cluster
+    - `k8s/prometheus/podmonitors/podmonitor-product-db.yaml` - Manual PodMonitor for product-db cluster
+  - **Reference**: [CloudNativePG Monitoring Documentation](https://cloudnative-pg.io/docs/1.28/monitoring)
+  - **Note**: `spec.monitoring.enablePodMonitor: true` is deprecated and will be removed in future CloudNativePG versions
+
+**PodMonitor Label Fix (Prometheus Operator Discovery):**
+- **Fixed**: Added `release: kube-prometheus-stack` label to all PodMonitor resources
+  - **Root Cause**: Prometheus Operator has `podMonitorSelector` with `matchLabels: release: kube-prometheus-stack`, but PodMonitors were missing this label
+  - **Impact**: PodMonitors were not being discovered by Prometheus Operator, causing missing targets in Prometheus
+  - **Files Updated**:
+    - `k8s/prometheus/podmonitors/podmonitor-transaction-db.yaml` - Added `release: kube-prometheus-stack` label
+    - `k8s/prometheus/podmonitors/podmonitor-product-db.yaml` - Added `release: kube-prometheus-stack` label
+    - `k8s/prometheus/podmonitors/podmonitor-auth-db.yaml` - Added `release: kube-prometheus-stack` label
+    - `k8s/prometheus/podmonitors/podmonitor-review-db.yaml` - Added `release: kube-prometheus-stack` label
+    - `k8s/prometheus/podmonitors/podmonitor-supporting-db.yaml` - Added `release: kube-prometheus-stack` label
+  - **Result**: All PodMonitors are now discoverable by Prometheus Operator, targets appear in Prometheus UI
+
+### Fixed
+
+**CloudNativePG Grafana Dashboard ConfigMap Size Limit:**
+- **Fixed**: ConfigMap "grafana-dashboard-cloudnative-pg" annotations too long error
+  - **Root Cause**: Dashboard JSON file is ~281KB, exceeding Kubernetes ConfigMap annotations size limit (262144 bytes) when created via kustomization
+  - **Solution**: Created ConfigMap manually using `kubectl create` instead of kustomization configMapGenerator
+  - **Files Created**:
+    - `k8s/grafana-operator/dashboards/configmap-cloudnative-pg.yaml` - Manual ConfigMap (created via `kubectl create --dry-run`)
+  - **Files Updated**:
+    - `k8s/grafana-operator/dashboards/kustomization.yaml` - Removed cloudnative-pg from configMapGenerator, added manual ConfigMap to resources
+    - `scripts/10-reload-dashboard.sh` - Added handling for large ConfigMap using `kubectl create/replace` instead of `apply`
+  - **Result**: ConfigMap can now be created/updated without annotations size limit errors
+- **Added**: Official CloudNativePG Grafana dashboard
+  - Dashboard JSON: `k8s/grafana-operator/dashboards/cloudnative-pg.json` (downloaded from official repo, ~281KB)
+  - GrafanaDashboard CRD: `k8s/grafana-operator/dashboards/grafana-dashboard-cloudnative-pg.yaml`
+  - ConfigMap created manually (not via kustomization) to avoid annotations size limit (262144 bytes)
+  - Dashboard appears in Grafana under "Databases" folder
+  - **Files Created**:
+    - `k8s/grafana-operator/dashboards/cloudnative-pg.json`
+    - `k8s/grafana-operator/dashboards/configmap-cloudnative-pg.yaml` - Manual ConfigMap (too large for kustomization)
+    - `k8s/grafana-operator/dashboards/grafana-dashboard-cloudnative-pg.yaml`
+  - **Files Updated**:
+    - `k8s/grafana-operator/dashboards/kustomization.yaml` - Removed cloudnative-pg from configMapGenerator, added manual ConfigMap to resources
+    - `scripts/10-reload-dashboard.sh` - Added handling for large ConfigMap using `kubectl create/replace`
+
+### Removed
+
+**Deprecated Built-in PodMonitor Configuration:**
+- **Removed**: `spec.monitoring.enablePodMonitor: true` from Cluster CRDs (deprecated feature)
+  - `k8s/postgres-operator/cloudnativepg/crds/transaction-db.yaml` - Removed monitoring.enablePodMonitor section
+  - `k8s/postgres-operator/cloudnativepg/crds/product-db.yaml` - Removed monitoring.enablePodMonitor section
+  - **Reason**: `enablePodMonitor: true` is deprecated and will be removed in future CloudNativePG versions. Manual PodMonitor creation is the official recommended approach per CloudNativePG documentation.
+
+### Changed
+
+**Monitoring Approach:**
+- **Changed**: CloudNativePG monitoring to manual PodMonitor (official recommended approach)
+  - **Before**: Attempted to use `spec.monitoring.enablePodMonitor: true` (deprecated)
+  - **After**: Manual PodMonitor CRDs with full control over configuration
+  - **Benefits**: 
+    - No deprecation concerns (official recommended approach)
+    - Full control over scrape intervals, timeouts, and relabeling
+    - Version-controlled independently
+    - Production-ready approach per CloudNativePG documentation
+    - Consistent configuration across clusters
+    - Less maintenance overhead
+
 ## [0.11.1] - 2026-01-02
 
 ### Fixed

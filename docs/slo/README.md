@@ -16,7 +16,7 @@ This SLO (Service Level Objective) system provides comprehensive monitoring and 
 ### Deploy SLO System
 
 ```bash
-./scripts/08-deploy-slo.sh
+./scripts/07-deploy-slo.sh
 ```
 
 This script:
@@ -73,7 +73,7 @@ graph TD
 │       ├── shipping-slo.yaml
 │       └── shipping-v2-slo.yaml
 └── scripts/
-    └── 08-deploy-slo.sh      # SLO deployment script (Helm-based)
+    └── 07-deploy-slo.sh      # SLO deployment script (Helm-based)
 ```
 
 ## SLO Definitions

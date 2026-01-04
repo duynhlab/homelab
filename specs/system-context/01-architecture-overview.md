@@ -258,6 +258,10 @@ monitoring/
 │   ├── prometheus/        # Prometheus Operator config
 │   ├── grafana-operator/  # Grafana Operator resources
 │   ├── sloth/             # Sloth Operator + SLO CRDs
+│   ├── postgres-operator/  # PostgreSQL operators and poolers
+│   │   ├── cloudnativepg/ # CloudNativePG operator (CRDs, values)
+│   │   ├── zalando/       # Zalando operator (CRDs, values)
+│   │   └── pgcat/         # PgCat connection poolers
 │   ├── tempo/             # Tempo deployment
 │   ├── loki/              # Loki deployment
 │   ├── pyroscope/         # Pyroscope deployment

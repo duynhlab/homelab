@@ -7,20 +7,19 @@ NAMESPACE="monitoring"
 
 # 1. Add Sloth Helm repo
 echo "1. Adding Sloth Helm repository..."
-helm repo add sloth https://slok.github.io/sloth >/dev/null 2>&1 || true
+helm repo add sloth https://slok.github.io/sloth
 helm repo update >/dev/null 2>&1
 
 # 2. Deploy Sloth Operator
 echo "2. Deploying Sloth Operator..."
 helm upgrade --install sloth sloth/sloth \
   --namespace "$NAMESPACE" \
-  --create-namespace \
   -f k8s/sloth/values.yaml \
   --wait --timeout 120s
 
 # 3. Wait for operator
 echo "3. Waiting for Sloth Operator..."
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=sloth -n "$NAMESPACE" --timeout=120s || true
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=sloth -n "$NAMESPACE" --timeout=120s
 
 # 4. Deploy PrometheusServiceLevel CRDs
 echo "4. Deploying SLO definitions (PrometheusServiceLevel CRs)..."
@@ -39,11 +38,11 @@ kubectl get prometheusservicelevels -n "$NAMESPACE"
 
 echo ""
 echo "Generated PrometheusRules:"
-kubectl get prometheusrules -n "$NAMESPACE" | grep sloth || echo "  (Sloth will generate rules within a few seconds)"
+kubectl get prometheusrules -n "$NAMESPACE"
 
 echo ""
 echo "Grafana Dashboards (SLO):"
-kubectl get grafanadashboard -n "$NAMESPACE" | grep slo
+kubectl get grafanadashboard -n "$NAMESPACE"
 
 echo ""
 echo "SUCCESS: Sloth SLO system deployed successfully!"

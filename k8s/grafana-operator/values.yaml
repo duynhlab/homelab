@@ -1,19 +1,22 @@
-operator:
-  ## Deploy the operator inside the monitoring namespace
-  namespace: monitoring
+# Namespace override (replaces operator.namespace)
+namespaceOverride: monitoring
 
-  ## Only watch resources in the monitoring namespace
-  watchNamespaces:
-    - monitoring
+# Watch only monitoring namespace (replaces operator.watchNamespaces)
+# String format, space-separated for multiple namespaces
+watchNamespaces: "monitoring"
 
-  ## Reduce noise in demo environments
-  logLevel: info
+# Logging configuration (replaces operator.logLevel)
+logging:
+  level: info
 
-  ## Controller image (keep default from chart)
-  image:
-    repository: quay.io/grafana-operator/grafana-operator
+# Image configuration (replaces operator.image.repository)
+# Split into registry + repository for OCI chart structure
+image:
+  registry: ghcr.io
+  repository: grafana/grafana-operator
+  tag: ""  # Uses chart appVersion by default, or specify version like "v5.21.3"
 
-## CRDs are installed automatically by the chart (default behaviour)
+# CRDs configuration (replaces crds.install)
+# immutable: true means CRDs are installed automatically (default behavior)
 crds:
-  install: true
-
+  immutable: true

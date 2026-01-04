@@ -15,8 +15,8 @@ PostgreSQL database integration enables microservices to persist data, execute r
 - ✅ Full monitoring integration (postgres_exporter sidecars, PodMonitors, Prometheus, Grafana)
 
 **Technologies:**
-- **Zalando Postgres Operator**: PostgreSQL management powered by Patroni for 3 clusters (Review, Auth, Supporting)
-- **CloudNativePG Operator**: Kubernetes-native PostgreSQL with Patroni for 2 clusters (Product DB, Transaction DB)
+- **Zalando Postgres Operator**: PostgreSQL management powered by Patroni for 3 clusters (Review( review-db), Auth(auth-db), Supporting(supporting-db))
+- **CloudNativePG Operator**: Kubernetes-native PostgreSQL with Patroni for 2 clusters (Product DB(product-db), Transaction DB(transaction-db))
 - **PgBouncer**: Transaction pooling for Auth service (Zalando built-in sidecar)
 - **PgCat**: Modern connection pooler deployed as standalone deployments (2 replicas each) for Product DB and Transaction DB clusters
 - **Patroni**: High availability manager (used by both Zalando and CloudNativePG operators via Kubernetes API)

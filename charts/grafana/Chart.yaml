@@ -1,0 +1,16 @@
+apiVersion: v2
+name: grafana
+description: Helm chart for deploying Grafana dashboards with ConfigMap and GrafanaDashboard CRD support. Follows CloudNativePG pattern for single-dashboard charts.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+maintainers:
+  - name: duynhne
+    url: https://github.com/duynhne
+keywords:
+  - grafana
+  - dashboard
+  - monitoring
+  - observability
+  - configmap
+  - grafanadashboard

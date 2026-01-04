@@ -1,0 +1,79 @@
+# Default values for grafana chart.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# -- Override the chart name
+nameOverride: ""
+
+# -- Override the full name of the chart
+fullnameOverride: ""
+
+# -- Namespace where ConfigMap and GrafanaDashboard CRD will be created
+# Default: monitoring (matches current setup)
+# When to change: If deploying to a different namespace
+# Example: "observability"
+namespace: "monitoring"
+
+# -- Grafana instance selector configuration
+# Used in GrafanaDashboard CRD to match Grafana instance
+instanceSelector:
+  # -- Match labels for Grafana instance
+  # Default: dashboards: grafana (matches current setup)
+  # When to change: If Grafana instance has different labels
+  # Example: { dashboards: grafana, environment: production }
+  matchLabels:
+    dashboards: grafana
+
+# -- GrafanaDashboard CRD name
+# Default: microservices-monitoring (matches current setup)
+# When to change: If you want a different CRD name
+# Example: "my-dashboard"
+crdName: "microservices-monitoring"
+
+# -- Grafana dashboard configuration
+# Follows CloudNativePG pattern for consistency
+grafanaDashboard:
+  # -- The name of the ConfigMap containing the dashboard JSON
+  # Default: grafana-dashboard-main (matches current setup)
+  # When to change: If you want a different ConfigMap name
+  # Example: "my-dashboard-configmap"
+  configMapName: "grafana-dashboard-main"
+
+  # -- The name of the JSON file in the chart's files/ directory
+  # Default: microservices-dashboard.json (matches current setup)
+  # When to change: If using a different dashboard file
+  # Example: "custom-dashboard.json"
+  fileName: "microservices-dashboard.json"
+
+  # -- Folder name in Grafana UI where dashboard will appear
+  # Default: Observability (matches current setup)
+  # When to change: To organize dashboards in different folders
+  # Example: "Production", "Development", "Databases"
+  folder: "Observability"
+
+  # -- Datasource mappings for dashboard template variables
+  # Maps template variable names in dashboard JSON to Grafana datasource names
+  # Default: DS_PROMETHEUS -> Prometheus (matches current setup)
+  # When to change: If dashboard uses different datasources or variable names
+  # Example:
+  #   - inputName: DS_PROMETHEUS
+  #     datasourceName: Prometheus
+  #   - inputName: DS_LOKI
+  #     datasourceName: Loki
+  datasources:
+    - inputName: DS_PROMETHEUS
+      datasourceName: Prometheus
+
+  # -- Labels that ConfigMap should have
+  # Used by Grafana Operator for sidecar discovery (if enabled)
+  # Default: grafana_dashboard: "1" (matches CloudNativePG pattern)
+  # When to change: If using different label scheme
+  # Example: { grafana_dashboard: "1", environment: "production" }
+  labels:
+    grafana_dashboard: "1"
+
+  # -- Annotations that ConfigMap can have
+  # Default: {} (empty)
+  # When to change: To add custom annotations for metadata
+  # Example: { description: "Production monitoring dashboard" }
+  annotations: {}

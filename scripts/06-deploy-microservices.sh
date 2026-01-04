@@ -9,12 +9,12 @@ set -euo pipefail
 # =============================================================================
 
 # Configuration
-REGISTRY="oci://ghcr.io/duynhne/charts/microservice"
+REGISTRY="oci://ghcr.io/duynhne/charts/mop"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Get chart version from Chart.yaml
-CHART_VERSION=$(grep '^version:' "$PROJECT_ROOT/charts/Chart.yaml" | awk '{print $2}')
+CHART_VERSION=$(grep '^version:' "$PROJECT_ROOT/charts/mop/Chart.yaml" | awk '{print $2}')
 
 # Always deploy from OCI registry
 CHART_REF="$REGISTRY"
@@ -50,7 +50,7 @@ for entry in "${SERVICES[@]}"; do
   # Note: Increased timeout to 5m to accommodate init container migrations (Flyway)
   if ! helm upgrade --install "$SERVICE" "$CHART_REF" \
     --version "$CHART_VERSION" \
-    -f "$PROJECT_ROOT/charts/values/${VALUES}.yaml" \
+    -f "$PROJECT_ROOT/charts/mop/values/${VALUES}.yaml" \
     -n "$NAMESPACE" \
     --create-namespace \
     --wait \

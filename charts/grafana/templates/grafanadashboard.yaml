@@ -1,0 +1,21 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: {{ .Values.crdName }}
+  namespace: {{ include "grafana.namespace" . }}
+  labels:
+    {{- include "grafana.labels" . | nindent 4 }}
+spec:
+  instanceSelector:
+    {{- with .Values.instanceSelector.matchLabels }}
+    matchLabels:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  folder: {{ .Values.grafanaDashboard.folder | quote }}
+  configMapRef:
+    name: {{ .Values.grafanaDashboard.configMapName }}
+    key: {{ .Values.grafanaDashboard.fileName }}
+  {{- with .Values.grafanaDashboard.datasources }}
+  datasources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}

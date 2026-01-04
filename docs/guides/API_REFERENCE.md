@@ -19,15 +19,33 @@ This section documents naming conventions, code standards, and organizational pa
 
 ### Script Naming
 
-- **Numbered prefixes (01-12)** - Execution order
-- **Format**: `{number}-{purpose}.sh`
-- **Categories**: Infrastructure (01-02), Monitoring (02), APM (03), Databases (04), Apps (05-06), Load Testing (07), SLO (08), Access (09), Utilities (10-12)
+- **Numbered prefixes (00-10)** - Execution order
+- **Format**: `{number}-{purpose}.sh` or `{number}{letter}-{purpose}.sh` for sub-scripts
+- **Categories**: 
+  - Build Verification (00)
+  - Infrastructure (01)
+  - Monitoring (02)
+  - APM (03, 03a-03d)
+  - Databases (04, 04a)
+  - Apps (05)
+  - Load Testing (06)
+  - SLO (07)
+  - Access (08)
+  - Utilities (09-10, cleanup.sh)
 
 **Examples:**
+- `00-verify-build.sh` - Build verification
 - `01-create-kind-cluster.sh` - Infrastructure setup
 - `02-deploy-monitoring.sh` - Monitoring deployment
-- `06-deploy-microservices.sh` - Application deployment
-- `09-setup-access.sh` - Access configuration
+- `03-deploy-apm.sh` - APM deployment (main)
+- `03a-deploy-tempo.sh` - Tempo deployment (sub-script)
+- `04-deploy-databases.sh` - Database deployment
+- `04a-verify-databases.sh` - Database verification
+- `05-deploy-microservices.sh` - Application deployment
+- `08-setup-access.sh` - Access configuration
+- `09-reload-dashboard.sh` - Dashboard reload utility
+- `10-error-budget-alert.sh` - Error budget alert utility
+- `cleanup.sh` - Complete cleanup
 
 ### File Organization Patterns
 
@@ -1110,7 +1128,7 @@ resources:
 
 #### Step 3: Update Deployment Script
 
-Add the service to `scripts/06-deploy-microservices.sh`:
+Add the service to `scripts/05-deploy-microservices.sh`:
 
 ```bash
 SERVICES=(
@@ -1135,7 +1153,7 @@ metadata:
 
 ```bash
 # Deploy using Helm (images are built automatically by GitHub Actions on push)
-./scripts/06-deploy-microservices.sh
+./scripts/05-deploy-microservices.sh
 ```
 
 Or deploy manually:
@@ -1981,7 +1999,7 @@ Error response format:
 
 ```bash
 # Deploy services (from OCI registry, images built by GitHub Actions)
-./scripts/06-deploy-microservices.sh
+./scripts/05-deploy-microservices.sh
 
 # Port forward specific service
 kubectl port-forward -n auth svc/auth 8080:8080
@@ -1993,7 +2011,7 @@ kubectl port-forward -n product svc/product 8082:8080
 
 ```bash
 # Setup all port forwards
-./scripts/09-setup-access.sh
+./scripts/08-setup-access.sh
 ```
 
 ---
@@ -2004,7 +2022,7 @@ Use k6 to test all services:
 
 ```bash
 # Deploy k6 load generators
-./scripts/07-deploy-k6.sh
+./scripts/06-deploy-k6.sh
 
 # View k6 logs
 kubectl logs -n k6 -l app=k6 -f

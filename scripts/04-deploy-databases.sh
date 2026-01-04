@@ -15,24 +15,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Check prerequisites
-if ! command -v helm &> /dev/null; then
-    echo "ERROR: Helm is not installed. Please install Helm 3.x"
-    exit 1
-fi
-
-if ! command -v kubectl &> /dev/null; then
-    echo "ERROR: kubectl is not installed. Please install kubectl"
-    exit 1
-fi
-
-
 # Deploy Zalando Postgres Operator
 echo "Deploying Zalando Postgres Operator..."
-if ! helm repo list | grep -q "postgres-operator"; then
-    helm repo add postgres-operator https://opensource.zalando.com/postgres-operator/charts/postgres-operator
-    helm repo update postgres-operator
-fi
+helm repo add postgres-operator https://opensource.zalando.com/postgres-operator/charts/postgres-operator
+helm repo update postgres-operator
 
 helm upgrade --install postgres-operator postgres-operator/postgres-operator \
     -f "$PROJECT_ROOT/k8s/postgres-operator/zalando/values.yaml" \
@@ -46,19 +32,12 @@ kubectl wait --for=condition=ready pod \
     -n database \
     --timeout=300s
 
-if ! kubectl get crd postgresqls.acid.zalan.do &> /dev/null; then
-    echo "ERROR: CRD postgresqls.acid.zalan.do not found"
-    exit 1
-fi
-
 echo "SUCCESS: Zalando Postgres Operator deployed"
 
 # Deploy Postgres Operator UI (optional component)
 echo "Deploying Postgres Operator UI..."
-if ! helm repo list | grep -q "postgres-operator-ui-charts"; then
-    helm repo add postgres-operator-ui-charts https://opensource.zalando.com/postgres-operator/charts/postgres-operator-ui
-    helm repo update postgres-operator-ui-charts
-fi
+helm repo add postgres-operator-ui-charts https://opensource.zalando.com/postgres-operator/charts/postgres-operator-ui
+helm repo update postgres-operator-ui-charts
 
 helm upgrade --install postgres-operator-ui postgres-operator-ui-charts/postgres-operator-ui \
     -f "$PROJECT_ROOT/k8s/postgres-operator/zalando/ui-values.yaml" \
@@ -76,10 +55,8 @@ echo "SUCCESS: Postgres Operator UI deployed (if enabled)"
 
 # Deploy CloudNativePG Operator
 echo "Deploying CloudNativePG Operator..."
-if ! helm repo list | grep -q "cnpg"; then
-    helm repo add cnpg https://cloudnative-pg.github.io/charts
-    helm repo update cnpg
-fi
+helm repo add cnpg https://cloudnative-pg.github.io/charts
+helm repo update cnpg
 
 helm upgrade --install cloudnative-pg cnpg/cloudnative-pg \
     -f "$PROJECT_ROOT/k8s/postgres-operator/cloudnativepg/values.yaml" \
@@ -92,23 +69,14 @@ kubectl wait --for=condition=ready pod \
     -n database \
     --timeout=300s
 
-if ! kubectl get crd clusters.postgresql.cnpg.io &> /dev/null; then
-    echo "ERROR: CRD clusters.postgresql.cnpg.io not found"
-    exit 1
-fi
-
 echo "SUCCESS: CloudNativePG Operator deployed"
 
 # Create database clusters
 echo "Creating database clusters..."
 
-# Create database secrets BEFORE applying CRDs
-# CloudNativePG requires secrets to exist during bootstrap
 echo "Creating database secrets..."
 echo "Applying secrets for CloudNativePG databases from YAML files..."
 
-# Apply secrets from YAML files (declarative approach)
-# Product database secret
 if [ -f "$PROJECT_ROOT/k8s/secrets/product-db-secret.yaml" ]; then
     kubectl apply -f "$PROJECT_ROOT/k8s/secrets/product-db-secret.yaml"
     echo "Applied product-db-secret from YAML"
@@ -116,7 +84,6 @@ else
     echo "WARN: product-db-secret.yaml not found, skipping"
 fi
 
-# Transaction database secrets (cart + order - separate files)
 if [ -f "$PROJECT_ROOT/k8s/secrets/transaction-db-secret-cart.yaml" ]; then
     kubectl apply -f "$PROJECT_ROOT/k8s/secrets/transaction-db-secret-cart.yaml"
     echo "Applied transaction-db-secret to cart namespace"
@@ -132,38 +99,28 @@ else
 fi
 
 echo "SUCCESS: CloudNativePG database secrets created from YAML files"
-echo "NOTE: Zalando operator will auto-generate secrets when CRDs are applied"
 
-# Note: OperatorConfiguration is managed by Helm chart (postgres-operator CRD)
-# Configuration is set via k8s/postgres-operator/zalando/values.yaml
-# The operator-configuration.yaml file is not used (operator reads postgres-operator CRD from Helm)
-
-# Apply Zalando CRDs
 echo "Applying Zalando database CRDs..."
 kubectl apply -f "$PROJECT_ROOT/k8s/postgres-operator/zalando/crds/"
 
-# Apply CloudNativePG CRDs
 echo "Applying CloudNativePG database CRDs..."
 kubectl apply -f "$PROJECT_ROOT/k8s/postgres-operator/cloudnativepg/crds/"
 
-# Wait for clusters to be ready
 echo "Waiting for database clusters to be ready (this may take 5-10 minutes)..."
 
-# Zalando clusters - Check pods directly by name (simpler and faster)
-# Zalando operator doesn't expose ready condition on CRD, so check pods instead
 for cluster in review-db auth-db supporting-db; do
     namespace=""
     pod_name=""
     case $cluster in
-        review-db) 
+        review-db)
             namespace="review"
             pod_name="review-db-0"
             ;;
-        auth-db) 
+        auth-db)
             namespace="auth"
             pod_name="auth-db-0"
             ;;
-        supporting-db) 
+        supporting-db)
             namespace="user"
             pod_name="supporting-db-0"
             ;;
@@ -179,7 +136,6 @@ for cluster in review-db auth-db supporting-db; do
     fi
 done
 
-# CloudNativePG clusters - Check CRD condition (has Ready condition)
 for cluster in product-db transaction-db; do
     namespace=""
     case $cluster in
@@ -194,17 +150,12 @@ for cluster in product-db transaction-db; do
         echo "SUCCESS: $cluster is ready"
     else
         echo "WARN: $cluster may not be ready yet. Check with: kubectl get cluster $cluster -n $namespace"
-        echo "      Or check pods: kubectl get pods -n $namespace -l cnpg.io/cluster=$cluster"
+        echo "Or check pods: kubectl get pods -n $namespace -l cnpg.io/cluster=$cluster"
     fi
 done
 
-echo "SUCCESS: Database clusters created (or in progress)"
+echo "SUCCESS: Database clusters created"
 
-# Note: Zalando operator with enable_cross_namespace_secret: true automatically creates secrets
-# in target namespaces when users are defined with namespace.username format (e.g., notification.notification)
-# Secrets are created automatically - no manual sync needed
-
-# Deploy PgCat poolers
 echo "Deploying PgCat connection poolers..."
 
 echo "Deploying PgCat for Product service..."
@@ -233,12 +184,8 @@ echo "SUCCESS: PgCat poolers deployed"
 
 # Deploy PodMonitors for postgres_exporter sidecars (all clusters)
 echo "Deploying PodMonitors for postgres_exporter sidecars..."
-if [ -d "$PROJECT_ROOT/k8s/prometheus/podmonitors" ]; then
-    kubectl apply -f "$PROJECT_ROOT/k8s/prometheus/podmonitors/"
-    echo "SUCCESS: PodMonitors deployed"
-else
-    echo "WARN: k8s/prometheus/podmonitors directory not found, skipping PodMonitor deployment"
-fi
+kubectl apply -f "$PROJECT_ROOT/k8s/prometheus/podmonitors/"
+echo "SUCCESS: PodMonitors deployed"
 
 # Print summary
 echo ""
@@ -247,25 +194,25 @@ echo "Database Deployment Summary"
 echo "=========================================="
 echo ""
 
-echo "Operators (in database namespace):"
-kubectl get pods -n database -l app.kubernetes.io/name=postgres-operator 2>/dev/null || echo "  No Zalando operator pods found"
-kubectl get pods -n database -l app.kubernetes.io/name=cloudnative-pg 2>/dev/null || echo "  No CloudNativePG operator pods found"
+echo "Operators in database namespace:"
+kubectl get pods -n database -l app.kubernetes.io/name=postgres-operator
+kubectl get pods -n database -l app.kubernetes.io/name=cloudnative-pg
 echo ""
 
 echo "Database Clusters:"
 echo "Zalando (Review, Auth, Supporting):"
-kubectl get postgresql -A 2>/dev/null || echo "  No Zalando clusters found"
+kubectl get postgresql -A
 echo ""
 echo "CloudNativePG (Product, Transaction):"
-kubectl get cluster -A 2>/dev/null || echo "  No CloudNativePG clusters found"
+kubectl get cluster -A
 echo ""
 
 echo "PgCat Poolers:"
 echo "Product PgCat:"
-kubectl get pods -n product -l app=pgcat-product 2>/dev/null || echo "  No PgCat Product pods found"
+kubectl get pods -n product -l app=pgcat-product
 echo ""
 echo "Transaction PgCat:"
-kubectl get pods -n cart -l app=pgcat-transaction 2>/dev/null || echo "  No PgCat Transaction pods found"
+kubectl get pods -n cart -l app=pgcat-transaction
 echo ""
 
 echo "Database Connection Endpoints:"
@@ -299,7 +246,7 @@ echo "2. Supporting-db secrets are automatically created in notification and shi
 echo "3. Run database migrations (init containers will handle this)"
 echo "4. Deploy microservices with database configuration"
 echo ""
-echo "⚠️  IMPORTANT NOTES:"
+echo "IMPORTANT NOTES:"
 echo "  - Order database is created via postInitSQL in transaction-db CRD"
 echo "  - Order service uses cart user (shared user approach)"
 echo "  - Supporting-db secrets are automatically created in target namespaces by Zalando operator (enable_cross_namespace_secret: true)"

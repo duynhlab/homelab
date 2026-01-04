@@ -13,30 +13,18 @@ echo "=== Deploying Monitoring Stack (Prometheus + Grafana + Metrics Infrastruct
 echo "This includes: kube-prometheus-stack (with kube-state-metrics) + metrics-server"
 echo ""
 
-# Verify monitoring namespace exists (should exist now)
-if ! kubectl get namespace monitoring &> /dev/null; then
-    echo "ERROR: 'monitoring' namespace does not exist after creation."
-    exit 1
-fi
-
 # Install Prometheus Operator via kube-prometheus-stack
 echo "Step 1: Installing kube-prometheus-stack v80.0.0 (includes kube-state-metrics)..."
-if command -v helm >/dev/null 2>&1; then
-  helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
-  helm repo update >/dev/null 2>&1 || true
-  
-  helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-    --version 80.0.0 \
-    --namespace monitoring \
-    -f k8s/prometheus/values.yaml \
-    --wait \
-    --timeout 5m
-  
-  echo "  SUCCESS: Prometheus Operator v80.0.0 installed (includes kube-state-metrics)"
-else
-  echo "  ERROR: Helm is required but not installed!"
-  exit 1
-fi
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
+helm repo update >/dev/null 2>&1 || true
+
+helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+  --version 80.0.0 \
+  --namespace monitoring \
+  -f k8s/prometheus/values.yaml \
+  --wait \
+  --timeout 5m
+echo "SUCCESS: Prometheus Operator v80.0.0 installed (includes kube-state-metrics)"
 
 # Install metrics-server (for kubectl top and HPA)
 echo "2. Installing metrics-server..."
@@ -47,28 +35,23 @@ helm upgrade --install metrics-server metrics-server/metrics-server \
   --wait \
   --timeout 2m
 
-echo "  SUCCESS: metrics-server installed"
+echo "SUCCESS: metrics-server installed"
 echo ""
 
 # Wait for Prometheus Operator CRDs to be ready
 echo "3. Waiting for Prometheus Operator CRDs..."
 sleep 10
 
-# Apply ServiceMonitors
+# Apply ServiceMonitors (after Prometheus Operator is ready)
 echo "4. Applying ServiceMonitors..."
-if [ -d "k8s/prometheus/servicemonitors" ]; then
-    kubectl apply -f k8s/prometheus/servicemonitors/
-    echo "  SUCCESS: ServiceMonitors deployed"
-else
-    echo "  WARN: k8s/prometheus/servicemonitors directory not found, skipping ServiceMonitor deployment"
-fi
+kubectl apply -f k8s/prometheus/servicemonitors/
+echo "SUCCESS: ServiceMonitors deployed"
+echo ""
 
 # Deploy Grafana Operator + resources
-echo "5. Installing/Upgrading Grafana Operator v5.20.0..."
-helm repo add grafana-operator https://grafana.github.io/helm-charts >/dev/null 2>&1 || true
-helm repo update >/dev/null 2>&1 || true
-helm upgrade --install grafana-operator grafana-operator/grafana-operator \
-  --version v5.20.0 \
+echo "5. Installing/Upgrading Grafana Operator 5.21.3..."
+helm upgrade --install grafana-operator oci://ghcr.io/grafana/helm-charts/grafana-operator \
+  --version 5.21.3 \
   --namespace monitoring \
   -f k8s/grafana-operator/values.yaml
 
@@ -81,7 +64,7 @@ helm upgrade --install cnpg-grafana-cluster cnpg-grafana/cluster \
   -f k8s/grafana-operator/cloudnative-pg-values.yaml \
   --wait \
   --timeout 2m
-echo "  SUCCESS: CloudNativePG Grafana Dashboard installed via Helm chart"
+echo "SUCCESS: CloudNativePG Grafana Dashboard installed via Helm chart"
 
 echo "7. Applying Grafana CRDs (instance, datasources, dashboards)..."
 kubectl apply -f k8s/grafana-operator/grafana.yaml

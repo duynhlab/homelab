@@ -8,32 +8,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+## [0.11.6] - 2026-01-04
+
+### Changed
+
+**Grafana Operator Migration to OCI Registry:**
+- **Changed**: Migrated Grafana Operator installation from Helm repository to OCI registry
+  - **Before**: Helm repo (`https://grafana.github.io/helm-charts`) with version `v5.20.0`
+  - **After**: OCI registry (`oci://ghcr.io/grafana/helm-charts/grafana-operator`) with version `5.21.3`
+  - **Benefits**:
+    - ✅ Modern distribution method (OCI registry)
+    - ✅ No need for Helm repo management (`helm repo add/update`)
+    - ✅ Version upgrade (5.20.0 → 5.21.3)
+    - ✅ Consistent with project's OCI-first approach
+  - **Files Updated**:
+    - `scripts/02-deploy-monitoring.sh` - Updated to use OCI registry, removed `helm repo add/update` commands
+    - `k8s/grafana-operator/values.yaml` - Updated to new chart structure:
+      - `operator.namespace` → `namespaceOverride: monitoring`
+      - `operator.watchNamespaces: [monitoring]` → `watchNamespaces: "monitoring"` (string format)
+      - `operator.logLevel: info` → `logging.level: info`
+      - `operator.image.repository` → `image.registry: ghcr.io` + `image.repository: grafana/grafana-operator` + `image.tag`
+      - `crds.install: true` → `crds.immutable: true`
+
+**Grafana Image Version Pinning:**
+- **Changed**: Replaced `latest` tag with specific version in Grafana deployment
+  - **Before**: `grafana/grafana:latest` (unstable, can change unexpectedly)
+  - **After**: `grafana/grafana:10.4.0` (pinned version for stability)
+  - **Benefits**:
+    - ✅ Predictable deployments (same version every time)
+    - ✅ Avoids unexpected breaking changes from `latest` tag updates
+    - ✅ Better for production environments
+  - **Files Updated**:
+    - `k8s/grafana-operator/grafana.yaml` - Changed image from `grafana/grafana:latest` to `grafana/grafana:10.4.0`
+    - `k8s/grafana-operator/values.yaml` - Added `image.tag` field for operator image version control
+
+## [0.11.5] - 2026-01-04
+
+### Changed
+
+**Helm Release Workflow Simplified to OCI-Only:**
+- **Changed**: Removed GitHub Pages publishing, keeping only OCI registry publishing
+  - **Before**: Dual publishing to both GitHub Pages (Helm chart repository) and OCI registry
+  - **After**: OCI registry only (`oci://ghcr.io/duynhne/charts`)
+  - **Benefits**:
+    - ✅ Simpler workflow: Single job instead of two
+    - ✅ Faster execution: No need to checkout with full history or configure Git
+    - ✅ Less dependencies: No chart-releaser-action dependency
+    - ✅ OCI-first approach: Modern Helm chart distribution via OCI registries
+  - **Files Updated**:
+    - `.github/workflows/helm-release.yml` - Removed `release-gh-pages` job, simplified to single `release` job
+      - Removed: Git configuration steps (not needed for OCI publishing)
+      - Removed: `fetch-depth: 0` (not needed without Git operations)
+      - Removed: `contents: write` permission (not needed without GitHub Pages)
+  - **Files Deleted**:
+    - `.github/configs/cr.yaml` - Chart releaser configuration no longer needed
+  - **Registry**: `oci://ghcr.io/duynhne/charts` (unchanged)
+
 ## [0.11.4] - 2026-01-04
 
 ### Changed
 
-**Helm Release Workflow Migration to Chart Releaser Pattern:**
-- **Changed**: Migrated Helm release workflow to use chart-releaser-action pattern for dual publishing (GitHub Pages + OCI registry)
+**Helm Release Workflow Migration to Simplified Pattern:**
+- **Changed**: Migrated Helm release workflow to simplified loop-based approach for OCI registry publishing
   - **Before**: Complex matrix strategy with path detection, selective chart release, manual version handling
-  - **After**: Simplified loop-based approach that packages and publishes all charts automatically
+  - **After**: Simplified loop-based approach that packages and publishes all charts automatically to OCI registry
   - **Benefits**:
-    - ✅ Dual publishing: Both GitHub Pages (Helm chart repository) and OCI registry (ghcr.io)
     - ✅ Automatic chart discovery: Loops through `charts/*` to package all charts
-    - ✅ Standard tooling: Uses official `helm/chart-releaser-action` for GitHub Pages
     - ✅ Simpler workflow: No complex path detection or conditional logic
     - ✅ Pinned action versions: Uses specific commit SHAs for stability
-  - **Files Created**:
-    - `.github/configs/cr.yaml` - Chart releaser configuration for GitHub Pages publishing
+    - ✅ OCI-first: Modern Helm chart distribution via OCI registries
   - **Files Updated**:
-    - `.github/workflows/helm-release.yml` - Complete rewrite with 2 jobs:
-      - `release-gh-pages`: Publishes charts to GitHub Pages branch using chart-releaser-action
-      - `release-ghcr`: Packages and publishes charts to OCI registry (ghcr.io/duynhne/charts)
+    - `.github/workflows/helm-release.yml` - Complete rewrite with single `release` job:
+      - Packages all charts in `charts/*` directory
+      - Publishes to OCI registry (ghcr.io/duynhne/charts)
   - **Removed Features**:
     - Path detection job (`detect-changes`)
     - Lint job with matrix strategy
     - Selective chart release (now releases all charts)
     - Manual version input via workflow_dispatch
     - Summary step
+    - GitHub Pages publishing (removed in v0.11.5)
   - **Trigger**: Push to `v5` or `v5-refactor` branches with changes in `charts/**`
   - **Registry**: `oci://ghcr.io/duynhne/charts` (updated from dynamic `${{ github.repository_owner }}`)
 

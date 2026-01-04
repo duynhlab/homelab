@@ -5,6 +5,8 @@ kind: PodMonitor
 metadata:
   name: postgresql-review-db
   namespace: review
+  labels:
+    release: kube-prometheus-stack  # Required for Prometheus Operator discovery
 spec:
   selector:
     matchLabels:

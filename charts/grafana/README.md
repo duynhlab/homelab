@@ -39,9 +39,6 @@ helm install grafana charts/grafana \
 ### Installation from OCI Registry
 
 ```bash
-# Add OCI registry (if not already added)
-helm registry login ghcr.io
-
 # Install from OCI registry
 helm install grafana oci://ghcr.io/duynhne/charts/grafana \
   --version 0.1.0 \
@@ -103,24 +100,6 @@ See `values.yaml` for all available configuration options. Key parameters:
 - `grafanaDashboard.fileName`: Dashboard JSON file name (default: `microservices-dashboard.json`)
 - `grafanaDashboard.folder`: Folder in Grafana UI (default: `Observability`)
 - `grafanaDashboard.datasources`: Datasource mappings (default: Prometheus)
-
-### Multiple Datasources
-
-```yaml
-grafanaDashboard:
-  datasources:
-    - inputName: DS_PROMETHEUS
-      datasourceName: Prometheus
-    - inputName: DS_LOKI
-      datasourceName: Loki
-```
-
-### Custom ConfigMap Name
-
-```yaml
-grafanaDashboard:
-  configMapName: "my-custom-dashboard-configmap"
-```
 
 ## Chart Structure
 

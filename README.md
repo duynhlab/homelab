@@ -122,27 +122,39 @@ flowchart TB
 ### Complete Deployment
 
 ```bash
-# Infrastructure & Monitoring
-./scripts/01-create-kind-cluster.sh      # Create Kind cluster
-./scripts/02-deploy-monitoring.sh        # Deploy Prometheus + Grafana
+# Step 0: Verify builds (optional but recommended)
+./scripts/00-verify-build.sh              # Verify local builds before deployment
 
-# APM Stack
-./scripts/03-deploy-apm.sh               # Deploy Tempo, Pyroscope, Loki, Vector
+# Step 1: Infrastructure
+./scripts/01-create-kind-cluster.sh        # Create Kind cluster
 
-# Database Infrastructure
-./scripts/04-deploy-databases.sh         # Deploy PostgreSQL operators, clusters, poolers
+# Step 2: Monitoring
+./scripts/02-deploy-monitoring.sh          # Deploy Prometheus + Grafana
 
-# Deploy Applications (from OCI registry, images built by GitHub Actions)
-./scripts/06-deploy-microservices.sh     # Deploy all microservices from ghcr.io OCI registry
+# Step 3: APM Stack
+./scripts/03-deploy-apm.sh                 # Deploy Tempo, Pyroscope, Loki, Vector
+# Sub-scripts: 03a-tempo, 03b-pyroscope, 03c-loki, 03d-jaeger
 
-# Load Testing (AFTER apps)
-./scripts/07-deploy-k6.sh                # Deploy k6 load generators
+# Step 4: Database Infrastructure
+./scripts/04-deploy-databases.sh           # Deploy PostgreSQL operators, clusters, poolers
+./scripts/04a-verify-databases.sh          # Verify database deployment
 
-# SLO System
-./scripts/08-deploy-slo.sh               # Deploy Sloth Operator and SLO CRDs
+# Step 5: Deploy Applications (from OCI registry, images built by GitHub Actions)
+./scripts/05-deploy-microservices.sh      # Deploy all microservices from ghcr.io OCI registry
 
-# Access Setup
-./scripts/09-setup-access.sh             # Setup port-forwarding
+# Step 6: Load Testing (AFTER apps)
+./scripts/06-deploy-k6.sh                 # Deploy k6 load generators
+
+# Step 7: SLO System
+./scripts/07-deploy-slo.sh                # Deploy Sloth Operator and SLO CRDs
+
+# Step 8: Access Setup
+./scripts/08-setup-access.sh               # Setup port-forwarding
+
+# Utilities (optional)
+./scripts/09-reload-dashboard.sh           # Reload Grafana dashboards
+./scripts/10-error-budget-alert.sh         # Error budget alert handling
+./scripts/cleanup.sh                       # Complete cleanup
 ```
 
 **Detailed Setup Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md) for step-by-step instructions, prerequisites, and troubleshooting.
@@ -180,7 +192,7 @@ flowchart TB
 
 ## Access Points
 
-After running `./scripts/09-setup-access.sh` or manual port-forwarding:
+After running `./scripts/08-setup-access.sh` or manual port-forwarding:
 
 | Service | URL | Credentials |
 |---------|-----|-------------|

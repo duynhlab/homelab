@@ -10,43 +10,6 @@ This project provides 9 microservices with RESTful APIs. Each service exposes v1
 
 This section documents naming conventions, code standards, and organizational patterns used throughout the codebase.
 
-### Namespace Conventions
-
-- **`monitoring`** - Monitoring components and SLO system
-- **Service namespaces** - Each microservice has own namespace: `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`
-- **`k6`** - K6 load testing
-- **`kube-system`** - Vector (log collection)
-
-### Script Naming
-
-- **Numbered prefixes (00-10)** - Execution order
-- **Format**: `{number}-{purpose}.sh` or `{number}{letter}-{purpose}.sh` for sub-scripts
-- **Categories**: 
-  - Build Verification (00)
-  - Infrastructure (01)
-  - Monitoring (02)
-  - APM (03, 03a-03d)
-  - Databases (04, 04a)
-  - Apps (05)
-  - Load Testing (06)
-  - SLO (07)
-  - Access (08)
-  - Utilities (09-10, cleanup.sh)
-
-**Examples:**
-- `00-verify-build.sh` - Build verification
-- `01-create-kind-cluster.sh` - Infrastructure setup
-- `02-deploy-monitoring.sh` - Monitoring deployment
-- `03-deploy-apm.sh` - APM deployment (main)
-- `03a-deploy-tempo.sh` - Tempo deployment (sub-script)
-- `04-deploy-databases.sh` - Database deployment
-- `04a-verify-databases.sh` - Database verification
-- `05-deploy-microservices.sh` - Application deployment
-- `08-setup-access.sh` - Access configuration
-- `09-reload-dashboard.sh` - Dashboard reload utility
-- `10-error-budget-alert.sh` - Error budget alert utility
-- `cleanup.sh` - Complete cleanup
-
 ### File Organization Patterns
 
 #### Services
@@ -54,11 +17,6 @@ This section documents naming conventions, code standards, and organizational pa
 - Helm values: `charts/values/{service}.yaml`
 - SLO CRD: `k8s/sloth/crds/{service}-slo.yaml`
 - Migration: `services/migrations/{service}/Dockerfile` + `sql/001__init_schema.sql`
-
-#### Kubernetes
-- Kubernetes manifests: `k8s/{component}/`
-- Scripts: `scripts/{number}-{purpose}.sh`
-- SLO: `k8s/sloth/crds/*.yaml` (PrometheusServiceLevel CRDs)
 
 **Example Structure:**
 ```
@@ -181,25 +139,6 @@ services/
 - Fix the reported error
 - Re-run the script
 - Commit changes only after all checks pass
-
-#### Optional: Git Hook Setup
-
-To automatically run verification before each commit:
-
-```bash
-# Install git hook
-cp .githooks/pre-commit .git/hooks/pre-commit
-chmod +x .git/hooks/pre-commit
-```
-
-**Note:** Git hook is optional. You can skip it with `git commit --no-verify` if needed.
-
-#### Troubleshooting
-
-- **"go.mod or go.sum changed"**: Run `go mod tidy` and commit the changes
-- **"Code not formatted"**: Run `gofmt -w .` to auto-format
-- **"Failed to build [service]"**: Check compilation errors in that service
-- **"go vet found issues"**: Review and fix the reported issues
 
 ---
 
@@ -752,74 +691,6 @@ terminationGracePeriodSeconds: 25  # 5s + 20s buffer
    - High concurrency: Increase `SHUTDOWN_TIMEOUT`
    - Fast operations: Can decrease `SHUTDOWN_TIMEOUT`
 
-### Troubleshooting
-
-#### Pod Terminated with SIGKILL
-
-**Symptom**: Pod events show "killed" or shutdown takes longer than `terminationGracePeriodSeconds`
-
-**Solution**:
-1. Check shutdown duration in logs
-2. Increase `terminationGracePeriodSeconds` if shutdown is taking longer
-3. Optimize cleanup operations if they're slow
-
-#### Requests Lost During Rolling Update
-
-**Symptom**: Some requests return errors during deployment
-
-**Solution**:
-1. Verify `SHUTDOWN_TIMEOUT` is sufficient for request processing
-2. Check that Load Balancer removes pod from EndpointSlices before shutdown completes
-3. Increase `SHUTDOWN_TIMEOUT` if requests take longer than timeout
-
-#### Shutdown Timeout Too Short
-
-**Symptom**: Logs show "Server forced to shutdown" errors
-
-**Solution**:
-1. Increase `SHUTDOWN_TIMEOUT` to match actual request processing time
-2. Monitor p95/p99 request latencies to determine appropriate timeout
-3. Update `terminationGracePeriodSeconds` accordingly
-
-### Verification
-
-#### Check Shutdown Logs
-
-```bash
-# View shutdown sequence in logs
-kubectl logs -n auth deployment/auth | grep -i shutdown
-
-# Expected output:
-# {"level":"info","msg":"Shutdown signal received"}
-# {"level":"info","msg":"Shutting down server...","timeout":"10s"}
-# {"level":"info","msg":"HTTP server shutdown complete"}
-# {"level":"info","msg":"Database closed"}
-# {"level":"info","msg":"Tracer shutdown complete"}
-# {"level":"info","msg":"Graceful shutdown complete"}
-```
-
-#### Verify No SIGKILL
-
-```bash
-# Check pod events for graceful termination
-kubectl get events -n auth --sort-by='.lastTimestamp' | grep auth
-
-# Should NOT see "killed" events
-# Should see "Terminated" with exit code 0
-```
-
-#### Test Rolling Update
-
-```bash
-# Trigger rolling update
-kubectl set image deployment/auth auth=ghcr.io/duynhne/auth:v6 -n auth
-
-# Monitor pod termination
-kubectl get pods -n auth -w
-
-# Verify no request loss (check metrics during update)
-```
-
 ### Related Configuration
 
 - **Centralized Config**: `SHUTDOWN_TIMEOUT` is managed in `pkg/config/config.go`
@@ -1223,55 +1094,6 @@ Your new service will have access to all monitoring features:
 - **Error Rate Tracking** - 4xx/5xx error monitoring
 - **Resource Usage** - CPU, memory, network
 - **Go Runtime Health** - GC, goroutines, memory leak detection
-- **SLO Tracking** - Service level objective monitoring
-
-### Troubleshooting
-
-#### Service Not Appearing in Dashboard
-
-1. **Check Helm release**: `helm list -n payment`
-2. **Verify pod is running**: `kubectl get pods -n payment`
-3. **Check metrics endpoint**: `kubectl port-forward -n payment svc/payment 8080:8080` then `curl localhost:8080/metrics`
-4. **Prometheus targets**: Check http://localhost:9090/targets
-
-#### No Data in Panels
-
-1. **Wait for scrape**: Prometheus scrapes every 30 seconds
-2. **Check time range**: Ensure dashboard time range includes current time
-3. **Verify app filter**: Check if correct service is selected
-4. **Check metrics format**: Ensure metrics follow Prometheus format
-
-#### Adding Custom Metrics
-
-Your service can expose any custom metrics. They will automatically appear in Grafana if they follow Prometheus naming conventions:
-
-```go
-// Example custom metric
-var customCounter = prometheus.NewCounterVec(
-    prometheus.CounterOpts{
-        Name: "custom_operations_total",
-        Help: "Total number of custom operations",
-    },
-    []string{"operation"},
-)
-```
-
-### Best Practices
-
-1. **Consistent Naming**: Use `service-name` pattern (e.g., `payment`) without `-service` suffix
-2. **Namespace per Service**: One namespace per service type
-3. **Use Helm Values**: Don't hardcode configuration
-4. **Metrics Quality**: Use meaningful metric names and labels
-5. **Documentation**: Document your service's metrics
-
-### Support
-
-For questions or issues:
-1. Check this documentation
-2. Review existing service examples in `charts/values/`
-3. Check Prometheus targets page
-4. Verify Grafana dashboard configuration
-
 ---
 
 ## Common Endpoints
@@ -1295,10 +1117,6 @@ curl http://localhost:8080/metrics
 ---
 
 ## Error Handling
-
-> **Version**: 1.0  
-> **Last Updated**: December 10, 2025  
-> **Status**: Production
 
 This guide describes the error handling patterns used across all microservices in this project. The approach uses **Go standard library error handling** with:
 
@@ -1878,80 +1696,6 @@ case errors.Is(err, logicv1.ErrUnauthorized):
        return fmt.Errorf("some operation: %w", err)
    }
    ```
-
----
-
-### Troubleshooting
-
-#### Error logs don't include context
-
-**Problem**: Error logs show only the sentinel error message without context.
-
-**Solution**: Ensure you're wrapping errors with `fmt.Errorf("%w")` in the service layer:
-
-```go
-// Wrong
-return nil, ErrUserNotFound
-
-// Correct
-return nil, fmt.Errorf("get user by id %q: %w", userID, ErrUserNotFound)
-```
-
-#### errors.Is() always returns false
-
-**Problem**: `errors.Is()` doesn't match the error even though it should.
-
-**Solution**: Make sure you're wrapping errors with `%w` verb, not `%v`:
-
-```go
-// Wrong
-return fmt.Errorf("context: %v", ErrSentinel) // Uses %v
-
-// Correct
-return fmt.Errorf("context: %w", ErrSentinel) // Uses %w
-```
-
-#### Compilation error: "undefined: ErrSentinel"
-
-**Problem**: Handler layer can't find sentinel error from logic layer.
-
-**Solution**: Import the logic package and reference the error correctly:
-
-```go
-import logicv1 "github.com/duynhne/monitoring/internal/{service}/logic/v1"
-
-// Usage
-case errors.Is(err, logicv1.ErrUserNotFound):
-```
-
-#### HTTP responses changed after migration
-
-**Problem**: API responses are different from before.
-
-**Solution**: Map errors to the same HTTP status codes and messages as before:
-
-```go
-// Before
-c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
-
-// After (keep the same)
-case errors.Is(err, logicv1.ErrInvalidCredentials):
-    c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
-```
-
----
-
-### Migration Checklist
-
-When migrating a service to the new error handling pattern:
-
-- [ ] Create `errors.go` file with sentinel errors
-- [ ] Update service layer to use `fmt.Errorf("%w")` for error wrapping
-- [ ] Update handler layer to use `errors.Is()` for error checking
-- [ ] Remove old custom error types (e.g., `AuthError` struct)
-- [ ] Verify HTTP responses are unchanged
-- [ ] Test error logs include full context
-- [ ] Compile and test the service
 
 ---
 

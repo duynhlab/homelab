@@ -346,54 +346,11 @@ Numbered scripts (00-10) execute in order. See [Step-by-Step Deployment](#step-b
 
 ---
 
-## Troubleshooting
-
-**Pods Not Starting (ImagePullBackOff):** Images built by GitHub Actions. Check: `docker pull ghcr.io/duynhne/auth:v5`. Fix: `kubectl delete pods -l app=auth -n auth`
-
-**Dashboard No Data:** Check Prometheus targets: `http://localhost:9090/targets`. Query: `request_duration_seconds_count{job=~"microservices"}`. Check logs: `kubectl logs deployment/prometheus -n monitoring`
-
-**Grafana Dashboard Empty:** Reload: `./scripts/09-reload-dashboard.sh`. Restart: `kubectl rollout restart deployment grafana -n monitoring`
-
-**Services Not Accessible:** Use port-forwarding: `./scripts/08-setup-access.sh`
-
-**Configuration Issues:** Verify Helm values: `helm get values auth -n auth`. Check pod env: `kubectl exec -n auth deployment/auth -- env | grep SERVICE_NAME`
-
-**Tracing Not Working:** Check Tempo: `kubectl get pods -n monitoring -l app.kubernetes.io/name=tempo`. Test connectivity: `kubectl exec -n auth deployment/auth -- nc -zv tempo.monitoring.svc.cluster.local 4318`
-
----
-
 ## Load Testing
 
 k6 load generators run continuously in the `k6` namespace. Check: `kubectl get pods -n k6`. View logs: `kubectl logs -n k6 -l app=k6 -f`
 
 **See**: [`docs/k6/K6_LOAD_TESTING.md`](../k6/K6_LOAD_TESTING.md) for detailed scenarios and manual testing.
-
----
-
-## Resource Usage
-
-### Expected Resources
-
-```
-Total Requirements:
-- RAM: ~5-6 GB
-- CPU: ~2-3 cores
-- Disk: ~5 GB
-
-Breakdown:
-- Kind cluster: ~4 GB RAM
-- Application pods (9x): ~600 MB RAM
-- Monitoring stack: ~1 GB RAM
-```
-
-### Performance
-
-With k6 load test:
-- **P50**: ~50-100ms
-- **P95**: ~100-200ms  
-- **P99**: ~200-400ms
-- **Error Rate**: 3-5% (simulated)
-- **Throughput**: ~45-50 req/s actual
 
 ---
 

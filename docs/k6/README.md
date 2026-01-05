@@ -11,11 +11,11 @@ k6 runs as a **continuous load generator** with realistic user journey functions
 ```mermaid
 flowchart TB
     subgraph "K6 Load Test (RPS-Based)"
-        K6[K6 Scenarios<br/>Arrival-Rate Executors<br/>✅ NO health checks]
+        K6[K6 Scenarios<br/>Arrival-Rate Executors<br/>NO health checks]
     end
     
     subgraph "Traffic Generation (CLEAN)"
-        Business[Business APIs<br/>100% - ~800K requests ✅]
+        Business[Business APIs<br/>100% - ~800K requests]
     end
     
     subgraph "Microservices (9 Services)"
@@ -26,20 +26,20 @@ flowchart TB
     end
     
     subgraph "Middleware Pipeline (FILTERED)"
-        Tracing[Tracing Middleware<br/>✅ Filters /health + /metrics]
-        Prometheus[Prometheus Middleware<br/>✅ Filters /health + /metrics]
+        Tracing[Tracing Middleware<br/>Filters /health + /metrics]
+        Prometheus[Prometheus Middleware<br/>Filters /health + /metrics]
         Logging[Logging Middleware]
     end
     
     subgraph "Observability Stack (CLEAN)"
-        Tempo[Tempo<br/>100% business spans ✅]
-        PromDB[Prometheus<br/>100% business metrics ✅]
-        Grafana[Grafana Dashboard<br/>Shows accurate distribution ✅]
+        Tempo[Tempo<br/>100% business spans]
+        PromDB[Prometheus<br/>100% business metrics]
+        Grafana[Grafana Dashboard<br/>Shows accurate distribution]
     end
     
     subgraph "Infrastructure Monitoring (INDEPENDENT)"
-        K8sProbes[Kubernetes Probes<br/>Every 5-10s<br/>✅ Still works]
-        PromScraper[Prometheus ServiceMonitor<br/>Every 15s<br/>✅ Still works]
+        K8sProbes[Kubernetes Probes<br/>Every 5-10s<br/>Still works]
+        PromScraper[Prometheus ServiceMonitor<br/>Every 15s<br/>Still works]
     end
     
     K6 --> Business
@@ -582,127 +582,3 @@ The k6 script includes 4 production traffic pattern scenarios that run concurren
 All 4 traffic pattern scenarios run concurrently with the 5 user persona scenarios, simulating realistic production traffic with multiple load patterns overlapping.
 
 ---
-
-## Troubleshooting
-
-**Pod not running:**
-```bash
-kubectl logs -n k6 -l app=k6
-kubectl describe pod -n k6
-```
-
-**No traffic in Grafana:**
-- Check pods are running: `kubectl get pods -n k6`
-- Check service URLs in test scripts
-- Check Prometheus scrape config
-- Verify microservices are running in their respective namespaces
-
-**Traces not appearing in Tempo:**
-- **Check if services are receiving k6 requests**:
-  ```bash
-  # Check shipping-v2 logs for POST requests:
-  kubectl logs -n shipping -l app=shipping-v2 --tail=50 | grep "POST.*estimate"
-  
-  # Check trace_id in logs (confirms tracing is enabled):
-  kubectl logs -n shipping -l app=shipping-v2 --tail=20 | grep "trace_id"
-  ```
-- **Verify service name detection**:
-  - Services with hyphens (e.g., `shipping-v2`) must be detected correctly
-  - Check `services/pkg/middleware/resource.go` for pod name parsing logic
-  - Expected: `shipping-v2-xxx-yyy` → `shipping-v2` (not `shipping`)
-- **Check Tempo for traces**:
-  ```bash
-  # Grafana Explore → Tempo → TraceQL queries:
-  {resource.service.name="shipping-v2"}  # Should return traces
-  {.session_id=~".+"}                    # View all journey traces
-  {.journey="ecommerce_purchase"}        # View specific journey type
-  ```
-- **Verify k6 journey execution**:
-  - Journeys execute based on probability (80% journeys, 20% legacy)
-  - May take a few minutes before journeys start (ramp-up period)
-  - Check k6 logs for journey console.log messages (if k6 outputs them)
-
-**shipping-v2 showing 400 errors:**
-- **Symptom**: Logs show "Invalid request" (EOF error) with 400 status
-- **Cause**: Endpoint expects POST with JSON body, but k6 is sending GET
-- **Solution**: Use journey functions (e.g., `ecommerceShoppingJourney()`) which send POST requests
-- **Verify**: `kubectl logs -n shipping -l app=shipping-v2 --tail=20 | grep "method\":\"`
-  - Should see `"method":"POST"` for `/api/v2/shipments/estimate`
-
-**High resource usage:**
-- Reduce VUs in test scripts (edit `k6/*.js`)
-- Scale down deployment:
-  - `kubectl scale deployment k6 --replicas=0 -n k6`
-- Or uninstall release:
-  - `helm uninstall k6 -n k6`
-
-## Best Practices (v0.6.14+)
-
-### What to Include in Load Tests
-
-✅ **DO include**:
-- Business API endpoints (`/api/v1/*`, `/api/v2/*`)
-- Realistic user journeys (multi-service flows)
-- Edge cases (timeouts, retries, errors)
-- Different user personas (browser, API, admin)
-- Production-like load patterns
-
-❌ **DO NOT include**:
-- Health check endpoints (`/health`, `/readiness`, `/liveness`)
-- Metrics endpoints (`/metrics`)
-- Infrastructure monitoring endpoints
-
-### Why Separate Infrastructure from Load Testing?
-
-**Kubernetes Handles Infrastructure Monitoring:**
-- Liveness probes check container health
-- Readiness probes check service availability
-- Load balancers perform health checks
-- Prometheus scrapes `/metrics` automatically
-
-**Load Testing Should Simulate Users:**
-- Real users don't call `/health` endpoints
-- Health checks create misleading metrics (79% traffic in v0.6.13!)
-- APM traces get polluted with infrastructure calls
-- Storage costs increase (millions of unnecessary datapoints)
-
-**Result:**
-- Metrics reflect actual user experience
-- Accurate response time percentiles (P50, P95, P99)
-- Clean APM traces (only business transactions)
-- Lower storage costs (~75% reduction)
-- Accurate SLO tracking
-
-### Middleware Filtering (v0.6.14+)
-
-Even if infrastructure endpoints are accidentally called, they are filtered at the middleware level:
-
-```go
-// services/pkg/middleware/prometheus.go
-func shouldCollectMetrics(path string) bool {
-    infrastructurePaths := []string{
-        "/health", "/metrics", "/readiness", "/liveness",
-    }
-    for _, skipPath := range infrastructurePaths {
-        if strings.HasPrefix(path, skipPath) {
-            return false
-        }
-    }
-    return true
-}
-```
-
-**Benefits:**
-- Prevents metric pollution at collection time
-- Consistent with distributed tracing filtering
-- Efficient (early return, no overhead)
-- Easy to extend (add new paths to filter)
-
----
-
-## Update Test Scripts
-
-1. Edit `k6/load-test.js` or `k6/load-test-multiple-scenarios.js`
-2. k6 images are built automatically by GitHub Actions on push (`.github/workflows/build-k6-images.yml`)
-3. Redeploy: `./scripts/06-deploy-k6.sh`
-4. Pods will automatically use new images (ImagePullPolicy: Never for local images)

@@ -167,29 +167,6 @@ Use error budget to balance:
 | < 20% | Low | Stabilize |
 | < 10% | None | Emergency |
 
-## Budget Recovery
-
-### After Budget Exhaustion
-
-1. **Immediate**: Stop all deployments
-2. **Short-term**: Fix root causes
-3. **Medium-term**: Improve reliability
-4. **Long-term**: Review SLO targets
-
-### Recovery Plan
-
-1. **Identify causes**: Analyze error patterns
-2. **Fix issues**: Address root causes
-3. **Monitor**: Track budget recovery
-4. **Resume**: Gradually resume deployments
-
-## Best Practices
-
-1. **Use budget for decisions**: Let budget guide deployment gates
-2. **Track consumption**: Monitor budget usage regularly
-3. **Review monthly**: Analyze budget trends
-4. **Adjust targets**: If budget consistently exhausted, review SLOs
-5. **Document decisions**: Record why deployments were allowed/blocked
 
 ## References
 

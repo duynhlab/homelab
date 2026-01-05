@@ -40,7 +40,3 @@ Thumbs.db
 # Kubernetes
 kubeconfig
 *.kubeconfig
-
-# Database secrets (DO NOT commit passwords)
-k8s/secrets/*-secret.yaml
-!k8s/secrets/README.md

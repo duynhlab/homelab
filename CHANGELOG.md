@@ -8,6 +8,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+## [0.11.7] - 2026-01-05
+
+### Changed
+
+**Metrics Documentation Cleanup:**
+- **Changed**: Removed code examples from memory leak detection section in `docs/monitoring/METRICS.md`
+  - **Removed**: "Example Leak Code" and "Fixed Code" examples for Heap Memory Leak
+  - **Removed**: "Fixed Code" example for Goroutine Leak
+  - **Kept**: Only "Causes" descriptions for both leak types
+  - **Reason**: Code examples were not needed, documentation focuses on causes and detection workflow
+  - **Files Updated**:
+    - `docs/monitoring/METRICS.md` - Removed Go code examples from "Common Leak Causes & Fixes" section
+
+**Dashboard Variables Documentation Update:**
+- **Changed**: Updated `docs/monitoring/VARIABLES_REGEX.md` to match actual dashboard configuration
+  - **Removed**: `$pod` variable section (does not exist in dashboard)
+  - **Fixed**: `$namespace` variable:
+    - Query: Changed from `label_values(kube_pod_info, namespace)` to `label_values(request_duration_seconds_count, namespace)`
+    - Multi-select: Changed from `false` to `true`
+    - Include All: Changed from `false` to `true`
+  - **Fixed**: `$app` variable:
+    - Query: Updated to include namespace filter: `label_values(request_duration_seconds_count{namespace=~"$namespace"}, app)`
+    - Multi-select: Changed from `false` to `true`
+  - **Fixed**: `$rate` variable:
+    - Values: Updated from 5 values to full list: `1m,2m,3m,5m,10m,30m,1h,2h,4h,8h,16h,1d,2d,3d,5d,7d`
+  - **Updated**: Variable dependencies section to remove `$pod` from dependency chain
+  - **Updated**: Troubleshooting section to remove `$pod` references
+  - **Updated**: Best Practices section to reflect actual variable configuration
+  - **Reason**: Documentation was outdated and did not match the actual dashboard JSON configuration
+  - **Files Updated**:
+    - `docs/monitoring/VARIABLES_REGEX.md` - Complete update to match dashboard variables
+
 ## [0.11.6] - 2026-01-04
 
 ### Changed

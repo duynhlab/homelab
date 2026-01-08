@@ -3,6 +3,7 @@ name: Build Docker Images
 on:
   push:
     branches:
+      - main
       - v5-refactor
     paths:
       - 'services/Dockerfile'
@@ -12,11 +13,11 @@ on:
       - 'services/*/internal/**'
       - 'services/*/middleware/**'
       - 'services/*/config/**'
-      - '.github/workflows/build-images.yml'
+      - '.github/workflows/build-be.yml'
   pull_request:
     branches:
+      - main
       - v5-refactor
-      - feat/go-1.25
     paths:
       - 'services/Dockerfile'
       - 'services/*/go.mod'
@@ -25,7 +26,7 @@ on:
       - 'services/*/internal/**'
       - 'services/*/middleware/**'
       - 'services/*/config/**'
-      - '.github/workflows/build-images.yml'
+      - '.github/workflows/build-be.yml'
   workflow_dispatch:
 
 jobs:

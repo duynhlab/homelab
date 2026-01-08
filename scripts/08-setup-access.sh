@@ -41,6 +41,10 @@ kubectl port-forward -n user svc/user 8081:8080 > /dev/null 2>&1 &
 echo "Starting Postgres Operator UI port forward (8082)..."
 kubectl port-forward -n database svc/postgres-operator-ui 8082:80 > /dev/null 2>&1 &
 
+# Frontend
+echo "Starting Frontend port forward (3000)..."
+kubectl port-forward -n default svc/frontend 3000:80 > /dev/null 2>&1 &
+
 # Wait for port forwards to be ready
 echo "Waiting for port forwards to be ready..."
 sleep 5
@@ -56,5 +60,6 @@ echo "Tempo:              http://localhost:3200"
 echo "Pyroscope:          http://localhost:4040"
 echo "User API:           http://localhost:8081/api/v1/users"
 echo "Postgres Operator UI: http://localhost:8082"
+echo "Frontend:            http://localhost:3000"
 echo ""
 echo "To stop port forwarding: pkill -f 'kubectl port-forward'"

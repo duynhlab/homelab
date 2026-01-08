@@ -5,21 +5,16 @@ on:
     branches:
       - v5-refactor
     paths:
-      - 'services/migrations/**'
-      - '.github/workflows/build-init-images.yml'
+      - 'services/*/db/migrations/**'
+      - '.github/workflows/build-init.yml'
   pull_request:
     branches:
       - v5-refactor
       - feat/go-1.25
     paths:
-      - 'services/migrations/**'
-      - '.github/workflows/build-init-images.yml'
+      - 'services/*/db/migrations/**'
+      - '.github/workflows/build-init.yml'
   workflow_dispatch:
-
-env:
-  REGISTRY: ghcr.io
-  IMAGE_PREFIX: ${{ github.repository_owner }}
-
 jobs:
   build-init:
     runs-on: ubuntu-latest
@@ -53,7 +48,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -62,7 +57,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}
           tags: |
             type=raw,value=v5-init
 
@@ -71,8 +66,8 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v6
         with:
-          context: ./services/migrations/${{ matrix.service }}
-          file: ./services/migrations/${{ matrix.service }}/Dockerfile
+          context: ./services/${{ matrix.service }}/db/migrations
+          file: ./services/${{ matrix.service }}/db/migrations/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

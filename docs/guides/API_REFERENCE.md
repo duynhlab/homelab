@@ -1,7 +1,7 @@
 # API Reference
 
 > **Document Status:** Production Contract  
-> **Last Updated:** 2026-01-07  
+> **Last Updated:** 2026-01-08  
 > **Architecture:** 3-Layer (Web / Logic / Core)
 
 ---
@@ -10,63 +10,61 @@
 
 This is the **single source of truth** for all API endpoints. The Frontend team MUST use these endpoints exactly as documented. No client-side orchestration allowed for aggregation endpoints.
 
-### API Stability Levels
+### Frontend Endpoints
 
-| Phase | Status | Meaning |
-|-------|--------|---------|
-| Phase 1 | ✅ STABLE | Production-ready, no breaking changes |
-| Phase 2 | ⏳ PLANNED | Approved, implementation pending |
-| Phase 3 | 🧪 OPTIONAL | Under consideration |
+| Service | Endpoint | Method | Version | Purpose | Status |
+|---------|----------|--------|---------|---------|--------|
+| **Product** | `/api/v1/products` | GET | v1 | List all products with filtering | STABLE |
+| **Product** | `/api/v1/products/:id` | GET | v1 | Get single product | STABLE |
+| **Product** | `/api/v1/products/:id/details` | GET | v1 | **Aggregated product details** | STABLE |
+| **Product** | `/api/v2/catalog/items` | GET | v2 | Get all catalog items | STABLE |
+| **Product** | `/api/v2/catalog/items/:itemId` | GET | v2 | Get catalog item by ID | STABLE |
+| **Cart** | `/api/v1/cart` | GET | v1 | Get user cart | STABLE |
+| **Cart** | `/api/v1/cart` | POST | v1 | Add item to cart | STABLE |
+| **Cart** | `/api/v1/cart/count` | GET | v1 | **Get cart item count** | STABLE |
+| **Cart** | `/api/v1/cart/items/:itemId` | PATCH | v1 | **Update cart item quantity** | STABLE |
+| **Cart** | `/api/v1/cart/items/:itemId` | DELETE | v1 | **Remove cart item** | STABLE |
+| **Cart** | `/api/v2/carts/:cartId` | GET | v2 | Get cart by ID | STABLE |
+| **Cart** | `/api/v2/carts/:cartId/items` | POST | v2 | Add item to cart | STABLE |
+| **Order** | `/api/v1/orders` | GET | v1 | List user orders | STABLE |
+| **Order** | `/api/v1/orders/:id` | GET | v1 | Get order by ID | STABLE |
+| **Order** | `/api/v1/orders` | POST | v1 | Create new order | STABLE |
+| **Order** | `/api/v2/orders` | GET | v2 | List orders | STABLE |
+| **Order** | `/api/v2/orders/:orderId/status` | GET | v2 | Get order status | STABLE |
+| **Order** | `/api/v2/orders` | POST | v2 | Create order | STABLE |
+| **Auth** | `/api/v1/auth/login` | POST | v1 | User login | STABLE |
+| **Auth** | `/api/v1/auth/register` | POST | v1 | User registration | STABLE |
+| **Auth** | `/api/v2/auth/login` | POST | v2 | User login | STABLE |
+| **Auth** | `/api/v2/auth/register` | POST | v2 | User registration | STABLE |
+| **User** | `/api/v1/users/:id` | GET | v1 | Get user by ID | STABLE |
+| **User** | `/api/v1/users/profile` | GET | v1 | Get user profile | STABLE |
+| **User** | `/api/v2/users/:id` | GET | v2 | Get user by ID | STABLE |
+| **User** | `/api/v2/users/profile` | GET | v2 | Get user profile | STABLE |
+| **Review** | `/api/v1/reviews` | GET | v1 | Get all reviews | STABLE |
+| **Review** | `/api/v1/reviews` | POST | v1 | Create new review | STABLE |
+| **Review** | `/api/v2/reviews/:reviewId` | GET | v2 | Get review by ID | STABLE |
+| **Review** | `/api/v2/reviews` | POST | v2 | Create review | STABLE |
+| **Notification** | `/api/v2/notifications` | GET | v2 | Get all notifications | STABLE |
+| **Notification** | `/api/v2/notifications/:id` | GET | v2 | Get notification by ID | STABLE |
+| **Shipping** | `/api/v1/shipping/track` | GET | v1 | Track shipment | STABLE |
+| **Shipping-v2** | `/api/v2/shipments/estimate` | GET | v2 | Estimate shipment cost | STABLE |
 
-### Master Endpoint Table
+### Internal Endpoints
 
-| Service | Endpoint | Method | Purpose | Phase | Status | Used By |
-|---------|----------|--------|---------|-------|--------|---------|
-| **Product** | `/api/v1/products` | GET | List all products with filtering | 1 | ✅ STABLE | Frontend |
-| **Product** | `/api/v1/products/:id` | GET | Get single product | 1 | ✅ STABLE | Frontend |
-| **Product** | `/api/v1/products/:id/details` | GET | **Aggregated product details** | 1 | ✅ STABLE | Frontend |
-| **Product** | `/api/v1/products` | POST | Create new product | 1 | ✅ STABLE | Internal |
-| **Product** | `/api/v2/catalog/items` | GET | Get all catalog items (v2) | 1 | ✅ STABLE | Frontend |
-| **Product** | `/api/v2/catalog/items/:itemId` | GET | Get catalog item by ID (v2) | 1 | ✅ STABLE | Frontend |
-| **Product** | `/api/v2/catalog/items` | POST | Create catalog item (v2) | 1 | ✅ STABLE | Internal |
-| **Cart** | `/api/v1/cart` | GET | Get user cart | 1 | ✅ STABLE | Frontend |
-| **Cart** | `/api/v1/cart` | POST | Add item to cart | 1 | ✅ STABLE | Frontend |
-| **Cart** | `/api/v1/cart/count` | GET | **Get cart item count** | 1 | ✅ STABLE | Frontend |
-| **Cart** | `/api/v1/cart/items/:itemId` | PATCH | **Update cart item quantity** | 1 | ✅ STABLE | Frontend |
-| **Cart** | `/api/v1/cart/items/:itemId` | DELETE | **Remove cart item** | 1 | ✅ STABLE | Frontend |
-| **Cart** | `/api/v2/carts/:cartId` | GET | Get cart by ID (v2) | 1 | ✅ STABLE | Frontend |
-| **Cart** | `/api/v2/carts/:cartId/items` | POST | Add item to cart (v2) | 1 | ✅ STABLE | Frontend |
-| **Order** | `/api/v1/orders` | GET | List user orders | 1 | ✅ STABLE | Frontend |
-| **Order** | `/api/v1/orders/:id` | GET | Get order by ID | 1 | ✅ STABLE | Frontend |
-| **Order** | `/api/v1/orders` | POST | Create new order | 1 | ✅ STABLE | Frontend |
-| **Order** | `/api/v2/orders` | GET | List orders (v2) | 1 | ✅ STABLE | Frontend |
-| **Order** | `/api/v2/orders/:orderId/status` | GET | Get order status (v2) | 1 | ✅ STABLE | Frontend |
-| **Order** | `/api/v2/orders` | POST | Create order (v2) | 1 | ✅ STABLE | Frontend |
-| **Auth** | `/api/v1/auth/login` | POST | User login | 1 | ✅ STABLE | Frontend |
-| **Auth** | `/api/v1/auth/register` | POST | User registration | 1 | ✅ STABLE | Frontend |
-| **Auth** | `/api/v2/auth/login` | POST | User login (v2) | 1 | ✅ STABLE | Frontend |
-| **Auth** | `/api/v2/auth/register` | POST | User registration (v2) | 1 | ✅ STABLE | Frontend |
-| **User** | `/api/v1/users/:id` | GET | Get user by ID | 1 | ✅ STABLE | Frontend |
-| **User** | `/api/v1/users/profile` | GET | Get user profile | 1 | ✅ STABLE | Frontend |
-| **User** | `/api/v1/users` | POST | Create new user | 1 | ✅ STABLE | Internal |
-| **User** | `/api/v2/users/:id` | GET | Get user by ID (v2) | 1 | ✅ STABLE | Frontend |
-| **User** | `/api/v2/users/profile` | GET | Get user profile (v2) | 1 | ✅ STABLE | Frontend |
-| **User** | `/api/v2/users` | POST | Create new user (v2) | 1 | ✅ STABLE | Internal |
-| **Review** | `/api/v1/reviews` | GET | Get all reviews | 1 | ✅ STABLE | Frontend |
-| **Review** | `/api/v1/reviews` | POST | Create new review | 1 | ✅ STABLE | Frontend |
-| **Review** | `/api/v2/reviews/:reviewId` | GET | Get review by ID (v2) | 1 | ✅ STABLE | Frontend |
-| **Review** | `/api/v2/reviews` | POST | Create review (v2) | 1 | ✅ STABLE | Frontend |
-| **Notification** | `/api/v1/notify/email` | POST | Send email notification | 1 | ✅ STABLE | Internal |
-| **Notification** | `/api/v1/notify/sms` | POST | Send SMS notification | 1 | ✅ STABLE | Internal |
-| **Notification** | `/api/v2/notifications` | GET | Get all notifications | 1 | ✅ STABLE | Frontend |
-| **Notification** | `/api/v2/notifications/:id` | GET | Get notification by ID | 1 | ✅ STABLE | Frontend |
-| **Shipping** | `/api/v1/shipping/track` | GET | Track shipment | 1 | ✅ STABLE | Frontend |
-| **Shipping-v2** | `/api/v2/shipments/estimate` | GET | Estimate shipment cost | 1 | ✅ STABLE | Frontend |
+| Service | Endpoint | Method | Version | Purpose | Status |
+|---------|----------|--------|---------|---------|--------|
+| **Product** | `/api/v1/products` | POST | v1 | Create new product | STABLE |
+| **Product** | `/api/v2/catalog/items` | POST | v2 | Create catalog item | STABLE |
+| **User** | `/api/v1/users` | POST | v1 | Create new user | STABLE |
+| **User** | `/api/v2/users` | POST | v2 | Create new user | STABLE |
+| **Notification** | `/api/v1/notify/email` | POST | v1 | Send email notification | STABLE |
+| **Notification** | `/api/v1/notify/sms` | POST | v1 | Send SMS notification | STABLE |
 
 **Legend:**
-- **Bold endpoints** = Phase 1 aggregation APIs (Frontend-critical)
-- Frontend = Called directly by frontend application
-- Internal = Backend-to-backend or admin only
+- **Bold endpoints** = Aggregation APIs (combine multiple data sources)
+- Version = API version (v1 or v2) extracted from endpoint path
+- Frontend endpoints = Called directly by frontend React application
+- Internal endpoints = Backend-to-backend or admin operations only
 
 ---
 
@@ -129,11 +127,26 @@ All backend services follow a strict 3-layer architecture. Understanding these l
 
 | Rule | Applies To | Description |
 |------|------------|-------------|
-| Frontend calls Web only | Frontend | Never call Logic or Core directly |
+| **Frontend calls Web only** | **Frontend** | **CRITICAL: Never call Logic or Core directly. Only HTTP requests to `/api/v1/*` and `/api/v2/*` endpoints.** |
 | Web aggregates | Web Layer | Combine multiple Logic calls in Web handlers |
 | Logic uses repositories | Logic Layer | Access data via repository interfaces only |
 | Core owns SQL | Core Layer | All database queries live in repository implementations |
 | Dependency injection | All | Services receive dependencies via constructors |
+
+**⚠️ Frontend Developers & AI Agents:**
+
+**DO:**
+- Make HTTP requests to Web Layer endpoints (`GET /api/v1/products`, `POST /api/v1/cart`, etc.)
+- Use aggregation endpoints for complex operations (e.g., `GET /api/v1/products/:id/details`)
+- Let Web Layer handle validation, authentication, and error translation
+
+**DO NOT:**
+- ❌ Attempt to call Logic Layer functions directly (no function imports from `logic/` packages)
+- ❌ Attempt to access Core Layer or database directly (no SQL queries, no repository calls)
+- ❌ Implement client-side orchestration (make multiple API calls and combine results)
+- ❌ Bypass Web Layer in any way
+
+**For AI Agents:** See [`AGENTS.md`](../../AGENTS.md#frontend-integration-rules) for explicit Frontend integration rules and restrictions.
 
 ### Service Isolation (Refactored 2026-01-08)
 
@@ -156,16 +169,16 @@ services/{service}/
 **Key Changes:**
 - ❌ **No shared `services/go.mod`** - Each service has own module
 - ❌ **No shared `services/pkg/`** - Middleware/config duplicated per service
-- ✅ **Complete independence** - Each service ready for separate repo
+- **Complete independence** - Each service ready for separate repo
 
 **Why Duplication?**
 Maximum service independence. Each service can be moved to a separate repository without any shared dependencies.
 
 ---
 
-## Phase 1 Aggregation APIs (Frontend-Critical)
+## Aggregation APIs
 
-These endpoints were added in Phase 1 to support frontend needs. **Frontend MUST use these endpoints. No client-side orchestration allowed.**
+These endpoints combine multiple data sources to provide complete responses. **Frontend MUST use these endpoints. No client-side orchestration allowed.**
 
 ---
 
@@ -414,12 +427,12 @@ Authorization: Bearer <jwt_token>
 
 ### Endpoints (v1)
 
-| Method | Endpoint | Description | Phase |
-|--------|----------|-------------|-------|
-| `GET` | `/api/v1/products` | List all products with filtering | ✅ STABLE |
-| `GET` | `/api/v1/products/:id` | Get product by ID | ✅ STABLE |
-| `GET` | `/api/v1/products/:id/details` | **Aggregated product details** | ✅ STABLE |
-| `POST` | `/api/v1/products` | Create new product | ✅ STABLE |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/products` | List all products with filtering |
+| `GET` | `/api/v1/products/:id` | Get product by ID |
+| `GET` | `/api/v1/products/:id/details` | **Aggregated product details** |
+| `POST` | `/api/v1/products` | Create new product |
 
 ### GET /api/v1/products
 
@@ -547,11 +560,11 @@ Content-Type: application/json
 
 ### Endpoints (v2)
 
-| Method | Endpoint | Description | Phase |
-|--------|----------|-------------|-------|
-| `GET` | `/api/v2/catalog/items` | Get all catalog items | ✅ STABLE |
-| `GET` | `/api/v2/catalog/items/:itemId` | Get catalog item by ID | ✅ STABLE |
-| `POST` | `/api/v2/catalog/items` | Create new catalog item | ✅ STABLE |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v2/catalog/items` | Get all catalog items |
+| `GET` | `/api/v2/catalog/items/:itemId` | Get catalog item by ID |
+| `POST` | `/api/v2/catalog/items` | Create new catalog item |
 
 ---
 
@@ -559,13 +572,13 @@ Content-Type: application/json
 
 ### Endpoints (v1)
 
-| Method | Endpoint | Description | Phase |
-|--------|----------|-------------|-------|
-| `GET` | `/api/v1/cart` | Get user cart | ✅ STABLE |
-| `POST` | `/api/v1/cart` | Add item to cart | ✅ STABLE |
-| `GET` | `/api/v1/cart/count` | **Get cart item count** | ✅ STABLE |
-| `PATCH` | `/api/v1/cart/items/:itemId` | **Update cart item quantity** | ✅ STABLE |
-| `DELETE` | `/api/v1/cart/items/:itemId` | **Remove cart item** | ✅ STABLE |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/cart` | Get user cart |
+| `POST` | `/api/v1/cart` | Add item to cart |
+| `GET` | `/api/v1/cart/count` | **Get cart item count** |
+| `PATCH` | `/api/v1/cart/items/:itemId` | **Update cart item quantity** |
+| `DELETE` | `/api/v1/cart/items/:itemId` | **Remove cart item** |
 
 ### GET /api/v1/cart
 
@@ -645,10 +658,10 @@ Authorization: Bearer <jwt_token>
 
 ### Endpoints (v2)
 
-| Method | Endpoint | Description | Phase |
-|--------|----------|-------------|-------|
-| `GET` | `/api/v2/carts/:cartId` | Get cart by ID | ✅ STABLE |
-| `POST` | `/api/v2/carts/:cartId/items` | Add item to cart | ✅ STABLE |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v2/carts/:cartId` | Get cart by ID |
+| `POST` | `/api/v2/carts/:cartId/items` | Add item to cart |
 
 ---
 
@@ -656,11 +669,11 @@ Authorization: Bearer <jwt_token>
 
 ### Endpoints (v1)
 
-| Method | Endpoint | Description | Phase |
-|--------|----------|-------------|-------|
-| `GET` | `/api/v1/orders` | Get all user orders | ✅ STABLE |
-| `GET` | `/api/v1/orders/:id` | Get order by ID | ✅ STABLE |
-| `POST` | `/api/v1/orders` | Create new order | ✅ STABLE |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/orders` | Get all user orders |
+| `GET` | `/api/v1/orders/:id` | Get order by ID |
+| `POST` | `/api/v1/orders` | Create new order |
 
 ### GET /api/v1/orders
 
@@ -791,11 +804,11 @@ Authorization: Bearer <jwt_token>
 
 ### Endpoints (v2)
 
-| Method | Endpoint | Description | Phase |
-|--------|----------|-------------|-------|
-| `GET` | `/api/v2/orders` | Get all orders (v2) | ✅ STABLE |
-| `GET` | `/api/v2/orders/:orderId/status` | Get order status | ✅ STABLE |
-| `POST` | `/api/v2/orders` | Create new order (v2) | ✅ STABLE |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v2/orders` | Get all orders (v2) |
+| `GET` | `/api/v2/orders/:orderId/status` | Get order status |
+| `POST` | `/api/v2/orders` | Create new order (v2) |
 
 ---
 
@@ -803,12 +816,12 @@ Authorization: Bearer <jwt_token>
 
 ### Endpoints
 
-| Method | Endpoint | Description | Phase |
-|--------|----------|-------------|-------|
-| `POST` | `/api/v1/auth/login` | User login | ✅ STABLE |
-| `POST` | `/api/v1/auth/register` | User registration | ✅ STABLE |
-| `POST` | `/api/v2/auth/login` | User login (v2) | ✅ STABLE |
-| `POST` | `/api/v2/auth/register` | User registration (v2) | ✅ STABLE |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/auth/login` | User login |
+| `POST` | `/api/v1/auth/register` | User registration |
+| `POST` | `/api/v2/auth/login` | User login (v2) |
+| `POST` | `/api/v2/auth/register` | User registration (v2) |
 
 ### POST /api/v1/auth/login
 
@@ -871,19 +884,19 @@ Content-Type: application/json
 
 ### Endpoints (v1)
 
-| Method | Endpoint | Description | Phase |
-|--------|----------|-------------|-------|
-| `GET` | `/api/v1/users/:id` | Get user by ID | ✅ STABLE |
-| `GET` | `/api/v1/users/profile` | Get user profile | ✅ STABLE |
-| `POST` | `/api/v1/users` | Create new user | ✅ STABLE |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/users/:id` | Get user by ID |
+| `GET` | `/api/v1/users/profile` | Get user profile |
+| `POST` | `/api/v1/users` | Create new user |
 
 ### Endpoints (v2)
 
-| Method | Endpoint | Description | Phase |
-|--------|----------|-------------|-------|
-| `GET` | `/api/v2/users/:id` | Get user by ID (v2) | ✅ STABLE |
-| `GET` | `/api/v2/users/profile` | Get user profile (v2) | ✅ STABLE |
-| `POST` | `/api/v2/users` | Create new user (v2) | ✅ STABLE |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v2/users/:id` | Get user by ID (v2) |
+| `GET` | `/api/v2/users/profile` | Get user profile (v2) |
+| `POST` | `/api/v2/users` | Create new user (v2) |
 
 ---
 
@@ -891,17 +904,17 @@ Content-Type: application/json
 
 ### Endpoints (v1)
 
-| Method | Endpoint | Description | Phase |
-|--------|----------|-------------|-------|
-| `GET` | `/api/v1/reviews` | Get all reviews | ✅ STABLE |
-| `POST` | `/api/v1/reviews` | Create new review | ✅ STABLE |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/reviews` | Get all reviews |
+| `POST` | `/api/v1/reviews` | Create new review |
 
 ### Endpoints (v2)
 
-| Method | Endpoint | Description | Phase |
-|--------|----------|-------------|-------|
-| `GET` | `/api/v2/reviews/:reviewId` | Get review by ID | ✅ STABLE |
-| `POST` | `/api/v2/reviews` | Create new review (v2) | ✅ STABLE |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v2/reviews/:reviewId` | Get review by ID |
+| `POST` | `/api/v2/reviews` | Create new review (v2) |
 
 ---
 
@@ -909,17 +922,17 @@ Content-Type: application/json
 
 ### Endpoints (v1)
 
-| Method | Endpoint | Description | Phase |
-|--------|----------|-------------|-------|
-| `POST` | `/api/v1/notify/email` | Send email notification | ✅ STABLE |
-| `POST` | `/api/v1/notify/sms` | Send SMS notification | ✅ STABLE |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/notify/email` | Send email notification |
+| `POST` | `/api/v1/notify/sms` | Send SMS notification |
 
 ### Endpoints (v2)
 
-| Method | Endpoint | Description | Phase |
-|--------|----------|-------------|-------|
-| `GET` | `/api/v2/notifications` | Get all notifications | ✅ STABLE |
-| `GET` | `/api/v2/notifications/:id` | Get notification by ID | ✅ STABLE |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v2/notifications` | Get all notifications |
+| `GET` | `/api/v2/notifications/:id` | Get notification by ID |
 
 ---
 
@@ -927,9 +940,9 @@ Content-Type: application/json
 
 ### Endpoints (v1 only)
 
-| Method | Endpoint | Description | Phase |
-|--------|----------|-------------|-------|
-| `GET` | `/api/v1/shipping/track` | Track shipment | ✅ STABLE |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/shipping/track` | Track shipment |
 
 #### Request
 
@@ -943,9 +956,9 @@ GET /api/v1/shipping/track?tracking_number=TRACK123
 
 ### Endpoints (v2 only)
 
-| Method | Endpoint | Description | Phase |
-|--------|----------|-------------|-------|
-| `GET` | `/api/v2/shipments/estimate` | Estimate shipment cost | ✅ STABLE |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v2/shipments/estimate` | Estimate shipment cost |
 
 #### Request
 
@@ -984,37 +997,43 @@ All error responses follow this format:
 ### File Organization Patterns
 
 #### Services
-- Service code: `services/cmd/{service}/main.go` + `services/internal/{service}/{web,logic,core}/`
+- Service code: `services/{service}/cmd/main.go` + `services/{service}/internal/{web,logic,core}/`
 - Helm values: `charts/values/{service}.yaml`
 - SLO CRD: `k8s/sloth/crds/{service}-slo.yaml`
-- Migration: `services/migrations/{service}/Dockerfile` + `sql/001__init_schema.sql`
+- Migration: `services/{service}/db/migrations/Dockerfile` + `sql/V*__*.sql`
 
 **Example Structure:**
 ```
 services/
-├── cmd/
-│   └── product/
-│       └── main.go
-├── internal/
-│   └── product/
-│       ├── web/
-│       │   ├── v1/
-│       │   │   └── handler.go
-│       │   └── v2/
-│       ├── logic/
-│       │   ├── v1/
-│       │   │   └── service.go
-│       │   └── v2/
-│       └── core/
-│           ├── domain/
-│           │   ├── product.go
-│           │   ├── repository.go
-│           │   └── errors.go
-│           ├── repository/
-│           │   └── postgres_product_repository.go
-│           └── database.go
-└── migrations/
-    └── product/
+├── product/
+│   ├── go.mod                    # Independent module
+│   ├── cmd/
+│   │   └── main.go              # Entry point
+│   ├── internal/
+│   │   ├── web/
+│   │   │   ├── v1/
+│   │   │   │   └── handler.go
+│   │   │   └── v2/
+│   │   ├── logic/
+│   │   │   ├── v1/
+│   │   │   │   └── service.go
+│   │   │   └── v2/
+│   │   └── core/
+│   │       ├── domain/
+│   │       │   ├── product.go
+│   │       │   ├── repository.go
+│   │       │   └── errors.go
+│   │       ├── repository/
+│   │       │   └── postgres_product_repository.go
+│   │       └── database.go
+│   ├── middleware/              # Duplicated (not shared)
+│   ├── config/                 # Duplicated (not shared)
+│   └── db/
+│       └── migrations/
+│           ├── Dockerfile
+│           └── sql/
+│               ├── V1__init_schema.sql
+│               └── V2__seed_products.sql
 ```
 
 ### Local Build Verification

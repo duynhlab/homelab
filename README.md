@@ -99,6 +99,38 @@ flowchart TB
 
 **Detailed Architecture**: See [`docs/apm/ARCHITECTURE.md`](docs/apm/ARCHITECTURE.md) for middleware chain and APM integration. Full system architecture in [`specs/system-context/01-architecture-overview.md`](specs/system-context/01-architecture-overview.md)
 
+### Service Isolation Architecture
+
+**Each service is completely independent** and ready for separate repository deployment:
+
+```
+services/
+├── product/
+│   ├── go.mod              # Independent module
+│   ├── go.sum
+│   ├── cmd/main.go         # Entry point
+│   ├── internal/           # Service domain
+│   │   ├── web/           # HTTP handlers
+│   │   ├── logic/         # Business logic
+│   │   └── core/          # Domain + repositories
+│   ├── middleware/         # Duplicated (not shared)
+│   └── config/             # Duplicated (not shared)
+├── cart/
+│   └── ... (same structure)
+└── ... (9 services total)
+```
+
+**Key Principles:**
+- ✅ Each service has own `go.mod` and `go.sum`
+- ✅ No shared code between services (middleware/config duplicated)
+- ✅ Each service builds independently: `cd services/product && go build ./cmd/main.go`
+- ✅ Ready to move to separate repo: `cp -r services/product /path/to/product-service.git`
+
+**Build Verification:**
+```bash
+./scripts/00-verify-build.sh  # Verifies all 9 services independently
+```
+
 ### Microservices
 
 | Service | Language | Description | Namespace | API Versions |

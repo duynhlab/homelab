@@ -7,14 +7,14 @@ on:
       - v5-refactor
     paths:
       - 'frontend/**'
-      - '.github/workflows/build-frontend.yml'
+      - '.github/workflows/build-fe.yml'
   pull_request:
     branches:
       - main
       - v5-refactor
     paths:
       - 'frontend/**'
-      - '.github/workflows/build-frontend.yml'
+      - '.github/workflows/build-fe.yml'
   workflow_dispatch:
 
 jobs:

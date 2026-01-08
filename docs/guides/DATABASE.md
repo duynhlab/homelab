@@ -2,31 +2,20 @@
 
 ## Quick Summary
 
-**What is Database Integration?**
+**PostgreSQL Operators:**
+- **Zalando Postgres Operator** (v1.15.1): 3 clusters
+  - `review-db`: PostgreSQL 16, 1 node, no pooler
+  - `auth-db`: PostgreSQL 17, 3 nodes (HA), PgBouncer sidecar (2 instances)
+  - `supporting-db`: PostgreSQL 16, 1 node, no pooler
+- **CloudNativePG Operator** (v1.28.0): 2 clusters
+  - `product-db`: PostgreSQL 18, 2 nodes (HA), PgCat standalone (2 replicas)
+  - `transaction-db`: PostgreSQL 18, 3 nodes (HA), PgCat standalone (2 replicas)
 
-PostgreSQL database integration enables microservices to persist data, execute real database queries, and support realistic k6 load testing with data consistency. This implementation uses multiple PostgreSQL operators, connection poolers, and HA patterns as a comprehensive learning platform.
-
-**Key Capabilities:**
-- ✅ 5 PostgreSQL clusters with different configurations (operators, poolers, HA patterns)
-- ✅ Multiple connection patterns (direct, PgBouncer sidecar, PgCat standalone)
-- ✅ High availability with Patroni (all operators use Patroni internally)
-- ✅ Connection pooling for performance optimization
-- ✅ Separate environment variables (DB_HOST, DB_PORT, etc.) for flexible configuration
-- ✅ Full monitoring integration (postgres_exporter sidecars, PodMonitors, Prometheus, Grafana)
-
-**Technologies:**
-- **Zalando Postgres Operator**: PostgreSQL management powered by Patroni for 3 clusters (Review( review-db), Auth(auth-db), Supporting(supporting-db))
-- **CloudNativePG Operator**: Kubernetes-native PostgreSQL with Patroni for 2 clusters (Product DB(product-db), Transaction DB(transaction-db))
-- **PgBouncer**: Transaction pooling for Auth service (Zalando built-in sidecar)
-- **PgCat**: Modern connection pooler deployed as standalone deployments (2 replicas each) for Product DB and Transaction DB clusters
-- **Patroni**: High availability manager (used by both Zalando and CloudNativePG operators via Kubernetes API)
-- **Flyway**: Database schema management via init containers (9 init container images, Flyway 11.8.2)
-  - **Note**: `shipping-v2` service has migrations disabled (`migrations.enabled: false`) because it shares the `shipping` database with `shipping` service. The schema is already created by `shipping` service, preventing Flyway checksum mismatch errors.
-
-**Note on Patroni:**
-- Both Zalando and CloudNativePG operators use **Patroni internally** for HA and leader election
-- Patroni uses **Kubernetes API** as the Distributed Configuration Store (DCS) by default
-- No separate etcd cluster needed - Kubernetes API serves as the coordination layer
+**Key Features:**
+- ✅ Patroni-based HA (all operators use Patroni internally via Kubernetes API)
+- ✅ Connection poolers: PgBouncer (Zalando sidecar), PgCat (standalone for CloudNativePG)
+- ✅ Monitoring: postgres_exporter sidecars with custom queries (pg_stat_statements, pg_replication, pg_postmaster)
+- ✅ Log collection: Vector sidecars (Zalando clusters) shipping to Loki
 
 ---
 
@@ -72,15 +61,15 @@ flowchart TB
     end
     
     subgraph Clusters["PostgreSQL Clusters"]
-        AuthDB[(auth-db<br/>Zalando<br/>PostgreSQL 15<br/>HA: 3 nodes<br/>namespace: auth)]
+        AuthDB[(auth-db<br/>Zalando<br/>PostgreSQL 17<br/>HA: 3 nodes<br/>namespace: auth)]
         ProductDB[(product-db<br/>CloudNativePG<br/>PostgreSQL 18<br/>HA: 2 instances<br/>namespace: product)]
         subgraph TransactionDBCluster["transaction-db Cluster<br/>HA: 3 Instances"]
             TransactionPrimary[(Primary<br/>PostgreSQL 18<br/>Read-Write)]
             TransactionReplica1[(Replica 1<br/>PostgreSQL 18<br/>Read-Only)]
             TransactionReplica2[(Replica 2<br/>PostgreSQL 18<br/>Read-Only)]
         end
-        ReviewDB[(review-db<br/>Zalando<br/>PostgreSQL 15<br/>Single Instance<br/>namespace: review)]
-        SupportingDB[(supporting-db<br/>Zalando<br/>PostgreSQL 15<br/>Shared DB<br/>namespace: user)]
+        ReviewDB[(review-db<br/>Zalando<br/>PostgreSQL 16<br/>Single Instance<br/>namespace: review)]
+        SupportingDB[(supporting-db<br/>Zalando<br/>PostgreSQL 16<br/>Shared DB<br/>namespace: user)]
     end
     
     subgraph CloudNativePGServices["CloudNativePG Services<br/>Auto-created"]
@@ -134,10 +123,10 @@ flowchart TB
 | Cluster | Services | Operator | PostgreSQL Version | Pooler | HA Pattern | Learning Focus |
 |---------|----------|----------|-------------------|--------|------------|----------------|
 | **Product** | Product | **CloudNativePG** | **18** (default) | **PgCat** (standalone, 2 replicas) | **Patroni HA** (2 instances) | Read scaling, PgCat routing, Patroni failover |
-| **Review** | Review | **Zalando** | **15** | **None** (direct) | **Patroni** (single instance) | Simple setup, direct connection, Patroni basics |
-| **Auth** | Auth | **Zalando** | **15** | **PgBouncer** (sidecar) | **Patroni HA** (3 instances) | Production-ready HA, transaction pooling, Zalando built-in pooler, Patroni failover |
+| **Review** | Review | **Zalando** | **16** | **None** (direct) | **Patroni** (single instance) | Simple setup, direct connection, Patroni basics |
+| **Auth** | Auth | **Zalando** | **17** | **PgBouncer** (sidecar) | **Patroni HA** (3 instances) | Production-ready HA, transaction pooling, Zalando built-in pooler, Patroni failover |
 | **Transaction** | Cart, Order | **CloudNativePG** | **18** (default) | **PgCat** (standalone, 2 replicas) | **Patroni HA** (3 instances) | **Multi-database routing, Patroni failover, synchronous replication, read replica routing** |
-| **Supporting** | User, Notification, Shipping-v2 | **Zalando** | **15** | **None** (direct) | **Patroni** (single instance) | **Shared database pattern, Patroni basics** |
+| **Supporting** | User, Notification, Shipping-v2 | **Zalando** | **16** | **None** (direct) | **Patroni** (single instance) | **Shared database pattern, Patroni basics** |
 
 ### Cluster Details
 
@@ -147,9 +136,9 @@ This section provides a brief overview of all 5 PostgreSQL clusters. For detaile
 |---------|----------|-------------------|-----------|--------|------------|-----------|----------|
 | **Product** | CloudNativePG | 18 | 2 (1 primary + 1 replica) | PgCat (standalone, 2 replicas) | Patroni HA | `product` | Product |
 | **Transaction** | CloudNativePG | 18 | 3 (1 primary + 2 replicas) | PgCat (standalone, 2 replicas) | Patroni HA (Synchronous) | `cart` | Cart, Order |
-| **Review** | Zalando | 15 | 1 (single instance) | None (direct) | Patroni (single) | `review` | Review |
-| **Auth** | Zalando | 15 | 3 (1 leader + 2 standbys) | PgBouncer (sidecar) | Patroni HA | `auth` | Auth |
-| **Supporting** | Zalando | 15 | 1 (single instance) | None (direct) | Patroni (single) | `user` | User, Notification, Shipping-v2 |
+| **Review** | Zalando | 16 | 1 (single instance) | None (direct) | Patroni (single) | `review` | Review |
+| **Auth** | Zalando | 17 | 3 (1 leader + 2 standbys) | PgBouncer (sidecar) | Patroni HA | `auth` | Auth |
+| **Supporting** | Zalando | 16 | 1 (single instance) | None (direct) | Patroni (single) | `user` | User, Notification, Shipping-v2 |
 
 **Detailed Information:**
 - **CloudNativePG Clusters** (Product, Transaction): See [CloudNativePG Operator](#cloudnativepg-operator) section
@@ -684,11 +673,12 @@ PodMonitors are automatically deployed by `scripts/04-deploy-databases.sh` after
 **Key Features:**
 - Kubernetes-native CRDs for cluster management
 - Patroni-based HA with automatic failover (< 30 seconds)
-- PostgreSQL 15 (explicitly configured)
+- PostgreSQL versions: 16 (review-db, supporting-db), 17 (auth-db) - explicitly configured
 - Built-in PgBouncer sidecar for connection pooling
 - Automatic secret generation
 - Cross-namespace secret support
-- Built-in `postgres_exporter` sidecar for metrics
+- Built-in `postgres_exporter` sidecar for metrics with custom queries
+- **Vector sidecar**: Log collection for PostgreSQL logs (all clusters)
 - **Optional UI Component**: Web-based graphical interface for cluster management
 
 **Clusters Managed:**
@@ -703,7 +693,7 @@ PodMonitors are automatically deployed by `scripts/04-deploy-databases.sh` after
 #### Review Database
 
 - **Operator**: Zalando Postgres Operator (v1.15.1) - powered by Patroni
-- **PostgreSQL Version**: 15 (explicitly configured in CRD)
+- **PostgreSQL Version**: 16 (explicitly configured in CRD)
 - **Instances**: 1 (single instance, no HA)
 - **HA**: Patroni via Kubernetes API (single instance, no failover needed)
 - **Pooler**: None (direct connection)
@@ -718,7 +708,11 @@ flowchart TB
         ReviewSvc[Review Service<br/>Pod]
         
         subgraph ReviewDB["review-db Cluster"]
-            Instance[(Single Instance<br/>PostgreSQL 15<br/>Patroni-managed)]
+            subgraph ReviewDBPod["review-db-0 Pod"]
+                Instance[(Single Instance<br/>PostgreSQL 16<br/>Patroni-managed)]
+                Exporter[postgres_exporter<br/>Sidecar<br/>Custom Queries]
+                Vector[Vector Sidecar<br/>Log Collection]
+            end
         end
         
         Secret[review.review-db.credentials...<br/>username: review<br/>password: auto-generated<br/>Created by Zalando Operator]
@@ -735,20 +729,51 @@ flowchart TB
     
     style ReviewDB fill:#e1f5ff
     style Secret fill:#ffe1f5
+    style Exporter fill:#f3e5f5
+    style Vector fill:#fff4e1
 ```
 
 **Features:**
 - Patroni-based management (even for single instance)
 - Simple setup for low-traffic service
 - Direct PostgreSQL connection (no pooler overhead)
-- PostgreSQL 15
+- PostgreSQL 16
 - **Secret**: Auto-generated by Zalando operator (`review.review-db.credentials.postgresql.acid.zalan.do`)
+- **Monitoring**: `postgres_exporter` sidecar with custom queries for enhanced metrics
+- **Log Collection**: Vector sidecar for PostgreSQL log collection to Loki
 - **Note**: Cluster and service are in the same namespace (`review`), so cross-namespace secret feature is not needed
+
+#### Log Collection with Vector Sidecar
+
+- **Vector Sidecar**: Log collection sidecar for PostgreSQL logs
+- **Log Location**: `/home/postgres/pgdata/pgroot/pg_log/*.log`
+- **ConfigMap**: `pg-zalando-vector-config-review` in `review` namespace
+- **Loki Endpoint**: `http://loki.monitoring.svc.cluster.local:3100`
+- **Features**:
+  - Multiline log parsing (PostgreSQL log format)
+  - Label injection (namespace: `review`, cluster: `review-db`, pod)
+  - Automatic log shipping to Loki
+- **Resource Limits**: CPU 50m/200m, Memory 64Mi/128Mi
+- **Configuration**: `k8s/postgres-operator/zalando/vector-configs/pg-zalando-vector-config-review.yaml`
+
+#### Custom Metrics Configuration
+
+- **ConfigMap**: `postgres-monitoring-queries-review` in `review` namespace
+- **Custom Queries**:
+  - **pg_stat_statements**: Query performance metrics (execution time, calls, cache hits, I/O statistics) - Top 100 queries
+  - **pg_replication**: Replication lag monitoring (for HA clusters)
+  - **pg_postmaster**: PostgreSQL server start time
+- **Environment Variable**: `PG_EXPORTER_EXTEND_QUERY_PATH=/etc/postgres-exporter/queries.yaml`
+- **Key Metrics Exposed**:
+  - `pg_stat_statements_*` (calls, time_milliseconds, rows, cache hits, I/O stats)
+  - `pg_replication_lag` (replication lag in seconds)
+  - `pg_postmaster_start_time_seconds` (server start time)
+- **Configuration**: `k8s/postgres-operator/zalando/monitoring-queries/postgres-monitoring-queries-review.yaml`
 
 #### Auth Database
 
 - **Operator**: Zalando Postgres Operator (v1.15.1) - powered by Patroni
-- **PostgreSQL Version**: 15 (explicitly configured in CRD)
+- **PostgreSQL Version**: 17 (explicitly configured in CRD)
 - **Instances**: 3 (HA: 1 leader + 2 standbys)
 - **HA**: Patroni HA via Kubernetes API (automatic failover < 30 seconds)
 - **Pooler**: PgBouncer sidecar (2 instances, transaction mode)
@@ -768,18 +793,21 @@ flowchart TB
         
         subgraph AuthDBCluster["auth-db Cluster<br/>HA: 3 Nodes"]
             subgraph AuthDBPod1["auth-db-0 Pod<br/>(Leader)"]
-                Instance1[(PostgreSQL 15<br/>Leader<br/>Patroni-managed)]
-                Exporter1[postgres_exporter<br/>Sidecar]
+                Instance1[(PostgreSQL 17<br/>Leader<br/>Patroni-managed)]
+                Exporter1[postgres_exporter<br/>Sidecar<br/>Custom Queries]
+                Vector1[Vector Sidecar<br/>Log Collection]
             end
             
             subgraph AuthDBPod2["auth-db-1 Pod<br/>(Standby)"]
-                Instance2[(PostgreSQL 15<br/>Standby<br/>Patroni-managed)]
-                Exporter2[postgres_exporter<br/>Sidecar]
+                Instance2[(PostgreSQL 17<br/>Standby<br/>Patroni-managed)]
+                Exporter2[postgres_exporter<br/>Sidecar<br/>Custom Queries]
+                Vector2[Vector Sidecar<br/>Log Collection]
             end
             
             subgraph AuthDBPod3["auth-db-2 Pod<br/>(Standby)"]
-                Instance3[(PostgreSQL 15<br/>Standby<br/>Patroni-managed)]
-                Exporter3[postgres_exporter<br/>Sidecar]
+                Instance3[(PostgreSQL 17<br/>Standby<br/>Patroni-managed)]
+                Exporter3[postgres_exporter<br/>Sidecar<br/>Custom Queries]
+                Vector3[Vector Sidecar<br/>Log Collection]
             end
             
             PgBouncer1[PgBouncer Sidecar<br/>Instance 1<br/>Transaction Mode]
@@ -827,6 +855,9 @@ flowchart TB
     style Exporter1 fill:#f3e5f5
     style Exporter2 fill:#f3e5f5
     style Exporter3 fill:#f3e5f5
+    style Vector1 fill:#fff4e1
+    style Vector2 fill:#fff4e1
+    style Vector3 fill:#fff4e1
 ```
 
 **Features:**
@@ -842,8 +873,36 @@ flowchart TB
 - Transaction pooling for short-lived connections (main container)
 - Pool size: 25 connections
 - **Secret**: Auto-generated by Zalando operator (`auth.auth-db.credentials.postgresql.acid.zalan.do`)
-- **Monitoring**: `postgres_exporter` sidecar in each pod for Prometheus metrics collection
+- **Monitoring**: `postgres_exporter` sidecar in each pod with custom queries for enhanced Prometheus metrics collection (pg_stat_statements, pg_replication, pg_postmaster)
+- **Log Collection**: Vector sidecar in each pod for PostgreSQL log collection to Loki
 - **Note**: Cluster and service are in the same namespace (`auth`), so cross-namespace secret feature is not needed
+
+#### Log Collection with Vector Sidecar
+
+- **Vector Sidecar**: Log collection sidecar for PostgreSQL logs (deployed in all 3 pods)
+- **Log Location**: `/home/postgres/pgdata/pgroot/pg_log/*.log`
+- **ConfigMap**: `pg-zalando-vector-config-auth` in `auth` namespace
+- **Loki Endpoint**: `http://loki.monitoring.svc.cluster.local:3100`
+- **Features**:
+  - Multiline log parsing (PostgreSQL log format)
+  - Label injection (namespace: `auth`, cluster: `auth-db`, pod)
+  - Automatic log shipping to Loki
+- **Resource Limits**: CPU 50m/200m, Memory 64Mi/128Mi
+- **Configuration**: `k8s/postgres-operator/zalando/vector-configs/pg-zalando-vector-config-auth.yaml`
+
+#### Custom Metrics Configuration
+
+- **ConfigMap**: `postgres-monitoring-queries-auth` in `auth` namespace
+- **Custom Queries**:
+  - **pg_stat_statements**: Query performance metrics (execution time, calls, cache hits, I/O statistics) - Top 100 queries
+  - **pg_replication**: Replication lag monitoring (critical for HA clusters)
+  - **pg_postmaster**: PostgreSQL server start time
+- **Environment Variable**: `PG_EXPORTER_EXTEND_QUERY_PATH=/etc/postgres-exporter/queries.yaml`
+- **Key Metrics Exposed**:
+  - `pg_stat_statements_*` (calls, time_milliseconds, rows, cache hits, I/O stats)
+  - `pg_replication_lag` (replication lag in seconds)
+  - `pg_postmaster_start_time_seconds` (server start time)
+- **Configuration**: `k8s/postgres-operator/zalando/monitoring-queries/postgres-monitoring-queries-auth.yaml`
 
 **Why Two Connection Paths?**
 - **PgBouncer Pooler** (`auth-db-pooler`): Used by main container for transaction pooling, reduces connection overhead
@@ -855,7 +914,7 @@ flowchart TB
 #### Supporting Database
 
 - **Operator**: Zalando Postgres Operator (v1.15.1) - powered by Patroni
-- **PostgreSQL Version**: 15 (explicitly configured in CRD)
+- **PostgreSQL Version**: 16 (explicitly configured in CRD)
 - **Instances**: 1 (single instance, no HA)
 - **HA**: Patroni via Kubernetes API (single instance, no failover needed)
 - **Pooler**: None (direct connection)
@@ -870,7 +929,11 @@ flowchart TB
         UserSvc[User Service<br/>Pod]
         
         subgraph SupportingDB["supporting-db Cluster"]
-            Instance[(Single Instance<br/>PostgreSQL 15<br/>Databases: user, notification, shipping)]
+            subgraph SupportingDBPod["supporting-db-0 Pod"]
+                Instance[(Single Instance<br/>PostgreSQL 16<br/>Databases: user, notification, shipping)]
+                Exporter[postgres_exporter<br/>Sidecar<br/>Custom Queries]
+                Vector[Vector Sidecar<br/>Log Collection]
+            end
         end
         
         UserSecret[user.supporting-db.credentials...<br/>username: user<br/>password: auto-generated<br/>Created in user namespace]
@@ -912,14 +975,45 @@ flowchart TB
     style UserSecret fill:#ffe1f5
     style NotifSecret fill:#ffe1f5
     style ShippingSecret fill:#ffe1f5
+    style Exporter fill:#f3e5f5
+    style Vector fill:#fff4e1
 ```
 
 **Features:**
 - Patroni-based management (even for single instance)
 - Shared database pattern (3 databases: user, notification, shipping)
 - Direct connection for low-traffic services
-- PostgreSQL 15
+- PostgreSQL 16
+- **Monitoring**: `postgres_exporter` sidecar with custom queries for enhanced metrics
+- **Log Collection**: Vector sidecar for PostgreSQL log collection to Loki
 - Cross-namespace secret management (see [Zalando Postgres Operator - Secret Management](#secret-management) section)
+
+#### Log Collection with Vector Sidecar
+
+- **Vector Sidecar**: Log collection sidecar for PostgreSQL logs
+- **Log Location**: `/home/postgres/pgdata/pgroot/pg_log/*.log`
+- **ConfigMap**: `pg-zalando-vector-config-supporting` in `user` namespace
+- **Loki Endpoint**: `http://loki.monitoring.svc.cluster.local:3100`
+- **Features**:
+  - Multiline log parsing (PostgreSQL log format)
+  - Label injection (namespace: `user`, cluster: `supporting-db`, pod)
+  - Automatic log shipping to Loki
+- **Resource Limits**: CPU 50m/200m, Memory 64Mi/128Mi
+- **Configuration**: `k8s/postgres-operator/zalando/vector-configs/pg-zalando-vector-config-supporting.yaml`
+
+#### Custom Metrics Configuration
+
+- **ConfigMap**: `postgres-monitoring-queries-supporting` in `user` namespace
+- **Custom Queries**:
+  - **pg_stat_statements**: Query performance metrics (execution time, calls, cache hits, I/O statistics) - Top 100 queries
+  - **pg_replication**: Replication lag monitoring (for HA clusters)
+  - **pg_postmaster**: PostgreSQL server start time
+- **Environment Variable**: `PG_EXPORTER_EXTEND_QUERY_PATH=/etc/postgres-exporter/queries.yaml`
+- **Key Metrics Exposed**:
+  - `pg_stat_statements_*` (calls, time_milliseconds, rows, cache hits, I/O stats)
+  - `pg_replication_lag` (replication lag in seconds)
+  - `pg_postmaster_start_time_seconds` (server start time)
+- **Configuration**: `k8s/postgres-operator/zalando/monitoring-queries/postgres-monitoring-queries-supporting.yaml`
 
 **Cross-Namespace Secret Pattern:**
 - Database cluster exists in `user` namespace
@@ -949,6 +1043,79 @@ flowchart TB
 - Comprehensive PostgreSQL performance tuning (Auth DB)
 - Optimized resource limits
 - Enhanced logging for security auditing
+
+### Monitoring
+
+#### PodMonitor Setup
+
+Zalando clusters use **PodMonitor** CRDs to enable Prometheus scraping of `postgres_exporter` sidecars.
+
+**PodMonitor Files:**
+- `k8s/prometheus/podmonitors/podmonitor-auth-db.yaml` (Auth DB)
+- `k8s/prometheus/podmonitors/podmonitor-review-db.yaml` (Review DB)
+- `k8s/prometheus/podmonitors/podmonitor-supporting-db.yaml` (Supporting DB)
+
+**Deployment:**
+PodMonitors are automatically deployed by `scripts/04-deploy-databases.sh` after database clusters are ready.
+
+#### Log Collection with Vector Sidecar
+
+All Zalando PostgreSQL clusters include a **Vector sidecar** for log collection and shipping to Loki.
+
+**Configuration:**
+- **Vector ConfigMaps**: Located in `k8s/postgres-operator/zalando/vector-configs/`
+  - `pg-zalando-vector-config-auth.yaml` (Auth DB)
+  - `pg-zalando-vector-config-review.yaml` (Review DB)
+  - `pg-zalando-vector-config-supporting.yaml` (Supporting DB)
+- **Log Location**: `/home/postgres/pgdata/pgroot/pg_log/*.log` (default Zalando Spilo log path)
+- **Loki Endpoint**: `http://loki.monitoring.svc.cluster.local:3100`
+- **Features**:
+  - Multiline log parsing (PostgreSQL log format with timestamp detection)
+  - Label injection (namespace, cluster, pod, container)
+  - Automatic log shipping to Loki
+- **Resource Limits**: CPU 50m/200m, Memory 64Mi/128Mi per sidecar
+
+**Verification:**
+```bash
+# Check Vector sidecar logs
+kubectl logs -n auth auth-db-0 -c vector
+
+# Query logs in Loki (via Grafana)
+{job="postgres", namespace="auth", cluster="auth-db"}
+```
+
+#### Custom Metrics with postgres_exporter
+
+All Zalando PostgreSQL clusters include `postgres_exporter` sidecars with **custom queries** for enhanced metrics.
+
+**Configuration:**
+- **Custom Queries ConfigMaps**: Located in `k8s/postgres-operator/zalando/monitoring-queries/`
+  - `postgres-monitoring-queries-auth.yaml` (Auth DB)
+  - `postgres-monitoring-queries-review.yaml` (Review DB)
+  - `postgres-monitoring-queries-supporting.yaml` (Supporting DB)
+- **Environment Variable**: `PG_EXPORTER_EXTEND_QUERY_PATH=/etc/postgres-exporter/queries.yaml`
+- **Custom Queries Configured**:
+  - **pg_stat_statements**: Query performance metrics (execution time, calls, cache hits, I/O statistics) - Top 100 queries by execution time
+  - **pg_replication**: Replication lag monitoring (critical for HA clusters like auth-db)
+  - **pg_postmaster**: PostgreSQL server start time
+
+**Key Metrics Exposed:**
+- `pg_stat_statements_*` (calls, time_milliseconds, rows, shared_blks_hit, shared_blks_read, etc.)
+- `pg_replication_lag` (replication lag in seconds)
+- `pg_postmaster_start_time_seconds` (server start time)
+
+**Prerequisites:**
+- PostgreSQL clusters must have `pg_stat_statements` extension enabled (configured via `shared_preload_libraries` in CRDs)
+
+**Verification:**
+```bash
+# Check if custom metrics are exposed
+kubectl port-forward -n auth svc/auth-db 9187:9187
+curl http://localhost:9187/metrics | grep pg_stat_statements
+
+# Query metrics in Prometheus/Grafana
+pg_stat_statements_calls{namespace="auth", cluster="auth-db"}
+```
 
 ### Connection Patterns
 

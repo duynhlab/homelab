@@ -169,7 +169,8 @@ kubectl get nodes
 - Deploys connection poolers:
   - PgBouncer for Auth database (transaction pooling)
   - PgCat for Product and Transaction databases (multi-database routing, read replica load balancing)
-- Deploys `postgres_exporter` for all clusters (Prometheus metrics)
+- Deploys `postgres_exporter` sidecars with custom queries for all clusters (Prometheus metrics: pg_stat_statements, pg_replication, pg_postmaster)
+- Deploys Vector sidecars for log collection (Zalando clusters only) shipping to Loki
 - Creates Kubernetes Secrets for database passwords
 
 **Verify:** `kubectl get postgresql -A && kubectl get cluster -A` or `./scripts/04a-verify-databases.sh`

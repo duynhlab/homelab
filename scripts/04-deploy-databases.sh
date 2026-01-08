@@ -100,6 +100,16 @@ fi
 
 echo "SUCCESS: CloudNativePG database secrets created from YAML files"
 
+# Deploy Vector ConfigMaps for log collection (required before CRDs)
+echo "Deploying Vector ConfigMaps for PostgreSQL log collection..."
+kubectl apply -f "$PROJECT_ROOT/k8s/postgres-operator/zalando/vector-configs/"
+echo "SUCCESS: Vector ConfigMaps deployed"
+
+# Deploy Custom Queries ConfigMaps for postgres_exporter (required before CRDs)
+echo "Deploying Custom Queries ConfigMaps for postgres_exporter..."
+kubectl apply -f "$PROJECT_ROOT/k8s/postgres-operator/zalando/monitoring-queries/"
+echo "SUCCESS: Custom Queries ConfigMaps deployed"
+
 echo "Applying Zalando database CRDs..."
 kubectl apply -f "$PROJECT_ROOT/k8s/postgres-operator/zalando/crds/"
 

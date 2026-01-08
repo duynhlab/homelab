@@ -8,7 +8,8 @@ on:
       - v5
       - v5-refactor
     paths:
-      - 'charts/**'
+      - 'charts/mop/**'
+      - 'charts/grafana/**'
 
 permissions:
   packages: write # publish chart to ghcr.io

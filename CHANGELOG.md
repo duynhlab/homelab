@@ -7,6 +7,120 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.12.2] - 2026-01-05
+
+### Changed
+
+**PgCat Dashboard Metrics Update:**
+- **Updated**: `k8s/grafana-operator/dashboards/pgcat.json` - Updated all metric queries to match current PgCat metrics API
+  - **Metric Query Updates**:
+    - Transaction Count: `pgcat_servers_transaction_count` → `increase(pgcat_stats_total_xact_count[1m])`
+    - Query Count: `pgcat_servers_query_count` → `increase(pgcat_stats_total_query_count[1m])`
+    - Data Received: `pgcat_servers_bytes_received` → `increase(pgcat_stats_total_received[1m])`
+    - Data Sent: `pgcat_servers_bytes_sent` → `increase(pgcat_stats_total_sent[1m])`
+    - Server Pool Utilization: Updated to use `pgcat_databases_current_connections` instead of `pgcat_servers_active_count`
+    - Server Connection States: Updated to use pool-level metrics (`pgcat_pools_sv_*`) instead of server-level metrics
+      - Idle: `pgcat_servers_idle_count` → `pgcat_pools_sv_idle`
+      - Active: `pgcat_servers_active_count` → `pgcat_pools_sv_active`
+      - Login: `pgcat_servers_login_count` → `pgcat_pools_sv_login`
+      - Tested: `pgcat_servers_tested_count` → `pgcat_pools_sv_tested`
+  - **Removed Metrics**:
+    - Banned Connections: `pgcat_servers_is_banned` (no longer available in current PgCat version) - set to `0` with updated description
+    - Paused Connections: `pgcat_servers_is_paused` (no longer available in current PgCat version) - set to `0` with updated description
+  - **Label Updates**:
+    - Removed `index` label references (no longer available in current metrics)
+    - Updated legend formats to match current label structure
+    - Pool-level metrics now use `pool` and `user` labels only
+    - Stats metrics use `host`, `role`, `shard`, `pool`, `database` labels
+  - **Template Variables**:
+    - Updated `user` variable to use `label_values(pgcat_pools_cl_active,user)` instead of `label_values(usename)`
+    - Hidden `instance_index` variable (label no longer exists in current PgCat metrics)
+  - **Reason**: Dashboard was 2 years old and using deprecated metric names that no longer exist in current PgCat version. All queries verified against live metrics endpoint (`/metrics` on port 9930) in cart namespace.
+  - **Files Modified**:
+    - `k8s/grafana-operator/dashboards/pgcat.json` - Updated all metric queries and template variables
+
+## [0.12.1] - 2026-01-05
+
+### Added
+
+**GrafanaDashboard CRDs for PostgreSQL Dashboards:**
+- **Added**: Created GrafanaDashboard CRDs for 5 missing PostgreSQL dashboards
+  - **Dashboards Added**:
+    - `pg-monitoring` - PostgreSQL monitoring dashboard (postgres_exporter metrics)
+    - `pg-query-drilldown` - PostgreSQL query drill-down dashboard
+    - `pg-query-overview` - PostgreSQL queries overview dashboard
+    - `pgbouncer` - PgBouncer connection pooler dashboard
+    - `postgres-replication-lag` - PostgreSQL replication lag dashboard
+  - **ConfigMaps**: Added 5 new ConfigMaps to `kustomization.yaml`:
+    - `grafana-dashboard-pg-monitoring`
+    - `grafana-dashboard-pg-query-drilldown`
+    - `grafana-dashboard-pg-query-overview`
+    - `grafana-dashboard-pgbouncer`
+    - `grafana-dashboard-postgres-replication-lag`
+  - **GrafanaDashboard CRDs Created**:
+    - `k8s/grafana-operator/dashboards/grafana-dashboard-pg-monitoring.yaml`
+    - `k8s/grafana-operator/dashboards/grafana-dashboard-pg-query-drilldown.yaml`
+    - `k8s/grafana-operator/dashboards/grafana-dashboard-pg-query-overview.yaml`
+    - `k8s/grafana-operator/dashboards/grafana-dashboard-pgbouncer.yaml`
+    - `k8s/grafana-operator/dashboards/grafana-dashboard-postgres-replication-lag.yaml`
+  - **Configuration**:
+    - All dashboards placed in "Databases" folder (consistent with pgcat and cloudnative-pg)
+    - Datasource mapping: `DS_PROMETHEUS` → `Prometheus` (fixes "datasource was not found" error when importing manually)
+  - **Reason**: Enable automatic dashboard provisioning via Grafana Operator instead of manual import, ensuring datasource mapping works correctly
+  - **Files Modified**:
+    - `k8s/grafana-operator/dashboards/kustomization.yaml` - Added ConfigMaps and resources
+
+
+## [0.12.0] - 2026-01-05
+
+### Added
+
+**postgres_exporter Custom Queries Configuration (Zalando Operator):**
+- **Added**: Custom queries configuration for postgres_exporter sidecars to expose pg_stat_statements, pg_replication, and pg_postmaster metrics
+  - **ConfigMaps Created**: 3 ConfigMaps with queries.yaml for each PostgreSQL cluster:
+    - `k8s/postgres-operator/zalando/monitoring-queries/postgres-monitoring-queries-auth.yaml` (namespace: `auth`)
+    - `k8s/postgres-operator/zalando/monitoring-queries/postgres-monitoring-queries-review.yaml` (namespace: `review`)
+    - `k8s/postgres-operator/zalando/monitoring-queries/postgres-monitoring-queries-supporting.yaml` (namespace: `user`)
+  - **Custom Queries**: 
+    - `pg_stat_statements`: Query performance metrics (execution time, calls, cache hits, I/O statistics) - Top 100 queries by execution time
+    - `pg_replication`: Replication lag monitoring (critical for HA clusters)
+    - `pg_postmaster`: PostgreSQL server start time
+  - **CRD Updates**: Updated all 3 PostgreSQL CRDs to mount ConfigMap and configure environment variable:
+    - Added `PG_EXPORTER_EXTENDED_QUERY_PATH` environment variable: `/etc/postgres-exporter/queries.yaml`
+    - Added `volumeMounts` section for exporter sidecar: mount `postgres-monitoring-queries` ConfigMap at `/etc/postgres-exporter` (read-only)
+    - Added `additionalVolumes` section: ConfigMap volume for `postgres-monitoring-queries` targeting exporter sidecar
+  - **Files Modified**:
+    - `k8s/postgres-operator/zalando/crds/auth-db.yaml` - Added custom queries configuration
+    - `k8s/postgres-operator/zalando/crds/review-db.yaml` - Added custom queries configuration
+    - `k8s/postgres-operator/zalando/crds/supporting-db.yaml` - Added custom queries configuration
+  - **Benefits**: 
+    - Query performance analysis (track slow queries, execution counts, cache hit ratios)
+    - Replication monitoring (monitor replication lag for HA clusters)
+    - Server uptime tracking (track PostgreSQL server start time)
+    - Production-ready metrics for PostgreSQL monitoring
+  - **Prerequisites**: PostgreSQL clusters have `pg_stat_statements` extension enabled (already configured via `shared_preload_libraries`)
+  - **Status**: Implementation complete, requires manual verification after applying ConfigMaps and CRDs
+
+### Documentation
+
+**Research Documentation:**
+- **Added**: Comprehensive "Custom Queries Configuration for postgres_exporter" section in `specs/active/Zalando-operator/research.md` (Section 15.1)
+  - Complete ConfigMap example with queries.yaml format
+  - CRD update instructions for volume mounting and environment variable configuration
+  - Key metrics exposed (pg_stat_statements, pg_replication, pg_postmaster)
+  - Troubleshooting guide for common issues
+  - **Files Updated**:
+    - `specs/active/Zalando-operator/research.md` - Added Section 15.1 with detailed configuration guide
+
+**Tasks Documentation:**
+- **Added**: Phase 7 tasks in `specs/active/Zalando-operator/tasks.md` and `specs/active/Zalando-operator/todo-list.md`
+  - Task 7.1-7.3: Create Custom Queries ConfigMaps for 3 clusters
+  - Task 7.4-7.6: Update CRDs with custom queries configuration
+  - Task 7.7: Verify custom metrics in Prometheus (manual verification)
+  - **Files Updated**:
+    - `specs/active/Zalando-operator/tasks.md` - Added Phase 7 with 7 tasks
+    - `specs/active/Zalando-operator/todo-list.md` - Documented Phase 7 implementation completion
+    - `specs/active/Zalando-operator/plan.md` - Added Section 15 for postgres_exporter custom queries configuration
 
 ## [0.11.7] - 2026-01-05
 

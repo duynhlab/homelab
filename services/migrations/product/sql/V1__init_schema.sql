@@ -1,39 +1,56 @@
--- V1__init_schema.sql
--- Product Database Schema - Initial Setup
+-- =============================================================================
+-- Product Service - Schema Migration V1
+-- =============================================================================
+-- Purpose: Initialize product database schema (SCHEMA ONLY)
+-- Author: Backend Team
+-- Date: 2026-01-07
+-- Note: Seed data is in separate file (seed_products.sql)
+-- =============================================================================
 
--- Categories table
+-- Enable UUID extension (optional, for future use)
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- =============================================================================
+-- CATEGORIES TABLE
+-- =============================================================================
 CREATE TABLE IF NOT EXISTS categories (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
     description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Products table
-CREATE TABLE IF NOT EXISTS products (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    price DECIMAL(10, 2) NOT NULL,
-    category_id INTEGER REFERENCES categories(id),
-    stock_quantity INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexes
-CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
-CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
+CREATE INDEX idx_categories_name ON categories(name);
 
--- Inventory table (for stock tracking)
-CREATE TABLE IF NOT EXISTS inventory (
+-- =============================================================================
+-- PRODUCTS TABLE
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS products (
     id SERIAL PRIMARY KEY,
-    product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
-    quantity INTEGER NOT NULL,
-    reserved_quantity INTEGER DEFAULT 0,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
+    category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+    stock_quantity INTEGER DEFAULT 0 CHECK (stock_quantity >= 0),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_product_name UNIQUE (name)
 );
 
--- Indexes
-CREATE INDEX IF NOT EXISTS idx_inventory_product ON inventory(product_id);
+CREATE INDEX idx_products_name ON products(name);
+CREATE INDEX idx_products_category ON products(category_id);
+CREATE INDEX idx_products_price ON products(price);
+CREATE INDEX idx_products_created_at ON products(created_at DESC);
 
+-- =============================================================================
+-- REFERENCE DATA - Categories (Always Required)
+-- =============================================================================
+-- Note: Categories are reference data, not seed data
+-- They define the product taxonomy and are required for FK constraints
+INSERT INTO categories (name, description) VALUES
+    ('Electronics', 'Electronic devices and accessories'),
+    ('Computers', 'Laptops, desktops, and computer peripherals'),
+    ('Accessories', 'Various accessories and add-ons'),
+    ('Peripherals', 'Computer peripherals and input devices')
+ON CONFLICT (name) DO NOTHING;

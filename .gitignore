@@ -40,3 +40,7 @@ Thumbs.db
 # Kubernetes
 kubeconfig
 *.kubeconfig
+
+# frontend
+frontend/node_modules
+bin/*

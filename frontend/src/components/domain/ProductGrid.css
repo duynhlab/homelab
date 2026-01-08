@@ -1,0 +1,117 @@
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--spacing-lg);
+}
+
+@media (max-width: 1200px) {
+    .product-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    .product-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    .product-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Skeleton Loading */
+.product-skeleton {
+    background-color: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.product-skeleton__image {
+    aspect-ratio: 4/3;
+    border-radius: 0;
+}
+
+.product-skeleton__content {
+    padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.product-skeleton__category {
+    width: 60px;
+    height: 20px;
+}
+
+.product-skeleton__name {
+    width: 80%;
+    height: 24px;
+}
+
+.product-skeleton__desc {
+    width: 100%;
+    height: 40px;
+}
+
+.product-skeleton__price {
+    width: 80px;
+    height: 28px;
+    margin-top: var(--spacing-md);
+}
+
+/* Empty State */
+.product-grid__empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: var(--spacing-2xl);
+    background-color: var(--color-bg-secondary);
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-lg);
+}
+
+.product-grid__empty-icon {
+    font-size: 4rem;
+    display: block;
+    margin-bottom: var(--spacing-md);
+    opacity: 0.5;
+}
+
+.product-grid__empty h3 {
+    font-size: var(--font-size-xl);
+    margin-bottom: var(--spacing-sm);
+}
+
+.product-grid__empty p {
+    color: var(--color-text-muted);
+    margin: 0;
+}
+
+/* Error State */
+.product-grid__error {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: var(--spacing-2xl);
+    background-color: rgba(239, 68, 68, 0.1);
+    border: 1px solid var(--color-error);
+    border-radius: var(--radius-lg);
+}
+
+.product-grid__error-icon {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: var(--spacing-md);
+}
+
+.product-grid__error h3 {
+    color: var(--color-error);
+    margin-bottom: var(--spacing-sm);
+}
+
+.product-grid__error p {
+    color: var(--color-text-muted);
+    margin: 0;
+}

@@ -1,0 +1,117 @@
+.product-filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background-color: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-xl);
+}
+
+/* Search */
+.product-filter__search {
+    display: flex;
+    gap: var(--spacing-xs);
+    flex: 1;
+    min-width: 200px;
+}
+
+.product-filter__search-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.product-filter__search-btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--color-accent-gradient);
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    transition: all var(--transition-fast);
+}
+
+.product-filter__search-btn:hover {
+    transform: scale(1.05);
+}
+
+/* Categories */
+.product-filter__categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+}
+
+.product-filter__category {
+    padding: var(--spacing-xs) var(--spacing-md);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    background-color: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    transition: all var(--transition-fast);
+}
+
+.product-filter__category:hover {
+    color: var(--color-text-primary);
+    border-color: var(--color-border-hover);
+}
+
+.product-filter__category.active {
+    color: white;
+    background: var(--color-accent-gradient);
+    border-color: transparent;
+}
+
+/* Actions */
+.product-filter__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-left: auto;
+}
+
+.product-filter__sort {
+    min-width: 150px;
+    padding: var(--spacing-sm) var(--spacing-md);
+    cursor: pointer;
+}
+
+.product-filter__clear {
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-error);
+    background-color: rgba(239, 68, 68, 0.1);
+    border: 1px solid var(--color-error);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.product-filter__clear:hover {
+    background-color: rgba(239, 68, 68, 0.2);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .product-filter {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .product-filter__search {
+        order: 1;
+    }
+
+    .product-filter__categories {
+        order: 2;
+        justify-content: center;
+    }
+
+    .product-filter__actions {
+        order: 3;
+        margin-left: 0;
+        justify-content: center;
+    }
+}

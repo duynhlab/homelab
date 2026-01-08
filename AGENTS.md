@@ -135,9 +135,34 @@ flowchart TD
 
 ---
 
+### Frontend Integration Rules
+
+**CRITICAL**: Frontend (React SPA) can ONLY interact with Web Layer endpoints.
+
+**Allowed:**
+- ✅ HTTP requests to `/api/v1/*` and `/api/v2/*` endpoints
+- ✅ All requests go through Web Layer handlers
+- ✅ Web Layer handles aggregation, validation, error translation
+
+**Forbidden:**
+- ❌ Direct calls to Logic Layer (no function calls to services)
+- ❌ Direct calls to Core Layer (no database access)
+- ❌ Client-side orchestration (use aggregation endpoints instead)
+- ❌ Bypassing Web Layer in any way
+
+**Why:**
+- Web Layer provides HTTP interface, validation, authentication
+- Logic/Core layers are internal implementation details
+- Aggregation endpoints handle complex operations server-side
+
+**Reference:** See [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md) for complete API documentation and 3-layer architecture details.
+
+---
+
 ## Key Design Patterns
 
 - **Clean Architecture**: 3-layer separation (web → logic → core) with clear boundaries
+- **Frontend → Web Layer Only**: Frontend can ONLY call Web Layer HTTP endpoints, never Logic/Core directly
 - **API Versioning**: Parallel v1/v2 endpoints, no breaking changes, gradual migration path
 - **Microservices**: 9 independent services with bounded contexts, each in own namespace
 - **Middleware Chain**: Ordered middleware (tracing → logging → metrics) for observability
@@ -255,7 +280,7 @@ Infrastructure → Build Verification → Monitoring → APM → **Databases** �
 - Service code: `services/cmd/{service}/`, `services/internal/{service}/`
 - Helm values: `charts/values/{service}.yaml`
 - SLO CRD: `k8s/sloth/crds/{service}-slo.yaml`
-- Migration: `services/migrations/{service}/Dockerfile` + `sql/001__init_schema.sql`
+- Migration: `services/{service}/db/migrations/Dockerfile` + `sql/V*__*.sql`
 
 **Update monitoring:**
 - Dashboard JSON: `k8s/grafana-operator/dashboards/microservices-dashboard.json`

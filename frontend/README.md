@@ -93,22 +93,28 @@ docker run -d -p 80:80 frontend:prod
 
 ### Kubernetes Deployment
 
-Build separate images for each environment:
+Deploy via Helm using the frontend values file:
 
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: frontend
-spec:
-  template:
-    spec:
-      containers:
-      - name: frontend
-        # Use environment-specific image
-        image: ghcr.io/yourorg/frontend:prod
-        ports:
-        - containerPort: 80
+```bash
+# Deploy frontend to default namespace
+helm install frontend charts/mop -f charts/mop/values/frontend.yaml -n default
+
+# Or upgrade existing deployment
+helm upgrade --install frontend charts/mop -f charts/mop/values/frontend.yaml -n default
+```
+
+**Helm Values Configuration:**
+- `replicaCount: 1` - Single pod (static files, no scaling needed)
+- `service.type: ClusterIP` - Internal service (use port-forward for local access)
+- `livenessProbe` and `readinessProbe` - Configured for `/health` endpoint
+- `resources` - Minimal (32Mi memory, 25m CPU)
+
+**Access via Port-Forward:**
+```bash
+# Port-forward frontend service (or use scripts/08-setup-access.sh)
+kubectl port-forward -n default svc/frontend 3000:80
+
+# Access at http://localhost:3000
 ```
 
 ## API Contract
@@ -136,6 +142,90 @@ headers: {
 ```
 
 **Auto-redirect on 401**: Frontend automatically redirects to `/login` when token expires.
+
+---
+
+## Frontend-Backend Integration
+
+### API URL Configuration: localhost:8080 for Local/Kind Testing
+
+**Important:** Frontend runs in the browser, not in the Kubernetes pod.
+
+**How it works:**
+1. **Frontend pod** serves static files via nginx (port 80)
+2. **Browser** loads frontend from `localhost:3000` (port-forwarded from pod)
+3. **Browser** makes API calls to `localhost:8080` (backend services port-forwarded)
+4. **`localhost` in browser** = user's machine, NOT pod's localhost
+5. **Port-forward** bridges browser → Kubernetes services
+
+**Why `localhost:8080` works:**
+- Frontend code runs in **browser JavaScript** (not in pod)
+- Browser's `localhost` refers to **user's machine**
+- Backend services port-forwarded to `localhost:8080` on user's machine
+- Frontend API calls from browser → `localhost:8080` → port-forward → backend service ✅
+
+**For Production (Real K8s):**
+- Would use service DNS: `http://product.default.svc.cluster.local:8080`
+- But for Kind/local testing: `localhost:8080` is correct ✅
+
+**Setup:**
+```bash
+# Port-forward backend services (via scripts/08-setup-access.sh)
+kubectl port-forward -n product svc/product 8080:8080
+
+# Frontend build with localhost:8080
+docker build --build-arg API_BASE_URL=http://localhost:8080 -t frontend .
+
+# Frontend in browser calls: http://localhost:8080/api/v1/products
+```
+
+### API Endpoint Mapping
+
+Complete mapping of frontend API endpoints to backend web layer handlers:
+
+| Frontend API | HTTP Method | Backend Service | Backend Handler | Web Layer File | Logic Layer Call |
+|-------------|-------------|-----------------|-----------------|----------------|-------------------|
+| `/api/v1/products` | GET | product | `ListProducts` | `services/product/internal/web/v1/handler.go:24` | `productService.ListProducts()` |
+| `/api/v1/products/:id` | GET | product | `GetProduct` | `services/product/internal/web/v1/handler.go:54` | `productService.GetProduct()` |
+| `/api/v1/products/:id/details` ⭐ | GET | product | `GetProductDetails` | `services/product/internal/web/v1/handler.go:125` | `productService.GetProduct()` + aggregation |
+| `/api/v1/cart` | GET | cart | `GetCart` | `services/cart/internal/web/v1/handler.go:26` | `cartService.GetCart()` |
+| `/api/v1/cart/count` ⭐ | GET | cart | `GetCartCount` | `services/cart/internal/web/v1/handler.go:98` | `cartService.GetCartCount()` |
+| `/api/v1/cart` | POST | cart | `AddToCart` | `services/cart/internal/web/v1/handler.go:60` | `cartService.AddToCart()` |
+| `/api/v1/cart/items/:itemId` ⭐ | PATCH | cart | `UpdateCartItem` | `services/cart/internal/web/v1/handler.go:124` | `cartService.UpdateItemQuantity()` |
+| `/api/v1/cart/items/:itemId` ⭐ | DELETE | cart | `RemoveCartItem` | `services/cart/internal/web/v1/handler.go:162` | `cartService.RemoveItem()` |
+| `/api/v1/orders` | GET | order | `ListOrders` | `services/order/internal/web/v1/handler.go:26` | `orderService.ListOrders()` |
+| `/api/v1/orders/:id` | GET | order | `GetOrder` | `services/order/internal/web/v1/handler.go:54` | `orderService.GetOrder()` |
+| `/api/v1/orders` | POST | order | `CreateOrder` | `services/order/internal/web/v1/handler.go:84` | `orderService.CreateOrder()` |
+| `/api/v1/auth/login` | POST | auth | `Login` | `services/auth/internal/web/v1/handler.go:19` | `authService.Login()` |
+| `/api/v1/auth/register` | POST | auth | `Register` | `services/auth/internal/web/v1/handler.go:81` | `authService.Register()` |
+
+**Legend:**
+- ⭐ = Phase 1 aggregation endpoints (optimized for frontend)
+- All endpoints follow 3-layer pattern: Web → Logic → Core
+
+### Request Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant FE as Frontend (React)
+    participant WL as Web Layer (Gin Handler)
+    participant LL as Logic Layer (Service)
+    participant CL as Core Layer (Repository)
+    participant DB as PostgreSQL
+
+    FE->>WL: HTTP Request (GET /api/v1/products)
+    WL->>WL: Request Validation
+    WL->>WL: Tracing Span (layer=web)
+    WL->>LL: productService.ListProducts(ctx, filters)
+    LL->>LL: Business Logic
+    LL->>CL: repo.FindAll(ctx, filters)
+    CL->>DB: SQL Query
+    DB-->>CL: Results
+    CL-->>LL: []domain.Product
+    LL-->>WL: []domain.Product
+    WL->>WL: JSON Response
+    WL-->>FE: HTTP 200 + JSON
+```
 
 ---
 

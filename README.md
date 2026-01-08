@@ -24,11 +24,16 @@ Production-ready microservices monitoring platform with 9 Go services, complete 
 
 ### System Architecture
 
-Complete system architecture showing k6 load testing, microservices stack (3-layer architecture), data layer, and observability:
+Complete system architecture showing Frontend (React SPA), k6 load testing, microservices stack (3-layer architecture), data layer, and observability:
 
 ```mermaid
 flowchart TB
-    subgraph "k6 Load Generator"
+    subgraph "Frontend Layer"
+        FE[Frontend React SPA<br/>Browser-based<br/>Port-forward: 3000]
+        FEAPI[API Client<br/>Axios<br/>VITE_API_BASE_URL]
+    end
+    
+    subgraph "Load Testing"
         K6[k6 Pod<br/>Arrival-Rate Executors]
         Script[k6 Script<br/>load-test-multiple-scenarios.js]
         Journeys[Journey Functions<br/>8 journey types]
@@ -40,10 +45,10 @@ flowchart TB
         Burst[Burst Scenarios<br/>ramping-arrival-rate<br/>200+ RPS]
     end
     
-    subgraph "Microservices Stack - 3-Layer Architecture"
-        Web[Web Layer<br/>web/v1/, web/v2/<br/>HTTP Handlers<br/>Request/Response]
+    subgraph "Backend Services - 3-Layer Architecture"
+        Web[Web Layer<br/>web/v1/, web/v2/<br/>HTTP Handlers<br/>Request/Response<br/>Validation]
         Logic[Logic Layer<br/>logic/v1/, logic/v2/<br/>Business Logic<br/>Orchestration]
-        Core[Core Layer<br/>core/domain/<br/>Domain Models<br/>core/database.go<br/>DB Connection]
+        Core[Core Layer<br/>core/domain/<br/>Domain Models<br/>Repository<br/>DB Connection]
     end
     
     subgraph "Data Layer"
@@ -57,6 +62,9 @@ flowchart TB
         Grafana[Dashboards<br/>Grafana]
     end
     
+    FE --> FEAPI
+    FEAPI -->|"HTTP /api/v1/*<br/>/api/v2/*"| Web
+    
     K6 --> Script
     Script --> Journeys
     
@@ -64,9 +72,9 @@ flowchart TB
     Journeys --> Peak
     Journeys --> Burst
     
-    Baseline --> Web
-    Peak --> Web
-    Burst --> Web
+    Baseline -->|"HTTP /api/v1/*"| Web
+    Peak -->|"HTTP /api/v1/*"| Web
+    Burst -->|"HTTP /api/v1/*"| Web
     
     Web -->|calls| Logic
     Logic -->|uses| Core
@@ -86,16 +94,15 @@ flowchart TB
     
     Prometheus --> Grafana
     Tempo --> Grafana
-    
-    style K6 fill:#9f9,stroke:#333,stroke-width:2px
-    style Baseline fill:#9ff,stroke:#333,stroke-width:2px
-    style Peak fill:#9ff,stroke:#333,stroke-width:2px
-    style Burst fill:#9ff,stroke:#333,stroke-width:2px
-    style Web fill:#e1f5ff,stroke:#333,stroke-width:2px
-    style Logic fill:#fff4e1,stroke:#333,stroke-width:2px
-    style Core fill:#e8f5e9,stroke:#333,stroke-width:2px
-    style Database fill:#ff9,stroke:#333,stroke-width:2px
 ```
+
+**Key Points:**
+- **Frontend (React SPA)**: Runs in browser, makes HTTP requests to Web Layer only (`/api/v1/*`, `/api/v2/*`)
+- **k6 Load Testing**: Simulates traffic patterns, also calls Web Layer endpoints
+- **3-Layer Architecture**: Web → Logic → Core (Frontend and k6 can ONLY access Web Layer)
+- **Observability**: All layers emit traces/metrics to Tempo/Prometheus, visualized in Grafana
+
+**Frontend Architecture**: See [`frontend/README.md`](frontend/README.md) for complete frontend documentation, API mapping, and integration details.
 
 **Detailed Architecture**: See [`docs/apm/ARCHITECTURE.md`](docs/apm/ARCHITECTURE.md) for middleware chain and APM integration. Full system architecture in [`specs/system-context/01-architecture-overview.md`](specs/system-context/01-architecture-overview.md)
 

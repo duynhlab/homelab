@@ -8,6 +8,127 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+## [0.17.0] - 2026-01-08
+
+### 🔄 Database Migrations Restructure
+
+**Breaking Change:** Database migrations moved from centralized `services/migrations/{service}/` to service-specific `services/{service}/db/migrations/` to align with service isolation pattern where each service has its own GitHub repository.
+
+#### Migration Structure Changes
+
+**File Locations:**
+- **Before**: `services/migrations/{service}/Dockerfile` + `services/migrations/{service}/sql/*.sql`
+- **After**: `services/{service}/db/migrations/Dockerfile` + `services/{service}/db/migrations/sql/*.sql`
+
+**Affected Services:**
+- All 9 services: auth, user, product, cart, order, review, notification, shipping, shipping-v2
+
+#### GitHub Actions
+
+**Workflow Updates:**
+- Updated `.github/workflows/build-init.yml`:
+  - Path triggers: `services/migrations/**` → `services/*/db/migrations/**`
+  - Build context: `./services/migrations/${{ matrix.service }}` → `./services/${{ matrix.service }}/db/migrations`
+  - Dockerfile path: Updated to new location
+
+**Action Required:**
+- Migration image builds will use new paths automatically
+- No changes needed to Helm values (image names unchanged)
+
+#### Documentation Updates
+
+**Updated References:**
+- `AGENTS.md`: Migration path reference updated
+- `docs/guides/API_REFERENCE.md`: "Find Files by Purpose" and "File Organization Patterns" sections updated
+- All documentation now reflects new migration structure
+
+#### Migration Notes
+
+- **Dockerfile Compatibility**: Dockerfiles use relative paths (`COPY sql/ $FLYWAY_HOME/sql/`), so they work without changes after move
+- **Image Names**: Migration image names remain unchanged (e.g., `ghcr.io/duynhne/product:v5-init`)
+- **Helm Values**: No changes needed - Helm values reference image names, not paths
+- **Old Directory**: `services/migrations/` directory removed after migration
+
+## [0.16.0] - 2026-01-08
+
+### 🚀 Frontend Integration Optimization & Production-Ready Deployment
+
+**Breaking Change:** Frontend mock data system removed. All builds now require `VITE_API_BASE_URL` environment variable.
+
+#### Frontend
+
+**Mock Data Removal:**
+- Removed `frontend/src/api/mockData.js` file completely
+- Removed all `USE_MOCK` conditional logic from API modules
+- Updated `getApiBaseUrl()` to require `VITE_API_BASE_URL` (throws error if missing)
+- Frontend now always uses real backend API (no mock mode)
+
+**API Configuration:**
+- `VITE_API_BASE_URL` is now mandatory for all builds
+- Build fails with clear error if API URL not provided
+- Docker builds validate `API_BASE_URL` build argument
+
+**ESLint Configuration:**
+- Added `frontend/.eslintrc.cjs` for React + Vite project
+- Configured React, React Hooks, and ES2020+ support
+- GitHub Actions lint step now passes
+
+#### Database & Migrations
+
+**Seed Data Automation:**
+- Renamed `services/migrations/product/sql/seed_products.sql` → `V2__seed_products.sql`
+- Seed data now automatically loads via Flyway on product service deployment
+- Idempotent inserts using `ON CONFLICT DO NOTHING` (safe for pod restarts)
+- Initial catalog: 8 products with total stock of 233 units
+
+#### CI/CD
+
+**GitHub Actions Optimization:**
+- Removed redundant `build` job from `.github/workflows/build-frontend.yml`
+- Docker job now depends directly on `lint` job
+- Expected build time reduction: ≥ 2 minutes
+- Workflow structure: `lint` → `docker` (2 jobs instead of 3)
+
+#### Kubernetes Deployment
+
+**Helm Values:**
+- Created `charts/mop/values/frontend.yaml` for standardized deployment
+- Configuration: 1 replica, ClusterIP service (port 80)
+- Health probes: `/health` endpoint (liveness + readiness)
+- Minimal resources: 32Mi memory, 25m CPU
+
+**Port-Forwarding:**
+- Added frontend port-forward to `scripts/08-setup-access.sh`
+- Frontend accessible at `http://localhost:3000` after running access script
+- Health check: `http://localhost:3000/health`
+
+#### Documentation
+
+**API Mapping:**
+- Added comprehensive API endpoint mapping table to `frontend/README.md`
+- Documented all 13 endpoints (Product: 3, Cart: 5, Order: 3, Auth: 2)
+- Added request flow diagram (Frontend → Web Layer → Logic Layer → Core Layer)
+- Explained `localhost:8080` configuration for Kind/local testing
+
+**Frontend-Backend Integration:**
+- Added "Frontend-Backend Integration" section explaining:
+  - Why `localhost:8080` works for browser-based frontend
+  - Port-forwarding setup procedure
+  - Helm deployment instructions
+  - Production vs. local testing differences
+
+**Files Changed:**
+- `frontend/src/api/config.js` - Removed mock mode, enforced API URL requirement
+- `frontend/src/api/productApi.js` - Removed mock conditionals
+- `frontend/src/api/cartApi.js` - Removed mock conditionals
+- `frontend/src/api/mockData.js` - **DELETED**
+- `frontend/.eslintrc.cjs` - **CREATED** (ESLint configuration)
+- `.github/workflows/build-frontend.yml` - Optimized (removed build job)
+- `charts/mop/values/frontend.yaml` - **CREATED** (Helm values)
+- `scripts/08-setup-access.sh` - Added frontend port-forward
+- `frontend/README.md` - Added API mapping and integration docs
+- `services/migrations/product/sql/V2__seed_products.sql` - Renamed from `seed_products.sql`
+
 ## [0.15.0] - 2026-01-08
 
 ### 🚀 Major Refactor: Service Isolation Architecture

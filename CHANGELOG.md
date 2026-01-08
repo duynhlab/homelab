@@ -122,6 +122,350 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `specs/active/Zalando-operator/todo-list.md` - Documented Phase 7 implementation completion
     - `specs/active/Zalando-operator/plan.md` - Added Section 15 for postgres_exporter custom queries configuration
 
+## [0.15.0] - 2026-01-08
+
+### 🚀 Major Refactor: Service Isolation Architecture
+
+**Breaking Change:** Complete restructuring from shared monorepo to independent service architecture. Each service is now completely isolated and ready for separate repository deployment.
+
+#### Architecture Changes
+
+**Service Isolation:**
+- Each service now has own `go.mod` and `go.sum` (9 independent modules)
+- Removed shared `services/go.mod` and `services/pkg/` directory
+- Middleware and config code duplicated per service for complete independence
+- New structure: `services/{service}/` instead of `services/internal/{service}/`
+
+**Directory Structure:**
+```
+services/
+├── product/
+│   ├── go.mod              # Independent module
+│   ├── cmd/main.go         # Entry point
+│   ├── internal/           # Service domain (web, logic, core)
+│   ├── middleware/         # Duplicated (not shared)
+│   └── config/             # Duplicated (not shared)
+└── ... (9 services total)
+```
+
+#### Backend Services
+
+**Build System:**
+- Updated `scripts/00-verify-build.sh` - Verifies each service independently
+- Created `scripts/build-service-image.sh` - Individual service Docker builds
+
+**Dockerfile:**
+- Updated for service isolation: `COPY ${SERVICE_NAME}/ ./`
+- Builds from `cmd/main.go` (not `cmd/${SERVICE_NAME}/main.go`)
+- Binary name matches service: `${SERVICE_NAME}` (not generic "service")
+
+**Domain Models:**
+- Fixed Cart domain: Added `UserID`, `Subtotal`, `Shipping`, `ItemCount`
+- Fixed Order domain: Added `UserID`, `Subtotal`, `Shipping`, `CreatedAt`
+- Removed cross-service dependencies (e.g., `PostgresTransaction`)
+
+**Service Fixes:**
+- Cart: Removed `ClearWithTx` method, fixed v1 handler dependency injection
+- Order: Added `ErrInvalidOrder` alias, fixed v1 handler dependency injection
+- All services: Removed duplicate error declarations, consolidated to `errors.go`
+
+#### Frontend
+
+**Mock API System:**
+- Implemented centralized mock toggle: `frontend/src/api/config.js` (`USE_MOCK = true/false`)
+- Created mock data matching DB schema: `frontend/src/api/mockData.js`
+- Mock data synchronized with seed data (8 products)
+- All API files support mock mode (no axios, no backend when `USE_MOCK = true`)
+
+**API Integration:**
+- Product API: `getProducts()`, `getProduct()`, `getProductDetails()`
+- Cart API: `getCart()`, `addToCart()`, `updateItemQuantity()`, `removeCartItem()`, `getCartCount()`
+- Order API: `listOrders()`, `getOrder()`, `createOrder()`
+- Auth API: `login()`, `register()`
+
+**Deployment Strategy:**
+- Local dev: `USE_MOCK = true` (no backend needed)
+- Production: `USE_MOCK = false` (real API)
+- Build process: Set `USE_MOCK = false` before `npm run build`
+
+#### API Layer
+
+**No Breaking Changes to Existing APIs:**
+- All v1/v2 endpoints remain unchanged
+- Response structures match frontend expectations
+- Cart API contracts verified (5/5 endpoints match)
+- Order API contracts verified (3/3 endpoints match)
+- Product API contracts verified (3/3 endpoints match)
+
+**Phase 1 Aggregation Endpoints Preserved:**
+- `GET /api/v1/products/:id/details` - Product detail aggregation
+- `DELETE /api/v1/cart/items/:itemId` - Remove cart item
+- `PATCH /api/v1/cart/items/:itemId` - Update item quantity
+- `GET /api/v1/cart/count` - Cart badge count
+
+**Backend Structure Changes (Internal Only):**
+- File paths: `services/internal/{service}/` → `services/{service}/internal/`
+- 3-Layer architecture maintained (Web / Logic / Core)
+- Repository pattern unchanged
+- Each service independent, but API contracts frozen
+- Frontend requires ZERO changes
+
+#### Database & Migrations
+
+**Schema Separation:**
+- Split `V1__init_schema.sql` (schema only) from `seed_products.sql` (data)
+- Categories kept in V1 as reference data (required for FK constraints)
+- Seed data loaded via Docker init container (automatic)
+
+**Migration Strategy:**
+- V1 migration: Schema only (tables, indexes, constraints)
+- Seed data: Separate file for initial product catalog
+- Production-ready: Seed data safe for all environments
+
+#### Frontend Integration
+
+**Mock API Strategy:**
+- `USE_MOCK = true` - Local dev (no backend needed)
+- `USE_MOCK = false` - Production (real API + DB)
+- Mock data matches seed data exactly (8 products)
+- Deployment: Set `USE_MOCK = false` before build
+
+#### CI/CD
+
+**GitHub Actions (`build-images.yml`):**
+- Updated path triggers: `services/*/go.mod`, `services/*/internal/**`
+- Fixed Go cache: `services/${{ matrix.service }}/go.sum`
+- Updated build verification: Per-service working directory
+- Removed env vars, inlined registry config
+
+#### Documentation
+
+**Updated:**
+- `README.md` - Added service isolation architecture section
+- `docs/guides/API_REFERENCE.md` - Fixed file paths, added isolation notes
+- `.gitignore` - Added `bin/*` for local binaries
+
+**File Path Updates:**
+- `services/internal/{service}/` → `services/{service}/internal/`
+- `services/pkg/middleware/` → `services/{service}/middleware/`
+
+#### Deployment
+
+**Docker:**
+- Each service builds independently with `SERVICE_NAME` build arg
+- Init container auto-loads seed data from SQL files
+- No manual seed loading required
+
+**Kubernetes:**
+- Helm charts compatible (no changes needed)
+- K8s manifests compatible (no changes needed)
+
+### Migration Guide
+
+**For Developers:**
+```bash
+# Old structure
+cd services
+go build ./cmd/product
+
+# New structure
+cd services/product
+go build ./cmd/main.go
+```
+
+**For CI/CD:**
+- Update path triggers to `services/*/`
+- Update cache paths to service-specific `go.sum`
+- Update working directories to `services/{service}/`
+
+### Files Changed
+
+**Backend:**
+- `services/*/go.mod` - 9 new independent modules
+- `services/Dockerfile` - Updated for service isolation
+- `services/*/internal/` - Restructured (was `services/internal/*/`)
+- `services/*/middleware/` - Duplicated per service
+- `services/*/config/` - Duplicated per service
+
+**Scripts:**
+- `scripts/00-verify-build.sh` - Independent service verification
+- `scripts/build-service-image.sh` - New Docker build helper
+- `scripts/load-seed-data.sh` - Removed (Docker init container)
+
+**Migrations:**
+- `services/migrations/product/sql/V1__init_schema.sql` - Schema only
+- `services/migrations/product/sql/seed_products.sql` - New seed file
+
+**Documentation:**
+- `README.md` - Service isolation section
+- `docs/guides/API_REFERENCE.md` - Updated paths
+
+**CI/CD:**
+- `.github/workflows/build-images.yml` - Service isolation support
+
+### Breaking Changes
+
+1. **Directory Structure:** `services/internal/{service}/` → `services/{service}/internal/`
+2. **Go Modules:** Shared `services/go.mod` removed, each service has own module
+3. **Shared Code:** `services/pkg/` removed, code duplicated per service
+4. **Build Process:** Must build from service directory: `cd services/{service} && go build`
+
+### Upgrade Path
+
+**Moving to Separate Repos:**
+```bash
+# Each service is now ready for separate repository
+cp -r services/product /path/to/product-service.git
+cd /path/to/product-service.git
+git init
+# Service is completely independent!
+```
+
+## [0.12.0] - 2026-01-07
+
+> **⚠️ PRE-PRODUCTION STABILIZATION MILESTONE**  
+> This is NOT a production release. Phase 1 represents backend architecture stabilization and frontend preparation work.
+
+### Architecture
+
+**3-Layer Enforcement (Web / Logic / Core):**
+- **Enforced strict separation** between Web, Logic, and Core layers across all services
+- **Eliminated architectural violations** - Zero direct database access in Logic layer
+- **Fixed cross-layer dependencies** - Logic layer now depends only on Core repository interfaces
+- **Benefits**:
+  - ✅ Testable business logic (repository mocking)
+  - ✅ Database-agnostic Logic layer
+  - ✅ Clear separation of concerns
+  - ✅ Production-ready architecture
+
+**Repository Pattern Introduction:**
+- **Implemented repository pattern** for Product, Cart, and Order services
+- **Created repository interfaces** in Core domain layer
+- **Implemented PostgreSQL repositories** with full CRUD operations
+- **Refactored all Logic services** to use repositories via dependency injection
+- **Result**: Zero SQL queries in Logic layer, all data access through repositories
+
+**Transaction Management:**
+- **Implemented Transaction interface** in Core domain layer
+- **Created TransactionManager** for PostgreSQL with commit/rollback support
+- **Integrated transactions** in OrderService for multi-step order creation
+- **Benefits**: Atomic operations, data consistency, rollback on error
+
+### Added
+
+**4 New Aggregation APIs (Frontend-Critical):**
+- `GET /api/v1/products/:id/details` - Aggregated product details (product + related products + stock + reviews)
+- `DELETE /api/v1/cart/items/:itemId` - Remove single item from cart
+- `PATCH /api/v1/cart/items/:itemId` - Update cart item quantity
+- `GET /api/v1/cart/count` - Lightweight cart badge count
+
+**Repository Implementations:**
+- `PostgresProductRepository` - Products with filtering, sorting, pagination, related products
+- `PostgresCartRepository` - Cart operations with cross-service product data join
+- `PostgresOrderRepository` - Orders with transaction support for creation
+- `PostgresTransactionManager` - Database transaction management
+
+**Service Initialization:**
+- Dependency injection setup in all main.go files
+- Repository initialization with database connection
+- Service configuration with injected repositories
+- Web handler configuration with service instances
+
+### Database
+
+**Schema Alignment (Flyway V1 Updates):**
+- **Product Schema**: Removed unused inventory table, added seed data (4 categories, 8 products), added CHECK constraints
+- **Cart Schema**: Added CHECK constraints, documented cross-service dependency, added performance indexes
+- **Order Schema** (CRITICAL FIXES):
+  - Added `subtotal` column to orders table (repository expected it)
+  - Added `shipping` column to orders table (repository expected it)
+  - Renamed `total_amount` → `total` (repository expected `total`)
+  - Added `product_name` column to order_items (repository inserts it)
+  - Added `subtotal` column to order_items (repository selects it)
+  - Added business rule constraints (`total = subtotal + shipping`, `subtotal = quantity × price`)
+
+**Data Integrity Improvements:**
+- CHECK constraints on all money/quantity columns (prevent negative values)
+- Foreign keys with cascade deletes (order_items deleted with orders)
+- Unique constraints (prevent duplicate cart items per user)
+- Performance indexes on created_at columns (ORDER BY optimization)
+
+### Changed
+
+**Logic Layer Refactoring:**
+- **ProductService** - Refactored to use ProductRepository interface
+- **CartService** - Refactored to use CartRepository interface, added new methods (GetCartCount, UpdateItemQuantity, RemoveItem)
+- **OrderService** - Refactored to use OrderRepository + TransactionManager, transaction-based order creation
+
+**API Documentation:**
+- Updated `API_REFERENCE.md` with Master API Overview table
+- Added 3-Layer Architecture Responsibility section
+- Documented all Phase 1 aggregation endpoints with real request/response examples
+- Added API stability tagging (Phase 1: ✅ STABLE, Phase 2: ⏳ PLANNED)
+
+### Fixed
+
+**Schema-Code Mismatches:**
+- Fixed missing columns in orders table (repository queries expected subtotal/shipping/total)
+- Fixed missing columns in order_items table (repository inserts product_name/subtotal)
+- Fixed repository-schema alignment (all queries now work correctly)
+
+**Architecture Violations:**
+- Removed direct `database.GetDB()` calls from Logic layer (3 services affected)
+- Removed SQL queries from Logic layer (replaced with repository calls)
+- Fixed dependency direction (Logic → Core repositories, not Logic → Database)
+
+### Impact
+
+**Frontend Unblocking:**
+- ✅ Product Detail page fully supported (aggregation endpoint ready)
+- ✅ Cart operations fully supported (remove, update quantity, count badge)
+- ✅ Order management fully supported (proper totals breakdown)
+- ✅ All Phase 2 frontend features can proceed
+
+**Backend Stability:**
+- ✅ Production-ready architecture (3-layer pattern enforced)
+- ✅ Maintainable codebase (clear separation of concerns)
+- ✅ Testable business logic (repository mocking enabled)
+- ✅ Database migrations stable (schema matches code)
+
+### Files Modified
+
+**Core Layer** (7 files):
+- Repository interfaces: `product/core/domain/repository.go`, `cart/core/domain/repository.go`, `order/core/domain/repository.go`
+- Domain errors: 3 error definition files
+- Transaction interface: `order/core/domain/transaction.go`
+
+**Core Repository Layer** (4 files):
+- `product/core/repository/postgres_product_repository.go`
+- `cart/core/repository/postgres_cart_repository.go`
+- `order/core/repository/postgres_order_repository.go`
+- `order/core/repository/transaction_manager.go`
+
+**Logic Layer** (3 files):
+- `product/logic/v1/service.go`
+- `cart/logic/v1/service.go`
+- `order/logic/v1/service.go`
+
+**Web Layer** (2 files):
+- `product/web/v1/handler.go` (added GetProductDetails)
+- `cart/web/v1/handler.go` (added GetCartCount, UpdateCartItem, RemoveCartItem)
+
+**Main Files** (3 files):
+- `cmd/product/main.go`
+- `cmd/cart/main.go`
+- `cmd/order/main.go`
+
+**Database Migrations** (3 files):
+- `migrations/product/sql/V1__init_schema.sql`
+- `migrations/cart/sql/V1__init_schema.sql`
+- `migrations/order/sql/V1__init_schema.sql`
+
+**Documentation** (1 file):
+- `docs/guides/API_REFERENCE.md`
+
+---
+
 ## [0.11.7] - 2026-01-05
 
 ### Changed

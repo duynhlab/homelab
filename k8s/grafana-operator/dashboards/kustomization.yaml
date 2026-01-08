@@ -15,6 +15,21 @@ configMapGenerator:
   - name: grafana-dashboard-pgcat
     files:
       - pgcat.json
+  - name: grafana-dashboard-pg-monitoring
+    files:
+      - pg-monitoring.json
+  - name: grafana-dashboard-pg-query-drilldown
+    files:
+      - pg-query-drilldown.json
+  - name: grafana-dashboard-pg-query-overview
+    files:
+      - pg-query-overview.json
+  - name: grafana-dashboard-pgbouncer
+    files:
+      - pgbouncer.json
+  - name: grafana-dashboard-postgres-replication-lag
+    files:
+      - postgres-replication-lag.json
   # Note: grafana-dashboard-cloudnative-pg ConfigMap is created by Helm chart
   # (cnpg-grafana-cluster) to avoid ConfigMap annotations size limit
 
@@ -26,4 +41,9 @@ resources:
   - grafana-dashboard-tempo.yaml
   - grafana-dashboard-pgcat.yaml
   - grafana-dashboard-cloudnative-pg.yaml  # References ConfigMap created by Helm chart
+  - grafana-dashboard-pg-monitoring.yaml
+  - grafana-dashboard-pg-query-drilldown.yaml
+  - grafana-dashboard-pg-query-overview.yaml
+  - grafana-dashboard-pgbouncer.yaml
+  - grafana-dashboard-postgres-replication-lag.yaml
 

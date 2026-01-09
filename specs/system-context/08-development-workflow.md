@@ -49,7 +49,7 @@ docker --version
 
 # Check kubectl
 kubectl version --client
-# Client Version: v1.33.0
+# Client Version: v1.33.7
 
 # Check Helm
 helm version --short
@@ -73,7 +73,7 @@ go version
 ```
 === Creating Kind Cluster ===
 Creating cluster "monitoring-cluster" ...
- ✓ Ensuring node image (kindest/node:v1.33.0)
+ ✓ Ensuring node image (kindest/node:v1.33.7)
  ✓ Preparing nodes 📦 📦 📦
  ✓ Writing configuration 📜
  ✓ Starting control-plane 🕹️

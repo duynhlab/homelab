@@ -5,8 +5,7 @@ run-name: Release Helm Charts
 on:
   push:
     branches:
-      - v5
-      - v5-refactor
+      - v6
     paths:
       - 'charts/mop/**'
       - 'charts/grafana/**'
@@ -19,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 #v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 #v6
 
       - name: Install Helm
         uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 #v4.3.1

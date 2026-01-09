@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - v5-refactor
+      - v6
     paths:
       - 'services/Dockerfile'
       - 'services/*/go.mod'
@@ -17,7 +17,7 @@ on:
   pull_request:
     branches:
       - main
-      - v5-refactor
+      - v6
     paths:
       - 'services/Dockerfile'
       - 'services/*/go.mod'
@@ -89,7 +89,7 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}
           tags: |
-            type=raw,value=v5
+            type=raw,value=v6
 
       - name: Build and push Docker image
         id: build

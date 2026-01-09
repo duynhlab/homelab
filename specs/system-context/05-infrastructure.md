@@ -313,7 +313,7 @@ replicaCount: 2
 image:
   repository: ghcr.io/duynhne
   name: ""  # REQUIRED: Short name (auth, user, product)
-  tag: v5
+  tag: v6
   pullPolicy: IfNotPresent
 
 # Service networking
@@ -370,7 +370,7 @@ name: auth
 namespace: auth
 image:
   name: auth
-  tag: v5
+  tag: v6
 
 # Custom environment variables
 extraEnv:
@@ -433,7 +433,7 @@ namespace: auth
 
 image:
   name: auth
-  tag: v5
+  tag: v6
 
 replicaCount: 2
 
@@ -487,7 +487,7 @@ CMD ["./service"]
 
 **Build command**:
 ```bash
-docker build --build-arg SERVICE_NAME=auth -t ghcr.io/duynhne/auth:v5 -f services/Dockerfile services/
+docker build --build-arg SERVICE_NAME=auth -t ghcr.io/duynhne/auth:v6 -f services/Dockerfile services/
 ```
 
 ---
@@ -764,7 +764,7 @@ jobs:
           file: ./services/Dockerfile
           build-args: SERVICE_NAME=${{ matrix.service }}
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}:v5
+          tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}:v6
           cache-from: type=gha
           cache-to: type=gha,mode=max
 ```
@@ -775,22 +775,22 @@ jobs:
 - Manual workflow dispatch
 
 **Output**:
-- 9 Docker images pushed to `ghcr.io/duynhne/<service>:v5`
+- 9 Docker images pushed to `ghcr.io/duynhne/<service>:v6`
 
 ### OCI Registry
 
 **Registry**: GitHub Container Registry (ghcr.io)
 
 **Images**:
-- `ghcr.io/duynhne/auth:v5`
-- `ghcr.io/duynhne/user:v5`
-- `ghcr.io/duynhne/product:v5`
-- `ghcr.io/duynhne/cart:v5`
-- `ghcr.io/duynhne/order:v5`
-- `ghcr.io/duynhne/review:v5`
-- `ghcr.io/duynhne/notification:v5`
-- `ghcr.io/duynhne/shipping:v5`
-- `ghcr.io/duynhne/shipping-v2:v5`
+- `ghcr.io/duynhne/auth:v6`
+- `ghcr.io/duynhne/user:v6`
+- `ghcr.io/duynhne/product:v6`
+- `ghcr.io/duynhne/cart:v6`
+- `ghcr.io/duynhne/order:v6`
+- `ghcr.io/duynhne/review:v6`
+- `ghcr.io/duynhne/notification:v6`
+- `ghcr.io/duynhne/shipping:v6`
+- `ghcr.io/duynhne/shipping-v2:v6`
 - `ghcr.io/duynhne/k6:scenarios`
 
 **Helm Charts**:

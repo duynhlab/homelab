@@ -5,7 +5,7 @@ replicaCount: 2
 
 image:
   repository: ghcr.io/duynhne/shipping
-  tag: v5
+  tag: v6
   pullPolicy: IfNotPresent
 
 service:
@@ -91,7 +91,7 @@ readinessProbe:
 # Database migrations (Flyway init container)
 migrations:
   enabled: true
-  image: ghcr.io/duynhne/shipping:v5-init
+  image: ghcr.io/duynhne/shipping:v6-init
   imagePullPolicy: Always #IfNotPresent
   env:
     DB_HOST: "supporting-db.user.svc.cluster.local"  # Direct connection, no pooler - supporting-db is in user namespace

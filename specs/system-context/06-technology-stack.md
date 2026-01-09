@@ -130,7 +130,7 @@ helm version --short
 **Images**:
 - `alpine:latest` (base image)
 - `golang:1.25.5-alpine` (builder image)
-- `ghcr.io/duynhne/*:v5` (microservices)
+- `ghcr.io/duynhne/*:v6` (microservices)
 
 ---
 

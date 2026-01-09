@@ -48,8 +48,8 @@ app: {{ include "microservice.name" . }}
 {{/*
 Create the image name
 Format: repository (full path) + tag
-Example: repository: ghcr.io/duynhne/auth, tag: v5
-Result: ghcr.io/duynhne/auth:v5
+Example: repository: ghcr.io/duynhne/auth, tag: v6
+Result: ghcr.io/duynhne/auth:v6
 */}}
 {{- define "microservice.image" -}}
 {{- printf "%s:%s" .Values.image.repository .Values.image.tag }}

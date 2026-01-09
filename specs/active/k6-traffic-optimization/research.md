@@ -478,7 +478,7 @@ func PrometheusMiddleware() gin.HandlerFunc {
 cd k6
 docker build --build-arg SCRIPT_FILE=load-test-multiple-scenarios.js \
   -t ghcr.io/duynhne/k6:scenarios .
-kind load docker-image ghcr.io/duynhne/k6:scenarios --name monitoring-local
+kind load docker-image ghcr.io/duynhne/k6:scenarios --name mop
 
 # 2. Rebuild all microservices (middleware changed)
 cd ..

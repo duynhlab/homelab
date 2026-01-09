@@ -1304,7 +1304,7 @@ docker build --build-arg SCRIPT_FILE=load-test-multiple-scenarios.js \
 docker images | grep k6
 
 # Load to Kind cluster
-kind load docker-image ghcr.io/duynhne/k6:scenarios --name monitoring-local
+kind load docker-image ghcr.io/duynhne/k6:scenarios --name mop
 
 # 2. Build all microservices (middleware changed)
 cd ..
@@ -1630,7 +1630,7 @@ git push --force  # Only if branch not shared
 cd k6
 docker build --build-arg SCRIPT_FILE=load-test-multiple-scenarios.js \
   -t ghcr.io/duynhne/k6:scenarios .
-kind load docker-image ghcr.io/duynhne/k6:scenarios --name monitoring-local
+kind load docker-image ghcr.io/duynhne/k6:scenarios --name mop
 
 # 2. Rebuild all microservices (old middleware)
 cd ..

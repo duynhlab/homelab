@@ -14,7 +14,7 @@ echo ""
 
 # Delete Kind cluster
 echo "Deleting Kind cluster..."
-kind delete cluster --name monitoring-local
+kind delete cluster --name mop
 
 echo ""
 echo "SUCCESS: Cleanup complete!"

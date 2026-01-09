@@ -7,120 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
-## [0.12.2] - 2026-01-05
+
+## [0.18.0] - 2026-01-08
 
 ### Changed
 
-**PgCat Dashboard Metrics Update:**
-- **Updated**: `k8s/grafana-operator/dashboards/pgcat.json` - Updated all metric queries to match current PgCat metrics API
-  - **Metric Query Updates**:
-    - Transaction Count: `pgcat_servers_transaction_count` → `increase(pgcat_stats_total_xact_count[1m])`
-    - Query Count: `pgcat_servers_query_count` → `increase(pgcat_stats_total_query_count[1m])`
-    - Data Received: `pgcat_servers_bytes_received` → `increase(pgcat_stats_total_received[1m])`
-    - Data Sent: `pgcat_servers_bytes_sent` → `increase(pgcat_stats_total_sent[1m])`
-    - Server Pool Utilization: Updated to use `pgcat_databases_current_connections` instead of `pgcat_servers_active_count`
-    - Server Connection States: Updated to use pool-level metrics (`pgcat_pools_sv_*`) instead of server-level metrics
-      - Idle: `pgcat_servers_idle_count` → `pgcat_pools_sv_idle`
-      - Active: `pgcat_servers_active_count` → `pgcat_pools_sv_active`
-      - Login: `pgcat_servers_login_count` → `pgcat_pools_sv_login`
-      - Tested: `pgcat_servers_tested_count` → `pgcat_pools_sv_tested`
-  - **Removed Metrics**:
-    - Banned Connections: `pgcat_servers_is_banned` (no longer available in current PgCat version) - set to `0` with updated description
-    - Paused Connections: `pgcat_servers_is_paused` (no longer available in current PgCat version) - set to `0` with updated description
-  - **Label Updates**:
-    - Removed `index` label references (no longer available in current metrics)
-    - Updated legend formats to match current label structure
-    - Pool-level metrics now use `pool` and `user` labels only
-    - Stats metrics use `host`, `role`, `shard`, `pool`, `database` labels
-  - **Template Variables**:
-    - Updated `user` variable to use `label_values(pgcat_pools_cl_active,user)` instead of `label_values(usename)`
-    - Hidden `instance_index` variable (label no longer exists in current PgCat metrics)
-  - **Reason**: Dashboard was 2 years old and using deprecated metric names that no longer exist in current PgCat version. All queries verified against live metrics endpoint (`/metrics` on port 9930) in cart namespace.
-  - **Files Modified**:
-    - `k8s/grafana-operator/dashboards/pgcat.json` - Updated all metric queries and template variables
+**Kind Cluster Rename and Node Version Upgrade:**
+- **Cluster Name**: Renamed Kind cluster from `monitoring-local` to `mop` to align with project naming convention (Microservices Observability Platform)
+- **Node Image Upgrade**: Upgraded all Kind node images from `kindest/node:v1.33.0` to `kindest/node:v1.33.7` (patch version update)
+  - Updated all 4 nodes: 1 control-plane + 3 workers
+- **Files Updated**:
+  - `k8s/kind/cluster-config.yaml` - Cluster name and all node images
+  - `scripts/01-create-kind-cluster.sh` - Cluster name checks
+  - `scripts/cleanup.sh` - Cluster name in delete command
+  - `specs/system-context/*.md` - Node version references
+  - `specs/active/k6-traffic-optimization/*.md` - Cluster name references
+  - `CHANGELOG.md` - Fixed existing reference
 
-## [0.12.1] - 2026-01-05
+**Breaking Changes:**
+- Existing cluster named `monitoring-local` must be deleted and recreated
+- kubectl context will change from `kind-monitoring-local` to `kind-mop`
 
-### Added
-
-**GrafanaDashboard CRDs for PostgreSQL Dashboards:**
-- **Added**: Created GrafanaDashboard CRDs for 5 missing PostgreSQL dashboards
-  - **Dashboards Added**:
-    - `pg-monitoring` - PostgreSQL monitoring dashboard (postgres_exporter metrics)
-    - `pg-query-drilldown` - PostgreSQL query drill-down dashboard
-    - `pg-query-overview` - PostgreSQL queries overview dashboard
-    - `pgbouncer` - PgBouncer connection pooler dashboard
-    - `postgres-replication-lag` - PostgreSQL replication lag dashboard
-  - **ConfigMaps**: Added 5 new ConfigMaps to `kustomization.yaml`:
-    - `grafana-dashboard-pg-monitoring`
-    - `grafana-dashboard-pg-query-drilldown`
-    - `grafana-dashboard-pg-query-overview`
-    - `grafana-dashboard-pgbouncer`
-    - `grafana-dashboard-postgres-replication-lag`
-  - **GrafanaDashboard CRDs Created**:
-    - `k8s/grafana-operator/dashboards/grafana-dashboard-pg-monitoring.yaml`
-    - `k8s/grafana-operator/dashboards/grafana-dashboard-pg-query-drilldown.yaml`
-    - `k8s/grafana-operator/dashboards/grafana-dashboard-pg-query-overview.yaml`
-    - `k8s/grafana-operator/dashboards/grafana-dashboard-pgbouncer.yaml`
-    - `k8s/grafana-operator/dashboards/grafana-dashboard-postgres-replication-lag.yaml`
-  - **Configuration**:
-    - All dashboards placed in "Databases" folder (consistent with pgcat and cloudnative-pg)
-    - Datasource mapping: `DS_PROMETHEUS` → `Prometheus` (fixes "datasource was not found" error when importing manually)
-  - **Reason**: Enable automatic dashboard provisioning via Grafana Operator instead of manual import, ensuring datasource mapping works correctly
-  - **Files Modified**:
-    - `k8s/grafana-operator/dashboards/kustomization.yaml` - Added ConfigMaps and resources
-
-
-## [0.12.0] - 2026-01-05
-
-### Added
-
-**postgres_exporter Custom Queries Configuration (Zalando Operator):**
-- **Added**: Custom queries configuration for postgres_exporter sidecars to expose pg_stat_statements, pg_replication, and pg_postmaster metrics
-  - **ConfigMaps Created**: 3 ConfigMaps with queries.yaml for each PostgreSQL cluster:
-    - `k8s/postgres-operator/zalando/monitoring-queries/postgres-monitoring-queries-auth.yaml` (namespace: `auth`)
-    - `k8s/postgres-operator/zalando/monitoring-queries/postgres-monitoring-queries-review.yaml` (namespace: `review`)
-    - `k8s/postgres-operator/zalando/monitoring-queries/postgres-monitoring-queries-supporting.yaml` (namespace: `user`)
-  - **Custom Queries**: 
-    - `pg_stat_statements`: Query performance metrics (execution time, calls, cache hits, I/O statistics) - Top 100 queries by execution time
-    - `pg_replication`: Replication lag monitoring (critical for HA clusters)
-    - `pg_postmaster`: PostgreSQL server start time
-  - **CRD Updates**: Updated all 3 PostgreSQL CRDs to mount ConfigMap and configure environment variable:
-    - Added `PG_EXPORTER_EXTENDED_QUERY_PATH` environment variable: `/etc/postgres-exporter/queries.yaml`
-    - Added `volumeMounts` section for exporter sidecar: mount `postgres-monitoring-queries` ConfigMap at `/etc/postgres-exporter` (read-only)
-    - Added `additionalVolumes` section: ConfigMap volume for `postgres-monitoring-queries` targeting exporter sidecar
-  - **Files Modified**:
-    - `k8s/postgres-operator/zalando/crds/auth-db.yaml` - Added custom queries configuration
-    - `k8s/postgres-operator/zalando/crds/review-db.yaml` - Added custom queries configuration
-    - `k8s/postgres-operator/zalando/crds/supporting-db.yaml` - Added custom queries configuration
-  - **Benefits**: 
-    - Query performance analysis (track slow queries, execution counts, cache hit ratios)
-    - Replication monitoring (monitor replication lag for HA clusters)
-    - Server uptime tracking (track PostgreSQL server start time)
-    - Production-ready metrics for PostgreSQL monitoring
-  - **Prerequisites**: PostgreSQL clusters have `pg_stat_statements` extension enabled (already configured via `shared_preload_libraries`)
-  - **Status**: Implementation complete, requires manual verification after applying ConfigMaps and CRDs
-
-### Documentation
-
-**Research Documentation:**
-- **Added**: Comprehensive "Custom Queries Configuration for postgres_exporter" section in `specs/active/Zalando-operator/research.md` (Section 15.1)
-  - Complete ConfigMap example with queries.yaml format
-  - CRD update instructions for volume mounting and environment variable configuration
-  - Key metrics exposed (pg_stat_statements, pg_replication, pg_postmaster)
-  - Troubleshooting guide for common issues
-  - **Files Updated**:
-    - `specs/active/Zalando-operator/research.md` - Added Section 15.1 with detailed configuration guide
-
-**Tasks Documentation:**
-- **Added**: Phase 7 tasks in `specs/active/Zalando-operator/tasks.md` and `specs/active/Zalando-operator/todo-list.md`
-  - Task 7.1-7.3: Create Custom Queries ConfigMaps for 3 clusters
-  - Task 7.4-7.6: Update CRDs with custom queries configuration
-  - Task 7.7: Verify custom metrics in Prometheus (manual verification)
-  - **Files Updated**:
-    - `specs/active/Zalando-operator/tasks.md` - Added Phase 7 with 7 tasks
-    - `specs/active/Zalando-operator/todo-list.md` - Documented Phase 7 implementation completion
-    - `specs/active/Zalando-operator/plan.md` - Added Section 15 for postgres_exporter custom queries configuration
+**User Action Required:**
+```bash
+kind delete cluster --name monitoring-local  # Delete old cluster
+./scripts/01-create-kind-cluster.sh          # Create new cluster named mop with v1.33.7 nodes
+```
 
 ## [0.17.0] - 2026-01-08
 
@@ -442,150 +354,120 @@ git init
 # Service is completely independent!
 ```
 
-## [0.12.0] - 2026-01-07
-
-> **⚠️ PRE-PRODUCTION STABILIZATION MILESTONE**  
-> This is NOT a production release. Phase 1 represents backend architecture stabilization and frontend preparation work.
-
-### Architecture
-
-**3-Layer Enforcement (Web / Logic / Core):**
-- **Enforced strict separation** between Web, Logic, and Core layers across all services
-- **Eliminated architectural violations** - Zero direct database access in Logic layer
-- **Fixed cross-layer dependencies** - Logic layer now depends only on Core repository interfaces
-- **Benefits**:
-  - ✅ Testable business logic (repository mocking)
-  - ✅ Database-agnostic Logic layer
-  - ✅ Clear separation of concerns
-  - ✅ Production-ready architecture
-
-**Repository Pattern Introduction:**
-- **Implemented repository pattern** for Product, Cart, and Order services
-- **Created repository interfaces** in Core domain layer
-- **Implemented PostgreSQL repositories** with full CRUD operations
-- **Refactored all Logic services** to use repositories via dependency injection
-- **Result**: Zero SQL queries in Logic layer, all data access through repositories
-
-**Transaction Management:**
-- **Implemented Transaction interface** in Core domain layer
-- **Created TransactionManager** for PostgreSQL with commit/rollback support
-- **Integrated transactions** in OrderService for multi-step order creation
-- **Benefits**: Atomic operations, data consistency, rollback on error
-
-### Added
-
-**4 New Aggregation APIs (Frontend-Critical):**
-- `GET /api/v1/products/:id/details` - Aggregated product details (product + related products + stock + reviews)
-- `DELETE /api/v1/cart/items/:itemId` - Remove single item from cart
-- `PATCH /api/v1/cart/items/:itemId` - Update cart item quantity
-- `GET /api/v1/cart/count` - Lightweight cart badge count
-
-**Repository Implementations:**
-- `PostgresProductRepository` - Products with filtering, sorting, pagination, related products
-- `PostgresCartRepository` - Cart operations with cross-service product data join
-- `PostgresOrderRepository` - Orders with transaction support for creation
-- `PostgresTransactionManager` - Database transaction management
-
-**Service Initialization:**
-- Dependency injection setup in all main.go files
-- Repository initialization with database connection
-- Service configuration with injected repositories
-- Web handler configuration with service instances
-
-### Database
-
-**Schema Alignment (Flyway V1 Updates):**
-- **Product Schema**: Removed unused inventory table, added seed data (4 categories, 8 products), added CHECK constraints
-- **Cart Schema**: Added CHECK constraints, documented cross-service dependency, added performance indexes
-- **Order Schema** (CRITICAL FIXES):
-  - Added `subtotal` column to orders table (repository expected it)
-  - Added `shipping` column to orders table (repository expected it)
-  - Renamed `total_amount` → `total` (repository expected `total`)
-  - Added `product_name` column to order_items (repository inserts it)
-  - Added `subtotal` column to order_items (repository selects it)
-  - Added business rule constraints (`total = subtotal + shipping`, `subtotal = quantity × price`)
-
-**Data Integrity Improvements:**
-- CHECK constraints on all money/quantity columns (prevent negative values)
-- Foreign keys with cascade deletes (order_items deleted with orders)
-- Unique constraints (prevent duplicate cart items per user)
-- Performance indexes on created_at columns (ORDER BY optimization)
+## [0.12.2] - 2026-01-05
 
 ### Changed
 
-**Logic Layer Refactoring:**
-- **ProductService** - Refactored to use ProductRepository interface
-- **CartService** - Refactored to use CartRepository interface, added new methods (GetCartCount, UpdateItemQuantity, RemoveItem)
-- **OrderService** - Refactored to use OrderRepository + TransactionManager, transaction-based order creation
+**PgCat Dashboard Metrics Update:**
+- **Updated**: `k8s/grafana-operator/dashboards/pgcat.json` - Updated all metric queries to match current PgCat metrics API
+  - **Metric Query Updates**:
+    - Transaction Count: `pgcat_servers_transaction_count` → `increase(pgcat_stats_total_xact_count[1m])`
+    - Query Count: `pgcat_servers_query_count` → `increase(pgcat_stats_total_query_count[1m])`
+    - Data Received: `pgcat_servers_bytes_received` → `increase(pgcat_stats_total_received[1m])`
+    - Data Sent: `pgcat_servers_bytes_sent` → `increase(pgcat_stats_total_sent[1m])`
+    - Server Pool Utilization: Updated to use `pgcat_databases_current_connections` instead of `pgcat_servers_active_count`
+    - Server Connection States: Updated to use pool-level metrics (`pgcat_pools_sv_*`) instead of server-level metrics
+      - Idle: `pgcat_servers_idle_count` → `pgcat_pools_sv_idle`
+      - Active: `pgcat_servers_active_count` → `pgcat_pools_sv_active`
+      - Login: `pgcat_servers_login_count` → `pgcat_pools_sv_login`
+      - Tested: `pgcat_servers_tested_count` → `pgcat_pools_sv_tested`
+  - **Removed Metrics**:
+    - Banned Connections: `pgcat_servers_is_banned` (no longer available in current PgCat version) - set to `0` with updated description
+    - Paused Connections: `pgcat_servers_is_paused` (no longer available in current PgCat version) - set to `0` with updated description
+  - **Label Updates**:
+    - Removed `index` label references (no longer available in current metrics)
+    - Updated legend formats to match current label structure
+    - Pool-level metrics now use `pool` and `user` labels only
+    - Stats metrics use `host`, `role`, `shard`, `pool`, `database` labels
+  - **Template Variables**:
+    - Updated `user` variable to use `label_values(pgcat_pools_cl_active,user)` instead of `label_values(usename)`
+    - Hidden `instance_index` variable (label no longer exists in current PgCat metrics)
+  - **Reason**: Dashboard was 2 years old and using deprecated metric names that no longer exist in current PgCat version. All queries verified against live metrics endpoint (`/metrics` on port 9930) in cart namespace.
+  - **Files Modified**:
+    - `k8s/grafana-operator/dashboards/pgcat.json` - Updated all metric queries and template variables
 
-**API Documentation:**
-- Updated `API_REFERENCE.md` with Master API Overview table
-- Added 3-Layer Architecture Responsibility section
-- Documented all Phase 1 aggregation endpoints with real request/response examples
-- Added API stability tagging (Phase 1: ✅ STABLE, Phase 2: ⏳ PLANNED)
+## [0.12.1] - 2026-01-05
 
-### Fixed
+### Added
 
-**Schema-Code Mismatches:**
-- Fixed missing columns in orders table (repository queries expected subtotal/shipping/total)
-- Fixed missing columns in order_items table (repository inserts product_name/subtotal)
-- Fixed repository-schema alignment (all queries now work correctly)
+**GrafanaDashboard CRDs for PostgreSQL Dashboards:**
+- **Added**: Created GrafanaDashboard CRDs for 5 missing PostgreSQL dashboards
+  - **Dashboards Added**:
+    - `pg-monitoring` - PostgreSQL monitoring dashboard (postgres_exporter metrics)
+    - `pg-query-drilldown` - PostgreSQL query drill-down dashboard
+    - `pg-query-overview` - PostgreSQL queries overview dashboard
+    - `pgbouncer` - PgBouncer connection pooler dashboard
+    - `postgres-replication-lag` - PostgreSQL replication lag dashboard
+  - **ConfigMaps**: Added 5 new ConfigMaps to `kustomization.yaml`:
+    - `grafana-dashboard-pg-monitoring`
+    - `grafana-dashboard-pg-query-drilldown`
+    - `grafana-dashboard-pg-query-overview`
+    - `grafana-dashboard-pgbouncer`
+    - `grafana-dashboard-postgres-replication-lag`
+  - **GrafanaDashboard CRDs Created**:
+    - `k8s/grafana-operator/dashboards/grafana-dashboard-pg-monitoring.yaml`
+    - `k8s/grafana-operator/dashboards/grafana-dashboard-pg-query-drilldown.yaml`
+    - `k8s/grafana-operator/dashboards/grafana-dashboard-pg-query-overview.yaml`
+    - `k8s/grafana-operator/dashboards/grafana-dashboard-pgbouncer.yaml`
+    - `k8s/grafana-operator/dashboards/grafana-dashboard-postgres-replication-lag.yaml`
+  - **Configuration**:
+    - All dashboards placed in "Databases" folder (consistent with pgcat and cloudnative-pg)
+    - Datasource mapping: `DS_PROMETHEUS` → `Prometheus` (fixes "datasource was not found" error when importing manually)
+  - **Reason**: Enable automatic dashboard provisioning via Grafana Operator instead of manual import, ensuring datasource mapping works correctly
+  - **Files Modified**:
+    - `k8s/grafana-operator/dashboards/kustomization.yaml` - Added ConfigMaps and resources
 
-**Architecture Violations:**
-- Removed direct `database.GetDB()` calls from Logic layer (3 services affected)
-- Removed SQL queries from Logic layer (replaced with repository calls)
-- Fixed dependency direction (Logic → Core repositories, not Logic → Database)
 
-### Impact
+## [0.12.0] - 2026-01-05
 
-**Frontend Unblocking:**
-- ✅ Product Detail page fully supported (aggregation endpoint ready)
-- ✅ Cart operations fully supported (remove, update quantity, count badge)
-- ✅ Order management fully supported (proper totals breakdown)
-- ✅ All Phase 2 frontend features can proceed
+### Added
 
-**Backend Stability:**
-- ✅ Production-ready architecture (3-layer pattern enforced)
-- ✅ Maintainable codebase (clear separation of concerns)
-- ✅ Testable business logic (repository mocking enabled)
-- ✅ Database migrations stable (schema matches code)
+**postgres_exporter Custom Queries Configuration (Zalando Operator):**
+- **Added**: Custom queries configuration for postgres_exporter sidecars to expose pg_stat_statements, pg_replication, and pg_postmaster metrics
+  - **ConfigMaps Created**: 3 ConfigMaps with queries.yaml for each PostgreSQL cluster:
+    - `k8s/postgres-operator/zalando/monitoring-queries/postgres-monitoring-queries-auth.yaml` (namespace: `auth`)
+    - `k8s/postgres-operator/zalando/monitoring-queries/postgres-monitoring-queries-review.yaml` (namespace: `review`)
+    - `k8s/postgres-operator/zalando/monitoring-queries/postgres-monitoring-queries-supporting.yaml` (namespace: `user`)
+  - **Custom Queries**: 
+    - `pg_stat_statements`: Query performance metrics (execution time, calls, cache hits, I/O statistics) - Top 100 queries by execution time
+    - `pg_replication`: Replication lag monitoring (critical for HA clusters)
+    - `pg_postmaster`: PostgreSQL server start time
+  - **CRD Updates**: Updated all 3 PostgreSQL CRDs to mount ConfigMap and configure environment variable:
+    - Added `PG_EXPORTER_EXTENDED_QUERY_PATH` environment variable: `/etc/postgres-exporter/queries.yaml`
+    - Added `volumeMounts` section for exporter sidecar: mount `postgres-monitoring-queries` ConfigMap at `/etc/postgres-exporter` (read-only)
+    - Added `additionalVolumes` section: ConfigMap volume for `postgres-monitoring-queries` targeting exporter sidecar
+  - **Files Modified**:
+    - `k8s/postgres-operator/zalando/crds/auth-db.yaml` - Added custom queries configuration
+    - `k8s/postgres-operator/zalando/crds/review-db.yaml` - Added custom queries configuration
+    - `k8s/postgres-operator/zalando/crds/supporting-db.yaml` - Added custom queries configuration
+  - **Benefits**: 
+    - Query performance analysis (track slow queries, execution counts, cache hit ratios)
+    - Replication monitoring (monitor replication lag for HA clusters)
+    - Server uptime tracking (track PostgreSQL server start time)
+    - Production-ready metrics for PostgreSQL monitoring
+  - **Prerequisites**: PostgreSQL clusters have `pg_stat_statements` extension enabled (already configured via `shared_preload_libraries`)
+  - **Status**: Implementation complete, requires manual verification after applying ConfigMaps and CRDs
 
-### Files Modified
+### Documentation
 
-**Core Layer** (7 files):
-- Repository interfaces: `product/core/domain/repository.go`, `cart/core/domain/repository.go`, `order/core/domain/repository.go`
-- Domain errors: 3 error definition files
-- Transaction interface: `order/core/domain/transaction.go`
+**Research Documentation:**
+- **Added**: Comprehensive "Custom Queries Configuration for postgres_exporter" section in `specs/active/Zalando-operator/research.md` (Section 15.1)
+  - Complete ConfigMap example with queries.yaml format
+  - CRD update instructions for volume mounting and environment variable configuration
+  - Key metrics exposed (pg_stat_statements, pg_replication, pg_postmaster)
+  - Troubleshooting guide for common issues
+  - **Files Updated**:
+    - `specs/active/Zalando-operator/research.md` - Added Section 15.1 with detailed configuration guide
 
-**Core Repository Layer** (4 files):
-- `product/core/repository/postgres_product_repository.go`
-- `cart/core/repository/postgres_cart_repository.go`
-- `order/core/repository/postgres_order_repository.go`
-- `order/core/repository/transaction_manager.go`
-
-**Logic Layer** (3 files):
-- `product/logic/v1/service.go`
-- `cart/logic/v1/service.go`
-- `order/logic/v1/service.go`
-
-**Web Layer** (2 files):
-- `product/web/v1/handler.go` (added GetProductDetails)
-- `cart/web/v1/handler.go` (added GetCartCount, UpdateCartItem, RemoveCartItem)
-
-**Main Files** (3 files):
-- `cmd/product/main.go`
-- `cmd/cart/main.go`
-- `cmd/order/main.go`
-
-**Database Migrations** (3 files):
-- `migrations/product/sql/V1__init_schema.sql`
-- `migrations/cart/sql/V1__init_schema.sql`
-- `migrations/order/sql/V1__init_schema.sql`
-
-**Documentation** (1 file):
-- `docs/guides/API_REFERENCE.md`
-
----
+**Tasks Documentation:**
+- **Added**: Phase 7 tasks in `specs/active/Zalando-operator/tasks.md` and `specs/active/Zalando-operator/todo-list.md`
+  - Task 7.1-7.3: Create Custom Queries ConfigMaps for 3 clusters
+  - Task 7.4-7.6: Update CRDs with custom queries configuration
+  - Task 7.7: Verify custom metrics in Prometheus (manual verification)
+  - **Files Updated**:
+    - `specs/active/Zalando-operator/tasks.md` - Added Phase 7 with 7 tasks
+    - `specs/active/Zalando-operator/todo-list.md` - Documented Phase 7 implementation completion
+    - `specs/active/Zalando-operator/plan.md` - Added Section 15 for postgres_exporter custom queries configuration
 
 ## [0.11.7] - 2026-01-05
 
@@ -3306,7 +3188,7 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
      # Rebuild and deploy k6:
      cd k6
      docker build --build-arg SCRIPT_FILE=load-test-multiple-scenarios.js -t ghcr.io/duynhne/k6:scenarios .
-     kind load docker-image ghcr.io/duynhne/k6:scenarios --name monitoring-local
+     kind load docker-image ghcr.io/duynhne/k6:scenarios --name mop
      kubectl delete deployment k6-scenarios -n k6
      helm upgrade --install k6-scenarios charts/ -f charts/values/k6-scenarios.yaml -n k6 --create-namespace
      

@@ -168,7 +168,7 @@ The newly integrated React frontend has several issues preventing production-rea
   - `name: frontend`
   - `replicaCount: 1` (static files, no scaling needed)
   - `image.repository: ghcr.io/duynhne/frontend`
-  - `image.tag: v5`
+  - `image.tag: v6`
   - `service.type: ClusterIP` (for Kind/local testing, use port-forward)
   - `service.port: 80` (nginx default)
   - `containerPort: 80`

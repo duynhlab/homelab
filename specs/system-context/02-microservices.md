@@ -282,7 +282,7 @@ Trace: 2db2fe7dcd3c8cb8cb4647ea2b455a21
 **Purpose**: User authentication and registration
 
 **Namespace**: `auth`
-**Image**: `ghcr.io/duynhne/auth:v5`
+**Image**: `ghcr.io/duynhne/auth:v6`
 **Replicas**: 2
 
 #### API Endpoints
@@ -325,7 +325,7 @@ services/internal/auth/
 **Purpose**: User profile management
 
 **Namespace**: `user`
-**Image**: `ghcr.io/duynhne/user:v5`
+**Image**: `ghcr.io/duynhne/user:v6`
 **Replicas**: 2
 
 #### API Endpoints
@@ -351,7 +351,7 @@ services/internal/auth/
 **Purpose**: Product catalog management
 
 **Namespace**: `product`
-**Image**: `ghcr.io/duynhne/product:v5`
+**Image**: `ghcr.io/duynhne/product:v6`
 **Replicas**: 2
 
 #### API Endpoints
@@ -379,7 +379,7 @@ services/internal/auth/
 **Purpose**: Shopping cart management
 
 **Namespace**: `cart`
-**Image**: `ghcr.io/duynhne/cart:v5`
+**Image**: `ghcr.io/duynhne/cart:v6`
 **Replicas**: 2
 
 #### API Endpoints
@@ -405,7 +405,7 @@ services/internal/auth/
 **Purpose**: Order processing and tracking
 
 **Namespace**: `order`
-**Image**: `ghcr.io/duynhne/order:v5`
+**Image**: `ghcr.io/duynhne/order:v6`
 **Replicas**: 2
 
 #### API Endpoints
@@ -431,7 +431,7 @@ services/internal/auth/
 **Purpose**: Product reviews and ratings
 
 **Namespace**: `review`
-**Image**: `ghcr.io/duynhne/review:v5`
+**Image**: `ghcr.io/duynhne/review:v6`
 **Replicas**: 2
 
 #### API Endpoints
@@ -455,7 +455,7 @@ services/internal/auth/
 **Purpose**: Notification delivery
 
 **Namespace**: `notification`
-**Image**: `ghcr.io/duynhne/notification:v5`
+**Image**: `ghcr.io/duynhne/notification:v6`
 **Replicas**: 2
 
 #### API Endpoints
@@ -479,7 +479,7 @@ services/internal/auth/
 **Purpose**: Legacy shipping tracking
 
 **Namespace**: `shipping`
-**Image**: `ghcr.io/duynhne/shipping:v5`
+**Image**: `ghcr.io/duynhne/shipping:v6`
 **Replicas**: 2
 
 #### API Endpoints
@@ -499,7 +499,7 @@ services/internal/auth/
 **Purpose**: Enhanced shipping with estimates
 
 **Namespace**: `shipping` (same as shipping v1)
-**Image**: `ghcr.io/duynhne/shipping-v2:v5`
+**Image**: `ghcr.io/duynhne/shipping-v2:v6`
 **Replicas**: 2
 
 #### API Endpoints

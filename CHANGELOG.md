@@ -8,6 +8,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+## [0.19.0] - 2026-01-09
+
+### Changed
+
+**Version Tag Update: v5/v5-refactor → v6**
+
+Updated all Docker image tags and branch references from v5/v5-refactor to v6 across the entire codebase.
+
+#### GitHub Actions Workflows
+- Updated branch triggers: `v5-refactor` → `v6`, `v5` → `v6`
+- Updated Docker image tags: `v5` → `v6`, `v5-init` → `v6-init`
+- **Files Updated**:
+  - `.github/workflows/build-be.yml` - Backend service builds
+  - `.github/workflows/build-init.yml` - Migration image builds
+  - `.github/workflows/build-fe.yml` - Frontend builds
+  - `.github/workflows/build-k6.yml` - K6 load testing image builds
+  - `.github/workflows/helm-release.yml` - Helm chart release triggers
+
+#### Helm Chart Values
+- Updated default image tag in `charts/mop/values.yaml`: `v5` → `v6`
+- Updated all service-specific values files (11 files):
+  - Application image tags: `tag: v5` → `tag: v6`
+  - Migration image tags: `ghcr.io/duynhne/{service}:v5-init` → `ghcr.io/duynhne/{service}:v6-init`
+- **Services Updated**: auth, user, product, cart, order, review, notification, shipping, shipping-v2, frontend, k6
+
+#### Helm Templates
+- Updated example comments in `charts/mop/templates/_helpers.tpl`
+
+#### Documentation
+- Updated all image tag references in `specs/system-context/*.md`
+- Updated branch references in `specs/active/*/*.md`
+- Preserved CHANGELOG.md historical entries (no changes to existing changelog entries)
+- Preserved software version numbers (e.g., Grafana Operator v5.20.0, PostgreSQL v5.7.0)
+
+**Impact:**
+- All new builds will use v6 image tags
+- GitHub Actions workflows now trigger on v6 branch
+- Helm deployments will pull v6 images
+- All 9 microservices consistently use v6 tagging
+
 ## [0.18.0] - 2026-01-08
 
 ### Changed

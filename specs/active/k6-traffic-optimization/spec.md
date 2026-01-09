@@ -611,7 +611,7 @@ vim services/pkg/middleware/tracing.go
 cd k6
 docker build --build-arg SCRIPT_FILE=load-test-multiple-scenarios.js \
   -t ghcr.io/duynhne/k6:scenarios .
-kind load docker-image ghcr.io/duynhne/k6:scenarios --name monitoring-local
+kind load docker-image ghcr.io/duynhne/k6:scenarios --name mop
 
 # 2. Build all microservices (middleware changed)
 cd ..
@@ -1253,7 +1253,7 @@ git push
 cd k6
 docker build --build-arg SCRIPT_FILE=load-test-multiple-scenarios.js \
   -t ghcr.io/duynhne/k6:scenarios .
-kind load docker-image ghcr.io/duynhne/k6:scenarios --name monitoring-local
+kind load docker-image ghcr.io/duynhne/k6:scenarios --name mop
 
 # Rebuild microservices (old middleware)
 cd ..

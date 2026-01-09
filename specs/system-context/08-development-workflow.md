@@ -130,14 +130,14 @@ Set kubectl context to "kind-monitoring-cluster"
 
 **What it does:**
 1. Builds 9 service images using multi-stage Dockerfile
-2. Tags images: `ghcr.io/duynhne/<service>:v5`
+2. Tags images: `ghcr.io/duynhne/<service>:v6`
 3. Optionally pushes to registry (commented out)
 
 **Manual build (single service):**
 ```bash
 docker build \
   --build-arg SERVICE_NAME=auth \
-  -t ghcr.io/duynhne/auth:v5 \
+  -t ghcr.io/duynhne/auth:v6 \
   -f services/Dockerfile services/
 ```
 
@@ -321,7 +321,7 @@ kubectl get pods -n <namespace>
 **Issue 1: ImagePullBackOff**
 ```bash
 kubectl describe pod <pod-name> -n <namespace>
-# Events: Failed to pull image "ghcr.io/duynhne/auth:v5"
+# Events: Failed to pull image "ghcr.io/duynhne/auth:v6"
 ```
 
 **Solution**:
@@ -330,7 +330,7 @@ kubectl describe pod <pod-name> -n <namespace>
 ./scripts/04-build-microservices.sh
 
 # Load image into Kind cluster
-kind load docker-image ghcr.io/duynhne/auth:v5 --name monitoring-cluster
+kind load docker-image ghcr.io/duynhne/auth:v6 --name monitoring-cluster
 ```
 
 **Issue 2: CrashLoopBackOff**
@@ -488,7 +488,7 @@ name: newservice
 namespace: newservice
 image:
   name: newservice
-  tag: v5
+  tag: v6
 ```
 
 **Step 4: Create SLO definition**
@@ -568,11 +568,11 @@ vi services/internal/auth/web/v1/handler.go
 ```bash
 docker build \
   --build-arg SERVICE_NAME=auth \
-  -t ghcr.io/duynhne/auth:v5 \
+  -t ghcr.io/duynhne/auth:v6 \
   -f services/Dockerfile services/
 
 # Load into Kind
-kind load docker-image ghcr.io/duynhne/auth:v5 --name monitoring-cluster
+kind load docker-image ghcr.io/duynhne/auth:v6 --name monitoring-cluster
 ```
 
 **Step 3: Restart deployment**

@@ -702,8 +702,8 @@ kubectl port-forward -n monitoring svc/grafana-service 3000:3000
 ### Go 1.25 Rollback
 ```bash
 # Revert Docker images
-kubectl set image deployment/auth -n auth auth=ghcr.io/duynhne/auth:v5
-kubectl set image deployment/user -n user user=ghcr.io/duynhne/user:v5
+kubectl set image deployment/auth -n auth auth=ghcr.io/duynhne/auth:v6
+kubectl set image deployment/user -n user user=ghcr.io/duynhne/user:v6
 # ... repeat for all services
 ```
 

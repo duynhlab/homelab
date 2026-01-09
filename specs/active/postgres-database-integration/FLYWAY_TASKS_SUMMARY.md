@@ -65,7 +65,7 @@ CMD ["flyway", "migrate"]
 
 2. ✅ Create `.github/workflows/build-migration-images.yml`: ✅ Done
    - Builds migration images for 8 services (auth, user, product, cart, order, review, notification, shipping-v2)
-   - Triggers on push to v5/v5-refactor branches
+   - Triggers on push to v6 branches
    - Changes in `services/migrations/**`
 
 3. Test build locally:

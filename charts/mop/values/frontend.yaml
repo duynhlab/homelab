@@ -6,7 +6,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/duynhne/frontend
-  tag: v5
+  tag: v6
   pullPolicy: IfNotPresent
 
 service:

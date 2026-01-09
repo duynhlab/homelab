@@ -144,7 +144,7 @@ name: product
 replicaCount: 2
 image:
   repository: ghcr.io/duynhne/product
-  tag: v5
+  tag: v6
 env:
   - name: SERVICE_NAME
     value: "product"
@@ -308,7 +308,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/duynhne/frontend
-  tag: v5
+  tag: v6
   pullPolicy: IfNotPresent
 
 service:

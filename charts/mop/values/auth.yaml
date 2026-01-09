@@ -5,7 +5,7 @@ replicaCount: 2
 
 image:
   repository: ghcr.io/duynhne/auth
-  tag: v5
+  tag: v6
   pullPolicy: IfNotPresent
 
 service:
@@ -95,7 +95,7 @@ readinessProbe:
 # Database migrations (Flyway init container)
 migrations:
   enabled: true
-  image: ghcr.io/duynhne/auth:v5-init
+  image: ghcr.io/duynhne/auth:v6-init
   imagePullPolicy: Always #IfNotPresent
   env:
     DB_HOST: "auth-db.auth.svc.cluster.local"  # Direct connection for migrations - auth-db is in auth namespace

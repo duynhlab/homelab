@@ -189,7 +189,7 @@ kubectl exec -n product -it <product-pod> -- psql -U product -d product -c "SELE
   - `name: frontend`
   - `replicaCount: 1`
   - `image.repository: ghcr.io/duynhne/frontend`
-  - `image.tag: v5`
+  - `image.tag: v6`
   - `service.type: ClusterIP`
   - `service.port: 80`
   - `containerPort: 80`

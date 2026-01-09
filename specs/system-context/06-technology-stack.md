@@ -71,8 +71,8 @@
 **Version**:
 ```bash
 $ kubectl version --short
-Client Version: v1.33.0
-Server Version: v1.33.0
+Client Version: v1.33.7
+Server Version: v1.33.7
 ```
 
 **Kind Configuration**: `k8s/kind/kind-config.yaml`

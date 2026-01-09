@@ -4,14 +4,14 @@ on:
   push:
     branches:
       - main
-      - v5-refactor
+      - v6
     paths:
       - 'frontend/**'
       - '.github/workflows/build-fe.yml'
   pull_request:
     branches:
       - main
-      - v5-refactor
+      - v6
     paths:
       - 'frontend/**'
       - '.github/workflows/build-fe.yml'
@@ -71,7 +71,7 @@ jobs:
           images: ghcr.io/${{ github.repository_owner }}/frontend
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=v5
+            type=raw,value=v6
             type=sha,prefix={{branch}}-
 
       - name: Build Docker image (PR validation)

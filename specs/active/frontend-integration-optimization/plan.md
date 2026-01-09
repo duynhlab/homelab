@@ -299,7 +299,7 @@ name: frontend
 replicaCount: 1
 image:
   repository: ghcr.io/duynhne/frontend
-  tag: v5
+  tag: v6
 service:
   type: ClusterIP
   port: 80
@@ -597,7 +597,7 @@ Response:
 **Tasks:**
 - [ ] Create `charts/mop/values/frontend.yaml`
 - [ ] Configure: `name: frontend`, `replicaCount: 1`
-- [ ] Configure: `image.repository: ghcr.io/duynhne/frontend`, `tag: v5`
+- [ ] Configure: `image.repository: ghcr.io/duynhne/frontend`, `tag: v6`
 - [ ] Configure: `service.type: ClusterIP`, `port: 80`, `containerPort: 80`
 - [ ] Configure: `livenessProbe` and `readinessProbe` for `/health` endpoint
 - [ ] Configure: `resources` (32Mi memory, 25m CPU)

@@ -3,14 +3,13 @@ name: Build Flyway Init Images
 on:
   push:
     branches:
-      - v5-refactor
+      - v6
     paths:
       - 'services/*/db/migrations/**'
       - '.github/workflows/build-init.yml'
   pull_request:
     branches:
-      - v5-refactor
-      - feat/go-1.25
+      - v6
     paths:
       - 'services/*/db/migrations/**'
       - '.github/workflows/build-init.yml'
@@ -59,7 +58,7 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}
           tags: |
-            type=raw,value=v5-init
+            type=raw,value=v6-init
 
       - name: Build and push init image
         id: build

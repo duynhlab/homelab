@@ -8,6 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+## [0.20.0] - 2026-01-09
+
+### Fixed
+
+**Database SSL Connection Issue:**
+
+- **Problem**: Both migration init containers and main containers failed with `pg_hba.conf rejects connection for host "10.244.x.x", user "auth", database "auth", no encryption`
+- **Root Cause**: Zalando PostgreSQL operator defaults require SSL connections, but both init containers and main containers were using `DB_SSLMODE: "disable"`
+- **Solution**: Updated all containers (init + main) connecting to Zalando-managed databases to use `DB_SSLMODE: "require"` instead of `DB_SSLMODE: "disable"`
+- **Files Updated**:
+  - `charts/mop/values/auth.yaml` - Migration init container SSL mode (main container already uses require via PgBouncer)
+  - `charts/mop/values/user.yaml` - Both main container and migration init container SSL mode
+  - `charts/mop/values/product.yaml` - Migration init container SSL mode (CloudNativePG, main container uses disable)
+  - `charts/mop/values/cart.yaml` - Migration init container SSL mode (CloudNativePG, main container uses disable)
+  - `charts/mop/values/order.yaml` - Migration init container SSL mode (CloudNativePG, main container uses disable)
+  - `charts/mop/values/review.yaml` - Both main container and migration init container SSL mode
+  - `charts/mop/values/notification.yaml` - Both main container and migration init container SSL mode
+  - `charts/mop/values/shipping.yaml` - Both main container and migration init container SSL mode
+  - `charts/mop/values/shipping-v2.yaml` - Main container SSL mode (no migrations)
+- **Documentation Updated**:
+  - `docs/guides/DATABASE.md` - Updated init container connection pattern documentation
+- **Impact**: 
+  - Migration init containers can now connect successfully to Zalando-managed PostgreSQL databases
+  - Pods transition from `Init:CrashLoopBackOff` to `Running` status
+  - All services can initialize their databases properly
+
 ## [0.19.0] - 2026-01-09
 
 ### Changed

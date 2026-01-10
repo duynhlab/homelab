@@ -54,7 +54,7 @@ env:
         name: shipping.shipping.supporting-db.credentials.postgresql.acid.zalan.do  # Zalando operator cross-namespace secret (in shipping namespace)
         key: password
   - name: DB_SSLMODE
-    value: "disable"
+    value: "require"
   - name: DB_POOL_MAX_CONNECTIONS
     value: "10"  # Low traffic, smaller pool
   # Graceful shutdown configuration

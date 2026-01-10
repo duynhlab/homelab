@@ -102,6 +102,6 @@ migrations:
     DB_PORT: "5432"
     DB_NAME: "auth"
     DB_USER: "auth"
-    DB_SSLMODE: "disable"
+    DB_SSLMODE: "require"
   envFrom:
     secretRef: "auth.auth-db.credentials.postgresql.acid.zalan.do"  # Zalando operator auto-generated secret

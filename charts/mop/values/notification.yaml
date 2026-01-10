@@ -54,7 +54,7 @@ env:
         name: notification.notification.supporting-db.credentials.postgresql.acid.zalan.do  # Zalando operator auto-generated secret (cross-namespace)
         key: password
   - name: DB_SSLMODE
-    value: "disable"
+    value: "require"
   - name: DB_POOL_MAX_CONNECTIONS
     value: "10"  # Low traffic, smaller pool
   # Graceful shutdown configuration
@@ -98,6 +98,6 @@ migrations:
     DB_PORT: "5432"
     DB_NAME: "notification"
     DB_USER: "notification.notification"  # Cross-namespace format: namespace.username
-    DB_SSLMODE: "disable"
+    DB_SSLMODE: "require"
   envFrom:
     secretRef: "notification.notification.supporting-db.credentials.postgresql.acid.zalan.do"  # Zalando operator cross-namespace secret (in notification namespace)

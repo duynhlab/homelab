@@ -100,6 +100,6 @@ migrations:
     DB_PORT: "5432"
     DB_NAME: "product"
     DB_USER: "product"
-    DB_SSLMODE: "disable"
+    DB_SSLMODE: "require"
   envFrom:
     secretRef: "product-db-secret"

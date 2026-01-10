@@ -55,7 +55,7 @@ env:
         name: user.supporting-db.credentials.postgresql.acid.zalan.do  # Zalando operator auto-generated secret
         key: password
   - name: DB_SSLMODE
-    value: "disable"
+    value: "require"
   - name: DB_POOL_MAX_CONNECTIONS
     value: "10"  # Low traffic, smaller pool
   # Graceful shutdown configuration
@@ -99,6 +99,6 @@ migrations:
     DB_PORT: "5432"
     DB_NAME: "user"
     DB_USER: "user"
-    DB_SSLMODE: "disable"
+    DB_SSLMODE: "require"
   envFrom:
     secretRef: "user.supporting-db.credentials.postgresql.acid.zalan.do"  # Zalando operator auto-generated secret

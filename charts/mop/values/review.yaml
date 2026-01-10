@@ -54,7 +54,7 @@ env:
         name: review.review-db.credentials.postgresql.acid.zalan.do  # Zalando operator auto-generated secret
         key: password
   - name: DB_SSLMODE
-    value: "disable"
+    value: "require"
   - name: DB_POOL_MAX_CONNECTIONS
     value: "10"  # Direct connection, no pooler - smaller pool
   # Graceful shutdown configuration
@@ -98,6 +98,6 @@ migrations:
     DB_PORT: "5432"
     DB_NAME: "review"
     DB_USER: "review"
-    DB_SSLMODE: "disable"
+    DB_SSLMODE: "require"
   envFrom:
     secretRef: "review.review-db.credentials.postgresql.acid.zalan.do"  # Zalando operator auto-generated secret

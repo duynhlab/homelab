@@ -2,10 +2,14 @@
 set -euo pipefail
 
 # =============================================================================
-# Deploy All Microservices using Helm
+# Deploy All Microservices and Frontend using Helm
 # =============================================================================
 # Usage:
-#   ./06-deploy-microservices.sh   # Deploy from ghcr.io OCI registry
+#   ./05-deploy-microservices.sh   # Deploy from ghcr.io OCI registry
+# =============================================================================
+# Deploys:
+#   - 9 backend microservices (auth, user, product, cart, order, review, notification, shipping, shipping-v2)
+#   - 1 frontend service (deployed to default namespace)
 # =============================================================================
 
 # Configuration
@@ -18,7 +22,7 @@ CHART_VERSION=$(grep '^version:' "$PROJECT_ROOT/charts/mop/Chart.yaml" | awk '{p
 
 # Always deploy from OCI registry
 CHART_REF="$REGISTRY"
-echo "=== Deploying All Microservices from OCI Registry ==="
+echo "=== Deploying All Microservices and Frontend from OCI Registry ==="
 echo "Chart: $CHART_REF"
 echo "Version: $CHART_VERSION"
 
@@ -35,6 +39,7 @@ SERVICES=(
   "notification:notification:notification"
   "shipping:shipping:shipping"
   "shipping-v2:shipping:shipping-v2"
+  "frontend:default:frontend"
 )
 
 # Deploy each service
@@ -58,7 +63,7 @@ for entry in "${SERVICES[@]}"; do
 done
 
 echo ""
-echo "SUCCESS: All 9 services deployed!"
+echo "SUCCESS: All 10 services deployed (9 microservices + frontend)!"
 
 # Wait for pods to be ready
 echo ""
@@ -74,10 +79,15 @@ echo ""
 echo "Pod Status Summary:"
 echo ""
 
-NAMESPACES=("auth" "user" "product" "cart" "order" "review" "notification" "shipping")
+NAMESPACES=("auth" "user" "product" "cart" "order" "review" "notification" "shipping" "default")
 for NS in "${NAMESPACES[@]}"; do
   echo "--- $NS namespace ---"
-  kubectl get pods -n "$NS"
+  # Only show frontend pods in default namespace, skip if no frontend
+  if [ "$NS" == "default" ]; then
+    kubectl get pods -n "$NS" -l app=frontend 2>/dev/null || echo "  (No frontend pods found)"
+  else
+    kubectl get pods -n "$NS"
+  fi
   echo ""
 done
 

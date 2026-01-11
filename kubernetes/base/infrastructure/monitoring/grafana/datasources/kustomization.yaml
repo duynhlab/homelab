@@ -1,0 +1,17 @@
+---
+# Grafana Datasources - Configure all observability backends
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - prometheus.yaml
+  - tempo.yaml
+  - loki.yaml
+  - pyroscope.yaml
+  - jaeger.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: flux
+      app.kubernetes.io/component: grafana
+      app.kubernetes.io/part-of: monitoring-stack

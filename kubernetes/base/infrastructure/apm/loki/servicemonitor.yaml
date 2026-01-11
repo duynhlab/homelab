@@ -1,0 +1,21 @@
+---
+# ServiceMonitor for Loki - Scrape log aggregation metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: loki
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/component: apm
+    app.kubernetes.io/managed-by: flux
+spec:
+  selector:
+    matchLabels:
+      app: loki
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
+    scheme: http

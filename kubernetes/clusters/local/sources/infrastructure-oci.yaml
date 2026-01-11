@@ -1,0 +1,14 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: infrastructure-oci
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: infrastructure
+spec:
+  interval: 5m
+  url: oci://localhost:5050/flux-infra-sync
+  ref:
+    tag: latest
+  insecure: true

@@ -1,0 +1,37 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: databases-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: database
+spec:
+  interval: 10m
+  timeout: 15m
+  retryInterval: 2m
+  
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+  
+  path: ./databases
+  
+  # Safety: prune disabled to prevent accidental database deletion
+  prune: false
+  wait: true
+  
+  # Databases depend on APM (for metrics/logging)
+  dependsOn:
+    - name: apm-local
+  
+  # Health checks for database operators
+  healthChecks:
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: postgres-operator
+      namespace: postgres-operator
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: cloudnative-pg
+      namespace: cloudnative-pg

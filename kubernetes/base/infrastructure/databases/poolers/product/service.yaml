@@ -1,0 +1,21 @@
+# PgCat Service for Product Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgcat
+  namespace: product
+  labels:
+    app: pgcat-product
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+  - port: 9930
+    targetPort: 9930
+    protocol: TCP
+    name: metrics  # Admin port (9930) serves both admin interface and Prometheus metrics endpoint (/metrics)
+  selector:
+    app: pgcat-product

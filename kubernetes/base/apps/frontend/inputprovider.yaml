@@ -1,0 +1,18 @@
+---
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSetInputProvider
+metadata:
+  name: frontend-config
+  namespace: default
+  annotations:
+    fluxcd.controlplane.io/reconcile: "enabled"
+    fluxcd.controlplane.io/reconcileEvery: "10m"
+spec:
+  type: Static
+  
+  defaultValues:
+    service: frontend
+    version: v6
+    environment: local
+    replicas: 1
+    port: 80

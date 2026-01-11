@@ -1,0 +1,15 @@
+---
+# HelmRepository for OpenTelemetry charts
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: opentelemetry
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: opentelemetry-helm-repo
+    app.kubernetes.io/component: apm
+    app.kubernetes.io/part-of: apm-stack
+    app.kubernetes.io/managed-by: flux
+spec:
+  interval: 10m
+  url: https://open-telemetry.github.io/opentelemetry-helm-charts

@@ -13,17 +13,55 @@ This SLO (Service Level Objective) system provides comprehensive monitoring and 
 
 ## Quick Start
 
-### Deploy SLO System
+### Deploy SLO System (GitOps)
 
+**SLO system is deployed automatically via Flux Operator:**
+
+**Flux Kustomization:** `slo-stack` ([kubernetes/clusters/local/slo.yaml](../../kubernetes/clusters/local/slo.yaml))
+- **Source:** OCI artifact `localhost:5050/flux-infra-sync`
+- **Base manifests:** [kubernetes/base/infrastructure/slo/](../../kubernetes/base/infrastructure/slo/)
+- **Reconciliation:** Every 10 minutes (automatic)
+- **Dependencies:** Monitoring stack must be ready first
+
+**Components deployed:**
+1. **Sloth Operator** (v0.15.0) - HelmRelease
+2. **PrometheusServiceLevel CRDs** - 9 services, 27 total SLOs
+
+**Manual reconciliation (if needed):**
 ```bash
-./scripts/07-deploy-slo.sh
+# Trigger Flux reconciliation
+flux reconcile kustomization slo-stack --with-source
+
+# Check deployment status
+flux get kustomizations
+kubectl get pods -n monitoring | grep sloth
+
+# Check SLO CRDs
+kubectl get prometheusservicelevel -A
+
+# Check generated PrometheusRules
+kubectl get prometheusrule -n monitoring | grep sloth
 ```
 
-This script:
-- Adds Sloth Helm repository
-- Deploys Sloth Operator to `monitoring` namespace
-- Applies PrometheusServiceLevel CRDs (9 services)
-- Verifies deployment
+**Verification:**
+```bash
+# Check Sloth Operator is running
+kubectl get pods -n monitoring | grep sloth
+
+# List all SLO definitions (27 SLOs across 9 services)
+kubectl get prometheusservicelevel -A
+
+# Check generated recording/alerting rules
+kubectl get prometheusrule -n monitoring -l prometheus-operator.io/sloth-generated=true
+
+# Query SLO metrics in Prometheus
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090
+# Open: http://localhost:9090 and query: slo:sli_error:ratio_rate5m
+```
+
+**Legacy deployment (reference only):**
+- Old script: `./scripts/07-deploy-slo.sh`
+- **Note:** This script is kept for reference but is no longer used. Use Flux GitOps workflow instead.
 
 **Note:** Grafana dashboards are automatically deployed via Grafana Operator (IDs 14348, 14643).
 
@@ -116,7 +154,7 @@ Multi-window multi-burn-rate alerts:
 
 ## Documentation
 
-- **Deployment**: [k8s/sloth/README.md](../../k8s/sloth/README.md)
+- **Deployment**: Deployed automatically via Flux ([kubernetes/base/infrastructure/slo/](../../kubernetes/base/infrastructure/slo/))
 - **Sloth Docs**: https://sloth.dev/
 - **CRD Spec**: https://sloth.dev/usage/getting-started/
 - **Alert Configuration**: [ALERTING.md](./ALERTING.md)

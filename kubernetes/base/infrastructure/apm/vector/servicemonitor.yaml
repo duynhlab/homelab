@@ -1,0 +1,22 @@
+---
+# ServiceMonitor for Vector - Scrape metrics for APM stack monitoring
+# Migrated from k8s/vector/servicemonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vector
+  namespace: kube-system
+  labels:
+    release: kube-prometheus-stack
+    app.kubernetes.io/name: vector
+    app.kubernetes.io/component: apm
+    app.kubernetes.io/managed-by: flux
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vector
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    scheme: http

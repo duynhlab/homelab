@@ -1,0 +1,44 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: apm-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: apm
+spec:
+  interval: 10m
+  timeout: 10m
+  retryInterval: 2m
+  
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+  
+  path: ./apm
+  
+  prune: true
+  wait: true
+  
+  # APM depends on monitoring (Prometheus for ServiceMonitors)
+  dependsOn:
+    - name: monitoring-local
+  
+  # Health checks for APM stack
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: tempo
+      namespace: monitoring
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: pyroscope
+      namespace: monitoring
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: loki
+      namespace: monitoring
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: jaeger
+      namespace: monitoring

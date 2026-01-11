@@ -1,0 +1,22 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: auth
+  namespace: auth
+  labels:
+    app.kubernetes.io/name: auth
+    app.kubernetes.io/component: backend
+spec:
+  interval: 10m
+  timeout: 5m
+  
+  chartRef:
+    kind: OCIRepository
+    name: mop-chart-oci
+    namespace: flux-system
+  
+  releaseName: auth
+  
+  # Use chart defaults from charts/mop/values/auth.yaml
+  # Local overrides via Kustomize patches in overlays/local/apps/

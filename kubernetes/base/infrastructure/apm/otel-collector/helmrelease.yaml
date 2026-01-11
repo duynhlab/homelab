@@ -1,0 +1,187 @@
+---
+# OpenTelemetry Collector HelmRelease - Trace Fan-Out Layer
+# Migrated from k8s/otel-collector/values.yaml
+# Purpose: Receive traces from microservices, fan-out to Tempo + Jaeger
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: opentelemetry-collector
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: otel-collector
+    app.kubernetes.io/component: apm
+    app.kubernetes.io/part-of: apm-stack
+    app.kubernetes.io/managed-by: flux
+spec:
+  interval: 10m
+  timeout: 10m
+  
+  chart:
+    spec:
+      chart: opentelemetry-collector
+      version: ">=0.114.0 <0.115.0"
+      sourceRef:
+        kind: HelmRepository
+        name: opentelemetry
+        namespace: flux-system
+      interval: 10m
+  
+  releaseName: otel-collector
+  
+  # Values from k8s/otel-collector/values.yaml
+  values:
+    # Deployment mode (not daemonset)
+    mode: deployment
+    
+    # Single replica for Kind cluster
+    replicaCount: 1
+    
+    # Image configuration
+    image:
+      repository: otel/opentelemetry-collector-contrib
+      tag: "0.114.0"
+      pullPolicy: IfNotPresent
+    
+    # Resources
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+    
+    # Service configuration
+    service:
+      type: ClusterIP
+    
+    # Ports to expose
+    ports:
+      otlp:
+        enabled: true
+        containerPort: 4317
+        servicePort: 4317
+        protocol: TCP
+      otlp-http:
+        enabled: true
+        containerPort: 4318
+        servicePort: 4318
+        protocol: TCP
+      metrics:
+        enabled: true
+        containerPort: 8888
+        servicePort: 8888
+        protocol: TCP
+    
+    # OpenTelemetry Collector configuration
+    config:
+      # Receivers - where traces come from (applications)
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: 0.0.0.0:4317
+            http:
+              endpoint: 0.0.0.0:4318
+      
+      # Processors - transform/batch traces
+      processors:
+        batch:
+          # Send traces in batches for efficiency
+          timeout: 5s
+          send_batch_size: 512
+          send_batch_max_size: 1024
+        
+        # Memory limiter to prevent OOM
+        memory_limiter:
+          check_interval: 1s
+          limit_mib: 200
+          spike_limit_mib: 50
+      
+      # Exporters - where traces go to (backends)
+      exporters:
+        # Export to Tempo (existing backend)
+        otlp/tempo:
+          endpoint: tempo.monitoring.svc.cluster.local:4317
+          tls:
+            insecure: true
+        
+        # Export to Jaeger (new backend)
+        otlp/jaeger:
+          endpoint: jaeger-collector.monitoring.svc.cluster.local:4317
+          tls:
+            insecure: true
+        
+        # Debug exporter (optional - for troubleshooting)
+        debug:
+          verbosity: basic
+          sampling_initial: 5
+          sampling_thereafter: 200
+      
+      # Extensions
+      extensions:
+        health_check:
+          endpoint: 0.0.0.0:13133
+        zpages:
+          endpoint: 0.0.0.0:55679
+      
+      # Service - connect receivers, processors, and exporters
+      service:
+        extensions:
+          - health_check
+          - zpages
+        
+        pipelines:
+          # Traces pipeline - fan-out to both Tempo and Jaeger
+          traces:
+            receivers:
+              - otlp
+            processors:
+              - memory_limiter
+              - batch
+            exporters:
+              - otlp/tempo
+              - otlp/jaeger
+              # Uncomment for debugging:
+              # - debug
+        
+        # Telemetry for the collector itself
+        telemetry:
+          logs:
+            level: info
+          metrics:
+            address: 0.0.0.0:8888
+    
+    # Liveness and readiness probes
+    livenessProbe:
+      httpGet:
+        path: /
+        port: 13133
+      initialDelaySeconds: 10
+      periodSeconds: 10
+    
+    readinessProbe:
+      httpGet:
+        path: /
+        port: 13133
+      initialDelaySeconds: 5
+      periodSeconds: 5
+    
+    # Service account
+    serviceAccount:
+      create: true
+      name: otel-collector
+    
+    # Pod annotations
+    podAnnotations:
+      app.kubernetes.io/component: apm
+      app.kubernetes.io/part-of: apm-stack
+    
+    # Node selector
+    nodeSelector: {}
+    
+    # Tolerations
+    tolerations: []
+    
+    # Affinity
+    affinity: {}

@@ -35,6 +35,53 @@ This project implements a comprehensive APM solution with four pillars:
 3. **Structured Logging** - JSON logs with trace-id correlation via Vector → Loki
 4. **Continuous Profiling** - Pyroscope for CPU, heap, lock, and goroutine profiling
 
+## Deployment (GitOps)
+
+**APM stack is deployed automatically via Flux Operator:**
+
+**Flux Kustomization:** `apm-stack` ([kubernetes/clusters/local/apm.yaml](../../kubernetes/clusters/local/apm.yaml))
+- **Source:** OCI artifact `localhost:5050/flux-infra-sync`
+- **Base manifests:** [kubernetes/base/infrastructure/apm/](../../kubernetes/base/infrastructure/apm/)
+- **Reconciliation:** Every 10 minutes (automatic)
+- **Dependencies:** Monitoring stack must be ready first
+
+**Components deployed:**
+- Tempo (HelmRelease) - Distributed tracing backend
+- Pyroscope (Deployment + ConfigMap) - Continuous profiling
+- Loki (Deployment + ConfigMap) - Log aggregation
+- Jaeger (HelmRelease) - Alternative tracing UI
+- Vector (HelmRelease) - Log collection agent (DaemonSet)
+- OpenTelemetry Collector (HelmRelease) - Trace fan-out
+
+**Manual reconciliation (if needed):**
+```bash
+# Trigger Flux reconciliation
+flux reconcile kustomization apm-stack --with-source
+
+# Check deployment status
+flux get kustomizations
+kubectl get pods -n monitoring  # Tempo, Jaeger, OTel, Loki, Pyroscope
+kubectl get pods -n kube-system  # Vector DaemonSet
+
+# Check HelmReleases
+kubectl get helmreleases -n monitoring
+kubectl get helmreleases -n kube-system
+```
+
+**Verification:**
+```bash
+# Check all APM pods are running
+kubectl get pods -n monitoring | grep -E "tempo|jaeger|loki|pyroscope|otel"
+kubectl get pods -n kube-system | grep vector
+
+# Check ServiceMonitors (Prometheus scraping)
+kubectl get servicemonitors -n monitoring
+```
+
+**Legacy deployment (reference only):**
+- Old scripts: `./scripts/03a-deploy-tempo.sh`, `03b-deploy-pyroscope.sh`, `03c-deploy-loki.sh`, `03d-deploy-jaeger.sh`
+- **Note:** These scripts are kept for reference but are no longer used. Use Flux GitOps workflow instead.
+
 ## Architecture
 
 ```mermaid
@@ -109,13 +156,9 @@ flowchart LR
 - `OTEL_COLLECTOR_ENDPOINT`: OTel Collector endpoint (not Tempo directly)
 
 **Deployment**:
-```bash
-# Deploy Tempo
-./scripts/03a-deploy-tempo.sh
-
-# Deploy Jaeger + OTel Collector
-./scripts/03d-deploy-jaeger.sh
-```
+- Deployed automatically via Flux HelmRelease
+- Files: [kubernetes/base/infrastructure/apm/tempo/](../../kubernetes/base/infrastructure/apm/tempo/)
+- Manual reconciliation: `flux reconcile kustomization apm-stack --with-source`
 
 **Access**:
 - Tempo via Grafana: http://localhost:3000 (Explore > Tempo)
@@ -144,9 +187,9 @@ flowchart LR
 - Loki v3.6.2 with pattern ingestion and level detection enabled
 
 **Deployment**:
-```bash
-./scripts/03c-deploy-loki.sh
-```
+- Deployed automatically via Flux (Loki: Deployment, Vector: HelmRelease DaemonSet)
+- Files: [kubernetes/base/infrastructure/apm/loki/](../../kubernetes/base/infrastructure/apm/loki/), [kubernetes/base/infrastructure/apm/vector/](../../kubernetes/base/infrastructure/apm/vector/)
+- Manual reconciliation: `flux reconcile kustomization apm-stack --with-source`
 
 ### 3. Continuous Profiling (Pyroscope)
 
@@ -166,9 +209,9 @@ flowchart LR
 - Service name and namespace tags
 
 **Deployment**:
-```bash
-./scripts/03b-deploy-pyroscope.sh
-```
+- Deployed automatically via Flux (Deployment + ConfigMap)
+- Files: [kubernetes/base/infrastructure/apm/pyroscope/](../../kubernetes/base/infrastructure/apm/pyroscope/)
+- Manual reconciliation: `flux reconcile kustomization apm-stack --with-source`
 
 ## Quick Start
 

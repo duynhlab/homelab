@@ -1,0 +1,74 @@
+# PgCat Configuration for Transaction Services (Cart + Order)
+# Multi-database routing
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgcat-transaction-config
+  namespace: cart
+data:
+  pgcat.toml: |
+    # PgCat Configuration for Transaction Databases
+    [general]
+    host = "0.0.0.0"
+    port = 5432
+    pool_mode = "transaction"
+    log_level = "info"
+    admin_username = "admin"
+    admin_password = "admin"
+    enable_prometheus_exporter = true
+    # Port at which prometheus exporter listens on.
+    prometheus_exporter_port = 9930
+    
+    [admin]
+    host = "0.0.0.0"
+    port = 9930
+    
+    # Cart database pool
+    [pools.cart]
+    pool_size = 30
+    
+    [pools.cart.users]
+    cart = { username = "cart", password = "postgres", pool_size = 30 }
+    
+    [pools.cart.shards.0]
+    database = "cart"
+    
+    [[pools.cart.shards.0.servers]]
+    host = "transaction-db-rw.cart.svc.cluster.local"
+    port = 5432
+    user = "cart"
+    password = "postgres"
+    role = "primary"
+    
+    # Replica server for read queries
+    [[pools.cart.shards.0.servers]]
+    host = "transaction-db-r.cart.svc.cluster.local"
+    port = 5432
+    user = "cart"
+    password = "postgres"
+    role = "replica"
+    
+    # Order database pool
+    [pools.order]
+    pool_size = 30
+    
+    [pools.order.users]
+    cart = { username = "cart", password = "postgres", pool_size = 30 }
+    
+    [pools.order.shards.0]
+    database = "order"
+    
+    [[pools.order.shards.0.servers]]
+    host = "transaction-db-rw.cart.svc.cluster.local"
+    port = 5432
+    user = "cart"
+    password = "postgres"
+    role = "primary"
+    
+    # Replica server for read queries
+    [[pools.order.shards.0.servers]]
+    host = "transaction-db-r.cart.svc.cluster.local"
+    port = 5432
+    user = "cart"
+    password = "postgres"
+    role = "replica"

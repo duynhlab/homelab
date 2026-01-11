@@ -1,0 +1,19 @@
+---
+# Production Cluster Configuration
+# TODO: Configure FluxInstance for production cluster
+# Example: Point to production OCI registry, configure production-specific sync
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - flux-system/.gitkeep
+  - sources/helm/.gitkeep
+
+# Add Flux Kustomization CRDs here when ready:
+# - infrastructure.yaml
+# - monitoring.yaml
+# - apm.yaml
+# - databases.yaml
+# - slo.yaml
+# - apps.yaml

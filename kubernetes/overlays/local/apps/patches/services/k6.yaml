@@ -1,0 +1,32 @@
+#############################################################################
+# K6 Load Testing - Local overrides
+#############################################################################
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: k6
+  namespace: k6
+spec:
+  values:
+    replicaCount: 1
+    
+    resources:
+      requests:
+        memory: "1Gi"    # Local: 1Gi (base: 2Gi)
+        cpu: "500m"      # Local: 500m (base: 1000m)
+      limits:
+        memory: "2Gi"    # Local: 2Gi (base: 4Gi)
+        cpu: "1000m"     # Local: 1000m (base: 2000m)
+    
+    # Reduced RPS for local testing
+    env:
+      - name: BASELINE_RPS
+        value: "10"      # Local: 10 RPS (base: 30)
+      - name: PEAK_RPS
+        value: "30"      # Local: 30 RPS (base: 100)
+      - name: BURST_RPS
+        value: "50"      # Local: 50 RPS (base: 200)
+      - name: BURST_DURATION
+        value: "2m"      # Local: 2m (base: 5m)
+      - name: BURST_TIMING
+        value: "10:00-14:00"

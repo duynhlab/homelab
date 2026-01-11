@@ -1,0 +1,632 @@
+---
+# Local environment patches for HelmRelease values
+# Pattern: HelmRelease patches with FULL env list (strategic merge replaces entire env array)
+# Reason: Kustomize strategic merge patch replaces entire arrays if a full array is provided
+
+#############################################################################
+# Auth Service - Local overrides
+#############################################################################
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: auth
+  namespace: auth
+spec:
+  values:
+    replicaCount: 1  # Local: 1 replica (chart default: 2)
+    
+    resources:
+      requests:
+        memory: "32Mi"  # Local: 32Mi (chart default: 64Mi)
+        cpu: "25m"      # Local: 25m (chart default: 50m)
+      limits:
+        memory: "64Mi"  # Local: 64Mi (chart default: 128Mi)
+        cpu: "50m"      # Local: 50m (chart default: 100m)
+    
+    # FULL env list for local environment
+    env:
+      - name: SERVICE_NAME
+        value: "auth"
+      - name: PORT
+        value: "8080"
+      - name: ENV
+        value: "local"  # Changed from "production"
+      - name: OTEL_COLLECTOR_ENDPOINT
+        value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
+      - name: OTEL_SAMPLE_RATE
+        value: "1.0"  # Local: 100% sampling (chart default: 0.1)
+      - name: PYROSCOPE_ENDPOINT
+        value: "http://pyroscope.monitoring.svc.cluster.local:4040"
+      - name: LOG_LEVEL
+        value: "debug"  # Local: debug (chart default: info)
+      - name: LOG_FORMAT
+        value: "json"
+      - name: TRACING_ENABLED
+        value: "true"
+      - name: PROFILING_ENABLED
+        value: "true"
+      - name: METRICS_ENABLED
+        value: "true"
+      - name: DB_HOST
+        value: "auth-db-pooler.auth.svc.cluster.local"
+      - name: DB_PORT
+        value: "5432"
+      - name: DB_NAME
+        value: "auth"
+      - name: DB_USER
+        value: "auth"
+      - name: DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: auth.auth-db.credentials.postgresql.acid.zalan.do
+            key: password
+      - name: DB_SSLMODE
+        value: "require"
+      - name: DB_POOL_MAX_CONNECTIONS
+        value: "10"  # Local: 10 (chart default: 25)
+      - name: DB_POOL_MODE
+        value: "transaction"
+      - name: SHUTDOWN_TIMEOUT
+        value: "10s"
+
+---
+#############################################################################
+# User Service - Local overrides
+#############################################################################
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: user
+  namespace: user
+spec:
+  values:
+    replicaCount: 1
+    
+    resources:
+      requests:
+        memory: "32Mi"
+        cpu: "25m"
+      limits:
+        memory: "64Mi"
+        cpu: "50m"
+    
+    env:
+      - name: SERVICE_NAME
+        value: "user"
+      - name: PORT
+        value: "8080"
+      - name: ENV
+        value: "local"
+      - name: OTEL_COLLECTOR_ENDPOINT
+        value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
+      - name: OTEL_SAMPLE_RATE
+        value: "1.0"
+      - name: PYROSCOPE_ENDPOINT
+        value: "http://pyroscope.monitoring.svc.cluster.local:4040"
+      - name: LOG_LEVEL
+        value: "debug"
+      - name: LOG_FORMAT
+        value: "json"
+      - name: TRACING_ENABLED
+        value: "true"
+      - name: PROFILING_ENABLED
+        value: "true"
+      - name: METRICS_ENABLED
+        value: "true"
+      - name: DB_HOST
+        value: "supporting-db.user.svc.cluster.local"
+      - name: DB_PORT
+        value: "5432"
+      - name: DB_NAME
+        value: "user"
+      - name: DB_USER
+        value: "user"
+      - name: DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: user.supporting-db.credentials.postgresql.acid.zalan.do
+            key: password
+      - name: DB_SSLMODE
+        value: "require"
+      - name: DB_POOL_MAX_CONNECTIONS
+        value: "10"
+      - name: DB_POOL_MODE
+        value: "session"
+      - name: SHUTDOWN_TIMEOUT
+        value: "10s"
+
+---
+#############################################################################
+# Product Service - Local overrides
+#############################################################################
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: product
+  namespace: product
+spec:
+  values:
+    replicaCount: 1
+    
+    resources:
+      requests:
+        memory: "32Mi"
+        cpu: "25m"
+      limits:
+        memory: "64Mi"
+        cpu: "50m"
+    
+    env:
+      - name: SERVICE_NAME
+        value: "product"
+      - name: PORT
+        value: "8080"
+      - name: ENV
+        value: "local"
+      - name: OTEL_COLLECTOR_ENDPOINT
+        value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
+      - name: OTEL_SAMPLE_RATE
+        value: "1.0"
+      - name: PYROSCOPE_ENDPOINT
+        value: "http://pyroscope.monitoring.svc.cluster.local:4040"
+      - name: LOG_LEVEL
+        value: "debug"
+      - name: LOG_FORMAT
+        value: "json"
+      - name: TRACING_ENABLED
+        value: "true"
+      - name: PROFILING_ENABLED
+        value: "true"
+      - name: METRICS_ENABLED
+        value: "true"
+      - name: DB_HOST
+        value: "product-db-pooler.product.svc.cluster.local"
+      - name: DB_PORT
+        value: "5432"
+      - name: DB_NAME
+        value: "product"
+      - name: DB_USER
+        value: "product"
+      - name: DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: product.product-db.credentials.postgresql.acid.zalan.do
+            key: password
+      - name: DB_SSLMODE
+        value: "require"
+      - name: DB_POOL_MAX_CONNECTIONS
+        value: "10"
+      - name: DB_POOL_MODE
+        value: "transaction"
+      - name: SHUTDOWN_TIMEOUT
+        value: "10s"
+
+---
+#############################################################################
+# Cart Service - Local overrides
+#############################################################################
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cart
+  namespace: cart
+spec:
+  values:
+    replicaCount: 1
+    
+    resources:
+      requests:
+        memory: "32Mi"
+        cpu: "25m"
+      limits:
+        memory: "64Mi"
+        cpu: "50m"
+    
+    env:
+      - name: SERVICE_NAME
+        value: "cart"
+      - name: PORT
+        value: "8080"
+      - name: ENV
+        value: "local"
+      - name: OTEL_COLLECTOR_ENDPOINT
+        value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
+      - name: OTEL_SAMPLE_RATE
+        value: "1.0"
+      - name: PYROSCOPE_ENDPOINT
+        value: "http://pyroscope.monitoring.svc.cluster.local:4040"
+      - name: LOG_LEVEL
+        value: "debug"
+      - name: LOG_FORMAT
+        value: "json"
+      - name: TRACING_ENABLED
+        value: "true"
+      - name: PROFILING_ENABLED
+        value: "true"
+      - name: METRICS_ENABLED
+        value: "true"
+      - name: DB_HOST
+        value: "transaction-db-pooler.cart.svc.cluster.local"
+      - name: DB_PORT
+        value: "5432"
+      - name: DB_NAME
+        value: "cart"
+      - name: DB_USER
+        value: "cart"
+      - name: DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: cart.transaction-db.credentials.postgresql.acid.zalan.do
+            key: password
+      - name: DB_SSLMODE
+        value: "require"
+      - name: DB_POOL_MAX_CONNECTIONS
+        value: "10"
+      - name: DB_POOL_MODE
+        value: "transaction"
+      - name: SHUTDOWN_TIMEOUT
+        value: "10s"
+
+---
+#############################################################################
+# Order Service - Local overrides
+#############################################################################
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: order
+  namespace: order
+spec:
+  values:
+    replicaCount: 1
+    
+    resources:
+      requests:
+        memory: "32Mi"
+        cpu: "25m"
+      limits:
+        memory: "64Mi"
+        cpu: "50m"
+    
+    env:
+      - name: SERVICE_NAME
+        value: "order"
+      - name: PORT
+        value: "8080"
+      - name: ENV
+        value: "local"
+      - name: OTEL_COLLECTOR_ENDPOINT
+        value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
+      - name: OTEL_SAMPLE_RATE
+        value: "1.0"
+      - name: PYROSCOPE_ENDPOINT
+        value: "http://pyroscope.monitoring.svc.cluster.local:4040"
+      - name: LOG_LEVEL
+        value: "debug"
+      - name: LOG_FORMAT
+        value: "json"
+      - name: TRACING_ENABLED
+        value: "true"
+      - name: PROFILING_ENABLED
+        value: "true"
+      - name: METRICS_ENABLED
+        value: "true"
+      - name: DB_HOST
+        value: "transaction-db-pooler.order.svc.cluster.local"
+      - name: DB_PORT
+        value: "5432"
+      - name: DB_NAME
+        value: "order"
+      - name: DB_USER
+        value: "order"
+      - name: DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: order.transaction-db.credentials.postgresql.acid.zalan.do
+            key: password
+      - name: DB_SSLMODE
+        value: "require"
+      - name: DB_POOL_MAX_CONNECTIONS
+        value: "10"
+      - name: DB_POOL_MODE
+        value: "transaction"
+      - name: SHUTDOWN_TIMEOUT
+        value: "10s"
+
+---
+#############################################################################
+# Review Service - Local overrides
+#############################################################################
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: review
+  namespace: review
+spec:
+  values:
+    replicaCount: 1
+    
+    resources:
+      requests:
+        memory: "32Mi"
+        cpu: "25m"
+      limits:
+        memory: "64Mi"
+        cpu: "50m"
+    
+    env:
+      - name: SERVICE_NAME
+        value: "review"
+      - name: PORT
+        value: "8080"
+      - name: ENV
+        value: "local"
+      - name: OTEL_COLLECTOR_ENDPOINT
+        value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
+      - name: OTEL_SAMPLE_RATE
+        value: "1.0"
+      - name: PYROSCOPE_ENDPOINT
+        value: "http://pyroscope.monitoring.svc.cluster.local:4040"
+      - name: LOG_LEVEL
+        value: "debug"
+      - name: LOG_FORMAT
+        value: "json"
+      - name: TRACING_ENABLED
+        value: "true"
+      - name: PROFILING_ENABLED
+        value: "true"
+      - name: METRICS_ENABLED
+        value: "true"
+      - name: DB_HOST
+        value: "review-db.review.svc.cluster.local"
+      - name: DB_PORT
+        value: "5432"
+      - name: DB_NAME
+        value: "review"
+      - name: DB_USER
+        value: "review"
+      - name: DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: review.review-db.credentials.postgresql.acid.zalan.do
+            key: password
+      - name: DB_SSLMODE
+        value: "require"
+      - name: DB_POOL_MAX_CONNECTIONS
+        value: "10"
+      - name: DB_POOL_MODE
+        value: "session"
+      - name: SHUTDOWN_TIMEOUT
+        value: "10s"
+
+---
+#############################################################################
+# Notification Service - Local overrides
+#############################################################################
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: notification
+  namespace: notification
+spec:
+  values:
+    replicaCount: 1
+    
+    resources:
+      requests:
+        memory: "32Mi"
+        cpu: "25m"
+      limits:
+        memory: "64Mi"
+        cpu: "50m"
+    
+    env:
+      - name: SERVICE_NAME
+        value: "notification"
+      - name: PORT
+        value: "8080"
+      - name: ENV
+        value: "local"
+      - name: OTEL_COLLECTOR_ENDPOINT
+        value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
+      - name: OTEL_SAMPLE_RATE
+        value: "1.0"
+      - name: PYROSCOPE_ENDPOINT
+        value: "http://pyroscope.monitoring.svc.cluster.local:4040"
+      - name: LOG_LEVEL
+        value: "debug"
+      - name: LOG_FORMAT
+        value: "json"
+      - name: TRACING_ENABLED
+        value: "true"
+      - name: PROFILING_ENABLED
+        value: "true"
+      - name: METRICS_ENABLED
+        value: "true"
+      - name: DB_HOST
+        value: "supporting-db.notification.svc.cluster.local"
+      - name: DB_PORT
+        value: "5432"
+      - name: DB_NAME
+        value: "notification"
+      - name: DB_USER
+        value: "notification"
+      - name: DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: notification.supporting-db.credentials.postgresql.acid.zalan.do
+            key: password
+      - name: DB_SSLMODE
+        value: "require"
+      - name: DB_POOL_MAX_CONNECTIONS
+        value: "10"
+      - name: DB_POOL_MODE
+        value: "session"
+      - name: SHUTDOWN_TIMEOUT
+        value: "10s"
+
+---
+#############################################################################
+# Shipping Service (v1) - Local overrides
+#############################################################################
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: shipping
+  namespace: shipping
+spec:
+  values:
+    replicaCount: 1
+    
+    resources:
+      requests:
+        memory: "32Mi"
+        cpu: "25m"
+      limits:
+        memory: "64Mi"
+        cpu: "50m"
+    
+    env:
+      - name: SERVICE_NAME
+        value: "shipping"
+      - name: PORT
+        value: "8080"
+      - name: ENV
+        value: "local"
+      - name: OTEL_COLLECTOR_ENDPOINT
+        value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
+      - name: OTEL_SAMPLE_RATE
+        value: "1.0"
+      - name: PYROSCOPE_ENDPOINT
+        value: "http://pyroscope.monitoring.svc.cluster.local:4040"
+      - name: LOG_LEVEL
+        value: "debug"
+      - name: LOG_FORMAT
+        value: "json"
+      - name: TRACING_ENABLED
+        value: "true"
+      - name: PROFILING_ENABLED
+        value: "true"
+      - name: METRICS_ENABLED
+        value: "true"
+      - name: DB_HOST
+        value: "supporting-db.shipping.svc.cluster.local"
+      - name: DB_PORT
+        value: "5432"
+      - name: DB_NAME
+        value: "shipping"
+      - name: DB_USER
+        value: "shipping"
+      - name: DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: shipping.supporting-db.credentials.postgresql.acid.zalan.do
+            key: password
+      - name: DB_SSLMODE
+        value: "require"
+      - name: DB_POOL_MAX_CONNECTIONS
+        value: "10"
+      - name: DB_POOL_MODE
+        value: "session"
+      - name: SHUTDOWN_TIMEOUT
+        value: "10s"
+
+---
+#############################################################################
+# Shipping Service (v2) - Local overrides
+#############################################################################
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: shipping-v2
+  namespace: shipping
+spec:
+  values:
+    replicaCount: 1
+    
+    resources:
+      requests:
+        memory: "32Mi"
+        cpu: "25m"
+      limits:
+        memory: "64Mi"
+        cpu: "50m"
+    
+    env:
+      - name: SERVICE_NAME
+        value: "shipping-v2"
+      - name: PORT
+        value: "8080"
+      - name: ENV
+        value: "local"
+      - name: OTEL_COLLECTOR_ENDPOINT
+        value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
+      - name: OTEL_SAMPLE_RATE
+        value: "1.0"
+      - name: PYROSCOPE_ENDPOINT
+        value: "http://pyroscope.monitoring.svc.cluster.local:4040"
+      - name: LOG_LEVEL
+        value: "debug"
+      - name: LOG_FORMAT
+        value: "json"
+      - name: TRACING_ENABLED
+        value: "true"
+      - name: PROFILING_ENABLED
+        value: "true"
+      - name: METRICS_ENABLED
+        value: "true"
+      - name: DB_HOST
+        value: "supporting-db.shipping.svc.cluster.local"
+      - name: DB_PORT
+        value: "5432"
+      - name: DB_NAME
+        value: "shipping"
+      - name: DB_USER
+        value: "shipping"
+      - name: DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: shipping.supporting-db.credentials.postgresql.acid.zalan.do
+            key: password
+      - name: DB_SSLMODE
+        value: "require"
+      - name: DB_POOL_MAX_CONNECTIONS
+        value: "10"
+      - name: DB_POOL_MODE
+        value: "session"
+      - name: SHUTDOWN_TIMEOUT
+        value: "10s"
+
+---
+#############################################################################
+# K6 Load Testing - Local overrides
+#############################################################################
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: k6
+  namespace: k6
+spec:
+  values:
+    replicaCount: 1
+    
+    resources:
+      requests:
+        memory: "1Gi"    # Local: 1Gi (base: 2Gi)
+        cpu: "500m"      # Local: 500m (base: 1000m)
+      limits:
+        memory: "2Gi"    # Local: 2Gi (base: 4Gi)
+        cpu: "1000m"     # Local: 1000m (base: 2000m)
+    
+    # Reduced RPS for local testing
+    env:
+      - name: BASELINE_RPS
+        value: "10"      # Local: 10 RPS (base: 30)
+      - name: PEAK_RPS
+        value: "30"      # Local: 30 RPS (base: 100)
+      - name: BURST_RPS
+        value: "50"      # Local: 50 RPS (base: 200)
+      - name: BURST_DURATION
+        value: "2m"      # Local: 2m (base: 5m)
+      - name: BURST_TIMING
+        value: "10:00-14:00"

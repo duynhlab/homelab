@@ -1,0 +1,43 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: apps-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: apps
+spec:
+  interval: 10m
+  timeout: 10m
+  retryInterval: 2m
+  
+  sourceRef:
+    kind: OCIRepository
+    name: apps-oci
+  
+  path: ./
+  
+  prune: true
+  wait: true
+  
+  # Apps depend on ALL infrastructure being ready
+  dependsOn:
+    - name: infrastructure-local  # Namespaces
+    - name: monitoring-local       # Prometheus for metrics
+    - name: apm-local              # OTel/Loki/Tempo for traces/logs
+    - name: databases-local        # PostgreSQL clusters for data
+  
+  # Health checks for apps
+  healthChecks:
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: auth
+      namespace: auth
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: product
+      namespace: product
+    - apiVersion: fluxcd.controlplane.io/v1
+      kind: ResourceSet
+      name: frontend
+      namespace: default

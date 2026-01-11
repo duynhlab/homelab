@@ -1,0 +1,19 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: product
+  namespace: product
+  labels:
+    app.kubernetes.io/name: product
+    app.kubernetes.io/component: backend
+spec:
+  interval: 10m
+  timeout: 5m
+  
+  chartRef:
+    kind: OCIRepository
+    name: mop-chart-oci
+    namespace: flux-system
+  
+  releaseName: product

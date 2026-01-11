@@ -1,0 +1,15 @@
+---
+# Production Infrastructure Overlay
+# TODO: Add production-specific infrastructure patches
+# Example: larger storage, longer retention, HA configuration
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base/infrastructure
+
+# Production-specific labels
+labels:
+  - pairs:
+      environment: production

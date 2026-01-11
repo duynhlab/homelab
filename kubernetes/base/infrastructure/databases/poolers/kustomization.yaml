@@ -1,0 +1,18 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Note: product and transaction are directories containing ConfigMap, Deployment, Service
+
+resources:
+  - product/configmap.yaml
+  - product/deployment.yaml
+  - product/service.yaml
+  - transaction/configmap.yaml
+  - transaction/deployment.yaml
+  - transaction/service.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: flux
+      app.kubernetes.io/component: connection-pooler

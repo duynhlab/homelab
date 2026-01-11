@@ -8,6 +8,128 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+## [0.22.0] - 2026-01-11
+
+### Fixed
+
+**Flux Operator Dependency Chain & Namespace Consistency**
+
+Critical fixes to ensure correct deployment order and namespace alignment for APM components.
+
+#### Dependency Chain Fix
+- **Fixed:** `kubernetes/clusters/local/apps.yaml` - Added complete infrastructure dependencies
+  - **Before:** Apps only depended on `infrastructure-local` (namespaces only)
+  - **After:** Apps now depend on `infrastructure-local`, `monitoring-local`, `apm-local`, `databases-local`
+  - **Impact:** Prevents apps from deploying before databases/monitoring/APM are ready
+  - **Why Critical:** Init containers (Flyway migrations) require database clusters ready, microservices require OTel/Loki ready for traces/logs
+
+#### APM Namespace Fix
+- **Fixed:** APM components namespace from `apm` → `monitoring`
+  - `kubernetes/base/infrastructure/apm/tempo/kustomization.yaml`
+  - `kubernetes/base/infrastructure/apm/loki/kustomization.yaml`
+  - `kubernetes/base/infrastructure/apm/pyroscope/kustomization.yaml`
+  - `kubernetes/base/infrastructure/apm/jaeger/helmrelease.yaml`
+  - `kubernetes/clusters/local/apm.yaml` (healthChecks)
+- **Reason:** Service endpoints use `*.monitoring.svc.cluster.local`, Vector config points to `loki.monitoring.svc.cluster.local`, resource manifests already declare `namespace: monitoring`
+- **Impact:** Aligns Kustomization namespace declarations with actual resource deployment and service DNS
+
+### Changed
+
+**Documentation Consolidation**
+
+- **Consolidated:** `kubernetes/clusters/local/FLUX_OPERATOR_INSTALLATION.md` + `kubernetes/clusters/local/OCI_REGISTRY.md` → `kubernetes/clusters/local/README.md`
+  - Reduced from 414 lines (2 files) to 219 lines (1 file)
+  - Added Quick Start section (5 commands)
+  - Documented Helm + kubectl installation pattern (production-ready approach)
+  - Included OCI registry setup
+  - Added deployment order with dependency chain
+  - Verification commands and common issues
+
+## [0.21.0] - 2026-01-11
+
+### Changed
+
+**Documentation Update: Complete GitOps Migration Reflection**
+
+Comprehensive update of all documentation to reflect the **100% complete Flux GitOps migration**. All script-based deployment references replaced with modern GitOps workflows using Flux Operator, Kustomize, and OCI artifacts.
+
+#### Root Documentation
+- **README.md**:
+  - Quick Start: Replaced 8 numbered scripts (`01-08.sh`) with 3 GitOps commands (`kind-up.sh`, `flux-up.sh`, `flux-push.sh`)
+  - Technology Stack: Added "GitOps: Flux Operator, Kustomize, OCI Registry"
+  - Project Structure: Added complete `kubernetes/` directory structure with base/overlays/clusters explanation
+  - Access Points: Added Flux Web UI (`http://localhost:9080`)
+  - Architecture: Documented GitOps deployment model with automatic reconciliation
+
+- **AGENTS.md**:
+  - Deployment Order: Replaced numbered script sequence with Flux automated workflow showing dependency-aware deployment
+  - Project Structure: Added `kubernetes/` directory with GitOps structure (base/overlays/clusters)
+  - Technology Stack: Added Flux Operator to deployment tools
+  - Development Commands: Updated deployment command to `./scripts/flux-push.sh`
+  - Find Files by Purpose: Updated all paths from `k8s/` to `kubernetes/base/infrastructure/` and `kubernetes/base/apps/`
+
+#### Documentation Index
+- **docs/README.md**:
+  - Learning Path: Updated Setup Guide description to emphasize GitOps (3 commands, 5 minutes)
+  - Common Tasks: Replaced 10+ script commands with Flux workflow (kind-up, flux-up, flux-push, flux-sync, flux-ui)
+  - Quick Reference: Added GitOps concepts (Flux Operator, Kustomize, OCI Registry, HelmRelease CRDs)
+  - Deployment commands: Changed from sequential script execution to declarative GitOps
+
+#### APM Documentation
+- **docs/apm/README.md**:
+  - Added comprehensive "Deployment (GitOps)" section after Overview
+  - Documented Flux Kustomization (`apm-stack`), OCI source (`localhost:5050/flux-infra-sync`), reconciliation interval (10 minutes)
+  - Listed all 6 APM components with deployment method (Tempo/Jaeger/Vector/OTel: HelmRelease, Loki/Pyroscope: Deployment+ConfigMap)
+  - Updated individual component deployment sections (Tempo, Vector+Loki, Pyroscope)
+  - Added verification commands (`flux get kustomizations`, `kubectl get helmreleases`, `kubectl get pods`)
+  - Marked legacy scripts (`03a-d.sh`) as "reference only"
+
+#### Database Documentation
+- **docs/guides/DATABASE.md**:
+  - Updated 15+ file path references:
+    - `k8s/postgres-operator/cloudnativepg/crds/` → `kubernetes/base/infrastructure/databases/clusters/`
+    - `k8s/postgres-operator/pgcat/` → `kubernetes/base/infrastructure/databases/poolers/pgcat-`
+  - Added comprehensive "Deployment (GitOps)" section after TOC
+  - Documented Flux Kustomization (`database-stack`), prune=false for safety
+  - Listed all components: 2 operators (Zalando, CloudNativePG HelmReleases), 5 clusters, 2 poolers, 3 secrets
+  - Added verification commands for clusters, poolers, and pods
+  - Documented file structure in `kubernetes/base/infrastructure/databases/`
+  - Marked legacy scripts (`04-deploy-databases.sh`, `04a-verify-databases.sh`) as "reference only"
+
+#### SLO Documentation
+- **docs/slo/README.md**:
+  - Replaced Quick Start section with GitOps deployment documentation
+  - Documented Flux Kustomization (`slo-stack`), OCI source, reconciliation
+  - Listed components: Sloth Operator HelmRelease (v0.15.0), 9 PrometheusServiceLevel CRDs (27 total SLOs)
+  - Added verification commands (`kubectl get prometheusservicelevel -A`, `kubectl get prometheusrule`)
+  - Updated deployment reference path to `kubernetes/base/infrastructure/slo/`
+  - Marked legacy script (`07-deploy-slo.sh`) as "reference only"
+
+#### Monitoring Documentation
+- **docs/monitoring/METRICS.md**:
+  - Updated ServiceMonitor reference with new path (`kubernetes/base/infrastructure/monitoring/servicemonitors/microservices.yaml`)
+  - Added Flux deployment note (deployed via `monitoring-stack` Kustomization)
+  - Updated namespace selector description (explicitly lists 8 namespaces: auth, user, product, cart, order, review, notification, shipping)
+  - Added manual reconciliation command reference
+
+#### Key Improvements
+1. **Deployment Simplification**: 8 sequential scripts → 3 commands (62.5% reduction)
+2. **Automatic Dependency Management**: Flux reconciles in correct order automatically (Monitoring → APM → Databases → Apps → SLO)
+3. **Drift Detection**: Automatic reconciliation every 10 minutes + manual trigger via `flux reconcile`
+4. **Multi-Environment Ready**: Documented `kubernetes/overlays/` structure (local active, staging/production placeholders)
+5. **Production-Ready Patterns**: 67-89% YAML reduction, single source of truth in OCI registry, Kubernetes-native
+
+#### Statistics
+- Files Updated: 7 (README.md, AGENTS.md, docs/README.md, docs/apm/README.md, docs/guides/DATABASE.md, docs/slo/README.md, docs/monitoring/METRICS.md)
+- Path Updates: 20+ references from `k8s/*` to `kubernetes/base/*`
+- Script References Removed: 10+ (`01-08.sh`)
+- New Sections Added: 4 major deployment sections with GitOps workflows
+- Verification Commands Added: 30+ (`flux get`, `kubectl get`, manual reconciliation)
+- Mermaid Diagrams: Preserved all existing diagrams
+
+#### Legacy References
+All legacy script references (`./scripts/0X-*.sh`) are now marked as "reference only" in documentation. The GitOps workflow using Flux Operator is now the primary and recommended deployment method.
+
 ## [0.20.0] - 2026-01-09
 
 ### Fixed

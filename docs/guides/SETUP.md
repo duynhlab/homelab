@@ -16,13 +16,18 @@ make prereqs
 
 ```bash
 # 1. Create Kind cluster + OCI registry
-./scripts/kind-up.sh
+make cluster-up
 
 # 2. Bootstrap Flux Operator
-./scripts/flux-up.sh  # or: make flux-up
+make flux-up
 
 # 3. Deploy all infrastructure and applications
-./scripts/flux-push.sh  # or: make flux-push
+make flux-push
+```
+
+**Or use one command:**
+```bash
+make up  # Does all 3 steps automatically
 ```
 
 Wait 5-10 minutes for reconciliation. Then access:
@@ -362,7 +367,7 @@ make prereqs
 ### Step 1: Create Kind Cluster
 
 ```bash
-./scripts/kind-up.sh
+make cluster-up
 ```
 
 **What it does:**
@@ -386,6 +391,7 @@ docker ps | grep mop-registry
 **Technical details:**
 - Cluster name: `mop` (configurable via `CLUSTER_NAME` env var)
 - Registry: `localhost:5050` (Docker container)
+- Script: `scripts/kind-up.sh`
 - Pattern: Based on `flux-operator-local-dev/scripts/kind-up.sh`
 
 ---
@@ -393,8 +399,7 @@ docker ps | grep mop-registry
 ### Step 2: Bootstrap Flux Operator
 
 ```bash
-./scripts/flux-up.sh
-# or: make flux-up
+make flux-up
 ```
 
 **What it does:**
@@ -425,14 +430,14 @@ kubectl get pods -n flux-system
 - Flux Operator chart: `oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator`
 - FluxInstance pulls from: `oci://localhost:5050/flux-cluster-sync`
 - Insecure mode for local registry (no TLS)
+- Script: `scripts/flux-up.sh`
 
 ---
 
 ### Step 3: Deploy All Infrastructure and Applications
 
 ```bash
-./scripts/flux-push.sh
-# or: make flux-push
+make flux-push
 ```
 
 **What it does:**
@@ -448,7 +453,7 @@ kubectl get pods -n flux-system
 
 **Verify reconciliation:**
 ```bash
-make flux-ls
+make flux-status
 # Expected: All Kustomizations in "Applied" status
 ```
 
@@ -462,6 +467,8 @@ flux get kustomizations --watch
 - Applications: 2-3 minutes
 - SLO: 1-2 minutes
 - **Total: 5-10 minutes**
+
+**Script:** `scripts/flux-push.sh`
 
 ---
 
@@ -560,8 +567,6 @@ kubectl port-forward -n flux-system svc/flux-operator 9080:9080
 |---------|---------|
 | `make cluster-check` | Check if Kind cluster `mop` is running |
 | `make cluster-up` | Create Kind cluster (if not exists) |
-
-**Note:** Use `./scripts/01-create-kind-cluster.sh` for first-time cluster creation.
 
 ### Registry Operations
 
@@ -894,18 +899,13 @@ make clean
 
 ```bash
 # Remove everything (cluster + Flux + registry)
-make clean-all
+make down
 ```
 
 **What it does:**
 - Deletes Kind cluster (`mop`)
 - Stops and removes OCI registry
 - Frees up Docker resources
-
-**Legacy script:**
-```bash
-./scripts/cleanup.sh
-```
 
 **Verify cleanup:**
 ```bash

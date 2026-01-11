@@ -8,6 +8,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+## [0.23.0] - 2026-01-11
+
+### Changed
+
+**Makefile Simplification - Following flux-operator-local-dev Pattern**
+
+Complete refactor of Makefile to follow production best practices from ControlPlane.io's `flux-operator-local-dev` repository.
+
+#### Makefile Refactor (67% Reduction)
+- **Simplified:** 239 lines → 85 lines (67% reduction)
+- **Pattern Change:** Each target now delegates to a single script (no inline logic)
+- **Removed Complexity:**
+  - Inline Docker commands (registry management)
+  - Inline Helm commands (Flux installation)
+  - Inline kubectl commands (verification)
+  - Complex color variables and formatting
+  - Registry management logic
+
+- **Added Composite Targets:**
+  - `make up` - Bootstrap complete environment (cluster-up + flux-up + flux-push)
+  - `make down` - Delete cluster and registry
+  - `make sync` - Push and reconcile manifests (flux-push + flux-sync)
+  - `make all` - Alias for `make up`
+
+- **Benefits:**
+  - Makefile is now a thin wrapper (easier to understand)
+  - All logic in scripts (easier to test/debug)
+  - Follows industry standard pattern (ControlPlane.io)
+  - Clear separation of concerns
+
+#### Documentation Updates
+- **docs/guides/SETUP.md:** Updated 7 locations to use Makefile commands instead of direct script calls
+  - Quick Start: Use `make up` for one-command deployment
+  - Step 1 (Create Cluster): Use `make cluster-up` instead of `./scripts/kind-up.sh`
+  - Step 2 (Bootstrap Flux): Use `make flux-up` instead of `./scripts/flux-up.sh`
+  - Step 3 (Deploy All): Use `make flux-push` instead of `./scripts/flux-push.sh`
+  - Cluster Operations: Removed outdated note about legacy scripts
+  - Cleanup Section: Use `make down` instead of `./scripts/cleanup.sh`
+
+#### Backward Compatibility
+- All existing scripts (`./scripts/*.sh`) still work
+- New Makefile commands are now the recommended way
+- Documentation updated to reflect best practices
+
+#### Reference
+- Pattern based on: [`flux-operator-local-dev/Makefile`](https://github.com/controlplaneio-fluxcd/flux-operator-local-dev/blob/main/Makefile)
+- Author: Stefan Prodan (ControlPlane.io)
+
 ## [0.22.0] - 2026-01-11
 
 ### Fixed

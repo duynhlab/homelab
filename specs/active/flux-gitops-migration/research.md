@@ -457,6 +457,8 @@ echo "Flux Web UI: http://localhost:9080"
 
 ## Repository Structure Patterns (flux-operator-local-dev Analysis)
 
+**Updated 2026-01-12:** Simplified structure adopted for personal learning project (no base/overlays complexity).
+
 ### Directory Structure
 
 ```
@@ -467,11 +469,11 @@ flux-operator-local-dev/
 │   │   ├── registry.yaml         # ResourceSetInputProvider (local registry config)
 │   │   ├── infra.yaml            # ResourceSet for infrastructure components
 │   │   └── apps.yaml             # ResourceSet for applications
-│   ├── infra/                    # Infrastructure components (raw manifests)
+│   ├── infra/                    # Infrastructure components (direct manifests)
 │   │   ├── cert-manager.yaml
 │   │   ├── gateway-api.yaml
 │   │   └── metrics-server.yaml
-│   └── apps/                     # Application definitions (raw manifests)
+│   └── apps/                     # Application definitions (direct manifests)
 │       ├── podinfo.yaml
 │       └── redis.yaml
 ├── scripts/
@@ -485,23 +487,33 @@ flux-operator-local-dev/
 
 ### Key Design Patterns
 
-#### 1. Three-Layer Architecture
+#### 1. Simplified Three-Layer Architecture (Adopted 2026-01-12)
 
 **Layer 1: Cluster Configuration** (`kubernetes/clusters/local/`)
 - **FluxInstance**: Defines which Flux components to install
-- **ResourceSetInputProvider**: Provides configuration inputs (registry URL, tags, namespaces)
-- **ResourceSets**: Orchestrate deployment of infra/apps layers
+- **ResourceSetInputProvider**: Provides configuration inputs (registry URL, tags, namespaces) - optional
+- **Kustomization CRDs**: Orchestrate deployment of infra/apps layers (primary pattern)
 
 **Layer 2: Infrastructure** (`kubernetes/infra/`)
-- Raw Kubernetes manifests for cluster addons (cert-manager, metrics-server, gateway-api)
-- Pushed as OCI artifact: `oci://flux-registry:5000/flux-infra-sync:local`
-- Reconciled by `infra-sync` Kustomization
+- Direct Kubernetes manifests for cluster addons (no base/overlay)
+- Can use HelmRelease CRDs for operators (Prometheus, Grafana, etc.)
+- Can optionally use ResourceSet for 1 component (learning example)
+- Pushed as OCI artifact: `oci://mop-registry:5000/flux-infra-sync:local`
+- Reconciled by `infrastructure-local` Kustomization CRD
 
 **Layer 3: Applications** (`kubernetes/apps/`)
-- Raw Kubernetes manifests for application workloads (podinfo, redis)
-- Pushed as OCI artifact: `oci://flux-registry:5000/flux-apps-sync:local`
-- Reconciled by `apps-sync` Kustomization
-- Dependencies: `apps-sync` depends on `infra-sync` (ensures infra ready first)
+- Direct Kubernetes manifests for application workloads (no base/overlay)
+- HelmRelease CRDs for 9 backend services (with inline patches or separate patch files)
+- ResourceSet for frontend (learning example)
+- Pushed as OCI artifact: `oci://mop-registry:5000/flux-apps-sync:local`
+- Reconciled by `apps-local` Kustomization CRD
+- Dependencies: `apps-local` depends on `infrastructure-local` (ensures infra ready first)
+
+**Why Simplified?**
+- Personal learning project doesn't need base/overlay complexity
+- Reference project uses direct manifests (easier to follow)
+- Easier to understand and maintain for single developer
+- Still supports hybrid approach (ResourceSet + HelmRelease)
 
 #### 2. OCI Artifact Workflow
 
@@ -716,104 +728,59 @@ graph TD
 
 ---
 
-### Repository Structure with Kustomize
+### Repository Structure (Simplified - Adopted 2026-01-12)
 
-**Recommended Structure for This Project:**
+**Updated Structure for This Project (Following Reference Pattern):**
 
 ```
 kubernetes/
-├── base/                                    # Shared base manifests
-│   ├── infrastructure/
-│   │   ├── kustomization.yaml
-│   │   ├── namespaces.yaml
-│   │   ├── monitoring/
-│   │   │   ├── kustomization.yaml
-│   │   │   ├── prometheus-operator.yaml
-│   │   │   ├── grafana-operator.yaml
-│   │   │   └── metrics-server.yaml
-│   │   ├── apm/
-│   │   │   ├── kustomization.yaml
-│   │   │   ├── tempo.yaml
-│   │   │   ├── pyroscope.yaml
-│   │   │   ├── loki.yaml
-│   │   │   └── vector.yaml
-│   │   └── databases/
-│   │       ├── kustomization.yaml
-│   │       ├── operators.yaml
-│   │       └── README.md
-│   └── apps/
-│       ├── kustomization.yaml
-│       ├── auth/
-│       │   ├── kustomization.yaml
-│       │   ├── deployment.yaml
-│       │   ├── service.yaml
-│       │   └── helmrelease.yaml          # Flux HelmRelease CRD
-│       ├── user/
-│       ├── product/
-│       ├── cart/
-│       ├── order/
-│       ├── review/
-│       ├── notification/
-│       ├── shipping/
-│       ├── shipping-v2/
-│       └── frontend/
+├── infra/                                    # Infrastructure manifests (direct, no base/overlay)
+│   ├── monitoring.yaml                        # Prometheus, Grafana, Metrics Server (HelmRelease CRDs)
+│   ├── apm.yaml                              # Tempo, Loki, Pyroscope, Jaeger, Vector, OTel
+│   ├── databases.yaml                        # Zalando Operator, CloudNativePG Operator, 5 clusters
+│   └── slo.yaml                              # Sloth Operator + 9 PrometheusServiceLevel CRDs
 │
-├── overlays/
-│   ├── local/                               # Local Kind cluster
-│   │   ├── kustomization.yaml
-│   │   ├── infrastructure/
-│   │   │   ├── kustomization.yaml
-│   │   │   └── patches/
-│   │   │       ├── monitoring-resources.yaml    # Smaller resources
-│   │   │       └── database-replicas.yaml       # 1 replica
-│   │   └── apps/
-│   │       ├── kustomization.yaml
-│   │       └── patches/
-│   │           ├── replicas.yaml                # replicaCount: 1
-│   │           ├── resources.yaml               # Minimal CPU/memory
-│   │           ├── images.yaml                  # localhost:5050 registry
-│   │           └── env-local.yaml               # Local env vars
-│   │
-│   ├── staging/                             # Staging cluster
-│   │   ├── kustomization.yaml
-│   │   ├── infrastructure/
-│   │   │   ├── kustomization.yaml
-│   │   │   └── patches/
-│   │   │       ├── monitoring-resources.yaml    # Medium resources
-│   │   │       └── database-replicas.yaml       # 2 replicas
-│   │   └── apps/
-│   │       ├── kustomization.yaml
-│   │       └── patches/
-│   │           ├── replicas.yaml                # replicaCount: 2
-│   │           ├── resources.yaml               # Medium CPU/memory
-│   │           ├── images.yaml                  # ghcr.io with staging tag
-│   │           └── env-staging.yaml             # Staging env vars
-│   │
-│   └── production/                          # Production cluster
-│       ├── kustomization.yaml
-│       ├── infrastructure/
-│       │   ├── kustomization.yaml
-│       │   └── patches/
-│       │       ├── monitoring-resources.yaml    # Full resources
-│       │       ├── database-replicas.yaml       # 3 replicas (HA)
-│       │       └── database-backup.yaml         # Enable backups
-│       └── apps/
-│           ├── kustomization.yaml
-│           └── patches/
-│               ├── replicas.yaml                # replicaCount: 3
-│               ├── resources.yaml               # Full CPU/memory
-│               ├── images.yaml                  # ghcr.io with production tag
-│               ├── env-production.yaml          # Production env vars
-│               ├── hpa.yaml                     # HorizontalPodAutoscaler
-│               └── pdb.yaml                     # PodDisruptionBudget
+├── apps/                                     # Application manifests (direct, no base/overlay)
+│   ├── auth.yaml                             # HelmRelease + patches (inline or separate)
+│   ├── user.yaml                             # HelmRelease + patches
+│   ├── product.yaml                          # HelmRelease + patches
+│   ├── cart.yaml                             # HelmRelease + patches
+│   ├── order.yaml                            # HelmRelease + patches
+│   ├── review.yaml                           # HelmRelease + patches
+│   ├── notification.yaml                     # HelmRelease + patches
+│   ├── shipping.yaml                         # HelmRelease + patches
+│   ├── shipping-v2.yaml                      # HelmRelease + patches
+│   ├── k6.yaml                               # HelmRelease + patches
+│   └── frontend.yaml                         # ResourceSet (learning example)
 │
-└── clusters/                                    # Flux cluster configuration
+└── clusters/                                  # Flux cluster configuration
     ├── local/
     │   ├── flux-system/
-    │   │   ├── instance.yaml                    # FluxInstance
+    │   │   ├── instance.yaml                  # FluxInstance
     │   │   └── kustomization.yaml
-    │   ├── infrastructure.yaml                  # Flux Kustomization for infra
-    │   └── apps.yaml                            # Flux Kustomization for apps
+    │   ├── sources/                           # OCIRepository + HelmRepository
+    │   ├── infrastructure.yaml                # Flux Kustomization CRD (references infra/)
+    │   ├── monitoring.yaml                    # Flux Kustomization CRD
+    │   ├── apm.yaml                           # Flux Kustomization CRD
+    │   ├── databases.yaml                     # Flux Kustomization CRD
+    │   ├── slo.yaml                           # Flux Kustomization CRD
+    │   └── apps.yaml                          # Flux Kustomization CRD (references apps/)
+    ├── staging/                               # (Future)
+    └── production/                             # (Future)
+```
+
+**Why Simplified Structure?**
+- Personal learning project doesn't need base/overlay complexity
+- Reference project (`flux-operator-local-dev`) uses direct manifests
+- Easier to understand and maintain for single developer
+- Can still use both ResourceSet and HelmRelease patterns (hybrid approach)
+- Infrastructure: Kustomization CRD (primary), ResourceSet optional for 1 component (learning)
+- Apps: HelmRelease + patches (keep existing pattern, no change)
+
+**Pattern Decisions:**
+1. **9 Backend Services:** HelmRelease + Kustomize patches (keep existing, no change)
+2. **1 Frontend Service:** ResourceSet + ResourceSetInputProvider (learning example)
+3. **Infrastructure:** Kustomization CRD (primary), ResourceSet optional for 1 component (learning)
     ├── staging/
     │   ├── flux-system/
     │   ├── infrastructure.yaml

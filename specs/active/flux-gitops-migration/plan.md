@@ -2,13 +2,44 @@
 
 **Task ID:** flux-gitops-migration
 **Created:** 2026-01-10
-**Last Updated:** 2026-01-10 (Hybrid Pattern)
+**Last Updated:** 2026-01-12 (Simplified Structure Refactor)
 **Status:** Updated with hybrid approach (HelmRelease + ResourceSet)
 **Based on:** spec.md (613 lines) + research.md (2,921 lines)
 
 ---
 
-## ⚠️ Important Updates (2026-01-10)
+## ⚠️ Important Updates
+
+### 2026-01-12: Simplified Structure Refactor
+
+**Architecture Decision: Simplified Repository Structure**
+
+After user feedback that base/overlays pattern is over-engineered for personal learning project, refactored to simplified structure following reference project (`flux-operator-local-dev`) pattern:
+
+**New Structure:**
+- **Infrastructure:** Direct manifests in `kubernetes/infra/` (no base/overlay)
+- **Applications:** Direct manifests in `kubernetes/apps/` (no base/overlay)
+- **Flux Configs:** Kustomization CRDs in `kubernetes/clusters/local/` (references `infra/` and `apps/`)
+
+**Pattern Decisions:**
+1. **9 Backend Services:** HelmRelease + Kustomize patches (keep existing, no change)
+2. **1 Frontend Service:** ResourceSet + ResourceSetInputProvider (learning example)
+3. **Infrastructure:** Kustomization CRD (primary), ResourceSet optional for 1 component (learning)
+
+**Why Simplified:**
+- ✅ Personal learning project doesn't need base/overlay complexity
+- ✅ Reference project uses direct manifests (easier to follow)
+- ✅ Easier to understand and maintain for single developer
+- ✅ Still supports hybrid approach (ResourceSet + HelmRelease)
+- ✅ Can experiment with ResourceSet for infrastructure component
+
+**Files Structure:**
+- Before: `base/` + `overlays/` + `clusters/` (complex)
+- After: `infra/` + `apps/` + `clusters/` (simple)
+
+---
+
+### 2026-01-10: Hybrid Pattern
 
 **Architecture Decision: Hybrid Pattern**
 
@@ -24,11 +55,6 @@ After user request, implementing **hybrid approach** to learn both patterns:
 - ✅ Backend uses production-proven pattern (HelmRelease + Kustomize)
 - ✅ Can compare patterns and decide on future adoption
 - ✅ Low risk (frontend has minimal dependencies)
-
-**Configuration Lines:**
-- **Backend (9 services):** Base HelmRelease (20 lines) + Local patch (80 lines) = 100 lines/service
-- **Frontend (1 service):** ResourceSet (60 lines) + ResourceSetInputProvider (15 lines) = 75 lines
-- **Total:** 975 lines (vs 900 lines current single-env)
 
 ---
 
@@ -255,62 +281,38 @@ spec:
 
 ---
 
-### Component 2: Kustomize Base (Shared Manifests)
+### Component 2: Simplified Infrastructure Manifests (Refactored 2026-01-12)
 
-**Purpose:** Single source of truth for all Kubernetes resources, shared across environments.
+**Purpose:** Direct infrastructure manifests in `infra/` directory, following reference project pattern. Simplified structure for personal learning project.
 
 **Responsibilities:**
-- Define minimal HelmRelease CRDs referencing existing Helm chart (`charts/mop`)
-- Provide base configuration (references chart defaults)
-- Include infrastructure manifests (operators, monitoring, APM)
-- Enable multi-environment deployment via Kustomize overlays
+- Define infrastructure components directly (no base/overlay complexity)
+- Use Kustomization CRDs for reconciliation (primary pattern)
+- Optionally include ResourceSet example for 1 component (learning)
+- Keep HelmRelease pattern for operators (Prometheus, Grafana, etc.)
 
-**Architecture Decision (from research.md):**
-- ✅ **Use HelmRelease CRDs** (not raw Deployments) to leverage existing `charts/mop`
-- ✅ **Chart provides defaults** (`charts/mop/values/*.yaml`)
-- ✅ **Overlays provide env-specific patches** (with FULL env list per environment)
-- ✅ **Minimal duplication** (base HelmRelease ~20 lines)
+**Architecture Decision (Updated 2026-01-12):**
+- ✅ **Simplified structure** - Direct manifests in `infra/` (no base/overlay)
+- ✅ **Kustomization CRD** - Primary pattern for infrastructure reconciliation
+- ✅ **ResourceSet optional** - Can experiment with 1 component as learning example
+- ✅ **HelmRelease for operators** - Keep existing HelmRelease pattern for operators
 
 **Structure:**
 ```
-kubernetes/base/
-├── infrastructure/
-│   ├── kustomization.yaml                      # References all infra components
-│   ├── namespaces.yaml                         # 11 namespaces
-│   ├── monitoring/
-│   │   ├── kustomization.yaml
-│   │   ├── prometheus-operator.yaml
-│   │   ├── grafana-operator.yaml
-│   │   └── metrics-server.yaml
-│   ├── apm/
-│   │   ├── kustomization.yaml
-│   │   ├── tempo.yaml
-│   │   ├── pyroscope.yaml
-│   │   ├── loki.yaml
-│   │   ├── vector.yaml
-│   │   └── jaeger.yaml
-│   └── databases/
-│       ├── kustomization.yaml
-│       ├── zalando-operator.yaml               # Helm-based installation
-│       ├── cloudnativepg-operator.yaml         # Helm-based installation
-│       └── README.md                           # Database CRDs in k8s/postgres-operator/
-└── apps/
-    ├── kustomization.yaml                      # References all 9 services
-    ├── auth/
-    │   ├── kustomization.yaml
-    │   └── helmrelease.yaml                    # 20 lines - references chart
-    ├── user/
-    │   ├── kustomization.yaml
-    │   └── helmrelease.yaml
-    ├── product/
-    ├── cart/
-    ├── order/
-    ├── review/
-    ├── notification/
-    ├── shipping/
-    ├── shipping-v2/
-    └── frontend/
+kubernetes/infra/
+├── monitoring.yaml              # Prometheus, Grafana, Metrics Server (HelmRelease CRDs)
+├── apm.yaml                     # Tempo, Loki, Pyroscope, Jaeger, Vector, OTel
+├── databases.yaml               # Zalando Operator, CloudNativePG Operator, 5 clusters
+├── slo.yaml                     # Sloth Operator + 9 PrometheusServiceLevel CRDs
+└── [optional-resourceset-example.yaml]  # Learning example (e.g., cert-manager ResourceSet)
 ```
+
+**Why Simplified Structure:**
+- Personal learning project doesn't need base/overlay complexity
+- Reference project (`flux-operator-local-dev`) uses direct manifests
+- Easier to understand and maintain
+- Can still use Kustomization CRD for reconciliation
+- Optionally learn ResourceSet with 1 component example
 
 **Example: Base HelmRelease (auth service)**
 ```yaml
@@ -351,91 +353,90 @@ spec:
 
 ---
 
-### Component 3: Kustomize Overlays (Environment-Specific Patches)
+### Component 3: Application Manifests with Inline Patches (Refactored 2026-01-12)
 
-**Purpose:** Environment-specific customizations without duplicating base manifests.
+**Purpose:** Direct application manifests in `apps/` directory with HelmRelease + inline patches. Simplified structure following reference project pattern.
 
 **Responsibilities:**
-- Patch replicas (local: 1, staging: 2, production: 3)
-- Patch resources (local: minimal, production: full)
-- Patch images (local: localhost:5050, production: ghcr.io)
-- Add environment-specific features (production: HPA, PDB, anti-affinity)
+- Define HelmRelease CRDs for 9 backend services (keep existing pattern)
+- Include patches inline or via Kustomize patches within same directory
+- Use ResourceSet for frontend (learning example)
+- Keep HelmRelease + patches pattern (no change to existing approach)
+
+**Architecture Decision (Updated 2026-01-12):**
+- ✅ **HelmRelease + patches** - Keep existing pattern for 9 backend services
+- ✅ **Direct manifests** - No base/overlay, manifests in `apps/` directly
+- ✅ **ResourceSet for frontend** - Learning example
+- ✅ **Simplified structure** - Easier to understand and maintain
 
 **Structure:**
 ```
-kubernetes/overlays/
-├── local/                                      # Kind cluster
-│   ├── infrastructure/
-│   │   ├── kustomization.yaml                  # bases: ../../base/infrastructure
-│   │   └── patches/
-│   │       ├── monitoring-resources.yaml       # Smaller CPU/memory
-│   │       └── database-replicas.yaml          # 1 replica for operators
-│   └── apps/
-│       ├── kustomization.yaml                  # bases: ../../base/apps
-│       └── patches/
-│           ├── replicas.yaml                   # 1 replica for all services
-│           ├── resources.yaml                  # 32Mi memory, 25m CPU
-│           ├── images.yaml                     # localhost:5050/auth:local
-│           └── env-local.yaml                  # Local DB hosts, no TLS
-├── staging/                                    # Phase 5 (future)
-│   └── ...
-└── production/                                 # Phase 5 (future)
-    └── ...
+kubernetes/apps/
+├── auth.yaml                   # HelmRelease + patches (inline or separate patch file)
+├── user.yaml                   # HelmRelease + patches
+├── product.yaml                # HelmRelease + patches
+├── cart.yaml                   # HelmRelease + patches
+├── order.yaml                  # HelmRelease + patches
+├── review.yaml                 # HelmRelease + patches
+├── notification.yaml           # HelmRelease + patches
+├── shipping.yaml                # HelmRelease + patches
+├── shipping-v2.yaml            # HelmRelease + patches
+├── k6.yaml                     # HelmRelease + patches
+└── frontend.yaml               # ResourceSet (learning example)
 ```
 
-**Example: Local Overlay Patch (replicas)**
+**Example: App Manifest with Patches**
 ```yaml
-# kubernetes/overlays/local/apps/patches/replicas.yaml
-apiVersion: apps/v1
-kind: Deployment
+# kubernetes/apps/auth.yaml
+# Option 1: HelmRelease with inline values (local config)
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
 metadata:
   name: auth
+  namespace: auth
 spec:
-  replicas: 1                                   # Local: 1 replica only
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: user
-spec:
-  replicas: 1
-# ... (repeat for all 9 services)
+  interval: 10m
+  chartRef:
+    kind: OCIRepository
+    name: mop-chart-oci
+    namespace: flux-system
+  values:
+    replicaCount: 1              # Local: 1 replica
+    resources:
+      requests:
+        memory: 32Mi
+        cpu: 25m
+    env:
+      - name: LOG_LEVEL
+        value: "debug"
+      # ... (full env list for local)
 ```
 
-**Example: Local Overlay Kustomization**
+**Or Option 2: HelmRelease + Kustomize patches in same directory**
 ```yaml
-# kubernetes/overlays/local/apps/kustomization.yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
+# kubernetes/apps/auth/helmrelease.yaml
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: auth
+  namespace: auth
+spec:
+  interval: 10m
+  chartRef:
+    kind: OCIRepository
+    name: mop-chart-oci
+    namespace: flux-system
 
-namespace: default                              # Local uses default namespace
-
-bases:
-  - ../../base/apps/auth
-  - ../../base/apps/user
-  - ../../base/apps/product
-  - ../../base/apps/cart
-  - ../../base/apps/order
-  - ../../base/apps/review
-  - ../../base/apps/notification
-  - ../../base/apps/shipping
-  - ../../base/apps/shipping-v2
-  - ../../base/apps/frontend
-
-patchesStrategicMerge:
-  - patches/replicas.yaml
-  - patches/resources.yaml
-  - patches/images.yaml
-  - patches/env-local.yaml
-
-commonLabels:
-  environment: local
-  cluster: mop-local
+# kubernetes/apps/auth/patches.yaml
+# Kustomize patches for local environment
 ```
 
-**Dependencies:** Kustomize base manifests
+**Dependencies:** 
+- OCI Registry for Helm chart (`charts/mop`)
+- Flux HelmRelease controller
+- Flux ResourceSet controller (for frontend)
 
-**Files:** ~20 files in `kubernetes/overlays/local/`
+**Files:** 11 files in `kubernetes/apps/` (10 HelmRelease + 1 ResourceSet)
 
 ---
 

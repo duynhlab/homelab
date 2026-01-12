@@ -1,7 +1,8 @@
 # Flux GitOps Migration - COMPLETE ✅
 
 **Date:** 2026-01-10  
-**Status:** Core Implementation Complete (85%)  
+**Last Updated:** 2026-01-12 (Structure Refactored)  
+**Status:** Core Implementation Complete (85%) - Structure Simplified  
 **Environment:** Local Kind Cluster (`mop`)
 
 ---
@@ -11,9 +12,10 @@
 Successfully migrated the monitoring microservices platform from script-based deployment to **GitOps** using **Flux Operator** + **Kustomize** + **OCI Artifacts**.
 
 **Key Achievement:** 
-- **67-89% YAML reduction** through Kustomize base/overlay pattern
+- **Simplified structure** following reference project pattern (refactored 2026-01-12)
 - **All infrastructure and applications** now managed declaratively
-- **Production-ready patterns** established for multi-environment deployment
+- **Hybrid approach** - HelmRelease + ResourceSet patterns for learning
+- **67-89% YAML reduction** through direct manifests with patches (no base/overlay complexity)
 
 ---
 
@@ -29,22 +31,48 @@ Successfully migrated the monitoring microservices platform from script-based de
 6. **Load Testing** - K6 with configurable RPS
 7. **SLO System** - Sloth Operator + 9 PrometheusServiceLevel CRDs
 
-### Multi-Environment Structure
+### Repository Structure (Refactored 2026-01-12)
+
+**Simplified Structure** - Following reference project pattern for personal learning:
 
 ```
 kubernetes/
-├── base/                       # Shared manifests
-│   ├── apps/                   # 11 HelmReleases (9 backend + frontend + k6)
-│   └── infrastructure/         # Monitoring, APM, Databases, SLO
-├── overlays/
-│   ├── local/                  # ✅ ACTIVE (Kind cluster)
-│   ├── staging/                # 📋 PLACEHOLDER
-│   └── production/             # 📋 PLACEHOLDER
+├── infra/                      # Infrastructure manifests (direct, no base/overlay)
+│   ├── monitoring.yaml         # Prometheus, Grafana, Metrics Server
+│   ├── apm.yaml                # Tempo, Loki, Pyroscope, Jaeger, Vector, OTel
+│   ├── databases.yaml          # Operators + 5 PostgreSQL clusters
+│   └── slo.yaml                # Sloth Operator + 9 PrometheusServiceLevel CRDs
+├── apps/                       # Application manifests (direct, no base/overlay)
+│   ├── auth.yaml               # HelmRelease + patches
+│   ├── user.yaml               # HelmRelease + patches
+│   ├── product.yaml            # HelmRelease + patches
+│   ├── cart.yaml               # HelmRelease + patches
+│   ├── order.yaml              # HelmRelease + patches
+│   ├── review.yaml             # HelmRelease + patches
+│   ├── notification.yaml       # HelmRelease + patches
+│   ├── shipping.yaml           # HelmRelease + patches
+│   ├── shipping-v2.yaml        # HelmRelease + patches
+│   ├── k6.yaml                 # HelmRelease + patches
+│   └── frontend.yaml            # ResourceSet (learning example)
 └── clusters/
-    ├── local/                  # ✅ FluxInstance configured
+    ├── local/                  # ✅ ACTIVE (Kind cluster)
+    │   ├── flux-system/        # FluxInstance CRD
+    │   ├── sources/            # OCIRepository + HelmRepository
+    │   ├── infrastructure.yaml # Kustomization CRD (references infra/)
+    │   ├── monitoring.yaml     # Kustomization CRD
+    │   ├── apm.yaml            # Kustomization CRD
+    │   ├── databases.yaml      # Kustomization CRD
+    │   ├── slo.yaml            # Kustomization CRD
+    │   └── apps.yaml           # Kustomization CRD (references apps/)
     ├── staging/                # 📋 PLACEHOLDER
     └── production/             # 📋 PLACEHOLDER
 ```
+
+**Why Simplified:**
+- Personal learning project doesn't need base/overlay complexity
+- Reference project (`flux-operator-local-dev`) uses direct manifests
+- Easier to understand and maintain for single developer
+- Can still use both ResourceSet and HelmRelease patterns (hybrid)
 
 ---
 
@@ -73,15 +101,17 @@ kubernetes/
 - OCI artifact support (simpler than Git)
 - ResourceSet CRDs (advanced templating + dependency management)
 
-### 3. Kustomize Base/Overlay
-- **Base:** Shared manifests (environment-agnostic)
-- **Overlay:** Environment-specific patches (local/staging/production)
-- **Pattern:** Strategic merge with FULL env arrays
+### 3. Simplified Structure (Refactored 2026-01-12)
+- **Direct Manifests:** Infrastructure in `infra/`, apps in `apps/` (no base/overlay)
+- **Kustomization CRD:** Primary pattern for reconciliation (references `infra/` and `apps/`)
+- **ResourceSet Optional:** Can experiment with ResourceSet for 1 component as learning example
+- **HelmRelease + Patches:** Keep existing pattern for apps (inline or separate patch files)
 
-**Result:** 
-- Local overlay: 32Mi memory, 1 replica, debug logging
-- Chart defaults: 64Mi memory, 2 replicas, info logging
-- Production (future): 5+ replicas, HA, warn logging
+**Result:**
+- Simplified structure following reference project pattern
+- Easier to understand and maintain for personal learning project
+- Still supports hybrid approach (ResourceSet + HelmRelease)
+- Infrastructure: Kustomization CRD (primary), ResourceSet (optional learning example)
 
 ### 4. Helm Chart Reuse
 - All services use existing `charts/mop` Helm chart
@@ -97,11 +127,10 @@ kubernetes/
 | File | Purpose |
 |------|---------|
 | `kubernetes/clusters/local/flux-system/instance.yaml` | FluxInstance CRD (Flux CD bootstrap) |
-| `kubernetes/base/apps/*/helmrelease.yaml` | HelmRelease CRDs for all services |
-| `kubernetes/overlays/local/apps/patches/helmreleases.yaml` | Local environment patches (reduced resources) |
-| `kubernetes/base/infrastructure/` | Infrastructure components (monitoring, APM, databases, SLO) |
-| `kubernetes/clusters/local/{monitoring,apm,databases,slo,apps}.yaml` | Flux Kustomization CRDs (reconciliation) |
-| `kubernetes/overlays/README.md` | Multi-environment guide |
+| `kubernetes/apps/*.yaml` | HelmRelease CRDs for all services (with inline patches) |
+| `kubernetes/apps/frontend.yaml` | ResourceSet (learning example) |
+| `kubernetes/infra/*.yaml` | Infrastructure components (monitoring, APM, databases, SLO) |
+| `kubernetes/clusters/local/{infrastructure,monitoring,apm,databases,slo,apps}.yaml` | Flux Kustomization CRDs (reconciliation) |
 | `Makefile` | Automation (flux-push, cluster management) |
 
 ---

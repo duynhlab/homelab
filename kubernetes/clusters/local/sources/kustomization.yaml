@@ -18,3 +18,4 @@ resources:
   - helm/sloth.yaml
   - helm/vector.yaml
   - helm/opentelemetry.yaml
+  - helm/pgcat.yaml

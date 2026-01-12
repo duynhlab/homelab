@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Copyright 2025 Stefan Prodan
-# SPDX-License-Identifier: AGPL-3.0
 
 set -o errexit
 
@@ -23,23 +21,9 @@ echo "Waiting for Flux controllers to be ready..."
 sleep 10
 kubectl wait --for=condition=ready --timeout=300s pod -l app.kubernetes.io/part-of=flux -n flux-system 2>/dev/null || true
 
+echo "✔ Flux Operator is ready"
 echo ""
-echo "Waiting for infrastructure sync to complete"
-kubectl wait --for=condition=ready --timeout=5m kustomization/infrastructure-local -n flux-system 2>/dev/null || true
-
-echo "Waiting for monitoring sync to complete"
-kubectl wait --for=condition=ready --timeout=5m kustomization/monitoring-local -n flux-system 2>/dev/null || true
-
-echo "Waiting for apm sync to complete"
-kubectl wait --for=condition=ready --timeout=5m kustomization/apm-local -n flux-system 2>/dev/null || true
-
-echo "Waiting for databases sync to complete"
-kubectl wait --for=condition=ready --timeout=10m kustomization/databases-local -n flux-system 2>/dev/null || true
-
-echo "Waiting for apps sync to complete"
-kubectl wait --for=condition=ready --timeout=5m kustomization/apps-local -n flux-system 2>/dev/null || true
-
-echo "Waiting for slo sync to complete"
-kubectl wait --for=condition=ready --timeout=5m kustomization/slo-local -n flux-system 2>/dev/null || true
-
-echo "✔ Cluster is ready"
+echo "Next steps:"
+echo "  1. Push manifests: make flux-push"
+echo "  2. Wait for reconciliation: make flux-sync"
+echo "  3. Check status: make flux-status"

@@ -2,17 +2,32 @@
 
 **Task ID:** flux-gitops-migration
 **Created:** 2026-01-10
-**Last Updated:** 2026-01-10 (Hybrid Pattern)
+**Last Updated:** 2026-01-12 (Simplified Structure Refactor)
 **Status:** Ready for Implementation
 **Based on:** plan.md (1,333 lines) + research.md (2,921 lines)
 
 ---
 
-## ⚠️ Architecture Decision: Hybrid Pattern
+## ⚠️ Architecture Decisions
+
+### Simplified Structure (Updated 2026-01-12)
+
+**Repository Structure:**
+- **Infrastructure:** Direct manifests in `kubernetes/infra/` (no base/overlay)
+- **Applications:** Direct manifests in `kubernetes/apps/` (no base/overlay)
+- **Flux Configs:** Kustomization CRDs in `kubernetes/clusters/local/` (references `infra/` and `apps/`)
+
+**Why Simplified?**
+- Personal learning project doesn't need base/overlay complexity
+- Reference project uses direct manifests (easier to follow)
+- Easier to understand and maintain for single developer
+
+### Hybrid Pattern (2026-01-10)
 
 **Implementation Strategy:**
 - **9 Backend Services:** HelmRelease + Kustomize patches (production-ready)
 - **1 Frontend Service:** ResourceSet + ResourceSetInputProvider (learning Flux Operator)
+- **Infrastructure:** Kustomization CRD (primary), ResourceSet optional for 1 component (learning)
 
 **Why?**
 - Learn both Flux Operator patterns
@@ -21,9 +36,10 @@
 - Compare patterns side-by-side
 
 **Key Tasks:**
-- Task 2.1-2.2: Create HelmRelease for backend services
+- Task 1.4: Create infrastructure manifests in `infra/` (direct, no base/overlay)
+- Task 2.1-2.2: Create HelmRelease for backend services in `apps/`
 - Task 2.3b: Create ResourceSet for frontend (learning)
-- Task 2.5: Create Kustomize patches for 9 backend services only
+- Task 2.5: Create Kustomize patches for 9 backend services (inline or separate files)
 - Task 2.5b: Update ResourceSetInputProvider for frontend
 
 ---
@@ -136,18 +152,19 @@
 
 ---
 
-### Task 1.4: Create Kustomize Base for Infrastructure
+### Task 1.4: Create Infrastructure Manifests in infra/ (Simplified Structure)
 
-**Description:** Create Kustomize base manifests for infrastructure components (namespaces, monitoring, APM, database operators).
+**Description:** Create direct infrastructure manifests in `kubernetes/infra/` directory (no base/overlay complexity).
 
 **Acceptance Criteria:**
-- [ ] Directory structure created: `kubernetes/base/infrastructure/`
-- [ ] `kustomization.yaml` references all infrastructure components
-- [ ] Namespaces manifest (`namespaces.yaml`) with 11 namespaces
-- [ ] Monitoring manifests (Prometheus, Grafana, Metrics Server)
-- [ ] APM manifests (Tempo, Pyroscope, Loki, Vector, Jaeger)
-- [ ] Database operator manifests (Zalando, CloudNativePG)
-- [ ] `kubectl kustomize kubernetes/base/infrastructure` builds successfully
+- [ ] Directory structure created: `kubernetes/infra/`
+- [ ] File created: `kubernetes/infra/monitoring.yaml` (Prometheus, Grafana, Metrics Server - HelmRelease CRDs)
+- [ ] File created: `kubernetes/infra/apm.yaml` (Tempo, Loki, Pyroscope, Jaeger, Vector, OTel)
+- [ ] File created: `kubernetes/infra/databases.yaml` (Zalando Operator, CloudNativePG Operator, 5 clusters)
+- [ ] File created: `kubernetes/infra/slo.yaml` (Sloth Operator + 9 PrometheusServiceLevel CRDs)
+- [ ] Optional: Create ResourceSet example for 1 component (learning)
+- [ ] All manifests use local configuration (1 replica, minimal resources) inline
+- [ ] `kubectl apply -f kubernetes/infra/monitoring.yaml` works (dry-run test)
 
 **Effort:** 6 hours
 **Priority:** High
@@ -156,32 +173,10 @@
 
 **Implementation Notes:**
 - Migrate from existing `k8s/` directory and Helm charts
-- Keep Helm-based operator installations (reference chart values)
+- Keep Helm-based operator installations (HelmRelease CRDs)
 - Include all resources from `k8s/namespaces.yaml`, `k8s/prometheus/`, etc.
-
----
-
-### Task 1.5: Create Kustomize Local Overlay for Infrastructure
-
-**Description:** Create local environment overlay with patches for infrastructure (smaller resources, 1 replica for operators).
-
-**Acceptance Criteria:**
-- [ ] Directory structure created: `kubernetes/overlays/local/infrastructure/`
-- [ ] `kustomization.yaml` bases on `../../base/infrastructure`
-- [ ] Patches created: `patches/monitoring-resources.yaml`, `patches/database-replicas.yaml`
-- [ ] Local overlay reduces CPU/memory requests for Kind
-- [ ] `kubectl kustomize kubernetes/overlays/local/infrastructure` builds successfully
-- [ ] Diff from base shows only intended patches
-
-**Effort:** 4 hours
-**Priority:** High
-**Dependencies:** Task 1.4
-**Assignee:** [Unassigned]
-
-**Implementation Notes:**
-- Use `patchesStrategicMerge` for simple patches
-- Target: 1 replica for operators, minimal CPU (25m), minimal memory (32Mi)
-- Add `commonLabels: {environment: local, cluster: mop-local}`
+- Use direct manifests (no base/overlay) - simpler for personal learning project
+- Can optionally create ResourceSet for 1 component as learning example
 
 ---
 
@@ -191,20 +186,21 @@
 
 **Acceptance Criteria:**
 - [ ] File created: `kubernetes/clusters/local/infrastructure.yaml`
-- [ ] OCIRepository source configured (localhost:5050/flux-infra-sync)
-- [ ] Kustomization points to `./kubernetes/overlays/local/infrastructure`
+- [ ] OCIRepository source configured (mop-registry:5000/flux-infra-sync:local)
+- [ ] Kustomization points to `./kubernetes/infra/` (direct manifests, no overlay)
 - [ ] Reconciliation interval: 10m, retryInterval: 2m
 - [ ] Health assessment enabled with 30s interval
 - [ ] `prune: true`, `wait: true` configured
 
 **Effort:** 3 hours
 **Priority:** High
-**Dependencies:** Task 1.5
+**Dependencies:** Task 1.4
 **Assignee:** [Unassigned]
 
 **Implementation Notes:**
 - Follow plan.md Section 3 (Component 5: Flux Kustomization CRD)
-- Add postBuild substitutions for cluster_name, registry_url
+- Reference simplified structure: `path: ./` in OCI artifact points to `infra/` directory
+- No overlay needed - manifests already have local configuration inline
 
 ---
 
@@ -213,7 +209,7 @@
 **Description:** Push infrastructure manifests to OCI registry and verify Flux auto-syncs.
 
 **Acceptance Criteria:**
-- [ ] `make flux-push` successfully pushes to localhost:5050/flux-infra-sync:local
+- [ ] `make flux-push` successfully pushes to mop-registry:5000/flux-infra-sync:local
 - [ ] Flux reconciles infrastructure within 10 minutes (or manual trigger)
 - [ ] All 11 namespaces created
 - [ ] Prometheus Operator deployed to `monitoring` namespace
@@ -232,6 +228,7 @@
 - Use `flux reconcile kustomization infrastructure-local --with-source` for manual trigger
 - Check logs: `flux logs --kind=Kustomization --name=infrastructure-local`
 - Compare with existing script output: `./scripts/02-deploy-monitoring.sh`, `./scripts/03-deploy-apm.sh`, `./scripts/04-deploy-databases.sh`
+- OCI artifact contains `infra/` directory with direct manifests
 
 ---
 
@@ -280,18 +277,18 @@
 
 ---
 
-### Task 2.1: Create Kustomize Base for Auth Service
+### Task 2.1: Create HelmRelease for Auth Service in apps/
 
-**Description:** Create Kustomize base HelmRelease CRD for auth service (referencing charts/mop).
+**Description:** Create HelmRelease CRD for auth service in `kubernetes/apps/auth.yaml` (direct manifest, no base/overlay).
 
 **Acceptance Criteria:**
-- [ ] Directory structure created: `kubernetes/base/apps/auth/`
-- [ ] `kustomization.yaml` + `helmrelease.yaml` created (NOT raw Deployment)
-- [ ] Base HelmRelease: references `charts/mop` via OCIRepository
-- [ ] NO values section in base (use chart defaults from `charts/mop/values/auth.yaml`)
-- [ ] Chart ref: `chartRef.kind: OCIRepository`, `chartRef.name: mop-chart`
-- [ ] Minimal HelmRelease: ~20 lines (interval, retries, chartRef only)
-- [ ] `kubectl kustomize kubernetes/base/apps/auth` builds successfully
+- [ ] File created: `kubernetes/apps/auth.yaml`
+- [ ] HelmRelease CRD created (NOT raw Deployment)
+- [ ] HelmRelease references `charts/mop` via OCIRepository
+- [ ] Chart ref: `chartRef.kind: OCIRepository`, `chartRef.name: mop-chart-oci`
+- [ ] Values section includes local configuration (1 replica, 32Mi memory, local env vars)
+- [ ] HelmRelease: ~100 lines (includes local config inline)
+- [ ] `kubectl apply -f kubernetes/apps/auth.yaml` works (dry-run test)
 
 **Effort:** 3 hours
 **Priority:** High
@@ -300,21 +297,23 @@
 
 **Implementation Notes:**
 - Migrate from `charts/mop/values/auth.yaml` + `charts/mop/templates/deployment.yaml`
-- Follow plan.md Section 3 (Component 2: Kustomize Base) example
-- ConfigMap generates from `configMapGenerator` in kustomization.yaml
+- Use direct manifest in `apps/` (no base/overlay)
+- Include local configuration inline (replicas, resources, env vars)
+- Can use separate patch file if preferred: `kubernetes/apps/auth/helmrelease.yaml` + `patches.yaml`
 
 ---
 
-### Task 2.2: Create Kustomize Base for Remaining 8 Services
+### Task 2.2: Create HelmRelease for Remaining 8 Services in apps/
 
-**Description:** Create Kustomize base manifests for user, product, cart, order, review, notification, shipping, shipping-v2.
+**Description:** Create HelmRelease manifests for user, product, cart, order, review, notification, shipping, shipping-v2 in `kubernetes/apps/`.
 
 **Acceptance Criteria:**
-- [ ] Directory structure created for all 8 services in `kubernetes/base/apps/`
-- [ ] Each service has: `kustomization.yaml`, `deployment.yaml`, `service.yaml`, `configmap.yaml`
+- [ ] Files created for all 8 services: `kubernetes/apps/{user,product,cart,order,review,notification,shipping,shipping-v2}.yaml`
+- [ ] Each service has HelmRelease CRD (NOT raw Deployment)
 - [ ] All services follow same pattern as auth (Task 2.1)
 - [ ] Service-specific configurations applied (ports, DB hosts, image tags)
-- [ ] `kubectl kustomize kubernetes/base/apps/{service}` builds for all services
+- [ ] Each HelmRelease includes local configuration inline
+- [ ] `kubectl apply -f kubernetes/apps/{service}.yaml` works for all services (dry-run test)
 
 **Effort:** 8 hours
 **Priority:** High
@@ -328,47 +327,23 @@
   - Cart/Order: Transaction DB with different secrets
   - Shipping-v2: Only v2 endpoints
 - Validate each service independently before proceeding
+- Use direct manifests in `apps/` (no base/overlay)
 
 ---
 
-### Task 2.3: Create Kustomize Base for Frontend
+### Task 2.3b: Create ResourceSet for Frontend in apps/ (Learning Purpose)
 
-**Description:** Create Kustomize base manifests for frontend (React + Vite + Nginx).
-
-**Acceptance Criteria:**
-- [ ] Directory structure created: `kubernetes/base/apps/frontend/`
-- [ ] `kustomization.yaml`, `deployment.yaml`, `service.yaml`, `configmap.yaml` created
-- [ ] Base deployment: 1 replica, 32Mi memory, ghcr.io/duynhne/frontend:v6
-- [ ] Service type: ClusterIP, port 80
-- [ ] Health probes: liveness (/health), readiness (/health)
-- [ ] No init container (frontend has no database migrations)
-- [ ] `kubectl kustomize kubernetes/base/apps/frontend` builds successfully
-
-**Effort:** 2 hours
-**Priority:** Medium
-**Dependencies:** Task 2.2
-**Assignee:** [Unassigned]
-
-**Implementation Notes:**
-- Migrate from `charts/mop/values/frontend.yaml`
-- Frontend is simpler (no database, no migrations)
-- **UPDATE 2026-01-10:** Frontend will use ResourceSet pattern (see Task 2.3b)
-
----
-
-### Task 2.3b: ALTERNATIVE - Create ResourceSet for Frontend (Learning Purpose)
-
-**Description:** Create ResourceSet + ResourceSetInputProvider for frontend (learning Flux Operator advanced features).
+**Description:** Create ResourceSet + ResourceSetInputProvider for frontend in `kubernetes/apps/frontend.yaml` (learning Flux Operator advanced features).
 
 **Architecture Decision:** Use ResourceSet pattern for frontend to learn Flux Operator while backend uses HelmRelease.
 
 **Acceptance Criteria:**
-- [ ] Directory: `kubernetes/base/apps/frontend/`
-- [ ] File: `resourceset.yaml` (60 lines)
-- [ ] File: `inputprovider.yaml` (15 lines)
+- [ ] File created: `kubernetes/apps/frontend.yaml` (or separate files: `resourceset.yaml` + `inputprovider.yaml`)
 - [ ] ResourceSetInputProvider type: Static (provides: replicas, tag, registry)
 - [ ] ResourceSet includes HelmRelease (inline) with templating: `<< inputs.replicas >>`, `<< inputs.tag >>`
-- [ ] `kubectl apply -f kubernetes/base/apps/frontend/` works
+- [ ] ResourceSetInputProvider: ~15 lines
+- [ ] ResourceSet: ~60 lines
+- [ ] `kubectl apply -f kubernetes/apps/frontend.yaml` works
 - [ ] `kubectl get resourceset frontend` shows Ready
 
 **Effort:** 4 hours (learning)
@@ -380,6 +355,7 @@
 - ✅ Learn Flux Operator advanced pattern
 - ✅ Frontend is simple (no database) - ideal for experiment
 - ✅ Compare with backend HelmRelease pattern side-by-side
+- ✅ Use direct manifest in `apps/` (no base/overlay)
 
 **Example:**
 ```yaml
@@ -420,39 +396,16 @@ spec:
 
 ---
 
-### Task 2.4: Create Master Kustomization for Apps Base
+### Task 2.5: Create Patches for Backend Apps (Simplified Structure)
 
-**Description:** Create master `kustomization.yaml` that references all 9 services + frontend.
+**Description:** Create patches for HelmRelease values (9 backend services only - frontend uses ResourceSet). Use inline patches in HelmRelease or separate patch files.
 
-**Acceptance Criteria:**
-- [ ] File created: `kubernetes/base/apps/kustomization.yaml`
-- [ ] References all 10 services (auth, user, product, cart, order, review, notification, shipping, shipping-v2, frontend)
-- [ ] `commonLabels` applied: `app.kubernetes.io/managed-by: flux`
-- [ ] `kubectl kustomize kubernetes/base/apps` builds all services successfully
-- [ ] Verify output contains 30+ resources (10 deployments, 10 services, 10 configmaps)
-
-**Effort:** 2 hours
-**Priority:** High
-**Dependencies:** Task 2.3
-**Assignee:** [Unassigned]
-
-**Implementation Notes:**
-- Use `bases` or `resources` directive to reference subdirectories
-- Add namespace: default (for local)
-
----
-
-### Task 2.5: Create Kustomize Local Overlay for Backend Apps
-
-**Description:** Create local environment overlay with patches for HelmRelease values (9 backend services only - frontend uses ResourceSet).
-
-**Architecture Note:** Based on research (`research.md`), using HelmRelease patches with FULL env list per environment. Frontend uses ResourceSetInputProvider (no Kustomize patches needed).
+**Architecture Note:** Using HelmRelease with local configuration inline (no overlay needed). Can use separate patch files if preferred.
 
 **Acceptance Criteria:**
-- [ ] Directory structure created: `kubernetes/overlays/local/apps/`
-- [ ] `kustomization.yaml` bases on `../../base/apps`
-- [ ] Single patch file created: `patches/helmreleases.yaml` (contains **9 backend services only**)
-- [ ] Each backend service patch includes:
+- [ ] Option 1: Patches included inline in each HelmRelease in `kubernetes/apps/{service}.yaml`
+- [ ] Option 2: Separate patch files in `kubernetes/apps/{service}/helmrelease.yaml` + `patches.yaml`
+- [ ] Each backend service includes:
   - [ ] `replicaCount: 1` (local override)
   - [ ] FULL `env` array (~25 vars) with local values:
     - `ENV: "local"` (not "production")
@@ -462,19 +415,19 @@ spec:
   - [ ] `resources.requests`: 32Mi memory, 25m CPU (minimal for Kind)
   - [ ] `migrations.image`: ghcr.io/duynhne/{service}:v6-init
 - [ ] **Frontend NOT patched** (uses ResourceSetInputProvider Static values)
-- [ ] `kubectl kustomize kubernetes/overlays/local/apps` builds successfully
-- [ ] Total lines per backend service: ~80 lines (FULL env list required)
-- [ ] Total: 9 services × 80 lines = ~720 lines of patches
+- [ ] `kubectl apply -f kubernetes/apps/{service}.yaml` works for all services (dry-run test)
+- [ ] Total lines per backend service: ~100 lines (includes local config)
 
 **Effort:** 8 hours (9 backend services)
 **Priority:** High
-**Dependencies:** Task 2.4
+**Dependencies:** Task 2.2
 **Assignee:** [Unassigned]
 
 **Implementation Notes:**
 - **Skip frontend** - ResourceSet uses ResourceSetInputProvider for configuration
-- Backend services require FULL env list (Kustomize strategic merge limitation)
-- Document in `kubernetes/overlays/local/apps/README.md`: "Frontend uses ResourceSet pattern (see base/apps/frontend/)"
+- Backend services include local configuration inline (no overlay needed)
+- Can use separate patch files if preferred (more organized)
+- Use direct manifests in `apps/` (no base/overlay)
 
 ---
 
@@ -506,8 +459,8 @@ spec:
 
 **Acceptance Criteria:**
 - [ ] File created: `kubernetes/clusters/local/apps.yaml`
-- [ ] OCIRepository source configured (localhost:5050/flux-apps-sync)
-- [ ] Kustomization points to `./kubernetes/overlays/local/apps`
+- [ ] OCIRepository source configured (mop-registry:5000/flux-apps-sync:local)
+- [ ] Kustomization points to `./kubernetes/apps/` (direct manifests, no overlay)
 - [ ] `dependsOn: [infrastructure-local]` ensures infrastructure deploys first
 - [ ] Reconciliation interval: 10m, retryInterval: 2m
 - [ ] Health assessment enabled with 30s interval
@@ -520,7 +473,8 @@ spec:
 
 **Implementation Notes:**
 - Follow plan.md Section 3 (Component 5: Flux Kustomization CRD)
-- Add postBuild substitutions for image_tag, registry_url
+- Reference simplified structure: `path: ./` in OCI artifact points to `apps/` directory
+- No overlay needed - manifests already have local configuration inline
 
 ---
 
@@ -529,7 +483,7 @@ spec:
 **Description:** Push apps manifests to OCI registry and verify Flux auto-syncs all microservices.
 
 **Acceptance Criteria:**
-- [ ] `make flux-push` successfully pushes to localhost:5050/flux-apps-sync:local
+- [ ] `make flux-push` successfully pushes to mop-registry:5000/flux-apps-sync:local
 - [ ] Flux waits for infrastructure-local to be Ready before reconciling apps
 - [ ] All 9 microservices + frontend deployed to default namespace
 - [ ] Each service has 1 replica running
@@ -548,6 +502,7 @@ spec:
 - Check logs: `flux logs --kind=Kustomization --name=apps-local`
 - Test with `./scripts/08-setup-access.sh` for port-forwarding
 - Compare deployment time: should be < 5 minutes (vs 30 min with scripts)
+- OCI artifact contains `apps/` directory with direct manifests
 
 ---
 

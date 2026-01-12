@@ -3,7 +3,7 @@
 **Task ID:** flux-gitops-migration
 **Created:** 2026-01-10
 **Status:** Ready for Planning
-**Version:** 1.0
+**Version:** 1.1
 
 ---
 
@@ -128,60 +128,61 @@ Current deployment system relies on **manual script-based execution** with signi
 
 ---
 
-### FR-2: Kustomize Base/Overlay Repository Structure
+### FR-2: Simplified Repository Structure (Refactored 2026-01-12)
 
-**Description:** Create production-ready repository structure with Kustomize base manifests and environment-specific overlays (local/staging/production) to eliminate configuration duplication.
+**Description:** Create simplified repository structure following reference project pattern. For personal learning project, base/overlays pattern is over-engineered. Use direct manifests structure similar to `flux-operator-local-dev` reference.
 
-**Architecture Decision (Updated 2026-01-10):**
-- **9 backend services:** HelmRelease + Kustomize patches (production-ready, standard pattern)
+**Architecture Decision (Updated 2026-01-12):**
+- **9 backend services:** HelmRelease + Kustomize patches (keep existing pattern, no change)
 - **1 frontend service:** ResourceSet + ResourceSetInputProvider (learning Flux Operator advanced features)
+- **Infrastructure:** Kustomization CRDs (keep existing), optionally try ResourceSet for 1 component as learning example
+- **Structure:** Simplified - direct manifests in `infra/` and `apps/` (no base/overlays)
 
-**Rationale for Hybrid Approach:**
-- Learn both patterns side-by-side
-- Frontend is simple (no database, minimal env vars) - ideal for ResourceSet experiment
-- Backend services use production-proven HelmRelease + Kustomize pattern
-- Can compare patterns and decide on future adoption
+**Rationale for Simplified Structure:**
+- Personal learning project doesn't need complex base/overlay pattern
+- Reference project (`flux-operator-local-dev`) uses simpler structure
+- Easier to understand and maintain for single developer
+- Can still use both ResourceSet and HelmRelease patterns (hybrid approach)
+- Infrastructure can experiment with ResourceSet while keeping Kustomization CRD as primary
 
 **User Story:**
-> As a DevOps Engineer, I want to organize Kubernetes manifests using Kustomize base/overlay pattern for backend services and ResourceSet for frontend so that I can maintain a single source of truth while learning Flux Operator advanced patterns.
+> As a DevOps Engineer learning GitOps, I want a simplified repository structure similar to reference projects so that I can focus on learning Flux Operator patterns without over-engineering for a personal project.
 
 **Acceptance Criteria:**
-- [ ] Given repository structure exists, when I run `tree kubernetes/`, then I see `base/`, `overlays/`, and `clusters/` directories
-- [ ] Given base manifests are created (9 HelmReleases + 1 ResourceSet), when I run `kubectl apply -k kubernetes/base/apps/auth`, then auth service deploys with default configuration (2 replicas, 64Mi memory)
+- [ ] Given repository structure exists, when I run `tree kubernetes/`, then I see `infra/`, `apps/`, and `clusters/` directories (no `base/` or `overlays/`)
+- [ ] Given infrastructure manifests exist in `kubernetes/infra/`, when Flux reconciles, then infrastructure deploys successfully
+- [ ] Given app manifests exist in `kubernetes/apps/`, when Flux reconciles, then all 9 backend services deploy with HelmRelease + patches
 - [ ] Given ResourceSet for frontend exists, when I run `kubectl get resourceset frontend`, then frontend deploys via ResourceSet pattern
-- [ ] Given local overlay exists, when I run `kubectl apply -k kubernetes/overlays/local/apps`, then all 9 backend services deploy with local configuration (1 replica, 32Mi memory)
-- [ ] Given overlay patches exist, when I update a patch file, then only the patched fields change (not entire manifest)
-- [ ] Given base is updated, when I run `kubectl apply -k overlays/local`, then changes automatically propagate to overlay
+- [ ] Given infrastructure has Kustomization CRD, when I check `clusters/local/infrastructure.yaml`, then it references `infra/` directory
+- [ ] Given optional ResourceSet example exists for 1 infrastructure component, when I check `infra/`, then I see both Kustomization-ready manifests and ResourceSet example
 
 **Priority:** Must Have (Phase 1-2)
 
 **Files Created:**
 ```
 kubernetes/
-├── base/
-│   ├── infrastructure/     # Monitoring, APM, Databases
-│   └── apps/
-│       ├── auth/helmrelease.yaml           # HelmRelease (backend)
-│       ├── user/helmrelease.yaml           # HelmRelease (backend)
-│       ├── product/helmrelease.yaml        # HelmRelease (backend)
-│       ├── cart/helmrelease.yaml           # HelmRelease (backend)
-│       ├── order/helmrelease.yaml          # HelmRelease (backend)
-│       ├── review/helmrelease.yaml         # HelmRelease (backend)
-│       ├── notification/helmrelease.yaml   # HelmRelease (backend)
-│       ├── shipping/helmrelease.yaml       # HelmRelease (backend)
-│       ├── shipping-v2/helmrelease.yaml    # HelmRelease (backend)
-│       └── frontend/
-│           ├── resourceset.yaml            # ResourceSet (learning)
-│           └── inputprovider.yaml          # ResourceSetInputProvider
-├── overlays/
-│   ├── local/              # 1 replica, minimal resources
-│   ├── staging/            # 2 replicas, medium resources (future)
-│   └── production/         # 3 replicas, full resources (future)
+├── infra/                    # Infrastructure manifests (direct, no base/overlay)
+│   ├── monitoring.yaml       # Monitoring components
+│   ├── apm.yaml              # APM components
+│   ├── databases.yaml        # Database operators + clusters
+│   └── [optional-resourceset-example.yaml]  # Learning example
+├── apps/                     # Application manifests (direct, no base/overlay)
+│   ├── auth.yaml             # HelmRelease + patches inline
+│   ├── user.yaml             # HelmRelease + patches inline
+│   ├── product.yaml          # HelmRelease + patches inline
+│   ├── cart.yaml             # HelmRelease + patches inline
+│   ├── order.yaml            # HelmRelease + patches inline
+│   ├── review.yaml           # HelmRelease + patches inline
+│   ├── notification.yaml     # HelmRelease + patches inline
+│   ├── shipping.yaml          # HelmRelease + patches inline
+│   ├── shipping-v2.yaml      # HelmRelease + patches inline
+│   ├── k6.yaml               # HelmRelease + patches inline
+│   └── frontend.yaml         # ResourceSet (learning)
 └── clusters/
     └── local/
         ├── flux-system/
-        ├── infrastructure.yaml
-        └── apps.yaml
+        ├── infrastructure.yaml  # Kustomization CRD (references infra/)
+        └── apps.yaml           # Kustomization CRD (references apps/)
 ```
 
 ---
@@ -618,6 +619,7 @@ The following are explicitly NOT included in this migration:
 
 | Version | Date | Changes | Author |
 |---------|------|---------|--------|
+| 1.1 | 2026-01-12 | [REFINED] Simplified repository structure - removed base/overlays, use direct manifests in `infra/` and `apps/` following reference project pattern | System |
 | 1.0 | 2026-01-10 | Initial specification | DevOps/SRE Engineer |
 
 ---

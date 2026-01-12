@@ -17,11 +17,15 @@ This SLO (Service Level Objective) system provides comprehensive monitoring and 
 
 **SLO system is deployed automatically via Flux Operator:**
 
-**Flux Kustomization:** `slo-stack` ([kubernetes/clusters/local/slo.yaml](../../kubernetes/clusters/local/slo.yaml))
-- **Source:** OCI artifact `localhost:5050/flux-infra-sync`
-- **Base manifests:** [kubernetes/base/infrastructure/slo/](../../kubernetes/base/infrastructure/slo/)
+**Flux Kustomizations (controllers/configs pattern):**
+- `controllers-local` ([kubernetes/clusters/local/controllers.yaml](../../kubernetes/clusters/local/controllers.yaml)) - installs Sloth Operator (CRDs/controllers)
+- `configs-local` ([kubernetes/clusters/local/configs.yaml](../../kubernetes/clusters/local/configs.yaml)) - applies PrometheusServiceLevel CRs
+- **Source:** OCI artifact `mop-registry:5000/flux-infra-sync:local`
+- **Manifests:**
+  - `kubernetes/infra/controllers/slo/`
+  - `kubernetes/infra/configs/slo/`
 - **Reconciliation:** Every 10 minutes (automatic)
-- **Dependencies:** Monitoring stack must be ready first
+- **Dependencies:** `controllers-local` must be ready before `configs-local`
 
 **Components deployed:**
 1. **Sloth Operator** (v0.15.0) - HelmRelease
@@ -30,7 +34,7 @@ This SLO (Service Level Objective) system provides comprehensive monitoring and 
 **Manual reconciliation (if needed):**
 ```bash
 # Trigger Flux reconciliation
-flux reconcile kustomization slo-stack --with-source
+flux reconcile kustomization configs-local --with-source
 
 # Check deployment status
 flux get kustomizations
@@ -60,7 +64,7 @@ kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:909
 ```
 
 **Legacy deployment (reference only):**
-- Old script: `./scripts/07-deploy-slo.sh`
+- Old script: `./scripts/backup/07-deploy-slo.sh`
 - **Note:** This script is kept for reference but is no longer used. Use Flux GitOps workflow instead.
 
 **Note:** Grafana dashboards are automatically deployed via Grafana Operator (IDs 14348, 14643).
@@ -154,7 +158,7 @@ Multi-window multi-burn-rate alerts:
 
 ## Documentation
 
-- **Deployment**: Deployed automatically via Flux ([kubernetes/base/infrastructure/slo/](../../kubernetes/base/infrastructure/slo/))
+- **Deployment**: Deployed automatically via Flux ([kubernetes/infra/slo.yaml](../../kubernetes/infra/slo.yaml) - simplified structure, refactored 2026-01-12)
 - **Sloth Docs**: https://sloth.dev/
 - **CRD Spec**: https://sloth.dev/usage/getting-started/
 - **Alert Configuration**: [ALERTING.md](./ALERTING.md)

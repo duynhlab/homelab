@@ -6,12 +6,12 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 
 ## Learning Path
 
-### 🚀 Getting Started (New Users)
+### Getting Started (New Users)
 
 1. **[Setup Guide](./guides/SETUP.md)** - Complete GitOps deployment guide
    - Quick start (3 commands, 5 minutes)
    - GitOps architecture with Flux Operator
-   - Kustomize base/overlay patterns
+   - Simplified structure (infra/ + apps/, refactored 2026-01-12)
    - Multi-environment support
    - Step-by-step instructions
    - Troubleshooting common issues
@@ -38,7 +38,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
    - Filter configurations
    - Multi-select patterns
 
-7. **[Metrics Label Solutions](./monitoring/METRICS_LABEL_SOLUTIONS.md)** - Label configuration guide
+7. **[Metrics Labels](./monitoring/METRICS_LABEL.md)** - Label configuration guide
    - Kubernetes Downward API
    - ServiceMonitor configuration
 
@@ -110,9 +110,9 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
     - SRE runbooks and incident response scenarios
     - Grafana Annotations planning (planned feature)
 
-### 🚦 k6 Load Testing
+### k6 Load Testing
 
-23. **[k6 Load Testing](./k6/K6_LOAD_TESTING.md)** - Load testing setup and architecture
+23. **[k6 Load Testing](./k6/README.md)** - Load testing setup and architecture
     - System architecture with filtering
     - Multiple scenarios (5 user personas)
     - Deployment configurations
@@ -130,7 +130,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 - [Metrics Guide](./monitoring/METRICS.md) - Comprehensive metrics documentation
 - [PromQL Guide](./monitoring/PROMQL_GUIDE.md) - Complete guide to PromQL functions, time range vs rate interval, and counter handling
 - [Variables & Regex](./monitoring/VARIABLES_REGEX.md) - Filter patterns
-- [Metrics Label Solutions](./monitoring/METRICS_LABEL_SOLUTIONS.md) - Label configuration
+- [Metrics Labels](./monitoring/METRICS_LABEL.md) - Label configuration
 
 ### SLO/SRE
 - [SLO Overview](./slo/README.md) - System overview
@@ -159,12 +159,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 - [Grafana Dashboard Guide](./guides/GRAFANA_DASHBOARD.md) - Complete SRE/DevOps dashboard reference (34 panels + annotations planning)
 
 ### k6 Load Testing
-- [k6 Load Testing](./k6/K6_LOAD_TESTING.md) - Complete load testing guide with architecture
-
-### Archive
-- [Microservices Refactoring](./archive/MICROSERVICES_REFACTORING.md) - Historical architecture document
-- [Deployment Plan](./archive/plan.deploy.md) - Historical deployment plan
-- [API Architecture](./archive/api.md) - Architecture planning document
+- [k6 Load Testing](./k6/README.md) - Complete load testing guide with architecture
 
 ---
 
@@ -173,7 +168,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 ### Key Concepts
 - **GitOps** - Declarative infrastructure managed via Flux Operator
 - **Flux Operator** - Kubernetes-native GitOps reconciliation engine
-- **Kustomize** - Base/overlay pattern for multi-environment deployment
+- **Kustomize** - Simplified structure (direct manifests in infra/ + apps/, refactored 2026-01-12)
 - **OCI Registry** - `localhost:5050` (local), stores Kubernetes manifests as artifacts
 - **Helm Chart** - Generic chart for all microservices (`charts/`)
 - **HelmRelease CRDs** - Flux manages Helm deployments declaratively

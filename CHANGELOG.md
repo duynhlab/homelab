@@ -8,6 +8,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+## [0.24.0] - 2026-01-12
+
+### Changed
+
+**Documentation Refresh - Controllers/Configs/Apps Structure Alignment**
+
+Complete documentation update to reflect the current GitOps structure and fix all outdated references.
+
+#### Documentation Updates
+- **docs/README.md:** Fixed broken links
+  - `METRICS_LABEL_SOLUTIONS.md` → `METRICS_LABEL.md`
+  - `k6/K6_LOAD_TESTING.md` → `k6/README.md`
+  - Removed non-existent archive section references
+
+- **docs/guides/SETUP.md:** Updated to controllers/configs/apps structure
+  - Updated directory layout to show `kubernetes/infra/controllers/` and `kubernetes/infra/configs/` pattern
+  - Fixed deployment order descriptions (controllers-local → configs-local → apps-local)
+  - Updated access instructions (removed reference to missing `scripts/08-setup-access.sh`)
+  - Corrected APM component descriptions (Loki/Tempo/Pyroscope as raw manifests, not HelmReleases)
+  - Updated infrastructure paths and dependency chain
+
+- **docs/apm/README.md:** Updated manifest paths and Kustomization references
+  - Changed from `apm-local`/`apm.yaml` to `configs-local` + `kubernetes/infra/configs/apm/`
+  - Updated component descriptions (raw manifests vs HelmReleases)
+  - Fixed reconciliation commands
+
+- **docs/monitoring/METRICS.md:** Updated ServiceMonitor location
+  - Changed from `kubernetes/infra/monitoring.yaml` to `kubernetes/infra/configs/monitoring/servicemonitors/microservices.yaml`
+  - Fixed reconciliation command to use `configs-local`
+
+- **docs/guides/DATABASE.md:** Complete path updates
+  - Changed from `databases-local`/`databases.yaml` to `controllers-local`/`configs-local` pattern
+  - Updated all database instance paths to `kubernetes/infra/configs/databases/instances/*`
+  - Updated PgCat pooler paths to `kubernetes/infra/configs/databases/poolers/*`
+  - Updated PodMonitor paths to `kubernetes/infra/configs/monitoring/podmonitors/*`
+  - Updated Vector configmap and monitoring queries paths
+  - Fixed script references to `scripts/backup/*`
+
+- **docs/slo/README.md:** Updated to controllers/configs pattern
+  - Changed from `slo-local`/`slo.yaml` to `controllers-local`/`configs-local`
+  - Updated manifest paths
+
+- **kubernetes/README.md:** Removed outdated Kustomization chain
+  - Removed references to `infrastructure-local`, `monitoring-local`, `apm-local`, `databases-local`, `slo-local`
+  - Updated to show `controllers-local` → `configs-local` → `apps-local` chain
+  - Updated directory structure to reflect controllers/configs separation
+  - Fixed verification commands
+
+- **kubernetes/infra/README.md:** Updated deployment flow
+  - Removed `infrastructure-local` references
+  - Updated flowchart to show controllers → configs → apps
+  - Corrected APM component descriptions (raw manifests vs HelmReleases)
+
+- **kubernetes/clusters/local/README.md:** Updated to current structure
+  - Changed from old Kustomization chain to `controllers-local`/`configs-local`/`apps-local`
+  - Updated file structure section
+  - Fixed dependency verification examples
+  - Changed `make flux-install` references to `make flux-up`
+
+- **scripts/README.md:** Updated Kustomization lists
+  - Changed from 6 Kustomizations to 3 (controllers-local, configs-local, apps-local)
+  - Updated flux-sync.sh documentation
+
+- **README.md:** Updated GitOps project structure
+  - Changed from base/overlays pattern to controllers/configs/apps structure
+  - Updated deployment model description
+
+#### HelmRelease Values Completion
+
+**kubernetes/apps/*.yaml:** Copied full values from `charts/mop/values/*.yaml`
+
+All 9 microservice HelmReleases now include complete configuration:
+- **Added fields:** `name`, `image`, `service`, `containerPort`, `terminationGracePeriodSeconds`, `livenessProbe`, `readinessProbe`, `migrations`
+- **Fixed:** Pod naming issue (was using "mop" instead of service name)
+- **Updated:** All services now use production values (replicaCount: 2, ENV: production, LOG_LEVEL: info, OTEL_SAMPLE_RATE: 0.1)
+- **Services updated:** auth, user, product, cart, order, review, notification, shipping, shipping-v2
+
+#### K6 Dependency Fix
+
+- **kubernetes/apps/k6.yaml:** Added `dependsOn` for all 9 microservices
+  - K6 now waits for all services to be ready before starting load testing
+  - Prevents K6 from running before APIs are available
+
+#### Secret Name Fixes
+
+- **kubernetes/apps/order.yaml:** Fixed secret name
+  - Changed from `order.transaction-db.credentials.postgresql.acid.zalan.do` to `transaction-db-secret`
+  - Aligned with CloudNativePG secret naming convention (matches cart service)
+
+### Fixed
+
+- **Documentation:** All broken links and outdated structure references
+- **HelmRelease values:** Missing fields causing incorrect pod names and missing migrations
+- **K6 deployment:** Now properly waits for all microservices via HelmRelease `dependsOn`
+- **Secret references:** Order service now uses correct CloudNativePG secret name
+
 ## [0.23.0] - 2026-01-11
 
 ### Changed

@@ -83,12 +83,10 @@ This directory contains deployment and management scripts for the monitoring pla
    ```
 2. Applies FluxInstance from `kubernetes/clusters/local/flux-system/instance.yaml`
 3. Waits for all Kustomizations to sync:
-   - infrastructure-local
-   - monitoring-local
-   - apm-local
-   - databases-local
+   - controllers-local
+   - configs-local
    - apps-local
-   - slo-local
+   - flux-system
 
 **Key difference from reference repo:**
 - Uses **Helm** instead of `flux-operator` CLI
@@ -105,9 +103,9 @@ This directory contains deployment and management scripts for the monitoring pla
 **What it does:**
 1. Checks if manifests changed (via `flux diff artifact`)
 2. If changed, pushes to `localhost:5050`:
-   - `flux-cluster-sync:latest` (from `kubernetes/clusters/local/`)
-   - `flux-infra-sync:latest` (from `kubernetes/overlays/local/infrastructure/`)
-   - `flux-apps-sync:latest` (from `kubernetes/overlays/local/apps/`)
+   - `flux-cluster-sync:local` (from `kubernetes/clusters/local/`)
+   - `flux-infra-sync:local` (from `kubernetes/infra/`) - **Simplified structure (refactored 2026-01-12)**
+   - `flux-apps-sync:local` (from `kubernetes/apps/`) - **Simplified structure (refactored 2026-01-12)**
 3. Includes Git source + revision metadata
 
 **Smart behavior:**
@@ -124,12 +122,9 @@ This directory contains deployment and management scripts for the monitoring pla
 
 **What it does:**
 1. Triggers `flux reconcile` for all Kustomizations:
-   - infrastructure-local
-   - monitoring-local
-   - apm-local
-   - databases-local
+   - controllers-local
+   - configs-local
    - apps-local
-   - slo-local
 2. Shows resource tree for apps
 
 **Use when:**
@@ -231,7 +226,8 @@ These scripts follow the pattern from:
 **Key differences:**
 - Added `flux-ui.sh` (Flux Web UI access)
 - Multiple Kustomizations (infrastructure, monitoring, apm, databases, apps, slo)
-- Project-specific paths (`kubernetes/overlays/local/`)
+- **Simplified structure** (`kubernetes/infra/` + `kubernetes/apps/`) - refactored 2026-01-12
+- No base/overlay pattern (direct manifests with local config inline)
 
 ---
 

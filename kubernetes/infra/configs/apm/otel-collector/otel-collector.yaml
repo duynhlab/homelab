@@ -1,0 +1,125 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: opentelemetry-collector
+  namespace: monitoring
+spec:
+  chart:
+    spec:
+      chart: opentelemetry-collector
+      interval: 10m
+      sourceRef:
+        kind: HelmRepository
+        name: opentelemetry
+        namespace: flux-system
+      version: '>=0.114.0 <0.115.0'
+  interval: 10m
+  releaseName: otel-collector
+  timeout: 10m
+  values:
+    affinity: {}
+    config:
+      exporters:
+        debug:
+          sampling_initial: 5
+          sampling_thereafter: 200
+          verbosity: basic
+        otlp/jaeger:
+          endpoint: jaeger-collector.monitoring.svc.cluster.local:4317
+          tls:
+            insecure: true
+        otlp/tempo:
+          endpoint: tempo.monitoring.svc.cluster.local:4317
+          tls:
+            insecure: true
+      extensions:
+        health_check:
+          endpoint: 0.0.0.0:13133
+        zpages:
+          endpoint: 0.0.0.0:55679
+      processors:
+        batch:
+          send_batch_max_size: 1024
+          send_batch_size: 512
+          timeout: 5s
+        memory_limiter:
+          check_interval: 1s
+          limit_mib: 200
+          spike_limit_mib: 50
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: 0.0.0.0:4317
+            http:
+              endpoint: 0.0.0.0:4318
+      service:
+        extensions:
+        - health_check
+        - zpages
+        pipelines:
+          traces:
+            exporters:
+            - otlp/tempo
+            - otlp/jaeger
+            processors:
+            - memory_limiter
+            - batch
+            receivers:
+            - otlp
+        telemetry:
+          logs:
+            level: info
+          metrics:
+            address: 0.0.0.0:8888
+    image:
+      pullPolicy: IfNotPresent
+      repository: otel/opentelemetry-collector-contrib
+      tag: 0.114.0
+    livenessProbe:
+      httpGet:
+        path: /
+        port: 13133
+      initialDelaySeconds: 10
+      periodSeconds: 10
+    mode: deployment
+    nodeSelector: {}
+    podAnnotations:
+      app.kubernetes.io/component: apm
+      app.kubernetes.io/part-of: apm-stack
+    ports:
+      metrics:
+        containerPort: 8888
+        enabled: true
+        protocol: TCP
+        servicePort: 8888
+      otlp:
+        containerPort: 4317
+        enabled: true
+        protocol: TCP
+        servicePort: 4317
+      otlp-http:
+        containerPort: 4318
+        enabled: true
+        protocol: TCP
+        servicePort: 4318
+    readinessProbe:
+      httpGet:
+        path: /
+        port: 13133
+      initialDelaySeconds: 5
+      periodSeconds: 5
+    replicaCount: 1
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    service:
+      type: ClusterIP
+    serviceAccount:
+      create: true
+      name: otel-collector
+    tolerations: []

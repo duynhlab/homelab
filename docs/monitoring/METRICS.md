@@ -49,7 +49,10 @@ Dự án này expose **6 custom application metrics** và tận dụng **Go runt
 **Service Discovery:**
 - **Prometheus Operator**: Manages Prometheus via CRDs
 - **ServiceMonitor**: Single resource for all microservices (namespace-based discovery)
-- **Namespace selector**: `monitoring: enabled` label
+  - **Location**: In [`kubernetes/infra/configs/monitoring/servicemonitors/microservices.yaml`](../../kubernetes/infra/configs/monitoring/servicemonitors/microservices.yaml)
+  - **Deployment**: Automatically deployed via Flux Operator
+  - **Reconciliation**: `flux reconcile kustomization configs-local --with-source`
+- **Namespace selector**: Matches 8 namespaces (auth, user, product, cart, order, review, notification, shipping)
 - **Scalability**: Efficiently handles 1000+ pods without manual configuration
 
 ---
@@ -1223,7 +1226,7 @@ Diagnosis: High load period, NOT leak ✅
 ### PromQL & Queries
 
 ### Architecture & Labels
-- **[Metrics Label Solutions](./METRICS_LABEL_SOLUTIONS.md)** - Label injection strategy, ServiceMonitor configuration, and auto-discovery
+- **[Metrics Labels](./METRICS_LABEL.md)** - Label injection strategy, ServiceMonitor configuration, and auto-discovery
 
 ### Troubleshooting
 - **[Grafana Dashboard Guide](../guides/GRAFANA_DASHBOARD.md)** - Dashboard troubleshooting and best practices

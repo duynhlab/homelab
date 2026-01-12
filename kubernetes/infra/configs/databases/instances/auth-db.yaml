@@ -1,0 +1,248 @@
+# Auth Database Cluster (Zalando Operator)
+# With PgBouncer connection pooler
+apiVersion: acid.zalan.do/v1
+kind: postgresql
+metadata:
+  name: auth-db
+  namespace: auth
+spec:
+  teamId: "platform"
+  
+  # Volume configuration
+  volume:
+    size: 5Gi
+    # storageClass: "ssd"
+  
+  # High Availability: 3 nodes (1 leader + 2 standbys)
+  numberOfInstances: 3
+  
+  # Database and user configuration
+  databases:
+    auth: auth
+  
+  users:
+    auth:  # Database owner
+      - createdb
+  
+  # Connection pooler (PgBouncer) configuration - Keep existing
+  connectionPooler:
+    numberOfInstances: 2
+    schema: pooler
+    user: pooler
+    mode: transaction  # Transaction pooling for short-lived connections
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: "256Mi"
+    maxDBConnections: 240
+    # max database connections for 2 poolers will be 240 * 2 = 480, so the free connections will be 20
+    # max client connections per pooler is always 10 000!!!
+
+  # PostgreSQL version and production-ready parameters
+  postgresql:
+    version: "17"
+    parameters:
+      # Connection settings
+      port: "5432"
+      # max_connections: "200"
+      # password_encryption: scram-sha-256  # More secure than MD5
+      
+      # # Memory settings for performance (small, conservative)
+      # shared_buffers: "512MB"  # 25% of 2GB pod memory (small limit)
+      # work_mem: "8MB"  # Conservative for small workload
+      # maintenance_work_mem: "128MB"
+      # effective_cache_size: "1536MB"  # 75% of 2GB pod memory
+      
+      # # Write-Ahead Log (WAL) settings
+      # wal_buffers: "16MB"
+      # wal_level: "replica"  # For HA (use "logical" if replication needed)
+      # checkpoint_timeout: "15min"
+      # checkpoint_completion_target: "0.9"
+      # max_wal_size: "2GB"  # Adjusted for small workload
+      # min_wal_size: "512MB"
+      
+      # # Query planner settings (SSD assumed - default tuning)
+      # random_page_cost: "1.1"  # Lower for SSD
+      # effective_io_concurrency: "200"  # Higher for SSD
+      # default_statistics_target: "100"
+      
+      # # Parallelism settings (conservative for small workload)
+      # max_worker_processes: "4"
+      # max_parallel_workers_per_gather: "2"
+      # max_parallel_workers: "4"
+      
+      # # Autovacuum settings
+      # autovacuum: "on"
+      # autovacuum_max_workers: "2"
+      # autovacuum_vacuum_scale_factor: "0.1"  # Trigger vacuum more frequently
+      
+      # # Logging settings
+      # log_statement: "mod"  # Log DDL + DML
+      # log_min_duration_statement: "5000"  # Log slow queries (>5s)
+      # log_checkpoints: "on"
+      # log_lock_waits: "on"
+      # log_temp_files: "0"  # Log all temp file usage
+      # log_autovacuum_min_duration: "1000"  # Log autovacuum >1s
+      # log_connections: "on"
+      # log_disconnections: "on"
+      # logging_collector: "on"
+      # log_filename: 'postgresql-%Y-%m-%d_%H%M%S.log'
+      # log_rotation_age: "1d"
+      # log_rotation_size: "128MB"
+
+
+      # set the default autovacuum parameters
+      autovacuum_analyze_scale_factor: "0.1"
+      autovacuum_vacuum_scale_factor: "0.2"
+      # setup logs for future debugging of the most aspects of the database
+      log_destination: "stderr"
+      log_connections: "off"
+      log_disconnections: "off"
+      log_min_duration_statement: "100ms"
+      log_statement: "ddl"
+      log_lock_waits: "on"
+      log_temp_files: "0"
+      # limit the connections
+      max_connections: "500"
+      superuser_reserved_connections: "5"
+      # set the maximum delay for the standby
+      # after this timeout all queries on replica will be canceled until the standby will be up to date
+      max_standby_archive_delay: "30s"
+      max_standby_streaming_delay: "30s"
+      wal_level: "replica"
+      max_wal_senders: "6"
+      max_replication_slots: "6"
+      max_worker_processes: "16"
+      max_parallel_workers: "8"
+      max_parallel_workers_per_gather: "4"
+      max_parallel_maintenance_workers: "2"
+      max_wal_size: "4GB"
+      min_wal_size: "2GB"
+      wal_keep_size: "2GB"
+      effective_cache_size: "8GB"
+      shared_buffers: "4GB"
+      work_mem: "256MB"
+      maintenance_work_mem: "1024MB"
+      # we're on ssd
+      effective_io_concurrency: "100"
+      random_page_cost: "1.1"
+      # enable the extentions, pg_stat_statements is a must-have for production
+      shared_preload_libraries: "pg_stat_statements,pg_cron,pg_trgm,pgcrypto,pg_stat_kcache"
+      track_io_timing: "on"
+      pg_stat_statements.max: "1000"
+      pg_stat_statements.track: "all"
+      cron.database_name: "postgres"
+      synchronous_commit: "local"
+
+
+  # Patroni configuration for pg_hba.conf
+  # CRITICAL: Order matters! Replication entries must come BEFORE reject rules
+  # Replicas need to connect via non-SSL for basebackup, so replication entries must allow non-SSL
+  # patroni:
+  #   pg_hba:
+  #     # Local connections (required for Patroni)
+  #     - local     all          all                        trust
+  #     - local     replication  standby                    trust
+      
+  #     # Replication connections (MUST be before reject rules)
+  #     # Allow non-SSL replication from pod network (required for basebackup)
+  #     - host      replication  standby   10.244.0.0/16    md5
+  #     - host      replication  standby   172.19.0.0/16    md5
+  #     - host      replication  standby   10.0.0.0/8       md5
+  #     # Allow SSL replication (preferred)
+  #     - hostssl   replication  standby   all              md5
+      
+  #     # Application connections from internal network (allow non-SSL for metrics scraping)
+  #     - host      all          all       10.0.0.0/8       trust
+  #     - host      all          all       127.0.0.1/32     md5
+  #     - host      all          all       ::1/128          md5
+      
+  #     # SSL connections (zalandos users use PAM)
+  #     - hostssl   all          +zalandos 127.0.0.1/32     pam
+  #     - hostssl   all          +zalandos ::1/128          pam
+  #     - hostssl   all          +zalandos all              pam
+      
+  #     # Reject non-SSL connections (except those allowed above)
+  #     - hostnossl all          all       all              reject
+      
+  #     # All other SSL connections require md5 password
+  #     - hostssl   all          all       all              md5
+
+  # Production-ready resource limits (small, conservative)
+  resources:
+    requests:
+      cpu: 100m  # Minimum CPU
+      memory: 512Mi  # Small memory request (conservative)
+    limits:
+      cpu: "1"  # Small CPU limit (not large)
+      memory: 2Gi  # Small memory limit (conservative)
+  
+  # Sidecars: postgres_exporter for Prometheus metrics collection and Vector for log collection
+  sidecars:
+    - name: exporter
+      image: quay.io/prometheuscommunity/postgres-exporter:v0.18.1
+      ports:
+        - name: exporter
+          containerPort: 9187
+          protocol: TCP
+      resources:
+        limits:
+          cpu: 500m
+          memory: 256M
+        requests:
+          cpu: 100m
+          memory: 256M
+      env:
+        - name: "DATA_SOURCE_URI"
+          value: "localhost/postgres?sslmode=require"
+        - name: "DATA_SOURCE_USER"
+          value: "$(POSTGRES_USER)"
+        - name: "DATA_SOURCE_PASS"
+          value: "$(POSTGRES_PASSWORD)"
+        - name: "PG_EXPORTER_EXTEND_QUERY_PATH"
+          value: "/etc/postgres-exporter/queries.yaml"
+      volumeMounts:
+        - name: postgres-monitoring-queries
+          mountPath: /etc/postgres-exporter
+          readOnly: true
+    - name: vector
+      image: timberio/vector:0.52.0-alpine
+      args:
+        - "--config"
+        - "/etc/vector/vector.yaml"
+      env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+      volumeMounts:
+        - name: pg-zalando-vector-config
+          mountPath: /etc/vector
+          readOnly: true
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+  
+  # Additional volumes for sidecars
+  additionalVolumes:
+    - name: pg-zalando-vector-config
+      targetContainers:
+        - vector
+      mountPath: /etc/vector
+      volumeSource:
+        configMap:
+          name: pg-zalando-vector-config
+    - name: postgres-monitoring-queries
+      targetContainers:
+        - exporter
+      mountPath: /etc/postgres-exporter
+      volumeSource:
+        configMap:
+          name: postgres-monitoring-queries

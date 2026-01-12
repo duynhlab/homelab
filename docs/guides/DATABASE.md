@@ -28,6 +28,110 @@
 
 ---
 
+## Deployment (GitOps)
+
+**Database infrastructure is deployed automatically via Flux Operator:**
+
+**Flux Kustomizations (controllers/configs pattern):**
+- `controllers-local` ([kubernetes/clusters/local/controllers.yaml](../../kubernetes/clusters/local/controllers.yaml)) - installs database operators/CRDs
+- `configs-local` ([kubernetes/clusters/local/configs.yaml](../../kubernetes/clusters/local/configs.yaml)) - applies database instances, poolers, and secrets
+- **Source:** OCI artifact `mop-registry:5000/flux-infra-sync:local`
+- **Manifests:**
+  - `kubernetes/infra/controllers/databases/`
+  - `kubernetes/infra/configs/databases/`
+- **Reconciliation:** Every 10 minutes (automatic)
+- **Dependencies:** `controllers-local` must be ready before `configs-local`
+
+**Components deployed:**
+1. **Operators:**
+   - Zalando Postgres Operator (v1.15.1) - HelmRelease
+   - CloudNativePG Operator (v1.28.0) - HelmRelease
+2. **Database Clusters:** 5 clusters (3 Zalando + 2 CloudNativePG)
+   - Review DB, Auth DB, Supporting DB (Zalando)
+   - Product DB, Transaction DB (CloudNativePG)
+3. **Connection Poolers:** PgBouncer (sidecar), PgCat (standalone, 2 deployments)
+4. **Secrets:** Pre-created for CloudNativePG clusters
+
+**Manual reconciliation (if needed):**
+```bash
+# Trigger Flux reconciliation
+flux reconcile kustomization controllers-local --with-source
+flux reconcile kustomization configs-local --with-source
+
+# Check deployment status
+flux get kustomizations
+kubectl get postgresql -A         # Zalando clusters
+kubectl get clusters -A           # CloudNativePG clusters
+
+# Check connection poolers
+kubectl get pods -n auth | grep pooler        # PgBouncer
+kubectl get pods -n product | grep pgcat      # PgCat
+kubectl get pods -n cart | grep pgcat         # PgCat
+```
+
+**Verification:**
+```bash
+# Check all database clusters are running
+kubectl get postgresql -A         # Zalando clusters (3)
+kubectl get clusters -A           # CloudNativePG clusters (2)
+
+# Check poolers
+kubectl get svc -n auth | grep pooler
+kubectl get svc -n product | grep pgcat
+kubectl get svc -n cart | grep pgcat
+
+# Check database pods
+kubectl get pods -n review | grep review-db
+kubectl get pods -n auth | grep auth-db
+kubectl get pods -n user | grep supporting-db
+kubectl get pods -n product | grep product-db
+kubectl get pods -n cart | grep transaction-db
+```
+
+**File Structure (Simplified - Refactored 2026-01-12):**
+```
+kubernetes/infra/
+├── controllers/databases/              # Operators (CRDs first)
+│   ├── zalando-operator.yaml
+│   └── cloudnativepg-operator.yaml
+└── configs/databases/                  # Instances + poolers + secrets
+    ├── instances/                      # 5 database instances (CRs)
+    │   ├── auth-db.yaml
+    │   ├── review-db.yaml
+    │   ├── supporting-db.yaml
+    │   ├── product-db.yaml
+    │   └── transaction-db.yaml
+    ├── poolers/                        # PgCat raw manifests
+    │   ├── product/
+    │   └── transaction/
+    └── secrets/secrets.yaml            # Pre-created secrets (CloudNativePG, etc.)
+
+**Old Structure (Moved to backup/):**
+```
+kubernetes/backup/base/infrastructure/databases/
+├── zalando-operator/         # Zalando operator HelmRelease
+├── cnpg-operator/            # CloudNativePG operator HelmRelease
+├── clusters/                 # 5 database cluster CRDs
+│   ├── auth-db.yaml          # Zalando postgresql CRD
+│   ├── review-db.yaml        # Zalando postgresql CRD
+│   ├── supporting-db.yaml    # Zalando postgresql CRD
+│   ├── product-db.yaml       # CloudNativePG cluster CRD
+│   └── transaction-db.yaml   # CloudNativePG cluster CRD
+├── poolers/                  # PgCat standalone deployments
+│   ├── pgcat-product-*       # PgCat for product-db (3 files)
+│   └── pgcat-transaction-*   # PgCat for transaction-db (3 files)
+└── secrets/                  # Pre-created secrets for CloudNativePG
+    ├── product-db-secret.yaml
+    ├── transaction-db-secret-cart.yaml
+    └── transaction-db-secret-order.yaml
+```
+
+**Legacy deployment (reference only):**
+- Old scripts: `./scripts/backup/04-deploy-databases.sh`, `./scripts/backup/04a-verify-databases.sh`
+- **Note:** These scripts are kept for reference but are no longer used. Use Flux GitOps workflow instead.
+
+---
+
 ## Database Architecture
 
 ### Overview
@@ -176,9 +280,9 @@ This section provides a brief overview of all 5 PostgreSQL clusters. For detaile
 - **HA**: Patroni via Kubernetes API (automatic failover)
 - **Pooler**: PgCat standalone deployment v1.2.0 (`ghcr.io/postgresml/pgcat:v1.2.0`) with 2 replicas for HA
 - **Namespace**: `product`
-- **CRD**: `k8s/postgres-operator/cloudnativepg/crds/product-db.yaml`
-- **Pooler Config**: `k8s/postgres-operator/pgcat/product/configmap.yaml`
-- **Pooler Deployment**: `k8s/postgres-operator/pgcat/product/deployment.yaml`
+- **CRD**: `kubernetes/infra/configs/databases/instances/product-db.yaml`
+- **Pooler Config**: `kubernetes/infra/configs/databases/poolers/product/configmap.yaml`
+- **Pooler Deployment**: `kubernetes/infra/configs/databases/poolers/product/deployment.yaml`
 
 **Architecture Diagram:**
 
@@ -226,7 +330,7 @@ flowchart TB
 Check Flyway migration status:
 ```bash
 # Get primary pod
-PRIMARY_POD=$(kubectl get pods -n product -l cnpg.io/cluster=product-db,role=primary -o jsonpath='{.items[0].metadata.name}' || kubectl get pods -n product -l cnpg.io/cluster=product-db -o jsonpath='{.items[0].metadata.name}')
+PRIMARY_POD=$(kubectl get pods -n product -l cnpg.io/cluster=product-db,cnpg.io/instanceRole=primary -o jsonpath='{.items[0].metadata.name}')
 
 # Get password
 PASSWORD=$(kubectl get secret product-db-secret -n product -o jsonpath='{.data.password}' | base64 -d)
@@ -258,9 +362,9 @@ kubectl exec -n product $PRIMARY_POD -- env PGPASSWORD=$PASSWORD psql -h localho
 - **Replication**: Synchronous replication with logical replication slot synchronization
 - **Pooler**: PgCat standalone deployment v1.2.0 (`ghcr.io/postgresml/pgcat:v1.2.0`) with 2 replicas for HA
 - **Namespace**: `cart`
-- **CRD**: `k8s/postgres-operator/cloudnativepg/crds/transaction-db.yaml`
-- **Pooler Config**: `k8s/postgres-operator/pgcat/transaction/configmap.yaml`
-- **Pooler Deployment**: `k8s/postgres-operator/pgcat/transaction/deployment.yaml`
+- **CRD**: `kubernetes/infra/configs/databases/instances/transaction-db.yaml`
+- **Pooler Config**: `kubernetes/infra/configs/databases/poolers/transaction/configmap.yaml`
+- **Pooler Deployment**: `kubernetes/infra/configs/databases/poolers/transaction/deployment.yaml`
 - **Production-Ready**: Comprehensive PostgreSQL performance tuning, synchronous replication, logical replication slot sync
 
 **Architecture Diagram:**
@@ -417,7 +521,7 @@ env:
         key: password
 ```
 
-**PgCat Configuration** (`k8s/postgres-operator/pgcat/product/configmap.yaml`):
+**PgCat Configuration** (`kubernetes/infra/configs/databases/poolers/product/configmap.yaml`):
 ```toml
 # PgCat Configuration for Product Database
 [general]
@@ -456,10 +560,10 @@ role = "primary"
 - **CloudNativePG Services**: CloudNativePG automatically creates services:
   - `{cluster-name}-rw` (read-write endpoint) → `product-db-rw.product.svc.cluster.local`
   - `{cluster-name}-r` (read-only endpoint) → `product-db-r.product.svc.cluster.local` (for future replica routing)
-- **Deployment**: `k8s/postgres-operator/pgcat/product/deployment.yaml` with 2 replicas
+- **Deployment**: `kubernetes/infra/configs/databases/poolers/product/deployment.yaml` with 2 replicas
 - Currently configured with primary server only; replicas can be added later for read balancing
 
-**Transaction Database PgCat Configuration** (`k8s/postgres-operator/pgcat/transaction/configmap.yaml`):
+**Transaction Database PgCat Configuration** (`kubernetes/infra/configs/databases/poolers/transaction/configmap.yaml`):
 ```toml
 # PgCat Configuration for Transaction Databases (Cart + Order)
 [general]
@@ -587,7 +691,7 @@ PgCat metrics are exposed via HTTP endpoint (`/metrics` on port 9930) and scrape
 
 **Configuration Requirement:**
 - PgCat config must have `enable_prometheus_exporter = true` in `[general]` section to expose HTTP metrics endpoint
-- ConfigMaps: `k8s/postgres-operator/pgcat/transaction/configmap.yaml` and `k8s/postgres-operator/pgcat/product/configmap.yaml`
+- ConfigMaps: `kubernetes/infra/configs/databases/poolers/transaction/configmap.yaml` and `kubernetes/infra/configs/databases/poolers/product/configmap.yaml`
 
 **ServiceMonitor Files:**
 - `k8s/prometheus/servicemonitors/servicemonitor-pgcat-product.yaml` - For Product DB PgCat
@@ -631,8 +735,8 @@ ServiceMonitor is automatically deployed by `scripts/02-deploy-monitoring.sh` (a
 
 **CRD Examples:**
 
-Product DB CRD location: `k8s/postgres-operator/cloudnativepg/crds/product-db.yaml`
-Transaction DB CRD location: `k8s/postgres-operator/cloudnativepg/crds/transaction-db.yaml`
+Product DB CRD location: `kubernetes/infra/configs/databases/instances/product-db.yaml`
+Transaction DB CRD location: `kubernetes/infra/configs/databases/instances/transaction-db.yaml`
 
 **Key Configuration Parameters:**
 - `instances`: Number of PostgreSQL instances (2 for Product, 3 for Transaction)
@@ -655,8 +759,8 @@ Transaction DB CRD location: `k8s/postgres-operator/cloudnativepg/crds/transacti
 CloudNativePG clusters use **PodMonitor** CRDs to enable Prometheus scraping of `postgres_exporter` sidecars.
 
 **PodMonitor Files:**
-- `k8s/prometheus/podmonitors/podmonitor-product-db.yaml` (Product DB)
-- `k8s/prometheus/podmonitors/podmonitor-transaction-db.yaml` (Transaction DB)
+- `kubernetes/infra/configs/monitoring/podmonitors/podmonitor-cloudnativepg-product-db.yaml` (Product DB)
+- `kubernetes/infra/configs/monitoring/podmonitors/podmonitor-cloudnativepg-transaction-db.yaml` (Transaction DB)
 
 **Example PodMonitor:**
 ```yaml
@@ -684,7 +788,7 @@ spec:
 ```
 
 **Deployment:**
-PodMonitors are automatically deployed by `scripts/04-deploy-databases.sh` after database clusters are ready.
+PodMonitors are deployed via Flux as part of `configs-local` (`kubernetes/infra/configs/monitoring/podmonitors/`).
 
 **Key Metrics:**
 - `pg_up` - Database availability
@@ -1080,19 +1184,19 @@ flowchart TB
 Zalando clusters use **PodMonitor** CRDs to enable Prometheus scraping of `postgres_exporter` sidecars.
 
 **PodMonitor Files:**
-- `k8s/prometheus/podmonitors/podmonitor-auth-db.yaml` (Auth DB)
-- `k8s/prometheus/podmonitors/podmonitor-review-db.yaml` (Review DB)
-- `k8s/prometheus/podmonitors/podmonitor-supporting-db.yaml` (Supporting DB)
+- `kubernetes/infra/configs/monitoring/podmonitors/podmonitor-zalando-auth-db.yaml` (Auth DB)
+- `kubernetes/infra/configs/monitoring/podmonitors/podmonitor-zalando-review-db.yaml` (Review DB)
+- `kubernetes/infra/configs/monitoring/podmonitors/podmonitor-zalando-supporting-db.yaml` (Supporting DB)
 
 **Deployment:**
-PodMonitors are automatically deployed by `scripts/04-deploy-databases.sh` after database clusters are ready.
+PodMonitors are deployed via Flux as part of `configs-local` (`kubernetes/infra/configs/monitoring/podmonitors/`).
 
 #### Log Collection with Vector Sidecar
 
 All Zalando PostgreSQL clusters include a **Vector sidecar** for log collection and shipping to Loki.
 
 **Configuration:**
-- **Vector ConfigMaps**: Located in `k8s/postgres-operator/zalando/vector-configs/`
+- **Vector ConfigMaps**: Located in `kubernetes/infra/configs/databases/configmaps/vector-configs/`
   - `pg-zalando-vector-config-auth.yaml` (Auth DB)
   - `pg-zalando-vector-config-review.yaml` (Review DB)
   - `pg-zalando-vector-config-supporting.yaml` (Supporting DB)
@@ -1118,7 +1222,7 @@ kubectl logs -n auth auth-db-0 -c vector
 All Zalando PostgreSQL clusters include `postgres_exporter` sidecars with **custom queries** for enhanced metrics.
 
 **Configuration:**
-- **Custom Queries ConfigMaps**: Located in `k8s/postgres-operator/zalando/monitoring-queries/`
+- **Custom Queries ConfigMaps**: Located in `kubernetes/infra/configs/databases/configmaps/monitoring-queries/`
   - `postgres-monitoring-queries-auth.yaml` (Auth DB)
   - `postgres-monitoring-queries-review.yaml` (Review DB)
   - `postgres-monitoring-queries-supporting.yaml` (Supporting DB)
@@ -1467,7 +1571,7 @@ The Zalando Postgres Operator includes an **optional UI component** (`postgres-o
 
 **Deployment:**
 
-The UI component is deployed automatically by `scripts/04-deploy-databases.sh` after the Zalando operator is deployed.
+The UI component is **not deployed by default** in the current GitOps setup. If you want it, add a manifest (HelmRelease or raw manifests) under `kubernetes/infra/configs/databases/` and let `configs-local` apply it.
 
 **Configuration:**
 
@@ -1832,7 +1936,7 @@ SHOW STATS;
 
 **Configuration:**
 ```toml
-# k8s/postgres-operator/pgcat/product/configmap.yaml
+# kubernetes/infra/configs/databases/poolers/product/configmap.yaml - PgCat ConfigMap for product
 [general]
 host = "0.0.0.0"
 port = 5432
@@ -1851,7 +1955,7 @@ pool_size = 30
 - Prometheus metrics: `http://pgcat-product.product.svc.cluster.local:9930/metrics`
 - Admin database: `psql -h pgcat-product.product.svc.cluster.local -p 9930 -U admin -d pgbouncer`
 
-**ServiceMonitor:** Configured for Prometheus scraping (see `k8s/prometheus/servicemonitors/`)
+**Scraping note:** PgCat exposes metrics on port 9930. If you want Prometheus Operator to scrape it, add a `ServiceMonitor` under `kubernetes/infra/configs/monitoring/servicemonitors/`.
 
 ## Related Documentation
 

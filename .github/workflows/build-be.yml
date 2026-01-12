@@ -18,6 +18,7 @@ on:
     branches:
       - main
       - v6
+      - feat/gitops
     paths:
       - 'services/Dockerfile'
       - 'services/*/go.mod'

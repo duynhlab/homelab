@@ -1,0 +1,12 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: apps-oci
+  namespace: flux-system
+spec:
+  interval: 5m
+  url: oci://mop-registry:5000/flux-apps-sync
+  ref:
+    tag: local
+  insecure: true

@@ -1,0 +1,63 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: configs-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: infrastructure
+spec:
+  interval: 10m
+  timeout: 15m
+  retryInterval: 2m
+  
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+  
+  path: ./configs
+  
+  prune: false
+  wait: true
+  
+  # Configs depend on controllers being ready
+  dependsOn:
+    - name: controllers-local
+  
+  # Health checks for key resources
+  healthChecks:
+    # Monitoring configs
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: Grafana
+      name: grafana
+      namespace: monitoring
+    # Database instances
+    - apiVersion: acid.zalan.do/v1
+      kind: postgresql
+      name: auth-db
+      namespace: auth
+    - apiVersion: acid.zalan.do/v1
+      kind: postgresql
+      name: review-db
+      namespace: review
+    - apiVersion: acid.zalan.do/v1
+      kind: postgresql
+      name: supporting-db
+      namespace: user
+    - apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
+      name: transaction-db
+      namespace: cart
+    - apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
+      name: product-db
+      namespace: product
+    # APM configs
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: loki
+      namespace: monitoring
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: tempo
+      namespace: monitoring

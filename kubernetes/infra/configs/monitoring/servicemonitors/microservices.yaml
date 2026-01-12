@@ -1,0 +1,39 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: microservices-api
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  endpoints:
+  - interval: 15s
+    path: /metrics
+    port: http
+    relabelings:
+    - replacement: microservices
+      targetLabel: job
+    - sourceLabels:
+      - __meta_kubernetes_service_name
+      targetLabel: service
+    - sourceLabels:
+      - __meta_kubernetes_namespace
+      targetLabel: namespace
+    - sourceLabels:
+      - __meta_kubernetes_service_label_app
+      targetLabel: app
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - auth
+    - user
+    - product
+    - cart
+    - order
+    - review
+    - notification
+    - shipping
+  selector:
+    matchExpressions:
+    - key: app
+      operator: Exists

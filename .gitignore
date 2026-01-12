@@ -44,3 +44,5 @@ kubeconfig
 # frontend
 frontend/node_modules
 bin/*
+
+debugs

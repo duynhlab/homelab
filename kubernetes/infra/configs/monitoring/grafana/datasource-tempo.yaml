@@ -1,0 +1,24 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: tempo-datasource
+  namespace: monitoring
+spec:
+  datasource:
+    access: proxy
+    jsonData:
+      serviceMap:
+        datasourceUid: prometheus
+      tracesToLogsV2:
+        datasourceUid: loki
+        tags:
+        - trace_id
+      tracesToMetrics:
+        datasourceUid: prometheus
+    name: Tempo
+    type: tempo
+    uid: tempo
+    url: http://tempo.monitoring.svc.cluster.local:3200
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana

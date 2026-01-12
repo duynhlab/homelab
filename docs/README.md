@@ -6,10 +6,13 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 
 ## Learning Path
 
-### 🚀 Getting Started (New Users)
+### Getting Started (New Users)
 
-1. **[Setup Guide](./guides/SETUP.md)** - Complete deployment guide
-   - Quick start (5 minutes)
+1. **[Setup Guide](./guides/SETUP.md)** - Complete GitOps deployment guide
+   - Quick start (3 commands, 5 minutes)
+   - GitOps architecture with Flux Operator
+   - Simplified structure (infra/ + apps/, refactored 2026-01-12)
+   - Multi-environment support
    - Step-by-step instructions
    - Troubleshooting common issues
 
@@ -35,7 +38,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
    - Filter configurations
    - Multi-select patterns
 
-7. **[Metrics Label Solutions](./monitoring/METRICS_LABEL_SOLUTIONS.md)** - Label configuration guide
+7. **[Metrics Labels](./monitoring/METRICS_LABEL.md)** - Label configuration guide
    - Kubernetes Downward API
    - ServiceMonitor configuration
 
@@ -107,9 +110,9 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
     - SRE runbooks and incident response scenarios
     - Grafana Annotations planning (planned feature)
 
-### 🚦 k6 Load Testing
+### k6 Load Testing
 
-23. **[k6 Load Testing](./k6/K6_LOAD_TESTING.md)** - Load testing setup and architecture
+23. **[k6 Load Testing](./k6/README.md)** - Load testing setup and architecture
     - System architecture with filtering
     - Multiple scenarios (5 user personas)
     - Deployment configurations
@@ -127,7 +130,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 - [Metrics Guide](./monitoring/METRICS.md) - Comprehensive metrics documentation
 - [PromQL Guide](./monitoring/PROMQL_GUIDE.md) - Complete guide to PromQL functions, time range vs rate interval, and counter handling
 - [Variables & Regex](./monitoring/VARIABLES_REGEX.md) - Filter patterns
-- [Metrics Label Solutions](./monitoring/METRICS_LABEL_SOLUTIONS.md) - Label configuration
+- [Metrics Labels](./monitoring/METRICS_LABEL.md) - Label configuration
 
 ### SLO/SRE
 - [SLO Overview](./slo/README.md) - System overview
@@ -156,20 +159,19 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 - [Grafana Dashboard Guide](./guides/GRAFANA_DASHBOARD.md) - Complete SRE/DevOps dashboard reference (34 panels + annotations planning)
 
 ### k6 Load Testing
-- [k6 Load Testing](./k6/K6_LOAD_TESTING.md) - Complete load testing guide with architecture
-
-### Archive
-- [Microservices Refactoring](./archive/MICROSERVICES_REFACTORING.md) - Historical architecture document
-- [Deployment Plan](./archive/plan.deploy.md) - Historical deployment plan
-- [API Architecture](./archive/api.md) - Architecture planning document
+- [k6 Load Testing](./k6/README.md) - Complete load testing guide with architecture
 
 ---
 
 ## Quick Reference
 
 ### Key Concepts
+- **GitOps** - Declarative infrastructure managed via Flux Operator
+- **Flux Operator** - Kubernetes-native GitOps reconciliation engine
+- **Kustomize** - Simplified structure (direct manifests in infra/ + apps/, refactored 2026-01-12)
+- **OCI Registry** - `localhost:5050` (local), stores Kubernetes manifests as artifacts
 - **Helm Chart** - Generic chart for all microservices (`charts/`)
-- **OCI Registry** - `oci://ghcr.io/duynhne/charts/microservice`
+- **HelmRelease CRDs** - Flux manages Helm deployments declaratively
 - **32 Grafana Panels** - Complete monitoring dashboard
 - **6 Custom Metrics** - Application-level metrics
 - **9 Microservices** - All services with v1/v2 APIs
@@ -180,36 +182,41 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 
 ### Common Tasks
 
-**Deploy everything:**
+**Deploy everything with GitOps:**
 ```bash
-./scripts/00-verify-build.sh              # Step 0: Verify local builds (optional)
-./scripts/01-create-kind-cluster.sh        # Step 1: Infrastructure
-./scripts/02-deploy-monitoring.sh          # Step 2: Monitoring + metrics (BEFORE apps)
-./scripts/03-deploy-apm.sh                 # Step 3: APM (BEFORE apps)
-# Sub-scripts: 03a-tempo, 03b-pyroscope, 03c-loki, 03d-jaeger
-./scripts/04-deploy-databases.sh           # Step 4: Databases (BEFORE apps)
-./scripts/04a-verify-databases.sh          # Step 4a: Verify databases
-./scripts/05-deploy-microservices.sh      # Step 5: Deploy (from OCI registry, images built by GitHub Actions)
-./scripts/06-deploy-k6.sh                 # Step 6: Load testing (AFTER apps)
-./scripts/07-deploy-slo.sh                # Step 7: SLO system
-./scripts/08-setup-access.sh               # Step 8: Access setup
-./scripts/09-reload-dashboard.sh           # Step 9: Reload dashboards (utility)
-./scripts/10-error-budget-alert.sh         # Step 10: Error budget alerts (utility)
-./scripts/cleanup.sh                       # Cleanup everything
+# Check prerequisites
+make prereqs
+
+# Deploy complete stack (3 commands)
+./scripts/kind-up.sh        # Create Kind cluster + OCI registry
+./scripts/flux-up.sh         # Bootstrap Flux Operator
+./scripts/flux-push.sh       # Deploy all infrastructure + apps
+
+# Manage deployments
+./scripts/flux-sync.sh       # Trigger reconciliation
+./scripts/flux-ui.sh         # Open Flux Web UI (http://localhost:9080)
+flux get kustomizations      # Check sync status
+kubectl get helmreleases -A  # Check HelmReleases
+kubectl get pods -A          # Check all pods
+
+# Cleanup
+./scripts/kind-down.sh       # Delete cluster + registry
 ```
 
-**Manual Helm deployment:**
+**Manual Helm deployment (for testing):**
 ```bash
 helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-namespace
 ```
 
 **Deploy SLOs:**
 ```bash
-./scripts/07-deploy-slo.sh
+# SLOs are deployed automatically via Flux
+flux reconcile kustomization slo-stack --with-source  # Manual trigger
 ```
 
 **Access services:**
-- Grafana: http://localhost:3000 (admin/admin)
+- Flux Web UI: http://localhost:9080 (./scripts/flux-ui.sh)
+- Grafana: http://localhost:3000 (anonymous/enabled)
 - Prometheus: http://localhost:9090
 - Jaeger UI: http://localhost:16686
 - API: http://localhost:8080

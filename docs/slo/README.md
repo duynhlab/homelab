@@ -13,17 +13,59 @@ This SLO (Service Level Objective) system provides comprehensive monitoring and 
 
 ## Quick Start
 
-### Deploy SLO System
+### Deploy SLO System (GitOps)
 
+**SLO system is deployed automatically via Flux Operator:**
+
+**Flux Kustomizations (controllers/configs pattern):**
+- `controllers-local` ([kubernetes/clusters/local/controllers.yaml](../../kubernetes/clusters/local/controllers.yaml)) - installs Sloth Operator (CRDs/controllers)
+- `configs-local` ([kubernetes/clusters/local/configs.yaml](../../kubernetes/clusters/local/configs.yaml)) - applies PrometheusServiceLevel CRs
+- **Source:** OCI artifact `mop-registry:5000/flux-infra-sync:local`
+- **Manifests:**
+  - `kubernetes/infra/controllers/slo/`
+  - `kubernetes/infra/configs/slo/`
+- **Reconciliation:** Every 10 minutes (automatic)
+- **Dependencies:** `controllers-local` must be ready before `configs-local`
+
+**Components deployed:**
+1. **Sloth Operator** (v0.15.0) - HelmRelease
+2. **PrometheusServiceLevel CRDs** - 9 services, 27 total SLOs
+
+**Manual reconciliation (if needed):**
 ```bash
-./scripts/07-deploy-slo.sh
+# Trigger Flux reconciliation
+flux reconcile kustomization configs-local --with-source
+
+# Check deployment status
+flux get kustomizations
+kubectl get pods -n monitoring | grep sloth
+
+# Check SLO CRDs
+kubectl get prometheusservicelevel -A
+
+# Check generated PrometheusRules
+kubectl get prometheusrule -n monitoring | grep sloth
 ```
 
-This script:
-- Adds Sloth Helm repository
-- Deploys Sloth Operator to `monitoring` namespace
-- Applies PrometheusServiceLevel CRDs (9 services)
-- Verifies deployment
+**Verification:**
+```bash
+# Check Sloth Operator is running
+kubectl get pods -n monitoring | grep sloth
+
+# List all SLO definitions (27 SLOs across 9 services)
+kubectl get prometheusservicelevel -A
+
+# Check generated recording/alerting rules
+kubectl get prometheusrule -n monitoring -l prometheus-operator.io/sloth-generated=true
+
+# Query SLO metrics in Prometheus
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090
+# Open: http://localhost:9090 and query: slo:sli_error:ratio_rate5m
+```
+
+**Legacy deployment (reference only):**
+- Old script: `./scripts/backup/07-deploy-slo.sh`
+- **Note:** This script is kept for reference but is no longer used. Use Flux GitOps workflow instead.
 
 **Note:** Grafana dashboards are automatically deployed via Grafana Operator (IDs 14348, 14643).
 
@@ -116,7 +158,7 @@ Multi-window multi-burn-rate alerts:
 
 ## Documentation
 
-- **Deployment**: [k8s/sloth/README.md](../../k8s/sloth/README.md)
+- **Deployment**: Deployed automatically via Flux ([kubernetes/infra/slo.yaml](../../kubernetes/infra/slo.yaml) - simplified structure, refactored 2026-01-12)
 - **Sloth Docs**: https://sloth.dev/
 - **CRD Spec**: https://sloth.dev/usage/getting-started/
 - **Alert Configuration**: [ALERTING.md](./ALERTING.md)

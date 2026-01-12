@@ -121,7 +121,8 @@ services/
 │   │   ├── logic/         # Business logic
 │   │   └── core/          # Domain + repositories
 │   ├── middleware/         # Duplicated (not shared)
-│   └── config/             # Duplicated (not shared)
+│   ├── config/             # Duplicated (not shared)
+│   └── db/migrations/     # Database migrations
 ├── cart/
 │   └── ... (same structure)
 └── ... (9 services total)
@@ -137,6 +138,47 @@ services/
 ```bash
 ./scripts/00-verify-build.sh  # Verifies all 9 services independently
 ```
+
+### GitOps Project Structure
+
+**Kubernetes manifests are organized for local-first GitOps with clear ordering (controllers → configs → apps):**
+
+```
+kubernetes/
+├── infra/                       # Infrastructure manifests
+│   ├── namespaces.yaml           # Namespaces (applied first)
+│   ├── controllers/              # Operators + CRDs (Phase 1)
+│   ├── configs/                  # Instances + configs (Phase 2)
+│   └── kustomization.yaml
+├── apps/                         # Applications (HelmReleases + frontend + k6)
+│   ├── auth.yaml
+│   ├── user.yaml
+│   ├── product.yaml
+│   ├── cart.yaml
+│   ├── order.yaml
+│   ├── review.yaml
+│   ├── notification.yaml
+│   ├── shipping.yaml
+│   ├── shipping-v2.yaml
+│   ├── frontend.yaml
+│   └── k6.yaml
+├── clusters/
+│   └── local/                    # FluxInstance + OCI sources + Kustomizations
+│       ├── flux-system/
+│       ├── sources/
+│       ├── controllers.yaml
+│       ├── configs.yaml
+│       └── apps.yaml
+└── backup/                       # Legacy base/overlays snapshots (reference only)
+```
+
+**Deployment Model:**
+- Flux Operator pulls manifests from OCI Registry (`localhost:5050`)
+- `controllers-local` installs operators/CRDs first
+- `configs-local` applies instances/configs (monitoring, apm, databases, slo)
+- `apps-local` applies apps after infra is ready (k6 waits for all microservices via HelmRelease `dependsOn`)
+
+**GitOps Details**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md) for complete GitOps architecture and workflows.
 
 ### Microservices
 
@@ -158,45 +200,39 @@ services/
 
 ## Quick Start
 
-### Complete Deployment
+### GitOps Deployment (3 Commands)
+
+**Complete stack deployment using Flux Operator:**
 
 ```bash
-# Step 0: Verify builds (optional but recommended)
-./scripts/00-verify-build.sh              # Verify local builds before deployment
+# Prerequisites check
+make prereqs
 
-# Step 1: Infrastructure
-./scripts/01-create-kind-cluster.sh        # Create Kind cluster
+# 1. Create Kind cluster + OCI registry
+./scripts/kind-up.sh
 
-# Step 2: Monitoring
-./scripts/02-deploy-monitoring.sh          # Deploy Prometheus + Grafana
+# 2. Bootstrap Flux Operator
+./scripts/flux-up.sh
 
-# Step 3: APM Stack
-./scripts/03-deploy-apm.sh                 # Deploy Tempo, Pyroscope, Loki, Vector
-# Sub-scripts: 03a-tempo, 03b-pyroscope, 03c-loki, 03d-jaeger
-
-# Step 4: Database Infrastructure
-./scripts/04-deploy-databases.sh           # Deploy PostgreSQL operators, clusters, poolers
-./scripts/04a-verify-databases.sh          # Verify database deployment
-
-# Step 5: Deploy Applications (from OCI registry, images built by GitHub Actions)
-./scripts/05-deploy-microservices.sh      # Deploy all microservices from ghcr.io OCI registry
-
-# Step 6: Load Testing (AFTER apps)
-./scripts/06-deploy-k6.sh                 # Deploy k6 load generators
-
-# Step 7: SLO System
-./scripts/07-deploy-slo.sh                # Deploy Sloth Operator and SLO CRDs
-
-# Step 8: Access Setup
-./scripts/08-setup-access.sh               # Setup port-forwarding
-
-# Utilities (optional)
-./scripts/09-reload-dashboard.sh           # Reload Grafana dashboards
-./scripts/10-error-budget-alert.sh         # Error budget alert handling
-./scripts/cleanup.sh                       # Complete cleanup
+# 3. Deploy everything (infrastructure + apps)
+./scripts/flux-push.sh
 ```
 
-**Detailed Setup Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md) for step-by-step instructions, prerequisites, and troubleshooting.
+**What gets deployed automatically:**
+- Infrastructure: Monitoring (Prometheus, Grafana), APM (Tempo, Loki, Jaeger, Pyroscope, Vector, OTel)
+- Databases: PostgreSQL operators, 5 clusters, connection poolers
+- Applications: 9 microservices + frontend + k6 load testing
+- SLO: Sloth Operator + Service Level Objectives
+
+**Wait 5-10 minutes** for Flux reconciliation, then access services.
+
+**Benefits:**
+- 67-89% YAML reduction via Kustomize base/overlay patterns
+- Automatic drift detection and correction
+- Multi-environment support (local/staging/production)
+- Single source of truth in OCI registry
+
+**Detailed Setup Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md) for step-by-step instructions, architecture explanation, and troubleshooting.
 
 ---
 
@@ -208,6 +244,7 @@ services/
   - Migrations: Flyway 11.8.2 (8 migration images)
 - **HTTP Framework**: Gin
 - **Observability**: OpenTelemetry (traces, metrics, logs)
+- **GitOps**: Flux Operator, Kustomize, OCI Registry
 - **Deployment**: Kubernetes (Kind), Helm 3
 - **Monitoring**: Prometheus, Grafana, Tempo, Loki, Pyroscope, Jaeger
 
@@ -231,15 +268,21 @@ services/
 
 ## Access Points
 
-After running `./scripts/08-setup-access.sh` or manual port-forwarding:
+After deployment, access services via port-forwarding:
 
-| Service | URL | Credentials |
-|---------|-----|-------------|
-| Grafana | http://localhost:3000 | - |
-| Prometheus | http://localhost:9090 | - |
-| Jaeger UI | http://localhost:16686 | - |
-| Tempo | http://localhost:3200 | - |
-| API (via port-forward) | http://localhost:8080 | - |
+| Service | URL | Command | Credentials |
+|---------|-----|---------|-------------|
+| Flux Web UI | http://localhost:9080 | `./scripts/flux-ui.sh` or `make flux-ui` | - |
+| Grafana | http://localhost:3000 | `kubectl port-forward -n monitoring svc/grafana-service 3000:3000` | Anonymous (enabled) |
+| Prometheus | http://localhost:9090 | `kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090` | - |
+| Jaeger UI | http://localhost:16686 | `kubectl port-forward -n monitoring svc/jaeger-query 16686:16686` | - |
+| Tempo | http://localhost:3200 | `kubectl port-forward -n monitoring svc/tempo 3200:3200` | - |
+| Frontend | http://localhost:3000 | `kubectl port-forward -n default svc/frontend 3000:80` | - |
+| API (any service) | http://localhost:8080 | `kubectl port-forward -n <namespace> svc/<service> 8080:8080` | - |
+
+**Quick Access Script**: `./scripts/08-setup-access.sh` sets up port-forwarding for all services.
+
+**GitOps Monitoring**: Use Flux Web UI to monitor reconciliation status, view Kustomizations, and check deployment health.
 
 **Port-Forwarding Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md)
 

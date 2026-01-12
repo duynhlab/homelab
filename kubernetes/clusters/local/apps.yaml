@@ -4,8 +4,6 @@ kind: Kustomization
 metadata:
   name: apps-local
   namespace: flux-system
-  labels:
-    app.kubernetes.io/component: apps
 spec:
   interval: 10m
   timeout: 10m
@@ -22,10 +20,7 @@ spec:
   
   # Apps depend on ALL infrastructure being ready
   dependsOn:
-    - name: infrastructure-local  # Namespaces
-    - name: monitoring-local       # Prometheus for metrics
-    - name: apm-local              # OTel/Loki/Tempo for traces/logs
-    - name: databases-local        # PostgreSQL clusters for data
+    - name: configs-local  # Includes everything (namespaces, operators, instances)
   
   # Health checks for apps
   healthChecks:

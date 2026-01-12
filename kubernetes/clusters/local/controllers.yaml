@@ -1,0 +1,67 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: controllers-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: infrastructure
+spec:
+  interval: 10m
+  timeout: 15m
+  retryInterval: 2m
+  
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+  
+  path: ./controllers
+  
+  prune: false
+  wait: true
+  
+  # Health checks for namespaces and operators
+  healthChecks:
+    # Namespaces (now included in controllers path)
+    - apiVersion: v1
+      kind: Namespace
+      name: monitoring
+    - apiVersion: v1
+      kind: Namespace
+      name: auth
+    - apiVersion: v1
+      kind: Namespace
+      name: database
+    - apiVersion: v1
+      kind: Namespace
+      name: postgres-operator
+    - apiVersion: v1
+      kind: Namespace
+      name: cloudnative-pg
+    # Monitoring operators
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: kube-prometheus-stack
+      namespace: monitoring
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: grafana-operator
+      namespace: monitoring
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: metrics-server
+      namespace: kube-system
+    # Database operators
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: postgres-operator
+      namespace: postgres-operator
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: cloudnative-pg
+      namespace: cloudnative-pg
+    # SLO operator
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: sloth
+      namespace: monitoring

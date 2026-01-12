@@ -1,0 +1,77 @@
+# K6 Load Testing - Local environment configuration (simplified structure)
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: k6
+  namespace: k6
+spec:
+  interval: 10m
+  releaseName: k6
+  chartRef:
+    kind: OCIRepository
+    name: mop-chart-oci
+    namespace: flux-system
+  timeout: 5m
+  
+  # K6 depends on all microservices being ready
+  dependsOn:
+    - name: auth
+      namespace: auth
+    - name: user
+      namespace: user
+    - name: product
+      namespace: product
+    - name: cart
+      namespace: cart
+    - name: order
+      namespace: order
+    - name: review
+      namespace: review
+    - name: notification
+      namespace: notification
+    - name: shipping
+      namespace: shipping
+    - name: shipping-v2
+      namespace: shipping
+  
+  values:
+    name: k6
+    replicaCount: 1
+    image:
+      repository: ghcr.io/duynhne/k6
+      tag: v6
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 8080
+      targetPort: 8080
+      portName: http
+    containerPort: 8080
+    resources:
+      requests:
+        memory: "1Gi"    # Local: 1Gi (base: 2Gi)
+        cpu: "500m"      # Local: 500m (base: 1000m)
+      limits:
+        memory: "2Gi"    # Local: 2Gi (base: 4Gi)
+        cpu: "1000m"     # Local: 1000m (base: 2000m)
+    livenessProbe:
+      enabled: false
+    readinessProbe:
+      enabled: false
+    labels:
+      component: load-testing
+      test-mode: multiple-scenarios
+    command: ["k6"]
+    args: ["run", "/scripts/script.js"]
+    env:
+      - name: BASELINE_RPS
+        value: "10"      # Local: 10 RPS (base: 30)
+      - name: PEAK_RPS
+        value: "30"      # Local: 30 RPS (base: 100)
+      - name: BURST_RPS
+        value: "50"      # Local: 50 RPS (base: 200)
+      - name: BURST_DURATION
+        value: "2m"      # Local: 2m (base: 5m)
+      - name: BURST_TIMING
+        value: "10:00-14:00"

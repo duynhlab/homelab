@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - loki/
+  - tempo/
+  - pyroscope/
+  - vector/vector.yaml
+  - jaeger/jaeger.yaml
+  - otel-collector/otel-collector.yaml

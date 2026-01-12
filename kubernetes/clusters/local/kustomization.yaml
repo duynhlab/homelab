@@ -5,9 +5,6 @@ kind: Kustomization
 resources:
   - flux-system/
   - sources/
-  - infrastructure.yaml
-  - monitoring.yaml
-  - apm.yaml
-  - databases.yaml
-  - slo.yaml
-  - apps.yaml
+  - controllers.yaml     # Namespaces + operators (monitoring, databases, slo)
+  - configs.yaml         # Instances (monitoring, apm, databases, slo)
+  - apps.yaml            # Microservices

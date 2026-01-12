@@ -1,0 +1,118 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: review
+  namespace: review
+spec:
+  interval: 10m
+  timeout: 5m
+  chartRef:
+    kind: OCIRepository
+    name: mop-chart-oci
+    namespace: flux-system
+  releaseName: review
+  values:
+    # Values for review service
+    name: review
+
+    replicaCount: 2
+
+    image:
+      repository: ghcr.io/duynhne/review
+      tag: v6
+      pullPolicy: IfNotPresent
+
+    service:
+      type: ClusterIP
+      port: 8080
+      targetPort: 8080
+      portName: http
+
+    containerPort: 8080
+
+    env:
+      - name: SERVICE_NAME
+        value: "review"
+      - name: PORT
+        value: "8080"
+      - name: ENV
+        value: "production"
+      - name: OTEL_COLLECTOR_ENDPOINT
+        value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
+      - name: OTEL_SAMPLE_RATE
+        value: "0.1"
+      - name: PYROSCOPE_ENDPOINT
+        value: "http://pyroscope.monitoring.svc.cluster.local:4040"
+      - name: LOG_LEVEL
+        value: "info"
+      - name: LOG_FORMAT
+        value: "json"
+      - name: TRACING_ENABLED
+        value: "true"
+      - name: PROFILING_ENABLED
+        value: "true"
+      - name: METRICS_ENABLED
+        value: "true"
+      # Database configuration
+      - name: DB_HOST
+        value: "review-db.review.svc.cluster.local"  # Direct connection, no pooler - review-db is in review namespace
+      - name: DB_PORT
+        value: "5432"
+      - name: DB_NAME
+        value: "review"
+      - name: DB_USER
+        value: "review"
+      - name: DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: review.review-db.credentials.postgresql.acid.zalan.do  # Zalando operator auto-generated secret
+            key: password
+      - name: DB_SSLMODE
+        value: "require"
+      - name: DB_POOL_MAX_CONNECTIONS
+        value: "10"  # Direct connection, no pooler - smaller pool
+      # Graceful shutdown configuration
+      - name: SHUTDOWN_TIMEOUT
+        value: "10s"  # Default shutdown timeout (can be overridden)
+
+    # Kubernetes graceful shutdown configuration
+    terminationGracePeriodSeconds: 30  # Shutdown timeout (10s) + buffer (20s)
+
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "128Mi"
+        cpu: "100m"
+
+    livenessProbe:
+      enabled: true
+      httpGet:
+        path: /health
+        port: 8080
+      initialDelaySeconds: 30
+      periodSeconds: 10
+
+    readinessProbe:
+      enabled: true
+      httpGet:
+        path: /health
+        port: 8080
+      initialDelaySeconds: 5
+      periodSeconds: 5
+
+    # Database migrations (Flyway init container)
+    migrations:
+      enabled: true
+      image: ghcr.io/duynhne/review:v6-init
+      imagePullPolicy: Always #IfNotPresent
+      env:
+        DB_HOST: "review-db.review.svc.cluster.local"  # Direct connection, no pooler - review-db is in review namespace
+        DB_PORT: "5432"
+        DB_NAME: "review"
+        DB_USER: "review"
+        DB_SSLMODE: "require"
+      envFrom:
+        secretRef: "review.review-db.credentials.postgresql.acid.zalan.do"  # Zalando operator auto-generated secret

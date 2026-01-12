@@ -141,44 +141,42 @@ services/
 
 ### GitOps Project Structure
 
-**Kubernetes manifests organized for multi-environment deployment:**
+**Kubernetes manifests are organized for local-first GitOps with clear ordering (controllers → configs → apps):**
 
 ```
 kubernetes/
-├── base/                       # Shared manifests (environment-agnostic)
-│   ├── apps/                   # 11 HelmReleases (9 backend + frontend + k6)
-│   │   ├── auth/              # HelmRelease + kustomization
-│   │   ├── user/
-│   │   ├── product/
-│   │   └── ...
-│   └── infrastructure/         # Infrastructure components
-│       ├── monitoring/        # Prometheus, Grafana, Metrics Server
-│       ├── apm/               # Tempo, Loki, Vector, OTel, Pyroscope, Jaeger
-│       ├── databases/         # Operators, clusters, poolers
-│       └── slo/               # Sloth Operator + CRDs
-├── overlays/                   # Environment-specific patches
-│   ├── local/                 # Kind cluster (1 replica, 32Mi memory)
-│   ├── staging/               # Staging environment (placeholder)
-│   └── production/            # Production environment (placeholder)
-└── clusters/                   # Flux system configuration per cluster
-    ├── local/                 # FluxInstance + Kustomization CRDs
-    │   ├── flux-system/       # Flux Operator bootstrap
-    │   ├── sources/           # OCI + Helm repositories
-    │   ├── infrastructure.yaml
-    │   ├── monitoring.yaml
-    │   ├── apm.yaml
-    │   ├── databases.yaml
-    │   ├── apps.yaml
-    │   └── slo.yaml
-    ├── staging/               # Placeholder
-    └── production/            # Placeholder
+├── infra/                       # Infrastructure manifests
+│   ├── namespaces.yaml           # Namespaces (applied first)
+│   ├── controllers/              # Operators + CRDs (Phase 1)
+│   ├── configs/                  # Instances + configs (Phase 2)
+│   └── kustomization.yaml
+├── apps/                         # Applications (HelmReleases + frontend + k6)
+│   ├── auth.yaml
+│   ├── user.yaml
+│   ├── product.yaml
+│   ├── cart.yaml
+│   ├── order.yaml
+│   ├── review.yaml
+│   ├── notification.yaml
+│   ├── shipping.yaml
+│   ├── shipping-v2.yaml
+│   ├── frontend.yaml
+│   └── k6.yaml
+├── clusters/
+│   └── local/                    # FluxInstance + OCI sources + Kustomizations
+│       ├── flux-system/
+│       ├── sources/
+│       ├── controllers.yaml
+│       ├── configs.yaml
+│       └── apps.yaml
+└── backup/                       # Legacy base/overlays snapshots (reference only)
 ```
 
 **Deployment Model:**
 - Flux Operator pulls manifests from OCI Registry (`localhost:5050`)
-- Kustomize applies environment-specific patches
-- Automatic reconciliation every 10 minutes
-- 67-89% YAML reduction via base/overlay pattern
+- `controllers-local` installs operators/CRDs first
+- `configs-local` applies instances/configs (monitoring, apm, databases, slo)
+- `apps-local` applies apps after infra is ready (k6 waits for all microservices via HelmRelease `dependsOn`)
 
 **GitOps Details**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md) for complete GitOps architecture and workflows.
 

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Copyright 2025 Stefan Prodan
-# SPDX-License-Identifier: AGPL-3.0
 
 set -o errexit
 
@@ -37,6 +35,6 @@ diff_push() {
   echo "✔ pushed to ${oci_url}"
 }
 
-diff_push "${registry}/flux-cluster-sync:latest" "${kubernetes_path}/clusters/${cluster_name}"
-diff_push "${registry}/flux-infra-sync:latest" "${kubernetes_path}/overlays/${cluster_name}/infrastructure"
-diff_push "${registry}/flux-apps-sync:latest" "${kubernetes_path}/overlays/${cluster_name}/apps"
+diff_push "${registry}/flux-cluster-sync:local" "${kubernetes_path}/clusters/${cluster_name}"
+diff_push "${registry}/flux-infra-sync:local" "${kubernetes_path}/infra"
+diff_push "${registry}/flux-apps-sync:local" "${kubernetes_path}/apps"

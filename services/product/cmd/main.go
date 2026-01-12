@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
@@ -91,6 +93,16 @@ func main() {
 	logger.Info("Web handlers configured")
 
 	r := gin.Default()
+
+	// CORS middleware (must be before other middleware for OPTIONS requests)
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:3000", "http://localhost:3001"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	// Tracing middleware (must be first for context propagation)
 	r.Use(middleware.TracingMiddleware())

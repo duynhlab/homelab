@@ -1,0 +1,26 @@
+# PodMonitor for product-db PostgreSQL cluster (CloudNativePG)
+# Prometheus Operator will discover and scrape metrics from postgres_exporter sidecar
+# Manual PodMonitor creation is the recommended approach per official CloudNativePG documentation
+# Reference: https://cloudnative-pg.io/docs/1.28/monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: product-db
+  namespace: product
+  labels:
+    app: product-db
+    operator: cloudnativepg
+    release: kube-prometheus-stack  # Required for Prometheus Operator discovery
+spec:
+  selector:
+    matchLabels:
+      cnpg.io/cluster: product-db  # Required: Must match cluster name
+  podMetricsEndpoints:
+  - port: metrics  # Port name (9187)
+    interval: 15s
+    scrapeTimeout: 10s
+    path: /metrics
+  podTargetLabels:
+    - cnpg.io/cluster
+    - cnpg.io/instanceRole
+    - cnpg.io/instanceName

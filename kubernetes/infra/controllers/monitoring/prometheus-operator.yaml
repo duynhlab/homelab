@@ -1,0 +1,51 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kube-prometheus-stack
+  namespace: monitoring
+spec:
+  chart:
+    spec:
+      chart: kube-prometheus-stack
+      interval: 10m
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-community
+        namespace: flux-system
+      version: '>=60.0.0'
+  interval: 10m
+  releaseName: kube-prometheus-stack
+  timeout: 10m
+  values:
+    alertmanager:
+      enabled: false
+    grafana:
+      enabled: false
+    prometheus:
+      enabled: true
+      prometheusSpec:
+        podMonitorNamespaceSelector: {}
+        podMonitorSelector: {}
+        resources:
+          limits:
+            cpu: 500m
+            memory: 2Gi
+          requests:
+            cpu: 100m
+            memory: 1Gi
+        retention: 7d
+        retentionSize: 10GB
+        ruleNamespaceSelector: {}
+        ruleSelector:
+          matchLabels:
+            prometheus: kube-prometheus
+        serviceMonitorNamespaceSelector: {}
+        serviceMonitorSelector: {}
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              accessModes:
+              - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 20Gi

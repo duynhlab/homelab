@@ -1,0 +1,122 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: vector
+  namespace: kube-system
+spec:
+  chart:
+    spec:
+      chart: vector
+      sourceRef:
+        kind: HelmRepository
+        name: vector
+        namespace: flux-system
+      version: '>=0.30.0'
+  interval: 10m
+  releaseName: vector
+  timeout: 10m
+  values:
+    role: Agent
+    customConfig:
+      data_dir: /vector-data-dir
+      api:
+        enabled: true
+        address: 0.0.0.0:8686
+        playground: false
+      sources:
+        kubernetes_logs:
+          type: kubernetes_logs
+          extra_field_selector: ""
+          extra_label_selector: ""
+          exclude_paths_glob_patterns:
+            - "**/*.gz"
+            - "**/*.tmp"
+            - "**/*.log.*"
+            - "**/containers/*/checkpoints/**"
+        internal_metrics:
+          type: internal_metrics
+      transforms:
+        add_labels:
+          type: remap
+          inputs:
+            - kubernetes_logs
+          source: |
+            # Extract service from kubernetes.pod_labels.app
+            if exists(.kubernetes.pod_labels."app") {
+              .service = to_string!(.kubernetes.pod_labels."app")
+            } else if exists(.kubernetes.pod_name) {
+              .service = to_string!(.kubernetes.pod_name)
+            } else {
+              .service = "system"
+            }
+            
+            # Extract namespace from kubernetes.pod_namespace
+            if exists(.kubernetes.pod_namespace) {
+              .namespace = to_string!(.kubernetes.pod_namespace)
+            } else {
+              .namespace = "kube-system"
+            }
+            
+            # Extract pod_name from kubernetes.pod_name
+            if exists(.kubernetes.pod_name) {
+              .pod_name = to_string!(.kubernetes.pod_name)
+            } else {
+              .pod_name = "unknown-pod"
+            }
+            
+            # Extract container_name from kubernetes.container_name
+            if exists(.kubernetes.container_name) {
+              .container_name = to_string!(.kubernetes.container_name)
+            } else {
+              .container_name = "unknown-container"
+            }
+            
+            # Parse JSON message and extract level field
+            if exists(.message) {
+              parsed, err = parse_json(.message)
+              if err == null && exists(parsed.level) {
+                .level = to_string!(parsed.level)
+              }
+            }
+      sinks:
+        loki:
+          type: loki
+          inputs:
+            - add_labels
+          endpoint: http://loki.monitoring.svc.cluster.local:3100
+          encoding:
+            codec: json
+          labels:
+            service: "{{ `{{service}}` }}"
+            namespace: "{{ `{{namespace}}` }}"
+            pod: "{{ `{{pod_name}}` }}"
+            container: "{{ `{{container_name}}` }}"
+          out_of_order_action: accept
+          batch:
+            max_bytes: 3145728
+            timeout_secs: 5
+          request:
+            rate_limit_duration_secs: 1
+            rate_limit_num: 100
+          healthcheck:
+            enabled: false
+        prometheus_exporter:
+          type: prometheus_exporter
+          inputs:
+            - internal_metrics
+          address: 0.0.0.0:9090
+          default_namespace: vector
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 128Mi
+    tolerations:
+      - effect: NoSchedule
+        operator: Exists
+    podMonitor:
+      enabled: true
+      additionalLabels:
+        release: kube-prometheus-stack

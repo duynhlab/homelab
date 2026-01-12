@@ -93,7 +93,7 @@ go build -o bin/{service} cmd/{service}/main.go
 
 **Detailed Configuration**: See [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md) for environment variables, `.env` files, and local setup.
 
-**Deployment**: Docker/Kubernetes deployment details in [`docs/guides/SETUP.md`](docs/guides/SETUP.md)
+**GitOps Deployment**: See deployment commands in [Deployment Order](#deployment-order) section. Use `./scripts/flux-push.sh` to deploy all services to Kubernetes.
 
 ---
 
@@ -180,6 +180,7 @@ flowchart TD
   - **Database Documentation**: [`docs/guides/DATABASE.md`](docs/guides/DATABASE.md)
 - **HTTP Framework**: Gin
 - **Observability**: OpenTelemetry (traces, metrics, logs)
+- **GitOps**: Flux Operator, Kustomize, OCI Registry
 - **Deployment**: Kubernetes (Kind), Helm 3
 - **Monitoring**: Prometheus, Grafana, Tempo, Loki, Pyroscope, Jaeger
 
@@ -193,12 +194,21 @@ flowchart TD
 monitoring/
 ├── services/          # Go application code (9 microservices)
 ├── charts/            # Helm chart for microservices
-├── k8s/               # Kubernetes manifests
-├── scripts/           # Deployment scripts
+├── kubernetes/        # GitOps manifests (Flux + Kustomize)
+│   ├── base/          # Shared manifests (apps + infrastructure)
+│   ├── overlays/      # Environment patches (local/staging/production)
+│   └── clusters/      # Flux system config per cluster
+├── k8s/               # Legacy manifests (reference only)
+├── scripts/           # Deployment scripts (Flux + legacy)
 ├── docs/              # Documentation (starting point for details)
 ├── k6/                # K6 load testing
 └── specs/             # Specifications and research
 ```
+
+**GitOps Structure:**
+- `kubernetes/base/` - Environment-agnostic manifests (HelmReleases, infrastructure)
+- `kubernetes/overlays/` - Environment-specific patches (local: 1 replica, prod: 5 replicas)
+- `kubernetes/clusters/` - Flux Operator bootstrap and Kustomization CRDs
 
 **Full Documentation Index**: See [`docs/README.md`](docs/README.md) for complete documentation structure.
 
@@ -228,26 +238,40 @@ monitoring/
 
 ### Deployment Order
 
-Infrastructure → Build Verification → Monitoring → APM → **Databases** → Apps → Load Testing → SLO → Access → Utilities
+**GitOps Workflow** - Infrastructure → Monitoring → APM → Databases → Apps → SLO
 
-1. Build Verification (00) - Verify local builds before deployment
-2. Infrastructure (01) - Kind cluster
-3. Monitoring (02) - **Create all namespaces** + Prometheus, Grafana, metrics (BEFORE apps)
-4. APM (03) - Tempo, Pyroscope, Loki, Vector (BEFORE apps)
-   - 03a-deploy-tempo.sh - Tempo deployment
-   - 03b-deploy-pyroscope.sh - Pyroscope deployment
-   - 03c-deploy-loki.sh - Loki deployment
-   - 03d-deploy-jaeger.sh - Jaeger deployment
-5. **Databases (04)** - PostgreSQL operators, clusters, poolers (BEFORE apps)
-   - 04a-verify-databases.sh - Database verification
-6. Deploy Apps (05) - Deploy services from OCI registry (images built by GitHub Actions)
-7. Load Testing (06) - K6 load generators (AFTER apps)
-8. SLO (07) - Sloth Operator and SLO CRDs
-9. Access Setup (08) - Port-forwarding
-10. Utilities:
-    - 09-reload-dashboard.sh - Reload Grafana dashboards
-    - 10-error-budget-alert.sh - Error budget alert handling
-    - cleanup.sh - Complete cleanup
+```bash
+# 1. Create Kind Cluster + OCI Registry
+./scripts/kind-up.sh
+
+# 2. Bootstrap Flux Operator
+./scripts/flux-up.sh
+
+# 3. Deploy All (Flux reconciles in dependency order)
+./scripts/flux-push.sh
+```
+
+**Flux automatically deploys in correct order:**
+1. **Foundation** - Flux Operator, namespaces, OCI sources
+2. **Monitoring** (BEFORE apps) - Prometheus, Grafana, Metrics Server
+3. **APM** (BEFORE apps) - Tempo, Loki, Vector, OTel Collector, Pyroscope, Jaeger
+4. **Databases** (BEFORE apps) - PostgreSQL operators, 5 clusters, connection poolers
+5. **Applications** - 9 microservices + frontend + k6 load testing
+6. **SLO** - Sloth Operator + 9 PrometheusServiceLevel CRDs
+
+**Verification:**
+```bash
+# Check Flux reconciliation status
+flux get kustomizations
+
+# Check all resources
+kubectl get pods --all-namespaces
+kubectl get helmreleases --all-namespaces
+
+# Trigger manual reconciliation (if needed)
+flux reconcile kustomization infrastructure-local --with-source
+flux reconcile kustomization apps-local --with-source
+```
 
 **Detailed Deployment Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md)
 
@@ -279,17 +303,26 @@ Infrastructure → Build Verification → Monitoring → APM → **Databases** �
 **Add a new service:**
 - Service code: `services/cmd/{service}/`, `services/internal/{service}/`
 - Helm values: `charts/values/{service}.yaml`
-- SLO CRD: `k8s/sloth/crds/{service}-slo.yaml`
+- HelmRelease: `kubernetes/base/apps/{service}/helmrelease.yaml`
+- Local patches: `kubernetes/overlays/local/apps/patches/services/{service}.yaml`
+- SLO CRD: `kubernetes/base/infrastructure/slo/crds/{service}.yaml`
 - Migration: `services/{service}/db/migrations/Dockerfile` + `sql/V*__*.sql`
 
 **Update monitoring:**
 - Dashboard JSON: `k8s/grafana-operator/dashboards/microservices-dashboard.json`
-- Prometheus Operator values: `k8s/prometheus/values.yaml`
-- ServiceMonitor: `k8s/prometheus/servicemonitor-microservices.yaml`
+- Prometheus HelmRelease: `kubernetes/base/infrastructure/monitoring/prometheus/helmrelease.yaml`
+- ServiceMonitor (microservices): `kubernetes/base/infrastructure/monitoring/servicemonitors/microservices.yaml`
+- ServiceMonitor (infrastructure): `kubernetes/base/infrastructure/monitoring/{component}/servicemonitor.yaml`
 
 **Modify SLOs:**
-- Edit CRDs: `k8s/sloth/crds/*.yaml` (PrometheusServiceLevel CRDs)
-- Apply: `kubectl apply -f k8s/sloth/crds/`
+- Edit CRDs: `kubernetes/base/infrastructure/slo/crds/*.yaml` (PrometheusServiceLevel CRDs)
+- Apply: Flux reconciles automatically, or `flux reconcile kustomization slo-stack --with-source`
+
+**Modify infrastructure:**
+- Databases: `kubernetes/base/infrastructure/databases/`
+- Monitoring: `kubernetes/base/infrastructure/monitoring/`
+- APM: `kubernetes/base/infrastructure/apm/`
+- SLO: `kubernetes/base/infrastructure/slo/`
 
 ### Find Documentation by Topic
 

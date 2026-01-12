@@ -4,11 +4,9 @@ kind: OCIRepository
 metadata:
   name: apps-oci
   namespace: flux-system
-  labels:
-    app.kubernetes.io/component: apps
 spec:
   interval: 5m
-  url: oci://localhost:5050/flux-apps-sync
+  url: oci://mop-registry:5000/flux-apps-sync
   ref:
-    tag: latest
+    tag: local
   insecure: true

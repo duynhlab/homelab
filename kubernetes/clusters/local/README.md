@@ -12,8 +12,8 @@
 # 1. Create Kind cluster + local registry
 make cluster-up
 
-# 2. Install Flux Operator (Helm) + FluxInstance (kubectl)
-make flux-install
+# 2. Bootstrap Flux Operator + FluxInstance
+make flux-up
 
 # 3. Push manifests to OCI registry
 make flux-push
@@ -54,7 +54,7 @@ helm install flux-operator oci://ghcr.io/controlplaneio-fluxcd/charts/flux-opera
 kubectl apply -k kubernetes/clusters/local/flux-system/
 
 # Or use Makefile
-make flux-install
+make flux-up
 ```
 
 **Why this order?**
@@ -92,15 +92,15 @@ curl http://localhost:5050/v2/_catalog
 ### Push Manifests
 
 ```bash
-# Push infrastructure manifests
+# Push infrastructure manifests (simplified structure - refactored 2026-01-12)
 flux push artifact oci://localhost:5050/flux-infra-sync:local \
-  --path=kubernetes/overlays/local/infrastructure \
+  --path=kubernetes/infra \
   --source="$(git config --get remote.origin.url)" \
   --revision="$(git rev-parse HEAD)"
 
-# Push apps manifests
+# Push apps manifests (simplified structure - refactored 2026-01-12)
 flux push artifact oci://localhost:5050/flux-apps-sync:local \
-  --path=kubernetes/overlays/local/apps \
+  --path=kubernetes/apps \
   --source="$(git config --get remote.origin.url)" \
   --revision="$(git rev-parse HEAD)"
 
@@ -108,37 +108,42 @@ flux push artifact oci://localhost:5050/flux-apps-sync:local \
 make flux-push
 ```
 
+**Note:** Structure simplified from `base/overlays` to direct `infra/` and `apps/` manifests (2026-01-12).
+
 **Production Note:** Use authenticated registry (AWS ECR, Google GAR, Azure ACR) with TLS enabled.
 
 ---
 
 ## Deployment Order
 
-Flux automatically deploys in correct dependency order:
+Flux automatically deploys in correct dependency order via `dependsOn` field in Kustomization CRDs:
 
 ```
-1. infrastructure-local (Namespaces)
-   └── 14 namespaces
+1. controllers-local
+   └── No dependencies (first to deploy)
+   └── Creates namespaces + installs operators/CRDs (monitoring, databases, slo)
 
-2. monitoring-local (depends on: infrastructure-local)
-   └── Prometheus, Grafana, Metrics Server
+2. configs-local
+   └── dependsOn: [controllers-local]
+   └── Applies instances/configs (monitoring, apm, databases, slo)
 
-3. apm-local (depends on: monitoring-local)
-   └── Tempo, Loki, Pyroscope, Jaeger, Vector, OTel Collector
-
-4. databases-local (depends on: apm-local)
-   └── Zalando Postgres Operator, CloudNativePG Operator
-   └── 5 PostgreSQL Clusters
-   └── PgCat Connection Poolers
-
-5. apps-local (depends on: infrastructure + monitoring + apm + databases)
+3. apps-local
+   └── dependsOn: [configs-local]
    └── 9 Backend Microservices + Frontend + K6
-
-6. slo-local (depends on: monitoring-local)
-   └── Sloth Operator + 9 PrometheusServiceLevel CRDs
+   └── K6 depends on all microservices via HelmRelease dependsOn
 ```
 
-**Critical:** Apps only deploy after ALL infrastructure is ready (databases, monitoring, APM).
+**Result:** Applications **will NOT start** until `configs-local` is ready. Flux enforces this automatically.
+
+**Verify dependencies:**
+```bash
+# Check apps-local dependsOn
+kubectl get kustomization apps-local -n flux-system -o yaml | grep -A5 dependsOn
+
+# Expected output:
+# dependsOn:
+#   - name: configs-local
+```
 
 ---
 
@@ -150,8 +155,9 @@ Flux automatically deploys in correct dependency order:
 # All Kustomizations
 flux get kustomizations
 
-# Infrastructure
-flux get kustomization infrastructure-local
+# Controllers/configs
+flux get kustomization controllers-local
+flux get kustomization configs-local
 
 # Apps
 flux get kustomization apps-local
@@ -215,12 +221,9 @@ kubernetes/clusters/local/
 │   ├── apps-oci.yaml              # OCI source for apps
 │   ├── helm/                      # HelmRepository sources
 │   └── kustomization.yaml
-├── infrastructure.yaml            # Kustomization: namespaces
-├── monitoring.yaml                # Kustomization: Prometheus, Grafana
-├── apm.yaml                       # Kustomization: Tempo, Loki, Jaeger
-├── databases.yaml                 # Kustomization: Postgres operators + clusters
+├── controllers.yaml               # Kustomization: namespaces + operators
+├── configs.yaml                   # Kustomization: instances/configs
 ├── apps.yaml                      # Kustomization: 9 microservices + frontend
-├── slo.yaml                       # Kustomization: Sloth + SLO CRDs
 └── kustomization.yaml             # Master kustomization
 ```
 

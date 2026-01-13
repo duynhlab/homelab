@@ -4,7 +4,7 @@ kind: Kustomization
 resources:
   - loki/
   - tempo/
-  - pyroscope/
+  # - pyroscope/
   - vector/vector.yaml
   - jaeger/jaeger.yaml
   - otel-collector/otel-collector.yaml

@@ -1,0 +1,16 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: postgres-replication-lag
+  namespace: monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "Databases"
+  configMapRef:
+    name: grafana-dashboard-postgres-replication-lag
+    key: postgres-replication-lag.json
+  datasources:
+    - inputName: DS_PROMETHEUS
+      datasourceName: Prometheus

@@ -77,18 +77,25 @@ func (r *PostgresProductRepository) FindAll(ctx context.Context, filters domain.
 
 	// Add sorting (whitelist to prevent SQL injection)
 	sortBy := filters.SortBy
-	allowedSortFields := map[string]bool{
-		"id": true, "name": true, "price": true, "created_at": true,
+	allowedSortFields := map[string]string{
+		"id":         "p.id",
+		"name":       "p.name",
+		"price":      "p.price",
+		"created_at": "p.created_at",
 	}
-	if sortBy == "" || !allowedSortFields[sortBy] {
-		sortBy = "created_at"
+	
+	sortColumn := allowedSortFields["created_at"] // default
+	if sortBy != "" {
+		if col, ok := allowedSortFields[sortBy]; ok {
+			sortColumn = col
+		}
 	}
 	
 	order := filters.Order
 	if order != "ASC" && order != "DESC" {
 		order = "DESC"
 	}
-	query += fmt.Sprintf(" ORDER BY %s %s", sortBy, order)
+	query += fmt.Sprintf(" ORDER BY %s %s", sortColumn, order)
 
 	// Add pagination
 	limit := filters.Limit

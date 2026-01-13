@@ -7,9 +7,11 @@ import apiClient from './client';
 
 /**
  * POST /api/v1/auth/login
+ * @param {string} email - User email (matches seed data: alice@example.com)
+ * @param {string} password - User password
  */
-export async function login(username, password) {
-    const response = await apiClient.post('/auth/login', { username, password });
+export async function login(email, password) {
+    const response = await apiClient.post('/auth/login', { email, password });
     return response.data;
 }
 

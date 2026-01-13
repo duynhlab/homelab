@@ -19,3 +19,4 @@ resources:
   - helm/vector.yaml
   - helm/opentelemetry.yaml
   - helm/pgcat.yaml
+  - helm/pgdog.yaml

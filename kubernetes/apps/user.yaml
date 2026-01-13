@@ -57,11 +57,11 @@ spec:
         value: "true"
       - name: METRICS_ENABLED
         value: "true"
-      # Database configuration
+      # Database configuration (via PgDog pooler)
       - name: DB_HOST
-        value: "supporting-db.user.svc.cluster.local"  # Shared database - supporting-db is in user namespace
+        value: "pgdog-supporting.user.svc.cluster.local"  # PgDog pooler service
       - name: DB_PORT
-        value: "5432"
+        value: "6432"  # PgDog port (not PostgreSQL port 5432)
       - name: DB_NAME
         value: "user"  # Different schema/database
       - name: DB_USER
@@ -112,8 +112,8 @@ spec:
       image: ghcr.io/duynhne/user:v6-init
       imagePullPolicy: IfNotPresent
       env:
-        DB_HOST: "supporting-db.user.svc.cluster.local"
-        DB_PORT: "5432"
+        DB_HOST: "supporting-db.user.svc.cluster.local"  # Direct connection, no pooler - supporting-db is in user namespace
+        DB_PORT: "5432"  # PostgreSQL port (direct connection)
         DB_NAME: "user"
         DB_USER: "user"
         DB_SSLMODE: "require"

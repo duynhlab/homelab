@@ -23,6 +23,7 @@ Added PgDog as a connection pooler for the supporting-db cluster (Zalando operat
   - Chart: `pgdog` (version 0.31)
 
 - **PgDog HelmRelease**: Created HelmRelease for PgDog deployment (`kubernetes/infra/configs/databases/poolers/supporting/helmrelease.yaml`)
+  - **API Version**: `helm.toolkit.fluxcd.io/v2` (stable API, not deprecated v2beta1)
   - **Replicas**: 2 (HA with pod anti-affinity)
   - **Port**: 6432 (PostgreSQL protocol), 9090 (OpenMetrics)
   - **Multi-database routing**: 3 databases (user, notification, shipping)
@@ -39,23 +40,20 @@ Added PgDog as a connection pooler for the supporting-db cluster (Zalando operat
 #### Service Configuration Updates
 
 - **User Service** (`kubernetes/apps/user.yaml`): Updated database connection
-  - `DB_HOST`: `pgdog-supporting.user.svc.cluster.local`
-  - `DB_PORT`: `6432` (PgDog port)
-  - Updated for both main container and migrations init container
+  - **Main container**: `DB_HOST`: `pgdog-supporting.user.svc.cluster.local`, `DB_PORT`: `6432` (PgDog port)
+  - **Migrations init container**: `DB_HOST`: `supporting-db.user.svc.cluster.local`, `DB_PORT`: `5432` (Direct connection, no pooler)
 
 - **Notification Service** (`kubernetes/apps/notification.yaml`): Updated database connection
-  - `DB_HOST`: `pgdog-supporting.user.svc.cluster.local`
-  - `DB_PORT`: `6432`
-  - Updated for both main container and migrations init container
+  - **Main container**: `DB_HOST`: `pgdog-supporting.user.svc.cluster.local`, `DB_PORT`: `6432`
+  - **Migrations init container**: `DB_HOST`: `supporting-db.user.svc.cluster.local`, `DB_PORT`: `5432` (Direct connection, no pooler)
 
 - **Shipping Service** (`kubernetes/apps/shipping.yaml`): Updated database connection
-  - `DB_HOST`: `pgdog-supporting.user.svc.cluster.local`
-  - `DB_PORT`: `6432`
-  - Updated for both main container and migrations init container
+  - **Main container**: `DB_HOST`: `pgdog-supporting.user.svc.cluster.local`, `DB_PORT`: `6432`
+  - **Migrations init container**: `DB_HOST`: `supporting-db.user.svc.cluster.local`, `DB_PORT`: `5432` (Direct connection, no pooler)
 
 - **Shipping-v2 Service** (`kubernetes/apps/shipping-v2.yaml`): Updated database connection
-  - `DB_HOST`: `pgdog-supporting.user.svc.cluster.local`
-  - `DB_PORT`: `6432`
+  - **Main container**: `DB_HOST`: `pgdog-supporting.user.svc.cluster.local`, `DB_PORT`: `6432`
+  - **Migrations**: Disabled (shares database with shipping service)
 
 #### Documentation Updates
 
@@ -90,13 +88,34 @@ Added PgDog as a connection pooler for the supporting-db cluster (Zalando operat
 **Connection Pattern Migration: supporting-db**
 
 - **Before**: Direct connections from User, Notification, Shipping services to `supporting-db.user.svc.cluster.local:5432`
-- **After**: All services connect via PgDog pooler at `pgdog-supporting.user.svc.cluster.local:6432`
+- **After**: 
+  - **Main application containers**: Connect via PgDog pooler at `pgdog-supporting.user.svc.cluster.local:6432`
+  - **Migrations init containers**: Use direct connections to `supporting-db.user.svc.cluster.local:5432` (no pooler)
 - **Benefits**:
-  - Connection pooling reduces connection overhead
+  - Connection pooling reduces connection overhead for application traffic
   - Multi-database routing (user, notification, shipping) on shared cluster
   - Prepared statements support in transaction mode
   - Centralized monitoring via Prometheus
   - HA deployment (2 replicas) with automatic failover
+  - Migrations use direct connections to avoid Flyway advisory lock issues with connection poolers
+
+### Fixed
+
+**QA Fixes - PgDog Deployment**
+
+- **Migrations Connection Pattern**: Fixed migrations to use direct PostgreSQL connections instead of connection pooler
+  - **Issue**: Flyway uses PostgreSQL advisory locks for concurrent migration protection, which can fail with connection poolers in transaction mode due to connection reuse and session state loss
+  - **Fix**: Updated migrations sections in `user.yaml`, `notification.yaml`, and `shipping.yaml` to use direct connection `supporting-db.user.svc.cluster.local:5432` instead of PgDog pooler
+  - **Pattern**: Aligned with other services (auth, cart, product, order, review) which all use direct connections for migrations
+  - **Files updated**:
+    - `kubernetes/apps/user.yaml`: Migrations now use direct connection
+    - `kubernetes/apps/notification.yaml`: Migrations now use direct connection
+    - `kubernetes/apps/shipping.yaml`: Migrations now use direct connection
+
+- **HelmRelease API Version**: Updated from deprecated `v2beta1` to stable `v2`
+  - **Issue**: Using deprecated `helm.toolkit.fluxcd.io/v2beta1` API version
+  - **Fix**: Changed to stable `helm.toolkit.fluxcd.io/v2` API version per Flux CD documentation
+  - **File updated**: `kubernetes/infra/configs/databases/poolers/supporting/helmrelease.yaml`
 
 ## [0.24.0] - 2026-01-12
 

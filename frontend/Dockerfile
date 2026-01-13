@@ -3,13 +3,8 @@
 # ===================================
 FROM node:24-alpine AS builder
 
-# Build argument for API base URL (required for Docker builds)
-ARG API_BASE_URL
-RUN if [ -z "$API_BASE_URL" ]; then \
-      echo "ERROR: API_BASE_URL build argument is required"; \
-      echo "Example: docker build --build-arg API_BASE_URL=http://localhost:8080 ."; \
-      exit 1; \
-    fi
+# Build argument for API base URL (optional - defaults to relative URLs for Nginx proxy)
+ARG API_BASE_URL=""
 
 # Set working directory
 WORKDIR /app
@@ -23,7 +18,7 @@ RUN npm ci --only=production=false
 # Copy source code
 COPY . .
 
-# Build with API_BASE_URL baked in
+# Build with API_BASE_URL (empty for relative URLs)
 ENV VITE_API_BASE_URL=$API_BASE_URL
 RUN npm run build
 

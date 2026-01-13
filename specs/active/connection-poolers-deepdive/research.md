@@ -87,6 +87,123 @@ role = "primary"
 - Multi-database support (cart + order on same cluster)
 - Can be extended with read replica routing
 
+#### PgDog Implementation (supporting-db)
+
+**Location:** `kubernetes/infra/configs/databases/poolers/supporting/` (to be created)
+
+**How it works:**
+- **Helm Chart Deployment**: Standalone deployment via Helm chart (`helm.pgdog.dev/pgdog`)
+- **Multi-Database Routing**: Routes to 3 databases (user, notification, shipping) on Zalando cluster
+- **Service**: ClusterIP service exposing port 6432 (PostgreSQL) and 9090 (OpenMetrics)
+- **Configuration**: Helm values define databases, users, and pool settings
+
+**Helm Chart Setup:**
+```bash
+# Add PgDog Helm repository
+helm repo add pgdogdev https://helm.pgdog.dev
+helm repo update
+```
+
+**Helm Values Example:**
+```yaml
+# kubernetes/infra/configs/databases/poolers/supporting/values.yaml
+replicas: 2  # HA deployment
+
+port: 6432  # PostgreSQL protocol port
+openMetricsPort: 9090  # Prometheus metrics port
+
+# Multi-database configuration
+databases:
+  - name: user
+    host: supporting-db.user.svc.cluster.local
+    port: 5432
+    database: user
+    poolSize: 30
+    poolMode: transaction
+  - name: notification
+    host: supporting-db.user.svc.cluster.local
+    port: 5432
+    database: notification
+    poolSize: 20
+    poolMode: transaction
+  - name: shipping
+    host: supporting-db.user.svc.cluster.local
+    port: 5432
+    database: shipping
+    poolSize: 20
+    poolMode: transaction
+
+# User authentication (from Kubernetes secrets)
+users:
+  - name: user
+    passwordFromSecret:
+      name: user.supporting-db.credentials.postgresql.acid.zalan.do
+      key: password
+  - name: notification.notification
+    passwordFromSecret:
+      name: notification.notification.supporting-db.credentials.postgresql.acid.zalan.do
+      key: password
+  - name: shipping.shipping
+    passwordFromSecret:
+      name: shipping.shipping.supporting-db.credentials.postgresql.acid.zalan.do
+      key: password
+
+# Resources
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# ServiceMonitor for Prometheus
+serviceMonitor:
+  enabled: true
+```
+
+**Service Endpoints:**
+- **PostgreSQL**: `pgdog-supporting.user.svc.cluster.local:6432`
+- **OpenMetrics**: `pgdog-supporting.user.svc.cluster.local:9090/metrics`
+
+**Application Connection:**
+```yaml
+# Service Helm values (e.g., charts/values/user.yaml)
+env:
+  - name: DB_HOST
+    value: "pgdog-supporting.user.svc.cluster.local"  # PgDog service
+  - name: DB_PORT
+    value: "6432"  # PgDog port (not PostgreSQL port 5432)
+  - name: DB_NAME
+    value: "user"  # Database name (PgDog routes by database name)
+  - name: DB_USER
+    value: "user"
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: user.supporting-db.credentials.postgresql.acid.zalan.do
+        key: password
+  - name: DB_SSLMODE
+    value: "require"
+```
+
+**Reusability:** This pattern is ideal for Zalando clusters with multiple databases because:
+- **No Built-in Pooler**: Zalando operator doesn't provide built-in pooler for multi-database clusters (only sidecar for single database)
+- **Multi-Database Support**: PgDog routes by database name, perfect for shared clusters
+- **Advanced Features**: Prepared statements, pub/sub support for future needs
+- **Production-Ready**: Helm chart provides HA, monitoring, and security features
+
+**Why PgDog over PgBouncer for supporting-db:**
+- ✅ **Multi-Database**: PgDog has better multi-database support than PgBouncer
+- ✅ **Prepared Statements**: Full support in transaction mode (PgBouncer only in session mode)
+- ✅ **Future-Proof**: Advanced features (pub/sub, sharding) available if needed
+- ✅ **Helm Chart**: Production-ready Helm chart with HA, monitoring, security
+
+**Why PgDog over PgCat for supporting-db:**
+- ✅ **Zalando Compatibility**: PgDog works well with Zalando clusters (no CloudNativePG requirement)
+- ✅ **Helm Chart**: Official Helm chart simplifies deployment
+- ✅ **Advanced Features**: Better prepared statements support, pub/sub if needed
+
 ### Current Monitoring Patterns
 
 **Location:** `k8s/prometheus/podmonitors/`
@@ -299,11 +416,12 @@ role = "primary"
 - ❌ **Resource usage**: Higher than PgBouncer (similar to PgCat, higher for sharding features)
 - ❌ **Learning curve**: More configuration options, sharding concepts to understand
 
-**Fit for our use case:** **Medium** - Consider for future sharding needs
-- Current setup doesn't require sharding
-- PgCat already handles our HA needs effectively
-- PgDog would be overkill for current requirements
-- **Future consideration**: If we need advanced sharding, two-phase commit, or pub/sub support
+**Fit for our use case:** **High** - Recommended for supporting-db
+- **supporting-db**: Multi-database cluster (user, notification, shipping) needs pooler with multi-database routing
+- **Zalando Compatibility**: PgDog works well with Zalando clusters (no built-in pooler for multi-database)
+- **Advanced Features**: Prepared statements, pub/sub support for future needs
+- **Production-Ready**: Helm chart provides HA, monitoring, security
+- **Future-proof**: Sharding capabilities available if databases grow > 100GB
 
 **Performance Characteristics:**
 - **Latency**: <1ms overhead per connection
@@ -327,13 +445,16 @@ role = "primary"
 - ✅ Need service discovery for multi-instance deployments
 - ✅ High connection counts with sharding requirements (200+ microservices)
 - ✅ Enterprise-scale deployments requiring horizontal scaling
+- ✅ **Zalando clusters with multiple databases** (no built-in pooler for multi-database)
+- ✅ **Multi-database routing** on shared cluster (user, notification, shipping)
+- ✅ **Future-proofing** for advanced features (sharding, pub/sub) if needed later
 
 **When NOT to Use:**
-- ❌ Simple pooling needs (PgBouncer sufficient)
-- ❌ No sharding requirements (PgCat sufficient)
-- ❌ Zalando operator (use built-in PgBouncer)
+- ❌ Simple pooling needs with single database (PgBouncer sufficient)
+- ❌ No sharding requirements and CloudNativePG cluster (PgCat sufficient)
+- ❌ Zalando operator with single database (use built-in PgBouncer sidecar)
 - ❌ Very low connection counts (<10)
-- ❌ Small-to-medium microservices (<50 services, <100 conn/service)
+- ❌ Small-to-medium microservices with single database (<50 services, <100 conn/service)
 
 **Microservices Architecture Fit:**
 - **Database-per-service pattern**: Excellent fit - supports sharding for scale
@@ -344,6 +465,58 @@ role = "primary"
 - [PgDog Documentation](https://docs.pgdog.dev/)
 - [PgDog Configuration](https://docs.pgdog.dev/configuration/pgdog.toml/general/)
 - [PgDog vs PgBouncer Benchmarks](https://pgdog.dev/blog/pgbouncer-vs-pgdog)
+
+---
+
+## Sharding vs Pooling: When Do You Need Each?
+
+### Understanding the Difference
+
+**Connection Pooling:**
+- **Problem Solved**: Too many client connections to PostgreSQL
+- **Solution**: Reuse a small pool of PostgreSQL connections (e.g., 30 connections) to serve many clients (e.g., 1000+)
+- **When Needed**: High connection churn, connection limit exhaustion
+- **Example**: 100 microservices, each opening 10 connections = 1000 connections → Pooler reduces to 30 PostgreSQL connections
+
+**Sharding:**
+- **Problem Solved**: Database too large or write throughput too high for single database
+- **Solution**: Split data across multiple databases (shards) based on a key (e.g., `user_id % 10`)
+- **When Needed**: Database size > 100GB, write throughput exceeds single database capacity
+- **Example**: 50M users → Split into 10 shards → Each shard has 5M users
+
+### Use-Case Decision Matrix
+
+| Scenario | Solution | Reason |
+|----------|----------|--------|
+| **1000+ client connections, database < 100GB** | Connection Pooling | Too many connections, but database size manageable |
+| **Database > 100GB, growing fast** | Sharding | Database size is the bottleneck, not connections |
+| **High write throughput (10K+ writes/sec)** | Sharding | Single database can't handle write load |
+| **High read load, need read scaling** | Pooling + Read Replicas | Connection pooling + read replica routing |
+| **Multi-database cluster (3+ databases)** | Pooling (multi-database support) | Pooler routes by database name, no sharding needed |
+
+### supporting-db Use-Case Analysis
+
+**Current State:**
+- **Databases**: 3 databases (user, notification, shipping) on single Zalando cluster
+- **Size**: Each database < 10GB (estimated)
+- **Connections**: User service (2 replicas × 10 conn), Notification (2 replicas × 10 conn), Shipping (2 replicas × 10 conn) = ~60 total connections
+- **Traffic**: Low-to-medium traffic, no sharding requirements
+
+**Decision: Connection Pooling Only (No Sharding)**
+
+**Why Pooling:**
+- ✅ **Connection Management**: Even with 60 connections, pooling reduces PostgreSQL connection overhead
+- ✅ **Future-Proof**: As services scale (more replicas), connection count grows (e.g., 10 replicas × 10 conn = 100 connections)
+- ✅ **Multi-Database Support**: PgDog can route to 3 databases (user, notification, shipping) on same cluster
+- ✅ **Performance**: Connection reuse improves latency and reduces connection establishment overhead
+
+**Why NOT Sharding:**
+- ❌ **Database Size**: Each database < 10GB, no size pressure
+- ❌ **Write Throughput**: Low write load, single database sufficient
+- ❌ **Complexity**: Sharding adds complexity (cross-shard queries, two-phase commit) without benefit
+- ❌ **Future Growth**: Can add sharding later if databases grow > 100GB
+
+**Conclusion**: supporting-db needs **connection pooling with multi-database routing**, not sharding. PgDog provides excellent multi-database support and advanced features (prepared statements, pub/sub) that may be useful in the future.
 
 ---
 
@@ -511,42 +684,68 @@ SHOW STATS;
 
 ### PgDog Monitoring
 
-**Current State:** OpenMetrics endpoint available (configurable)
+**Current State:** OpenMetrics endpoint available via Helm chart configuration
 
 **Available Metrics:**
-- **HTTP Endpoint**: `http://pgdog.service.svc.cluster.local:{openmetrics_port}/metrics` (configurable via `openmetrics_port` in `pgdog.toml`)
+- **HTTP Endpoint**: `http://pgdog-supporting.user.svc.cluster.local:9090/metrics` (configurable via Helm `openMetricsPort`)
 - **OpenMetrics Format**: Prometheus-compatible metrics
-- **Key Metrics** (similar to PgCat):
-  - Pool active connections
-  - Waiting clients
-  - Server health status
-  - Query statistics
-  - Error counts
+- **Key Metrics**:
+  - `pgdog_pools_active_connections` - Active connections per pool
+  - `pgdog_pools_waiting_clients` - Clients waiting for connections
+  - `pgdog_servers_health` - Server health status (per database)
+  - `pgdog_queries_total` - Total queries processed (by database)
+  - `pgdog_errors_total` - Error count (by database and error type)
+  - `pgdog_query_duration_seconds` - Query latency histogram
+  - `pgdog_pool_utilization` - Pool utilization percentage
 
-**Configuration Pattern:**
-```toml
-# pgdog.toml
-[general]
-openmetrics_port = 9090  # Configurable port for OpenMetrics endpoint
-openmetrics_namespace = "pgdog"  # Optional: prefix for metric names
+**Helm Chart Configuration:**
+```yaml
+# kubernetes/infra/configs/databases/poolers/supporting/values.yaml
+openMetricsPort: 9090  # Prometheus metrics port
+openMetricsNamespace: "pgdog_"  # Metric name prefix
+
+# Enable ServiceMonitor
+serviceMonitor:
+  enabled: true
+  interval: 15s
+  scrapeTimeout: 10s
 ```
 
-**ServiceMonitor Configuration:**
+**ServiceMonitor Configuration (Auto-generated by Helm):**
 ```yaml
+# Automatically created by Helm chart when serviceMonitor.enabled: true
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: pgdog-service
-  namespace: monitoring
+  name: pgdog-supporting
+  namespace: user
+  labels:
+    app: pgdog-supporting
 spec:
-  namespaceSelector:
-    matchNames:
-      - service
   selector:
     matchLabels:
-      app: pgdog-service
+      app: pgdog-supporting
   endpoints:
-  - port: metrics  # Port name from Service (mapped to openmetrics_port)
+  - port: metrics  # Service port name (mapped to openMetricsPort)
+    path: /metrics
+    interval: 15s
+    scrapeTimeout: 10s
+```
+
+**Manual ServiceMonitor (if Helm doesn't create):**
+```yaml
+# kubernetes/infra/configs/monitoring/servicemonitors/pgdog-supporting.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pgdog-supporting
+  namespace: user
+spec:
+  selector:
+    matchLabels:
+      app: pgdog-supporting
+  endpoints:
+  - port: metrics
     path: /metrics
     interval: 15s
     scrapeTimeout: 10s
@@ -554,20 +753,49 @@ spec:
 
 **Admin Database:**
 ```sql
--- Connect to admin database (default port 6432)
-psql -h pgdog.service.svc.cluster.local -p 6432 -U admin -d pgbouncer
+-- Connect to admin database (PostgreSQL port 6432)
+psql -h pgdog-supporting.user.svc.cluster.local -p 6432 -U admin -d pgbouncer
 
--- Show statistics (PgBouncer-compatible)
-SHOW POOLS;
-SHOW STATS;
-SHOW QUERY_CACHE;  # PgDog-specific: shows query routing decisions
+-- Show pool statistics (PgBouncer-compatible)
+SHOW POOLS;  # Active connections per pool
+SHOW STATS;  # Query statistics
+SHOW DATABASES;  # Configured databases
+SHOW CLIENTS;  # Active client connections
+
+-- PgDog-specific commands
+SHOW QUERY_CACHE;  # Query routing decisions (for sharding)
+SHOW SERVERS;  # Backend server status
 ```
 
+**Grafana Dashboard:**
+- **Metrics to Visualize**:
+  - Connection pool utilization (active/max connections)
+  - Query rate and latency (P50, P95, P99)
+  - Error rate by database
+  - Waiting clients (pool exhaustion indicator)
+  - Server health status
+- **Recommended Panels**:
+  - Pool utilization per database (user, notification, shipping)
+  - Query latency histogram
+  - Error rate trend
+  - Connection pool exhaustion alerts
+
+**Alerting Thresholds:**
+- **Critical**:
+  - Pool exhaustion: `pgdog_pools_waiting_clients > 10` for >30s
+  - High error rate: `rate(pgdog_errors_total[5m]) > 0.01` (1% of queries)
+  - Server down: `pgdog_servers_health == 0` for >1m
+- **Warning**:
+  - High pool utilization: `pgdog_pool_utilization > 0.8` (80%)
+  - High latency: `histogram_quantile(0.95, pgdog_query_duration_seconds) > 0.1` (100ms P95)
+
 **Recommendation:** 
-- ✅ **Configure OpenMetrics port** in `pgdog.toml` for Prometheus scraping
-- ✅ **Add ServiceMonitor** for OpenMetrics scraping
-- ✅ **Use admin database** for manual troubleshooting
-- ✅ **Monitor query cache** for sharding routing decisions
+- ✅ **Enable ServiceMonitor** via Helm chart (`serviceMonitor.enabled: true`)
+- ✅ **Configure OpenMetrics port** in Helm values (`openMetricsPort: 9090`)
+- ✅ **Create Grafana dashboard** for pooler metrics visualization
+- ✅ **Set up alerts** for pool exhaustion and high error rates
+- ✅ **Use admin database** for manual troubleshooting and query routing inspection
+- ✅ **Monitor per-database metrics** (user, notification, shipping) separately
 
 ---
 
@@ -806,9 +1034,19 @@ SHOW QUERY_CACHE;  # PgDog-specific: shows query routing decisions
    - ✅ Configure failover (already built-in)
    - ✅ Add ServiceMonitor for Prometheus metrics
 
-3. **Monitoring** - **Add PgCat Monitoring**
-   - ✅ Create ServiceMonitor for PgCat HTTP metrics
-   - ✅ Use admin databases for manual checks
+3. **PgDog (supporting-db)** - **Add Pooler**
+   - ✅ Deploy PgDog via Helm chart for multi-database support
+   - ✅ Route to 3 databases (user, notification, shipping) on Zalando cluster
+   - ✅ Enable ServiceMonitor for OpenMetrics scraping
+   - ✅ Configure connection pooling (30 conn for user, 20 each for notification/shipping)
+   - ✅ **Why PgDog**: Multi-database support, prepared statements, future-proof features
+
+4. **Monitoring** - **Add Pooler Monitoring**
+   - ✅ Create ServiceMonitor for PgCat HTTP metrics (Transaction DB)
+   - ✅ Enable ServiceMonitor for PgDog OpenMetrics (supporting-db)
+   - ✅ Create Grafana dashboards for pooler metrics
+   - ✅ Set up alerts for pool exhaustion and high error rates
+   - ✅ Use admin databases for manual troubleshooting
    - ✅ Focus PostgreSQL monitoring on database metrics (already done)
 
 ### Alternative Approach
@@ -924,6 +1162,7 @@ SHOW QUERY_CACHE;  # PgDog-specific: shows query routing decisions
 
 | Version | Date | Changes | Author |
 |---------|------|---------|--------|
+| 1.2 | 2026-01-13 | [REFINED] Added PgDog implementation for supporting-db, expanded monitoring section with Helm chart config, added sharding vs pooling use-case explanation, updated recommendations | System |
 | 1.1 | 2026-01-02 | [REFINED] Added PgDog research, expanded comparison to 3 poolers, added real-world use cases and DevOps/SRE analysis | System |
 | 1.0 | 2025-12-30 | Initial research: PgBouncer and PgCat comparison | System |
 

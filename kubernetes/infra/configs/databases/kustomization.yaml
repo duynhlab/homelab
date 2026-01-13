@@ -11,6 +11,7 @@ resources:
   - configmaps/monitoring-queries/postgres-monitoring-queries-supporting.yaml
   - poolers/product/
   - poolers/transaction/
+  - poolers/supporting/
   - instances/auth-db.yaml
   - instances/review-db.yaml
   - instances/supporting-db.yaml

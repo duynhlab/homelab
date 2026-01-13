@@ -1,15 +1,19 @@
-# Specification: PgCat HA Integration for Transaction Database
+# Specification: Connection Poolers Deep Dive - PgCat HA & PgDog for supporting-db
 
 **Task ID:** connection-poolers-deepdive
 **Created:** 2025-12-30
 **Status:** Ready for Planning
-**Version:** 1.0
+**Version:** 2.0
 
 ---
 
 ## 1. Problem Statement
 
 ### The Problem
+
+This specification addresses two connection pooler improvements:
+
+**Problem 1: PgCat HA Integration for Transaction Database**
 
 The current PgCat configuration for the transaction-db cluster (3-node HA: 1 primary + 2 replicas) only routes all queries to the primary server. This creates several production-readiness gaps:
 
@@ -40,7 +44,40 @@ The current PgCat configuration for the transaction-db cluster (3-node HA: 1 pri
 - No visibility into pooler performance
 - Manual intervention required if replica issues occur
 
+**Problem 2: supporting-db Missing Connection Pooler**
+
+The supporting-db cluster (Zalando operator, single instance) currently uses direct connections from 3 services (user, notification, shipping). This creates connection management challenges:
+
+1. **No Connection Pooling**: Each service opens direct connections to PostgreSQL, increasing connection overhead
+2. **Connection Limit Risk**: As services scale (more replicas), connection count grows (e.g., 10 replicas × 10 conn = 100 connections)
+3. **No Multi-Database Routing**: Services must know exact database names and connection strings
+4. **No Monitoring**: No pooler metrics for connection health and performance
+5. **Future Growth**: No prepared statements support, no advanced features for future needs
+
+**Current Situation:**
+
+**supporting-db Cluster:**
+- **Operator**: Zalando Postgres Operator
+- **Instances**: 1 (single instance, no HA)
+- **Databases**: 3 databases on same cluster (user, notification, shipping)
+- **Services**: User service, Notification service, Shipping service (v1 and v2)
+- **Connection Pattern**: Direct connection to `supporting-db.user.svc.cluster.local:5432`
+
+**Current Configuration:**
+- No connection pooler (direct connections)
+- Each service manages its own connection pool (application-level)
+- No centralized connection management
+- No pooler-level monitoring
+
+**Impact:**
+- Connection overhead as services scale
+- No connection reuse optimization
+- No centralized monitoring
+- Limited future-proofing for advanced features
+
 ### Desired Outcome
+
+**Outcome 1: Production-Ready PgCat HA Configuration**
 
 A production-ready PgCat configuration that:
 - Automatically routes SELECT queries to replicas for read scaling
@@ -50,6 +87,17 @@ A production-ready PgCat configuration that:
 - Provides Prometheus metrics for monitoring and alerting
 - Maintains backward compatibility with existing cart/order services
 - Works seamlessly with CloudNativePG's 3-node HA cluster
+
+**Outcome 2: PgDog Pooler for supporting-db**
+
+A production-ready PgDog deployment that:
+- Provides connection pooling for 3 databases (user, notification, shipping) on Zalando cluster
+- Routes connections by database name (multi-database support)
+- Supports prepared statements in transaction mode (future-proof)
+- Provides OpenMetrics metrics for monitoring
+- Deploys via Helm chart with HA (2 replicas)
+- Maintains backward compatibility with existing services
+- Works seamlessly with Zalando Postgres Operator
 
 ---
 
@@ -84,6 +132,8 @@ A production-ready PgCat configuration that:
 ---
 
 ## 3. Functional Requirements
+
+### Part A: PgCat HA Integration (Transaction DB)
 
 ### FR-1: Read Replica Routing
 
@@ -210,6 +260,110 @@ A production-ready PgCat configuration that:
 
 ---
 
+### Part B: PgDog Pooler for supporting-db
+
+### FR-6: PgDog Deployment
+
+**Description:** Deploy PgDog via Helm chart to provide connection pooling for supporting-db cluster with multi-database support.
+
+**User Story:**
+> As a DevOps/SRE engineer, I want PgDog deployed for supporting-db so that connection pooling is centralized and services can scale without connection limit issues.
+
+**Acceptance Criteria:**
+- [ ] PgDog Helm chart deployed in `user` namespace
+- [ ] PgDog configured with 2 replicas (HA)
+- [ ] PgDog routes to 3 databases (user, notification, shipping) on supporting-db cluster
+- [ ] PgDog service endpoint: `pgdog-supporting.user.svc.cluster.local:6432`
+- [ ] PgDog OpenMetrics endpoint: `pgdog-supporting.user.svc.cluster.local:9090/metrics`
+- [ ] All 3 databases accessible via PgDog (verified via admin database)
+
+**Priority:** Must Have
+
+**Technical Details:**
+- Deploy via Helm chart: `helm.pgdog.dev/pgdog`
+- Helm values configure databases, users, and pool settings
+- Service type: ClusterIP (internal only)
+- Port 6432: PostgreSQL protocol
+- Port 9090: OpenMetrics endpoint
+
+---
+
+### FR-7: Multi-Database Routing
+
+**Description:** PgDog must route connections to correct database based on database name in connection string.
+
+**User Story:**
+> As an application developer, I want to connect to PgDog with my database name so that queries are routed to the correct database on the shared cluster.
+
+**Acceptance Criteria:**
+- [ ] Given connection to `pgdog-supporting:6432/user`, when query executes, then it routes to `user` database
+- [ ] Given connection to `pgdog-supporting:6432/notification`, when query executes, then it routes to `notification` database
+- [ ] Given connection to `pgdog-supporting:6432/shipping`, when query executes, then it routes to `shipping` database
+- [ ] Database routing is transparent to applications (no code changes needed)
+- [ ] Each database has its own connection pool (configurable pool size)
+
+**Priority:** Must Have
+
+**Technical Details:**
+- PgDog routes by database name in connection string
+- Each database configured in Helm values `databases` section
+- Pool size configurable per database (30 for user, 20 each for notification/shipping)
+- Connection string format: `postgresql://user:pass@pgdog-supporting:6432/database_name`
+
+---
+
+### FR-8: Service Configuration Update
+
+**Description:** Update user, notification, and shipping services to connect via PgDog instead of direct PostgreSQL connection.
+
+**User Story:**
+> As a DevOps/SRE engineer, I want services to connect via PgDog so that connection pooling is centralized and connection limits are managed.
+
+**Acceptance Criteria:**
+- [ ] User service Helm values updated: `DB_HOST=pgdog-supporting.user.svc.cluster.local`, `DB_PORT=6432`
+- [ ] Notification service Helm values updated: `DB_HOST=pgdog-supporting.user.svc.cluster.local`, `DB_PORT=6432`
+- [ ] Shipping service Helm values updated: `DB_HOST=pgdog-supporting.user.svc.cluster.local`, `DB_PORT=6432`
+- [ ] All services can connect and execute queries successfully
+- [ ] No application errors or connection failures
+- [ ] Database names unchanged (user, notification, shipping)
+
+**Priority:** Must Have
+
+**Technical Details:**
+- Update Helm values files: `charts/values/user.yaml`, `charts/values/notification.yaml`, `charts/values/shipping.yaml`
+- Change `DB_HOST` from `supporting-db.user.svc.cluster.local` to `pgdog-supporting.user.svc.cluster.local`
+- Change `DB_PORT` from `5432` to `6432` (PgDog port)
+- Database names and credentials unchanged
+- Apply via Flux HelmRelease reconciliation
+
+---
+
+### FR-9: PgDog Monitoring Integration
+
+**Description:** PgDog must expose OpenMetrics metrics via HTTP endpoint and be scraped by Prometheus Operator via ServiceMonitor.
+
+**User Story:**
+> As a DevOps/SRE engineer, I want PgDog metrics exposed to Prometheus so that I can monitor pooler health, connection counts, and query performance.
+
+**Acceptance Criteria:**
+- [ ] PgDog OpenMetrics endpoint accessible: `http://pgdog-supporting.user.svc.cluster.local:9090/metrics`
+- [ ] ServiceMonitor created and applied for PgDog
+- [ ] Prometheus discovers and scrapes PgDog metrics
+- [ ] Metrics include: active connections, waiting clients, server health, query counts, error counts
+- [ ] Metrics are labeled with database name (user, notification, shipping)
+- [ ] Metrics available in Grafana for visualization
+
+**Priority:** Must Have
+
+**Technical Details:**
+- Configure `openMetricsPort: 9090` in Helm values
+- Enable ServiceMonitor via Helm: `serviceMonitor.enabled: true`
+- Or create manual ServiceMonitor: `kubernetes/infra/configs/monitoring/servicemonitors/pgdog-supporting.yaml`
+- Key metrics: `pgdog_pools_active_connections`, `pgdog_pools_waiting_clients`, `pgdog_servers_health`, `pgdog_queries_total`, `pgdog_errors_total`
+- Metrics namespace: `pgdog_` (configurable)
+
+---
+
 ## 4. Non-Functional Requirements
 
 ### NFR-1: Performance
@@ -255,14 +409,25 @@ A production-ready PgCat configuration that:
 
 The following are explicitly NOT included in this feature:
 
+**PgCat HA Integration:**
 - ❌ **PgBouncer Changes** - PgBouncer configuration remains unchanged (Zalando operator built-in sidecar)
 - ❌ **Product DB PgCat** - Only transaction-db cluster is enhanced (product-db remains as-is)
 - ❌ **Sharding** - PgCat sharding features are experimental and not included
 - ❌ **Mirroring** - Query mirroring to multiple databases is not needed
 - ❌ **Custom Load Balancing Algorithms** - Use PgCat default algorithms (random or least connections)
-- ❌ **PgBouncer Monitoring** - PgBouncer admin database is sufficient, no Prometheus exporter needed
 - ❌ **Connection Pool Size Changes** - Keep current pool sizes (30 per database)
+
+**PgDog supporting-db:**
+- ❌ **Sharding** - PgDog sharding features not needed for supporting-db (databases < 10GB each)
+- ❌ **HA PostgreSQL** - supporting-db remains single instance (no replicas to route to)
+- ❌ **Read/Write Split** - Not applicable (single instance, no replicas)
+- ❌ **Two-Phase Commit** - Not needed (no sharding, single database per service)
+- ❌ **Pub/Sub Features** - LISTEN/NOTIFY support not required for initial deployment
+
+**General:**
+- ❌ **PgBouncer Monitoring** - PgBouncer admin database is sufficient, no Prometheus exporter needed
 - ❌ **SSL/TLS Configuration** - Keep current SSL settings (disable for Kind cluster)
+- ❌ **review-db Pooler** - review-db remains with direct connection (low traffic, single database)
 
 ---
 
@@ -317,16 +482,29 @@ The following are explicitly NOT included in this feature:
 
 ### Definition of Done
 
+**PgCat HA Integration:**
 - [ ] All acceptance criteria met for FR-1 through FR-5
 - [ ] Replica servers configured in PgCat TOML for both cart and order databases
 - [ ] Read queries automatically route to replicas (verified via logs/metrics)
 - [ ] Write queries automatically route to primary (verified via logs/metrics)
 - [ ] Automatic failover works when replica fails (tested manually)
 - [ ] Load balancing distributes reads across replicas (verified via metrics)
-- [ ] ServiceMonitor created and Prometheus scraping metrics
+- [ ] ServiceMonitor created and Prometheus scraping PgCat metrics
 - [ ] Metrics visible in Grafana (optional but recommended)
-- [ ] Configuration documented in `docs/guides/DATABASE.md`
 - [ ] Backward compatibility verified (cart/order services work without changes)
+
+**PgDog supporting-db:**
+- [ ] All acceptance criteria met for FR-6 through FR-9
+- [ ] PgDog deployed via Helm chart with 2 replicas (HA)
+- [ ] PgDog routes to 3 databases (user, notification, shipping)
+- [ ] All 3 services (user, notification, shipping) connect via PgDog
+- [ ] ServiceMonitor created and Prometheus scraping PgDog metrics
+- [ ] Metrics visible in Grafana (optional but recommended)
+- [ ] Backward compatibility verified (all services work without errors)
+
+**Documentation:**
+- [ ] Configuration documented in `docs/guides/DATABASE.md`
+- [ ] PgDog deployment documented with Helm chart details
 - [ ] Edge cases handled (all scenarios in section 6 tested or documented)
 
 ---
@@ -344,17 +522,18 @@ The following are explicitly NOT included in this feature:
 
 | Version | Date | Changes | Author |
 |---------|------|---------|--------|
-| 1.0 | 2025-12-30 | Initial specification | AI Agent |
+| 2.0 | 2026-01-13 | [REFINED] Added PgDog pooler for supporting-db (FR-6 through FR-9), expanded scope to include multi-database routing and service configuration updates | System |
+| 1.0 | 2025-12-30 | Initial specification: PgCat HA integration only | AI Agent |
 
 ---
 
 ## Next Steps
 
 1. ✅ Review spec with stakeholders (DevOps/SRE)
-2. Resolve open questions (load balancing algorithm preference)
-3. Run `/plan connection-poolers-deepdive` to create technical implementation plan
-4. Run `/tasks connection-poolers-deepdive` to break down into implementation tasks
-5. Implement HA integration and monitoring
+2. ✅ Resolve open questions (load balancing algorithm, PgDog use-case)
+3. ✅ Run `/plan connection-poolers-deepdive` to create technical implementation plan
+4. ✅ Run `/tasks connection-poolers-deepdive` to break down into implementation tasks
+5. Implement PgCat HA integration and PgDog deployment
 6. Update documentation in `docs/guides/DATABASE.md`
 
 ---

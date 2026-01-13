@@ -1,0 +1,16 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: pgcat
+  namespace: monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "Databases"
+  configMapRef:
+    name: grafana-dashboard-pgcat
+    key: pgcat.json
+  datasources:
+    - inputName: DS_PROMETHEUS
+      datasourceName: Prometheus

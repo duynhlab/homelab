@@ -1,9 +1,10 @@
-# Implementation Tasks: PgCat HA Integration for Transaction Database
+# Implementation Tasks: Connection Poolers Deep Dive - PgCat HA & PgDog for supporting-db
 
 **Task ID:** connection-poolers-deepdive
 **Created:** 2025-12-30
 **Status:** Ready for Implementation
-**Based on:** plan.md
+**Based on:** plan.md (v2.0)
+**Version:** 2.0
 
 ---
 
@@ -11,10 +12,10 @@
 
 | Metric | Value |
 |--------|-------|
-| Total Tasks | 15 |
-| Estimated Effort | ~80 minutes (1.3 hours) |
-| Phases | 4 |
-| Critical Path | Phase 1 → Phase 2 → Phase 3 → Phase 4 |
+| Total Tasks | 28 |
+| Estimated Effort | ~150 minutes (2.5 hours) |
+| Phases | 7 |
+| Critical Path | Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5 → Phase 6 → Phase 7 |
 
 ---
 
@@ -517,43 +518,469 @@ curl http://localhost:9090/api/v1/query?query=pgcat_queries_total | jq '.data.re
 
 ---
 
-## Phase 4: Documentation Update
+## Phase 4: PgDog Deployment
 
-**Goal:** Update DATABASE.md with HA integration details
+**Goal:** Deploy PgDog via Helm chart for supporting-db with multi-database support
+**Estimated:** 20 minutes
+
+### Task 4.1: Add PgDog Helm Repository
+
+**Description:** Add PgDog Helm repository to Flux system for GitOps deployment.
+
+**Acceptance Criteria:**
+- [ ] HelmRepository CRD created: `kubernetes/infra/configs/databases/poolers/supporting/helmrepository.yaml`
+- [ ] Repository URL: `https://helm.pgdog.dev`
+- [ ] Repository accessible: `helm repo list` shows `pgdogdev`
+- [ ] Flux reconciles HelmRepository successfully
+
+**Effort:** 5 minutes
+**Priority:** High
+**Dependencies:** None
+**Assignee:** [Unassigned]
+
+**Files to Create:**
+- `kubernetes/infra/configs/databases/poolers/supporting/helmrepository.yaml`
+
+**Expected Structure:**
+```yaml
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: pgdogdev
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://helm.pgdog.dev
+```
+
+---
+
+### Task 4.2: Create PgDog HelmRelease and Values
+
+**Description:** Create HelmRelease CRD and Helm values file for PgDog deployment with multi-database configuration.
+
+**Acceptance Criteria:**
+- [ ] HelmRelease file created: `kubernetes/infra/configs/databases/poolers/supporting/helmrelease.yaml`
+- [ ] Helm values file created: `kubernetes/infra/configs/databases/poolers/supporting/values.yaml`
+- [ ] HelmRelease configured with:
+  - Chart: `pgdog`
+  - Source: `pgdogdev` HelmRepository
+  - Version: `0.31` (or latest)
+  - Namespace: `user`
+- [ ] Helm values configured with:
+  - Replicas: 2
+  - Port: 6432
+  - OpenMetricsPort: 9090
+  - 3 databases (user, notification, shipping)
+  - Pool sizes: 30 (user), 20 (notification), 20 (shipping)
+  - User authentication from Kubernetes secrets
+  - ServiceMonitor enabled
+  - Resources: CPU 500m-1000m, Memory 512Mi-1Gi
+
+**Effort:** 10 minutes
+**Priority:** High
+**Dependencies:** Task 4.1
+**Assignee:** [Unassigned]
+
+**Files to Create:**
+- `kubernetes/infra/configs/databases/poolers/supporting/helmrelease.yaml`
+- `kubernetes/infra/configs/databases/poolers/supporting/values.yaml`
+
+---
+
+### Task 4.3: Apply PgDog Deployment
+
+**Description:** Apply HelmRelease via Flux GitOps and verify PgDog deployment.
+
+**Acceptance Criteria:**
+- [ ] HelmRelease applied: Commit files to GitOps repository
+- [ ] Flux reconciles HelmRelease: `flux get helmrelease pgdog-supporting -n user`
+- [ ] PgDog pods running: `kubectl get pods -n user -l app=pgdog-supporting` shows 2 pods Running
+- [ ] PgDog service created: `kubectl get svc -n user pgdog-supporting`
+- [ ] Service exposes ports: 6432 (PostgreSQL), 9090 (OpenMetrics)
+
+**Effort:** 3 minutes
+**Priority:** High
+**Dependencies:** Task 4.2
+**Assignee:** [Unassigned]
+
+**Commands:**
+```bash
+# Commit and push to GitOps repository
+git add kubernetes/infra/configs/databases/poolers/supporting/
+git commit -m "Add PgDog HelmRelease for supporting-db"
+git push
+
+# Verify Flux reconciliation
+flux get helmrelease pgdog-supporting -n user
+
+# Verify pods
+kubectl get pods -n user -l app=pgdog-supporting
+
+# Verify service
+kubectl get svc -n user pgdog-supporting
+```
+
+---
+
+### Task 4.4: Verify PgDog Configuration
+
+**Description:** Verify that PgDog successfully loaded configuration with all 3 databases.
+
+**Acceptance Criteria:**
+- [ ] PgDog logs show no errors about database configuration
+- [ ] PgDog logs show all 3 databases recognized (user, notification, shipping)
+- [ ] Admin database accessible: `psql -h pgdog-supporting.user.svc.cluster.local -p 6432 -U admin -d pgbouncer`
+- [ ] Can list databases: `SHOW DATABASES` shows all 3 databases
+- [ ] Can show pools: `SHOW POOLS` shows pools for all databases
+
+**Effort:** 5 minutes
+**Priority:** High
+**Dependencies:** Task 4.3
+**Assignee:** [Unassigned]
+
+**Commands:**
+```bash
+# Check PgDog logs
+kubectl logs -n user -l app=pgdog-supporting --tail=50 | grep -i "database\|error\|config"
+
+# Test admin database
+psql -h pgdog-supporting.user.svc.cluster.local -p 6432 -U admin -d pgbouncer
+
+# Show databases
+SHOW DATABASES;
+
+# Show pools
+SHOW POOLS;
+```
+
+---
+
+## Phase 5: PgDog Monitoring Integration
+
+**Goal:** Enable Prometheus scraping of PgDog metrics
 **Estimated:** 15 minutes
 
-### Task 4.1: Update DATABASE.md with HA Integration
+### Task 5.1: Create ServiceMonitor for PgDog
 
-**Description:** Add HA integration section to the PgCat Standalone section in DATABASE.md, documenting the replica server configuration, monitoring setup, and troubleshooting.
+**Description:** Create ServiceMonitor CRD for PgDog metrics (if not auto-created by Helm).
+
+**Acceptance Criteria:**
+- [ ] ServiceMonitor file created: `kubernetes/infra/configs/monitoring/servicemonitors/pgdog-supporting.yaml`
+- [ ] ServiceMonitor configured with:
+  - Namespace selector: `user` (where PgDog service is located)
+  - Service selector: `app: pgdog-supporting`
+  - Endpoint: port `metrics` (9090), path `/metrics`
+  - Appropriate labels and relabelings
+- [ ] YAML syntax is valid
+- [ ] ServiceMonitor follows existing ServiceMonitor patterns
+
+**Effort:** 8 minutes
+**Priority:** High
+**Dependencies:** Phase 4 complete
+**Assignee:** [Unassigned]
+
+**Files to Create:**
+- `kubernetes/infra/configs/monitoring/servicemonitors/pgdog-supporting.yaml`
+
+**Note:** If Helm chart auto-creates ServiceMonitor (`serviceMonitor.enabled: true`), this task can be skipped. Verify first: `kubectl get servicemonitor -n monitoring pgdog-supporting`
+
+---
+
+### Task 5.2: Apply ServiceMonitor and Verify Discovery
+
+**Description:** Apply ServiceMonitor and verify Prometheus discovers PgDog metrics.
+
+**Acceptance Criteria:**
+- [ ] ServiceMonitor applied: `kubectl apply -f kubernetes/infra/configs/monitoring/servicemonitors/pgdog-supporting.yaml`
+- [ ] ServiceMonitor created: `kubectl get servicemonitor -n monitoring pgdog-supporting`
+- [ ] Prometheus discovers PgDog target (port-forward to Prometheus UI)
+- [ ] Target status is UP in Prometheus targets page
+- [ ] Metrics endpoint returns 200 OK: `curl http://pgdog-supporting.user.svc.cluster.local:9090/metrics`
+
+**Effort:** 5 minutes
+**Priority:** High
+**Dependencies:** Task 5.1
+**Assignee:** [Unassigned]
+
+**Commands:**
+```bash
+# Apply ServiceMonitor
+kubectl apply -f kubernetes/infra/configs/monitoring/servicemonitors/pgdog-supporting.yaml
+
+# Verify created
+kubectl get servicemonitor -n monitoring pgdog-supporting
+
+# Port-forward to Prometheus
+kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090
+# Visit: http://localhost:9090/targets
+# Look for "pgdog-supporting" target with status UP
+
+# Test metrics endpoint
+kubectl port-forward -n user svc/pgdog-supporting 9090:9090
+curl http://localhost:9090/metrics | grep pgdog
+```
+
+---
+
+### Task 5.3: Verify PgDog Metrics Available
+
+**Description:** Verify that PgDog metrics are available in Prometheus with correct labels.
+
+**Acceptance Criteria:**
+- [ ] Key metrics queryable in Prometheus:
+  - `pgdog_pools_active_connections`
+  - `pgdog_servers_health`
+  - `pgdog_queries_total`
+  - `pgdog_errors_total`
+- [ ] Metrics have correct labels:
+  - `database` (user, notification, shipping)
+  - `pool` (database name)
+- [ ] Metrics show activity for all 3 databases
+
+**Effort:** 5 minutes
+**Priority:** High
+**Dependencies:** Task 5.2
+**Assignee:** [Unassigned]
+
+**Commands:**
+```bash
+# Query Prometheus for key metrics
+curl http://localhost:9090/api/v1/query?query=pgdog_pools_active_connections
+curl http://localhost:9090/api/v1/query?query=pgdog_servers_health
+curl http://localhost:9090/api/v1/query?query=pgdog_queries_total
+```
+
+---
+
+## Phase 6: Service Configuration Updates
+
+**Goal:** Update user, notification, and shipping services to connect via PgDog
+**Estimated:** 15 minutes
+
+### Task 6.1: Update User Service Configuration
+
+**Description:** Update user service Helm values to connect via PgDog instead of direct PostgreSQL connection.
+
+**Acceptance Criteria:**
+- [ ] Helm values file updated: `charts/values/user.yaml`
+- [ ] `DB_HOST` changed: `pgdog-supporting.user.svc.cluster.local`
+- [ ] `DB_PORT` changed: `6432`
+- [ ] `DB_NAME` unchanged: `user`
+- [ ] All other database configuration unchanged (credentials, SSL mode, etc.)
+
+**Effort:** 3 minutes
+**Priority:** High
+**Dependencies:** Phase 4 complete
+**Assignee:** [Unassigned]
+
+**Files to Modify:**
+- `charts/values/user.yaml`
+
+**Expected Changes:**
+```yaml
+env:
+  - name: DB_HOST
+    value: "pgdog-supporting.user.svc.cluster.local"  # Changed from supporting-db.user.svc.cluster.local
+  - name: DB_PORT
+    value: "6432"  # Changed from 5432
+  - name: DB_NAME
+    value: "user"  # Unchanged
+```
+
+---
+
+### Task 6.2: Update Notification Service Configuration
+
+**Description:** Update notification service Helm values to connect via PgDog.
+
+**Acceptance Criteria:**
+- [ ] Helm values file updated: `charts/values/notification.yaml`
+- [ ] `DB_HOST` changed: `pgdog-supporting.user.svc.cluster.local`
+- [ ] `DB_PORT` changed: `6432`
+- [ ] `DB_NAME` unchanged: `notification`
+
+**Effort:** 3 minutes
+**Priority:** High
+**Dependencies:** Task 6.1
+**Assignee:** [Unassigned]
+
+**Files to Modify:**
+- `charts/values/notification.yaml`
+
+---
+
+### Task 6.3: Update Shipping Service Configuration
+
+**Description:** Update shipping service Helm values to connect via PgDog.
+
+**Acceptance Criteria:**
+- [ ] Helm values file updated: `charts/values/shipping.yaml`
+- [ ] `DB_HOST` changed: `pgdog-supporting.user.svc.cluster.local`
+- [ ] `DB_PORT` changed: `6432`
+- [ ] `DB_NAME` unchanged: `shipping`
+
+**Effort:** 3 minutes
+**Priority:** High
+**Dependencies:** Task 6.2
+**Assignee:** [Unassigned]
+
+**Files to Modify:**
+- `charts/values/shipping.yaml`
+
+---
+
+### Task 6.4: Apply Service Updates and Verify
+
+**Description:** Apply service configuration updates via Flux and verify services can connect to PgDog.
+
+**Acceptance Criteria:**
+- [ ] Changes committed to GitOps repository
+- [ ] Flux reconciles HelmReleases for all 3 services
+- [ ] Services restart successfully
+- [ ] Service logs show no connection errors
+- [ ] Services can execute queries successfully
+
+**Effort:** 5 minutes
+**Priority:** High
+**Dependencies:** Task 6.3
+**Assignee:** [Unassigned]
+
+**Commands:**
+```bash
+# Commit changes
+git add charts/values/user.yaml charts/values/notification.yaml charts/values/shipping.yaml
+git commit -m "Update services to connect via PgDog"
+git push
+
+# Verify Flux reconciliation
+flux get helmrelease user -n user
+flux get helmrelease notification -n notification
+flux get helmrelease shipping -n shipping
+
+# Check service logs
+kubectl logs -n user -l app=user --tail=50 | grep -i "error\|fail\|database"
+kubectl logs -n notification -l app=notification --tail=50 | grep -i "error\|fail\|database"
+kubectl logs -n shipping -l app=shipping --tail=50 | grep -i "error\|fail\|database"
+```
+
+---
+
+## Phase 7: PgDog Verification & Testing
+
+**Goal:** Verify PgDog deployment works correctly (multi-database routing, monitoring, service connectivity)
+**Estimated:** 20 minutes
+
+### Task 7.1: Verify Multi-Database Routing
+
+**Description:** Verify that PgDog correctly routes connections to the correct database based on database name.
+
+**Acceptance Criteria:**
+- [ ] Can connect to user database: `psql -h pgdog-supporting.user.svc.cluster.local -p 6432 -U user -d user`
+- [ ] Can connect to notification database: `psql -h pgdog-supporting.user.svc.cluster.local -p 6432 -U notification.notification -d notification`
+- [ ] Can connect to shipping database: `psql -h pgdog-supporting.user.svc.cluster.local -p 6432 -U shipping.shipping -d shipping`
+- [ ] Each connection routes to correct database (verified via queries)
+- [ ] No routing errors in PgDog logs
+
+**Effort:** 5 minutes
+**Priority:** High
+**Dependencies:** Phase 6 complete
+**Assignee:** [Unassigned]
+
+---
+
+### Task 7.2: Verify Service Connectivity
+
+**Description:** Verify that all 3 services (user, notification, shipping) can connect and execute queries via PgDog.
+
+**Acceptance Criteria:**
+- [ ] User service pods running: `kubectl get pods -n user -l app=user` shows all pods Running
+- [ ] Notification service pods running: `kubectl get pods -n notification -l app=notification` shows all pods Running
+- [ ] Shipping service pods running: `kubectl get pods -n shipping -l app=shipping` shows all pods Running
+- [ ] No connection errors in service logs
+- [ ] Services can execute queries (test via health endpoints or logs)
+
+**Effort:** 5 minutes
+**Priority:** High
+**Dependencies:** Task 7.1
+**Assignee:** [Unassigned]
+
+---
+
+### Task 7.3: Verify PgDog Monitoring
+
+**Description:** Verify that PgDog metrics show activity for all 3 databases and services.
+
+**Acceptance Criteria:**
+- [ ] Metrics show active connections for all 3 databases
+- [ ] Metrics show query counts per database
+- [ ] Metrics have correct labels (database, pool)
+- [ ] Metrics visible in Grafana (optional)
+
+**Effort:** 5 minutes
+**Priority:** Medium
+**Dependencies:** Task 7.2
+**Assignee:** [Unassigned]
+
+---
+
+### Task 7.4: Verify Backward Compatibility
+
+**Description:** Verify that all services continue to work without errors after PgDog deployment.
+
+**Acceptance Criteria:**
+- [ ] All services can connect and execute queries
+- [ ] No application errors in service logs
+- [ ] No connection failures or timeouts
+- [ ] Service health endpoints return healthy status
+
+**Effort:** 5 minutes
+**Priority:** High
+**Dependencies:** Task 7.2
+**Assignee:** [Unassigned]
+
+---
+
+## Phase 8: Documentation Update
+
+**Goal:** Update DATABASE.md with HA integration and PgDog deployment details
+**Estimated:** 15 minutes
+
+### Task 8.1: Update DATABASE.md with HA Integration and PgDog
+
+**Description:** Add HA integration section to PgCat Standalone section and PgDog deployment section for supporting-db in DATABASE.md.
 
 **Acceptance Criteria:**
 - [ ] Documentation updated: `docs/guides/DATABASE.md`
 - [ ] New section added: "High Availability Integration" under "PgCat Standalone" section
+- [ ] New section added: "PgDog Pooler for supporting-db" in Connection Poolers section
 - [ ] Documentation includes:
-  - Replica server configuration (TOML structure)
-  - ServiceMonitor setup
-  - Monitoring metrics overview
-  - Troubleshooting guide for HA scenarios
+  - PgCat HA: Replica server configuration (TOML structure), ServiceMonitor setup, monitoring metrics, troubleshooting
+  - PgDog: Helm chart deployment, multi-database configuration, ServiceMonitor setup, monitoring metrics, troubleshooting
 - [ ] Internal links updated if needed
 - [ ] Documentation follows existing style and format
 
 **Effort:** 15 minutes
 **Priority:** Medium
-**Dependencies:** Phase 3 complete
+**Dependencies:** Phase 7 complete
 **Assignee:** [Unassigned]
 
 **Files to Modify:**
 - `docs/guides/DATABASE.md`
 
-**Expected Location:**
-- After "PgCat Standalone" section (around line 453)
+**Expected Locations:**
+- After "PgCat Standalone" section (around line 453) - HA Integration
+- After "PgCat (Product & Transaction DB)" section - PgDog section
 
 **Content to Add:**
-- HA Integration Overview
-- Replica Server Configuration
-- Monitoring Setup (ServiceMonitor)
+- PgCat HA Integration Overview
+- PgCat Replica Server Configuration
+- PgDog Deployment Overview
+- PgDog Helm Chart Configuration
+- PgDog Multi-Database Routing
+- Monitoring Setup (ServiceMonitor for both)
 - Key Metrics
-- Troubleshooting (replica routing, failover, load balancing)
+- Troubleshooting guides
 
 ---
 
@@ -580,8 +1007,31 @@ Phase 3: Verification & Testing (depends on Phase 2)
 │       └── Task 3.4: Test Failover (Optional)
 │           └── Task 3.6: Verify Monitoring Integration
 
-Phase 4: Documentation Update (depends on Phase 3)
-└── Task 4.1: Update DATABASE.md with HA Integration
+Phase 4: PgDog Deployment (depends on Phase 3)
+├── Task 4.1: Add PgDog Helm Repository
+│   └── Task 4.2: Create PgDog HelmRelease and Values
+│       └── Task 4.3: Apply PgDog Deployment
+│           └── Task 4.4: Verify PgDog Configuration
+
+Phase 5: PgDog Monitoring Integration (depends on Phase 4)
+├── Task 5.1: Create ServiceMonitor for PgDog
+│   └── Task 5.2: Apply ServiceMonitor and Verify Discovery
+│       └── Task 5.3: Verify PgDog Metrics Available
+
+Phase 6: Service Configuration Updates (depends on Phase 4)
+├── Task 6.1: Update User Service Configuration
+│   └── Task 6.2: Update Notification Service Configuration
+│       └── Task 6.3: Update Shipping Service Configuration
+│           └── Task 6.4: Apply Service Updates and Verify
+
+Phase 7: PgDog Verification & Testing (depends on Phase 6)
+├── Task 7.1: Verify Multi-Database Routing
+│   ├── Task 7.2: Verify Service Connectivity
+│   │   ├── Task 7.3: Verify PgDog Monitoring
+│   │   └── Task 7.4: Verify Backward Compatibility
+
+Phase 8: Documentation Update (depends on Phase 7)
+└── Task 8.1: Update DATABASE.md with HA Integration and PgDog
 ```
 
 ---
@@ -608,8 +1058,31 @@ Phase 4: Documentation Update (depends on Phase 3)
 - [ ] Task 3.5: Verify Backward Compatibility
 - [ ] Task 3.6: Verify Monitoring Integration
 
-### Phase 4: Documentation Update
-- [ ] Task 4.1: Update DATABASE.md with HA Integration
+### Phase 4: PgDog Deployment
+- [ ] Task 4.1: Add PgDog Helm Repository
+- [ ] Task 4.2: Create PgDog HelmRelease and Values
+- [ ] Task 4.3: Apply PgDog Deployment
+- [ ] Task 4.4: Verify PgDog Configuration
+
+### Phase 5: PgDog Monitoring Integration
+- [ ] Task 5.1: Create ServiceMonitor for PgDog
+- [ ] Task 5.2: Apply ServiceMonitor and Verify Discovery
+- [ ] Task 5.3: Verify PgDog Metrics Available
+
+### Phase 6: Service Configuration Updates
+- [ ] Task 6.1: Update User Service Configuration
+- [ ] Task 6.2: Update Notification Service Configuration
+- [ ] Task 6.3: Update Shipping Service Configuration
+- [ ] Task 6.4: Apply Service Updates and Verify
+
+### Phase 7: PgDog Verification & Testing
+- [ ] Task 7.1: Verify Multi-Database Routing
+- [ ] Task 7.2: Verify Service Connectivity
+- [ ] Task 7.3: Verify PgDog Monitoring
+- [ ] Task 7.4: Verify Backward Compatibility
+
+### Phase 8: Documentation Update
+- [ ] Task 8.1: Update DATABASE.md with HA Integration and PgDog
 
 ---
 
@@ -637,4 +1110,15 @@ Phase 4: Documentation Update (depends on Phase 3)
 
 ---
 
-*Tasks created with SDD 2.0*
+---
+
+## Revision History
+
+| Version | Date | Changes | Author |
+|---------|------|---------|--------|
+| 2.0 | 2026-01-13 | [REFINED] Added PgDog deployment tasks (Phase 4-7), service configuration updates, and expanded documentation task | System |
+| 1.0 | 2025-12-30 | Initial tasks: PgCat HA integration only | AI Agent |
+
+---
+
+*Tasks created with SDD 2.0, refined 2026-01-13*

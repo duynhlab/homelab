@@ -30,8 +30,10 @@ spec:
     shipping.shipping:  # Database owner for shipping database (namespace.username format for cross-namespace secret, used by both shipping and shipping-v2 services)
       - createdb
   
-  # No connection pooler (direct connection, low traffic)
-  # Note: To disable pooler, omit connectionPooler section entirely
+  # Connection pooler: PgDog deployed separately via Helm chart
+  # See: kubernetes/infra/configs/databases/poolers/supporting/helmrelease.yaml
+  # Services connect via: pgdog-supporting.user.svc.cluster.local:6432
+  # Note: Zalando operator's built-in pooler is not used (omit connectionPooler section)
   
   # PostgreSQL version and parameters
   postgresql:

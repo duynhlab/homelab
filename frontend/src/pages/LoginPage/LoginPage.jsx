@@ -29,7 +29,8 @@ export default function LoginPage() {
         try {
             let result;
             if (mode === 'login') {
-                result = await login(form.username, form.password);
+                // Use email for login (matches backend API contract)
+                result = await login(form.email, form.password);
                 console.log('[API] POST /auth/login:', result);
             } else {
                 result = await register(form.username, form.email, form.password);
@@ -62,15 +63,29 @@ export default function LoginPage() {
                 {success && <div className="success">{success}</div>}
 
                 <form onSubmit={handleSubmit}>
-                    <div className="form-group">
-                        <label>Username</label>
-                        <input
-                            type="text"
-                            value={form.username}
-                            onChange={(e) => setForm({ ...form, username: e.target.value })}
-                            required
-                        />
-                    </div>
+                    {/* Email field for login, Username for register */}
+                    {mode === 'login' ? (
+                        <div className="form-group">
+                            <label>Email</label>
+                            <input
+                                type="email"
+                                placeholder="alice@example.com"
+                                value={form.email}
+                                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                                required
+                            />
+                        </div>
+                    ) : (
+                        <div className="form-group">
+                            <label>Username</label>
+                            <input
+                                type="text"
+                                value={form.username}
+                                onChange={(e) => setForm({ ...form, username: e.target.value })}
+                                required
+                            />
+                        </div>
+                    )}
 
                     {mode === 'register' && (
                         <div className="form-group">

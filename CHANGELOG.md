@@ -8,6 +8,200 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+## [0.26.0] - 2026-01-13
+
+### Added
+
+**Database Seed Data for All Microservices**
+
+Implemented comprehensive seed data across all 8 microservices to enable immediate data availability for local development, demos, and testing.
+
+#### Seed Data Files Created
+
+- **Auth Service** (`services/auth/db/migrations/sql/V2__seed_auth.sql`):
+  - 5 demo users (Alice, Bob, Carol, David, Eve) with bcrypt-hashed passwords (`password123`)
+  - 2 active sessions for testing
+  - Idempotent inserts using `ON CONFLICT DO NOTHING`
+
+- **User Service** (`services/user/db/migrations/sql/V2__seed_user.sql`):
+  - 5 user profiles matching auth users
+  - Complete with names, phone numbers, and addresses
+  - Cross-service consistency via fixed user IDs (1-5)
+
+- **Cart Service** (`services/cart/db/migrations/sql/V2__seed_cart.sql`):
+  - 5 cart items: 3 for Alice (Wireless Mouse x2, Mechanical Keyboard, Webcam HD)
+  - 2 for Bob (USB-C Hub, Laptop Stand)
+  - Realistic quantities and product references
+
+- **Order Service** (`services/order/db/migrations/sql/V2__seed_orders.sql`):
+  - 5 orders across 3 users (Alice, David, Eve)
+  - 8 order items with mixed statuses (pending, processing, completed, shipped)
+  - Correct pricing calculations (subtotal + shipping = total)
+
+- **Review Service** (`services/review/db/migrations/sql/V2__seed_reviews.sql`):
+  - 12 reviews across 6 products
+  - Varying ratings (3-5 stars) with realistic titles and comments
+  - Reviews from different users (Alice, Bob, Carol, David, Eve)
+
+- **Notification Service** (`services/notification/db/migrations/sql/V2__seed_notifications.sql`):
+  - 8 notifications across 3 users (Alice, Bob, David)
+  - Types: order_shipped, promotion, review_reminder, cart_reminder, order_processing, order_placed, order_completed
+  - Mixed read/unread statuses for testing
+
+- **Shipping Service** (`services/shipping/db/migrations/sql/V2__seed_shipping.sql`):
+  - 3 shipments for completed/shipped orders
+  - Different carriers (UPS, USPS, FedEx)
+  - Statuses: delivered, in_transit, pending
+  - Realistic tracking numbers
+
+- **Shipping-v2 Service** (`services/shipping-v2/db/migrations/sql/V2__seed_shipping_v2.sql`):
+  - Duplicate of shipping service seed data for v2 version
+
+#### Seed Data Features
+
+- **Idempotency**: All `INSERT` statements use `ON CONFLICT DO NOTHING` to prevent duplication on restarts
+- **Cross-Service Consistency**: Fixed integer IDs (user_id 1-5, product_id 1-8) ensure data relationships work
+- **Realistic Data**: 
+  - 5 user personas (Alice, Bob, Carol, David, Eve)
+  - 8 products with varying stock levels
+  - Mixed order statuses and shipment states
+  - Varied review ratings and notification types
+- **Automatic Loading**: Flyway executes V2 migrations automatically on service startup
+- **Environment-Specific**: Designed for local/dev/demo environments only
+
+#### Documentation Updates
+
+- **docs/guides/API_REFERENCE.md**: Added "Seed Data for Local Development" section
+  - Demo user credentials table (5 users with shared password)
+  - Seed data summary table (8 services, 28+ records)
+  - Cross-service data relationships diagram (Mermaid)
+  - Example seeded products table
+  - Alice's cart JSON example
+  - Idempotency strategy explanation
+  - Environment-specific configuration guidance
+  - Migration file structure documentation
+  - Verification commands (`curl` examples for API endpoints)
+
+**Frontend API Integration Completion**
+
+Implemented missing API modules and UI components to achieve 100% API coverage and full feature parity with backend.
+
+#### API Modules Created (4 new files)
+
+- **`frontend/src/api/reviewApi.js`**: Review API integration
+  - `getReviews(productId)` - GET /api/v1/reviews?product_id={id}
+  - `createReview(productId, rating, title, comment)` - POST /api/v1/reviews
+
+- **`frontend/src/api/notificationApi.js`**: Notification API integration (v2 endpoints)
+  - `getNotifications()` - GET /api/v2/notifications
+  - `getNotification(id)` - GET /api/v2/notifications/:id
+  - `markAsRead(id)` - PATCH /api/v2/notifications/:id
+
+- **`frontend/src/api/shippingApi.js`**: Shipping API integration
+  - `trackShipment(trackingNumber)` - GET /api/v1/shipping/track
+  - `estimateShipment(weight, destination)` - GET /api/v2/shipments/estimate
+
+- **`frontend/src/api/userApi.js`**: User API integration
+  - `getUserProfile()` - GET /api/v1/users/profile
+  - `getUser(id)` - GET /api/v1/users/:id
+  - `updateProfile(profileData)` - PUT /api/v1/users/profile
+
+**API Coverage**: Increased from 4/9 services (44%) to 9/9 services (100%)
+
+#### UI Implementations (3 features)
+
+- **Product Reviews** (`frontend/src/pages/ProductDetailPage/ProductDetailPage.jsx`):
+  - Added reviews section with average rating display
+  - Star rating visualization (⭐⭐⭐⭐⭐)
+  - Review list with titles, comments, user IDs, and dates
+  - Loading and empty states
+  - Integrated with 12 seeded reviews
+
+- **Notifications Page** (`frontend/src/pages/NotificationPage/NotificationPage.jsx` - NEW):
+  - Unread/read sections with color-coded borders
+  - Notification type icons (📦 order_shipped, ✅ order_completed, ⭐ review_reminder, etc.)
+  - "Mark as Read" functionality
+  - Unread count summary
+  - Integrated with 8 seeded notifications
+
+- **Shipping Tracking** (`frontend/src/pages/OrdersPage/OrdersPage.jsx`):
+  - Shipment tracking box with carrier info (UPS, USPS, FedEx)
+  - Color-coded status badges (pending: orange, in_transit: blue, delivered: green)
+  - Tracking number display
+  - Estimated delivery date
+  - Integrated with 3 seeded shipments
+
+### Changed
+
+**Frontend Dependency Updates**
+
+- **Vite**: Updated from `^5.0.0` to `^6.4.1`
+  - Fixed 2 moderate severity vulnerabilities (esbuild CORS bypass)
+  - Non-breaking update (Vite 5.x → 6.x compatible)
+  - Dev server now runs on `http://localhost:3000` (was 5173)
+
+### Fixed
+
+**Frontend Auth Login Bug**
+
+- **Issue**: Frontend sent `username` field but backend expected `email` field
+- **Impact**: Login with seed data failed (e.g., `alice@example.com` / `password123`)
+- **Files Fixed**:
+  - `frontend/src/api/authApi.js`: Changed `login(username, password)` to `login(email, password)`
+  - `frontend/src/pages/LoginPage/LoginPage.jsx`: 
+    - Updated form to use email field for login mode
+    - Changed input type to `type="email"` with placeholder `alice@example.com`
+    - Login mode shows Email field, Register mode shows Username + Email
+- **Result**: Login now works with all 5 demo users from seed data
+
+**NPM Security Vulnerabilities**
+
+- **Fixed**: 2 moderate severity vulnerabilities in esbuild and vite
+- **CVE**: GHSA-67mh-4wv8-2f99 (esbuild CORS bypass in dev server)
+- **Solution**: Updated vite to 6.4.1 which includes fixed esbuild version
+- **Verification**: `npm audit` now shows `0 vulnerabilities`
+- **Impact**: Dev-only vulnerability (no production impact)
+
+**Seed Data Documentation**
+
+- Added comprehensive seed data section to `docs/guides/API_REFERENCE.md`
+- Documented 5 demo users, cross-service relationships, and verification commands
+- Included Mermaid diagram showing data dependencies
+
+### Testing
+
+**Seed Data Verification**
+
+- All 8 services have V2 seed migrations ready
+- Total seed records: 28+ across all services
+- Cross-service data relationships verified (user IDs, product IDs, order IDs)
+- Idempotency tested (safe for pod restarts)
+
+**Frontend Testing**
+
+- Login tested with all 5 demo users
+- Product reviews display (12 reviews across 6 products)
+- Notifications page (8 notifications with unread/read sections)
+- Shipping tracking (3 shipments with carrier info)
+- All features integrated with seed data
+
+### Migration Notes
+
+**For Developers**:
+- Run `npm install` in frontend directory to get Vite 6.4.1
+- Use demo credentials: `alice@example.com` / `password123`
+- All seed data loads automatically on service startup (no manual steps)
+
+**For Testing**:
+- Frontend dev server: `cd frontend && npm run dev` → `http://localhost:3000`
+- Login with any of 5 demo users
+- All features (products, cart, orders, reviews, notifications, shipping) have seed data
+
+**For Production**:
+- Seed data is for local/dev/demo only (controlled by environment variables)
+- Frontend vulnerabilities fixed (0 vulnerabilities)
+- All API endpoints fully implemented and tested
+
 ## [0.25.0] - 2026-01-13
 
 ### Added

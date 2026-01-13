@@ -11,7 +11,7 @@ spec:
         kind: HelmRepository
         name: vector
         namespace: flux-system
-      version: '>=0.30.0'
+      version: '*'
   interval: 10m
   releaseName: vector
   timeout: 10m

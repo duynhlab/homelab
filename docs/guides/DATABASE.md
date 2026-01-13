@@ -1,24 +1,4 @@
 # Database Integration Guide
-
-## Quick Summary
-
-**PostgreSQL Operators:**
-- **Zalando Postgres Operator** (v1.15.1): 3 clusters
-  - `review-db`: PostgreSQL 16, 1 node, no pooler
-  - `auth-db`: PostgreSQL 17, 3 nodes (HA), PgBouncer sidecar (2 instances)
-  - `supporting-db`: PostgreSQL 16, 1 node, no pooler
-- **CloudNativePG Operator** (v1.28.0): 2 clusters
-  - `product-db`: PostgreSQL 18, 2 nodes (HA), PgCat standalone (2 replicas)
-  - `transaction-db`: PostgreSQL 18, 3 nodes (HA), PgCat standalone (2 replicas)
-
-**Key Features:**
-- ✅ Patroni-based HA (all operators use Patroni internally via Kubernetes API)
-- ✅ Connection poolers: PgBouncer (Zalando sidecar), PgCat (standalone for CloudNativePG)
-- ✅ Monitoring: postgres_exporter sidecars with custom queries (pg_stat_statements, pg_replication, pg_postmaster)
-- ✅ Log collection: Vector sidecars (Zalando clusters) shipping to Loki
-
----
-
 ## Table of Contents
 
 1. [Database Architecture](#database-architecture) - 5 clusters overview
@@ -27,12 +7,18 @@
 4. [Shared Topics](#shared-topics) - Environment Variables, Helm Config, Local Dev, Verification, Best Practices
 
 ---
+## Quick Summary
 
-## Deployment (GitOps)
-
-**Database infrastructure is deployed automatically via Flux Operator:**
-
-**Flux Kustomizations (controllers/configs pattern):**
+**PostgreSQL Operators:**
+- **Zalando Postgres Operator** (v1.15.1): 3 clusters
+  - `review-db`: PostgreSQL 16, 1 node, no pooler
+  - `auth-db`: PostgreSQL 17, 3 nodes (HA), PgBouncer sidecar (2 instances)
+  - `supporting-db`: PostgreSQL 16, 1 node, PgDog standalone (2 replicas, Helm chart)
+- **CloudNativePG Operator** (v1.28.0): 2 clusters
+  - `product-db`: PostgreSQL 18, 2 nodes (HA), PgCat standalone (2 replicas)
+  - `transaction-db`: PostgreSQL 18, 3 nodes (HA), PgCat standalone (2 replicas)
+---
+**Deployment with Flux Operator**
 - `controllers-local` ([kubernetes/clusters/local/controllers.yaml](../../kubernetes/clusters/local/controllers.yaml)) - installs database operators/CRDs
 - `configs-local` ([kubernetes/clusters/local/configs.yaml](../../kubernetes/clusters/local/configs.yaml)) - applies database instances, poolers, and secrets
 - **Source:** OCI artifact `mop-registry:5000/flux-infra-sync:local`
@@ -49,86 +35,8 @@
 2. **Database Clusters:** 5 clusters (3 Zalando + 2 CloudNativePG)
    - Review DB, Auth DB, Supporting DB (Zalando)
    - Product DB, Transaction DB (CloudNativePG)
-3. **Connection Poolers:** PgBouncer (sidecar), PgCat (standalone, 2 deployments)
+3. **Connection Poolers:** PgBouncer (sidecar), PgCat (standalone, 2 deployments), PgDog (standalone, Helm chart)
 4. **Secrets:** Pre-created for CloudNativePG clusters
-
-**Manual reconciliation (if needed):**
-```bash
-# Trigger Flux reconciliation
-flux reconcile kustomization controllers-local --with-source
-flux reconcile kustomization configs-local --with-source
-
-# Check deployment status
-flux get kustomizations
-kubectl get postgresql -A         # Zalando clusters
-kubectl get clusters -A           # CloudNativePG clusters
-
-# Check connection poolers
-kubectl get pods -n auth | grep pooler        # PgBouncer
-kubectl get pods -n product | grep pgcat      # PgCat
-kubectl get pods -n cart | grep pgcat         # PgCat
-```
-
-**Verification:**
-```bash
-# Check all database clusters are running
-kubectl get postgresql -A         # Zalando clusters (3)
-kubectl get clusters -A           # CloudNativePG clusters (2)
-
-# Check poolers
-kubectl get svc -n auth | grep pooler
-kubectl get svc -n product | grep pgcat
-kubectl get svc -n cart | grep pgcat
-
-# Check database pods
-kubectl get pods -n review | grep review-db
-kubectl get pods -n auth | grep auth-db
-kubectl get pods -n user | grep supporting-db
-kubectl get pods -n product | grep product-db
-kubectl get pods -n cart | grep transaction-db
-```
-
-**File Structure (Simplified - Refactored 2026-01-12):**
-```
-kubernetes/infra/
-├── controllers/databases/              # Operators (CRDs first)
-│   ├── zalando-operator.yaml
-│   └── cloudnativepg-operator.yaml
-└── configs/databases/                  # Instances + poolers + secrets
-    ├── instances/                      # 5 database instances (CRs)
-    │   ├── auth-db.yaml
-    │   ├── review-db.yaml
-    │   ├── supporting-db.yaml
-    │   ├── product-db.yaml
-    │   └── transaction-db.yaml
-    ├── poolers/                        # PgCat raw manifests
-    │   ├── product/
-    │   └── transaction/
-    └── secrets/secrets.yaml            # Pre-created secrets (CloudNativePG, etc.)
-
-**Old Structure (Moved to backup/):**
-```
-kubernetes/backup/base/infrastructure/databases/
-├── zalando-operator/         # Zalando operator HelmRelease
-├── cnpg-operator/            # CloudNativePG operator HelmRelease
-├── clusters/                 # 5 database cluster CRDs
-│   ├── auth-db.yaml          # Zalando postgresql CRD
-│   ├── review-db.yaml        # Zalando postgresql CRD
-│   ├── supporting-db.yaml    # Zalando postgresql CRD
-│   ├── product-db.yaml       # CloudNativePG cluster CRD
-│   └── transaction-db.yaml   # CloudNativePG cluster CRD
-├── poolers/                  # PgCat standalone deployments
-│   ├── pgcat-product-*       # PgCat for product-db (3 files)
-│   └── pgcat-transaction-*   # PgCat for transaction-db (3 files)
-└── secrets/                  # Pre-created secrets for CloudNativePG
-    ├── product-db-secret.yaml
-    ├── transaction-db-secret-cart.yaml
-    └── transaction-db-secret-order.yaml
-```
-
-**Legacy deployment (reference only):**
-- Old scripts: `./scripts/backup/04-deploy-databases.sh`, `./scripts/backup/04a-verify-databases.sh`
-- **Note:** These scripts are kept for reference but are no longer used. Use Flux GitOps workflow instead.
 
 ---
 
@@ -161,6 +69,9 @@ flowchart TB
         PgCatProduct[PgCat Standalone<br/>Product DB]
         subgraph PgCatTransactionDeployment["PgCat Transaction<br/>2 Replicas + HA"]
             PgCatTransaction[PgCat Standalone<br/>Transaction DB<br/>Read Replica Routing]
+        end
+        subgraph PgDogSupportingDeployment["PgDog Supporting<br/>2 Replicas (Helm)"]
+            PgDogSupporting[PgDog Standalone<br/>supporting-db<br/>Multi-Database Routing]
         end
     end
     
@@ -204,9 +115,10 @@ flowchart TB
     TransactionPrimary -.->|Synchronous Replication| TransactionReplica1
     TransactionPrimary -.->|Synchronous Replication| TransactionReplica2
     ReviewSvc -->|direct| ReviewDB
-    UserSvc -->|direct| SupportingDB
-    NotificationSvc -->|direct| SupportingDB
-    ShippingSvc -->|direct| SupportingDB
+    UserSvc -->|via pooler| PgDogSupporting
+    NotificationSvc -->|via pooler| PgDogSupporting
+    ShippingSvc -->|via pooler| PgDogSupporting
+    PgDogSupporting --> SupportingDB
     
     style Zalando fill:#e1f5ff
     style CloudNativePG fill:#fff4e1
@@ -219,6 +131,7 @@ flowchart TB
     style TransactionReplica1 fill:#e1f5ff
     style TransactionReplica2 fill:#e1f5ff
     style PgCatTransactionDeployment fill:#e1ffe1
+    style PgDogSupportingDeployment fill:#e1ffe1
     style CloudNativePGServices fill:#fff4e1
 ```
 
@@ -230,7 +143,7 @@ flowchart TB
 | **Review** | Review | **Zalando** | **16** | **None** (direct) | **Patroni** (single instance) | Simple setup, direct connection, Patroni basics |
 | **Auth** | Auth | **Zalando** | **17** | **PgBouncer** (sidecar) | **Patroni HA** (3 instances) | Production-ready HA, transaction pooling, Zalando built-in pooler, Patroni failover |
 | **Transaction** | Cart, Order | **CloudNativePG** | **18** (default) | **PgCat** (standalone, 2 replicas) | **Patroni HA** (3 instances) | **Multi-database routing, Patroni failover, synchronous replication, read replica routing** |
-| **Supporting** | User, Notification, Shipping-v2 | **Zalando** | **16** | **None** (direct) | **Patroni** (single instance) | **Shared database pattern, Patroni basics** |
+| **Supporting** | User, Notification, Shipping-v2 | **Zalando** | **16** | **PgDog** (standalone, Helm chart, 2 replicas) | **Patroni** (single instance) | **Multi-database routing, shared database pattern, Patroni basics** |
 
 ### Cluster Details
 
@@ -242,11 +155,8 @@ This section provides a brief overview of all 5 PostgreSQL clusters. For detaile
 | **Transaction** | CloudNativePG | 18 | 3 (1 primary + 2 replicas) | PgCat (standalone, 2 replicas) | Patroni HA (Synchronous) | `cart` | Cart, Order |
 | **Review** | Zalando | 16 | 1 (single instance) | None (direct) | Patroni (single) | `review` | Review |
 | **Auth** | Zalando | 17 | 3 (1 leader + 2 standbys) | PgBouncer (sidecar) | Patroni HA | `auth` | Auth |
-| **Supporting** | Zalando | 16 | 1 (single instance) | None (direct) | Patroni (single) | `user` | User, Notification, Shipping-v2 |
+| **Supporting** | Zalando | 16 | 1 (single instance) | PgDog (standalone, Helm chart, 2 replicas) | Patroni (single) | `user` | User, Notification, Shipping-v2 |
 
-**Detailed Information:**
-- **CloudNativePG Clusters** (Product, Transaction): See [CloudNativePG Operator](#cloudnativepg-operator) section
-- **Zalando Clusters** (Review, Auth, Supporting): See [Zalando Postgres Operator](#zalando-postgres-operator) section
 ---
 
 ## CloudNativePG Operator
@@ -502,118 +412,39 @@ flowchart TB
 
 **When to use**: Read replica routing, multi-database routing, advanced load balancing.
 
-**Configuration:**
-```yaml
-# Helm values (charts/values/product.yaml)
-env:
-  - name: DB_HOST
-    value: "pgcat-product.product.svc.cluster.local"  # PgCat service
-  - name: DB_PORT
-    value: "5432"
-  - name: DB_NAME
-    value: "product"
-  - name: DB_USER
-    value: "product"
-  - name: DB_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: product-db-secret
-        key: password
-```
+**Key Points:**
+- Connect via PgCat service: `pgcat-product.product.svc.cluster.local:5432`
+- PgCat transparently routes to CloudNativePG cluster
+- Application code same as direct connection
 
 **PgCat Configuration** (`kubernetes/infra/configs/databases/poolers/product/configmap.yaml`):
-```toml
-# PgCat Configuration for Product Database
-[general]
-host = "0.0.0.0"
-port = 5432
-pool_mode = "transaction"
-log_level = "info"
-admin_username = "admin"
-admin_password = "admin"
 
-[admin]
-host = "0.0.0.0"
-port = 9930
+**Key Concepts:**
+- **pool_mode: `transaction`** - Connection released per transaction (optimal for REST APIs)
+- **pool_size: 50** - Higher than transaction DB (30) due to Product being high-traffic service
+- **Primary-only**: Currently uses only primary server; can add replicas later for read scaling
+- **Image**: `ghcr.io/postgresml/pgcat:v1.2.0` (pinned version, not `latest`)
+- **Deployment**: 2 replicas for PgCat itself (load balanced by Kubernetes Service)
 
-# Product database pool
-[pools.product]
-pool_size = 50
-
-[pools.product.users]
-product = { username = "product", password = "postgres", pool_size = 50 }
-
-# Primary shard (numbered starting at 0)
-[pools.product.shards.0]
-database = "product"
-
-[[pools.product.shards.0.servers]]
-host = "product-db-rw.product.svc.cluster.local"
-port = 5432
-user = "product"
-password = "postgres"
-role = "primary"
-```
-
-**Notes:**
-- **Image**: `ghcr.io/postgresml/pgcat:v1.2.0` (fixed version, not `latest`)
-- **CloudNativePG Services**: CloudNativePG automatically creates services:
-  - `{cluster-name}-rw` (read-write endpoint) → `product-db-rw.product.svc.cluster.local`
-  - `{cluster-name}-r` (read-only endpoint) → `product-db-r.product.svc.cluster.local` (for future replica routing)
-- **Deployment**: `kubernetes/infra/configs/databases/poolers/product/deployment.yaml` with 2 replicas
-- Currently configured with primary server only; replicas can be added later for read balancing
+**CloudNativePG Auto-Created Services:**
+- `product-db-rw`: Read-write endpoint (primary)
+- `product-db-r`: Read-only endpoint (for future replica routing)
 
 **Transaction Database PgCat Configuration** (`kubernetes/infra/configs/databases/poolers/transaction/configmap.yaml`):
-```toml
-# PgCat Configuration for Transaction Databases (Cart + Order)
-[general]
-host = "0.0.0.0"
-port = 5432
-pool_mode = "transaction"
-log_level = "info"
-admin_username = "admin"
-admin_password = "admin"
 
-[admin]
-host = "0.0.0.0"
-port = 9930
+**Key Concepts:**
+- **pool_mode: `transaction`** - Connection released after each transaction (better concurrency for microservices)
+- **pool_size: 30** - Max connections pooler maintains to database per pool (cart + order)
+- **Primary role** (`transaction-db-rw`): Handles all writes (INSERT, UPDATE, DELETE, DDL)
+- **Replica role** (`transaction-db-r`): Handles read queries (SELECT) with automatic load balancing
+- **Multi-database**: Single PgCat instance serves both Cart and Order databases on same PostgreSQL cluster
 
-# Cart database pool
-[pools.cart]
-pool_size = 30
+**Why transaction mode?**
+- Microservices make short-lived transactions
+- Higher connection reuse vs session mode
+- Better for REST APIs with stateless requests
 
-[pools.cart.users]
-cart = { username = "cart", password = "postgres", pool_size = 30 }
-
-[pools.cart.shards.0]
-database = "cart"
-
-[[pools.cart.shards.0.servers]]
-host = "transaction-db-rw.cart.svc.cluster.local"
-port = 5432
-user = "cart"
-password = "postgres"
-role = "primary"
-
-# Order database pool (same server, different database)
-[pools.order]
-pool_size = 30
-
-[pools.order.users]
-cart = { username = "cart", password = "postgres", pool_size = 30 }
-
-[pools.order.shards.0]
-database = "order"
-
-[[pools.order.shards.0.servers]]
-host = "transaction-db-rw.cart.svc.cluster.local"
-port = 5432
-user = "cart"
-password = "postgres"
-role = "primary"
-```
-
-**Go Code**: Same as direct connection (PgCat transparent).
+**Go Code**: Same as direct connection (PgCat is transparent to application).
 
 #### High Availability Integration
 
@@ -650,40 +481,15 @@ kubectl get endpoints -n cart transaction-db-r   # Should point to replica pods
 
 **Replica Server Configuration:**
 
-Each database pool (cart, order) includes both primary and replica servers:
+**How Query Routing Works:**
+1. **Primary server** (`transaction-db-rw`): Handles ALL writes + reads when no replicas available
+2. **Replica servers** (`transaction-db-r`): Handle SELECT queries only, load balanced by Kubernetes
+3. **Automatic failover**: Unhealthy replica banned for 60s, queries route to healthy replicas + primary
+4. **Health checks**: Fast check (`;` query) before each query execution
 
-```toml
-# Primary server (handles writes)
-[[pools.cart.shards.0.servers]]
-host = "transaction-db-rw.cart.svc.cluster.local"
-port = 5432
-user = "cart"
-password = "postgres"
-role = "primary"
-
-# Replica server (handles read queries)
-[[pools.cart.shards.0.servers]]
-host = "transaction-db-r.cart.svc.cluster.local"
-port = 5432
-user = "cart"
-password = "postgres"
-role = "replica"
-```
-
-**How It Works:**
-
-1. **Query Routing**: PgCat automatically routes queries based on SQL type:
-   - **SELECT queries** → Replica servers (load balanced across available replicas)
-   - **INSERT/UPDATE/DELETE/DDL** → Primary server
-
-2. **Load Balancing**: SELECT queries are distributed across healthy replica servers using the default "random" algorithm.
-
-3. **Automatic Failover**: If a replica becomes unhealthy:
-   - PgCat automatically bans the unhealthy replica for 60 seconds (default `ban_time`)
-   - Queries are routed to remaining healthy replicas + primary
-   - When replica recovers, it automatically rejoins the pool
-
-4. **Health Checks**: PgCat performs fast health checks (query `;`) before each query to ensure server availability.
+**CloudNativePG Auto-Created Services:**
+- **`-rw` service**: Always points to current primary (auto-updates on failover)
+- **`-r` service**: Load balances across all healthy replicas (auto-updates when replicas added/removed)
 
 **Monitoring:**
 
@@ -762,30 +568,13 @@ CloudNativePG clusters use **PodMonitor** CRDs to enable Prometheus scraping of 
 - `kubernetes/infra/configs/monitoring/podmonitors/podmonitor-cloudnativepg-product-db.yaml` (Product DB)
 - `kubernetes/infra/configs/monitoring/podmonitors/podmonitor-cloudnativepg-transaction-db.yaml` (Transaction DB)
 
-**Example PodMonitor:**
-```yaml
-apiVersion: monitoring.coreos.com/v1
-kind: PodMonitor
-metadata:
-  name: product-db
-  namespace: product
-  labels:
-    app: product-db
-    operator: cloudnativepg
-spec:
-  selector:
-    matchLabels:
-      cnpg.io/cluster: product-db
-  podMetricsEndpoints:
-  - port: metrics
-    interval: 15s
-    scrapeTimeout: 10s
-    path: /metrics
-  podTargetLabels:
-    - cnpg.io/cluster
-    - cnpg.io/instanceRole
-    - cnpg.io/instanceName
-```
+**Example PodMonitor** (`kubernetes/infra/configs/monitoring/podmonitors/podmonitor-cloudnativepg-product-db.yaml`):
+
+**Key Elements:**
+- **Selector**: Matches pods with label `cnpg.io/cluster: product-db`
+- **Port**: `metrics` (exposed by postgres_exporter sidecar)
+- **Interval**: 15s scrape interval
+- **Labels**: Captures cluster, role (primary/replica), instance name
 
 **Deployment:**
 PodMonitors are deployed via Flux as part of `configs-local` (`kubernetes/infra/configs/monitoring/podmonitors/`).
@@ -1050,9 +839,10 @@ flowchart TB
 - **PostgreSQL Version**: 16 (explicitly configured in CRD)
 - **Instances**: 1 (single instance, no HA)
 - **HA**: Patroni via Kubernetes API (single instance, no failover needed)
-- **Pooler**: None (direct connection)
+- **Pooler**: PgDog standalone deployment via Helm chart (2 replicas, HA)
 - **Namespace**: `user` (cluster location)
-- **CRD**: `k8s/postgres-operator/zalando/crds/supporting-db.yaml`
+- **CRD**: `kubernetes/infra/configs/databases/instances/supporting-db.yaml`
+- **Pooler HelmRelease**: `kubernetes/infra/configs/databases/poolers/supporting/helmrelease.yaml`
 
 **Architecture Diagram:**
 
@@ -1060,6 +850,13 @@ flowchart TB
 flowchart TB
     subgraph UserNS["namespace: user"]
         UserSvc[User Service<br/>Pod]
+        
+        subgraph PgDogDeployment["PgDog Deployment<br/>2 Replicas (Helm)"]
+            PgDogPod1[PgDog Pod 1<br/>Port 6432, 9090]
+            PgDogPod2[PgDog Pod 2<br/>Port 6432, 9090]
+        end
+        
+        PgDogSvc[Service: pgdog-supporting<br/>ClusterIP<br/>Ports: 6432, 9090]
         
         subgraph SupportingDB["supporting-db Cluster"]
             subgraph SupportingDBPod["supporting-db-0 Pod"]
@@ -1084,6 +881,11 @@ flowchart TB
         ShippingSecret[shipping.shipping.supporting-db...<br/>username: shipping.shipping<br/>password: auto-generated<br/>Created in shipping namespace]
     end
     
+    subgraph MonitoringNS["namespace: monitoring"]
+        Prometheus[Prometheus<br/>Scrapes Metrics]
+        ServiceMonitor[ServiceMonitor: pgdog-supporting<br/>Discovers PgDog Service]
+    end
+    
     subgraph ZalandoOp["Zalando Operator"]
         Operator[Operator Controller<br/>namespace: database<br/>v1.15.1]
         Config[OperatorConfiguration CRD<br/>enable_cross_namespace_secret: true]
@@ -1096,29 +898,41 @@ flowchart TB
     Operator -->|Auto-generates<br/>namespace.username format<br/>Cross-namespace| ShippingSecret
     
     UserSvc -->|Reads| UserSecret
-    UserSvc -->|Direct Connection<br/>Port 5432| Instance
-    
+    UserSvc -->|Connects via| PgDogSvc
     NotificationSvc -->|Reads| NotifSecret
-    NotificationSvc -->|Direct Connection<br/>Port 5432<br/>Cross-namespace| Instance
-    
+    NotificationSvc -->|Connects via| PgDogSvc
     ShippingSvc -->|Reads| ShippingSecret
-    ShippingSvc -->|Direct Connection<br/>Port 5432<br/>Cross-namespace| Instance
+    ShippingSvc -->|Connects via| PgDogSvc
+    
+    PgDogSvc --> PgDogPod1
+    PgDogSvc --> PgDogPod2
+    PgDogPod1 -->|Routes by DB name<br/>Port 6432| Instance
+    PgDogPod2 -->|Routes by DB name<br/>Port 6432| Instance
+    
+    ServiceMonitor -->|Discovers| PgDogSvc
+    Prometheus -->|Scrapes| PgDogPod1
+    Prometheus -->|Scrapes| PgDogPod2
     
     style SupportingDB fill:#e1f5ff
+    style PgDogDeployment fill:#e1ffe1
+    style PgDogSvc fill:#e1ffe1
     style UserSecret fill:#ffe1f5
     style NotifSecret fill:#ffe1f5
     style ShippingSecret fill:#ffe1f5
     style Exporter fill:#f3e5f5
     style Vector fill:#fff4e1
+    style ServiceMonitor fill:#f3e5f5
 ```
 
 **Features:**
 - Patroni-based management (even for single instance)
 - Shared database pattern (3 databases: user, notification, shipping)
-- Direct connection for low-traffic services
+- **Connection Pooler**: PgDog via Helm chart (2 replicas, HA)
+- **Multi-Database Routing**: PgDog routes connections by database name (user, notification, shipping)
 - PostgreSQL 16
 - **Monitoring**: `postgres_exporter` sidecar with custom queries for enhanced metrics
 - **Log Collection**: Vector sidecar for PostgreSQL log collection to Loki
+- **Pooler Monitoring**: PgDog OpenMetrics endpoint (port 9090) scraped by Prometheus
 - Cross-namespace secret management (see [Zalando Postgres Operator - Secret Management](#secret-management) section)
 
 #### Log Collection with Vector Sidecar
@@ -1256,78 +1070,76 @@ pg_stat_statements_calls{namespace="auth", cluster="auth-db"}
 
 **When to use**: Low-traffic services, simple setup, no connection pooling needed.
 
-**Configuration:**
-```yaml
-# Helm values (charts/values/review.yaml)
-env:
-  - name: DB_HOST
-    value: "review-db.review.svc.cluster.local"  # review-db is in review namespace
-  - name: DB_PORT
-    value: "5432"
-  - name: DB_NAME
-    value: "review"
-  - name: DB_USER
-    value: "review"
-  - name: DB_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: review.review-db.credentials.postgresql.acid.zalan.do
-        key: password
-```
+**Key Points:**
+- Connect directly to service: `{cluster-name}.{namespace}.svc.cluster.local:5432`
+- Use Zalando auto-generated secret for credentials
+- No pooler overhead, suitable for low-traffic services
 
-**Go Code** (`services/internal/review/core/database.go`):
-```go
-// Direct connection - no pooler
-cfg := &DatabaseConfig{
-    Host:     getEnv("DB_HOST", ""),  // review-db.review.svc.cluster.local
-    Port:     getEnv("DB_PORT", "5432"),
-    Name:     getEnv("DB_NAME", ""),  // review
-    User:     getEnv("DB_USER", ""),  // review
-    Password: getEnv("DB_PASSWORD", ""),
-}
-```
-
-**Used by:** Review DB, Supporting DB
+**Used by:** Review DB
 
 #### PgBouncer Sidecar
 
 **When to use**: High connection churn, transaction pooling needed, Zalando operator built-in.
 
-**Configuration:**
-```yaml
-# Helm values (charts/values/auth.yaml)
-env:
-  - name: DB_HOST
-    value: "auth-db-pooler.auth.svc.cluster.local"  # PgBouncer endpoint - auth-db is in auth namespace
-  - name: DB_PORT
-    value: "5432"
-  - name: DB_NAME
-    value: "auth"
-  - name: DB_USER
-    value: "auth"
-  - name: DB_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: auth.auth-db.credentials.postgresql.acid.zalan.do
-        key: password
-  - name: DB_SSLMODE
-    value: "require"  # PgBouncer requires SSL connections
-  - name: DB_POOL_MODE
-    value: "transaction"  # PgBouncer transaction pooling
-```
+**Configuration Helm Values:**
 
-**CRD Configuration** (`k8s/postgres-operator/zalando/crds/auth-db.yaml`):
+**Key Concepts:**
+- **Endpoint**: Use `-pooler` suffix service (`auth-db-pooler.auth.svc.cluster.local`)
+- **pool_mode: `transaction`** - Same concept as PgCat (connection per transaction)
+- **Built-in sidecar**: No separate deployment needed, Zalando creates it automatically
+- **numberOfInstances: 2** - 2 PgBouncer pods for HA
+- **SSL required**: PgBouncer enforces SSL connections (`sslmode=require`)
+
+**CRD Config** (`k8s/postgres-operator/zalando/crds/auth-db.yaml`):
 ```yaml
 connectionPooler:
   numberOfInstances: 2
-  schema: pooler
-  user: pooler
   mode: transaction  # Transaction pooling
 ```
 
-**Go Code**: Same as direct connection (service doesn't know about pooler).
+**Go Code**: Same as direct connection (application doesn't know about pooler).
 
 **Used by:** Auth DB
+
+#### PgDog Standalone (supporting-db)
+
+**When to use**: Multi-database routing on shared cluster, prepared statements support, future-proof features.
+
+**Key Points:**
+- Connect via PgDog service: `pgdog-supporting.user.svc.cluster.local:6432`
+- PgDog routes by database name in connection string
+- Application code same as direct connection (transparent routing)
+- Helm chart deployment with HA (2 replicas)
+
+**Deployment:**
+- **Helm Chart**: `helm.pgdog.dev/pgdog` (version 0.31)
+- **HelmRelease**: `kubernetes/infra/configs/databases/poolers/supporting/helmrelease.yaml`
+- **Replicas**: 2 (HA deployment with pod anti-affinity)
+- **Port**: 6432 (PostgreSQL protocol), 9090 (OpenMetrics)
+
+**Multi-Database Configuration:**
+- **3 databases** on same cluster: user, notification, shipping
+- **Pool sizes**: 30 (user), 20 (notification), 20 (shipping)
+- **pool_mode**: `transaction` (connection per transaction)
+- **Routing**: PgDog routes by database name in connection string
+
+**Service Endpoint:**
+- `pgdog-supporting.user.svc.cluster.local:6432`
+
+**Monitoring:**
+- OpenMetrics: Port 9090 (`/metrics` endpoint)
+- ServiceMonitor: `kubernetes/infra/configs/monitoring/servicemonitors/pgdog-supporting.yaml`
+- Admin database: `psql -h pgdog-supporting.user.svc.cluster.local -p 6432 -U admin -d pgbouncer`
+
+**Why PgDog for supporting-db:**
+- Multi-database support (3 databases on shared cluster)
+- Prepared statements support in transaction mode
+- Advanced features available if needed (pub/sub, sharding)
+- Production-ready Helm chart with HA, monitoring, security
+
+**Go Code**: Same as direct connection (PgDog is transparent to application).
+
+**Used by:** Supporting DB
 
 ### Secret Management
 
@@ -1384,19 +1196,13 @@ The **Supporting Database** (`supporting-db`) cluster uses a **shared database p
 **Note:** The Helm chart automatically creates the `postgres-operator` OperatorConfiguration CRD from the values file. This is the only configuration method used.
 
 **Database CRD** (`k8s/postgres-operator/zalando/crds/supporting-db.yaml`):
-   ```yaml
-   databases:
-     user: user
-     notification: notification.notification  # namespace.username format for cross-namespace secret
-     shipping: shipping.shipping  # namespace.username format for cross-namespace secret
-   users:
-     user:  # Database owner for user database
-       - createdb
-     notification.notification:  # namespace.username format for cross-namespace secret
-       - createdb
-    shipping.shipping:  # namespace.username format for cross-namespace secret (used by both shipping and shipping-v2 services)
-      - createdb
-   ```
+
+**Multi-Database Configuration:**
+- **user** database → `user` namespace
+- **notification** database → `notification` namespace (cross-namespace secret)
+- **shipping** database → `shipping` namespace (cross-namespace secret, shared by shipping + shipping-v2)
+
+**Key**: Use `namespace.username` format for cross-namespace secrets
 
 ### Password Rotation
 
@@ -1715,54 +1521,15 @@ psql -d auth
 
 #### Useful PostgreSQL Commands
 
-**Check connection info:**
-```sql
--- Current database and user
-SELECT current_database(), current_user;
-
--- Connection info
-\conninfo
-
--- List all databases
-\l
-
--- List tables in current database
-\dt
-
--- List schemas
-\dn
-
--- Describe a table
-\d table_name
-
--- Exit psql
-\q
-```
-
-**Check replication status (from leader):**
-```sql
--- Check replication slots
-SELECT * FROM pg_replication_slots;
-
--- Check replication statistics
-SELECT * FROM pg_stat_replication;
-
--- Check WAL sender processes
-SELECT * FROM pg_stat_activity WHERE application_name LIKE '%replication%';
-```
-
-**Check cluster configuration:**
-```sql
--- PostgreSQL version
-SELECT version();
-
--- Check PostgreSQL configuration
-SHOW all;
-
--- Check specific parameter
-SHOW max_connections;
-SHOW shared_buffers;
-```
+**Common Commands:**
+- `\conninfo` - Connection info
+- `\l` - List databases
+- `\dt` - List tables
+- `\d table_name` - Describe table
+- `SELECT current_database(), current_user` - Check current connection
+- `SELECT version()` - PostgreSQL version
+- `SELECT * FROM pg_stat_replication` - Replication status
+- `SHOW all` - All configuration parameters
 
 #### Service Management (runit)
 
@@ -1850,7 +1617,7 @@ ps aux | grep patroni
 
 ### Overview
 
-Connection poolers solve the "too many connections" problem by reusing PostgreSQL connections, allowing applications to handle 1000+ client connections with only 25-50 database connections. This section covers the three poolers used in this project: **PgBouncer** (Zalando sidecar), **PgCat** (standalone), and **PgDog** (alternative for sharding).
+Connection poolers solve the "too many connections" problem by reusing PostgreSQL connections, allowing applications to handle 1000+ client connections with only 25-50 database connections. This section covers the three poolers used in this project: **PgBouncer** (Zalando sidecar), **PgCat** (standalone), and **PgDog** (Helm chart for multi-database).
 
 **Why Use Connection Poolers?**
 - PostgreSQL has limited connections (`max_connections` typically 100-200)
@@ -1894,9 +1661,12 @@ Connection poolers solve the "too many connections" problem by reusing PostgreSQ
 - ✅ Multi-database routing (cart + order)
 
 **Use PgDog when:**
-- ✅ Need advanced sharding with two-phase commit
-- ✅ Need pub/sub (LISTEN/NOTIFY) support
-- ✅ 200+ microservices with sharding requirements
+- ✅ Zalando clusters with multiple databases (no built-in pooler for multi-database)
+- ✅ Need multi-database routing on shared cluster
+- ✅ Need prepared statements support in transaction mode
+- ✅ Future-proofing for advanced features (sharding, pub/sub)
+- ✅ Need advanced sharding with two-phase commit (future)
+- ✅ Need pub/sub (LISTEN/NOTIFY) support (future)
 
 ### Current Implementation
 
@@ -1904,58 +1674,61 @@ Connection poolers solve the "too many connections" problem by reusing PostgreSQ
 
 **Deployment:** Built-in sidecar via Zalando operator
 
-**Configuration:**
-```yaml
-# k8s/postgres-operator/zalando/crds/auth-db.yaml
-connectionPooler:
-  numberOfInstances: 2
-  schema: pooler
-  user: pooler
-  mode: transaction
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-```
+**Key Settings:**
+- **numberOfInstances**: 2 (HA)
+- **mode**: `transaction`
+- **Resources**: CPU 100m, Memory 128Mi
 
 **Service Endpoint:**
 - `auth-db-pooler.auth.svc.cluster.local:5432`
 - Requires SSL: `DB_SSLMODE=require`
 
 **Monitoring:**
-```sql
--- Connect to admin database
-psql -h auth-db-pooler.auth.svc.cluster.local -U pooler -d pgbouncer
-SHOW POOLS;
-SHOW STATS;
-```
+- Admin interface: `psql -h auth-db-pooler.auth.svc.cluster.local -U pooler -d pgbouncer`
+- Commands: `SHOW POOLS`, `SHOW STATS`
 
 #### PgCat (Product & Transaction DB)
 
 **Deployment:** Standalone Kubernetes Deployment (2 replicas)
 
-**Configuration:**
-```toml
-# kubernetes/infra/configs/databases/poolers/product/configmap.yaml - PgCat ConfigMap for product
-[general]
-host = "0.0.0.0"
-port = 5432
-pool_mode = "transaction"
-enable_prometheus_exporter = true
-
-[pools.product]
-pool_size = 30
-```
+**Key Configuration:**
+- **pool_mode**: `transaction` (both Product and Transaction)
+- **pool_size**: 30 per database
+- **Prometheus exporter**: Enabled on port 9930
 
 **Service Endpoints:**
 - Product: `pgcat-product.product.svc.cluster.local:5432`
 - Transaction: `pgcat.cart.svc.cluster.local:5432`
 
 **Monitoring:**
-- Prometheus metrics: `http://pgcat-product.product.svc.cluster.local:9930/metrics`
-- Admin database: `psql -h pgcat-product.product.svc.cluster.local -p 9930 -U admin -d pgbouncer`
+- Metrics: Port 9930 (`/metrics` endpoint)
+- ServiceMonitor: `kubernetes/infra/configs/monitoring/servicemonitors/`
 
-**Scraping note:** PgCat exposes metrics on port 9930. If you want Prometheus Operator to scrape it, add a `ServiceMonitor` under `kubernetes/infra/configs/monitoring/servicemonitors/`.
+#### PgDog (supporting-db)
+
+**Deployment:** Helm chart (`helm.pgdog.dev/pgdog`) via Flux HelmRelease
+
+**Key Configuration:**
+- **replicas**: 2 (HA)
+- **port**: 6432 (PostgreSQL protocol)
+- **openMetricsPort**: 9090 (Prometheus metrics)
+- **Multi-database routing**: 3 databases (user, notification, shipping) on Zalando cluster
+- **Pool sizes**: 30 (user), 20 (notification), 20 (shipping)
+- **pool_mode**: `transaction`
+
+**Service Endpoint:**
+- `pgdog-supporting.user.svc.cluster.local:6432`
+
+**Monitoring:**
+- OpenMetrics: Port 9090 (`/metrics` endpoint)
+- ServiceMonitor: `kubernetes/infra/configs/monitoring/servicemonitors/pgdog-supporting.yaml`
+- Admin database: `psql -h pgdog-supporting.user.svc.cluster.local -p 6432 -U admin -d pgbouncer`
+
+**Why PgDog for supporting-db:**
+- Multi-database support (3 databases on shared cluster)
+- Prepared statements support in transaction mode
+- Advanced features available if needed (pub/sub, sharding)
+- Production-ready Helm chart with HA, monitoring, security
 
 ## Related Documentation
 

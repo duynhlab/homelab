@@ -1,0 +1,85 @@
+---
+# PgDog HelmRelease for supporting-db
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: pgdog-supporting
+  namespace: user
+spec:
+  interval: 10m
+  timeout: 5m
+  chart:
+    spec:
+      chart: pgdog
+      sourceRef:
+        kind: HelmRepository
+        name: pgdogdev
+        namespace: flux-system
+      version: "0.31"
+  values:
+    replicas: 2
+    
+    port: 6432
+    openMetricsPort: 9090
+    openMetricsNamespace: "pgdog_"
+    
+    # Multi-database configuration
+    databases:
+      - name: user
+        host: supporting-db.user.svc.cluster.local
+        port: 5432
+        database: user
+        poolSize: 30
+        poolMode: transaction
+      - name: notification
+        host: supporting-db.user.svc.cluster.local
+        port: 5432
+        database: notification
+        poolSize: 20
+        poolMode: transaction
+      - name: shipping
+        host: supporting-db.user.svc.cluster.local
+        port: 5432
+        database: shipping
+        poolSize: 20
+        poolMode: transaction
+    
+    # User authentication from Kubernetes secrets
+    users:
+      - name: user
+        passwordFromSecret:
+          name: user.supporting-db.credentials.postgresql.acid.zalan.do
+          key: password
+      - name: notification.notification
+        passwordFromSecret:
+          name: notification.notification.supporting-db.credentials.postgresql.acid.zalan.do
+          key: password
+      - name: shipping.shipping
+        passwordFromSecret:
+          name: shipping.shipping.supporting-db.credentials.postgresql.acid.zalan.do
+          key: password
+    
+    # Resources
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+    
+    # ServiceMonitor for Prometheus (Helm chart can auto-create)
+    serviceMonitor:
+      enabled: true
+      interval: 15s
+      scrapeTimeout: 10s
+    
+    # Pod anti-affinity for HA
+    podAntiAffinity:
+      enabled: true
+      type: soft
+    
+    # PodDisruptionBudget
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1

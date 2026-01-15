@@ -42,7 +42,7 @@ export default function CartPage() {
             const result = await updateCartItem(itemId, newQuantity);
             console.log('[API] PATCH /cart/items/' + itemId + ':', result);
             setActionMessage({ type: 'success', text: 'Updated!' });
-            fetchCart(); // Refresh cart
+            fetchCart();
         } catch (err) {
             setActionMessage({ type: 'error', text: err.message });
             console.error('[API ERROR]', err);
@@ -58,7 +58,7 @@ export default function CartPage() {
             const result = await removeCartItem(itemId);
             console.log('[API] DELETE /cart/items/' + itemId + ':', result);
             setActionMessage({ type: 'success', text: 'Removed!' });
-            fetchCart(); // Refresh cart
+            fetchCart();
         } catch (err) {
             setActionMessage({ type: 'error', text: err.message });
             console.error('[API ERROR]', err);
@@ -67,25 +67,34 @@ export default function CartPage() {
         }
     };
 
-    if (loading) return <div className="loading">Loading cart...</div>;
-    if (error) return <div className="error">Error: {error}</div>;
-
     const items = cart?.items || [];
 
     return (
         <div className="page container">
             <h2>Shopping Cart</h2>
+            <p className="api-label">API: GET /api/v1/cart</p>
 
+            {/* Loading */}
+            {loading && <div className="loading">Loading cart...</div>}
+
+            {/* Error */}
+            {!loading && error && <div className="error">Error: {error}</div>}
+
+            {/* Action Message */}
             {actionMessage && (
                 <div className={actionMessage.type}>{actionMessage.text}</div>
             )}
 
-            {items.length === 0 ? (
+            {/* Empty */}
+            {!loading && !error && items.length === 0 && (
                 <div className="empty">
                     <p>Your cart is empty</p>
                     <Link to="/">Browse Products</Link>
                 </div>
-            ) : (
+            )}
+
+            {/* Cart Content */}
+            {!loading && !error && items.length > 0 && (
                 <div className="two-col">
                     {/* Cart Items */}
                     <div className="card">
@@ -94,30 +103,24 @@ export default function CartPage() {
                             <div key={item.id} className="cart-item">
                                 <div>
                                     <strong>{item.product_name}</strong>
-                                    <p style={{ color: '#888' }}>${item.product_price} each</p>
+                                    <p className="text-muted">${item.product_price} each</p>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <div className="cart-item-actions">
                                     <button
                                         onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
                                         disabled={actionLoading === item.id || item.quantity <= 1}
-                                    >
-                                        -
-                                    </button>
+                                    >−</button>
                                     <span>{item.quantity}</span>
                                     <button
                                         onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
                                         disabled={actionLoading === item.id}
-                                    >
-                                        +
-                                    </button>
-                                    <span style={{ marginLeft: '1rem' }}>${item.subtotal?.toFixed(2)}</span>
+                                    >+</button>
+                                    <span className="cart-item-subtotal">${item.subtotal?.toFixed(2)}</span>
                                     <button
                                         className="danger"
                                         onClick={() => handleRemoveItem(item.id)}
                                         disabled={actionLoading === item.id}
-                                    >
-                                        Remove
-                                    </button>
+                                    >Remove</button>
                                 </div>
                             </div>
                         ))}
@@ -128,22 +131,13 @@ export default function CartPage() {
                         <h3>Order Summary</h3>
                         <table>
                             <tbody>
-                                <tr>
-                                    <th>Subtotal</th>
-                                    <td>${cart.subtotal?.toFixed(2)}</td>
-                                </tr>
-                                <tr>
-                                    <th>Shipping</th>
-                                    <td>${cart.shipping?.toFixed(2)}</td>
-                                </tr>
-                                <tr style={{ fontWeight: 'bold' }}>
-                                    <th>Total</th>
-                                    <td>${cart.total?.toFixed(2)}</td>
-                                </tr>
+                                <tr><th>Subtotal</th><td>${cart.subtotal?.toFixed(2)}</td></tr>
+                                <tr><th>Shipping</th><td>${cart.shipping?.toFixed(2)}</td></tr>
+                                <tr><th><strong>Total</strong></th><td><strong>${cart.total?.toFixed(2)}</strong></td></tr>
                             </tbody>
                         </table>
                         <Link to="/checkout">
-                            <button className="primary" style={{ width: '100%', marginTop: '1rem' }}>
+                            <button className="primary" style={{ width: '100%', marginTop: '0.75rem' }}>
                                 Proceed to Checkout
                             </button>
                         </Link>
@@ -152,11 +146,9 @@ export default function CartPage() {
             )}
 
             {/* API Debug */}
-            <details style={{ marginTop: '2rem' }}>
-                <summary>API Response Debug</summary>
-                <pre style={{ background: '#000', padding: '1rem', overflow: 'auto', fontSize: '0.75rem' }}>
-                    {JSON.stringify(cart, null, 2)}
-                </pre>
+            <details className="api-debug">
+                <summary>API Response</summary>
+                <pre>{JSON.stringify(cart, null, 2)}</pre>
             </details>
         </div>
     );

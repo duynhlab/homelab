@@ -6,7 +6,7 @@
 export default function Footer() {
     return (
         <footer className="app-footer">
-            <p>E-Commerce Demo • API Test Harness</p>
+            <p>E-Commerce • API Test Harness</p>
             <p>UI strictly reflects backend API capabilities</p>
         </footer>
     );

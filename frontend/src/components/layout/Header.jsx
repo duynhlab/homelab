@@ -13,7 +13,7 @@ export default function Header({ cartCount = 0 }) {
                     {/* Logo */}
                     <Link to="/" className="header__logo">
                         <span className="header__logo-icon">🛒</span>
-                        <span className="header__logo-text">ShopDemo</span>
+                        <span className="header__logo-text">Shop</span>
                     </Link>
 
                     {/* Navigation Links */}

@@ -30,7 +30,7 @@ spec:
       max_connections: "200"
       
       # Memory settings (adjusted for 2Gi pod memory)
-      shared_buffers: "512MB"  # 25% of 2GB (was: 256MB)
+      shared_buffers: "256MB"  # 25% of 2GB (was: 256MB)
       effective_cache_size: "1.5GB"  # 75% of 2GB (was: 512MB)
       maintenance_work_mem: "512MB"  # (was: 128MB)
       work_mem: "32MB"  # (was: 8MB)
@@ -128,11 +128,11 @@ spec:
   # Resource requests and limits (production-ready, cost-optimized)
   resources:
     requests:
-      memory: "1Gi"  # Increased from 256Mi
-      cpu: "500m"  # Increased from 200m
+      memory: "512Mi"  # Must be >= shared_buffers (512MB)
+      cpu: "100m"
     limits:
-      memory: "2Gi"  # Increased from 512Mi
-      cpu: "1000m"  # Increased from 500m
+      memory: "1Gi"
+      cpu: "500m"
   
   # Patroni configuration for etcd (learning purpose)
   # Note: CloudNativePG uses Kubernetes API for leader election by default

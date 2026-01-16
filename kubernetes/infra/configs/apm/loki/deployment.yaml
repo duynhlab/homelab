@@ -34,11 +34,11 @@ spec:
           mountPath: /var/loki
         resources:
           requests:
+            memory: "256Mi"
+            cpu: "50m"
+          limits:
             memory: "512Mi"
             cpu: "200m"
-          limits:
-            memory: "1Gi"
-            cpu: "1000m"
         livenessProbe:
           httpGet:
             path: /ready

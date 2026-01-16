@@ -24,7 +24,7 @@ This guide provides quick reference for AI agents working with this codebase. Fo
 
 ### Code Quality Standards
 
-- **Consistency**: Follow existing code patterns (see [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md#conventions-and-standards))
+- **Consistency**: Follow existing code patterns (see [`docs/guides/API.md`](docs/guides/API.md#conventions-and-standards))
 - **Documentation**: Update relevant docs when adding features
 - **Testing**: Write tests for new functionality
 - **Error Handling**: Use consistent error patterns
@@ -42,6 +42,7 @@ This guide provides quick reference for AI agents working with this codebase. Fo
 **MANDATORY**: All architecture diagrams, flowcharts, and system visualizations MUST use Mermaid syntax.
 
 **Rules**:
+
 1. ❌ **NEVER** use ASCII art diagrams (boxes with `┌─┐`, arrows with `│`, `→`, `▼`, etc.)
 2. ✅ **ALWAYS** use Mermaid diagrams for:
    - Architecture diagrams (`flowchart`, `graph`)
@@ -68,6 +69,7 @@ sequenceDiagram
 ```
 
 **Enforcement**: When reviewing or creating documentation:
+
 - Replace existing ASCII diagrams with Mermaid equivalents
 - Ensure all new diagrams use Mermaid syntax
 - Use appropriate Mermaid diagram types for the content
@@ -91,7 +93,7 @@ go test ./internal/{service}/...
 go build -o bin/{service} cmd/{service}/main.go
 ```
 
-**Detailed Configuration**: See [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md) for environment variables, `.env` files, and local setup.
+**Detailed Configuration**: See [`docs/guides/API.md`](docs/guides/API.md) for environment variables, `.env` files, and local setup.
 
 **GitOps Deployment**: See deployment commands in [Deployment Order](#deployment-order) section. Use `./scripts/flux-push.sh` to deploy all services to Kubernetes.
 
@@ -127,6 +129,7 @@ flowchart TD
 **Database Integration**: See [`docs/guides/DATABASE.md`](docs/guides/DATABASE.md) for database architecture, connection patterns (direct, PgBouncer, PgCat), and configuration.
 
 **Layer Responsibilities**:
+
 - **Web Layer** (`web/v1/`, `web/v2/`): HTTP handlers, request/response, validation
 - **Logic Layer** (`logic/v1/`, `logic/v2/`): Business logic, orchestration, database queries
 - **Core Layer** (`core/domain/`, `core/database.go`): Domain models, database connections
@@ -140,22 +143,25 @@ flowchart TD
 **CRITICAL**: Frontend (React SPA) can ONLY interact with Web Layer endpoints.
 
 **Allowed:**
+
 - ✅ HTTP requests to `/api/v1/*` and `/api/v2/*` endpoints
 - ✅ All requests go through Web Layer handlers
 - ✅ Web Layer handles aggregation, validation, error translation
 
 **Forbidden:**
+
 - ❌ Direct calls to Logic Layer (no function calls to services)
 - ❌ Direct calls to Core Layer (no database access)
 - ❌ Client-side orchestration (use aggregation endpoints instead)
 - ❌ Bypassing Web Layer in any way
 
 **Why:**
+
 - Web Layer provides HTTP interface, validation, authentication
 - Logic/Core layers are internal implementation details
 - Aggregation endpoints handle complex operations server-side
 
-**Reference:** See [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md) for complete API documentation and 3-layer architecture details.
+**Reference:** See [`docs/guides/API.md`](docs/guides/API.md) for complete API documentation and 3-layer architecture details.
 
 ---
 
@@ -206,6 +212,7 @@ monitoring/
 ```
 
 **GitOps Structure:**
+
 - `kubernetes/base/` - Environment-agnostic manifests (HelmReleases, infrastructure)
 - `kubernetes/overlays/` - Environment-specific patches (local: 1 replica, prod: 5 replicas)
 - `kubernetes/clusters/` - Flux Operator bootstrap and Kustomization CRDs
@@ -230,7 +237,7 @@ monitoring/
 | shipping | shipping | `/api/v1/*` (v1 only) |
 | shipping-v2 | shipping | `/api/v2/*` (v2 only) |
 
-**Complete API Documentation**: See [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md) for all endpoints, request/response models, and examples.
+**Complete API Documentation**: See [`docs/guides/API.md`](docs/guides/API.md) for all endpoints, request/response models, and examples.
 
 ---
 
@@ -252,6 +259,7 @@ monitoring/
 ```
 
 **Flux automatically deploys in correct order:**
+
 1. **Foundation** - Flux Operator, namespaces, OCI sources
 2. **Monitoring** (BEFORE apps) - Prometheus, Grafana, Metrics Server
 3. **APM** (BEFORE apps) - Tempo, Loki, Vector, OTel Collector, Pyroscope, Jaeger
@@ -260,6 +268,7 @@ monitoring/
 6. **SLO** - Sloth Operator + 9 PrometheusServiceLevel CRDs
 
 **Verification:**
+
 ```bash
 # Check Flux reconciliation status
 flux get kustomizations
@@ -292,15 +301,16 @@ flux reconcile kustomization apps-local --with-source
 
 - **Research Patterns**: [`docs/guides/RESEARCH_PATTERNS.md`](docs/guides/RESEARCH_PATTERNS.md) - API, APM, Database research patterns
 - **Command Reference**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md#command-reference) - Deployment scripts, Helm, kubectl commands
-- **Conventions**: [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md#conventions-and-standards) - Naming conventions, code standards, build verification
-- **API Reference**: [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md) - Complete API documentation
+- **Conventions**: [`docs/guides/API.md`](docs/guides/API.md#conventions-and-standards) - Naming conventions, code standards, build verification
+- **API Reference**: [`docs/guides/API.md`](docs/guides/API.md) - Complete API documentation
 - **Setup Guide**: [`docs/guides/SETUP.md`](docs/guides/SETUP.md) - Deployment instructions
-- **Configuration**: [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md) - Environment variables and config
+- **Configuration**: [`docs/guides/API.md`](docs/guides/API.md) - Environment variables and config
 - **Database**: [`docs/guides/DATABASE.md`](docs/guides/DATABASE.md) - Database architecture and patterns
 
 ### Find Files by Purpose
 
 **Add a new service:**
+
 - Service code: `services/cmd/{service}/`, `services/internal/{service}/`
 - Helm values: `charts/values/{service}.yaml`
 - HelmRelease: `kubernetes/base/apps/{service}/helmrelease.yaml`
@@ -309,16 +319,19 @@ flux reconcile kustomization apps-local --with-source
 - Migration: `services/{service}/db/migrations/Dockerfile` + `sql/V*__*.sql`
 
 **Update monitoring:**
+
 - Dashboard JSON: `k8s/grafana-operator/dashboards/microservices-dashboard.json`
 - Prometheus HelmRelease: `kubernetes/base/infrastructure/monitoring/prometheus/helmrelease.yaml`
 - ServiceMonitor (microservices): `kubernetes/base/infrastructure/monitoring/servicemonitors/microservices.yaml`
 - ServiceMonitor (infrastructure): `kubernetes/base/infrastructure/monitoring/{component}/servicemonitor.yaml`
 
 **Modify SLOs:**
+
 - Edit CRDs: `kubernetes/base/infrastructure/slo/crds/*.yaml` (PrometheusServiceLevel CRDs)
 - Apply: Flux reconciles automatically, or `flux reconcile kustomization slo-stack --with-source`
 
 **Modify infrastructure:**
+
 - Databases: `kubernetes/base/infrastructure/databases/`
 - Monitoring: `kubernetes/base/infrastructure/monitoring/`
 - APM: `kubernetes/base/infrastructure/apm/`
@@ -326,12 +339,12 @@ flux reconcile kustomization apps-local --with-source
 
 ### Find Documentation by Topic
 
-- **Getting Started**: [`docs/guides/SETUP.md`](docs/guides/SETUP.md), [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md)
-- **Development**: [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md), [`docs/guides/API_REFERENCE.md#error-handling`](docs/guides/API_REFERENCE.md#error-handling), [`docs/guides/TRACING_ARCHITECTURE.md`](docs/guides/TRACING_ARCHITECTURE.md)
+- **Getting Started**: [`docs/guides/SETUP.md`](docs/guides/SETUP.md), [`docs/guides/API.md`](docs/guides/API.md)
+- **Development**: [`docs/guides/API.md`](docs/guides/API.md), [`docs/guides/API.md#error-handling`](docs/guides/API.md#error-handling), [`docs/guides/TRACING_ARCHITECTURE.md`](docs/guides/TRACING_ARCHITECTURE.md)
 - **Monitoring**: [`docs/monitoring/METRICS.md`](docs/monitoring/METRICS.md)
 - **APM**: [`docs/apm/README.md`](docs/apm/README.md), [`docs/apm/TRACING.md`](docs/apm/TRACING.md), [`docs/apm/LOGGING.md`](docs/apm/LOGGING.md), [`docs/apm/PROFILING.md`](docs/apm/PROFILING.md)
 - **SLO**: [`docs/slo/README.md`](docs/slo/README.md), [`docs/slo/GETTING_STARTED.md`](docs/slo/GETTING_STARTED.md)
-- **k6**: [`docs/k6/K6_LOAD_TESTING.md`](docs/k6/K6_LOAD_TESTING.md)
+- **k6**: [`docs/guides/K6.md`](docs/guides/K6.md)
 - **Docs Index**: [`docs/README.md`](docs/README.md)
 
 ---

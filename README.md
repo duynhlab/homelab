@@ -9,6 +9,7 @@
 Production-ready microservices monitoring platform with 9 Go services, complete observability (metrics, traces, logs, profiles), PostgreSQL database integration, and SRE practices (SLO tracking, error budgets).
 
 **Key Features:**
+
 - 9 microservices with v1/v2 APIs
 - 34 Grafana dashboard panels (5 row groups)
 - Complete observability stack (Prometheus, Tempo, Jaeger, Loki, Pyroscope)
@@ -97,6 +98,7 @@ flowchart TB
 ```
 
 **Key Points:**
+
 - **Frontend (React SPA)**: Runs in browser, makes HTTP requests to Web Layer only (`/api/v1/*`, `/api/v2/*`)
 - **k6 Load Testing**: Simulates traffic patterns, also calls Web Layer endpoints
 - **3-Layer Architecture**: Web → Logic → Core (Frontend and k6 can ONLY access Web Layer)
@@ -129,12 +131,14 @@ services/
 ```
 
 **Key Principles:**
+
 - ✅ Each service has own `go.mod` and `go.sum`
 - ✅ No shared code between services (middleware/config duplicated)
 - ✅ Each service builds independently: `cd services/product && go build ./cmd/main.go`
 - ✅ Ready to move to separate repo: `cp -r services/product /path/to/product-service.git`
 
 **Build Verification:**
+
 ```bash
 ./scripts/00-verify-build.sh  # Verifies all 9 services independently
 ```
@@ -173,6 +177,7 @@ kubernetes/
 ```
 
 **Deployment Model:**
+
 - Flux Operator pulls manifests from OCI Registry (`localhost:5050`)
 - `controllers-local` installs operators/CRDs first
 - `configs-local` applies instances/configs (monitoring, apm, databases, slo)
@@ -194,7 +199,7 @@ kubernetes/
 | shipping | Go | Shipping tracking (legacy) | shipping | v1 only |
 | shipping-v2 | Go | Enhanced shipping API | shipping | v2 only |
 
-**Complete API Documentation**: See [`docs/guides/API_REFERENCE.md`](docs/guides/API_REFERENCE.md)
+**Complete API Documentation**: See [`docs/guides/API.md`](docs/guides/API.md)
 
 ---
 
@@ -219,6 +224,7 @@ make prereqs
 ```
 
 **What gets deployed automatically:**
+
 - Infrastructure: Monitoring (Prometheus, Grafana), APM (Tempo, Loki, Jaeger, Pyroscope, Vector, OTel)
 - Databases: PostgreSQL operators, 5 clusters, connection poolers
 - Applications: 9 microservices + frontend + k6 load testing
@@ -227,6 +233,7 @@ make prereqs
 **Wait 5-10 minutes** for Flux reconciliation, then access services.
 
 **Benefits:**
+
 - 67-89% YAML reduction via Kustomize base/overlay patterns
 - Automatic drift detection and correction
 - Multi-environment support (local/staging/production)
@@ -257,7 +264,7 @@ make prereqs
 **Grafana Dashboard**: `microservices-monitoring-001`
 
 - **34 panels** organized in 5 row groups
-- **Access**: http://localhost:3000/d/microservices-monitoring-001/ (after port-forward)
+- **Access**: <http://localhost:3000/d/microservices-monitoring-001/> (after port-forward)
 - **Variables**: `$namespace`, `$app`, `$rate`
 
 **Complete Dashboard Reference**: See [`docs/guides/GRAFANA_DASHBOARD.md`](docs/guides/GRAFANA_DASHBOARD.md) for all 34 panels with query analysis and troubleshooting.
@@ -272,13 +279,13 @@ After deployment, access services via port-forwarding:
 
 | Service | URL | Command | Credentials |
 |---------|-----|---------|-------------|
-| Flux Web UI | http://localhost:9080 | `./scripts/flux-ui.sh` or `make flux-ui` | - |
-| Grafana | http://localhost:3000 | `kubectl port-forward -n monitoring svc/grafana-service 3000:3000` | Anonymous (enabled) |
-| Prometheus | http://localhost:9090 | `kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090` | - |
-| Jaeger UI | http://localhost:16686 | `kubectl port-forward -n monitoring svc/jaeger-query 16686:16686` | - |
-| Tempo | http://localhost:3200 | `kubectl port-forward -n monitoring svc/tempo 3200:3200` | - |
-| Frontend | http://localhost:3000 | `kubectl port-forward -n default svc/frontend 3000:80` | - |
-| API (any service) | http://localhost:8080 | `kubectl port-forward -n <namespace> svc/<service> 8080:8080` | - |
+| Flux Web UI | <http://localhost:9080> | `./scripts/flux-ui.sh` or `make flux-ui` | - |
+| Grafana | <http://localhost:3000> | `kubectl port-forward -n monitoring svc/grafana-service 3000:3000` | Anonymous (enabled) |
+| Prometheus | <http://localhost:9090> | `kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090` | - |
+| Jaeger UI | <http://localhost:16686> | `kubectl port-forward -n monitoring svc/jaeger-query 16686:16686` | - |
+| Tempo | <http://localhost:3200> | `kubectl port-forward -n monitoring svc/tempo 3200:3200` | - |
+| Frontend | <http://localhost:3000> | `kubectl port-forward -n default svc/frontend 3000:80` | - |
+| API (any service) | <http://localhost:8080> | `kubectl port-forward -n <namespace> svc/<service> 8080:8080` | - |
 
 **Quick Access Script**: `./scripts/08-setup-access.sh` sets up port-forwarding for all services.
 
@@ -297,8 +304,8 @@ After deployment, access services via port-forwarding:
 | **[Grafana Dashboard Guide](docs/guides/GRAFANA_DASHBOARD.md)** | Complete dashboard reference (34 panels + annotations planning) |
 | **[APM Overview](docs/apm/README.md)** | Complete APM system overview |
 | **[SLO Documentation](docs/slo/README.md)** | SRE practices: SLI/SLO definitions, error budgets |
-| **[API Reference](docs/guides/API_REFERENCE.md)** | Complete API documentation for all 9 microservices |
-| **[k6 Load Testing](docs/k6/K6_LOAD_TESTING.md)** | k6 load testing setup and configuration |
+| **[API Reference](docs/guides/API.md)** | Complete API documentation for all 9 microservices |
+| **[k6 Load Testing](docs/guides/K6.md)** | k6 load testing setup and configuration |
 | **[Documentation Index](docs/README.md)** | Complete documentation index with learning path |
 | **[AGENTS.md](AGENTS.md)** | AI Agent Guide for navigating the codebase |
 

@@ -61,6 +61,36 @@ Dự án này expose **6 custom application metrics** và tận dụng **Go runt
 
 Tất cả metrics được sử dụng trong hệ thống, được tổ chức theo loại: Custom Application Metrics, Go Runtime Metrics, và Kubernetes Metrics.
 
+### All Metrics Summary
+
+| Metric | Category | Type | Labels | Purpose |
+|--------|----------|------|--------|---------|
+| `request_duration_seconds` | Custom Application | Histogram | app, method, path, code | Response time percentiles (P50, P95, P99), Apdex score |
+| `request_duration_seconds_bucket` | Custom Application | Histogram Bucket | app, method, path, code, le | Percentile calculation (histogram_quantile) |
+| `request_duration_seconds_count` | Custom Application | Counter | app, method, path, code | RPS calculation, total requests |
+| `requests_total` | Custom Application | Counter | app, method, path, code | Request counts & RPS calculation |
+| `requests_in_flight` | Custom Application | Gauge | app, method, path | Concurrent requests, saturation monitoring |
+| `request_size_bytes` | Custom Application | Histogram | app, method, path, code | Request body size |
+| `request_size_bytes_sum` | Custom Application | Histogram Sum | app, method, path, code | Network RX traffic (bytes/sec) |
+| `response_size_bytes` | Custom Application | Histogram | app, method, path, code | Response body size |
+| `response_size_bytes_sum` | Custom Application | Histogram Sum | app, method, path, code | Network TX traffic (bytes/sec) |
+| `error_rate_total` | Custom Application | Counter | app, method, path, code | Error tracking (4xx/5xx) |
+| `go_memstats_alloc_bytes` | Go Runtime | Gauge | app, namespace, job, instance | Heap allocated memory, memory leak detection |
+| `go_memstats_heap_inuse_bytes` | Go Runtime | Gauge | app, namespace, job, instance | Heap in-use memory, memory leak detection |
+| `process_resident_memory_bytes` | Go Runtime | Gauge | app, namespace, job, instance | Process RSS, OS-level memory monitoring |
+| `go_goroutines` | Go Runtime | Gauge | app, namespace, job, instance | Active goroutines, goroutine leak detection |
+| `go_threads` | Go Runtime | Gauge | app, namespace, job, instance | OS threads, concurrency monitoring |
+| `go_gc_duration_seconds_sum` | Go Runtime | Counter | app, namespace, job, instance | GC duration, memory pressure detection |
+| `go_gc_duration_seconds_count` | Go Runtime | Counter | app, namespace, job, instance | GC frequency, memory pressure detection |
+| `go_memstats_frees_total` | Go Runtime | Counter | app, namespace, job, instance | Memory frees, GC activity monitoring |
+| `process_cpu_seconds_total` | Go Runtime | Counter | app, namespace, job, instance | CPU usage, service-level resource monitoring |
+| `up` | Kubernetes | Gauge | job, app, namespace, instance | Service availability, instance health monitoring |
+| `kube_pod_container_status_restarts_total` | Kubernetes | Counter | namespace, pod, container | Container restarts, OOM/crash detection |
+
+**Note:** The `app` and `namespace` labels are automatically injected by Prometheus during scrape (not by application code), but included in the table for completeness since they appear in final metrics.
+
+---
+
 ### Custom Application Metrics
 
 Các metrics được emit bởi application code thông qua Prometheus middleware.

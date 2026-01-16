@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { getCart } from '../../api/cartApi';
 import { createOrder } from '../../api/orderApi';
 
@@ -36,9 +36,8 @@ export default function CheckoutPage() {
         setError(null);
 
         try {
-            // Create order from cart
             const orderData = {
-                user_id: '1', // Demo user
+                user_id: '1',
                 items: cart.items.map(item => ({
                     product_id: item.product_id,
                     quantity: item.quantity,
@@ -57,102 +56,98 @@ export default function CheckoutPage() {
         }
     };
 
-    if (loading) return <div className="loading">Loading...</div>;
-
-    // Order success
-    if (orderResult) {
-        return (
-            <div className="page container">
-                <div className="success">
-                    <h2>✅ Order Created Successfully!</h2>
-                    <p>Order ID: {orderResult.id}</p>
-                    <p>Status: {orderResult.status}</p>
-                    <p>Total: ${orderResult.total?.toFixed(2)}</p>
-                </div>
-                <button onClick={() => navigate('/orders')} style={{ marginTop: '1rem' }}>
-                    View Orders
-                </button>
-
-                <details style={{ marginTop: '2rem' }}>
-                    <summary>API Response Debug</summary>
-                    <pre style={{ background: '#000', padding: '1rem', overflow: 'auto', fontSize: '0.75rem' }}>
-                        {JSON.stringify(orderResult, null, 2)}
-                    </pre>
-                </details>
-            </div>
-        );
-    }
-
-    if (!cart || !cart.items || cart.items.length === 0) {
-        return (
-            <div className="page container">
-                <div className="empty">Cart is empty. Add items first.</div>
-            </div>
-        );
-    }
-
     return (
         <div className="page container">
+            <Link to="/cart" className="back-link">← Back to Cart</Link>
             <h2>Checkout</h2>
+            <p className="api-label">API: POST /api/v1/orders</p>
 
-            {error && <div className="error">Error: {error}</div>}
+            {/* Loading */}
+            {loading && <div className="loading">Loading...</div>}
 
-            <div className="two-col">
-                {/* Order Items */}
-                <div className="card">
-                    <h3>Order Items</h3>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Product</th>
-                                <th>Qty</th>
-                                <th>Price</th>
-                                <th>Subtotal</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {cart.items.map(item => (
-                                <tr key={item.id}>
-                                    <td>{item.product_name}</td>
-                                    <td>{item.quantity}</td>
-                                    <td>${item.product_price}</td>
-                                    <td>${item.subtotal?.toFixed(2)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Order Summary */}
-                <div className="card">
-                    <h3>Order Summary</h3>
-                    <table>
-                        <tbody>
-                            <tr>
-                                <th>Subtotal</th>
-                                <td>${cart.subtotal?.toFixed(2)}</td>
-                            </tr>
-                            <tr>
-                                <th>Shipping</th>
-                                <td>${cart.shipping?.toFixed(2)}</td>
-                            </tr>
-                            <tr style={{ fontWeight: 'bold', fontSize: '1.25rem' }}>
-                                <th>Total</th>
-                                <td>${cart.total?.toFixed(2)}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <button
-                        className="primary"
-                        style={{ width: '100%', marginTop: '1rem' }}
-                        onClick={handleSubmitOrder}
-                        disabled={submitting}
-                    >
-                        {submitting ? 'Creating Order...' : 'Place Order'}
+            {/* Order Success */}
+            {orderResult && (
+                <>
+                    <div className="success">
+                        <h3>✅ Order Created Successfully!</h3>
+                        <p>Order ID: {orderResult.id}</p>
+                        <p>Status: {orderResult.status}</p>
+                        <p>Total: ${orderResult.total?.toFixed(2)}</p>
+                    </div>
+                    <button onClick={() => navigate('/orders')} style={{ marginTop: '0.75rem' }}>
+                        View Orders
                     </button>
+                    <details className="api-debug">
+                        <summary>API Response</summary>
+                        <pre>{JSON.stringify(orderResult, null, 2)}</pre>
+                    </details>
+                </>
+            )}
+
+            {/* Empty Cart */}
+            {!loading && !orderResult && (!cart || !cart.items || cart.items.length === 0) && (
+                <div className="empty">
+                    <p>Cart is empty. Add items first.</p>
+                    <Link to="/">Browse Products</Link>
                 </div>
-            </div>
+            )}
+
+            {/* Checkout Form */}
+            {!loading && !orderResult && cart?.items?.length > 0 && (
+                <>
+                    {error && <div className="error">Error: {error}</div>}
+
+                    <div className="two-col">
+                        {/* Order Items */}
+                        <div className="card">
+                            <h3>Order Items</h3>
+                            <div className="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Product</th>
+                                            <th>Qty</th>
+                                            <th className="hide-mobile">Price</th>
+                                            <th>Subtotal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {cart.items.map(item => (
+                                            <tr key={item.id}>
+                                                <td>{item.product_name}</td>
+                                                <td>{item.quantity}</td>
+                                                <td className="hide-mobile">${item.product_price}</td>
+                                                <td>${item.subtotal?.toFixed(2)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* Order Summary */}
+                        <div className="card">
+                            <h3>Order Summary</h3>
+                            <table>
+                                <tbody>
+                                    <tr><th>Subtotal</th><td>${cart.subtotal?.toFixed(2)}</td></tr>
+                                    <tr><th>Shipping</th><td>${cart.shipping?.toFixed(2)}</td></tr>
+                                    <tr><th><strong>Total</strong></th><td><strong>${cart.total?.toFixed(2)}</strong></td></tr>
+                                </tbody>
+                            </table>
+
+                            <button
+                                className="primary"
+                                style={{ width: '100%', marginTop: '0.75rem' }}
+                                onClick={handleSubmitOrder}
+                                disabled={submitting}
+                            >
+                                {submitting ? 'Creating Order...' : 'Place Order'}
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 }

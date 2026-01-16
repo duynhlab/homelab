@@ -1733,6 +1733,6 @@ Connection poolers solve the "too many connections" problem by reusing PostgreSQ
 ## Related Documentation
 
 - **[Setup Guide](./SETUP.md)** - Complete deployment and configuration guide
-- **[Error Handling](./API_REFERENCE.md#error-handling)** - Database error handling patterns
-- **[API Reference](./API_REFERENCE.md)** - API endpoints using database
+- **[Error Handling](./API.md#error-handling)** - Database error handling patterns
+- **[API Reference](./API.md)** - API endpoints using database
 

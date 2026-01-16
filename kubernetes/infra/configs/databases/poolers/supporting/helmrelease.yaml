@@ -11,11 +11,18 @@ spec:
   chart:
     spec:
       chart: pgdog
+      interval: 5m
+      version: "v0.31"
       sourceRef:
         kind: HelmRepository
         name: pgdogdev
         namespace: flux-system
-      version: "0.31"
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
   values:
     replicas: 2
     
@@ -47,14 +54,17 @@ spec:
     # User authentication from Kubernetes secrets
     users:
       - name: user
+        database: user
         passwordFromSecret:
           name: user.supporting-db.credentials.postgresql.acid.zalan.do
           key: password
       - name: notification.notification
+        database: notification
         passwordFromSecret:
           name: notification.notification.supporting-db.credentials.postgresql.acid.zalan.do
           key: password
       - name: shipping.shipping
+        database: shipping
         passwordFromSecret:
           name: shipping.shipping.supporting-db.credentials.postgresql.acid.zalan.do
           key: password
@@ -62,11 +72,11 @@ spec:
     # Resources
     resources:
       requests:
-        cpu: 500m
-        memory: 512Mi
+        cpu: 50m
+        memory: 128Mi
       limits:
-        cpu: 1000m
-        memory: 1Gi
+        cpu: 100m
+        memory: 256Mi
     
     # ServiceMonitor for Prometheus (Helm chart can auto-create)
     serviceMonitor:

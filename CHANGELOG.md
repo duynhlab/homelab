@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+## [0.26.1] - 2026-01-16
+
+### Changed
+
+**Documentation File Rename**
+
+- Renamed `docs/guides/API_REFERENCE.md` → `docs/guides/API.md` for consistency
+- Updated all references across documentation:
+  - `AGENTS.md` - 6 references updated
+  - `docs/README.md` - 6 references updated
+  - `README.md` - 2 references updated
+  - `docs/guides/SETUP.md` - 1 reference updated
+  - `docs/guides/DATABASE.md` - 2 references updated
+  - `frontend/README.md` - 4 references updated
+
 ## [0.26.0] - 2026-01-13
 
 ### Added

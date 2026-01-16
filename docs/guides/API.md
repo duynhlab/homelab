@@ -72,55 +72,16 @@ This is the **single source of truth** for all API endpoints. The Frontend team 
 
 All backend services follow a strict 3-layer architecture. Understanding these layers is essential for both frontend and backend engineers.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        FRONTEND (React SPA)                      │
-│                  Calls ONLY Web Layer endpoints                  │
-└─────────────────────────────────────────────────────────────────┘
-                                 │
-                                 ▼ HTTP
-┌─────────────────────────────────────────────────────────────────┐
-│                         WEB LAYER                                │
-│  • HTTP request/response handling                                │
-│  • Request validation (JSON binding)                             │
-│  • Authentication/Authorization                                  │
-│  • DTO mapping (request → domain, domain → response)             │
-│  • Aggregation of multiple Logic services                        │
-│  • Error translation (domain errors → HTTP status codes)         │
-│                                                                  │
-│  Location: services/{service}/internal/web/v1/handler.go         │
-└─────────────────────────────────────────────────────────────────┘
-                                 │
-                                 ▼ Function calls
-┌─────────────────────────────────────────────────────────────────┐
-│                        LOGIC LAYER                               │
-│  • Business rules and validation                                 │
-│  • Transaction orchestration                                     │
-│  • Repository interface usage (NO direct DB access)              │
-│  • Cross-service coordination                                    │
-│  • Domain error definitions                                      │
-│                                                                  │
-│  Location: services/{service}/internal/logic/v1/service.go       │
-│                                                                  │
-│  ❌ NO SQL queries                                               │
-│  ❌ NO database.GetDB() calls                                    │
-│  ❌ NO HTTP handling                                             │
-└─────────────────────────────────────────────────────────────────┘
-                                 │
-                                 ▼ Repository interface
-┌─────────────────────────────────────────────────────────────────┐
-│                         CORE LAYER                               │
-│  • Domain models (entities, value objects)                       │
-│  • Repository interfaces (contracts)                             │
-│  • Repository implementations (PostgreSQL)                       │
-│  • Database connection management                                │
-│  • Transaction implementation                                    │
-│                                                                  │
-│  Location:                                                       │
-│    - services/{service}/internal/core/domain/          (models)  │
-│    - services/{service}/internal/core/repository/      (impl)    │
-│    - services/{service}/internal/core/database.go      (conn)    │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Frontend["FRONTEND (React SPA)\nCalls ONLY Web Layer endpoints"]
+    WebLayer["WEB LAYER\n- HTTP request/response handling\n- Request validation (JSON binding)\n- Authentication/Authorization\n- DTO mapping (request -> domain, domain -> response)\n- Aggregation of multiple Logic services\n- Error translation (domain errors -> HTTP status codes)\nLocation: services/{service}/internal/web/v1/handler.go"]
+    LogicLayer["LOGIC LAYER\n- Business rules and validation\n- Transaction orchestration\n- Repository interface usage (NO direct DB access)\n- Cross-service coordination\n- Domain error definitions\nLocation: services/{service}/internal/logic/v1/service.go\nConstraints:\n- NO SQL queries\n- NO database.GetDB() calls\n- NO HTTP handling"]
+    CoreLayer["CORE LAYER\n- Domain models (entities, value objects)\n- Repository interfaces (contracts)\n- Repository implementations (PostgreSQL)\n- Database connection management\n- Transaction implementation\nLocation:\n- services/{service}/internal/core/domain/ (models)\n- services/{service}/internal/core/repository/ (impl)\n- services/{service}/internal/core/database.go (conn)"]
+
+    Frontend -->|"HTTP"| WebLayer
+    WebLayer -->|"Function calls"| LogicLayer
+    LogicLayer -->|"Repository interface"| CoreLayer
 ```
 
 ### Key Rules
@@ -148,7 +109,7 @@ All backend services follow a strict 3-layer architecture. Understanding these l
 
 **For AI Agents:** See [`AGENTS.md`](../../AGENTS.md#frontend-integration-rules) for explicit Frontend integration rules and restrictions.
 
-### Service Isolation (Refactored 2026-01-08)
+### Service Isolation
 
 **Each service is completely independent:**
 
@@ -162,17 +123,16 @@ services/{service}/
 │   └── core/
 │       ├── domain/          # Domain models
 │       └── repository/      # DB access
-├── middleware/              # Duplicated (not shared)
-└── config/                  # Duplicated (not shared)
+├── middleware/
+└── config/
 ```
 
 **Key Changes:**
 - ❌ **No shared `services/go.mod`** - Each service has own module
-- ❌ **No shared `services/pkg/`** - Middleware/config duplicated per service
+- ❌ **No shared `services/pkg/`** - Middleware/config live within each service
 - **Complete independence** - Each service ready for separate repo
 
-**Why Duplication?**
-Maximum service independence. Each service can be moved to a separate repository without any shared dependencies.
+**Rationale:** Keep cross-service coupling minimal so each service stays portable and independently deployable.
 
 ---
 
@@ -1026,8 +986,8 @@ services/
 │   │       ├── repository/
 │   │       │   └── postgres_product_repository.go
 │   │       └── database.go
-│   ├── middleware/              # Duplicated (not shared)
-│   ├── config/                 # Duplicated (not shared)
+│   ├── middleware/
+│   ├── config/
 │   └── db/
 │       └── migrations/
 │           ├── Dockerfile
@@ -1121,19 +1081,33 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
 Cross-service references use fixed IDs for consistency:
 
 ```mermaid
-graph TD
-    A["auth.users<br/>(IDs: 1-5)"] -->|user_id| B[user.user_profiles]
-    A -->|user_id| C[cart.cart_items]
-    A -->|user_id| D[order.orders]
-    A -->|user_id| E[review.reviews]
-    A -->|user_id| F[notification.notifications]
-    
-    P["product.products<br/>(IDs: 1-8)"] -->|product_id| C
-    P -->|product_id| G[order.order_items]
-    P -->|product_id| E
-    
-    D -->|order_id| G
-    D -->|order_id| H[shipping.shipments]
+flowchart TD
+    AuthUsers["auth.users (IDs: 1-5)"]
+    ProductProducts["product.products (IDs: 1-8)"]
+
+    UserProfiles["user.user_profiles"]
+    CartItems["cart.cart_items"]
+    Orders["order.orders"]
+    Reviews["review.reviews"]
+    Notifications["notification.notifications"]
+
+    OrderItems["order.order_items"]
+    Shipments["shipping.shipments"]
+
+    %% Top-down: sources -> consumers
+    AuthUsers -->|user_id| UserProfiles
+    AuthUsers -->|user_id| CartItems
+    AuthUsers -->|user_id| Orders
+    AuthUsers -->|user_id| Reviews
+    AuthUsers -->|user_id| Notifications
+
+    ProductProducts -->|product_id| CartItems
+    ProductProducts -->|product_id| Reviews
+    ProductProducts -->|product_id| OrderItems
+
+    %% Orders -> downstream relations
+    Orders -->|order_id| OrderItems
+    Orders -->|order_id| Shipments
 ```
 
 ### Example Seeded Products
@@ -1172,7 +1146,7 @@ All seed migrations use `ON CONFLICT DO NOTHING` to safely handle:
 - Re-running migrations
 - Multiple deployments
 
-**Safe to restart services** - Data won't duplicate.
+**Safe to restart services** - Seed data won't be inserted twice.
 
 ### Environment Configuration
 

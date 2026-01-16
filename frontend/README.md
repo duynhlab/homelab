@@ -121,7 +121,7 @@ kubectl port-forward -n default svc/frontend 3000:80
 
 ### Overview
 
-Frontend consumes backend REST APIs following the contract defined in [API_REFERENCE.md](../docs/guides/API_REFERENCE.md).
+Frontend consumes backend REST APIs following the contract defined in [API.md](../docs/guides/API.md).
 
 **Base URL**: Configured via `VITE_API_BASE_URL` at build time
 **API Version**: `/api/v1`
@@ -231,7 +231,7 @@ sequenceDiagram
 
 ### Frontend API Endpoints
 
-Frontend consumes these backend REST APIs. All endpoints follow the contract defined in [API_REFERENCE.md](../docs/guides/API_REFERENCE.md).
+Frontend consumes these backend REST APIs. All endpoints follow the contract defined in [API.md](../docs/guides/API.md).
 
 **Base URL**: `{VITE_API_BASE_URL}/api/v1`
 
@@ -700,7 +700,7 @@ For complete API documentation including:
 - Backend architecture (3-layer)
 - Service isolation details
 
-See: [API_REFERENCE.md](../docs/guides/API_REFERENCE.md)
+See: [API.md](../docs/guides/API.md)
 
 ---
 
@@ -852,5 +852,5 @@ docker build --build-arg API_BASE_URL=https://api.prod.com .
 ## Related Documentation
 
 - [Root README](../README.md) - Full system overview
-- [API Reference](../docs/API_REFERENCE.md) - Backend API contracts
+- [API Reference](../docs/API.md) - Backend API contracts
 - [CHANGELOG](../CHANGELOG.md) - Recent changes

@@ -95,10 +95,10 @@ spec:
   resources:
     requests:
       cpu: 100m
-      memory: 512Mi
+      memory: 128Mi
     limits:
-      cpu: "500m"
-      memory: "1Gi"
+      cpu: "100m"
+      memory: "256Mi"
   # Sidecars: postgres_exporter for Prometheus metrics collection and Vector for log collection
   sidecars:
     - name: exporter
@@ -109,11 +109,11 @@ spec:
           protocol: TCP
       resources:
         limits:
-          cpu: 500m
-          memory: 256M
-        requests:
           cpu: 100m
-          memory: 256M
+          memory: 128Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi
       env:
         - name: "DATA_SOURCE_URI"
           value: "localhost/postgres?sslmode=require"
@@ -146,7 +146,7 @@ spec:
           cpu: 50m
           memory: 64Mi
         limits:
-          cpu: 200m
+          cpu: 100m
           memory: 128Mi
   
   # Additional volumes for sidecars

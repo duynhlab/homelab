@@ -9,7 +9,7 @@ import { login, register } from '../../api/authApi';
  */
 export default function LoginPage() {
     const navigate = useNavigate();
-    const [mode, setMode] = useState('login'); // 'login' or 'register'
+    const [mode, setMode] = useState('login');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
@@ -29,7 +29,6 @@ export default function LoginPage() {
         try {
             let result;
             if (mode === 'login') {
-                // Use email for login (matches backend API contract)
                 result = await login(form.email, form.password);
                 console.log('[API] POST /auth/login:', result);
             } else {
@@ -37,14 +36,11 @@ export default function LoginPage() {
                 console.log('[API] POST /auth/register:', result);
             }
 
-            // Store token
             if (result.token) {
                 localStorage.setItem('authToken', result.token);
             }
 
             setSuccess(`${mode === 'login' ? 'Login' : 'Registration'} successful!`);
-
-            // Redirect after success
             setTimeout(() => navigate('/'), 1000);
         } catch (err) {
             setError(err.message);
@@ -55,21 +51,24 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="page container" style={{ maxWidth: '400px' }}>
-            <div className="card">
+        <div className="auth-page">
+            <div className="auth-form">
+                <Link to="/" className="back-link">← Back</Link>
                 <h2>{mode === 'login' ? 'Login' : 'Register'}</h2>
+                <p className="api-label">
+                    API: POST /api/v1/auth/{mode === 'login' ? 'login' : 'register'}
+                </p>
 
                 {error && <div className="error">{error}</div>}
                 {success && <div className="success">{success}</div>}
 
                 <form onSubmit={handleSubmit}>
-                    {/* Email field for login, Username for register */}
                     {mode === 'login' ? (
                         <div className="form-group">
                             <label>Email</label>
                             <input
                                 type="email"
-                                placeholder="alice@example.com"
+                                placeholder="user@example.com"
                                 value={form.email}
                                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                                 required
@@ -114,23 +113,19 @@ export default function LoginPage() {
                     </button>
                 </form>
 
-                <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+                <div className="auth-toggle">
                     {mode === 'login' ? (
                         <p>
-                            Don't have an account?{' '}
+                            No account?{' '}
                             <button onClick={() => setMode('register')}>Register</button>
                         </p>
                     ) : (
                         <p>
-                            Already have an account?{' '}
+                            Have account?{' '}
                             <button onClick={() => setMode('login')}>Login</button>
                         </p>
                     )}
                 </div>
-
-                <Link to="/" style={{ display: 'block', marginTop: '1rem', textAlign: 'center' }}>
-                    ← Back to Shop
-                </Link>
             </div>
         </div>
     );

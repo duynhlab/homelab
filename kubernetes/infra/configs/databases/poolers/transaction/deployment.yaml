@@ -31,8 +31,8 @@ spec:
           name: pgcat-transaction-config
       resources:
         requests:
-          memory: "256Mi"
-          cpu: "100m"
+          memory: "64Mi"
+          cpu: "20m"
         limits:
-          memory: "512Mi"
-          cpu: "500m"
+          memory: "128Mi"
+          cpu: "100m"

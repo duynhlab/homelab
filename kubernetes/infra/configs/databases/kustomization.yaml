@@ -18,3 +18,5 @@ resources:
   - instances/supporting-db.yaml
   - instances/transaction-db.yaml
   - instances/product-db.yaml
+  # PodMonitors deploy AFTER database instances (within same kustomization, processed in order)
+  - monitoring/

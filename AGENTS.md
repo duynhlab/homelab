@@ -207,7 +207,8 @@ monitoring/
 ├── k8s/               # Legacy manifests (reference only)
 ├── scripts/           # Deployment scripts (Flux + legacy)
 ├── docs/              # Documentation (starting point for details)
-├── k6/                # K6 load testing
+├── services/
+│   ├── k6/            # K6 load testing
 └── specs/             # Specifications and research
 ```
 

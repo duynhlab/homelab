@@ -13,9 +13,9 @@
 - **Zalando Postgres Operator** (v1.15.1): 3 clusters
   - `review-db`: PostgreSQL 16, 1 node, no pooler
   - `auth-db`: PostgreSQL 17, 3 nodes (HA), PgBouncer sidecar (2 instances)
-  - `supporting-db`: PostgreSQL 16, 1 node, PgDog standalone (2 replicas, Helm chart)
+  - `supporting-db`: PostgreSQL 16, 1 node, PgBouncer sidecar (2 instances)
 - **CloudNativePG Operator** (v1.28.0): 2 clusters
-  - `product-db`: PostgreSQL 18, 2 nodes (HA), PgCat standalone (2 replicas)
+  - `product-db`: PostgreSQL 18, 2 nodes (HA), PgDog standalone (2 replicas, Helm chart)
   - `transaction-db`: PostgreSQL 18, 3 nodes (HA), PgCat standalone (2 replicas)
 ---
 **Deployment with Flux Operator**
@@ -35,7 +35,7 @@
 2. **Database Clusters:** 5 clusters (3 Zalando + 2 CloudNativePG)
    - Review DB, Auth DB, Supporting DB (Zalando)
    - Product DB, Transaction DB (CloudNativePG)
-3. **Connection Poolers:** PgBouncer (sidecar), PgCat (standalone, 2 deployments), PgDog (standalone, Helm chart)
+3. **Connection Poolers:** PgBouncer (sidecar for auth-db, supporting-db), PgCat (standalone for transaction-db), PgDog (standalone Helm chart for product-db)
 4. **Secrets:** Pre-created for CloudNativePG clusters
 
 ---
@@ -65,13 +65,11 @@ flowchart TB
     end
     
     subgraph Poolers[Connection Poolers]
-        PgBouncer[PgBouncer Sidecar<br/>Auth - Built-in]
-        PgCatProduct[PgCat Standalone<br/>Product DB]
+        PgBouncerAuth[PgBouncer Sidecar<br/>Auth - Built-in]
+        PgBouncerSupporting[PgBouncer Sidecar<br/>Supporting - Built-in]
+        PgDogProduct[PgDog Standalone<br/>Product DB<br/>Helm Chart]
         subgraph PgCatTransactionDeployment["PgCat Transaction<br/>2 Replicas + HA"]
             PgCatTransaction[PgCat Standalone<br/>Transaction DB<br/>Read Replica Routing]
-        end
-        subgraph PgDogSupportingDeployment["PgDog Supporting<br/>2 Replicas (Helm)"]
-            PgDogSupporting[PgDog Standalone<br/>supporting-db<br/>Multi-Database Routing]
         end
     end
     
@@ -104,10 +102,10 @@ flowchart TB
     TransactionR --> TransactionReplica1
     TransactionR --> TransactionReplica2
     
-    AuthSvc -->|via pooler| PgBouncer
-    PgBouncer --> AuthDB
-    ProductSvc -->|via pooler| PgCatProduct
-    PgCatProduct --> ProductDB
+    AuthSvc -->|via pooler| PgBouncerAuth
+    PgBouncerAuth --> AuthDB
+    ProductSvc -->|via pooler| PgDogProduct
+    PgDogProduct --> ProductDB
     CartSvc -->|via pooler| PgCatTransaction
     OrderSvc -->|via pooler| PgCatTransaction
     PgCatTransaction -->|SELECT queries| TransactionR
@@ -115,10 +113,10 @@ flowchart TB
     TransactionPrimary -.->|Synchronous Replication| TransactionReplica1
     TransactionPrimary -.->|Synchronous Replication| TransactionReplica2
     ReviewSvc -->|direct| ReviewDB
-    UserSvc -->|via pooler| PgDogSupporting
-    NotificationSvc -->|via pooler| PgDogSupporting
-    ShippingSvc -->|via pooler| PgDogSupporting
-    PgDogSupporting --> SupportingDB
+    UserSvc -->|via pooler| PgBouncerSupporting
+    NotificationSvc -->|via pooler| PgBouncerSupporting
+    ShippingSvc -->|via pooler| PgBouncerSupporting
+    PgBouncerSupporting --> SupportingDB
     
     style Zalando fill:#e1f5ff
     style CloudNativePG fill:#fff4e1
@@ -131,31 +129,44 @@ flowchart TB
     style TransactionReplica1 fill:#e1f5ff
     style TransactionReplica2 fill:#e1f5ff
     style PgCatTransactionDeployment fill:#e1ffe1
-    style PgDogSupportingDeployment fill:#e1ffe1
+    style PgBouncerSupporting fill:#e1ffe1
+    style PgBouncerAuth fill:#e1ffe1
+    style PgDogProduct fill:#e1ffe1
     style CloudNativePGServices fill:#fff4e1
 ```
 
-### Operator Distribution
+### Database Summary
 
-| Cluster | Services | Operator | PostgreSQL Version | Pooler | HA Pattern | Learning Focus |
-|---------|----------|----------|-------------------|--------|------------|----------------|
-| **Product** | Product | **CloudNativePG** | **18** (default) | **PgCat** (standalone, 2 replicas) | **Patroni HA** (2 instances) | Read scaling, PgCat routing, Patroni failover |
-| **Review** | Review | **Zalando** | **16** | **None** (direct) | **Patroni** (single instance) | Simple setup, direct connection, Patroni basics |
-| **Auth** | Auth | **Zalando** | **17** | **PgBouncer** (sidecar) | **Patroni HA** (3 instances) | Production-ready HA, transaction pooling, Zalando built-in pooler, Patroni failover |
-| **Transaction** | Cart, Order | **CloudNativePG** | **18** (default) | **PgCat** (standalone, 2 replicas) | **Patroni HA** (3 instances) | **Multi-database routing, Patroni failover, synchronous replication, read replica routing** |
-| **Supporting** | User, Notification, Shipping-v2 | **Zalando** | **16** | **PgDog** (standalone, Helm chart, 2 replicas) | **Patroni** (single instance) | **Multi-database routing, shared database pattern, Patroni basics** |
+| Operator | Cluster | Database | Owner | Secret NS | Secret Type | Direct Connection | Pooler |
+|----------|---------|----------|-------|-----------|-------------|-------------------|--------|
+| CloudNativePG | product-db | product | product | product | Manual (`product-db-secret`) | `product-db-rw.product:5432` | PgDog |
+| CloudNativePG | transaction-db | cart | cart | cart | Manual (`transaction-db-secret`) | `transaction-db-rw.cart:5432` | PgCat |
+| CloudNativePG | transaction-db | order | cart | cart | Manual (`transaction-db-secret`) | `transaction-db-rw.cart:5432` | PgCat |
+| Zalando | auth-db | auth | auth | auth | Auto (operator) | `auth-db.auth:5432` | PgBouncer |
+| Zalando | review-db | review | review | review | Auto (operator) | `review-db.review:5432` | None |
+| Zalando | supporting-db | user | user | user | Auto (operator) | `supporting-db.user:5432` | PgBouncer |
+| Zalando | supporting-db | notification | notification.notification | notification | Auto (cross-ns) | `supporting-db.user:5432` | PgBouncer |
+| Zalando | supporting-db | shipping | shipping.shipping | shipping | Auto (cross-ns) | `supporting-db.user:5432` | PgBouncer |
 
-### Cluster Details
+### Pooler Endpoints
 
-This section provides a brief overview of all 5 PostgreSQL clusters. For detailed configuration, architecture diagrams, and features, see the operator-specific sections below.
+| Cluster | Init Endpoint (Direct) | App Endpoint (via Pooler) |
+|---------|------------------------|---------------------------|
+| product-db | `product-db-rw.product:5432` | `pgdog-product.product:6432` |
+| transaction-db | `transaction-db-rw.cart:5432` | `pgcat.cart:6432` |
+| auth-db | `auth-db.auth:5432` | `auth-db-pooler.auth:5432` |
+| review-db | `review-db.review:5432` | (direct, no pooler) |
+| supporting-db | `supporting-db.user:5432` | `supporting-db-pooler.user:5432` |
 
-| Cluster | Operator | PostgreSQL Version | Instances | Pooler | HA Pattern | Namespace | Services |
-|---------|----------|-------------------|-----------|--------|------------|-----------|----------|
-| **Product** | CloudNativePG | 18 | 2 (1 primary + 1 replica) | PgCat (standalone, 2 replicas) | Patroni HA | `product` | Product |
-| **Transaction** | CloudNativePG | 18 | 3 (1 primary + 2 replicas) | PgCat (standalone, 2 replicas) | Patroni HA (Synchronous) | `cart` | Cart, Order |
-| **Review** | Zalando | 16 | 1 (single instance) | None (direct) | Patroni (single) | `review` | Review |
-| **Auth** | Zalando | 17 | 3 (1 leader + 2 standbys) | PgBouncer (sidecar) | Patroni HA | `auth` | Auth |
-| **Supporting** | Zalando | 16 | 1 (single instance) | PgDog (standalone, Helm chart, 2 replicas) | Patroni (single) | `user` | User, Notification, Shipping-v2 |
+### Cluster HA Summary
+
+| Cluster | Operator | PostgreSQL | Instances | HA Pattern | Namespace |
+|---------|----------|------------|-----------|------------|-----------|
+| product-db | CloudNativePG | 18 | 2 (1 primary + 1 replica) | Patroni HA | `product` |
+| transaction-db | CloudNativePG | 18 | 3 (1 primary + 2 replicas) | Patroni HA (Sync) | `cart` |
+| auth-db | Zalando | 17 | 3 (1 leader + 2 standbys) | Patroni HA | `auth` |
+| review-db | Zalando | 16 | 1 (single instance) | Patroni (single) | `review` |
+| supporting-db | Zalando | 16 | 1 (single instance) | Patroni (single) | `user` |
 
 ---
 
@@ -178,7 +189,9 @@ This section provides a brief overview of all 5 PostgreSQL clusters. For detaile
 - **Product Database** (`product-db`) - 2 instances (1 primary + 1 replica)
 - **Transaction Database** (`transaction-db`) - 3 instances (1 primary + 2 replicas) with synchronous replication
 
-**Connection Pooler:** PgCat standalone deployment (v1.2.0, 2 replicas each) for both clusters
+**Connection Pooler:**
+- Product DB: PgDog standalone Helm chart (1 replica, HA capable)
+- Transaction DB: PgCat standalone deployment (v1.2.0, 2 replicas each)
 
 ### Clusters
 
@@ -188,11 +201,10 @@ This section provides a brief overview of all 5 PostgreSQL clusters. For detaile
 - **PostgreSQL Version**: 18 (CloudNativePG default image)
 - **Instances**: 2 (1 primary + 1 replica)
 - **HA**: Patroni via Kubernetes API (automatic failover)
-- **Pooler**: PgCat standalone deployment v1.2.0 (`ghcr.io/postgresml/pgcat:v1.2.0`) with 2 replicas for HA
+- **Pooler**: PgDog standalone deployment via Helm chart (`helm.pgdog.dev/pgdog`)
 - **Namespace**: `product`
 - **CRD**: `kubernetes/infra/configs/databases/instances/product-db.yaml`
-- **Pooler Config**: `kubernetes/infra/configs/databases/poolers/product/configmap.yaml`
-- **Pooler Deployment**: `kubernetes/infra/configs/databases/poolers/product/deployment.yaml`
+- **Pooler HelmRelease**: `kubernetes/infra/configs/databases/poolers/product/helmrelease.yaml`
 
 **Architecture Diagram:**
 
@@ -200,7 +212,7 @@ This section provides a brief overview of all 5 PostgreSQL clusters. For detaile
 flowchart TB
     subgraph ProductNS["namespace: product"]
         ProductSvc[Product Service<br/>Pod]
-        PgCat[PgCat Pooler<br/>Standalone Pod<br/>Port 6432]
+        PgDog[PgDog Pooler<br/>Standalone Pod<br/>Port 6432]
         
         subgraph ProductDB["product-db Cluster"]
             Primary[(Primary Instance<br/>PostgreSQL 18<br/>Read-Write)]
@@ -216,23 +228,23 @@ flowchart TB
     
     CloudNativePG -->|Creates| ProductDB
     ProductSvc -->|Reads| Secret
-    ProductSvc -->|Connects via| PgCat
-    PgCat -->|Routes writes| Primary
-    PgCat -->|Routes reads| Replica
+    ProductSvc -->|Connects via| PgDog
+    PgDog -->|Routes writes| Primary
+    PgDog -->|Routes reads| Replica
     Primary -.->|Async Replication| Replica
     
     style ProductDB fill:#fff4e1
-    style PgCat fill:#e1ffe1
+    style PgDog fill:#e1ffe1
     style Secret fill:#ffe1f5
 ```
 
 **Features:**
 - Patroni HA with automatic failover (< 30 seconds)
-- Read replica load balancing via PgCat (primary configured, replicas can be added)
+- Connection pooling and routing via PgDog
 - Async replication (no sync constraints)
-- Pool size: 50 connections
+- Pool size: 30 connections (configured in HelmRelease)
 - CloudNativePG services: `product-db-rw` (read-write), `product-db-r` (read-only)
-- **Secret**: `product-db-secret` in `product` namespace (CloudNativePG requires pre-created secret)
+- **Secret**: `product-db-secret` in `product` namespace (Static secret)
 - **Database Migrations**: Flyway init container runs `V1__init_schema.sql` and `V2__seed_products.sql` automatically
 
 **Verification Commands:**
@@ -839,10 +851,9 @@ flowchart TB
 - **PostgreSQL Version**: 16 (explicitly configured in CRD)
 - **Instances**: 1 (single instance, no HA)
 - **HA**: Patroni via Kubernetes API (single instance, no failover needed)
-- **Pooler**: PgDog standalone deployment via Helm chart (2 replicas, HA)
+- **Pooler**: PgBouncer sidecar (2 instances, transaction mode) - Zalando built-in
 - **Namespace**: `user` (cluster location)
 - **CRD**: `kubernetes/infra/configs/databases/instances/supporting-db.yaml`
-- **Pooler HelmRelease**: `kubernetes/infra/configs/databases/poolers/supporting/helmrelease.yaml`
 
 **Architecture Diagram:**
 
@@ -851,88 +862,75 @@ flowchart TB
     subgraph UserNS["namespace: user"]
         UserSvc[User Service<br/>Pod]
         
-        subgraph PgDogDeployment["PgDog Deployment<br/>2 Replicas (Helm)"]
-            PgDogPod1[PgDog Pod 1<br/>Port 6432, 9090]
-            PgDogPod2[PgDog Pod 2<br/>Port 6432, 9090]
-        end
-        
-        PgDogSvc[Service: pgdog-supporting<br/>ClusterIP<br/>Ports: 6432, 9090]
-        
         subgraph SupportingDB["supporting-db Cluster"]
             subgraph SupportingDBPod["supporting-db-0 Pod"]
                 Instance[(Single Instance<br/>PostgreSQL 16<br/>Databases: user, notification, shipping)]
                 Exporter[postgres_exporter<br/>Sidecar<br/>Custom Queries]
                 Vector[Vector Sidecar<br/>Log Collection]
             end
+            
+            PgBouncer1[PgBouncer Sidecar<br/>Instance 1<br/>Transaction Mode]
+            PgBouncer2[PgBouncer Sidecar<br/>Instance 2<br/>Transaction Mode]
         end
         
-        UserSecret[user.supporting-db.credentials...<br/>username: user<br/>password: auto-generated<br/>Created in user namespace]
+        PoolerSvc[Service: supporting-db-pooler<br/>Port 5432<br/>Routes to PgBouncer]
+        DirectSvc[Service: supporting-db<br/>Port 5432<br/>Direct to PostgreSQL]
+        
+        UserSecret[user.supporting-db.credentials...<br/>username: user<br/>password: auto-generated]
     end
     
     subgraph NotificationNS["namespace: notification"]
         NotificationSvc[Notification Service<br/>Pod]
         
-        NotifSecret[notification.notification.supporting-db...<br/>username: notification.notification<br/>password: auto-generated<br/>Created in notification namespace]
+        NotifSecret[notification.notification.supporting-db...<br/>Cross-namespace secret]
     end
     
     subgraph ShippingNS["namespace: shipping"]
         ShippingSvc[Shipping-v2 Service<br/>Pod]
         
-        ShippingSecret[shipping.shipping.supporting-db...<br/>username: shipping.shipping<br/>password: auto-generated<br/>Created in shipping namespace]
-    end
-    
-    subgraph MonitoringNS["namespace: monitoring"]
-        Prometheus[Prometheus<br/>Scrapes Metrics]
-        ServiceMonitor[ServiceMonitor: pgdog-supporting<br/>Discovers PgDog Service]
+        ShippingSecret[shipping.shipping.supporting-db...<br/>Cross-namespace secret]
     end
     
     subgraph ZalandoOp["Zalando Operator"]
         Operator[Operator Controller<br/>namespace: database<br/>v1.15.1]
-        Config[OperatorConfiguration CRD<br/>enable_cross_namespace_secret: true]
     end
     
-    Config --> Operator
     Operator -->|Creates & Manages| SupportingDB
     Operator -->|Auto-generates| UserSecret
-    Operator -->|Auto-generates<br/>namespace.username format<br/>Cross-namespace| NotifSecret
-    Operator -->|Auto-generates<br/>namespace.username format<br/>Cross-namespace| ShippingSecret
+    Operator -->|Auto-generates<br/>Cross-namespace| NotifSecret
+    Operator -->|Auto-generates<br/>Cross-namespace| ShippingSecret
     
     UserSvc -->|Reads| UserSecret
-    UserSvc -->|Connects via| PgDogSvc
+    UserSvc -->|via Pooler| PoolerSvc
     NotificationSvc -->|Reads| NotifSecret
-    NotificationSvc -->|Connects via| PgDogSvc
+    NotificationSvc -->|via Pooler| PoolerSvc
     ShippingSvc -->|Reads| ShippingSecret
-    ShippingSvc -->|Connects via| PgDogSvc
+    ShippingSvc -->|via Pooler| PoolerSvc
     
-    PgDogSvc --> PgDogPod1
-    PgDogSvc --> PgDogPod2
-    PgDogPod1 -->|Routes by DB name<br/>Port 6432| Instance
-    PgDogPod2 -->|Routes by DB name<br/>Port 6432| Instance
-    
-    ServiceMonitor -->|Discovers| PgDogSvc
-    Prometheus -->|Scrapes| PgDogPod1
-    Prometheus -->|Scrapes| PgDogPod2
+    PoolerSvc --> PgBouncer1
+    PoolerSvc --> PgBouncer2
+    PgBouncer1 --> Instance
+    PgBouncer2 --> Instance
     
     style SupportingDB fill:#e1f5ff
-    style PgDogDeployment fill:#e1ffe1
-    style PgDogSvc fill:#e1ffe1
+    style PgBouncer1 fill:#e1ffe1
+    style PgBouncer2 fill:#e1ffe1
+    style PoolerSvc fill:#e1ffe1
     style UserSecret fill:#ffe1f5
     style NotifSecret fill:#ffe1f5
     style ShippingSecret fill:#ffe1f5
     style Exporter fill:#f3e5f5
     style Vector fill:#fff4e1
-    style ServiceMonitor fill:#f3e5f5
 ```
 
 **Features:**
 - Patroni-based management (even for single instance)
 - Shared database pattern (3 databases: user, notification, shipping)
-- **Connection Pooler**: PgDog via Helm chart (2 replicas, HA)
-- **Multi-Database Routing**: PgDog routes connections by database name (user, notification, shipping)
+- **Connection Pooler**: PgBouncer sidecar (Zalando built-in, 2 instances)
+- **Multi-Database Support**: All 3 databases accessible via same pooler endpoint
 - PostgreSQL 16
 - **Monitoring**: `postgres_exporter` sidecar with custom queries for enhanced metrics
 - **Log Collection**: Vector sidecar for PostgreSQL log collection to Loki
-- **Pooler Monitoring**: PgDog OpenMetrics endpoint (port 9090) scraped by Prometheus
 - Cross-namespace secret management (see [Zalando Postgres Operator - Secret Management](#secret-management) section)
 
 #### Log Collection with Vector Sidecar
@@ -1101,45 +1099,43 @@ connectionPooler:
 
 **Used by:** Auth DB
 
-#### PgDog Standalone (supporting-db)
+#### PgDog Standalone (product-db)
 
-**When to use**: Multi-database routing on shared cluster, prepared statements support, future-proof features.
+**When to use**: CloudNativePG clusters, advanced connection pooling features, Helm-based deployment.
 
 **Key Points:**
-- Connect via PgDog service: `pgdog-supporting.user.svc.cluster.local:6432`
-- PgDog routes by database name in connection string
+- Connect via PgDog service: `pgdog-product.product.svc.cluster.local:6432`
+- PgDog provides connection pooling with transaction mode
 - Application code same as direct connection (transparent routing)
 - Helm chart deployment with HA (2 replicas)
 
 **Deployment:**
 - **Helm Chart**: `helm.pgdog.dev/pgdog` (version 0.31)
-- **HelmRelease**: `kubernetes/infra/configs/databases/poolers/supporting/helmrelease.yaml`
+- **HelmRelease**: `kubernetes/infra/configs/databases/poolers/product/helmrelease.yaml`
 - **Replicas**: 2 (HA deployment with pod anti-affinity)
 - **Port**: 6432 (PostgreSQL protocol), 9090 (OpenMetrics)
 
-**Multi-Database Configuration:**
-- **3 databases** on same cluster: user, notification, shipping
-- **Pool sizes**: 30 (user), 20 (notification), 20 (shipping)
+**Configuration:**
+- **Database**: product
+- **Pool size**: 50 (high traffic)
 - **pool_mode**: `transaction` (connection per transaction)
-- **Routing**: PgDog routes by database name in connection string
 
 **Service Endpoint:**
-- `pgdog-supporting.user.svc.cluster.local:6432`
+- `pgdog-product.product.svc.cluster.local:6432`
 
 **Monitoring:**
 - OpenMetrics: Port 9090 (`/metrics` endpoint)
-- ServiceMonitor: `kubernetes/infra/configs/monitoring/servicemonitors/pgdog-supporting.yaml`
-- Admin database: `psql -h pgdog-supporting.user.svc.cluster.local -p 6432 -U admin -d pgbouncer`
+- ServiceMonitor: Auto-created by Helm chart (enabled)
 
-**Why PgDog for supporting-db:**
-- Multi-database support (3 databases on shared cluster)
+**Why PgDog for product-db:**
+- CloudNativePG clusters don't have built-in pooler
 - Prepared statements support in transaction mode
 - Advanced features available if needed (pub/sub, sharding)
 - Production-ready Helm chart with HA, monitoring, security
 
 **Go Code**: Same as direct connection (PgDog is transparent to application).
 
-**Used by:** Supporting DB
+**Used by:** Product DB
 
 ### Secret Management
 
@@ -1687,45 +1683,43 @@ Connection poolers solve the "too many connections" problem by reusing PostgreSQ
 - Admin interface: `psql -h auth-db-pooler.auth.svc.cluster.local -U pooler -d pgbouncer`
 - Commands: `SHOW POOLS`, `SHOW STATS`
 
-#### PgCat (Product & Transaction DB)
+#### PgCat (Transaction DB)
 
 **Deployment:** Standalone Kubernetes Deployment (2 replicas)
 
 **Key Configuration:**
-- **pool_mode**: `transaction` (both Product and Transaction)
+- **pool_mode**: `transaction`
 - **pool_size**: 30 per database
 - **Prometheus exporter**: Enabled on port 9930
 
-**Service Endpoints:**
-- Product: `pgcat-product.product.svc.cluster.local:5432`
-- Transaction: `pgcat.cart.svc.cluster.local:5432`
+**Service Endpoint:**
+- `pgcat.cart.svc.cluster.local:5432`
 
 **Monitoring:**
 - Metrics: Port 9930 (`/metrics` endpoint)
 - ServiceMonitor: `kubernetes/infra/configs/monitoring/servicemonitors/`
 
-#### PgDog (supporting-db)
+#### PgDog (Product DB)
 
 **Deployment:** Helm chart (`helm.pgdog.dev/pgdog`) via Flux HelmRelease
 
 **Key Configuration:**
-- **replicas**: 2 (HA)
+- **replicas**: 1 (Single replica for dev)
 - **port**: 6432 (PostgreSQL protocol)
 - **openMetricsPort**: 9090 (Prometheus metrics)
-- **Multi-database routing**: 3 databases (user, notification, shipping) on Zalando cluster
-- **Pool sizes**: 30 (user), 20 (notification), 20 (shipping)
+- **Database**: product
+- **Pool size**: 30
 - **pool_mode**: `transaction`
 
 **Service Endpoint:**
-- `pgdog-supporting.user.svc.cluster.local:6432`
+- `pgdog-product.product.svc.cluster.local:6432`
 
 **Monitoring:**
 - OpenMetrics: Port 9090 (`/metrics` endpoint)
-- ServiceMonitor: `kubernetes/infra/configs/monitoring/servicemonitors/pgdog-supporting.yaml`
-- Admin database: `psql -h pgdog-supporting.user.svc.cluster.local -p 6432 -U admin -d pgbouncer`
+- ServiceMonitor: Auto-created by Helm chart
 
-**Why PgDog for supporting-db:**
-- Multi-database support (3 databases on shared cluster)
+**Why PgDog for product-db:**
+- CloudNativePG clusters don't have built-in pooler
 - Prepared statements support in transaction mode
 - Advanced features available if needed (pub/sub, sharding)
 - Production-ready Helm chart with HA, monitoring, security

@@ -3,7 +3,6 @@ kind: Kustomization
 
 resources:
   - servicemonitors/microservices.yaml
-  - servicemonitors/pgdog-supporting.yaml
   - grafana/
   - podmonitors/podmonitor-cloudnativepg-product-db.yaml
   - podmonitors/podmonitor-cloudnativepg-transaction-db.yaml

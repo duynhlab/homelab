@@ -3,10 +3,8 @@ kind: Kustomization
 
 resources:
   - servicemonitors/microservices.yaml
-  - servicemonitors/pgdog-supporting.yaml
   - grafana/
-  - podmonitors/podmonitor-cloudnativepg-product-db.yaml
-  - podmonitors/podmonitor-cloudnativepg-transaction-db.yaml
+  # Note: CloudNativePG PodMonitors moved to configs/databases/monitoring/ to deploy AFTER database clusters
   - podmonitors/podmonitor-zalando-auth-db.yaml
   - podmonitors/podmonitor-zalando-review-db.yaml
   - podmonitors/podmonitor-zalando-supporting-db.yaml

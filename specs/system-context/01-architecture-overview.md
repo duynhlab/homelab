@@ -279,9 +279,10 @@ monitoring/
 │   ├── 10-reload-dashboard.sh
 │   ├── 11-diagnose-latency.sh
 │   └── 12-error-budget-alert.sh
-├── k6/                    # Load testing
-│   ├── Dockerfile
-│   └── load-test-multiple-scenarios.js
+├── services/
+│   ├── k6/                # Load testing
+│   │   ├── Dockerfile
+│   │   └── load-test-multiple-scenarios.js
 ├── docs/                  # Documentation
 └── specs/                 # System context (this document)
 ```

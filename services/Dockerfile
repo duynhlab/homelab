@@ -1,5 +1,5 @@
 # Build stage - Go 1.25.5 with static binary compilation
-FROM golang:1.25.5-alpine AS builder
+FROM golang:1.25.6-alpine AS builder
 
 # Build argument for service name (must be first)
 ARG SERVICE_NAME

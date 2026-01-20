@@ -408,7 +408,7 @@ function apiMonitoringJourney() {
   console.log(`[${apiKey}] Starting API monitoring journey (session: ${sessionId})`);
   
   const services = [
-    { name: 'auth', service: SERVICES.auth, path: '/api/v1/auth/validate' },
+    { name: 'auth', service: SERVICES.auth, path: '/health' }, // Changed from /api/v1/auth/validate (doesn't exist)
     { name: 'user', service: SERVICES.user, path: '/api/v1/users' },
     { name: 'product', service: SERVICES.product, path: '/api/v1/products' },
     { name: 'cart', service: SERVICES.cart, path: '/api/v1/cart' },

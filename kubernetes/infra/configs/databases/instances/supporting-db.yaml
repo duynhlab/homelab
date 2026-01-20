@@ -30,10 +30,22 @@ spec:
     shipping.shipping:  # Database owner for shipping database (namespace.username format for cross-namespace secret, used by both shipping and shipping-v2 services)
       - createdb
   
-  # Connection pooler: PgDog deployed separately via Helm chart
-  # See: kubernetes/infra/configs/databases/poolers/supporting/helmrelease.yaml
-  # Services connect via: pgdog-supporting.user.svc.cluster.local:6432
-  # Note: Zalando operator's built-in pooler is not used (omit connectionPooler section)
+  # Connection pooler (PgBouncer sidecar) configuration
+  # Services connect via: supporting-db-pooler.user.svc.cluster.local:5432
+  # Note: PgBouncer requires SSL connections (sslmode=require)
+  connectionPooler:
+    numberOfInstances: 2
+    schema: pooler
+    user: pooler
+    mode: transaction  # Transaction pooling for short-lived connections
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+    maxDBConnections: 240
   
   # PostgreSQL version and parameters
   postgresql:

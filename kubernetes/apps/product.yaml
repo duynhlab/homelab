@@ -58,11 +58,11 @@ spec:
         value: "true"
       - name: METRICS_ENABLED
         value: "true"
-      # Database configuration
+      # Database configuration (via PgDog pooler)
       - name: DB_HOST
-        value: "pgcat.product.svc.cluster.local"  # PgCat pooler endpoint
+        value: "pgdog-product.product.svc.cluster.local"  # PgDog pooler endpoint
       - name: DB_PORT
-        value: "5432"
+        value: "6432"  # PgDog port
       - name: DB_NAME
         value: "product"
       - name: DB_USER
@@ -77,7 +77,7 @@ spec:
       - name: DB_POOL_MAX_CONNECTIONS
         value: "50"  # Higher for high traffic
       - name: DB_POOLER_TYPE
-        value: "pgcat"  # Indicates PgCat pooler (for logging/monitoring)
+        value: "pgdog"  # Indicates PgDog pooler (for logging/monitoring)
       # Graceful shutdown configuration
       - name: SHUTDOWN_TIMEOUT
         value: "10s"  # Default shutdown timeout (can be overridden)

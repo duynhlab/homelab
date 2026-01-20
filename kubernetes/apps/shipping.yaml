@@ -54,11 +54,11 @@ spec:
         value: "true"
       - name: METRICS_ENABLED
         value: "true"
-      # Database configuration (via PgDog pooler)
+      # Database configuration (via PgBouncer pooler)
       - name: DB_HOST
-        value: "pgdog-supporting.user.svc.cluster.local"  # PgDog pooler service
+        value: "supporting-db-pooler.user.svc.cluster.local"  # PgBouncer pooler service
       - name: DB_PORT
-        value: "6432"  # PgDog port (not PostgreSQL port 5432)
+        value: "5432"  # PgBouncer port
       - name: DB_NAME
         value: "shipping"
       - name: DB_USER

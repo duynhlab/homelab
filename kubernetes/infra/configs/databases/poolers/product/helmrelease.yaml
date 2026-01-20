@@ -1,0 +1,74 @@
+---
+# PgDog HelmRelease for product-db
+# Note: PgDog Helm chart does NOT support passwordFromSecret
+# Using inline password that matches product-db-secret
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: pgdog-product
+  namespace: product
+spec:
+  interval: 10m
+  timeout: 5m
+  chart:
+    spec:
+      chart: pgdog
+      interval: 5m
+      version: "v0.31"
+      sourceRef:
+        kind: HelmRepository
+        name: pgdogdev
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    replicas: 1  # Single replica for dev
+    
+    port: 6432
+    openMetricsPort: 9090
+    openMetricsNamespace: "pgdog_"
+    
+    # Single database configuration
+    databases:
+      - name: product
+        host: product-db-rw.product.svc.cluster.local
+        port: 5432
+        database: product
+        poolSize: 30
+        poolMode: transaction
+    
+    # User authentication (inline password - matches product-db-secret)
+    # Note: passwordFromSecret is NOT supported by this chart
+    users:
+      - name: product
+        database: product
+        password: postgres  # Must match product-db-secret
+    
+    # Resources
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 100m
+        memory: 256Mi
+    
+    # ServiceMonitor for Prometheus (Helm chart auto-creates)
+    serviceMonitor:
+      enabled: true
+      interval: 15s
+      scrapeTimeout: 10s
+    
+    # Pod anti-affinity for HA
+    podAntiAffinity:
+      enabled: true
+      type: soft
+    
+    # PodDisruptionBudget
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1

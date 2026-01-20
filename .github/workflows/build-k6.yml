@@ -5,15 +5,15 @@ on:
     branches:
       - v6
     paths:
-      - 'k6/Dockerfile'
-      - 'k6/*.js'
+      - 'services/k6/Dockerfile'
+      - 'services/k6/*.js'
       - '.github/workflows/build-k6.yml'
   pull_request:
     branches:
       - v6
     paths:
-      - 'k6/Dockerfile'
-      - 'k6/*.js'
+      - 'services/k6/Dockerfile'
+      - 'services/k6/*.js'
       - '.github/workflows/build-k6.yml'
   workflow_dispatch:
 
@@ -54,8 +54,8 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v6
         with:
-          context: ./k6
-          file: ./k6/Dockerfile
+          context: ./services/k6
+          file: ./services/k6/Dockerfile
           build-args: |
             SCRIPT_NAME=load-test-multiple-scenarios
           push: true

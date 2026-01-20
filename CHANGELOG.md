@@ -9,6 +9,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [0.28.0] - 2026-01-20
+
+### Changed
+
+**k6 Directory Structure**
+
+- **Moved k6 to services directory**: `k6/` → `services/k6/`
+  - k6 load testing is now organized alongside other microservices in `services/` directory
+  - Updated GitHub workflow paths: `services/k6/Dockerfile`, `services/k6/*.js`
+  - Updated documentation references in `docs/guides/K6.md`, `AGENTS.md`, and `specs/system-context/*.md`
+
+**APM Infrastructure Architecture Refactor**
+
+Moved all APM components from `configs/apm/` to `controllers/apm/` to align with infrastructure layer pattern.
+
+- **APM Components Moved**: All APM infrastructure components now deployed in controllers layer:
+  - `loki/` - Log aggregation (raw manifests)
+  - `tempo/` - Distributed tracing (raw manifests)
+  - `pyroscope/` - Continuous profiling (raw manifests)
+  - `vector/` - Log collection agent (HelmRelease)
+  - `jaeger/` - Alternative tracing UI (HelmRelease)
+  - `otel-collector/` - Trace fan-out (HelmRelease)
+- **Rationale**: APM components are infrastructure (not CRDs), so they belong in controllers layer alongside operators
+- **Vector ConfigMaps**: Remain in `configs/databases/configmaps/vector-configs/` since they're used by Zalando CRDs (`acid.zalan.do/v1`)
+
+**PodMonitor Deployment Order Fix**
+
+- **Issue**: CloudNativePG PodMonitors showed 'NotFound' status because they deployed before database clusters
+- **Fix**: Moved CloudNativePG PodMonitors from `configs/monitoring/podmonitors/` to `configs/databases/monitoring/`
+  - PodMonitors now deploy AFTER database instances (within same kustomization, processed in order)
+  - Zalando PodMonitors remain in `configs/monitoring/podmonitors/` (different namespaces)
+
+**Directory Structure Cleanup**
+
+- Removed empty `configs/apm/` directory after APM components migration
+- Updated `configs/kustomization.yaml` to remove `apm/` reference
+
+### Fixed
+
+**k6 Load Test Script**
+
+- **Issue**: k6 script was calling non-existent endpoint `/api/v1/auth/validate`, causing 404 errors
+- **Fix**: Changed endpoint to `/health` in `apiMonitoringJourney()` function
+  - Auth service only has: `/api/v1/auth/login`, `/api/v1/auth/register` (POST), `/health`, `/metrics`
+
+**Documentation Updates**
+
+- Updated `kubernetes/infra/README.md`:
+  - Moved APM components to controllers directory structure
+  - Updated architecture diagrams
+  - Removed Vector exception note (now correctly in controllers)
+  - Added Vector Configuration section explaining separation
+- Updated `docs/guides/DATABASE.md`:
+  - Fixed Vector ConfigMap paths (already correct, verified)
+  - Updated PodMonitor deployment paths
+
 ## [0.27.0] - 2026-01-20
 
 ### Changed

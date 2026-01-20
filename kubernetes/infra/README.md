@@ -15,7 +15,13 @@ kubernetes/infra/
 │   │   ├── grafana-operator.yaml       # Grafana Operator Helm
 │   │   └── metrics-server.yaml         # Metrics Server Helm
 │   ├── apm/
-│   │   └── kustomization.yaml          # Empty (no operators)
+│   │   ├── kustomization.yaml
+│   │   ├── loki/                       # Loki (raw manifests)
+│   │   ├── tempo/                      # Tempo (raw manifests)
+│   │   ├── pyroscope/                  # Pyroscope (raw manifests)
+│   │   ├── vector/                     # Vector (HelmRelease)
+│   │   ├── jaeger/                     # Jaeger (HelmRelease)
+│   │   └── otel-collector/             # OTel Collector (HelmRelease)
 │   ├── databases/
 │   │   ├── zalando-operator.yaml       # Zalando Postgres Operator Helm
 │   │   └── cloudnativepg-operator.yaml # CloudNativePG Operator Helm
@@ -27,16 +33,10 @@ kubernetes/infra/
     │   ├── servicemonitors/            # ServiceMonitors
     │   ├── grafana/                    # Grafana CR + Datasources
     │   └── podmonitors/                # PodMonitors for databases
-    ├── apm/
-    │   ├── loki/                       # Loki (raw manifests)
-    │   ├── tempo/                      # Tempo (raw manifests)
-    │   ├── pyroscope/                  # Pyroscope (raw manifests)
-    │   ├── vector/                     # Vector (HelmRelease)
-    │   ├── jaeger/                     # Jaeger (HelmRelease)
-    │   └── otel-collector/             # OTel Collector (HelmRelease)
     ├── databases/
     │   ├── secrets/                    # Database secrets
-    │   ├── configmaps/                 # Vector configs, monitoring queries
+    │   ├── configmaps/                 # Vector configs (for Zalando sidecars), monitoring queries
+    │   ├── monitoring/                 # CloudNativePG PodMonitors (deploy AFTER database clusters)
     │   ├── poolers/                    # PgCat HelmReleases
     │   └── instances/                  # PostgreSQL CRs (5 databases)
     └── slo/
@@ -49,12 +49,13 @@ kubernetes/infra/
 
 **Controllers** (Infrastructure Layer):
 - Helm charts for operators (Prometheus, Grafana, Postgres, Sloth)
+- APM components (Loki, Tempo, Pyroscope, Vector, Jaeger, OTel Collector) - infrastructure, not CRDs
 - Provide CRDs and manage lifecycle
 - Deployed FIRST to ensure CRDs are available
 
 **Configs** (Application Layer):
 - Custom Resources (Grafana, PostgreSQL, PrometheusServiceLevel)
-- HelmReleases for APM components (Loki, Tempo, Pyroscope, Vector, Jaeger, OTel)
+- ConfigMaps used by CRDs (e.g., Vector ConfigMaps for Zalando databases)
 - Deployed AFTER controllers are ready
 
 This separation ensures:
@@ -77,12 +78,12 @@ flowchart TD
         ZalandoOp[Zalando Postgres Operator]
         CNPGOp[CloudNativePG Operator]
         SlothOp[Sloth Operator]
+        APM[APM: Loki, Tempo, Vector, Jaeger, OTel]
     end
     
     subgraph Configs[configs-local]
         Monitoring[Monitoring Configs: Grafana, ServiceMonitors]
-        APM[APM Configs: Loki, Tempo, Pyroscope, Vector, Jaeger, OTel]
-        Databases[Database Configs: instances, poolers, secrets]
+        Databases[Database Configs: instances, poolers, secrets, PodMonitors, Vector ConfigMaps]
         SLO[SLO Configs: PrometheusServiceLevel CRs]
     end
 ```
@@ -106,14 +107,24 @@ flowchart TD
 ### SLO Controllers
 - **sloth** - Sloth Operator for SLO/SLI management
 
-### APM Configs (No Operators)
-APM components are deployed under `kubernetes/infra/configs/apm/`:
+### APM Controllers (Infrastructure)
+APM components are deployed under `kubernetes/infra/controllers/apm/`:
 - **Loki** - raw manifests (Deployment/ConfigMap/Service)
 - **Tempo** - raw manifests (Deployment/ConfigMap/Service)
 - **Pyroscope** - raw manifests (Deployment/ConfigMap/Service)
 - **Vector** - HelmRelease (DaemonSet)
 - **Jaeger** - HelmRelease
 - **OTel Collector** - HelmRelease
+
+**Note**: APM components are infrastructure (not CRDs), so they're in controllers layer.
+
+### Database Monitoring
+- **CloudNativePG PodMonitors**: `configs/databases/monitoring/` - Deploy AFTER database clusters (within same kustomization, processed in order)
+- **Zalando PodMonitors**: `configs/monitoring/podmonitors/` - Deploy with monitoring configs
+
+### Vector Configuration
+- **Vector HelmRelease**: `controllers/apm/vector/` - APM infrastructure component
+- **Vector ConfigMaps for Zalando**: `configs/databases/configmaps/vector-configs/` - Used by Zalando CRDs (`acid.zalan.do/v1`) as sidecar configs
 
 ## How to Deploy
 

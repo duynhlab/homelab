@@ -287,7 +287,7 @@ helm version --short
 
 **Docker Image**: `ghcr.io/duynhne/k6:scenarios`
 
-**Test Script**: `k6/load-test-multiple-scenarios.js`
+**Test Script**: `services/k6/load-test-multiple-scenarios.js`
 
 **Configuration**:
 - **Duration**: 6.5 hours (390 minutes)

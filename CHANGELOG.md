@@ -8,6 +8,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 
+
+## [0.27.0] - 2026-01-20
+
+### Changed
+
+**Database Pooler Architecture Refactor**
+
+Completed a major refactoring of the database connection pooling strategy to optimize for performance, reliability, and GitOps best practices.
+
+- **Supporting DB (Zalando)**: Migrated from external PgDog deployment to **built-in PgBouncer sidecar**.
+  - **Why**: Leverages the operator's native capabilities for simpler management and lower resource overhead for this shared cluster.
+  - **Status**: Active, 2 instances, transaction mode.
+
+- **Product DB (CloudNativePG)**: Migrated from PgCat to **PgDog (Standalone Helm Chart)**.
+  - **Why**: PgDog provides robust connection pooling and routing for the high-traffic product service.
+  - **Configuration**: Deployed via HelmRelease `pgdog-product`, 1 replica (dev), transaction mode.
+  - **Authentication**: Fixed password mismatch issue where CloudNativePG generated password differed from static secret.
+
+**Secret Management Improvements**
+
+- **Split Secrets**: Refactored `secrets.yaml` into dedicated files for better granularity and GitOps management:
+  - `secrets/product-db-secret.yaml`
+  - `secrets/transaction-db-secret-cart.yaml`
+  - `secrets/transaction-db-secret-order.yaml`
+
+### Fixed
+
+**Frontend Service Discovery**
+
+- **Issue**: Nginx configuration in frontend was failing to resolve upstream services (`notification` and `shipping`) because it assumed they were in the `user` namespace.
+- **Fix**: Updated `frontend/nginx.conf` to use the correct namespaces:
+  - `notification.notification.svc.cluster.local`
+  - `shipping.shipping.svc.cluster.local`
+
+**Documentation Accuracy**
+
+- **DATABASE.md**: Comprehensive audit and update.
+  - Updated architecture diagrams to reflect new PgBouncer/PgDog setup.
+  - Corrected secret namespace for `order` service (`cart` -> `order`).
+  - Standardized "Secret Type" descriptions (Manual -> Static).
+  - Removed outdated references to legacy PgCat configurations.
+
+**Product Database Authentication**
+
+- **Issue**: `product` service failed to connect to PgDog with "password authentication failed".
+- **Root Cause**: CloudNativePG bootstrap generated a random password for the `product` user, while the static secret `product-db-secret` contained `postgres`.
+- **Fix**: Synchronized the database password to match the secret using `ALTER ROLE`.
+
 ## [0.26.1] - 2026-01-16
 
 ### Changed

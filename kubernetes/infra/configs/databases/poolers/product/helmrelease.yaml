@@ -51,8 +51,8 @@ spec:
     # Resources
     resources:
       requests:
-        cpu: 50m
-        memory: 128Mi
+        cpu: 20m
+        memory: 64Mi
       limits:
         cpu: 100m
         memory: 256Mi
@@ -65,10 +65,10 @@ spec:
     
     # Pod anti-affinity for HA
     podAntiAffinity:
-      enabled: true
+      enabled: false
       type: soft
     
     # PodDisruptionBudget
     podDisruptionBudget:
-      enabled: true
+      enabled: false
       minAvailable: 1

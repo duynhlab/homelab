@@ -56,7 +56,11 @@ func LoadConfig() (*DatabaseConfig, error) {
 // BuildDSN constructs PostgreSQL connection string from config
 func (c *DatabaseConfig) BuildDSN() string {
 	// Format: postgresql://user:password@host:port/dbname?sslmode=disable
-	return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s",
+	// prefer_simple_protocol=true: Forces driver to use simple query protocol (no prepared statements)
+	// Required for PgCat/PgBouncer transaction pooling mode to avoid
+	// "bind message supplies X parameters, but prepared statement requires Y" errors
+	// Note: binary_parameters=yes is insufficient - it only disables binary encoding but still uses prepared statements
+	return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s&prefer_simple_protocol=true",
 		c.User,
 		c.Password,
 		c.Host,

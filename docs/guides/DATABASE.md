@@ -1722,4 +1722,33 @@ Connection poolers solve the "too many connections" problem by reusing PostgreSQ
 - **[Setup Guide](./SETUP.md)** - Complete deployment and configuration guide
 - **[Error Handling](./API.md#error-handling)** - Database error handling patterns
 - **[API Reference](./API.md)** - API endpoints using database
+- **[PgCat Prepared Statement Error](../troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md)** - Fix intermittent 500 errors with PgCat
+
+## Troubleshooting
+
+### PgCat + Prepared Statements Issue
+
+**Problem:** Intermittent 500 errors with message `pq: bind message supplies X parameters, but prepared statement requires Y` when using PgCat in transaction pooling mode.
+
+**Root Cause:** Go's `database/sql` driver caches prepared statements per connection. When PgCat reuses connections across transactions, old prepared statements may conflict with new queries.
+
+**Solution:** Add `prefer_simple_protocol=true` to PostgreSQL DSN to disable prepared statements completely.
+
+```go
+// services/cart/internal/core/database.go
+// services/order/internal/core/database.go
+return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s&prefer_simple_protocol=true",
+    c.User, c.Password, c.Host, c.Port, c.Name, c.SSLMode,
+)
+```
+
+**Why This Works:**
+- `binary_parameters=yes` only disables binary encoding but **still uses prepared statements** (insufficient)
+- `prefer_simple_protocol=true` forces the driver to use simple query protocol (no prepared statements)
+- Simple protocol sends query + parameters in one message (no caching, no reuse conflicts)
+
+**Affected Services:** Cart, Order (both use PgCat transaction pooler)
+
+**See:** [Full troubleshooting guide](../troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md) with diagrams and testing instructions.
+
 

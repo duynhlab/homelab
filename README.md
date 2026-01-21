@@ -145,43 +145,52 @@ services/
 
 ### GitOps Project Structure
 
-**Kubernetes manifests are organized for local-first GitOps with clear ordering (controllers → configs → apps):**
+**Kubernetes manifests organized for Flux Operator with base/overlay pattern:**
 
 ```
 kubernetes/
-├── infra/                       # Infrastructure manifests
-│   ├── namespaces.yaml           # Namespaces (applied first)
-│   ├── controllers/              # Operators + CRDs (Phase 1)
-│   ├── configs/                  # Instances + configs (Phase 2)
-│   └── kustomization.yaml
-├── apps/                         # Applications (HelmReleases + frontend + k6)
-│   ├── auth.yaml
-│   ├── user.yaml
-│   ├── product.yaml
-│   ├── cart.yaml
-│   ├── order.yaml
-│   ├── review.yaml
-│   ├── notification.yaml
-│   ├── shipping.yaml
-│   ├── shipping-v2.yaml
-│   ├── frontend.yaml
-│   └── k6.yaml
-├── clusters/
+├── base/                         # Environment-agnostic manifests
+│   ├── infrastructure/           # Infrastructure (monitoring, apm, databases, slo)
+│   │   ├── monitoring/           # Prometheus, Grafana, Metrics Server
+│   │   ├── apm/                  # Tempo, Loki, Jaeger, Pyroscope, Vector, OTel
+│   │   ├── databases/            # PostgreSQL operators, clusters, poolers
+│   │   └── slo/                  # Sloth Operator + PrometheusServiceLevel CRDs
+│   └── apps/                     # Applications (9 microservices + frontend + k6)
+│       ├── auth/
+│       ├── user/
+│       ├── product/
+│       ├── cart/
+│       ├── order/
+│       ├── review/
+│       ├── notification/
+│       ├── shipping/
+│       ├── shipping-v2/
+│       ├── frontend/
+│       └── k6/
+├── overlays/                     # Environment-specific patches
+│   ├── local/                    # Local development (1 replica, minimal resources)
+│   └── production/               # Production (5 replicas, HA, resource limits)
+├── clusters/                     # Flux Operator configuration
 │   └── local/                    # FluxInstance + OCI sources + Kustomizations
-│       ├── flux-system/
-│       ├── sources/
-│       ├── controllers.yaml
-│       ├── configs.yaml
-│       └── apps.yaml
-└── backup/                       # Legacy base/overlays snapshots (reference only)
+│       ├── flux-system/          # FluxInstance CRD
+│       ├── sources/              # OCI + Helm sources
+│       ├── infrastructure.yaml   # Infrastructure Kustomization
+│       └── apps.yaml             # Apps Kustomization
+└── backup/                       # Legacy snapshots (reference only)
 ```
 
 **Deployment Model:**
 
-- Flux Operator pulls manifests from OCI Registry (`localhost:5050`)
-- `controllers-local` installs operators/CRDs first
-- `configs-local` applies instances/configs (monitoring, apm, databases, slo)
-- `apps-local` applies apps after infra is ready (k6 waits for all microservices via HelmRelease `dependsOn`)
+- **Flux Operator** pulls manifests from OCI Registry (`localhost:5050`)
+- **Base manifests** define resources (HelmReleases, raw YAML)
+- **Overlays** patch for environment (replicas, resources, namespaces)
+- **Dependency chain**: `infrastructure-local` → `apps-local` (via `dependsOn`)
+
+**Benefits:**
+
+- **67-89% YAML reduction**: Kustomize base/overlay eliminates duplication
+- **Multi-environment**: Same base, different overlays (local/production)
+- **GitOps-native**: Flux reconciles from OCI artifacts, not Git directly
 
 **GitOps Details**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md) for complete GitOps architecture and workflows.
 
@@ -205,7 +214,7 @@ kubernetes/
 
 ## Quick Start
 
-### GitOps Deployment (3 Commands)
+### GitOps Deployment (One Command)
 
 **Complete stack deployment using Flux Operator:**
 
@@ -213,14 +222,13 @@ kubernetes/
 # Prerequisites check
 make prereqs
 
-# 1. Create Kind cluster + OCI registry
-./scripts/kind-up.sh
+# One-command deployment (cluster + Flux + apps)
+make up
 
-# 2. Bootstrap Flux Operator
-./scripts/flux-up.sh
-
-# 3. Deploy everything (infrastructure + apps)
-./scripts/flux-push.sh
+# Or step-by-step:
+make cluster-up   # 1. Create Kind cluster + OCI registry
+make flux-up      # 2. Bootstrap Flux Operator
+make flux-push    # 3. Deploy everything (infrastructure + apps)
 ```
 
 **What gets deployed automatically:**
@@ -234,10 +242,11 @@ make prereqs
 
 **Benefits:**
 
-- 67-89% YAML reduction via Kustomize base/overlay patterns
-- Automatic drift detection and correction
-- Multi-environment support (local/production)
-- Single source of truth in OCI registry
+- **Simplified Makefile**: 85 lines (67% reduction), delegates to scripts
+- **One-command deployment**: `make up` bootstraps everything
+- **Automatic drift detection**: Flux reconciles changes automatically
+- **Multi-environment support**: Local/production overlays
+- **OCI-based GitOps**: Single source of truth in OCI registry
 
 **Detailed Setup Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md) for step-by-step instructions, architecture explanation, and troubleshooting.
 
@@ -279,7 +288,7 @@ After deployment, access services via port-forwarding:
 
 | Service | URL | Command | Credentials |
 |---------|-----|---------|-------------|
-| Flux Web UI | <http://localhost:9080> | `./scripts/flux-ui.sh` or `make flux-ui` | - |
+| Flux Web UI | <http://localhost:9080> | `make flux-ui` | - |
 | Grafana | <http://localhost:3000> | `kubectl port-forward -n monitoring svc/grafana-service 3000:3000` | Anonymous (enabled) |
 | Prometheus | <http://localhost:9090> | `kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090` | - |
 | Jaeger UI | <http://localhost:16686> | `kubectl port-forward -n monitoring svc/jaeger-query 16686:16686` | - |
@@ -287,9 +296,9 @@ After deployment, access services via port-forwarding:
 | Frontend | <http://localhost:3000> | `kubectl port-forward -n default svc/frontend 3000:80` | - |
 | API (any service) | <http://localhost:8080> | `kubectl port-forward -n <namespace> svc/<service> 8080:8080` | - |
 
-**Quick Access Script**: `./scripts/08-setup-access.sh` sets up port-forwarding for all services.
+**GitOps Monitoring**: Use `make flux-ui` to open Flux Web UI and monitor reconciliation status, view Kustomizations, and check deployment health.
 
-**GitOps Monitoring**: Use Flux Web UI to monitor reconciliation status, view Kustomizations, and check deployment health.
+**Makefile Commands**: See `make help` for all available commands (cluster, Flux, validation, utilities).
 
 **Port-Forwarding Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md)
 

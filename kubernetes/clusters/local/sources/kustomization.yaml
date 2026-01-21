@@ -4,13 +4,13 @@ kind: Kustomization
 
 resources:
   # OCI Repositories
-  - infrastructure-oci.yaml
-  - apps-oci.yaml
-  - mop-chart-oci.yaml
+  - oci/infrastructure-oci.yaml
+  - oci/apps-oci.yaml
+  - oci/mop-chart-oci.yaml
+  - oci/grafana-operator-oci.yaml
   
   # Helm Repositories
   - helm/prometheus-community.yaml
-  - helm/grafana.yaml
   - helm/metrics-server.yaml
   - helm/jaegertracing.yaml
   - helm/postgres-operator.yaml

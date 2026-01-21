@@ -43,7 +43,6 @@ kubernetes/
 │   │   ├── controllers.yaml     # Kustomization CRD (namespaces + operators)
 │   │   ├── configs.yaml         # Kustomization CRD (instances/configs)
 │   │   └── apps.yaml            # Kustomization CRD (apps/)
-│   ├── staging/        # 📋 PLACEHOLDER
 │   └── production/     # 📋 PLACEHOLDER
 │
 └── backup/             # Old base/overlay structure (moved 2026-01-12)

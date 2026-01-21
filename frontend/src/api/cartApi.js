@@ -24,9 +24,11 @@ export async function getCartCount() {
 /**
  * POST /api/v1/cart - Add item to cart
  */
-export async function addToCart(productId, quantity = 1) {
+export async function addToCart(productId, productName, productPrice, quantity = 1) {
     const response = await apiClient.post('/cart', {
         product_id: productId,
+        product_name: productName,
+        product_price: productPrice,
         quantity
     });
     return response.data;

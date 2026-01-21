@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [0.28.1] - 2026-01-21
+
+### Fixed
+
+**Cart Service 500 Error on GET /api/v1/cart**
+
+- **Issue**: Cart service returned 500 error with `pq: relation "products" does not exist`
+- **Root Cause**: Repository query joined `cart_items` with `products` table, but they exist in separate databases
+- **Fix**: Added `product_name` and `product_price` columns to `cart_items` table
+  - Product details are now stored when adding items to cart
+  - Cart queries no longer require cross-database JOIN
+
+#### Files Changed
+
+**Database Migrations:**
+- `services/cart/db/migrations/sql/V1__init_schema.sql` - Added `product_name`, `product_price` columns
+- `services/cart/db/migrations/sql/V2__seed_cart.sql` - Updated seed data with product details
+- `services/cart/db/migrations/sql/V3__add_product_details.sql` - **[NEW]** Migration for existing databases
+
+**Backend:**
+- `services/cart/internal/core/domain/cart.go` - Added fields to `AddToCartRequest`
+- `services/cart/internal/logic/v1/service.go` - Pass product details to repository
+- `services/cart/internal/core/repository/postgres_cart_repository.go` - Updated queries
+
+**Frontend:**
+- `frontend/src/api/cartApi.js` - Send product name and price when adding to cart
+- `frontend/src/pages/ProductDetailPage/ProductDetailPage.jsx` - Pass product info on add-to-cart
+
+**Documentation:**
+- `docs/guides/API.md` - Updated POST /api/v1/cart request body
+
+#### Migration Notes
+
+For existing deployments, run the V3 migration:
+```bash
+psql -h <cart-db-host> -U cart -d cart -f services/cart/db/migrations/sql/V3__add_product_details.sql
+```
+
 ## [0.28.0] - 2026-01-20
 
 ### Changed

@@ -7,3 +7,4 @@ kind: Kustomization
 resources:
   - podmonitor-cloudnativepg-product-db.yaml
   - podmonitor-cloudnativepg-transaction-db.yaml
+  - servicemonitor-pgcat-transaction.yaml

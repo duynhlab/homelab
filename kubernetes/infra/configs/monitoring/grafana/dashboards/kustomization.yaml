@@ -44,3 +44,4 @@ resources:
   - grafana-dashboard-pg-query-overview.yaml
   - grafana-dashboard-pgbouncer.yaml
   - grafana-dashboard-postgres-replication-lag.yaml
+  - grafana-dashboard-pgdog.yaml

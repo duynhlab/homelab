@@ -236,7 +236,7 @@ make prereqs
 
 - 67-89% YAML reduction via Kustomize base/overlay patterns
 - Automatic drift detection and correction
-- Multi-environment support (local/staging/production)
+- Multi-environment support (local/production)
 - Single source of truth in OCI registry
 
 **Detailed Setup Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md) for step-by-step instructions, architecture explanation, and troubleshooting.

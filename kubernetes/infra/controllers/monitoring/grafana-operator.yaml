@@ -4,18 +4,13 @@ metadata:
   name: grafana-operator
   namespace: monitoring
 spec:
-  chart:
-    spec:
-      chart: grafana-operator
-      interval: 10m
-      sourceRef:
-        kind: HelmRepository
-        name: grafana
-        namespace: flux-system
-      version: '>=v5.0.0'
   interval: 10m
-  releaseName: grafana-operator
   timeout: 10m
+  chartRef:
+    kind: OCIRepository
+    name: grafana-operator-oci
+    namespace: flux-system
+  releaseName: grafana-operator
   values:
     crds:
       immutable: true

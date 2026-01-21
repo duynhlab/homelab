@@ -19,12 +19,11 @@ func NewPostgresCartRepository(db *sql.DB) *PostgresCartRepository {
 
 // FindByUserID retrieves a cart by user ID
 func (r *PostgresCartRepository) FindByUserID(ctx context.Context, userID string) (*domain.Cart, error) {
-	// Get cart items
+	// Get cart items with product details
 	query := `
-		SELECT ci.id, ci.product_id, p.name, p.price, ci.quantity
-		FROM cart_items ci
-		JOIN products p ON ci.product_id = p.id
-		WHERE ci.user_id = $1
+		SELECT id, product_id, product_name, product_price, quantity
+		FROM cart_items
+		WHERE user_id = $1
 	`
 
 	rows, err := r.db.QueryContext(ctx, query, userID)
@@ -84,13 +83,13 @@ func (r *PostgresCartRepository) AddItem(ctx context.Context, userID string, ite
 	err := r.db.QueryRowContext(ctx, checkQuery, userID, item.ProductID).Scan(&existingID)
 
 	if err == sql.ErrNoRows {
-		// Insert new item
+		// Insert new item with denormalized product details
 		insertQuery := `
-			INSERT INTO cart_items (user_id, product_id, quantity, created_at, updated_at)
-			VALUES ($1, $2, $3, NOW(), NOW())
+			INSERT INTO cart_items (user_id, product_id, product_name, product_price, quantity, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
 			RETURNING id
 		`
-		return r.db.QueryRowContext(ctx, insertQuery, userID, item.ProductID, item.Quantity).Scan(&item.ID)
+		return r.db.QueryRowContext(ctx, insertQuery, userID, item.ProductID, item.ProductName, item.ProductPrice, item.Quantity).Scan(&item.ID)
 	} else if err != nil {
 		return err
 	}

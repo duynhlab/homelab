@@ -590,27 +590,37 @@ Authorization: Bearer <jwt_token>
 
 {
   "product_id": "prod123",
+  "product_name": "Wireless Mouse",
+  "product_price": 29.99,
   "quantity": 2
 }
 ```
 
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `product_id` | string | Yes | Product ID to add |
+| `product_name` | string | Yes | Product name (stored for display) |
+| `product_price` | number | Yes | Product price at time of adding |
+| `quantity` | integer | Yes | Quantity to add (min=1) |
+
 #### Response
 
-**201 Created**
+**200 OK**
 ```json
 {
-  "product_id": "prod123",
-  "quantity": 2
+  "message": "Item added to cart"
 }
 ```
 
 **Validation Rules:**
 - `quantity` must be > 0 (positive integer)
+- `product_price` must be >= 0
 
 **Error Responses:**
 
 | Status | Body | Condition |
 |--------|------|-----------|
+| 400 | `{"error": "<validation_error>"}` | Missing required fields |
 | 400 | `{"error": "Invalid quantity"}` | Quantity <= 0 |
 | 500 | `{"error": "Internal server error"}` | Server error |
 

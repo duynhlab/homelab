@@ -82,11 +82,11 @@ spec:
 
     resources:
       requests:
-        memory: "24Mi"
-        cpu: "10m"
-      limits:
         memory: "64Mi"
-        cpu: "30m"
+        cpu: "50m"
+      limits:
+        memory: "128Mi"
+        cpu: "100m"
 
     livenessProbe:
       enabled: true

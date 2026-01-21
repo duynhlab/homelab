@@ -118,6 +118,13 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
     - Deployment configurations
     - Best practices (v0.6.14+)
 
+### Troubleshooting
+
+1. **[PgCat Prepared Statement Error](./troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md)** - Fix intermittent 500 errors with PgCat connection pooler
+    - Prepared statement parameter mismatch
+    - Solution: `prefer_simple_protocol=true`
+    - Diagram: Why the error happens
+
 ---
 
 ## Documentation by Category
@@ -167,6 +174,10 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 ### k6 Load Testing
 
 - [k6 Load Testing](./guides/K6.md) - Complete load testing guide with architecture
+
+### Troubleshooting
+
+- [PgCat Prepared Statement Error](./troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md) - Fix intermittent 500 errors with connection pooler
 
 ---
 

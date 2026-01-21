@@ -6,6 +6,6 @@ resources:
   - loki/
   - tempo/
   - pyroscope/
-  - vector/
-  - jaeger/
-  - otel-collector/
+  - vector/vector.yaml
+  - jaeger/jaeger.yaml
+  - otel-collector/otel-collector.yaml

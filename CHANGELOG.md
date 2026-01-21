@@ -11,6 +11,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.28.1] - 2026-01-21
 
+### Changed
+
+**Grafana Operator OCI Migration**
+
+- **Changed**: Grafana Operator now uses OCI registry instead of Helm repository
+  - **From**: HelmRepository `grafana` (https://grafana.github.io/helm-charts)
+  - **To**: OCIRepository `grafana-operator-oci` (oci://ghcr.io/grafana/helm-charts/grafana-operator)
+- **Benefits**: Faster chart pulls, better security with OCI registry, aligns with modern Helm practices
+- **Implementation Details**:
+  - **HelmRelease Format**: Changed from `chart.spec.sourceRef` to `chartRef` (required for OCI Helm charts in Flux)
+  - **OCIRepository URL**: Includes chart name in path (`/grafana-operator`) for proper chart resolution
+- **Files Changed**:
+  - Created: `sources/oci/grafana-operator-oci.yaml`
+  - Updated: `controllers/monitoring/grafana-operator.yaml` (changed to `chartRef` format)
+  - Deleted: `sources/helm/grafana.yaml` (no longer used)
+
+**OCI Sources Organization**
+
+- **Created**: `sources/oci/` folder to separate OCI repositories from Helm repositories
+- **Moved OCI repositories**:
+  - `infrastructure-oci.yaml` → `oci/infrastructure-oci.yaml`
+  - `apps-oci.yaml` → `oci/apps-oci.yaml`
+  - `mop-chart-oci.yaml` → `oci/mop-chart-oci.yaml`
+  - `grafana-operator-oci.yaml` → `oci/grafana-operator-oci.yaml`
+- **Structure**: Clean separation between `sources/helm/` (HelmRepository) and `sources/oci/` (OCIRepository)
+
+**ServiceMonitor Deployment Order Fix**
+
+- **Issue**: Tempo ServiceMonitor failed with 'NotFound' error because ServiceMonitor CRD wasn't ready when deployed in controllers layer
+- **Fix**: Moved Tempo ServiceMonitor from `controllers/apm/tempo/servicemonitor.yaml` to `configs/monitoring/servicemonitors/tempo.yaml`
+- **Rationale**: ServiceMonitor is a CRD from Prometheus Operator, so it must deploy after the operator is ready (in configs layer)
+
+**Cluster Configuration Cleanup**
+
+- **Removed**: `kubernetes/clusters/staging/` folder (placeholder, not in use)
+- **Updated documentation**: Removed staging references from `README.md`, `kubernetes/README.md`, and `CHANGELOG.md`
+- **Rationale**: Only local and production clusters are configured; staging was unused placeholder
+
 ### Fixed
 
 **Cart Service 500 Error on GET /api/v1/cart**
@@ -720,7 +758,7 @@ Comprehensive update of all documentation to reflect the **100% complete Flux Gi
 1. **Deployment Simplification**: 8 sequential scripts → 3 commands (62.5% reduction)
 2. **Automatic Dependency Management**: Flux reconciles in correct order automatically (Monitoring → APM → Databases → Apps → SLO)
 3. **Drift Detection**: Automatic reconciliation every 10 minutes + manual trigger via `flux reconcile`
-4. **Multi-Environment Ready**: Documented `kubernetes/overlays/` structure (local active, staging/production placeholders)
+4. **Multi-Environment Ready**: Documented `kubernetes/overlays/` structure (local active, production placeholder)
 5. **Production-Ready Patterns**: 67-89% YAML reduction, single source of truth in OCI registry, Kubernetes-native
 
 #### Statistics

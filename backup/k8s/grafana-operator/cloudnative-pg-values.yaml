@@ -1,0 +1,18 @@
+# Values file for CloudNativePG Grafana Dashboard Helm Chart
+# Overrides deprecated sidecarLabel/sidecarLabelValue with labels to avoid deprecation warnings
+# Based on default values from: cnpg-grafana/cluster chart
+
+nameOverride: ""
+fullnameOverride: ""
+
+grafanaDashboard:
+  # -- Allows overriding the namespace where the ConfigMap will be created, defaulting to the same one as the Release.
+  namespace: "monitoring"
+  # -- The name of the ConfigMap containing the dashboard.
+  configMapName: "cnpg-grafana-dashboard"
+  # -- Labels that ConfigMaps should have to get configured in Grafana.
+  # Replaces deprecated sidecarLabel/sidecarLabelValue
+  labels:
+    grafana_dashboard: "1"
+  # -- Annotations that ConfigMaps can have to get configured in Grafana.
+  annotations: {}

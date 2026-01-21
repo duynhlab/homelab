@@ -1,0 +1,146 @@
+# kube-prometheus-stack Helm values
+# This configures Prometheus Operator for microservices monitoring
+
+# Disable components we don't need (using Grafana Operator instead)
+grafana:
+  enabled: false
+
+alertmanager:
+  enabled: false
+
+# Prometheus configuration
+prometheus:
+  enabled: true
+  
+  prometheusSpec:
+    # Retention and storage
+    retention: 7d
+    retentionSize: "10GB"
+    
+    # Resources
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "100m"
+      limits:
+        memory: "2Gi"
+        cpu: "500m"
+    
+    # Storage
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi
+    
+    # ServiceMonitor selector - match all ServiceMonitors
+    serviceMonitorSelector: {}
+    serviceMonitorNamespaceSelector: {}
+    
+    # PodMonitor selector - for Sloth Operator
+    podMonitorSelector: {}
+    podMonitorNamespaceSelector: {}
+    
+    # PrometheusRule selector - for SLO rules
+    # 
+    # 🎯 ROOT CAUSE: Sloth-Prometheus Label Mismatch
+    # -----------------------------------------------
+    # Problem:
+    #   1. Sloth Operator generates PrometheusRule CRDs WITHOUT label: release=kube-prometheus-stack
+    #   2. Prometheus Operator default ruleSelector ONLY loads rules WITH that label
+    #   3. Result: Prometheus doesn't load SLO rules → No SLO metrics
+    # 
+    # Why Sloth can't add labels:
+    #   - Sloth Helm chart v0.15.0 does NOT support adding custom labels to PrometheusRule CRD metadata
+    #   - commonLabels: Only applies to Helm-managed resources (Deployment, Service), NOT controller-generated CRDs
+    #   - extraLabels: Only applies to rule labels INSIDE PrometheusRule spec, NOT metadata.labels
+    #   - No field in values.yaml exists to add metadata labels to generated CRDs
+    # 
+    # Solution (CURRENT):
+    #   - Set ruleSelector: {} to match ALL PrometheusRules (most flexible, production-ready)
+    #   - Prometheus will load Sloth-generated SLO rules without requiring specific labels
+    # 
+    # Alternative Solutions (NOT RECOMMENDED):
+    #   - Manually label PrometheusRules after creation (not automated)
+    #   - Wait for future Sloth versions with native metadata label support
+    ruleSelector: {}
+    ruleNamespaceSelector: {}
+    
+    # External labels
+    externalLabels:
+      cluster: 'kind-monitoring'
+    
+    # Enable features
+    enableFeatures:
+      - exemplar-storage
+    
+    # Scrape interval
+    evaluationInterval: 15s
+    scrapeInterval: 15s
+
+# Prometheus Operator configuration
+prometheusOperator:
+  enabled: true
+  
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+  # DISABLE ADMISSION WEBHOOKS - Fix for Sloth compatibility
+  admissionWebhooks:
+    enabled: false
+    failurePolicy: Ignore
+    
+    # Disable patch job that creates webhook certificates
+    patch:
+      enabled: false
+    
+    # Disable cert-manager certificate generation
+    certManager:
+      enabled: false
+  
+  # Disable TLS completely
+  tls:
+    enabled: false
+  
+  # Don't mount any secret
+  secretName: ""
+
+# Node Exporter (for node metrics)
+nodeExporter:
+  enabled: true
+
+# Kube State Metrics (included in kube-prometheus-stack)
+kubeStateMetrics:
+  enabled: true
+
+# Default ServiceMonitors and PrometheusRules
+defaultRules:
+  create: false
+
+kubeApiServer:
+  enabled: true
+
+kubelet:
+  enabled: true
+
+kubeControllerManager:
+  enabled: false
+
+coreDns:
+  enabled: true
+
+kubeEtcd:
+  enabled: false
+
+kubeScheduler:
+  enabled: false
+
+kubeProxy:
+  enabled: false

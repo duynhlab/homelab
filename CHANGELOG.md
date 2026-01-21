@@ -9,6 +9,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [0.29.0] - 2026-01-21
+
+### Changed
+
+**Documentation Updates - Reflect GitOps Migration and Makefile Simplification**
+
+Complete documentation refresh to reflect the GitOps migration, Makefile simplification, and current project structure.
+
+#### README.md Updates
+
+- **Quick Start**: Updated to use Makefile commands (`make up`, `make cluster-up`, `make flux-up`, `make flux-push`)
+  - Highlighted one-command deployment: `make up`
+  - Added step-by-step alternative with Makefile commands
+  - Updated benefits section to reflect 67% Makefile reduction and simplified workflow
+
+- **GitOps Project Structure**: Corrected structure to show actual base/overlay pattern
+  - Changed from outdated `infra/apps/` structure to correct `base/overlays/clusters/` structure
+  - Added detailed breakdown of `kubernetes/base/infrastructure/` and `kubernetes/base/apps/`
+  - Clarified overlay pattern (local: 1 replica, production: 5 replicas)
+  - Updated deployment model explanation with dependency chain
+
+- **Access Points**: Updated Flux Web UI command to use `make flux-ui`
+  - Added note about `make help` for all available commands
+  - Removed outdated script reference (`./scripts/flux-ui.sh`)
+
+#### AGENTS.md Updates
+
+- **Development Commands**: Updated GitOps deployment reference to use `make up` or `make flux-push`
+
+- **Deployment Order**: Complete rewrite to reflect Makefile-first approach
+  - Changed from 3 script commands to `make up` one-liner
+  - Added step-by-step alternative with Makefile commands
+  - Simplified infrastructure deployment explanation (single layer instead of 6 separate items)
+  - Added explicit dependency chain explanation (`apps-local` depends on `infrastructure-local`)
+  - Updated verification commands to use `make flux-status` and `make flux-sync`
+
+- **Quick Navigation**: Updated file paths and commands
+  - Changed Helm values path: `charts/values/` → `charts/mop/values/`
+  - Added "Push to OCI" step: `make flux-push`
+  - Updated SLO modification workflow to use `make flux-push` and `make flux-sync`
+
+#### Benefits
+
+- **User-friendly**: Documentation now uses Makefile commands (easier to remember, tab-completion)
+- **Accurate**: Reflects actual project structure (base/overlay pattern, not infra/apps)
+- **Consistent**: All deployment commands use Makefile (not mix of scripts and Make)
+- **Career Development**: Learn production Makefile patterns (ControlPlane.io standard)
+
+#### Files Changed
+
+- `README.md`: 3 major sections updated (Quick Start, GitOps Structure, Access Points)
+- `AGENTS.md`: 4 sections updated (Development Commands, Deployment Order, Quick Navigation)
+
 ## [0.28.1] - 2026-01-21
 
 ### Changed

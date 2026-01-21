@@ -95,7 +95,7 @@ go build -o bin/{service} cmd/{service}/main.go
 
 **Detailed Configuration**: See [`docs/guides/API.md`](docs/guides/API.md) for environment variables, `.env` files, and local setup.
 
-**GitOps Deployment**: See deployment commands in [Deployment Order](#deployment-order) section. Use `./scripts/flux-push.sh` to deploy all services to Kubernetes.
+**GitOps Deployment**: See deployment commands in [Deployment Order](#deployment-order) section. Use `make up` for one-command deployment or `make flux-push` to deploy all services to Kubernetes.
 
 ---
 
@@ -246,41 +246,48 @@ monitoring/
 
 ### Deployment Order
 
-**GitOps Workflow** - Infrastructure → Monitoring → APM → Databases → Apps → SLO
+**GitOps Workflow** - Infrastructure → Apps (Flux enforces via `dependsOn`)
 
 ```bash
-# 1. Create Kind Cluster + OCI Registry
-./scripts/kind-up.sh
+# One-command deployment
+make up
 
-# 2. Bootstrap Flux Operator
-./scripts/flux-up.sh
-
-# 3. Deploy All (Flux reconciles in dependency order)
-./scripts/flux-push.sh
+# Or step-by-step:
+make cluster-up   # 1. Create Kind Cluster + OCI Registry
+make flux-up      # 2. Bootstrap Flux Operator
+make flux-push    # 3. Deploy All (Flux reconciles in dependency order)
 ```
 
 **Flux automatically deploys in correct order:**
 
 1. **Foundation** - Flux Operator, namespaces, OCI sources
-2. **Monitoring** (BEFORE apps) - Prometheus, Grafana, Metrics Server
-3. **APM** (BEFORE apps) - Tempo, Loki, Vector, OTel Collector, Pyroscope, Jaeger
-4. **Databases** (BEFORE apps) - PostgreSQL operators, 5 clusters, connection poolers
-5. **Applications** - 9 microservices + frontend + k6 load testing
-6. **SLO** - Sloth Operator + 9 PrometheusServiceLevel CRDs
+2. **Infrastructure** (BEFORE apps) - Monitoring, APM, Databases, SLO
+   - Monitoring: Prometheus, Grafana, Metrics Server
+   - APM: Tempo, Loki, Vector, OTel Collector, Pyroscope, Jaeger
+   - Databases: PostgreSQL operators, 5 clusters, connection poolers
+   - SLO: Sloth Operator + 9 PrometheusServiceLevel CRDs
+3. **Applications** - 9 microservices + frontend + k6 load testing
+
+**Dependency Chain:**
+
+- `apps-local` has `dependsOn: [infrastructure-local]`
+- Apps **will NOT start** until infrastructure is ready
+- Flux enforces this automatically via Kustomization CRDs
 
 **Verification:**
 
 ```bash
 # Check Flux reconciliation status
-flux get kustomizations
+make flux-status
+# Or: flux get kustomizations
 
 # Check all resources
 kubectl get pods --all-namespaces
 kubectl get helmreleases --all-namespaces
 
 # Trigger manual reconciliation (if needed)
-flux reconcile kustomization infrastructure-local --with-source
-flux reconcile kustomization apps-local --with-source
+make flux-sync
+# Or: flux reconcile kustomization infrastructure-local --with-source
 ```
 
 **Detailed Deployment Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md)
@@ -313,11 +320,12 @@ flux reconcile kustomization apps-local --with-source
 **Add a new service:**
 
 - Service code: `services/cmd/{service}/`, `services/internal/{service}/`
-- Helm values: `charts/values/{service}.yaml`
+- Helm values: `charts/mop/values/{service}.yaml`
 - HelmRelease: `kubernetes/base/apps/{service}/helmrelease.yaml`
 - Local patches: `kubernetes/overlays/local/apps/patches/services/{service}.yaml`
 - SLO CRD: `kubernetes/base/infrastructure/slo/crds/{service}.yaml`
 - Migration: `services/{service}/db/migrations/Dockerfile` + `sql/V*__*.sql`
+- Push to OCI: `make flux-push` (updates OCI registry)
 
 **Update monitoring:**
 
@@ -329,7 +337,8 @@ flux reconcile kustomization apps-local --with-source
 **Modify SLOs:**
 
 - Edit CRDs: `kubernetes/base/infrastructure/slo/crds/*.yaml` (PrometheusServiceLevel CRDs)
-- Apply: Flux reconciles automatically, or `flux reconcile kustomization slo-stack --with-source`
+- Push changes: `make flux-push` (updates OCI registry)
+- Apply: Flux reconciles automatically, or `make flux-sync`
 
 **Modify infrastructure:**
 

@@ -1,0 +1,129 @@
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: product
+  namespace: monitoring
+spec:
+  service: "product"
+  labels:
+    team: "platform"
+    env: "monitoring"
+    service: "product"
+    namespace: "product"
+  slos:
+    # SLO 1: Availability (Success Rate - 5xx errors)
+    - name: "availability"
+      objective: 99.5
+      description: "Availability measures the ratio of successful requests (non-5xx) to total requests"
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(request_duration_seconds_count{
+              app="product",
+              namespace="product",
+              job=~"microservices",
+              code=~"5.."
+            }[{{.window}}]))
+          totalQuery: |
+            sum(rate(request_duration_seconds_count{
+              app="product",
+              namespace="product",
+              job=~"microservices"
+            }[{{.window}}]))
+      alerting:
+        name: ProductHighErrorRate
+        labels:
+          severity: critical
+          category: availability
+          service: "product"
+        annotations:
+          summary: "High 5xx error rate detected on product"
+          description: "Availability SLO is at risk. Current error rate is impacting user productentication."
+        pageAlert:
+          labels:
+            severity: page
+            channel: "#alerts"
+        ticketAlert:
+          labels:
+            severity: ticket
+            channel: "#incidents"
+
+    # SLO 2: Latency (P95 < 500ms)
+    - name: "latency"
+      objective: 95.0
+      description: "Latency measures the ratio of requests faster than 500ms to total requests"
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(request_duration_seconds_count{
+              app="product",
+              namespace="product",
+              job=~"microservices"
+            }[{{.window}}]))
+            -
+            sum(rate(request_duration_seconds_bucket{
+              app="product",
+              namespace="product",
+              job=~"microservices",
+              le="0.5"
+            }[{{.window}}]))
+          totalQuery: |
+            sum(rate(request_duration_seconds_count{
+              app="product",
+              namespace="product",
+              job=~"microservices"
+            }[{{.window}}]))
+      alerting:
+        name: ProductHighLatency
+        labels:
+          severity: warning
+          category: latency
+          service: "product"
+        annotations:
+          summary: "High latency detected on product"
+          description: "More than 5% of requests are slower than 500ms threshold."
+        pageAlert:
+          labels:
+            severity: page
+            channel: "#alerts"
+        ticketAlert:
+          labels:
+            severity: ticket
+            channel: "#incidents"
+
+    # SLO 3: Overall Error Rate (4xx + 5xx)
+    - name: "error-rate"
+      objective: 99.0
+      description: "Error rate measures the ratio of successful requests (non-4xx/5xx) to total requests"
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(request_duration_seconds_count{
+              app="product",
+              namespace="product",
+              job=~"microservices",
+              code=~"4..|5.."
+            }[{{.window}}]))
+          totalQuery: |
+            sum(rate(request_duration_seconds_count{
+              app="product",
+              namespace="product",
+              job=~"microservices"
+            }[{{.window}}]))
+      alerting:
+        name: ProductHighOverallErrorRate
+        labels:
+          severity: warning
+          category: errors
+          service: "product"
+        annotations:
+          summary: "High overall error rate (4xx + 5xx) on product"
+          description: "More than 1% of requests are returning errors."
+        pageAlert:
+          labels:
+            severity: page
+            channel: "#alerts"
+        ticketAlert:
+          labels:
+            severity: ticket
+            channel: "#incidents"

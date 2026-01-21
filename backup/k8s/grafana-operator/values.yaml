@@ -1,0 +1,22 @@
+# Namespace override (replaces operator.namespace)
+namespaceOverride: monitoring
+
+# Watch only monitoring namespace (replaces operator.watchNamespaces)
+# String format, space-separated for multiple namespaces
+watchNamespaces: "monitoring"
+
+# Logging configuration (replaces operator.logLevel)
+logging:
+  level: info
+
+# Image configuration (replaces operator.image.repository)
+# Split into registry + repository for OCI chart structure
+image:
+  registry: ghcr.io
+  repository: grafana/grafana-operator
+  tag: ""  # Uses chart appVersion by default, or specify version like "v5.21.3"
+
+# CRDs configuration (replaces crds.install)
+# immutable: true means CRDs are installed automatically (default behavior)
+crds:
+  immutable: true

@@ -65,7 +65,12 @@ export default function ProductDetailPage() {
         setAdding(true);
         setCartMessage(null);
         try {
-            const result = await addToCart(id, quantity);
+            const result = await addToCart(
+                id,
+                data.product.name,
+                data.product.price,
+                quantity
+            );
             console.log('[API] POST /cart:', result);
             setCartMessage({ type: 'success', text: `Added ${quantity} to cart` });
             setQuantity(1);

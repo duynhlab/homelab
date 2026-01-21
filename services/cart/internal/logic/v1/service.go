@@ -72,10 +72,12 @@ func (s *CartService) AddToCart(ctx context.Context, userID string, req domain.A
 		return nil, ErrInvalidQuantity
 	}
 
-	// Create cart item
+	// Create cart item with product details
 	item := domain.CartItem{
-		ProductID: req.ProductID,
-		Quantity:  req.Quantity,
+		ProductID:    req.ProductID,
+		ProductName:  req.ProductName,
+		ProductPrice: req.ProductPrice,
+		Quantity:     req.Quantity,
 	}
 
 	// Call repository

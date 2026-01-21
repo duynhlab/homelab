@@ -22,6 +22,8 @@ type CartItem struct {
 
 // AddToCartRequest represents a request to add an item to cart
 type AddToCartRequest struct {
-	ProductID string `json:"product_id" binding:"required"`
-	Quantity  int    `json:"quantity" binding:"required,min=1"`
+	ProductID    string  `json:"product_id" binding:"required"`
+	ProductName  string  `json:"product_name" binding:"required"`
+	ProductPrice float64 `json:"product_price" binding:"required,min=0"`
+	Quantity     int     `json:"quantity" binding:"required,min=1"`
 }

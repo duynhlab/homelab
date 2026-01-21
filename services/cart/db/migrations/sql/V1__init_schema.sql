@@ -6,20 +6,16 @@
 -- =============================================================================
 -- CART ITEMS TABLE
 -- =============================================================================
--- Note: This service has cross-service dependency on product.products table
--- for JOIN operations in CartRepository.FindByUserID():
---   SELECT ci.id, ci.product_id, p.name, p.price, ci.quantity
---   FROM cart_items ci
---   JOIN products p ON ci.product_id = p.id
---
--- This is acceptable for Phase 1 but should be refactored in future phases
--- by denormalizing product_name and product_price into cart_items.
+-- Stores shopping cart items with product details for display.
+-- Product name and price are stored when adding to cart.
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS cart_items (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL,  -- References auth.users.id (cross-service reference, no FK)
     product_id INTEGER NOT NULL,  -- References product.products.id (cross-service reference, no FK)
+    product_name VARCHAR(255) NOT NULL,  -- Product name at time of adding to cart
+    product_price DECIMAL(10,2) NOT NULL,  -- Product price at time of adding to cart
     quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

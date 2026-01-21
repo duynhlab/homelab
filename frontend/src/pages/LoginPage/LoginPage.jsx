@@ -16,8 +16,8 @@ export default function LoginPage() {
 
     const [form, setForm] = useState({
         username: '',
-        email: '',
-        password: ''
+        email: 'alice@example.com',
+        password: 'password123'
     });
 
     const handleSubmit = async (e) => {

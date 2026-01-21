@@ -1,0 +1,26 @@
+# ServiceMonitor for PgCat Transaction Pooler
+# Enables Prometheus to scrape PgCat metrics from HTTP admin endpoint
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pgcat-transaction
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  # Select the cart namespace where PgCat service is located
+  namespaceSelector:
+    matchNames:
+      - cart
+  
+  # Match the PgCat service by app label
+  selector:
+    matchLabels:
+      app: pgcat-transaction
+  
+  # Scrape configuration
+  endpoints:
+  - port: metrics  # Port 9930 (admin port) serves both admin interface and Prometheus metrics endpoint
+    path: /metrics
+    interval: 15s
+    scrapeTimeout: 10s

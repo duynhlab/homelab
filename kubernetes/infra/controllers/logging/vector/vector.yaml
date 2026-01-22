@@ -324,6 +324,7 @@ spec:
               - database
               - query_id
               - pod_name
+              - user
               - query_text
               - plan_json
               - duration_ms

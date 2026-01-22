@@ -15,7 +15,7 @@ Connection poolers solve the "too many connections" problem by reusing PostgreSQ
 
 ## PgDog (Product Database)
 
-**Location:** [`pgdog-product/`](pgdog-product/)
+**Location:** [`product-db/poolers/`](product-db/poolers/)
 
 **Purpose:** Connection pooling for product-db (CloudNativePG cluster)
 
@@ -110,11 +110,11 @@ externalSecrets:
 - Metrics: Port 9090 (OpenMetrics)
 
 **Files:**
-- [`pgdog-product/helmrelease.yaml`](pgdog-product/helmrelease.yaml) - Flux HelmRelease definition
+- [`product-db/poolers/helmrelease.yaml`](product-db/poolers/helmrelease.yaml) - Flux HelmRelease definition
 
 ## PgCat (Transaction Database)
 
-**Location:** [`pgcat-transaction/`](pgcat-transaction/)
+**Location:** [`transaction-db/poolers/`](transaction-db/poolers/)
 
 ### Kubernetes Deployment Architecture
 
@@ -170,9 +170,9 @@ flowchart TD
 - Metrics: Port 9930 (Prometheus exporter)
 
 **Files:**
-- [`pgcat-transaction/configmap.yaml`](pgcat-transaction/configmap.yaml) - PgCat TOML configuration
-- [`pgcat-transaction/deployment.yaml`](pgcat-transaction/deployment.yaml) - Kubernetes Deployment
-- [`pgcat-transaction/service.yaml`](pgcat-transaction/service.yaml) - Kubernetes Service
+- [`transaction-db/poolers/configmap.yaml`](transaction-db/poolers/configmap.yaml) - PgCat TOML configuration
+- [`transaction-db/poolers/deployment.yaml`](transaction-db/poolers/deployment.yaml) - Kubernetes Deployment
+- [`transaction-db/poolers/service.yaml`](transaction-db/poolers/service.yaml) - Kubernetes Service
 
 ## Comparison
 
@@ -212,7 +212,7 @@ DB_PORT=5432
 - Namespace: `pgdog_`
 
 **PgCat Metrics:**
-- ServiceMonitor: `kubernetes/infra/configs/monitoring/servicemonitors/`
+- ServiceMonitor: `transaction-db/monitoring/servicemonitor-pgcat-transaction.yaml`
 - Endpoint: `http://pgcat.cart.svc.cluster.local:9930/metrics`
 
 ## Related Documentation

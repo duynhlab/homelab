@@ -37,13 +37,13 @@ func main() {
 		zap.String("port", cfg.Service.Port),
 	)
 
-	// Initialize database connection
-	db, err := database.Connect()
+	// Initialize database connection pool (pgx)
+	pool, err := database.Connect(context.Background())
 	if err != nil {
 		logger.Fatal("Failed to connect to database", zap.Error(err))
 	}
-	defer db.Close()
-	logger.Info("Database connection established")
+	defer pool.Close()
+	logger.Info("Database connection pool established")
 
 	// Initialize OpenTelemetry tracing with centralized config
 	var tp interface{ Shutdown(context.Context) error }
@@ -140,11 +140,8 @@ func main() {
 	}
 
 	// 2. Close database connections (explicit cleanup + defer for safety)
-	if err := db.Close(); err != nil {
-		logger.Error("Database close error", zap.Error(err))
-	} else {
-		logger.Info("Database closed")
-	}
+	pool.Close()
+	logger.Info("Database pool closed")
 
 	// 3. Shutdown tracer (flush pending spans)
 	if tp != nil {

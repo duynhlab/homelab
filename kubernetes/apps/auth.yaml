@@ -25,7 +25,7 @@ spec:
     image:
       repository: ghcr.io/duynhne/auth
       tag: v6
-      pullPolicy: IfNotPresent
+      pullPolicy: Always
 
     service:
       type: ClusterIP

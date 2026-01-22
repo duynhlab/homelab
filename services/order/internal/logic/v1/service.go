@@ -102,7 +102,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, req domain.CreateOrderRe
 		span.RecordError(err)
 		return nil, err
 	}
-	defer tx.Rollback() // Rollback if not committed
+	defer tx.Rollback(ctx) // Rollback if not committed
 
 	// Create order with transaction
 	err = s.orderRepo.CreateWithTx(ctx, tx, order)
@@ -126,7 +126,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, req domain.CreateOrderRe
 	// }
 
 	// Commit transaction
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		span.RecordError(err)
 		return nil, err
 	}

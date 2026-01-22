@@ -2,10 +2,11 @@ package v1
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	database "github.com/duynhne/monitoring/services/shipping/internal/core"
 	"github.com/duynhne/monitoring/services/shipping/internal/core/domain"
 	"github.com/duynhne/monitoring/services/shipping/middleware"
@@ -27,7 +28,7 @@ func (s *ShippingService) TrackShipment(ctx context.Context, trackingNumber stri
 	))
 	defer span.End()
 
-	// Get database connection
+	// Get database connection pool (pgx)
 	db := database.GetDB()
 	if db == nil {
 		span.RecordError(fmt.Errorf("database connection not available"))
@@ -44,14 +45,14 @@ func (s *ShippingService) TrackShipment(ctx context.Context, trackingNumber stri
 
 	var id, orderID int
 	var trackingNum, carrier, status string
-	var estimatedDelivery sql.NullTime
+	var estimatedDelivery *time.Time // Use pointer for nullable column
 	var createdAt, updatedAt time.Time
 
-	err := db.QueryRowContext(ctx, query, trackingNumber).Scan(
+	err := db.QueryRow(ctx, query, trackingNumber).Scan(
 		&id, &orderID, &trackingNum, &carrier, &status, &estimatedDelivery, &createdAt, &updatedAt,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			span.SetAttributes(attribute.Bool("shipment.found", false))
 			return nil, fmt.Errorf("track shipment with number %q: %w", trackingNumber, ErrShipmentNotFound)
 		}
@@ -73,8 +74,8 @@ func (s *ShippingService) TrackShipment(ctx context.Context, trackingNumber stri
 		shipment.Carrier = carrier
 	}
 
-	if estimatedDelivery.Valid {
-		deliveryStr := estimatedDelivery.Time.Format(time.RFC3339)
+	if estimatedDelivery != nil {
+		deliveryStr := estimatedDelivery.Format(time.RFC3339)
 		shipment.EstimatedDelivery = &deliveryStr
 		span.SetAttributes(attribute.String("shipment.estimated_delivery", deliveryStr))
 	}

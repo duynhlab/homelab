@@ -2,11 +2,12 @@ package v2
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	database "github.com/duynhne/monitoring/services/auth/internal/core"
 	"github.com/duynhne/monitoring/services/auth/internal/core/domain"
 	"github.com/duynhne/monitoring/services/auth/middleware"
@@ -33,21 +34,21 @@ func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*doma
 	))
 	defer span.End()
 
-	// Get database connection
-	db := database.GetDB()
-	if db == nil {
+	// Get database connection pool (pgx)
+	pool := database.GetPool()
+	if pool == nil {
 		return nil, fmt.Errorf("database connection not available")
 	}
 
 	// Query user from database
 	var userID int
 	var username, email, passwordHash string
-	var lastLogin sql.NullTime
+	var lastLogin *time.Time
 
 	query := `SELECT id, username, email, password_hash, last_login FROM users WHERE username = $1`
-	err := db.QueryRowContext(ctx, query, req.Username).Scan(&userID, &username, &email, &passwordHash, &lastLogin)
+	err := pool.QueryRow(ctx, query, req.Username).Scan(&userID, &username, &email, &passwordHash, &lastLogin)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			span.SetAttributes(attribute.Bool("auth.success", false))
 			span.AddEvent("authentication.failed")
 			return nil, fmt.Errorf("authenticate user %q: %w", req.Username, ErrUserNotFound)
@@ -66,7 +67,7 @@ func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*doma
 
 	// Update last_login timestamp
 	updateQuery := `UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1`
-	_, err = db.ExecContext(ctx, updateQuery, userID)
+	_, err = pool.Exec(ctx, updateQuery, userID)
 	if err != nil {
 		// Log error but don't fail login
 		span.RecordError(fmt.Errorf("update last_login: %w", err))
@@ -78,7 +79,7 @@ func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*doma
 	// Insert session into database
 	sessionQuery := `INSERT INTO sessions (user_id, token, expires_at) VALUES ($1, $2, $3)`
 	expiresAt := time.Now().Add(24 * time.Hour) // 24 hour expiry
-	_, err = db.ExecContext(ctx, sessionQuery, userID, token, expiresAt)
+	_, err = pool.Exec(ctx, sessionQuery, userID, token, expiresAt)
 	if err != nil {
 		// Log error but don't fail login
 		span.RecordError(fmt.Errorf("create session: %w", err))
@@ -115,9 +116,9 @@ func (s *AuthService) Register(ctx context.Context, req domain.RegisterRequest) 
 	))
 	defer span.End()
 
-	// Get database connection
-	db := database.GetDB()
-	if db == nil {
+	// Get database connection pool (pgx)
+	pool := database.GetPool()
+	if pool == nil {
 		return nil, fmt.Errorf("database connection not available")
 	}
 
@@ -131,12 +132,12 @@ func (s *AuthService) Register(ctx context.Context, req domain.RegisterRequest) 
 	// Check if username or email already exists (v2 enhanced validation)
 	var existingID int
 	checkQuery := `SELECT id FROM users WHERE username = $1 OR email = $2`
-	err = db.QueryRowContext(ctx, checkQuery, req.Username, req.Email).Scan(&existingID)
+	err = pool.QueryRow(ctx, checkQuery, req.Username, req.Email).Scan(&existingID)
 	if err == nil {
 		// User already exists
 		span.SetAttributes(attribute.Bool("registration.success", false))
 		return nil, fmt.Errorf("register user %q: %w", req.Username, ErrUserExists)
-	} else if err != sql.ErrNoRows {
+	} else if !errors.Is(err, pgx.ErrNoRows) {
 		// Database error
 		span.RecordError(err)
 		return nil, fmt.Errorf("check existing user: %w", err)
@@ -145,7 +146,7 @@ func (s *AuthService) Register(ctx context.Context, req domain.RegisterRequest) 
 	// Insert new user
 	insertQuery := `INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id`
 	var userID int
-	err = db.QueryRowContext(ctx, insertQuery, req.Username, req.Email, string(passwordHash)).Scan(&userID)
+	err = pool.QueryRow(ctx, insertQuery, req.Username, req.Email, string(passwordHash)).Scan(&userID)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("insert user: %w", err)
@@ -157,7 +158,7 @@ func (s *AuthService) Register(ctx context.Context, req domain.RegisterRequest) 
 	// Insert session
 	sessionQuery := `INSERT INTO sessions (user_id, token, expires_at) VALUES ($1, $2, $3)`
 	expiresAt := time.Now().Add(24 * time.Hour)
-	_, err = db.ExecContext(ctx, sessionQuery, userID, token, expiresAt)
+	_, err = pool.Exec(ctx, sessionQuery, userID, token, expiresAt)
 	if err != nil {
 		// Log error but don't fail registration
 		span.RecordError(fmt.Errorf("create session: %w", err))

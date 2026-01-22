@@ -2,7 +2,8 @@ package v2
 
 import (
 	"context"
-	"database/sql"
+	"errors"
+	"github.com/jackc/pgx/v5"
 	"fmt"
 	"strconv"
 
@@ -42,7 +43,7 @@ func (s *CartService) GetCart(ctx context.Context, cartId string) (*domain.Cart,
 
 	// Query cart items
 	query := `SELECT id, user_id, product_id, quantity FROM cart_items WHERE user_id = $1`
-	rows, err := db.QueryContext(ctx, query, userID)
+	rows, err := db.Query(ctx, query, userID)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("query cart items: %w", err)
@@ -129,12 +130,12 @@ func (s *CartService) AddItem(ctx context.Context, cartId string, req domain.Add
 	var existingID int
 	var existingQuantity int
 	checkQuery := `SELECT id, quantity FROM cart_items WHERE user_id = $1 AND product_id = $2`
-	err = db.QueryRowContext(ctx, checkQuery, userID, productID).Scan(&existingID, &existingQuantity)
+	err = db.QueryRow(ctx, checkQuery, userID, productID).Scan(&existingID, &existingQuantity)
 	if err == nil {
 		// Update quantity
 		newQuantity := existingQuantity + req.Quantity
 		updateQuery := `UPDATE cart_items SET quantity = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`
-		_, err = db.ExecContext(ctx, updateQuery, newQuantity, existingID)
+		_, err = db.Exec(ctx, updateQuery, newQuantity, existingID)
 		if err != nil {
 			span.RecordError(err)
 			return nil, fmt.Errorf("update cart item: %w", err)
@@ -147,7 +148,7 @@ func (s *CartService) AddItem(ctx context.Context, cartId string, req domain.Add
 		}
 		span.SetAttributes(attribute.Bool("item.added", true))
 		return item, nil
-	} else if err != sql.ErrNoRows {
+	} else if !errors.Is(err, pgx.ErrNoRows) {
 		span.RecordError(err)
 		return nil, fmt.Errorf("check existing cart item: %w", err)
 	}
@@ -155,7 +156,7 @@ func (s *CartService) AddItem(ctx context.Context, cartId string, req domain.Add
 	// Insert new item
 	insertQuery := `INSERT INTO cart_items (user_id, product_id, quantity) VALUES ($1, $2, $3) RETURNING id`
 	var itemID int
-	err = db.QueryRowContext(ctx, insertQuery, userID, productID, req.Quantity).Scan(&itemID)
+	err = db.QueryRow(ctx, insertQuery, userID, productID, req.Quantity).Scan(&itemID)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("insert cart item: %w", err)

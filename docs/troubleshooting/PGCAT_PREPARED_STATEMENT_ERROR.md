@@ -57,7 +57,34 @@ sequenceDiagram
 |--------|------------------------|------------------|
 | `lib/pq` | Server-side (cached on PostgreSQL) | ❌ No |
 | `lib/pq` + `prefer_simple_protocol=true` | Simple protocol (workaround) | ✅ Yes |
-| `pgx/v5` with `pgxpool` | Client-side / Simple protocol | ✅ Yes (native) |
+| `pgx/v5` with `pgxpool` (default) | Client-side with statement cache | ⚠️ Partial |
+| `pgx/v5` with `QueryExecModeSimpleProtocol` | Simple protocol (no cache) | ✅ Yes |
+
+**IMPORTANT:** Even with `pgx/v5`, you must configure it to use **simple protocol** and **disable statement caching** for full compatibility with transaction-mode poolers:
+
+```go
+// Parse DSN into pool config
+poolCfg, err := pgxpool.ParseConfig(dsn)
+if err != nil {
+    return nil, err
+}
+
+// Configure for transaction-mode poolers (PgCat/PgBouncer):
+// - Use simple protocol to avoid server-side prepared statements
+// - Disable statement cache (prepared statements are connection-scoped)
+// - Disable description cache
+poolCfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+poolCfg.ConnConfig.StatementCacheCapacity = 0
+poolCfg.ConnConfig.DescriptionCacheCapacity = 0
+
+// Create pool with configured settings
+pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
+```
+
+Without this configuration, `pgx/v5` may still use its internal statement cache (`stmtcache_*`) which causes errors like:
+```
+prepared statement "stmtcache_261f715dc1ec05ba407647df6dcb2cda66737f25b12047d1" does not exist
+```
 
 ### Migration Applied
 
@@ -78,7 +105,10 @@ All 9 services migrated from `lib/pq` to `pgx/v5 v5.8.0`:
 ### Files Changed Per Service
 
 1. **go.mod**: `lib/pq v1.10.9` → `jackc/pgx/v5 v5.8.0`
-2. **database.go**: `sql.DB` → `pgxpool.Pool`
+2. **database.go**: 
+   - `sql.DB` → `pgxpool.Pool`
+   - `pgxpool.New()` → `pgxpool.ParseConfig()` + `pgxpool.NewWithConfig()`
+   - Added `QueryExecModeSimpleProtocol` + disabled statement/description caches
 3. **main.go**: `database.Connect()` → `database.Connect(ctx)`
 4. **repository** (if exists): `QueryContext/ExecContext` → `Query/Exec`
 
@@ -114,4 +144,5 @@ make flux-push
 
 - Affected services: All 9 services using PostgreSQL
 - Date discovered: 2026-01-21
-- Fixed by: Migration from `lib/pq` to `pgx/v5 v5.8.0`
+- Initial fix: Migration from `lib/pq` to `pgx/v5 v5.8.0`
+- Additional fix (2026-01-22): Added `QueryExecModeSimpleProtocol` + disabled statement cache to fix `stmtcache_*` errors

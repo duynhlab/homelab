@@ -4,9 +4,10 @@ set -o errexit
 
 echo "Starting cluster bootstrap"
 
-# Install Flux Operator via Helm (not flux-operator CLI)
-echo "Installing Flux Operator via Helm..."
-helm install flux-operator oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator \
+# Install or upgrade Flux Operator via Helm (idempotent)
+# helm upgrade --install will install if not present, or upgrade if it exists
+echo "Installing/upgrading Flux Operator via Helm..."
+helm upgrade --install flux-operator oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator \
     --namespace flux-system \
     --create-namespace \
     --wait

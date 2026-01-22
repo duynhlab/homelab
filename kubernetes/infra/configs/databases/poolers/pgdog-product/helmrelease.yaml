@@ -14,7 +14,7 @@ spec:
     spec:
       chart: pgdog
       interval: 5m
-      version: "v0.31"
+      version: "v0.32"
       sourceRef:
         kind: HelmRepository
         name: pgdogdev

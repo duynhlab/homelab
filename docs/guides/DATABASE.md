@@ -207,7 +207,7 @@ flowchart TB
 - **Pooler**: PgDog standalone deployment via Helm chart (`helm.pgdog.dev/pgdog`)
 - **Namespace**: `product`
 - **CRD**: `kubernetes/infra/configs/databases/instances/product-db.yaml`
-- **Pooler HelmRelease**: `kubernetes/infra/configs/databases/poolers/product/helmrelease.yaml`
+- **Pooler HelmRelease**: `kubernetes/infra/configs/databases/poolers/pgdog-product/helmrelease.yaml`
 
 **Architecture Diagram:**
 
@@ -287,8 +287,8 @@ kubectl exec -n product $PRIMARY_POD -- env PGPASSWORD=$PASSWORD psql -h localho
 - **Pooler**: PgCat standalone deployment v1.2.0 (`ghcr.io/postgresml/pgcat:v1.2.0`) with 2 replicas for HA
 - **Namespace**: `cart`
 - **CRD**: `kubernetes/infra/configs/databases/instances/transaction-db.yaml`
-- **Pooler Config**: `kubernetes/infra/configs/databases/poolers/transaction/configmap.yaml`
-- **Pooler Deployment**: `kubernetes/infra/configs/databases/poolers/transaction/deployment.yaml`
+- **Pooler Config**: `kubernetes/infra/configs/databases/poolers/pgcat-transaction/configmap.yaml`
+- **Pooler Deployment**: `kubernetes/infra/configs/databases/poolers/pgcat-transaction/deployment.yaml`
 - **Production-Ready**: Comprehensive PostgreSQL performance tuning, synchronous replication, logical replication slot sync
 
 **Architecture Diagram:**
@@ -434,7 +434,7 @@ flowchart TB
 - PgCat transparently routes to CloudNativePG cluster
 - Application code same as direct connection
 
-**Transaction Database PgCat Configuration** (`kubernetes/infra/configs/databases/poolers/transaction/configmap.yaml`):
+**Transaction Database PgCat Configuration** (`kubernetes/infra/configs/databases/poolers/pgcat-transaction/configmap.yaml`):
 
 **Key Concepts:**
 - **pool_mode: `transaction`** - Connection released after each transaction (better concurrency for microservices)
@@ -501,7 +501,7 @@ PgCat metrics are exposed via HTTP endpoint (`/metrics` on port 9930) and scrape
 
 **Configuration Requirement:**
 - PgCat config must have `enable_prometheus_exporter = true` in `[general]` section to expose HTTP metrics endpoint
-- ConfigMap: `kubernetes/infra/configs/databases/poolers/transaction/configmap.yaml` (transaction-db uses PgCat; product-db uses PgDog via Helm chart)
+- ConfigMap: `kubernetes/infra/configs/databases/poolers/pgcat-transaction/configmap.yaml` (transaction-db uses PgCat; product-db uses PgDog via Helm chart)
 
 **ServiceMonitor Files:**
 - `k8s/prometheus/servicemonitors/servicemonitor-pgcat-transaction.yaml` - For Transaction DB PgCat
@@ -1107,7 +1107,7 @@ connectionPooler:
 
 **Deployment:**
 - **Helm Chart**: `helm.pgdog.dev/pgdog` (version 0.31)
-- **HelmRelease**: `kubernetes/infra/configs/databases/poolers/product/helmrelease.yaml`
+- **HelmRelease**: `kubernetes/infra/configs/databases/poolers/pgdog-product/helmrelease.yaml`
 - **Replicas**: 1 (Single replica for dev)
 - **Port**: 6432 (PostgreSQL protocol), 9090 (OpenMetrics)
 

@@ -4,8 +4,8 @@ import "context"
 
 // Transaction represents a database transaction
 type Transaction interface {
-	Commit() error
-	Rollback() error
+	Commit(ctx context.Context) error
+	Rollback(ctx context.Context) error
 }
 
 // TransactionManager manages database transactions

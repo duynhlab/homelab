@@ -44,7 +44,7 @@ func (s *NotificationService) SendEmail(ctx context.Context, req domain.SendEmai
 	// Insert notification into database
 	insertQuery := `INSERT INTO notifications (user_id, title, message, type, read) VALUES ($1, $2, $3, $4, $5) RETURNING id`
 	var notificationID int
-	err := db.QueryRowContext(ctx, insertQuery, userID, req.Subject, req.Body, "email", false).Scan(&notificationID)
+	err := db.QueryRow(ctx, insertQuery, userID, req.Subject, req.Body, "email", false).Scan(&notificationID)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("insert notification: %w", err)
@@ -82,7 +82,7 @@ func (s *NotificationService) SendSMS(ctx context.Context, req domain.SendSMSReq
 	// Insert notification
 	insertQuery := `INSERT INTO notifications (user_id, title, message, type, read) VALUES ($1, $2, $3, $4, $5) RETURNING id`
 	var notificationID int
-	err := db.QueryRowContext(ctx, insertQuery, userID, "SMS", req.Message, "sms", false).Scan(&notificationID)
+	err := db.QueryRow(ctx, insertQuery, userID, "SMS", req.Message, "sms", false).Scan(&notificationID)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("insert notification: %w", err)

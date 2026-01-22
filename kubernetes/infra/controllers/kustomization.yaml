@@ -3,7 +3,8 @@ kind: Kustomization
 
 resources:
   - ../namespaces.yaml  # Apply namespaces FIRST
-  - monitoring/
-  - apm/
+  - metrics/
+  - logging/
+  - tracing/
+  - profiling/
   - databases/
-  - slo/

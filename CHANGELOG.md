@@ -7,6 +7,136 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.35.0] - 2026-01-22
+
+### Changed
+
+#### Refactor: Cluster-centric database configs
+
+Reorganized `kubernetes/infra/configs/databases/` to group all resources by database cluster.
+
+**Before:**
+```
+configs/databases/
+├── instances/         # All cluster CRDs
+├── secrets/           # App secrets (CloudNativePG only)
+├── configmaps/        # Monitoring queries, Vector sidecar configs
+├── poolers/           # PgDog, PgCat
+└── monitoring/        # PodMonitors, ServiceMonitors
+```
+
+**After:**
+```
+configs/databases/
+├── clusters/
+│   ├── auth-db/       # Zalando (3-node HA)
+│   │   ├── instance.yaml
+│   │   └── configmaps/
+│   ├── review-db/     # Zalando (single node)
+│   ├── supporting-db/ # Zalando (shared DB)
+│   ├── product-db/    # CloudNativePG (2-node)
+│   │   ├── instance.yaml
+│   │   ├── secrets/
+│   │   ├── poolers/   # PgDog HelmRelease
+│   │   └── monitoring/
+│   └── transaction-db/ # CloudNativePG (3-node HA)
+│       ├── instance.yaml
+│       ├── secrets/
+│       ├── poolers/   # PgCat manifests
+│       └── monitoring/
+├── kustomization.yaml
+└── README.md
+```
+
+**Benefits:**
+- Easy to find all resources for a specific cluster
+- Clear ownership and dependencies
+- Kustomize ordering handled per-cluster (secrets → instance → poolers → monitoring)
+
+**Docs updated:**
+- `docs/guides/DATABASE.md` - Updated all path references
+- `kubernetes/README.md` - Updated structure overview
+- `kubernetes/infra/configs/databases/README.md` - New README explaining cluster-centric convention
+- `kubernetes/infra/configs/databases/clusters/README.md` - Updated pooler locations
+
+**Removed:**
+- `instances/secrets.yaml` - Duplicate secrets file (unused)
+- Empty directories: `instances/`, `secrets/`, `poolers/`, `monitoring/`, `configmaps/`
+
+## [0.34.0] - 2026-01-22
+
+### Changed
+
+#### Refactor: Flatten controllers observability + move Sloth under metrics
+
+Follow-up cleanup to the observability refactor:
+- Removed the `controllers/observability/` wrapper directory
+- Kept `metrics/`, `logging/`, `tracing/`, `profiling/` at the **same level** as `databases/`
+- Moved `controllers/slo/` into `controllers/metrics/slo/` (Sloth is metrics-based)
+
+**New layout:**
+```
+controllers/
+├── metrics/      (prometheus-operator, grafana-operator, metrics-server, slo/sloth-operator)
+├── logging/      (loki, vector, victorialogs)
+├── tracing/      (tempo, jaeger, otel-collector)
+├── profiling/    (pyroscope)
+├── databases/
+└── slo/          (removed)
+```
+
+**Docs updated:**
+- `kubernetes/README.md`
+- `docs/victorialogs/README.md`
+
+## [0.33.0] - 2026-01-22
+
+### Changed
+
+#### Refactor: Split controllers into observability domains
+
+Reorganized `kubernetes/infra/controllers/` to eliminate the confusing `apm/` bucket and create explicit observability domains.
+
+**Before:**
+```
+controllers/
+├── monitoring/   (prometheus, grafana, metrics-server)
+├── apm/          (loki, tempo, vector, jaeger, otel, pyroscope, victorialogs)
+├── databases/
+└── slo/
+```
+
+**After:**
+```
+controllers/
+├── observability/
+│   ├── metrics/    (prometheus-operator, grafana-operator, metrics-server)
+│   ├── logging/    (loki, vector, victorialogs)
+│   ├── tracing/    (tempo, jaeger, otel-collector)
+│   └── profiling/  (pyroscope)
+├── databases/
+└── slo/
+```
+
+**Benefits:**
+- Clear separation by observability pillar (metrics/logging/tracing/profiling)
+- Easier to navigate and understand component ownership
+- No functional changes - same Kubernetes resources, just reorganized
+
+**Files moved:**
+- `controllers/monitoring/*` → `controllers/observability/metrics/`
+- `controllers/apm/loki/` → `controllers/observability/logging/loki/`
+- `controllers/apm/vector/` → `controllers/observability/logging/vector/`
+- `controllers/apm/victorialogs/` → `controllers/observability/logging/victorialogs/`
+- `controllers/apm/tempo/` → `controllers/observability/tracing/tempo/`
+- `controllers/apm/jaeger/` → `controllers/observability/tracing/jaeger/`
+- `controllers/apm/otel-collector/` → `controllers/observability/tracing/otel-collector/`
+- `controllers/apm/pyroscope/` → `controllers/observability/profiling/pyroscope/`
+
+**Docs updated:**
+- `kubernetes/README.md` - Updated structure overview
+- `docs/victorialogs/README.md` - Updated file paths
+
 ## [0.32.0] - 2026-01-22
 
 ### Fixed

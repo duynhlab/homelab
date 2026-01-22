@@ -7,6 +7,120 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.32.0] - 2026-01-22
+
+### Fixed
+
+#### pgx Simple Protocol Fix - Eliminate `stmtcache_*` Errors
+
+Fixed `prepared statement "stmtcache_*" does not exist` errors that occurred with PgCat/PgBouncer transaction-mode poolers, even after migrating to `pgx/v5`.
+
+**Root Cause:**
+- `pgx/v5` still uses an internal statement cache (`stmtcache_*`) by default
+- With transaction-mode poolers, connections are returned to pool after each transaction
+- Statement cache entries become invalid when connection is reused
+
+**Solution:**
+Updated all 9 services' `database.go` to use simple protocol and disable caching:
+
+```go
+poolCfg, _ := pgxpool.ParseConfig(dsn)
+poolCfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+poolCfg.ConnConfig.StatementCacheCapacity = 0
+poolCfg.ConnConfig.DescriptionCacheCapacity = 0
+pool, _ := pgxpool.NewWithConfig(ctx, poolCfg)
+```
+
+**Services Updated:**
+- `auth`, `user`, `notification`, `cart`, `order`, `product`, `review`, `shipping`, `shipping-v2`
+
+**Files Modified:**
+- `services/*/internal/core/database.go` (all 9 services)
+- `docs/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md` - Added simple protocol documentation
+
+#### Frontend Login Fix - Username Instead of Email
+
+Fixed login validation error: `LoginRequest.Username required`
+
+**Root Cause:**
+- Backend expects `{ username, password }` in login request
+- Frontend was sending `{ email, password }`
+
+**Solution:**
+- `frontend/src/api/authApi.js` - Changed `login(email, password)` to `login(username, password)`
+- `frontend/src/pages/LoginPage/LoginPage.jsx` - Login form now shows Username field (default: `alice`)
+
+**Seed Users for Testing:**
+| Username | Password | Email |
+|----------|----------|-------|
+| alice | password123 | alice@example.com |
+| bob | password123 | bob@example.com |
+| carol | password123 | carol@example.com |
+| david | password123 | david@example.com |
+| eve | password123 | eve@example.com |
+
+## [0.31.0] - 2026-01-22
+
+### Added
+
+#### VictoriaLogs Integration - Dual Log Shipping (Loki + VictoriaLogs)
+
+Added VictoriaLogs as a secondary log storage backend alongside Loki, using a single Vector Agent for dual-shipping.
+
+**Architecture:**
+- Single cluster-wide Vector Agent (`kube-system/vector`) ships logs to **both** Loki and VictoriaLogs
+- VictoriaLogs embedded collector/vector is **disabled** to avoid conflicts
+- PostgreSQL auto_explain parsing pipeline added for CloudNativePG clusters
+
+**New Components:**
+
+| Component | Namespace | Purpose |
+|-----------|-----------|---------|
+| `victorialogs` HelmRelease | `monitoring` | VictoriaLogs Single log storage (7d retention, 20Gi PVC) |
+| `victorialogs-oci` OCIRepository | `flux-system` | Flux source for VictoriaLogs Helm chart |
+
+**Vector Configuration Updates:**
+
+New sinks added to Vector:
+- `victorialogs_all` - All Kubernetes logs via `/insert/jsonline`
+- `victorialogs_pg_plans` - Structured PostgreSQL execution plans
+- `victorialogs_pg_parse_failures` - Parse failure debugging stream
+
+New transforms for PostgreSQL auto_explain:
+- `parse_pg_json` - Parse CloudNativePG JSON logs
+- `filter_pg_auto_explain` - Filter for execution plan logs
+- `parse_pg_auto_explain` - Extract plan JSON, query_id, duration, timing metrics
+
+**VictoriaLogs Headers:**
+```yaml
+VL-Time-Field: timestamp
+VL-Msg-Field: message
+VL-Stream-Fields: namespace,service,pod_name,container_name
+AccountID: "0"
+ProjectID: "0"
+```
+
+**Files Added:**
+- `kubernetes/clusters/local/sources/oci/victorialogs-oci.yaml`
+- `kubernetes/infra/controllers/apm/victorialogs/helmrelease.yaml`
+- `docs/victorialogs/README.md`
+
+**Files Modified:**
+- `kubernetes/clusters/local/sources/kustomization.yaml` - Added VictoriaLogs OCI source
+- `kubernetes/infra/controllers/apm/kustomization.yaml` - Added VictoriaLogs HelmRelease
+- `kubernetes/infra/controllers/apm/vector/vector.yaml` - Extended with VictoriaLogs sinks + PG parsing
+- `kubernetes/infra/README.md` - Updated directory structure and APM Controllers
+- `docs/README.md` - Added VictoriaLogs documentation links
+- `scripts/flux-ui.sh` - Added VictoriaLogs port forward (9428)
+
+**Access:**
+- VictoriaLogs: `http://localhost:9428` (via `./scripts/flux-ui.sh`)
+- Health check: `curl http://localhost:9428/health`
+- LogsQL queries: `curl -G 'http://localhost:9428/select/logsql/query' --data-urlencode 'query=...'`
+
+**Documentation:**
+- [VictoriaLogs README](docs/victorialogs/README.md) - Architecture, endpoints, verification, troubleshooting
+
 ## [0.30.0] - 2026-01-22
 
 ### Changed

@@ -21,7 +21,7 @@ spec:
     image:
       repository: ghcr.io/duynhne/shipping-v2
       tag: v6
-      pullPolicy: IfNotPresent
+      pullPolicy: Always
 
     service:
       type: ClusterIP

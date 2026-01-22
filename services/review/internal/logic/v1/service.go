@@ -2,10 +2,11 @@ package v1
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 
+	"github.com/jackc/pgx/v5"
 	database "github.com/duynhne/monitoring/services/review/internal/core"
 	"github.com/duynhne/monitoring/services/review/internal/core/domain"
 	"github.com/duynhne/monitoring/services/review/middleware"
@@ -25,7 +26,7 @@ func (s *ReviewService) ListReviews(ctx context.Context) ([]domain.Review, error
 	))
 	defer span.End()
 
-	// Get database connection
+	// Get database connection pool (pgx)
 	db := database.GetDB()
 	if db == nil {
 		return nil, fmt.Errorf("database connection not available")
@@ -33,7 +34,7 @@ func (s *ReviewService) ListReviews(ctx context.Context) ([]domain.Review, error
 
 	// Query reviews
 	query := `SELECT id, product_id, user_id, rating, title, comment FROM reviews ORDER BY created_at DESC`
-	rows, err := db.QueryContext(ctx, query)
+	rows, err := db.Query(ctx, query)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("query reviews: %w", err)
@@ -44,7 +45,7 @@ func (s *ReviewService) ListReviews(ctx context.Context) ([]domain.Review, error
 	for rows.Next() {
 		var reviewID, productID, userID int
 		var rating int
-		var title, comment sql.NullString
+		var title, comment *string // Use pointers for nullable columns
 
 		err := rows.Scan(&reviewID, &productID, &userID, &rating, &title, &comment)
 		if err != nil {
@@ -58,8 +59,8 @@ func (s *ReviewService) ListReviews(ctx context.Context) ([]domain.Review, error
 			UserID:    strconv.Itoa(userID),
 			Rating:    rating,
 		}
-		if comment.Valid {
-			review.Comment = comment.String
+		if comment != nil {
+			review.Comment = *comment
 		}
 
 		reviews = append(reviews, review)
@@ -81,7 +82,7 @@ func (s *ReviewService) CreateReview(ctx context.Context, req domain.CreateRevie
 	))
 	defer span.End()
 
-	// Get database connection
+	// Get database connection pool (pgx)
 	db := database.GetDB()
 	if db == nil {
 		return nil, fmt.Errorf("database connection not available")
@@ -106,11 +107,11 @@ func (s *ReviewService) CreateReview(ctx context.Context, req domain.CreateRevie
 	// Check for duplicate review
 	var existingID int
 	checkQuery := `SELECT id FROM reviews WHERE product_id = $1 AND user_id = $2`
-	err = db.QueryRowContext(ctx, checkQuery, productID, userID).Scan(&existingID)
+	err = db.QueryRow(ctx, checkQuery, productID, userID).Scan(&existingID)
 	if err == nil {
 		span.SetAttributes(attribute.Bool("review.created", false))
 		return nil, fmt.Errorf("create review for product %q: %w", req.ProductID, ErrDuplicateReview)
-	} else if err != sql.ErrNoRows {
+	} else if !errors.Is(err, pgx.ErrNoRows) {
 		span.RecordError(err)
 		return nil, fmt.Errorf("check existing review: %w", err)
 	}
@@ -118,7 +119,7 @@ func (s *ReviewService) CreateReview(ctx context.Context, req domain.CreateRevie
 	// Insert review
 	insertQuery := `INSERT INTO reviews (product_id, user_id, rating, title, comment) VALUES ($1, $2, $3, $4, $5) RETURNING id`
 	var reviewID int
-	err = db.QueryRowContext(ctx, insertQuery, productID, userID, req.Rating, "", req.Comment).Scan(&reviewID)
+	err = db.QueryRow(ctx, insertQuery, productID, userID, req.Rating, "", req.Comment).Scan(&reviewID)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("insert review: %w", err)

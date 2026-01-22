@@ -2,22 +2,23 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strconv"
 	"time"
 
 	"github.com/duynhne/monitoring/services/order/internal/core/domain"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// PostgresOrderRepository implements OrderRepository using PostgreSQL
+// PostgresOrderRepository implements OrderRepository using PostgreSQL with pgx
 type PostgresOrderRepository struct {
-	db *sql.DB
+	pool *pgxpool.Pool
 }
 
 // NewPostgresOrderRepository creates a new PostgreSQL order repository
-func NewPostgresOrderRepository(db *sql.DB) *PostgresOrderRepository {
-	return &PostgresOrderRepository{db: db}
+func NewPostgresOrderRepository(pool *pgxpool.Pool) *PostgresOrderRepository {
+	return &PostgresOrderRepository{pool: pool}
 }
 
 // FindByID retrieves an order by ID
@@ -30,7 +31,7 @@ func (r *PostgresOrderRepository) FindByID(ctx context.Context, id string) (*dom
 
 	var order domain.Order
 	var idInt int
-	err := r.db.QueryRowContext(ctx, query, id).Scan(
+	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&idInt,
 		&order.UserID,
 		&order.Status,
@@ -40,7 +41,7 @@ func (r *PostgresOrderRepository) FindByID(ctx context.Context, id string) (*dom
 		&order.CreatedAt,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrNotFound
 	}
 	if err != nil {
@@ -56,7 +57,7 @@ func (r *PostgresOrderRepository) FindByID(ctx context.Context, id string) (*dom
 		WHERE order_id = $1
 	`
 
-	rows, err := r.db.QueryContext(ctx, itemsQuery, idInt)
+	rows, err := r.pool.Query(ctx, itemsQuery, idInt)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +84,7 @@ func (r *PostgresOrderRepository) FindByUserID(ctx context.Context, userID strin
 		ORDER BY created_at DESC
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, userID)
+	rows, err := r.pool.Query(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +114,7 @@ func (r *PostgresOrderRepository) Create(ctx context.Context, order *domain.Orde
 	`
 
 	var id int
-	err := r.db.QueryRowContext(ctx, query,
+	err := r.pool.QueryRow(ctx, query,
 		order.UserID,
 		order.Status,
 		order.Subtotal,
@@ -134,7 +135,7 @@ func (r *PostgresOrderRepository) Create(ctx context.Context, order *domain.Orde
 			INSERT INTO order_items (order_id, product_id, product_name, quantity, price, subtotal)
 			VALUES ($1, $2, $3, $4, $5, $6)
 		`
-		_, err := r.db.ExecContext(ctx, itemQuery, id, item.ProductID, item.ProductName, item.Quantity, item.Price, item.Subtotal)
+		_, err := r.pool.Exec(ctx, itemQuery, id, item.ProductID, item.ProductName, item.Quantity, item.Price, item.Subtotal)
 		if err != nil {
 			return err
 		}
@@ -145,7 +146,7 @@ func (r *PostgresOrderRepository) Create(ctx context.Context, order *domain.Orde
 
 // CreateWithTx creates a new order within a transaction
 func (r *PostgresOrderRepository) CreateWithTx(ctx context.Context, tx domain.Transaction, order *domain.Order) error {
-	sqlTx, ok := tx.(*PostgresTransaction)
+	pgxTx, ok := tx.(*PostgresTransaction)
 	if !ok {
 		return errors.New("invalid transaction type")
 	}
@@ -157,7 +158,7 @@ func (r *PostgresOrderRepository) CreateWithTx(ctx context.Context, tx domain.Tr
 	`
 
 	var id int
-	err := sqlTx.tx.QueryRowContext(ctx, query,
+	err := pgxTx.QueryRow(ctx, query,
 		order.UserID,
 		order.Status,
 		order.Subtotal,
@@ -178,7 +179,7 @@ func (r *PostgresOrderRepository) CreateWithTx(ctx context.Context, tx domain.Tr
 			INSERT INTO order_items (order_id, product_id, product_name, quantity, price, subtotal)
 			VALUES ($1, $2, $3, $4, $5, $6)
 		`
-		_, err := sqlTx.tx.ExecContext(ctx, itemQuery, id, item.ProductID, item.ProductName, item.Quantity, item.Price, item.Subtotal)
+		err := pgxTx.Exec(ctx, itemQuery, id, item.ProductID, item.ProductName, item.Quantity, item.Price, item.Subtotal)
 		if err != nil {
 			return err
 		}
@@ -195,17 +196,12 @@ func (r *PostgresOrderRepository) UpdateStatus(ctx context.Context, id, status s
 		WHERE id = $2
 	`
 
-	result, err := r.db.ExecContext(ctx, query, status, id)
+	result, err := r.pool.Exec(ctx, query, status, id)
 	if err != nil {
 		return err
 	}
 
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rows == 0 {
+	if result.RowsAffected() == 0 {
 		return domain.ErrNotFound
 	}
 

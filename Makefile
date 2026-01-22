@@ -1,5 +1,4 @@
-# Makefile for Flux Operator Local Development
-# Based on flux-operator-local-dev by Stefan Prodan (ControlPlane.io)
+# Makefile for Flux Operator
 
 SHELL := /usr/bin/env bash -o pipefail
 .SHELLFLAGS := -ec
@@ -58,6 +57,10 @@ flux-status: ## Show Flux status (all resources)
 
 ##@ Development
 
+.PHONY: build
+build: ## Build all service binaries locally (no Docker)
+	@./scripts/build.sh
+
 .PHONY: validate
 validate: ## Validate Kubernetes manifests
 	@echo "Validating infrastructure manifests..."
@@ -73,7 +76,6 @@ prereqs: ## Check prerequisites (flux, kubectl, kind, docker)
 	@which flux >/dev/null 2>&1 && echo "  ✓ flux" || echo "  ✗ flux (install: brew install fluxcd/tap/flux)"
 	@which kubectl >/dev/null 2>&1 && echo "  ✓ kubectl" || echo "  ✗ kubectl"
 	@which kind >/dev/null 2>&1 && echo "  ✓ kind" || echo "  ✗ kind"
-	@which docker >/dev/null 2>&1 && echo "  ✓ docker" || echo "  ✗ docker"
 	@which helm >/dev/null 2>&1 && echo "  ✓ helm" || echo "  ✗ helm"
 
 .PHONY: help

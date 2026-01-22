@@ -2,10 +2,11 @@ package v2
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 
+	"github.com/jackc/pgx/v5"
 	database "github.com/duynhne/monitoring/services/notification/internal/core"
 	"github.com/duynhne/monitoring/services/notification/internal/core/domain"
 	"github.com/duynhne/monitoring/services/notification/middleware"
@@ -26,7 +27,7 @@ func (s *NotificationService) ListNotifications(ctx context.Context) ([]domain.N
 	))
 	defer span.End()
 
-	// Get database connection
+	// Get database connection pool (pgx)
 	db := database.GetDB()
 	if db == nil {
 		return nil, fmt.Errorf("database connection not available")
@@ -37,7 +38,7 @@ func (s *NotificationService) ListNotifications(ctx context.Context) ([]domain.N
 
 	// Query notifications
 	query := `SELECT id, user_id, title, message, type FROM notifications WHERE user_id = $1 ORDER BY created_at DESC`
-	rows, err := db.QueryContext(ctx, query, userID)
+	rows, err := db.Query(ctx, query, userID)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("query notifications: %w", err)
@@ -47,7 +48,7 @@ func (s *NotificationService) ListNotifications(ctx context.Context) ([]domain.N
 	var notifications []domain.Notification
 	for rows.Next() {
 		var notificationID int
-		var title, message, notifType sql.NullString
+		var title, message, notifType *string // Use pointers for nullable columns
 
 		err := rows.Scan(&notificationID, &userID, &title, &message, &notifType)
 		if err != nil {
@@ -59,13 +60,13 @@ func (s *NotificationService) ListNotifications(ctx context.Context) ([]domain.N
 			ID:     strconv.Itoa(notificationID),
 			Status: "sent",
 		}
-		if title.Valid {
-			notif.Message = title.String
-		} else if message.Valid {
-			notif.Message = message.String
+		if title != nil {
+			notif.Message = *title
+		} else if message != nil {
+			notif.Message = *message
 		}
-		if notifType.Valid {
-			notif.Type = notifType.String
+		if notifType != nil {
+			notif.Type = *notifType
 		}
 
 		notifications = append(notifications, notif)
@@ -88,7 +89,7 @@ func (s *NotificationService) GetNotification(ctx context.Context, id string) (*
 	))
 	defer span.End()
 
-	// Get database connection
+	// Get database connection pool (pgx)
 	db := database.GetDB()
 	if db == nil {
 		return nil, fmt.Errorf("database connection not available")
@@ -101,15 +102,15 @@ func (s *NotificationService) GetNotification(ctx context.Context, id string) (*
 		return nil, fmt.Errorf("invalid notification id %q: %w", id, ErrNotificationNotFound)
 	}
 
-	// Query notification
+	// Query notification - use pointers for nullable columns
 	query := `SELECT id, user_id, title, message, type, read FROM notifications WHERE id = $1`
 	var userID int
-	var title, message, notifType sql.NullString
+	var title, message, notifType *string
 	var read bool
 
-	err = db.QueryRowContext(ctx, query, notificationID).Scan(&notificationID, &userID, &title, &message, &notifType, &read)
+	err = db.QueryRow(ctx, query, notificationID).Scan(&notificationID, &userID, &title, &message, &notifType, &read)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			span.SetAttributes(attribute.Bool("notification.found", false))
 			return nil, fmt.Errorf("get notification by id %q: %w", id, ErrNotificationNotFound)
 		}
@@ -121,13 +122,13 @@ func (s *NotificationService) GetNotification(ctx context.Context, id string) (*
 		ID:     strconv.Itoa(notificationID),
 		Status: "sent",
 	}
-	if title.Valid {
-		notification.Message = title.String
-	} else if message.Valid {
-		notification.Message = message.String
+	if title != nil {
+		notification.Message = *title
+	} else if message != nil {
+		notification.Message = *message
 	}
-	if notifType.Valid {
-		notification.Type = notifType.String
+	if notifType != nil {
+		notification.Type = *notifType
 	}
 
 	span.SetAttributes(attribute.Bool("notification.found", true))

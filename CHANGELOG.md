@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.30.0] - 2026-01-22
+
+### Changed
+
+#### PostgreSQL Driver Migration: lib/pq → pgx/v5
+
+Migrated all 9 PostgreSQL-connected microservices from `github.com/lib/pq` to `github.com/jackc/pgx/v5` (v5.8.0).
+
+**Motivation:**
+- Fix intermittent 500 errors with PgCat/PgBouncer transaction mode pooling
+- Resolve "bind message supplies X parameters, but prepared statement requires Y" errors
+- lib/pq uses server-side prepared statements incompatible with transaction-mode poolers
+- pgx uses client-side prepared statements, fully compatible with connection poolers
+
+**Services Updated:**
+| Service | Namespace | Connection Pooler |
+|---------|-----------|-------------------|
+| auth | auth | PgBouncer |
+| user | user | PgBouncer |
+| notification | notification | PgBouncer |
+| cart | cart | PgCat |
+| order | order | PgCat |
+| product | product | PgDog |
+| review | review | PgBouncer |
+| shipping | shipping | PgBouncer |
+| shipping-v2 | shipping | PgBouncer |
+
+**Files Changed per Service:**
+
+1. **go.mod** - Replaced `github.com/lib/pq v1.10.9` with `github.com/jackc/pgx/v5 v5.8.0`
+
+2. **internal/core/database.go** - Complete rewrite:
+   - Changed from `database/sql` to `github.com/jackc/pgx/v5/pgxpool`
+   - `Connect()` now uses `pgxpool.New(ctx, dsn)` instead of `sql.Open()`
+   - Added `GetPool()` function returning `*pgxpool.Pool`
+   - Added `GetDB()` as backward-compatible alias for `GetPool()`
+   - DSN uses `pool_max_conns` instead of manual pool config
+
+3. **cmd/main.go** - Updated initialization:
+   - `database.Connect(context.Background())` returns `*pgxpool.Pool`
+   - Shutdown uses `pool.Close()` (no error return) instead of `db.Close()`
+
+4. **internal/logic/v1/service.go** & **v2/service.go** - Query method updates:
+   - `QueryRowContext()` → `QueryRow()`
+   - `QueryContext()` → `Query()`
+   - `ExecContext()` → `Exec()`
+   - `sql.ErrNoRows` → `pgx.ErrNoRows` with `errors.Is()`
+   - `sql.NullString/NullTime/NullInt64` → pointer types (`*string`, `*time.Time`, `*int`)
+
+5. **internal/core/repository/*.go** (cart, order, product):
+   - Updated to use `pgxpool.Pool` methods
+   - Changed transaction handling to use `pgx.Tx`
+
+**API Comparison:**
+
+| Feature | lib/pq | pgx/v5 |
+|---------|--------|--------|
+| Prepared Statements | Server-side (cached) | Client-side |
+| Connection Pooling | Manual via sql.DB | Built-in pgxpool |
+| Binary Protocol | Limited | Full support |
+| PostgreSQL Types | Basic | Extended (JSONB, arrays) |
+| Maintenance | Maintenance mode | Actively maintained |
+
+**Breaking Changes:** None (internal refactoring only)
+
+**Documentation Updated:**
+- `docs/guides/API.md` - Added "Go PostgreSQL Driver" section
+- `docs/guides/DATABASE.md` - Updated Table of Contents
+- `docs/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md` - Updated with pgx migration as permanent fix
 
 
 ## [0.29.0] - 2026-01-21
@@ -4948,3 +5017,7 @@ cd services && go build ./cmd/auth ./cmd/user ./cmd/product ./cmd/cart ./cmd/ord
    ./scripts/05-deploy-microservices.sh --local
    ```
 
+Beta
+0 / 0
+used queries
+1

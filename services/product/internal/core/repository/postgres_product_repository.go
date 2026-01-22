@@ -2,21 +2,23 @@ package repository
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 
 	"github.com/duynhne/monitoring/services/product/internal/core/domain"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// PostgresProductRepository implements ProductRepository using PostgreSQL
+// PostgresProductRepository implements ProductRepository using PostgreSQL with pgx
 type PostgresProductRepository struct {
-	db *sql.DB
+	pool *pgxpool.Pool
 }
 
 // NewPostgresProductRepository creates a new PostgreSQL product repository
-func NewPostgresProductRepository(db *sql.DB) *PostgresProductRepository {
-	return &PostgresProductRepository{db: db}
+func NewPostgresProductRepository(pool *pgxpool.Pool) *PostgresProductRepository {
+	return &PostgresProductRepository{pool: pool}
 }
 
 // FindByID retrieves a product by ID
@@ -30,15 +32,11 @@ func (r *PostgresProductRepository) FindByID(ctx context.Context, id string) (*d
 
 	var product domain.Product
 	var idInt int
-	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&idInt,
-		&product.Name,
-		&product.Description,
-		&product.Price,
-		&product.Category,
+	err := r.pool.QueryRow(ctx, query, id).Scan(
+		&idInt, &product.Name, &product.Description, &product.Price, &product.Category,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrNotFound
 	}
 	if err != nil {
@@ -61,30 +59,24 @@ func (r *PostgresProductRepository) FindAll(ctx context.Context, filters domain.
 	args := []interface{}{}
 	argPos := 1
 
-	// Add category filter
 	if filters.Category != "" {
 		query += fmt.Sprintf(" AND c.name = $%d", argPos)
 		args = append(args, filters.Category)
 		argPos++
 	}
 
-	// Add search filter
 	if filters.Search != "" {
 		query += fmt.Sprintf(" AND p.name ILIKE $%d", argPos)
 		args = append(args, "%"+filters.Search+"%")
 		argPos++
 	}
 
-	// Add sorting (whitelist to prevent SQL injection)
 	sortBy := filters.SortBy
 	allowedSortFields := map[string]string{
-		"id":         "p.id",
-		"name":       "p.name",
-		"price":      "p.price",
-		"created_at": "p.created_at",
+		"id": "p.id", "name": "p.name", "price": "p.price", "created_at": "p.created_at",
 	}
 	
-	sortColumn := allowedSortFields["created_at"] // default
+	sortColumn := allowedSortFields["created_at"]
 	if sortBy != "" {
 		if col, ok := allowedSortFields[sortBy]; ok {
 			sortColumn = col
@@ -97,7 +89,6 @@ func (r *PostgresProductRepository) FindAll(ctx context.Context, filters domain.
 	}
 	query += fmt.Sprintf(" ORDER BY %s %s", sortColumn, order)
 
-	// Add pagination
 	limit := filters.Limit
 	if limit == 0 {
 		limit = 20
@@ -109,7 +100,7 @@ func (r *PostgresProductRepository) FindAll(ctx context.Context, filters domain.
 	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argPos, argPos+1)
 	args = append(args, limit, offset)
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +131,7 @@ func (r *PostgresProductRepository) FindRelatedProducts(ctx context.Context, pro
 		LIMIT $2
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, productID, limit)
+	rows, err := r.pool.Query(ctx, query, productID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +161,7 @@ func (r *PostgresProductRepository) Create(ctx context.Context, product *domain.
 	`
 
 	var id int
-	err := r.db.QueryRowContext(ctx, query, product.Name, product.Description, product.Price, product.Category).Scan(&id)
+	err := r.pool.QueryRow(ctx, query, product.Name, product.Description, product.Price, product.Category).Scan(&id)
 	if err != nil {
 		return err
 	}
@@ -188,17 +179,12 @@ func (r *PostgresProductRepository) Update(ctx context.Context, product *domain.
 		WHERE id = $5
 	`
 
-	result, err := r.db.ExecContext(ctx, query, product.Name, product.Description, product.Price, product.Category, product.ID)
+	result, err := r.pool.Exec(ctx, query, product.Name, product.Description, product.Price, product.Category, product.ID)
 	if err != nil {
 		return err
 	}
 
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rows == 0 {
+	if result.RowsAffected() == 0 {
 		return domain.ErrNotFound
 	}
 
@@ -209,17 +195,12 @@ func (r *PostgresProductRepository) Update(ctx context.Context, product *domain.
 func (r *PostgresProductRepository) Delete(ctx context.Context, id string) error {
 	query := `DELETE FROM products WHERE id = $1`
 
-	result, err := r.db.ExecContext(ctx, query, id)
+	result, err := r.pool.Exec(ctx, query, id)
 	if err != nil {
 		return err
 	}
 
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rows == 0 {
+	if result.RowsAffected() == 0 {
 		return domain.ErrNotFound
 	}
 

@@ -2,31 +2,32 @@ package repository
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 
 	"github.com/duynhne/monitoring/services/cart/internal/core/domain"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// PostgresCartRepository implements CartRepository using PostgreSQL
+// PostgresCartRepository implements CartRepository using PostgreSQL with pgx
 type PostgresCartRepository struct {
-	db *sql.DB
+	pool *pgxpool.Pool
 }
 
 // NewPostgresCartRepository creates a new PostgreSQL cart repository
-func NewPostgresCartRepository(db *sql.DB) *PostgresCartRepository {
-	return &PostgresCartRepository{db: db}
+func NewPostgresCartRepository(pool *pgxpool.Pool) *PostgresCartRepository {
+	return &PostgresCartRepository{pool: pool}
 }
 
 // FindByUserID retrieves a cart by user ID
 func (r *PostgresCartRepository) FindByUserID(ctx context.Context, userID string) (*domain.Cart, error) {
-	// Get cart items with product details
 	query := `
 		SELECT id, product_id, product_name, product_price, quantity
 		FROM cart_items
 		WHERE user_id = $1
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, userID)
+	rows, err := r.pool.Query(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +51,7 @@ func (r *PostgresCartRepository) FindByUserID(ctx context.Context, userID string
 		UserID:    userID,
 		Items:     items,
 		Subtotal:  subtotal,
-		Shipping:  5.00, // Fixed shipping cost for demo
+		Shipping:  5.00,
 		Total:     subtotal + 5.00,
 		ItemCount: len(items),
 	}
@@ -67,7 +68,7 @@ func (r *PostgresCartRepository) GetItemCount(ctx context.Context, userID string
 	`
 
 	var count int
-	err := r.db.QueryRowContext(ctx, query, userID).Scan(&count)
+	err := r.pool.QueryRow(ctx, query, userID).Scan(&count)
 	if err != nil {
 		return 0, err
 	}
@@ -80,16 +81,16 @@ func (r *PostgresCartRepository) AddItem(ctx context.Context, userID string, ite
 	// Check if item already exists
 	checkQuery := `SELECT id FROM cart_items WHERE user_id = $1 AND product_id = $2`
 	var existingID string
-	err := r.db.QueryRowContext(ctx, checkQuery, userID, item.ProductID).Scan(&existingID)
+	err := r.pool.QueryRow(ctx, checkQuery, userID, item.ProductID).Scan(&existingID)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, pgx.ErrNoRows) {
 		// Insert new item with denormalized product details
 		insertQuery := `
 			INSERT INTO cart_items (user_id, product_id, product_name, product_price, quantity, created_at, updated_at)
 			VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
 			RETURNING id
 		`
-		return r.db.QueryRowContext(ctx, insertQuery, userID, item.ProductID, item.ProductName, item.ProductPrice, item.Quantity).Scan(&item.ID)
+		return r.pool.QueryRow(ctx, insertQuery, userID, item.ProductID, item.ProductName, item.ProductPrice, item.Quantity).Scan(&item.ID)
 	} else if err != nil {
 		return err
 	}
@@ -100,7 +101,7 @@ func (r *PostgresCartRepository) AddItem(ctx context.Context, userID string, ite
 		SET quantity = quantity + $1, updated_at = NOW()
 		WHERE id = $2
 	`
-	_, err = r.db.ExecContext(ctx, updateQuery, item.Quantity, existingID)
+	_, err = r.pool.Exec(ctx, updateQuery, item.Quantity, existingID)
 	return err
 }
 
@@ -112,17 +113,12 @@ func (r *PostgresCartRepository) UpdateItem(ctx context.Context, userID, itemID 
 		WHERE id = $2 AND user_id = $3
 	`
 
-	result, err := r.db.ExecContext(ctx, query, quantity, itemID, userID)
+	result, err := r.pool.Exec(ctx, query, quantity, itemID, userID)
 	if err != nil {
 		return err
 	}
 
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rows == 0 {
+	if result.RowsAffected() == 0 {
 		return domain.ErrNotFound
 	}
 
@@ -136,17 +132,12 @@ func (r *PostgresCartRepository) RemoveItem(ctx context.Context, userID, itemID 
 		WHERE id = $1 AND user_id = $2
 	`
 
-	result, err := r.db.ExecContext(ctx, query, itemID, userID)
+	result, err := r.pool.Exec(ctx, query, itemID, userID)
 	if err != nil {
 		return err
 	}
 
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rows == 0 {
+	if result.RowsAffected() == 0 {
 		return domain.ErrNotFound
 	}
 
@@ -156,6 +147,6 @@ func (r *PostgresCartRepository) RemoveItem(ctx context.Context, userID, itemID 
 // Clear removes all items from the cart
 func (r *PostgresCartRepository) Clear(ctx context.Context, userID string) error {
 	query := `DELETE FROM cart_items WHERE user_id = $1`
-	_, err := r.db.ExecContext(ctx, query, userID)
+	_, err := r.pool.Exec(ctx, query, userID)
 	return err
 }

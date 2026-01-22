@@ -15,13 +15,14 @@ kubernetes/infra/
 │   │   ├── grafana-operator.yaml       # Grafana Operator Helm
 │   │   └── metrics-server.yaml         # Metrics Server Helm
 │   ├── apm/
-│   │   ├── kustomization.yaml
-│   │   ├── loki/                       # Loki (raw manifests)
-│   │   ├── tempo/                      # Tempo (raw manifests)
-│   │   ├── pyroscope/                  # Pyroscope (raw manifests)
-│   │   ├── vector/                     # Vector (HelmRelease)
-│   │   ├── jaeger/                     # Jaeger (HelmRelease)
-│   │   └── otel-collector/             # OTel Collector (HelmRelease)
+    │   │   ├── kustomization.yaml
+    │   │   ├── loki/                       # Loki (raw manifests)
+    │   │   ├── tempo/                      # Tempo (raw manifests)
+    │   │   ├── pyroscope/                  # Pyroscope (raw manifests)
+    │   │   ├── victorialogs/               # VictoriaLogs (HelmRelease)
+    │   │   ├── vector/                     # Vector (HelmRelease)
+    │   │   ├── jaeger/                     # Jaeger (HelmRelease)
+    │   │   └── otel-collector/             # OTel Collector (HelmRelease)
 │   ├── databases/
 │   │   ├── zalando-operator.yaml       # Zalando Postgres Operator Helm
 │   │   └── cloudnativepg-operator.yaml # CloudNativePG Operator Helm
@@ -112,7 +113,8 @@ APM components are deployed under `kubernetes/infra/controllers/apm/`:
 - **Loki** - raw manifests (Deployment/ConfigMap/Service)
 - **Tempo** - raw manifests (Deployment/ConfigMap/Service)
 - **Pyroscope** - raw manifests (Deployment/ConfigMap/Service)
-- **Vector** - HelmRelease (DaemonSet)
+- **VictoriaLogs** - HelmRelease (log storage, collector disabled)
+- **Vector** - HelmRelease (DaemonSet, dual-ships to Loki + VictoriaLogs)
 - **Jaeger** - HelmRelease
 - **OTel Collector** - HelmRelease
 

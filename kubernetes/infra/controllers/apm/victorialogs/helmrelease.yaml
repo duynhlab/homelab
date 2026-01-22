@@ -1,0 +1,62 @@
+# VictoriaLogs Single Node HelmRelease
+# Chart: oci://ghcr.io/victoriametrics/helm-charts/victoria-logs-single
+# Docs: https://docs.victoriametrics.com/helm/victorialogs-single/
+#
+# NOTE: Vector collector is DISABLED here.
+# Log ingestion is handled by the cluster-wide Vector Agent (kube-system/vector)
+# which ships logs to both Loki and VictoriaLogs.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: victorialogs
+  namespace: monitoring
+spec:
+  interval: 10m
+  timeout: 10m
+  chartRef:
+    kind: OCIRepository
+    name: victorialogs-oci
+    namespace: flux-system
+  releaseName: victorialogs
+  values:
+    server:
+      # Data retention period (7 days)
+      retentionPeriod: 7d
+
+      # Storage for logs
+      persistentVolume:
+        enabled: true
+        size: 20Gi
+
+      # Resources
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+      # ServiceMonitor for Prometheus scraping
+      serviceMonitor:
+        enabled: true
+        extraLabels:
+          release: kube-prometheus-stack
+
+    # ============================================================================
+    # CRITICAL: Disable embedded Vector collector
+    # ============================================================================
+    # Log collection is handled by the cluster-wide Vector Agent (kube-system/vector)
+    # which ships logs to both Loki and VictoriaLogs endpoints.
+    # This avoids duplicate Vector deployments and conflicting log collection.
+    vector:
+      enabled: false
+
+    # Grafana dashboards (optional)
+    dashboards:
+      enabled: true
+      grafanaOperator:
+        enabled: true
+        spec:
+          allowCrossNamespaceImport: true
+          folderRef: "logs"

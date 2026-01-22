@@ -42,6 +42,10 @@ kubectl port-forward -n monitoring svc/pyroscope 4040:4040 > /dev/null 2>&1 &
 echo "Starting Loki port forward (3100)..."
 kubectl port-forward -n monitoring svc/loki 3100:3100 > /dev/null 2>&1 &
 
+# VictoriaLogs
+echo "Starting VictoriaLogs port forward (9428)..."
+kubectl port-forward -n monitoring svc/victorialogs-victoria-logs-single-server 9428:9428 > /dev/null 2>&1 &
+
 # Postgres Operator UI
 echo "Starting Postgres Operator UI port forward (8082)..."
 kubectl port-forward -n postgres-operator svc/postgres-operator 8082:8080 > /dev/null 2>&1 &
@@ -69,6 +73,7 @@ echo "Jaeger:              http://localhost:16686"
 echo "Tempo:               http://localhost:3200"
 echo "Pyroscope:           http://localhost:4040"
 echo "Loki:                http://localhost:3100"
+echo "VictoriaLogs:        http://localhost:9428"
 echo "Postgres Operator UI: http://localhost:8082"
 echo "Frontend:            http://localhost:3001"
 echo "Product API:         http://localhost:8080"

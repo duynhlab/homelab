@@ -1,10 +1,13 @@
 # Database Integration Guide
 ## Table of Contents
 
-1. [Database Architecture](#database-architecture) - 5 clusters overview
-2. [CloudNativePG Operator](#cloudnativepg-operator) - Product DB, Transaction DB, PgCat, PodMonitor
-3. [Zalando Postgres Operator](#zalando-postgres-operator) - Review DB, Auth DB, Supporting DB, PgBouncer, Secrets, Monitoring, Password Rotation, Backup, UI Component, Cluster Management
-4. [Shared Topics](#shared-topics) - Environment Variables, Helm Config, Local Dev, Verification, Best Practices
+1. [Quick Summary](#quick-summary) - Operators, clusters, poolers overview
+2. [Database Architecture](#database-architecture) - 5 clusters overview
+3. [CloudNativePG Operator](#cloudnativepg-operator) - Product DB, Transaction DB, PgCat, PodMonitor
+4. [Zalando Postgres Operator](#zalando-postgres-operator) - Review DB, Auth DB, Supporting DB, PgBouncer, Secrets, Monitoring
+5. [Connection Poolers](#connection-poolers) - PgCat, PgBouncer, PgDog configuration
+6. [Related Documentation](#related-documentation) - Links to other docs
+7. [Troubleshooting](#troubleshooting) - Common issues and solutions
 
 ---
 ## Quick Summary

@@ -1,6 +1,6 @@
 # Kubernetes Manifests - Component-Based Structure
 
-**Last Updated:** 2026-01-12 (Restructured from monolithic files to component-based organization)
+**Last Updated:** 2026-01-22 (Flattened controllers observability + moved SLO into metrics)
 
 ## Structure Overview
 
@@ -10,13 +10,15 @@ kubernetes/
 │   ├── namespaces.yaml           # Namespaces (applied first)
 │   ├── kustomization.yaml        # Root kustomization
 │   ├── controllers/              # Operators + CRDs (Phase 1)
-│   │   ├── monitoring/           # Prometheus Operator, Grafana Operator, metrics-server
+│   │   ├── metrics/              # Prometheus Operator, Grafana Operator, metrics-server, Sloth operator
+│   │   ├── logging/              # Loki, Vector, VictoriaLogs
+│   │   ├── tracing/              # Tempo, Jaeger, OTel Collector
+│   │   ├── profiling/            # Pyroscope
 │   │   ├── databases/            # Zalando + CloudNativePG operators
-│   │   └── slo/                  # Sloth operator
 │   └── configs/                  # Instances + configs (Phase 2)
 │       ├── monitoring/           # Grafana CR + Datasources, ServiceMonitors, PodMonitors
-│       ├── apm/                  # Loki/Tempo/Pyroscope (raw) + Vector/Jaeger/OTel (HelmRelease)
-│       ├── databases/            # DB instances, secrets, poolers (PgCat raw)
+│       ├── databases/            # DB clusters (cluster-centric: instance + secrets + poolers + monitoring per cluster)
+│       │   └── clusters/         # Per-cluster folders: auth-db, review-db, supporting-db, product-db, transaction-db
 │       └── slo/                  # PrometheusServiceLevel CRs
 │
 ├── apps/               # Application manifests (HelmRelease with inline config)
@@ -58,10 +60,10 @@ kubernetes/
 - ❌ Manual Deployments - Loki, Tempo, Pyroscope, PgCat used manual K8s resources
 
 **New structure** splits by component type:
-- ✅ **Easy to debug** - Find resources by component (loki/, pgcat-transaction/)
-- ✅ **Logical separation** - Clear boundaries: monitoring/, apm/, databases/, slo/
+- ✅ **Easy to debug** - Find resources by component (loki/, pyroscope/, pgcat-transaction/)
+- ✅ **Logical separation** - Clear boundaries: metrics/, logging/, tracing/, profiling/, databases/, slo/
 - ✅ **Correct ordering** - Operators/CRDs first (`controllers/`), then instances (`configs/`)
-- ✅ **25 separate files** - Clear component ownership
+- ✅ **25+ separate files** - Clear component ownership
 
 
 

@@ -1,22 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# Database clusters organized by cluster name
+# Each cluster folder contains: instance, secrets, poolers (if any), monitoring
 resources:
-  - secrets/product-db-secret.yaml
-  - secrets/transaction-db-secret-cart.yaml
-  - secrets/transaction-db-secret-order.yaml
-  - configmaps/vector-configs/pg-zalando-vector-config-auth.yaml
-  - configmaps/vector-configs/pg-zalando-vector-config-review.yaml
-  - configmaps/vector-configs/pg-zalando-vector-config-supporting.yaml
-  - configmaps/monitoring-queries/postgres-monitoring-queries-auth.yaml
-  - configmaps/monitoring-queries/postgres-monitoring-queries-review.yaml
-  - configmaps/monitoring-queries/postgres-monitoring-queries-supporting.yaml
-  - poolers/pgdog-product/
-  - poolers/pgcat-transaction/
-  - instances/auth-db.yaml
-  - instances/review-db.yaml
-  - instances/supporting-db.yaml
-  - instances/transaction-db.yaml
-  - instances/product-db.yaml
-  # PodMonitors deploy AFTER database instances (within same kustomization, processed in order)
-  - monitoring/
+  - clusters/auth-db/
+  - clusters/review-db/
+  - clusters/supporting-db/
+  - clusters/product-db/
+  - clusters/transaction-db/

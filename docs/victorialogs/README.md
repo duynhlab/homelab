@@ -109,7 +109,7 @@ CloudNativePG auto_explain logs are parsed and stored with:
 
 ### VictoriaLogs HelmRelease
 
-Location: `kubernetes/infra/controllers/apm/victorialogs/helmrelease.yaml`
+Location: `kubernetes/infra/controllers/logging/victorialogs/helmrelease.yaml`
 
 Key settings:
 ```yaml
@@ -127,7 +127,7 @@ values:
 
 ### Vector HelmRelease
 
-Location: `kubernetes/infra/controllers/apm/vector/vector.yaml`
+Location: `kubernetes/infra/controllers/logging/vector/vector.yaml`
 
 The Vector config includes:
 - **Sources**: `kubernetes_logs`

@@ -22,7 +22,7 @@ spec:
     image:
       repository: ghcr.io/duynhne/notification
       tag: v6
-      pullPolicy: IfNotPresent
+      pullPolicy: Always
 
     service:
       type: ClusterIP

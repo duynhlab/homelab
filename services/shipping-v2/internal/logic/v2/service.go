@@ -2,9 +2,10 @@ package v2
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	database "github.com/duynhne/monitoring/services/shipping-v2/internal/core"
 	"github.com/duynhne/monitoring/services/shipping-v2/internal/core/domain"
 	"github.com/duynhne/monitoring/services/shipping-v2/middleware"
@@ -34,7 +35,7 @@ func (s *ShippingService) EstimateShipment(ctx context.Context, req domain.Estim
 		return nil, fmt.Errorf("estimate shipment to %q: %w", req.Destination, ErrInvalidAddress)
 	}
 
-	// Get database connection
+	// Get database connection pool (pgx)
 	db := database.GetDB()
 	if db == nil {
 		span.RecordError(fmt.Errorf("database connection not available"))
@@ -52,11 +53,11 @@ func (s *ShippingService) EstimateShipment(ctx context.Context, req domain.Estim
 
 	var cost float64
 	var estimatedDays int
-	var carrier sql.NullString
+	var carrier *string // Use pointer for nullable column
 
-	err := db.QueryRowContext(ctx, query, req.Origin, req.Destination, req.Weight).Scan(&cost, &estimatedDays, &carrier)
+	err := db.QueryRow(ctx, query, req.Origin, req.Destination, req.Weight).Scan(&cost, &estimatedDays, &carrier)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			// No matching estimate found - calculate default estimate
 			span.SetAttributes(attribute.Bool("estimate.found_in_db", false))
 			estimate := map[string]interface{}{
@@ -88,9 +89,9 @@ func (s *ShippingService) EstimateShipment(ctx context.Context, req domain.Estim
 		"days":        estimatedDays,
 	}
 
-	if carrier.Valid {
-		estimate["carrier"] = carrier.String
-		span.SetAttributes(attribute.String("estimate.carrier", carrier.String))
+	if carrier != nil {
+		estimate["carrier"] = *carrier
+		span.SetAttributes(attribute.String("estimate.carrier", *carrier))
 	}
 
 	span.SetAttributes(attribute.Bool("estimate.created", true))

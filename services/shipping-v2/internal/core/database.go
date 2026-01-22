@@ -1,112 +1,95 @@
 package database
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"os"
 	"strconv"
 
-	_ "github.com/lib/pq" // PostgreSQL driver
-	"go.uber.org/zap"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var (
-	globalDB *sql.DB
-	logger   *zap.Logger
-)
+// DatabaseConfig holds database connection configuration
+type DatabaseConfig struct {
+	Host           string // DB_HOST - PostgreSQL host
+	Port           string // DB_PORT - PostgreSQL port (default: 5432)
+	Name           string // DB_NAME - Database name
+	User           string // DB_USER - Database user
+	Password       string // DB_PASSWORD - Database password
+	SSLMode        string // DB_SSLMODE - SSL mode
+	MaxConnections int    // DB_POOL_MAX_CONNECTIONS - Max pool connections
+}
 
-// Connect establishes a database connection using environment variables
-// Environment variables:
-//   - DB_HOST: Database host (required)
-//   - DB_PORT: Database port (default: 5432)
-//   - DB_NAME: Database name (required)
-//   - DB_USER: Database user (required)
-//   - DB_PASSWORD: Database password (required)
-//   - DB_SSLMODE: SSL mode (default: disable)
-//   - DB_POOL_MAX_CONNECTIONS: Maximum connections (default: 25)
-func Connect() (*sql.DB, error) {
-	if globalDB != nil {
-		return globalDB, nil
+var globalPool *pgxpool.Pool
+
+// LoadConfig loads database configuration from environment variables.
+func LoadConfig() (*DatabaseConfig, error) {
+	cfg := &DatabaseConfig{
+		Host:           getEnv("DB_HOST", ""),
+		Port:           getEnv("DB_PORT", "5432"),
+		Name:           getEnv("DB_NAME", ""),
+		User:           getEnv("DB_USER", ""),
+		Password:       getEnv("DB_PASSWORD", ""),
+		SSLMode:        getEnv("DB_SSLMODE", "disable"),
+		MaxConnections: getEnvInt("DB_POOL_MAX_CONNECTIONS", 25),
 	}
 
-	// Initialize logger
-	var err error
-	logger, err = zap.NewProduction()
+	if cfg.Host == "" {
+		return nil, fmt.Errorf("DB_HOST environment variable is required")
+	}
+	if cfg.Name == "" {
+		return nil, fmt.Errorf("DB_NAME environment variable is required")
+	}
+	if cfg.User == "" {
+		return nil, fmt.Errorf("DB_USER environment variable is required")
+	}
+	if cfg.Password == "" {
+		return nil, fmt.Errorf("DB_PASSWORD environment variable is required")
+	}
+
+	return cfg, nil
+}
+
+// BuildDSN constructs PostgreSQL connection string (DSN) from config.
+func (c *DatabaseConfig) BuildDSN() string {
+	return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s&pool_max_conns=%d",
+		c.User, c.Password, c.Host, c.Port, c.Name, c.SSLMode, c.MaxConnections,
+	)
+}
+
+// Connect establishes database connection pool using pgx/v5.
+// pgx is used instead of lib/pq for PgBouncer/PgCat compatibility.
+func Connect(ctx context.Context) (*pgxpool.Pool, error) {
+	cfg, err := LoadConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize logger: %w", err)
+		return nil, fmt.Errorf("failed to load database config: %w", err)
 	}
 
-	// Load configuration from environment variables
-	host := os.Getenv("DB_HOST")
-	port := getEnv("DB_PORT", "5432")
-	name := os.Getenv("DB_NAME")
-	user := os.Getenv("DB_USER")
-	password := os.Getenv("DB_PASSWORD")
-	sslmode := getEnv("DB_SSLMODE", "disable")
-	maxConnections := getEnvInt("DB_POOL_MAX_CONNECTIONS", 25)
-
-	// Validate required fields
-	if host == "" {
-		return nil, fmt.Errorf("DB_HOST is required")
-	}
-	if name == "" {
-		return nil, fmt.Errorf("DB_NAME is required")
-	}
-	if user == "" {
-		return nil, fmt.Errorf("DB_USER is required")
-	}
-	if password == "" {
-		return nil, fmt.Errorf("DB_PASSWORD is required")
-	}
-
-	// Build DSN
-	dsn := fmt.Sprintf("host=%s port=%s dbname=%s user=%s password=%s sslmode=%s",
-		host, port, name, user, password, sslmode)
-
-	// Open connection
-	db, err := sql.Open("postgres", dsn)
+	pool, err := pgxpool.New(ctx, cfg.BuildDSN())
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database connection: %w", err)
+		return nil, fmt.Errorf("failed to create connection pool: %w", err)
 	}
 
-	// Configure connection pool
-	db.SetMaxOpenConns(maxConnections)
-	db.SetMaxIdleConns(maxConnections / 2)
-	db.SetConnMaxLifetime(0) // Connections don't expire
-
-	// Test connection
-	if err := db.Ping(); err != nil {
-		db.Close()
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	globalDB = db
-	logger.Info("Database connection established",
-		zap.String("host", host),
-		zap.String("port", port),
-		zap.String("database", name),
-		zap.String("user", user),
-		zap.Int("max_connections", maxConnections),
-	)
-
-	return globalDB, nil
+	globalPool = pool
+	return pool, nil
 }
 
-// GetDB returns the global database connection
-// Returns nil if Connect() has not been called or failed
-func GetDB() *sql.DB {
-	return globalDB
+// GetPool returns the global connection pool.
+func GetPool() *pgxpool.Pool {
+	return globalPool
 }
 
-// Close closes the global database connection
-func Close() error {
-	if globalDB != nil {
-		return globalDB.Close()
-	}
-	return nil
+// GetDB is an alias for GetPool() - provided for backward compatibility
+// Deprecated: Use GetPool() for new code
+func GetDB() *pgxpool.Pool {
+	return globalPool
 }
 
-// Helper functions
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -115,9 +98,9 @@ func getEnv(key, defaultValue string) string {
 }
 
 func getEnvInt(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		if intValue, err := strconv.Atoi(value); err == nil {
-			return intValue
+	if val := os.Getenv(key); val != "" {
+		if intVal, err := strconv.Atoi(val); err == nil {
+			return intVal
 		}
 	}
 	return defaultValue

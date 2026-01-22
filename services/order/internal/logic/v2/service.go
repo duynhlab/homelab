@@ -2,13 +2,14 @@ package v2
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 
 	database "github.com/duynhne/monitoring/services/order/internal/core"
 	"github.com/duynhne/monitoring/services/order/internal/core/domain"
 	"github.com/duynhne/monitoring/services/order/middleware"
+	"github.com/jackc/pgx/v5"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -26,9 +27,9 @@ func (s *OrderService) ListOrders(ctx context.Context) ([]domain.Order, error) {
 	))
 	defer span.End()
 
-	// Get database connection
-	db := database.GetDB()
-	if db == nil {
+	// Get database connection pool
+	pool := database.GetPool()
+	if pool == nil {
 		return nil, fmt.Errorf("database connection not available")
 	}
 
@@ -37,7 +38,7 @@ func (s *OrderService) ListOrders(ctx context.Context) ([]domain.Order, error) {
 
 	// Query orders
 	query := `SELECT id, user_id, total_amount, status FROM orders WHERE user_id = $1 ORDER BY created_at DESC`
-	rows, err := db.QueryContext(ctx, query, userID)
+	rows, err := pool.Query(ctx, query, userID)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("query orders: %w", err)
@@ -58,7 +59,7 @@ func (s *OrderService) ListOrders(ctx context.Context) ([]domain.Order, error) {
 
 		// Query order items
 		itemsQuery := `SELECT product_id, quantity, price FROM order_items WHERE order_id = $1`
-		itemRows, err := db.QueryContext(ctx, itemsQuery, orderID)
+		itemRows, err := pool.Query(ctx, itemsQuery, orderID)
 		if err != nil {
 			span.RecordError(err)
 			continue
@@ -108,9 +109,9 @@ func (s *OrderService) GetOrderStatus(ctx context.Context, orderId string) (map[
 	))
 	defer span.End()
 
-	// Get database connection
-	db := database.GetDB()
-	if db == nil {
+	// Get database connection pool
+	pool := database.GetPool()
+	if pool == nil {
 		return nil, fmt.Errorf("database connection not available")
 	}
 
@@ -125,9 +126,9 @@ func (s *OrderService) GetOrderStatus(ctx context.Context, orderId string) (map[
 	query := `SELECT id, status FROM orders WHERE id = $1`
 	var status string
 
-	err = db.QueryRowContext(ctx, query, orderID).Scan(&orderID, &status)
+	err = pool.QueryRow(ctx, query, orderID).Scan(&orderID, &status)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			span.SetAttributes(attribute.Bool("order.found", false))
 			return nil, fmt.Errorf("get order status for id %q: %w", orderId, ErrOrderNotFound)
 		}
@@ -153,9 +154,9 @@ func (s *OrderService) CreateOrder(ctx context.Context, req domain.CreateOrderRe
 	))
 	defer span.End()
 
-	// Get database connection
-	db := database.GetDB()
-	if db == nil {
+	// Get database connection pool
+	pool := database.GetPool()
+	if pool == nil {
 		return nil, fmt.Errorf("database connection not available")
 	}
 
@@ -169,17 +170,17 @@ func (s *OrderService) CreateOrder(ctx context.Context, req domain.CreateOrderRe
 	}
 
 	// Start transaction
-	tx, err := db.BeginTx(ctx, nil)
+	tx, err := pool.Begin(ctx)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer tx.Rollback(ctx)
 
 	// Insert order
 	insertOrderQuery := `INSERT INTO orders (user_id, total_amount, status) VALUES ($1, $2, $3) RETURNING id`
 	var orderID int
-	err = tx.QueryRowContext(ctx, insertOrderQuery, userID, totalAmount, "pending").Scan(&orderID)
+	err = tx.QueryRow(ctx, insertOrderQuery, userID, totalAmount, "pending").Scan(&orderID)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("insert order: %w", err)
@@ -194,7 +195,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, req domain.CreateOrderRe
 		}
 
 		insertItemQuery := `INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ($1, $2, $3, $4)`
-		_, err = tx.ExecContext(ctx, insertItemQuery, orderID, productID, item.Quantity, item.Price)
+		_, err = tx.Exec(ctx, insertItemQuery, orderID, productID, item.Quantity, item.Price)
 		if err != nil {
 			span.RecordError(err)
 			return nil, fmt.Errorf("insert order item: %w", err)
@@ -202,7 +203,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, req domain.CreateOrderRe
 	}
 
 	// Commit transaction
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("commit transaction: %w", err)

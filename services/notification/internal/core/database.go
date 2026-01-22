@@ -1,29 +1,28 @@
 package database
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"os"
 	"strconv"
 
-	_ "github.com/lib/pq" // PostgreSQL driver
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // DatabaseConfig holds database connection configuration
 type DatabaseConfig struct {
-	Host           string
-	Port           string
-	Name           string
-	User           string
-	Password       string
-	SSLMode        string
-	MaxConnections int
-	PoolMode       string
+	Host           string // DB_HOST - PostgreSQL host
+	Port           string // DB_PORT - PostgreSQL port (default: 5432)
+	Name           string // DB_NAME - Database name
+	User           string // DB_USER - Database user
+	Password       string // DB_PASSWORD - Database password
+	SSLMode        string // DB_SSLMODE - SSL mode
+	MaxConnections int    // DB_POOL_MAX_CONNECTIONS - Max pool connections
 }
 
-var globalDB *sql.DB
+var globalPool *pgxpool.Pool
 
-// LoadConfig loads database configuration from separate environment variables
+// LoadConfig loads database configuration from environment variables.
 func LoadConfig() (*DatabaseConfig, error) {
 	cfg := &DatabaseConfig{
 		Host:           getEnv("DB_HOST", ""),
@@ -33,10 +32,8 @@ func LoadConfig() (*DatabaseConfig, error) {
 		Password:       getEnv("DB_PASSWORD", ""),
 		SSLMode:        getEnv("DB_SSLMODE", "disable"),
 		MaxConnections: getEnvInt("DB_POOL_MAX_CONNECTIONS", 25),
-		PoolMode:       getEnv("DB_POOL_MODE", "transaction"),
 	}
 
-	// Validate required fields
 	if cfg.Host == "" {
 		return nil, fmt.Errorf("DB_HOST environment variable is required")
 	}
@@ -53,56 +50,46 @@ func LoadConfig() (*DatabaseConfig, error) {
 	return cfg, nil
 }
 
-// BuildDSN constructs PostgreSQL connection string from config
+// BuildDSN constructs PostgreSQL connection string (DSN) from config.
 func (c *DatabaseConfig) BuildDSN() string {
-	// Format: postgresql://user:password@host:port/dbname?sslmode=disable
-	return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s",
-		c.User,
-		c.Password,
-		c.Host,
-		c.Port,
-		c.Name,
-		c.SSLMode,
+	return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s&pool_max_conns=%d",
+		c.User, c.Password, c.Host, c.Port, c.Name, c.SSLMode, c.MaxConnections,
 	)
 }
 
-// Connect establishes database connection using separate environment variables
-func Connect() (*sql.DB, error) {
-	// ⚠️ CRITICAL: Load config from separate env vars, NOT DATABASE_URL string
+// Connect establishes database connection pool using pgx/v5.
+// pgx is used instead of lib/pq for PgBouncer/PgCat compatibility.
+func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 	cfg, err := LoadConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load database config: %w", err)
 	}
 
-	// Build DSN from individual env vars
-	dsn := cfg.BuildDSN()
-
-	db, err := sql.Open("postgres", dsn)
+	pool, err := pgxpool.New(ctx, cfg.BuildDSN())
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
+		return nil, fmt.Errorf("failed to create connection pool: %w", err)
 	}
 
-	// Configure connection pool
-	db.SetMaxOpenConns(cfg.MaxConnections)
-	db.SetMaxIdleConns(cfg.MaxConnections / 2)
-
-	// Test connection
-	if err := db.Ping(); err != nil {
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	// Store global connection
-	globalDB = db
-
-	return db, nil
+	globalPool = pool
+	return pool, nil
 }
 
-// GetDB returns the global database connection
-func GetDB() *sql.DB {
-	return globalDB
+// GetPool returns the global connection pool.
+func GetPool() *pgxpool.Pool {
+	return globalPool
 }
 
-// Helper functions
+// GetDB is an alias for GetPool() - provided for backward compatibility
+// Deprecated: Use GetPool() for new code
+func GetDB() *pgxpool.Pool {
+	return globalPool
+}
+
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value

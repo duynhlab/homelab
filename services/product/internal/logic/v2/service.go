@@ -2,10 +2,11 @@ package v2
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 
+	"github.com/jackc/pgx/v5"
 	database "github.com/duynhne/monitoring/services/product/internal/core"
 	"github.com/duynhne/monitoring/services/product/middleware"
 	"go.opentelemetry.io/otel/attribute"
@@ -58,7 +59,7 @@ func (s *ProductService) GetItem(ctx context.Context, itemId string) (*Item, err
 	))
 	defer span.End()
 
-	// Get database connection
+	// Get database connection pool (pgx)
 	db := database.GetDB()
 	if db == nil {
 		return nil, fmt.Errorf("database connection not available")
@@ -71,20 +72,19 @@ func (s *ProductService) GetItem(ctx context.Context, itemId string) (*Item, err
 		return nil, fmt.Errorf("invalid item id %q: %w", itemId, ErrProductNotFound)
 	}
 
-	// Query product
+	// Query product - use pointers for nullable columns
 	query := `
 		SELECT p.id, p.name, p.description, p.price, COALESCE(c.name, 'Uncategorized') as category
 		FROM products p
 		LEFT JOIN categories c ON p.category_id = c.id
 		WHERE p.id = $1
 	`
-	var name, description sql.NullString
+	var name, description, category *string
 	var price float64
-	var category sql.NullString
 
-	err = db.QueryRowContext(ctx, query, productID).Scan(&productID, &name, &description, &price, &category)
+	err = db.QueryRow(ctx, query, productID).Scan(&productID, &name, &description, &price, &category)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			span.SetAttributes(attribute.Bool("item.found", false))
 			return nil, fmt.Errorf("get item by id %q: %w", itemId, ErrProductNotFound)
 		}
@@ -93,20 +93,19 @@ func (s *ProductService) GetItem(ctx context.Context, itemId string) (*Item, err
 	}
 
 	item := &Item{
-		ItemID: strconv.Itoa(productID),
-		Price:  price,
-		SKU:    "SKU-" + strconv.Itoa(productID),
+		ItemID:   strconv.Itoa(productID),
+		Price:    price,
+		SKU:      "SKU-" + strconv.Itoa(productID),
+		Category: "Uncategorized",
 	}
-	if name.Valid {
-		item.Name = name.String
+	if name != nil {
+		item.Name = *name
 	}
-	if description.Valid {
-		item.Description = description.String
+	if description != nil {
+		item.Description = *description
 	}
-	if category.Valid {
-		item.Category = category.String
-	} else {
-		item.Category = "Uncategorized"
+	if category != nil {
+		item.Category = *category
 	}
 
 	span.SetAttributes(attribute.Bool("item.found", true))
@@ -121,7 +120,7 @@ func (s *ProductService) CreateItem(ctx context.Context, req CreateItemRequest) 
 	))
 	defer span.End()
 
-	// Get database connection
+	// Get database connection pool (pgx)
 	db := database.GetDB()
 	if db == nil {
 		return nil, fmt.Errorf("database connection not available")
@@ -133,15 +132,15 @@ func (s *ProductService) CreateItem(ctx context.Context, req CreateItemRequest) 
 		return nil, fmt.Errorf("validate price %.2f for item %q: %w", req.Price, req.Name, ErrInvalidPrice)
 	}
 
-	// Get or create category
-	var categoryID sql.NullInt64
+	// Get or create category - use pointer for nullable category_id
+	var categoryID *int
 	if req.Category != "" {
 		var catID int
 		checkCatQuery := `SELECT id FROM categories WHERE name = $1`
-		err := db.QueryRowContext(ctx, checkCatQuery, req.Category).Scan(&catID)
-		if err == sql.ErrNoRows {
+		err := db.QueryRow(ctx, checkCatQuery, req.Category).Scan(&catID)
+		if errors.Is(err, pgx.ErrNoRows) {
 			createCatQuery := `INSERT INTO categories (name, description) VALUES ($1, $2) RETURNING id`
-			err = db.QueryRowContext(ctx, createCatQuery, req.Category, "").Scan(&catID)
+			err = db.QueryRow(ctx, createCatQuery, req.Category, "").Scan(&catID)
 			if err != nil {
 				span.RecordError(err)
 				return nil, fmt.Errorf("create category: %w", err)
@@ -150,13 +149,13 @@ func (s *ProductService) CreateItem(ctx context.Context, req CreateItemRequest) 
 			span.RecordError(err)
 			return nil, fmt.Errorf("check category: %w", err)
 		}
-		categoryID = sql.NullInt64{Int64: int64(catID), Valid: true}
+		categoryID = &catID
 	}
 
 	// Insert product
 	insertQuery := `INSERT INTO products (name, description, price, category_id) VALUES ($1, $2, $3, $4) RETURNING id`
 	var productID int
-	err := db.QueryRowContext(ctx, insertQuery, req.Name, req.Description, req.Price, categoryID).Scan(&productID)
+	err := db.QueryRow(ctx, insertQuery, req.Name, req.Description, req.Price, categoryID).Scan(&productID)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("insert item: %w", err)
@@ -164,7 +163,7 @@ func (s *ProductService) CreateItem(ctx context.Context, req CreateItemRequest) 
 
 	// Create inventory
 	inventoryQuery := `INSERT INTO inventory (product_id, quantity) VALUES ($1, $2)`
-	_, err = db.ExecContext(ctx, inventoryQuery, productID, 0)
+	_, err = db.Exec(ctx, inventoryQuery, productID, 0)
 	if err != nil {
 		span.RecordError(fmt.Errorf("create inventory: %w", err))
 	}

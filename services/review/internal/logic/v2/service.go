@@ -2,7 +2,8 @@ package v2
 
 import (
 	"context"
-	"database/sql"
+	"errors"
+	"github.com/jackc/pgx/v5"
 	"fmt"
 	"strconv"
 
@@ -70,11 +71,11 @@ func (s *ReviewService) CreateReview(ctx context.Context, req domain.CreateRevie
 	// Check for duplicate review
 	var existingID int
 	checkQuery := `SELECT id FROM reviews WHERE product_id = $1 AND user_id = $2`
-	err = db.QueryRowContext(ctx, checkQuery, productID, userID).Scan(&existingID)
+	err = db.QueryRow(ctx, checkQuery, productID, userID).Scan(&existingID)
 	if err == nil {
 		span.SetAttributes(attribute.Bool("review.created", false))
 		return nil, fmt.Errorf("create review for product %q: %w", req.ProductID, ErrDuplicateReview)
-	} else if err != sql.ErrNoRows {
+	} else if !errors.Is(err, pgx.ErrNoRows) {
 		span.RecordError(err)
 		return nil, fmt.Errorf("check existing review: %w", err)
 	}
@@ -82,7 +83,7 @@ func (s *ReviewService) CreateReview(ctx context.Context, req domain.CreateRevie
 	// Insert review
 	insertQuery := `INSERT INTO reviews (product_id, user_id, rating, title, comment) VALUES ($1, $2, $3, $4, $5) RETURNING id`
 	var reviewID int
-	err = db.QueryRowContext(ctx, insertQuery, productID, userID, req.Rating, "", req.Comment).Scan(&reviewID)
+	err = db.QueryRow(ctx, insertQuery, productID, userID, req.Rating, "", req.Comment).Scan(&reviewID)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("insert review: %w", err)

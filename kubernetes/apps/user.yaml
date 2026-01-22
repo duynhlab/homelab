@@ -23,7 +23,7 @@ spec:
     image:
       repository: ghcr.io/duynhne/user
       tag: v6
-      pullPolicy: IfNotPresent
+      pullPolicy: Always
 
     service:
       type: ClusterIP
@@ -110,7 +110,7 @@ spec:
     migrations:
       enabled: true
       image: ghcr.io/duynhne/user:v6-init
-      imagePullPolicy: IfNotPresent
+      imagePullPolicy: Always #IfNotPresent
       env:
         DB_HOST: "supporting-db.user.svc.cluster.local"  # Direct connection, no pooler - supporting-db is in user namespace
         DB_PORT: "5432"  # PostgreSQL port (direct connection)

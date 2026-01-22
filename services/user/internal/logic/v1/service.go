@@ -2,11 +2,12 @@ package v1
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	database "github.com/duynhne/monitoring/services/user/internal/core"
 	"github.com/duynhne/monitoring/services/user/internal/core/domain"
 	"github.com/duynhne/monitoring/services/user/middleware"
@@ -55,7 +56,7 @@ func (s *UserService) GetProfile(ctx context.Context) (*domain.User, error) {
 	))
 	defer span.End()
 
-	// Get database connection
+	// Get database connection pool (pgx)
 	db := database.GetDB()
 	if db == nil {
 		return nil, fmt.Errorf("database connection not available")
@@ -65,15 +66,14 @@ func (s *UserService) GetProfile(ctx context.Context) (*domain.User, error) {
 	// For now, use user_id = 1 as default (mock)
 	userID := 1
 
-	// Query user profile
+	// Query user profile - use pointers for nullable columns
 	var profileID int
-	var firstName, lastName sql.NullString
-	var phone, address sql.NullString
+	var firstName, lastName, phone, address *string
 
 	query := `SELECT id, user_id, first_name, last_name, phone, address FROM user_profiles WHERE user_id = $1`
-	err := db.QueryRowContext(ctx, query, userID).Scan(&profileID, &userID, &firstName, &lastName, &phone, &address)
+	err := db.QueryRow(ctx, query, userID).Scan(&profileID, &userID, &firstName, &lastName, &phone, &address)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			span.SetAttributes(attribute.Bool("profile.found", false))
 			return nil, fmt.Errorf("get profile for user %d: %w", userID, ErrUserNotFound)
 		}
@@ -83,11 +83,11 @@ func (s *UserService) GetProfile(ctx context.Context) (*domain.User, error) {
 
 	// Build name
 	nameParts := []string{}
-	if firstName.Valid && firstName.String != "" {
-		nameParts = append(nameParts, firstName.String)
+	if firstName != nil && *firstName != "" {
+		nameParts = append(nameParts, *firstName)
 	}
-	if lastName.Valid && lastName.String != "" {
-		nameParts = append(nameParts, lastName.String)
+	if lastName != nil && *lastName != "" {
+		nameParts = append(nameParts, *lastName)
 	}
 	name := strings.Join(nameParts, " ")
 	if name == "" {
@@ -116,7 +116,7 @@ func (s *UserService) CreateUser(ctx context.Context, req domain.CreateUserReque
 	))
 	defer span.End()
 
-	// Get database connection
+	// Get database connection pool (pgx)
 	db := database.GetDB()
 	if db == nil {
 		return nil, fmt.Errorf("database connection not available")
@@ -146,12 +146,12 @@ func (s *UserService) CreateUser(ctx context.Context, req domain.CreateUserReque
 
 	var existingID int
 	checkQuery := `SELECT id FROM user_profiles WHERE user_id = $1`
-	err := db.QueryRowContext(ctx, checkQuery, userID).Scan(&existingID)
+	err := db.QueryRow(ctx, checkQuery, userID).Scan(&existingID)
 	if err == nil {
 		// Profile already exists
 		span.SetAttributes(attribute.Bool("user.created", false))
 		return nil, fmt.Errorf("create user %q: %w", req.Username, ErrUserExists)
-	} else if err != sql.ErrNoRows {
+	} else if !errors.Is(err, pgx.ErrNoRows) {
 		// Database error
 		span.RecordError(err)
 		return nil, fmt.Errorf("check existing profile: %w", err)
@@ -160,7 +160,7 @@ func (s *UserService) CreateUser(ctx context.Context, req domain.CreateUserReque
 	// Insert new user profile
 	insertQuery := `INSERT INTO user_profiles (user_id, first_name, last_name) VALUES ($1, $2, $3) RETURNING id`
 	var profileID int
-	err = db.QueryRowContext(ctx, insertQuery, userID, firstName, lastName).Scan(&profileID)
+	err = db.QueryRow(ctx, insertQuery, userID, firstName, lastName).Scan(&profileID)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("insert user profile: %w", err)

@@ -1,3 +1,6 @@
+# Vector Agent HelmRelease
+# Dual-ships Kubernetes logs to both Loki and VictoriaLogs
+# Includes PostgreSQL auto_explain parsing pipeline for CloudNativePG clusters
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -23,6 +26,10 @@ spec:
         enabled: true
         address: 0.0.0.0:8686
         playground: false
+
+      # ========================================================================
+      # SOURCES
+      # ========================================================================
       sources:
         kubernetes_logs:
           type: kubernetes_logs
@@ -35,7 +42,14 @@ spec:
             - "**/containers/*/checkpoints/**"
         internal_metrics:
           type: internal_metrics
+
+      # ========================================================================
+      # TRANSFORMS
+      # ========================================================================
       transforms:
+        # ----------------------------------------------------------------------
+        # Transform: add_labels (existing - for Loki and general VictoriaLogs)
+        # ----------------------------------------------------------------------
         add_labels:
           type: remap
           inputs:
@@ -78,7 +92,170 @@ spec:
                 .level = to_string!(parsed.level)
               }
             }
+
+        # ======================================================================
+        # PostgreSQL auto_explain Pipeline (CloudNativePG)
+        # ======================================================================
+        # Architecture: CloudNativePG Postgres → Vector → VictoriaLogs
+        #
+        # Data Flow:
+        #   1. parse_pg_json: Parse CloudNativePG JSON-formatted logs
+        #   2. filter_pg_auto_explain: Filter for auto_explain execution plans
+        #   3. parse_pg_auto_explain: Extract plan JSON + metadata
+        #   4. Sinks: Route to VictoriaLogs (plans + failures)
+        #
+        # CloudNativePG Log Structure:
+        #   - Outer JSON: CloudNativePG wrapper (timestamp, record)
+        #   - Inner JSON: PostgreSQL auto_explain output (embedded in record.message)
+        #   - Format: "duration: X.X ms  plan: {...}"
+        # ======================================================================
+
+        # ----------------------------------------------------------------------
+        # Transform: parse_pg_json - Parse CloudNativePG JSON Logs
+        # ----------------------------------------------------------------------
+        parse_pg_json:
+          type: remap
+          inputs:
+            - kubernetes_logs
+          source: |
+            # Only parse PostgreSQL (CloudNativePG) postgres container logs
+            # CloudNativePG automatically formats PostgreSQL logs as JSON
+            if .kubernetes.container_name == "postgres" && exists(.kubernetes.pod_labels."cnpg.io/cluster") {
+              parsed, err = parse_json(.message)
+              if err == null {
+                .log = parsed
+                del(.message)
+              }
+            }
+
+        # ----------------------------------------------------------------------
+        # Transform: filter_pg_auto_explain - Filter for auto_explain Logs
+        # ----------------------------------------------------------------------
+        filter_pg_auto_explain:
+          type: filter
+          inputs:
+            - parse_pg_json
+          condition: |
+            # Check if log has the expected structure and contains "plan:"
+            # This identifies auto_explain output which embeds JSON plans
+            exists(.log.record.message) &&
+            contains(string(.log.record.message) ?? "", "plan:")
+
+        # ----------------------------------------------------------------------
+        # Transform: parse_pg_auto_explain - Extract & Structure Execution Plan
+        # ----------------------------------------------------------------------
+        parse_pg_auto_explain:
+          type: remap
+          inputs:
+            - filter_pg_auto_explain
+          drop_on_error: true
+          drop_on_abort: true
+          reroute_dropped: true
+          source: |
+            # Step 1: Extract message from already-parsed PostgreSQL JSON structure
+            msg_val, err = get(.log, ["record", "message"])
+            if err != null {
+              cluster = .kubernetes.pod_labels."cnpg.io/cluster" || "unknown"
+              pod = .kubernetes.pod_name || "unknown"
+              log({
+                "level": "warn",
+                "component": "pg_auto_explain_parser",
+                "error_type": "missing_field",
+                "field": "log.record.message",
+                "cluster": cluster,
+                "pod": pod,
+                "message": "PostgreSQL log missing expected log.record.message field"
+              }, level: "warn")
+              abort
+            }
+            log_message = string!(msg_val)
+
+            # Step 2: Verify plan exists in message
+            if !contains(log_message, "plan:") {
+              abort
+            }
+
+            # Step 3: Extract JSON plan from message string
+            parts = split!(log_message, "plan:", limit: 2)
+            if length(parts) != 2 {
+              cluster = .kubernetes.pod_labels."cnpg.io/cluster" || "unknown"
+              log({
+                "level": "error",
+                "component": "pg_auto_explain_parser",
+                "error_type": "split_failure",
+                "cluster": cluster,
+                "message": "Failed to split log message at 'plan:' delimiter"
+              }, level: "error")
+              abort
+            }
+
+            # Step 4: Parse the execution plan JSON
+            json_string = strip_whitespace!(string!(parts[1]))
+            parsed_plan, err = parse_json(json_string)
+            if err != null {
+              cluster = .kubernetes.pod_labels."cnpg.io/cluster" || "unknown"
+              log({
+                "level": "error",
+                "component": "pg_auto_explain_parser",
+                "error_type": "json_parse_failure",
+                "cluster": cluster,
+                "error": string!(err),
+                "json_preview": slice!(json_string, start: 0, end: 100),
+                "message": "Failed to parse execution plan JSON"
+              }, level: "error")
+              abort
+            }
+
+            # Step 5: Extract core metadata from PostgreSQL log
+            .query_id = to_string(.log.record.query_id) ?? "unknown"
+            .cluster_name = .kubernetes.pod_labels."cnpg.io/cluster" || "unknown"
+            .namespace = .kubernetes.pod_namespace || .kubernetes.namespace_name || "unknown"
+            .pod_name = .kubernetes.pod_name || "unknown"
+            .database = .log.record.database_name || "unknown"
+            .user = .log.record.user_name || "unknown"
+
+            # Step 6: Extract query duration from log message
+            duration_match, err = parse_regex(log_message, r'duration: (?P<duration>[\d.]+) ms')
+            if err == null {
+              .duration_ms = to_float!(duration_match.duration)
+            }
+
+            # Step 7: Extract execution plan and query text
+            plan_object, err = get(parsed_plan, ["Plan"])
+            if err == null && plan_object != null {
+              .plan_json = encode_json(plan_object)
+            }
+            .query_text = get!(parsed_plan, ["Query Text"]) || ""
+
+            # Step 8: Extract timing metrics (optional fields)
+            planning_time, err = get(parsed_plan, ["Planning Time"])
+            if err == null && planning_time != null {
+              .planning_time_ms = planning_time
+            }
+
+            execution_time, err = get(parsed_plan, ["Execution Time"])
+            if err == null && execution_time != null {
+              .execution_time_ms = execution_time
+            }
+
+            # Step 9: Create human-readable message for log display
+            if exists(.duration_ms) {
+              .message = "Query plan for queryid=" + string!(.query_id) + " (duration=" + to_string!(.duration_ms) + "ms)"
+            } else {
+              .message = "Query plan for queryid=" + string!(.query_id) + " (duration=unknown)"
+            }
+
+            # Step 10: Cleanup - Remove Kubernetes metadata to reduce storage
+            del(.kubernetes)
+            del(.log)
+
+      # ========================================================================
+      # SINKS
+      # ========================================================================
       sinks:
+        # ----------------------------------------------------------------------
+        # Sink: Loki (existing - all logs)
+        # ----------------------------------------------------------------------
         loki:
           type: loki
           inputs:
@@ -100,22 +277,133 @@ spec:
             rate_limit_num: 100
           healthcheck:
             enabled: false
+
+        # ----------------------------------------------------------------------
+        # Sink: VictoriaLogs - All Logs (jsonline ingestion)
+        # ----------------------------------------------------------------------
+        # Docs: https://docs.victoriametrics.com/victorialogs/data-ingestion/vector
+        victorialogs_all:
+          type: http
+          inputs:
+            - add_labels
+          uri: http://victorialogs-victoria-logs-single-server.monitoring.svc.cluster.local:9428/insert/jsonline
+          encoding:
+            codec: json
+          framing:
+            method: newline_delimited
+          batch:
+            max_events: 1000
+            timeout_secs: 5
+          buffer:
+            type: memory
+            max_events: 10000
+            when_full: drop_newest
+          request:
+            headers:
+              VL-Time-Field: timestamp
+              VL-Msg-Field: message
+              VL-Stream-Fields: namespace,service,pod_name,container_name
+              AccountID: "0"
+              ProjectID: "0"
+          healthcheck:
+            enabled: false
+
+        # ----------------------------------------------------------------------
+        # Sink: VictoriaLogs - PostgreSQL Query Plans (structured)
+        # ----------------------------------------------------------------------
+        victorialogs_pg_plans:
+          type: http
+          inputs:
+            - parse_pg_auto_explain
+          uri: http://victorialogs-victoria-logs-single-server.monitoring.svc.cluster.local:9428/insert/jsonline
+          encoding:
+            codec: json
+            only_fields:
+              - cluster_name
+              - namespace
+              - database
+              - query_id
+              - pod_name
+              - query_text
+              - plan_json
+              - duration_ms
+              - planning_time_ms
+              - execution_time_ms
+              - message
+              - timestamp
+          framing:
+            method: newline_delimited
+          batch:
+            max_events: 100
+            timeout_secs: 5
+          buffer:
+            type: memory
+            max_events: 1000
+            when_full: drop_newest
+          request:
+            headers:
+              VL-Time-Field: timestamp
+              VL-Msg-Field: plan_json
+              VL-Stream-Fields: cluster_name,namespace,database,query_id
+              AccountID: "0"
+              ProjectID: "0"
+          healthcheck:
+            enabled: false
+
+        # ----------------------------------------------------------------------
+        # Sink: VictoriaLogs - PostgreSQL Parsing Failures (debugging)
+        # ----------------------------------------------------------------------
+        victorialogs_pg_parse_failures:
+          type: http
+          inputs:
+            - parse_pg_auto_explain.dropped
+          uri: http://victorialogs-victoria-logs-single-server.monitoring.svc.cluster.local:9428/insert/jsonline
+          encoding:
+            codec: json
+          framing:
+            method: newline_delimited
+          batch:
+            max_events: 100
+            timeout_secs: 10
+          buffer:
+            type: memory
+            max_events: 500
+            when_full: drop_newest
+          request:
+            headers:
+              VL-Time-Field: timestamp
+              VL-Msg-Field: message
+              VL-Stream-Fields: kubernetes.container_name,kubernetes.pod_name
+              AccountID: "0"
+              ProjectID: "0"
+          healthcheck:
+            enabled: false
+
+        # ----------------------------------------------------------------------
+        # Sink: Prometheus Exporter (internal metrics)
+        # ----------------------------------------------------------------------
         prometheus_exporter:
           type: prometheus_exporter
           inputs:
             - internal_metrics
           address: 0.0.0.0:9090
           default_namespace: vector
+
+    # ==========================================================================
+    # Resources (increased for dual-sink + parsing workload)
+    # ==========================================================================
     resources:
       limits:
-        cpu: 100m
-        memory: 128Mi
+        cpu: 500m
+        memory: 512Mi
       requests:
-        cpu: 20m
-        memory: 64Mi
+        cpu: 100m
+        memory: 256Mi
+
     tolerations:
       - effect: NoSchedule
         operator: Exists
+
     podMonitor:
       enabled: true
       additionalLabels:

@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -73,6 +74,10 @@ func (c *DatabaseConfig) BuildDSN() string {
 // - lib/pq uses server-side prepared statements which cause errors with connection poolers
 // - pgxpool provides built-in connection pooling optimized for PostgreSQL
 //
+// IMPORTANT: We use SimpleProtocol mode and disable statement caching to work correctly
+// with transaction-mode connection poolers (PgCat/PgBouncer). Without this, you may see:
+//   "prepared statement stmtcache_* does not exist"
+//
 // The pool is stored globally and can be retrieved via GetPool().
 func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 	cfg, err := LoadConfig()
@@ -80,8 +85,22 @@ func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("failed to load database config: %w", err)
 	}
 
-	// Create connection pool with pgx
-	pool, err := pgxpool.New(ctx, cfg.BuildDSN())
+	// Parse DSN into pool config
+	poolCfg, err := pgxpool.ParseConfig(cfg.BuildDSN())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse database config: %w", err)
+	}
+
+	// Configure for transaction-mode poolers (PgCat/PgBouncer):
+	// - Use simple protocol to avoid server-side prepared statements
+	// - Disable statement cache (prepared statements are connection-scoped)
+	// - Disable description cache
+	poolCfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+	poolCfg.ConnConfig.StatementCacheCapacity = 0
+	poolCfg.ConnConfig.DescriptionCacheCapacity = 0
+
+	// Create connection pool with the configured settings
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection pool: %w", err)
 	}

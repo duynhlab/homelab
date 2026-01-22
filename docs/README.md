@@ -72,7 +72,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
     - Distributed tracing with Tempo + Jaeger
     - OpenTelemetry Collector for trace fan-out
     - Continuous profiling with Pyroscope
-    - Log aggregation with Loki + Vector
+    - Log aggregation with Loki + Vector + VictoriaLogs
     - Grafana Operator datasource integration
 
 2. **[APM Architecture](./apm/ARCHITECTURE.md)** - System architecture
@@ -80,6 +80,10 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 4. **[Jaeger Guide](./apm/JAEGER.md)** - Jaeger UI usage, comparison with Tempo
 5. **[Continuous Profiling](./apm/PROFILING.md)** - Pyroscope setup
 6. **[Log Aggregation](./apm/LOGGING.md)** - Loki + Vector configuration
+7. **[VictoriaLogs](./victorialogs/README.md)** - VictoriaLogs deployment and configuration
+    - Single Vector architecture (dual-ship to Loki + VictoriaLogs)
+    - PostgreSQL auto_explain plan parsing pipeline
+    - Verification and troubleshooting
 
 ### 💻 Development Guides
 
@@ -162,6 +166,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 - [Jaeger Guide](./apm/JAEGER.md) - Jaeger UI usage, comparison with Tempo
 - [Continuous Profiling](./apm/PROFILING.md) - Pyroscope setup
 - [Log Aggregation](./apm/LOGGING.md) - Loki + Vector
+- [VictoriaLogs](./victorialogs/README.md) - VictoriaLogs deployment (single Vector, dual-ship)
 
 ### Development Guides
 
@@ -196,7 +201,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 - **9 Microservices** - All services with v1/v2 APIs
 - **Monitoring Stack** - Prometheus Operator + Grafana Operator + kube-state-metrics + metrics-server
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
-- **APM Stack** - Tempo + Jaeger (tracing), OTel Collector (fan-out), Pyroscope (profiling), Loki + Vector (logging)
+- **APM Stack** - Tempo + Jaeger (tracing), OTel Collector (fan-out), Pyroscope (profiling), Loki + VictoriaLogs + Vector (logging)
 - **k6 Load Testing** - Helm-managed load generators
 
 ### Common Tasks
@@ -254,4 +259,4 @@ flux reconcile kustomization slo-stack --with-source  # Manual trigger
 
 ---
 
-**Last Updated**: December 2025
+**Last Updated**: January 2026

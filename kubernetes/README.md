@@ -121,9 +121,6 @@ sequenceDiagram
 - ✅ PgCat Transaction → `pgcat/pgcat` v0.2.5
 - ✅ PgCat Product → `pgcat/pgcat` v0.2.5
 
-**Added new HelmRepositories:**
-- `vector` - https://helm.vector.dev
-- `pgcat` - https://postgresml.github.io/pgcat/
 
 ### 3. Consistent Patterns
 

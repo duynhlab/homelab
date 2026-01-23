@@ -45,3 +45,4 @@ resources:
   - grafana-dashboard-pgbouncer.yaml
   - grafana-dashboard-postgres-replication-lag.yaml
   - grafana-dashboard-pgdog.yaml
+  - grafana-dashboard-loki.yaml

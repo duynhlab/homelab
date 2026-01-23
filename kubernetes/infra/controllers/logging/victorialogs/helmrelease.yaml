@@ -43,12 +43,6 @@ spec:
         extraLabels:
           release: kube-prometheus-stack
 
-    # ============================================================================
-    # CRITICAL: Disable embedded Vector collector
-    # ============================================================================
-    # Log collection is handled by the cluster-wide Vector Agent (kube-system/vector)
-    # which ships logs to both Loki and VictoriaLogs endpoints.
-    # This avoids duplicate Vector deployments and conflicting log collection.
     vector:
       enabled: false
 
@@ -59,4 +53,4 @@ spec:
         enabled: true
         spec:
           allowCrossNamespaceImport: true
-          folderRef: "logs"
+          folderRef: "Logs"

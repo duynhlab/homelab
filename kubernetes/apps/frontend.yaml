@@ -65,7 +65,7 @@ spec:
           image:
             repository: ghcr.io/duynhne/<< inputs.service >>
             tag: << inputs.version | quote >>
-            pullPolicy: IfNotPresent
+            pullPolicy: Always
           
           service:
             type: ClusterIP

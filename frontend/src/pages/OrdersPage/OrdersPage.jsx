@@ -102,7 +102,7 @@ export default function OrdersPage() {
             {!loading && !error && (
                 <div className="two-col">
                     {/* Orders List */}
-                    <div className="card">
+                    <div className="card orders-history">
                         <h3>Order History</h3>
                         {orders.length === 0 ? (
                             <div className="empty">
@@ -146,7 +146,7 @@ export default function OrdersPage() {
                     </div>
 
                     {/* Order Details */}
-                    <div className="card">
+                    <div className="card order-details">
                         <h3>Order Details</h3>
                         {selectedOrder ? (
                             <>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { login, register } from '../../api/authApi';
+import { useToast } from '../../components/common/ToastProvider';
 
 /**
  * Login Page - Auth APIs
@@ -14,6 +15,7 @@ import { login, register } from '../../api/authApi';
 export default function LoginPage() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
+    const { notify } = useToast();
     
     // Read query params
     const returnTo = searchParams.get('returnTo') || '/';
@@ -21,8 +23,6 @@ export default function LoginPage() {
     
     const [mode, setMode] = useState(initialMode);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const [success, setSuccess] = useState(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
 
     const [form, setForm] = useState({
@@ -55,8 +55,6 @@ export default function LoginPage() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setError(null);
-        setSuccess(null);
 
         try {
             let result;
@@ -79,11 +77,11 @@ export default function LoginPage() {
                 localStorage.setItem('authUser', JSON.stringify(result.user));
             }
 
-            setSuccess(`${mode === 'login' ? 'Login' : 'Registration'} successful!`);
+            notify('success', `${mode === 'login' ? 'Login' : 'Registration'} successful!`);
             // Redirect to returnTo URL (or home)
-            setTimeout(() => navigate(returnTo), 1000);
+            setTimeout(() => navigate(returnTo), 800);
         } catch (err) {
-            setError(err.message);
+            notify('error', err.message || 'Authentication failed');
             console.error('[API ERROR]', err);
         } finally {
             setLoading(false);
@@ -125,9 +123,6 @@ export default function LoginPage() {
                 <p className="api-label">
                     API: POST /api/v1/auth/{mode === 'login' ? 'login' : 'register'}
                 </p>
-
-                {error && <div className="error">{error}</div>}
-                {success && <div className="success">{success}</div>}
 
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">

@@ -9,3 +9,5 @@ resources:
   - podmonitors/podmonitor-zalando-auth-db.yaml
   - podmonitors/podmonitor-zalando-review-db.yaml
   - podmonitors/podmonitor-zalando-supporting-db.yaml
+  # SLO definitions (PrometheusServiceLevel CRDs for Sloth)
+  - slo/

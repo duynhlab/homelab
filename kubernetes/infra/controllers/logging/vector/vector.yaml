@@ -14,7 +14,7 @@ spec:
         kind: HelmRepository
         name: vector
         namespace: flux-system
-      version: '*'
+      version: '0.49.0'
   interval: 10m
   releaseName: vector
   timeout: 10m
@@ -395,17 +395,14 @@ spec:
     # ==========================================================================
     resources:
       limits:
-        cpu: 500m
-        memory: 512Mi
-      requests:
         cpu: 100m
         memory: 256Mi
-
-    tolerations:
-      - effect: NoSchedule
-        operator: Exists
+      requests:
+        cpu: 50m
+        memory: 128Mi
 
     podMonitor:
       enabled: true
+      port: prometheus-expo
       additionalLabels:
         release: kube-prometheus-stack

@@ -7,6 +7,126 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.36.1] - 2026-01-23
+
+### Changed
+
+#### Documentation Updates
+
+Updated all documentation to reflect recent organizational changes.
+
+**SLO Path Updates:**
+- `kubernetes/infra/configs/slo/` → `kubernetes/infra/configs/monitoring/slo/`
+- Updated: `docs/slo/README.md`, `docs/README.md`, `kubernetes/README.md`, `AGENTS.md`
+
+**Review API Contract Updates:**
+- `GET /api/v1/reviews` now **requires** `product_id` query parameter (returns 400 if missing)
+- Response uses snake_case fields: `product_id`, `user_id`, `created_at`
+- `POST /api/v1/reviews` requires `user_id` in request body
+- Returns 409 Conflict for duplicate reviews
+- Updated: `docs/guides/API.md`, `frontend/README.md`
+
+**Frontend README Updates:**
+- Added Global Toast Notification System documentation
+- Added Review Service endpoint documentation with auth-gated UX details
+- Fixed Auth login request to use `username` instead of `email`
+
+---
+
+## [0.36.0] - 2026-01-23
+
+### Added
+
+#### Global Toast Notification System
+
+Implemented a global toast notification system for consistent, non-intrusive feedback across the app.
+
+**Features:**
+- Toast notifications appear top-right, stack cleanly (max 5)
+- Auto-dismiss after 4 seconds (configurable)
+- Manual dismiss via X button
+- Three types: `success`, `error`, `info`
+- No layout shifts (fixed positioning)
+
+**Usage:**
+```jsx
+import { useToast } from '../../components/common/ToastProvider';
+
+const { notify } = useToast();
+notify('success', 'Item added to cart');
+notify('error', 'Failed to save');
+notify('info', 'You already reviewed this product');
+```
+
+**Files Added:**
+- `frontend/src/components/common/ToastProvider.jsx` - Context + `useToast()` hook
+- `frontend/src/components/common/ToastViewport.jsx` - Toast UI component
+- `frontend/src/components/common/toast.css` - Toast styling
+- `frontend/src/notifications/README.md` - Documentation for future notification-service integration
+
+**Files Changed:**
+- `frontend/src/main.jsx` - Wrapped app with `<ToastProvider>`
+
+### Changed
+
+#### Frontend: Inline Alerts Migrated to Toast Notifications
+
+Replaced inline system-level alerts with global toast notifications for better UX.
+
+**Pages Updated:**
+- `frontend/src/pages/LoginPage/LoginPage.jsx`:
+  - Login/register success → toast success
+  - Auth errors → toast error
+  - Removed inline `error`/`success` state variables
+- `frontend/src/pages/ProductDetailPage/ProductDetailPage.jsx`:
+  - Add-to-cart success/error → toasts
+  - Review submit success → toast success
+  - Duplicate review (409) → toast info
+  - Removed `cartMessage` and `reviewMessage` inline alerts
+
+#### Reviews API Contract + UI Improvements
+
+Fixed review display issues and improved review submission UX.
+
+**Backend Changes (`services/review/`):**
+- `internal/core/domain/review.go`:
+  - Added `Title` and `CreatedAt` fields to `Review` struct
+  - Changed JSON tags to snake_case (`product_id`, `user_id`, `created_at`)
+- `internal/logic/v1/service.go`:
+  - `ListReviews(ctx, productID)` now filters by `product_id`
+  - Returns `title`, `comment`, `created_at` from database
+- `internal/web/v1/handler.go`:
+  - `GET /api/v1/reviews` requires `product_id` query param (returns 400 if missing)
+
+**Frontend Changes:**
+- `frontend/src/api/reviewApi.js`:
+  - `createReview()` now sends `user_id` in request body
+- `frontend/src/pages/ProductDetailPage/ProductDetailPage.jsx`:
+  - Safe date formatting with `—` fallback for invalid dates
+  - Author shows `Guest` if no username available
+  - Conditionally display review title only if present
+  - Auth-gated review form (login prompt for unauthenticated users)
+  - **Hide review form if user already reviewed** (computed from reviews list)
+  - Auto-scroll to `#reviews` section when landing with that hash
+- `frontend/src/pages/LoginPage/LoginPage.jsx`:
+  - Persist `authUser` to localStorage after login/register
+  - Honor `returnTo` and `mode` query params for redirect-back flow
+
+#### SLO Configs Moved Under Monitoring
+
+Moved SLO definitions to be part of the monitoring config bundle.
+
+**Structure Change:**
+```
+Before: kubernetes/infra/configs/slo/
+After:  kubernetes/infra/configs/monitoring/slo/
+```
+
+**Files Changed:**
+- `kubernetes/infra/configs/monitoring/kustomization.yaml` - Added `- slo/`
+- `kubernetes/infra/configs/kustomization.yaml` - Removed `- slo/` (now included via monitoring)
+- `kubernetes/clusters/local/configs.yaml` - Added healthCheck for `PrometheusServiceLevel` (auth)
+
 ## [0.35.0] - 2026-01-22
 
 ### Changed

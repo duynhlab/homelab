@@ -1,5 +1,16 @@
 # PgCat Prepared Statement Error - Cart Count 500
 
+## Not This Issue?
+
+If you're seeing a **different error**, check these related docs:
+
+| Error Message | Doc |
+|---------------|-----|
+| `cannot execute UPDATE in a read-only transaction (SQLSTATE 25006)` | [PgCat Read-Only Transaction Error](PGCAT_READ_ONLY_TRANSACTION_ERROR.md) |
+| `Connection refused (os error 111)` / `Shard 0 down or misconfigured: TimedOut` | [PgCat Upstream Connectivity Errors](PGCAT_UPSTREAM_CONNECTIVITY_ERRORS.md) |
+
+---
+
 ## Problem
 
 Intermittent 500 errors on `/api/v1/cart/count` when adding items to cart rapidly (>10 consecutive requests).
@@ -146,3 +157,8 @@ make flux-push
 - Date discovered: 2026-01-21
 - Initial fix: Migration from `lib/pq` to `pgx/v5 v5.8.0`
 - Additional fix (2026-01-22): Added `QueryExecModeSimpleProtocol` + disabled statement cache to fix `stmtcache_*` errors
+
+## See Also
+
+- [PgCat Read-Only Transaction Error](PGCAT_READ_ONLY_TRANSACTION_ERROR.md) - `SQLSTATE 25006` write-on-replica errors
+- [PgCat Upstream Connectivity Errors](PGCAT_UPSTREAM_CONNECTIVITY_ERRORS.md) - Connection refused / shard down errors

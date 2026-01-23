@@ -17,7 +17,12 @@ INSERT INTO products (name, description, price, category_id, stock_quantity) VAL
     ('Webcam HD', '1080p HD webcam with built-in microphone', 59.99, 1, 20),
     ('Monitor 24"', '24-inch Full HD IPS monitor with ultra-thin bezels', 149.99, 1, 15),
     ('Gaming Headset', 'Surround sound gaming headset with noise cancellation', 89.99, 3, 35),
-    ('External SSD 1TB', 'Portable 1TB SSD with USB 3.1 Gen 2 interface', 99.99, 2, 18)
+    ('External SSD 1TB', 'Portable 1TB SSD with USB 3.1 Gen 2 interface', 99.99, 2, 18),
+    ('Bluetooth Speaker', 'Portable Bluetooth speaker with deep bass and 12-hour playtime', 34.99, 3, 28),
+    ('Smartphone Stand', 'Adjustable smartphone stand compatible with all devices', 19.99, 3, 60),
+    ('USB Flash Drive 128GB', 'High-speed USB 3.0 flash drive with 128GB capacity', 22.99, 2, 75),
+    ('4K HDMI Cable', '2-meter ultra HD 4K HDMI cable with gold-plated connectors', 12.99, 2, 120),
+    ('Noise Cancelling Earbuds', 'True wireless earbuds with active noise cancellation', 59.99, 3, 38)
 ON CONFLICT (name) DO NOTHING;
 
 -- Verify seed data loaded

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Routes, Route, Link } from 'react-router-dom';
+import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { getCartCount } from './api/cartApi';
 import Footer from './components/common/Footer';
 
@@ -17,7 +17,20 @@ import LoginPage from './pages/LoginPage/LoginPage';
  * Uses GET /api/v1/cart/count for badge
  */
 function App() {
+    const navigate = useNavigate();
     const [cartCount, setCartCount] = useState(0);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+    const checkAuth = () => {
+        const token = localStorage.getItem('authToken');
+        setIsAuthenticated(!!token);
+    };
+
+    const handleLogout = () => {
+        localStorage.removeItem('authToken');
+        setIsAuthenticated(false);
+        navigate('/login');
+    };
 
     const fetchCartCount = async () => {
         try {
@@ -30,9 +43,16 @@ function App() {
     };
 
     useEffect(() => {
+        checkAuth();
         fetchCartCount();
         const interval = setInterval(fetchCartCount, 5000);
-        return () => clearInterval(interval);
+        // Listen for storage changes (e.g., login/logout in other tabs or from LoginPage)
+        const handleStorage = () => checkAuth();
+        window.addEventListener('storage', handleStorage);
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('storage', handleStorage);
+        };
     }, []);
 
     return (
@@ -50,7 +70,23 @@ function App() {
                     <Link to="/cart">
                         Cart {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
                     </Link>
-                    <Link to="/login">Login</Link>
+                    {isAuthenticated ? (
+                        <button
+                            onClick={handleLogout}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--accent)',
+                                cursor: 'pointer',
+                                padding: 0,
+                                fontSize: 'inherit'
+                            }}
+                        >
+                            Logout
+                        </button>
+                    ) : (
+                        <Link to="/login">Login</Link>
+                    )}
                 </nav>
             </header>
 

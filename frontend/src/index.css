@@ -424,6 +424,7 @@ select:focus {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 0.75rem;
+  align-items: start;
 }
 
 @media (max-width: 768px) {
@@ -599,6 +600,12 @@ th {
   margin-bottom: 0.75rem;
 }
 
+/* Order Details - scrollable on desktop */
+.order-details {
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+}
+
 /* Shipment box */
 .shipment-box {
   background: var(--bg-hover);
@@ -721,6 +728,12 @@ th {
   /* Shipment box */
   .shipment-box {
     font-size: 0.8125rem;
+  }
+
+  /* Order Details - no scroll constraint on mobile */
+  .order-details {
+    max-height: none;
+    overflow-y: visible;
   }
 }
 

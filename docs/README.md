@@ -237,8 +237,8 @@ helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-
 **Deploy SLOs:**
 
 ```bash
-# SLOs are deployed automatically via Flux
-flux reconcile kustomization slo-stack --with-source  # Manual trigger
+# SLOs are deployed automatically via Flux (part of configs-local)
+flux reconcile kustomization configs-local --with-source  # Manual trigger
 ```
 
 **Access services:**

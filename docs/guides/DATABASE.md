@@ -1587,22 +1587,6 @@ ps aux | grep postgres
 # Check Patroni process
 ps aux | grep patroni
 ```
-
-#### Quick Verification Checklist
-
-**For a healthy cluster:**
-1. ✅ All members show in `patronictl list`
-2. ✅ Leader shows `running` state
-3. ✅ Replicas show `running` or `streaming` state (not `creating replica` or `stopped`)
-4. ✅ Replication lag is minimal (< 1 MB for healthy replicas)
-5. ✅ All databases are accessible via `psql`
-6. ✅ Patroni service is running (`sv status /etc/service/patroni` shows `run`)
-
-**Common Issues:**
-- **Replicas stuck in "creating replica"**: Check `pg_hba.conf` replication entries (see [Troubleshooting Guide](../troubleshooting/zalando-operator-pod-labels-error.md#issue-2-replica-cannot-connect))
-- **High replication lag**: Check network connectivity, disk I/O, or WAL generation rate
-- **Patroni service not running**: Check logs and restart with `sv restart patroni`
-
 ---
 
 ## Connection Poolers

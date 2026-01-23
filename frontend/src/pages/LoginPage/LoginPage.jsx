@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { login, register } from '../../api/authApi';
 
@@ -13,12 +13,26 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
 
     const [form, setForm] = useState({
         username: 'alice',
         email: 'alice@example.com',
         password: 'password123'
     });
+
+    // Check if user is already authenticated
+    useEffect(() => {
+        const token = localStorage.getItem('authToken');
+        setIsAuthenticated(!!token);
+    }, []);
+
+    const handleLogout = () => {
+        localStorage.removeItem('authToken');
+        setIsAuthenticated(false);
+        // Dispatch storage event so App.jsx updates header immediately
+        window.dispatchEvent(new Event('storage'));
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -38,6 +52,8 @@ export default function LoginPage() {
 
             if (result.token) {
                 localStorage.setItem('authToken', result.token);
+                // Dispatch storage event so App.jsx updates header immediately
+                window.dispatchEvent(new Event('storage'));
             }
 
             setSuccess(`${mode === 'login' ? 'Login' : 'Registration'} successful!`);
@@ -49,6 +65,33 @@ export default function LoginPage() {
             setLoading(false);
         }
     };
+
+    // Already authenticated - show message + CTA
+    if (isAuthenticated) {
+        return (
+            <div className="auth-page">
+                <div className="auth-form">
+                    <h2>Already Logged In</h2>
+                    <div className="success" style={{ marginBottom: '1rem' }}>
+                        You are already logged in.
+                    </div>
+                    <button
+                        className="primary"
+                        style={{ width: '100%', marginBottom: '0.5rem' }}
+                        onClick={() => navigate('/')}
+                    >
+                        Go to Products
+                    </button>
+                    <button
+                        style={{ width: '100%' }}
+                        onClick={handleLogout}
+                    >
+                        Logout
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="auth-page">

@@ -22,8 +22,8 @@ This SLO (Service Level Objective) system provides comprehensive monitoring and 
 - `configs-local` ([kubernetes/clusters/local/configs.yaml](../../kubernetes/clusters/local/configs.yaml)) - applies PrometheusServiceLevel CRs
 - **Source:** OCI artifact `mop-registry:5000/flux-infra-sync:local`
 - **Manifests:**
-  - `kubernetes/infra/controllers/slo/`
-  - `kubernetes/infra/configs/slo/`
+  - `kubernetes/infra/controllers/metrics/slo/` (Sloth Operator)
+  - `kubernetes/infra/configs/monitoring/slo/` (PrometheusServiceLevel CRDs)
 - **Reconciliation:** Every 10 minutes (automatic)
 - **Dependencies:** `controllers-local` must be ready before `configs-local`
 
@@ -158,7 +158,9 @@ Multi-window multi-burn-rate alerts:
 
 ## Documentation
 
-- **Deployment**: Deployed automatically via Flux ([kubernetes/infra/slo.yaml](../../kubernetes/infra/slo.yaml) - simplified structure, refactored 2026-01-12)
+- **Manifests:**
+  - Sloth Operator: `kubernetes/infra/controllers/metrics/slo/`
+  - SLO CRDs: `kubernetes/infra/configs/monitoring/slo/`
 - **Sloth Docs**: https://sloth.dev/
 - **CRD Spec**: https://sloth.dev/usage/getting-started/
 - **Alert Configuration**: [ALERTING.md](./ALERTING.md)

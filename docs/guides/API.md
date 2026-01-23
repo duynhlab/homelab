@@ -40,8 +40,8 @@ This is the **single source of truth** for all API endpoints. The Frontend team 
 | **User** | `/api/v1/users/profile` | GET | v1 | Get user profile | STABLE |
 | **User** | `/api/v2/users/:id` | GET | v2 | Get user by ID | STABLE |
 | **User** | `/api/v2/users/profile` | GET | v2 | Get user profile | STABLE |
-| **Review** | `/api/v1/reviews` | GET | v1 | Get all reviews | STABLE |
-| **Review** | `/api/v1/reviews` | POST | v1 | Create new review | STABLE |
+| **Review** | `/api/v1/reviews?product_id={id}` | GET | v1 | Get reviews for product (**product_id required**) | STABLE |
+| **Review** | `/api/v1/reviews` | POST | v1 | Create review (**user_id required**, 409 if duplicate) | STABLE |
 | **Review** | `/api/v2/reviews/:reviewId` | GET | v2 | Get review by ID | STABLE |
 | **Review** | `/api/v2/reviews` | POST | v2 | Create review | STABLE |
 | **Notification** | `/api/v2/notifications` | GET | v2 | Get all notifications | STABLE |
@@ -925,8 +925,79 @@ Content-Type: application/json
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/v1/reviews` | Get all reviews |
-| `POST` | `/api/v1/reviews` | Create new review |
+| `GET` | `/api/v1/reviews?product_id={id}` | Get reviews for a product (**product_id required**) |
+| `POST` | `/api/v1/reviews` | Create new review (**user_id required**) |
+
+#### GET /api/v1/reviews
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `product_id` | string | **Yes** | Product ID to get reviews for |
+
+**Response (200 OK):**
+```json
+[
+  {
+    "id": "1",
+    "product_id": "5",
+    "user_id": "1",
+    "rating": 5,
+    "title": "Great product!",
+    "comment": "Highly recommend this product.",
+    "created_at": "2026-01-23T10:30:00Z"
+  }
+]
+```
+
+**Error (400 Bad Request):** Missing `product_id`
+```json
+{
+  "error": "product_id query parameter is required"
+}
+```
+
+#### POST /api/v1/reviews
+
+**Request Body:**
+```json
+{
+  "product_id": "5",
+  "user_id": "1",
+  "rating": 5,
+  "title": "Great product!",
+  "comment": "Highly recommend this product."
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `product_id` | string | Yes | Product ID |
+| `user_id` | string | Yes | User ID (authenticated user) |
+| `rating` | int | Yes | Rating 1-5 |
+| `title` | string | No | Review title |
+| `comment` | string | Yes | Review comment |
+
+**Response (201 Created):**
+```json
+{
+  "id": "10",
+  "product_id": "5",
+  "user_id": "1",
+  "rating": 5,
+  "title": "Great product!",
+  "comment": "Highly recommend this product.",
+  "created_at": "2026-01-23T10:30:00Z"
+}
+```
+
+**Error (409 Conflict):** User already reviewed this product
+```json
+{
+  "error": "Review already exists"
+}
+```
 
 ### Endpoints (v2)
 

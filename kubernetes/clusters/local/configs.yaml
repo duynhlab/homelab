@@ -31,6 +31,11 @@ spec:
       kind: Grafana
       name: grafana
       namespace: monitoring
+    # SLO configs (PrometheusServiceLevel CRDs)
+    - apiVersion: sloth.slok.dev/v1
+      kind: PrometheusServiceLevel
+      name: auth
+      namespace: monitoring
     # Database instances
     - apiVersion: acid.zalan.do/v1
       kind: postgresql

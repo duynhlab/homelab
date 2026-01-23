@@ -117,6 +117,52 @@ kubectl port-forward -n default svc/frontend 3000:80
 # Access at http://localhost:3000
 ```
 
+## Global Toast Notification System
+
+The frontend includes a global toast notification system for consistent, non-intrusive user feedback.
+
+### Features
+
+- **Position**: Top-right corner (fixed)
+- **Auto-dismiss**: 4 seconds (configurable)
+- **Manual dismiss**: X button
+- **Types**: `success` (green), `error` (red), `info` (accent)
+- **Stacking**: Max 5 visible, drops oldest
+- **No layout shifts**: Fixed positioning
+
+### Usage
+
+```jsx
+import { useToast } from '../../components/common/ToastProvider';
+
+function MyComponent() {
+    const { notify } = useToast();
+    
+    // Trigger toasts
+    notify('success', 'Item added to cart');
+    notify('error', 'Failed to save');
+    notify('info', 'You already reviewed this product');
+    
+    // Custom duration (5 seconds)
+    notify('success', 'Saved!', { duration: 5000 });
+}
+```
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `src/components/common/ToastProvider.jsx` | Context + `useToast()` hook |
+| `src/components/common/ToastViewport.jsx` | Toast UI component |
+| `src/components/common/toast.css` | Toast styling |
+| `src/main.jsx` | Wrapped with `<ToastProvider>` |
+
+### Future: Notification Service Integration
+
+The `src/notifications/README.md` documents how to integrate with the backend notification microservice (SSE/WebSocket) to display real-time server notifications as toasts.
+
+---
+
 ## API Contract
 
 ### Overview
@@ -500,7 +546,7 @@ Frontend consumes these backend REST APIs. All endpoints follow the contract def
 **Request:**
 ```json
 {
-  "email": "user@example.com",
+  "username": "alice",
   "password": "password123"
 }
 ```
@@ -510,12 +556,14 @@ Frontend consumes these backend REST APIs. All endpoints follow the contract def
 {
   "token": "eyJhbGciOiJIUzI1NiIs...",
   "user": {
-    "id": "user456",
-    "email": "user@example.com",
-    "name": "John Doe"
+    "id": "1",
+    "username": "alice",
+    "email": "alice@example.com"
   }
 }
 ```
+
+**Note**: User object is stored in `localStorage.authUser` for review submissions.
 
 ---
 
@@ -526,9 +574,9 @@ Frontend consumes these backend REST APIs. All endpoints follow the contract def
 **Request:**
 ```json
 {
-  "email": "user@example.com",
-  "password": "password123",
-  "name": "John Doe"
+  "username": "newuser",
+  "email": "newuser@example.com",
+  "password": "password123"
 }
 ```
 
@@ -537,12 +585,80 @@ Frontend consumes these backend REST APIs. All endpoints follow the contract def
 {
   "token": "eyJhbGciOiJIUzI1NiIs...",
   "user": {
-    "id": "user456",
-    "email": "user@example.com",
-    "name": "John Doe"
+    "id": "10",
+    "username": "newuser",
+    "email": "newuser@example.com"
   }
 }
 ```
+
+---
+
+#### Review Service
+
+##### `GET /api/v1/reviews?product_id={id}`
+**Purpose**: Get reviews for a product  
+**Auth**: No  
+**Note**: `product_id` query param is **required** (returns 400 if missing)
+
+**Response:**
+```json
+[
+  {
+    "id": "1",
+    "product_id": "5",
+    "user_id": "1",
+    "rating": 5,
+    "title": "Great product!",
+    "comment": "Highly recommend this product.",
+    "created_at": "2026-01-23T10:30:00Z"
+  }
+]
+```
+
+---
+
+##### `POST /api/v1/reviews`
+**Purpose**: Create a new review  
+**Auth**: Yes (JWT)  
+**Note**: One review per user per product (returns 409 if duplicate)
+
+**Request:**
+```json
+{
+  "product_id": "5",
+  "user_id": "1",
+  "rating": 5,
+  "title": "Great product!",
+  "comment": "Highly recommend this product."
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "id": "10",
+  "product_id": "5",
+  "user_id": "1",
+  "rating": 5,
+  "title": "Great product!",
+  "comment": "Highly recommend this product.",
+  "created_at": "2026-01-23T10:30:00Z"
+}
+```
+
+**Error (409 Conflict):**
+```json
+{
+  "error": "Review already exists"
+}
+```
+
+**Frontend UX:**
+- Review form is **auth-gated** (login prompt for unauthenticated users)
+- Form is **hidden** if user already reviewed the product (computed from reviews list)
+- Uses `authUser.id` from localStorage for `user_id` field
+- Supports redirect-back flow with `returnTo` query param after login
 
 ---
 

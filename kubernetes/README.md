@@ -16,10 +16,10 @@ kubernetes/
 │   │   ├── profiling/            # Pyroscope
 │   │   ├── databases/            # Zalando + CloudNativePG operators
 │   └── configs/                  # Instances + configs (Phase 2)
-│       ├── monitoring/           # Grafana CR + Datasources, ServiceMonitors, PodMonitors
-│       ├── databases/            # DB clusters (cluster-centric: instance + secrets + poolers + monitoring per cluster)
-│       │   └── clusters/         # Per-cluster folders: auth-db, review-db, supporting-db, product-db, transaction-db
-│       └── slo/                  # PrometheusServiceLevel CRs
+│       ├── monitoring/           # Grafana CR + Datasources, ServiceMonitors, PodMonitors, SLO
+│       │   └── slo/              # PrometheusServiceLevel CRs (Sloth)
+│       └── databases/            # DB clusters (cluster-centric: instance + secrets + poolers + monitoring per cluster)
+│           └── clusters/         # Per-cluster folders: auth-db, review-db, supporting-db, product-db, transaction-db
 │
 ├── apps/               # Application manifests (HelmRelease with inline config)
 │   ├── auth.yaml
@@ -61,7 +61,7 @@ kubernetes/
 
 **New structure** splits by component type:
 - ✅ **Easy to debug** - Find resources by component (loki/, pyroscope/, pgcat-transaction/)
-- ✅ **Logical separation** - Clear boundaries: metrics/, logging/, tracing/, profiling/, databases/, slo/
+- ✅ **Logical separation** - Clear boundaries: metrics/, logging/, tracing/, profiling/, databases/
 - ✅ **Correct ordering** - Operators/CRDs first (`controllers/`), then instances (`configs/`)
 - ✅ **25+ separate files** - Clear component ownership
 
@@ -159,7 +159,7 @@ flowchart TD
 ```
 
 1. **controllers-local** (no dependencies) - namespaces + operators/CRDs
-2. **configs-local** → depends on `controllers-local` - instances/configs (monitoring, apm, databases, slo)
+2. **configs-local** → depends on `controllers-local` - instances/configs (monitoring incl. SLO, databases)
 3. **apps-local** → depends on `configs-local` - apps (microservices, frontend, k6)
 
 **Critical:** `apps-local` will **NOT start** until `configs-local` is ready.

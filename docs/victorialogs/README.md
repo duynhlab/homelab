@@ -247,5 +247,5 @@ If Vector is consuming too much memory:
 | Resource | Path |
 |----------|------|
 | VictoriaLogs OCI Source | `kubernetes/clusters/local/sources/oci/victorialogs-oci.yaml` |
-| VictoriaLogs HelmRelease | `kubernetes/infra/controllers/apm/victorialogs/helmrelease.yaml` |
-| Vector HelmRelease | `kubernetes/infra/controllers/apm/vector/vector.yaml` |
+| VictoriaLogs HelmRelease | `kubernetes/infra/controllers/logging/victorialogs/helmrelease.yaml` |
+| Vector HelmRelease | `kubernetes/infra/controllers/logging/vector/vector.yaml` |

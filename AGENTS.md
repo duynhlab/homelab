@@ -321,31 +321,28 @@ make flux-sync
 
 - Service code: `services/cmd/{service}/`, `services/internal/{service}/`
 - Helm values: `charts/mop/values/{service}.yaml`
-- HelmRelease: `kubernetes/base/apps/{service}/helmrelease.yaml`
-- Local patches: `kubernetes/overlays/local/apps/patches/services/{service}.yaml`
-- SLO CRD: `kubernetes/base/infrastructure/slo/crds/{service}.yaml`
+- HelmRelease: `kubernetes/apps/{service}.yaml`
+- SLO CRD: `kubernetes/infra/configs/monitoring/slo/{service}.yaml`
 - Migration: `services/{service}/db/migrations/Dockerfile` + `sql/V*__*.sql`
 - Push to OCI: `make flux-push` (updates OCI registry)
 
 **Update monitoring:**
 
-- Dashboard JSON: `k8s/grafana-operator/dashboards/microservices-dashboard.json`
-- Prometheus HelmRelease: `kubernetes/base/infrastructure/monitoring/prometheus/helmrelease.yaml`
-- ServiceMonitor (microservices): `kubernetes/base/infrastructure/monitoring/servicemonitors/microservices.yaml`
-- ServiceMonitor (infrastructure): `kubernetes/base/infrastructure/monitoring/{component}/servicemonitor.yaml`
+- Dashboard JSON: `kubernetes/infra/configs/monitoring/grafana/dashboards/*.json`
+- ServiceMonitors: `kubernetes/infra/configs/monitoring/servicemonitors/`
+- PodMonitors: `kubernetes/infra/configs/monitoring/podmonitors/`
 
 **Modify SLOs:**
 
-- Edit CRDs: `kubernetes/base/infrastructure/slo/crds/*.yaml` (PrometheusServiceLevel CRDs)
+- Edit CRDs: `kubernetes/infra/configs/monitoring/slo/*.yaml` (PrometheusServiceLevel CRDs)
 - Push changes: `make flux-push` (updates OCI registry)
 - Apply: Flux reconciles automatically, or `make flux-sync`
 
 **Modify infrastructure:**
 
-- Databases: `kubernetes/base/infrastructure/databases/`
-- Monitoring: `kubernetes/base/infrastructure/monitoring/`
-- APM: `kubernetes/base/infrastructure/apm/`
-- SLO: `kubernetes/base/infrastructure/slo/`
+- Databases: `kubernetes/infra/configs/databases/`
+- Controllers: `kubernetes/infra/controllers/` (metrics, logging, tracing, profiling, databases)
+- Configs: `kubernetes/infra/configs/` (monitoring, databases)
 
 ### Find Documentation by Topic
 

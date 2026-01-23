@@ -25,15 +25,25 @@ func ListReviews(c *gin.Context) {
 
 	zapLogger := middleware.GetLoggerFromGinContext(c)
 
-	reviews, err := reviewService.ListReviews(ctx)
+	// Parse product_id from query string (required)
+	productID := c.Query("product_id")
+	if productID == "" {
+		span.SetAttributes(attribute.Bool("request.valid", false))
+		zapLogger.Error("Missing product_id query parameter")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "product_id query parameter is required"})
+		return
+	}
+	span.SetAttributes(attribute.String("product.id", productID))
+
+	reviews, err := reviewService.ListReviews(ctx, productID)
 	if err != nil {
 		span.RecordError(err)
-		zapLogger.Error("Failed to list reviews", zap.Error(err))
+		zapLogger.Error("Failed to list reviews", zap.Error(err), zap.String("product_id", productID))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
-	zapLogger.Info("Reviews listed", zap.Int("count", len(reviews)))
+	zapLogger.Info("Reviews listed", zap.Int("count", len(reviews)), zap.String("product_id", productID))
 	c.JSON(http.StatusOK, reviews)
 }
 

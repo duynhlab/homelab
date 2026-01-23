@@ -1,31 +1,21 @@
-import { useState, useEffect } from 'react';
+import useSWR from 'swr';
 import { getProducts } from '../api/productApi';
 
 /**
- * Custom hook for fetching products
+ * Custom hook for fetching products with SWR
+ * SWR provides automatic request deduplication, caching, and revalidation
  * NOTE: No filter support - API doesn't have search/filter
  */
 export function useProducts() {
-    const [products, setProducts] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const { data, error, isLoading } = useSWR('products', getProducts, {
+        revalidateOnFocus: false,
+        dedupingInterval: 2000, // Dedupe requests within 2s
+        revalidateOnReconnect: true,
+    });
 
-    useEffect(() => {
-        async function fetchProducts() {
-            setLoading(true);
-            setError(null);
-            try {
-                const data = await getProducts();
-                setProducts(Array.isArray(data) ? data : []);
-            } catch (err) {
-                setError(err.message || 'Failed to load products');
-                setProducts([]);
-            } finally {
-                setLoading(false);
-            }
-        }
-        fetchProducts();
-    }, []);
-
-    return { products, loading, error };
+    return {
+        products: Array.isArray(data) ? data : [],
+        loading: isLoading,
+        error: error?.message || null,
+    };
 }

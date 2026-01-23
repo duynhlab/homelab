@@ -60,10 +60,14 @@ export default function LoginPage() {
             let result;
             if (mode === 'login') {
                 result = await login(form.username, form.password);
-                console.log('[API] POST /auth/login:', result);
+                if (import.meta.env.DEV) {
+                    console.log('[API] POST /auth/login:', result);
+                }
             } else {
                 result = await register(form.username, form.email, form.password);
-                console.log('[API] POST /auth/register:', result);
+                if (import.meta.env.DEV) {
+                    console.log('[API] POST /auth/register:', result);
+                }
             }
 
             if (result.token) {
@@ -82,7 +86,9 @@ export default function LoginPage() {
             setTimeout(() => navigate(returnTo), 800);
         } catch (err) {
             notify('error', err.message || 'Authentication failed');
-            console.error('[API ERROR]', err);
+            if (import.meta.env.DEV) {
+                console.error('[API ERROR]', err);
+            }
         } finally {
             setLoading(false);
         }

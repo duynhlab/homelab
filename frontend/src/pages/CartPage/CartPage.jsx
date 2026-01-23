@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getCart, updateCartItem, removeCartItem } from '../../api/cartApi';
 
 /**
@@ -9,11 +9,15 @@ import { getCart, updateCartItem, removeCartItem } from '../../api/cartApi';
  * DELETE /api/v1/cart/items/:itemId
  */
 export default function CartPage() {
+    const navigate = useNavigate();
     const [cart, setCart] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [actionLoading, setActionLoading] = useState(null);
     const [actionMessage, setActionMessage] = useState(null);
+
+    // Check authentication
+    const isAuthenticated = !!localStorage.getItem('authToken');
 
     const fetchCart = async () => {
         setLoading(true);
@@ -31,8 +35,13 @@ export default function CartPage() {
     };
 
     useEffect(() => {
+        // Only fetch cart if authenticated
+        if (!isAuthenticated) {
+            setLoading(false);
+            return;
+        }
         fetchCart();
-    }, []);
+    }, [isAuthenticated]);
 
     const handleUpdateQuantity = async (itemId, newQuantity) => {
         if (newQuantity < 1) return;
@@ -68,6 +77,26 @@ export default function CartPage() {
     };
 
     const items = cart?.items || [];
+
+    // Gated state for unauthenticated users
+    if (!isAuthenticated) {
+        return (
+            <div className="page container">
+                <h2>Shopping Cart</h2>
+                <div className="empty" style={{ marginTop: '1rem' }}>
+                    <p>You need to log in to view your cart.</p>
+                    <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                        <button className="primary" onClick={() => navigate('/login')}>
+                            Login
+                        </button>
+                        <button onClick={() => navigate('/')}>
+                            Continue Shopping
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="page container">

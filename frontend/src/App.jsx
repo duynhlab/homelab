@@ -66,10 +66,14 @@ function App() {
                 </h1>
                 <nav>
                     <Link to="/">Products</Link>
-                    <Link to="/orders">Orders</Link>
-                    <Link to="/cart">
-                        Cart {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
-                    </Link>
+                    {isAuthenticated && (
+                        <>
+                            <Link to="/orders">Orders</Link>
+                            <Link to="/cart">
+                                Cart {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
+                            </Link>
+                        </>
+                    )}
                     {isAuthenticated ? (
                         <button
                             onClick={handleLogout}

@@ -25,10 +25,14 @@ export default function CartPage() {
         try {
             const result = await getCart();
             setCart(result);
-            console.log('[API] GET /cart:', result);
+            if (import.meta.env.DEV) {
+                console.log('[API] GET /cart:', result);
+            }
         } catch (err) {
             setError(err.message);
-            console.error('[API ERROR]', err);
+            if (import.meta.env.DEV) {
+                console.error('[API ERROR]', err);
+            }
         } finally {
             setLoading(false);
         }
@@ -49,12 +53,16 @@ export default function CartPage() {
         setActionMessage(null);
         try {
             const result = await updateCartItem(itemId, newQuantity);
-            console.log('[API] PATCH /cart/items/' + itemId + ':', result);
+            if (import.meta.env.DEV) {
+                console.log('[API] PATCH /cart/items/' + itemId + ':', result);
+            }
             setActionMessage({ type: 'success', text: 'Updated!' });
             fetchCart();
         } catch (err) {
             setActionMessage({ type: 'error', text: err.message });
-            console.error('[API ERROR]', err);
+            if (import.meta.env.DEV) {
+                console.error('[API ERROR]', err);
+            }
         } finally {
             setActionLoading(null);
         }
@@ -65,12 +73,16 @@ export default function CartPage() {
         setActionMessage(null);
         try {
             const result = await removeCartItem(itemId);
-            console.log('[API] DELETE /cart/items/' + itemId + ':', result);
+            if (import.meta.env.DEV) {
+                console.log('[API] DELETE /cart/items/' + itemId + ':', result);
+            }
             setActionMessage({ type: 'success', text: 'Removed!' });
             fetchCart();
         } catch (err) {
             setActionMessage({ type: 'error', text: err.message });
-            console.error('[API ERROR]', err);
+            if (import.meta.env.DEV) {
+                console.error('[API ERROR]', err);
+            }
         } finally {
             setActionLoading(null);
         }

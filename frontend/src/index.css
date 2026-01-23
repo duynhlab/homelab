@@ -129,6 +129,15 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.btn-logout {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+}
+
 .btn-primary,
 button.primary {
   background: var(--accent);

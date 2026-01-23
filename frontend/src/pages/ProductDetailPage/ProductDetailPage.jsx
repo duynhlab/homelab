@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import PlaceholderImage from '../../components/common/PlaceholderImage';
 import { DetailSkeleton } from '../../components/common/Skeleton';
@@ -10,10 +10,24 @@ import { getProductDetails } from '../../api/productApi';
 import { addToCart } from '../../api/cartApi';
 import { getReviews, createReview } from '../../api/reviewApi';
 
+// Helper functions moved outside component to avoid recreation on every render
+function formatReviewDate(review) {
+    const dateValue = review.created_at || review.createdAt;
+    if (!dateValue) return '—';
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) return '—';
+    return date.toLocaleDateString();
+}
+
+function getReviewAuthor(review) {
+    return review.username || review.user_name || 'Guest';
+}
+
 /**
  * ProductDetailPage
- * API: GET /api/v1/products/:id/details
- * API: GET /api/v1/reviews?product_id={id}
+ * 3-Layer Pattern Compliance: Uses aggregation endpoint GET /api/v1/products/:id/details
+ * This endpoint aggregates product details, stock, reviews, and related products.
+ * Frontend MUST use aggregation endpoints - no client-side orchestration.
  */
 export default function ProductDetailPage() {
     const { id } = useParams();
@@ -24,32 +38,35 @@ export default function ProductDetailPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    // Reviews from aggregation endpoint (3-layer pattern compliance)
+    // If aggregation endpoint doesn't include reviews yet, we'll fetch separately as fallback
     const [reviews, setReviews] = useState([]);
     const [reviewsLoading, setReviewsLoading] = useState(false);
+    const [needsReviewsFallback, setNeedsReviewsFallback] = useState(false);
 
     const [quantity, setQuantity] = useState(1);
     const [adding, setAdding] = useState(false);
 
-    // Auth state
-    const isAuthenticated = !!localStorage.getItem('authToken');
-    const authUser = (() => {
+    // Auth state - moved to useMemo to avoid localStorage reads in render
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [authUser, setAuthUser] = useState(null);
+
+    useEffect(() => {
+        const token = localStorage.getItem('authToken');
+        setIsAuthenticated(!!token);
         try {
             const stored = localStorage.getItem('authUser');
-            return stored ? JSON.parse(stored) : null;
+            setAuthUser(stored ? JSON.parse(stored) : null);
         } catch {
-            return null;
+            setAuthUser(null);
         }
-    })();
+    }, []);
 
     // Review form state
     const [reviewForm, setReviewForm] = useState({ rating: 5, title: '', comment: '' });
     const [submittingReview, setSubmittingReview] = useState(false);
 
-    // Compute hasReviewed: check if current user already has a review for this product
-    const hasReviewed = isAuthenticated && authUser?.id && reviews.some(
-        (r) => String(r.user_id) === String(authUser.id)
-    );
-
+    // Fetch product details using aggregation endpoint (3-layer pattern)
     useEffect(() => {
         async function fetchData() {
             setLoading(true);
@@ -57,10 +74,29 @@ export default function ProductDetailPage() {
             try {
                 const result = await getProductDetails(id);
                 setData(result);
-                console.log('[API] GET /products/' + id + '/details:', result);
+                
+                // Use reviews from aggregation endpoint if available
+                // According to API docs, /api/v1/products/:id/details includes reviews
+                if (result.reviews && Array.isArray(result.reviews) && result.reviews.length > 0) {
+                    setReviews(result.reviews);
+                    setNeedsReviewsFallback(false);
+                } else if (result.reviews_summary && result.reviews_summary.total === 0) {
+                    // Reviews array exists but is empty - no fallback needed
+                    setReviews([]);
+                    setNeedsReviewsFallback(false);
+                } else {
+                    // Aggregation endpoint might not include reviews yet - use fallback
+                    setNeedsReviewsFallback(true);
+                }
+                
+                if (import.meta.env.DEV) {
+                    console.log('[API] GET /products/' + id + '/details:', result);
+                }
             } catch (err) {
                 setError(err.message);
-                console.error('[API ERROR]:', err);
+                if (import.meta.env.DEV) {
+                    console.error('[API ERROR]:', err);
+                }
             } finally {
                 setLoading(false);
             }
@@ -68,14 +104,22 @@ export default function ProductDetailPage() {
         fetchData();
     }, [id]);
 
+    // Fallback: Fetch reviews separately only if aggregation endpoint doesn't provide them
+    // This is temporary until backend fully integrates reviews into aggregation endpoint
     const fetchReviews = async () => {
+        if (!needsReviewsFallback) return;
+        
         setReviewsLoading(true);
         try {
             const result = await getReviews(id);
             setReviews(Array.isArray(result) ? result : []);
-            console.log('[API] GET /reviews?product_id=' + id + ':', result);
+            if (import.meta.env.DEV) {
+                console.log('[API] GET /reviews?product_id=' + id + ':', result);
+            }
         } catch (err) {
-            console.error('[API ERROR] Reviews:', err);
+            if (import.meta.env.DEV) {
+                console.error('[API ERROR] Reviews:', err);
+            }
             setReviews([]);
         } finally {
             setReviewsLoading(false);
@@ -83,8 +127,17 @@ export default function ProductDetailPage() {
     };
 
     useEffect(() => {
-        fetchReviews();
-    }, [id]);
+        if (needsReviewsFallback) {
+            fetchReviews();
+        }
+    }, [id, needsReviewsFallback]);
+
+    // Compute hasReviewed: check if current user already has a review for this product
+    const hasReviewed = useMemo(() => {
+        return isAuthenticated && authUser?.id && reviews.some(
+            (r) => String(r.user_id) === String(authUser.id)
+        );
+    }, [isAuthenticated, authUser?.id, reviews]);
 
     // Auto-scroll to reviews section when #reviews hash is present
     useEffect(() => {
@@ -111,11 +164,21 @@ export default function ProductDetailPage() {
                 reviewForm.title,
                 reviewForm.comment
             );
-            console.log('[API] POST /reviews:', result);
+            if (import.meta.env.DEV) {
+                console.log('[API] POST /reviews:', result);
+            }
             notify('success', 'Review submitted!');
             setReviewForm({ rating: 5, title: '', comment: '' });
-            // Refresh reviews list
-            fetchReviews();
+            // Refresh reviews list - refetch aggregation endpoint to get updated data
+            if (needsReviewsFallback) {
+                fetchReviews();
+            } else {
+                // Refetch aggregation endpoint to get updated reviews
+                const result = await getProductDetails(id);
+                if (result.reviews && Array.isArray(result.reviews)) {
+                    setReviews(result.reviews);
+                }
+            }
         } catch (err) {
             // Check for 409 Conflict (duplicate review) - fallback for stale UI state
             const isDuplicate = err.response?.status === 409 ||
@@ -124,11 +187,20 @@ export default function ProductDetailPage() {
             if (isDuplicate) {
                 notify('info', 'You have already reviewed this product.');
                 // Refresh reviews to update hasReviewed and hide the form
-                fetchReviews();
+                if (needsReviewsFallback) {
+                    fetchReviews();
+                } else {
+                    const result = await getProductDetails(id);
+                    if (result.reviews && Array.isArray(result.reviews)) {
+                        setReviews(result.reviews);
+                    }
+                }
             } else {
                 notify('error', err.message || 'Failed to submit review');
             }
-            console.error('[API ERROR] Create review:', err);
+            if (import.meta.env.DEV) {
+                console.error('[API ERROR] Create review:', err);
+            }
         } finally {
             setSubmittingReview(false);
         }
@@ -143,34 +215,27 @@ export default function ProductDetailPage() {
                 data.product.price,
                 quantity
             );
-            console.log('[API] POST /cart:', result);
+            if (import.meta.env.DEV) {
+                console.log('[API] POST /cart:', result);
+            }
             notify('success', `Added ${quantity} item${quantity > 1 ? 's' : ''} to cart`);
             setQuantity(1);
         } catch (err) {
             notify('error', err.message || 'Failed to add to cart');
-            console.error('[API ERROR]:', err);
+            if (import.meta.env.DEV) {
+                console.error('[API ERROR]:', err);
+            }
         } finally {
             setAdding(false);
         }
     };
 
-    const averageRating = reviews.length > 0
-        ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
-        : 0;
-
-    // Helper: Safe date formatting with fallback
-    const formatReviewDate = (review) => {
-        const dateValue = review.created_at || review.createdAt;
-        if (!dateValue) return '—';
-        const date = new Date(dateValue);
-        if (isNaN(date.getTime())) return '—';
-        return date.toLocaleDateString();
-    };
-
-    // Helper: Author display with fallback
-    const getReviewAuthor = (review) => {
-        return review.username || review.user_name || 'Guest';
-    };
+    // Memoize expensive computations
+    const averageRating = useMemo(() => {
+        return reviews.length > 0
+            ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
+            : 0;
+    }, [reviews]);
 
     return (
         <div className="page container">

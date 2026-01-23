@@ -1,15 +1,25 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { login, register } from '../../api/authApi';
 
 /**
  * Login Page - Auth APIs
  * POST /api/v1/auth/login
  * POST /api/v1/auth/register
+ * 
+ * Supports query params:
+ * - returnTo: URL to redirect after successful auth (e.g. /products/1#reviews)
+ * - mode: initial mode (login or register)
  */
 export default function LoginPage() {
     const navigate = useNavigate();
-    const [mode, setMode] = useState('login');
+    const [searchParams] = useSearchParams();
+    
+    // Read query params
+    const returnTo = searchParams.get('returnTo') || '/';
+    const initialMode = searchParams.get('mode') || 'login';
+    
+    const [mode, setMode] = useState(initialMode);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
@@ -26,9 +36,17 @@ export default function LoginPage() {
         const token = localStorage.getItem('authToken');
         setIsAuthenticated(!!token);
     }, []);
+    
+    // Update mode when query param changes
+    useEffect(() => {
+        if (initialMode === 'login' || initialMode === 'register') {
+            setMode(initialMode);
+        }
+    }, [initialMode]);
 
     const handleLogout = () => {
         localStorage.removeItem('authToken');
+        localStorage.removeItem('authUser');
         setIsAuthenticated(false);
         // Dispatch storage event so App.jsx updates header immediately
         window.dispatchEvent(new Event('storage'));
@@ -55,9 +73,15 @@ export default function LoginPage() {
                 // Dispatch storage event so App.jsx updates header immediately
                 window.dispatchEvent(new Event('storage'));
             }
+            
+            // Persist user info for review submissions etc.
+            if (result.user) {
+                localStorage.setItem('authUser', JSON.stringify(result.user));
+            }
 
             setSuccess(`${mode === 'login' ? 'Login' : 'Registration'} successful!`);
-            setTimeout(() => navigate('/'), 1000);
+            // Redirect to returnTo URL (or home)
+            setTimeout(() => navigate(returnTo), 1000);
         } catch (err) {
             setError(err.message);
             console.error('[API ERROR]', err);

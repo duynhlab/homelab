@@ -21,13 +21,15 @@ export async function getReviews(productId) {
  * Create a new review
  * POST /api/v1/reviews
  * @param {string} productId - Product ID
+ * @param {string} userId - User ID (from auth)
  * @param {number} rating - Rating (1-5)
  * @param {string} title - Review title
  * @param {string} comment - Review comment
  */
-export async function createReview(productId, rating, title, comment) {
+export async function createReview(productId, userId, rating, title, comment) {
     const response = await apiClient.post('/reviews', {
         product_id: productId,
+        user_id: userId,
         rating,
         title,
         comment

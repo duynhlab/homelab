@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	database "github.com/duynhne/monitoring/services/review/internal/core"
@@ -20,9 +21,10 @@ func NewReviewService() *ReviewService {
 	return &ReviewService{}
 }
 
-func (s *ReviewService) ListReviews(ctx context.Context) ([]domain.Review, error) {
+func (s *ReviewService) ListReviews(ctx context.Context, productID string) ([]domain.Review, error) {
 	ctx, span := middleware.StartSpan(ctx, "review.list", trace.WithAttributes(
 		attribute.String("layer", "logic"),
+		attribute.String("product.id", productID),
 	))
 	defer span.End()
 
@@ -32,9 +34,15 @@ func (s *ReviewService) ListReviews(ctx context.Context) ([]domain.Review, error
 		return nil, fmt.Errorf("database connection not available")
 	}
 
-	// Query reviews
-	query := `SELECT id, product_id, user_id, rating, title, comment FROM reviews ORDER BY created_at DESC`
-	rows, err := db.Query(ctx, query)
+	// Convert productID to int
+	prodID, err := strconv.Atoi(productID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid product_id %q: %w", productID, err)
+	}
+
+	// Query reviews filtered by product_id
+	query := `SELECT id, product_id, user_id, rating, title, comment, created_at FROM reviews WHERE product_id = $1 ORDER BY created_at DESC`
+	rows, err := db.Query(ctx, query, prodID)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("query reviews: %w", err)
@@ -43,11 +51,12 @@ func (s *ReviewService) ListReviews(ctx context.Context) ([]domain.Review, error
 
 	var reviews []domain.Review
 	for rows.Next() {
-		var reviewID, productID, userID int
+		var reviewID, dbProductID, userID int
 		var rating int
 		var title, comment *string // Use pointers for nullable columns
+		var createdAt *time.Time
 
-		err := rows.Scan(&reviewID, &productID, &userID, &rating, &title, &comment)
+		err := rows.Scan(&reviewID, &dbProductID, &userID, &rating, &title, &comment, &createdAt)
 		if err != nil {
 			span.RecordError(err)
 			continue
@@ -55,9 +64,13 @@ func (s *ReviewService) ListReviews(ctx context.Context) ([]domain.Review, error
 
 		review := domain.Review{
 			ID:        strconv.Itoa(reviewID),
-			ProductID: strconv.Itoa(productID),
+			ProductID: strconv.Itoa(dbProductID),
 			UserID:    strconv.Itoa(userID),
 			Rating:    rating,
+			CreatedAt: createdAt,
+		}
+		if title != nil {
+			review.Title = *title
 		}
 		if comment != nil {
 			review.Comment = *comment
@@ -116,10 +129,11 @@ func (s *ReviewService) CreateReview(ctx context.Context, req domain.CreateRevie
 		return nil, fmt.Errorf("check existing review: %w", err)
 	}
 
-	// Insert review
-	insertQuery := `INSERT INTO reviews (product_id, user_id, rating, title, comment) VALUES ($1, $2, $3, $4, $5) RETURNING id`
+	// Insert review and return id + created_at
+	insertQuery := `INSERT INTO reviews (product_id, user_id, rating, title, comment) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at`
 	var reviewID int
-	err = db.QueryRow(ctx, insertQuery, productID, userID, req.Rating, "", req.Comment).Scan(&reviewID)
+	var createdAt time.Time
+	err = db.QueryRow(ctx, insertQuery, productID, userID, req.Rating, req.Title, req.Comment).Scan(&reviewID, &createdAt)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("insert review: %w", err)
@@ -130,7 +144,9 @@ func (s *ReviewService) CreateReview(ctx context.Context, req domain.CreateRevie
 		ProductID: req.ProductID,
 		UserID:    req.UserID,
 		Rating:    req.Rating,
+		Title:     req.Title,
 		Comment:   req.Comment,
+		CreatedAt: &createdAt,
 	}
 
 	span.SetAttributes(

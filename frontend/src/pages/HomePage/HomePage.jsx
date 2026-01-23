@@ -1,41 +1,20 @@
-import { useState, useEffect } from 'react';
 import ProductGrid from '../../components/domain/ProductGrid';
 import { GridSkeleton } from '../../components/common/Skeleton';
 import EmptyState from '../../components/common/EmptyState';
 import ApiError from '../../components/common/ApiError';
-import { getProducts } from '../../api/productApi';
+import { useProducts } from '../../hooks/useProducts';
 
 /**
  * HomePage - Product Catalog
  * API: GET /api/v1/products
  * 
  * Responsibilities:
- * - Fetch products from API
+ * - Fetch products from API (using useProducts hook with SWR)
  * - Handle loading/error/empty states
  * - Pass data to domain components
  */
 export default function HomePage() {
-    const [products, setProducts] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-
-    useEffect(() => {
-        async function fetchProducts() {
-            setLoading(true);
-            setError(null);
-            try {
-                const result = await getProducts();
-                setProducts(Array.isArray(result) ? result : []);
-                console.log('[API] GET /products:', result);
-            } catch (err) {
-                setError(err.message);
-                console.error('[API ERROR] GET /products:', err);
-            } finally {
-                setLoading(false);
-            }
-        }
-        fetchProducts();
-    }, []);
+    const { products, loading, error } = useProducts();
 
     return (
         <div className="page container">

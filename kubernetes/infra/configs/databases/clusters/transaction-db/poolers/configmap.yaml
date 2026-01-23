@@ -19,6 +19,11 @@ data:
     # Port at which prometheus exporter listens on.
     prometheus_exporter_port = 9930
     
+    # Read/Write splitting: route writes to primary, reads to replicas
+    query_parser_enabled = true
+    query_parser_read_write_splitting = true
+    primary_reads_enabled = false
+    
     [admin]
     host = "0.0.0.0"
     port = 9930

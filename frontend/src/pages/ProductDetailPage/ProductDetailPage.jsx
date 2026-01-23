@@ -5,6 +5,7 @@ import { DetailSkeleton } from '../../components/common/Skeleton';
 import EmptyState from '../../components/common/EmptyState';
 import ApiError from '../../components/common/ApiError';
 import QuantitySelector from '../../components/domain/QuantitySelector';
+import { useToast } from '../../components/common/ToastProvider';
 import { getProductDetails } from '../../api/productApi';
 import { addToCart } from '../../api/cartApi';
 import { getReviews, createReview } from '../../api/reviewApi';
@@ -18,6 +19,7 @@ export default function ProductDetailPage() {
     const { id } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
+    const { notify } = useToast();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -27,7 +29,6 @@ export default function ProductDetailPage() {
 
     const [quantity, setQuantity] = useState(1);
     const [adding, setAdding] = useState(false);
-    const [cartMessage, setCartMessage] = useState(null);
 
     // Auth state
     const isAuthenticated = !!localStorage.getItem('authToken');
@@ -43,7 +44,11 @@ export default function ProductDetailPage() {
     // Review form state
     const [reviewForm, setReviewForm] = useState({ rating: 5, title: '', comment: '' });
     const [submittingReview, setSubmittingReview] = useState(false);
-    const [reviewMessage, setReviewMessage] = useState(null);
+
+    // Compute hasReviewed: check if current user already has a review for this product
+    const hasReviewed = isAuthenticated && authUser?.id && reviews.some(
+        (r) => String(r.user_id) === String(authUser.id)
+    );
 
     useEffect(() => {
         async function fetchData() {
@@ -94,11 +99,10 @@ export default function ProductDetailPage() {
     const handleSubmitReview = async (e) => {
         e.preventDefault();
         if (!authUser?.id) {
-            setReviewMessage({ type: 'error', text: 'User not found. Please log in again.' });
+            notify('error', 'User not found. Please log in again.');
             return;
         }
         setSubmittingReview(true);
-        setReviewMessage(null);
         try {
             const result = await createReview(
                 id,
@@ -108,12 +112,22 @@ export default function ProductDetailPage() {
                 reviewForm.comment
             );
             console.log('[API] POST /reviews:', result);
-            setReviewMessage({ type: 'success', text: 'Review submitted!' });
+            notify('success', 'Review submitted!');
             setReviewForm({ rating: 5, title: '', comment: '' });
             // Refresh reviews list
             fetchReviews();
         } catch (err) {
-            setReviewMessage({ type: 'error', text: err.message || 'Failed to submit review' });
+            // Check for 409 Conflict (duplicate review) - fallback for stale UI state
+            const isDuplicate = err.response?.status === 409 ||
+                (err.message && err.message.toLowerCase().includes('already exists'));
+            
+            if (isDuplicate) {
+                notify('info', 'You have already reviewed this product.');
+                // Refresh reviews to update hasReviewed and hide the form
+                fetchReviews();
+            } else {
+                notify('error', err.message || 'Failed to submit review');
+            }
             console.error('[API ERROR] Create review:', err);
         } finally {
             setSubmittingReview(false);
@@ -122,7 +136,6 @@ export default function ProductDetailPage() {
 
     const handleAddToCart = async () => {
         setAdding(true);
-        setCartMessage(null);
         try {
             const result = await addToCart(
                 id,
@@ -131,10 +144,10 @@ export default function ProductDetailPage() {
                 quantity
             );
             console.log('[API] POST /cart:', result);
-            setCartMessage({ type: 'success', text: `Added ${quantity} to cart` });
+            notify('success', `Added ${quantity} item${quantity > 1 ? 's' : ''} to cart`);
             setQuantity(1);
         } catch (err) {
-            setCartMessage({ type: 'error', text: err.message });
+            notify('error', err.message || 'Failed to add to cart');
             console.error('[API ERROR]:', err);
         } finally {
             setAdding(false);
@@ -211,12 +224,6 @@ export default function ProductDetailPage() {
                             >
                                 {adding ? 'Adding...' : 'Add to Cart'}
                             </button>
-
-                            {cartMessage && (
-                                <p className={cartMessage.type === 'success' ? 'success-text' : 'error-text'}>
-                                    {cartMessage.text}
-                                </p>
-                            )}
                         </div>
                     </div>
 
@@ -255,13 +262,32 @@ export default function ProductDetailPage() {
                         {/* Write a Review */}
                         <div className="write-review" style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
                             <h3>Write a Review</h3>
-                            {isAuthenticated ? (
+                            {!isAuthenticated ? (
+                                // Not logged in: show login prompt
+                                <div className="empty" style={{ padding: '1rem' }}>
+                                    <p>Please log in or sign up to write a review.</p>
+                                    <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                        <button
+                                            className="primary"
+                                            onClick={() => navigate(`/login?returnTo=/products/${id}#reviews&mode=login`)}
+                                        >
+                                            Login
+                                        </button>
+                                        <button
+                                            onClick={() => navigate(`/login?returnTo=/products/${id}#reviews&mode=register`)}
+                                        >
+                                            Register
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : hasReviewed ? (
+                                // Already reviewed: show message
+                                <div className="empty" style={{ padding: '1rem' }}>
+                                    <p>You have already reviewed this product.</p>
+                                </div>
+                            ) : (
+                                // Logged in + not reviewed: show form
                                 <form onSubmit={handleSubmitReview}>
-                                    {reviewMessage && (
-                                        <div className={reviewMessage.type} style={{ marginBottom: '0.75rem' }}>
-                                            {reviewMessage.text}
-                                        </div>
-                                    )}
                                     <div className="form-group">
                                         <label>Rating</label>
                                         <select
@@ -300,23 +326,6 @@ export default function ProductDetailPage() {
                                         {submittingReview ? 'Submitting...' : 'Submit Review'}
                                     </button>
                                 </form>
-                            ) : (
-                                <div className="empty" style={{ padding: '1rem' }}>
-                                    <p>Please log in or sign up to write a review.</p>
-                                    <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                                        <button
-                                            className="primary"
-                                            onClick={() => navigate(`/login?returnTo=/products/${id}#reviews&mode=login`)}
-                                        >
-                                            Login
-                                        </button>
-                                        <button
-                                            onClick={() => navigate(`/login?returnTo=/products/${id}#reviews&mode=register`)}
-                                        >
-                                            Register
-                                        </button>
-                                    </div>
-                                </div>
                             )}
                         </div>
                     </div>

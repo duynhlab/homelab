@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getOrders, getOrder } from '../../api/orderApi';
 import { trackShipment } from '../../api/shippingApi';
 
@@ -10,6 +10,7 @@ import { trackShipment } from '../../api/shippingApi';
  * GET /api/v1/shipping/track?tracking_number={number}
  */
 export default function OrdersPage() {
+    const navigate = useNavigate();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -18,7 +19,16 @@ export default function OrdersPage() {
     const [shipment, setShipment] = useState(null);
     const [shipmentLoading, setShipmentLoading] = useState(false);
 
+    // Check authentication
+    const isAuthenticated = !!localStorage.getItem('authToken');
+
     useEffect(() => {
+        // Only fetch orders if authenticated
+        if (!isAuthenticated) {
+            setLoading(false);
+            return;
+        }
+
         async function fetchOrders() {
             try {
                 const result = await getOrders();
@@ -32,7 +42,7 @@ export default function OrdersPage() {
             }
         }
         fetchOrders();
-    }, []);
+    }, [isAuthenticated]);
 
     const handleViewOrder = async (orderId) => {
         setOrderLoading(true);
@@ -86,6 +96,26 @@ export default function OrdersPage() {
         };
         return colors[status] || '#888';
     };
+
+    // Gated state for unauthenticated users
+    if (!isAuthenticated) {
+        return (
+            <div className="page container">
+                <h2>My Orders</h2>
+                <div className="empty" style={{ marginTop: '1rem' }}>
+                    <p>You need to log in to view your orders.</p>
+                    <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                        <button className="primary" onClick={() => navigate('/login')}>
+                            Login
+                        </button>
+                        <button onClick={() => navigate('/')}>
+                            Continue Shopping
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="page container">

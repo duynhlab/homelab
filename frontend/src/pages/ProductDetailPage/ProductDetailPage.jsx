@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import PlaceholderImage from '../../components/common/PlaceholderImage';
 import { DetailSkeleton } from '../../components/common/Skeleton';
 import EmptyState from '../../components/common/EmptyState';
@@ -7,7 +7,7 @@ import ApiError from '../../components/common/ApiError';
 import QuantitySelector from '../../components/domain/QuantitySelector';
 import { getProductDetails } from '../../api/productApi';
 import { addToCart } from '../../api/cartApi';
-import { getReviews } from '../../api/reviewApi';
+import { getReviews, createReview } from '../../api/reviewApi';
 
 /**
  * ProductDetailPage
@@ -16,6 +16,8 @@ import { getReviews } from '../../api/reviewApi';
  */
 export default function ProductDetailPage() {
     const { id } = useParams();
+    const navigate = useNavigate();
+    const location = useLocation();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -26,6 +28,22 @@ export default function ProductDetailPage() {
     const [quantity, setQuantity] = useState(1);
     const [adding, setAdding] = useState(false);
     const [cartMessage, setCartMessage] = useState(null);
+
+    // Auth state
+    const isAuthenticated = !!localStorage.getItem('authToken');
+    const authUser = (() => {
+        try {
+            const stored = localStorage.getItem('authUser');
+            return stored ? JSON.parse(stored) : null;
+        } catch {
+            return null;
+        }
+    })();
+
+    // Review form state
+    const [reviewForm, setReviewForm] = useState({ rating: 5, title: '', comment: '' });
+    const [submittingReview, setSubmittingReview] = useState(false);
+    const [reviewMessage, setReviewMessage] = useState(null);
 
     useEffect(() => {
         async function fetchData() {
@@ -45,21 +63,62 @@ export default function ProductDetailPage() {
         fetchData();
     }, [id]);
 
-    useEffect(() => {
-        async function fetchReviews() {
-            setReviewsLoading(true);
-            try {
-                const result = await getReviews(id);
-                setReviews(result);
-                console.log('[API] GET /reviews?product_id=' + id + ':', result);
-            } catch (err) {
-                console.error('[API ERROR] Reviews:', err);
-            } finally {
-                setReviewsLoading(false);
-            }
+    const fetchReviews = async () => {
+        setReviewsLoading(true);
+        try {
+            const result = await getReviews(id);
+            setReviews(Array.isArray(result) ? result : []);
+            console.log('[API] GET /reviews?product_id=' + id + ':', result);
+        } catch (err) {
+            console.error('[API ERROR] Reviews:', err);
+            setReviews([]);
+        } finally {
+            setReviewsLoading(false);
         }
+    };
+
+    useEffect(() => {
         fetchReviews();
     }, [id]);
+
+    // Auto-scroll to reviews section when #reviews hash is present
+    useEffect(() => {
+        if (location.hash === '#reviews' && !loading && !reviewsLoading) {
+            const reviewsSection = document.getElementById('reviews');
+            if (reviewsSection) {
+                reviewsSection.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+    }, [location.hash, loading, reviewsLoading]);
+
+    const handleSubmitReview = async (e) => {
+        e.preventDefault();
+        if (!authUser?.id) {
+            setReviewMessage({ type: 'error', text: 'User not found. Please log in again.' });
+            return;
+        }
+        setSubmittingReview(true);
+        setReviewMessage(null);
+        try {
+            const result = await createReview(
+                id,
+                authUser.id,
+                reviewForm.rating,
+                reviewForm.title,
+                reviewForm.comment
+            );
+            console.log('[API] POST /reviews:', result);
+            setReviewMessage({ type: 'success', text: 'Review submitted!' });
+            setReviewForm({ rating: 5, title: '', comment: '' });
+            // Refresh reviews list
+            fetchReviews();
+        } catch (err) {
+            setReviewMessage({ type: 'error', text: err.message || 'Failed to submit review' });
+            console.error('[API ERROR] Create review:', err);
+        } finally {
+            setSubmittingReview(false);
+        }
+    };
 
     const handleAddToCart = async () => {
         setAdding(true);
@@ -85,6 +144,20 @@ export default function ProductDetailPage() {
     const averageRating = reviews.length > 0
         ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
         : 0;
+
+    // Helper: Safe date formatting with fallback
+    const formatReviewDate = (review) => {
+        const dateValue = review.created_at || review.createdAt;
+        if (!dateValue) return '—';
+        const date = new Date(dateValue);
+        if (isNaN(date.getTime())) return '—';
+        return date.toLocaleDateString();
+    };
+
+    // Helper: Author display with fallback
+    const getReviewAuthor = (review) => {
+        return review.username || review.user_name || 'Guest';
+    };
 
     return (
         <div className="page container">
@@ -148,7 +221,7 @@ export default function ProductDetailPage() {
                     </div>
 
                     {/* Reviews */}
-                    <div className="reviews-section">
+                    <div id="reviews" className="reviews-section">
                         <h2>Customer Reviews</h2>
 
                         {reviewsLoading ? (
@@ -166,11 +239,11 @@ export default function ProductDetailPage() {
                                         <div key={review.id} className="review-item">
                                             <div className="review-header">
                                                 <span className="review-stars">{'⭐'.repeat(review.rating)}</span>
-                                                <span className="text-muted">{new Date(review.created_at).toLocaleDateString()}</span>
+                                                <span className="text-muted">{formatReviewDate(review)}</span>
                                             </div>
-                                            <h4>{review.title}</h4>
+                                            {review.title && <h4>{review.title}</h4>}
                                             <p>{review.comment}</p>
-                                            <p className="text-muted">By User #{review.user_id}</p>
+                                            <p className="text-muted">By {getReviewAuthor(review)}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -178,6 +251,74 @@ export default function ProductDetailPage() {
                         ) : (
                             <EmptyState message="No reviews yet" icon="📝" />
                         )}
+
+                        {/* Write a Review */}
+                        <div className="write-review" style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                            <h3>Write a Review</h3>
+                            {isAuthenticated ? (
+                                <form onSubmit={handleSubmitReview}>
+                                    {reviewMessage && (
+                                        <div className={reviewMessage.type} style={{ marginBottom: '0.75rem' }}>
+                                            {reviewMessage.text}
+                                        </div>
+                                    )}
+                                    <div className="form-group">
+                                        <label>Rating</label>
+                                        <select
+                                            value={reviewForm.rating}
+                                            onChange={(e) => setReviewForm({ ...reviewForm, rating: parseInt(e.target.value) })}
+                                            style={{ width: 'auto' }}
+                                        >
+                                            <option value={5}>⭐⭐⭐⭐⭐ (5)</option>
+                                            <option value={4}>⭐⭐⭐⭐ (4)</option>
+                                            <option value={3}>⭐⭐⭐ (3)</option>
+                                            <option value={2}>⭐⭐ (2)</option>
+                                            <option value={1}>⭐ (1)</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Title (optional)</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Summary of your review"
+                                            value={reviewForm.title}
+                                            onChange={(e) => setReviewForm({ ...reviewForm, title: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Comment</label>
+                                        <textarea
+                                            placeholder="Share your thoughts about this product..."
+                                            value={reviewForm.comment}
+                                            onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                                            rows={3}
+                                            style={{ width: '100%', resize: 'vertical' }}
+                                            required
+                                        />
+                                    </div>
+                                    <button type="submit" className="primary" disabled={submittingReview}>
+                                        {submittingReview ? 'Submitting...' : 'Submit Review'}
+                                    </button>
+                                </form>
+                            ) : (
+                                <div className="empty" style={{ padding: '1rem' }}>
+                                    <p>Please log in or sign up to write a review.</p>
+                                    <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                        <button
+                                            className="primary"
+                                            onClick={() => navigate(`/login?returnTo=/products/${id}#reviews&mode=login`)}
+                                        >
+                                            Login
+                                        </button>
+                                        <button
+                                            onClick={() => navigate(`/login?returnTo=/products/${id}#reviews&mode=register`)}
+                                        >
+                                            Register
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </>
             )}

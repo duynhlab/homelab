@@ -20,7 +20,9 @@ export default function CheckoutPage() {
             try {
                 const result = await getCart();
                 setCart(result);
-                console.log('[API] GET /cart:', result);
+                if (import.meta.env.DEV) {
+                    console.log('[API] GET /cart:', result);
+                }
             } catch (err) {
                 setError(err.message);
             } finally {
@@ -46,11 +48,15 @@ export default function CheckoutPage() {
             };
 
             const result = await createOrder(orderData);
-            console.log('[API] POST /orders:', result);
+            if (import.meta.env.DEV) {
+                console.log('[API] POST /orders:', result);
+            }
             setOrderResult(result);
         } catch (err) {
             setError(err.message);
-            console.error('[API ERROR]', err);
+            if (import.meta.env.DEV) {
+                console.error('[API ERROR]', err);
+            }
         } finally {
             setSubmitting(false);
         }

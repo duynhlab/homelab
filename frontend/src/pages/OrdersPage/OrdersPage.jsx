@@ -33,10 +33,14 @@ export default function OrdersPage() {
             try {
                 const result = await getOrders();
                 setOrders(Array.isArray(result) ? result : []);
-                console.log('[API] GET /orders:', result);
+                if (import.meta.env.DEV) {
+                    console.log('[API] GET /orders:', result);
+                }
             } catch (err) {
                 setError(err.message);
-                console.error('[API ERROR]', err);
+                if (import.meta.env.DEV) {
+                    console.error('[API ERROR]', err);
+                }
             } finally {
                 setLoading(false);
             }
@@ -50,7 +54,9 @@ export default function OrdersPage() {
         try {
             const result = await getOrder(orderId);
             setSelectedOrder(result);
-            console.log('[API] GET /orders/' + orderId + ':', result);
+            if (import.meta.env.DEV) {
+                console.log('[API] GET /orders/' + orderId + ':', result);
+            }
 
             // Try to fetch shipment for specific order IDs
             if ([1, 2, 4].includes(parseInt(orderId))) {
@@ -58,7 +64,9 @@ export default function OrdersPage() {
             }
         } catch (err) {
             alert('Error: ' + err.message);
-            console.error('[API ERROR]', err);
+            if (import.meta.env.DEV) {
+                console.error('[API ERROR]', err);
+            }
         } finally {
             setOrderLoading(false);
         }
@@ -76,10 +84,14 @@ export default function OrdersPage() {
             if (trackingNumber) {
                 const result = await trackShipment(trackingNumber);
                 setShipment(result);
-                console.log('[API] GET /shipping/track:', result);
+                if (import.meta.env.DEV) {
+                    console.log('[API] GET /shipping/track:', result);
+                }
             }
         } catch (err) {
-            console.error('[API ERROR] Shipment:', err);
+            if (import.meta.env.DEV) {
+                console.error('[API ERROR] Shipment:', err);
+            }
         } finally {
             setShipmentLoading(false);
         }

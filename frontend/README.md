@@ -325,6 +325,8 @@ Frontend consumes these backend REST APIs. All endpoints follow the contract def
 **Purpose**: Aggregated product details (product + stock + reviews + related)  
 **Auth**: No
 
+**Note**: The `reviews` array is now aggregated from the review service and may contain reviews when available. If aggregation returns empty reviews, the frontend falls back to calling `GET /api/v1/reviews?product_id={id}` directly.
+
 **Response:**
 ```json
 {

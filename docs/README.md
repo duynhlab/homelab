@@ -4,11 +4,58 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 
 ---
 
+## Documentation Structure
+
+```
+docs/
+├── api/                          # API documentation
+│   └── API.md                    # Complete API reference
+├── databases/                    # Database documentation
+│   └── DATABASE.md               # PostgreSQL architecture
+├── observability/                # Observability documentation
+│   ├── apm/                      # Application Performance Monitoring
+│   │   ├── README.md             # APM overview
+│   │   ├── ARCHITECTURE.md       # APM architecture
+│   │   ├── TRACING.md            # Distributed tracing (Tempo)
+│   │   ├── TRACING_ARCHITECTURE.md # Tracing architecture
+│   │   ├── JAEGER.md             # Jaeger UI guide
+│   │   ├── LOGGING.md            # Log aggregation (Loki + Vector)
+│   │   └── PROFILING.md          # Continuous profiling (Pyroscope)
+│   ├── logs/                     # Logging systems
+│   │   └── victorialogs/         # VictoriaLogs
+│   │       └── README.md
+│   ├── metrics/                  # Metrics documentation
+│   │   ├── METRICS.md            # Complete metrics guide
+│   │   ├── GRAFANA_DASHBOARD.md  # Dashboard reference
+│   │   ├── PROMQL_GUIDE.md       # PromQL functions
+│   │   ├── VARIABLES_REGEX.md    # Dashboard variables
+│   │   ├── METRICS_LABEL.md      # Label configuration
+│   │   └── POSTGRES_CUSTOM_METRICS.md
+│   └── slo/                      # Service Level Objectives
+│       ├── README.md             # SLO overview
+│       ├── GETTING_STARTED.md    # Quick start
+│       ├── SLI_DEFINITIONS.md    # SLI specifications
+│       ├── SLO_TARGETS.md        # SLO targets
+│       ├── ALERTING.md           # Alert configuration
+│       └── ERROR_BUDGET_POLICY.md
+├── platform/                     # Platform/deployment documentation
+│   └── SETUP.md                  # GitOps deployment guide
+├── runbooks/                     # Operational runbooks
+│   └── troubleshooting/          # Troubleshooting guides
+│       ├── PGCAT_PREPARED_STATEMENT_ERROR.md
+│       ├── PGCAT_READ_ONLY_TRANSACTION_ERROR.md
+│       └── PGCAT_UPSTREAM_CONNECTIVITY_ERRORS.md
+└── testing/                      # Testing documentation
+    └── K6.md                     # k6 load testing guide
+```
+
+---
+
 ## Learning Path
 
 ### Getting Started (New Users)
 
-1. **[Setup Guide](./guides/SETUP.md)** - Complete GitOps deployment guide
+1. **[Setup Guide](./platform/SETUP.md)** - Complete GitOps deployment guide
    - Quick start (3 commands, 5 minutes)
    - GitOps architecture with Flux Operator
    - Simplified structure (infra/ + apps/, refactored 2026-01-12)
@@ -16,86 +63,88 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
    - Step-by-step instructions
    - Troubleshooting common issues
 
-2. **[API Reference](./guides/API.md)** - API endpoints and adding new microservices
+2. **[API Reference](./api/API.md)** - API endpoints and adding new microservices
    - Requirements and conventions
    - Step-by-step guide
    - Automatic monitoring setup
 
-### 📊 Monitoring & Metrics
+### Observability
 
-1. **[Metrics Guide](./monitoring/METRICS.md)** - Complete metrics documentation
+#### Metrics
+
+1. **[Metrics Guide](./observability/metrics/METRICS.md)** - Complete metrics documentation
    - 6 custom application metrics
    - 32 Grafana dashboard panels
    - Memory leak detection strategy
 
-2. **[PromQL Guide](./monitoring/PROMQL_GUIDE.md)** - Complete guide to PromQL functions
+2. **[PromQL Guide](./observability/metrics/PROMQL_GUIDE.md)** - Complete guide to PromQL functions
    - `rate()` vs `increase()` functions
    - Counter resets handling
    - Time range vs rate interval
    - Best practices and troubleshooting
 
-3. **[Variables & Regex](./monitoring/VARIABLES_REGEX.md)** - Dashboard variable patterns
+3. **[Variables & Regex](./observability/metrics/VARIABLES_REGEX.md)** - Dashboard variable patterns
    - Filter configurations
    - Multi-select patterns
 
-4. **[Metrics Labels](./monitoring/METRICS_LABEL.md)** - Label configuration guide
+4. **[Metrics Labels](./observability/metrics/METRICS_LABEL.md)** - Label configuration guide
    - Kubernetes Downward API
    - ServiceMonitor configuration
 
-### 🎯 Service Level Objectives (SLO)
+5. **[Grafana Dashboard Guide](./observability/metrics/GRAFANA_DASHBOARD.md)** - Complete dashboard reference for SRE/DevOps
+    - All 34 panels with query analysis and troubleshooting
+    - PromQL patterns and best practices (Google SRE, Prometheus docs)
+    - Before/After comparisons for updated panels (Status Code, Apdex, 4xx/5xx)
+    - SRE runbooks and incident response scenarios
+    - Grafana Annotations planning (planned feature)
 
-1. **[SLO Documentation](./slo/README.md)** - Complete SLO system overview
+#### Service Level Objectives (SLO)
+
+1. **[SLO Documentation](./observability/slo/README.md)** - Complete SLO system overview
    - SLI definitions
    - Error budgets
    - Burn rate alerts
 
-2. **[SLO Getting Started](./slo/GETTING_STARTED.md)** - Quick start guide
+2. **[SLO Getting Started](./observability/slo/GETTING_STARTED.md)** - Quick start guide
    - Validate definitions
    - Generate rules
    - Deploy to Prometheus
 
-3. **[SLI Definitions](./slo/SLI_DEFINITIONS.md)** - Service Level Indicator specifications
-4. **[SLO Targets](./slo/SLO_TARGETS.md)** - SLO targets per service
-5. **[Alerting](./slo/ALERTING.md)** - Alert configuration and runbooks
-6. **[Error Budget Policy](./slo/ERROR_BUDGET_POLICY.md)** - Budget management guidelines
+3. **[SLI Definitions](./observability/slo/SLI_DEFINITIONS.md)** - Service Level Indicator specifications
+4. **[SLO Targets](./observability/slo/SLO_TARGETS.md)** - SLO targets per service
+5. **[Alerting](./observability/slo/ALERTING.md)** - Alert configuration and runbooks
+6. **[Error Budget Policy](./observability/slo/ERROR_BUDGET_POLICY.md)** - Budget management guidelines
 
-### 🔌 API Reference
+#### Application Performance Monitoring (APM)
 
-1. **[API Reference](./guides/API.md)** - Complete API documentation
-    - All 9 microservices
-    - Endpoints, models, examples
-    - Health checks and metrics
-
-### 🔍 Application Performance Monitoring (APM)
-
-1. **[APM Overview](./apm/README.md)** - Complete APM system overview
+1. **[APM Overview](./observability/apm/README.md)** - Complete APM system overview
     - Distributed tracing with Tempo + Jaeger
     - OpenTelemetry Collector for trace fan-out
     - Continuous profiling with Pyroscope
     - Log aggregation with Loki + Vector + VictoriaLogs
     - Grafana Operator datasource integration
 
-2. **[APM Architecture](./apm/ARCHITECTURE.md)** - System architecture
-3. **[Distributed Tracing](./apm/TRACING.md)** - Tempo integration guide
-4. **[Jaeger Guide](./apm/JAEGER.md)** - Jaeger UI usage, comparison with Tempo
-5. **[Continuous Profiling](./apm/PROFILING.md)** - Pyroscope setup
-6. **[Log Aggregation](./apm/LOGGING.md)** - Loki + Vector configuration
-7. **[VictoriaLogs](./victorialogs/README.md)** - VictoriaLogs deployment and configuration
+2. **[APM Architecture](./observability/apm/ARCHITECTURE.md)** - System architecture
+3. **[Distributed Tracing](./observability/apm/TRACING.md)** - Tempo integration guide
+4. **[Tracing Architecture](./observability/apm/TRACING_ARCHITECTURE.md)** - Distributed tracing architecture
+5. **[Jaeger Guide](./observability/apm/JAEGER.md)** - Jaeger UI usage, comparison with Tempo
+6. **[Continuous Profiling](./observability/apm/PROFILING.md)** - Pyroscope setup
+7. **[Log Aggregation](./observability/apm/LOGGING.md)** - Loki + Vector configuration
+8. **[VictoriaLogs](./observability/logs/victorialogs/README.md)** - VictoriaLogs deployment and configuration
     - Single Vector architecture (dual-ship to Loki + VictoriaLogs)
     - PostgreSQL auto_explain plan parsing pipeline
     - Verification and troubleshooting
 
-### 💻 Development Guides
+### API Reference
 
-1. **[Setup Guide](./guides/SETUP.md)** - Complete deployment and configuration guide
-    - Step-by-step deployment instructions
-    - Configuration management (.env, environment variables, Helm values)
-    - Local development setup
-    - Troubleshooting common issues
+1. **[API Reference](./api/API.md)** - Complete API documentation
+    - All 9 microservices
+    - Endpoints, models, examples
+    - Health checks and metrics
 
-2. **[Error Handling](./guides/API.md#error-handling)** - Error handling patterns
+### Databases
 
-3. **[Database Guide](./guides/DATABASE.md)** - PostgreSQL database integration guide
+1. **[Database Guide](./databases/DATABASE.md)** - PostgreSQL database integration guide
     - 5 PostgreSQL clusters architecture with comprehensive diagrams
     - Overview diagram showing operators, services, poolers, and clusters
     - Individual cluster diagrams with secrets, connections, and patterns
@@ -105,26 +154,17 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
     - Database verification and troubleshooting
     - Monitoring and best practices
 
-4. **[Tracing Architecture](./guides/TRACING_ARCHITECTURE.md)** - Distributed tracing architecture
+### Testing
 
-5. **[Grafana Dashboard Guide](./guides/GRAFANA_DASHBOARD.md)** - Complete dashboard reference for SRE/DevOps
-    - All 34 panels with query analysis and troubleshooting
-    - PromQL patterns and best practices (Google SRE, Prometheus docs)
-    - Before/After comparisons for updated panels (Status Code, Apdex, 4xx/5xx)
-    - SRE runbooks and incident response scenarios
-    - Grafana Annotations planning (planned feature)
-
-### k6 Load Testing
-
-1. **[k6 Load Testing](./guides/K6.md)** - Load testing setup and architecture
+1. **[k6 Load Testing](./testing/K6.md)** - Load testing setup and architecture
     - System architecture with filtering
     - Multiple scenarios (5 user personas)
     - Deployment configurations
     - Best practices (v0.6.14+)
 
-### Troubleshooting
+### Runbooks & Troubleshooting
 
-1. **[PgCat Prepared Statement Error](./troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md)** - Fix intermittent 500 errors with PgCat connection pooler
+1. **[PgCat Prepared Statement Error](./runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md)** - Fix intermittent 500 errors with PgCat connection pooler
     - Prepared statement parameter mismatch
     - Solution: `prefer_simple_protocol=true`
     - Diagram: Why the error happens
@@ -135,54 +175,55 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 
 ### Getting Started
 
-- [Setup Guide](./guides/SETUP.md) - Complete deployment instructions
-- [API Reference](./guides/API.md) - API endpoints and adding new microservices
+- [Setup Guide](./platform/SETUP.md) - Complete deployment instructions
+- [API Reference](./api/API.md) - API endpoints and adding new microservices
 
-### Monitoring
+### Observability
 
-- [Metrics Guide](./monitoring/METRICS.md) - Comprehensive metrics documentation
-- [PromQL Guide](./monitoring/PROMQL_GUIDE.md) - Complete guide to PromQL functions, time range vs rate interval, and counter handling
-- [Variables & Regex](./monitoring/VARIABLES_REGEX.md) - Filter patterns
-- [Metrics Labels](./monitoring/METRICS_LABEL.md) - Label configuration
+#### Metrics
+- [Metrics Guide](./observability/metrics/METRICS.md) - Comprehensive metrics documentation
+- [PromQL Guide](./observability/metrics/PROMQL_GUIDE.md) - Complete guide to PromQL functions, time range vs rate interval, and counter handling
+- [Variables & Regex](./observability/metrics/VARIABLES_REGEX.md) - Filter patterns
+- [Metrics Labels](./observability/metrics/METRICS_LABEL.md) - Label configuration
+- [Grafana Dashboard Guide](./observability/metrics/GRAFANA_DASHBOARD.md) - Complete SRE/DevOps dashboard reference (34 panels + annotations planning)
 
-### SLO/SRE
+#### SLO/SRE
+- [SLO Overview](./observability/slo/README.md) - System overview
+- [Getting Started](./observability/slo/GETTING_STARTED.md) - Setup guide
+- [SLI Definitions](./observability/slo/SLI_DEFINITIONS.md) - Indicator specifications
+- [SLO Targets](./observability/slo/SLO_TARGETS.md) - Service targets
+- [Alerting](./observability/slo/ALERTING.md) - Alert configuration
+- [Error Budget Policy](./observability/slo/ERROR_BUDGET_POLICY.md) - Budget management
 
-- [SLO Overview](./slo/README.md) - System overview
-- [Getting Started](./slo/GETTING_STARTED.md) - Setup guide
-- [SLI Definitions](./slo/SLI_DEFINITIONS.md) - Indicator specifications
-- [SLO Targets](./slo/SLO_TARGETS.md) - Service targets
-- [Alerting](./slo/ALERTING.md) - Alert configuration
-- [Error Budget Policy](./slo/ERROR_BUDGET_POLICY.md) - Budget management
+#### APM
+- [APM Overview](./observability/apm/README.md) - Complete APM system overview
+- [APM Architecture](./observability/apm/ARCHITECTURE.md) - System architecture
+- [Distributed Tracing](./observability/apm/TRACING.md) - Tempo integration
+- [Tracing Architecture](./observability/apm/TRACING_ARCHITECTURE.md) - Distributed tracing architecture
+- [Jaeger Guide](./observability/apm/JAEGER.md) - Jaeger UI usage, comparison with Tempo
+- [Continuous Profiling](./observability/apm/PROFILING.md) - Pyroscope setup
+- [Log Aggregation](./observability/apm/LOGGING.md) - Loki + Vector
+- [VictoriaLogs](./observability/logs/victorialogs/README.md) - VictoriaLogs deployment (single Vector, dual-ship)
 
 ### API
 
-- [API Reference](./guides/API.md) - Complete API documentation
+- [API Reference](./api/API.md) - Complete API documentation
 
-### APM
+### Databases
 
-- [APM Overview](./apm/README.md) - Complete APM system overview
-- [APM Architecture](./apm/ARCHITECTURE.md) - System architecture
-- [Distributed Tracing](./apm/TRACING.md) - Tempo integration
-- [Jaeger Guide](./apm/JAEGER.md) - Jaeger UI usage, comparison with Tempo
-- [Continuous Profiling](./apm/PROFILING.md) - Pyroscope setup
-- [Log Aggregation](./apm/LOGGING.md) - Loki + Vector
-- [VictoriaLogs](./victorialogs/README.md) - VictoriaLogs deployment (single Vector, dual-ship)
+- [Database Guide](./databases/DATABASE.md) - PostgreSQL database integration guide
 
-### Development Guides
+### Platform
 
-- [Setup Guide](./guides/SETUP.md) - Complete deployment and configuration guide
-- [Error Handling](./guides/API.md#error-handling) - Error handling patterns
-- [Database Guide](./guides/DATABASE.md) - PostgreSQL database integration guide
-- [Tracing Architecture](./guides/TRACING_ARCHITECTURE.md) - Distributed tracing architecture
-- [Grafana Dashboard Guide](./guides/GRAFANA_DASHBOARD.md) - Complete SRE/DevOps dashboard reference (34 panels + annotations planning)
+- [Setup Guide](./platform/SETUP.md) - Complete deployment and configuration guide
 
-### k6 Load Testing
+### Testing
 
-- [k6 Load Testing](./guides/K6.md) - Complete load testing guide with architecture
+- [k6 Load Testing](./testing/K6.md) - Complete load testing guide with architecture
 
-### Troubleshooting
+### Runbooks
 
-- [PgCat Prepared Statement Error](./troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md) - Fix intermittent 500 errors with connection pooler
+- [PgCat Prepared Statement Error](./runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md) - Fix intermittent 500 errors with connection pooler
 
 ---
 

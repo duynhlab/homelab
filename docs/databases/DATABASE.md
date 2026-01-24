@@ -172,14 +172,15 @@ flowchart TB
 
 #### Product Database
 
-| Attribute              | Value                                                    |
-|------------------------|----------------------------------------------------------|
-| **Operator**           | CloudNativePG (v1.28.0) - uses Patroni internally        |
-| **PostgreSQL Version** | 18 (CloudNativePG default image)                         |
-| **Instances**          | 3 (1 primary + 2 replicas)                               |
-| **HA**                 | Patroni via Kubernetes API (automatic failover)          |
-| **Pooler**             | PgDog deployment via Helm chart                          |
-| **Namespace**          | `product`                                                |
+| Attribute               | Value                                                    |
+|-------------------------|----------------------------------------------------------|
+| **Cluster Name**        | product-db                                               |
+| **Operator**            | CloudNativePG (v1.28.0) - uses Patroni internally        |
+| **PostgreSQL Version**  | 18 (CloudNativePG default image)                         |
+| **Instances**           | 3 (1 primary + 2 replicas)                               |
+| **HA**                  | Patroni via Kubernetes API (automatic failover)          |
+| **Pooler**              | PgDog deployment via Helm chart                          |
+| **Namespace**           | `product`                                                |
 
 **Architecture Diagram:**
 
@@ -231,12 +232,13 @@ flowchart TB
 
 | Attribute                | Value                                                                                 |
 |--------------------------|---------------------------------------------------------------------------------------|
-| **Operator**             | CloudNativePG (v1.28.0) - uses Patroni internally                                     |
+| **Cluster Name**         | `transaction-db`                                                                     |
+| **Operator**             | CloudNativePG (v1.28.0) - uses Patroni internally                                    |
 | **PostgreSQL Version**   | 18 (CloudNativePG default image)                                                     |
-| **Instances**            | HA: 3 (1 primary + 2 replicas)                                                           |
+| **Instances**            | HA: 3 (1 primary + 2 replicas)                                                       |
 | **HA**                   | Patroni via Kubernetes API (automatic failover < 30 seconds)                         |
-| **Replication**          | Synchronous replication with logical replication slot synchronization                 |
-| **Pooler**               | PgCat deployment v1.2.0 (`ghcr.io/postgresml/pgcat:v1.2.0`) with 2 replicas for HA |
+| **Replication**          | Synchronous replication with logical replication slot synchronization                |
+| **Pooler**               | PgCat deployment v1.2.0 with 2 replicas for HA                                       |
 | **Namespace**            | `cart`                                                                               |
 | **Production-Ready**     | Comprehensive PostgreSQL performance tuning, synchronous replication, logical replication slot sync |
 
@@ -503,14 +505,15 @@ CloudNativePG clusters use **PodMonitor** CRDs to enable Prometheus scraping of 
 
 #### Review Database
 
-| Thuộc tính       | Giá trị                                                                             |
-|------------------|-------------------------------------------------------------------------------------|
-| **Operator**     | Zalando Postgres Operator (v1.15.1) - sử dụng Patroni                               |
-| **PostgreSQL**   | 16 (được cấu hình rõ ràng trong CRD)                                                |
-| **Instances**    | 1 (single instance, không HA)                                                       |
-| **HA**           | Patroni qua Kubernetes API (chỉ single instance, không cần failover)                |
-| **Pooler**       | Không dùng (kết nối trực tiếp)                                                      |
-| **Namespace**    | `review` (cùng namespace với review service - không cần cross-namespace secrets)    |
+| Thuộc tính         | Giá trị                                                                             |
+|--------------------|-------------------------------------------------------------------------------------|
+| **Cluster Name**   | `review-db`                                                                         |
+| **Operator**       | Zalando Postgres Operator (v1.15.1) - sử dụng Patroni                               |
+| **PostgreSQL**     | 16 (được cấu hình rõ ràng trong CRD)                                                |
+| **Instances**      | 1 (single instance, không HA)                                                       |
+| **HA**             | Patroni qua Kubernetes API (chỉ single instance, không cần failover)                |
+| **Pooler**         | Không dùng (kết nối trực tiếp)                                                      |
+| **Namespace**      | `review` (cùng namespace với review service - không cần cross-namespace secrets)    |
 
 
 **Architecture Diagram:**
@@ -585,6 +588,7 @@ flowchart TB
 
 | Attribute             | Value                                                                                                    |
 |-----------------------|----------------------------------------------------------------------------------------------------------|
+| **Cluster Name**      | `auth-db`                                                                                                |
 | **Operator**          | Zalando Postgres Operator (v1.15.1) - powered by Patroni                                                 |
 | **PostgreSQL Version**| 17 (explicitly configured in CRD)                                                                       |
 | **Instances**         | 3 (HA: 1 leader + 2 standbys)                                                                           |
@@ -720,14 +724,15 @@ flowchart TB
 
 #### Supporting Database
 
-| Thuộc tính             | Giá trị                                                                                   |
-|------------------------|------------------------------------------------------------------------------------------|
-| Operator               | Zalando Postgres Operator (v1.15.1) - powered by Patroni                                |
-| PostgreSQL Version     | 16 (explicitly configured in CRD)                                                       |
-| Instances              | 1 (single instance, no HA)                                                              |
-| HA                     | Patroni via Kubernetes API (single instance, no failover needed)                        |
-| Pooler                 | PgBouncer sidecar (2 instances, transaction mode) - Zalando built-in                    |
-| Namespace              | `user` (cluster location)                                                               |
+| Attribute              | Value                                                                                                   |
+|------------------------|---------------------------------------------------------------------------------------------------------|
+| Cluster Name           | `supporting-db`                                                                                         |
+| Operator               | Zalando Postgres Operator (v1.15.1) - powered by Patroni                                                |
+| PostgreSQL Version     | 16 (explicitly configured in CRD)                                                                       |
+| Instances              | 1 (single instance, no HA)                                                                              |
+| High Availability (HA) | Patroni via Kubernetes API (single instance, no failover needed)                                        |
+| Pooler                 | PgBouncer sidecar (2 instances, transaction mode) - built-in by Zalando                                 |
+| Namespace              | `user` (cluster location)                                                                               |
 
 **Architecture Diagram:**
 

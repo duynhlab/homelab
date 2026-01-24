@@ -152,11 +152,14 @@ These endpoints combine multiple data sources to provide complete responses. **F
 - Product details (ProductService.GetProduct)
 - Related products (ProductService.GetRelatedProducts)
 - Stock information (mock data, pending inventory service)
-- Reviews (empty array, pending review service integration)
+- Reviews (aggregated from review service via HTTP call; soft-fail to empty array if review service unavailable)
 
 **Logic Services Involved:**
 - `ProductService.GetProduct(ctx, id)`
 - `ProductService.GetRelatedProducts(ctx, id, limit)`
+
+**Configuration:**
+- Product service uses `REVIEW_SERVICE_URL` environment variable (default: `http://review.review.svc.cluster.local:8080`) to call review service for aggregation.
 
 #### Request
 

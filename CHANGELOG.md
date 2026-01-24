@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.37.0] - 2026-01-23
+
+### Changed
+
+#### Documentation Structure Refactor
+
+Refactored documentation directory structure to standardized, domain-based organization for better maintainability and discoverability.
+
+**New Documentation Structure:**
+```
+docs/
+├── api/                    # API documentation
+├── databases/              # Database architecture
+├── observability/          # Observability (grouped by domain)
+│   ├── apm/               # Tracing, logging, profiling
+│   ├── metrics/           # Prometheus/Grafana metrics
+│   ├── slo/               # Service Level Objectives
+│   └── logs/              # Logging systems (VictoriaLogs)
+├── platform/              # Deployment & setup
+├── runbooks/              # Operational runbooks
+└── testing/               # Load testing (k6)
+```
+
+**File Moves:**
+- `docs/monitoring/` → `docs/observability/metrics/`
+- `docs/apm/` → `docs/observability/apm/`
+- `docs/slo/` → `docs/observability/slo/`
+- `docs/victorialogs/` → `docs/observability/logs/victorialogs/`
+- `docs/troubleshooting/` → `docs/runbooks/troubleshooting/`
+- `docs/guides/API.md` → `docs/api/API.md`
+- `docs/guides/DATABASE.md` → `docs/databases/DATABASE.md`
+- `docs/guides/SETUP.md` → `docs/platform/SETUP.md`
+- `docs/guides/K6.md` → `docs/testing/K6.md`
+- `docs/guides/TRACING_ARCHITECTURE.md` → `docs/observability/apm/TRACING_ARCHITECTURE.md`
+- `docs/guides/GRAFANA_DASHBOARD.md` → `docs/observability/metrics/GRAFANA_DASHBOARD.md`
+
+**Updated Files:**
+- `README.md` - Added Documentation Structure section, reorganized Documentation table by categories (Getting Started, Observability, API & Databases, Testing & Operations, Reference)
+- `docs/README.md` - Complete rewrite to reflect new structure with tree view and organized categories
+- `AGENTS.md` - Updated all documentation path references
+- `kubernetes/README.md` - Updated documentation links
+- `frontend/README.md` - Updated API documentation links
+- `scripts/README.md` - Updated setup guide links
+- `kubernetes/infra/configs/databases/*.md` - Updated database guide and troubleshooting links
+- `kubernetes/clusters/local/README.md` - Updated project docs link
+- `specs/system-context/02-microservices.md` - Updated k6 documentation link
+- All internal documentation files - Updated relative links to match new structure
+
+**Link Updates:**
+- All `docs/guides/*` → new paths (`docs/api/`, `docs/databases/`, `docs/platform/`, `docs/observability/*/`, `docs/testing/`, `docs/runbooks/`)
+- All `docs/monitoring/*` → `docs/observability/metrics/*`
+- All `docs/apm/*` → `docs/observability/apm/*`
+- All `docs/slo/*` → `docs/observability/slo/*`
+- All `docs/troubleshooting/*` → `docs/runbooks/troubleshooting/*`
+- All `docs/victorialogs/*` → `docs/observability/logs/victorialogs/*`
+
+**Removed:**
+- Empty `docs/guides/` directory (all files moved to appropriate locations)
+- Empty old directories: `docs/monitoring/`, `docs/apm/`, `docs/slo/`, `docs/troubleshooting/`, `docs/victorialogs/`
+
+**Benefits:**
+- Clearer organization by domain (observability, API, databases, platform, operations)
+- Easier navigation with standardized structure
+- Better discoverability with categorized documentation table
+- Consistent structure across all documentation
+
+---
+
 ## [0.36.1] - 2026-01-23
 
 ### Changed

@@ -18,8 +18,8 @@ This SLO (Service Level Objective) system provides comprehensive monitoring and 
 **SLO system is deployed automatically via Flux Operator:**
 
 **Flux Kustomizations (controllers/configs pattern):**
-- `controllers-local` ([kubernetes/clusters/local/controllers.yaml](../../kubernetes/clusters/local/controllers.yaml)) - installs Sloth Operator (CRDs/controllers)
-- `configs-local` ([kubernetes/clusters/local/configs.yaml](../../kubernetes/clusters/local/configs.yaml)) - applies PrometheusServiceLevel CRs
+- `controllers-local` ([kubernetes/clusters/local/controllers.yaml](../../../kubernetes/clusters/local/controllers.yaml)) - installs Sloth Operator (CRDs/controllers)
+- `configs-local` ([kubernetes/clusters/local/configs.yaml](../../../kubernetes/clusters/local/configs.yaml)) - applies PrometheusServiceLevel CRs
 - **Source:** OCI artifact `mop-registry:5000/flux-infra-sync:local`
 - **Manifests:**
   - `kubernetes/infra/controllers/metrics/slo/` (Sloth Operator)

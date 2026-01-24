@@ -167,7 +167,7 @@ The `src/notifications/README.md` documents how to integrate with the backend no
 
 ### Overview
 
-Frontend consumes backend REST APIs following the contract defined in [API.md](../docs/guides/API.md).
+Frontend consumes backend REST APIs following the contract defined in [API.md](../docs/api/API.md).
 
 **Base URL**: Configured via `VITE_API_BASE_URL` at build time
 **API Version**: `/api/v1`
@@ -277,7 +277,7 @@ sequenceDiagram
 
 ### Frontend API Endpoints
 
-Frontend consumes these backend REST APIs. All endpoints follow the contract defined in [API.md](../docs/guides/API.md).
+Frontend consumes these backend REST APIs. All endpoints follow the contract defined in [API.md](../docs/api/API.md).
 
 **Base URL**: `{VITE_API_BASE_URL}/api/v1`
 
@@ -816,7 +816,7 @@ For complete API documentation including:
 - Backend architecture (3-layer)
 - Service isolation details
 
-See: [API.md](../docs/guides/API.md)
+See: [API.md](../docs/api/API.md)
 
 ---
 

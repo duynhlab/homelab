@@ -1709,7 +1709,7 @@ Connection poolers solve the "too many connections" problem by reusing PostgreSQ
 - **[Setup Guide](./SETUP.md)** - Complete deployment and configuration guide
 - **[Error Handling](./API.md#error-handling)** - Database error handling patterns
 - **[API Reference](./API.md)** - API endpoints using database
-- **[PgCat Prepared Statement Error](../troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md)** - Fix intermittent 500 errors with PgCat
+- **[PgCat Prepared Statement Error](../runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md)** - Fix intermittent 500 errors with PgCat
 
 ## Troubleshooting
 
@@ -1736,6 +1736,6 @@ return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s&prefer_simple_protoco
 
 **Affected Services:** Cart, Order (both use PgCat transaction pooler)
 
-**See:** [Full troubleshooting guide](../troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md) with diagrams and testing instructions.
+**See:** [Full troubleshooting guide](../runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md) with diagrams and testing instructions.
 
 

@@ -8,7 +8,7 @@
 
 ## Overview
 
-This guide provides quick reference for AI agents working with this codebase. For detailed documentation, see [`docs/`](docs/README.md) - start with [`docs/guides/`](docs/guides/) for development workflows.
+This guide provides quick reference for AI agents working with this codebase. For detailed documentation, see [`docs/`](docs/README.md) - start with [`docs/platform/`](docs/platform/) for deployment and [`docs/api/`](docs/api/) for API development.
 
 ---
 
@@ -17,21 +17,21 @@ This guide provides quick reference for AI agents working with this codebase. Fo
 ### Before Starting Any Task
 
 1. **Read AGENTS.md FIRST** - This file contains essential patterns, conventions, and best practices
-2. **Read relevant docs** - Check `docs/guides/` for existing documentation
-3. **Research if needed** - For API/architecture work, research industry patterns (see [`docs/guides/RESEARCH_PATTERNS.md`](docs/guides/RESEARCH_PATTERNS.md))
+2. **Read relevant docs** - Check `docs/` for existing documentation
+3. **Research if needed** - For API/architecture work, research industry patterns
 4. **Plan before coding** - Understand the problem, propose solution, get approval
 5. **Follow conventions** - Use existing patterns, don't reinvent
 
 ### Code Quality Standards
 
-- **Consistency**: Follow existing code patterns (see [`docs/guides/API.md`](docs/guides/API.md#conventions-and-standards))
+- **Consistency**: Follow existing code patterns (see [`docs/api/API.md`](docs/api/API.md#conventions-and-standards))
 - **Documentation**: Update relevant docs when adding features
 - **Testing**: Write tests for new functionality
 - **Error Handling**: Use consistent error patterns
-- **Logging**: Use structured logging with appropriate levels (see [`docs/apm/LOGGING.md`](docs/apm/LOGGING.md))
-- **API Patterns**: Research industry best practices before implementing (see [`docs/guides/RESEARCH_PATTERNS.md`](docs/guides/RESEARCH_PATTERNS.md))
-- **APM Patterns**: Follow established observability patterns (see [`docs/apm/`](docs/apm/))
-- **Database Patterns**: Research database patterns, reference [`docs/guides/DATABASE.md`](docs/guides/DATABASE.md)
+- **Logging**: Use structured logging with appropriate levels (see [`docs/observability/apm/LOGGING.md`](docs/observability/apm/LOGGING.md))
+- **API Patterns**: Research industry best practices before implementing
+- **APM Patterns**: Follow established observability patterns (see [`docs/observability/apm/`](docs/observability/apm/))
+- **Database Patterns**: Research database patterns, reference [`docs/databases/DATABASE.md`](docs/databases/DATABASE.md)
 
 ---
 
@@ -93,7 +93,7 @@ go test ./internal/{service}/...
 go build -o bin/{service} cmd/{service}/main.go
 ```
 
-**Detailed Configuration**: See [`docs/guides/API.md`](docs/guides/API.md) for environment variables, `.env` files, and local setup.
+**Detailed Configuration**: See [`docs/api/API.md`](docs/api/API.md) for environment variables, `.env` files, and local setup.
 
 **GitOps Deployment**: See deployment commands in [Deployment Order](#deployment-order) section. Use `make up` for one-command deployment or `make flux-push` to deploy all services to Kubernetes.
 
@@ -126,7 +126,7 @@ flowchart TD
     Database -->|PostgreSQL| DB[(Database)]
 ```
 
-**Database Integration**: See [`docs/guides/DATABASE.md`](docs/guides/DATABASE.md) for database architecture, connection patterns (direct, PgBouncer, PgCat), and configuration.
+**Database Integration**: See [`docs/databases/DATABASE.md`](docs/databases/DATABASE.md) for database architecture, connection patterns (direct, PgBouncer, PgCat), and configuration.
 
 **Layer Responsibilities**:
 
@@ -134,7 +134,7 @@ flowchart TD
 - **Logic Layer** (`logic/v1/`, `logic/v2/`): Business logic, orchestration, database queries
 - **Core Layer** (`core/domain/`, `core/database.go`): Domain models, database connections
 
-**Detailed Architecture**: See [`docs/apm/ARCHITECTURE.md`](docs/apm/ARCHITECTURE.md) for middleware chain and APM integration. Full system architecture in [`specs/system-context/01-architecture-overview.md`](specs/system-context/01-architecture-overview.md)
+**Detailed Architecture**: See [`docs/observability/apm/ARCHITECTURE.md`](docs/observability/apm/ARCHITECTURE.md) for middleware chain and APM integration. Full system architecture in [`specs/system-context/01-architecture-overview.md`](specs/system-context/01-architecture-overview.md)
 
 ---
 
@@ -161,7 +161,7 @@ flowchart TD
 - Logic/Core layers are internal implementation details
 - Aggregation endpoints handle complex operations server-side
 
-**Reference:** See [`docs/guides/API.md`](docs/guides/API.md) for complete API documentation and 3-layer architecture details.
+**Reference:** See [`docs/api/API.md`](docs/api/API.md) for complete API documentation and 3-layer architecture details.
 
 ---
 
@@ -173,7 +173,7 @@ flowchart TD
 - **Microservices**: 9 independent services with bounded contexts, each in own namespace
 - **Middleware Chain**: Ordered middleware (tracing → logging → metrics) for observability
 
-**Middleware Details**: See [`docs/guides/TRACING_ARCHITECTURE.md`](docs/guides/TRACING_ARCHITECTURE.md) for middleware chain ordering and responsibilities.
+**Middleware Details**: See [`docs/observability/apm/TRACING_ARCHITECTURE.md`](docs/observability/apm/TRACING_ARCHITECTURE.md) for middleware chain ordering and responsibilities.
 
 ---
 
@@ -183,14 +183,14 @@ flowchart TD
 - **Database**: PostgreSQL (5 clusters via Zalando/CloudNativePG operators)
   - Connection poolers: PgBouncer, PgCat
   - Migrations: Flyway 11.19.0 (8 migration images)
-  - **Database Documentation**: [`docs/guides/DATABASE.md`](docs/guides/DATABASE.md)
+  - **Database Documentation**: [`docs/databases/DATABASE.md`](docs/databases/DATABASE.md)
 - **HTTP Framework**: Gin
 - **Observability**: OpenTelemetry (traces, metrics, logs)
 - **GitOps**: Flux Operator, Kustomize, OCI Registry
 - **Deployment**: Kubernetes (Kind), Helm 3
 - **Monitoring**: Prometheus, Grafana, Tempo, Loki, Pyroscope, Jaeger
 
-**Observability Details**: See [`docs/apm/README.md`](docs/apm/README.md) for complete APM system overview. Metrics documentation in [`docs/monitoring/METRICS.md`](docs/monitoring/METRICS.md)
+**Observability Details**: See [`docs/observability/apm/README.md`](docs/observability/apm/README.md) for complete APM system overview. Metrics documentation in [`docs/observability/metrics/METRICS.md`](docs/observability/metrics/METRICS.md)
 
 ---
 
@@ -238,7 +238,7 @@ monitoring/
 | shipping | shipping | `/api/v1/*` (v1 only) |
 | shipping-v2 | shipping | `/api/v2/*` (v2 only) |
 
-**Complete API Documentation**: See [`docs/guides/API.md`](docs/guides/API.md) for all endpoints, request/response models, and examples.
+**Complete API Documentation**: See [`docs/api/API.md`](docs/api/API.md) for all endpoints, request/response models, and examples.
 
 ---
 
@@ -290,7 +290,7 @@ make flux-sync
 # Or: flux reconcile kustomization infrastructure-local --with-source
 ```
 
-**Detailed Deployment Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md)
+**Detailed Deployment Guide**: See [`docs/platform/SETUP.md`](docs/platform/SETUP.md)
 
 ### Key Infrastructure
 
@@ -307,13 +307,12 @@ make flux-sync
 
 ### Detailed Guides
 
-- **Research Patterns**: [`docs/guides/RESEARCH_PATTERNS.md`](docs/guides/RESEARCH_PATTERNS.md) - API, APM, Database research patterns
-- **Command Reference**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md#command-reference) - Deployment scripts, Helm, kubectl commands
-- **Conventions**: [`docs/guides/API.md`](docs/guides/API.md#conventions-and-standards) - Naming conventions, code standards, build verification
-- **API Reference**: [`docs/guides/API.md`](docs/guides/API.md) - Complete API documentation
-- **Setup Guide**: [`docs/guides/SETUP.md`](docs/guides/SETUP.md) - Deployment instructions
-- **Configuration**: [`docs/guides/API.md`](docs/guides/API.md) - Environment variables and config
-- **Database**: [`docs/guides/DATABASE.md`](docs/guides/DATABASE.md) - Database architecture and patterns
+- **Command Reference**: See [`docs/platform/SETUP.md`](docs/platform/SETUP.md#command-reference) - Deployment scripts, Helm, kubectl commands
+- **Conventions**: [`docs/api/API.md`](docs/api/API.md#conventions-and-standards) - Naming conventions, code standards, build verification
+- **API Reference**: [`docs/api/API.md`](docs/api/API.md) - Complete API documentation
+- **Setup Guide**: [`docs/platform/SETUP.md`](docs/platform/SETUP.md) - Deployment instructions
+- **Configuration**: [`docs/api/API.md`](docs/api/API.md) - Environment variables and config
+- **Database**: [`docs/databases/DATABASE.md`](docs/databases/DATABASE.md) - Database architecture and patterns
 
 ### Find Files by Purpose
 
@@ -346,12 +345,12 @@ make flux-sync
 
 ### Find Documentation by Topic
 
-- **Getting Started**: [`docs/guides/SETUP.md`](docs/guides/SETUP.md), [`docs/guides/API.md`](docs/guides/API.md)
-- **Development**: [`docs/guides/API.md`](docs/guides/API.md), [`docs/guides/API.md#error-handling`](docs/guides/API.md#error-handling), [`docs/guides/TRACING_ARCHITECTURE.md`](docs/guides/TRACING_ARCHITECTURE.md)
-- **Monitoring**: [`docs/monitoring/METRICS.md`](docs/monitoring/METRICS.md)
-- **APM**: [`docs/apm/README.md`](docs/apm/README.md), [`docs/apm/TRACING.md`](docs/apm/TRACING.md), [`docs/apm/LOGGING.md`](docs/apm/LOGGING.md), [`docs/apm/PROFILING.md`](docs/apm/PROFILING.md)
-- **SLO**: [`docs/slo/README.md`](docs/slo/README.md), [`docs/slo/GETTING_STARTED.md`](docs/slo/GETTING_STARTED.md)
-- **k6**: [`docs/guides/K6.md`](docs/guides/K6.md)
+- **Getting Started**: [`docs/platform/SETUP.md`](docs/platform/SETUP.md), [`docs/api/API.md`](docs/api/API.md)
+- **Development**: [`docs/api/API.md`](docs/api/API.md), [`docs/api/API.md#error-handling`](docs/api/API.md#error-handling), [`docs/observability/apm/TRACING_ARCHITECTURE.md`](docs/observability/apm/TRACING_ARCHITECTURE.md)
+- **Monitoring**: [`docs/observability/metrics/METRICS.md`](docs/observability/metrics/METRICS.md)
+- **APM**: [`docs/observability/apm/README.md`](docs/observability/apm/README.md), [`docs/observability/apm/TRACING.md`](docs/observability/apm/TRACING.md), [`docs/observability/apm/LOGGING.md`](docs/observability/apm/LOGGING.md), [`docs/observability/apm/PROFILING.md`](docs/observability/apm/PROFILING.md)
+- **SLO**: [`docs/observability/slo/README.md`](docs/observability/slo/README.md), [`docs/observability/slo/GETTING_STARTED.md`](docs/observability/slo/GETTING_STARTED.md)
+- **k6**: [`docs/testing/K6.md`](docs/testing/K6.md)
 - **Docs Index**: [`docs/README.md`](docs/README.md)
 
 ---

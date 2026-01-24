@@ -21,27 +21,6 @@
   - `product-db`: PostgreSQL 18, 2 nodes (HA), PgDog standalone (1 replica, Helm chart)
   - `transaction-db`: PostgreSQL 18, 3 nodes (HA), PgCat standalone (2 replicas)
 ---
-**Deployment with Flux Operator**
-- `controllers-local` ([kubernetes/clusters/local/controllers.yaml](../../kubernetes/clusters/local/controllers.yaml)) - installs database operators/CRDs
-- `configs-local` ([kubernetes/clusters/local/configs.yaml](../../kubernetes/clusters/local/configs.yaml)) - applies database instances, poolers, and secrets
-- **Source:** OCI artifact `mop-registry:5000/flux-infra-sync:local`
-- **Manifests:**
-  - `kubernetes/infra/controllers/databases/`
-  - `kubernetes/infra/configs/databases/`
-- **Reconciliation:** Every 10 minutes (automatic)
-- **Dependencies:** `controllers-local` must be ready before `configs-local`
-
-**Components deployed:**
-1. **Operators:**
-   - Zalando Postgres Operator (v1.15.1) - HelmRelease
-   - CloudNativePG Operator (v1.28.0) - HelmRelease
-2. **Database Clusters:** 5 clusters (3 Zalando + 2 CloudNativePG)
-   - Review DB, Auth DB, Supporting DB (Zalando)
-   - Product DB, Transaction DB (CloudNativePG)
-3. **Connection Poolers:** PgBouncer (sidecar for auth-db, supporting-db), PgCat (standalone for transaction-db), PgDog (standalone Helm chart for product-db)
-4. **Secrets:** Pre-created for CloudNativePG clusters
-
----
 
 ## Database Architecture
 
@@ -156,7 +135,7 @@ flowchart TB
 | Cluster | Init Endpoint (Direct) | App Endpoint (via Pooler) |
 |---------|------------------------|---------------------------|
 | product-db | `product-db-rw.product:5432` | `pgdog-product.product:6432` |
-| transaction-db | `transaction-db-rw.cart:5432` | `pgcat.cart:6432` |
+| transaction-db | `transaction-db-rw.cart:5432` | `pgcat.cart:5432` |
 | auth-db | `auth-db.auth:5432` | `auth-db-pooler.auth:5432` |
 | review-db | `review-db.review:5432` | (direct, no pooler) |
 | supporting-db | `supporting-db.user:5432` | `supporting-db-pooler.user:5432` |
@@ -272,10 +251,6 @@ kubectl exec -n product $PRIMARY_POD -- env PGPASSWORD=$PASSWORD psql -h localho
 kubectl exec -n product $PRIMARY_POD -- env PGPASSWORD=$PASSWORD psql -h localhost -U product -d product -c "SELECT id, name, price, category_id, stock_quantity FROM products ORDER BY id;"
 ```
 
-**Expected Results:**
-- Flyway migrations: V1 (init schema) and V2 (seed products) both show `success = t`
-- Product count: 8 products
-- Total stock: 233
 
 #### Transaction Database
 

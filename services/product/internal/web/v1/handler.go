@@ -152,8 +152,33 @@ func GetProductDetails(c *gin.Context) {
 	// Get related products (aggregation in Web layer)
 	relatedProducts, _ := productService.GetRelatedProducts(ctx, id, 4)
 
-	// TODO: Get reviews from review service when available
-	// reviews, _ := reviewService.GetProductReviews(ctx, id)
+	// Get reviews from review service (soft-fail: return empty on error)
+	var reviews []Review
+	var reviewsTotal int
+	var reviewsAverage float64
+	if reviewClient != nil {
+		fetchedReviews, err := reviewClient.GetProductReviews(ctx, id, zapLogger)
+		if err != nil {
+			// Soft-fail: log and continue with empty reviews
+			span.SetAttributes(attribute.Bool("reviews.fetch_failed", true))
+			zapLogger.Warn("Failed to fetch reviews, continuing with empty list",
+				zap.Error(err),
+				zap.String("product_id", id),
+			)
+			reviews = []Review{}
+		} else {
+			reviews = fetchedReviews
+			reviewsTotal, reviewsAverage = ComputeReviewsSummary(reviews)
+			span.SetAttributes(
+				attribute.Bool("reviews.fetch_failed", false),
+				attribute.Int("reviews.total", reviewsTotal),
+				attribute.Float64("reviews.average_rating", reviewsAverage),
+			)
+		}
+	} else {
+		zapLogger.Warn("Review client not configured, returning empty reviews")
+		reviews = []Review{}
+	}
 
 	// TODO: Get stock from inventory service when available
 	// stock, _ := inventoryService.GetStock(ctx, id)
@@ -165,10 +190,10 @@ func GetProductDetails(c *gin.Context) {
 			"available": true, // Mock data
 			"quantity":  50,   // Mock data
 		},
-		"reviews": []gin.H{}, // Empty for now, will be populated when review service is integrated
+		"reviews": reviews,
 		"reviews_summary": gin.H{
-			"total":          0,
-			"average_rating": 0.0,
+			"total":          reviewsTotal,
+			"average_rating": reviewsAverage,
 		},
 		"related_products": relatedProducts,
 	}

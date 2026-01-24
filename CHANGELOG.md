@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.37.1] - 2026-01-24
+
+### Changed
+
+#### Documentation Updates
+
+- Updated API documentation for `GET /api/v1/products/:id/details` to reflect reviews aggregation from review service with soft-fail behavior and `REVIEW_SERVICE_URL` configuration note.
+- Updated frontend documentation to reflect reviews display behavior and fallback to direct review API when aggregation returns empty.
+
+---
+
 ## [0.37.0] - 2026-01-23
 
 ### Changed

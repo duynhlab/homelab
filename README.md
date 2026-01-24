@@ -106,93 +106,27 @@ flowchart TB
 
 **Frontend Architecture**: See [`frontend/README.md`](frontend/README.md) for complete frontend documentation, API mapping, and integration details.
 
-**Detailed Architecture**: See [`docs/apm/ARCHITECTURE.md`](docs/apm/ARCHITECTURE.md) for middleware chain and APM integration. Full system architecture in [`specs/system-context/01-architecture-overview.md`](specs/system-context/01-architecture-overview.md)
+**Detailed Architecture**: See [`docs/observability/apm/ARCHITECTURE.md`](docs/observability/apm/ARCHITECTURE.md) for middleware chain and APM integration. Full system architecture in [`specs/system-context/01-architecture-overview.md`](specs/system-context/01-architecture-overview.md)
 
-### Service Isolation Architecture
+### Documentation Structure
 
-**Each service is completely independent** and ready for separate repository deployment:
-
-```
-services/
-├── product/
-│   ├── go.mod              # Independent module
-│   ├── go.sum
-│   ├── cmd/main.go         # Entry point
-│   ├── internal/           # Service domain
-│   │   ├── web/           # HTTP handlers
-│   │   ├── logic/         # Business logic
-│   │   └── core/          # Domain + repositories
-│   ├── middleware/         # Duplicated (not shared)
-│   ├── config/             # Duplicated (not shared)
-│   └── db/migrations/     # Database migrations
-├── cart/
-│   └── ... (same structure)
-└── ... (9 services total)
-```
-
-**Key Principles:**
-
-- ✅ Each service has own `go.mod` and `go.sum`
-- ✅ No shared code between services (middleware/config duplicated)
-- ✅ Each service builds independently: `cd services/product && go build ./cmd/main.go`
-- ✅ Ready to move to separate repo: `cp -r services/product /path/to/product-service.git`
-
-**Build Verification:**
-
-```bash
-./scripts/00-verify-build.sh  # Verifies all 9 services independently
-```
-
-### GitOps Project Structure
-
-**Kubernetes manifests organized for Flux Operator with base/overlay pattern:**
+**Standardized documentation organized by domain:**
 
 ```
-kubernetes/
-├── base/                         # Environment-agnostic manifests
-│   ├── infrastructure/           # Infrastructure (monitoring, apm, databases, slo)
-│   │   ├── monitoring/           # Prometheus, Grafana, Metrics Server
-│   │   ├── apm/                  # Tempo, Loki, Jaeger, Pyroscope, Vector, OTel
-│   │   ├── databases/            # PostgreSQL operators, clusters, poolers
-│   │   └── slo/                  # Sloth Operator + PrometheusServiceLevel CRDs
-│   └── apps/                     # Applications (9 microservices + frontend + k6)
-│       ├── auth/
-│       ├── user/
-│       ├── product/
-│       ├── cart/
-│       ├── order/
-│       ├── review/
-│       ├── notification/
-│       ├── shipping/
-│       ├── shipping-v2/
-│       ├── frontend/
-│       └── k6/
-├── overlays/                     # Environment-specific patches
-│   ├── local/                    # Local development (1 replica, minimal resources)
-│   └── production/               # Production (5 replicas, HA, resource limits)
-├── clusters/                     # Flux Operator configuration
-│   └── local/                    # FluxInstance + OCI sources + Kustomizations
-│       ├── flux-system/          # FluxInstance CRD
-│       ├── sources/              # OCI + Helm sources
-│       ├── infrastructure.yaml   # Infrastructure Kustomization
-│       └── apps.yaml             # Apps Kustomization
-└── backup/                       # Legacy snapshots (reference only)
+docs/
+├── api/                    # API documentation
+├── databases/              # Database architecture
+├── observability/          # Observability (grouped by domain)
+│   ├── apm/               # Tracing, logging, profiling
+│   ├── metrics/           # Prometheus/Grafana metrics
+│   ├── slo/               # Service Level Objectives
+│   └── logs/              # Logging systems (VictoriaLogs)
+├── platform/              # Deployment & setup
+├── runbooks/              # Operational runbooks
+└── testing/               # Load testing (k6)
 ```
 
-**Deployment Model:**
-
-- **Flux Operator** pulls manifests from OCI Registry (`localhost:5050`)
-- **Base manifests** define resources (HelmReleases, raw YAML)
-- **Overlays** patch for environment (replicas, resources, namespaces)
-- **Dependency chain**: `infrastructure-local` → `apps-local` (via `dependsOn`)
-
-**Benefits:**
-
-- **67-89% YAML reduction**: Kustomize base/overlay eliminates duplication
-- **Multi-environment**: Same base, different overlays (local/production)
-- **GitOps-native**: Flux reconciles from OCI artifacts, not Git directly
-
-**GitOps Details**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md) for complete GitOps architecture and workflows.
+**See [`docs/README.md`](docs/README.md) for complete documentation index.**
 
 ### Microservices
 
@@ -208,7 +142,7 @@ kubernetes/
 | shipping | Go | Shipping tracking (legacy) | shipping | v1 only |
 | shipping-v2 | Go | Enhanced shipping API | shipping | v2 only |
 
-**Complete API Documentation**: See [`docs/guides/API.md`](docs/guides/API.md)
+**Complete API Documentation**: See [`docs/api/API.md`](docs/api/API.md)
 
 ---
 
@@ -248,7 +182,7 @@ make flux-push    # 3. Deploy everything (infrastructure + apps)
 - **Multi-environment support**: Local/production overlays
 - **OCI-based GitOps**: Single source of truth in OCI registry
 
-**Detailed Setup Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md) for step-by-step instructions, architecture explanation, and troubleshooting.
+**Detailed Setup Guide**: See [`docs/platform/SETUP.md`](docs/platform/SETUP.md) for step-by-step instructions, architecture explanation, and troubleshooting.
 
 ---
 
@@ -264,7 +198,7 @@ make flux-push    # 3. Deploy everything (infrastructure + apps)
 - **Deployment**: Kubernetes (Kind), Helm 3
 - **Monitoring**: Prometheus, Grafana, Tempo, Loki, Pyroscope, Jaeger
 
-**Observability Details**: See [`docs/apm/README.md`](docs/apm/README.md) for complete APM system overview.
+**Observability Details**: See [`docs/observability/apm/README.md`](docs/observability/apm/README.md) for complete APM system overview.
 
 ---
 
@@ -276,9 +210,9 @@ make flux-push    # 3. Deploy everything (infrastructure + apps)
 - **Access**: <http://localhost:3000/d/microservices-monitoring-001/> (after port-forward)
 - **Variables**: `$namespace`, `$app`, `$rate`
 
-**Complete Dashboard Reference**: See [`docs/guides/GRAFANA_DASHBOARD.md`](docs/guides/GRAFANA_DASHBOARD.md) for all 34 panels with query analysis and troubleshooting.
+**Complete Dashboard Reference**: See [`docs/observability/metrics/GRAFANA_DASHBOARD.md`](docs/observability/metrics/GRAFANA_DASHBOARD.md) for all 34 panels with query analysis and troubleshooting.
 
-**Metrics Documentation**: See [`docs/monitoring/METRICS.md`](docs/monitoring/METRICS.md) for complete metrics guide (6 custom metrics, 34 panels).
+**Metrics Documentation**: See [`docs/observability/metrics/METRICS.md`](docs/observability/metrics/METRICS.md) for complete metrics guide (6 custom metrics, 34 panels).
 
 ---
 
@@ -300,23 +234,38 @@ After deployment, access services via port-forwarding:
 
 **Makefile Commands**: See `make help` for all available commands (cluster, Flux, validation, utilities).
 
-**Port-Forwarding Guide**: See [`docs/guides/SETUP.md`](docs/guides/SETUP.md)
+**Port-Forwarding Guide**: See [`docs/platform/SETUP.md`](docs/platform/SETUP.md)
 
 ---
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| **[Setup Guide](docs/guides/SETUP.md)** | Complete deployment instructions |
-| **[Metrics Guide](docs/monitoring/METRICS.md)** | Complete metrics documentation (6 custom metrics, 34 panels) |
-| **[Grafana Dashboard Guide](docs/guides/GRAFANA_DASHBOARD.md)** | Complete dashboard reference (34 panels + annotations planning) |
-| **[APM Overview](docs/apm/README.md)** | Complete APM system overview |
-| **[SLO Documentation](docs/slo/README.md)** | SRE practices: SLI/SLO definitions, error budgets |
-| **[API Reference](docs/guides/API.md)** | Complete API documentation for all 9 microservices |
-| **[k6 Load Testing](docs/guides/K6.md)** | k6 load testing setup and configuration |
-| **[Documentation Index](docs/README.md)** | Complete documentation index with learning path |
-| **[AGENTS.md](AGENTS.md)** | AI Agent Guide for navigating the codebase |
+### Getting Started
+
+- **[Setup Guide](docs/platform/SETUP.md)** - Complete deployment instructions
+- **[API Reference](docs/api/API.md)** - API endpoints and adding new microservices
+
+### Observability
+
+- **[Metrics Guide](docs/observability/metrics/METRICS.md)** - Complete metrics documentation (6 custom metrics, 34 panels)
+- **[Grafana Dashboard Guide](docs/observability/metrics/GRAFANA_DASHBOARD.md)** - Complete dashboard reference (34 panels + annotations planning)
+- **[APM Overview](docs/observability/apm/README.md)** - Complete APM system overview
+- **[SLO Documentation](docs/observability/slo/README.md)** - SRE practices: SLI/SLO definitions, error budgets
+
+### API & Databases
+
+- **[API Reference](docs/api/API.md)** - Complete API documentation for all 9 microservices
+- **[Database Guide](docs/databases/DATABASE.md)** - PostgreSQL database integration guide
+
+### Testing & Operations
+
+- **[k6 Load Testing](docs/testing/K6.md)** - k6 load testing setup and configuration
+- **[Runbooks/Troubleshooting](docs/runbooks/troubleshooting/)** - Operational runbooks and troubleshooting guides
+
+### Reference
+
+- **[Documentation Index](docs/README.md)** - Complete documentation index with learning path
+- **[AGENTS.md](AGENTS.md)** - AI Agent Guide for navigating the codebase
 
 ---
 
@@ -329,7 +278,7 @@ After deployment, access services via port-forwarding:
 - **Logs**: Structured logging with zap, correlated via trace_id/span_id (Loki + Vector)
 - **Profiles**: Continuous profiling with Pyroscope (CPU, heap, goroutines, locks)
 
-**APM Details**: See [`docs/apm/README.md`](docs/apm/README.md)
+**APM Details**: See [`docs/observability/apm/README.md`](docs/observability/apm/README.md)
 
 ### Database
 
@@ -340,7 +289,7 @@ After deployment, access services via port-forwarding:
 - **Operators**: Zalando Postgres Operator (v1.15.0), CloudNativePG Operator (v1.28.0)
 - **Cross-Namespace Secrets**: Zalando operator configured for shared database pattern
 
-**Database Details**: See [`docs/guides/DATABASE.md`](docs/guides/DATABASE.md) for complete architecture diagrams and configuration
+**Database Details**: See [`docs/databases/DATABASE.md`](docs/databases/DATABASE.md) for complete architecture diagrams and configuration
 
 ### SLO Management
 
@@ -349,7 +298,7 @@ After deployment, access services via port-forwarding:
 - **Burn Rate Alerts**: Multi-window multi-burn-rate alerts
 - **Automated Runbooks**: Latency diagnosis and error budget alert response
 
-**SLO Details**: See [`docs/slo/README.md`](docs/slo/README.md)
+**SLO Details**: See [`docs/observability/slo/README.md`](docs/observability/slo/README.md)
 
 ---
 

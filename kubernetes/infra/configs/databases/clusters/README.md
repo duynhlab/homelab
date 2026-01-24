@@ -217,5 +217,5 @@ DB_PORT=5432
 
 ## Related Documentation
 
-- **Database Guide:** [`docs/guides/DATABASE.md`](../../../../docs/guides/DATABASE.md#connection-poolers)
-- **PgCat Troubleshooting:** [`docs/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md`](../../../../docs/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md)
+- **Database Guide:** [`docs/databases/DATABASE.md`](../../../../docs/databases/DATABASE.md#connection-poolers)
+- **PgCat Troubleshooting:** [`docs/runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md`](../../../../docs/runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md)

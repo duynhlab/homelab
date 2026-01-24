@@ -26,7 +26,7 @@ metadata:
   annotations:
     fluxcd.controlplane.io/reconcile: "enabled"
     fluxcd.controlplane.io/reconcileEvery: "10m"
-    fluxcd.controlplane.io/reconcileTimeout: "5m"
+    fluxcd.controlplane.io/reconcileTimeout: "10m"
   labels:
     app.kubernetes.io/name: frontend
     app.kubernetes.io/component: ui
@@ -49,7 +49,15 @@ spec:
         namespace: default
       spec:
         interval: 10m
-        timeout: 5m
+        # Helm install/upgrade can be slow on first pull; avoid marking release failed prematurely.
+        timeout: 10m
+
+        install:
+          remediation:
+            retries: 3
+        upgrade:
+          remediation:
+            retries: 3
         
         chartRef:
           kind: OCIRepository

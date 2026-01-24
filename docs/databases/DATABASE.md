@@ -76,10 +76,8 @@ flowchart TB
         ReviewDB[("review-db - PostgreSQL 16 - Single Instance")]
         SupportingDB[("supporting-db - PostgreSQL 16 - Shared DB")]
     end
-    
-    Spacer1[ ]
-    Spacer2[ ]
-    Spacer3[ ]
+
+
     
     subgraph CloudNativePGSvc["CloudNativePG Services - Auto-created"]
         ProductRW["product-db-rw - Primary Endpoint"]

@@ -49,7 +49,7 @@ Dự án này expose **6 custom application metrics** và tận dụng **Go runt
 **Service Discovery:**
 - **Prometheus Operator**: Manages Prometheus via CRDs
 - **ServiceMonitor**: Single resource for all microservices (namespace-based discovery)
-  - **Location**: In [`kubernetes/infra/configs/monitoring/servicemonitors/microservices.yaml`](../../kubernetes/infra/configs/monitoring/servicemonitors/microservices.yaml)
+  - **Location**: In [`kubernetes/infra/configs/monitoring/servicemonitors/microservices.yaml`](../../../kubernetes/infra/configs/monitoring/servicemonitors/microservices.yaml)
   - **Deployment**: Automatically deployed via Flux Operator
   - **Reconciliation**: `flux reconcile kustomization configs-local --with-source`
 - **Namespace selector**: Matches 8 namespaces (auth, user, product, cart, order, review, notification, shipping)
@@ -914,7 +914,7 @@ The Grafana dashboard contains **34 panels** organized in **5 row groups**:
    - Memory allocations
 
 **Complete Panel Reference:**
-> **📖 See [Grafana Dashboard Guide](../guides/GRAFANA_DASHBOARD.md)** for detailed query analysis, troubleshooting scenarios, and SRE best practices for all 34 panels.
+> **📖 See [Grafana Dashboard Guide](./GRAFANA_DASHBOARD.md)** for detailed query analysis, troubleshooting scenarios, and SRE best practices for all 34 panels.
 
 ---
 
@@ -936,7 +936,7 @@ The dashboard uses **4 variables** for filtering and customization:
 > **📖 See [Variables & Regex Guide](./VARIABLES_REGEX.md)** for detailed variable configuration, regex patterns, and cascading best practices.
 
 **Troubleshooting:**
-> **📖 See [Grafana Dashboard Guide](../guides/GRAFANA_DASHBOARD.md)** for troubleshooting dashboard issues.
+> **📖 See [Grafana Dashboard Guide](./GRAFANA_DASHBOARD.md)** for troubleshooting dashboard issues.
 
 ---
 
@@ -1247,7 +1247,7 @@ Diagnosis: High load period, NOT leak ✅
 ## Related Documentation
 
 ### Dashboard & Visualization
-- **[Grafana Dashboard Guide](../guides/GRAFANA_DASHBOARD.md)** - Complete reference for all 34 panels with queries, troubleshooting, and SRE best practices
+- **[Grafana Dashboard Guide](./GRAFANA_DASHBOARD.md)** - Complete reference for all 34 panels with queries, troubleshooting, and SRE best practices
 
 ### Variables & Configuration
 - **[Variables & Regex Guide](./VARIABLES_REGEX.md)** - Dashboard variables, regex patterns, and cascading configuration
@@ -1259,7 +1259,7 @@ Diagnosis: High load period, NOT leak ✅
 - **[Metrics Labels](./METRICS_LABEL.md)** - Label injection strategy, ServiceMonitor configuration, and auto-discovery
 
 ### Troubleshooting
-- **[Grafana Dashboard Guide](../guides/GRAFANA_DASHBOARD.md)** - Dashboard troubleshooting and best practices
+- **[Grafana Dashboard Guide](./GRAFANA_DASHBOARD.md)** - Dashboard troubleshooting and best practices
 
 ---
 

@@ -412,7 +412,7 @@ func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 ```
 
 > [!NOTE]
-> See [PGCAT_PREPARED_STATEMENT_ERROR.md](../troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md) for detailed troubleshooting.
+> See [PGCAT_PREPARED_STATEMENT_ERROR.md](../runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md) for detailed troubleshooting.
 
 ---
 

@@ -349,11 +349,11 @@ spec:
 
 ## Related Documentation
 
-- [OpenTelemetry Collector README](../../k8s/otel-collector/README.md)
-- [Jaeger README](../../k8s/jaeger/README.md)
-- [APM Overview](../apm/README.md)
-- [Tracing Guide](../apm/TRACING.md)
-- [Jaeger Guide](../apm/JAEGER.md)
+- [OpenTelemetry Collector README](../../../k8s/otel-collector/README.md)
+- [Jaeger README](../../../k8s/jaeger/README.md)
+- [APM Overview](./README.md)
+- [Tracing Guide](./TRACING.md)
+- [Jaeger Guide](./JAEGER.md)
 
 ## References
 

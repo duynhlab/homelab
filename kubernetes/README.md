@@ -189,8 +189,8 @@ kubectl get pods -n product
 
 ## Documentation
 
-- **Setup Guide:** [`docs/guides/SETUP.md`](../docs/guides/SETUP.md) - Complete deployment instructions
-- **Database Guide:** [`docs/guides/DATABASE.md`](../docs/guides/DATABASE.md) - Database patterns
+- **Setup Guide:** [`docs/platform/SETUP.md`](../docs/platform/SETUP.md) - Complete deployment instructions
+- **Database Guide:** [`docs/databases/DATABASE.md`](../docs/databases/DATABASE.md) - Database patterns
 - **Infrastructure Details:** [`infra/README.md`](infra/README.md) - Component-specific documentation
 - **Cluster Configuration:** [`clusters/local/README.md`](clusters/local/README.md) - Flux setup details
 

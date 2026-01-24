@@ -78,6 +78,6 @@ Each cluster's `kustomization.yaml` applies resources in the correct order:
 
 ## Related Documentation
 
-- **Database Guide:** [`docs/guides/DATABASE.md`](../../../docs/guides/DATABASE.md)
+- **Database Guide:** [`docs/databases/DATABASE.md`](../../../docs/databases/DATABASE.md)
 - **Poolers Documentation:** [`clusters/README.md`](clusters/README.md)
-- **PgCat Troubleshooting:** [`docs/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md`](../../../docs/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md)
+- **PgCat Troubleshooting:** [`docs/runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md`](../../../docs/runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md)

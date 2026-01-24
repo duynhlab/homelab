@@ -16,7 +16,7 @@ spec:
     # Values for shipping-v2 service (v2 only)
     name: shipping-v2
 
-    replicaCount: 2
+    replicaCount: 1
 
     image:
       repository: ghcr.io/duynhne/shipping-v2

@@ -16,7 +16,7 @@ spec:
     # Values for review service
     name: review
 
-    replicaCount: 2
+    replicaCount: 1
 
     image:
       repository: ghcr.io/duynhne/review

@@ -75,17 +75,15 @@ export default function ProductDetailPage() {
                 const result = await getProductDetails(id);
                 setData(result);
                 
-                // Use reviews from aggregation endpoint if available
-                // According to API docs, /api/v1/products/:id/details includes reviews
+                // Use reviews from aggregation endpoint if available and non-empty
+                // If aggregation returns empty reviews, always try fallback to review service
+                // This handles cases where backend aggregation fails or hasn't been implemented yet
                 if (result.reviews && Array.isArray(result.reviews) && result.reviews.length > 0) {
                     setReviews(result.reviews);
                     setNeedsReviewsFallback(false);
-                } else if (result.reviews_summary && result.reviews_summary.total === 0) {
-                    // Reviews array exists but is empty - no fallback needed
-                    setReviews([]);
-                    setNeedsReviewsFallback(false);
                 } else {
-                    // Aggregation endpoint might not include reviews yet - use fallback
+                    // Aggregation returned empty/missing reviews - use fallback to get real reviews
+                    setReviews([]);
                     setNeedsReviewsFallback(true);
                 }
                 
@@ -149,6 +147,26 @@ export default function ProductDetailPage() {
         }
     }, [location.hash, loading, reviewsLoading]);
 
+    // Helper function to refresh reviews from either aggregation or direct API
+    const refreshReviews = async () => {
+        try {
+            // First try aggregation endpoint
+            const aggregationResult = await getProductDetails(id);
+            if (aggregationResult.reviews && Array.isArray(aggregationResult.reviews) && aggregationResult.reviews.length > 0) {
+                setReviews(aggregationResult.reviews);
+                setNeedsReviewsFallback(false);
+                return;
+            }
+            // If aggregation returns empty, fall back to direct review API
+            const directReviews = await getReviews(id);
+            setReviews(Array.isArray(directReviews) ? directReviews : []);
+        } catch (err) {
+            if (import.meta.env.DEV) {
+                console.error('[API ERROR] Failed to refresh reviews:', err);
+            }
+        }
+    };
+
     const handleSubmitReview = async (e) => {
         e.preventDefault();
         if (!authUser?.id) {
@@ -169,16 +187,8 @@ export default function ProductDetailPage() {
             }
             notify('success', 'Review submitted!');
             setReviewForm({ rating: 5, title: '', comment: '' });
-            // Refresh reviews list - refetch aggregation endpoint to get updated data
-            if (needsReviewsFallback) {
-                fetchReviews();
-            } else {
-                // Refetch aggregation endpoint to get updated reviews
-                const result = await getProductDetails(id);
-                if (result.reviews && Array.isArray(result.reviews)) {
-                    setReviews(result.reviews);
-                }
-            }
+            // Refresh reviews list - try aggregation first, fallback to direct API
+            await refreshReviews();
         } catch (err) {
             // Check for 409 Conflict (duplicate review) - fallback for stale UI state
             const isDuplicate = err.response?.status === 409 ||
@@ -187,14 +197,7 @@ export default function ProductDetailPage() {
             if (isDuplicate) {
                 notify('info', 'You have already reviewed this product.');
                 // Refresh reviews to update hasReviewed and hide the form
-                if (needsReviewsFallback) {
-                    fetchReviews();
-                } else {
-                    const result = await getProductDetails(id);
-                    if (result.reviews && Array.isArray(result.reviews)) {
-                        setReviews(result.reviews);
-                    }
-                }
+                await refreshReviews();
             } else {
                 notify('error', err.message || 'Failed to submit review');
             }

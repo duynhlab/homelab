@@ -90,6 +90,12 @@ func main() {
 
 	// Set service instances in Web handlers
 	v1.SetProductService(productService)
+
+	// Initialize review service client for aggregation in product details endpoint
+	reviewClient := v1.NewReviewClient(cfg.ReviewServiceURL)
+	v1.SetReviewClient(reviewClient)
+	logger.Info("Review client initialized", zap.String("review_service_url", cfg.ReviewServiceURL))
+
 	logger.Info("Web handlers configured")
 
 	r := gin.Default()

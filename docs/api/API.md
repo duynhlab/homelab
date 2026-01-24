@@ -1,6 +1,6 @@
 # API Reference
 
-> **Document Status:** Production Contract  
+> **Document Status:** Production  
 > **Last Updated:** 2026-01-08  
 > **Architecture:** 3-Layer (Web / Logic / Core)
 

@@ -18,7 +18,7 @@
   - `auth-db`: PostgreSQL 17, 3 nodes (HA), PgBouncer sidecar (2 instances)
   - `supporting-db`: PostgreSQL 16, 1 node, PgBouncer sidecar (2 instances)
 - **CloudNativePG Operator** (v1.28.0): 2 clusters
-  - `product-db`: PostgreSQL 18, 2 nodes (HA), PgDog standalone (1 replica, Helm chart)
+  - `product-db`: PostgreSQL 18, 3 nodes (HA), PgDog standalone (1 replica, Helm chart)
   - `transaction-db`: PostgreSQL 18, 3 nodes (HA), PgCat standalone (2 replicas)
 ---
 
@@ -57,7 +57,7 @@ flowchart TB
     
     subgraph Clusters["PostgreSQL Clusters"]
         AuthDB[(auth-db<br/>Zalando<br/>PostgreSQL 17<br/>HA: 3 nodes<br/>namespace: auth)]
-        ProductDB[(product-db<br/>CloudNativePG<br/>PostgreSQL 18<br/>HA: 2 instances<br/>namespace: product)]
+        ProductDB[(product-db<br/>CloudNativePG<br/>PostgreSQL 18<br/>HA: 3 instances<br/>namespace: product)]
         subgraph TransactionDBCluster["transaction-db Cluster<br/>HA: 3 Instances"]
             TransactionPrimary[(Primary<br/>PostgreSQL 18<br/>Read-Write)]
             TransactionReplica1[(Replica 1<br/>PostgreSQL 18<br/>Read-Only)]
@@ -144,7 +144,7 @@ flowchart TB
 
 | Cluster | Operator | PostgreSQL | Instances | HA Pattern | Namespace |
 |---------|----------|------------|-----------|------------|-----------|
-| product-db | CloudNativePG | 18 | 2 (1 primary + 1 replica) | Patroni HA | `product` |
+| product-db | CloudNativePG | 18 | 3 (1 primary + 2 replicas) | Patroni HA | `product` |
 | transaction-db | CloudNativePG | 18 | 3 (1 primary + 2 replicas) | Patroni HA (Sync) | `cart` |
 | auth-db | Zalando | 17 | 3 (1 leader + 2 standbys) | Patroni HA | `auth` |
 | review-db | Zalando | 16 | 1 (single instance) | Patroni (single) | `review` |
@@ -168,7 +168,7 @@ flowchart TB
 - Production-ready performance tuning
 
 **Clusters Managed:**
-- **Product Database** (`product-db`) - 2 instances (1 primary + 1 replica)
+- **Product Database** (`product-db`) - 3 instances (1 primary + 2 replicas)
 - **Transaction Database** (`transaction-db`) - 3 instances (1 primary + 2 replicas) with synchronous replication
 
 **Connection Pooler:**
@@ -181,7 +181,7 @@ flowchart TB
 
 - **Operator**: CloudNativePG (v1.28.0) - uses Patroni internally
 - **PostgreSQL Version**: 18 (CloudNativePG default image)
-- **Instances**: 2 (1 primary + 1 replica)
+- **Instances**: 3 (1 primary + 2 replicas)
 - **HA**: Patroni via Kubernetes API (automatic failover)
 - **Pooler**: PgDog standalone deployment via Helm chart (`helm.pgdog.dev/pgdog`)
 - **Namespace**: `product`

@@ -32,13 +32,14 @@ import (
 
 // Config holds all configuration for a microservice
 type Config struct {
-	Service         ServiceConfig   // Service-specific settings (port, name, version)
-	Tracing         TracingConfig   // OpenTelemetry/Tempo configuration
-	Profiling       ProfilingConfig // Pyroscope continuous profiling
-	Logging         LoggingConfig   // Structured logging (Zap)
-	Metrics         MetricsConfig   // Prometheus metrics
-	Database        DatabaseConfig  // PostgreSQL database configuration
-	ShutdownTimeout int             // Graceful shutdown timeout in seconds - from SHUTDOWN_TIMEOUT env (default: 10)
+	Service          ServiceConfig   // Service-specific settings (port, name, version)
+	Tracing          TracingConfig   // OpenTelemetry/Tempo configuration
+	Profiling        ProfilingConfig // Pyroscope continuous profiling
+	Logging          LoggingConfig   // Structured logging (Zap)
+	Metrics          MetricsConfig   // Prometheus metrics
+	Database         DatabaseConfig  // PostgreSQL database configuration
+	ShutdownTimeout  int             // Graceful shutdown timeout in seconds - from SHUTDOWN_TIMEOUT env (default: 10)
+	ReviewServiceURL string          // Review service URL for aggregation - from REVIEW_SERVICE_URL env
 }
 
 // ServiceConfig defines basic service configuration
@@ -147,7 +148,8 @@ func Load() *Config {
 			PoolMode:       getEnv("DB_POOL_MODE", ""),
 			PoolerType:     getEnv("DB_POOLER_TYPE", ""),
 		},
-		ShutdownTimeout: getEnvDurationSeconds("SHUTDOWN_TIMEOUT", 10),
+		ShutdownTimeout:  getEnvDurationSeconds("SHUTDOWN_TIMEOUT", 10),
+		ReviewServiceURL: getEnv("REVIEW_SERVICE_URL", "http://review.review.svc.cluster.local:8080"),
 	}
 }
 

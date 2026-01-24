@@ -1,7 +1,3 @@
-# Connection Poolers
-
-This directory contains Kubernetes manifests for PostgreSQL connection poolers used by the microservices.
-
 ## Overview
 
 Connection poolers solve the "too many connections" problem by reusing PostgreSQL connections, allowing applications to handle 1000+ client connections with only 25-50 database connections.
@@ -18,6 +14,8 @@ Connection poolers solve the "too many connections" problem by reusing PostgreSQ
 **Location:** [`product-db/poolers/`](product-db/poolers/)
 
 **Purpose:** Connection pooling for product-db (CloudNativePG cluster)
+
+**Cluster topology:** `product-db` now runs **3 instances** (1 primary + 2 replicas).
 
 ### Kubernetes Deployment Architecture
 
@@ -50,7 +48,7 @@ flowchart TD
     
     subgraph DatabaseLayer["PostgreSQL Databases - product-db Cluster"]
         PrimaryDB["Primary DB<br/>product-db-rw.product.svc<br/>Port: 5432"]
-        ReplicaDB["Replica DB<br/>product-db-r.product.svc<br/>Port: 5432"]
+        ReplicaDB["Replica Endpoint (load balanced)<br/>product-db-r.product.svc<br/>Port: 5432"]
     end
     
     ProductService -->|"connects to"| Frontend
@@ -160,7 +158,7 @@ flowchart TD
 **Purpose:** Connection pooling and read replica routing for transaction-db (CloudNativePG cluster)
 
 **Deployment:**
-- Standalone Kubernetes Deployment (1 replica, HA capable)
+- Standalone Kubernetes Deployment (2 replicas, HA capable)
 - Managed via Kustomize
 
 **Configuration:**
@@ -168,11 +166,6 @@ flowchart TD
 - Pool size: 30 connections per database
 - Port: 5432 (PostgreSQL protocol)
 - Metrics: Port 9930 (Prometheus exporter)
-
-**Files:**
-- [`transaction-db/poolers/configmap.yaml`](transaction-db/poolers/configmap.yaml) - PgCat TOML configuration
-- [`transaction-db/poolers/deployment.yaml`](transaction-db/poolers/deployment.yaml) - Kubernetes Deployment
-- [`transaction-db/poolers/service.yaml`](transaction-db/poolers/service.yaml) - Kubernetes Service
 
 ## Comparison
 

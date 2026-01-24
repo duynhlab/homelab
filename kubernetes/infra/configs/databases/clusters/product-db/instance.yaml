@@ -6,8 +6,8 @@ metadata:
   name: product-db
   namespace: product
 spec:
-  # Number of instances (1 primary + 1 replica)
-  instances: 2
+  # Number of instances (1 primary + 2 replica)
+  instances: 3
   
   # PostgreSQL parameters
   postgresql:

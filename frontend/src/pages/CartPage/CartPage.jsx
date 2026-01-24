@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getCart, updateCartItem, removeCartItem } from '../../api/cartApi';
+import { useToast } from '../../components/common/ToastProvider';
 
 /**
  * Cart Page - Full cart operations
@@ -10,11 +11,11 @@ import { getCart, updateCartItem, removeCartItem } from '../../api/cartApi';
  */
 export default function CartPage() {
     const navigate = useNavigate();
+    const { notify } = useToast();
     const [cart, setCart] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [actionLoading, setActionLoading] = useState(null);
-    const [actionMessage, setActionMessage] = useState(null);
 
     // Check authentication
     const isAuthenticated = !!localStorage.getItem('authToken');
@@ -50,16 +51,15 @@ export default function CartPage() {
     const handleUpdateQuantity = async (itemId, newQuantity) => {
         if (newQuantity < 1) return;
         setActionLoading(itemId);
-        setActionMessage(null);
         try {
             const result = await updateCartItem(itemId, newQuantity);
             if (import.meta.env.DEV) {
                 console.log('[API] PATCH /cart/items/' + itemId + ':', result);
             }
-            setActionMessage({ type: 'success', text: 'Updated!' });
+            notify('success', 'Updated!');
             fetchCart();
         } catch (err) {
-            setActionMessage({ type: 'error', text: err.message });
+            notify('error', err.message);
             if (import.meta.env.DEV) {
                 console.error('[API ERROR]', err);
             }
@@ -70,16 +70,15 @@ export default function CartPage() {
 
     const handleRemoveItem = async (itemId) => {
         setActionLoading(itemId);
-        setActionMessage(null);
         try {
             const result = await removeCartItem(itemId);
             if (import.meta.env.DEV) {
                 console.log('[API] DELETE /cart/items/' + itemId + ':', result);
             }
-            setActionMessage({ type: 'success', text: 'Removed!' });
+            notify('success', 'Removed!');
             fetchCart();
         } catch (err) {
-            setActionMessage({ type: 'error', text: err.message });
+            notify('error', err.message);
             if (import.meta.env.DEV) {
                 console.error('[API ERROR]', err);
             }
@@ -120,11 +119,6 @@ export default function CartPage() {
 
             {/* Error */}
             {!loading && error && <div className="error">Error: {error}</div>}
-
-            {/* Action Message */}
-            {actionMessage && (
-                <div className={actionMessage.type}>{actionMessage.text}</div>
-            )}
 
             {/* Empty */}
             {!loading && !error && items.length === 0 && (

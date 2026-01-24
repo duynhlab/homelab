@@ -227,28 +227,6 @@ flowchart TB
 - Pool size: 30 connections (configured in HelmRelease)
 - CloudNativePG services: `product-db-rw` (read-write), `product-db-r` (read-only)
 
-**Cluster Topology:**
-
-```mermaid
-flowchart LR
-    subgraph productdb["product-db Cluster"]
-        Primary[("Primary")]
-        Replica1[("Replica 1")]
-        Replica2[("Replica 2")]
-    end
-    
-    subgraph services["Services"]
-        RW["product-db-rw"]
-        R["product-db-r"]
-    end
-    
-    RW --> Primary
-    R --> Replica1
-    R --> Replica2
-    Primary -.->|Async| Replica1
-    Primary -.->|Async| Replica2
-```
-
 #### Transaction Database
 
 | Attribute                | Value                                                                                 |
@@ -371,28 +349,6 @@ flowchart TB
 - CloudNativePG uses Patroni internally for HA management
 - Patroni uses Kubernetes API as Distributed Configuration Store (DCS)
 - No separate etcd cluster required - Kubernetes serves as coordination layer
-
-**Cluster Topology:**
-
-```mermaid
-flowchart LR
-    subgraph transactiondb["transaction-db Cluster"]
-        Primary[("Primary")]
-        Replica1[("Replica 1")]
-        Replica2[("Replica 2")]
-    end
-    
-    subgraph services["Services"]
-        RW["transaction-db-rw"]
-        R["transaction-db-r"]
-    end
-    
-    RW --> Primary
-    R --> Replica1
-    R --> Replica2
-    Primary -.->|Sync| Replica1
-    Primary -.->|Sync| Replica2
-```
 
 ### Features & Capabilities
 
@@ -603,21 +559,6 @@ flowchart TB
 - **Log Collection**: Vector sidecar for PostgreSQL log collection to Loki
 - **Note**: Cluster and service are in the same namespace (`review`), so cross-namespace secret feature is not needed
 
-**Cluster Topology:**
-
-```mermaid
-flowchart LR
-    subgraph reviewdb["review-db Cluster"]
-        Instance[("Single Instance")]
-    end
-    
-    subgraph services["Services"]
-        Direct["review-db - Port 5432"]
-    end
-    
-    Direct --> Instance
-```
-
 #### Log Collection with Vector Sidecar
 
 - **Vector Sidecar**: Log collection sidecar for PostgreSQL logs
@@ -750,27 +691,6 @@ flowchart TB
 - **Log Collection**: Vector sidecar in each pod for PostgreSQL log collection to Loki
 - **Note**: Cluster and service are in the same namespace (`auth`), so cross-namespace secret feature is not needed
 
-**Cluster Topology:**
-
-```mermaid
-flowchart LR
-    subgraph authdb["auth-db Cluster"]
-        Leader[("Leader")]
-        Standby1[("Standby 1")]
-        Standby2[("Standby 2")]
-    end
-    
-    subgraph services["Services"]
-        Direct["auth-db - Port 5432"]
-        Pooler["auth-db-pooler - Port 6432"]
-    end
-    
-    Direct --> Leader
-    Pooler --> Leader
-    Leader -.->|Streaming| Standby1
-    Leader -.->|Streaming| Standby2
-```
-
 #### Log Collection with Vector Sidecar
 
 - **Vector Sidecar**: Log collection sidecar for PostgreSQL logs (deployed in all 3 pods)
@@ -890,23 +810,6 @@ flowchart TB
 - **Monitoring**: `postgres_exporter` sidecar with custom queries for enhanced metrics
 - **Log Collection**: Vector sidecar for PostgreSQL log collection to Loki
 - Cross-namespace secret management (see [Zalando Postgres Operator - Secret Management](#secret-management) section)
-
-**Cluster Topology:**
-
-```mermaid
-flowchart LR
-    subgraph supportingdb["supporting-db Cluster"]
-        Instance[("Single Instance")]
-    end
-    
-    subgraph services["Services"]
-        Direct["supporting-db - Port 5432"]
-        Pooler["supporting-db-pooler - Port 5432"]
-    end
-    
-    Direct --> Instance
-    Pooler --> Instance
-```
 
 #### Log Collection with Vector Sidecar
 

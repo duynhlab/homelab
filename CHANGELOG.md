@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.37.2] - 2026-01-24
+
+### Changed
+
+#### UI Notification Consistency
+
+- Cart page now uses global toast notifications for item update/remove/error feedback (consistent with other pages)
+- Replaced inline `actionMessage` banner with `ToastProvider` popup notifications
+- Updated frontend documentation (`frontend/README.md`) with Cart UX notes
+
+---
+
 ## [0.37.1] - 2026-01-24
 
 ### Changed

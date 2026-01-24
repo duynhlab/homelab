@@ -1,7 +1,4 @@
 ---
-# PgDog HelmRelease for product-db
-# Note: PgDog Helm chart does NOT support passwordFromSecret
-# Using inline password that matches product-db-secret
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -57,18 +54,15 @@ spec:
         cpu: 100m
         memory: 256Mi
     
-    # ServiceMonitor for Prometheus (Helm chart auto-creates)
     serviceMonitor:
       enabled: true
       interval: 15s
       scrapeTimeout: 10s
     
-    # Pod anti-affinity for HA
     podAntiAffinity:
       enabled: false
       type: soft
     
-    # PodDisruptionBudget
     podDisruptionBudget:
       enabled: false
       minAvailable: 1

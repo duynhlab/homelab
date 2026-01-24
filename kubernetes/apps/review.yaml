@@ -6,7 +6,15 @@ metadata:
   namespace: review
 spec:
   interval: 10m
-  timeout: 5m
+  # Helm install/upgrade can be slow on first pull + migrations; avoid marking release failed prematurely.
+  timeout: 10m
+
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
   chartRef:
     kind: OCIRepository
     name: mop-chart-oci

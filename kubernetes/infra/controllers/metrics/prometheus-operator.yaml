@@ -26,6 +26,10 @@ spec:
       prometheusSpec:
         podMonitorNamespaceSelector: {}
         podMonitorSelector: {}
+        # Option A: discover ServiceMonitors/PodMonitors without requiring Helm 'release' label.
+        # This removes the default constraint: serviceMonitorSelector.matchLabels.release=kube-prometheus-stack
+        serviceMonitorSelectorNilUsesHelmValues: false
+        podMonitorSelectorNilUsesHelmValues: false
         resources:
           limits:
             cpu: 500m

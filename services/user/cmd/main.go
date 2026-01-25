@@ -100,6 +100,7 @@ func main() {
 	{
 		apiV1.GET("/users/:id", v1.GetUser)
 		apiV1.GET("/users/profile", v1.GetProfile)
+		apiV1.PUT("/users/profile", v1.UpdateProfile)
 		apiV1.POST("/users", v1.CreateUser)
 	}
 

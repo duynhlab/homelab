@@ -144,3 +144,52 @@ func CreateUser(c *gin.Context) {
 	zapLogger.Info("User created", zap.String("user_id", user.ID))
 	c.JSON(http.StatusCreated, user)
 }
+
+// UpdateProfile handles PUT /api/v1/users/profile
+func UpdateProfile(c *gin.Context) {
+	ctx, span := middleware.StartSpan(c.Request.Context(), "http.request", trace.WithAttributes(
+		attribute.String("layer", "web"),
+		attribute.String("method", c.Request.Method),
+		attribute.String("path", c.Request.URL.Path),
+	))
+	defer span.End()
+
+	loggerVal, exists := c.Get("logger")
+	var zapLogger *zap.Logger
+	if exists {
+		if l, ok := loggerVal.(*zap.Logger); ok {
+			zapLogger = l
+		}
+	}
+	if zapLogger == nil {
+		zapLogger, _ = middleware.NewLogger()
+	}
+
+	// Get user_id from auth middleware (falls back to "1" for demo)
+	userID := c.GetString("user_id")
+	if userID == "" {
+		userID = "1"
+	}
+
+	var req domain.UpdateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		span.SetAttributes(attribute.Bool("request.valid", false))
+		span.RecordError(err)
+		zapLogger.Error("Invalid request", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	span.SetAttributes(attribute.Bool("request.valid", true))
+
+	user, err := userService.UpdateProfile(ctx, userID, req)
+	if err != nil {
+		span.RecordError(err)
+		zapLogger.Error("Failed to update profile", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		return
+	}
+
+	zapLogger.Info("Profile updated", zap.String("user_id", userID))
+	c.JSON(http.StatusOK, user)
+}

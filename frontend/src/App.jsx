@@ -11,6 +11,8 @@ const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage/ProductDe
 const CartPage = lazy(() => import('./pages/CartPage/CartPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage/CheckoutPage'));
 const OrdersPage = lazy(() => import('./pages/OrdersPage/OrdersPage'));
+const NotificationPage = lazy(() => import('./pages/NotificationPage/NotificationPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage/ProfilePage'));
 const LoginPage = lazy(() => import('./pages/LoginPage/LoginPage'));
 
 /**
@@ -73,6 +75,8 @@ function App() {
                     {isAuthenticated && (
                         <>
                             <Link to="/orders">Orders</Link>
+                            <Link to="/notifications">Notifications</Link>
+                            <Link to="/profile">Profile</Link>
                             <Link to="/cart">
                                 Cart {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
                             </Link>
@@ -100,6 +104,8 @@ function App() {
                         <Route path="/cart" element={<CartPage />} />
                         <Route path="/checkout" element={<CheckoutPage />} />
                         <Route path="/orders" element={<OrdersPage />} />
+                        <Route path="/notifications" element={<NotificationPage />} />
+                        <Route path="/profile" element={<ProfilePage />} />
                         <Route path="/login" element={<LoginPage />} />
                     </Routes>
                 </Suspense>

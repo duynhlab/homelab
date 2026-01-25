@@ -16,3 +16,13 @@ type EstimateRequest struct {
 	Destination string  `json:"destination" binding:"required"`
 	Weight      float64 `json:"weight" binding:"required"`
 }
+
+type EstimateResponse struct {
+	Origin           string  `json:"origin"`
+	Destination      string  `json:"destination"`
+	Weight           float64 `json:"weight"`
+	EstimatedCost    float64 `json:"estimated_cost"`
+	EstimatedDays    int     `json:"estimated_days"`
+	Currency         string  `json:"currency"`
+	Carrier          string  `json:"carrier"`
+}

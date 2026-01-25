@@ -18,14 +18,15 @@ export async function trackShipment(trackingNumber) {
 }
 
 /**
- * Estimate shipment cost (v2)
- * GET /api/v2/shipments/estimate?weight={weight}&destination={destination}
- * @param {number} weight - Package weight
- * @param {string} destination - Destination code (e.g., 'US')
+ * Estimate shipment cost (v1)
+ * GET /api/v1/shipping/estimate?origin={origin}&destination={destination}&weight={weight}
+ * @param {string} origin - Origin location
+ * @param {string} destination - Destination location
+ * @param {number} weight - Package weight in kg
  */
-export async function estimateShipment(weight, destination) {
-    const response = await apiClient.get('/api/v2/shipments/estimate', {
-        params: { weight, destination }
+export async function estimateShipment(origin, destination, weight) {
+    const response = await apiClient.get('/shipping/estimate', {
+        params: { origin, destination, weight }
     });
     return response.data;
 }

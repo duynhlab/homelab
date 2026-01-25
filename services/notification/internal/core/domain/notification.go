@@ -5,6 +5,7 @@ type Notification struct {
 	Type    string `json:"type"`
 	Message string `json:"message"`
 	Status  string `json:"status"`
+	Read    bool   `json:"read"`
 }
 
 type SendEmailRequest struct {

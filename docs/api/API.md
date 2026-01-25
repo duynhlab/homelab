@@ -1,7 +1,7 @@
 # API Reference
 
 > **Document Status:** Production  
-> **Last Updated:** 2026-01-08  
+> **Last Updated:** 2026-01-25  
 > **Architecture:** 3-Layer (Web / Logic / Core)
 
 ---
@@ -34,19 +34,25 @@ This is the **single source of truth** for all API endpoints. The Frontend team 
 | **Order** | `/api/v2/orders` | POST | v2 | Create order | STABLE |
 | **Auth** | `/api/v1/auth/login` | POST | v1 | User login | STABLE |
 | **Auth** | `/api/v1/auth/register` | POST | v1 | User registration | STABLE |
+| **Auth** | `/api/v1/auth/me` | GET | v1 | **Get current user from token** | STABLE |
 | **Auth** | `/api/v2/auth/login` | POST | v2 | User login | STABLE |
 | **Auth** | `/api/v2/auth/register` | POST | v2 | User registration | STABLE |
 | **User** | `/api/v1/users/:id` | GET | v1 | Get user by ID | STABLE |
 | **User** | `/api/v1/users/profile` | GET | v1 | Get user profile | STABLE |
+| **User** | `/api/v1/users/profile` | PUT | v1 | **Update user profile** | STABLE |
 | **User** | `/api/v2/users/:id` | GET | v2 | Get user by ID | STABLE |
 | **User** | `/api/v2/users/profile` | GET | v2 | Get user profile | STABLE |
 | **Review** | `/api/v1/reviews?product_id={id}` | GET | v1 | Get reviews for product (**product_id required**) | STABLE |
 | **Review** | `/api/v1/reviews` | POST | v1 | Create review (**user_id required**, 409 if duplicate) | STABLE |
 | **Review** | `/api/v2/reviews/:reviewId` | GET | v2 | Get review by ID | STABLE |
 | **Review** | `/api/v2/reviews` | POST | v2 | Create review | STABLE |
+| **Notification** | `/api/v1/notifications` | GET | v1 | Get all notifications | STABLE |
+| **Notification** | `/api/v1/notifications/:id` | GET | v1 | Get notification by ID | STABLE |
+| **Notification** | `/api/v1/notifications/:id` | PATCH | v1 | Mark notification as read | STABLE |
 | **Notification** | `/api/v2/notifications` | GET | v2 | Get all notifications | STABLE |
 | **Notification** | `/api/v2/notifications/:id` | GET | v2 | Get notification by ID | STABLE |
-| **Shipping** | `/api/v1/shipping/track` | GET | v1 | Track shipment | STABLE |
+| **Shipping** | `/api/v1/shipping/track` | GET | v1 | Track shipment (query: `tracking_number`) | STABLE |
+| **Shipping** | `/api/v1/shipping/estimate` | GET | v1 | **Estimate shipment cost** | STABLE |
 | **Shipping-v2** | `/api/v2/shipments/estimate` | GET | v2 | Estimate shipment cost | STABLE |
 
 ### Internal Endpoints

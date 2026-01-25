@@ -90,6 +90,10 @@ func main() {
 	v1.SetCartService(cartService)
 	logger.Info("Web handlers configured")
 
+	// Initialize auth client for token introspection
+	authClient := middleware.NewAuthClient(cfg.AuthServiceURL)
+	logger.Info("Auth client initialized", zap.String("auth_service_url", cfg.AuthServiceURL))
+
 	r := gin.Default()
 
 	// Tracing middleware (must be first for context propagation)
@@ -109,14 +113,15 @@ func main() {
 	// Metrics endpoint
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	// API v1
+	// API v1 with auth middleware
 	apiV1 := r.Group("/api/v1")
+	apiV1.Use(middleware.AuthMiddleware(authClient, logger))
 	{
 		apiV1.GET("/cart", v1.GetCart)
 		apiV1.POST("/cart", v1.AddToCart)
-		apiV1.GET("/cart/count", v1.GetCartCount)              // New endpoint (Task 1.8)
-		apiV1.PATCH("/cart/items/:itemId", v1.UpdateCartItem)  // New endpoint (Task 1.7)
-		apiV1.DELETE("/cart/items/:itemId", v1.RemoveCartItem) // New endpoint (Task 1.6)
+		apiV1.GET("/cart/count", v1.GetCartCount)
+		apiV1.PATCH("/cart/items/:itemId", v1.UpdateCartItem)
+		apiV1.DELETE("/cart/items/:itemId", v1.RemoveCartItem)
 	}
 
 	// API v2

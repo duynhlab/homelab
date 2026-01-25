@@ -1,61 +1,67 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getNotifications, markAsRead } from '../../api/notificationApi';
+import { useAuth } from '../../hooks/useAuth';
+import { useApiQuery } from '../../hooks/useApiQuery';
+import { useApiMutation } from '../../hooks/useApiMutation';
+import PageHeader from '../../components/common/PageHeader';
+import LoadingState from '../../components/common/LoadingState';
+import ApiError from '../../components/common/ApiError';
 import EmptyState from '../../components/common/EmptyState';
+import ApiDebug from '../../components/common/ApiDebug';
+import './NotificationPage.css';
 
 /**
  * NotificationPage
- * API: GET /api/v2/notifications
- * API: PATCH /api/v2/notifications/:id
+ * API: GET /api/v1/notifications
+ * API: PATCH /api/v1/notifications/:id
  * 
  * Displays user notifications with read/unread status
+ * Uses shared hooks for consistent data fetching and auth
  */
 export default function NotificationPage() {
-    const [notifications, setNotifications] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [actionLoading, setActionLoading] = useState(null);
+    const navigate = useNavigate();
+    const { isAuthenticated, requireAuth } = useAuth();
 
-    const fetchNotifications = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const result = await getNotifications();
-            setNotifications(result);
-            console.log('[API] GET /api/v2/notifications:', result);
-        } catch (err) {
-            setError(err.message);
-            console.error('[API ERROR]', err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
+    // Auth guard
     useEffect(() => {
-        fetchNotifications();
-    }, []);
+        requireAuth(navigate, '/notifications');
+    }, [requireAuth, navigate]);
+
+    // Fetch notifications using shared hook
+    const { data: notifications, loading, error, mutate } = useApiQuery(
+        isAuthenticated ? 'notifications' : null,
+        getNotifications
+    );
+
+    // Mark as read mutation with optimistic update
+    const { mutate: markRead, loading: markingRead } = useApiMutation(markAsRead, {
+        successMessage: 'Marked as read',
+        errorMessage: 'Failed to mark as read',
+    });
 
     const handleMarkAsRead = async (id) => {
-        setActionLoading(id);
-        try {
-            await markAsRead(id);
-            console.log('[API] PATCH /api/v2/notifications/' + id);
-            // Update local state
-            setNotifications(prev =>
-                prev.map(n => n.id === id ? { ...n, read: true } : n)
-            );
-        } catch (err) {
-            console.error('[API ERROR]', err);
-        } finally {
-            setActionLoading(null);
+        // Optimistic update
+        mutate(
+            notifications?.map(n => n.id === id ? { ...n, read: true } : n),
+            false // Don't revalidate yet
+        );
+        
+        const result = await markRead(id);
+        if (result) {
+            // Revalidate on success
+            mutate();
+        } else {
+            // Revert on failure
+            mutate();
         }
     };
 
-    const unreadCount = notifications.filter(n => !n.read).length;
-
-    // Group notifications by read status
-    const unreadNotifications = notifications.filter(n => !n.read);
-    const readNotifications = notifications.filter(n => n.read);
+    // Computed values
+    const notificationsList = useMemo(() => notifications || [], [notifications]);
+    const unreadCount = useMemo(() => notificationsList.filter(n => !n.read).length, [notificationsList]);
+    const unreadNotifications = useMemo(() => notificationsList.filter(n => !n.read), [notificationsList]);
+    const readNotifications = useMemo(() => notificationsList.filter(n => n.read), [notificationsList]);
 
     // Get notification icon based on type
     const getNotificationIcon = (type) => {
@@ -66,34 +72,63 @@ export default function NotificationPage() {
             order_processing: '⚙️',
             review_reminder: '⭐',
             promotion: '🎉',
-            cart_reminder: '🛍️'
+            cart_reminder: '🛍️',
+            email: '📧',
+            sms: '📱',
         };
         return icons[type] || '🔔';
     };
 
-    if (loading) return <div className="loading">Loading notifications...</div>;
-    if (error) return <div className="error">Error: {error}</div>;
+    // Format date
+    const formatDate = (dateString) => {
+        if (!dateString) return '';
+        try {
+            return new Date(dateString).toLocaleString();
+        } catch {
+            return '';
+        }
+    };
+
+    // Auth gate
+    if (!isAuthenticated) {
+        return (
+            <div className="page container">
+                <PageHeader title="Notifications" backLink="/" backText="← Back to Home" />
+                <EmptyState message="Please log in to view notifications" icon="🔒" />
+            </div>
+        );
+    }
 
     return (
         <div className="page container">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                <h2>Notifications</h2>
-                <Link to="/" className="back-link">← Back to Home</Link>
-            </div>
+            <PageHeader 
+                title="Notifications" 
+                backLink="/" 
+                backText="← Back to Home"
+                apiLabel={`API: GET /api/v1/notifications • ${notificationsList.length} items`}
+            />
 
-            <p className="api-label">API: GET /api/v2/notifications</p>
+            {/* Loading State */}
+            {loading && <LoadingState message="Loading notifications..." variant="list" count={3} />}
 
-            {notifications.length === 0 ? (
+            {/* Error State */}
+            {!loading && error && (
+                <ApiError error={error} endpoint="GET /api/v1/notifications" />
+            )}
+
+            {/* Empty State */}
+            {!loading && !error && notificationsList.length === 0 && (
                 <EmptyState message="No notifications" icon="🔔" />
-            ) : (
+            )}
+
+            {/* Notifications Content */}
+            {!loading && !error && notificationsList.length > 0 && (
                 <>
                     {/* Summary */}
-                    <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#f5f5f5', borderRadius: '8px' }}>
-                        <p style={{ margin: 0, color: '#666' }}>
+                    <div className="notification-summary">
+                        <p>
                             {unreadCount > 0 ? (
-                                <>
-                                    <strong>{unreadCount}</strong> unread notification{unreadCount !== 1 ? 's' : ''}
-                                </>
+                                <><strong>{unreadCount}</strong> unread notification{unreadCount !== 1 ? 's' : ''}</>
                             ) : (
                                 'All caught up! 🎉'
                             )}
@@ -102,47 +137,36 @@ export default function NotificationPage() {
 
                     {/* Unread Notifications */}
                     {unreadNotifications.length > 0 && (
-                        <div style={{ marginBottom: '2rem' }}>
-                            <h3 style={{ marginBottom: '1rem', color: '#333' }}>Unread</h3>
+                        <div className="notification-section unread">
+                            <h3>Unread</h3>
                             {unreadNotifications.map(notification => (
-                                <div
-                                    key={notification.id}
-                                    style={{
-                                        padding: '1.5rem',
-                                        marginBottom: '1rem',
-                                        border: '2px solid #4CAF50',
-                                        borderRadius: '8px',
-                                        background: '#f0fff4'
-                                    }}
-                                >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                                                <span style={{ fontSize: '1.5rem' }}>
+                                <div key={notification.id} className="notification-item unread">
+                                    <div className="notification-content">
+                                        <div className="notification-body">
+                                            <div className="notification-header">
+                                                <span className="notification-icon">
                                                     {getNotificationIcon(notification.type)}
                                                 </span>
-                                                <h4 style={{ margin: 0 }}>{notification.title}</h4>
+                                                <h4 className="notification-title">
+                                                    {notification.title || notification.message}
+                                                </h4>
                                             </div>
-                                            <p style={{ color: '#555', margin: '0.5rem 0' }}>{notification.message}</p>
-                                            <p style={{ color: '#888', fontSize: '0.85rem', margin: 0 }}>
-                                                {new Date(notification.created_at).toLocaleString()}
+                                            {notification.title && notification.message !== notification.title && (
+                                                <p className="notification-message">{notification.message}</p>
+                                            )}
+                                            <p className="notification-time">
+                                                {formatDate(notification.created_at)}
                                             </p>
                                         </div>
-                                        <button
-                                            onClick={() => handleMarkAsRead(notification.id)}
-                                            disabled={actionLoading === notification.id}
-                                            style={{
-                                                padding: '0.5rem 1rem',
-                                                background: '#4CAF50',
-                                                color: 'white',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                cursor: 'pointer',
-                                                fontSize: '0.85rem'
-                                            }}
-                                        >
-                                            {actionLoading === notification.id ? 'Marking...' : 'Mark as Read'}
-                                        </button>
+                                        <div className="notification-actions">
+                                            <button
+                                                className="primary"
+                                                onClick={() => handleMarkAsRead(notification.id)}
+                                                disabled={markingRead}
+                                            >
+                                                {markingRead ? 'Marking...' : 'Mark as Read'}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -151,30 +175,26 @@ export default function NotificationPage() {
 
                     {/* Read Notifications */}
                     {readNotifications.length > 0 && (
-                        <div>
-                            <h3 style={{ marginBottom: '1rem', color: '#888' }}>Read</h3>
+                        <div className="notification-section read">
+                            <h3>Read</h3>
                             {readNotifications.map(notification => (
-                                <div
-                                    key={notification.id}
-                                    style={{
-                                        padding: '1.5rem',
-                                        marginBottom: '1rem',
-                                        border: '1px solid #ddd',
-                                        borderRadius: '8px',
-                                        background: '#fafafa',
-                                        opacity: 0.7
-                                    }}
-                                >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                                        <span style={{ fontSize: '1.5rem' }}>
-                                            {getNotificationIcon(notification.type)}
-                                        </span>
-                                        <h4 style={{ margin: 0, color: '#888' }}>{notification.title}</h4>
+                                <div key={notification.id} className="notification-item read">
+                                    <div className="notification-body">
+                                        <div className="notification-header">
+                                            <span className="notification-icon">
+                                                {getNotificationIcon(notification.type)}
+                                            </span>
+                                            <h4 className="notification-title">
+                                                {notification.title || notification.message}
+                                            </h4>
+                                        </div>
+                                        {notification.title && notification.message !== notification.title && (
+                                            <p className="notification-message">{notification.message}</p>
+                                        )}
+                                        <p className="notification-time">
+                                            {formatDate(notification.created_at)}
+                                        </p>
                                     </div>
-                                    <p style={{ color: '#777', margin: '0.5rem 0' }}>{notification.message}</p>
-                                    <p style={{ color: '#999', fontSize: '0.85rem', margin: 0 }}>
-                                        {new Date(notification.created_at).toLocaleString()}
-                                    </p>
                                 </div>
                             ))}
                         </div>
@@ -183,12 +203,7 @@ export default function NotificationPage() {
             )}
 
             {/* API Debug */}
-            <details style={{ marginTop: '2rem' }}>
-                <summary>API Response Debug</summary>
-                <pre style={{ background: '#000', padding: '1rem', overflow: 'auto', fontSize: '0.75rem' }}>
-                    {JSON.stringify(notifications, null, 2)}
-                </pre>
-            </details>
+            <ApiDebug data={notifications} />
         </div>
     );
 }

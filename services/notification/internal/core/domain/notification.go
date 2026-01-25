@@ -1,11 +1,13 @@
 package domain
 
 type Notification struct {
-	ID      string `json:"id"`
-	Type    string `json:"type"`
-	Message string `json:"message"`
-	Status  string `json:"status"`
-	Read    bool   `json:"read"`
+	ID        string `json:"id"`
+	Type      string `json:"type"`
+	Title     string `json:"title,omitempty"`
+	Message   string `json:"message"`
+	Status    string `json:"status"`
+	Read      bool   `json:"read"`
+	CreatedAt string `json:"created_at,omitempty"`
 }
 
 type SendEmailRequest struct {

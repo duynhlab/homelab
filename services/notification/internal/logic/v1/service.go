@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	database "github.com/duynhne/monitoring/services/notification/internal/core"
@@ -125,7 +126,7 @@ func (s *NotificationService) ListNotifications(ctx context.Context, userID stri
 		}
 	}
 
-	query := `SELECT id, user_id, title, message, type, read FROM notifications WHERE user_id = $1 ORDER BY created_at DESC`
+	query := `SELECT id, user_id, title, message, type, read, created_at FROM notifications WHERE user_id = $1 ORDER BY created_at DESC`
 	rows, err := db.Query(ctx, query, uid)
 	if err != nil {
 		span.RecordError(err)
@@ -138,21 +139,25 @@ func (s *NotificationService) ListNotifications(ctx context.Context, userID stri
 		var notificationID, dbUserID int
 		var title, message, notifType *string
 		var read bool
+		var createdAt time.Time
 
-		err := rows.Scan(&notificationID, &dbUserID, &title, &message, &notifType, &read)
+		err := rows.Scan(&notificationID, &dbUserID, &title, &message, &notifType, &read, &createdAt)
 		if err != nil {
 			span.RecordError(err)
 			continue
 		}
 
 		notif := domain.Notification{
-			ID:     strconv.Itoa(notificationID),
-			Status: "sent",
-			Read:   read,
+			ID:        strconv.Itoa(notificationID),
+			Status:    "sent",
+			Read:      read,
+			CreatedAt: createdAt.Format(time.RFC3339),
 		}
 		if title != nil {
-			notif.Message = *title
-		} else if message != nil {
+			notif.Title = *title
+			notif.Message = *title // For backward compat, use title as message if no separate message
+		}
+		if message != nil && *message != "" {
 			notif.Message = *message
 		}
 		if notifType != nil {
@@ -191,12 +196,13 @@ func (s *NotificationService) GetNotification(ctx context.Context, id string) (*
 		return nil, fmt.Errorf("invalid notification id %q: %w", id, ErrNotificationNotFound)
 	}
 
-	query := `SELECT id, user_id, title, message, type, read FROM notifications WHERE id = $1`
+	query := `SELECT id, user_id, title, message, type, read, created_at FROM notifications WHERE id = $1`
 	var userID int
 	var title, message, notifType *string
 	var read bool
+	var createdAt time.Time
 
-	err = db.QueryRow(ctx, query, notificationID).Scan(&notificationID, &userID, &title, &message, &notifType, &read)
+	err = db.QueryRow(ctx, query, notificationID).Scan(&notificationID, &userID, &title, &message, &notifType, &read, &createdAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			span.SetAttributes(attribute.Bool("notification.found", false))
@@ -207,13 +213,16 @@ func (s *NotificationService) GetNotification(ctx context.Context, id string) (*
 	}
 
 	notification := &domain.Notification{
-		ID:     strconv.Itoa(notificationID),
-		Status: "sent",
-		Read:   read,
+		ID:        strconv.Itoa(notificationID),
+		Status:    "sent",
+		Read:      read,
+		CreatedAt: createdAt.Format(time.RFC3339),
 	}
 	if title != nil {
+		notification.Title = *title
 		notification.Message = *title
-	} else if message != nil {
+	}
+	if message != nil && *message != "" {
 		notification.Message = *message
 	}
 	if notifType != nil {

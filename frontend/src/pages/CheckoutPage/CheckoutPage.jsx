@@ -6,6 +6,7 @@ import { createOrder } from '../../api/orderApi';
 /**
  * Checkout Page - Create order
  * POST /api/v1/orders
+ * Note: user_id is extracted from auth token by backend middleware
  */
 export default function CheckoutPage() {
     const navigate = useNavigate();
@@ -16,6 +17,13 @@ export default function CheckoutPage() {
     const [orderResult, setOrderResult] = useState(null);
 
     useEffect(() => {
+        // Verify user is authenticated
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+            navigate('/login?returnTo=/checkout');
+            return;
+        }
+
         async function fetchCart() {
             try {
                 const result = await getCart();
@@ -30,7 +38,7 @@ export default function CheckoutPage() {
             }
         }
         fetchCart();
-    }, []);
+    }, [navigate]);
 
     const handleSubmitOrder = async (e) => {
         e.preventDefault();
@@ -38,8 +46,9 @@ export default function CheckoutPage() {
         setError(null);
 
         try {
+            // user_id is resolved by backend auth middleware from token
+            // We no longer send it from frontend
             const orderData = {
-                user_id: '1',
                 items: cart.items.map(item => ({
                     product_id: item.product_id,
                     quantity: item.quantity,

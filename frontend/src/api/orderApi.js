@@ -22,6 +22,15 @@ export async function getOrder(id) {
 }
 
 /**
+ * GET /api/v1/orders/:id/details - Get order with shipment info (aggregation)
+ * Returns: { order, shipment? }
+ */
+export async function getOrderDetails(id) {
+    const response = await apiClient.get(`/orders/${id}/details`);
+    return response.data;
+}
+
+/**
  * POST /api/v1/orders - Create new order
  */
 export async function createOrder(orderData) {

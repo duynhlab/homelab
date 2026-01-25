@@ -129,3 +129,65 @@ func Register(c *gin.Context) {
 	zapLogger.Info("Registration successful", zap.String("user_id", response.User.ID))
 	c.JSON(http.StatusCreated, response)
 }
+
+// GetMe handles HTTP request to get current user from session token
+// GET /api/v1/auth/me
+// Authorization: Bearer <token>
+func GetMe(c *gin.Context) {
+	ctx, span := middleware.StartSpan(c.Request.Context(), "http.request", trace.WithAttributes(
+		attribute.String("layer", "web"),
+		attribute.String("method", c.Request.Method),
+		attribute.String("path", c.Request.URL.Path),
+	))
+	defer span.End()
+
+	loggerVal, exists := c.Get("logger")
+	var zapLogger *zap.Logger
+	if exists {
+		if l, ok := loggerVal.(*zap.Logger); ok {
+			zapLogger = l
+		}
+	}
+	if zapLogger == nil {
+		zapLogger, _ = middleware.NewLogger()
+	}
+
+	// Extract token from Authorization header
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		span.SetAttributes(attribute.Bool("auth.present", false))
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+		return
+	}
+
+	// Expect "Bearer <token>"
+	const bearerPrefix = "Bearer "
+	if len(authHeader) <= len(bearerPrefix) || authHeader[:len(bearerPrefix)] != bearerPrefix {
+		span.SetAttributes(attribute.Bool("auth.valid_format", false))
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization format"})
+		return
+	}
+	token := authHeader[len(bearerPrefix):]
+
+	span.SetAttributes(attribute.Bool("auth.present", true))
+
+	// Lookup user by token
+	user, err := authService.GetUserByToken(ctx, token)
+	if err != nil {
+		span.RecordError(err)
+		zapLogger.Warn("Token lookup failed", zap.Error(err))
+
+		switch {
+		case errors.Is(err, logicv1.ErrSessionNotFound):
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+		case errors.Is(err, logicv1.ErrSessionExpired):
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Session expired"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
+		return
+	}
+
+	zapLogger.Info("Token validated", zap.String("user_id", user.ID))
+	c.JSON(http.StatusOK, user)
+}

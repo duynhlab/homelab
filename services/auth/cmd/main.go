@@ -103,6 +103,7 @@ func main() {
 	{
 		apiV1.POST("/auth/login", v1.Login)
 		apiV1.POST("/auth/register", v1.Register)
+		apiV1.GET("/auth/me", v1.GetMe)
 	}
 
 	// API v2

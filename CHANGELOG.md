@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.38.0] - 2026-01-25
+
+### Added
+
+#### Backend API Enhancements
+
+- **Auth Service**: Added `GET /api/v1/auth/me` endpoint for session token introspection
+- **Notification Service**: Added v1 endpoints: `GET /api/v1/notifications`, `GET /api/v1/notifications/:id`, `PATCH /api/v1/notifications/:id` (mark as read)
+- **Shipping Service**: Added `GET /api/v1/shipping/estimate` for shipping cost estimation with query params (origin, destination, weight)
+- **User Service**: Added `PUT /api/v1/users/profile` endpoint for profile updates
+- **Auth Middleware**: Added lightweight auth client middleware to cart and order services for token validation via auth service
+
+#### Frontend Improvements
+
+- Added Profile page (`/profile`) with view/edit functionality
+- Wired Notification page (`/notifications`) into app routing and navigation
+- Updated navigation to include Profile and Notifications links for authenticated users
+
+### Changed
+
+#### API Fixes
+
+- **Shipping v1**: Track endpoint now accepts both `tracking_number` (preferred) and `trackingId` (legacy) query parameters
+- **Shipping API**: Frontend now uses v1 estimate endpoint instead of v2
+
+#### Frontend Cleanup
+
+- Removed client-side review fetching fallback in ProductDetailPage (now fully relies on aggregation endpoint)
+- Removed hardcoded `user_id` from CheckoutPage (backend middleware now handles user identification)
+
+### Documentation
+
+- Updated `docs/api/API.md` with new endpoints: auth/me, notifications v1, shipping estimate v1, users/profile PUT
+
+---
+
 ## [0.37.2] - 2026-01-24
 
 ### Changed

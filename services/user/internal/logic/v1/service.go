@@ -181,3 +181,61 @@ func (s *UserService) CreateUser(ctx context.Context, req domain.CreateUserReque
 
 	return user, nil
 }
+
+// UpdateProfile updates the current user's profile
+func (s *UserService) UpdateProfile(ctx context.Context, userID string, req domain.UpdateProfileRequest) (*domain.User, error) {
+	ctx, span := middleware.StartSpan(ctx, "user.update_profile", trace.WithAttributes(
+		attribute.String("layer", "logic"),
+		attribute.String("user_id", userID),
+	))
+	defer span.End()
+
+	db := database.GetDB()
+	if db == nil {
+		return nil, fmt.Errorf("database connection not available")
+	}
+
+	// Parse user ID
+	uid := 1
+	if userID != "" {
+		if parsed, err := strconv.Atoi(userID); err == nil {
+			uid = parsed
+		}
+	}
+
+	// Parse name into first_name and last_name
+	nameParts := strings.Fields(req.Name)
+	var firstName, lastName string
+	if len(nameParts) > 0 {
+		firstName = nameParts[0]
+	}
+	if len(nameParts) > 1 {
+		lastName = strings.Join(nameParts[1:], " ")
+	}
+
+	// Update profile
+	updateQuery := `UPDATE user_profiles SET first_name = $1, last_name = $2, phone = $3 WHERE user_id = $4`
+	result, err := db.Exec(ctx, updateQuery, firstName, lastName, req.Phone, uid)
+	if err != nil {
+		span.RecordError(err)
+		return nil, fmt.Errorf("update profile: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		// Profile doesn't exist, create one
+		insertQuery := `INSERT INTO user_profiles (user_id, first_name, last_name, phone) VALUES ($1, $2, $3, $4)`
+		_, err = db.Exec(ctx, insertQuery, uid, firstName, lastName, req.Phone)
+		if err != nil {
+			span.RecordError(err)
+			return nil, fmt.Errorf("create profile: %w", err)
+		}
+	}
+
+	user := &domain.User{
+		ID:   strconv.Itoa(uid),
+		Name: req.Name,
+	}
+
+	span.SetAttributes(attribute.Bool("profile.updated", true))
+	return user, nil
+}

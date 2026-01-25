@@ -181,3 +181,57 @@ func (s *AuthService) Register(ctx context.Context, req domain.RegisterRequest) 
 
 	return response, nil
 }
+
+// GetUserByToken retrieves user info from a session token (for /auth/me endpoint)
+func (s *AuthService) GetUserByToken(ctx context.Context, token string) (*domain.User, error) {
+	ctx, span := middleware.StartSpan(ctx, "auth.get_user_by_token", trace.WithAttributes(
+		attribute.String("layer", "logic"),
+	))
+	defer span.End()
+
+	pool := database.GetPool()
+	if pool == nil {
+		return nil, fmt.Errorf("database connection not available")
+	}
+
+	// Query session and join with user
+	query := `
+		SELECT u.id, u.username, u.email, s.expires_at
+		FROM sessions s
+		JOIN users u ON s.user_id = u.id
+		WHERE s.token = $1
+	`
+
+	var userID int
+	var username, email string
+	var expiresAt time.Time
+
+	err := pool.QueryRow(ctx, query, token).Scan(&userID, &username, &email, &expiresAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			span.SetAttributes(attribute.Bool("session.valid", false))
+			return nil, fmt.Errorf("lookup session: %w", ErrSessionNotFound)
+		}
+		span.RecordError(err)
+		return nil, fmt.Errorf("query session: %w", err)
+	}
+
+	// Check if session has expired
+	if time.Now().After(expiresAt) {
+		span.SetAttributes(attribute.Bool("session.valid", false))
+		return nil, fmt.Errorf("session expired at %v: %w", expiresAt, ErrSessionExpired)
+	}
+
+	user := &domain.User{
+		ID:       strconv.Itoa(userID),
+		Username: username,
+		Email:    email,
+	}
+
+	span.SetAttributes(
+		attribute.String("user.id", user.ID),
+		attribute.Bool("session.valid", true),
+	)
+
+	return user, nil
+}

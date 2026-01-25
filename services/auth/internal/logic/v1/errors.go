@@ -55,4 +55,12 @@ var (
 	// ErrUserExists indicates the username or email already exists in the system.
 	// HTTP Status: 409 Conflict
 	ErrUserExists = errors.New("user already exists")
+
+	// ErrSessionNotFound indicates the session token does not exist.
+	// HTTP Status: 401 Unauthorized
+	ErrSessionNotFound = errors.New("session not found")
+
+	// ErrSessionExpired indicates the session token has expired.
+	// HTTP Status: 401 Unauthorized
+	ErrSessionExpired = errors.New("session expired")
 )

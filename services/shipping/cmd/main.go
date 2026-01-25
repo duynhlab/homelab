@@ -98,6 +98,7 @@ func main() {
 	apiV1 := r.Group("/api/v1")
 	{
 		apiV1.GET("/shipping/track", v1.TrackShipment)
+		apiV1.GET("/shipping/estimate", v1.EstimateShipping)
 	}
 
 	// Create HTTP server

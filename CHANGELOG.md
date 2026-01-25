@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.39.0] - 2026-01-25
+
+### Added
+
+#### Frontend Shared Components & Hooks
+
+- **useAuth Hook** (`frontend/src/hooks/useAuth.js`): Centralized authentication state with `isAuthenticated`, `requireAuth`, `logout`, and `refreshAuth` helpers
+- **useApiQuery Hook** (`frontend/src/hooks/useApiQuery.js`): SWR wrapper for consistent data fetching with deduplication and error handling
+- **useApiMutation Hook** (`frontend/src/hooks/useApiMutation.js`): Standard mutation wrapper with loading state and toast integration
+- **PageHeader Component** (`frontend/src/components/common/PageHeader.jsx`): Reusable page header with title, back link, and actions
+- **LoadingState Component** (`frontend/src/components/common/LoadingState.jsx`): Standard loading UI with variant support (default, card, list)
+- **ApiDebug Component** (`frontend/src/components/common/ApiDebug.jsx`): Development-only API response display
+
+#### Backend Aggregation Endpoints (3-Layer Compliance)
+
+- **Order Service**: Added `GET /api/v1/orders/:id/details` aggregation endpoint that returns order with shipment data
+- **Shipping Service**: Added `GET /api/v1/shipping/orders/:orderId` to get shipment by order ID (used by order aggregation)
+
+#### Notification Service Enhancements
+
+- Added `title` and `created_at` fields to notification v1 response shape for frontend consistency
+
+### Changed
+
+#### Frontend Page Refactoring (3-Layer Compliance)
+
+- **NotificationPage**: Refactored to use shared hooks (`useAuth`, `useApiQuery`, `useApiMutation`), added dedicated CSS, uses toast notifications
+- **ProfilePage**: Fixed toast API usage (now uses `notify` instead of non-existent `showToast`), uses shared hooks and consistent styling
+- **OrdersPage**: Removed client-side shipping API calls; now uses `GET /api/v1/orders/:id/details` aggregation endpoint for strict 3-layer compliance
+
+#### Styling Consistency
+
+- Added CSS for PageHeader component in `index.css`
+- Created `NotificationPage.css` and updated `ProfilePage.css` to use CSS variables from `index.css`
+
+### Documentation
+
+- Updated `docs/api/API.md` with:
+  - `GET /api/v1/orders/:id/details` aggregation endpoint documentation
+  - `GET /api/v1/shipping/orders/:orderId` endpoint documentation
+  - Notification v1 response shape with `title`, `message`, `read`, `created_at` fields
+
+---
+
 ## [0.38.0] - 2026-01-25
 
 ### Added

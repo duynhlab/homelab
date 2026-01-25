@@ -87,6 +87,10 @@ func main() {
 	orderService := logicv1.NewOrderService(orderRepo, txManager)
 	logger.Info("Order service initialized")
 
+	// Initialize auth client for token introspection
+	authClient := middleware.NewAuthClient(cfg.AuthServiceURL)
+	logger.Info("Auth client initialized", zap.String("auth_service_url", cfg.AuthServiceURL))
+
 	r := gin.Default()
 
 	// Tracing middleware (must be first for context propagation)
@@ -109,8 +113,9 @@ func main() {
 	// Inject service into v1 handler
 	v1.SetOrderService(orderService)
 
-	// API v1
+	// API v1 with auth middleware
 	apiV1 := r.Group("/api/v1")
+	apiV1.Use(middleware.AuthMiddleware(authClient, logger))
 	{
 		apiV1.GET("/orders", v1.ListOrders)
 		apiV1.GET("/orders/:id", v1.GetOrder)

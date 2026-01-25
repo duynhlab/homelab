@@ -89,3 +89,52 @@ func (s *ShippingService) TrackShipment(ctx context.Context, trackingNumber stri
 
 	return shipment, nil
 }
+
+// EstimateShipping calculates estimated shipping cost and delivery time
+func (s *ShippingService) EstimateShipping(ctx context.Context, origin, destination string, weight float64) (*domain.EstimateResponse, error) {
+	ctx, span := middleware.StartSpan(ctx, "shipping.estimate", trace.WithAttributes(
+		attribute.String("layer", "logic"),
+		attribute.String("api.version", "v1"),
+		attribute.String("origin", origin),
+		attribute.String("destination", destination),
+		attribute.Float64("weight", weight),
+	))
+	defer span.End()
+
+	// Simple deterministic calculation for demo purposes
+	// In production, this would call external carrier APIs
+	baseCost := 5.0
+	weightCost := weight * 1.5
+	distanceCost := 0.0
+	estimatedDays := 3
+
+	// Simple distance estimation based on string comparison
+	if origin != destination {
+		distanceCost = 10.0
+		estimatedDays = 5
+	}
+
+	// Heavier packages take longer
+	if weight > 10 {
+		estimatedDays += 2
+	}
+
+	totalCost := baseCost + weightCost + distanceCost
+
+	response := &domain.EstimateResponse{
+		Origin:        origin,
+		Destination:   destination,
+		Weight:        weight,
+		EstimatedCost: totalCost,
+		EstimatedDays: estimatedDays,
+		Currency:      "USD",
+		Carrier:       "Standard Shipping",
+	}
+
+	span.SetAttributes(
+		attribute.Float64("estimate.cost", totalCost),
+		attribute.Int("estimate.days", estimatedDays),
+	)
+
+	return response, nil
+}

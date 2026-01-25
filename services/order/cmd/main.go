@@ -91,6 +91,11 @@ func main() {
 	authClient := middleware.NewAuthClient(cfg.AuthServiceURL)
 	logger.Info("Auth client initialized", zap.String("auth_service_url", cfg.AuthServiceURL))
 
+	// Initialize shipping client for order aggregation
+	shippingClient := v1.NewShippingClient(cfg.ShippingServiceURL)
+	v1.SetShippingClient(shippingClient)
+	logger.Info("Shipping client initialized", zap.String("shipping_service_url", cfg.ShippingServiceURL))
+
 	r := gin.Default()
 
 	// Tracing middleware (must be first for context propagation)
@@ -119,6 +124,7 @@ func main() {
 	{
 		apiV1.GET("/orders", v1.ListOrders)
 		apiV1.GET("/orders/:id", v1.GetOrder)
+		apiV1.GET("/orders/:id/details", v1.GetOrderDetails) // Aggregation endpoint with shipment
 		apiV1.POST("/orders", v1.CreateOrder)
 	}
 

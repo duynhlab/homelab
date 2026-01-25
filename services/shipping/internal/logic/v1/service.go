@@ -138,3 +138,69 @@ func (s *ShippingService) EstimateShipping(ctx context.Context, origin, destinat
 
 	return response, nil
 }
+
+// GetShipmentByOrderID retrieves a shipment by its order ID
+func (s *ShippingService) GetShipmentByOrderID(ctx context.Context, orderID string) (*domain.Shipment, error) {
+	ctx, span := middleware.StartSpan(ctx, "shipping.get_by_order", trace.WithAttributes(
+		attribute.String("layer", "logic"),
+		attribute.String("api.version", "v1"),
+		attribute.String("order_id", orderID),
+	))
+	defer span.End()
+
+	db := database.GetDB()
+	if db == nil {
+		span.RecordError(fmt.Errorf("database connection not available"))
+		return nil, fmt.Errorf("database connection not available")
+	}
+
+	query := `
+		SELECT id, order_id, tracking_number, carrier, status, estimated_delivery, created_at, updated_at
+		FROM shipments
+		WHERE order_id = $1
+		LIMIT 1
+	`
+
+	var id, dbOrderID int
+	var trackingNum, carrier, status string
+	var estimatedDelivery *time.Time
+	var createdAt, updatedAt time.Time
+
+	err := db.QueryRow(ctx, query, orderID).Scan(
+		&id, &dbOrderID, &trackingNum, &carrier, &status, &estimatedDelivery, &createdAt, &updatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			span.SetAttributes(attribute.Bool("shipment.found", false))
+			return nil, fmt.Errorf("get shipment for order %q: %w", orderID, ErrShipmentNotFound)
+		}
+		span.RecordError(err)
+		return nil, fmt.Errorf("query shipment: %w", err)
+	}
+
+	shipment := &domain.Shipment{
+		ID:             id,
+		OrderID:        dbOrderID,
+		TrackingNumber: trackingNum,
+		Status:         status,
+		CreatedAt:      createdAt.Format(time.RFC3339),
+		UpdatedAt:      updatedAt.Format(time.RFC3339),
+	}
+
+	if carrier != "" {
+		shipment.Carrier = carrier
+	}
+
+	if estimatedDelivery != nil {
+		deliveryStr := estimatedDelivery.Format(time.RFC3339)
+		shipment.EstimatedDelivery = &deliveryStr
+	}
+
+	span.SetAttributes(
+		attribute.Bool("shipment.found", true),
+		attribute.Int("shipment.id", id),
+		attribute.String("shipment.status", status),
+	)
+
+	return shipment, nil
+}

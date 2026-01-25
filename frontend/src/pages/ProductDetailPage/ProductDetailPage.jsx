@@ -8,7 +8,7 @@ import QuantitySelector from '../../components/domain/QuantitySelector';
 import { useToast } from '../../components/common/ToastProvider';
 import { getProductDetails } from '../../api/productApi';
 import { addToCart } from '../../api/cartApi';
-import { getReviews, createReview } from '../../api/reviewApi';
+import { createReview } from '../../api/reviewApi';
 
 // Helper functions moved outside component to avoid recreation on every render
 function formatReviewDate(review) {
@@ -39,10 +39,7 @@ export default function ProductDetailPage() {
     const [error, setError] = useState(null);
 
     // Reviews from aggregation endpoint (3-layer pattern compliance)
-    // If aggregation endpoint doesn't include reviews yet, we'll fetch separately as fallback
     const [reviews, setReviews] = useState([]);
-    const [reviewsLoading, setReviewsLoading] = useState(false);
-    const [needsReviewsFallback, setNeedsReviewsFallback] = useState(false);
 
     const [quantity, setQuantity] = useState(1);
     const [adding, setAdding] = useState(false);
@@ -67,6 +64,7 @@ export default function ProductDetailPage() {
     const [submittingReview, setSubmittingReview] = useState(false);
 
     // Fetch product details using aggregation endpoint (3-layer pattern)
+    // This endpoint aggregates product + stock + reviews - no client-side orchestration needed
     useEffect(() => {
         async function fetchData() {
             setLoading(true);
@@ -75,17 +73,8 @@ export default function ProductDetailPage() {
                 const result = await getProductDetails(id);
                 setData(result);
                 
-                // Use reviews from aggregation endpoint if available and non-empty
-                // If aggregation returns empty reviews, always try fallback to review service
-                // This handles cases where backend aggregation fails or hasn't been implemented yet
-                if (result.reviews && Array.isArray(result.reviews) && result.reviews.length > 0) {
-                    setReviews(result.reviews);
-                    setNeedsReviewsFallback(false);
-                } else {
-                    // Aggregation returned empty/missing reviews - use fallback to get real reviews
-                    setReviews([]);
-                    setNeedsReviewsFallback(true);
-                }
+                // Use reviews from aggregation endpoint (3-layer compliance)
+                setReviews(result.reviews && Array.isArray(result.reviews) ? result.reviews : []);
                 
                 if (import.meta.env.DEV) {
                     console.log('[API] GET /products/' + id + '/details:', result);
@@ -102,34 +91,6 @@ export default function ProductDetailPage() {
         fetchData();
     }, [id]);
 
-    // Fallback: Fetch reviews separately only if aggregation endpoint doesn't provide them
-    // This is temporary until backend fully integrates reviews into aggregation endpoint
-    const fetchReviews = async () => {
-        if (!needsReviewsFallback) return;
-        
-        setReviewsLoading(true);
-        try {
-            const result = await getReviews(id);
-            setReviews(Array.isArray(result) ? result : []);
-            if (import.meta.env.DEV) {
-                console.log('[API] GET /reviews?product_id=' + id + ':', result);
-            }
-        } catch (err) {
-            if (import.meta.env.DEV) {
-                console.error('[API ERROR] Reviews:', err);
-            }
-            setReviews([]);
-        } finally {
-            setReviewsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        if (needsReviewsFallback) {
-            fetchReviews();
-        }
-    }, [id, needsReviewsFallback]);
-
     // Compute hasReviewed: check if current user already has a review for this product
     const hasReviewed = useMemo(() => {
         return isAuthenticated && authUser?.id && reviews.some(
@@ -139,27 +100,19 @@ export default function ProductDetailPage() {
 
     // Auto-scroll to reviews section when #reviews hash is present
     useEffect(() => {
-        if (location.hash === '#reviews' && !loading && !reviewsLoading) {
+        if (location.hash === '#reviews' && !loading) {
             const reviewsSection = document.getElementById('reviews');
             if (reviewsSection) {
                 reviewsSection.scrollIntoView({ behavior: 'smooth' });
             }
         }
-    }, [location.hash, loading, reviewsLoading]);
+    }, [location.hash, loading]);
 
-    // Helper function to refresh reviews from either aggregation or direct API
+    // Refresh reviews by re-fetching aggregation endpoint (3-layer compliance)
     const refreshReviews = async () => {
         try {
-            // First try aggregation endpoint
-            const aggregationResult = await getProductDetails(id);
-            if (aggregationResult.reviews && Array.isArray(aggregationResult.reviews) && aggregationResult.reviews.length > 0) {
-                setReviews(aggregationResult.reviews);
-                setNeedsReviewsFallback(false);
-                return;
-            }
-            // If aggregation returns empty, fall back to direct review API
-            const directReviews = await getReviews(id);
-            setReviews(Array.isArray(directReviews) ? directReviews : []);
+            const result = await getProductDetails(id);
+            setReviews(result.reviews && Array.isArray(result.reviews) ? result.reviews : []);
         } catch (err) {
             if (import.meta.env.DEV) {
                 console.error('[API ERROR] Failed to refresh reviews:', err);
@@ -299,9 +252,7 @@ export default function ProductDetailPage() {
                     <div id="reviews" className="reviews-section">
                         <h2>Customer Reviews</h2>
 
-                        {reviewsLoading ? (
-                            <p className="text-muted">Loading reviews...</p>
-                        ) : reviews.length > 0 ? (
+                        {reviews.length > 0 ? (
                             <>
                                 <div className="reviews-summary">
                                     <span className="reviews-score">{averageRating}</span>

@@ -105,3 +105,36 @@ func EstimateShipping(c *gin.Context) {
 	)
 	c.JSON(http.StatusOK, estimate)
 }
+
+// GetShipmentByOrder handles GET /api/v1/shipping/orders/:orderId
+// Returns shipment info for a given order ID
+func GetShipmentByOrder(c *gin.Context) {
+	ctx, span := middleware.StartSpan(c.Request.Context(), "http.request", trace.WithAttributes(
+		attribute.String("layer", "web"),
+		attribute.String("method", c.Request.Method),
+		attribute.String("path", c.Request.URL.Path),
+	))
+	defer span.End()
+
+	zapLogger := middleware.GetLoggerFromGinContext(c)
+
+	orderID := c.Param("orderId")
+	span.SetAttributes(attribute.String("order.id", orderID))
+
+	shipment, err := shippingService.GetShipmentByOrderID(ctx, orderID)
+	if err != nil {
+		span.RecordError(err)
+		zapLogger.Error("Failed to get shipment by order", zap.Error(err), zap.String("order_id", orderID))
+
+		switch {
+		case errors.Is(err, logicv1.ErrShipmentNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "Shipment not found for this order"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
+		return
+	}
+
+	zapLogger.Info("Shipment retrieved by order", zap.String("order_id", orderID), zap.Int("shipment_id", shipment.ID))
+	c.JSON(http.StatusOK, shipment)
+}

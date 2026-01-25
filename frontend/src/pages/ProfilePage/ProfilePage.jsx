@@ -1,53 +1,59 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUserProfile, updateProfile } from '../../api/userApi';
-import { useToast } from '../../components/common/ToastProvider';
+import { useAuth } from '../../hooks/useAuth';
+import { useApiQuery } from '../../hooks/useApiQuery';
+import { useApiMutation } from '../../hooks/useApiMutation';
+import PageHeader from '../../components/common/PageHeader';
+import LoadingState from '../../components/common/LoadingState';
+import ApiError from '../../components/common/ApiError';
+import EmptyState from '../../components/common/EmptyState';
+import ApiDebug from '../../components/common/ApiDebug';
 import './ProfilePage.css';
 
 /**
  * ProfilePage Component
  * Allows users to view and edit their profile
- * Uses GET /api/v1/users/profile and PUT /api/v1/users/profile
+ * API: GET /api/v1/users/profile
+ * API: PUT /api/v1/users/profile
  */
-function ProfilePage() {
+export default function ProfilePage() {
     const navigate = useNavigate();
-    const { showToast } = useToast();
-    const [profile, setProfile] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
+    const { isAuthenticated, requireAuth } = useAuth();
+
+    // Auth guard
+    useEffect(() => {
+        requireAuth(navigate, '/profile');
+    }, [requireAuth, navigate]);
+
+    // Fetch profile using shared hook
+    const { data: profile, loading, error, mutate } = useApiQuery(
+        isAuthenticated ? 'user-profile' : null,
+        getUserProfile
+    );
+
+    // Update mutation
+    const { mutate: saveProfile, loading: saving } = useApiMutation(updateProfile, {
+        successMessage: 'Profile updated!',
+        errorMessage: 'Failed to update profile',
+    });
+
+    // Form state
     const [editMode, setEditMode] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         phone: ''
     });
 
+    // Sync form data when profile loads
     useEffect(() => {
-        // Check if user is authenticated
-        const token = localStorage.getItem('authToken');
-        if (!token) {
-            navigate('/login');
-            return;
-        }
-
-        fetchProfile();
-    }, [navigate]);
-
-    const fetchProfile = async () => {
-        try {
-            setLoading(true);
-            const data = await getUserProfile();
-            setProfile(data);
+        if (profile) {
             setFormData({
-                name: data.name || '',
-                phone: data.phone || ''
+                name: profile.name || '',
+                phone: profile.phone || ''
             });
-        } catch (error) {
-            console.error('Failed to fetch profile:', error);
-            showToast('Failed to load profile', 'error');
-        } finally {
-            setLoading(false);
         }
-    };
+    }, [profile]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -59,17 +65,10 @@ function ProfilePage() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        try {
-            setSaving(true);
-            const updated = await updateProfile(formData);
-            setProfile({ ...profile, ...updated });
+        const result = await saveProfile(formData);
+        if (result) {
             setEditMode(false);
-            showToast('Profile updated successfully!', 'success');
-        } catch (error) {
-            console.error('Failed to update profile:', error);
-            showToast('Failed to update profile', 'error');
-        } finally {
-            setSaving(false);
+            mutate(); // Refresh profile data
         }
     };
 
@@ -81,100 +80,115 @@ function ProfilePage() {
         setEditMode(false);
     };
 
-    if (loading) {
+    // Auth gate
+    if (!isAuthenticated) {
         return (
-            <div className="profile-page">
-                <h1>My Profile</h1>
-                <div className="profile-card">
-                    <p>Loading profile...</p>
-                </div>
+            <div className="page container">
+                <PageHeader title="My Profile" backLink="/" backText="← Back to Home" />
+                <EmptyState message="Please log in to view your profile" icon="🔒" />
             </div>
         );
     }
 
     return (
-        <div className="profile-page">
-            <h1>My Profile</h1>
+        <div className="page container">
+            <PageHeader 
+                title="My Profile" 
+                backLink="/" 
+                backText="← Back to Home"
+                apiLabel="API: GET /api/v1/users/profile"
+            />
 
-            <div className="profile-card">
-                {!editMode ? (
-                    <div className="profile-view">
-                        <div className="profile-field">
-                            <label>User ID</label>
-                            <span>{profile?.id || 'N/A'}</span>
-                        </div>
-                        <div className="profile-field">
-                            <label>Username</label>
-                            <span>{profile?.username || 'N/A'}</span>
-                        </div>
-                        <div className="profile-field">
-                            <label>Email</label>
-                            <span>{profile?.email || 'N/A'}</span>
-                        </div>
-                        <div className="profile-field">
-                            <label>Name</label>
-                            <span>{profile?.name || 'Not set'}</span>
-                        </div>
-                        <div className="profile-field">
-                            <label>Phone</label>
-                            <span>{profile?.phone || 'Not set'}</span>
-                        </div>
+            {/* Loading State */}
+            {loading && <LoadingState message="Loading profile..." />}
 
-                        <button 
-                            className="btn btn-primary"
-                            onClick={() => setEditMode(true)}
-                        >
-                            Edit Profile
-                        </button>
-                    </div>
-                ) : (
-                    <form onSubmit={handleSubmit} className="profile-form">
-                        <div className="form-group">
-                            <label htmlFor="name">Name</label>
-                            <input
-                                type="text"
-                                id="name"
-                                name="name"
-                                value={formData.name}
-                                onChange={handleInputChange}
-                                placeholder="Enter your full name"
-                            />
-                        </div>
+            {/* Error State */}
+            {!loading && error && (
+                <ApiError error={error} endpoint="GET /api/v1/users/profile" />
+            )}
 
-                        <div className="form-group">
-                            <label htmlFor="phone">Phone</label>
-                            <input
-                                type="tel"
-                                id="phone"
-                                name="phone"
-                                value={formData.phone}
-                                onChange={handleInputChange}
-                                placeholder="Enter your phone number"
-                            />
-                        </div>
+            {/* Profile Content */}
+            {!loading && !error && profile && (
+                <div className="card profile-card">
+                    {!editMode ? (
+                        <div className="profile-view">
+                            <div className="profile-field">
+                                <label>User ID</label>
+                                <span>{profile.id || 'N/A'}</span>
+                            </div>
+                            <div className="profile-field">
+                                <label>Username</label>
+                                <span>{profile.username || 'N/A'}</span>
+                            </div>
+                            <div className="profile-field">
+                                <label>Email</label>
+                                <span>{profile.email || 'N/A'}</span>
+                            </div>
+                            <div className="profile-field">
+                                <label>Name</label>
+                                <span>{profile.name || 'Not set'}</span>
+                            </div>
+                            <div className="profile-field">
+                                <label>Phone</label>
+                                <span>{profile.phone || 'Not set'}</span>
+                            </div>
 
-                        <div className="form-actions">
                             <button 
-                                type="button" 
-                                className="btn btn-secondary"
-                                onClick={handleCancel}
-                                disabled={saving}
+                                className="primary"
+                                onClick={() => setEditMode(true)}
                             >
-                                Cancel
-                            </button>
-                            <button 
-                                type="submit" 
-                                className="btn btn-primary"
-                                disabled={saving}
-                            >
-                                {saving ? 'Saving...' : 'Save Changes'}
+                                Edit Profile
                             </button>
                         </div>
-                    </form>
-                )}
-            </div>
+                    ) : (
+                        <form onSubmit={handleSubmit} className="profile-form">
+                            <div className="form-group">
+                                <label htmlFor="name">Name</label>
+                                <input
+                                    type="text"
+                                    id="name"
+                                    name="name"
+                                    value={formData.name}
+                                    onChange={handleInputChange}
+                                    placeholder="Enter your full name"
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label htmlFor="phone">Phone</label>
+                                <input
+                                    type="tel"
+                                    id="phone"
+                                    name="phone"
+                                    value={formData.phone}
+                                    onChange={handleInputChange}
+                                    placeholder="Enter your phone number"
+                                />
+                            </div>
+
+                            <div className="profile-actions">
+                                <button 
+                                    type="button" 
+                                    onClick={handleCancel}
+                                    disabled={saving}
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    className="primary"
+                                    disabled={saving}
+                                >
+                                    {saving ? 'Saving...' : 'Save Changes'}
+                                </button>
+                            </div>
+                        </form>
+                    )}
+                </div>
+            )}
+
+            {/* API Debug */}
+            <ApiDebug data={profile} />
         </div>
     );
 }
-
-export default ProfilePage;

@@ -99,6 +99,7 @@ func main() {
 	{
 		apiV1.GET("/shipping/track", v1.TrackShipment)
 		apiV1.GET("/shipping/estimate", v1.EstimateShipping)
+		apiV1.GET("/shipping/orders/:orderId", v1.GetShipmentByOrder)
 	}
 
 	// Create HTTP server

@@ -1,129 +1,88 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getOrders, getOrder } from '../../api/orderApi';
-import { trackShipment } from '../../api/shippingApi';
+import { getOrders, getOrderDetails } from '../../api/orderApi';
+import { useAuth } from '../../hooks/useAuth';
+import { useApiQuery } from '../../hooks/useApiQuery';
+import { useToast } from '../../components/common/ToastProvider';
+import PageHeader from '../../components/common/PageHeader';
+import LoadingState from '../../components/common/LoadingState';
+import EmptyState from '../../components/common/EmptyState';
+import ApiDebug from '../../components/common/ApiDebug';
 
 /**
  * Orders Page - List and view orders with shipping tracking
- * GET /api/v1/orders
- * GET /api/v1/orders/:id
- * GET /api/v1/shipping/track?tracking_number={number}
+ * API: GET /api/v1/orders - List all orders
+ * API: GET /api/v1/orders/:id/details - Get order with shipment (aggregation)
+ * 
+ * Uses aggregation endpoint for strict 3-layer compliance
  */
 export default function OrdersPage() {
     const navigate = useNavigate();
-    const [orders, setOrders] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [selectedOrder, setSelectedOrder] = useState(null);
-    const [orderLoading, setOrderLoading] = useState(false);
-    const [shipment, setShipment] = useState(null);
-    const [shipmentLoading, setShipmentLoading] = useState(false);
+    const { notify } = useToast();
+    const { isAuthenticated, requireAuth } = useAuth();
 
-    // Check authentication
-    const isAuthenticated = !!localStorage.getItem('authToken');
+    // Selected order state (for details panel)
+    const [selectedOrderId, setSelectedOrderId] = useState(null);
+    const [selectedOrderData, setSelectedOrderData] = useState(null);
+    const [orderDetailsLoading, setOrderDetailsLoading] = useState(false);
 
+    // Auth guard effect
     useEffect(() => {
-        // Only fetch orders if authenticated
-        if (!isAuthenticated) {
-            setLoading(false);
-            return;
-        }
+        // Don't redirect, just show login prompt
+    }, []);
 
-        async function fetchOrders() {
-            try {
-                const result = await getOrders();
-                setOrders(Array.isArray(result) ? result : []);
-                if (import.meta.env.DEV) {
-                    console.log('[API] GET /orders:', result);
-                }
-            } catch (err) {
-                setError(err.message);
-                if (import.meta.env.DEV) {
-                    console.error('[API ERROR]', err);
-                }
-            } finally {
-                setLoading(false);
-            }
-        }
-        fetchOrders();
-    }, [isAuthenticated]);
+    // Fetch orders list using shared hook
+    const { data: orders, loading, error } = useApiQuery(
+        isAuthenticated ? 'orders' : null,
+        getOrders
+    );
 
+    const ordersList = useMemo(() => orders || [], [orders]);
+
+    // Handle viewing order details (uses aggregation endpoint)
     const handleViewOrder = async (orderId) => {
-        setOrderLoading(true);
-        setShipment(null);
-        try {
-            const result = await getOrder(orderId);
-            setSelectedOrder(result);
-            if (import.meta.env.DEV) {
-                console.log('[API] GET /orders/' + orderId + ':', result);
-            }
+        setSelectedOrderId(orderId);
+        setOrderDetailsLoading(true);
+        setSelectedOrderData(null);
 
-            // Try to fetch shipment for specific order IDs
-            if ([1, 2, 4].includes(parseInt(orderId))) {
-                fetchShipmentForOrder(orderId);
+        try {
+            const result = await getOrderDetails(orderId);
+            setSelectedOrderData(result);
+            if (import.meta.env.DEV) {
+                console.log('[API] GET /orders/' + orderId + '/details:', result);
             }
         } catch (err) {
-            alert('Error: ' + err.message);
+            notify('error', 'Failed to load order details');
             if (import.meta.env.DEV) {
                 console.error('[API ERROR]', err);
             }
         } finally {
-            setOrderLoading(false);
-        }
-    };
-
-    const fetchShipmentForOrder = async (orderId) => {
-        setShipmentLoading(true);
-        try {
-            const trackingNumbers = {
-                '1': '1Z999AA10123456784',
-                '2': '9400111899223344556677',
-                '4': '794612345678'
-            };
-            const trackingNumber = trackingNumbers[orderId];
-            if (trackingNumber) {
-                const result = await trackShipment(trackingNumber);
-                setShipment(result);
-                if (import.meta.env.DEV) {
-                    console.log('[API] GET /shipping/track:', result);
-                }
-            }
-        } catch (err) {
-            if (import.meta.env.DEV) {
-                console.error('[API ERROR] Shipment:', err);
-            }
-        } finally {
-            setShipmentLoading(false);
+            setOrderDetailsLoading(false);
         }
     };
 
     const getStatusColor = (status) => {
         const colors = {
-            pending: '#ffa500',
-            processing: '#2196F3',
-            completed: '#4CAF50',
-            shipped: '#9C27B0',
-            delivered: '#4CAF50',
-            in_transit: '#2196F3'
+            pending: 'var(--warning)',
+            processing: 'var(--info)',
+            completed: 'var(--success)',
+            shipped: 'var(--accent)',
+            delivered: 'var(--success)',
+            in_transit: 'var(--info)',
         };
-        return colors[status] || '#888';
+        return colors[status] || 'var(--text-muted)';
     };
 
-    // Gated state for unauthenticated users
+    // Auth gate
     if (!isAuthenticated) {
         return (
             <div className="page container">
-                <h2>My Orders</h2>
-                <div className="empty" style={{ marginTop: '1rem' }}>
-                    <p>You need to log in to view your orders.</p>
-                    <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                        <button className="primary" onClick={() => navigate('/login')}>
-                            Login
-                        </button>
-                        <button onClick={() => navigate('/')}>
-                            Continue Shopping
-                        </button>
-                    </div>
+                <PageHeader title="My Orders" backLink="/" backText="← Back to Home" />
+                <EmptyState message="Please log in to view your orders" icon="🔒" />
+                <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                    <button className="primary" onClick={() => navigate('/login?returnTo=/orders')}>
+                        Login
+                    </button>
                 </div>
             </div>
         );
@@ -131,14 +90,20 @@ export default function OrdersPage() {
 
     return (
         <div className="page container">
-            <h2>My Orders</h2>
-            <p className="api-label">API: GET /api/v1/orders • {orders.length} orders</p>
+            <PageHeader 
+                title="My Orders" 
+                backLink="/" 
+                backText="← Back to Home"
+                apiLabel={`API: GET /api/v1/orders • ${ordersList.length} orders`}
+            />
 
             {/* Loading */}
-            {loading && <div className="loading">Loading orders...</div>}
+            {loading && <LoadingState message="Loading orders..." variant="list" count={3} />}
 
             {/* Error */}
-            {!loading && error && <div className="error">Error: {error}</div>}
+            {!loading && error && (
+                <div className="error">Error: {error}</div>
+            )}
 
             {/* Content */}
             {!loading && !error && (
@@ -146,11 +111,10 @@ export default function OrdersPage() {
                     {/* Orders List */}
                     <div className="card orders-history">
                         <h3>Order History</h3>
-                        {orders.length === 0 ? (
-                            <div className="empty">
-                                <p>No orders yet</p>
+                        {ordersList.length === 0 ? (
+                            <EmptyState message="No orders yet" icon="📦">
                                 <Link to="/">Start Shopping</Link>
-                            </div>
+                            </EmptyState>
                         ) : (
                             <div className="table-wrapper">
                                 <table>
@@ -164,7 +128,7 @@ export default function OrdersPage() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {orders.map(order => (
+                                        {ordersList.map(order => (
                                             <tr key={order.id}>
                                                 <td>#{order.id}</td>
                                                 <td>
@@ -173,10 +137,15 @@ export default function OrdersPage() {
                                                     </span>
                                                 </td>
                                                 <td>${order.total?.toFixed(2)}</td>
-                                                <td className="hide-mobile">{new Date(order.created_at).toLocaleDateString()}</td>
+                                                <td className="hide-mobile">
+                                                    {new Date(order.created_at).toLocaleDateString()}
+                                                </td>
                                                 <td>
-                                                    <button onClick={() => handleViewOrder(order.id)}>
-                                                        {orderLoading ? '...' : 'View'}
+                                                    <button 
+                                                        onClick={() => handleViewOrder(order.id)}
+                                                        disabled={orderDetailsLoading && selectedOrderId === order.id}
+                                                    >
+                                                        {orderDetailsLoading && selectedOrderId === order.id ? '...' : 'View'}
                                                     </button>
                                                 </td>
                                             </tr>
@@ -190,65 +159,83 @@ export default function OrdersPage() {
                     {/* Order Details */}
                     <div className="card order-details">
                         <h3>Order Details</h3>
-                        {selectedOrder ? (
-                            <>
-                                <p><strong>Order #{selectedOrder.id}</strong></p>
-                                <p>
-                                    Status:{' '}
-                                    <span style={{ color: getStatusColor(selectedOrder.status) }}>
-                                        {selectedOrder.status}
-                                    </span>
-                                </p>
-                                <p className="text-muted">
-                                    {new Date(selectedOrder.created_at).toLocaleString()}
-                                </p>
-
-                                {/* Shipping Tracking */}
-                                {shipmentLoading && (
-                                    <div className="shipment-box">Loading tracking...</div>
-                                )}
-                                {shipment && (
-                                    <div className="shipment-box">
-                                        <strong>📦 Shipment Tracking</strong>
-                                        <p>Carrier: {shipment.carrier}</p>
-                                        <p>
-                                            Status:{' '}
-                                            <span style={{ color: getStatusColor(shipment.status) }}>
-                                                {shipment.status.replace('_', ' ').toUpperCase()}
-                                            </span>
-                                        </p>
-                                        <p>Tracking: {shipment.tracking_number}</p>
-                                        <p>Est: {new Date(shipment.estimated_delivery).toLocaleDateString()}</p>
-                                    </div>
-                                )}
-
-                                <h4>Items:</h4>
-                                {selectedOrder.items?.map((item, i) => (
-                                    <div key={i} className="order-item">
-                                        {item.product_name} ×{item.quantity} = ${item.subtotal?.toFixed(2)}
-                                    </div>
-                                ))}
-
-                                <table>
-                                    <tbody>
-                                        <tr><th>Subtotal</th><td>${selectedOrder.subtotal?.toFixed(2)}</td></tr>
-                                        <tr><th>Shipping</th><td>${selectedOrder.shipping?.toFixed(2)}</td></tr>
-                                        <tr><th><strong>Total</strong></th><td><strong>${selectedOrder.total?.toFixed(2)}</strong></td></tr>
-                                    </tbody>
-                                </table>
-
-                                {/* API Debug */}
-                                <details className="api-debug">
-                                    <summary>API Response</summary>
-                                    <pre>{JSON.stringify({ order: selectedOrder, shipment }, null, 2)}</pre>
-                                </details>
-                            </>
-                        ) : (
+                        {orderDetailsLoading && (
+                            <LoadingState message="Loading order details..." />
+                        )}
+                        
+                        {!orderDetailsLoading && selectedOrderData ? (
+                            <OrderDetailsPanel 
+                                order={selectedOrderData.order} 
+                                shipment={selectedOrderData.shipment}
+                                getStatusColor={getStatusColor}
+                            />
+                        ) : !orderDetailsLoading && (
                             <p className="text-muted">Select an order to view details</p>
                         )}
                     </div>
                 </div>
             )}
+
+            {/* API Debug */}
+            <ApiDebug data={{ orders: ordersList, selectedOrderData }} label="Orders API Response" />
         </div>
+    );
+}
+
+// Separate component for order details panel
+function OrderDetailsPanel({ order, shipment, getStatusColor }) {
+    if (!order) return null;
+
+    return (
+        <>
+            <p><strong>Order #{order.id}</strong></p>
+            <p>
+                Status:{' '}
+                <span style={{ color: getStatusColor(order.status) }}>
+                    {order.status}
+                </span>
+            </p>
+            <p className="text-muted">
+                {new Date(order.created_at).toLocaleString()}
+            </p>
+
+            {/* Shipping Tracking - from aggregation endpoint */}
+            {shipment && (
+                <div className="shipment-box">
+                    <strong>📦 Shipment Tracking</strong>
+                    <p>Carrier: {shipment.carrier || 'N/A'}</p>
+                    <p>
+                        Status:{' '}
+                        <span style={{ color: getStatusColor(shipment.status) }}>
+                            {shipment.status?.replace('_', ' ').toUpperCase()}
+                        </span>
+                    </p>
+                    <p>Tracking: {shipment.tracking_number}</p>
+                    {shipment.estimated_delivery && (
+                        <p>Est: {new Date(shipment.estimated_delivery).toLocaleDateString()}</p>
+                    )}
+                </div>
+            )}
+            {!shipment && order.status === 'shipped' && (
+                <div className="shipment-box">
+                    <p className="text-muted">Shipment info not available</p>
+                </div>
+            )}
+
+            <h4>Items:</h4>
+            {order.items?.map((item, i) => (
+                <div key={i} className="order-item">
+                    {item.product_name} ×{item.quantity} = ${item.subtotal?.toFixed(2)}
+                </div>
+            ))}
+
+            <table>
+                <tbody>
+                    <tr><th>Subtotal</th><td>${order.subtotal?.toFixed(2)}</td></tr>
+                    <tr><th>Shipping</th><td>${order.shipping?.toFixed(2)}</td></tr>
+                    <tr><th><strong>Total</strong></th><td><strong>${order.total?.toFixed(2)}</strong></td></tr>
+                </tbody>
+            </table>
+        </>
     );
 }

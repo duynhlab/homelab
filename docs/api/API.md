@@ -28,6 +28,7 @@ This is the **single source of truth** for all API endpoints. The Frontend team 
 | **Cart** | `/api/v2/carts/:cartId/items` | POST | v2 | Add item to cart | STABLE |
 | **Order** | `/api/v1/orders` | GET | v1 | List user orders | STABLE |
 | **Order** | `/api/v1/orders/:id` | GET | v1 | Get order by ID | STABLE |
+| **Order** | `/api/v1/orders/:id/details` | GET | v1 | **Aggregated order with shipment** | STABLE |
 | **Order** | `/api/v1/orders` | POST | v1 | Create new order | STABLE |
 | **Order** | `/api/v2/orders` | GET | v2 | List orders | STABLE |
 | **Order** | `/api/v2/orders/:orderId/status` | GET | v2 | Get order status | STABLE |
@@ -53,6 +54,7 @@ This is the **single source of truth** for all API endpoints. The Frontend team 
 | **Notification** | `/api/v2/notifications/:id` | GET | v2 | Get notification by ID | STABLE |
 | **Shipping** | `/api/v1/shipping/track` | GET | v1 | Track shipment (query: `tracking_number`) | STABLE |
 | **Shipping** | `/api/v1/shipping/estimate` | GET | v1 | **Estimate shipment cost** | STABLE |
+| **Shipping** | `/api/v1/shipping/orders/:orderId` | GET | v1 | **Get shipment by order ID** | STABLE |
 | **Shipping-v2** | `/api/v2/shipments/estimate` | GET | v2 | Estimate shipment cost | STABLE |
 
 ### Internal Endpoints
@@ -701,6 +703,7 @@ Authorization: Bearer <jwt_token>
 |--------|----------|-------------|
 | `GET` | `/api/v1/orders` | Get all user orders |
 | `GET` | `/api/v1/orders/:id` | Get order by ID |
+| `GET` | `/api/v1/orders/:id/details` | **Aggregation: Get order with shipment** |
 | `POST` | `/api/v1/orders` | Create new order |
 
 ### GET /api/v1/orders
@@ -767,6 +770,58 @@ Authorization: Bearer <jwt_token>
   "created_at": "2026-01-07T08:00:00Z"
 }
 ```
+
+**Error Responses:**
+
+| Status | Body | Condition |
+|--------|------|-----------|
+| 404 | Order not found | Order ID does not exist |
+| 500 | `{"error": "Internal server error"}` | Server error |
+
+---
+
+### GET /api/v1/orders/:id/details
+
+**Aggregation Endpoint** - Get order with shipment information.
+
+This endpoint combines order data with shipment tracking from the Shipping service. Used by frontend for strict 3-layer compliance (single endpoint per view).
+
+#### Request
+
+```
+GET /api/v1/orders/123/details
+Authorization: Bearer <jwt_token>
+```
+
+#### Response
+
+**200 OK**
+```json
+{
+  "order": {
+    "id": "123",
+    "user_id": "1",
+    "status": "shipped",
+    "items": [...],
+    "subtotal": 59.98,
+    "shipping": 5.00,
+    "total": 64.98,
+    "created_at": "2026-01-07T08:00:00Z"
+  },
+  "shipment": {
+    "id": 1,
+    "order_id": 123,
+    "tracking_number": "1Z999AA10123456784",
+    "carrier": "UPS",
+    "status": "in_transit",
+    "estimated_delivery": "2026-01-10T18:00:00Z",
+    "created_at": "2026-01-07T12:00:00Z",
+    "updated_at": "2026-01-08T09:30:00Z"
+  }
+}
+```
+
+**Note:** `shipment` may be `null` if no shipment exists for the order yet.
 
 **Error Responses:**
 
@@ -1023,8 +1078,35 @@ Content-Type: application/json
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| `GET` | `/api/v1/notifications` | Get all notifications for user |
+| `GET` | `/api/v1/notifications/:id` | Get notification by ID |
+| `PATCH` | `/api/v1/notifications/:id` | Mark notification as read |
 | `POST` | `/api/v1/notify/email` | Send email notification |
 | `POST` | `/api/v1/notify/sms` | Send SMS notification |
+
+#### Notification Response Shape
+
+```json
+{
+  "id": "1",
+  "type": "order_shipped",
+  "title": "Order Shipped",
+  "message": "Your order #123 has been shipped",
+  "status": "sent",
+  "read": false,
+  "created_at": "2026-01-25T10:30:00Z"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Notification ID |
+| `type` | string | Notification type (order_shipped, email, sms, etc.) |
+| `title` | string | Notification title (may be same as message) |
+| `message` | string | Notification message content |
+| `status` | string | Delivery status (sent, pending, etc.) |
+| `read` | boolean | Whether notification has been read |
+| `created_at` | string | ISO 8601 timestamp when notification was created |
 
 ### Endpoints (v2)
 
@@ -1041,13 +1123,29 @@ Content-Type: application/json
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/v1/shipping/track` | Track shipment |
+| `GET` | `/api/v1/shipping/track` | Track shipment by tracking number |
+| `GET` | `/api/v1/shipping/estimate` | Estimate shipping cost |
+| `GET` | `/api/v1/shipping/orders/:orderId` | Get shipment by order ID |
 
-#### Request
+#### Track Shipment
 
 ```
 GET /api/v1/shipping/track?tracking_number=TRACK123
 ```
+
+#### Estimate Shipping
+
+```
+GET /api/v1/shipping/estimate?origin=NYC&destination=LA&weight=2.5
+```
+
+#### Get Shipment by Order ID
+
+```
+GET /api/v1/shipping/orders/123
+```
+
+Returns shipment info for a specific order (used by order aggregation endpoint).
 
 ---
 

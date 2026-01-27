@@ -16,6 +16,9 @@ type PostgresProductRepository struct {
 	pool *pgxpool.Pool
 }
 
+// Ensure interface compliance
+var _ domain.ProductRepository = (*PostgresProductRepository)(nil)
+
 // NewPostgresProductRepository creates a new PostgreSQL product repository
 func NewPostgresProductRepository(pool *pgxpool.Pool) *PostgresProductRepository {
 	return &PostgresProductRepository{pool: pool}
@@ -75,14 +78,14 @@ func (r *PostgresProductRepository) FindAll(ctx context.Context, filters domain.
 	allowedSortFields := map[string]string{
 		"id": "p.id", "name": "p.name", "price": "p.price", "created_at": "p.created_at",
 	}
-	
+
 	sortColumn := allowedSortFields["created_at"]
 	if sortBy != "" {
 		if col, ok := allowedSortFields[sortBy]; ok {
 			sortColumn = col
 		}
 	}
-	
+
 	order := filters.Order
 	if order != "ASC" && order != "DESC" {
 		order = "DESC"
@@ -119,6 +122,39 @@ func (r *PostgresProductRepository) FindAll(ctx context.Context, filters domain.
 	}
 
 	return products, nil
+}
+
+// Count returns the total number of products matching the filters
+func (r *PostgresProductRepository) Count(ctx context.Context, filters domain.ProductFilters) (int, error) {
+	query := `
+		SELECT COUNT(*)
+		FROM products p
+		LEFT JOIN categories c ON p.category_id = c.id
+		WHERE 1=1
+	`
+
+	args := []interface{}{}
+	argPos := 1
+
+	if filters.Category != "" {
+		query += fmt.Sprintf(" AND c.name = $%d", argPos)
+		args = append(args, filters.Category)
+		argPos++
+	}
+
+	if filters.Search != "" {
+		query += fmt.Sprintf(" AND p.name ILIKE $%d", argPos)
+		args = append(args, "%"+filters.Search+"%")
+		argPos++
+	}
+
+	var count int
+	err := r.pool.QueryRow(ctx, query, args...).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
 
 // FindRelatedProducts finds products in the same category

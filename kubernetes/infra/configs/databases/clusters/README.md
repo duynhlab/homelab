@@ -1,214 +1,541 @@
-## Overview
+# PostgreSQL Clusters Deep Dive
 
-Connection poolers solve the "too many connections" problem by reusing PostgreSQL connections, allowing applications to handle 1000+ client connections with only 25-50 database connections.
+This document provides a comprehensive reference for all PostgreSQL database clusters in the monitoring project. Each cluster diagram shows the exact topology as currently configured in the manifests.
 
-## Quick Reference
+## Cluster Summary
+### How to Read the Diagrams
 
-| Pooler    | Database       | Namespace | Service Endpoint                               | Deployment Method    | Features                                                                |
-| --------- | -------------- | --------- | ---------------------------------------------- | -------------------- | ----------------------------------------------------------------------- |
-| **PgDog** | product-db     | product   | `pgdog-product.product.svc.cluster.local:6432` | Helm chart (v0.32)   | Multi-database routing, ServiceMonitor, PodDisruptionBudget             |
-| **PgCat** | transaction-db | cart      | `pgcat.cart.svc.cluster.local:5432`            | Kubernetes manifests | Multi-database routing, Read replica load balancing, Automatic failover |
+- **Solid lines** (`-->`) indicate active, configured connections
+- **Dashed lines** (`-.->`) indicate planned/future features not yet configured
+- **Subgraphs** group related components by layer (Apps → Pooler → DB Services → DB Instances)
+- **Labels** show service endpoints in `service.namespace.svc:port` format
 
-## PgDog (Product Database)
+---
 
-**Location:** [`product-db/poolers/`](product-db/poolers/)
+## Cluster Index
 
-**Purpose:** Connection pooling for product-db (CloudNativePG cluster)
+| Cluster | Operator | Namespace | Instances | Replication | Pooler | Pooler Endpoint | Direct Endpoint |
+|---------|----------|-----------|-----------|-------------|--------|-----------------|-----------------|
+| **auth-db** | Zalando | auth | 3 (1 Leader + 2 Standbys) | Streaming (async) | PgBouncer (2 pods) | `auth-db-pooler.auth.svc:5432` | `auth-db.auth.svc:5432` |
+| **supporting-db** | Zalando | user | 1 | N/A | PgBouncer (2 pods) | `supporting-db-pooler.user.svc:5432` | `supporting-db.user.svc:5432` |
+| **review-db** | Zalando | review | 1 | N/A | None | N/A | `review-db.review.svc:5432` |
+| **product-db** | CloudNativePG | product | 3 (1 Primary + 2 Replicas) | Async | PgDog (1 pod) | `pgdog-product.product.svc:6432` | `product-db-rw.product.svc:5432` |
+| **transaction-db** | CloudNativePG | cart | 3 (1 Primary + 2 Replicas) | Synchronous | PgCat (2 pods) | `pgcat.cart.svc:5432` | `transaction-db-rw.cart.svc:5432` |
 
-**Cluster topology:** `product-db` now runs **3 instances** (1 primary + 2 replicas).
+---
 
-### Kubernetes Deployment Architecture
+## 1. auth-db (Zalando Operator)
+
+### Overview
+
+| Property | Value |
+|----------|-------|
+| **Operator** | Zalando Postgres Operator |
+| **Namespace** | `auth` |
+| **PostgreSQL Version** | 17 |
+| **Instances** | 3 (1 Leader + 2 Standbys) |
+| **Replication** | Streaming replication (async, `synchronous_commit: local`) |
+| **Pooler** | PgBouncer (2 instances, transaction mode) |
+| **Sidecars** | postgres_exporter (v0.18.1), Vector (v0.52.0) |
+
+### Endpoints
+
+| Type | Endpoint | Port | Purpose |
+|------|----------|------|---------|
+| Direct (Leader) | `auth-db.auth.svc.cluster.local` | 5432 | Direct connection to current leader |
+| Pooler | `auth-db-pooler.auth.svc.cluster.local` | 5432 | Connection pooling (recommended) |
+| Metrics | Pod IP | 9187 | postgres_exporter metrics |
+
+### Topology Diagram
 
 ```mermaid
 flowchart TD
-    subgraph ClientLayer["Client Applications"]
-        ProductService["Product Service"]
-        InventoryService["Inventory Service"]
+    subgraph Apps["Applications - Namespace: auth"]
+        AuthService["Auth Service"]
     end
-    
-    subgraph PgDogProxy["PgDog Proxy - pgdog-product.product.svc:6432"]
-        Frontend["Frontend Layer<br/>Listener"]
-        QueryRouter["Query Router"]
-        
-        subgraph Backend["Backend Architecture"]
-            DBManager["Databases Manager"]
-            Cluster["Cluster: product-db"]
-            
-            subgraph Shard["Shard"]
-                PrimaryPool["Primary Pool"]
-                ReplicasPool["Replicas Pool"]
-            end
-            
-            subgraph ServerConn["Server Connections"]
-                ConnPool["Connection Pools"]
-                PrepStmt["Prepared Statements"]
-            end
+
+    subgraph Pooler["PgBouncer Pooler - 2 Instances"]
+        PgBouncer1["auth-db-pooler Pod 1"]
+        PgBouncer2["auth-db-pooler Pod 2"]
+        PoolerSvc["Service: auth-db-pooler.auth.svc:5432"]
+    end
+
+    subgraph ZalandoSvc["Zalando Services - Auto-created"]
+        DirectSvc["Service: auth-db.auth.svc:5432"]
+    end
+
+    subgraph Cluster["auth-db Cluster - 3 Instances"]
+        Leader["auth-db-0 - Leader"]
+        Standby1["auth-db-1 - Standby"]
+        Standby2["auth-db-2 - Standby"]
+    end
+
+    subgraph Sidecars["Sidecars per Pod"]
+        Exporter["postgres_exporter:9187"]
+        Vector["vector - logs to Loki"]
+    end
+
+    AuthService --> PoolerSvc
+    PoolerSvc --> PgBouncer1
+    PoolerSvc --> PgBouncer2
+    PgBouncer1 --> DirectSvc
+    PgBouncer2 --> DirectSvc
+    DirectSvc --> Leader
+    Leader -->|"streaming replication"| Standby1
+    Leader -->|"streaming replication"| Standby2
+    Leader --- Exporter
+    Leader --- Vector
+```
+
+### Notes
+
+**Current Configuration:**
+- HA enabled with 3 instances for automatic failover via Patroni
+- PgBouncer in transaction mode with `maxDBConnections: 240` per pooler (480 total)
+- Tuned PostgreSQL parameters: `max_connections: 500`, `shared_buffers: 128MB`, `work_mem: 256MB`
+- Extensions: `pg_stat_statements`, `pg_cron`, `pg_trgm`, `pgcrypto`, `pg_stat_kcache`
+- Logging: DDL statements, slow queries >100ms, lock waits
+
+**Considering:**
+- Enable synchronous replication for zero data loss (currently `synchronous_commit: local`)
+- Add PodDisruptionBudget for controlled maintenance
+- Configure node anti-affinity for production zone distribution
+
+---
+
+## 2. supporting-db (Zalando Operator)
+
+### Overview
+
+| Property | Value |
+|----------|-------|
+| **Operator** | Zalando Postgres Operator |
+| **Namespace** | `user` |
+| **PostgreSQL Version** | 16 |
+| **Instances** | 1 (Single instance) |
+| **Replication** | N/A (single instance) |
+| **Pooler** | PgBouncer (2 instances, transaction mode) |
+| **Sidecars** | postgres_exporter (v0.18.1), Vector (v0.52.0) |
+| **Databases** | `user`, `notification`, `shipping` (multi-tenant) |
+
+### Endpoints
+
+| Type | Endpoint | Port | Purpose |
+|------|----------|------|---------|
+| Direct | `supporting-db.user.svc.cluster.local` | 5432 | Direct connection |
+| Pooler | `supporting-db-pooler.user.svc.cluster.local` | 5432 | Connection pooling (recommended, requires `sslmode=require`) |
+| Metrics | Pod IP | 9187 | postgres_exporter metrics |
+
+### Topology Diagram
+
+```mermaid
+flowchart TD
+    subgraph Apps["Applications - Multiple Namespaces"]
+        UserService["User Service - ns: user"]
+        NotificationService["Notification Service - ns: notification"]
+        ShippingService["Shipping Service - ns: shipping"]
+    end
+
+    subgraph Pooler["PgBouncer Pooler - 2 Instances"]
+        PgBouncer1["supporting-db-pooler Pod 1"]
+        PgBouncer2["supporting-db-pooler Pod 2"]
+        PoolerSvc["Service: supporting-db-pooler.user.svc:5432"]
+    end
+
+    subgraph ZalandoSvc["Zalando Services - Auto-created"]
+        DirectSvc["Service: supporting-db.user.svc:5432"]
+    end
+
+    subgraph Cluster["supporting-db Cluster - 1 Instance"]
+        Primary["supporting-db-0 - Primary"]
+        subgraph Databases["Databases"]
+            UserDB["user"]
+            NotificationDB["notification"]
+            ShippingDB["shipping"]
         end
     end
     
-    subgraph DatabaseLayer["PostgreSQL Databases - product-db Cluster"]
-        PrimaryDB["Primary DB<br/>product-db-rw.product.svc<br/>Port: 5432"]
-        ReplicaDB["Replica Endpoint (load balanced)<br/>product-db-r.product.svc<br/>Port: 5432"]
+    subgraph Sidecars["Sidecars"]
+        Exporter["postgres_exporter:9187"]
+        Vector["vector - logs to Loki"]
     end
-    
-    ProductService -->|"connects to"| Frontend
-    InventoryService -->|"connects to"| Frontend
-    Frontend -->|"requests connection"| QueryRouter
-    QueryRouter --> DBManager
-    DBManager -->|"manages"| Cluster
-    Cluster -->|"contains"| Shard
-    Shard -->|"has"| PrimaryPool
-    Shard -->|"has"| ReplicasPool
-    PrimaryPool --> ServerConn
-    ReplicasPool -.-> ServerConn
-    ConnPool -->|"write queries"| PrimaryDB
-    ConnPool -.->|"read queries<br/>(future)"| ReplicaDB
+
+    UserService --> PoolerSvc
+    NotificationService --> PoolerSvc
+    ShippingService --> PoolerSvc
+    PoolerSvc --> PgBouncer1
+    PoolerSvc --> PgBouncer2
+    PgBouncer1 --> DirectSvc
+    PgBouncer2 --> DirectSvc
+    DirectSvc --> Primary
+    Primary --- UserDB
+    Primary --- NotificationDB
+    Primary --- ShippingDB
+    Primary --- Exporter
+    Primary --- Vector
 ```
 
-> [!NOTE]
-> Đường nét đứt (-.->`) chỉ replica routing là **planned feature** chưa được configure trong helmrelease hiện tại.
+### Notes
 
-**Deployment:**
-- Managed via Flux HelmRelease
-- Helm chart: `helm.pgdog.dev/pgdog` (version v0.32)
-- Single replica (HA capable)
+**Current Configuration:**
+- Multi-database cluster serving 3 services across different namespaces
+- Cross-namespace user naming: `notification.notification`, `shipping.shipping` for automatic secret distribution
+- PgBouncer requires `sslmode=require` for connections
+- Conservative memory tuning: `shared_buffers: 64MB`, `work_mem: 4MB` (256MB container limit)
+- Extensions: `pg_stat_statements`, `pg_cron`, `pg_trgm`, `pgcrypto`, `pg_stat_kcache`
 
-**Password Configuration:**
-The PgDog Helm chart supports two methods for password management:
-**Option 1: Inline Password(current)**
+**Considering:**
+- Scale to 2+ instances for HA (currently single instance for cost optimization)
+- Separate databases into dedicated clusters if traffic increases significantly
+- Enable synchronous replication when HA is added
 
-```yaml
-users:
-  - name: product
-    database: product
-    password: postgres
-```
+---
 
-**Option 2: ExternalSecrets (apply later)**
+## 3. review-db (Zalando Operator)
 
-The chart supports ExternalSecrets Operator for secure password injection:
+### Overview
 
-```yaml
-externalSecrets:
-  enabled: true
-  secretStoreRef:
-    name: vault-backend
-    kind: ClusterSecretStore
-  data:
-    - secretKey: password
-      remoteRef:
-        key: path/to/secret
-        property: password
-```
+| Property | Value |
+|----------|-------|
+| **Operator** | Zalando Postgres Operator |
+| **Namespace** | `review` |
+| **PostgreSQL Version** | 16 |
+| **Instances** | 1 (Single instance) |
+| **Replication** | N/A (single instance) |
+| **Pooler** | None (direct connection) |
+| **Sidecars** | postgres_exporter (v0.18.1), Vector (v0.52.0) |
 
-**Configuration:**
-- Pool mode: `transaction`
-- Pool size: 30 connections
-- Port: 6432
-- Metrics: Port 9090 (OpenMetrics)
+### Endpoints
 
-**Files:**
-- [`product-db/poolers/helmrelease.yaml`](product-db/poolers/helmrelease.yaml) - Flux HelmRelease definition
+| Type | Endpoint | Port | Purpose |
+|------|----------|------|---------|
+| Direct | `review-db.review.svc.cluster.local` | 5432 | Direct connection (only option) |
+| Metrics | Pod IP | 9187 | postgres_exporter metrics |
 
-## PgCat (Transaction Database)
-
-**Location:** [`transaction-db/poolers/`](transaction-db/poolers/)
-
-### Kubernetes Deployment Architecture
+### Topology Diagram
 
 ```mermaid
 flowchart TD
-    subgraph K8sControlPlane[Kubernetes Control Plane]
-        DeploymentController[Deployment Controller]
-        PgCatDeployment[pgcat-transaction Deployment]
+    subgraph Apps["Applications - Namespace: review"]
+        ReviewService["Review Service"]
     end
-    
-    subgraph ConfigLayer[Configuration]
-        ConfigMap[ConfigMap: pgcat-transaction-config<br/>pgcat.toml]
+
+    subgraph ZalandoSvc["Zalando Services - Auto-created"]
+        DirectSvc["Service: review-db.review.svc:5432"]
     end
-    
-    subgraph PodLayer[Pods - Namespace: cart]
-        PgCatPod[PgCat Pod<br/>ghcr.io/postgresml/pgcat:v1.2.0<br/>Ports: 5432, 9930]
+
+    subgraph Cluster["review-db Cluster - 1 Instance"]
+        Primary["review-db-0 - Primary"]
     end
-    
-    subgraph ServiceLayer[Service]
-        PgCatService[Service: pgcat<br/>ClusterIP<br/>Ports: 5432, 9930]
+
+    subgraph Sidecars["Sidecars"]
+        Exporter["postgres_exporter:9187"]
+        Vector["vector - logs to Loki"]
     end
-    
-    subgraph DatabaseLayer[PostgreSQL Databases]
-        PrimaryDB[Primary DB<br/>transaction-db-rw.cart.svc<br/>Port: 5432]
-        ReplicaDB[Replica DB<br/>transaction-db-r.cart.svc<br/>Port: 5432]
-    end
-    
-    subgraph ClientLayer[Client Applications]
-        CartService[Cart Service]
-        OrderService[Order Service]
-    end
-    
-    DeploymentController --> PgCatDeployment
-    PgCatDeployment --> PgCatPod
-    ConfigMap -->|Mounts /etc/pgcat| PgCatPod
-    PgCatPod --> PgCatService
-    PgCatPod -->|Write queries| PrimaryDB
-    PgCatPod -->|Read queries<br/>Load balanced| ReplicaDB
-    CartService -->|Connects via<br/>pgcat.cart.svc.cluster.local:5432| PgCatService
-    OrderService -->|Connects via<br/>pgcat.cart.svc.cluster.local:5432| PgCatService
+
+    ReviewService --> DirectSvc
+    DirectSvc --> Primary
+    Primary --- Exporter
+    Primary --- Vector
 ```
 
-**Purpose:** Connection pooling and read replica routing for transaction-db (CloudNativePG cluster)
+### Notes
 
-**Deployment:**
-- Standalone Kubernetes Deployment (2 replicas, HA capable)
-- Managed via Kustomize
+**Current Configuration:**
+- Intentionally no connection pooler (low traffic, simple workload)
+- Single instance for cost optimization in development/learning environment
+- Direct connections from Review service only
+- Conservative memory tuning: `shared_buffers: 64MB`, `work_mem: 4MB`
 
-**Configuration:**
-- Pool mode: `transaction`
-- Pool size: 30 connections per database
-- Port: 5432 (PostgreSQL protocol)
-- Metrics: Port 9930 (Prometheus exporter)
+**Considering:**
+- Add PgBouncer pooler if connection count grows
+- Scale to 2+ instances for HA in production
+- Consider merging with supporting-db if usage remains low
 
-## Comparison
+---
 
-| Feature                | PgDog                     | PgCat                 |
-| ---------------------- | ------------------------- | --------------------- |
-| **Architecture**       | Multi-threaded (Rust)     | Multi-threaded (Rust) |
-| **Deployment**         | Helm chart                | Kubernetes manifests  |
-| **Load Balancing**     | Yes (multiple strategies) | Yes (read replicas)   |
-| **Automatic Failover** | Yes                       | Yes                   |
-| **Sharding**           | Production-grade          | Experimental          |
-| **Monitoring**         | OpenMetrics + Admin DB    | Prometheus + Admin DB |
-| **Multi-Database**     | Yes                       | Yes                   |
+## 4. product-db (CloudNativePG Operator)
 
-## Usage
+### Overview
 
-### Application Connection
+| Property | Value |
+|----------|-------|
+| **Operator** | CloudNativePG |
+| **Namespace** | `product` |
+| **PostgreSQL Version** | Default (latest) |
+| **Instances** | 3 (1 Primary + 2 Replicas) |
+| **Replication** | Asynchronous (`syncReplicaElectionConstraint.enabled: false`) |
+| **Pooler** | PgDog (1 replica, Helm chart v0.32) |
+| **Sidecars** | None (CloudNativePG handles metrics natively) |
 
-Both poolers are transparent to applications. Use the service endpoint in your database connection string:
+### Endpoints
 
-**Product Service:**
-```go
-DB_HOST=pgdog-product.product.svc.cluster.local
-DB_PORT=6432
+| Type | Endpoint | Port | Purpose |
+|------|----------|------|---------|
+| RW (Primary) | `product-db-rw.product.svc.cluster.local` | 5432 | Write queries (auto-routes to primary) |
+| R (Replicas) | `product-db-r.product.svc.cluster.local` | 5432 | Read queries (load-balanced replicas) |
+| RO (Any) | `product-db-ro.product.svc.cluster.local` | 5432 | Read-only (any instance) |
+| Pooler | `pgdog-product.product.svc.cluster.local` | 6432 | Connection pooling |
+| Metrics | `pgdog-product.product.svc.cluster.local` | 9090 | PgDog OpenMetrics |
+
+### Topology Diagram
+
+```mermaid
+flowchart TD
+    subgraph Apps["Applications - Namespace: product"]
+        ProductService["Product Service"]
+        InventoryService["Inventory Service"]
+    end
+
+    subgraph Pooler["PgDog Pooler - 1 Instance"]
+        PgDog["pgdog-product Pod"]
+        PgDogSvc["Service: pgdog-product.product.svc:6432"]
+        PgDogMetrics["Metrics: :9090"]
+    end
+
+    subgraph CNPGSvc["CloudNativePG Services - Auto-created"]
+        RWSvc["Service: product-db-rw.product.svc:5432"]
+        RSvc["Service: product-db-r.product.svc:5432"]
+        ROSvc["Service: product-db-ro.product.svc:5432"]
+    end
+
+    subgraph Cluster["product-db Cluster - 3 Instances"]
+        Primary["product-db-1 - Primary"]
+        Replica1["product-db-2 - Replica"]
+        Replica2["product-db-3 - Replica"]
+    end
+
+    ProductService --> PgDogSvc
+    InventoryService --> PgDogSvc
+    PgDogSvc --> PgDog
+    PgDog --> RWSvc
+    PgDog -.->|"read routing - future"| RSvc
+    RWSvc --> Primary
+    RSvc --> Replica1
+    RSvc --> Replica2
+    ROSvc --> Primary
+    ROSvc --> Replica1
+    ROSvc --> Replica2
+    Primary -->|"async replication"| Replica1
+    Primary -->|"async replication"| Replica2
+    PgDog --- PgDogMetrics
 ```
 
-**Cart/Order Services:**
-```go
-DB_HOST=pgcat.cart.svc.cluster.local
-DB_PORT=5432
+### Notes
+
+**Current Configuration:**
+- 3 instances with asynchronous replication for read scaling
+- PgDog currently routes ALL traffic to `product-db-rw` (primary only)
+- ServiceMonitor enabled for Prometheus scraping
+- Pool mode: `transaction`, pool size: 30 connections
+- Memory tuning: `shared_buffers: 64MB`, `effective_cache_size: 512MB`
+
+**Considering:**
+- Enable read replica routing in PgDog to utilize `product-db-r` endpoint
+- Scale PgDog to 2 replicas for HA
+- Enable `syncReplicaElectionConstraint` for stronger consistency if needed
+- Add `podAntiAffinity` for production zone distribution
+
+---
+
+## 5. transaction-db (CloudNativePG Operator)
+
+### Overview
+
+| Property | Value |
+|----------|-------|
+| **Operator** | CloudNativePG |
+| **Namespace** | `cart` |
+| **PostgreSQL Version** | 18 |
+| **Instances** | 3 (1 Primary + 2 Replicas) |
+| **Replication** | Synchronous (quorum: any 1, dataDurability: required) |
+| **Pooler** | PgCat (2 replicas, Kubernetes manifests) |
+| **Databases** | `cart`, `order` |
+| **Features** | Logical replication slot sync, read/write splitting |
+
+### Endpoints
+
+| Type | Endpoint | Port | Purpose |
+|------|----------|------|---------|
+| RW (Primary) | `transaction-db-rw.cart.svc.cluster.local` | 5432 | Write queries |
+| R (Replicas) | `transaction-db-r.cart.svc.cluster.local` | 5432 | Read queries |
+| Pooler | `pgcat.cart.svc.cluster.local` | 5432 | Connection pooling with R/W splitting |
+| Metrics | `pgcat.cart.svc.cluster.local` | 9930 | PgCat Prometheus metrics |
+
+### Topology Diagram
+
+```mermaid
+flowchart TD
+    subgraph Apps["Applications - Namespaces: cart, order"]
+        CartService["Cart Service - ns: cart"]
+        OrderService["Order Service - ns: order"]
+    end
+
+    subgraph Pooler["PgCat Pooler - 2 Instances"]
+        PgCat1["pgcat-transaction Pod 1"]
+        PgCat2["pgcat-transaction Pod 2"]
+        PgCatSvc["Service: pgcat.cart.svc:5432"]
+        PgCatMetrics["Metrics: :9930"]
+    end
+
+    subgraph CNPGSvc["CloudNativePG Services - Auto-created"]
+        RWSvc["Service: transaction-db-rw.cart.svc:5432"]
+        RSvc["Service: transaction-db-r.cart.svc:5432"]
+    end
+
+    subgraph Cluster["transaction-db Cluster - 3 Instances"]
+        Primary["transaction-db-1 - Primary"]
+        Replica1["transaction-db-2 - Sync Replica"]
+        Replica2["transaction-db-3 - Sync Replica"]
+    end
+
+    subgraph Databases["Databases"]
+        CartDB["cart"]
+        OrderDB["order"]
+    end
+
+    CartService --> PgCatSvc
+    OrderService --> PgCatSvc
+    PgCatSvc --> PgCat1
+    PgCatSvc --> PgCat2
+    PgCat1 -->|"writes"| RWSvc
+    PgCat1 -->|"reads"| RSvc
+    PgCat2 -->|"writes"| RWSvc
+    PgCat2 -->|"reads"| RSvc
+    RWSvc --> Primary
+    RSvc --> Replica1
+    RSvc --> Replica2
+    Primary -->|"sync replication"| Replica1
+    Primary -->|"sync replication"| Replica2
+    Primary --- CartDB
+    Primary --- OrderDB
+    PgCat1 --- PgCatMetrics
 ```
 
-### Monitoring
+### Notes
 
-**PgDog Metrics:**
-- ServiceMonitor auto-created by Helm chart
-- Endpoint: `http://pgdog-product.product.svc.cluster.local:9090/metrics`
-- Namespace: `pgdog_`
+**Current Configuration:**
+- Synchronous replication with quorum-based commit (any 1 replica required)
+- Zero data loss guarantee (`dataDurability: required`)
+- Read/write splitting enabled in PgCat:
+  - `query_parser_read_write_splitting = true`
+  - Writes → `transaction-db-rw`, Reads → `transaction-db-r`
+- Logical replication slot synchronization for CDC support (Debezium, Kafka Connect)
+- PostgreSQL 18 features: native `sync_replication_slots` parameter
+- Production-tuned: `shared_buffers: 256MB`, `work_mem: 32MB`, `wal_level: logical`
+- Aggressive autovacuum for high-write workloads
 
-**PgCat Metrics:**
-- ServiceMonitor: `transaction-db/monitoring/servicemonitor-pgcat-transaction.yaml`
-- Endpoint: `http://pgcat.cart.svc.cluster.local:9930/metrics`
+**Considering:**
+- Enable `syncReplicaElectionConstraint` with node anti-affinity for production
+- Add PodDisruptionBudget for PgCat deployment
+- Configure backup with Barman/pgBackRest for disaster recovery
+- Enable connection throttling in PgCat during peak loads
+
+---
+
+## Connection Pooler Comparison
+
+| Feature | PgBouncer (Zalando) | PgDog | PgCat |
+|---------|---------------------|-------|-------|
+| **Architecture** | Single-threaded (C) | Multi-threaded (Rust) | Multi-threaded (Rust) |
+| **Deployment** | Operator-managed | Helm chart | Kubernetes manifests |
+| **Read/Write Splitting** | No | Yes (configurable) | Yes (enabled) |
+| **Load Balancing** | No | Yes | Yes |
+| **Multi-Database** | Limited | Yes | Yes |
+| **Sharding** | No | Production-grade | Experimental |
+| **Monitoring** | Basic | OpenMetrics + Admin DB | Prometheus + Admin DB |
+| **SSL Requirement** | Required | Optional | Optional |
+
+---
+
+## Explore Internal Cluster PostgreSQL
+
+This section uses **product-db** as a learning vehicle to understand PostgreSQL internals. The same concepts apply whether PostgreSQL runs on Kubernetes (CloudNativePG) or VMs (EC2).
+
+### Product-db Topology (Current Configuration)
+
+| Component | Endpoint | Port | Role |
+|-----------|----------|------|------|
+| **PgDog Pooler** | `pgdog-product.product.svc.cluster.local` | 6432 | Connection pooling, routes to RW |
+| **CNPG RW Service** | `product-db-rw.product.svc.cluster.local` | 5432 | Write queries (auto-routes to primary) |
+| **CNPG R Service** | `product-db-r.product.svc.cluster.local` | 5432 | Read queries (load-balanced replicas) |
+| **CNPG RO Service** | `product-db-ro.product.svc.cluster.local` | 5432 | Read-only (any instance) |
+| **Cluster** | 3 instances | - | 1 Primary + 2 Replicas (async replication) |
+
+```mermaid
+flowchart LR
+    subgraph App["Application Layer"]
+        Driver["Go Driver - database/sql"]
+    end
+
+    subgraph Pooler["Connection Pooler"]
+        PgDog["PgDog - pgdog-product:6432"]
+    end
+
+    subgraph CNPG["CloudNativePG Services"]
+        RW["product-db-rw:5432"]
+        R["product-db-r:5432"]
+    end
+
+    subgraph Cluster["product-db Cluster"]
+        Primary["Primary Instance"]
+        Replica1["Replica 1"]
+        Replica2["Replica 2"]
+    end
+
+    Driver --> PgDog
+    PgDog --> RW
+    PgDog -.->|"future: read routing"| R
+    RW --> Primary
+    R --> Replica1
+    R --> Replica2
+    Primary -->|"async WAL streaming"| Replica1
+    Primary -->|"async WAL streaming"| Replica2
+```
+
+### INSERT/UPDATE in 10 Steps (Preview)
+
+When a Product Service calls `INSERT INTO products (name, price) VALUES ('Widget', 99.99)`:
+
+| Step | Component | What Happens |
+|------|-----------|--------------|
+| 1 | **Go Driver** | Sends SQL over TCP to PgDog |
+| 2 | **PgDog** | Picks a pooled connection, forwards to `product-db-rw` |
+| 3 | **Backend Process** | PostgreSQL spawns/reuses a backend process for this connection |
+| 4 | **Parser** | Validates SQL syntax, builds parse tree |
+| 5 | **Planner** | Creates execution plan (trivial for INSERT) |
+| 6 | **Executor** | Begins transaction, acquires locks |
+| 7 | **MVCC** | Assigns `xmin` (transaction ID), creates new tuple version |
+| 8 | **Buffer Manager** | Loads target heap page into **Shared Buffers**, marks dirty |
+| 9 | **WAL Writer** | Writes change to **WAL Buffers**, then to WAL segment on disk |
+| 10 | **Commit** | `fsync` WAL to disk, return success to client |
+
+**After commit (async):**
+- **Background Writer**: Gradually flushes dirty pages from Shared Buffers to data files
+- **Checkpointer**: Periodically forces all dirty pages to disk (recovery point)
+- **WAL Sender**: Ships WAL to replicas for replay
+
+### Deep Dive Documentation
+
+For full explanations with detailed diagrams, tables, and EC2/VM mapping, see:
+
+**[PostgreSQL Internals Deep Dive (product-db)](../../../../docs/databases/POSTGRESQL_INTERNALS_PRODUCT_DB.md)**
+
+Topics covered:
+- INSERT/UPDATE workflow with sequence diagrams
+- Shared Buffers and Buffer Manager
+- WAL (Write-Ahead Log) and crash recovery
+- MVCC, tuple versioning, and visibility
+- Streaming Replication internals
+- Storage: files, pages, and on-disk layout
+- Autovacuum and bloat control
+- CNPG vs EC2/VM operational differences
+- Backup/restore, scaling, and sharding concepts
+
+---
 
 ## Related Documentation
 
-- **Database Guide:** [`docs/databases/DATABASE.md`](../../../../docs/databases/DATABASE.md#connection-poolers)
-- **PgCat Troubleshooting:** [`docs/runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md`](../../../../docs/runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md)
+- **Database Architecture Overview**: [`docs/databases/DATABASE.md`](../../../../docs/databases/DATABASE.md)
+- **PgCat Troubleshooting**: [`docs/runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md`](../../../../docs/runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md)
+- **Monitoring Setup**: [`docs/monitoring/METRICS.md`](../../../../docs/monitoring/METRICS.md)

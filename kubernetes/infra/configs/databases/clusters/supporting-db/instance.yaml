@@ -79,10 +79,15 @@ spec:
       max_wal_size: "4GB"
       min_wal_size: "2GB"
       wal_keep_size: "2GB"
-      effective_cache_size: "8GB"
-      shared_buffers: "4GB"
-      work_mem: "256MB"
-      maintenance_work_mem: "1024MB"
+      # Memory tuning for 256MB container limit:
+      # - shared_buffers: 25% of RAM (64MB)
+      # - effective_cache_size: 75% of RAM (192MB) - helps planner knowing FS cache size
+      # - work_mem: 4MB (conservative to avoid OOM with max_connections=500)
+      # - maintenance_work_mem: 64MB (max safe value for vacuuming without OOM)
+      effective_cache_size: "192MB"
+      shared_buffers: "64MB"
+      work_mem: "4MB"
+      maintenance_work_mem: "64MB"
       # we're on ssd
       effective_io_concurrency: "100"
       random_page_cost: "1.1"

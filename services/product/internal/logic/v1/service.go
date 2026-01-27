@@ -21,7 +21,7 @@ func NewProductService(repo domain.ProductRepository) *ProductService {
 }
 
 // ListProducts retrieves all products with optional filtering
-func (s *ProductService) ListProducts(ctx context.Context, filters domain.ProductFilters) ([]domain.Product, error) {
+func (s *ProductService) ListProducts(ctx context.Context, filters domain.ProductFilters) ([]domain.Product, int, error) {
 	ctx, span := middleware.StartSpan(ctx, "product.list", trace.WithAttributes(
 		attribute.String("layer", "logic"),
 	))
@@ -31,11 +31,21 @@ func (s *ProductService) ListProducts(ctx context.Context, filters domain.Produc
 	products, err := s.productRepo.FindAll(ctx, filters)
 	if err != nil {
 		span.RecordError(err)
-		return nil, err
+		return nil, 0, err
 	}
 
-	span.SetAttributes(attribute.Int("products.count", len(products)))
-	return products, nil
+	// Get total count
+	total, err := s.productRepo.Count(ctx, filters)
+	if err != nil {
+		span.RecordError(err)
+		return nil, 0, err
+	}
+
+	span.SetAttributes(
+		attribute.Int("products.count", len(products)),
+		attribute.Int("products.total", total),
+	)
+	return products, total, nil
 }
 
 // GetProduct retrieves a single product by ID

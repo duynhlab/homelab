@@ -9,8 +9,9 @@ import apiClient from './client';
  * Get all products
  * GET /api/v1/products
  */
-export async function getProducts() {
-    const response = await apiClient.get('/products');
+export async function getProducts(params = {}) {
+    const response = await apiClient.get('/products', { params });
+    // Response format: { items: [], total: number }
     return response.data;
 }
 

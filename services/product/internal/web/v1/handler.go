@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 
+	"strconv"
+
 	"github.com/duynhne/monitoring/services/product/internal/core/domain"
 	logicv1 "github.com/duynhne/monitoring/services/product/internal/logic/v1"
 	"github.com/duynhne/monitoring/services/product/middleware"
@@ -39,7 +41,19 @@ func ListProducts(c *gin.Context) {
 		Order:    c.Query("order"),
 	}
 
-	products, err := productService.ListProducts(ctx, filters)
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if limit, err := strconv.Atoi(limitStr); err == nil {
+			filters.Limit = limit
+		}
+	}
+
+	if pageStr := c.Query("page"); pageStr != "" {
+		if page, err := strconv.Atoi(pageStr); err == nil {
+			filters.Page = page
+		}
+	}
+
+	products, total, err := productService.ListProducts(ctx, filters)
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to list products", zap.Error(err))
@@ -47,8 +61,11 @@ func ListProducts(c *gin.Context) {
 		return
 	}
 
-	zapLogger.Info("Products listed", zap.Int("count", len(products)))
-	c.JSON(http.StatusOK, products)
+	zapLogger.Info("Products listed", zap.Int("count", len(products)), zap.Int("total", total))
+	c.JSON(http.StatusOK, gin.H{
+		"items": products,
+		"total": total,
+	})
 }
 
 func GetProduct(c *gin.Context) {

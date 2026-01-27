@@ -13,6 +13,9 @@ type ProductRepository interface {
 
 	// Aggregation support for BFF endpoints
 	FindRelatedProducts(ctx context.Context, productID string, limit int) ([]Product, error)
+
+	// Count returns the total number of products matching the filters
+	Count(ctx context.Context, filters ProductFilters) (int, error)
 }
 
 // ProductFilters defines filtering options for product queries

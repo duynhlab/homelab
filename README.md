@@ -168,59 +168,40 @@ make flux-push    # 3. Deploy everything (infrastructure + apps)
 **Detailed Setup Guide**: See [`docs/platform/SETUP.md`](docs/platform/SETUP.md) for step-by-step instructions, architecture explanation, and troubleshooting.
 
 ---
-## Dashboard
+## Grafana Dashboards
 
-Grafana dashboards are deployed via manifests in `kubernetes/infra/configs/monitoring/grafana/dashboards/`.
+The platform includes **14 Grafana dashboards** covering observability, databases, and SLO monitoring. All dashboards are deployed via GitOps from `kubernetes/infra/configs/monitoring/grafana/dashboards/`.
 
-### Observability
+**Key Dashboards:**
+- **Microservices Monitoring** (`microservices-monitoring-001`): Main observability dashboard with 34 panels covering metrics, traffic, errors, and runtime
+- **Tempo Distributed Tracing** (`tempo-obs-001`): Trace visualization with exemplars and log correlation
+- **SLO Overview & Detailed**: Error budget tracking and burn rate monitoring
+- **Database Dashboards**: PostgreSQL, CloudNativePG, PgBouncer, PgCat, PgDog monitoring
+- **Logs & Infrastructure**: Loki logs explorer, Vector metrics
 
-- **Microservices Monitoring**: `microservices-monitoring-001`
-  - **Access**: <http://localhost:3000/d/microservices-monitoring-001/> (after port-forward)
-  - **Notes**: Main project dashboard (microservices metrics)
-- **Tempo - Distributed Tracing Observability**: `tempo-obs-001`
-  - **Access**: <http://localhost:3000/d/tempo-obs-001/> (after port-forward)
-  - **Notes**: Traces + exemplars + logs/traces correlation
-- **Vector**: imported from Grafana.com (dashboard manifest: `grafana-dashboard-vector.yaml`)
+**Access**: All dashboards are available via Grafana at <http://localhost:3000> after port-forwarding (see [Access Points](#access-points) below).
 
-### Logs
-
-- **Loki Logs Explorer**: imported from Grafana.com (dashboard manifest: `grafana-dashboard-loki.yaml`)
-
-### Databases
-
-- **CloudNativePG**: `grafana-dashboard-cloudnative-pg.yaml` (from CNPG chart configMap)
-- **PgBouncer**: `grafana-dashboard-pgbouncer.yaml`
-- **PgCat**: `grafana-dashboard-pgcat.yaml`
-- **PgDog**: `grafana-dashboard-pgdog.yaml` (imported from Grafana.com)
-- **PostgreSQL Monitoring**: `grafana-dashboard-pg-monitoring.yaml`
-- **PostgreSQL Query Overview**: `grafana-dashboard-pg-query-overview.yaml`
-- **PostgreSQL Query Drilldown**: `grafana-dashboard-pg-query-drilldown.yaml`
-- **PostgreSQL Replication Lag**: `grafana-dashboard-postgres-replication-lag.yaml`
-
-### SLO
-
-- **SLO Overview**: `grafana-dashboard-slo-overview.yaml` (imported from Grafana.com)
-- **SLO Detailed**: `grafana-dashboard-slo-detailed.yaml` (imported from Grafana.com)
-
-**Complete Dashboard Reference**: See [`docs/observability/metrics/GRAFANA_DASHBOARD.md`](docs/observability/metrics/GRAFANA_DASHBOARD.md) for all 34 panels with query analysis and troubleshooting.
-
-**Metrics Documentation**: See [`docs/observability/metrics/METRICS.md`](docs/observability/metrics/METRICS.md) for complete metrics guide (6 custom metrics, 34 panels).
+**Documentation**: See [`docs/observability/metrics/GRAFANA_DASHBOARD.md`](docs/observability/metrics/GRAFANA_DASHBOARD.md) for complete dashboard reference (34 panels, query analysis, troubleshooting) and [`docs/observability/metrics/METRICS.md`](docs/observability/metrics/METRICS.md) for metrics guide.
 
 ---
 
 ## Access Points
 
-After deployment, access services via port-forwarding:
+After deployment, access services via port-forwarding. Use `make flux-ui` to automatically set up all port-forwards, or manually forward individual services:
 
 | Service | URL | Command | Credentials |
 |---------|-----|---------|-------------|
-| Flux Web UI | <http://localhost:9080> | `make flux-ui` | - |
+| Flux Web UI | <http://localhost:9080> | `make flux-ui` or `kubectl port-forward -n flux-system svc/flux-operator 9080:9080` | - |
 | Grafana | <http://localhost:3000> | `kubectl port-forward -n monitoring svc/grafana-service 3000:3000` | Anonymous (enabled) |
 | Prometheus | <http://localhost:9090> | `kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090` | - |
-| Jaeger UI | <http://localhost:16686> | `kubectl port-forward -n monitoring svc/jaeger-query 16686:16686` | - |
+| Jaeger UI | <http://localhost:16686> | `kubectl port-forward -n monitoring svc/jaeger 16686:16686` | - |
 | Tempo | <http://localhost:3200> | `kubectl port-forward -n monitoring svc/tempo 3200:3200` | - |
-| Frontend | <http://localhost:3000> | `kubectl port-forward -n default svc/frontend 3000:80` | - |
-| API (any service) | <http://localhost:8080> | `kubectl port-forward -n <namespace> svc/<service> 8080:8080` | - |
+| Pyroscope | <http://localhost:4040> | `kubectl port-forward -n monitoring svc/pyroscope 4040:4040` | - |
+| VictoriaLogs | <http://localhost:9428> | `kubectl port-forward -n monitoring svc/victorialogs-victoria-logs-single-server 9428:9428` | - |
+| Postgres Operator UI | <http://localhost:8082> | `kubectl port-forward -n postgres-operator svc/postgres-operator 8082:8080` | - |
+| Frontend | <http://localhost:3001> | `kubectl port-forward -n default svc/frontend 3001:80` | - |
+
+**Quick Setup**: Run `make flux-ui` to automatically set up all port-forwards in the background. To stop: `pkill -f 'kubectl port-forward'`
 
 **GitOps Monitoring**: Use `make flux-ui` to open Flux Web UI and monitor reconciliation status, view Kustomizations, and check deployment health.
 
@@ -232,65 +213,26 @@ After deployment, access services via port-forwarding:
 
 ## Documentation
 
-### Getting Started
+Complete documentation is available in the [`docs/`](docs/README.md) directory. Quick links:
 
-- **[Setup Guide](docs/platform/SETUP.md)** - Complete deployment instructions
-- **[API Reference](docs/api/API.md)** - API endpoints and adding new microservices
-
-### Observability
-
-- **[Metrics Guide](docs/observability/metrics/METRICS.md)** - Complete metrics documentation (6 custom metrics, 34 panels)
-- **[Grafana Dashboard Guide](docs/observability/metrics/GRAFANA_DASHBOARD.md)** - Complete dashboard reference (34 panels + annotations planning)
-- **[APM Overview](docs/observability/apm/README.md)** - Complete APM system overview
-- **[SLO Documentation](docs/observability/slo/README.md)** - SRE practices: SLI/SLO definitions, error budgets
-
-### API & Databases
-
+**Getting Started:**
+- **[Setup Guide](docs/platform/SETUP.md)** - Deployment instructions and troubleshooting
 - **[API Reference](docs/api/API.md)** - Complete API documentation for all 8 microservices
-- **[Database Guide](docs/databases/DATABASE.md)** - PostgreSQL database integration guide
 
-### Testing & Operations
+**Observability:**
+- **[APM Overview](docs/observability/apm/README.md)** - Distributed tracing, metrics, logs, profiling
+- **[Metrics Guide](docs/observability/metrics/METRICS.md)** - Custom metrics and Prometheus integration
+- **[Grafana Dashboards](docs/observability/metrics/GRAFANA_DASHBOARD.md)** - Dashboard reference (34 panels)
+- **[SLO Documentation](docs/observability/slo/README.md)** - SLI/SLO definitions and error budgets
 
-- **[k6 Load Testing](docs/testing/K6.md)** - k6 load testing setup and configuration
-- **[Runbooks/Troubleshooting](docs/runbooks/troubleshooting/)** - Operational runbooks and troubleshooting guides
+**Infrastructure:**
+- **[Database Guide](docs/databases/DATABASE.md)** - PostgreSQL architecture (5 clusters, poolers, migrations)
+- **[k6 Load Testing](docs/testing/K6.md)** - Load testing setup and scenarios
+- **[Runbooks](docs/runbooks/troubleshooting/)** - Operational troubleshooting guides
 
-### Reference
-
-- **[Documentation Index](docs/README.md)** - Complete documentation index with learning path
-- **[AGENTS.md](AGENTS.md)** - AI Agent Guide for navigating the codebase
-
----
-
-## Key Features
-
-### Observability
-
-- **Traces**: Distributed tracing with Tempo + Jaeger (via OpenTelemetry Collector)
-- **Metrics**: Prometheus (custom business + infrastructure metrics)
-- **Logs**: Structured logging with zap, correlated via trace_id/span_id (Loki + Vector)
-- **Profiles**: Continuous profiling with Pyroscope (CPU, heap, goroutines, locks)
-
-**APM Details**: See [`docs/observability/apm/README.md`](docs/observability/apm/README.md)
-
-### Database
-
-- **5 PostgreSQL Clusters**: review-db, auth-db, supporting-db (shared: user + notification), product-db, transaction-db
-- **Architecture Diagrams**: Comprehensive Mermaid diagrams showing overview and individual cluster details
-- **Connection Poolers**: PgBouncer (Auth), PgCat (Product, Cart+Order)
-- **Migrations**: Flyway 11.8.2 with 8 migration images
-- **Operators**: Zalando Postgres Operator (v1.15.0), CloudNativePG Operator (v1.28.0)
-- **Cross-Namespace Secrets**: Zalando operator configured for shared database pattern
-
-**Database Details**: See [`docs/databases/DATABASE.md`](docs/databases/DATABASE.md) for complete architecture diagrams and configuration
-
-### SLO Management
-
-- **Sloth Operator**: Kubernetes-native SLO management
-- **Error Budget Tracking**: Real-time error budget monitoring
-- **Burn Rate Alerts**: Multi-window multi-burn-rate alerts
-- **Automated Runbooks**: Latency diagnosis and error budget alert response
-
-**SLO Details**: See [`docs/observability/slo/README.md`](docs/observability/slo/README.md)
+**Reference:**
+- **[Documentation Index](docs/README.md)** - Complete index with learning path
+- **[AGENTS.md](AGENTS.md)** - AI Agent Guide for codebase navigation
 
 ---
 

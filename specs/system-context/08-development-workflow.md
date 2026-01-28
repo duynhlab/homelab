@@ -187,7 +187,6 @@ order           order-deployment-xxx-yyy          1/1     Running   0          2
 review          review-deployment-xxx-yyy         1/1     Running   0          2m
 notification    notification-deployment-xxx-yyy   1/1     Running   0          2m
 shipping        shipping-deployment-xxx-yyy       1/1     Running   0          2m
-shipping        shipping-v2-deployment-xxx-yyy    1/1     Running   0          2m
 ```
 
 **Check services:**
@@ -215,13 +214,8 @@ curl http://localhost:8080/health
 # Metrics
 curl http://localhost:8080/metrics | head -20
 
-# v1 API
+# v1 API (canonical)
 curl -X POST http://localhost:8080/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin"}'
-
-# v2 API
-curl -X POST http://localhost:8080/api/v2/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin"}'
 ```

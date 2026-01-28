@@ -56,11 +56,6 @@ All services have the same SLO targets for consistency:
 - **Latency**: 95% < 500ms
 - **Error Rate**: 99% success
 
-### shipping-v2
-- **Availability**: 99.5%
-- **Latency**: 95% < 500ms
-- **Error Rate**: 99% success
-
 ## Rationale
 
 ### Why 99.5% Availability?

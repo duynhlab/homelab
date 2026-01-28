@@ -218,7 +218,7 @@ monitoring/
 │   │   ├── review.yaml
 │   │   ├── notification.yaml
 │   │   ├── shipping.yaml
-│   │   ├── shipping-v2.yaml
+│   │   ├── shipping-v2.yaml          # Suspended (v1 API only)
 │   │   ├── k6.yaml
 │   │   └── frontend.yaml               # ResourceSet
 │   └── clusters/                       # Flux cluster configurations

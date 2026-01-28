@@ -44,19 +44,13 @@ graph TD
     D --> E[LoggingMiddleware<br/>Extracts trace-id]
     E --> F[PrometheusMiddleware<br/>Collects metrics]
     
-    F --> G{API Version?}
-    G -->|v1| H[Web Layer v1<br/>web/v1/handler.go]
-    G -->|v2| I[Web Layer v2<br/>web/v2/handler.go]
+    F --> H[Web Layer v1<br/>web/v1/handler.go]
     
     H --> J[Parse Request<br/>Validate Input<br/>Create Web Span]
-    I --> J
     
-    J --> K{Version?}
-    K -->|v1| L[Logic Layer v1<br/>logic/v1/service.go]
-    K -->|v2| M[Logic Layer v2<br/>logic/v2/service.go]
+    J --> L[Logic Layer v1<br/>logic/v1/service.go]
     
     L --> N[Business Logic<br/>Create Logic Span<br/>Use Domain Models]
-    M --> N
     
     N --> O[Core Layer<br/>core/domain/<br/>Domain Models]
     
@@ -294,7 +288,7 @@ sequenceDiagram
 
 ## Layer Responsibilities
 
-### Web Layer (`web/v1/`, `web/v2/`)
+### Web Layer (`web/v1/`)
 
 **Responsibilities:**
 - HTTP request/response handling
@@ -334,7 +328,7 @@ func Login(c *gin.Context) {
 }
 ```
 
-### Logic Layer (`logic/v1/`, `logic/v2/`)
+### Logic Layer (`logic/v1/`)
 
 **Responsibilities:**
 - Business logic implementation
@@ -465,10 +459,10 @@ graph TD
    - Can trace a request from HTTP to domain model
    - Can see which layer has performance issues
 
-4. **Version Independence**
-   - v1 and v2 can have different logic
+4. **Single API Version**
+   - v1 is the canonical API (frontend-aligned)
    - Same domain models (core layer)
-   - APM shows differences between versions
+   - APM correlates traces, logs, and metrics per request
 
 ## Related Documentation
 

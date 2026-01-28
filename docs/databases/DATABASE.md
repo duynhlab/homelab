@@ -42,7 +42,7 @@ flowchart TB
         ReviewSvc["Review Service - namespace: review"]
         UserSvc["User Service - namespace: user"]
         NotificationSvc["Notification Service - namespace: notification"]
-        ShippingSvc["Shipping-v2 Service - namespace: shipping"]
+        ShippingSvc["Shipping Service - namespace: shipping"]
     end
     
     subgraph Poolers["Connection Poolers"]
@@ -765,7 +765,7 @@ flowchart TB
     end
     
     subgraph ShippingNS["namespace: shipping"]
-        ShippingSvc[Shipping-v2 Service<br/>Pod]
+        ShippingSvc[Shipping Service<br/>Pod]
         
         ShippingSecret[shipping.shipping.supporting-db...<br/>Cross-namespace secret]
     end
@@ -1007,11 +1007,11 @@ Zalando Postgres Operator automatically creates secrets for each database user. 
 
 #### Cross-Namespace Secrets for Shared Supporting Database
 
-The **Supporting Database** (`supporting-db`) cluster uses a **shared database pattern** where multiple services (User, Notification, Shipping-v2) share the same PostgreSQL cluster but use separate databases within that cluster.
+The **Supporting Database** (`supporting-db`) cluster uses a **shared database pattern** where multiple services (User, Notification, Shipping) share the same PostgreSQL cluster but use separate databases within that cluster.
 
 **Key Characteristics:**
 - **Cluster Location**: `supporting-db` cluster is deployed in the `user` namespace
-- **Services**: User (same namespace), Notification (`notification` namespace), Shipping-v2 (`shipping` namespace)
+- **Services**: User (same namespace), Notification (`notification` namespace), Shipping (`shipping` namespace)
 - **Cross-Namespace Secret Management**: Zalando operator configured with `enable_cross_namespace_secret: true`
 - **User Format**: `namespace.username` notation (e.g., `notification.notification`, `shipping.shipping`)
 - **Secret Names**: `{namespace}.{username}.{clustername}.credentials.postgresql.acid.zalan.do`
@@ -1037,7 +1037,7 @@ The **Supporting Database** (`supporting-db`) cluster uses a **shared database p
 **Multi-Database Configuration:**
 - **user** database → `user` namespace
 - **notification** database → `notification` namespace (cross-namespace secret)
-- **shipping** database → `shipping` namespace (cross-namespace secret, shared by shipping + shipping-v2)
+- **shipping** database → `shipping` namespace (cross-namespace secret)
 
 **Key**: Use `namespace.username` format for cross-namespace secrets
 

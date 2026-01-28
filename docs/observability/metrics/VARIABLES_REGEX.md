@@ -53,7 +53,6 @@ Options:
   - review
   - notification
   - shipping
-  - shipping-v2
   - (auto-discover new apps)
 ```
 

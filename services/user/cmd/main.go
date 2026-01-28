@@ -13,7 +13,6 @@ import (
 	"github.com/duynhne/monitoring/services/user/config"
 	database "github.com/duynhne/monitoring/services/user/internal/core"
 	v1 "github.com/duynhne/monitoring/services/user/internal/web/v1"
-	v2 "github.com/duynhne/monitoring/services/user/internal/web/v2"
 	"github.com/duynhne/monitoring/services/user/middleware"
 )
 
@@ -95,21 +94,13 @@ func main() {
 	// Metrics endpoint
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	// API v1
+	// API v1 (canonical API - frontend-aligned)
 	apiV1 := r.Group("/api/v1")
 	{
 		apiV1.GET("/users/:id", v1.GetUser)
 		apiV1.GET("/users/profile", v1.GetProfile)
 		apiV1.PUT("/users/profile", v1.UpdateProfile)
 		apiV1.POST("/users", v1.CreateUser)
-	}
-
-	// API v2
-	apiV2 := r.Group("/api/v2")
-	{
-		apiV2.GET("/users/:id", v2.GetUser)
-		apiV2.GET("/users/profile", v2.GetProfile)
-		apiV2.POST("/users", v2.CreateUser)
 	}
 
 	// Create HTTP server

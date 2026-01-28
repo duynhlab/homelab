@@ -11,7 +11,8 @@ docs/
 ├── api/                          # API documentation
 │   └── API.md                    # Complete API reference
 ├── databases/                    # Database documentation
-│   └── DATABASE.md               # PostgreSQL architecture
+│   ├── DATABASE.md               # PostgreSQL architecture
+│   └── POSTGRESQL_INTERNALS_PRODUCT_DB.md  # PostgreSQL internals deep dive
 ├── observability/                # Observability documentation
 │   ├── apm/                      # Application Performance Monitoring
 │   │   ├── README.md             # APM overview
@@ -148,6 +149,17 @@ docs/
     - 5 PostgreSQL clusters architecture with comprehensive diagrams
     - Overview diagram showing operators, services, poolers, and clusters
     - Individual cluster diagrams with secrets, connections, and patterns
+
+2. **[PostgreSQL Internals Deep Dive](./databases/POSTGRESQL_INTERNALS_PRODUCT_DB.md)** - PostgreSQL internals using product-db
+    - INSERT/UPDATE workflow with sequence diagrams
+    - Shared Buffers and Buffer Manager explained
+    - WAL (Write-Ahead Log) and crash recovery
+    - MVCC, tuple versioning, and visibility
+    - Streaming Replication internals (WAL sender/receiver, lag)
+    - Storage: files, pages, and on-disk layout
+    - Autovacuum and bloat control
+    - CNPG vs EC2/VM operational differences
+    - Backup/restore, scaling, and sharding concepts
     - Cross-namespace secrets visualization for supporting-db
     - Connection patterns (direct, PgBouncer, PgCat)
     - Environment variables and Helm configuration
@@ -239,7 +251,7 @@ docs/
 - **HelmRelease CRDs** - Flux manages Helm deployments declaratively
 - **32 Grafana Panels** - Complete monitoring dashboard
 - **6 Custom Metrics** - Application-level metrics
-- **9 Microservices** - All services with v1/v2 APIs
+- **9 Microservices** - All services with v1 API (canonical)
 - **Monitoring Stack** - Prometheus Operator + Grafana Operator + kube-state-metrics + metrics-server
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
 - **APM Stack** - Tempo + Jaeger (tracing), OTel Collector (fan-out), Pyroscope (profiling), Loki + VictoriaLogs + Vector (logging)

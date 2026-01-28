@@ -20,7 +20,7 @@ const CONFIG = {
   BURST_TIMING: __ENV.BURST_TIMING || '10:00-14:00', // Example: 10 AM - 2 PM
 };
 
-// Service URLs for 9 microservices
+// Service URLs for 8 microservices (v1 API only)
 const SERVICES = {
   auth: 'http://auth.auth.svc.cluster.local:8080',
   user: 'http://user.user.svc.cluster.local:8080',
@@ -30,7 +30,6 @@ const SERVICES = {
   review: 'http://review.review.svc.cluster.local:8080',
   notification: 'http://notification.notification.svc.cluster.local:8080',
   shipping: 'http://shipping.shipping.svc.cluster.local:8080',
-  shippingV2: 'http://shipping-v2.shipping.svc.cluster.local:8080',
 };
 
 // Helper function to make requests with proper tagging
@@ -88,7 +87,7 @@ function makeRequest(method, url, body, tags = {}, stack_layer = 'web', operatio
 
 // Journey 1: E-commerce Shopping Journey
 // Complete user lifecycle: Register → Login → Profile → Browse → View Product → Add Cart → View Cart → Shipping → Order → Notification
-// Touches 9 services: Auth → User → Product → Cart → Shipping-v2 → Order → Notification
+// Touches 8 services: Auth → User → Product → Cart → Shipping → Order → Notification
 function ecommerceShoppingJourney() {
   // Generate unique user ID with timestamp to avoid conflicts
   const userId = `user-${__VU}-${Date.now()}`;
@@ -105,7 +104,7 @@ function ecommerceShoppingJourney() {
   
   // Step 1: Auth - Register (NEW - Full user lifecycle starts here)
   console.log(`[${userId}] Step 1/10: Registering new account...`);
-  const registerResponse = makeRequest('POST', `${SERVICES.auth}/api/v2/auth/register`, {
+  const registerResponse = makeRequest('POST', `${SERVICES.auth}/api/v1/auth/register`, {
     username: userId,
     email: userEmail,
     password: 'password123',
@@ -116,7 +115,7 @@ function ecommerceShoppingJourney() {
     const retryUserId = `${userId}-retry-${Date.now()}`;
     const retryEmail = `${retryUserId}@test.com`;
     console.log(`[${userId}] Registration conflict (409), retrying with ${retryUserId}...`);
-    makeRequest('POST', `${SERVICES.auth}/api/v2/auth/register`, {
+    makeRequest('POST', `${SERVICES.auth}/api/v1/auth/register`, {
       username: retryUserId,
       email: retryEmail,
       password: 'password123',
@@ -138,13 +137,13 @@ function ecommerceShoppingJourney() {
   
   // Step 3: User - Get Profile
   console.log(`[${userId}] Step 3/10: Loading user profile...`);
-  makeRequest('GET', `${SERVICES.user}/api/v2/users/${userId}`, null, 
+  makeRequest('GET', `${SERVICES.user}/api/v1/users/profile`, null, 
     { ...tags, flow_step: '3_profile', service_target: 'user' }, 'database', 'db_read');
   sleep(0.3);
   
   // Step 4: Product - Browse Catalog
   console.log(`[${userId}] Step 4/10: Browsing product catalog...`);
-  makeRequest('GET', `${SERVICES.product}/api/v2/catalog/items`, null, 
+  makeRequest('GET', `${SERVICES.product}/api/v1/products`, null, 
     { ...tags, flow_step: '4_browse', service_target: 'product' }, 'database', 'db_read');
   sleep(2.0);
   
@@ -158,7 +157,7 @@ function ecommerceShoppingJourney() {
   // Step 6: Cart - Add to Cart
   console.log(`[${userId}] Step 6/10: Adding product to cart...`);
   const quantity = Math.floor(Math.random() * 3) + 1;
-  makeRequest('POST', `${SERVICES.cart}/api/v2/carts/cart-${userId}/items`, {
+  makeRequest('POST', `${SERVICES.cart}/api/v1/cart`, {
     productId: productId,
     quantity: quantity,
   }, { ...tags, flow_step: '6_add_to_cart', service_target: 'cart', product_id: productId }, 'database', 'db_write');
@@ -170,13 +169,11 @@ function ecommerceShoppingJourney() {
     { ...tags, flow_step: '7_view_cart', service_target: 'cart' }, 'database', 'db_read');
   sleep(1.0);
   
-  // Step 8: Shipping-v2 - Estimate Shipping (POST with body!)
+  // Step 8: Shipping - Estimate Shipping (GET with query params)
   console.log(`[${userId}] Step 8/10: Estimating shipping cost...`);
-  makeRequest('POST', `${SERVICES.shippingV2}/api/v2/shipments/estimate`, {
-    origin: 'New York',
-    destination: 'Los Angeles',
-    weight: Math.random() * 10 + 1,
-  }, { ...tags, flow_step: '8_shipping_estimate', service_target: 'shipping-v2' }, 'web', 'api_call');
+  const weight = Math.random() * 10 + 1;
+  makeRequest('GET', `${SERVICES.shipping}/api/v1/shipping/estimate?origin=New%20York&destination=Los%20Angeles&weight=${weight}`, null, 
+    { ...tags, flow_step: '8_shipping_estimate', service_target: 'shipping' }, 'web', 'api_call');
   sleep(0.8);
   
   // Step 9: Order - Create Order
@@ -189,10 +186,10 @@ function ecommerceShoppingJourney() {
   
   // Step 10: Notification - Order Confirmation
   console.log(`[${userId}] Step 10/10: Sending order confirmation...`);
-  makeRequest('POST', `${SERVICES.notification}/api/v2/notifications`, {
-    userId: userId,
-    type: 'order_confirmation',
-    message: 'Your order has been placed successfully!',
+  makeRequest('POST', `${SERVICES.notification}/api/v1/notify/email`, {
+    to: userEmail,
+    subject: 'Order Confirmation',
+    body: 'Your order has been placed successfully!',
   }, { ...tags, flow_step: '10_notification', service_target: 'notification' }, 'database', 'db_write');
   sleep(0.3);
   
@@ -218,7 +215,7 @@ function productReviewJourney() {
   
   // Step 1: Auth - Register (NEW - Full user lifecycle starts here)
   console.log(`[${userId}] Step 1/6: Registering new account...`);
-  makeRequest('POST', `${SERVICES.auth}/api/v2/auth/register`, {
+  makeRequest('POST', `${SERVICES.auth}/api/v1/auth/register`, {
     username: userId,
     email: userEmail,
     password: 'password123',
@@ -235,7 +232,7 @@ function productReviewJourney() {
   
   // Step 3: User - Get Profile
   console.log(`[${userId}] Step 3/6: Loading profile...`);
-  makeRequest('GET', `${SERVICES.user}/api/v2/users/${userId}`, null, 
+  makeRequest('GET', `${SERVICES.user}/api/v1/users/profile`, null, 
     { ...tags, flow_step: '3_profile', service_target: 'user' }, 'database', 'db_read');
   sleep(0.3);
   
@@ -254,7 +251,7 @@ function productReviewJourney() {
   
   // Step 6: Review - Write review
   console.log(`[${userId}] Step 6/6: Writing review...`);
-  makeRequest('POST', `${SERVICES.review}/api/v2/reviews`, {
+  makeRequest('POST', `${SERVICES.review}/api/v1/reviews`, {
     productId: productId,
     rating: Math.floor(Math.random() * 3) + 3, // 3-5 stars
     comment: `Great product! Review from ${userId}`,
@@ -285,7 +282,7 @@ function orderTrackingJourney() {
   
   // Step 1: Auth - Register (NEW - Full user lifecycle starts here)
   console.log(`[${userId}] Step 1/7: Registering new account...`);
-  makeRequest('POST', `${SERVICES.auth}/api/v2/auth/register`, {
+  makeRequest('POST', `${SERVICES.auth}/api/v1/auth/register`, {
     username: userId,
     email: userEmail,
     password: 'password123',
@@ -302,7 +299,7 @@ function orderTrackingJourney() {
   
   // Step 3: User - Get Profile
   console.log(`[${userId}] Step 3/7: Loading profile...`);
-  makeRequest('GET', `${SERVICES.user}/api/v2/users/${userId}`, null, 
+  makeRequest('GET', `${SERVICES.user}/api/v1/users/profile`, null, 
     { ...tags, flow_step: '3_profile', service_target: 'user' }, 'database', 'db_read');
   sleep(0.3);
   
@@ -315,7 +312,7 @@ function orderTrackingJourney() {
   // Step 5: Order - Get Order Details
   const orderId = `order-${__VU}`;
   console.log(`[${userId}] Step 5/7: Getting order ${orderId} details...`);
-  makeRequest('GET', `${SERVICES.order}/api/v2/orders/${orderId}`, null, 
+  makeRequest('GET', `${SERVICES.order}/api/v1/orders/${orderId}`, null, 
     { ...tags, flow_step: '5_order_details', service_target: 'order', order_id: orderId }, 'database', 'db_read');
   sleep(1.0);
   
@@ -336,7 +333,7 @@ function orderTrackingJourney() {
 
 // Journey 4: Quick Browse Journey (Abandoned Cart)
 // Complete user lifecycle: Register → Browse → View Product → Shipping Check → Add Cart
-// Touches 4 services: Auth → Product → Shipping-v2 → Cart
+// Touches 4 services: Auth → Product → Shipping → Cart
 function quickBrowseJourney() {
   // Generate unique user ID with timestamp to avoid conflicts
   const userId = `browser-${__VU}-${Date.now()}`;
@@ -353,7 +350,7 @@ function quickBrowseJourney() {
   
   // Step 1: Auth - Register (NEW - Full user lifecycle starts here)
   console.log(`[${userId}] Step 1/5: Registering new account...`);
-  makeRequest('POST', `${SERVICES.auth}/api/v2/auth/register`, {
+  makeRequest('POST', `${SERVICES.auth}/api/v1/auth/register`, {
     username: userId,
     email: userEmail,
     password: 'password123',
@@ -362,7 +359,7 @@ function quickBrowseJourney() {
   
   // Step 2: Product - Browse Catalog
   console.log(`[${userId}] Step 2/5: Browsing catalog...`);
-  makeRequest('GET', `${SERVICES.product}/api/v2/catalog/items`, null, 
+  makeRequest('GET', `${SERVICES.product}/api/v1/products`, null, 
     { ...tags, flow_step: '2_browse', service_target: 'product' }, 'database', 'db_read');
   sleep(1.5);
   
@@ -373,18 +370,16 @@ function quickBrowseJourney() {
     { ...tags, flow_step: '3_view_product', service_target: 'product', product_id: productId }, 'database', 'db_read');
   sleep(2.0);
   
-  // Step 4: Shipping-v2 - Quick shipping estimate
+  // Step 4: Shipping - Quick shipping estimate
   console.log(`[${userId}] Step 4/5: Checking shipping cost...`);
-  makeRequest('POST', `${SERVICES.shippingV2}/api/v2/shipments/estimate`, {
-    origin: 'New York',
-    destination: 'Los Angeles',
-    weight: Math.random() * 5 + 1,
-  }, { ...tags, flow_step: '4_shipping_check', service_target: 'shipping-v2' }, 'web', 'api_call');
+  const weight = Math.random() * 5 + 1;
+  makeRequest('GET', `${SERVICES.shipping}/api/v1/shipping/estimate?origin=New%20York&destination=Los%20Angeles&weight=${weight}`, null, 
+    { ...tags, flow_step: '4_shipping_check', service_target: 'shipping' }, 'web', 'api_call');
   sleep(0.5);
   
   // Step 5: Cart - Add to cart then abandon
   console.log(`[${userId}] Step 5/5: Adding to cart (will abandon)...`);
-  makeRequest('POST', `${SERVICES.cart}/api/v2/carts/cart-${userId}/items`, {
+  makeRequest('POST', `${SERVICES.cart}/api/v1/cart`, {
     productId: productId,
     quantity: 1,
   }, { ...tags, flow_step: '5_add_cart_abandon', service_target: 'cart', product_id: productId }, 'database', 'db_write');
@@ -478,8 +473,8 @@ function concurrentOperationsJourney() {
   
   // Concurrent cart operations (add items simultaneously)
   const requests = [
-    ['POST', `${SERVICES.cart}/api/v2/carts/${cartId}/items`, { productId: productIds[0], quantity: 1 }],
-    ['POST', `${SERVICES.cart}/api/v2/carts/${cartId}/items`, { productId: productIds[1], quantity: 2 }],
+    ['POST', `${SERVICES.cart}/api/v1/cart`, { productId: productIds[0], quantity: 1 }],
+    ['POST', `${SERVICES.cart}/api/v1/cart`, { productId: productIds[1], quantity: 2 }],
     ['GET', `${SERVICES.cart}/api/v1/cart`, null],
   ];
   
@@ -520,7 +515,7 @@ function errorHandlingJourney() {
   sleep(0.3);
   
   // Invalid cart operation (empty cart)
-  makeRequest('POST', `${SERVICES.cart}/api/v2/carts/empty-cart/items`, { productId: '', quantity: 0 }, 
+  makeRequest('POST', `${SERVICES.cart}/api/v1/cart`, { productId: '', quantity: 0 }, 
     { ...tags, flow_step: '2_invalid_cart', service_target: 'cart', expected_error: '400' }, 'web', 'api_call');
   sleep(0.3);
   
@@ -895,10 +890,10 @@ export function browserUserScenario() {
     });
     sleep(Math.random() * 2 + 2); // 2-4 seconds (browsing)
   } else if (browseRand < 0.8) {
-    // GET catalog v2
-    makeRequest('GET', `${SERVICES.product}/api/v2/catalog/items`, null, {
+    // GET products v1
+    makeRequest('GET', `${SERVICES.product}/api/v1/products`, null, {
       ...tags,
-      endpoint: '/api/v2/catalog/items',
+      endpoint: '/api/v1/products',
       method: 'GET',
     });
     sleep(Math.random() * 2 + 2);
@@ -946,12 +941,12 @@ export function shoppingUserScenario() {
   
   // Step 2: Add to cart (70% proceed to cart)
   if (Math.random() < 0.7) {
-    makeRequest('POST', `${SERVICES.cart}/api/v2/carts/cart-${__VU}/items`, {
+    makeRequest('POST', `${SERVICES.cart}/api/v1/cart`, {
       productId: `prod-${Math.floor(Math.random() * 10)}`,
       quantity: Math.floor(Math.random() * 3) + 1,
     }, {
       ...tags,
-      endpoint: '/api/v2/carts/:cartId/items',
+      endpoint: '/api/v1/cart',
       method: 'POST',
       flow_step: 'add_to_cart',
     });

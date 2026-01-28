@@ -8,6 +8,5 @@ resources:
   - order.yaml
   - product.yaml
   - review.yaml
-  - shipping-v2.yaml
   - shipping.yaml
   - user.yaml

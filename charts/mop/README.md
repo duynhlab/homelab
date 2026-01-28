@@ -80,7 +80,6 @@ charts/mop/
 │   ├── review.yaml
 │   ├── notification.yaml
 │   ├── shipping.yaml
-│   ├── shipping-v2.yaml
 │   └── k6.yaml
 └── templates/
     ├── _helpers.tpl       # Template helper functions

@@ -33,7 +33,6 @@ jobs:
           - review
           - notification
           - shipping
-          - shipping-v2
 
     steps:
       - name: Checkout code

@@ -20,7 +20,7 @@
 
 **Location**: `services/pkg/middleware/`
 
-All 9 microservices share the same middleware stack for consistent observability:
+All 8 microservices share the same middleware stack for consistent observability (shipping-v2 suspended):
 
 | Middleware | File | Purpose | Order |
 |------------|------|---------|-------|
@@ -256,7 +256,7 @@ func detectServiceInfo() (string, string) {
 ```
 
 **Handles hyphenated names**:
-- `shipping-v2-deployment-abc-xyz` → `shipping-v2` ✅
+- `shipping-deployment-abc-xyz` → `shipping` ✅
 - `auth-deployment-abc-xyz` → `auth` ✅
 
 ---
@@ -266,12 +266,12 @@ func detectServiceInfo() (string, string) {
 ### Generic Helm Chart
 
 **Chart**: `charts/` (version 0.2.0)
-**Purpose**: One chart for all 9 microservices
+**Purpose**: One chart for all 8 microservices (shipping-v2 suspended)
 
 **Files**:
 - `Chart.yaml`: Chart metadata
 - `values.yaml`: Default values
-- `values/*.yaml`: Per-service overrides (9 files)
+- `values/*.yaml`: Per-service overrides (8 active + shipping-v2 suspended)
 - `templates/deployment.yaml`: Deployment template
 - `templates/service.yaml`: Service template
 - `templates/_helpers.tpl`: Template helpers
@@ -423,7 +423,8 @@ env:
 6. `review.yaml` - Review service
 7. `notification.yaml` - Notification service
 8. `shipping.yaml` - Shipping service (v1)
-9. `shipping-v2.yaml` - Shipping-v2 service
+
+(shipping-v2.yaml exists but deployment is suspended.)
 
 **Example**: `charts/values/auth.yaml`
 
@@ -459,7 +460,7 @@ tracing:
 
 **File**: `services/Dockerfile`
 
-**Multi-stage build** for all 9 services:
+**Multi-stage build** for all 8 services (shipping-v2 suspended):
 
 ```dockerfile
 # Build stage
@@ -532,13 +533,13 @@ scripts/
 
 #### 05-build-microservices.sh
 
-**Purpose**: Build Docker images for all 9 services
+**Purpose**: Build Docker images for all 8 services (shipping-v2 suspended)
 
 ```bash
 #!/bin/bash
 set -e
 
-SERVICES=("auth" "user" "product" "cart" "order" "review" "notification" "shipping" "shipping-v2")
+SERVICES=("auth" "user" "product" "cart" "order" "review" "notification" "shipping")
 IMAGE_TAG="v5"
 REGISTRY="ghcr.io/duynhne"
 
@@ -558,13 +559,13 @@ echo "✅ All images built successfully!"
 
 #### 06-deploy-microservices.sh
 
-**Purpose**: Deploy all 9 services via Helm
+**Purpose**: Deploy all 8 services via Helm (shipping-v2 suspended)
 
 ```bash
 #!/bin/bash
 set -e
 
-SERVICES=("auth" "user" "product" "cart" "order" "review" "notification" "shipping" "shipping-v2")
+SERVICES=("auth" "user" "product" "cart" "order" "review" "notification" "shipping")
 CHART_VERSION=$(grep '^version:' charts/Chart.yaml | awk '{print $2}')
 MODE="${1:---local}"  # --local or --registry
 
@@ -622,7 +623,7 @@ spec:
     matchExpressions:
       - key: app
         operator: In
-        values: [auth, user, product, cart, order, review, notification, shipping, shipping-v2]
+        values: [auth, user, product, cart, order, review, notification, shipping]
   namespaceSelector:
     matchLabels:
       monitoring: enabled
@@ -742,7 +743,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [auth, user, product, cart, order, review, notification, shipping, shipping-v2]
+        service: [auth, user, product, cart, order, review, notification, shipping]
     
     steps:
       - uses: actions/checkout@v4
@@ -790,7 +791,6 @@ jobs:
 - `ghcr.io/duynhne/review:v6`
 - `ghcr.io/duynhne/notification:v6`
 - `ghcr.io/duynhne/shipping:v6`
-- `ghcr.io/duynhne/shipping-v2:v6`
 - `ghcr.io/duynhne/k6:scenarios`
 
 **Helm Charts**:

@@ -15,7 +15,6 @@ import (
 	"github.com/duynhne/monitoring/services/order/internal/core/repository"
 	logicv1 "github.com/duynhne/monitoring/services/order/internal/logic/v1"
 	v1 "github.com/duynhne/monitoring/services/order/internal/web/v1"
-	v2 "github.com/duynhne/monitoring/services/order/internal/web/v2"
 	"github.com/duynhne/monitoring/services/order/middleware"
 )
 
@@ -118,7 +117,7 @@ func main() {
 	// Inject service into v1 handler
 	v1.SetOrderService(orderService)
 
-	// API v1 with auth middleware
+	// API v1 with auth middleware (canonical API - frontend-aligned)
 	apiV1 := r.Group("/api/v1")
 	apiV1.Use(middleware.AuthMiddleware(authClient, logger))
 	{
@@ -126,14 +125,6 @@ func main() {
 		apiV1.GET("/orders/:id", v1.GetOrder)
 		apiV1.GET("/orders/:id/details", v1.GetOrderDetails) // Aggregation endpoint with shipment
 		apiV1.POST("/orders", v1.CreateOrder)
-	}
-
-	// API v2
-	apiV2 := r.Group("/api/v2")
-	{
-		apiV2.GET("/orders", v2.ListOrders)
-		apiV2.GET("/orders/:orderId/status", v2.GetOrderStatus)
-		apiV2.POST("/orders", v2.CreateOrder)
 	}
 
 	// Create HTTP server

@@ -107,11 +107,11 @@ All microservices follow a consistent 3-layer architecture:
 
 ```mermaid
 flowchart TD
-    subgraph Web["Web Layer (web/v1/, web/v2/)"]
+    subgraph Web["Web Layer (web/v1/)"]
         Handler[HTTP Handlers<br/>Request/Response<br/>Validation]
     end
     
-    subgraph Logic["Logic Layer (logic/v1/, logic/v2/)"]
+    subgraph Logic["Logic Layer (logic/v1/)"]
         Service[Business Logic<br/>Orchestration<br/>Database Queries]
     end
     
@@ -130,8 +130,8 @@ flowchart TD
 
 **Layer Responsibilities**:
 
-- **Web Layer** (`web/v1/`, `web/v2/`): HTTP handlers, request/response, validation
-- **Logic Layer** (`logic/v1/`, `logic/v2/`): Business logic, orchestration, database queries
+- **Web Layer** (`web/v1/`): HTTP handlers, request/response, validation
+- **Logic Layer** (`logic/v1/`): Business logic, orchestration, database queries
 - **Core Layer** (`core/domain/`, `core/database.go`): Domain models, database connections
 
 **Detailed Architecture**: See [`docs/observability/apm/ARCHITECTURE.md`](docs/observability/apm/ARCHITECTURE.md) for middleware chain and APM integration. Full system architecture in [`specs/system-context/01-architecture-overview.md`](specs/system-context/01-architecture-overview.md)
@@ -144,7 +144,7 @@ flowchart TD
 
 **Allowed:**
 
-- ✅ HTTP requests to `/api/v1/*` and `/api/v2/*` endpoints
+- ✅ HTTP requests to `/api/v1/*` endpoints (canonical API)
 - ✅ All requests go through Web Layer handlers
 - ✅ Web Layer handles aggregation, validation, error translation
 
@@ -169,7 +169,7 @@ flowchart TD
 
 - **Clean Architecture**: 3-layer separation (web → logic → core) with clear boundaries
 - **Frontend → Web Layer Only**: Frontend can ONLY call Web Layer HTTP endpoints, never Logic/Core directly
-- **API Versioning**: Parallel v1/v2 endpoints, no breaking changes, gradual migration path
+- **API Versioning**: v1 only (canonical, frontend-aligned); v2 removed
 - **Microservices**: 9 independent services with bounded contexts, each in own namespace
 - **Middleware Chain**: Ordered middleware (tracing → logging → metrics) for observability
 
@@ -224,19 +224,18 @@ monitoring/
 
 ## API Endpoints
 
-9 microservices with RESTful APIs:
+9 microservices with RESTful APIs (v1 only - canonical, frontend-aligned):
 
-| Service | Namespace | Base URLs |
-|---------|-----------|-----------|
-| auth | auth | `/api/v1/*`, `/api/v2/*` |
-| user | user | `/api/v1/*`, `/api/v2/*` |
-| product | product | `/api/v1/*`, `/api/v2/*` |
-| cart | cart | `/api/v1/*`, `/api/v2/*` |
-| order | order | `/api/v1/*`, `/api/v2/*` |
-| review | review | `/api/v1/*`, `/api/v2/*` |
-| notification | notification | `/api/v1/*`, `/api/v2/*` |
-| shipping | shipping | `/api/v1/*` (v1 only) |
-| shipping-v2 | shipping | `/api/v2/*` (v2 only) |
+| Service | Namespace | Base URL |
+|---------|-----------|----------|
+| auth | auth | `/api/v1/*` |
+| user | user | `/api/v1/*` |
+| product | product | `/api/v1/*` |
+| cart | cart | `/api/v1/*` |
+| order | order | `/api/v1/*` |
+| review | review | `/api/v1/*` |
+| notification | notification | `/api/v1/*` |
+| shipping | shipping | `/api/v1/*` |
 
 **Complete API Documentation**: See [`docs/api/API.md`](docs/api/API.md) for all endpoints, request/response models, and examples.
 

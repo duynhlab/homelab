@@ -16,17 +16,7 @@ React + Vite frontend application for the e-commerce microservices monitoring sy
 npm install
 ```
 
-### 2. Configure Environment (Optional)
-
-Create `.env.local` for custom API URL:
-
-```bash
-VITE_API_BASE_URL=http://localhost:8080
-```
-
-**Default**: Uses Vite proxy to `http://localhost:8080` (no config needed)
-
-### 3. Start Development Server
+### 2. Start Development Server
 
 ```bash
 npm run dev
@@ -34,13 +24,34 @@ npm run dev
 
 App available at **http://localhost:3000**
 
-### 4. Backend Connection
+### 3. Backend Connection (Choose One)
 
-Frontend expects backend at `http://localhost:8080`:
+**Option A: Per-Service Port Forwards (Recommended for service development)**
+
+Vite is configured with per-service proxy paths. Run port-forwards for each service:
 
 ```bash
-# Port-forward backend service
-kubectl port-forward svc/product 8080:8080
+# Port-forward each microservice to dedicated local port
+kubectl port-forward -n product svc/product 8081:8080 &
+kubectl port-forward -n cart svc/cart 8082:8080 &
+kubectl port-forward -n order svc/order 8083:8080 &
+kubectl port-forward -n auth svc/auth 8084:8080 &
+kubectl port-forward -n user svc/user 8085:8080 &
+kubectl port-forward -n review svc/review 8086:8080 &
+kubectl port-forward -n notification svc/notification 8087:8080 &
+kubectl port-forward -n shipping svc/shipping 8088:8080 &
+```
+
+**Option B: Single Gateway (Simpler, uses frontend nginx)**
+
+Port-forward the frontend service which acts as an API gateway:
+
+```bash
+# Port-forward frontend nginx (handles API routing)
+kubectl port-forward -n default svc/frontend 8080:80
+
+# Then update vite.config.js to use single target:
+# All proxy targets → 'http://localhost:8080'
 ```
 
 ## Build & Deploy
@@ -940,8 +951,8 @@ frontend/
 │   ├── pages/
 │   └── main.jsx             # Entry point with startup logging
 ├── Dockerfile               # Multi-stage build with API_BASE_URL arg
-├── nginx.conf               # SPA routing, gzip, security headers
-└── vite.config.js           # Dev proxy to localhost:8080
+├── nginx.conf               # SPA routing, gzip, security headers, API gateway
+└── vite.config.js           # Dev proxy to per-service local ports (8081-8088)
 ```
 
 ## Troubleshooting

@@ -51,13 +51,6 @@ updates:
     labels: ["dependencies", "go"]
 
   - package-ecosystem: "gomod"
-    directory: "/services/shipping-v2"
-    schedule:
-      interval: "daily"
-    open-pull-requests-limit: 10
-    labels: ["dependencies", "go"]
-
-  - package-ecosystem: "gomod"
     directory: "/services/user"
     schedule:
       interval: "daily"

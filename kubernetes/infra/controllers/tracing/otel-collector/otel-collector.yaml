@@ -13,6 +13,11 @@ spec:
         name: opentelemetry
         namespace: flux-system
       version: '>=0.114.0 <0.115.0'
+  dependsOn:
+    - name: kube-prometheus-stack
+      namespace: monitoring
+    - name: grafana-operator
+      namespace: monitoring
   interval: 10m
   releaseName: otel-collector
   timeout: 10m

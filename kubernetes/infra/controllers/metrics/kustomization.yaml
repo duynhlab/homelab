@@ -5,4 +5,4 @@ resources:
   - prometheus-operator.yaml
   - grafana-operator.yaml
   - metrics-server.yaml
-  - slo/
+  - sloth-operator.yaml

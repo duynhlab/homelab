@@ -17,7 +17,6 @@ import (
 	"github.com/duynhne/monitoring/services/product/internal/core/repository"
 	logicv1 "github.com/duynhne/monitoring/services/product/internal/logic/v1"
 	v1 "github.com/duynhne/monitoring/services/product/internal/web/v1"
-	v2 "github.com/duynhne/monitoring/services/product/internal/web/v2"
 	"github.com/duynhne/monitoring/services/product/middleware"
 )
 
@@ -127,21 +126,13 @@ func main() {
 	// Metrics endpoint
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	// API v1
+	// API v1 (canonical API - frontend-aligned)
 	apiV1 := r.Group("/api/v1")
 	{
 		apiV1.GET("/products", v1.ListProducts)
 		apiV1.GET("/products/:id", v1.GetProduct)
-		apiV1.GET("/products/:id/details", v1.GetProductDetails) // New aggregation endpoint
+		apiV1.GET("/products/:id/details", v1.GetProductDetails) // Aggregation endpoint
 		apiV1.POST("/products", v1.CreateProduct)
-	}
-
-	// API v2
-	apiV2 := r.Group("/api/v2")
-	{
-		apiV2.GET("/catalog/items", v2.ListItems)
-		apiV2.GET("/catalog/items/:itemId", v2.GetItem)
-		apiV2.POST("/catalog/items", v2.CreateItem)
 	}
 
 	// Create HTTP server

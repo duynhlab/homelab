@@ -160,7 +160,6 @@ spec:
           - review
           - notification
           - shipping
-          - shipping-v2
   
   # Scrape services in all namespaces with monitoring=enabled
   namespaceSelector:

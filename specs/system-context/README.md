@@ -64,21 +64,20 @@ A **production-ready microservices monitoring platform** built with Go, Kubernet
 
 ## 🏗️ System Components
 
-### Microservices Layer (9 Services)
+### Microservices Layer (8 Services)
 
-| Service | Namespace | API Versions | Endpoints | Responsibility |
-|---------|-----------|--------------|-----------|----------------|
-| **auth** | auth | v1, v2 | `/api/v*/auth/*` | Authentication & registration |
-| **user** | user | v1, v2 | `/api/v*/users/*` | User management & profiles |
-| **product** | product | v1, v2 | `/api/v1/products/*`, `/api/v2/catalog/*` | Product catalog |
-| **cart** | cart | v1, v2 | `/api/v*/cart*` | Shopping cart |
-| **order** | order | v1, v2 | `/api/v*/orders/*` | Order management |
-| **review** | review | v1, v2 | `/api/v*/reviews/*` | Product reviews |
-| **notification** | notification | v1, v2 | `/api/v*/notify*` | Notifications |
-| **shipping** | shipping | v1 only | `/api/v1/shipping/*` | Shipping tracking (v1) |
-| **shipping-v2** | shipping | v2 only | `/api/v2/shipments/*` | Enhanced shipping (v2) |
+| Service | Namespace | API | Endpoints | Responsibility |
+|---------|-----------|-----|----------|----------------|
+| **auth** | auth | v1 | `/api/v1/auth/*` | Authentication & registration |
+| **user** | user | v1 | `/api/v1/users/*` | User management & profiles |
+| **product** | product | v1 | `/api/v1/products/*` | Product catalog |
+| **cart** | cart | v1 | `/api/v1/cart*` | Shopping cart |
+| **order** | order | v1 | `/api/v1/orders/*` | Order management |
+| **review** | review | v1 | `/api/v1/reviews/*` | Product reviews |
+| **notification** | notification | v1 | `/api/v1/notify*` | Notifications |
+| **shipping** | shipping | v1 | `/api/v1/shipping/*` | Shipping tracking |
 
-**Total**: 9 services, 13 namespaces (9 services + monitoring + kube-system + k6 + default)
+**Total**: 8 services (v1 API only; shipping-v2 suspended). 13 namespaces (8 services + monitoring + kube-system + k6 + default)
 
 ### Observability Layer
 

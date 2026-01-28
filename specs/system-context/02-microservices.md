@@ -1,6 +1,6 @@
 # 02. Microservices
 
-> **Purpose**: Detailed documentation of all 9 microservices, API endpoints, 3-layer architecture, and service responsibilities.
+> **Purpose**: Detailed documentation of all 8 microservices, API endpoints (v1 only), 3-layer architecture, and service responsibilities.
 
 ---
 
@@ -18,19 +18,18 @@
 
 ### Overview
 
-| # | Service | Namespace | Replicas | API Versions | Port | Responsibility |
-|---|---------|-----------|----------|--------------|------|----------------|
-| 1 | **auth** | auth | 2 | v1, v2 | 8080 | Authentication & registration |
-| 2 | **user** | user | 2 | v1, v2 | 8080 | User management & profiles |
-| 3 | **product** | product | 2 | v1, v2 | 8080 | Product catalog management |
-| 4 | **cart** | cart | 2 | v1, v2 | 8080 | Shopping cart operations |
-| 5 | **order** | order | 2 | v1, v2 | 8080 | Order processing & tracking |
-| 6 | **review** | review | 2 | v1, v2 | 8080 | Product reviews & ratings |
-| 7 | **notification** | notification | 2 | v1, v2 | 8080 | Notification delivery |
-| 8 | **shipping** | shipping | 2 | v1 only | 8080 | Shipping tracking (legacy) |
-| 9 | **shipping-v2** | shipping | 2 | v2 only | 8080 | Enhanced shipping API |
+| # | Service | Namespace | Replicas | API | Port | Responsibility |
+|---|---------|-----------|----------|-----|------|----------------|
+| 1 | **auth** | auth | 2 | v1 | 8080 | Authentication & registration |
+| 2 | **user** | user | 2 | v1 | 8080 | User management & profiles |
+| 3 | **product** | product | 2 | v1 | 8080 | Product catalog management |
+| 4 | **cart** | cart | 2 | v1 | 8080 | Shopping cart operations |
+| 5 | **order** | order | 2 | v1 | 8080 | Order processing & tracking |
+| 6 | **review** | review | 2 | v1 | 8080 | Product reviews & ratings |
+| 7 | **notification** | notification | 2 | v1 | 8080 | Notification delivery |
+| 8 | **shipping** | shipping | 2 | v1 | 8080 | Shipping tracking & estimates |
 
-**Total**: 9 services, 18 pods (2 replicas each)
+**Total**: 8 services (v1 API only; shipping-v2 suspended)
 
 ### Service Communication Pattern
 
@@ -46,7 +45,6 @@ flowchart LR
     Client -->|6. Write Review| Review
     Client -->|7. Get Notifications| Notification
     Client -->|8. Track Shipping| Shipping
-    Client -->|8. Track Shipment v2| ShippingV2[Shipping-v2]
     
     Order -->|Verify Product| Product
     Order -->|Get User Info| User
@@ -67,12 +65,10 @@ All microservices follow a consistent 3-layer architecture:
 flowchart TD
     subgraph "HTTP Layer (Web)"
         WebV1[web/v1/handler.go<br/>HTTP Handlers v1]
-        WebV2[web/v2/handler.go<br/>HTTP Handlers v2]
     end
     
     subgraph "Business Logic Layer (Logic)"
         LogicV1[logic/v1/service.go<br/>Business Logic v1]
-        LogicV2[logic/v2/service.go<br/>Business Logic v2]
     end
     
     subgraph "Domain Layer (Core)"
@@ -80,26 +76,21 @@ flowchart TD
     end
     
     Client[HTTP Client] -->|Request| WebV1
-    Client -->|Request| WebV2
     
     WebV1 -->|Calls| LogicV1
-    WebV2 -->|Calls| LogicV2
     
     LogicV1 -->|Uses| Domain
-    LogicV2 -->|Uses| Domain
     
     LogicV1 -->|Response| WebV1
-    LogicV2 -->|Response| WebV2
     
     WebV1 -->|JSON Response| Client
-    WebV2 -->|JSON Response| Client
 ```
 
 ### Layer Responsibilities
 
 #### Layer 1: Web (HTTP Handlers)
 
-**Location**: `services/internal/{service}/web/v{1,2}/handler.go`
+**Location**: `services/{service}/internal/web/v1/handler.go`
 
 **Responsibilities:**
 - HTTP request/response handling
@@ -109,11 +100,11 @@ flowchart TD
 - Error response formatting
 - Span creation with `layer=web` attribute
 
-**Example**: Auth Service v2 Handler
+**Example**: Auth Service v1 Handler
 
 ```go
-// services/internal/auth/web/v2/handler.go
-package v2
+// services/auth/internal/web/v1/handler.go
+package v1
 
 import (
     "net/http"
@@ -128,10 +119,7 @@ import (
 func Login(c *gin.Context) {
     // Create span for web layer
     ctx, span := middleware.StartSpan(c.Request.Context(), "http.request", 
-        trace.WithAttributes(
-            attribute.String("layer", "web"),
-            attribute.String("api.version", "v2"),
-        ))
+        trace.WithAttributes(attribute.String("layer", "web")))
     defer span.End()
 
     // Parse request
@@ -143,7 +131,7 @@ func Login(c *gin.Context) {
     }
 
     // Call business logic
-    authService := logicv2.NewAuthService()
+    authService := logicv1.NewAuthService()
     token, err := authService.Login(ctx, req)
     if err != nil {
         span.RecordError(err)
@@ -157,7 +145,7 @@ func Login(c *gin.Context) {
 
 #### Layer 2: Logic (Business Logic)
 
-**Location**: `services/internal/{service}/logic/v{1,2}/service.go`
+**Location**: `services/{service}/internal/logic/v1/service.go`
 
 **Responsibilities:**
 - Business rule enforcement
@@ -166,16 +154,16 @@ func Login(c *gin.Context) {
 - Data transformation
 - Span creation with `layer=logic` attribute
 
-**Example**: Auth Service v2 Logic
+**Example**: Auth Service v1 Logic
 
 ```go
-// services/internal/auth/logic/v2/service.go
-package v2
+// services/auth/internal/logic/v1/service.go
+package v1
 
 import (
     "context"
-    "github.com/duynhne/monitoring/internal/auth/core/domain"
-    "github.com/duynhne/monitoring/pkg/middleware"
+    "github.com/duynhne/monitoring/services/auth/internal/core/domain"
+    "github.com/duynhne/monitoring/services/auth/middleware"
     "go.opentelemetry.io/otel/attribute"
     "go.opentelemetry.io/otel/trace"
 )
@@ -191,7 +179,6 @@ func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (strin
     ctx, span := middleware.StartSpan(ctx, "auth.login", 
         trace.WithAttributes(
             attribute.String("layer", "logic"),
-            attribute.String("api.version", "v2"),
             attribute.String("username", req.Username),
         ))
     defer span.End()
@@ -251,7 +238,7 @@ sequenceDiagram
     participant LogicService as Logic Layer<br/>(service.go)
     participant Domain as Domain Layer<br/>(model.go)
 
-    Client->>WebHandler: POST /api/v2/auth/login
+    Client->>WebHandler: POST /api/v1/auth/login
     Note over WebHandler: Create span: layer=web
     WebHandler->>WebHandler: Validate & bind JSON
     WebHandler->>LogicService: Login(ctx, req)
@@ -268,9 +255,9 @@ sequenceDiagram
 **Span Hierarchy:**
 ```
 Trace: 2db2fe7dcd3c8cb8cb4647ea2b455a21
-├─ Span 1: "POST /api/v2/auth/login" [middleware]
-   ├─ Span 2: "http.request" [web, layer=web, api.version=v2]
-      ├─ Span 3: "auth.login" [logic, layer=logic, api.version=v2]
+├─ Span 1: "POST /api/v1/auth/login" [middleware]
+   ├─ Span 2: "http.request" [web, layer=web]
+      ├─ Span 3: "auth.login" [logic, layer=logic]
 ```
 
 ---
@@ -287,35 +274,26 @@ Trace: 2db2fe7dcd3c8cb8cb4647ea2b455a21
 
 #### API Endpoints
 
-**v1 API:**
+**v1 API (canonical):**
 | Method | Endpoint | Description | Request Body | Response |
 |--------|----------|-------------|--------------|----------|
-| POST | `/api/v1/auth/login` | User login | `{username, password}` | `{token}` |
-| POST | `/api/v1/auth/register` | User registration | `{username, password}` | `{message}` |
-
-**v2 API:**
-| Method | Endpoint | Description | Request Body | Response |
-|--------|----------|-------------|--------------|----------|
-| POST | `/api/v2/auth/login` | Enhanced login | `{username, password, deviceId}` | `{token, expiresIn}` |
-| POST | `/api/v2/auth/register` | Enhanced registration | `{username, password, email}` | `{userId, token}` |
+| POST | `/api/v1/auth/login` | User login | `{username, password}` | `{token, user}` |
+| POST | `/api/v1/auth/register` | User registration | `{username, email, password}` | `{id, username, email}` |
+| GET | `/api/v1/auth/me` | Get current user from token | - | `{id, username, email}` |
 
 #### Directory Structure
 
 ```
-services/internal/auth/
-├── web/
-│   ├── v1/
-│   │   └── handler.go      # v1 HTTP handlers
-│   └── v2/
-│       └── handler.go      # v2 HTTP handlers
-├── logic/
-│   ├── v1/
-│   │   └── service.go      # v1 business logic
-│   └── v2/
-│       └── service.go      # v2 business logic
-└── core/
-    └── domain/
-        └── model.go        # Domain models
+services/auth/
+├── internal/
+│   ├── web/v1/
+│   │   └── handler.go      # HTTP handlers
+│   ├── logic/v1/
+│   │   └── service.go      # Business logic
+│   └── core/
+│       └── domain/         # Domain models
+├── middleware/
+└── cmd/main.go
 ```
 
 ---
@@ -330,19 +308,13 @@ services/internal/auth/
 
 #### API Endpoints
 
-**v1 API:**
+**v1 API (canonical):**
 | Method | Endpoint | Description | Response |
 |--------|----------|-------------|----------|
 | GET | `/api/v1/users/:id` | Get user by ID | `{id, name, email}` |
-| GET | `/api/v1/users/profile` | Get current user profile | `{id, name, email, createdAt}` |
-| POST | `/api/v1/users` | Create user | `{name, email}` |
-
-**v2 API:**
-| Method | Endpoint | Description | Response |
-|--------|----------|-------------|----------|
-| GET | `/api/v2/users/:id` | Get user by ID (enhanced) | `{id, name, email, avatar, bio}` |
-| GET | `/api/v2/users/profile` | Get profile (enhanced) | `{id, name, email, avatar, bio, preferences}` |
-| POST | `/api/v2/users` | Create user (enhanced) | `{userId, name, email, avatar}` |
+| GET | `/api/v1/users/profile` | Get current user profile | `{id, name, email, ...}` |
+| PUT | `/api/v1/users/profile` | Update user profile | - |
+| POST | `/api/v1/users` | Create user | `{id, name, email}` |
 
 ---
 
@@ -356,21 +328,13 @@ services/internal/auth/
 
 #### API Endpoints
 
-**v1 API:**
+**v1 API (canonical):**
 | Method | Endpoint | Description | Response |
 |--------|----------|-------------|----------|
-| GET | `/api/v1/products` | List all products | `[{id, name, price, description}]` |
+| GET | `/api/v1/products` | List all products | `[{id, name, price, description, category}]` |
 | GET | `/api/v1/products/:id` | Get product by ID | `{id, name, price, description, category}` |
-| POST | `/api/v1/products` | Create product | `{id, name, price}` |
-
-**v2 API (Catalog):**
-| Method | Endpoint | Description | Response |
-|--------|----------|-------------|----------|
-| GET | `/api/v2/catalog/items` | List catalog items | `[{itemId, name, price, sku, category}]` |
-| GET | `/api/v2/catalog/items/:itemId` | Get catalog item | `{itemId, name, price, sku, description}` |
-| POST | `/api/v2/catalog/items` | Create catalog item | `{itemId, name, price, sku}` |
-
-**Note**: v2 uses "catalog" namespace and "item" terminology instead of "product"
+| GET | `/api/v1/products/:id/details` | Aggregated product details | `{product, stock, reviews, related_products}` |
+| POST | `/api/v1/products` | Create product | `{id, name, price, ...}` |
 
 ---
 
@@ -384,19 +348,14 @@ services/internal/auth/
 
 #### API Endpoints
 
-**v1 API:**
+**v1 API (canonical):**
 | Method | Endpoint | Description | Request Body | Response |
 |--------|----------|-------------|--------------|----------|
-| GET | `/api/v1/cart` | Get cart contents | - | `{items: [{productId, quantity}], total}` |
-| POST | `/api/v1/cart/add` | Add item to cart | `{productId, quantity}` | `{message}` |
-| POST | `/api/v1/cart/remove` | Remove item | `{productId}` | `{message}` |
-
-**v2 API:**
-| Method | Endpoint | Description | Request Body | Response |
-|--------|----------|-------------|--------------|----------|
-| GET | `/api/v2/carts/:cartId` | Get cart by ID | - | `{cartId, items, total, updatedAt}` |
-| POST | `/api/v2/carts/:cartId/items` | Add item | `{itemId, quantity}` | `{cartId, items}` |
-| DELETE | `/api/v2/carts/:cartId/items/:itemId` | Remove item | - | `{cartId, items}` |
+| GET | `/api/v1/cart` | Get cart contents | - | `{id, user_id, items, subtotal, total, item_count}` |
+| GET | `/api/v1/cart/count` | Get cart item count | - | `{count}` |
+| POST | `/api/v1/cart` | Add item to cart | `{product_id, product_name, product_price, quantity}` | `{message}` |
+| PATCH | `/api/v1/cart/items/:itemId` | Update item quantity | `{quantity}` | `{success, cart_total, cart_count}` |
+| DELETE | `/api/v1/cart/items/:itemId` | Remove item | - | `{success, cart_total, cart_count}` |
 
 ---
 
@@ -410,19 +369,13 @@ services/internal/auth/
 
 #### API Endpoints
 
-**v1 API:**
+**v1 API (canonical):**
 | Method | Endpoint | Description | Request Body | Response |
 |--------|----------|-------------|--------------|----------|
-| GET | `/api/v1/orders` | List user orders | - | `[{id, status, items, total}]` |
-| GET | `/api/v1/orders/:id` | Get order details | - | `{id, status, items, total, createdAt}` |
-| POST | `/api/v1/orders` | Create order | `{items: [{productId, quantity}]}` | `{id, status, total}` |
-
-**v2 API:**
-| Method | Endpoint | Description | Request Body | Response |
-|--------|----------|-------------|--------------|----------|
-| GET | `/api/v2/orders` | List orders (paginated) | - | `{orders: [], page, totalPages}` |
-| GET | `/api/v2/orders/:orderId/status` | Get order status | - | `{orderId, status, tracking}` |
-| POST | `/api/v2/orders` | Create order (enhanced) | `{items, shippingAddress}` | `{orderId, status, estimatedDelivery}` |
+| GET | `/api/v1/orders` | List user orders | - | `[{id, status, items, total, ...}]` |
+| GET | `/api/v1/orders/:id` | Get order details | - | `{id, status, items, total, ...}` |
+| GET | `/api/v1/orders/:id/details` | Aggregated order + shipment | - | `{order, shipment}` |
+| POST | `/api/v1/orders` | Create order | `{user_id, items: [{product_id, quantity, price}]}` | `{id, status, total, ...}` |
 
 ---
 
@@ -436,17 +389,11 @@ services/internal/auth/
 
 #### API Endpoints
 
-**v1 API:**
+**v1 API (canonical):**
 | Method | Endpoint | Description | Request Body | Response |
 |--------|----------|-------------|--------------|----------|
-| GET | `/api/v1/reviews` | List all reviews | - | `[{productId, rating, comment}]` |
-| POST | `/api/v1/reviews` | Create review | `{productId, rating, comment}` | `{message}` |
-
-**v2 API:**
-| Method | Endpoint | Description | Request Body | Response |
-|--------|----------|-------------|--------------|----------|
-| GET | `/api/v2/reviews/:reviewId` | Get review by ID | - | `{reviewId, productId, rating, comment, createdAt}` |
-| POST | `/api/v2/reviews` | Create review (enhanced) | `{productId, rating, comment, verified}` | `{reviewId, productId, rating}` |
+| GET | `/api/v1/reviews?product_id={id}` | List reviews for product | - | `[{id, product_id, user_id, rating, title, comment, ...}]` |
+| POST | `/api/v1/reviews` | Create review | `{product_id, user_id, rating, title, comment}` | `{id, product_id, user_id, rating, ...}` |
 
 ---
 
@@ -460,23 +407,20 @@ services/internal/auth/
 
 #### API Endpoints
 
-**v1 API:**
+**v1 API (canonical):**
 | Method | Endpoint | Description | Request Body | Response |
 |--------|----------|-------------|--------------|----------|
-| GET | `/api/v1/notify` | Get notifications | - | `[{message, type, timestamp}]` |
-| POST | `/api/v1/notify/send` | Send notification | `{userId, message}` | `{message}` |
-
-**v2 API:**
-| Method | Endpoint | Description | Request Body | Response |
-|--------|----------|-------------|--------------|----------|
-| GET | `/api/v2/notifications` | List notifications | - | `{notifications: [], unreadCount}` |
-| POST | `/api/v2/notifications` | Send notification (enhanced) | `{userId, message, type, priority}` | `{notificationId, status}` |
+| GET | `/api/v1/notifications` | List notifications | - | `[{id, type, title, message, status, read, ...}]` |
+| GET | `/api/v1/notifications/:id` | Get notification by ID | - | `{id, type, title, message, ...}` |
+| PATCH | `/api/v1/notifications/:id` | Mark as read | - | - |
+| POST | `/api/v1/notify/email` | Send email (internal) | `{recipient, subject, body}` | - |
+| POST | `/api/v1/notify/sms` | Send SMS (internal) | `{recipient, message}` | - |
 
 ---
 
-### 8. Shipping Service (v1 Only)
+### 8. Shipping Service
 
-**Purpose**: Legacy shipping tracking
+**Purpose**: Shipping tracking and estimates
 
 **Namespace**: `shipping`
 **Image**: `ghcr.io/duynhne/shipping:v6`
@@ -484,82 +428,25 @@ services/internal/auth/
 
 #### API Endpoints
 
-**v1 API Only:**
+**v1 API (canonical):**
 | Method | Endpoint | Description | Request Body | Response |
 |--------|----------|-------------|--------------|----------|
-| GET | `/api/v1/shipping/:id` | Get shipment status | - | `{id, status, location}` |
-| POST | `/api/v1/shipping/track` | Track shipment | `{trackingNumber}` | `{status, location, estimatedDelivery}` |
+| GET | `/api/v1/shipping/track` | Track shipment | Query: `tracking_number` | Shipment status |
+| GET | `/api/v1/shipping/estimate` | Estimate shipping cost | Query: `origin`, `destination`, `weight` | Estimate |
+| GET | `/api/v1/shipping/orders/:orderId` | Get shipment by order ID | - | Shipment details |
 
-**Note**: No v2 API - see shipping-v2 service for enhanced version
-
----
-
-### 9. Shipping-v2 Service (v2 Only)
-
-**Purpose**: Enhanced shipping with estimates
-
-**Namespace**: `shipping` (same as shipping v1)
-**Image**: `ghcr.io/duynhne/shipping-v2:v6`
-**Replicas**: 2
-
-#### API Endpoints
-
-**v2 API Only:**
-| Method | Endpoint | Description | Request Body | Response |
-|--------|----------|-------------|--------------|----------|
-| POST | `/api/v2/shipments/estimate` | Estimate shipping cost | `{origin, destination, weight}` | `{cost, days, carrier}` |
-| GET | `/api/v2/shipments/:shipmentId/tracking` | Track shipment (enhanced) | - | `{shipmentId, status, history, eta}` |
-
-**Note**: No v1 API - this is a new service separate from shipping v1
+**Note**: shipping-v2 service is suspended; v1 is the canonical API.
 
 ---
 
 ## API Versioning Strategy
 
-### Why v1 and v2 Coexist
+### v1 Only (Canonical API)
 
-**Benefits:**
-- **Backward Compatibility**: Existing clients continue working
-- **Gradual Migration**: Clients migrate at their own pace
-- **A/B Testing**: Test v2 in production without breaking v1
-- **Deprecation Path**: Clear timeline for sunsetting old versions
-
-### Version Differences
-
-| Aspect | v1 | v2 |
-|--------|----|----|
-| **URL Pattern** | `/api/v1/{resource}` | `/api/v2/{resource}` |
-| **Response Format** | Basic fields | Enhanced fields with metadata |
-| **Pagination** | No pagination | Paginated responses |
-| **Error Handling** | Simple error messages | Structured error responses |
-| **Validation** | Basic validation | Enhanced validation with field errors |
-| **Product Terminology** | "products" | "catalog/items" |
-
-### Migration Example
-
-**v1 Product Response:**
-```json
-{
-  "id": "1",
-  "name": "Product 1",
-  "price": 100,
-  "description": "Description 1"
-}
-```
-
-**v2 Catalog Item Response:**
-```json
-{
-  "itemId": "item-1",
-  "name": "Product 1",
-  "price": 100,
-  "description": "Description 1",
-  "sku": "SKU-001",
-  "category": "Electronics",
-  "createdAt": "2025-01-01T00:00:00Z",
-  "updatedAt": "2025-01-10T00:00:00Z"
-}
-```
+- **URL Pattern**: `/api/v1/{resource}`
+- **Frontend-aligned**: The React frontend uses v1 exclusively
+- **Standardized**: Single API surface; v2 was removed (was demo-only)
+- **Future**: A new v2 will be introduced only when there are breaking changes or genuinely new semantics
 
 ---
 
@@ -622,7 +509,7 @@ zapLogger.Info("Processing request",
 ctx, span := middleware.StartSpan(ctx, "operation.name", 
     trace.WithAttributes(
         attribute.String("layer", "web"), // or "logic"
-        attribute.String("api.version", "v2"),
+        attribute.String("layer", "web"), // or "logic"
         attribute.String("entity.id", id),
     ))
 defer span.End()
@@ -675,7 +562,6 @@ flowchart TD
     Client --> Review
     Client --> Notification
     Client --> Shipping
-    Client --> ShippingV2[Shipping-v2]
     
     Order -.->|Optional| Product
     Order -.->|Optional| User
@@ -702,37 +588,25 @@ flowchart TD
 
 **Auth Service:**
 ```bash
-# v1 Login
+# Login
 curl -X POST http://localhost:8080/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin"}'
-
-# v2 Login
-curl -X POST http://localhost:8080/api/v2/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin"}'
 ```
 
 **Product Service:**
 ```bash
-# v1 List Products
+# List products
 curl http://localhost:8080/api/v1/products
-
-# v2 List Catalog Items
-curl http://localhost:8080/api/v2/catalog/items
 ```
 
 **Order Service:**
 ```bash
-# v1 Create Order
+# Create order (requires Authorization: Bearer <token>)
 curl -X POST http://localhost:8080/api/v1/orders \
   -H "Content-Type: application/json" \
-  -d '{"items":[{"productId":"1","quantity":2}]}'
-
-# v2 Create Order
-curl -X POST http://localhost:8080/api/v2/orders \
-  -H "Content-Type: application/json" \
-  -d '{"items":[{"itemId":"item-1","quantity":2}],"shippingAddress":"123 Main St"}'
+  -H "Authorization: Bearer <token>" \
+  -d '{"user_id":"1","items":[{"product_id":"1","quantity":2,"price":29.99}]}'
 ```
 
 ### Load Testing with K6
@@ -740,7 +614,7 @@ curl -X POST http://localhost:8080/api/v2/orders \
 **See**: [K6 Load Testing Documentation](../../docs/testing/K6.md)
 
 K6 automatically tests all services with 8 journey types:
-1. E-commerce Shopping Journey (9 services)
+1. E-commerce Shopping Journey (8 services)
 2. Product Review Journey (5 services)
 3. Order Tracking Journey (6 services)
 4. Quick Browse Journey (4 services)

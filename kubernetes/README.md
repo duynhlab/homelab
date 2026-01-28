@@ -30,7 +30,7 @@ kubernetes/
 │   ├── review.yaml
 │   ├── notification.yaml
 │   ├── shipping.yaml
-│   ├── shipping-v2.yaml
+│   ├── shipping-v2.yaml    # suspended (v1 API only)
 │   ├── k6.yaml
 │   └── frontend.yaml         # ResourceSet (learning example)
 │
@@ -93,7 +93,7 @@ sequenceDiagram
     
     Note over Flux,Apps: Step 3: Deploy Applications
     Flux->>Apps: Apply ./apps (dependsOn: configs-local)
-    Apps->>Apps: Deploy 9 microservices
+    Apps->>Apps: Deploy 8 microservices (+ shipping-v2 suspended)
     Apps->>Apps: Deploy frontend
 ```
 

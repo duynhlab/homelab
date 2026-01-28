@@ -115,9 +115,8 @@ Each service has **3 SLOs**:
 | review | review | 3 | ✅ Active |
 | notification | notification | 3 | ✅ Active |
 | shipping | shipping | 3 | ✅ Active |
-| shipping-v2 | shipping | 3 | ✅ Active |
 
-**Total: 27 SLOs** across 9 services
+**Total: 24 SLOs** across 8 services (v1 API only; shipping-v2 suspended)
 
 ## Grafana Dashboards
 

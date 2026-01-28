@@ -111,7 +111,6 @@ All 9 services migrated from `lib/pq` to `pgx/v5 v5.8.0`:
 | notification | supporting-db | PgBouncer | ✅ Migrated |
 | review | review-db | None | ✅ Migrated |
 | shipping | supporting-db | PgBouncer | ✅ Migrated |
-| shipping-v2 | supporting-db | PgBouncer | ✅ Migrated |
 
 ### Files Changed Per Service
 
@@ -127,7 +126,7 @@ All 9 services migrated from `lib/pq` to `pgx/v5 v5.8.0`:
 
 ```bash
 # Rebuild all services
-for svc in cart order product auth user notification review shipping shipping-v2; do
+for svc in cart order product auth user notification review shipping; do
   cd services/$svc && go mod tidy && cd ../..
 done
 

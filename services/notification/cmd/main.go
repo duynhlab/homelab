@@ -13,7 +13,6 @@ import (
 	"github.com/duynhne/monitoring/services/notification/config"
 	database "github.com/duynhne/monitoring/services/notification/internal/core"
 	v1 "github.com/duynhne/monitoring/services/notification/internal/web/v1"
-	v2 "github.com/duynhne/monitoring/services/notification/internal/web/v2"
 	"github.com/duynhne/monitoring/services/notification/middleware"
 )
 
@@ -95,7 +94,7 @@ func main() {
 	// Metrics endpoint
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	// API v1
+	// API v1 (canonical API - frontend-aligned)
 	apiV1 := r.Group("/api/v1")
 	{
 		apiV1.POST("/notify/email", v1.SendEmail)
@@ -103,13 +102,6 @@ func main() {
 		apiV1.GET("/notifications", v1.ListNotifications)
 		apiV1.GET("/notifications/:id", v1.GetNotification)
 		apiV1.PATCH("/notifications/:id", v1.MarkAsRead)
-	}
-
-	// API v2
-	apiV2 := r.Group("/api/v2")
-	{
-		apiV2.GET("/notifications", v2.ListNotifications)
-		apiV2.GET("/notifications/:id", v2.GetNotification)
 	}
 
 	// Create HTTP server

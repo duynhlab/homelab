@@ -40,8 +40,6 @@ spec:
       namespace: notification
     - name: shipping
       namespace: shipping
-    - name: shipping-v2
-      namespace: shipping
   
   values:
     name: k6

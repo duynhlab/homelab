@@ -347,7 +347,7 @@ instance="10.244.1.6:8080"   # Pod IP:port
 sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[5m]))
 
 # Or match multiple jobs explicitly
-sum(rate(request_duration_seconds_count{job=~"auth|user|product|cart|order|review|notification|shipping|shipping-v2", app=~"$app"}[5m]))
+sum(rate(request_duration_seconds_count{job=~"auth|user|product|cart|order|review|notification|shipping", app=~"$app"}[5m]))
 ```
 
 **Advantages:**

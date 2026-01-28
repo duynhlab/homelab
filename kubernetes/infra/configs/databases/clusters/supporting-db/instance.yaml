@@ -1,5 +1,5 @@
 # Supporting Database Cluster (Zalando Operator)
-# Shared database for User, Notification, and Shipping-v2 services
+# Shared database for User, Notification, and Shipping services
 apiVersion: acid.zalan.do/v1
 kind: postgresql
 metadata:
@@ -19,7 +19,7 @@ spec:
   databases:
     user: user
     notification: notification.notification  # namespace.username format for cross-namespace secret
-    shipping: shipping.shipping  # namespace.username format for cross-namespace secret (Database for shipping-v2 service)
+    shipping: shipping.shipping  # namespace.username format for cross-namespace secret (Database for shipping service)
   
   # Multiple users (one per database)
   users:
@@ -27,7 +27,7 @@ spec:
       - createdb
     notification.notification:  # Database owner for notification database (namespace.username format for cross-namespace secret)
       - createdb
-    shipping.shipping:  # Database owner for shipping database (namespace.username format for cross-namespace secret, used by both shipping and shipping-v2 services)
+    shipping.shipping:  # Database owner for shipping database (namespace.username format for cross-namespace secret)
       - createdb
   
   # Connection pooler (PgBouncer sidecar) configuration

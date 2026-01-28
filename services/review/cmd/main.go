@@ -13,7 +13,6 @@ import (
 	"github.com/duynhne/monitoring/services/review/config"
 	database "github.com/duynhne/monitoring/services/review/internal/core"
 	v1 "github.com/duynhne/monitoring/services/review/internal/web/v1"
-	v2 "github.com/duynhne/monitoring/services/review/internal/web/v2"
 	"github.com/duynhne/monitoring/services/review/middleware"
 )
 
@@ -95,18 +94,11 @@ func main() {
 	// Metrics endpoint
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	// API v1
+	// API v1 (canonical API - frontend-aligned)
 	apiV1 := r.Group("/api/v1")
 	{
 		apiV1.GET("/reviews", v1.ListReviews)
 		apiV1.POST("/reviews", v1.CreateReview)
-	}
-
-	// API v2
-	apiV2 := r.Group("/api/v2")
-	{
-		apiV2.GET("/reviews/:reviewId", v2.GetReview)
-		apiV2.POST("/reviews", v2.CreateReview)
 	}
 
 	// Create HTTP server

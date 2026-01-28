@@ -7,6 +7,134 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.41.0] - 2026-01-28
+
+### Removed
+
+#### API Versioning - v2 APIs Removed
+
+- **Removed all v2 API endpoints** across all microservices:
+  - `auth`: Removed `/api/v2/auth/*` endpoints (v1 is canonical)
+  - `user`: Removed `/api/v2/users/*` endpoints (v1 is canonical)
+  - `product`: Removed `/api/v2/catalog/*` endpoints (v1 `/api/v1/products/*` is canonical)
+  - `cart`: Removed `/api/v2/carts/*` endpoints (v1 `/api/v1/cart/*` is canonical)
+  - `order`: Removed `/api/v2/orders/*` endpoints (v1 is canonical)
+  - `review`: Removed `/api/v2/reviews/*` endpoints (v1 is canonical)
+  - `notification`: Removed `/api/v2/notifications/*` endpoints (v1 `/api/v1/notify/*` is canonical)
+- **Removed shipping-v2 service** (`services/shipping-v2/`):
+  - Entire service directory deleted (was v2-only service)
+  - Removed HelmRelease (`kubernetes/apps/shipping-v2.yaml`)
+  - Removed Helm values (`charts/mop/values/shipping-v2.yaml`)
+  - Removed SLO CRD (`kubernetes/infra/configs/monitoring/slo/shipping-v2.yaml`)
+- **Removed v2 code directories**:
+  - Deleted `services/*/internal/web/v2/` directories from all 8 services
+  - Deleted `services/*/internal/logic/v2/` directories from all 8 services
+  - Removed v2 route handlers and business logic
+
+### Changed
+
+#### API Standardization - v1 Only
+
+- **All services now use v1 API exclusively**:
+  - Frontend integration uses `/api/v1/*` endpoints only
+  - Load testing (k6) updated to use v1 endpoints
+  - All documentation updated to reflect v1-only architecture
+- **Service count reduced**: 9 services → 8 services (shipping-v2 removed)
+- **K6 load testing script** (`services/k6/load-test-multiple-scenarios.js`):
+  - Updated all journey functions to use v1 endpoints
+  - Removed `shippingV2` service reference
+  - Updated shipping estimate calls: POST `/api/v2/shipments/estimate` → GET `/api/v1/shipping/estimate` (query params)
+  - Updated cart operations: `/api/v2/carts/*` → `/api/v1/cart`
+  - Updated user profile: `/api/v2/users/:id` → `/api/v1/users/profile`
+  - Updated product catalog: `/api/v2/catalog/items` → `/api/v1/products`
+  - Updated notifications: `/api/v2/notifications` → `/api/v1/notify/email`
+
+#### Infrastructure & CI/CD Updates
+
+- **GitOps manifests**:
+  - Removed shipping-v2 from `kubernetes/clusters/local/apps.yaml` health checks
+  - Removed shipping-v2 dependency from `kubernetes/apps/k6.yaml`
+  - Updated SLO kustomization to exclude shipping-v2
+- **CI/CD workflows**:
+  - Removed shipping-v2 from `.github/workflows/build-be.yml` service matrix
+  - Removed shipping-v2 from `.github/workflows/build-init.yml` service matrix
+  - Removed shipping-v2 from `.github/dependabot.yml`
+- **Database configuration**:
+  - Updated `supporting-db` comments to reflect shipping service (not shipping-v2)
+  - Shipping database now used by shipping service only
+
+### Documentation
+
+- **Updated all documentation** to reflect v1-only API:
+  - `AGENTS.md`: Updated architecture diagrams and API endpoints table
+  - `README.md`: Updated service count and API versioning notes
+  - `docs/api/API.md`: Removed all v2 endpoint documentation
+  - `docs/observability/`: Updated SLO, metrics, and APM docs
+  - `specs/system-context/`: Updated all system context specs
+  - `kubernetes/README.md`: Updated file tree and deployment notes
+  - `charts/mop/README.md`: Removed shipping-v2 from values list
+
+### Migration Notes
+
+- **Breaking Change**: All v2 API endpoints are no longer available
+- **Action Required**: Update any clients or scripts using `/api/v2/*` endpoints to use `/api/v1/*` equivalents
+- **Shipping Service**: Use `/api/v1/shipping/estimate` (GET with query params) instead of POST `/api/v2/shipments/estimate`
+- **Build Verification**: `make build` now builds 8 services (was 9)
+
+---
+
+## [0.40.0] - 2026-01-28
+
+### Added
+
+#### PostgreSQL Deep Dive Documentation
+
+- **PostgreSQL Internals Guide** (`docs/databases/POSTGRESQL_INTERNALS_PRODUCT_DB.md`): Comprehensive deep-dive covering:
+  - Mental Model: Database vs Instance vs Schema
+  - INSERT/UPDATE/DELETE workflow with 10-step breakdown
+  - Shared Buffers and Buffer Manager operations
+  - WAL (Write-Ahead Log) for durability and crash recovery
+  - MVCC and Transaction Isolation levels
+  - Storage: Files, Pages, and TOAST
+  - Autovacuum and Bloat Control
+  - Streaming Replication (async/sync)
+  - CNPG vs EC2/VM deployment comparison
+  - Backup, Restore, and PITR strategies
+
+#### Infrastructure Enhancements
+
+- **Sloth Operator**: Added PrometheusServiceLevel CRD configuration with common SLI plugins for SLO monitoring
+- **Product Service Seeder**: Added 500 product seed data with pagination support
+
+### Fixed
+
+#### Prometheus Operator - SLO Metrics Discovery
+
+- Fixed `prometheusSpec.ruleSelector` to use empty selector `{}` instead of `matchLabels.prometheus: kube-prometheus`
+- Added `ruleSelectorNilUsesHelmValues: false` for explicit PrometheusRule discovery
+- **Impact**: Sloth-generated PrometheusRules (SLO recording rules) are now properly discovered by Prometheus
+- Grafana SLO dashboards (Overview, Detailed) now display metrics correctly
+
+### Changed
+
+#### Product Service
+
+- Implemented pagination: 30 products per page (default)
+- Product listing now supports `page` and `limit` query parameters
+
+#### Logging & Tracing Infrastructure
+
+- Updated Vector logging configuration
+- Updated VictoriaLogs HelmRelease
+- Updated Jaeger and OpenTelemetry Collector configurations
+
+### Documentation
+
+- Updated `docs/README.md` with PostgreSQL internals guide reference
+- Updated `kubernetes/infra/configs/databases/clusters/README.md` with cluster topology details
+
+---
+
 ## [0.39.0] - 2026-01-25
 
 ### Added

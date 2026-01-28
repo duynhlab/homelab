@@ -15,7 +15,6 @@ import (
 	"github.com/duynhne/monitoring/services/cart/internal/core/repository"
 	logicv1 "github.com/duynhne/monitoring/services/cart/internal/logic/v1"
 	v1 "github.com/duynhne/monitoring/services/cart/internal/web/v1"
-	v2 "github.com/duynhne/monitoring/services/cart/internal/web/v2"
 	"github.com/duynhne/monitoring/services/cart/middleware"
 )
 
@@ -113,7 +112,7 @@ func main() {
 	// Metrics endpoint
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	// API v1 with auth middleware
+	// API v1 with auth middleware (canonical API - frontend-aligned)
 	apiV1 := r.Group("/api/v1")
 	apiV1.Use(middleware.AuthMiddleware(authClient, logger))
 	{
@@ -122,13 +121,6 @@ func main() {
 		apiV1.GET("/cart/count", v1.GetCartCount)
 		apiV1.PATCH("/cart/items/:itemId", v1.UpdateCartItem)
 		apiV1.DELETE("/cart/items/:itemId", v1.RemoveCartItem)
-	}
-
-	// API v2
-	apiV2 := r.Group("/api/v2")
-	{
-		apiV2.GET("/carts/:cartId", v2.GetCart)
-		apiV2.POST("/carts/:cartId/items", v2.AddItem)
 	}
 
 	// Create HTTP server

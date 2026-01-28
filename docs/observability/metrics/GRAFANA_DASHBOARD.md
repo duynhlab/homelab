@@ -779,7 +779,7 @@ histogram_quantile(0.95, sum(rate(request_duration_seconds_bucket{app=~"$app", n
 
 **Legend Format**: `{{code}} {{path}}`
 - Shows HTTP status code and endpoint path in single column
-- Example: `404 /api/v2/shipments/estimate`
+- Example: `404 /api/v1/shipping/estimate`
 - **Note**: Grafana timeseries panels do not support splitting legend labels into separate columns. The code and path must remain in a single Name column.
 
 **Why This Metric**:
@@ -828,7 +828,7 @@ histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{app=~"$app", n
 - Highlights endpoints with worst outliers
 
 **Legend Format**: `{{code}} {{path}}`
-- Example: `201 /api/v2/carts/cart-browser-25/items`
+- Example: `201 /api/v1/cart`
 
 **Use Case**: Identify which endpoints have variable latency or occasional slowness.
 

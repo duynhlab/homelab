@@ -26,10 +26,11 @@ spec:
       prometheusSpec:
         podMonitorNamespaceSelector: {}
         podMonitorSelector: {}
-        # Option A: discover ServiceMonitors/PodMonitors without requiring Helm 'release' label.
+        # Option A: discover ServiceMonitors/PodMonitors/PrometheusRules without requiring Helm 'release' label.
         # This removes the default constraint: serviceMonitorSelector.matchLabels.release=kube-prometheus-stack
         serviceMonitorSelectorNilUsesHelmValues: false
         podMonitorSelectorNilUsesHelmValues: false
+        ruleSelectorNilUsesHelmValues: false
         resources:
           limits:
             cpu: 500m
@@ -40,9 +41,7 @@ spec:
         retention: 7d
         retentionSize: 10GB
         ruleNamespaceSelector: {}
-        ruleSelector:
-          matchLabels:
-            prometheus: kube-prometheus
+        ruleSelector: {}
         serviceMonitorNamespaceSelector: {}
         serviceMonitorSelector: {}
         storageSpec:

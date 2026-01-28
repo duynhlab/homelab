@@ -189,9 +189,8 @@ spec:
 | review | `k8s/sloth/crds/review-slo.yaml` | 99.9% | request success rate | HTTP 5xx |
 | notification | `k8s/sloth/crds/notification-slo.yaml` | 99.9% | request success rate | HTTP 5xx |
 | shipping | `k8s/sloth/crds/shipping-slo.yaml` | 99.9% | request success rate | HTTP 5xx |
-| shipping-v2 | `k8s/sloth/crds/shipping-v2-slo.yaml` | 99.9% | request success rate | HTTP 5xx |
 
-**Objective Explanation:**
+**Objective Explanation:** (8 services; shipping-v2 SLO CRD exists but service is suspended.)
 - **99.9%** = 0.1% error budget
 - **43.2 minutes** downtime allowed per month
 - **8.64 hours** downtime allowed per year
@@ -513,10 +512,9 @@ order-slo                  order            1              1            true    
 review-slo                review           1              1            true     5d
 notification-slo          notification     1              1            true     5d
 shipping-slo              shipping         1              1            true     5d
-shipping-v2-slo           shipping-v2      1              1            true     5d
 ```
 
-**Status Fields:**
+**Status Fields:** (8 services; shipping-v2-slo may appear if CRD is present but service is suspended.)
 - `DESIRED SLOs`: Number of SLOs defined
 - `READY SLOs`: Number of SLOs successfully processed
 - `GEN OK`: Prometheus rule generation status (should be `true`)

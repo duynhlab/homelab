@@ -135,7 +135,7 @@ flowchart TD
             KubeStateMetrics[kube-state-metrics]
         end
 
-        subgraph "Service Namespaces (9 Namespaces)"
+        subgraph "Service Namespaces (8 active; shipping-v2 suspended)"
             NSAuth[auth namespace<br/>auth-deployment × 2 replicas]
             NSUser[user namespace<br/>user-deployment × 2 replicas]
             NSProduct[product namespace<br/>product-deployment × 2 replicas]
@@ -143,7 +143,7 @@ flowchart TD
             NSOrder[order namespace<br/>order-deployment × 2 replicas]
             NSReview[review namespace<br/>review-deployment × 2 replicas]
             NSNotification[notification namespace<br/>notification-deployment × 2 replicas]
-            NSShipping[shipping namespace<br/>shipping-deployment × 2 replicas<br/>shipping-v2-deployment × 2 replicas]
+            NSShipping[shipping namespace<br/>shipping-deployment × 2 replicas]
         end
 
         subgraph "k6 Namespace"
@@ -192,7 +192,7 @@ flowchart LR
         Templates[templates/<br/>deployment.yaml<br/>service.yaml]
     end
 
-    subgraph "Per-Service Values (9 Files)"
+    subgraph "Per-Service Values (8 active + shipping-v2 suspended)"
         ValuesAuth[values/auth.yaml]
         ValuesUser[values/user.yaml]
         ValuesProduct[values/product.yaml]
@@ -201,7 +201,6 @@ flowchart LR
         ValuesReview[values/review.yaml]
         ValuesNotification[values/notification.yaml]
         ValuesShipping[values/shipping.yaml]
-        ValuesShippingV2[values/shipping-v2.yaml]
     end
 
     subgraph "Kubernetes Resources"
@@ -220,7 +219,6 @@ flowchart LR
     ValuesReview --> Templates
     ValuesNotification --> Templates
     ValuesShipping --> Templates
-    ValuesShippingV2 --> Templates
 
     Templates --> Deployment
     Templates --> Service
@@ -228,7 +226,7 @@ flowchart LR
 ```
 
 **Key Features:**
-- **Generic Chart**: One chart for all 9 microservices
+- **Generic Chart**: One chart for all 8 microservices (shipping-v2 suspended)
 - **Value Overrides**: Per-service configuration (image, env, resources)
 - **extraEnv Pattern**: Flexible environment variable injection
 - **Tracing Config**: Built-in Tempo endpoint configuration
@@ -243,7 +241,7 @@ flowchart LR
 ```
 monitoring/
 ├── services/              # Go application code
-│   ├── cmd/               # 9 microservice entry points
+│   ├── cmd/               # 8 microservice entry points (shipping-v2 suspended)
 │   ├── internal/          # Domain logic (3-layer architecture)
 │   ├── pkg/middleware/    # Shared observability middleware
 │   ├── Dockerfile         # Unified Dockerfile for all services
@@ -252,7 +250,7 @@ monitoring/
 ├── charts/                # Helm chart for microservices
 │   ├── Chart.yaml         # Chart metadata (v0.2.0)
 │   ├── values.yaml        # Default values
-│   ├── values/            # Per-service overrides (9 files)
+│   ├── values/            # Per-service overrides (8 active + shipping-v2 suspended)
 │   └── templates/         # Kubernetes templates
 ├── k8s/                   # Kubernetes manifests for infrastructure
 │   ├── prometheus/        # Prometheus Operator config
@@ -297,14 +295,10 @@ services/
 ├── internal/
 │   └── auth/              # Auth service domain
 │       ├── web/           # HTTP handlers (Layer 1)
-│       │   ├── v1/        # v1 API handlers
-│       │   │   └── handler.go
-│       │   └── v2/        # v2 API handlers
+│       │   └── v1/        # v1 API handlers (canonical)
 │       │       └── handler.go
 │       ├── logic/         # Business logic (Layer 2)
-│       │   ├── v1/        # v1 business logic
-│       │   │   └── service.go
-│       │   └── v2/        # v2 business logic
+│       │   └── v1/        # v1 business logic
 │       │       └── service.go
 │       └── core/          # Domain models (Layer 3)
 │           └── domain/
@@ -335,11 +329,11 @@ services/
 | **order** | Order service | order-deployment (2 replicas) | 2 | `monitoring=enabled`, `app=order` |
 | **review** | Review service | review-deployment (2 replicas) | 2 | `monitoring=enabled`, `app=review` |
 | **notification** | Notification service | notification-deployment (2 replicas) | 2 | `monitoring=enabled`, `app=notification` |
-| **shipping** | Shipping services | shipping-deployment (2 replicas)<br/>shipping-v2-deployment (2 replicas) | 4 | `monitoring=enabled`, `app=shipping`, `app=shipping-v2` |
+| **shipping** | Shipping service | shipping-deployment (2 replicas) | 2 | `monitoring=enabled`, `app=shipping` |
 | **k6** | Load testing | k6-scenarios | 1 | - |
 
-**Total Namespaces**: 13 (1 default + 1 kube-system + 1 monitoring + 9 services + 1 k6)
-**Total Pods**: ~43 pods (9 services × 2 replicas + 4 shipping pods + monitoring stack ~15 + system ~10 + k6)
+**Total Namespaces**: 13 (1 default + 1 kube-system + 1 monitoring + 8 services + 1 k6; shipping-v2 suspended)
+**Total Pods**: ~39 pods (8 services × 2 replicas + monitoring stack ~15 + system ~10 + k6)
 
 ### Namespace Label Strategy
 
@@ -513,21 +507,21 @@ flowchart LR
 - **Deprecation**: Clear path to sunset old API versions
 
 **Implementation:**
-- v1 and v2 handlers coexist in same service
-- Different URL paths: `/api/v1/*` vs `/api/v2/*`
-- Separate logic and domain models per version
+- v1 API only (v2 removed; shipping-v2 service suspended)
+- Single URL path: `/api/v1/*`
+- Logic and domain in `web/v1/` and `logic/v1/`
 
 ### Decision 6: Helm for Deployment
 
 **Rationale:**
-- **Templating**: One chart for all 9 microservices
+- **Templating**: One chart for all 8 microservices (shipping-v2 suspended)
 - **Value Overrides**: Per-service configuration without code duplication
 - **Release Management**: Easy rollback, history tracking
 - **Package Distribution**: OCI registry for chart distribution
 
 **Chart Strategy:**
 - **Generic Chart**: `charts/Chart.yaml` (v0.2.0)
-- **Per-Service Values**: `charts/values/*.yaml` (9 files)
+- **Per-Service Values**: `charts/values/*.yaml` (8 active + shipping-v2 suspended)
 - **extraEnv Pattern**: Flexible environment variable injection
 - **Unified Deployment**: `./scripts/05-deploy-microservices.sh` deploys all services
 
@@ -582,7 +576,7 @@ flowchart LR
 **Phase 4: Build & Deploy Applications (Steps 5-6)**
 ```bash
 ./scripts/04-build-microservices.sh      # Build Docker images (9 services + k6)
-./scripts/05-deploy-microservices.sh     # Deploy all 9 microservices via Helm
+./scripts/05-deploy-microservices.sh     # Deploy all 8 microservices via Helm (shipping-v2 suspended)
 ```
 
 **Phase 5: Load Testing (Step 7)**

@@ -6,25 +6,22 @@ metadata:
   namespace: order
 spec:
   interval: 10m
-  # Helm install/upgrade can be slow on first pull + migrations; avoid marking release failed prematurely.
   timeout: 10m
-
+  chartRef:
+    kind: OCIRepository
+    name: mop-chart-oci
+    namespace: flux-system
+  releaseName: order
   install:
     remediation:
       retries: 3
   upgrade:
     remediation:
       retries: 3
-  chartRef:
-    kind: OCIRepository
-    name: mop-chart-oci
-    namespace: flux-system
-  releaseName: order
   values:
-    # Values for order service
     name: order
 
-    replicaCount: 2
+    replicaCount: 1
 
     image:
       repository: ghcr.io/duynhne/order

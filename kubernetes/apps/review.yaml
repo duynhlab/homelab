@@ -6,22 +6,19 @@ metadata:
   namespace: review
 spec:
   interval: 10m
-  # Helm install/upgrade can be slow on first pull + migrations; avoid marking release failed prematurely.
   timeout: 10m
-
+  chartRef:
+    kind: OCIRepository
+    name: mop-chart-oci
+    namespace: flux-system
   install:
     remediation:
       retries: 3
   upgrade:
     remediation:
       retries: 3
-  chartRef:
-    kind: OCIRepository
-    name: mop-chart-oci
-    namespace: flux-system
   releaseName: review
   values:
-    # Values for review service
     name: review
 
     replicaCount: 1

@@ -19,6 +19,10 @@ type CacheClient interface {
 	// TTL of 0 means no expiration
 	Set(ctx context.Context, key string, value []byte, ttl time.Duration) error
 
+	// SetNX stores a value in cache only if the key does not exist
+	// Returns true if the key was set, false otherwise
+	SetNX(ctx context.Context, key string, value []byte, ttl time.Duration) (bool, error)
+
 	// Delete removes a key from cache
 	Delete(ctx context.Context, key string) error
 

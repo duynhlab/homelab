@@ -38,6 +38,7 @@ type Config struct {
 	Logging          LoggingConfig   // Structured logging (Zap)
 	Metrics          MetricsConfig   // Prometheus metrics
 	Database         DatabaseConfig  // PostgreSQL database configuration
+	Cache            CacheConfig     // Valkey/Redis cache configuration
 	ShutdownTimeout  int             // Graceful shutdown timeout in seconds - from SHUTDOWN_TIMEOUT env (default: 10)
 	ReviewServiceURL string          // Review service URL for aggregation - from REVIEW_SERVICE_URL env
 }
@@ -77,6 +78,18 @@ type LoggingConfig struct {
 type MetricsConfig struct {
 	Enabled bool   // Enable metrics (default: true) - from METRICS_ENABLED env
 	Path    string // Metrics endpoint path (default: "/metrics") - from METRICS_PATH env
+}
+
+// CacheConfig defines Valkey/Redis cache configuration
+// Used for caching Product service read-heavy endpoints (GET /products, GET /products/:id)
+type CacheConfig struct {
+	Enabled          bool          // Enable caching (default: true) - from CACHE_ENABLED env
+	Host             string        // Cache host - from CACHE_HOST env (default: "valkey.cache-system.svc.cluster.local")
+	Port             string        // Cache port - from CACHE_PORT env (default: "6379")
+	Password         string        // Cache password - from CACHE_PASSWORD env (optional, empty for local)
+	DB               int           // Cache database number - from CACHE_DB env (default: 0)
+	TTLProductList   time.Duration // TTL for product list cache - from CACHE_TTL_PRODUCT_LIST env (default: 5m)
+	TTLProductDetail time.Duration // TTL for single product cache - from CACHE_TTL_PRODUCT_DETAIL env (default: 10m)
 }
 
 // DatabaseConfig defines PostgreSQL database configuration
@@ -147,6 +160,15 @@ func Load() *Config {
 			MaxConnections: getEnvInt("DB_POOL_MAX_CONNECTIONS", 25),
 			PoolMode:       getEnv("DB_POOL_MODE", ""),
 			PoolerType:     getEnv("DB_POOLER_TYPE", ""),
+		},
+		Cache: CacheConfig{
+			Enabled:          getEnvBool("CACHE_ENABLED", true),
+			Host:             getEnv("CACHE_HOST", "valkey.cache-system.svc.cluster.local"),
+			Port:             getEnv("CACHE_PORT", "6379"),
+			Password:         getEnv("CACHE_PASSWORD", ""),
+			DB:               getEnvInt("CACHE_DB", 0),
+			TTLProductList:   getEnvDuration("CACHE_TTL_PRODUCT_LIST", 5*time.Minute),
+			TTLProductDetail: getEnvDuration("CACHE_TTL_PRODUCT_DETAIL", 10*time.Minute),
 		},
 		ShutdownTimeout:  getEnvDurationSeconds("SHUTDOWN_TIMEOUT", 10),
 		ReviewServiceURL: getEnv("REVIEW_SERVICE_URL", "http://review.review.svc.cluster.local:8080"),
@@ -227,6 +249,23 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	// Cache validation (if cache is enabled)
+	if c.Cache.Enabled {
+		if c.Cache.Host == "" {
+			errors = append(errors, "CACHE_HOST is required when CACHE_ENABLED is true")
+		}
+		// Validate port is a valid number
+		if c.Cache.Port != "" {
+			if _, err := strconv.Atoi(c.Cache.Port); err != nil {
+				errors = append(errors, fmt.Sprintf("CACHE_PORT must be a valid number, got: %s", c.Cache.Port))
+			}
+		}
+		// Validate DB is non-negative
+		if c.Cache.DB < 0 {
+			errors = append(errors, fmt.Sprintf("CACHE_DB must be non-negative, got: %d", c.Cache.DB))
+		}
+	}
+
 	if len(errors) > 0 {
 		return fmt.Errorf("configuration validation failed:\n  - %s", strings.Join(errors, "\n  - "))
 	}
@@ -293,6 +332,30 @@ func getEnvFloat(key string, defaultValue float64) float64 {
 		return defaultValue
 	}
 	return floatValue
+}
+
+// getEnvDuration reads a duration environment variable and returns time.Duration
+// Accepts Go duration format (e.g., "10s", "30s", "5m", "1h")
+// Returns default on invalid values (silent fallback for startup safety)
+func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
+	durationStr := os.Getenv(key)
+	if durationStr == "" {
+		return defaultValue
+	}
+
+	duration, err := time.ParseDuration(durationStr)
+	if err != nil {
+		// Invalid format - use default (silent fallback for startup safety)
+		return defaultValue
+	}
+
+	// Validate: must be positive
+	if duration <= 0 {
+		// Invalid value - use default (silent fallback for startup safety)
+		return defaultValue
+	}
+
+	return duration
 }
 
 // getEnvDurationSeconds reads a duration environment variable and returns seconds as int

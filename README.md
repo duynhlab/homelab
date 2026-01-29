@@ -14,8 +14,8 @@ Production-ready microservices monitoring platform with 8 Go services, complete 
 - 34 Grafana dashboard panels (5 row groups)
 - Complete observability stack (Prometheus, Tempo, Jaeger, Loki, Pyroscope)
 - PostgreSQL database integration (5 clusters, Flyway migrations)
+- Valkey caching (Redis-compatible) with Cache-Aside pattern
 - SLO management via Sloth Operator
-- k6 load testing
 
 **For detailed documentation, see [`docs/README.md`](docs/README.md)**
 
@@ -25,74 +25,54 @@ Production-ready microservices monitoring platform with 8 Go services, complete 
 
 ### System Architecture
 
-Complete system architecture showing Frontend (React SPA), k6 load testing, microservices stack (3-layer architecture), data layer, and observability:
+Complete system architecture showing Frontend (React SPA), microservices stack (3-layer architecture), Valkey cache layer, data layer, and observability:
 
 ```mermaid
 flowchart TB
-    subgraph "Frontend Layer"
-        FE[Frontend React SPA<br/>Browser-based<br/>Port-forward: 3000]
-        FEAPI[API Client<br/>Axios<br/>VITE_API_BASE_URL]
+    subgraph FrontendLayer["Frontend Layer"]
+        FE[Frontend React SPA]
+        FEAPI[API Client]
     end
     
-    subgraph "Load Testing"
-        K6[k6 Pod<br/>Arrival-Rate Executors]
-        Script[k6 Script<br/>load-test-multiple-scenarios.js]
-        Journeys[Journey Functions<br/>8 journey types]
+    subgraph BackendServices["Backend Services - 3-Layer Architecture"]
+        Web[Web Layer]
+        Logic[Logic Layer]
+        Core[Core Layer]
     end
     
-    subgraph "Traffic Patterns"
-        Baseline[Baseline Traffic<br/>constant-arrival-rate<br/>30 RPS]
-        Peak[Peak Hours<br/>ramping-arrival-rate<br/>100 RPS]
-        Burst[Burst Scenarios<br/>ramping-arrival-rate<br/>200+ RPS]
+    subgraph CacheLayer["Cache Layer"]
+        Valkey[Valkey Cache]
     end
     
-    subgraph "Backend Services - 3-Layer Architecture"
-        Web[Web Layer<br/>web/v1/<br/>HTTP Handlers<br/>Request/Response<br/>Validation]
-        Logic[Logic Layer<br/>logic/v1/<br/>Business Logic<br/>Orchestration]
-        Core[Core Layer<br/>core/domain/<br/>Domain Models<br/>Repository<br/>DB Connection]
+    subgraph DataLayer["Data Layer"]
+        Pooler[Connection Poolers]
+        Database[(PostgreSQL)]
     end
     
-    subgraph "Data Layer"
-        Pooler[Connection Poolers<br/>PgBouncer / PgCat]
-        Database[(PostgreSQL<br/>5 Clusters)]
-    end
-    
-    subgraph "Observability"
-        Tempo[Distributed Tracing<br/>Tempo]
-        Prometheus[Metrics<br/>Prometheus]
-        Grafana[Dashboards<br/>Grafana]
+    subgraph Observability["Observability"]
+        Tempo[Tempo]
+        Prometheus[Prometheus]
+        Grafana[Grafana]
     end
     
     FE --> FEAPI
-    FEAPI -->|"HTTP /api/v1/*"| Web
-    
-    K6 --> Script
-    Script --> Journeys
-    
-    Journeys --> Baseline
-    Journeys --> Peak
-    Journeys --> Burst
-    
-    Baseline -->|"HTTP /api/v1/*"| Web
-    Peak -->|"HTTP /api/v1/*"| Web
-    Burst -->|"HTTP /api/v1/*"| Web
-    
+    FEAPI -->|HTTP /api/v1/*| Web
     Web -->|calls| Logic
+    Logic -->|Cache-Aside| CacheLayer
     Logic -->|uses| Core
     Logic -->|queries| Core
     Core -->|connects via| Pooler
     Pooler -->|routes to| Database
+    CacheLayer --> Valkey
     Database -->|returns data| Core
     Core -->|returns| Logic
     Logic -->|returns| Web
-    
+    Web -->|JSON response| FEAPI
     Web --> Tempo
     Logic --> Tempo
     Core --> Tempo
-    
     Web --> Prometheus
     Logic --> Prometheus
-    
     Prometheus --> Grafana
     Tempo --> Grafana
 ```
@@ -100,7 +80,8 @@ flowchart TB
 **Key Points:**
 
 - **Frontend (React SPA)**: Runs in browser, makes HTTP requests to Web Layer only (`/api/v1/*`)
-- **3-Layer Architecture**: Web → Logic → Core (Frontend and k6 can ONLY access Web Layer)
+- **3-Layer Architecture**: Web → Logic → Core (Frontend can ONLY access Web Layer)
+- **Cache-Aside Pattern**: Logic Layer checks Valkey cache first, queries database on cache miss, then writes to cache
 - **Observability**: All layers emit traces/metrics to Tempo/Prometheus, visualized in Grafana
 
 **Frontend Architecture**: See [`frontend/README.md`](frontend/README.md) for complete frontend documentation, API mapping, and integration details.
@@ -119,7 +100,7 @@ flowchart TB
     - Connection poolers: PgBouncer, PgCat
     - Migrations: Flyway 11.8.2 (8 migration images)
 - **HTTP Framework**: Gin
-- **Cache**: TDB
+- **Cache**: Valkey (Redis-compatible) with Cache-Aside pattern
 
 **Complete API Documentation**: See [`docs/api/API.md`](docs/api/API.md)
 
@@ -152,7 +133,8 @@ make flux-push    # 3. Deploy everything (infrastructure + apps)
 
 - Infrastructure: Monitoring (Prometheus, Grafana), APM (Tempo, Loki, Jaeger, Pyroscope, Vector, OTel)
 - Databases: PostgreSQL operators, 5 clusters, connection poolers
-- Applications: 8 microservices + frontend + k6 load testing
+- Cache: Valkey (Redis-compatible) in cache-system namespace
+- Applications: 8 microservices + frontend
 - SLO: Sloth Operator + Service Level Objectives
 
 **Wait 5-10 minutes** for Flux reconciliation, then access services.

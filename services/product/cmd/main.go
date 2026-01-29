@@ -14,6 +14,7 @@ import (
 
 	"github.com/duynhne/monitoring/services/product/config"
 	database "github.com/duynhne/monitoring/services/product/internal/core"
+	"github.com/duynhne/monitoring/services/product/internal/core/cache"
 	"github.com/duynhne/monitoring/services/product/internal/core/repository"
 	logicv1 "github.com/duynhne/monitoring/services/product/internal/logic/v1"
 	v1 "github.com/duynhne/monitoring/services/product/internal/web/v1"
@@ -83,8 +84,37 @@ func main() {
 	productRepo := repository.NewPostgresProductRepository(pool)
 	logger.Info("Product repository initialized")
 
+	// Initialize cache client (Core layer) - optional, can be nil if disabled
+	var productCache *cache.ProductCache
+	if cfg.Cache.Enabled {
+		cacheAddr := cfg.Cache.Host + ":" + cfg.Cache.Port
+		cacheClient, err := cache.NewValkeyCacheClient(cacheAddr, cfg.Cache.Password, cfg.Cache.DB)
+		if err != nil {
+			logger.Warn("Failed to initialize cache client, continuing without cache",
+				zap.Error(err),
+				zap.String("cache_addr", cacheAddr),
+			)
+		} else {
+			productCache = cache.NewProductCache(cacheClient, cfg.Cache.TTLProductList, cfg.Cache.TTLProductDetail)
+			logger.Info("Cache client initialized",
+				zap.String("cache_addr", cacheAddr),
+				zap.Duration("ttl_list", cfg.Cache.TTLProductList),
+				zap.Duration("ttl_detail", cfg.Cache.TTLProductDetail),
+			)
+			defer func() {
+				if err := cacheClient.Close(); err != nil {
+					logger.Error("Failed to close cache client", zap.Error(err))
+				} else {
+					logger.Info("Cache client closed")
+				}
+			}()
+		}
+	} else {
+		logger.Info("Cache disabled (CACHE_ENABLED=false)")
+	}
+
 	// Initialize services (Logic layer) with dependency injection
-	productService := logicv1.NewProductService(productRepo)
+	productService := logicv1.NewProductService(productRepo, productCache)
 	logger.Info("Product service initialized")
 
 	// Set service instances in Web handlers
@@ -164,7 +194,7 @@ func main() {
 
 	logger.Info("Shutting down server...", zap.Duration("timeout", shutdownTimeout))
 
-	// Explicit cleanup sequence: HTTP Server → Database → Tracer
+	// Explicit cleanup sequence: HTTP Server → Cache → Database → Tracer
 	// This ensures predictable shutdown order and easier debugging
 
 	// 1. Shutdown HTTP server (stop accepting new connections, wait for in-flight requests)
@@ -174,11 +204,14 @@ func main() {
 		logger.Info("HTTP server shutdown complete")
 	}
 
-	// 2. Close database connections (explicit cleanup + defer for safety)
+	// 2. Close cache connection (if enabled)
+	// Note: Cache client cleanup is handled by defer in initialization section above
+
+	// 3. Close database connections (explicit cleanup + defer for safety)
 	pool.Close()
 	logger.Info("Database pool closed")
 
-	// 3. Shutdown tracer (flush pending spans)
+	// 4. Shutdown tracer (flush pending spans)
 	if tp != nil {
 		if err := tp.Shutdown(shutdownCtx); err != nil {
 			logger.Error("Tracer shutdown error", zap.Error(err))

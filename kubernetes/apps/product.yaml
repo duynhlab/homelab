@@ -6,29 +6,22 @@ metadata:
   namespace: product
 spec:
   interval: 10m
-  # Helm install/upgrade can be slow on first pull + migrations; avoid marking release failed prematurely.
-  timeout: 10m
-
+  timeout: 10m  
+  chartRef:
+    kind: OCIRepository
+    name: mop-chart-oci
+    namespace: flux-system
   install:
     remediation:
       retries: 3
   upgrade:
     remediation:
       retries: 3
-  
-  chartRef:
-    kind: OCIRepository
-    name: mop-chart-oci
-    namespace: flux-system
-  
   releaseName: product
-  
-  # Local environment configuration (inline, no overlay needed)
   values:
-    # Values for product service
     name: product
 
-    replicaCount: 1
+    replicaCount: 2
 
     image:
       repository: ghcr.io/duynhne/product
@@ -92,6 +85,21 @@ spec:
       # Review service URL for product details aggregation
       - name: REVIEW_SERVICE_URL
         value: "http://review.review.svc.cluster.local:8080"
+      # Cache configuration (Valkey/Redis-compatible)
+      - name: CACHE_ENABLED
+        value: "true"
+      - name: CACHE_HOST
+        value: "valkey.cache-system.svc.cluster.local"
+      - name: CACHE_PORT
+        value: "6379"
+      - name: CACHE_PASSWORD
+        value: ""  # Empty - auth disabled for local dev
+      - name: CACHE_DB
+        value: "0"
+      - name: CACHE_TTL_PRODUCT_LIST
+        value: "5m"  # TTL for product list cache
+      - name: CACHE_TTL_PRODUCT_DETAIL
+        value: "10m"  # TTL for single product cache
 
     # Kubernetes graceful shutdown configuration
     terminationGracePeriodSeconds: 30  # Shutdown timeout (10s) + buffer (20s)

@@ -85,6 +85,21 @@ spec:
       # Review service URL for product details aggregation
       - name: REVIEW_SERVICE_URL
         value: "http://review.review.svc.cluster.local:8080"
+      # Cache configuration (Valkey/Redis-compatible)
+      - name: CACHE_ENABLED
+        value: "true"
+      - name: CACHE_HOST
+        value: "valkey.cache-system.svc.cluster.local"
+      - name: CACHE_PORT
+        value: "6379"
+      - name: CACHE_PASSWORD
+        value: ""  # Empty - auth disabled for local dev
+      - name: CACHE_DB
+        value: "0"
+      - name: CACHE_TTL_PRODUCT_LIST
+        value: "5m"  # TTL for product list cache
+      - name: CACHE_TTL_PRODUCT_DETAIL
+        value: "10m"  # TTL for single product cache
 
     # Kubernetes graceful shutdown configuration
     terminationGracePeriodSeconds: 30  # Shutdown timeout (10s) + buffer (20s)

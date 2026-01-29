@@ -21,3 +21,4 @@ resources:
   - helm/opentelemetry.yaml
   - helm/pgcat.yaml
   - helm/pgdog.yaml
+  - helm/valkey.yaml

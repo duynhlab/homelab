@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/duynhne/monitoring/services/product/internal/core/cache"
 	"github.com/duynhne/monitoring/services/product/internal/core/domain"
 	"github.com/duynhne/monitoring/services/product/middleware"
 	"go.opentelemetry.io/otel/attribute"
@@ -13,21 +14,47 @@ import (
 // ProductService handles product business logic
 type ProductService struct {
 	productRepo domain.ProductRepository
+	productCache *cache.ProductCache // Optional - nil if caching disabled
 }
 
 // NewProductService creates a new ProductService with repository injection
-func NewProductService(repo domain.ProductRepository) *ProductService {
-	return &ProductService{productRepo: repo}
+// productCache can be nil if caching is disabled
+func NewProductService(repo domain.ProductRepository, productCache *cache.ProductCache) *ProductService {
+	return &ProductService{
+		productRepo: repo,
+		productCache: productCache,
+	}
 }
 
 // ListProducts retrieves all products with optional filtering
+// Implements Cache-Aside pattern: check cache first, fallback to repository
 func (s *ProductService) ListProducts(ctx context.Context, filters domain.ProductFilters) ([]domain.Product, int, error) {
 	ctx, span := middleware.StartSpan(ctx, "product.list", trace.WithAttributes(
 		attribute.String("layer", "logic"),
 	))
 	defer span.End()
 
-	// Call repository
+	// Cache-Aside pattern: Check cache first
+	if s.productCache != nil {
+		cachedProducts, cachedTotal, err := s.productCache.GetProductList(ctx, filters)
+		if err != nil {
+			// Cache error - log but continue to database
+			span.RecordError(err)
+			span.SetAttributes(attribute.Bool("cache.error", true))
+		} else if cachedProducts != nil {
+			// Cache hit
+			span.SetAttributes(
+				attribute.Bool("cache.hit", true),
+				attribute.Int("products.count", len(cachedProducts)),
+				attribute.Int("products.total", cachedTotal),
+			)
+			return cachedProducts, cachedTotal, nil
+		}
+		// Cache miss - continue to database
+		span.SetAttributes(attribute.Bool("cache.hit", false))
+	}
+
+	// Cache miss or cache disabled - query repository
 	products, err := s.productRepo.FindAll(ctx, filters)
 	if err != nil {
 		span.RecordError(err)
@@ -41,6 +68,15 @@ func (s *ProductService) ListProducts(ctx context.Context, filters domain.Produc
 		return nil, 0, err
 	}
 
+	// Write to cache (async - don't block on cache write errors)
+	if s.productCache != nil {
+		if err := s.productCache.SetProductList(ctx, filters, products, total); err != nil {
+			// Log cache write error but don't fail the request
+			span.RecordError(err)
+			span.SetAttributes(attribute.Bool("cache.write_error", true))
+		}
+	}
+
 	span.SetAttributes(
 		attribute.Int("products.count", len(products)),
 		attribute.Int("products.total", total),
@@ -49,6 +85,7 @@ func (s *ProductService) ListProducts(ctx context.Context, filters domain.Produc
 }
 
 // GetProduct retrieves a single product by ID
+// Implements Cache-Aside pattern: check cache first, fallback to repository
 func (s *ProductService) GetProduct(ctx context.Context, id string) (*domain.Product, error) {
 	ctx, span := middleware.StartSpan(ctx, "product.get", trace.WithAttributes(
 		attribute.String("layer", "logic"),
@@ -56,7 +93,24 @@ func (s *ProductService) GetProduct(ctx context.Context, id string) (*domain.Pro
 	))
 	defer span.End()
 
-	// Call repository
+	// Cache-Aside pattern: Check cache first
+	if s.productCache != nil {
+		cachedProduct, err := s.productCache.GetProduct(ctx, id)
+		if err != nil {
+			// Cache error - log but continue to database
+			span.RecordError(err)
+			span.SetAttributes(attribute.Bool("cache.error", true))
+		} else if cachedProduct != nil {
+			// Cache hit
+			span.SetAttributes(attribute.Bool("cache.hit", true))
+			span.SetAttributes(attribute.Bool("product.found", true))
+			return cachedProduct, nil
+		}
+		// Cache miss - continue to database
+		span.SetAttributes(attribute.Bool("cache.hit", false))
+	}
+
+	// Cache miss or cache disabled - query repository
 	product, err := s.productRepo.FindByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
@@ -65,6 +119,15 @@ func (s *ProductService) GetProduct(ctx context.Context, id string) (*domain.Pro
 		}
 		span.RecordError(err)
 		return nil, err
+	}
+
+	// Write to cache (async - don't block on cache write errors)
+	if s.productCache != nil {
+		if err := s.productCache.SetProduct(ctx, id, product); err != nil {
+			// Log cache write error but don't fail the request
+			span.RecordError(err)
+			span.SetAttributes(attribute.Bool("cache.write_error", true))
+		}
 	}
 
 	span.SetAttributes(attribute.Bool("product.found", true))
@@ -116,6 +179,17 @@ func (s *ProductService) CreateProduct(ctx context.Context, req domain.CreatePro
 	if err != nil {
 		span.RecordError(err)
 		return nil, err
+	}
+
+	// Invalidate cache after successful creation
+	// This ensures new products appear in list queries
+	if s.productCache != nil {
+		// Invalidate list caches (new product should appear in lists)
+		if err := s.productCache.InvalidateProductList(ctx); err != nil {
+			// Log cache invalidation error but don't fail the request
+			span.RecordError(err)
+			span.SetAttributes(attribute.Bool("cache.invalidation_error", true))
+		}
 	}
 
 	span.SetAttributes(

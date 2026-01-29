@@ -52,6 +52,11 @@ func (c *ValkeyCacheClient) Set(ctx context.Context, key string, value []byte, t
 	return c.client.Set(ctx, key, value, ttl).Err()
 }
 
+// SetNX stores a value in cache only if the key does not exist
+func (c *ValkeyCacheClient) SetNX(ctx context.Context, key string, value []byte, ttl time.Duration) (bool, error) {
+	return c.client.SetNX(ctx, key, value, ttl).Result()
+}
+
 // Delete removes a key from cache
 func (c *ValkeyCacheClient) Delete(ctx context.Context, key string) error {
 	return c.client.Del(ctx, key).Err()

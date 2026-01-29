@@ -13,7 +13,7 @@ import (
 
 // ProductService handles product business logic
 type ProductService struct {
-	productRepo domain.ProductRepository
+	productRepo  domain.ProductRepository
 	productCache *cache.ProductCache // Optional - nil if caching disabled
 }
 
@@ -21,7 +21,7 @@ type ProductService struct {
 // productCache can be nil if caching is disabled
 func NewProductService(repo domain.ProductRepository, productCache *cache.ProductCache) *ProductService {
 	return &ProductService{
-		productRepo: repo,
+		productRepo:  repo,
 		productCache: productCache,
 	}
 }
@@ -93,24 +93,35 @@ func (s *ProductService) GetProduct(ctx context.Context, id string) (*domain.Pro
 	))
 	defer span.End()
 
-	// Cache-Aside pattern: Check cache first
+	// Check cache with Stampede Prevention (Locking)
 	if s.productCache != nil {
-		cachedProduct, err := s.productCache.GetProduct(ctx, id)
+		product, err := s.productCache.GetProductOrSet(ctx, id, func() (*domain.Product, error) {
+			// This closure is only called if cache miss AND lock acquired
+			p, err := s.productRepo.FindByID(ctx, id)
+			if err != nil {
+				// If not found, return domain error which will be propagated
+				return nil, err
+			}
+			return p, nil
+		})
+
 		if err != nil {
-			// Cache error - log but continue to database
+			if errors.Is(err, domain.ErrNotFound) {
+				span.SetAttributes(attribute.Bool("product.found", false))
+				return nil, ErrProductNotFound
+			}
+			// Log other errors
 			span.RecordError(err)
-			span.SetAttributes(attribute.Bool("cache.error", true))
-		} else if cachedProduct != nil {
-			// Cache hit
-			span.SetAttributes(attribute.Bool("cache.hit", true))
-			span.SetAttributes(attribute.Bool("product.found", true))
-			return cachedProduct, nil
+			// Decide whether to fail or return error. Since GetProductOrSet handles fallback logic internally
+			// for timeouts, if we get here it's likely a DB error or a persistent cache/lock error.
+			return nil, err
 		}
-		// Cache miss - continue to database
-		span.SetAttributes(attribute.Bool("cache.hit", false))
+
+		span.SetAttributes(attribute.Bool("product.found", true))
+		return product, nil
 	}
 
-	// Cache miss or cache disabled - query repository
+	// Cache disabled - direct DB call
 	product, err := s.productRepo.FindByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
@@ -119,15 +130,6 @@ func (s *ProductService) GetProduct(ctx context.Context, id string) (*domain.Pro
 		}
 		span.RecordError(err)
 		return nil, err
-	}
-
-	// Write to cache (async - don't block on cache write errors)
-	if s.productCache != nil {
-		if err := s.productCache.SetProduct(ctx, id, product); err != nil {
-			// Log cache write error but don't fail the request
-			span.RecordError(err)
-			span.SetAttributes(attribute.Bool("cache.write_error", true))
-		}
 	}
 
 	span.SetAttributes(attribute.Bool("product.found", true))

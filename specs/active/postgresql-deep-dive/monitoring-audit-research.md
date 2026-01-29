@@ -61,9 +61,9 @@ kubectl exec -n cart transaction-db-1 -- psql -U postgres -c "SELECT version();"
 | **Extensions** | `pg_stat_statements`, `pg_cron`, `pg_trgm`, `pgcrypto`, `pg_stat_kcache` |
 
 **Configuration Files:**
-- [instance.yaml](file:///home/duydo/Working/duy/Github/monitoring/kubernetes/infra/configs/databases/clusters/supporting-db/instance.yaml)
-- [monitoring-queries.yaml](file:///home/duydo/Working/duy/Github/monitoring/kubernetes/infra/configs/databases/clusters/supporting-db/configmaps/monitoring-queries.yaml)
-- [vector-sidecar.yaml](file:///home/duydo/Working/duy/Github/monitoring/kubernetes/infra/configs/databases/clusters/supporting-db/configmaps/vector-sidecar.yaml)
+- [instance.yaml](kubernetes/infra/configs/databases/clusters/supporting-db/instance.yaml)
+- [monitoring-queries.yaml](kubernetes/infra/configs/databases/clusters/supporting-db/configmaps/monitoring-queries.yaml)
+- [vector-sidecar.yaml](kubernetes/infra/configs/databases/clusters/supporting-db/configmaps/vector-sidecar.yaml)
 
 ---
 
@@ -80,9 +80,9 @@ kubectl exec -n cart transaction-db-1 -- psql -U postgres -c "SELECT version();"
 | **Extensions** | `shared_preload_libraries` is **empty** |
 
 **Configuration Files:**
-- [product-db/instance.yaml](file:///home/duydo/Working/duy/Github/monitoring/kubernetes/infra/configs/databases/clusters/product-db/instance.yaml)
-- [transaction-db/instance.yaml](file:///home/duydo/Working/duy/Github/monitoring/kubernetes/infra/configs/databases/clusters/transaction-db/instance.yaml)
-- [podmonitor.yaml](file:///home/duydo/Working/duy/Github/monitoring/kubernetes/infra/configs/databases/clusters/product-db/monitoring/podmonitor-cloudnativepg-product-db.yaml)
+- [product-db/instance.yaml](kubernetes/infra/configs/databases/clusters/product-db/instance.yaml)
+- [transaction-db/instance.yaml](kubernetes/infra/configs/databases/clusters/transaction-db/instance.yaml)
+- [podmonitor.yaml](kubernetes/infra/configs/databases/clusters/product-db/monitoring/podmonitor-cloudnativepg-product-db.yaml)
 
 ---
 
@@ -211,7 +211,7 @@ flowchart LR
   VEC --> |adds labels| LAB["namespace, cluster, pod, container"]
 ```
 
-**Config:** [vector-sidecar.yaml](file:///home/duydo/Working/duy/Github/monitoring/kubernetes/infra/configs/databases/clusters/supporting-db/configmaps/vector-sidecar.yaml)
+**Config:** [vector-sidecar.yaml](kubernetes/infra/configs/databases/clusters/supporting-db/configmaps/vector-sidecar.yaml)
 
 ---
 
@@ -239,7 +239,7 @@ flowchart LR
 
 ### Current queries.yaml Columns Used
 
-All columns used in [monitoring-queries.yaml](file:///home/duydo/Working/duy/Github/monitoring/kubernetes/infra/configs/databases/clusters/supporting-db/configmaps/monitoring-queries.yaml) exist in **all versions**:
+All columns used in [monitoring-queries.yaml](kubernetes/infra/configs/databases/clusters/supporting-db/configmaps/monitoring-queries.yaml) exist in **all versions**:
 
 | Column | PG 16 | PG 17 | PG 18 | Used in queries.yaml |
 |--------|-------|-------|-------|---------------------|

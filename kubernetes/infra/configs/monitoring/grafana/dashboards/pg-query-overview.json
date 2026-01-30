@@ -964,7 +964,7 @@
                     },
                     "editorMode": "code",
                     "exemplar": false,
-                    "expr": "sort_desc(topk(50,increase(sum(pg_stat_statements_time_milliseconds{query=~\"^SELECT.*|^INSERT.*|^UPDATE.*\",datname!=\"postgres\",kubernetes_namespace=\"$namespace\",kubernetes_pod_name=\"$Pod\"}) by (query,queryid,user)[1h])))",
+                    "expr": "sort_desc(topk(50,sum by (query,queryid,user) (increase(pg_stat_statements_time_milliseconds{query=~\"^SELECT.*|^INSERT.*|^UPDATE.*\",datname!=\"postgres\",kubernetes_namespace=\"$namespace\",kubernetes_pod_name=\"$Pod\"}[1h]))))",
                     "format": "table",
                     "hide": false,
                     "instant": true,
@@ -1040,7 +1040,7 @@
                         "uid": "${DS_LOKI}"
                     },
                     "editorMode": "code",
-                    "expr": "{namespace=\"$namespace\",pod=\"$Pod\"} |~ \"duration:\"",
+                    "expr": "{namespace=~\"$namespace\",pod=~\"$Pod\",container!=\"\"} |~ \"duration:\"",
                     "queryType": "range",
                     "refId": "A"
                 }
@@ -1444,7 +1444,7 @@
                                 "uid": "${DS_PROMETHEUS}"
                             },
                             "dsType": "influxdb",
-                            "expr": "sort_desc(topk(10,rate(pg_stat_statements_shared_blks_dirtied{datname=~\"$datname\",instance=\"$host\"}[$interval])))",
+                            "expr": "sort_desc(topk(10,rate(pg_stat_statements_shared_blks_dirtied{datname=~\"$datname\",kubernetes_namespace=\"$namespace\",kubernetes_pod_name=\"$Pod\"}[$interval])))",
                             "format": "table",
                             "groupBy": [
                                 {
@@ -1669,7 +1669,7 @@
                                 "uid": "${DS_PROMETHEUS}"
                             },
                             "dsType": "influxdb",
-                            "expr": "sort_desc(topk(10,rate(pg_stat_statements_shared_blks_hit{datname=~\"$datname\",instance=\"$host\"}[$interval])))",
+                            "expr": "sort_desc(topk(10,rate(pg_stat_statements_shared_blks_hit{datname=~\"$datname\",kubernetes_namespace=\"$namespace\",kubernetes_pod_name=\"$Pod\"}[$interval])))",
                             "format": "table",
                             "groupBy": [
                                 {
@@ -2106,7 +2106,7 @@
                                 "uid": "${DS_PROMETHEUS}"
                             },
                             "dsType": "influxdb",
-                            "expr": "sort_desc(topk(10,rate(pg_stat_statements_shared_blks_read{datname=~\"$datname\",instance=\"$host\"}[$interval])))",
+                            "expr": "sort_desc(topk(10,rate(pg_stat_statements_shared_blks_read{datname=~\"$datname\",kubernetes_namespace=\"$namespace\",kubernetes_pod_name=\"$Pod\"}[$interval])))",
                             "format": "table",
                             "groupBy": [
                                 {
@@ -2331,7 +2331,7 @@
                                 "uid": "${DS_PROMETHEUS}"
                             },
                             "dsType": "influxdb",
-                            "expr": "sort_desc(topk(10,rate(pg_stat_statements_shared_blks_written{datname=~\"$datname\",instance=\"$host\"}[$interval])))",
+                            "expr": "sort_desc(topk(10,rate(pg_stat_statements_shared_blks_written{datname=~\"$datname\",kubernetes_namespace=\"$namespace\",kubernetes_pod_name=\"$Pod\"}[$interval])))",
                             "format": "table",
                             "groupBy": [
                                 {

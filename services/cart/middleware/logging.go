@@ -3,11 +3,11 @@ package middleware
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"log/slog"
 	"time"
 
+	"github.com/duynhne/monitoring/services/pkg/logger/clog"
 	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 const TraceIDHeader = "X-Trace-ID"
@@ -62,7 +62,7 @@ func generateTraceID() string {
 }
 
 // LoggingMiddleware creates a Gin middleware for structured logging with trace-id
-func LoggingMiddleware(logger *zap.Logger) gin.HandlerFunc {
+func LoggingMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
@@ -74,9 +74,16 @@ func LoggingMiddleware(logger *zap.Logger) gin.HandlerFunc {
 		// Store trace-id in context for handlers to use
 		c.Set("trace_id", traceID)
 
-		// Store logger in context for handlers to use
-		loggerWithTrace := logger.With(zap.String("trace_id", traceID))
-		c.Set("logger", loggerWithTrace)
+		// Setup logger with trace_id
+		ctx := c.Request.Context()
+		logger := slog.Default().With("trace_id", traceID)
+
+		// Inject logger into context
+		ctx = clog.WithLogger(ctx, logger)
+		c.Request = c.Request.WithContext(ctx)
+
+		// Create a helper to get logger from gin context explicitly if needed (legacy compatibility)
+		c.Set("logger", logger)
 
 		// Add trace-id to response header
 		c.Header(TraceIDHeader, traceID)
@@ -89,66 +96,29 @@ func LoggingMiddleware(logger *zap.Logger) gin.HandlerFunc {
 		statusCode := c.Writer.Status()
 
 		// Log request/response
-		logger.Info("HTTP request",
-			zap.String("trace_id", traceID),
-			zap.String("method", method),
-			zap.String("path", path),
-			zap.Int("status", statusCode),
-			zap.Duration("duration", duration),
-			zap.String("client_ip", c.ClientIP()),
-			zap.String("user_agent", c.Request.UserAgent()),
+		clog.InfoContext(ctx, "HTTP request",
+			"method", method,
+			"path", path,
+			"status", statusCode,
+			"duration", duration,
+			"client_ip", c.ClientIP(),
+			"user_agent", c.Request.UserAgent(),
 		)
 
-		// Log errors (4xx, 5xx) with error level
+		// Log errors (4xx, 5xx)
 		if statusCode >= 400 {
-			logger.Error("HTTP error",
-				zap.String("trace_id", traceID),
-				zap.String("method", method),
-				zap.String("path", path),
-				zap.Int("status", statusCode),
-				zap.Duration("duration", duration),
+			clog.ErrorContext(ctx, "HTTP error",
+				"method", method,
+				"path", path,
+				"status", statusCode,
+				"duration", duration,
 			)
 		}
 	}
 }
 
-// GetLoggerFromContext retrieves logger with trace-id from Gin context
-func GetLoggerFromContext(c *gin.Context, baseLogger *zap.Logger) *zap.Logger {
-	traceID, exists := c.Get("trace_id")
-	if !exists {
-		return baseLogger
-	}
-	return baseLogger.With(zap.String("trace_id", traceID.(string)))
-}
-
-// GetLoggerFromGinContext retrieves logger from Gin context (set by LoggingMiddleware)
-func GetLoggerFromGinContext(c *gin.Context) *zap.Logger {
-	loggerVal, exists := c.Get("logger")
-	if exists {
-		if l, ok := loggerVal.(*zap.Logger); ok {
-			return l
-		}
-	}
-	// Fallback: create a basic logger
-	logger, _ := NewLogger()
-	return logger
-}
-
-// NewLogger creates a new zap logger with JSON encoder for production
-func NewLogger() (*zap.Logger, error) {
-	config := zap.NewProductionConfig()
-	config.EncoderConfig.TimeKey = "timestamp"
-	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	config.EncoderConfig.MessageKey = "message"
-	config.EncoderConfig.LevelKey = "level"
-	config.EncoderConfig.CallerKey = "caller"
-
-	return config.Build()
-}
-
-// NewDevelopmentLogger creates a new zap logger for development (console encoder)
-func NewDevelopmentLogger() (*zap.Logger, error) {
-	config := zap.NewDevelopmentConfig()
-	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	return config.Build()
+// GetLoggerFromContext retrieves logger from Gin context (legacy adapter)
+// New code should use clog.FromContext(ctx) directly
+func GetLoggerFromGinContext(c *gin.Context) *slog.Logger {
+	return clog.FromContext(c.Request.Context())
 }

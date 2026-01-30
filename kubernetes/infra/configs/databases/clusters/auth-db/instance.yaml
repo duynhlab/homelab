@@ -47,57 +47,40 @@ spec:
     parameters:
       # Connection settings
       port: "5432"
-      # max_connections: "200"
-      # password_encryption: scram-sha-256  # More secure than MD5
+      max_connections: "200"
+      password_encryption: scram-sha-256  # More secure than MD5
       
-      # # Memory settings for performance (small, conservative)
-      # shared_buffers: "512MB"  # 25% of 2GB pod memory (small limit)
-      # work_mem: "8MB"  # Conservative for small workload
-      # maintenance_work_mem: "128MB"
-      # effective_cache_size: "1536MB"  # 75% of 2GB pod memory
+      # Memory settings for performance (small)
+      shared_buffers: "512MB"  # 25% of 2GB pod memory (small limit)
+      work_mem: "8MB"  # Conservative for small workload
+      maintenance_work_mem: "128MB"
+      effective_cache_size: "1536MB"  # 75% of 2GB pod memory
       
-      # # Write-Ahead Log (WAL) settings
-      # wal_buffers: "16MB"
-      # wal_level: "replica"  # For HA (use "logical" if replication needed)
-      # checkpoint_timeout: "15min"
-      # checkpoint_completion_target: "0.9"
-      # max_wal_size: "2GB"  # Adjusted for small workload
-      # min_wal_size: "512MB"
+      # Write-Ahead Log (WAL) settings
+      wal_buffers: "16MB"
+      wal_level: "replica"  # For HA (use "logical" if replication needed)
+      checkpoint_timeout: "15min"
+      checkpoint_completion_target: "0.9"
+      max_wal_size: "2GB"  # Adjusted for small workload
+      min_wal_size: "512MB"
       
-      # # Query planner settings (SSD assumed - default tuning)
-      # random_page_cost: "1.1"  # Lower for SSD
-      # effective_io_concurrency: "200"  # Higher for SSD
-      # default_statistics_target: "100"
+      # Query planner settings (SSD assumed - default tuning)
+      random_page_cost: "1.1"  # Lower for SSD
+      effective_io_concurrency: "200"  # Higher for SSD
+      default_statistics_target: "100"
       
-      # # Parallelism settings (conservative for small workload)
-      # max_worker_processes: "4"
-      # max_parallel_workers_per_gather: "2"
-      # max_parallel_workers: "4"
+      # Parallelism settings 
+      max_worker_processes: "4"
+      max_parallel_workers_per_gather: "2"
+      max_parallel_workers: "4"
       
       # # Autovacuum settings
-      # autovacuum: "on"
-      # autovacuum_max_workers: "2"
-      # autovacuum_vacuum_scale_factor: "0.1"  # Trigger vacuum more frequently
-      
-      # # Logging settings
-      # log_statement: "mod"  # Log DDL + DML
-      # log_min_duration_statement: "5000"  # Log slow queries (>5s)
-      # log_checkpoints: "on"
-      # log_lock_waits: "on"
-      # log_temp_files: "0"  # Log all temp file usage
-      # log_autovacuum_min_duration: "1000"  # Log autovacuum >1s
-      # log_connections: "on"
-      # log_disconnections: "on"
-      # logging_collector: "on"
-      # log_filename: 'postgresql-%Y-%m-%d_%H%M%S.log'
-      # log_rotation_age: "1d"
-      # log_rotation_size: "128MB"
-
-
-      # set the default autovacuum parameters
+      autovacuum: "on"
+      autovacuum_max_workers: "2"
+      autovacuum_vacuum_scale_factor: "0.1"  # Trigger vacuum more frequently
       autovacuum_analyze_scale_factor: "0.1"
-      autovacuum_vacuum_scale_factor: "0.2"
-      # setup logs for future debugging of the most aspects of the database
+
+      # Logging settings
       log_destination: "stderr"
       log_connections: "off"
       log_disconnections: "off"
@@ -105,30 +88,11 @@ spec:
       log_statement: "ddl"
       log_lock_waits: "on"
       log_temp_files: "0"
-      # limit the connections
-      max_connections: "500"
-      superuser_reserved_connections: "5"
-      # set the maximum delay for the standby
-      # after this timeout all queries on replica will be canceled until the standby will be up to date
-      max_standby_archive_delay: "30s"
-      max_standby_streaming_delay: "30s"
-      wal_level: "replica"
-      max_wal_senders: "6"
-      max_replication_slots: "6"
-      max_worker_processes: "16"
-      max_parallel_workers: "8"
-      max_parallel_workers_per_gather: "4"
-      max_parallel_maintenance_workers: "2"
-      max_wal_size: "4GB"
-      min_wal_size: "2GB"
-      wal_keep_size: "2GB"
-      effective_cache_size: "8GB"
-      shared_buffers: "128MB"
-      work_mem: "256MB"
-      maintenance_work_mem: "1024MB"
-      # we're on ssd
-      effective_io_concurrency: "100"
-      random_page_cost: "1.1"
+      # log_filename: 'postgresql-%Y-%m-%d_%H%M%S.log'
+      # log_rotation_age: "1d"
+      # log_rotation_size: "128MB"
+      # logging_collector: "on"
+
       # enable the extentions, pg_stat_statements is a must-have for production
       shared_preload_libraries: "pg_stat_statements,pg_cron,pg_trgm,pgcrypto,pg_stat_kcache"
       track_io_timing: "on"
@@ -156,11 +120,11 @@ spec:
           protocol: TCP
       resources:
         limits:
-          cpu: 500m
-          memory: 256M
-        requests:
           cpu: 100m
-          memory: 256M
+          memory: 128Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi
       env:
         - name: "DATA_SOURCE_URI"
           value: "localhost/postgres?sslmode=require"
@@ -193,7 +157,7 @@ spec:
           cpu: 50m
           memory: 64Mi
         limits:
-          cpu: 200m
+          cpu: 100m
           memory: 128Mi
   
   # Additional volumes for sidecars

@@ -8,3 +8,4 @@ resources:
   - tracing/
   - profiling/
   - databases/
+  - caching/

@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"os/signal"
 	"syscall"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.uber.org/zap"
 
+	"github.com/duynhne/monitoring/services/pkg/logger/clog"
 	"github.com/duynhne/monitoring/services/cart/config"
 	database "github.com/duynhne/monitoring/services/cart/internal/core"
 	"github.com/duynhne/monitoring/services/cart/internal/core/repository"
@@ -25,73 +26,73 @@ func main() {
 		panic("Configuration validation failed: " + err.Error())
 	}
 
-	// Initialize structured logger
-	logger, err := middleware.NewLogger()
-	if err != nil {
-		panic("Failed to initialize logger: " + err.Error())
-	}
-	defer logger.Sync()
+	// Initialize structured logger (clog/slog)
+	clog.Setup()
+	// slog.Default() is now configured with JSON handler and trace injection
 
-	logger.Info("Service starting",
-		zap.String("service", cfg.Service.Name),
-		zap.String("version", cfg.Service.Version),
-		zap.String("env", cfg.Service.Env),
-		zap.String("port", cfg.Service.Port),
+	slog.Info("Service starting",
+		"service", cfg.Service.Name,
+		"version", cfg.Service.Version,
+		"env", cfg.Service.Env,
+		"port", cfg.Service.Port,
 	)
 
 	// Initialize OpenTelemetry tracing with centralized config
 	var tp interface{ Shutdown(context.Context) error }
+	var err error
 	if cfg.Tracing.Enabled {
 		tp, err = middleware.InitTracing(cfg)
 		if err != nil {
-			logger.Warn("Failed to initialize tracing", zap.Error(err))
+			slog.Warn("Failed to initialize tracing", "error", err)
 		} else {
-			logger.Info("Tracing initialized",
-				zap.String("endpoint", cfg.Tracing.Endpoint),
-				zap.Float64("sample_rate", cfg.Tracing.SampleRate),
+			slog.Info("Tracing initialized",
+				"endpoint", cfg.Tracing.Endpoint,
+				"sample_rate", cfg.Tracing.SampleRate,
 			)
 		}
 	} else {
-		logger.Info("Tracing disabled (TRACING_ENABLED=false)")
+		slog.Info("Tracing disabled (TRACING_ENABLED=false)")
 	}
 
 	// Initialize Pyroscope profiling
 	if cfg.Profiling.Enabled {
 		if err := middleware.InitProfiling(); err != nil {
-			logger.Warn("Failed to initialize profiling", zap.Error(err))
+			slog.Warn("Failed to initialize profiling", "error", err)
 		} else {
-			logger.Info("Profiling initialized",
-				zap.String("endpoint", cfg.Profiling.Endpoint),
+			slog.Info("Profiling initialized",
+				"endpoint", cfg.Profiling.Endpoint,
 			)
 			defer middleware.StopProfiling()
 		}
 	} else {
-		logger.Info("Profiling disabled (PROFILING_ENABLED=false)")
+		slog.Info("Profiling disabled (PROFILING_ENABLED=false)")
 	}
 
 	// Initialize database connection pool (pgx)
 	pool, err := database.Connect(context.Background())
 	if err != nil {
-		logger.Fatal("Failed to connect to database", zap.Error(err))
+		slog.Error("Failed to connect to database", "error", err)
+		// Fatal replacement
+		panic(err)
 	}
 	defer pool.Close()
-	logger.Info("Database connection pool established")
+	slog.Info("Database connection pool established")
 
 	// Initialize repositories (Core layer)
 	cartRepo := repository.NewPostgresCartRepository(pool)
-	logger.Info("Cart repository initialized")
+	slog.Info("Cart repository initialized")
 
 	// Initialize services (Logic layer) with dependency injection
 	cartService := logicv1.NewCartService(cartRepo)
-	logger.Info("Cart service initialized")
+	slog.Info("Cart service initialized")
 
 	// Set service instances in Web handlers
 	v1.SetCartService(cartService)
-	logger.Info("Web handlers configured")
+	slog.Info("Web handlers configured")
 
 	// Initialize auth client for token introspection
 	authClient := middleware.NewAuthClient(cfg.AuthServiceURL)
-	logger.Info("Auth client initialized", zap.String("auth_service_url", cfg.AuthServiceURL))
+	slog.Info("Auth client initialized", "auth_service_url", cfg.AuthServiceURL)
 
 	r := gin.Default()
 
@@ -99,7 +100,7 @@ func main() {
 	r.Use(middleware.TracingMiddleware())
 
 	// Logging middleware (must be before Prometheus middleware)
-	r.Use(middleware.LoggingMiddleware(logger))
+	r.Use(middleware.LoggingMiddleware())
 
 	// Prometheus middleware
 	r.Use(middleware.PrometheusMiddleware())
@@ -114,7 +115,7 @@ func main() {
 
 	// API v1 with auth middleware (canonical API - frontend-aligned)
 	apiV1 := r.Group("/api/v1")
-	apiV1.Use(middleware.AuthMiddleware(authClient, logger))
+	apiV1.Use(middleware.AuthMiddleware(authClient))
 	{
 		apiV1.GET("/cart", v1.GetCart)
 		apiV1.POST("/cart", v1.AddToCart)
@@ -131,9 +132,10 @@ func main() {
 
 	// Start server in a goroutine
 	go func() {
-		logger.Info("Starting cart service", zap.String("port", cfg.Service.Port))
+		slog.Info("Starting cart service", "port", cfg.Service.Port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal("Failed to start server", zap.Error(err))
+			slog.Error("Failed to start server", "error", err)
+			panic(err)
 		}
 	}()
 
@@ -143,37 +145,37 @@ func main() {
 
 	// Wait for shutdown signal
 	<-ctx.Done()
-	logger.Info("Shutdown signal received")
+	slog.Info("Shutdown signal received")
 
 	// Shutdown context with configurable timeout
 	shutdownTimeout := cfg.GetShutdownTimeoutDuration()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
-	logger.Info("Shutting down server...", zap.Duration("timeout", shutdownTimeout))
+	slog.Info("Shutting down server...", "timeout", shutdownTimeout)
 
 	// Explicit cleanup sequence: HTTP Server → Database → Tracer
 	// This ensures predictable shutdown order and easier debugging
 
 	// 1. Shutdown HTTP server (stop accepting new connections, wait for in-flight requests)
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Error("HTTP server shutdown error", zap.Error(err))
+		slog.Error("HTTP server shutdown error", "error", err)
 	} else {
-		logger.Info("HTTP server shutdown complete")
+		slog.Info("HTTP server shutdown complete")
 	}
 
 	// 2. Close database connections (explicit cleanup + defer for safety)
 	pool.Close()
-	logger.Info("Database pool closed")
+	slog.Info("Database pool closed")
 
 	// 3. Shutdown tracer (flush pending spans)
 	if tp != nil {
 		if err := tp.Shutdown(shutdownCtx); err != nil {
-			logger.Error("Tracer shutdown error", zap.Error(err))
+			slog.Error("Tracer shutdown error", "error", err)
 		} else {
-			logger.Info("Tracer shutdown complete")
+			slog.Info("Tracer shutdown complete")
 		}
 	}
 
-	logger.Info("Graceful shutdown complete")
+	slog.Info("Graceful shutdown complete")
 }

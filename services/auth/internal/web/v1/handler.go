@@ -8,9 +8,9 @@ import (
 	logicv1 "github.com/duynhne/monitoring/services/auth/internal/logic/v1"
 	"github.com/duynhne/monitoring/services/auth/middleware"
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
 )
 
 var authService = logicv1.NewAuthService()
@@ -25,24 +25,14 @@ func Login(c *gin.Context) {
 	))
 	defer span.End()
 
-	// Get logger from context (set by logging middleware)
-	loggerVal, exists := c.Get("logger")
-	var zapLogger *zap.Logger
-	if exists {
-		if l, ok := loggerVal.(*zap.Logger); ok {
-			zapLogger = l
-		}
-	}
-	if zapLogger == nil {
-		// Fallback: create a basic logger
-		zapLogger, _ = middleware.NewLogger()
-	}
+	// Get logger from context
+	logger := zerolog.Ctx(ctx)
 
 	var req domain.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		span.SetAttributes(attribute.Bool("request.valid", false))
 		span.RecordError(err)
-		zapLogger.Error("Invalid request", zap.Error(err))
+		logger.Error().Err(err).Msg("Invalid request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -53,8 +43,8 @@ func Login(c *gin.Context) {
 	response, err := authService.Login(ctx, req)
 	if err != nil {
 		span.RecordError(err)
-		// Log the full error with context (error chain includes username)
-		zapLogger.Error("Login failed", zap.Error(err))
+		// Log the full error with context
+		logger.Error().Err(err).Msg("Login failed")
 
 		// Check error type using errors.Is() and map to appropriate HTTP response
 		switch {
@@ -73,7 +63,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	zapLogger.Info("Login successful", zap.String("user_id", response.User.ID))
+	logger.Info().Str("user_id", response.User.ID).Msg("Login successful")
 	c.JSON(http.StatusOK, response)
 }
 
@@ -87,23 +77,14 @@ func Register(c *gin.Context) {
 	))
 	defer span.End()
 
-	// Get logger from context (set by logging middleware)
-	loggerVal, exists := c.Get("logger")
-	var zapLogger *zap.Logger
-	if exists {
-		if l, ok := loggerVal.(*zap.Logger); ok {
-			zapLogger = l
-		}
-	}
-	if zapLogger == nil {
-		zapLogger, _ = middleware.NewLogger()
-	}
+	// Get logger from context
+	logger := zerolog.Ctx(ctx)
 
 	var req domain.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		span.SetAttributes(attribute.Bool("request.valid", false))
 		span.RecordError(err)
-		zapLogger.Error("Invalid request", zap.Error(err))
+		logger.Error().Err(err).Msg("Invalid request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -114,7 +95,10 @@ func Register(c *gin.Context) {
 	response, err := authService.Register(ctx, req)
 	if err != nil {
 		span.RecordError(err)
-		zapLogger.Error("Registration failed", zap.Error(err), zap.String("username", req.Username))
+		logger.Error().
+			Err(err).
+			Str("username", req.Username).
+			Msg("Registration failed")
 
 		// Check error type and map to appropriate HTTP response
 		switch {
@@ -126,7 +110,7 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	zapLogger.Info("Registration successful", zap.String("user_id", response.User.ID))
+	logger.Info().Str("user_id", response.User.ID).Msg("Registration successful")
 	c.JSON(http.StatusCreated, response)
 }
 
@@ -141,16 +125,7 @@ func GetMe(c *gin.Context) {
 	))
 	defer span.End()
 
-	loggerVal, exists := c.Get("logger")
-	var zapLogger *zap.Logger
-	if exists {
-		if l, ok := loggerVal.(*zap.Logger); ok {
-			zapLogger = l
-		}
-	}
-	if zapLogger == nil {
-		zapLogger, _ = middleware.NewLogger()
-	}
+	logger := zerolog.Ctx(ctx)
 
 	// Extract token from Authorization header
 	authHeader := c.GetHeader("Authorization")
@@ -175,7 +150,7 @@ func GetMe(c *gin.Context) {
 	user, err := authService.GetUserByToken(ctx, token)
 	if err != nil {
 		span.RecordError(err)
-		zapLogger.Warn("Token lookup failed", zap.Error(err))
+		logger.Warn().Err(err).Msg("Token lookup failed")
 
 		switch {
 		case errors.Is(err, logicv1.ErrSessionNotFound):
@@ -188,6 +163,6 @@ func GetMe(c *gin.Context) {
 		return
 	}
 
-	zapLogger.Info("Token validated", zap.String("user_id", user.ID))
+	logger.Info().Str("user_id", user.ID).Msg("Token validated")
 	c.JSON(http.StatusOK, user)
 }

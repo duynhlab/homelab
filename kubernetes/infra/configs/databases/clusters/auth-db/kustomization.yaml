@@ -7,3 +7,4 @@ resources:
   - configmaps/monitoring-queries.yaml
   - configmaps/vector-sidecar.yaml
   - instance.yaml
+  - monitoring/pgbouncer-exporter.yaml

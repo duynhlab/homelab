@@ -37,12 +37,21 @@ spec:
         database: product
         poolSize: 30
         poolMode: transaction
+      - name: product_ro
+        host: product-db-r.product.svc.cluster.local
+        port: 5432
+        database: product
+        poolSize: 30
+        poolMode: transaction
     
     # User authentication (inline password - matches product-db-secret)
     # Note: passwordFromSecret is NOT supported by this chart
     users:
       - name: product
         database: product
+        password: postgres  # Must match product-db-secret
+      - name: product
+        database: product_ro
         password: postgres  # Must match product-db-secret
     
     # Resources

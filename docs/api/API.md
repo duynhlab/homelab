@@ -1339,3 +1339,38 @@ curl http://localhost:8080/api/v1/orders \
 ```
 
 ---
+## Logging Standards
+
+All services must adhere to the following logging standards to ensure compatibility with **Victorialogs** and **OpenTelemetry**.
+
+### JSON Format
+
+All logs must be output in **JSON format**. This is critical for efficient parsing and querying in the centralized logging system.
+
+**Required Fields:**
+- `time`: Timestamp (ISO8601 or Unix)
+- `level`: Log level (INFO, WARN, ERROR, etc.)
+- `msg` (or `message`): Log message
+- `trace_id`: OpenTelemetry Trace ID (automatically injected)
+- `span_id`: OpenTelemetry Span ID (automatically injected)
+
+### Log Levels
+
+We follow a standardized log level schema (aligned with Syslog/Zerolog):
+
+| Level | Value | Description |
+| :--- | :--- | :--- |
+| **panic** | 5 | System crash |
+| **fatal** | 4 | System exit |
+| **error** | 3 | Runtime errors |
+| **warn** | 2 | Warnings |
+| **info** | 1 | Normal operation |
+| **debug** | 0 | Detailed debug info |
+| **trace** | -1 | Low-level tracing |
+
+### Libraries
+
+- **Cart Service**: Uses `clog` (slog wrapper) - POC
+- **Auth Service**: Uses `zerolog` - POC
+- **Other Services**: Currently migrating from `zap`
+

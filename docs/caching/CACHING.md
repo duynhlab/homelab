@@ -9,7 +9,7 @@
 
 ## Overview
 
-Valkey caching is integrated into the Product service to improve performance for read-heavy endpoints. The implementation follows the **Cache-Aside pattern** and integrates seamlessly with the existing **3-Layer Architecture**.
+Valkey caching is integrated into the Product service to improve performance for read-heavy endpoints. The implementation follows the **Cache-Aside pattern** and includes **Stampede Prevention** (Distributed Locking) for hot keys, inspired by OpenAI's architecture.
 
 ## Architecture Integration
 
@@ -24,11 +24,11 @@ flowchart TD
     end
     
     subgraph LogicLayer["LOGIC LAYER (internal/logic/v1/)"]
-        LogicService["service.go<br/>Cache-Aside pattern<br/>Check cache → Query DB → Write cache"]
+        LogicService["service.go<br/>Service Logic"]
     end
     
     subgraph CoreLayer["CORE LAYER (internal/core/)"]
-        ProductCache["cache/product_cache.go<br/>ProductCache wrapper"]
+        ProductCache["cache/product_cache.go<br/>ProductCache wrapper<br/>(Implements Stampede Prevention)"]
         CacheClient["cache/cache.go<br/>CacheClient interface"]
         ValkeyClient["cache/valkey_client.go<br/>ValkeyCacheClient implementation"]
         RepoInterface["domain/repository.go<br/>ProductRepository interface"]
@@ -38,16 +38,17 @@ flowchart TD
     Valkey["Valkey Cache<br/>Kubernetes Service"]
     PostgreSQL["PostgreSQL Database"]
     
-    Frontend -->|"HTTP GET /api/v1/products"| WebHandler
+    Frontend -->|"HTTP GET /api/v1/products/:id"| WebHandler
     WebHandler -->|"Function call"| LogicService
-    LogicService -->|"Check cache"| ProductCache
-    ProductCache -->|"Get/Set"| CacheClient
+    LogicService -->|"GetProductOrSet"| ProductCache
+    ProductCache -->|"1. Check cache"| CacheClient
     CacheClient -->|"Redis protocol"| Valkey
-    LogicService -->|"Cache miss: query"| RepoInterface
-    RepoInterface -->|"Implementation"| RepoImpl
+    ProductCache -.->|"2. Cache Miss?<br/>Acquire Lock (SETNX)"| CacheClient
+    ProductCache -.->|"3. If Lock Acquired:<br/>Fetch Data"| RepoInterface
+    RepoInterface -->|"FindByID"| RepoImpl
     RepoImpl -->|"SQL queries"| PostgreSQL
-    RepoImpl -->|"Result"| LogicService
-    LogicService -->|"Write cache"| ProductCache
+    ProductCache -.->|"4. Set Cache &<br/>Release Lock"| CacheClient
+    ProductCache -->|"Return Data"| LogicService
     LogicService -->|"Return"| WebHandler
     WebHandler -->|"JSON response"| Frontend
 ```
@@ -64,6 +65,31 @@ flowchart TD
   - `cache/valkey_client.go`: `ValkeyCacheClient` implementation (Redis-compatible)
   - `cache/product_cache.go`: `ProductCache` wrapper with key generation and JSON serialization
 
+## Cache Stampede Prevention
+
+> **Note:** This advanced pattern is inspired by OpenAI's PostgreSQL scaling architecture.
+
+### The Problem: Thundering Herd
+In a standard Cache-Aside pattern, a race condition occurs when a "hot" cache key expires:
+1. **Cache Miss**: Key expires for a popular item (e.g., "iPhone 16").
+2. **Concurrent Requests**: 1,000 users request this item simultaneously.
+3. **DB Overload**: All 1,000 requests see a cache miss and trigger 1,000 database queries at the exact same moment.
+4. **Impact**: Database CPU spikes, latency increases, potential outage.
+
+### The Solution: Distributed Locking
+We implement a **Locking Mechanism** (using Redis `SETNX`) to ensure only **one** process refreshes the cache.
+
+1. **Request A** encounters cache miss.
+2. **Request A** acquires a lock (`lock:product:123`) with a short TTL (e.g., 5s).
+   - ✅ **Success**: Request A queries DB → Updates Cache → Releases Lock.
+3. **Request B...Z** encounter cache miss.
+4. **Request B...Z** try to acquire lock.
+   - ❌ **Fail**: Lock already likely held by Request A.
+   - **Wait**: They sleep briefly (e.g., 50ms) and retry the cache check.
+   - **Result**: They eventually read the fresh data put in cache by Request A.
+
+**Benefit**: DB load = 1 query (instead of 1,000).
+
 ## Cache-Aside Pattern Flow
 
 ### GET /api/v1/products (List Products)
@@ -78,13 +104,14 @@ flowchart TD
 
 ### GET /api/v1/products/:id (Single Product)
 
-1. **Logic Layer** calls `productCache.GetProduct(ctx, id)`
-2. **Cache Hit** → Return cached product immediately
-3. **Cache Miss** →
-   - Call `productRepo.FindByID(ctx, id)`
-   - Query PostgreSQL database
-   - Write result to cache via `productCache.SetProduct(ctx, id, product)`
-   - Return data
+1. **Logic Layer** calls `productCache.GetProductOrSet(ctx, id, fetchFunc)`
+2. **ProductCache** checks cache:
+   - **Hit**: Returns cached product immediately.
+   - **Miss**: Tries to acquire distributed lock (`lock:product:{id}`).
+3. **Locking Logic**:
+   - **Acquired**: Calls `fetchFunc` (queries DB), updates cache, releases lock, returns data.
+   - **Locked (Busy)**: Waits (spins) until data appears in cache, then returns it.
+   - **benefit**: Only 1 request hits the DB even if 1,000 requests arrive simultaneously.
 
 ### POST /api/v1/products (Create Product)
 

@@ -5,8 +5,6 @@ kind: PodMonitor
 metadata:
   name: postgresql-supporting-db
   namespace: user
-  labels:
-    release: kube-prometheus-stack  # Required for Prometheus Operator discovery
 spec:
   selector:
     matchLabels:

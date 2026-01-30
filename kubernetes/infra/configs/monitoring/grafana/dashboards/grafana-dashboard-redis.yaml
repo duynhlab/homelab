@@ -1,0 +1,16 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: redis
+  namespace: monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "Cache"
+  configMapRef:
+    name: grafana-dashboard-redis
+    key: redis.json
+  datasources:
+    - inputName: DS_PROM
+      datasourceName: Prometheus

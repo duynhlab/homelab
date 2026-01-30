@@ -1,0 +1,26 @@
+# Product Database Resource (CloudNativePG)
+# Declaratively manages the product database and extensions
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: product-database
+  namespace: product
+spec:
+  name: product
+  owner: product
+  cluster:
+    name: product-db
+  extensions:
+    # CREATE EXTENSION commands will be run automatically by CloudNativePG
+    # All extensions to use in database
+
+    # Extensions already preloaded at cluster level (shared_preload_libraries)
+    - name: pgaudit # Audit logging
+      version: "1.7.0"
+    - name: pg_stat_statements # Track query performance
+    - name: auto_explain # Automatically explain queries
+    - name: pglogical # Logical replication
+
+     # Extensions NOT yet preloaded at cluster level
+    - name: pgcrypto # Cryptographic functions
+    - name: uuid-ossp # UUID generation

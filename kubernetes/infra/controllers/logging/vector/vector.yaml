@@ -407,5 +407,3 @@ spec:
     podMonitor:
       enabled: true
       port: prometheus-expo
-      additionalLabels:
-        release: kube-prometheus-stack

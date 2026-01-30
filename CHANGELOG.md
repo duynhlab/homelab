@@ -7,6 +7,137 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.42.2] - 2026-01-30
+
+### Changed
+
+- **Prometheus Operator Configuration**:
+  - Removed unnecessary `release: kube-prometheus-stack` labels from all ServiceMonitors and PodMonitors
+  - With `serviceMonitorSelector: {}` and `podMonitorSelector: {}` configuration, Prometheus discovers all resources without requiring specific labels
+  - Cleaned up 4 ServiceMonitors and 5 PodMonitors across monitoring and database namespaces
+  - Removed `additionalLabels` from Vector HelmRelease PodMonitor configuration
+  - Removed `extraLabels` from VictoriaLogs HelmRelease ServiceMonitor configuration
+
+- **Product Service Cache Implementation** (`services/product/internal/core/cache/`):
+  - Added comprehensive test suite (`product_cache_test.go`) with 153 lines of test coverage
+  - Implemented cache stampede prevention using distributed locking (`SetNX`) in `GetProductOrSet` method
+  - Improved cache key generation with normalized filter handling for consistent key structure
+  - Enhanced error handling and graceful degradation in cache operations
+  - Added `GetProductOrSet` method for atomic cache-miss handling with lock acquisition
+  - Cache stampede prevention ensures only one concurrent request fetches from database when cache misses occur
+
+### Testing
+
+- **Product Service Cache Tests** (`services/product/internal/core/cache/product_cache_test.go`):
+  - Unit tests for `ProductCache` wrapper covering:
+    - Cache hit/miss scenarios for single products and product lists
+    - Product list caching with various filter combinations
+    - Single product caching with TTL handling
+    - Cache invalidation patterns
+    - Concurrent access handling with cache stampede prevention
+    - Error scenarios and graceful degradation
+  - Mock cache client implementation (`MockCacheClient`) for isolated testing without external dependencies
+  - Test coverage for key generation, JSON serialization/deserialization, and TTL handling
+  - Concurrent test (`TestGetProductOrSet_StampedePrevention`) verifies only one DB fetch occurs under high concurrency
+
+### Infrastructure
+
+- **PostgreSQL Extensions (CloudNativePG)**:
+  - Removed Image Volume Extension declarations for `pgaudit` from `product-db` and `transaction-db` Cluster resources
+  - Extension is already available in PostgreSQL base image (`18.1-system-trixie`) at `/usr/lib/postgresql/18/lib/pgaudit.so`
+  - Image Volume Extensions require Kubernetes ImageVolume feature gate (not enabled in current Kind cluster)
+  - Database resources now reconcile successfully with extension from base image (version `18.0`)
+
+### Notes
+
+- Prometheus Operator continues to discover all ServiceMonitors/PodMonitors without label requirements
+- PostgreSQL `pgaudit` extension works correctly from base image without Image Volume Extension mount
+- Image Volume Extensions can be re-enabled in future if needed (requires enabling ImageVolume feature gate in Kind cluster)
+
+## [0.42.1] - 2026-01-29
+
+### Documentation
+
+- **PostgreSQL Extensions Guide** (`docs/databases/EXTENSIONS.md`):
+  - Added **Building Extension Container Images** section with multi-stage Dockerfile patterns
+  - Added **Image Layer Structure** diagram showing builder stage → final stage (scratch) flow
+  - Added **Extension Image Architecture** diagram showing integration with PostgreSQL pods
+  - Included Dockerfile examples for:
+    - Simple extensions (pgvector pattern)
+    - Complex extensions with system dependencies (PostGIS pattern)
+  - Added best practices for building and publishing extension images
+  - Added reference to Mini Summit 5 transcript on extension management
+  - Documented `ld_library_path` configuration for system libraries
+
+## [0.42.0] - 2026-01-28
+
+### Added
+
+#### Valkey Caching Integration
+
+- **Valkey (Redis-compatible) caching** integrated into Product service:
+  - Deployed via Bitnami Helm chart in `monitoring` namespace
+  - Single-node deployment for local development
+  - Service: `valkey.monitoring.svc.cluster.local:6379`
+- **Cache-Aside pattern** implementation in Logic Layer:
+  - `GET /api/v1/products`: Cached product list with filters (TTL: 5 minutes)
+  - `GET /api/v1/products/:id`: Cached single product (TTL: 10 minutes)
+  - Cache invalidation on product creation
+- **Core Layer cache infrastructure**:
+  - `CacheClient` interface (abstraction over cache implementation)
+  - `ValkeyCacheClient` implementation (Redis-compatible)
+  - `ProductCache` wrapper with key generation and JSON serialization
+- **Configuration**:
+  - `CacheConfig` struct in Product service config
+  - Environment variables: `CACHE_ENABLED`, `CACHE_HOST`, `CACHE_PORT`, `CACHE_PASSWORD`, `CACHE_DB`, `CACHE_TTL_PRODUCT_LIST`, `CACHE_TTL_PRODUCT_DETAIL`
+  - Cache disabled by default if connection fails (graceful degradation)
+
+### Changed
+
+- **Product Service Logic Layer**:
+  - `ListProducts()`: Implements Cache-Aside pattern (check cache → query DB → write cache)
+  - `GetProduct()`: Implements Cache-Aside pattern (check cache → query DB → write cache)
+  - `CreateProduct()`: Invalidates list cache after successful creation
+- **Product Service Main**:
+  - Initializes Valkey cache client on startup
+  - Graceful shutdown includes cache client cleanup
+- **3-Layer Architecture**:
+  - Core Layer now includes cache interfaces and implementations
+  - Logic Layer uses cache via dependency injection (optional - nil if disabled)
+
+### Documentation
+
+- **New caching documentation** (`docs/caching/CACHING.md`):
+  - Architecture integration with 3-Layer pattern
+  - Cache-Aside pattern flow diagrams
+  - Cache key structure documentation
+  - Configuration reference
+  - Troubleshooting guide
+  - Observability integration (tracing, metrics)
+- **Updated AGENTS.md**:
+  - Added caching to Technology Stack section
+  - Added caching to Key Design Patterns
+  - Updated Layer Responsibilities to include cache layer
+
+### Infrastructure
+
+- **HelmRepository**: Added Bitnami Helm repository (`kubernetes/clusters/local/sources/helm/bitnami.yaml`)
+- **Valkey HelmRelease**: Created (`kubernetes/infra/controllers/caching/valkey/helmrelease.yaml`)
+- **Infrastructure Kustomization**: Added `caching/` directory to resources
+
+### Dependencies
+
+- **Product Service**: Added `github.com/redis/go-redis/v9` (Redis-compatible client for Valkey)
+
+### Notes
+
+- Cache is optional - Product service continues to work if cache is disabled or unavailable
+- Cache errors are logged but don't fail requests (fallback to database)
+- TTL values are configurable via environment variables
+- Cache invalidation uses simple pattern matching (can be enhanced with Redis SCAN in future)
+
+---
+
 ## [0.41.0] - 2026-01-28
 
 ### Removed

@@ -13,7 +13,7 @@ import (
 
 // ProductCache wraps CacheClient with Product-specific operations
 type ProductCache struct {
-	client CacheClient
+	client    CacheClient
 	ttlList   time.Duration
 	ttlDetail time.Duration
 }
@@ -93,6 +93,72 @@ func (c *ProductCache) SetProduct(ctx context.Context, id string, product *domai
 	}
 
 	return c.client.Set(ctx, key, data, c.ttlDetail)
+}
+
+// GetProductOrSet retrieves a product from cache or fetches it using the provided function
+// Implements Cache Stampede Prevention using distributed locking
+func (c *ProductCache) GetProductOrSet(ctx context.Context, id string, fetchFunc func() (*domain.Product, error)) (*domain.Product, error) {
+	// 1. Check cache first
+	product, err := c.GetProduct(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if product != nil {
+		return product, nil
+	}
+
+	// 2. Cache miss - Try to acquire lock
+	lockKey := fmt.Sprintf("lock:product:%s", id)
+	acquired, err := c.client.SetNX(ctx, lockKey, []byte("1"), 5*time.Second) // 5s lock TTL
+	if err != nil {
+		return nil, err
+	}
+
+	if acquired {
+		// 3a. Lock acquired - Owner responsible for fetching data
+		defer c.client.Delete(ctx, lockKey) // Ensure lock is released
+
+		// Fetch from DB
+		product, err := fetchFunc()
+		if err != nil {
+			return nil, err
+		}
+
+		// Set cache
+		if err := c.SetProduct(ctx, id, product); err != nil {
+			// Log error but return success since we have the data
+			// In a real app, use a logger here
+		}
+
+		return product, nil
+	} else {
+		// 3b. Lock failed - Wait and retry (spin lock)
+		// Wait for data to appear in cache (max 10 retries, 500ms total)
+		ticker := time.NewTicker(50 * time.Millisecond)
+		defer ticker.Stop()
+
+		timeout := time.After(500 * time.Millisecond)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-timeout:
+				// Timeout waiting for lock/data - Fallback to DB (or return error)
+				// Here we fallback to DB to ensure availability
+				return fetchFunc()
+			case <-ticker.C:
+				// Check cache again
+				product, err := c.GetProduct(ctx, id)
+				if err != nil {
+					continue // Retry on error
+				}
+				if product != nil {
+					return product, nil
+				}
+			}
+		}
+	}
 }
 
 // GetProductList retrieves product list from cache

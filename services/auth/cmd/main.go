@@ -8,8 +8,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog/log"
 
+	"github.com/duynhne/monitoring/services/pkg/logger/zerolog"
 	"github.com/duynhne/monitoring/services/auth/config"
 	database "github.com/duynhne/monitoring/services/auth/internal/core"
 	v1 "github.com/duynhne/monitoring/services/auth/internal/web/v1"
@@ -17,74 +18,68 @@ import (
 )
 
 func main() {
-	// Load configuration from environment variables (with .env file support for local dev)
-	// Priority: .env file < environment variables < Helm values (via extraEnv)
+	// Load configuration
 	cfg := config.Load()
 	if err := cfg.Validate(); err != nil {
 		panic("Configuration validation failed: " + err.Error())
 	}
 
-	// Initialize structured logger
-	logger, err := middleware.NewLogger()
-	if err != nil {
-		panic("Failed to initialize logger: " + err.Error())
-	}
-	defer logger.Sync()
+	// Initialize Zerolog
+	zerolog.Setup()
 
-	logger.Info("Service starting",
-		zap.String("service", cfg.Service.Name),
-		zap.String("version", cfg.Service.Version),
-		zap.String("env", cfg.Service.Env),
-		zap.String("port", cfg.Service.Port),
-	)
+	log.Info().
+		Str("service", cfg.Service.Name).
+		Str("version", cfg.Service.Version).
+		Str("env", cfg.Service.Env).
+		Str("port", cfg.Service.Port).
+		Msg("Service starting")
 
-	// Initialize OpenTelemetry tracing with centralized config
-	// Tracing config: TRACING_ENABLED, OTEL_COLLECTOR_ENDPOINT, OTEL_SAMPLE_RATE
+	// Initialize OpenTelemetry tracing
 	var tp interface{ Shutdown(context.Context) error }
+	var err error
 	if cfg.Tracing.Enabled {
 		tp, err = middleware.InitTracing(cfg)
 		if err != nil {
-			logger.Warn("Failed to initialize tracing", zap.Error(err))
+			log.Warn().Err(err).Msg("Failed to initialize tracing")
 		} else {
-			logger.Info("Tracing initialized",
-				zap.String("endpoint", cfg.Tracing.Endpoint),
-				zap.Float64("sample_rate", cfg.Tracing.SampleRate),
-			)
+			log.Info().
+				Str("endpoint", cfg.Tracing.Endpoint).
+				Float64("sample_rate", cfg.Tracing.SampleRate).
+				Msg("Tracing initialized")
 		}
 	} else {
-		logger.Info("Tracing disabled (TRACING_ENABLED=false)")
+		log.Info().Msg("Tracing disabled (TRACING_ENABLED=false)")
 	}
 
 	// Initialize Pyroscope profiling
-	// Profiling config: PROFILING_ENABLED, PYROSCOPE_ENDPOINT
 	if cfg.Profiling.Enabled {
 		if err := middleware.InitProfiling(); err != nil {
-			logger.Warn("Failed to initialize profiling", zap.Error(err))
+			log.Warn().Err(err).Msg("Failed to initialize profiling")
 		} else {
-			logger.Info("Profiling initialized",
-				zap.String("endpoint", cfg.Profiling.Endpoint),
-			)
+			log.Info().
+				Str("endpoint", cfg.Profiling.Endpoint).
+				Msg("Profiling initialized")
 			defer middleware.StopProfiling()
 		}
 	} else {
-		logger.Info("Profiling disabled (PROFILING_ENABLED=false)")
+		log.Info().Msg("Profiling disabled (PROFILING_ENABLED=false)")
 	}
 
 	// Initialize database connection pool (pgx)
 	pool, err := database.Connect(context.Background())
 	if err != nil {
-		logger.Fatal("Failed to connect to database", zap.Error(err))
+		log.Fatal().Err(err).Msg("Failed to connect to database")
 	}
 	defer pool.Close()
-	logger.Info("Database connection pool established")
+	log.Info().Msg("Database connection pool established")
 
 	r := gin.Default()
 
-	// Tracing middleware (must be first for context propagation)
+	// Tracing middleware
 	r.Use(middleware.TracingMiddleware())
 
-	// Logging middleware (must be before Prometheus middleware)
-	r.Use(middleware.LoggingMiddleware(logger))
+	// Logging middleware
+	r.Use(middleware.LoggingMiddleware())
 
 	// Prometheus middleware
 	r.Use(middleware.PrometheusMiddleware())
@@ -113,49 +108,46 @@ func main() {
 
 	// Start server in a goroutine
 	go func() {
-		logger.Info("Starting auth service", zap.String("port", cfg.Service.Port))
+		log.Info().Str("port", cfg.Service.Port).Msg("Starting auth service")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal("Failed to start server", zap.Error(err))
+			log.Fatal().Err(err).Msg("Failed to start server")
 		}
 	}()
 
-	// Graceful shutdown - modern signal handling with context
+	// Graceful shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
 	// Wait for shutdown signal
 	<-ctx.Done()
-	logger.Info("Shutdown signal received")
+	log.Info().Msg("Shutdown signal received")
 
 	// Shutdown context with configurable timeout
 	shutdownTimeout := cfg.GetShutdownTimeoutDuration()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
-	logger.Info("Shutting down server...", zap.Duration("timeout", shutdownTimeout))
+	log.Info().Dur("timeout", shutdownTimeout).Msg("Shutting down server...")
 
-	// Explicit cleanup sequence: HTTP Server → Database → Tracer
-	// This ensures predictable shutdown order and easier debugging
-
-	// 1. Shutdown HTTP server (stop accepting new connections, wait for in-flight requests)
+	// 1. Shutdown HTTP server
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Error("HTTP server shutdown error", zap.Error(err))
+		log.Error().Err(err).Msg("HTTP server shutdown error")
 	} else {
-		logger.Info("HTTP server shutdown complete")
+		log.Info().Msg("HTTP server shutdown complete")
 	}
 
-	// 2. Close database connections (explicit cleanup + defer for safety)
+	// 2. Close database connections
 	pool.Close()
-	logger.Info("Database pool closed")
+	log.Info().Msg("Database pool closed")
 
-	// 3. Shutdown tracer (flush pending spans)
+	// 3. Shutdown tracer
 	if tp != nil {
 		if err := tp.Shutdown(shutdownCtx); err != nil {
-			logger.Error("Tracer shutdown error", zap.Error(err))
+			log.Error().Err(err).Msg("Tracer shutdown error")
 		} else {
-			logger.Info("Tracer shutdown complete")
+			log.Info().Msg("Tracer shutdown complete")
 		}
 	}
 
-	logger.Info("Graceful shutdown complete")
+	log.Info().Msg("Graceful shutdown complete")
 }

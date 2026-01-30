@@ -5,8 +5,6 @@ kind: PodMonitor
 metadata:
   name: postgresql-auth-db
   namespace: auth
-  labels:
-    release: kube-prometheus-stack  # Required for Prometheus Operator discovery
 spec:
   selector:
     matchLabels:

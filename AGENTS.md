@@ -89,6 +89,10 @@ go run cmd/{service}/main.go
 go test ./...
 go test ./internal/{service}/...
 
+# Using make 
+# Run make build to execute all Go binary.
+make build
+
 # Build binary (no Docker needed for dev)
 go build -o bin/{service} cmd/{service}/main.go
 ```
@@ -131,8 +135,8 @@ flowchart TD
 **Layer Responsibilities**:
 
 - **Web Layer** (`web/v1/`): HTTP handlers, request/response, validation
-- **Logic Layer** (`logic/v1/`): Business logic, orchestration, database queries
-- **Core Layer** (`core/domain/`, `core/database.go`): Domain models, database connections
+- **Logic Layer** (`logic/v1/`): Business logic, orchestration, Cache-Aside pattern, database queries via repository interfaces
+- **Core Layer** (`core/domain/`, `core/database.go`, `core/cache/`): Domain models, database connections, cache client interfaces and implementations
 
 **Detailed Architecture**: See [`docs/observability/apm/ARCHITECTURE.md`](docs/observability/apm/ARCHITECTURE.md) for middleware chain and APM integration. Full system architecture in [`specs/system-context/01-architecture-overview.md`](specs/system-context/01-architecture-overview.md)
 
@@ -170,10 +174,13 @@ flowchart TD
 - **Clean Architecture**: 3-layer separation (web → logic → core) with clear boundaries
 - **Frontend → Web Layer Only**: Frontend can ONLY call Web Layer HTTP endpoints, never Logic/Core directly
 - **API Versioning**: v1 only (canonical, frontend-aligned); v2 removed
-- **Microservices**: 9 independent services with bounded contexts, each in own namespace
+- **Microservices**: 8 independent services with bounded contexts, each in own namespace
 - **Middleware Chain**: Ordered middleware (tracing → logging → metrics) for observability
+- **Caching**: Cache-Aside pattern with Valkey (Redis-compatible) for read-heavy endpoints
 
 **Middleware Details**: See [`docs/observability/apm/TRACING_ARCHITECTURE.md`](docs/observability/apm/TRACING_ARCHITECTURE.md) for middleware chain ordering and responsibilities.
+
+**Caching Details**: See [`docs/caching/CACHING.md`](docs/caching/CACHING.md) for cache architecture, Cache-Aside pattern, and configuration.
 
 ---
 
@@ -184,6 +191,10 @@ flowchart TD
   - Connection poolers: PgBouncer, PgCat
   - Migrations: Flyway 11.19.0 (8 migration images)
   - **Database Documentation**: [`docs/databases/DATABASE.md`](docs/databases/DATABASE.md)
+- **Cache**: Valkey (Redis-compatible) for read-heavy endpoints
+  - Cache-Aside pattern in Logic Layer
+  - Product service: `GET /api/v1/products`, `GET /api/v1/products/:id`
+  - **Caching Documentation**: [`docs/caching/CACHING.md`](docs/caching/CACHING.md)
 - **HTTP Framework**: Gin
 - **Observability**: OpenTelemetry (traces, metrics, logs)
 - **GitOps**: Flux Operator, Kustomize, OCI Registry
@@ -198,7 +209,7 @@ flowchart TD
 
 ```
 monitoring/
-├── services/          # Go application code (9 microservices)
+├── services/          # Go application code (8 microservices)
 ├── charts/            # Helm chart for microservices
 ├── kubernetes/        # GitOps manifests (Flux + Kustomize)
 │   ├── base/          # Shared manifests (apps + infrastructure)
@@ -224,7 +235,7 @@ monitoring/
 
 ## API Endpoints
 
-9 microservices with RESTful APIs (v1 only - canonical, frontend-aligned):
+8 microservices with RESTful APIs (v1 only - canonical, frontend-aligned):
 
 | Service | Namespace | Base URL |
 |---------|-----------|----------|
@@ -264,8 +275,8 @@ make flux-push    # 3. Deploy All (Flux reconciles in dependency order)
    - Monitoring: Prometheus, Grafana, Metrics Server
    - APM: Tempo, Loki, Vector, OTel Collector, Pyroscope, Jaeger
    - Databases: PostgreSQL operators, 5 clusters, connection poolers
-   - SLO: Sloth Operator + 9 PrometheusServiceLevel CRDs
-3. **Applications** - 9 microservices + frontend + k6 load testing
+   - SLO: Sloth Operator + 8 PrometheusServiceLevel CRDs
+3. **Applications** - 8 microservices + frontend + k6 load testing
 
 **Dependency Chain:**
 

@@ -40,11 +40,11 @@ spec:
     mode: transaction  # Transaction pooling for short-lived connections
     resources:
       requests:
+        cpu: 20m
+        memory: 32Mi
+      limits:
         cpu: 50m
         memory: 64Mi
-      limits:
-        cpu: 100m
-        memory: 128Mi
     maxDBConnections: 240
   
   # PostgreSQL version and parameters
@@ -99,15 +99,15 @@ spec:
       cron.database_name: "postgres"
       synchronous_commit: "local"
   
-  # Patroni configuration for pg_hba.conf
-  # Default Zalando operator requires SSL, but we allow unencrypted for simplicity
-  # Note: Must include local entries for Patroni to connect via Unix socket
-  # patroni:
-  #   pg_hba:
-  #     - "local all all peer"              # Local Unix socket connections (required for Patroni)
-  #     - "host all all 127.0.0.1/32 md5"   # Localhost TCP connections
-  #     - "host all all 10.244.0.0/16 md5"  # Allow unencrypted connections from pod network (Kind default CIDR)
-  #     - "host all all 172.19.0.0/16 md5"  # Allow unencrypted connections from Kind bridge network
+      # Patroni configuration for pg_hba.conf
+      # Default Zalando operator requires SSL, but we allow unencrypted for simplicity
+      # Note: Must include local entries for Patroni to connect via Unix socket
+      # patroni:
+      #   pg_hba:
+      #     - "local all all peer"              # Local Unix socket connections (required for Patroni)
+      #     - "host all all 127.0.0.1/32 md5"   # Localhost TCP connections
+      #     - "host all all 10.244.0.0/16 md5"  # Allow unencrypted connections from pod network (Kind default CIDR)
+      #     - "host all all 172.19.0.0/16 md5"  # Allow unencrypted connections from Kind bridge network
 
   resources:
     requests:
@@ -126,11 +126,11 @@ spec:
           protocol: TCP
       resources:
         limits:
-          cpu: 100m
-          memory: 128Mi
-        requests:
           cpu: 50m
           memory: 64Mi
+        requests:
+          cpu: 20m
+          memory: 32Mi
       env:
         - name: "DATA_SOURCE_URI"
           value: "localhost/postgres?sslmode=require"
@@ -160,11 +160,11 @@ spec:
           readOnly: true
       resources:
         requests:
+          cpu: 20m
+          memory: 32Mi
+        limits:
           cpu: 50m
           memory: 64Mi
-        limits:
-          cpu: 100m
-          memory: 128Mi
   
   # Additional volumes for sidecars
   additionalVolumes:

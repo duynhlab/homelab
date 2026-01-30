@@ -3,8 +3,6 @@ kind: ServiceMonitor
 metadata:
   name: microservices-api
   namespace: monitoring
-  labels:
-    release: kube-prometheus-stack
 spec:
   endpoints:
   - interval: 15s

@@ -30,6 +30,9 @@ configMapGenerator:
   - name: grafana-dashboard-postgres-replication-lag
     files:
       - postgres-replication-lag.json
+  - name: grafana-dashboard-redis
+    files:
+      - grafana_prometheus_redis_dashboard.json
 
 resources:
   - grafana-dashboard-main.yaml
@@ -46,3 +49,4 @@ resources:
   - grafana-dashboard-postgres-replication-lag.yaml
   - grafana-dashboard-pgdog.yaml
   - grafana-dashboard-loki.yaml
+  - grafana-dashboard-redis.yaml

@@ -45,8 +45,6 @@ spec:
       # ServiceMonitor for Prometheus scraping
       serviceMonitor:
         enabled: true
-        extraLabels:
-          release: kube-prometheus-stack
 
     vector:
       enabled: false

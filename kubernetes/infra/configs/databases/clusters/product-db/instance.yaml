@@ -20,7 +20,7 @@ spec:
       - pgaudit #  Load binary into PostgreSQL server process
       - pg_stat_statements # Load into memory to track queries
       - auto_explain # Load to automatically explain queries
-      # - pglogical # Logical replication
+      - pglogical # Logical replication
 
     parameters:
       max_connections: "200"

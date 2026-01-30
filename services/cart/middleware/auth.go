@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/duynhne/monitoring/services/pkg/logger/clog"
 	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 )
 
 // AuthUser represents the user info returned from auth service
@@ -66,7 +66,7 @@ func (c *AuthClient) GetMe(token string) (*AuthUser, error) {
 
 // AuthMiddleware creates a middleware that validates tokens via auth service
 // It sets "user_id" in the gin context if authentication succeeds
-func AuthMiddleware(authClient *AuthClient, logger *zap.Logger) gin.HandlerFunc {
+func AuthMiddleware(authClient *AuthClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get token from Authorization header
 		authHeader := c.GetHeader("Authorization")
@@ -90,9 +90,9 @@ func AuthMiddleware(authClient *AuthClient, logger *zap.Logger) gin.HandlerFunc 
 		// Call auth service to validate token
 		user, err := authClient.GetMe(token)
 		if err != nil {
-			if logger != nil {
-				logger.Debug("Auth validation failed", zap.Error(err))
-			}
+			logger := clog.FromContext(c.Request.Context())
+			logger.Debug("Auth validation failed", "error", err)
+
 			// For demo compatibility, fall back to default user_id
 			// In production: c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			c.Set("user_id", "1")

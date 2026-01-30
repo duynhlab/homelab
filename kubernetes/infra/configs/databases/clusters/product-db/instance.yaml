@@ -8,9 +8,20 @@ metadata:
 spec:
   # Number of instances (1 primary + 2 replica)
   instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
   
   # PostgreSQL parameters
   postgresql:
+    # # This is LOADING libraries into PostgreSQL PROCESS to use
+    # PostgreSQL 18 has built-in pgaudit - NO need extension image!
+    # Only need to enable in shared_preload_libraries
+    # Preload libraries required by extensions
+    shared_preload_libraries:
+      - pgaudit #  Load binary into PostgreSQL server process
+      - pg_stat_statements # Load into memory to track queries
+      - auto_explain # Load to automatically explain queries
+      # - pglogical # Logical replication
+
     parameters:
       max_connections: "200"
       shared_buffers: "64MB"
@@ -24,6 +35,31 @@ spec:
       work_mem: "8MB"
       min_wal_size: "1GB"
       max_wal_size: "4GB"
+      # pgAudit configuration
+      pgaudit.log: "ddl, write"  # Only log DDL and write (less noise than "all" includes ddl, read, write, function, misc)
+      pgaudit.log_catalog: "off"  # Don't log system catalog queries (reduces noise)
+      pgaudit.log_parameter: "on"  # Include query parameters in logs
+      pgaudit.log_statement_once: "off"  # Log each statement (not just once per session)
+      pgaudit.log_relation: "on"  # Log relation (table) access
+      pgaudit.log_rows: "on"  # Log number of rows affected
+      track_io_timing: "on"
+
+      # Config cho pg_stat_statements
+      pg_stat_statements.track: "all"
+      pg_stat_statements.max: "10000"
+
+      # Config cho auto_explain
+      auto_explain.log_min_duration: "1s"
+      auto_explain.log_analyze: "on"
+
+      # Config cho pglogical
+      # pglogical.database_name: "product"
+      # pglogical.database_user: "product"
+      # pglogical.database_password: "product"
+      # pglogical.database_host: "product-db.product.svc.cluster.local"
+      # pglogical.database_port: "5432"
+      # pglogical.database_sslmode: "disable"
+
     # High Availability configuration
     # Allow async replicas for read scaling (no sync replication)
     syncReplicaElectionConstraint:
@@ -32,14 +68,14 @@ spec:
   # Bootstrap configuration
   bootstrap:
     initdb:
-      database: product
-      owner: product
+      database: product # Create default database before bootstrap
+      owner: product # Set owner for the database
       secret:
-        name: product-db-secret
-      dataChecksums: true
-      encoding: "UTF8"
-      localeCType: "C"
-      localeCollate: "C"
+        name: product-db-secret # Use secret for authentication
+      dataChecksums: true # Enable data checksums for data integrity
+      encoding: "UTF8" # Set encoding for the database
+      localeCType: "C" # Set locale for the database
+      localeCollate: "C" # Set locale for the database
   
   # Storage configuration
   storage:

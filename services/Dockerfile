@@ -7,6 +7,10 @@ ARG SERVICE_NAME
 WORKDIR /app
 
 # Copy service-specific go mod files
+# Copy shared pkg (needed for replace directive)
+COPY services/pkg /pkg
+
+# Copy service-specific go mod files
 COPY ${SERVICE_NAME}/go.mod ${SERVICE_NAME}/go.sum ./
 RUN go mod download
 

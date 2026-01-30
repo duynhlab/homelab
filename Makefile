@@ -61,6 +61,10 @@ flux-status: ## Show Flux status (all resources)
 build: ## Build all service binaries locally (no Docker)
 	@./scripts/build.sh
 
+.PHONY: test
+test: ## Run unit tests
+	@./scripts/test.sh
+
 .PHONY: validate
 validate: ## Validate Kubernetes manifests
 	@echo "Validating infrastructure manifests..."

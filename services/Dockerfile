@@ -1,5 +1,5 @@
 # Build stage - Go 1.25.6 with static binary compilation
-FROM golang:1.25.6-alpine AS builder
+FROM docker.io/library/golang:1.25.5-alpine AS builder
 
 # Build argument for service name (must be first)
 ARG SERVICE_NAME
@@ -8,7 +8,7 @@ WORKDIR /app
 
 # Copy service-specific go mod files
 # Copy shared pkg (needed for replace directive)
-COPY services/pkg /pkg
+COPY pkg /pkg
 
 # Copy service-specific go mod files
 COPY ${SERVICE_NAME}/go.mod ${SERVICE_NAME}/go.sum ./

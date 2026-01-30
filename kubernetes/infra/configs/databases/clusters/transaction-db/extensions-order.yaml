@@ -1,0 +1,14 @@
+# Order Database Resource (CloudNativePG)
+# Declaratively manages the order database and extensions
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: order-database
+  namespace: cart
+spec:
+  name: order
+  owner: cart
+  cluster:
+    name: transaction-db
+  extensions:
+    - name: pgaudit

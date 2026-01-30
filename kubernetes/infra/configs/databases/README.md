@@ -57,13 +57,13 @@ databases/
 
 ## Cluster Overview
 
-| Cluster | Operator | Namespace | HA | Pooler | Services |
-|---------|----------|-----------|-----|--------|----------|
-| auth-db | Zalando | auth | 3 nodes | PgBouncer (sidecar) | Auth |
-| review-db | Zalando | review | 1 node | None | Review |
-| supporting-db | Zalando | user | 1 node | PgBouncer (sidecar) | User, Notification, Shipping |
-| product-db | CloudNativePG | product | 2 nodes | PgDog (standalone) | Product |
-| transaction-db | CloudNativePG | cart | 3 nodes | PgCat (standalone) | Cart, Order |
+| Cluster | Operator | PostgreSQL | Namespace | HA | Pooler | Services |
+|---------|----------|------------|-----------|-----|--------|----------|
+| auth-db | Zalando | 17 | auth | 3 nodes | PgBouncer (sidecar) | Auth |
+| review-db | Zalando | 16 | review | 1 node | None | Review |
+| supporting-db | Zalando | 16 | user | 1 node | PgBouncer (sidecar) | User, Notification, Shipping |
+| product-db | CloudNativePG | 18 | product | 3 nodes | PgDog (standalone) | Product |
+| transaction-db | CloudNativePG | 18 | cart | 3 nodes | PgCat (standalone) | Cart, Order |
 
 ## Why Cluster-Centric Organization?
 

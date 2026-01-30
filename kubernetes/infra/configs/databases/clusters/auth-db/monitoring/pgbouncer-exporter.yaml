@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-db-pgbouncer-exporter
+  namespace: auth
+  labels:
+    app: auth-db-pgbouncer-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-db-pgbouncer-exporter
+  template:
+    metadata:
+      labels:
+        app: auth-db-pgbouncer-exporter
+    spec:
+      containers:
+        - name: pgbouncer-exporter
+          image: prometheuscommunity/pgbouncer-exporter:v0.11.0
+          ports:
+            - containerPort: 9127
+              name: metrics
+          env:
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: pooler.auth-db.credentials.postgresql.acid.zalan.do
+                  key: username
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pooler.auth-db.credentials.postgresql.acid.zalan.do
+                  key: password
+            - name: PGBOUNCER_EXPORTER_CONNECTION_STRING
+              value: "postgres://$(PG_USER):$(PG_PASSWORD)@auth-db-pooler:5432/pgbouncer?sslmode=require"
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-db-pgbouncer-exporter
+  namespace: auth
+  labels:
+    app: auth-db-pgbouncer-exporter
+spec:
+  selector:
+    app: auth-db-pgbouncer-exporter
+  ports:
+    - protocol: TCP
+      port: 9127
+      targetPort: 9127
+      name: metrics
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: auth-db-pgbouncer-exporter
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: auth-db-pgbouncer-exporter
+  namespaceSelector:
+    matchNames:
+      - auth
+  endpoints:
+    - port: metrics
+      interval: 15s
+      scrapeTimeout: 10s

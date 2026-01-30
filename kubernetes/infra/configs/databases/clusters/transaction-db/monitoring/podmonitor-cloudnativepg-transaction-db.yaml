@@ -10,7 +10,6 @@ metadata:
   labels:
     app: transaction-db
     operator: cloudnativepg
-    release: kube-prometheus-stack  # Required for Prometheus Operator discovery
 spec:
   selector:
     matchLabels:

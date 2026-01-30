@@ -9,6 +9,7 @@ metadata:
 spec:
   # Number of instances (HA with Patroni) - Production-Ready: 3 nodes
   instances: 3  # 1 primary + 2 replicas for HA with synchronous replication
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
   
   # Logical Replication Slot Synchronization
   # Required for CDC clients (Debezium, Kafka Connect) - slots synchronized across replicas during failover
@@ -18,6 +19,10 @@ spec:
   
   # PostgreSQL parameters and HA configuration
   postgresql:
+    # Preload libraries required by extensions
+    shared_preload_libraries:
+      - pgaudit
+    
     # Synchronous Replication Configuration
     # Zero data loss with at least 1 synchronous replica required
     synchronous:
@@ -77,6 +82,16 @@ spec:
       
       # Security
       password_encryption: "scram-sha-256"  # More secure than MD5
+
+      # pgAudit configuration
+      pgaudit.log: "all"  # Log all statements (ddl, read, write, function, misc)
+      pgaudit.log_catalog: "off"  # Don't log system catalog queries (reduces noise)
+      pgaudit.log_parameter: "on"  # Include query parameters in logs
+      pgaudit.log_statement_once: "off"  # Log each statement (not just once per session)
+      pgaudit.log_relation: "on"  # Log relation (table) access
+      pgaudit.log_rows: "on"  # Log number of rows affected
+      
+      track_io_timing: "on"
       
       # Replication (for logical replication slot sync)
       # For PostgreSQL 17+: Use sync_replication_slots parameter (native PostgreSQL feature)
@@ -118,7 +133,7 @@ spec:
         - CREATE DATABASE "order" OWNER cart;
         # Note: For PostgreSQL 17+, sync_replication_slots parameter is used (set above)
         # For PostgreSQL 15/16, pg_failover_slots extension would be needed here
-        # But since we're using PostgreSQL 18, no extension creation needed
+        # But since we're using PostgreSQL 18, sync_replication_slots is the correct approach
   
   # Storage configuration
   storage:

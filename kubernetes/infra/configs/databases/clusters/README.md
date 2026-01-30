@@ -9,6 +9,13 @@ This document provides a comprehensive reference for all PostgreSQL database clu
 - **Dashed lines** (`-.->`) indicate planned/future features not yet configured
 - **Subgraphs** group related components by layer (Apps → Pooler → DB Services → DB Instances)
 - **Labels** show service endpoints in `service.namespace.svc:port` format
+- **Cylinders** `[("...")]` represent database instances and schemas
+- **Hexagons** `{{"..."}}` represent connection pooler pods
+- **Color coding**:
+  - 🔴 **Red** = Primary/Leader instance (accepts writes)
+  - 🟡 **Yellow** = Standby/Sync Replica (synchronous replication)
+  - 🟢 **Green** = Read Replica (async) or database schema
+  - 🟣 **Purple** = Connection Pooler (PgBouncer, PgDog, PgCat)
 
 ---
 
@@ -55,8 +62,8 @@ flowchart TD
     end
 
     subgraph Pooler["PgBouncer Pooler - 2 Instances"]
-        PgBouncer1["auth-db-pooler Pod 1"]
-        PgBouncer2["auth-db-pooler Pod 2"]
+        PgBouncer1{{"🟣 auth-db-pooler<br/>Pod 1"}}
+        PgBouncer2{{"🟣 auth-db-pooler<br/>Pod 2"}}
         PoolerSvc["Service: auth-db-pooler.auth.svc:5432"]
     end
 
@@ -65,9 +72,9 @@ flowchart TD
     end
 
     subgraph Cluster["auth-db Cluster - 3 Instances"]
-        Leader["auth-db-0 - Leader"]
-        Standby1["auth-db-1 - Standby"]
-        Standby2["auth-db-2 - Standby"]
+        Leader[("🔴 auth-db-0<br/>Leader")]
+        Standby1[("🟡 auth-db-1<br/>Standby")]
+        Standby2[("🟡 auth-db-2<br/>Standby")]
     end
 
     subgraph Sidecars["Sidecars per Pod"]
@@ -85,6 +92,12 @@ flowchart TD
     Leader -->|"streaming replication"| Standby2
     Leader --- Exporter
     Leader --- Vector
+    
+    style Leader fill:#E53935,color:#fff
+    style Standby1 fill:#FFA726,color:#fff
+    style Standby2 fill:#FFA726,color:#fff
+    style PgBouncer1 fill:#7E57C2,color:#fff
+    style PgBouncer2 fill:#7E57C2,color:#fff
 ```
 
 ### Notes
@@ -137,8 +150,8 @@ flowchart TD
     end
 
     subgraph Pooler["PgBouncer Pooler - 2 Instances"]
-        PgBouncer1["supporting-db-pooler Pod 1"]
-        PgBouncer2["supporting-db-pooler Pod 2"]
+        PgBouncer1{{"🟣 supporting-db-pooler<br/>Pod 1"}}
+        PgBouncer2{{"🟣 supporting-db-pooler<br/>Pod 2"}}
         PoolerSvc["Service: supporting-db-pooler.user.svc:5432"]
     end
 
@@ -147,11 +160,11 @@ flowchart TD
     end
 
     subgraph Cluster["supporting-db Cluster - 1 Instance"]
-        Primary["supporting-db-0 - Primary"]
+        Primary[("🔴 supporting-db-0<br/>Primary")]
         subgraph Databases["Databases"]
-            UserDB["user"]
-            NotificationDB["notification"]
-            ShippingDB["shipping"]
+            UserDB[("user")]
+            NotificationDB[("notification")]
+            ShippingDB[("shipping")]
         end
     end
     
@@ -173,6 +186,13 @@ flowchart TD
     Primary --- ShippingDB
     Primary --- Exporter
     Primary --- Vector
+    
+    style Primary fill:#E53935,color:#fff
+    style UserDB fill:#66BB6A
+    style NotificationDB fill:#66BB6A
+    style ShippingDB fill:#66BB6A
+    style PgBouncer1 fill:#7E57C2,color:#fff
+    style PgBouncer2 fill:#7E57C2,color:#fff
 ```
 
 ### Notes
@@ -225,7 +245,7 @@ flowchart TD
     end
 
     subgraph Cluster["review-db Cluster - 1 Instance"]
-        Primary["review-db-0 - Primary"]
+        Primary[("🔴 review-db-0<br/>Primary")]
     end
 
     subgraph Sidecars["Sidecars"]
@@ -237,6 +257,8 @@ flowchart TD
     DirectSvc --> Primary
     Primary --- Exporter
     Primary --- Vector
+    
+    style Primary fill:#E53935,color:#fff
 ```
 
 ### Notes
@@ -288,7 +310,7 @@ flowchart TD
     end
 
     subgraph Pooler["PgDog Pooler - 1 Instance"]
-        PgDog["pgdog-product Pod"]
+        PgDog{{"🟣 pgdog-product<br/>Pod"}}
         PgDogSvc["Service: pgdog-product.product.svc:6432"]
         PgDogMetrics["Metrics: :9090"]
     end
@@ -300,9 +322,9 @@ flowchart TD
     end
 
     subgraph Cluster["product-db Cluster - 3 Instances"]
-        Primary["product-db-1 - Primary"]
-        Replica1["product-db-2 - Replica"]
-        Replica2["product-db-3 - Replica"]
+        Primary[("🔴 product-db-1<br/>Primary")]
+        Replica1[("🟢 product-db-2<br/>Replica")]
+        Replica2[("🟢 product-db-3<br/>Replica")]
     end
 
     ProductService --> PgDogSvc
@@ -319,6 +341,11 @@ flowchart TD
     Primary -->|"async replication"| Replica1
     Primary -->|"async replication"| Replica2
     PgDog --- PgDogMetrics
+    
+    style Primary fill:#E53935,color:#fff
+    style Replica1 fill:#66BB6A
+    style Replica2 fill:#66BB6A
+    style PgDog fill:#7E57C2,color:#fff
 ```
 
 ### Notes
@@ -372,8 +399,8 @@ flowchart TD
     end
 
     subgraph Pooler["PgCat Pooler - 2 Instances"]
-        PgCat1["pgcat-transaction Pod 1"]
-        PgCat2["pgcat-transaction Pod 2"]
+        PgCat1{{"🟣 pgcat-transaction<br/>Pod 1"}}
+        PgCat2{{"🟣 pgcat-transaction<br/>Pod 2"}}
         PgCatSvc["Service: pgcat.cart.svc:5432"]
         PgCatMetrics["Metrics: :9930"]
     end
@@ -384,14 +411,14 @@ flowchart TD
     end
 
     subgraph Cluster["transaction-db Cluster - 3 Instances"]
-        Primary["transaction-db-1 - Primary"]
-        Replica1["transaction-db-2 - Sync Replica"]
-        Replica2["transaction-db-3 - Sync Replica"]
+        Primary[("🔴 transaction-db-1<br/>Primary")]
+        Replica1[("🟡 transaction-db-2<br/>Sync Replica")]
+        Replica2[("🟡 transaction-db-3<br/>Sync Replica")]
     end
 
     subgraph Databases["Databases"]
-        CartDB["cart"]
-        OrderDB["order"]
+        CartDB[("cart")]
+        OrderDB[("order")]
     end
 
     CartService --> PgCatSvc
@@ -410,6 +437,14 @@ flowchart TD
     Primary --- CartDB
     Primary --- OrderDB
     PgCat1 --- PgCatMetrics
+    
+    style Primary fill:#E53935,color:#fff
+    style Replica1 fill:#FFA726,color:#fff
+    style Replica2 fill:#FFA726,color:#fff
+    style CartDB fill:#66BB6A
+    style OrderDB fill:#66BB6A
+    style PgCat1 fill:#7E57C2,color:#fff
+    style PgCat2 fill:#7E57C2,color:#fff
 ```
 
 ### Notes
@@ -469,7 +504,7 @@ flowchart LR
     end
 
     subgraph Pooler["Connection Pooler"]
-        PgDog["PgDog - pgdog-product:6432"]
+        PgDog{{"🟣 PgDog<br/>pgdog-product:6432"}}
     end
 
     subgraph CNPG["CloudNativePG Services"]
@@ -478,9 +513,9 @@ flowchart LR
     end
 
     subgraph Cluster["product-db Cluster"]
-        Primary["Primary Instance"]
-        Replica1["Replica 1"]
-        Replica2["Replica 2"]
+        Primary[("🔴 Primary")]
+        Replica1[("🟢 Replica 1")]
+        Replica2[("🟢 Replica 2")]
     end
 
     Driver --> PgDog
@@ -491,6 +526,11 @@ flowchart LR
     R --> Replica2
     Primary -->|"async WAL streaming"| Replica1
     Primary -->|"async WAL streaming"| Replica2
+    
+    style Primary fill:#E53935,color:#fff
+    style Replica1 fill:#66BB6A
+    style Replica2 fill:#66BB6A
+    style PgDog fill:#7E57C2,color:#fff
 ```
 
 ### INSERT/UPDATE in 10 Steps (Preview)

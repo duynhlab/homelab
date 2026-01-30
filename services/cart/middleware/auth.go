@@ -91,7 +91,7 @@ func AuthMiddleware(authClient *AuthClient) gin.HandlerFunc {
 		user, err := authClient.GetMe(token)
 		if err != nil {
 			logger := clog.FromContext(c.Request.Context())
-			logger.Debug("Auth validation failed", "error", err)
+			logger.DebugContext(c.Request.Context(), "Auth validation failed", "error", err)
 
 			// For demo compatibility, fall back to default user_id
 			// In production: c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})

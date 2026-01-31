@@ -108,6 +108,33 @@ cat specs/active/openai-postgresql-scaling/application-layer-optimization.md
 
 ---
 
+## 💡 Detailed Learnings & Insights
+
+### 1. Simplicity is Key (KISS Principle)
+OpenAI avoids over-engineering. They explicitly **avoided sharding** (distributed database complexity) as long as possible.
+- **Why?** Sharding adds massive complexity to operations, debugging, and transactional logic.
+- **Instead:** They maximized vertical scaling and read scaling (replicas) first.
+
+### 2. Cache Stampede Prevention (Thundering Herd)
+A critical insight is that standard caching is not enough for high-concurrency systems.
+- **Problem:** When a hot cache key expires, thousands of concurrent requests can hit the DB simultaneously.
+- **Solution:** Implementing **Distributed Locking** (e.g., Redis `SETNX`) so only *one* request refreshes the cache while others wait. *We have implemented this in our Product Service.*
+
+### 3. Cascading Replication
+When scaling to 50+ replicas, a single Primary cannot push WAL logs to all of them efficiently.
+- **Solution:** Use "Hub" replicas that receive WAL from Primary and forward it to "Leaf" replicas.
+- **Benefit:** Reduces CPU/Network load on the Primary.
+
+### 4. Separate Workloads (Bulk vs Interactive)
+They isolate heavy internal workloads (e.g., data warehouse exports, analytics) from user-facing traffic.
+- **Implementation:** Dedicated read replicas for internal tools to ensure user latency is never impacted by heavy background jobs.
+
+### 5. Connection Pooling is Mandatory
+At scale, opening/closing connections is expensive.
+- **Tools:** Use PgBouncer/PgCat to maintain persistent connections to the backend, lightweight connections to the frontend apps.
+
+---
+
 ## 📚 References
 
 - [OpenAI Blog - Scaling PostgreSQL](https://openai.com/index/scaling-postgresql/)

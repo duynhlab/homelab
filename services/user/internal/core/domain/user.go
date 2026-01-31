@@ -5,6 +5,7 @@ type User struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
 	Name     string `json:"name"`
+	Phone    string `json:"phone,omitempty"`
 }
 
 type CreateUserRequest struct {

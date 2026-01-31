@@ -49,10 +49,11 @@ func (s *UserService) GetUser(ctx context.Context, id string) (*domain.User, err
 }
 
 // GetProfile retrieves the current user's profile
-// Note: In production, user_id should be extracted from JWT token or session
-func (s *UserService) GetProfile(ctx context.Context) (*domain.User, error) {
+// userID, username, email are passed from auth middleware (auth service token introspection)
+func (s *UserService) GetProfile(ctx context.Context, userID string, username, email string) (*domain.User, error) {
 	ctx, span := middleware.StartSpan(ctx, "user.profile", trace.WithAttributes(
 		attribute.String("layer", "logic"),
+		attribute.String("user.id", userID),
 	))
 	defer span.End()
 
@@ -62,26 +63,35 @@ func (s *UserService) GetProfile(ctx context.Context) (*domain.User, error) {
 		return nil, fmt.Errorf("database connection not available")
 	}
 
-	// TODO: Extract user_id from JWT token or session context
-	// For now, use user_id = 1 as default (mock)
-	userID := 1
+	// Parse user_id for database query
+	uid, err := strconv.Atoi(userID)
+	if err != nil {
+		span.SetAttributes(attribute.Bool("profile.found", false))
+		return nil, fmt.Errorf("invalid user_id %q: %w", userID, ErrUserNotFound)
+	}
 
 	// Query user profile - use pointers for nullable columns
 	var profileID int
 	var firstName, lastName, phone, address *string
 
 	query := `SELECT id, user_id, first_name, last_name, phone, address FROM user_profiles WHERE user_id = $1`
-	err := db.QueryRow(ctx, query, userID).Scan(&profileID, &userID, &firstName, &lastName, &phone, &address)
+	err = db.QueryRow(ctx, query, uid).Scan(&profileID, &uid, &firstName, &lastName, &phone, &address)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			span.SetAttributes(attribute.Bool("profile.found", false))
-			return nil, fmt.Errorf("get profile for user %d: %w", userID, ErrUserNotFound)
+			// Return auth data even if no profile in user_profiles (e.g., new user)
+			return &domain.User{
+				ID:       userID,
+				Username: username,
+				Email:    email,
+				Name:     "User " + userID,
+			}, nil
 		}
 		span.RecordError(err)
 		return nil, fmt.Errorf("query user profile: %w", err)
 	}
 
-	// Build name
+	// Build name from profile
 	nameParts := []string{}
 	if firstName != nil && *firstName != "" {
 		nameParts = append(nameParts, *firstName)
@@ -91,14 +101,21 @@ func (s *UserService) GetProfile(ctx context.Context) (*domain.User, error) {
 	}
 	name := strings.Join(nameParts, " ")
 	if name == "" {
-		name = "User " + strconv.Itoa(userID)
+		name = "User " + userID
+	}
+
+	// Build phone string
+	phoneStr := ""
+	if phone != nil && *phone != "" {
+		phoneStr = *phone
 	}
 
 	user := &domain.User{
-		ID:       strconv.Itoa(userID),
-		Username: "current_user",        // In production, fetch from auth service
-		Email:    "current@example.com", // In production, fetch from auth service
+		ID:       userID,
+		Username: username,
+		Email:    email,
 		Name:     name,
+		Phone:    phoneStr,
 	}
 
 	span.SetAttributes(attribute.Bool("profile.found", true))

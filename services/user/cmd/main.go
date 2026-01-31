@@ -86,6 +86,10 @@ func main() {
 	// Prometheus middleware
 	r.Use(middleware.PrometheusMiddleware())
 
+	// Initialize auth client for token introspection
+	authClient := middleware.NewAuthClient(cfg.AuthServiceURL)
+	logger.Info("Auth client initialized", zap.String("auth_service_url", cfg.AuthServiceURL))
+
 	// Health check
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -98,8 +102,13 @@ func main() {
 	apiV1 := r.Group("/api/v1")
 	{
 		apiV1.GET("/users/:id", v1.GetUser)
-		apiV1.GET("/users/profile", v1.GetProfile)
-		apiV1.PUT("/users/profile", v1.UpdateProfile)
+		// Profile endpoints require auth middleware for user resolution
+		profileGroup := apiV1.Group("/users")
+		profileGroup.Use(middleware.AuthMiddleware(authClient, logger))
+		{
+			profileGroup.GET("/profile", v1.GetProfile)
+			profileGroup.PUT("/profile", v1.UpdateProfile)
+		}
 		apiV1.POST("/users", v1.CreateUser)
 	}
 

@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.42.4] - 2026-01-28
+
+### Changed
+
+- **Error Handling - No Raw Backend Errors in UI**:
+  - Added `sanitizeValidationError()` in user and order services - never expose gin/go validation errors to clients
+  - Added `frontend/src/utils/errorMessages.js` - maps backend errors to user-friendly messages
+  - ApiError component now uses `toUserFriendlyError()` and supports `onRetry` prop
+  - Profile page: ApiError with retry button
+  - Checkout page: user-friendly error messages, toast notifications, retry for cart load failure
+
+- **Profile Flow**:
+  - GetProfile/UpdateProfile: removed user_id fallback "1", return 401 when auth context empty
+  - CreateUser/UpdateProfile: sanitized validation errors (return "Invalid request" instead of raw gin errors)
+
+- **Checkout / Place Order Flow**:
+  - Added `product_name` to order payload (required by order_items schema)
+  - Toast for success and error (user-friendly messages)
+  - Cart load failure: retry button, user-friendly error
+  - Order failure: clear UX with retry hint ("You can try again or return to your cart")
+  - Empty cart vs load error: distinct states (empty cart only when load succeeded)
+
+- **Order Service**:
+  - ListOrders: removed user_id fallback, return 401 when auth context empty
+  - CreateOrder: sanitized validation errors
+  - Auth middleware: configurable `AUTH_ALLOW_UNAUTHENTICATED_FALLBACK` (default: false for production)
+
+- **User Service**:
+  - Auth middleware: configurable `AUTH_ALLOW_UNAUTHENTICATED_FALLBACK` (default: false)
+
+- **Order Service Auth**:
+  - Added `AuthAllowUnauthenticatedFallback` config and `AUTH_ALLOW_UNAUTHENTICATED_FALLBACK` env
+  - Auth middleware returns 401 for missing/invalid tokens when fallback disabled (production default)
+
 ## [0.42.3] - 2026-01-31
 
 ### Fixed

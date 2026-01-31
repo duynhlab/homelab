@@ -26,8 +26,8 @@ func main() {
 		panic("Configuration validation failed: " + err.Error())
 	}
 
-	// Initialize structured logger (clog/slog)
-	clog.Setup()
+	// Initialize structured logger (clog/slog) with LOG_LEVEL from config
+	clog.Setup(cfg.Logging.Level)
 	// slog.Default() is now configured with JSON handler and trace injection
 
 	slog.Info("Service starting",

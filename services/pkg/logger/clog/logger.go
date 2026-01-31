@@ -4,15 +4,18 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/chainguard-dev/clog"
 	"go.opentelemetry.io/otel/trace"
 )
 
 // Setup initializes the global logger with a JSON handler and tracing support.
-func Setup() {
+// level is parsed from LOG_LEVEL env (debug, info, warn, error). Defaults to info if invalid.
+func Setup(level string) {
+	slogLevel := parseSlogLevel(level)
 	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
+		Level: slogLevel,
 	})
 
 	// Create a logger with the tracing handler
@@ -46,6 +49,22 @@ func (h *TracingHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 
 func (h *TracingHandler) WithGroup(name string) slog.Handler {
 	return &TracingHandler{handler: h.handler.WithGroup(name)}
+}
+
+// parseSlogLevel maps config level string to slog.Level. Defaults to info for unknown values.
+func parseSlogLevel(level string) slog.Level {
+	switch strings.ToLower(strings.TrimSpace(level)) {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }
 
 // WithLogger is a helper to inject logger into context using clog

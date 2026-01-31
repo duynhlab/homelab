@@ -801,6 +801,8 @@ Authorization: Bearer <jwt_token>
 
 Create a new order.
 
+> **Note:** `user_id` is extracted from the `Authorization: Bearer <token>` header by the Web Layer (auth middleware). Do not send `user_id` in the request body.
+
 #### Request
 
 ```
@@ -809,16 +811,24 @@ Content-Type: application/json
 Authorization: Bearer <jwt_token>
 
 {
-  "user_id": "user123",
   "items": [
     {
       "product_id": "prod1",
+      "product_name": "Wireless Mouse",
       "quantity": 2,
       "price": 29.99
     }
   ]
 }
 ```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `items` | array | Yes | Order line items |
+| `items[].product_id` | string | Yes | Product ID |
+| `items[].product_name` | string | Yes | Product name (denormalized for order record) |
+| `items[].quantity` | integer | Yes | Quantity (min=1) |
+| `items[].price` | number | Yes | Unit price at time of order |
 
 #### Response
 
@@ -846,6 +856,7 @@ Authorization: Bearer <jwt_token>
 | Status | Body | Condition |
 |--------|------|-----------|
 | 400 | `{"error": "Invalid order"}` | Items array empty or validation failed |
+| 401 | `{"error": "Authentication required"}` | No valid user in auth context |
 | 500 | `{"error": "Internal server error"}` | Server error |
 
 ---
@@ -1341,36 +1352,10 @@ curl http://localhost:8080/api/v1/orders \
 ---
 ## Logging Standards
 
-All services must adhere to the following logging standards to ensure compatibility with **Victorialogs** and **OpenTelemetry**.
+For comprehensive logging documentation including JSON format, log levels, library comparison, and VictoriaLogs integration, see **[LOGS.md](LOGS.md)**.
 
-### JSON Format
-
-All logs must be output in **JSON format**. This is critical for efficient parsing and querying in the centralized logging system.
-
-**Required Fields:**
-- `time`: Timestamp (ISO8601 or Unix)
-- `level`: Log level (INFO, WARN, ERROR, etc.)
-- `msg` (or `message`): Log message
-- `trace_id`: OpenTelemetry Trace ID (automatically injected)
-- `span_id`: OpenTelemetry Span ID (automatically injected)
-
-### Log Levels
-
-We follow a standardized log level schema (aligned with Syslog/Zerolog):
-
-| Level | Value | Description |
-| :--- | :--- | :--- |
-| **panic** | 5 | System crash |
-| **fatal** | 4 | System exit |
-| **error** | 3 | Runtime errors |
-| **warn** | 2 | Warnings |
-| **info** | 1 | Normal operation |
-| **debug** | 0 | Detailed debug info |
-| **trace** | -1 | Low-level tracing |
-
-### Libraries
-
-- **Cart Service**: Uses `clog` (slog wrapper) - POC
-- **Auth Service**: Uses `zerolog` - POC
-- **Other Services**: Currently migrating from `zap`
+**Summary:**
+- **2 services**: cart (clog), auth (zerolog)
+- **6 services**: product, order, review, notification, shipping, user (Zap)
+- All logs must be JSON format with `time`, `level`, `msg`/`message`, `trace_id`
 

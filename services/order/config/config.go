@@ -38,9 +38,10 @@ type Config struct {
 	Logging            LoggingConfig   // Structured logging (Zap)
 	Metrics            MetricsConfig   // Prometheus metrics
 	Database           DatabaseConfig  // PostgreSQL database configuration
-	ShutdownTimeout    int             // Graceful shutdown timeout in seconds - from SHUTDOWN_TIMEOUT env (default: 10)
-	AuthServiceURL     string          // Auth service URL for token introspection - from AUTH_SERVICE_URL env
-	ShippingServiceURL string          // Shipping service URL for order aggregation - from SHIPPING_SERVICE_URL env
+	ShutdownTimeout                   int    // Graceful shutdown timeout in seconds - from SHUTDOWN_TIMEOUT env (default: 10)
+	AuthServiceURL                    string // Auth service URL for token introspection - from AUTH_SERVICE_URL env
+	ShippingServiceURL                string // Shipping service URL for order aggregation - from SHIPPING_SERVICE_URL env
+	AuthAllowUnauthenticatedFallback  bool   // When true, allow requests without token with user_id="1" (demo only). Default: false.
 }
 
 // ServiceConfig defines basic service configuration
@@ -149,9 +150,10 @@ func Load() *Config {
 			PoolMode:       getEnv("DB_POOL_MODE", ""),
 			PoolerType:     getEnv("DB_POOLER_TYPE", ""),
 		},
-		ShutdownTimeout:    getEnvDurationSeconds("SHUTDOWN_TIMEOUT", 10),
-		AuthServiceURL:     getEnv("AUTH_SERVICE_URL", "http://auth.auth.svc.cluster.local:8080"),
-		ShippingServiceURL: getEnv("SHIPPING_SERVICE_URL", "http://shipping.shipping.svc.cluster.local:8080"),
+		ShutdownTimeout:                  getEnvDurationSeconds("SHUTDOWN_TIMEOUT", 10),
+		AuthServiceURL:                   getEnv("AUTH_SERVICE_URL", "http://auth.auth.svc.cluster.local:8080"),
+		ShippingServiceURL:               getEnv("SHIPPING_SERVICE_URL", "http://shipping.shipping.svc.cluster.local:8080"),
+		AuthAllowUnauthenticatedFallback: getEnvBool("AUTH_ALLOW_UNAUTHENTICATED_FALLBACK", false),
 	}
 }
 

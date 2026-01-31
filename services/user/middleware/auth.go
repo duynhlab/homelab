@@ -65,24 +65,32 @@ func (c *AuthClient) GetMe(token string) (*AuthUser, error) {
 }
 
 // AuthMiddleware creates a middleware that validates tokens via auth service
-// It sets "user_id", "username", "email" in the gin context if authentication succeeds
-func AuthMiddleware(authClient *AuthClient, logger *zap.Logger) gin.HandlerFunc {
+// It sets "user_id", "username", "email" in the gin context if authentication succeeds.
+// When allowUnauthenticatedFallback is true (demo mode), missing/invalid tokens fall back to user_id="1".
+// When false (default), returns 401 for missing or invalid tokens.
+func AuthMiddleware(authClient *AuthClient, logger *zap.Logger, allowUnauthenticatedFallback bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get token from Authorization header
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			// No token provided - allow request with default user_id for demo compatibility
-			// In production, you'd return 401 here
-			c.Set("user_id", "1")
-			c.Next()
+			if allowUnauthenticatedFallback {
+				c.Set("user_id", "1")
+				c.Next()
+				return
+			}
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
 			return
 		}
 
 		// Extract token from "Bearer <token>"
 		const bearerPrefix = "Bearer "
 		if len(authHeader) <= len(bearerPrefix) || authHeader[:len(bearerPrefix)] != bearerPrefix {
-			c.Set("user_id", "1")
-			c.Next()
+			if allowUnauthenticatedFallback {
+				c.Set("user_id", "1")
+				c.Next()
+				return
+			}
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization header"})
 			return
 		}
 		token := authHeader[len(bearerPrefix):]
@@ -93,9 +101,12 @@ func AuthMiddleware(authClient *AuthClient, logger *zap.Logger) gin.HandlerFunc 
 			if logger != nil {
 				logger.Debug("Auth validation failed", zap.Error(err))
 			}
-			// For demo compatibility, fall back to default user_id
-			c.Set("user_id", "1")
-			c.Next()
+			if allowUnauthenticatedFallback {
+				c.Set("user_id", "1")
+				c.Next()
+				return
+			}
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 			return
 		}
 

@@ -24,8 +24,8 @@ func main() {
 		panic("Configuration validation failed: " + err.Error())
 	}
 
-	// Initialize Zerolog
-	zerolog.Setup()
+	// Initialize Zerolog with LOG_LEVEL from config
+	zerolog.Setup(cfg.Logging.Level)
 
 	log.Info().
 		Str("service", cfg.Service.Name).

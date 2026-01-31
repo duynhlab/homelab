@@ -72,7 +72,6 @@ export default function CheckoutPage() {
             notify('success', 'Order created successfully!');
         } catch (err) {
             const message = toUserFriendlyError(err?.message);
-            setError(message);
             notify('error', message);
             if (import.meta.env.DEV) {
                 console.error('[API ERROR]', err);
@@ -136,15 +135,6 @@ export default function CheckoutPage() {
             {/* Checkout Form */}
             {!loading && !orderResult && cart?.items?.length > 0 && (
                 <>
-                    {error && (
-                        <div className="error-box">
-                            <strong>Error:</strong> {error}
-                            <p style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>
-                                You can try again or return to your cart to review items.
-                            </p>
-                        </div>
-                    )}
-
                     <div className="two-col">
                         {/* Order Items */}
                         <div className="card">

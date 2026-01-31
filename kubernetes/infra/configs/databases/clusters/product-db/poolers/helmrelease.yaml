@@ -45,6 +45,7 @@ spec:
         host: product-db-r.product.svc.cluster.local
         port: 5432
         database: product
+        databaseName: product  # Actual PostgreSQL DB (defaults to name if unset)
         poolSize: 30
         poolMode: transaction
     

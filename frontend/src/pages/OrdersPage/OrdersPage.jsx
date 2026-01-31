@@ -182,27 +182,77 @@ export default function OrdersPage() {
     );
 }
 
-// Separate component for order details panel
+// Separate component for order details panel - layout consistent with Checkout
 function OrderDetailsPanel({ order, shipment, getStatusColor }) {
     if (!order) return null;
 
     return (
-        <>
-            <p><strong>Order #{order.id}</strong></p>
-            <p>
-                Status:{' '}
-                <span style={{ color: getStatusColor(order.status) }}>
+        <div className="order-details-panel">
+            {/* Header: Order ID + Status + Date */}
+            <div className="order-details-header">
+                <div>
+                    <strong>Order #{order.id}</strong>
+                </div>
+                <span
+                    className="order-status-badge"
+                    style={{ color: getStatusColor(order.status) }}
+                >
                     {order.status}
                 </span>
-            </p>
-            <p className="text-muted">
-                {new Date(order.created_at).toLocaleString()}
-            </p>
+                <div className="text-muted order-details-date">
+                    {new Date(order.created_at).toLocaleString()}
+                </div>
+            </div>
+
+            {/* Two-col layout: Order Items (left) + Order Summary (right) - same as Checkout */}
+            <div className="two-col order-details-layout">
+                {/* Order Items - table format */}
+                <div className="card order-items-section">
+                    <h4>Order Items</h4>
+                    <div className="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Qty</th>
+                                    <th className="hide-mobile">Price</th>
+                                    <th>Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {order.items?.map((item, i) => (
+                                    <tr key={i}>
+                                        <td>{item.product_name}</td>
+                                        <td>{item.quantity}</td>
+                                        <td className="hide-mobile">${item.price?.toFixed(2)}</td>
+                                        <td>${item.subtotal?.toFixed(2)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Order Summary - Subtotal / Shipping / Total */}
+                <div className="card order-summary-section">
+                    <h4>Order Summary</h4>
+                    <table>
+                        <tbody>
+                            <tr><th>Subtotal</th><td>${order.subtotal?.toFixed(2)}</td></tr>
+                            <tr><th>Shipping</th><td>${order.shipping?.toFixed(2)}</td></tr>
+                            <tr className="order-total-row">
+                                <th><strong>Total</strong></th>
+                                <td><strong className="order-total-value">${order.total?.toFixed(2)}</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
             {/* Shipping Tracking - from aggregation endpoint */}
             {shipment && (
                 <div className="shipment-box">
-                    <strong>📦 Shipment Tracking</strong>
+                    <strong>Shipment Tracking</strong>
                     <p>Carrier: {shipment.carrier || 'N/A'}</p>
                     <p>
                         Status:{' '}
@@ -221,21 +271,6 @@ function OrderDetailsPanel({ order, shipment, getStatusColor }) {
                     <p className="text-muted">Shipment info not available</p>
                 </div>
             )}
-
-            <h4>Items:</h4>
-            {order.items?.map((item, i) => (
-                <div key={i} className="order-item">
-                    {item.product_name} ×{item.quantity} = ${item.subtotal?.toFixed(2)}
-                </div>
-            ))}
-
-            <table>
-                <tbody>
-                    <tr><th>Subtotal</th><td>${order.subtotal?.toFixed(2)}</td></tr>
-                    <tr><th>Shipping</th><td>${order.shipping?.toFixed(2)}</td></tr>
-                    <tr><th><strong>Total</strong></th><td><strong>${order.total?.toFixed(2)}</strong></td></tr>
-                </tbody>
-            </table>
-        </>
+        </div>
     );
 }

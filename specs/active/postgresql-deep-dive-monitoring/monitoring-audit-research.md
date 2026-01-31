@@ -1,6 +1,6 @@
 # PostgreSQL Monitoring Audit Research
 
-> **Date:** 2026-01-28  
+> **Date:** 2026-01-29  
 > **Scope:** 5 clusters, 2 operators, 2 monitoring/logging methods
 
 ---
@@ -77,7 +77,7 @@ kubectl exec -n cart transaction-db-1 -- psql -U postgres -c "SELECT version();"
 | **Sidecar Containers** | Built-in exporter only |
 | **Metrics** | Automatic `cnpg_*` metrics |
 | **Logging** | `logging_collector` → stdout |
-| **Extensions** | `shared_preload_libraries` is **empty** |
+| **Extensions** | `shared_preload_libraries` includes **pgaudit** |
 
 **Configuration Files:**
 - [product-db/instance.yaml](kubernetes/infra/configs/databases/clusters/product-db/instance.yaml)
@@ -260,12 +260,18 @@ All columns used in [monitoring-queries.yaml](kubernetes/infra/configs/databases
 ```yaml
 # Current: product-db/instance.yaml
 postgresql:
-  parameters: {}  # Empty! No shared_preload_libraries set
+  # Preload libraries required by extensions
+  shared_preload_libraries:
+    - pgaudit
+    # pg_stat_statements is MISSING here!
 
 # Required for pg_stat_statements:
 postgresql:
+  # Preload libraries required by extensions
+  shared_preload_libraries:
+    - pgaudit
+    - pg_stat_statements
   parameters:
-    shared_preload_libraries: "pg_stat_statements"
     pg_stat_statements.max: "10000"
     pg_stat_statements.track: "all"
 ```
@@ -285,6 +291,10 @@ postgresql:
 | CloudNativePG (Helm) | CloudNativePG metrics | `cnpg_*` | ❌ | ✅ |
 | `pgbouncer.json` | PgBouncer pooler metrics | `pgbouncer_*` | ✅ | — |
 | `pgcat.json` | PgCat pooler metrics | `pgcat_*` | — | ✅ |
+| `grafana-dashboard-pgdog.yaml` | PgDog metrics | `pgdog_*` | — | ✅ (External URL) |
+| `grafana-dashboard-cloudnative-pg.yaml` | CloudNativePG metrics | `cnpg_*` | — | ✅ (Helm ConfigMap) |
+| `grafana-dashboard-vector.yaml` | Vector metrics | `vector_*` | ✅ | ✅ (External URL) |
+| `grafana-dashboard-loki.yaml` | Loki Logs | `loki_*` | ✅ | ✅ (External URL) |
 
 ---
 
@@ -371,6 +381,26 @@ postgresql:
 | CNPG dashboard from Helm (not version-controlled) | External dependency |
 | PgDog dashboard JSON missing | Dashboard not available |
 | No replication lag seconds for CNPG | Only status available |
+| **Missing Local Dashboards** | `pgdog`, `vector`, `loki`, `cnpg` rely on external URLs/Helm | Risk of broken links/upstream changes |
+
+### 🔍 Dashboard Directory Audit
+Location: `kubernetes/infra/configs/monitoring/grafana/dashboards/`
+
+> [!NOTE]
+> **Dashboard Fixes Applied (2026-01-29):**
+> Critical syntax and selector errors were fixed in `pg-query-overview.json`. See [fix-dashboard-report.md](fix-dashboard-report.md) for details.
+
+| Dashboard | Source | Status |
+|-----------|--------|--------|
+| `pg-monitoring.json` | Local File | ✅ Safe |
+| `pg-query-overview.json` | Local File | ✅ Safe |
+| `pgcat.json` | Local File | ✅ Safe |
+| `pgdog` | **External URL** | ⚠️ ID 24583 (Grafana.com) |
+| `vector` | **External URL** | ⚠️ ID 21954 (Grafana.com) |
+| `loki` | **External URL** | ⚠️ ID 15141 (Grafana.com) |
+| `cloudnative-pg` | **Helm ConfigMap** | ⚠️ Managed by Helm Chart |
+
+**Risk:** External dashboards may change or disappear. Helm-managed dashboards are hard to customize.
 
 ---
 
@@ -381,8 +411,11 @@ postgresql:
 **Add to instance.yaml:**
 ```yaml
 postgresql:
+  # Preload libraries required by extensions
+  shared_preload_libraries:
+    - pgaudit
+    - pg_stat_statements
   parameters:
-    shared_preload_libraries: "pg_stat_statements"
     pg_stat_statements.max: "10000"
     pg_stat_statements.track: "all"
     pg_stat_statements.track_utility: "on"
@@ -465,10 +498,11 @@ Plan migration from deprecated `queries.yaml` to collector-based config in futur
   - Add:
     ```yaml
     postgresql:
-      parameters:
-        shared_preload_libraries: "pg_stat_statements"
-        pg_stat_statements.max: "10000"
-        pg_stat_statements.track: "all"
+    # Preload libraries required by extensions
+    shared_preload_libraries:
+      - pgaudit
+      - pg_stat_statements
+
     ```
   - Run: `kubectl apply -f clusters/product-db/instance.yaml`
   - Then: `kubectl exec -n product product-db-1 -- psql -U postgres -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"`

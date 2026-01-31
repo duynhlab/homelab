@@ -47,6 +47,37 @@ Rất hữu ích cho việc hiểu trade-offs:
 - Write Amplification → Migration to CosmosDB
 - Replica Lag → Co-location + Large Instance Types
 
+### 5. Deep Dive: SPOF vs HA Hot Standby
+> **Concept Explanation**:
+
+- **SPOF (Single Point of Failure)**: Nếu database chết, toàn bộ app chết (Downtime 100%).
+- **HA Hot Standby**: Có 1 database dự phòng (Standby) luôn "nóng" (sync data liên tục). Khi cái chính (Primary) chết, cái phụ lên thay ngay lập tức (Failover).
+
+**Diagram visualized:**
+
+```mermaid
+graph TD
+    subgraph SPOF["❌ OLD: Single Point of Failure"]
+        App1[App] -->|Writes/Reads| DB1[("🔴 Primary DB")]
+        style DB1 fill:#EF5350,color:#fff
+        
+        DB1 -.->|🔥 CRASH!| Down[System DOWN]
+    end
+
+    subgraph HA["✅ NEW: HA Hot Standby"]
+        App2[App] -->|Writes| DB_P[("🔴 Primary DB")]
+        
+        DB_P -->|WAL Sync| DB_S[("🟡 Hot Standby")]
+        
+        DB_P -.->|🔥 CRASH!| Failover
+        Failover[⚡ Failover Triggered] -->|Promote| DB_S
+        App2 -.->|Reconnect| DB_S
+        
+        style DB_P fill:#66BB6A,color:#fff
+        style DB_S fill:#FFA726,color:#fff
+    end
+```
+
 ---
 
 ## 🔧 Góp Ý Cải Thiện

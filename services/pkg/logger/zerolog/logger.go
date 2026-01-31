@@ -3,6 +3,7 @@ package zerolog
 import (
 	"context"
 	"os"
+	"strings"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -10,15 +11,32 @@ import (
 )
 
 // Setup initializes the global zerolog configuration.
-func Setup() {
+// level is parsed from LOG_LEVEL env (debug, info, warn, error). Defaults to info if invalid.
+func Setup(level string) {
 	// Standardize timestamp
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
-	// Set global log level to INFO (1) by default
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	// Set global log level from config
+	zerolog.SetGlobalLevel(parseZerologLevel(level))
 
 	// Configure global logger to write to stdout
 	log.Logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
+}
+
+// parseZerologLevel maps config level string to zerolog.Level. Defaults to info for unknown values.
+func parseZerologLevel(level string) zerolog.Level {
+	switch strings.ToLower(strings.TrimSpace(level)) {
+	case "debug":
+		return zerolog.DebugLevel
+	case "info":
+		return zerolog.InfoLevel
+	case "warn":
+		return zerolog.WarnLevel
+	case "error":
+		return zerolog.ErrorLevel
+	default:
+		return zerolog.InfoLevel
+	}
 }
 
 // WithContext returns a context with the logger attached.

@@ -13,48 +13,6 @@ As an alternative to deploying Postgres manually, you can also use one of severa
 | **KubeDB PostgreSQL Operator** | An open-source Kubernetes operator focused on managing databases at scale, including PostgreSQL. It is part of the KubeDB ecosystem, which supports a range of databases beyond just PostgreSQL. | ⬜ |
 | **StackGres Postgres Operator** | A PostgreSQL operator that emphasizes fully managed PostgreSQL deployments within Kubernetes environments. It's known for providing a more opinionated approach to PostgreSQL management with a focus on ease of use and automation. | ⬜ |
 
-
-## Structure
-
-```
-databases/
-├── clusters/                    # Per-cluster configurations
-│   ├── auth-db/                 # Zalando cluster (3-node HA)
-│   │   ├── kustomization.yaml
-│   │   ├── instance.yaml
-│   │   └── configmaps/
-│   │       ├── monitoring-queries.yaml
-│   │       └── vector-sidecar.yaml
-│   ├── review-db/               # Zalando cluster (single node)
-│   │   └── ...
-│   ├── supporting-db/           # Zalando cluster (shared DB pattern)
-│   │   └── ...
-│   ├── product-db/              # CloudNativePG cluster (2-node HA)
-│   │   ├── kustomization.yaml
-│   │   ├── instance.yaml
-│   │   ├── secrets/
-│   │   │   └── product-db-secret.yaml
-│   │   ├── poolers/
-│   │   │   └── helmrelease.yaml  # PgDog
-│   │   └── monitoring/
-│   │       └── podmonitor-cloudnativepg-product-db.yaml
-│   ├── transaction-db/          # CloudNativePG cluster (3-node HA)
-│   │   ├── kustomization.yaml
-│   │   ├── instance.yaml
-│   │   ├── secrets/
-│   │   │   ├── transaction-db-secret-cart.yaml
-│   │   │   └── transaction-db-secret-order.yaml
-│   │   ├── poolers/
-│   │   │   ├── configmap.yaml   # PgCat config
-│   │   │   ├── deployment.yaml
-│   │   │   └── service.yaml
-│   │   └── monitoring/
-│   │       ├── podmonitor-cloudnativepg-transaction-db.yaml
-│   │       └── servicemonitor-pgcat-transaction.yaml
-│   └── README.md                # Connection poolers documentation
-└── kustomization.yaml           # Root kustomization (includes all clusters)
-```
-
 ## Cluster Overview
 
 | Cluster | Operator | PostgreSQL | Namespace | HA | Pooler | Services |
@@ -64,29 +22,6 @@ databases/
 | supporting-db | Zalando | 16 | user | 1 node | PgBouncer (sidecar) | User, Notification, Shipping |
 | product-db | CloudNativePG | 18 | product | 3 nodes | PgDog (standalone) | Product |
 | transaction-db | CloudNativePG | 18 | cart | 3 nodes | PgCat (standalone) | Cart, Order |
-
-## Why Cluster-Centric Organization?
-
-Each cluster folder contains **all resources** for that cluster:
-- **Instance**: The PostgreSQL cluster CRD
-- **Secrets**: Application database credentials (CloudNativePG only)
-- **ConfigMaps**: Monitoring queries, Vector sidecar configs (Zalando only)
-- **Poolers**: Connection pooler deployment (if standalone)
-- **Monitoring**: PodMonitor/ServiceMonitor for the cluster
-
-**Benefits:**
-- Easy to find all resources for a specific cluster
-- Clear ownership and dependencies
-- Simplified troubleshooting
-
-## Kustomization Order
-
-Each cluster's `kustomization.yaml` applies resources in the correct order:
-
-1. **Secrets/ConfigMaps** - Must exist before cluster creation
-2. **Instance** - PostgreSQL cluster CRD
-3. **Poolers** - Connection pooler deployment
-4. **Monitoring** - PodMonitors/ServiceMonitors (require running cluster)
 
 ## Related Documentation
 

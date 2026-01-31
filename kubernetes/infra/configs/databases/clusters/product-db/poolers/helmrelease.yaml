@@ -37,6 +37,10 @@ spec:
         database: product
         poolSize: 30
         poolMode: transaction
+        replicas:
+          - host: product-db-r.product.svc.cluster.local
+            port: 5432
+            poolSize: 30
       - name: product_ro
         host: product-db-r.product.svc.cluster.local
         port: 5432

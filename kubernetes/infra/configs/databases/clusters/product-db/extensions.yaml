@@ -19,7 +19,7 @@ spec:
       version: "1.7.0"
     - name: pg_stat_statements # Track query performance
     - name: auto_explain # Automatically explain queries
-    - name: pglogical # Logical replication
+    # - name: pglogical # Logical replication
 
      # Extensions NOT yet preloaded at cluster level
     - name: pgcrypto # Cryptographic functions

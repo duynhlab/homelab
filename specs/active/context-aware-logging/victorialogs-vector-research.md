@@ -17,7 +17,7 @@ Khi test VictoriaLogs, bạn gặp issue với `_msg` field:
 
 ### 1.2 Hiện trạng cấu hình Vector
 
-File: [vector.yaml](file:///home/duydo/Working/duy/Github/monitoring/kubernetes/infra/controllers/logging/vector/vector.yaml)
+File: [vector.yaml](kubernetes/infra/controllers/logging/vector/vector.yaml)
 
 ```yaml
 # Sink: VictoriaLogs - All Logs
@@ -115,7 +115,7 @@ Khi Vector collect logs từ Kubernetes, output có cấu trúc như sau:
 flowchart TD
     subgraph Input["Log Input Types"]
         Text["Plain Text\n'Starting server on :8080'"]
-        JSON["JSON Structured\n'{\"level\":\"info\",\"msg\":\"Starting\"}'"]
+        JSON["JSON Structured\n'{'level':'info','msg':'Starting'}'"]
     end
     
     subgraph Vector["Vector Processing"]
@@ -124,12 +124,12 @@ flowchart TD
     
     subgraph Output["To VictoriaLogs"]
         Out1["{message: 'Starting server on :8080'}"]
-        Out2["{message: '{\"level\":\"info\",\"msg\":\"Starting\"}'}"]
+        Out2["{message: '{'level':'info','msg':'Starting'}'}"]
     end
     
     subgraph VLogs["VictoriaLogs VL-Msg-Field: message"]
         Parse1["_msg = 'Starting server on :8080'\n✅ Correct!"]
-        Parse2["_msg = '{\"level\":\"info\",...}'\n❌ Raw JSON string!"]
+        Parse2["_msg = '{'level':'info',...}'\n❌ Raw JSON string!"]
     end
     
     Text --> Wrap

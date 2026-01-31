@@ -88,6 +88,13 @@ spec:
               .container_name = "unknown-container"
             }
             
+            # Extract stream (stdout/stderr) - required by Grafana Loki Kubernetes dashboard
+            if exists(.stream) {
+              .stream = to_string!(.stream)
+            } else {
+              .stream = "stdout"
+            }
+            
             # Parse JSON message and extract level field
             if exists(.message) {
               parsed, err = parse_json(.message)
@@ -271,6 +278,7 @@ spec:
             namespace: "{{ `{{namespace}}` }}"
             pod: "{{ `{{pod_name}}` }}"
             container: "{{ `{{container_name}}` }}"
+            stream: "{{ `{{stream}}` }}"
           out_of_order_action: accept
           batch:
             max_bytes: 3145728

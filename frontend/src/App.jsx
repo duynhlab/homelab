@@ -71,7 +71,6 @@ function App() {
                     </Link>
                 </h1>
                 <nav>
-                    <Link to="/">Products</Link>
                     {isAuthenticated && (
                         <>
                             <Link to="/orders">Orders</Link>

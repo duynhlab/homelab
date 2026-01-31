@@ -104,7 +104,7 @@ func main() {
 		apiV1.GET("/users/:id", v1.GetUser)
 		// Profile endpoints require auth middleware for user resolution
 		profileGroup := apiV1.Group("/users")
-		profileGroup.Use(middleware.AuthMiddleware(authClient, logger))
+		profileGroup.Use(middleware.AuthMiddleware(authClient, logger, cfg.AuthAllowUnauthenticatedFallback))
 		{
 			profileGroup.GET("/profile", v1.GetProfile)
 			profileGroup.PUT("/profile", v1.UpdateProfile)

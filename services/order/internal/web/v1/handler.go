@@ -33,10 +33,12 @@ func (h *OrderHandler) ListOrders(c *gin.Context) {
 
 	zapLogger := middleware.GetLoggerFromGinContext(c)
 
-	// Get userID from context/auth (for now, use a placeholder)
+	// Get userID from auth context (required - no fallback)
 	userID := c.GetString("user_id")
 	if userID == "" {
-		userID = "1" // Default for demo
+		zapLogger.Warn("ListOrders: no user_id in context")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
 	}
 
 	orders, err := h.orderService.ListOrders(ctx, userID)
@@ -96,16 +98,31 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		span.SetAttributes(attribute.Bool("request.valid", false))
 		span.RecordError(err)
 		zapLogger.Error("Invalid request", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": sanitizeValidationError(err)})
 		return
 	}
+
+	// Inject user_id from auth context - never trust client
+	userID := c.GetString("user_id")
+	if userID == "" {
+		zapLogger.Warn("CreateOrder: no user_id in context")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
+	}
+	req.UserID = userID
 
 	span.SetAttributes(attribute.Bool("request.valid", true))
 	order, err := h.orderService.CreateOrder(ctx, req)
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to create order", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+
+		switch {
+		case errors.Is(err, logicv1.ErrInvalidOrder):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid order"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
 		return
 	}
 

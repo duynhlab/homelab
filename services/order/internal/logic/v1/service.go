@@ -3,6 +3,7 @@ package v1
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/duynhne/monitoring/services/order/internal/core/domain"
 	"github.com/duynhne/monitoring/services/order/middleware"
@@ -80,16 +81,31 @@ func (s *OrderService) CreateOrder(ctx context.Context, req domain.CreateOrderRe
 		return nil, ErrInvalidOrder
 	}
 
-	// Calculate total
+	// Enrich order items: Subtotal, ProductName (fallback if empty)
+	enrichedItems := make([]domain.OrderItem, len(req.Items))
 	var subtotal float64
-	for _, item := range req.Items {
-		subtotal += item.Price * float64(item.Quantity)
+	for i, item := range req.Items {
+		itemSubtotal := item.Price * float64(item.Quantity)
+		subtotal += itemSubtotal
+
+		productName := item.ProductName
+		if productName == "" {
+			productName = fmt.Sprintf("Product %s", item.ProductID)
+		}
+
+		enrichedItems[i] = domain.OrderItem{
+			ProductID:   item.ProductID,
+			ProductName: productName,
+			Quantity:    item.Quantity,
+			Price:      item.Price,
+			Subtotal:   itemSubtotal,
+		}
 	}
 
 	// Create order domain model
 	order := &domain.Order{
 		UserID:   req.UserID,
-		Items:    req.Items,
+		Items:    enrichedItems,
 		Subtotal: subtotal,
 		Shipping: 5.00, // Fixed shipping for demo
 		Total:    subtotal + 5.00,

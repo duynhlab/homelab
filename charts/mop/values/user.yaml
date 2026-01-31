@@ -40,6 +40,9 @@ env:
     value: "true"
   - name: METRICS_ENABLED
     value: "true"
+  # Auth service for token introspection (profile endpoints)
+  - name: AUTH_SERVICE_URL
+    value: "http://auth.auth.svc.cluster.local:8080"
   # Database configuration
   - name: DB_HOST
     value: "supporting-db.user.svc.cluster.local"  # Shared database - supporting-db is in user namespace

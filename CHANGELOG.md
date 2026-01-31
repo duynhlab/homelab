@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.42.4] - 2026-01-28
+
+### Changed
+
+- **Error Handling - No Raw Backend Errors in UI**:
+  - Added `sanitizeValidationError()` in user and order services - never expose gin/go validation errors to clients
+  - Added `frontend/src/utils/errorMessages.js` - maps backend errors to user-friendly messages
+  - ApiError component now uses `toUserFriendlyError()` and supports `onRetry` prop
+  - Profile page: ApiError with retry button
+  - Checkout page: user-friendly error messages, toast notifications, retry for cart load failure
+
+- **Profile Flow**:
+  - GetProfile/UpdateProfile: removed user_id fallback "1", return 401 when auth context empty
+  - CreateUser/UpdateProfile: sanitized validation errors (return "Invalid request" instead of raw gin errors)
+
+- **Checkout / Place Order Flow**:
+  - Added `product_name` to order payload (required by order_items schema)
+  - Toast for success and error (user-friendly messages)
+  - Cart load failure: retry button, user-friendly error
+  - Order failure: clear UX with retry hint ("You can try again or return to your cart")
+  - Empty cart vs load error: distinct states (empty cart only when load succeeded)
+
+- **Order Service**:
+  - ListOrders: removed user_id fallback, return 401 when auth context empty
+  - CreateOrder: sanitized validation errors
+  - Auth middleware: configurable `AUTH_ALLOW_UNAUTHENTICATED_FALLBACK` (default: false for production)
+
+- **User Service**:
+  - Auth middleware: configurable `AUTH_ALLOW_UNAUTHENTICATED_FALLBACK` (default: false)
+
+- **Order Service Auth**:
+  - Added `AuthAllowUnauthenticatedFallback` config and `AUTH_ALLOW_UNAUTHENTICATED_FALLBACK` env
+  - Auth middleware returns 401 for missing/invalid tokens when fallback disabled (production default)
+
+## [0.42.3] - 2026-01-31
+
+### Fixed
+
+- **Profile Data Consistency** (`GET /api/v1/users/profile`):
+  - Removed hardcoded seed data (user_id=1, current_user, current@example.com)
+  - Added auth middleware to user service for token introspection
+  - GetProfile now extracts user_id, username, email from auth context
+  - Profile returns actual logged-in user data from auth service + user_profiles table
+  - Added AuthServiceURL config and AUTH_SERVICE_URL env to user service
+  - Added Phone field to User domain for profile response
+
+### Added
+
+- **PostgreSQL Replication Documentation** (`docs/databases/REPLICATION_STRATEGY.md`):
+  - Executive Summary with 5-cluster overview table and architecture diagram
+  - Khái niệm cơ bản section (WAL, Replication, RPO, RTO) with Vietnamese explanations
+  - 6 Mermaid diagrams: 5-cluster architecture, WAL flow, Physical vs Logical, Sync vs Async, HA vs Single-Instance, Replication lag stages
+  - Replication Monitoring section (pg_stat_replication, synchronous_standby_names, replication slots)
+  - Ví dụ đời thường (real-world analogies) for Sync vs Async
+  - Expanded summary table to all 5 clusters (transaction-db, product-db, auth-db, review-db, supporting-db)
+  - **OpenAI PostgreSQL Scaling** content from specs/active/openai-postgresql-scaling/:
+    - Cascading Replication section (problem, solution, when to use, trade-offs)
+    - Read/Write Splitting and Connection Pooling diagrams
+    - WAL Sender/Receiver flow sequence diagram
+    - SPOF vs HA Hot Standby diagrams
+    - OpenAI Scaling Insights summary with references to research.md, application-layer-optimization.md, cascading-replication-lab.md
+
+### Fixed
+
+- **Logging Configuration (clog, zerolog)**:
+  - `clog.Setup()` and `zerolog.Setup()` now accept `level string` and parse `LOG_LEVEL` from config
+  - Previously hardcoded `slog.LevelInfo` / `zerolog.InfoLevel` - `LOG_LEVEL` env was loaded but not applied
+  - Cart and auth services now pass `cfg.Logging.Level` to `Setup()` for runtime configurability
+  - Supports debug, info, warn, error; defaults to info for unknown values
+
 ## [0.42.2] - 2026-01-30
 
 ### Changed

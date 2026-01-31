@@ -359,6 +359,8 @@ kubectl exec -n cache-system deploy/valkey -- redis-cli KEYS "product:*"
 # Expected output: 
 # product:list:all:none:created_at:desc:1:20
 # product:14
+
+kubectl exec -n cache-system deploy/valkey -- redis-cli --scan --pattern "product:*"
 ```
 
 **4. Check Cache Values**

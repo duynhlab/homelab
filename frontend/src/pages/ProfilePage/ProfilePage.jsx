@@ -104,7 +104,11 @@ export default function ProfilePage() {
 
             {/* Error State */}
             {!loading && error && (
-                <ApiError error={error} endpoint="GET /api/v1/users/profile" />
+                <ApiError
+                    error={error}
+                    endpoint="GET /api/v1/users/profile"
+                    onRetry={() => mutate()}
+                />
             )}
 
             {/* Profile Content */}

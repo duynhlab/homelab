@@ -76,10 +76,12 @@ func GetProfile(c *gin.Context) {
 		zapLogger, _ = middleware.NewLogger()
 	}
 
-	// Extract user info from auth middleware context
+	// Extract user info from auth middleware context (required - no fallback)
 	userID := c.GetString("user_id")
 	if userID == "" {
-		userID = "1"
+		zapLogger.Warn("GetProfile: no user_id in context")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
 	}
 	username := c.GetString("username")
 	email := c.GetString("email")
@@ -127,7 +129,7 @@ func CreateUser(c *gin.Context) {
 		span.SetAttributes(attribute.Bool("request.valid", false))
 		span.RecordError(err)
 		zapLogger.Error("Invalid request", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": sanitizeValidationError(err)})
 		return
 	}
 
@@ -173,10 +175,12 @@ func UpdateProfile(c *gin.Context) {
 		zapLogger, _ = middleware.NewLogger()
 	}
 
-	// Get user_id from auth middleware (falls back to "1" for demo)
+	// Get user_id from auth middleware (required - no fallback)
 	userID := c.GetString("user_id")
 	if userID == "" {
-		userID = "1"
+		zapLogger.Warn("UpdateProfile: no user_id in context")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
 	}
 
 	var req domain.UpdateProfileRequest
@@ -184,7 +188,7 @@ func UpdateProfile(c *gin.Context) {
 		span.SetAttributes(attribute.Bool("request.valid", false))
 		span.RecordError(err)
 		zapLogger.Error("Invalid request", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": sanitizeValidationError(err)})
 		return
 	}
 

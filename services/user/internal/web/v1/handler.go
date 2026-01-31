@@ -76,7 +76,15 @@ func GetProfile(c *gin.Context) {
 		zapLogger, _ = middleware.NewLogger()
 	}
 
-	user, err := userService.GetProfile(ctx)
+	// Extract user info from auth middleware context
+	userID := c.GetString("user_id")
+	if userID == "" {
+		userID = "1"
+	}
+	username := c.GetString("username")
+	email := c.GetString("email")
+
+	user, err := userService.GetProfile(ctx, userID, username, email)
 	if err != nil {
 		span.RecordError(err)
 		zapLogger.Error("Failed to get profile", zap.Error(err))

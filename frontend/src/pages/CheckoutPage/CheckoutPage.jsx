@@ -1,44 +1,53 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { getCart } from '../../api/cartApi';
 import { createOrder } from '../../api/orderApi';
+import { useToast } from '../../components/common/ToastProvider';
+import { toUserFriendlyError } from '../../utils/errorMessages';
 
 /**
  * Checkout Page - Create order
  * POST /api/v1/orders
- * Note: user_id is extracted from auth token by backend middleware
+ * user_id extracted from auth token by backend
  */
 export default function CheckoutPage() {
     const navigate = useNavigate();
+    const { notify } = useToast();
     const [cart, setCart] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [submitting, setSubmitting] = useState(false);
     const [orderResult, setOrderResult] = useState(null);
 
+    const fetchCart = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const result = await getCart();
+            setCart(result);
+            if (import.meta.env.DEV) {
+                console.log('[API] GET /cart:', result);
+            }
+        } catch (err) {
+            const message = toUserFriendlyError(err?.message);
+            setError(message);
+            notify('error', message);
+            if (import.meta.env.DEV) {
+                console.error('[API ERROR]', err);
+            }
+        } finally {
+            setLoading(false);
+        }
+    }, [notify]);
+
     useEffect(() => {
-        // Verify user is authenticated
         const token = localStorage.getItem('authToken');
         if (!token) {
             navigate('/login?returnTo=/checkout');
             return;
         }
-
-        async function fetchCart() {
-            try {
-                const result = await getCart();
-                setCart(result);
-                if (import.meta.env.DEV) {
-                    console.log('[API] GET /cart:', result);
-                }
-            } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
-        }
         fetchCart();
-    }, [navigate]);
+    }, [navigate, fetchCart]);
 
     const handleSubmitOrder = async (e) => {
         e.preventDefault();
@@ -46,11 +55,10 @@ export default function CheckoutPage() {
         setError(null);
 
         try {
-            // user_id is resolved by backend auth middleware from token
-            // We no longer send it from frontend
             const orderData = {
                 items: cart.items.map(item => ({
                     product_id: item.product_id,
+                    product_name: item.product_name,
                     quantity: item.quantity,
                     price: item.product_price
                 }))
@@ -61,8 +69,11 @@ export default function CheckoutPage() {
                 console.log('[API] POST /orders:', result);
             }
             setOrderResult(result);
+            notify('success', 'Order created successfully!');
         } catch (err) {
-            setError(err.message);
+            const message = toUserFriendlyError(err?.message);
+            setError(message);
+            notify('error', message);
             if (import.meta.env.DEV) {
                 console.error('[API ERROR]', err);
             }
@@ -99,18 +110,40 @@ export default function CheckoutPage() {
                 </>
             )}
 
-            {/* Empty Cart */}
-            {!loading && !orderResult && (!cart || !cart.items || cart.items.length === 0) && (
+            {/* Empty Cart - only when load succeeded but cart is empty */}
+            {!loading && !orderResult && !error && (!cart || !cart.items || cart.items.length === 0) && (
                 <div className="empty">
                     <p>Cart is empty. Add items first.</p>
                     <Link to="/">Browse Products</Link>
                 </div>
             )}
 
+            {/* Cart Load Error - Retry */}
+            {!loading && !orderResult && error && (!cart?.items?.length) && (
+                <div className="error-box">
+                    <strong>Error:</strong> {error}
+                    <button
+                        type="button"
+                        className="primary"
+                        style={{ marginTop: '0.75rem' }}
+                        onClick={fetchCart}
+                    >
+                        Try Again
+                    </button>
+                </div>
+            )}
+
             {/* Checkout Form */}
             {!loading && !orderResult && cart?.items?.length > 0 && (
                 <>
-                    {error && <div className="error">Error: {error}</div>}
+                    {error && (
+                        <div className="error-box">
+                            <strong>Error:</strong> {error}
+                            <p style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>
+                                You can try again or return to your cart to review items.
+                            </p>
+                        </div>
+                    )}
 
                     <div className="two-col">
                         {/* Order Items */}

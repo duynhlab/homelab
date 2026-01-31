@@ -119,7 +119,7 @@ func main() {
 
 	// API v1 with auth middleware (canonical API - frontend-aligned)
 	apiV1 := r.Group("/api/v1")
-	apiV1.Use(middleware.AuthMiddleware(authClient, logger))
+	apiV1.Use(middleware.AuthMiddleware(authClient, logger, cfg.AuthAllowUnauthenticatedFallback))
 	{
 		apiV1.GET("/orders", v1.ListOrders)
 		apiV1.GET("/orders/:id", v1.GetOrder)

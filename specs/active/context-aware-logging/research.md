@@ -1,340 +1,234 @@
 # Context-Aware Logging Research
 
-> **Status**: 🔬 Research  
+> **Status**: ✅ POC Complete  
 > **Created**: 2026-01-28  
+> **Last Updated**: 2026-01-30
 > **Author**: Research findings for evaluating logging solutions
 
 ---
 
-## 1. Bối cảnh nghiên cứu
+## 1. Bối cảnh & Yêu cầu 
 
 ### 1.1 Vấn đề hiện tại
+Dự án microservices hiện đang sử dụng **Zap** (`go.uber.org/zap` v1.27.1) với việc implement context-aware logging thủ công và không chuẩn hóa.
+- **8 microservices** đang dùng Zap.
+- **Victorialogs** là đích đến của log, yêu cầu định dạng **JSON** thuần để dễ dàng parse và query.
+- Cần **Tracing Support** mạnh mẽ để tích hợp với OpenTelemetry.
 
-Dự án microservices hiện đang sử dụng **Zap** (`go.uber.org/zap` v1.27.1) với Go 1.25. Context-aware logging được implement thủ công qua Gin context:
-
-```go
-// middleware/logging.go - Current implementation
-loggerWithTrace := logger.With(zap.String("trace_id", traceID))
-c.Set("logger", loggerWithTrace)  // Store in Gin context only
-
-func GetLoggerFromGinContext(c *gin.Context) *zap.Logger {
-    loggerVal, exists := c.Get("logger")
-    // ... type assertion
-}
-```
-
-**Hạn chế:**
-- ❌ Chỉ hoạt động với `*gin.Context`, không portable
-- ❌ Không sử dụng được với `context.Context` chuẩn
-- ❌ Không thể truyền logger xuống các layer không phụ thuộc Gin (repository, service)
-- ❌ Phải truyền logger riêng qua function parameters
+### 1.2 Mục tiêu
+1.  **JSON Format**: Bắt buộc để tương thích tốt với Victorialogs và các công cụ log aggregation (Graylog, ELK).
+2.  **Tracing Support**: Log phải tự động gắn `trace_id` và `span_id` từ OpenTelemetry context mà không cần code thủ công.
+3.  **Migration Target**: Sử dụng library **`clog`** (chainguard-dev/clog) cho service **`cart`** như một bước chuyển đổi (POC).
 
 ---
 
-## 2. Các giải pháp được nghiên cứu
+## 2. Standardized Log Levels
 
-### 2.1 chainguard-dev/clog
+Để đảm bảo tính nhất quán khi chuyển đổi giữa các thư viện và tương thích với hệ thống monitoring (Victorialogs), dự án sẽ chuẩn hóa các log levels theo thang đo sau:
 
-**Repository**: https://github.com/chainguard-dev/clog
+| Level Name | Value | Description |
+| :--- | :--- | :--- |
+| **panic** | **5** | Hệ thống gặp lỗi không thể phục hồi và sẽ crash (panic). |
+| **fatal** | **4** | Lỗi nghiêm trọng buộc process phải dừng hoạt động (os.Exit). |
+| **error** | **3** | Runtime errors, nhưng hệ thống vẫn có thể tiếp tục phục vụ request khác. |
+| **warn** | **2** | Cảnh báo về vấn đề tiềm ẩn, deprecated APIs, hoặc sử dụng tài nguyên cao. |
+| **info** | **1** | Thông tin xác nhận hệ thống hoạt động bình thường (startup, healthcheck). |
+| **debug** | **0** | Thông tin chi tiết phục vụ debug (payload, state changes). |
+| **trace** | **-1** | Thông tin chi tiết nhất, tracing flow chi tiết từng step. |
 
-#### Tổng quan
-- Context-aware wrapper cho `log/slog` (Go 1.21+)
-- **Zero dependencies** - chỉ sử dụng stdlib
-- Lấy cảm hứng từ `knative.dev/pkg/logging` nhưng nhẹ hơn nhiều
+### 2.1 Library Level Comparison Table
 
-#### Core APIs
+Bảng so sánh giá trị Log Level thực tế (Integer values) giữa các thư viện:
 
-```go
-// Gắn logger vào context
-ctx := clog.WithLogger(context.Background(), logger)
+| User Standard | **Zap** (`go.uber.org/zap`) | **clog** (`log/slog`) | **zerolog** (`rs/zerolog`) | Note |
+| :--- | :--- | :--- | :--- | :--- |
+| **panic (5)** | `PanicLevel` (4) | N/A (Note 1) | `PanicLevel` (5) | Slog dùng Error+panic |
+| **fatal (4)** | `FatalLevel` (5) | N/A (Note 2) | `FatalLevel` (4) | Slog dùng Error+exit |
+| **error (3)** | `ErrorLevel` (2) | `LevelError` (8) | `ErrorLevel` (3) | |
+| **warn (2)** | `WarnLevel` (1) | `LevelWarn` (4) | `WarnLevel` (2) | |
+| **info (1)** | `InfoLevel` (0) | `LevelInfo` (0) | `InfoLevel` (1) | |
+| **debug (0)** | `DebugLevel` (-1) | `LevelDebug` (-4) | `DebugLevel` (0) | |
+| **trace (-1)** | N/A (Note 3) | Custom (-8) | `TraceLevel` (-1) | Zap thường dùng Debug |
 
-// Lấy logger từ context
-log := clog.FromContext(ctx)
-log.Info("message", "key", "value")
-
-// Hoặc dùng package-level functions
-clog.InfoContext(ctx, "message")
-clog.ErrorContextf(ctx, "error: %v", err)
-```
-
-#### Tính năng
-
-| Feature | Có/Không |
-|---------|----------|
-| Context propagation | ✅ |
-| Zero dependencies | ✅ |
-| slog compatible | ✅ |
-| Testing support (`slogtest`) | ✅ |
-| GCP Cloud Logging handler | ✅ |
-| Sampling | ❌ |
-| Binary encoding | ❌ |
-
-#### Benchmark (ước tính)
-- Performance dựa trên slog (~4x chậm hơn Zap/Zerolog trong high-throughput)
-- Memory allocations: thấp nhưng không zero-alloc
+*   **Note 1 (Slog Panic)**: Slog (và clog) không có level Panic riêng biệt trong thiết kế chuẩn, thường xử lý bằng cách log Error rồi gọi `panic()`.
+*   **Note 2 (Slog Fatal)**: Slog không có level Fatal. Triết lý của Go team là logger không nên side-effect (exit).
+*   **Note 3 (Zap Trace)**: Zap mặc định không có Trace level, thường map Trace vào Debug hoặc dùng custom core.
 
 ---
 
-### 2.2 rs/zerolog
+## 3. Deep Dive: chainguard-dev/clog
 
-**Repository**: https://github.com/rs/zerolog
+**Repository**: https://github.com/chainguard-dev/clog  
+**Base**: Wrapper cho `log/slog` (Standard Library Go 1.21+).
 
-#### Tổng quan
-- **Zero allocation** JSON logger
-- Performance tốt nhất trong các logging libraries
-- Native context.Context support
+### 3.1 Tại sao chọn `clog`?
+- **Zero Dependencies**: Sử dụng `slog` của Go, không kéo thêm dependencies nặng nề.
+- **Context-First API**: `clog.FromContext(ctx)` giúp lấy logger đã được gắn metadata (như trace ID) ở bất kỳ đâu.
+- **JSON Support**: Native support qua `slog.JSONHandler`. Metadata được flatten thành JSON fields chuẩn.
+- **Cloud Native**: Thiết kế cho Kubernetes và Cloud Run (GCP), output mặc định rất gần với format của cloud providers.
 
-#### Core APIs
-
-```go
-// Gắn logger vào context
-ctx := logger.WithContext(context.Background())
-
-// Lấy logger từ context
-log := zerolog.Ctx(ctx)
-log.Info().Str("key", "value").Msg("message")
-```
-
-#### Tính năng
-
-| Feature | Có/Không |
-|---------|----------|
-| Context propagation | ✅ |
-| Zero allocation | ✅ |
-| Sampling | ✅ |
-| Hooks | ✅ |
-| Binary encoding (CBOR) | ✅ |
-| HTTP integration (`hlog`) | ✅ |
-| Pretty console logging | ✅ |
-
-#### Benchmark
-```
-BenchmarkInfo-8            30000000    42.5 ns/op    0 B/op   0 allocs/op
-BenchmarkLogFields-8       10000000    184 ns/op     0 B/op   0 allocs/op
-```
-
----
-
-### 2.3 log/slog (Standard Library)
-
-**Package**: `log/slog` (Go 1.21+)
-
-#### Tổng quan
-- Standard library từ Go 1.21
-- Structured, leveled logging
-- Handler interface cho extensibility
-
-#### Core APIs
-
-```go
-// Với context
-slog.InfoContext(ctx, "message", "key", "value")
-
-// Handler có thể extract từ context
-type contextHandler struct {
-    handler slog.Handler
-}
-
-func (h *contextHandler) Handle(ctx context.Context, r slog.Record) error {
-    if traceID := ctx.Value(traceIDKey); traceID != nil {
-        r.AddAttrs(slog.String("trace_id", traceID.(string)))
+### 3.2 Tracing Support & OpenTelemetry Integration
+Đây là điểm mạnh khi kết hợp với `slog`.
+- **Cơ chế**: `clog` (thông qua `slog`) cho phép định nghĩa `Handler` middleware.
+- **Implementation**:
+    Chúng ta có thể viết một `TracingHandler` đơn giản wrap `slog.JSONHandler`.
+    ```go
+    // Middleware tự động extract TraceID từ Otel
+    func (h *TracingHandler) Handle(ctx context.Context, r slog.Record) error {
+        if span := trace.SpanFromContext(ctx); span.SpanContext().IsValid() {
+            r.AddAttrs(
+                slog.String("trace_id", span.SpanContext().TraceID().String()),
+                slog.String("span_id", span.SpanContext().SpanID().String()),
+            )
+        }
+        return h.handler.Handle(ctx, r)
     }
-    return h.handler.Handle(ctx, r)
-}
-```
-
-#### Tính năng
-
-| Feature | Có/Không |
-|---------|----------|
-| Context support | ✅ (manual) |
-| Zero dependencies | ✅ |
-| Handler interface | ✅ |
-| Pluggable backends (Zap, Zerolog) | ✅ |
-| Built-in context propagation | ❌ |
+    ```
+- **Kết quả**: Mọi log call `clog.InfoContext(ctx, "msg")` sẽ tự động có field `trace_id` trong JSON output.
 
 ---
 
-### 2.4 uber-go/zap (Hiện tại)
+## 4. Deep Dive: rs/zerolog
 
-**Repository**: https://github.com/uber-go/zap
+**Repository**: https://github.com/rs/zerolog  
+**Base**: Pure Go, Zero Allocation JSON Logger.
 
-#### Tổng quan
-- High-performance structured logging
-- Type-safe field construction
-- Đang được sử dụng trong dự án
+### 4.1 Tổng quan
+`rs/zerolog` cung cấp một logger siêu nhanh và đơn giản, dành riêng cho output **JSON**.
 
-#### Context Support (Manual)
+### 4.2 Thiết kế & Hiệu năng
+API của Zerolog được thiết kế để mang lại trải nghiệm lập trình tuyệt vời đồng thời đảm bảo hiệu suất tối ưu (stunning performance).
+- **Chaining API**: API dạng chuỗi độc đáo cho phép zerolog viết log JSON (hoặc CBOR) mà tránh được overhead của memory allocation và reflection.
+- **Inspiration**: Uber's `zap` library đi tiên phong trong cách tiếp cận này, nhưng `zerolog` đưa concept này lên tầm cao mới với API đơn giản hơn và performance thậm chí tốt hơn.
+
+### 4.3 Focus & Features
+- **Efficient Structured Logging**: Để giữ codebase và API đơn giản, zerolog chỉ tập trung vào structured logging hiệu quả.
+- **Console Logging**: Pretty logging trên console được hỗ trợ qua `zerolog.ConsoleWriter` (tuy nhiên inefficient hơn so với JSON mode, chỉ nên dùng cho dev).
+
+### 4.4 Example
+```go
+// Zero allocation, JSON output
+zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+log.Info().
+    Str("scale", "833 cents").
+    Float64("interval", 833.09).
+    Msg("Fibonacci is everywhere")
+
+// Output: {"level":"info","scale":"833 cents","interval":833.09,"time":1560968903,"message":"Fibonacci is everywhere"}
+```
+
+### 4.5 Global Settings
+Some settings can be changed and will be applied to all loggers:
+
+*   **`log.Logger`**: You can set this value to customize the global logger (the one used by package level methods).
+*   **`zerolog.SetGlobalLevel`**: Can raise the minimum level of all loggers. Call this with `zerolog.Disabled` to disable logging altogether (quiet mode).
+*   **`zerolog.DisableSampling`**: If argument is `true`, all sampled loggers will stop sampling and issue 100% of their log events.
+*   **`zerolog.TimestampFieldName`**: Can be set to customize Timestamp field name.
+*   **`zerolog.LevelFieldName`**: Can be set to customize level field name.
+*   **`zerolog.MessageFieldName`**: Can be set to customize message field name.
+*   **`zerolog.ErrorFieldName`**: Can be set to customize Err field name.
+*   **`zerolog.TimeFieldFormat`**: Can be set to customize Time field value formatting. If set with `zerolog.TimeFormatUnix`, `zerolog.TimeFormatUnixMs` or `zerolog.TimeFormatUnixMicro`, times are formatted as UNIX timestamp.
+*   **`zerolog.DurationFieldUnit`**: Can be set to customize the unit for `time.Duration` type fields added by `Dur` (default: `time.Millisecond`).
+*   **`zerolog.DurationFieldFormat`**: Can be set to `DurationFormatFloat`, `DurationFormatInt`, or `DurationFormatString` (default: `DurationFormatFloat`) to append the Duration as a Float64, Int64, or by calling `String()` (respectively).
+*   **`zerolog.DurationFieldInteger`**: If set to `true`, `Dur` fields are formatted as integers instead of floats (default: `false`). *Deprecated: Use `zerolog.DurationFieldFormat = DurationFormatInt` instead.*
+*   **`zerolog.ErrorHandler`**: Called whenever zerolog fails to write an event on its output. If not set, an error is printed on the stderr. This handler must be thread safe and non-blocking.
+*   **`zerolog.FloatingPointPrecision`**: If set to a value other than `-1`, controls the number of digits when formatting float numbers in JSON. See `strconv.FormatFloat` for more details.
+
+### 4.6 Field Types
+
+#### Standard Types
+*   `Str`
+*   `Bool`
+*   `Int`, `Int8`, `Int16`, `Int32`, `Int64`
+*   `Uint`, `Uint8`, `Uint16`, `Uint32`, `Uint64`
+*   `Float32`, `Float64`
+
+#### Advanced Fields
+*   **`Err`**: Takes an error and renders it as a string using the `zerolog.ErrorFieldName` field name.
+*   **`Func`**: Run a func only if the level is enabled.
+*   **`Timestamp`**: Inserts a timestamp field with `zerolog.TimestampFieldName` field name, formatted using `zerolog.TimeFieldFormat.
+*   **`Time`**: Adds a field with time formatted with `zerolog.TimeFieldFormat`.
+*   **`Dur`**: Adds a field with `time.Duration`.
+*   **`Dict`**: Adds a sub-key/value as a field of the event.
+*   **`RawJSON`**: Adds a field with an already encoded JSON (`[]byte`)
+*   **`Hex`**: Adds a field with value formatted as a hexadecimal string (`[]byte`)
+*   **`Interface`**: Uses reflection to marshal the type.
+*   **`IPAddr`**: Adds a field with `net.IP`.
+*   **`IPPrefix`**: Adds a field with `net.IPNet`.
+*   **`MACAddr`**: Adds a field with `net.HardwareAddr`
+
+> Most fields are also available in the slice format (`Strs` for `[]string`, `Errs` for `[]error` etc.)
+
+---
+
+## 5. Compatibility với Victorialogs
+
+Victorialogs ingest log qua HTTP/TCP/UDP và tối ưu cho JSON logs.
+- **Format**: `clog` xuất ra JSON chuẩn (`{"time": "...", "level": "INFO", "msg": "...", "trace_id": "..."}`).
+- **Parsing**: Victorialogs (và Vector) dễ dàng parse JSON này thành các fields để filter.
+- **Raw Data**: JSON giữ nguyên cấu trúc raw, đảm bảo tính mở rộng nếu sau này chuyển sang ClickHouse hay Elasticsearch.
+
+---
+
+## 6. Plan: Convert `cart` Service sang `clog`
+
+Kế hoạch chuyển đổi service `cart` từ Zap sang `clog` để kiểm chứng.
+
+### 6.1 Step 1: Chuẩn bị Shared Package
+Tạo `services/pkg/logger` mới wrap `clog` và setup default handler (JSON + Tracing).
 
 ```go
-// Cần tự implement context propagation
-type ctxKey struct{}
-
-func WithLogger(ctx context.Context, logger *zap.Logger) context.Context {
-    return context.WithValue(ctx, ctxKey{}, logger)
-}
-
-func FromContext(ctx context.Context) *zap.Logger {
-    if logger, ok := ctx.Value(ctxKey{}).(*zap.Logger); ok {
-        return logger
-    }
-    return zap.L() // global logger
-}
-```
-
----
-
-## 3. Bảng so sánh tổng hợp
-
-```
-┌─────────────────────┬──────────┬─────────┬───────────┬──────────┐
-│      Tiêu chí       │   Zap    │  clog   │  zerolog  │   slog   │
-├─────────────────────┼──────────┼─────────┼───────────┼──────────┤
-│ Performance         │ ⭐⭐⭐⭐⭐  │ ⭐⭐⭐⭐   │ ⭐⭐⭐⭐⭐   │ ⭐⭐⭐⭐   │
-│ Memory allocations  │ 0-2      │ Low     │ 0         │ Low      │
-│ Dependencies        │ ~10 pkgs │ 0       │ ~3 pkgs   │ 0        │
-│ Context-aware       │ Manual   │ Native  │ Native    │ Manual   │
-│ Go version          │ 1.15+    │ 1.21+   │ 1.15+     │ 1.21+    │
-│ Learning curve      │ Medium   │ Low     │ Medium    │ Low      │
-│ Community           │ Huge     │ Small   │ Large     │ Official │
-│ API Style           │ Type-safe│ Printf  │ Chainable │ Printf   │
-│ Cloud integrations  │ Plugins  │ GCP     │ Plugins   │ Plugins  │
-└─────────────────────┴──────────┴─────────┴───────────┴──────────┘
-```
-
----
-
-## 4. Use Cases Analysis
-
-### 4.1 Request Scoping (HTTP Server)
-
-**Yêu cầu**: Gắn `trace_id`, `request_id` vào mọi log trong request lifecycle
-
-| Library | Đánh giá |
-|---------|----------|
-| **clog** | ⭐⭐⭐⭐⭐ Native support, clean API |
-| **zerolog** | ⭐⭐⭐⭐⭐ Native support + `hlog` package |
-| **Zap** | ⭐⭐⭐ Cần wrapper, đang làm thủ công |
-| **slog** | ⭐⭐⭐⭐ Cần custom handler |
-
-### 4.2 Cross-layer Logging (Handler → Service → Repository)
-
-**Yêu cầu**: Logger propagate qua mọi layer mà không truyền tham số
-
-| Library | Đánh giá |
-|---------|----------|
-| **clog** | ⭐⭐⭐⭐⭐ `clog.FromContext(ctx)` ở mọi layer |
-| **zerolog** | ⭐⭐⭐⭐⭐ `zerolog.Ctx(ctx)` ở mọi layer |
-| **Zap** | ⭐⭐ Cần tự implement |
-| **slog** | ⭐⭐⭐ Cần tự implement |
-
-### 4.3 Testing
-
-**Yêu cầu**: Log output hiển thị trong test failures
-
-| Library | Đánh giá |
-|---------|----------|
-| **clog** | ⭐⭐⭐⭐⭐ `slogtest.TestContextWithLogger(t)` |
-| **zerolog** | ⭐⭐⭐⭐ `zerolog.New(zerolog.TestWriter{T: t})` |
-| **Zap** | ⭐⭐⭐⭐ `zaptest.NewLogger(t)` |
-| **slog** | ⭐⭐⭐ Cần custom handler |
-
----
-
-## 5. Migration Effort Estimate
-
-### 5.1 Zap → clog
-
-| Task | Effort | Files Affected |
-|------|--------|----------------|
-| Update go.mod | Low | 8 services |
-| Refactor middleware | Medium | 8 files |
-| Update handlers | Medium-High | ~30 files |
-| Update services/repositories | Medium | ~20 files |
-| Testing | Medium | ~15 files |
-| **Total** | **2-3 days** | ~80 files |
-
-### 5.2 Zap → zerolog
-
-| Task | Effort | Files Affected |
-|------|--------|----------------|
-| Update go.mod | Low | 8 services |
-| Learn chainable API | Medium | N/A |
-| Refactor all logging calls | High | ~80 files |
-| Update middleware | High | 8 files |
-| Testing | Medium-High | ~15 files |
-| **Total** | **4-5 days** | ~100 files |
-
----
-
-## 6. Recommendations
-
-### 6.1 Short-term (Quick Win)
-
-Thêm context propagation wrapper cho Zap hiện tại:
-
-```go
-// pkg/logger/context.go
+// services/pkg/logger/logger.go
 package logger
 
 import (
     "context"
-    "go.uber.org/zap"
+    "log/slog"
+    "os"
+    "github.com/chainguard-dev/clog"
 )
 
-type ctxKey struct{}
-
-func WithLogger(ctx context.Context, l *zap.Logger) context.Context {
-    return context.WithValue(ctx, ctxKey{}, l)
-}
-
-func FromContext(ctx context.Context) *zap.Logger {
-    if l, ok := ctx.Value(ctxKey{}).(*zap.Logger); ok {
-        return l
-    }
-    return zap.L()
+// Setup cấu hình logger mặc định cho service
+func Setup() {
+    handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+        Level: slog.LevelInfo,
+    })
+    // TODO: Add TracingHandler here
+    logger := slog.New(handler)
+    slog.SetDefault(logger)
 }
 ```
 
-**Effort**: 1 day  
-**Benefit**: Context propagation mà không thay đổi logging library
+### 6.2 Step 2: Refactor `cart/cmd/main.go`
+- Thay thế `zap.NewProduction()` bằng `logger.Setup()`.
+- Inject logger vào `context` ở root level: `ctx = clog.WithLogger(ctx, logger)`.
+
+### 6.3 Step 3: Refactor Middleware
+- Update logging middleware để sử dụng `clog.FromContext(ctx)`.
+- Đảm bảo TraceID từ HTTP header được truyền vào context trước khi logger được khởi tạo/sử dụng.
+
+### 6.4 Step 4: Refactor Business Logic
+- Thay format:
+    - **Old**: `logger.Info("failed to call", zap.Error(err))`
+    - **New**: `clog.ErrorContext(ctx, "failed to call", "error", err)`
 
 ---
 
-### 6.2 Long-term (Recommended)
+## 7. Bảng So Sánh Cập Nhật (Feature)
 
-**Migrate sang clog** vì:
-
-1. ✅ **Zero dependencies** - giảm attack surface, nhẹ binary
-2. ✅ **Clean API** - `clog.FromContext(ctx)` gọn gàng
-3. ✅ **Future-proof** - dựa trên slog chuẩn Go
-4. ✅ **Testing support** - slogtest package
-5. ✅ **GCP ready** - có handler cho Cloud Logging
-
-**Migration path**:
-```
-Phase 1: Add clog alongside Zap (parallel logging)
-Phase 2: Migrate high-traffic services first
-Phase 3: Complete migration, remove Zap
-```
+| Feature | Zap | clog (slog wrapper) | Zerolog |
+| :--- | :--- | :--- | :--- |
+| **JSON Output** | ✅ (High Perf) | ✅ (Native) | ✅ (High Perf) |
+| **Tracing Support** | ⚠️ Manual (Fields) | ✅ Easy w/ Handler | ✅ Native Support |
+| **API Style** | Fluent / Type-safe | Printf / KV | Chainable |
+| **Context Propagation** | ❌ Manual Wrapper | ✅ Built-in | ✅ Built-in |
+| **Dependencies** | ~10 | **0** (Stdlib) | ~3 |
+| **Usage in Project** | 8 Services | **Target for `cart`** | 0 |
 
 ---
 
-## 7. References
+## 8. Next Actions
 
-- [chainguard-dev/clog](https://github.com/chainguard-dev/clog)
-- [rs/zerolog](https://github.com/rs/zerolog)
-- [uber-go/zap](https://github.com/uber-go/zap)
-- [log/slog documentation](https://pkg.go.dev/log/slog)
-- [Go 1.21 slog announcement](https://go.dev/blog/slog)
-- [Structured Logging with slog](https://go.dev/blog/slog)
-- [Zerolog Benchmarks](http://bench.zerolog.io/)
-
----
-
-## 8. Next Steps
-
-- [ ] POC: Implement clog trong 1 service (product)
-- [ ] Benchmark: So sánh performance clog vs Zap trong dự án
-- [ ] Document: Tạo migration guide cho team
-- [ ] Review: Trình bày findings cho team lead
+- [ ] **Create `services/pkg/logger`**: Implement `clog` wrapper với JSON handler và OTel integration.
+- [ ] **Convert `cart`**: Refactor service `cart` theo plan section 6.
+- [ ] **Verify**: Check log output trong Victorialogs để đảm bảo JSON valid và có `trace_id`.

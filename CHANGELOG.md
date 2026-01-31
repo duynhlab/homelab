@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.42.5] - 2026-01-28
+
+### Fixed
+
+- **Loki Kubernetes Logs Dashboard** - No logs showing:
+  - Root cause: Grafana dashboard 15141 expects `stream` label (stdout/stderr), Vector Loki sink did not send it
+  - Added `stream` to Vector add_labels transform and Loki sink labels
+  - Dashboard template variables (namespace, stream, container) now populate correctly
+  - Runbook: `docs/runbooks/troubleshooting/LOKI_KUBERNETES_LOGS_DEBUG.md`
+
+### Changed
+
+- **PgDog Helm Chart**
+  - Bumped PgDog chart version from v0.32 to v0.39 (appVersion 0.1.26)
+
 ## [0.42.4] - 2026-01-28
 
 ### Changed

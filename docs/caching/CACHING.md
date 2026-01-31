@@ -333,7 +333,42 @@ rate(valkey_keyspace_hits_total[5m]) /
 - Consider increasing TTL for stable data
 - Monitor cache operation latency in traces
 
+### Live Debugging & Verification
 
+Use these steps to verify caching is working in a live cluster:
+
+**1. Verify Connectivity from App to Cache**
+Check if the Product service can reach Valkey on port 6379:
+```bash
+kubectl exec -n product -it deploy/product -- nc -zv valkey.cache-system.svc.cluster.local 6379
+# Expected output: valkey.cache-system.svc.cluster.local (10.96.x.x:6379) open
+```
+
+**2. Trigger Cache Population**
+Make a request to the product service (using an ephemeral curl pod if needed):
+```bash
+# Launch a temporary pod to curl the internal service
+kubectl run -it --rm curl-test --image=curlimages/curl --restart=Never -n product -- curl -v http://product.product.svc.cluster.local:8080/products
+```
+
+**3. Inspect Cache Keys**
+Check if keys are created in Valkey:
+```bash
+# List all keys (use specific pattern in production)
+kubectl exec -n cache-system deploy/valkey -- redis-cli KEYS "product:*"
+# Expected output: 
+# product:list:all:none:created_at:desc:1:20
+# product:14
+```
+
+**4. Check Cache Values**
+View the cached JSON data:
+```bash
+kubectl exec -n cache-system deploy/valkey -- redis-cli GET "product:14"
+# Expected output: {"id":"14","name":"Modern Headset",...}
+```
+
+---
 ## Future Enhancements
 
 - **Pattern-based invalidation**: Use Redis SCAN for better cache invalidation

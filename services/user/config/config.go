@@ -39,6 +39,7 @@ type Config struct {
 	Metrics         MetricsConfig   // Prometheus metrics
 	Database        DatabaseConfig  // PostgreSQL database configuration
 	ShutdownTimeout int             // Graceful shutdown timeout in seconds - from SHUTDOWN_TIMEOUT env (default: 10)
+	AuthServiceURL  string          // Auth service URL for token introspection - from AUTH_SERVICE_URL env
 }
 
 // ServiceConfig defines basic service configuration
@@ -148,6 +149,7 @@ func Load() *Config {
 			PoolerType:     getEnv("DB_POOLER_TYPE", ""),
 		},
 		ShutdownTimeout: getEnvDurationSeconds("SHUTDOWN_TIMEOUT", 10),
+		AuthServiceURL:  getEnv("AUTH_SERVICE_URL", "http://auth.auth.svc.cluster.local:8080"),
 	}
 }
 

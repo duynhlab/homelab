@@ -4,13 +4,6 @@ This document provides a comprehensive reference for all PostgreSQL database clu
 
 ## Cluster Summary
 ### How to Read the Diagrams
-
-- **Solid lines** (`-->`) indicate active, configured connections
-- **Dashed lines** (`-.->`) indicate planned/future features not yet configured
-- **Subgraphs** group related components by layer (Apps → Pooler → DB Services → DB Instances)
-- **Labels** show service endpoints in `service.namespace.svc:port` format
-- **Cylinders** `[("...")]` represent database instances and schemas
-- **Hexagons** `{{"..."}}` represent connection pooler pods
 - **Color coding**:
   - 🔴 **Red** = Primary/Leader instance (accepts writes)
   - 🟡 **Yellow** = Standby/Sync Replica (synchronous replication)
@@ -42,7 +35,7 @@ This document provides a comprehensive reference for all PostgreSQL database clu
 | **PostgreSQL Version** | 17 |
 | **Instances** | 3 (1 Leader + 2 Standbys) |
 | **Replication** | Streaming replication (async, `synchronous_commit: local`) |
-| **Pooler** | PgBouncer (2 instances, transaction mode) |
+| **Pooler** | PgBouncer: 2 instances, `transaction` mode |
 | **Sidecars** | postgres_exporter (v0.18.1), Vector (v0.52.0) |
 
 ### Endpoints
@@ -331,7 +324,7 @@ flowchart TD
     InventoryService --> PgDogSvc
     PgDogSvc --> PgDog
     PgDog --> RWSvc
-    PgDog -.->|"read routing - future"| RSvc
+    PgDog -->|"read routing"| RSvc
     RWSvc --> Primary
     RSvc --> Replica1
     RSvc --> Replica2
@@ -352,13 +345,12 @@ flowchart TD
 
 **Current Configuration:**
 - 3 instances with asynchronous replication for read scaling
-- PgDog currently routes ALL traffic to `product-db-rw` (primary only)
+- PgDog routes writes to `product-db-rw` and reads to `product-db-r`
 - ServiceMonitor enabled for Prometheus scraping
 - Pool mode: `transaction`, pool size: 30 connections
 - Memory tuning: `shared_buffers: 64MB`, `effective_cache_size: 512MB`
 
 **Considering:**
-- Enable read replica routing in PgDog to utilize `product-db-r` endpoint
 - Scale PgDog to 2 replicas for HA
 - Enable `syncReplicaElectionConstraint` for stronger consistency if needed
 - Add `podAntiAffinity` for production zone distribution
@@ -520,7 +512,7 @@ flowchart LR
 
     Driver --> PgDog
     PgDog --> RW
-    PgDog -.->|"future: read routing"| R
+    PgDog -->|"read routing"| R
     RW --> Primary
     R --> Replica1
     R --> Replica2
@@ -579,3 +571,4 @@ Topics covered:
 - **Database Architecture Overview**: [`docs/databases/DATABASE.md`](../../../../docs/databases/DATABASE.md)
 - **PgCat Troubleshooting**: [`docs/runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md`](../../../../docs/runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md)
 - **Monitoring Setup**: [`docs/monitoring/METRICS.md`](../../../../docs/monitoring/METRICS.md)
+- **Replication Deep Dive**: [`docs/databases/REPLICATION_STRATEGY.md`](../../../../docs/databases/REPLICATION_STRATEGY.md)

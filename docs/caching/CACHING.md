@@ -172,28 +172,6 @@ type CacheConfig struct {
 }
 ```
 
-## Deployment
-
-### Valkey Deployment (Kubernetes)
-
-Valkey is deployed via Helm chart (official) in the `cache-system` namespace:
-
-**Location:** `kubernetes/infra/controllers/caching/valkey/helmrelease.yaml`  
-**Namespace:** `cache-system`
-
-**Configuration:**
-- Single-node deployment (standalone architecture)
-- Authentication disabled for local dev (`auth.enabled: false`)
-- Service: `valkey.cache-system.svc.cluster.local:6379`
-- Resource limits: 256Mi memory, 100m CPU
-- Eviction policy: `allkeys-lru` (configured via `valkeyConfig`)
-- Metrics enabled for Prometheus scraping
-
-**Deploy:**
-```bash
-make flux-push  # Deploys Valkey via Flux GitOps
-```
-
 ## Key Eviction Policy
 
 ### Overview

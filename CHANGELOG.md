@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.42.5] - 2026-01-28
 
+### Added
+
+- **RustFS Object Storage** (S3-compatible):
+  - HelmRepository: charts.rustfs.com
+  - HelmRelease: rustfs v0.0.82 in namespace rustfs
+  - Standalone mode (1 pod, 1 PVC) for local/dev
+  - ClusterIP service: port 9000 (API), 9001 (Console)
+  - Ingress disabled (no ingress controller in local Kind)
+  - ingress.className: nginx (avoids TraefikService CRD - cluster has no Traefik)
+
 ### Fixed
 
 - **Loki Kubernetes Logs Dashboard** - No logs showing:

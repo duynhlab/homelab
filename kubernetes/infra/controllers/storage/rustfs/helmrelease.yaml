@@ -1,0 +1,80 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: rustfs
+  namespace: rustfs
+spec:
+  interval: 10m
+  timeout: 10m
+  chart:
+    spec:
+      chart: rustfs
+      sourceRef:
+        kind: HelmRepository
+        name: rustfs
+        namespace: flux-system
+      version: "0.0.82"
+  releaseName: rustfs
+  targetNamespace: rustfs
+  
+  # Force clean install on failures
+  install:
+    crds: Skip
+    createNamespace: true
+    remediation:
+      retries: 3
+  
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+  
+  values:
+    # Standalone mode
+    mode:
+      standalone:
+        enabled: true
+      distributed:
+        enabled: false
+    
+    # CRITICAL: Disable ingress completely
+    ingress:
+      enabled: false
+      traefikAnnotations: {}  # Explicitly clear Traefik annotations
+    
+    # Disable Gateway API (might also create Traefik resources)
+    # CRITICAL: Chart 0.0.82 creates TraefikService when gatewayClass=traefik
+    # regardless of gatewayApi.enabled. Set gatewayClass to nginx to avoid
+    # "no matches for kind TraefikService" error when cluster has no Traefik CRDs.
+    gatewayApi:
+      enabled: false
+      gatewayClass: nginx
+    
+    # Service config
+    service:
+      type: ClusterIP
+      endpoint:
+        port: 9000
+      console:
+        port: 9001
+    
+    # Credentials
+    secret:
+      rustfs:
+        access_key: rustfsadmin
+        secret_key: rustfsadmin
+    
+    # Storage (Kind cluster uses "standard" StorageClass, not "local-path")
+    storageclass:
+      name: standard
+      dataStorageSize: 1Gi
+      logStorageSize: 256Mi
+    
+    # Resources
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi

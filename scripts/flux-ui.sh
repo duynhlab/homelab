@@ -45,7 +45,7 @@ kubectl port-forward -n monitoring svc/victorialogs-victoria-logs-single-server 
 
 # RustFS (S3-compatible object storage)
 echo "Starting RustFS port forward (9000 API, 9001 Console)..."
-kubectl port-forward -n rustfs svc/rustfs 9000:9000 9001:9001 > /dev/null 2>&1 &
+kubectl port-forward -n rustfs svc/rustfs-svc 9000:9000 9001:9001 > /dev/null 2>&1 &
 
 # Postgres Operator UI
 echo "Starting Postgres Operator UI port forward (8082)..."

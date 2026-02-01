@@ -94,6 +94,13 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+  name: rustfs
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
   name: shipping
 ---
 apiVersion: v1

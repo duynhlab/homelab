@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { getCart } from '../../api/cartApi';
+import { useSWRConfig } from 'swr';
+import { getCart, clearCart } from '../../api/cartApi';
 import { createOrder } from '../../api/orderApi';
 import { useToast } from '../../components/common/ToastProvider';
 import { toUserFriendlyError } from '../../utils/errorMessages';
@@ -13,6 +14,7 @@ import { toUserFriendlyError } from '../../utils/errorMessages';
 export default function CheckoutPage() {
     const navigate = useNavigate();
     const { notify } = useToast();
+    const { mutate } = useSWRConfig();
     const [cart, setCart] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -70,6 +72,16 @@ export default function CheckoutPage() {
             }
             setOrderResult(result);
             notify('success', 'Order created successfully!');
+
+            // Clear cart immediately for UI + backend consistency
+            try {
+                await clearCart();
+                // Refresh cart badge (App.jsx uses SWR key: 'cart-count')
+                await mutate('cart-count');
+            } catch (clearErr) {
+                const message = toUserFriendlyError(clearErr?.message);
+                notify('error', `Order created, but failed to clear cart: ${message}`);
+            }
         } catch (err) {
             const message = toUserFriendlyError(err?.message);
             notify('error', message);

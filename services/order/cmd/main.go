@@ -95,6 +95,11 @@ func main() {
 	v1.SetShippingClient(shippingClient)
 	logger.Info("Shipping client initialized", zap.String("shipping_service_url", cfg.ShippingServiceURL))
 
+	// Initialize cart client for best-effort cart clearing after order creation
+	cartClient := v1.NewCartClient(cfg.CartServiceURL)
+	v1.SetCartClient(cartClient)
+	logger.Info("Cart client initialized", zap.String("cart_service_url", cfg.CartServiceURL))
+
 	r := gin.Default()
 
 	// Tracing middleware (must be first for context propagation)

@@ -119,6 +119,7 @@ func main() {
 	{
 		apiV1.GET("/cart", v1.GetCart)
 		apiV1.POST("/cart", v1.AddToCart)
+		apiV1.DELETE("/cart", v1.ClearCart)
 		apiV1.GET("/cart/count", v1.GetCartCount)
 		apiV1.PATCH("/cart/items/:itemId", v1.UpdateCartItem)
 		apiV1.DELETE("/cart/items/:itemId", v1.RemoveCartItem)

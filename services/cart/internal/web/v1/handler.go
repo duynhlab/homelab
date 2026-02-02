@@ -177,6 +177,29 @@ func (h *CartHandler) RemoveCartItem(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Cart item removed"})
 }
 
+func (h *CartHandler) ClearCart(c *gin.Context) {
+	ctx, span := middleware.StartSpan(c.Request.Context(), "http.request", trace.WithAttributes(
+		attribute.String("layer", "web"),
+		attribute.String("method", c.Request.Method),
+		attribute.String("path", c.Request.URL.Path),
+	))
+	defer span.End()
+
+	userID := c.GetString("user_id")
+	if userID == "" {
+		userID = "1"
+	}
+
+	if err := h.cartService.ClearCart(ctx, userID); err != nil {
+		span.RecordError(err)
+		clog.ErrorContext(ctx, "Failed to clear cart", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Cart cleared"})
+}
+
 // Legacy function wrappers for backward compatibility
 var handler *CartHandler
 
@@ -211,5 +234,11 @@ func UpdateCartItem(c *gin.Context) {
 func RemoveCartItem(c *gin.Context) {
 	if handler != nil {
 		handler.RemoveCartItem(c)
+	}
+}
+
+func ClearCart(c *gin.Context) {
+	if handler != nil {
+		handler.ClearCart(c)
 	}
 }

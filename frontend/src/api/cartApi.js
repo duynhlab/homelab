@@ -49,3 +49,11 @@ export async function removeCartItem(itemId) {
     const response = await apiClient.delete(`/cart/items/${itemId}`);
     return response.data;
 }
+
+/**
+ * DELETE /api/v1/cart - Clear all cart items
+ */
+export async function clearCart() {
+    const response = await apiClient.delete('/cart');
+    return response.data;
+}

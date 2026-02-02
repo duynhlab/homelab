@@ -35,10 +35,10 @@ spec:
     resources:
       limits:
         cpu: 100m
-        memory: 256Mi
+        memory: 128Mi
       requests:
         cpu: 20m
-        memory: 128Mi
+        memory: 32Mi
     sloth:
       resyncInterval: "5m"
       workers: 2

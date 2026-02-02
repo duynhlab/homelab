@@ -33,11 +33,11 @@ spec:
         ruleSelectorNilUsesHelmValues: false
         resources:
           limits:
-            cpu: 500m
-            memory: 2Gi
-          requests:
             cpu: 100m
-            memory: 1Gi
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 32Mi
         retention: 7d
         retentionSize: 10GB
         ruleNamespaceSelector: {}

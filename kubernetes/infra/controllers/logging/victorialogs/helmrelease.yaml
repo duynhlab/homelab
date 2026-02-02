@@ -36,11 +36,11 @@ spec:
       # Resources
       resources:
         requests:
-          cpu: 100m
-          memory: 256Mi
+          cpu: 20m
+          memory: 32Mi
         limits:
-          cpu: 500m
-          memory: 512Mi
+          cpu: 100m
+          memory: 128Mi
 
       # ServiceMonitor for Prometheus scraping
       serviceMonitor:

@@ -22,6 +22,7 @@ This is the **single source of truth** for all API endpoints. The Frontend team 
 | **Product** | `/api/v1/products/:id/details` | GET | **Aggregated product details** | STABLE |
 | **Cart** | `/api/v1/cart` | GET | Get user cart | STABLE |
 | **Cart** | `/api/v1/cart` | POST | Add item to cart | STABLE |
+| **Cart** | `/api/v1/cart` | DELETE | **Clear user cart after successful order** | STABLE |
 | **Cart** | `/api/v1/cart/count` | GET | **Get cart item count** | STABLE |
 | **Cart** | `/api/v1/cart/items/:itemId` | PATCH | **Update cart item quantity** | STABLE |
 | **Cart** | `/api/v1/cart/items/:itemId` | DELETE | **Remove cart item** | STABLE |

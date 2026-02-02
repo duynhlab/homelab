@@ -127,6 +127,17 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 	}
 
 	zapLogger.Info("Order created", zap.String("order_id", order.ID))
+
+	// Best-effort: clear cart after successful order creation.
+	// Do NOT fail the order if cart clearing fails (order is already committed).
+	if client := getCartClient(zapLogger); client != nil {
+		authHeader := c.GetHeader("Authorization")
+		if err := client.ClearCart(ctx, authHeader); err != nil {
+			span.RecordError(err)
+			zapLogger.Warn("Best-effort cart clear failed", zap.Error(err))
+		}
+	}
+
 	c.JSON(http.StatusCreated, order)
 }
 

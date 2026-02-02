@@ -10,6 +10,7 @@ import (
 // MockCartRepository
 type MockCartRepository struct {
 	addItemFunc func(ctx context.Context, userID string, item domain.CartItem) error
+	clearFunc   func(ctx context.Context, userID string) error
 }
 
 func (m *MockCartRepository) FindByUserID(ctx context.Context, userID string) (*domain.Cart, error) {
@@ -31,6 +32,9 @@ func (m *MockCartRepository) RemoveItem(ctx context.Context, userID, itemID stri
 	return nil
 }
 func (m *MockCartRepository) Clear(ctx context.Context, userID string) error {
+	if m.clearFunc != nil {
+		return m.clearFunc(ctx, userID)
+	}
 	return nil
 }
 
@@ -74,5 +78,31 @@ func TestAddToCart(t *testing.T) {
 				t.Errorf("AddToCart() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestClearCart(t *testing.T) {
+	ctx := context.Background()
+
+	called := false
+	var gotUserID string
+
+	mockRepo := &MockCartRepository{
+		clearFunc: func(ctx context.Context, userID string) error {
+			called = true
+			gotUserID = userID
+			return nil
+		},
+	}
+	service := NewCartService(mockRepo)
+
+	if err := service.ClearCart(ctx, "user1"); err != nil {
+		t.Fatalf("ClearCart() error = %v, want nil", err)
+	}
+	if !called {
+		t.Fatalf("expected repository Clear to be called")
+	}
+	if gotUserID != "user1" {
+		t.Fatalf("ClearCart() userID = %q, want %q", gotUserID, "user1")
 	}
 }

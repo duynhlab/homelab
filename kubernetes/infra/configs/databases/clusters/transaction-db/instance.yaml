@@ -114,6 +114,21 @@ spec:
     #   #   - key: topology.kubernetes.io/zone
     #   #     values: ["zone-a", "zone-b", "zone-c"]
   
+  # Backup configuration (RustFS S3-compatible)
+  # Reference: docs/databases/backup.md
+  backup:
+    retentionPolicy: "7d"
+    barmanObjectStore:
+      destinationPath: s3://pg-backups/transaction-db/
+      endpointURL: http://rustfs-svc.rustfs.svc.cluster.local:9000
+      s3Credentials:
+        accessKeyId:
+          name: pg-backup-rustfs-credentials
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: pg-backup-rustfs-credentials
+          key: ACCESS_SECRET_KEY
+  
   # Bootstrap configuration
   bootstrap:
     initdb:

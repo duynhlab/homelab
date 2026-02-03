@@ -4,8 +4,12 @@ kind: Kustomization
 # product-db cluster (CloudNativePG)
 # Order: secrets → instance → extensions → poolers → monitoring
 resources:
-  - secrets/product-db-secret.yaml
   - instance.yaml
-  # - extensions.yaml
   - poolers/
-  - monitoring/podmonitor-cloudnativepg-product-db.yaml
+  - monitoring/podmonitor.yaml
+  - secrets/product-db-secret.yaml
+  - secrets/pg-backup-rustfs-credentials.yaml
+  - backup/backup-daily.yaml
+  - backup/backup-every-6h.yaml
+
+  # - extensions.yaml

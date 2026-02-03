@@ -164,7 +164,7 @@ flowchart LR
 - Tempo via Grafana: http://localhost:3000 (Explore > Tempo)
 - Jaeger UI: http://localhost:16686
 
-📖 See [JAEGER.md](./JAEGER.md) for Jaeger-specific documentation
+📖 See [jaeger.md](./jaeger.md) for Jaeger-specific documentation
 
 ### 2. Structured Logging (Vector + Loki)
 
@@ -305,11 +305,11 @@ kubectl port-forward -n monitoring svc/loki 3100:3100
 
 ## Documentation
 
-- [Architecture Guide](./ARCHITECTURE.md) - ⭐ **3-layer architecture & APM integration diagrams**
-- [Tracing Guide](./TRACING.md) - Distributed tracing details
-- [Jaeger Guide](./JAEGER.md) - Jaeger UI usage, comparison with Tempo
-- [Logging Guide](./LOGGING.md) - Structured logging guide
-- [Profiling Guide](./PROFILING.md) - Continuous profiling guide
+- [Architecture Guide](./architecture.md) - ⭐ **3-layer architecture & APM integration diagrams**
+- [Tracing Guide](./tracing.md) - Distributed tracing details
+- [Jaeger Guide](./jaeger.md) - Jaeger UI usage, comparison with Tempo
+- [Logging Guide](./logging.md) - Structured logging guide
+- [Profiling Guide](./profiling.md) - Continuous profiling guide
 
 ## Troubleshooting
 

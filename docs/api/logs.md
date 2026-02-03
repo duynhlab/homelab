@@ -315,4 +315,4 @@ logger.Info("HTTP request", zap.String("method", c.Request.Method), zap.String("
 
 - [specs/active/context-aware-logging/research.md](../../specs/active/context-aware-logging/research.md) - Library comparison and deep dives
 - [specs/active/context-aware-logging/victorialogs-vector-research.md](../../specs/active/context-aware-logging/victorialogs-vector-research.md) - VictoriaLogs integration
-- [docs/observability/apm/LOGGING.md](../observability/apm/LOGGING.md) - Structured logging guide (Zap-focused)
+- [docs/observability/apm/logging.md](../observability/apm/logging.md) - Structured logging guide (Zap-focused)

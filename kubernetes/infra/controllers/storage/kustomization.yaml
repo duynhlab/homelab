@@ -4,3 +4,5 @@ kind: Kustomization
 # Object storage: RustFS (S3-compatible)
 resources:
   - rustfs/helmrelease.yaml
+  # One-time Job to create pg-backups bucket (idempotent, runs after RustFS is up)
+  - rustfs/job-create-bucket.yaml

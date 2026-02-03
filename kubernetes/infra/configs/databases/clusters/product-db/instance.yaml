@@ -24,17 +24,30 @@ spec:
 
     parameters:
       max_connections: "200"
-      shared_buffers: "64MB"
+
+      # Memory settings
+      shared_buffers: "128MB"
       effective_cache_size: "512MB"
       maintenance_work_mem: "128MB"
-      checkpoint_completion_target: "0.9"
-      wal_buffers: "16MB"
+      work_mem: "8MB"
+
+      # Query planner settings
       default_statistics_target: "100"
       random_page_cost: "4.0"
       effective_io_concurrency: "2"
-      work_mem: "8MB"
+      
+      # Checkpoint settings
+      checkpoint_completion_target: "0.9"
+
+      # WAL settings (optimized for backup)
+      wal_buffers: "16MB"  # Increased from 16MB for better WAL performance
       min_wal_size: "1GB"
       max_wal_size: "4GB"
+      wal_compression: "on"  # Compress WAL segments (saves ~70% storage)
+      archive_timeout: "5min"  # Force WAL switch every 5 min (ensures low RPO even with low write activity)
+      max_wal_senders: "10"  # Increased for 3 replicas + backup streams
+      wal_keep_size: "1GB"  # Keep WAL locally for replica catch-up
+
       # pgAudit configuration
       pgaudit.log: "ddl, write"  # Only log DDL and write (less noise than "all" includes ddl, read, write, function, misc)
       pgaudit.log_catalog: "off"  # Don't log system catalog queries (reduces noise)
@@ -42,17 +55,19 @@ spec:
       pgaudit.log_statement_once: "off"  # Log each statement (not just once per session)
       pgaudit.log_relation: "on"  # Log relation (table) access
       pgaudit.log_rows: "on"  # Log number of rows affected
+
+      # Performance monitoring
       track_io_timing: "on"
 
-      # Config cho pg_stat_statements
+      # Config for pg_stat_statements
       pg_stat_statements.track: "all"
       pg_stat_statements.max: "10000"
 
-      # Config cho auto_explain
+      # Config for auto_explain
       auto_explain.log_min_duration: "1s"
       auto_explain.log_analyze: "on"
 
-      # Config cho pglogical
+      # Config for pglogical
       # pglogical.database_name: "product"
       # pglogical.database_user: "product"
       # pglogical.database_password: "product"
@@ -77,16 +92,67 @@ spec:
       localeCType: "C" # Set locale for the database
       localeCollate: "C" # Set locale for the database
   
+  # Backup configuration (RustFS S3-compatible)
+  # Reference: docs/databases/backup.md
+  backup:
+    retentionPolicy: "30d"
+    # Volume snapshot backups (optional, requires CSI driver support)
+    # volumeSnapshot:
+    #   className: csi-snapshot-class
+    #   online: true
+    #   onlineConfiguration:
+    #     waitForArchive: true
+    #     immediateCheckpoint: false
+
+    # Barman Object Store backup to RustFS (S3-compatible object storage)
+    barmanObjectStore:
+      destinationPath: s3://pg-backups/product-db/
+      endpointURL: http://rustfs-svc.rustfs.svc.cluster.local:9000
+
+      # Server name for Barman (must be unique across all clusters)
+      serverName: product-db-cluster
+      
+      # WAL archiving configuration (for PITR)
+      wal:
+        compression: gzip  # Compress WAL segments (reduces storage by ~70%)
+        maxParallel: 4     # Upload 4 WAL segments in parallel (faster archiving)
+      
+      # Base backup configuration
+      data:
+        compression: gzip  # Compress base backup (reduces storage significantly)
+        jobs: 4            # Parallel base backup (requires CNPG >= 1.23)
+        immediateCheckpoint: false  # Don't force checkpoint (reduces I/O impact)
+
+      s3Credentials:
+        accessKeyId:
+          name: pg-backup-rustfs-credentials
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: pg-backup-rustfs-credentials
+          key: ACCESS_SECRET_KEY
+
+      # Optional: S3-specific settings
+      # tags:
+      #   environment: production
+      #   cluster: product-db
+      # historyTags:
+      #   environment: production
+      #   type: wal-archive
+  
   # Storage configuration
   storage:
     size: 10Gi
     storageClass: standard  # Use default storage class for Kind
-  
-  # Resource requests and limits
+
+  # WAL storage (optional: separate WAL to different disk for better I/O)
+  # walStorage:
+  #   size: 5Gi
+  #   storageClass: fast-ssd
+
   resources:
     requests:
-      memory: "128Mi"
-      cpu: "50m"
-    limits:
-      memory: "128Mi"
+      memory: "256Mi"
       cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"

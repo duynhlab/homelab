@@ -1,0 +1,22 @@
+# ConfigMap for Zalando Postgres Operator - WAL-G backup to RustFS
+# Injected into all Zalando PostgreSQL pods via pod_environment_configmap
+# Reference: docs/databases/BACKUP_STRATEGY.md
+# Note: AWS credentials come from pod_environment_secret per cluster
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zalando-walg-config
+  namespace: postgres-operator
+data:
+  WAL_S3_BUCKET: "pg-backups"
+  WAL_BUCKET_SCOPE_PREFIX: ""
+  WAL_BUCKET_SCOPE_SUFFIX: ""
+  USE_WALG_BACKUP: "true"
+  USE_WALG_RESTORE: "true"
+  BACKUP_SCHEDULE: "0 0 2 * * *"
+  AWS_ENDPOINT: "http://rustfs-svc.rustfs.svc.cluster.local:9000"
+  AWS_REGION: "us-east-1"
+  AWS_S3_FORCE_PATH_STYLE: "true"
+  WALG_DISABLE_S3_SSE: "true"
+  BACKUP_NUM_TO_RETAIN: "7"
+  CLONE_USE_WALG_RESTORE: "true"

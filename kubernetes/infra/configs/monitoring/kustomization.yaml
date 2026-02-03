@@ -11,3 +11,5 @@ resources:
   - podmonitors/podmonitor-zalando-supporting-db.yaml
   # SLO definitions (PrometheusServiceLevel CRDs for Sloth)
   - slo/
+  # Backup alerts for PostgreSQL clusters
+  - prometheusrules/postgres-backup-alerts.yaml

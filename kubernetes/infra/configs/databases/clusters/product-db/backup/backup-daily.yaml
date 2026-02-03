@@ -1,0 +1,21 @@
+# ============================================================================
+# SCHEDULED BACKUP - Daily at 2 AM UTC
+# ============================================================================
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: product-db-daily
+  namespace: product
+  labels:
+    app.kubernetes.io/name: product-db-backup
+    app.kubernetes.io/component: scheduled-backup
+    backup-frequency: daily
+spec:
+  # Daily at 02:00 (cron: sec min hour day month weekday)
+  schedule: "0 0 2 * * *"
+  
+  cluster:
+    name: product-db
+  
+  backupOwnerReference: self
+  immediate: false

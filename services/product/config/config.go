@@ -40,6 +40,10 @@ type Config struct {
 	Database         DatabaseConfig  // PostgreSQL database configuration
 	Cache            CacheConfig     // Valkey/Redis cache configuration
 	ShutdownTimeout  int             // Graceful shutdown timeout in seconds - from SHUTDOWN_TIMEOUT env (default: 10)
+	// ReadinessDrainDelay: delay after failing readiness before shutting down the HTTP server.
+	// This gives Kubernetes/Service routing time to stop sending new traffic.
+	// From READINESS_DRAIN_DELAY env (default: 5s, max: 30s).
+	ReadinessDrainDelay int
 	ReviewServiceURL string          // Review service URL for aggregation - from REVIEW_SERVICE_URL env
 }
 
@@ -171,6 +175,7 @@ func Load() *Config {
 			TTLProductDetail: getEnvDuration("CACHE_TTL_PRODUCT_DETAIL", 10*time.Minute),
 		},
 		ShutdownTimeout:  getEnvDurationSeconds("SHUTDOWN_TIMEOUT", 10),
+		ReadinessDrainDelay: getEnvDurationSecondsWithMax("READINESS_DRAIN_DELAY", 5, 30),
 		ReviewServiceURL: getEnv("REVIEW_SERVICE_URL", "http://review.review.svc.cluster.local:8080"),
 	}
 }
@@ -389,10 +394,37 @@ func getEnvDurationSeconds(key string, defaultValueSeconds int) int {
 	return seconds
 }
 
+// getEnvDurationSecondsWithMax reads a duration env var and returns seconds as int.
+// Accepts Go duration format (e.g., "5s", "30s", "1m").
+// Returns default on invalid values (silent fallback for startup safety).
+func getEnvDurationSecondsWithMax(key string, defaultValueSeconds int, maxSeconds int) int {
+	timeoutStr := os.Getenv(key)
+	if timeoutStr == "" {
+		return defaultValueSeconds
+	}
+
+	timeout, err := time.ParseDuration(timeoutStr)
+	if err != nil {
+		return defaultValueSeconds
+	}
+
+	seconds := int(timeout.Seconds())
+	if seconds <= 0 || seconds > maxSeconds {
+		return defaultValueSeconds
+	}
+
+	return seconds
+}
+
 // GetShutdownTimeoutDuration returns shutdown timeout as time.Duration
 // Convenience method for use in main.go
 func (c *Config) GetShutdownTimeoutDuration() time.Duration {
 	return time.Duration(c.ShutdownTimeout) * time.Second
+}
+
+// GetReadinessDrainDelayDuration returns readiness drain delay as time.Duration.
+func (c *Config) GetReadinessDrainDelayDuration() time.Duration {
+	return time.Duration(c.ReadinessDrainDelay) * time.Second
 }
 
 // contains checks if a string slice contains a specific value

@@ -467,7 +467,7 @@ graph TD
 ## Related Documentation
 
 - [APM Overview](./README.md) - Complete APM system overview
-- [Tracing Guide](./TRACING.md) - Distributed tracing details
-- [Logging Guide](./LOGGING.md) - Structured logging guide
-- [Profiling Guide](./PROFILING.md) - Continuous profiling guide
+- [Tracing Guide](./tracing.md) - Distributed tracing details
+- [Logging Guide](./logging.md) - Structured logging guide
+- [Profiling Guide](./profiling.md) - Continuous profiling guide
 

@@ -152,6 +152,44 @@ When executing: `INSERT INTO products (name, price) VALUES ('Widget', 99.99);`
 | 14 | **Commit** | fsync WAL to disk | WAL segment file | Durability guarantee |
 | 15 | **Response** | Return success | Result packet | Client sees success |
 
+```mermaid
+flowchart TB
+    subgraph Client["1-2. Client Layer"]
+        A1[Go Driver<br/>Serialize SQL]
+        A2[PgDog<br/>Pooled connection]
+    end
+
+    subgraph Backend["3-6. Parse & Plan"]
+        A3[Postmaster<br/>Route to backend]
+        A4[Parser<br/>Parse tree]
+        A5[Rewriter<br/>Query tree]
+        A6[Planner<br/>Plan tree]
+    end
+
+    subgraph Execute["7-9. Execute"]
+        A7[Executor<br/>Begin Tx, XID]
+        A8[Lock Manager<br/>RowExclusiveLock]
+        A9[MVCC<br/>Assign xmin]
+    end
+
+    subgraph Storage["10-12. Storage"]
+        A10[Buffer Manager<br/>Shared Buffers]
+        A11[Heap Insert<br/>Mark page dirty]
+        A12[Index Insert<br/>B-tree update]
+    end
+
+    subgraph Durability["13-15. Durability & Response"]
+        A13[WAL Writer<br/>WAL buffer]
+        A14[Commit<br/>fsync WAL]
+        A15[Response<br/>INSERT 0 1]
+    end
+
+    A1 --> A2 --> A3 --> A4 --> A5 --> A6
+    A6 --> A7 --> A8 --> A9
+    A9 --> A10 --> A11 --> A12
+    A12 --> A13 --> A14 --> A15
+```
+
 ### UPDATE Flow (Key Differences)
 
 UPDATE in PostgreSQL does NOT modify tuples in-place. Instead:
@@ -954,6 +992,6 @@ spec:
 ## Related Documentation
 
 - **Cluster Topology**: [`kubernetes/infra/configs/databases/clusters/README.md`](../../kubernetes/infra/configs/databases/clusters/README.md)
-- **Database Architecture**: [`docs/databases/DATABASE.md`](./DATABASE.md)
+- **Database Architecture**: [`docs/databases/database.md`](./database.md)
 - **Performance Tuning Research**: [`specs/active/postgresql-performance-tuning/research.md`](../../specs/active/postgresql-performance-tuning/research.md)
 - **PostgreSQL Deep Dive Notes**: [`specs/active/postgresql-deep-dive/internals.md`](../../specs/active/postgresql-deep-dive/internals.md)

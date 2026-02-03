@@ -409,7 +409,7 @@ func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 ```
 
 > [!NOTE]
-> See [PGCAT_PREPARED_STATEMENT_ERROR.md](../runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md) for detailed troubleshooting.
+> See [pgcat_prepared_statement_error.md](../runbooks/troubleshooting/pgcat_prepared_statement_error.md) for detailed troubleshooting.
 
 ---
 
@@ -1353,10 +1353,23 @@ curl http://localhost:8080/api/v1/orders \
 ---
 ## Logging Standards
 
-For comprehensive logging documentation including JSON format, log levels, library comparison, and VictoriaLogs integration, see **[LOGS.md](LOGS.md)**.
+For comprehensive logging documentation including JSON format, log levels, library comparison, and VictoriaLogs integration, see **[logs.md](logs.md)**.
 
 **Summary:**
 - **2 services**: cart (clog), auth (zerolog)
 - **6 services**: product, order, review, notification, shipping, user (Zap)
 - All logs must be JSON format with `time`, `level`, `msg`/`message`, `trace_id`
+
+---
+
+## Graceful Shutdown
+
+For comprehensive graceful shutdown documentation including signal handling, cleanup sequence, Kubernetes configuration, and troubleshooting, see **[graceful-shutdown.md](graceful-shutdown.md)**.
+
+**Summary:**
+- **Signal handling**: `signal.NotifyContext` (modern Go pattern)
+- **Probes**: Liveness `GET /health` (always 200); Readiness `GET /ready` (503 during drain)
+- **Cleanup order**: HTTP Server → Database → Tracer (sequential)
+- **Configuration**: `SHUTDOWN_TIMEOUT`, `READINESS_DRAIN_DELAY` (default 5s)
+- **Kubernetes**: `terminationGracePeriodSeconds: 30` (shutdown + buffer)
 

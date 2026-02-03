@@ -352,8 +352,8 @@ spec:
 - [OpenTelemetry Collector README](../../../k8s/otel-collector/README.md)
 - [Jaeger README](../../../k8s/jaeger/README.md)
 - [APM Overview](./README.md)
-- [Tracing Guide](./TRACING.md)
-- [Jaeger Guide](./JAEGER.md)
+- [Tracing Guide](./tracing.md)
+- [Jaeger Guide](./jaeger.md)
 
 ## References
 

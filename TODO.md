@@ -25,7 +25,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 - [x] **Distributed tracing with Tempo** — `kubernetes/infra/controllers/tracing/tempo/`
 - [x] **Logging with Loki + Vector** — `kubernetes/infra/controllers/logging/`
 - [x] **Continuous profiling with Pyroscope** — `kubernetes/infra/controllers/profiling/`
-- [~] **Jaeger integration** — Deployed but DNS/connectivity issues (Partial)
+- [x] **Jaeger integration** — `kubernetes/infra/controllers/tracing/jaeger/`
 - [ ] Alertmanager with routing rules and receivers (currently disabled)
 - [ ] Golden signals alerting (Latency, Errors, Traffic, Saturation)
 - [ ] Anomaly detection and synthetic monitoring
@@ -39,14 +39,14 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 - [x] **PostgreSQL with Zalando operator** — `kubernetes/infra/controllers/databases/zalando-operator.yaml`, clusters: `auth-db`, `review-db`, `supporting-db`
 - [x] **Connection poolers** — PgBouncer (Zalando sidecar), PgCat (`transaction-db`), PgDog (`product-db`)
 - [x] **SQL migrations with Flyway** — `services/*/db/migrations/Dockerfile`, `.github/workflows/build-init.yml`
-- [x] **PostgreSQL internals deep-dive** — `docs/databases/POSTGRESQL_INTERNALS_PRODUCT_DB.md`
+- [x] **PostgreSQL internals deep-dive** — `docs/databases/postgresql_internals_product_db.md`
 - [ ] sqlc code generation + repository pattern
 - [ ] Database backup/restore with Barman or pgBackRest
 - [ ] Point-in-Time Recovery (PITR) drill
 - [ ] HA failover drill (kill primary, verify replica promotion)
 - [ ] Connection pooler tuning (pool sizes, timeouts, prepared statements)
-- [ ] Valkey/Redis caching with TTL policies and operation tracing
-- [ ] Read replica routing (PgCat/PgDog query routing)
+- [x] **Valkey/Redis caching with TTL policies and operation tracing** — `kubernetes/infra/controllers/caching/valkey/`
+- [x] **Read replica routing (PgCat/PgDog query routing)** — Implemented via PgCat/PgDog poolers
 
 ---
 

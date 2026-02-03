@@ -108,7 +108,7 @@ func InitTracing(cfg *config.Config) (*sdktrace.TracerProvider, error) {
 // Skips health checks, metrics endpoints, and static resources
 func shouldTrace(path string) bool {
 	skipPaths := []string{
-		"/health", "/healthz", "/readyz", "/livez",
+		"/health", "/healthz", "/ready", "/readyz", "/livez",
 		"/metrics", "/favicon.ico",
 	}
 	for _, skip := range skipPaths {

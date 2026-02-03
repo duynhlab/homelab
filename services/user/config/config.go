@@ -39,6 +39,10 @@ type Config struct {
 	Metrics         MetricsConfig   // Prometheus metrics
 	Database        DatabaseConfig  // PostgreSQL database configuration
 	ShutdownTimeout int             // Graceful shutdown timeout in seconds - from SHUTDOWN_TIMEOUT env (default: 10)
+	// ReadinessDrainDelay: delay after failing readiness before shutting down the HTTP server.
+	// This gives Kubernetes/Service routing time to stop sending new traffic.
+	// From READINESS_DRAIN_DELAY env (default: 5s, max: 30s).
+	ReadinessDrainDelay int
 	AuthServiceURL  string          // Auth service URL for token introspection - from AUTH_SERVICE_URL env
 	// AuthAllowUnauthenticatedFallback: when true, allows requests without token to proceed with user_id="1" (demo only).
 	// When false (default), returns 401 for missing/invalid tokens. Set AUTH_ALLOW_UNAUTHENTICATED_FALLBACK=true for local/dev.
@@ -152,6 +156,7 @@ func Load() *Config {
 			PoolerType:     getEnv("DB_POOLER_TYPE", ""),
 		},
 		ShutdownTimeout:                   getEnvDurationSeconds("SHUTDOWN_TIMEOUT", 10),
+		ReadinessDrainDelay:               getEnvDurationSecondsWithMax("READINESS_DRAIN_DELAY", 5, 30),
 		AuthServiceURL:                    getEnv("AUTH_SERVICE_URL", "http://auth.auth.svc.cluster.local:8080"),
 		AuthAllowUnauthenticatedFallback:  getEnvBool("AUTH_ALLOW_UNAUTHENTICATED_FALLBACK", false),
 	}
@@ -334,6 +339,33 @@ func getEnvDurationSeconds(key string, defaultValueSeconds int) int {
 // Convenience method for use in main.go
 func (c *Config) GetShutdownTimeoutDuration() time.Duration {
 	return time.Duration(c.ShutdownTimeout) * time.Second
+}
+
+// getEnvDurationSecondsWithMax reads a duration env var and returns seconds as int.
+// Accepts Go duration format (e.g., "5s", "30s", "1m").
+// Returns default on invalid values (silent fallback for startup safety).
+func getEnvDurationSecondsWithMax(key string, defaultValueSeconds int, maxSeconds int) int {
+	timeoutStr := os.Getenv(key)
+	if timeoutStr == "" {
+		return defaultValueSeconds
+	}
+
+	timeout, err := time.ParseDuration(timeoutStr)
+	if err != nil {
+		return defaultValueSeconds
+	}
+
+	seconds := int(timeout.Seconds())
+	if seconds <= 0 || seconds > maxSeconds {
+		return defaultValueSeconds
+	}
+
+	return seconds
+}
+
+// GetReadinessDrainDelayDuration returns readiness drain delay as time.Duration.
+func (c *Config) GetReadinessDrainDelayDuration() time.Duration {
+	return time.Duration(c.ReadinessDrainDelay) * time.Second
 }
 
 // contains checks if a string slice contains a specific value

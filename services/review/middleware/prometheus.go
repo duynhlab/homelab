@@ -72,6 +72,7 @@ func shouldCollectMetrics(path string) bool {
 	// Skip infrastructure endpoints
 	infrastructurePaths := []string{
 		"/health",
+		"/ready",
 		"/metrics",
 		"/readiness",
 		"/liveness",

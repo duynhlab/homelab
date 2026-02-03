@@ -178,7 +178,7 @@ The `src/notifications/README.md` documents how to integrate with the backend no
 
 ### Overview
 
-Frontend consumes backend REST APIs following the contract defined in [API.md](../docs/api/API.md).
+Frontend consumes backend REST APIs following the contract defined in [api.md](../docs/api/api.md).
 
 **Base URL**: Configured via `VITE_API_BASE_URL` at build time
 **API Version**: `/api/v1`
@@ -288,7 +288,7 @@ sequenceDiagram
 
 ### Frontend API Endpoints
 
-Frontend consumes these backend REST APIs. All endpoints follow the contract defined in [API.md](../docs/api/API.md).
+Frontend consumes these backend REST APIs. All endpoints follow the contract defined in [api.md](../docs/api/api.md).
 
 **Base URL**: `{VITE_API_BASE_URL}/api/v1`
 
@@ -829,7 +829,7 @@ For complete API documentation including:
 - Backend architecture (3-layer)
 - Service isolation details
 
-See: [API.md](../docs/api/API.md)
+See: [api.md](../docs/api/api.md)
 
 ---
 
@@ -981,5 +981,5 @@ docker build --build-arg API_BASE_URL=https://api.prod.com .
 ## Related Documentation
 
 - [Root README](../README.md) - Full system overview
-- [API Reference](../docs/API.md) - Backend API contracts
+- [API Reference](../docs/api/api.md) - Backend API contracts
 - [CHANGELOG](../CHANGELOG.md) - Recent changes

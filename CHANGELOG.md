@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.42.7] - 2026-02-03
+
+### Changed
+
+- **Graceful shutdown documentation** ([docs/api/graceful-shutdown.md](docs/api/graceful-shutdown.md)):
+  - Added section **Readiness drain (VictoriaMetrics pattern)**: readiness vs liveness, drain delay rationale, interaction with `terminationGracePeriodSeconds`
+  - Normalized Mermaid diagram (System Components): `flowchart TB`, single-line node labels (no `\n`) for stable rendering
+  - Added [VictoriaMetrics Graceful Shutdown in Go](https://victoriametrics.com/blog/go-graceful-shutdown/) as primary reference
+- **API reference** ([docs/api/api.md](docs/api/api.md)): Graceful Shutdown summary now includes Probes (liveness `GET /health`, readiness `GET /ready`) and `READINESS_DRAIN_DELAY`
+
+## [0.42.6] - 2026-01-28
+
+### Added
+
+- **PostgreSQL Backup to RustFS** (S3-compatible):
+  - Backup strategy: [docs/databases/BACKUP_STRATEGY.md](docs/databases/BACKUP_STRATEGY.md) - cluster inventory, bucket layout, retention
+  - Runbook: [docs/runbooks/troubleshooting/POSTGRES_BACKUP_RESTORE.md](docs/runbooks/troubleshooting/POSTGRES_BACKUP_RESTORE.md)
+  - **CloudNativePG** (product-db, transaction-db): barmanObjectStore + ScheduledBackup (daily 02:00), restore example manifest
+  - **Zalando** (auth-db, supporting-db, review-db): WAL-G via operator-level pod_environment_configmap + pod_environment_secret
+  - Bucket `pg-backups` created via Job `rustfs-create-pg-backups` in rustfs namespace
+  - Credentials secret `pg-backup-rustfs-credentials` per namespace (product, cart, user, auth, review)
+  - PrometheusRule `postgres-backup-alerts` - PostgresBackupTooOld, PostgresBackupFailed
+
+### Fixed
+
+- **Cart not cleared after successful order**:
+  - Added `DELETE /api/v1/cart` endpoint to clear all cart items
+  - Checkout now clears cart and refreshes cart badge after `POST /api/v1/orders` succeeds
+  - Order service performs best-effort server-side cart clear for consistency
+
 ## [0.42.5] - 2026-01-28
 
 ### Added

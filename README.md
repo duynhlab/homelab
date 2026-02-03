@@ -86,7 +86,7 @@ flowchart TB
 
 **Frontend Architecture**: See [`frontend/README.md`](frontend/README.md) for complete frontend documentation, API mapping, and integration details.
 
-**Detailed Architecture**: See [`docs/observability/apm/ARCHITECTURE.md`](docs/observability/apm/ARCHITECTURE.md) for middleware chain and APM integration. Full system architecture in [`specs/system-context/01-architecture-overview.md`](specs/system-context/01-architecture-overview.md)
+**Detailed Architecture**: See [`docs/observability/apm/architecture.md`](docs/observability/apm/architecture.md) for middleware chain and APM integration. Full system architecture in [`specs/system-context/01-architecture-overview.md`](specs/system-context/01-architecture-overview.md)
 
 ---
 
@@ -102,7 +102,7 @@ flowchart TB
 - **HTTP Framework**: Gin
 - **Cache**: Valkey (Redis-compatible) with Cache-Aside pattern
 
-**Complete API Documentation**: See [`docs/api/API.md`](docs/api/API.md)
+**Complete API Documentation**: See [`docs/api/api.md`](docs/api/api.md)
 
 ### Infrastructure Stack
 - **Kubernetes**: Local Cluster (Kind), Helm 3
@@ -147,7 +147,7 @@ make flux-push    # 3. Deploy everything (infrastructure + apps)
 - **Multi-environment support**: Local/production overlays
 - **OCI-based GitOps**: Single source of truth in OCI registry
 
-**Detailed Setup Guide**: See [`docs/platform/SETUP.md`](docs/platform/SETUP.md) for step-by-step instructions, architecture explanation, and troubleshooting.
+**Detailed Setup Guide**: See [`docs/platform/setup.md`](docs/platform/setup.md) for step-by-step instructions, architecture explanation, and troubleshooting.
 
 ---
 ## Grafana Dashboards
@@ -163,7 +163,7 @@ The platform includes **14 Grafana dashboards** covering observability, database
 
 **Access**: All dashboards are available via Grafana at <http://localhost:3000> after port-forwarding (see [Access Points](#access-points) below).
 
-**Documentation**: See [`docs/observability/metrics/GRAFANA_DASHBOARD.md`](docs/observability/metrics/GRAFANA_DASHBOARD.md) for complete dashboard reference (34 panels, query analysis, troubleshooting) and [`docs/observability/metrics/METRICS.md`](docs/observability/metrics/METRICS.md) for metrics guide.
+**Documentation**: See [`docs/observability/metrics/grafana_dashboard.md`](docs/observability/metrics/grafana_dashboard.md) for complete dashboard reference (34 panels, query analysis, troubleshooting) and [`docs/observability/metrics/metrics.md`](docs/observability/metrics/metrics.md) for metrics guide.
 
 ---
 
@@ -189,7 +189,7 @@ After deployment, access services via port-forwarding. Use `make flux-ui` to aut
 
 **Makefile Commands**: See `make help` for all available commands (cluster, Flux, validation, utilities).
 
-**Port-Forwarding Guide**: See [`docs/platform/SETUP.md`](docs/platform/SETUP.md)
+**Port-Forwarding Guide**: See [`docs/platform/setup.md`](docs/platform/setup.md)
 
 ---
 
@@ -198,18 +198,18 @@ After deployment, access services via port-forwarding. Use `make flux-ui` to aut
 Complete documentation is available in the [`docs/`](docs/README.md) directory. Quick links:
 
 **Getting Started:**
-- **[Setup Guide](docs/platform/SETUP.md)** - Deployment instructions and troubleshooting
-- **[API Reference](docs/api/API.md)** - Complete API documentation for all 8 microservices
+- **[Setup Guide](docs/platform/setup.md)** - Deployment instructions and troubleshooting
+- **[API Reference](docs/api/api.md)** - Complete API documentation for all 8 microservices
 
 **Observability:**
 - **[APM Overview](docs/observability/apm/README.md)** - Distributed tracing, metrics, logs, profiling
-- **[Metrics Guide](docs/observability/metrics/METRICS.md)** - Custom metrics and Prometheus integration
-- **[Grafana Dashboards](docs/observability/metrics/GRAFANA_DASHBOARD.md)** - Dashboard reference (34 panels)
+- **[Metrics Guide](docs/observability/metrics/metrics.md)** - Custom metrics and Prometheus integration
+- **[Grafana Dashboards](docs/observability/metrics/grafana_dashboard.md)** - Dashboard reference (34 panels)
 - **[SLO Documentation](docs/observability/slo/README.md)** - SLI/SLO definitions and error budgets
 
 **Infrastructure:**
-- **[Database Guide](docs/databases/DATABASE.md)** - PostgreSQL architecture (5 clusters, poolers, migrations)
-- **[k6 Load Testing](docs/testing/K6.md)** - Load testing setup and scenarios
+- **[Database Guide](docs/databases/database.md)** - PostgreSQL architecture (5 clusters, poolers, migrations)
+- **[k6 Load Testing](docs/testing/k6.md)** - Load testing setup and scenarios
 - **[Runbooks](docs/runbooks/troubleshooting/)** - Operational troubleshooting guides
 
 **Reference:**

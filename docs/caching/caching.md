@@ -362,4 +362,4 @@ kubectl exec -n cache-system deploy/valkey -- redis-cli GET "product:14"
 - [Valkey Documentation](https://valkey.io/)
 - [Redis Go Client](https://github.com/redis/go-redis)
 - [Cache-Aside Pattern](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Strategies.html)
-- [3-Layer Architecture](../api/API.md#3-layer-architecture-responsibility)
+- [3-Layer Architecture](../api/api.md#3-layer-architecture-responsibility)

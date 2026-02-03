@@ -34,10 +34,10 @@ spec:
         resources:
           limits:
             cpu: 100m
-            memory: 256Mi
+            memory: 512Mi
           requests:
             cpu: 50m
-            memory: 32Mi
+            memory: 256Mi
         retention: 7d
         retentionSize: 10GB
         ruleNamespaceSelector: {}

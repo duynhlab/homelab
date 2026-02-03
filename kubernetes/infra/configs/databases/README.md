@@ -25,6 +25,6 @@ As an alternative to deploying Postgres manually, you can also use one of severa
 
 ## Related Documentation
 
-- **Database Guide:** [`docs/databases/DATABASE.md`](../../../docs/databases/DATABASE.md)
+- **Database Guide:** [`docs/databases/database.md`](../../../docs/databases/database.md)
 - **Poolers Documentation:** [`clusters/README.md`](clusters/README.md)
-- **PgCat Troubleshooting:** [`docs/runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md`](../../../docs/runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md)
+- **PgCat Troubleshooting:** [`docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md`](../../../docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md)

@@ -283,6 +283,6 @@ ctx, span := tracer.Start(ctx, "ProcessOrder")
 ## Related Documentation
 
 - [APM Overview](./README.md)
-- [Tracing Guide](./TRACING.md)
+- [Tracing Guide](./tracing.md)
 - [OTel Collector Config](../../k8s/otel-collector/README.md)
 - [Jaeger Official Docs](https://www.jaegertracing.io/docs/)

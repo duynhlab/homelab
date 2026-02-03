@@ -611,7 +611,7 @@ curl -X POST http://localhost:8080/api/v1/orders \
 
 ### Load Testing with K6
 
-**See**: [K6 Load Testing Documentation](../../docs/testing/K6.md)
+**See**: [K6 Load Testing Documentation](../../docs/testing/k6.md)
 
 K6 automatically tests all services with 8 journey types:
 1. E-commerce Shopping Journey (8 services)

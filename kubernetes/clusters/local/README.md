@@ -261,4 +261,4 @@ kubernetes/clusters/local/
 - **Flux Operator Docs:** https://fluxcd.control-plane.io/operator/
 - **Kustomize Docs:** https://kustomize.io/
 - **OCI Artifacts:** https://fluxcd.io/flux/cheatsheets/oci-artifacts/
-- **Project Docs:** `../../../docs/platform/SETUP.md`
+- **Project Docs:** `../../../docs/platform/setup.md`

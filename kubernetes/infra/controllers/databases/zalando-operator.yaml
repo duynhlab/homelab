@@ -19,8 +19,14 @@ spec:
   timeout: 10m
   values:
     configAwsOrGcp:
-      aws_region: eu-central-1
-      wal_s3_bucket: ""
+      aws_region: us-east-1
+      wal_s3_bucket: pg-backups
+    configKubernetes:
+      cluster_domain: cluster.local
+      enable_cross_namespace_secret: true
+      # WAL-G backup to RustFS - ConfigMap has non-sensitive config, Secret has credentials per cluster
+      pod_environment_configmap: postgres-operator/zalando-walg-config
+      pod_environment_secret: pg-backup-rustfs-credentials
     configConnectionPooler:
       connection_pooler_default_cpu_limit: "1"
       connection_pooler_default_cpu_request: 500m
@@ -36,9 +42,6 @@ spec:
       docker_image: ghcr.io/zalando/spilo-16:3.3-p2
       enable_teams_api: false
       workers: 8
-    configKubernetes:
-      cluster_domain: cluster.local
-      enable_cross_namespace_secret: true
     image:
       pullPolicy: IfNotPresent
       registry: ghcr.io

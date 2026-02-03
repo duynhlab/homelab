@@ -1,0 +1,36 @@
+# PrometheusRule for PostgreSQL backup alerts (CNPG clusters)
+# Reference: docs/runbooks/troubleshooting/POSTGRES_BACKUP_RESTORE.md
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: postgres-backup-alerts
+  namespace: monitoring
+  labels:
+    prometheus: kube-prometheus-stack
+spec:
+  groups:
+    - name: postgres-backup
+      interval: 5m
+      rules:
+        # CNPG: Last successful backup too old (> 26 hours)
+        - alert: PostgresBackupTooOld
+          expr: |
+            cnpg_collector_last_available_backup_timestamp > 0
+            and (time() - cnpg_collector_last_available_backup_timestamp) > 93600
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "PostgreSQL backup too old ({{ $labels.namespace }}/{{ $labels.cluster }})"
+            description: "Last successful backup was more than 26 hours ago. Check backup configuration and RustFS connectivity."
+        # CNPG: Backup failed recently
+        - alert: PostgresBackupFailed
+          expr: |
+            (time() - cnpg_collector_last_failed_backup_timestamp) < 3600
+            and cnpg_collector_last_failed_backup_timestamp > cnpg_collector_last_available_backup_timestamp
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PostgreSQL backup failed ({{ $labels.namespace }}/{{ $labels.cluster }})"
+            description: "Backup failed in the last hour. Check cluster logs and S3 connectivity."

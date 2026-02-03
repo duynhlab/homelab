@@ -6,8 +6,8 @@ If you're seeing a **different error**, check these related docs:
 
 | Error Message | Doc |
 |---------------|-----|
-| `cannot execute UPDATE in a read-only transaction (SQLSTATE 25006)` | [PgCat Read-Only Transaction Error](PGCAT_READ_ONLY_TRANSACTION_ERROR.md) |
-| `Connection refused (os error 111)` / `Shard 0 down or misconfigured: TimedOut` | [PgCat Upstream Connectivity Errors](PGCAT_UPSTREAM_CONNECTIVITY_ERRORS.md) |
+| `cannot execute UPDATE in a read-only transaction (SQLSTATE 25006)` | [PgCat Read-Only Transaction Error](pgcat_read_only_transaction_error.md) |
+| `Connection refused (os error 111)` / `Shard 0 down or misconfigured: TimedOut` | [PgCat Upstream Connectivity Errors](pgcat_upstream_connectivity_errors.md) |
 
 ---
 
@@ -159,5 +159,5 @@ make flux-push
 
 ## See Also
 
-- [PgCat Read-Only Transaction Error](PGCAT_READ_ONLY_TRANSACTION_ERROR.md) - `SQLSTATE 25006` write-on-replica errors
-- [PgCat Upstream Connectivity Errors](PGCAT_UPSTREAM_CONNECTIVITY_ERRORS.md) - Connection refused / shard down errors
+- [PgCat Read-Only Transaction Error](pgcat_read_only_transaction_error.md) - `SQLSTATE 25006` write-on-replica errors
+- [PgCat Upstream Connectivity Errors](pgcat_upstream_connectivity_errors.md) - Connection refused / shard down errors

@@ -260,5 +260,5 @@ done
 
 ## See Also
 
-- [PgCat Prepared Statement Error](PGCAT_PREPARED_STATEMENT_ERROR.md) - Different error: `bind message supplies X parameters`
-- [PgCat Upstream Connectivity Errors](PGCAT_UPSTREAM_CONNECTIVITY_ERRORS.md) - Connection refused / shard down errors
+- [PgCat Prepared Statement Error](pgcat_prepared_statement_error.md) - Different error: `bind message supplies X parameters`
+- [PgCat Upstream Connectivity Errors](pgcat_upstream_connectivity_errors.md) - Connection refused / shard down errors

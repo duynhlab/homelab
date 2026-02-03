@@ -162,6 +162,6 @@ Multi-window multi-burn-rate alerts:
   - SLO CRDs: `kubernetes/infra/configs/monitoring/slo/`
 - **Sloth Docs**: https://sloth.dev/
 - **CRD Spec**: https://sloth.dev/usage/getting-started/
-- **Alert Configuration**: [ALERTING.md](./ALERTING.md)
-- **Error Budget Policy**: [ERROR_BUDGET_POLICY.md](./ERROR_BUDGET_POLICY.md)
+- **Alert Configuration**: [alerting.md](./alerting.md)
+- **Error Budget Policy**: [error_budget_policy.md](./error_budget_policy.md)
 

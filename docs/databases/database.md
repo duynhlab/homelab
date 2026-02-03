@@ -228,6 +228,7 @@ flowchart TB
 - Pool size: 30 connections (configured in HelmRelease)
 - CloudNativePG services: `product-db-rw` (read-write), `product-db-r` (read-only)
 
+---
 #### Transaction Database
 
 | Attribute                | Value                                                                                 |
@@ -584,6 +585,7 @@ flowchart TB
   - `pg_replication_lag` (replication lag in seconds)
   - `pg_postmaster_start_time_seconds` (server start time)
 
+---
 #### Auth Database
 
 | Attribute             | Value                                                                                                    |
@@ -721,6 +723,8 @@ flowchart TB
   - Init containers run before main container starts
   - Init containers need full database access and long-running operations
   - Transaction pooling mode doesn't support DDL statements (CREATE TABLE, ALTER TABLE, etc.)
+
+---
 
 #### Supporting Database
 
@@ -1129,6 +1133,8 @@ PostgreSQL Database
 ### Backup Strategy
 
 **Purpose:** Comprehensive backup and disaster recovery strategy for Zalando Postgres Operator-managed clusters, ensuring data protection and business continuity.
+
+**Implementation:** WAL-G backup to RustFS (S3-compatible) is configured at operator level via `pod_environment_configmap` and `pod_environment_secret`. See [backup.md](./backup.md) and [postgres_backup_restore.md](../runbooks/troubleshooting/postgres_backup_restore.md).
 
 #### Overview
 
@@ -1551,10 +1557,12 @@ Connection poolers solve the "too many connections" problem by reusing PostgreSQ
 
 ## Related Documentation
 
-- **[Setup Guide](./SETUP.md)** - Complete deployment and configuration guide
-- **[Error Handling](./API.md#error-handling)** - Database error handling patterns
-- **[API Reference](./API.md)** - API endpoints using database
-- **[PgCat Prepared Statement Error](../runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md)** - Fix intermittent 500 errors with PgCat
+- **[Backup Strategy](./backup.md)** - Backup architecture, retention, bucket layout
+- **[Backup/Restore Runbook](../runbooks/troubleshooting/postgres_backup_restore.md)** - Restore procedures (CNPG vs Zalando)
+- **[Setup Guide](./setup.md)** - Complete deployment and configuration guide
+- **[Error Handling](./api.md#error-handling)** - Database error handling patterns
+- **[API Reference](./api.md)** - API endpoints using database
+- **[PgCat Prepared Statement Error](../runbooks/troubleshooting/pgcat_prepared_statement_error.md)** - Fix intermittent 500 errors with PgCat
 
 ## Troubleshooting
 
@@ -1581,6 +1589,6 @@ return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s&prefer_simple_protoco
 
 **Affected Services:** Cart, Order (both use PgCat transaction pooler)
 
-**See:** [Full troubleshooting guide](../runbooks/troubleshooting/PGCAT_PREPARED_STATEMENT_ERROR.md) with diagrams and testing instructions.
+**See:** [Full troubleshooting guide](../runbooks/troubleshooting/pgcat_prepared_statement_error.md) with diagrams and testing instructions.
 
 

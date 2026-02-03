@@ -24,14 +24,14 @@ This guide provides quick reference for AI agents working with this codebase. Fo
 
 ### Code Quality Standards
 
-- **Consistency**: Follow existing code patterns (see [`docs/api/API.md`](docs/api/API.md#conventions-and-standards))
+- **Consistency**: Follow existing code patterns (see [`docs/api/api.md`](docs/api/api.md#conventions-and-standards))
 - **Documentation**: Update relevant docs when adding features
 - **Testing**: Write tests for new functionality
 - **Error Handling**: Use consistent error patterns
-- **Logging**: Use structured logging with appropriate levels (see [`docs/observability/apm/LOGGING.md`](docs/observability/apm/LOGGING.md))
+- **Logging**: Use structured logging with appropriate levels (see [`docs/observability/apm/logging.md`](docs/observability/apm/logging.md))
 - **API Patterns**: Research industry best practices before implementing
 - **APM Patterns**: Follow established observability patterns (see [`docs/observability/apm/`](docs/observability/apm/))
-- **Database Patterns**: Research database patterns, reference [`docs/databases/DATABASE.md`](docs/databases/DATABASE.md)
+- **Database Patterns**: Research database patterns, reference [`docs/databases/database.md`](docs/databases/database.md)
 
 ---
 
@@ -97,7 +97,7 @@ make build
 go build -o bin/{service} cmd/{service}/main.go
 ```
 
-**Detailed Configuration**: See [`docs/api/API.md`](docs/api/API.md) for environment variables, `.env` files, and local setup.
+**Detailed Configuration**: See [`docs/api/api.md`](docs/api/api.md) for environment variables, `.env` files, and local setup.
 
 **GitOps Deployment**: See deployment commands in [Deployment Order](#deployment-order) section. Use `make up` for one-command deployment or `make flux-push` to deploy all services to Kubernetes.
 
@@ -130,7 +130,7 @@ flowchart TD
     Database -->|PostgreSQL| DB[(Database)]
 ```
 
-**Database Integration**: See [`docs/databases/DATABASE.md`](docs/databases/DATABASE.md) for database architecture, connection patterns (direct, PgBouncer, PgCat), and configuration.
+**Database Integration**: See [`docs/databases/database.md`](docs/databases/database.md) for database architecture, connection patterns (direct, PgBouncer, PgCat), and configuration.
 
 **Layer Responsibilities**:
 
@@ -138,7 +138,7 @@ flowchart TD
 - **Logic Layer** (`logic/v1/`): Business logic, orchestration, Cache-Aside pattern, database queries via repository interfaces
 - **Core Layer** (`core/domain/`, `core/database.go`, `core/cache/`): Domain models, database connections, cache client interfaces and implementations
 
-**Detailed Architecture**: See [`docs/observability/apm/ARCHITECTURE.md`](docs/observability/apm/ARCHITECTURE.md) for middleware chain and APM integration. Full system architecture in [`specs/system-context/01-architecture-overview.md`](specs/system-context/01-architecture-overview.md)
+**Detailed Architecture**: See [`docs/observability/apm/architecture.md`](docs/observability/apm/architecture.md) for middleware chain and APM integration. Full system architecture in [`specs/system-context/01-architecture-overview.md`](specs/system-context/01-architecture-overview.md)
 
 ---
 
@@ -165,7 +165,7 @@ flowchart TD
 - Logic/Core layers are internal implementation details
 - Aggregation endpoints handle complex operations server-side
 
-**Reference:** See [`docs/api/API.md`](docs/api/API.md) for complete API documentation and 3-layer architecture details.
+**Reference:** See [`docs/api/api.md`](docs/api/api.md) for complete API documentation and 3-layer architecture details.
 
 ---
 
@@ -178,9 +178,9 @@ flowchart TD
 - **Middleware Chain**: Ordered middleware (tracing → logging → metrics) for observability
 - **Caching**: Cache-Aside pattern with Valkey (Redis-compatible) for read-heavy endpoints
 
-**Middleware Details**: See [`docs/observability/apm/TRACING_ARCHITECTURE.md`](docs/observability/apm/TRACING_ARCHITECTURE.md) for middleware chain ordering and responsibilities.
+**Middleware Details**: See [`docs/observability/apm/tracing_architecture.md`](docs/observability/apm/tracing_architecture.md) for middleware chain ordering and responsibilities.
 
-**Caching Details**: See [`docs/caching/CACHING.md`](docs/caching/CACHING.md) for cache architecture, Cache-Aside pattern, and configuration.
+**Caching Details**: See [`docs/caching/caching.md`](docs/caching/caching.md) for cache architecture, Cache-Aside pattern, and configuration.
 
 ---
 
@@ -190,18 +190,18 @@ flowchart TD
 - **Database**: PostgreSQL (5 clusters via Zalando/CloudNativePG operators)
   - Connection poolers: PgBouncer, PgCat
   - Migrations: Flyway 11.19.0 (8 migration images)
-  - **Database Documentation**: [`docs/databases/DATABASE.md`](docs/databases/DATABASE.md)
+  - **Database Documentation**: [`docs/databases/database.md`](docs/databases/database.md)
 - **Cache**: Valkey (Redis-compatible) for read-heavy endpoints
   - Cache-Aside pattern in Logic Layer
   - Product service: `GET /api/v1/products`, `GET /api/v1/products/:id`
-  - **Caching Documentation**: [`docs/caching/CACHING.md`](docs/caching/CACHING.md)
+  - **Caching Documentation**: [`docs/caching/caching.md`](docs/caching/caching.md)
 - **HTTP Framework**: Gin
 - **Observability**: OpenTelemetry (traces, metrics, logs)
 - **GitOps**: Flux Operator, Kustomize, OCI Registry
 - **Deployment**: Kubernetes (Kind), Helm 3
 - **Monitoring**: Prometheus, Grafana, Tempo, Loki, Pyroscope, Jaeger
 
-**Observability Details**: See [`docs/observability/apm/README.md`](docs/observability/apm/README.md) for complete APM system overview. Metrics documentation in [`docs/observability/metrics/METRICS.md`](docs/observability/metrics/METRICS.md)
+**Observability Details**: See [`docs/observability/apm/README.md`](docs/observability/apm/README.md) for complete APM system overview. Metrics documentation in [`docs/observability/metrics/metrics.md`](docs/observability/metrics/metrics.md)
 
 ---
 
@@ -248,7 +248,7 @@ monitoring/
 | notification | notification | `/api/v1/*` |
 | shipping | shipping | `/api/v1/*` |
 
-**Complete API Documentation**: See [`docs/api/API.md`](docs/api/API.md) for all endpoints, request/response models, and examples.
+**Complete API Documentation**: See [`docs/api/api.md`](docs/api/api.md) for all endpoints, request/response models, and examples.
 
 ---
 
@@ -300,7 +300,7 @@ make flux-sync
 # Or: flux reconcile kustomization infrastructure-local --with-source
 ```
 
-**Detailed Deployment Guide**: See [`docs/platform/SETUP.md`](docs/platform/SETUP.md)
+**Detailed Deployment Guide**: See [`docs/platform/setup.md`](docs/platform/setup.md)
 
 ### Key Infrastructure
 
@@ -317,12 +317,12 @@ make flux-sync
 
 ### Detailed Guides
 
-- **Command Reference**: See [`docs/platform/SETUP.md`](docs/platform/SETUP.md#command-reference) - Deployment scripts, Helm, kubectl commands
-- **Conventions**: [`docs/api/API.md`](docs/api/API.md#conventions-and-standards) - Naming conventions, code standards, build verification
-- **API Reference**: [`docs/api/API.md`](docs/api/API.md) - Complete API documentation
-- **Setup Guide**: [`docs/platform/SETUP.md`](docs/platform/SETUP.md) - Deployment instructions
-- **Configuration**: [`docs/api/API.md`](docs/api/API.md) - Environment variables and config
-- **Database**: [`docs/databases/DATABASE.md`](docs/databases/DATABASE.md) - Database architecture and patterns
+- **Command Reference**: See [`docs/platform/setup.md`](docs/platform/setup.md#command-reference) - Deployment scripts, Helm, kubectl commands
+- **Conventions**: [`docs/api/api.md`](docs/api/api.md#conventions-and-standards) - Naming conventions, code standards, build verification
+- **API Reference**: [`docs/api/api.md`](docs/api/api.md) - Complete API documentation
+- **Setup Guide**: [`docs/platform/setup.md`](docs/platform/setup.md) - Deployment instructions
+- **Configuration**: [`docs/api/api.md`](docs/api/api.md) - Environment variables and config
+- **Database**: [`docs/databases/database.md`](docs/databases/database.md) - Database architecture and patterns
 
 ### Find Files by Purpose
 
@@ -355,12 +355,12 @@ make flux-sync
 
 ### Find Documentation by Topic
 
-- **Getting Started**: [`docs/platform/SETUP.md`](docs/platform/SETUP.md), [`docs/api/API.md`](docs/api/API.md)
-- **Development**: [`docs/api/API.md`](docs/api/API.md), [`docs/api/API.md#error-handling`](docs/api/API.md#error-handling), [`docs/observability/apm/TRACING_ARCHITECTURE.md`](docs/observability/apm/TRACING_ARCHITECTURE.md)
-- **Monitoring**: [`docs/observability/metrics/METRICS.md`](docs/observability/metrics/METRICS.md)
-- **APM**: [`docs/observability/apm/README.md`](docs/observability/apm/README.md), [`docs/observability/apm/TRACING.md`](docs/observability/apm/TRACING.md), [`docs/observability/apm/LOGGING.md`](docs/observability/apm/LOGGING.md), [`docs/observability/apm/PROFILING.md`](docs/observability/apm/PROFILING.md)
-- **SLO**: [`docs/observability/slo/README.md`](docs/observability/slo/README.md), [`docs/observability/slo/GETTING_STARTED.md`](docs/observability/slo/GETTING_STARTED.md)
-- **k6**: [`docs/testing/K6.md`](docs/testing/K6.md)
+- **Getting Started**: [`docs/platform/setup.md`](docs/platform/setup.md), [`docs/api/api.md`](docs/api/api.md)
+- **Development**: [`docs/api/api.md`](docs/api/api.md), [`docs/api/api.md#error-handling`](docs/api/api.md#error-handling), [`docs/observability/apm/tracing_architecture.md`](docs/observability/apm/tracing_architecture.md)
+- **Monitoring**: [`docs/observability/metrics/metrics.md`](docs/observability/metrics/metrics.md)
+- **APM**: [`docs/observability/apm/README.md`](docs/observability/apm/README.md), [`docs/observability/apm/tracing.md`](docs/observability/apm/tracing.md), [`docs/observability/apm/logging.md`](docs/observability/apm/logging.md), [`docs/observability/apm/profiling.md`](docs/observability/apm/profiling.md)
+- **SLO**: [`docs/observability/slo/README.md`](docs/observability/slo/README.md), [`docs/observability/slo/getting_started.md`](docs/observability/slo/getting_started.md)
+- **k6**: [`docs/testing/k6.md`](docs/testing/k6.md)
 - **Docs Index**: [`docs/README.md`](docs/README.md)
 
 ---

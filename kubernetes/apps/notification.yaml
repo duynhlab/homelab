@@ -81,6 +81,8 @@ spec:
       # Graceful shutdown configuration
       - name: SHUTDOWN_TIMEOUT
         value: "10s"  # Default shutdown timeout (can be overridden)
+      - name: READINESS_DRAIN_DELAY
+        value: "5s"  # Delay after failing readiness, before HTTP shutdown
 
     # Kubernetes graceful shutdown configuration
     terminationGracePeriodSeconds: 30  # Shutdown timeout (10s) + buffer (20s)
@@ -104,7 +106,7 @@ spec:
     readinessProbe:
       enabled: true
       httpGet:
-        path: /health
+        path: /ready
         port: 8080
       initialDelaySeconds: 5
       periodSeconds: 5

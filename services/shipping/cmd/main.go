@@ -4,7 +4,9 @@ import (
 	"context"
 	"net/http"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -77,6 +79,8 @@ func main() {
 
 	r := gin.Default()
 
+	var isShuttingDown atomic.Bool
+
 	// Tracing middleware (must be first for context propagation)
 	r.Use(middleware.TracingMiddleware())
 
@@ -89,6 +93,16 @@ func main() {
 	// Health check
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
+	})
+
+	// Readiness check
+	// Returns 503 once shutdown has started, to drain traffic before HTTP shutdown.
+	r.GET("/ready", func(c *gin.Context) {
+		if isShuttingDown.Load() {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "shutting_down"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
 	// Metrics endpoint
@@ -123,6 +137,15 @@ func main() {
 	// Wait for shutdown signal
 	<-ctx.Done()
 	logger.Info("Shutdown signal received")
+
+	// Fail readiness first and wait for propagation (best practice for K8s rollout).
+	isShuttingDown.Store(true)
+	drainDelay := cfg.GetReadinessDrainDelayDuration()
+	if drainDelay > 0 {
+		logger.Info("Readiness drain delay started", zap.Duration("delay", drainDelay))
+		time.Sleep(drainDelay)
+		logger.Info("Readiness drain delay completed", zap.Duration("delay", drainDelay))
+	}
 
 	// Shutdown context with configurable timeout
 	shutdownTimeout := cfg.GetShutdownTimeoutDuration()

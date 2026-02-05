@@ -35,6 +35,22 @@ jobs:
       contents: read
       pull-requests: read
 
+  # 1b. Check for Changes
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      migrations: ${{ steps.filter.outputs.migrations }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            migrations:
+              - 'db/migrations/**'
+
   # 4. Build (Main Only)
   docker:
     needs: [go-check, sonar]
@@ -51,8 +67,8 @@ jobs:
 
   # 4b. Build Migration Image
   docker-db-init:
-    needs: [go-check, sonar]
-    if: github.ref == 'refs/heads/main'
+    needs: [go-check, sonar, changes]
+    if: needs.changes.outputs.migrations == 'true'
     uses: duyhenryer/shared-workflows/.github/workflows/docker-build.yml@main
     with:
       image-name: '{{SERVICE_NAME}}-init'

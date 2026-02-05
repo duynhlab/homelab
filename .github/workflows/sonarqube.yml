@@ -19,9 +19,11 @@ jobs:
 
       # Triggering SonarQube analysis as results of it are required by Quality Gate check.
       - name: SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@master
+        uses: sonarsource/sonarqube-scan-action@v7.0.0
         with:
           args: >
+            -Dsonar.projectKey=duynhne_monitoring
+            -Dsonar.organization=duynhne
             -Dsonar.sources=services,frontend/src
             -Dsonar.exclusions=**/node_modules/**,**/vendor/**,**/dist/**,**/build/**,**/*.min.js
         env:
@@ -30,7 +32,7 @@ jobs:
       # Check the Quality Gate status.
       - name: SonarQube Quality Gate check
         id: sonarqube-quality-gate-check
-        uses: sonarsource/sonarqube-quality-gate-action@master
+        uses: sonarsource/sonarqube-quality-gate-action@v1.2.0
         with:
           pollingTimeoutSec: 600
         env:

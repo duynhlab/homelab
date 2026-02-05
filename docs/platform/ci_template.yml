@@ -1,0 +1,76 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # 1. PR Checks (Branch Name + Slack "PR Opened")
+  common:
+    if: github.event_name == 'pull_request'
+    uses: duyhenryer/shared-workflows/.github/workflows/ci-common.yml@main
+    secrets: inherit
+
+  # 2. Test & Lint
+  go-check:
+    uses: duyhenryer/shared-workflows/.github/workflows/go-check.yml@main
+    with:
+      command-test: 'go test -race -coverprofile=coverage.out ./...'
+      lint: true
+    secrets: inherit
+
+  # 3. Analysis
+  sonar:
+    needs: go-check
+    uses: duyhenryer/shared-workflows/.github/workflows/sonarqube.yml@main
+    with:
+      project-key: 'duynhne_{{SERVICE_NAME}}'
+      organization: 'duynhne'
+      fail-on-quality-gate: false
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    permissions:
+      contents: read
+      pull-requests: read
+
+  # 4. Build (Main Only)
+  docker:
+    needs: [go-check, sonar]
+    if: github.ref == 'refs/heads/main'
+    uses: duyhenryer/shared-workflows/.github/workflows/docker-build.yml@main
+    with:
+      image-name: '{{SERVICE_NAME}}'
+      push: true
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+  # 4b. Build Migration Image
+  docker-db-init:
+    needs: [go-check, sonar]
+    if: github.ref == 'refs/heads/main'
+    uses: duyhenryer/shared-workflows/.github/workflows/docker-build.yml@main
+    with:
+      image-name: '{{SERVICE_NAME}}-migration'
+      dockerfile: 'db/migrations/Dockerfile'
+      context: 'db/migrations'
+      push: true
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+  # 5. Final Status Notification
+  notify:
+    if: always()
+    needs: [go-check, sonar, docker, docker-db-init]
+    uses: duyhenryer/shared-workflows/.github/workflows/status.yml@main
+    with:
+      slack_channel_id: "C0AD82A9A74"
+    secrets:
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

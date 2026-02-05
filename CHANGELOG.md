@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.50.0] - 2026-02-05
+
+### Changed
+
+- **Monorepo Split**: Transformed the monolithic repository into separate, isolated repositories for each microservice (`auth`, `user`, `cart`, `product`, `order`, `review`, `notification`, `shipping`).
+- **CI/CD Architecture**:
+  - Implementation of **Shared Workflows** (`duyhenryer/shared-workflows`) for standardized CI/CD across all services.
+  - Centralized **Pull Request Checks** (`ci-common.yml`) and **Main Branch Builds** (`ci.yml`, `docker-build.yml`).
+  - Integrated **SonarQube Quality Gate** with optional enforcement (`fail-on-quality-gate: false`).
+  - Enhanced **Slack Notifications** with dedicated channel routing and status reporting.
+- **Service Isolation**:
+  - Independent `go.mod` and dependency management for each service.
+  - Dedicated Dockerfiles and Helm charts per service.
+  - Refactored `cmd` entrypoints to `cmd/main.go`.
+
+### Added
+
+- **Shared Workflows Repository**: Created `duyhenryer/shared-workflows` to host reusable GitHub Actions workflows (`go-check`, `docker-build`, `sonarqube`, `status`).
+- **CI Templates**: Introduced `ci_template.yml` for rapid onboarding of new services.
+
+### Security
+
+- **Explicit Secret Passing**: Transitioned to explicit secret passing in reusable workflows for better security and auditability.
+- **Permission Scoping**: Restricted GITHUB_TOKEN permissions to minimum required privileges (read-only by default).
+
+## [0.43.0] - 2026-02-03
+
+### Added
+
+- **External Secrets Operator + HashiCorp Vault (Dev Mode)** - Centralized secret management:
+  - Vault HelmRelease: dev mode with `root` token, TLS disabled (local/dev only)
+  - External Secrets Operator HelmRelease: v0.13.0 with CRD installation
+  - ClusterSecretStore `vault-dev`: Kubernetes auth method for ESO → Vault
+  - Idempotent Vault bootstrap Job: configures Kubernetes auth, policies, and seeds secrets on each restart
+  - Helm sources: `hashicorp.yaml`, `external-secrets.yaml` in `kubernetes/clusters/local/sources/helm/`
+  - Namespaces: `vault`, `external-secrets-system`
+  - Health checks in Flux Kustomizations for Vault and ESO readiness
+
+- **Shadow-first Secret Migration** (Vault-backed ExternalSecrets alongside existing secrets):
+  - **Database credentials**: `product-db-secret-vault`, `transaction-db-secret-vault` (cart, order namespaces)
+  - **Backup credentials**: `pg-backup-rustfs-credentials-vault` for all 5 DB namespaces (CNPG + WAL-G formats)
+  - **Pooler credentials**: `pgdog-product-credentials-vault`, `pgcat-transaction-credentials-vault` (prepared for future chart support)
+
+- **Secrets Management Documentation** ([docs/secrets/secrets-management.md](docs/secrets/secrets-management.md)):
+  - Vault path reference (DB, backup, pooler credentials)
+  - Kubernetes secret mapping and naming conventions
+  - Migration guide: step-by-step for switching applications to Vault-backed secrets
+  - Operations guide: adding secrets, rotation, troubleshooting
+  - Known limitations: pooler inline passwords, dev mode Vault
+
+### Changed
+
+- **AGENTS.md**: Added secrets to Technology Stack, file references, and documentation links
+- **docs/README.md**: Added secrets section to documentation structure and index
+- **Pooler manifests**: Documented inline password limitations with Vault path references and future remediation options
+
 ## [0.42.7] - 2026-02-03
 
 ### Changed

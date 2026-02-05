@@ -46,6 +46,8 @@ docs/
 │       ├── pgcat_prepared_statement_error.md
 │       ├── pgcat_read_only_transaction_error.md
 │       └── pgcat_upstream_connectivity_errors.md
+├── secrets/                      # Secrets management documentation
+│   └── secrets-management.md     # Vault + ESO guide
 └── testing/                      # Testing documentation
     └── k6.md                     # k6 load testing guide
 ```
@@ -56,7 +58,8 @@ docs/
 
 ### Getting Started (New Users)
 
-1. **[Setup Guide](./platform/setup.md)** - Complete GitOps deployment guide
+1. **[Services Index](../SERVICES.md)** - List of all service repositories (Polyrepo)
+2. **[Setup Guide](./platform/setup.md)** - Complete GitOps deployment guide
    - Quick start (3 commands, 5 minutes)
    - GitOps architecture with Flux Operator
    - Simplified structure (infra/ + apps/, refactored 2026-01-12)
@@ -229,6 +232,10 @@ docs/
 
 - [Setup Guide](./platform/setup.md) - Complete deployment and configuration guide
 
+### Secrets
+
+- [Secrets Management](./secrets/secrets-management.md) - Vault + ESO guide for centralized secret management
+
 ### Testing
 
 - [k6 Load Testing](./testing/k6.md) - Complete load testing guide with architecture
@@ -255,6 +262,7 @@ docs/
 - **Monitoring Stack** - Prometheus Operator + Grafana Operator + kube-state-metrics + metrics-server
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
 - **APM Stack** - Tempo + Jaeger (tracing), OTel Collector (fan-out), Pyroscope (profiling), Loki + VictoriaLogs + Vector (logging)
+- **Secrets Stack** - HashiCorp Vault (dev mode) + External Secrets Operator for centralized secret management
 - **k6 Load Testing** - Helm-managed load generators
 
 ### Common Tasks

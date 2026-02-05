@@ -8,7 +8,14 @@
 
 ## Overview
 
-This guide provides quick reference for AI agents working with this codebase. For detailed documentation, see [`docs/`](docs/README.md) - start with [`docs/platform/`](docs/platform/) for deployment and [`docs/api/`](docs/api/) for API development.
+This guide provides quick reference for AI agents working with the `duynhne` microservices platform.
+
+**Repository Context**:
+- **This Repository (`monitoring`)**: Infrastructure, GitOps, Observability, and Docs.
+- **Service Repositories**: Application code is in separate repositories (e.g., `auth-service`, `user-service`).
+- **Shared Workflows**: CI/CD templates in `duyhenryer/shared-workflows`.
+
+**Detailed Index**: See [`docs/`](docs/README.md) for platform docs and [**SERVICES.md**](SERVICES.md) for the list of repositories.
 
 ---
 
@@ -16,22 +23,23 @@ This guide provides quick reference for AI agents working with this codebase. Fo
 
 ### Before Starting Any Task
 
-1. **Read AGENTS.md FIRST** - This file contains essential patterns, conventions, and best practices
-2. **Read relevant docs** - Check `docs/` for existing documentation
-3. **Research if needed** - For API/architecture work, research industry patterns
-4. **Plan before coding** - Understand the problem, propose solution, get approval
-5. **Follow conventions** - Use existing patterns, don't reinvent
+1.  **Identify the Scope**:
+    - **Infrastructure/GitOps**: Work in this repository (`monitoring`).
+    - **Application Code**: Check [**SERVICES.md**](SERVICES.md) to find the correct service repo.
+    - **CI/CD Pipelines**: Check `duyhenryer/shared-workflows` if modifying reusable workflows.
+2.  **Read AGENTS.md FIRST** - In the target repository (each service has its own AGENTS.md).
+3.  **Read relevant docs** - Check `docs/` in this repo for architecture/platform context.
+4.  **Plan before coding** - Understand the problem, propose solution, get approval.
 
-### Code Quality Standards
+### Code Quality Standards (General)
 
-- **Consistency**: Follow existing code patterns (see [`docs/api/api.md`](docs/api/api.md#conventions-and-standards))
-- **Documentation**: Update relevant docs when adding features
-- **Testing**: Write tests for new functionality
-- **Error Handling**: Use consistent error patterns
-- **Logging**: Use structured logging with appropriate levels (see [`docs/observability/apm/logging.md`](docs/observability/apm/logging.md))
-- **API Patterns**: Research industry best practices before implementing
-- **APM Patterns**: Follow established observability patterns (see [`docs/observability/apm/`](docs/observability/apm/))
-- **Database Patterns**: Research database patterns, reference [`docs/databases/database.md`](docs/databases/database.md)
+(See specific `AGENTS.md` in service repositories for language-specific standards)
+
+- **Consistency**: Follow existing code patterns.
+- **Documentation**: Update relevant docs when adding features.
+- **Testing**: Write tests for new functionality.
+- **Error Handling**: Use consistent error patterns.
+- **Logging**: Use structured logging with appropriate levels.
 
 ---
 
@@ -60,14 +68,6 @@ flowchart TD
     B --> C[Component C]
 ```
 
-```mermaid
-sequenceDiagram
-    Client->>API: Request
-    API->>Database: Query
-    Database-->>API: Response
-    API-->>Client: Result
-```
-
 **Enforcement**: When reviewing or creating documentation:
 
 - Replace existing ASCII diagrams with Mermaid equivalents
@@ -78,26 +78,32 @@ sequenceDiagram
 
 ## Development Commands
 
-Quick Go commands for local development (no Docker/Kubernetes needed):
+### Infrastructure & GitOps
+
+This repository manages deployment via **Flux**.
 
 ```bash
-# Run service locally
-cd services
-go run cmd/{service}/main.go
+# Validate manifests (dry-run)
+make validate
 
-# Run tests
-go test ./...
-go test ./internal/{service}/...
+# Deploy entire platform (Kind + Flux + Apps)
+make up
 
-# Using make 
-# Run make build to execute all Go binary.
-make build
-
-# Build binary (no Docker needed for dev)
-go build -o bin/{service} cmd/{service}/main.go
+# Check status
+make flux-status
 ```
 
-**Detailed Configuration**: See [`docs/api/api.md`](docs/api/api.md) for environment variables, `.env` files, and local setup.
+### Microservices Development
+
+To work on a specific service (e.g., `auth-service`):
+
+1.  **Find Repo**: Check [**SERVICES.md**](SERVICES.md).
+2.  **Clone**: `git clone https://github.com/duynhne/auth-service` (or use setup script).
+3.  **Run Locally** (inside service repo):
+    ```bash
+    go run cmd/main.go
+    ```
+4.  **Test**: `go test ./...`
 
 **GitOps Deployment**: See deployment commands in [Deployment Order](#deployment-order) section. Use `make up` for one-command deployment or `make flux-push` to deploy all services to Kubernetes.
 
@@ -200,6 +206,9 @@ flowchart TD
 - **GitOps**: Flux Operator, Kustomize, OCI Registry
 - **Deployment**: Kubernetes (Kind), Helm 3
 - **Monitoring**: Prometheus, Grafana, Tempo, Loki, Pyroscope, Jaeger
+- **Secrets**: HashiCorp Vault (dev mode) + External Secrets Operator (ESO)
+  - Centralized secret management with Kubernetes sync
+  - **Secrets Documentation**: [`docs/secrets/secrets-management.md`](docs/secrets/secrets-management.md)
 
 **Observability Details**: See [`docs/observability/apm/README.md`](docs/observability/apm/README.md) for complete APM system overview. Metrics documentation in [`docs/observability/metrics/metrics.md`](docs/observability/metrics/metrics.md)
 
@@ -350,8 +359,16 @@ make flux-sync
 **Modify infrastructure:**
 
 - Databases: `kubernetes/infra/configs/databases/`
-- Controllers: `kubernetes/infra/controllers/` (metrics, logging, tracing, profiling, databases)
-- Configs: `kubernetes/infra/configs/` (monitoring, databases)
+- Controllers: `kubernetes/infra/controllers/` (metrics, logging, tracing, profiling, databases, secrets)
+- Configs: `kubernetes/infra/configs/` (monitoring, databases, secrets)
+
+**Add/modify secrets:**
+
+- Vault bootstrap: `kubernetes/infra/configs/secrets/vault-bootstrap/configmap.yaml` (add `vault kv put` command)
+- ExternalSecret: `kubernetes/infra/configs/secrets/external-secrets/{name}.yaml`
+- ClusterSecretStore: `kubernetes/infra/configs/secrets/cluster-secret-store.yaml`
+- Vault HelmRelease: `kubernetes/infra/controllers/secrets/vault/helmrelease.yaml`
+- ESO HelmRelease: `kubernetes/infra/controllers/secrets/external-secrets/helmrelease.yaml`
 
 ### Find Documentation by Topic
 
@@ -360,6 +377,7 @@ make flux-sync
 - **Monitoring**: [`docs/observability/metrics/metrics.md`](docs/observability/metrics/metrics.md)
 - **APM**: [`docs/observability/apm/README.md`](docs/observability/apm/README.md), [`docs/observability/apm/tracing.md`](docs/observability/apm/tracing.md), [`docs/observability/apm/logging.md`](docs/observability/apm/logging.md), [`docs/observability/apm/profiling.md`](docs/observability/apm/profiling.md)
 - **SLO**: [`docs/observability/slo/README.md`](docs/observability/slo/README.md), [`docs/observability/slo/getting_started.md`](docs/observability/slo/getting_started.md)
+- **Secrets**: [`docs/secrets/secrets-management.md`](docs/secrets/secrets-management.md)
 - **k6**: [`docs/testing/k6.md`](docs/testing/k6.md)
 - **Docs Index**: [`docs/README.md`](docs/README.md)
 

@@ -55,6 +55,40 @@ Complete guide to deploy microservices platform using **GitOps**, **Flux Operato
 
 ---
 
+## Workspace Setup (Polyrepo)
+
+Since the project is split into multiple repositories, you need to clone all service repositories to work on the code locally.
+
+### 1. Create Workspace Directory
+
+```bash
+mkdir -p ~/Working/duynhne
+cd ~/Working/duynhne
+```
+
+### 2. Clone Repositories
+
+Run this snippet to clone all required repositories:
+
+```bash
+# Infrastructure
+git clone https://github.com/duynhne/monitoring.git
+git clone https://github.com/duyhenryer/shared-workflows.git
+git clone https://github.com/duynhne/pkg.git
+
+# Microservices
+for service in auth user product cart order review notification shipping; do
+  git clone https://github.com/duynhne/${service}-service.git
+done
+
+# Frontend
+git clone https://github.com/duynhne/frontend.git
+```
+
+This will create a structured workspace with all components.
+
+---
+
 ## Step-by-Step Deployment
 
 ### Step 1: Create Kind Cluster

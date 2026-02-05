@@ -11,9 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Monorepo Split**: Transformed the monolithic repository into separate, isolated repositories for each microservice (`auth`, `user`, `cart`, `product`, `order`, `review`, `notification`, `shipping`).
+- **Monorepo Split**: Transformed the monolithic repository into separate, isolated repositories for each microservice (`auth`, `user`, `cart`, `product`, `order`, `review`, `notification`, `shipping`). Code hosted at [duynhne](https://github.com/duynhne).
 - **CI/CD Architecture**:
-  - Implementation of **Shared Workflows** (`duyhenryer/shared-workflows`) for standardized CI/CD across all services.
+  - Implementation of **Shared Workflows** ([duyhenryer/shared-workflows](https://github.com/duyhenryer/shared-workflows)) for standardized CI/CD across all services.
   - Centralized **Pull Request Checks** (`ci-common.yml`) and **Main Branch Builds** (`ci.yml`, `docker-build.yml`).
   - Integrated **SonarQube Quality Gate** with optional enforcement (`fail-on-quality-gate: false`).
   - Enhanced **Slack Notifications** with dedicated channel routing and status reporting.
@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Shared Workflows Repository**: Created `duyhenryer/shared-workflows` to host reusable GitHub Actions workflows (`go-check`, `docker-build`, `sonarqube`, `status`).
+- **Shared Workflows Repository**: Created `duyhenryer/shared-workflows` to host reusable GitHub Actions workflows (`go-check`, `docker-build`, `sonarqube`, `status`). Check it out at [duyhenryer/shared-workflows](https://github.com/duyhenryer/shared-workflows).
 - **CI Templates**: Introduced `ci_template.yml` for rapid onboarding of new services.
 
 ### Security

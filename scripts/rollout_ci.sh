@@ -27,8 +27,6 @@ for SERVICE in "${SERVICES[@]}"; do
   fi
 
   # Apply Template with substitution
-  # {{SERVICE_NAME}} -> auth-service (for project-key)
-  # {{SERVICE_SHORT}} -> auth (for image names)
   sed -e "s/{{SERVICE_NAME}}/$FULL_SERVICE_NAME/g" \
       -e "s/{{SERVICE_SHORT}}/$SHORT_SERVICE_NAME/g" \
       "$TEMPLATE_FILE" > "$TARGET_FILE"
@@ -42,11 +40,11 @@ for SERVICE in "${SERVICES[@]}"; do
       echo "No changes to commit for $FULL_SERVICE_NAME."
   else
       git add .github/workflows/ci.yml
-      git commit -m "fix(ci): use short image names (e.g. cart instead of cart-service)"
+      git commit -m "fix(ci): add top-level permissions for GHCR push"
       git push
       echo "🚀 Pushed changes to $FULL_SERVICE_NAME"
   fi
 done
 
 echo "--------------------------------------------------"
-echo "🎉 rollout_ci.sh completed successfully!"
+echo "🎉 rollout complete!"

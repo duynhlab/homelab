@@ -109,3 +109,17 @@ metadata:
   labels:
     environment: local
   name: user
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+  name: vault
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+  name: external-secrets-system

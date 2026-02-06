@@ -10,3 +10,4 @@ resources:
   - databases/
   - caching/
   - storage/
+  - secrets/

@@ -797,7 +797,7 @@ Row này cung cấp service-level aggregation của resources và infrastructure
 
 ### Prometheus Middleware with Filtering (v0.6.14+)
 
-**Location:** `services/pkg/middleware/prometheus.go`
+**Location:** `middleware/prometheus.go` in each service repository (polyrepo)
 
 **Key Functions:**
 

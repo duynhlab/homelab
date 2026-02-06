@@ -69,9 +69,9 @@ All backend services follow a strict 3-layer architecture. Understanding these l
 ```mermaid
 flowchart TD
     Frontend["FRONTEND (React SPA)\nCalls ONLY Web Layer endpoints"]
-    WebLayer["WEB LAYER\n- HTTP request/response handling\n- Request validation (JSON binding)\n- Authentication/Authorization\n- DTO mapping (request -> domain, domain -> response)\n- Aggregation of multiple Logic services\n- Error translation (domain errors -> HTTP status codes)\nLocation: services/{service}/internal/web/v1/handler.go"]
-    LogicLayer["LOGIC LAYER\n- Business rules and validation\n- Transaction orchestration\n- Repository interface usage (NO direct DB access)\n- Cross-service coordination\n- Domain error definitions\nLocation: services/{service}/internal/logic/v1/service.go\nConstraints:\n- NO SQL queries\n- NO database.GetDB() calls\n- NO HTTP handling"]
-    CoreLayer["CORE LAYER\n- Domain models (entities, value objects)\n- Repository interfaces (contracts)\n- Repository implementations (PostgreSQL)\n- Database connection management\n- Transaction implementation\nLocation:\n- services/{service}/internal/core/domain/ (models)\n- services/{service}/internal/core/repository/ (impl)\n- services/{service}/internal/core/database.go (conn)"]
+    WebLayer["WEB LAYER\n- HTTP request/response handling\n- Request validation (JSON binding)\n- Authentication/Authorization\n- DTO mapping (request -> domain, domain -> response)\n- Aggregation of multiple Logic services\n- Error translation (domain errors -> HTTP status codes)\nLocation: internal/web/v1/handler.go (per service repo)"]
+    LogicLayer["LOGIC LAYER\n- Business rules and validation\n- Transaction orchestration\n- Repository interface usage (NO direct DB access)\n- Cross-service coordination\n- Domain error definitions\nLocation: internal/logic/v1/service.go (per service repo)\nConstraints:\n- NO SQL queries\n- NO database.GetDB() calls\n- NO HTTP handling"]
+    CoreLayer["CORE LAYER\n- Domain models (entities, value objects)\n- Repository interfaces (contracts)\n- Repository implementations (PostgreSQL)\n- Database connection management\n- Transaction implementation\nLocation:\n- internal/core/domain/ (models)\n- internal/core/repository/ (impl)\n- internal/core/database.go (conn)\n(per service repo)"]
 
     Frontend -->|"HTTP"| WebLayer
     WebLayer -->|"Function calls"| LogicLayer
@@ -108,7 +108,7 @@ flowchart TD
 **Each service is completely independent:**
 
 ```
-services/{service}/
+{service}-service/            # example: auth-service/, cart-service/, ...
 ├── go.mod                    # Independent module
 ├── cmd/main.go              # Entry point
 ├── internal/
@@ -122,9 +122,9 @@ services/{service}/
 ```
 
 **Key Changes:**
-- ❌ **No shared `services/go.mod`** - Each service has own module
-- ❌ **No shared `services/pkg/`** - Middleware/config live within each service
-- **Complete independence** - Each service ready for separate repo
+- ✅ **Polyrepo**: each service is its own GitHub repository (see `SERVICES.md`)
+- ✅ **Independent module**: each service has its own `go.mod`
+- ✅ **Shared library repo**: cross-cutting libs live in `duynhne/pkg` (imported as `github.com/duynhne/pkg/...`)
 
 **Rationale:** Keep cross-service coupling minimal so each service stays portable and independently deployable.
 
@@ -1123,15 +1123,14 @@ All error responses follow this format:
 ### File Organization Patterns
 
 #### Services
-- Service code: `services/{service}/cmd/main.go` + `services/{service}/internal/{web,logic,core}/`
-- Helm values: `charts/values/{service}.yaml`
-- SLO CRD: `k8s/sloth/crds/{service}-slo.yaml`
-- Migration: `services/{service}/db/migrations/Dockerfile` + `sql/V*__*.sql`
+- **Service code (polyrepo)**: `{service}-service/cmd/main.go` + `{service}-service/internal/{web,logic,core}/`
+- **Helm values (this repo)**: `charts/mop/values/{service}.yaml`
+- **SLO CRD (this repo)**: `kubernetes/infra/configs/monitoring/slo/{service}.yaml`
+- **Migration (service repo)**: `{service}-service/db/migrations/Dockerfile` + `{service}-service/db/migrations/sql/V*__*.sql`
 
 **Example Structure:**
 ```
-services/
-├── product/
+product-service/
 │   ├── go.mod                    # Independent module
 │   ├── cmd/
 │   │   └── main.go              # Entry point
@@ -1164,7 +1163,10 @@ services/
 
 **Before pushing code, run:**
 ```bash
-./scripts/00-verify-build.sh
+# Run build/tests in the target service repository (polyrepo).
+# Example:
+cd ~/Working/duynhne/auth-service
+go test ./...
 ```
 
 #### What It Checks
@@ -1172,8 +1174,8 @@ services/
 1. Go module synchronization (`go.mod`/`go.sum`)
 2. Code formatting (`gofmt`)
 3. Static analysis (`go vet`)
-4. Build all 9 services
-5. Tests (optional - use `--skip-tests` to skip)
+4. Service build
+5. Unit tests
 
 ---
 
@@ -1322,7 +1324,7 @@ All seed migrations use `ON CONFLICT DO NOTHING` to safely handle:
 Seed data located in each service:
 
 ```
-services/{service}/db/migrations/sql/
+{service}-service/db/migrations/sql/
 ├── V1__init_schema.sql      # Schema creation
 └── V2__seed_{service}.sql   # Demo data
 ```

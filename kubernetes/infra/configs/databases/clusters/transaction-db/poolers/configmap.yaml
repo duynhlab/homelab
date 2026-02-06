@@ -1,5 +1,20 @@
 # PgCat Configuration for Transaction Services (Cart + Order)
 # Multi-database routing
+#
+# SECURITY NOTE (Phase 4 - Secrets Management):
+# This ConfigMap contains INLINE passwords (dev-only).
+# PgCat requires config file with passwords embedded.
+#
+# Vault-backed secrets are available at:
+#   - Secret: pgcat-transaction-credentials-vault (namespace: cart)
+#   - Vault path: secret/data/poolers/pgcat-transaction
+#
+# Future options to eliminate inline passwords:
+# 1. InitContainer: Render pgcat.toml from Secret + template
+# 2. Sidecar: Use envsubst or gomplate to inject secrets at runtime
+# 3. Alternative: Switch to pooler that supports secretRef
+#
+# For production: Implement InitContainer-based config rendering.
 apiVersion: v1
 kind: ConfigMap
 metadata:

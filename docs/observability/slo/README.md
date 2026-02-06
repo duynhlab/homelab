@@ -63,9 +63,7 @@ kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:909
 # Open: http://localhost:9090 and query: slo:sli_error:ratio_rate5m
 ```
 
-**Legacy deployment (reference only):**
-- Old script: `./scripts/backup/07-deploy-slo.sh`
-- **Note:** This script is kept for reference but is no longer used. Use Flux GitOps workflow instead.
+**Legacy deployment:** Removed. SLO is managed via Flux GitOps in this repository.
 
 **Note:** Grafana dashboards are automatically deployed via Grafana Operator (IDs 14348, 14643).
 
@@ -73,18 +71,11 @@ kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:909
 
 ```mermaid
 graph TD
-    A[PrometheusServiceLevel CRDs<br/>9 services] -->|Watch & Reconcile| B[Sloth Operator<br/>Controller]
-    B -->|Generate| C[PrometheusRules<br/>Recording & Alerting]
-    C -->|Scrape & Evaluate| D[Prometheus<br/>Metrics & Alerts]
-    D -->|Query| E[Grafana<br/>SLO Dashboards]
-    D -->|Fire Alerts| F[Alertmanager<br/>Notifications]
-    
-    style A fill:#e1f5ff,stroke:#0288d1,stroke-width:2px
-    style B fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    style C fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    style D fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
-    style E fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    style F fill:#fff9c4,stroke:#f9a825,stroke-width:2px
+    A["PrometheusServiceLevel CRDs (per service)"] -->|"Watch_and_reconcile"| B["Sloth Operator Controller"]
+    B -->|"Generate"| C["PrometheusRules (recording and alerting)"]
+    C -->|"Scrape_and_evaluate"| D["Prometheus (metrics and alerts)"]
+    D -->|"Query"| E["Grafana (SLO dashboards)"]
+    D -->|"Fire_alerts"| F["Alertmanager (notifications)"]
 ```
 
 ## SLO Definitions

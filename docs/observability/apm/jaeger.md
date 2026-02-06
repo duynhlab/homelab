@@ -17,7 +17,9 @@ Open: http://localhost:16686
 ### Deploy Jaeger
 
 ```bash
-./scripts/03d-deploy-jaeger.sh
+# Jaeger is deployed via GitOps (Flux) as part of infrastructure controllers.
+# Trigger a reconcile if needed:
+make sync
 ```
 
 ## Jaeger vs Tempo Comparison
@@ -143,7 +145,7 @@ flowchart TB
 
 ### Jaeger All-in-One
 
-Located at: `k8s/jaeger/values.yaml`
+Located at: `kubernetes/infra/controllers/tracing/jaeger/jaeger.yaml`
 
 ```yaml
 allInOne:
@@ -158,7 +160,7 @@ storage:
 
 ### Grafana Datasource
 
-Located at: `k8s/grafana-operator/datasource-jaeger.yaml`
+Located at: `kubernetes/infra/configs/monitoring/grafana/datasource-jaeger.yaml`
 
 ```yaml
 datasource:
@@ -284,5 +286,5 @@ ctx, span := tracer.Start(ctx, "ProcessOrder")
 
 - [APM Overview](./README.md)
 - [Tracing Guide](./tracing.md)
-- [OTel Collector Config](../../k8s/otel-collector/README.md)
+- OTel Collector config: `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
 - [Jaeger Official Docs](https://www.jaegertracing.io/docs/)

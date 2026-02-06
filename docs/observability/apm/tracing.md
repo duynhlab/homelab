@@ -130,10 +130,10 @@ kubectl port-forward -n monitoring svc/grafana-service 3000:3000
 
 ### Quick Configuration via Helm
 
-All tracing configuration is managed via Helm chart values (`charts/values/*.yaml`):
+All tracing configuration is managed via Helm chart values (`charts/mop/values/*.yaml`):
 
 ```yaml
-# charts/values/auth.yaml
+# charts/mop/values/auth.yaml
 env:
   - name: SERVICE_NAME
     value: "auth"
@@ -147,10 +147,9 @@ env:
 
 **Deploy with custom sampling:**
 ```bash
-helm upgrade --install auth charts/ \
-  -f charts/values/auth.yaml \
-  --set env[4].value="0.5" \
-  -n auth
+helm upgrade --install auth charts/mop/ \
+  -f charts/mop/values/auth.yaml \
+  -n auth --create-namespace
 ```
 
 ### Environment Variables
@@ -346,7 +345,7 @@ middleware.AddSpanEvent(ctx, "payment.approved")
 
 **Solutions:**
 1. **Reduce sampling**: `OTEL_SAMPLE_RATE=0.05` (5%)
-2. **Verify no tracing in loops**: `grep -r "StartSpan.*for.*range" services/`
+2. **Verify no tracing in loops**: `grep -r "StartSpan.*for.*range" ~/Working/duynhne/*-service`
 3. **Check batch timeout** (default 5s is optimal)
 
 ### Problem: Missing traces during pod restarts

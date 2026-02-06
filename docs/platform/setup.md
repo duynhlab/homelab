@@ -6,52 +6,52 @@ Complete guide to deploy microservices platform using **GitOps**, **Flux Operato
 
 ## All Commands
 
-### Cluster Operations
+### Quick Commands (Makefile)
 
-| Command | Purpose |
-|---------|---------|
-| `make cluster-check` | Check if Kind cluster `mop` is running |
-| `make cluster-up` | Create Kind cluster (if not exists) |
+- **Bootstrap everything**: `make up` (cluster-up + flux-up + flux-push)
+- **Reconcile**: `make sync` (flux-push + flux-sync)
+- **Tear down local env**: `make down` (cluster-down)
+- **Validate manifests**: `make validate`
 
-### Flux Operations
+### Detailed Commands (Makefile)
 
-| Command | Purpose |
-|---------|---------|
-| `make flux-up` | Bootstrap Flux Operator (checks cluster, starts registry, installs Flux, applies FluxInstance) |
-| `make flux-push` | Push manifests to OCI registry (`localhost:5050`) |
-| `make flux-sync` | Trigger Flux reconciliation |
-| `make flux-status` | Show Flux reconciliation status (pods, resources) |
-| `make flux-ui` | Open Flux Web UI (port-forward to `localhost:9080`) |
-| `make flux-logs` | Show Flux controller logs (last 10 minutes) |
+- **Cluster**: `make cluster-up`, `make cluster-down`
+- **Flux**: `make flux-up`, `make flux-push`, `make flux-sync`, `make flux-status`, `make flux-logs`, `make flux-ui`
+- **Utilities**: `make prereqs`, `make help`
 
-### Registry Operations
+---
 
-| Command | Purpose |
-|---------|---------|
-| `make registry-up` | Start local OCI registry (`localhost:5050`) |
-| `make registry-down` | Stop and remove local OCI registry |
-| `make registry-status` | Check OCI registry status |
+## Workspace Setup (Polyrepo)
 
-### Development
+Since the project is split into multiple repositories, you need to clone all service repositories to work on the code locally.
 
-| Command | Purpose |
-|---------|---------|
-| `make validate` | Validate all Kubernetes manifests (dry-run) |
+### 1. Create Workspace Directory
 
-### Cleanup
+```bash
+mkdir -p ~/Working/duynhne
+cd ~/Working/duynhne
+```
 
-| Command | Purpose |
-|---------|---------|
-| `make clean` | Clean Flux + registry (keeps cluster) |
-| `make clean-all` | Clean everything (cluster + Flux + registry) |
+### 2. Clone Repositories
 
-### Utilities
+Run this snippet to clone all required repositories:
 
-| Command | Purpose |
-|---------|---------|
-| `make prereqs` | Check prerequisites (flux, kubectl, kind, docker) |
-| `make info` | Show current configuration (cluster, registry, git) |
-| `make help` | Display all Makefile commands |
+```bash
+# Infrastructure
+git clone https://github.com/duynhne/monitoring.git
+git clone https://github.com/duyhenryer/shared-workflows.git
+git clone https://github.com/duynhne/pkg.git
+
+# Microservices
+for service in auth user product cart order review notification shipping; do
+  git clone https://github.com/duynhne/${service}-service.git
+done
+
+# Frontend
+git clone https://github.com/duynhne/frontend.git
+```
+
+This will create a structured workspace with all components.
 
 ---
 
@@ -230,7 +230,7 @@ monitoring/
 │           └── apps.yaml               # Apps Kustomization
 ├── Makefile                            # GitOps automation
 ├── charts/mop/                         # Helm chart for all services
-└── scripts/                            # Cluster creation & troubleshooting
+└── scripts/                            # Kind/Flux helper scripts (invoked by Makefile targets)
 ```
 
 **Dependency Chain:**

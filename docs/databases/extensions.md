@@ -54,7 +54,7 @@
 | **PostgreSQL (CloudNativePG)** | ✅ Compatible | 18.1 (Required: 18+) |
 | **ImageVolume Feature Gate** | ⚠️ Needs Configuration | Beta, disabled by default |
 
-**Note**: ImageVolume feature gate is in beta in Kubernetes 1.33 but disabled by default. Kind cluster config (`scripts/kind-up.sh`) has been updated to enable it. Recreate cluster to apply changes.
+**Note**: ImageVolume feature gate is in beta in Kubernetes 1.33 but disabled by default. The local Kind cluster config used by `make cluster-up` has been updated to enable it. Recreate the cluster to apply changes.
 
 ---
 
@@ -756,7 +756,7 @@ spec:
 **Status**: Beta in Kubernetes 1.33, **disabled by default**
 
 **Current Setup**:
-- Kind cluster config (`scripts/kind-up.sh`) has been updated to enable ImageVolume feature gate
+- Kind cluster config (used by `make cluster-up`) has been updated to enable ImageVolume feature gate
 - Feature gate enabled via:
   - Cluster-level: `featureGates.ImageVolume: true`
   - Node-level: `kubeletExtraArgs.feature-gates: "ImageVolume=true"`

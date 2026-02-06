@@ -72,3 +72,18 @@ spec:
       kind: HelmRelease
       name: sloth
       namespace: monitoring
+    # Secrets management (Vault + ESO)
+    - apiVersion: v1
+      kind: Namespace
+      name: vault
+    - apiVersion: v1
+      kind: Namespace
+      name: external-secrets-system
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: vault
+      namespace: vault
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: external-secrets
+      namespace: external-secrets-system

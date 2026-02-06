@@ -1,3 +1,20 @@
+# PgDog Connection Pooler for Product Database
+#
+# SECURITY NOTE (Phase 4 - Secrets Management):
+# This HelmRelease uses INLINE passwords (dev-only).
+# The PgDog chart does NOT currently support passwordFromSecret.
+#
+# Vault-backed secrets are available at:
+#   - Secret: pgdog-product-credentials-vault (namespace: product)
+#   - Vault path: secret/data/poolers/pgdog-product
+#
+# Future options to eliminate inline passwords:
+# 1. Upstream: Request passwordFromSecret support in PgDog chart
+# 2. InitContainer: Render values.yaml from Secret before Helm install
+# 3. Kustomize: Use secretGenerator with Helm post-renderer
+#
+# For production: Implement one of the above or use a pooler that
+# supports secretRef (e.g., CNPG's built-in PgBouncer).
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease

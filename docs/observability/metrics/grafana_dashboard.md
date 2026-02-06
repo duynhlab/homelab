@@ -1370,11 +1370,9 @@ Triển khai Grafana Annotations để track các events quan trọng:
 }
 ```
 
-#### Phase 3: Tạo Scripts gửi Annotations
+#### Phase 3: Gửi Annotations (curl)
 
-##### Script 1: Đánh dấu Deployment
-
-**File:** `scripts/send-deployment-annotation.sh`
+##### 1) Đánh dấu Deployment
 
 **Công dụng:**
 - Gửi annotation khi deploy xong
@@ -1382,11 +1380,8 @@ Triển khai Grafana Annotations để track các events quan trọng:
 - Màu xanh
 
 ```bash
-#!/bin/bash
-# Gửi annotation khi deploy
-
 GRAFANA_URL="http://localhost:3000"
-GRAFANA_TOKEN="${GRAFANA_TOKEN}"  # Cần setup trước
+GRAFANA_TOKEN="${GRAFANA_TOKEN}" # setup trước
 
 curl -X POST "${GRAFANA_URL}/api/annotations" \
   -H "Authorization: Bearer ${GRAFANA_TOKEN}" \
@@ -1398,9 +1393,7 @@ curl -X POST "${GRAFANA_URL}/api/annotations" \
   }"
 ```
 
-##### Script 2: Đánh dấu k6 Load Test
-
-**File:** `scripts/send-k6-annotation.sh`
+##### 2) Đánh dấu k6 Load Test
 
 **Công dụng:**
 - Gửi annotation sau khi k6 test xong
@@ -1408,13 +1401,10 @@ curl -X POST "${GRAFANA_URL}/api/annotations" \
 - Màu cam
 
 ```bash
-#!/bin/bash
-# Gửi annotation cho k6 load test
-
 GRAFANA_URL="http://localhost:3000"
 GRAFANA_TOKEN="${GRAFANA_TOKEN}"
 
-START_TIME=$(date +%s%3N -d "60 minutes ago")  # Test chạy 60 phút
+START_TIME=$(date +%s%3N -d "60 minutes ago") # test chạy 60 phút
 END_TIME=$(date +%s%3N)
 
 curl -X POST "${GRAFANA_URL}/api/annotations" \
@@ -1429,9 +1419,7 @@ curl -X POST "${GRAFANA_URL}/api/annotations" \
   }"
 ```
 
-##### Script 3: Đánh dấu Incident
-
-**File:** `scripts/send-incident-annotation.sh`
+##### 3) Đánh dấu Incident
 
 **Công dụng:**
 - Gửi annotation khi xảy ra incident
@@ -1439,13 +1427,10 @@ curl -X POST "${GRAFANA_URL}/api/annotations" \
 - Màu đỏ
 
 ```bash
-#!/bin/bash
-# Gửi annotation khi có incident
-
 GRAFANA_URL="http://localhost:3000"
 GRAFANA_TOKEN="${GRAFANA_TOKEN}"
 
-START_TIME="${INCIDENT_START}"  # Unix timestamp ms
+START_TIME="${INCIDENT_START}" # Unix timestamp ms
 END_TIME=$(date +%s%3N)
 
 curl -X POST "${GRAFANA_URL}/api/annotations" \
@@ -1465,31 +1450,47 @@ curl -X POST "${GRAFANA_URL}/api/annotations" \
 ##### 1. Deployment Workflow
 
 ```bash
-# Deploy version mới
-kubectl apply -f k8s/deployment-v2.yaml
+# Deploy version mới (GitOps): bump image tag / config in manifests, then reconcile
+make sync
 
 # Gửi annotation
 export APP_NAME="auth"
 export VERSION="v2.1.0"
 export ENV="production"
-./scripts/send-deployment-annotation.sh
 
-# → Dashboard sẽ hiện đường thẳng đứng màu xanh tại thời điểm deploy
+GRAFANA_URL="http://localhost:3000"
+curl -X POST "${GRAFANA_URL}/api/annotations" \
+  -H "Authorization: Bearer ${GRAFANA_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"time\": $(date +%s%3N),
+    \"tags\": [\"deployment\"],
+    \"text\": \"Deployed ${APP_NAME} version ${VERSION} to ${ENV}\"
+  }"
 ```
 
 ##### 2. k6 Load Test Workflow
 
 ```bash
-# Chạy k6 test via Helm
-helm upgrade --install k6 charts/ -f charts/values/k6.yaml -n k6
+# Chạy k6 test (GitOps): enable k6 in `kubernetes/apps/k6.yaml` then reconcile
+make sync
 
-# Đợi test chạy xong (60 phút)
-
-# Gửi annotation
+# Đợi test chạy xong (ví dụ 60 phút), rồi gửi annotation
 export K6_VUS="300-500"
-./scripts/send-k6-annotation.sh
 
-# → Dashboard sẽ hiện vùng màu cam trong 60 phút test
+GRAFANA_URL="http://localhost:3000"
+START_TIME=$(date +%s%3N -d "60 minutes ago")
+END_TIME=$(date +%s%3N)
+curl -X POST "${GRAFANA_URL}/api/annotations" \
+  -H "Authorization: Bearer ${GRAFANA_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"time\": ${START_TIME},
+    \"timeEnd\": ${END_TIME},
+    \"tags\": [\"k6-loadtest\"],
+    \"text\": \"k6 load test: VUs ${K6_VUS}, Duration 60m\",
+    \"isRegion\": true
+  }"
 ```
 
 ##### 3. Incident Response Workflow
@@ -1501,9 +1502,18 @@ export INCIDENT_NAME="High Error Rate"
 export SEVERITY="SEV1"
 
 # Resolve incident lúc 10:15, gửi annotation
-./scripts/send-incident-annotation.sh
-
-# → Dashboard sẽ hiện vùng màu đỏ từ 09:30 đến 10:15
+GRAFANA_URL="http://localhost:3000"
+END_TIME=$(date +%s%3N)
+curl -X POST "${GRAFANA_URL}/api/annotations" \
+  -H "Authorization: Bearer ${GRAFANA_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"time\": ${INCIDENT_START},
+    \"timeEnd\": ${END_TIME},
+    \"tags\": [\"incident\"],
+    \"text\": \"Incident: ${INCIDENT_NAME} - Severity: ${SEVERITY}\",
+    \"isRegion\": true
+  }"
 ```
 
 #### Phase 5: Tạo Documentation
@@ -1530,17 +1540,11 @@ export SEVERITY="SEV1"
 
 **Workflow:**
 ```bash
-# 1. Deploy
-kubectl apply -f k8s/deployment-v2.yaml
+# 1. Deploy (GitOps)
+make sync
 
-# 2. Đánh dấu
-./scripts/send-deployment-annotation.sh
-
-# 3. Mở dashboard
-# - Thấy đường thẳng đứng màu xanh tại 10:00
-# - Check RPS: Có tăng không?
-# - Check Error Rate %: Có tăng không?
-# - Check Response Time: Có chậm hơn không?
+# 2. Đánh dấu deployment (curl snippet ở Phase 3)
+# 3. Mở dashboard và correlate với RPS / Error Rate / Latency
 ```
 
 **Kết quả:** Biết ngay deployment có impact gì lên hệ thống
@@ -1553,17 +1557,11 @@ kubectl apply -f k8s/deployment-v2.yaml
 
 **Workflow:**
 ```bash
-# 1. Chạy test via Helm
-helm upgrade --install k6 charts/ -f charts/values/k6.yaml -n k6
+# 1. Chạy k6 (GitOps): enable k6 then reconcile
+make sync
 
-# 2. Đợi test xong, đánh dấu
-./scripts/send-k6-annotation.sh
-
-# 3. Mở dashboard
-# - Thấy vùng màu cam (test duration)
-# - Check RPS trong vùng cam: Tăng bao nhiêu?
-# - Check Response Time p95: Có tăng không?
-# - Check CPU/Memory: Có đủ resources không?
+# 2. Đợi test xong, đánh dấu (curl snippet ở Phase 3)
+# 3. Mở dashboard và correlate trong time window đó
 ```
 
 **Kết quả:** Hiểu được system capacity và bottlenecks
@@ -1577,20 +1575,9 @@ helm upgrade --install k6 charts/ -f charts/values/k6.yaml -n k6
 **Workflow:**
 ```bash
 # 1. Mở dashboard, zoom vào 10:30
-# 2. Thấy các annotations:
-#    - Deployment annotation lúc 10:00 (xanh)
-#    - k6 test annotation 10:15-10:45 (cam)
-#    - Error spike lúc 10:30
-
-# 3. Phân tích:
-#    - Deploy ok (10:00), không có error ngay lập tức
-#    - k6 test bắt đầu 10:15
-#    - Error tăng 10:30 (trong k6 test)
-#    → Nguyên nhân: System không handle được load
-
-# 4. Đánh dấu incident
+# 2. Correlate annotations (deployment/k6) với error spike
+# 3. Đánh dấu incident (curl snippet ở Phase 3)
 export INCIDENT_START=$(date +%s%3N -d "10:30")
-./scripts/send-incident-annotation.sh
 ```
 
 **Kết quả:** Tìm được root cause nhanh chóng
@@ -1678,15 +1665,23 @@ curl -H "Authorization: Bearer ${GRAFANA_TOKEN}" \
 #### Scenario: Deploy rồi test
 
 ```bash
-# Bước 1: Deploy version mới
-kubectl apply -f k8s/deployment-v2.yaml
+# Bước 1: Deploy version mới (GitOps)
+make sync
 echo "✓ Deployed"
 
 # Bước 2: Đánh dấu deployment
 export APP_NAME="auth"
 export VERSION="v2.1.0"
 export ENV="dev"
-./scripts/send-deployment-annotation.sh
+GRAFANA_URL="http://localhost:3000"
+curl -X POST "${GRAFANA_URL}/api/annotations" \
+  -H "Authorization: Bearer ${GRAFANA_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"time\": $(date +%s%3N),
+    \"tags\": [\"deployment\"],
+    \"text\": \"Deployed ${APP_NAME} version ${VERSION} to ${ENV}\"
+  }"
 echo "✓ Deployment annotation sent"
 
 # Bước 3: Đợi 5 phút, check dashboard
@@ -1695,7 +1690,8 @@ echo "→ Check dashboard: Có deployment annotation màu xanh"
 echo "→ Check metrics: RPS, Error Rate, Latency có thay đổi?"
 
 # Bước 4: Nếu ok, chạy load test
-helm upgrade --install k6 charts/ -f charts/values/k6.yaml -n k6
+# (enable k6 in GitOps manifests if currently disabled)
+make sync
 echo "✓ k6 test started"
 
 # Bước 5: Đợi test xong (60 phút)
@@ -1703,7 +1699,18 @@ sleep 3600
 
 # Bước 6: Đánh dấu k6 test
 export K6_VUS="300-500"
-./scripts/send-k6-annotation.sh
+START_TIME=$(date +%s%3N -d "60 minutes ago")
+END_TIME=$(date +%s%3N)
+curl -X POST "${GRAFANA_URL}/api/annotations" \
+  -H "Authorization: Bearer ${GRAFANA_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"time\": ${START_TIME},
+    \"timeEnd\": ${END_TIME},
+    \"tags\": [\"k6-loadtest\"],
+    \"text\": \"k6 load test: VUs ${K6_VUS}, Duration 60m\",
+    \"isRegion\": true
+  }"
 echo "✓ k6 annotation sent"
 
 # Bước 7: Review dashboard
@@ -1719,32 +1726,13 @@ echo "→ Kết luận: System ok hay cần optimize?"
 ### Implementation Checklist
 
 #### Dashboard Configuration
-- [ ] Enable built-in annotations
-- [ ] Add "Deployments" annotation (tag: deployment, màu xanh)
-- [ ] Add "k6 Load Tests" annotation (tag: k6-loadtest, màu cam)
-- [ ] Add "Incidents" annotation (tag: incident, màu đỏ)
-
-#### Scripts
-- [ ] Create `scripts/send-deployment-annotation.sh`
-- [ ] Create `scripts/send-k6-annotation.sh`
-- [ ] Create `scripts/send-incident-annotation.sh`
-- [ ] Make scripts executable: `chmod +x scripts/*.sh`
+- Enable built-in annotations
+- Add tags: `deployment`, `k6-loadtest`, `incident`
 
 #### Setup
-- [ ] Create Grafana service account
-- [ ] Generate và lưu GRAFANA_TOKEN
-- [ ] Test annotation scripts
-
-#### Documentation
-- [ ] Create `docs/GRAFANA_ANNOTATIONS.md`
-- [ ] Add examples và use cases
-- [ ] Update README.md với link
-
-#### Testing
-- [ ] Test deployment annotation
-- [ ] Test k6 annotation (region)
-- [ ] Test incident annotation (region)
-- [ ] Verify hiển thị trên dashboard
+- Create Grafana service account
+- Generate and store `GRAFANA_TOKEN`
+- Test curl snippets for annotations
 
 ---
 

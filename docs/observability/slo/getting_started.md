@@ -27,29 +27,12 @@ The SLO system uses:
 Deploy the complete SLO system:
 
 ```bash
-./scripts/07-deploy-slo.sh
+make up
+# or, if the cluster is already running:
+make sync
 ```
 
-This script:
-1. Installs the Sloth Operator via Helm to the `monitoring` namespace
-2. Applies all 9 PrometheusServiceLevel CRDs from `k8s/sloth/crds/`
-3. Waits for the operator to become ready
-4. Automatically generates Prometheus recording rules and alerts
-
-Expected output:
-```
-🚀 Deploying Sloth SLO System...
-
-1. Installing Sloth Operator (Helm)...
-Release "sloth" installed successfully
-
-2. Applying PrometheusServiceLevel CRDs (9 services)...
-prometheusservicelevel.sloth.slok.dev/auth created
-prometheusservicelevel.sloth.slok.dev/user created
-...
-
-✅ Sloth SLO system deployed successfully!
-```
+SLO is managed via GitOps (Flux): the Sloth operator is deployed as part of infrastructure (`controllers-local`) and SLO CRDs/configs are applied via `configs-local`. Flux will also generate Prometheus recording rules and alerts automatically.
 
 ### Step 2: Verify Deployment
 
@@ -102,7 +85,7 @@ Open Prometheus UI (http://localhost:9090) and navigate to:
 To add a new SLO for a service, create a PrometheusServiceLevel CRD:
 
 ```yaml
-# k8s/sloth/crds/myapp-slo.yaml
+# kubernetes/infra/configs/monitoring/slo/myapp.yaml
 apiVersion: sloth.slok.dev/v1
 kind: PrometheusServiceLevel
 metadata:
@@ -150,7 +133,8 @@ spec:
 Apply the CRD:
 
 ```bash
-kubectl apply -f k8s/sloth/crds/myapp-slo.yaml
+# Commit the manifest, then reconcile via Flux
+make sync
 ```
 
 The Sloth Operator will automatically:

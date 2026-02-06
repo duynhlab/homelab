@@ -11,6 +11,7 @@ permissions:
   packages: write
   pull-requests: read
   id-token: write
+  actions: read
 
 jobs:
   # 1. PR Checks (Branch Name + Slack "PR Opened")
@@ -37,9 +38,7 @@ jobs:
       fail-on-quality-gate: false
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-    permissions:
-      contents: read
-      pull-requests: read
+
 
   # 4. Build (Main Only)
   docker:
@@ -50,10 +49,7 @@ jobs:
       image-name: '{{SERVICE_SHORT}}'
       push: true
     secrets: inherit
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
+
 
   # 4b. Build Migration Image
   docker-db-init:
@@ -66,10 +62,7 @@ jobs:
       context: 'db/migrations'
       push: true
     secrets: inherit
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
+
 
   # 5. Final Status Notification
   notify:

@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  packages: write
+  pull-requests: read
+  id-token: write
+
 jobs:
   # 1. PR Checks (Branch Name + Slack "PR Opened")
   common:

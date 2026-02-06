@@ -66,3 +66,7 @@ spec:
       kind: HelmRelease
       name: tempo
       namespace: monitoring
+    # Secrets management configs
+    - apiVersion: external-secrets.io/v1beta1
+      kind: ClusterSecretStore
+      name: vault-dev

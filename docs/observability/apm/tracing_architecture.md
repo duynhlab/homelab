@@ -17,18 +17,18 @@ flowchart TB
         Others[...6 more]
     end
     
-    subgraph OTelCollector["OpenTelemetry Collector<br/>(Fan-out Layer)"]
-        Receiver[OTLP Receiver<br/>:4317 gRPC<br/>:4318 HTTP]
-        Processor[Batch Processor<br/>Memory Limiter]
+    subgraph OTelCollector["OpenTelemetry Collector (fan-out layer)"]
+        Receiver["OTLP Receiver (:4317 gRPC, :4318 HTTP)"]
+        Processor["Batch Processor (memory limiter)"]
         Exporter[Exporters]
     end
     
     subgraph Backends["Tracing Backends"]
-        Tempo[(Tempo<br/>Production Backend)]
-        Jaeger[(Jaeger v2<br/>Alternative UI)]
+        Tempo["Tempo (primary backend)"]
+        Jaeger["Jaeger (alternative UI)"]
     end
     
-    Apps -->|OTLP HTTP<br/>SDK Export| Receiver
+    Apps -->|"OTLP HTTP (SDK export)"| Receiver
     Receiver --> Processor
     Processor --> Exporter
     Exporter -->|OTLP gRPC| Tempo
@@ -42,12 +42,12 @@ flowchart TB
 - **Export Protocol**: OTLP HTTP
 - **Endpoint**: `otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318`
 - **Sampling**: 10% in production, 100% in development
-- **Implementation**: `services/pkg/middleware/tracing.go`
+- **Implementation**: `middleware/tracing.go` in each service repository (polyrepo)
 
 **2. OpenTelemetry Collector**
 - **Deployment**: Kubernetes Deployment (1 replica, scalable)
 - **Function**: Fan-out layer, receives traces and distributes to backends
-- **Configuration**: `k8s/otel-collector/values.yaml`
+- **Configuration**: `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
 - **Ports**: 4317 (gRPC), 4318 (HTTP), 8888 (metrics)
 
 **3. Tempo (Primary Backend)**
@@ -94,7 +94,7 @@ This is a **POC/learning project**, so dual backends allow:
 
 **Implementation:**
 ```go
-// services/pkg/middleware/tracing.go
+// middleware/tracing.go (in each service repository)
 exporter, _ := otlptracehttp.New(ctx,
     otlptracehttp.WithEndpoint(cfg.Tracing.Endpoint),
     otlptracehttp.WithInsecure(),
@@ -149,7 +149,7 @@ tracerProvider := sdktrace.NewTracerProvider(
 All microservices use consistent configuration via Helm values:
 
 ```yaml
-# charts/values/*.yaml
+# charts/mop/values/*.yaml
 env:
   - name: OTEL_COLLECTOR_ENDPOINT
     value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
@@ -168,7 +168,7 @@ env:
 
 **Fan-out Configuration:**
 ```yaml
-# k8s/otel-collector/values.yaml
+# kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml (conceptual example)
 exporters:
   otlp/tempo:
     endpoint: tempo.monitoring.svc.cluster.local:4317
@@ -232,7 +232,7 @@ service:
 
 **1. Persistent Storage for Jaeger:**
 ```yaml
-# k8s/jaeger/values.yaml
+# kubernetes/infra/controllers/tracing/jaeger/jaeger.yaml (conceptual example)
 storage:
   type: badger
   badger:
@@ -245,7 +245,7 @@ storage:
 
 **2. High Availability:**
 ```yaml
-# k8s/otel-collector/values.yaml
+# kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml (conceptual example)
 replicaCount: 2
 ```
 - Multiple collector replicas
@@ -269,8 +269,8 @@ replicaCount: 2
 
 **What we use:**
 - Jaeger Helm chart (`jaegertracing/jaeger`)
-- Direct Helm deployment via `scripts/03d-deploy-jaeger.sh`
-- Configuration via `k8s/jaeger/values.yaml`
+- GitOps-managed HelmRelease in this repo: `kubernetes/infra/controllers/tracing/jaeger/jaeger.yaml`
+- Reconciled by Flux (`controllers-local` → `configs-local` → `apps-local`)
 
 **Why Helm:**
 - ✅ Simple and straightforward
@@ -345,12 +345,12 @@ spec:
 - Moving to production
 - Need auto-instrumentation
 - Want GitOps workflow
-- Multiple services/namespaces
+- Multiple services and namespaces
 
 ## Related Documentation
 
-- [OpenTelemetry Collector README](../../../k8s/otel-collector/README.md)
-- [Jaeger README](../../../k8s/jaeger/README.md)
+- OpenTelemetry Collector manifests: `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
+- Jaeger manifests: `kubernetes/infra/controllers/tracing/jaeger/jaeger.yaml`
 - [APM Overview](./README.md)
 - [Tracing Guide](./tracing.md)
 - [Jaeger Guide](./jaeger.md)

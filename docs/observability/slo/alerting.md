@@ -114,7 +114,7 @@ Alerts include:
 4. Review application logs
 5. Check dependencies
 
-**Runbook**: `./scripts/10-error-budget-alert.sh`
+**Runbook**: Manual diagnosis via Grafana dashboards and Prometheus queries (Sloth error budget burn alerts).
 
 ### Latency Alert Runbook
 

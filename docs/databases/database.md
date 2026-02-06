@@ -1025,7 +1025,7 @@ The **Supporting Database** (`supporting-db`) cluster uses a **shared database p
 **OperatorConfiguration CRD** - **Helm-managed CRD (`postgres-operator`) is the active configuration**:
 
 - **CRD Name**: `postgres-operator` (created automatically by Helm chart)
-- **Configuration Source**: `k8s/postgres-operator/zalando/values.yaml`:
+- **Configuration Source**: `kubernetes/infra/controllers/databases/zalando-operator.yaml` (HelmRelease values):
 ```yaml
    # Flat structure (NOT nested under config:)
    configKubernetes:
@@ -1034,7 +1034,7 @@ The **Supporting Database** (`supporting-db`) cluster uses a **shared database p
    ```
 - **Important**: Helm chart expects **flat structure** (`configKubernetes:`, `configPostgresql:`, etc.) as top-level keys, NOT nested under `config:`
 - **How Operator Reads It**: Operator reads this CRD via `POSTGRES_OPERATOR_CONFIGURATION_OBJECT: postgres-operator` environment variable (set by Helm chart)
-- **To Update Configuration**: Edit `values.yaml` and run `helm upgrade postgres-operator postgres-operator/postgres-operator -n database -f k8s/postgres-operator/zalando/values.yaml`
+- **To Update Configuration**: Edit the HelmRelease values and reconcile via Flux (`make sync`)
 
 **Note:** The Helm chart automatically creates the `postgres-operator` OperatorConfiguration CRD from the values file. This is the only configuration method used.
 
@@ -1224,7 +1224,7 @@ The UI component is **not deployed by default** in the current GitOps setup. If 
 
 **Configuration:**
 
-**File**: `k8s/postgres-operator/zalando/ui-values.yaml`
+**Example values** (create a HelmRelease/manifest under `kubernetes/infra/` if you decide to deploy the UI):
 
 ```yaml
 replicaCount: 1
@@ -1575,8 +1575,8 @@ Connection poolers solve the "too many connections" problem by reusing PostgreSQ
 **Solution:** Add `prefer_simple_protocol=true` to PostgreSQL DSN to disable prepared statements completely.
 
 ```go
-// services/cart/internal/core/database.go
-// services/order/internal/core/database.go
+// cart-service/internal/core/database.go
+// order-service/internal/core/database.go
 return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s&prefer_simple_protocol=true",
     c.User, c.Password, c.Host, c.Port, c.Name, c.SSLMode,
 )

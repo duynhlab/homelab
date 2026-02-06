@@ -46,6 +46,8 @@ docs/
 │       ├── pgcat_prepared_statement_error.md
 │       ├── pgcat_read_only_transaction_error.md
 │       └── pgcat_upstream_connectivity_errors.md
+├── secrets/                      # Secrets management documentation
+│   └── secrets-management.md     # Vault + ESO guide
 └── testing/                      # Testing documentation
     └── k6.md                     # k6 load testing guide
 ```
@@ -56,7 +58,8 @@ docs/
 
 ### Getting Started (New Users)
 
-1. **[Setup Guide](./platform/setup.md)** - Complete GitOps deployment guide
+1. **[Services Index](../SERVICES.md)** - List of all service repositories (Polyrepo)
+2. **[Setup Guide](./platform/setup.md)** - Complete GitOps deployment guide
    - Quick start (3 commands, 5 minutes)
    - GitOps architecture with Flux Operator
    - Simplified structure (infra/ + apps/, refactored 2026-01-12)
@@ -229,6 +232,10 @@ docs/
 
 - [Setup Guide](./platform/setup.md) - Complete deployment and configuration guide
 
+### Secrets
+
+- [Secrets Management](./secrets/secrets-management.md) - Vault + ESO guide for centralized secret management
+
 ### Testing
 
 - [k6 Load Testing](./testing/k6.md) - Complete load testing guide with architecture
@@ -255,6 +262,7 @@ docs/
 - **Monitoring Stack** - Prometheus Operator + Grafana Operator + kube-state-metrics + metrics-server
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
 - **APM Stack** - Tempo + Jaeger (tracing), OTel Collector (fan-out), Pyroscope (profiling), Loki + VictoriaLogs + Vector (logging)
+- **Secrets Stack** - HashiCorp Vault (dev mode) + External Secrets Operator for centralized secret management
 - **k6 Load Testing** - Helm-managed load generators
 
 ### Common Tasks
@@ -265,26 +273,24 @@ docs/
 # Check prerequisites
 make prereqs
 
-# Deploy complete stack (3 commands)
-./scripts/kind-up.sh        # Create Kind cluster + OCI registry
-./scripts/flux-up.sh         # Bootstrap Flux Operator
-./scripts/flux-push.sh       # Deploy all infrastructure + apps
+# Deploy complete stack
+make up                      # cluster-up + flux-up + flux-push
 
 # Manage deployments
-./scripts/flux-sync.sh       # Trigger reconciliation
-./scripts/flux-ui.sh         # Open Flux Web UI (http://localhost:9080)
-flux get kustomizations      # Check sync status
+make sync                    # flux-push + flux-sync
+make flux-ui                 # Open Flux Web UI (http://localhost:9080)
+make flux-status             # Check sync status
 kubectl get helmreleases -A  # Check HelmReleases
 kubectl get pods -A          # Check all pods
 
 # Cleanup
-./scripts/kind-down.sh       # Delete cluster + registry
+make down                    # Delete cluster + registry
 ```
 
 **Manual Helm deployment (for testing):**
 
 ```bash
-helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-namespace
+helm upgrade --install auth charts/mop/ -f charts/mop/values/auth.yaml -n auth --create-namespace
 ```
 
 **Deploy SLOs:**
@@ -296,7 +302,7 @@ flux reconcile kustomization configs-local --with-source  # Manual trigger
 
 **Access services:**
 
-- Flux Web UI: <http://localhost:9080> (./scripts/flux-ui.sh)
+- Flux Web UI: <http://localhost:9080> (`make flux-ui`)
 - Grafana: <http://localhost:3000> (anonymous/enabled)
 - Prometheus: <http://localhost:9090>
 - Jaeger UI: <http://localhost:16686>

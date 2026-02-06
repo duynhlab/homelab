@@ -99,9 +99,9 @@ postgres_exporter converts custom queries to Prometheus metrics using this patte
 ### Query Configuration Files
 
 Custom queries are defined in ConfigMaps:
-- **review-db**: `k8s/postgres-operator/zalando/monitoring-queries/postgres-monitoring-queries-review.yaml`
-- **auth-db**: `k8s/postgres-operator/zalando/monitoring-queries/postgres-monitoring-queries-auth.yaml`
-- **supporting-db**: `k8s/postgres-operator/zalando/monitoring-queries/postgres-monitoring-queries-supporting.yaml`
+- **review-db**: `kubernetes/infra/configs/databases/clusters/review-db/configmaps/monitoring-queries.yaml`
+- **auth-db**: `kubernetes/infra/configs/databases/clusters/auth-db/configmaps/monitoring-queries.yaml`
+- **supporting-db**: `kubernetes/infra/configs/databases/clusters/supporting-db/configmaps/monitoring-queries.yaml`
 
 ### Query Structure
 

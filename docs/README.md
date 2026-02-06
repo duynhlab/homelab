@@ -273,26 +273,24 @@ docs/
 # Check prerequisites
 make prereqs
 
-# Deploy complete stack (3 commands)
-./scripts/kind-up.sh        # Create Kind cluster + OCI registry
-./scripts/flux-up.sh         # Bootstrap Flux Operator
-./scripts/flux-push.sh       # Deploy all infrastructure + apps
+# Deploy complete stack
+make up                      # cluster-up + flux-up + flux-push
 
 # Manage deployments
-./scripts/flux-sync.sh       # Trigger reconciliation
-./scripts/flux-ui.sh         # Open Flux Web UI (http://localhost:9080)
-flux get kustomizations      # Check sync status
+make sync                    # flux-push + flux-sync
+make flux-ui                 # Open Flux Web UI (http://localhost:9080)
+make flux-status             # Check sync status
 kubectl get helmreleases -A  # Check HelmReleases
 kubectl get pods -A          # Check all pods
 
 # Cleanup
-./scripts/kind-down.sh       # Delete cluster + registry
+make down                    # Delete cluster + registry
 ```
 
 **Manual Helm deployment (for testing):**
 
 ```bash
-helm upgrade --install auth charts/ -f charts/values/auth.yaml -n auth --create-namespace
+helm upgrade --install auth charts/mop/ -f charts/mop/values/auth.yaml -n auth --create-namespace
 ```
 
 **Deploy SLOs:**
@@ -304,7 +302,7 @@ flux reconcile kustomization configs-local --with-source  # Manual trigger
 
 **Access services:**
 
-- Flux Web UI: <http://localhost:9080> (./scripts/flux-ui.sh)
+- Flux Web UI: <http://localhost:9080> (`make flux-ui`)
 - Grafana: <http://localhost:3000> (anonymous/enabled)
 - Prometheus: <http://localhost:9090>
 - Jaeger UI: <http://localhost:16686>

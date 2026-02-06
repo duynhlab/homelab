@@ -263,7 +263,7 @@ All services use consistent settings via Helm values:
 
 ### Code Pattern
 
-All services follow this pattern in `services/{service}/cmd/main.go`:
+All services follow this pattern in each service repository (example: `~/Working/duynhne/auth-service/cmd/main.go`):
 
 ```go
 var isShuttingDown atomic.Bool
@@ -361,7 +361,7 @@ The cleanup sequence is **critical**:
 
 ```bash
 # 1. Run service locally
-cd services/auth
+cd ~/Working/duynhne/auth-service
 go run cmd/main.go
 
 # 2. Send SIGTERM (simulates Kubernetes)

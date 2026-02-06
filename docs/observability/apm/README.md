@@ -78,9 +78,7 @@ kubectl get pods -n kube-system | grep vector
 kubectl get servicemonitors -n monitoring
 ```
 
-**Legacy deployment (reference only):**
-- Old scripts: `./scripts/backup/03a-deploy-tempo.sh`, `03b-deploy-pyroscope.sh`, `03c-deploy-loki.sh`, `03d-deploy-jaeger.sh`
-- **Note:** These scripts are kept for reference but are no longer used. Use Flux GitOps workflow instead.
+**Legacy deployment:** Removed. APM stack is managed via Flux GitOps in this repository.
 
 ## Architecture
 

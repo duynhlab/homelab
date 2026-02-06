@@ -48,7 +48,7 @@ Prometheus Operator, ServiceMonitor, Label Injection, Relabel Configs, Auto-disc
 Applications **only emit** 3 labels:
 
 ```go
-// services/pkg/middleware/prometheus.go
+// middleware/prometheus.go (in each service repository)
 var (
     requestDuration = promauto.NewHistogramVec(
         prometheus.HistogramOpts{
@@ -121,7 +121,7 @@ request_duration_seconds_bucket{
 **Single ServiceMonitor** for all microservices:
 
 ```yaml
-# k8s/prometheus/servicemonitor-microservices.yaml
+# kubernetes/infra/configs/monitoring/servicemonitors/microservices.yaml
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -247,7 +247,7 @@ Too many unique label combinations (e.g., unique `path` values)
 
 2. **Use relabeling** to drop/aggregate labels in ServiceMonitor:
    ```yaml
-   # k8s/prometheus/servicemonitor-microservices.yaml
+   # kubernetes/infra/configs/monitoring/servicemonitors/microservices.yaml
    endpoints:
    - port: http
      path: /metrics
@@ -264,7 +264,7 @@ Too many unique label combinations (e.g., unique `path` values)
 
 **Implementation:** ServiceMonitor relabeling sets `job="microservices"` for all microservice targets.
 
-**Configuration** (`k8s/prometheus/servicemonitor-microservices.yaml`):
+**Configuration** (`kubernetes/infra/configs/monitoring/servicemonitors/microservices.yaml`):
 ```yaml
 endpoints:
   - port: http
@@ -318,7 +318,7 @@ up{job="microservices"}
 
 **Implementation:** Let ServiceMonitor use default behavior (job = service name).
 
-**Configuration** (`k8s/prometheus/servicemonitor-microservices.yaml`):
+**Configuration** (`kubernetes/infra/configs/monitoring/servicemonitors/microservices.yaml`):
 ```yaml
 endpoints:
   - port: http

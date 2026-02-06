@@ -127,7 +127,7 @@ All 9 services migrated from `lib/pq` to `pgx/v5 v5.8.0`:
 ```bash
 # Rebuild all services
 for svc in cart order product auth user notification review shipping; do
-  cd services/$svc && go mod tidy && cd ../..
+  cd ~/Working/duynhne/${svc}-service && go mod tidy && cd - >/dev/null
 done
 
 # Deploy to Kubernetes

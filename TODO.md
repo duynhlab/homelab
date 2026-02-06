@@ -40,8 +40,22 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 - [x] **Connection poolers** — PgBouncer (Zalando sidecar), PgCat (`transaction-db`), PgDog (`product-db`)
 - [x] **SQL migrations with Flyway** — `services/*/db/migrations/Dockerfile`, `.github/workflows/build-init.yml`
 - [x] **PostgreSQL internals deep-dive** — `docs/databases/postgresql_internals_product_db.md`
+- [x] **PostgreSQL internals mastery** — `docs/databases/postgresql_internals_product_db.md`:
+  - [x] Buffer pool tuning (shared_buffers, effective_cache_size, work_mem)
+  - [x] WAL mechanics (redo logs, checkpoint tuning, wal_level)
+  - [x] MVCC behavior (tuple visibility, transaction isolation levels, bloat)
+  - [x] Vacuum and autovacuum optimization
+- [~] **Connection management and query routing** — `docs/databases/database.md`:
+  - [x] Connection pooler deep-dive (PgBouncer vs PgCat vs PgDog trade-offs)
+  - [x] Query routing strategies (read/write split, sharding keys)
+  - [ ] Connection lifecycle and timeout tuning (pool sizes, idle timeout, statement timeout)
+- [~] **Replication strategies** — `docs/databases/replication_strategy.md`:
+  - [x] Streaming replication internals (WAL sender/receiver, sync vs async)
+  - [ ] Logical replication for selective table sync
+  - [ ] Multi-source replication patterns
+  - [x] Replication lag monitoring and optimization
 - [ ] sqlc code generation + repository pattern
-- [ ] Database backup/restore with Barman or pgBackRest
+- [x] **Database backup to RustFS (S3-compatible)** — CloudNativePG (barmanObjectStore), Zalando (WAL-G), credentials in Vault
 - [ ] Point-in-Time Recovery (PITR) drill
 - [ ] HA failover drill (kill primary, verify replica promotion)
 - [ ] Connection pooler tuning (pool sizes, timeouts, prepared statements)
@@ -54,7 +68,10 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 
 - [x] **Cosign image signing (backend)** — `.github/workflows/build-be.yml` (keyless signing)
 - [ ] Cosign signing for frontend, init, k6 images (parity)
-- [ ] ExternalSecrets Operator + SecretStore (AWS SSM, Vault, etc.)
+- [x] **External Secrets Operator + HashiCorp Vault** — `kubernetes/infra/controllers/secrets/`, `kubernetes/infra/configs/secrets/`
+  - Vault (dev mode) + ESO + ClusterSecretStore
+  - Shadow-first migration: DB credentials, backup credentials, pooler credentials
+  - Documentation: `docs/secrets/secrets-management.md`
 - [ ] SOPS or SealedSecrets for GitOps-safe secrets
 - [ ] Secret rotation automation (database credentials)
 - [ ] SBOM generation with Syft + vulnerability scanning with Grype/Trivy
@@ -101,6 +118,26 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 - [ ] On-call rotation simulation with PagerDuty/Opsgenie
 - [ ] Game days (planned failure scenarios)
 - [ ] Capacity planning and cost optimization
+
+---
+
+## Distributed Systems Theory
+
+- [ ] **CAP theorem and trade-offs**:
+  - [ ] Consistency vs Availability scenarios (CP vs AP systems)
+  - [ ] Real-world examples: PostgreSQL (CP), Cassandra (AP), CockroachDB (CP with tunable)
+- [ ] **Consensus protocols**:
+  - [ ] Raft protocol (etcd, Consul, CockroachDB)
+  - [ ] Paxos fundamentals
+  - [ ] Leader election and split-brain prevention
+- [ ] **Partition tolerance and failure modes**:
+  - [ ] Network partition handling strategies
+  - [ ] Quorum-based systems and write consistency
+  - [ ] Eventual consistency and conflict resolution (CRDTs, vector clocks)
+- [ ] **Distributed transactions**:
+  - [ ] Two-phase commit (2PC) and its limitations
+  - [ ] Saga pattern for microservices
+  - [ ] Outbox pattern for reliable messaging
 
 ---
 

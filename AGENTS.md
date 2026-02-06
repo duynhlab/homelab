@@ -218,25 +218,21 @@ flowchart TD
 
 ```
 monitoring/
-├── services/          # Go application code (8 microservices)
-├── charts/            # Helm chart for microservices
+├── charts/            # Helm charts (apps + dashboards)
 ├── kubernetes/        # GitOps manifests (Flux + Kustomize)
-│   ├── base/          # Shared manifests (apps + infrastructure)
-│   ├── overlays/      # Environment patches (local/staging/production)
-│   └── clusters/      # Flux system config per cluster
-├── k8s/               # Legacy manifests (reference only)
-├── scripts/           # Deployment scripts (Flux + legacy)
+│   ├── clusters/      # Flux cluster configurations (local/prod)
+│   ├── infra/         # Controllers + configs (operators, monitoring, databases, secrets)
+│   └── apps/          # Application HelmReleases + ResourceSets (frontend, k6, services)
+├── scripts/           # Kind/Flux helper scripts (used by Makefile)
 ├── docs/              # Documentation (starting point for details)
-├── services/
-│   ├── k6/            # K6 load testing
 └── specs/             # Specifications and research
 ```
 
 **GitOps Structure:**
 
-- `kubernetes/base/` - Environment-agnostic manifests (HelmReleases, infrastructure)
-- `kubernetes/overlays/` - Environment-specific patches (local: 1 replica, prod: 5 replicas)
-- `kubernetes/clusters/` - Flux Operator bootstrap and Kustomization CRDs
+- `kubernetes/clusters/` - Flux bootstrap and Kustomization CRDs per cluster
+- `kubernetes/infra/` - Operators/controllers + infrastructure configs (monitoring, APM, databases, secrets, SLO)
+- `kubernetes/apps/` - Application layer (HelmReleases/ResourceSets for services, frontend, k6)
 
 **Full Documentation Index**: See [`docs/README.md`](docs/README.md) for complete documentation structure.
 

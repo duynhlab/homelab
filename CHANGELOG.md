@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.50.2] - 2026-02-06
+
+### Changed
+
+- **Docs aligned to polyrepo**: Updated documentation to stop referencing in-repo `services/` and legacy deployment scripts; docs now prefer `make up/sync/...` and point to per-service repositories (see [`SERVICES.md`](SERVICES.md)).
+- **Makefile cleanup**: Removed local `make build` / `make test` targets (service code is no longer in this repository).
+
+### Fixed
+
+- **Changelog clarification (Polyrepo)**: The `monitoring` repository is the **Infrastructure & GitOps** hub. Application code for microservices and the frontend lives in separate repositories under `duynhne` (see [`SERVICES.md`](SERVICES.md)). The `0.50.0` “Monorepo Split” item refers to the platform-wide move to polyrepo, not application code remaining in this repository.
+
 ## [0.50.0] - 2026-02-05
 
 ### Changed

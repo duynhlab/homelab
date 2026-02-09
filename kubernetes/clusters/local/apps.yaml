@@ -20,7 +20,8 @@ spec:
   
   # Apps depend on ALL infrastructure being ready
   dependsOn:
-    - name: configs-local  # Includes everything (namespaces, operators, instances)
+    - name: databases-local
+    - name: monitoring-local
   
   # Health checks for apps
   healthChecks:

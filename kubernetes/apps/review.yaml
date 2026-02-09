@@ -24,8 +24,8 @@ spec:
     replicaCount: 1
 
     image:
-      repository: ghcr.io/duynhne/review
-      tag: v6
+      repository: ghcr.io/duynhne/review-service/review
+      tag: latest
       pullPolicy: Always
 
     service:
@@ -113,7 +113,7 @@ spec:
     # Database migrations (Flyway init container)
     migrations:
       enabled: true
-      image: ghcr.io/duynhne/review:v6-init
+      image: ghcr.io/duynhne/review-service/review-init:latest
       imagePullPolicy: Always #IfNotPresent
       env:
         DB_HOST: "review-db.review.svc.cluster.local"  # Direct connection, no pooler - review-db is in review namespace

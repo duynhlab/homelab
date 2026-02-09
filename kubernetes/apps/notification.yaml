@@ -25,8 +25,8 @@ spec:
     replicaCount: 1
 
     image:
-      repository: ghcr.io/duynhne/notification
-      tag: v6
+      repository: ghcr.io/duynhne/notification-service/notification
+      tag: latest
       pullPolicy: Always
 
     service:
@@ -83,6 +83,9 @@ spec:
         value: "10s"  # Default shutdown timeout (can be overridden)
       - name: READINESS_DRAIN_DELAY
         value: "5s"  # Delay after failing readiness, before HTTP shutdown
+      # Auth service URL for authentication
+      - name: AUTH_SERVICE_URL
+        value: "http://auth.auth.svc.cluster.local:8080"
 
     # Kubernetes graceful shutdown configuration
     terminationGracePeriodSeconds: 30  # Shutdown timeout (10s) + buffer (20s)
@@ -114,7 +117,7 @@ spec:
     # Database migrations (Flyway init container)
     migrations:
       enabled: true
-      image: ghcr.io/duynhne/notification:v6-init
+      image: ghcr.io/duynhne/notification-service/notification-init:latest
       imagePullPolicy: Always #IfNotPresent
       env:
         DB_HOST: "supporting-db.user.svc.cluster.local"  # Direct connection, no pooler - supporting-db is in user namespace

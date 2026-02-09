@@ -110,9 +110,11 @@ make flux-push
   - `flux-apps-sync:local` (from `kubernetes/apps/`)
 
 - Flux Operator reconciles in dependency order:
-  - **Phase 1: Infrastructure** - Namespaces, Controllers (operators), Configs (instances)
-  - **Phase 2: Applications** - 9 backend + 1 frontend + 1 k6 (waits for all infrastructure)
-  - **Phase 3: SLO** - Sloth Operator + 9 PrometheusServiceLevel CRDs
+  - **Phase 1: Infrastructure** - Namespaces, Controllers (operators)
+  - **Phase 2: Secrets & Monitoring** - Vault/ESO, Grafana/Prometheus (Wait for Controllers)
+  - **Phase 3: Databases** - Postgres Clusters (Wait for Secrets & Monitoring)
+  - **Phase 4: Applications** - Microservices (Wait for Databases & Infrastructure)
+  - **Phase 5: SLO** - Sloth Operator (Managed by Monitoring)
 
 **Verify:**
 ```bash
@@ -226,7 +228,10 @@ monitoring/
 │           ├── flux-system/            # FluxInstance CRD
 │           ├── sources/                # OCI & Helm repositories
 │           ├── controllers.yaml       # Controllers Kustomization
-│           ├── configs.yaml            # Configs Kustomization
+│           ├── controllers.yaml       # Controllers Kustomization
+│           ├── secrets.yaml            # Secrets Kustomization
+│           ├── monitoring.yaml         # Monitoring Kustomization
+│           ├── databases.yaml          # Databases Kustomization
 │           └── apps.yaml               # Apps Kustomization
 ├── Makefile                            # GitOps automation
 ├── charts/mop/                         # Helm chart for all services
@@ -234,9 +239,12 @@ monitoring/
 ```
 
 **Dependency Chain:**
+**Dependency Chain:**
 - `controllers-local` → Creates namespaces + deploys all operators
-- `configs-local` → Depends on `controllers-local` → Deploys all configs
-- `apps-local` → Depends on `configs-local` → Waits for all infrastructure
+- `secrets-local` → Depends on `controllers-local` → Deploys Vault & ESO
+- `monitoring-local` → Depends on `controllers-local` → Deploys Grafana & Prometheus
+- `databases-local` → Depends on `secrets-local` & `monitoring-local` → Deploys Postgres Clusters
+- `apps-local` → Depends on `databases-local` & `monitoring-local` → Deploys Microservices
 
 ---
 

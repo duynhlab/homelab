@@ -39,6 +39,7 @@ This is the **single source of truth** for all API endpoints. The Frontend team 
 | **Review** | `/api/v1/reviews?product_id={id}` | GET | Get reviews for product (**product_id required**) | STABLE |
 | **Review** | `/api/v1/reviews` | POST | Create review (**user_id required**, 409 if duplicate) | STABLE |
 | **Notification** | `/api/v1/notifications` | GET | Get all notifications | STABLE |
+| **Notification** | `/api/v1/notifications/count` | GET | **Get unread notification count** | STABLE |
 | **Notification** | `/api/v1/notifications/:id` | GET | Get notification by ID | STABLE |
 | **Notification** | `/api/v1/notifications/:id` | PATCH | Mark notification as read | STABLE |
 | **Shipping** | `/api/v1/shipping/track` | GET | Track shipment (query: `tracking_number`) | STABLE |

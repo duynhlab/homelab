@@ -25,8 +25,8 @@ spec:
     replicaCount: 2
 
     image:
-      repository: ghcr.io/duynhne/cart
-      tag: v6
+      repository: ghcr.io/duynhne/cart-service/cart
+      tag: latest
       pullPolicy: Always
 
     service:
@@ -116,7 +116,7 @@ spec:
     # Database migrations (Flyway init container)
     migrations:
       enabled: true
-      image: ghcr.io/duynhne/cart:v6-init
+      image: ghcr.io/duynhne/cart-service/cart-init:latest
       imagePullPolicy: Always #IfNotPresent
       env:
         DB_HOST: "transaction-db-rw.cart.svc.cluster.local"  # Direct connection, no pooler

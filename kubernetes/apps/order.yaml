@@ -24,8 +24,8 @@ spec:
     replicaCount: 1
 
     image:
-      repository: ghcr.io/duynhne/order
-      tag: v6
+      repository: ghcr.io/duynhne/order-service/order
+      tag: latest
       pullPolicy: Always
 
     service:
@@ -115,7 +115,7 @@ spec:
     # Database migrations (Flyway init container)
     migrations:
       enabled: true
-      image: ghcr.io/duynhne/order:v6-init
+      image: ghcr.io/duynhne/order-service/order-init:latest
       imagePullPolicy: IfNotPresent #Always
       env:
         DB_HOST: "transaction-db-rw.cart.svc.cluster.local"  # Direct connection, no pooler

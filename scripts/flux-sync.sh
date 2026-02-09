@@ -8,8 +8,14 @@ flux reconcile kustomization flux-system --with-source
 echo "Syncing controllers (operators)..."
 flux reconcile kustomization controllers-local --with-source
 
-echo "Syncing configs (instances)..."
-flux reconcile kustomization configs-local --with-source
+echo "Syncing databases..."
+flux reconcile kustomization databases-local --with-source
+
+echo "Syncing monitoring..."
+flux reconcile kustomization monitoring-local --with-source
+
+echo "Syncing secrets..."
+flux reconcile kustomization secrets-local --with-source
 
 echo "Syncing apps (microservices)..."
 flux reconcile kustomization apps-local --with-source

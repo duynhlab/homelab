@@ -6,5 +6,7 @@ resources:
   - flux-system/
   - sources/
   - controllers.yaml     # Namespaces + operators (monitoring, databases, slo)
-  - configs.yaml         # Instances (monitoring, apm, databases, slo)
+  - secrets.yaml         # Vault + ESO (Must be before databases)
+  - databases.yaml       # DB Instances (Must be before apps)
+  - monitoring.yaml      # Grafana + Prometheus Configs
   - apps.yaml            # Microservices

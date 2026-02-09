@@ -1,72 +1,8 @@
 version: 2
 
 updates:
-  - package-ecosystem: "gomod"
-    directory: "/services/auth"
-    schedule:
-      interval: "daily"
-    open-pull-requests-limit: 10
-    labels: ["dependencies", "go"]
-
-  - package-ecosystem: "gomod"
-    directory: "/services/cart"
-    schedule:
-      interval: "daily"
-    open-pull-requests-limit: 10
-    labels: ["dependencies", "go"]
-
-  - package-ecosystem: "gomod"
-    directory: "/services/notification"
-    schedule:
-      interval: "daily"
-    open-pull-requests-limit: 10
-    labels: ["dependencies", "go"]
-
-  - package-ecosystem: "gomod"
-    directory: "/services/order"
-    schedule:
-      interval: "daily"
-    open-pull-requests-limit: 10
-    labels: ["dependencies", "go"]
-
-  - package-ecosystem: "gomod"
-    directory: "/services/product"
-    schedule:
-      interval: "daily"
-    open-pull-requests-limit: 10
-    labels: ["dependencies", "go"]
-
-  - package-ecosystem: "gomod"
-    directory: "/services/review"
-    schedule:
-      interval: "daily"
-    open-pull-requests-limit: 10
-    labels: ["dependencies", "go"]
-
-  - package-ecosystem: "gomod"
-    directory: "/services/shipping"
-    schedule:
-      interval: "daily"
-    open-pull-requests-limit: 10
-    labels: ["dependencies", "go"]
-
-  - package-ecosystem: "gomod"
-    directory: "/services/user"
-    schedule:
-      interval: "daily"
-    open-pull-requests-limit: 10
-    labels: ["dependencies", "go"]
-
-
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "daily"
     labels: ["dependencies", "github-actions"]
-
-
-  - package-ecosystem: "docker"
-    directory: "/services"
-    schedule:
-      interval: "daily"
-    labels: ["dependencies", "docker"]

@@ -86,7 +86,7 @@ spec:
       database: product # Create default database before bootstrap
       owner: product # Set owner for the database
       secret:
-        name: product-db-secret # Use secret for authentication
+        name: product-db-secret-vault  # Vault-backed (ExternalSecret)
       dataChecksums: true # Enable data checksums for data integrity
       encoding: "UTF8" # Set encoding for the database
       localeCType: "C" # Set locale for the database

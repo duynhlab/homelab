@@ -128,9 +128,9 @@ securityContext: {}
 # When enabled, a Flyway init container will run migrations before the main container starts
 migrations:
   enabled: false  # Set to true to enable migrations
-  # Flyway migration Docker image (e.g., ghcr.io/duynhne/auth:v6-init)
+  # Flyway migration Docker image (e.g., ghcr.io/duynhne/auth-service/auth-init:v6)
   # This image should contain the migration SQL files in /flyway/sql/
-  image: ""  # e.g., ghcr.io/duynhne/auth:v6-init
+  image: ""  # e.g., ghcr.io/duynhne/auth-service/auth-init:v6
   imagePullPolicy: IfNotPresent
   # Environment variables for migration init container (key-value pairs)
   env: {}

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.50.3] - 2026-02-07
+
+### Fixed
+
+- **Vault Auth Configuration**: Fixed `403 Permission Denied` error in `ClusterSecretStore` by injecting `token_reviewer_jwt` into Vault auth config via `vault-bootstrap` job.
+- **Flux Dependencies**: Resolved race condition between `monitoring` and `databases` by making `databases-local` depend on `monitoring-local`.
+
+### Added
+
+- **Validation Script**: Added `make validate` to validate Flux Kustomizations and Kubernetes manifests locally.
+
+### Changed
+
+- **Zalando Backup Credentials (Vault Migration)**: Migrated `auth-db`, `review-db`, `supporting-db` to use Vault-backed `pg-backup-rustfs-credentials-vault` secret for WAL-G backups. Removed legacy plaintext secret manifests.
+- **CNPG App Credentials (Vault Migration)**: Migrated `transaction-db` and `product-db` bootstrap secrets to use Vault-backed `transaction-db-secret-vault` and `product-db-secret-vault`. Removed legacy plaintext secret manifests.
+
 ## [0.50.2] - 2026-02-06
 
 ### Changed

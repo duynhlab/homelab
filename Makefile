@@ -58,11 +58,8 @@ flux-status: ## Show Flux status (all resources)
 ##@ Development
 
 .PHONY: validate
-validate: ## Validate Kubernetes manifests
-	@echo "Validating infrastructure manifests..."
-	@kubectl kustomize kubernetes/overlays/local/infrastructure > /dev/null && echo "✓ infrastructure"
-	@echo "Validating apps manifests..."
-	@kubectl kustomize kubernetes/overlays/local/apps > /dev/null && echo "✓ apps"
+validate: ## Validate Kubernetes manifests (Kustomize)
+	./scripts/flux-validate.sh
 
 ##@ Utilities
 

@@ -5,7 +5,8 @@ kind: Kustomization
 # Order: secrets → instance → extensions → poolers → monitoring
 resources:
   - secrets/transaction-db-secret-cart.yaml
-  - secrets/pg-backup-rustfs-credentials.yaml
+  - secrets/pgcat-transaction-creds.yaml
+  - secrets/pg-backup-rustfs-credentials-vault.yaml
   - backup/scheduledbackup.yaml
   - secrets/transaction-db-secret-order.yaml
   - instance.yaml

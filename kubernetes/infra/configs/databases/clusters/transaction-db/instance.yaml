@@ -135,7 +135,7 @@ spec:
       database: cart  # Default database
       owner: cart
       secret:
-        name: transaction-db-secret
+        name: transaction-db-secret-vault  # Vault-backed (ExternalSecret)
       dataChecksums: true
       encoding: "UTF8"
       localeCType: "C"

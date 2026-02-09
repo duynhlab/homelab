@@ -13,6 +13,28 @@ spec:
     size: 5Gi
     # storageClass: "ssd"
   
+  # Inject Vault-backed credentials for WAL-G backups
+  # Secret: pg-backup-rustfs-credentials-vault (managed by ExternalSecret)
+  env:
+    - name: WALG_S3_PREFIX
+      value: s3://pg-backups/auth-db/
+    - name: AWS_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          name: pg-backup-rustfs-credentials-vault
+          key: AWS_ACCESS_KEY_ID
+    - name: AWS_SECRET_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: pg-backup-rustfs-credentials-vault
+          key: AWS_SECRET_ACCESS_KEY
+    - name: AWS_ENDPOINT
+      value: http://rustfs-svc.rustfs.svc.cluster.local:9000
+    - name: AWS_S3_FORCE_PATH_STYLE
+      value: "true"
+    - name: AWS_REGION
+      value: "us-east-1"
+  
   # High Availability: 3 nodes (1 leader + 2 standbys)
   numberOfInstances: 3
   

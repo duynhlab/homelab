@@ -67,8 +67,8 @@ All secrets are stored in Vault's KV v2 secrets engine under the `secret/` path.
 | Vault Path | Description | Consumer |
 |------------|-------------|----------|
 | `secret/data/product/db` | Product DB credentials | product service |
-| `secret/data/cart/db` | Cart DB credentials (transaction-db) | cart service |
-| `secret/data/order/db` | Order DB credentials (transaction-db) | order service |
+| `secret/data/cart/db` | Cart DB credentials (transaction-shared-db) | cart service |
+| `secret/data/order/db` | Order DB credentials (transaction-shared-db) | order service |
 
 **Keys**: `username`, `password`
 
@@ -105,8 +105,8 @@ This enables **shadow-first migration**: new Vault-backed secrets coexist with o
 | K8s Secret | Namespace | Source | Status |
 |------------|-----------|--------|--------|
 | `product-db-secret-vault` | product | `secret/data/product/db` | Shadow |
-| `transaction-db-secret-vault` | cart | `secret/data/cart/db` | Shadow |
-| `transaction-db-secret-vault` | order | `secret/data/order/db` | Shadow |
+| `transaction-shared-db-secret-vault` | cart | `secret/data/cart/db` | Shadow |
+| `transaction-shared-db-secret-vault` | order | `secret/data/order/db` | Shadow |
 
 ### Backup Secrets
 

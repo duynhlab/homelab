@@ -29,8 +29,8 @@ flowchart TD
     end
     
     subgraph CNPG["CloudNativePG Cluster"]
-        SvcRW[Service: transaction-db-rw]
-        SvcR[Service: transaction-db-r]
+        SvcRW[Service: transaction-shared-db-rw]
+        SvcR[Service: transaction-shared-db-r]
         Primary[(Primary Pod)]
         Replica1[(Replica Pod 1)]
         Replica2[(Replica Pod 2)]
@@ -61,11 +61,11 @@ flowchart TD
 
 ```bash
 # Check cluster status
-kubectl get cluster -n cart transaction-db
+kubectl get cluster -n cart transaction-shared-db
 
 # Expected output:
 # NAME             AGE   INSTANCES   READY   STATUS
-# transaction-db   1h    3           3       Cluster in healthy state
+# transaction-shared-db   1h    3           3       Cluster in healthy state
 
 # If READY < INSTANCES, cluster is not fully ready
 ```
@@ -74,11 +74,11 @@ kubectl get cluster -n cart transaction-db
 
 ```bash
 # Check primary endpoint
-kubectl get endpoints -n cart transaction-db-rw
+kubectl get endpoints -n cart transaction-shared-db-rw
 # Should show IP addresses of primary pod
 
 # Check replica endpoints
-kubectl get endpoints -n cart transaction-db-r
+kubectl get endpoints -n cart transaction-shared-db-r
 # Should show IP addresses of replica pods
 
 # If ENDPOINTS column is empty: "<none>", that's the problem
@@ -87,12 +87,12 @@ kubectl get endpoints -n cart transaction-db-r
 ### 3. Check pod readiness
 
 ```bash
-# List all transaction-db pods
-kubectl get pods -n cart -l cnpg.io/cluster=transaction-db
+# List all transaction-shared-db pods
+kubectl get pods -n cart -l cnpg.io/cluster=transaction-shared-db
 
 # Check if all pods are Running and Ready (1/1 or 2/2)
 # If not ready, check pod events:
-kubectl describe pod -n cart -l cnpg.io/cluster=transaction-db
+kubectl describe pod -n cart -l cnpg.io/cluster=transaction-shared-db
 ```
 
 ### 4. Test connectivity from PgCat pod
@@ -102,13 +102,13 @@ kubectl describe pod -n cart -l cnpg.io/cluster=transaction-db
 PGCAT_POD=$(kubectl get pods -n cart -l app=pgcat-transaction -o jsonpath='{.items[0].metadata.name}')
 
 # Test DNS resolution
-kubectl exec -n cart $PGCAT_POD -- nslookup transaction-db-rw.cart.svc.cluster.local
+kubectl exec -n cart $PGCAT_POD -- nslookup transaction-shared-db-rw.cart.svc.cluster.local
 
 # Test TCP connectivity to primary
-kubectl exec -n cart $PGCAT_POD -- nc -zv transaction-db-rw.cart.svc.cluster.local 5432
+kubectl exec -n cart $PGCAT_POD -- nc -zv transaction-shared-db-rw.cart.svc.cluster.local 5432
 
 # Test TCP connectivity to replica
-kubectl exec -n cart $PGCAT_POD -- nc -zv transaction-db-r.cart.svc.cluster.local 5432
+kubectl exec -n cart $PGCAT_POD -- nc -zv transaction-shared-db-r.cart.svc.cluster.local 5432
 ```
 
 ### 5. Check PgCat logs for connection attempts
@@ -124,7 +124,7 @@ kubectl logs -n cart -l app=pgcat-transaction --tail=100 | grep -E "Creating a n
 kubectl get configmap pgcat-transaction-config -n cart -o yaml | grep "host ="
 
 # Compare with actual service names
-kubectl get svc -n cart | grep transaction-db
+kubectl get svc -n cart | grep transaction-shared-db
 ```
 
 ## Common Fixes
@@ -135,7 +135,7 @@ If the cluster is still initializing:
 
 ```bash
 # Watch cluster status
-kubectl get cluster -n cart transaction-db -w
+kubectl get cluster -n cart transaction-shared-db -w
 
 # Wait until STATUS shows "Cluster in healthy state"
 # and READY equals INSTANCES (e.g., 3/3)
@@ -166,8 +166,8 @@ spec:
           command: ['sh', '-c']
           args:
             - |
-              until nc -z transaction-db-rw.cart.svc.cluster.local 5432; do
-                echo "Waiting for transaction-db-rw..."
+              until nc -z transaction-shared-db-rw.cart.svc.cluster.local 5432; do
+                echo "Waiting for transaction-shared-db-rw..."
                 sleep 2
               done
               echo "Database is ready"
@@ -203,8 +203,8 @@ If using NetworkPolicies, ensure PgCat can reach the database:
 kubectl get networkpolicy -n cart
 
 # If policies exist, verify they allow:
-# - PgCat pods → transaction-db-rw service (port 5432)
-# - PgCat pods → transaction-db-r service (port 5432)
+# - PgCat pods → transaction-shared-db-rw service (port 5432)
+# - PgCat pods → transaction-shared-db-r service (port 5432)
 ```
 
 ### Fix 6: Verify credentials
@@ -213,8 +213,8 @@ Ensure PgCat credentials match the database:
 
 ```bash
 # Get credentials from secret
-kubectl get secret transaction-db-secret -n cart -o jsonpath='{.data.username}' | base64 -d
-kubectl get secret transaction-db-secret -n cart -o jsonpath='{.data.password}' | base64 -d
+kubectl get secret transaction-shared-db-secret -n cart -o jsonpath='{.data.username}' | base64 -d
+kubectl get secret transaction-shared-db-secret -n cart -o jsonpath='{.data.password}' | base64 -d
 
 # Compare with PgCat config
 kubectl get configmap pgcat-transaction-config -n cart -o yaml | grep -E "user =|password ="
@@ -234,14 +234,14 @@ spec:
     # Wait for CNPG cluster to be healthy before apps start
     - apiVersion: postgresql.cnpg.io/v1
       kind: Cluster
-      name: transaction-db
+      name: transaction-shared-db
       namespace: cart
 ```
 
 **Deployment order should be:**
 
 1. CNPG Operator (controllers)
-2. transaction-db Cluster (configs)
+2. transaction-shared-db Cluster (configs)
 3. PgCat pooler (configs, after cluster)
 4. Cart/Order services (apps)
 

@@ -9,6 +9,6 @@ spec:
   name: order
   owner: cart
   cluster:
-    name: transaction-db
+    name: transaction-shared-db
   extensions:
     - name: pgaudit

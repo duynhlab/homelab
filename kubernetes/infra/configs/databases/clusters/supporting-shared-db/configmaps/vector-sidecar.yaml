@@ -25,7 +25,7 @@ data:
           .job = "postgres"
           .namespace = "user"
           .container = "postgres"
-          .cluster = "supporting-db"
+          .cluster = "supporting-shared-db"
           .pod = get_env_var!("POD_NAME")
 
     sinks:

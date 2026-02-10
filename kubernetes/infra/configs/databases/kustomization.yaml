@@ -6,6 +6,6 @@ kind: Kustomization
 resources:
   - clusters/auth-db/
   - clusters/review-db/
-  - clusters/supporting-db/
+  - clusters/supporting-shared-db/
   - clusters/product-db/
-  - clusters/transaction-db/
+  - clusters/transaction-shared-db/

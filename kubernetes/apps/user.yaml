@@ -61,7 +61,7 @@ spec:
         value: "true"
       # Database configuration (via PgBouncer pooler)
       - name: DB_HOST
-        value: "supporting-db-pooler.user.svc.cluster.local"  # PgBouncer pooler service
+        value: "supporting-shared-db-pooler.user.svc.cluster.local"  # PgBouncer pooler service
       - name: DB_PORT
         value: "5432"  # PgBouncer port
       - name: DB_NAME
@@ -71,7 +71,7 @@ spec:
       - name: DB_PASSWORD
         valueFrom:
           secretKeyRef:
-            name: user.supporting-db.credentials.postgresql.acid.zalan.do  # Zalando operator auto-generated secret
+            name: user.supporting-shared-db.credentials.postgresql.acid.zalan.do  # Zalando operator auto-generated secret
             key: password
       - name: DB_SSLMODE
         value: "require"
@@ -116,10 +116,10 @@ spec:
       image: ghcr.io/duynhne/user:v6-init
       imagePullPolicy: Always #IfNotPresent
       env:
-        DB_HOST: "supporting-db.user.svc.cluster.local"  # Direct connection, no pooler - supporting-db is in user namespace
+        DB_HOST: "supporting-shared-db.user.svc.cluster.local"  # Direct connection, no pooler - supporting-shared-db is in user namespace
         DB_PORT: "5432"  # PostgreSQL port (direct connection)
         DB_NAME: "user"
         DB_USER: "user"
         DB_SSLMODE: "require"
       envFrom:
-        secretRef: "user.supporting-db.credentials.postgresql.acid.zalan.do"  # Zalando operator auto-generated secret
+        secretRef: "user.supporting-shared-db.credentials.postgresql.acid.zalan.do"  # Zalando operator auto-generated secret

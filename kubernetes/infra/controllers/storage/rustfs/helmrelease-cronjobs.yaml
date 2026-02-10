@@ -1,0 +1,81 @@
+# CronJob to ensure pg-backups bucket exists in RustFS
+# Required before first backup - Barman/CNPG expects bucket to exist
+# Runs periodically (idempotent) - safe to re-run if bucket already exists
+#
+# Chart: cronjobs v0.2.0 from oci://ghcr.io/duyhenryer/charts/cronjobs
+# Verify: kubectl get cronjob -n rustfs
+# Logs:   kubectl logs job/<job-name> -n rustfs
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: rustfs-cronjobs
+  namespace: rustfs
+spec:
+  dependsOn:
+    - name: rustfs
+      namespace: rustfs
+  interval: 10m
+  timeout: 10m
+  chartRef:
+    kind: OCIRepository
+    name: cronjobs-oci
+    namespace: flux-system
+  releaseName: rustfs-cronjobs
+  targetNamespace: rustfs
+
+  install:
+    createNamespace: false
+    remediation:
+      retries: 3
+
+  upgrade:
+    remediation:
+      retries: 3
+
+  values:
+    jobs:
+      create-pg-backups:
+        image:
+          repository: amazon/aws-cli
+          tag: "2.21.0"
+          imagePullPolicy: IfNotPresent
+        # Run every 30 minutes to ensure bucket exists
+        # Idempotent - safe if bucket already exists
+        schedule: "*/30 * * * *"
+        failedJobsHistoryLimit: 1
+        successfulJobsHistoryLimit: 1
+        concurrencyPolicy: Forbid
+        restartPolicy: OnFailure
+        command:
+          - /bin/sh
+          - -c
+        args:
+          - |
+            set -e
+            ENDPOINT="http://rustfs-svc.rustfs.svc.cluster.local:9000"
+            echo "Waiting for RustFS to be ready..."
+            for i in 1 2 3 4 5 6 7 8 9 10; do
+              if aws s3 ls --endpoint-url "$ENDPOINT" --region us-east-1 2>/dev/null; then
+                echo "RustFS is ready."
+                break
+              fi
+              echo "Attempt $i: RustFS not ready, retrying in 10s..."
+              sleep 10
+            done
+            echo "Creating bucket pg-backups..."
+            aws s3 mb s3://pg-backups --endpoint-url "$ENDPOINT" --region us-east-1 2>/dev/null || echo "Bucket may already exist."
+            echo "Verifying bucket..."
+            aws s3 ls --endpoint-url "$ENDPOINT" --region us-east-1
+            echo "Done."
+        env:
+          - name: AWS_ACCESS_KEY_ID
+            value: rustfsadmin
+          - name: AWS_SECRET_ACCESS_KEY
+            value: rustfsadmin
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi

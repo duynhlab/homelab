@@ -12,13 +12,17 @@ permissions:
   pull-requests: read
   id-token: write
   actions: read
+  security-events: write
 
 jobs:
   # 1. PR Checks (Branch Name + Slack "PR Opened")
-  common:
+  pr-checks:
     if: github.event_name == 'pull_request'
-    uses: duyhenryer/shared-workflows/.github/workflows/ci-common.yml@main
-    secrets: inherit
+    uses: duyhenryer/shared-workflows/.github/workflows/pr-checks.yml@main
+    with:
+      slack_channel_id: "C0AD82A9A74"
+    secrets:
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
   # 2. Test & Lint
   go-check:
@@ -39,37 +43,107 @@ jobs:
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-
-  # 4. Build (Main Only)
-  docker:
+  # 4a. Build & Push (Main Only)
+  docker-build:
     needs: [go-check, sonar]
     if: github.ref == 'refs/heads/main'
-    uses: duyhenryer/shared-workflows/.github/workflows/docker-build.yml@main
+    uses: duyhenryer/shared-workflows/.github/workflows/docker-build-go.yml@main
     with:
       image-name: '{{SERVICE_NAME}}'
       push: true
     secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+      actions: read
 
+  # 4b. Trivy Vulnerability Scan
+  trivy-scan:
+    needs: [docker-build]
+    uses: duyhenryer/shared-workflows/.github/workflows/trivy-scan.yml@main
+    with:
+      image-ref: ghcr.io/${{ github.repository }}/{{SERVICE_NAME}}@${{ needs.docker-build.outputs.digest }}
+      severity: 'CRITICAL,HIGH'
+      exit-code: '1'
+      ignore-unfixed: true
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
 
-  # 4b. Build Migration Image
+  # 4c. Cosign Signing (only after scan passes)
+  docker-sign:
+    needs: [docker-build, trivy-scan]
+    uses: duyhenryer/shared-workflows/.github/workflows/docker-sign.yml@main
+    with:
+      tags: ${{ needs.docker-build.outputs.tags }}
+      digest: ${{ needs.docker-build.outputs.digest }}
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+  # 4d. Build Migration Image
   docker-db-init:
     needs: [go-check, sonar]
     if: github.ref == 'refs/heads/main'
-    uses: duyhenryer/shared-workflows/.github/workflows/docker-build.yml@main
+    uses: duyhenryer/shared-workflows/.github/workflows/docker-build-go.yml@main
     with:
       image-name: '{{SERVICE_NAME}}-init'
       dockerfile: 'db/migrations/Dockerfile'
       context: 'db/migrations'
       push: true
     secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+      actions: read
 
+  ## ──────────────────────────────────────────────────────────────
+  ## OPTIONAL: Scan + Sign the migration image
+  ## Uncomment the two jobs below (and add them to notify.needs)
+  ## to apply the same Trivy scan + Cosign sign pipeline to db-init.
+  ## ──────────────────────────────────────────────────────────────
+  #
+  # trivy-scan-db-init:
+  #   needs: [docker-db-init]
+  #   uses: duyhenryer/shared-workflows/.github/workflows/trivy-scan.yml@main
+  #   with:
+  #     image-ref: ghcr.io/${{ github.repository }}/{{SERVICE_NAME}}-init@${{ needs.docker-db-init.outputs.digest }}
+  #     severity: 'CRITICAL,HIGH'
+  #     exit-code: '1'
+  #     ignore-unfixed: true
+  #   secrets: inherit
+  #   permissions:
+  #     contents: read
+  #     packages: read
+  #     security-events: write
+  #
+  # docker-sign-db-init:
+  #   needs: [docker-db-init, trivy-scan-db-init]
+  #   uses: duyhenryer/shared-workflows/.github/workflows/docker-sign.yml@main
+  #   with:
+  #     tags: ${{ needs.docker-db-init.outputs.tags }}
+  #     digest: ${{ needs.docker-db-init.outputs.digest }}
+  #   secrets: inherit
+  #   permissions:
+  #     contents: read
+  #     packages: write
+  #     id-token: write
 
-  # 5. Final Status Notification
+  # 5. Final Status Notification + Google Sheets Reporting
+  # NOTE: If you enable scan+sign for db-init above, add trivy-scan-db-init and docker-sign-db-init to needs.
   notify:
     if: always()
-    needs: [go-check, sonar, docker, docker-db-init]
+    needs: [pr-checks, go-check, sonar, docker-build, trivy-scan, docker-sign, docker-db-init]
     uses: duyhenryer/shared-workflows/.github/workflows/status.yml@main
     with:
       slack_channel_id: "C0AD82A9A74"
+      slack_thread_ts: ${{ needs.pr-checks.outputs.slack_thread_ts }}
+      gsheet_spreadsheet_id: "1F2VUrAOyMGnETApp5yA-ldCW81ConiQXnWYZVxKas_0"
     secrets:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      GSHEET_CLIENT_EMAIL: ${{ secrets.GSHEET_CLIENT_EMAIL }}
+      GSHEET_PRIVATE_KEY: ${{ secrets.GSHEET_PRIVATE_KEY }}

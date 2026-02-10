@@ -35,9 +35,9 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 
 ## Data Platform & Persistence
 
-- [x] **PostgreSQL with CloudNativePG operator** — `kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml`, clusters: `product-db`, `transaction-db`
-- [x] **PostgreSQL with Zalando operator** — `kubernetes/infra/controllers/databases/zalando-operator.yaml`, clusters: `auth-db`, `review-db`, `supporting-db`
-- [x] **Connection poolers** — PgBouncer (Zalando sidecar), PgCat (`transaction-db`), PgDog (`product-db`)
+- [x] **PostgreSQL with CloudNativePG operator** — `kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml`, clusters: `product-db`, `transaction-shared-db`
+- [x] **PostgreSQL with Zalando operator** — `kubernetes/infra/controllers/databases/zalando-operator.yaml`, clusters: `auth-db`, `review-db`, `supporting-shared-db`
+- [x] **Connection poolers** — PgBouncer (Zalando sidecar), PgCat (`transaction-shared-db`), PgDog (`product-db`)
 - [x] **SQL migrations with Flyway** — `services/*/db/migrations/Dockerfile`, `.github/workflows/build-init.yml`
 - [x] **PostgreSQL internals deep-dive** — `docs/databases/postgresql_internals_product_db.md`
 - [x] **PostgreSQL internals mastery** — `docs/databases/postgresql_internals_product_db.md`:

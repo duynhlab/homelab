@@ -221,75 +221,23 @@ flowchart TB
 
 ### Connection Patterns
 
-#### PgCat Standalone
+> **Deep Dive**: For detailed architecture, trade-offs, and configuration of **PgCat**, **PgDog**, and **PgBouncer**, see [`docs/databases/pooler.md`](./pooler.md).
 
-**When to use**: Read replica routing, multi-database routing, advanced load balancing.
+#### PgCat Standalone (Transaction DB)
 
-**Key Points:**
-- Connect via PgCat service: `pgcat.cart.svc.cluster.local:5432` (for transaction-shared-db)
-- PgCat transparently routes to CloudNativePG cluster
-- Application code same as direct connection
+**Endpoint**: `pgcat.cart:5432`
 
-**Key Concepts:**
-- **pool_mode: `transaction`** - Connection released after each transaction (better concurrency for microservices)
-- **pool_size: 30** - Max connections pooler maintains to database per pool (cart + order)
-- **Primary role** (`transaction-shared-db-rw`): Handles all writes (INSERT, UPDATE, DELETE, DDL)
-- **Replica role** (`transaction-shared-db-r`): Handles read queries (SELECT) with automatic load balancing
-- **Multi-database**: Single PgCat instance serves both Cart and Order databases on same PostgreSQL cluster
+- **Role**: Routes read/write traffic for `cart` and `order` databases.
+- **Topology Awareness**: Routes writes to Primary (`-rw` service), reads to Replicas (`-r` service).
+- **Pooling Mode**: `transaction` (Connection per transaction).
 
-**Why transaction mode?**
-- Microservices make short-lived transactions
-- Higher connection reuse vs session mode
-- Better for REST APIs with stateless requests
+#### PgDog Standalone (Product DB)
 
-#### High Availability Integration
+**Endpoint**: `pgdog-product.product:6432`
 
-**Transaction Database HA Configuration:**
+- **Role**: Connection pooling for `product` database.
+- **Pooling Mode**: `transaction`.
 
-The Transaction Database PgCat pooler is configured with **High Availability (HA)** support, enabling automatic read replica routing and load balancing.
-
-**CloudNativePG Services (Auto-Created):**
-
-CloudNativePG Operator automatically creates two Kubernetes services for each cluster:
-
-1. **`transaction-shared-db-rw`** (Read-Write Service):
-   - Format: `{cluster-name}-rw.{namespace}.svc.cluster.local`
-   - Points to: Current primary instance
-   - Updates automatically during failover/switchover
-   - Used by PgCat for: All write queries (INSERT, UPDATE, DELETE, DDL)
-
-2. **`transaction-shared-db-r`** (Read-Only Service):
-   - Format: `{cluster-name}-r.{namespace}.svc.cluster.local`
-   - Points to: All replica instances (load balanced by Kubernetes)
-   - Automatically excludes unhealthy replicas
-   - Updates automatically when replicas are added/removed
-   - Used by PgCat for: All read queries (SELECT)
-
-**Replica Server Configuration:**
-
-**How Query Routing Works:**
-1. **Primary server** (`transaction-shared-db-rw`): Handles ALL writes + reads when no replicas available
-2. **Replica servers** (`transaction-shared-db-r`): Handle SELECT queries only, load balanced by Kubernetes
-3. **Automatic failover**: Unhealthy replica banned for 60s, queries route to healthy replicas + primary
-4. **Health checks**: Fast check (`;` query) before each query execution
-
-**CloudNativePG Auto-Created Services:**
-- **`-rw` service**: Always points to current primary (auto-updates on failover)
-- **`-r` service**: Load balances across all healthy replicas (auto-updates when replicas added/removed)
-
-**Monitoring:**
-
-PgCat metrics are exposed via HTTP endpoint (`/metrics` on port 9930) and scraped by Prometheus using **ServiceMonitors**.
-
-**Configuration Requirement:**
-- PgCat config must have `enable_prometheus_exporter = true` in `[general]` section to expose HTTP metrics endpoint
-
-**Key Metrics:**
-- `pgcat_pools_active_connections{pool="cart"}` - Active connections per pool
-- `pgcat_pools_waiting_clients{pool="cart"}` - Clients waiting for connections
-- `pgcat_servers_health{server_host="...", role="primary|replica"}` - Server health status
-- `pgcat_queries_total{pool="cart", server_role="replica"}` - Query count by pool and role
-- `pgcat_errors_total{pool="cart"}` - Error count per pool
 
 ### Configuration
 
@@ -461,62 +409,21 @@ pg_stat_statements_calls{namespace="auth", cluster="auth-db"}
 
 ### Connection Patterns
 
+> **Deep Dive**: See [`docs/databases/pooler.md`](./pooler.md) for details on **PgBouncer** sidecar architecture.
+
 #### Direct Connection
 
-**When to use**: Low-traffic services, simple setup, no connection pooling needed.
-
-**Key Points:**
-- Connect directly to service: `{cluster-name}.{namespace}.svc.cluster.local:5432`
-- Use Zalando auto-generated secret for credentials
-- No pooler overhead, suitable for low-traffic services
-
-**Used by:** Review DB
+- **Used by**: Review DB
+- **Endpoint**: `{cluster-name}.{namespace}:5432`
+- **Use case**: Simple/Low-traffic services.
 
 #### PgBouncer Sidecar
 
-**When to use**: High connection churn, transaction pooling needed, Zalando operator built-in.
+- **Used by**: Auth DB, Supporting Shared DB
+- **Endpoint**: `{cluster-name}-pooler.{namespace}:5432`
+- **Architecture**: Sidecar container injected by Operator.
+- **Pooling Mode**: `transaction`.
 
-**Configuration Helm Values:**
-
-**Key Concepts:**
-- **Endpoint**: Use `-pooler` suffix service (`auth-db-pooler.auth.svc.cluster.local`)
-- **pool_mode: `transaction`** - Same concept as PgCat (connection per transaction)
-- **Built-in sidecar**: No separate deployment needed, Zalando creates it automatically
-- **numberOfInstances: 2** - 2 PgBouncer pods for HA
-- **SSL required**: PgBouncer enforces SSL connections (`sslmode=require`)
-
-#### PgDog Standalone (product-db)
-
-**When to use**: CloudNativePG clusters, advanced connection pooling features, Helm-based deployment.
-
-**Key Points:**
-- Connect via PgDog service: `pgdog-product.product.svc.cluster.local:6432`
-- PgDog provides connection pooling with transaction mode
-- Application code same as direct connection (transparent routing)
-- Helm chart deployment (1 replica for dev)
-
-**Deployment:**
-- **Helm Chart**: `helm.pgdog.dev/pgdog` (version 0.32)
-- **Replicas**: 1 (Single replica for dev)
-- **Port**: 6432 (PostgreSQL protocol), 9090 (OpenMetrics)
-
-**Configuration:**
-- **Database**: product
-- **Pool size**: 30
-- **pool_mode**: `transaction` (connection per transaction)
-
-**Service Endpoint:**
-- `pgdog-product.product.svc.cluster.local:6432`
-
-**Monitoring:**
-- OpenMetrics: Port 9090 (`/metrics` endpoint)
-- ServiceMonitor: Auto-created by Helm chart (enabled)
-
-**Why PgDog for product-db:**
-- CloudNativePG clusters don't have built-in pooler
-- Prepared statements support in transaction mode
-- Advanced features available if needed (pub/sub, sharding)
-- Production-ready Helm chart with HA, monitoring, security
 
 ### Secret Management
 

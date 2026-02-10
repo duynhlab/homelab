@@ -103,14 +103,14 @@ All 9 services migrated from `lib/pq` to `pgx/v5 v5.8.0`:
 
 | Service | Database | Pooler | Status |
 |---------|----------|--------|--------|
-| cart | transaction-db | PgCat | ✅ Migrated |
-| order | transaction-db | PgCat | ✅ Migrated |
+| cart | transaction-shared-db | PgCat | ✅ Migrated |
+| order | transaction-shared-db | PgCat | ✅ Migrated |
 | product | product-db | PgDog | ✅ Migrated |
 | auth | auth-db | PgBouncer | ✅ Migrated |
-| user | supporting-db | PgBouncer | ✅ Migrated |
-| notification | supporting-db | PgBouncer | ✅ Migrated |
+| user | supporting-shared-db | PgBouncer | ✅ Migrated |
+| notification | supporting-shared-db | PgBouncer | ✅ Migrated |
 | review | review-db | None | ✅ Migrated |
-| shipping | supporting-db | PgBouncer | ✅ Migrated |
+| shipping | supporting-shared-db | PgBouncer | ✅ Migrated |
 
 ### Files Changed Per Service
 

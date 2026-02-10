@@ -35,11 +35,11 @@ spec:
       namespace: review
     - apiVersion: acid.zalan.do/v1
       kind: postgresql
-      name: supporting-db
+      name: supporting-shared-db
       namespace: user
     - apiVersion: postgresql.cnpg.io/v1
       kind: Cluster
-      name: transaction-db
+      name: transaction-shared-db
       namespace: cart
     - apiVersion: postgresql.cnpg.io/v1
       kind: Cluster

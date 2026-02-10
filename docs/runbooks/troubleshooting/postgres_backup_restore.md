@@ -5,8 +5,8 @@ This runbook covers backup/restore procedures for the 5 PostgreSQL clusters usin
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [CloudNativePG (product-db, transaction-db)](#cloudnativepg-product-db-transaction-db)
-3. [Zalando (auth-db, supporting-db, review-db)](#zalando-auth-db-supporting-db-review-db)
+2. [CloudNativePG (product-db, transaction-shared-db)](#cloudnativepg-product-db-transaction-shared-db)
+3. [Zalando (auth-db, supporting-shared-db, review-db)](#zalando-auth-db-supporting-shared-db-review-db)
 4. [Verification Checklist](#verification-checklist)
 
 ---
@@ -16,14 +16,14 @@ This runbook covers backup/restore procedures for the 5 PostgreSQL clusters usin
 | Cluster         | Operator      | Backup Method | Restore Method |
 |-----------------|---------------|---------------|----------------|
 | product-db      | CloudNativePG | barmanObjectStore + ScheduledBackup | Bootstrap recovery from object store |
-| transaction-db  | CloudNativePG | barmanObjectStore + ScheduledBackup | Bootstrap recovery from object store |
+| transaction-shared-db  | CloudNativePG | barmanObjectStore + ScheduledBackup | Bootstrap recovery from object store |
 | auth-db         | Zalando       | WAL-G (operator-level) | Clone from S3 / pg_restore |
-| supporting-db   | Zalando       | WAL-G (operator-level) | Clone from S3 / pg_restore |
+| supporting-shared-db   | Zalando       | WAL-G (operator-level) | Clone from S3 / pg_restore |
 | review-db       | Zalando       | WAL-G (operator-level) | Clone from S3 / pg_restore |
 
 ---
 
-## CloudNativePG (product-db, transaction-db)
+## CloudNativePG (product-db, transaction-shared-db)
 
 ### Prerequisites
 
@@ -156,7 +156,7 @@ bootstrap:
 
 ---
 
-## Zalando (auth-db, supporting-db, review-db)
+## Zalando (auth-db, supporting-shared-db, review-db)
 
 ### WAL-G Backup Configuration
 
@@ -165,12 +165,12 @@ Zalando clusters use WAL-G for PITR backup to RustFS. Configuration is operator-
 - **Secret**: `pg-backup-rustfs-credentials` (per cluster namespace: user, auth, review)
 - **Bucket**: `pg-backups` with cluster-specific paths (spilo/{cluster-name}/...)
 
-### Restore to New Cluster (supporting-db)
+### Restore to New Cluster (supporting-shared-db)
 
 1. **Get source cluster UID**:
 
 ```bash
-kubectl get postgresql supporting-db -n user -o jsonpath='{.metadata.uid}'
+kubectl get postgresql supporting-shared-db -n user -o jsonpath='{.metadata.uid}'
 ```
 
 2. **Create clone cluster** with `clone` section (uses WAL-G env from pod_environment_configmap/secret):
@@ -179,13 +179,13 @@ kubectl get postgresql supporting-db -n user -o jsonpath='{.metadata.uid}'
 apiVersion: acid.zalan.do/v1
 kind: postgresql
 metadata:
-  name: supporting-db-restore
+  name: supporting-shared-db-restore
   namespace: user
 spec:
   teamId: "platform"
   numberOfInstances: 1
   clone:
-    cluster: supporting-db
+    cluster: supporting-shared-db
     uid: "<paste-source-cluster-uid>"
     s3_endpoint: "http://rustfs-svc.rustfs.svc.cluster.local:9000"
     s3_force_path_style: true
@@ -206,14 +206,14 @@ spec:
 3. **Apply and verify**:
 
 ```bash
-kubectl apply -f supporting-db-restore.yaml
+kubectl apply -f supporting-shared-db-restore.yaml
 kubectl get postgresql -n user -w
-kubectl exec -it supporting-db-restore-0 -n user -- psql -U user -d user -c "\l"
+kubectl exec -it supporting-shared-db-restore-0 -n user -- psql -U user -d user -c "\l"
 ```
 
 ### Selective Restore (Logical pg_dump)
 
-For single-DB restore (e.g., only `notification` from supporting-db):
+For single-DB restore (e.g., only `notification` from supporting-shared-db):
 
 1. **Take logical backup** (manual or enable `enableLogicalBackup` on cluster)
 2. **Restore to target**:

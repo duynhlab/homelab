@@ -3,7 +3,7 @@
 apiVersion: acid.zalan.do/v1
 kind: postgresql
 metadata:
-  name: supporting-db
+  name: supporting-shared-db
   namespace: user
 spec:
   teamId: "platform"
@@ -53,7 +53,7 @@ spec:
       - createdb
   
   # Connection pooler (PgBouncer sidecar) configuration
-  # Services connect via: supporting-db-pooler.user.svc.cluster.local:5432
+  # Services connect via: supporting-shared-db-pooler.user.svc.cluster.local:5432
   # Note: PgBouncer requires SSL connections (sslmode=require)
   connectionPooler:
     numberOfInstances: 2

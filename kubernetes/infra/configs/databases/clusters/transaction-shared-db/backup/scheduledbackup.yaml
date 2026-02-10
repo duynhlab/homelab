@@ -1,12 +1,12 @@
-# ScheduledBackup for transaction-db - daily base backups to RustFS
+# ScheduledBackup for transaction-shared-db - daily base backups to RustFS
 # Uses cluster's backup.barmanObjectStore config (WAL archiving + base backup)
 # Reference: docs/databases/backup.md
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: transaction-db-daily
+  name: transaction-shared-db-daily
   namespace: cart
 spec:
   schedule: "0 0 2 * * *"
   cluster:
-    name: transaction-db
+    name: transaction-shared-db

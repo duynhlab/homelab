@@ -62,7 +62,7 @@ spec:
         value: "true"
       # Database configuration (via PgBouncer pooler)
       - name: DB_HOST
-        value: "supporting-db-pooler.user.svc.cluster.local"  # PgBouncer pooler service
+        value: "supporting-shared-db-pooler.user.svc.cluster.local"  # PgBouncer pooler service
       - name: DB_PORT
         value: "5432"  # PgBouncer port
       - name: DB_NAME
@@ -72,7 +72,7 @@ spec:
       - name: DB_PASSWORD
         valueFrom:
           secretKeyRef:
-            name: notification.notification.supporting-db.credentials.postgresql.acid.zalan.do  # Zalando operator auto-generated secret (cross-namespace)
+            name: notification.notification.supporting-shared-db.credentials.postgresql.acid.zalan.do  # Zalando operator auto-generated secret (cross-namespace)
             key: password
       - name: DB_SSLMODE
         value: "require"
@@ -120,11 +120,11 @@ spec:
       image: ghcr.io/duynhne/notification-service/notification-init:latest
       imagePullPolicy: Always #IfNotPresent
       env:
-        DB_HOST: "supporting-db.user.svc.cluster.local"  # Direct connection, no pooler - supporting-db is in user namespace
+        DB_HOST: "supporting-shared-db.user.svc.cluster.local"  # Direct connection, no pooler - supporting-shared-db is in user namespace
         DB_PORT: "5432"  # PostgreSQL port (direct connection)
         DB_NAME: "notification"
         DB_USER: "notification.notification"  # Cross-namespace format: namespace.username
         DB_SSLMODE: "require"
       envFrom:
-        secretRef: "notification.notification.supporting-db.credentials.postgresql.acid.zalan.do"  # Zalando operator cross-namespace secret (in notification namespace)
+        secretRef: "notification.notification.supporting-shared-db.credentials.postgresql.acid.zalan.do"  # Zalando operator cross-namespace secret (in notification namespace)
 

@@ -17,8 +17,8 @@
 
 | Type | Endpoint | Port | Purpose |
 |------|----------|------|---------|
-| RW (Primary) | `transaction-db-rw.cart.svc.cluster.local` | 5432 | Write queries |
-| R (Replicas) | `transaction-db-r.cart.svc.cluster.local` | 5432 | Read queries |
+| RW (Primary) | `transaction-shared-db-rw.cart.svc.cluster.local` | 5432 | Write queries |
+| R (Replicas) | `transaction-shared-db-r.cart.svc.cluster.local` | 5432 | Read queries |
 | Pooler | `pgcat.cart.svc.cluster.local` | 5432 | Connection pooling with R/W splitting |
 | Metrics | `pgcat.cart.svc.cluster.local` | 9930 | PgCat Prometheus metrics |
 
@@ -46,14 +46,14 @@ flowchart TD
     end
 
     subgraph CNPGSvc["CloudNativePG Services - Auto-created"]
-        RWSvc["Service: transaction-db-rw.cart.svc:5432"]
-        RSvc["Service: transaction-db-r.cart.svc:5432"]
+        RWSvc["Service: transaction-shared-db-rw.cart.svc:5432"]
+        RSvc["Service: transaction-shared-db-r.cart.svc:5432"]
     end
 
-    subgraph Cluster["transaction-db Cluster - 3 Instances"]
-        Primary[("🔴 transaction-db-1<br/>Primary")]
-        Replica1[("🟡 transaction-db-2<br/>Sync Replica")]
-        Replica2[("🟡 transaction-db-3<br/>Sync Replica")]
+    subgraph Cluster["transaction-shared-db Cluster - 3 Instances"]
+        Primary[("🔴 transaction-shared-db-1<br/>Primary")]
+        Replica1[("🟡 transaction-shared-db-2<br/>Sync Replica")]
+        Replica2[("🟡 transaction-shared-db-3<br/>Sync Replica")]
     end
 
     subgraph Databases["Databases"]
@@ -94,7 +94,7 @@ flowchart TD
 - Zero data loss guarantee (`dataDurability: required`)
 - Read/write splitting enabled in PgCat:
   - `query_parser_read_write_splitting = true`
-  - Writes → `transaction-db-rw`, Reads → `transaction-db-r`
+  - Writes → `transaction-shared-db-rw`, Reads → `transaction-shared-db-r`
 - Logical replication slot synchronization for CDC support (Debezium, Kafka Connect)
 - PostgreSQL 18 features: native `sync_replication_slots` parameter
 - Production-tuned: `shared_buffers: 256MB`, `work_mem: 32MB`, `wal_level: logical`
@@ -115,7 +115,7 @@ The following components are active in `kustomization.yaml`:
 ### 1. Database Cluster
 - **File**: [`instance.yaml`](instance.yaml)
 - **Description**: The main PostgreSQL 18 cluster configuration.
-- **Spec**: 3 instances (1 primary + 2 replicas), writes to `s3://pg-backups/transaction-db/`.
+- **Spec**: 3 instances (1 primary + 2 replicas), writes to `s3://pg-backups/transaction-shared-db/`.
 
 ### 2. Connection Pooler
 - **Directory**: [`poolers/`](poolers/)
@@ -125,12 +125,12 @@ The following components are active in `kustomization.yaml`:
 
 ### 3. Monitoring
 - **Files**:
-  - [`monitoring/podmonitor-cloudnativepg-transaction-db.yaml`](monitoring/podmonitor-cloudnativepg-transaction-db.yaml): For CNPG metrics.
+  - [`monitoring/podmonitor-cloudnativepg-transaction-shared-db.yaml`](monitoring/podmonitor-cloudnativepg-transaction-shared-db.yaml): For CNPG metrics.
   - [`monitoring/servicemonitor-pgcat-transaction.yaml`](monitoring/servicemonitor-pgcat-transaction.yaml): For PgCat metrics.
 
 ### 4. Secrets
-- **Cart Database Credentials**: `secrets/transaction-db-secret-cart.yaml`
-- **Order Database Credentials**: `secrets/transaction-db-secret-order.yaml`
+- **Cart Database Credentials**: `secrets/transaction-shared-db-secret-cart.yaml`
+- **Order Database Credentials**: `secrets/transaction-shared-db-secret-order.yaml`
 - **Backup Credentials**: `secrets/pg-backup-rustfs-credentials.yaml`
 
 ### 5. Extensions

@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# supporting-db cluster (Zalando Postgres Operator)
+# supporting-shared-db cluster (Zalando Postgres Operator)
 # Order: secrets → configmaps → instance
 resources:
   - secrets/pg-backup-rustfs-credentials-vault.yaml

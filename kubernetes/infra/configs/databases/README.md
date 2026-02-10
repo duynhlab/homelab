@@ -19,9 +19,9 @@ As an alternative to deploying Postgres manually, you can also use one of severa
 |---------|----------|------------|-----------|-----|--------|----------|
 | auth-db | Zalando | 17 | auth | 3 nodes | PgBouncer (sidecar) | Auth |
 | review-db | Zalando | 16 | review | 1 node | None | Review |
-| supporting-db | Zalando | 16 | user | 1 node | PgBouncer (sidecar) | User, Notification, Shipping |
+| supporting-shared-db | Zalando | 16 | user | 1 node | PgBouncer (sidecar) | User, Notification, Shipping |
 | product-db | CloudNativePG | 18 | product | 3 nodes | PgDog (standalone) | Product |
-| transaction-db | CloudNativePG | 18 | cart | 3 nodes | PgCat (standalone) | Cart, Order |
+| transaction-shared-db | CloudNativePG | 18 | cart | 3 nodes | PgCat (standalone) | Cart, Order |
 
 ## Related Documentation
 

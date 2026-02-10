@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.50.4] - 2026-02-09
+
+### Changed
+
+- **Database Cluster Rename**: Renamed multi-database clusters for clearer naming convention:
+  - `supporting-db` → `supporting-shared-db` (Zalando, hosts: user, notification, shipping)
+  - `transaction-db` → `transaction-shared-db` (CloudNativePG, hosts: cart, order)
+  - Single-database clusters (`auth-db`, `review-db`, `product-db`) unchanged.
+  - Updated all Kubernetes manifests, Flux health checks, app HelmReleases, secrets, pooler configs, monitoring, and documentation.
+- **GHCR Multi-Level Image Naming**: Changed image naming to `ghcr.io/duynhne/<repo-name>/<short-image-name>:<tag>` for auto-linking packages to repositories. Updated shared workflow, all service CI files, Helm values, and SERVICES.md.
+- **Validation Script**: Enhanced `flux-validate.sh` to validate infrastructure kustomizations (controllers, databases, monitoring, secrets) and production cluster config, in addition to existing cluster and app validations.
+- **Flux Sync Script**: Fixed `flux-sync.sh` to match current kustomization names (`databases-local`, `monitoring-local`, `secrets-local` instead of removed `configs-local`).
+
 ## [0.50.3] - 2026-02-07
 
 ### Fixed

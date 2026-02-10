@@ -309,7 +309,7 @@ make flux-sync
 
 ### Key Infrastructure
 
-- **5 PostgreSQL Clusters**: review-db, auth-db, supporting-db, product-db, transaction-db
+- **5 PostgreSQL Clusters**: review-db, auth-db, supporting-shared-db, product-db, transaction-shared-db
 - **Connection Poolers**: PgBouncer (Auth), PgCat (Product, Cart+Order)
 - **Migrations**: Flyway 11.19.0 with 8 migration images
 - **Operators**: Zalando Postgres Operator (v1.15.1), CloudNativePG Operator (v1.28.0)

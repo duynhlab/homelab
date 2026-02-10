@@ -13,4 +13,4 @@ resources:
   - backup/backup-daily.yaml
   - backup/backup-every-6h.yaml
 
-  # - extensions.yaml
+  - extensions.yaml

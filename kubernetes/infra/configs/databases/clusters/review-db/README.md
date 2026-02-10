@@ -66,7 +66,7 @@ flowchart TD
 **Considering:**
 - Add PgBouncer pooler if connection count grows
 - Scale to 2+ instances for HA in production
-- Consider merging with supporting-db if usage remains low
+- Consider merging with supporting-shared-db if usage remains low
 
 ---
 

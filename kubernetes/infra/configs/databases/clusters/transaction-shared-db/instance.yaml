@@ -4,7 +4,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: transaction-db
+  name: transaction-shared-db
   namespace: cart
 spec:
   # Number of instances (HA with Patroni) - Production-Ready: 3 nodes
@@ -119,7 +119,7 @@ spec:
   backup:
     retentionPolicy: "7d"
     barmanObjectStore:
-      destinationPath: s3://pg-backups/transaction-db/
+      destinationPath: s3://pg-backups/transaction-shared-db/
       endpointURL: http://rustfs-svc.rustfs.svc.cluster.local:9000
       s3Credentials:
         accessKeyId:
@@ -135,7 +135,7 @@ spec:
       database: cart  # Default database
       owner: cart
       secret:
-        name: transaction-db-secret-vault  # Vault-backed (ExternalSecret)
+        name: transaction-shared-db-secret-vault  # Vault-backed (ExternalSecret)
       dataChecksums: true
       encoding: "UTF8"
       localeCType: "C"
@@ -179,7 +179,7 @@ spec:
   # patroni:
   #   etcd:
   #     hosts: etcd-0.etcd:2379
-  #     scope: transaction-db
+  #     scope: transaction-shared-db
   #     ttl: 30
   
   # Additional databases (order database)

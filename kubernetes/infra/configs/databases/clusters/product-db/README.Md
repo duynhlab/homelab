@@ -117,9 +117,10 @@ The following components are active in `kustomization.yaml`:
 - **Backup Credentials**: `secrets/pg-backup-rustfs-credentials.yaml` (for S3/RustFS access)
 
 ### 5. Extensions
-- **File**: [`extensions.yaml`](extensions.yaml)
-- **Status**: **Disabled** (commented out in `kustomization.yaml`).
-- **Description**: Custom PostgreSQL extensions configuration.
+- **File**: [`extensions.yaml`](extensions.yaml) (Database resource for declarative `CREATE EXTENSION`)
+- **Status**: **Enabled**
+- **Extensions**: pgaudit, pg_stat_statements, auto_explain, pgcrypto, uuid-ossp
+- **Guide**: See [`extensions.md`](extensions.md) for the 3-layer model (binary availability, shared_preload_libraries, Database resource)
 
 ### 6. Backup Schedules
 - **Daily**: [`backup/backup-daily.yaml`](backup/backup-daily.yaml)
@@ -135,21 +136,23 @@ This section details the Point-in-Time Recovery (PITR) strategy implemented for 
 
 We use a combination of **Base Backups** (snapshots) and **WAL Archiving** (continuous logs) to achieve PITR.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  COMPLETE BACKUP SOLUTION                               │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  BASE/                    WAL/                          │
-│  ├─ Snapshot #1           ├─ Transaction Log 1          │
-│  ├─ Snapshot #2           ├─ Transaction Log 2          │
-│  ├─ Snapshot #3           ├─ Transaction Log 3          │
-│  └─ Snapshot #4           └─ Transaction Log ...N       │
-│     (every 6h)                (continuous)              │
-│                                                         │
-│  [Full DB at point]   +   [All changes since]           │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph BaseBackups["BASE Backups - every 6h"]
+        S1["Snapshot 1"]
+        S2["Snapshot 2"]
+        S3["Snapshot 3"]
+        S4["Snapshot 4"]
+    end
+
+    subgraph WALArchive["WAL Archive - continuous"]
+        W1["Transaction Log 1"]
+        W2["Transaction Log 2"]
+        W3["Transaction Log N..."]
+    end
+
+    BaseBackups -->|"Full DB at point + All changes since"| Recovery["PITR Recovery"]
+    WALArchive --> Recovery
 ```
 
 ### 2. BASE Backup ("Snapshot")

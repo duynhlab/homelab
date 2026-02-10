@@ -1,15 +1,15 @@
-# PodMonitor for supporting-db PostgreSQL cluster
+# PodMonitor for supporting-shared-db PostgreSQL cluster
 # Prometheus Operator will discover and scrape metrics from postgres_exporter sidecar
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: postgresql-supporting-db
+  name: postgresql-supporting-shared-db
   namespace: user
 spec:
   selector:
     matchLabels:
       application: spilo  # Zalando operator default label
-      cluster-name: supporting-db  # Cluster-specific label
+      cluster-name: supporting-shared-db  # Cluster-specific label
   podTargetLabels:
     - spilo-role
     - cluster-name

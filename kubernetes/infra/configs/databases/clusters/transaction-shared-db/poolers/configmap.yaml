@@ -54,7 +54,7 @@ data:
     database = "cart"
     
     [[pools.cart.shards.0.servers]]
-    host = "transaction-db-rw.cart.svc.cluster.local"
+    host = "transaction-shared-db-rw.cart.svc.cluster.local"
     port = 5432
     user = "cart"
     password = "postgres"
@@ -62,7 +62,7 @@ data:
     
     # Replica server for read queries
     [[pools.cart.shards.0.servers]]
-    host = "transaction-db-r.cart.svc.cluster.local"
+    host = "transaction-shared-db-r.cart.svc.cluster.local"
     port = 5432
     user = "cart"
     password = "postgres"
@@ -79,7 +79,7 @@ data:
     database = "order"
     
     [[pools.order.shards.0.servers]]
-    host = "transaction-db-rw.cart.svc.cluster.local"
+    host = "transaction-shared-db-rw.cart.svc.cluster.local"
     port = 5432
     user = "cart"
     password = "postgres"
@@ -87,7 +87,7 @@ data:
     
     # Replica server for read queries
     [[pools.order.shards.0.servers]]
-    host = "transaction-db-r.cart.svc.cluster.local"
+    host = "transaction-shared-db-r.cart.svc.cluster.local"
     port = 5432
     user = "cart"
     password = "postgres"

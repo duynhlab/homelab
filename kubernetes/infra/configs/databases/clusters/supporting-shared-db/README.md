@@ -17,8 +17,8 @@
 
 | Type | Endpoint | Port | Purpose |
 |------|----------|------|---------|
-| Direct | `supporting-db.user.svc.cluster.local` | 5432 | Direct connection |
-| Pooler | `supporting-db-pooler.user.svc.cluster.local` | 5432 | Connection pooling (recommended, requires `sslmode=require`) |
+| Direct | `supporting-shared-db.user.svc.cluster.local` | 5432 | Direct connection |
+| Pooler | `supporting-shared-db-pooler.user.svc.cluster.local` | 5432 | Connection pooling (recommended, requires `sslmode=require`) |
 | Metrics | Pod IP | 9187 | postgres_exporter metrics |
 
 ### How to Read the Diagrams
@@ -39,17 +39,17 @@ flowchart TD
     end
 
     subgraph Pooler["PgBouncer Pooler - 2 Instances"]
-        PgBouncer1{{"🟣 supporting-db-pooler<br/>Pod 1"}}
-        PgBouncer2{{"🟣 supporting-db-pooler<br/>Pod 2"}}
-        PoolerSvc["Service: supporting-db-pooler.user.svc:5432"]
+        PgBouncer1{{"🟣 supporting-shared-db-pooler<br/>Pod 1"}}
+        PgBouncer2{{"🟣 supporting-shared-db-pooler<br/>Pod 2"}}
+        PoolerSvc["Service: supporting-shared-db-pooler.user.svc:5432"]
     end
 
     subgraph ZalandoSvc["Zalando Services - Auto-created"]
-        DirectSvc["Service: supporting-db.user.svc:5432"]
+        DirectSvc["Service: supporting-shared-db.user.svc:5432"]
     end
 
-    subgraph Cluster["supporting-db Cluster - 1 Instance"]
-        Primary[("🔴 supporting-db-0<br/>Primary")]
+    subgraph Cluster["supporting-shared-db Cluster - 1 Instance"]
+        Primary[("🔴 supporting-shared-db-0<br/>Primary")]
         subgraph Databases["Databases"]
             UserDB[("user")]
             NotificationDB[("notification")]

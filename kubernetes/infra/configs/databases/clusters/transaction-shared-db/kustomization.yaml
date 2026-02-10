@@ -1,17 +1,17 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# transaction-db cluster (CloudNativePG)
+# transaction-shared-db cluster (CloudNativePG)
 # Order: secrets → instance → extensions → poolers → monitoring
 resources:
-  - secrets/transaction-db-secret-cart.yaml
+  - secrets/transaction-shared-db-secret-cart.yaml
   - secrets/pgcat-transaction-creds.yaml
   - secrets/pg-backup-rustfs-credentials-vault.yaml
   - backup/scheduledbackup.yaml
-  - secrets/transaction-db-secret-order.yaml
+  - secrets/transaction-shared-db-secret-order.yaml
   - instance.yaml
   # - extensions-cart.yaml
   # - extensions-order.yaml
   - poolers/
-  - monitoring/podmonitor-cloudnativepg-transaction-db.yaml
-  - monitoring/servicemonitor-pgcat-transaction.yaml
+  - monitoring/podmonitor-cloudnativepg-transaction-shared-db.yaml
+  - monitoring/servicemonitor-pgcat-transaction-shared.yaml

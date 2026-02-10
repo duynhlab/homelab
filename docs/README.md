@@ -163,7 +163,7 @@ docs/
     - Autovacuum and bloat control
     - CNPG vs EC2/VM operational differences
     - Backup/restore, scaling, and sharding concepts
-    - Cross-namespace secrets visualization for supporting-db
+    - Cross-namespace secrets visualization for supporting-shared-db
     - Connection patterns (direct, PgBouncer, PgCat)
     - Environment variables and Helm configuration
     - Database verification and troubleshooting

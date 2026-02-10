@@ -72,7 +72,7 @@ spec:
       - name: DB_PASSWORD
         valueFrom:
           secretKeyRef:
-            name: transaction-db-secret
+            name: transaction-shared-db-secret
             key: password
       - name: DB_SSLMODE
         value: "disable"
@@ -119,10 +119,10 @@ spec:
       image: ghcr.io/duynhne/cart-service/cart-init:latest
       imagePullPolicy: Always #IfNotPresent
       env:
-        DB_HOST: "transaction-db-rw.cart.svc.cluster.local"  # Direct connection, no pooler
+        DB_HOST: "transaction-shared-db-rw.cart.svc.cluster.local"  # Direct connection, no pooler
         DB_PORT: "5432"
         DB_NAME: "cart"
         DB_USER: "cart"
         DB_SSLMODE: "require"
       envFrom:
-        secretRef: "transaction-db-secret"
+        secretRef: "transaction-shared-db-secret"

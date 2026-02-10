@@ -8,7 +8,7 @@ resources:
   # Note: CloudNativePG PodMonitors moved to configs/databases/monitoring/ to deploy AFTER database clusters
   - podmonitors/podmonitor-zalando-auth-db.yaml
   - podmonitors/podmonitor-zalando-review-db.yaml
-  - podmonitors/podmonitor-zalando-supporting-db.yaml
+  - podmonitors/podmonitor-zalando-supporting-shared-db.yaml
   # SLO definitions (PrometheusServiceLevel CRDs for Sloth)
   - slo/
   # Backup alerts for PostgreSQL clusters

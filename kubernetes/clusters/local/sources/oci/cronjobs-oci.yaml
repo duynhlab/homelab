@@ -1,0 +1,13 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: cronjobs-oci
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: helm-chart
+spec:
+  interval: 10m
+  url: oci://ghcr.io/duyhenryer/charts/cronjobs
+  ref:
+    semver: ">=0.2.1"

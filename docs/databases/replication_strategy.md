@@ -8,18 +8,18 @@ You are running **5 PostgreSQL clusters** with a hybrid architecture optimized f
 
 | Cluster | Operator | Namespace | Instances | Sync Mode | Pooler | Services |
 |--------|----------|-----------|-----------|-----------|--------|----------|
-| **transaction-db** | CloudNativePG | cart | 3 | Synchronous (`on`) | PgCat | cart, order |
+| **transaction-shared-db** | CloudNativePG | cart | 3 | Synchronous (`on`) | PgCat | cart, order |
 | **product-db** | CloudNativePG | product | 3 | Async (`local`) | PgDog | product |
 | **auth-db** | Zalando | auth | 3 | Async (`local`) | PgBouncer | auth |
 | **review-db** | Zalando | review | 1 | N/A (single node) | None | review |
-| **supporting-db** | Zalando | user | 1 | N/A (single node) | PgBouncer | user, notification, shipping |
+| **supporting-shared-db** | Zalando | user | 1 | N/A (single node) | PgBouncer | user, notification, shipping |
 
 ### Architecture Diagram
 
 ```mermaid
 flowchart TB
     subgraph HA [3-Node HA Clusters]
-        subgraph transaction [transaction-db - Sync RPO=0]
+        subgraph transaction [transaction-shared-db - Sync RPO=0]
             T1[Primary]
             T2[Replica 1]
             T3[Replica 2]
@@ -44,14 +44,14 @@ flowchart TB
 
     subgraph Single [Single-Instance Clusters - No HA]
         R1[review-db]
-        S1[supporting-db]
+        S1[supporting-shared-db]
     end
 ```
 
 **Key findings:**
-- **transaction-db**: Only cluster with synchronous replication. RPO = 0 (zero data loss).
+- **transaction-shared-db**: Only cluster with synchronous replication. RPO = 0 (zero data loss).
 - **product-db, auth-db**: 3-node async. Fast writes, possible small data loss on crash.
-- **review-db, supporting-db**: Single instance, no HA. No replication.
+- **review-db, supporting-shared-db**: Single instance, no HA. No replication.
 
 ---
 
@@ -93,7 +93,7 @@ This is "block-level" replication. PostgreSQL transmits 16MB **WAL** files (or s
 *   **Mechanism**: "Copy this byte from offset A to offset B." (Giống photocopy - copy nguyên block dữ liệu)
 *   **Pros**: Extremely efficient, low overhead, replicates ALL changes (indexes, DDL, schema changes, user creation).
 *   **Cons**: Replicas must be read-only. Major version of Primary and Replica must match exactly.
-*   **Your Usage**: 3-node clusters (`transaction-db`, `product-db`, `auth-db`) use physical streaming for HA.
+*   **Your Usage**: 3-node clusters (`transaction-shared-db`, `product-db`, `auth-db`) use physical streaming for HA.
 
 ### Logical Replication
 This is "row-level" replication. It decodes the WAL into a stream of logical changes (INSERT, UPDATE, DELETE).
@@ -101,7 +101,7 @@ This is "row-level" replication. It decodes the WAL into a stream of logical cha
 *   **Mechanism**: "Insert row {id: 1, name: 'Apple'} into table 'products'." (Giống dictation - đọc từng dòng thay đổi)
 *   **Pros**: Flexible. Can replicate between different OSs, Postgres versions, or to external systems (Kafka/Debezium).
 *   **Cons**: Higher CPU usage (decoding). Typically doesn't replicate DDL (CREATE TABLE) automatically.
-*   **Your Usage**: `transaction-db` has `wal_level: logical` - ready for CDC (Debezium) even though internal HA is physical.
+*   **Your Usage**: `transaction-shared-db` has `wal_level: logical` - ready for CDC (Debezium) even though internal HA is physical.
 
 ### Physical vs Logical Diagram
 
@@ -165,14 +165,14 @@ sequenceDiagram
 2.  **`local`** (Default Async): "Success if written to My Disk."
     *   **Fastest safe mode**.
     *   **Risk**: If Primary dies immediately after, data is lost before reaching replica.
-    *   **Your Clusters**: `auth-db`, `product-db`, `review-db`, `supporting-db`.
+    *   **Your Clusters**: `auth-db`, `product-db`, `review-db`, `supporting-shared-db`.
 3.  **`remote_write`**: "Success if Replica OS received it."
     *   Replica has it in RAM, but hasn't flushed to disk. 
     *   Survives Postgres crash, but not Replica OS crash.
 4.  **`on`** (Standard Sync): "Success if Replica flushed to Disk."
     *   **Zero Data Loss** guarantee.
     *   **Latency Cost**: Round-trip time (RTT) to replica + Disk I/O.
-    *   **Your Clusters**: `transaction-db` only.
+    *   **Your Clusters**: `transaction-shared-db` only.
 5.  **`remote_apply`**: "Success if Replica has applied the SQL."
     *   Guarantees "Read-Your-Writes" on the replica immediately.
     *   **Slowest**.
@@ -181,7 +181,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart TB
-    subgraph HA [3-Node HA - transaction-db, product-db, auth-db]
+    subgraph HA [3-Node HA - transaction-shared-db, product-db, auth-db]
         Primary[Primary]
         R1[Replica 1]
         R2[Replica 2]
@@ -189,7 +189,7 @@ flowchart TB
         Primary --> R2
     end
 
-    subgraph Single [Single Instance - review-db, supporting-db]
+    subgraph Single [Single Instance - review-db, supporting-shared-db]
         S1[Only Node]
     end
 
@@ -197,7 +197,7 @@ flowchart TB
     Single -->|"No failover - single point of failure"| S1
 ```
 
-**Tóm lại:** 3-node clusters có failover tự động. Single-instance clusters (review-db, supporting-db) không có replica - nếu node chết thì service down.
+**Tóm lại:** 3-node clusters có failover tự động. Single-instance clusters (review-db, supporting-shared-db) không có replica - nếu node chết thì service down.
 
 ---
 
@@ -217,7 +217,7 @@ flowchart TB
 
 **Current Gap**: 
 Your `instance.yaml` files do **not** show `backup` or `barmanObjectStore` configuration. 
-*   **Implication**: If you `DROP TABLE users` by mistake on `transaction-db`, the command will instantly replicate to all standbys. **Replication cannot save you here.** You need PITR to roll back.
+*   **Implication**: If you `DROP TABLE users` by mistake on `transaction-shared-db`, the command will instantly replicate to all standbys. **Replication cannot save you here.** You need PITR to roll back.
 
 **Tóm lại:** Replication = chống sập server. PITR = chống lỗi người (DROP TABLE, migration sai).
 
@@ -289,9 +289,9 @@ FROM pg_replication_slots;
 | Syntax | Meaning | Your Usage |
 |--------|---------|------------|
 | **FIRST n (s1, s2, ...)** | Priority-based - wait for top n standbys | - |
-| **ANY n (s1, s2, ...)** | Quorum-based - wait for any n standbys | transaction-db uses `method: any` |
+| **ANY n (s1, s2, ...)** | Quorum-based - wait for any n standbys | transaction-shared-db uses `method: any` |
 
-transaction-db: `synchronous.method: any`, `number: 1` - commits when any 1 replica acknowledges.
+transaction-shared-db: `synchronous.method: any`, `number: 1` - commits when any 1 replica acknowledges.
 
 ---
 
@@ -355,7 +355,7 @@ flowchart TD
 
 | Replicas | Approach | Your Clusters |
 |----------|----------|---------------|
-| < 10 | Direct replication | transaction-db, product-db, auth-db |
+| < 10 | Direct replication | transaction-shared-db, product-db, auth-db |
 | 10-30 | Consider cascading | - |
 | 30+ | Cascading recommended | OpenAI: ~50 replicas |
 | Multi-region | Intermediate per region | - |
@@ -400,7 +400,7 @@ flowchart TB
     PRIMARY -.->|WAL Stream| REP2
 ```
 
-**Your clusters:** transaction-db (PgCat), product-db (PgDog), auth-db/supporting-db (PgBouncer).
+**Your clusters:** transaction-shared-db (PgCat), product-db (PgDog), auth-db/supporting-shared-db (PgBouncer).
 
 ### WAL Sender/Receiver Flow
 
@@ -500,7 +500,7 @@ OpenAI scales PostgreSQL to **800M+ users** with:
 
 ## 11. Summary Table for Your Infrastructure
 
-| Feature | transaction-db | product-db | auth-db | review-db | supporting-db |
+| Feature | transaction-shared-db | product-db | auth-db | review-db | supporting-shared-db |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Replication Type** | Physical (HA) + Logical (CDC) | Physical | Physical | N/A (1 node) | N/A (1 node) |
 | **Sync Mode** | Synchronous (`on`) | Async (`local`) | Async (`local`) | N/A | N/A |
@@ -514,5 +514,5 @@ OpenAI scales PostgreSQL to **800M+ users** with:
 
 | Operator | Clusters | PostgreSQL Version |
 |----------|----------|-------------------|
-| **CloudNativePG** | transaction-db, product-db | 18 |
-| **Zalando Postgres Operator** | auth-db, review-db, supporting-db | 16/17 |
+| **CloudNativePG** | transaction-shared-db, product-db | 18 |
+| **Zalando Postgres Operator** | auth-db, review-db, supporting-shared-db | 16/17 |

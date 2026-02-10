@@ -3,14 +3,14 @@
 This document defines a **production-ready physical backup strategy** (base backup + WAL archiving) for **two PostgreSQL clusters** using **RustFS (S3-compatible)** as the backup target:
 
 - `product-db` (CloudNativePG)
-- `supporting-db` (Zalando Postgres Operator / Spilo)
+- `supporting-shared-db` (Zalando Postgres Operator / Spilo)
 
 ## Table of Contents
 
 1. [Scope (production)](#scope-production)
 2. [Architecture Overview (physical backup to RustFS)](#architecture-overview-physical-backup-to-rustfs)
    - [Runtime CNPG physical backup (product-db)](#runtime-cnpg-physical-backup-product-db)
-   - [Runtime Zalando physical backup (supporting-db)](#runtime-zalando-physical-backup-supporting-db)
+   - [Runtime Zalando physical backup (supporting-shared-db)](#runtime-zalando-physical-backup-supporting-shared-db)
    - [Runtime alerts (PrometheusRule)](#runtime-alerts-prometheusrule)
 3. [Cluster Inventory](#cluster-inventory)
 4. [Bucket Layout](#bucket-layout)
@@ -63,7 +63,7 @@ sequenceDiagram
   Barman-->>CNPGOp: backup complete
 ```
 
-### Runtime Zalando physical backup (supporting-db)
+### Runtime Zalando physical backup (supporting-shared-db)
 
 ```mermaid
 sequenceDiagram
@@ -94,7 +94,7 @@ flowchart LR
 | Cluster         | Operator      | Namespace | PostgreSQL | Instances | Databases                    | Pooler     | HA Pattern |
 |-----------------|---------------|-----------|------------|-----------|------------------------------|------------|------------|
 | product-db      | CloudNativePG | product   | 18         | 3         | product                      | PgDog      | Async      |
-| supporting-db   | Zalando       | user      | 16         | 1 (SPOF)  | user, notification, shipping | PgBouncer  | Single     |
+| supporting-shared-db   | Zalando       | user      | 16         | 1 (SPOF)  | user, notification, shipping | PgBouncer  | Single     |
 
 ### Detailed Cluster Profiles
 
@@ -109,7 +109,7 @@ flowchart LR
 - **Secret:** `product-db-secret` (manual)
 - **Backup scope:** Physical backup + WAL archiving (PITR) to RustFS; restore-to-new-cluster drills.
 
-#### supporting-db (Zalando)
+#### supporting-shared-db (Zalando)
 
 - **Namespace:** user
 - **Operator:** Zalando v1.15.1
@@ -131,7 +131,7 @@ RustFS (S3-compatible) is deployed in namespace `rustfs`. Backups land in the `p
 | Cluster        | S3 path (logical view)       | Implementation notes |
 |---------------|-------------------------------|----------------------|
 | product-db     | `s3://pg-backups/product-db/` | CNPG `backup.barmanObjectStore.destinationPath` |
-| supporting-db  | `s3://pg-backups/spilo/...`   | WAL-G uses Spilo/WAL-G object layout inside the bucket |
+| supporting-shared-db  | `s3://pg-backups/spilo/...`   | WAL-G uses Spilo/WAL-G object layout inside the bucket |
 
 ### S3 Endpoint
 
@@ -250,7 +250,7 @@ Key insight: more frequent base backups reduce risk of corrupted base backups, b
 ### Current implementation (what is deployed now)
 
 - `product-db` (CNPG): `retentionPolicy: "7d"` in `backup.retentionPolicy`.
-- `supporting-db` (Zalando/WAL-G): `BACKUP_NUM_TO_RETAIN: "7"` in `zalando-walg-config`.
+- `supporting-shared-db` (Zalando/WAL-G): `BACKUP_NUM_TO_RETAIN: "7"` in `zalando-walg-config`.
 
 ### Recommended production baseline (starting point)
 
@@ -286,14 +286,14 @@ CloudNativePG deprecated in-tree `barmanObjectStore` starting 1.26 and recommend
 ### What we use today
 
 - **product-db (CNPG)**: Barman Cloud via CNPG (`backup.barmanObjectStore`), storing base backups + WAL in RustFS.
-- **supporting-db (Zalando)**: WAL-G via Spilo, storing base backups + WAL in RustFS.
+- **supporting-shared-db (Zalando)**: WAL-G via Spilo, storing base backups + WAL in RustFS.
 
 ### High-level comparison of common tools
 
 | Tool | Type | PITR support | Best for | Notes | Fit in this repo |
 |------|------|--------------|----------|-------|------------------|
 | **Barman (EDB)** | Physical backup + WAL archiving | Yes | Standardized PITR workflows, enterprise ops | CNPG integrates via Barman Cloud tooling | **Used** (product-db via CNPG) |
-| **WAL-G** | Physical backup + WAL archiving | Yes | Fast object-store backups, cloud-native | Used by Zalando Spilo images | **Used** (supporting-db via Zalando) |
+| **WAL-G** | Physical backup + WAL archiving | Yes | Fast object-store backups, cloud-native | Used by Zalando Spilo images | **Used** (supporting-shared-db via Zalando) |
 | **pgBackRest** | Physical backup + WAL archiving | Yes | Standalone Postgres clusters, robust features | Strong retention/compression, great for non-operator setups | Not used (could replace WAL-G/Barman in non-operator setups) |
 | **pgagroal** | Connection pooler | No | Connection pooling | **Not a backup tool** | Not applicable |
 

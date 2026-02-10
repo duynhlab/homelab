@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.50.5] - 2026-02-10
+
+### Changed
+
+- **RustFS Bucket Init**: Migrated raw `job-create-bucket.yaml` Job to a HelmRelease using the `cronjobs` chart (v0.1.0, `oci://ghcr.io/duyhenryer/charts/cronjobs`). Bucket creation now runs as an idempotent CronJob (every 30 min) instead of a one-time Job, ensuring the `pg-backups` bucket is always present even after RustFS restarts.
+
+### Added
+
+- **CronJobs OCIRepository**: Added `cronjobs-oci` source (`kubernetes/clusters/local/sources/oci/cronjobs-oci.yaml`) for the shared cronjobs Helm chart.
+
 ## [0.50.4] - 2026-02-09
 
 ### Changed

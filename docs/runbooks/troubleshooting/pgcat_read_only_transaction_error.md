@@ -25,8 +25,8 @@ ERROR: cannot execute UPDATE in a read-only transaction (SQLSTATE 25006)
 sequenceDiagram
     participant App as Cart Service
     participant PgCat as PgCat Pooler
-    participant Primary as transaction-db-rw<br/>(Primary)
-    participant Replica as transaction-db-r<br/>(Replica)
+    participant Primary as transaction-shared-db-rw<br/>(Primary)
+    participant Replica as transaction-shared-db-r<br/>(Replica)
     
     Note over PgCat: Has both primary + replica configured
     
@@ -74,10 +74,10 @@ kubectl logs -n cart -l app=pgcat-transaction --tail=200 | grep -E "Creating a n
 You'll see entries like:
 
 ```
-Creating a new server connection Address { ... host: "transaction-db-r.cart.svc.cluster.local", ... role: Replica ...}
+Creating a new server connection Address { ... host: "transaction-shared-db-r.cart.svc.cluster.local", ... role: Replica ...}
 ```
 
-If writes are going to `transaction-db-r` (Replica), that's the problem.
+If writes are going to `transaction-shared-db-r` (Replica), that's the problem.
 
 ### 3. Verify current PgCat config
 
@@ -90,14 +90,14 @@ Check if both primary and replica servers are configured without query routing e
 ## Current Configuration (Problem)
 
 ```toml
-# kubernetes/infra/configs/databases/clusters/transaction-db/poolers/configmap.yaml
+# kubernetes/infra/configs/databases/clusters/transaction-shared-db/poolers/configmap.yaml
 
 [[pools.cart.shards.0.servers]]
-host = "transaction-db-rw.cart.svc.cluster.local"
+host = "transaction-shared-db-rw.cart.svc.cluster.local"
 role = "primary"
 
 [[pools.cart.shards.0.servers]]
-host = "transaction-db-r.cart.svc.cluster.local"
+host = "transaction-shared-db-r.cart.svc.cluster.local"
 role = "replica"
 ```
 
@@ -135,15 +135,15 @@ kubectl rollout restart deployment pgcat-transaction -n cart
 curl -X POST http://localhost:8080/api/v1/cart -d '{"productId":"1","quantity":1}'
 
 # Should return 200, not 500
-# Check PgCat logs - writes should go to transaction-db-rw
+# Check PgCat logs - writes should go to transaction-shared-db-rw
 ```
 
 ### Option B: Separate RW/RO PgCat Services
 
 Create two PgCat deployments:
 
-1. **pgcat-rw**: Only `transaction-db-rw` (for all writes)
-2. **pgcat-ro**: Only `transaction-db-r` (for read-heavy endpoints)
+1. **pgcat-rw**: Only `transaction-shared-db-rw` (for all writes)
+2. **pgcat-ro**: Only `transaction-shared-db-r` (for read-heavy endpoints)
 
 **Pros:**
 - Guaranteed write isolation
@@ -159,13 +159,13 @@ Create two PgCat deployments:
 ```yaml
 # pgcat-rw ConfigMap - only primary
 [[pools.cart.shards.0.servers]]
-host = "transaction-db-rw.cart.svc.cluster.local"
+host = "transaction-shared-db-rw.cart.svc.cluster.local"
 role = "primary"
 # NO replica server
 
 # pgcat-ro ConfigMap - only replica
 [[pools.cart.shards.0.servers]]
-host = "transaction-db-r.cart.svc.cluster.local"
+host = "transaction-shared-db-r.cart.svc.cluster.local"
 role = "replica"
 # NO primary server
 ```
@@ -189,7 +189,7 @@ To confirm PgCat routing is the issue, temporarily point cart/order directly to 
 ```yaml
 extraEnv:
   - name: DB_HOST
-    value: "transaction-db-rw.cart.svc.cluster.local"  # Direct to primary
+    value: "transaction-shared-db-rw.cart.svc.cluster.local"  # Direct to primary
   - name: DB_PORT
     value: "5432"
 ```
@@ -213,12 +213,12 @@ If you don't need read replica routing, simply remove the replica server:
 ```toml
 # Only primary - all queries go here
 [[pools.cart.shards.0.servers]]
-host = "transaction-db-rw.cart.svc.cluster.local"
+host = "transaction-shared-db-rw.cart.svc.cluster.local"
 role = "primary"
 
 # DELETE or comment out replica server
 # [[pools.cart.shards.0.servers]]
-# host = "transaction-db-r.cart.svc.cluster.local"
+# host = "transaction-shared-db-r.cart.svc.cluster.local"
 # role = "replica"
 ```
 
@@ -243,11 +243,11 @@ done
 
 - No `SQLSTATE 25006` errors in cart/order logs
 - All write operations return 200/201
-- PgCat logs show writes going to `transaction-db-rw` (Primary)
+- PgCat logs show writes going to `transaction-shared-db-rw` (Primary)
 
 ## Related Issues
 
-- **Affected services:** cart, order (both use PgCat with transaction-db)
+- **Affected services:** cart, order (both use PgCat with transaction-shared-db)
 - **Date discovered:** 2026-01-22
 - **Root cause:** PgCat routing writes to read-only replica without query parsing
 - **Chosen fix:** Option A (query parser enabled)

@@ -1,0 +1,130 @@
+{{- if .Values.slo.enabled }}
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: {{ include "microservice.fullname" . }}
+  namespace: monitoring
+  labels:
+    {{- include "microservice.labels" . | nindent 4 }}
+spec:
+  service: {{ .Values.name | quote }}
+  labels:
+    team: {{ .Values.slo.team | default "platform" | quote }}
+    env: {{ .Values.slo.env | default "monitoring" | quote }}
+    service: {{ .Values.name | quote }}
+    namespace: {{ include "microservice.namespace" . | quote }}
+  slos:
+    - name: "availability"
+      objective: {{ .Values.slo.availability.objective }}
+      description: "Availability measures the ratio of successful requests (non-5xx) to total requests"
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(request_duration_seconds_count{
+              app={{ .Values.name | quote }},
+              namespace={{ include "microservice.namespace" . | quote }},
+              job=~"microservices",
+              code=~"5.."
+            }[{{`{{.window}}`}}]))
+          totalQuery: |
+            sum(rate(request_duration_seconds_count{
+              app={{ .Values.name | quote }},
+              namespace={{ include "microservice.namespace" . | quote }},
+              job=~"microservices"
+            }[{{`{{.window}}`}}]))
+      alerting:
+        name: {{ .Values.name | title }}HighErrorRate
+        labels:
+          severity: critical
+          category: availability
+          service: {{ .Values.name | quote }}
+        annotations:
+          summary: "High 5xx error rate detected on {{ .Values.name }}"
+          description: "Availability SLO is at risk. Current error rate is impacting {{ .Values.name }} service availability."
+        pageAlert:
+          labels:
+            severity: page
+            channel: "#alerts"
+        ticketAlert:
+          labels:
+            severity: ticket
+            channel: "#incidents"
+
+    - name: "latency"
+      objective: {{ .Values.slo.latency.objective }}
+      description: "Latency measures the ratio of requests faster than {{ .Values.slo.latency.threshold }}s to total requests"
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(request_duration_seconds_count{
+              app={{ .Values.name | quote }},
+              namespace={{ include "microservice.namespace" . | quote }},
+              job=~"microservices"
+            }[{{`{{.window}}`}}]))
+            -
+            sum(rate(request_duration_seconds_bucket{
+              app={{ .Values.name | quote }},
+              namespace={{ include "microservice.namespace" . | quote }},
+              job=~"microservices",
+              le={{ .Values.slo.latency.threshold | quote }}
+            }[{{`{{.window}}`}}]))
+          totalQuery: |
+            sum(rate(request_duration_seconds_count{
+              app={{ .Values.name | quote }},
+              namespace={{ include "microservice.namespace" . | quote }},
+              job=~"microservices"
+            }[{{`{{.window}}`}}]))
+      alerting:
+        name: {{ .Values.name | title }}HighLatency
+        labels:
+          severity: warning
+          category: latency
+          service: {{ .Values.name | quote }}
+        annotations:
+          summary: "High latency detected on {{ .Values.name }}"
+          description: "More than {{ sub 100 (int .Values.slo.latency.objective) }}% of requests are slower than {{ .Values.slo.latency.threshold }}s threshold."
+        pageAlert:
+          labels:
+            severity: page
+            channel: "#alerts"
+        ticketAlert:
+          labels:
+            severity: ticket
+            channel: "#incidents"
+
+    - name: "error-rate"
+      objective: {{ .Values.slo.errorRate.objective }}
+      description: "Error rate measures the ratio of successful requests (non-4xx/5xx) to total requests"
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(request_duration_seconds_count{
+              app={{ .Values.name | quote }},
+              namespace={{ include "microservice.namespace" . | quote }},
+              job=~"microservices",
+              code=~"4..|5.."
+            }[{{`{{.window}}`}}]))
+          totalQuery: |
+            sum(rate(request_duration_seconds_count{
+              app={{ .Values.name | quote }},
+              namespace={{ include "microservice.namespace" . | quote }},
+              job=~"microservices"
+            }[{{`{{.window}}`}}]))
+      alerting:
+        name: {{ .Values.name | title }}HighOverallErrorRate
+        labels:
+          severity: warning
+          category: errors
+          service: {{ .Values.name | quote }}
+        annotations:
+          summary: "High overall error rate (4xx + 5xx) on {{ .Values.name }}"
+          description: "More than {{ sub 100 (int .Values.slo.errorRate.objective) }}% of requests are returning errors."
+        pageAlert:
+          labels:
+            severity: page
+            channel: "#alerts"
+        ticketAlert:
+          labels:
+            severity: ticket
+            channel: "#incidents"
+{{- end }}

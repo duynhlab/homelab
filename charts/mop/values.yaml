@@ -122,6 +122,22 @@ securityContext: {}
   #   drop:
   #     - ALL
 
+# --- SLO Configuration ---
+# Generates a PrometheusServiceLevel CRD for Sloth Operator.
+# When enabled, Sloth auto-generates PrometheusRules (recording + alerting)
+# following Google SRE multi-window multi-burn-rate pattern.
+slo:
+  enabled: false
+  team: "platform"
+  env: "monitoring"
+  availability:
+    objective: 99.5
+  latency:
+    objective: 95.0
+    threshold: "0.5"
+  errorRate:
+    objective: 99.0
+
 # --- Database Migrations Configuration ---
 
 # Enable database migrations via Flyway init container

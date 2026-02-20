@@ -86,6 +86,9 @@ spec:
     # Kubernetes graceful shutdown configuration
     terminationGracePeriodSeconds: 30  # Shutdown timeout (10s) + buffer (20s)
 
+    slo:
+      enabled: true
+
     resources:
       requests:
         memory: "32Mi"

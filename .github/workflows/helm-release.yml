@@ -7,14 +7,16 @@ on:
     branches:
       - v6
     paths:
-      - 'charts/mop/**'
-      - 'charts/grafana/**'
+      - 'charts/**'
+  pull_request:
+    paths:
+      - 'charts/**'
 
 permissions:
   packages: write # publish chart to ghcr.io
 
 jobs:
-  release:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -25,7 +27,28 @@ jobs:
         with:
           version: v3.9.0
 
-      # Publish OCI charts to ghcr.io
+      - name: Lint charts (SLO enabled)
+        run: helm lint charts/mop/ --set name=test --set slo.enabled=true
+
+      - name: Lint charts (SLO disabled)
+        run: helm lint charts/mop/ --set name=test
+
+      - name: Template dry-run
+        run: helm template test charts/mop/ --set name=test --set slo.enabled=true --namespace test
+
+  release:
+    if: github.event_name == 'push'
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6
+
+      - name: Install Helm
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 #v4.3.1
+        with:
+          version: v3.9.0
+
       - name: Generate charts
         run: |
           mkdir -p .cr-release-packages

@@ -24,8 +24,8 @@ spec:
     replicaCount: 1
 
     image:
-      repository: ghcr.io/duynhne/user
-      tag: v6
+      repository: ghcr.io/duynhne/user-service/user
+      tag: latest
       pullPolicy: Always
 
     service:
@@ -86,6 +86,9 @@ spec:
     # Kubernetes graceful shutdown configuration
     terminationGracePeriodSeconds: 30  # Shutdown timeout (10s) + buffer (20s)
 
+    slo:
+      enabled: true
+
     resources:
       requests:
         memory: "32Mi"
@@ -113,7 +116,7 @@ spec:
     # Database migrations (Flyway init container)
     migrations:
       enabled: true
-      image: ghcr.io/duynhne/user:v6-init
+      image: ghcr.io/duynhne/user-service/user-init:latest
       imagePullPolicy: Always #IfNotPresent
       env:
         DB_HOST: "supporting-shared-db.user.svc.cluster.local"  # Direct connection, no pooler - supporting-shared-db is in user namespace

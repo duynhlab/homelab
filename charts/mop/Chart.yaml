@@ -2,7 +2,7 @@ apiVersion: v2
 name: mop
 description: A generic Helm chart for deploying Go microservices (Microservices Observability Platform)
 type: application
-version: 0.6.0
+version: 0.7.0
 appVersion: "1.0.0"
 maintainers:
   - name: duynhne

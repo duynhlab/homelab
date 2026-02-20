@@ -22,16 +22,7 @@ spec:
       targetLabel: app
     scrapeTimeout: 10s
   namespaceSelector:
-    matchNames:
-    - auth
-    - user
-    - product
-    - cart
-    - order
-    - review
-    - notification
-    - shipping
+    any: true
   selector:
-    matchExpressions:
-    - key: app
-      operator: Exists
+    matchLabels:
+      component: api

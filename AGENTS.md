@@ -210,7 +210,7 @@ flowchart TD
   - Centralized secret management with Kubernetes sync
   - **Secrets Documentation**: [`docs/secrets/secrets-management.md`](docs/secrets/secrets-management.md)
 
-**Observability Details**: See [`docs/observability/apm/README.md`](docs/observability/apm/README.md) for complete APM system overview. Metrics documentation in [`docs/observability/metrics/metrics.md`](docs/observability/metrics/metrics.md)
+**Observability Details**: See [`docs/observability/apm/README.md`](docs/observability/apm/README.md) for complete APM system overview. Metrics documentation in [`docs/observability/metrics/README.md`](docs/observability/metrics/README.md)
 
 ---
 
@@ -370,7 +370,7 @@ make flux-sync
 
 - **Getting Started**: [`docs/platform/setup.md`](docs/platform/setup.md), [`docs/api/api.md`](docs/api/api.md)
 - **Development**: [`docs/api/api.md`](docs/api/api.md), [`docs/api/api.md#error-handling`](docs/api/api.md#error-handling), [`docs/observability/apm/tracing_architecture.md`](docs/observability/apm/tracing_architecture.md)
-- **Monitoring**: [`docs/observability/metrics/metrics.md`](docs/observability/metrics/metrics.md)
+- **Monitoring**: [`docs/observability/metrics/README.md`](docs/observability/metrics/README.md)
 - **APM**: [`docs/observability/apm/README.md`](docs/observability/apm/README.md), [`docs/observability/apm/tracing.md`](docs/observability/apm/tracing.md), [`docs/observability/apm/logging.md`](docs/observability/apm/logging.md), [`docs/observability/apm/profiling.md`](docs/observability/apm/profiling.md)
 - **SLO**: [`docs/observability/slo/README.md`](docs/observability/slo/README.md), [`docs/observability/slo/getting_started.md`](docs/observability/slo/getting_started.md)
 - **Secrets**: [`docs/secrets/secrets-management.md`](docs/secrets/secrets-management.md)

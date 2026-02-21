@@ -114,6 +114,11 @@ spec:
     #   #   - key: topology.kubernetes.io/zone
     #   #     values: ["zone-a", "zone-b", "zone-c"]
   
+  monitoring:
+    customQueriesConfigMap:
+      - name: transaction-shared-db-monitoring-queries
+        key: custom-queries
+
   # Backup configuration (RustFS S3-compatible)
   # Reference: docs/databases/backup.md
   backup:

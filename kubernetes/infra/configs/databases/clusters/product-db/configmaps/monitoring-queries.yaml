@@ -1,0 +1,223 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: product-db-monitoring-queries
+  namespace: product
+  labels:
+    cnpg.io/reload: ""
+data:
+  custom-queries: |
+    pg_stat_statements:
+      query: "SELECT pg_get_userbyid(userid) as user, pg_database.datname, pg_stat_statements.queryid, SUBSTRING(pg_stat_statements.query,1,2000) as query,
+               pg_stat_statements.calls, pg_stat_statements.total_exec_time as time_milliseconds, pg_stat_statements.rows,
+               pg_stat_statements.shared_blks_hit, pg_stat_statements.shared_blks_read, pg_stat_statements.shared_blks_dirtied,
+               pg_stat_statements.shared_blks_written, pg_stat_statements.local_blks_hit, pg_stat_statements.local_blks_read,
+               pg_stat_statements.local_blks_dirtied, pg_stat_statements.local_blks_written, pg_stat_statements.temp_blks_read,
+               pg_stat_statements.temp_blks_written, pg_stat_statements.blk_read_time, pg_stat_statements.blk_write_time
+               FROM pg_stat_statements JOIN pg_database ON pg_database.oid = pg_stat_statements.dbid
+               WHERE pg_stat_statements.query not like '%pg_stat_statements%' and pg_database.datname != 'postgres'
+               and pg_stat_statements.query not like 'SET %' and pg_stat_statements.query != 'COMMIT' and pg_stat_statements.query != 'BEGIN'
+               and pg_stat_statements.query not like '%SAVEPOINT%'
+               ORDER BY pg_stat_statements.total_exec_time DESC LIMIT 100"
+      metrics:
+        - user:
+            usage: "LABEL"
+            description: "The user who executed the statement"
+        - datname:
+            usage: "LABEL"
+            description: "The database in which the statement was executed"
+        - queryid:
+            usage: "LABEL"
+            description: "Internal hash code, computed from the statement's parse tree"
+        - query:
+            usage: "LABEL"
+            description: "Processed query"
+        - calls:
+            usage: "COUNTER"
+            description: "Number of times executed"
+        - time_milliseconds:
+            usage: "COUNTER"
+            description: "Total time spent in the statement, in milliseconds"
+        - rows:
+            usage: "COUNTER"
+            description: "Total number of rows retrieved or affected by the statement"
+        - shared_blks_hit:
+            usage: "COUNTER"
+            description: "Total number of shared block cache hits by the statement"
+        - shared_blks_read:
+            usage: "COUNTER"
+            description: "Total number of shared blocks read by the statement"
+        - shared_blks_dirtied:
+            usage: "COUNTER"
+            description: "Total number of shared blocks dirtied by the statement"
+        - shared_blks_written:
+            usage: "COUNTER"
+            description: "Total number of shared blocks written by the statement"
+        - local_blks_hit:
+            usage: "COUNTER"
+            description: "Total number of local block cache hits by the statement"
+        - local_blks_read:
+            usage: "COUNTER"
+            description: "Total number of local blocks read by the statement"
+        - local_blks_dirtied:
+            usage: "COUNTER"
+            description: "Total number of local blocks dirtied by the statement"
+        - local_blks_written:
+            usage: "COUNTER"
+            description: "Total number of local blocks written by the statement"
+        - temp_blks_read:
+            usage: "COUNTER"
+            description: "Total number of temp blocks read by the statement"
+        - temp_blks_written:
+            usage: "COUNTER"
+            description: "Total number of temp blocks written by the statement"
+        - blk_read_time:
+            usage: "COUNTER"
+            description: "Total time spent reading blocks by the statement, in milliseconds"
+        - blk_write_time:
+            usage: "COUNTER"
+            description: "Total time spent writing blocks by the statement, in milliseconds"
+
+    pg_stat_activity_count:
+      query: "SELECT datname, state, COALESCE(usename, '') as usename, count(*) as count FROM pg_stat_activity WHERE pid <> pg_backend_pid() GROUP BY datname, state, usename"
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Database name"
+        - state:
+            usage: "LABEL"
+            description: "Connection state"
+        - usename:
+            usage: "LABEL"
+            description: "User name"
+        - count:
+            usage: "GAUGE"
+            description: "Number of connections"
+
+    pg_connection_limits:
+      query: "SELECT current_setting('max_connections')::int as max_connections, (SELECT count(*) FROM pg_stat_activity) as current_connections"
+      metrics:
+        - max_connections:
+            usage: "GAUGE"
+            description: "Maximum number of connections"
+        - current_connections:
+            usage: "GAUGE"
+            description: "Current number of connections"
+
+    pg_locks_count:
+      query: "SELECT d.datname, l.mode, count(*) as count FROM pg_locks l JOIN pg_database d ON l.database = d.oid GROUP BY d.datname, l.mode"
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Database name"
+        - mode:
+            usage: "LABEL"
+            description: "Lock mode"
+        - count:
+            usage: "GAUGE"
+            description: "Number of locks"
+
+    pg_blocking_queries:
+      query: "SELECT count(*) as blocked_queries FROM pg_stat_activity WHERE wait_event_type = 'Lock'"
+      metrics:
+        - blocked_queries:
+            usage: "GAUGE"
+            description: "Number of queries waiting on locks"
+
+    pg_stat_user_tables_autovacuum:
+      query: "SELECT schemaname, relname, n_dead_tup, n_live_tup, autovacuum_count, autoanalyze_count FROM pg_stat_user_tables WHERE n_dead_tup > 100 ORDER BY n_dead_tup DESC LIMIT 50"
+      metrics:
+        - schemaname:
+            usage: "LABEL"
+            description: "Schema name"
+        - relname:
+            usage: "LABEL"
+            description: "Table name"
+        - n_dead_tup:
+            usage: "GAUGE"
+            description: "Estimated number of dead tuples"
+        - n_live_tup:
+            usage: "GAUGE"
+            description: "Estimated number of live tuples"
+        - autovacuum_count:
+            usage: "COUNTER"
+            description: "Number of times autovacuum ran"
+        - autoanalyze_count:
+            usage: "COUNTER"
+            description: "Number of times autoanalyze ran"
+
+    pg_table_size:
+      query: "SELECT schemaname, tablename, pg_total_relation_size(schemaname||'.'||tablename) as total_bytes, pg_relation_size(schemaname||'.'||tablename) as table_bytes FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema') ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC LIMIT 30"
+      metrics:
+        - schemaname:
+            usage: "LABEL"
+            description: "Schema name"
+        - tablename:
+            usage: "LABEL"
+            description: "Table name"
+        - total_bytes:
+            usage: "GAUGE"
+            description: "Total size including indexes and TOAST"
+        - table_bytes:
+            usage: "GAUGE"
+            description: "Table-only size"
+
+    pg_stat_user_indexes:
+      query: "SELECT schemaname, relname, indexrelname, idx_scan, idx_tup_read, idx_tup_fetch, pg_relation_size(indexrelid) as index_bytes FROM pg_stat_user_indexes ORDER BY idx_scan ASC LIMIT 30"
+      metrics:
+        - schemaname:
+            usage: "LABEL"
+            description: "Schema name"
+        - relname:
+            usage: "LABEL"
+            description: "Table name"
+        - indexrelname:
+            usage: "LABEL"
+            description: "Index name"
+        - idx_scan:
+            usage: "COUNTER"
+            description: "Number of index scans"
+        - idx_tup_read:
+            usage: "COUNTER"
+            description: "Number of index entries read"
+        - idx_tup_fetch:
+            usage: "COUNTER"
+            description: "Number of live table rows fetched by index scans"
+        - index_bytes:
+            usage: "GAUGE"
+            description: "Index size in bytes"
+
+    pg_database_size:
+      query: "SELECT datname, pg_database_size(datname) as size_bytes FROM pg_database WHERE datistemplate = false"
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Database name"
+        - size_bytes:
+            usage: "GAUGE"
+            description: "Database size in bytes"
+
+    pg_stat_bgwriter_checkpoints:
+      query: "SELECT checkpoints_timed, checkpoints_req, checkpoint_write_time, checkpoint_sync_time, buffers_checkpoint, buffers_clean, buffers_backend FROM pg_stat_bgwriter"
+      metrics:
+        - checkpoints_timed:
+            usage: "COUNTER"
+            description: "Scheduled checkpoints performed"
+        - checkpoints_req:
+            usage: "COUNTER"
+            description: "Requested checkpoints performed"
+        - checkpoint_write_time:
+            usage: "COUNTER"
+            description: "Time spent writing checkpoint files to disk (ms)"
+        - checkpoint_sync_time:
+            usage: "COUNTER"
+            description: "Time spent syncing checkpoint files to disk (ms)"
+        - buffers_checkpoint:
+            usage: "COUNTER"
+            description: "Buffers written during checkpoints"
+        - buffers_clean:
+            usage: "COUNTER"
+            description: "Buffers written by background writer"
+        - buffers_backend:
+            usage: "COUNTER"
+            description: "Buffers written directly by backends"

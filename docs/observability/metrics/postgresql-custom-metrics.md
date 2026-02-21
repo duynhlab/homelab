@@ -340,5 +340,5 @@ kill %1  # or pkill -f "kubectl port-forward"
 ## Related Documentation
 
 - **Database Guide**: [`docs/databases/database.md`](../../databases/database.md) - Custom queries configuration
-- **Metrics Guide**: [`docs/observability/metrics/metrics.md`](./metrics.md) - General metrics documentation
-- **Prometheus Guide**: [`docs/observability/metrics/promql_guide.md`](./promql_guide.md) - PromQL functions and examples
+- **Metrics Guide**: [`docs/observability/metrics/README.md`](./README.md) - General metrics documentation
+- **Prometheus Guide**: [`docs/observability/metrics/promql-guide.md`](./promql-guide.md) - PromQL functions and examples

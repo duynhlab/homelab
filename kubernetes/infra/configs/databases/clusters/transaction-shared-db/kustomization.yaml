@@ -10,6 +10,7 @@ resources:
   - backup/scheduledbackup.yaml
   - secrets/transaction-shared-db-secret-order.yaml
   - instance.yaml
+  - configmaps/monitoring-queries.yaml
   # - extensions-cart.yaml
   # - extensions-order.yaml
   - poolers/

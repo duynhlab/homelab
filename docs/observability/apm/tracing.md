@@ -6,7 +6,7 @@
 Track requests as they flow through multiple microservices to understand performance bottlenecks, debug errors, and visualize service dependencies.
 
 **Key Capabilities:**
-- ✅ Track request journey across 9 microservices
+- ✅ Track request journey across 8 microservices
 - ✅ Identify slow services and bottlenecks
 - ✅ Debug cross-service errors with full context
 - ✅ Correlate traces with logs (via trace_id)
@@ -35,9 +35,9 @@ Track requests as they flow through multiple microservices to understand perform
 ### Real-World Use Cases
 
 #### 1. **Debugging Cross-Service Issues** 🔍
-**Problem**: User reports "checkout is slow" but you have 9 microservices involved.
+**Problem**: User reports "checkout is slow" but you have 8 microservices involved.
 
-**Without Tracing**: Check logs of all 9 services manually, guess which service is slow.
+**Without Tracing**: Check logs of all 8 services manually, guess which service is slow.
 
 **With Tracing**: 
 - See the entire request flow: `Gateway → Order → Payment → Inventory → Shipping`

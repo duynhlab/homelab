@@ -163,7 +163,7 @@ The platform includes **14 Grafana dashboards** covering observability, database
 
 **Access**: All dashboards are available via Grafana at <http://localhost:3000> after port-forwarding (see [Access Points](#access-points) below).
 
-**Documentation**: See [`docs/observability/metrics/grafana_dashboard.md`](docs/observability/metrics/grafana_dashboard.md) for complete dashboard reference (34 panels, query analysis, troubleshooting) and [`docs/observability/metrics/metrics.md`](docs/observability/metrics/metrics.md) for metrics guide.
+**Documentation**: See [`docs/observability/metrics/grafana-dashboard.md`](docs/observability/metrics/grafana-dashboard.md) for complete dashboard reference (34 data panels + 5 row panels, query analysis, troubleshooting) and [`docs/observability/metrics/README.md`](docs/observability/metrics/README.md) for metrics guide.
 
 ---
 
@@ -203,8 +203,8 @@ Complete documentation is available in the [`docs/`](docs/README.md) directory. 
 
 **Observability:**
 - **[APM Overview](docs/observability/apm/README.md)** - Distributed tracing, metrics, logs, profiling
-- **[Metrics Guide](docs/observability/metrics/metrics.md)** - Custom metrics and Prometheus integration
-- **[Grafana Dashboards](docs/observability/metrics/grafana_dashboard.md)** - Dashboard reference (34 panels)
+- **[Metrics Guide](docs/observability/metrics/README.md)** - Custom metrics and Prometheus integration
+- **[Grafana Dashboards](docs/observability/metrics/grafana-dashboard.md)** - Dashboard reference (34 panels)
 - **[SLO Documentation](docs/observability/slo/README.md)** - SLI/SLO definitions and error budgets
 
 **Infrastructure:**

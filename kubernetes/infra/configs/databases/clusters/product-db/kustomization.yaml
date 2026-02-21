@@ -5,6 +5,7 @@ kind: Kustomization
 # Order: secrets → instance → extensions → poolers → monitoring
 resources:
   - instance.yaml
+  - configmaps/monitoring-queries.yaml
   - poolers/
   - monitoring/podmonitor.yaml
   - secrets/product-db-secret.yaml

@@ -134,5 +134,5 @@ Topics covered:
 
 - **Database Architecture Overview**: [`docs/databases/database.md`](../../../../docs/databases/database.md)
 - **PgCat Troubleshooting**: [`docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md`](../../../../docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md)
-- **Monitoring Setup**: [`docs/observability/metrics/metrics.md`](../../../../docs/observability/metrics/metrics.md)
+- **Monitoring Setup**: [`docs/observability/metrics/README.md`](../../../../docs/observability/metrics/README.md)
 - **Replication Deep Dive**: [`docs/databases/replication_strategy.md`](../../../../docs/databases/replication_strategy.md)

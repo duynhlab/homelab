@@ -17,7 +17,7 @@ spec:
   
   path: ./configs/databases
   
-  prune: true
+  prune: false
   wait: true
   
   dependsOn:

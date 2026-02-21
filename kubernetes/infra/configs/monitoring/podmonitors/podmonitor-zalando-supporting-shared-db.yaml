@@ -1,15 +1,17 @@
 # PodMonitor for supporting-shared-db PostgreSQL cluster
-# Prometheus Operator will discover and scrape metrics from postgres_exporter sidecar
+# pg_exporter pilot: scrapes pg_exporter sidecar (port 9630) instead of postgres_exporter (port 9187)
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
   name: postgresql-supporting-shared-db
   namespace: user
+  labels:
+    exporter: pg-exporter
 spec:
   selector:
     matchLabels:
-      application: spilo  # Zalando operator default label
-      cluster-name: supporting-shared-db  # Cluster-specific label
+      application: spilo
+      cluster-name: supporting-shared-db
   podTargetLabels:
     - spilo-role
     - cluster-name
@@ -17,4 +19,4 @@ spec:
   podMetricsEndpoints:
     - port: exporter
       interval: 15s
-      scrapeTimeout: 10s
+      scrapeTimeout: 14s

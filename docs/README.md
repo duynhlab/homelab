@@ -12,6 +12,11 @@ docs/
 │   └── api.md                    # Complete API reference
 ├── databases/                    # Database documentation
 │   ├── database.md               # PostgreSQL architecture
+│   ├── architecture.md           # Database architecture overview
+│   ├── backup.md                 # Backup strategy and retention
+│   ├── extensions.md             # PostgreSQL extensions
+│   ├── pooler.md                 # Connection pooler documentation
+│   ├── replication_strategy.md   # Replication strategy
 │   └── postgresql_internals_product_db.md  # PostgreSQL internals deep dive
 ├── observability/                # Observability documentation
 │   ├── apm/                      # Application Performance Monitoring
@@ -26,28 +31,35 @@ docs/
 │   │   └── victorialogs/         # VictoriaLogs
 │   │       └── README.md
 │   ├── metrics/                  # Metrics documentation
-│   │   ├── metrics.md            # Complete metrics guide
-│   │   ├── grafana_dashboard.md  # Dashboard reference
-│   │   ├── promql_guide.md       # PromQL functions
-│   │   ├── variables_regex.md    # Dashboard variables
-│   │   ├── metrics_label.md      # Label configuration
-│   │   └── POSTGRES_CUSTOM_metrics.md
+│   │   ├── README.md             # Complete metrics guide (RED method, architecture)
+│   │   ├── grafana-dashboard.md  # Dashboard reference (34 panels)
+│   │   ├── grafana-variables.md  # Dashboard variables & regex
+│   │   ├── promql-guide.md       # PromQL functions & counter handling
+│   │   ├── postgresql-monitoring.md           # PostgreSQL monitoring overview
+│   │   ├── postgresql-custom-metrics.md       # PostgreSQL custom queries
+│   │   ├── postgresql-pg-exporter-mapping.md  # pg_exporter metric mapping
+│   │   └── postgresql-pg-exporter-dashboards.md  # pg_exporter dashboard analysis
 │   └── slo/                      # Service Level Objectives
-│       ├── README.md             # SLO overview
-│       ├── getting_started.md    # Quick start
-│       ├── sli_definitions.md    # SLI specifications
-│       ├── slo_targets.md        # SLO targets
+│       ├── README.md             # SLO overview, architecture, targets
+│       ├── getting_started.md    # Enable SLO via Helm values
 │       ├── alerting.md           # Alert configuration
-│       └── error_budget_policy.md
+│       ├── error_budget_policy.md
+│       └── annotation-driven-slo-controller.md  # Future: annotation-based automation
 ├── platform/                     # Platform/deployment documentation
-│   └── setup.md                  # GitOps deployment guide
+│   ├── setup.md                  # GitOps deployment guide
+│   ├── cicd.md                   # CI/CD pipelines
+│   └── sonarcloud.md             # SonarCloud integration
 ├── runbooks/                     # Operational runbooks
+│   ├── metrics-audit-fixes.md    # Metrics audit runbook (before/after fixes)
 │   └── troubleshooting/          # Troubleshooting guides
 │       ├── pgcat_prepared_statement_error.md
 │       ├── pgcat_read_only_transaction_error.md
-│       └── pgcat_upstream_connectivity_errors.md
+│       ├── pgcat_upstream_connectivity_errors.md
+│       ├── postgres_backup_restore.md  # PostgreSQL backup/restore procedures
+│       └── loki_kubernetes_logs_debug.md  # Loki log debugging
 ├── secrets/                      # Secrets management documentation
-│   └── secrets-management.md     # Vault + ESO guide
+│   ├── secrets-management.md     # Vault + ESO guide
+│   └── vault.md                  # Vault configuration details
 └── testing/                      # Testing documentation
     └── k6.md                     # k6 load testing guide
 ```
@@ -76,26 +88,22 @@ docs/
 
 #### Metrics
 
-1. **[Metrics Guide](./observability/metrics/metrics.md)** - Complete metrics documentation
-   - 6 custom application metrics
-   - 32 Grafana dashboard panels
-   - Memory leak detection strategy
+1. **[Metrics Guide](./observability/metrics/README.md)** - Complete metrics documentation
+   - 4 custom application metrics (RED method)
+   - 34 data panels + 5 row panels in Grafana dashboard
+   - Exemplars, path normalization, auto-discovery
 
-2. **[PromQL Guide](./observability/metrics/promql_guide.md)** - Complete guide to PromQL functions
+2. **[PromQL Guide](./observability/metrics/promql-guide.md)** - Complete guide to PromQL functions
    - `rate()` vs `increase()` functions
    - Counter resets handling
    - Time range vs rate interval
    - Best practices and troubleshooting
 
-3. **[Variables & Regex](./observability/metrics/variables_regex.md)** - Dashboard variable patterns
+3. **[Variables & Regex](./observability/metrics/grafana-variables.md)** - Dashboard variable patterns
    - Filter configurations
    - Multi-select patterns
 
-4. **[Metrics Labels](./observability/metrics/metrics_label.md)** - Label configuration guide
-   - Kubernetes Downward API
-   - ServiceMonitor configuration
-
-5. **[Grafana Dashboard Guide](./observability/metrics/grafana_dashboard.md)** - Complete dashboard reference for SRE/DevOps
+4. **[Grafana Dashboard Guide](./observability/metrics/grafana-dashboard.md)** - Complete dashboard reference for SRE/DevOps
     - All 34 panels with query analysis and troubleshooting
     - PromQL patterns and best practices (Google SRE, Prometheus docs)
     - Before/After comparisons for updated panels (Status Code, Apdex, 4xx/5xx)
@@ -105,19 +113,18 @@ docs/
 #### Service Level Objectives (SLO)
 
 1. **[SLO Documentation](./observability/slo/README.md)** - Complete SLO system overview
-   - SLI definitions
-   - Error budgets
-   - Burn rate alerts
+   - Architecture (Helm chart auto-generation)
+   - SLI definitions and PromQL queries
+   - SLO targets and error budgets
 
-2. **[SLO Getting Started](./observability/slo/getting_started.md)** - Quick start guide
-   - Validate definitions
-   - Generate rules
-   - Deploy to Prometheus
+2. **[SLO Getting Started](./observability/slo/getting_started.md)** - Enable SLOs via Helm values
+   - `slo.enabled: true` in HelmRelease
+   - Per-service target overrides
+   - Verification checklist
 
-3. **[SLI Definitions](./observability/slo/sli_definitions.md)** - Service Level Indicator specifications
-4. **[SLO Targets](./observability/slo/slo_targets.md)** - SLO targets per service
-5. **[Alerting](./observability/slo/alerting.md)** - Alert configuration and runbooks
-6. **[Error Budget Policy](./observability/slo/error_budget_policy.md)** - Budget management guidelines
+3. **[Alerting](./observability/slo/alerting.md)** - Alert configuration and runbooks
+4. **[Error Budget Policy](./observability/slo/error_budget_policy.md)** - Budget management guidelines
+5. **[Annotation-Driven Controller](./observability/slo/annotation-driven-slo-controller.md)** - Future approach for large-scale automation
 
 #### Application Performance Monitoring (APM)
 
@@ -142,7 +149,7 @@ docs/
 ### API Reference
 
 1. **[API Reference](./api/api.md)** - Complete API documentation
-    - All 9 microservices
+    - All 8 microservices
     - Endpoints, models, examples
     - Health checks and metrics
 
@@ -179,10 +186,12 @@ docs/
 
 ### Runbooks & Troubleshooting
 
-1. **[PgCat Prepared Statement Error](./runbooks/troubleshooting/pgcat_prepared_statement_error.md)** - Fix intermittent 500 errors with PgCat connection pooler
-    - Prepared statement parameter mismatch
-    - Solution: `prefer_simple_protocol=true`
-    - Diagram: Why the error happens
+1. **[Metrics Audit Fixes](./runbooks/metrics-audit-fixes.md)** - Metrics audit runbook with before/after code, PromQL verification, dashboard impact
+2. **[PgCat Prepared Statement Error](./runbooks/troubleshooting/pgcat_prepared_statement_error.md)** - Fix intermittent 500 errors with PgCat connection pooler
+3. **[PgCat Read-Only Transaction](./runbooks/troubleshooting/pgcat_read_only_transaction_error.md)** - Fix read-only transaction errors
+4. **[PgCat Upstream Connectivity](./runbooks/troubleshooting/pgcat_upstream_connectivity_errors.md)** - Fix upstream connectivity errors
+5. **[PostgreSQL Backup/Restore](./runbooks/troubleshooting/postgres_backup_restore.md)** - Backup and restore procedures (CNPG vs Zalando)
+6. **[Loki Log Debugging](./runbooks/troubleshooting/loki_kubernetes_logs_debug.md)** - Kubernetes log debugging with Loki
 
 ---
 
@@ -196,19 +205,17 @@ docs/
 ### Observability
 
 #### Metrics
-- [Metrics Guide](./observability/metrics/metrics.md) - Comprehensive metrics documentation
-- [PromQL Guide](./observability/metrics/promql_guide.md) - Complete guide to PromQL functions, time range vs rate interval, and counter handling
-- [Variables & Regex](./observability/metrics/variables_regex.md) - Filter patterns
-- [Metrics Labels](./observability/metrics/metrics_label.md) - Label configuration
-- [Grafana Dashboard Guide](./observability/metrics/grafana_dashboard.md) - Complete SRE/DevOps dashboard reference (34 panels + annotations planning)
+- [Metrics Guide](./observability/metrics/README.md) - Comprehensive metrics documentation
+- [PromQL Guide](./observability/metrics/promql-guide.md) - Complete guide to PromQL functions, time range vs rate interval, and counter handling
+- [Variables & Regex](./observability/metrics/grafana-variables.md) - Filter patterns
+- [Grafana Dashboard Guide](./observability/metrics/grafana-dashboard.md) - Complete SRE/DevOps dashboard reference (34 panels + annotations planning)
 
 #### SLO/SRE
-- [SLO Overview](./observability/slo/README.md) - System overview
-- [Getting Started](./observability/slo/getting_started.md) - Setup guide
-- [SLI Definitions](./observability/slo/sli_definitions.md) - Indicator specifications
-- [SLO Targets](./observability/slo/slo_targets.md) - Service targets
+- [SLO Overview](./observability/slo/README.md) - Architecture, SLI definitions, targets
+- [Getting Started](./observability/slo/getting_started.md) - Enable SLOs via Helm values
 - [Alerting](./observability/slo/alerting.md) - Alert configuration
 - [Error Budget Policy](./observability/slo/error_budget_policy.md) - Budget management
+- [Annotation-Driven Controller](./observability/slo/annotation-driven-slo-controller.md) - Future approach
 
 #### APM
 - [APM Overview](./observability/apm/README.md) - Complete APM system overview
@@ -227,14 +234,23 @@ docs/
 ### Databases
 
 - [Database Guide](./databases/database.md) - PostgreSQL database integration guide
+- [Architecture](./databases/architecture.md) - Database architecture overview
+- [Backup Strategy](./databases/backup.md) - Backup architecture and retention
+- [Extensions](./databases/extensions.md) - PostgreSQL extensions
+- [Connection Poolers](./databases/pooler.md) - PgBouncer, PgCat, PgDog
+- [Replication Strategy](./databases/replication_strategy.md) - Replication strategy
+- [PostgreSQL Internals](./databases/postgresql_internals_product_db.md) - Deep dive using product-db
 
 ### Platform
 
 - [Setup Guide](./platform/setup.md) - Complete deployment and configuration guide
+- [CI/CD](./platform/cicd.md) - CI/CD pipelines and workflows
+- [SonarCloud](./platform/sonarcloud.md) - SonarCloud integration
 
 ### Secrets
 
 - [Secrets Management](./secrets/secrets-management.md) - Vault + ESO guide for centralized secret management
+- [Vault](./secrets/vault.md) - Vault configuration details
 
 ### Testing
 
@@ -242,7 +258,12 @@ docs/
 
 ### Runbooks
 
+- [Metrics Audit Fixes](./runbooks/metrics-audit-fixes.md) - Before/after metrics audit with PromQL verification
 - [PgCat Prepared Statement Error](./runbooks/troubleshooting/pgcat_prepared_statement_error.md) - Fix intermittent 500 errors with connection pooler
+- [PgCat Read-Only Transaction](./runbooks/troubleshooting/pgcat_read_only_transaction_error.md) - Fix read-only transaction errors
+- [PgCat Upstream Connectivity](./runbooks/troubleshooting/pgcat_upstream_connectivity_errors.md) - Fix upstream connectivity errors
+- [PostgreSQL Backup/Restore](./runbooks/troubleshooting/postgres_backup_restore.md) - Backup and restore procedures
+- [Loki Log Debugging](./runbooks/troubleshooting/loki_kubernetes_logs_debug.md) - Kubernetes log debugging with Loki
 
 ---
 
@@ -256,9 +277,9 @@ docs/
 - **OCI Registry** - `localhost:5050` (local), stores Kubernetes manifests as artifacts
 - **Helm Chart** - Generic chart for all microservices (`charts/`)
 - **HelmRelease CRDs** - Flux manages Helm deployments declaratively
-- **32 Grafana Panels** - Complete monitoring dashboard
-- **6 Custom Metrics** - Application-level metrics
-- **9 Microservices** - All services with v1 API (canonical)
+- **34 Data Panels + 5 Row Panels** - Complete monitoring dashboard
+- **4 Custom Metrics** - Application-level metrics (RED method)
+- **8 Microservices** - All services with v1 API (canonical)
 - **Monitoring Stack** - Prometheus Operator + Grafana Operator + kube-state-metrics + metrics-server
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
 - **APM Stack** - Tempo + Jaeger (tracing), OTel Collector (fan-out), Pyroscope (profiling), Loki + VictoriaLogs + Vector (logging)
@@ -296,8 +317,9 @@ helm upgrade --install auth charts/mop/ -f charts/mop/values/auth.yaml -n auth -
 **Deploy SLOs:**
 
 ```bash
-# SLOs are deployed automatically via Flux (part of configs-local)
-flux reconcile kustomization configs-local --with-source  # Manual trigger
+# SLOs are auto-generated by mop Helm chart (slo.enabled: true in HelmRelease)
+# Deploy via GitOps:
+make flux-push && make flux-sync
 ```
 
 **Access services:**
@@ -318,4 +340,4 @@ flux reconcile kustomization configs-local --with-source  # Manual trigger
 
 ---
 
-**Last Updated**: January 2026
+**Last Updated**: February 2026

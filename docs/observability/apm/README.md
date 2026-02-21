@@ -84,7 +84,7 @@ kubectl get servicemonitors -n monitoring
 
 ```mermaid
 flowchart LR
-    subgraph Apps["Microservices (9 services)"]
+    subgraph Apps["Microservices (8 services)"]
         Services[auth, user, product, ...]
     end
     

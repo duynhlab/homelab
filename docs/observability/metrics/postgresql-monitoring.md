@@ -180,9 +180,9 @@ All alerts use `or` expressions to cover Zalando (`custom_*` / built-in), CNPG (
 
 #### Why `custom_` Prefix (Renamed Queries)
 
-`postgres_exporter v0.18+` ships with built-in collectors (`stat_bgwriter`, `stat_user_tables`, `database`, `locks`, etc.) that register metric families at startup. If a custom query name produces metrics whose prefix collides with a built-in collector's metric namespace, the custom query is **silently dropped** -- no error in logs, no warning, just zero metrics emitted.
+`postgres_exporter v0.18+` ships with built-in collectors (`stat_bgwriter`, `stat_user_tables`, `database`, `locks`, etc.) that register metric families at startup. If a custom query name produces metrics whose prefix collides with a built-in collector's metric namespace, the Prometheus client library returns a **duplicate registration error** on the `/metrics` endpoint. The scrape fails with an HTTP 500 and the error is visible in the exporter logs and in Prometheus scrape error metrics.
 
-For example, a custom query named `pg_database_size` would emit `pg_database_size_size_bytes`, but the built-in `database` collector already registers `pg_database_size_bytes`. The Prometheus client detects the shared prefix and drops the custom query entirely.
+For example, a custom query named `pg_database_size` would emit `pg_database_size_size_bytes`, but the built-in `database` collector already registers `pg_database_size_bytes`. The Prometheus client detects the shared prefix and rejects the conflicting metric family.
 
 To avoid this, all custom queries that conflicted were renamed with a `custom_` prefix.
 
@@ -190,11 +190,11 @@ To avoid this, all custom queries that conflicted were renamed with a `custom_` 
 
 | Original Name | New Name | Conflicting Built-in Collector |
 |---|---|---|
-| pg_connection_limits | custom_connection_limits | (silently dropped, no matching built-in but naming pattern caused failure) |
-| pg_blocking_queries | custom_blocking_queries | (silently dropped, same root cause) |
+| pg_connection_limits | custom_connection_limits | Naming pattern overlap caused registration error |
+| pg_blocking_queries | custom_blocking_queries | Naming pattern overlap caused registration error |
 | pg_stat_user_tables_autovacuum | custom_autovacuum_stats | `stat_user_tables` (registers `pg_stat_user_tables_n_dead_tup`, etc.) |
-| pg_table_size | custom_table_size | (silently dropped, naming pattern overlap) |
-| pg_stat_user_indexes | custom_stat_user_indexes | (silently dropped, naming pattern overlap) |
+| pg_table_size | custom_table_size | Naming pattern overlap caused registration error |
+| pg_stat_user_indexes | custom_stat_user_indexes | Naming pattern overlap caused registration error |
 
 #### Removed Queries (Built-in Equivalents)
 

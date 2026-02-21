@@ -1,0 +1,16 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: pg-exporter-instance
+  namespace: monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "Databases"
+  configMapRef:
+    name: grafana-dashboard-pg-exporter-instance
+    key: pg-exporter-instance.json
+  datasources:
+    - inputName: DS_PROMETHEUS
+      datasourceName: Prometheus

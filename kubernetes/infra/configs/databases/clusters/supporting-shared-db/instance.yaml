@@ -142,7 +142,7 @@ spec:
   # pg_exporter pilot: 600+ built-in metrics, auto-discovery for 3 databases, per-query caching/timeout
   sidecars:
     - name: exporter
-      image: pgsty/pg_exporter:latest
+      image: pgsty/pg_exporter:v1.2.0
       ports:
         - name: exporter
           containerPort: 9630

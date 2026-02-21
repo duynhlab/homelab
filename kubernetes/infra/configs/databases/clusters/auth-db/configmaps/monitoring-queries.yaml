@@ -11,7 +11,7 @@ data:
                pg_stat_statements.shared_blks_hit, pg_stat_statements.shared_blks_read, pg_stat_statements.shared_blks_dirtied,
                pg_stat_statements.shared_blks_written, pg_stat_statements.local_blks_hit, pg_stat_statements.local_blks_read,
                pg_stat_statements.local_blks_dirtied, pg_stat_statements.local_blks_written, pg_stat_statements.temp_blks_read,
-               pg_stat_statements.temp_blks_written, pg_stat_statements.blk_read_time, pg_stat_statements.blk_write_time
+               pg_stat_statements.temp_blks_written, pg_stat_statements.shared_blk_read_time as blk_read_time, pg_stat_statements.shared_blk_write_time as blk_write_time
                FROM pg_stat_statements JOIN pg_database ON pg_database.oid = pg_stat_statements.dbid
                WHERE pg_stat_statements.query not like '%pg_stat_statements%' and pg_database.datname != 'postgres'
                and pg_stat_statements.query not like 'SET %' and pg_stat_statements.query != 'COMMIT' and pg_stat_statements.query != 'BEGIN'
@@ -71,10 +71,10 @@ data:
             description: "Total number of temp blocks written by the statement"
         - blk_read_time:
             usage: "COUNTER"
-            description: "Total time spent reading blocks by the statement, in milliseconds"
+            description: "Total time spent reading shared blocks, in milliseconds (PG17+: shared_blk_read_time)"
         - blk_write_time:
             usage: "COUNTER"
-            description: "Total time spent writing blocks by the statement, in milliseconds"
+            description: "Total time spent writing shared blocks, in milliseconds (PG17+: shared_blk_write_time)"
     
     pg_replication:
       query: "SELECT CASE WHEN NOT pg_is_in_recovery() THEN 0 ELSE GREATEST (0, EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))) END AS lag"
@@ -93,7 +93,7 @@ data:
             description: "Time at which postmaster started"
 
     custom_connection_limits:
-      query: "SELECT current_setting('max_connections')::int as max_connections, (SELECT count(*) FROM pg_stat_activity) as current_connections"
+      query: "SELECT current_setting('max_connections')::int as max_connections, (SELECT count(*) FROM pg_stat_activity WHERE backend_type = 'client backend') as current_connections"
       master: true
       metrics:
         - max_connections:
@@ -101,10 +101,10 @@ data:
             description: "Maximum number of connections"
         - current_connections:
             usage: "GAUGE"
-            description: "Current number of connections"
+            description: "Current number of client connections"
 
     pg_locks_count:
-      query: "SELECT d.datname, l.mode, count(*) as count FROM pg_locks l JOIN pg_database d ON l.database = d.oid GROUP BY d.datname, l.mode"
+      query: "SELECT COALESCE(d.datname, 'shared') as datname, l.mode, count(*) as count FROM pg_locks l LEFT JOIN pg_database d ON l.database = d.oid GROUP BY COALESCE(d.datname, 'shared'), l.mode"
       metrics:
         - datname:
             usage: "LABEL"
@@ -125,7 +125,7 @@ data:
             description: "Number of queries waiting on locks"
 
     custom_autovacuum_stats:
-      query: "SELECT schemaname, relname, n_dead_tup, n_live_tup, autovacuum_count, autoanalyze_count FROM pg_stat_user_tables WHERE n_dead_tup > 100 ORDER BY n_dead_tup DESC LIMIT 50"
+      query: "SELECT schemaname, relname, n_dead_tup, n_live_tup, autovacuum_count, autoanalyze_count FROM pg_stat_user_tables"
       metrics:
         - schemaname:
             usage: "LABEL"
@@ -147,7 +147,7 @@ data:
             description: "Number of times autoanalyze ran"
 
     custom_table_size:
-      query: "SELECT schemaname, tablename, pg_total_relation_size(schemaname||'.'||tablename) as total_bytes, pg_relation_size(schemaname||'.'||tablename) as table_bytes FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema') ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC LIMIT 30"
+      query: "SELECT schemaname, tablename, pg_total_relation_size(format('%I.%I', schemaname, tablename)) as total_bytes, pg_relation_size(format('%I.%I', schemaname, tablename)) as table_bytes FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema') ORDER BY pg_total_relation_size(format('%I.%I', schemaname, tablename)) DESC LIMIT 30"
       metrics:
         - schemaname:
             usage: "LABEL"
@@ -163,7 +163,7 @@ data:
             description: "Table-only size"
 
     custom_stat_user_indexes:
-      query: "SELECT schemaname, relname, indexrelname, idx_scan, idx_tup_read, idx_tup_fetch, pg_relation_size(indexrelid) as index_bytes FROM pg_stat_user_indexes ORDER BY idx_scan ASC LIMIT 30"
+      query: "SELECT schemaname, relname, indexrelname, idx_scan, idx_tup_read, idx_tup_fetch, pg_relation_size(indexrelid) as index_bytes FROM pg_stat_user_indexes"
       metrics:
         - schemaname:
             usage: "LABEL"

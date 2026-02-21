@@ -1221,8 +1221,8 @@ sum(metric{...}) by (app)
 
 | Function | Purpose | Example |
 |----------|---------|---------|
-| `rate()` | Per-second rate over interval | `rate(requests_total[5m])` |
-| `increase()` | Total increase over interval | `increase(requests_total[1h])` |
+| `rate()` | Per-second rate over interval | `rate(request_duration_seconds_count[5m])` |
+| `increase()` | Total increase over interval | `increase(request_duration_seconds_count[1h])` |
 | `histogram_quantile()` | Calculate percentile | `histogram_quantile(0.95, ...)` |
 | `sum()` | Aggregate values | `sum(metric) by (label)` |
 | `count()` | Count time series | `count(up{...})` |

@@ -33,6 +33,12 @@ configMapGenerator:
   - name: grafana-dashboard-redis
     files:
       - redis.json
+  - name: grafana-dashboard-pg-exporter-instance
+    files:
+      - pg-exporter-instance.json
+  - name: grafana-dashboard-pg-exporter-self
+    files:
+      - pg-exporter-self.json
 
 resources:
   - grafana-dashboard-main.yaml
@@ -50,3 +56,5 @@ resources:
   - grafana-dashboard-pgdog.yaml
   - grafana-dashboard-loki.yaml
   - grafana-dashboard-redis.yaml
+  - grafana-dashboard-pg-exporter-instance.yaml
+  - grafana-dashboard-pg-exporter-self.yaml

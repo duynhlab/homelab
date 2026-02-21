@@ -138,34 +138,31 @@ spec:
     limits:
       cpu: "100m"
       memory: "256Mi"
-  # Sidecars: postgres_exporter for Prometheus metrics collection and Vector for log collection
+  # Sidecars: pg_exporter (Pigsty) for Prometheus metrics + Vector for log collection
+  # pg_exporter pilot: 600+ built-in metrics, auto-discovery for 3 databases, per-query caching/timeout
   sidecars:
     - name: exporter
-      image: quay.io/prometheuscommunity/postgres-exporter:v0.18.1
+      image: pgsty/pg_exporter:v1.2.0
       ports:
         - name: exporter
-          containerPort: 9187
+          containerPort: 9630
           protocol: TCP
       resources:
         limits:
+          cpu: 100m
+          memory: 128Mi
+        requests:
           cpu: 50m
           memory: 64Mi
-        requests:
-          cpu: 20m
-          memory: 32Mi
       env:
-        - name: "DATA_SOURCE_URI"
-          value: "localhost/postgres?sslmode=require"
-        - name: "DATA_SOURCE_USER"
-          value: "$(POSTGRES_USER)"
-        - name: "DATA_SOURCE_PASS"
-          value: "$(POSTGRES_PASSWORD)"
-        - name: "PG_EXPORTER_EXTEND_QUERY_PATH"
-          value: "/etc/postgres-exporter/queries.yaml"
-      volumeMounts:
-        - name: postgres-monitoring-queries
-          mountPath: /etc/postgres-exporter
-          readOnly: true
+        - name: PG_EXPORTER_URL
+          value: "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:5432/postgres?sslmode=require"
+        - name: PG_EXPORTER_AUTO_DISCOVERY
+          value: "true"
+        - name: PG_EXPORTER_CONNECT_TIMEOUT
+          value: "200"
+        - name: PG_EXPORTER_TAG
+          value: "cls=supporting-shared-db"
     - name: vector
       image: timberio/vector:0.52.0-alpine
       args:
@@ -197,10 +194,3 @@ spec:
       volumeSource:
         configMap:
           name: pg-zalando-vector-config
-    - name: postgres-monitoring-queries
-      targetContainers:
-        - exporter
-      mountPath: /etc/postgres-exporter
-      volumeSource:
-        configMap:
-          name: postgres-monitoring-queries

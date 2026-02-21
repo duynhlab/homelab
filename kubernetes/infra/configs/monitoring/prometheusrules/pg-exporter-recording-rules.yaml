@@ -1,0 +1,156 @@
+# Recording rules for pg_exporter (Pigsty) dashboards.
+# Adapted from pgsty/pigsty pgsql.yml -- only the 44 rules required by pgrds-instance.json.
+# Raw metrics come from pg_exporter sidecar on supporting-shared-db (port 9630).
+# Labels: ins (auto from pg_exporter), cls (via PG_EXPORTER_TAG), datname (auto-discovery).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pg-exporter-recording-rules
+  namespace: monitoring
+  labels:
+    prometheus: kube-prometheus-stack
+spec:
+  groups:
+    # ---------------------------------------------------------------
+    # Database-level rules (pg:db:*)
+    # Aggregated per database from raw pg_exporter counters.
+    # ---------------------------------------------------------------
+    - name: pg-exporter-db
+      interval: 15s
+      rules:
+        # --- Transactions ---
+        - record: pg:db:xact_commit_rate1m
+          expr: rate(pg_db_xact_commit[1m])
+        - record: pg:db:xact_commit_rate5m
+          expr: rate(pg_db_xact_commit[5m])
+        - record: pg:db:xact_rollback_rate1m
+          expr: rate(pg_db_xact_rollback[1m])
+        - record: pg:db:xact_rollback_rate5m
+          expr: rate(pg_db_xact_rollback[5m])
+        - record: pg:db:xact_total_rate1m
+          expr: rate(pg_db_xact_total[1m])
+
+        # --- Active time (PG14+) ---
+        - record: pg:db:active_time_rate1m
+          expr: rate(pg_db_active_time[1m])
+
+        # --- CRUD ---
+        - record: pg:db:tup_fetched_rate1m
+          expr: rate(pg_db_tup_fetched[1m])
+        - record: pg:db:tup_modified_rate1m
+          expr: rate(pg_db_tup_modified[1m])
+
+        # --- Connections ---
+        - record: pg:db:num_backends
+          expr: pg_db_numbackends
+        - record: pg:db:active_backends
+          expr: sum without(state) (pg_activity_count{state="active"})
+        - record: pg:db:ixact_backends
+          expr: sum without(state) (pg_activity_count{state=~"idle in.*"})
+        - record: pg:db:conn_limit
+          expr: (pg_db_conn_limit != -1) or (0 * pg_db_conn_limit + on(cls, ins) group_left pg_setting_max_connections)
+        - record: pg:db:conn_usage
+          expr: pg:db:num_backends / pg:db:conn_limit
+
+        # --- Locks ---
+        - record: pg:db:rlock_count
+          expr: sum without(mode) (pg_lock_count{mode="AccessShareLock"})
+        - record: pg:db:wlock_count
+          expr: sum without(mode) (pg_lock_count{mode=~"RowShareLock|RowExclusiveLock"})
+        - record: pg:db:xlock_count
+          expr: sum without(mode) (pg_lock_count{mode!~"AccessShareLock|RowShareLock|RowExclusiveLock"})
+
+        # --- Age ---
+        - record: pg:db:age
+          expr: pg_db_age / 2147483647
+
+        # --- Disk / Memory blocks ---
+        - record: pg:db:blks_read_1m
+          expr: increase(pg_db_blks_read[1m])
+        - record: pg:db:blks_hit_1m
+          expr: increase(pg_db_blks_hit[1m])
+        - record: pg:db:blks_access_1m
+          expr: increase(pg_db_blks_access[1m])
+        - record: pg:db:blks_hit_ratio1m
+          expr: pg:db:blks_hit_1m / pg:db:blks_access_1m
+        - record: pg:db:blk_read_time_seconds_rate1m
+          expr: rate(pg_db_blk_read_time[1m])
+        - record: pg:db:blk_write_time_seconds_rate1m
+          expr: rate(pg_db_blk_write_time[1m])
+
+    # ---------------------------------------------------------------
+    # Instance-level rules (pg:ins:*)
+    # Aggregated across databases: sum without(datname).
+    # ---------------------------------------------------------------
+    - name: pg-exporter-ins
+      interval: 15s
+      rules:
+        # --- Transactions ---
+        - record: pg:ins:xact_commit_rate1m
+          expr: sum without(datname) (pg:db:xact_commit_rate1m)
+        - record: pg:ins:xact_commit_rate5m
+          expr: sum without(datname) (pg:db:xact_commit_rate5m)
+        - record: pg:ins:xact_rollback_rate1m
+          expr: sum without(datname) (pg:db:xact_rollback_rate1m)
+        - record: pg:ins:xact_rollback_rate5m
+          expr: sum without(datname) (pg:db:xact_rollback_rate5m)
+        - record: pg:ins:xact_total_rate1m
+          expr: sum without(datname) (pg:db:xact_total_rate1m)
+
+        # --- Active time ---
+        - record: pg:ins:active_time_rate1m
+          expr: sum without(datname) (pg:db:active_time_rate1m)
+
+        # --- CRUD ---
+        - record: pg:ins:tup_fetched_rate1m
+          expr: sum without(datname) (pg:db:tup_fetched_rate1m)
+        - record: pg:ins:tup_modified_rate1m
+          expr: sum without(datname) (pg:db:tup_modified_rate1m)
+
+        # --- Connections ---
+        - record: pg:ins:num_backends
+          expr: sum without(datname) (pg:db:num_backends)
+        - record: pg:ins:active_backends
+          expr: sum without(datname) (pg:db:active_backends)
+        - record: pg:ins:ixact_backends
+          expr: sum without(datname) (pg:db:ixact_backends)
+        - record: pg:ins:conn_limit
+          expr: pg_setting_max_connections
+
+        # --- Locks ---
+        - record: pg:ins:rlock_count
+          expr: sum without(datname) (pg:db:rlock_count)
+        - record: pg:ins:wlock_count
+          expr: sum without(datname) (pg:db:wlock_count)
+        - record: pg:ins:xlock_count
+          expr: sum without(datname) (pg:db:xlock_count)
+
+        # --- Age ---
+        - record: pg:ins:age
+          expr: max without(datname) (pg:db:age{datname!~"template[0-9]"})
+
+        # --- Replication / WAL ---
+        - record: pg:ins:timeline
+          expr: pg_checkpoint_tli
+        - record: pg:ins:lsn_rate1m
+          expr: rate(pg_lsn[1m])
+
+    # ---------------------------------------------------------------
+    # Cluster-level rules (pg:cls:*)
+    # ---------------------------------------------------------------
+    - name: pg-exporter-cls
+      interval: 15s
+      rules:
+        - record: pg:cls:active_time_rate1m
+          expr: sum by (job, cls) (pg:ins:active_time_rate1m)
+
+    # ---------------------------------------------------------------
+    # Object-level rules (pg:table:*, pg:query:*)
+    # ---------------------------------------------------------------
+    - name: pg-exporter-objects
+      interval: 15s
+      rules:
+        - record: pg:table:scan_rate1m
+          expr: rate(pg_table_tbl_scan[1m])
+        - record: pg:query:call_rate1m
+          expr: rate(pg_query_calls[1m])

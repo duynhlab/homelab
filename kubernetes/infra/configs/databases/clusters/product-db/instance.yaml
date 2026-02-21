@@ -79,6 +79,11 @@ spec:
     # Allow async replicas for read scaling (no sync replication)
     syncReplicaElectionConstraint:
       enabled: false  # Allow async replicas for read scaling
+
+  monitoring:
+    customQueriesConfigMap:
+      - name: product-db-monitoring-queries
+        key: custom-queries
   
   # Bootstrap configuration
   bootstrap:

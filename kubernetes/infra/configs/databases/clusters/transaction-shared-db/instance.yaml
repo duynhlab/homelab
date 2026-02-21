@@ -22,6 +22,7 @@ spec:
     # Preload libraries required by extensions
     shared_preload_libraries:
       - pgaudit
+      - pg_stat_statements
     
     # Synchronous Replication Configuration
     # Zero data loss with at least 1 synchronous replica required
@@ -92,6 +93,10 @@ spec:
       pgaudit.log_rows: "on"  # Log number of rows affected
       
       track_io_timing: "on"
+
+      # Config for pg_stat_statements
+      pg_stat_statements.track: "all"
+      pg_stat_statements.max: "10000"
       
       # Replication (for logical replication slot sync)
       # For PostgreSQL 17+: Use sync_replication_slots parameter (native PostgreSQL feature)
@@ -114,6 +119,11 @@ spec:
     #   #   - key: topology.kubernetes.io/zone
     #   #     values: ["zone-a", "zone-b", "zone-c"]
   
+  monitoring:
+    customQueriesConfigMap:
+      - name: transaction-shared-db-monitoring-queries
+        key: custom-queries
+
   # Backup configuration (RustFS S3-compatible)
   # Reference: docs/databases/backup.md
   backup:

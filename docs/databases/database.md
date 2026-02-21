@@ -1000,9 +1000,9 @@ Connection poolers solve the "too many connections" problem by reusing PostgreSQ
 
 - **[Backup Strategy](./backup.md)** - Backup architecture, retention, bucket layout
 - **[Backup/Restore Runbook](../runbooks/troubleshooting/postgres_backup_restore.md)** - Restore procedures (CNPG vs Zalando)
-- **[Setup Guide](./setup.md)** - Complete deployment and configuration guide
-- **[Error Handling](./api.md#error-handling)** - Database error handling patterns
-- **[API Reference](./api.md)** - API endpoints using database
+- **[Setup Guide](../platform/setup.md)** - Complete deployment and configuration guide
+- **[Error Handling](../api/api.md#error-handling)** - Database error handling patterns
+- **[API Reference](../api/api.md)** - API endpoints using database
 - **[PgCat Prepared Statement Error](../runbooks/troubleshooting/pgcat_prepared_statement_error.md)** - Fix intermittent 500 errors with PgCat
 
 ## Troubleshooting

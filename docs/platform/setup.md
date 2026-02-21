@@ -250,5 +250,5 @@ monitoring/
 
 ---
 
-For detailed API documentation, see [api.md](./api/api.md).  
-For database architecture, see [database.md](./database/database.md).
+For detailed API documentation, see [api.md](../api/api.md).  
+For database architecture, see [database.md](../databases/database.md).

@@ -17,7 +17,7 @@ spec:
   
   path: ./configs/monitoring
   
-  prune: false
+  prune: true
   wait: true
   
   dependsOn:
@@ -27,10 +27,6 @@ spec:
     - apiVersion: grafana.integreatly.org/v1beta1
       kind: Grafana
       name: grafana
-      namespace: monitoring
-    - apiVersion: sloth.slok.dev/v1
-      kind: PrometheusServiceLevel
-      name: auth
       namespace: monitoring
     - apiVersion: helm.toolkit.fluxcd.io/v2
       kind: HelmRelease

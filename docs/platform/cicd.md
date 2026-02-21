@@ -376,6 +376,77 @@ trivy image --sbom ghcr.io/duynhne/auth-service:latest
 | Complexity | Zero -- built into BuildKit, no extra tools |
 | Cost | 100% free (open source tooling) |
 
+### Local SBOM Testing
+
+You can generate and inspect SBOM locally without relying on CI. This is useful for debugging, auditing, or verifying image contents before pushing.
+
+#### Prerequisites
+
+```bash
+# Install syft (SBOM generator by Anchore)
+curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+# Install grype (vulnerability scanner by Anchore, works with syft SBOMs)
+curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+```
+
+#### Generate SBOM from a GHCR image
+
+```bash
+# Table format (quick overview)
+syft ghcr.io/duynhne/frontend/frontend:latest -o table
+
+# SPDX JSON (standard format, same as BuildKit generates)
+syft ghcr.io/duynhne/frontend/frontend:latest -o spdx-json > frontend-sbom.spdx.json
+
+# CycloneDX JSON (alternative standard)
+syft ghcr.io/duynhne/frontend/frontend:latest -o cyclonedx-json > frontend-sbom.cdx.json
+```
+
+#### Generate SBOM from a locally built image (podman)
+
+```bash
+# Build image locally with podman
+podman build -t frontend:local -f Dockerfile .
+
+# Generate SBOM from local image
+syft frontend:local -o table
+syft frontend:local -o spdx-json > frontend-sbom.spdx.json
+```
+
+#### Scan image for vulnerabilities
+
+```bash
+# Full scan (all severities)
+grype ghcr.io/duynhne/frontend/frontend:latest
+
+# Only show fixable vulnerabilities, fail on HIGH+
+grype ghcr.io/duynhne/frontend/frontend:latest --only-fixed --fail-on high
+
+# Scan a local image
+grype frontend:local
+```
+
+#### Example output
+
+```
+# syft (SBOM table)
+NAME                VERSION        TYPE
+alpine-baselayout   3.7.1-r8       apk
+busybox             1.37.0-r30     apk
+curl                8.17.0-r1      apk
+nginx               1.29.5-r1      apk
+...
+
+# grype (vulnerability scan)
+NAME    INSTALLED   TYPE  VULNERABILITY   SEVERITY
+tiff    4.7.1-r0    apk   CVE-2023-52356  High
+curl    8.17.0-r1   apk   CVE-2025-14819  Medium
+...
+```
+
+> **Note**: `syft` generates the same SPDX format as BuildKit's built-in SBOM generator. The difference is that CI uses BuildKit (embedded Syft) during `docker build`, while local testing uses Syft standalone against an already-built image.
+
 ### Current Status
 
 SBOM support is **wired up but off by default** (`sbom: false`). To enable it for a service, add `sbom: true` to the `docker-build` job in that service's `ci.yml`. No changes to shared-workflows are needed.

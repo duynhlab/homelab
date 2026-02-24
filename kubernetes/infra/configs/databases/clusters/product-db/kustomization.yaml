@@ -10,7 +10,7 @@ resources:
   - monitoring/podmonitor.yaml
   - secrets/product-db-secret.yaml
   - secrets/pgdog-product-creds.yaml
-  - secrets/pg-backup-rustfs-credentials-vault.yaml
+  # pg-backup-rustfs-credentials: managed by ClusterExternalSecret (configs/secrets/cluster-external-secrets/)
   - backup/backup-daily.yaml
   - backup/backup-every-6h.yaml
 

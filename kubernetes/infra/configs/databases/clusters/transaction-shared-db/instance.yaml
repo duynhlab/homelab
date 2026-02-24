@@ -129,7 +129,7 @@ spec:
   backup:
     retentionPolicy: "7d"
     barmanObjectStore:
-      destinationPath: s3://pg-backups/transaction-shared-db/
+      destinationPath: s3://pg-backups-cnpg/transaction-shared-db/
       endpointURL: http://rustfs-svc.rustfs.svc.cluster.local:9000
       s3Credentials:
         accessKeyId:
@@ -145,7 +145,7 @@ spec:
       database: cart  # Default database
       owner: cart
       secret:
-        name: transaction-shared-db-secret-vault  # Vault-backed (ExternalSecret)
+        name: transaction-shared-db-secret  # Vault-backed (ExternalSecret)
       dataChecksums: true
       encoding: "UTF8"
       localeCType: "C"

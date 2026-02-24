@@ -6,7 +6,6 @@
 |---------|----------|-----------|-----------|-------------|--------|-----------------|-----------------|
 | **auth-db** | Zalando | auth | 3 (1 Leader + 2 Standbys) | Streaming (async) | PgBouncer (2 pods) | `auth-db-pooler.auth.svc:5432` | `auth-db.auth.svc:5432` |
 | **supporting-shared-db** | Zalando | user | 1 | N/A | PgBouncer (2 pods) | `supporting-shared-db-pooler.user.svc:5432` | `supporting-shared-db.user.svc:5432` |
-| **review-db** | Zalando | review | 1 | N/A | None | N/A | `review-db.review.svc:5432` |
 | **product-db** | CloudNativePG | product | 3 (1 Primary + 2 Replicas) | Async | PgDog (1 pod) | `pgdog-product.product.svc:6432` | `product-db-rw.product.svc:5432` |
 | **transaction-shared-db** | CloudNativePG | cart | 3 (1 Primary + 2 Replicas) | Synchronous | PgCat (2 pods) | `pgcat.cart.svc:5432` | `transaction-shared-db-rw.cart.svc:5432` |
 
@@ -17,8 +16,7 @@
 For detailed architecture, configuration, and components of each cluster, please refer to their respective directories:
 
 - **[auth-db](auth-db/README.md)**: Authentication service database.
-- **[supporting-shared-db](supporting-shared-db/README.md)**: Shared database for User, Notification, and Shipping services.
-- **[review-db](review-db/README.md)**: Review service database.
+- **[supporting-shared-db](supporting-shared-db/README.md)**: Shared database for User, Notification, Shipping, and Review services.
 - **[product-db](product-db/README.Md)**: Product service database (includes backup architecture).
 - **[transaction-shared-db](transaction-shared-db/README.md)**: Transaction (cart/order) service database.
 

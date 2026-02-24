@@ -6,7 +6,7 @@ kind: Kustomization
 resources:
   - secrets/transaction-shared-db-secret-cart.yaml
   - secrets/pgcat-transaction-creds.yaml
-  - secrets/pg-backup-rustfs-credentials-vault.yaml
+  # pg-backup-rustfs-credentials: managed by ClusterExternalSecret (configs/secrets/cluster-external-secrets/)
   - backup/scheduledbackup.yaml
   - secrets/transaction-shared-db-secret-order.yaml
   - instance.yaml

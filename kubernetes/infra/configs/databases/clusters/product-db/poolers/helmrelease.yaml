@@ -6,7 +6,7 @@
 #
 # Vault-backed secrets are available at:
 #   - Secret: pgdog-product-credentials-vault (namespace: product)
-#   - Vault path: secret/data/poolers/pgdog-product
+#   - Vault path: secret/data/local/databases/pgdog-product/credentials
 #
 # Future options to eliminate inline passwords:
 # 1. Upstream: Request passwordFromSecret support in PgDog chart

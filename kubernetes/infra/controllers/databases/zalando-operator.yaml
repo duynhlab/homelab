@@ -20,7 +20,7 @@ spec:
   values:
     configAwsOrGcp:
       aws_region: us-east-1
-      wal_s3_bucket: pg-backups
+      wal_s3_bucket: pg-backups-zalando
     configKubernetes:
       cluster_domain: cluster.local
       enable_cross_namespace_secret: true

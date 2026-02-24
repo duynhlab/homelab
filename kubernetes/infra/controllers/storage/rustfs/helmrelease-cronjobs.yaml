@@ -1,6 +1,9 @@
-# CronJob to ensure pg-backups bucket exists in RustFS
-# Required before first backup - Barman/CNPG expects bucket to exist
-# Runs periodically (idempotent) - safe to re-run if bucket already exists
+# CronJob to ensure backup buckets, service accounts, and IAM policies exist in RustFS
+# Creates per-operator buckets with dedicated service accounts (least-privilege)
+# Runs periodically (idempotent) - safe to re-run
+#
+# Buckets:  pg-backups-zalando (Zalando/WAL-G), pg-backups-cnpg (CloudNativePG/Barman)
+# Accounts: backup-zalando, backup-cnpg (bucket-scoped IAM policies)
 #
 # Chart: cronjobs v0.2.0 from oci://ghcr.io/duyhenryer/charts/cronjobs
 # Verify: kubectl get cronjob -n rustfs
@@ -34,13 +37,11 @@ spec:
 
   values:
     jobs:
-      create-pg-backups:
+      setup-pg-backup-buckets:
         image:
-          repository: amazon/aws-cli
-          tag: "2.21.0"
+          repository: minio/mc
+          tag: "RELEASE.2025-08-13T08-35-41Z"
           imagePullPolicy: IfNotPresent
-        # Run every 30 minutes to ensure bucket exists
-        # Idempotent - safe if bucket already exists
         schedule: "*/30 * * * *"
         failedJobsHistoryLimit: 1
         successfulJobsHistoryLimit: 1
@@ -53,29 +54,83 @@ spec:
           - |
             set -e
             ENDPOINT="http://rustfs-svc.rustfs.svc.cluster.local:9000"
-            echo "Waiting for RustFS to be ready..."
+
+            echo "=== Waiting for RustFS ==="
             for i in 1 2 3 4 5 6 7 8 9 10; do
-              if aws s3 ls --endpoint-url "$ENDPOINT" --region us-east-1 2>/dev/null; then
+              if mc alias set rustfs "$ENDPOINT" "$ROOT_ACCESS_KEY" "$ROOT_SECRET_KEY" 2>/dev/null; then
                 echo "RustFS is ready."
                 break
               fi
               echo "Attempt $i: RustFS not ready, retrying in 10s..."
               sleep 10
             done
-            echo "Creating bucket pg-backups..."
-            aws s3 mb s3://pg-backups --endpoint-url "$ENDPOINT" --region us-east-1 2>/dev/null || echo "Bucket may already exist."
-            echo "Verifying bucket..."
-            aws s3 ls --endpoint-url "$ENDPOINT" --region us-east-1
-            echo "Done."
+
+            echo "=== Creating buckets ==="
+            mc mb --ignore-existing rustfs/pg-backups-zalando
+            mc mb --ignore-existing rustfs/pg-backups-cnpg
+
+            echo "=== Creating IAM policies ==="
+            cat > /tmp/policy-backup-zalando.json <<'POLICY'
+            {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": ["s3:*"],
+                  "Resource": [
+                    "arn:aws:s3:::pg-backups-zalando",
+                    "arn:aws:s3:::pg-backups-zalando/*"
+                  ]
+                }
+              ]
+            }
+            POLICY
+
+            cat > /tmp/policy-backup-cnpg.json <<'POLICY'
+            {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": ["s3:*"],
+                  "Resource": [
+                    "arn:aws:s3:::pg-backups-cnpg",
+                    "arn:aws:s3:::pg-backups-cnpg/*"
+                  ]
+                }
+              ]
+            }
+            POLICY
+
+            mc admin policy create rustfs policy-backup-zalando /tmp/policy-backup-zalando.json 2>/dev/null || echo "Policy policy-backup-zalando may already exist."
+            mc admin policy create rustfs policy-backup-cnpg /tmp/policy-backup-cnpg.json 2>/dev/null || echo "Policy policy-backup-cnpg may already exist."
+
+            echo "=== Creating service accounts ==="
+            mc admin user add rustfs "$ZALANDO_ACCESS_KEY" "$ZALANDO_SECRET_KEY" 2>/dev/null || echo "User backup-zalando may already exist."
+            mc admin user add rustfs "$CNPG_ACCESS_KEY" "$CNPG_SECRET_KEY" 2>/dev/null || echo "User backup-cnpg may already exist."
+
+            echo "=== Attaching policies ==="
+            mc admin policy attach rustfs policy-backup-zalando --user "$ZALANDO_ACCESS_KEY" 2>/dev/null || echo "Policy already attached to backup-zalando."
+            mc admin policy attach rustfs policy-backup-cnpg --user "$CNPG_ACCESS_KEY" 2>/dev/null || echo "Policy already attached to backup-cnpg."
+
+            echo "=== Verifying ==="
+            mc ls rustfs/
+            mc admin user list rustfs
+            echo "=== Done ==="
         env:
-          - name: AWS_ACCESS_KEY_ID
+          - name: ROOT_ACCESS_KEY
             value: rustfsadmin
-          - name: AWS_SECRET_ACCESS_KEY
+          - name: ROOT_SECRET_KEY
             value: rustfsadmin
+          - name: ZALANDO_ACCESS_KEY
+            value: backup-zalando
+          - name: ZALANDO_SECRET_KEY
+            value: backup-zalando-secret
+          - name: CNPG_ACCESS_KEY
+            value: backup-cnpg
+          - name: CNPG_SECRET_KEY
+            value: backup-cnpg-secret
         resources:
           requests:
             cpu: 10m
-            memory: 32Mi
-          limits:
-            cpu: 50m
             memory: 64Mi

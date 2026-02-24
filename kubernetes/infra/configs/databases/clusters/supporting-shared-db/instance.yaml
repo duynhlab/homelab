@@ -1,5 +1,5 @@
 # Supporting Database Cluster (Zalando Operator)
-# Shared database for User, Notification, and Shipping services
+# Shared database for User, Notification, Shipping, and Review services
 apiVersion: acid.zalan.do/v1
 kind: postgresql
 metadata:
@@ -14,19 +14,19 @@ spec:
     # storageClass: "ssd"
   
   # Inject Vault-backed credentials for WAL-G backups
-  # Secret: pg-backup-rustfs-credentials-vault (managed by ExternalSecret)
+  # Secret: pg-backup-rustfs-credentials (managed by ExternalSecret)
   env:
     - name: WALG_S3_PREFIX
-      value: s3://pg-backups/user-db/
+      value: s3://pg-backups-zalando/user-db/
     - name: AWS_ACCESS_KEY_ID
       valueFrom:
         secretKeyRef:
-          name: pg-backup-rustfs-credentials-vault
+          name: pg-backup-rustfs-credentials
           key: AWS_ACCESS_KEY_ID
     - name: AWS_SECRET_ACCESS_KEY
       valueFrom:
         secretKeyRef:
-          name: pg-backup-rustfs-credentials-vault
+          name: pg-backup-rustfs-credentials
           key: AWS_SECRET_ACCESS_KEY
     - name: AWS_ENDPOINT
       value: http://rustfs-svc.rustfs.svc.cluster.local:9000
@@ -41,7 +41,8 @@ spec:
   databases:
     user: user
     notification: notification.notification  # namespace.username format for cross-namespace secret
-    shipping: shipping.shipping  # namespace.username format for cross-namespace secret (Database for shipping service)
+    shipping: shipping.shipping  # namespace.username format for cross-namespace secret
+    review: review.review  # namespace.username format for cross-namespace secret (migrated from review-db)
   
   # Multiple users (one per database)
   users:
@@ -50,6 +51,8 @@ spec:
     notification.notification:  # Database owner for notification database (namespace.username format for cross-namespace secret)
       - createdb
     shipping.shipping:  # Database owner for shipping database (namespace.username format for cross-namespace secret)
+      - createdb
+    review.review:  # Database owner for review database (namespace.username format for cross-namespace secret)
       - createdb
   
   # Connection pooler (PgBouncer sidecar) configuration
@@ -142,7 +145,7 @@ spec:
   # pg_exporter pilot: 600+ built-in metrics, auto-discovery for 3 databases, per-query caching/timeout
   sidecars:
     - name: exporter
-      image: pgsty/pg_exporter:v1.2.0
+      image: pgsty/pg_exporter:1.2.0
       ports:
         - name: exporter
           containerPort: 9630

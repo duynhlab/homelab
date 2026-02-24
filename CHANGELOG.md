@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.50.13] - 2026-02-24
+
+### Changed
+
+- **Migrate review-db into supporting-shared-db**: Consolidated the standalone `review-db` Zalando cluster into the `supporting-shared-db` shared cluster. The review database now runs alongside user, notification, and shipping databases, reducing cluster count from 5 to 4.
+  - Added `review` database and `review.review` cross-namespace user to `supporting-shared-db/instance.yaml`
+  - Updated `review.yaml` HelmRelease: DB_HOST now points to `supporting-shared-db-pooler.user.svc.cluster.local`, credentials use cross-namespace secret pattern
+  - Flyway migrations connect directly to `supporting-shared-db.user.svc.cluster.local` (bypassing pooler for DDL)
+
+### Removed
+
+- **review-db cluster**: Deleted `kubernetes/infra/configs/databases/clusters/review-db/` (instance, kustomization, configmaps, README)
+- **review-db PodMonitor**: Removed `podmonitor-zalando-review-db.yaml` and its reference in monitoring kustomization
+- **review-db health check**: Removed from `kubernetes/clusters/local/databases.yaml`
+- **review namespace backup label**: Removed `platform.duynhne/backup: walg` label from review namespace (no longer hosts a database)
+
+### Documentation
+
+- Updated all docs (database.md, operator.md, replication_strategy.md, backup.md, extensions.md, AGENTS.md, secrets-management.md, postgresql-monitoring.md, postgresql-custom-metrics.md, runbooks) to reflect 4 clusters and review's new location in supporting-shared-db
+
+## [0.50.12] - 2026-02-24
+
+### Added
+
+- **Operator Comparison Deep Dive**: Created `docs/databases/operator.md` with comprehensive CloudNativePG vs Zalando Postgres Operator comparison covering core architecture, HA mechanisms (Instance Manager vs Patroni), failover sequences, pod internals, Kubernetes resource model, feature matrix, strengths/trade-offs, and production recommendations.
+
+### Fixed
+
+- **CloudNativePG HA Documentation**: Corrected factual errors in `docs/databases/database.md` that incorrectly stated CloudNativePG uses Patroni for HA. CloudNativePG uses its own native Instance Manager -- it does not use Patroni, etcd, or any external DCS. Updated HA Pattern column, overview text, and features section.
+
+## [0.50.11] - 2026-02-23
+
+### Fixed
+
+- **Secret Naming Mismatch**: Removed `-vault` suffix from all secret names, resolving `CreateContainerConfigError` on `product-db` and `transaction-shared-db` CNPG clusters where pods expected `*-secret-vault` but ExternalSecrets created `*-secret`.
+- **Backup Credential Mismatch**: Changed ClusterExternalSecret target names from `pg-backup-rustfs-credentials-vault` to `pg-backup-rustfs-credentials`, matching what CNPG `s3Credentials` and Zalando `pod_environment_secret` reference.
+- **Zalando Backup Secret Refs**: Updated `secretKeyRef.name` in auth-db, review-db, and supporting-shared-db instance files from `pg-backup-rustfs-credentials-vault` to `pg-backup-rustfs-credentials`, resolving `CreateContainerConfigError` on all 3 Zalando clusters.
+- **Duplicate Backup ExternalSecrets**: Removed 3 per-cluster ExternalSecrets (`pg-backup-rustfs-credentials-operator`) from auth-db, review-db, supporting-shared-db. ClusterExternalSecret now solely manages backup credentials across all namespaces.
+- **Pooler Credential Names**: Renamed `pgdog-product-credentials-vault` and `pgcat-transaction-credentials-vault` ExternalSecrets to `pgdog-product-credentials` and `pgcat-transaction-credentials` for naming consistency.
+- **Documentation**: Updated `secrets-management.md` to reflect that ESO-managed secrets use the same name as the original (no `-vault` suffix). The `managed-by: external-secrets` label identifies Vault-backed secrets.
+
+## [0.50.10] - 2026-02-18
+
+### Changed
+
+- **Vault Path Naming Convention**: Standardized all Vault secret paths to `secret/{env}/{category}/{service}/{resource}` following [HashiCorp recommended patterns](https://developer.hashicorp.com/vault/tutorials/recommended-patterns/pattern-centralized-secrets). Migrated 7 `vault kv put` paths in bootstrap, 8 ExternalSecret `remoteRef.key`, and 2 ClusterExternalSecret `remoteRef.key` from ad-hoc paths to the new convention. Enables granular per-category Vault policies, multi-environment support, and self-documenting paths.
+- **Vault Policy Templates**: Updated ESO policy with commented-out per-category production templates (`+/databases/*`, `+/services/*`, `+/infra/*`) ready for production hardening.
+- **Secrets Documentation**: Added "Path Naming Convention" section to `secrets-management.md` with migration map, future app secret examples, and Vault policy templates. Updated all path references across docs and comments.
+
+## [0.50.9] - 2026-02-18
+
+### Added
+
+- **ClusterExternalSecret for Backup Credentials**: Replaced 5 duplicate per-namespace `ExternalSecret` files with 2 `ClusterExternalSecret` resources (`pg-backup-rustfs-cnpg` for CNPG/Barman format, `pg-backup-rustfs-walg` for WAL-G format). Uses `namespaceSelector` with `platform.duynhne/backup` label to auto-deploy to matching namespaces. Adding backup secrets to a new namespace now requires only a label.
+- **Vault Audit Logging**: Enabled file audit device to stdout in bootstrap script. Every secret read/write is logged as JSON, collected by existing Vector -> Loki pipeline. Queryable in Grafana. Required for SOC2/HIPAA compliance.
+- **Secrets Backlog Documentation**: Added `docs/secrets/backlog.md` with detailed specs for remaining P1/P2 improvements, including real-world references (Uber, Canva, PostFinance, ngrok).
+- **ESO ServiceMonitor**: Added `servicemonitors/external-secrets.yaml` to scrape ESO controller metrics (`externalsecret_sync_calls_error_total`, `externalsecret_status_condition`, `externalsecret_reconcile_duration`). ESO sync failures are now observable in Prometheus/Grafana.
+- **Namespace Labels for Secret Targeting**: Added `platform.duynhne/backup: "cnpg"` (product, cart) and `platform.duynhne/backup: "walg"` (auth, user, review) labels to `namespaces.yaml` for ClusterExternalSecret targeting.
+- **Production Readiness Roadmap**: Added sections to `secrets-management.md` and `vault.md` covering HA Raft deployment, auto-unseal, dynamic database secrets (Vault DB secrets engine), and patterns from Uber (150K secrets), Spotify, and Grab.
+
+### Changed
+
+- **ESO Upgraded from v0.13.0 to v2.0.0**: Major upgrade from end-of-life version (EOL Feb 2025) to latest stable. Includes v1 GA API, ClusterExternalSecret improvements, security patches.
+- **API Version Migration v1beta1 to v1**: Migrated all `external-secrets.io/v1beta1` resources (ClusterSecretStore, 8 ExternalSecrets, 2 ClusterExternalSecrets) to `external-secrets.io/v1` GA API.
+- **Hybrid Secret Organization**: DB-specific ExternalSecrets remain co-located with their clusters (`configs/databases/clusters/*/secrets/`), shared secrets use ClusterExternalSecret (`configs/secrets/cluster-external-secrets/`).
+- **Vault Policy Simplified**: Removed misleading explicit policy paths (`products/*`, `transactions/*`, `backups/*`) that didn't match actual Vault paths. Kept only the wildcard `secret/data/*` with production template comment.
+- **Secrets Documentation Rewritten**: Updated `secrets-management.md` with hybrid strategy, ClusterExternalSecret pattern, monitoring section, and production roadmap. Updated `vault.md` with HA Raft config, auto-unseal, and dynamic secrets guide.
+
+### Removed
+
+- **Central Duplicate ExternalSecrets**: Deleted 10 files from `configs/secrets/external-secrets/` that duplicated resources already in `configs/databases/clusters/*/secrets/`. Single source of truth per secret.
+- **Per-Cluster Backup ExternalSecrets**: Deleted 5 individual `pg-backup-rustfs-credentials-vault.yaml` files from cluster directories, replaced by 2 ClusterExternalSecrets.
+
 ## [0.50.8] - 2026-02-20
 
 ### Added

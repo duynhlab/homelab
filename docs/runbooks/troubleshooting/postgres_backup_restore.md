@@ -6,7 +6,7 @@ This runbook covers backup/restore procedures for the 5 PostgreSQL clusters usin
 
 1. [Overview](#overview)
 2. [CloudNativePG (product-db, transaction-shared-db)](#cloudnativepg-product-db-transaction-shared-db)
-3. [Zalando (auth-db, supporting-shared-db, review-db)](#zalando-auth-db-supporting-shared-db-review-db)
+3. [Zalando (auth-db, supporting-shared-db)](#zalando-auth-db-supporting-shared-db)
 4. [Verification Checklist](#verification-checklist)
 
 ---
@@ -19,7 +19,6 @@ This runbook covers backup/restore procedures for the 5 PostgreSQL clusters usin
 | transaction-shared-db  | CloudNativePG | barmanObjectStore + ScheduledBackup | Bootstrap recovery from object store |
 | auth-db         | Zalando       | WAL-G (operator-level) | Clone from S3 / pg_restore |
 | supporting-shared-db   | Zalando       | WAL-G (operator-level) | Clone from S3 / pg_restore |
-| review-db       | Zalando       | WAL-G (operator-level) | Clone from S3 / pg_restore |
 
 ---
 
@@ -28,7 +27,7 @@ This runbook covers backup/restore procedures for the 5 PostgreSQL clusters usin
 ### Prerequisites
 
 - RustFS running in `rustfs` namespace
-- Bucket `pg-backups` created (Job `rustfs-create-pg-backups` in rustfs namespace)
+- Buckets `pg-backups-zalando` / `pg-backups-cnpg` created (CronJob `setup-pg-backup-buckets` in rustfs namespace)
 - Secret `pg-backup-rustfs-credentials` in cluster namespace
 - At least one successful base backup + WAL archiving
 
@@ -84,7 +83,7 @@ spec:
   externalClusters:
     - name: product-db-backup
       barmanObjectStore:
-        destinationPath: s3://pg-backups/product-db/
+        destinationPath: s3://pg-backups-cnpg/product-db/
         endpointURL: http://rustfs-svc.rustfs.svc.cluster.local:9000
         serverName: product-db  # Matches backup path prefix
         s3Credentials:
@@ -148,7 +147,7 @@ bootstrap:
 ### Verification Checklist (CNPG)
 
 - [ ] Backup CR shows `Completed` status
-- [ ] WAL files visible in RustFS: `s3://pg-backups/product-db/` (via mc or aws cli)
+- [ ] WAL files visible in RustFS: `s3://pg-backups-cnpg/product-db/` (via mc or aws cli)
 - [ ] Restore cluster reaches `Cluster in healthy state`
 - [ ] Schema matches: `\dt` shows expected tables
 - [ ] Row counts match (or expected for PITR)
@@ -156,14 +155,14 @@ bootstrap:
 
 ---
 
-## Zalando (auth-db, supporting-shared-db, review-db)
+## Zalando (auth-db, supporting-shared-db)
 
 ### WAL-G Backup Configuration
 
 Zalando clusters use WAL-G for PITR backup to RustFS. Configuration is operator-level:
 - **ConfigMap**: `postgres-operator/zalando-walg-config` (non-sensitive)
 - **Secret**: `pg-backup-rustfs-credentials` (per cluster namespace: user, auth, review)
-- **Bucket**: `pg-backups` with cluster-specific paths (spilo/{cluster-name}/...)
+- **Bucket**: `pg-backups-zalando` with cluster-specific paths (spilo/{cluster-name}/...)
 
 ### Restore to New Cluster (supporting-shared-db)
 
@@ -240,7 +239,7 @@ pg_restore -h target-host -U notification -d notification -Fc backup_notificatio
 | Issue | Resolution |
 |-------|------------|
 | `Expected empty archive` | Add `cnpg.io/skipEmptyWalArchiveCheck: "enabled"` when restoring to new cluster name |
-| Bucket not found | Run Job `rustfs-create-pg-backups` in rustfs namespace |
+| Bucket not found | CronJob `setup-pg-backup-buckets` in rustfs namespace creates buckets every 30min; trigger manually if needed |
 | S3 connection refused | Verify RustFS service: `kubectl get svc -n rustfs` |
 | No backups listed | Ensure WAL archiving is active; check cluster status and backup CRs |
 

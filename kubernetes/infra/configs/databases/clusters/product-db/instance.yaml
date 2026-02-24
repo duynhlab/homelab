@@ -91,7 +91,7 @@ spec:
       database: product # Create default database before bootstrap
       owner: product # Set owner for the database
       secret:
-        name: product-db-secret-vault  # Vault-backed (ExternalSecret)
+        name: product-db-secret  # Vault-backed (ExternalSecret)
       dataChecksums: true # Enable data checksums for data integrity
       encoding: "UTF8" # Set encoding for the database
       localeCType: "C" # Set locale for the database
@@ -111,7 +111,7 @@ spec:
 
     # Barman Object Store backup to RustFS (S3-compatible object storage)
     barmanObjectStore:
-      destinationPath: s3://pg-backups/product-db/
+      destinationPath: s3://pg-backups-cnpg/product-db/
       endpointURL: http://rustfs-svc.rustfs.svc.cluster.local:9000
 
       # Server name for Barman (must be unique across all clusters)

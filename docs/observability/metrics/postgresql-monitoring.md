@@ -6,8 +6,7 @@
 flowchart TD
     subgraph zalando [Zalando Operator Clusters]
         authDB["auth-db<br/>PG 17, 3 instances"]
-        reviewDB["review-db<br/>PG 16, 1 instance"]
-        supportDB["supporting-shared-db<br/>PG 16, 1 instance<br/>3 DBs: user, notification, shipping"]
+        supportDB["supporting-shared-db<br/>PG 16, 1 instance<br/>4 DBs: user, notification, shipping, review"]
     end
 
     subgraph cnpg [CloudNativePG Clusters]
@@ -51,29 +50,29 @@ flowchart TD
 
 ## Monitoring Coverage Matrix
 
-| Metric Layer | auth-db | review-db | supporting-shared-db | product-db | transaction-shared-db |
-|---|---|---|---|---|---|
-| **Operator** | Zalando | Zalando | Zalando | CloudNativePG | CloudNativePG |
-| **Exporter** | postgres_exporter | postgres_exporter | pg_exporter (pilot) | CNPG built-in | CNPG built-in |
-| **Availability** | pg_up | pg_up | pg_up (600+) | cnpg_collector_up | cnpg_collector_up |
-| **Replication lag** | pg_replication_lag | pg_replication_lag | pg_repl_* | cnpg_collector_sync_replicas | cnpg_collector_sync_replicas |
-| **WAL status** | - | - | pg_wal_* | cnpg_collector_pg_wal | cnpg_collector_pg_wal |
-| **Backup status** | - | - | - | cnpg_collector_last_*_backup | cnpg_collector_last_*_backup |
-| **pg_stat_statements** | custom query | custom query | built-in collector | custom query | custom query |
-| **Connection stats** | built-in + custom_ | built-in + custom_ | built-in collector | custom query | custom query |
-| **Lock contention** | custom_ query | custom_ query | built-in collector | custom query | custom query |
-| **Autovacuum/dead tuples** | built-in + custom_ | built-in + custom_ | built-in collector | custom query | custom query |
-| **Table/index size** | custom_ query | custom_ query | built-in collector | custom query | custom query |
-| **Bloat estimation** | - | - | built-in collector | - | - |
-| **Checkpoints** | built-in collector | built-in collector | built-in collector | custom query | custom query |
-| **Database size** | built-in collector | built-in collector | built-in collector | custom query | custom query |
-| **Pooler metrics** | pgbouncer-exporter | - | pg_exporter built-in pgBouncer | - | PgCat :9930 |
+| Metric Layer | auth-db | supporting-shared-db | product-db | transaction-shared-db |
+|---|---|---|---|---|
+| **Operator** | Zalando | Zalando | CloudNativePG | CloudNativePG |
+| **Exporter** | postgres_exporter | pg_exporter (Pigsty) | CNPG built-in | CNPG built-in |
+| **Availability** | pg_up | pg_up (600+) | cnpg_collector_up | cnpg_collector_up |
+| **Replication lag** | pg_replication_lag | pg_repl_* | cnpg_collector_sync_replicas | cnpg_collector_sync_replicas |
+| **WAL status** | - | pg_wal_* | cnpg_collector_pg_wal | cnpg_collector_pg_wal |
+| **Backup status** | - | - | cnpg_collector_last_*_backup | cnpg_collector_last_*_backup |
+| **pg_stat_statements** | custom query | built-in collector | custom query | custom query |
+| **Connection stats** | built-in + custom_ | built-in collector | custom query | custom query |
+| **Lock contention** | custom_ query | built-in collector | custom query | custom query |
+| **Autovacuum/dead tuples** | built-in + custom_ | built-in collector | custom query | custom query |
+| **Table/index size** | custom_ query | built-in collector | custom query | custom query |
+| **Bloat estimation** | - | built-in collector | - | - |
+| **Checkpoints** | built-in collector | built-in collector | custom query | custom query |
+| **Database size** | built-in collector | built-in collector | custom query | custom query |
+| **Pooler metrics** | pgbouncer-exporter | pg_exporter built-in pgBouncer | - | PgCat :9930 |
 
 ## Exporter Comparison
 
 ### postgres_exporter (Prometheus Community)
 
-- **Used by**: auth-db, review-db (Zalando sidecar) + CNPG built-in exporter uses same query format
+- **Used by**: auth-db (Zalando sidecar) + CNPG built-in exporter uses same query format
 - **Port**: 9187
 - **Default metrics**: ~50
 - **Custom queries**: YAML ConfigMap (`queries.yaml`)
@@ -100,7 +99,7 @@ Hybrid approach chosen: custom queries for 4 clusters + pg_exporter pilot on 1 c
 1. CNPG clusters must use built-in exporter (mandatory, cannot be replaced)
 2. Custom queries achieve ~90% coverage with zero new components
 3. pg_exporter pilot on supporting-shared-db validates the remaining 10% value
-4. Expansion path: if pilot succeeds, migrate review-db then auth-db
+4. Expansion path: if pilot succeeds, migrate auth-db to pg_exporter
 
 ## Collector Reference (pg_exporter)
 
@@ -176,7 +175,7 @@ All alerts use `or` expressions to cover Zalando (`custom_*` / built-in), CNPG (
 
 ## Custom Queries Reference
 
-### Zalando Clusters (auth-db, review-db)
+### Zalando Clusters (auth-db)
 
 #### Why `custom_` Prefix (Renamed Queries)
 

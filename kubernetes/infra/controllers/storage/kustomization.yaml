@@ -4,5 +4,5 @@ kind: Kustomization
 # Object storage: RustFS (S3-compatible)
 resources:
   - rustfs/helmrelease.yaml
-  # CronJob to ensure pg-backups bucket exists (idempotent, runs periodically)
+  # CronJob to ensure pg-backups-zalando/pg-backups-cnpg buckets + IAM exist (idempotent, runs periodically)
   - rustfs/helmrelease-cronjobs.yaml

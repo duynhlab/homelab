@@ -8,7 +8,7 @@ metadata:
   name: zalando-walg-config
   namespace: postgres-operator
 data:
-  WAL_S3_BUCKET: "pg-backups"
+  WAL_S3_BUCKET: "pg-backups-zalando"
   WAL_BUCKET_SCOPE_PREFIX: ""
   WAL_BUCKET_SCOPE_SUFFIX: ""
   USE_WALG_BACKUP: "true"

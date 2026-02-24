@@ -5,7 +5,6 @@ kind: Kustomization
 # Each cluster folder contains: instance, secrets, poolers (if any), monitoring
 resources:
   - clusters/auth-db/
-  - clusters/review-db/
   - clusters/supporting-shared-db/
   - clusters/product-db/
   - clusters/transaction-shared-db/

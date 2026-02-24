@@ -85,7 +85,7 @@ The `kubernetes/infra/configs/secrets/vault-bootstrap/job.yaml` performs these s
 3.  **Configure Auth**: Points Vault to the K8s API server (`kubernetes.default.svc`).
 4.  **Create Policy**: Adds `external-secrets-read` allowing read access to `secret/*`.
 5.  **Create Role**: Binds the `external-secrets` K8s ServiceAccount to the policy.
-6.  **Seed Secrets**: (Optional) Puts initial development secrets into `secret/`.
+6.  **Seed Secrets**: (Optional) Puts initial development secrets into `secret/` using the [path naming convention](./secrets-management.md#path-naming-convention): `secret/{env}/{category}/{service}/{resource}`.
 
 ---
 
@@ -188,4 +188,97 @@ kubectl exec -it vault-0 -n vault -- vault login <Root-Token>
 ### 6. Run Bootstrap (Optional)
 You can manually trigger the bootstrap job to configure Auth Methods, or configure them manually/Terraform one time (since they will now persist).
 
+---
+
+## 8. HA Mode with Raft (Production Scale)
+
+For production environments with high availability requirements, deploy Vault with integrated Raft storage.
+
+### Configuration
+
+```yaml
+server:
+  dev:
+    enabled: false
+  ha:
+    enabled: true
+    replicas: 3
+    raft:
+      enabled: true
+      config: |
+        ui = true
+        listener "tcp" {
+          tls_disable = 0
+          address = "[::]:8200"
+          cluster_address = "[::]:8201"
+          tls_cert_file = "/vault/userconfig/vault-tls/tls.crt"
+          tls_key_file  = "/vault/userconfig/vault-tls/tls.key"
+        }
+        storage "raft" {
+          path = "/vault/data"
+          retry_join {
+            leader_api_addr = "https://vault-0.vault-internal:8200"
+          }
+          retry_join {
+            leader_api_addr = "https://vault-1.vault-internal:8200"
+          }
+          retry_join {
+            leader_api_addr = "https://vault-2.vault-internal:8200"
+          }
+        }
+        service_registration "kubernetes" {}
+  dataStorage:
+    enabled: true
+    size: 10Gi
+```
+
+### Auto-Unseal (Eliminates Manual Key Management)
+
+```yaml
+seal "awskms" {
+  region     = "us-east-1"
+  kms_key_id = "alias/vault-unseal"
+}
+```
+
+Alternatives: GCP Cloud KMS (`seal "gcpckms"`), Azure Key Vault (`seal "azurekeyvault"`).
+
+---
+
+## 9. Dynamic Database Secrets (Future Direction)
+
+Instead of static credentials seeded by the bootstrap Job, Vault's **database secrets engine** can generate short-lived credentials on demand. This is the approach used by Spotify and other large-scale platforms.
+
+### How It Works
+
+1. Vault connects to PostgreSQL as a privileged user
+2. When ESO (or an app) requests credentials, Vault creates a temporary DB user
+3. Credentials automatically expire after the configured TTL
+4. No static passwords exist anywhere
+
+### Example Configuration
+
+```bash
+vault secrets enable database
+
+vault write database/config/product-db \
+  plugin_name=postgresql-database-plugin \
+  connection_url="postgresql://{{username}}:{{password}}@product-db-rw.product:5432/product?sslmode=require" \
+  allowed_roles="product-app" \
+  username="vault_admin" \
+  password="<admin-password>"
+
+vault write database/roles/product-app \
+  db_name=product-db \
+  creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
+  default_ttl="1h" \
+  max_ttl="24h"
+```
+
+### Benefits at Scale
+
+- No password rotation needed (credentials are ephemeral)
+- Each pod gets unique credentials (audit trail per pod)
+- Credential revocation is instant (Vault drops the DB user)
+- Works with 2000+ microservices without managing 2000 static passwords
 

@@ -16,7 +16,6 @@
 
 | Operator                   | Version   | Cluster Name      | PostgreSQL Ver. | Nodes      | Pooler Type              | Pooler Details                    |
 |----------------------------|-----------|-------------------|-----------------|------------|--------------------------|------------------------------------|
-| Zalando Postgres Operator  | v1.15.1   | review-db         | 16              | 1          | None                     | -                                  |
 | Zalando Postgres Operator  | v1.15.1   | auth-db           | 17              | 3 (HA)     | PgBouncer Sidecar        | 2 instances                        |
 | Zalando Postgres Operator  | v1.15.1   | supporting-shared-db     | 16              | 1          | PgBouncer Sidecar        | 2 instances                        |
 | CloudNativePG Operator     | v1.28.0   | product-db        | 18              | 3 (HA)     | PgDog Standalone         | 1 replica (Helm chart)              |
@@ -75,8 +74,7 @@ flowchart TB
             TransactionReplica2[("Replica 2 - PostgreSQL 18")]
         end
         
-        ReviewDB[("review-db - PostgreSQL 16 - Single Instance")]
-        SupportingDB[("supporting-shared-db - PostgreSQL 16 - Shared DB")]
+        SupportingDB[("supporting-shared-db - PostgreSQL 16 - Shared DB: user, notification, shipping, review")]
     end
 
 
@@ -89,7 +87,6 @@ flowchart TB
     end
     
     Zalando --> AuthDBCluster
-    Zalando --> ReviewDB
     Zalando --> SupportingDB
     CloudNativePG --> ProductDBCluster
     CloudNativePG --> TransactionDBCluster
@@ -127,14 +124,14 @@ flowchart TB
 
 | Operator      | Cluster         | Database      | Owner                      | Secret NS  | Secret Type                | Direct Connection              | Pooler     | Instances                      | HA Pattern               | Namespace   |
 |---------------|----------------|--------------|----------------------------|------------|----------------------------|-------------------------------|------------|-------------------------------|--------------------------|-------------|
-| CloudNativePG | product-db     | product      | product                    | product    | Manual (`product-db-secret`)| `product-db-rw.product:5432`  | PgDog      | 3 (1 primary + 2 replicas)     | Patroni HA               | product     |
-| CloudNativePG | transaction-shared-db | cart         | cart                       | cart       | Manual (`transaction-shared-db-secret`)| `transaction-shared-db-rw.cart:5432` | PgCat       | 3 (1 primary + 2 replicas)     | Patroni HA (Sync)        | cart        |
-| CloudNativePG | transaction-shared-db | order        | cart                       | cart       | Manual (`transaction-shared-db-secret`)| `transaction-shared-db-rw.cart:5432` | PgCat       | 3 (1 primary + 2 replicas)     | Patroni HA (Sync)        | cart        |
+| CloudNativePG | product-db     | product      | product                    | product    | Manual (`product-db-secret`)| `product-db-rw.product:5432`  | PgDog      | 3 (1 primary + 2 replicas)     | CNPG Instance Manager    | product     |
+| CloudNativePG | transaction-shared-db | cart         | cart                       | cart       | Manual (`transaction-shared-db-secret`)| `transaction-shared-db-rw.cart:5432` | PgCat       | 3 (1 primary + 2 replicas)     | CNPG Instance Manager (Sync) | cart        |
+| CloudNativePG | transaction-shared-db | order        | cart                       | cart       | Manual (`transaction-shared-db-secret`)| `transaction-shared-db-rw.cart:5432` | PgCat       | 3 (1 primary + 2 replicas)     | CNPG Instance Manager (Sync) | cart        |
 | Zalando       | auth-db        | auth         | auth                       | auth       | Auto (operator)            | `auth-db.auth:5432`           | PgBouncer  | 3 (1 leader + 2 standbys)      | Patroni HA               | auth        |
-| Zalando       | review-db      | review       | review                     | review     | Auto (operator)            | `review-db.review:5432`       | None       | 1 (single instance)            | Patroni (single)         | review      |
 | Zalando       | supporting-shared-db  | user         | user                       | user       | Auto (operator)            | `supporting-shared-db.user:5432`     | PgBouncer  | 1 (single instance)            | Patroni (single)         | user        |
 | Zalando       | supporting-shared-db  | notification | notification.notification  | notification| Auto (cross-ns)           | `supporting-shared-db.user:5432`     | PgBouncer  | 1 (single instance)            | Patroni (single)         | user        |
 | Zalando       | supporting-shared-db  | shipping     | shipping.shipping          | shipping   | Auto (cross-ns)           | `supporting-shared-db.user:5432`     | PgBouncer  | 1 (single instance)            | Patroni (single)         | user        |
+| Zalando       | supporting-shared-db  | review       | review.review              | review     | Auto (cross-ns)           | `supporting-shared-db.user:5432`     | PgBouncer  | 1 (single instance)            | Patroni (single)         | user        |
 
 ### Pooler Summary
 
@@ -143,8 +140,7 @@ flowchart TB
 | product-db      | `pgdog-product.product:6432`           | PgDog      | Standalone| HA Capable (1 replica)  |
 | transaction-shared-db  | `pgcat.cart:5432`                      | PgCat      | HA        | 2 replicas              |
 | auth-db         | `auth-db-pooler.auth:5432`             | PgBouncer  | Standalone| -                       |
-| review-db       | (direct, no pooler)                    | None       | -         | Direct connection only  |
-| supporting-shared-db   | `supporting-shared-db-pooler.user:5432`       | PgBouncer  | Standalone| -                       |
+| supporting-shared-db   | `supporting-shared-db-pooler.user:5432`       | PgBouncer  | Standalone| 4 databases: user, notification, shipping, review |
 
 
 ---
@@ -153,11 +149,11 @@ flowchart TB
 
 ### Overview
 
-**CloudNativePG Operator** (v1.28.0) is a Kubernetes operator for PostgreSQL that uses Patroni internally for high availability management. It provides a declarative, Kubernetes-native approach to managing PostgreSQL clusters.
+**CloudNativePG Operator** (v1.28.0) is a Kubernetes-native operator for PostgreSQL with its own built-in Instance Manager for high availability. It does **not** use Patroni -- the operator itself handles failover, promotion, and lifecycle management through the Kubernetes API.
 
 **Key Features:**
 - Kubernetes-native CRDs for cluster management
-- Patroni-based HA with automatic failover (< 30 seconds)
+- Operator-driven HA with automatic failover (< 30 seconds) via Instance Manager
 - PostgreSQL 18 (default image)
 - Built-in `postgres_exporter` sidecar for metrics
 - Support for synchronous replication
@@ -193,17 +189,17 @@ flowchart TB
 
 > **Topology diagram, endpoints, PgCat HA config**: See [transaction-shared-db README](../../kubernetes/infra/configs/databases/clusters/transaction-shared-db/README.md)
 
-**Note on Patroni:**
-- CloudNativePG uses Patroni internally for HA management
-- Patroni uses Kubernetes API as Distributed Configuration Store (DCS)
-- No separate etcd cluster required - Kubernetes serves as coordination layer
+**Note on HA Architecture:**
+- CloudNativePG does **not** use Patroni. It has its own native [Instance Manager](https://cloudnative-pg.io/docs/1.28/instance_manager/) that handles failover and lifecycle.
+- The operator uses Kubernetes API as the sole coordination layer -- no DCS, no etcd required.
+- For a full comparison with Zalando's Patroni-based HA, see [Operator Comparison](./operator.md).
 
 ### Features & Capabilities
 
 **High Availability:**
-- Patroni-based HA with automatic failover (< 30 seconds)
-- Kubernetes API as Distributed Configuration Store (DCS)
-- No separate etcd cluster required
+- Operator-driven HA with automatic failover (< 30 seconds) via native Instance Manager
+- Kubernetes API as sole coordination layer (no DCS, no Patroni, no etcd)
+- Quorum-based failover available for synchronous replication clusters
 
 **Replication:**
 - Async replication (Product DB)
@@ -283,7 +279,7 @@ CloudNativePG clusters use **PodMonitor** CRDs to enable Prometheus scraping of 
 **Key Features:**
 - Kubernetes-native CRDs for cluster management
 - Patroni-based HA with automatic failover (< 30 seconds)
-- PostgreSQL versions: 16 (review-db, supporting-shared-db), 17 (auth-db) - explicitly configured
+- PostgreSQL versions: 16 (supporting-shared-db), 17 (auth-db) - explicitly configured
 - Built-in PgBouncer sidecar for connection pooling
 - Automatic secret generation
 - Cross-namespace secret support
@@ -293,24 +289,13 @@ CloudNativePG clusters use **PodMonitor** CRDs to enable Prometheus scraping of 
 
 | Cluster Name        | Instances          | Description                                        |
 |---------------------|-------------------|----------------------------------------------------|
-| **review-db**       | 1                 | Review Database (single instance)                  |
 | **auth-db**         | 3 (1 leader, 2 standby) | Auth Database (production-ready high availability) |
-| **supporting-shared-db**   | 1                 | Supporting Database (shared database pattern)       |
+| **supporting-shared-db**   | 1                 | Supporting Database (shared: user, notification, shipping, review) |
 
 ---
 
 ### Clusters
 
-#### review-db
-
-- **1 instance** (single, no HA), PostgreSQL 16
-- **Pooler**: None (direct connection)
-- **Namespace**: `review`
-- **Sidecars**: postgres_exporter + Vector (log collection to Loki)
-
-> **Topology diagram, endpoints, monitoring config**: See [review-db README](../../kubernetes/infra/configs/databases/clusters/review-db/README.md)
-
----
 #### auth-db
 
 - **3 instances** (1 leader + 2 standbys), PostgreSQL 17, streaming replication
@@ -326,9 +311,9 @@ CloudNativePG clusters use **PodMonitor** CRDs to enable Prometheus scraping of 
 #### supporting-shared-db
 
 - **1 instance** (single, no HA), PostgreSQL 16
-- **Databases**: `user`, `notification`, `shipping` (shared database pattern)
+- **Databases**: `user`, `notification`, `shipping`, `review` (shared database pattern)
 - **Pooler**: PgBouncer sidecar (2 instances), endpoint `supporting-shared-db-pooler.user:5432`
-- **Namespace**: `user` (cluster location), cross-namespace secrets for `notification` and `shipping`
+- **Namespace**: `user` (cluster location), cross-namespace secrets for `notification`, `shipping`, and `review`
 - **Sidecars**: postgres_exporter + Vector (log collection to Loki)
 - **Extensions**: pg_stat_statements, pg_cron, pg_trgm, pgcrypto, pg_stat_kcache
 
@@ -365,7 +350,6 @@ All Zalando PostgreSQL clusters include a **Vector sidecar** for log collection 
 **Configuration:**
 - **Vector ConfigMaps**: Located in each cluster's `configmaps/` folder (used by Zalando database instances as sidecar configs)
   - `kubernetes/infra/configs/databases/clusters/auth-db/configmaps/vector-sidecar.yaml` (Auth DB)
-  - `kubernetes/infra/configs/databases/clusters/review-db/configmaps/vector-sidecar.yaml` (Review DB)
   - `kubernetes/infra/configs/databases/clusters/supporting-shared-db/configmaps/vector-sidecar.yaml` (Supporting DB)
 - **Log Location**: `/home/postgres/pgdata/pgroot/pg_log/*.log` (default Zalando Spilo log path)
 - **Loki Endpoint**: `http://loki.monitoring.svc.cluster.local:3100`
@@ -381,7 +365,6 @@ All Zalando PostgreSQL clusters include `postgres_exporter` sidecars with **cust
 **Configuration:**
 - **Custom Queries ConfigMaps**: Located in each cluster's `configmaps/` folder
   - `kubernetes/infra/configs/databases/clusters/auth-db/configmaps/monitoring-queries.yaml` (Auth DB)
-  - `kubernetes/infra/configs/databases/clusters/review-db/configmaps/monitoring-queries.yaml` (Review DB)
   - `kubernetes/infra/configs/databases/clusters/supporting-shared-db/configmaps/monitoring-queries.yaml` (Supporting DB)
 - **Environment Variable**: `PG_EXPORTER_EXTEND_QUERY_PATH=/etc/postgres-exporter/queries.yaml`
 - **Custom Queries Configured**:
@@ -442,7 +425,7 @@ Zalando Postgres Operator automatically creates secrets for each database user. 
 | **User** | `user.supporting-shared-db.credentials.postgresql.acid.zalan.do` | `user` | Regular (same namespace) |
 | **Notification** | `notification.notification.supporting-shared-db.credentials.postgresql.acid.zalan.do` | `notification` | Cross-namespace (`namespace.username`) |
 | **Shipping** | `shipping.shipping.supporting-shared-db.credentials.postgresql.acid.zalan.do` | `shipping` | Cross-namespace (`namespace.username`) |
-| **Review** | `review.review-db.credentials.postgresql.acid.zalan.do` | `review` | Regular (same namespace) |
+| **Review** | `review.review.supporting-shared-db.credentials.postgresql.acid.zalan.do` | `review` | Cross-namespace (`namespace.username`) |
 | **Auth** | `auth.auth-db.credentials.postgresql.acid.zalan.do` | `auth` | Regular (same namespace) |
 
 **Note**: 
@@ -709,7 +692,6 @@ flowchart LR
         
         subgraph DBNamespaces["Database Namespaces"]
             AuthDB["auth-db"]
-            ReviewDB["review-db"]
             SupportingDB["supporting-shared-db"]
         end
     end
@@ -717,7 +699,6 @@ flowchart LR
     User["DevOps/SRE User"] -->|"HTTP<br/>Port-forward"| UIPod
     UIPod -->|"HTTP API<br/>http://postgres-operator:8080"| OperatorPod
     OperatorPod -->|"Manages"| AuthDB
-    OperatorPod -->|"Manages"| ReviewDB
     OperatorPod -->|"Manages"| SupportingDB
     
     style UIPod fill:#e1f5ff

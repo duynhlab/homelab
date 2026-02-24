@@ -12,6 +12,7 @@ docs/
 │   └── api.md                    # Complete API reference
 ├── databases/                    # Database documentation
 │   ├── database.md               # PostgreSQL architecture
+│   ├── operator.md               # CloudNativePG vs Zalando operator deep dive
 │   ├── architecture.md           # Database architecture overview
 │   ├── backup.md                 # Backup strategy and retention
 │   ├── extensions.md             # PostgreSQL extensions
@@ -156,11 +157,17 @@ docs/
 ### Databases
 
 1. **[Database Guide](./databases/database.md)** - PostgreSQL database integration guide
-    - 5 PostgreSQL clusters architecture with comprehensive diagrams
+    - 4 PostgreSQL clusters architecture with comprehensive diagrams
     - Overview diagram showing operators, services, poolers, and clusters
     - Individual cluster diagrams with secrets, connections, and patterns
 
-2. **[PostgreSQL Internals Deep Dive](./databases/postgresql_internals_product_db.md)** - PostgreSQL internals using product-db
+2. **[Operator Comparison](./databases/operator.md)** - CloudNativePG vs Zalando deep dive
+    - Core architecture differences (Instance Manager vs Patroni)
+    - HA and failover mechanisms with sequence diagrams
+    - Feature comparison matrix, strengths, trade-offs
+    - Production recommendations and decision matrix
+
+3. **[PostgreSQL Internals Deep Dive](./databases/postgresql_internals_product_db.md)** - PostgreSQL internals using product-db
     - INSERT/UPDATE workflow with sequence diagrams
     - Shared Buffers and Buffer Manager explained
     - WAL (Write-Ahead Log) and crash recovery
@@ -234,6 +241,7 @@ docs/
 ### Databases
 
 - [Database Guide](./databases/database.md) - PostgreSQL database integration guide
+- [Operator Comparison](./databases/operator.md) - CloudNativePG vs Zalando deep dive
 - [Architecture](./databases/architecture.md) - Database architecture overview
 - [Backup Strategy](./databases/backup.md) - Backup architecture and retention
 - [Extensions](./databases/extensions.md) - PostgreSQL extensions
@@ -251,6 +259,7 @@ docs/
 
 - [Secrets Management](./secrets/secrets-management.md) - Vault + ESO guide for centralized secret management
 - [Vault](./secrets/vault.md) - Vault configuration details
+- [Backlog (P1/P2)](./secrets/backlog.md) - Pending improvements: bootstrap split, rotation, audit logging, PushSecret, HA templates
 
 ### Testing
 

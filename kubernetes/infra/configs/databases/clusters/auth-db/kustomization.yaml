@@ -4,8 +4,7 @@ kind: Kustomization
 # auth-db cluster (Zalando Postgres Operator)
 # Order: secrets → configmaps → instance
 resources:
-  - secrets/pg-backup-rustfs-credentials-vault.yaml
-  - secrets/pg-backup-rustfs-credentials-operator.yaml
+  # pg-backup-rustfs-credentials: managed by ClusterExternalSecret (configs/secrets/cluster-external-secrets/)
   - configmaps/monitoring-queries.yaml
   - configmaps/vector-sidecar.yaml
   - instance.yaml

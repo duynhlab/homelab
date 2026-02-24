@@ -4,7 +4,7 @@
 #
 # Prerequisites:
 # - At least one successful base backup + WAL archiving
-# - Bucket pg-backups exists in RustFS
+# - Bucket pg-backups-cnpg exists in RustFS
 # - Secret pg-backup-rustfs-credentials in product namespace
 #
 # Usage:
@@ -35,7 +35,7 @@ spec:
   externalClusters:
     - name: product-db-backup
       barmanObjectStore:
-        destinationPath: s3://pg-backups/product-db/
+        destinationPath: s3://pg-backups-cnpg/product-db/
         endpointURL: http://rustfs-svc.rustfs.svc.cluster.local:9000
         serverName: product-db
         s3Credentials:

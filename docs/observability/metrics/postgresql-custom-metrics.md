@@ -99,7 +99,6 @@ postgres_exporter converts custom queries to Prometheus metrics using this patte
 ### Query Configuration Files
 
 Custom queries are defined in ConfigMaps:
-- **review-db**: `kubernetes/infra/configs/databases/clusters/review-db/configmaps/monitoring-queries.yaml`
 - **auth-db**: `kubernetes/infra/configs/databases/clusters/auth-db/configmaps/monitoring-queries.yaml`
 - **supporting-shared-db**: `kubernetes/infra/configs/databases/clusters/supporting-shared-db/configmaps/monitoring-queries.yaml`
 
@@ -154,9 +153,9 @@ time() - pg_postmaster_start_time_seconds
 
 ### Filtered Queries
 
-**1. Top 10 queries by execution count (review-db):**
+**1. Top 10 queries by execution count (auth-db):**
 ```
-topk(10, rate(pg_stat_statements_calls{namespace="review", datname="review"}[5m]))
+topk(10, rate(pg_stat_statements_calls{namespace="auth", datname="auth"}[5m]))
 ```
 
 **2. Top 10 slowest queries (auth-db):**
@@ -207,7 +206,7 @@ pg_replication_lag > 10
 
 **1. Port-forward to postgres_exporter:**
 ```bash
-kubectl port-forward -n review review-db-0 9187:9187
+kubectl port-forward -n auth auth-db-0 9187:9187
 ```
 
 **2. Query metrics endpoint:**
@@ -233,7 +232,7 @@ kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 909
 
 ```bash
 # Verify postgres_exporter is being scraped
-kubectl get podmonitor -n review postgresql-review-db -o yaml
+kubectl get podmonitor -n auth postgresql-auth-db -o yaml
 
 # Check Prometheus targets
 kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090
@@ -287,33 +286,33 @@ sum(rate(pg_stat_statements_shared_blks_hit[5m])) by (datname) /
 
 **1. Check if ConfigMap is mounted:**
 ```bash
-kubectl exec -n review review-db-0 -c exporter -- ls -la /etc/postgres-exporter/
-kubectl exec -n review review-db-0 -c exporter -- cat /etc/postgres-exporter/queries.yaml
+kubectl exec -n auth auth-db-0 -c exporter -- ls -la /etc/postgres-exporter/
+kubectl exec -n auth auth-db-0 -c exporter -- cat /etc/postgres-exporter/queries.yaml
 ```
 
 **2. Check environment variable:**
 ```bash
-kubectl exec -n review review-db-0 -c exporter -- env | grep PG_EXPORTER_EXTEND_QUERY_PATH
+kubectl exec -n auth auth-db-0 -c exporter -- env | grep PG_EXPORTER_EXTEND_QUERY_PATH
 ```
 
 **3. Check postgres_exporter logs:**
 ```bash
-kubectl logs -n review review-db-0 -c exporter | grep -i error
+kubectl logs -n auth auth-db-0 -c exporter | grep -i error
 ```
 
 **4. Verify pg_stat_statements is enabled:**
 ```bash
-kubectl exec -n review review-db-0 -c postgres -- psql -U postgres -c "SHOW shared_preload_libraries;"
+kubectl exec -n auth auth-db-0 -c postgres -- psql -U postgres -c "SHOW shared_preload_libraries;"
 ```
 
 **5. Verify custom metrics are exposed:**
 ```bash
 # Option 1: Direct exec into pod (recommended - no port-forward needed)
-kubectl exec -n review review-db-0 -c exporter -- wget -qO- http://localhost:9187/metrics 2>&1 | head -5
-kubectl exec -n review review-db-0 -c exporter -- wget -qO- http://localhost:9187/metrics 2>&1 | grep "^pg_stat_statements_calls" | head -3
+kubectl exec -n auth auth-db-0 -c exporter -- wget -qO- http://localhost:9187/metrics 2>&1 | head -5
+kubectl exec -n auth auth-db-0 -c exporter -- wget -qO- http://localhost:9187/metrics 2>&1 | grep "^pg_stat_statements_calls" | head -3
 
 # Option 2: Port-forward to postgres_exporter
-kubectl port-forward -n review review-db-0 9187:9187 &
+kubectl port-forward -n auth auth-db-0 9187:9187 &
 
 # Wait a few seconds, then query metrics
 sleep 3

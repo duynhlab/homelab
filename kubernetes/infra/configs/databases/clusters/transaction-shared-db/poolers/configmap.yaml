@@ -7,7 +7,7 @@
 #
 # Vault-backed secrets are available at:
 #   - Secret: pgcat-transaction-credentials-vault (namespace: cart)
-#   - Vault path: secret/data/poolers/pgcat-transaction
+#   - Vault path: secret/data/local/databases/pgcat-transaction/credentials
 #
 # Future options to eliminate inline passwords:
 # 1. InitContainer: Render pgcat.toml from Secret + template

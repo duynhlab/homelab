@@ -1,9 +1,9 @@
 # PostgreSQL Backup Strategy
 
-This document defines a **production-ready physical backup strategy** (base backup + WAL archiving) for **two PostgreSQL clusters** using **RustFS (S3-compatible)** as the backup target:
+This document defines a **production-ready physical backup strategy** (base backup + WAL archiving) for **all 4 PostgreSQL clusters** using **RustFS (S3-compatible)** as the backup target, with per-operator bucket isolation and dedicated service accounts:
 
-- `product-db` (CloudNativePG)
-- `supporting-shared-db` (Zalando Postgres Operator / Spilo)
+- **Bucket `pg-backups-zalando`** (SA: `backup-zalando`): `auth-db`, `supporting-shared-db` (Zalando / WAL-G)
+- **Bucket `pg-backups-cnpg`** (SA: `backup-cnpg`): `product-db`, `transaction-shared-db` (CloudNativePG / Barman)
 
 ## Table of Contents
 
@@ -57,7 +57,7 @@ sequenceDiagram
   Sched->>CNPGOp: schedule "0 0 2 * * *"
   CNPGOp->>Primary: run online base backup
   Primary->>Barman: upload base backup + archive WAL
-  Note over Barman: destinationPath="s3://pg-backups/product-db/", endpointURL="http://rustfs-svc.rustfs.svc.cluster.local:9000"
+  Note over Barman: destinationPath="s3://pg-backups-cnpg/product-db/", endpointURL="http://rustfs-svc.rustfs.svc.cluster.local:9000"
   Barman->>RustFS: PUT base + WAL files
   RustFS-->>Barman: 200_OK
   Barman-->>CNPGOp: backup complete
@@ -71,7 +71,7 @@ sequenceDiagram
   participant WalG as WAL_G
   participant RustFS as RustFS_S3
 
-  Note over Spilo: WAL_S3_BUCKET="pg-backups", AWS_ENDPOINT="http://rustfs-svc.rustfs.svc.cluster.local:9000"
+  Note over Spilo: WAL_S3_BUCKET="pg-backups-zalando", AWS_ENDPOINT="http://rustfs-svc.rustfs.svc.cluster.local:9000"
   Spilo->>WalG: scheduled base backup (BACKUP_SCHEDULE)
   WalG->>RustFS: PUT base backup objects (spilo path)
   Spilo->>WalG: archive_command pushes WAL segments
@@ -124,27 +124,36 @@ flowchart LR
 
 ## Bucket Layout
 
-RustFS (S3-compatible) is deployed in namespace `rustfs`. Backups land in the `pg-backups` bucket.
+RustFS (S3-compatible) is deployed in namespace `rustfs`. Backups are split into **2 buckets by operator** with dedicated service accounts (least-privilege).
 
 ### Layout
 
-| Cluster        | S3 path (logical view)       | Implementation notes |
-|---------------|-------------------------------|----------------------|
-| product-db     | `s3://pg-backups/product-db/` | CNPG `backup.barmanObjectStore.destinationPath` |
-| supporting-shared-db  | `s3://pg-backups/spilo/...`   | WAL-G uses Spilo/WAL-G object layout inside the bucket |
+| Bucket | Cluster | S3 path | Service Account | Implementation |
+|--------|---------|---------|-----------------|----------------|
+| `pg-backups-zalando` | auth-db | `s3://pg-backups-zalando/auth-db/` | `backup-zalando` | WAL-G via Spilo |
+| `pg-backups-zalando` | supporting-shared-db | `s3://pg-backups-zalando/user-db/` | `backup-zalando` | WAL-G via Spilo |
+| `pg-backups-cnpg` | product-db | `s3://pg-backups-cnpg/product-db/` | `backup-cnpg` | Barman Object Store |
+| `pg-backups-cnpg` | transaction-shared-db | `s3://pg-backups-cnpg/transaction-shared-db/` | `backup-cnpg` | Barman Object Store |
 
 ### S3 Endpoint
 
 - **Internal (in-cluster):** `http://rustfs-svc.rustfs.svc.cluster.local:9000`
-- **Bucket name:** `pg-backups`
+- **Buckets:** `pg-backups-zalando`, `pg-backups-cnpg`
 - **Path style:** Use path-style URLs for S3-compatible (RustFS/MinIO style)
 
-### Credentials
+### IAM & Credentials
 
-- **Access Key / Secret Key**: provisioned in RustFS (example in local/dev: `rustfsadmin` / `rustfsadmin`).
-- **Kubernetes Secret name**: `pg-backup-rustfs-credentials` (per namespace).
+Each operator uses a **dedicated RustFS service account** with a bucket-scoped IAM policy (no root credentials in pods).
+
+| Service Account | Bucket Access | IAM Policy | Vault Path |
+|----------------|---------------|------------|------------|
+| `backup-zalando` | `pg-backups-zalando` only | `s3:*` on `arn:aws:s3:::pg-backups-zalando/*` | `secret/local/infra/rustfs/backup-zalando` |
+| `backup-cnpg` | `pg-backups-cnpg` only | `s3:*` on `arn:aws:s3:::pg-backups-cnpg/*` | `secret/local/infra/rustfs/backup-cnpg` |
+
+- **Kubernetes Secret name**: `pg-backup-rustfs-credentials-vault` (per namespace, created by ClusterExternalSecret).
   - **CNPG/Barman keys**: `ACCESS_KEY_ID`, `ACCESS_SECRET_KEY`
   - **Zalando/WAL-G keys**: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
+- **Bucket + user + policy creation**: CronJob `setup-pg-backup-buckets` in namespace `rustfs` (runs every 30min, idempotent).
 
 ---
 
@@ -249,8 +258,9 @@ Key insight: more frequent base backups reduce risk of corrupted base backups, b
 
 ### Current implementation (what is deployed now)
 
-- `product-db` (CNPG): `retentionPolicy: "7d"` in `backup.retentionPolicy`.
-- `supporting-shared-db` (Zalando/WAL-G): `BACKUP_NUM_TO_RETAIN: "7"` in `zalando-walg-config`.
+- `product-db` (CNPG): `retentionPolicy: "30d"` in `backup.retentionPolicy`, bucket `pg-backups-cnpg`.
+- `transaction-shared-db` (CNPG): `retentionPolicy: "7d"` in `backup.retentionPolicy`, bucket `pg-backups-cnpg`.
+- All Zalando clusters (auth-db, supporting-shared-db): `BACKUP_NUM_TO_RETAIN: "7"` in `zalando-walg-config`, bucket `pg-backups-zalando`.
 
 ### Recommended production baseline (starting point)
 
@@ -285,8 +295,8 @@ CloudNativePG deprecated in-tree `barmanObjectStore` starting 1.26 and recommend
 
 ### What we use today
 
-- **product-db (CNPG)**: Barman Cloud via CNPG (`backup.barmanObjectStore`), storing base backups + WAL in RustFS.
-- **supporting-shared-db (Zalando)**: WAL-G via Spilo, storing base backups + WAL in RustFS.
+- **CNPG clusters** (product-db, transaction-shared-db): Barman Cloud via CNPG (`backup.barmanObjectStore`), storing base backups + WAL in RustFS bucket `pg-backups-cnpg` (SA: `backup-cnpg`).
+- **Zalando clusters** (auth-db, supporting-shared-db): WAL-G via Spilo, storing base backups + WAL in RustFS bucket `pg-backups-zalando` (SA: `backup-zalando`).
 
 ### High-level comparison of common tools
 

@@ -115,7 +115,7 @@ The following components are active in `kustomization.yaml`:
 ### 1. Database Cluster
 - **File**: [`instance.yaml`](instance.yaml)
 - **Description**: The main PostgreSQL 18 cluster configuration.
-- **Spec**: 3 instances (1 primary + 2 replicas), writes to `s3://pg-backups/transaction-shared-db/`.
+- **Spec**: 3 instances (1 primary + 2 replicas), writes to `s3://pg-backups-cnpg/transaction-shared-db/`.
 
 ### 2. Connection Pooler
 - **Directory**: [`poolers/`](poolers/)

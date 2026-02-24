@@ -309,7 +309,7 @@ make flux-sync
 
 ### Key Infrastructure
 
-- **5 PostgreSQL Clusters**: review-db, auth-db, supporting-shared-db, product-db, transaction-shared-db
+- **4 PostgreSQL Clusters**: auth-db, supporting-shared-db, product-db, transaction-shared-db
 - **Connection Poolers**: PgBouncer (Auth), PgCat (Product, Cart+Order)
 - **Migrations**: Flyway 11.19.0 with 8 migration images
 - **Operators**: Zalando Postgres Operator (v1.15.1), CloudNativePG Operator (v1.28.0)
@@ -361,7 +361,8 @@ make flux-sync
 **Add/modify secrets:**
 
 - Vault bootstrap: `kubernetes/infra/configs/secrets/vault-bootstrap/configmap.yaml` (add `vault kv put` command)
-- ExternalSecret: `kubernetes/infra/configs/secrets/external-secrets/{name}.yaml`
+- ClusterExternalSecret (shared): `kubernetes/infra/configs/secrets/cluster-external-secrets/{name}.yaml`
+- ExternalSecret (per-cluster): `kubernetes/infra/configs/databases/clusters/{cluster}/secrets/{name}.yaml`
 - ClusterSecretStore: `kubernetes/infra/configs/secrets/cluster-secret-store.yaml`
 - Vault HelmRelease: `kubernetes/infra/controllers/secrets/vault/helmrelease.yaml`
 - ESO HelmRelease: `kubernetes/infra/controllers/secrets/external-secrets/helmrelease.yaml`

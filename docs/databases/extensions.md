@@ -20,7 +20,7 @@
 | Operator | Version | PostgreSQL Version | Clusters |
 |----------|---------|-------------------|----------|
 | **CloudNativePG** | v1.28.0 | 18.1 (default) | `transaction-shared-db`, `product-db` |
-| **Zalando Postgres Operator** | v1.15.1 | 16/17 | `auth-db`, `supporting-shared-db`, `review-db` |
+| **Zalando Postgres Operator** | v1.15.1 | 16/17 | `auth-db`, `supporting-shared-db` |
 
 ### Current Extensions Usage
 
@@ -42,8 +42,6 @@ Both clusters use the **`system-trixie`** image (`ghcr.io/cloudnative-pg/postgre
 - **`auth-db`** (PostgreSQL 17): 
   - `shared_preload_libraries: "pg_stat_statements,pg_cron,pg_trgm,pgcrypto,pg_stat_kcache"`
 - **`supporting-shared-db`** (PostgreSQL 16):
-  - `shared_preload_libraries: "pg_stat_statements,pg_cron,pg_trgm,pgcrypto,pg_stat_kcache"`
-- **`review-db`** (PostgreSQL 16):
   - `shared_preload_libraries: "pg_stat_statements,pg_cron,pg_trgm,pgcrypto,pg_stat_kcache"`
 
 ### Compatibility Check
@@ -686,7 +684,7 @@ All Zalando clusters use the same extension set:
 apiVersion: acid.zalan.do/v1
 kind: postgresql
 metadata:
-  name: auth-db  # or supporting-shared-db, review-db
+  name: auth-db  # or supporting-shared-db
 spec:
   postgresql:
     version: "16"  # or "17" for auth-db
@@ -713,7 +711,7 @@ pgAudit can be added to Zalando clusters for audit logging (only required if aud
 apiVersion: acid.zalan.do/v1
 kind: postgresql
 metadata:
-  name: auth-db  # or supporting-shared-db, review-db
+  name: auth-db  # or supporting-shared-db
 spec:
   postgresql:
     version: "17"  # or "16"
@@ -1001,7 +999,6 @@ kubectl describe database order-database -n cart
 | `transaction-shared-db` | CloudNativePG | `system-trixie` | pgaudit | pgaudit (cart + order) |
 | `auth-db` | Zalando | Spilo 17 | pg_stat_statements, pg_cron, pg_trgm, pgcrypto, pg_stat_kcache | N/A |
 | `supporting-shared-db` | Zalando | Spilo 16 | pg_stat_statements, pg_cron, pg_trgm, pgcrypto, pg_stat_kcache | N/A |
-| `review-db` | Zalando | Spilo 16 | pg_stat_statements, pg_cron, pg_trgm, pgcrypto, pg_stat_kcache | N/A |
 
 **Key points:**
 - CloudNativePG clusters use `system-trixie` image with built-in extensions (no ImageVolume needed currently)

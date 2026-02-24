@@ -11,8 +11,7 @@ You are running **5 PostgreSQL clusters** with a hybrid architecture optimized f
 | **transaction-shared-db** | CloudNativePG | cart | 3 | Synchronous (`on`) | PgCat | cart, order |
 | **product-db** | CloudNativePG | product | 3 | Async (`local`) | PgDog | product |
 | **auth-db** | Zalando | auth | 3 | Async (`local`) | PgBouncer | auth |
-| **review-db** | Zalando | review | 1 | N/A (single node) | None | review |
-| **supporting-shared-db** | Zalando | user | 1 | N/A (single node) | PgBouncer | user, notification, shipping |
+| **supporting-shared-db** | Zalando | user | 1 | N/A (single node) | PgBouncer | user, notification, shipping, review |
 
 ### Architecture Diagram
 
@@ -43,7 +42,6 @@ flowchart TB
     end
 
     subgraph Single [Single-Instance Clusters - No HA]
-        R1[review-db]
         S1[supporting-shared-db]
     end
 ```
@@ -51,7 +49,7 @@ flowchart TB
 **Key findings:**
 - **transaction-shared-db**: Only cluster with synchronous replication. RPO = 0 (zero data loss).
 - **product-db, auth-db**: 3-node async. Fast writes, possible small data loss on crash.
-- **review-db, supporting-shared-db**: Single instance, no HA. No replication.
+- **supporting-shared-db**: Single instance, no HA. No replication. Hosts 4 databases (user, notification, shipping, review).
 
 ---
 
@@ -165,7 +163,7 @@ sequenceDiagram
 2.  **`local`** (Default Async): "Success if written to My Disk."
     *   **Fastest safe mode**.
     *   **Risk**: If Primary dies immediately after, data is lost before reaching replica.
-    *   **Your Clusters**: `auth-db`, `product-db`, `review-db`, `supporting-shared-db`.
+    *   **Your Clusters**: `auth-db`, `product-db`, `supporting-shared-db`.
 3.  **`remote_write`**: "Success if Replica OS received it."
     *   Replica has it in RAM, but hasn't flushed to disk. 
     *   Survives Postgres crash, but not Replica OS crash.
@@ -189,7 +187,7 @@ flowchart TB
         Primary --> R2
     end
 
-    subgraph Single [Single Instance - review-db, supporting-shared-db]
+    subgraph Single [Single Instance - supporting-shared-db]
         S1[Only Node]
     end
 
@@ -197,7 +195,7 @@ flowchart TB
     Single -->|"No failover - single point of failure"| S1
 ```
 
-**Tóm lại:** 3-node clusters có failover tự động. Single-instance clusters (review-db, supporting-shared-db) không có replica - nếu node chết thì service down.
+**Tóm lại:** 3-node clusters có failover tự động. Single-instance cluster (supporting-shared-db) không có replica - nếu node chết thì service down.
 
 ---
 
@@ -500,19 +498,20 @@ OpenAI scales PostgreSQL to **800M+ users** with:
 
 ## 11. Summary Table for Your Infrastructure
 
-| Feature | transaction-shared-db | product-db | auth-db | review-db | supporting-shared-db |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Replication Type** | Physical (HA) + Logical (CDC) | Physical | Physical | N/A (1 node) | N/A (1 node) |
-| **Sync Mode** | Synchronous (`on`) | Async (`local`) | Async (`local`) | N/A | N/A |
-| **Instances** | 3 | 3 | 3 | 1 | 1 |
-| **Pooler** | PgCat | PgDog | PgBouncer | None | PgBouncer |
-| **Failover RPO** | **0** (No data loss) | >0 (Possible small loss) | >0 (Possible small loss) | N/A | N/A |
-| **Failover RTO** | Seconds (Auto) | Seconds (Auto) | Seconds (Auto) | N/A | N/A |
-| **PITR Status** | Not Configured | Not Configured | Not Configured | Not Configured | Not Configured |
+| Feature | transaction-shared-db | product-db | auth-db | supporting-shared-db |
+| :--- | :--- | :--- | :--- | :--- |
+| **Replication Type** | Physical (HA) + Logical (CDC) | Physical | Physical | N/A (1 node) |
+| **Sync Mode** | Synchronous (`on`) | Async (`local`) | Async (`local`) | N/A |
+| **Instances** | 3 | 3 | 3 | 1 |
+| **Pooler** | PgCat | PgDog | PgBouncer | PgBouncer |
+| **Databases** | cart, order | product | auth | user, notification, shipping, review |
+| **Failover RPO** | **0** (No data loss) | >0 (Possible small loss) | >0 (Possible small loss) | N/A |
+| **Failover RTO** | Seconds (Auto) | Seconds (Auto) | Seconds (Auto) | N/A |
+| **PITR Status** | Not Configured | Not Configured | Not Configured | Not Configured |
 
 ### Operators
 
 | Operator | Clusters | PostgreSQL Version |
 |----------|----------|-------------------|
 | **CloudNativePG** | transaction-shared-db, product-db | 18 |
-| **Zalando Postgres Operator** | auth-db, review-db, supporting-shared-db | 16/17 |
+| **Zalando Postgres Operator** | auth-db, supporting-shared-db | 16/17 |

@@ -109,7 +109,7 @@ All 9 services migrated from `lib/pq` to `pgx/v5 v5.8.0`:
 | auth | auth-db | PgBouncer | ✅ Migrated |
 | user | supporting-shared-db | PgBouncer | ✅ Migrated |
 | notification | supporting-shared-db | PgBouncer | ✅ Migrated |
-| review | review-db | None | ✅ Migrated |
+| review | supporting-shared-db | PgBouncer | ✅ Migrated |
 | shipping | supporting-shared-db | PgBouncer | ✅ Migrated |
 
 ### Files Changed Per Service

@@ -59,9 +59,9 @@ spec:
         value: "true"
       - name: METRICS_ENABLED
         value: "true"
-      # Database configuration
+      # Database configuration (via PgBouncer pooler on supporting-shared-db)
       - name: DB_HOST
-        value: "review-db.review.svc.cluster.local"  # Direct connection, no pooler - review-db is in review namespace
+        value: "supporting-shared-db-pooler.user.svc.cluster.local"  # PgBouncer pooler service (migrated from review-db)
       - name: DB_PORT
         value: "5432"
       - name: DB_NAME
@@ -71,12 +71,12 @@ spec:
       - name: DB_PASSWORD
         valueFrom:
           secretKeyRef:
-            name: review.review-db.credentials.postgresql.acid.zalan.do  # Zalando operator auto-generated secret
+            name: review.review.supporting-shared-db.credentials.postgresql.acid.zalan.do  # Zalando cross-namespace secret
             key: password
       - name: DB_SSLMODE
         value: "require"
       - name: DB_POOL_MAX_CONNECTIONS
-        value: "10"  # Direct connection, no pooler - smaller pool
+        value: "10"
       # Graceful shutdown configuration
       - name: SHUTDOWN_TIMEOUT
         value: "10s"  # Default shutdown timeout (can be overridden)
@@ -113,16 +113,16 @@ spec:
       initialDelaySeconds: 5
       periodSeconds: 5
 
-    # Database migrations (Flyway init container)
+    # Database migrations (Flyway init container - direct connection, bypasses pooler)
     migrations:
       enabled: true
       image: ghcr.io/duynhne/review-service/review-init:latest
       imagePullPolicy: Always #IfNotPresent
       env:
-        DB_HOST: "review-db.review.svc.cluster.local"  # Direct connection, no pooler - review-db is in review namespace
+        DB_HOST: "supporting-shared-db.user.svc.cluster.local"  # Direct connection for DDL migrations (bypasses pooler)
         DB_PORT: "5432"
         DB_NAME: "review"
         DB_USER: "review"
         DB_SSLMODE: "require"
       envFrom:
-        secretRef: "review.review-db.credentials.postgresql.acid.zalan.do"  # Zalando operator auto-generated secret
+        secretRef: "review.review.supporting-shared-db.credentials.postgresql.acid.zalan.do"  # Zalando cross-namespace secret

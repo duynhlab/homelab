@@ -1,5 +1,5 @@
 # PrometheusRule for PostgreSQL alerts across all exporter types:
-#   - postgres_exporter v0.18 (Zalando: auth-db, review-db) -- built-in + custom_ prefixed queries
+#   - postgres_exporter v0.18 (Zalando: auth-db) -- built-in + custom_ prefixed queries
 #   - pg_exporter (Zalando: supporting-shared-db pilot) -- pg_* built-in collectors
 #   - CNPG built-in exporter (product-db, transaction-shared-db) -- cnpg_* prefixed custom queries
 apiVersion: monitoring.coreos.com/v1

@@ -31,10 +31,6 @@ spec:
       namespace: auth
     - apiVersion: acid.zalan.do/v1
       kind: postgresql
-      name: review-db
-      namespace: review
-    - apiVersion: acid.zalan.do/v1
-      kind: postgresql
       name: supporting-shared-db
       namespace: user
     - apiVersion: postgresql.cnpg.io/v1

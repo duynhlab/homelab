@@ -218,7 +218,6 @@ flowchart TD
 
 ```
 monitoring/
-├── charts/            # Helm charts (apps + dashboards)
 ├── kubernetes/        # GitOps manifests (Flux + Kustomize)
 │   ├── clusters/      # Flux cluster configurations (local/prod)
 │   ├── infra/         # Controllers + configs (operators, monitoring, databases, secrets)
@@ -334,8 +333,7 @@ make flux-sync
 **Add a new service:**
 
 - Service code: `services/cmd/{service}/`, `services/internal/{service}/`
-- Helm values: `charts/mop/values/{service}.yaml`
-- HelmRelease: `kubernetes/apps/{service}.yaml`
+- HelmRelease (values inline): `kubernetes/apps/{service}.yaml`
 - SLO CRD: `kubernetes/infra/configs/monitoring/slo/{service}.yaml`
 - Migration: `services/{service}/db/migrations/Dockerfile` + `sql/V*__*.sql`
 - Push to OCI: `make flux-push` (updates OCI registry)

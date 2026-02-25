@@ -67,11 +67,11 @@ spec:
       - name: DB_NAME
         value: "review"
       - name: DB_USER
-        value: "review"
+        value: "review.review"
       - name: DB_PASSWORD
         valueFrom:
           secretKeyRef:
-            name: review.review.supporting-shared-db.credentials.postgresql.acid.zalan.do  # Zalando cross-namespace secret
+            name: review.review.supporting-shared-db.credentials.postgresql.acid.zalan.do # Zalando cross-namespace secret
             key: password
       - name: DB_SSLMODE
         value: "require"
@@ -122,7 +122,7 @@ spec:
         DB_HOST: "supporting-shared-db.user.svc.cluster.local"  # Direct connection for DDL migrations (bypasses pooler)
         DB_PORT: "5432"
         DB_NAME: "review"
-        DB_USER: "review"
+        DB_USER: "review.review"
         DB_SSLMODE: "require"
       envFrom:
         secretRef: "review.review.supporting-shared-db.credentials.postgresql.acid.zalan.do"  # Zalando cross-namespace secret

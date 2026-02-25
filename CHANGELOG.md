@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.50.14] - 2026-02-24
+
+### Changed
+
+- **Extract Helm charts to dedicated `duyhenryer/charts` repo**: Moved `charts/mop` (v0.7.0) and `charts/grafana` (v0.1.0) out of this repository into the dedicated [`duyhenryer/charts`](https://github.com/duyhenryer/charts) repo. All charts are now published under `oci://ghcr.io/duyhenryer/charts/` from a single source.
+  - Updated `mop-chart-oci.yaml` OCIRepository URL from `ghcr.io/duynhne` to `ghcr.io/duyhenryer`
+  - No changes to `kubernetes/apps/` HelmReleases (they reference the OCIRepository by name, not URL)
+
+### Removed
+
+- **`charts/` directory**: Removed `charts/mop/` and `charts/grafana/` (16 files). Charts are now maintained in `duyhenryer/charts` repo.
+- **`helm-release.yml` workflow**: Removed `.github/workflows/helm-release.yml`. Chart publishing is now handled by `duyhenryer/charts` repo's `release.yml`.
+
+### Documentation
+
+- Updated 12 files to remove references to `charts/mop/values/{service}.yaml` (path no longer exists). Values are inline in `kubernetes/apps/{service}.yaml`.
+  - `AGENTS.md`, `docs/README.md`, `docs/platform/setup.md`, `docs/api/api.md`
+  - `docs/observability/slo/README.md`, `docs/observability/slo/getting_started.md`
+  - `docs/observability/apm/tracing.md`, `docs/observability/apm/tracing_architecture.md`
+  - `docs/testing/k6.md`
+  - `docs/runbooks/metrics-audit-fixes.md`, `docs/runbooks/troubleshooting/pgcat_read_only_transaction_error.md`
+
 ## [0.50.13] - 2026-02-24
 
 ### Changed

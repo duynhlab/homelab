@@ -34,10 +34,10 @@ This directory contains PostgreSQL database configurations organized by cluster.
 
 | Cluster | Metrics Exporter | Log Shipper | Backup Method | Backup Target |
 |---------|-----------------|-------------|---------------|---------------|
-| auth-db | postgres_exporter v0.18.1 (sidecar, :9187) + PgBouncer exporter v0.11.0 | Vector v0.52.0 (sidecar) | WAL-G | `s3://pg-backups-zalando/auth-db/` (SA: backup-zalando) |
-| supporting-shared-db | pg_exporter (Pigsty) v1.2.0 (sidecar, :9630) | Vector v0.52.0 (sidecar) | WAL-G | `s3://pg-backups-zalando/user-db/` (SA: backup-zalando) |
-| product-db | CNPG built-in (PodMonitor) + PgDog OpenMetrics (:9090) | CNPG built-in (stdout) | Barman Object Store | `s3://pg-backups-cnpg/product-db/` (SA: backup-cnpg), retention 30d |
-| transaction-shared-db | CNPG built-in (PodMonitor) + PgCat Prometheus (:9930) | CNPG built-in (stdout) | Barman Object Store | `s3://pg-backups-cnpg/transaction-shared-db/` (SA: backup-cnpg), retention 7d |
+| auth-db | postgres_exporter v0.18.1 (sidecar, :9187) + PgBouncer exporter v0.11.0 | Vector v0.52.0 (sidecar) | WAL-G | `s3://pg-backups-zalando/auth-db/` |
+| supporting-shared-db | pg_exporter (Pigsty) v1.2.0 (sidecar, :9630) | Vector v0.52.0 (sidecar) | WAL-G | `s3://pg-backups-zalando/user-db/` |
+| product-db | CNPG built-in (PodMonitor) + PgDog OpenMetrics (:9090) | CNPG built-in (stdout) | Barman Object Store | `s3://pg-backups-cnpg/product-db/`, retention 30d |
+| transaction-shared-db | CNPG built-in (PodMonitor) + PgCat Prometheus (:9930) | CNPG built-in (stdout) | Barman Object Store | `s3://pg-backups-cnpg/transaction-shared-db/`, retention 7d |
 
 ## Extensions
 

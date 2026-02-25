@@ -184,7 +184,7 @@ DB_READ_HOST: "pgcat-ro.cart.svc.cluster.local"
 
 To confirm PgCat routing is the issue, temporarily point cart/order directly to the primary:
 
-**In `charts/mop/values/cart.yaml`:**
+**In `kubernetes/apps/cart.yaml` (HelmRelease values):**
 
 ```yaml
 extraEnv:

@@ -40,7 +40,7 @@ spec:
       connection_pooler_user: pooler
     configGeneral:
       docker_image: ghcr.io/zalando/spilo-16:3.3-p2
-      enable_teams_api: false
+      # enable_teams_api: false
       workers: 8
     image:
       pullPolicy: IfNotPresent

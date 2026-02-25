@@ -1,9 +1,8 @@
-# CronJob to ensure backup buckets, service accounts, and IAM policies exist in RustFS
-# Creates per-operator buckets with dedicated service accounts (least-privilege)
+# CronJob to ensure backup buckets exist in RustFS
+# Creates per-operator buckets for backup isolation
 # Runs periodically (idempotent) - safe to re-run
 #
-# Buckets:  pg-backups-zalando (Zalando/WAL-G), pg-backups-cnpg (CloudNativePG/Barman)
-# Accounts: backup-zalando, backup-cnpg (bucket-scoped IAM policies)
+# Buckets: pg-backups-zalando (Zalando/WAL-G), pg-backups-cnpg (CloudNativePG/Barman)
 #
 # Chart: cronjobs v0.2.0 from oci://ghcr.io/duyhenryer/charts/cronjobs
 # Verify: kubectl get cronjob -n rustfs
@@ -57,7 +56,7 @@ spec:
 
             echo "=== Waiting for RustFS ==="
             for i in 1 2 3 4 5 6 7 8 9 10; do
-              if mc alias set rustfs "$ENDPOINT" "$ROOT_ACCESS_KEY" "$ROOT_SECRET_KEY" 2>/dev/null; then
+              if mc alias set rustfs "$ENDPOINT" "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" 2>/dev/null; then
                 echo "RustFS is ready."
                 break
               fi
@@ -69,68 +68,18 @@ spec:
             mc mb --ignore-existing rustfs/pg-backups-zalando
             mc mb --ignore-existing rustfs/pg-backups-cnpg
 
-            echo "=== Creating IAM policies ==="
-            cat > /tmp/policy-backup-zalando.json <<'POLICY'
-            {
-              "Version": "2012-10-17",
-              "Statement": [
-                {
-                  "Effect": "Allow",
-                  "Action": ["s3:*"],
-                  "Resource": [
-                    "arn:aws:s3:::pg-backups-zalando",
-                    "arn:aws:s3:::pg-backups-zalando/*"
-                  ]
-                }
-              ]
-            }
-            POLICY
-
-            cat > /tmp/policy-backup-cnpg.json <<'POLICY'
-            {
-              "Version": "2012-10-17",
-              "Statement": [
-                {
-                  "Effect": "Allow",
-                  "Action": ["s3:*"],
-                  "Resource": [
-                    "arn:aws:s3:::pg-backups-cnpg",
-                    "arn:aws:s3:::pg-backups-cnpg/*"
-                  ]
-                }
-              ]
-            }
-            POLICY
-
-            mc admin policy create rustfs policy-backup-zalando /tmp/policy-backup-zalando.json 2>/dev/null || echo "Policy policy-backup-zalando may already exist."
-            mc admin policy create rustfs policy-backup-cnpg /tmp/policy-backup-cnpg.json 2>/dev/null || echo "Policy policy-backup-cnpg may already exist."
-
-            echo "=== Creating service accounts ==="
-            mc admin user add rustfs "$ZALANDO_ACCESS_KEY" "$ZALANDO_SECRET_KEY" 2>/dev/null || echo "User backup-zalando may already exist."
-            mc admin user add rustfs "$CNPG_ACCESS_KEY" "$CNPG_SECRET_KEY" 2>/dev/null || echo "User backup-cnpg may already exist."
-
-            echo "=== Attaching policies ==="
-            mc admin policy attach rustfs policy-backup-zalando --user "$ZALANDO_ACCESS_KEY" 2>/dev/null || echo "Policy already attached to backup-zalando."
-            mc admin policy attach rustfs policy-backup-cnpg --user "$CNPG_ACCESS_KEY" 2>/dev/null || echo "Policy already attached to backup-cnpg."
-
             echo "=== Verifying ==="
             mc ls rustfs/
-            mc admin user list rustfs
             echo "=== Done ==="
         env:
-          - name: ROOT_ACCESS_KEY
+          - name: AWS_ACCESS_KEY_ID
             value: rustfsadmin
-          - name: ROOT_SECRET_KEY
+          - name: AWS_SECRET_ACCESS_KEY
             value: rustfsadmin
-          - name: ZALANDO_ACCESS_KEY
-            value: backup-zalando
-          - name: ZALANDO_SECRET_KEY
-            value: backup-zalando-secret
-          - name: CNPG_ACCESS_KEY
-            value: backup-cnpg
-          - name: CNPG_SECRET_KEY
-            value: backup-cnpg-secret
         resources:
           requests:
             cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 50m
             memory: 64Mi

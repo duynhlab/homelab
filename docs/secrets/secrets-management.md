@@ -114,8 +114,8 @@ All secrets are stored in Vault's KV v2 secrets engine under the `secret/` path.
 
 | Vault Path | Description | Consumer |
 |------------|-------------|----------|
-| `secret/local/infra/rustfs/backup-zalando` | RustFS S3 credentials (SA: backup-zalando, bucket: pg-backups-zalando) | Zalando clusters (auth-db, supporting-shared-db) |
-| `secret/local/infra/rustfs/backup-cnpg` | RustFS S3 credentials (SA: backup-cnpg, bucket: pg-backups-cnpg) | CNPG clusters (product-db, transaction-shared-db) |
+| `secret/local/infra/rustfs/backup-zalando` | RustFS S3 credentials (bucket: pg-backups-zalando, currently rustfsadmin) | Zalando clusters (auth-db, supporting-shared-db) |
+| `secret/local/infra/rustfs/backup-cnpg` | RustFS S3 credentials (bucket: pg-backups-cnpg, currently rustfsadmin) | CNPG clusters (product-db, transaction-shared-db) |
 
 **Keys**: `access_key_id`, `secret_access_key`
 

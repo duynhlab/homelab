@@ -1125,7 +1125,7 @@ All error responses follow this format:
 
 #### Services
 - **Service code (polyrepo)**: `{service}-service/cmd/main.go` + `{service}-service/internal/{web,logic,core}/`
-- **Helm values (this repo)**: `charts/mop/values/{service}.yaml`
+- **HelmRelease (this repo)**: `kubernetes/apps/{service}.yaml` (values inline)
 - **SLO CRD (this repo)**: `kubernetes/infra/configs/monitoring/slo/{service}.yaml`
 - **Migration (service repo)**: `{service}-service/db/migrations/Dockerfile` + `{service}-service/db/migrations/sql/V*__*.sql`
 

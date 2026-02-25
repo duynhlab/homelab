@@ -67,7 +67,7 @@ kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:909
 
 ## Default SLO Values
 
-Defined in `charts/mop/values.yaml`:
+Defined in the mop chart's `values.yaml` ([`duyhenryer/charts` repo](https://github.com/duyhenryer/charts/blob/main/charts/mop/values.yaml)):
 
 ```yaml
 slo:

@@ -54,7 +54,36 @@ spec:
       - createdb
     review.review:  # Database owner for review database (namespace.username format for cross-namespace secret)
       - createdb
-  
+  preparedDatabases:
+  # Important: preparedDatabases is executed only when the DB is created for the first time.
+  # If the database:
+  # - already exists
+  # - or the cluster has already been bootstrapped
+  # => the operator will NOT automatically add new extensions to an existing DB
+  # In that case, you must manually run: CREATE EXTENSION "uuid-ossp";
+    user:
+      extensions:
+        pg_trgm: public
+        citext: public
+        uuid-ossp: public
+        pg_partman: public
+        hstore: public
+        unaccent: public
+    notification:
+      extensions:
+        pg_trgm: public
+        citext: public
+        uuid-ossp: public
+    shipping:
+      extensions:
+        pg_trgm: public
+        uuid-ossp: public
+    review:
+      extensions:
+        pg_trgm: public
+        uuid-ossp: public
+        hstore: public
+
   # Connection pooler (PgBouncer sidecar) configuration
   # Services connect via: supporting-shared-db-pooler.user.svc.cluster.local:5432
   # Note: PgBouncer requires SSL connections (sslmode=require)
@@ -88,7 +117,7 @@ spec:
       log_lock_waits: "on"
       log_temp_files: "0"
       # limit the connections
-      max_connections: "500"
+      max_connections: "100"
       superuser_reserved_connections: "5"
       # set the maximum delay for the standby
       # after this timeout all queries on replica will be canceled until the standby will be up to date
@@ -117,13 +146,16 @@ spec:
       effective_io_concurrency: "100"
       random_page_cost: "1.1"
       # enable the extentions, pg_stat_statements is a must-have for production
-      shared_preload_libraries: "pg_stat_statements,pg_cron,pg_trgm,pgcrypto,pg_stat_kcache"
+      shared_preload_libraries: "pg_stat_statements,pg_cron,pgcrypto,pg_stat_kcache,pgaudit"
       track_io_timing: "on"
       pg_stat_statements.max: "1000"
       pg_stat_statements.track: "all"
       cron.database_name: "postgres"
       synchronous_commit: "local"
-  
+      pgaudit.log: "write,ddl"
+      pgaudit.log_relation: "on"
+      pgaudit.log_parameter: "off"
+
       # Patroni configuration for pg_hba.conf
       # Default Zalando operator requires SSL, but we allow unencrypted for simplicity
       # Note: Must include local entries for Patroni to connect via Unix socket
@@ -138,9 +170,9 @@ spec:
     requests:
       cpu: 100m
       memory: 128Mi
-    limits:
-      cpu: "100m"
-      memory: "256Mi"
+    # limits:
+    #   cpu: "100m"
+    #   memory: "256Mi"
   # Sidecars: pg_exporter (Pigsty) for Prometheus metrics + Vector for log collection
   # pg_exporter pilot: 600+ built-in metrics, auto-discovery for 3 databases, per-query caching/timeout
   sidecars:

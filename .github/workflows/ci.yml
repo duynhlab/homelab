@@ -1,0 +1,54 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [v6]
+  pull_request:
+    branches: [v6]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # 1. PR Checks (Branch Name Validation + Slack "PR Opened")
+  pr-checks:
+    if: github.event_name == 'pull_request'
+    uses: duyhenryer/shared-workflows/.github/workflows/pr-checks.yml@main
+    with:
+      slack_channel_id: "C0AD82A9A74"
+    secrets:
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+  # 2. Validate Kubernetes Manifests
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup yq
+        uses: fluxcd/pkg/actions/yq@main
+
+      - name: Setup kubeconform
+        uses: fluxcd/pkg/actions/kubeconform@main
+
+      - name: Setup kustomize
+        uses: fluxcd/pkg/actions/kustomize@main
+
+      - name: Validate manifests
+        run: ./scripts/flux-validate.sh
+
+  # 3. Final Status Notification
+  notify:
+    if: always()
+    needs: [pr-checks, validate]
+    uses: duyhenryer/shared-workflows/.github/workflows/status.yml@main
+    with:
+      slack_channel_id: "C0AD82A9A74"
+      slack_thread_ts: ${{ needs.pr-checks.outputs.slack_thread_ts }}
+      gsheet_spreadsheet_id: "1F2VUrAOyMGnETApp5yA-ldCW81ConiQXnWYZVxKas_0"
+    secrets:
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      GSHEET_CLIENT_EMAIL: ${{ secrets.GSHEET_CLIENT_EMAIL }}
+      GSHEET_PRIVATE_KEY: ${{ secrets.GSHEET_PRIVATE_KEY }}

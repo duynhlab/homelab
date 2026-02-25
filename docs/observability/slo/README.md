@@ -152,7 +152,7 @@ Access: http://localhost:3000/dashboards (folder: SLO)
 
 ### Manifests
 
-- SLO Template: `charts/mop/templates/slo.yaml`
+- SLO Template: [`duyhenryer/charts` repo](https://github.com/duyhenryer/charts/blob/main/charts/mop/templates/slo.yaml)
 - Sloth Operator: `kubernetes/infra/controllers/metrics/sloth-operator.yaml`
 - ServiceMonitor: `kubernetes/infra/configs/monitoring/servicemonitors/microservices.yaml`
 

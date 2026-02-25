@@ -116,7 +116,7 @@ errorRate = promauto.NewCounterVec(prometheus.CounterOpts{
 | `error_rate_total` | **0 panels** | ZERO impact |
 | `request_duration_seconds_count` | **14 panels** + 2 template variables | Already the source of truth |
 
-**SLO template audit:** `charts/mop/templates/slo.yaml` uses only `request_duration_seconds_count` and `request_duration_seconds_bucket`. Zero references to `requests_total` or `error_rate_total`.
+**SLO template audit:** The mop chart's `slo.yaml` template ([`duyhenryer/charts` repo](https://github.com/duyhenryer/charts/blob/main/charts/mop/templates/slo.yaml)) uses only `request_duration_seconds_count` and `request_duration_seconds_bucket`. Zero references to `requests_total` or `error_rate_total`.
 
 ### After (fix)
 

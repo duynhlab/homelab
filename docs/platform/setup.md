@@ -234,7 +234,6 @@ monitoring/
 │           ├── databases.yaml          # Databases Kustomization
 │           └── apps.yaml               # Apps Kustomization
 ├── Makefile                            # GitOps automation
-├── charts/mop/                         # Helm chart for all services
 └── scripts/                            # Kind/Flux helper scripts (invoked by Makefile targets)
 ```
 

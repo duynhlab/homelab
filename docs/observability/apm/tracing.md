@@ -130,10 +130,10 @@ kubectl port-forward -n monitoring svc/grafana-service 3000:3000
 
 ### Quick Configuration via Helm
 
-All tracing configuration is managed via Helm chart values (`charts/mop/values/*.yaml`):
+All tracing configuration is managed via HelmRelease values (`kubernetes/apps/*.yaml`):
 
 ```yaml
-# charts/mop/values/auth.yaml
+# kubernetes/apps/auth.yaml (values section)
 env:
   - name: SERVICE_NAME
     value: "auth"
@@ -147,9 +147,7 @@ env:
 
 **Deploy with custom sampling:**
 ```bash
-helm upgrade --install auth charts/mop/ \
-  -f charts/mop/values/auth.yaml \
-  -n auth --create-namespace
+make sync  # Push manifests and trigger Flux reconciliation
 ```
 
 ### Environment Variables

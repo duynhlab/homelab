@@ -149,7 +149,7 @@ tracerProvider := sdktrace.NewTracerProvider(
 All microservices use consistent configuration via Helm values:
 
 ```yaml
-# charts/mop/values/*.yaml
+# kubernetes/apps/*.yaml (values section)
 env:
   - name: OTEL_COLLECTOR_ENDPOINT
     value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"

@@ -48,7 +48,10 @@ docs/
 │       └── annotation-driven-slo-controller.md  # Future: annotation-based automation
 ├── platform/                     # Platform/deployment documentation
 │   ├── setup.md                  # GitOps deployment guide
+│   ├── application-delivery.md    # ResourceSet patterns & templates
 │   ├── cicd.md                   # CI/CD pipelines
+│   ├── gitflow.md                # Git branching & release standard
+│   ├── ci_template.yml           # CI template for service repos
 │   └── sonarcloud.md             # SonarCloud integration
 ├── runbooks/                     # Operational runbooks
 │   ├── metrics-audit-fixes.md    # Metrics audit runbook (before/after fixes)
@@ -252,7 +255,10 @@ docs/
 ### Platform
 
 - [Setup Guide](./platform/setup.md) - Complete deployment and configuration guide
+- [Application Delivery](./platform/application-delivery.md) - ResourceSet patterns & templates
 - [CI/CD](./platform/cicd.md) - CI/CD pipelines and workflows
+- [Git Branching & Release](./platform/gitflow.md) - Hybrid Enterprise Gitflow standard (dev/staging/main + immutable tags)
+- [CI Template](./platform/ci_template.yml) - Reference CI workflow for service repos
 - [SonarCloud](./platform/sonarcloud.md) - SonarCloud integration
 
 ### Secrets

@@ -101,7 +101,7 @@ flowchart LR
 #### product-db (CloudNativePG)
 
 - **Namespace:** product
-- **Operator:** CloudNativePG v1.28.0
+- **Operator:** CloudNativePG v1.28.1
 - **PostgreSQL:** 18.1-system-trixie
 - **Topology:** 3 instances (1 primary + 2 replicas), async replication
 - **Scope:** 1 DB (`product`)

@@ -311,7 +311,7 @@ make flux-sync
 - **4 PostgreSQL Clusters**: auth-db, supporting-shared-db, product-db, transaction-shared-db
 - **Connection Poolers**: PgBouncer (Auth), PgCat (Product, Cart+Order)
 - **Migrations**: Flyway 11.19.0 with 8 migration images
-- **Operators**: Zalando Postgres Operator (v1.15.1), CloudNativePG Operator (v1.28.0)
+- **Operators**: Zalando Postgres Operator (v1.15.1), CloudNativePG Operator (v1.28.1)
 - **SLO**: Managed via Sloth Operator (PrometheusServiceLevel CRDs)
 - **CI/CD**: GitHub Actions workflows (build-images, build-init-images, build-k6-images, helm-release)
 

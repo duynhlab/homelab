@@ -69,7 +69,7 @@ kubectl exec -n cart transaction-db-1 -- psql -U postgres -c "SELECT version();"
 
 ### CloudNativePG Operator
 
-**Version:** v1.28.0  
+**Version:** v1.28.1  
 **Clusters:** product-db, transaction-db
 
 | Feature | Implementation |

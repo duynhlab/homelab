@@ -18,8 +18,8 @@
 |----------------------------|-----------|-------------------|-----------------|------------|--------------------------|------------------------------------|
 | Zalando Postgres Operator  | v1.15.1   | auth-db           | 17              | 3 (HA)     | PgBouncer Sidecar        | 2 instances                        |
 | Zalando Postgres Operator  | v1.15.1   | supporting-shared-db     | 16              | 1          | PgBouncer Sidecar        | 2 instances                        |
-| CloudNativePG Operator     | v1.28.0   | product-db        | 18              | 3 (HA)     | PgDog Standalone         | 1 replica (Helm chart)              |
-| CloudNativePG Operator     | v1.28.0   | transaction-shared-db    | 18              | 3 (HA)     | PgCat Standalone         | 2 replicas                          |
+| CloudNativePG Operator     | v1.28.1   | product-db        | 18              | 3 (HA)     | PgDog Standalone         | 1 replica (Helm chart)              |
+| CloudNativePG Operator     | v1.28.1   | transaction-shared-db    | 18              | 3 (HA)     | PgCat Standalone         | 2 replicas                          |
 ---
 
 ## Database Architecture
@@ -32,7 +32,7 @@ The system uses **4 PostgreSQL clusters** distributed across different operators
 flowchart TB
     subgraph Operators["PostgreSQL Operators"]
         Zalando["Zalando Operator v1.15.1 - 3 clusters"]
-        CloudNativePG["CloudNativePG Operator v1.28.0 - 2 clusters"]
+        CloudNativePG["CloudNativePG Operator v1.28.1 - 2 clusters"]
     end
     
     subgraph Services["Microservices by Namespace"]
@@ -149,7 +149,7 @@ flowchart TB
 
 ### Overview
 
-**CloudNativePG Operator** (v1.28.0) is a Kubernetes-native operator for PostgreSQL with its own built-in Instance Manager for high availability. It does **not** use Patroni -- the operator itself handles failover, promotion, and lifecycle management through the Kubernetes API.
+**CloudNativePG Operator** (v1.28.1) is a Kubernetes-native operator for PostgreSQL with its own built-in Instance Manager for high availability. It does **not** use Patroni -- the operator itself handles failover, promotion, and lifecycle management through the Kubernetes API.
 
 **Key Features:**
 - Kubernetes-native CRDs for cluster management

@@ -92,7 +92,7 @@ flowchart TB
 
 | Layer | Technology | Version | Rationale |
 |-------|------------|---------|-----------|
-| **Kubernetes Operator** | CloudNativePG | 1.28.0+ | Existing operator, supports logical replication slot sync |
+| **Kubernetes Operator** | CloudNativePG | 1.28.1+ | Existing operator, supports logical replication slot sync |
 | **PostgreSQL** | PostgreSQL | 15+ | Managed by CloudNativePG, supports logical replication |
 | **Monitoring** | Prometheus Operator | Latest | Existing operator, auto-discovers operator-created PodMonitors |
 | **Metrics Exporter** | postgres_exporter | Built-in | CloudNativePG includes postgres_exporter sidecar |
@@ -103,7 +103,7 @@ flowchart TB
 ### Dependencies
 
 **Existing Infrastructure:**
-- ✅ CloudNativePG Operator installed (v1.28.0)
+- ✅ CloudNativePG Operator installed (v1.28.1)
 - ✅ Prometheus Operator installed
 - ✅ Kubernetes cluster (Kind or production)
 - ✅ Transaction-DB cluster (2 instances, operational)

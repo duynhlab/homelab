@@ -163,7 +163,7 @@ flowchart TB
 | Layer | Technology | Version | Rationale |
 |-------|------------|---------|-----------|
 | **Connection Pooler** | PgCat | v1.2.0 | Already deployed. Modern Rust-based pooler with HA features. |
-| **Database Operator** | CloudNativePG | v1.28.0 | Manages transaction-db cluster. Provides service endpoints. |
+| **Database Operator** | CloudNativePG | v1.28.1 | Manages transaction-db cluster. Provides service endpoints. |
 | **PostgreSQL** | PostgreSQL | 18 | CloudNativePG default. 3-node HA with synchronous replication. |
 | **Monitoring** | Prometheus Operator | v80.0.0 | Already deployed. ServiceMonitor CRD for metrics discovery. |
 | **Configuration** | Kubernetes ConfigMap | - | TOML format. Live reload support. |

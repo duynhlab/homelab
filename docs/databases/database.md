@@ -2,7 +2,7 @@
 ## Table of Contents
 
 1. [Quick Summary](#quick-summary) - Operators, clusters, poolers overview
-2. [Database Architecture](#database-architecture) - 5 clusters overview diagram + tables
+2. [Database Architecture](#database-architecture) - 4 clusters overview diagram + tables
 3. [CloudNativePG Operator](#cloudnativepg-operator) - Operator features, connection patterns, monitoring
 4. [Zalando Postgres Operator](#zalando-postgres-operator) - Operator features, secrets, monitoring, management
 5. [Connection Poolers](#connection-poolers) - PgCat, PgBouncer, PgDog comparison + configuration
@@ -26,7 +26,7 @@
 
 ### Overview
 
-The system uses **5 PostgreSQL clusters** distributed across different operators and connection patterns to demonstrate various database management approaches:
+The system uses **4 PostgreSQL clusters** distributed across different operators and connection patterns to demonstrate various database management approaches:
 
 ```mermaid
 flowchart TB

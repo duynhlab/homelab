@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 
-You are running **5 PostgreSQL clusters** with a hybrid architecture optimized for specific workload needs.
+You are running **4 PostgreSQL clusters** with a hybrid architecture optimized for specific workload needs.
 
 ### 5-Cluster Overview
 

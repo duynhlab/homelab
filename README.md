@@ -13,7 +13,7 @@ Production-ready microservices monitoring platform with 8 Go services, complete 
 - 8 microservices with v1 API (canonical, frontend-aligned)
 - 34 Grafana dashboard panels (5 row groups)
 - Complete observability stack (Prometheus, Tempo, Jaeger, Loki, Pyroscope)
-- PostgreSQL database integration (5 clusters, Flyway migrations)
+- PostgreSQL database integration (4 clusters, Flyway migrations)
 - Valkey caching (Redis-compatible) with Cache-Aside pattern
 - SLO management via Sloth Operator
 
@@ -21,72 +21,103 @@ Production-ready microservices monitoring platform with 8 Go services, complete 
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ### System Architecture
 
-Complete system architecture showing Frontend (React SPA), microservices stack (3-layer architecture), Valkey cache layer, data layer, and observability:
+Runtime architecture: Frontend (React SPA), 8 microservices (3-layer each), Valkey cache, 4 PostgreSQL clusters, and full observability stack.
+
+> **Note**: This repository contains **infrastructure, GitOps, observability, and docs only**. Application code lives in separate repos (see [SERVICES.md](SERVICES.md)). Apps are deployed via Flux Operator ResourceSets (see [Application Delivery](docs/platform/application-delivery.md)).
 
 ```mermaid
 flowchart TB
-    subgraph FrontendLayer["Frontend Layer"]
-        FE[Frontend React SPA]
-        FEAPI[API Client]
+    subgraph frontend ["Frontend"]
+        FE["React SPA"]
     end
-    
-    subgraph BackendServices["Backend Services - 3-Layer Architecture"]
-        Web[Web Layer]
-        Logic[Logic Layer]
-        Core[Core Layer]
+
+    subgraph services ["8 Microservices (each: Web -> Logic -> Core)"]
+        direction LR
+        subgraph identity ["Identity Domain"]
+            auth["auth"]
+            user["user"]
+        end
+        subgraph catalog ["Catalog Domain"]
+            product["product"]
+            review["review"]
+        end
+        subgraph checkout ["Checkout Domain"]
+            cart["cart"]
+            order["order"]
+        end
+        subgraph comms ["Comms Domain"]
+            notification["notification"]
+            shipping["shipping"]
+        end
     end
-    
-    subgraph CacheLayer["Cache Layer"]
-        Valkey[Valkey Cache]
+
+    subgraph cache ["Cache Layer"]
+        valkey["Valkey"]
     end
-    
-    subgraph DataLayer["Data Layer"]
-        Pooler[Connection Poolers]
-        Database[(PostgreSQL)]
+
+    subgraph data ["Data Layer (4 PostgreSQL Clusters)"]
+        poolers["PgBouncer / PgCat / PgDog"]
+        authDB[("auth-db\nZalando")]
+        supportDB[("supporting-shared-db\nZalando")]
+        productDB[("product-db\nCNPG")]
+        txDB[("transaction-shared-db\nCNPG")]
     end
-    
-    subgraph Observability["Observability"]
-        Tempo[Tempo]
-        Prometheus[Prometheus]
-        Grafana[Grafana]
+
+    subgraph observability ["Observability Stack"]
+        direction LR
+        subgraph metrics ["Metrics"]
+            prometheus["Prometheus"]
+        end
+        subgraph tracing ["Tracing"]
+            tempo["Tempo"]
+            jaeger["Jaeger"]
+            otel["OTel Collector"]
+        end
+        subgraph logging ["Logging"]
+            loki["Loki"]
+            vector["Vector"]
+        end
+        subgraph profiling ["Profiling"]
+            pyroscope["Pyroscope"]
+        end
+        grafana["Grafana"]
     end
-    
-    FE --> FEAPI
-    FEAPI -->|HTTP /api/v1/*| Web
-    Web -->|calls| Logic
-    Logic -->|Cache-Aside| CacheLayer
-    Logic -->|uses| Core
-    Logic -->|queries| Core
-    Core -->|connects via| Pooler
-    Pooler -->|routes to| Database
-    CacheLayer --> Valkey
-    Database -->|returns data| Core
-    Core -->|returns| Logic
-    Logic -->|returns| Web
-    Web -->|JSON response| FEAPI
-    Web --> Tempo
-    Logic --> Tempo
-    Core --> Tempo
-    Web --> Prometheus
-    Logic --> Prometheus
-    Prometheus --> Grafana
-    Tempo --> Grafana
+
+    FE -->|"HTTP /api/v1/*"| services
+    services -->|"Cache-Aside"| valkey
+    services -->|"SQL via poolers"| poolers
+    poolers --> authDB
+    poolers --> supportDB
+    poolers --> productDB
+    poolers --> txDB
+
+    services -->|"traces"| otel
+    otel --> tempo
+    otel --> jaeger
+    services -->|"metrics"| prometheus
+    services -->|"logs to stdout"| vector
+    vector --> loki
+    services -->|"profiles"| pyroscope
+    prometheus --> grafana
+    tempo --> grafana
+    loki --> grafana
+    pyroscope --> grafana
 ```
 
 **Key Points:**
 
-- **Frontend (React SPA)**: Runs in browser, makes HTTP requests to Web Layer only (`/api/v1/*`)
-- **3-Layer Architecture**: Web → Logic → Core (Frontend can ONLY access Web Layer)
-- **Cache-Aside Pattern**: Logic Layer checks Valkey cache first, queries database on cache miss, then writes to cache
-- **Observability**: All layers emit traces/metrics to Tempo/Prometheus, visualized in Grafana
+- **Frontend (React SPA)**: Runs in browser, HTTP requests to Web Layer only (`/api/v1/*`). Frontend repo: [`duynhne/frontend`](https://github.com/duynhne/frontend).
+- **8 Microservices**: Each follows 3-layer architecture (Web -> Logic -> Core), organized into 4 domains (identity, catalog, checkout, comms).
+- **Cache-Aside Pattern**: Logic Layer checks Valkey first, queries database on miss, writes to cache.
+- **4 PostgreSQL Clusters**: auth-db (Zalando), supporting-shared-db (Zalando, hosts user/notification/shipping/review), product-db (CNPG), transaction-shared-db (CNPG, hosts cart/order). Connected via PgBouncer, PgCat, or PgDog poolers.
+- **Full Observability**: Traces (Tempo + Jaeger via OTel Collector), Metrics (Prometheus), Logs (Loki + Vector), Profiles (Pyroscope), all visualized in Grafana.
+- **GitOps Delivery**: Flux Operator with domain ResourceSets + per-service InputProviders + OCI + Kustomize. See [Application Delivery](docs/platform/application-delivery.md) and [Setup](docs/platform/setup.md).
 
-**Frontend Architecture**: See [`frontend/README.md`](frontend/README.md) for complete frontend documentation, API mapping, and integration details.
-
-**Detailed Architecture**: See [`docs/observability/apm/architecture.md`](docs/observability/apm/architecture.md) for middleware chain and APM integration. Full system architecture in [`specs/system-context/01-architecture-overview.md`](specs/system-context/01-architecture-overview.md)
+**Detailed Architecture**: See [`docs/observability/apm/architecture.md`](docs/observability/apm/architecture.md) for middleware chain and APM integration.
 
 ---
 
@@ -96,9 +127,9 @@ flowchart TB
     - 8 microservices
     - 3 layer: Web → Logic → Core
 
-- **Database**: PostgreSQL (5 clusters via Zalando/CloudNativePG operators)
-    - Connection poolers: PgBouncer, PgCat
-    - Migrations: Flyway 11.8.2 (8 migration images)
+- **Database**: PostgreSQL (4 clusters via Zalando/CloudNativePG operators)
+    - Connection poolers: PgBouncer, PgCat, PgDog
+    - Migrations: Flyway 11.19.0 (8 migration images)
 - **HTTP Framework**: Gin
 - **Cache**: Valkey (Redis-compatible) with Cache-Aside pattern
 
@@ -107,6 +138,7 @@ flowchart TB
 ### Infrastructure Stack
 - **Kubernetes**: Local Cluster (Kind), Helm 3
 - **GitOps**: Flux Operator, ResourceSet (Unified Templating), Kustomize, OCI Registry
+    - Application layer: 4 domain ResourceSets (identity, catalog, checkout, comms) + per-service InputProviders
 - **Dynamic Delivery**: OCIArtifactTag (Automated image updates)
 - **Monitoring**: Prometheus, Grafana, Tempo, Loki, Pyroscope, Jaeger, Vector.
 
@@ -132,9 +164,9 @@ make flux-push    # 3. Deploy everything (infrastructure + apps)
 **What gets deployed automatically:**
 
 - Infrastructure: Monitoring (Prometheus, Grafana), APM (Tempo, Loki, Jaeger, Pyroscope, Vector, OTel)
-- Databases: PostgreSQL operators, 5 clusters, connection poolers
+- Databases: PostgreSQL operators, 4 clusters, connection poolers
 - Cache: Valkey (Redis-compatible) in cache-system namespace
-- Applications: 8 microservices + frontend
+- Applications: 8 microservices + frontend (via domain ResourceSets)
 - SLO: Sloth Operator + Service Level Objectives
 
 **Wait 5-10 minutes** for Flux reconciliation, then access services.
@@ -209,8 +241,8 @@ Complete documentation is available in the [`docs/`](docs/README.md) directory. 
 - **[SLO Documentation](docs/observability/slo/README.md)** - SLI/SLO definitions and error budgets
 
 **Infrastructure:**
-- **[Database Guide](docs/databases/database.md)** - PostgreSQL architecture (5 clusters, poolers, migrations)
-- **[k6 Load Testing](docs/testing/k6.md)** - Load testing setup and scenarios
+- **[Database Guide](docs/databases/database.md)** - PostgreSQL architecture (4 clusters, poolers, migrations)
+- **[k6 Load Testing](docs/testing/k6.md)** - Load testing setup and scenarios *(k6 workload retired; doc kept for reference)*
 - **[Runbooks](docs/runbooks/troubleshooting/)** - Operational troubleshooting guides
 
 **Reference:**

@@ -22,7 +22,7 @@ A deep dive comparison of the two PostgreSQL operators used in this platform, co
 
 This project runs **4 PostgreSQL clusters** managed by two different operators. Both are production-grade, but they follow fundamentally different architectural philosophies.
 
-| Dimension | CloudNativePG (v1.28.0) | Zalando Postgres Operator (v1.15.1) |
+| Dimension | CloudNativePG (v1.28.1) | Zalando Postgres Operator (v1.15.1) |
 |-----------|------------------------|--------------------------------------|
 | **HA Agent** | None -- operator handles HA natively | Patroni (embedded in Spilo) |
 | **DCS** | Kubernetes API (via operator reconciliation) | Kubernetes Endpoints (via Patroni) |
@@ -502,7 +502,7 @@ Running both operators is a valid production strategy when different workloads h
 
 Both operators are deployed via Flux HelmReleases:
 
-- **CloudNativePG**: [`kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml`](../../kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml) -- Chart `cloudnative-pg` v1.28.0, namespace `cloudnative-pg`
+- **CloudNativePG**: [`kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml`](../../kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml) -- Chart `cloudnative-pg` v1.28.1, namespace `cloudnative-pg`
 - **Zalando**: [`kubernetes/infra/controllers/databases/zalando-operator.yaml`](../../kubernetes/infra/controllers/databases/zalando-operator.yaml) -- Chart `postgres-operator` v1.15.1, namespace `postgres-operator`
 
 ---

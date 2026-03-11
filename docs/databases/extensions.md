@@ -19,7 +19,7 @@
 
 | Operator | Version | PostgreSQL Version | Clusters |
 |----------|---------|-------------------|----------|
-| **CloudNativePG** | v1.28.0 | 18.1 (default) | `transaction-shared-db`, `product-db` |
+| **CloudNativePG** | v1.28.1 | 18.1 (default) | `transaction-shared-db`, `product-db` |
 | **Zalando Postgres Operator** | v1.15.1 | 16/17 | `auth-db`, `supporting-shared-db` |
 
 ### Current Extensions Usage

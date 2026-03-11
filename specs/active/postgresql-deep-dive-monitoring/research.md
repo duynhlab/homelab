@@ -31,7 +31,7 @@ Key takeaways:
 Tài liệu `docs/guides/DATABASE.md` mô tả rất chi tiết kiến trúc PostgreSQL hiện tại:
 
 - **5 PostgreSQL clusters**:
-  - **CloudNativePG Operator (v1.28.0)**:
+  - **CloudNativePG Operator (v1.28.1)**:
     - `product-db` (PostgreSQL 18, 1 primary + 1 replica, **async replication**, PgCat pooler).  
     - `transaction-db` (PostgreSQL 18, 1 primary + 2 replicas, **synchronous replication**, PgCat pooler, logical replication slot sync).  
   - **Zalando Postgres Operator (v1.15.1)**:

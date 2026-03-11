@@ -221,7 +221,7 @@ monitoring/
 ├── kubernetes/        # GitOps manifests (Flux + Kustomize)
 │   ├── clusters/      # Flux cluster configurations (local/prod)
 │   ├── infra/         # Controllers + configs (operators, monitoring, databases, secrets)
-│   └── apps/          # Application HelmReleases + ResourceSets (frontend, k6, services)
+│   └── apps/          # Domain ResourceSets + per-service InputProviders + frontend
 ├── scripts/           # Kind/Flux helper scripts (used by Makefile)
 ├── docs/              # Documentation (starting point for details)
 └── specs/             # Specifications and research
@@ -231,7 +231,7 @@ monitoring/
 
 - `kubernetes/clusters/` - Flux bootstrap and Kustomization CRDs per cluster
 - `kubernetes/infra/` - Operators/controllers + infrastructure configs (monitoring, APM, databases, secrets, SLO)
-- `kubernetes/apps/` - Application layer (HelmReleases/ResourceSets for services, frontend, k6)
+- `kubernetes/apps/` - Application layer (domain ResourceSets + per-service InputProviders + frontend)
 
 **Full Documentation Index**: See [`docs/README.md`](docs/README.md) for complete documentation structure.
 
@@ -332,11 +332,13 @@ make flux-sync
 
 **Add a new service:**
 
-- Service code: `services/cmd/{service}/`, `services/internal/{service}/`
-- HelmRelease (values inline): `kubernetes/apps/{service}.yaml`
-- SLO CRD: `kubernetes/infra/configs/monitoring/slo/{service}.yaml`
-- Migration: `services/{service}/db/migrations/Dockerfile` + `sql/V*__*.sql`
-- Push to OCI: `make flux-push` (updates OCI registry)
+- Service code: separate repo (e.g., `duynhne/{service}-service`)
+- Create `kubernetes/apps/services/{name}.yaml` (ResourceSetInputProvider with `platform.duynhne.dev/domain: <domain>` label)
+- The domain ResourceSet in `kubernetes/apps/domains/` auto-discovers the new InputProvider via label selector
+- SLO: `slo.enabled: true` is set in the shared domain template (automatic for all backend services)
+- Migration image: built in the service repo, referenced automatically by the template
+- Deploy: `make validate && make sync`
+- See [`docs/platform/application-delivery.md`](docs/platform/application-delivery.md) for full onboarding guide
 
 **Update monitoring:**
 

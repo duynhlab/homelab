@@ -193,7 +193,7 @@ flowchart TD
 ## Technology Stack
 
 - **Runtime**: Go 1.25
-- **Database**: PostgreSQL (5 clusters via Zalando/CloudNativePG operators)
+- **Database**: PostgreSQL (4 clusters via Zalando/CloudNativePG operators)
   - Connection poolers: PgBouncer, PgCat
   - Migrations: Flyway 11.19.0 (8 migration images)
   - **Database Documentation**: [`docs/databases/database.md`](docs/databases/database.md)
@@ -278,7 +278,7 @@ make flux-push    # 3. Deploy All (Flux reconciles in dependency order)
 2. **Infrastructure** (BEFORE apps) - Monitoring, APM, Databases, SLO
    - Monitoring: Prometheus, Grafana, Metrics Server
    - APM: Tempo, Loki, Vector, OTel Collector, Pyroscope, Jaeger
-   - Databases: PostgreSQL operators, 5 clusters, connection poolers
+   - Databases: PostgreSQL operators, 4 clusters, connection poolers
    - SLO: Sloth Operator + 8 PrometheusServiceLevel CRDs
 3. **Applications** - 8 microservices + frontend + k6 load testing
 

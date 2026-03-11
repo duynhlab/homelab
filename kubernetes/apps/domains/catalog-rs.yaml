@@ -1,0 +1,136 @@
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSet
+metadata:
+  name: rs-catalog
+  namespace: default
+spec:
+  inputsFrom:
+    - kind: ResourceSetInputProvider
+      selector:
+        matchLabels:
+          platform.duynhne.dev/domain: catalog
+  resourcesTemplate: |
+    apiVersion: v1
+    kind: Namespace
+    metadata:
+      name: << inputs.namespace >>
+    ---
+    apiVersion: helm.toolkit.fluxcd.io/v2
+    kind: HelmRelease
+    metadata:
+      name: << inputs.name >>
+      namespace: << inputs.namespace >>
+    spec:
+      interval: 10m
+      timeout: 10m
+      chartRef:
+        kind: OCIRepository
+        name: mop-chart-oci
+        namespace: flux-system
+      releaseName: << inputs.name >>
+      values:
+        name: << inputs.name >>
+        replicaCount: << inputs.replicaCount | int >>
+        image:
+          repository: << index inputs "registry_url" | default "ghcr.io/duynhne" >>/<< inputs.name >>-service/<< inputs.name >>
+          tag: latest
+          pullPolicy: Always
+        service:
+          type: ClusterIP
+          port: 8080
+          targetPort: 8080
+          portName: http
+        containerPort: 8080
+        env:
+          - name: SERVICE_NAME
+            value: << inputs.name >>
+          - name: PORT
+            value: "8080"
+          - name: ENV
+            value: "production"
+          - name: OTEL_COLLECTOR_ENDPOINT
+            value: << index inputs "otel_endpoint" | default "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318" >>
+          - name: OTEL_SAMPLE_RATE
+            value: "0.1"
+          - name: PYROSCOPE_ENDPOINT
+            value: << index inputs "pyroscope_endpoint" | default "http://pyroscope.monitoring.svc.cluster.local:4040" >>
+          - name: LOG_LEVEL
+            value: << index inputs "log_level" | default "info" >>
+          - name: LOG_FORMAT
+            value: << index inputs "log_format" | default "json" >>
+          - name: TRACING_ENABLED
+            value: << index inputs "tracing_enabled" | default "true" | quote >>
+          - name: PROFILING_ENABLED
+            value: "true"
+          - name: METRICS_ENABLED
+            value: "true"
+          - name: DB_HOST
+            value: << inputs.db_host >>
+          - name: DB_PORT
+            value: << index inputs "db_port" | default "5432" | quote >>
+          - name: DB_NAME
+            value: << inputs.name >>
+          - name: DB_USER
+            value: << index inputs "db_user" | default inputs.name >>
+          - name: DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: << inputs.db_secret >>
+                key: password
+          - name: DB_SSLMODE
+            value: << index inputs "db_sslmode" | default "require" >>
+          - name: DB_POOL_MAX_CONNECTIONS
+            value: << inputs.pool_max | quote >>
+          - name: DB_POOL_MODE
+            value: "transaction"
+          <<- if (index inputs "cache_enabled") >>
+          - name: CACHE_ENABLED
+            value: "true"
+          - name: CACHE_HOST
+            value: "valkey.cache-system.svc.cluster.local"
+          - name: CACHE_PORT
+            value: "6379"
+          <<- end >>
+          <<- if (index inputs "review_url") >>
+          - name: REVIEW_SERVICE_URL
+            value: << inputs.review_url >>
+          <<- end >>
+          <<- if (index inputs "auth_url") >>
+          - name: AUTH_SERVICE_URL
+            value: << inputs.auth_url >>
+          <<- end >>
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "20m"
+          limits:
+            memory: "64Mi"
+            cpu: "50m"
+        livenessProbe:
+          enabled: true
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          enabled: true
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        migrations:
+          enabled: true
+          image: << index inputs "registry_url" | default "ghcr.io/duynhne" >>/<< inputs.name >>-service/<< inputs.name >>-init:latest
+          imagePullPolicy: Always
+          env:
+            DB_HOST: << inputs.db_migration_host >>
+            DB_PORT: "5432"
+            DB_NAME: << inputs.name >>
+            DB_USER: << index inputs "db_user" | default inputs.name >>
+            DB_SSLMODE: "require"
+          envFrom:
+            secretRef: << inputs.db_secret >>
+        slo:
+          enabled: true

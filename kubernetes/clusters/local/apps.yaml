@@ -23,45 +23,25 @@ spec:
     - name: databases-local
     - name: monitoring-local
   
-  # Health checks for apps
+  # Health checks for apps (per-domain ResourceSets)
   healthChecks:
-    - apiVersion: helm.toolkit.fluxcd.io/v2
-      kind: HelmRelease
-      name: auth
-      namespace: auth
-    - apiVersion: helm.toolkit.fluxcd.io/v2
-      kind: HelmRelease
-      name: product
-      namespace: product
     - apiVersion: fluxcd.controlplane.io/v1
       kind: ResourceSet
-      name: frontend
+      name: rs-identity
       namespace: default
-    - apiVersion: helm.toolkit.fluxcd.io/v2
-      kind: HelmRelease
-      name: user
-      namespace: user
-    - apiVersion: helm.toolkit.fluxcd.io/v2
-      kind: HelmRelease
-      name: product
-      namespace: product
-    - apiVersion: helm.toolkit.fluxcd.io/v2
-      kind: HelmRelease
-      name: cart
-      namespace: cart
-    - apiVersion: helm.toolkit.fluxcd.io/v2
-      kind: HelmRelease
-      name: order
-      namespace: order
-    - apiVersion: helm.toolkit.fluxcd.io/v2
-      kind: HelmRelease
-      name: review
-      namespace: review
-    - apiVersion: helm.toolkit.fluxcd.io/v2
-      kind: HelmRelease
-      name: notification
-      namespace: notification
-    - apiVersion: helm.toolkit.fluxcd.io/v2
-      kind: HelmRelease
-      name: shipping
-      namespace: shipping
+    - apiVersion: fluxcd.controlplane.io/v1
+      kind: ResourceSet
+      name: rs-catalog
+      namespace: default
+    - apiVersion: fluxcd.controlplane.io/v1
+      kind: ResourceSet
+      name: rs-checkout
+      namespace: default
+    - apiVersion: fluxcd.controlplane.io/v1
+      kind: ResourceSet
+      name: rs-comms
+      namespace: default
+    - apiVersion: fluxcd.controlplane.io/v1
+      kind: ResourceSet
+      name: rs-frontend
+      namespace: default

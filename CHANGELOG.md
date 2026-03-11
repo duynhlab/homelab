@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.60.0] - 2026-03-02
+
+### Added
+
+- **Hybrid ResourceSet application delivery**: `kubernetes/apps/domains/` — 4 domain ResourceSets (identity-rs, catalog-rs, checkout-rs, comms-rs); `kubernetes/apps/services/` — 8 ResourceSetInputProviders (auth, user, product, review, cart, order, notification, shipping); `kubernetes/apps/frontend-rs.yaml` — standalone frontend ResourceSet. Replaces per-service HelmRelease files with domain-scoped templates and per-service inputs.
+- **Application Delivery Guide**: `docs/platform/application-delivery.md` — Hybrid ResourceSet architecture, file layout, template contract (safe key access, string typing), onboarding new microservices, scaling strategy, operability and debug checklists.
+- **Gitflow and release standard**: `docs/platform/gitflow.md` — Hybrid Enterprise Gitflow (dev/staging/main, feature/hotfix, immutable tagging, step-by-step promotion runbook, GitHub Rulesets, post-deploy verification, governance at scale). `docs/platform/ci_template.yml` — CI triggers for dev/staging/main and tags v*. `docs/README.md` — added gitflow and ci_template to platform index.
+
+### Changed
+
+- **Kubernetes**: `kubernetes/clusters/local/apps.yaml` — healthChecks now reference rs-identity, rs-catalog, rs-checkout, rs-comms, rs-frontend. `scripts/flux-validate.sh` — validate_standalone_manifests discovers all `*.yaml` under `kubernetes/apps/` recursively. `AGENTS.md` — project structure and "Add a new service" updated to ResourceSet + InputProvider flow. `docs/platform/setup.md`, `docs/observability/slo/getting_started.md` — references updated for ResourceSet layout.
+- **Platform docs**: `docs/platform/cicd.md` — Branching & Release Standard, branch enforcement via GitHub Rulesets, post-deploy verification reference. `docs/platform/gitflow.md` — GitHub Rulesets (section 7), post-deploy verification (section 6.2), Promotion Flow rewrite (section 3: who/where/action/CI, exact git tag and back-merge commands, staging optional), Release Runbook merged into section 3, sections renumbered 6→5 … 11→10.
+
+### Removed
+
+- **Per-service HelmRelease files** in `kubernetes/apps/` (auth, user, product, cart, order, review, notification, shipping, frontend) — migrated into ResourceSet templates.
+- **k6**: k6 namespace removed from `kubernetes/infra/namespaces.yaml`; k6 HelmRelease and load-testing workload retired.
+- **Standalone Release Runbook section** from `docs/platform/gitflow.md` — content merged into section 3 (Promotion Flow).
+
 ## [0.50.14] - 2026-02-24
 
 ### Changed

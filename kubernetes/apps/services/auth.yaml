@@ -1,0 +1,18 @@
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSetInputProvider
+metadata:
+  name: rsip-auth
+  namespace: default
+  labels:
+    app.kubernetes.io/part-of: backend-services
+    platform.duynhne.dev/domain: identity
+spec:
+  type: Static
+  defaultValues:
+    name: auth
+    namespace: auth
+    replicaCount: 2
+    db_host: "auth-db-pooler.auth.svc.cluster.local"
+    db_migration_host: "auth-db.auth.svc.cluster.local"
+    db_secret: "auth.auth-db.credentials.postgresql.acid.zalan.do"
+    pool_max: "25"

@@ -18,7 +18,18 @@ set -o pipefail
 kustomize_flags=("--load-restrictor=LoadRestrictionsNone")
 
 kubeconform_flags=("-skip=Secret")
-kubeconform_config=("-strict" "-ignore-missing-schemas" "-schema-location" "default" "-schema-location" "/tmp/flux-crd-schemas" "-verbose")
+kubeconform_flags=("-skip=Secret")
+kubeconform_config=(
+  "-strict" 
+  "-ignore-missing-schemas" 
+  "-schema-location" "default" 
+  "-schema-location" "/tmp/flux-crd-schemas/{{.ResourceKind}}-fluxcd-{{.ResourceAPIVersion}}.json"
+  "-schema-location" "/tmp/flux-crd-schemas/{{.ResourceKind}}-helm-{{.ResourceAPIVersion}}.json"
+  "-schema-location" "/tmp/flux-crd-schemas/{{.ResourceKind}}-source-{{.ResourceAPIVersion}}.json"
+  "-schema-location" "/tmp/flux-crd-schemas/{{.ResourceKind}}-image-{{.ResourceAPIVersion}}.json"
+  "-schema-location" "/tmp/flux-crd-schemas/{{.ResourceKind}}-notification-{{.ResourceAPIVersion}}.json"
+  "-verbose"
+)
 
 # Kustomize overlays that Flux actually reconciles (matches Flux Kustomization paths).
 # These are the ONLY overlays we kustomize-build; auto-discovery causes parent/child
@@ -46,9 +57,17 @@ check_prerequisites() {
 
 download_schemas() {
   echo "INFO - Downloading Flux OpenAPI schemas"
-  mkdir -p /tmp/flux-crd-schemas/master-standalone-strict
-  curl -sL https://github.com/controlplaneio-fluxcd/flux-operator/releases/latest/download/crd-schemas.tar.gz | tar zxf - -C /tmp/flux-crd-schemas/master-standalone-strict
-  curl -sL https://github.com/fluxcd/flux2/releases/latest/download/crd-schemas.tar.gz | tar zxf - -C /tmp/flux-crd-schemas/master-standalone-strict
+  mkdir -p /tmp/flux-crd-schemas
+
+  # Flux Operator schemas
+  echo "  fetching flux-operator schemas"
+  curl -sL https://github.com/controlplaneio-fluxcd/flux-operator/releases/latest/download/crd-schemas.tar.gz | \
+    tar zxf - -C /tmp/flux-crd-schemas
+  
+  # Flux CD v2 schemas
+  echo "  fetching flux2 schemas"
+  curl -sL https://github.com/fluxcd/flux2/releases/latest/download/crd-schemas.tar.gz | \
+    tar zxf - -C /tmp/flux-crd-schemas
 }
 
 validate_yaml_syntax() {
@@ -73,10 +92,10 @@ validate_yaml_syntax() {
 validate_standalone_manifests() {
   echo "INFO - Validating standalone Kubernetes manifests"
   local count=0
-  for f in kubernetes/apps/*.yaml; do
+  while IFS= read -r -d $'\0' f; do
     kubeconform "${kubeconform_flags[@]}" "${kubeconform_config[@]}" "$f"
     count=$((count + 1))
-  done
+  done < <(find kubernetes/apps/ -type f -name '*.yaml' -print0)
   echo "  validated $count app manifests"
 }
 

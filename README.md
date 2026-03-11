@@ -106,8 +106,8 @@ flowchart TB
 
 ### Infrastructure Stack
 - **Kubernetes**: Local Cluster (Kind), Helm 3
-- **GitOps**: Flux Operator, Kustomize, OCI Registry
-- **Observability**: OpenTelemetry (traces, metrics, logs)
+- **GitOps**: Flux Operator, ResourceSet (Unified Templating), Kustomize, OCI Registry
+- **Dynamic Delivery**: OCIArtifactTag (Automated image updates)
 - **Monitoring**: Prometheus, Grafana, Tempo, Loki, Pyroscope, Jaeger, Vector.
 
 **Observability Details**: See [`docs/observability/apm/README.md`](docs/observability/apm/README.md) for complete APM system overview.
@@ -199,7 +199,8 @@ Complete documentation is available in the [`docs/`](docs/README.md) directory. 
 
 **Getting Started:**
 - **[Setup Guide](docs/platform/setup.md)** - Deployment instructions and troubleshooting
-- **[API Reference](docs/api/api.md)** - Complete API documentation for all 8 microservices
+- **[Application Delivery](docs/platform/application-delivery.md)** - ResourceSet patterns & templates
+- **[API Reference](docs/api/api.md)** - Complete API documentation
 
 **Observability:**
 - **[APM Overview](docs/observability/apm/README.md)** - Distributed tracing, metrics, logs, profiling

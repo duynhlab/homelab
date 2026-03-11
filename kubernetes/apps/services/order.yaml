@@ -1,0 +1,18 @@
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSetInputProvider
+metadata:
+  name: rsip-order
+  namespace: default
+  labels:
+    app.kubernetes.io/part-of: backend-services
+    platform.duynhne.dev/domain: checkout
+spec:
+  type: Static
+  defaultValues:
+    name: order
+    namespace: order
+    replicaCount: 2
+    db_host: "pgcat.order.svc.cluster.local"
+    db_migration_host: "transaction-shared-db-rw.order.svc.cluster.local"
+    db_secret: "transaction-shared-db-secret"
+    pool_max: "30"

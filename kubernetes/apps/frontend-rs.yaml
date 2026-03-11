@@ -1,0 +1,59 @@
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSet
+metadata:
+  name: rs-frontend
+  namespace: default
+spec:
+  inputs:
+    - name: frontend
+      replicaCount: 1
+  resources:
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      metadata:
+        name: << inputs.name >>
+        namespace: default
+      spec:
+        interval: 10m
+        timeout: 10m
+        chartRef:
+          kind: OCIRepository
+          name: mop-chart-oci
+          namespace: flux-system
+        releaseName: << inputs.name >>
+        values:
+          name: << inputs.name >>
+          replicaCount: << inputs.replicaCount | int >>
+          image:
+            repository: ghcr.io/duynhne/frontend/frontend
+            tag: latest
+            pullPolicy: Always
+          service:
+            type: ClusterIP
+            port: 80
+            targetPort: 80
+            portName: http
+          containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          livenessProbe:
+            enabled: true
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            enabled: true
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          migrations:
+            enabled: false

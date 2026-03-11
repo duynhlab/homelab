@@ -1,0 +1,18 @@
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSetInputProvider
+metadata:
+  name: rsip-shipping
+  namespace: default
+  labels:
+    app.kubernetes.io/part-of: backend-services
+    platform.duynhne.dev/domain: comms
+spec:
+  type: Static
+  defaultValues:
+    name: shipping
+    namespace: shipping
+    replicaCount: 1
+    db_host: "supporting-shared-db-pooler.user.svc.cluster.local"
+    db_migration_host: "supporting-shared-db.user.svc.cluster.local"
+    db_secret: "shipping.supporting-shared-db.credentials.postgresql.acid.zalan.do"
+    pool_max: "10"

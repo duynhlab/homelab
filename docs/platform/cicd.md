@@ -1,6 +1,22 @@
-# 🚀 CI/CD Pipeline Documentation
+# CI/CD Pipeline Documentation
 
-This document outlines the **Trunk-Based Development** CI/CD pipeline implemented for all microservices (`auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`) and the `frontend` in a **polyrepo** setup.
+This document describes the CI/CD pipeline for all microservices (`auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`) and the `frontend` in a **polyrepo** setup.
+
+## Branching & Release Standard
+
+This pipeline operates under the **Hybrid Enterprise Gitflow** model defined in [`gitflow.md`](gitflow.md):
+
+- **`dev`** — internal integration; every push builds and deploys to the dev namespace.
+- **`staging`** (optional) — release candidate; QA/UAT before production.
+- **`main`** — production-ready code; merged from `staging` (or `dev` if staging is skipped).
+- **`vX.Y.Z` tags** on `main` — immutable production releases; trigger release pipeline.
+- **`feature/*`** from `dev`, **`hotfix/*`** from `main`.
+
+Image artifacts are **built once per commit** with an immutable `sha-<short>` tag. Promotion between environments reuses the same digest — no rebuild occurs at tag time. `latest` exists as a convenience alias but is never the sole deployment reference. See [`gitflow.md`](gitflow.md) for the full branching model, tagging policy, runbooks, and governance rules.
+
+**Branch enforcement** is managed via **GitHub Rulesets** (not legacy Branch Protection). Each service repo has 3 layered rulesets: Base Protection (all branches), Production Gate (`main` only), and Release Tags (`v*`). Required status checks (`go-check`, `sonar`) are configured in the Base Protection ruleset, ensuring CI must pass before any merge. See [`gitflow.md` section 7](gitflow.md#7-github-rulesets-branch-enforcement) for the full ruleset configuration, CODEOWNERS integration, and setup guide.
+
+## Shared Workflows
 
 Each service repository reuses workflows from `duyhenryer/shared-workflows`:
 - `pr-checks.yml` (PR validation + Slack PR events)
@@ -37,7 +53,40 @@ flowchart TD
     TRIVY -->|"pass"| SIGN
 ```
 
-### 2. PR Flow
+### 2. Branch Promotion & CI Trigger Map
+
+```mermaid
+flowchart LR
+    subgraph branches ["Branch Promotion"]
+        F["feature/*"] -->|"MR"| D["dev"]
+        D -->|"Promote MR"| S["staging"]
+        S -->|"Promote MR"| M["main"]
+        M -->|"Tag"| T["v1.2.0"]
+    end
+
+    subgraph ci_pr ["PR Events (checks only)"]
+        PR_D["MR -> dev: test + lint + sonar"]
+        PR_S["MR -> staging: test + lint + sonar"]
+        PR_M["MR -> main: test + lint + sonar"]
+    end
+
+    subgraph ci_push ["Push Events (build + deliver)"]
+        P_D["push dev: build sha + dev-N"]
+        P_S["push staging: build sha + rc-sha"]
+        P_M["push main: build sha + latest"]
+        P_T["tag v*: promote digest, no rebuild"]
+    end
+
+    F -.-> PR_D
+    D -.-> P_D
+    D -.-> PR_S
+    S -.-> P_S
+    S -.-> PR_M
+    M -.-> P_M
+    T -.-> P_T
+```
+
+### 3. PR Flow
 
 ```mermaid
 flowchart TD
@@ -54,11 +103,15 @@ flowchart TD
     end
 ```
 
-### 3. Main Flow (Push to main)
+### 3. Build & Delivery Flow (Push to dev / staging / main)
+
+On push to any persistent branch (`dev`, `staging`, `main`), the full build pipeline runs. The image is tagged with `sha-<short>` plus a branch-specific alias. No rebuild occurs when promoting between branches — the same digest is reused.
+
+After each deployment, **post-deploy verification** runs automatically: smoke tests on all environments, plus integration/regression tests on staging. See [`gitflow.md` section 6.2](gitflow.md#62-post-deploy-verification) for the full verification matrix.
 
 ```mermaid
 flowchart TD
-    subgraph main_flow ["Main Flow"]
+    subgraph build_flow ["Build & Delivery Flow"]
         GOCHECK2["go-check.yml"]
         SONAR2["sonarqube.yml"]
 
@@ -86,7 +139,7 @@ flowchart TD
 
 ### 4. Execution Sequence
 
-This diagram details the interaction between GitHub Actions, SonarCloud, Trivy, Cosign, and Slack.
+This diagram details the interaction between GitHub Actions, SonarCloud, Trivy, Cosign, and Slack across the full promotion lifecycle.
 
 ```mermaid
 sequenceDiagram
@@ -101,32 +154,37 @@ sequenceDiagram
     participant Cosign as docker-sign
     participant Slack as Slack
 
-    Dev->>GA: Open_or_update_pull_request
-    GA->>PR: Run_pr-checks
-    PR->>PR: Validate_branch_name
-    PR-->>Slack: Notify_PR_event
+    Dev->>GA: Open MR (feature -> dev / dev -> staging / staging -> main)
+    GA->>PR: Run pr-checks
+    PR->>PR: Validate branch name
+    PR-->>Slack: Notify PR event
 
-    GA->>Test: Run_go-check
-    Test->>Test: go_test_and_generate_coverage_out
-    Test->>GA: Upload_artifact_coverage-report
+    GA->>Test: Run go-check
+    Test->>Test: go test + generate coverage.out
+    Test->>GA: Upload artifact coverage-report
 
-    GA->>Sonar: Run_sonarqube
-    Sonar->>GA: Download_artifact_coverage-report
-    Sonar->>Sonar: Scan_and_check_quality_gate
+    GA->>Sonar: Run sonarqube
+    Sonar->>GA: Download artifact coverage-report
+    Sonar->>Sonar: Scan and check quality gate
 
-    alt Push_to_main
-      GA->>Build: Build_and_push_image
-      Build->>GA: Output_tags_and_digest
-      GA->>Trivy: Scan_image_for_vulnerabilities
-      Trivy->>GA: Upload_SARIF_to_Security_tab
-      alt Scan_passes
-        GA->>Cosign: Sign_image_with_keyless_OIDC
-      else Scan_fails
-        Note over GA,Cosign: Signing_SKIPPED
+    alt Push to dev/staging/main
+      GA->>Build: Build and push image (sha-short + branch alias)
+      Build->>GA: Output tags and digest
+      GA->>Trivy: Scan image for vulnerabilities
+      Trivy->>GA: Upload SARIF to Security tab
+      alt Scan passes
+        GA->>Cosign: Sign image with keyless OIDC
+      else Scan fails
+        Note over GA,Cosign: Signing SKIPPED
       end
     end
 
-    GA->>Slack: Final_status_notification
+    alt Tag v* on main
+      Note over GA,Build: No rebuild — promote existing digest
+      GA-->>Slack: Release notification
+    end
+
+    GA->>Slack: Final status notification
 ```
 
 ---
@@ -134,12 +192,12 @@ sequenceDiagram
 ## 🔄 Detailed Process Flows
 
 ### 1️⃣ Flow: Pull Request (Validation)
-**Trigger:** Developer opens or updates a Pull Request targeting `main`.
+**Trigger:** Developer opens or updates a Pull Request targeting `dev`, `staging`, or `main`.
 **Goal:** Verify code quality, security, and functionality **before** merging.
 
 | Step | Job Name | Trigger Condition | Action & Responsibility |
 |------|----------|-------------------|-------------------------|
-| **1** | `pr-checks` | **PR Only** | **Gateway Check**: validates branch naming (`feat/*`, `fix/*`, etc.) and sends Slack PR-event notification. |
+| **1** | `pr-checks` | **PR Only** | **Gateway Check**: validates branch naming (`feature/*`, `hotfix/*`, `fix/*`, etc.) and sends Slack PR-event notification. |
 | **2** | `go-check` | **Always** | **Test + Coverage Artifact**: runs Go tests and uploads `coverage-report` artifact containing `coverage.out`. **Lint runs only on PR** when enabled. |
 | **3** | `sonar` | **Always** | **SonarCloud Analysis**: downloads `coverage-report` and runs Sonar scan. **Quality Gate enforcement is configurable** (`fail-on-quality-gate`). |
 | **4** | `notify` | **Always** | **Reporting**: posts final pipeline status to Slack and Google Sheets (runs even if previous steps failed). |
@@ -148,19 +206,30 @@ sequenceDiagram
 
 ---
 
-### 2️⃣ Flow: Push to Main (Delivery)
-**Trigger:** PR is merged into `main` (or direct push).
-**Goal:** Create a release candidate, scan it, sign it, and publish.
+### 2️⃣ Flow: Push to Persistent Branch (Delivery)
+**Trigger:** PR is merged into `dev`, `staging`, or `main`.
+**Goal:** Build an immutable artifact, scan it, sign it, and deploy to the corresponding environment.
 
 | Step | Job Name | Trigger Condition | Action & Responsibility |
 |------|----------|-------------------|-------------------------|
 | **1** | `go-check` | **Always** | **Regression Check**: re-runs tests and uploads fresh `coverage-report` artifact. (Lint is PR-only.) |
-| **2** | `sonar` | **Always** | **Analysis Update**: updates SonarCloud main-branch analysis based on the coverage artifact. |
-| **3** | `docker-build` | **Main Only** | **Build Artifact**: builds and pushes the service image to GHCR. Outputs `tags` and `digest`. |
+| **2** | `sonar` | **Always** | **Analysis Update**: updates SonarCloud branch analysis based on the coverage artifact. |
+| **3** | `docker-build` | **Push to dev/staging/main** | **Build Artifact**: builds and pushes the service image to GHCR with `sha-<short>` tag. Outputs `tags` and `digest`. |
 | **4** | `trivy-scan` | **After build** | **Vulnerability Scan**: scans the built image with Trivy for CRITICAL/HIGH CVEs. Uploads SARIF to GitHub Security tab. Reports to Google Sheets. |
 | **5** | `docker-sign` | **After scan passes** | **Image Signing**: signs the image with Cosign keyless (OIDC). Only runs if Trivy scan passes. |
-| **6** | `docker-db-init` | **Main Only** | **Migration Artifact**: builds and pushes the migration image (Flyway init image) to GHCR. |
+| **6** | `docker-db-init` | **Push to dev/staging/main** | **Migration Artifact**: builds and pushes the migration image (Flyway init image) to GHCR. |
 | **7** | `notify` | **Always** | **Reporting**: posts final pipeline status to Slack and Google Sheets. |
+
+### 3️⃣ Flow: Tag Release (Production Deploy)
+**Trigger:** A `vX.Y.Z` tag is pushed to `main`.
+**Goal:** Publish production release metadata and deploy the already-built artifact. No rebuild occurs.
+
+| Step | Job Name | Action & Responsibility |
+|------|----------|-------------------------|
+| **1** | `docker-build` | **Retag existing digest** with `vX.Y.Z` (or publish release metadata). |
+| **2** | `notify` | **Reporting**: posts release notification to Slack. |
+
+> The tag pipeline does **not** rebuild. It promotes the digest that was already built, scanned, and signed when the commit was merged to `main`.
 
 ---
 

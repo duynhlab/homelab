@@ -1,10 +1,25 @@
+# CI Pipeline Template — Hybrid Enterprise Gitflow
+#
+# Branch behavior:
+#   pull_request -> dev/staging/main : checks only (test, lint, sonar) — no build
+#   push -> dev                      : build + scan + sign, image tagged sha-<short> + dev-<run>
+#   push -> staging                  : build + scan + sign, image tagged sha-<short> + rc-<sha>
+#   push -> main                     : build + scan + sign, image tagged sha-<short> + latest
+#   push tag v*                      : release pipeline — retag digest with vX.Y.Z, notify
+#
+# Staging optional: services not using staging simply never push to that branch.
+# The CI template works identically whether staging exists or not.
+#
+# See docs/platform/gitflow.md for the full branching & release standard.
+
 name: CI Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [dev, staging, main]
+    tags: ['v*']
   pull_request:
-    branches: [main]
+    branches: [dev, staging, main]
 
 permissions:
   contents: read
@@ -15,7 +30,10 @@ permissions:
   security-events: write
 
 jobs:
+  # ──────────────────────────────────────────────────
   # 1. PR Checks (Branch Name + Slack "PR Opened")
+  # Runs on: pull_request only
+  # ──────────────────────────────────────────────────
   pr-checks:
     if: github.event_name == 'pull_request'
     uses: duyhenryer/shared-workflows/.github/workflows/pr-checks.yml@main
@@ -24,15 +42,23 @@ jobs:
     secrets:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
+  # ──────────────────────────────────────────────────
   # 2. Test & Lint
+  # Runs on: all events (PR + push to any branch)
+  # Skipped on: tag pushes (code already tested on branch)
+  # ──────────────────────────────────────────────────
   go-check:
+    if: "!startsWith(github.ref, 'refs/tags/')"
     uses: duyhenryer/shared-workflows/.github/workflows/go-check.yml@main
     with:
       command-test: 'go test -race -coverprofile=coverage.out ./...'
       lint: true
     secrets: inherit
 
-  # 3. Analysis
+  # ──────────────────────────────────────────────────
+  # 3. SonarCloud Analysis
+  # Runs on: all events except tags
+  # ──────────────────────────────────────────────────
   sonar:
     needs: go-check
     uses: duyhenryer/shared-workflows/.github/workflows/sonarqube.yml@main
@@ -43,10 +69,15 @@ jobs:
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-  # 4a. Build & Push (Main Only)
+  # ──────────────────────────────────────────────────
+  # 4a. Build & Push (push to dev/staging/main only)
+  # NOT on: pull_request, tags
+  # ──────────────────────────────────────────────────
   docker-build:
     needs: [go-check, sonar]
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      github.event_name == 'push' &&
+      !startsWith(github.ref, 'refs/tags/')
     uses: duyhenryer/shared-workflows/.github/workflows/docker-build-go.yml@main
     with:
       image-name: '{{SERVICE_NAME}}'
@@ -57,7 +88,10 @@ jobs:
       packages: write
       actions: read
 
+  # ──────────────────────────────────────────────────
   # 4b. Trivy Vulnerability Scan
+  # Runs after: docker-build
+  # ──────────────────────────────────────────────────
   trivy-scan:
     needs: [docker-build]
     uses: duyhenryer/shared-workflows/.github/workflows/trivy-scan.yml@main
@@ -72,7 +106,9 @@ jobs:
       packages: read
       security-events: write
 
+  # ──────────────────────────────────────────────────
   # 4c. Cosign Signing (only after scan passes)
+  # ──────────────────────────────────────────────────
   docker-sign:
     needs: [docker-build, trivy-scan]
     uses: duyhenryer/shared-workflows/.github/workflows/docker-sign.yml@main
@@ -85,10 +121,14 @@ jobs:
       packages: write
       id-token: write
 
-  # 4d. Build Migration Image
+  # ──────────────────────────────────────────────────
+  # 4d. Build Migration Image (push to dev/staging/main only)
+  # ──────────────────────────────────────────────────
   docker-db-init:
     needs: [go-check, sonar]
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      github.event_name == 'push' &&
+      !startsWith(github.ref, 'refs/tags/')
     uses: duyhenryer/shared-workflows/.github/workflows/docker-build-go.yml@main
     with:
       image-name: '{{SERVICE_NAME}}-init'
@@ -133,8 +173,25 @@ jobs:
   #     packages: write
   #     id-token: write
 
-  # 5. Final Status Notification + Google Sheets Reporting
-  # NOTE: If you enable scan+sign for db-init above, add trivy-scan-db-init and docker-sign-db-init to needs.
+  # ──────────────────────────────────────────────────
+  # 5. Tag Release (v* tags on main only)
+  # Promotes the existing digest — no rebuild.
+  # Add deployment steps or GitHub Release creation here.
+  # ──────────────────────────────────────────────────
+  # release:
+  #   if: startsWith(github.ref, 'refs/tags/v')
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v6
+  #     - name: Create GitHub Release
+  #       uses: softprops/action-gh-release@v2
+  #       with:
+  #         generate_release_notes: true
+
+  # ──────────────────────────────────────────────────
+  # 6. Final Status Notification
+  # Runs: always, regardless of branch or event type
+  # ──────────────────────────────────────────────────
   notify:
     if: always()
     needs: [pr-checks, go-check, sonar, docker-build, trivy-scan, docker-sign, docker-db-init]

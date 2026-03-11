@@ -41,13 +41,6 @@ kind: Namespace
 metadata:
   labels:
     environment: local
-  name: k6
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  labels:
-    environment: local
   name: monitoring
 ---
 apiVersion: v1

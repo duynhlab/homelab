@@ -1,0 +1,19 @@
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSetInputProvider
+metadata:
+  name: rsip-cart
+  namespace: default
+  labels:
+    app.kubernetes.io/part-of: backend-services
+    platform.duynhne.dev/domain: checkout
+spec:
+  type: Static
+  defaultValues:
+    name: cart
+    namespace: cart
+    replicaCount: 2
+    db_host: "pgcat.cart.svc.cluster.local"
+    db_migration_host: "transaction-shared-db-rw.cart.svc.cluster.local"
+    db_secret: "transaction-shared-db-secret"
+    db_sslmode: "disable"
+    pool_max: "30"

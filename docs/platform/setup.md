@@ -149,7 +149,7 @@ kubectl get prometheusservicelevel -n monitoring
 - 7 Helm Repositories configured.
 - 5 ResourceSets (`rs-identity`, `rs-catalog`, `rs-checkout`, `rs-comms`, `rs-frontend`) successfully reconciled.
 - 9 HelmReleases automatically generated and in `Ready` state.
-- 5 PostgreSQL clusters operational.
+- 4 PostgreSQL clusters operational.
 
 ---
 

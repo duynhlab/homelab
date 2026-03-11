@@ -20,7 +20,7 @@ A deep dive comparison of the two PostgreSQL operators used in this platform, co
 
 ## 1. Executive Summary
 
-This project runs **5 PostgreSQL clusters** managed by two different operators. Both are production-grade, but they follow fundamentally different architectural philosophies.
+This project runs **4 PostgreSQL clusters** managed by two different operators. Both are production-grade, but they follow fundamentally different architectural philosophies.
 
 | Dimension | CloudNativePG (v1.28.0) | Zalando Postgres Operator (v1.15.1) |
 |-----------|------------------------|--------------------------------------|

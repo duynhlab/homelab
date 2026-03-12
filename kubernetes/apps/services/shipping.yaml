@@ -14,5 +14,6 @@ spec:
     replicaCount: 1
     db_host: "supporting-shared-db-pooler.user.svc.cluster.local"
     db_migration_host: "supporting-shared-db.user.svc.cluster.local"
-    db_secret: "shipping.supporting-shared-db.credentials.postgresql.acid.zalan.do"
+    db_secret: "shipping.shipping.supporting-shared-db.credentials.postgresql.acid.zalan.do"
+    db_user: "shipping.shipping"
     pool_max: "10"

@@ -2,7 +2,7 @@
 
 set -o errexit
 
-cluster_name="${CLUSTER_NAME:=mop}"
+cluster_name="${CLUSTER_NAME:=homelab}"
 cluster_version="${CLUSTER_VERSION:=v1.33.7}"
 reg_name="${cluster_name}-registry"
 reg_localhost_port="5050"

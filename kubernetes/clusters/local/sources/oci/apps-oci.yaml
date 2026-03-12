@@ -6,7 +6,7 @@ metadata:
   namespace: flux-system
 spec:
   interval: 5m
-  url: oci://mop-registry:5000/flux-apps-sync
+  url: oci://homelab-registry:5000/flux-apps-sync
   ref:
     tag: local
   insecure: true

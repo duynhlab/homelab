@@ -21,6 +21,7 @@ Image artifacts are **built once per commit** with an immutable `sha-<short>` ta
 Each service repository reuses workflows from `duyhenryer/shared-workflows`:
 - `pr-checks.yml` (PR validation + Slack PR events)
 - `go-check.yml` (tests + optional lint + coverage artifact)
+- `gitleaks.yml` (Secret scanning + SARIF output)
 - `sonarqube.yml` (SonarCloud analysis + optional Quality Gate enforcement)
 - `docker-build-go.yml` (build & push Docker image for Go services — outputs `tags` + `digest`)
 - `docker-build-node.yml` (build & push Docker image for Node.js services — same outputs)
@@ -32,7 +33,48 @@ The pipeline follows a **"Build Once, Analyze Everywhere"** pattern: `go-check` 
 
 ## 📊 Workflow Visualization
 
-### 1. Architecture Overview
+### 1. Full Pipeline Architecture
+
+This diagram illustrates the comprehensive end-to-end pipeline, showcasing the integration of secret scanning (`gitleaks`), code quality checks (`sonar`), and delivery stages.
+
+```mermaid
+flowchart TD
+    subgraph pr_push["All Events (PR + Push)"]
+        PR[pr-checks]
+        GOCHECK[go-check]
+        GITLEAKS["🔐 gitleaks"]
+        SONAR[sonar]
+    end
+
+    subgraph build_only["Push Only (dev/staging/main)"]
+        BUILD[docker-build]
+        TRIVY[trivy-scan]
+        SIGN[docker-sign]
+        DBINIT[docker-db-init]
+    end
+
+    NOTIFY[notify]
+
+    GOCHECK --> SONAR
+    GITLEAKS --> SONAR
+    SONAR --> BUILD
+    SONAR --> DBINIT
+    BUILD --> TRIVY
+    TRIVY --> SIGN
+
+    PR --> NOTIFY
+    GOCHECK --> NOTIFY
+    GITLEAKS --> NOTIFY
+    SONAR --> NOTIFY
+    BUILD --> NOTIFY
+    TRIVY --> NOTIFY
+    SIGN --> NOTIFY
+    DBINIT --> NOTIFY
+
+    style GITLEAKS fill:#22c55e,color:#fff,stroke:#16a34a,stroke-width:2px
+```
+
+### 2. Architecture Overview
 
 Stack-specific builders feed into shared scan and sign workflows:
 
@@ -53,7 +95,7 @@ flowchart TD
     TRIVY -->|"pass"| SIGN
 ```
 
-### 2. Branch Promotion & CI Trigger Map
+### 3. Branch Promotion & CI Trigger Map
 
 ```mermaid
 flowchart LR
@@ -86,24 +128,29 @@ flowchart LR
     T -.-> P_T
 ```
 
-### 3. PR Flow
+### 4. PR Flow
 
 ```mermaid
 flowchart TD
     subgraph pr_flow ["PR Flow"]
         PR["pr-checks.yml"]
         GOCHECK["go-check.yml"]
+        GITLEAKS["gitleaks.yml"]
         SONAR["sonarqube.yml"]
         NOTIFY["status.yml"]
 
         GOCHECK --> SONAR
+        GITLEAKS --> SONAR
         PR --> NOTIFY
         GOCHECK --> NOTIFY
+        GITLEAKS --> NOTIFY
         SONAR --> NOTIFY
     end
+    
+    style GITLEAKS fill:#22c55e,color:#fff,stroke:#16a34a,stroke-width:2px
 ```
 
-### 3. Build & Delivery Flow (Push to dev / staging / main)
+### 5. Build & Delivery Flow (Push to dev / staging / main)
 
 On push to any persistent branch (`dev`, `staging`, `main`), the full build pipeline runs. The image is tagged with `sha-<short>` plus a branch-specific alias. No rebuild occurs when promoting between branches — the same digest is reused.
 
@@ -113,6 +160,7 @@ After each deployment, **post-deploy verification** runs automatically: smoke te
 flowchart TD
     subgraph build_flow ["Build & Delivery Flow"]
         GOCHECK2["go-check.yml"]
+        GITLEAKS2["gitleaks.yml"]
         SONAR2["sonarqube.yml"]
 
         BUILD["docker-build-go.yml"]
@@ -124,6 +172,7 @@ flowchart TD
         NOTIFY2["status.yml"]
 
         GOCHECK2 --> SONAR2
+        GITLEAKS2 --> SONAR2
         SONAR2 --> BUILD
         SONAR2 --> DBINIT
         BUILD -->|"outputs: tags, digest"| SCAN
@@ -135,9 +184,11 @@ flowchart TD
         SIGN --> NOTIFY2
         DBINIT --> NOTIFY2
     end
+    
+    style GITLEAKS2 fill:#22c55e,color:#fff,stroke:#16a34a,stroke-width:2px
 ```
 
-### 4. Execution Sequence
+### 6. Execution Sequence
 
 This diagram details the interaction between GitHub Actions, SonarCloud, Trivy, Cosign, and Slack across the full promotion lifecycle.
 
@@ -148,6 +199,7 @@ sequenceDiagram
     participant GA as GitHubActions
     participant PR as pr-checks
     participant Test as go-check
+    participant Scan as gitleaks
     participant Sonar as SonarCloud
     participant Build as docker-build-go
     participant Trivy as trivy-scan
@@ -159,11 +211,17 @@ sequenceDiagram
     PR->>PR: Validate branch name
     PR-->>Slack: Notify PR event
 
-    GA->>Test: Run go-check
-    Test->>Test: go test + generate coverage.out
-    Test->>GA: Upload artifact coverage-report
+    par Parallel Checks
+        GA->>Test: Run go-check
+        Test->>Test: go test + generate coverage.out
+        Test->>GA: Upload artifact coverage-report
+    and
+        GA->>Scan: Run gitleaks
+        Scan->>Scan: Scan git history for secrets
+        Scan->>GA: Upload SARIF to Security tab
+    end
 
-    GA->>Sonar: Run sonarqube
+    GA->>Sonar: Run sonarqube (waits for go-check & gitleaks)
     Sonar->>GA: Download artifact coverage-report
     Sonar->>Sonar: Scan and check quality gate
 
@@ -198,8 +256,9 @@ sequenceDiagram
 | Step | Job Name | Trigger Condition | Action & Responsibility |
 |------|----------|-------------------|-------------------------|
 | **1** | `pr-checks` | **PR Only** | **Gateway Check**: validates branch naming (`feature/*`, `hotfix/*`, `fix/*`, etc.) and sends Slack PR-event notification. |
-| **2** | `go-check` | **Always** | **Test + Coverage Artifact**: runs Go tests and uploads `coverage-report` artifact containing `coverage.out`. **Lint runs only on PR** when enabled. |
-| **3** | `sonar` | **Always** | **SonarCloud Analysis**: downloads `coverage-report` and runs Sonar scan. **Quality Gate enforcement is configurable** (`fail-on-quality-gate`). |
+| **2a** | `go-check` | **Always** | **Test + Coverage Artifact**: runs Go tests and uploads `coverage-report` artifact containing `coverage.out`. **Lint runs only on PR** when enabled. |
+| **2b** | `gitleaks` | **Always** | **Secret Scanning**: scans git history for secrets in parallel with `go-check`. Uploads SARIF. Block CI on leaks. |
+| **3** | `sonar` | **Always** | **SonarCloud Analysis**: waits for 2a and 2b. Downloads `coverage-report` and runs Sonar scan. **Quality Gate enforcement is configurable**. |
 | **4** | `notify` | **Always** | **Reporting**: posts final pipeline status to Slack and Google Sheets (runs even if previous steps failed). |
 
 > **Skipped on PR:** `docker-build` / `trivy-scan` / `docker-sign` / `docker-db-init` jobs do NOT run on PRs to avoid pushing images for non-merged code.

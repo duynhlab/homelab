@@ -6,10 +6,10 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 
 ## Infrastructure & GitOps
 
-- [x] **Kustomize bases/overlays + GitOps deployment** — `kubernetes/base/`, `kubernetes/overlays/`, Flux Kustomizations
-- [x] **Flux Operator with OCI sync** — `kubernetes/clusters/local/`, OCI registry at `localhost:5050`
-- [x] **CI/CD pipelines for container images** — `.github/workflows/build-*.yml` (backend, frontend, init, k6)
-- [x] **Helm chart publishing to OCI registry** — `.github/workflows/helm-release.yml`
+- [x] **Kustomize bases/overlays + GitOps deployment** — `kubernetes/apps/`, `kubernetes/infra/`, `kubernetes/clusters/`, Flux Kustomizations
+- [x] **Flux Operator with OCI sync** — `kubernetes/clusters/local/`, Kind cluster `homelab`, OCI registry `homelab-registry:5000` (localhost:5050)
+- [x] **CI/CD pipelines for container images** — Service repos + `duyhenryer/shared-workflows` (build-images, build-init-images, build-k6-images); this repo: `ci.yml` (validate)
+- [x] **Helm chart publishing to OCI registry** — Charts in `duyhenryer/charts` repo, OCI `ghcr.io/duyhenryer/charts`
 - [x] **GHCR multi-level image naming** — `ghcr.io/duynhne/<repo>/<image>:<tag>` for auto-linking packages to repos
 - [x] **Shared reusable CI/CD workflows** — `duyhenryer/shared-workflows` (docker-build-go, docker-build, go-check)
 - [x] **Dependabot for dependency management** — gomod, github-actions, docker across all 8 service repos
@@ -66,10 +66,10 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 - [ ] sqlc code generation + repository pattern
 - [~] **PostgreSQL Backup & Recovery Mastery** — `docs/databases/backup.md`:
   - [x] Physical backup architecture (Base backup + WAL archiving) — Implemented via CloudNativePG & Zalando
-  - [ ] Point-in-Time Recovery (PITR) strategy (concepts, WAL replay, timeline IDs)
-  - [ ] RPO/RTO analysis and trade-offs (storage cost vs recovery time)
-  - [ ] Tooling comparison: Barman (CNPG) vs WAL-G (Zalando)
-  - [ ] Backup lifecycle & retention policies (S3 versioning, immutable backups)
+  - [x] Point-in-Time Recovery (PITR) strategy (concepts, WAL replay, timeline IDs)
+  - [x] RPO/RTO analysis and trade-offs (storage cost vs recovery time)
+  - [x] Tooling comparison: Barman (CNPG) vs WAL-G (Zalando)
+  - [x] Backup lifecycle & retention policies (S3 versioning, immutable backups)
   - [ ] Disaster Recovery drills:
     - [ ] Perform a full Point-in-Time Recovery (PITR)
     - [ ] Corrupt/delete data and recover to specific transaction

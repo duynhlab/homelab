@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/component: infrastructure
 spec:
   interval: 5m
-  url: oci://mop-registry:5000/flux-infra-sync
+  url: oci://homelab-registry:5000/flux-infra-sync
   ref:
     tag: local
   insecure: true

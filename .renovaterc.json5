@@ -1,0 +1,29 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "config:recommended",
+    "docker:enableMajor",
+    ":automergeBranch",
+    ":automergeMinor",
+    ":dependencyDashboard",
+    ":disableRateLimiting",
+    ":semanticCommits",
+    ":timezone(Asia/Ho_Chi_Minh)",
+  ],
+  dependencyDashboardTitle: "Renovate Dashboard",
+  flux: {
+    managerFilePatterns: [
+      "/^kubernetes/.+\\.yaml$/",
+    ],
+  },
+  "helm-values": {
+    managerFilePatterns: [
+      "/^kubernetes/.+\\.yaml$/",
+    ],
+  },
+  kubernetes: {
+    managerFilePatterns: [
+      "/^kubernetes/.+\\.yaml$/",
+    ],
+  },
+}

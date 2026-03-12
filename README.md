@@ -1,6 +1,6 @@
 # Microservices Observability Platform
 
-**Complete microservices observability solution** - Kubernetes-ready with Prometheus, Grafana, and full observability stack.
+A GitOps-managed Kubernetes homelab cluster running on Kind Local(Planed to server).
 
 ---
 

@@ -33,7 +33,7 @@ spec:
   
   sync:
     kind: OCIRepository
-    url: "oci://mop-registry:5000/flux-cluster-sync"
+    url: "oci://homelab-registry:5000/flux-cluster-sync"
     ref: local
     path: "./"
   

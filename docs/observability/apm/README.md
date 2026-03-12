@@ -40,7 +40,7 @@ This project implements a comprehensive APM solution with four pillars:
 **APM stack is deployed automatically via Flux Operator:**
 
 **Flux Kustomization:** `configs-local` ([kubernetes/clusters/local/configs.yaml](../../../kubernetes/clusters/local/configs.yaml))
-- **Source:** OCI artifact `mop-registry:5000/flux-infra-sync:local`
+- **Source:** OCI artifact `homelab-registry:5000/flux-infra-sync:local`
 - **Manifests:** `kubernetes/infra/configs/apm/`
 - **Reconciliation:** Every 10 minutes (automatic)
 - **Dependencies:** `controllers-local` must be ready first (operators/CRDs)

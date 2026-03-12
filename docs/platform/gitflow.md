@@ -401,16 +401,18 @@ Branch enforcement uses **GitHub Rulesets** instead of legacy Branch Protection 
 | Visibility | Only admins can view rules | Anyone with read access can see active rulesets |
 | Status | Delete to disable | Active / Evaluate / Disabled states |
 
-### Plan Availability
+### Plan Availability (Free vs Team vs Enterprise)
 
-| Feature | Free (public repos) | Pro / Team | Enterprise |
-|---------|-------------------|------------|------------|
-| Repository-level rulesets | Yes | Yes (+ private repos) | Yes |
-| Org-level rulesets | No | No | Yes |
-| Custom properties targeting | No | No | Yes |
-| Push rulesets (file restrictions) | No | No | Yes |
+GitHub Rulesets availability depends on your organization's billing plan:
 
-Your public service repos on the **Free plan** get full repository-level rulesets. For private repos, upgrade to Pro or Team. For org-wide enforcement across 1000 repos, Enterprise is required.
+| Ruleset Feature | GitHub Free | GitHub Team | GitHub Enterprise |
+| :--- | :--- | :--- | :--- |
+| **Protect Public Repos** | ✅ Yes | ✅ Yes | ✅ Yes |
+| **Protect Private Repos** | ❌ **No** | ✅ **Yes** | ✅ Yes |
+| **Require CODEOWNERS review** | ❌ Public repos only | ✅ Private repos supported | ✅ Yes |
+| **Org-level Rulesets (Auto-apply to 1000 repos)** | ❌ Manual setup per repo | ❌ Manual setup per repo | ✅ **Yes** (Setup once, applies everywhere) |
+
+> **Note for CI/CD Automation:** With a **Free** or **Team** organization plan, you cannot use Org-level Rulesets. Setting up rulesets manually across dozens of microservices is tedious. Therefore, it is highly recommended to use the **REST API Automation** approach (detailed below) to programmatically apply rulesets to all new repositories.
 
 ### Layered Rulesets (3 per repository)
 
@@ -434,7 +436,7 @@ flowchart TD
 
 #### Ruleset 1: Base Protection
 
-**Targets**: branches matching `main`, `staging`, `dev`
+**Targets**: branches matching `main`, `dev`
 
 | Rule | Setting |
 |------|---------|
@@ -454,7 +456,7 @@ flowchart TD
 
 | Rule | Setting |
 |------|---------|
-| Required approvals | **2** (layered on top of Base; most restrictive wins) |
+| Required approvals | **1** (layered on top of Base; most restrictive wins) |
 | Require review from CODEOWNERS | Enabled |
 | Require approval of the most recent reviewable push | Enabled (non-author must approve) |
 | Require signed commits | Enabled |
@@ -509,43 +511,101 @@ db/         @duynhne/platform-team
 - CODEOWNERS teams/users must have at least **write** access to the repository.
 - The golden template (section 10) includes a default CODEOWNERS file.
 
-### Setup Guide (per repository)
+### Setup via REST API (Automation)
 
-#### Step 1: Create Base Protection ruleset
+For environments with many repositories (especially on the Free/Team plan without Org-level rulesets), configuring rulesets manually in the UI is tedious and error-prone. Use the GitHub REST API to automate creation.
 
-1. Go to **Settings > Rules > Rulesets** in the repository.
-2. Click **New ruleset > New branch ruleset**.
-3. Name: `Base Protection`, Enforcement: **Evaluate** (start in test mode).
-4. Under **Target branches**, add patterns: `main`, `staging`, `dev`.
-5. Enable rules: Restrict deletions, Block force pushes, Require PR (1 approval, dismiss stale reviews), Require status checks (`go-check`, `sonar`, strict mode).
-6. Under **Bypass list**, add CI GitHub App with "Always allow".
-7. Click **Create**.
+**Prerequisites**:
+- Install `gh` CLI and authenticate: `gh auth login`
 
-#### Step 2: Create Production Gate ruleset
+#### 1. Create Base Protection (`main`, `dev`)
 
-1. Click **New ruleset > New branch ruleset**.
-2. Name: `Production Gate`, Enforcement: **Evaluate**.
-3. Target branch: `main`.
-4. Enable rules: Require PR (2 approvals, require CODEOWNERS, require non-author approval), Require signed commits, Require linear history.
-5. Under **Bypass list**, add Maintainers role with "Allow for PR only".
-6. Click **Create**.
+```bash
+gh api \
+  --method POST \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  /repos/{owner}/{repo}/rulesets \
+  -f name='Base Protection' \
+  -f target='branch' \
+  -f enforcement='active' \
+  --input - << "EOF"
+{
+  "bypass_actors": [{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}],
+  "conditions": {
+    "ref_name": {"include": ["refs/heads/main", "refs/heads/dev"], "exclude": []}
+  },
+  "rules": [
+    {"type": "deletion"},
+    {"type": "non_fast_forward"},
+    {
+      "type": "pull_request",
+      "parameters": {"dismiss_stale_reviews_on_push": true, "require_code_owner_review": false, "require_last_push_approval": false, "required_approving_review_count": 1, "required_review_thread_resolution": false}
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {"strict_required_status_checks_policy": true, "required_status_checks": [{"context": "go-check"}, {"context": "sonar"}]}
+    }
+  ]
+}
+EOF
+```
 
-#### Step 3: Create Release Tags ruleset
+#### 2. Create Production Gate (`main`)
 
-1. Click **New ruleset > New tag ruleset**.
-2. Name: `Release Tags`, Enforcement: **Evaluate**.
-3. Target tags: `v*`.
-4. Enable rules: Restrict creations, Restrict deletions, Restrict updates.
-5. Bypass list: empty (no exceptions).
-6. Click **Create**.
+```bash
+gh api \
+  --method POST \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  /repos/{owner}/{repo}/rulesets \
+  -f name='Production Gate' \
+  -f target='branch' \
+  -f enforcement='active' \
+  --input - << "EOF"
+{
+  "bypass_actors": [{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "pull_request"}],
+  "conditions": {
+    "ref_name": {"include": ["refs/heads/main"], "exclude": []}
+  },
+  "rules": [
+    {"type": "required_linear_history"},
+    {"type": "required_signatures"},
+    {
+      "type": "pull_request",
+      "parameters": {"dismiss_stale_reviews_on_push": true, "require_code_owner_review": true, "require_last_push_approval": true, "required_approving_review_count": 1, "required_review_thread_resolution": true}
+    }
+  ]
+}
+EOF
+```
 
-#### Step 4: Validate with Evaluate mode
+#### 3. Create Release Tags (`v*`)
 
-1. Go to **Settings > Rules > Rulesets** and open a ruleset.
-2. Click **Insights** tab.
-3. Verify rules would pass/fail as expected for recent PRs and pushes.
-4. Once validated, change Enforcement status from **Evaluate** to **Active**.
-5. Repeat for each ruleset.
+```bash
+gh api \
+  --method POST \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  /repos/{owner}/{repo}/rulesets \
+  -f name='Release Tags' \
+  -f target='tag' \
+  -f enforcement='active' \
+  --input - << "EOF"
+{
+  "bypass_actors": [],
+  "conditions": {
+    "ref_name": {"include": ["refs/tags/v*"], "exclude": []}
+  },
+  "rules": [
+    {"type": "creation"},
+    {"type": "deletion"},
+    {"type": "non_fast_forward"},
+    {"type": "update"}
+  ]
+}
+EOF
+```
 
 ---
 
@@ -613,8 +673,8 @@ Every service repo must have 3 rulesets configured (see section 7 for full detai
 
 | Ruleset | Targets | Key rules |
 |---------|---------|-----------|
-| Base Protection | `main`, `staging`, `dev` | Require PR (1 approval), dismiss stale reviews, require status checks (`go-check`, `sonar`), block force push, restrict deletion |
-| Production Gate | `main` | Require 2 approvals, require CODEOWNERS review, require signed commits, require non-author approval |
+| Base Protection | `main`, `dev` | Require PR (1 approval), dismiss stale reviews, require status checks (`go-check`, `sonar`, `gitleaks`), block force push, restrict deletion |
+| Production Gate | `main` | Require 1 approval, require CODEOWNERS review, require signed commits, require non-author approval |
 | Release Tags | `v*` tags | Restrict creation/deletion/updates (immutable tags) |
 
 ### Required Status Checks

@@ -56,11 +56,22 @@ jobs:
     secrets: inherit
 
   # ──────────────────────────────────────────────────
+  # 2b. Secret Detection (Gitleaks)
+  # Runs on: all events except tags (parallel with go-check)
+  # ──────────────────────────────────────────────────
+  gitleaks:
+    if: "!startsWith(github.ref, 'refs/tags/')"
+    uses: duyhenryer/shared-workflows/.github/workflows/gitleaks.yml@main
+    permissions:
+      contents: read
+      security-events: write
+
+  # ──────────────────────────────────────────────────
   # 3. SonarCloud Analysis
   # Runs on: all events except tags
   # ──────────────────────────────────────────────────
   sonar:
-    needs: go-check
+    needs: [go-check, gitleaks]
     uses: duyhenryer/shared-workflows/.github/workflows/sonarqube.yml@main
     with:
       project-key: 'duynhne_{{SERVICE_NAME}}'
@@ -194,7 +205,7 @@ jobs:
   # ──────────────────────────────────────────────────
   notify:
     if: always()
-    needs: [pr-checks, go-check, sonar, docker-build, trivy-scan, docker-sign, docker-db-init]
+    needs: [pr-checks, go-check, gitleaks, sonar, docker-build, trivy-scan, docker-sign, docker-db-init]
     uses: duyhenryer/shared-workflows/.github/workflows/status.yml@main
     with:
       slack_channel_id: "C0AD82A9A74"

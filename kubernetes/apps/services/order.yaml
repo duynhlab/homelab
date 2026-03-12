@@ -12,7 +12,9 @@ spec:
     name: order
     namespace: order
     replicaCount: 2
-    db_host: "pgcat.order.svc.cluster.local"
-    db_migration_host: "transaction-shared-db-rw.order.svc.cluster.local"
+    db_host: "pgcat.cart.svc.cluster.local"
+    db_migration_host: "transaction-shared-db-rw.cart.svc.cluster.local"
     db_secret: "transaction-shared-db-secret"
+    db_user: "cart"
+    db_sslmode: "disable"
     pool_max: "30"

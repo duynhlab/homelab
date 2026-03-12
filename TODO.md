@@ -39,6 +39,14 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 - [ ] Anomaly detection and synthetic monitoring
 - [ ] Exemplars: link metrics → traces in Grafana
 - [ ] Log-based alerting (Loki ruler → Alertmanager)
+- [ ] **VictoriaMetrics stack (future / server)** — When migrating or adding VM:
+  - [ ] VictoriaMetrics Operator — VMSingle (metrics storage, e.g. 12-week retention on Ceph block), VMAgent (collection)
+  - [ ] VMAlert + VMAlertmanager for alerting
+  - [ ] OpenTelemetry integration with Prometheus naming
+- [ ] **Grafana Operator (future / server)** — Declarative Grafana when on server:
+  - [ ] Grafana Operator manages Grafana instances and dashboards
+  - [ ] Declarative dashboard management via GrafanaDashboard CRDs
+  - [ ] Automated datasource configuration; integrated with VictoriaMetrics (or Prometheus)
 
 ---
 
@@ -123,6 +131,16 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 
 ---
 
+## Certificate Management
+
+- [ ] **cert-manager** — Automate certificate lifecycle (issue, renew, revoke):
+  - [ ] Deploy cert-manager (Helm or operator)
+  - [ ] ClusterIssuer/Issuer for CA (e.g. Let's Encrypt ACME for public domains, or internal CA for private)
+  - [ ] Certificate CRs for ingress TLS, webhook TLS (ESO, admission controllers), optional DB/client certs
+  - [ ] Integration with Ingress (e.g. ingress-shim annotations) or Gateway API for automatic cert per host
+
+---
+
 ## Application Services
 
 - [x] **Go microservices with 3-layer architecture** — `services/*/` (Web → Logic → Core)
@@ -148,6 +166,31 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 - [ ] Circuit breakers, retries, timeouts at mesh level
 - [ ] Fault injection for chaos engineering
 - [ ] Service-to-service authentication (SPIFFE/SPIRE)
+
+---
+
+## Networking & Zero-Trust
+
+- [ ] **Tailscale integration** — Tailscale Operator for Kubernetes; tailnet for private secure global access (subscription includes Tailscale Operator)
+- [ ] **Cloudflare Tunnel (cloudflared)** — Expose services via Cloudflare proxy + tunnel to cluster (no direct public IP); DDoS and privacy protection
+- [ ] Zero-Trust access model (identity-based access to cluster/admin UIs; no open firewall ports)
+
+---
+
+## Storage
+
+*Not applicable for Kind on laptop; for bare-metal or VM-based homelab server.*
+
+- [ ] **Rook-Ceph (distributed storage)** — When needed on multi-node cluster:
+  - [ ] Block Storage (ceph-block) — Default StorageClass, 3-way replication, LZ4 compression
+  - [ ] Object Storage (ceph-bucket) — S3-compatible with erasure coding (e.g. 2+1)
+  - [ ] Ceph dashboard exposed via Envoy Gateway (optional)
+  - [ ] Encrypted OSDs for data-at-rest security
+- [ ] **OpenEBS ZFS LocalPV** — When nodes have ZFS pools:
+  - [ ] Expose existing ZFS pools on nodes as Kubernetes storage
+  - [ ] Use for large media/data pools; ZFS features (compression, snapshots, datasets)
+  - [ ] Workloads requiring high-capacity local storage
+- [ ] StorageClass strategy (default for PVCs; when to use block vs object vs local)
 
 ---
 

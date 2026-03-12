@@ -65,14 +65,14 @@ make cluster-up
 
 **Actions Performed:**
 - Initializes a local OCI registry (`localhost:5050`).
-- Provisions a 4-node Kubernetes cluster named `mop`.
+- Provisions a 4-node Kubernetes cluster named `homelab`.
 - Establishes network connectivity between the registry and the Kind cluster.
 
 **Verification:**
 ```bash
 kubectl cluster-info
 kubectl get nodes
-docker ps | grep mop-registry
+docker ps | grep homelab-registry
 ```
 
 ---

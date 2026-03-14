@@ -8,7 +8,7 @@ resources:
   - oci/apps-oci.yaml
   - oci/mop-chart-oci.yaml
   - oci/grafana-operator-oci.yaml
-  - oci/victorialogs-oci.yaml
+  - oci/victoria-metrics-operator-oci.yaml
   - oci/cronjobs-oci.yaml
   
   # Helm Repositories
@@ -16,6 +16,7 @@ resources:
   - helm/metrics-server.yaml
   - helm/jaegertracing.yaml
   - helm/postgres-operator.yaml
+  - helm/postgres-operator-ui.yaml
   - helm/cnpg.yaml
   - helm/sloth.yaml
   - helm/vector.yaml

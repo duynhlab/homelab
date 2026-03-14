@@ -45,10 +45,15 @@ spec:
     - apiVersion: apiextensions.k8s.io/v1
       kind: CustomResourceDefinition
       name: clusters.postgresql.cnpg.io
+    # Prometheus CRDs (required by VM Prometheus auto-conversion + other charts)
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: prometheus-operator-crds
+      namespace: monitoring
     # Monitoring operators
     - apiVersion: helm.toolkit.fluxcd.io/v2
       kind: HelmRelease
-      name: kube-prometheus-stack
+      name: victoria-metrics-operator
       namespace: monitoring
     - apiVersion: helm.toolkit.fluxcd.io/v2
       kind: HelmRelease

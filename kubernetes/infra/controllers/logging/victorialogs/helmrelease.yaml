@@ -12,7 +12,7 @@ metadata:
   namespace: monitoring
 spec:
   dependsOn:
-    - name: kube-prometheus-stack
+    - name: victoria-metrics-operator
       namespace: monitoring
     - name: grafana-operator
       namespace: monitoring

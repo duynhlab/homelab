@@ -1,0 +1,34 @@
+# VMAlert - VictoriaMetrics alerting rule evaluator
+# Evaluates VMRule resources (including those auto-converted from PrometheusRule
+# by the VM Operator, e.g. postgres-alerts, pg-exporter-recording-rules, SLO rules).
+# Docs: https://docs.victoriametrics.com/operator/resources/vmalert/
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAlert
+metadata:
+  name: victoria-metrics
+  namespace: monitoring
+spec:
+  # Discover VMRule resources in all namespaces
+  selectAllByDefault: true
+
+  evaluationInterval: "15s"
+
+  datasource:
+    url: "http://vmsingle-victoria-metrics.monitoring.svc:8428"
+
+  remoteWrite:
+    url: "http://vmsingle-victoria-metrics.monitoring.svc:8428"
+
+  remoteRead:
+    url: "http://vmsingle-victoria-metrics.monitoring.svc:8428"
+
+  notifier:
+    url: "http://vmalertmanager-victoria-metrics.monitoring.svc:9093"
+
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi

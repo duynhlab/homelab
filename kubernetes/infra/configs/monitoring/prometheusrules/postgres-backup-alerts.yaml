@@ -6,7 +6,7 @@ metadata:
   name: postgres-backup-alerts
   namespace: monitoring
   labels:
-    prometheus: kube-prometheus-stack
+    app.kubernetes.io/component: alerting-rules
 spec:
   groups:
     - name: postgres-backup

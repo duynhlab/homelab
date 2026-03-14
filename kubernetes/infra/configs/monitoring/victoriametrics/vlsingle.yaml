@@ -1,0 +1,25 @@
+# VLSingle - VictoriaLogs single-node log storage (Operator-managed)
+# Replaces the VictoriaLogs Helm chart HelmRelease.
+# Log ingestion is handled by the cluster-wide Vector Agent (kube-system/vector).
+# Docs: https://docs.victoriametrics.com/operator/resources/vlsingle/
+apiVersion: operator.victoriametrics.com/v1
+kind: VLSingle
+metadata:
+  name: victoria-logs
+  namespace: monitoring
+spec:
+  retentionPeriod: "7d"
+  removePvcAfterDelete: true
+
+  storage:
+    resources:
+      requests:
+        storage: 20Gi
+
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi

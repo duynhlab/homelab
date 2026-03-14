@@ -3,5 +3,6 @@ kind: Kustomization
 
 resources:
   - zalando-operator.yaml
+  - postgres-operator-ui.yaml
   - zalando-walg-config.yaml
   - cloudnativepg-operator.yaml

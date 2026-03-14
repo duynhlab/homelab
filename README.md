@@ -33,36 +33,26 @@ Runtime architecture: Frontend (React SPA), 8 microservices (3-layer each), Valk
 flowchart TD
     %% Styling
     classDef frontend fill:#3b82f6,stroke:#1d4ed8,stroke-width:2px,color:#fff,rx:8px,ry:8px
-    classDef domain fill:#f8fafc,stroke:#cbd5e1,stroke-width:2px,stroke-dasharray: 5 5,rx:10px,ry:10px
-    classDef service fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff,rx:5px,ry:5px
+    classDef layer fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff,rx:5px,ry:5px
     classDef cache fill:#f59e0b,stroke:#b45309,stroke-width:2px,color:#fff,rx:5px,ry:5px
     classDef pooler fill:#8b5cf6,stroke:#5b21b6,stroke-width:2px,color:#fff,rx:5px,ry:5px
     classDef database fill:#ef4444,stroke:#b91c1c,stroke-width:2px,color:#fff,shape:cylinder
     classDef obs fill:#1e293b,stroke:#0f172a,stroke-width:2px,color:#fff,rx:5px,ry:5px
     classDef obsGroup fill:#f1f5f9,stroke:#94a3b8,stroke-width:2px,stroke-dasharray: 5 5,rx:10px,ry:10px
     classDef secret fill:#ec4899,stroke:#be185d,stroke-width:2px,color:#fff,rx:5px,ry:5px
+    classDef servicebox fill:#f8fafc,stroke:#cbd5e1,stroke-width:2px,stroke-dasharray: 5 5,rx:10px,ry:10px
 
     FE["🌐 Frontend"]:::frontend
 
-    %% API Layer / Microservices
-    subgraph Services ["Microservices (Web ➔ Logic ➔ Core)"]
-        direction LR
-        subgraph Identity ["Identity Domain"]
-            auth["Auth"]:::service
-            user["User"]:::service
-        end
-        subgraph Catalog ["Catalog Domain"]
-            product["Product"]:::service
-            review["Review"]:::service
-        end
-        subgraph Checkout ["Checkout Domain"]
-            cart["Cart"]:::service
-            order["Order"]:::service
-        end
-        subgraph Comms ["Comms Domain"]
-            notification["Notification"]:::service
-            shipping["Shipping"]:::service
-        end
+    %% API Layer / Microservices (3-Layer Architecture)
+    subgraph Microservices ["8 Independent Microservices (Polyrepo)"]
+        
+        WebLayer["Web Layer<br/>(HTTP, Validation, Aggregation)"]:::layer
+        LogicLayer["Logic Layer<br/>(Business Rules, Cache-Aside)"]:::layer
+        CoreLayer["Core Layer<br/>(Domain Models, DB Repositories)"]:::layer
+        
+        WebLayer -->|"Function Calls"| LogicLayer
+        LogicLayer -->|"Interface Calls"| CoreLayer
     end
 
     %% Observability Layer
@@ -105,19 +95,19 @@ flowchart TD
     end
 
     %% Connections
-    FE -->|"HTTP /api/v1/*"| Services
+    FE -->|"HTTP /api/v1/*"| WebLayer
     
-    auth & product & cart & order & review & user & notification & shipping -.->|"O11y Data"| Observability
+    WebLayer & LogicLayer & CoreLayer -.->|"O11y Data"| Observability
     
-    product -->|"Cache-Aside"| valkey
+    LogicLayer -->|"Cache-Aside"| valkey
     eso -.->|"Injects Secrets"| Databases
-    eso -.->|"Injects Secrets"| Services
+    eso -.->|"Injects Secrets"| CoreLayer
     
-    auth -->|"SQL"| pb_auth
-    user & notification & shipping -->|"SQL"| pb_shared
-    review -->|"Direct SQL"| db_shared
-    product -->|"SQL"| pdog
-    cart & order -->|"SQL"| pcat
+    CoreLayer -->|"SQL (auth)"| pb_auth
+    CoreLayer -->|"SQL (user, notify, shipping)"| pb_shared
+    CoreLayer -->|"Direct SQL (review)"| db_shared
+    CoreLayer -->|"SQL (product)"| pdog
+    CoreLayer -->|"SQL (cart, order)"| pcat
 
     pb_auth ==> db_auth
     pb_shared ==> db_shared
@@ -125,7 +115,7 @@ flowchart TD
     pcat ==> db_tx
     
     %% Assign classes to subgraphs
-    class Identity,Catalog,Checkout,Comms,SecretsDev domain;
+    class Microservices,SecretsDev servicebox;
     class Observability obsGroup;
 ```
 

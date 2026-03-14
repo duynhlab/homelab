@@ -8,7 +8,7 @@ metadata:
   name: pg-exporter-recording-rules
   namespace: monitoring
   labels:
-    prometheus: kube-prometheus-stack
+    app.kubernetes.io/component: recording-rules
 spec:
   groups:
     # ---------------------------------------------------------------

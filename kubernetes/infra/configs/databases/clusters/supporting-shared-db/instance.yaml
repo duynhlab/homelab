@@ -54,35 +54,35 @@ spec:
       - createdb
     review.review:  # Database owner for review database (namespace.username format for cross-namespace secret)
       - createdb
-  preparedDatabases:
-  # Important: preparedDatabases is executed only when the DB is created for the first time.
-  # If the database:
-  # - already exists
-  # - or the cluster has already been bootstrapped
-  # => the operator will NOT automatically add new extensions to an existing DB
-  # In that case, you must manually run: CREATE EXTENSION "uuid-ossp";
-    user:
-      extensions:
-        pg_trgm: public
-        citext: public
-        uuid-ossp: public
-        pg_partman: public
-        hstore: public
-        unaccent: public
-    notification:
-      extensions:
-        pg_trgm: public
-        citext: public
-        uuid-ossp: public
-    shipping:
-      extensions:
-        pg_trgm: public
-        uuid-ossp: public
-    review:
-      extensions:
-        pg_trgm: public
-        uuid-ossp: public
-        hstore: public
+  # preparedDatabases:
+  # # Important: preparedDatabases is executed only when the DB is created for the first time.
+  # # If the database:
+  # # - already exists
+  # # - or the cluster has already been bootstrapped
+  # # => the operator will NOT automatically add new extensions to an existing DB
+  # # In that case, you must manually run: CREATE EXTENSION "uuid-ossp";
+  #   user:
+  #     extensions:
+  #       pg_trgm: public
+  #       citext: public
+  #       uuid-ossp: public
+  #       pg_partman: public
+  #       hstore: public
+  #       unaccent: public
+  #   notification:
+  #     extensions:
+  #       pg_trgm: public
+  #       citext: public
+  #       uuid-ossp: public
+  #   shipping:
+  #     extensions:
+  #       pg_trgm: public
+  #       uuid-ossp: public
+  #   review:
+  #     extensions:
+  #       pg_trgm: public
+  #       uuid-ossp: public
+  #       hstore: public
 
   # Connection pooler (PgBouncer sidecar) configuration
   # Services connect via: supporting-shared-db-pooler.user.svc.cluster.local:5432

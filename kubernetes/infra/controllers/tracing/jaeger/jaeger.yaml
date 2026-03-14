@@ -14,7 +14,7 @@ spec:
         namespace: flux-system
       version: '>=3.0.0'
   dependsOn:
-    - name: kube-prometheus-stack
+    - name: victoria-metrics-operator
       namespace: monitoring
     - name: grafana-operator
       namespace: monitoring

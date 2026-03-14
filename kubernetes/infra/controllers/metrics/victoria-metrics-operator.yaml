@@ -1,0 +1,45 @@
+# VictoriaMetrics Operator HelmRelease
+# Chart: oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-operator
+# Docs: https://docs.victoriametrics.com/operator/
+#
+# The operator manages VMSingle, VMAgent, VMAlert, VMAlertmanager, VLSingle CRDs
+# and auto-converts Prometheus CRDs (ServiceMonitor, PodMonitor, PrometheusRule)
+# into VictoriaMetrics equivalents.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: victoria-metrics-operator
+  namespace: monitoring
+spec:
+  dependsOn:
+    - name: prometheus-operator-crds
+      namespace: monitoring
+  interval: 10m
+  timeout: 10m
+  chartRef:
+    kind: OCIRepository
+    name: victoria-metrics-operator-oci
+    namespace: flux-system
+  releaseName: victoria-metrics-operator
+  install:
+    crds: Create
+  upgrade:
+    crds: CreateReplace
+  values:
+    operator:
+      # Auto-convert Prometheus CRDs (ServiceMonitor -> VMServiceScrape, etc.)
+      disable_prometheus_converter: false
+      # Delete converted VM objects when the original Prometheus objects are deleted
+      enable_converter_ownership: true
+
+    resources:
+      requests:
+        cpu: 20m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+    # Admission webhooks (disabled for simplicity in local dev)
+    admissionWebhooks:
+      enabled: false

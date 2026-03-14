@@ -16,7 +16,7 @@ spec:
         namespace: flux-system
       version: '0.49.0'
   dependsOn:
-    - name: kube-prometheus-stack
+    - name: victoria-metrics-operator
       namespace: monitoring
   interval: 10m
   releaseName: vector
@@ -297,7 +297,7 @@ spec:
           type: http
           inputs:
             - add_labels
-          uri: http://victorialogs-victoria-logs-single-server.monitoring.svc.cluster.local:9428/insert/jsonline
+          uri: http://vlsingle-victoria-logs.monitoring.svc:9428/insert/jsonline
           encoding:
             codec: json
           framing:
@@ -326,7 +326,7 @@ spec:
           type: http
           inputs:
             - parse_pg_auto_explain
-          uri: http://victorialogs-victoria-logs-single-server.monitoring.svc.cluster.local:9428/insert/jsonline
+          uri: http://vlsingle-victoria-logs.monitoring.svc:9428/insert/jsonline
           encoding:
             codec: json
             only_fields:
@@ -369,7 +369,7 @@ spec:
           type: http
           inputs:
             - parse_pg_auto_explain.dropped
-          uri: http://victorialogs-victoria-logs-single-server.monitoring.svc.cluster.local:9428/insert/jsonline
+          uri: http://vlsingle-victoria-logs.monitoring.svc:9428/insert/jsonline
           encoding:
             codec: json
           framing:
@@ -407,7 +407,7 @@ spec:
     resources:
       limits:
         cpu: 50m
-        memory: 128Mi
+        memory: 256Mi
       requests: 
         cpu: 20m
         memory: 32Mi

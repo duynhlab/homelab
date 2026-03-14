@@ -135,7 +135,7 @@ spec:
   # Sidecars: postgres_exporter for Prometheus metrics collection and Vector for log collection
   sidecars:
     - name: exporter
-      image: quay.io/prometheuscommunity/postgres-exporter:v0.18.1
+      image: quay.io/prometheuscommunity/postgres-exporter:v0.19.1
       ports:
         - name: exporter
           containerPort: 9187

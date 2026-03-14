@@ -1,0 +1,28 @@
+# VMAgent - VictoriaMetrics scraping agent
+# Replaces the Prometheus scraping capability.
+# Auto-discovers VMServiceScrape/VMPodScrape (including those auto-converted
+# from Prometheus ServiceMonitor/PodMonitor CRDs by the VM Operator).
+# Docs: https://docs.victoriametrics.com/operator/resources/vmagent/
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAgent
+metadata:
+  name: victoria-metrics
+  namespace: monitoring
+spec:
+  # Discover scrape targets in all namespaces
+  selectAllByDefault: true
+
+  remoteWrite:
+    - url: "http://vmsingle-victoria-metrics.monitoring.svc:8428/api/v1/write"
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  extraArgs:
+    # Scrape interval matches the existing Prometheus config
+    promscrape.suppressDuplicateScrapeTargetErrors: "true"

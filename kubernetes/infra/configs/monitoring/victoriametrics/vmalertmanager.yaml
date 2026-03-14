@@ -1,0 +1,31 @@
+# VMAlertmanager - VictoriaMetrics alert notification manager
+# Receives alerts from VMAlert and routes them to configured receivers.
+# Docs: https://docs.victoriametrics.com/operator/resources/vmalertmanager/
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAlertmanager
+metadata:
+  name: victoria-metrics
+  namespace: monitoring
+spec:
+  selectAllByDefault: true
+  replicaCount: 1
+
+  configRawYaml: |
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['alertname', 'namespace']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      receiver: 'default'
+    receivers:
+      - name: 'default'
+
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi

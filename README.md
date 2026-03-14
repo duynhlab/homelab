@@ -207,11 +207,11 @@ After deployment, access services via port-forwarding. Use `make flux-ui` to aut
 |---------|-----|---------|-------------|
 | Flux Web UI | <http://localhost:9080> | `make flux-ui` or `kubectl port-forward -n flux-system svc/flux-operator 9080:9080` | - |
 | Grafana | <http://localhost:3000> | `kubectl port-forward -n monitoring svc/grafana-service 3000:3000` | Anonymous (enabled) |
-| Prometheus | <http://localhost:9090> | `kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090` | - |
+| VictoriaMetrics | <http://localhost:8428/vmui> | `kubectl port-forward -n monitoring svc/vmsingle-victoria-metrics 8428:8428` | - |
 | Jaeger UI | <http://localhost:16686> | `kubectl port-forward -n monitoring svc/jaeger 16686:16686` | - |
 | Tempo | <http://localhost:3200> | `kubectl port-forward -n monitoring svc/tempo 3200:3200` | - |
 | Pyroscope | <http://localhost:4040> | `kubectl port-forward -n monitoring svc/pyroscope 4040:4040` | - |
-| VictoriaLogs | <http://localhost:9428> | `kubectl port-forward -n monitoring svc/victorialogs-victoria-logs-single-server 9428:9428` | - |
+| VictoriaLogs | <http://localhost:9428> | `kubectl port-forward -n monitoring svc/vlsingle-victoria-logs 9428:9428` | - |
 | Postgres Operator UI | <http://localhost:8082> | `kubectl port-forward -n postgres-operator svc/postgres-operator 8082:8080` | - |
 | Frontend | <http://localhost:3001> | `kubectl port-forward -n default svc/frontend 3001:80` | - |
 

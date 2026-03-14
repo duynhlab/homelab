@@ -13,7 +13,8 @@ spec:
     name: Prometheus
     type: prometheus
     uid: prometheus
-    url: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+    # VMSingle is fully Prometheus API compatible
+    url: http://vmsingle-victoria-metrics.monitoring.svc:8428
   instanceSelector:
     matchLabels:
       dashboards: grafana

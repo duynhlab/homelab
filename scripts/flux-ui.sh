@@ -22,9 +22,9 @@ kubectl port-forward -n flux-system svc/flux-operator 9080:9080 > /dev/null 2>&1
 echo "Starting Grafana port forward (3000)..."
 kubectl port-forward -n monitoring svc/grafana-service 3000:3000 > /dev/null 2>&1 &
 
-# Prometheus
-echo "Starting Prometheus port forward (9090)..."
-kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090 > /dev/null 2>&1 &
+# VictoriaMetrics (VMSingle - Prometheus API compatible at :8428)
+echo "Starting VictoriaMetrics port forward (8428)..."
+kubectl port-forward -n monitoring svc/vmsingle-victoria-metrics 8428:8428 > /dev/null 2>&1 &
 
 # Jaeger
 echo "Starting Jaeger port forward (16686)..."
@@ -39,17 +39,17 @@ echo "Starting Pyroscope port forward (4040)..."
 kubectl port-forward -n monitoring svc/pyroscope 4040:4040 > /dev/null 2>&1 &
 
 
-# VictoriaLogs
+# VictoriaLogs (Operator-managed VLSingle)
 echo "Starting VictoriaLogs port forward (9428)..."
-kubectl port-forward -n monitoring svc/victorialogs-victoria-logs-single-server 9428:9428 > /dev/null 2>&1 &
+kubectl port-forward -n monitoring svc/vlsingle-victoria-logs 9428:9428 > /dev/null 2>&1 &
 
 # RustFS (S3-compatible object storage)
 echo "Starting RustFS port forward (9000 API, 9001 Console)..."
 kubectl port-forward -n rustfs svc/rustfs-svc 9000:9000 9001:9001 > /dev/null 2>&1 &
 
 # Postgres Operator UI
-echo "Starting Postgres Operator UI port forward (8082)..."
-kubectl port-forward -n postgres-operator svc/postgres-operator 8082:8080 > /dev/null 2>&1 &
+echo "Starting Postgres Operator UI port forward (8081)..."
+kubectl port-forward -n postgres-operator svc/postgres-operator-ui 8081:80 > /dev/null 2>&1 &
 
 # Frontend
 echo "Starting Frontend port forward (3001)..."
@@ -66,13 +66,13 @@ echo ""
 echo "Access URLs:"
 echo "Flux Web UI:         http://localhost:9080"
 echo "Grafana:             http://localhost:3000"
-echo "Prometheus:          http://localhost:9090"
+echo "VictoriaMetrics:     http://localhost:8428/vmui"
 echo "Jaeger:              http://localhost:16686"
 echo "Tempo:               http://localhost:3200"
 echo "Pyroscope:           http://localhost:4040"
 echo "VictoriaLogs:        http://localhost:9428"
 echo "RustFS Console:      http://localhost:9001 (API: 9000)"
-echo "Postgres Operator UI: http://localhost:8082"
+echo "Postgres Operator UI: http://localhost:8081"
 echo "Frontend:            http://localhost:3001"
 echo ""
 echo "To stop port forwarding: pkill -f 'kubectl port-forward'"

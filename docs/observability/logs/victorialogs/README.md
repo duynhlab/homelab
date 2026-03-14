@@ -53,16 +53,16 @@ This deployment uses a **single cluster-wide Vector Agent** (`kube-system/vector
 
 ## Components
 
-| Component | Namespace | Purpose |
-|-----------|-----------|---------|
-| `victorialogs` | `monitoring` | Log storage and query engine |
-| `vector` | `kube-system` | Log collection agent (DaemonSet) |
+| Component | CRD/Kind | Namespace | Purpose |
+|-----------|----------|-----------|---------|
+| VLSingle | `VLSingle` (VM Operator) | `monitoring` | Log storage and query engine |
+| Vector | `HelmRelease` | `kube-system` | Log collection agent (DaemonSet) |
 
 ## Endpoints
 
-### VictoriaLogs Service
+### VictoriaLogs Service (Operator-Managed)
 
-- **Service**: `victorialogs-victoria-logs-single-server.monitoring.svc.cluster.local`
+- **Service**: `vlsingle-victoria-logs.monitoring.svc`
 - **Port**: `9428`
 
 ### Ingestion Endpoints
@@ -107,22 +107,24 @@ CloudNativePG auto_explain logs are parsed and stored with:
 
 ## Configuration
 
-### VictoriaLogs HelmRelease
+### VLSingle CRD (Operator-Managed)
 
-Location: `kubernetes/infra/controllers/logging/victorialogs/helmrelease.yaml`
+Location: `kubernetes/infra/configs/monitoring/victoriametrics/vlsingle.yaml`
 
 Key settings:
 ```yaml
-values:
-  server:
-    retentionPeriod: 7d
-    persistentVolume:
-      enabled: true
-      size: 20Gi
-  
-  # CRITICAL: Embedded Vector is disabled
-  vector:
-    enabled: false
+apiVersion: operator.victoriametrics.com/v1
+kind: VLSingle
+metadata:
+  name: victoria-logs
+  namespace: monitoring
+spec:
+  retentionPeriod: "7d"
+  removePvcAfterDelete: true
+  storage:
+    resources:
+      requests:
+        storage: 20Gi
 ```
 
 ### Vector HelmRelease
@@ -136,15 +138,14 @@ The Vector config includes:
 
 ## Verification
 
-### Check Flux Reconciliation
+### Check Operator Resources
 
 ```bash
-# Check HelmRelease status
-kubectl get helmrelease -n monitoring victorialogs
-kubectl get helmrelease -n kube-system vector
+# Check VLSingle status
+kubectl get vlsingle -n monitoring
 
 # Check pods
-kubectl get pods -n monitoring -l app.kubernetes.io/name=victoria-logs-single
+kubectl get pods -n monitoring -l app.kubernetes.io/name=vlsingle
 kubectl get pods -n kube-system -l app.kubernetes.io/name=vector
 ```
 
@@ -152,7 +153,7 @@ kubectl get pods -n kube-system -l app.kubernetes.io/name=vector
 
 ```bash
 # Port-forward to VictoriaLogs
-kubectl port-forward -n monitoring svc/victorialogs-victoria-logs-single-server 9428:9428
+kubectl port-forward -n monitoring svc/vlsingle-victoria-logs 9428:9428
 
 # Check health endpoint
 curl http://localhost:9428/health
@@ -199,7 +200,7 @@ curl -G 'http://localhost:9428/select/logsql/query' \
 3. **Verify VictoriaLogs service is accessible**:
    ```bash
    kubectl run -it --rm debug --image=curlimages/curl -- \
-     curl -s http://victorialogs-victoria-logs-single-server.monitoring.svc.cluster.local:9428/health
+     curl -s http://vlsingle-victoria-logs.monitoring.svc:9428/health
    ```
 
 ### PostgreSQL Plans Not Appearing
@@ -246,6 +247,6 @@ If Vector is consuming too much memory:
 
 | Resource | Path |
 |----------|------|
-| VictoriaLogs OCI Source | `kubernetes/clusters/local/sources/oci/victorialogs-oci.yaml` |
-| VictoriaLogs HelmRelease | `kubernetes/infra/controllers/logging/victorialogs/helmrelease.yaml` |
+| VLSingle CRD | `kubernetes/infra/configs/monitoring/victoriametrics/vlsingle.yaml` |
+| VM Operator | `kubernetes/infra/controllers/metrics/victoria-metrics-operator.yaml` |
 | Vector HelmRelease | `kubernetes/infra/controllers/logging/vector/vector.yaml` |

@@ -1,0 +1,32 @@
+# Prometheus Operator CRDs (standalone)
+# Chart: prometheus-community/prometheus-operator-crds
+#
+# Installs ONLY the Prometheus CRDs (ServiceMonitor, PodMonitor, PrometheusRule,
+# Probe, ScrapeConfig, AlertmanagerConfig) without the Prometheus Operator itself.
+#
+# Required because:
+# - VictoriaMetrics Operator does NOT ship Prometheus CRDs
+# - VM Operator auto-converts these CRDs to VM equivalents
+# - Other charts (valkey, etc.) create ServiceMonitor resources
+# - Sloth generates PrometheusRule/PrometheusServiceLevel CRDs
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: prometheus-operator-crds
+  namespace: monitoring
+spec:
+  chart:
+    spec:
+      chart: prometheus-operator-crds
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-community
+        namespace: flux-system
+      version: '>=18.0.0'
+  interval: 10m
+  timeout: 5m
+  releaseName: prometheus-operator-crds
+  install:
+    crds: Create
+  upgrade:
+    crds: CreateReplace

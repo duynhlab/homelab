@@ -30,82 +30,103 @@ Runtime architecture: Frontend (React SPA), 8 microservices (3-layer each), Valk
 > **Note**: This repository contains **infrastructure, GitOps, observability, and docs only**. Application code lives in separate repos (see [SERVICES.md](SERVICES.md)). Apps are deployed via Flux Operator ResourceSets (see [Application Delivery](docs/platform/application-delivery.md)).
 
 ```mermaid
-flowchart TB
-    subgraph frontend ["Frontend"]
-        FE["React SPA"]
-    end
+flowchart TD
+    %% Styling
+    classDef frontend fill:#3b82f6,stroke:#1d4ed8,stroke-width:2px,color:#fff,rx:8px,ry:8px
+    classDef domain fill:#f8fafc,stroke:#cbd5e1,stroke-width:2px,stroke-dasharray: 5 5,rx:10px,ry:10px
+    classDef service fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff,rx:5px,ry:5px
+    classDef cache fill:#f59e0b,stroke:#b45309,stroke-width:2px,color:#fff,rx:5px,ry:5px
+    classDef pooler fill:#8b5cf6,stroke:#5b21b6,stroke-width:2px,color:#fff,rx:5px,ry:5px
+    classDef database fill:#ef4444,stroke:#b91c1c,stroke-width:2px,color:#fff,shape:cylinder
+    classDef obs fill:#1e293b,stroke:#0f172a,stroke-width:2px,color:#fff,rx:5px,ry:5px
+    classDef obsGroup fill:#f1f5f9,stroke:#94a3b8,stroke-width:2px,stroke-dasharray: 5 5,rx:10px,ry:10px
+    classDef secret fill:#ec4899,stroke:#be185d,stroke-width:2px,color:#fff,rx:5px,ry:5px
 
-    subgraph services ["8 Microservices (each: Web -> Logic -> Core)"]
+    FE["🌐 Frontend"]:::frontend
+
+    %% API Layer / Microservices
+    subgraph Services ["Microservices (Web ➔ Logic ➔ Core)"]
         direction LR
-        subgraph identity ["Identity Domain"]
-            auth["auth"]
-            user["user"]
+        subgraph Identity ["Identity Domain"]
+            auth["Auth"]:::service
+            user["User"]:::service
         end
-        subgraph catalog ["Catalog Domain"]
-            product["product"]
-            review["review"]
+        subgraph Catalog ["Catalog Domain"]
+            product["Product"]:::service
+            review["Review"]:::service
         end
-        subgraph checkout ["Checkout Domain"]
-            cart["cart"]
-            order["order"]
+        subgraph Checkout ["Checkout Domain"]
+            cart["Cart"]:::service
+            order["Order"]:::service
         end
-        subgraph comms ["Comms Domain"]
-            notification["notification"]
-            shipping["shipping"]
+        subgraph Comms ["Comms Domain"]
+            notification["Notification"]:::service
+            shipping["Shipping"]:::service
         end
     end
 
-    subgraph cache ["Cache Layer"]
-        valkey["Valkey"]
-    end
-
-    subgraph data ["Data Layer (4 PostgreSQL Clusters)"]
-        poolers["PgBouncer / PgCat / PgDog"]
-        authDB[("auth-db\nZalando")]
-        supportDB[("supporting-shared-db\nZalando")]
-        productDB[("product-db\nCNPG")]
-        txDB[("transaction-shared-db\nCNPG")]
-    end
-
-    subgraph observability ["Observability Stack"]
+    %% Observability Layer
+    subgraph Observability ["Observability Stack"]
         direction LR
-        subgraph metrics ["Metrics"]
-            prometheus["Prometheus"]
-        end
-        subgraph tracing ["Tracing"]
-            tempo["Tempo"]
-            jaeger["Jaeger"]
-            otel["OTel Collector"]
-        end
-        subgraph logging ["Logging"]
-            loki["Loki"]
-            vector["Vector"]
-        end
-        subgraph profiling ["Profiling"]
-            pyroscope["Pyroscope"]
-        end
-        grafana["Grafana"]
+        prom["Prometheus<br/>(Metrics)"]:::obs
+        tempo["Tempo / OTel<br/>(Tracing)"]:::obs
+        loki["Loki / Vector<br/>(Logging)"]:::obs
+        pyro["Pyroscope<br/>(Profiles)"]:::obs
+        grafana["📊 Grafana"]:::obs
+        
+        prom & tempo & loki & pyro --> grafana
     end
 
-    FE -->|"HTTP /api/v1/*"| services
-    services -->|"Cache-Aside"| valkey
-    services -->|"SQL via poolers"| poolers
-    poolers --> authDB
-    poolers --> supportDB
-    poolers --> productDB
-    poolers --> txDB
+    %% Core Services Layer
+    subgraph CoreInfra ["Core Infrastructure"]
+        direction LR
+        valkey["⚡ Valkey Cache"]:::cache
+        subgraph SecretsDev ["Secrets Management"]
+            vault["HashiCorp Vault"]:::secret
+            eso["External Secrets Operator"]:::secret
+            vault -->|"Syncs via"| eso
+        end
+    end
 
-    services -->|"traces"| otel
-    otel --> tempo
-    otel --> jaeger
-    services -->|"metrics"| prometheus
-    services -->|"logs to stdout"| vector
-    vector --> loki
-    services -->|"profiles"| pyroscope
-    prometheus --> grafana
-    tempo --> grafana
-    loki --> grafana
-    pyroscope --> grafana
+    %% Database Connection Layer
+    subgraph Poolers ["Connection Poolers"]
+        pb_auth["PgBouncer<br/>(Auth)"]:::pooler
+        pb_shared["PgBouncer<br/>(Shared)"]:::pooler
+        pdog["PgDog<br/>(Product)"]:::pooler
+        pcat["PgCat<br/>(Transaction)"]:::pooler
+    end
+
+    %% Database Layer
+    subgraph Databases ["PostgreSQL Clusters (HA)"]
+        db_auth[("auth-db<br/>(Zalando)")]:::database
+        db_shared[("supporting-shared-db<br/>(Zalando)")]:::database
+        db_prod[("product-db<br/>(CNPG)")]:::database
+        db_tx[("transaction-shared-db<br/>(CNPG)")]:::database
+    end
+
+    %% Connections
+    FE -->|"HTTP /api/v1/*"| Services
+    
+    auth & product & cart & order & review & user & notification & shipping -.->|"O11y Data"| Observability
+    
+    product -->|"Cache-Aside"| valkey
+    eso -.->|"Injects Secrets"| Databases
+    eso -.->|"Injects Secrets"| Services
+    
+    auth -->|"SQL"| pb_auth
+    user & notification & shipping -->|"SQL"| pb_shared
+    review -->|"Direct SQL"| db_shared
+    product -->|"SQL"| pdog
+    cart & order -->|"SQL"| pcat
+
+    pb_auth ==> db_auth
+    pb_shared ==> db_shared
+    pdog ==> db_prod
+    pcat ==> db_tx
+    
+    %% Assign classes to subgraphs
+    class Identity,Catalog,Checkout,Comms,SecretsDev domain;
+    class Observability obsGroup;
 ```
 
 **Key Points:**

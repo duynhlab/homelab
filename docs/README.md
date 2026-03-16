@@ -20,32 +20,43 @@ docs/
 │   ├── replication_strategy.md   # Replication strategy
 │   └── postgresql_internals_product_db.md  # PostgreSQL internals deep dive
 ├── observability/                # Observability documentation
-│   ├── apm/                      # Application Performance Monitoring
-│   │   ├── README.md             # APM overview
-│   │   ├── architecture.md       # APM architecture
-│   │   ├── tracing.md            # Distributed tracing (Tempo)
-│   │   ├── tracing_architecture.md # Tracing architecture
-│   │   ├── jaeger.md             # Jaeger UI guide
-│   │   ├── logging.md            # Log aggregation (Loki + Vector)
-│   │   └── profiling.md          # Continuous profiling (Pyroscope)
-│   ├── logs/                     # Logging systems
-│   │   └── victorialogs/         # VictoriaLogs
-│   │       └── README.md
-│   ├── metrics/                  # Metrics documentation
-│   │   ├── README.md             # Complete metrics guide (RED method, architecture)
-│   │   ├── grafana-dashboard.md  # Dashboard reference (34 panels)
-│   │   ├── grafana-variables.md  # Dashboard variables & regex
-│   │   ├── promql-guide.md       # PromQL functions & counter handling
-│   │   ├── postgresql-monitoring.md           # PostgreSQL monitoring overview
-│   │   ├── postgresql-custom-metrics.md       # PostgreSQL custom queries
-│   │   ├── postgresql-pg-exporter-mapping.md  # pg_exporter metric mapping
-│   │   └── postgresql-pg-exporter-dashboards.md  # pg_exporter dashboard analysis
-│   └── slo/                      # Service Level Objectives
-│       ├── README.md             # SLO overview, architecture, targets
-│       ├── getting_started.md    # Enable SLO via Helm values
-│       ├── alerting.md           # Alert configuration
-│       ├── error_budget_policy.md
-│       └── annotation-driven-slo-controller.md  # Future: annotation-based automation
+│   ├── README.md                 # Master index + 4-pillar architecture
+│   ├── architecture.md           # 3-layer service architecture + APM integration
+│   ├── metrics/                  # Pillar 1: Metrics
+│   │   ├── README.md             # RED/USE/Golden Signals methodology
+│   │   ├── victoriametrics.md    # VictoriaMetrics Operator stack
+│   │   ├── promql-guide.md       # PromQL reference
+│   │   └── postgresql/           # PostgreSQL-specific metrics
+│   │       ├── monitoring.md
+│   │       ├── custom-metrics.md
+│   │       ├── pg-exporter-dashboards.md
+│   │       └── pg-exporter-mapping.md
+│   ├── tracing/                  # Pillar 2: Distributed Tracing
+│   │   ├── README.md             # Tracing guide (Tempo + OTel)
+│   │   ├── architecture.md       # Dual backend (Tempo + Jaeger)
+│   │   └── jaeger.md             # Jaeger UI guide
+│   ├── logging/                  # Pillar 3: Structured Logging
+│   │   ├── README.md             # Zap + Vector + Loki
+│   │   └── victorialogs.md       # VictoriaLogs backend
+│   ├── profiling/                # Pillar 4: Continuous Profiling
+│   │   └── README.md             # Pyroscope (CPU, heap, goroutine)
+│   ├── grafana/                  # Visualization layer
+│   │   ├── README.md             # Grafana overview + plugins
+│   │   ├── datasources.md        # Dual datasource strategy (case study)
+│   │   ├── dashboard-reference.md # Microservices dashboard (34 panels)
+│   │   └── variables.md          # Dashboard variables & regex
+│   ├── alerting/                 # Alerting rules
+│   │   └── README.md             # 2-layer alerting strategy
+│   ├── slo/                      # Service Level Objectives
+│   │   ├── README.md             # Sloth Operator + SLO targets
+│   │   ├── getting_started.md    # Enable SLO via Helm values
+│   │   ├── alerting.md           # Multi-window burn-rate alerts
+│   │   ├── error_budget_policy.md
+│   │   └── annotation-driven-slo-controller.md
+│   └── runbooks/                 # Operational runbooks
+│       ├── README.md             # Runbook index
+│       ├── observability-deep-dive.md   # Theory + interview prep
+│       └── microservices-alerts.md      # Per-alert investigation guide
 ├── platform/                     # Platform/deployment documentation
 │   ├── setup.md                  # GitOps deployment guide
 │   ├── application-delivery.md    # ResourceSet patterns & templates
@@ -103,11 +114,11 @@ docs/
    - Time range vs rate interval
    - Best practices and troubleshooting
 
-3. **[Variables & Regex](./observability/metrics/grafana-variables.md)** - Dashboard variable patterns
+3. **[Variables & Regex](./observability/grafana/variables.md)** - Dashboard variable patterns
    - Filter configurations
    - Multi-select patterns
 
-4. **[Grafana Dashboard Guide](./observability/metrics/grafana-dashboard.md)** - Complete dashboard reference for SRE/DevOps
+4. **[Grafana Dashboard Guide](./observability/grafana/dashboard-reference.md)** - Complete dashboard reference for SRE/DevOps
     - All 34 panels with query analysis and troubleshooting
     - PromQL patterns and best practices (Google SRE, Prometheus docs)
     - Before/After comparisons for updated panels (Status Code, Apdex, 4xx/5xx)
@@ -130,22 +141,20 @@ docs/
 4. **[Error Budget Policy](./observability/slo/error_budget_policy.md)** - Budget management guidelines
 5. **[Annotation-Driven Controller](./observability/slo/annotation-driven-slo-controller.md)** - Future approach for large-scale automation
 
-#### Application Performance Monitoring (APM)
+#### Observability (4 Pillars)
 
-1. **[APM Overview](./observability/apm/README.md)** - Complete APM system overview
-    - Distributed tracing with Tempo + Jaeger
-    - OpenTelemetry Collector for trace fan-out
-    - Continuous profiling with Pyroscope
-    - Log aggregation with Loki + Vector + VictoriaLogs
-    - Grafana Operator datasource integration
+1. **[Observability Overview](./observability/README.md)** - Master index, 4-pillar architecture
+    - Metrics, Tracing, Logging, Profiling
+    - Component inventory and correlation workflow
+    - Deployment and quick start
 
-2. **[APM Architecture](./observability/apm/architecture.md)** - System architecture
-3. **[Distributed Tracing](./observability/apm/tracing.md)** - Tempo integration guide
-4. **[Tracing Architecture](./observability/apm/tracing_architecture.md)** - Distributed tracing architecture
-5. **[Jaeger Guide](./observability/apm/jaeger.md)** - Jaeger UI usage, comparison with Tempo
-6. **[Continuous Profiling](./observability/apm/profiling.md)** - Pyroscope setup
-7. **[Log Aggregation](./observability/apm/logging.md)** - Loki + Vector configuration
-8. **[VictoriaLogs](./observability/logs/victorialogs/README.md)** - VictoriaLogs deployment and configuration
+2. **[Architecture](./observability/architecture.md)** - 3-layer service architecture + APM integration
+3. **[Distributed Tracing](./observability/tracing/README.md)** - Tempo integration guide
+4. **[Tracing Architecture](./observability/tracing/architecture.md)** - Dual backend (Tempo + Jaeger)
+5. **[Jaeger Guide](./observability/tracing/jaeger.md)** - Jaeger UI usage, comparison with Tempo
+6. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
+7. **[Structured Logging](./observability/logging/README.md)** - Zap + Vector + Loki
+8. **[VictoriaLogs](./observability/logging/victorialogs.md)** - VictoriaLogs deployment and configuration
     - Single Vector architecture (dual-ship to Loki + VictoriaLogs)
     - PostgreSQL auto_explain plan parsing pipeline
     - Verification and troubleshooting
@@ -217,8 +226,8 @@ docs/
 #### Metrics
 - [Metrics Guide](./observability/metrics/README.md) - Comprehensive metrics documentation
 - [PromQL Guide](./observability/metrics/promql-guide.md) - Complete guide to PromQL functions, time range vs rate interval, and counter handling
-- [Variables & Regex](./observability/metrics/grafana-variables.md) - Filter patterns
-- [Grafana Dashboard Guide](./observability/metrics/grafana-dashboard.md) - Complete SRE/DevOps dashboard reference (34 panels + annotations planning)
+- [Variables & Regex](./observability/grafana/variables.md) - Filter patterns
+- [Grafana Dashboard Guide](./observability/grafana/dashboard-reference.md) - Complete SRE/DevOps dashboard reference (34 panels + annotations planning)
 
 #### SLO/SRE
 - [SLO Overview](./observability/slo/README.md) - Architecture, SLI definitions, targets
@@ -227,15 +236,15 @@ docs/
 - [Error Budget Policy](./observability/slo/error_budget_policy.md) - Budget management
 - [Annotation-Driven Controller](./observability/slo/annotation-driven-slo-controller.md) - Future approach
 
-#### APM
-- [APM Overview](./observability/apm/README.md) - Complete APM system overview
-- [APM Architecture](./observability/apm/architecture.md) - System architecture
-- [Distributed Tracing](./observability/apm/tracing.md) - Tempo integration
-- [Tracing Architecture](./observability/apm/tracing_architecture.md) - Distributed tracing architecture
-- [Jaeger Guide](./observability/apm/jaeger.md) - Jaeger UI usage, comparison with Tempo
-- [Continuous Profiling](./observability/apm/profiling.md) - Pyroscope setup
-- [Log Aggregation](./observability/apm/logging.md) - Loki + Vector
-- [VictoriaLogs](./observability/logs/victorialogs/README.md) - VictoriaLogs deployment (single Vector, dual-ship)
+#### Observability Pillars
+- [Observability Overview](./observability/README.md) - Master index, 4-pillar architecture
+- [Architecture](./observability/architecture.md) - 3-layer service architecture + APM integration
+- [Distributed Tracing](./observability/tracing/README.md) - Tempo integration
+- [Tracing Architecture](./observability/tracing/architecture.md) - Dual backend (Tempo + Jaeger)
+- [Jaeger Guide](./observability/tracing/jaeger.md) - Jaeger UI usage, comparison with Tempo
+- [Continuous Profiling](./observability/profiling/README.md) - Pyroscope setup
+- [Structured Logging](./observability/logging/README.md) - Zap + Vector + Loki
+- [VictoriaLogs](./observability/logging/victorialogs.md) - VictoriaLogs deployment (single Vector, dual-ship)
 
 ### API
 

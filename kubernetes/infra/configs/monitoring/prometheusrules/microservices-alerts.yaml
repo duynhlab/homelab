@@ -1,0 +1,263 @@
+# PrometheusRule for microservice application alerts (RED/Golden Signals).
+# Layer 1: Simple threshold alerts for immediate detection.
+# Layer 2 (SLO burn-rate) is handled by Sloth Operator -- see docs/observability/slo/.
+#
+# Metrics source: PrometheusMiddleware in all 8 services (request_duration_seconds,
+# requests_in_flight, Go runtime). Scraped by VMAgent via ServiceMonitor (job="microservices").
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: microservices-alerts
+  namespace: monitoring
+spec:
+  groups:
+    # --- Availability ---
+    - name: microservices-availability
+      interval: 1m
+      rules:
+        - alert: MicroserviceDown
+          expr: up{job="microservices"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            category: availability
+          annotations:
+            summary: "Microservice instance down ({{ $labels.namespace }}/{{ $labels.app }})"
+            description: "Instance {{ $labels.instance }} of {{ $labels.app }} has been unreachable for more than 1 minute."
+            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicedown"
+
+        - alert: MicroserviceAllInstancesDown
+          expr: |
+            count by (app, namespace) (up{job="microservices"} == 1) == 0
+            and count by (app, namespace) (up{job="microservices"}) > 0
+          for: 1m
+          labels:
+            severity: critical
+            category: availability
+          annotations:
+            summary: "All instances of {{ $labels.app }} are down ({{ $labels.namespace }})"
+            description: "Every instance of {{ $labels.app }} in namespace {{ $labels.namespace }} is unreachable. Complete service outage."
+            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microserviceallinstancesdown"
+
+        - alert: MicroserviceHighRestartRate
+          expr: |
+            increase(kube_pod_container_status_restarts_total{namespace=~"auth|user|product|cart|order|review|notification|shipping"}[15m]) > 3
+          for: 5m
+          labels:
+            severity: warning
+            category: availability
+          annotations:
+            summary: "High restart rate ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Container {{ $labels.container }} in pod {{ $labels.pod }} has restarted {{ $value | humanize }} times in 15 minutes. Possible CrashLoopBackOff."
+            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighrestartrate"
+
+    # --- Errors (RED: Errors) ---
+    - name: microservices-errors
+      interval: 1m
+      rules:
+        - alert: MicroserviceHighErrorRate
+          expr: |
+            (
+              sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices", code=~"5.."}[5m]))
+              / sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices"}[5m]))
+            ) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+            category: errors
+          annotations:
+            summary: "High 5xx error rate for {{ $labels.app }} ({{ $labels.namespace }})"
+            description: "{{ $labels.app }} 5xx error rate is {{ $value | humanizePercentage }} (threshold: 5%). Check application logs and traces."
+            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehigherrorrate"
+
+        - alert: MicroserviceErrorRateCritical
+          expr: |
+            (
+              sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices", code=~"5.."}[5m]))
+              / sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices"}[5m]))
+            ) > 0.15
+          for: 5m
+          labels:
+            severity: critical
+            category: errors
+          annotations:
+            summary: "Critical 5xx error rate for {{ $labels.app }} ({{ $labels.namespace }})"
+            description: "{{ $labels.app }} 5xx error rate is {{ $value | humanizePercentage }} (threshold: 15%). Immediate investigation required."
+            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microserviceerrorratecritical"
+
+        - alert: MicroserviceNoSuccessfulRequests
+          expr: |
+            sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices", code=~"2.."}[10m])) == 0
+            and sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices"}[1h])) > 0
+          for: 10m
+          labels:
+            severity: critical
+            category: errors
+          annotations:
+            summary: "No successful requests for {{ $labels.app }} ({{ $labels.namespace }})"
+            description: "{{ $labels.app }} has returned zero 2xx responses in the last 10 minutes but had traffic in the prior hour. All requests may be failing."
+            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicenosuccessfulrequests"
+
+    # --- Latency (RED: Duration / Golden: Latency) ---
+    - name: microservices-latency
+      interval: 1m
+      rules:
+        - alert: MicroserviceHighLatencyP95
+          expr: |
+            histogram_quantile(0.95,
+              sum by (app, namespace, le) (rate(request_duration_seconds_bucket{job="microservices"}[5m]))
+            ) > 1
+          for: 10m
+          labels:
+            severity: warning
+            category: latency
+          annotations:
+            summary: "High P95 latency for {{ $labels.app }} ({{ $labels.namespace }})"
+            description: "{{ $labels.app }} P95 latency is {{ $value | humanizeDuration }} (threshold: 1s). Check slow endpoints, database queries, and downstream dependencies."
+            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighlatencyp95"
+
+        - alert: MicroserviceHighLatencyP99
+          expr: |
+            histogram_quantile(0.99,
+              sum by (app, namespace, le) (rate(request_duration_seconds_bucket{job="microservices"}[5m]))
+            ) > 2
+          for: 10m
+          labels:
+            severity: warning
+            category: latency
+          annotations:
+            summary: "High P99 latency for {{ $labels.app }} ({{ $labels.namespace }})"
+            description: "{{ $labels.app }} P99 latency is {{ $value | humanizeDuration }} (threshold: 2s). Tail latency indicates outlier slow requests."
+            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighlatencyp99"
+
+        - alert: MicroserviceLatencyCritical
+          expr: |
+            histogram_quantile(0.95,
+              sum by (app, namespace, le) (rate(request_duration_seconds_bucket{job="microservices"}[5m]))
+            ) > 2
+          for: 5m
+          labels:
+            severity: critical
+            category: latency
+          annotations:
+            summary: "Critical P95 latency for {{ $labels.app }} ({{ $labels.namespace }})"
+            description: "{{ $labels.app }} P95 latency is {{ $value | humanizeDuration }} (threshold: 2s). Most requests are severely degraded."
+            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicelatencycritical"
+
+    # --- Traffic (RED: Rate / Golden: Traffic) ---
+    - name: microservices-traffic
+      interval: 1m
+      rules:
+        - alert: MicroserviceNoTraffic
+          expr: |
+            sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices"}[10m])) == 0
+            and sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices"}[1h])) > 0
+          for: 10m
+          labels:
+            severity: warning
+            category: traffic
+          annotations:
+            summary: "No traffic for {{ $labels.app }} ({{ $labels.namespace }})"
+            description: "{{ $labels.app }} has received zero requests in the last 10 minutes but had traffic in the prior hour. Possible routing issue or upstream failure."
+            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicenotraffic"
+
+        - alert: MicroserviceApdexCritical
+          expr: |
+            (
+              sum by (app, namespace) (rate(request_duration_seconds_bucket{job="microservices", le="0.5"}[5m]))
+              + 0.5 * (
+                sum by (app, namespace) (rate(request_duration_seconds_bucket{job="microservices", le="2"}[5m]))
+                - sum by (app, namespace) (rate(request_duration_seconds_bucket{job="microservices", le="0.5"}[5m]))
+              )
+            )
+            / sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices"}[5m]))
+            < 0.5
+          for: 10m
+          labels:
+            severity: warning
+            category: traffic
+          annotations:
+            summary: "Critical Apdex score for {{ $labels.app }} ({{ $labels.namespace }})"
+            description: "{{ $labels.app }} Apdex score is {{ $value | humanize }} (threshold: 0.5). Majority of users are experiencing unacceptable response times."
+            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microserviceapdexcritical"
+
+    # --- Saturation (Golden: Saturation) ---
+    - name: microservices-saturation
+      interval: 1m
+      rules:
+        - alert: MicroserviceHighRequestsInFlight
+          expr: |
+            sum by (app, namespace) (requests_in_flight{job="microservices"}) > 50
+          for: 5m
+          labels:
+            severity: warning
+            category: saturation
+          annotations:
+            summary: "High concurrent requests for {{ $labels.app }} ({{ $labels.namespace }})"
+            description: "{{ $labels.app }} has {{ $value | humanize }} concurrent requests in flight (threshold: 50). Service may be approaching capacity."
+            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighrequestsinflight"
+
+        - alert: MicroserviceRequestsInFlightCritical
+          expr: |
+            sum by (app, namespace) (requests_in_flight{job="microservices"}) > 100
+          for: 2m
+          labels:
+            severity: critical
+            category: saturation
+          annotations:
+            summary: "Critical concurrent requests for {{ $labels.app }} ({{ $labels.namespace }})"
+            description: "{{ $labels.app }} has {{ $value | humanize }} concurrent requests in flight (threshold: 100). Service is overloaded."
+            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicerequestsinflightcritical"
+
+    # --- Go Runtime ---
+    - name: microservices-runtime
+      interval: 1m
+      rules:
+        - alert: MicroserviceGoroutineLeak
+          expr: |
+            go_goroutines{job="microservices"} > 1000
+            and rate(go_goroutines{job="microservices"}[15m]) > 0.17
+          for: 15m
+          labels:
+            severity: warning
+            category: runtime
+          annotations:
+            summary: "Goroutine leak suspected ({{ $labels.namespace }}/{{ $labels.app }})"
+            description: "{{ $labels.app }} has {{ $value | humanize }} goroutines and the count is steadily increasing. Possible forgotten defer cancel(), unclosed channels, or blocking operations."
+            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicegoroutineleak"
+
+        - alert: MicroserviceHighMemoryUsage
+          expr: |
+            process_resident_memory_bytes{job="microservices"} > 536870912
+          for: 15m
+          labels:
+            severity: warning
+            category: runtime
+          annotations:
+            summary: "High memory usage ({{ $labels.namespace }}/{{ $labels.app }})"
+            description: "{{ $labels.app }} RSS is {{ $value | humanize1024 }}B (threshold: 512Mi). Check for memory leaks via Pyroscope heap profiles."
+            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighmemoryusage"
+
+        - alert: MicroserviceHighGCPressure
+          expr: |
+            rate(go_gc_duration_seconds_sum{job="microservices"}[5m]) > 0.5
+          for: 15m
+          labels:
+            severity: warning
+            category: runtime
+          annotations:
+            summary: "High GC pressure ({{ $labels.namespace }}/{{ $labels.app }})"
+            description: "{{ $labels.app }} is spending {{ $value | humanize }}s per second in garbage collection (threshold: 0.5s/s). High memory allocation rate or insufficient heap."
+            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighgcpressure"
+
+        - alert: MicroserviceHighGCFrequency
+          expr: |
+            rate(go_gc_duration_seconds_count{job="microservices"}[5m]) > 10
+          for: 15m
+          labels:
+            severity: warning
+            category: runtime
+          annotations:
+            summary: "High GC frequency ({{ $labels.namespace }}/{{ $labels.app }})"
+            description: "{{ $labels.app }} is running {{ $value | humanize }} GC cycles per second (threshold: 10/s). Consider increasing GOGC or reducing allocations."
+            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighgcfrequency"

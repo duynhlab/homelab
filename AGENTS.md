@@ -8,7 +8,7 @@
 
 ## Overview
 
-This guide provides quick reference for AI agents working with the `duynhne` microservices platform.
+This guide provides quick reference for AI agents working with the `duynhlab` microservices platform.
 
 **Repository Context**:
 - **This Repository (`monitoring`)**: Infrastructure, GitOps, Observability, and Docs.
@@ -98,7 +98,7 @@ make flux-status
 To work on a specific service (e.g., `auth-service`):
 
 1.  **Find Repo**: Check [**SERVICES.md**](SERVICES.md).
-2.  **Clone**: `git clone https://github.com/duynhne/auth-service` (or use setup script).
+2.  **Clone**: `git clone https://github.com/duynhlab/auth-service` (or use setup script).
 3.  **Run Locally** (inside service repo):
     ```bash
     go run cmd/main.go
@@ -332,8 +332,8 @@ make flux-sync
 
 **Add a new service:**
 
-- Service code: separate repo (e.g., `duynhne/{service}-service`)
-- Create `kubernetes/apps/services/{name}.yaml` (ResourceSetInputProvider with `platform.duynhne.dev/domain: <domain>` label)
+- Service code: separate repo (e.g., `duynhlab/{service}-service`)
+- Create `kubernetes/apps/services/{name}.yaml` (ResourceSetInputProvider with `platform.duynhlab.dev/domain: <domain>` label)
 - The domain ResourceSet in `kubernetes/apps/domains/` auto-discovers the new InputProvider via label selector
 - SLO: `slo.enabled: true` is set in the shared domain template (automatic for all backend services)
 - Migration image: built in the service repo, referenced automatically by the template

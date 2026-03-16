@@ -28,8 +28,8 @@ Since the project utilizes a polyrepo architecture, you must clone all component
 ### 1. Initialize Workspace Directory
 
 ```bash
-mkdir -p ~/Working/duynhne
-cd ~/Working/duynhne
+mkdir -p ~/Working/duynhlab
+cd ~/Working/duynhlab
 ```
 
 ### 2. Clone Repositories
@@ -38,17 +38,17 @@ Execute the following script to clone all required components:
 
 ```bash
 # Infrastructure Repositories
-git clone https://github.com/duynhne/monitoring.git
+git clone https://github.com/duynhlab/monitoring.git
 git clone https://github.com/duyhenryer/shared-workflows.git
-git clone https://github.com/duynhne/pkg.git
+git clone https://github.com/duynhlab/pkg.git
 
 # Microservices Repositories
 for service in auth user product cart order review notification shipping; do
-  git clone https://github.com/duynhne/${service}-service.git
+  git clone https://github.com/duynhlab/${service}-service.git
 done
 
 # Frontend Repository
-git clone https://github.com/duynhne/frontend.git
+git clone https://github.com/duynhlab/frontend.git
 ```
 
 This creates a structured local environment with all necessary source code.

@@ -125,7 +125,7 @@ flowchart TD
 **Key Changes:**
 - ✅ **Polyrepo**: each service is its own GitHub repository (see `SERVICES.md`)
 - ✅ **Independent module**: each service has its own `go.mod`
-- ✅ **Shared library repo**: cross-cutting libs live in `duynhne/pkg` (imported as `github.com/duynhne/pkg/...`)
+- ✅ **Shared library repo**: cross-cutting libs live in `duynhlab/pkg` (imported as `github.com/duynhlab/pkg/...`)
 
 **Rationale:** Keep cross-service coupling minimal so each service stays portable and independently deployable.
 
@@ -1166,7 +1166,7 @@ product-service/
 ```bash
 # Run build/tests in the target service repository (polyrepo).
 # Example:
-cd ~/Working/duynhne/auth-service
+cd ~/Working/duynhlab/auth-service
 go test ./...
 ```
 

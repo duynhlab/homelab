@@ -179,7 +179,7 @@ spec:
       serviceAccountName: slo-controller
       containers:
         - name: controller
-          image: ghcr.io/duynhne/slo-controller:v1
+          image: ghcr.io/duynhlab/slo-controller:v1
           resources:
             requests:
               memory: "64Mi"

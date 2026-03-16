@@ -6,30 +6,30 @@ This project follows a **Polyrepo** architecture. The `monitoring` repository ac
 
 | Component | Repository | Description | Status |
 |-----------|------------|-------------|--------|
-| **Infrastructure** | [duynhne/monitoring](https://github.com/duynhne/monitoring) | GitOps, Helm Charts, K8s Manifests, Docs | [![CI](https://github.com/duynhne/monitoring/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhne/monitoring/actions) |
+| **Infrastructure** | [duynhlab/monitoring](https://github.com/duynhlab/monitoring) | GitOps, Helm Charts, K8s Manifests, Docs | [![CI](https://github.com/duynhlab/monitoring/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/monitoring/actions) |
 | **Shared Workflows** | [duyhenryer/shared-workflows](https://github.com/duyhenryer/shared-workflows) | Reusable GitHub Actions (CI/CD) | [![CI](https://github.com/duyhenryer/shared-workflows/actions/workflows/ci.yml/badge.svg)](https://github.com/duyhenryer/shared-workflows/actions) |
-| **Common Lib** | [duynhne/pkg](https://github.com/duynhne/pkg) | Shared Go Maven/Library | [![CI](https://github.com/duynhne/pkg/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhne/pkg/actions) |
+| **Common Lib** | [duynhlab/pkg](https://github.com/duynhlab/pkg) | Shared Go Maven/Library | [![CI](https://github.com/duynhlab/pkg/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/pkg/actions) |
 
 ## 🚀 Microservices
 
-All microservices are hosted in the `duynhne` organization.
+All microservices are hosted in the `duynhlab` organization.
 
 | Service | Repository | Port | CI Status | Docker Image |
 |---------|------------|------|-----------|--------------|
-| **Auth** | [duynhne/auth-service](https://github.com/duynhne/auth-service) | 8001 | [![CI](https://github.com/duynhne/auth-service/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhne/auth-service/actions) | `ghcr.io/duynhne/auth-service/auth` |
-| **User** | [duynhne/user-service](https://github.com/duynhne/user-service) | 8002 | [![CI](https://github.com/duynhne/user-service/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhne/user-service/actions) | `ghcr.io/duynhne/user-service/user` |
-| **Product** | [duynhne/product-service](https://github.com/duynhne/product-service) | 8003 | [![CI](https://github.com/duynhne/product-service/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhne/product-service/actions) | `ghcr.io/duynhne/product-service/product` |
-| **Cart** | [duynhne/cart-service](https://github.com/duynhne/cart-service) | 8004 | [![CI](https://github.com/duynhne/cart-service/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhne/cart-service/actions) | `ghcr.io/duynhne/cart-service/cart` |
-| **Order** | [duynhne/order-service](https://github.com/duynhne/order-service) | 8005 | [![CI](https://github.com/duynhne/order-service/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhne/order-service/actions) | `ghcr.io/duynhne/order-service/order` |
-| **Review** | [duynhne/review-service](https://github.com/duynhne/review-service) | 8006 | [![CI](https://github.com/duynhne/review-service/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhne/review-service/actions) | `ghcr.io/duynhne/review-service/review` |
-| **Notification** | [duynhne/notification-service](https://github.com/duynhne/notification-service) | 8007 | [![CI](https://github.com/duynhne/notification-service/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhne/notification-service/actions) | `ghcr.io/duynhne/notification-service/notification` |
-| **Shipping** | [duynhne/shipping-service](https://github.com/duynhne/shipping-service) | 8008 | [![CI](https://github.com/duynhne/shipping-service/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhne/shipping-service/actions) | `ghcr.io/duynhne/shipping-service/shipping` |
+| **Auth** | [duynhlab/auth-service](https://github.com/duynhlab/auth-service) | 8001 | [![CI](https://github.com/duynhlab/auth-service/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/auth-service/actions) | `ghcr.io/duynhlab/auth-service/auth` |
+| **User** | [duynhlab/user-service](https://github.com/duynhlab/user-service) | 8002 | [![CI](https://github.com/duynhlab/user-service/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/user-service/actions) | `ghcr.io/duynhlab/user-service/user` |
+| **Product** | [duynhlab/product-service](https://github.com/duynhlab/product-service) | 8003 | [![CI](https://github.com/duynhlab/product-service/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/product-service/actions) | `ghcr.io/duynhlab/product-service/product` |
+| **Cart** | [duynhlab/cart-service](https://github.com/duynhlab/cart-service) | 8004 | [![CI](https://github.com/duynhlab/cart-service/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/cart-service/actions) | `ghcr.io/duynhlab/cart-service/cart` |
+| **Order** | [duynhlab/order-service](https://github.com/duynhlab/order-service) | 8005 | [![CI](https://github.com/duynhlab/order-service/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/order-service/actions) | `ghcr.io/duynhlab/order-service/order` |
+| **Review** | [duynhlab/review-service](https://github.com/duynhlab/review-service) | 8006 | [![CI](https://github.com/duynhlab/review-service/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/review-service/actions) | `ghcr.io/duynhlab/review-service/review` |
+| **Notification** | [duynhlab/notification-service](https://github.com/duynhlab/notification-service) | 8007 | [![CI](https://github.com/duynhlab/notification-service/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/notification-service/actions) | `ghcr.io/duynhlab/notification-service/notification` |
+| **Shipping** | [duynhlab/shipping-service](https://github.com/duynhlab/shipping-service) | 8008 | [![CI](https://github.com/duynhlab/shipping-service/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/shipping-service/actions) | `ghcr.io/duynhlab/shipping-service/shipping` |
 
 ## 💻 Frontend
 
 | Component | Repository | Port | CI Status | Docker Image |
 |-----------|------------|------|-----------|--------------|
-| **Frontend** | [duynhne/frontend](https://github.com/duynhne/frontend) | 3000 | [![CI](https://github.com/duynhne/frontend/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhne/frontend/actions) | `ghcr.io/duynhne/frontend/frontend` |
+| **Frontend** | [duynhlab/frontend](https://github.com/duynhlab/frontend) | 3000 | [![CI](https://github.com/duynhlab/frontend/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/frontend/actions) | `ghcr.io/duynhlab/frontend/frontend` |
 
 ## 🛠️ Setup
 

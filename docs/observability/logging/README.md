@@ -81,7 +81,7 @@ HTTP errors (4xx, 5xx) are automatically logged at ERROR level.
 
 ```go
 import (
-    "github.com/duynhne/monitoring/pkg/middleware"
+    "github.com/duynhlab/monitoring/pkg/middleware"
     "go.uber.org/zap"
 )
 

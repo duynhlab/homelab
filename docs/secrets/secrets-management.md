@@ -161,17 +161,17 @@ Backup credentials use **ClusterExternalSecret** with namespace labels to auto-d
 
 | ClusterExternalSecret | Label Selector | Target Namespaces | Key Format |
 |----------------------|----------------|-------------------|------------|
-| `pg-backup-rustfs-cnpg` | `platform.duynhne/backup: "cnpg"` | product, cart | CNPG/Barman: `ACCESS_KEY_ID`, `ACCESS_SECRET_KEY` |
-| `pg-backup-rustfs-walg` | `platform.duynhne/backup: "walg"` | auth, user, review | WAL-G: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` |
+| `pg-backup-rustfs-cnpg` | `platform.duynhlab/backup: "cnpg"` | product, cart | CNPG/Barman: `ACCESS_KEY_ID`, `ACCESS_SECRET_KEY` |
+| `pg-backup-rustfs-walg` | `platform.duynhlab/backup: "walg"` | auth, user, review | WAL-G: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` |
 
 **Adding backup credentials to a new namespace**: Add the appropriate label to the namespace in `namespaces.yaml`:
 
 ```yaml
 metadata:
   labels:
-    platform.duynhne/backup: "cnpg"   # For CloudNativePG clusters
+    platform.duynhlab/backup: "cnpg"   # For CloudNativePG clusters
     # or
-    platform.duynhne/backup: "walg"   # For Zalando/WAL-G clusters
+    platform.duynhlab/backup: "walg"   # For Zalando/WAL-G clusters
 ```
 
 ### Pooler Secrets

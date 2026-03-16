@@ -1,6 +1,6 @@
 # Observability Documentation
 
-Comprehensive observability for the `duynhne` microservices platform -- 8 Go services, 4 PostgreSQL clusters, all running on Kubernetes with GitOps (Flux).
+Comprehensive observability for the `duynhlab` microservices platform -- 8 Go services, 4 PostgreSQL clusters, all running on Kubernetes with GitOps (Flux).
 
 ## Architecture
 

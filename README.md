@@ -121,7 +121,7 @@ flowchart TD
 
 **Key Points:**
 
-- **Frontend (React SPA)**: Runs in browser, HTTP requests to Web Layer only (`/api/v1/*`). Frontend repo: [`duynhne/frontend`](https://github.com/duynhne/frontend).
+- **Frontend (React SPA)**: Runs in browser, HTTP requests to Web Layer only (`/api/v1/*`). Frontend repo: [`duynhlab/frontend`](https://github.com/duynhlab/frontend).
 - **8 Microservices**: Each follows 3-layer architecture (Web -> Logic -> Core), organized into 4 domains (identity, catalog, checkout, comms).
 - **Cache-Aside Pattern**: Logic Layer checks Valkey first, queries database on miss, writes to cache.
 - **4 PostgreSQL Clusters**: auth-db (Zalando), supporting-shared-db (Zalando, hosts user/notification/shipping/review), product-db (CNPG), transaction-shared-db (CNPG, hosts cart/order). Connected via PgBouncer, PgCat, or PgDog poolers.

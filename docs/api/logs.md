@@ -142,7 +142,7 @@ kubectl logs -n auth deployment/auth --tail=50
 
 **Architecture:** Wrapper over `log/slog` with custom `TracingHandler`.
 
-**Setup** (`pkg/logger/clog/logger.go` in the `duynhne/pkg` repository):
+**Setup** (`pkg/logger/clog/logger.go` in the `duynhlab/pkg` repository):
 ```go
 func Setup(level string) {
     slogLevel := parseSlogLevel(level)  // debug, info, warn, error from LOG_LEVEL
@@ -173,7 +173,7 @@ func (h *TracingHandler) Handle(ctx context.Context, r slog.Record) error {
 
 **Architecture:** Pure Go, zero-allocation design.
 
-**Setup** (`pkg/logger/zerolog/logger.go` in the `duynhne/pkg` repository):
+**Setup** (`pkg/logger/zerolog/logger.go` in the `duynhlab/pkg` repository):
 ```go
 func Setup(level string) {
     zerolog.TimeFieldFormat = zerolog.TimeFormatUnix

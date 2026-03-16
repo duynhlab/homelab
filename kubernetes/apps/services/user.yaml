@@ -5,7 +5,7 @@ metadata:
   namespace: default
   labels:
     app.kubernetes.io/part-of: backend-services
-    platform.duynhne.dev/domain: identity
+    platform.duynhlab.dev/domain: identity
 spec:
   type: Static
   defaultValues:

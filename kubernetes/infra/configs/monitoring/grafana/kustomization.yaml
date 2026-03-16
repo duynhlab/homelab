@@ -8,4 +8,5 @@ resources:
   - datasource-tempo.yaml
   - datasource-jaeger.yaml
   - datasource-pyroscope.yaml
+  - datasource-victoriametrics.yaml
   - dashboards/

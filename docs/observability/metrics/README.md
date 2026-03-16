@@ -635,8 +635,8 @@ The "Total Network Traffic per Service" panel measures HTTP body size only, not 
 
 ## Related Documentation
 
-- **[Grafana Dashboard Guide](./grafana-dashboard.md)** - Complete panel reference, query analysis, troubleshooting, SRE best practices
-- **[Variables & Regex Guide](./grafana-variables.md)** - Dashboard variables, regex patterns, cascading configuration
+- **[Grafana Dashboard Guide](../grafana/dashboard-reference.md)** - Complete panel reference, query analysis, troubleshooting, SRE best practices
+- **[Variables & Regex Guide](../grafana/variables.md)** - Dashboard variables, regex patterns, cascading configuration
 - **[PromQL Guide](./promql-guide.md)** - PromQL functions, time range vs rate interval, counter handling
 - **[Metrics Audit Runbook](../../../docs/runbooks/metrics-audit-fixes.md)** - Before/after analysis for each metrics issue fixed, with PromQL verification queries
 - **[SLO Documentation](../slo/README.md)** - SLO definitions, SLI mappings, Sloth integration

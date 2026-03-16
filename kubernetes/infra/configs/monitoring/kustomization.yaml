@@ -16,3 +16,6 @@ resources:
   - prometheusrules/postgres-alerts.yaml
   # pg_exporter recording rules (required by Pigsty dashboards)
   - prometheusrules/pg-exporter-recording-rules.yaml
+  # Microservices application alerts (RED/Golden Signals)
+  - prometheusrules/microservices-alerts.yaml
+  - prometheusrules/microservices-recording-rules.yaml

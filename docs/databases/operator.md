@@ -514,7 +514,7 @@ Both operators are deployed via Flux HelmReleases:
 - **[Replication Strategy](./replication_strategy.md)** -- Sync vs async replication per cluster
 - **[Connection Poolers](./pooler.md)** -- PgBouncer, PgCat, PgDog comparison
 - **[Extensions](./extensions.md)** -- Extension management per operator
-- **[PostgreSQL Monitoring](../observability/metrics/postgresql-monitoring.md)** -- Exporter architecture and custom metrics
+- **[PostgreSQL Monitoring](../observability/metrics/postgresql/monitoring.md)** -- Exporter architecture and custom metrics
 
 ### External References
 

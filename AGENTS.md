@@ -144,7 +144,7 @@ flowchart TD
 - **Logic Layer** (`logic/v1/`): Business logic, orchestration, Cache-Aside pattern, database queries via repository interfaces
 - **Core Layer** (`core/domain/`, `core/database.go`, `core/cache/`): Domain models, database connections, cache client interfaces and implementations
 
-**Detailed Architecture**: See [`docs/observability/apm/architecture.md`](docs/observability/apm/architecture.md) for middleware chain and APM integration. Full system architecture in [`specs/system-context/01-architecture-overview.md`](specs/system-context/01-architecture-overview.md)
+**Detailed Architecture**: See [`docs/observability/architecture.md`](docs/observability/architecture.md) for middleware chain and APM integration. Full system architecture in [`specs/system-context/01-architecture-overview.md`](specs/system-context/01-architecture-overview.md)
 
 ---
 
@@ -184,7 +184,7 @@ flowchart TD
 - **Middleware Chain**: Ordered middleware (tracing → logging → metrics) for observability
 - **Caching**: Cache-Aside pattern with Valkey (Redis-compatible) for read-heavy endpoints
 
-**Middleware Details**: See [`docs/observability/apm/tracing_architecture.md`](docs/observability/apm/tracing_architecture.md) for middleware chain ordering and responsibilities.
+**Middleware Details**: See [`docs/observability/tracing/architecture.md`](docs/observability/tracing/architecture.md) for middleware chain ordering and responsibilities.
 
 **Caching Details**: See [`docs/caching/caching.md`](docs/caching/caching.md) for cache architecture, Cache-Aside pattern, and configuration.
 
@@ -210,7 +210,7 @@ flowchart TD
   - Centralized secret management with Kubernetes sync
   - **Secrets Documentation**: [`docs/secrets/secrets-management.md`](docs/secrets/secrets-management.md)
 
-**Observability Details**: See [`docs/observability/apm/README.md`](docs/observability/apm/README.md) for complete APM system overview. Metrics documentation in [`docs/observability/metrics/README.md`](docs/observability/metrics/README.md)
+**Observability Details**: See [`docs/observability/README.md`](docs/observability/README.md) for complete observability system overview. Metrics documentation in [`docs/observability/metrics/README.md`](docs/observability/metrics/README.md)
 
 ---
 
@@ -370,9 +370,9 @@ make flux-sync
 ### Find Documentation by Topic
 
 - **Getting Started**: [`docs/platform/setup.md`](docs/platform/setup.md), [`docs/api/api.md`](docs/api/api.md)
-- **Development**: [`docs/api/api.md`](docs/api/api.md), [`docs/api/api.md#error-handling`](docs/api/api.md#error-handling), [`docs/observability/apm/tracing_architecture.md`](docs/observability/apm/tracing_architecture.md)
+- **Development**: [`docs/api/api.md`](docs/api/api.md), [`docs/api/api.md#error-handling`](docs/api/api.md#error-handling), [`docs/observability/tracing/architecture.md`](docs/observability/tracing/architecture.md)
 - **Monitoring**: [`docs/observability/metrics/README.md`](docs/observability/metrics/README.md)
-- **APM**: [`docs/observability/apm/README.md`](docs/observability/apm/README.md), [`docs/observability/apm/tracing.md`](docs/observability/apm/tracing.md), [`docs/observability/apm/logging.md`](docs/observability/apm/logging.md), [`docs/observability/apm/profiling.md`](docs/observability/apm/profiling.md)
+- **Observability**: [`docs/observability/README.md`](docs/observability/README.md), [`docs/observability/tracing/README.md`](docs/observability/tracing/README.md), [`docs/observability/logging/README.md`](docs/observability/logging/README.md), [`docs/observability/profiling/README.md`](docs/observability/profiling/README.md)
 - **SLO**: [`docs/observability/slo/README.md`](docs/observability/slo/README.md), [`docs/observability/slo/getting_started.md`](docs/observability/slo/getting_started.md)
 - **Secrets**: [`docs/secrets/secrets-management.md`](docs/secrets/secrets-management.md)
 - **k6**: [`docs/testing/k6.md`](docs/testing/k6.md)

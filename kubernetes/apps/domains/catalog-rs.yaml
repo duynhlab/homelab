@@ -8,7 +8,7 @@ spec:
     - kind: ResourceSetInputProvider
       selector:
         matchLabels:
-          platform.duynhne.dev/domain: catalog
+          platform.duynhlab.dev/domain: catalog
   resourcesTemplate: |
     apiVersion: v1
     kind: Namespace
@@ -32,7 +32,7 @@ spec:
         name: << inputs.name >>
         replicaCount: << inputs.replicaCount | int >>
         image:
-          repository: << index inputs "registry_url" | default "ghcr.io/duynhne" >>/<< inputs.name >>-service/<< inputs.name >>
+          repository: << index inputs "registry_url" | default "ghcr.io/duynhlab" >>/<< inputs.name >>-service/<< inputs.name >>
           tag: latest
           pullPolicy: Always
         service:

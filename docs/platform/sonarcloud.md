@@ -7,8 +7,8 @@ SonarCloud provides static code analysis, code quality checks, and security scan
 | Property | Value |
 |----------|-------|
 | **Platform** | [SonarCloud](https://sonarcloud.io) (Free Plan) |
-| **Project Key** | `duynhne_monitoring` |
-| **Organization** | `duynhne` |
+| **Project Key** | `duynhlab_monitoring` |
+| **Organization** | `duynhlab` |
 | **Workflow** | `.github/workflows/sonarqube.yml` |
 
 ## CI/CD Flow
@@ -42,8 +42,8 @@ sonar:
   needs: go-check
   uses: duyhenryer/shared-workflows/.github/workflows/sonarqube.yml@main
   with:
-    project-key: 'duynhne_cart-service'
-    organization: 'duynhne'
+    project-key: 'duynhlab_cart-service'
+    organization: 'duynhlab'
     fail-on-quality-gate: false
   secrets:
     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -70,6 +70,6 @@ Coverage is generated per-repository during `go test -race -coverprofile=coverag
 
 ## Links
 
-- SonarCloud projects are per-repository (e.g. `duynhne_auth-service`, `duynhne_cart-service`)
+- SonarCloud projects are per-repository (e.g. `duynhlab_auth-service`, `duynhlab_cart-service`)
 - [SonarCloud Test Coverage Docs](https://docs.sonarsource.com/sonarqube-cloud/enriching/test-coverage/overview/)
 - Shared workflow: `duyhenryer/shared-workflows/.github/workflows/sonarqube.yml`

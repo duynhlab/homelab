@@ -10,7 +10,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 - **Flux Operator with OCI sync** — `kubernetes/clusters/local/`, Kind cluster `homelab`, OCI registry `homelab-registry:5000` (localhost:5050)
 - **CI/CD pipelines for container images** — Service repos + `duyhenryer/shared-workflows` (build-images, build-init-images, build-k6-images); this repo: `ci.yml` (validate)
 - **Helm chart publishing to OCI registry** — Charts in `duyhenryer/charts` repo, OCI `ghcr.io/duyhenryer/charts`
-- **GHCR multi-level image naming** — `ghcr.io/duynhne/<repo>/<image>:<tag>` for auto-linking packages to repos
+- **GHCR multi-level image naming** — `ghcr.io/duynhlab/<repo>/<image>:<tag>` for auto-linking packages to repos
 - **Shared reusable CI/CD workflows** — `duyhenryer/shared-workflows` (docker-build-go, docker-build, go-check)
 - **Dependabot for dependency management** — gomod, github-actions, docker across all 8 service repos
 - **CronJobs via HelmRelease** — Migrated raw Jobs to `cronjobs` Helm chart (`oci://ghcr.io/duyhenryer/charts/cronjobs`)
@@ -151,7 +151,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 - **OpenTelemetry instrumentation** — `services/*/middleware/tracing.go`
 - **React frontend with API client** — `frontend/`
 - **golangci-lint enforcement** — 60+ linters across all 8 service repos, CI-gated
-- **Shared Go package library** — `github.com/duynhne/pkg` (zerolog logger, reusable modules)
+- **Shared Go package library** — `github.com/duynhlab/pkg` (zerolog logger, reusable modules)
 - **Developer documentation standards** — AGENTS.md (3-layer coding rules, code quality) + README.md (dev guide) across all repos
 - gRPC services with Protobuf definitions
 - Message queue system (NATS/Kafka/Redis Streams) with workers

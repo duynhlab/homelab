@@ -343,7 +343,7 @@ middleware.AddSpanEvent(ctx, "payment.approved")
 
 **Solutions:**
 1. **Reduce sampling**: `OTEL_SAMPLE_RATE=0.05` (5%)
-2. **Verify no tracing in loops**: `grep -r "StartSpan.*for.*range" ~/Working/duynhne/*-service`
+2. **Verify no tracing in loops**: `grep -r "StartSpan.*for.*range" ~/Working/duynhlab/*-service`
 3. **Check batch timeout** (default 5s is optimal)
 
 ### Problem: Missing traces during pod restarts

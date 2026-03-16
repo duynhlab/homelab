@@ -1,6 +1,6 @@
 # 01. Architecture Overview
 
-> **Historical Document** — This spec describes an earlier layout (9 services, k6 namespace, `services/` Go code in-repo, `charts/values/` per-service, scripts 01–12). For the **current** architecture see: [Application Delivery](../../docs/platform/application-delivery.md), [Setup](../../docs/platform/setup.md), and [APM Architecture](../../docs/observability/apm/architecture.md).
+> **Historical Document** — This spec describes an earlier layout (9 services, k6 namespace, `services/` Go code in-repo, `charts/values/` per-service, scripts 01–12). For the **current** architecture see: [Application Delivery](../../docs/platform/application-delivery.md), [Setup](../../docs/platform/setup.md), and [APM Architecture](../../docs/observability/architecture.md).
 
 > **Purpose**: High-level system architecture, deployment patterns, and component organization.
 

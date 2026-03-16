@@ -1,0 +1,19 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: victoriametrics-datasource
+  namespace: monitoring
+spec:
+  datasource:
+    access: proxy
+    isDefault: false
+    name: VictoriaMetrics
+    type: victoriametrics-metrics-datasource
+    uid: victoriametrics
+    url: http://vmsingle-victoria-metrics.monitoring.svc:8428
+  plugins:
+    - name: victoriametrics-metrics-datasource
+      version: "0.23.1"
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana

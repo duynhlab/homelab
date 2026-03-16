@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.71.0] - 2026-03-16
+
+### Added
+
+- **VMSingle vmalert proxy**: `vmalert.proxyURL` in `vmsingle.yaml` — VMSingle proxies `/api/v1/rules`, `/api/v1/alerts`, and `/vmalert/` to VMAlert. Grafana Alerting UI now shows all data source-managed rules (read-only) via the Prometheus datasource; 92 rule groups visible.
+- **VictoriaMetrics Grafana datasource**: Plugin `victoriametrics-metrics-datasource` v0.23.1 — installed via `GF_INSTALL_PLUGINS`, `allow_loading_unsigned_plugins` in Grafana CR. New `datasource-victoriametrics.yaml` (secondary datasource, non-default) for MetricsQL, WITH templates, and VMUI integration. Dual datasource strategy documented in `docs/observability/grafana/datasources.md`.
+- **Microservices application alerts**: `prometheusrules/microservices-alerts.yaml` (18 alerts in 6 groups: availability, errors, latency, traffic, saturation, Go runtime) and `microservices-recording-rules.yaml` (pre-aggregated RPS, error rate, latency percentiles, Apdex). Both added to monitoring kustomization; alert `runbook_url` points to `docs/observability/runbooks/microservices-alerts.md`.
+- **Observability docs refactor (pillar-centric)**: New structure — `docs/observability/README.md` (master index, 4-pillar diagram, component inventory); `architecture.md` at root; `metrics/` (README, victoriametrics.md, promql-guide.md, postgresql/ subdir); `tracing/`, `logging/`, `profiling/` (content moved from `apm/`); `grafana/` (README, datasources.md, dashboard-reference.md, variables.md); `alerting/README.md` (2-layer strategy); `runbooks/` (README index, observability-deep-dive.md, microservices-alerts.md). Removed `apm/` and `logs/victorialogs/` directory nesting.
+- **Runbook: Zalando Postgres HA scaling**: `docs/databases/runbook-zalando-ha-scaling.md` — RPO/RTO trade-offs, scaling from 1 to 3 nodes, replicas vs standby, failover behavior.
+
+### Changed
+
+- **Grafana CR**: Added `config.plugins.allow_loading_unsigned_plugins: victoriametrics-metrics-datasource` and container `env.GF_INSTALL_PLUGINS` for VM plugin install.
+- **Prometheus datasource**: `datasource-prometheus.yaml` — `jsonData.manageAlerts: true`, `jsonData.prometheusType: Prometheus` for Alerting UI integration.
+- **Grafana kustomization**: Included `datasource-victoriametrics.yaml`.
+- **Monitoring kustomization**: Included `prometheusrules/microservices-alerts.yaml`, `prometheusrules/microservices-recording-rules.yaml`.
+- **Cross-references**: AGENTS.md, README.md, docs/README.md, docs/api/logs.md, docs/api/graceful-shutdown.md, docs/databases/operator.md, specs/system-context/01-architecture-overview.md — all links updated from `docs/observability/apm/`, `docs/observability/logs/`, `docs/observability/metrics/grafana-*` to new paths. Internal links in runbooks and metrics README updated.
+
+### Removed
+
+- **docs/observability/apm/**: Content distributed to `tracing/`, `logging/`, `profiling/`, and root `architecture.md`; `apm/README.md` content absorbed into new root `README.md`.
+- **docs/observability/logs/**: Replaced by `logging/` (single level).
+
+### Documentation
+
+- **New**: `docs/observability/README.md`, `grafana/README.md`, `grafana/datasources.md` (dual datasource case study, vmalert.proxyURL deep dive), `alerting/README.md`, `runbooks/README.md`; `docs/databases/runbook-zalando-ha-scaling.md`.
+- **Moved/renamed**: `apm/*` → `tracing/`, `logging/`, `profiling/`, `architecture.md`; `metrics/grafana-dashboard.md` → `grafana/dashboard-reference.md`, `metrics/grafana-variables.md` → `grafana/variables.md`; `metrics/postgresql-*` → `metrics/postgresql/*`; `metrics/victoriametrics/README.md` → `metrics/victoriametrics.md`; `runbook-*.md` → `runbooks/*.md`; `logs/victorialogs/README.md` → `logging/victorialogs.md`.
+
+## [0.70.0] - 2026-03-14
+
+### Added
+
+- **VictoriaMetrics Operator migration**: Replaced `kube-prometheus-stack` (Prometheus server) with VictoriaMetrics Operator-managed CRDs. New manifests in `kubernetes/infra/configs/monitoring/victoriametrics/`: VMSingle (metrics storage), VMAgent (scraping), VMAlert (alerting rules), VMAlertmanager (notification routing), VLSingle (log storage). Operator auto-converts Prometheus CRDs (ServiceMonitor, PodMonitor, PrometheusRule) to VM equivalents.
+- **Prometheus Operator CRDs (standalone)**: `kubernetes/infra/controllers/metrics/prometheus-operator-crds.yaml` — installs only the CRDs (`monitoring.coreos.com/v1`) without the full Prometheus stack. Required by third-party Helm charts (Valkey, Loki, etc.) and VM Operator's auto-conversion.
+- **VictoriaMetrics Operator HelmRelease**: `kubernetes/infra/controllers/metrics/victoria-metrics-operator.yaml` — chart `victoria-metrics-operator@0.59.2`, auto-converter enabled (`disable_prometheus_converter: false`, `enable_converter_ownership: true`), depends on `prometheus-operator-crds`.
+- **VictoriaMetrics Operator OCI source**: `kubernetes/clusters/local/sources/oci/victoria-metrics-operator-oci.yaml` — `oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-operator`.
+- **Postgres Operator UI**: `kubernetes/infra/controllers/databases/postgres-operator-ui.yaml` — HelmRelease for Zalando Postgres Operator UI (`v1.15.1`), accessible at `http://localhost:8081`. HelmRepository source: `kubernetes/clusters/local/sources/helm/postgres-operator-ui.yaml`.
+- **Runbook: preparedDatabases CreateFailed**: `docs/databases/runbook-prepared-databases.md` — root cause analysis, diagnostic commands, three fix options, and prevention strategies for Zalando `preparedDatabases` permission failures on PostgreSQL 15+.
+- **PostgreSQL backup and exporter alerts**: `kubernetes/infra/configs/monitoring/prometheusrules/postgres-backup-alerts.yaml`, updated `pg-exporter-recording-rules.yaml`.
+
+### Changed
+
+- **Grafana datasource**: `datasource-prometheus.yaml` URL updated to `http://vmsingle-victoria-metrics.monitoring.svc:8428` (VMSingle replaces Prometheus server).
+- **VLSingle (VictoriaLogs)**: Migrated from standalone HelmRelease (`victorialogs`) to operator-managed VLSingle CRD (`apiVersion: operator.victoriametrics.com/v1`). Storage format corrected to match operator API (no `volumeClaimTemplate` wrapper).
+- **Vector sinks**: Updated to ship logs to operator-managed VLSingle at `vlsingle-victoria-logs.monitoring.svc:9428`.
+- **Sloth Operator**: Updated dependency from `kube-prometheus-stack` to `prometheus-operator-crds`.
+- **OpenTelemetry Collector**: Metrics exporter updated to VMSingle endpoint.
+- **Jaeger**: Metrics endpoint updated to VMSingle.
+- **supporting-shared-db**: Removed `preparedDatabases` section to fix `CreateFailed` status caused by PostgreSQL 15+ permission model conflict with cross-namespace ownership pattern.
+- **flux-ui.sh**: Fixed Postgres Operator UI port-forward to target `svc/postgres-operator-ui:80` on port 8081 (was incorrectly pointing to `svc/postgres-operator:8080`).
+
+### Removed
+
+- **kube-prometheus-stack**: Removed `prometheus-operator.yaml` HelmRelease. Prometheus server, Alertmanager, and scraping are now handled by VictoriaMetrics Operator CRDs.
+- **VictoriaLogs standalone HelmRelease**: `kubernetes/infra/controllers/logging/victorialogs/helmrelease.yaml` disabled (replaced by VLSingle CRD).
+- **VictoriaLogs OCI source**: `kubernetes/clusters/local/sources/oci/victorialogs-oci.yaml` no longer needed.
+
+### Documentation
+
+- **VictoriaMetrics Operator deep dive**: Rewrote `docs/observability/metrics/victoriametrics/README.md` — dual CRD architecture (Prometheus CRDs vs VM CRDs), auto-conversion flow, all 5 VM components, data flow diagrams, Flux deployment order, troubleshooting, multi-environment strategy.
+- **VictoriaLogs docs**: Updated `docs/observability/logs/victorialogs/README.md` — VLSingle operator-managed setup, correct storage format, `apiVersion: v1`.
+
 ## [0.60.0] - 2026-03-02
 
 ### Added

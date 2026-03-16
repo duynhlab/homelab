@@ -10,6 +10,8 @@ spec:
     jsonData:
       httpMethod: POST
       timeInterval: 15s
+      manageAlerts: true
+      prometheusType: Prometheus
     name: Prometheus
     type: prometheus
     uid: prometheus

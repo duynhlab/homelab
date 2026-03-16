@@ -28,5 +28,7 @@ spec:
       memory: 512Mi
 
   extraArgs:
-    # Enable deduplication for metrics scraped by multiple agents
     dedup.minScrapeInterval: "15s"
+    # Proxy /api/v1/rules, /api/v1/alerts, /vmalert/ to VMAlert
+    # Enables Grafana Alerting UI to display read-only rules
+    vmalert.proxyURL: "http://vmalert-victoria-metrics.monitoring.svc:8080"

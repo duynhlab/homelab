@@ -406,4 +406,4 @@ kubectl describe pod <pod-name> -n auth | grep -i kill
 
 - [API Reference](api.md) - Service endpoints and architecture
 - [Logging Standards](logs.md) - JSON log format and levels
-- [Tracing Architecture](../observability/apm/tracing_architecture.md) - OpenTelemetry integration
+- [Tracing Architecture](../observability/tracing/architecture.md) - OpenTelemetry integration

@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: pgbouncer-exporter
-          image: prometheuscommunity/pgbouncer-exporter:v0.11.0
+          image: prometheuscommunity/pgbouncer-exporter:v0.12.0
           ports:
             - containerPort: 9127
               name: metrics

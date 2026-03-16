@@ -24,7 +24,7 @@ spec:
           annotations:
             summary: "Microservice instance down ({{ $labels.namespace }}/{{ $labels.app }})"
             description: "Instance {{ $labels.instance }} of {{ $labels.app }} has been unreachable for more than 1 minute."
-            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicedown"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicedown"
 
         - alert: MicroserviceAllInstancesDown
           expr: |
@@ -37,7 +37,7 @@ spec:
           annotations:
             summary: "All instances of {{ $labels.app }} are down ({{ $labels.namespace }})"
             description: "Every instance of {{ $labels.app }} in namespace {{ $labels.namespace }} is unreachable. Complete service outage."
-            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microserviceallinstancesdown"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microserviceallinstancesdown"
 
         - alert: MicroserviceHighRestartRate
           expr: |
@@ -49,7 +49,7 @@ spec:
           annotations:
             summary: "High restart rate ({{ $labels.namespace }}/{{ $labels.pod }})"
             description: "Container {{ $labels.container }} in pod {{ $labels.pod }} has restarted {{ $value | humanize }} times in 15 minutes. Possible CrashLoopBackOff."
-            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighrestartrate"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighrestartrate"
 
     # --- Errors (RED: Errors) ---
     - name: microservices-errors
@@ -68,7 +68,7 @@ spec:
           annotations:
             summary: "High 5xx error rate for {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} 5xx error rate is {{ $value | humanizePercentage }} (threshold: 5%). Check application logs and traces."
-            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehigherrorrate"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehigherrorrate"
 
         - alert: MicroserviceErrorRateCritical
           expr: |
@@ -83,7 +83,7 @@ spec:
           annotations:
             summary: "Critical 5xx error rate for {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} 5xx error rate is {{ $value | humanizePercentage }} (threshold: 15%). Immediate investigation required."
-            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microserviceerrorratecritical"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microserviceerrorratecritical"
 
         - alert: MicroserviceNoSuccessfulRequests
           expr: |
@@ -96,7 +96,7 @@ spec:
           annotations:
             summary: "No successful requests for {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} has returned zero 2xx responses in the last 10 minutes but had traffic in the prior hour. All requests may be failing."
-            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicenosuccessfulrequests"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicenosuccessfulrequests"
 
     # --- Latency (RED: Duration / Golden: Latency) ---
     - name: microservices-latency
@@ -114,7 +114,7 @@ spec:
           annotations:
             summary: "High P95 latency for {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} P95 latency is {{ $value | humanizeDuration }} (threshold: 1s). Check slow endpoints, database queries, and downstream dependencies."
-            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighlatencyp95"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighlatencyp95"
 
         - alert: MicroserviceHighLatencyP99
           expr: |
@@ -128,7 +128,7 @@ spec:
           annotations:
             summary: "High P99 latency for {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} P99 latency is {{ $value | humanizeDuration }} (threshold: 2s). Tail latency indicates outlier slow requests."
-            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighlatencyp99"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighlatencyp99"
 
         - alert: MicroserviceLatencyCritical
           expr: |
@@ -142,7 +142,7 @@ spec:
           annotations:
             summary: "Critical P95 latency for {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} P95 latency is {{ $value | humanizeDuration }} (threshold: 2s). Most requests are severely degraded."
-            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicelatencycritical"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicelatencycritical"
 
     # --- Traffic (RED: Rate / Golden: Traffic) ---
     - name: microservices-traffic
@@ -159,7 +159,7 @@ spec:
           annotations:
             summary: "No traffic for {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} has received zero requests in the last 10 minutes but had traffic in the prior hour. Possible routing issue or upstream failure."
-            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicenotraffic"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicenotraffic"
 
         - alert: MicroserviceApdexCritical
           expr: |
@@ -179,7 +179,7 @@ spec:
           annotations:
             summary: "Critical Apdex score for {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} Apdex score is {{ $value | humanize }} (threshold: 0.5). Majority of users are experiencing unacceptable response times."
-            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microserviceapdexcritical"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microserviceapdexcritical"
 
     # --- Saturation (Golden: Saturation) ---
     - name: microservices-saturation
@@ -195,7 +195,7 @@ spec:
           annotations:
             summary: "High concurrent requests for {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} has {{ $value | humanize }} concurrent requests in flight (threshold: 50). Service may be approaching capacity."
-            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighrequestsinflight"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighrequestsinflight"
 
         - alert: MicroserviceRequestsInFlightCritical
           expr: |
@@ -207,7 +207,7 @@ spec:
           annotations:
             summary: "Critical concurrent requests for {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} has {{ $value | humanize }} concurrent requests in flight (threshold: 100). Service is overloaded."
-            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicerequestsinflightcritical"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicerequestsinflightcritical"
 
     # --- Go Runtime ---
     - name: microservices-runtime
@@ -224,7 +224,7 @@ spec:
           annotations:
             summary: "Goroutine leak suspected ({{ $labels.namespace }}/{{ $labels.app }})"
             description: "{{ $labels.app }} has {{ $value | humanize }} goroutines and the count is steadily increasing. Possible forgotten defer cancel(), unclosed channels, or blocking operations."
-            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicegoroutineleak"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicegoroutineleak"
 
         - alert: MicroserviceHighMemoryUsage
           expr: |
@@ -236,7 +236,7 @@ spec:
           annotations:
             summary: "High memory usage ({{ $labels.namespace }}/{{ $labels.app }})"
             description: "{{ $labels.app }} RSS is {{ $value | humanize1024 }}B (threshold: 512Mi). Check for memory leaks via Pyroscope heap profiles."
-            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighmemoryusage"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighmemoryusage"
 
         - alert: MicroserviceHighGCPressure
           expr: |
@@ -248,7 +248,7 @@ spec:
           annotations:
             summary: "High GC pressure ({{ $labels.namespace }}/{{ $labels.app }})"
             description: "{{ $labels.app }} is spending {{ $value | humanize }}s per second in garbage collection (threshold: 0.5s/s). High memory allocation rate or insufficient heap."
-            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighgcpressure"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighgcpressure"
 
         - alert: MicroserviceHighGCFrequency
           expr: |
@@ -260,4 +260,4 @@ spec:
           annotations:
             summary: "High GC frequency ({{ $labels.namespace }}/{{ $labels.app }})"
             description: "{{ $labels.app }} is running {{ $value | humanize }} GC cycles per second (threshold: 10/s). Consider increasing GOGC or reducing allocations."
-            runbook_url: "https://github.com/duynhne/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighgcfrequency"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighgcfrequency"

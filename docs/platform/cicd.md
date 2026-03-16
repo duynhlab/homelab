@@ -316,9 +316,9 @@ GHCR auto-grants `write_package` permission to images whose name **matches the G
 
 | GitHub Repo | GHCR Image (app) | GHCR Image (migration) |
 |---|---|---|
-| `product-service` | `ghcr.io/duynhne/product-service` | `ghcr.io/duynhne/product-service-init` |
-| `auth-service` | `ghcr.io/duynhne/auth-service` | `ghcr.io/duynhne/auth-service-init` |
-| `user-service` | `ghcr.io/duynhne/user-service` | `ghcr.io/duynhne/user-service-init` |
+| `product-service` | `ghcr.io/duynhlab/product-service` | `ghcr.io/duynhlab/product-service-init` |
+| `auth-service` | `ghcr.io/duynhlab/auth-service` | `ghcr.io/duynhlab/auth-service-init` |
+| `user-service` | `ghcr.io/duynhlab/user-service` | `ghcr.io/duynhlab/user-service-init` |
 
 **Convention**: Always use the full GitHub repo name as `image-name` (e.g., `product-service`, not `product`). Append `-init` for migration images (e.g., `product-service-init`).
 
@@ -476,13 +476,13 @@ After the image is pushed, anyone with read access can inspect the SBOM:
 
 ```bash
 # BuildKit native
-docker buildx imagetools inspect ghcr.io/duynhne/auth-service:latest
+docker buildx imagetools inspect ghcr.io/duynhlab/auth-service:latest
 
 # Cosign (verify SBOM attestation)
-cosign verify-attestation --type spdx ghcr.io/duynhne/auth-service:latest
+cosign verify-attestation --type spdx ghcr.io/duynhlab/auth-service:latest
 
 # Trivy (scan SBOM for CVEs without pulling full image)
-trivy image --sbom ghcr.io/duynhne/auth-service:latest
+trivy image --sbom ghcr.io/duynhlab/auth-service:latest
 ```
 
 ### Why Use SBOM?
@@ -522,13 +522,13 @@ curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh 
 
 ```bash
 # Table format (quick overview)
-syft ghcr.io/duynhne/frontend/frontend:latest -o table
+syft ghcr.io/duynhlab/frontend/frontend:latest -o table
 
 # SPDX JSON (standard format, same as BuildKit generates)
-syft ghcr.io/duynhne/frontend/frontend:latest -o spdx-json > frontend-sbom.spdx.json
+syft ghcr.io/duynhlab/frontend/frontend:latest -o spdx-json > frontend-sbom.spdx.json
 
 # CycloneDX JSON (alternative standard)
-syft ghcr.io/duynhne/frontend/frontend:latest -o cyclonedx-json > frontend-sbom.cdx.json
+syft ghcr.io/duynhlab/frontend/frontend:latest -o cyclonedx-json > frontend-sbom.cdx.json
 ```
 
 #### Generate SBOM from a locally built image (podman)
@@ -546,10 +546,10 @@ syft frontend:local -o spdx-json > frontend-sbom.spdx.json
 
 ```bash
 # Full scan (all severities)
-grype ghcr.io/duynhne/frontend/frontend:latest
+grype ghcr.io/duynhlab/frontend/frontend:latest
 
 # Only show fixable vulnerabilities, fail on HIGH+
-grype ghcr.io/duynhne/frontend/frontend:latest --only-fixed --fail-on high
+grype ghcr.io/duynhlab/frontend/frontend:latest --only-fixed --fail-on high
 
 # Scan a local image
 grype frontend:local

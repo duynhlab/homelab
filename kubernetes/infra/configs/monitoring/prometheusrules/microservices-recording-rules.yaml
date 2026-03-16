@@ -1,0 +1,119 @@
+# Recording rules for microservice application metrics.
+# Pre-aggregate common RED/Golden Signal queries used by alerts and Grafana dashboards.
+# Source metrics: request_duration_seconds (histogram), requests_in_flight (gauge).
+# Scraped by VMAgent via ServiceMonitor (job="microservices", 8 services).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: microservices-recording-rules
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/component: recording-rules
+spec:
+  groups:
+    # ---------------------------------------------------------------
+    # RED signals -- per-service aggregations (5m window)
+    # Naming convention: level:metric:operation_window
+    # ---------------------------------------------------------------
+    - name: microservices-red-5m
+      interval: 30s
+      rules:
+        # --- Rate (requests per second) ---
+        - record: job_app:request_duration_seconds:rate5m
+          expr: sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices"}[5m]))
+
+        # --- Error rate (5xx per second) ---
+        - record: job_app:request_duration_seconds:error_rate5m
+          expr: sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices", code=~"5.."}[5m]))
+
+        # --- Client error rate (4xx per second) ---
+        - record: job_app:request_duration_seconds:client_error_rate5m
+          expr: sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices", code=~"4.."}[5m]))
+
+        # --- Error ratio (0-1, 5xx / total) ---
+        - record: job_app:request_duration_seconds:error_ratio5m
+          expr: |
+            job_app:request_duration_seconds:error_rate5m
+            / (job_app:request_duration_seconds:rate5m > 0)
+
+        # --- Success rate (0-1, 2xx / total) ---
+        - record: job_app:request_duration_seconds:success_ratio5m
+          expr: |
+            sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices", code=~"2.."}[5m]))
+            / (job_app:request_duration_seconds:rate5m > 0)
+
+    # ---------------------------------------------------------------
+    # Latency percentiles -- per-service (5m window)
+    # ---------------------------------------------------------------
+    - name: microservices-latency-5m
+      interval: 30s
+      rules:
+        - record: job_app:request_duration_seconds:p50_5m
+          expr: |
+            histogram_quantile(0.50,
+              sum by (app, namespace, le) (rate(request_duration_seconds_bucket{job="microservices"}[5m]))
+            )
+
+        - record: job_app:request_duration_seconds:p95_5m
+          expr: |
+            histogram_quantile(0.95,
+              sum by (app, namespace, le) (rate(request_duration_seconds_bucket{job="microservices"}[5m]))
+            )
+
+        - record: job_app:request_duration_seconds:p99_5m
+          expr: |
+            histogram_quantile(0.99,
+              sum by (app, namespace, le) (rate(request_duration_seconds_bucket{job="microservices"}[5m]))
+            )
+
+    # ---------------------------------------------------------------
+    # Apdex and saturation -- per-service (5m window)
+    # ---------------------------------------------------------------
+    - name: microservices-quality-5m
+      interval: 30s
+      rules:
+        # Apdex score: satisfied (<0.5s) + 0.5 * tolerating (0.5s-2s) / total
+        - record: job_app:request_duration_seconds:apdex5m
+          expr: |
+            (
+              sum by (app, namespace) (rate(request_duration_seconds_bucket{job="microservices", le="0.5"}[5m]))
+              + 0.5 * (
+                sum by (app, namespace) (rate(request_duration_seconds_bucket{job="microservices", le="2"}[5m]))
+                - sum by (app, namespace) (rate(request_duration_seconds_bucket{job="microservices", le="0.5"}[5m]))
+              )
+            )
+            / (job_app:request_duration_seconds:rate5m > 0)
+
+        # Concurrent requests (saturation)
+        - record: job_app:requests_in_flight:sum
+          expr: sum by (app, namespace) (requests_in_flight{job="microservices"})
+
+    # ---------------------------------------------------------------
+    # Per-endpoint breakdown (5m window) -- for drill-down dashboards
+    # ---------------------------------------------------------------
+    - name: microservices-endpoint-5m
+      interval: 30s
+      rules:
+        - record: job_app_path:request_duration_seconds:rate5m
+          expr: sum by (app, namespace, path, method) (rate(request_duration_seconds_count{job="microservices"}[5m]))
+
+        - record: job_app_path:request_duration_seconds:error_rate5m
+          expr: sum by (app, namespace, path, method) (rate(request_duration_seconds_count{job="microservices", code=~"5.."}[5m]))
+
+        - record: job_app_path:request_duration_seconds:p95_5m
+          expr: |
+            histogram_quantile(0.95,
+              sum by (app, namespace, path, method, le) (rate(request_duration_seconds_bucket{job="microservices"}[5m]))
+            )
+
+    # ---------------------------------------------------------------
+    # Bandwidth -- per-service (5m window)
+    # ---------------------------------------------------------------
+    - name: microservices-bandwidth-5m
+      interval: 30s
+      rules:
+        - record: job_app:request_size_bytes:rate5m
+          expr: sum by (app, namespace) (rate(request_size_bytes_sum{job="microservices"}[5m]))
+
+        - record: job_app:response_size_bytes:rate5m
+          expr: sum by (app, namespace) (rate(response_size_bytes_sum{job="microservices"}[5m]))

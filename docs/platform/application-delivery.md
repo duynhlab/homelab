@@ -107,7 +107,7 @@ Each InputProvider uses two labels for selector matching:
 metadata:
   labels:
     app.kubernetes.io/part-of: backend-services
-    platform.duynhne.dev/domain: identity  # identity | catalog | checkout | comms
+    platform.duynhlab.dev/domain: identity  # identity | catalog | checkout | comms
 ```
 
 Each domain ResourceSet selects by domain:
@@ -118,7 +118,7 @@ spec:
     - kind: ResourceSetInputProvider
       selector:
         matchLabels:
-          platform.duynhne.dev/domain: identity
+          platform.duynhlab.dev/domain: identity
 ```
 
 ### Naming Convention
@@ -224,7 +224,7 @@ To enable automatic semver-based rollouts, define a `ResourceSetInputProvider` o
      namespace: default
      labels:
        app.kubernetes.io/part-of: backend-services
-       platform.duynhne.dev/domain: <domain>
+       platform.duynhlab.dev/domain: <domain>
    spec:
      type: Static
      defaultValues:

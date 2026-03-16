@@ -25,7 +25,7 @@ spec:
           name: << inputs.name >>
           replicaCount: << inputs.replicaCount | int >>
           image:
-            repository: ghcr.io/duynhne/frontend/frontend
+            repository: ghcr.io/duynhlab/frontend/frontend
             tag: latest
             pullPolicy: Always
           service:

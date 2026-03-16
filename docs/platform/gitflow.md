@@ -1,6 +1,6 @@
 # Git Branching & Release Standard
 
-This document defines the **production-ready branching strategy** for all microservice repositories in the `duynhne` platform. It is designed to scale from the current 8 services to 1000+ repositories while maintaining traceability, blast-radius control, and fast incident response.
+This document defines the **production-ready branching strategy** for all microservice repositories in the `duynhlab` platform. It is designed to scale from the current 8 services to 1000+ repositories while maintaining traceability, blast-radius control, and fast incident response.
 
 **Model**: Hybrid Enterprise Flow (environment-aligned branch promotion + immutable tagging).
 
@@ -220,7 +220,7 @@ gh run list --workflow=ci.yml | head -5
 
 # Check image tag exists in GHCR
 # (requires crane: go install github.com/google/go-containerregistry/cmd/crane@latest)
-crane ls ghcr.io/duynhne/<service-name> | grep v1.2.0
+crane ls ghcr.io/duynhlab/<service-name> | grep v1.2.0
 
 # Check Flux reconciliation
 flux get kustomizations
@@ -496,13 +496,13 @@ Place a `CODEOWNERS` file at `.github/CODEOWNERS` in every service repo (highest
 
 ```
 # Default: team owns everything
-*    @duynhne/<team-name>
+*    @duynhlab/<team-name>
 
 # CI/CD and workflow changes need platform team review
-.github/    @duynhne/platform-team
+.github/    @duynhlab/platform-team
 
 # Database migrations need DBA review
-db/         @duynhne/platform-team
+db/         @duynhlab/platform-team
 ```
 
 **Rules**:

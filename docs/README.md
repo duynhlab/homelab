@@ -335,7 +335,7 @@ make down                    # Delete cluster + registry
 **Manual Helm deployment (for testing):**
 
 ```bash
-helm upgrade --install auth oci://ghcr.io/duyhenryer/charts/mop --set name=auth --set image.repository=ghcr.io/duynhne/auth-service/auth --set image.tag=latest -n auth --create-namespace
+helm upgrade --install auth oci://ghcr.io/duyhenryer/charts/mop --set name=auth --set image.repository=ghcr.io/duynhlab/auth-service/auth --set image.tag=latest -n auth --create-namespace
 ```
 
 **Deploy SLOs:**

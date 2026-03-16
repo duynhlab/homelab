@@ -4,7 +4,7 @@ kind: Namespace
 metadata:
   labels:
     environment: local
-    platform.duynhne/backup: "walg"
+    platform.duynhlab/backup: "walg"
   name: auth
 ---
 apiVersion: v1
@@ -12,7 +12,7 @@ kind: Namespace
 metadata:
   labels:
     environment: local
-    platform.duynhne/backup: "cnpg"
+    platform.duynhlab/backup: "cnpg"
   name: cart
 ---
 apiVersion: v1
@@ -69,7 +69,7 @@ kind: Namespace
 metadata:
   labels:
     environment: local
-    platform.duynhne/backup: "cnpg"
+    platform.duynhlab/backup: "cnpg"
   name: product
 ---
 apiVersion: v1
@@ -98,7 +98,7 @@ kind: Namespace
 metadata:
   labels:
     environment: local
-    platform.duynhne/backup: "walg"
+    platform.duynhlab/backup: "walg"
   name: user
 ---
 apiVersion: v1

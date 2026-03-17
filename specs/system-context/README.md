@@ -122,7 +122,7 @@ A **production-ready microservices monitoring platform** built with Go, Kubernet
 - **Helm**: Generic microservice chart v0.2.0
 - **Scripts**: 12 numbered scripts (01-12) for deployment automation
 - **CI/CD**: GitHub Actions for image builds
-- **Registry**: OCI registry (ghcr.io/duynhne)
+- **Registry**: OCI registry (ghcr.io/duynhlab)
 
 ---
 

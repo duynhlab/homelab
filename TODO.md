@@ -2,6 +2,27 @@
 
 A practical checklist for learning DevOps/SRE skills through this project. Items marked with references point to actual implementations in this repo.
 
+### Sections at a glance
+
+| Section | Purpose | Status |
+|---------|---------|--------|
+| [Infrastructure & GitOps](#infrastructure--gitops) | GitOps, Flux, Kustomize, CI/CD, image publishing | Partial |
+| [Observability](#observability-metrics-logs-traces-profiles) | Metrics (VM), traces, logs, profiling, Grafana, SLO | Partial |
+| [Data Platform & Persistence](#data-platform--persistence) | PostgreSQL (CNPG, Zalando), poolers, migrations, Valkey | Partial |
+| [Security & Secrets](#security--secrets) | Cosign, Vault/ESO, supply chain, hardening | Partial |
+| [Certificate Management](#certificate-management) | cert-manager, TLS, ClusterIssuer | Planned |
+| [Application Services](#application-services) | Go microservices, frontend, lint, shared libs | Partial |
+| [Service Mesh & Traffic Management](#service-mesh--traffic-management) | Istio/Ambient, Linkerd, mTLS, traffic policy | Not started |
+| [API Gateway](#api-gateway) | Kong (or Envoy/APISIX), north-south entry point | Not started |
+| [Networking & Zero-Trust](#networking--zero-trust) | Tailscale, Cloudflare Tunnel, identity-based access | Partial |
+| [Storage](#storage) | Rook-Ceph, OpenEBS (when not Kind) | Planned |
+| [Reliability & Operations](#reliability--operations) | k6, runbooks, chaos engineering, DR | Partial |
+| [Distributed Systems Theory](#distributed-systems-theory) | CAP, consensus, partitions, sagas | Learning |
+| [Platform Engineering & Enablement](#platform-engineering--enablement) | Templates, onboarding, self-service | Partial |
+| [Learning Resources & Interview Prep](#learning-resources--interview-prep) | ADRs, talking points, trade-off practice | Learning |
+
+> **Status key**: *Partial* = some items done, see `[x]`/`[~]` in section; *Planned* = scoped but not started; *Not started* = no implementation yet; *Learning* = theory/study items.
+
 ---
 
 ## Infrastructure & GitOps
@@ -19,6 +40,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 - GitOps drift detection and reconciliation monitoring (Flux alerts → Alertmanager)
 - Separate manifest repository for GitOps workflow (mono-repo → multi-repo)
 - Infrastructure as Code with Terraform/Pulumi for cloud resources
+- [ ] **Atlantis** — PR-driven Terraform (and Terragrunt/OpenTofu) automation: runs `plan` on PR and comments output, `apply` on merge or via PR comment; workspace locking and approval workflows; integrates with GitHub/GitLab. Complements GitOps for IaC that lives outside Kubernetes manifests (e.g. cloud networking, IAM, S3).
 - Canary deployments with Argo Rollouts and traffic analysis
 - Multi-environment promotion (dev → staging → prod)
 - Pre-deploy validation gates (lint → build → test → scan → deploy)
@@ -163,12 +185,28 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 
 ## Service Mesh & Traffic Management
 
-- Istio service mesh with mTLS
-- Ingress gateway with TLS termination
-- Traffic shifting (weight-based, header-based routing)
-- Circuit breakers, retries, timeouts at mesh level
-- Fault injection for chaos engineering
-- Service-to-service authentication (SPIFFE/SPIRE)
+- [ ] **Istio (or Istio Ambient)** — Service mesh with mTLS, traffic policy, observability:
+  - **Istio sidecar mode**: Envoy sidecar per pod; full L7 (HTTP/gRPC) policy, telemetry, retries/timeouts
+  - **Istio Ambient** (sidecarless): ztunnel (L4) + waypoint proxy (L7 optional); lower resource use, no pod injection; good candidate for learning modern mesh
+  - Documentation: [Istio Ambient](https://istio.io/latest/docs/concepts/ambient/)
+- [ ] **Linkerd** — Lightweight mesh (no Envoy); simpler ops, good for mTLS + basic traffic split
+- [ ] Ingress gateway with TLS termination (e.g. Istio Gateway, Kong, or standalone Ingress)
+- [ ] Traffic shifting (weight-based, header-based routing)
+- [ ] Circuit breakers, retries, timeouts at mesh level
+- [ ] Fault injection for chaos engineering
+- [ ] Service-to-service authentication (SPIFFE/SPIRE or mesh-native identity)
+
+## API Gateway
+
+*Not implemented. Frontend and clients call backend services directly (per-service URLs / Kubernetes Services).*
+
+- [ ] **Kong API Gateway** — Centralized north-south entry point:
+  - Single entry point for all APIs (e.g. `/api/v1/*` → route to auth, user, product, etc.)
+  - Plugins: rate limiting, CORS, JWT/auth, request/response transformation, Prometheus metrics
+  - Deploy via Helm in dedicated `kong` namespace; Kong CRDs (KongService, KongRoute, KongPlugin)
+  - Research and comparison with current direct-backend approach: `specs/active/frontend-integration-optimization/research.md` (Kong vs Direct Backend)
+- [ ] Alternative API gateways: Envoy Gateway, APISIX, Gloo (evaluate vs Kong for this stack)
+- [ ] API Gateway + Gateway API (Kubernetes standard) for ingress and routing
 
 ---
 

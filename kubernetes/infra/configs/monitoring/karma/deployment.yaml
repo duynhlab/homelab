@@ -1,0 +1,79 @@
+# Karma - Alert dashboard for Alertmanager
+# Reads VMAlertmanager API to display firing/silenced/inhibited alerts.
+# Docs: https://karma-dashboard.io/
+# Repo: https://github.com/prymitive/karma
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: karma
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: karma
+    app.kubernetes.io/component: alert-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: karma
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: karma
+        app.kubernetes.io/component: alert-dashboard
+    spec:
+      containers:
+        - name: karma
+          image: ghcr.io/prymitive/karma:v0.120
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: ALERTMANAGER_URI
+              value: http://vmalertmanager-victoria-metrics.monitoring.svc:9093
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 2000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: karma
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: karma
+    app.kubernetes.io/component: alert-dashboard
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: karma

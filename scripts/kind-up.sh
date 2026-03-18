@@ -3,7 +3,7 @@
 set -o errexit
 
 cluster_name="${CLUSTER_NAME:=homelab}"
-cluster_version="${CLUSTER_VERSION:=v1.33.7}"
+cluster_version="${CLUSTER_VERSION:=v1.34.3}"
 reg_name="${cluster_name}-registry"
 reg_localhost_port="5050"
 reg_cluster_port="5000"

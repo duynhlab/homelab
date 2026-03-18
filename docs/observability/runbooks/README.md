@@ -23,5 +23,5 @@ Each alert runbook follows a consistent format:
 - [Alerting Strategy](../alerting/README.md) -- 2-layer alerting architecture
 - [SLO System](../slo/README.md) -- SLO definitions and burn-rate alerts
 - [Grafana Datasources](../grafana/datasources.md) -- how to view rules in Grafana UI
-- [Database HA Scaling](../../databases/runbook-zalando-ha-scaling.md) -- PostgreSQL HA runbook
-- [Prepared Databases](../../databases/runbook-prepared-databases.md) -- preparedDatabases issue runbook
+- [Database HA Scaling](../../databases/runbooks/zalando-ha-scaling.md) -- PostgreSQL HA runbook
+- [Prepared Databases](../../databases/runbooks/prepared-databases.md) -- preparedDatabases issue runbook

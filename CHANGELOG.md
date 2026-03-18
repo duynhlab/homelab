@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.73.0] - 2026-03-13
+
+### Added
+
+- **Endpoints-to-ConfigMaps migration runbook**: `docs/databases/runbooks/endpoints-to-configmaps.md` — production-grade runbook for migrating Zalando Postgres Operator Patroni DCS from Kubernetes Endpoints to ConfigMaps. Covers split-brain risk analysis, in-place vs standby migration paths, 3-phase step-by-step procedure (scale-in → switch DCS → scale-out), verification, rollback, post-migration cleanup, and production tips.
+
+### Changed
+
+- **Zalando Operator DCS**: `kubernetes_use_configmaps: true` in `kubernetes/infra/controllers/databases/zalando-operator.yaml` — switches Patroni leader election from deprecated Kubernetes Endpoints to ConfigMaps. Prepares for K8s 1.34+ where Endpoints API is deprecated.
+- **Spilo image**: Bumped from `ghcr.io/zalando/spilo-16:3.3-p2` to `ghcr.io/zalando/spilo-17:4.0-p3` (Zalando recommended default for v1.15.x).
+- **Kind cluster version**: Bumped from `v1.33.7` to `v1.34.3` in `scripts/kind-up.sh`.
+- **Database runbooks reorganized**: Moved `docs/databases/runbook-zalando-ha-scaling.md` → `docs/databases/runbooks/zalando-ha-scaling.md` and `docs/databases/runbook-prepared-databases.md` → `docs/databases/runbooks/prepared-databases.md`. Updated cross-references in `docs/observability/runbooks/README.md`.
+
+## [0.72.0] - 2026-03-13
+
+### Added
+
+- **Karma alert dashboard**: `kubernetes/infra/configs/monitoring/karma/` — Deployment + Service for [Karma](https://github.com/prymitive/karma) v0.120, the industry-standard Alertmanager dashboard. Reads VMAlertmanager API directly (`ALERTMANAGER_URI`), provides silence management, alert history, label-based filtering, and multi-instance aggregation. Security-hardened container (read-only root filesystem, non-root user, all capabilities dropped).
+- **Alert dashboard comparison doc**: `docs/observability/alerting/dashboard-comparison.md` — deep-dive comparison of 5 tools (Karma, Alerta, UAR, Siren, Grafana built-in) with feature matrix, per-tool assessment, decision rationale, "when to reconsider" triggers, and reference links. Serves as future re-evaluation reference.
+- **Full alerting pipeline diagram**: `docs/observability/alerting/README.md` — end-to-end pipeline diagram (ingestion → storage → rules → evaluation → notification → destinations), VM vs Prometheus terminology mapping table, Karma integration section.
+- **Atlantis item in TODO.md**: PR-driven Terraform/Terragrunt/OpenTofu automation added to Infrastructure & GitOps learning checklist.
+
+### Changed
+
+- **Alerting README architecture**: Replaced single-layer alert pipeline diagram with comprehensive 6-stage full-stack diagram showing metrics ingestion through to alert destinations (Karma, Grafana, planned Slack/PagerDuty).
+- **Monitoring kustomization**: Added `karma/` to `kubernetes/infra/configs/monitoring/kustomization.yaml`.
+- **VictoriaMetrics Operator OCI source**: Bumped semver constraint from `>=0.40.0` to `>=0.59.0` in `kubernetes/clusters/local/sources/oci/victoria-metrics-operator-oci.yaml`.
+
 ## [0.71.0] - 2026-03-16
 
 ### Added

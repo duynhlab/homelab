@@ -2,29 +2,103 @@
 
 Two-layer alerting approach combining immediate threshold detection with SLO-based burn-rate alerts.
 
+## Full Alerting Pipeline
+
+End-to-end view of how metrics become alerts, from ingestion through evaluation to notification and visibility.
+
+```mermaid
+flowchart TD
+    subgraph ingestion ["1. Metrics Ingestion"]
+        Targets["Targets<br/>(8 microservices, PostgreSQL,<br/>external-secrets, Tempo)"]
+        VMAgent["VMAgent<br/>(scraper)"]
+        Targets -->|"ServiceMonitor<br/>PodMonitor"| VMAgent
+    end
+
+    subgraph storage ["2. Storage"]
+        VMSingle["VMSingle :8428<br/>(metrics storage)"]
+        VMAgent -->|"remoteWrite<br/>/api/v1/write"| VMSingle
+    end
+
+    subgraph rules ["3. Alert Rule Definitions"]
+        PR["PrometheusRule<br/>(microservices, postgres,<br/>backup alerts)"]
+        PSL["PrometheusServiceLevel<br/>(SLO definitions)"]
+        Sloth["Sloth Operator"]
+        VMOp["VM Operator"]
+        VMRule["VMRule<br/>(auto-converted)"]
+
+        PSL -->|generates| Sloth
+        Sloth -->|"burn-rate<br/>PrometheusRule"| PR
+        PR -->|auto-convert| VMOp
+        VMOp -->|creates| VMRule
+    end
+
+    subgraph evaluation ["4. Evaluation"]
+        VMAlert["VMAlert :8080<br/>(evaluates every 15s)"]
+        VMRule -->|selectAllByDefault| VMAlert
+        VMSingle <-->|"datasource<br/>remoteRead/Write"| VMAlert
+    end
+
+    subgraph notification ["5. Notification Routing"]
+        VMAM["VMAlertmanager :9093<br/>(group, deduplicate, silence, route)"]
+        VMAlert -->|"POST /api/v2/alerts"| VMAM
+    end
+
+    subgraph destinations ["6. Alert Destinations"]
+        Karma["Karma :8080<br/>(alert dashboard)"]
+        Grafana["Grafana<br/>(Alerting tab, drill-down)"]
+        Slack["Slack / PagerDuty<br/>(planned)"]
+
+        VMAM -.->|"reads AM API"| Karma
+        VMSingle -->|"vmalert.proxyURL"| Grafana
+        VMAM -.->|"webhook / pagerduty<br/>receivers (planned)"| Slack
+    end
+```
+
+### Current State
+
+- Stages 1-4 are fully operational (29+ threshold alerts, 48 SLO burn-rate alerts).
+- Stage 5 (VMAlertmanager) routes alerts but has only a `default` receiver with **no notification destination**.
+- Stage 6: Grafana provides read-only rule visibility via `vmalert.proxyURL`. **Karma** is the dedicated alert dashboard (reads VMAlertmanager API directly). Slack/PagerDuty integration is planned.
+
+## VictoriaMetrics vs Prometheus: Terminology Mapping
+
+This project uses the **VictoriaMetrics stack** instead of Prometheus. VM Operator auto-converts Prometheus CRDs, so you write standard Prometheus resources but they run on VM components.
+
+| Prometheus Ecosystem | VictoriaMetrics Equivalent | What It Does | Deployed? |
+|---|---|---|---|
+| Prometheus server | **VMSingle** `:8428` | Stores metrics, exposes PromQL-compatible API | Yes |
+| Prometheus scraper | **VMAgent** | Scrapes targets via ServiceMonitor/PodMonitor | Yes |
+| Prometheus rule evaluator | **VMAlert** `:8080` | Evaluates alert and recording rules | Yes |
+| Alertmanager | **VMAlertmanager** `:9093` | Groups, deduplicates, silences, and routes alerts | Yes |
+| PrometheusRule CRD | **VMRule** (auto-converted) | Defines alert/recording rules; VM Operator converts PrometheusRule to VMRule automatically | Yes |
+| PrometheusServiceLevel | (Sloth generates PrometheusRule) | SLO definitions; Sloth only supports PrometheusRule format, VM Operator converts the output | Yes |
+
+**Why write PrometheusRule instead of VMRule?** Sloth Operator only generates `PrometheusRule` CRDs. VM Operator's `disable_prometheus_converter: false` setting auto-converts all Prometheus CRDs to VM equivalents. This gives compatibility with the broader ecosystem while running entirely on VictoriaMetrics.
+
 ## Architecture
 
 ```mermaid
 flowchart TD
-    subgraph layer1 [Layer 1: Threshold Alerts]
+    subgraph layer1 ["Layer 1: Threshold Alerts"]
         PR1["PrometheusRule CRDs<br/>microservices-alerts.yaml<br/>postgres-alerts.yaml"]
         T1["18 application alerts<br/>14 PostgreSQL alerts"]
     end
 
-    subgraph layer2 [Layer 2: SLO Burn-Rate Alerts]
+    subgraph layer2 ["Layer 2: SLO Burn-Rate Alerts"]
         PSL["PrometheusServiceLevel CRDs<br/>8 services x 3 SLOs"]
         Sloth["Sloth Operator<br/>generates multi-window burn-rate rules"]
         T2["48 SLO alerts<br/>page + ticket severity"]
     end
 
-    subgraph pipeline [Alert Pipeline]
-        VMOp["VM Operator<br/>auto-converts PrometheusRule → VMRule"]
+    subgraph pipeline ["Alert Pipeline"]
+        VMOp["VM Operator<br/>auto-converts PrometheusRule to VMRule"]
         VMAlert["VMAlert<br/>evaluates all rules every 15s"]
         VMAM["VMAlertmanager<br/>deduplication, routing, silencing"]
     end
 
     subgraph viz [Visibility]
         Grafana["Grafana Alerting UI<br/>read-only rules via vmalert.proxyURL"]
+        Karma["Karma Dashboard<br/>reads VMAlertmanager API"]
     end
 
     PR1 --> VMOp
@@ -33,6 +107,7 @@ flowchart TD
     VMOp -->|"VMRule"| VMAlert
     VMAlert -->|"firing alerts"| VMAM
     VMAlert -->|"/api/v1/rules"| Grafana
+    VMAM -.->|"AM API"| Karma
 ```
 
 ## Two-Layer Approach
@@ -143,6 +218,28 @@ kubernetes/infra/configs/monitoring/
     └── vmalertmanager.yaml                 # VMAlertmanager (notification router)
 ```
 
+## Alert Dashboard: Karma
+
+[Karma](https://github.com/prymitive/karma) is the dedicated alert dashboard, reading directly from VMAlertmanager's Alertmanager-compatible API.
+
+**Why Karma:**
+
+- Industry-standard Alertmanager dashboard used widely in production SRE teams
+- Reads VMAlertmanager API natively (zero config on AM side)
+- Silence management from the UI (create/expire silences for maintenance windows)
+- Multi-instance aggregation (production HA Alertmanager support)
+- Alert history visualization (24h trend blocks for incident review)
+
+**Deployment:** Raw K8s manifest in `kubernetes/infra/configs/monitoring/karma/`.
+
+**Configuration:** Single environment variable pointing to VMAlertmanager:
+
+```
+ALERTMANAGER_URI=http://vmalertmanager-victoria-metrics.monitoring.svc:9093
+```
+
+For a detailed comparison of Karma against other alert dashboard tools (Alerta, UAR, Siren), see [Alert Dashboard Comparison](dashboard-comparison.md).
+
 ## Future Roadmap
 
 | Phase | Scope | Status |
@@ -150,6 +247,7 @@ kubernetes/infra/configs/monitoring/
 | Layer 1: Application alerts | 18 alerts (RED + Golden Signals) | Implemented |
 | Layer 1: PostgreSQL alerts | 14 alerts (availability, performance, storage) | Implemented |
 | Layer 2: SLO alerts | 48 alerts (8 services x 3 SLOs x 2 severities) | Implemented |
+| Alert dashboard | Karma reading VMAlertmanager API | Implemented |
 | Layer 1: Database connection pool | PgBouncer/PgCat saturation alerts | Planned |
 | Layer 1: Infrastructure | Node CPU/memory/disk pressure | Planned |
 | Layer 1: Kubernetes | Pod OOM, CrashLoopBackOff, pending pods | Planned |
@@ -157,6 +255,7 @@ kubernetes/infra/configs/monitoring/
 
 ## Related Documentation
 
+- [Alert Dashboard Comparison](dashboard-comparison.md) -- deep-dive tool comparison (Karma, Alerta, UAR, Siren, Grafana)
 - [Microservices Alerts Runbook](../runbooks/microservices-alerts.md) -- per-alert investigation and resolution
 - [SLO System](../slo/README.md) -- Sloth Operator, SLO targets, error budgets
 - [SLO Alerting](../slo/alerting.md) -- burn-rate methodology details

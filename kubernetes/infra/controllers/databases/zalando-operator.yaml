@@ -24,7 +24,6 @@ spec:
     configKubernetes:
       cluster_domain: cluster.local
       enable_cross_namespace_secret: true
-      kubernetes_use_configmaps: true
       pod_environment_configmap: postgres-operator/zalando-walg-config
       pod_environment_secret: pg-backup-rustfs-credentials
     configConnectionPooler:
@@ -40,7 +39,7 @@ spec:
       connection_pooler_user: pooler
     configGeneral:
       docker_image: ghcr.io/zalando/spilo-17:4.0-p3
-      # enable_teams_api: false
+      kubernetes_use_configmaps: true
       workers: 8
     image:
       pullPolicy: IfNotPresent

@@ -140,15 +140,13 @@ flux get kustomizations
 
 Set `max_instances: 1` in the operator config. This tells the operator to scale all clusters down to a single pod.
 
-**Edit** `kubernetes/infra/controllers/databases/zalando-operator.yaml`:
+**Edit** `kubernetes/infra/controllers/databases/zalando-operator.yaml` under `configGeneral`:
 
 ```yaml
-configKubernetes:
-  cluster_domain: cluster.local
-  enable_cross_namespace_secret: true
+configGeneral:
+  docker_image: ghcr.io/zalando/spilo-17:4.0-p3
   max_instances: 1  # TEMPORARY: scale all clusters to 1 pod for DCS migration
-  pod_environment_configmap: postgres-operator/zalando-walg-config
-  pod_environment_secret: pg-backup-rustfs-credentials
+  workers: 8
 ```
 
 Deploy and wait:
@@ -177,16 +175,14 @@ kubectl exec -n auth auth-db-0 -c postgres -- patronictl list
 
 Now that each cluster has only one pod, switch the DCS backend.
 
-**Edit** `kubernetes/infra/controllers/databases/zalando-operator.yaml`:
+**Edit** `kubernetes/infra/controllers/databases/zalando-operator.yaml` under `configGeneral`:
 
 ```yaml
-configKubernetes:
-  cluster_domain: cluster.local
-  enable_cross_namespace_secret: true
+configGeneral:
+  docker_image: ghcr.io/zalando/spilo-17:4.0-p3
   kubernetes_use_configmaps: true  # Switch Patroni DCS from Endpoints to ConfigMaps
   max_instances: 1  # Keep at 1 until migration verified
-  pod_environment_configmap: postgres-operator/zalando-walg-config
-  pod_environment_secret: pg-backup-rustfs-credentials
+  workers: 8
 ```
 
 Deploy and wait:
@@ -220,16 +216,14 @@ kubectl exec -n user supporting-shared-db-0 -c postgres -- patronictl list
 
 Remove `max_instances` to allow clusters to scale back to their intended sizes.
 
-**Edit** `kubernetes/infra/controllers/databases/zalando-operator.yaml`:
+**Edit** `kubernetes/infra/controllers/databases/zalando-operator.yaml` under `configGeneral`:
 
 ```yaml
-configKubernetes:
-  cluster_domain: cluster.local
-  enable_cross_namespace_secret: true
+configGeneral:
+  docker_image: ghcr.io/zalando/spilo-17:4.0-p3
   kubernetes_use_configmaps: true
   # max_instances removed -- clusters return to spec.numberOfInstances
-  pod_environment_configmap: postgres-operator/zalando-walg-config
-  pod_environment_secret: pg-backup-rustfs-credentials
+  workers: 8
 ```
 
 Deploy and wait:

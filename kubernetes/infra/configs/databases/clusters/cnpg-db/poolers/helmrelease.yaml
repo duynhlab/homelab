@@ -1,0 +1,107 @@
+# PgDog Connection Pooler for cnpg-db (product, cart, order)
+# R/W splitting: SELECTs routed to replicas, writes to primary
+# LSN monitoring: detects replication lag, bans lagging replicas
+# Prepared statements: extended mode (no prefer_simple_protocol needed)
+#
+# SECURITY NOTE: Inline passwords (dev-only).
+# Vault-backed secret: pgdog-cnpg-credentials (namespace: product)
+# Vault path: secret/data/local/databases/pgdog-cnpg/credentials
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: pgdog-cnpg
+  namespace: product
+spec:
+  interval: 10m
+  timeout: 5m
+  chart:
+    spec:
+      chart: pgdog
+      interval: 5m
+      version: "v0.39"
+      sourceRef:
+        kind: HelmRepository
+        name: pgdogdev
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    replicas: 1
+    port: 6432
+    openMetricsPort: 9090
+    openMetricsNamespace: "pgdog_"
+
+    lsnCheckDelay: 0
+    lsnCheckInterval: 5000
+
+    databases:
+      # product DB -- primary
+      - name: product
+        host: cnpg-db-rw.product.svc.cluster.local
+        port: 5432
+        database: product
+        poolSize: 30
+        poolMode: transaction
+        replicas:
+          - host: cnpg-db-r.product.svc.cluster.local
+            port: 5432
+            poolSize: 30
+      # cart DB -- primary
+      - name: cart
+        host: cnpg-db-rw.product.svc.cluster.local
+        port: 5432
+        database: cart
+        poolSize: 30
+        poolMode: transaction
+        replicas:
+          - host: cnpg-db-r.product.svc.cluster.local
+            port: 5432
+            poolSize: 30
+      # order DB -- primary
+      - name: order
+        host: cnpg-db-rw.product.svc.cluster.local
+        port: 5432
+        database: order
+        poolSize: 30
+        poolMode: transaction
+        replicas:
+          - host: cnpg-db-r.product.svc.cluster.local
+            port: 5432
+            poolSize: 30
+
+    users:
+      - name: product
+        database: product
+        password: postgres
+      - name: cart
+        database: cart
+        password: postgres
+      - name: order
+        database: order
+        password: postgres
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+    serviceMonitor:
+      enabled: true
+      interval: 15s
+      scrapeTimeout: 10s
+
+    podAntiAffinity:
+      enabled: false
+      type: soft
+
+    podDisruptionBudget:
+      enabled: false
+      minAvailable: 1

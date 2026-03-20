@@ -1,0 +1,21 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: cnpg-db
+  namespace: product
+  labels:
+    app: cnpg-db
+    operator: cloudnativepg
+spec:
+  selector:
+    matchLabels:
+      cnpg.io/cluster: cnpg-db
+  podMetricsEndpoints:
+  - port: metrics
+    interval: 15s
+    scrapeTimeout: 10s
+    path: /metrics
+  podTargetLabels:
+    - cnpg.io/cluster
+    - cnpg.io/instanceRole
+    - cnpg.io/instanceName

@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# cnpg-db cluster (CloudNativePG)
+# Consolidated: product + cart + order databases
+# Order: secrets -> instance -> extensions -> poolers -> monitoring -> backup
+resources:
+  - secrets/cnpg-db-secret.yaml
+  - secrets/cnpg-db-cart-secret.yaml
+  - secrets/cnpg-db-order-secret.yaml
+  - secrets/pgdog-cnpg-credentials.yaml
+  # pg-backup-rustfs-credentials: managed by ClusterExternalSecret (configs/secrets/cluster-external-secrets/)
+  - instance.yaml
+  - extensions.yaml
+  - configmaps/monitoring-queries.yaml
+  - poolers/
+  - monitoring/podmonitor.yaml
+  - backup/backup-daily.yaml
+  - backup/backup-every-6h.yaml

@@ -1,0 +1,163 @@
+# Consolidated Primary Database Cluster (CloudNativePG)
+# Merged from product-db + transaction-shared-db into single HA cluster
+# Databases: product, cart, order
+# HA: 3 instances (1 primary, 1 sync replica, 1 async replica)
+# DR: WAL archived to RustFS for cnpg-db-replica continuous recovery
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cnpg-db
+  namespace: product
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
+
+  replicationSlots:
+    highAvailability:
+      synchronizeLogicalDecoding: true
+
+  postgresql:
+    shared_preload_libraries:
+      - pgaudit
+      - pg_stat_statements
+      - auto_explain
+
+    synchronous:
+      method: any
+      number: 1
+      dataDurability: required
+
+    parameters:
+      # Connection settings
+      max_connections: "200"
+
+      # Memory settings (production-tuned)
+      shared_buffers: "256MB"
+      effective_cache_size: "1.5GB"
+      maintenance_work_mem: "512MB"
+      work_mem: "32MB"
+
+      # Query planner (SSD optimization)
+      default_statistics_target: "100"
+      random_page_cost: "1.1"
+      effective_io_concurrency: "200"
+
+      # Checkpoint settings
+      checkpoint_completion_target: "0.9"
+      checkpoint_timeout: "15min"
+
+      # WAL settings (optimized for backup + replication)
+      wal_buffers: "16MB"
+      wal_level: "logical"
+      wal_compression: "on"
+      archive_timeout: "5min"
+      max_wal_senders: "10"
+      wal_keep_size: "1GB"
+      min_wal_size: "2GB"
+      max_wal_size: "8GB"
+
+      # Parallelism settings
+      max_worker_processes: "8"
+      max_parallel_workers_per_gather: "4"
+      max_parallel_workers: "8"
+      max_parallel_maintenance_workers: "4"
+
+      # Autovacuum tuning (high-write workloads)
+      autovacuum: "on"
+      autovacuum_max_workers: "3"
+      autovacuum_vacuum_scale_factor: "0.1"
+      autovacuum_analyze_scale_factor: "0.05"
+      autovacuum_vacuum_cost_delay: "10ms"
+      autovacuum_vacuum_cost_limit: "200"
+
+      # Logging
+      log_statement: "mod"
+      log_min_duration_statement: "1000"
+      log_checkpoints: "on"
+      log_lock_waits: "on"
+      log_temp_files: "0"
+      log_autovacuum_min_duration: "1000"
+      log_connections: "on"
+      log_disconnections: "on"
+      logging_collector: "on"
+
+      # Security
+      password_encryption: "scram-sha-256"
+
+      # pgAudit configuration
+      pgaudit.log: "ddl, write"
+      pgaudit.log_catalog: "off"
+      pgaudit.log_parameter: "on"
+      pgaudit.log_statement_once: "off"
+      pgaudit.log_relation: "on"
+      pgaudit.log_rows: "on"
+
+      # Performance monitoring
+      track_io_timing: "on"
+
+      # pg_stat_statements
+      pg_stat_statements.track: "all"
+      pg_stat_statements.max: "10000"
+
+      # auto_explain
+      auto_explain.log_min_duration: "1s"
+      auto_explain.log_analyze: "on"
+
+      # Replication slot sync (PostgreSQL 18 native)
+      hot_standby_feedback: "on"
+      sync_replication_slots: "on"
+
+  monitoring:
+    customQueriesConfigMap:
+      - name: cnpg-db-monitoring-queries
+        key: custom-queries
+
+  bootstrap:
+    initdb:
+      database: product
+      owner: product
+      secret:
+        name: cnpg-db-secret
+      dataChecksums: true
+      walSegmentSize: 64
+      encoding: "UTF8"
+      localeCType: "C"
+      localeCollate: "C"
+      postInitSQL:
+        - CREATE USER cart WITH PASSWORD 'postgres';
+        - CREATE DATABASE cart OWNER cart;
+        - CREATE USER "order" WITH PASSWORD 'postgres';
+        - CREATE DATABASE "order" OWNER "order";
+
+  backup:
+    retentionPolicy: "30d"
+    barmanObjectStore:
+      destinationPath: s3://pg-backups-cnpg/cnpg-db/
+      endpointURL: http://rustfs-svc.rustfs.svc.cluster.local:9000
+      serverName: cnpg-db-cluster
+      wal:
+        compression: gzip
+        maxParallel: 4
+      data:
+        compression: gzip
+        jobs: 4
+        immediateCheckpoint: false
+      s3Credentials:
+        accessKeyId:
+          name: pg-backup-rustfs-credentials
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: pg-backup-rustfs-credentials
+          key: ACCESS_SECRET_KEY
+
+  storage:
+    size: 10Gi
+    storageClass: standard
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"

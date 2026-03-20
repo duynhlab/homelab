@@ -12,10 +12,10 @@ spec:
     name: product
     namespace: product
     replicaCount: 2
-    db_host: "pgdog-product.product.svc.cluster.local"
+    db_host: "pgdog-cnpg.product.svc.cluster.local"
     db_port: "6432"
-    db_migration_host: "product-db-rw.product.svc.cluster.local"
-    db_secret: "product-db-secret"
+    db_migration_host: "cnpg-db-rw.product.svc.cluster.local"
+    db_secret: "cnpg-db-secret"
     db_sslmode: "disable"
     pool_max: "50"
     cache_enabled: "true"

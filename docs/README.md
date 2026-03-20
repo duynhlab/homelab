@@ -257,10 +257,11 @@ docs/
 - [Operator Comparison](./databases/003-operator-comparison.md) - CloudNativePG vs Zalando deep dive
 - [Architecture](./databases/007-architecture.md) - Database architecture overview
 - [Backup Strategy](./databases/006-backup-strategy.md) - Backup architecture and retention
-- [Extensions](./databases/009-extensions.md) - PostgreSQL extensions
+- [Extensions](./databases/009-extensions.md) - PostgreSQL extensions (operand built-in vs Image Volume models)
 - [Connection Poolers](./databases/008-pooler.md) - PgBouncer, PgCat, PgDog
 - [Replication Strategy](./databases/004-replication-strategy.md) - Replication strategy
 - [HA & DR Deep Dive](./databases/005-ha-dr-deep-dive.md) - cnpg-db vs cnpg-db-replica (object-store DR)
+- [CNPG DR replica bootstrap](./databases/runbooks/cnpg-dr-replica-bootstrap.md) - full-recovery prerequisites and troubleshooting
 - [PostgreSQL Internals](./databases/001-postgresql-internals.md) - Deep dive using cnpg-db examples
 
 ### Platform

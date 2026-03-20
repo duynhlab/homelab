@@ -113,10 +113,9 @@ Imagine `supporting-shared-db` handles 1000 transactions/second:
 
 | Cluster | Recommended | Why |
 |---------|------------|-----|
-| **transaction-shared-db** (cart, order) | Sync (RPO = 0) | Financial data. Losing an order is unacceptable. Worth the latency cost. |
+| **cnpg-db** (product, cart, order) | Sync ANY 1 (RPO = 0 for 1 replica) | Financial data (cart/order). Losing an order is unacceptable. Worth the latency cost. |
 | **auth-db** (auth) | Async (RPO > 0) | Sessions/tokens can be regenerated. A few lost logins are tolerable. |
 | **supporting-shared-db** (user, notification, shipping, review) | Async (RPO > 0) | User profiles and notifications are not financial-critical. Async gives best write performance. |
-| **product-db** (product) | Async (RPO > 0) | Product catalog changes are infrequent and can be re-applied. |
 
 ---
 
@@ -630,32 +629,34 @@ Retaining PVCs is a safety feature -- if you scale back up to 3, the replicas ca
 
 ## 10. Comparison with Existing Clusters
 
-### All 4 Clusters
+### All 3 Clusters (+ DR Replica)
 
-| | transaction-shared-db | product-db | auth-db | supporting-shared-db |
-|---|---|---|---|---|
-| **Operator** | CloudNativePG | CloudNativePG | Zalando | Zalando |
-| **Instances** | 3 | 3 | 3 | **1 (SPOF)** |
-| **HA framework** | Instance Manager | Instance Manager | Patroni | Patroni (inactive) |
-| **Sync mode** | Synchronous | Async | Async | N/A |
-| **RPO** | 0 | > 0 | > 0 | N/A |
-| **RTO** | ~10-30s | ~10-30s | ~10-30s | **No failover** |
-| **Pooler** | PgCat | PgDog | PgBouncer | PgBouncer |
-| **Databases** | cart, order | product | auth | user, notification, shipping, review |
-| **Risk** | Low | Low | Low | **High (4 services affected)** |
+> **Note**: `product-db` and `transaction-shared-db` were consolidated into **`cnpg-db`** (see CHANGELOG). The table below reflects the current topology.
+
+| | cnpg-db | auth-db | supporting-shared-db |
+|---|---|---|---|
+| **Operator** | CloudNativePG | Zalando | Zalando |
+| **Instances** | 3 | 3 | **1 (SPOF)** |
+| **HA framework** | Instance Manager | Patroni | Patroni (inactive) |
+| **Sync mode** | Sync (ANY 1) | Async | N/A |
+| **RPO** | 0 | > 0 | N/A |
+| **RTO** | ~10-30s | ~10-30s | **No failover** |
+| **Pooler** | PgDog | PgBouncer | PgBouncer |
+| **Databases** | product, cart, order | auth | user, notification, shipping, review |
+| **Risk** | Low | Low | **High (4 services affected)** |
 
 ### After Scaling supporting-shared-db to 3 Nodes
 
-| | transaction-shared-db | product-db | auth-db | supporting-shared-db |
-|---|---|---|---|---|
-| **Instances** | 3 | 3 | 3 | **3** |
-| **HA** | Yes | Yes | Yes | **Yes** |
-| **Sync mode** | Synchronous | Async | Async | **Async** |
-| **RPO** | 0 | > 0 | > 0 | **> 0** |
-| **RTO** | ~10-30s | ~10-30s | ~10-30s | **~15-40s** |
-| **Risk** | Low | Low | Low | **Low** |
+| | cnpg-db | auth-db | supporting-shared-db |
+|---|---|---|---|
+| **Instances** | 3 | 3 | **3** |
+| **HA** | Yes | Yes | **Yes** |
+| **Sync mode** | Sync (ANY 1) | Async | **Async** |
+| **RPO** | 0 | > 0 | **> 0** |
+| **RTO** | ~10-30s | ~10-30s | **~15-40s** |
+| **Risk** | Low | Low | **Low** |
 
-All 4 clusters will have HA with automatic failover. The platform achieves **100% database HA coverage**.
+All 3 clusters will have HA with automatic failover. The platform achieves **100% database HA coverage**.
 
 ---
 

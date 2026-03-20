@@ -131,8 +131,7 @@ data:
     vault kv put secret/cart/db username="${CART_DB_USER}" password="${CART_DB_PASS}"
     vault kv put secret/order/db username="${ORDER_DB_USER}" password="${ORDER_DB_PASS}"
     vault kv put secret/backups/rustfs access_key_id="${RUSTFS_ACCESS_KEY}" secret_access_key="${RUSTFS_SECRET_KEY}"
-    vault kv put secret/poolers/pgdog-product username="${PGDOG_USER}" password="${PGDOG_PASS}"
-    vault kv put secret/poolers/pgcat-transaction admin_username="${PGCAT_ADMIN_USER}" admin_password="${PGCAT_ADMIN_PASS}" db_username="${PGCAT_DB_USER}" db_password="${PGCAT_DB_PASS}"
+    vault kv put secret/poolers/pgdog-cnpg username="${PGDOG_USER}" password="${PGDOG_PASS}"
 ```
 
 2. Add second container in `vault-bootstrap/job.yaml` with env vars:
@@ -290,8 +289,7 @@ Sensitive values are HMAC-hashed by default. Only metadata (path, operation, pol
 
 | Operator | Secret Name | Namespace | Keys |
 |----------|-------------|-----------|------|
-| CNPG | `product-db-superuser` | product | `username`, `password`, `pgpass`, `uri` |
-| CNPG | `transaction-shared-db-superuser` | cart | `username`, `password`, `pgpass`, `uri` |
+| CNPG | `cnpg-db-superuser` | product | `username`, `password`, `pgpass`, `uri` |
 | Zalando | `postgres.auth-db.credentials.postgresql.acid.zalan.do` | auth | `username`, `password` |
 | Zalando | `postgres.supporting-shared-db.credentials.postgresql.acid.zalan.do` | user | `username`, `password` |
 
@@ -405,8 +403,7 @@ spec:
 **Files to create**:
 - `kubernetes/infra/configs/secrets/cluster-secret-store-push.yaml`
 - `kubernetes/infra/configs/secrets/push-secrets/kustomization.yaml`
-- `kubernetes/infra/configs/secrets/push-secrets/cnpg-product-db.yaml`
-- `kubernetes/infra/configs/secrets/push-secrets/cnpg-transaction-shared-db.yaml`
+- `kubernetes/infra/configs/secrets/push-secrets/cnpg-db.yaml` *(consolidated; replaces former cnpg-product-db + cnpg-transaction-shared-db)*
 - `kubernetes/infra/configs/secrets/push-secrets/zalando-auth-db.yaml`
 - `kubernetes/infra/configs/secrets/push-secrets/zalando-supporting-shared-db.yaml`
 - Update: `kubernetes/infra/configs/secrets/vault-bootstrap/configmap.yaml` (add push policy + role)

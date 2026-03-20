@@ -13,7 +13,7 @@ Production-ready microservices monitoring platform with 8 Go services, complete 
 - 8 microservices with v1 API (canonical, frontend-aligned)
 - 34 Grafana dashboard panels (5 row groups)
 - Complete observability stack (Prometheus, Tempo, Jaeger, Loki, Pyroscope)
-- PostgreSQL database integration (4 clusters, Flyway migrations)
+- PostgreSQL database integration (3 clusters + DR replica, Flyway migrations)
 - Valkey caching (Redis-compatible) with Cache-Aside pattern
 - SLO management via Sloth Operator
 
@@ -25,7 +25,7 @@ Production-ready microservices monitoring platform with 8 Go services, complete 
 
 ### System Architecture
 
-Runtime architecture: Frontend (React SPA), 8 microservices (3-layer each), Valkey cache, 4 PostgreSQL clusters, and full observability stack.
+Runtime architecture: Frontend (React SPA), 8 microservices (3-layer each), Valkey cache, 3 PostgreSQL clusters (+ DR replica), and full observability stack.
 
 > **Note**: This repository contains **infrastructure, GitOps, observability, and docs only**. Application code lives in separate repos (see [SERVICES.md](SERVICES.md)). Apps are deployed via Flux Operator ResourceSets (see [Application Delivery](docs/platform/application-delivery.md)).
 
@@ -82,16 +82,14 @@ flowchart TD
     subgraph Poolers ["Connection Poolers"]
         pb_auth["PgBouncer<br/>(Auth)"]:::pooler
         pb_shared["PgBouncer<br/>(Shared)"]:::pooler
-        pdog["PgDog<br/>(Product)"]:::pooler
-        pcat["PgCat<br/>(Transaction)"]:::pooler
+        pdog["PgDog<br/>(Product, Cart, Order)"]:::pooler
     end
 
     %% Database Layer
     subgraph Databases ["PostgreSQL Clusters (HA)"]
         db_auth[("auth-db<br/>(Zalando)")]:::database
         db_shared[("supporting-shared-db<br/>(Zalando)")]:::database
-        db_prod[("product-db<br/>(CNPG)")]:::database
-        db_tx[("transaction-shared-db<br/>(CNPG)")]:::database
+        db_cnpg[("cnpg-db<br/>(CNPG)")]:::database
     end
 
     %% Connections
@@ -104,15 +102,12 @@ flowchart TD
     eso -.->|"Injects Secrets"| CoreLayer
     
     CoreLayer -->|"SQL (auth)"| pb_auth
-    CoreLayer -->|"SQL (user, notify, shipping)"| pb_shared
-    CoreLayer -->|"Direct SQL (review)"| db_shared
-    CoreLayer -->|"SQL (product)"| pdog
-    CoreLayer -->|"SQL (cart, order)"| pcat
+    CoreLayer -->|"SQL (user, notify, shipping, review)"| pb_shared
+    CoreLayer -->|"SQL (product, cart, order)"| pdog
 
     pb_auth ==> db_auth
     pb_shared ==> db_shared
-    pdog ==> db_prod
-    pcat ==> db_tx
+    pdog ==> db_cnpg
     
     %% Assign classes to subgraphs
     class Microservices,SecretsDev servicebox;
@@ -124,7 +119,7 @@ flowchart TD
 - **Frontend (React SPA)**: Runs in browser, HTTP requests to Web Layer only (`/api/v1/*`). Frontend repo: [`duynhlab/frontend`](https://github.com/duynhlab/frontend).
 - **8 Microservices**: Each follows 3-layer architecture (Web -> Logic -> Core), organized into 4 domains (identity, catalog, checkout, comms).
 - **Cache-Aside Pattern**: Logic Layer checks Valkey first, queries database on miss, writes to cache.
-- **4 PostgreSQL Clusters**: auth-db (Zalando), supporting-shared-db (Zalando, hosts user/notification/shipping/review), product-db (CNPG), transaction-shared-db (CNPG, hosts cart/order). Connected via PgBouncer, PgCat, or PgDog poolers.
+- **3 PostgreSQL Clusters**: auth-db (Zalando), supporting-shared-db (Zalando, hosts user/notification/shipping/review), cnpg-db (CNPG, hosts product/cart/order). Connected via PgBouncer and PgDog poolers. A DR replica cluster (cnpg-db-replica) continuously recovers from cnpg-db WAL archive.
 - **Full Observability**: Traces (Tempo + Jaeger via OTel Collector), Metrics (Prometheus), Logs (Loki + Vector), Profiles (Pyroscope), all visualized in Grafana.
 - **GitOps Delivery**: Flux Operator with domain ResourceSets + per-service InputProviders + OCI + Kustomize. See [Application Delivery](docs/platform/application-delivery.md) and [Setup](docs/platform/setup.md).
 
@@ -138,8 +133,8 @@ flowchart TD
     - 8 microservices
     - 3 layer: Web → Logic → Core
 
-- **Database**: PostgreSQL (4 clusters via Zalando/CloudNativePG operators)
-    - Connection poolers: PgBouncer, PgCat, PgDog
+- **Database**: PostgreSQL (3 clusters + DR replica via Zalando/CloudNativePG operators)
+    - Connection poolers: PgBouncer, PgDog
     - Migrations: Flyway 11.19.0 (8 migration images)
 - **HTTP Framework**: Gin
 - **Cache**: Valkey (Redis-compatible) with Cache-Aside pattern
@@ -175,7 +170,7 @@ make flux-push    # 3. Deploy everything (infrastructure + apps)
 **What gets deployed automatically:**
 
 - Infrastructure: Monitoring (Prometheus, Grafana), APM (Tempo, Loki, Jaeger, Pyroscope, Vector, OTel)
-- Databases: PostgreSQL operators, 4 clusters, connection poolers
+- Databases: PostgreSQL operators, 3 clusters + DR replica, connection poolers
 - Cache: Valkey (Redis-compatible) in cache-system namespace
 - Applications: 8 microservices + frontend (via domain ResourceSets)
 - SLO: Sloth Operator + Service Level Objectives
@@ -252,7 +247,7 @@ Complete documentation is available in the [`docs/`](docs/README.md) directory. 
 - **[SLO Documentation](docs/observability/slo/README.md)** - SLI/SLO definitions and error budgets
 
 **Infrastructure:**
-- **[Database Guide](docs/databases/002-database-integration.md)** - PostgreSQL architecture (4 clusters, poolers, migrations)
+- **[Database Guide](docs/databases/002-database-integration.md)** - PostgreSQL architecture (3 clusters + DR replica, poolers, migrations)
 - **[k6 Load Testing](docs/testing/k6.md)** - Load testing setup and scenarios *(k6 workload retired; doc kept for reference)*
 - **[Runbooks](docs/runbooks/troubleshooting/)** - Operational troubleshooting guides
 

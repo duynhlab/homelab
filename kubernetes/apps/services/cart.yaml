@@ -12,8 +12,9 @@ spec:
     name: cart
     namespace: cart
     replicaCount: 2
-    db_host: "pgcat.cart.svc.cluster.local"
-    db_migration_host: "transaction-shared-db-rw.cart.svc.cluster.local"
-    db_secret: "transaction-shared-db-secret"
+    db_host: "pgdog-cnpg.product.svc.cluster.local"
+    db_port: "6432"
+    db_migration_host: "cnpg-db-rw.product.svc.cluster.local"
+    db_secret: "cnpg-db-cart-secret"
     db_sslmode: "disable"
     pool_max: "30"

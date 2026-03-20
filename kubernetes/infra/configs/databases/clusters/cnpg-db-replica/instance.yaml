@@ -10,6 +10,23 @@ spec:
   instances: 1
   imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
 
+  # Must match or exceed cnpg-db primary for recovery-critical GUCs.
+  # PostgreSQL refuses recovery when replica values < primary pg_controldata.
+  postgresql:
+    parameters:
+      max_connections: "200"
+      max_worker_processes: "8"
+      max_wal_senders: "10"
+      wal_level: "logical"
+      min_wal_size: "2GB"
+      max_wal_size: "8GB"
+      wal_buffers: "16MB"
+      wal_compression: "on"
+
+  bootstrap:
+    recovery:
+      source: cnpg-db-primary
+
   replica:
     enabled: true
     source: cnpg-db-primary

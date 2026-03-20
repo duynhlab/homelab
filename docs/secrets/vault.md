@@ -261,15 +261,15 @@ Instead of static credentials seeded by the bootstrap Job, Vault's **database se
 ```bash
 vault secrets enable database
 
-vault write database/config/product-db \
+vault write database/config/cnpg-db \
   plugin_name=postgresql-database-plugin \
-  connection_url="postgresql://{{username}}:{{password}}@product-db-rw.product:5432/product?sslmode=require" \
+  connection_url="postgresql://{{username}}:{{password}}@cnpg-db-rw.product:5432/product?sslmode=require" \
   allowed_roles="product-app" \
   username="vault_admin" \
   password="<admin-password>"
 
 vault write database/roles/product-app \
-  db_name=product-db \
+  db_name=cnpg-db \
   creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
   default_ttl="1h" \
   max_ttl="24h"

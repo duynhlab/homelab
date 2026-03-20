@@ -79,9 +79,9 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 
 ## Data Platform & Persistence
 
-- **PostgreSQL with CloudNativePG operator** — `kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml`, clusters: `product-db`, `transaction-shared-db`
+- **PostgreSQL with CloudNativePG operator** — `kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml`, clusters: `cnpg-db`, `cnpg-db-replica` (DR)
 - **PostgreSQL with Zalando operator** — `kubernetes/infra/controllers/databases/zalando-operator.yaml`, clusters: `auth-db`, `supporting-shared-db`
-- **Connection poolers** — PgBouncer (Zalando sidecar), PgCat (`transaction-shared-db`), PgDog (`product-db`)
+- **Connection poolers** — PgBouncer (Zalando sidecar), PgDog (`cnpg-db` — product, cart, order)
 - **SQL migrations with Flyway** — `services/*/db/migrations/Dockerfile`, `.github/workflows/build-init.yml`
 - **PostgreSQL internals deep-dive** — `docs/databases/001-postgresql-internals.md`
 - **PostgreSQL internals mastery** — `docs/databases/001-postgresql-internals.md`:
@@ -90,7 +90,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
   - MVCC behavior (tuple visibility, transaction isolation levels, bloat)
   - Vacuum and autovacuum optimization
 - [~] **Connection management and query routing** — `docs/databases/002-database-integration.md`:
-  - Connection pooler deep-dive (PgBouncer vs PgCat vs PgDog trade-offs)
+  - Connection pooler deep-dive (PgBouncer vs PgDog trade-offs; PgCat legacy comparison)
   - Query routing strategies (read/write split, sharding keys)
   - Connection lifecycle and timeout tuning (pool sizes, idle timeout, statement timeout)
 - [~] **Replication strategies** — `docs/databases/004-replication-strategy.md`:
@@ -111,7 +111,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
     - Measure actual RTO during drill
 - [~] **PostgreSQL High Availability (HA) Mastery** — `docs/databases/004-replication-strategy.md`:
   - Patroni under the hood (DCS, Leader Election, loop behavior) — Implemented in both operators
-  - Synchronous vs Asynchronous Replication trade-offs (Performance vs Durability) — `transaction-shared-db` (Sync) vs `product-db` (Async)
+  - Synchronous vs Asynchronous Replication trade-offs (Performance vs Durability) — `cnpg-db` uses Sync (ANY 1) with mixed sync + async replicas
   - Split-brain protection mechanisms (Watchdog, Fencing)
   - Quorum commits consistency tuning (`synchronous_standby_names`)
   - Failover scenarios & recovery drills:
@@ -120,10 +120,10 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
     - Network partition simulation (simulate split-brain)
   - Client-side failover handling (libpq `target_session_attrs`, connection retry logic)
 - **CloudNativePG extensions management** — `Database` resource for declarative `CREATE EXTENSION`, `shared_preload_libraries` for preload, `009-extensions.md` guide
-- **Database naming conventions** — Single-DB clusters use service name (`auth-db`), multi-DB use `*-shared-db` (`supporting-shared-db`, `transaction-shared-db`)
+- **Database naming conventions** — Single-DB clusters use service name (`auth-db`), multi-DB use `*-shared-db` (`supporting-shared-db`) or consolidated name (`cnpg-db`)
 - Connection pooler tuning (pool sizes, timeouts, prepared statements)
 - **Valkey/Redis caching with TTL policies and operation tracing** — `kubernetes/infra/controllers/caching/valkey/`
-- **Read replica routing (PgCat/PgDog query routing)** — Implemented via PgCat/PgDog poolers
+- **Read replica routing (PgDog query routing)** — Implemented via PgDog pooler for cnpg-db
 
 ---
 

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.81.0] - 2026-03-20
+
+### Added
+
+- **Flux layer for CNPG DR**: `kubernetes/infra/configs/databases-cnpg-dr/` and `kubernetes/clusters/local/databases-cnpg-dr.yaml` (`databases-cnpg-dr-local`) so `cnpg-db-replica` applies after `databases-local` (`dependsOn`).
+- **On-demand Backup CR** `cnpg-db-initial` for `cnpg-db` (`backup/backup-initial.yaml`) to anchor a named backup for DR bootstrap verification.
+- **Runbook** `docs/databases/runbooks/cnpg-dr-replica-bootstrap.md` — prerequisites, `full-recovery` troubleshooting, WAL `min_wal_size` / `wal_segment_size` note.
+
+### Changed
+
+- **Extension docs overview**: Added "Extension Delivery Models (CNPG)" section to `docs/databases/009-extensions.md` — comparison table, decision flowchart, and upstream links for Path A (operand built-in / `system-trixie`) vs Path B (Image Volume / pluggable OCI images). Updated TOC and docs index.
+- **Database docs sync**: Updated 17 documentation files across infra READMEs, AGENTS.md, secrets, observability, runbooks, and extensions to reflect consolidated `cnpg-db` cluster topology (formerly separate `product-db` + `transaction-shared-db`). Added legacy banners to PgCat runbooks.
+- **`configs/databases`**: Removed `clusters/cnpg-db-replica/` from the main databases kustomization (replica only in `databases-cnpg-dr`).
+- **`databases-local` healthChecks**: No longer waits on `cnpg-db-replica` (handled by `databases-cnpg-dr-local`).
+- **ScheduledBackup `cnpg-db-daily`**: `immediate: true` so the daily schedule also triggers soon after apply (alongside every-6h + initial backup).
+- **`cnpg-db-replica` `bootstrap.recovery`**: Dropped `database` / `owner` (skipped for replica clusters per CNPG semantics).
+
+### Fixed
+
+- **DR replica WAL config** (already in manifest): `postgresql.parameters` on `cnpg-db-replica` aligned with primary to satisfy `min_wal_size >= 2 * wal_segment_size` after restore.
+
 ## [0.80.0] - 2026-03-13
 
 ### Added

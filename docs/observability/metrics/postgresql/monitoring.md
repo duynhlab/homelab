@@ -10,31 +10,28 @@ flowchart TD
     end
 
     subgraph cnpg [CloudNativePG Clusters]
-        productDB["product-db<br/>PG 18, 3 instances"]
-        transDB["transaction-shared-db<br/>PG 18, 3 instances<br/>2 DBs: cart, order"]
+        cnpgDB["cnpg-db<br/>PG 18, 3 instances<br/>3 DBs: product, cart, order"]
     end
 
     subgraph exporters [Metrics Exporters]
         pgExp1["postgres_exporter v0.18.1<br/>sidecar + custom queries"]
         pgExp2["postgres_exporter v0.18.1<br/>sidecar + custom queries"]
         pigsty["pg_exporter (Pigsty)<br/>sidecar, 600+ metrics<br/>auto-discovery, built-in pgBouncer"]
-        cnpgBuiltin1["CNPG built-in exporter<br/>+ custom queries ConfigMap"]
-        cnpgBuiltin2["CNPG built-in exporter<br/>+ custom queries ConfigMap"]
+        cnpgBuiltin["CNPG built-in exporter<br/>+ custom queries ConfigMap"]
     end
 
     authDB --> pgExp1
     reviewDB --> pgExp2
     supportDB --> pigsty
-    productDB --> cnpgBuiltin1
-    transDB --> cnpgBuiltin2
+    cnpgDB --> cnpgBuiltin
 
     subgraph poolerMetrics [Pooler Metrics]
         pgbExporter["pgbouncer-exporter<br/>port 9127"]
-        pgcatMetrics["PgCat built-in<br/>port 9930"]
+        pgdogMetrics["PgDog OpenMetrics<br/>port 9090"]
     end
 
     authDB -.-> pgbExporter
-    transDB -.-> pgcatMetrics
+    cnpgDB -.-> pgdogMetrics
 
     pgExp1 -->|":9187"| prom["Prometheus"]
     pgExp2 -->|":9187"| prom
@@ -50,23 +47,23 @@ flowchart TD
 
 ## Monitoring Coverage Matrix
 
-| Metric Layer | auth-db | supporting-shared-db | product-db | transaction-shared-db |
-|---|---|---|---|---|
-| **Operator** | Zalando | Zalando | CloudNativePG | CloudNativePG |
-| **Exporter** | postgres_exporter | pg_exporter (Pigsty) | CNPG built-in | CNPG built-in |
-| **Availability** | pg_up | pg_up (600+) | cnpg_collector_up | cnpg_collector_up |
-| **Replication lag** | pg_replication_lag | pg_repl_* | cnpg_collector_sync_replicas | cnpg_collector_sync_replicas |
-| **WAL status** | - | pg_wal_* | cnpg_collector_pg_wal | cnpg_collector_pg_wal |
-| **Backup status** | - | - | cnpg_collector_last_*_backup | cnpg_collector_last_*_backup |
-| **pg_stat_statements** | custom query | built-in collector | custom query | custom query |
-| **Connection stats** | built-in + custom_ | built-in collector | custom query | custom query |
-| **Lock contention** | custom_ query | built-in collector | custom query | custom query |
-| **Autovacuum/dead tuples** | built-in + custom_ | built-in collector | custom query | custom query |
-| **Table/index size** | custom_ query | built-in collector | custom query | custom query |
-| **Bloat estimation** | - | built-in collector | - | - |
-| **Checkpoints** | built-in collector | built-in collector | custom query | custom query |
-| **Database size** | built-in collector | built-in collector | custom query | custom query |
-| **Pooler metrics** | pgbouncer-exporter | pg_exporter built-in pgBouncer | - | PgCat :9930 |
+| Metric Layer | auth-db | supporting-shared-db | cnpg-db |
+|---|---|---|---|
+| **Operator** | Zalando | Zalando | CloudNativePG |
+| **Exporter** | postgres_exporter | pg_exporter (Pigsty) | CNPG built-in |
+| **Availability** | pg_up | pg_up (600+) | cnpg_collector_up |
+| **Replication lag** | pg_replication_lag | pg_repl_* | cnpg_collector_sync_replicas |
+| **WAL status** | - | pg_wal_* | cnpg_collector_pg_wal |
+| **Backup status** | - | - | cnpg_collector_last_*_backup |
+| **pg_stat_statements** | custom query | built-in collector | custom query |
+| **Connection stats** | built-in + custom_ | built-in collector | custom query |
+| **Lock contention** | custom_ query | built-in collector | custom query |
+| **Autovacuum/dead tuples** | built-in + custom_ | built-in collector | custom query |
+| **Table/index size** | custom_ query | built-in collector | custom query |
+| **Bloat estimation** | - | built-in collector | - |
+| **Checkpoints** | built-in collector | built-in collector | custom query |
+| **Database size** | built-in collector | built-in collector | custom query |
+| **Pooler metrics** | pgbouncer-exporter | pg_exporter built-in pgBouncer | PgDog OpenMetrics :9090 |
 
 ## Exporter Comparison
 
@@ -94,7 +91,7 @@ flowchart TD
 
 ### Decision Rationale
 
-Hybrid approach chosen: custom queries for 4 clusters + pg_exporter pilot on 1 cluster.
+Hybrid approach chosen: custom queries for 3 clusters + pg_exporter pilot on 1 cluster.
 
 1. CNPG clusters must use built-in exporter (mandatory, cannot be replaced)
 2. Custom queries achieve ~90% coverage with zero new components
@@ -219,10 +216,10 @@ These queries were removed because `postgres_exporter v0.18+` built-in collector
 | custom_table_size | total_bytes, table_bytes | Table size (top 30) |
 | custom_stat_user_indexes | idx_scan, index_bytes | Index usage and size (bottom 30 by scans) |
 
-### CNPG Clusters (product-db, transaction-shared-db)
+### CNPG Cluster (cnpg-db)
 
 Queries keep original names; CNPG auto-prefixes all metrics with `cnpg_`.
-For `transaction-shared-db`, queries with `target_databases` include `current_database() AS datname` to disambiguate shared tables.
+For `cnpg-db`, queries with `target_databases` include `current_database() AS datname` to disambiguate shared tables (product, cart, order databases coexist on the same cluster).
 
 | Query Name | CNPG Metric Prefix | Purpose |
 |---|---|---|

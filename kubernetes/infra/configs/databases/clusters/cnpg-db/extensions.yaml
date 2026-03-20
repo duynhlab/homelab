@@ -1,0 +1,47 @@
+# Product Database extensions
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: product-database
+  namespace: product
+spec:
+  name: product
+  owner: product
+  cluster:
+    name: cnpg-db
+  extensions:
+    - name: pgaudit
+    - name: pg_stat_statements
+    - name: auto_explain
+    - name: pgcrypto
+    - name: uuid-ossp
+---
+# Cart Database extensions
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: cart-database
+  namespace: product
+spec:
+  name: cart
+  owner: cart
+  cluster:
+    name: cnpg-db
+  extensions:
+    - name: pgaudit
+    - name: pg_stat_statements
+---
+# Order Database extensions
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: order-database
+  namespace: product
+spec:
+  name: order
+  owner: order
+  cluster:
+    name: cnpg-db
+  extensions:
+    - name: pgaudit
+    - name: pg_stat_statements

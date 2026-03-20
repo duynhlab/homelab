@@ -1,6 +1,6 @@
 # ConfigMap for Zalando Postgres Operator - WAL-G backup to RustFS
 # Injected into all Zalando PostgreSQL pods via pod_environment_configmap
-# Reference: docs/databases/BACKUP_STRATEGY.md
+# Reference: docs/databases/006-backup-strategy.md
 # Note: AWS credentials come from pod_environment_secret per cluster
 apiVersion: v1
 kind: ConfigMap

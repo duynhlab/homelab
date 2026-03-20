@@ -1,0 +1,15 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: cnpg-db-daily
+  namespace: product
+  labels:
+    app.kubernetes.io/name: cnpg-db-backup
+    app.kubernetes.io/component: scheduled-backup
+    backup-frequency: daily
+spec:
+  schedule: "0 0 2 * * *"
+  cluster:
+    name: cnpg-db
+  backupOwnerReference: self
+  immediate: false

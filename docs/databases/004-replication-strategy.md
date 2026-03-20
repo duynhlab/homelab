@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 
-You are running **4 PostgreSQL clusters** with a hybrid architecture optimized for specific workload needs.
+You are running **3 operational PostgreSQL clusters** + **1 DR replica cluster** with a hybrid architecture optimized for specific workload needs.
 
 ### Cluster overview
 
@@ -17,30 +17,52 @@ You are running **4 PostgreSQL clusters** with a hybrid architecture optimized f
 
 ```mermaid
 flowchart TB
-    subgraph HA [3-Node HA Clusters]
-        subgraph cnpg [cnpg-db - Sync ANY 1, RPO=0]
-            C1[Primary]
-            C2[Replica 1]
-            C3[Replica 2]
-            C1 --> C2
-            C1 --> C3
-        end
-        subgraph auth [auth-db - Async]
-            A1[Primary]
-            A2[Replica 1]
-            A3[Replica 2]
-            A1 --> A2
-            A1 --> A3
-        end
+  subgraph productNS ["product namespace"]
+    subgraph cnpgPrimary ["cnpg-db - Primary Cluster, 3 instances, Sync ANY 1, RPO=0"]
+      CnpgSvc["K8s Service: cnpg-db-rw / cnpg-db-r"]
+      P1["Primary"]
+      P2["Sync Replica"]
+      P3["Async Replica"]
+      CnpgSvc --> P1
+      CnpgSvc --> P2
+      CnpgSvc --> P3
+      P1 -->|"sync WAL stream"| P2
+      P1 -->|"async WAL stream"| P3
     end
 
-    subgraph DR [DR via backups]
-        DR1[cnpg-db-replica - 1 instance from object store]
+    subgraph cnpgDR ["cnpg-db-replica - DR Cluster, 1 instance"]
+      DRSvc["K8s Service: cnpg-db-replica-rw"]
+      DR1["Designated Primary"]
+      DRSvc --> DR1
     end
 
-    subgraph Single [Single-Instance Clusters - No HA]
-        S1[supporting-shared-db]
+    PgDog["PgDog Pooler :6432"]
+  end
+
+  subgraph objStores ["Backup Object Stores"]
+    PrimaryStore["s3://pg-backups-cnpg/cnpg-db/"]
+    DRStore["s3://pg-backups-cnpg/cnpg-db-replica/"]
+  end
+
+  subgraph zalandoClusters ["Zalando Clusters"]
+    subgraph authCluster ["auth-db - 3 nodes, Async"]
+      AuthP["Leader"]
+      AuthS1["Standby 1"]
+      AuthS2["Standby 2"]
+      AuthP --> AuthS1
+      AuthP --> AuthS2
     end
+    SupportingDB["supporting-shared-db - 1 node, No HA"]
+  end
+
+  ProductSvc["Product Service"] --> PgDog
+  CartSvc["Cart Service"] --> PgDog
+  OrderSvc["Order Service"] --> PgDog
+  PgDog --> CnpgSvc
+
+  P1 -->|"archive_command"| PrimaryStore
+  PrimaryStore -->|"restore_command"| DR1
+  DR1 -->|"archive_command"| DRStore
 ```
 
 **Key findings:**
@@ -77,8 +99,6 @@ flowchart LR
     WAL -->|3. Flush to Disk| Disk1[Primary Disk]
     Primary -->|4. Stream WAL| Replica[Replica]
     Replica -->|5. Replay| Disk2[Replica Disk]
-
-    style WAL fill:#e1f5fe
 ```
 
 **Tóm lại:** WAL là "nhật ký thay đổi". Primary ghi WAL trước, rồi stream sang Replica. Replica replay WAL để đồng bộ dữ liệu.
@@ -245,9 +265,6 @@ flowchart LR
     Network -->|2. write_lsn| ReplicaRAM[Replica RAM]
     ReplicaRAM -->|3. flush_lsn| ReplicaDisk[Replica Disk]
     ReplicaDisk -->|4. replay_lsn| Visible[Visible to Queries]
-
-    style Network fill:#fff3e0
-    style ReplicaRAM fill:#e8f5e9
 ```
 
 **Lag types:**

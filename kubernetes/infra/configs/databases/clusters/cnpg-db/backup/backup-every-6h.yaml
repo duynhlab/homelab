@@ -1,0 +1,14 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: cnpg-db-every-6h
+  namespace: product
+  labels:
+    backup-frequency: every-6h
+spec:
+  schedule: "0 0 */6 * * *"
+  cluster:
+    name: cnpg-db
+  backupOwnerReference: self
+  immediate: true
+  method: barmanObjectStore

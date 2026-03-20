@@ -11,14 +11,15 @@ docs/
 ├── api/                          # API documentation
 │   └── api.md                    # Complete API reference
 ├── databases/                    # Database documentation
-│   ├── database.md               # PostgreSQL architecture
-│   ├── operator.md               # CloudNativePG vs Zalando operator deep dive
-│   ├── architecture.md           # Database architecture overview
-│   ├── backup.md                 # Backup strategy and retention
-│   ├── extensions.md             # PostgreSQL extensions
-│   ├── pooler.md                 # Connection pooler documentation
-│   ├── replication_strategy.md   # Replication strategy
-│   └── postgresql_internals_product_db.md  # PostgreSQL internals deep dive
+│   ├── 002-database-integration.md               # PostgreSQL architecture
+│   ├── 003-operator-comparison.md               # CloudNativePG vs Zalando operator deep dive
+│   ├── 007-architecture.md           # Database architecture overview
+│   ├── 006-backup-strategy.md                 # Backup strategy and retention
+│   ├── 009-extensions.md             # PostgreSQL extensions
+│   ├── 008-pooler.md                 # Connection pooler documentation
+│   ├── 004-replication-strategy.md   # Replication strategy
+│   ├── 005-ha-dr-deep-dive.md        # HA vs DR (cnpg-db-replica)
+│   └── 001-postgresql-internals.md  # PostgreSQL internals deep dive
 ├── observability/                # Observability documentation
 │   ├── README.md                 # Master index + 4-pillar architecture
 │   ├── architecture.md           # 3-layer service architecture + APM integration
@@ -168,18 +169,18 @@ docs/
 
 ### Databases
 
-1. **[Database Guide](./databases/database.md)** - PostgreSQL database integration guide
+1. **[Database Guide](./databases/002-database-integration.md)** - PostgreSQL database integration guide
     - 4 PostgreSQL clusters architecture with comprehensive diagrams
     - Overview diagram showing operators, services, poolers, and clusters
     - Individual cluster diagrams with secrets, connections, and patterns
 
-2. **[Operator Comparison](./databases/operator.md)** - CloudNativePG vs Zalando deep dive
+2. **[Operator Comparison](./databases/003-operator-comparison.md)** - CloudNativePG vs Zalando deep dive
     - Core architecture differences (Instance Manager vs Patroni)
     - HA and failover mechanisms with sequence diagrams
     - Feature comparison matrix, strengths, trade-offs
     - Production recommendations and decision matrix
 
-3. **[PostgreSQL Internals Deep Dive](./databases/postgresql_internals_product_db.md)** - PostgreSQL internals using product-db
+3. **[PostgreSQL Internals Deep Dive](./databases/001-postgresql-internals.md)** - PostgreSQL internals using cnpg-db examples
     - INSERT/UPDATE workflow with sequence diagrams
     - Shared Buffers and Buffer Manager explained
     - WAL (Write-Ahead Log) and crash recovery
@@ -252,14 +253,15 @@ docs/
 
 ### Databases
 
-- [Database Guide](./databases/database.md) - PostgreSQL database integration guide
-- [Operator Comparison](./databases/operator.md) - CloudNativePG vs Zalando deep dive
-- [Architecture](./databases/architecture.md) - Database architecture overview
-- [Backup Strategy](./databases/backup.md) - Backup architecture and retention
-- [Extensions](./databases/extensions.md) - PostgreSQL extensions
-- [Connection Poolers](./databases/pooler.md) - PgBouncer, PgCat, PgDog
-- [Replication Strategy](./databases/replication_strategy.md) - Replication strategy
-- [PostgreSQL Internals](./databases/postgresql_internals_product_db.md) - Deep dive using product-db
+- [Database Guide](./databases/002-database-integration.md) - PostgreSQL database integration guide
+- [Operator Comparison](./databases/003-operator-comparison.md) - CloudNativePG vs Zalando deep dive
+- [Architecture](./databases/007-architecture.md) - Database architecture overview
+- [Backup Strategy](./databases/006-backup-strategy.md) - Backup architecture and retention
+- [Extensions](./databases/009-extensions.md) - PostgreSQL extensions
+- [Connection Poolers](./databases/008-pooler.md) - PgBouncer, PgCat, PgDog
+- [Replication Strategy](./databases/004-replication-strategy.md) - Replication strategy
+- [HA & DR Deep Dive](./databases/005-ha-dr-deep-dive.md) - cnpg-db vs cnpg-db-replica (object-store DR)
+- [PostgreSQL Internals](./databases/001-postgresql-internals.md) - Deep dive using cnpg-db examples
 
 ### Platform
 

@@ -1,6 +1,6 @@
 # PostgreSQL Backup and Restore Runbook
 
-This runbook covers backup/restore procedures for the 4 PostgreSQL clusters using RustFS (S3-compatible) as object storage. Reference: [docs/databases/backup.md](../../databases/backup.md).
+This runbook covers backup/restore procedures for the 4 PostgreSQL clusters using RustFS (S3-compatible) as object storage. Reference: [docs/databases/006-backup-strategy.md](../../databases/006-backup-strategy.md).
 
 ## Table of Contents
 
@@ -247,6 +247,6 @@ pg_restore -h target-host -U notification -d notification -Fc backup_notificatio
 
 ## Related Documentation
 
-- [backup.md](../../databases/backup.md) - Strategy, retention, bucket layout
-- [database.md](../../databases/database.md) - Cluster architecture
+- [backup.md](../../databases/006-backup-strategy.md) - Strategy, retention, bucket layout
+- [database.md](../../databases/002-database-integration.md) - Cluster architecture
 - [RustFS README](../../../kubernetes/infra/controllers/storage/rustfs/README.md) - Object storage setup

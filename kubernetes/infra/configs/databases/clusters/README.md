@@ -113,7 +113,7 @@ When a Product Service calls `INSERT INTO products (name, price) VALUES ('Widget
 
 For full explanations with detailed diagrams, tables, and EC2/VM mapping, see:
 
-**[PostgreSQL Internals Deep Dive (product-db)](../../../../docs/databases/postgresql_internals_product_db.md)**
+**[PostgreSQL Internals Deep Dive (product-db)](../../../../docs/databases/001-postgresql-internals.md)**
 
 Topics covered:
 - INSERT/UPDATE workflow with sequence diagrams
@@ -130,7 +130,7 @@ Topics covered:
 
 ## Related Documentation
 
-- **Database Architecture Overview**: [`docs/databases/database.md`](../../../../docs/databases/database.md)
+- **Database Architecture Overview**: [`docs/databases/002-database-integration.md`](../../../../docs/databases/002-database-integration.md)
 - **PgCat Troubleshooting**: [`docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md`](../../../../docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md)
 - **Monitoring Setup**: [`docs/observability/metrics/README.md`](../../../../docs/observability/metrics/README.md)
-- **Replication Deep Dive**: [`docs/databases/replication_strategy.md`](../../../../docs/databases/replication_strategy.md)
+- **Replication Deep Dive**: [`docs/databases/004-replication-strategy.md`](../../../../docs/databases/004-replication-strategy.md)

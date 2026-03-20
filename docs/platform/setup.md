@@ -243,4 +243,4 @@ monitoring/
 ---
 
 For detailed API specifications, refer to [api.md](../api/api.md).  
-For persistence layer details, refer to [database.md](../databases/database.md).
+For persistence layer details, refer to [database.md](../databases/002-database-integration.md).

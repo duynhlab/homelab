@@ -63,7 +63,7 @@ This directory contains PostgreSQL database configurations organized by cluster.
 
 ## Related Documentation
 
-- **Database Guide:** `[docs/databases/database.md](../../../docs/databases/database.md)`
+- **Database Guide:** `[docs/databases/002-database-integration.md](../../../docs/databases/002-database-integration.md)`
 - **Poolers Documentation:** `[clusters/README.md](clusters/README.md)`
 - **PgCat Troubleshooting:** `[docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md](../../../docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md)`
 

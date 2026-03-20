@@ -252,7 +252,7 @@ Complete documentation is available in the [`docs/`](docs/README.md) directory. 
 - **[SLO Documentation](docs/observability/slo/README.md)** - SLI/SLO definitions and error budgets
 
 **Infrastructure:**
-- **[Database Guide](docs/databases/database.md)** - PostgreSQL architecture (4 clusters, poolers, migrations)
+- **[Database Guide](docs/databases/002-database-integration.md)** - PostgreSQL architecture (4 clusters, poolers, migrations)
 - **[k6 Load Testing](docs/testing/k6.md)** - Load testing setup and scenarios *(k6 workload retired; doc kept for reference)*
 - **[Runbooks](docs/runbooks/troubleshooting/)** - Operational troubleshooting guides
 

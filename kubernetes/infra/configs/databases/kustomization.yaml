@@ -6,5 +6,5 @@ kind: Kustomization
 resources:
   - clusters/auth-db/
   - clusters/supporting-shared-db/
-  - clusters/product-db/
-  - clusters/transaction-shared-db/
+  - clusters/cnpg-db/
+  - clusters/cnpg-db-replica/

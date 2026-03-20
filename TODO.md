@@ -83,23 +83,23 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 - **PostgreSQL with Zalando operator** — `kubernetes/infra/controllers/databases/zalando-operator.yaml`, clusters: `auth-db`, `supporting-shared-db`
 - **Connection poolers** — PgBouncer (Zalando sidecar), PgCat (`transaction-shared-db`), PgDog (`product-db`)
 - **SQL migrations with Flyway** — `services/*/db/migrations/Dockerfile`, `.github/workflows/build-init.yml`
-- **PostgreSQL internals deep-dive** — `docs/databases/postgresql_internals_product_db.md`
-- **PostgreSQL internals mastery** — `docs/databases/postgresql_internals_product_db.md`:
+- **PostgreSQL internals deep-dive** — `docs/databases/001-postgresql-internals.md`
+- **PostgreSQL internals mastery** — `docs/databases/001-postgresql-internals.md`:
   - Buffer pool tuning (shared_buffers, effective_cache_size, work_mem)
   - WAL mechanics (redo logs, checkpoint tuning, wal_level)
   - MVCC behavior (tuple visibility, transaction isolation levels, bloat)
   - Vacuum and autovacuum optimization
-- [~] **Connection management and query routing** — `docs/databases/database.md`:
+- [~] **Connection management and query routing** — `docs/databases/002-database-integration.md`:
   - Connection pooler deep-dive (PgBouncer vs PgCat vs PgDog trade-offs)
   - Query routing strategies (read/write split, sharding keys)
   - Connection lifecycle and timeout tuning (pool sizes, idle timeout, statement timeout)
-- [~] **Replication strategies** — `docs/databases/replication_strategy.md`:
+- [~] **Replication strategies** — `docs/databases/004-replication-strategy.md`:
   - Streaming replication internals (WAL sender/receiver, sync vs async)
   - Logical replication for selective table sync
   - Multi-source replication patterns
   - Replication lag monitoring and optimization
 - sqlc code generation + repository pattern
-- [~] **PostgreSQL Backup & Recovery Mastery** — `docs/databases/backup.md`:
+- [~] **PostgreSQL Backup & Recovery Mastery** — `docs/databases/006-backup-strategy.md`:
   - Physical backup architecture (Base backup + WAL archiving) — Implemented via CloudNativePG & Zalando
   - Point-in-Time Recovery (PITR) strategy (concepts, WAL replay, timeline IDs)
   - RPO/RTO analysis and trade-offs (storage cost vs recovery time)
@@ -109,7 +109,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
     - Perform a full Point-in-Time Recovery (PITR)
     - Corrupt/delete data and recover to specific transaction
     - Measure actual RTO during drill
-- [~] **PostgreSQL High Availability (HA) Mastery** — `docs/databases/replication_strategy.md`:
+- [~] **PostgreSQL High Availability (HA) Mastery** — `docs/databases/004-replication-strategy.md`:
   - Patroni under the hood (DCS, Leader Election, loop behavior) — Implemented in both operators
   - Synchronous vs Asynchronous Replication trade-offs (Performance vs Durability) — `transaction-shared-db` (Sync) vs `product-db` (Async)
   - Split-brain protection mechanisms (Watchdog, Fencing)
@@ -119,7 +119,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
     - Forced failover (kill primary pod) -> Measure downtime
     - Network partition simulation (simulate split-brain)
   - Client-side failover handling (libpq `target_session_attrs`, connection retry logic)
-- **CloudNativePG extensions management** — `Database` resource for declarative `CREATE EXTENSION`, `shared_preload_libraries` for preload, `extensions.md` guide
+- **CloudNativePG extensions management** — `Database` resource for declarative `CREATE EXTENSION`, `shared_preload_libraries` for preload, `009-extensions.md` guide
 - **Database naming conventions** — Single-DB clusters use service name (`auth-db`), multi-DB use `*-shared-db` (`supporting-shared-db`, `transaction-shared-db`)
 - Connection pooler tuning (pool sizes, timeouts, prepared statements)
 - **Valkey/Redis caching with TTL policies and operation tracing** — `kubernetes/infra/controllers/caching/valkey/`

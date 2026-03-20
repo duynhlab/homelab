@@ -136,7 +136,7 @@ flowchart TD
     Database -->|PostgreSQL| DB[(Database)]
 ```
 
-**Database Integration**: See [`docs/databases/database.md`](docs/databases/database.md) for database architecture, connection patterns (direct, PgBouncer, PgCat), and configuration.
+**Database Integration**: See [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) for database architecture, connection patterns (direct, PgBouncer, PgCat), and configuration.
 
 **Layer Responsibilities**:
 
@@ -196,7 +196,7 @@ flowchart TD
 - **Database**: PostgreSQL (4 clusters via Zalando/CloudNativePG operators)
   - Connection poolers: PgBouncer, PgCat
   - Migrations: Flyway 11.19.0 (8 migration images)
-  - **Database Documentation**: [`docs/databases/database.md`](docs/databases/database.md)
+  - **Database Documentation**: [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md)
 - **Cache**: Valkey (Redis-compatible) for read-heavy endpoints
   - Cache-Aside pattern in Logic Layer
   - Product service: `GET /api/v1/products`, `GET /api/v1/products/:id`
@@ -326,7 +326,7 @@ make flux-sync
 - **API Reference**: [`docs/api/api.md`](docs/api/api.md) - Complete API documentation
 - **Setup Guide**: [`docs/platform/setup.md`](docs/platform/setup.md) - Deployment instructions
 - **Configuration**: [`docs/api/api.md`](docs/api/api.md) - Environment variables and config
-- **Database**: [`docs/databases/database.md`](docs/databases/database.md) - Database architecture and patterns
+- **Database**: [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) - Database architecture and patterns
 
 ### Find Files by Purpose
 

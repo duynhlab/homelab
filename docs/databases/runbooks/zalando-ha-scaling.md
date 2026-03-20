@@ -663,8 +663,8 @@ All 4 clusters will have HA with automatic failover. The platform achieves **100
 
 - **Manifest**: `kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml`
 - **Reference cluster (3-node)**: `kubernetes/infra/configs/databases/clusters/auth-db/instance.yaml`
-- **Replication strategy docs**: `docs/databases/replication_strategy.md`
-- **Operator comparison**: `docs/databases/operator.md`
+- **Replication strategy docs**: `docs/databases/004-replication-strategy.md`
+- **Operator comparison**: `docs/databases/003-operator-comparison.md`
 - **Zalando Operator User Guide**: [Standby clusters](https://opensource.zalando.com/postgres-operator/docs/user.html#setting-up-a-standby-cluster)
 - **Zalando Operator Admin Guide**: [Rolling updates](https://postgres-operator.readthedocs.io/en/latest/administrator/#understanding-rolling-update-of-spilo-pods)
 - **Patroni documentation**: [patroni.readthedocs.io](https://patroni.readthedocs.io/en/latest/)

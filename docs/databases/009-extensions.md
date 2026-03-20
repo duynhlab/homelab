@@ -2,14 +2,76 @@
 
 ## Table of Contents
 
-1. [Current State](#current-state)
-2. [Problem Statement](#problem-statement)
-3. [Solutions](#solutions)
+1. [Extension Delivery Models (CNPG)](#extension-delivery-models-cnpg) - Path A (operand built-in) vs Path B (Image Volume)
+2. [Current State](#current-state)
+3. [Problem Statement](#problem-statement)
+4. [Solutions](#solutions)
    - [CloudNativePG Operator](#cloudnativepg-operator)
      - [Image Volume Extensions](#solution-1-image-volume-extensions-postgresql-18-recommended)
      - [Building Extension Container Images](#building-extension-container-images)
    - [Zalando Operator](#zalando-operator)
-4. [Additional Information](#additional-information)
+5. [Additional Information](#additional-information)
+
+---
+
+## Extension Delivery Models (CNPG)
+
+CloudNativePG provides two ways to make extensions available in a PostgreSQL cluster. Understanding which model applies avoids confusion when reading upstream docs or planning new extensions.
+
+### Path A — Built into the operand image (current homelab approach)
+
+The `cnpg-db` cluster runs `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie`, which bundles 50+ extensions (pgaudit, pg_stat_statements, pgcrypto, etc.). Extensions are activated through:
+
+1. `shared_preload_libraries` in the Cluster spec — loads libraries at startup.
+2. `Database` resource with `extensions:` — declaratively runs `CREATE EXTENSION`.
+
+This is all that's needed when the required extension **already ships with the operand image**. No Kubernetes ImageVolume support is required.
+
+- Cluster manifest: [`kubernetes/infra/configs/databases/clusters/cnpg-db/instance.yaml`](../../kubernetes/infra/configs/databases/clusters/cnpg-db/instance.yaml)
+- Extension declarations: [`kubernetes/infra/configs/databases/clusters/cnpg-db/extensions.yaml`](../../kubernetes/infra/configs/databases/clusters/cnpg-db/extensions.yaml)
+
+### Path B — Image Volume Extensions (pluggable OCI images)
+
+For extensions **not included** in the operand image (e.g., pgvector, PostGIS), or when using a `minimal` image to reduce attack surface, CNPG can mount extension binaries from a **separate OCI container image** at pod startup via `spec.postgresql.extensions`.
+
+This model requires:
+
+- **PostgreSQL 18+** (for `extension_control_path` GUC).
+- **Kubernetes 1.33+** with `ImageVolume` feature gate enabled (default-on from 1.35+).
+- **containerd 2.1.0+** or **CRI-O 1.31+**.
+- **CNPG ≥ 1.27** (catalog support from 1.29+).
+
+Each extension is mounted at `/extensions/<name>/` and CNPG auto-configures `extension_control_path` and `dynamic_library_path`. The `Database` resource then activates extensions declaratively, same as Path A.
+
+For implementation details, see [Image Volume Extensions (Solution 1)](#solution-1-image-volume-extensions-postgresql-18-recommended) below.
+
+### Comparison
+
+| Aspect | Path A (operand built-in) | Path B (Image Volume) |
+|--------|--------------------------|----------------------|
+| **When to use** | Extension ships with `system-*` image | Extension not in operand, or using `minimal` image |
+| **Image** | `system-trixie` (fat, 50+ extensions) | `minimal-*` + per-extension OCI images |
+| **K8s requirement** | None (standard volumes) | ImageVolume feature gate (K8s 1.33+) |
+| **Supply chain** | Extensions coupled to operand image | Extensions versioned and shipped independently |
+| **Rolling update** | Only when changing operand image | Triggered when adding/removing extension images |
+| **Catalog support** | N/A | `ClusterImageCatalog` (CNPG 1.29+) |
+| **Homelab status** | **Active** — used by `cnpg-db` | **Ready** — infra compatible; not yet deployed |
+
+```mermaid
+flowchart TD
+    Q{"Extension in\nsystem-trixie image?"}
+    Q -->|Yes| A["Path A\nshared_preload_libraries +\nDatabase resource"]
+    Q -->|No| B{"ImageVolume\nenabled in K8s?"}
+    B -->|Yes| C["Path B\nspec.postgresql.extensions +\nDatabase resource"]
+    B -->|No| D["Enable ImageVolume\nfeature gate first"]
+    D --> C
+```
+
+### Upstream references
+
+- [Image Volume Extensions (CNPG docs — devel)](https://cloudnative-pg.io/docs/devel/imagevolume_extensions/) — check the stable docs matching your operator version for production guidance.
+- [postgres-extensions-containers](https://github.com/cloudnative-pg/postgres-extensions-containers) — official OCI extension images (pgvector, PostGIS, pgaudit, pg_crash) and `ClusterImageCatalog` artifacts.
+- Operator version deployed in this repo: see [`kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml`](../../kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml) (Helm chart constraint). Verify the running controller version with `kubectl get deployment -n cloudnative-pg -o wide`.
 
 ---
 
@@ -19,23 +81,20 @@
 
 | Operator | Version | PostgreSQL Version | Clusters |
 |----------|---------|-------------------|----------|
-| **CloudNativePG** | v1.28.1 | 18.1 (default) | `transaction-shared-db`, `product-db` |
+| **CloudNativePG** | v1.28.1 | 18.1 (default) | `cnpg-db` (product, cart, order), `cnpg-db-replica` (DR) |
 | **Zalando Postgres Operator** | v1.15.1 | 16/17 | `auth-db`, `supporting-shared-db` |
 
 ### Current Extensions Usage
 
 #### CloudNativePG Clusters
 
-Both clusters use the **`system-trixie`** image (`ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie`) which includes 50+ extensions pre-packaged (pgaudit, pg_stat_statements, pgcrypto, etc.). No ImageVolume is needed for current extensions.
+The consolidated `cnpg-db` cluster uses the **`system-trixie`** image (`ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie`) which includes 50+ extensions pre-packaged (pgaudit, pg_stat_statements, pgcrypto, etc.). No ImageVolume is needed for current extensions.
 
-- **`product-db`** (PostgreSQL 18):
+- **`cnpg-db`** (PostgreSQL 18, hosts product/cart/order):
   - Image: `system-trixie` (extensions built-in)
   - `shared_preload_libraries`: pgaudit, pg_stat_statements, auto_explain
   - Database resource: pgaudit, pg_stat_statements, auto_explain, pgcrypto, uuid-ossp
-- **`transaction-shared-db`** (PostgreSQL 18):
-  - Image: `system-trixie` (extensions built-in)
-  - `shared_preload_libraries`: pgaudit
-  - Database resources: pgaudit (for `cart` and `order` databases)
+  - See [`kubernetes/infra/configs/databases/clusters/cnpg-db/extensions.yaml`](../../kubernetes/infra/configs/databases/clusters/cnpg-db/extensions.yaml)
 
 #### Zalando Operator Clusters
 
@@ -64,7 +123,7 @@ Both clusters use the **`system-trixie`** image (`ghcr.io/cloudnative-pg/postgre
 In CloudNativePG 1.28, `shared_preload_libraries` is a **fixed parameter** and **cannot** be set via `spec.postgresql.parameters`. Attempting to do so results in:
 
 ```
-Cluster.postgresql.cnpg.io "transaction-shared-db" is invalid: 
+Cluster.postgresql.cnpg.io "cnpg-db" is invalid: 
 spec.postgresql.parameters.shared_preload_libraries: Invalid value: "pg_stat_statements": 
 Can't set fixed configuration parameter
 ```
@@ -96,10 +155,9 @@ CloudNativePG manages `shared_preload_libraries` specially because:
 
 ### Current Setup
 
-Both CloudNativePG clusters use the **dedicated `shared_preload_libraries` field** successfully:
+The consolidated `cnpg-db` cluster uses the **dedicated `shared_preload_libraries` field** successfully:
 
-- **`product-db`**: pgaudit, pg_stat_statements, auto_explain
-- **`transaction-shared-db`**: pgaudit
+- **`cnpg-db`**: pgaudit, pg_stat_statements, auto_explain
 
 This means **all extensions work correctly**, including `pg_stat_statements`.
 
@@ -137,7 +195,7 @@ Extension images are defined in `.spec.postgresql.extensions` stanza. Each image
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: transaction-shared-db
+  name: cnpg-db
 spec:
   postgresql:
     extensions:
@@ -478,18 +536,20 @@ pgAudit provides detailed session and object audit logging. It's **only required
 **Step 1: Configure shared_preload_libraries in Cluster Resource**:
 
 ```yaml
-# kubernetes/infra/configs/databases/clusters/transaction-shared-db/instance.yaml
+# kubernetes/infra/configs/databases/clusters/cnpg-db/instance.yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: transaction-shared-db
-  namespace: cart
+  name: cnpg-db
+  namespace: product
 spec:
   imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie  # pgaudit built-in
   postgresql:
     # Use the dedicated field (NOT spec.postgresql.parameters)
     shared_preload_libraries:
       - pgaudit
+      - pg_stat_statements
+      - auto_explain
     parameters:
       # pgAudit configuration (these go in parameters, NOT shared_preload_libraries)
       pgaudit.log: "all"  # Log all statements (ddl, read, write, function, misc)
@@ -503,33 +563,23 @@ spec:
 **Step 2: Create Database Resources for Declarative Extension Management** (Recommended):
 
 ```yaml
-# kubernetes/infra/configs/databases/clusters/transaction-shared-db/extensions-cart.yaml
+# kubernetes/infra/configs/databases/clusters/cnpg-db/extensions.yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
-  name: cart-database
-  namespace: cart
+  name: product-database
+  namespace: product
 spec:
-  name: cart
-  owner: cart
+  name: product
+  owner: product
   cluster:
-    name: transaction-shared-db
+    name: cnpg-db
   extensions:
     - name: pgaudit
----
-# kubernetes/infra/configs/databases/clusters/transaction-shared-db/extensions-order.yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Database
-metadata:
-  name: order-database
-  namespace: cart
-spec:
-  name: order
-  owner: cart
-  cluster:
-    name: transaction-shared-db
-  extensions:
-    - name: pgaudit
+    - name: pg_stat_statements
+    - name: auto_explain
+    - name: pgcrypto
+    - name: uuid-ossp
 ```
 
 **Benefits of Database Resource Approach**:
@@ -587,36 +637,27 @@ spec:
     - name: uuid-ossp
 ```
 
-**Transaction Database - Cart** (`kubernetes/infra/configs/databases/clusters/transaction-shared-db/extensions-cart.yaml`):
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Database
-metadata:
-  name: cart-database
-  namespace: cart
-spec:
-  name: cart
-  owner: cart
-  cluster:
-    name: transaction-shared-db
-  extensions:
-    - name: pgaudit
-```
+**cnpg-db extensions** (`kubernetes/infra/configs/databases/clusters/cnpg-db/extensions.yaml`):
 
-**Transaction Database - Order** (`kubernetes/infra/configs/databases/clusters/transaction-shared-db/extensions-order.yaml`):
+> **Note**: `product-db` and `transaction-shared-db` were consolidated into `cnpg-db`. All databases (product, cart, order) now share extensions via a single cluster resource.
+
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
-  name: order-database
-  namespace: cart
+  name: product-database
+  namespace: product
 spec:
-  name: order
-  owner: cart
+  name: product
+  owner: product
   cluster:
-    name: transaction-shared-db
+    name: cnpg-db
   extensions:
     - name: pgaudit
+    - name: pg_stat_statements
+    - name: auto_explain
+    - name: pgcrypto
+    - name: uuid-ossp
 ```
 
 **Benefits**:
@@ -653,7 +694,7 @@ bootstrap:
 1. Add to `spec.postgresql.shared_preload_libraries` (the dedicated YAML list field)
 2. Add to `Database` resource `extensions` list
 
-**Current status**: ✅ Enabled in `product-db` via `shared_preload_libraries` + Database resource. Not yet enabled in `transaction-shared-db` (only pgaudit is configured there).
+**Current status**: ✅ Enabled in `cnpg-db` via `shared_preload_libraries` + Database resource.
 
 #### Solution 2: Declarative Database Resource
 
@@ -848,21 +889,14 @@ kubectl exec -it <pod-name> -n <namespace> -- ls -la /extensions/<extension-name
 
 #### For CloudNativePG Clusters
 
-**`product-db`**:
+**`cnpg-db`** (consolidated: product, cart, order):
 - **Image**: `system-trixie` (all extensions built-in)
 - **`shared_preload_libraries`**: pgaudit, pg_stat_statements, auto_explain
 - **Database resource**: pgaudit, pg_stat_statements, auto_explain, pgcrypto, uuid-ossp
 - **Status**: ✅ Fully configured
 
-**`transaction-shared-db`** (Production Critical):
-- **Image**: `system-trixie` (all extensions built-in)
-- **`shared_preload_libraries`**: pgaudit
-- **Database resources**: `extensions-cart.yaml`, `extensions-order.yaml` (pgaudit only)
-- **Status**: ✅ Configured
-- **Potential improvement**: Add pg_stat_statements and pgcrypto to match product-db
-
 **`pgAudit`** (Audit Logging) - ✅ **Currently Implemented**:
-- **Status**: Configured in both clusters via `system` image + `shared_preload_libraries` field + Database resources
+- **Status**: Configured in `cnpg-db` via `system` image + `shared_preload_libraries` field + Database resources
 - **Use Cases**: Compliance (PCI-DSS, HIPAA, SOC 2), security auditing, data access monitoring, troubleshooting
 - **Configuration**: 
   - `system-trixie` image has pgaudit binary built-in (no ImageVolume needed)
@@ -891,16 +925,14 @@ kubectl exec -it <pod-name> -n <namespace> -- ls -la /extensions/<extension-name
 
 ```
 kubernetes/infra/configs/databases/clusters/
-├── product-db/
-│   ├── instance.yaml          # Cluster resource (system-trixie, shared_preload_libraries)
-│   ├── extensions.yaml        # Database resource (pgaudit, pg_stat_statements, pgcrypto, etc.)
-│   ├── extensions.md          # Extension management guide (3-layer model)
-│   └── kustomization.yaml    # Includes extensions.yaml
-└── transaction-shared-db/
+└── cnpg-db/
     ├── instance.yaml          # Cluster resource (system-trixie, shared_preload_libraries)
-    ├── extensions-cart.yaml   # Database resource for cart (pgaudit)
-    ├── extensions-order.yaml  # Database resource for order (pgaudit)
-    └── kustomization.yaml    # Includes extensions-cart.yaml and extensions-order.yaml
+    ├── extensions.yaml        # Database resource (pgaudit, pg_stat_statements, pgcrypto, etc.)
+    ├── secrets/               # DB credentials (product, cart, order)
+    ├── poolers/               # PgDog HelmRelease
+    ├── monitoring/            # PodMonitor
+    ├── backup/                # Barman Object Store schedules
+    └── kustomization.yaml     # Includes all above in order
 ```
 
 **Deployment Order** (enforced by Kustomization):
@@ -932,8 +964,7 @@ SHOW pgaudit.log;  -- Should show current log level (should be 'all')
 # Verify libraries are loaded
 kubectl exec -it <pod-name> -n <namespace> -c postgres -- \
   psql -U postgres -c "SHOW shared_preload_libraries;"
-# product-db should show: pgaudit,pg_stat_statements,auto_explain
-# transaction-shared-db should show: pgaudit
+# cnpg-db should show: pgaudit,pg_stat_statements,auto_explain
 ```
 
 **Check Extension Images Mounted** (only if using ImageVolume):
@@ -995,8 +1026,7 @@ kubectl describe database order-database -n cart
 
 | Cluster | Operator | Image | Preloaded | Database Resource Extensions |
 |---------|----------|-------|-----------|------------------------------|
-| `product-db` | CloudNativePG | `system-trixie` | pgaudit, pg_stat_statements, auto_explain | pgaudit, pg_stat_statements, auto_explain, pgcrypto, uuid-ossp |
-| `transaction-shared-db` | CloudNativePG | `system-trixie` | pgaudit | pgaudit (cart + order) |
+| `cnpg-db` | CloudNativePG | `system-trixie` | pgaudit, pg_stat_statements, auto_explain | pgaudit, pg_stat_statements, auto_explain, pgcrypto, uuid-ossp |
 | `auth-db` | Zalando | Spilo 17 | pg_stat_statements, pg_cron, pg_trgm, pgcrypto, pg_stat_kcache | N/A |
 | `supporting-shared-db` | Zalando | Spilo 16 | pg_stat_statements, pg_cron, pg_trgm, pgcrypto, pg_stat_kcache | N/A |
 

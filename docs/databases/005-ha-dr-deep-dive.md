@@ -347,6 +347,12 @@ kubectl cnpg status cnpg-db
 
 ## 6. DR: Replica Cluster Operations
 
+### Prerequisites (bootstrap)
+
+- **Object store backup** — DR `bootstrap.recovery` needs a **completed** physical backup of `cnpg-db` in RustFS (`s3://pg-backups-cnpg/cnpg-db/`). On first cluster bring-up, apply `cnpg-db` and wait for scheduled/on-demand backups before the DR replica can finish `full-recovery` (or expect transient job `Error` until a backup exists).
+- **GitOps** — Flux applies `configs/databases` first, then `configs/databases-cnpg-dr` (`databases-cnpg-dr-local` `dependsOn: databases-local`) so primary + `ScheduledBackup` / `Backup` resources exist before `cnpg-db-replica`.
+- **WAL GUC parity** — Data directory inherits primary `wal_segment_size` (e.g. 64MB). The DR cluster `spec.postgresql.parameters` must include `min_wal_size` (and related WAL settings) consistent with PostgreSQL rules: `min_wal_size >= 2 * wal_segment_size` (see [`cnpg-db-replica/instance.yaml`](../../kubernetes/infra/configs/databases/clusters/cnpg-db-replica/instance.yaml)).
+
 ### Architecture
 
 The DR replica cluster (`cnpg-db-replica`) is a single-node cluster that continuously recovers from the primary cluster's WAL archive:

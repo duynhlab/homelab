@@ -6,8 +6,8 @@
 |---------|----------|-----------|-----------|-------------|--------|-----------------|-----------------|
 | **auth-db** | Zalando | auth | 3 (1 Leader + 2 Standbys) | Streaming (async) | PgBouncer (2 pods) | `auth-db-pooler.auth.svc:5432` | `auth-db.auth.svc:5432` |
 | **supporting-shared-db** | Zalando | user | 1 | N/A | PgBouncer (2 pods) | `supporting-shared-db-pooler.user.svc:5432` | `supporting-shared-db.user.svc:5432` |
-| **product-db** | CloudNativePG | product | 3 (1 Primary + 2 Replicas) | Async | PgDog (1 pod) | `pgdog-product.product.svc:6432` | `product-db-rw.product.svc:5432` |
-| **transaction-shared-db** | CloudNativePG | cart | 3 (1 Primary + 2 Replicas) | Synchronous | PgCat (2 pods) | `pgcat.cart.svc:5432` | `transaction-shared-db-rw.cart.svc:5432` |
+| **cnpg-db** | CloudNativePG | product | 3 (1 Primary + 1 Sync + 1 Async Replica) | Sync (ANY 1) | PgDog (1 pod) | `pgdog-cnpg.product.svc:6432` | `cnpg-db-rw.product.svc:5432` |
+| **cnpg-db-replica** | CloudNativePG | product | 1 (Designated Primary) | WAL recovery from object store | — | — | `cnpg-db-replica-rw.product.svc:5432` |
 
 ---
 
@@ -17,8 +17,12 @@ For detailed architecture, configuration, and components of each cluster, please
 
 - **[auth-db](auth-db/README.md)**: Authentication service database.
 - **[supporting-shared-db](supporting-shared-db/README.md)**: Shared database for User, Notification, Shipping, and Review services.
-- **[product-db](product-db/README.Md)**: Product service database (includes backup architecture).
-- **[transaction-shared-db](transaction-shared-db/README.md)**: Transaction (cart/order) service database.
+- **[cnpg-db](cnpg-db/)**: Consolidated CNPG cluster hosting Product, Cart, and Order databases (merged from former product-db + transaction-shared-db). Includes PgDog pooler, backup, and monitoring.
+- **[cnpg-db-replica](cnpg-db-replica/)**: DR replica cluster; continuously recovers from cnpg-db WAL archive. Promotable to standalone primary. Deployed via Flux **`configs/databases-cnpg-dr`** (`databases-cnpg-dr-local` depends on `databases-local`).
+
+### DR replica troubleshooting
+
+See **[cnpg-dr-replica-bootstrap.md](../../../../../docs/databases/runbooks/cnpg-dr-replica-bootstrap.md)** — base backup prerequisite, `full-recovery` job errors, and `min_wal_size` / `wal_segment_size` CrashLoop.
 
 ---
 
@@ -39,17 +43,17 @@ For detailed architecture, configuration, and components of each cluster, please
 
 ## Explore Internal Cluster PostgreSQL
 
-This section uses **product-db** as a learning vehicle to understand PostgreSQL internals. The same concepts apply whether PostgreSQL runs on Kubernetes (CloudNativePG) or VMs (EC2).
+This section uses **cnpg-db** as a learning vehicle to understand PostgreSQL internals. The same concepts apply whether PostgreSQL runs on Kubernetes (CloudNativePG) or VMs (EC2).
 
-### Product-db Topology (Current Configuration)
+### cnpg-db Topology (Current Configuration)
 
 | Component | Endpoint | Port | Role |
 |-----------|----------|------|------|
-| **PgDog Pooler** | `pgdog-product.product.svc.cluster.local` | 6432 | Connection pooling, routes to RW |
-| **CNPG RW Service** | `product-db-rw.product.svc.cluster.local` | 5432 | Write queries (auto-routes to primary) |
-| **CNPG R Service** | `product-db-r.product.svc.cluster.local` | 5432 | Read queries (load-balanced replicas) |
-| **CNPG RO Service** | `product-db-ro.product.svc.cluster.local` | 5432 | Read-only (any instance) |
-| **Cluster** | 3 instances | - | 1 Primary + 2 Replicas (async replication) |
+| **PgDog Pooler** | `pgdog-cnpg.product.svc.cluster.local` | 6432 | Connection pooling, R/W splitting (product, cart, order) |
+| **CNPG RW Service** | `cnpg-db-rw.product.svc.cluster.local` | 5432 | Write queries (auto-routes to primary) |
+| **CNPG R Service** | `cnpg-db-r.product.svc.cluster.local` | 5432 | Read queries (load-balanced replicas) |
+| **CNPG RO Service** | `cnpg-db-ro.product.svc.cluster.local` | 5432 | Read-only (any instance) |
+| **Cluster** | 3 instances | - | 1 Primary + 1 Sync Replica + 1 Async Replica |
 
 ```mermaid
 flowchart LR
@@ -58,15 +62,15 @@ flowchart LR
     end
 
     subgraph Pooler["Connection Pooler"]
-        PgDog{{"🟣 PgDog<br/>pgdog-product:6432"}}
+        PgDog{{"🟣 PgDog<br/>pgdog-cnpg:6432"}}
     end
 
     subgraph CNPG["CloudNativePG Services"]
-        RW["product-db-rw:5432"]
-        R["product-db-r:5432"]
+        RW["cnpg-db-rw:5432"]
+        R["cnpg-db-r:5432"]
     end
 
-    subgraph Cluster["product-db Cluster"]
+    subgraph Cluster["cnpg-db Cluster"]
         Primary[("🔴 Primary")]
         Replica1[("🟢 Replica 1")]
         Replica2[("🟢 Replica 2")]
@@ -78,7 +82,7 @@ flowchart LR
     RW --> Primary
     R --> Replica1
     R --> Replica2
-    Primary -->|"async WAL streaming"| Replica1
+    Primary -->|"sync WAL streaming"| Replica1
     Primary -->|"async WAL streaming"| Replica2
     
     style Primary fill:#E53935,color:#fff
@@ -94,7 +98,7 @@ When a Product Service calls `INSERT INTO products (name, price) VALUES ('Widget
 | Step | Component | What Happens |
 |------|-----------|--------------|
 | 1 | **Go Driver** | Sends SQL over TCP to PgDog |
-| 2 | **PgDog** | Picks a pooled connection, forwards to `product-db-rw` |
+| 2 | **PgDog** | Picks a pooled connection, forwards to `cnpg-db-rw` |
 | 3 | **Backend Process** | PostgreSQL spawns/reuses a backend process for this connection |
 | 4 | **Parser** | Validates SQL syntax, builds parse tree |
 | 5 | **Planner** | Creates execution plan (trivial for INSERT) |
@@ -113,7 +117,7 @@ When a Product Service calls `INSERT INTO products (name, price) VALUES ('Widget
 
 For full explanations with detailed diagrams, tables, and EC2/VM mapping, see:
 
-**[PostgreSQL Internals Deep Dive (product-db)](../../../../docs/databases/001-postgresql-internals.md)**
+**[PostgreSQL Internals Deep Dive (cnpg-db)](../../../../docs/databases/001-postgresql-internals.md)**
 
 Topics covered:
 - INSERT/UPDATE workflow with sequence diagrams
@@ -131,6 +135,6 @@ Topics covered:
 ## Related Documentation
 
 - **Database Architecture Overview**: [`docs/databases/002-database-integration.md`](../../../../docs/databases/002-database-integration.md)
-- **PgCat Troubleshooting**: [`docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md`](../../../../docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md)
+- **PgCat Troubleshooting (legacy)**: [`docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md`](../../../../docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md)
 - **Monitoring Setup**: [`docs/observability/metrics/README.md`](../../../../docs/observability/metrics/README.md)
 - **Replication Deep Dive**: [`docs/databases/004-replication-strategy.md`](../../../../docs/databases/004-replication-strategy.md)

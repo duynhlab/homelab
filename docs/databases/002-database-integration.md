@@ -2,7 +2,7 @@
 ## Table of Contents
 
 1. [Quick Summary](#quick-summary) - Operators, clusters, poolers overview
-2. [Database Architecture](#database-architecture) - 4 clusters overview diagram + tables
+2. [Database Architecture](#database-architecture) - 3 clusters + DR overview diagram + tables
 3. [CloudNativePG Operator](#cloudnativepg-operator) - Operator features, connection patterns, monitoring
 4. [Zalando Postgres Operator](#zalando-postgres-operator) - Operator features, secrets, monitoring, management
 5. [Connection Poolers](#connection-poolers) - PgBouncer, PgDog (active); PgCat (comparison / legacy) + configuration
@@ -26,7 +26,7 @@
 
 ### Overview
 
-The system uses **4 PostgreSQL clusters** (Zalando: **auth-db**, **supporting-shared-db**; CloudNativePG: **cnpg-db** primary + **cnpg-db-replica** DR) across operators and connection patterns. Application traffic for **product**, **cart**, and **order** shares **cnpg-db** and a single **PgDog** pooler (`pgdog-cnpg`).
+The system uses **3 operational PostgreSQL clusters** + **1 DR replica** (Zalando: **auth-db**, **supporting-shared-db**; CloudNativePG: **cnpg-db** primary with **cnpg-db-replica** as disaster recovery) across operators and connection patterns. Application traffic for **product**, **cart**, and **order** shares **cnpg-db** and a single **PgDog** pooler (`pgdog-cnpg`).
 
 ```mermaid
 flowchart TB

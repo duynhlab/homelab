@@ -1,6 +1,6 @@
 # PostgreSQL Backup Strategy
 
-This document defines a **production-ready physical backup strategy** (base backup + WAL archiving) for **all 4 PostgreSQL clusters** using **RustFS (S3-compatible)** as the backup target, with per-operator bucket isolation:
+This document defines a **production-ready physical backup strategy** (base backup + WAL archiving) for **all 3 PostgreSQL clusters + DR replica** using **RustFS (S3-compatible)** as the backup target, with per-operator bucket isolation:
 
 - **Bucket `pg-backups-zalando`**: `auth-db`, `supporting-shared-db` (Zalando / WAL-G)
 - **Bucket `pg-backups-cnpg`**: `cnpg-db` (primary), `cnpg-db-replica` (DR) — CloudNativePG / Barman; separate S3 prefixes in the same bucket

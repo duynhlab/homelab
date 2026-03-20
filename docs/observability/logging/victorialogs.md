@@ -214,7 +214,7 @@ curl -G 'http://localhost:9428/select/logsql/query' \
 
 3. **Generate a slow query** to trigger auto_explain:
    ```sql
-   -- Connect to product-db or transaction-shared-db
+   -- Connect to cnpg-db (product, cart, or order database)
    SELECT pg_sleep(1);
    ```
 

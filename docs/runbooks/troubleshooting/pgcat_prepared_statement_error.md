@@ -1,5 +1,7 @@
 # PgCat Prepared Statement Error - Cart Count 500
 
+> **Legacy / Pre-consolidation**: This runbook applies to the former `transaction-shared-db` + PgCat topology. The current stack uses **PgDog** (`pgdog-cnpg`) as the unified pooler for the consolidated **`cnpg-db`** cluster (product, cart, order). See [`kubernetes/infra/configs/databases/clusters/cnpg-db/`](../../../kubernetes/infra/configs/databases/clusters/cnpg-db/) for the current configuration.
+
 ## Not This Issue?
 
 If you're seeing a **different error**, check these related docs:

@@ -1,5 +1,7 @@
 # PgCat Read-Only Transaction Error (SQLSTATE 25006)
 
+> **Legacy / Pre-consolidation**: This runbook applies to the former `transaction-shared-db` + PgCat topology. The current stack uses **PgDog** (`pgdog-cnpg`) as the unified pooler for the consolidated **`cnpg-db`** cluster (product, cart, order). See [`kubernetes/infra/configs/databases/clusters/cnpg-db/`](../../../kubernetes/infra/configs/databases/clusters/cnpg-db/) for the current configuration.
+
 ## Problem
 
 Intermittent 500 errors on write operations (POST `/api/v1/cart`, etc.) with cart/order services.

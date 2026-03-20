@@ -35,9 +35,9 @@ spec:
       namespace: user
     - apiVersion: postgresql.cnpg.io/v1
       kind: Cluster
-      name: transaction-shared-db
-      namespace: cart
+      name: cnpg-db
+      namespace: product
     - apiVersion: postgresql.cnpg.io/v1
       kind: Cluster
-      name: product-db
+      name: cnpg-db-replica
       namespace: product

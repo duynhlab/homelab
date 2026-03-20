@@ -86,7 +86,7 @@ secret/{environment}/{category}/{service-or-component}/{resource}
 |-------|--------|---------|
 | `{environment}` | `local`, `staging`, `prod` | Environment isolation; same paths across envs |
 | `{category}` | `databases`, `services`, `infra` | Top-level grouping; maps to Vault policy templates |
-| `{service-or-component}` | `auth`, `product`, `pgdog-product`, `rustfs` | Specific service or infra component |
+| `{service-or-component}` | `auth`, `product`, `pgdog-cnpg`, `rustfs` | Specific service or infra component |
 | `{resource}` | `credentials`, `jwt-signing-key`, `api-keys`, `backup-credentials` | Type of secret |
 
 This convention enables:
@@ -105,8 +105,8 @@ All secrets are stored in Vault's KV v2 secrets engine under the `secret/` path.
 | Vault Path | Description | Consumer |
 |------------|-------------|----------|
 | `secret/local/databases/product/credentials` | Product DB credentials | product service |
-| `secret/local/databases/cart/credentials` | Cart DB credentials (transaction-shared-db) | cart service |
-| `secret/local/databases/order/credentials` | Order DB credentials (transaction-shared-db) | order service |
+| `secret/local/databases/cart/credentials` | Cart DB credentials (cnpg-db) | cart service |
+| `secret/local/databases/order/credentials` | Order DB credentials (cnpg-db) | order service |
 
 **Keys**: `username`, `password`
 
@@ -115,7 +115,7 @@ All secrets are stored in Vault's KV v2 secrets engine under the `secret/` path.
 | Vault Path | Description | Consumer |
 |------------|-------------|----------|
 | `secret/local/infra/rustfs/backup-zalando` | RustFS S3 credentials (bucket: pg-backups-zalando, currently rustfsadmin) | Zalando clusters (auth-db, supporting-shared-db) |
-| `secret/local/infra/rustfs/backup-cnpg` | RustFS S3 credentials (bucket: pg-backups-cnpg, currently rustfsadmin) | CNPG clusters (product-db, transaction-shared-db) |
+| `secret/local/infra/rustfs/backup-cnpg` | RustFS S3 credentials (bucket: pg-backups-cnpg, currently rustfsadmin) | CNPG clusters (cnpg-db, cnpg-db-replica) |
 
 **Keys**: `access_key_id`, `secret_access_key`
 
@@ -123,11 +123,9 @@ All secrets are stored in Vault's KV v2 secrets engine under the `secret/` path.
 
 | Vault Path | Description | Consumer |
 |------------|-------------|----------|
-| `secret/local/databases/pgdog-product/credentials` | PgDog (product) credentials | pgdog-product pooler |
-| `secret/local/databases/pgcat-transaction/credentials` | PgCat (transaction) credentials | pgcat-transaction pooler |
+| `secret/local/databases/pgdog-cnpg/credentials` | PgDog (cnpg-db) credentials | pgdog-cnpg pooler |
 
 **Keys (pgdog)**: `username`, `password`
-**Keys (pgcat)**: `admin_username`, `admin_password`, `db_username`, `db_password`
 
 ### Future App Secrets (Ready for Onboarding)
 
@@ -145,15 +143,15 @@ All secrets are stored in Vault's KV v2 secrets engine under the `secret/` path.
 
 ### Naming Convention
 
-ESO-managed secrets use the **same name** as the original secret they replace (e.g., `product-db-secret`). The `managed-by: external-secrets` label identifies Vault-backed secrets. No `-vault` suffix is used.
+ESO-managed secrets use the **same name** as the original secret they replace (e.g., `cnpg-db-secret`). The `managed-by: external-secrets` label identifies Vault-backed secrets. No `-vault` suffix is used.
 
 ### Database Secrets (ExternalSecret per cluster)
 
 | K8s Secret | Namespace | Source |
 |------------|-----------|--------|
-| `product-db-secret` | product | `secret/data/local/databases/product/credentials` |
-| `transaction-shared-db-secret` | cart | `secret/data/local/databases/cart/credentials` |
-| `transaction-shared-db-secret` | order | `secret/data/local/databases/order/credentials` |
+| `cnpg-db-secret` | product | `secret/data/local/databases/product/credentials` |
+| `cnpg-db-cart-secret` | cart | `secret/data/local/databases/cart/credentials` |
+| `cnpg-db-order-secret` | order | `secret/data/local/databases/order/credentials` |
 
 ### Backup Secrets (ClusterExternalSecret)
 
@@ -178,8 +176,7 @@ metadata:
 
 | K8s Secret | Namespace | Source | Status |
 |------------|-----------|--------|--------|
-| `pgdog-product-credentials` | product | `secret/data/local/databases/pgdog-product/credentials` | Available (not consumed) |
-| `pgcat-transaction-credentials` | cart | `secret/data/local/databases/pgcat-transaction/credentials` | Available (not consumed) |
+| `pgdog-cnpg-credentials` | product | `secret/data/local/databases/pgdog-cnpg/credentials` | Available (not consumed) |
 
 > **Note**: Pooler charts don't currently support `secretRef`. Secrets are created for future use.
 
@@ -234,7 +231,7 @@ env:
   - name: DB_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: product-db-secret
+        name: cnpg-db-secret
         key: password
 
 # After (ExternalSecret creates the same secret name, no suffix needed)
@@ -242,7 +239,7 @@ env:
   - name: DB_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: product-db-secret  # Vault-backed via ExternalSecret
+        name: cnpg-db-secret  # Vault-backed via ExternalSecret
         key: password
 ```
 
@@ -401,8 +398,7 @@ vault read auth/kubernetes/config
 **Current State**: Inline passwords in HelmRelease/ConfigMap (dev-only, documented).
 
 **Vault Secrets Available**:
-- `pgdog-product-credentials` (product namespace)
-- `pgcat-transaction-credentials` (cart namespace)
+- `pgdog-cnpg-credentials` (product namespace)
 
 **Future Solutions**:
 1. Request upstream chart support for `secretRef`

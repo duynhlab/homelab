@@ -8,5 +8,6 @@ resources:
   - controllers.yaml     # Namespaces + operators (monitoring, databases, slo)
   - secrets.yaml         # Vault + ESO (Must be before databases)
   - databases.yaml       # DB Instances (Must be before apps)
+  - databases-cnpg-dr.yaml  # CNPG DR replica (depends on databases-local)
   - monitoring.yaml      # Grafana + Prometheus Configs
   - apps.yaml            # Microservices

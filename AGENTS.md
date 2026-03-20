@@ -136,7 +136,7 @@ flowchart TD
     Database -->|PostgreSQL| DB[(Database)]
 ```
 
-**Database Integration**: See [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) for database architecture, connection patterns (direct, PgBouncer, PgCat), and configuration.
+**Database Integration**: See [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) for database architecture, connection patterns (direct, PgBouncer, PgDog), and configuration.
 
 **Layer Responsibilities**:
 
@@ -193,8 +193,8 @@ flowchart TD
 ## Technology Stack
 
 - **Runtime**: Go 1.25
-- **Database**: PostgreSQL (4 clusters via Zalando/CloudNativePG operators)
-  - Connection poolers: PgBouncer, PgCat
+- **Database**: PostgreSQL (3 clusters + DR replica via Zalando/CloudNativePG operators)
+  - Connection poolers: PgBouncer, PgDog
   - Migrations: Flyway 11.19.0 (8 migration images)
   - **Database Documentation**: [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md)
 - **Cache**: Valkey (Redis-compatible) for read-heavy endpoints
@@ -278,7 +278,7 @@ make flux-push    # 3. Deploy All (Flux reconciles in dependency order)
 2. **Infrastructure** (BEFORE apps) - Monitoring, APM, Databases, SLO
    - Monitoring: Prometheus, Grafana, Metrics Server
    - APM: Tempo, Loki, Vector, OTel Collector, Pyroscope, Jaeger
-   - Databases: PostgreSQL operators, 4 clusters, connection poolers
+   - Databases: PostgreSQL operators, 3 clusters + DR replica, connection poolers
    - SLO: Sloth Operator + 8 PrometheusServiceLevel CRDs
 3. **Applications** - 8 microservices + frontend + k6 load testing
 
@@ -308,8 +308,8 @@ make flux-sync
 
 ### Key Infrastructure
 
-- **4 PostgreSQL Clusters**: auth-db, supporting-shared-db, product-db, transaction-shared-db
-- **Connection Poolers**: PgBouncer (Auth), PgCat (Product, Cart+Order)
+- **3 PostgreSQL Clusters + DR**: auth-db (Zalando), supporting-shared-db (Zalando), cnpg-db (CNPG, hosts product/cart/order), cnpg-db-replica (CNPG DR)
+- **Connection Poolers**: PgBouncer (Auth, Shared), PgDog (cnpg-db)
 - **Migrations**: Flyway 11.19.0 with 8 migration images
 - **Operators**: Zalando Postgres Operator (v1.15.1), CloudNativePG Operator (v1.28.1)
 - **SLO**: Managed via Sloth Operator (PrometheusServiceLevel CRDs)

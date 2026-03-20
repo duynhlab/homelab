@@ -248,7 +248,7 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 | Layer 1: PostgreSQL alerts | 14 alerts (availability, performance, storage) | Implemented |
 | Layer 2: SLO alerts | 48 alerts (8 services x 3 SLOs x 2 severities) | Implemented |
 | Alert dashboard | Karma reading VMAlertmanager API | Implemented |
-| Layer 1: Database connection pool | PgBouncer/PgCat saturation alerts | Planned |
+| Layer 1: Database connection pool | PgBouncer/PgDog saturation alerts | Planned |
 | Layer 1: Infrastructure | Node CPU/memory/disk pressure | Planned |
 | Layer 1: Kubernetes | Pod OOM, CrashLoopBackOff, pending pods | Planned |
 | Integration | PagerDuty/Slack routing in VMAlertmanager | Planned |

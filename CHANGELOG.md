@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.80.0] - 2026-03-13
+
+### Added
+
+- **Consolidated CloudNativePG HA cluster** (`cnpg-db`): Merged `product-db` and `transaction-shared-db` into single 3-instance cluster (1 primary, 1 sync replica, 1 async replica) hosting product/cart/order databases in `product` namespace. Synchronous replication with `ANY 1` quorum, logical replication slot sync, production-tuned parameters.
+- **DR replica cluster** (`cnpg-db-replica`): Single-node designated primary that continuously recovers from `cnpg-db` WAL archive via RustFS object store. Promotable for disaster recovery with own backup at `s3://pg-backups-cnpg/cnpg-db-replica/`.
+- **PgDog unified pooler** (`pgdog-cnpg`): Single PgDog HelmRelease serving all 3 databases with R/W splitting (SELECTs to replicas, writes to primary), LSN monitoring for replication lag detection, and prepared statement support in transaction mode.
+- **HA/DR deep-dive documentation**: `docs/databases/005-ha-dr-deep-dive.md` — flagship learning document covering architecture overview, WAL archiving pipeline, replication topology (streaming + object store), `synchronous_commit` 5-level spectrum with sequence diagrams, HA failure scenarios + failover state machine, DR promotion runbook, RPO/RTO reference card, and practical commands reference.
+- **Database docs numbered reading order**: All `docs/databases/*.md` renamed with 001-010 prefixes for structured learning path from foundational PostgreSQL internals to advanced operations.
+- **Vault secrets for cnpg-db**: ExternalSecret manifests for product/cart/order database users with `cnpg.io/reload: "true"` label for zero-downtime password rotation, plus PgDog pooler credentials.
+- **Database CRDs for extensions**: Merged `Database` CRDs for product (pgaudit, pg_stat_statements, auto_explain, pgcrypto, uuid-ossp), cart (pgaudit, pg_stat_statements), and order (pgaudit, pg_stat_statements).
+- **Monitoring**: Merged PodMonitor and monitoring queries ConfigMap targeting all 3 databases (product, cart, order).
+- **Backup schedules**: Daily (2 AM UTC) and every-6h ScheduledBackup manifests for `cnpg-db`.
+
+### Changed
+
+- **Database docs renamed**: `postgresql_internals_product_db.md` → `001-postgresql-internals.md`, `database.md` → `002-database-integration.md`, `operator.md` → `003-operator-comparison.md`, `replication_strategy.md` → `004-replication-strategy.md`, `backup.md` → `006-backup-strategy.md`, `architecture.md` → `007-architecture.md`, `pooler.md` → `008-pooler.md`, `extensions.md` → `009-extensions.md`, `documents.md` → `010-documents.md`.
+- **Cross-references updated**: ~66 references across 18+ files (AGENTS.md, README.md, docs/README.md, TODO.md, docs/platform/setup.md, Kubernetes READMEs, runbooks, custom-metrics.md) updated to match new numbered filenames.
+- **Vault bootstrap**: Updated `vault-bootstrap/configmap.yaml` with new Vault paths (`secret/local/databases/cnpg-db/*`) replacing old product/cart/order/pgdog-product/pgcat-transaction paths.
+- **Flux healthchecks**: `databases.yaml` updated to check `cnpg-db` and `cnpg-db-replica` instead of `product-db` and `transaction-shared-db`.
+- **Documentation consolidated**: All database docs updated for `cnpg-db` cluster, PgDog pooler, sync replication, and DR replica architecture.
+
+### Removed
+
+- **product-db cluster**: Entire `clusters/product-db/` directory (14 files). Replaced by consolidated `cnpg-db`.
+- **transaction-shared-db cluster**: Entire `clusters/transaction-shared-db/` directory (16 files). Replaced by consolidated `cnpg-db`.
+- **PgCat pooler config**: PgCat deployment/service/configmap for transaction-shared-db. Replaced by PgDog for all CNPG databases.
+
+### Fixed
+
+- **Broken link**: `runbooks/prepared-databases.md` → `extensions.md` relative path from `runbooks/` subfolder (now `../009-extensions.md`).
+- **Stale reference**: `zalando-walg-config.yaml` comment referenced non-existent `BACKUP_STRATEGY.md` (now `006-backup-strategy.md`).
+
 ## [0.73.0] - 2026-03-13
 
 ### Added

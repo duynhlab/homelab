@@ -354,7 +354,7 @@ make down && make up
 - [EndpointSlice Migration Guide](https://thelinuxnotes.com/migrating-from-endpoints-to-endpointslices-in-kubernetes/) -- general Endpoints to EndpointSlices migration
 - [Zalando HA Scaling Runbook](zalando-ha-scaling.md) -- scaling from 1 to 3 nodes
 - [Prepared Databases Runbook](prepared-databases.md) -- preparedDatabases CreateFailed fix
-- [Operator Comparison](../operator.md) -- Zalando vs CloudNativePG
+- [Operator Comparison](../003-operator-comparison.md) -- Zalando vs CloudNativePG
 
 ## Manifest Locations
 

@@ -1,3 +1,11 @@
+# Homelab (Kind): HTTP registry in-cluster (homelab-registry:5000). `insecure: true` is required.
+#
+# Production checklist (apply in your prod cluster overlay / separate manifests):
+#   - Point `spec.url` to an HTTPS-capable registry (TLS), e.g. oci://registry.example.com/org/flux-infra-sync
+#   - Remove `insecure: true` (defaults to false when omitted) so Flux verifies TLS to the registry
+#   - Prefer immutable refs: semver range, digest, or promoted tags — avoid mutable `tag: local`
+#   - Optional supply chain: uncomment and wire `spec.verify` + Secret with Cosign public keys (see README in this directory)
+#   - Upstream: https://fluxcd.io/flux/components/source/ocirepositories/
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
@@ -12,3 +20,8 @@ spec:
   ref:
     tag: local
   insecure: true
+  # Production example (Cosign) — create Secret with trusted public key(s), then uncomment:
+  # verify:
+  #   provider: cosign
+  #   secretRef:
+  #     name: flux-oci-cosign-public

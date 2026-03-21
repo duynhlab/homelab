@@ -58,6 +58,16 @@ This deployment uses a **single cluster-wide Vector Agent** (`kube-system/vector
 | VLSingle | `VLSingle` (VM Operator) | `monitoring` | Log storage and query engine |
 | Vector | `HelmRelease` | `kube-system` | Log collection agent (DaemonSet) |
 
+## Grafana
+
+VictoriaLogs is available in Grafana as a **VictoriaLogs** datasource (plugin `victoriametrics-logs-datasource`), provisioned by GitOps:
+
+- **CR**: [`kubernetes/infra/configs/monitoring/grafana/datasource-victorialogs.yaml`](../../../kubernetes/infra/configs/monitoring/grafana/datasource-victorialogs.yaml)
+- **UID**: `victorialogs`
+- **URL**: `http://vlsingle-victoria-logs.monitoring.svc.cluster.local:9428`
+
+After `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`, use **Explore → VictoriaLogs** and LogsQL (e.g. `*` or `_stream:{namespace="product"}`). Plugin reference: [Grafana VictoriaLogs datasource](https://grafana.com/grafana/plugins/victoriametrics-logs-datasource/).
+
 ## Endpoints
 
 ### VictoriaLogs Service (Operator-Managed)

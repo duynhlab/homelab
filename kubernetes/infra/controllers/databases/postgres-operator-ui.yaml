@@ -17,6 +17,12 @@ spec:
   releaseName: postgres-operator-ui
   targetNamespace: postgres-operator
   timeout: 10m
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
   values:
     image:
       registry: ghcr.io

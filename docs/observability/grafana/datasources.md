@@ -115,6 +115,19 @@ Since VMSingle is 100% Prometheus API compatible, the `prometheus` datasource ty
 
 **Rule of thumb**: Use Prometheus datasource by default. Switch to VictoriaMetrics datasource only when you need MetricsQL-specific features.
 
+## Logs: Loki vs VictoriaLogs plugin
+
+Metrics uses two Grafana datasources pointing at one backend (Prometheus type + VictoriaMetrics plugin). Logs follow a similar **learning / dual-backend** pattern: one ingestion path (Vector), two query UIs.
+
+| Datasource | Type | Backend | Query language | Best for |
+|------------|------|---------|----------------|----------|
+| **Loki** | `loki` | Loki `:3100` | LogQL | Default dashboards, Grafana log-to-trace correlation (derived fields), Logs Drilldown |
+| **VictoriaLogs** | `victoriametrics-logs-datasource` | VLSingle `:9428` | LogsQL | VM plugin features, high-volume Explore, same streams as [`victorialogs.md`](../logging/victorialogs.md) |
+
+**CRDs**: `datasource-loki.yaml`, `datasource-victorialogs.yaml`. Plugins: see [Grafana README](README.md#plugins).
+
+**Rule of thumb**: Use **Loki** for day-to-day correlation with traces in Grafana. Use **VictoriaLogs** when practicing LogsQL or comparing query behavior with Loki.
+
 ## How Read-Only Rules Work: `vmalert.proxyURL`
 
 ### The Problem

@@ -7,6 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.81.8] - 2026-03-13
+
+### Fixed
+
+- **Kustomize**: Moved cluster namespace definitions from `kubernetes/infra/namespaces.yaml` to [`kubernetes/infra/controllers/namespaces.yaml`](kubernetes/infra/controllers/namespaces.yaml) so `controllers/kustomization.yaml` references a **local** file (no `../namespaces.yaml`). Plain `kustomize build kubernetes/infra` now succeeds with the default load restrictor; previously only worked with `--load-restrictor=LoadRestrictionsNone`.
+
+### Changed
+
+- **Documentation**: [`kubernetes/infra/README.md`](kubernetes/infra/README.md), [`docs/platform/setup.md`](docs/platform/setup.md), [`docs/secrets/secrets-management.md`](docs/secrets/secrets-management.md), and [`homelab-validation.md`](.agents/skills/gitops-repo-audit/references/homelab-validation.md) updated for the new path.
+
+## [0.81.7] - 2026-03-13
+
+### Changed
+
+- **HelmRelease (Tier 3)**: Standardized `install.remediation.retries` / `upgrade.remediation.retries` (`3`) across infra controllers, ResourceSet app templates (`kubernetes/apps/`), and merged with existing `crds` policies where present (Vault/RustFS/External Secrets/PgDog unchanged — already matched).
+- **Documentation**: [`docs/platform/helmrelease-conventions.md`](docs/platform/helmrelease-conventions.md); [`docs/README.md`](docs/README.md) index entry.
+- **GitOps audit skill**: [`references/homelab-validation.md`](.agents/skills/gitops-repo-audit/references/homelab-validation.md) + [`SKILL.md`](.agents/skills/gitops-repo-audit/SKILL.md) cross-links for `flux-validate.sh` vs bundled `validate.sh`.
+
+## [0.81.6] - 2026-03-13
+
+### Changed
+
+- **GitOps / OCI (Tier 2 docs)**: Added production-deployment comments and optional Cosign `verify` examples (commented) on [`kubernetes/clusters/local/sources/oci/infrastructure-oci.yaml`](kubernetes/clusters/local/sources/oci/infrastructure-oci.yaml) and [`apps-oci.yaml`](kubernetes/clusters/local/sources/oci/apps-oci.yaml); documented `spec.kustomize.patches` removal for prod on [`kubernetes/clusters/local/flux-system/instance.yaml`](kubernetes/clusters/local/flux-system/instance.yaml).
+- **Documentation**: [`kubernetes/clusters/local/sources/oci/README.md`](kubernetes/clusters/local/sources/oci/README.md) — TLS registry, insecure flag, Cosign verification, links; [`kubernetes/clusters/production/kustomization.yaml`](kubernetes/clusters/production/kustomization.yaml) cross-link.
+
+## [0.81.5] - 2026-03-13
+
+### Fixed
+
+- **Kustomize**: Removed duplicate `Namespace` resources from root [`kubernetes/infra/kustomization.yaml`](kubernetes/infra/kustomization.yaml) — `namespaces.yaml` is already included via [`kubernetes/infra/controllers/kustomization.yaml`](kubernetes/infra/controllers/kustomization.yaml), so `kustomize build kubernetes/infra` no longer fails with duplicate id errors.
+
+### Added
+
+- **Documentation**: [`kubernetes/infra/README.md`](kubernetes/infra/README.md) — Flux subpaths vs root umbrella build and namespace ownership.
+
+## [0.81.4] - 2026-03-21
+
+### Added
+
+- **Documentation**: `docs/observability/metrics/vmauth.md` — VMAuth/vmauth (HTTP auth proxy), `auth.config`, use-case matrix, VMAuth/VMUser Operator CRs, repo mapping, Grafana vs API security, diagrams, FAQ (GitOps VMAuth deployment out of scope for this entry).
+- **Documentation**: `docs/observability/grafana/rbac-multi-team.md` — Grafana Viewer/Editor/Admin, Teams, anonymous vs named users, SRE vs other teams, homelab defaults aligned with `grafana.yaml`.
+
+### Changed
+
+- **Documentation**: Cross-links from `docs/observability/metrics/victoriametrics.md`, `docs/observability/metrics/README.md`, `docs/observability/grafana/README.md`, `docs/README.md`, and `docs/observability/README.md` to the new pages.
+
+## [0.81.3] - 2026-03-21
+
+### Added
+
+- **Grafana VictoriaLogs datasource**: `kubernetes/infra/configs/monitoring/grafana/datasource-victorialogs.yaml` (`victoriametrics-logs-datasource` → `vlsingle-victoria-logs:9428`, UID `victorialogs`).
+- **Grafana plugin**: `victoriametrics-logs-datasource` v0.26.3 via `GF_INSTALL_PLUGINS` and `allow_loading_unsigned_plugins` in `grafana.yaml`.
+
+### Changed
+
+- **Documentation**: Updated `docs/observability/grafana/README.md`, `docs/observability/grafana/datasources.md` (Loki vs VictoriaLogs section), `docs/observability/logging/README.md` and `victorialogs.md` with Grafana Explore + provisioning links.
+
+## [0.81.2] - 2026-03-21
+
+### Changed
+
+- **Logging docs dual-backend alignment**: Updated `docs/observability/logging/README.md` with a dual-backend architecture Mermaid diagram (Vector → Loki + VictoriaLogs), updated Quick Summary/Objectives/Technologies/Keywords to reflect both backends, added VictoriaLogs storage section and LogsQL viewing instructions, and cross-linked to `victorialogs.md`.
+- **docs/README.md index**: Updated logging README description from "Zap + Vector + Loki" to "Dual backend: Loki + VictoriaLogs (single Vector)" in tree, Learning Path, and Documentation by Category sections.
+
+## [0.81.1] - 2026-03-21
+
+### Changed
+
+- **Metrics docs alignment**: Updated `docs/observability/metrics/README.md` to reflect actual VictoriaMetrics stack (VMAgent + VMSingle) instead of legacy "Prometheus server" wording. Replaced Mermaid diagram (ServiceMonitor → Prometheus) with accurate ServiceMonitor → VM Operator → VMAgent → VMSingle flow. Fixed label injection references, exemplar prerequisites, flux reconciliation command, and Related Documentation links.
+- **docs/README.md glossary**: Updated "Monitoring Stack" entry from "Prometheus Operator" to "VictoriaMetrics Operator (VMAgent, VMSingle, VMAlert, VMAlertmanager) + prometheus-operator-crds + Grafana Operator".
+
 ## [0.81.0] - 2026-03-20
 
 ### Added

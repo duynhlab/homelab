@@ -162,7 +162,7 @@ Backup credentials use **ClusterExternalSecret** with namespace labels to auto-d
 | `pg-backup-rustfs-cnpg` | `platform.duynhlab/backup: "cnpg"` | product, cart | CNPG/Barman: `ACCESS_KEY_ID`, `ACCESS_SECRET_KEY` |
 | `pg-backup-rustfs-walg` | `platform.duynhlab/backup: "walg"` | auth, user, review | WAL-G: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` |
 
-**Adding backup credentials to a new namespace**: Add the appropriate label to the namespace in `namespaces.yaml`:
+**Adding backup credentials to a new namespace**: Add the appropriate label to the namespace in `kubernetes/infra/controllers/namespaces.yaml`:
 
 ```yaml
 metadata:

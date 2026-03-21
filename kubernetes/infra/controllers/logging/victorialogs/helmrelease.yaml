@@ -23,6 +23,12 @@ spec:
     name: victorialogs-oci
     namespace: flux-system
   releaseName: victorialogs
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
   values:
     server:
       # Data retention period (7 days)

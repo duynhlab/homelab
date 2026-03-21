@@ -193,8 +193,8 @@ pkill -f 'kubectl port-forward'
 monitoring/
 ├── kubernetes/
 │   ├── infra/                          # Core infrastructure definitions
-│   │   ├── namespaces.yaml             # Cluster-wide namespace definitions
 │   │   ├── controllers/                # Operators and CRD definitions
+│   │   │   ├── namespaces.yaml         # Cluster-wide namespace definitions
 │   │   │   ├── monitoring/             # Prometheus and Grafana operators
 │   │   │   ├── databases/              # Database orchestration operators
 │   │   │   └── slo/                    # Service Level Objective operator

@@ -82,6 +82,7 @@ docs/observability/
 ├── metrics/                      # Pillar 1: Metrics collection & storage
 │   ├── README.md                 # RED/USE/Golden Signals methodology
 │   ├── victoriametrics.md        # VictoriaMetrics Operator stack
+│   ├── vmauth.md                 # VMAuth/vmauth HTTP proxy (auth.config, CRs)
 │   ├── promql-guide.md           # PromQL reference
 │   └── postgresql/               # PostgreSQL-specific metrics
 │       ├── monitoring.md          # Monitoring overview
@@ -103,6 +104,7 @@ docs/observability/
 │
 ├── grafana/                      # Visualization layer
 │   ├── README.md                 # Grafana overview + plugin management
+│   ├── rbac-multi-team.md        # Org roles, Teams, anonymous vs named users
 │   ├── datasources.md            # Dual datasource strategy (case study)
 │   ├── dashboard-reference.md    # Microservices dashboard (34 panels)
 │   └── variables.md              # Dashboard variables & regex

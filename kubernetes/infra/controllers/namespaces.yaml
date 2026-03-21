@@ -1,0 +1,120 @@
+# Cluster-wide Namespace definitions (single source of truth).
+# Lives under controllers/ so Kustomize can reference it without `../` (default
+# load restrictor allows only files inside the kustomization root).
+# Flux path `./controllers` includes this file first via kustomization.yaml.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+    platform.duynhlab/backup: "walg"
+  name: auth
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+    platform.duynhlab/backup: "cnpg"
+  name: cart
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+  name: cache-system
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+  name: cloudnative-pg
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+  name: database
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+  name: monitoring
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+  name: notification
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+  name: order
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+  name: postgres-operator
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+    platform.duynhlab/backup: "cnpg"
+  name: product
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+  name: review
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+  name: rustfs
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+  name: shipping
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+    platform.duynhlab/backup: "walg"
+  name: user
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+  name: vault
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+  name: external-secrets-system

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "skills": {
+    "gitops-cluster-debug": {
+      "source": "fluxcd/agent-skills",
+      "sourceType": "github",
+      "computedHash": "6017de3b526abb75ff32a2cd14297dd6b368b8c376112f0ab9b875e280805324"
+    },
+    "gitops-knowledge": {
+      "source": "fluxcd/agent-skills",
+      "sourceType": "github",
+      "computedHash": "a5efeeae68b77cb9e81efd905074df964ea5c956722c0563e263e6ab509961e4"
+    },
+    "gitops-repo-audit": {
+      "source": "fluxcd/agent-skills",
+      "sourceType": "github",
+      "computedHash": "abf9992d693ae68193535bc1053a191321ada875e1f7d779255de0e8e3ddc582"
+    }
+  }
+}

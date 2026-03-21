@@ -17,6 +17,12 @@ spec:
   releaseName: postgres-operator
   targetNamespace: postgres-operator
   timeout: 10m
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
   values:
     configAwsOrGcp:
       aws_region: us-east-1

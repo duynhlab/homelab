@@ -1,7 +1,7 @@
 ---
 # Production Cluster Configuration
-# TODO: Configure FluxInstance for production cluster
-# Example: Point to production OCI registry, configure production-specific sync
+# TODO: Configure FluxInstance for production cluster (TLS OCI, no insecure patch).
+# See: ../local/sources/oci/README.md and ../local/flux-system/instance.yaml (production checklist comments).
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization

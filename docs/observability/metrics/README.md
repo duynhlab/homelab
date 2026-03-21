@@ -3,20 +3,24 @@
 ## Quick Summary
 
 **Objectives:**
-- Understand the RED method and how it maps to our Prometheus metrics
-- Understand label injection (application emits 3 labels, Prometheus adds 4 at scrape time)
+- Understand the RED method and how it maps to our application metrics (PromQL-compatible)
+- Understand label injection (application emits 3 labels, VMAgent adds 4 at scrape time)
 - Understand ServiceMonitor auto-discovery, path normalization, and exemplars
+- Understand the VMAgent → VMSingle pipeline (scrape → store → query)
 - Configure and query metrics in Grafana dashboards
 
 **Keywords:**
-Prometheus, RED Method, Golden Signals, Histogram, Counter, Gauge, PromQL, Percentiles, Apdex, SLO, Exemplars, ServiceMonitor, Label Injection, Path Normalization, Cardinality
+VictoriaMetrics, VMAgent, VMSingle, PromQL, RED Method, Golden Signals, Histogram, Counter, Gauge, Percentiles, Apdex, SLO, Exemplars, ServiceMonitor, Label Injection, Path Normalization, Cardinality
 
 **Technologies:**
-- Prometheus (metrics collection) + Prometheus Operator (v0.5.0+)
+- **VictoriaMetrics**: VMAgent (scrape) + VMSingle `:8428` (storage + PromQL API) — replaces Prometheus server
+- **prometheus-operator-crds**: CRD definitions only (`ServiceMonitor`, `PodMonitor`, `PrometheusRule`) — no Prometheus server or Prometheus Operator
+- **VM Operator**: auto-converts Prometheus CRDs to VM equivalents (`VMServiceScrape`, `VMPodScrape`, `VMRule`)
 - Prometheus Go Client Library + OpenTelemetry (tracing)
-- ServiceMonitor CRD
 - Grafana (visualization) + Tempo (traces)
-- PromQL (query language)
+- PromQL / MetricsQL (query language)
+
+> **See also:** [VictoriaMetrics Operator Stack](victoriametrics.md) for full architecture, dual CRD system, and component details. [VMAuth and vmauth](vmauth.md) for HTTP auth proxy patterns (not deployed in this repo yet). [Datasource Strategy](../grafana/datasources.md) for Grafana Prometheus vs VM plugin.
 
 ---
 
@@ -92,7 +96,7 @@ Common principles across all large-scale platforms:
 
 ### Label Injection Strategy
 
-Applications **only emit** 3 labels. Prometheus **automatically adds** 4 more labels during scrape via ServiceMonitor relabel_configs.
+Applications **only emit** 3 labels. **VMAgent** (via ServiceMonitor relabel_configs) **automatically adds** 4 more labels during scrape.
 
 **Application Level (Go Middleware):**
 
@@ -109,7 +113,7 @@ var (
 )
 ```
 
-**Prometheus Level (Scrape Time):**
+**VMAgent Level (Scrape Time):**
 
 - `app` - From pod's `metadata.labels.app`
 - `namespace` - From pod's `metadata.namespace`
@@ -120,10 +124,10 @@ var (
 
 ```promql
 request_duration_seconds_bucket{
-  app="auth",                    # Added by Prometheus
-  namespace="auth",              # Added by Prometheus
-  job="microservices",           # Added by Prometheus
-  instance="10.244.1.5:8080",   # Added by Prometheus
+  app="auth",                    # Added by VMAgent
+  namespace="auth",              # Added by VMAgent
+  job="microservices",           # Added by VMAgent
+  instance="10.244.1.5:8080",   # Added by VMAgent
   method="GET",                  # From application
   path="/api/v1/login",         # From application
   code="200",                   # From application
@@ -136,19 +140,19 @@ request_duration_seconds_bucket{
 | `method` | HTTP request | `GET`, `POST` | Application |
 | `path` | Route pattern | `/api/v1/users/:id` | Application |
 | `code` | Status code | `200`, `404`, `500` | Application |
-| `app` | Pod label | `auth`, `user` | **Prometheus** |
-| `namespace` | Pod namespace | `auth`, `user` | **Prometheus** |
-| `job` | ServiceMonitor | `microservices` | **Prometheus** |
-| `instance` | Pod IP:port | `10.244.1.5:8080` | **Prometheus** |
+| `app` | Pod label | `auth`, `user` | **VMAgent** |
+| `namespace` | Pod namespace | `auth`, `user` | **VMAgent** |
+| `job` | ServiceMonitor | `microservices` | **VMAgent** |
+| `instance` | Pod IP:port | `10.244.1.5:8080` | **VMAgent** |
 
 **Benefits:**
 1. **Eliminates Label Duplication** - Application doesn't need to know its own name or namespace
 2. **Simplifies Application Code** - No env var injection, no helper functions
-3. **Follows Best Practices** - Prometheus Community best practice: let Prometheus add target labels
+3. **Follows Best Practices** - Prometheus ecosystem best practice: let the scraping agent add target labels
 4. **Scales to 1000+ Pods** - Single ServiceMonitor discovers all microservices automatically
 
 **Consistent approach across the stack:**
-- **Metrics (Prometheus)**: Labels auto-injected by Prometheus during scrape
+- **Metrics (VMAgent)**: Labels auto-injected by VMAgent during scrape
 - **Tracing (OpenTelemetry)**: Service name auto-detected from Kubernetes environment
 - **Profiling (Pyroscope)**: Service name auto-detected from Kubernetes environment
 
@@ -190,29 +194,38 @@ spec:
 **How It Works:**
 
 1. **Label Matching**: ServiceMonitor finds all Services with `component: api` label in ANY namespace
-2. **Pod Discovery**: Prometheus resolves Service endpoints to pods
-3. **Label Injection**: Prometheus adds `app`, `namespace`, `job`, `service` labels from pod/service metadata
-4. **Scraping**: Prometheus scrapes `/metrics` endpoint every 15s
+2. **CRD Conversion**: VM Operator auto-converts `ServiceMonitor` → `VMServiceScrape`
+3. **Pod Discovery**: VMAgent resolves Service endpoints to pods
+4. **Label Injection**: VMAgent adds `app`, `namespace`, `job`, `service` labels from pod/service metadata
+5. **Scraping**: VMAgent scrapes `/metrics` endpoint every 15s, remote-writes to VMSingle
 
 ```mermaid
 flowchart TD
-    subgraph Operator["Prometheus Operator"]
-        ServiceMonitor["ServiceMonitor\n(monitoring ns)\nselector: component=api"]
-        Prometheus["Prometheus\n(scrape config)"]
-        ServiceMonitor -->|"creates"| Prometheus
+    subgraph vmOperator ["VM Operator"]
+        ServiceMonitor["ServiceMonitor\nselector: component=api\nnamespaceSelector: any"]
+        VMServiceScrape["VMServiceScrape\nauto-converted"]
+        ServiceMonitor -->|"auto-convert"| VMServiceScrape
     end
 
-    subgraph Namespaces["All Namespaces (any: true)"]
-        AuthService["auth:8080\n/metrics\n(component=api)"]
-        UserService["user:8080\n/metrics\n(component=api)"]
-        ProductService["product:8080\n/metrics\n(component=api)"]
-        NewService["new-service:8080\n/metrics\n(component=api)"]
+    subgraph vmAgent ["VMAgent"]
+        Scraper["Scrape config\nfrom VMServiceScrape"]
     end
 
-    ServiceMonitor -->|"auto-discovers\ncomponent=api"| AuthService
-    ServiceMonitor -->|"auto-discovers"| UserService
-    ServiceMonitor -->|"auto-discovers"| ProductService
-    ServiceMonitor -->|"auto-discovers"| NewService
+    subgraph namespaces ["All Namespaces"]
+        AuthService["auth:8080/metrics"]
+        UserService["user:8080/metrics"]
+        ProductService["product:8080/metrics"]
+        NewService["new-service:8080/metrics"]
+    end
+
+    VMSingle["VMSingle :8428"]
+
+    VMServiceScrape --> Scraper
+    Scraper -->|"auto-discovers\ncomponent=api"| AuthService
+    Scraper --> UserService
+    Scraper --> ProductService
+    Scraper --> NewService
+    Scraper -->|"remote write"| VMSingle
 ```
 
 **Auto-discovery**: New services deployed with the `mop` Helm chart (which sets `component: api` on the Service) are automatically scraped. No manual namespace registration needed.
@@ -220,7 +233,7 @@ flowchart TD
 **Deployment:**
 - **Location**: [`kubernetes/infra/configs/monitoring/servicemonitors/microservices.yaml`](../../../kubernetes/infra/configs/monitoring/servicemonitors/microservices.yaml)
 - **Deployed via**: Flux Operator
-- **Reconciliation**: `flux reconcile kustomization configs-local --with-source`
+- **Reconciliation**: `flux reconcile kustomization monitoring-local --with-source`
 
 ---
 
@@ -283,7 +296,7 @@ With 8 services, ~20 routes each, 3 methods, 5 status codes: `8 * 20 * 3 * 5 = 2
 
 ## 3. Metrics Reference
 
-All metrics used in the system, organized by category. The `app`, `namespace`, `job`, `instance` labels are automatically injected by Prometheus during scrape (see Architecture above) and are omitted from individual metric label lists below to avoid repetition.
+All metrics used in the system, organized by category. The `app`, `namespace`, `job`, `instance` labels are automatically injected by VMAgent during scrape (see Architecture above) and are omitted from individual metric label lists below to avoid repetition.
 
 ### Summary Table
 
@@ -309,7 +322,7 @@ All metrics used in the system, organized by category. The `app`, `namespace`, `
 
 ### Custom Application Metrics (4 metrics)
 
-Emitted by application code via Prometheus middleware. All metrics also carry the 4 Prometheus-injected labels (`app`, `namespace`, `job`, `instance`).
+Emitted by application code via Prometheus middleware. All metrics also carry the 4 VMAgent-injected labels (`app`, `namespace`, `job`, `instance`).
 
 #### 1. `request_duration_seconds` (Histogram) -- Core RED Metric
 
@@ -366,7 +379,7 @@ HTTP response body size in bytes.
 
 ### Go Runtime Metrics
 
-Automatically exposed by Prometheus Go client library. No application code needed. All carry the 4 Prometheus-injected labels only.
+Automatically exposed by Prometheus Go client library. No application code needed. All carry the 4 VMAgent-injected labels only.
 
 | Metric | Type | Purpose |
 |--------|------|---------|
@@ -384,7 +397,7 @@ Automatically exposed by Prometheus Go client library. No application code neede
 
 ### Kubernetes Metrics
 
-From Kubernetes infrastructure, scraped from kube-state-metrics or Prometheus.
+From Kubernetes infrastructure, scraped by VMAgent from kube-state-metrics.
 
 | Metric | Type | Labels | Purpose |
 |--------|------|--------|---------|
@@ -423,7 +436,7 @@ This eliminates manual trace hunting during incidents -- click on the P99 spike,
 
 ### Prerequisites
 
-- Prometheus: `--enable-feature=exemplar-storage`
+- VMSingle supports exemplar storage natively (no extra flags needed)
 - OpenTelemetry tracing middleware must run **before** Prometheus middleware (already configured: `TracingMiddleware()` -> `LoggingMiddleware()` -> `PrometheusMiddleware()`)
 - Grafana: Tempo datasource configured (already done)
 
@@ -578,7 +591,7 @@ If both increase + Heap stable = High load (not a leak).
 
 ### Cardinality Monitoring
 
-**Symptoms:** Prometheus slow queries, "high cardinality metrics" warnings, OOM on Prometheus pods.
+**Symptoms:** Slow PromQL queries, "high cardinality metrics" warnings, high memory on VMSingle.
 
 **Check current cardinality:**
 
@@ -610,7 +623,7 @@ Memory & CPU panels show Go process metrics, **not** Kubernetes container metric
 
 ### Counter Reset Handling
 
-Counter panels ("Total Request", "Total Requests by Endpoint") use `increase([$__range])` instead of raw counter values. Prometheus handles counter resets automatically when pods restart.
+Counter panels ("Total Request", "Total Requests by Endpoint") use `increase([$__range])` instead of raw counter values. PromQL handles counter resets automatically when pods restart.
 
 See [PromQL Guide](./promql-guide.md) for details on `increase()` and `rate()` counter reset handling.
 
@@ -635,12 +648,15 @@ The "Total Network Traffic per Service" panel measures HTTP body size only, not 
 
 ## Related Documentation
 
+- **[VictoriaMetrics Operator Stack](victoriametrics.md)** - Full architecture, dual CRD system, VM Operator auto-conversion
+- **[Datasource Strategy](../grafana/datasources.md)** - Prometheus vs VictoriaMetrics plugin in Grafana
 - **[Grafana Dashboard Guide](../grafana/dashboard-reference.md)** - Complete panel reference, query analysis, troubleshooting, SRE best practices
 - **[Variables & Regex Guide](../grafana/variables.md)** - Dashboard variables, regex patterns, cascading configuration
 - **[PromQL Guide](./promql-guide.md)** - PromQL functions, time range vs rate interval, counter handling
 - **[Metrics Audit Runbook](../../../docs/runbooks/metrics-audit-fixes.md)** - Before/after analysis for each metrics issue fixed, with PromQL verification queries
 - **[SLO Documentation](../slo/README.md)** - SLO definitions, SLI mappings, Sloth integration
-- **[Prometheus Operator](https://prometheus-operator.dev/)** - Official documentation
+- **[VictoriaMetrics Docs](https://docs.victoriametrics.com/)** - Official VictoriaMetrics documentation
+- **[prometheus-operator-crds](https://prometheus-operator.dev/)** - CRD definitions (ServiceMonitor, PodMonitor, PrometheusRule)
 - **[ServiceMonitor API](https://prometheus-operator.dev/docs/operator/api/#monitoring.coreos.com/v1.ServiceMonitor)** - CRD reference
 
 ---

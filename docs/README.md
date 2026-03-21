@@ -26,6 +26,7 @@ docs/
 │   ├── metrics/                  # Pillar 1: Metrics
 │   │   ├── README.md             # RED/USE/Golden Signals methodology
 │   │   ├── victoriametrics.md    # VictoriaMetrics Operator stack
+│   │   ├── vmauth.md             # VMAuth/vmauth HTTP proxy (auth.config, Operator CRs)
 │   │   ├── promql-guide.md       # PromQL reference
 │   │   └── postgresql/           # PostgreSQL-specific metrics
 │   │       ├── monitoring.md
@@ -37,12 +38,13 @@ docs/
 │   │   ├── architecture.md       # Dual backend (Tempo + Jaeger)
 │   │   └── jaeger.md             # Jaeger UI guide
 │   ├── logging/                  # Pillar 3: Structured Logging
-│   │   ├── README.md             # Zap + Vector + Loki
+│   │   ├── README.md             # Dual backend: Loki + VictoriaLogs (single Vector)
 │   │   └── victorialogs.md       # VictoriaLogs backend
 │   ├── profiling/                # Pillar 4: Continuous Profiling
 │   │   └── README.md             # Pyroscope (CPU, heap, goroutine)
 │   ├── grafana/                  # Visualization layer
 │   │   ├── README.md             # Grafana overview + plugins
+│   │   ├── rbac-multi-team.md    # Org roles, Teams, anonymous vs named users
 │   │   ├── datasources.md        # Dual datasource strategy (case study)
 │   │   ├── dashboard-reference.md # Microservices dashboard (34 panels)
 │   │   └── variables.md          # Dashboard variables & regex
@@ -60,6 +62,7 @@ docs/
 │       └── microservices-alerts.md      # Per-alert investigation guide
 ├── platform/                     # Platform/deployment documentation
 │   ├── setup.md                  # GitOps deployment guide
+│   ├── helmrelease-conventions.md # Flux HelmRelease remediation conventions
 │   ├── application-delivery.md    # ResourceSet patterns & templates
 │   ├── cicd.md                   # CI/CD pipelines
 │   ├── gitflow.md                # Git branching & release standard
@@ -154,7 +157,7 @@ docs/
 4. **[Tracing Architecture](./observability/tracing/architecture.md)** - Dual backend (Tempo + Jaeger)
 5. **[Jaeger Guide](./observability/tracing/jaeger.md)** - Jaeger UI usage, comparison with Tempo
 6. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
-7. **[Structured Logging](./observability/logging/README.md)** - Zap + Vector + Loki
+7. **[Structured Logging](./observability/logging/README.md)** - Dual backend: Loki + VictoriaLogs (single Vector)
 8. **[VictoriaLogs](./observability/logging/victorialogs.md)** - VictoriaLogs deployment and configuration
     - Single Vector architecture (dual-ship to Loki + VictoriaLogs)
     - PostgreSQL auto_explain plan parsing pipeline
@@ -244,7 +247,7 @@ docs/
 - [Tracing Architecture](./observability/tracing/architecture.md) - Dual backend (Tempo + Jaeger)
 - [Jaeger Guide](./observability/tracing/jaeger.md) - Jaeger UI usage, comparison with Tempo
 - [Continuous Profiling](./observability/profiling/README.md) - Pyroscope setup
-- [Structured Logging](./observability/logging/README.md) - Zap + Vector + Loki
+- [Structured Logging](./observability/logging/README.md) - Dual backend: Loki + VictoriaLogs (single Vector)
 - [VictoriaLogs](./observability/logging/victorialogs.md) - VictoriaLogs deployment (single Vector, dual-ship)
 
 ### API
@@ -307,7 +310,7 @@ docs/
 - **34 Data Panels + 5 Row Panels** - Complete monitoring dashboard
 - **4 Custom Metrics** - Application-level metrics (RED method)
 - **8 Microservices** - All services with v1 API (canonical)
-- **Monitoring Stack** - Prometheus Operator + Grafana Operator + kube-state-metrics + metrics-server
+- **Monitoring Stack** - VictoriaMetrics Operator (VMAgent, VMSingle, VMAlert, VMAlertmanager) + prometheus-operator-crds + Grafana Operator + metrics-server
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
 - **APM Stack** - Tempo + Jaeger (tracing), OTel Collector (fan-out), Pyroscope (profiling), Loki + VictoriaLogs + Vector (logging)
 - **Secrets Stack** - HashiCorp Vault (dev mode) + External Secrets Operator for centralized secret management

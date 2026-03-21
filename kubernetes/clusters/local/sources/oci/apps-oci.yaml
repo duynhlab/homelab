@@ -1,3 +1,6 @@
+# Homelab (Kind): HTTP registry in-cluster (homelab-registry:5000). `insecure: true` is required.
+#
+# Production: same guidance as `infrastructure-oci.yaml` — TLS registry URL, omit `insecure`, pin refs, optional `spec.verify`.
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
@@ -10,3 +13,7 @@ spec:
   ref:
     tag: local
   insecure: true
+  # verify:
+  #   provider: cosign
+  #   secretRef:
+  #     name: flux-oci-cosign-public

@@ -28,6 +28,12 @@ spec:
         name: mop-chart-oci
         namespace: flux-system
       releaseName: << inputs.name >>
+      install:
+        remediation:
+          retries: 3
+      upgrade:
+        remediation:
+          retries: 3
       values:
         name: << inputs.name >>
         replicaCount: << inputs.replicaCount | int >>

@@ -782,6 +782,8 @@ kubectl get helmreleases -A -o wide
 
 ## References
 
+- [VMAuth and vmauth (HTTP auth proxy)](vmauth.md) — vmauth binary, `auth.config`, VMAuth/VMUser CRs, Grafana vs API security (this repo has no VMAuth manifests yet).
+
 - [VictoriaMetrics Operator Documentation](https://docs.victoriametrics.com/operator/)
 - [VM Operator Quick Start](https://docs.victoriametrics.com/operator/quick-start/)
 - [VM Operator Resources (all CRDs)](https://docs.victoriametrics.com/operator/resources/)

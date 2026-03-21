@@ -1,6 +1,6 @@
 # Grafana
 
-Grafana is the unified visualization layer for all 4 observability pillars. It connects to VMSingle (metrics), Tempo (traces), Loki (logs), Jaeger (traces), and Pyroscope (profiles) through configured datasources.
+Grafana is the unified visualization layer for all 4 observability pillars. It connects to VMSingle (metrics), Tempo (traces), Loki (logs), VictoriaLogs (LogsQL via plugin), Jaeger (traces), and Pyroscope (profiles) through configured datasources.
 
 ## Deployment
 
@@ -16,6 +16,10 @@ kubectl port-forward svc/grafana-service -n monitoring 3000:3000
 # Open http://localhost:3000
 ```
 
+## Security and access control
+
+Grafana **organization roles**, **Teams**, and **anonymous** access are documented in [rbac-multi-team.md](rbac-multi-team.md). That page explains why anonymous `Admin` does not provide per-team separation and how this differs from **[VMAuth / vmauth](../metrics/vmauth.md)** (HTTP proxy for VictoriaMetrics APIs—not the Grafana UI).
+
 ## Datasources
 
 All datasources are managed as `GrafanaDatasource` CRDs (GitOps, no manual configuration):
@@ -24,12 +28,15 @@ All datasources are managed as `GrafanaDatasource` CRDs (GitOps, no manual confi
 |------------|------|---------|-----|---------|
 | Prometheus | `prometheus` | Yes | `vmsingle-victoria-metrics:8428` | Metrics, alerting, read-only rules |
 | VictoriaMetrics | `victoriametrics-metrics-datasource` | No | `vmsingle-victoria-metrics:8428` | MetricsQL, VMUI integration |
-| Loki | `loki` | No | `loki:3100` | Log queries (LogQL) |
+| Loki | `loki` | No | `loki:3100` | Log queries (LogQL), trace correlation |
+| VictoriaLogs | `victoriametrics-logs-datasource` | No | `vlsingle-victoria-logs:9428` | Log queries (LogsQL), [plugin](https://grafana.com/grafana/plugins/victoriametrics-logs-datasource/) |
 | Tempo | `tempo` | No | `tempo:3200` | Trace queries |
 | Jaeger | `jaeger` | No | `jaeger-query:16686` | Trace search (alternative UI) |
 | Pyroscope | `grafana-pyroscope-datasource` | No | `pyroscope:4040` | Flamegraphs |
 
 Both **Prometheus** and **VictoriaMetrics** datasources point to the same VMSingle backend. See [datasources.md](datasources.md) for the rationale and case study.
+
+**Loki** and **VictoriaLogs** are separate log backends (same logs ingested by Vector); use Loki for LogQL and default trace correlation, VictoriaLogs for LogsQL and the VM plugin workflow. See [datasources.md](datasources.md#logs-loki-vs-victorialogs-plugin).
 
 **Datasource CRD files:**
 
@@ -38,6 +45,7 @@ kubernetes/infra/configs/monitoring/grafana/
 ├── datasource-prometheus.yaml
 ├── datasource-victoriametrics.yaml    # VictoriaMetrics plugin
 ├── datasource-loki.yaml
+├── datasource-victorialogs.yaml       # VictoriaLogs plugin
 ├── datasource-tempo.yaml
 ├── datasource-jaeger.yaml
 └── datasource-pyroscope.yaml
@@ -50,14 +58,15 @@ Plugins are installed via the `GF_INSTALL_PLUGINS` environment variable in the G
 | Plugin | Version | Purpose |
 |--------|---------|---------|
 | `victoriametrics-metrics-datasource` | 0.23.1 | Native VictoriaMetrics datasource with MetricsQL support |
+| `victoriametrics-logs-datasource` | 0.26.3 | VictoriaLogs datasource with LogsQL in Explore and dashboards |
 
-The plugin must also be listed in `allow_loading_unsigned_plugins` since it is not signed by Grafana:
+Both plugins must be listed in `allow_loading_unsigned_plugins` (comma-separated) since they are not signed by Grafana:
 
 ```yaml
 spec:
   config:
     plugins:
-      allow_loading_unsigned_plugins: victoriametrics-metrics-datasource
+      allow_loading_unsigned_plugins: victoriametrics-metrics-datasource,victoriametrics-logs-datasource
 ```
 
 ## Dashboards
@@ -91,6 +100,7 @@ kubernetes/infra/configs/monitoring/grafana/
 ├── datasource-prometheus.yaml         # Prometheus-type datasource (default)
 ├── datasource-victoriametrics.yaml    # VictoriaMetrics plugin datasource
 ├── datasource-loki.yaml
+├── datasource-victorialogs.yaml       # VictoriaLogs plugin datasource
 ├── datasource-tempo.yaml
 ├── datasource-jaeger.yaml
 ├── datasource-pyroscope.yaml
@@ -100,6 +110,8 @@ kubernetes/infra/configs/monitoring/grafana/
 
 ## Related Documentation
 
+- [RBAC and multi-team access](rbac-multi-team.md) -- Viewer/Editor/Admin, Teams, anonymous vs named users
+- [VMAuth and vmauth](../metrics/vmauth.md) -- API-layer auth for VictoriaMetrics (separate from Grafana UI)
 - [Datasource Strategy](datasources.md) -- dual datasource case study
 - [Dashboard Reference](dashboard-reference.md) -- panel-by-panel reference
 - [Variables](variables.md) -- dashboard variable configuration

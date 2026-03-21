@@ -1,3 +1,14 @@
+# Homelab FluxInstance: sync from local OCI (`homelab-registry:5000`) over HTTP.
+#
+# Production checklist:
+#   - Set `spec.sync.url` to your production OCI artifact URL (HTTPS registry).
+#   - Remove the entire `spec.kustomize.patches` block below. That patch forces
+#     `spec.insecure: true` on all OCIRepository objects generated for this instance;
+#     production registries should use TLS (default insecure=false).
+#   - If the cluster sync bundle also materializes OCIRepository CRs, ensure they
+#     match your prod registry URLs and auth (`secretRef` on sources if private).
+#   - Consider enabling Cosign verification on each OCIRepository (see
+#     kubernetes/clusters/local/sources/oci/README.md).
 ---
 apiVersion: fluxcd.controlplane.io/v1
 kind: FluxInstance
@@ -37,6 +48,8 @@ spec:
     ref: local
     path: "./"
   
+  # Homelab only: source-controller must pull from HTTP registry without TLS.
+  # PRODUCTION: delete this whole `kustomize:` key so OCIRepository resources use TLS.
   kustomize:
     patches:
       - patch: |

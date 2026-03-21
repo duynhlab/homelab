@@ -16,7 +16,7 @@ spec:
       level: info
       mode: console
     plugins:
-      allow_loading_unsigned_plugins: victoriametrics-metrics-datasource
+      allow_loading_unsigned_plugins: victoriametrics-metrics-datasource,victoriametrics-logs-datasource
     server:
       root_url: http://localhost:3000
     users:
@@ -32,7 +32,7 @@ spec:
             name: grafana
             env:
             - name: GF_INSTALL_PLUGINS
-              value: "https://github.com/VictoriaMetrics/victoriametrics-datasource/releases/download/v0.23.1/victoriametrics-metrics-datasource-v0.23.1.zip;victoriametrics-metrics-datasource"
+              value: "https://github.com/VictoriaMetrics/victoriametrics-datasource/releases/download/v0.23.1/victoriametrics-metrics-datasource-v0.23.1.zip;victoriametrics-metrics-datasource,https://github.com/VictoriaMetrics/victorialogs-datasource/releases/download/v0.26.3/victoriametrics-logs-datasource-v0.26.3.zip;victoriametrics-logs-datasource"
             resources:
               limits:
                 cpu: 100m

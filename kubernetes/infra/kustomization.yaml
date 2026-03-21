@@ -1,7 +1,14 @@
+# Composite view of infrastructure (operators + configs).
+#
+# Namespaces are NOT listed here: they live under controllers/namespaces.yaml and are
+# included only via controllers/kustomization.yaml (avoids duplicate ids and avoids
+# `../` paths that break `kustomize build` with the default load restrictor).
+#
+# Flux reconciles subpaths of this tree from OCI (e.g. ./controllers, ./configs/monitoring);
+# see kubernetes/clusters/local/*.yaml and scripts/flux-validate.sh overlay list.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - namespaces.yaml
   - controllers/
   - configs/

@@ -199,7 +199,7 @@ spec:
         - name: PG_EXPORTER_TAG
           value: "cls=supporting-shared-db"
     - name: vector
-      image: timberio/vector:0.52.0-alpine
+      image: timberio/vector:0.54.0-alpine
       args:
         - "--config"
         - "/etc/vector/vector.yaml"

@@ -13,6 +13,6 @@ spec:
     key: pg-query-overview.json
   datasources:
     - inputName: DS_PROMETHEUS
-      datasourceName: Prometheus
+      datasourceName: VictoriaMetrics
     - inputName: DS_LOKI
       datasourceName: Loki

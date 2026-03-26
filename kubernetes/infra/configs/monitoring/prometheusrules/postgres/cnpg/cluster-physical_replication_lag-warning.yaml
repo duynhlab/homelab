@@ -1,0 +1,31 @@
+# Generated from cnpg/cluster chart v0.6.0 (helm template) with fullnameOverride=cnpg-db, namespace=product.
+# Do not edit expr by hand; re-render from chart and split, or bump chart version in README.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-db-cluster-physical-replication-lag-warning
+  namespace: product
+  labels:
+    app.kubernetes.io/part-of: cnpg-chart-rules
+    cnpg.io/cluster: cnpg-db
+    platform.duynhlab.dev/source: cloudnative-pg-charts-cluster
+    platform.duynhlab.dev/chart-version: 0.6.0
+spec:
+  groups:
+  - name: cloudnative-pg/cnpg-db
+    rules:
+    - alert: CNPGClusterPhysicalReplicationLagWarning
+      annotations:
+        summary: CNPG Cluster high physical replication lag
+        description: 'CloudNativePG Cluster "product/cnpg-db" is experiencing a high physical replication lag of {{ $value }}ms.
+
+
+          High replication lag indicates network issues, busy instances, slow queries or suboptimal configuration.'
+        runbook_url: https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/docs/runbooks/CNPGClusterPhysicalReplicationLag.md
+      expr: max(cnpg_pg_replication_lag{namespace="product",pod=~"cnpg-db-([1-9][0-9]*)$"}) > 1
+      for: 5m
+      labels:
+        severity: warning
+        namespace: product
+        cnpg_cluster: cnpg-db

@@ -13,4 +13,4 @@ spec:
     key: pg-query-drilldown.json
   datasources:
     - inputName: DS_PROMETHEUS
-      datasourceName: Prometheus
+      datasourceName: VictoriaMetrics

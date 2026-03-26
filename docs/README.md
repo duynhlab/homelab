@@ -19,7 +19,13 @@ docs/
 │   ├── 008-pooler.md                 # Connection pooler documentation
 │   ├── 004-replication-strategy.md   # Replication strategy
 │   ├── 005-ha-dr-deep-dive.md        # HA vs DR (cnpg-db-replica)
-│   └── 001-postgresql-internals.md  # PostgreSQL internals deep dive
+│   ├── 001-postgresql-internals.md  # PostgreSQL internals deep dive
+│   ├── 010-documents.md              # Further reading / document map
+│   └── runbooks/                     # Database ops runbooks
+│       ├── cnpg-dr-replica-bootstrap.md
+│       ├── endpoints-to-configmaps.md
+│       ├── prepared-databases.md
+│       └── zalando-ha-scaling.md
 ├── observability/                # Observability documentation
 │   ├── README.md                 # Master index + 4-pillar architecture
 │   ├── architecture.md           # 3-layer service architecture + APM integration
@@ -98,7 +104,7 @@ docs/
    - Step-by-step instructions
    - Troubleshooting common issues
 
-2. **[API Reference](./api/api.md)** - API endpoints and adding new microservices
+3. **[API Reference](./api/api.md)** - API endpoints and adding new microservices
    - Requirements and conventions
    - Step-by-step guide
    - Automatic monitoring setup

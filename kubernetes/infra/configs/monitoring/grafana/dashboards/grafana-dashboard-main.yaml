@@ -12,5 +12,5 @@ spec:
     key: microservices-dashboard.json
   datasources:
     - inputName: DS_PROMETHEUS
-      datasourceName: Prometheus
+      datasourceName: VictoriaMetrics
 

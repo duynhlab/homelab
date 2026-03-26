@@ -1,0 +1,33 @@
+# Generated from cnpg/cluster chart v0.6.0 (helm template) with fullnameOverride=cnpg-db, namespace=product.
+# Do not edit expr by hand; re-render from chart and split, or bump chart version in README.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-db-cluster-logical-replication-lagging
+  namespace: product
+  labels:
+    app.kubernetes.io/part-of: cnpg-chart-rules
+    cnpg.io/cluster: cnpg-db
+    platform.duynhlab.dev/source: cloudnative-pg-charts-cluster
+    platform.duynhlab.dev/chart-version: 0.6.0
+spec:
+  groups:
+  - name: cloudnative-pg/cnpg-db
+    rules:
+    - alert: CNPGClusterLogicalReplicationLagging
+      annotations:
+        summary: CNPG Cluster logical replication lagging
+        description: 'CloudNativePG Cluster''s "product/cnpg-db" "{{ .subname }}" subscription is experiencing replication lag.
+
+          Current lag: {{ $value }}s
+
+
+          This alert indicates the subscriber is falling behind the publisher. The lag could be receipt lag (not receiving WAL data fast enough due to network issues), apply lag (receiving data but not applying it fast enough due to resource contention), or LSN distance (large amount of pending data to be applied).'
+        runbook_url: https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/docs/runbooks/CNPGClusterLogicalReplicationLagging.md
+      expr: "(\n  # Receipt lag - time since last message received\n  label_replace(max by (namespace, job, subname) (cnpg_pg_stat_subscription_receipt_lag_seconds), \"cluster\", \"$1\", \"job\", \".+/(.+)\") > 60\n) or (\n  # Apply lag - time delay in applying changes\n  label_replace(max by (namespace, job, subname) (cnpg_pg_stat_subscription_apply_lag_seconds), \"cluster\", \"$1\", \"job\", \".+/(.+)\") > 60\n) or (\n  # LSN distance - bytes pending to be applied\n  label_replace(max by (namespace, job, subname) (cnpg_pg_stat_subscription_buffered_lag_bytes), \"cluster\", \"$1\", \"job\", \".+/(.+)\") / 1024^3 > 1\n)"
+      for: 5m
+      labels:
+        severity: warning
+        namespace: product
+        cnpg_cluster: cnpg-db

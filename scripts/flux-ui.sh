@@ -26,6 +26,14 @@ kubectl port-forward -n monitoring svc/grafana-service 3000:3000 > /dev/null 2>&
 echo "Starting VictoriaMetrics port forward (8428)..."
 kubectl port-forward -n monitoring svc/vmsingle-victoria-metrics 8428:8428 > /dev/null 2>&1 &
 
+# VMAlert (alert rules + evaluation UI; also proxied under VMSingle /vmalert/)
+echo "Starting VMAlert port forward (8080)..."
+kubectl port-forward -n monitoring svc/vmalert-victoria-metrics 8080:8080 > /dev/null 2>&1 &
+
+# Karma (Alertmanager alert dashboard — firing/silenced)
+echo "Starting Karma port forward (8086 -> svc :8080)..."
+kubectl port-forward -n monitoring svc/karma 8086:8080 > /dev/null 2>&1 &
+
 # Jaeger
 echo "Starting Jaeger port forward (16686)..."
 kubectl port-forward -n monitoring svc/jaeger 16686:16686 > /dev/null 2>&1 &
@@ -67,6 +75,8 @@ echo "Access URLs:"
 echo "Flux Web UI:         http://localhost:9080"
 echo "Grafana:             http://localhost:3000"
 echo "VictoriaMetrics:     http://localhost:8428/vmui"
+echo "VMAlert (rules):     http://localhost:8080  (VMalert UI; Grafana datasource may proxy /vmalert/ via VMSingle)"
+echo "Karma (alerts):      http://localhost:8086  (Alertmanager / firing alerts)"
 echo "Jaeger:              http://localhost:16686"
 echo "Tempo:               http://localhost:3200"
 echo "Pyroscope:           http://localhost:4040"

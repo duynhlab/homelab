@@ -12,9 +12,9 @@ configMapGenerator:
   - name: grafana-dashboard-tempo
     files:
       - tempo-observability-dashboard.json
-  - name: grafana-dashboard-pgcat
-    files:
-      - pgcat.json
+  # - name: grafana-dashboard-pgcat
+  #   files:
+  #     - pgcat.json
   - name: grafana-dashboard-pg-monitoring
     files:
       - pg-monitoring.json
@@ -39,6 +39,9 @@ configMapGenerator:
   - name: grafana-dashboard-pg-exporter-self
     files:
       - pg-exporter-self.json
+  - name: grafana-dashboard-cloudnative-pg
+    files:
+      - cloudnative-pg-cluster.json
 
 resources:
   - grafana-dashboard-main.yaml
@@ -46,7 +49,7 @@ resources:
   - grafana-dashboard-slo-detailed.yaml
   - grafana-dashboard-vector.yaml
   - grafana-dashboard-tempo.yaml
-  - grafana-dashboard-pgcat.yaml
+  # - grafana-dashboard-pgcat.yaml
   - grafana-dashboard-cloudnative-pg.yaml
   - grafana-dashboard-pg-monitoring.yaml
   - grafana-dashboard-pg-query-drilldown.yaml

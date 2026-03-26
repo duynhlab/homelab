@@ -1,0 +1,42 @@
+# Generated from cnpg/cluster chart v0.6.0 (helm template) with fullnameOverride=cnpg-db, namespace=product.
+# Do not edit expr by hand; re-render from chart and split, or bump chart version in README.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-db-cluster-ha-warning
+  namespace: product
+  labels:
+    app.kubernetes.io/part-of: cnpg-chart-rules
+    cnpg.io/cluster: cnpg-db
+    platform.duynhlab.dev/source: cloudnative-pg-charts-cluster
+    platform.duynhlab.dev/chart-version: 0.6.0
+spec:
+  groups:
+  - name: cloudnative-pg/cnpg-db
+    rules:
+    - alert: CNPGClusterHAWarning
+      annotations:
+        summary: CNPG Cluster less than 2 standby replicas.
+        description: 'CloudNativePG Cluster "{{ $labels.job }}" has only {{ $value }} standby replicas, putting
+
+          your cluster at risk if another instance fails. The cluster is still able to operate normally, although
+
+          the `-ro` and `-r` endpoints operate at reduced capacity.
+
+
+          This can happen during a normal fail-over or automated minor version upgrades. The replaced instance may
+
+          need some time to catch-up with the cluster primary instance.
+
+
+          This alarm will be constantly triggered if your cluster is configured to run with less than 3 instances.
+
+          In this case you may want to silence it.'
+        runbook_url: https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/docs/runbooks/CNPGClusterHAWarning.md
+      expr: max by (job) (cnpg_pg_replication_streaming_replicas{namespace="product"} - cnpg_pg_replication_is_wal_receiver_up{namespace="product"}) < 2
+      for: 5m
+      labels:
+        severity: warning
+        namespace: product
+        cnpg_cluster: cnpg-db

@@ -6,4 +6,5 @@ resources:
   - victoria-metrics-operator.yaml
   - grafana-operator.yaml
   - metrics-server.yaml
+  - kube-state-metrics.yaml
   - sloth-operator.yaml

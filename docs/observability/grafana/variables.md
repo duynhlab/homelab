@@ -26,11 +26,14 @@ Grafana Variables, Dashboard Variables, Regex Patterns, Label Values, Multi-sele
 Dashboard này sử dụng **4 variables động** để filter và customize metrics display:
 
 ### 1️⃣ **$DS_PROMETHEUS** (Datasource)
+
+Legacy variable **name**; it selects the **VictoriaMetrics** Grafana datasource (`victoriametrics-metrics-datasource`), not a `type: prometheus` datasource.
+
 ```yaml
 Type: datasource
-Query: prometheus
-Purpose: Select Prometheus datasource
-Default: Prometheus
+Query: victoriametrics-metrics-datasource
+Purpose: Select VictoriaMetrics datasource (same VMSingle backend)
+Default: VictoriaMetrics
 ```
 
 ### 2️⃣ **$app** (Application Filter)

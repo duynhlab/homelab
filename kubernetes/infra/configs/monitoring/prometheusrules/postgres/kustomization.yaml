@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Do not set namespace here: CNPG chart rules use namespace product; Zalando rules use monitoring.
+
+resources:
+  - cnpg/cluster-fenced.yaml
+  - cnpg/cluster-ha-critical.yaml
+  - cnpg/cluster-ha-warning.yaml
+  - cnpg/cluster-high_connection-critical.yaml
+  - cnpg/cluster-high_connection-warning.yaml
+  - cnpg/cluster-high_replication_lag.yaml
+  - cnpg/cluster-logical_replication_errors-critical.yaml
+  - cnpg/cluster-logical_replication_errors.yaml
+  - cnpg/cluster-logical_replication_lagging-critical.yaml
+  - cnpg/cluster-logical_replication_lagging.yaml
+  - cnpg/cluster-logical_replication_stopped-critical.yaml
+  - cnpg/cluster-logical_replication_stopped.yaml
+  - cnpg/cluster-offline.yaml
+  - cnpg/cluster-physical_replication_lag-critical.yaml
+  - cnpg/cluster-physical_replication_lag-warning.yaml
+  - cnpg/cluster-wal-size-high.yaml
+  # Homelab default: gated — uncomment when production-ready (KSM zone labels for spread; kube_pod_info for colocation). See cnpg/README.md.
+  # - cnpg/cluster-instances_on_same_node.yaml
+  # - cnpg/cluster-zone_spread-warning.yaml
+  - cnpg/cluster-low_disk_space-critical.yaml
+  - cnpg/cluster-low_disk_space-warning.yaml
+  - zalando/availability.yaml
+  - zalando/maintenance.yaml
+  - zalando/performance.yaml
+  - zalando/storage.yaml

@@ -1,0 +1,35 @@
+# Zalando / pg_exporter: dead tuples and checkpoints (CNPG branches removed — see ../cnpg/).
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zalando-postgres-maintenance
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: zalando-postgres-rules
+spec:
+  groups:
+    - name: zalando-postgres-maintenance
+      interval: 5m
+      rules:
+        - alert: PostgresDeadTuplesHigh
+          expr: |
+            pg_stat_user_tables_n_dead_tup > 100000
+            or custom_autovacuum_stats_n_dead_tup > 100000
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PostgreSQL dead tuples high ({{ $labels.namespace }}/{{ $labels.relname }})"
+            description: "Table {{ $labels.relname }} has {{ $value }} dead tuples. Autovacuum may be falling behind."
+
+        - alert: PostgresCheckpointsTooFrequent
+          expr: |
+            rate(pg_stat_bgwriter_checkpoints_req_total[5m]) > 0.5
+            or rate(pg_bgwriter_checkpoints_req[5m]) > 0.5
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PostgreSQL requested checkpoints too frequent ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Requested checkpoints rate is {{ $value }}/s. Consider increasing max_wal_size."

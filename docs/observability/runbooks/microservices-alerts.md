@@ -877,6 +877,6 @@ Add alerts for application-side database health signals:
 - [SLO Documentation](../slo/README.md) -- SLO definitions, Sloth integration (Layer 2 alerts)
 - [SLO Alerting](../slo/alerting.md) -- Multi-window multi-burn-rate methodology
 - [Error Budget Policy](../slo/error_budget_policy.md) -- Budget gates and deployment decisions
-- [PostgreSQL Alerts](../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres-alerts.yaml) -- Database-level alerts
+- [PostgreSQL Alerts](../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/README.md) -- Database-level alerts (`cnpg/` + `zalando/`)
 - [Metrics Reference](../metrics/README.md) -- RED method, label strategy, cardinality
 - [Grafana Dashboard Guide](../grafana/dashboard-reference.md) -- Dashboard panel reference

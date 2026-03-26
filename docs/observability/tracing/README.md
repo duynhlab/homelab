@@ -179,7 +179,7 @@ These endpoints are **never traced** (reduces volume by 30-40%):
 | Path | Reason |
 |------|--------|
 | `/health`, `/healthz`, `/readyz`, `/livez` | High frequency, low value |
-| `/metrics` | Prometheus scrape endpoint |
+| `/metrics` | Prometheus-compatible scrape endpoint (VMAgent) |
 | `/favicon.ico` | Browser noise |
 
 ### Service Auto-Detection
@@ -270,7 +270,7 @@ middleware.AddSpanEvent(ctx, "payment.approved")
 1. **Record all errors** for debugging context
 2. **Add business IDs** (user_id, order_id) for filtering
 3. **Use child spans** for distinct operations (DB queries, external API calls)
-4. **Monitor trace volume** with Prometheus: `rate(tempo_spans_received_total[5m])`
+4. **Monitor trace volume** in VictoriaMetrics (Grafana Explore): `rate(tempo_spans_received_total[5m])`
 
 ### Don'ts ❌
 

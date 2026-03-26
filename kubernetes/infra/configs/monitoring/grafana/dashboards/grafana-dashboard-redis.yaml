@@ -12,5 +12,5 @@ spec:
     name: grafana-dashboard-redis
     key: redis.json
   datasources:
-    - inputName: DS_PROM
-      datasourceName: Prometheus
+    - inputName: DS_PROMETHEUS
+      datasourceName: VictoriaMetrics

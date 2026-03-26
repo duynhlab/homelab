@@ -15,6 +15,11 @@
       "source": "fluxcd/agent-skills",
       "sourceType": "github",
       "computedHash": "abf9992d693ae68193535bc1053a191321ada875e1f7d779255de0e8e3ddc582"
+    },
+    "postgres": {
+      "source": "planetscale/database-skills",
+      "sourceType": "github",
+      "computedHash": "2acf9fae4fcdb6c392923708b67234828f8a9f10b10dfa5d228eaab6e9108245"
     }
   }
 }

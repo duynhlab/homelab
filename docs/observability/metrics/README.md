@@ -649,7 +649,7 @@ The "Total Network Traffic per Service" panel measures HTTP body size only, not 
 ## Related Documentation
 
 - **[VictoriaMetrics Operator Stack](victoriametrics.md)** - Full architecture, dual CRD system, VM Operator auto-conversion
-- **[Datasource Strategy](../grafana/datasources.md)** - Prometheus vs VictoriaMetrics plugin in Grafana
+- **[Datasource Strategy](../grafana/datasources.md)** - VictoriaMetrics Grafana plugin (metrics)
 - **[Grafana Dashboard Guide](../grafana/dashboard-reference.md)** - Complete panel reference, query analysis, troubleshooting, SRE best practices
 - **[Variables & Regex Guide](../grafana/variables.md)** - Dashboard variables, regex patterns, cascading configuration
 - **[PromQL Guide](./promql-guide.md)** - PromQL functions, time range vs rate interval, counter handling

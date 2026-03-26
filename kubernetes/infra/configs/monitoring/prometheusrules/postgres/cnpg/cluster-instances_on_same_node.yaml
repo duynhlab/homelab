@@ -1,0 +1,34 @@
+# Generated from cnpg/cluster chart v0.6.0 (helm template) with fullnameOverride=cnpg-db, namespace=product.
+# Do not edit expr by hand; re-render from chart and split, or bump chart version in README.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-db-cluster-instances-on-same-node
+  namespace: product
+  labels:
+    app.kubernetes.io/part-of: cnpg-chart-rules
+    cnpg.io/cluster: cnpg-db
+    platform.duynhlab.dev/source: cloudnative-pg-charts-cluster
+    platform.duynhlab.dev/chart-version: 0.6.0
+spec:
+  groups:
+  - name: cloudnative-pg/cnpg-db
+    rules:
+    - alert: CNPGClusterInstancesOnSameNode
+      annotations:
+        summary: CNPG Cluster instances are located on the same node.
+        description: 'CloudNativePG Cluster "product/cnpg-db" has {{ $value }}
+
+          instances on the same node {{ $labels.node }}.
+
+
+          A failure or scheduled downtime of a single node will lead to a potential service disruption and/or data loss.'
+        runbook_url: https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/docs/runbooks/CNPGClusterInstancesOnSameNode.md
+      # Chart uses namespace/pod; with VMAgent+KSM the workload is exported_pod/exported_namespace (target pod is KSM).
+      expr: count by (node) (kube_pod_info{exported_namespace="product", exported_pod=~"cnpg-db-([1-9][0-9]*)$"}) > 1
+      for: 5m
+      labels:
+        severity: warning
+        namespace: product
+        cnpg_cluster: cnpg-db

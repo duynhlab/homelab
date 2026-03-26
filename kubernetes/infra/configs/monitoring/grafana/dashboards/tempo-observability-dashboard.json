@@ -65,7 +65,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
+        "type": "victoriametrics-metrics-datasource",
         "uid": "${DS_PROMETHEUS}"
       },
       "description": "Top 10 slowest spans by P99 latency",
@@ -121,7 +121,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
+            "type": "victoriametrics-metrics-datasource",
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
@@ -174,7 +174,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
+        "type": "victoriametrics-metrics-datasource",
         "uid": "${DS_PROMETHEUS}"
       },
       "description": "Latency percentiles (P50, P90, P95, P99) for selected services",
@@ -313,7 +313,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
+            "type": "victoriametrics-metrics-datasource",
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
@@ -324,7 +324,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
+            "type": "victoriametrics-metrics-datasource",
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
@@ -336,7 +336,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
+            "type": "victoriametrics-metrics-datasource",
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
@@ -348,7 +348,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
+            "type": "victoriametrics-metrics-datasource",
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
@@ -364,7 +364,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
+        "type": "victoriametrics-metrics-datasource",
         "uid": "${DS_PROMETHEUS}"
       },
       "description": "Percentage of requests with errors",
@@ -448,7 +448,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
+            "type": "victoriametrics-metrics-datasource",
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
@@ -463,7 +463,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
+        "type": "victoriametrics-metrics-datasource",
         "uid": "${DS_PROMETHEUS}"
       },
       "description": "Request throughput (requests per second)",
@@ -541,7 +541,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
+            "type": "victoriametrics-metrics-datasource",
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
@@ -569,7 +569,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
+        "type": "victoriametrics-metrics-datasource",
         "uid": "${DS_PROMETHEUS}"
       },
       "description": "Operations table with latency, error rate, and request count",
@@ -659,7 +659,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
+            "type": "victoriametrics-metrics-datasource",
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
@@ -673,7 +673,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
+            "type": "victoriametrics-metrics-datasource",
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
@@ -688,7 +688,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
+            "type": "victoriametrics-metrics-datasource",
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
@@ -738,7 +738,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
+        "type": "victoriametrics-metrics-datasource",
         "uid": "${DS_PROMETHEUS}"
       },
       "description": "Latency graph with exemplars - click points to view traces",
@@ -816,7 +816,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
+            "type": "victoriametrics-metrics-datasource",
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
@@ -895,16 +895,16 @@
       {
         "current": {
           "selected": false,
-          "text": "Prometheus",
-          "value": "Prometheus"
+          "text": "VictoriaMetrics",
+          "value": "VictoriaMetrics"
         },
         "hide": 0,
         "includeAll": false,
-        "label": "Prometheus",
+        "label": "Datasource",
         "multi": false,
         "name": "DS_PROMETHEUS",
         "options": [],
-        "query": "prometheus",
+        "query": "victoriametrics-metrics-datasource",
         "queryValue": "",
         "refresh": 1,
         "regex": "",
@@ -960,7 +960,7 @@
           ]
         },
         "datasource": {
-          "type": "prometheus",
+          "type": "victoriametrics-metrics-datasource",
           "uid": "${DS_PROMETHEUS}"
         },
         "definition": "label_values(traces_spanmetrics_calls_total, service_name)",
@@ -992,7 +992,7 @@
           ]
         },
         "datasource": {
-          "type": "prometheus",
+          "type": "victoriametrics-metrics-datasource",
           "uid": "${DS_PROMETHEUS}"
         },
         "definition": "label_values(traces_spanmetrics_calls_total{service_name=~\"$service\"}, span_name)",
@@ -1020,7 +1020,7 @@
           "value": "auth"
         },
         "datasource": {
-          "type": "prometheus",
+          "type": "victoriametrics-metrics-datasource",
           "uid": "${DS_PROMETHEUS}"
         },
         "definition": "label_values(kube_pod_info{namespace!~\"kube-.*|default\"}, namespace)",

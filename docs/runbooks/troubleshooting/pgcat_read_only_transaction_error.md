@@ -1,6 +1,6 @@
 # PgCat Read-Only Transaction Error (SQLSTATE 25006)
 
-> **Legacy / Pre-consolidation**: This runbook applies to the former `transaction-shared-db` + PgCat topology. The current stack uses **PgDog** (`pgdog-cnpg`) as the unified pooler for the consolidated **`cnpg-db`** cluster (product, cart, order). See [`kubernetes/infra/configs/databases/clusters/cnpg-db/`](../../../kubernetes/infra/configs/databases/clusters/cnpg-db/) for the current configuration.
+> **Legacy (PgCat) — historical reference only**: This runbook applies to the former `transaction-shared-db` + PgCat topology. The current stack uses **PgDog** (`pgdog-cnpg`) as the unified pooler for the consolidated **`cnpg-db`** cluster (product, cart, order). See [`kubernetes/infra/configs/databases/clusters/cnpg-db/`](../../../kubernetes/infra/configs/databases/clusters/cnpg-db/) for the current configuration. Use this document when maintaining legacy deployments or comparing similar errors with **PgDog**; do not treat it as the active pooler runbook.
 
 ## Problem
 

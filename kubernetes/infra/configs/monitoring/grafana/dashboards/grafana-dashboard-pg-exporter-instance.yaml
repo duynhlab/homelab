@@ -13,4 +13,4 @@ spec:
     key: pg-exporter-instance.json
   datasources:
     - inputName: DS_PROMETHEUS
-      datasourceName: Prometheus
+      datasourceName: VictoriaMetrics

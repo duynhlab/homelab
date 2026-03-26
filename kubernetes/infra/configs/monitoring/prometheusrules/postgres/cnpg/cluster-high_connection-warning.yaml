@@ -1,0 +1,30 @@
+# Generated from cnpg/cluster chart v0.6.0 (helm template) with fullnameOverride=cnpg-db, namespace=product.
+# Do not edit expr by hand; re-render from chart and split, or bump chart version in README.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-db-cluster-high-connection-warning
+  namespace: product
+  labels:
+    app.kubernetes.io/part-of: cnpg-chart-rules
+    cnpg.io/cluster: cnpg-db
+    platform.duynhlab.dev/source: cloudnative-pg-charts-cluster
+    platform.duynhlab.dev/chart-version: 0.6.0
+spec:
+  groups:
+  - name: cloudnative-pg/cnpg-db
+    rules:
+    - alert: CNPGClusterHighConnectionsWarning
+      annotations:
+        summary: CNPG Instance is approaching the maximum number of connections.
+        description: 'CloudNativePG Cluster "product/cnpg-db" instance {{ $labels.pod }} is using {{ $value }}% of
+
+          the maximum number of connections.'
+        runbook_url: https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/docs/runbooks/CNPGClusterHighConnectionsWarning.md
+      expr: sum by (pod) (cnpg_backends_total{namespace="product", pod=~"cnpg-db-([1-9][0-9]*)$"}) / max by (pod) (cnpg_pg_settings_setting{name="max_connections", namespace="product", pod=~"cnpg-db-([1-9][0-9]*)$"}) * 100 > 80
+      for: 5m
+      labels:
+        severity: warning
+        namespace: product
+        cnpg_cluster: cnpg-db

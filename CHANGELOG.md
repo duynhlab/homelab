@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.81.14] - 2026-03-26
+
+### Added
+
+- **Metrics / VictoriaMetrics**: [`kube-state-metrics.yaml`](kubernetes/infra/controllers/metrics/kube-state-metrics.yaml) — kube-state-metrics HelmRelease; [`vmnodescrape-kubelet.yaml`](kubernetes/infra/configs/monitoring/victoriametrics/vmnodescrape-kubelet.yaml) — `VMNodeScrape` for kubelet/cAdvisor-style node metrics (wired in [`victoriametrics/kustomization.yaml`](kubernetes/infra/configs/monitoring/victoriametrics/kustomization.yaml)).
+- **PostgreSQL alert audit**: [`scripts/postgres-alert-audit.sh`](scripts/postgres-alert-audit.sh) and [`make postgres-alert-audit`](Makefile) for local checks against CNPG/Zalando `PrometheusRule` layouts.
+- **Agent skills**: [`.agents/skills/postgres/`](.agents/skills/postgres/SKILL.md) (PlanetScale database-skills) with references; [`skills-lock.json`](skills-lock.json) entry for `postgres`.
+- **Claude skills**: [`.claude/skills/sre_architect_pack/`](.claude/skills/sre_architect_pack/README.md) — SRE runbooks, SLO/alert templates, tooling catalog.
+
+### Changed
+
+- **Grafana dashboards**: Removed legacy PgCat assets ([`grafana-dashboard-pgcat.yaml`](kubernetes/infra/configs/monitoring/grafana/dashboards/grafana-dashboard-pgcat.yaml), [`pgcat.json`](kubernetes/infra/configs/monitoring/grafana/dashboards/pgcat.json)); PgDog is the pooler dashboard ([`pgdog.json`](kubernetes/infra/configs/monitoring/grafana/dashboards/pgdog.json), [`grafana-dashboard-pgdog.yaml`](kubernetes/infra/configs/monitoring/grafana/dashboards/grafana-dashboard-pgdog.yaml)). Refreshed embedded JSON and `GrafanaDashboard` wrappers (e.g. microservices, Redis, Tempo, postgres replication lag, Vector, CloudNativePG, main/SLO) and [`dashboards/kustomization.yaml`](kubernetes/infra/configs/monitoring/grafana/dashboards/kustomization.yaml). [`datasource-victoriametrics.yaml`](kubernetes/infra/configs/monitoring/grafana/datasource-victoriametrics.yaml) and root [`grafana/kustomization.yaml`](kubernetes/infra/configs/monitoring/grafana/kustomization.yaml) aligned with VictoriaMetrics-only metrics (no `datasource-prometheus.yaml`).
+- **VictoriaMetrics**: [`vmalert.yaml`](kubernetes/infra/configs/monitoring/victoriametrics/vmalert.yaml) tuning; [`controllers/metrics/kustomization.yaml`](kubernetes/infra/controllers/metrics/kustomization.yaml) includes kube-state-metrics.
+- **CloudNativePG**: [`cloudnativepg-operator.yaml`](kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml) operator metrics; [`cnpg-db` monitoring queries](kubernetes/infra/configs/databases/clusters/cnpg-db/configmaps/monitoring-queries.yaml) updates for exporter alignment.
+- **Documentation**: Observability index and runbooks — [`docs/README.md`](docs/README.md), [`docs/observability/README.md`](docs/observability/README.md), Grafana (datasources, variables, README), metrics (PostgreSQL, PromQL, VictoriaMetrics), SLO, alerting, tracing, logging, microservices alerts / deep-dive, [`docs/databases/010-documents.md`](docs/databases/010-documents.md), k6 testing, PgCat troubleshooting callouts; [**AGENTS.md**](AGENTS.md) navigation refresh.
+
+## [0.81.13] - 2026-03-24
+
+### Changed
+
+- **PostgreSQL alerting (GitOps)**: Replaced monolithic `postgres-alerts.yaml` with [`kubernetes/infra/configs/monitoring/prometheusrules/postgres/`](kubernetes/infra/configs/monitoring/prometheusrules/postgres/README.md): **`cnpg/`** — 18 `PrometheusRule` files from [cloudnative-pg/charts](https://github.com/cloudnative-pg/charts) `cluster` v0.6.0 (`helm template`, `fullnameOverride=cnpg-db`, `namespace=product`) plus `cluster-fenced.yaml` and `cluster-wal-size-high.yaml`; **`zalando/`** — availability, performance (`custom_*`), storage, maintenance. [`monitoring/kustomization.yaml`](kubernetes/infra/configs/monitoring/kustomization.yaml) now includes `prometheusrules/postgres`.
+- **Documentation**: [`docs/observability/metrics/postgresql/monitoring.md`](docs/observability/metrics/postgresql/monitoring.md) — Alert section updated for new layout; runbook links fixed.
+
+## [0.81.12] - 2026-03-24
+
+### Changed
+
+- **Documentation (post-audit alignment)**: [`docs/observability/slo/README.md`](docs/observability/slo/README.md) — Architecture and “How it works” updated for VictoriaMetrics (VMAgent, VMSingle, VMAlert, VMAlertmanager, VMRule/VMServiceScrape); cross-link to [`victoriametrics.md`](docs/observability/metrics/victoriametrics.md); SLO metrics section retitled for PromQL on VictoriaMetrics.
+- **Documentation**: [`docs/README.md`](docs/README.md) — Documentation tree lists `010-documents.md` and `databases/runbooks/`; Learning Path numbering fixed (API Reference as step 3).
+- **Documentation**: [`docs/observability/logging/README.md`](docs/observability/logging/README.md) — Vector monitoring wording for VMAgent/VMSingle and VictoriaMetrics datasource in Explore.
+- **Documentation**: [`docs/testing/k6.md`](docs/testing/k6.md) — Diagram and metrics flow reference VMSingle/VMAgent; middleware clarified as Prometheus-compatible `/metrics`.
+- **Documentation**: [`docs/observability/tracing/README.md`](docs/observability/tracing/README.md) — `/metrics` and trace-volume monitoring wording aligned with VictoriaMetrics.
+- **Documentation**: [`docs/observability/metrics/promql-guide.md`](docs/observability/metrics/promql-guide.md) — Quick Summary notes PromQL against VictoriaMetrics/VMSingle.
+- **Documentation**: [`docs/runbooks/troubleshooting/pgcat_*.md`](docs/runbooks/troubleshooting/) — Legacy PgCat runbook callouts strengthened (PgDog is current pooler for `cnpg-db`).
+
+## [0.81.11] - 2026-03-24
+
+### Changed
+
+- **Documentation**: [`docs/observability/metrics/postgresql/monitoring.md`](docs/observability/metrics/postgresql/monitoring.md) — Architecture Mermaid fixed (valid exporter wiring, VictoriaMetrics path: VMAgent → VMSingle → Grafana / VMAlert); prose updated for `DS_PROMETHEUS` → VictoriaMetrics, VMAlert/VMSingle evaluation, pilot cardinality in VM.
+- **Documentation**: [`docs/databases/010-documents.md`](docs/databases/010-documents.md) — Restructured as **PostgreSQL: further reading and references** (grouped links: official, replication, internals, ops).
+- **AGENTS.md** / **CLAUDE.md**: Quick navigation links to PostgreSQL monitoring doc and `010-documents.md`.
+
+## [0.81.10] - 2026-03-13
+
+### Added
+
+- **CloudNativePG Grafana**: Vendored upstream [Cluster Overview](https://github.com/cloudnative-pg/grafana-dashboards/blob/main/charts/cluster/grafana-dashboard.json) as [`cloudnative-pg-cluster.json`](kubernetes/infra/configs/monitoring/grafana/dashboards/cloudnative-pg-cluster.json); `configMapGenerator` + [`GrafanaDashboard`](kubernetes/infra/configs/monitoring/grafana/dashboards/grafana-dashboard-cloudnative-pg.yaml) in `monitoring` (folder **Databases**). JSON adapted for `victoriametrics-metrics-datasource`, `DS_PROMETHEUS` → VictoriaMetrics, expression target `uid: __expr__`.
+
+### Changed
+
+- **CloudNativePG operator HelmRelease**: [`monitoring.podMonitorEnabled: true`](kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml) so VMAgent discovers the operator `PodMonitor` (controller metrics used by the dashboard).
+
+### Documentation
+
+- [`docs/observability/grafana/README.md`](docs/observability/grafana/README.md) — CloudNativePG dashboard row and ops notes.
+
+## [0.81.9] - 2026-03-13
+
+### Breaking
+
+- **Grafana metrics**: Removed [`datasource-prometheus.yaml`](kubernetes/infra/configs/monitoring/grafana/datasource-prometheus.yaml). Single metrics datasource is the VictoriaMetrics plugin ([`datasource-victoriametrics.yaml`](kubernetes/infra/configs/monitoring/grafana/datasource-victoriametrics.yaml), `isDefault: true`, `jsonData` for query interval). All dashboard JSON updated: `victoriametrics-metrics-datasource` + datasource variable query; variable name **`DS_PROMETHEUS`** retained where present; `GrafanaDashboard` maps `inputName` → `datasourceName: VictoriaMetrics`. **Grafana Alerting UI** for data source-managed rules may differ from the old `prometheus`-type datasource — see [`docs/observability/grafana/datasources.md`](docs/observability/grafana/datasources.md).
+
+### Changed
+
+- **Documentation**: [`docs/observability/grafana/datasources.md`](docs/observability/grafana/datasources.md), [`README.md`](docs/observability/grafana/README.md), [`variables.md`](docs/observability/grafana/variables.md), [`docs/observability/metrics/victoriametrics.md`](docs/observability/metrics/victoriametrics.md), [`docs/observability/README.md`](docs/observability/README.md), [`metrics/README.md`](docs/observability/metrics/README.md).
+
 ## [0.81.8] - 2026-03-13
 
 ### Fixed

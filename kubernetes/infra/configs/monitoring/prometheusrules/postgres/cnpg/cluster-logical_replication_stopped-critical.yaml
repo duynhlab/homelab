@@ -1,0 +1,28 @@
+# Generated from cnpg/cluster chart v0.6.0 (helm template) with fullnameOverride=cnpg-db, namespace=product.
+# Do not edit expr by hand; re-render from chart and split, or bump chart version in README.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-db-cluster-logical-replication-stopped-critical
+  namespace: product
+  labels:
+    app.kubernetes.io/part-of: cnpg-chart-rules
+    cnpg.io/cluster: cnpg-db
+    platform.duynhlab.dev/source: cloudnative-pg-charts-cluster
+    platform.duynhlab.dev/chart-version: 0.6.0
+spec:
+  groups:
+  - name: cloudnative-pg/cnpg-db
+    rules:
+    - alert: CNPGClusterLogicalReplicationStoppedCritical
+      annotations:
+        summary: CNPG Cluster logical replication subscription CRITICAL
+        description: "CloudNativePG Cluster's \"product/cnpg-db\" \"{{ .subname }}\" subscription is in a critical state.\n\nCRITICAL: The subscription has been stopped for more than 15 minutes. This will lead to significant data divergence and requires immediate intervention.\n\nStatus: \nDuration: {{ $value }}s"
+        runbook_url: https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/docs/runbooks/CNPGClusterLogicalReplicationStopped.md
+      expr: "(\n  # Subscription is explicitly disabled\n  label_replace(max by (namespace, job, subname) (cnpg_pg_stat_subscription_enabled), \"cluster\", \"$1\", \"job\", \".+/(.+)\") == 0\n) or (\n  # Subscription is enabled but stuck (no worker process with significant lag)\n  label_replace(max by (namespace, job, subname) (cnpg_pg_stat_subscription_enabled), \"cluster\", \"$1\", \"job\", \".+/(.+)\") == 1\n  and label_replace(max by (namespace, job, subname) (cnpg_pg_stat_subscription_pid), \"cluster\", \"$1\", \"job\", \".+/(.+)\") == \"\"\n  and label_replace(max by (namespace, job, subname) (cnpg_pg_stat_subscription_buffered_lag_bytes), \"cluster\", \"$1\", \"job\", \".+/(.+)\") / 1024^3 > 0.1\n)"
+      for: 15m
+      labels:
+        severity: critical
+        namespace: product
+        cnpg_cluster: cnpg-db

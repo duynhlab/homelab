@@ -1,0 +1,29 @@
+# Generated from cnpg/cluster chart v0.6.0 (helm template) with fullnameOverride=cnpg-db, namespace=product.
+# Do not edit expr by hand; re-render from chart and split, or bump chart version in README.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-db-cluster-low-disk-space-critical
+  namespace: product
+  labels:
+    app.kubernetes.io/part-of: cnpg-chart-rules
+    cnpg.io/cluster: cnpg-db
+    platform.duynhlab.dev/source: cloudnative-pg-charts-cluster
+    platform.duynhlab.dev/chart-version: 0.6.0
+spec:
+  groups:
+  - name: cloudnative-pg/cnpg-db
+    rules:
+    - alert: CNPGClusterLowDiskSpaceCritical
+      annotations:
+        summary: CNPG Instance is running out of disk space!
+        description: CloudNativePG Cluster "product/cnpg-db" is running extremely low on disk space. Check attached PVCs!
+        runbook_url: https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/docs/runbooks/CNPGClusterLowDiskSpaceCritical.md
+      expr: "max(max by(persistentvolumeclaim) (1 - kubelet_volume_stats_available_bytes{namespace=\"product\", persistentvolumeclaim=~\"cnpg-db-([1-9][0-9]*)$\"} / kubelet_volume_stats_capacity_bytes{namespace=\"product\", persistentvolumeclaim=~\"cnpg-db-([1-9][0-9]*)$\"})) * 100 > 90 OR\nmax(max by(persistentvolumeclaim) (1 - kubelet_volume_stats_available_bytes{namespace=\"product\", persistentvolumeclaim=~\"cnpg-db-([1-9][0-9]*)$-wal\"} / kubelet_volume_stats_capacity_bytes{namespace=\"product\", persistentvolumeclaim=~\"cnpg-db-([1-9][0-9]*)$-wal\"})) * 100 > 90 OR\nmax(sum by (namespace,persistentvolumeclaim) (kubelet_volume_stats_used_bytes{namespace=\"product\", persistentvolumeclaim=~\"cnpg-db-([1-9][0-9]*)$-tbs.*\"})\n    /\n    sum by (namespace,persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes{namespace=\"product\", persistentvolumeclaim=~\"cnpg-db-([1-9][0-9]*)$-tbs.*\"})\n    *\n    on(namespace, persistentvolumeclaim) group_left(volume)\n    kube_pod_spec_volumes_persistentvolumeclaims_info{pod=~\"\
+        cnpg-db-([1-9][0-9]*)$\"}\n) * 100 > 90"
+      for: 5m
+      labels:
+        severity: critical
+        namespace: product
+        cnpg_cluster: cnpg-db

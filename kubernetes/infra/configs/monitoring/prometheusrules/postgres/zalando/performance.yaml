@@ -1,0 +1,42 @@
+# Zalando: auth-db custom_* metrics (connection limits, blocking). CNPG branches removed — see ../cnpg/.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zalando-postgres-performance
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: zalando-postgres-rules
+spec:
+  groups:
+    - name: zalando-postgres-performance
+      interval: 1m
+      rules:
+        - alert: PostgresConnectionSaturation
+          expr: |
+            custom_connection_limits_current_connections / custom_connection_limits_max_connections > 0.8
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PostgreSQL connection saturation ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Connection usage is {{ $value | humanizePercentage }} of max_connections."
+
+        - alert: PostgresConnectionSaturationCritical
+          expr: |
+            custom_connection_limits_current_connections / custom_connection_limits_max_connections > 0.95
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PostgreSQL connections nearly exhausted ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Connection usage is {{ $value | humanizePercentage }} of max_connections. New connections may be refused."
+
+        - alert: PostgresLockContention
+          expr: custom_blocking_queries_blocked_queries > 5
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PostgreSQL lock contention ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "{{ $value }} queries are blocked waiting on locks for more than 5 minutes."

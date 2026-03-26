@@ -13,4 +13,4 @@ spec:
     key: pgbouncer.json
   datasources:
     - inputName: DS_PROMETHEUS
-      datasourceName: Prometheus
+      datasourceName: VictoriaMetrics

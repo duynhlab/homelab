@@ -1,0 +1,40 @@
+# Zalando clusters: availability (postgres_exporter / Spilo).
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zalando-postgres-availability
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: zalando-postgres-rules
+spec:
+  groups:
+    - name: zalando-postgres-availability
+      interval: 1m
+      rules:
+        - alert: PostgresDown
+          expr: pg_up == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PostgreSQL is down ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "PostgreSQL instance has been unreachable for more than 1 minute."
+
+        - alert: PostgresReplicationLagHigh
+          expr: pg_replication_lag > 30
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PostgreSQL replication lag high ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Replication lag is {{ $value }}s (threshold: 30s)."
+
+        - alert: PostgresReplicationLagCritical
+          expr: pg_replication_lag > 120
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PostgreSQL replication lag critical ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Replication lag is {{ $value }}s (threshold: 120s). Risk of data loss on failover."

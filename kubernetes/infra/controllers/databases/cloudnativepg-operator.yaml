@@ -48,7 +48,7 @@ spec:
       repository: ghcr.io/cloudnative-pg/cloudnative-pg
       tag: 1.28.1
     monitoring:
-      podMonitorEnabled: false
+      podMonitorEnabled: true
     podSecurityContext:
       runAsNonRoot: true
       seccompProfile:

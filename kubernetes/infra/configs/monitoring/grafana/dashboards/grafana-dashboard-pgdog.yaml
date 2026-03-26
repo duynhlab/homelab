@@ -1,3 +1,19 @@
+# apiVersion: grafana.integreatly.org/v1beta1
+# kind: GrafanaDashboard
+# metadata:
+#   name: pgdog
+#   namespace: monitoring
+# spec:
+#   instanceSelector:
+#     matchLabels:
+#       dashboards: grafana
+#   folder: "Databases"
+#   url: https://grafana.com/api/dashboards/24583/revisions/latest/download
+#   datasources:
+#     - inputName: DS_PROMETHEUS
+#       datasourceName: VictoriaMetrics
+
+
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
@@ -8,9 +24,9 @@ spec:
     matchLabels:
       dashboards: grafana
   folder: "Databases"
-  url: https://grafana.com/api/dashboards/24583/revisions/latest/download
+  configMapRef:
+    name: pgdog
+    key: pgdog.json
   datasources:
     - inputName: DS_PROMETHEUS
-      datasourceName: Prometheus
-
-
+      datasourceName: VictoriaMetrics

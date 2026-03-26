@@ -80,8 +80,8 @@ This project uses the **VictoriaMetrics stack** instead of Prometheus. VM Operat
 ```mermaid
 flowchart TD
     subgraph layer1 ["Layer 1: Threshold Alerts"]
-        PR1["PrometheusRule CRDs<br/>microservices-alerts.yaml<br/>postgres-alerts.yaml"]
-        T1["18 application alerts<br/>14 PostgreSQL alerts"]
+        PR1["PrometheusRule CRDs<br/>microservices-alerts.yaml<br/>postgres/cnpg + postgres/zalando"]
+        T1["18 application alerts<br/>PostgreSQL: chart + Zalando split"]
     end
 
     subgraph layer2 ["Layer 2: SLO Burn-Rate Alerts"]
@@ -127,15 +127,7 @@ Direct metric threshold checks. Fire immediately when a condition is met.
 | Saturation | 3 | `MicroserviceHighInFlightRequests`, `MicroserviceHighBandwidth`, `MicroserviceConnectionPoolSaturation` |
 | Go Runtime | 3 | `MicroserviceHighGoroutineCount`, `MicroserviceHighMemoryUsage`, `MicroserviceFrequentGC` |
 
-**PostgreSQL alerts** (`postgres-alerts.yaml`, 14 alerts, 5 groups):
-
-| Group | Alerts | Examples |
-|-------|--------|----------|
-| Availability | 5 | `PostgresDown`, `CnpgDown`, `PostgresReplicationLagHigh` |
-| Performance | 3 | `PostgresHighConnectionUsage`, `PostgresSlowQueries` |
-| Storage | 2 | `PostgresDiskSpaceLow`, `PostgresWALSizeHigh` |
-| Backup | 2 | `PostgresBackupFailed`, `PostgresBackupStale` |
-| Maintenance | 2 | `PostgresHighDeadTuples`, `PostgresLongRunningTransactions` |
+**PostgreSQL alerts** ([`prometheusrules/postgres/`](../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/README.md)): CNPG chart-aligned rules under `postgres/cnpg/` (e.g. `CNPGClusterOffline`, HA, replication, disk, logical replication) and Zalando rules under `postgres/zalando/` (`PostgresDown`, `custom_*` saturation, etc.). Backup alerts remain in `postgres-backup-alerts.yaml`.
 
 **Recording rules** (`microservices-recording-rules.yaml`):
 
@@ -203,7 +195,7 @@ kubernetes/infra/configs/monitoring/
 ├── prometheusrules/
 │   ├── microservices-alerts.yaml           # Layer 1: 18 application alerts
 │   ├── microservices-recording-rules.yaml  # Pre-aggregated recording rules
-│   └── postgres-alerts.yaml                # Layer 1: 14 PostgreSQL alerts
+│   └── postgres/                           # Layer 1: CNPG + Zalando PrometheusRules
 ├── slo/
 │   ├── auth.yaml                           # Layer 2: SLO definitions per service
 │   ├── user.yaml

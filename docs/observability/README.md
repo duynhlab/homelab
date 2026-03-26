@@ -208,7 +208,7 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 - [3-Layer Architecture](architecture.md) -- how services integrate with APM middleware
 - [Metrics: RED/USE/Golden Signals](metrics/README.md) -- metrics methodology
 - [VictoriaMetrics Operator](metrics/victoriametrics.md) -- migration from kube-prometheus-stack
-- [Grafana Datasources](grafana/datasources.md) -- dual datasource strategy (Prometheus vs VictoriaMetrics plugin)
+- [Grafana Datasources](grafana/datasources.md) -- VictoriaMetrics plugin metrics datasource
 - [Alerting Strategy](alerting/README.md) -- 2-layer alerting (threshold + SLO burn-rate)
 - [SLO System](slo/README.md) -- Sloth Operator and burn-rate alerts
 - [Interview Prep](runbooks/observability-deep-dive.md) -- RED/USE/Golden Signals theory + structured answers

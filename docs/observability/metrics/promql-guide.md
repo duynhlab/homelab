@@ -2,6 +2,8 @@
 
 ## Quick Summary
 
+In this platform, PromQL runs in Grafana against the **VictoriaMetrics** datasource; the backend is **VMSingle** (Prometheus-compatible API on `:8428`).
+
 **Objectives:**
 - Understand Prometheus Counter metrics and their behavior
 - Learn the difference between `rate()` and `increase()` functions

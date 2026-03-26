@@ -184,9 +184,9 @@ sequenceDiagram
 
 ## Grafana Visibility
 
-All rules appear in **Grafana > Alerting > Alert rules** as **data source-managed (read-only)**. This works because VMSingle proxies `/api/v1/rules` to VMAlert via `vmalert.proxyURL`.
+**VMAlert** holds the rules; **VMSingle** proxies `/api/v1/rules` to VMAlert via `vmalert.proxyURL`. Whether **Grafana > Alerting > Alert rules** lists them as **data source–managed (read-only)** depends on Grafana’s integration with the **metrics datasource type** (VictoriaMetrics plugin vs optional `prometheus` type). With **only** the VM plugin, that page may be **empty or incomplete** even when rules are firing — this is a **UI** limitation, not missing rules.
 
-See [Grafana Datasources](../grafana/datasources.md) for technical details.
+See [Grafana Alerting and datasource types](../grafana/datasources.md#grafana-alerting-and-datasource-types) for details and alternatives (VMAlert UI, Karma, `kubectl`).
 
 ## Manifest Locations
 

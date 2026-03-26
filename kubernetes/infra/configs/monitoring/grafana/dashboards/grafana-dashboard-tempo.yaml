@@ -13,7 +13,7 @@ spec:
     key: tempo-observability-dashboard.json
   datasources:
     - inputName: DS_PROMETHEUS
-      datasourceName: Prometheus
+      datasourceName: VictoriaMetrics
     - inputName: DS_TEMPO
       datasourceName: Tempo
     - inputName: DS_LOKI

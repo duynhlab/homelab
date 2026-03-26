@@ -24,7 +24,7 @@
     "panels": [
         {
             "datasource": {
-                "type": "prometheus",
+                "type": "victoriametrics-metrics-datasource",
                 "uid": "${DS_PROMETHEUS}"
             },
             "fieldConfig": {
@@ -104,7 +104,7 @@
             "targets": [
                 {
                     "datasource": {
-                        "type": "prometheus",
+                        "type": "victoriametrics-metrics-datasource",
                         "uid": "${DS_PROMETHEUS}"
                     },
                     "editorMode": "code",
@@ -131,7 +131,7 @@
                     "value": "infra"
                 },
                 "datasource": {
-                    "type": "prometheus",
+                    "type": "victoriametrics-metrics-datasource",
                     "uid": "${DS_PROMETHEUS}"
                 },
                 "definition": "label_values(pg_replication_lag,source)",
@@ -159,7 +159,7 @@
                     "value": "pg-replica-malta-pve-3-0"
                 },
                 "datasource": {
-                    "type": "prometheus",
+                    "type": "victoriametrics-metrics-datasource",
                     "uid": "${DS_PROMETHEUS}"
                 },
                 "definition": "label_values(pg_replication_lag{source=\"$cluster\"},kubernetes_pod_name)",

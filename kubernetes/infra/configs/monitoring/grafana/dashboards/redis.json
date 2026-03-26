@@ -69,7 +69,7 @@
     "panels": [
       {
         "datasource": {
-          "type": "prometheus",
+          "type": "victoriametrics-metrics-datasource",
           "uid": "${DS_PROM}"
         },
         "fieldConfig": {
@@ -137,7 +137,7 @@
         "targets": [
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "max(max_over_time(redis_uptime_in_seconds{namespace=~\"$namespace\", instance=~\"$instance\"}[$__interval]))",
@@ -155,7 +155,7 @@
       },
       {
         "datasource": {
-          "type": "prometheus",
+          "type": "victoriametrics-metrics-datasource",
           "uid": "${DS_PROM}"
         },
         "fieldConfig": {
@@ -224,7 +224,7 @@
         "targets": [
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "sum(redis_connected_clients{namespace=~\"$namespace\", instance=~\"$instance\"})",
@@ -242,7 +242,7 @@
       },
       {
         "datasource": {
-          "type": "prometheus",
+          "type": "victoriametrics-metrics-datasource",
           "uid": "${DS_PROM}"
         },
         "fieldConfig": {
@@ -315,7 +315,7 @@
         "targets": [
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "sum(100 * (redis_memory_used_bytes{namespace=~\"$namespace\", instance=~\"$instance\"}  / redis_memory_max_bytes{namespace=~\"$namespace\", instance=~\"$instance\"}))",
@@ -333,7 +333,7 @@
       },
       {
         "datasource": {
-          "type": "prometheus",
+          "type": "victoriametrics-metrics-datasource",
           "uid": "${DS_PROM}"
         },
         "fieldConfig": {
@@ -417,7 +417,7 @@
         "targets": [
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "sum(rate(redis_commands_total{namespace=~\"$namespace\", instance=~\"$instance\"} [1m])) by (cmd)",
@@ -435,7 +435,7 @@
       },
       {
         "datasource": {
-          "type": "prometheus",
+          "type": "victoriametrics-metrics-datasource",
           "uid": "${DS_PROM}"
         },
         "fieldConfig": {
@@ -520,7 +520,7 @@
         "targets": [
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "irate(redis_keyspace_hits_total{instance=~\"$instance\"}[5m])",
@@ -536,7 +536,7 @@
           },
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "irate(redis_keyspace_misses_total{instance=~\"$instance\"}[5m])",
@@ -556,7 +556,7 @@
       },
       {
         "datasource": {
-          "type": "prometheus",
+          "type": "victoriametrics-metrics-datasource",
           "uid": "${DS_PROM}"
         },
         "fieldConfig": {
@@ -657,7 +657,7 @@
         "targets": [
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "redis_memory_used_bytes{instance=~\"$instance\"}",
@@ -671,7 +671,7 @@
           },
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "redis_memory_max_bytes{instance=~\"$instance\"}",
@@ -688,7 +688,7 @@
       },
       {
         "datasource": {
-          "type": "prometheus",
+          "type": "victoriametrics-metrics-datasource",
           "uid": "${DS_PROM}"
         },
         "fieldConfig": {
@@ -772,7 +772,7 @@
         "targets": [
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "sum(rate(redis_net_input_bytes_total{instance=~\"$instance\"}[5m]))",
@@ -784,7 +784,7 @@
           },
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "sum(rate(redis_net_output_bytes_total{instance=~\"$instance\"}[5m]))",
@@ -801,7 +801,7 @@
       },
       {
         "datasource": {
-          "type": "prometheus",
+          "type": "victoriametrics-metrics-datasource",
           "uid": "${DS_PROM}"
         },
         "fieldConfig": {
@@ -908,7 +908,7 @@
         "targets": [
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "sum (redis_db_keys{instance=~\"$instance\"}) by (db, instance)",
@@ -926,7 +926,7 @@
       },
       {
         "datasource": {
-          "type": "prometheus",
+          "type": "victoriametrics-metrics-datasource",
           "uid": "${DS_PROM}"
         },
         "fieldConfig": {
@@ -1010,7 +1010,7 @@
         "targets": [
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "sum (redis_db_keys{instance=~\"$instance\"}) by (instance) - sum (redis_db_keys_expiring{instance=~\"$instance\"}) by (instance)",
@@ -1024,7 +1024,7 @@
           },
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "sum (redis_db_keys_expiring{instance=~\"$instance\"}) by (instance)",
@@ -1042,7 +1042,7 @@
       },
       {
         "datasource": {
-          "type": "prometheus",
+          "type": "victoriametrics-metrics-datasource",
           "uid": "${DS_PROM}"
         },
         "fieldConfig": {
@@ -1171,7 +1171,7 @@
         "targets": [
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "sum(rate(redis_expired_keys_total{instance=~\"$instance\"}[5m])) by (instance)",
@@ -1187,7 +1187,7 @@
           },
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "sum(rate(redis_evicted_keys_total{instance=~\"$instance\"}[5m])) by (instance)",
@@ -1204,7 +1204,7 @@
       },
       {
         "datasource": {
-          "type": "prometheus",
+          "type": "victoriametrics-metrics-datasource",
           "uid": "${DS_PROM}"
         },
         "fieldConfig": {
@@ -1287,7 +1287,7 @@
         "targets": [
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "sum(redis_connected_clients{instance=~\"$instance\"})",
@@ -1298,7 +1298,7 @@
           },
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "sum(redis_blocked_clients{instance=~\"$instance\"})",
@@ -1313,7 +1313,7 @@
       },
       {
         "datasource": {
-          "type": "prometheus",
+          "type": "victoriametrics-metrics-datasource",
           "uid": "${DS_PROM}"
         },
         "fieldConfig": {
@@ -1417,7 +1417,7 @@
         "targets": [
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "sum(irate(redis_commands_duration_seconds_total{namespace=~\"$namespace\", instance =~ \"$instance\"}[1m])) by (cmd)\n  /\nsum(irate(redis_commands_total{namespace=~\"$namespace\", instance =~ \"$instance\"}[1m])) by (cmd)\n",
@@ -1435,7 +1435,7 @@
       },
       {
         "datasource": {
-          "type": "prometheus",
+          "type": "victoriametrics-metrics-datasource",
           "uid": "${DS_PROM}"
         },
         "fieldConfig": {
@@ -1518,7 +1518,7 @@
         "targets": [
           {
             "datasource": {
-              "type": "prometheus",
+              "type": "victoriametrics-metrics-datasource",
               "uid": "${DS_PROM}"
             },
             "expr": "sum(irate(redis_commands_duration_seconds_total{instance=~\"$instance\"}[1m])) by (cmd) != 0",
@@ -1555,7 +1555,7 @@
           "multi": false,
           "name": "DS_PROM",
           "options": [],
-          "query": "prometheus",
+          "query": "victoriametrics-metrics-datasource",
           "refresh": 1,
           "regex": "",
           "skipUrlSync": false,
@@ -1564,7 +1564,7 @@
         {
           "current": {},
           "datasource": {
-            "type": "prometheus",
+            "type": "victoriametrics-metrics-datasource",
             "uid": "${DS_PROM}"
           },
           "definition": "label_values(redis_up, namespace)",
@@ -1586,7 +1586,7 @@
         {
           "current": {},
           "datasource": {
-            "type": "prometheus",
+            "type": "victoriametrics-metrics-datasource",
             "uid": "${DS_PROM}"
           },
           "definition": "label_values(redis_up{namespace=~\"$namespace\"}, instance)",

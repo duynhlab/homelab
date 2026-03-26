@@ -11,6 +11,6 @@ spec:
   url: https://grafana.com/api/dashboards/21954/revisions/latest/download
   datasources:
     - inputName: DS_PROMETHEUS
-      datasourceName: Prometheus
+      datasourceName: VictoriaMetrics
 
 

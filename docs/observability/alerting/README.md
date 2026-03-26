@@ -80,8 +80,8 @@ This project uses the **VictoriaMetrics stack** instead of Prometheus. VM Operat
 ```mermaid
 flowchart TD
     subgraph layer1 ["Layer 1: Threshold Alerts"]
-        PR1["PrometheusRule CRDs<br/>microservices-alerts.yaml<br/>postgres-alerts.yaml"]
-        T1["18 application alerts<br/>14 PostgreSQL alerts"]
+        PR1["PrometheusRule CRDs<br/>microservices-alerts.yaml<br/>postgres/cnpg + postgres/zalando"]
+        T1["18 application alerts<br/>PostgreSQL: chart + Zalando split"]
     end
 
     subgraph layer2 ["Layer 2: SLO Burn-Rate Alerts"]
@@ -127,15 +127,7 @@ Direct metric threshold checks. Fire immediately when a condition is met.
 | Saturation | 3 | `MicroserviceHighInFlightRequests`, `MicroserviceHighBandwidth`, `MicroserviceConnectionPoolSaturation` |
 | Go Runtime | 3 | `MicroserviceHighGoroutineCount`, `MicroserviceHighMemoryUsage`, `MicroserviceFrequentGC` |
 
-**PostgreSQL alerts** (`postgres-alerts.yaml`, 14 alerts, 5 groups):
-
-| Group | Alerts | Examples |
-|-------|--------|----------|
-| Availability | 5 | `PostgresDown`, `CnpgDown`, `PostgresReplicationLagHigh` |
-| Performance | 3 | `PostgresHighConnectionUsage`, `PostgresSlowQueries` |
-| Storage | 2 | `PostgresDiskSpaceLow`, `PostgresWALSizeHigh` |
-| Backup | 2 | `PostgresBackupFailed`, `PostgresBackupStale` |
-| Maintenance | 2 | `PostgresHighDeadTuples`, `PostgresLongRunningTransactions` |
+**PostgreSQL alerts** ([`prometheusrules/postgres/`](../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/README.md)): CNPG chart-aligned rules under `postgres/cnpg/` (e.g. `CNPGClusterOffline`, HA, replication, disk, logical replication) and Zalando rules under `postgres/zalando/` (`PostgresDown`, `custom_*` saturation, etc.). Backup alerts remain in `postgres-backup-alerts.yaml`.
 
 **Recording rules** (`microservices-recording-rules.yaml`):
 
@@ -192,9 +184,9 @@ sequenceDiagram
 
 ## Grafana Visibility
 
-All rules appear in **Grafana > Alerting > Alert rules** as **data source-managed (read-only)**. This works because VMSingle proxies `/api/v1/rules` to VMAlert via `vmalert.proxyURL`.
+**VMAlert** holds the rules; **VMSingle** proxies `/api/v1/rules` to VMAlert via `vmalert.proxyURL`. Whether **Grafana > Alerting > Alert rules** lists them as **data source–managed (read-only)** depends on Grafana’s integration with the **metrics datasource type** (VictoriaMetrics plugin vs optional `prometheus` type). With **only** the VM plugin, that page may be **empty or incomplete** even when rules are firing — this is a **UI** limitation, not missing rules.
 
-See [Grafana Datasources](../grafana/datasources.md) for technical details.
+See [Grafana Alerting and datasource types](../grafana/datasources.md#grafana-alerting-and-datasource-types) for details and alternatives (VMAlert UI, Karma, `kubectl`).
 
 ## Manifest Locations
 
@@ -203,7 +195,7 @@ kubernetes/infra/configs/monitoring/
 ├── prometheusrules/
 │   ├── microservices-alerts.yaml           # Layer 1: 18 application alerts
 │   ├── microservices-recording-rules.yaml  # Pre-aggregated recording rules
-│   └── postgres-alerts.yaml                # Layer 1: 14 PostgreSQL alerts
+│   └── postgres/                           # Layer 1: CNPG + Zalando PrometheusRules
 ├── slo/
 │   ├── auth.yaml                           # Layer 2: SLO definitions per service
 │   ├── user.yaml

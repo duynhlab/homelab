@@ -1,0 +1,32 @@
+# Generated from cnpg/cluster chart v0.6.0 (helm template) with fullnameOverride=cnpg-db, namespace=product.
+# Do not edit expr by hand; re-render from chart and split, or bump chart version in README.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-db-cluster-zone-spread-warning
+  namespace: product
+  labels:
+    app.kubernetes.io/part-of: cnpg-chart-rules
+    cnpg.io/cluster: cnpg-db
+    platform.duynhlab.dev/source: cloudnative-pg-charts-cluster
+    platform.duynhlab.dev/chart-version: 0.6.0
+spec:
+  groups:
+  - name: cloudnative-pg/cnpg-db
+    rules:
+    - alert: CNPGClusterZoneSpreadWarning
+      annotations:
+        summary: CNPG Cluster instances in the same zone.
+        description: 'CloudNativePG Cluster "product/cnpg-db" has instances in the same availability zone.
+
+
+          A disaster in one availability zone will lead to a potential service disruption and/or data loss.'
+        runbook_url: https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/docs/runbooks/CNPGClusterZoneSpreadWarning.md
+      # Chart uses namespace/pod; with VMAgent+KSM the workload is exported_pod/exported_namespace. Requires kube_node_labels zone (see kube-state-metrics metricLabelsAllowlist).
+      expr: 3 > count(count by (label_topology_kubernetes_io_zone) (kube_pod_info{exported_namespace="product", exported_pod=~"cnpg-db-([1-9][0-9]*)$"} * on(node,instance) group_left(label_topology_kubernetes_io_zone) kube_node_labels)) < 3
+      for: 5m
+      labels:
+        severity: warning
+        namespace: product
+        cnpg_cluster: cnpg-db

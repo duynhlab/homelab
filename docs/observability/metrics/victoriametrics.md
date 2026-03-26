@@ -107,11 +107,11 @@ This is the most important concept to understand. The cluster runs **two separat
 | `ServiceMonitor/tempo` | `configs/monitoring/servicemonitors/tempo.yaml` | Manual (platform team) |
 | `PodMonitor/postgresql-auth-db` | `configs/monitoring/podmonitors/podmonitor-zalando-auth-db.yaml` | Manual (platform team) |
 | `PodMonitor/postgresql-supporting-shared-db` | `configs/monitoring/podmonitors/podmonitor-zalando-supporting-shared-db.yaml` | Manual (platform team) |
-| `PrometheusRule/postgres-alerts` | `configs/monitoring/prometheusrules/postgres-alerts.yaml` | Manual (platform team) |
+| `PrometheusRule` (PostgreSQL, many) | `configs/monitoring/prometheusrules/postgres/` | Manual (platform team) |
 | `PrometheusRule/postgres-backup-alerts` | `configs/monitoring/prometheusrules/postgres-backup-alerts.yaml` | Manual (platform team) |
 | `PrometheusRule/pg-exporter-recording-rules` | `configs/monitoring/prometheusrules/pg-exporter-recording-rules.yaml` | Manual (platform team) |
 | `ServiceMonitor` (valkey) | Created at runtime by Helm chart | Valkey chart (`serviceMonitor.enabled: true`) |
-| `PodMonitor` (product-db, transaction-shared-db) | `configs/databases/clusters/*/monitoring/` | Manual (platform team) |
+| `PodMonitor` (e.g. `cnpg-db`) | `configs/databases/clusters/*/monitoring/` | Manual (platform team) |
 | `PrometheusRule` (SLO rules) | Created at runtime by Sloth | Sloth Operator (from PrometheusServiceLevel) |
 
 **Why these CRDs are required**:
@@ -155,7 +155,7 @@ Additionally, the VM Operator **auto-creates** VM resources by converting Promet
 |-------------------------|-----------------------|
 | `ServiceMonitor/microservices-api` | `VMServiceScrape/microservices-api` |
 | `PodMonitor/postgresql-auth-db` | `VMPodScrape/postgresql-auth-db` |
-| `PrometheusRule/postgres-alerts` | `VMRule/postgres-alerts` |
+| `PrometheusRule` under `postgres/cnpg/`, `postgres/zalando/` | Corresponding `VMRule` per resource |
 | ...all other Prometheus resources | ...corresponding VM resources |
 
 ### Auto-Conversion Flow
@@ -315,7 +315,7 @@ spec:
 ```
 
 VMAlert reads `VMRule` resources (including those auto-converted from `PrometheusRule`) and evaluates them against VMSingle. This means:
-- PostgreSQL alerts (`postgres-alerts.yaml`, `postgres-backup-alerts.yaml`)
+- PostgreSQL alerts (`prometheusrules/postgres/`, `postgres-backup-alerts.yaml`)
 - pg_exporter recording rules (`pg-exporter-recording-rules.yaml`)
 - Sloth-generated SLO rules
 
@@ -497,14 +497,14 @@ flowchart LR
 ```mermaid
 flowchart LR
     subgraph rules ["Rule Sources"]
-        PR1["PrometheusRule<br/>postgres-alerts"]
+        PR1["PrometheusRule<br/>postgres/*"]
         PR2["PrometheusRule<br/>postgres-backup-alerts"]
         PR3["PrometheusRule<br/>pg-exporter-recording-rules"]
         SlothPR["PrometheusRule<br/>SLO rules from Sloth"]
     end
 
     subgraph autoConv2 ["VM Operator auto-converts"]
-        VMR1["VMRule<br/>postgres-alerts"]
+        VMR1["VMRule<br/>postgres/*"]
         VMR2["VMRule<br/>postgres-backup-alerts"]
         VMR3["VMRule<br/>pg-exporter-recording-rules"]
         VMR4["VMRule<br/>SLO rules"]
@@ -546,22 +546,21 @@ flowchart LR
 
 ## Grafana Integration
 
-The Grafana datasource (`configs/monitoring/grafana/datasource-prometheus.yaml`) points to VMSingle:
+The Grafana metrics datasource ([`datasource-victoriametrics.yaml`](../../../kubernetes/infra/configs/monitoring/grafana/datasource-victoriametrics.yaml)) uses the **VictoriaMetrics plugin** (`victoriametrics-metrics-datasource`) and points to VMSingle:
 
 ```yaml
 spec:
   datasource:
-    name: Prometheus
-    type: prometheus
-    uid: prometheus
+    name: VictoriaMetrics
+    type: victoriametrics-metrics-datasource
+    uid: victoriametrics
     url: http://vmsingle-victoria-metrics.monitoring.svc:8428
 ```
 
 Key points:
-- The datasource **type remains `prometheus`** because VMSingle exposes a Prometheus-compatible API.
-- The datasource **name and uid remain `Prometheus`** so all existing dashboard references continue to work.
-- All 20+ Grafana dashboards work without any modification.
-- PromQL queries work unchanged. MetricsQL (VictoriaMetrics superset) is also available.
+- VMSingle exposes a Prometheus-compatible HTTP API; the plugin adds MetricsQL and VMUI integration from Grafana.
+- Dashboards may still use the variable name `DS_PROMETHEUS` mapped to this datasource in `GrafanaDashboard` CRDs.
+- PromQL-compatible queries work; MetricsQL extensions are available. See [Grafana datasources](../grafana/datasources.md).
 
 ---
 
@@ -596,8 +595,8 @@ kubernetes/
 │   ├── podmonitors/                                # Prometheus PodMonitor resources
 │   ├── prometheusrules/                            # Prometheus PrometheusRule resources
 │   └── grafana/
-│       ├── datasource-prometheus.yaml              # Points to VMSingle :8428
-│       └── dashboards/                             # 20+ GrafanaDashboard CRDs
+│       ├── datasource-victoriametrics.yaml         # VM plugin → VMSingle :8428
+│       └── dashboards/                             # GrafanaDashboard CRDs + JSON
 │
 └── infra/configs/databases/clusters/*/monitoring/  # Per-database PodMonitors/ServiceMonitors
 ```

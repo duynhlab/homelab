@@ -90,9 +90,9 @@ Grafana's **Alerting > Alert rules** page shows two types of rules:
 1. **Grafana-managed rules** -- created in Grafana UI, stored in Grafana DB
 2. **Data source-managed rules (read-only)** -- fetched from external systems via `/api/v1/rules`
 
-For our setup, all alert rules are **data source-managed** (read-only) because they are defined as `PrometheusRule` CRDs and evaluated by VMAlert. Grafana displays them by querying VMSingle, which proxies the request to VMAlert via `vmalert.proxyURL`.
+For our setup, **rule evaluation** is always **VMAlert** (from `PrometheusRule` / VMRule in GitOps). What varies is whether **Grafana’s UI** lists those rules as read-only: the default metrics datasource is **`victoriametrics-metrics-datasource`**, which is tuned for **queries**, not the same **ruler** integration path as Grafana’s native **`prometheus`** datasource type. So the Alerting page may show **few or no** external rule groups even though VMAlert is healthy.
 
-See [datasources.md](datasources.md) for the full technical explanation.
+See **[Grafana Alerting and datasource types](datasources.md#grafana-alerting-and-datasource-types)** for why this happens, optional **`type: prometheus`** (same VMSingle URL) for read-only listing, and fallbacks (VMAlert UI, Karma, `kubectl`, API).
 
 ## Manifest Locations
 

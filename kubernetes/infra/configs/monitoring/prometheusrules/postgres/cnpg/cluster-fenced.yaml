@@ -1,0 +1,23 @@
+# CNPG-only: not part of chart prometheus_rules fragments; kept from legacy postgres-alerts split.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-db-cluster-fenced
+  namespace: product
+  labels:
+    app.kubernetes.io/part-of: cnpg-chart-rules
+    cnpg.io/cluster: cnpg-db
+spec:
+  groups:
+    - name: cloudnative-pg/cnpg-db-fenced
+      interval: 1m
+      rules:
+        - alert: CnpgClusterFenced
+          expr: cnpg_collector_fencing_on == 1
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "CNPG cluster fenced ({{ $labels.namespace }}/{{ $labels.cluster }})"
+            description: "CloudNativePG cluster is fenced. All write operations are blocked."

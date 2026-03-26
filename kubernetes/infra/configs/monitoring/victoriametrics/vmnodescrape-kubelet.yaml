@@ -1,0 +1,64 @@
+# Kubelet scraping for CNPG low-disk alerts and node-level container metrics.
+# VMAgent does not scrape kubelet by default; VMNodeScrape is required.
+#
+# kubelet_volume_stats_* gauges come from the kubelet /metrics endpoint (volume stats
+# collector), not from /metrics/cadvisor. See:
+# https://kubernetes.io/docs/concepts/cluster-administration/system-metrics/
+#
+# cAdvisor scrape (docs):
+# https://docs.victoriametrics.com/operator/resources/vmnodescrape/#cadvisor-scraping
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMNodeScrape
+metadata:
+  name: kubelet-cadvisor
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: kubelet
+    app.kubernetes.io/component: cadvisor
+spec:
+  scheme: https
+  path: /metrics/cadvisor
+  interval: 30s
+  tlsConfig:
+    insecureSkipVerify: true
+    caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+  bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+  relabelConfigs:
+    - action: labelmap
+      regex: __meta_kubernetes_node_label_(.+)
+    - source_labels: [__metrics_path__]
+      target_label: metrics_path
+    - action: replace
+      target_label: job
+      replacement: kubelet
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMNodeScrape
+metadata:
+  name: kubelet-volume-stats
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: kubelet
+    app.kubernetes.io/component: volume-stats
+spec:
+  scheme: https
+  path: /metrics
+  interval: 30s
+  scrapeTimeout: 20s
+  tlsConfig:
+    insecureSkipVerify: true
+    caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+  bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+  relabelConfigs:
+    - action: labelmap
+      regex: __meta_kubernetes_node_label_(.+)
+    - source_labels: [__metrics_path__]
+      target_label: metrics_path
+    - action: replace
+      target_label: job
+      replacement: kubelet
+  metricRelabelConfigs:
+    - source_labels: [__name__]
+      regex: kubelet_volume_stats_.+
+      action: keep

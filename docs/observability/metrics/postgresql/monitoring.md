@@ -15,13 +15,11 @@ flowchart TD
 
     subgraph exporters [Metrics Exporters]
         pgExp1["postgres_exporter v0.18.1<br/>sidecar + custom queries"]
-        pgExp2["postgres_exporter v0.18.1<br/>sidecar + custom queries"]
-        pigsty["pg_exporter (Pigsty)<br/>sidecar, 600+ metrics<br/>auto-discovery, built-in pgBouncer"]
+        pigsty["pg_exporter Pigsty<br/>sidecar, 600+ metrics<br/>auto-discovery, built-in pgBouncer"]
         cnpgBuiltin["CNPG built-in exporter<br/>+ custom queries ConfigMap"]
     end
 
     authDB --> pgExp1
-    reviewDB --> pgExp2
     supportDB --> pigsty
     cnpgDB --> cnpgBuiltin
 
@@ -33,16 +31,16 @@ flowchart TD
     authDB -.-> pgbExporter
     cnpgDB -.-> pgdogMetrics
 
-    pgExp1 -->|":9187"| prom["Prometheus"]
-    pgExp2 -->|":9187"| prom
-    pigsty -->|":9630"| prom
-    cnpgBuiltin1 -->|":9187"| prom
-    cnpgBuiltin2 -->|":9187"| prom
-    pgbExporter -->|":9127"| prom
-    pgcatMetrics -->|":9930"| prom
+    pgExp1 -->|":9187"| vma
+    pigsty -->|":9630"| vma
+    cnpgBuiltin -->|":9187"| vma
+    pgbExporter -->|":9127"| vma
+    pgdogMetrics -->|":9090"| vma
 
-    prom --> grafana["Grafana Dashboards"]
-    prom --> alertRules["PrometheusRules"]
+    vma["VMAgent PodMonitor and ServiceMonitor scrape"] --> vms["VMSingle :8428"]
+    vms --> grafana["Grafana VictoriaMetrics datasource"]
+    vms --> vmalert["VMAlert evaluation"]
+    vmalert --> ruleCRs["PrometheusRule and VMRule CRs"]
 ```
 
 ## Monitoring Coverage Matrix
@@ -123,7 +121,7 @@ Two dashboards adapted from [Pigsty](https://github.com/pgsty/pg_exporter/tree/m
 
 **Template variables**: `ins` (instance), `cls` (cluster), `datname` (database). The `cls` label is injected via `PG_EXPORTER_TAG=cls=supporting-shared-db` env var on the pg_exporter sidecar.
 
-**Provisioning**: GrafanaDashboard CRs in `kubernetes/infra/configs/monitoring/grafana/dashboards/`, folder "Databases", datasource injected as `DS_PROMETHEUS`.
+**Provisioning**: GrafanaDashboard CRs in `kubernetes/infra/configs/monitoring/grafana/dashboards/`, folder "Databases". Dashboard variables still use the legacy name `DS_PROMETHEUS`; the `GrafanaDashboard` CR maps that input to the **VictoriaMetrics** datasource (`datasourceName: VictoriaMetrics`). See [`docs/observability/grafana/datasources.md`](../../grafana/datasources.md).
 
 ## Recording Rules (pg_exporter)
 
@@ -149,26 +147,14 @@ Recording rule naming follows Pigsty convention: `pg:<level>:<metric>` (e.g., `p
 | PostgresBackupTooOld | warning | Last backup > 26 hours | CNPG only |
 | PostgresBackupFailed | critical | Backup failed in last hour | CNPG only |
 
-### postgres-alerts.yaml (new)
+### PostgreSQL `PrometheusRule` layout (`prometheusrules/postgres/`)
 
-All alerts use `or` expressions to cover Zalando (`custom_*` / built-in), CNPG (`cnpg_*`), and pg_exporter (`pg_*`) metric variants.
+The former monolith `postgres-alerts.yaml` was split by operator:
 
-| Alert | Severity | Condition | For |
-|---|---|---|---|
-| PostgresDown | critical | `pg_up == 0` (Zalando/pg_exporter) | 1m |
-| CnpgDown | critical | `cnpg_collector_up == 0` (CNPG) | 1m |
-| PostgresReplicationLagHigh | warning | lag > 30s | 5m |
-| PostgresReplicationLagCritical | critical | lag > 120s | 5m |
-| CnpgClusterFenced | critical | fencing_on == 1 | 1m |
-| PostgresConnectionSaturation | warning | connections > 80% max | 5m |
-| PostgresConnectionSaturationCritical | critical | connections > 95% max | 2m |
-| PostgresLockContention | warning | blocked queries > 5 | 5m |
-| PostgresDatabaseSizeLarge | warning | db size > 5GB | 10m |
-| PostgresWALSizeHigh | warning | WAL size > 2GB (CNPG only) | 15m |
-| PostgresDeadTuplesHigh | warning | dead tuples > 100K per table | 30m |
-| PostgresCheckpointsTooFrequent | warning | requested checkpoint rate > 0.5/s | 15m |
+- **[`kubernetes/infra/configs/monitoring/prometheusrules/postgres/cnpg/`](../../../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/cnpg/)** — CloudNativePG: chart-aligned rules (one file per upstream `cluster-*.yaml` from [cloudnative-pg/charts](https://github.com/cloudnative-pg/charts) `cluster` chart), plus small extras (`CnpgClusterFenced`, `PostgresWALSizeHigh`). Namespace **`product`** for chart-derived resources (matches `cnpg-db` cluster).
+- **[`kubernetes/infra/configs/monitoring/prometheusrules/postgres/zalando/`](../../../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/zalando/)** — Zalando: availability, `custom_*` connection/blocking, storage, maintenance (namespace **`monitoring`**).
 
-**Note**: Alertmanager is currently disabled. Alerts fire in Prometheus UI but notifications are not routed. Enable Alertmanager to activate notification delivery.
+**Note**: Rules are evaluated by **VMAlert** against **VMSingle**; Grafana Alerting can show read-only rules proxied via VMSingle (see [`docs/observability/metrics/victoriametrics.md`](../victoriametrics.md)). Notifications are not routed until Alertmanager is enabled.
 
 ## Custom Queries Reference
 
@@ -176,7 +162,7 @@ All alerts use `or` expressions to cover Zalando (`custom_*` / built-in), CNPG (
 
 #### Why `custom_` Prefix (Renamed Queries)
 
-`postgres_exporter v0.18+` ships with built-in collectors (`stat_bgwriter`, `stat_user_tables`, `database`, `locks`, etc.) that register metric families at startup. If a custom query name produces metrics whose prefix collides with a built-in collector's metric namespace, the Prometheus client library returns a **duplicate registration error** on the `/metrics` endpoint. The scrape fails with an HTTP 500 and the error is visible in the exporter logs and in Prometheus scrape error metrics.
+`postgres_exporter v0.18+` ships with built-in collectors (`stat_bgwriter`, `stat_user_tables`, `database`, `locks`, etc.) that register metric families at startup. If a custom query name produces metrics whose prefix collides with a built-in collector's metric namespace, the Prometheus client library returns a **duplicate registration error** on the `/metrics` endpoint. The scrape fails with an HTTP 500 and the error is visible in the exporter logs and in VMAgent scrape error metrics.
 
 For example, a custom query named `pg_database_size` would emit `pg_database_size_size_bytes`, but the built-in `database` collector already registers `pg_database_size_bytes`. The Prometheus client detects the shared prefix and rejects the conflicting metric family.
 
@@ -266,7 +252,7 @@ After 2 weeks of pg_exporter running on supporting-shared-db, evaluate:
 |---|---|---|
 | Auto-discovery | `curl :9630/explain` - check discovered databases | All 3 DBs found |
 | pgBouncer monitoring | `curl :9630/metrics \| grep pgbouncer` | pgBouncer metrics present |
-| Cardinality | `count({cluster_name="supporting-shared-db"})` in Prometheus | Document total series |
+| Cardinality | `count({cluster_name="supporting-shared-db"})` in VictoriaMetrics (Explore or `vmui`) | Document total series |
 | Resource usage | `kubectl top pod` for exporter container | Compare vs postgres_exporter |
 | Scrape duration | `pg_exporter_scrape_duration_seconds` | < 14s (scrapeTimeout) |
 | Collector errors | `curl :9630/stat` | No fatal collector failures |

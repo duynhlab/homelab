@@ -1,0 +1,31 @@
+# Generated from cnpg/cluster chart v0.6.0 (helm template) with fullnameOverride=cnpg-db, namespace=product.
+# Do not edit expr by hand; re-render from chart and split, or bump chart version in README.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-db-cluster-logical-replication-errors
+  namespace: product
+  labels:
+    app.kubernetes.io/part-of: cnpg-chart-rules
+    cnpg.io/cluster: cnpg-db
+    platform.duynhlab.dev/source: cloudnative-pg-charts-cluster
+    platform.duynhlab.dev/chart-version: 0.6.0
+spec:
+  groups:
+  - name: cloudnative-pg/cnpg-db
+    rules:
+    - alert: CNPGClusterLogicalReplicationErrors
+      annotations:
+        summary: CNPG Cluster logical replication errors detected
+        description: 'CloudNativePG Cluster''s "product/cnpg-db" "{{ .subname }}" subscription has experienced {{ $value }} errors.
+
+
+          This includes both apply errors (during normal replication) and sync errors (during initial table sync). Errors indicate data consistency issues that need immediate attention to prevent data divergence.'
+        runbook_url: https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/docs/runbooks/CNPGClusterLogicalReplicationErrors.md
+      expr: label_replace(increase(max by (namespace, job, subname) (cnpg_pg_stat_subscription_apply_error_count + cnpg_pg_stat_subscription_sync_error_count)[5m]), "cluster", "$1", "job", ".+/(.+)") > 0
+      for: 1m
+      labels:
+        severity: warning
+        namespace: product
+        cnpg_cluster: cnpg-db

@@ -1,0 +1,33 @@
+# Generated from cnpg/cluster chart v0.6.0 (helm template) with fullnameOverride=cnpg-db, namespace=product.
+# Do not edit expr by hand; re-render from chart and split, or bump chart version in README.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-db-cluster-logical-replication-lagging-critical
+  namespace: product
+  labels:
+    app.kubernetes.io/part-of: cnpg-chart-rules
+    cnpg.io/cluster: cnpg-db
+    platform.duynhlab.dev/source: cloudnative-pg-charts-cluster
+    platform.duynhlab.dev/chart-version: 0.6.0
+spec:
+  groups:
+  - name: cloudnative-pg/cnpg-db
+    rules:
+    - alert: CNPGClusterLogicalReplicationLaggingCritical
+      annotations:
+        summary: CNPG Cluster critical logical replication lag
+        description: 'CloudNativePG Cluster''s "product/cnpg-db" "{{ .subname }}" subscription is experiencing critical replication lag!
+
+          Current lag: {{ $value }}s
+
+
+          CRITICAL: The subscriber is significantly behind the publisher. Immediate action required. This could lead to significant data inconsistency, disk space exhaustion on publisher, or extended recovery time.'
+        runbook_url: https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/docs/runbooks/CNPGClusterLogicalReplicationLagging.md
+      expr: "(\n  # Receipt lag - not receiving WAL data\n  label_replace(max by (namespace, job, subname) (cnpg_pg_stat_subscription_receipt_lag_seconds), \"cluster\", \"$1\", \"job\", \".+/(.+)\") > 300\n) or (\n  # Apply lag - not applying received data\n  label_replace(max by (namespace, job, subname) (cnpg_pg_stat_subscription_apply_lag_seconds), \"cluster\", \"$1\", \"job\", \".+/(.+)\") > 300\n) or (\n  # LSN distance - large amount of pending data\n  label_replace(max by (namespace, job, subname) (cnpg_pg_stat_subscription_buffered_lag_bytes), \"cluster\", \"$1\", \"job\", \".+/(.+)\") / 1024^3 > 4\n)"
+      for: 2m
+      labels:
+        severity: critical
+        namespace: product
+        cnpg_cluster: cnpg-db

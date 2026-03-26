@@ -13,4 +13,4 @@ spec:
     key: postgres-replication-lag.json
   datasources:
     - inputName: DS_PROMETHEUS
-      datasourceName: Prometheus
+      datasourceName: VictoriaMetrics

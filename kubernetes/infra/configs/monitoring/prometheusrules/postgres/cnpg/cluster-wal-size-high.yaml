@@ -1,0 +1,23 @@
+# CNPG-only: WAL directory size (legacy split from postgres-alerts).
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-db-cluster-wal-size-high
+  namespace: product
+  labels:
+    app.kubernetes.io/part-of: cnpg-chart-rules
+    cnpg.io/cluster: cnpg-db
+spec:
+  groups:
+    - name: cloudnative-pg/cnpg-db-wal
+      interval: 5m
+      rules:
+        - alert: PostgresWALSizeHigh
+          expr: cnpg_collector_pg_wal{value="size"} > 2e+9
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CNPG WAL size high ({{ $labels.namespace }}/{{ $labels.cluster }})"
+            description: "WAL directory size is {{ $value | humanize1024 }}B (threshold: 2GB)."

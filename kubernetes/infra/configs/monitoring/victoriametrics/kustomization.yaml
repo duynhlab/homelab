@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - vmsingle.yaml
   - vmagent.yaml
+  - vmnodescrape-kubelet.yaml
   - vmalert.yaml
   - vmalertmanager.yaml
   - vlsingle.yaml

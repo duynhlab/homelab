@@ -291,11 +291,11 @@ Pattern ingestion and level detection are enabled via:
 
 ## Vector Monitoring
 
-Vector exports internal metrics about its own performance to Prometheus. This allows you to monitor the health and performance of the logging pipeline.
+Vector exposes internal metrics in **Prometheus text format** (`prometheus_exporter` sink). **VMAgent** scrapes those targets and remote-writes to **VMSingle**, so you can monitor pipeline health in Grafana like any other workload metric.
 
 ### Available Metrics
 
-Key Vector metrics available in Prometheus:
+Key Vector metrics (query in Grafana against the VictoriaMetrics datasource):
 
 - **`vector_events_processed_total`** - Total events processed by each component
 - **`vector_component_errors_total`** - Total errors by component  
@@ -347,7 +347,7 @@ vector_buffer_events
 **Option 2: Manual Queries via Explore**
 
 1. Navigate to **Explore** in Grafana
-2. Select **Prometheus** datasource
+2. Select the **VictoriaMetrics** metrics datasource (PromQL-compatible; see [datasources.md](../grafana/datasources.md))
 3. Query Vector metrics (namespace: `vector_*`)
 
 **Recommended Alerts**:
@@ -360,7 +360,7 @@ vector_buffer_events
 Vector self-monitoring is configured via:
 - **Source**: `internal_metrics` (collects Vector's internal metrics)
 - **Sink**: `prometheus_exporter` (exposes metrics on port 9090)
-- **ServiceMonitor**: Automatic Prometheus scraping (30s interval)
+- **ServiceMonitor → VMServiceScrape**: VMAgent scrapes Vector on a 30s interval (Prometheus Operator CRDs are converted by the VictoriaMetrics Operator)
 
 ## Log Queries
 

@@ -1,0 +1,24 @@
+# Zalando / generic exporter database size (CNPG-specific series removed — see ../cnpg/).
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zalando-postgres-storage
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: zalando-postgres-rules
+spec:
+  groups:
+    - name: zalando-postgres-storage
+      interval: 5m
+      rules:
+        - alert: PostgresDatabaseSizeLarge
+          expr: |
+            pg_database_size_bytes > 5e+9
+            or pg_size_bytes > 5e+9
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PostgreSQL database large ({{ $labels.namespace }}/{{ $labels.datname }})"
+            description: "Database {{ $labels.datname }} is {{ $value | humanize1024 }}B."

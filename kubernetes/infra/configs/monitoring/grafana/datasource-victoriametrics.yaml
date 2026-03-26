@@ -6,11 +6,14 @@ metadata:
 spec:
   datasource:
     access: proxy
-    isDefault: false
+    isDefault: true
     name: VictoriaMetrics
     type: victoriametrics-metrics-datasource
-    uid: victoriametrics
+    # uid: victoriametrics
     url: http://vmsingle-victoria-metrics.monitoring.svc:8428
+    jsonData:
+      httpMethod: POST
+      timeInterval: 15s
   plugins:
     - name: victoriametrics-metrics-datasource
       version: "0.23.1"

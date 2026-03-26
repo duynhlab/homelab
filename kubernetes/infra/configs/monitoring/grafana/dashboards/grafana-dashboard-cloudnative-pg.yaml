@@ -9,8 +9,8 @@ spec:
       dashboards: grafana
   folder: "Databases"
   configMapRef:
-    name: cnpg-grafana-dashboard  # Created by Helm chart (cnpg-grafana-cluster)
-    key: cnp.json  # Helm chart uses 'cnp.json' as the key
+    name: grafana-dashboard-cloudnative-pg
+    key: cloudnative-pg-cluster.json
   datasources:
     - inputName: DS_PROMETHEUS
-      datasourceName: Prometheus
+      datasourceName: VictoriaMetrics

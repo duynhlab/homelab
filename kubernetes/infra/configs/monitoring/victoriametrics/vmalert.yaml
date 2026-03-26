@@ -1,6 +1,6 @@
 # VMAlert - VictoriaMetrics alerting rule evaluator
 # Evaluates VMRule resources (including those auto-converted from PrometheusRule
-# by the VM Operator, e.g. postgres-alerts, pg-exporter-recording-rules, SLO rules).
+# by the VM Operator, e.g. prometheusrules/postgres/*, pg-exporter-recording-rules, SLO rules).
 # Docs: https://docs.victoriametrics.com/operator/resources/vmalert/
 apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMAlert

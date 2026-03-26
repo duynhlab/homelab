@@ -26,15 +26,14 @@ All datasources are managed as `GrafanaDatasource` CRDs (GitOps, no manual confi
 
 | Datasource | Type | Default | URL | Purpose |
 |------------|------|---------|-----|---------|
-| Prometheus | `prometheus` | Yes | `vmsingle-victoria-metrics:8428` | Metrics, alerting, read-only rules |
-| VictoriaMetrics | `victoriametrics-metrics-datasource` | No | `vmsingle-victoria-metrics:8428` | MetricsQL, VMUI integration |
+| VictoriaMetrics | `victoriametrics-metrics-datasource` | Yes | `vmsingle-victoria-metrics:8428` | Metrics (PromQL/MetricsQL), dashboards, Explore |
 | Loki | `loki` | No | `loki:3100` | Log queries (LogQL), trace correlation |
 | VictoriaLogs | `victoriametrics-logs-datasource` | No | `vlsingle-victoria-logs:9428` | Log queries (LogsQL), [plugin](https://grafana.com/grafana/plugins/victoriametrics-logs-datasource/) |
 | Tempo | `tempo` | No | `tempo:3200` | Trace queries |
 | Jaeger | `jaeger` | No | `jaeger-query:16686` | Trace search (alternative UI) |
 | Pyroscope | `grafana-pyroscope-datasource` | No | `pyroscope:4040` | Flamegraphs |
 
-Both **Prometheus** and **VictoriaMetrics** datasources point to the same VMSingle backend. See [datasources.md](datasources.md) for the rationale and case study.
+See [datasources.md](datasources.md) for metrics datasource details and Grafana Alerting UI notes.
 
 **Loki** and **VictoriaLogs** are separate log backends (same logs ingested by Vector); use Loki for LogQL and default trace correlation, VictoriaLogs for LogsQL and the VM plugin workflow. See [datasources.md](datasources.md#logs-loki-vs-victorialogs-plugin).
 
@@ -42,8 +41,7 @@ Both **Prometheus** and **VictoriaMetrics** datasources point to the same VMSing
 
 ```
 kubernetes/infra/configs/monitoring/grafana/
-├── datasource-prometheus.yaml
-├── datasource-victoriametrics.yaml    # VictoriaMetrics plugin
+├── datasource-victoriametrics.yaml    # VictoriaMetrics plugin (default metrics DS)
 ├── datasource-loki.yaml
 ├── datasource-victorialogs.yaml       # VictoriaLogs plugin
 ├── datasource-tempo.yaml
@@ -76,6 +74,10 @@ Dashboards are managed as `GrafanaDashboard` CRDs or JSON ConfigMaps:
 | Dashboard | Panels | Location |
 |-----------|--------|----------|
 | Microservices Observability | 34 panels, 5 rows | `grafana/dashboards/microservices-dashboard.json` |
+| CloudNativePG Cluster Overview | Upstream CNPG cluster + operator metrics | `grafana/dashboards/cloudnative-pg-cluster.json` |
+
+**CloudNativePG**: JSON is vendored from [cloudnative-pg/grafana-dashboards](https://github.com/cloudnative-pg/grafana-dashboards) (`charts/cluster/grafana-dashboard.json`), adapted for the VictoriaMetrics plugin (same pattern as other JSON dashboards). `GrafanaDashboard` maps `DS_PROMETHEUS` → `VictoriaMetrics`. Cluster DB metrics use `PodMonitor` resources under [`kubernetes/infra/configs/databases/clusters/`](../../../kubernetes/infra/configs/databases/clusters/) (e.g. `cnpg-db/monitoring/`); the CNPG **operator** `PodMonitor` is created when `monitoring.podMonitorEnabled` is true on the [`cloudnative-pg` HelmRelease](../../../kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml).
+
 
 Dashboard documentation:
 - [Dashboard Reference](dashboard-reference.md) -- all 34 panels, queries, and what they measure
@@ -97,8 +99,7 @@ See [datasources.md](datasources.md) for the full technical explanation.
 ```
 kubernetes/infra/configs/monitoring/grafana/
 ├── grafana.yaml                       # Grafana CR (operator-managed)
-├── datasource-prometheus.yaml         # Prometheus-type datasource (default)
-├── datasource-victoriametrics.yaml    # VictoriaMetrics plugin datasource
+├── datasource-victoriametrics.yaml    # VictoriaMetrics plugin (default metrics)
 ├── datasource-loki.yaml
 ├── datasource-victorialogs.yaml       # VictoriaLogs plugin datasource
 ├── datasource-tempo.yaml
@@ -112,7 +113,7 @@ kubernetes/infra/configs/monitoring/grafana/
 
 - [RBAC and multi-team access](rbac-multi-team.md) -- Viewer/Editor/Admin, Teams, anonymous vs named users
 - [VMAuth and vmauth](../metrics/vmauth.md) -- API-layer auth for VictoriaMetrics (separate from Grafana UI)
-- [Datasource Strategy](datasources.md) -- dual datasource case study
+- [Datasource Strategy](datasources.md) -- VictoriaMetrics plugin metrics DS
 - [Dashboard Reference](dashboard-reference.md) -- panel-by-panel reference
 - [Variables](variables.md) -- dashboard variable configuration
 - [Alerting Strategy](../alerting/README.md) -- 2-layer alerting approach

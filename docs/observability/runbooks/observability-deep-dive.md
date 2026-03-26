@@ -135,7 +135,7 @@ flowchart LR
 
 USE monitoring focuses on **PostgreSQL** -- the most critical infrastructure component.
 
-Source: [`kubernetes/infra/configs/monitoring/prometheusrules/postgres-alerts.yaml`](../../kubernetes/infra/configs/monitoring/prometheusrules/postgres-alerts.yaml)
+Source: [`kubernetes/infra/configs/monitoring/prometheusrules/postgres/`](../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/README.md)
 
 | USE Signal | Metric / Alert | PromQL |
 |-----------|---------------|--------|

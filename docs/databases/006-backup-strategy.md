@@ -145,9 +145,9 @@ RustFS (S3-compatible) is deployed in namespace `rustfs`. Backups are split into
 
 ### Credentials
 
-Each operator has its own **Vault path** for backup credentials, distributed via separate ClusterExternalSecrets. Both currently use shared admin credentials (`rustfsadmin`) -- dedicated per-operator service accounts with bucket-scoped IAM policies are a planned future improvement.
+Each operator has its own **OpenBAO path** for backup credentials, distributed via separate ClusterExternalSecrets. Both currently use shared admin credentials (`rustfsadmin`) -- dedicated per-operator service accounts with bucket-scoped IAM policies are a planned future improvement.
 
-| Vault Path | Bucket | Consumer | ClusterExternalSecret |
+| OpenBAO Path | Bucket | Consumer | ClusterExternalSecret |
 |------------|--------|----------|----------------------|
 | `secret/local/infra/rustfs/backup-zalando` | `pg-backups-zalando` | Zalando clusters (auth-db, supporting-shared-db) | `pg-backup-rustfs-walg` |
 | `secret/local/infra/rustfs/backup-cnpg` | `pg-backups-cnpg` | CNPG clusters (cnpg-db, cnpg-db-replica) | `pg-backup-rustfs-cnpg` |
@@ -157,7 +157,7 @@ Each operator has its own **Vault path** for backup credentials, distributed via
   - **Zalando/WAL-G keys**: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
 - **Bucket creation**: CronJob `setup-pg-backup-buckets` in namespace `rustfs` (runs every 30min, idempotent).
 
-> **Future**: Replace `rustfsadmin` values in Vault with dedicated service account credentials + IAM policies. No ESO or K8s manifest changes required -- only Vault values need updating.
+> **Future**: Replace `rustfsadmin` values in OpenBAO with dedicated service account credentials + IAM policies. No ESO or K8s manifest changes required -- only OpenBAO values need updating.
 
 ---
 

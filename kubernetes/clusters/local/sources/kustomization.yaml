@@ -25,5 +25,5 @@ resources:
   - helm/pgdog.yaml
   - helm/rustfs.yaml
   - helm/valkey.yaml
-  - helm/hashicorp.yaml
   - helm/external-secrets.yaml
+  - helm/openbao.yaml

@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.81.18] - 2026-03-28
+
+### Added
+
+- **OpenBAO §2 topology diagram**: [`docs/secrets/images/openbao-ha-raft-topology.png`](docs/secrets/images/openbao-ha-raft-topology.png) (source SVG alongside) and embed in [`openbao.md`](docs/secrets/openbao.md) under **System Architecture**.
+
+### Fixed
+
+- **OpenBAO bootstrap post-unseal wait**: [`openbao-bootstrap/configmap.yaml`](kubernetes/infra/configs/secrets/openbao-bootstrap/configmap.yaml) — after Phase 3, the script now **requires `sealed:false` on `openbao-0`** (stable) using `grep -E` for JSON whitespace; **optional** ~2 min confirmation on the **Service** URL with **warning + truncated health** if endpoints lag (avoids hanging on Service-only checks when the ClusterIP has no Ready backends yet).
+- **OpenBAO Phase 3 per-node sealed check**: same ConfigMap — the loop that decides whether to run `bao operator unseal` now reads **`/v1/sys/health?standbycode=200&sealedcode=200&uninitcode=200`** (not bare `/v1/sys/health`). Bare health returns **503** with no JSON when sealed, so the script skipped unseal and printed **already unsealed** incorrectly, then hung waiting for `sealed:false` on a still-sealed node.
+
+## [0.81.17] - 2026-03-28
+
+### Fixed
+
+- **CNPG `postInitSQL` vs OpenBAO**: [`cnpg-db/instance.yaml`](kubernetes/infra/configs/databases/clusters/cnpg-db/instance.yaml) — `cart` / `order` users are created with passwords matching the OpenBAO bootstrap seed ([`openbao-bootstrap/configmap.yaml`](kubernetes/infra/configs/secrets/openbao-bootstrap/configmap.yaml) paths `secret/local/databases/cnpg-db/{cart,order}`), replacing the previous placeholder `postgres` that diverged from ExternalSecrets and caused Flyway init **password authentication failed**.
+- **PgDog pooler credentials**: [`poolers/helmrelease.yaml`](kubernetes/infra/configs/databases/clusters/cnpg-db/poolers/helmrelease.yaml) — `users[].password` aligned with the same seed so PgDog SCRAM client auth matches apps and PostgreSQL (was hardcoded `postgres`).
+
+## [0.81.16] - 2026-03-28
+
+### Fixed
+
+- **ClusterExternalSecret / backup credentials**: Flux **ResourceSet** `Namespace` manifests ([`identity-rs.yaml`](kubernetes/apps/domains/identity-rs.yaml), [`catalog-rs.yaml`](kubernetes/apps/domains/catalog-rs.yaml), [`checkout-rs.yaml`](kubernetes/apps/domains/checkout-rs.yaml), [`comms-rs.yaml`](kubernetes/apps/domains/comms-rs.yaml)) now set **`platform.duynhlab/backup`** (and `environment: local`) so they are not stripped when apps reconcile. Identity namespaces (**auth**, **user**) use **`walg`**; catalog/checkout/comms use optional **`platform_backup_label`** from ResourceSetInputProvider ([`product.yaml`](kubernetes/apps/services/product.yaml), [`cart.yaml`](kubernetes/apps/services/cart.yaml), [`order.yaml`](kubernetes/apps/services/order.yaml) → **`cnpg`**). Restores **`pg-backup-rustfs-credentials`** sync for Zalando and CNPG backup/restore paths that depend on that label selector.
+
+## [0.81.15] - 2026-03-28
+
+### Fixed
+
+- **OpenBAO bootstrap**: [`openbao-bootstrap/configmap.yaml`](kubernetes/infra/configs/secrets/openbao-bootstrap/configmap.yaml) — wait for unsealed cluster after Phase 3 now uses **`/v1/sys/health?standbycode=200&sealedcode=200&uninitcode=200`** (aligned with Helm [`readinessProbe`](kubernetes/infra/controllers/secrets/openbao/helmrelease.yaml)) so sealed nodes return HTTP 200 with JSON; **bounded wait** (~10 min) with clear exit on timeout instead of an infinite loop when the service returned 503.
+- **OpenBAO bootstrap Job**: [`job.yaml`](kubernetes/infra/configs/secrets/openbao-bootstrap/job.yaml) — removed `kustomize.toolkit.fluxcd.io/force` on the Job (avoid Flux recreating the Job every reconcile); bootstrap image **`openbao/openbao:2.5.2`** to match server line used by the chart.
+
+### Changed
+
+- **Flux**: [`secrets.yaml`](kubernetes/clusters/local/secrets.yaml) — `secrets-local` **`timeout: 15m`** (was 10m) for bootstrap + ClusterSecretStore validation on cold start.
+- **Documentation**: [`docs/secrets/openbao.md`](docs/secrets/openbao.md) — runbook **Flux `secrets-local` stuck / `ClusterSecretStore` 503 / Job hangs** (unseal, delete Job, reconcile).
+
 ## [0.81.14] - 2026-03-26
 
 ### Added

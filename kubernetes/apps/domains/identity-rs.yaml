@@ -14,6 +14,9 @@ spec:
     kind: Namespace
     metadata:
       name: << inputs.namespace >>
+      labels:
+        environment: local
+        platform.duynhlab/backup: "walg"
     ---
     apiVersion: helm.toolkit.fluxcd.io/v2
     kind: HelmRelease

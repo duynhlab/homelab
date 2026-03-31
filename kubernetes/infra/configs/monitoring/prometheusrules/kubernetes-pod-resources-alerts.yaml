@@ -1,0 +1,92 @@
+# PrometheusRule for Kubernetes pod resource alerts (USE Method: Containers).
+# Monitors CPU throttling, memory saturation, OOMKill, CrashLoop, and readiness.
+#
+# Metrics source: cAdvisor (container_*) via kubelet-cadvisor VMNodeScrape,
+# kube-state-metrics (kube_pod_*) via ServiceMonitor.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kubernetes-pod-resources-alerts
+  namespace: monitoring
+spec:
+  groups:
+    # --- CPU Saturation ---
+    - name: kubernetes-pod-cpu
+      interval: 1m
+      rules:
+        - alert: KubePodCPUThrottlingHigh
+          expr: |
+            sum by (namespace, pod, container) (
+              increase(container_cpu_cfs_throttled_periods_total{container!=""}[5m])
+            )
+            / sum by (namespace, pod, container) (
+              increase(container_cpu_cfs_periods_total{container!=""}[5m])
+            ) > 0.25
+          for: 15m
+          labels:
+            severity: warning
+            category: resources
+          annotations:
+            summary: "High CPU throttling ({{ $labels.namespace }}/{{ $labels.pod }}/{{ $labels.container }})"
+            description: "Container {{ $labels.container }} in pod {{ $labels.pod }} is being throttled {{ $value | humanizePercentage }} of the time. Consider increasing CPU limits or optimizing CPU usage."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubepodcputhrottlinghigh"
+
+    # --- Memory Saturation ---
+    - name: kubernetes-pod-memory
+      interval: 1m
+      rules:
+        - alert: KubePodMemoryNearLimit
+          expr: |
+            sum by (namespace, pod, container) (container_memory_working_set_bytes{container!=""})
+            / sum by (namespace, pod, container) (kube_pod_container_resource_limits{resource="memory", container!=""})
+            > 0.9
+          for: 15m
+          labels:
+            severity: warning
+            category: resources
+          annotations:
+            summary: "Memory near limit ({{ $labels.namespace }}/{{ $labels.pod }}/{{ $labels.container }})"
+            description: "Container {{ $labels.container }} in pod {{ $labels.pod }} is using {{ $value | humanizePercentage }} of its memory limit. Risk of OOMKill."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubepodmemorynearlimit"
+
+        - alert: KubePodOOMKilled
+          expr: |
+            increase(kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}[15m]) > 0
+          for: 0m
+          labels:
+            severity: critical
+            category: resources
+          annotations:
+            summary: "OOMKilled ({{ $labels.namespace }}/{{ $labels.pod }}/{{ $labels.container }})"
+            description: "Container {{ $labels.container }} in pod {{ $labels.pod }} was OOMKilled. Increase memory limits or investigate memory leaks via Pyroscope heap profiles."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubepodoomkilled"
+
+    # --- Pod Health ---
+    - name: kubernetes-pod-health
+      interval: 1m
+      rules:
+        - alert: KubePodCrashLooping
+          expr: |
+            max_over_time(kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"}[5m]) == 1
+          for: 10m
+          labels:
+            severity: critical
+            category: resources
+          annotations:
+            summary: "CrashLoopBackOff ({{ $labels.namespace }}/{{ $labels.pod }}/{{ $labels.container }})"
+            description: "Container {{ $labels.container }} in pod {{ $labels.pod }} is in CrashLoopBackOff. Check container logs: kubectl logs -n {{ $labels.namespace }} {{ $labels.pod }} -c {{ $labels.container }} --previous"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubepodcrashlooping"
+
+        - alert: KubePodNotReady
+          expr: |
+            sum by (namespace, pod) (
+              max by (namespace, pod) (kube_pod_status_phase{phase=~"Pending|Unknown"})
+            ) > 0
+          for: 15m
+          labels:
+            severity: warning
+            category: resources
+          annotations:
+            summary: "Pod not ready ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been in a non-ready state for more than 15 minutes. Check events: kubectl describe pod -n {{ $labels.namespace }} {{ $labels.pod }}"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubepodnotready"

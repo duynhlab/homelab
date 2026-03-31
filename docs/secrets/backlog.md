@@ -3,6 +3,8 @@
 > **Purpose**: Detailed specs for P1/P2 improvements identified during the External Secrets deep dive (Feb 2026). Each item is self-contained -- pick up any item independently when ready.
 >
 > **P0 (Critical)**: Completed. See [CHANGELOG v0.50.9](../../CHANGELOG.md).
+>
+> **Note**: This project has migrated from HashiCorp Vault (dev mode) to **OpenBAO (HA Raft)**. References to "Vault" in code examples below should use `bao` CLI and OpenBAO paths. P2.1 (audit) and P2.3 (HA) are now complete via the OpenBAO migration. See [openbao.md](./openbao.md) for current architecture.
 
 ---
 

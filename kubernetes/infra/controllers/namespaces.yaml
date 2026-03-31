@@ -110,7 +110,7 @@ kind: Namespace
 metadata:
   labels:
     environment: local
-  name: vault
+  name: openbao
 ---
 apiVersion: v1
 kind: Namespace

@@ -401,7 +401,7 @@ flowchart LR
 
 2. **No in-place major version upgrade**: Must use clone-based upgrades, which require additional storage and longer downtime for large databases.
 
-3. **No built-in secret generation**: Secrets must be pre-created or managed externally (via ESO, Vault, etc.).
+3. **No built-in secret generation**: Secrets must be pre-created or managed externally (via ESO, OpenBAO, etc.).
 
 4. **Newer ecosystem**: Open-sourced in 2022 vs. Zalando's 2017. Smaller community and fewer real-world deployment references (though growing rapidly).
 

@@ -1,0 +1,13 @@
+# OpenBAO Helm Repository
+# Apache 2.0 licensed fork of HashiCorp Vault
+# Docs: https://openbao.org/docs/platform/k8s/helm/
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: openbao
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: helm-repository
+spec:
+  interval: 1h
+  url: https://openbao.github.io/openbao-helm

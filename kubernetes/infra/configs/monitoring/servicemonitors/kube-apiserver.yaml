@@ -1,0 +1,33 @@
+# ServiceMonitor for Kubernetes API server metrics (Four Golden Signals: Control Plane).
+# Scrapes the built-in `kubernetes` service in the `default` namespace.
+# metricRelabelConfigs keeps only essential metrics to avoid cardinality explosion.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kube-apiserver
+  namespace: monitoring
+spec:
+  endpoints:
+    - interval: 30s
+      port: https
+      scheme: https
+      path: /metrics
+      scrapeTimeout: 20s
+      tlsConfig:
+        insecureSkipVerify: true
+        caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      relabelings:
+        - replacement: apiserver
+          targetLabel: job
+      metricRelabelConfigs:
+        - sourceLabels: [__name__]
+          regex: "apiserver_request_total|apiserver_request_duration_seconds_bucket|apiserver_request_duration_seconds_count|apiserver_current_inflight_requests|apiserver_response_sizes_bucket|rest_client_request_duration_seconds_bucket|rest_client_requests_total|process_cpu_seconds_total|process_resident_memory_bytes|workqueue_depth|workqueue_adds_total"
+          action: keep
+  namespaceSelector:
+    matchNames:
+      - default
+  selector:
+    matchLabels:
+      component: apiserver
+      provider: kubernetes

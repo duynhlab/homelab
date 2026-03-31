@@ -1,0 +1,71 @@
+# PrometheusRule for Kubernetes API server alerts (Four Golden Signals: Control Plane).
+# Monitors API server availability, latency, error rate, and request saturation.
+#
+# Metrics source: kube-apiserver (apiserver_*) scraped via kube-apiserver ServiceMonitor.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kube-apiserver-alerts
+  namespace: monitoring
+spec:
+  groups:
+    - name: kube-apiserver
+      interval: 1m
+      rules:
+        # Golden Signal: Availability
+        - alert: KubeAPIServerDown
+          expr: |
+            absent(up{job="apiserver"} == 1)
+          for: 5m
+          labels:
+            severity: critical
+            category: availability
+          annotations:
+            summary: "Kubernetes API server is unreachable"
+            description: "The Kubernetes API server has been unreachable for more than 5 minutes. Cluster control plane is degraded."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubeapiserverdown"
+
+        # Golden Signal: Latency
+        - alert: KubeAPIServerHighLatency
+          expr: |
+            histogram_quantile(0.99,
+              sum by (le, verb, resource) (
+                rate(apiserver_request_duration_seconds_bucket{job="apiserver", verb!~"LIST|WATCH"}[5m])
+              )
+            ) > 1
+          for: 10m
+          labels:
+            severity: warning
+            category: latency
+          annotations:
+            summary: "API server high P99 latency ({{ $labels.verb }} {{ $labels.resource }})"
+            description: "API server P99 latency for {{ $labels.verb }} {{ $labels.resource }} is {{ $value | humanizeDuration }} (threshold: 1s)."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubeapiserverhighlatency"
+
+        # Golden Signal: Errors
+        - alert: KubeAPIServerErrorRate
+          expr: |
+            sum(rate(apiserver_request_total{job="apiserver", code=~"5.."}[5m]))
+            / sum(rate(apiserver_request_total{job="apiserver"}[5m]))
+            > 0.03
+          for: 10m
+          labels:
+            severity: warning
+            category: errors
+          annotations:
+            summary: "API server high error rate"
+            description: "Kubernetes API server 5xx error rate is {{ $value | humanizePercentage }} (threshold: 3%). Check API server logs and webhook configurations."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubeapiservererrorrate"
+
+        # Golden Signal: Saturation
+        - alert: KubeAPIServerHighInflight
+          expr: |
+            max(apiserver_current_inflight_requests{job="apiserver"}) > 200
+          for: 5m
+          labels:
+            severity: warning
+            category: saturation
+          annotations:
+            summary: "API server high inflight requests"
+            description: "API server has {{ $value | humanize }} concurrent inflight requests (threshold: 200). Control plane may be overloaded."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubeapiserverhighinflight"

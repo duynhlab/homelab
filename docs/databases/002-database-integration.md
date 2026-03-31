@@ -464,7 +464,7 @@ The **Supporting Database** (`supporting-shared-db`) cluster uses a **shared dat
 Password rotation is a critical security practice for production databases. Zalando Postgres Operator manages passwords via Kubernetes Secrets, and rotation can be performed through:
 
 1. **Native Zalando Approach** - Manual rotation via secret updates (documented below)
-2. **External Secrets Operator** - Automatic rotation from Vault/AWS Secrets Manager (future implementation)
+2. **External Secrets Operator** - Automatic rotation from OpenBAO/AWS Secrets Manager (future implementation)
 
 **Rotation Schedule:**
 - **Infrastructure roles** (monitoring, backup): Every 90 days
@@ -495,22 +495,19 @@ Password rotation is a critical security practice for production databases. Zala
 #### External Secrets Operator Integration (Future)
 
 **Architecture:**
-```
-Vault/AWS Secrets Manager
-    ↓ (password rotation)
-External Secrets Operator
-    ↓ (syncs new password)
-Kubernetes Secret (Zalando format)
-    ↓ (operator watches)
-Zalando Postgres Operator
-    ↓ (updates database)
-PostgreSQL Database
+
+```mermaid
+flowchart TD
+    A["OpenBAO / AWS Secrets Manager"] -->|password rotation| B["External Secrets Operator"]
+    B -->|syncs new password| C["Kubernetes Secret (Zalando format)"]
+    C -->|operator watches| D["Zalando Postgres Operator"]
+    D -->|updates database| E["PostgreSQL Database"]
 ```
 
 **Benefits:**
 - ✅ **Automatic rotation** - No manual intervention needed
-- ✅ **Centralized management** - All passwords in Vault
-- ✅ **Audit trail** - Vault audit logs track all rotations
+- ✅ **Centralized management** - All passwords in OpenBAO
+- ✅ **Audit trail** - OpenBAO audit logs track all rotations
 - ✅ **Zero-downtime** - ESO syncs before expiration
 - ✅ **Compliance** - Meets security policy requirements
 

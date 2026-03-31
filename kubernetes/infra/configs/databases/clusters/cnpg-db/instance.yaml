@@ -123,10 +123,12 @@ spec:
       encoding: "UTF8"
       localeCType: "C"
       localeCollate: "C"
+      # Passwords MUST match OpenBAO seed + ExternalSecrets (see openbao-bootstrap configmap
+      # secret/local/databases/cnpg-db/{cart,order}) — postInitSQL runs only on empty PVC initdb.
       postInitSQL:
-        - CREATE USER cart WITH PASSWORD 'postgres';
+        - CREATE USER cart WITH PASSWORD 'C4rt-K1nd-2026!';
         - CREATE DATABASE cart OWNER cart;
-        - CREATE USER "order" WITH PASSWORD 'postgres';
+        - CREATE USER "order" WITH PASSWORD '0rd3r-K1nd-2026!';
         - CREATE DATABASE "order" OWNER "order";
 
   backup:

@@ -1,0 +1,41 @@
+# Recording rules and alerts for Kubernetes network monitoring (USE Method: Network).
+# Pre-aggregates container network I/O by namespace and alerts on network errors.
+#
+# Metrics source: cAdvisor (container_network_*) via kubelet-cadvisor VMNodeScrape.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kubernetes-network-rules
+  namespace: monitoring
+spec:
+  groups:
+    # --- Recording Rules ---
+    - name: kubernetes-network-recording-rules
+      interval: 1m
+      rules:
+        - record: namespace:container_network_receive_bytes:rate5m
+          expr: |
+            sum by (namespace) (rate(container_network_receive_bytes_total{image!=""}[5m]))
+
+        - record: namespace:container_network_transmit_bytes:rate5m
+          expr: |
+            sum by (namespace) (rate(container_network_transmit_bytes_total{image!=""}[5m]))
+
+    # --- Alerts ---
+    - name: kubernetes-network-alerts
+      interval: 1m
+      rules:
+        - alert: KubeContainerNetworkErrors
+          expr: |
+            sum by (namespace, pod) (
+              rate(container_network_receive_errors_total[5m])
+              + rate(container_network_transmit_errors_total[5m])
+            ) > 1
+          for: 10m
+          labels:
+            severity: warning
+            category: network
+          annotations:
+            summary: "Network errors ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Pod {{ $labels.pod }} in {{ $labels.namespace }} has {{ $value | humanize }} network errors/sec (threshold: 1/s). Check CNI plugin, network policies, and pod networking configuration."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubecontainernetworkerrors"

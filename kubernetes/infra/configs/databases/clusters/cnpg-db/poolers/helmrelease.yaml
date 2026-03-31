@@ -5,7 +5,7 @@
 #
 # SECURITY NOTE: Inline passwords (dev-only).
 # Vault-backed secret: pgdog-cnpg-credentials (namespace: product)
-# Vault path: secret/data/local/databases/pgdog-cnpg/credentials
+# OpenBAO path: secret/data/local/databases/pgdog-cnpg/credentials
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -74,16 +74,17 @@ spec:
             port: 5432
             poolSize: 30
 
+    # MUST match PostgreSQL role passwords + OpenBAO seed (openbao-bootstrap configmap)
     users:
       - name: product
         database: product
-        password: postgres
+        password: "Pr0duct-K1nd-2026!"
       - name: cart
         database: cart
-        password: postgres
+        password: "C4rt-K1nd-2026!"
       - name: order
         database: order
-        password: postgres
+        password: "0rd3r-K1nd-2026!"
 
     resources:
       requests:

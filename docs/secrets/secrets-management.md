@@ -1,6 +1,6 @@
 # Secrets Management Guide
 
-> **Status**: Local/Dev environment using Vault (Dev Mode) + External Secrets Operator (ESO)
+> **Status**: Local/Dev environment using **OpenBAO (HA)** + External Secrets Operator (ESO)
 >
 > **Target**: Standardized secret management across all microservices and infrastructure
 
@@ -8,16 +8,17 @@
 
 ## Overview
 
-This project uses **HashiCorp Vault** as the source of truth for secrets, with **External Secrets Operator (ESO)** syncing secrets to Kubernetes. This approach:
+This project uses **OpenBAO** (Apache 2.0 fork of HashiCorp Vault) as the source of truth for secrets, with **External Secrets Operator (ESO)** syncing secrets to Kubernetes. This approach:
 
-- Centralizes secret management in Vault
+- Centralizes secret management in OpenBAO
 - Eliminates plaintext secrets in Git (eventual goal)
 - Provides audit trails for secret access
 - Enables secret rotation without redeployment
+- Production-ready HA cluster (3-node Raft) — not dev mode
 
 ```mermaid
 flowchart LR
-    subgraph VaultBox["HashiCorp Vault"]
+    subgraph OpenBAOBox["OpenBAO (HA Raft)"]
         KV["KV v2 Secrets Engine"]
     end
 
@@ -47,19 +48,20 @@ flowchart LR
 
 | Component | Purpose | Namespace | Version |
 |-----------|---------|-----------|---------|
-| Vault (Dev Mode) | Secret storage | `vault` | 0.32.0 (Helm) |
-| External Secrets Operator | Sync secrets to K8s | `external-secrets-system` | **v2.0.0** |
-| ClusterSecretStore | Vault connection config | cluster-scoped | `vault-dev` |
+| OpenBAO (HA) | Secret storage (3-node Raft) | `openbao` | 2.5.2 (Chart 0.26.2) |
+| External Secrets Operator | Sync secrets to K8s | `external-secrets-system` | **v2.1.0** |
+| ClusterSecretStore | OpenBAO connection config | cluster-scoped | `openbao` |
 | ClusterExternalSecret | Shared secrets across namespaces | cluster-scoped | Backup creds |
 | ExternalSecret | Per-secret definition | app namespaces | Creates K8s Secrets |
 
-### Vault Configuration
+### OpenBAO Configuration
 
-- **Mode**: Dev mode (no persistence, `root` token)
-- **Auth Method**: Kubernetes (ServiceAccount-based)
+- **Mode**: HA with Raft integrated storage (3 replicas, 10Gi PVC per node)
+- **Auth Method**: Kubernetes (ServiceAccount-based via TokenReview API)
 - **Secrets Engine**: KV v2 at path `secret/`
-- **Audit Logging**: File audit device to stdout (collected by Vector -> Loki)
-- **Bootstrap**: Idempotent Job runs on each Vault restart
+- **Audit Logging**: Stdout audit device (collected by Vector -> Loki)
+- **Bootstrap**: Idempotent Job — init, unseal, configure on each deploy
+- **Seal**: Shamir (1-share) for Kind; AWS KMS / GCP KMS for EKS/GKE
 
 ### Secret Organization (Hybrid Strategy)
 
@@ -76,7 +78,7 @@ Secrets are organized using a **hybrid strategy** for maintainability and scalab
 
 ## Path Naming Convention
 
-All Vault paths follow a standardized 4-level hierarchy based on [HashiCorp recommended patterns](https://developer.hashicorp.com/vault/tutorials/recommended-patterns/pattern-centralized-secrets):
+All secret paths follow a standardized 4-level hierarchy:
 
 ```
 secret/{environment}/{category}/{service-or-component}/{resource}
@@ -85,25 +87,25 @@ secret/{environment}/{category}/{service-or-component}/{resource}
 | Level | Values | Purpose |
 |-------|--------|---------|
 | `{environment}` | `local`, `staging`, `prod` | Environment isolation; same paths across envs |
-| `{category}` | `databases`, `services`, `infra` | Top-level grouping; maps to Vault policy templates |
+| `{category}` | `databases`, `services`, `infra` | Top-level grouping; maps to policy templates |
 | `{service-or-component}` | `auth`, `product`, `pgdog-cnpg`, `rustfs` | Specific service or infra component |
 | `{resource}` | `credentials`, `jwt-signing-key`, `api-keys`, `backup-credentials` | Type of secret |
 
 This convention enables:
 
-- **Granular Vault policies** per category (e.g., `secret/data/+/databases/*`)
+- **Granular policies** per category (e.g., `secret/data/+/databases/*`)
 - **Multi-environment** with the same paths (just swap `local` for `prod`)
 - **Scalable onboarding** -- new services follow the same pattern
 - **Self-documenting** -- the path tells you what, where, and why
 
-## Secret Paths (Vault)
+## Secret Paths
 
-All secrets are stored in Vault's KV v2 secrets engine under the `secret/` path.
+All secrets are stored in OpenBAO's KV v2 secrets engine under the `secret/` path.
 
 ### Database Credentials
 
-| Vault Path | Description | Consumer |
-|------------|-------------|----------|
+| Path | Description | Consumer |
+|------|-------------|----------|
 | `secret/local/databases/product/credentials` | Product DB credentials | product service |
 | `secret/local/databases/cart/credentials` | Cart DB credentials (cnpg-db) | cart service |
 | `secret/local/databases/order/credentials` | Order DB credentials (cnpg-db) | order service |
@@ -112,25 +114,25 @@ All secrets are stored in Vault's KV v2 secrets engine under the `secret/` path.
 
 ### Infrastructure Credentials
 
-| Vault Path | Description | Consumer |
-|------------|-------------|----------|
-| `secret/local/infra/rustfs/backup-zalando` | RustFS S3 credentials (bucket: pg-backups-zalando, currently rustfsadmin) | Zalando clusters (auth-db, supporting-shared-db) |
-| `secret/local/infra/rustfs/backup-cnpg` | RustFS S3 credentials (bucket: pg-backups-cnpg, currently rustfsadmin) | CNPG clusters (cnpg-db, cnpg-db-replica) |
+| Path | Description | Consumer |
+|------|-------------|----------|
+| `secret/local/infra/rustfs/backup-zalando` | RustFS S3 credentials (bucket: pg-backups-zalando) | Zalando clusters (auth-db, supporting-shared-db) |
+| `secret/local/infra/rustfs/backup-cnpg` | RustFS S3 credentials (bucket: pg-backups-cnpg) | CNPG clusters (cnpg-db, cnpg-db-replica) |
 
 **Keys**: `access_key_id`, `secret_access_key`
 
 ### Pooler Credentials
 
-| Vault Path | Description | Consumer |
-|------------|-------------|----------|
+| Path | Description | Consumer |
+|------|-------------|----------|
 | `secret/local/databases/pgdog-cnpg/credentials` | PgDog (cnpg-db) credentials | pgdog-cnpg pooler |
 
 **Keys (pgdog)**: `username`, `password`
 
 ### Future App Secrets (Ready for Onboarding)
 
-| Vault Path | Use Case |
-|------------|----------|
+| Path | Use Case |
+|------|----------|
 | `secret/local/services/auth/jwt-signing-key` | JWT signing key for auth service |
 | `secret/local/services/notification/smtp-credentials` | Email provider credentials |
 | `secret/local/services/product/stripe-api-key` | Payment integration |
@@ -143,7 +145,7 @@ All secrets are stored in Vault's KV v2 secrets engine under the `secret/` path.
 
 ### Naming Convention
 
-ESO-managed secrets use the **same name** as the original secret they replace (e.g., `cnpg-db-secret`). The `managed-by: external-secrets` label identifies Vault-backed secrets. No `-vault` suffix is used.
+ESO-managed secrets use the **same name** as the original secret they replace (e.g., `cnpg-db-secret`). The `managed-by: external-secrets` label identifies OpenBAO-backed secrets. No `-vault` suffix is used.
 
 ### Database Secrets (ExternalSecret per cluster)
 
@@ -171,6 +173,8 @@ metadata:
     # or
     platform.duynhlab/backup: "walg"   # For Zalando/WAL-G clusters
 ```
+
+**ResourceSet namespaces**: Microservice namespaces are also created by Flux **ResourceSet** templates under [`kubernetes/apps/domains/`](kubernetes/apps/domains/). If the `Namespace` resource there omits `platform.duynhlab/backup`, app reconciliation can overwrite metadata and **drop** the label from `controllers/namespaces.yaml`, so ClusterExternalSecret **stops** matching and `pg-backup-rustfs-credentials` is not created. Keep the label in the ResourceSet `Namespace` block (identity: fixed `walg`; catalog/checkout/comms: optional `platform_backup_label` in the ResourceSetInputProvider for `cnpg` where needed).
 
 ### Pooler Secrets
 
@@ -206,66 +210,15 @@ kubectl get clustersecretstore
 
 ---
 
-## Migration Guide
-
-### Current State
-
-All database and backup secrets are Vault-backed via ESO. Secrets use the same name as the resource they serve (no `-vault` suffix).
-
-### Switching an Application to Vault-backed Secrets
-
-#### Step 1: Verify ExternalSecret is Synced
-
-```bash
-kubectl get externalsecret -n <namespace>
-kubectl get secret <secret-name> -n <namespace> -o yaml
-```
-
-#### Step 2: Update Application Reference
-
-For `secretKeyRef`:
-
-```yaml
-# Before
-env:
-  - name: DB_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: cnpg-db-secret
-        key: password
-
-# After (ExternalSecret creates the same secret name, no suffix needed)
-env:
-  - name: DB_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: cnpg-db-secret  # Vault-backed via ExternalSecret
-        key: password
-```
-
-#### Step 3: Test and Deploy
-
-```bash
-flux reconcile kustomization apps-local --with-source
-
-kubectl describe pod <pod-name> -n <namespace> | grep -A5 "Environment"
-```
-
-#### Step 4: (Optional) Remove Original Secret
-
-After confirming Vault-backed secrets work, remove the plaintext secret from Git.
-
----
-
 ## Operations Guide
 
 ### Adding a New Secret
 
-1. **Add to Vault bootstrap script** (`vault-bootstrap/configmap.yaml`):
+1. **Add to OpenBAO bootstrap script** (`openbao-bootstrap/configmap.yaml`):
 
 ```bash
 # Follow path convention: secret/{env}/{category}/{service}/{resource}
-vault kv put secret/local/services/my-service/credentials key1="value1" key2="value2"
+bao kv put secret/local/services/my-service/credentials key1="value1" key2="value2"
 ```
 
 2. **Create ExternalSecret** (for namespace-specific secrets):
@@ -279,7 +232,7 @@ metadata:
 spec:
   refreshInterval: 1h
   secretStoreRef:
-    name: vault-dev
+    name: openbao
     kind: ClusterSecretStore
   target:
     name: <secret-name>
@@ -289,7 +242,7 @@ spec:
     - secretKey: <k8s-key>
       remoteRef:
         key: secret/data/local/<category>/<service>/<resource>
-        property: <vault-key>
+        property: <openbao-key>
 ```
 
 3. **Or use ClusterExternalSecret** (for secrets shared across namespaces):
@@ -307,7 +260,7 @@ spec:
   externalSecretSpec:
     refreshInterval: 1h
     secretStoreRef:
-      name: vault-dev
+      name: openbao
       kind: ClusterSecretStore
     target:
       name: <secret-name>
@@ -315,20 +268,20 @@ spec:
       - secretKey: <k8s-key>
         remoteRef:
           key: secret/data/local/<category>/<component>/<resource>
-          property: <vault-key>
+          property: <openbao-key>
 ```
 
 4. **Deploy**: `make flux-push && make flux-sync`
 
 ### Rotating a Secret
 
-1. **Update in Vault**:
+1. **Update in OpenBAO**:
 
 ```bash
-kubectl port-forward svc/vault -n vault 8200:8200
-export VAULT_ADDR=http://localhost:8200
-export VAULT_TOKEN=root
-vault kv put secret/local/<category>/<service>/<resource> key="new-value"
+kubectl port-forward svc/openbao -n openbao 8200:8200
+export BAO_ADDR=http://localhost:8200
+export BAO_TOKEN=$(kubectl get secret openbao-init-keys -n openbao -o jsonpath='{.data.root_token}' | base64 -d)
+bao kv put secret/local/<category>/<service>/<resource> key="new-value"
 ```
 
 2. **Wait for ESO sync** (default: 1 hour) or force refresh:
@@ -350,18 +303,31 @@ kubectl rollout restart deployment/<name> -n <namespace>
 ```bash
 kubectl get externalsecret -n <namespace> -o yaml
 kubectl describe externalsecret <name> -n <namespace>
-kubectl get clustersecretstore vault-dev
+kubectl get clustersecretstore openbao
 ```
 
-#### Vault Authentication Failing
+#### OpenBAO Authentication Failing
 
 ```bash
-kubectl logs job/vault-bootstrap -n vault
-kubectl port-forward svc/vault -n vault 8200:8200
-export VAULT_ADDR=http://localhost:8200
-export VAULT_TOKEN=root
-vault auth list
-vault read auth/kubernetes/config
+kubectl logs job/openbao-bootstrap -n openbao
+kubectl port-forward svc/openbao -n openbao 8200:8200
+export BAO_ADDR=http://localhost:8200
+export BAO_TOKEN=$(kubectl get secret openbao-init-keys -n openbao -o jsonpath='{.data.root_token}' | base64 -d)
+bao auth list
+bao read auth/kubernetes/config
+```
+
+#### OpenBAO Sealed After Restart
+
+```bash
+# Check seal status
+kubectl exec openbao-0 -n openbao -- bao status
+
+# Get unseal key and unseal all nodes
+UNSEAL_KEY=$(kubectl get secret openbao-init-keys -n openbao -o jsonpath='{.data.unseal_key}' | base64 -d)
+for i in 0 1 2; do
+  kubectl exec openbao-$i -n openbao -- bao operator unseal "$UNSEAL_KEY"
+done
 ```
 
 ---
@@ -372,9 +338,9 @@ vault read auth/kubernetes/config
 
 | File | Purpose |
 |------|---------|
-| `kubernetes/infra/controllers/secrets/vault/helmrelease.yaml` | Vault HelmRelease |
-| `kubernetes/infra/controllers/secrets/external-secrets/helmrelease.yaml` | ESO HelmRelease (v2.0.0) |
-| `kubernetes/infra/configs/secrets/vault-bootstrap/` | Vault bootstrap (Job, ConfigMap, SA) |
+| `kubernetes/infra/controllers/secrets/openbao/helmrelease.yaml` | OpenBAO HelmRelease (HA Raft) |
+| `kubernetes/infra/controllers/secrets/external-secrets/helmrelease.yaml` | ESO HelmRelease (v2.1.0) |
+| `kubernetes/infra/configs/secrets/openbao-bootstrap/` | OpenBAO bootstrap (Job, ConfigMap, SA, RBAC) |
 | `kubernetes/infra/configs/secrets/cluster-secret-store.yaml` | ClusterSecretStore |
 | `kubernetes/infra/configs/secrets/cluster-external-secrets/` | ClusterExternalSecret definitions |
 | `kubernetes/infra/configs/databases/clusters/*/secrets/` | Per-cluster ExternalSecret definitions |
@@ -384,7 +350,7 @@ vault read auth/kubernetes/config
 
 | File | Purpose |
 |------|---------|
-| `kubernetes/clusters/local/sources/helm/hashicorp.yaml` | HashiCorp Helm repo |
+| `kubernetes/clusters/local/sources/helm/openbao.yaml` | OpenBAO Helm repo |
 | `kubernetes/clusters/local/sources/helm/external-secrets.yaml` | ESO Helm repo |
 
 ---
@@ -397,7 +363,7 @@ vault read auth/kubernetes/config
 
 **Current State**: Inline passwords in HelmRelease/ConfigMap (dev-only, documented).
 
-**Vault Secrets Available**:
+**OpenBAO Secrets Available**:
 - `pgdog-cnpg-credentials` (product namespace)
 
 **Future Solutions**:
@@ -405,67 +371,26 @@ vault read auth/kubernetes/config
 2. Implement initContainer-based config rendering
 3. Switch to pooler that supports secrets (CNPG built-in PgBouncer)
 
-### Dev Mode Vault
-
-**Issue**: Vault dev mode loses all data on restart.
-
-**Mitigation**: Idempotent bootstrap Job re-seeds secrets on every restart.
-
-**Production**: Use persistent Vault with auto-unseal and HA (see [Production Readiness Roadmap](#production-readiness-roadmap)).
-
 ---
 
-## Production Readiness Roadmap
+## Production Roadmap
 
-Reference patterns from large-scale companies (Uber: 150K secrets/5K+ microservices, Spotify: 4K+ microservices).
+### Phase 1: Dynamic Database Secrets
 
-### Phase 1: Vault Persistence (Standalone Mode)
+Use OpenBAO's database secrets engine to generate short-lived PostgreSQL credentials on demand (eliminates static passwords entirely).
 
-Switch from dev mode to persistent Vault with Raft integrated storage:
+### Phase 2: Auto-Unseal (EKS/GKE)
 
-```yaml
-server:
-  dev:
-    enabled: false
-  standalone:
-    enabled: true
-  dataStorage:
-    enabled: true
-    size: 10Gi
-```
+Replace Shamir with cloud KMS for automatic unseal:
+- AWS KMS for EKS
+- GCP Cloud KMS for GKE
 
-### Phase 2: Auto-Unseal
+### Phase 3: Advanced Patterns
 
-Configure cloud KMS for automatic unseal (eliminates manual key management):
-
-- AWS KMS
-- GCP Cloud KMS
-- Azure Key Vault
-
-### Phase 3: HA with Raft
-
-Deploy 3-5 Vault nodes with integrated Raft storage for high availability:
-
-```yaml
-server:
-  ha:
-    enabled: true
-    raft:
-      enabled: true
-      config: |
-        storage "raft" { ... }
-```
-
-### Phase 4: Dynamic Secrets
-
-Use Vault's database secrets engine to generate short-lived credentials on demand (eliminates static passwords entirely). This is the approach used by Spotify and other large-scale platforms.
-
-### Phase 5: Advanced Patterns
-
-- **PushSecret**: Push operator-generated secrets back to Vault for centralized visibility
+- **PushSecret**: Push operator-generated secrets back to OpenBAO for centralized visibility
 - **Secret scanning**: Pre-commit hooks (`gitleaks`, `trufflehog`) in CI pipeline
 - **Namespace-scoped SecretStore**: Replace ClusterSecretStore with per-namespace SecretStore for team isolation
-- **Audit logging**: Enable Vault audit device for compliance
+- **OIDC Auth + Identity Groups**: Dev/data team access patterns with 90-day rotation
 
 ---
 
@@ -473,26 +398,25 @@ Use Vault's database secrets engine to generate short-lived credentials on deman
 
 ### Local/Dev Environment
 
-- Vault runs in dev mode with `root` token
-- Secrets are seeded from bootstrap script (values in Git)
-- Appropriate for development/testing only
+- OpenBAO runs in HA mode with Shamir seal (1 share, stored in K8s Secret)
+- Secrets are seeded from bootstrap script (values in Git for local dev)
+- Unseal key in `openbao-init-keys` Secret — for Kind only
 
 ### Production Recommendations
 
-1. Use persistent Vault with proper storage backend
-2. Enable auto-unseal (AWS KMS, Azure Key Vault, GCP KMS)
-3. Implement HA with Raft or Consul storage
-4. Enable audit logging
-5. Use AppRole or Kubernetes auth with limited policies
-6. Rotate secrets regularly
-7. Remove plaintext secrets from Git after migration
+1. Use auto-unseal (AWS KMS, GCP KMS) — never store unseal keys in K8s
+2. Enable TLS via cert-manager
+3. Restrict root token access; use AppRole or Kubernetes auth
+4. Enable audit logging to SIEM
+5. Rotate secrets regularly (90-day policy for service credentials)
+6. Remove plaintext secrets from Git after migration
 
 ---
 
 ## Related Documentation
 
-- [Vault Architecture & Bootstrap](./vault.md)
+- [OpenBAO Architecture & Operations](./openbao.md)
+- [OpenBAO Production Plan](./openbao-production-plan.md)
 - [Secrets Backlog (P1/P2)](./backlog.md) - Detailed specs for pending improvements
 - [External Secrets Operator Docs](https://external-secrets.io/)
-- [HashiCorp Vault Docs](https://developer.hashicorp.com/vault/docs)
-- [Vault Kubernetes Auth](https://developer.hashicorp.com/vault/docs/auth/kubernetes)
+- [OpenBAO Docs](https://openbao.org/docs/)

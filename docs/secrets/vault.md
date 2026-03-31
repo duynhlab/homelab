@@ -1,5 +1,9 @@
 
-# Vault Architecture & Bootstrap Guide
+# Vault Architecture & Bootstrap Guide (Archived)
+
+> **DEPRECATED**: HashiCorp Vault (dev mode) has been replaced by **OpenBAO (HA Raft)**. See [OpenBAO Architecture & Operations](./openbao.md) and [Secrets Management](./secrets-management.md) for current documentation.
+>
+> This file is retained as historical reference for the original Vault dev mode setup.
 
 > **Scope**: Understanding the ephemeral nature of Vault Dev Mode and the role of the Bootstrap Job.
 

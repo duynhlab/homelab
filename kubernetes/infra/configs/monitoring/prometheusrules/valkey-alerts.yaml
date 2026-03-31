@@ -1,0 +1,112 @@
+# PrometheusRule for Valkey/Redis alerts (USE Method: Cache).
+# Monitors availability, memory saturation, evictions, cache effectiveness, and connections.
+#
+# Metrics source: redis_exporter (redis_*) scraped via Valkey Helm chart ServiceMonitor.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: valkey-alerts
+  namespace: monitoring
+spec:
+  groups:
+    # --- Availability ---
+    - name: valkey-availability
+      interval: 1m
+      rules:
+        - alert: ValkeyDown
+          expr: redis_up == 0
+          for: 1m
+          labels:
+            severity: critical
+            category: availability
+          annotations:
+            summary: "Valkey instance down ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Valkey instance {{ $labels.instance }} has been unreachable for more than 1 minute."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#valkeydown"
+
+    # --- Memory Saturation (USE: Saturation) ---
+    - name: valkey-memory
+      interval: 1m
+      rules:
+        - alert: ValkeyMemorySaturation
+          expr: |
+            redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+            and redis_memory_max_bytes > 0
+          for: 5m
+          labels:
+            severity: warning
+            category: saturation
+          annotations:
+            summary: "Valkey memory saturation ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Valkey is using {{ $value | humanizePercentage }} of maxmemory. Evictions may start soon."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#valkeymemory saturation"
+
+        - alert: ValkeyMemorySaturationCritical
+          expr: |
+            redis_memory_used_bytes / redis_memory_max_bytes > 0.95
+            and redis_memory_max_bytes > 0
+          for: 2m
+          labels:
+            severity: critical
+            category: saturation
+          annotations:
+            summary: "Valkey memory critical ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Valkey is using {{ $value | humanizePercentage }} of maxmemory. Evictions are likely active."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#valkeymemory saturationcritical"
+
+        - alert: ValkeyHighEvictionRate
+          expr: |
+            rate(redis_evicted_keys_total[5m]) > 100
+          for: 10m
+          labels:
+            severity: warning
+            category: saturation
+          annotations:
+            summary: "High Valkey eviction rate ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Valkey is evicting {{ $value | humanize }} keys/sec. Cache is under memory pressure; consider increasing maxmemory or reviewing key TTLs."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#valkeyhighevictionrate"
+
+    # --- Cache Effectiveness (RED: Errors) ---
+    - name: valkey-effectiveness
+      interval: 1m
+      rules:
+        - alert: ValkeyHighMissRatio
+          expr: |
+            rate(redis_keyspace_misses_total[5m])
+            / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))
+            > 0.5
+          for: 10m
+          labels:
+            severity: warning
+            category: errors
+          annotations:
+            summary: "High Valkey cache miss ratio ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Valkey cache miss ratio is {{ $value | humanizePercentage }}. More than half of requests are cache misses. Check cache warming, key TTLs, and access patterns."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#valkeyhighmissratio"
+
+    # --- Connection Saturation (USE: Saturation) ---
+    - name: valkey-connections
+      interval: 1m
+      rules:
+        - alert: ValkeyHighClientConnections
+          expr: redis_connected_clients > 100
+          for: 5m
+          labels:
+            severity: warning
+            category: saturation
+          annotations:
+            summary: "High Valkey client connections ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Valkey has {{ $value | humanize }} connected clients (threshold: 100). Check for connection leaks in application code."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#valkeyhighclientconnections"
+
+        - alert: ValkeyRejectedConnections
+          expr: |
+            increase(redis_rejected_connections_total[5m]) > 0
+          for: 0m
+          labels:
+            severity: critical
+            category: errors
+          annotations:
+            summary: "Valkey rejecting connections ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Valkey has rejected {{ $value | humanize }} connections in the last 5 minutes. Max client limit reached."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#valkeyrejectedconnections"

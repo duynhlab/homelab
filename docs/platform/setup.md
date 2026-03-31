@@ -111,7 +111,7 @@ make flux-push
 
 - The Flux Operator reconciles resources in the following dependency order:
   - **Phase 1: Foundation** - Namespaces and Operators (Controllers).
-  - **Phase 2: Security & Monitoring** - Vault/ESO, Grafana/Prometheus.
+  - **Phase 2: Security & Monitoring** - OpenBAO/ESO, Grafana/Prometheus.
   - **Phase 3: Data Layer** - PostgreSQL Clusters.
   - **Phase 4: Applications** - Microservices (managed via ResourceSet).
   - **Phase 5: Reliability** - SLO tracking via Sloth.
@@ -235,7 +235,7 @@ monitoring/
 
 **Dependency Graph:**
 1. `controllers-local`: Provisions namespaces and core operators.
-2. `secrets-local`: Deploys Vault/ESO (Depends on `controllers-local`).
+2. `secrets-local`: Deploys OpenBAO/ESO (Depends on `controllers-local`).
 3. `monitoring-local`: Deploys observability stack (Depends on `controllers-local`).
 4. `databases-local`: Provisions persistence layer (Depends on `secrets-local`, `monitoring-local`).
 5. `apps-local`: Deploys business logic (Depends on `databases-local`, `monitoring-local`).

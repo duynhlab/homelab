@@ -200,7 +200,7 @@ kubectl logs -n $NAMESPACE $POD_NAME --previous --tail=50
 
 **Resolution**:
 1. If OOMKilled: increase memory limits in HelmRelease values, check Pyroscope for memory leaks
-2. If startup crash: fix application config, check Vault secrets
+2. If startup crash: fix application config, check OpenBAO secrets
 3. If liveness probe: increase `initialDelaySeconds` or probe timeout
 
 ---

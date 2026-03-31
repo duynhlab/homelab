@@ -1,0 +1,103 @@
+# PrometheusRule for Kubernetes workload alerts (USE Method: Workloads).
+# Monitors deployment/statefulset replica mismatches, failed jobs, HPA saturation, and PVC usage.
+#
+# Metrics source: kube-state-metrics (kube_*) and kubelet (kubelet_volume_stats_*).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kubernetes-workload-alerts
+  namespace: monitoring
+spec:
+  groups:
+    # --- Workload Health ---
+    - name: kubernetes-workload-health
+      interval: 1m
+      rules:
+        - alert: KubeDeploymentReplicasMismatch
+          expr: |
+            kube_deployment_spec_replicas
+            != kube_deployment_status_ready_replicas
+          for: 15m
+          labels:
+            severity: warning
+            category: workloads
+          annotations:
+            summary: "Deployment replicas mismatch ({{ $labels.namespace }}/{{ $labels.deployment }})"
+            description: "Deployment {{ $labels.deployment }} in {{ $labels.namespace }} has {{ $value }} unavailable replicas for more than 15 minutes. Check pod events and resource constraints."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubedeploymentreplicasmismatch"
+
+        - alert: KubeStatefulSetReplicasMismatch
+          expr: |
+            kube_statefulset_status_replicas_ready
+            != kube_statefulset_status_replicas
+          for: 15m
+          labels:
+            severity: warning
+            category: workloads
+          annotations:
+            summary: "StatefulSet replicas mismatch ({{ $labels.namespace }}/{{ $labels.statefulset }})"
+            description: "StatefulSet {{ $labels.statefulset }} in {{ $labels.namespace }} has not reached desired replica count for more than 15 minutes."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubestatefulsetreplicasmismatch"
+
+        - alert: KubeJobFailed
+          expr: |
+            kube_job_status_failed > 0
+          for: 5m
+          labels:
+            severity: warning
+            category: workloads
+          annotations:
+            summary: "Job failed ({{ $labels.namespace }}/{{ $labels.job_name }})"
+            description: "Job {{ $labels.job_name }} in {{ $labels.namespace }} has failed. Check job logs: kubectl logs -n {{ $labels.namespace }} job/{{ $labels.job_name }}"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubejobfailed"
+
+    # --- Autoscaling Saturation ---
+    - name: kubernetes-autoscaling
+      interval: 1m
+      rules:
+        - alert: KubeHPAMaxedOut
+          expr: |
+            kube_horizontalpodautoscaler_status_current_replicas
+            == kube_horizontalpodautoscaler_spec_max_replicas
+          for: 15m
+          labels:
+            severity: warning
+            category: saturation
+          annotations:
+            summary: "HPA at max replicas ({{ $labels.namespace }}/{{ $labels.horizontalpodautoscaler }})"
+            description: "HPA {{ $labels.horizontalpodautoscaler }} in {{ $labels.namespace }} is running at maximum replicas ({{ $value }}). Service may not be able to handle additional load."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubehpamaxedout"
+
+    # --- Storage (USE: Utilization) ---
+    - name: kubernetes-storage
+      interval: 1m
+      rules:
+        - alert: KubePersistentVolumeFillingUp
+          expr: |
+            kubelet_volume_stats_available_bytes
+            / kubelet_volume_stats_capacity_bytes
+            < 0.15
+            and kubelet_volume_stats_capacity_bytes > 0
+          for: 10m
+          labels:
+            severity: warning
+            category: storage
+          annotations:
+            summary: "PVC filling up ({{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }})"
+            description: "PVC {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} has less than 15% free space ({{ $value | humanizePercentage }} remaining)."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubepersistentvolume fillingup"
+
+        - alert: KubePersistentVolumeFillingUpCritical
+          expr: |
+            kubelet_volume_stats_available_bytes
+            / kubelet_volume_stats_capacity_bytes
+            < 0.05
+            and kubelet_volume_stats_capacity_bytes > 0
+          for: 5m
+          labels:
+            severity: critical
+            category: storage
+          annotations:
+            summary: "PVC critically full ({{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }})"
+            description: "PVC {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} has less than 5% free space. Immediate action required to prevent data loss."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubepersistentvolumefillingupcritical"

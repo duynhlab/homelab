@@ -11,6 +11,7 @@ spec:
   defaultValues:
     name: order
     namespace: order
+    platform_backup_label: "cnpg"
     replicaCount: 2
     db_host: "pgdog-cnpg.product.svc.cluster.local"
     db_port: "6432"

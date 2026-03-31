@@ -77,17 +77,17 @@ spec:
       kind: HelmRelease
       name: sloth
       namespace: monitoring
-    # Secrets management (Vault + ESO)
+    # Secrets management (OpenBAO HA + ESO)
     - apiVersion: v1
       kind: Namespace
-      name: vault
+      name: openbao
     - apiVersion: v1
       kind: Namespace
       name: external-secrets-system
     - apiVersion: helm.toolkit.fluxcd.io/v2
       kind: HelmRelease
-      name: vault
-      namespace: vault
+      name: openbao
+      namespace: openbao
     - apiVersion: helm.toolkit.fluxcd.io/v2
       kind: HelmRelease
       name: external-secrets

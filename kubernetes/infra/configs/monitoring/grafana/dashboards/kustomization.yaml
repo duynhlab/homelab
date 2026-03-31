@@ -42,6 +42,9 @@ configMapGenerator:
   - name: grafana-dashboard-cloudnative-pg
     files:
       - cloudnative-pg-cluster.json
+  - name: grafana-dashboard-kubernetes-cluster-overview
+    files:
+      - kubernetes-cluster-overview.json
 
 resources:
   - grafana-dashboard-main.yaml
@@ -61,3 +64,4 @@ resources:
   - grafana-dashboard-redis.yaml
   - grafana-dashboard-pg-exporter-instance.yaml
   - grafana-dashboard-pg-exporter-self.yaml
+  - grafana-dashboard-kubernetes-cluster-overview.yaml

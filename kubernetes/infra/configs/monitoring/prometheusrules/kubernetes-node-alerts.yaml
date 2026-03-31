@@ -1,0 +1,76 @@
+# PrometheusRule for Kubernetes node alerts (USE Method: Nodes).
+# Monitors node readiness, memory/disk/PID pressure, and scheduling status.
+#
+# Metrics source: kube-state-metrics (kube_node_*).
+# Note: In Kind, nodes are Docker containers. These alerts establish production patterns
+# and will work correctly with real nodes.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kubernetes-node-alerts
+  namespace: monitoring
+spec:
+  groups:
+    # --- Node Health ---
+    - name: kubernetes-node-health
+      interval: 1m
+      rules:
+        - alert: KubeNodeNotReady
+          expr: |
+            kube_node_status_condition{condition="Ready", status="true"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            category: nodes
+          annotations:
+            summary: "Node not ready ({{ $labels.node }})"
+            description: "Node {{ $labels.node }} has been in a NotReady state for more than 5 minutes. Check kubelet logs and node conditions."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubenodenotready"
+
+        - alert: KubeNodeMemoryPressure
+          expr: |
+            kube_node_status_condition{condition="MemoryPressure", status="true"} == 1
+          for: 5m
+          labels:
+            severity: warning
+            category: nodes
+          annotations:
+            summary: "Node memory pressure ({{ $labels.node }})"
+            description: "Node {{ $labels.node }} is under memory pressure. Kubelet may start evicting pods."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubenodememory pressure"
+
+        - alert: KubeNodeDiskPressure
+          expr: |
+            kube_node_status_condition{condition="DiskPressure", status="true"} == 1
+          for: 5m
+          labels:
+            severity: warning
+            category: nodes
+          annotations:
+            summary: "Node disk pressure ({{ $labels.node }})"
+            description: "Node {{ $labels.node }} is under disk pressure. Kubelet may start evicting pods and garbage-collecting images."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubenodediskpressure"
+
+        - alert: KubeNodePIDPressure
+          expr: |
+            kube_node_status_condition{condition="PIDPressure", status="true"} == 1
+          for: 5m
+          labels:
+            severity: warning
+            category: nodes
+          annotations:
+            summary: "Node PID pressure ({{ $labels.node }})"
+            description: "Node {{ $labels.node }} is running low on available PIDs. Check for runaway process creation."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubenodepidpressure"
+
+        - alert: KubeNodeUnschedulable
+          expr: |
+            kube_node_spec_unschedulable == 1
+          for: 5m
+          labels:
+            severity: warning
+            category: nodes
+          annotations:
+            summary: "Node cordoned ({{ $labels.node }})"
+            description: "Node {{ $labels.node }} has been cordoned (unschedulable) for more than 5 minutes. No new pods will be scheduled on this node."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubenodeunschedulable"

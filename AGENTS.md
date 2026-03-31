@@ -206,7 +206,7 @@ flowchart TD
 - **GitOps**: Flux Operator, Kustomize, OCI Registry
 - **Deployment**: Kubernetes (Kind), Helm 3
 - **Monitoring**: Prometheus, Grafana, Tempo, Loki, Pyroscope, Jaeger
-- **Secrets**: HashiCorp Vault (dev mode) + External Secrets Operator (ESO)
+- **Secrets**: OpenBAO (HA Raft, 3-node) + External Secrets Operator (ESO)
   - Centralized secret management with Kubernetes sync
   - **Secrets Documentation**: [`docs/secrets/secrets-management.md`](docs/secrets/secrets-management.md)
 
@@ -360,11 +360,11 @@ make flux-sync
 
 **Add/modify secrets:**
 
-- Vault bootstrap: `kubernetes/infra/configs/secrets/vault-bootstrap/configmap.yaml` (add `vault kv put` command)
+- OpenBAO bootstrap: `kubernetes/infra/configs/secrets/openbao-bootstrap/configmap.yaml` (add `bao kv put` command)
 - ClusterExternalSecret (shared): `kubernetes/infra/configs/secrets/cluster-external-secrets/{name}.yaml`
 - ExternalSecret (per-cluster): `kubernetes/infra/configs/databases/clusters/{cluster}/secrets/{name}.yaml`
 - ClusterSecretStore: `kubernetes/infra/configs/secrets/cluster-secret-store.yaml`
-- Vault HelmRelease: `kubernetes/infra/controllers/secrets/vault/helmrelease.yaml`
+- OpenBAO HelmRelease: `kubernetes/infra/controllers/secrets/openbao/helmrelease.yaml`
 - ESO HelmRelease: `kubernetes/infra/controllers/secrets/external-secrets/helmrelease.yaml`
 
 ### Find Documentation by Topic
@@ -374,7 +374,7 @@ make flux-sync
 - **Monitoring**: [`docs/observability/metrics/README.md`](docs/observability/metrics/README.md), [`docs/observability/metrics/postgresql/monitoring.md`](docs/observability/metrics/postgresql/monitoring.md) (PostgreSQL exporters, VMAgent/VMSingle, alerts)
 - **Observability**: [`docs/observability/README.md`](docs/observability/README.md), [`docs/observability/tracing/README.md`](docs/observability/tracing/README.md), [`docs/observability/logging/README.md`](docs/observability/logging/README.md), [`docs/observability/profiling/README.md`](docs/observability/profiling/README.md)
 - **SLO**: [`docs/observability/slo/README.md`](docs/observability/slo/README.md), [`docs/observability/slo/getting_started.md`](docs/observability/slo/getting_started.md)
-- **Secrets**: [`docs/secrets/secrets-management.md`](docs/secrets/secrets-management.md)
+- **Secrets**: [`docs/secrets/secrets-management.md`](docs/secrets/secrets-management.md), [`docs/secrets/openbao.md`](docs/secrets/openbao.md) (OpenBAO architecture + Flux/sealed runbook in §13)
 - **k6**: [`docs/testing/k6.md`](docs/testing/k6.md)
 - **Docs Index**: [`docs/README.md`](docs/README.md)
 

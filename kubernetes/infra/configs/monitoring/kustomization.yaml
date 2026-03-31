@@ -7,6 +7,7 @@ resources:
   - servicemonitors/microservices.yaml
   - servicemonitors/external-secrets.yaml
   - servicemonitors/tempo.yaml
+  - servicemonitors/kube-apiserver.yaml
   - grafana/
   # Note: CloudNativePG PodMonitors moved to configs/databases/monitoring/ to deploy AFTER database clusters
   - podmonitors/podmonitor-zalando-auth-db.yaml
@@ -20,3 +21,14 @@ resources:
   # Microservices application alerts (RED/Golden Signals)
   - prometheusrules/microservices-alerts.yaml
   - prometheusrules/microservices-recording-rules.yaml
+  # Kubernetes infrastructure alerts (USE Method)
+  - prometheusrules/kubernetes-pod-resources-alerts.yaml
+  - prometheusrules/kubernetes-workload-alerts.yaml
+  - prometheusrules/kubernetes-node-alerts.yaml
+  # Valkey/Redis alerts and recording rules (USE Method)
+  - prometheusrules/valkey-alerts.yaml
+  - prometheusrules/valkey-recording-rules.yaml
+  # Kubernetes API server alerts (Golden Signals: Control Plane)
+  - prometheusrules/kube-apiserver-alerts.yaml
+  # Kubernetes network recording rules and alerts (USE Method)
+  - prometheusrules/kubernetes-network-rules.yaml

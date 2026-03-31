@@ -83,8 +83,10 @@ docs/
 │       ├── postgres_backup_restore.md  # PostgreSQL backup/restore procedures
 │       └── loki_kubernetes_logs_debug.md  # Loki log debugging
 ├── secrets/                      # Secrets management documentation
-│   ├── secrets-management.md     # Vault + ESO guide
-│   └── vault.md                  # Vault configuration details
+│   ├── secrets-management.md     # OpenBAO + ESO guide
+│   ├── openbao.md                # OpenBAO architecture & operations
+│   ├── openbao-production-plan.md # OpenBAO production migration plan
+│   └── vault.md                  # Vault configuration details (archived)
 └── testing/                      # Testing documentation
     └── k6.md                     # k6 load testing guide
 ```
@@ -284,9 +286,11 @@ docs/
 
 ### Secrets
 
-- [Secrets Management](./secrets/secrets-management.md) - Vault + ESO guide for centralized secret management
-- [Vault](./secrets/vault.md) - Vault configuration details
-- [Backlog (P1/P2)](./secrets/backlog.md) - Pending improvements: bootstrap split, rotation, audit logging, PushSecret, HA templates
+- [Secrets Management](./secrets/secrets-management.md) - OpenBAO + ESO guide for centralized secret management
+- [OpenBAO](./secrets/openbao.md) - OpenBAO HA architecture & operations
+- [OpenBAO Production Plan](./secrets/openbao-production-plan.md) - Production migration plan (EKS/GKE)
+- [Vault (Archived)](./secrets/vault.md) - Legacy Vault dev mode docs (historical reference)
+- [Backlog (P1/P2)](./secrets/backlog.md) - Pending improvements: rotation, audit logging, PushSecret, dynamic secrets
 
 ### Testing
 
@@ -319,7 +323,7 @@ docs/
 - **Monitoring Stack** - VictoriaMetrics Operator (VMAgent, VMSingle, VMAlert, VMAlertmanager) + prometheus-operator-crds + Grafana Operator + metrics-server
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
 - **APM Stack** - Tempo + Jaeger (tracing), OTel Collector (fan-out), Pyroscope (profiling), Loki + VictoriaLogs + Vector (logging)
-- **Secrets Stack** - HashiCorp Vault (dev mode) + External Secrets Operator for centralized secret management
+- **Secrets Stack** - OpenBAO (HA Raft) + External Secrets Operator for centralized secret management
 - **k6 Load Testing** - Helm-managed load generators
 
 ### Common Tasks

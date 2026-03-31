@@ -9,7 +9,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 | [Infrastructure & GitOps](#infrastructure--gitops) | GitOps, Flux, Kustomize, CI/CD, image publishing | Partial |
 | [Observability](#observability-metrics-logs-traces-profiles) | Metrics (VM), traces, logs, profiling, Grafana, SLO | Partial |
 | [Data Platform & Persistence](#data-platform--persistence) | PostgreSQL (CNPG, Zalando), poolers, migrations, Valkey | Partial |
-| [Security & Secrets](#security--secrets) | Cosign, Vault/ESO, supply chain, hardening | Partial |
+| [Security & Secrets](#security--secrets) | Cosign, OpenBAO/ESO, supply chain, hardening | Partial |
 | [Certificate Management](#certificate-management) | cert-manager, TLS, ClusterIssuer | Planned |
 | [Application Services](#application-services) | Go microservices, frontend, lint, shared libs | Partial |
 | [Service Mesh & Traffic Management](#service-mesh--traffic-management) | Istio/Ambient, Linkerd, mTLS, traffic policy | Not started |
@@ -131,9 +131,9 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 
 - **Cosign image signing (backend)** — `.github/workflows/build-be.yml` (keyless signing)
 - Cosign signing for frontend, init, k6 images (parity with backend)
-- **External Secrets Operator + HashiCorp Vault** — `kubernetes/infra/controllers/secrets/`, `kubernetes/infra/configs/secrets/`
-  - Vault (dev mode) + ESO + ClusterSecretStore
-  - Shadow-first migration: DB credentials, backup credentials, pooler credentials
+- **External Secrets Operator + OpenBAO (HA Raft)** — `kubernetes/infra/controllers/secrets/`, `kubernetes/infra/configs/secrets/`
+  - OpenBAO 3-node HA + ESO + ClusterSecretStore (migrated from Vault dev mode)
+  - DB credentials, backup credentials, pooler credentials synced via ESO
   - Documentation: `docs/secrets/secrets-management.md`
 - SOPS or SealedSecrets for GitOps-safe secrets
 - Secret rotation automation (database credentials, scheduled via CronJob)

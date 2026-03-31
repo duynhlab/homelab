@@ -1,0 +1,35 @@
+# Recording rules for Valkey/Redis metrics (USE + RED pre-aggregation).
+# Provides efficient dashboard queries and consistent alert expressions.
+#
+# Metrics source: redis_exporter (redis_*) scraped via Valkey Helm chart ServiceMonitor.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: valkey-recording-rules
+  namespace: monitoring
+spec:
+  groups:
+    - name: valkey-recording-rules
+      interval: 1m
+      rules:
+        # USE: Utilization -- memory usage ratio
+        - record: valkey:memory:usage_ratio
+          expr: |
+            redis_memory_used_bytes / redis_memory_max_bytes
+            and redis_memory_max_bytes > 0
+
+        # RED: Rate -- total command throughput
+        - record: valkey:commands:rate5m
+          expr: |
+            sum by (instance, namespace) (rate(redis_commands_total[5m]))
+
+        # Cache effectiveness -- hit ratio (higher is better)
+        - record: valkey:keyspace:hit_ratio5m
+          expr: |
+            rate(redis_keyspace_hits_total[5m])
+            / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))
+
+        # USE: Saturation -- eviction rate
+        - record: valkey:evictions:rate5m
+          expr: |
+            rate(redis_evicted_keys_total[5m])

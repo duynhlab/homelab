@@ -20,7 +20,7 @@ Charts that set **CRD policies** on install/upgrade (e.g. `install.crds: Create`
 
 - Aligns with [HelmRelease install/upgrade remediation](https://fluxcd.io/flux/components/helm/helmreleases/#install-configuration) in Flux.
 - Reduces flakiness from transient API errors during reconciliation.
-- Matches existing releases that already used `remediation.retries: 3` (Vault, RustFS, External Secrets, PgDog).
+- Matches existing releases that already used `remediation.retries: 3` (OpenBAO, RustFS, External Secrets, PgDog).
 
 ## ResourceSet-generated apps
 

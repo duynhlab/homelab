@@ -72,9 +72,9 @@ flowchart TD
         direction LR
         valkey["⚡ Valkey Cache"]:::cache
         subgraph SecretsDev ["Secrets Management"]
-            vault["HashiCorp Vault"]:::secret
+            openbao["OpenBAO (HA Raft)"]:::secret
             eso["External Secrets Operator"]:::secret
-            vault -->|"Syncs via"| eso
+            openbao -->|"Syncs via"| eso
         end
     end
 

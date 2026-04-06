@@ -1,50 +1,37 @@
-# CI Pipeline Template — Hybrid Enterprise Gitflow
+# Build Template — Push-only workflow
 #
-# Branch behavior:
-#   pull_request -> dev/staging/main : checks only (test, lint, sonar) — no build
-#   push -> dev                      : build + scan + sign, image tagged sha-<short> + dev-<run>
-#   push -> staging                  : build + scan + sign, image tagged sha-<short> + rc-<sha>
-#   push -> main                     : build + scan + sign, image tagged sha-<short> + latest
-#   push tag v*                      : release pipeline — retag digest with vX.Y.Z, notify
+# Triggers on: push to dev/staging/main, tag v*
+# Purpose: build Docker images, scan, sign, notify
+#
+# This workflow only handles push events. By not mixing pull_request triggers,
+# GitHub status check names stay clean (no "(push)" suffix).
 #
 # Staging optional: services not using staging simply never push to that branch.
-# The CI template works identically whether staging exists or not.
+#
+# Placeholders to replace:
+#   {{SERVICE_NAME}}       — Docker image name (e.g. auth, cart, frontend)
+#   {{SLACK_CHANNEL_ID}}   — Slack channel for build notifications
+#   {{GSHEET_SPREADSHEET}} — Google Sheet ID for status tracking (optional)
 #
 # See docs/platform/gitflow.md for the full branching & release standard.
 
-name: CI Pipeline
+name: Build
 
 on:
   push:
     branches: [dev, staging, main]
     tags: ['v*']
-  pull_request:
-    branches: [dev, staging, main]
 
 permissions:
   contents: read
   packages: write
-  pull-requests: read
   id-token: write
   actions: read
   security-events: write
 
 jobs:
   # ──────────────────────────────────────────────────
-  # 1. PR Checks (Branch Name + Slack "PR Opened")
-  # Runs on: pull_request only
-  # ──────────────────────────────────────────────────
-  pr-checks:
-    if: github.event_name == 'pull_request'
-    uses: duyhenryer/shared-workflows/.github/workflows/pr-checks.yml@main
-    with:
-      slack_channel_id: "C0AD82A9A74"
-    secrets:
-      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-
-  # ──────────────────────────────────────────────────
-  # 2. Test & Lint
-  # Runs on: all events (PR + push to any branch)
+  # 1. Test & Lint (gate before build)
   # Skipped on: tag pushes (code already tested on branch)
   # ──────────────────────────────────────────────────
   go-check:
@@ -56,8 +43,7 @@ jobs:
     secrets: inherit
 
   # ──────────────────────────────────────────────────
-  # 2b. Secret Detection (Gitleaks)
-  # Runs on: all events except tags (parallel with go-check)
+  # 1b. Secret Detection (Gitleaks)
   # ──────────────────────────────────────────────────
   gitleaks:
     if: "!startsWith(github.ref, 'refs/tags/')"
@@ -67,8 +53,7 @@ jobs:
       security-events: write
 
   # ──────────────────────────────────────────────────
-  # 3. SonarCloud Analysis
-  # Runs on: all events except tags
+  # 2. SonarCloud Analysis
   # ──────────────────────────────────────────────────
   sonar:
     needs: [go-check, gitleaks]
@@ -81,14 +66,12 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   # ──────────────────────────────────────────────────
-  # 4a. Build & Push (push to dev/staging/main only)
-  # NOT on: pull_request, tags
+  # 3a. Build & Push Docker Image
+  # NOT on: tags (no rebuild at release time)
   # ──────────────────────────────────────────────────
   docker-build:
     needs: [go-check, sonar]
-    if: >-
-      github.event_name == 'push' &&
-      !startsWith(github.ref, 'refs/tags/')
+    if: "!startsWith(github.ref, 'refs/tags/')"
     uses: duyhenryer/shared-workflows/.github/workflows/docker-build-go.yml@main
     with:
       image-name: '{{SERVICE_NAME}}'
@@ -100,8 +83,7 @@ jobs:
       actions: read
 
   # ──────────────────────────────────────────────────
-  # 4b. Trivy Vulnerability Scan
-  # Runs after: docker-build
+  # 3b. Trivy Vulnerability Scan
   # ──────────────────────────────────────────────────
   trivy-scan:
     needs: [docker-build]
@@ -118,7 +100,7 @@ jobs:
       security-events: write
 
   # ──────────────────────────────────────────────────
-  # 4c. Cosign Signing (only after scan passes)
+  # 3c. Cosign Signing (only after scan passes)
   # ──────────────────────────────────────────────────
   docker-sign:
     needs: [docker-build, trivy-scan]
@@ -133,13 +115,11 @@ jobs:
       id-token: write
 
   # ──────────────────────────────────────────────────
-  # 4d. Build Migration Image (push to dev/staging/main only)
+  # 3d. Build Migration Image (optional)
   # ──────────────────────────────────────────────────
   docker-db-init:
     needs: [go-check, sonar]
-    if: >-
-      github.event_name == 'push' &&
-      !startsWith(github.ref, 'refs/tags/')
+    if: "!startsWith(github.ref, 'refs/tags/')"
     uses: duyhenryer/shared-workflows/.github/workflows/docker-build-go.yml@main
     with:
       image-name: '{{SERVICE_NAME}}-init'
@@ -152,65 +132,16 @@ jobs:
       packages: write
       actions: read
 
-  ## ──────────────────────────────────────────────────────────────
-  ## OPTIONAL: Scan + Sign the migration image
-  ## Uncomment the two jobs below (and add them to notify.needs)
-  ## to apply the same Trivy scan + Cosign sign pipeline to db-init.
-  ## ──────────────────────────────────────────────────────────────
-  #
-  # trivy-scan-db-init:
-  #   needs: [docker-db-init]
-  #   uses: duyhenryer/shared-workflows/.github/workflows/trivy-scan.yml@main
-  #   with:
-  #     image-ref: ghcr.io/${{ github.repository }}/{{SERVICE_NAME}}-init@${{ needs.docker-db-init.outputs.digest }}
-  #     severity: 'CRITICAL,HIGH'
-  #     exit-code: '1'
-  #     ignore-unfixed: true
-  #   secrets: inherit
-  #   permissions:
-  #     contents: read
-  #     packages: read
-  #     security-events: write
-  #
-  # docker-sign-db-init:
-  #   needs: [docker-db-init, trivy-scan-db-init]
-  #   uses: duyhenryer/shared-workflows/.github/workflows/docker-sign.yml@main
-  #   with:
-  #     tags: ${{ needs.docker-db-init.outputs.tags }}
-  #     digest: ${{ needs.docker-db-init.outputs.digest }}
-  #   secrets: inherit
-  #   permissions:
-  #     contents: read
-  #     packages: write
-  #     id-token: write
-
   # ──────────────────────────────────────────────────
-  # 5. Tag Release (v* tags on main only)
-  # Promotes the existing digest — no rebuild.
-  # Add deployment steps or GitHub Release creation here.
-  # ──────────────────────────────────────────────────
-  # release:
-  #   if: startsWith(github.ref, 'refs/tags/v')
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v6
-  #     - name: Create GitHub Release
-  #       uses: softprops/action-gh-release@v2
-  #       with:
-  #         generate_release_notes: true
-
-  # ──────────────────────────────────────────────────
-  # 6. Final Status Notification
-  # Runs: always, regardless of branch or event type
+  # 4. Final Status Notification
   # ──────────────────────────────────────────────────
   notify:
     if: always()
-    needs: [pr-checks, go-check, gitleaks, sonar, docker-build, trivy-scan, docker-sign, docker-db-init]
+    needs: [go-check, gitleaks, sonar, docker-build, trivy-scan, docker-sign, docker-db-init]
     uses: duyhenryer/shared-workflows/.github/workflows/status.yml@main
     with:
-      slack_channel_id: "C0AD82A9A74"
-      slack_thread_ts: ${{ needs.pr-checks.outputs.slack_thread_ts }}
-      gsheet_spreadsheet_id: "1F2VUrAOyMGnETApp5yA-ldCW81ConiQXnWYZVxKas_0"
+      slack_channel_id: "{{SLACK_CHANNEL_ID}}"
+      gsheet_spreadsheet_id: "{{GSHEET_SPREADSHEET}}"
     secrets:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
       GSHEET_CLIENT_EMAIL: ${{ secrets.GSHEET_CLIENT_EMAIL }}

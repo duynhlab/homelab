@@ -14,7 +14,13 @@ This pipeline operates under the **Hybrid Enterprise Gitflow** model defined in 
 
 Image artifacts are **built once per commit** with an immutable `sha-<short>` tag. Promotion between environments reuses the same digest — no rebuild occurs at tag time. `latest` exists as a convenience alias but is never the sole deployment reference. See [`gitflow.md`](gitflow.md) for the full branching model, tagging policy, runbooks, and governance rules.
 
-**Branch enforcement** is managed via **GitHub Rulesets** (not legacy Branch Protection). Each service repo has 3 layered rulesets: Base Protection (all branches), Production Gate (`main` only), and Release Tags (`v*`). Required status checks (`go-check`, `sonar`) are configured in the Base Protection ruleset, ensuring CI must pass before any merge. See [`gitflow.md` section 7](gitflow.md#7-github-rulesets-branch-enforcement) for the full ruleset configuration, CODEOWNERS integration, and setup guide.
+**Branch enforcement** is managed via **GitHub Rulesets** (not legacy Branch Protection). Each service repo has 3 layered rulesets: Base Protection (all branches), Production Gate (`main` only), and Release Tags (`v*`). Required status checks (`Check / go-check / Test`, `Check / sonar / SonarCloud Analysis`) are configured in the Base Protection ruleset, ensuring CI must pass before any merge. See [`gitflow.md` section 7](gitflow.md#7-github-rulesets-branch-enforcement) for the full ruleset configuration, CODEOWNERS integration, and setup guide.
+
+**Workflow split**: Each service repo uses **two workflow files** instead of a single `ci.yml`:
+- **`check.yml`** (PR only) -- runs tests, lint, secret scanning, SonarCloud analysis
+- **`build.yml`** (push only) -- builds Docker images, scans, signs, notifies
+
+This split ensures GitHub does not append `(pull_request)` or `(push)` suffixes to status check names, making ruleset matching predictable. See [`ruleset-automation.md`](ruleset-automation.md) for details on how check names are constructed and enforced.
 
 ## Shared Workflows
 
@@ -39,39 +45,45 @@ This diagram illustrates the comprehensive end-to-end pipeline, showcasing the i
 
 ```mermaid
 flowchart TD
-    subgraph pr_push["All Events (PR + Push)"]
+    subgraph check_wf["check.yml — PR Only"]
         PR[pr-checks]
         GOCHECK[go-check]
         GITLEAKS["🔐 gitleaks"]
         SONAR[sonar]
+        NOTIFY_PR[notify]
     end
 
-    subgraph build_only["Push Only (dev/staging/main)"]
+    subgraph build_wf["build.yml — Push Only (dev/staging/main)"]
+        GOCHECK2[go-check]
+        GITLEAKS2["🔐 gitleaks"]
+        SONAR2[sonar]
         BUILD[docker-build]
         TRIVY[trivy-scan]
         SIGN[docker-sign]
         DBINIT[docker-db-init]
+        NOTIFY_BUILD[notify]
     end
-
-    NOTIFY[notify]
 
     GOCHECK --> SONAR
     GITLEAKS --> SONAR
-    SONAR --> BUILD
-    SONAR --> DBINIT
+    PR --> NOTIFY_PR
+    GOCHECK --> NOTIFY_PR
+    GITLEAKS --> NOTIFY_PR
+    SONAR --> NOTIFY_PR
+
+    GOCHECK2 --> SONAR2
+    GITLEAKS2 --> SONAR2
+    SONAR2 --> BUILD
+    SONAR2 --> DBINIT
     BUILD --> TRIVY
     TRIVY --> SIGN
-
-    PR --> NOTIFY
-    GOCHECK --> NOTIFY
-    GITLEAKS --> NOTIFY
-    SONAR --> NOTIFY
-    BUILD --> NOTIFY
-    TRIVY --> NOTIFY
-    SIGN --> NOTIFY
-    DBINIT --> NOTIFY
+    BUILD --> NOTIFY_BUILD
+    TRIVY --> NOTIFY_BUILD
+    SIGN --> NOTIFY_BUILD
+    DBINIT --> NOTIFY_BUILD
 
     style GITLEAKS fill:#22c55e,color:#fff,stroke:#16a34a,stroke-width:2px
+    style GITLEAKS2 fill:#22c55e,color:#fff,stroke:#16a34a,stroke-width:2px
 ```
 
 ### 2. Architecture Overview
@@ -304,8 +316,11 @@ sequenceDiagram
 > **Recommendation**: Use `act` to catch YAML syntax errors, job dependency issues, and shell script bugs. Always rely on GitHub Actions (real runtime) for production correctness.
 
 ```bash
-# Example: dry-run a PR workflow locally
-act pull_request -W .github/workflows/ci.yml --detect-event
+# Example: dry-run the PR check workflow locally
+act pull_request -W .github/workflows/check.yml --detect-event
+
+# Example: dry-run the build workflow locally
+act push -W .github/workflows/build.yml --detect-event
 ```
 
 ---
@@ -334,11 +349,16 @@ Each service repo explicitly chains three independent reusable workflows via `ne
 
 ```mermaid
 flowchart TD
-  Caller[Service CI - ci.yml] --> Build[docker-build-go.yml - Build and Push]
+  CheckCaller["check.yml (PR only)"] --> GoCheck["go-check.yml"]
+  CheckCaller --> Gitleaks["gitleaks.yml"]
+  GoCheck --> Sonar["sonarqube.yml"]
+  Gitleaks --> Sonar
+
+  BuildCaller["build.yml (push only)"] --> Build[docker-build-go.yml - Build and Push]
   Build -->|"outputs: tags, digest"| Scan[trivy-scan.yml - Vulnerability Scan]
   Scan -->|"pass"| Sign[docker-sign.yml - Cosign Signing]
   Scan -.->|"fail"| Skip["Sign SKIPPED"]
-  Caller --> DbInit[docker-build-go.yml - Migration Image]
+  BuildCaller --> DbInit[docker-build-go.yml - Migration Image]
 ```
 
 | Workflow | Responsibility |
@@ -457,7 +477,7 @@ flowchart LR
 
 ### How to Enable
 
-Add `sbom: true` to the builder workflow call in your service `ci.yml`:
+Add `sbom: true` to the builder workflow call in your service `build.yml`:
 
 ```yaml
 docker-build:
@@ -577,4 +597,4 @@ curl    8.17.0-r1   apk   CVE-2025-14819  Medium
 
 ### Current Status
 
-SBOM support is **wired up but off by default** (`sbom: false`). To enable it for a service, add `sbom: true` to the `docker-build` job in that service's `ci.yml`. No changes to shared-workflows are needed.
+SBOM support is **wired up but off by default** (`sbom: false`). To enable it for a service, add `sbom: true` to the `docker-build` job in that service's `build.yml`. No changes to shared-workflows are needed.

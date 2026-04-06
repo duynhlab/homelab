@@ -1,0 +1,89 @@
+# Check Template — PR-only workflow
+#
+# Triggers on: pull_request to dev/staging/main
+# Purpose: run tests, lint, secret scanning, SonarCloud analysis
+#
+# This workflow only handles pull_request events. By not mixing push triggers,
+# GitHub status check names stay clean (no "(pull_request)" suffix), making
+# ruleset required-check matching predictable.
+#
+# Resulting status check names:
+#   Check / go-check / Test
+#   Check / go-check / Lint
+#   Check / gitleaks / Gitleaks Scan
+#   Check / sonar / SonarCloud Analysis
+#
+# Placeholders to replace:
+#   {{SLACK_CHANNEL_ID}}   — Slack channel for PR notifications
+#   {{SONAR_PROJECT_KEY}}  — SonarCloud project key (e.g. duynhlab_auth-service)
+#   {{SONAR_ORG}}          — SonarCloud organization (e.g. duynhlab)
+#
+# See docs/platform/gitflow.md for the full branching & release standard.
+# See docs/platform/ruleset-automation.md for how rulesets enforce these checks.
+
+name: Check
+
+on:
+  pull_request:
+    branches: [dev, staging, main]
+
+permissions:
+  contents: read
+  pull-requests: read
+  security-events: write
+
+jobs:
+  # ──────────────────────────────────────────────────
+  # 1. PR Checks (Branch Name + Slack "PR Opened")
+  # ──────────────────────────────────────────────────
+  pr-checks:
+    uses: duyhenryer/shared-workflows/.github/workflows/pr-checks.yml@main
+    with:
+      slack_channel_id: "{{SLACK_CHANNEL_ID}}"
+    secrets:
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+  # ──────────────────────────────────────────────────
+  # 2. Test & Lint
+  # ──────────────────────────────────────────────────
+  go-check:
+    uses: duyhenryer/shared-workflows/.github/workflows/go-check.yml@main
+    with:
+      command-test: 'go test -race -coverprofile=coverage.out ./...'
+      lint: true
+    secrets: inherit
+
+  # ──────────────────────────────────────────────────
+  # 2b. Secret Detection (Gitleaks)
+  # ──────────────────────────────────────────────────
+  gitleaks:
+    uses: duyhenryer/shared-workflows/.github/workflows/gitleaks.yml@main
+    permissions:
+      contents: read
+      security-events: write
+
+  # ──────────────────────────────────────────────────
+  # 3. SonarCloud Analysis
+  # ──────────────────────────────────────────────────
+  sonar:
+    needs: [go-check, gitleaks]
+    uses: duyhenryer/shared-workflows/.github/workflows/sonarqube.yml@main
+    with:
+      project-key: '{{SONAR_PROJECT_KEY}}'
+      organization: '{{SONAR_ORG}}'
+      fail-on-quality-gate: false
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  # ──────────────────────────────────────────────────
+  # 4. Status Notification
+  # ──────────────────────────────────────────────────
+  notify:
+    if: always()
+    needs: [pr-checks, go-check, gitleaks, sonar]
+    uses: duyhenryer/shared-workflows/.github/workflows/status.yml@main
+    with:
+      slack_channel_id: "{{SLACK_CHANNEL_ID}}"
+      slack_thread_ts: ${{ needs.pr-checks.outputs.slack_thread_ts }}
+    secrets:
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

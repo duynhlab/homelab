@@ -331,7 +331,7 @@ CI and post-deploy verification are separated into two phases: **pre-merge check
 | `push` | `main` | test, sonar, build, scan, sign | `sha-<short>`, `latest` |
 | `push` | `tags/v*` | retag digest, release metadata | `vX.Y.Z` (no rebuild) |
 
-See [`ci_template.yml`](ci_template.yml) for the reference workflow.
+See [`check_template.yml`](check_template.yml) (PR-only checks) and [`build_template.yml`](build_template.yml) (push-only build & delivery) for the reference workflows.
 
 ### 6.2 Post-Deploy Verification
 
@@ -445,7 +445,7 @@ flowchart TD
 | Require a pull request before merging | Enabled |
 | Required approvals | **1** |
 | Dismiss stale pull request approvals when new commits are pushed | Enabled |
-| Require status checks to pass | `go-check`, `sonar` |
+| Require status checks to pass | `Check / go-check / Test`, `Check / sonar / SonarCloud Analysis` |
 | Require branches to be up to date before merging | Enabled (strict mode) |
 
 **Bypass list**: GitHub Apps (CI bots) with "Always allow".
@@ -515,6 +515,8 @@ db/         @duynhlab/platform-team
 
 For environments with many repositories (especially on the Free/Team plan without Org-level rulesets), configuring rulesets manually in the UI is tedious and error-prone. Use the GitHub REST API to automate creation.
 
+> **Recommended**: Use [gh-patcher](https://github.com/duynhlab/gh-patcher) to automate ruleset creation across all repos in the org. It runs daily via GitHub Actions and handles create-or-update idempotently. See [`ruleset-automation.md`](ruleset-automation.md) for setup details.
+
 **Prerequisites**:
 - Install `gh` CLI and authenticate: `gh auth login`
 
@@ -544,7 +546,7 @@ gh api \
     },
     {
       "type": "required_status_checks",
-      "parameters": {"strict_required_status_checks_policy": true, "required_status_checks": [{"context": "go-check"}, {"context": "sonar"}]}
+      "parameters": {"strict_required_status_checks_policy": true, "required_status_checks": [{"context": "Check / go-check / Test"}, {"context": "Check / sonar / SonarCloud Analysis"}]}
     }
   ]
 }
@@ -660,7 +662,8 @@ Every new service repository must be created from the **org template** that incl
 
 | File | Purpose |
 |------|---------|
-| `.github/workflows/ci.yml` | CI pipeline (from [`ci_template.yml`](ci_template.yml)) |
+| `.github/workflows/check.yml` | PR checks pipeline (from [`check_template.yml`](check_template.yml)) |
+| `.github/workflows/build.yml` | Build & delivery pipeline (from [`build_template.yml`](build_template.yml)) |
 | `.github/CODEOWNERS` | Ownership and review routing (required by Production Gate ruleset) |
 | `.github/pull_request_template.md` | PR description checklist |
 | `.github/rulesets/` | Exported ruleset JSON configs (3 rulesets, see section 7) |
@@ -673,7 +676,7 @@ Every service repo must have 3 rulesets configured (see section 7 for full detai
 
 | Ruleset | Targets | Key rules |
 |---------|---------|-----------|
-| Base Protection | `main`, `dev` | Require PR (1 approval), dismiss stale reviews, require status checks (`go-check`, `sonar`, `gitleaks`), block force push, restrict deletion |
+| Base Protection | `main`, `dev` | Require PR (1 approval), dismiss stale reviews, require status checks (`Check / go-check / Test`, `Check / sonar / SonarCloud Analysis`), block force push, restrict deletion |
 | Production Gate | `main` | Require 1 approval, require CODEOWNERS review, require signed commits, require non-author approval |
 | Release Tags | `v*` tags | Restrict creation/deletion/updates (immutable tags) |
 
@@ -681,9 +684,11 @@ Every service repo must have 3 rulesets configured (see section 7 for full detai
 
 All repos must configure these checks in the Base Protection ruleset:
 
-- `go-check` (or stack equivalent: `node-check`, `python-check`)
-- `sonar` (quality gate -- configurable per team)
+- `Check / go-check / Test` (or stack equivalent: `Check / node-check / Test`, `Check / python-check / Test`)
+- `Check / sonar / SonarCloud Analysis` (quality gate -- configurable per team)
 - Strict mode: branch must be up to date before merging
+
+> **Note**: Check names follow the pattern `{caller workflow name} / {caller job ID} / {reusable job name}`. When using the split workflow pattern (`check.yml` + `build.yml`), the caller name is `Check` and no event suffix is appended. See [`ruleset-automation.md`](ruleset-automation.md) for details.
 
 ### Upgrade Path (Free to Enterprise)
 
@@ -742,7 +747,7 @@ flowchart LR
     W4 --> O["Org-wide enforcement"]
 ```
 
-1. **Define golden template** — `gitflow.md` + `ci_template.yml` + 3 rulesets (exported as JSON in `.github/rulesets/`).
+1. **Define golden template** — `gitflow.md` + `check_template.yml` + `build_template.yml` + 3 rulesets (exported as JSON in `.github/rulesets/`).
 2. **Pilot** (3-5 services) — Apply template, create rulesets in **Evaluate** mode, validate CI/CD flow end-to-end.
 3. **Activate rulesets** — Switch from Evaluate to Active after validating Insights tab shows expected behavior.
 4. **Validate signals** — Measure DORA metrics: deployment frequency, lead time, change failure rate, MTTR.

@@ -35,7 +35,7 @@ spec:
     image:
       registry: ghcr.io
       repository: slok/sloth
-      tag: v0.15.0
+      tag: v0.16.0
     resources:
       limits:
         cpu: 100m

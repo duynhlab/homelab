@@ -46,7 +46,7 @@ spec:
     image:
       pullPolicy: IfNotPresent
       repository: ghcr.io/cloudnative-pg/cloudnative-pg
-      tag: 1.28.1
+      tag: 1.29.0
     monitoring:
       podMonitorEnabled: true
     podSecurityContext:

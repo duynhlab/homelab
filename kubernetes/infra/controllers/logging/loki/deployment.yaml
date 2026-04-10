@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: loki
-        image: grafana/loki:3.6.2
+        image: grafana/loki:3.7.1
         args:
           - -config.file=/etc/loki/loki.yaml
           - --pattern-ingester.enabled=true

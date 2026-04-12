@@ -27,3 +27,5 @@ resources:
   - helm/valkey.yaml
   - helm/external-secrets.yaml
   - helm/openbao.yaml
+  - helm/jetstack.yaml
+  - helm/kong.yaml

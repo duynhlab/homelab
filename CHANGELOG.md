@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.83.0] - 2026-04-12
+
+### Added
+
+- **Kong API Gateway:** Deploy Kong Ingress Controller (DB-less mode) as centralized API gateway with path-based routing (`gateway.duynhne.me`). 9 Ingress resources route `/` to frontend and `/api/v1/*` to 8 microservices. Global CORS + Prometheus plugins. HelmRelease [`kong/helmrelease.yaml`](kubernetes/infra/controllers/kong/helmrelease.yaml), Ingress routes [`configs/kong/`](kubernetes/infra/configs/kong/), Flux Kustomization [`kong-config.yaml`](kubernetes/clusters/local/kong-config.yaml). Port-forward via `make flux-ui` (HTTP `:8000`, HTTPS `:8443`).
+- **Kong monitoring (RED/Golden Signals):** Recording rules ([`kong-recording-rules.yaml`](kubernetes/infra/configs/monitoring/prometheusrules/kong-recording-rules.yaml)) — 22 pre-aggregated metrics (rate, errors, latency percentiles, bandwidth, internals). Alert rules ([`kong-alerts.yaml`](kubernetes/infra/configs/monitoring/prometheusrules/kong-alerts.yaml)) — 13 alerts covering availability, errors, latency, traffic, saturation, shared memory, upstream health. Grafana dashboard ([`kong-dashboard.json`](kubernetes/infra/configs/monitoring/grafana/dashboards/kong-dashboard.json)) — overview stats, per-service/per-route breakdown, latency percentiles, nginx connections, shared memory, bandwidth. ServiceMonitor [`servicemonitors/kong.yaml`](kubernetes/infra/configs/monitoring/servicemonitors/kong.yaml).
+- **cert-manager self-signed CA:** Replace Let's Encrypt HTTP-01 (won't work locally) with self-signed CA chain (`selfsigned-bootstrap` → `homelab-ca`). Single `kong-proxy-tls` Certificate replaces 8 per-service certs. Let's Encrypt issuers preserved as comments for production use.
+- **Kong gateway docs:** [`docs/platform/kong-gateway.md`](docs/platform/kong-gateway.md) — architecture, components, routing rules, 11-step verification runbook (curl + agent-browser E2E), troubleshooting, design decisions.
+
+### Changed
+
+- **Frontend nginx.conf:** Removed 8 API proxy blocks (`/api/v1/*` → microservices) and `resolver` directive. Kong now handles all API routing. Nginx only serves static files + SPA fallback. (Change in `duynhlab/frontend` repo.)
+- **Kong HelmRelease:** Enabled JSON access logs (`proxy_access_log: /dev/stdout`) for Vector → Loki/VictoriaLogs pipeline.
+- **flux-ui.sh:** Added Kong port-forward (`localhost:8000` HTTP, `localhost:8443` HTTPS) and access URLs.
+
+### Fixed
+
+- **kube-apiserver ServiceMonitor:** `metricRelabelConfigs` → `metricRelabelings` (field renamed in newer Prometheus Operator CRDs).
+
+## [0.82.2] - 2026-04-09
+
+### Added
+
+- **cert-manager + Flux (TLS for 8 microservices):** [`docs/platform/cert-manager-flux.md`](docs/platform/cert-manager-flux.md) — full guide. GitOps manifests: Jetstack [`HelmRepository`](kubernetes/clusters/local/sources/helm/jetstack.yaml), [`cert-manager` HelmRelease](kubernetes/infra/controllers/cert-manager/helmrelease.yaml), [`configs/cert-manager`](kubernetes/infra/configs/cert-manager/) (ClusterIssuers, Certificates), Flux [`cert-manager-local`](kubernetes/clusters/local/cert-manager-config.yaml), optional [`ingress-example.yaml`](kubernetes/infra/configs/cert-manager/ingress-example.yaml). Namespace [`cert-manager`](kubernetes/infra/controllers/namespaces.yaml), [`controllers-local` health check](kubernetes/clusters/local/controllers.yaml). Indexed in [`docs/README.md`](docs/README.md).
+
+## [0.82.1] - 2026-04-09
+
+### Added
+
+- **GKE internal & private DNS:** [`docs/api/gke-internal-dns.md`](docs/api/gke-internal-dns.md) — `cluster.local` / CoreDNS, Cloud DNS private zones, multi-environment patterns, `gcloud`/Terraform samples; linked from [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md) internal section. [`docs/README.md`](docs/README.md) updated. Gateway plan appendix points to this doc.
+
+### Changed
+
+- **`gke-internal-dns.md`:** Document language switched from Vietnamese to English.
+
+## [0.82.0] - 2026-04-09
+
+### Added
+
+- **API naming convention (draft v1.0.0):** [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md) — gateway-facing URL layout (multi-segment service/audience/resource path + [Google API Design Guide](https://cloud.google.com/apis/design) notes). Documented hosts: **`gateway.duynhne.me`** (public API gateway), **`internal.gateway.duynhne.me`** (internal S2S), **`static.duynhne.me`** (static/CDN reference). Does not replace canonical [`docs/api/api.md`](docs/api/api.md). Indexed in [`docs/README.md`](docs/README.md).
+
 ## [0.81.18] - 2026-03-28
 
 ### Added

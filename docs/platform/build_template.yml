@@ -25,6 +25,7 @@ on:
 permissions:
   contents: read
   packages: write
+  pull-requests: read
   id-token: write
   actions: read
   security-events: write

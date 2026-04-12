@@ -11,3 +11,5 @@ resources:
   - caching/
   - storage/
   - secrets/
+  - cert-manager/
+  - kong/

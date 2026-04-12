@@ -1,0 +1,84 @@
+# Kong Ingress Controller — DB-less mode (declarative config via CRDs)
+# Chart: kong/kong — https://github.com/Kong/charts/tree/main/charts/kong
+# Docs: https://docs.konghq.com/kubernetes-ingress-controller/latest/
+#
+# TLS: Kong uses its default proxy cert on startup. The cert-manager issued
+# certificate (kong-proxy-tls) is referenced in the Ingress TLS block and
+# picked up by KIC for SNI-based TLS termination once cert-manager-local deploys.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kong
+  namespace: kong
+spec:
+  interval: 10m
+  timeout: 10m
+  chart:
+    spec:
+      chart: kong
+      sourceRef:
+        kind: HelmRepository
+        name: kong
+        namespace: flux-system
+      version: "2.44.0"
+  install:
+    crds: CreateReplace
+    createNamespace: false
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  values:
+    # DB-less mode — config from Kubernetes CRDs only
+    env:
+      database: "off"
+      plugins: "bundled"
+      # Trust proxy protocol headers from port-forward
+      trusted_ips: "0.0.0.0/0,::/0"
+      # JSON access logs — picked up by Vector DaemonSet → Loki + VictoriaLogs
+      proxy_access_log: "/dev/stdout"
+      proxy_error_log: "/dev/stderr"
+
+    # Ingress Controller
+    ingressController:
+      enabled: true
+      installCRDs: true
+      env:
+        # Watch Ingress resources across all namespaces
+        controller_ingress_class: kong
+
+    # Proxy service — ClusterIP for port-forwarding (no LoadBalancer in Kind)
+    proxy:
+      enabled: true
+      type: ClusterIP
+      http:
+        enabled: true
+        containerPort: 8000
+        servicePort: 80
+      tls:
+        enabled: true
+        containerPort: 8443
+        servicePort: 443
+
+    # Admin API — disabled (CRDs used for configuration)
+    admin:
+      enabled: false
+
+    # Status endpoint for health checks and metrics
+    status:
+      enabled: true
+      http:
+        containerPort: 8100
+
+    # Resource limits (homelab-friendly)
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+    replicaCount: 1

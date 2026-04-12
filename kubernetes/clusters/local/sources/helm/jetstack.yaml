@@ -1,0 +1,11 @@
+# Jetstack Helm repository — cert-manager
+# https://cert-manager.io/docs/installation/helm/
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: jetstack
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://charts.jetstack.io

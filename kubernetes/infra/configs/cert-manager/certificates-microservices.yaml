@@ -1,0 +1,23 @@
+# TLS certificate for Kong API Gateway — single cert for the gateway domain.
+# Kong terminates TLS at the edge; individual service certs are not needed.
+# Uses homelab-ca (self-signed, works offline).
+# For production: switch issuerRef to letsencrypt-prod and update dnsNames.
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kong-proxy-tls
+  namespace: kong
+spec:
+  secretName: kong-proxy-tls
+  duration: 8760h # 1 year
+  renewBefore: 720h # 30 days
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca
+  dnsNames:
+    - gateway.duynhne.me
+    - "*.duynhne.me"
+    - localhost
+  ipAddresses:
+    - "127.0.0.1"

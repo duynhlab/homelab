@@ -1,0 +1,444 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "Kong API Gateway — RED Method / Golden Signals monitoring dashboard",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "title": "Overview",
+      "type": "row"
+    },
+    {
+      "title": "Total RPS",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "thresholds": { "steps": [{ "color": "green", "value": null }] }
+        }
+      },
+      "targets": [{
+        "expr": "kong:http_requests:rate5m",
+        "legendFormat": "RPS"
+      }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "title": "5xx Error Rate",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.01 },
+              { "color": "red", "value": 0.05 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "expr": "kong:http_requests:error_ratio5m or vector(0)",
+        "legendFormat": "Error Rate"
+      }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "title": "P95 Latency",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 500 },
+              { "color": "red", "value": 1000 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "expr": "kong:request_latency_ms:p95_5m",
+        "legendFormat": "P95"
+      }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "title": "P99 Latency",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1000 },
+              { "color": "red", "value": 2000 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "expr": "kong:request_latency_ms:p99_5m",
+        "legendFormat": "P99"
+      }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "title": "Active Connections",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 200 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "expr": "kong:nginx_connections_active:current",
+        "legendFormat": "Active"
+      }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "title": "Kong Internal P95",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 100 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "expr": "kong:kong_latency_ms:p95_5m",
+        "legendFormat": "Kong Overhead"
+      }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "title": "Requests & Errors",
+      "type": "row"
+    },
+    {
+      "title": "Total Request Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "fillOpacity": 10, "lineWidth": 2 } }
+      },
+      "targets": [
+        { "expr": "kong:http_requests:rate5m", "legendFormat": "Total RPS" },
+        { "expr": "kong:http_requests:error_rate5m", "legendFormat": "5xx RPS" }
+      ],
+      "options": { "tooltip": { "mode": "multi" } }
+    },
+    {
+      "title": "Request Rate by Service",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } }
+      },
+      "targets": [{
+        "expr": "kong_service:http_requests:rate5m{service=~\"$service\"}",
+        "legendFormat": "{{ service }}"
+      }]
+    },
+    {
+      "title": "Error Rate by Service",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "custom": { "fillOpacity": 10 } }
+      },
+      "targets": [{
+        "expr": "kong_service:http_requests:error_ratio5m{service=~\"$service\"}",
+        "legendFormat": "{{ service }}"
+      }]
+    },
+    {
+      "title": "Status Code Distribution",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "fillOpacity": 30, "stacking": { "mode": "normal" } } }
+      },
+      "targets": [
+        { "expr": "sum(rate(kong_http_requests_total{job=\"kong\", service=~\"$service\", code=~\"2..\"}[5m]))", "legendFormat": "2xx" },
+        { "expr": "sum(rate(kong_http_requests_total{job=\"kong\", service=~\"$service\", code=~\"3..\"}[5m]))", "legendFormat": "3xx" },
+        { "expr": "sum(rate(kong_http_requests_total{job=\"kong\", service=~\"$service\", code=~\"4..\"}[5m]))", "legendFormat": "4xx" },
+        { "expr": "sum(rate(kong_http_requests_total{job=\"kong\", service=~\"$service\", code=~\"5..\"}[5m]))", "legendFormat": "5xx" }
+      ],
+      "overrides": [
+        { "matcher": { "id": "byName", "options": "2xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+        { "matcher": { "id": "byName", "options": "3xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
+        { "matcher": { "id": "byName", "options": "4xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
+        { "matcher": { "id": "byName", "options": "5xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+      ]
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "title": "Latency",
+      "type": "row",
+      "panels": [
+        {
+          "title": "Request Latency Percentiles",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+          "fieldConfig": {
+            "defaults": { "unit": "ms", "custom": { "fillOpacity": 5, "lineWidth": 2 } }
+          },
+          "targets": [
+            { "expr": "kong:request_latency_ms:p50_5m", "legendFormat": "P50" },
+            { "expr": "kong:request_latency_ms:p95_5m", "legendFormat": "P95" },
+            { "expr": "kong:request_latency_ms:p99_5m", "legendFormat": "P99" }
+          ]
+        },
+        {
+          "title": "Upstream Latency P95 by Service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+          "fieldConfig": {
+            "defaults": { "unit": "ms", "custom": { "fillOpacity": 10 } }
+          },
+          "targets": [{
+            "expr": "kong_service:upstream_latency_ms:p95_5m{service=~\"$service\"}",
+            "legendFormat": "{{ service }}"
+          }]
+        },
+        {
+          "title": "Request Latency P95 by Service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 },
+          "fieldConfig": {
+            "defaults": { "unit": "ms", "custom": { "fillOpacity": 10 } }
+          },
+          "targets": [{
+            "expr": "kong_service:request_latency_ms:p95_5m{service=~\"$service\"}",
+            "legendFormat": "{{ service }}"
+          }]
+        },
+        {
+          "title": "Kong Internal Latency P95",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
+          "fieldConfig": {
+            "defaults": { "unit": "ms", "custom": { "fillOpacity": 10 } }
+          },
+          "targets": [{
+            "expr": "kong:kong_latency_ms:p95_5m",
+            "legendFormat": "Kong Overhead P95"
+          }]
+        }
+      ]
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "title": "Per-Service Breakdown",
+      "type": "row",
+      "panels": [
+        {
+          "title": "Service Overview",
+          "type": "table",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 24 },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "RPS" }, "properties": [{ "id": "unit", "value": "reqps" }, { "id": "decimals", "value": 2 }] },
+              { "matcher": { "id": "byName", "options": "Error %" }, "properties": [{ "id": "unit", "value": "percentunit" }, { "id": "thresholds", "value": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.05 }] } }, { "id": "custom.cellOptions", "value": { "type": "color-background" } }] },
+              { "matcher": { "id": "byName", "options": "P95 (ms)" }, "properties": [{ "id": "unit", "value": "ms" }, { "id": "thresholds", "value": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 500 }, { "color": "red", "value": 1000 }] } }, { "id": "custom.cellOptions", "value": { "type": "color-background" } }] },
+              { "matcher": { "id": "byName", "options": "Upstream P95 (ms)" }, "properties": [{ "id": "unit", "value": "ms" }] }
+            ]
+          },
+          "targets": [
+            { "expr": "kong_service:http_requests:rate5m", "legendFormat": "{{ service }}", "instant": true, "format": "table", "refId": "A" },
+            { "expr": "kong_service:http_requests:error_ratio5m", "legendFormat": "{{ service }}", "instant": true, "format": "table", "refId": "B" },
+            { "expr": "kong_service:request_latency_ms:p95_5m", "legendFormat": "{{ service }}", "instant": true, "format": "table", "refId": "C" },
+            { "expr": "kong_service:upstream_latency_ms:p95_5m", "legendFormat": "{{ service }}", "instant": true, "format": "table", "refId": "D" }
+          ],
+          "transformations": [
+            { "id": "merge", "options": {} },
+            { "id": "organize", "options": { "renameByName": { "Value #A": "RPS", "Value #B": "Error %", "Value #C": "P95 (ms)", "Value #D": "Upstream P95 (ms)" }, "excludeByName": { "Time": true } } }
+          ]
+        }
+      ]
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "title": "Per-Route Breakdown",
+      "type": "row",
+      "panels": [
+        {
+          "title": "Route RPS",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
+          "fieldConfig": {
+            "defaults": { "unit": "reqps", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } }
+          },
+          "targets": [{
+            "expr": "kong_route:http_requests:rate5m{service=~\"$service\"}",
+            "legendFormat": "{{ route }}"
+          }]
+        },
+        {
+          "title": "Route Error Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+          "fieldConfig": {
+            "defaults": { "unit": "percentunit" }
+          },
+          "targets": [{
+            "expr": "sum by (service, route) (rate(kong_http_requests_total{job=\"kong\", service=~\"$service\", code=~\"5..\"}[5m])) / sum by (service, route) (rate(kong_http_requests_total{job=\"kong\", service=~\"$service\"}[5m]))",
+            "legendFormat": "{{ route }}"
+          }]
+        }
+      ]
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "title": "Kong Internals",
+      "type": "row",
+      "panels": [
+        {
+          "title": "Nginx Connection States",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 26 },
+          "fieldConfig": {
+            "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } }
+          },
+          "targets": [{
+            "expr": "kong_nginx_connections_total{job=\"kong\"}",
+            "legendFormat": "{{ state }}"
+          }]
+        },
+        {
+          "title": "Shared Memory Usage",
+          "type": "bargauge",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 26 },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "red", "value": 0.9 }
+                ]
+              }
+            }
+          },
+          "targets": [{
+            "expr": "kong:memory_shared_dict:usage_ratio",
+            "legendFormat": "{{ shared_dict }}"
+          }],
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal" }
+        },
+        {
+          "title": "Datastore Reachable",
+          "type": "stat",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 26 },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                { "type": "value", "options": { "1": { "text": "Reachable", "color": "green" } } },
+                { "type": "value", "options": { "0": { "text": "Unreachable", "color": "red" } } }
+              ]
+            }
+          },
+          "targets": [{
+            "expr": "kong_datastore_reachable{job=\"kong\"}",
+            "legendFormat": "Datastore"
+          }],
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+        }
+      ]
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "title": "Bandwidth",
+      "type": "row",
+      "panels": [
+        {
+          "title": "Total Bandwidth",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 27 },
+          "fieldConfig": {
+            "defaults": { "unit": "Bps", "custom": { "fillOpacity": 15 } }
+          },
+          "targets": [{
+            "expr": "kong:bandwidth_bytes:rate5m",
+            "legendFormat": "{{ direction }}"
+          }]
+        },
+        {
+          "title": "Bandwidth by Service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 27 },
+          "fieldConfig": {
+            "defaults": { "unit": "Bps", "custom": { "fillOpacity": 15 } }
+          },
+          "targets": [
+            { "expr": "kong_service:bandwidth_egress_bytes:rate5m{service=~\"$service\"}", "legendFormat": "{{ service }} egress" },
+            { "expr": "kong_service:bandwidth_ingress_bytes:rate5m{service=~\"$service\"}", "legendFormat": "{{ service }} ingress" }
+          ]
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["kong", "api-gateway", "red"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "definition": "label_values(kong_http_requests_total{job=\"kong\"}, service)",
+        "includeAll": true,
+        "multi": true,
+        "name": "service",
+        "query": "label_values(kong_http_requests_total{job=\"kong\"}, service)",
+        "refresh": 2,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Kong API Gateway",
+  "uid": "kong-api-gateway"
+}

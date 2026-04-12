@@ -9,7 +9,9 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 ```
 docs/
 ├── api/                          # API documentation
-│   └── api.md                    # Complete API reference
+│   ├── api.md                    # Complete API reference (canonical /api/v1)
+│   ├── api-naming-convention.md # Draft v1.0.0: gateway URL naming (gateway.duynhne.me), does not replace api.md
+│   └── gke-internal-dns.md      # GKE cluster.local, Cloud DNS private zones, multi-environment
 ├── databases/                    # Database documentation
 │   ├── 002-database-integration.md               # PostgreSQL architecture
 │   ├── 003-operator-comparison.md               # CloudNativePG vs Zalando operator deep dive
@@ -68,7 +70,7 @@ docs/
 │       └── microservices-alerts.md      # Per-alert investigation guide
 ├── platform/                     # Platform/deployment documentation
 │   ├── setup.md                  # GitOps deployment guide
-│   ├── helmrelease-conventions.md # Flux HelmRelease remediation conventions
+│   ├── cert-manager-flux.md      # cert-manager + Let's Encrypt + Flux (Helm, Ingress, TLS)
 │   ├── application-delivery.md    # ResourceSet patterns & templates
 │   ├── cicd.md                   # CI/CD pipelines
 │   ├── gitflow.md                # Git branching & release standard
@@ -110,6 +112,10 @@ docs/
    - Requirements and conventions
    - Step-by-step guide
    - Automatic monitoring setup
+
+4. **[API naming convention (draft v1.0.0)](./api/api-naming-convention.md)** - Gateway URL layout (`gateway.duynhne.me`), Chợ Tốt–style segments + Google notes; does not replace `api.md`
+
+5. **[GKE internal & private DNS](./api/gke-internal-dns.md)** - `cluster.local`, Cloud DNS private zones, multi-environment naming
 
 ### Observability
 
@@ -177,6 +183,10 @@ docs/
     - All 8 microservices
     - Endpoints, models, examples
     - Health checks and metrics
+
+2. **[API naming convention (draft v1.0.0)](./api/api-naming-convention.md)** - Edge/gateway naming exploration; canonical routes remain in `api.md`
+
+3. **[GKE internal & private DNS](./api/gke-internal-dns.md)** - In-cluster DNS and Cloud DNS private zones
 
 ### Databases
 
@@ -279,6 +289,7 @@ docs/
 
 - [Setup Guide](./platform/setup.md) - Complete deployment and configuration guide
 - [Application Delivery](./platform/application-delivery.md) - ResourceSet patterns & templates
+- [cert-manager + Flux](./platform/cert-manager-flux.md) - TLS with Let's Encrypt, HelmRelease, Ingress
 - [CI/CD](./platform/cicd.md) - CI/CD pipelines and workflows
 - [Git Branching & Release](./platform/gitflow.md) - Hybrid Enterprise Gitflow standard (dev/staging/main + immutable tags)
 - [CI Template](./platform/ci_template.yml) - Reference CI workflow for service repos

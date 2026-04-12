@@ -7,11 +7,15 @@
 # GitHub status check names stay clean (no "(pull_request)" suffix), making
 # ruleset required-check matching predictable.
 #
-# Resulting status check names:
-#   Check / go-check / Test
-#   Check / go-check / Lint
-#   Check / gitleaks / Gitleaks Scan
-#   Check / sonar / SonarCloud Analysis
+# Resulting check run names (for ruleset matching):
+#   go-check / Test
+#   go-check / Lint
+#   gitleaks / Gitleaks Scan
+#   sonar / SonarCloud Analysis
+#
+# Note: GitHub UI displays these with a prefix and suffix
+# (e.g. "Check / go-check / Test (pull_request)"), but rulesets
+# match against the shorter name shown above.
 #
 # Placeholders to replace:
 #   {{SLACK_CHANNEL_ID}}   — Slack channel for PR notifications

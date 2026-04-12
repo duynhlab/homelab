@@ -1,0 +1,180 @@
+# API routes — Kong routes /api/v1/{resource} to the correct backend service.
+# Each service handles its own /api/v1/* routes internally.
+# Kong passes the full path through (strip-path: false).
+
+# Auth Service
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-auth
+  namespace: auth
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: gateway.duynhne.me
+      http:
+        paths:
+          - path: /api/v1/auth
+            pathType: Prefix
+            backend:
+              service:
+                name: auth
+                port:
+                  number: 8080
+---
+# User Service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-user
+  namespace: user
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: gateway.duynhne.me
+      http:
+        paths:
+          - path: /api/v1/users
+            pathType: Prefix
+            backend:
+              service:
+                name: user
+                port:
+                  number: 8080
+---
+# Product Service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-product
+  namespace: product
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: gateway.duynhne.me
+      http:
+        paths:
+          - path: /api/v1/products
+            pathType: Prefix
+            backend:
+              service:
+                name: product
+                port:
+                  number: 8080
+---
+# Cart Service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-cart
+  namespace: cart
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: gateway.duynhne.me
+      http:
+        paths:
+          - path: /api/v1/cart
+            pathType: Prefix
+            backend:
+              service:
+                name: cart
+                port:
+                  number: 8080
+---
+# Order Service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-order
+  namespace: order
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: gateway.duynhne.me
+      http:
+        paths:
+          - path: /api/v1/orders
+            pathType: Prefix
+            backend:
+              service:
+                name: order
+                port:
+                  number: 8080
+---
+# Review Service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-review
+  namespace: review
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: gateway.duynhne.me
+      http:
+        paths:
+          - path: /api/v1/reviews
+            pathType: Prefix
+            backend:
+              service:
+                name: review
+                port:
+                  number: 8080
+---
+# Notification Service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-notification
+  namespace: notification
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: gateway.duynhne.me
+      http:
+        paths:
+          - path: /api/v1/notifications
+            pathType: Prefix
+            backend:
+              service:
+                name: notification
+                port:
+                  number: 8080
+---
+# Shipping Service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-shipping
+  namespace: shipping
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: gateway.duynhne.me
+      http:
+        paths:
+          - path: /api/v1/shipping
+            pathType: Prefix
+            backend:
+              service:
+                name: shipping
+                port:
+                  number: 8080

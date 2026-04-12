@@ -92,3 +92,15 @@ spec:
       kind: HelmRelease
       name: external-secrets
       namespace: external-secrets-system
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: cert-manager
+      namespace: cert-manager
+    # Kong API Gateway
+    - apiVersion: v1
+      kind: Namespace
+      name: kong
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: kong
+      namespace: kong

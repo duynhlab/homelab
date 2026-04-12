@@ -445,7 +445,7 @@ flowchart TD
 | Require a pull request before merging | Enabled |
 | Required approvals | **1** |
 | Dismiss stale pull request approvals when new commits are pushed | Enabled |
-| Require status checks to pass | `Check / go-check / Test`, `Check / sonar / SonarCloud Analysis` |
+| Require status checks to pass | `go-check / Test` |
 | Require branches to be up to date before merging | Enabled (strict mode) |
 
 **Bypass list**: GitHub Apps (CI bots) with "Always allow".
@@ -546,7 +546,7 @@ gh api \
     },
     {
       "type": "required_status_checks",
-      "parameters": {"strict_required_status_checks_policy": true, "required_status_checks": [{"context": "Check / go-check / Test"}, {"context": "Check / sonar / SonarCloud Analysis"}]}
+      "parameters": {"strict_required_status_checks_policy": true, "required_status_checks": [{"context": "go-check / Test"}]}
     }
   ]
 }
@@ -676,7 +676,7 @@ Every service repo must have 3 rulesets configured (see section 7 for full detai
 
 | Ruleset | Targets | Key rules |
 |---------|---------|-----------|
-| Base Protection | `main`, `dev` | Require PR (1 approval), dismiss stale reviews, require status checks (`Check / go-check / Test`, `Check / sonar / SonarCloud Analysis`), block force push, restrict deletion |
+| Base Protection | `main`, `dev` | Require PR (1 approval), dismiss stale reviews, require status checks (`go-check / Test`), block force push, restrict deletion |
 | Production Gate | `main` | Require 1 approval, require CODEOWNERS review, require signed commits, require non-author approval |
 | Release Tags | `v*` tags | Restrict creation/deletion/updates (immutable tags) |
 
@@ -684,11 +684,10 @@ Every service repo must have 3 rulesets configured (see section 7 for full detai
 
 All repos must configure these checks in the Base Protection ruleset:
 
-- `Check / go-check / Test` (or stack equivalent: `Check / node-check / Test`, `Check / python-check / Test`)
-- `Check / sonar / SonarCloud Analysis` (quality gate -- configurable per team)
+- `go-check / Test` (or stack equivalent: `node-check / Test`, `python-check / Test`)
 - Strict mode: branch must be up to date before merging
 
-> **Note**: Check names follow the pattern `{caller workflow name} / {caller job ID} / {reusable job name}`. When using the split workflow pattern (`check.yml` + `build.yml`), the caller name is `Check` and no event suffix is appended. See [`ruleset-automation.md`](ruleset-automation.md) for details.
+> **Note**: For reusable workflows, the check run name used for ruleset matching is `{caller job ID} / {reusable job name}` (e.g. `go-check / Test`). The GitHub UI displays a longer form with the workflow name prefix and event suffix, but rulesets match against the shorter name. Use `gh pr checks` to find the exact name. See [`ruleset-automation.md`](ruleset-automation.md) for details.
 
 ### Upgrade Path (Free to Enterprise)
 

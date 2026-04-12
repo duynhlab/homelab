@@ -1,0 +1,140 @@
+# Recording rules for Kong API Gateway metrics.
+# Pre-aggregate common RED/Golden Signal queries used by alerts and Grafana dashboards.
+# Source: Kong Prometheus plugin (kong_*), scraped via ServiceMonitor (job="kong", 15s interval).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kong-recording-rules
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/component: recording-rules
+spec:
+  groups:
+    # ---------------------------------------------------------------
+    # RED signals — global + per-service aggregations (5m window)
+    # ---------------------------------------------------------------
+    - name: kong-red-5m
+      interval: 30s
+      rules:
+        # Rate (requests/sec) — global
+        - record: kong:http_requests:rate5m
+          expr: sum(rate(kong_http_requests_total{job="kong"}[5m]))
+
+        # Rate — per service
+        - record: kong_service:http_requests:rate5m
+          expr: sum by (service) (rate(kong_http_requests_total{job="kong"}[5m]))
+
+        # Rate — per route
+        - record: kong_route:http_requests:rate5m
+          expr: sum by (service, route) (rate(kong_http_requests_total{job="kong"}[5m]))
+
+        # Error rate (5xx/sec) — global
+        - record: kong:http_requests:error_rate5m
+          expr: sum(rate(kong_http_requests_total{job="kong", code=~"5.."}[5m]))
+
+        # Error rate — per service
+        - record: kong_service:http_requests:error_rate5m
+          expr: sum by (service) (rate(kong_http_requests_total{job="kong", code=~"5.."}[5m]))
+
+        # Client error rate (4xx/sec) — per service
+        - record: kong_service:http_requests:client_error_rate5m
+          expr: sum by (service) (rate(kong_http_requests_total{job="kong", code=~"4.."}[5m]))
+
+        # Error ratio (0-1, 5xx/total) — global
+        - record: kong:http_requests:error_ratio5m
+          expr: |
+            kong:http_requests:error_rate5m
+            / (kong:http_requests:rate5m > 0)
+
+        # Error ratio — per service
+        - record: kong_service:http_requests:error_ratio5m
+          expr: |
+            kong_service:http_requests:error_rate5m
+            / (kong_service:http_requests:rate5m > 0)
+
+    # ---------------------------------------------------------------
+    # Latency percentiles (5m window, values in ms)
+    # ---------------------------------------------------------------
+    - name: kong-latency-5m
+      interval: 30s
+      rules:
+        # Request latency P50 — global
+        - record: kong:request_latency_ms:p50_5m
+          expr: |
+            histogram_quantile(0.50,
+              sum by (le) (rate(kong_request_latency_ms_bucket{job="kong"}[5m]))
+            )
+
+        # Request latency P95 — global
+        - record: kong:request_latency_ms:p95_5m
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(kong_request_latency_ms_bucket{job="kong"}[5m]))
+            )
+
+        # Request latency P99 — global
+        - record: kong:request_latency_ms:p99_5m
+          expr: |
+            histogram_quantile(0.99,
+              sum by (le) (rate(kong_request_latency_ms_bucket{job="kong"}[5m]))
+            )
+
+        # Request latency P95 — per service
+        - record: kong_service:request_latency_ms:p95_5m
+          expr: |
+            histogram_quantile(0.95,
+              sum by (service, le) (rate(kong_request_latency_ms_bucket{job="kong"}[5m]))
+            )
+
+        # Request latency P99 — per service
+        - record: kong_service:request_latency_ms:p99_5m
+          expr: |
+            histogram_quantile(0.99,
+              sum by (service, le) (rate(kong_request_latency_ms_bucket{job="kong"}[5m]))
+            )
+
+        # Upstream latency P95 — per service
+        - record: kong_service:upstream_latency_ms:p95_5m
+          expr: |
+            histogram_quantile(0.95,
+              sum by (service, le) (rate(kong_upstream_latency_ms_bucket{job="kong"}[5m]))
+            )
+
+        # Kong internal latency P95 — global
+        - record: kong:kong_latency_ms:p95_5m
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(kong_kong_latency_ms_bucket{job="kong"}[5m]))
+            )
+
+    # ---------------------------------------------------------------
+    # Bandwidth — per service (5m window)
+    # ---------------------------------------------------------------
+    - name: kong-bandwidth-5m
+      interval: 30s
+      rules:
+        - record: kong_service:bandwidth_ingress_bytes:rate5m
+          expr: sum by (service) (rate(kong_bandwidth_bytes{job="kong", direction="ingress"}[5m]))
+
+        - record: kong_service:bandwidth_egress_bytes:rate5m
+          expr: sum by (service) (rate(kong_bandwidth_bytes{job="kong", direction="egress"}[5m]))
+
+        # Total bandwidth — global by direction
+        - record: kong:bandwidth_bytes:rate5m
+          expr: sum by (direction) (rate(kong_bandwidth_bytes{job="kong"}[5m]))
+
+    # ---------------------------------------------------------------
+    # Kong internals — connections and memory
+    # ---------------------------------------------------------------
+    - name: kong-internals
+      interval: 30s
+      rules:
+        # Nginx active connections
+        - record: kong:nginx_connections_active:current
+          expr: kong_nginx_connections_total{job="kong", state="active"}
+
+        # Shared memory usage ratio per dict
+        - record: kong:memory_shared_dict:usage_ratio
+          expr: |
+            kong_memory_lua_shared_dict_bytes{job="kong"}
+            / kong_memory_lua_shared_dict_total_bytes{job="kong"}

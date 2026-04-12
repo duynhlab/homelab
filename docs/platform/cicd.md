@@ -14,7 +14,7 @@ This pipeline operates under the **Hybrid Enterprise Gitflow** model defined in 
 
 Image artifacts are **built once per commit** with an immutable `sha-<short>` tag. Promotion between environments reuses the same digest — no rebuild occurs at tag time. `latest` exists as a convenience alias but is never the sole deployment reference. See [`gitflow.md`](gitflow.md) for the full branching model, tagging policy, runbooks, and governance rules.
 
-**Branch enforcement** is managed via **GitHub Rulesets** (not legacy Branch Protection). Each service repo has 3 layered rulesets: Base Protection (all branches), Production Gate (`main` only), and Release Tags (`v*`). Required status checks (`Check / go-check / Test`, `Check / sonar / SonarCloud Analysis`) are configured in the Base Protection ruleset, ensuring CI must pass before any merge. See [`gitflow.md` section 7](gitflow.md#7-github-rulesets-branch-enforcement) for the full ruleset configuration, CODEOWNERS integration, and setup guide.
+**Branch enforcement** is managed via **GitHub Rulesets** (not legacy Branch Protection). Each service repo has 3 layered rulesets: Base Protection (all branches), Production Gate (`main` only), and Release Tags (`v*`). Required status checks (`go-check / Test`) are configured in the Base Protection ruleset, ensuring CI must pass before any merge. See [`gitflow.md` section 7](gitflow.md#7-github-rulesets-branch-enforcement) for the full ruleset configuration, CODEOWNERS integration, and setup guide.
 
 **Workflow split**: Each service repo uses **two workflow files** instead of a single `ci.yml`:
 - **`check.yml`** (PR only) -- runs tests, lint, secret scanning, SonarCloud analysis

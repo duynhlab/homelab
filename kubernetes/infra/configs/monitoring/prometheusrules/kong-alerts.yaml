@@ -1,0 +1,199 @@
+# Alert rules for Kong API Gateway (RED/Golden Signals + Internal Health).
+# Source: Kong Prometheus plugin (kong_*), scraped via ServiceMonitor (job="kong").
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kong-alerts
+  namespace: monitoring
+spec:
+  groups:
+    # --- Availability ---
+    - name: kong-availability
+      interval: 1m
+      rules:
+        - alert: KongDown
+          expr: up{job="kong"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            category: availability
+          annotations:
+            summary: "Kong API Gateway instance down"
+            description: "Kong instance {{ $labels.instance }} has been unreachable for more than 1 minute. All API traffic may be affected."
+
+    # --- Errors (RED: Errors) ---
+    - name: kong-errors
+      interval: 1m
+      rules:
+        - alert: KongHighErrorRate
+          expr: |
+            (
+              sum(rate(kong_http_requests_total{job="kong", code=~"5.."}[5m]))
+              / sum(rate(kong_http_requests_total{job="kong"}[5m]))
+            ) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+            category: errors
+          annotations:
+            summary: "Kong gateway-wide 5xx error rate above 5%"
+            description: "Kong global 5xx error rate is {{ $value | humanizePercentage }} (threshold: 5%). Check upstream service health and Kong error logs."
+
+        - alert: KongErrorRateCritical
+          expr: |
+            (
+              sum(rate(kong_http_requests_total{job="kong", code=~"5.."}[5m]))
+              / sum(rate(kong_http_requests_total{job="kong"}[5m]))
+            ) > 0.15
+          for: 5m
+          labels:
+            severity: critical
+            category: errors
+          annotations:
+            summary: "Kong gateway-wide 5xx error rate above 15%"
+            description: "Kong global 5xx error rate is {{ $value | humanizePercentage }} (threshold: 15%). Majority of API traffic is failing."
+
+        - alert: KongServiceHighErrorRate
+          expr: |
+            (
+              sum by (service) (rate(kong_http_requests_total{job="kong", code=~"5.."}[5m]))
+              / sum by (service) (rate(kong_http_requests_total{job="kong"}[5m]))
+            ) > 0.10
+          for: 5m
+          labels:
+            severity: warning
+            category: errors
+          annotations:
+            summary: "Kong service {{ $labels.service }} 5xx error rate above 10%"
+            description: "Service {{ $labels.service }} 5xx error rate is {{ $value | humanizePercentage }} via Kong."
+
+    # --- Latency (RED: Duration / Golden: Latency) ---
+    - name: kong-latency
+      interval: 1m
+      rules:
+        - alert: KongHighLatencyP95
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(kong_request_latency_ms_bucket{job="kong"}[5m]))
+            ) > 1000
+          for: 10m
+          labels:
+            severity: warning
+            category: latency
+          annotations:
+            summary: "Kong gateway P95 request latency above 1s"
+            description: "Kong global P95 request latency is {{ $value | humanize }}ms (threshold: 1000ms). Check slow upstream services."
+
+        - alert: KongLatencyCritical
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(kong_request_latency_ms_bucket{job="kong"}[5m]))
+            ) > 2000
+          for: 5m
+          labels:
+            severity: critical
+            category: latency
+          annotations:
+            summary: "Kong gateway P95 request latency above 2s"
+            description: "Kong global P95 request latency is {{ $value | humanize }}ms (threshold: 2000ms). Most API requests are severely degraded."
+
+        - alert: KongHighUpstreamLatencyP95
+          expr: |
+            histogram_quantile(0.95,
+              sum by (service, le) (rate(kong_upstream_latency_ms_bucket{job="kong"}[5m]))
+            ) > 1500
+          for: 10m
+          labels:
+            severity: warning
+            category: latency
+          annotations:
+            summary: "Kong upstream P95 latency above 1.5s for {{ $labels.service }}"
+            description: "Upstream service {{ $labels.service }} P95 latency is {{ $value | humanize }}ms as seen from Kong."
+
+        - alert: KongHighInternalLatency
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(kong_kong_latency_ms_bucket{job="kong"}[5m]))
+            ) > 100
+          for: 10m
+          labels:
+            severity: warning
+            category: latency
+          annotations:
+            summary: "Kong internal processing P95 latency above 100ms"
+            description: "Kong's own processing overhead (plugins, routing) P95 is {{ $value | humanize }}ms. Check plugin chain and Lua memory."
+
+    # --- Traffic (RED: Rate / Golden: Traffic) ---
+    - name: kong-traffic
+      interval: 1m
+      rules:
+        - alert: KongNoTraffic
+          expr: |
+            sum(rate(kong_http_requests_total{job="kong"}[10m])) == 0
+            and sum(rate(kong_http_requests_total{job="kong"}[1h])) > 0
+          for: 10m
+          labels:
+            severity: warning
+            category: traffic
+          annotations:
+            summary: "Kong receiving no traffic"
+            description: "Kong has received zero requests in the last 10 minutes but had traffic in the prior hour."
+
+    # --- Saturation (Golden: Saturation) ---
+    - name: kong-saturation
+      interval: 1m
+      rules:
+        - alert: KongHighNginxConnections
+          expr: |
+            kong_nginx_connections_total{job="kong", state="active"} > 200
+          for: 5m
+          labels:
+            severity: warning
+            category: saturation
+          annotations:
+            summary: "Kong high active nginx connections"
+            description: "Kong has {{ $value | humanize }} active nginx connections (threshold: 200)."
+
+        - alert: KongSharedMemoryHigh
+          expr: |
+            (
+              kong_memory_lua_shared_dict_bytes{job="kong"}
+              / kong_memory_lua_shared_dict_total_bytes{job="kong"}
+            ) > 0.85
+          for: 10m
+          labels:
+            severity: warning
+            category: saturation
+          annotations:
+            summary: "Kong shared memory dict {{ $labels.shared_dict }} above 85%"
+            description: "Lua shared dict '{{ $labels.shared_dict }}' is using {{ $value | humanizePercentage }} of capacity."
+
+        - alert: KongSharedMemoryCritical
+          expr: |
+            (
+              kong_memory_lua_shared_dict_bytes{job="kong"}
+              / kong_memory_lua_shared_dict_total_bytes{job="kong"}
+            ) > 0.95
+          for: 5m
+          labels:
+            severity: critical
+            category: saturation
+          annotations:
+            summary: "Kong shared memory dict {{ $labels.shared_dict }} above 95%"
+            description: "Lua shared dict '{{ $labels.shared_dict }}' is using {{ $value | humanizePercentage }} of capacity. Kong may fail to process requests."
+
+    # --- Upstream Health ---
+    - name: kong-upstream-health
+      interval: 1m
+      rules:
+        - alert: KongUpstreamTargetUnhealthy
+          expr: |
+            kong_upstream_target_health{job="kong", state="healthchecks_off"} != 1
+            and kong_upstream_target_health{job="kong", state="healthy"} != 1
+          for: 2m
+          labels:
+            severity: warning
+            category: availability
+          annotations:
+            summary: "Kong upstream target unhealthy ({{ $labels.upstream }}/{{ $labels.target }})"
+            description: "Upstream target {{ $labels.target }} in upstream {{ $labels.upstream }} is not healthy."

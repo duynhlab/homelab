@@ -45,6 +45,13 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+  name: kong
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
   name: monitoring
 ---
 apiVersion: v1
@@ -118,3 +125,10 @@ metadata:
   labels:
     environment: local
   name: external-secrets-system
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+  name: cert-manager

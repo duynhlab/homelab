@@ -59,7 +59,11 @@ kubectl port-forward -n rustfs svc/rustfs-svc 9000:9000 9001:9001 > /dev/null 2>
 echo "Starting Postgres Operator UI port forward (8081)..."
 kubectl port-forward -n postgres-operator svc/postgres-operator-ui 8081:80 > /dev/null 2>&1 &
 
-# Frontend
+# Kong API Gateway (HTTP + HTTPS)
+echo "Starting Kong Gateway port forward (8000 HTTP, 8443 HTTPS)..."
+kubectl port-forward -n kong svc/kong-kong-proxy 8000:80 8443:443 > /dev/null 2>&1 &
+
+# Frontend (direct access, bypassing Kong)
 echo "Starting Frontend port forward (3001)..."
 kubectl port-forward -n default svc/frontend 3001:80 > /dev/null 2>&1 &
 
@@ -83,6 +87,8 @@ echo "Pyroscope:           http://localhost:4040"
 echo "VictoriaLogs:        http://localhost:9428"
 echo "RustFS Console:      http://localhost:9001 (API: 9000)"
 echo "Postgres Operator UI: http://localhost:8081"
-echo "Frontend:            http://localhost:3001"
+echo "Kong Gateway (HTTP):  http://gateway.duynhne.me:8000"
+echo "Kong Gateway (HTTPS): https://gateway.duynhne.me:8443"
+echo "Frontend (direct):   http://localhost:3001"
 echo ""
 echo "To stop port forwarding: pkill -f 'kubectl port-forward'"

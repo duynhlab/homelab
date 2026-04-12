@@ -45,6 +45,9 @@ configMapGenerator:
   - name: grafana-dashboard-kubernetes-cluster-overview
     files:
       - kubernetes-cluster-overview.json
+  - name: grafana-dashboard-kong
+    files:
+      - kong-dashboard.json
 
 resources:
   - grafana-dashboard-main.yaml
@@ -65,3 +68,4 @@ resources:
   - grafana-dashboard-pg-exporter-instance.yaml
   - grafana-dashboard-pg-exporter-self.yaml
   - grafana-dashboard-kubernetes-cluster-overview.yaml
+  - grafana-dashboard-kong.yaml

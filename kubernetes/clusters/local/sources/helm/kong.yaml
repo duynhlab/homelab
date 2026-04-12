@@ -1,0 +1,13 @@
+# Kong Helm repository — Kong Ingress Controller + API Gateway
+# https://github.com/Kong/charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: kong
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: helm-repository
+spec:
+  interval: 1h
+  url: https://charts.konghq.com

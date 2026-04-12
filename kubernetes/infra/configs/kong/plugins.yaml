@@ -1,0 +1,48 @@
+# Global CORS plugin — allows frontend to call APIs through Kong
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: cors-policy
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "true"
+plugin: cors
+config:
+  origins:
+    - "https://gateway.duynhne.me:8443"
+    - "http://gateway.duynhne.me:8000"
+    - "http://localhost:3001"
+    - "http://localhost:8000"
+  methods:
+    - GET
+    - POST
+    - PUT
+    - PATCH
+    - DELETE
+    - OPTIONS
+  headers:
+    - Content-Type
+    - Authorization
+    - X-Request-ID
+  exposed_headers:
+    - X-Request-ID
+  credentials: true
+  max_age: 3600
+---
+# Global Prometheus plugin — expose metrics for VictoriaMetrics scraping
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: prometheus-metrics
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "true"
+plugin: prometheus
+config:
+  status_code_metrics: true
+  latency_metrics: true
+  bandwidth_metrics: true
+  upstream_health_metrics: true

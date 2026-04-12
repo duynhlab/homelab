@@ -1,0 +1,74 @@
+# Self-signed CA chain for local homelab (works offline, no internet needed).
+# For production: uncomment the Let's Encrypt issuers at the bottom.
+
+# Step 1: Bootstrap issuer — generates the root CA
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-bootstrap
+spec:
+  selfSigned: {}
+---
+# Step 2: CA certificate — signed by the bootstrap issuer
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: homelab-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: homelab-ca
+  duration: 87600h # 10 years
+  secretName: homelab-ca-secret
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    kind: ClusterIssuer
+    name: selfsigned-bootstrap
+    group: cert-manager.io
+---
+# Step 3: CA issuer — signs all service certificates using the CA cert
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: homelab-ca
+spec:
+  ca:
+    secretName: homelab-ca-secret
+
+# --- Let's Encrypt (HTTP-01) — for production with public internet access ---
+# Uncomment when cluster has a public ingress controller and DNS records.
+# Update ingress class to match your ingress controller (e.g., kong).
+#
+# ---
+# apiVersion: cert-manager.io/v1
+# kind: ClusterIssuer
+# metadata:
+#   name: letsencrypt-staging
+# spec:
+#   acme:
+#     email: acme@duynhne.me
+#     server: https://acme-staging-v02.api.letsencrypt.org/directory
+#     privateKeySecretRef:
+#       name: letsencrypt-staging-account-key
+#     solvers:
+#       - http01:
+#           ingress:
+#             class: kong
+# ---
+# apiVersion: cert-manager.io/v1
+# kind: ClusterIssuer
+# metadata:
+#   name: letsencrypt-prod
+# spec:
+#   acme:
+#     email: acme@duynhne.me
+#     server: https://acme-v02.api.letsencrypt.org/directory
+#     privateKeySecretRef:
+#       name: letsencrypt-prod-account-key
+#     solvers:
+#       - http01:
+#           ingress:
+#             class: kong

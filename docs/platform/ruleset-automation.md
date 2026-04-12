@@ -38,44 +38,37 @@ This ensures new repositories automatically get the standard ruleset within 24 h
 When a caller workflow invokes a reusable workflow, GitHub constructs the status check name as:
 
 ```
-{caller workflow name} / {caller job ID} / {reusable job name}
+{caller job ID} / {reusable job name}
 ```
 
 For example, with this caller:
 
 ```yaml
-name: Check               # ← caller workflow name
+name: Check               # ← workflow name (display only)
 
 jobs:
-  go-check:                # ← caller job ID
+  go-check:                # ← caller job ID (used in check name)
     uses: org/shared/.github/workflows/go-check.yml@main
 ```
 
-And this reusable workflow containing a job named `Test`, the resulting check name is:
+And this reusable workflow containing a job named `Test`, the actual check run name for ruleset matching is:
 
 ```
-Check / go-check / Test
+go-check / Test
 ```
+
+The GitHub UI displays it with additional context: `Check / go-check / Test (pull_request)`, but the shorter form is what rulesets match against. Use `gh pr checks` or the Check Runs API to find the exact name.
 
 ### Why split into check.yml + build.yml
 
-If a single workflow triggers on **both** `pull_request` and `push`, GitHub appends the event name as a suffix to disambiguate:
+Splitting into two files keeps concerns separated:
 
-```
-CI Pipeline / go-check / Test (pull_request)
-CI Pipeline / go-check / Test (push)
-```
+| File | Trigger | Purpose |
+|------|---------|---------|
+| `check.yml` | `pull_request` only | Tests, lint, SonarCloud |
+| `build.yml` | `push` only | Docker build, scan, sign |
 
-This makes ruleset matching fragile — the required check name must include the suffix. By splitting into two files:
-
-| File | Trigger | Workflow name |
-|------|---------|---------------|
-| `check.yml` | `pull_request` only | `Check` |
-| `build.yml` | `push` only | `Build` |
-
-Each workflow handles a single event, so GitHub does **not** append `(pull_request)` or `(push)`.
-
-The ruleset-required check becomes simply: **`Check / go-check / Test`**
+The ruleset-required check is: **`go-check / Test`**
 
 ## Configuration
 
@@ -87,7 +80,7 @@ The ruleset-required check becomes simply: **`Check / go-check / Test`**
 | `GITHUB_ORG` | Target GitHub organization | `duynhlab` |
 | `REPO_PATTERN` | Regex to match repos (space-separated alternatives = OR) | `.*-service frontend pkg` |
 | `REPO_EXCLUDE_PATTERN` | Regex to exclude repos | `^$` |
-| `STATUS_CHECK_CONTEXTS` | Comma-separated required check names | `Check / go-check / Test` |
+| `STATUS_CHECK_CONTEXTS` | Comma-separated required check names | `go-check / Test` |
 | `DRY_RUN` | Preview mode (no writes) — defaults to `true` | `false` |
 
 ### Setting up `GH_PATCHER_TOKEN`

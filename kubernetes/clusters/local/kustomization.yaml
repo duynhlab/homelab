@@ -6,6 +6,8 @@ resources:
   - flux-system/
   - sources/
   - controllers.yaml     # Namespaces + operators (monitoring, databases, slo)
+  - cert-manager-config.yaml
+  - kong-config.yaml         # Kong Ingress routes + plugins (depends on controllers + cert-manager)
   - secrets.yaml         # Vault + ESO (Must be before databases)
   - databases.yaml       # DB Instances (Must be before apps)
   - databases-cnpg-dr.yaml  # CNPG DR replica (depends on databases-local)

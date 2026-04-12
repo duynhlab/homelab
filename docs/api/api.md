@@ -5,6 +5,8 @@
 > **Architecture:** 3-Layer (Web / Logic / Core)  
 > **API Version:** v1 only (canonical, frontend-aligned)
 
+**See also (draft, non-canonical):** [Gateway URL naming exploration](api-naming-convention.md) — does not change the `/api/v1/*` surface documented below.
+
 ---
 
 ## Master API Overview

@@ -11,6 +11,8 @@ metadata:
 plugin: cors
 config:
   origins:
+    - "https://gateway.duynhne.me"
+    - "http://gateway.duynhne.me"
     - "https://gateway.duynhne.me:8443"
     - "http://gateway.duynhne.me:8000"
     - "http://localhost:3001"

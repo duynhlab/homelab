@@ -63,9 +63,15 @@ resources:
   - grafana-dashboard-pgbouncer.yaml
   - grafana-dashboard-postgres-replication-lag.yaml
   - grafana-dashboard-pgdog.yaml
-  - grafana-dashboard-loki.yaml
   - grafana-dashboard-redis.yaml
   - grafana-dashboard-pg-exporter-instance.yaml
   - grafana-dashboard-pg-exporter-self.yaml
   - grafana-dashboard-kubernetes-cluster-overview.yaml
   - grafana-dashboard-kong.yaml
+  # VictoriaMetrics stack dashboards
+  - grafana-dashboard-vmsingle.yaml
+  - grafana-dashboard-vmagent.yaml
+  - grafana-dashboard-vmalert.yaml
+  # Flux GitOps dashboards
+  - grafana-dashboard-flux-cluster.yaml
+  - grafana-dashboard-flux-controlplane.yaml

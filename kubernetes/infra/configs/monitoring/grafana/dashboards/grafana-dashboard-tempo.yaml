@@ -17,5 +17,5 @@ spec:
     - inputName: DS_TEMPO
       datasourceName: Tempo
     - inputName: DS_LOKI
-      datasourceName: Loki
+      datasourceName: VictoriaLogs
 

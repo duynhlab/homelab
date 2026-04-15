@@ -3,6 +3,13 @@
 set -o errexit
 
 echo "=== Setting up Access ==="
+echo ""
+echo "RECOMMENDED: Use /etc/hosts domain mapping instead of port-forwarding."
+echo "See README.md for setup instructions."
+echo ""
+echo "This script provides fallback port-forwarding for environments"
+echo "without /etc/hosts configuration or extraPortMappings."
+echo ""
 
 # Kill existing port forwards
 echo "Stopping existing port forwards..."
@@ -46,7 +53,6 @@ kubectl port-forward -n monitoring svc/tempo 3200:3200 > /dev/null 2>&1 &
 echo "Starting Pyroscope port forward (4040)..."
 kubectl port-forward -n monitoring svc/pyroscope 4040:4040 > /dev/null 2>&1 &
 
-
 # VictoriaLogs (Operator-managed VLSingle)
 echo "Starting VictoriaLogs port forward (9428)..."
 kubectl port-forward -n monitoring svc/vlsingle-victoria-logs 9428:9428 > /dev/null 2>&1 &
@@ -67,7 +73,6 @@ kubectl port-forward -n kong svc/kong-kong-proxy 8000:80 8443:443 > /dev/null 2>
 echo "Starting Frontend port forward (3001)..."
 kubectl port-forward -n default svc/frontend 3001:80 > /dev/null 2>&1 &
 
-
 # Wait for port forwards to be ready
 echo "Waiting for port forwards to be ready..."
 sleep 5
@@ -75,12 +80,12 @@ sleep 5
 echo ""
 echo "SUCCESS: Port forwarding setup complete!"
 echo ""
-echo "Access URLs:"
+echo "Access URLs (port-forward fallback):"
 echo "Flux Web UI:         http://localhost:9080"
 echo "Grafana:             http://localhost:3000"
 echo "VictoriaMetrics:     http://localhost:8428/vmui"
-echo "VMAlert (rules):     http://localhost:8080  (VMalert UI; Grafana datasource may proxy /vmalert/ via VMSingle)"
-echo "Karma (alerts):      http://localhost:8086  (Alertmanager / firing alerts)"
+echo "VMAlert (rules):     http://localhost:8080"
+echo "Karma (alerts):      http://localhost:8086"
 echo "Jaeger:              http://localhost:16686"
 echo "Tempo:               http://localhost:3200"
 echo "Pyroscope:           http://localhost:4040"

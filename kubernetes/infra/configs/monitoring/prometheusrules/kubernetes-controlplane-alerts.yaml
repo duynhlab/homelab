@@ -1,0 +1,98 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kubernetes-controlplane-alerts
+  namespace: monitoring
+  labels:
+    prometheus: victoria-metrics
+    role: alert-rules
+spec:
+  groups:
+    - name: kubernetes-controlplane
+      rules:
+        - alert: EtcdMembersDown
+          expr: |
+            max without(endpoint)
+            (sum without(instance) (up{job=~".*etcd.*"} == bool 0))
+            > 0
+          for: 3m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Etcd cluster members are down"
+            description: "Etcd cluster has unhealthy members. Cluster stability is at risk."
+
+        - alert: EtcdHighFsyncDurations
+          expr: |
+            histogram_quantile(0.99,
+              rate(etcd_disk_wal_fsync_duration_seconds_bucket[5m])
+            ) > 0.5
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Etcd WAL fsync duration is high (P99 > 500ms)"
+            description: "High fsync duration indicates disk I/O issues that can affect etcd stability."
+
+        - alert: EtcdHighCommitDurations
+          expr: |
+            histogram_quantile(0.99,
+              rate(etcd_disk_backend_commit_duration_seconds_bucket[5m])
+            ) > 0.25
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Etcd backend commit duration is high (P99 > 250ms)"
+            description: "High commit duration indicates disk I/O pressure on etcd."
+
+        - alert: EtcdHighNumberOfLeaderChanges
+          expr: increase(etcd_server_leader_changes_seen_total[1h]) > 3
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Etcd has seen {{ $value }} leader changes in the last hour"
+            description: "Frequent leader changes indicate network or resource issues in the etcd cluster."
+
+        - alert: CoreDNSDown
+          expr: absent(up{job="kube-dns"} == 1)
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "CoreDNS is down"
+            description: "CoreDNS has no running instances. DNS resolution in the cluster will fail."
+
+        - alert: CoreDNSHighErrorRate
+          expr: |
+            sum(rate(coredns_dns_responses_total{rcode="SERVFAIL"}[5m]))
+            / sum(rate(coredns_dns_responses_total[5m]))
+            > 0.03
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CoreDNS SERVFAIL error rate is above 3%"
+            description: "{{ $value | humanizePercentage }} of DNS queries are failing with SERVFAIL."
+
+        - alert: KubeletDown
+          expr: absent(up{job="kubelet"} == 1)
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Kubelet is down"
+            description: "No kubelet instances are reporting metrics. Node health cannot be determined."
+
+        - alert: KubeletTooManyPods
+          expr: |
+            max(kubelet_running_pods) by (instance)
+            / max(kubelet_node_config_assigned_pod_cidr_max_pods) by (instance)
+            > 0.9
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Kubelet on {{ $labels.instance }} is running more than 90% of max pods"
+            description: "Node is approaching the pod capacity limit. New pods may fail to schedule."

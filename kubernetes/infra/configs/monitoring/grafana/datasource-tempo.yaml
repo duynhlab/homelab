@@ -10,7 +10,7 @@ spec:
       serviceMap:
         datasourceUid: prometheus
       tracesToLogsV2:
-        datasourceUid: loki
+        datasourceUid: victorialogs
         tags:
         - trace_id
       tracesToMetrics:

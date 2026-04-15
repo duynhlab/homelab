@@ -1,0 +1,24 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: mcp-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: infrastructure
+spec:
+  interval: 10m
+  timeout: 10m
+  retryInterval: 2m
+
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+
+  path: ./controllers/mcp
+
+  prune: true
+  wait: false
+
+  dependsOn:
+    - name: monitoring-local

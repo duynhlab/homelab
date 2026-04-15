@@ -12,7 +12,7 @@ Production-ready microservices monitoring platform with 8 Go services, complete 
 
 - 8 microservices with v1 API (canonical, frontend-aligned)
 - 34 Grafana dashboard panels (5 row groups)
-- Complete observability stack (Prometheus, Tempo, Jaeger, Loki, Pyroscope)
+- Complete observability stack (VictoriaMetrics, Tempo, Jaeger, VictoriaLogs, Pyroscope)
 - PostgreSQL database integration (3 clusters + DR replica, Flyway migrations)
 - Valkey caching (Redis-compatible) with Cache-Aside pattern
 - SLO management via Sloth Operator
@@ -60,11 +60,11 @@ flowchart TD
         direction LR
         prom["Prometheus<br/>(Metrics)"]:::obs
         tempo["Tempo / OTel<br/>(Tracing)"]:::obs
-        loki["Loki / Vector<br/>(Logging)"]:::obs
+        vlogs["VictoriaLogs / Vector<br/>(Logging)"]:::obs
         pyro["Pyroscope<br/>(Profiles)"]:::obs
         grafana["📊 Grafana"]:::obs
         
-        prom & tempo & loki & pyro --> grafana
+        prom & tempo & vlogs & pyro --> grafana
     end
 
     %% Core Services Layer
@@ -120,7 +120,7 @@ flowchart TD
 - **8 Microservices**: Each follows 3-layer architecture (Web -> Logic -> Core), organized into 4 domains (identity, catalog, checkout, comms).
 - **Cache-Aside Pattern**: Logic Layer checks Valkey first, queries database on miss, writes to cache.
 - **3 PostgreSQL Clusters**: auth-db (Zalando), supporting-shared-db (Zalando, hosts user/notification/shipping/review), cnpg-db (CNPG, hosts product/cart/order). Connected via PgBouncer and PgDog poolers. A DR replica cluster (cnpg-db-replica) continuously recovers from cnpg-db WAL archive.
-- **Full Observability**: Traces (Tempo + Jaeger via OTel Collector), Metrics (Prometheus), Logs (Loki + Vector), Profiles (Pyroscope), all visualized in Grafana.
+- **Full Observability**: Traces (Tempo + Jaeger via OTel Collector), Metrics (VictoriaMetrics via VMAgent/VMSingle), Logs (VictoriaLogs + Vector), Profiles (Pyroscope), all visualized in Grafana.
 - **GitOps Delivery**: Flux Operator with domain ResourceSets + per-service InputProviders + OCI + Kustomize. See [Application Delivery](docs/platform/application-delivery.md) and [Setup](docs/platform/setup.md).
 
 **Detailed Architecture**: See [`docs/observability/architecture.md`](docs/observability/architecture.md) for middleware chain and APM integration.
@@ -146,7 +146,7 @@ flowchart TD
 - **GitOps**: Flux Operator, ResourceSet (Unified Templating), Kustomize, OCI Registry
     - Application layer: 4 domain ResourceSets (identity, catalog, checkout, comms) + per-service InputProviders
 - **Dynamic Delivery**: OCIArtifactTag (Automated image updates)
-- **Monitoring**: Prometheus, Grafana, Tempo, Loki, Pyroscope, Jaeger, Vector.
+- **Monitoring**: VictoriaMetrics (VMSingle, VMAgent, VMAlert), Grafana, Tempo, VictoriaLogs, Pyroscope, Jaeger, Vector.
 
 **Observability Details**: See [`docs/observability/README.md`](docs/observability/README.md) for complete observability system overview.
 
@@ -169,7 +169,7 @@ make flux-push    # 3. Deploy everything (infrastructure + apps)
 
 **What gets deployed automatically:**
 
-- Infrastructure: Monitoring (Prometheus, Grafana), APM (Tempo, Loki, Jaeger, Pyroscope, Vector, OTel)
+- Infrastructure: Monitoring (VictoriaMetrics, Grafana), APM (Tempo, VictoriaLogs, Jaeger, Pyroscope, Vector, OTel)
 - Databases: PostgreSQL operators, 3 clusters + DR replica, connection poolers
 - Cache: Valkey (Redis-compatible) in cache-system namespace
 - Applications: 8 microservices + frontend (via domain ResourceSets)
@@ -190,16 +190,16 @@ make flux-push    # 3. Deploy everything (infrastructure + apps)
 ---
 ## Grafana Dashboards
 
-The platform includes **14 Grafana dashboards** covering observability, databases, and SLO monitoring. All dashboards are deployed via GitOps from `kubernetes/infra/configs/monitoring/grafana/dashboards/`.
+The platform includes **22 Grafana dashboards** covering observability, databases, and SLO monitoring. All dashboards are deployed via GitOps from `kubernetes/infra/configs/monitoring/grafana/dashboards/`.
 
 **Key Dashboards:**
 - **Microservices Monitoring** (`microservices-monitoring-001`): Main observability dashboard with 34 panels covering metrics, traffic, errors, and runtime
 - **Tempo Distributed Tracing** (`tempo-obs-001`): Trace visualization with exemplars and log correlation
 - **SLO Overview & Detailed**: Error budget tracking and burn rate monitoring
 - **Database Dashboards**: PostgreSQL, CloudNativePG, PgBouncer, PgCat, PgDog monitoring
-- **Logs & Infrastructure**: Loki logs explorer, Vector metrics
+- **Logs & Infrastructure**: VictoriaLogs explorer, Vector metrics
 
-**Access**: All dashboards are available via Grafana at <http://localhost:3000> after port-forwarding (see [Access Points](#access-points) below).
+**Access**: All dashboards are available via Grafana at http://grafana.duynhne.me (see [Access Points](#access-points) below).
 
 **Documentation**: See [`docs/observability/grafana/dashboard-reference.md`](docs/observability/grafana/dashboard-reference.md) for complete dashboard reference (34 data panels + 5 row panels, query analysis, troubleshooting) and [`docs/observability/metrics/README.md`](docs/observability/metrics/README.md) for metrics guide.
 
@@ -207,27 +207,67 @@ The platform includes **14 Grafana dashboards** covering observability, database
 
 ## Access Points
 
-After deployment, access services via port-forwarding. Use `make flux-ui` to automatically set up all port-forwards, or manually forward individual services:
+After deployment, access services via domain names using `/etc/hosts` mapping through Kong Ingress.
 
-| Service | URL | Command | Credentials |
-|---------|-----|---------|-------------|
-| Flux Web UI | <http://localhost:9080> | `make flux-ui` or `kubectl port-forward -n flux-system svc/flux-operator 9080:9080` | - |
-| Grafana | <http://localhost:3000> | `kubectl port-forward -n monitoring svc/grafana-service 3000:3000` | Anonymous (enabled) |
-| VictoriaMetrics | <http://localhost:8428/vmui> | `kubectl port-forward -n monitoring svc/vmsingle-victoria-metrics 8428:8428` | - |
-| Jaeger UI | <http://localhost:16686> | `kubectl port-forward -n monitoring svc/jaeger 16686:16686` | - |
-| Tempo | <http://localhost:3200> | `kubectl port-forward -n monitoring svc/tempo 3200:3200` | - |
-| Pyroscope | <http://localhost:4040> | `kubectl port-forward -n monitoring svc/pyroscope 4040:4040` | - |
-| VictoriaLogs | <http://localhost:9428> | `kubectl port-forward -n monitoring svc/vlsingle-victoria-logs 9428:9428` | - |
-| Postgres Operator UI | <http://localhost:8082> | `kubectl port-forward -n postgres-operator svc/postgres-operator 8082:8080` | - |
-| Frontend | <http://localhost:3001> | `kubectl port-forward -n default svc/frontend 3001:80` | - |
+### Setup `/etc/hosts`
 
-**Quick Setup**: Run `make flux-ui` to automatically set up all port-forwards in the background. To stop: `pkill -f 'kubectl port-forward'`
+Add the following entries to your `/etc/hosts` file:
 
-**GitOps Monitoring**: Use `make flux-ui` to open Flux Web UI and monitor reconciliation status, view Kustomizations, and check deployment health.
+```bash
+# duynhlab homelab — Kong Ingress domains
+127.0.0.1 gateway.duynhne.me
+127.0.0.1 app.duynhne.me
+127.0.0.1 grafana.duynhne.me
+127.0.0.1 vmui.duynhne.me
+127.0.0.1 vmalert.duynhne.me
+127.0.0.1 karma.duynhne.me
+127.0.0.1 jaeger.duynhne.me
+127.0.0.1 tempo.duynhne.me
+127.0.0.1 pyroscope.duynhne.me
+127.0.0.1 logs.duynhne.me
+127.0.0.1 ui.duynhne.me
+127.0.0.1 source.duynhne.me
+127.0.0.1 openbao.duynhne.me
+127.0.0.1 pgui.duynhne.me
+127.0.0.1 vm-mcp.duynhne.me
+127.0.0.1 vl-mcp.duynhne.me
+127.0.0.1 flux-mcp.duynhne.me
+```
 
-**Makefile Commands**: See `make help` for all available commands (cluster, Flux, validation, utilities).
+> **Note**: Requires Kind cluster with `extraPortMappings` (ports 80/443 → NodePort 30080/30443). This is configured automatically by `make cluster-up`.
 
-**Port-Forwarding Guide**: See [`docs/platform/setup.md`](docs/platform/setup.md)
+### Service URLs
+
+All services are routed through Kong Ingress Controller on port 80 (HTTP).
+
+| Service | Domain | Description |
+|---------|--------|-------------|
+| **Frontend** | http://app.duynhne.me | React SPA |
+| **API Gateway** | http://gateway.duynhne.me | Kong → 8 microservices (`/api/v1/*`) |
+| **Grafana** | http://grafana.duynhne.me | Dashboards (anonymous access) |
+| **VictoriaMetrics** | http://vmui.duynhne.me/vmui | Metrics query UI |
+| **VMAlert** | http://vmalert.duynhne.me | Alert rules & evaluation |
+| **Karma** | http://karma.duynhne.me | Alertmanager dashboard |
+| **Jaeger** | http://jaeger.duynhne.me | Distributed tracing UI |
+| **Tempo** | http://tempo.duynhne.me | Trace backend API |
+| **Pyroscope** | http://pyroscope.duynhne.me | Continuous profiling |
+| **VictoriaLogs** | http://logs.duynhne.me | Log query UI |
+| **Flux UI** | http://ui.duynhne.me | GitOps reconciliation status |
+| **RustFS Console** | http://source.duynhne.me | S3 object storage console |
+| **OpenBAO** | http://openbao.duynhne.me | Secrets management UI |
+| **Postgres Operator UI** | http://pgui.duynhne.me | Database cluster management |
+| **VM MCP** | http://vm-mcp.duynhne.me/mcp | VictoriaMetrics MCP (AI assistants) |
+| **VL MCP** | http://vl-mcp.duynhne.me/mcp | VictoriaLogs MCP (AI assistants) |
+| **Flux MCP** | http://flux-mcp.duynhne.me/mcp | Flux Operator MCP (AI assistants) |
+
+### Fallback: Port Forwarding
+
+If `/etc/hosts` is not configured (e.g., CI environments), use `make flux-ui` for port-forwarding:
+
+```bash
+make flux-ui          # Start all port-forwards
+pkill -f 'kubectl port-forward'  # Stop all
+```
 
 ---
 

@@ -15,4 +15,4 @@ spec:
     - inputName: DS_PROMETHEUS
       datasourceName: VictoriaMetrics
     - inputName: DS_LOKI
-      datasourceName: Loki
+      datasourceName: VictoriaLogs

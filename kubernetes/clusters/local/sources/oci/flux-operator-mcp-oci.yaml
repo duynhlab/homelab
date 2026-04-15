@@ -1,0 +1,16 @@
+---
+# OCIRepository for Flux Operator MCP Server chart
+# Chart: oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator-mcp
+# Docs: https://fluxoperator.dev/docs/charts/flux-operator-mcp
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: flux-operator-mcp-oci
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: helm-chart
+spec:
+  interval: 10m
+  url: oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator-mcp
+  ref:
+    semver: "*"

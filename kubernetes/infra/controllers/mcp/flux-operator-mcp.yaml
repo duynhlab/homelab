@@ -1,0 +1,54 @@
+# Flux Operator MCP Server — AI-assisted GitOps operations
+# Chart: oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator-mcp
+# Docs: https://fluxoperator.dev/docs/mcp/install/
+#
+# Enables AI assistants to interact with Flux-managed Kubernetes clusters.
+# Capabilities: get Flux instance/resources/logs/metrics, reconcile sources/
+# kustomizations/helmreleases, suspend/resume, apply manifests, search docs.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: flux-operator-mcp
+  namespace: flux-system
+spec:
+  interval: 30m
+  timeout: 5m
+  chartRef:
+    kind: OCIRepository
+    name: flux-operator-mcp-oci
+    namespace: flux-system
+  serviceAccountName: flux-operator
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    transport: http
+    readonly: false
+
+    networkPolicy:
+      create: true
+      ingress:
+        namespaces: [kong]
+
+    rbac:
+      create: true
+
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    securityContext:
+      runAsNonRoot: true
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+      seccompProfile:
+        type: "RuntimeDefault"

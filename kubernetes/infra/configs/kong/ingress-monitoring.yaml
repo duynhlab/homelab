@@ -1,0 +1,180 @@
+# Monitoring & Infrastructure Ingress routes
+# Each service gets a dedicated subdomain under *.duynhne.me
+# Accessible via /etc/hosts → Kong NodePort (80/443)
+
+# Grafana — grafana.duynhne.me
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana
+  namespace: monitoring
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: grafana.duynhne.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana-service
+                port:
+                  number: 3000
+---
+# VictoriaMetrics (VMSingle) — vmui.duynhne.me
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: victoriametrics
+  namespace: monitoring
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: vmui.duynhne.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vmsingle-victoria-metrics
+                port:
+                  number: 8428
+---
+# VMAlert — vmalert.duynhne.me
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vmalert
+  namespace: monitoring
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: vmalert.duynhne.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vmalert-victoria-metrics
+                port:
+                  number: 8080
+---
+# Karma (Alertmanager dashboard) — karma.duynhne.me
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: karma
+  namespace: monitoring
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: karma.duynhne.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: karma
+                port:
+                  number: 8080
+---
+# Jaeger — jaeger.duynhne.me
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jaeger
+  namespace: monitoring
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: jaeger.duynhne.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jaeger
+                port:
+                  number: 16686
+---
+# Tempo — tempo.duynhne.me
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tempo
+  namespace: monitoring
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: tempo.duynhne.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: tempo
+                port:
+                  number: 3200
+---
+# Pyroscope — pyroscope.duynhne.me
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pyroscope
+  namespace: monitoring
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: pyroscope.duynhne.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pyroscope
+                port:
+                  number: 4040
+---
+# VictoriaLogs — logs.duynhne.me
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: victorialogs
+  namespace: monitoring
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: logs.duynhne.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vlsingle-victoria-logs
+                port:
+                  number: 9428

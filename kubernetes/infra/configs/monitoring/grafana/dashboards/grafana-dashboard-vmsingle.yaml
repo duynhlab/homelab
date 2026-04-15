@@ -1,0 +1,14 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: victoriametrics-vmsingle
+  namespace: monitoring
+spec:
+  folder: VictoriaMetrics
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"
+  url: "https://grafana.com/api/dashboards/10229/revisions/37/download"
+  contentCacheDuration: 48h

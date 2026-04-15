@@ -1,0 +1,38 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cert-manager-alerts
+  namespace: monitoring
+  labels:
+    prometheus: victoria-metrics
+    role: alert-rules
+spec:
+  groups:
+    - name: cert-manager
+      rules:
+        - alert: CertManagerCertExpiringSoon
+          expr: certmanager_certificate_expiration_timestamp_seconds - time() < 7 * 24 * 3600
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in less than 7 days"
+            description: "Certificate {{ $labels.name }} in namespace {{ $labels.namespace }} will expire in {{ $value | humanizeDuration }}."
+
+        - alert: CertManagerCertExpiryCritical
+          expr: certmanager_certificate_expiration_timestamp_seconds - time() < 24 * 3600
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in less than 24 hours"
+            description: "Certificate {{ $labels.name }} in namespace {{ $labels.namespace }} will expire in {{ $value | humanizeDuration }}. Immediate action required."
+
+        - alert: CertManagerCertNotReady
+          expr: certmanager_certificate_ready_status{condition="False"} == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} is not ready"
+            description: "Certificate {{ $labels.name }} in namespace {{ $labels.namespace }} has not been issued or renewed. Check cert-manager logs."

@@ -10,6 +10,9 @@ resources:
   - oci/grafana-operator-oci.yaml
   - oci/victoria-metrics-operator-oci.yaml
   - oci/cronjobs-oci.yaml
+  - oci/victoria-metrics-mcp-oci.yaml
+  - oci/victoria-logs-mcp-oci.yaml
+  - oci/flux-operator-mcp-oci.yaml
   
   # Helm Repositories
   - helm/prometheus-community.yaml

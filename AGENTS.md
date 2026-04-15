@@ -205,7 +205,7 @@ flowchart TD
 - **Observability**: OpenTelemetry (traces, metrics, logs)
 - **GitOps**: Flux Operator, Kustomize, OCI Registry
 - **Deployment**: Kubernetes (Kind), Helm 3
-- **Monitoring**: Prometheus, Grafana, Tempo, Loki, Pyroscope, Jaeger
+- **Monitoring**: VictoriaMetrics (VMSingle, VMAgent, VMAlert, VMAlertmanager), Grafana, Tempo, VictoriaLogs, Pyroscope, Jaeger, Vector
 - **Secrets**: OpenBAO (HA Raft, 3-node) + External Secrets Operator (ESO)
   - Centralized secret management with Kubernetes sync
   - **Secrets Documentation**: [`docs/secrets/secrets-management.md`](docs/secrets/secrets-management.md)
@@ -276,15 +276,28 @@ make flux-push    # 3. Deploy All (Flux reconciles in dependency order)
 
 1. **Foundation** - Flux Operator, namespaces, OCI sources
 2. **Infrastructure** (BEFORE apps) - Monitoring, APM, Databases, SLO
-   - Monitoring: Prometheus, Grafana, Metrics Server
-   - APM: Tempo, Loki, Vector, OTel Collector, Pyroscope, Jaeger
+   - Monitoring: VictoriaMetrics (VMSingle, VMAgent, VMAlert), Grafana, Metrics Server
+   - APM: Tempo, VictoriaLogs, Vector, OTel Collector, Pyroscope, Jaeger
+   - MCP Servers: victoria-metrics-mcp, victoria-logs-mcp, flux-operator-mcp
    - Databases: PostgreSQL operators, 3 clusters + DR replica, connection poolers
    - SLO: Sloth Operator + 8 PrometheusServiceLevel CRDs
 3. **Applications** - 8 microservices + frontend + k6 load testing
 
 **Dependency Chain:**
 
-- `apps-local` has `dependsOn: [infrastructure-local]`
+```
+flux-system (bootstrap)
+  ├── controllers-local (operators, CRDs, Kong, cert-manager, secrets managers)
+  ├── cert-manager-local (depends: controllers)
+  ├── kong-config-local (depends: controllers + cert-manager) — Ingress resources
+  ├── secrets-local (depends: controllers)
+  ├── databases-local (depends: secrets + monitoring)
+  ├── databases-cnpg-dr-local (depends: databases + secrets) — DR replica
+  ├── monitoring-local (depends: controllers) — VMSingle, VLSingle, Grafana, alerting
+  ├── mcp-local (depends: monitoring, wait: false) — 3 MCP HelmReleases
+  └── apps-local (depends: databases + monitoring) — 8 microservices via ResourceSets
+```
+
 - Apps **will NOT start** until infrastructure is ready
 - Flux enforces this automatically via Kustomization CRDs
 
@@ -357,6 +370,9 @@ make flux-sync
 - Databases: `kubernetes/infra/configs/databases/`
 - Controllers: `kubernetes/infra/controllers/` (metrics, logging, tracing, profiling, databases, secrets)
 - Configs: `kubernetes/infra/configs/` (monitoring, databases, secrets)
+- MCP servers: `kubernetes/infra/controllers/mcp/` (decoupled from controllers chain)
+- Kong Ingress: `kubernetes/infra/configs/kong/` (ingress resources for all services)
+- Cluster Kustomizations: `kubernetes/clusters/local/` (dependency chain)
 
 **Add/modify secrets:**
 
@@ -366,6 +382,14 @@ make flux-sync
 - ClusterSecretStore: `kubernetes/infra/configs/secrets/cluster-secret-store.yaml`
 - OpenBAO HelmRelease: `kubernetes/infra/controllers/secrets/openbao/helmrelease.yaml`
 - ESO HelmRelease: `kubernetes/infra/controllers/secrets/external-secrets/helmrelease.yaml`
+
+**Access services via domain names:**
+
+- All services are routed through Kong Ingress Controller with `/etc/hosts` mapping
+- Domain pattern: `*.duynhne.me` (e.g., `grafana.duynhne.me`, `vmui.duynhne.me`)
+- Kong runs as NodePort (30080/30443), Kind maps host ports 80/443
+- Fallback: `make flux-ui` for port-forwarding
+- See `README.md` for full domain list and `/etc/hosts` setup
 
 ### Find Documentation by Topic
 

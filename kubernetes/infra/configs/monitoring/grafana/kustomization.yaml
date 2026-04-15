@@ -3,7 +3,6 @@ kind: Kustomization
 
 resources:
   - grafana.yaml
-  - datasource-loki.yaml
   - datasource-victorialogs.yaml
   - datasource-tempo.yaml
   - datasource-jaeger.yaml

@@ -30,9 +30,5 @@ spec:
       namespace: monitoring
     - apiVersion: helm.toolkit.fluxcd.io/v2
       kind: HelmRelease
-      name: loki
-      namespace: monitoring
-    - apiVersion: helm.toolkit.fluxcd.io/v2
-      kind: HelmRelease
       name: tempo
       namespace: monitoring

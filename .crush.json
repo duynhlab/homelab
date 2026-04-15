@@ -1,0 +1,20 @@
+{
+  "$schema": "https://charm.land/crush.json",
+  "mcp": {
+    "victoria-metrics": {
+      "type": "http",
+      "url": "http://vm-mcp.duynhne.me/mcp",
+      "timeout": 30
+    },
+    "victoria-logs": {
+      "type": "http",
+      "url": "http://vl-mcp.duynhne.me/mcp",
+      "timeout": 30
+    },
+    "flux-operator": {
+      "type": "http",
+      "url": "http://flux-mcp.duynhne.me/mcp",
+      "timeout": 30
+    }
+  }
+}

@@ -4,3 +4,6 @@ resources:
   - plugins.yaml
   - ingress-frontend.yaml
   - ingress-api.yaml
+  - ingress-monitoring.yaml
+  - ingress-infra.yaml
+  - ingress-mcp.yaml

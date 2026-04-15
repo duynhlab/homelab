@@ -1,8 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Logging stack: Loki (storage) + Vector (collector)
-# VictoriaLogs is now operator-managed via VLSingle CRD in configs/monitoring/victoriametrics/
+# Logging stack: VictoriaLogs (storage) + Vector (collector)
+# VictoriaLogs is operator-managed via VLSingle CRD in configs/monitoring/victoriametrics/
 resources:
-  - loki/
   - vector/vector.yaml

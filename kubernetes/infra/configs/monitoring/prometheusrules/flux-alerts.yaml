@@ -1,0 +1,71 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: flux-alerts
+  namespace: monitoring
+  labels:
+    prometheus: victoria-metrics
+    role: alert-rules
+spec:
+  groups:
+    - name: flux-gitops
+      rules:
+        - alert: FluxReconciliationFailure
+          expr: |
+            gotk_resource_info{ready="False"} == 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Flux {{ $labels.customresource_kind }} {{ $labels.exported_namespace }}/{{ $labels.name }} reconciliation failing"
+            description: "{{ $labels.customresource_kind }} {{ $labels.name }} in namespace {{ $labels.exported_namespace }} has been in a non-ready state for more than 10 minutes."
+
+        - alert: FluxSuspendedResource
+          expr: |
+            gotk_resource_info{suspended="true"} == 1
+          for: 24h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Flux {{ $labels.customresource_kind }} {{ $labels.exported_namespace }}/{{ $labels.name }} has been suspended for 24h"
+            description: "{{ $labels.customresource_kind }} {{ $labels.name }} in namespace {{ $labels.exported_namespace }} has been suspended for more than 24 hours. Verify if this is intentional."
+
+        - alert: FluxHelmReleaseNotReady
+          expr: |
+            gotk_resource_info{customresource_kind="HelmRelease", ready="False"} == 1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Flux HelmRelease {{ $labels.exported_namespace }}/{{ $labels.name }} is not ready"
+            description: "HelmRelease {{ $labels.name }} (chart: {{ $labels.chart_name }}) in namespace {{ $labels.exported_namespace }} has been failing for more than 5 minutes."
+
+        - alert: FluxKustomizationNotReady
+          expr: |
+            gotk_resource_info{customresource_kind="Kustomization", ready="False"} == 1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Flux Kustomization {{ $labels.exported_namespace }}/{{ $labels.name }} is not ready"
+            description: "Kustomization {{ $labels.name }} in namespace {{ $labels.exported_namespace }} has been failing for more than 5 minutes."
+
+        - alert: FluxSourceNotReady
+          expr: |
+            gotk_resource_info{customresource_group=~"source.toolkit.fluxcd.io", ready="False"} == 1
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Flux Source {{ $labels.customresource_kind }} {{ $labels.exported_namespace }}/{{ $labels.name }} is not ready"
+            description: "{{ $labels.customresource_kind }} {{ $labels.name }} in namespace {{ $labels.exported_namespace }} has been failing for more than 10 minutes. Source fetch errors will block all dependent Kustomizations and HelmReleases."
+
+        - alert: FluxReconcileDurationHigh
+          expr: |
+            histogram_quantile(0.99, sum(rate(gotk_reconcile_duration_seconds_bucket[5m])) by (le, kind, namespace)) > 300
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Flux {{ $labels.kind }} reconciliation in {{ $labels.namespace }} is taking more than 5 minutes (P99)"
+            description: "High reconciliation duration may indicate complex or large resources, controller resource pressure, or dependency issues."

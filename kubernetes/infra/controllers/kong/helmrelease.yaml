@@ -52,15 +52,17 @@ spec:
     # Proxy service — ClusterIP for port-forwarding (no LoadBalancer in Kind)
     proxy:
       enabled: true
-      type: ClusterIP
+      type: NodePort
       http:
         enabled: true
         containerPort: 8000
         servicePort: 80
+        nodePort: 30080
       tls:
         enabled: true
         containerPort: 8443
         servicePort: 443
+        nodePort: 30443
 
     # Admin API — disabled (CRDs used for configuration)
     admin:

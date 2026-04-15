@@ -37,7 +37,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 - **CronJobs via HelmRelease** — Migrated raw Jobs to `cronjobs` Helm chart (`oci://ghcr.io/duyhenryer/charts/cronjobs`)
 - **Flux validation script** — `scripts/flux-validate.sh` validates clusters, infrastructure kustomizations, and app manifests
 - Automated image tag updates via Flux Image Automation
-- GitOps drift detection and reconciliation monitoring (Flux alerts → Alertmanager)
+- [~] **GitOps drift detection and reconciliation monitoring** — `kubernetes/infra/configs/monitoring/prometheusrules/flux-alerts.yaml`, `kubernetes/infra/controllers/metrics/kube-state-metrics.yaml` (custom resource metrics for Flux CRDs). PrometheusRules for reconciliation failures; native Flux Alert/Provider CRDs not yet configured
 - Separate manifest repository for GitOps workflow (mono-repo → multi-repo)
 - Infrastructure as Code with Terraform/Pulumi for cloud resources
 - [ ] **Atlantis** — PR-driven Terraform (and Terragrunt/OpenTofu) automation: runs `plan` on PR and comments output, `apply` on merge or via PR comment; workspace locking and approval workflows; integrates with GitHub/GitLab. Complements GitOps for IaC that lives outside Kubernetes manifests (e.g. cloud networking, IAM, S3).
@@ -57,23 +57,23 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
   - [x] VLSingle replaces VictoriaLogs Helm chart (operator-managed, 7d retention, 20Gi)
   - [x] Auto-converts Prometheus CRDs (ServiceMonitor, PodMonitor, PrometheusRule) to VM equivalents
   - [x] Documentation: `docs/observability/metrics/victoriametrics/README.md`
-- **Grafana dashboards** — 14 dashboards in `kubernetes/infra/configs/monitoring/grafana/dashboards/`
+- **Grafana dashboards** — 23 dashboards in `kubernetes/infra/configs/monitoring/grafana/dashboards/` (microservices, Tempo, CNPG, pg-monitoring, pg-query, PgBouncer, PgDog, replication-lag, Redis, Kong, SLO, Vector, VictoriaMetrics, Flux, Kubernetes)
 - **SLI/SLO monitoring with Sloth** — `kubernetes/infra/configs/monitoring/slo/` (9 PrometheusServiceLevel CRDs)
 - **Distributed tracing with Tempo** — `kubernetes/infra/controllers/tracing/tempo/`
-- **Logging with Loki + Vector** — `kubernetes/infra/controllers/logging/`
+- **Logging with VictoriaLogs + Vector** — `kubernetes/infra/controllers/logging/` (Loki removed; VictoriaLogs via VLSingle operator-managed CRD + Vector agent for collection)
 - **Continuous profiling with Pyroscope** — `kubernetes/infra/controllers/profiling/`
 - **Jaeger integration** — `kubernetes/infra/controllers/tracing/jaeger/`
-- Alertmanager with routing rules and receivers (currently disabled)
-- Golden signals alerting (Latency, Errors, Traffic, Saturation)
-- Actionable alerts with runbook links (alert → page → runbook → fix)
+- [x] **Alertmanager with routing rules and receivers** — `kubernetes/infra/configs/monitoring/victoriametrics/vmalertmanager.yaml` (VMAlertmanager with Slack routing: `#alerts` default, `#alerts-critical` critical severity, watchdog null receiver, inhibit rules)
+- [x] **Golden signals alerting** — `kubernetes/infra/configs/monitoring/prometheusrules/microservices-alerts.yaml` (Availability, Errors, Latency P95/P99, Traffic, Saturation groups)
+- [x] **Actionable alerts with runbook links** — 30+ PrometheusRules across microservices, Kubernetes, PostgreSQL, Valkey, Kong, cert-manager, VictoriaMetrics, Flux with runbook_url annotations
 - Anomaly detection and synthetic monitoring
-- Exemplars: link metrics → traces in Grafana
-- Log-based alerting (Loki ruler → Alertmanager)
+- [~] **Exemplars: link metrics → traces in Grafana** — Tempo→metrics/logs correlation configured (tracesToMetrics, tracesToLogs in datasources); metrics→traces via exemplars not yet wired
+- Log-based alerting (VictoriaLogs alerting rules → VMAlert)
 - OpenTelemetry integration with Prometheus naming (VMAgent + OTel Collector metrics pipeline)
 - [x] **Grafana Operator** — `kubernetes/infra/controllers/metrics/grafana-operator.yaml`, `kubernetes/infra/configs/monitoring/grafana/`:
   - [x] Grafana Operator (HelmRelease from OCI) manages Grafana instances and dashboards
-  - [x] Declarative dashboard management via GrafanaDashboard CRDs (20+ dashboards in `grafana/dashboards/`)
-  - [x] Automated datasource configuration (Prometheus, Tempo, Loki, Jaeger, Pyroscope)
+  - [x] Declarative dashboard management via GrafanaDashboard CRDs (23 dashboards in `grafana/dashboards/`)
+  - [x] Automated datasource configuration (VictoriaMetrics, Tempo, VictoriaLogs, Jaeger, Pyroscope)
 
 ---
 
@@ -158,11 +158,12 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 
 ## Certificate Management
 
-- **cert-manager** — Automate certificate lifecycle (issue, renew, revoke):
-  - Deploy cert-manager (Helm or operator)
-  - ClusterIssuer/Issuer for CA (e.g. Let's Encrypt ACME for public domains, or internal CA for private)
-  - Certificate CRs for ingress TLS, webhook TLS (ESO, admission controllers), optional DB/client certs
-  - Integration with Ingress (e.g. ingress-shim annotations) or Gateway API for automatic cert per host
+- [x] **cert-manager** — `kubernetes/infra/controllers/cert-manager/helmrelease.yaml` (v1.16.2), `kubernetes/infra/configs/cert-manager/`:
+  - [x] Deploy cert-manager via Helm in `cert-manager` namespace
+  - [x] ClusterIssuers configured — `kubernetes/infra/configs/cert-manager/clusterissuers.yaml`
+  - [x] Certificate CRs for microservices TLS — `kubernetes/infra/configs/cert-manager/certificates-microservices.yaml`
+  - [x] PrometheusRule alerts for cert-manager — `kubernetes/infra/configs/monitoring/prometheusrules/cert-manager-alerts.yaml`
+  - [ ] Integration with Ingress (ingress-shim annotations) or Gateway API for automatic cert per host
 
 ---
 
@@ -198,14 +199,15 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 
 ## API Gateway
 
-*Not implemented. Frontend and clients call backend services directly (per-service URLs / Kubernetes Services).*
-
-- [ ] **Kong API Gateway** — Centralized north-south entry point:
-  - Single entry point for all APIs (e.g. `/api/v1/*` → route to auth, user, product, etc.)
-  - Plugins: rate limiting, CORS, JWT/auth, request/response transformation, Prometheus metrics
-  - Deploy via Helm in dedicated `kong` namespace; Kong CRDs (KongService, KongRoute, KongPlugin)
-  - Research and comparison with current direct-backend approach: `specs/active/frontend-integration-optimization/research.md` (Kong vs Direct Backend)
-- [ ] Alternative API gateways: Envoy Gateway, APISIX, Gloo (evaluate vs Kong for this stack)
+- [x] **Kong API Gateway** — `kubernetes/infra/controllers/kong/helmrelease.yaml` (v2.44.0, DB-less mode), `kubernetes/infra/configs/kong/`:
+  - [x] Deploy via Helm in dedicated `kong` namespace
+  - [x] ServiceMonitor for Prometheus metrics — `kubernetes/infra/configs/monitoring/servicemonitors/kong.yaml`
+  - [x] PrometheusRule alerts (availability, errors, latency, saturation, traffic, upstream-health) — `kong-alerts.yaml`
+  - [x] Recording rules (RED metrics, latency percentiles, bandwidth) — `kong-recording-rules.yaml`
+  - [x] Grafana dashboard — `grafana-dashboard-kong.yaml`
+  - [ ] Plugins: rate limiting, CORS, JWT/auth, request/response transformation
+  - [ ] Route configuration for all APIs (`/api/v1/*` → route to services)
+- Alternative API gateways: Envoy Gateway, APISIX, Gloo (evaluate vs Kong for this stack)
 - [ ] API Gateway + Gateway API (Kubernetes standard) for ingress and routing
 
 ---

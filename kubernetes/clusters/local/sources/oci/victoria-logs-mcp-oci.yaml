@@ -1,0 +1,16 @@
+---
+# OCIRepository for VictoriaLogs MCP Server chart
+# Chart: oci://ghcr.io/victoriametrics/helm-charts/victoria-logs-mcp
+# Docs: https://docs.victoriametrics.com/helm/victoria-logs-mcp/
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: victoria-logs-mcp-oci
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: helm-chart
+spec:
+  interval: 10m
+  url: oci://ghcr.io/victoriametrics/helm-charts/victoria-logs-mcp
+  ref:
+    semver: ">=0.1.0"

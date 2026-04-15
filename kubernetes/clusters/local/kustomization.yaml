@@ -12,4 +12,5 @@ resources:
   - databases.yaml       # DB Instances (Must be before apps)
   - databases-cnpg-dr.yaml  # CNPG DR replica (depends on databases-local)
   - monitoring.yaml      # Grafana + Prometheus Configs
+  - mcp.yaml             # MCP servers (depends on monitoring)
   - apps.yaml            # Microservices

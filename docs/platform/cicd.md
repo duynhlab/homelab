@@ -18,9 +18,32 @@ Image artifacts are **built once per commit** with an immutable `sha-<short>` ta
 
 **Workflow split**: Each service repo uses **two workflow files** instead of a single `ci.yml`:
 - **`check.yml`** (PR only) -- runs tests, lint, secret scanning, SonarCloud analysis
-- **`build.yml`** (push only) -- builds Docker images, scans, signs, notifies
+- **`build.yml`** (push only) -- builds Docker images, scans **before push**, signs, notifies
 
 This split ensures GitHub does not append `(pull_request)` or `(push)` suffixes to status check names, making ruleset matching predictable. See [`ruleset-automation.md`](ruleset-automation.md) for details on how check names are constructed and enforced.
+
+## Image Security: Scan Before Push
+
+**Critical design**: Images are scanned with Trivy **before** being pushed to GHCR. This prevents FluxCD from auto-deploying vulnerable images.
+
+```mermaid
+flowchart LR
+    subgraph ci["CI Pipeline"]
+        BUILD["Build image<br/>(--load, local only)"]
+        SCAN["Trivy scan<br/>(local image)"]
+        PUSH["Push to GHCR<br/>(only if scan passes)"]
+        SIGN["Cosign sign"]
+    end
+
+    BUILD --> SCAN
+    SCAN -->|"pass"| PUSH --> SIGN
+    SCAN -->|"fail"| STOP["Image never pushed"]
+
+    style STOP fill:#ef4444,color:#fff
+    style SIGN fill:#22c55e,color:#fff
+```
+
+The `docker-build-go.yml` (and `docker-build-node.yml`) workflows handle this automatically via the `scan-before-push` input (default: `true`). See [`cicd-security-improvement-plan.md`](cicd-security-improvement-plan.md) for the full security architecture.
 
 ## Shared Workflows
 
@@ -29,38 +52,38 @@ Each service repository reuses workflows from `duyhenryer/shared-workflows`:
 - `go-check.yml` (tests + optional lint + coverage artifact)
 - `gitleaks.yml` (Secret scanning + SARIF output)
 - `sonarqube.yml` (SonarCloud analysis + optional Quality Gate enforcement)
-- `docker-build-go.yml` (build & push Docker image for Go services — outputs `tags` + `digest`)
-- `docker-build-node.yml` (build & push Docker image for Node.js services — same outputs)
-- `trivy-scan.yml` (Trivy image vulnerability scan — SARIF + Google Sheets reporting)
+- `docker-build-go.yml` (build, scan before push, push Docker image for Go services — outputs `tags` + `digest` + `scan-status`)
+- `docker-build-node.yml` (build, scan before push, push Docker image for Node.js services — same outputs)
+- `trivy-scan.yml` (Post-push Trivy image scan — SARIF + Google Sheets reporting, non-blocking)
 - `docker-sign.yml` (Cosign keyless image signing)
 - `status.yml` (final Slack + Google Sheets status notification)
 
 The pipeline follows a **"Build Once, Analyze Everywhere"** pattern: `go-check` produces a `coverage.out` artifact that `sonarqube` consumes (no need to rerun tests for analysis).
 
-## 📊 Workflow Visualization
+## Workflow Visualization
 
 ### 1. Full Pipeline Architecture
 
-This diagram illustrates the comprehensive end-to-end pipeline, showcasing the integration of secret scanning (`gitleaks`), code quality checks (`sonar`), and delivery stages.
+This diagram illustrates the comprehensive end-to-end pipeline, showcasing the integration of secret scanning (`gitleaks`), code quality checks (`sonar`), and the scan-before-push delivery pattern.
 
 ```mermaid
 flowchart TD
     subgraph check_wf["check.yml — PR Only"]
         PR[pr-checks]
         GOCHECK[go-check]
-        GITLEAKS["🔐 gitleaks"]
+        GITLEAKS["gitleaks"]
         SONAR[sonar]
         NOTIFY_PR[notify]
     end
 
     subgraph build_wf["build.yml — Push Only (dev/staging/main)"]
         GOCHECK2[go-check]
-        GITLEAKS2["🔐 gitleaks"]
+        GITLEAKS2["gitleaks"]
         SONAR2[sonar]
-        BUILD[docker-build]
-        TRIVY[trivy-scan]
+        BUILD["docker-build<br/>(--load → scan → push)"]
         SIGN[docker-sign]
-        DBINIT[docker-db-init]
+        TRIVY_RPT["trivy-report<br/>(SARIF, optional)"]
+        DBINIT["docker-db-init<br/>(--load → scan → push)"]
         NOTIFY_BUILD[notify]
     end
 
@@ -75,36 +98,38 @@ flowchart TD
     GITLEAKS2 --> SONAR2
     SONAR2 --> BUILD
     SONAR2 --> DBINIT
-    BUILD --> TRIVY
-    TRIVY --> SIGN
+    BUILD --> SIGN
+    BUILD --> TRIVY_RPT
     BUILD --> NOTIFY_BUILD
-    TRIVY --> NOTIFY_BUILD
     SIGN --> NOTIFY_BUILD
+    TRIVY_RPT --> NOTIFY_BUILD
     DBINIT --> NOTIFY_BUILD
 
     style GITLEAKS fill:#22c55e,color:#fff,stroke:#16a34a,stroke-width:2px
     style GITLEAKS2 fill:#22c55e,color:#fff,stroke:#16a34a,stroke-width:2px
+    style BUILD fill:#3b82f6,color:#fff,stroke:#2563eb,stroke-width:2px
 ```
 
 ### 2. Architecture Overview
 
-Stack-specific builders feed into shared scan and sign workflows:
+Stack-specific builders with integrated scanning feed into shared sign workflows:
 
 ```mermaid
 flowchart TD
-    subgraph builders ["Stack-specific Builders"]
-        GO["docker-build-go.yml"]
-        NODE["docker-build-node.yml"]
+    subgraph builders ["Stack-specific Builders (scan-before-push)"]
+        GO["docker-build-go.yml<br/>(--load → Trivy → push)"]
+        NODE["docker-build-node.yml<br/>(--load → Trivy → push)"]
         PYTHON["docker-build-python.yml (future)"]
     end
     subgraph shared ["Shared Downstream"]
-        TRIVY["trivy-scan.yml"]
         SIGN["docker-sign.yml"]
+        TRIVY_RPT["trivy-scan.yml<br/>(SARIF reporting, optional)"]
     end
-    GO -->|"outputs: tags, digest"| TRIVY
-    NODE -->|"outputs: tags, digest"| TRIVY
-    PYTHON -->|"outputs: tags, digest"| TRIVY
-    TRIVY -->|"pass"| SIGN
+    GO -->|"outputs: tags, digest, scan-status"| SIGN
+    NODE -->|"outputs: tags, digest, scan-status"| SIGN
+    PYTHON -->|"outputs: tags, digest, scan-status"| SIGN
+    GO -.->|"optional"| TRIVY_RPT
+    NODE -.->|"optional"| TRIVY_RPT
 ```
 
 ### 3. Branch Promotion & CI Trigger Map
@@ -164,7 +189,7 @@ flowchart TD
 
 ### 5. Build & Delivery Flow (Push to dev / staging / main)
 
-On push to any persistent branch (`dev`, `staging`, `main`), the full build pipeline runs. The image is tagged with `sha-<short>` plus a branch-specific alias. No rebuild occurs when promoting between branches — the same digest is reused.
+On push to any persistent branch (`dev`, `staging`, `main`), the full build pipeline runs. Images are **scanned before push** — if Trivy finds CRITICAL/HIGH CVEs, the image is never pushed to the registry and the pipeline fails.
 
 After each deployment, **post-deploy verification** runs automatically: smoke tests on all environments, plus integration/regression tests on staging. See [`gitflow.md` section 6.2](gitflow.md#62-post-deploy-verification) for the full verification matrix.
 
@@ -175,11 +200,12 @@ flowchart TD
         GITLEAKS2["gitleaks.yml"]
         SONAR2["sonarqube.yml"]
 
-        BUILD["docker-build-go.yml"]
-        SCAN["trivy-scan.yml"]
+        BUILD["docker-build-go.yml<br/>(--load → Trivy → push)"]
         SIGN["docker-sign.yml"]
 
-        DBINIT["docker-build-go.yml (migration)"]
+        DBINIT["docker-build-go.yml (migration)<br/>(--load → Trivy → push)"]
+
+        TRIVY_RPT["trivy-scan.yml<br/>(SARIF report, optional)"]
 
         NOTIFY2["status.yml"]
 
@@ -187,17 +213,19 @@ flowchart TD
         GITLEAKS2 --> SONAR2
         SONAR2 --> BUILD
         SONAR2 --> DBINIT
-        BUILD -->|"outputs: tags, digest"| SCAN
-        SCAN -->|"success"| SIGN
-        SCAN -.->|"fail"| SIGN_SKIP["sign SKIPPED"]
+        BUILD -->|"scan pass → pushed"| SIGN
+        BUILD -.->|"scan fail"| BUILD_FAIL["Image NOT pushed"]
+        BUILD -->|"optional reporting"| TRIVY_RPT
 
         BUILD --> NOTIFY2
-        SCAN --> NOTIFY2
         SIGN --> NOTIFY2
+        TRIVY_RPT --> NOTIFY2
         DBINIT --> NOTIFY2
     end
     
     style GITLEAKS2 fill:#22c55e,color:#fff,stroke:#16a34a,stroke-width:2px
+    style BUILD fill:#3b82f6,color:#fff,stroke:#2563eb,stroke-width:2px
+    style BUILD_FAIL fill:#ef4444,color:#fff
 ```
 
 ### 6. Execution Sequence
@@ -214,7 +242,8 @@ sequenceDiagram
     participant Scan as gitleaks
     participant Sonar as SonarCloud
     participant Build as docker-build-go
-    participant Trivy as trivy-scan
+    participant Trivy as Trivy (pre-push)
+    participant GHCR as GHCR Registry
     participant Cosign as docker-sign
     participant Slack as Slack
 
@@ -238,14 +267,18 @@ sequenceDiagram
     Sonar->>Sonar: Scan and check quality gate
 
     alt Push to dev/staging/main
-      GA->>Build: Build and push image (sha-short + branch alias)
-      Build->>GA: Output tags and digest
-      GA->>Trivy: Scan image for vulnerabilities
-      Trivy->>GA: Upload SARIF to Security tab
+      GA->>Build: Build image locally (--load, no push)
+      Build->>Trivy: Scan local image for vulnerabilities
       alt Scan passes
+        Trivy->>Build: Clean — no CRITICAL/HIGH CVEs
+        Build->>GHCR: Push image (sha-short + branch alias)
+        Build->>GA: Output tags, digest, scan-status=pass
         GA->>Cosign: Sign image with keyless OIDC
       else Scan fails
-        Note over GA,Cosign: Signing SKIPPED
+        Trivy->>Build: CRITICAL/HIGH CVEs found
+        Note over Build,GHCR: Image NEVER pushed to registry
+        Build->>GA: scan-status=fail, job fails
+        Note over GA,Cosign: Signing SKIPPED (no image to sign)
       end
     end
 
@@ -257,11 +290,50 @@ sequenceDiagram
     GA->>Slack: Final status notification
 ```
 
+### 7. Security Layers
+
+The pipeline implements defense-in-depth with multiple security gates:
+
+```mermaid
+flowchart TD
+    subgraph l1["Layer 1: Code Scanning"]
+        GL["gitleaks<br/>(secrets in code)"]
+        SQ["SonarCloud<br/>(code quality)"]
+    end
+
+    subgraph l2["Layer 2: Pre-push Image Scan"]
+        TR["Trivy in docker-build<br/>(--load → scan → push)"]
+    end
+
+    subgraph l3["Layer 3: Image Signing"]
+        CS["Cosign keyless<br/>(OIDC attestation)"]
+    end
+
+    subgraph l4["Layer 4: Post-push Report"]
+        TS["trivy-scan.yml<br/>(SARIF + GSheet)"]
+    end
+
+    l1 --> l2 --> l3
+    l3 -.-> l4
+
+    style l2 fill:#3b82f6,color:#fff
+    style l3 fill:#22c55e,color:#fff
+```
+
+| Layer | What | Prevents |
+|---|---|---|
+| **L1: Code scan** | `gitleaks` + `sonar` | Secrets in code, code quality issues |
+| **L2: Pre-push image scan** | Trivy in `docker-build-go.yml` | Known CVEs reaching registry |
+| **L3: Image signing** | Cosign keyless (OIDC) | Tampering, provenance verification |
+| **L4: Post-push report** | `trivy-scan.yml` (SARIF) | New CVEs discovered after push |
+
+> **Future**: Layer 5 (Kyverno admission control) will verify Cosign signatures at deploy time. See [`cicd-security-improvement-plan.md`](cicd-security-improvement-plan.md).
+
 ---
 
-## 🔄 Detailed Process Flows
+## Detailed Process Flows
 
-### 1️⃣ Flow: Pull Request (Validation)
+### 1. Flow: Pull Request (Validation)
 **Trigger:** Developer opens or updates a Pull Request targeting `dev`, `staging`, or `main`.
 **Goal:** Verify code quality, security, and functionality **before** merging.
 
@@ -273,25 +345,26 @@ sequenceDiagram
 | **3** | `sonar` | **Always** | **SonarCloud Analysis**: waits for 2a and 2b. Downloads `coverage-report` and runs Sonar scan. **Quality Gate enforcement is configurable**. |
 | **4** | `notify` | **Always** | **Reporting**: posts final pipeline status to Slack and Google Sheets (runs even if previous steps failed). |
 
-> **Skipped on PR:** `docker-build` / `trivy-scan` / `docker-sign` / `docker-db-init` jobs do NOT run on PRs to avoid pushing images for non-merged code.
+> **Skipped on PR:** `docker-build` / `trivy-report` / `docker-sign` / `docker-db-init` jobs do NOT run on PRs to avoid pushing images for non-merged code.
 
 ---
 
-### 2️⃣ Flow: Push to Persistent Branch (Delivery)
+### 2. Flow: Push to Persistent Branch (Delivery)
 **Trigger:** PR is merged into `dev`, `staging`, or `main`.
-**Goal:** Build an immutable artifact, scan it, sign it, and deploy to the corresponding environment.
+**Goal:** Build an immutable artifact, scan it **before pushing**, sign it, and deploy to the corresponding environment.
 
 | Step | Job Name | Trigger Condition | Action & Responsibility |
 |------|----------|-------------------|-------------------------|
 | **1** | `go-check` | **Always** | **Regression Check**: re-runs tests and uploads fresh `coverage-report` artifact. (Lint is PR-only.) |
+| **1b** | `gitleaks` | **Always** | **Secret Scanning**: scans git history for secrets in parallel with `go-check`. |
 | **2** | `sonar` | **Always** | **Analysis Update**: updates SonarCloud branch analysis based on the coverage artifact. |
-| **3** | `docker-build` | **Push to dev/staging/main** | **Build Artifact**: builds and pushes the service image to GHCR with `sha-<short>` tag. Outputs `tags` and `digest`. |
-| **4** | `trivy-scan` | **After build** | **Vulnerability Scan**: scans the built image with Trivy for CRITICAL/HIGH CVEs. Uploads SARIF to GitHub Security tab. Reports to Google Sheets. |
-| **5** | `docker-sign` | **After scan passes** | **Image Signing**: signs the image with Cosign keyless (OIDC). Only runs if Trivy scan passes. |
-| **6** | `docker-db-init` | **Push to dev/staging/main** | **Migration Artifact**: builds and pushes the migration image (Flyway init image) to GHCR. |
+| **3** | `docker-build` | **Push to dev/staging/main** | **Build + Scan + Push**: builds image locally (`--load`), scans with Trivy for CRITICAL/HIGH CVEs. **Only pushes to GHCR if scan passes.** Outputs `tags`, `digest`, and `scan-status`. |
+| **4** | `trivy-report` | **After build (optional)** | **Vulnerability Reporting**: detailed scan with SARIF upload to GitHub Security tab and Google Sheets. Non-blocking (`exit-code: '0'`). |
+| **5** | `docker-sign` | **After build passes** | **Image Signing**: signs the image with Cosign keyless (OIDC). Only runs if build (including scan) succeeded. |
+| **6** | `docker-db-init` | **Push to dev/staging/main** | **Migration Artifact**: builds, scans, and pushes the migration image (Flyway init image) to GHCR. Also uses scan-before-push. |
 | **7** | `notify` | **Always** | **Reporting**: posts final pipeline status to Slack and Google Sheets. |
 
-### 3️⃣ Flow: Tag Release (Production Deploy)
+### 3. Flow: Tag Release (Production Deploy)
 **Trigger:** A `vX.Y.Z` tag is pushed to `main`.
 **Goal:** Publish production release metadata and deploy the already-built artifact. No rebuild occurs.
 
@@ -343,9 +416,9 @@ GHCR auto-grants `write_package` permission to images whose name **matches the G
 
 ## Shared Workflow Architecture
 
-### Explicit Pipeline Pattern (Build → Scan → Sign)
+### Scan-Before-Push Pattern (Build → Scan → Push → Sign)
 
-Each service repo explicitly chains three independent reusable workflows via `needs:` dependencies:
+Each service repo calls `docker-build-go.yml` which internally handles the full build → scan → push flow. The scan is integrated into the builder, not a separate job:
 
 ```mermaid
 flowchart TD
@@ -354,18 +427,21 @@ flowchart TD
   GoCheck --> Sonar["sonarqube.yml"]
   Gitleaks --> Sonar
 
-  BuildCaller["build.yml (push only)"] --> Build[docker-build-go.yml - Build and Push]
-  Build -->|"outputs: tags, digest"| Scan[trivy-scan.yml - Vulnerability Scan]
-  Scan -->|"pass"| Sign[docker-sign.yml - Cosign Signing]
-  Scan -.->|"fail"| Skip["Sign SKIPPED"]
-  BuildCaller --> DbInit[docker-build-go.yml - Migration Image]
+  BuildCaller["build.yml (push only)"] --> Build["docker-build-go.yml<br/>(--load → Trivy → push)"]
+  Build -->|"outputs: tags, digest, scan-status"| Sign[docker-sign.yml - Cosign Signing]
+  Build -.->|"scan fail"| Skip["Image NOT pushed, sign SKIPPED"]
+  Build -.->|"optional"| Report["trivy-scan.yml - SARIF Report"]
+  BuildCaller --> DbInit["docker-build-go.yml - Migration Image<br/>(--load → Trivy → push)"]
+
+  style Build fill:#3b82f6,color:#fff
+  style Skip fill:#ef4444,color:#fff
 ```
 
 | Workflow | Responsibility |
 |---|---|
-| `docker-build-go.yml` | Core build logic: checkout, QEMU/Buildx, GHCR login, metadata, build & push, summary. Designed for Go services. Outputs `tags` and `digest`. |
-| `docker-build-node.yml` | Same as above but named for Node.js/frontend services. Same inputs and outputs interface. |
-| `trivy-scan.yml` | Scans the built image for vulnerabilities using `aquasecurity/trivy-action`. Uploads SARIF to GitHub Security tab. Reports vulnerability counts to Google Sheets. |
+| `docker-build-go.yml` | Build locally (`--load`), Trivy pre-push scan, push only if clean, registry caching, provenance, SBOM. Outputs `tags`, `digest`, and `scan-status`. |
+| `docker-build-node.yml` | Same as above for Node.js/frontend services. Same inputs and outputs interface. |
+| `trivy-scan.yml` | **Post-push reporting only** (not a security gate). Uploads SARIF to GitHub Security tab. Reports to Google Sheets. |
 | `docker-sign.yml` | Cosign keyless (OIDC) image signing. Receives tags + digest from the build job. |
 
 ### Why Stack-Specific Builders?
@@ -374,16 +450,17 @@ The build workflow is split by stack (`docker-build-go.yml`, `docker-build-node.
 
 - **Current**: Go services use `docker-build-go.yml`, frontend uses `docker-build-node.yml`
 - **Future**: Python, Rust, or other stacks can have their own builder (e.g., `docker-build-python.yml`)
-- **Key constraint**: All builders must output the same interface (`tags` + `digest`) so that `trivy-scan.yml` and `docker-sign.yml` work identically regardless of the upstream builder
+- **Key constraint**: All builders must output the same interface (`tags` + `digest` + `scan-status`) so that `docker-sign.yml` and optional `trivy-scan.yml` work identically regardless of the upstream builder
 
 ### Learnings from Clone-Workflow
 
 Ideas adopted from a reference CI/CD repository:
 
-- **Explicit pipeline pattern**: Each service repo explicitly chains `build → scan → sign` as separate jobs rather than using a wrapper workflow. This gives each repo full control over the pipeline and makes the flow visible in the GitHub Actions UI.
+- **Scan-before-push pattern**: Images are built locally (`--load`), scanned with Trivy, and only pushed to GHCR if no CRITICAL/HIGH CVEs are found. This prevents FluxCD from auto-deploying vulnerable images.
+- **Explicit pipeline pattern**: Each service repo explicitly chains `build → sign` as separate jobs rather than using a wrapper workflow. This gives each repo full control over the pipeline and makes the flow visible in the GitHub Actions UI.
 - **Future extensions** (not yet implemented):
-  - **PII checks**: A dedicated workflow for scanning code or config for sensitive data before build (similar to `pii-checks.yml` pattern).
-  - **CI status aggregation**: A common wrapper that orchestrates the entire CI pipeline, reducing boilerplate in individual service repos.
+  - **Kyverno admission control**: Kubernetes admission controller verifying Cosign signatures at deploy time (defense-in-depth).
+  - **PII checks**: A dedicated workflow for scanning code or config for sensitive data before build.
 
 ---
 
@@ -458,21 +535,24 @@ All three share the same image **digest** (sha256). The SBOM is metadata attache
 
 ### How It Fits in the Pipeline
 
-SBOM generation happens inside the build step. It does not add a new job -- it's part of `docker/build-push-action`:
+SBOM generation happens inside the push step (after scan passes). It does not add a new job -- it's part of `docker/build-push-action`:
 
 ```mermaid
 flowchart LR
     subgraph buildJob ["docker-build-go.yml"]
-        BUILD["Build + Push"]
+        BUILD_LOCAL["Build (--load)"]
+        SCAN["Trivy scan"]
+        PUSH["Push (if clean)"]
         SBOM_GEN["SBOM generated (if sbom: true)"]
         PROV_GEN["Provenance generated"]
     end
 
-    BUILD --> SBOM_GEN
-    BUILD --> PROV_GEN
+    BUILD_LOCAL --> SCAN
+    SCAN --> PUSH
+    PUSH --> SBOM_GEN
+    PUSH --> PROV_GEN
 
-    buildJob -->|"tags, digest"| TRIVY["trivy-scan.yml"]
-    TRIVY -->|"pass"| SIGN["docker-sign.yml"]
+    buildJob -->|"tags, digest"| SIGN["docker-sign.yml"]
 ```
 
 ### How to Enable
@@ -483,7 +563,7 @@ Add `sbom: true` to the builder workflow call in your service `build.yml`:
 docker-build:
   uses: duyhenryer/shared-workflows/.github/workflows/docker-build-go.yml@main
   with:
-    image-name: 'auth'
+    image-name: 'auth-service'
     push: true
     sbom: true     # <-- just add this
 ```

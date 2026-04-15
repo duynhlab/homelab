@@ -1,0 +1,91 @@
+# Infrastructure service Ingress routes
+# Accessible via /etc/hosts → Kong NodePort (80/443)
+
+# Flux Web UI — ui.duynhne.me
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: flux-ui
+  namespace: flux-system
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: ui.duynhne.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: flux-operator
+                port:
+                  number: 9080
+---
+# RustFS Console — source.duynhne.me
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rustfs-console
+  namespace: rustfs
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: source.duynhne.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rustfs-svc
+                port:
+                  number: 9001
+---
+# OpenBAO UI — openbao.duynhne.me
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: openbao-ui
+  namespace: openbao
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: openbao.duynhne.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: openbao-ui
+                port:
+                  number: 8200
+---
+# Postgres Operator UI — pgui.duynhne.me
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: postgres-operator-ui
+  namespace: postgres-operator
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: pgui.duynhne.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: postgres-operator-ui
+                port:
+                  number: 80

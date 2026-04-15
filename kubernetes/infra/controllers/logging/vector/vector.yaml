@@ -1,5 +1,5 @@
 # Vector Agent HelmRelease
-# Dual-ships Kubernetes logs to both Loki and VictoriaLogs
+# Ships Kubernetes logs to VictoriaLogs
 # Includes PostgreSQL auto_explain parsing pipeline for CloudNativePG clusters
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -269,32 +269,6 @@ spec:
       # SINKS
       # ========================================================================
       sinks:
-        # ----------------------------------------------------------------------
-        # Sink: Loki (existing - all logs)
-        # ----------------------------------------------------------------------
-        loki:
-          type: loki
-          inputs:
-            - add_labels
-          endpoint: http://loki.monitoring.svc.cluster.local:3100
-          encoding:
-            codec: json
-          labels:
-            service: "{{ `{{service}}` }}"
-            namespace: "{{ `{{namespace}}` }}"
-            pod: "{{ `{{pod_name}}` }}"
-            container: "{{ `{{container_name}}` }}"
-            stream: "{{ `{{stream}}` }}"
-          out_of_order_action: accept
-          batch:
-            max_bytes: 3145728
-            timeout_secs: 5
-          request:
-            rate_limit_duration_secs: 1
-            rate_limit_num: 100
-          healthcheck:
-            enabled: false
-
         # ----------------------------------------------------------------------
         # Sink: VictoriaLogs - All Logs (jsonline ingestion)
         # ----------------------------------------------------------------------

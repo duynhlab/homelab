@@ -17,10 +17,11 @@
 # (e.g. "Check / go-check / Test (pull_request)"), but rulesets
 # match against the shorter name shown above.
 #
+# Dynamic naming: Uses ${{ github.event.repository.name }} so this file is
+# identical across all service repos — no placeholders for project keys.
+#
 # Placeholders to replace:
 #   {{SLACK_CHANNEL_ID}}   — Slack channel for PR notifications
-#   {{SONAR_PROJECT_KEY}}  — SonarCloud project key (e.g. duynhlab_auth-service)
-#   {{SONAR_ORG}}          — SonarCloud organization (e.g. duynhlab)
 #
 # See docs/platform/gitflow.md for the full branching & release standard.
 # See docs/platform/ruleset-automation.md for how rulesets enforce these checks.
@@ -73,8 +74,8 @@ jobs:
     needs: [go-check, gitleaks]
     uses: duyhenryer/shared-workflows/.github/workflows/sonarqube.yml@main
     with:
-      project-key: '{{SONAR_PROJECT_KEY}}'
-      organization: '{{SONAR_ORG}}'
+      project-key: 'duynhlab_${{ github.event.repository.name }}'
+      organization: 'duynhlab'
       fail-on-quality-gate: false
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

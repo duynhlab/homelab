@@ -11,7 +11,11 @@ Production-ready microservices monitoring platform with 8 Go services, complete 
 **Key Features:**
 
 - 8 microservices with v1 API (canonical, frontend-aligned)
+<<<<<<< HEAD
 - 15 Grafana dashboards (microservices, databases, tracing, infrastructure)
+=======
+- 34 Grafana dashboard panels (5 row groups)
+>>>>>>> f4bd0c0 (feat: MCP servers, Kong domain-based ingress, monitoring expansion, Loki removal (v0.84.0))
 - Complete observability stack (VictoriaMetrics, Tempo, Jaeger, VictoriaLogs, Pyroscope)
 - PostgreSQL database integration (3 clusters + DR replica, Flyway migrations)
 - Valkey caching (Redis-compatible) with Cache-Aside pattern
@@ -145,6 +149,10 @@ flowchart TD
 - **Kubernetes**: Local Cluster (Kind), Helm 3
 - **GitOps**: Flux Operator, ResourceSet (Unified Templating), Kustomize, OCI Registry
     - Application layer: 4 domain ResourceSets (identity, catalog, checkout, comms) + per-service InputProviders
+<<<<<<< HEAD
+=======
+- **Dynamic Delivery**: OCIArtifactTag (Automated image updates)
+>>>>>>> f4bd0c0 (feat: MCP servers, Kong domain-based ingress, monitoring expansion, Loki removal (v0.84.0))
 - **Monitoring**: VictoriaMetrics (VMSingle, VMAgent, VMAlert), Grafana, Tempo, VictoriaLogs, Pyroscope, Jaeger, Vector.
 
 **Observability Details**: See [`docs/observability/README.md`](docs/observability/README.md) for complete observability system overview.
@@ -189,6 +197,7 @@ make flux-push    # 3. Deploy everything (infrastructure + apps)
 ---
 ## Grafana Dashboards
 
+<<<<<<< HEAD
 The platform includes **15 Grafana dashboards** covering observability, databases, and infrastructure monitoring. All dashboards are deployed via GitOps from `kubernetes/infra/configs/monitoring/grafana/dashboards/`.
 
 **Key Dashboards:**
@@ -198,6 +207,16 @@ The platform includes **15 Grafana dashboards** covering observability, database
 - **Kubernetes Cluster Overview**: Cluster-wide resource utilization
 - **Database Dashboards**: PostgreSQL monitoring, CloudNativePG, PgBouncer, PgDog, query overview/drilldown, replication lag
 - **Infrastructure**: Vector metrics, Redis/Valkey monitoring
+=======
+The platform includes **22 Grafana dashboards** covering observability, databases, and SLO monitoring. All dashboards are deployed via GitOps from `kubernetes/infra/configs/monitoring/grafana/dashboards/`.
+
+**Key Dashboards:**
+- **Microservices Monitoring** (`microservices-monitoring-001`): Main observability dashboard with 34 panels covering metrics, traffic, errors, and runtime
+- **Tempo Distributed Tracing** (`tempo-obs-001`): Trace visualization with exemplars and log correlation
+- **SLO Overview & Detailed**: Error budget tracking and burn rate monitoring
+- **Database Dashboards**: PostgreSQL, CloudNativePG, PgBouncer, PgCat, PgDog monitoring
+- **Logs & Infrastructure**: VictoriaLogs explorer, Vector metrics
+>>>>>>> f4bd0c0 (feat: MCP servers, Kong domain-based ingress, monitoring expansion, Loki removal (v0.84.0))
 
 **Access**: All dashboards are available via Grafana at http://grafana.duynhne.me (see [Access Points](#access-points) below).
 

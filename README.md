@@ -1,6 +1,6 @@
 # Microservices Observability Platform
 
-A GitOps-managed Kubernetes homelab cluster running on Kind Local(Planed to server).
+A GitOps-managed Kubernetes homelab cluster running on Kind Local (planned to server).
 
 ---
 
@@ -11,7 +11,7 @@ Production-ready microservices monitoring platform with 8 Go services, complete 
 **Key Features:**
 
 - 8 microservices with v1 API (canonical, frontend-aligned)
-- 34 Grafana dashboard panels (5 row groups)
+- 15 Grafana dashboards (microservices, databases, tracing, infrastructure)
 - Complete observability stack (VictoriaMetrics, Tempo, Jaeger, VictoriaLogs, Pyroscope)
 - PostgreSQL database integration (3 clusters + DR replica, Flyway migrations)
 - Valkey caching (Redis-compatible) with Cache-Aside pattern
@@ -58,7 +58,7 @@ flowchart TD
     %% Observability Layer
     subgraph Observability ["Observability Stack"]
         direction LR
-        prom["Prometheus<br/>(Metrics)"]:::obs
+        prom["VictoriaMetrics<br/>(Metrics)"]:::obs
         tempo["Tempo / OTel<br/>(Tracing)"]:::obs
         vlogs["VictoriaLogs / Vector<br/>(Logging)"]:::obs
         pyro["Pyroscope<br/>(Profiles)"]:::obs
@@ -129,7 +129,7 @@ flowchart TD
 
 ## Technology Stack
 ### Core Services
-- **Runtime**: Go 1.25.5
+- **Runtime**: Go 1.25
     - 8 microservices
     - 3 layer: Web → Logic → Core
 
@@ -145,7 +145,6 @@ flowchart TD
 - **Kubernetes**: Local Cluster (Kind), Helm 3
 - **GitOps**: Flux Operator, ResourceSet (Unified Templating), Kustomize, OCI Registry
     - Application layer: 4 domain ResourceSets (identity, catalog, checkout, comms) + per-service InputProviders
-- **Dynamic Delivery**: OCIArtifactTag (Automated image updates)
 - **Monitoring**: VictoriaMetrics (VMSingle, VMAgent, VMAlert), Grafana, Tempo, VictoriaLogs, Pyroscope, Jaeger, Vector.
 
 **Observability Details**: See [`docs/observability/README.md`](docs/observability/README.md) for complete observability system overview.
@@ -179,7 +178,7 @@ make flux-push    # 3. Deploy everything (infrastructure + apps)
 
 **Benefits:**
 
-- **Simplified Makefile**: 85 lines (67% reduction), delegates to scripts
+- **Simplified Makefile**: 80 lines, delegates to scripts
 - **One-command deployment**: `make up` bootstraps everything
 - **Automatic drift detection**: Flux reconciles changes automatically
 - **Multi-environment support**: Local/production overlays
@@ -190,18 +189,19 @@ make flux-push    # 3. Deploy everything (infrastructure + apps)
 ---
 ## Grafana Dashboards
 
-The platform includes **22 Grafana dashboards** covering observability, databases, and SLO monitoring. All dashboards are deployed via GitOps from `kubernetes/infra/configs/monitoring/grafana/dashboards/`.
+The platform includes **15 Grafana dashboards** covering observability, databases, and infrastructure monitoring. All dashboards are deployed via GitOps from `kubernetes/infra/configs/monitoring/grafana/dashboards/`.
 
 **Key Dashboards:**
-- **Microservices Monitoring** (`microservices-monitoring-001`): Main observability dashboard with 34 panels covering metrics, traffic, errors, and runtime
-- **Tempo Distributed Tracing** (`tempo-obs-001`): Trace visualization with exemplars and log correlation
-- **SLO Overview & Detailed**: Error budget tracking and burn rate monitoring
-- **Database Dashboards**: PostgreSQL, CloudNativePG, PgBouncer, PgCat, PgDog monitoring
-- **Logs & Infrastructure**: VictoriaLogs explorer, Vector metrics
+- **Microservices Monitoring**: Main observability dashboard covering metrics, traffic, errors, and runtime
+- **Tempo Distributed Tracing**: Trace visualization with exemplars and log correlation
+- **Kong Dashboard**: API gateway traffic, latency, and error rates
+- **Kubernetes Cluster Overview**: Cluster-wide resource utilization
+- **Database Dashboards**: PostgreSQL monitoring, CloudNativePG, PgBouncer, PgDog, query overview/drilldown, replication lag
+- **Infrastructure**: Vector metrics, Redis/Valkey monitoring
 
 **Access**: All dashboards are available via Grafana at http://grafana.duynhne.me (see [Access Points](#access-points) below).
 
-**Documentation**: See [`docs/observability/grafana/dashboard-reference.md`](docs/observability/grafana/dashboard-reference.md) for complete dashboard reference (34 data panels + 5 row panels, query analysis, troubleshooting) and [`docs/observability/metrics/README.md`](docs/observability/metrics/README.md) for metrics guide.
+**Documentation**: See [`docs/observability/grafana/dashboard-reference.md`](docs/observability/grafana/dashboard-reference.md) for complete dashboard reference and [`docs/observability/metrics/README.md`](docs/observability/metrics/README.md) for metrics guide.
 
 ---
 
@@ -282,8 +282,8 @@ Complete documentation is available in the [`docs/`](docs/README.md) directory. 
 
 **Observability:**
 - **[Observability Overview](docs/observability/README.md)** - Distributed tracing, metrics, logs, profiling
-- **[Metrics Guide](docs/observability/metrics/README.md)** - Custom metrics and Prometheus integration
-- **[Grafana Dashboards](docs/observability/grafana/dashboard-reference.md)** - Dashboard reference (34 panels)
+- **[Metrics Guide](docs/observability/metrics/README.md)** - Custom metrics and VictoriaMetrics integration
+- **[Grafana Dashboards](docs/observability/grafana/dashboard-reference.md)** - Dashboard reference (15 dashboards)
 - **[SLO Documentation](docs/observability/slo/README.md)** - SLI/SLO definitions and error budgets
 
 **Infrastructure:**

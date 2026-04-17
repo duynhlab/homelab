@@ -391,6 +391,64 @@ make flux-sync
 - Fallback: `make flux-ui` for port-forwarding
 - See `README.md` for full domain list and `/etc/hosts` setup
 
+### Gateway Edge Naming (Variant A — adopted)
+
+All **browser** API traffic goes through Kong at `gateway.duynhne.me` using Variant A edge paths:
+
+```
+https://gateway.duynhne.me/{service}/v1/{audience}/{resource...}
+```
+
+- `{service}` ∈ `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`.
+- `{audience}` ∈ `public` (anonymous), `private` (JWT user), `protected` (webhooks — reserved), `internal` (**never** on the gateway).
+- `{resource...}` mirrors the cluster resource path.
+
+**Services keep `/api/v1/*`** — Kong rewrites edge → cluster via a per-namespace `KongPlugin` (pre-function) called `rewrite-edge-to-cluster`. Service handlers and JWT middleware are unchanged.
+
+**Sample mappings:**
+
+| Browser (edge) | Cluster (service-to-service) |
+|----------------|------------------------------|
+| `POST gateway.duynhne.me/auth/v1/public/login` | `POST /api/v1/auth/login` |
+| `GET gateway.duynhne.me/product/v1/public/products/:id/details` | `GET /api/v1/products/:id/details` |
+| `GET gateway.duynhne.me/cart/v1/private/cart` | `GET /api/v1/cart` |
+| `GET gateway.duynhne.me/order/v1/private/orders/:id/details` | `GET /api/v1/orders/:id/details` |
+| `GET gateway.duynhne.me/notification/v1/private/notifications` | `GET /api/v1/notifications` |
+
+**Rules for AI agents:**
+
+1. **Never** add internal endpoints (`POST /notify/*`, `POST /products`, `POST /users`, `GET /shipping/orders/:id`) to `ingress-api.yaml`. They stay reachable only via in-cluster `*.svc.cluster.local` DNS.
+2. When adding a new browser-facing route: add the service handler on `/api/v1/*`, add an edge row to `ingress-api.yaml` + (if shape differs) update `rewrite-plugins.yaml`, and update the mapping table in `docs/api/api-naming-convention.md`.
+3. When the frontend needs a new call, use the edge path, not the cluster path. Frontend base URL is `VITE_API_BASE_URL` (defaults to `http://gateway.duynhne.me`).
+
+**Authoritative docs:**
+
+- [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md) — edge convention + complete mapping.
+- [`docs/api/api.md`](docs/api/api.md) — cluster-internal API reference (source of truth for handler contracts).
+- [`docs/platform/kong-gateway.md`](docs/platform/kong-gateway.md) — Kong setup, CORS, rate limiting, verification runbook.
+
+### Demo / Test Credentials
+
+Default seeded user (Flyway migration on `auth-db`) — use for login testing:
+
+- **Username**: `alice`
+- **Password**: `password123`
+- **Email**: `alice@example.com`
+
+Hardcoded as initial form values in `frontend/src/pages/LoginPage/LoginPage.jsx`.
+
+**API usage:**
+
+```bash
+# Login via API (use username, NOT email)
+curl -H "Host: gateway.duynhne.me" -X POST http://localhost/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice","password":"password123"}'
+# → {"token":"jwt-token-...","user":{"id":"1","username":"alice","email":"alice@example.com"}}
+```
+
+Token stored in `localStorage.authToken`, sent as `Authorization: Bearer <token>` on subsequent requests.
+
 ### Find Documentation by Topic
 
 - **Getting Started**: [`docs/platform/setup.md`](docs/platform/setup.md), [`docs/api/api.md`](docs/api/api.md)

@@ -1,6 +1,6 @@
-# Frontend SPA — served at /
-# Kong routes non-API traffic to the frontend Nginx container (static files + SPA fallback).
-# TLS is terminated by Kong's default proxy certificate.
+# Frontend SPA — served at duynhne.me
+# Kong routes all non-API traffic to the frontend Nginx container (static files + SPA fallback).
+# TLS terminated by Kong using the default proxy certificate (kong-proxy-tls secret mounted via HelmRelease).
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -12,17 +12,7 @@ metadata:
 spec:
   ingressClassName: kong
   rules:
-    - host: gateway.duynhne.me
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: frontend
-                port:
-                  number: 80
-    - host: app.duynhne.me
+    - host: duynhne.me
       http:
         paths:
           - path: /

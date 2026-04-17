@@ -10,12 +10,9 @@ Production-ready microservices monitoring platform with 8 Go services, complete 
 
 **Key Features:**
 
-- 8 microservices with v1 API (canonical, frontend-aligned)
-<<<<<<< HEAD
+- 8 microservices behind Kong API gateway with **Variant A** edge naming: `https://gateway.duynhne.me/{service}/v1/{audience}/…`
+- Single public API hostname — Kong rewrites edge paths to cluster `/api/v1/*` (services unchanged)
 - 15 Grafana dashboards (microservices, databases, tracing, infrastructure)
-=======
-- 34 Grafana dashboard panels (5 row groups)
->>>>>>> f4bd0c0 (feat: MCP servers, Kong domain-based ingress, monitoring expansion, Loki removal (v0.84.0))
 - Complete observability stack (VictoriaMetrics, Tempo, Jaeger, VictoriaLogs, Pyroscope)
 - PostgreSQL database integration (3 clusters + DR replica, Flyway migrations)
 - Valkey caching (Redis-compatible) with Cache-Aside pattern
@@ -97,7 +94,7 @@ flowchart TD
     end
 
     %% Connections
-    FE -->|"HTTP /api/v1/*"| WebLayer
+    FE -->|"HTTPS gateway.duynhne.me<br/>/{service}/v1/{audience}/..."| WebLayer
     
     WebLayer & LogicLayer & CoreLayer -.->|"O11y Data"| Observability
     
@@ -120,12 +117,25 @@ flowchart TD
 
 **Key Points:**
 
-- **Frontend (React SPA)**: Runs in browser, HTTP requests to Web Layer only (`/api/v1/*`). Frontend repo: [`duynhlab/frontend`](https://github.com/duynhlab/frontend).
+- **Frontend (React SPA)**: Served from `duynhne.me`. All API calls go cross-origin to `https://gateway.duynhne.me/{service}/v1/{audience}/…` (Variant A edge naming — see [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md)). Frontend repo: [`duynhlab/frontend`](https://github.com/duynhlab/frontend).
+- **Kong API gateway**: Single public API edge at `gateway.duynhne.me`. Per-namespace `pre-function` plugin rewrites edge paths to cluster `/api/v1/*` — service handlers are unchanged. CORS allows `https://duynhne.me` origin.
 - **8 Microservices**: Each follows 3-layer architecture (Web -> Logic -> Core), organized into 4 domains (identity, catalog, checkout, comms).
 - **Cache-Aside Pattern**: Logic Layer checks Valkey first, queries database on miss, writes to cache.
 - **3 PostgreSQL Clusters**: auth-db (Zalando), supporting-shared-db (Zalando, hosts user/notification/shipping/review), cnpg-db (CNPG, hosts product/cart/order). Connected via PgBouncer and PgDog poolers. A DR replica cluster (cnpg-db-replica) continuously recovers from cnpg-db WAL archive.
 - **Full Observability**: Traces (Tempo + Jaeger via OTel Collector), Metrics (VictoriaMetrics via VMAgent/VMSingle), Logs (VictoriaLogs + Vector), Profiles (Pyroscope), all visualized in Grafana.
 - **GitOps Delivery**: Flux Operator with domain ResourceSets + per-service InputProviders + OCI + Kustomize. See [Application Delivery](docs/platform/application-delivery.md) and [Setup](docs/platform/setup.md).
+
+### Edge vs Cluster Paths
+
+| Browser hits (edge) | Kong rewrites to (cluster) |
+|---------------------|-----------------------------|
+| `POST gateway.duynhne.me/auth/v1/public/login` | `/api/v1/auth/login` |
+| `GET gateway.duynhne.me/product/v1/public/products` | `/api/v1/products` |
+| `GET gateway.duynhne.me/cart/v1/private/cart` | `/api/v1/cart` |
+| `GET gateway.duynhne.me/order/v1/private/orders/:id/details` | `/api/v1/orders/:id/details` |
+| `GET gateway.duynhne.me/notification/v1/private/notifications` | `/api/v1/notifications` |
+
+Service-to-service callers inside the cluster continue to use `/api/v1/*` directly via service DNS (e.g. `http://product.product.svc.cluster.local:8080/api/v1/products`). Full mapping: [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
 
 **Detailed Architecture**: See [`docs/observability/architecture.md`](docs/observability/architecture.md) for middleware chain and APM integration.
 
@@ -149,10 +159,8 @@ flowchart TD
 - **Kubernetes**: Local Cluster (Kind), Helm 3
 - **GitOps**: Flux Operator, ResourceSet (Unified Templating), Kustomize, OCI Registry
     - Application layer: 4 domain ResourceSets (identity, catalog, checkout, comms) + per-service InputProviders
-<<<<<<< HEAD
-=======
 - **Dynamic Delivery**: OCIArtifactTag (Automated image updates)
->>>>>>> f4bd0c0 (feat: MCP servers, Kong domain-based ingress, monitoring expansion, Loki removal (v0.84.0))
+- **API Gateway**: Kong Ingress Controller at `gateway.duynhne.me` with per-namespace `pre-function` rewrite plugins + global CORS / rate-limit / request-size-limit.
 - **Monitoring**: VictoriaMetrics (VMSingle, VMAgent, VMAlert), Grafana, Tempo, VictoriaLogs, Pyroscope, Jaeger, Vector.
 
 **Observability Details**: See [`docs/observability/README.md`](docs/observability/README.md) for complete observability system overview.
@@ -197,7 +205,6 @@ make flux-push    # 3. Deploy everything (infrastructure + apps)
 ---
 ## Grafana Dashboards
 
-<<<<<<< HEAD
 The platform includes **15 Grafana dashboards** covering observability, databases, and infrastructure monitoring. All dashboards are deployed via GitOps from `kubernetes/infra/configs/monitoring/grafana/dashboards/`.
 
 **Key Dashboards:**
@@ -207,16 +214,6 @@ The platform includes **15 Grafana dashboards** covering observability, database
 - **Kubernetes Cluster Overview**: Cluster-wide resource utilization
 - **Database Dashboards**: PostgreSQL monitoring, CloudNativePG, PgBouncer, PgDog, query overview/drilldown, replication lag
 - **Infrastructure**: Vector metrics, Redis/Valkey monitoring
-=======
-The platform includes **22 Grafana dashboards** covering observability, databases, and SLO monitoring. All dashboards are deployed via GitOps from `kubernetes/infra/configs/monitoring/grafana/dashboards/`.
-
-**Key Dashboards:**
-- **Microservices Monitoring** (`microservices-monitoring-001`): Main observability dashboard with 34 panels covering metrics, traffic, errors, and runtime
-- **Tempo Distributed Tracing** (`tempo-obs-001`): Trace visualization with exemplars and log correlation
-- **SLO Overview & Detailed**: Error budget tracking and burn rate monitoring
-- **Database Dashboards**: PostgreSQL, CloudNativePG, PgBouncer, PgCat, PgDog monitoring
-- **Logs & Infrastructure**: VictoriaLogs explorer, Vector metrics
->>>>>>> f4bd0c0 (feat: MCP servers, Kong domain-based ingress, monitoring expansion, Loki removal (v0.84.0))
 
 **Access**: All dashboards are available via Grafana at http://grafana.duynhne.me (see [Access Points](#access-points) below).
 
@@ -234,8 +231,8 @@ Add the following entries to your `/etc/hosts` file:
 
 ```bash
 # duynhlab homelab — Kong Ingress domains
+127.0.0.1 duynhne.me
 127.0.0.1 gateway.duynhne.me
-127.0.0.1 app.duynhne.me
 127.0.0.1 grafana.duynhne.me
 127.0.0.1 vmui.duynhne.me
 127.0.0.1 vmalert.duynhne.me
@@ -261,8 +258,8 @@ All services are routed through Kong Ingress Controller on port 80 (HTTP).
 
 | Service | Domain | Description |
 |---------|--------|-------------|
-| **Frontend** | http://app.duynhne.me | React SPA |
-| **API Gateway** | http://gateway.duynhne.me | Kong → 8 microservices (`/api/v1/*`) |
+| **API Gateway** | http://gateway.duynhne.me | **Single public API entry.** Variant A edge paths `/{service}/v1/{audience}/…` → rewritten to `/api/v1/*`. Rate-limited, CORS-controlled. See [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md). |
+| **Frontend** | http://duynhne.me | React SPA (calls the API gateway cross-origin). |
 | **Grafana** | http://grafana.duynhne.me | Dashboards (anonymous access) |
 | **VictoriaMetrics** | http://vmui.duynhne.me/vmui | Metrics query UI |
 | **VMAlert** | http://vmalert.duynhne.me | Alert rules & evaluation |

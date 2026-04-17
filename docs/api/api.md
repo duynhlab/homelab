@@ -1,19 +1,23 @@
 # API Reference
 
-> **Document Status:** Production  
-> **Last Updated:** 2026-01-28  
-> **Architecture:** 3-Layer (Web / Logic / Core)  
+> **Document Status:** Production
+> **Last Updated:** 2026-04-17
+> **Architecture:** 3-Layer (Web / Logic / Core)
 > **API Version:** v1 only (canonical, frontend-aligned)
 
-**See also (draft, non-canonical):** [Gateway URL naming exploration](api-naming-convention.md) — does not change the `/api/v1/*` surface documented below.
+> **🔀 Cluster-internal paths vs edge paths**
+>
+> Tables below document **cluster-internal** paths (`/api/v1/{resource}`) — accurate for service-to-service callers inside the Kubernetes cluster and for unit/integration tests that target the service directly.
+>
+> **Browser traffic** goes through Kong at `gateway.duynhne.me` using Variant A edge paths: `/{service}/v1/{audience}/{resource}`. Kong rewrites these to the cluster paths below via per-namespace `pre-function` plugins. See [`api-naming-convention.md`](api-naming-convention.md) for the complete edge → cluster mapping and rewrite rules.
 
 ---
 
 ## Master API Overview
 
-This is the **single source of truth** for all API endpoints. The Frontend team MUST use these endpoints exactly as documented. No client-side orchestration allowed for aggregation endpoints.
+This is the **single source of truth** for all API endpoints (cluster-internal paths). Frontend code calls the **edge equivalents** at `gateway.duynhne.me` per [`api-naming-convention.md`](api-naming-convention.md); Kong rewrites to the cluster paths documented here. No client-side orchestration allowed for aggregation endpoints.
 
-> **Note:** v2 API endpoints have been removed. v1 is the canonical API that aligns with the frontend.
+> **Note:** v2 API endpoints have been removed. v1 is the canonical API.
 
 ### Frontend Endpoints
 
@@ -418,16 +422,18 @@ func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 
 ## Services
 
-| Service | Namespace | Port | Base URL |
-|---------|-----------|------|----------|
-| auth | auth | 8080 | `/api/v1` |
-| user | user | 8080 | `/api/v1` |
-| product | product | 8080 | `/api/v1` |
-| cart | cart | 8080 | `/api/v1` |
-| order | order | 8080 | `/api/v1` |
-| review | review | 8080 | `/api/v1` |
-| notification | notification | 8080 | `/api/v1` |
-| shipping | shipping | 8080 | `/api/v1` |
+| Service | Namespace | Port | Cluster base URL | Edge base URL (browser) |
+|---------|-----------|------|------------------|-------------------------|
+| auth | auth | 8080 | `/api/v1/auth/*` | `gateway.duynhne.me/auth/v1/{public,private}/*` |
+| user | user | 8080 | `/api/v1/users/*` | `gateway.duynhne.me/user/v1/{public,private}/users/*` |
+| product | product | 8080 | `/api/v1/products/*` | `gateway.duynhne.me/product/v1/public/products/*` |
+| cart | cart | 8080 | `/api/v1/cart/*` | `gateway.duynhne.me/cart/v1/private/cart/*` |
+| order | order | 8080 | `/api/v1/orders/*` | `gateway.duynhne.me/order/v1/private/orders/*` |
+| review | review | 8080 | `/api/v1/reviews/*` | `gateway.duynhne.me/review/v1/{public,private}/reviews/*` |
+| notification | notification | 8080 | `/api/v1/notifications/*`, `/api/v1/notify/*` | `gateway.duynhne.me/notification/v1/private/notifications/*` (notify/* stays internal) |
+| shipping | shipping | 8080 | `/api/v1/shipping/*` | `gateway.duynhne.me/shipping/v1/public/{track,estimate}` (orders/:id stays internal) |
+
+**Rule:** Cluster base URLs are what handler code mounts. Edge base URLs are what the frontend and any external clients hit. For the complete per-endpoint mapping, see [`api-naming-convention.md`](api-naming-convention.md).
 
 ---
 

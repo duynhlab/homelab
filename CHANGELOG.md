@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.86.0] - 2026-04-17
+
+### Added
+
+- **Variant A edge naming adopted (gateway-facing URL convention):** Public API traffic now uses `https://gateway.duynhne.me/{service}/v1/{audience}/{resource…}` per [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md) (promoted Draft → Adopted; illustrative examples replaced with the real 8 services).
+- **Kong `rewrite-edge-to-cluster` plugins (8 namespaces):** Per-namespace `KongPlugin` (pre-function) rewrites edge paths to `/api/v1/*` before proxying — service handlers remain on `/api/v1/*` and keep validating JWT themselves (defense-in-depth). Source: [`rewrite-plugins.yaml`](kubernetes/infra/configs/kong/rewrite-plugins.yaml).
+- **Edge-vs-cluster path reference** added to homelab [`AGENTS.md`](AGENTS.md), [`README.md`](README.md) *Architecture Overview* (mapping table under *Edge vs Cluster Paths*), and [`docs/api/api.md`](docs/api/api.md) banner.
+- **Kong TLS via `secretVolumes`:** Kong HelmRelease now mounts the cert-manager–issued `kong-proxy-tls` secret into the proxy container (`ssl_cert` / `ssl_cert_key` pointing at `/etc/secrets/kong-proxy-tls/tls.{crt,key}`), avoiding cross-namespace secret references in Ingress TLS blocks.
+
+### Changed
+
+- **`ingress-api.yaml` rewritten for single-host edge:** Each of 8 service ingresses now matches `host: gateway.duynhne.me, path: /{service}/v1/` (one rule per ingress). Removed the transitional `duynhne.me` duplicates that were added as a same-origin workaround — frontend now calls the gateway cross-origin (CORS handled by existing `cors-policy` KongClusterPlugin).
+- **`docs/platform/kong-gateway.md`:** Routing Rules table updated to show edge path + cluster path + rewrite rule; Step 3 verification expanded to list 8 `KongPlugin`s; Step 6 ingress table reflects new edge paths; Steps 7–9 curl commands migrated to edge paths; added negative tests (legacy `/api/v1/*` on gateway → 404, internal audience on gateway → 404).
+- **`docs/api/api.md`:** Top-of-file banner now distinguishes cluster-internal paths (tables below) from browser edge paths (at `gateway.duynhne.me`). Link to `api-naming-convention.md` for the mapping.
+- **Monitoring `prometheusrules/` reorganized into per-domain subdirectories** — `gitops/`, `kong/`, `kubernetes/`, `microservices/`, `postgres/`, `valkey/`, `victoriametrics/` — each with its own `kustomization.yaml`. The parent `monitoring/kustomization.yaml` is simplified to a single `prometheusrules/` entry. No rule content changed; only file layout.
+
+### Fixed
+
+- **README.md merge-conflict markers** (`<<<<<<< / ======= / >>>>>>>`) left over from the 0.84 → 0.85 merge are removed; content normalized to 15 dashboards + OCIArtifactTag line.
+
+## [0.85.0] - 2026-04-16
+
+### Added
+
+- **Kong rate limiting plugin (`rate-limiting-api`):** Global API rate limiting — 10 req/s, 200 req/min, 5000 req/hr per consumer, local policy, fault-tolerant mode, HTTP 429 on breach. [`plugins.yaml`](kubernetes/infra/configs/kong/plugins.yaml).
+- **Kong request size limiting plugin (`request-size-limiting-api`):** 10MB max request payload for all API ingresses. [`plugins.yaml`](kubernetes/infra/configs/kong/plugins.yaml).
+- **Kong gateway documentation expansion:** Comprehensive [`kong-gateway.md`](docs/platform/kong-gateway.md) rewrite — "Why Kong?" comparison table (Kong vs Traefik vs NGINX vs APISIX vs Envoy/Istio), rate limiting deep dive (industry examples from GitHub/Stripe/Shopify/Twitter, algorithm comparison, OSS vs Enterprise), domain routing strategy, plugin ecosystem overview, rate limiting verification step, design decisions, future roadmap (phases 2–5).
+
+### Changed
+
+- **Frontend domain:** `app.duynhne.me` → `duynhne.me` (root domain for frontend SPA). Updated [`ingress-frontend.yaml`](kubernetes/infra/configs/kong/ingress-frontend.yaml), [`README.md`](README.md), `/etc/hosts` instructions.
+- **CORS origins updated:** Removed `app.duynhne.me` variants, added `duynhne.me` variants (http/https). Exposed rate limit response headers (`RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset`). [`plugins.yaml`](kubernetes/infra/configs/kong/plugins.yaml).
+- **API ingresses annotated with plugins:** All 8 API service Ingress resources (auth, user, product, cart, order, review, notification, shipping) now include `konghq.com/plugins: rate-limiting-api,request-size-limiting-api`. [`ingress-api.yaml`](kubernetes/infra/configs/kong/ingress-api.yaml).
+- **Verification runbook URLs:** Updated from `https://gateway.duynhne.me:8443` to `http://gateway.duynhne.me` and `http://duynhne.me` throughout [`kong-gateway.md`](docs/platform/kong-gateway.md).
+- **README.md:** Resolved merge conflict (kept 15 dashboards), updated frontend domain and API Gateway description to mention rate limiting.
+
 ## [0.84.0] - 2026-04-15
 
 ### Added

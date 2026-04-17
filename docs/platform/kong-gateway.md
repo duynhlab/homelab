@@ -68,7 +68,7 @@ flowchart TD
 
     subgraph Domains["Domain Routing"]
         FERoute["duynhne.me /*"]:::fe
-        APIRoute["gateway.duynhne.me /api/v1/*"]:::api
+        APIRoute["gateway.duynhne.me /{service}/v1/{public,private}/…"]:::api
         MonRoute["*.duynhne.me (monitoring/infra)"]:::infra
     end
 
@@ -123,7 +123,7 @@ flowchart LR
     subgraph Before["Before (Single Domain)"]
         GW1["gateway.duynhne.me"]
         GW1 -->|"/"| FE1["Frontend"]
-        GW1 -->|"/api/v1/*"| API1["APIs"]
+        GW1 -->|"/{service}/v1/…"| API1["APIs"]
     end
 
     subgraph After["After (Separated)"]
@@ -381,7 +381,7 @@ Currently, auth is handled at the application level (auth-service). Gateway-leve
 | HelmRelease | `kubernetes/infra/controllers/kong/helmrelease.yaml` | Kong KIC deployment (DB-less, chart v2.44.0) |
 | Plugins | `kubernetes/infra/configs/kong/plugins.yaml` | Global CORS + Prometheus, API rate limiting + request size limiting |
 | Frontend Ingress | `kubernetes/infra/configs/kong/ingress-frontend.yaml` | Routes `duynhne.me /` to frontend |
-| API Ingress | `kubernetes/infra/configs/kong/ingress-api.yaml` | Routes `gateway.duynhne.me /api/v1/*` to services (rate-limited) |
+| API Ingress | `kubernetes/infra/configs/kong/ingress-api.yaml` | Routes `gateway.duynhne.me /{service}/v1/{public,private}/…` to services (rate-limited, pass-through) |
 | Monitoring Ingress | `kubernetes/infra/configs/kong/ingress-monitoring.yaml` | Routes monitoring tools (Grafana, VM, Jaeger, etc.) |
 | Infra Ingress | `kubernetes/infra/configs/kong/ingress-infra.yaml` | Routes infra tools (Flux UI, RustFS, OpenBAO, PG UI) |
 | MCP Ingress | `kubernetes/infra/configs/kong/ingress-mcp.yaml` | Routes MCP servers (VM, VL, Flux) |
@@ -410,7 +410,7 @@ Kong runs as NodePort with Kind port mappings (80→30080, 443→30443). After `
 | URL | Description |
 |-----|-------------|
 | `http://duynhne.me` | Frontend (React SPA) |
-| `http://gateway.duynhne.me/api/v1/products` | API route example |
+| `http://gateway.duynhne.me/product/v1/public/products` | API route example (Variant A) |
 | `http://grafana.duynhne.me` | Grafana dashboards |
 
 ### Fallback: Port Forwarding
@@ -441,49 +441,32 @@ For production, uncomment the Let's Encrypt issuers in `clusterissuers.yaml` and
 
 ## Routing Rules
 
-Edge URL shape is **Variant A** from [`api-naming-convention.md`](../api/api-naming-convention.md): `/{service}/v1/{audience}/{resource…}`. Kong keeps `strip-path: false` and a per-namespace `KongPlugin rewrite-edge-to-cluster` (pre-function) rewrites the prefix to `/api/v1/{resource}` before proxying. Service handlers stay mounted on `/api/v1/*` and validate JWTs themselves.
+URL shape is **Variant A** from [`api-naming-convention.md`](../api/api-naming-convention.md): `/{service}/v1/{audience}/{resource…}`. Services mount these paths directly on their HTTP routers; Kong is **pure pass-through** (`strip-path: false`, no rewrite plugin). Services keep validating JWTs themselves.
 
-| Host | Edge path prefix | Cluster path | Backend | Namespace | Rate limited |
-|------|------------------|--------------|---------|-----------|--------------|
-| `duynhne.me` | `/` | — | `frontend:80` | default | No |
-| `gateway.duynhne.me` | `/auth/v1/{public,private}/…` | `/api/v1/auth/…` | `auth:8080` | auth | Yes |
-| `gateway.duynhne.me` | `/user/v1/{public,private}/users/…` | `/api/v1/users/…` | `user:8080` | user | Yes |
-| `gateway.duynhne.me` | `/product/v1/public/products/…` | `/api/v1/products/…` | `product:8080` | product | Yes |
-| `gateway.duynhne.me` | `/cart/v1/private/cart/…` | `/api/v1/cart/…` | `cart:8080` | cart | Yes |
-| `gateway.duynhne.me` | `/order/v1/private/orders/…` | `/api/v1/orders/…` | `order:8080` | order | Yes |
-| `gateway.duynhne.me` | `/review/v1/{public,private}/reviews/…` | `/api/v1/reviews/…` | `review:8080` | review | Yes |
-| `gateway.duynhne.me` | `/notification/v1/private/notifications/…` | `/api/v1/notifications/…` | `notification:8080` | notification | Yes |
-| `gateway.duynhne.me` | `/shipping/v1/public/{track,estimate}` | `/api/v1/shipping/{track,estimate}` | `shipping:8080` | shipping | Yes |
+Per-ingress `path:` entries are scoped to `public` and `private` audiences only — `internal` is never listed on the gateway, so requests to `https://gateway.duynhne.me/notification/v1/internal/…` return Kong's default 404.
 
-**Internal endpoints NOT routed here** (reachable only via in-cluster service DNS):
+| Host | Path | Backend | Namespace | Rate limited |
+|------|------|---------|-----------|--------------|
+| `duynhne.me` | `/` | `frontend:80` | default | No |
+| `gateway.duynhne.me` | `/auth/v1/public/`, `/auth/v1/private/` | `auth:8080` | auth | Yes |
+| `gateway.duynhne.me` | `/user/v1/public/`, `/user/v1/private/` | `user:8080` | user | Yes |
+| `gateway.duynhne.me` | `/product/v1/public/` | `product:8080` | product | Yes |
+| `gateway.duynhne.me` | `/cart/v1/private/` | `cart:8080` | cart | Yes |
+| `gateway.duynhne.me` | `/order/v1/private/` | `order:8080` | order | Yes |
+| `gateway.duynhne.me` | `/review/v1/public/`, `/review/v1/private/` | `review:8080` | review | Yes |
+| `gateway.duynhne.me` | `/notification/v1/private/` | `notification:8080` | notification | Yes |
+| `gateway.duynhne.me` | `/shipping/v1/public/` | `shipping:8080` | shipping | Yes |
 
-| Service | Cluster path | Caller |
-|---------|--------------|--------|
-| product | `POST /api/v1/products` | Admin / seed jobs |
-| user | `POST /api/v1/users` | auth-service during registration flow |
-| notification | `POST /api/v1/notify/{email,sms}` | Any service publishing a notification |
-| shipping | `GET /api/v1/shipping/orders/:orderId` | order-service (order aggregation) |
+**Internal endpoints NOT routed here** (reachable only via Kubernetes Service DNS):
 
-Adding these to gateway ingresses is a safety/privacy regression — treat them as private-by-network.
+| Service | Path | Caller |
+|---------|------|--------|
+| product | `POST /product/v1/internal/products` | Admin / seed jobs |
+| user | `POST /user/v1/internal/users` | auth-service during registration flow |
+| notification | `POST /notification/v1/internal/notify/{email,sms}` | Any service publishing a notification |
+| shipping | `GET /shipping/v1/internal/orders/:orderId` | order-service (order aggregation) |
 
-### Rewrite plugin (example — `auth` namespace)
-
-```yaml
-apiVersion: configuration.konghq.com/v1
-kind: KongPlugin
-metadata:
-  name: rewrite-edge-to-cluster
-  namespace: auth
-plugin: pre-function
-config:
-  access:
-    - |
-      local p = kong.request.get_path()
-      local new, n = p:gsub("^/auth/v1/[%w]+", "/api/v1/auth")
-      if n > 0 then kong.service.request.set_path(new) end
-```
-
-Source: [`kubernetes/infra/configs/kong/rewrite-plugins.yaml`](../../kubernetes/infra/configs/kong/rewrite-plugins.yaml) — one plugin per service namespace.
+Adding any `internal` audience to a gateway Ingress is a safety/privacy regression — keep them private-by-network (NetworkPolicy + no public rule).
 
 ---
 
@@ -526,7 +509,7 @@ kubectl get kongplugins -A
 **Expected**:
 
 - 4 `KongClusterPlugin`s: `cors-policy`, `prometheus-metrics`, `rate-limiting-api`, `request-size-limiting-api`.
-- 8 `KongPlugin`s named `rewrite-edge-to-cluster` — one per service namespace (`auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`).
+- No namespaced `KongPlugin` resources needed — Kong is pure pass-through (services mount Variant A paths directly).
 
 ### Step 4: Check Kong Services
 
@@ -570,7 +553,7 @@ kubectl get ingress -A
 
 ### Step 7: Test API Routes (curl)
 
-All browser-facing requests use Variant A edge paths. Kong rewrites to `/api/v1/*` internally.
+All browser-facing requests use Variant A paths. Kong passes them through unchanged; services mount these paths directly.
 
 ```bash
 # Frontend
@@ -618,7 +601,7 @@ curl -s -o /dev/null -w "%{http_code}\n" \
   "http://gateway.duynhne.me/shipping/v1/public/track?tracking_number=TRACK123"
 # Expected: 200 or 404
 
-# Legacy path GONE from gateway — expected 404
+# Legacy /api/v1/* is gone everywhere (services + gateway) — expected 404
 curl -s -o /dev/null -w "legacy /api/v1 on gateway: %{http_code}\n" \
   http://gateway.duynhne.me/api/v1/products
 

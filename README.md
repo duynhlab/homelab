@@ -11,7 +11,7 @@ Production-ready microservices monitoring platform with 8 Go services, complete 
 **Key Features:**
 
 - 8 microservices behind Kong API gateway with **Variant A** edge naming: `https://gateway.duynhne.me/{service}/v1/{audience}/…`
-- Single public API hostname — Kong rewrites edge paths to cluster `/api/v1/*` (services unchanged)
+- Single public API hostname — Kong is pass-through; services mount Variant A paths directly (no `/api/v1/*` anywhere)
 - 15 Grafana dashboards (microservices, databases, tracing, infrastructure)
 - Complete observability stack (VictoriaMetrics, Tempo, Jaeger, VictoriaLogs, Pyroscope)
 - PostgreSQL database integration (3 clusters + DR replica, Flyway migrations)
@@ -118,24 +118,30 @@ flowchart TD
 **Key Points:**
 
 - **Frontend (React SPA)**: Served from `duynhne.me`. All API calls go cross-origin to `https://gateway.duynhne.me/{service}/v1/{audience}/…` (Variant A edge naming — see [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md)). Frontend repo: [`duynhlab/frontend`](https://github.com/duynhlab/frontend).
-- **Kong API gateway**: Single public API edge at `gateway.duynhne.me`. Per-namespace `pre-function` plugin rewrites edge paths to cluster `/api/v1/*` — service handlers are unchanged. CORS allows `https://duynhne.me` origin.
+- **Kong API gateway**: Single public API edge at `gateway.duynhne.me`. Pure pass-through — services mount Variant A paths directly on their routers. Kong provides CORS (`https://duynhne.me`), rate limiting, and request-size limits.
 - **8 Microservices**: Each follows 3-layer architecture (Web -> Logic -> Core), organized into 4 domains (identity, catalog, checkout, comms).
 - **Cache-Aside Pattern**: Logic Layer checks Valkey first, queries database on miss, writes to cache.
 - **3 PostgreSQL Clusters**: auth-db (Zalando), supporting-shared-db (Zalando, hosts user/notification/shipping/review), cnpg-db (CNPG, hosts product/cart/order). Connected via PgBouncer and PgDog poolers. A DR replica cluster (cnpg-db-replica) continuously recovers from cnpg-db WAL archive.
 - **Full Observability**: Traces (Tempo + Jaeger via OTel Collector), Metrics (VictoriaMetrics via VMAgent/VMSingle), Logs (VictoriaLogs + Vector), Profiles (Pyroscope), all visualized in Grafana.
 - **GitOps Delivery**: Flux Operator with domain ResourceSets + per-service InputProviders + OCI + Kustomize. See [Application Delivery](docs/platform/application-delivery.md) and [Setup](docs/platform/setup.md).
 
-### Edge vs Cluster Paths
+### API paths
 
-| Browser hits (edge) | Kong rewrites to (cluster) |
-|---------------------|-----------------------------|
-| `POST gateway.duynhne.me/auth/v1/public/login` | `/api/v1/auth/login` |
-| `GET gateway.duynhne.me/product/v1/public/products` | `/api/v1/products` |
-| `GET gateway.duynhne.me/cart/v1/private/cart` | `/api/v1/cart` |
-| `GET gateway.duynhne.me/order/v1/private/orders/:id/details` | `/api/v1/orders/:id/details` |
-| `GET gateway.duynhne.me/notification/v1/private/notifications` | `/api/v1/notifications` |
+Single URL shape across the platform — browser and in-cluster callers use the **same path**, just a different host. Kong is pure pass-through.
 
-Service-to-service callers inside the cluster continue to use `/api/v1/*` directly via service DNS (e.g. `http://product.product.svc.cluster.local:8080/api/v1/products`). Full mapping: [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
+| Method | Path | Audience | Browser? |
+|--------|------|----------|----------|
+| `POST` | `/auth/v1/public/login` | public | ✅ |
+| `GET` | `/product/v1/public/products/:id/details` | public | ✅ (aggregation) |
+| `GET` / `POST` / `DELETE` | `/cart/v1/private/cart` | private | ✅ |
+| `GET` | `/order/v1/private/orders/:id/details` | private | ✅ (aggregation) |
+| `POST` | `/notification/v1/internal/notify/email` | internal | ❌ in-cluster only |
+
+- Browser: `https://gateway.duynhne.me/{service}/v1/{audience}/…`
+- Service-to-service: `http://{svc}.{ns}.svc.cluster.local:8080/{service}/v1/{audience}/…`
+- `internal` audience is **never** routed through Kong.
+
+Full per-endpoint mapping: [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
 
 **Detailed Architecture**: See [`docs/observability/architecture.md`](docs/observability/architecture.md) for middleware chain and APM integration.
 
@@ -258,7 +264,7 @@ All services are routed through Kong Ingress Controller on port 80 (HTTP).
 
 | Service | Domain | Description |
 |---------|--------|-------------|
-| **API Gateway** | http://gateway.duynhne.me | **Single public API entry.** Variant A edge paths `/{service}/v1/{audience}/…` → rewritten to `/api/v1/*`. Rate-limited, CORS-controlled. See [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md). |
+| **API Gateway** | http://gateway.duynhne.me | **Single public API entry.** Variant A paths `/{service}/v1/{public,private}/…`. Pass-through — services mount these paths directly. Rate-limited, CORS-controlled. See [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md). |
 | **Frontend** | http://duynhne.me | React SPA (calls the API gateway cross-origin). |
 | **Grafana** | http://grafana.duynhne.me | Dashboards (anonymous access) |
 | **VictoriaMetrics** | http://vmui.duynhne.me/vmui | Metrics query UI |

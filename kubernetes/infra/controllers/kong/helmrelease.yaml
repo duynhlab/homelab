@@ -2,9 +2,9 @@
 # Chart: kong/kong — https://github.com/Kong/charts/tree/main/charts/kong
 # Docs: https://docs.konghq.com/kubernetes-ingress-controller/latest/
 #
-# TLS: Kong uses its default proxy cert on startup. The cert-manager issued
-# certificate (kong-proxy-tls) is referenced in the Ingress TLS block and
-# picked up by KIC for SNI-based TLS termination once cert-manager-local deploys.
+# TLS: The cert-manager issued certificate (kong-proxy-tls) is mounted as
+# Kong's default proxy certificate via secretVolumes + ssl_cert/ssl_cert_key.
+# This avoids cross-namespace secret references in Ingress TLS blocks.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -40,6 +40,13 @@ spec:
       # JSON access logs — picked up by Vector DaemonSet → Loki + VictoriaLogs
       proxy_access_log: "/dev/stdout"
       proxy_error_log: "/dev/stderr"
+      # Default proxy TLS certificate (cert-manager issued, wildcard *.duynhne.me)
+      ssl_cert: "/etc/secrets/kong-proxy-tls/tls.crt"
+      ssl_cert_key: "/etc/secrets/kong-proxy-tls/tls.key"
+
+    # Mount the cert-manager TLS secret into the Kong proxy container
+    secretVolumes:
+      - kong-proxy-tls
 
     # Ingress Controller
     ingressController:

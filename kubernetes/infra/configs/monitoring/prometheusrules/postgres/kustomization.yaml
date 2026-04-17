@@ -3,6 +3,8 @@ kind: Kustomization
 # Do not set namespace here: CNPG chart rules use namespace product; Zalando rules use monitoring.
 
 resources:
+  - backup-alerts.yaml
+  - pg-exporter-recording-rules.yaml
   - cnpg/cluster-fenced.yaml
   - cnpg/cluster-ha-critical.yaml
   - cnpg/cluster-ha-warning.yaml

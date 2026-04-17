@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.87.0] - 2026-04-17
+
+### ⚠️ Breaking change — services migrated off `/api/v1/*`
+
+All 8 microservices now mount Variant A paths **directly** on their HTTP routers:
+
+```
+/{service}/v1/{audience}/{resource…}
+```
+
+There is no more `/api/v1/*` anywhere — handlers, service-to-service callers, frontend, docs. Kong is pure pass-through (no rewrite plugin). `internal` audience is reserved for service-to-service calls and is **never** routed through the gateway.
+
+### Added
+
+- `docs/api/api-naming-convention.md` **v2.0.0 — Adopted, sole URL surface.** Complete per-service route inventory + service-to-service call table.
+
+### Changed
+
+- **All 8 service repos** (`auth-service`, `user-service`, `product-service`, `cart-service`, `order-service`, `review-service`, `notification-service`, `shipping-service`): route groups migrated from `r.Group("/api/v1")` to `/{service}/v1/{public,private,internal}/…` mounted on the root router. JWT middleware is re-wired to the `/private` router group per service.
+- **Service-to-service HTTP URLs** in Go source:
+  - Every service's `middleware/auth.go` calls `/auth/v1/private/me` on `auth-service`.
+  - `order-service` → `shipping-service`: `/shipping/v1/internal/orders/{orderId}`.
+  - `order-service` → `cart-service`: `/cart/v1/private/cart` (forwards user's Authorization header).
+  - `product-service` → `review-service`: `/review/v1/public/reviews?product_id=…`.
+- **Kong config simplification**:
+  - `kubernetes/infra/configs/kong/rewrite-plugins.yaml` **deleted** — no rewrite plugin needed.
+  - `kubernetes/infra/configs/kong/kustomization.yaml` drops the reference.
+  - `kubernetes/infra/configs/kong/ingress-api.yaml` rewritten: per-ingress `path:` entries are now one per `{public|private}` audience; `konghq.com/plugins` annotation keeps only `rate-limiting-api,request-size-limiting-api`.
+  - `internal` audience is never listed in any Ingress — requests like `/notification/v1/internal/notify/email` on the gateway return Kong's default 404.
+- **Frontend** (already aligned in v0.86): `src/api/*.js` modules call `/{service}/v1/{audience}/…` — now symmetric with what services mount.
+- **Documentation sweep**: `docs/api/api.md`, `docs/platform/kong-gateway.md`, homelab `AGENTS.md`, homelab `README.md` and each service repo's `AGENTS.md` + `README.md` collapse the former "cluster vs edge" dual-path tables to a single-path model.
+
+### Removed
+
+- All `/api/v1/*` mounts in service `cmd/main.go` and `internal/web/v1/handler.go`.
+- Kong `pre-function` `rewrite-edge-to-cluster` plugins (8 namespaced `KongPlugin` resources).
+
+### Migration notes
+
+- Rolled out as a **big-bang** change: 8 service repos + frontend + homelab merge together, then `make flux-push && make flux-sync`.
+- Services restart on new routes — any in-flight request with the old `/api/v1/*` shape fails. Acceptable for homelab (no uptime SLA).
+- For production environments, the safer approach is a transition release that mounts both URL shapes side-by-side and drops `/api/v1/*` one release later.
+
 ## [0.86.0] - 2026-04-17
 
 ### Added

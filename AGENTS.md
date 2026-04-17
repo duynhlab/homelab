@@ -154,7 +154,7 @@ flowchart TD
 
 **Allowed:**
 
-- ✅ HTTP requests to `/api/v1/*` endpoints (canonical API)
+- ✅ HTTP requests to `/{service}/v1/{public,private}/…` endpoints via `https://gateway.duynhne.me`
 - ✅ All requests go through Web Layer handlers
 - ✅ Web Layer handles aggregation, validation, error translation
 
@@ -199,7 +199,7 @@ flowchart TD
   - **Database Documentation**: [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md)
 - **Cache**: Valkey (Redis-compatible) for read-heavy endpoints
   - Cache-Aside pattern in Logic Layer
-  - Product service: `GET /api/v1/products`, `GET /api/v1/products/:id`
+  - Product service: `GET /product/v1/public/products`, `GET /product/v1/public/products/:id`
   - **Caching Documentation**: [`docs/caching/caching.md`](docs/caching/caching.md)
 - **HTTP Framework**: Gin
 - **Observability**: OpenTelemetry (traces, metrics, logs)
@@ -243,14 +243,14 @@ monitoring/
 
 | Service | Namespace | Base URL |
 |---------|-----------|----------|
-| auth | auth | `/api/v1/*` |
-| user | user | `/api/v1/*` |
-| product | product | `/api/v1/*` |
-| cart | cart | `/api/v1/*` |
-| order | order | `/api/v1/*` |
-| review | review | `/api/v1/*` |
-| notification | notification | `/api/v1/*` |
-| shipping | shipping | `/api/v1/*` |
+| auth | auth | `/auth/v1/{public,private}/…` |
+| user | user | `/user/v1/{public,private,internal}/users/…` |
+| product | product | `/product/v1/{public,internal}/products/…` |
+| cart | cart | `/cart/v1/private/cart/…` |
+| order | order | `/order/v1/private/orders/…` |
+| review | review | `/review/v1/{public,private}/reviews/…` |
+| notification | notification | `/notification/v1/{private,internal}/…` |
+| shipping | shipping | `/shipping/v1/{public,internal}/…` |
 
 **Complete API Documentation**: See [`docs/api/api.md`](docs/api/api.md) for all endpoints, request/response models, and examples.
 
@@ -391,40 +391,48 @@ make flux-sync
 - Fallback: `make flux-ui` for port-forwarding
 - See `README.md` for full domain list and `/etc/hosts` setup
 
-### Gateway Edge Naming (Variant A — adopted)
+### API URL shape (Variant A — adopted)
 
-All **browser** API traffic goes through Kong at `gateway.duynhne.me` using Variant A edge paths:
+Every HTTP path in the platform uses:
 
 ```
-https://gateway.duynhne.me/{service}/v1/{audience}/{resource...}
+/{service}/v1/{audience}/{resource…}
 ```
+
+Services mount these paths **directly** on their Gin router; Kong is pure pass-through (no rewriting). Same path, two hosts:
+
+- **Browser** → `https://gateway.duynhne.me/…`
+- **Service-to-service (in-cluster)** → `http://{svc}.{ns}.svc.cluster.local:8080/…`
+
+Segments:
 
 - `{service}` ∈ `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`.
-- `{audience}` ∈ `public` (anonymous), `private` (JWT user), `protected` (webhooks — reserved), `internal` (**never** on the gateway).
-- `{resource...}` mirrors the cluster resource path.
+- `{audience}` ∈ `public` (anonymous), `private` (JWT required), `internal` (service-to-service — **never** on the gateway), `protected` (reserved for webhooks).
+- `{resource…}` — collection or verb owned by the service.
 
-**Services keep `/api/v1/*`** — Kong rewrites edge → cluster via a per-namespace `KongPlugin` (pre-function) called `rewrite-edge-to-cluster`. Service handlers and JWT middleware are unchanged.
+**Sample endpoints:**
 
-**Sample mappings:**
-
-| Browser (edge) | Cluster (service-to-service) |
-|----------------|------------------------------|
-| `POST gateway.duynhne.me/auth/v1/public/login` | `POST /api/v1/auth/login` |
-| `GET gateway.duynhne.me/product/v1/public/products/:id/details` | `GET /api/v1/products/:id/details` |
-| `GET gateway.duynhne.me/cart/v1/private/cart` | `GET /api/v1/cart` |
-| `GET gateway.duynhne.me/order/v1/private/orders/:id/details` | `GET /api/v1/orders/:id/details` |
-| `GET gateway.duynhne.me/notification/v1/private/notifications` | `GET /api/v1/notifications` |
+| Method | Path | Audience |
+|--------|------|----------|
+| `POST` | `/auth/v1/public/login` | public |
+| `GET` | `/auth/v1/private/me` | private (called by every service's JWT middleware too) |
+| `GET` | `/product/v1/public/products/:id/details` | public (aggregates reviews) |
+| `GET` / `POST` / `DELETE` | `/cart/v1/private/cart` | private |
+| `GET` | `/order/v1/private/orders/:id/details` | private (aggregates shipment) |
+| `POST` | `/notification/v1/internal/notify/email` | internal (not on gateway) |
+| `GET` | `/shipping/v1/internal/orders/:orderId` | internal (not on gateway) |
 
 **Rules for AI agents:**
 
-1. **Never** add internal endpoints (`POST /notify/*`, `POST /products`, `POST /users`, `GET /shipping/orders/:id`) to `ingress-api.yaml`. They stay reachable only via in-cluster `*.svc.cluster.local` DNS.
-2. When adding a new browser-facing route: add the service handler on `/api/v1/*`, add an edge row to `ingress-api.yaml` + (if shape differs) update `rewrite-plugins.yaml`, and update the mapping table in `docs/api/api-naming-convention.md`.
-3. When the frontend needs a new call, use the edge path, not the cluster path. Frontend base URL is `VITE_API_BASE_URL` (defaults to `http://gateway.duynhne.me`).
+1. **Never** add `internal` audiences to `ingress-api.yaml`. Internal routes are reachable only via in-cluster service DNS (NetworkPolicy is the fence, not the absence of an Ingress rule).
+2. When adding a new browser-facing route: mount it in the service at `/{service}/v1/{public|private}/…`, add the path to the service's Ingress in `ingress-api.yaml`, update the mapping in `docs/api/api-naming-convention.md`. No rewrite plugin, no translation.
+3. When the frontend needs a new call, use the same path the service exposes. Frontend base URL is `VITE_API_BASE_URL` (defaults to `http://gateway.duynhne.me`).
+4. JWT middleware lives in each service, not Kong. It calls `http://auth.auth.svc.cluster.local:8080/auth/v1/private/me` to validate tokens.
 
 **Authoritative docs:**
 
-- [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md) — edge convention + complete mapping.
-- [`docs/api/api.md`](docs/api/api.md) — cluster-internal API reference (source of truth for handler contracts).
+- [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md) — sole URL surface; complete route inventory + service-to-service call table.
+- [`docs/api/api.md`](docs/api/api.md) — per-endpoint request/response shapes and validation rules.
 - [`docs/platform/kong-gateway.md`](docs/platform/kong-gateway.md) — Kong setup, CORS, rate limiting, verification runbook.
 
 ### Demo / Test Credentials
@@ -441,7 +449,7 @@ Hardcoded as initial form values in `frontend/src/pages/LoginPage/LoginPage.jsx`
 
 ```bash
 # Login via API (use username, NOT email)
-curl -H "Host: gateway.duynhne.me" -X POST http://localhost/api/v1/auth/login \
+curl -H "Host: gateway.duynhne.me" -X POST http://localhost/auth/v1/public/login \
   -H "Content-Type: application/json" \
   -d '{"username":"alice","password":"password123"}'
 # → {"token":"jwt-token-...","user":{"id":"1","username":"alice","email":"alice@example.com"}}

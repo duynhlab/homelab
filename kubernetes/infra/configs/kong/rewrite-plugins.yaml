@@ -1,0 +1,129 @@
+# Edge-to-cluster path rewrite plugins.
+#
+# Translates Variant A edge URLs (/{service}/v1/{audience}/{resource...}) to
+# cluster paths (/api/v1/{resource...}) so service handlers remain unchanged.
+# See docs/api/api-naming-convention.md for the convention.
+#
+# One KongPlugin per service namespace. Attached to the service's Ingress via
+# annotation konghq.com/plugins: rewrite-edge-to-cluster,... Each plugin uses
+# pre-function (bundled OSS plugin) with a small Lua gsub.
+#
+# Two rewrite patterns:
+#   A. Service name != cluster collection name -> strip edge prefix, keep rest
+#      e.g. /user/v1/private/users/profile -> /api/v1/users/profile
+#   B. Edge resource segment omits the collection -> strip + prepend collection
+#      e.g. /auth/v1/public/login        -> /api/v1/auth/login
+#           /shipping/v1/public/track    -> /api/v1/shipping/track
+
+---
+# auth: /auth/v1/{audience}/{verb}  ->  /api/v1/auth/{verb}
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: rewrite-edge-to-cluster
+  namespace: auth
+plugin: pre-function
+config:
+  access:
+    - |
+      local p = kong.request.get_path()
+      local new, n = p:gsub("^/auth/v1/[%w]+", "/api/v1/auth")
+      if n > 0 then kong.service.request.set_path(new) end
+---
+# user: /user/v1/{audience}/users/...  ->  /api/v1/users/...
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: rewrite-edge-to-cluster
+  namespace: user
+plugin: pre-function
+config:
+  access:
+    - |
+      local p = kong.request.get_path()
+      local new, n = p:gsub("^/user/v1/[%w]+", "/api/v1")
+      if n > 0 then kong.service.request.set_path(new) end
+---
+# product: /product/v1/{audience}/products/...  ->  /api/v1/products/...
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: rewrite-edge-to-cluster
+  namespace: product
+plugin: pre-function
+config:
+  access:
+    - |
+      local p = kong.request.get_path()
+      local new, n = p:gsub("^/product/v1/[%w]+", "/api/v1")
+      if n > 0 then kong.service.request.set_path(new) end
+---
+# cart: /cart/v1/{audience}/cart/...  ->  /api/v1/cart/...
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: rewrite-edge-to-cluster
+  namespace: cart
+plugin: pre-function
+config:
+  access:
+    - |
+      local p = kong.request.get_path()
+      local new, n = p:gsub("^/cart/v1/[%w]+", "/api/v1")
+      if n > 0 then kong.service.request.set_path(new) end
+---
+# order: /order/v1/{audience}/orders/...  ->  /api/v1/orders/...
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: rewrite-edge-to-cluster
+  namespace: order
+plugin: pre-function
+config:
+  access:
+    - |
+      local p = kong.request.get_path()
+      local new, n = p:gsub("^/order/v1/[%w]+", "/api/v1")
+      if n > 0 then kong.service.request.set_path(new) end
+---
+# review: /review/v1/{audience}/reviews/...  ->  /api/v1/reviews/...
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: rewrite-edge-to-cluster
+  namespace: review
+plugin: pre-function
+config:
+  access:
+    - |
+      local p = kong.request.get_path()
+      local new, n = p:gsub("^/review/v1/[%w]+", "/api/v1")
+      if n > 0 then kong.service.request.set_path(new) end
+---
+# notification: /notification/v1/{audience}/notifications/...  ->  /api/v1/notifications/...
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: rewrite-edge-to-cluster
+  namespace: notification
+plugin: pre-function
+config:
+  access:
+    - |
+      local p = kong.request.get_path()
+      local new, n = p:gsub("^/notification/v1/[%w]+", "/api/v1")
+      if n > 0 then kong.service.request.set_path(new) end
+---
+# shipping: /shipping/v1/{audience}/{verb}  ->  /api/v1/shipping/{verb}
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: rewrite-edge-to-cluster
+  namespace: shipping
+plugin: pre-function
+config:
+  access:
+    - |
+      local p = kong.request.get_path()
+      local new, n = p:gsub("^/shipping/v1/[%w]+", "/api/v1/shipping")
+      if n > 0 then kong.service.request.set_path(new) end

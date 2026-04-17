@@ -1,6 +1,7 @@
 # MCP Server Ingress routes
 # Accessible via /etc/hosts → Kong NodePort (80/443)
 # Used by AI clients (Crush, Claude Desktop, VS Code) via Streamable HTTP
+# TLS terminated by Kong using the default proxy certificate (kong-proxy-tls).
 
 # VictoriaMetrics MCP — vm-mcp.duynhne.me
 ---

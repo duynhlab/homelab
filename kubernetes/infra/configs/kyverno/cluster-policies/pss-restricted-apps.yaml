@@ -1,0 +1,43 @@
+# Pod Security Standard — restricted profile (app namespaces only)
+# Reference: https://kubernetes.io/docs/concepts/security/pod-security-standards/#restricted
+#
+# Mode: Audit. The 8 microservices are greenfield Go apps and should pass restricted
+# from day one. Flip to Enforce after 14 days of clean reports.
+# Scope: ONLY application namespaces; never apply to operator/database namespaces.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: pss-restricted-apps
+  annotations:
+    policies.kyverno.io/title: Pod Security Standard — Restricted (apps only)
+    policies.kyverno.io/category: Pod Security Standards (Restricted)
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Enforces the Pod Security Standard "restricted" profile on the 8
+      microservice namespaces only. Requires runAsNonRoot, drops ALL
+      capabilities, disallows privilege escalation and writable root FS.
+spec:
+  validationFailureAction: Audit
+  background: true
+  failurePolicy: Ignore
+  rules:
+    - name: restricted
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - auth
+                - user
+                - product
+                - cart
+                - order
+                - review
+                - notification
+                - shipping
+      validate:
+        podSecurity:
+          level: restricted
+          version: latest

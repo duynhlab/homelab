@@ -132,3 +132,10 @@ metadata:
   labels:
     environment: local
   name: cert-manager
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+  name: kyverno

@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.88.0] - 2026-04-21
+
+### Added — Kyverno admission policy engine (Tier 1, Audit mode)
+
+Kyverno installed as the cluster's policy engine following the GitOps adoption plan.
+
+- **Controller** — Kyverno v3.3.4 HelmRelease at `kubernetes/infra/controllers/kyverno/`.
+  Single-replica admission/background/cleanup/reports controllers sized for KinD.
+  ServiceMonitor enabled, scraped by VMAgent.
+- **Tier 1 ClusterPolicies** (`kubernetes/infra/configs/kyverno/cluster-policies/`):
+  - `pss-baseline` (Audit, all namespaces except platform)
+  - `pss-restricted-apps` (Audit, 8 app namespaces)
+  - `disallow-latest-tag` (Audit)
+  - `require-resources` (Audit, app namespaces)
+  - `require-probes` (Audit, app namespaces)
+  - `disallow-default-namespace` (**Enforce** — trivial, zero-risk)
+- **Cleanup policy** — `cleanup-completed-pods` removes Succeeded/Failed Pods every 30m.
+- **PolicyExceptions** for legitimate operator violations:
+  - `vector-hostpath` — Vector DaemonSet log tailing
+  - `postgres-operators` — Spilo/CNPG operator-managed Pods
+  - `kong-openbao` — Kong NET_BIND_SERVICE, OpenBAO IPC_LOCK
+- **Flux wiring**: new Kustomization `kyverno-policies-local` (`./configs/kyverno`)
+  depending on `controllers-local` + `monitoring-local`. Healthcheck added for the
+  Kyverno HelmRelease in `controllers.yaml`.
+- **Excluded namespaces** from admission: `kube-system`, `kube-public`, `kube-node-lease`,
+  `flux-system`, `kyverno`, `cert-manager`, `external-secrets-system`. Background scan
+  still applies — violations are reported, never blocked.
+- **failurePolicy** — `Ignore` for all Tier 1 policies during rollout; `Fail` only on
+  `disallow-default-namespace`.
+
+### Documentation
+
+- `docs/platform/kyverno.md` — adoption strategy, feature matrix, runbooks.
+- `docs/security/policy-catalog.md` — authoritative policy list + AI manifest acceptance criteria.
+- `docs/security/policy-exceptions.md` — exception registry with owner/expires-at/justification.
+- `AGENTS.md` — new "Kyverno admission policies" section listing manifest requirements.
+- `scripts/flux-validate.sh` — validates `kubernetes/infra/configs/kyverno`.
+
+### Rollout plan
+
+1. **Day 0** (this commit) — install in Audit mode.
+2. **Day 1–7** — observe `PolicyReport` via Grafana dashboard 15983.
+3. **Day 7+** — review reports, add exceptions if needed, flip Tier 1 to Enforce.
+4. **Tier 2/3/4** (verifyImages, NetworkPolicy generate, mutate labels) — follow-up PRs.
+
 ## [0.87.0] - 2026-04-17
 
 ### ⚠️ Breaking change — services migrated off `/api/v1/*`

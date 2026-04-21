@@ -1,0 +1,46 @@
+# Require resources.requests and resources.limits on every container in apps.
+# Without requests, CNPG/Zalando Pods get evicted under pressure → DB failover.
+# Mode: Audit. Use reports to size before flipping to Enforce.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resources
+  annotations:
+    policies.kyverno.io/title: Require CPU/memory requests and limits
+    policies.kyverno.io/category: Best Practices, Reliability
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Every container in application namespaces must declare CPU and memory
+      requests and limits. Prevents noisy-neighbor evictions of stateful
+      workloads (databases, monitoring) sharing the node.
+spec:
+  validationFailureAction: Audit
+  background: true
+  failurePolicy: Ignore
+  rules:
+    - name: validate-resources
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces:
+                - auth
+                - user
+                - product
+                - cart
+                - order
+                - review
+                - notification
+                - shipping
+      validate:
+        message: "Containers must declare resources.requests.{cpu,memory} and resources.limits.{cpu,memory}."
+        foreach:
+          - list: "request.object.spec.containers"
+            pattern:
+              resources:
+                requests:
+                  cpu: "?*"
+                  memory: "?*"
+                limits:
+                  memory: "?*"

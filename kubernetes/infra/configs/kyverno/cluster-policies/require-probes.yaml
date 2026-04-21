@@ -1,0 +1,43 @@
+# Require liveness + readiness probes on app containers.
+# Sloth SLO accuracy depends on Kong only routing to ready Pods.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-probes
+  annotations:
+    policies.kyverno.io/title: Require liveness and readiness probes
+    policies.kyverno.io/category: Best Practices, Reliability
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Application containers must declare both livenessProbe and readinessProbe.
+      Missing readinessProbe causes Kong to route to unready Pods, generating
+      false-positive SLI errors in Sloth burn-rate alerts.
+spec:
+  validationFailureAction: Audit
+  background: true
+  failurePolicy: Ignore
+  rules:
+    - name: validate-probes
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces:
+                - auth
+                - user
+                - product
+                - cart
+                - order
+                - review
+                - notification
+                - shipping
+      validate:
+        message: "Containers must declare both livenessProbe and readinessProbe."
+        foreach:
+          - list: "request.object.spec.containers"
+            pattern:
+              livenessProbe:
+                "<(periodSeconds)": 300
+              readinessProbe:
+                "<(periodSeconds)": 300

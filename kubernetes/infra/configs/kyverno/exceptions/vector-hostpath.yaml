@@ -1,0 +1,30 @@
+# PolicyException — Vector log shipper requires hostPath access.
+# Vector runs as a DaemonSet and tails container logs from /var/log/pods.
+#
+# Owner: platform-team
+# Expires: 2026-12-31 (re-evaluate when migrating to fluentbit or otel-collector logs)
+apiVersion: kyverno.io/v2
+kind: PolicyException
+metadata:
+  name: vector-hostpath
+  namespace: kyverno
+  annotations:
+    platform.duynhlab.dev/owner: platform-team
+    platform.duynhlab.dev/expires-at: "2026-12-31"
+    platform.duynhlab.dev/justification: "Vector DaemonSet must mount /var/log/pods to ship container logs."
+spec:
+  exceptions:
+    - policyName: pss-baseline
+      ruleNames:
+        - baseline
+        - autogen-baseline
+  match:
+    any:
+      - resources:
+          kinds:
+            - Pod
+            - DaemonSet
+          namespaces:
+            - monitoring
+          names:
+            - "vector-*"

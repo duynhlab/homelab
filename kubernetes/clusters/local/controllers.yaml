@@ -104,3 +104,11 @@ spec:
       kind: HelmRelease
       name: kong
       namespace: kong
+    # Kyverno admission policy engine
+    - apiVersion: v1
+      kind: Namespace
+      name: kyverno
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: kyverno
+      namespace: kyverno

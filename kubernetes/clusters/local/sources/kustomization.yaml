@@ -32,3 +32,4 @@ resources:
   - helm/openbao.yaml
   - helm/jetstack.yaml
   - helm/kong.yaml
+  - helm/kyverno.yaml

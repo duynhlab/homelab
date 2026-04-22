@@ -2,137 +2,175 @@
 
 | Attribute | Value |
 |-----------|--------|
-| **Version** | **v1.0.0** (draft) |
-| **Status** | Draft — design exploration, not production policy |
-| **Canonical API** | [`api.md`](api.md) — live **`/api/v1/*`** surface; **this document does not replace** that reference |
-| **Scope** | Gateway-facing URL naming (edge), Chợ Tốt–style segments + Google API Design Guide notes |
-| **Primary domain** | **`duynhne.me`** — production domain for the hosts below (not a placeholder) |
-| **Last updated** | 2026-04-09 |
+| **Version** | **v2.0.0** |
+| **Status** | **Adopted** — sole URL surface (services mount these paths directly) |
+| **Superseded** | `docs/api/api.md` cluster-only `/api/v1/*` shape (v0.85 and earlier) |
+| **Scope** | All HTTP URLs used by browsers, services, and admin/seed callers |
+| **Primary domain** | `duynhne.me` — platform root; public API at `gateway.duynhne.me` |
+| **Last updated** | 2026-04-17 |
 
 ## Purpose
 
-Capture a **gateway-facing** URL model inspired by a **multi-segment** edge layout (service → audience → resource path), refined with ideas from the [Google API Design Guide](https://cloud.google.com/apis/design). Use it when designing **north-south routing**, **Kong/Envoy routes**, or **public docs** for a future gateway—not when implementing handlers inside services that still expose `/api/v1/...` behind the mesh.
+Specify the **single** URL shape used everywhere in the platform — frontend, service handlers, service-to-service callers. There is no separate "cluster" vs "edge" path any more; services register Variant A paths directly on their Gin routers and Kong passes requests through without rewriting.
 
-## Relationship to [`api.md`](api.md)
+The shape is inspired by Chợ Tốt's multi-segment edge layout and refined with ideas from the [Google API Design Guide](https://cloud.google.com/apis/design).
 
-| Concern | [`api.md`](api.md) (current) | This document (draft) |
-|--------|------------------------------|-------------------------|
-| Path shape | `/api/v1/{resource}` per service | `https://{gateway}/{service}/v1/{audience}/...` (edge convention) |
-| Version | `v1` in path | Major version explicit; position fixed by ADR (see below) |
-| Audience | Tables (frontend vs internal) | Segment `public` / `private` / `protected` / `internal` |
+## URL shape
 
-**Bridge pattern:** gateway can **strip/rewrite** edge URLs to cluster paths such as `/api/v1/...` so service code stays aligned with [`api.md`](api.md) until a deliberate migration.
+```
+https://gateway.duynhne.me/{service}/v1/{audience}/{resource…}
+```
 
-## Hostnames on `duynhne.me`
+for browser (north-south) traffic, and
 
-**Root domain:** `duynhne.me` is the platform’s primary domain. The subdomains below are **intended hostnames** (same DNS zone / TLS), not fake examples.
+```
+http://{service}.{namespace}.svc.cluster.local:8080/{service}/v1/{audience}/{resource…}
+```
+
+for in-cluster (east-west) traffic. Same path, different host — Kong just forwards.
+
+- `{service}` ∈ `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`.
+- `{audience}` ∈ `public`, `private`, `internal`, `protected`.
+- `{resource…}` mirrors the collection/verb owned by the service.
+
+## Audience segments
+
+| Value | Meaning | On gateway? | Auth enforced by |
+|-------|---------|-------------|-------------------|
+| `public` | Anonymous callers — no JWT required | Yes | N/A |
+| `private` | Authenticated user — `Authorization: Bearer <JWT>` | Yes | Service middleware (calls auth-service `/auth/v1/private/me`) |
+| `protected` | Signed webhooks / partner HMAC / IP allowlist | Yes (when added) | Per-route plugin or service middleware |
+| `internal` | Pod → Service — cluster-only | **No — never** | NetworkPolicy + optional API key |
+
+**Kong enforcement:** each `api-*` Ingress has one or two explicit `path:` entries — `/{service}/v1/public/` and/or `/{service}/v1/private/`. Internal audiences are never added to Ingress rules, so requests to `https://gateway.duynhne.me/notification/v1/internal/notify/email` resolve to Kong's default 404.
+
+## Hostnames
 
 | Role | Host |
 |------|------|
-| Public API gateway (north-south) | `gateway.duynhne.me` |
-| Optional private hostname for internal L7 (VPC/private LB only; **not** public internet) | `internal.gateway.duynhne.me` |
-| Static assets + CDN | `static.duynhne.me` |
+| Public API gateway (north-south) | **`gateway.duynhne.me`** |
+| Frontend SPA (React) | `duynhne.me` |
+| Static assets + CDN (future) | `static.duynhne.me` |
+| Private internal gateway (future) | `internal.gateway.duynhne.me` |
 
-**Illustrative only** in this document: the **`{service}`** segment (e.g. `catalog`, `auth`, `payment`), **resource paths**, and **IDs** (`prod_01HZZZZ`, `ord_9Zbc82`, …)—they show the convention; wire them to real services when you deploy the gateway and publish OpenAPI.
+## Complete route inventory
 
-## Audience segments (`type`)
+### auth-service (namespace `auth`)
 
-Segment **must** be one of:
+| Method | Path | Audience | Caller |
+|--------|------|----------|--------|
+| `POST` | `/auth/v1/public/login` | public | Browser |
+| `POST` | `/auth/v1/public/register` | public | Browser |
+| `GET` | `/auth/v1/private/me` | private | Browser + every service's JWT middleware |
 
-| Value | Meaning | Typical edge policy |
-|-------|---------|---------------------|
-| `public` | No end-user JWT required | Rate limit, WAF, optional cache for safe GETs |
-| `private` | Authenticated user (e.g. JWT) | JWT validation, user context |
-| `protected` | Special verification (signed webhooks, partner keys, HMAC, IP allowlists) | Dedicated plugins + audit |
-| `internal` | **GKE-only** service-to-service: one workload calling another inside the cluster (Pod → Service) | **Not** for browsers or public clients. Use **Kubernetes Service DNS** (`*.svc.cluster.local`) and **NetworkPolicy** by default; optional **private** gateway/mesh + mTLS. Never expose `internal` routes on a public load balancer. |
+### user-service (namespace `user`)
 
-**`internal` in practice:** Callers and callees are **workloads in GKE** (or peered internal endpoints you treat as cluster-adjacent). Typical path: `http://{service}.{namespace}.svc.cluster.local:{port}/...` per your service chart, aligned with [`api.md`](api.md) where applicable. The `.../v1/internal/...` URL shape and `internal.gateway.duynhne.me` apply when you deliberately route that same convention through an **internal-only** hostname (private Google Cloud load balancer / internal Gateway) — still **only** reachable from inside the VPC / GKE, not from the internet.
+| Method | Path | Audience | Caller |
+|--------|------|----------|--------|
+| `GET` | `/user/v1/public/users/:id` | public | Browser |
+| `GET` | `/user/v1/private/users/profile` | private | Browser |
+| `PUT` | `/user/v1/private/users/profile` | private | Browser |
+| `POST` | `/user/v1/internal/users` | internal | auth-service during registration |
 
-## Version placement (pick one in ADR)
+### product-service (namespace `product`)
 
-- **Variant A — version after service (Chợ Tốt–friendly):**  
-  `https://gateway.duynhne.me/{service}/v1/{audience}/{resource...}`
-- **Variant B — version after host (common in many Google HTTP APIs):**  
-  `https://gateway.duynhne.me/v1/{service}/{audience}/{resource...}`
+| Method | Path | Audience | Caller |
+|--------|------|----------|--------|
+| `GET` | `/product/v1/public/products` | public | Browser |
+| `GET` | `/product/v1/public/products/:id` | public | Browser |
+| `GET` | `/product/v1/public/products/:id/details` | public | Browser (aggregates reviews) |
+| `POST` | `/product/v1/internal/products` | internal | Admin / seed |
 
-The following samples use **Variant A**.
+### cart-service (namespace `cart`)
 
-## Sample URLs (host: `gateway.duynhne.me`; paths illustrative)
+All private.
 
-### `public`
+| Method | Path | Caller |
+|--------|------|--------|
+| `GET` / `POST` / `DELETE` | `/cart/v1/private/cart` | Browser |
+| `GET` | `/cart/v1/private/cart/count` | Browser (badge) |
+| `PATCH` / `DELETE` | `/cart/v1/private/cart/items/:itemId` | Browser |
 
-```http
-GET https://gateway.duynhne.me/catalog/v1/public/products
-GET https://gateway.duynhne.me/catalog/v1/public/products/prod_01HZZZZ
-GET https://gateway.duynhne.me/search/v1/public/query?q=headphones&page_size=20
-GET https://gateway.duynhne.me/geo/v1/public/regions/VN/districts
-```
+Also callable by `order-service` with a forwarded `Authorization` header (DELETE after checkout).
 
-### `private`
+### order-service (namespace `order`)
 
-```http
-GET  https://gateway.duynhne.me/auth/v1/private/users/me
-GET  https://gateway.duynhne.me/order/v1/private/orders
-GET  https://gateway.duynhne.me/order/v1/private/orders/ord_9Zbc82/details
-POST https://gateway.duynhne.me/cart/v1/private/carts/me/items
-```
+All private.
 
-### `protected`
+| Method | Path | Caller |
+|--------|------|--------|
+| `GET` | `/order/v1/private/orders` | Browser |
+| `GET` | `/order/v1/private/orders/:id` | Browser |
+| `GET` | `/order/v1/private/orders/:id/details` | Browser (aggregates shipment) |
+| `POST` | `/order/v1/private/orders` | Browser |
 
-```http
-POST https://gateway.duynhne.me/payment/v1/protected/webhooks/stripe
-POST https://gateway.duynhne.me/partners/v1/protected/ingest/events
-```
+### review-service (namespace `review`)
 
-### `internal` (GKE workloads only)
+| Method | Path | Audience | Caller |
+|--------|------|----------|--------|
+| `GET` | `/review/v1/public/reviews?product_id=…` | public | Browser + product-service (aggregation) |
+| `POST` | `/review/v1/private/reviews` | private | Browser |
 
-**In-cluster (typical):** Pod → Service DNS — no public hostname. Paths follow [`api.md`](api.md) or your service contract (example namespaces match common `{service}.{namespace}` pattern).
+### notification-service (namespace `notification`)
 
-```http
-POST http://notification.notification.svc.cluster.local:8080/api/v1/notify/email
-GET  http://product.product.svc.cluster.local:8080/api/v1/products
-```
+| Method | Path | Audience | Caller |
+|--------|------|----------|--------|
+| `GET` | `/notification/v1/private/notifications` | private | Browser |
+| `GET` | `/notification/v1/private/notifications/count` | private | Browser (bell badge) |
+| `GET` / `PATCH` | `/notification/v1/private/notifications/:id` | private | Browser |
+| `POST` | `/notification/v1/internal/notify/email` | internal | Any service publishing a user notification |
+| `POST` | `/notification/v1/internal/notify/sms` | internal | Any service publishing a user notification |
 
-**DNS internals (GCP / GKE):** how `*.svc.cluster.local` works, optional **Cloud DNS private zones** (`*.gke.internal`, per-env names), `gcloud`/Terraform — see **[GKE internal & private DNS](gke-internal-dns.md)**.
+### shipping-service (namespace `shipping`)
 
-**Private gateway hostname (optional):** same semantics — callers are still **only** GKE/VPC-internal; TLS or L7 routing on a **private** LB.
+| Method | Path | Audience | Caller |
+|--------|------|----------|--------|
+| `GET` | `/shipping/v1/public/track?tracking_number=…` | public | Browser |
+| `GET` | `/shipping/v1/public/estimate?origin&destination&weight` | public | Browser |
+| `GET` | `/shipping/v1/internal/orders/:orderId` | internal | order-service (order-details aggregation) |
 
-```http
-POST https://internal.gateway.duynhne.me/search/v1/internal/reindex/jobs
-POST https://internal.gateway.duynhne.me/notify/v1/internal/dispatch/email
-```
+## Service-to-service calls
 
-### Same resource, different policy (illustrative)
+Inside the cluster, callers use Kubernetes Service DNS + the Variant A path directly:
 
-```text
-GET https://gateway.duynhne.me/catalog/v1/public/products/123
-GET https://gateway.duynhne.me/catalog/v1/private/products/123
-```
+| Caller | Target | Path | Audience |
+|--------|--------|------|----------|
+| Every service's JWT middleware | auth-service | `http://auth.auth.svc.cluster.local:8080/auth/v1/private/me` | private (forwards user's JWT) |
+| order-service → aggregation | shipping-service | `http://shipping.shipping.svc.cluster.local:8080/shipping/v1/internal/orders/:orderId` | internal |
+| order-service → checkout cleanup | cart-service | `http://cart.cart.svc.cluster.local:8080/cart/v1/private/cart` | private (forwards user's JWT) |
+| product-service → aggregation | review-service | `http://review.review.svc.cluster.local:8080/review/v1/public/reviews?product_id=…` | public |
+| auth-service → registration | user-service | `http://user.user.svc.cluster.local:8080/user/v1/internal/users` | internal |
 
-Prefer **one resource tail** after `audience`; document both in OpenAPI with shared path template if needed.
+Each caller keeps a `{TARGET}_SERVICE_URL` env var with a default pointing at the in-cluster DNS name; only the **URL suffix** is hard-coded.
 
-## Google-aligned practices (summary)
+## Registering a new route
 
-Apply to the **resource path after `audience`** and to **response bodies**:
+1. Choose the audience — `public`, `private`, or `internal`. This is a permanent contract decision.
+2. Mount it in the owning service at `/{service}/v1/{audience}/{resource…}`. Apply JWT middleware only to the `/{service}/v1/private` router group.
+3. If it's `public` or `private` **and** browser-reachable, add a `path:` entry to `kubernetes/infra/configs/kong/ingress-api.yaml` for that service. If it's `internal`, do nothing — the service DNS is enough.
+4. Add a row to the route inventory above.
+5. Update the frontend `src/api/*.js` module if the browser calls it.
+
+## Google-aligned practices (apply to `{resource…}` and bodies)
 
 - Plural nouns for collections; stable resource IDs.
-- Standard HTTP methods where possible; custom actions as documented sub-paths or POST bodies per team standard.
-- Consistent **error** envelope (e.g. `code`, `message`, optional `details`).
-- List endpoints: **pagination** (`page_size`, `page_token` or equivalent).
-- One **JSON field naming** style (e.g. `camelCase` vs `snake_case`) across public APIs.
+- Standard HTTP methods; custom actions as POST sub-paths.
+- Consistent error envelope: `{ "error": "<message>" }`.
+- List endpoints: pagination (`page_size`, `page_token` or offset/limit — be consistent per service).
+- JSON field naming: `snake_case` across services (aligns with current handlers).
 
-## Static assets (reference)
+## Static assets (future reference)
 
-Pattern aligned with object storage + CDN:
-
-```text
-https://static.duynhne.me/storage/app/v5/5.21.1/assets/header.css
+```
+https://static.duynhne.me/storage/app/v5/<release>/assets/header.css
 ```
 
-Use immutable file names (content hash) and explicit `Cache-Control` for chunks.
+Immutable file names (content hash) + explicit `Cache-Control` for chunks.
 
-## Next steps
+## History
 
-1. Record **Variant A vs B** and hostname map in an ADR.
-2. For each `{service}`, publish **OpenAPI** with tags per `audience`.
-3. Keep [`api.md`](api.md) as the **source of truth** for implemented routes until gateway rollout is decided.
+| Version | Date | Change |
+|---------|------|--------|
+| v1.0.0 | 2026-04-09 | Initial Draft — Variant A vs B exploration, illustrative services. |
+| v1.1.0 | 2026-04-17 | Adopted Variant A at the edge. Services still mounted on `/api/v1/*`; Kong rewrote edge → cluster via per-namespace `pre-function` plugins. |
+| **v2.0.0** | **2026-04-17** | **Full migration — services mount Variant A paths directly, Kong is pure pass-through, `/api/v1/*` removed entirely. Internal audiences live only in-cluster (never on gateway).** Breaking change; frontend and all service-to-service callers updated in lockstep. |

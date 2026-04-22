@@ -1,9 +1,21 @@
-# API routes — Kong routes /api/v1/{resource} to the correct backend service.
-# Each service handles its own /api/v1/* routes internally.
-# Kong passes the full path through (strip-path: false).
+# API routes on the public gateway (gateway.duynhne.me).
+#
+# URL shape: /{service}/v1/{audience}/{resource...}  — Variant A
+# (see docs/api/api-naming-convention.md). Services mount these paths
+# directly; Kong does NOT rewrite — pure pass-through.
+#
+# Only `public` and `private` audiences are exposed on the gateway.
+# `internal` routes (service-to-service) are deliberately excluded
+# and reachable only via in-cluster Service DNS.
+#
+# Services keep validating JWTs themselves in their middleware
+# (defense-in-depth; Kong does not enforce auth).
+#
+# TLS is terminated by Kong using the default proxy certificate
+# (kong-proxy-tls secret, mounted via the HelmRelease secretVolumes).
 
-# Auth Service
 ---
+# Auth Service — public (login, register) + private (me)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -11,13 +23,21 @@ metadata:
   namespace: auth
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/plugins: rate-limiting-api,request-size-limiting-api
 spec:
   ingressClassName: kong
   rules:
     - host: gateway.duynhne.me
       http:
         paths:
-          - path: /api/v1/auth
+          - path: /auth/v1/public/
+            pathType: Prefix
+            backend:
+              service:
+                name: auth
+                port:
+                  number: 8080
+          - path: /auth/v1/private/
             pathType: Prefix
             backend:
               service:
@@ -25,7 +45,7 @@ spec:
                 port:
                   number: 8080
 ---
-# User Service
+# User Service — public GET /users/:id + private /users/profile
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -33,13 +53,21 @@ metadata:
   namespace: user
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/plugins: rate-limiting-api,request-size-limiting-api
 spec:
   ingressClassName: kong
   rules:
     - host: gateway.duynhne.me
       http:
         paths:
-          - path: /api/v1/users
+          - path: /user/v1/public/
+            pathType: Prefix
+            backend:
+              service:
+                name: user
+                port:
+                  number: 8080
+          - path: /user/v1/private/
             pathType: Prefix
             backend:
               service:
@@ -47,7 +75,8 @@ spec:
                 port:
                   number: 8080
 ---
-# Product Service
+# Product Service — public catalog (list, detail, aggregated details)
+# (POST /product/v1/internal/products is NOT exposed here)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -55,13 +84,14 @@ metadata:
   namespace: product
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/plugins: rate-limiting-api,request-size-limiting-api
 spec:
   ingressClassName: kong
   rules:
     - host: gateway.duynhne.me
       http:
         paths:
-          - path: /api/v1/products
+          - path: /product/v1/public/
             pathType: Prefix
             backend:
               service:
@@ -69,7 +99,7 @@ spec:
                 port:
                   number: 8080
 ---
-# Cart Service
+# Cart Service — private only (all routes require JWT)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -77,13 +107,14 @@ metadata:
   namespace: cart
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/plugins: rate-limiting-api,request-size-limiting-api
 spec:
   ingressClassName: kong
   rules:
     - host: gateway.duynhne.me
       http:
         paths:
-          - path: /api/v1/cart
+          - path: /cart/v1/private/
             pathType: Prefix
             backend:
               service:
@@ -91,7 +122,7 @@ spec:
                 port:
                   number: 8080
 ---
-# Order Service
+# Order Service — private only (all routes require JWT)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -99,13 +130,14 @@ metadata:
   namespace: order
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/plugins: rate-limiting-api,request-size-limiting-api
 spec:
   ingressClassName: kong
   rules:
     - host: gateway.duynhne.me
       http:
         paths:
-          - path: /api/v1/orders
+          - path: /order/v1/private/
             pathType: Prefix
             backend:
               service:
@@ -113,7 +145,7 @@ spec:
                 port:
                   number: 8080
 ---
-# Review Service
+# Review Service — public list + private submit
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -121,13 +153,21 @@ metadata:
   namespace: review
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/plugins: rate-limiting-api,request-size-limiting-api
 spec:
   ingressClassName: kong
   rules:
     - host: gateway.duynhne.me
       http:
         paths:
-          - path: /api/v1/reviews
+          - path: /review/v1/public/
+            pathType: Prefix
+            backend:
+              service:
+                name: review
+                port:
+                  number: 8080
+          - path: /review/v1/private/
             pathType: Prefix
             backend:
               service:
@@ -135,7 +175,8 @@ spec:
                 port:
                   number: 8080
 ---
-# Notification Service
+# Notification Service — private only (user notifications).
+# /notification/v1/internal/notify/{email,sms} is NOT exposed here.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -143,13 +184,14 @@ metadata:
   namespace: notification
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/plugins: rate-limiting-api,request-size-limiting-api
 spec:
   ingressClassName: kong
   rules:
     - host: gateway.duynhne.me
       http:
         paths:
-          - path: /api/v1/notifications
+          - path: /notification/v1/private/
             pathType: Prefix
             backend:
               service:
@@ -157,7 +199,9 @@ spec:
                 port:
                   number: 8080
 ---
-# Shipping Service
+# Shipping Service — public track + estimate only.
+# /shipping/v1/internal/orders/:orderId is NOT exposed here
+# (called only by order-service via in-cluster DNS).
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -165,13 +209,14 @@ metadata:
   namespace: shipping
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/plugins: rate-limiting-api,request-size-limiting-api
 spec:
   ingressClassName: kong
   rules:
     - host: gateway.duynhne.me
       http:
         paths:
-          - path: /api/v1/shipping
+          - path: /shipping/v1/public/
             pathType: Prefix
             backend:
               service:

@@ -1,6 +1,7 @@
 # Monitoring & Infrastructure Ingress routes
 # Each service gets a dedicated subdomain under *.duynhne.me
 # Accessible via /etc/hosts → Kong NodePort (80/443)
+# TLS terminated by Kong using the default proxy certificate (kong-proxy-tls).
 
 # Grafana — grafana.duynhne.me
 ---

@@ -1,4 +1,4 @@
-# Global CORS plugin — allows frontend to call APIs through Kong
+# Global CORS plugin — allows frontend (duynhne.me) to call APIs (gateway.duynhne.me)
 ---
 apiVersion: configuration.konghq.com/v1
 kind: KongClusterPlugin
@@ -11,10 +11,8 @@ metadata:
 plugin: cors
 config:
   origins:
-    - "https://gateway.duynhne.me"
-    - "http://gateway.duynhne.me"
-    - "https://gateway.duynhne.me:8443"
-    - "http://gateway.duynhne.me:8000"
+    - "https://duynhne.me"
+    - "http://duynhne.me"
     - "http://localhost:3001"
     - "http://localhost:8000"
   methods:
@@ -30,6 +28,9 @@ config:
     - X-Request-ID
   exposed_headers:
     - X-Request-ID
+    - RateLimit-Limit
+    - RateLimit-Remaining
+    - RateLimit-Reset
   credentials: true
   max_age: 3600
 ---
@@ -48,3 +49,41 @@ config:
   latency_metrics: true
   bandwidth_metrics: true
   upstream_health_metrics: true
+---
+# API rate limiting — protects backend services from abuse
+# Applied per-consumer (if authenticated) or per-IP (anonymous).
+# Policy: local (per-node counter, suitable for single-replica Kong).
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: rate-limiting-api
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "false"
+plugin: rate-limiting
+config:
+  second: 10
+  minute: 200
+  hour: 5000
+  policy: local
+  fault_tolerant: true
+  hide_client_headers: false
+  error_code: 429
+  error_message: "Rate limit exceeded. Please slow down."
+---
+# Request size limiting — prevents oversized payloads (DoS protection).
+# Applied to API routes only (same as rate-limiting).
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: request-size-limiting-api
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "false"
+plugin: request-size-limiting
+config:
+  allowed_payload_size: 10
+  size_unit: megabytes
+  require_content_length: false

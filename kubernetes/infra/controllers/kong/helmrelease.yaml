@@ -20,7 +20,7 @@ spec:
         kind: HelmRepository
         name: kong
         namespace: flux-system
-      version: "2.44.0"
+      version: "2.52.0"
   install:
     crds: CreateReplace
     createNamespace: false

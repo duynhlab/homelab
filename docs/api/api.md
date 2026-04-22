@@ -1,67 +1,63 @@
 # API Reference
 
-> **Document Status:** Production  
-> **Last Updated:** 2026-01-28  
-> **Architecture:** 3-Layer (Web / Logic / Core)  
-> **API Version:** v1 only (canonical, frontend-aligned)
+> **Document Status:** Production
+> **Last Updated:** 2026-04-17
+> **Architecture:** 3-Layer (Web / Logic / Core)
+> **URL shape:** Variant A — `/{service}/v1/{audience}/{resource…}` (see [`api-naming-convention.md`](api-naming-convention.md))
 
-**See also (draft, non-canonical):** [Gateway URL naming exploration](api-naming-convention.md) — does not change the `/api/v1/*` surface documented below.
+> Services mount Variant A paths **directly** on their HTTP routers. Browser traffic hits them at `https://gateway.duynhne.me/…`; service-to-service traffic hits them at `http://{svc}.{ns}.svc.cluster.local:8080/…`. There is no separate "cluster" path any more — the path is the path.
 
 ---
 
 ## Master API Overview
 
-This is the **single source of truth** for all API endpoints. The Frontend team MUST use these endpoints exactly as documented. No client-side orchestration allowed for aggregation endpoints.
+Single source of truth for every HTTP path in the platform. Audience (`public` / `private` / `internal`) is encoded in the URL:
 
-> **Note:** v2 API endpoints have been removed. v1 is the canonical API that aligns with the frontend.
+- `public` — no auth; browser-reachable via `gateway.duynhne.me`.
+- `private` — JWT required; browser-reachable via `gateway.duynhne.me`.
+- `internal` — service-to-service; **never** on the gateway.
 
-### Frontend Endpoints
+No client-side orchestration for aggregation endpoints — frontend MUST use the `/details` variants.
 
-| Service | Endpoint | Method | Purpose | Status |
-|---------|----------|--------|---------|--------|
-| **Product** | `/api/v1/products` | GET | List all products with filtering | STABLE |
-| **Product** | `/api/v1/products/:id` | GET | Get single product | STABLE |
-| **Product** | `/api/v1/products/:id/details` | GET | **Aggregated product details** | STABLE |
-| **Cart** | `/api/v1/cart` | GET | Get user cart | STABLE |
-| **Cart** | `/api/v1/cart` | POST | Add item to cart | STABLE |
-| **Cart** | `/api/v1/cart` | DELETE | **Clear user cart after successful order** | STABLE |
-| **Cart** | `/api/v1/cart/count` | GET | **Get cart item count** | STABLE |
-| **Cart** | `/api/v1/cart/items/:itemId` | PATCH | **Update cart item quantity** | STABLE |
-| **Cart** | `/api/v1/cart/items/:itemId` | DELETE | **Remove cart item** | STABLE |
-| **Order** | `/api/v1/orders` | GET | List user orders | STABLE |
-| **Order** | `/api/v1/orders/:id` | GET | Get order by ID | STABLE |
-| **Order** | `/api/v1/orders/:id/details` | GET | **Aggregated order with shipment** | STABLE |
-| **Order** | `/api/v1/orders` | POST | Create new order | STABLE |
-| **Auth** | `/api/v1/auth/login` | POST | User login | STABLE |
-| **Auth** | `/api/v1/auth/register` | POST | User registration | STABLE |
-| **Auth** | `/api/v1/auth/me` | GET | **Get current user from token** | STABLE |
-| **User** | `/api/v1/users/:id` | GET | Get user by ID | STABLE |
-| **User** | `/api/v1/users/profile` | GET | Get user profile | STABLE |
-| **User** | `/api/v1/users/profile` | PUT | **Update user profile** | STABLE |
-| **Review** | `/api/v1/reviews?product_id={id}` | GET | Get reviews for product (**product_id required**) | STABLE |
-| **Review** | `/api/v1/reviews` | POST | Create review (**user_id required**, 409 if duplicate) | STABLE |
-| **Notification** | `/api/v1/notifications` | GET | Get all notifications | STABLE |
-| **Notification** | `/api/v1/notifications/count` | GET | **Get unread notification count** | STABLE |
-| **Notification** | `/api/v1/notifications/:id` | GET | Get notification by ID | STABLE |
-| **Notification** | `/api/v1/notifications/:id` | PATCH | Mark notification as read | STABLE |
-| **Shipping** | `/api/v1/shipping/track` | GET | Track shipment (query: `tracking_number`) | STABLE |
-| **Shipping** | `/api/v1/shipping/estimate` | GET | **Estimate shipment cost** | STABLE |
-| **Shipping** | `/api/v1/shipping/orders/:orderId` | GET | **Get shipment by order ID** | STABLE |
+### Browser-facing endpoints (routed through Kong)
 
-### Internal Endpoints
+| Service | Method | Path | Aggregation? |
+|---------|--------|------|--------------|
+| **Auth** | `POST` | `/auth/v1/public/login` | |
+| **Auth** | `POST` | `/auth/v1/public/register` | |
+| **Auth** | `GET` | `/auth/v1/private/me` | |
+| **User** | `GET` | `/user/v1/public/users/:id` | |
+| **User** | `GET` | `/user/v1/private/users/profile` | |
+| **User** | `PUT` | `/user/v1/private/users/profile` | |
+| **Product** | `GET` | `/product/v1/public/products` | |
+| **Product** | `GET` | `/product/v1/public/products/:id` | |
+| **Product** | `GET` | `/product/v1/public/products/:id/details` | ✅ product + reviews |
+| **Cart** | `GET` / `POST` / `DELETE` | `/cart/v1/private/cart` | |
+| **Cart** | `GET` | `/cart/v1/private/cart/count` | |
+| **Cart** | `PATCH` / `DELETE` | `/cart/v1/private/cart/items/:itemId` | |
+| **Order** | `GET` | `/order/v1/private/orders` | |
+| **Order** | `GET` | `/order/v1/private/orders/:id` | |
+| **Order** | `GET` | `/order/v1/private/orders/:id/details` | ✅ order + shipment |
+| **Order** | `POST` | `/order/v1/private/orders` | |
+| **Review** | `GET` | `/review/v1/public/reviews?product_id={id}` | |
+| **Review** | `POST` | `/review/v1/private/reviews` | |
+| **Notification** | `GET` | `/notification/v1/private/notifications` | |
+| **Notification** | `GET` | `/notification/v1/private/notifications/count` | |
+| **Notification** | `GET` / `PATCH` | `/notification/v1/private/notifications/:id` | |
+| **Shipping** | `GET` | `/shipping/v1/public/track?tracking_number=…` | |
+| **Shipping** | `GET` | `/shipping/v1/public/estimate?origin&destination&weight` | |
 
-| Service | Endpoint | Method | Purpose | Status |
-|---------|----------|--------|---------|--------|
-| **Product** | `/api/v1/products` | POST | Create new product | STABLE |
-| **User** | `/api/v1/users` | POST | Create new user | STABLE |
-| **Notification** | `/api/v1/notify/email` | POST | Send email notification | STABLE |
-| **Notification** | `/api/v1/notify/sms` | POST | Send SMS notification | STABLE |
+### Internal endpoints (in-cluster only — NOT on gateway)
 
-**Legend:**
-- **Bold endpoints** = Aggregation APIs (combine multiple data sources)
-- All endpoints use v1 API version
-- Frontend endpoints = Called directly by frontend React application
-- Internal endpoints = Backend-to-backend or admin operations only
+| Service | Method | Path | Caller |
+|---------|--------|------|--------|
+| **Product** | `POST` | `/product/v1/internal/products` | Admin / seed jobs |
+| **User** | `POST` | `/user/v1/internal/users` | auth-service during registration |
+| **Notification** | `POST` | `/notification/v1/internal/notify/email` | Any service publishing a notification |
+| **Notification** | `POST` | `/notification/v1/internal/notify/sms` | Any service publishing a notification |
+| **Shipping** | `GET` | `/shipping/v1/internal/orders/:orderId` | order-service (order-details aggregation) |
+
+Internal callers use Kubernetes Service DNS: `http://{svc}.{ns}.svc.cluster.local:8080` as host; the path suffix is identical to the table above.
 
 ---
 
@@ -85,7 +81,7 @@ flowchart TD
 
 | Rule | Applies To | Description |
 |------|------------|-------------|
-| **Frontend calls Web only** | **Frontend** | **CRITICAL: Never call Logic or Core directly. Only HTTP requests to `/api/v1/*` endpoints.** |
+| **Frontend calls Web only** | **Frontend** | **CRITICAL: Never call Logic or Core directly. Only HTTP requests to `/{service}/v1/{audience}/…` endpoints.** |
 | Web aggregates | Web Layer | Combine multiple Logic calls in Web handlers |
 | Logic uses repositories | Logic Layer | Access data via repository interfaces only |
 | Core owns SQL | Core Layer | All database queries live in repository implementations |
@@ -94,8 +90,8 @@ flowchart TD
 **⚠️ Frontend Developers & AI Agents:**
 
 **DO:**
-- Make HTTP requests to Web Layer endpoints (`GET /api/v1/products`, `POST /api/v1/cart`, etc.)
-- Use aggregation endpoints for complex operations (e.g., `GET /api/v1/products/:id/details`)
+- Make HTTP requests to Web Layer endpoints (`GET /product/v1/public/products`, `POST /cart/v1/private/cart`, etc.)
+- Use aggregation endpoints for complex operations (e.g., `GET /product/v1/public/products/:id/details`)
 - Let Web Layer handle validation, authentication, and error translation
 
 **DO NOT:**
@@ -139,7 +135,7 @@ These endpoints combine multiple data sources to provide complete responses. **F
 
 ---
 
-### GET /api/v1/products/:id/details
+### GET /product/v1/public/products/:id/details
 
 **Purpose:** Aggregated product details for Product Detail Page
 
@@ -161,7 +157,7 @@ These endpoints combine multiple data sources to provide complete responses. **F
 #### Request
 
 ```
-GET /api/v1/products/:id/details
+GET /product/v1/public/products/:id/details
 ```
 
 **Headers:**
@@ -219,7 +215,7 @@ Content-Type: application/json
 
 ---
 
-### DELETE /api/v1/cart/items/:itemId
+### DELETE /cart/v1/private/cart/items/:itemId
 
 **Purpose:** Remove a single item from the cart
 
@@ -232,7 +228,7 @@ Content-Type: application/json
 #### Request
 
 ```
-DELETE /api/v1/cart/items/:itemId
+DELETE /cart/v1/private/cart/items/:itemId
 ```
 
 **Headers:**
@@ -266,7 +262,7 @@ Authorization: Bearer <jwt_token>
 
 ---
 
-### PATCH /api/v1/cart/items/:itemId
+### PATCH /cart/v1/private/cart/items/:itemId
 
 **Purpose:** Update the quantity of a cart item
 
@@ -279,7 +275,7 @@ Authorization: Bearer <jwt_token>
 #### Request
 
 ```
-PATCH /api/v1/cart/items/:itemId
+PATCH /cart/v1/private/cart/items/:itemId
 ```
 
 **Headers:**
@@ -329,7 +325,7 @@ Authorization: Bearer <jwt_token>
 
 ---
 
-### GET /api/v1/cart/count
+### GET /cart/v1/private/cart/count
 
 **Purpose:** Lightweight endpoint for cart badge count
 
@@ -341,7 +337,7 @@ Authorization: Bearer <jwt_token>
 #### Request
 
 ```
-GET /api/v1/cart/count
+GET /cart/v1/private/cart/count
 ```
 
 **Headers:**
@@ -418,16 +414,18 @@ func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 
 ## Services
 
-| Service | Namespace | Port | Base URL |
-|---------|-----------|------|----------|
-| auth | auth | 8080 | `/api/v1` |
-| user | user | 8080 | `/api/v1` |
-| product | product | 8080 | `/api/v1` |
-| cart | cart | 8080 | `/api/v1` |
-| order | order | 8080 | `/api/v1` |
-| review | review | 8080 | `/api/v1` |
-| notification | notification | 8080 | `/api/v1` |
-| shipping | shipping | 8080 | `/api/v1` |
+| Service | Namespace | Port | Public (browser) | Private (browser) | Internal (in-cluster only) |
+|---------|-----------|------|------------------|-------------------|----------------------------|
+| auth | auth | 8080 | `/auth/v1/public/{login,register}` | `/auth/v1/private/me` | — |
+| user | user | 8080 | `/user/v1/public/users/:id` | `/user/v1/private/users/profile` | `POST /user/v1/internal/users` |
+| product | product | 8080 | `/product/v1/public/products/*` | — | `POST /product/v1/internal/products` |
+| cart | cart | 8080 | — | `/cart/v1/private/cart/*` | — |
+| order | order | 8080 | — | `/order/v1/private/orders/*` | — |
+| review | review | 8080 | `GET /review/v1/public/reviews` | `POST /review/v1/private/reviews` | — |
+| notification | notification | 8080 | — | `/notification/v1/private/notifications/*` | `POST /notification/v1/internal/notify/{email,sms}` |
+| shipping | shipping | 8080 | `/shipping/v1/public/{track,estimate}` | — | `GET /shipping/v1/internal/orders/:orderId` |
+
+Same path, two hosts: browser hits `https://gateway.duynhne.me/…`; services hit each other at `http://{svc}.{ns}.svc.cluster.local:8080/…`. Internal audiences are never published to the gateway. Full per-endpoint detail: [`api-naming-convention.md`](api-naming-convention.md).
 
 ---
 
@@ -437,19 +435,19 @@ func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/v1/products` | List all products with filtering |
-| `GET` | `/api/v1/products/:id` | Get product by ID |
-| `GET` | `/api/v1/products/:id/details` | **Aggregated product details** |
-| `POST` | `/api/v1/products` | Create new product |
+| `GET` | `/product/v1/public/products` | List all products with filtering |
+| `GET` | `/product/v1/public/products/:id` | Get product by ID |
+| `GET` | `/product/v1/public/products/:id/details` | **Aggregated product details** |
+| `POST` | `/product/v1/internal/products` | Create new product (internal, in-cluster only) |
 
-### GET /api/v1/products
+### GET /product/v1/public/products
 
 List all products with optional filtering.
 
 #### Request
 
 ```
-GET /api/v1/products?category=Electronics&search=mouse&sort=price&order=asc
+GET /product/v1/public/products?category=Electronics&search=mouse&sort=price&order=asc
 ```
 
 **Query Parameters:**
@@ -490,14 +488,14 @@ GET /api/v1/products?category=Electronics&search=mouse&sort=price&order=asc
 
 ---
 
-### GET /api/v1/products/:id
+### GET /product/v1/public/products/:id
 
 Get a single product by ID.
 
 #### Request
 
 ```
-GET /api/v1/products/123
+GET /product/v1/public/products/123
 ```
 
 #### Response
@@ -522,14 +520,14 @@ GET /api/v1/products/123
 
 ---
 
-### POST /api/v1/products
+### POST /product/v1/internal/products
 
-Create a new product.
+Create a new product. **Internal only** — not routed through Kong; called via `http://product.product.svc.cluster.local:8080`.
 
 #### Request
 
 ```
-POST /api/v1/products
+POST /product/v1/internal/products
 Content-Type: application/json
 
 {
@@ -572,20 +570,20 @@ Content-Type: application/json
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/v1/cart` | Get user cart |
-| `POST` | `/api/v1/cart` | Add item to cart |
-| `GET` | `/api/v1/cart/count` | **Get cart item count** |
-| `PATCH` | `/api/v1/cart/items/:itemId` | **Update cart item quantity** |
-| `DELETE` | `/api/v1/cart/items/:itemId` | **Remove cart item** |
+| `GET` | `/cart/v1/private/cart` | Get user cart |
+| `POST` | `/cart/v1/private/cart` | Add item to cart |
+| `GET` | `/cart/v1/private/cart/count` | **Get cart item count** |
+| `PATCH` | `/cart/v1/private/cart/items/:itemId` | **Update cart item quantity** |
+| `DELETE` | `/cart/v1/private/cart/items/:itemId` | **Remove cart item** |
 
-### GET /api/v1/cart
+### GET /cart/v1/private/cart
 
 Get the current user's cart.
 
 #### Request
 
 ```
-GET /api/v1/cart
+GET /cart/v1/private/cart
 Authorization: Bearer <jwt_token>
 ```
 
@@ -615,14 +613,14 @@ Authorization: Bearer <jwt_token>
 
 ---
 
-### POST /api/v1/cart
+### POST /cart/v1/private/cart
 
 Add an item to the cart.
 
 #### Request
 
 ```
-POST /api/v1/cart
+POST /cart/v1/private/cart
 Content-Type: application/json
 Authorization: Bearer <jwt_token>
 
@@ -670,19 +668,19 @@ Authorization: Bearer <jwt_token>
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/v1/orders` | Get all user orders |
-| `GET` | `/api/v1/orders/:id` | Get order by ID |
-| `GET` | `/api/v1/orders/:id/details` | **Aggregation: Get order with shipment** |
-| `POST` | `/api/v1/orders` | Create new order |
+| `GET` | `/order/v1/private/orders` | Get all user orders |
+| `GET` | `/order/v1/private/orders/:id` | Get order by ID |
+| `GET` | `/order/v1/private/orders/:id/details` | **Aggregation: Get order with shipment** |
+| `POST` | `/order/v1/private/orders` | Create new order |
 
-### GET /api/v1/orders
+### GET /order/v1/private/orders
 
 List all orders for the current user.
 
 #### Request
 
 ```
-GET /api/v1/orders
+GET /order/v1/private/orders
 Authorization: Bearer <jwt_token>
 ```
 
@@ -705,14 +703,14 @@ Authorization: Bearer <jwt_token>
 
 ---
 
-### GET /api/v1/orders/:id
+### GET /order/v1/private/orders/:id
 
 Get a specific order by ID.
 
 #### Request
 
 ```
-GET /api/v1/orders/ord123
+GET /order/v1/private/orders/ord123
 Authorization: Bearer <jwt_token>
 ```
 
@@ -749,7 +747,7 @@ Authorization: Bearer <jwt_token>
 
 ---
 
-### GET /api/v1/orders/:id/details
+### GET /order/v1/private/orders/:id/details
 
 **Aggregation Endpoint** - Get order with shipment information.
 
@@ -758,7 +756,7 @@ This endpoint combines order data with shipment tracking from the Shipping servi
 #### Request
 
 ```
-GET /api/v1/orders/123/details
+GET /order/v1/private/orders/123/details
 Authorization: Bearer <jwt_token>
 ```
 
@@ -801,7 +799,7 @@ Authorization: Bearer <jwt_token>
 
 ---
 
-### POST /api/v1/orders
+### POST /order/v1/private/orders
 
 Create a new order.
 
@@ -810,7 +808,7 @@ Create a new order.
 #### Request
 
 ```
-POST /api/v1/orders
+POST /order/v1/private/orders
 Content-Type: application/json
 Authorization: Bearer <jwt_token>
 
@@ -871,16 +869,16 @@ Authorization: Bearer <jwt_token>
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/v1/auth/login` | User login |
-| `POST` | `/api/v1/auth/register` | User registration |
-| `GET` | `/api/v1/auth/me` | Get current user from token |
+| `POST` | `/auth/v1/public/login` | User login |
+| `POST` | `/auth/v1/public/register` | User registration |
+| `GET` | `/auth/v1/private/me` | Get current user from token |
 
-### POST /api/v1/auth/login
+### POST /auth/v1/public/login
 
 #### Request
 
 ```
-POST /api/v1/auth/login
+POST /auth/v1/public/login
 Content-Type: application/json
 
 {
@@ -904,12 +902,12 @@ Content-Type: application/json
 
 ---
 
-### POST /api/v1/auth/register
+### POST /auth/v1/public/register
 
 #### Request
 
 ```
-POST /api/v1/auth/register
+POST /auth/v1/public/register
 Content-Type: application/json
 
 {
@@ -938,10 +936,10 @@ Content-Type: application/json
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/v1/users/:id` | Get user by ID |
-| `GET` | `/api/v1/users/profile` | Get user profile |
-| `PUT` | `/api/v1/users/profile` | Update user profile |
-| `POST` | `/api/v1/users` | Create new user |
+| `GET` | `/user/v1/public/users/:id` | Get user by ID |
+| `GET` | `/user/v1/private/users/profile` | Get user profile |
+| `PUT` | `/user/v1/private/users/profile` | Update user profile |
+| `POST` | `/user/v1/internal/users` | Create new user (internal, in-cluster only) |
 
 ---
 
@@ -951,10 +949,10 @@ Content-Type: application/json
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/v1/reviews?product_id={id}` | Get reviews for a product (**product_id required**) |
-| `POST` | `/api/v1/reviews` | Create new review (**user_id required**) |
+| `GET` | `/review/v1/public/reviews?product_id={id}` | Get reviews for a product (**product_id required**) |
+| `POST` | `/review/v1/private/reviews` | Create new review (**user_id required**) |
 
-#### GET /api/v1/reviews
+#### GET /review/v1/public/reviews
 
 **Query Parameters:**
 
@@ -984,7 +982,7 @@ Content-Type: application/json
 }
 ```
 
-#### POST /api/v1/reviews
+#### POST /review/v1/private/reviews
 
 **Request Body:**
 ```json
@@ -1033,11 +1031,11 @@ Content-Type: application/json
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/v1/notifications` | Get all notifications for user |
-| `GET` | `/api/v1/notifications/:id` | Get notification by ID |
-| `PATCH` | `/api/v1/notifications/:id` | Mark notification as read |
-| `POST` | `/api/v1/notify/email` | Send email notification |
-| `POST` | `/api/v1/notify/sms` | Send SMS notification |
+| `GET` | `/notification/v1/private/notifications` | Get all notifications for user |
+| `GET` | `/notification/v1/private/notifications/:id` | Get notification by ID |
+| `PATCH` | `/notification/v1/private/notifications/:id` | Mark notification as read |
+| `POST` | `/notification/v1/internal/notify/email` | Send email notification |
+| `POST` | `/notification/v1/internal/notify/sms` | Send SMS notification |
 
 #### Notification Response Shape
 
@@ -1071,26 +1069,26 @@ Content-Type: application/json
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/v1/shipping/track` | Track shipment by tracking number |
-| `GET` | `/api/v1/shipping/estimate` | Estimate shipping cost |
-| `GET` | `/api/v1/shipping/orders/:orderId` | Get shipment by order ID |
+| `GET` | `/shipping/v1/public/track` | Track shipment by tracking number |
+| `GET` | `/shipping/v1/public/estimate` | Estimate shipping cost |
+| `GET` | `/shipping/v1/internal/orders/:orderId` | Get shipment by order ID |
 
 #### Track Shipment
 
 ```
-GET /api/v1/shipping/track?tracking_number=TRACK123
+GET /shipping/v1/public/track?tracking_number=TRACK123
 ```
 
 #### Estimate Shipping
 
 ```
-GET /api/v1/shipping/estimate?origin=NYC&destination=LA&weight=2.5
+GET /shipping/v1/public/estimate?origin=NYC&destination=LA&weight=2.5
 ```
 
 #### Get Shipment by Order ID
 
 ```
-GET /api/v1/shipping/orders/123
+GET /shipping/v1/internal/orders/123
 ```
 
 Returns shipment info for a specific order (used by order aggregation endpoint).
@@ -1184,22 +1182,19 @@ go test ./...
 
 ## API Versioning
 
-### Version Strategy
-
-- **v1**: Canonical API, frontend-aligned (active)
-- **v2**: Removed (was redundant; to be added when genuine v2 features are needed)
-
 ### URL Pattern
 
 ```
-/api/v1/{resource}     # Version 1 (canonical)
+/{service}/v1/{audience}/{resource…}
 ```
+
+The major version lives between the service and the audience (Variant A). Bumping to v2 means adding `/{service}/v2/...` alongside v1; both can coexist until the v1 routes are retired.
 
 ### Policy
 
-- v1 endpoints are the canonical API surface
-- v1 matches the frontend implementation exactly
-- Future v2 will only be introduced when there are breaking changes or genuinely new semantics
+- **v1** is the only version live today — matches the frontend and every service-to-service caller.
+- Breaking changes get a new version (**v2**) mounted alongside; the old version is kept until all callers migrate, then removed.
+- Non-breaking additions (new fields, new optional query params) stay on v1.
 
 ---
 
@@ -1223,7 +1218,7 @@ All services include seed data via Flyway V2 migrations for immediate demo/local
 
 **Login Example**:
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/login \
+curl -X POST http://localhost:8080/auth/v1/public/login \
   -H "Content-Type: application/json" \
   -d '{"email": "alice@example.com", "password": "password123"}'
 ```
@@ -1338,20 +1333,20 @@ Seed data located in each service:
 
 ```bash
 # Check products
-curl http://localhost:8080/api/v1/products
+curl http://localhost:8080/product/v1/public/products
 
 # Login as Alice
-TOKEN=$(curl -X POST http://localhost:8080/api/v1/auth/login \
+TOKEN=$(curl -X POST http://localhost:8080/auth/v1/public/login \
   -H "Content-Type: application/json" \
   -d '{"email": "alice@example.com", "password": "password123"}' \
   | jq -r '.token')
 
 # Check Alice's cart
-curl http://localhost:8080/api/v1/cart \
+curl http://localhost:8080/cart/v1/private/cart \
   -H "Authorization: Bearer $TOKEN"
 
 # Check Alice's orders
-curl http://localhost:8080/api/v1/orders \
+curl http://localhost:8080/order/v1/private/orders \
   -H "Authorization: Bearer $TOKEN"
 ```
 

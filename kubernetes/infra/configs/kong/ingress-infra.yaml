@@ -1,5 +1,6 @@
 # Infrastructure service Ingress routes
 # Accessible via /etc/hosts → Kong NodePort (80/443)
+# TLS terminated by Kong using the default proxy certificate (kong-proxy-tls).
 
 # Flux Web UI — ui.duynhne.me
 ---

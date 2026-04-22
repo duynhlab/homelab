@@ -27,7 +27,7 @@ spec:
       template:
         spec:
           containers:
-          - image: grafana/grafana:12.4.2
+          - image: grafana/grafana:12.4.3
             imagePullPolicy: IfNotPresent
             name: grafana
             env:

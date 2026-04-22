@@ -1,0 +1,29 @@
+# PolicyException — Kong Ingress data plane and OpenBAO require capabilities
+# beyond the baseline default (NET_BIND_SERVICE for ports < 1024 on Kong;
+# IPC_LOCK for OpenBAO mlock to prevent secret swapping to disk).
+#
+# Owner: platform-team
+# Expires: 2026-12-31
+apiVersion: kyverno.io/v2
+kind: PolicyException
+metadata:
+  name: kong-openbao
+  namespace: kyverno
+  annotations:
+    platform.duynhlab.dev/owner: platform-team
+    platform.duynhlab.dev/expires-at: "2026-12-31"
+    platform.duynhlab.dev/justification: "Kong needs NET_BIND_SERVICE; OpenBAO needs IPC_LOCK."
+spec:
+  exceptions:
+    - policyName: pss-baseline
+      ruleNames:
+        - baseline
+        - autogen-baseline
+  match:
+    any:
+      - resources:
+          kinds: [Pod]
+          namespaces: [kong]
+      - resources:
+          kinds: [Pod]
+          namespaces: [openbao]

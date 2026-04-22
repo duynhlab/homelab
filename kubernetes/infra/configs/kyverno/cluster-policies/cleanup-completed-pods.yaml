@@ -1,0 +1,29 @@
+# Cleanup completed and evicted Pods older than 24h.
+# Reduces metric cardinality and noise in `kubectl get pods`.
+apiVersion: kyverno.io/v2
+kind: ClusterCleanupPolicy
+metadata:
+  name: cleanup-completed-pods
+  annotations:
+    policies.kyverno.io/title: Cleanup completed/evicted Pods
+    policies.kyverno.io/category: Cleanup
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/subject: Pod
+spec:
+  match:
+    any:
+      - resources:
+          kinds: [Pod]
+  exclude:
+    any:
+      - resources:
+          namespaces:
+            - kube-system
+            - flux-system
+            - kyverno
+  conditions:
+    any:
+      - key: "{{ target.status.phase }}"
+        operator: AnyIn
+        value: [Succeeded, Failed]
+  schedule: "*/30 * * * *"

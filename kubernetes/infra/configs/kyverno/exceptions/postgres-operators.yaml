@@ -1,0 +1,54 @@
+# PolicyException — Database operators (CNPG + Zalando) need elevated capabilities
+# for postgres lifecycle (initdb, base backups, pg_basebackup as postgres uid).
+#
+# Owner: platform-team
+# Expires: 2026-12-31 (track upstream hardening of operator-managed pods)
+apiVersion: kyverno.io/v2
+kind: PolicyException
+metadata:
+  name: postgres-operators
+  namespace: kyverno
+  annotations:
+    platform.duynhlab.dev/owner: platform-team
+    platform.duynhlab.dev/expires-at: "2026-12-31"
+    platform.duynhlab.dev/justification: "CNPG/Zalando operators manage postgres pods with operator-defined securityContext."
+spec:
+  exceptions:
+    - policyName: pss-baseline
+      ruleNames:
+        - baseline
+        - autogen-baseline
+    - policyName: require-resources
+      ruleNames:
+        - validate-resources
+        - autogen-validate-resources
+  match:
+    any:
+      - resources:
+          kinds:
+            - Pod
+          namespaces:
+            - postgres-operator
+            - cloudnative-pg
+            - database
+            - auth
+            - user
+            - product
+            - cart
+            - order
+          selector:
+            matchExpressions:
+              - key: application
+                operator: In
+                values: [spilo, cnpg]
+      - resources:
+          kinds:
+            - Pod
+          namespaces:
+            - postgres-operator
+            - cloudnative-pg
+          selector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values: [postgres-operator, cloudnative-pg]

@@ -14,8 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move `docs/observability/mcp-servers.md` to
   [`docs/platform/mcp-servers.md`](docs/platform/mcp-servers.md). It is a
   platform/AI-tooling reference, not an observability guide.
-- Rewrite [`docs/observability/architecture.md`](docs/observability/architecture.md)
-  diagrams to match the actual stack:
+- Merge `docs/observability/architecture.md` into
+  [`docs/observability/README.md`](docs/observability/README.md). The README
+  now owns the 4-pillar stack diagram, the 3-layer service diagram, the
+  end-to-end APM sequence diagram, the trace-id propagation diagram, and the
+  layer responsibility/code samples. Old `architecture.md` deleted; all
+  external references in `AGENTS.md`, `CLAUDE.md`, `README.md`, and
+  `docs/README.md` repointed to the README.
+- Rewrite the absorbed architecture content to match the actual stack:
   - Prometheus → VictoriaMetrics (VMAgent scrape, VMSingle storage,
     VMAlert + VMAlertmanager).
   - Loki → VictoriaLogs (VLSingle), with Vector DaemonSet as the shipper.

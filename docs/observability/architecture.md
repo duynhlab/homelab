@@ -187,7 +187,7 @@ graph LR
         end
 
         subgraph METRIC["🟣 Metrics (VictoriaMetrics)"]
-            M1[/metrics endpoint/] --> VMAGENT[VMAgent]
+            M1["/metrics endpoint"] --> VMAGENT[VMAgent]
             VMAGENT --> VMSINGLE[VMSingle]
             VMSINGLE --> VMALERT[VMAlert + AM]
         end

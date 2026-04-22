@@ -17,7 +17,7 @@ spec:
         kind: HelmRepository
         name: valkey
         namespace: flux-system
-      version: '0.9.3'
+      version: '0.9.4'
   interval: 10m
   timeout: 10m
   releaseName: valkey

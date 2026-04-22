@@ -143,7 +143,7 @@ Single URL shape across the platform — browser and in-cluster callers use the 
 
 Full per-endpoint mapping: [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
 
-**Detailed Architecture**: See [`docs/observability/architecture.md`](docs/observability/architecture.md) for middleware chain and APM integration.
+**Detailed Architecture**: See [`docs/observability/README.md`](docs/observability/README.md) for middleware chain and APM integration.
 
 ---
 

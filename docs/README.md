@@ -166,13 +166,12 @@ docs/
     - Component inventory and correlation workflow
     - Deployment and quick start
 
-2. **[Architecture](./observability/architecture.md)** - 3-layer service architecture + APM integration
-3. **[Distributed Tracing](./observability/tracing/README.md)** - Tempo integration guide
-4. **[Tracing Architecture](./observability/tracing/architecture.md)** - Dual backend (Tempo + Jaeger)
-5. **[Jaeger Guide](./observability/tracing/jaeger.md)** - Jaeger UI usage, comparison with Tempo
-6. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
-7. **[Structured Logging](./observability/logging/README.md)** - Dual backend: Loki + VictoriaLogs (single Vector)
-8. **[VictoriaLogs](./observability/logging/victorialogs.md)** - VictoriaLogs deployment and configuration
+2. **[Distributed Tracing](./observability/tracing/README.md)** - Tempo integration guide
+3. **[Tracing Architecture](./observability/tracing/architecture.md)** - Dual backend (Tempo + Jaeger)
+4. **[Jaeger Guide](./observability/tracing/jaeger.md)** - Jaeger UI usage, comparison with Tempo
+5. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
+6. **[Structured Logging](./observability/logging/README.md)** - Dual backend: Loki + VictoriaLogs (single Vector)
+7. **[VictoriaLogs](./observability/logging/victorialogs.md)** - VictoriaLogs deployment and configuration
     - Single Vector architecture (dual-ship to Loki + VictoriaLogs)
     - PostgreSQL auto_explain plan parsing pipeline
     - Verification and troubleshooting
@@ -259,8 +258,7 @@ docs/
 - [Annotation-Driven Controller](./observability/slo/annotation-driven-slo-controller.md) - Future approach
 
 #### Observability Pillars
-- [Observability Overview](./observability/README.md) - Master index, 4-pillar architecture
-- [Architecture](./observability/architecture.md) - 3-layer service architecture + APM integration
+- [Observability Overview](./observability/README.md) - Master index, 4-pillar architecture, 3-layer service architecture + APM integration
 - [Distributed Tracing](./observability/tracing/README.md) - Tempo integration
 - [Tracing Architecture](./observability/tracing/architecture.md) - Dual backend (Tempo + Jaeger)
 - [Jaeger Guide](./observability/tracing/jaeger.md) - Jaeger UI usage, comparison with Tempo

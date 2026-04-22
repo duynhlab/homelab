@@ -1,8 +1,6 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-
 resources:
-  - monitoring/
-  - databases/
-  - secrets/
-  - kyverno/
+  - vector-hostpath.yaml
+  - postgres-operators.yaml
+  - kong-openbao.yaml

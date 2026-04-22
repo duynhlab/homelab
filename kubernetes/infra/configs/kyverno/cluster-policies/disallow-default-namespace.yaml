@@ -1,0 +1,29 @@
+# Forbid the `default` namespace for any workload.
+# Trivial enforce — zero risk, prevents kubectl-apply pollution.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-default-namespace
+  annotations:
+    policies.kyverno.io/title: Disallow default namespace
+    policies.kyverno.io/category: Multi-Tenancy, Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod, Namespace
+    policies.kyverno.io/description: >-
+      Forbids workloads from running in the `default` namespace. Forces
+      explicit namespace selection and aligns with multi-tenancy boundaries.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  failurePolicy: Fail
+  rules:
+    - name: validate-namespace
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      validate:
+        message: "Workloads in the 'default' namespace are not allowed."
+        pattern:
+          metadata:
+            namespace: "!default"

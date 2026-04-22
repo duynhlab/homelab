@@ -13,3 +13,4 @@ resources:
   - secrets/
   - cert-manager/
   - kong/
+  - kyverno/

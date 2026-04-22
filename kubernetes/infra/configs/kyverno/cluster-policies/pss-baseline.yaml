@@ -1,0 +1,46 @@
+# Pod Security Standard — baseline profile (cluster-wide)
+# Reference: https://kubernetes.io/docs/concepts/security/pod-security-standards/#baseline
+#
+# Mode: Audit (rollout phase). Flip to Enforce after 7 days observation.
+# Scope: all namespaces except platform/operator namespaces (covered by exceptions).
+# Auto-gen: Kyverno generates rules for Deployment/StatefulSet/DaemonSet/Job/CronJob/ReplicaSet automatically.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: pss-baseline
+  annotations:
+    policies.kyverno.io/title: Pod Security Standard — Baseline
+    policies.kyverno.io/category: Pod Security Standards (Baseline)
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Enforces the Kubernetes Pod Security Standard "baseline" profile. Blocks
+      privileged containers, hostNetwork/hostPID/hostIPC, hostPath volumes,
+      and other known-dangerous primitives. Operators that legitimately need
+      these primitives (CNPG, Zalando, Vector) are whitelisted via PolicyException.
+spec:
+  validationFailureAction: Audit
+  background: true
+  failurePolicy: Ignore
+  rules:
+    - name: baseline
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kube-public
+                - kube-node-lease
+                - flux-system
+                - kyverno
+                - cert-manager
+                - external-secrets-system
+      validate:
+        podSecurity:
+          level: baseline
+          version: latest

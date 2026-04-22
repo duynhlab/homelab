@@ -40,6 +40,7 @@ kustomize_overlays=(
   "kubernetes/infra/configs/databases"
   "kubernetes/infra/configs/monitoring"
   "kubernetes/infra/configs/secrets"
+  "kubernetes/infra/configs/kyverno"
 )
 
 check_prerequisites() {

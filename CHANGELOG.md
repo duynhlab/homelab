@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.89.0] - 2026-04-21
+
+### Changed — Observability docs refresh
+
+- Move `docs/observability/mcp-servers.md` to
+  [`docs/platform/mcp-servers.md`](docs/platform/mcp-servers.md). It is a
+  platform/AI-tooling reference, not an observability guide.
+- Rewrite [`docs/observability/architecture.md`](docs/observability/architecture.md)
+  diagrams to match the actual stack:
+  - Prometheus → VictoriaMetrics (VMAgent scrape, VMSingle storage,
+    VMAlert + VMAlertmanager).
+  - Loki → VictoriaLogs (VLSingle), with Vector DaemonSet as the shipper.
+  - OTel Collector shown explicitly between service spans and Tempo
+    (with Jaeger fan-out).
+  - Pyroscope shown as push-based continuous profiling.
+  - Updated "Related Documentation" links to existing files under
+    `docs/observability/{tracing,logging,metrics,profiling}/README.md`.
+- Update CHANGELOG entry that referenced the old `docs/observability/mcp-servers.md`
+  path (history preserved, link only repointed).
+
 ## [0.88.0] - 2026-04-21
 
 ### Added — Kyverno admission policy engine (Tier 1, Audit mode)
@@ -139,7 +159,7 @@ There is no more `/api/v1/*` anywhere — handlers, service-to-service callers, 
 - **Flux GitOps observability:** kube-state-metrics `customResourceState` for Flux CRDs (Kustomization, HelmRelease, GitRepository, OCIRepository, HelmChart, HelmRepository, Alert, Provider, Receiver) with RBAC rules. Flux cluster Grafana dashboard ([`grafana-dashboard-flux-cluster.yaml`](kubernetes/infra/configs/monitoring/grafana/dashboards/grafana-dashboard-flux-cluster.yaml)) and control plane dashboard ([`grafana-dashboard-flux-controlplane.yaml`](kubernetes/infra/configs/monitoring/grafana/dashboards/grafana-dashboard-flux-controlplane.yaml)). PodMonitor [`podmonitor-flux-system.yaml`](kubernetes/infra/configs/monitoring/podmonitors/podmonitor-flux-system.yaml) for Flux controller metrics.
 - **VictoriaMetrics Grafana dashboards:** VMSingle ([`grafana-dashboard-vmsingle.yaml`](kubernetes/infra/configs/monitoring/grafana/dashboards/grafana-dashboard-vmsingle.yaml)), VMAgent ([`grafana-dashboard-vmagent.yaml`](kubernetes/infra/configs/monitoring/grafana/dashboards/grafana-dashboard-vmagent.yaml)), VMAlert ([`grafana-dashboard-vmalert.yaml`](kubernetes/infra/configs/monitoring/grafana/dashboards/grafana-dashboard-vmalert.yaml)).
 - **VMAlertmanager Slack routing:** Configured severity-based routing (`slack-default` for warnings, `slack-critical` for critical alerts), `watchdog-null` receiver, and inhibit rules (critical suppresses warning, node-level suppresses pod-level). Placeholder `<SLACK_WEBHOOK_URL>` — fill before production use. [`vmalertmanager.yaml`](kubernetes/infra/configs/monitoring/victoriametrics/vmalertmanager.yaml).
-- **MCP (Model Context Protocol) servers:** 3 new HelmReleases — [`victoria-metrics-mcp.yaml`](kubernetes/infra/controllers/mcp/victoria-metrics-mcp.yaml), [`victoria-logs-mcp.yaml`](kubernetes/infra/controllers/mcp/victoria-logs-mcp.yaml), [`flux-operator-mcp.yaml`](kubernetes/infra/controllers/mcp/flux-operator-mcp.yaml). 3 OCI sources in [`clusters/local/sources/oci/`](kubernetes/clusters/local/sources/oci/). Flux Kustomization [`mcp.yaml`](kubernetes/clusters/local/mcp.yaml) with `dependsOn: monitoring-local`. Kong Ingress routes [`ingress-mcp.yaml`](kubernetes/infra/configs/kong/ingress-mcp.yaml) — domains `vm-mcp.duynhne.me`, `vl-mcp.duynhne.me`, `flux-mcp.duynhne.me`. Documentation [`docs/observability/mcp-servers.md`](docs/observability/mcp-servers.md).
+- **MCP (Model Context Protocol) servers:** 3 new HelmReleases — [`victoria-metrics-mcp.yaml`](kubernetes/infra/controllers/mcp/victoria-metrics-mcp.yaml), [`victoria-logs-mcp.yaml`](kubernetes/infra/controllers/mcp/victoria-logs-mcp.yaml), [`flux-operator-mcp.yaml`](kubernetes/infra/controllers/mcp/flux-operator-mcp.yaml). 3 OCI sources in [`clusters/local/sources/oci/`](kubernetes/clusters/local/sources/oci/). Flux Kustomization [`mcp.yaml`](kubernetes/clusters/local/mcp.yaml) with `dependsOn: monitoring-local`. Kong Ingress routes [`ingress-mcp.yaml`](kubernetes/infra/configs/kong/ingress-mcp.yaml) — domains `vm-mcp.duynhne.me`, `vl-mcp.duynhne.me`, `flux-mcp.duynhne.me`. Documentation [`docs/platform/mcp-servers.md`](docs/platform/mcp-servers.md).
 - **Kong Ingress expansion — domain-based access for all infrastructure services:** [`ingress-monitoring.yaml`](kubernetes/infra/configs/kong/ingress-monitoring.yaml) routes 8 services (Grafana, VMSingle, VMAlert, Karma, Jaeger, Tempo, Pyroscope, VictoriaLogs). [`ingress-infra.yaml`](kubernetes/infra/configs/kong/ingress-infra.yaml) routes Flux UI, RustFS Console, OpenBAO, Postgres Operator UI. [`ingress-frontend.yaml`](kubernetes/infra/configs/kong/ingress-frontend.yaml) updated with `app.duynhne.me` host. All wired in [`kong/kustomization.yaml`](kubernetes/infra/configs/kong/kustomization.yaml).
 - **Kind cluster extraPortMappings:** [`scripts/kind-up.sh`](scripts/kind-up.sh) now maps host ports 80→30080 and 443→30443 for direct browser access to Kong Ingress without port-forwarding.
 

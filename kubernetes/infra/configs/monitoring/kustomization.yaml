@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - victoriametrics/
   - karma/
+  - sloth/
   - servicemonitors/microservices.yaml
   - servicemonitors/external-secrets.yaml
   - servicemonitors/tempo.yaml

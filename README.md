@@ -247,6 +247,7 @@ Add the following entries to your `/etc/hosts` file:
 127.0.0.1 tempo.duynhne.me
 127.0.0.1 pyroscope.duynhne.me
 127.0.0.1 logs.duynhne.me
+127.0.0.1 slo.duynhne.me
 127.0.0.1 ui.duynhne.me
 127.0.0.1 source.duynhne.me
 127.0.0.1 openbao.duynhne.me
@@ -274,6 +275,7 @@ All services are routed through Kong Ingress Controller on port 80 (HTTP).
 | **Tempo** | http://tempo.duynhne.me | Trace backend API |
 | **Pyroscope** | http://pyroscope.duynhne.me | Continuous profiling |
 | **VictoriaLogs** | http://logs.duynhne.me | Log query UI |
+| **Sloth UI** | http://slo.duynhne.me | SLO browser — service/SLO list, SLI charts, burn-rate views (Sloth v0.16.0+) |
 | **Flux UI** | http://ui.duynhne.me | GitOps reconciliation status |
 | **RustFS Console** | http://source.duynhne.me | S3 object storage console |
 | **OpenBAO** | http://openbao.duynhne.me | Secrets management UI |

@@ -179,3 +179,25 @@ spec:
                 name: vlsingle-victoria-logs
                 port:
                   number: 9428
+---
+# Sloth UI — slo.duynhne.me
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sloth-ui
+  namespace: monitoring
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: slo.duynhne.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sloth-ui
+                port:
+                  number: 8080

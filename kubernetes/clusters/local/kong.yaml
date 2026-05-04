@@ -1,0 +1,32 @@
+# Kong API Gateway HelmRelease — depends on cert-manager-local so the
+# kong-proxy-tls Secret (issued by cert-manager via Certificate CR in
+# configs/cert-manager/) exists before the Kong proxy pod tries to mount it.
+#
+# This breaks the deadlock that occurs when Kong is part of controllers-local
+# (controllers-local waits for Kong → Kong waits for Secret → Secret comes from
+# cert-manager-local which dependsOn controllers-local).
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: kong-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: infrastructure
+spec:
+  interval: 10m
+  timeout: 10m
+  retryInterval: 2m
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+  path: ./controllers/kong
+  prune: false
+  wait: true
+  dependsOn:
+    - name: cert-manager-local
+  healthChecks:
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: kong
+      namespace: kong

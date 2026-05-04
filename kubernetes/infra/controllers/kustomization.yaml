@@ -12,5 +12,5 @@ resources:
   - storage/
   - secrets/
   - cert-manager/
-  - kong/
+  # kong/ — moved to its own Kustomization (kong-local) so it can dependsOn cert-manager-local
   - kyverno/

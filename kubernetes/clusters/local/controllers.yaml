@@ -96,14 +96,12 @@ spec:
       kind: HelmRelease
       name: cert-manager
       namespace: cert-manager
-    # Kong API Gateway
+    # Kong API Gateway — moved to kong-local Kustomization (after cert-manager-local
+    # so the kong-proxy-tls Secret exists before the Kong pod tries to mount it).
+    # Kong namespace stays here (created by namespaces.yaml).
     - apiVersion: v1
       kind: Namespace
       name: kong
-    - apiVersion: helm.toolkit.fluxcd.io/v2
-      kind: HelmRelease
-      name: kong
-      namespace: kong
     # Kyverno admission policy engine
     - apiVersion: v1
       kind: Namespace

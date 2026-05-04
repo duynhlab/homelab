@@ -1,5 +1,5 @@
 # Kong API Gateway configuration — Ingress resources, plugins, routing rules.
-# Depends on controllers-local (Kong CRDs) and cert-manager-local (TLS certificate).
+# Depends on kong-local (Kong HelmRelease + CRDs) and cert-manager-local (TLS certificate).
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -19,5 +19,5 @@ spec:
   prune: true
   wait: true
   dependsOn:
-    - name: controllers-local
+    - name: kong-local
     - name: cert-manager-local

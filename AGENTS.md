@@ -352,7 +352,7 @@ make flux-sync
 - **3 PostgreSQL Clusters + DR**: auth-db (Zalando), supporting-shared-db (Zalando), cnpg-db (CNPG, hosts product/cart/order), cnpg-db-replica (CNPG DR)
 - **Connection Poolers**: PgBouncer (Auth, Shared), PgDog (cnpg-db)
 - **Migrations**: Flyway 11.19.0 with 8 migration images
-- **Operators**: Zalando Postgres Operator (v1.15.1), CloudNativePG Operator (v1.28.1)
+- **Operators**: Zalando Postgres Operator (v1.15.1), CloudNativePG Operator (v1.29.0)
 - **SLO**: Managed via Sloth Operator (PrometheusServiceLevel CRDs)
 - **CI/CD**: GitHub Actions workflows (build-images, build-init-images, build-k6-images, helm-release)
 

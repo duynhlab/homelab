@@ -81,7 +81,7 @@ flowchart TD
 
 | Operator | Version | PostgreSQL Version | Clusters |
 |----------|---------|-------------------|----------|
-| **CloudNativePG** | v1.28.1 | 18.1 (default) | `cnpg-db` (product, cart, order), `cnpg-db-replica` (DR) |
+| **CloudNativePG** | v1.29.0 | 18.1 (default) | `cnpg-db` (product, cart, order), `cnpg-db-replica` (DR) |
 | **Zalando Postgres Operator** | v1.15.1 | 16/17 | `auth-db`, `supporting-shared-db` |
 
 ### Current Extensions Usage

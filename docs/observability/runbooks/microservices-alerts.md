@@ -875,7 +875,7 @@ Add alerts for application-side database health signals:
 
 - [Observability Deep Dive Runbook](observability-deep-dive.md) -- RED/USE/Golden theory, middleware chain, interview answers
 - [SLO Documentation](../slo/README.md) -- SLO definitions, Sloth integration (Layer 2 alerts)
-- [SLO Alerting](../slo/alerting.md) -- Multi-window multi-burn-rate methodology
+- [SLO Burn-Rate Alerts](../alerting/slo-burn-rate-alerts.md) -- Multi-window multi-burn-rate methodology
 - [Error Budget Policy](../slo/error_budget_policy.md) -- Budget gates and deployment decisions
 - [PostgreSQL Alerts](../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/README.md) -- Database-level alerts (`cnpg/` + `zalando/`)
 - [Metrics Reference](../metrics/README.md) -- RED method, label strategy, cardinality

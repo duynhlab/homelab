@@ -791,7 +791,7 @@ For every answer, structure as:
 - [VictoriaMetrics Stack](../metrics/victoriametrics.md) -- Dual CRD system, VM Operator
 - [Grafana Datasources](../grafana/datasources.md) -- Dual datasource strategy, vmalert.proxyURL
 - [SLO Documentation](../slo/README.md) -- SLO definitions, Sloth integration
-- [SLO Alerting](../slo/alerting.md) -- Multi-window multi-burn-rate alerts
+- [SLO Burn-Rate Alerts](../alerting/slo-burn-rate-alerts.md) -- Multi-window multi-burn-rate alerts
 - [Tracing Guide](../tracing/README.md) -- Distributed tracing details
 - [Logging Guide](../logging/README.md) -- Structured logging, LogQL
 - [Profiling Guide](../profiling/README.md) -- Continuous profiling, flamegraphs

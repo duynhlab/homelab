@@ -250,6 +250,7 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 - [Alert Dashboard Comparison](dashboard-comparison.md) -- deep-dive tool comparison (Karma, Alerta, UAR, Siren, Grafana)
 - [Microservices Alerts Runbook](../runbooks/microservices-alerts.md) -- per-alert investigation and resolution
 - [SLO System](../slo/README.md) -- Sloth Operator, SLO targets, error budgets
-- [SLO Alerting](../slo/alerting.md) -- burn-rate methodology details
+- [SLO Burn-Rate Alerts](./slo-burn-rate-alerts.md) -- burn-rate methodology details
+- [SLO Fundamentals](../slo/fundamentals.md) -- SLA/SLO/SLI/Error Budget primer
 - [Grafana Datasources](../grafana/datasources.md) -- how read-only rules display works
 - [Observability Deep Dive](../runbooks/observability-deep-dive.md) -- theory and interview prep

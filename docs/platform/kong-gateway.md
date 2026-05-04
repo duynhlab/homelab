@@ -473,11 +473,18 @@ Adding any `internal` audience to a gateway Ingress is a safety/privacy regressi
 ## Flux Dependency Chain
 
 ```
-controllers-local (Kong HelmRelease + cert-manager HelmRelease)
-  → cert-manager-local (homelab-ca + kong-proxy-tls Certificate)
+controllers-local (cert-manager HelmRelease + Kong CRDs + namespaces)
+  → cert-manager-local (homelab-ca ClusterIssuer + kong-proxy-tls Certificate → Secret)
+  → kong-local (Kong HelmRelease — mounts kong-proxy-tls Secret at startup)
   → kong-config-local (Ingress resources + KongClusterPlugins)
   → apps-local (microservices + frontend)
 ```
+
+> Why Kong is **not** in `controllers-local`: the Kong proxy pod mounts the
+> `kong-proxy-tls` Secret as a volume, so it cannot start until cert-manager
+> has issued the Certificate. Putting Kong in `controllers-local` (which
+> `cert-manager-local` `dependsOn`) creates a deadlock — `kong-local` lives
+> after `cert-manager-local` to break that cycle.
 
 ---
 

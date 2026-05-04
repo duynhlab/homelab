@@ -313,9 +313,10 @@ make flux-push    # 3. Deploy All (Flux reconciles in dependency order)
 
 ```
 flux-system (bootstrap)
-  ├── controllers-local (operators, CRDs, Kong, cert-manager, secrets managers)
-  ├── cert-manager-local (depends: controllers)
-  ├── kong-config-local (depends: controllers + cert-manager) — Ingress resources
+  ├── controllers-local (operators, CRDs, cert-manager, Kong CRDs, secrets managers)
+  ├── cert-manager-local (depends: controllers) — issues kong-proxy-tls Secret
+  ├── kong-local (depends: cert-manager) — Kong HelmRelease (mounts kong-proxy-tls)
+  ├── kong-config-local (depends: kong + cert-manager) — Ingress resources
   ├── secrets-local (depends: controllers)
   ├── databases-local (depends: secrets + monitoring)
   ├── databases-cnpg-dr-local (depends: databases + secrets) — DR replica

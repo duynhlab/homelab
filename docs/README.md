@@ -155,7 +155,7 @@ docs/
    - Per-service target overrides
    - Verification checklist
 
-3. **[Alerting](./observability/slo/alerting.md)** - Alert configuration and runbooks
+3. **[SLO Burn-Rate Alerts](./observability/alerting/slo-burn-rate-alerts.md)** - Alert configuration and runbooks
 4. **[Error Budget Policy](./observability/slo/error_budget_policy.md)** - Budget management guidelines
 5. **[Annotation-Driven Controller](./observability/slo/annotation-driven-slo-controller.md)** - Future approach for large-scale automation
 
@@ -253,7 +253,7 @@ docs/
 #### SLO/SRE
 - [SLO Overview](./observability/slo/README.md) - Architecture, SLI definitions, targets
 - [Getting Started](./observability/slo/getting_started.md) - Enable SLOs via Helm values
-- [Alerting](./observability/slo/alerting.md) - Alert configuration
+- [SLO Burn-Rate Alerts](./observability/alerting/slo-burn-rate-alerts.md) - Alert configuration
 - [Error Budget Policy](./observability/slo/error_budget_policy.md) - Budget management
 - [Annotation-Driven Controller](./observability/slo/annotation-driven-slo-controller.md) - Future approach
 

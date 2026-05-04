@@ -7,6 +7,136 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.90.0] - 2026-05-04
+
+### Added — Sloth Web UI (v0.16.0)
+
+Sloth shipped a built-in read-only web UI in the v0.16.0 image. The upstream
+Helm chart still only deploys `kubernetes-controller`, so the `server`
+sub-command is exposed via a separate Deployment in `monitoring`.
+
+- **Manifest** — `kubernetes/infra/configs/monitoring/sloth/sloth-ui.yaml`
+  (Deployment + Service + PodMonitor). Reuses the same
+  `ghcr.io/slok/sloth:v0.16.0` image as the controller HelmRelease (already
+  on v0.16.0).
+- **Args** — `server --prometheus-address=http://vmsingle-victoria-metrics.monitoring.svc:8428
+  --prometheus-cache-refresh-interval=1m`. Reads SLI / error-budget series
+  back from VMSingle (Prometheus-compatible API). Stateless, restart-safe.
+- **Kustomize wiring** — new `sloth/` sub-kustomization added to
+  `kubernetes/infra/configs/monitoring/kustomization.yaml`.
+- **Ingress** — `slo.duynhne.me` added to
+  `kubernetes/infra/configs/kong/ingress-monitoring.yaml`. New `/etc/hosts`
+  entry and access-points row documented in
+  [`README.md`](README.md#service-urls).
+- **PSS-restricted compliant** — `runAsNonRoot`,
+  `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`,
+  `seccompProfile.type: RuntimeDefault`, `readOnlyRootFilesystem: true`,
+  CPU/memory requests + memory limit, liveness + readiness probes on the
+  metrics port.
+
+### Changed — SLO docs refreshed for Sloth v0.16.0
+
+- [`docs/observability/slo/README.md`](docs/observability/slo/README.md):
+  - Bump version reference to v0.16.0 and call out the two new upstream
+    features that affect us — built-in Web UI and the dynamic
+    `unstructured` k8s transformer plugin
+    (`sloth.dev/k8stransform/prom-operator-prometheus-rule/v1`) that
+    Sloth now uses internally to render `PrometheusRule` objects.
+  - Architecture diagram updated to show the new UI reading from VMSingle
+    and the controller using the k8s transformer plugin.
+  - New **Sloth Web UI (v0.16.0)** section covering features
+    (service/SLO listing, filters, SLI charts, burn-rate charts), backend
+    wiring, and the manifest location.
+  - Grafana dashboards section reframed as complementary to the upstream
+    UI; Grafana link corrected from `localhost:3000` to
+    `grafana.duynhne.me`.
+  - External references add v0.16.0 release notes and the `server`
+    command source for the full CLI flag reference (basic auth, mTLS,
+    custom headers, cache refresh interval).
+- [`docs/observability/slo/getting_started.md`](docs/observability/slo/getting_started.md):
+  prerequisites updated to VictoriaMetrics + Sloth v0.16.0; verification
+  steps now point at VMUI and the new Sloth UI instead of a non-existent
+  `kube-prometheus-stack-prometheus` port-forward.
+
+### Notes
+
+- **Helm chart unchanged.** Sloth v0.16.0 ships the controller and the UI
+  in a single binary; the chart only knows about the controller. When the
+  chart learns about the `server` mode upstream we can drop the standalone
+  Deployment.
+- The `PodMonitor` CRD used by `sloth-ui` is already provided by
+  `infra/controllers/metrics/prometheus-operator-crds.yaml`.
+
+
+### Added — SLO Fundamentals doc
+
+- **NEW** [`docs/observability/slo/fundamentals.md`](docs/observability/slo/fundamentals.md)
+  -- conceptual primer covering SLA / SLO / SLI / Error Budget / Burn
+  Rate, the 99.x cheatsheet, multi-window multi-burn-rate intuition, and
+  common pitfalls. Grounded in this platform's services, metric names
+  (`request_duration_seconds`), and UIs (slo, vmalert, karma, grafana,
+  vmui at `*.duynhne.me`). Now the recommended on-ramp before any other
+  SLO doc.
+
+### Changed — Move SLO alerting doc into `alerting/`
+
+- **MOVED** `docs/observability/slo/alerting.md` →
+  [`docs/observability/alerting/slo-burn-rate-alerts.md`](docs/observability/alerting/slo-burn-rate-alerts.md).
+  Burn-rate alerting is Layer 2 of the platform alerting strategy already
+  documented in [`docs/observability/alerting/README.md`](docs/observability/alerting/README.md);
+  the `alerting/` directory is its proper home.
+- Content rewritten end-to-end: removed stale references to non-existent
+  `localhost:9090` Prometheus, fake `/api/error` test endpoints, and
+  vanilla Alertmanager; replaced with VMAlert / VMAlertmanager / Karma
+  workflow, real on-call handling steps tied to `slo.duynhne.me` and
+  `grafana.duynhne.me`, and a load-test recipe using the existing k6
+  jobs in `kubernetes/apps/k6/`.
+- Cross-references updated repo-wide:
+  - `docs/README.md` (Quick Links + Documentation Map)
+  - `docs/observability/slo/README.md` (Documentation list now includes
+    `Fundamentals` and links to the new alerting location)
+  - `docs/observability/slo/getting_started.md` (Next Steps)
+  - `docs/observability/alerting/README.md` (Related Docs)
+  - `docs/observability/runbooks/observability-deep-dive.md`
+  - `docs/observability/runbooks/microservices-alerts.md`
+
+### Fixed — Kong ↔ cert-manager deadlock on `make up`
+
+Cold-boot symptom: Kong proxy pod stuck in `Init:0/1` with
+`MountVolume.SetUp failed for volume "kong-proxy-tls" : secret
+"kong-proxy-tls" not found`. Root cause: `controllers-local` healthChecked
+the Kong HelmRelease, Kong waited on the cert-manager-issued Secret, and
+`cert-manager-local` (which creates that Secret) `dependsOn`
+`controllers-local` — a circular wait that only resolved by luck.
+
+- **MOVED** Kong HelmRelease out of `controllers-local` into a new
+  `kong-local` Kustomization that `dependsOn: [cert-manager-local]`.
+- **NEW** [`kubernetes/clusters/local/kong.yaml`](kubernetes/clusters/local/kong.yaml)
+  — Kustomization `kong-local`, `path: ./controllers/kong`, healthChecks
+  the `kong/kong` HelmRelease.
+- **MODIFIED** [`kubernetes/infra/controllers/kustomization.yaml`](kubernetes/infra/controllers/kustomization.yaml)
+  — drop `kong/` from the controllers bundle (the dir is now consumed
+  exclusively by `kong-local`).
+- **MODIFIED** [`kubernetes/clusters/local/controllers.yaml`](kubernetes/clusters/local/controllers.yaml)
+  — remove the `HelmRelease kong/kong` healthCheck; keep the `kong`
+  Namespace healthCheck (created by `namespaces.yaml`).
+- **MODIFIED** [`kubernetes/clusters/local/kong-config.yaml`](kubernetes/clusters/local/kong-config.yaml)
+  — `dependsOn` now `[kong-local, cert-manager-local]` instead of
+  `[controllers-local, cert-manager-local]`.
+- **MODIFIED** [`kubernetes/clusters/local/kustomization.yaml`](kubernetes/clusters/local/kustomization.yaml)
+  — register `kong.yaml` between `cert-manager-config.yaml` and
+  `kong-config.yaml`.
+- **DOCS** [`docs/platform/kong-gateway.md`](docs/platform/kong-gateway.md)
+  + [`AGENTS.md`](AGENTS.md): updated Flux dependency chain diagrams to
+  show `controllers-local → cert-manager-local → kong-local →
+  kong-config-local → apps-local` and explain why Kong cannot live in
+  `controllers-local`.
+
+Resulting reconciliation order is now linear and race-free:
+`controllers (CRDs+cert-manager) → cert-manager-local (issue Secret) →
+kong-local (mount Secret + start proxy) → kong-config-local (Ingresses)
+→ apps-local`.
+
 ## [0.89.0] - 2026-04-21
 
 ### Changed — Observability docs refresh

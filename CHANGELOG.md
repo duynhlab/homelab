@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.90.0] - 2026-05-04
 
+### Changed
+
+- Refresh database docs: bump CNPG operator version reference from
+  v1.28.1 to v1.29.0 across docs/databases/002-database-integration.md,
+  docs/databases/009-extensions.md, AGENTS.md, and CLAUDE.md to match
+  the manifest in kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml.
+
+
 ### Added — Sloth Web UI (v0.16.0)
 
 Sloth shipped a built-in read-only web UI in the v0.16.0 image. The upstream

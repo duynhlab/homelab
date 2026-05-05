@@ -5,6 +5,9 @@ This document defines a **production-ready physical backup strategy** (base back
 - **Bucket `pg-backups-zalando`**: `auth-db`, `supporting-shared-db` (Zalando / WAL-G)
 - **Bucket `pg-backups-cnpg`**: `cnpg-db` (primary), `cnpg-db-replica` (DR) — CloudNativePG / Barman; separate S3 prefixes in the same bucket
 
+For DRP policy, recovery decision flow, RTO/RPO ownership, and restore-drill
+evidence, see [010-drp.md](./010-drp.md).
+
 ## Table of Contents
 
 1. [Scope (production)](#scope-production)
@@ -93,7 +96,7 @@ flowchart LR
 
 | Cluster         | Operator      | Namespace | PostgreSQL | Instances | Databases                    | Pooler     | HA Pattern |
 |-----------------|---------------|-----------|------------|-----------|------------------------------|------------|------------|
-| cnpg-db         | CloudNativePG | product   | 18         | 3         | product, cart, order         | PgDog      | Async primary; DR cluster `cnpg-db-replica` (see detailed profile) |
+| cnpg-db         | CloudNativePG | product   | 18         | 3         | product, cart, order         | PgDog      | Sync quorum `ANY 1`; DR cluster `cnpg-db-replica` |
 | auth-db         | Zalando       | auth      | 16         | 3         | auth                         | PgBouncer  | Patroni HA |
 | supporting-shared-db   | Zalando       | user      | 16         | 1 (SPOF)  | user, notification, shipping | PgBouncer  | Single     |
 
@@ -102,9 +105,9 @@ flowchart LR
 #### cnpg-db (CloudNativePG)
 
 - **Namespace:** product
-- **Operator:** CloudNativePG v1.28.1
+- **Operator:** CloudNativePG v1.29.0
 - **PostgreSQL:** 18.1-system-trixie
-- **Topology:** 3 instances (1 primary + 2 replicas), async replication
+- **Topology:** 3 instances (1 primary + 2 replicas), synchronous quorum `ANY 1` for HA
 - **Scope:** 3 DBs (`product`, `cart`, `order`) on one CNPG cluster; apps connect via PgDog
 - **Pooler:** PgDog (routes to this cluster for all three databases)
 - **Secret:** `cnpg-db-secret` (manual)
@@ -134,8 +137,8 @@ RustFS (S3-compatible) is deployed in namespace `rustfs`. Backups are split into
 |--------|---------|---------|----------------|
 | `pg-backups-zalando` | auth-db | `s3://pg-backups-zalando/auth-db/` | WAL-G via Spilo |
 | `pg-backups-zalando` | supporting-shared-db | `s3://pg-backups-zalando/user-db/` | WAL-G via Spilo |
-| `pg-backups-cnpg` | cnpg-db | `s3://pg-backups-cnpg/cnpg-db/` | Barman Object Store |
-| `pg-backups-cnpg` | cnpg-db-replica | `s3://pg-backups-cnpg/cnpg-db-replica/` | Barman Object Store (DR cluster) |
+| `pg-backups-cnpg` | cnpg-db | `s3://pg-backups-cnpg/cnpg-db/` | Barman Cloud Plugin + `ObjectStore` |
+| `pg-backups-cnpg` | cnpg-db-replica | `s3://pg-backups-cnpg/cnpg-db-replica/` | Barman Cloud Plugin + `ObjectStore` (DR cluster) |
 
 ### S3 Endpoint
 
@@ -293,13 +296,15 @@ Key insight: more frequent base backups reduce risk of corrupted base backups, b
 
 ### CNPG direction (production note)
 
-CloudNativePG deprecated in-tree `barmanObjectStore` starting 1.26 and recommends migrating to the **Barman Cloud Plugin (CNPG-I)** for long-term production compatibility.
+CloudNativePG deprecated in-tree `barmanObjectStore` starting 1.26. The current
+manifests use the **Barman Cloud Plugin (CNPG-I)** with `ObjectStore` CRs for
+long-term production compatibility.
 
 ## Backup tooling overview (market tools vs current stack)
 
 ### What we use today
 
-- **CNPG clusters** (`cnpg-db`, `cnpg-db-replica`): Barman Cloud via CNPG (`backup.barmanObjectStore`), storing base backups + WAL in RustFS bucket `pg-backups-cnpg` under prefixes `cnpg-db/` and `cnpg-db-replica/`.
+- **CNPG clusters** (`cnpg-db`, `cnpg-db-replica`): Barman Cloud Plugin via CNPG `ObjectStore` CRs, storing base backups + WAL in RustFS bucket `pg-backups-cnpg` under prefixes `cnpg-db/` and `cnpg-db-replica/`.
 - **Zalando clusters** (auth-db, supporting-shared-db): WAL-G via Spilo, storing base backups + WAL in RustFS bucket `pg-backups-zalando`.
 
 ### High-level comparison of common tools
@@ -390,5 +395,6 @@ Best practices:
 ## Related Documentation
 
 - [002-database-integration.md](./002-database-integration.md) - Database architecture and cluster details
+- [010-drp.md](./010-drp.md) - Production-ready DRP, recovery decision flow, and restore-drill evidence
 - [postgres_backup_restore.md](../runbooks/troubleshooting/postgres_backup_restore.md) - Runbook for backup/restore procedures
 - [RustFS README](../../kubernetes/infra/controllers/storage/rustfs/README.md) - RustFS deployment and access

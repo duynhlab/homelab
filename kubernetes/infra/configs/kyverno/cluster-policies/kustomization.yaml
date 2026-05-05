@@ -7,4 +7,5 @@ resources:
   - require-resources.yaml
   - require-probes.yaml
   - disallow-default-namespace.yaml
+  - cleanup-controller-rbac.yaml
   - cleanup-completed-pods.yaml

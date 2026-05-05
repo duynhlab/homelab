@@ -1,326 +1,288 @@
 # Microservices Observability Platform
 
-A GitOps-managed Kubernetes homelab cluster running on Kind Local (planned to server).
+A GitOps-managed Kubernetes homelab cluster running on Kind (planned to graduate to a server).
 
 ---
 
 ## Overview
 
-Production-ready microservices monitoring platform with 8 Go services, complete observability (metrics, traces, logs, profiles), PostgreSQL database integration, and SRE practices (SLO tracking, error budgets).
+Production-grade microservices platform built to practise day-2 SRE work end-to-end:
+8 Go services, full observability (metrics / traces / logs / profiles), HA PostgreSQL,
+SLOs with burn-rate alerts, and a single source of truth in Git delivered via Flux.
 
-**Key Features:**
+**Key features:**
 
-- 8 microservices behind Kong API gateway with **Variant A** edge naming: `https://gateway.duynh.me/{service}/v1/{audience}/…`
-- Single public API hostname — Kong is pass-through; services mount Variant A paths directly (no `/api/v1/*` anywhere)
-- 15 Grafana dashboards (microservices, databases, tracing, infrastructure)
-- Complete observability stack (VictoriaMetrics, Tempo, Jaeger, VictoriaLogs, Pyroscope)
-- PostgreSQL database integration (3 clusters + DR replica, Flyway migrations)
-- Valkey caching (Redis-compatible) with Cache-Aside pattern
-- SLO management via Sloth Operator
+- 8 microservices behind one Kong API gateway with **Variant A** edge naming —
+  single URL shape `/{service}/v1/{audience}/…`, browser and in-cluster callers use the
+  same path. Kong is pure pass-through (no rewrites).
+- Frontend on `https://local.duynh.me`, API gateway on `https://gateway.duynh.me`.
+  TLS terminated by Kong with a publicly-trusted Let's Encrypt wildcard cert.
+- Full observability: VictoriaMetrics, Tempo + Jaeger, VictoriaLogs + Vector, Pyroscope,
+  15 Grafana dashboards.
+- 3 PostgreSQL clusters (Zalando + CloudNativePG) + 1 DR replica, fronted by PgBouncer
+  and PgDog. Schema migrations via Flyway 11.
+- Valkey (Redis-compatible) cache with Cache-Aside pattern in the Logic layer.
+- SLOs managed declaratively by Sloth Operator.
+- GitOps with Flux Operator, ResourceSets, OCI artifacts, and Kustomize.
+- Secrets in OpenBAO (HA Raft), synced into the cluster by External Secrets Operator.
 
-**For detailed documentation, see [`docs/README.md`](docs/README.md)**
+> This repository contains **infrastructure, GitOps, observability, and docs**.
+> Application code lives in separate repositories — see [`SERVICES.md`](SERVICES.md).
+
+For deep documentation, start at [`docs/README.md`](docs/README.md).
 
 ---
 
 ## Architecture Overview
 
-### System Architecture
-
-Runtime architecture: Frontend (React SPA), 8 microservices (3-layer each), Valkey cache, 3 PostgreSQL clusters (+ DR replica), and full observability stack.
-
-> **Note**: This repository contains **infrastructure, GitOps, observability, and docs only**. Application code lives in separate repos (see [SERVICES.md](SERVICES.md)). Apps are deployed via Flux Operator ResourceSets (see [Application Delivery](docs/platform/application-delivery.md)).
-
 ```mermaid
 flowchart TD
-    %% Styling
     classDef frontend fill:#3b82f6,stroke:#1d4ed8,stroke-width:2px,color:#fff,rx:8px,ry:8px
-    classDef layer fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff,rx:5px,ry:5px
-    classDef cache fill:#f59e0b,stroke:#b45309,stroke-width:2px,color:#fff,rx:5px,ry:5px
-    classDef pooler fill:#8b5cf6,stroke:#5b21b6,stroke-width:2px,color:#fff,rx:5px,ry:5px
-    classDef database fill:#ef4444,stroke:#b91c1c,stroke-width:2px,color:#fff,shape:cylinder
-    classDef obs fill:#1e293b,stroke:#0f172a,stroke-width:2px,color:#fff,rx:5px,ry:5px
-    classDef obsGroup fill:#f1f5f9,stroke:#94a3b8,stroke-width:2px,stroke-dasharray: 5 5,rx:10px,ry:10px
-    classDef secret fill:#ec4899,stroke:#be185d,stroke-width:2px,color:#fff,rx:5px,ry:5px
-    classDef servicebox fill:#f8fafc,stroke:#cbd5e1,stroke-width:2px,stroke-dasharray: 5 5,rx:10px,ry:10px
+    classDef layer    fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff,rx:5px,ry:5px
+    classDef cache    fill:#f59e0b,stroke:#b45309,stroke-width:2px,color:#fff,rx:5px,ry:5px
+    classDef pooler   fill:#8b5cf6,stroke:#5b21b6,stroke-width:2px,color:#fff,rx:5px,ry:5px
+    classDef database fill:#ef4444,stroke:#b91c1c,stroke-width:2px,color:#fff
+    classDef obs      fill:#1e293b,stroke:#0f172a,stroke-width:2px,color:#fff,rx:5px,ry:5px
+    classDef obsGroup fill:#f1f5f9,stroke:#94a3b8,stroke-width:2px,stroke-dasharray:5 5,rx:10px,ry:10px
+    classDef secret   fill:#ec4899,stroke:#be185d,stroke-width:2px,color:#fff,rx:5px,ry:5px
+    classDef servicebox fill:#f8fafc,stroke:#cbd5e1,stroke-width:2px,stroke-dasharray:5 5,rx:10px,ry:10px
 
-    FE["🌐 Frontend"]:::frontend
+    FE["🌐 Frontend<br/>local.duynh.me"]:::frontend
+    Kong["Kong Ingress<br/>gateway.duynh.me<br/>(TLS, CORS, rate-limit)"]:::layer
 
-    %% API Layer / Microservices (3-Layer Architecture)
-    subgraph Microservices ["8 Independent Microservices (Polyrepo)"]
-        
-        WebLayer["Web Layer<br/>(HTTP, Validation, Aggregation)"]:::layer
-        LogicLayer["Logic Layer<br/>(Business Rules, Cache-Aside)"]:::layer
-        CoreLayer["Core Layer<br/>(Domain Models, DB Repositories)"]:::layer
-        
-        WebLayer -->|"Function Calls"| LogicLayer
-        LogicLayer -->|"Interface Calls"| CoreLayer
+    subgraph Microservices ["8 microservices · 3-layer architecture"]
+        WebLayer["Web<br/>(HTTP, validation, aggregation)"]:::layer
+        LogicLayer["Logic<br/>(business rules, Cache-Aside)"]:::layer
+        CoreLayer["Core<br/>(domain models, repositories)"]:::layer
+        WebLayer --> LogicLayer --> CoreLayer
     end
 
-    %% Observability Layer
-    subgraph Observability ["Observability Stack"]
+    subgraph Observability ["Observability stack"]
         direction LR
-        prom["VictoriaMetrics<br/>(Metrics)"]:::obs
-        tempo["Tempo / OTel<br/>(Tracing)"]:::obs
-        vlogs["VictoriaLogs / Vector<br/>(Logging)"]:::obs
-        pyro["Pyroscope<br/>(Profiles)"]:::obs
+        prom["VictoriaMetrics"]:::obs
+        tempo["Tempo + OTel"]:::obs
+        vlogs["VictoriaLogs + Vector"]:::obs
+        pyro["Pyroscope"]:::obs
         grafana["📊 Grafana"]:::obs
-        
         prom & tempo & vlogs & pyro --> grafana
     end
 
-    %% Core Services Layer
-    subgraph CoreInfra ["Core Infrastructure"]
+    subgraph CoreInfra ["Core infrastructure"]
         direction LR
-        valkey["⚡ Valkey Cache"]:::cache
-        subgraph SecretsDev ["Secrets Management"]
+        valkey["⚡ Valkey cache"]:::cache
+        subgraph SecretsDev ["Secrets"]
             openbao["OpenBAO (HA Raft)"]:::secret
             eso["External Secrets Operator"]:::secret
-            openbao -->|"Syncs via"| eso
+            openbao --> eso
         end
     end
 
-    %% Database Connection Layer
-    subgraph Poolers ["Connection Poolers"]
-        pb_auth["PgBouncer<br/>(Auth)"]:::pooler
-        pb_shared["PgBouncer<br/>(Shared)"]:::pooler
-        pdog["PgDog<br/>(Product, Cart, Order)"]:::pooler
+    subgraph Poolers ["Connection poolers"]
+        pb_auth["PgBouncer (auth)"]:::pooler
+        pb_shared["PgBouncer (shared)"]:::pooler
+        pdog["PgDog (product/cart/order)"]:::pooler
     end
 
-    %% Database Layer
-    subgraph Databases ["PostgreSQL Clusters (HA)"]
-        db_auth[("auth-db<br/>(Zalando)")]:::database
-        db_shared[("supporting-shared-db<br/>(Zalando)")]:::database
-        db_cnpg[("cnpg-db<br/>(CNPG)")]:::database
+    subgraph Databases ["PostgreSQL (HA)"]
+        db_auth[("auth-db<br/>Zalando")]:::database
+        db_shared[("supporting-shared-db<br/>Zalando")]:::database
+        db_cnpg[("cnpg-db<br/>CNPG (+ DR replica)")]:::database
     end
 
-    %% Connections
-    FE -->|"HTTPS gateway.duynh.me<br/>/{service}/v1/{audience}/..."| WebLayer
-    
-    WebLayer & LogicLayer & CoreLayer -.->|"O11y Data"| Observability
-    
-    LogicLayer -->|"Cache-Aside"| valkey
-    eso -.->|"Injects Secrets"| Databases
-    eso -.->|"Injects Secrets"| CoreLayer
-    
-    CoreLayer -->|"SQL (auth)"| pb_auth
-    CoreLayer -->|"SQL (user, notify, shipping, review)"| pb_shared
-    CoreLayer -->|"SQL (product, cart, order)"| pdog
-
+    FE -->|HTTPS| Kong --> WebLayer
+    WebLayer & LogicLayer & CoreLayer -.->|telemetry| Observability
+    LogicLayer -->|Cache-Aside| valkey
+    eso -.->|secrets| Databases
+    eso -.->|secrets| CoreLayer
+    CoreLayer -->|SQL auth| pb_auth
+    CoreLayer -->|SQL shared| pb_shared
+    CoreLayer -->|SQL cnpg| pdog
     pb_auth ==> db_auth
     pb_shared ==> db_shared
     pdog ==> db_cnpg
-    
-    %% Assign classes to subgraphs
-    class Microservices,SecretsDev servicebox;
-    class Observability obsGroup;
+
+    class Microservices,SecretsDev servicebox
+    class Observability obsGroup
 ```
 
-**Key Points:**
+**At a glance:**
 
-- **Frontend (React SPA)**: Served from `local.duynh.me`. All API calls go cross-origin to `https://gateway.duynh.me/{service}/v1/{audience}/…` (Variant A edge naming — see [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md)). Frontend repo: [`duynhlab/frontend`](https://github.com/duynhlab/frontend).
-- **Kong API gateway**: Single public API edge at `gateway.duynh.me`. Pure pass-through — services mount Variant A paths directly on their routers. Kong provides CORS (`https://local.duynh.me`), rate limiting, and request-size limits.
-- **8 Microservices**: Each follows 3-layer architecture (Web -> Logic -> Core), organized into 4 domains (identity, catalog, checkout, comms).
-- **Cache-Aside Pattern**: Logic Layer checks Valkey first, queries database on miss, writes to cache.
-- **3 PostgreSQL Clusters**: auth-db (Zalando), supporting-shared-db (Zalando, hosts user/notification/shipping/review), cnpg-db (CNPG, hosts product/cart/order). Connected via PgBouncer and PgDog poolers. A DR replica cluster (cnpg-db-replica) continuously recovers from cnpg-db WAL archive.
-- **Full Observability**: Traces (Tempo + Jaeger via OTel Collector), Metrics (VictoriaMetrics via VMAgent/VMSingle), Logs (VictoriaLogs + Vector), Profiles (Pyroscope), all visualized in Grafana.
-- **GitOps Delivery**: Flux Operator with domain ResourceSets + per-service InputProviders + OCI + Kustomize. See [Application Delivery](docs/platform/application-delivery.md) and [Setup](docs/platform/setup.md).
+- **Edge** — Kong terminates TLS with a Let's Encrypt wildcard cert (`*.duynh.me`),
+  enforces CORS, rate-limit, and request-size-limit. Force HTTP → HTTPS via Kong
+  annotations. Auth is **not** done at the gateway — every service validates JWTs
+  in its own middleware (defence-in-depth).
+- **Microservices** — 4 bounded-context domains: identity, catalog, checkout, comms.
+  Each service is its own repo, its own namespace, its own database role.
+- **Data** — 3 PostgreSQL clusters with operators (Zalando + CloudNativePG), behind
+  poolers, with Flyway migrations. cnpg-db has a continuously-recovering DR replica.
+- **Observability** — OpenTelemetry-first across metrics, traces, logs, and profiles.
+  All four pillars converge in Grafana via shared exemplars.
+- **Delivery** — Flux Operator pulls OCI artifacts from a registry. Domain ResourceSets
+  template per-service InputProviders so onboarding a service is one PR.
 
-### API paths
-
-Single URL shape across the platform — browser and in-cluster callers use the **same path**, just a different host. Kong is pure pass-through.
-
-| Method | Path | Audience | Browser? |
-|--------|------|----------|----------|
-| `POST` | `/auth/v1/public/login` | public | ✅ |
-| `GET` | `/product/v1/public/products/:id/details` | public | ✅ (aggregation) |
-| `GET` / `POST` / `DELETE` | `/cart/v1/private/cart` | private | ✅ |
-| `GET` | `/order/v1/private/orders/:id/details` | private | ✅ (aggregation) |
-| `POST` | `/notification/v1/internal/notify/email` | internal | ❌ in-cluster only |
-
-- Browser: `https://gateway.duynh.me/{service}/v1/{audience}/…`
-- Service-to-service: `http://{svc}.{ns}.svc.cluster.local:8080/{service}/v1/{audience}/…`
-- `internal` audience is **never** routed through Kong.
-
-Full per-endpoint mapping: [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
-
-**Detailed Architecture**: See [`docs/observability/README.md`](docs/observability/README.md) for middleware chain and APM integration.
+Detailed architecture: [`docs/observability/README.md`](docs/observability/README.md)
+and [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
 
 ---
 
 ## Technology Stack
-### Core Services
-- **Runtime**: Go 1.25
-    - 8 microservices
-    - 3 layer: Web → Logic → Core
 
-- **Database**: PostgreSQL (3 clusters + DR replica via Zalando/CloudNativePG operators)
-    - Connection poolers: PgBouncer, PgDog
-    - Migrations: Flyway 11.19.0 (8 migration images)
-- **HTTP Framework**: Gin
-- **Cache**: Valkey (Redis-compatible) with Cache-Aside pattern
+### Application
 
-**Complete API Documentation**: See [`docs/api/api.md`](docs/api/api.md)
+| Concern | Choice |
+|---|---|
+| Language / runtime | Go 1.25 |
+| HTTP framework | Gin |
+| API shape | Variant A — `/{service}/v1/{audience}/…` |
+| Architecture | Web → Logic → Core (per service) |
+| Cache | Valkey (Redis-compatible), Cache-Aside in Logic layer |
 
-### Infrastructure Stack
-- **Kubernetes**: Local Cluster (Kind), Helm 3
-- **GitOps**: Flux Operator, ResourceSet (Unified Templating), Kustomize, OCI Registry
-    - Application layer: 4 domain ResourceSets (identity, catalog, checkout, comms) + per-service InputProviders
-- **Dynamic Delivery**: OCIArtifactTag (Automated image updates)
-- **API Gateway**: Kong Ingress Controller at `gateway.duynh.me` with per-namespace `pre-function` rewrite plugins + global CORS / rate-limit / request-size-limit.
-- **Monitoring**: VictoriaMetrics (VMSingle, VMAgent, VMAlert), Grafana, Tempo, VictoriaLogs, Pyroscope, Jaeger, Vector.
+### Data
 
-**Observability Details**: See [`docs/observability/README.md`](docs/observability/README.md) for complete observability system overview.
+| Concern | Choice |
+|---|---|
+| RDBMS | PostgreSQL (Zalando operator + CloudNativePG) — 3 clusters + 1 DR replica |
+| Connection poolers | PgBouncer (auth, shared) · PgDog (product/cart/order) |
+| Migrations | Flyway 11.19.0 |
 
+### Platform
 
+| Concern | Choice |
+|---|---|
+| Kubernetes | Kind (local) — planned graduation to a server |
+| Packaging | Helm 3 + Kustomize |
+| GitOps | Flux Operator, ResourceSets, OCI artifacts |
+| API gateway / Ingress | Kong Ingress Controller |
+| TLS | cert-manager + Let's Encrypt (DNS-01 via Cloudflare) |
+| Secrets | OpenBAO (HA Raft, 3-node) + External Secrets Operator |
+| Admission policies | Kyverno (PSS baseline + restricted) |
 
-### GitOps Deployment
+### Observability
 
-```bash
-# Prerequisites check
-make prereqs
-
-# One-command deployment (cluster + Flux + apps)
-make up
-
-# Or step-by-step:
-make cluster-up   # 1. Create Kind cluster + OCI registry
-make flux-up      # 2. Bootstrap Flux Operator
-make flux-push    # 3. Deploy everything (infrastructure + apps)
-```
-
-**What gets deployed automatically:**
-
-- Infrastructure: Monitoring (VictoriaMetrics, Grafana), APM (Tempo, VictoriaLogs, Jaeger, Pyroscope, Vector, OTel)
-- Databases: PostgreSQL operators, 3 clusters + DR replica, connection poolers
-- Cache: Valkey (Redis-compatible) in cache-system namespace
-- Applications: 8 microservices + frontend (via domain ResourceSets)
-- SLO: Sloth Operator + Service Level Objectives
-
-**Wait 5-10 minutes** for Flux reconciliation, then access services.
-
-**Benefits:**
-
-- **Simplified Makefile**: 80 lines, delegates to scripts
-- **One-command deployment**: `make up` bootstraps everything
-- **Automatic drift detection**: Flux reconciles changes automatically
-- **Multi-environment support**: Local/production overlays
-- **OCI-based GitOps**: Single source of truth in OCI registry
-
-**Detailed Setup Guide**: See [`docs/platform/setup.md`](docs/platform/setup.md) for step-by-step instructions, architecture explanation, and troubleshooting.
-
----
-## Grafana Dashboards
-
-The platform includes **15 Grafana dashboards** covering observability, databases, and infrastructure monitoring. All dashboards are deployed via GitOps from `kubernetes/infra/configs/monitoring/grafana/dashboards/`.
-
-**Key Dashboards:**
-- **Microservices Monitoring**: Main observability dashboard covering metrics, traffic, errors, and runtime
-- **Tempo Distributed Tracing**: Trace visualization with exemplars and log correlation
-- **Kong Dashboard**: API gateway traffic, latency, and error rates
-- **Kubernetes Cluster Overview**: Cluster-wide resource utilization
-- **Database Dashboards**: PostgreSQL monitoring, CloudNativePG, PgBouncer, PgDog, query overview/drilldown, replication lag
-- **Infrastructure**: Vector metrics, Redis/Valkey monitoring
-
-**Access**: All dashboards are available via Grafana at https://grafana.duynh.me (see [Access Points](#access-points) below).
-
-**Documentation**: See [`docs/observability/grafana/dashboard-reference.md`](docs/observability/grafana/dashboard-reference.md) for complete dashboard reference and [`docs/observability/metrics/README.md`](docs/observability/metrics/README.md) for metrics guide.
+| Pillar | Stack |
+|---|---|
+| Metrics | VictoriaMetrics (VMSingle, VMAgent, VMAlert, VMAlertmanager) |
+| Tracing | OpenTelemetry Collector → Tempo + Jaeger |
+| Logs | Vector → VictoriaLogs |
+| Profiles | Pyroscope |
+| Dashboards | Grafana (15 curated dashboards) |
+| SLOs | Sloth Operator (PrometheusServiceLevel CRDs) |
 
 ---
 
 ## Access Points
 
-After deployment, access services via domain names using `/etc/hosts` mapping through Kong Ingress.
+All hostnames resolve to `127.0.0.1` and are routed by Kong. TLS is terminated at
+Kong with a wildcard `*.duynh.me` cert from Let's Encrypt — browsers trust it
+out of the box, no CA install needed.
 
-### Setup `/etc/hosts`
+### Set up `/etc/hosts`
 
-Add the following entries to your `/etc/hosts` file:
+Run the helper (idempotent, marker-managed block):
 
 ```bash
-# duynhlab homelab — Kong Ingress domains
+sudo scripts/setup-hosts.sh
+```
+
+Or add the entries manually:
+
+```
 127.0.0.1 local.duynh.me
 127.0.0.1 gateway.duynh.me
-127.0.0.1 grafana.duynh.me
-127.0.0.1 vmui.duynh.me
-127.0.0.1 vmalert.duynh.me
-127.0.0.1 karma.duynh.me
-127.0.0.1 jaeger.duynh.me
-127.0.0.1 tempo.duynh.me
-127.0.0.1 pyroscope.duynh.me
-127.0.0.1 logs.duynh.me
-127.0.0.1 slo.duynh.me
-127.0.0.1 ui.duynh.me
-127.0.0.1 source.duynh.me
-127.0.0.1 openbao.duynh.me
-127.0.0.1 pgui.duynh.me
-127.0.0.1 vm-mcp.duynh.me
-127.0.0.1 vl-mcp.duynh.me
+127.0.0.1 grafana.duynh.me   vmui.duynh.me     vmalert.duynh.me
+127.0.0.1 karma.duynh.me     jaeger.duynh.me   tempo.duynh.me
+127.0.0.1 pyroscope.duynh.me logs.duynh.me     slo.duynh.me
+127.0.0.1 ui.duynh.me        source.duynh.me   openbao.duynh.me
+127.0.0.1 pgui.duynh.me      vm-mcp.duynh.me   vl-mcp.duynh.me
 127.0.0.1 flux-mcp.duynh.me
 ```
 
-> **Note**: Requires Kind cluster with `extraPortMappings` (ports 80/443 → NodePort 30080/30443). This is configured automatically by `make cluster-up`.
+Kind binds host ports `80`/`443` to Kong's NodePort `30080`/`30443` — configured
+automatically by `make cluster-up`.
 
 ### Service URLs
 
-All services are routed through Kong Ingress Controller on port 80 (HTTP).
+| Category | URL | Purpose |
+|---|---|---|
+| Frontend | <https://local.duynh.me> | React SPA (calls the gateway cross-origin) |
+| API gateway | <https://gateway.duynh.me> | Single public API edge — see [api-naming-convention.md](docs/api/api-naming-convention.md) |
+| Grafana | <https://grafana.duynh.me> | Dashboards (anonymous viewer) |
+| VictoriaMetrics | <https://vmui.duynh.me/vmui> | Metrics query UI |
+| VMAlert | <https://vmalert.duynh.me> | Alert rule evaluation |
+| Karma | <https://karma.duynh.me> | Alertmanager dashboard |
+| Jaeger | <https://jaeger.duynh.me> | Distributed tracing UI |
+| Tempo | <https://tempo.duynh.me> | Trace backend API |
+| Pyroscope | <https://pyroscope.duynh.me> | Continuous profiling |
+| VictoriaLogs | <https://logs.duynh.me> | Log query UI |
+| Sloth UI | <https://slo.duynh.me> | SLO browser, SLI charts, burn-rate views |
+| Flux UI | <https://ui.duynh.me> | GitOps reconciliation status |
+| RustFS Console | <https://source.duynh.me> | S3 object storage console |
+| OpenBAO | <https://openbao.duynh.me> | Secrets management UI |
+| Postgres Operator UI | <https://pgui.duynh.me> | Cluster management |
+| VM / VL / Flux MCP | <https://vm-mcp.duynh.me/mcp> · <https://vl-mcp.duynh.me/mcp> · <https://flux-mcp.duynh.me/mcp> | MCP servers for AI assistants |
 
-| Service | Domain | Description |
-|---------|--------|-------------|
-| **API Gateway** | http://gateway.duynh.me | **Single public API entry.** Variant A paths `/{service}/v1/{public,private}/…`. Pass-through — services mount these paths directly. Rate-limited, CORS-controlled. See [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md). |
-| **Frontend** | https://local.duynh.me | React SPA (calls the API gateway cross-origin). |
-| **Grafana** | https://grafana.duynh.me | Dashboards (anonymous access) |
-| **VictoriaMetrics** | http://vmui.duynh.me/vmui | Metrics query UI |
-| **VMAlert** | http://vmalert.duynh.me | Alert rules & evaluation |
-| **Karma** | http://karma.duynh.me | Alertmanager dashboard |
-| **Jaeger** | http://jaeger.duynh.me | Distributed tracing UI |
-| **Tempo** | http://tempo.duynh.me | Trace backend API |
-| **Pyroscope** | http://pyroscope.duynh.me | Continuous profiling |
-| **VictoriaLogs** | http://logs.duynh.me | Log query UI |
-| **Sloth UI** | http://slo.duynh.me | SLO browser — service/SLO list, SLI charts, burn-rate views (Sloth v0.16.0+) |
-| **Flux UI** | http://ui.duynh.me | GitOps reconciliation status |
-| **RustFS Console** | http://source.duynh.me | S3 object storage console |
-| **OpenBAO** | http://openbao.duynh.me | Secrets management UI |
-| **Postgres Operator UI** | http://pgui.duynh.me | Database cluster management |
-| **VM MCP** | http://vm-mcp.duynh.me/mcp | VictoriaMetrics MCP (AI assistants) |
-| **VL MCP** | http://vl-mcp.duynh.me/mcp | VictoriaLogs MCP (AI assistants) |
-| **Flux MCP** | http://flux-mcp.duynh.me/mcp | Flux Operator MCP (AI assistants) |
+**Fallback (no `/etc/hosts`):** `make flux-ui` starts a port-forward bundle.
+Stop it with `pkill -f 'kubectl port-forward'`.
 
-### Fallback: Port Forwarding
-
-If `/etc/hosts` is not configured (e.g., CI environments), use `make flux-ui` for port-forwarding:
+### Deployment
 
 ```bash
-make flux-ui          # Start all port-forwards
-pkill -f 'kubectl port-forward'  # Stop all
+make prereqs        # check tools (kind, kubectl, flux, helm, …)
+make up             # cluster + Flux + everything (one-shot)
+
+# or step-by-step
+make cluster-up     # 1. Kind cluster + local OCI registry
+make flux-up        # 2. Bootstrap Flux Operator
+make flux-push      # 3. Push manifests; Flux reconciles in dependency order
 ```
+
+Wait 5–10 minutes for first reconciliation. Status:
+
+```bash
+make flux-status
+flux get kustomizations
+```
+
+Detailed walkthrough: [`docs/platform/setup.md`](docs/platform/setup.md).
 
 ---
 
 ## Documentation
 
-Complete documentation is available in the [`docs/`](docs/README.md) directory. Quick links:
+Full index in [`docs/README.md`](docs/README.md). Quick links:
 
-**Getting Started:**
-- **[Setup Guide](docs/platform/setup.md)** - Deployment instructions and troubleshooting
-- **[Application Delivery](docs/platform/application-delivery.md)** - ResourceSet patterns & templates
-- **[API Reference](docs/api/api.md)** - Complete API documentation
+**Getting started**
 
-**Observability:**
-- **[Observability Overview](docs/observability/README.md)** - Distributed tracing, metrics, logs, profiling
-- **[Metrics Guide](docs/observability/metrics/README.md)** - Custom metrics and VictoriaMetrics integration
-- **[Grafana Dashboards](docs/observability/grafana/dashboard-reference.md)** - Dashboard reference (15 dashboards)
-- **[SLO Documentation](docs/observability/slo/README.md)** - SLI/SLO definitions and error budgets
+- [Setup guide](docs/platform/setup.md) — deployment, prerequisites, troubleshooting
+- [Application delivery](docs/platform/application-delivery.md) — ResourceSet patterns, onboarding a service
+- [API reference](docs/api/api.md) — request/response shapes, error model
+- [API naming convention](docs/api/api-naming-convention.md) — Variant A URL shape, full route inventory
 
-**Infrastructure:**
-- **[Database Guide](docs/databases/002-database-integration.md)** - PostgreSQL architecture (3 clusters + DR replica, poolers, migrations)
-- **[k6 Load Testing](docs/testing/k6.md)** - Load testing setup and scenarios *(k6 workload retired; doc kept for reference)*
-- **[Runbooks](docs/runbooks/troubleshooting/)** - Operational troubleshooting guides
+**Observability**
 
-**Reference:**
-- **[Documentation Index](docs/README.md)** - Complete index with learning path
-- **[AGENTS.md](AGENTS.md)** - AI Agent Guide for codebase navigation
+- [Observability overview](docs/observability/README.md) — middleware chain, APM integration
+- [Metrics guide](docs/observability/metrics/README.md) — custom metrics, VictoriaMetrics
+- [Grafana dashboards](docs/observability/grafana/dashboard-reference.md) — 15 curated dashboards
+- [SLOs](docs/observability/slo/README.md) — SLIs, error budgets, burn-rate alerts
+
+**Platform**
+
+- [Kong gateway](docs/platform/kong-gateway.md) — routing, CORS, rate-limit, TLS
+- [cert-manager + Flux](docs/platform/cert-manager-flux.md) — issuer chain, DNS-01
+- [Trust distribution](docs/security/trust-distribution.md) — homelab CA bundle via trust-manager
+- [Kyverno policies](docs/security/policy-catalog.md) — admission rules, exception process
+
+**Data**
+
+- [Database integration](docs/databases/002-database-integration.md) — clusters, poolers, migrations
+- [Further reading](docs/databases/010-documents.md) — internals, replication, ops
+
+**Reference**
+
+- [SERVICES.md](SERVICES.md) — service repositories
+- [AGENTS.md](AGENTS.md) — AI agent guide
+- [CHANGELOG.md](CHANGELOG.md) — release notes
 
 ---
 
-**Built with ❤️ for learning observability**
-
-🚀 **Happy Monitoring!**
+**Built with ❤️ for learning observability.**

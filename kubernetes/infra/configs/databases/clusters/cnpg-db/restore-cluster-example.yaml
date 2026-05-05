@@ -33,19 +33,11 @@ spec:
         name: cnpg-db-secret
   externalClusters:
     - name: cnpg-db-backup
-      barmanObjectStore:
-        destinationPath: s3://pg-backups-cnpg/cnpg-db/
-        endpointURL: http://rustfs-svc.rustfs.svc.cluster.local:9000
-        serverName: cnpg-db-cluster
-        s3Credentials:
-          accessKeyId:
-            name: pg-backup-rustfs-credentials
-            key: ACCESS_KEY_ID
-          secretAccessKey:
-            name: pg-backup-rustfs-credentials
-            key: ACCESS_SECRET_KEY
-        wal:
-          maxParallel: 4
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: cnpg-db-backup-store
+          serverName: cnpg-db-cluster
   storage:
     size: 10Gi
     storageClass: standard

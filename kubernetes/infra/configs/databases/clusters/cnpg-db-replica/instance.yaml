@@ -10,6 +10,13 @@ spec:
   instances: 1
   imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
 
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: cnpg-db-replica-backup-store
+        serverName: cnpg-db-replica-cluster
+
   # Must match or exceed cnpg-db primary for recovery-critical GUCs.
   # PostgreSQL refuses recovery when replica values < primary pg_controldata.
   postgresql:
@@ -33,40 +40,11 @@ spec:
 
   externalClusters:
     - name: cnpg-db-primary
-      barmanObjectStore:
-        destinationPath: s3://pg-backups-cnpg/cnpg-db/
-        endpointURL: http://rustfs-svc.rustfs.svc.cluster.local:9000
-        serverName: cnpg-db-cluster
-        s3Credentials:
-          accessKeyId:
-            name: pg-backup-rustfs-credentials
-            key: ACCESS_KEY_ID
-          secretAccessKey:
-            name: pg-backup-rustfs-credentials
-            key: ACCESS_SECRET_KEY
-        wal:
-          maxParallel: 4
-
-  backup:
-    retentionPolicy: "7d"
-    barmanObjectStore:
-      destinationPath: s3://pg-backups-cnpg/cnpg-db-replica/
-      endpointURL: http://rustfs-svc.rustfs.svc.cluster.local:9000
-      serverName: cnpg-db-replica-cluster
-      wal:
-        compression: gzip
-        maxParallel: 2
-      data:
-        compression: gzip
-        jobs: 2
-        immediateCheckpoint: false
-      s3Credentials:
-        accessKeyId:
-          name: pg-backup-rustfs-credentials
-          key: ACCESS_KEY_ID
-        secretAccessKey:
-          name: pg-backup-rustfs-credentials
-          key: ACCESS_SECRET_KEY
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: cnpg-db-backup-store
+          serverName: cnpg-db-cluster
 
   storage:
     size: 10Gi

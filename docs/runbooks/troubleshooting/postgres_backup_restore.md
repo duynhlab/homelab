@@ -62,7 +62,9 @@ metadata:
 spec:
   cluster:
     name: cnpg-db
-  method: barmanObjectStore
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
 EOF
 ```
 
@@ -80,10 +82,11 @@ The example restores from:
 ```yaml
 externalClusters:
   - name: cnpg-db-backup
-    barmanObjectStore:
-      destinationPath: s3://pg-backups-cnpg/cnpg-db/
-      endpointURL: http://rustfs-svc.rustfs.svc.cluster.local:9000
-      serverName: cnpg-db-cluster
+    plugin:
+      name: barman-cloud.cloudnative-pg.io
+      parameters:
+        barmanObjectName: cnpg-db-backup-store
+        serverName: cnpg-db-cluster
 ```
 
 ### Point-in-time recovery

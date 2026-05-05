@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guide.
 - Add a refreshed CNPG DR replica bootstrap runbook that points to the
   canonical DRP and CNPG HA/DR deep dive.
+- Add Barman Cloud Plugin installation wiring and CNPG `ObjectStore` CRs for
+  `cnpg-db` and `cnpg-db-replica`.
 
 ### Changed
 
@@ -31,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rework the PostgreSQL backup/restore runbook around the current
   `cnpg-db`, `cnpg-db-replica`, `auth-db`, and `supporting-shared-db`
   topology.
+- Migrate CNPG backup, scheduled backup, restore, and DR replica configuration
+  from in-tree `barmanObjectStore` to Barman Cloud Plugin `method: plugin`
+  and `ObjectStore` references.
 
 ## [0.90.0] - 2026-05-04
 

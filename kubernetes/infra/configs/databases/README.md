@@ -43,8 +43,8 @@ This directory contains PostgreSQL database configurations organized by cluster.
 | -------------------- | ------------------------------------------------------------------------ | ------------------------ | ------------------- | -------------------------------------------------------- |
 | auth-db              | postgres_exporter v0.18.1 (sidecar, :9187) + PgBouncer exporter v0.11.0 | Vector v0.52.0 (sidecar) | WAL-G               | `s3://pg-backups-zalando/auth-db/`                       |
 | supporting-shared-db | pg_exporter (Pigsty) v1.2.0 (sidecar, :9630)                            | Vector v0.52.0 (sidecar) | WAL-G               | `s3://pg-backups-zalando/user-db/`                       |
-| cnpg-db              | CNPG built-in (PodMonitor) + PgDog OpenMetrics (:9090)                   | CNPG built-in (stdout)   | Barman Object Store | `s3://pg-backups-cnpg/cnpg-db/`, retention 30d           |
-| cnpg-db-replica      | CNPG built-in (PodMonitor)                                               | CNPG built-in (stdout)   | Barman Object Store | `s3://pg-backups-cnpg/cnpg-db-replica/`, retention 7d    |
+| cnpg-db              | CNPG built-in (PodMonitor) + PgDog OpenMetrics (:9090)                   | CNPG built-in (stdout)   | Barman Cloud Plugin + ObjectStore | `s3://pg-backups-cnpg/cnpg-db/`, retention 30d           |
+| cnpg-db-replica      | CNPG built-in (PodMonitor)                                               | CNPG built-in (stdout)   | Barman Cloud Plugin + ObjectStore | `s3://pg-backups-cnpg/cnpg-db-replica/`, retention 7d    |
 
 
 ## Extensions
@@ -61,6 +61,7 @@ This directory contains PostgreSQL database configurations organized by cluster.
 
 | Path | Flux Kustomization | Contents |
 |------|--------------------|----------|
+| `configs/cnpg-barman-plugin` | `cnpg-barman-plugin-local` | Barman Cloud Plugin deployment + `ObjectStore` CRD, applied before CNPG clusters |
 | `configs/databases` | `databases-local` | Zalando clusters, `cnpg-db` (+ PgDog, backups, `Backup` on-demand `cnpg-db-initial`) |
 | `configs/databases-cnpg-dr` | `databases-cnpg-dr-local` | `cnpg-db-replica` only; `dependsOn: databases-local` |
 

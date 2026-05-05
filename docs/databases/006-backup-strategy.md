@@ -137,8 +137,8 @@ RustFS (S3-compatible) is deployed in namespace `rustfs`. Backups are split into
 |--------|---------|---------|----------------|
 | `pg-backups-zalando` | auth-db | `s3://pg-backups-zalando/auth-db/` | WAL-G via Spilo |
 | `pg-backups-zalando` | supporting-shared-db | `s3://pg-backups-zalando/user-db/` | WAL-G via Spilo |
-| `pg-backups-cnpg` | cnpg-db | `s3://pg-backups-cnpg/cnpg-db/` | Barman Object Store |
-| `pg-backups-cnpg` | cnpg-db-replica | `s3://pg-backups-cnpg/cnpg-db-replica/` | Barman Object Store (DR cluster) |
+| `pg-backups-cnpg` | cnpg-db | `s3://pg-backups-cnpg/cnpg-db/` | Barman Cloud Plugin + `ObjectStore` |
+| `pg-backups-cnpg` | cnpg-db-replica | `s3://pg-backups-cnpg/cnpg-db-replica/` | Barman Cloud Plugin + `ObjectStore` (DR cluster) |
 
 ### S3 Endpoint
 
@@ -296,13 +296,15 @@ Key insight: more frequent base backups reduce risk of corrupted base backups, b
 
 ### CNPG direction (production note)
 
-CloudNativePG deprecated in-tree `barmanObjectStore` starting 1.26 and recommends migrating to the **Barman Cloud Plugin (CNPG-I)** for long-term production compatibility.
+CloudNativePG deprecated in-tree `barmanObjectStore` starting 1.26. The current
+manifests use the **Barman Cloud Plugin (CNPG-I)** with `ObjectStore` CRs for
+long-term production compatibility.
 
 ## Backup tooling overview (market tools vs current stack)
 
 ### What we use today
 
-- **CNPG clusters** (`cnpg-db`, `cnpg-db-replica`): Barman Cloud via CNPG (`backup.barmanObjectStore`), storing base backups + WAL in RustFS bucket `pg-backups-cnpg` under prefixes `cnpg-db/` and `cnpg-db-replica/`.
+- **CNPG clusters** (`cnpg-db`, `cnpg-db-replica`): Barman Cloud Plugin via CNPG `ObjectStore` CRs, storing base backups + WAL in RustFS bucket `pg-backups-cnpg` under prefixes `cnpg-db/` and `cnpg-db-replica/`.
 - **Zalando clusters** (auth-db, supporting-shared-db): WAL-G via Spilo, storing base backups + WAL in RustFS bucket `pg-backups-zalando`.
 
 ### High-level comparison of common tools

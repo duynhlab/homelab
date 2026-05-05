@@ -67,22 +67,6 @@ legitimately violate baseline are whitelisted via PolicyException with
 owner and TTL annotations.
 ```
 
-### Branching & Push Policy
-
-**NEVER push directly to `main`.** All changes go through a feature branch and PR.
-
-- Create a branch with conventional prefix before any work:
-  - `feat/<short-desc>` — new feature or capability
-  - `fix/<short-desc>` — bug fix
-  - `chore/<short-desc>` — tooling, deps, refactor with no behavior change
-  - `docs/<short-desc>` — documentation only
-  - `refactor/<short-desc>` — code restructure, no behavior change
-  - `ci/<short-desc>` — CI/CD pipeline changes
-- One logical change per branch. Keep branches short-lived.
-- Push the branch (`git push -u origin <branch>`), then open a PR against `main`.
-- Squash-merge via PR; never `git push origin main` from a local checkout.
-- Hotfix exception: only with explicit user approval (`"push thẳng main"`), otherwise always branch.
-
 ---
 
 ## Documentation Standards

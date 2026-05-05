@@ -9,6 +9,7 @@ metadata:
   labels:
     environment: local
     platform.duynhlab/backup: "walg"
+    platform.duynhlab.dev/needs-trust: "true"
   name: auth
 ---
 apiVersion: v1
@@ -52,6 +53,7 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+    platform.duynhlab.dev/needs-trust: "true"
   name: monitoring
 ---
 apiVersion: v1

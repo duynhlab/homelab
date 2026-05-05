@@ -290,7 +290,8 @@ docs/
 
 - [Setup Guide](./platform/setup.md) - Complete deployment and configuration guide
 - [Application Delivery](./platform/application-delivery.md) - ResourceSet patterns & templates
-- [cert-manager + Flux](./platform/cert-manager-flux.md) - TLS with Let's Encrypt, HelmRelease, Ingress
+- [cert-manager + Flux](./platform/cert-manager-flux.md) - TLS with Let's Encrypt, HelmRelease, Ingress, trust-manager
+- [Trust Distribution (trust-manager)](./security/trust-distribution.md) - CA bundle distribution to namespaces via trust-manager Bundle CRD
 - [CI/CD](./platform/cicd.md) - CI/CD pipelines and workflows
 - [Git Branching & Release](./platform/gitflow.md) - Hybrid Enterprise Gitflow standard (dev/staging/main + immutable tags)
 - [SonarCloud](./platform/sonarcloud.md) - SonarCloud integration

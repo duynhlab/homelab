@@ -69,7 +69,7 @@ owner and TTL annotations.
 
 ### Branching & Push Policy
 
-**NEVER push directly to `main`.** All changes go through a feature branch and PR.
+**NEVER push directly to `main`.** No exceptions. All changes go through a feature branch and PR.
 
 - Create a branch with conventional prefix before any work:
   - `feat/<short-desc>` — new feature or capability
@@ -80,8 +80,7 @@ owner and TTL annotations.
   - `ci/<short-desc>` — CI/CD pipeline changes
 - One logical change per branch. Keep branches short-lived.
 - Push the branch (`git push -u origin <branch>`), then open a PR against `main`.
-- Squash-merge via PR; never `git push origin main` from a local checkout.
-- Hotfix exception: only with explicit user approval (`"push thẳng main"`), otherwise always branch.
+- Squash-merge via PR. Never `git push origin main` from a local checkout, ever.
 
 ---
 

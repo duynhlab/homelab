@@ -1,0 +1,24 @@
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: cnpg-db-replica-backup-store
+  namespace: product
+spec:
+  retentionPolicy: "7d"
+  configuration:
+    destinationPath: s3://pg-backups-cnpg/cnpg-db-replica/
+    endpointURL: http://rustfs-svc.rustfs.svc.cluster.local:9000
+    s3Credentials:
+      accessKeyId:
+        name: pg-backup-rustfs-credentials
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: pg-backup-rustfs-credentials
+        key: ACCESS_SECRET_KEY
+    wal:
+      compression: gzip
+      maxParallel: 2
+    data:
+      compression: gzip
+      jobs: 2
+      immediateCheckpoint: false

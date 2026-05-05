@@ -267,7 +267,7 @@ graph TD
     %% ===== WAL ARCHIVING =====
     WALFiles -.->|"archive_command<br/>Archive completed segments"| Archive
     
-    Archive[Barman Object Store<br/>S3 Bucket<br/>Point-in-Time Recovery PITR<br/>Base backup + WAL archives]
+    Archive[Barman Cloud Plugin / ObjectStore<br/>S3 Bucket<br/>Point-in-Time Recovery PITR<br/>Base backup + WAL archives]
     
     %% ===== VACUUM PROCESS =====
     DataFiles -.->|"Dead tuples cleanup"| VacuumProc
@@ -588,7 +588,7 @@ graph TD
     WALSegments -.->|Completed segments| Archiver
     Archiver -.->|Copy via archive_command<br/>AWS CLI, rsync, cp| ArchiveStorage
     
-    ArchiveStorage[Barman Object Store<br/>S3 Bucket<br/>Base backup + WAL archives<br/>Point-in-Time Recovery PITR]
+    ArchiveStorage[Barman Cloud Plugin / ObjectStore<br/>S3 Bucket<br/>Base backup + WAL archives<br/>Point-in-Time Recovery PITR]
     
     %% ===== REPLICATION WORKFLOW =====
     WALSegments -->|Read new segments| WALSender1

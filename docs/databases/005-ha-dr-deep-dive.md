@@ -354,7 +354,7 @@ kubectl cnpg status cnpg-db
 ### Prerequisites (bootstrap)
 
 - **Object store backup** — DR `bootstrap.recovery` needs a **completed** physical backup of `cnpg-db` in RustFS (`s3://pg-backups-cnpg/cnpg-db/`). On first cluster bring-up, apply `cnpg-db` and wait for scheduled/on-demand backups before the DR replica can finish `full-recovery` (or expect transient job `Error` until a backup exists).
-- **GitOps** — Flux applies `configs/databases` first, then `configs/databases-cnpg-dr` (`databases-cnpg-dr-local` `dependsOn: databases-local`) so primary + `ScheduledBackup` / `Backup` resources exist before `cnpg-db-replica`.
+- **GitOps** — Flux applies `configs/cnpg-barman-plugin` before `configs/databases`, then `configs/databases-cnpg-dr` (`databases-cnpg-dr-local` `dependsOn: databases-local`) so the Barman Cloud Plugin, `ObjectStore` CRD, primary cluster, and `ScheduledBackup` / `Backup` resources exist before `cnpg-db-replica`.
 - **WAL GUC parity** — Data directory inherits primary `wal_segment_size` (e.g. 64MB). The DR cluster `spec.postgresql.parameters` must include `min_wal_size` (and related WAL settings) consistent with PostgreSQL rules: `min_wal_size >= 2 * wal_segment_size` (see [`cnpg-db-replica/instance.yaml`](../../kubernetes/infra/configs/databases/clusters/cnpg-db-replica/instance.yaml)).
 
 ### Architecture
@@ -368,8 +368,11 @@ spec:
     source: cnpg-db-primary  # references externalClusters entry
   externalClusters:
     - name: cnpg-db-primary
-      barmanObjectStore:
-        destinationPath: s3://pg-backups-cnpg/cnpg-db/
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: cnpg-db-backup-store
+          serverName: cnpg-db-cluster
 ```
 
 ### Promotion Procedure

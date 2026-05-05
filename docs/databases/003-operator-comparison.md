@@ -16,7 +16,7 @@ internals and feature details:
 | HA model | CNPG operator + instance manager | Patroni inside Spilo pods |
 | Pod model | Custom pod controller, no StatefulSets | StatefulSet-managed Spilo pods |
 | Coordination | Kubernetes API | Patroni DCS via Kubernetes Endpoints/ConfigMaps |
-| Backup model | Barman Cloud; current manifests use in-tree `barmanObjectStore`, production-forward path is Barman Cloud Plugin + `ObjectStore` | WAL-G built into Spilo |
+| Backup model | Barman Cloud Plugin + `ObjectStore` CRs; `Backup` / `ScheduledBackup` use `method: plugin` | WAL-G built into Spilo |
 | Best fit | Kubernetes-native, security-sensitive, DR-heavy deployments | Patroni-oriented teams, quick setup, auto secrets, in-place major upgrades |
 
 The short version:

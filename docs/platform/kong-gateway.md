@@ -447,7 +447,7 @@ Per-ingress `path:` entries are scoped to `public` and `private` audiences only 
 
 | Host | Path | Backend | Namespace | Rate limited |
 |------|------|---------|-----------|--------------|
-| `duynhne.me` | `/` | `frontend:80` | default | No |
+| `duynhne.me` | `/` | `frontend:80` | frontend | No |
 | `gateway.duynhne.me` | `/auth/v1/public/`, `/auth/v1/private/` | `auth:8080` | auth | Yes |
 | `gateway.duynhne.me` | `/user/v1/public/`, `/user/v1/private/` | `user:8080` | user | Yes |
 | `gateway.duynhne.me` | `/product/v1/public/` | `product:8080` | product | Yes |
@@ -547,7 +547,7 @@ kubectl get ingress -A
 
 | Namespace | Name | Host | Edge path |
 |-----------|------|------|-----------|
-| default | frontend | `duynhne.me` | `/` |
+| frontend | frontend | `duynhne.me` | `/` |
 | auth | api-auth | `gateway.duynhne.me` | `/auth/v1/` |
 | user | api-user | `gateway.duynhne.me` | `/user/v1/` |
 | product | api-product | `gateway.duynhne.me` | `/product/v1/` |

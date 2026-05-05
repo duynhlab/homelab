@@ -71,7 +71,7 @@ kubectl port-forward -n kong svc/kong-kong-proxy 8000:80 8443:443 > /dev/null 2>
 
 # Frontend (direct access, bypassing Kong)
 echo "Starting Frontend port forward (3001)..."
-kubectl port-forward -n default svc/frontend 3001:80 > /dev/null 2>&1 &
+kubectl port-forward -n frontend svc/frontend 3001:80 > /dev/null 2>&1 &
 
 # Wait for port forwards to be ready
 echo "Waiting for port forwards to be ready..."

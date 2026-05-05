@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.91.0] - 2026-05-05
+
+### Added
+
+- trust-manager v0.20.0 HelmRelease for distributing the homelab CA bundle
+  to opted-in namespaces (`kubernetes/infra/controllers/cert-manager/trust-manager-helmrelease.yaml`).
+- Static homelab CA root committed at
+  `kubernetes/infra/configs/cert-manager/ca-source/homelab-ca.crt` and exposed
+  as `ConfigMap/homelab-ca-source` via kustomize configMapGenerator.
+- Cluster-scoped `Bundle/homelab-ca-bundle` distributing `ca-bundle.pem`
+  (Mozilla defaults + homelab CA) to namespaces labeled
+  `platform.duynhlab.dev/needs-trust=true`. Namespaces `auth` and `monitoring`
+  opted in.
+- New deep-dive doc `docs/security/trust-distribution.md` covering
+  architecture, opt-in, mount example, rotation runbook, and troubleshooting.
+- `docs/platform/cert-manager-flux.md` updated with trust-manager section
+  and bundle flow diagram.
+
+### Fixed
+
+- Kyverno `disallow-default-namespace` autogen rule was blocking Deployments
+  in non-default namespaces because Pod template `metadata.namespace` is
+  empty. Added `pod-policies.kyverno.io/autogen-controllers: none` annotation
+  so the rule only validates `Pod` resources directly. Unblocks
+  `pgdog-cnpg` HelmRelease.
+
 ## [0.90.1] - 2026-05-05
 
 ### Added

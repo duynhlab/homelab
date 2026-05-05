@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- OpenBAO bootstrap was passing `token_reviewer_jwt=$(SA token)` when configuring
+  the Kubernetes auth method. That projected SA token has a 1h TTL, OpenBAO
+  cannot refresh it, and after expiry **every** ESO login returned `403
+  permission denied`. Removed the explicit `token_reviewer_jwt` so OpenBAO uses
+  its own (kubelet-rotated) pod SA token for `TokenReview` calls. Unblocks
+  `ClusterSecretStore/openbao` and all `ExternalSecret` reconciliations.
 - Kyverno `disallow-default-namespace` autogen rule was blocking Deployments
   in non-default namespaces because Pod template `metadata.namespace` is
   empty. Added `pod-policies.kyverno.io/autogen-controllers: none` annotation

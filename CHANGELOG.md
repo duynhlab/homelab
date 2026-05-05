@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.92.0] - 2026-05-06
+
+### Added
+
+- Let's Encrypt DNS-01 ClusterIssuers (`letsencrypt-prod`, `letsencrypt-staging`)
+  using Cloudflare DNS provider for the `duynh.me` zone
+  (`kubernetes/infra/configs/cert-manager/clusterissuers.yaml`).
+- `ExternalSecret/cloudflare-api-token` in `cert-manager` namespace, synced
+  from OpenBAO at `secret/data/local/infra/cloudflare/api-token`.
+- `scripts/setup-hosts.sh` helper to install `*.duynh.me` entries into
+  `/etc/hosts` (idempotent, marker-managed block).
+
+### Changed
+
+- Domain rename: all platform hostnames migrated from `*.duynhne.me` to
+  `*.duynh.me` (the actually-registered Cloudflare zone). Frontend host
+  changed from `duynhne.me` to `local.duynh.me` (subdomain to keep the apex
+  free for a future public landing page).
+- `kong-proxy-tls` Certificate now issued by `letsencrypt-prod` (was
+  `homelab-ca`). Wildcard `*.duynh.me` (+ apex `duynh.me` + explicit
+  `local.duynh.me`) — Kong terminates TLS at the edge with a publicly-trusted
+  cert; no per-Ingress `tls:` block needed.
+- All 25 Ingress resources updated to the new hosts and force HTTPS via
+  `konghq.com/protocols: "https"` + `konghq.com/https-redirect-status-code: "301"`.
+  HTTP requests return `301` to the same path on HTTPS.
+- Kong global CORS plugin origins updated to `https://local.duynh.me` +
+  `https://duynh.me` (was `*.duynhne.me`).
+- `cert-manager-local` Kustomization now `dependsOn: [secrets-local]` so the
+  `cloudflare-api-token` Secret exists before the ClusterIssuer is created.
+
+## [0.91.0] - 2026-05-05
+
+### Added
+
+- trust-manager v0.20.0 HelmRelease for distributing the homelab CA bundle
+  to opted-in namespaces (`kubernetes/infra/controllers/cert-manager/trust-manager-helmrelease.yaml`).
+- Static homelab CA root committed at
+  `kubernetes/infra/configs/cert-manager/ca-source/homelab-ca.crt` and exposed
+  as `ConfigMap/homelab-ca-source` via kustomize configMapGenerator.
+- Cluster-scoped `Bundle/homelab-ca-bundle` distributing `ca-bundle.pem`
+  (Mozilla defaults + homelab CA) to namespaces labeled
+  `platform.duynhlab.dev/needs-trust=true`. Namespaces `auth` and `monitoring`
+  opted in.
+- New deep-dive doc `docs/security/trust-distribution.md` covering
+  architecture, opt-in, mount example, rotation runbook, and troubleshooting.
+- `docs/platform/cert-manager-flux.md` updated with trust-manager section
+  and bundle flow diagram.
+
+### Fixed
+
+- Frontend was deployed in the `default` namespace with image tag `:latest`,
+  violating Kyverno `disallow-default-namespace` (Enforce) and `disallow-latest-tag`
+  policies. ReplicaSet could not create Pods (`admission webhook denied`),
+  blocking the HelmRelease. Created namespace `frontend`, moved the
+  `rs-frontend` ResourceSet, HelmRelease, and Kong Ingress into it, and pinned
+  the image tag to `sha-5d75f8b` (= digest of the previous `:latest`).
+- OpenBAO bootstrap was passing `token_reviewer_jwt=$(SA token)` when configuring
+  the Kubernetes auth method. That projected SA token has a 1h TTL, OpenBAO
+  cannot refresh it, and after expiry **every** ESO login returned `403
+  permission denied`. Removed the explicit `token_reviewer_jwt` so OpenBAO uses
+  its own (kubelet-rotated) pod SA token for `TokenReview` calls. Unblocks
+  `ClusterSecretStore/openbao` and all `ExternalSecret` reconciliations.
+- Kyverno `disallow-default-namespace` autogen rule was blocking Deployments
+  in non-default namespaces because Pod template `metadata.namespace` is
+  empty. Added `pod-policies.kyverno.io/autogen-controllers: none` annotation
+  so the rule only validates `Pod` resources directly. Unblocks
+  `pgdog-cnpg` HelmRelease.
+
 ## [0.90.1] - 2026-05-05
 
 ### Added

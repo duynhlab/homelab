@@ -238,7 +238,7 @@ Full layering and pipeline diagrams: [`alerting/README.md`](../alerting/README.m
 | Understand the full architecture (CRDs, Sloth, VMAlert) | [`README.md`](./README.md) |
 | Understand the burn-rate alert maths and on-call flow | [`../alerting/slo-burn-rate-alerts.md`](../alerting/slo-burn-rate-alerts.md) |
 | Decide whether to deploy when budget is low | [`error_budget_policy.md`](./error_budget_policy.md) |
-| See the SLOs / SLIs in a UI | [http://slo.duynhne.me](http://slo.duynhne.me) (Sloth UI) or Grafana SLO dashboards |
+| See the SLOs / SLIs in a UI | [http://slo.duynh.me](http://slo.duynh.me) (Sloth UI) or Grafana SLO dashboards |
 
 ## External references
 

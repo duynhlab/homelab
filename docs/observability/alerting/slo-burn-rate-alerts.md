@@ -137,11 +137,11 @@ The platform exposes alerts at every layer of the pipeline. Use whichever fits t
 
 | Tool | URL | Best for |
 |---|---|---|
-| **Karma** | [karma.duynhne.me](http://karma.duynhne.me) | The on-call view — groups, silences, history, multi-AM aggregation |
-| **VMAlert UI** | [vmalert.duynhne.me](http://vmalert.duynhne.me) | Inspect rule definitions, evaluation timing, last error |
-| **Sloth UI** | [slo.duynhne.me](http://slo.duynhne.me) | SLO-centric view — which SLOs are over budget, SLI chart, burn chart |
-| **Grafana** | [grafana.duynhne.me](http://grafana.duynhne.me) | Dashboards: "Sloth SLO Overview" (14643), "Sloth SLO Detailed" (14348) |
-| **VMSingle (vmui)** | [vmui.duynhne.me/vmui](http://vmui.duynhne.me/vmui) | Ad-hoc PromQL on `slo:*` recording rules |
+| **Karma** | [karma.duynh.me](http://karma.duynh.me) | The on-call view — groups, silences, history, multi-AM aggregation |
+| **VMAlert UI** | [vmalert.duynh.me](http://vmalert.duynh.me) | Inspect rule definitions, evaluation timing, last error |
+| **Sloth UI** | [slo.duynh.me](http://slo.duynh.me) | SLO-centric view — which SLOs are over budget, SLI chart, burn chart |
+| **Grafana** | [grafana.duynh.me](http://grafana.duynh.me) | Dashboards: "Sloth SLO Overview" (14643), "Sloth SLO Detailed" (14348) |
+| **VMSingle (vmui)** | [vmui.duynh.me/vmui](http://vmui.duynh.me/vmui) | Ad-hoc PromQL on `slo:*` recording rules |
 
 For routing semantics (group_by, receivers, silences) see [`README.md`](./README.md) (the alerting overview) — VMAlertmanager today routes to a single `default` receiver; Slack/PagerDuty integration is planned.
 
@@ -159,7 +159,7 @@ When a Sloth-generated alert fires, work the problem in this order:
    - One service, one SLO → a code/dependency issue specific to that path.
    - All services, availability SLO → infra-wide (gateway, network, DB, control plane).
 3. **Correlate with deploys / config changes**:
-   - Flux UI ([ui.duynhne.me](http://ui.duynhne.me)) — recent reconciliations.
+   - Flux UI ([ui.duynh.me](http://ui.duynh.me)) — recent reconciliations.
    - Service repo Git log around the burn start time.
 4. **Drill into Layer-1 alerts** for the same service in Karma — `MicroserviceHighErrorRate`, `MicroserviceHighP95Latency` etc. usually point at the proximate cause faster than the SLO alert.
 5. **Mitigate**, then **silence** the SLO alert in Karma with a clear comment + expiry. Don't leave silences open-ended.
@@ -198,7 +198,7 @@ kubectl get vmrule -n monitoring -l app.kubernetes.io/managed-by=sloth
 
 ### Confirm VMAlert picked it up
 
-Open [vmalert.duynhne.me](http://vmalert.duynhne.me) and search for the alert name (`<svc>HighErrorRate` etc.) — you should see the rule, the last evaluation timestamp, and the current value.
+Open [vmalert.duynh.me](http://vmalert.duynh.me) and search for the alert name (`<svc>HighErrorRate` etc.) — you should see the rule, the last evaluation timestamp, and the current value.
 
 ### Force the alert to fire (synthetic load)
 
@@ -218,7 +218,7 @@ curl -X POST http://localhost:9093/api/v2/alerts -H 'Content-Type: application/j
 }]'
 
 # Verify in Karma
-open http://karma.duynhne.me
+open http://karma.duynh.me
 ```
 
 ---

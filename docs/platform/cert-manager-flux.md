@@ -8,7 +8,9 @@ This guide provides **Helm values**, **Flux CD v2** manifests (`HelmRepository`,
 |--------|------|
 | Jetstack `HelmRepository` | [`kubernetes/clusters/local/sources/helm/jetstack.yaml`](../../kubernetes/clusters/local/sources/helm/jetstack.yaml) |
 | cert-manager `HelmRelease` | [`kubernetes/infra/controllers/cert-manager/helmrelease.yaml`](../../kubernetes/infra/controllers/cert-manager/helmrelease.yaml) |
+| trust-manager `HelmRelease` | [`kubernetes/infra/controllers/cert-manager/trust-manager-helmrelease.yaml`](../../kubernetes/infra/controllers/cert-manager/trust-manager-helmrelease.yaml) |
 | ClusterIssuers + Certificates | [`kubernetes/infra/configs/cert-manager/`](../../kubernetes/infra/configs/cert-manager/) |
+| CA bundle distribution (trust-manager) | [`docs/security/trust-distribution.md`](../security/trust-distribution.md) |
 | Flux `Kustomization` (configs) | [`kubernetes/clusters/local/cert-manager-config.yaml`](../../kubernetes/clusters/local/cert-manager-config.yaml) |
 | Ingress example (optional; not in default kustomize) | [`kubernetes/infra/configs/cert-manager/ingress-example.yaml`](../../kubernetes/infra/configs/cert-manager/ingress-example.yaml) |
 
@@ -23,12 +25,16 @@ This guide provides **Helm values**, **Flux CD v2** manifests (`HelmRepository`,
 ```mermaid
 flowchart LR
   subgraph flux [Flux]
-    HR[HelmRelease cert-manager]
+    HR[HelmRelease cert-manager + trust-manager]
     K[configs/cert-manager Kustomization]
   end
-  subgraph cm [cert-manager]
-    CI[ClusterIssuer LE staging/prod]
+  subgraph cm [cert-manager + trust-manager]
+    CI[ClusterIssuer LE / homelab-ca]
     C[Certificate per namespace]
+    CA[CA Certificate<br/>homelab-ca]
+    CACOPY[ConfigMap<br/>homelab-ca-source<br/>committed PEM]
+    TM[Bundle homelab-ca-bundle]
+    OUT[ConfigMap homelab-ca-bundle<br/>across labeled namespaces]
   end
   subgraph edge [Edge]
     IG[Ingress + HTTP-01 solver]
@@ -36,6 +42,10 @@ flowchart LR
   HR --> cm
   K --> CI
   CI --> C
+  CI --> CA
+  CA -. one-time export .-> CACOPY
+  CACOPY --> TM
+  TM --> OUT
   C --> IG
   LE[Let's Encrypt] <--> IG
 ```
@@ -176,7 +186,7 @@ metadata:
   name: letsencrypt-staging
 spec:
   acme:
-    email: acme@duynhne.me
+    email: acme@duynh.me
     server: https://acme-staging-v02.api.letsencrypt.org/directory
     privateKeySecretRef:
       name: letsencrypt-staging-account-key
@@ -191,7 +201,7 @@ metadata:
   name: letsencrypt-prod
 spec:
   acme:
-    email: acme@duynhne.me
+    email: acme@duynh.me
     server: https://acme-v02.api.letsencrypt.org/directory
     privateKeySecretRef:
       name: letsencrypt-prod-account-key
@@ -207,18 +217,18 @@ spec:
 
 ## 6. Certificate resources — eight microservices (template)
 
-One **Certificate** per hostname (per namespace). DNS names below follow `gateway.duynhne.me` style from [api-naming-convention.md](../api/api-naming-convention.md); **replace** `duynhne.me` with your domain.
+One **Certificate** per hostname (per namespace). DNS names below follow `gateway.duynh.me` style from [api-naming-convention.md](../api/api-naming-convention.md); **replace** `local.duynh.me` with your domain.
 
 | Service      | Namespace      | Example DNS name              |
 |-------------|----------------|-------------------------------|
-| auth        | auth           | auth.duynhne.me              |
-| user        | user           | user.duynhne.me              |
-| product     | product        | product.duynhne.me           |
-| cart        | cart           | cart.duynhne.me              |
-| order       | order          | order.duynhne.me             |
-| review      | review         | review.duynhne.me            |
-| notification| notification   | notification.duynhne.me      |
-| shipping    | shipping       | shipping.duynhne.me          |
+| auth        | auth           | auth.duynh.me              |
+| user        | user           | user.duynh.me              |
+| product     | product        | product.duynh.me           |
+| cart        | cart           | cart.duynh.me              |
+| order       | order          | order.duynh.me             |
+| review      | review         | review.duynh.me            |
+| notification| notification   | notification.duynh.me      |
+| shipping    | shipping       | shipping.duynh.me          |
 
 **File:** `kubernetes/infra/configs/cert-manager/certificates-microservices.yaml`
 
@@ -235,7 +245,7 @@ spec:
     kind: ClusterIssuer
     name: letsencrypt-staging
   dnsNames:
-    - auth.duynhne.me
+    - auth.duynh.me
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -248,7 +258,7 @@ spec:
     kind: ClusterIssuer
     name: letsencrypt-staging
   dnsNames:
-    - user.duynhne.me
+    - user.duynh.me
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -261,7 +271,7 @@ spec:
     kind: ClusterIssuer
     name: letsencrypt-staging
   dnsNames:
-    - product.duynhne.me
+    - product.duynh.me
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -274,7 +284,7 @@ spec:
     kind: ClusterIssuer
     name: letsencrypt-staging
   dnsNames:
-    - cart.duynhne.me
+    - cart.duynh.me
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -287,7 +297,7 @@ spec:
     kind: ClusterIssuer
     name: letsencrypt-staging
   dnsNames:
-    - order.duynhne.me
+    - order.duynh.me
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -300,7 +310,7 @@ spec:
     kind: ClusterIssuer
     name: letsencrypt-staging
   dnsNames:
-    - review.duynhne.me
+    - review.duynh.me
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -313,7 +323,7 @@ spec:
     kind: ClusterIssuer
     name: letsencrypt-staging
   dnsNames:
-    - notification.duynhne.me
+    - notification.duynh.me
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -326,7 +336,7 @@ spec:
     kind: ClusterIssuer
     name: letsencrypt-staging
   dnsNames:
-    - shipping.duynhne.me
+    - shipping.duynh.me
 ```
 
 Switch `letsencrypt-staging` → `letsencrypt-prod` when DNS + HTTP-01 are verified.
@@ -356,10 +366,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - auth.duynhne.me
+        - auth.duynh.me
       secretName: auth-tls
   rules:
-    - host: auth.duynhne.me
+    - host: auth.duynh.me
       http:
         paths:
           - path: /
@@ -378,7 +388,7 @@ Use the `Certificate` manifests from section 6; Ingress references `secretName` 
 ```yaml
 spec:
   tls:
-    - hosts: [auth.duynhne.me]
+    - hosts: [auth.duynh.me]
       secretName: auth-tls
 ```
 
@@ -426,7 +436,7 @@ Add `cert-manager-config.yaml` to `kubernetes/clusters/local/kustomization.yaml`
 ## 9. Deployment (step-by-step)
 
 1. **Ingress controller** — HTTP-01 needs a working Ingress with a **public** IP/DNS. On Kind, use [ingress-nginx](https://kubernetes.github.io/ingress-nginx/deploy/) or match your platform. **Local Kind without public DNS:** certificates stay **Pending**; use **staging** issuer or **mkcert**/self-signed for dev.
-2. **DNS** — Create **A/AAAA** (or CNAME) for each `*.duynhne.me` host → load balancer IP.
+2. **DNS** — Create **A/AAAA** (or CNAME) for each `*.duynh.me` host → load balancer IP.
 3. **Commit** HelmRepository, namespaces, `controllers/cert-manager`, `configs/cert-manager`, Flux `cert-manager-local`, and `kustomization.yaml` updates.
 4. **Push** to the branch Flux watches; **reconcile** (or wait for interval).
 5. **Verify** cert-manager pods: `kubectl -n cert-manager get pods`.
@@ -469,6 +479,60 @@ flux reconcile kustomization cert-manager-local --with-source
 
 ---
 
+## 11. trust-manager — distributing the homelab CA bundle
+
+cert-manager creates `homelab-ca-secret` in the `cert-manager` namespace only.
+Workloads in **other** namespaces that need to validate TLS connections signed
+by the homelab CA (k6 → gateway, future Vector → HTTPS sinks, in-cluster HTTPS
+clients) need that CA in their own namespace. trust-manager solves this with
+a single cluster-scoped `Bundle` CRD.
+
+**Full deep-dive:** [`docs/security/trust-distribution.md`](../security/trust-distribution.md)
+
+**Quick reference**
+
+```yaml
+# Bundle: combines Mozilla CAs + homelab CA, syncs to labeled namespaces.
+apiVersion: trust.cert-manager.io/v1alpha1
+kind: Bundle
+metadata:
+  name: homelab-ca-bundle
+spec:
+  sources:
+    - useDefaultCAs: true
+    - configMap:
+        name: homelab-ca-source
+        key: ca.crt
+  target:
+    configMap:
+      key: ca-bundle.pem
+    namespaceSelector:
+      matchLabels:
+        platform.duynhlab.dev/needs-trust: "true"
+```
+
+**Opt a namespace in:**
+
+```yaml
+metadata:
+  name: my-namespace
+  labels:
+    platform.duynhlab.dev/needs-trust: "true"
+```
+
+trust-manager creates `ConfigMap/homelab-ca-bundle` in that namespace within
+~10s. Mount as `/etc/ssl/certs/ca-bundle.pem` and set `SSL_CERT_FILE` for Go
+clients.
+
+**Why not point Bundle directly at `homelab-ca-secret`?** Rotation safety. We
+commit the CA cert as a static file under
+`kubernetes/infra/configs/cert-manager/ca-source/homelab-ca.crt` and let the
+Bundle read from a kustomize-generated ConfigMap. CA rollover then happens
+through PRs that bundle old + new CA simultaneously, never an atomic swap.
+Full runbook in `docs/security/trust-distribution.md` § 5.
+
+---
+
 ## DNS-01 / wildcard (optional)
 
 1. Create a **ClusterIssuer** (or Issuer) with a **DNS01** solver for your provider ([cert-manager DNS providers](https://cert-manager.io/docs/configuration/acme/dns01/)).
@@ -483,11 +547,11 @@ spec:
             project: my-gcp-project
         selector:
           dnsNames:
-            - "*.duynhne.me"
-            - "duynhne.me"
+            - "*.duynh.me"
+            - "local.duynh.me"
 ```
 
-3. Use **one** `Certificate` with `dnsNames: ["*.duynhne.me","duynhne.me"]` and a single TLS secret referenced by multiple Ingresses (same namespace limitations apply — wildcards are often **one namespace** or shared cert; plan accordingly).
+3. Use **one** `Certificate` with `dnsNames: ["*.duynh.me","local.duynh.me"]` and a single TLS secret referenced by multiple Ingresses (same namespace limitations apply — wildcards are often **one namespace** or shared cert; plan accordingly).
 
 ---
 

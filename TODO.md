@@ -243,7 +243,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 - **Runbooks/troubleshooting docs** — `docs/runbooks/troubleshooting/`
 - Chaos engineering with Litmus or Chaos Mesh
 - [~] **Disaster recovery**:
-  - Database backup to S3 (barmanObjectStore, WAL-G)
+  - Database backup to S3 (Barman Cloud Plugin/ObjectStore, WAL-G)
   - PITR drill (point-in-time recovery end-to-end)
   - Kubernetes resource backup with Velero
   - DR runbooks codified and periodically tested

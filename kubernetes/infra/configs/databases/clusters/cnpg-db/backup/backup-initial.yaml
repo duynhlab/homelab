@@ -14,4 +14,6 @@ metadata:
 spec:
   cluster:
     name: cnpg-db
-  method: barmanObjectStore
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io

@@ -4,4 +4,5 @@ kind: Kustomization
 # cnpg-db-replica (DR cluster)
 # Continuously recovers from cnpg-db WAL archive via object store
 resources:
+  - objectstore.yaml
   - instance.yaml

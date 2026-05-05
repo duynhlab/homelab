@@ -2,6 +2,10 @@
 
 How multiple PostgreSQL instances work together for High Availability and Disaster Recovery using CloudNativePG.
 
+This page is the CNPG technical deep dive. For the production-ready DRP,
+recovery decision flow, RTO/RPO ownership, and drill evidence checklist, see
+[010-drp.md](./010-drp.md).
+
 > **Prerequisites**: Read [001-postgresql-internals.md](./001-postgresql-internals.md) first for single-instance PostgreSQL mechanics (processes, memory, WAL, MVCC). This document builds on those fundamentals.
 
 ---
@@ -350,7 +354,7 @@ kubectl cnpg status cnpg-db
 ### Prerequisites (bootstrap)
 
 - **Object store backup** — DR `bootstrap.recovery` needs a **completed** physical backup of `cnpg-db` in RustFS (`s3://pg-backups-cnpg/cnpg-db/`). On first cluster bring-up, apply `cnpg-db` and wait for scheduled/on-demand backups before the DR replica can finish `full-recovery` (or expect transient job `Error` until a backup exists).
-- **GitOps** — Flux applies `configs/databases` first, then `configs/databases-cnpg-dr` (`databases-cnpg-dr-local` `dependsOn: databases-local`) so primary + `ScheduledBackup` / `Backup` resources exist before `cnpg-db-replica`.
+- **GitOps** — Flux applies `configs/cnpg-barman-plugin` before `configs/databases`, then `configs/databases-cnpg-dr` (`databases-cnpg-dr-local` `dependsOn: databases-local`) so the Barman Cloud Plugin, `ObjectStore` CRD, primary cluster, and `ScheduledBackup` / `Backup` resources exist before `cnpg-db-replica`.
 - **WAL GUC parity** — Data directory inherits primary `wal_segment_size` (e.g. 64MB). The DR cluster `spec.postgresql.parameters` must include `min_wal_size` (and related WAL settings) consistent with PostgreSQL rules: `min_wal_size >= 2 * wal_segment_size` (see [`cnpg-db-replica/instance.yaml`](../../kubernetes/infra/configs/databases/clusters/cnpg-db-replica/instance.yaml)).
 
 ### Architecture
@@ -364,8 +368,11 @@ spec:
     source: cnpg-db-primary  # references externalClusters entry
   externalClusters:
     - name: cnpg-db-primary
-      barmanObjectStore:
-        destinationPath: s3://pg-backups-cnpg/cnpg-db/
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: cnpg-db-backup-store
+          serverName: cnpg-db-cluster
 ```
 
 ### Promotion Procedure
@@ -498,6 +505,7 @@ RELOAD;            -- Hot-reload config (no restart)
 - [002-database-integration.md](./002-database-integration.md) -- All clusters overview
 - [004-replication-strategy.md](./004-replication-strategy.md) -- Replication modes and synchronous_commit deep-dive
 - [006-backup-strategy.md](./006-backup-strategy.md) -- Backup architecture, retention, restore
+- [010-drp.md](./010-drp.md) -- Production-ready DRP, recovery decision flow, and evidence checklist
 - [008-pooler.md](./008-pooler.md) -- PgDog R/W splitting configuration
 - Cluster manifests: `kubernetes/infra/configs/databases/clusters/cnpg-db/`
 - DR replica: `kubernetes/infra/configs/databases/clusters/cnpg-db-replica/`

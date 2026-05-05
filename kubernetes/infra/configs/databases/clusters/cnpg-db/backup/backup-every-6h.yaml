@@ -11,4 +11,6 @@ spec:
     name: cnpg-db
   backupOwnerReference: self
   immediate: true
-  method: barmanObjectStore
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io

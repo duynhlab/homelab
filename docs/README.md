@@ -14,7 +14,9 @@ docs/
 │   └── gke-internal-dns.md      # GKE cluster.local, Cloud DNS private zones, multi-environment
 ├── databases/                    # Database documentation
 │   ├── 002-database-integration.md               # PostgreSQL architecture
-│   ├── 003-operator-comparison.md               # CloudNativePG vs Zalando operator deep dive
+│   ├── 003-operator-comparison.md               # CloudNativePG vs Zalando decision guide
+│   ├── 003.1-operator-cnpg.md                   # CloudNativePG operator deep dive
+│   ├── 003.2-operator-zalando.md                # Zalando Postgres Operator deep dive
 │   ├── 007-architecture.md           # Database architecture overview
 │   ├── 006-backup-strategy.md                 # Backup strategy and retention
 │   ├── 009-extensions.md             # PostgreSQL extensions
@@ -22,9 +24,9 @@ docs/
 │   ├── 004-replication-strategy.md   # Replication strategy
 │   ├── 005-ha-dr-deep-dive.md        # HA vs DR (cnpg-db-replica)
 │   ├── 001-postgresql-internals.md  # PostgreSQL internals deep dive
-│   ├── 010-documents.md              # Further reading / document map
+│   ├── 010-drp.md                    # PostgreSQL DRP, RTO/RPO, PITR, restore evidence
+│   ├── 011-documents.md              # Further reading / document map
 │   └── runbooks/                     # Database ops runbooks
-│       ├── cnpg-dr-replica-bootstrap.md
 │       ├── endpoints-to-configmaps.md
 │       ├── prepared-databases.md
 │       └── zalando-ha-scaling.md
@@ -74,7 +76,6 @@ docs/
 │   ├── application-delivery.md    # ResourceSet patterns & templates
 │   ├── cicd.md                   # CI/CD pipelines
 │   ├── gitflow.md                # Git branching & release standard
-│   ├── ci_template.yml           # CI template for service repos
 │   └── sonarcloud.md             # SonarCloud integration
 ├── runbooks/                     # Operational runbooks
 │   ├── metrics-audit-fixes.md    # Metrics audit runbook (before/after fixes)
@@ -194,11 +195,10 @@ docs/
     - Overview diagram showing operators, services, poolers, and clusters
     - Individual cluster diagrams with secrets, connections, and patterns
 
-2. **[Operator Comparison](./databases/003-operator-comparison.md)** - CloudNativePG vs Zalando deep dive
-    - Core architecture differences (Instance Manager vs Patroni)
-    - HA and failover mechanisms with sequence diagrams
-    - Feature comparison matrix, strengths, trade-offs
-    - Production recommendations and decision matrix
+2. **[Operator Comparison](./databases/003-operator-comparison.md)** - CloudNativePG vs Zalando decision guide
+    - Concise decision matrix
+    - Homelab cluster-to-operator mapping
+    - Links to [CloudNativePG](./databases/003.1-operator-cnpg.md) and [Zalando](./databases/003.2-operator-zalando.md) deep dives
 
 3. **[PostgreSQL Internals Deep Dive](./databases/001-postgresql-internals.md)** - PostgreSQL internals using cnpg-db examples
     - INSERT/UPDATE workflow with sequence diagrams
@@ -273,14 +273,17 @@ docs/
 ### Databases
 
 - [Database Guide](./databases/002-database-integration.md) - PostgreSQL database integration guide
-- [Operator Comparison](./databases/003-operator-comparison.md) - CloudNativePG vs Zalando deep dive
+- [Operator Comparison](./databases/003-operator-comparison.md) - CloudNativePG vs Zalando decision guide
+- [CloudNativePG Operator](./databases/003.1-operator-cnpg.md) - CloudNativePG feature and operations deep dive
+- [Zalando Postgres Operator](./databases/003.2-operator-zalando.md) - Patroni/Spilo operator deep dive
 - [Architecture](./databases/007-architecture.md) - Database architecture overview
 - [Backup Strategy](./databases/006-backup-strategy.md) - Backup architecture and retention
 - [Extensions](./databases/009-extensions.md) - PostgreSQL extensions (operand built-in vs Image Volume models)
 - [Connection Poolers](./databases/008-pooler.md) - PgBouncer, PgCat, PgDog
 - [Replication Strategy](./databases/004-replication-strategy.md) - Replication strategy
 - [HA & DR Deep Dive](./databases/005-ha-dr-deep-dive.md) - cnpg-db vs cnpg-db-replica (object-store DR)
-- [CNPG DR replica bootstrap](./databases/runbooks/cnpg-dr-replica-bootstrap.md) - full-recovery prerequisites and troubleshooting
+- [PostgreSQL DRP](./databases/010-drp.md) - DRP, RTO/RPO, PITR, standby taxonomy, and restore evidence
+- [PostgreSQL Further Reading](./databases/011-documents.md) - Curated external references
 - [PostgreSQL Internals](./databases/001-postgresql-internals.md) - Deep dive using cnpg-db examples
 
 ### Platform
@@ -290,7 +293,6 @@ docs/
 - [cert-manager + Flux](./platform/cert-manager-flux.md) - TLS with Let's Encrypt, HelmRelease, Ingress
 - [CI/CD](./platform/cicd.md) - CI/CD pipelines and workflows
 - [Git Branching & Release](./platform/gitflow.md) - Hybrid Enterprise Gitflow standard (dev/staging/main + immutable tags)
-- [CI Template](./platform/ci_template.yml) - Reference CI workflow for service repos
 - [SonarCloud](./platform/sonarcloud.md) - SonarCloud integration
 
 ### Secrets

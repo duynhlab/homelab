@@ -931,7 +931,7 @@ kubernetes/infra/configs/databases/clusters/
     ├── secrets/               # DB credentials (product, cart, order)
     ├── poolers/               # PgDog HelmRelease
     ├── monitoring/            # PodMonitor
-    ├── backup/                # Barman Object Store schedules
+    ├── backup/                # Barman Cloud Plugin backup schedules
     └── kustomization.yaml     # Includes all above in order
 ```
 

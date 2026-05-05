@@ -67,9 +67,9 @@ flowchart TD
     end
 
     subgraph Domains["Domain Routing"]
-        FERoute["duynhne.me /*"]:::fe
-        APIRoute["gateway.duynhne.me /{service}/v1/{public,private}/…"]:::api
-        MonRoute["*.duynhne.me (monitoring/infra)"]:::infra
+        FERoute["local.local.duynh.me /*"]:::fe
+        APIRoute["gateway.local.duynh.me /{service}/v1/{public,private}/…"]:::api
+        MonRoute["*.duynh.me (monitoring/infra)"]:::infra
     end
 
     Browser --> Kong
@@ -106,14 +106,14 @@ Clear separation of concerns — each domain has a single responsibility:
 
 | Domain | Responsibility | Rate Limited | Ingress File |
 |--------|---------------|--------------|--------------|
-| `duynhne.me` | Frontend (React SPA) | No | `ingress-frontend.yaml` |
-| `gateway.duynhne.me` | API Gateway (8 microservices) | **Yes** | `ingress-api.yaml` |
-| `grafana.duynhne.me` | Grafana dashboards | No | `ingress-monitoring.yaml` |
-| `vmui.duynhne.me` | VictoriaMetrics UI | No | `ingress-monitoring.yaml` |
-| `jaeger.duynhne.me` | Distributed tracing | No | `ingress-monitoring.yaml` |
-| `logs.duynhne.me` | VictoriaLogs | No | `ingress-monitoring.yaml` |
-| `ui.duynhne.me` | Flux UI | No | `ingress-infra.yaml` |
-| `vm-mcp.duynhne.me` | VictoriaMetrics MCP | No | `ingress-mcp.yaml` |
+| `local.duynh.me` | Frontend (React SPA) | No | `ingress-frontend.yaml` |
+| `gateway.duynh.me` | API Gateway (8 microservices) | **Yes** | `ingress-api.yaml` |
+| `grafana.duynh.me` | Grafana dashboards | No | `ingress-monitoring.yaml` |
+| `vmui.duynh.me` | VictoriaMetrics UI | No | `ingress-monitoring.yaml` |
+| `jaeger.duynh.me` | Distributed tracing | No | `ingress-monitoring.yaml` |
+| `logs.duynh.me` | VictoriaLogs | No | `ingress-monitoring.yaml` |
+| `ui.duynh.me` | Flux UI | No | `ingress-infra.yaml` |
+| `vm-mcp.duynh.me` | VictoriaMetrics MCP | No | `ingress-mcp.yaml` |
 | *(+ 8 more)* | See README.md | No | Various |
 
 ### Why Separate Frontend and API Domains?
@@ -121,14 +121,14 @@ Clear separation of concerns — each domain has a single responsibility:
 ```mermaid
 flowchart LR
     subgraph Before["Before (Single Domain)"]
-        GW1["gateway.duynhne.me"]
+        GW1["gateway.duynh.me"]
         GW1 -->|"/"| FE1["Frontend"]
         GW1 -->|"/{service}/v1/…"| API1["APIs"]
     end
 
     subgraph After["After (Separated)"]
-        D1["duynhne.me"] --> FE2["Frontend"]
-        D2["gateway.duynhne.me"] --> API2["APIs"]
+        D1["local.duynh.me"] --> FE2["Frontend"]
+        D2["gateway.duynh.me"] --> API2["APIs"]
     end
 ```
 
@@ -237,7 +237,7 @@ config:
 
 **Applied to**: All 8 API ingresses via annotation `konghq.com/plugins: rate-limiting-api`
 
-**Not applied to**: Frontend (`duynhne.me`), monitoring dashboards, MCP servers
+**Not applied to**: Frontend (`local.duynh.me`), monitoring dashboards, MCP servers
 
 ### Response Headers
 
@@ -312,7 +312,7 @@ minute limit × 60 × 0.5 = hour limit (assume 50% sustained)
 
 | Plugin | Type | Scope | Configuration |
 |--------|------|-------|---------------|
-| **CORS** | Traffic Control | Global | Origins: `duynhne.me`, methods: GET/POST/PUT/PATCH/DELETE/OPTIONS |
+| **CORS** | Traffic Control | Global | Origins: `local.duynh.me`, methods: GET/POST/PUT/PATCH/DELETE/OPTIONS |
 | **Prometheus** | Observability | Global | Status codes, latency, bandwidth, upstream health |
 | **Rate Limiting** | Traffic Control | API routes | 10/s, 200/min, 5000/hr, local policy |
 | **Request Size Limiting** | Security | API routes | 10 MB max payload |
@@ -380,8 +380,8 @@ Currently, auth is handled at the application level (auth-service). Gateway-leve
 |-----------|----------|---------|
 | HelmRelease | `kubernetes/infra/controllers/kong/helmrelease.yaml` | Kong KIC deployment (DB-less, chart v2.44.0) |
 | Plugins | `kubernetes/infra/configs/kong/plugins.yaml` | Global CORS + Prometheus, API rate limiting + request size limiting |
-| Frontend Ingress | `kubernetes/infra/configs/kong/ingress-frontend.yaml` | Routes `duynhne.me /` to frontend |
-| API Ingress | `kubernetes/infra/configs/kong/ingress-api.yaml` | Routes `gateway.duynhne.me /{service}/v1/{public,private}/…` to services (rate-limited, pass-through) |
+| Frontend Ingress | `kubernetes/infra/configs/kong/ingress-frontend.yaml` | Routes `local.duynh.me /` to frontend |
+| API Ingress | `kubernetes/infra/configs/kong/ingress-api.yaml` | Routes `gateway.local.duynh.me /{service}/v1/{public,private}/…` to services (rate-limited, pass-through) |
 | Monitoring Ingress | `kubernetes/infra/configs/kong/ingress-monitoring.yaml` | Routes monitoring tools (Grafana, VM, Jaeger, etc.) |
 | Infra Ingress | `kubernetes/infra/configs/kong/ingress-infra.yaml` | Routes infra tools (Flux UI, RustFS, OpenBAO, PG UI) |
 | MCP Ingress | `kubernetes/infra/configs/kong/ingress-mcp.yaml` | Routes MCP servers (VM, VL, Flux) |
@@ -397,8 +397,8 @@ Currently, auth is handled at the application level (auth-service). Gateway-leve
 Add to `/etc/hosts`:
 
 ```
-127.0.0.1  duynhne.me
-127.0.0.1  gateway.duynhne.me
+127.0.0.1  local.duynh.me
+127.0.0.1  gateway.duynh.me
 ```
 
 See `README.md` for the full `/etc/hosts` block with all domains.
@@ -409,9 +409,9 @@ Kong runs as NodePort with Kind port mappings (80→30080, 443→30443). After `
 
 | URL | Description |
 |-----|-------------|
-| `http://duynhne.me` | Frontend (React SPA) |
-| `http://gateway.duynhne.me/product/v1/public/products` | API route example (Variant A) |
-| `http://grafana.duynhne.me` | Grafana dashboards |
+| `https://local.duynh.me` | Frontend (React SPA) |
+| `http://gateway.duynh.me/product/v1/public/products` | API route example (Variant A) |
+| `https://grafana.duynh.me` | Grafana dashboards |
 
 ### Fallback: Port Forwarding
 
@@ -433,7 +433,7 @@ The homelab uses a **self-signed CA** chain (works offline):
 1. `selfsigned-bootstrap` — ClusterIssuer that bootstraps itself
 2. `homelab-ca` — Certificate (10-year CA) signed by the bootstrap issuer
 3. `homelab-ca` — ClusterIssuer backed by the CA cert, signs all service certificates
-4. `kong-proxy-tls` — Certificate for `*.duynhne.me` signed by the CA
+4. `kong-proxy-tls` — Certificate for `*.duynh.me` signed by the CA
 
 For production, uncomment the Let's Encrypt issuers in `clusterissuers.yaml` and switch the certificate's `issuerRef` to `letsencrypt-prod`.
 
@@ -443,19 +443,19 @@ For production, uncomment the Let's Encrypt issuers in `clusterissuers.yaml` and
 
 URL shape is **Variant A** from [`api-naming-convention.md`](../api/api-naming-convention.md): `/{service}/v1/{audience}/{resource…}`. Services mount these paths directly on their HTTP routers; Kong is **pure pass-through** (`strip-path: false`, no rewrite plugin). Services keep validating JWTs themselves.
 
-Per-ingress `path:` entries are scoped to `public` and `private` audiences only — `internal` is never listed on the gateway, so requests to `https://gateway.duynhne.me/notification/v1/internal/…` return Kong's default 404.
+Per-ingress `path:` entries are scoped to `public` and `private` audiences only — `internal` is never listed on the gateway, so requests to `https://gateway.duynh.me/notification/v1/internal/…` return Kong's default 404.
 
 | Host | Path | Backend | Namespace | Rate limited |
 |------|------|---------|-----------|--------------|
-| `duynhne.me` | `/` | `frontend:80` | frontend | No |
-| `gateway.duynhne.me` | `/auth/v1/public/`, `/auth/v1/private/` | `auth:8080` | auth | Yes |
-| `gateway.duynhne.me` | `/user/v1/public/`, `/user/v1/private/` | `user:8080` | user | Yes |
-| `gateway.duynhne.me` | `/product/v1/public/` | `product:8080` | product | Yes |
-| `gateway.duynhne.me` | `/cart/v1/private/` | `cart:8080` | cart | Yes |
-| `gateway.duynhne.me` | `/order/v1/private/` | `order:8080` | order | Yes |
-| `gateway.duynhne.me` | `/review/v1/public/`, `/review/v1/private/` | `review:8080` | review | Yes |
-| `gateway.duynhne.me` | `/notification/v1/private/` | `notification:8080` | notification | Yes |
-| `gateway.duynhne.me` | `/shipping/v1/public/` | `shipping:8080` | shipping | Yes |
+| `local.duynh.me` | `/` | `frontend:80` | frontend | No |
+| `gateway.duynh.me` | `/auth/v1/public/`, `/auth/v1/private/` | `auth:8080` | auth | Yes |
+| `gateway.duynh.me` | `/user/v1/public/`, `/user/v1/private/` | `user:8080` | user | Yes |
+| `gateway.duynh.me` | `/product/v1/public/` | `product:8080` | product | Yes |
+| `gateway.duynh.me` | `/cart/v1/private/` | `cart:8080` | cart | Yes |
+| `gateway.duynh.me` | `/order/v1/private/` | `order:8080` | order | Yes |
+| `gateway.duynh.me` | `/review/v1/public/`, `/review/v1/private/` | `review:8080` | review | Yes |
+| `gateway.duynh.me` | `/notification/v1/private/` | `notification:8080` | notification | Yes |
+| `gateway.duynh.me` | `/shipping/v1/public/` | `shipping:8080` | shipping | Yes |
 
 **Internal endpoints NOT routed here** (reachable only via Kubernetes Service DNS):
 
@@ -547,15 +547,15 @@ kubectl get ingress -A
 
 | Namespace | Name | Host | Edge path |
 |-----------|------|------|-----------|
-| frontend | frontend | `duynhne.me` | `/` |
-| auth | api-auth | `gateway.duynhne.me` | `/auth/v1/` |
-| user | api-user | `gateway.duynhne.me` | `/user/v1/` |
-| product | api-product | `gateway.duynhne.me` | `/product/v1/` |
-| cart | api-cart | `gateway.duynhne.me` | `/cart/v1/` |
-| order | api-order | `gateway.duynhne.me` | `/order/v1/` |
-| review | api-review | `gateway.duynhne.me` | `/review/v1/` |
-| notification | api-notification | `gateway.duynhne.me` | `/notification/v1/` |
-| shipping | api-shipping | `gateway.duynhne.me` | `/shipping/v1/` |
+| frontend | frontend | `local.duynh.me` | `/` |
+| auth | api-auth | `gateway.duynh.me` | `/auth/v1/` |
+| user | api-user | `gateway.duynh.me` | `/user/v1/` |
+| product | api-product | `gateway.duynh.me` | `/product/v1/` |
+| cart | api-cart | `gateway.duynh.me` | `/cart/v1/` |
+| order | api-order | `gateway.duynh.me` | `/order/v1/` |
+| review | api-review | `gateway.duynh.me` | `/review/v1/` |
+| notification | api-notification | `gateway.duynh.me` | `/notification/v1/` |
+| shipping | api-shipping | `gateway.duynh.me` | `/shipping/v1/` |
 | *(+ monitoring, infra, MCP ingresses)* | | | |
 
 ### Step 7: Test API Routes (curl)
@@ -564,11 +564,11 @@ All browser-facing requests use Variant A paths. Kong passes them through unchan
 
 ```bash
 # Frontend
-curl -s -o /dev/null -w "%{http_code}\n" http://duynhne.me/
+curl -s -o /dev/null -w "%{http_code}\n" https://local.duynh.me/
 # Expected: 200
 
 # Auth — login (public)
-TOKEN=$(curl -s -X POST http://gateway.duynhne.me/auth/v1/public/login \
+TOKEN=$(curl -s -X POST http://gateway.duynh.me/auth/v1/public/login \
   -H "Content-Type: application/json" \
   -d '{"username":"alice","password":"password123"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))")
@@ -576,48 +576,48 @@ echo "Token: ${TOKEN:0:30}..."
 # Expected: jwt-token-v1-...
 
 # Products (public, anonymous)
-curl -s -o /dev/null -w "%{http_code}\n" http://gateway.duynhne.me/product/v1/public/products
+curl -s -o /dev/null -w "%{http_code}\n" http://gateway.duynh.me/product/v1/public/products
 # Expected: 200
 
 # Cart (private — requires JWT)
 curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $TOKEN" \
-  http://gateway.duynhne.me/cart/v1/private/cart
+  http://gateway.duynh.me/cart/v1/private/cart
 # Expected: 200
 
 # Orders
 curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $TOKEN" \
-  http://gateway.duynhne.me/order/v1/private/orders
+  http://gateway.duynh.me/order/v1/private/orders
 # Expected: 200
 
 # Users profile
 curl -s -H "Authorization: Bearer $TOKEN" \
-  http://gateway.duynhne.me/user/v1/private/users/profile
+  http://gateway.duynh.me/user/v1/private/users/profile
 # Expected: 200 with user JSON
 
 # Notifications
 curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $TOKEN" \
-  http://gateway.duynhne.me/notification/v1/private/notifications
+  http://gateway.duynh.me/notification/v1/private/notifications
 # Expected: 200
 
 # Reviews (public list)
-curl -s -o /dev/null -w "%{http_code}\n" http://gateway.duynhne.me/review/v1/public/reviews
+curl -s -o /dev/null -w "%{http_code}\n" http://gateway.duynh.me/review/v1/public/reviews
 # Expected: 400 (product_id query param required) — confirms routing works
 
 # Shipping track (public)
 curl -s -o /dev/null -w "%{http_code}\n" \
-  "http://gateway.duynhne.me/shipping/v1/public/track?tracking_number=TRACK123"
+  "http://gateway.duynh.me/shipping/v1/public/track?tracking_number=TRACK123"
 # Expected: 200 or 404
 
 # Legacy /api/v1/* is gone everywhere (services + gateway) — expected 404
 curl -s -o /dev/null -w "legacy /api/v1 on gateway: %{http_code}\n" \
-  http://gateway.duynhne.me/api/v1/products
+  http://gateway.duynh.me/api/v1/products
 
 # Internal endpoint NOT on gateway — expected 404
 curl -s -o /dev/null -w "notify/email on gateway: %{http_code}\n" \
-  -X POST http://gateway.duynhne.me/notification/v1/internal/notify/email
+  -X POST http://gateway.duynh.me/notification/v1/internal/notify/email
 
 # Check rate limit headers
-curl -sI http://gateway.duynhne.me/product/v1/public/products 2>&1 | grep -i ratelimit
+curl -sI http://gateway.duynh.me/product/v1/public/products 2>&1 | grep -i ratelimit
 # Expected: RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset headers
 ```
 
@@ -626,8 +626,8 @@ curl -sI http://gateway.duynhne.me/product/v1/public/products 2>&1 | grep -i rat
 ### Step 8: Test CORS Headers
 
 ```bash
-curl -s -X OPTIONS http://gateway.duynhne.me/product/v1/public/products \
-  -H "Origin: http://duynhne.me" \
+curl -s -X OPTIONS http://gateway.duynh.me/product/v1/public/products \
+  -H "Origin: https://local.duynh.me" \
   -H "Access-Control-Request-Method: GET" \
   -D - -o /dev/null 2>&1 | grep -i "access-control"
 ```
@@ -635,7 +635,7 @@ curl -s -X OPTIONS http://gateway.duynhne.me/product/v1/public/products \
 **Expected**:
 
 ```
-access-control-allow-origin: http://duynhne.me
+access-control-allow-origin: https://local.duynh.me
 access-control-allow-credentials: true
 access-control-allow-headers: Content-Type,Authorization,X-Request-ID
 access-control-allow-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
@@ -647,7 +647,7 @@ access-control-max-age: 3600
 ```bash
 # Rapid-fire 15 requests (limit is 10/s)
 for i in $(seq 1 15); do
-  code=$(curl -s -o /dev/null -w "%{http_code}" http://gateway.duynhne.me/product/v1/public/products)
+  code=$(curl -s -o /dev/null -w "%{http_code}" http://gateway.duynh.me/product/v1/public/products)
   echo "Request $i: $code"
 done
 # Expected: First ~10 return 200, remaining return 429
@@ -659,7 +659,7 @@ Use the `agent-browser` CLI to test the full frontend experience through Kong.
 
 ```bash
 # 1. Open homepage
-agent-browser open http://duynhne.me
+agent-browser open https://local.duynh.me
 agent-browser screenshot
 # Verify: "Welcome to Shop" page loads, nav shows "Products" and "Login"
 

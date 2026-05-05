@@ -3,7 +3,7 @@
 # Used by AI clients (Crush, Claude Desktop, VS Code) via Streamable HTTP
 # TLS terminated by Kong using the default proxy certificate (kong-proxy-tls).
 
-# VictoriaMetrics MCP — vm-mcp.duynhne.me
+# VictoriaMetrics MCP — vm-mcp.duynh.me
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -12,10 +12,12 @@ metadata:
   namespace: monitoring
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
 spec:
   ingressClassName: kong
   rules:
-    - host: vm-mcp.duynhne.me
+    - host: vm-mcp.duynh.me
       http:
         paths:
           - path: /
@@ -26,7 +28,7 @@ spec:
                 port:
                   number: 8080
 ---
-# VictoriaLogs MCP — vl-mcp.duynhne.me
+# VictoriaLogs MCP — vl-mcp.duynh.me
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -34,10 +36,12 @@ metadata:
   namespace: monitoring
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
 spec:
   ingressClassName: kong
   rules:
-    - host: vl-mcp.duynhne.me
+    - host: vl-mcp.duynh.me
       http:
         paths:
           - path: /
@@ -48,7 +52,7 @@ spec:
                 port:
                   number: 8080
 ---
-# Flux Operator MCP — flux-mcp.duynhne.me
+# Flux Operator MCP — flux-mcp.duynh.me
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -56,10 +60,12 @@ metadata:
   namespace: flux-system
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
 spec:
   ingressClassName: kong
   rules:
-    - host: flux-mcp.duynhne.me
+    - host: flux-mcp.duynh.me
       http:
         paths:
           - path: /

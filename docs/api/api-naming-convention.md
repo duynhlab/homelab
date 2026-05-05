@@ -6,7 +6,7 @@
 | **Status** | **Adopted** — sole URL surface (services mount these paths directly) |
 | **Superseded** | `docs/api/api.md` cluster-only `/api/v1/*` shape (v0.85 and earlier) |
 | **Scope** | All HTTP URLs used by browsers, services, and admin/seed callers |
-| **Primary domain** | `duynhne.me` — platform root; public API at `gateway.duynhne.me` |
+| **Primary domain** | `local.duynh.me` — platform root; public API at `gateway.duynh.me` |
 | **Last updated** | 2026-04-17 |
 
 ## Purpose
@@ -18,7 +18,7 @@ The shape is inspired by Chợ Tốt's multi-segment edge layout and refined wit
 ## URL shape
 
 ```
-https://gateway.duynhne.me/{service}/v1/{audience}/{resource…}
+https://gateway.duynh.me/{service}/v1/{audience}/{resource…}
 ```
 
 for browser (north-south) traffic, and
@@ -42,16 +42,16 @@ for in-cluster (east-west) traffic. Same path, different host — Kong just forw
 | `protected` | Signed webhooks / partner HMAC / IP allowlist | Yes (when added) | Per-route plugin or service middleware |
 | `internal` | Pod → Service — cluster-only | **No — never** | NetworkPolicy + optional API key |
 
-**Kong enforcement:** each `api-*` Ingress has one or two explicit `path:` entries — `/{service}/v1/public/` and/or `/{service}/v1/private/`. Internal audiences are never added to Ingress rules, so requests to `https://gateway.duynhne.me/notification/v1/internal/notify/email` resolve to Kong's default 404.
+**Kong enforcement:** each `api-*` Ingress has one or two explicit `path:` entries — `/{service}/v1/public/` and/or `/{service}/v1/private/`. Internal audiences are never added to Ingress rules, so requests to `https://gateway.duynh.me/notification/v1/internal/notify/email` resolve to Kong's default 404.
 
 ## Hostnames
 
 | Role | Host |
 |------|------|
-| Public API gateway (north-south) | **`gateway.duynhne.me`** |
-| Frontend SPA (React) | `duynhne.me` |
-| Static assets + CDN (future) | `static.duynhne.me` |
-| Private internal gateway (future) | `internal.gateway.duynhne.me` |
+| Public API gateway (north-south) | **`gateway.duynh.me`** |
+| Frontend SPA (React) | `local.duynh.me` |
+| Static assets + CDN (future) | `static.duynh.me` |
+| Private internal gateway (future) | `internal.gateway.duynh.me` |
 
 ## Complete route inventory
 
@@ -162,7 +162,7 @@ Each caller keeps a `{TARGET}_SERVICE_URL` env var with a default pointing at th
 ## Static assets (future reference)
 
 ```
-https://static.duynhne.me/storage/app/v5/<release>/assets/header.css
+https://static.duynh.me/storage/app/v5/<release>/assets/header.css
 ```
 
 Immutable file names (content hash) + explicit `Cache-Control` for chunks.

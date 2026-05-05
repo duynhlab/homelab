@@ -195,7 +195,7 @@ flowchart TD
 
 **Allowed:**
 
-- ✅ HTTP requests to `/{service}/v1/{public,private}/…` endpoints via `https://gateway.duynhne.me`
+- ✅ HTTP requests to `/{service}/v1/{public,private}/…` endpoints via `https://gateway.duynh.me`
 - ✅ All requests go through Web Layer handlers
 - ✅ Web Layer handles aggregation, validation, error translation
 
@@ -430,7 +430,7 @@ make flux-sync
 **Access services via domain names:**
 
 - All services are routed through Kong Ingress Controller with `/etc/hosts` mapping
-- Domain pattern: `*.duynhne.me` (e.g., `grafana.duynhne.me`, `vmui.duynhne.me`)
+- Domain pattern: `*.duynh.me` (e.g., `grafana.duynh.me`, `vmui.duynh.me`)
 - Kong runs as NodePort (30080/30443), Kind maps host ports 80/443
 - Fallback: `make flux-ui` for port-forwarding
 - See `README.md` for full domain list and `/etc/hosts` setup
@@ -445,7 +445,7 @@ Every HTTP path in the platform uses:
 
 Services mount these paths **directly** on their Gin router; Kong is pure pass-through (no rewriting). Same path, two hosts:
 
-- **Browser** → `https://gateway.duynhne.me/…`
+- **Browser** → `https://gateway.duynh.me/…`
 - **Service-to-service (in-cluster)** → `http://{svc}.{ns}.svc.cluster.local:8080/…`
 
 Segments:
@@ -470,7 +470,7 @@ Segments:
 
 1. **Never** add `internal` audiences to `ingress-api.yaml`. Internal routes are reachable only via in-cluster service DNS (NetworkPolicy is the fence, not the absence of an Ingress rule).
 2. When adding a new browser-facing route: mount it in the service at `/{service}/v1/{public|private}/…`, add the path to the service's Ingress in `ingress-api.yaml`, update the mapping in `docs/api/api-naming-convention.md`. No rewrite plugin, no translation.
-3. When the frontend needs a new call, use the same path the service exposes. Frontend base URL is `VITE_API_BASE_URL` (defaults to `http://gateway.duynhne.me`).
+3. When the frontend needs a new call, use the same path the service exposes. Frontend base URL is `VITE_API_BASE_URL` (defaults to `http://gateway.duynh.me`).
 4. JWT middleware lives in each service, not Kong. It calls `http://auth.auth.svc.cluster.local:8080/auth/v1/private/me` to validate tokens.
 
 **Authoritative docs:**
@@ -511,7 +511,7 @@ Hardcoded as initial form values in `frontend/src/pages/LoginPage/LoginPage.jsx`
 
 ```bash
 # Login via API (use username, NOT email)
-curl -H "Host: gateway.duynhne.me" -X POST http://localhost/auth/v1/public/login \
+curl -H "Host: gateway.duynh.me" -X POST http://localhost/auth/v1/public/login \
   -H "Content-Type: application/json" \
   -d '{"username":"alice","password":"password123"}'
 # → {"token":"jwt-token-...","user":{"id":"1","username":"alice","email":"alice@example.com"}}

@@ -2,7 +2,7 @@
 # Accessible via /etc/hosts → Kong NodePort (80/443)
 # TLS terminated by Kong using the default proxy certificate (kong-proxy-tls).
 
-# Flux Web UI — ui.duynhne.me
+# Flux Web UI — ui.duynh.me
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -11,10 +11,12 @@ metadata:
   namespace: flux-system
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
 spec:
   ingressClassName: kong
   rules:
-    - host: ui.duynhne.me
+    - host: ui.duynh.me
       http:
         paths:
           - path: /
@@ -25,7 +27,7 @@ spec:
                 port:
                   number: 9080
 ---
-# RustFS Console — source.duynhne.me
+# RustFS Console — source.duynh.me
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -33,10 +35,12 @@ metadata:
   namespace: rustfs
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
 spec:
   ingressClassName: kong
   rules:
-    - host: source.duynhne.me
+    - host: source.duynh.me
       http:
         paths:
           - path: /
@@ -47,7 +51,7 @@ spec:
                 port:
                   number: 9001
 ---
-# OpenBAO UI — openbao.duynhne.me
+# OpenBAO UI — openbao.duynh.me
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -55,10 +59,12 @@ metadata:
   namespace: openbao
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
 spec:
   ingressClassName: kong
   rules:
-    - host: openbao.duynhne.me
+    - host: openbao.duynh.me
       http:
         paths:
           - path: /
@@ -69,7 +75,7 @@ spec:
                 port:
                   number: 8200
 ---
-# Postgres Operator UI — pgui.duynhne.me
+# Postgres Operator UI — pgui.duynh.me
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -77,10 +83,12 @@ metadata:
   namespace: postgres-operator
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
 spec:
   ingressClassName: kong
   rules:
-    - host: pgui.duynhne.me
+    - host: pgui.duynh.me
       http:
         paths:
           - path: /

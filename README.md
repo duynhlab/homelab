@@ -10,7 +10,7 @@ Production-ready microservices monitoring platform with 8 Go services, complete 
 
 **Key Features:**
 
-- 8 microservices behind Kong API gateway with **Variant A** edge naming: `https://gateway.duynhne.me/{service}/v1/{audience}/…`
+- 8 microservices behind Kong API gateway with **Variant A** edge naming: `https://gateway.duynh.me/{service}/v1/{audience}/…`
 - Single public API hostname — Kong is pass-through; services mount Variant A paths directly (no `/api/v1/*` anywhere)
 - 15 Grafana dashboards (microservices, databases, tracing, infrastructure)
 - Complete observability stack (VictoriaMetrics, Tempo, Jaeger, VictoriaLogs, Pyroscope)
@@ -94,7 +94,7 @@ flowchart TD
     end
 
     %% Connections
-    FE -->|"HTTPS gateway.duynhne.me<br/>/{service}/v1/{audience}/..."| WebLayer
+    FE -->|"HTTPS gateway.duynh.me<br/>/{service}/v1/{audience}/..."| WebLayer
     
     WebLayer & LogicLayer & CoreLayer -.->|"O11y Data"| Observability
     
@@ -117,8 +117,8 @@ flowchart TD
 
 **Key Points:**
 
-- **Frontend (React SPA)**: Served from `duynhne.me`. All API calls go cross-origin to `https://gateway.duynhne.me/{service}/v1/{audience}/…` (Variant A edge naming — see [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md)). Frontend repo: [`duynhlab/frontend`](https://github.com/duynhlab/frontend).
-- **Kong API gateway**: Single public API edge at `gateway.duynhne.me`. Pure pass-through — services mount Variant A paths directly on their routers. Kong provides CORS (`https://duynhne.me`), rate limiting, and request-size limits.
+- **Frontend (React SPA)**: Served from `local.duynh.me`. All API calls go cross-origin to `https://gateway.duynh.me/{service}/v1/{audience}/…` (Variant A edge naming — see [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md)). Frontend repo: [`duynhlab/frontend`](https://github.com/duynhlab/frontend).
+- **Kong API gateway**: Single public API edge at `gateway.duynh.me`. Pure pass-through — services mount Variant A paths directly on their routers. Kong provides CORS (`https://local.duynh.me`), rate limiting, and request-size limits.
 - **8 Microservices**: Each follows 3-layer architecture (Web -> Logic -> Core), organized into 4 domains (identity, catalog, checkout, comms).
 - **Cache-Aside Pattern**: Logic Layer checks Valkey first, queries database on miss, writes to cache.
 - **3 PostgreSQL Clusters**: auth-db (Zalando), supporting-shared-db (Zalando, hosts user/notification/shipping/review), cnpg-db (CNPG, hosts product/cart/order). Connected via PgBouncer and PgDog poolers. A DR replica cluster (cnpg-db-replica) continuously recovers from cnpg-db WAL archive.
@@ -137,7 +137,7 @@ Single URL shape across the platform — browser and in-cluster callers use the 
 | `GET` | `/order/v1/private/orders/:id/details` | private | ✅ (aggregation) |
 | `POST` | `/notification/v1/internal/notify/email` | internal | ❌ in-cluster only |
 
-- Browser: `https://gateway.duynhne.me/{service}/v1/{audience}/…`
+- Browser: `https://gateway.duynh.me/{service}/v1/{audience}/…`
 - Service-to-service: `http://{svc}.{ns}.svc.cluster.local:8080/{service}/v1/{audience}/…`
 - `internal` audience is **never** routed through Kong.
 
@@ -166,7 +166,7 @@ Full per-endpoint mapping: [`docs/api/api-naming-convention.md`](docs/api/api-na
 - **GitOps**: Flux Operator, ResourceSet (Unified Templating), Kustomize, OCI Registry
     - Application layer: 4 domain ResourceSets (identity, catalog, checkout, comms) + per-service InputProviders
 - **Dynamic Delivery**: OCIArtifactTag (Automated image updates)
-- **API Gateway**: Kong Ingress Controller at `gateway.duynhne.me` with per-namespace `pre-function` rewrite plugins + global CORS / rate-limit / request-size-limit.
+- **API Gateway**: Kong Ingress Controller at `gateway.duynh.me` with per-namespace `pre-function` rewrite plugins + global CORS / rate-limit / request-size-limit.
 - **Monitoring**: VictoriaMetrics (VMSingle, VMAgent, VMAlert), Grafana, Tempo, VictoriaLogs, Pyroscope, Jaeger, Vector.
 
 **Observability Details**: See [`docs/observability/README.md`](docs/observability/README.md) for complete observability system overview.
@@ -221,7 +221,7 @@ The platform includes **15 Grafana dashboards** covering observability, database
 - **Database Dashboards**: PostgreSQL monitoring, CloudNativePG, PgBouncer, PgDog, query overview/drilldown, replication lag
 - **Infrastructure**: Vector metrics, Redis/Valkey monitoring
 
-**Access**: All dashboards are available via Grafana at http://grafana.duynhne.me (see [Access Points](#access-points) below).
+**Access**: All dashboards are available via Grafana at https://grafana.duynh.me (see [Access Points](#access-points) below).
 
 **Documentation**: See [`docs/observability/grafana/dashboard-reference.md`](docs/observability/grafana/dashboard-reference.md) for complete dashboard reference and [`docs/observability/metrics/README.md`](docs/observability/metrics/README.md) for metrics guide.
 
@@ -237,24 +237,24 @@ Add the following entries to your `/etc/hosts` file:
 
 ```bash
 # duynhlab homelab — Kong Ingress domains
-127.0.0.1 duynhne.me
-127.0.0.1 gateway.duynhne.me
-127.0.0.1 grafana.duynhne.me
-127.0.0.1 vmui.duynhne.me
-127.0.0.1 vmalert.duynhne.me
-127.0.0.1 karma.duynhne.me
-127.0.0.1 jaeger.duynhne.me
-127.0.0.1 tempo.duynhne.me
-127.0.0.1 pyroscope.duynhne.me
-127.0.0.1 logs.duynhne.me
-127.0.0.1 slo.duynhne.me
-127.0.0.1 ui.duynhne.me
-127.0.0.1 source.duynhne.me
-127.0.0.1 openbao.duynhne.me
-127.0.0.1 pgui.duynhne.me
-127.0.0.1 vm-mcp.duynhne.me
-127.0.0.1 vl-mcp.duynhne.me
-127.0.0.1 flux-mcp.duynhne.me
+127.0.0.1 local.duynh.me
+127.0.0.1 gateway.duynh.me
+127.0.0.1 grafana.duynh.me
+127.0.0.1 vmui.duynh.me
+127.0.0.1 vmalert.duynh.me
+127.0.0.1 karma.duynh.me
+127.0.0.1 jaeger.duynh.me
+127.0.0.1 tempo.duynh.me
+127.0.0.1 pyroscope.duynh.me
+127.0.0.1 logs.duynh.me
+127.0.0.1 slo.duynh.me
+127.0.0.1 ui.duynh.me
+127.0.0.1 source.duynh.me
+127.0.0.1 openbao.duynh.me
+127.0.0.1 pgui.duynh.me
+127.0.0.1 vm-mcp.duynh.me
+127.0.0.1 vl-mcp.duynh.me
+127.0.0.1 flux-mcp.duynh.me
 ```
 
 > **Note**: Requires Kind cluster with `extraPortMappings` (ports 80/443 → NodePort 30080/30443). This is configured automatically by `make cluster-up`.
@@ -265,24 +265,24 @@ All services are routed through Kong Ingress Controller on port 80 (HTTP).
 
 | Service | Domain | Description |
 |---------|--------|-------------|
-| **API Gateway** | http://gateway.duynhne.me | **Single public API entry.** Variant A paths `/{service}/v1/{public,private}/…`. Pass-through — services mount these paths directly. Rate-limited, CORS-controlled. See [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md). |
-| **Frontend** | http://duynhne.me | React SPA (calls the API gateway cross-origin). |
-| **Grafana** | http://grafana.duynhne.me | Dashboards (anonymous access) |
-| **VictoriaMetrics** | http://vmui.duynhne.me/vmui | Metrics query UI |
-| **VMAlert** | http://vmalert.duynhne.me | Alert rules & evaluation |
-| **Karma** | http://karma.duynhne.me | Alertmanager dashboard |
-| **Jaeger** | http://jaeger.duynhne.me | Distributed tracing UI |
-| **Tempo** | http://tempo.duynhne.me | Trace backend API |
-| **Pyroscope** | http://pyroscope.duynhne.me | Continuous profiling |
-| **VictoriaLogs** | http://logs.duynhne.me | Log query UI |
-| **Sloth UI** | http://slo.duynhne.me | SLO browser — service/SLO list, SLI charts, burn-rate views (Sloth v0.16.0+) |
-| **Flux UI** | http://ui.duynhne.me | GitOps reconciliation status |
-| **RustFS Console** | http://source.duynhne.me | S3 object storage console |
-| **OpenBAO** | http://openbao.duynhne.me | Secrets management UI |
-| **Postgres Operator UI** | http://pgui.duynhne.me | Database cluster management |
-| **VM MCP** | http://vm-mcp.duynhne.me/mcp | VictoriaMetrics MCP (AI assistants) |
-| **VL MCP** | http://vl-mcp.duynhne.me/mcp | VictoriaLogs MCP (AI assistants) |
-| **Flux MCP** | http://flux-mcp.duynhne.me/mcp | Flux Operator MCP (AI assistants) |
+| **API Gateway** | http://gateway.duynh.me | **Single public API entry.** Variant A paths `/{service}/v1/{public,private}/…`. Pass-through — services mount these paths directly. Rate-limited, CORS-controlled. See [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md). |
+| **Frontend** | https://local.duynh.me | React SPA (calls the API gateway cross-origin). |
+| **Grafana** | https://grafana.duynh.me | Dashboards (anonymous access) |
+| **VictoriaMetrics** | http://vmui.duynh.me/vmui | Metrics query UI |
+| **VMAlert** | http://vmalert.duynh.me | Alert rules & evaluation |
+| **Karma** | http://karma.duynh.me | Alertmanager dashboard |
+| **Jaeger** | http://jaeger.duynh.me | Distributed tracing UI |
+| **Tempo** | http://tempo.duynh.me | Trace backend API |
+| **Pyroscope** | http://pyroscope.duynh.me | Continuous profiling |
+| **VictoriaLogs** | http://logs.duynh.me | Log query UI |
+| **Sloth UI** | http://slo.duynh.me | SLO browser — service/SLO list, SLI charts, burn-rate views (Sloth v0.16.0+) |
+| **Flux UI** | http://ui.duynh.me | GitOps reconciliation status |
+| **RustFS Console** | http://source.duynh.me | S3 object storage console |
+| **OpenBAO** | http://openbao.duynh.me | Secrets management UI |
+| **Postgres Operator UI** | http://pgui.duynh.me | Database cluster management |
+| **VM MCP** | http://vm-mcp.duynh.me/mcp | VictoriaMetrics MCP (AI assistants) |
+| **VL MCP** | http://vl-mcp.duynh.me/mcp | VictoriaLogs MCP (AI assistants) |
+| **Flux MCP** | http://flux-mcp.duynh.me/mcp | Flux Operator MCP (AI assistants) |
 
 ### Fallback: Port Forwarding
 

@@ -40,7 +40,7 @@ spec:
       # JSON access logs — picked up by Vector DaemonSet → Loki + VictoriaLogs
       proxy_access_log: "/dev/stdout"
       proxy_error_log: "/dev/stderr"
-      # Default proxy TLS certificate (cert-manager issued, wildcard *.duynhne.me)
+      # Default proxy TLS certificate (cert-manager issued, wildcard *.duynh.me)
       ssl_cert: "/etc/secrets/kong-proxy-tls/tls.crt"
       ssl_cert_key: "/etc/secrets/kong-proxy-tls/tls.key"
 

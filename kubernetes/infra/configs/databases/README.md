@@ -7,7 +7,7 @@ This directory contains PostgreSQL database configurations organized by cluster.
 
 | Operator                           | Version | Description                                                                                       | In Use | Releases                                                              |
 | ---------------------------------- | ------- | ------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------- |
-| **CloudNativePG**                  | v1.28.1 | Kubernetes-native operator for PostgreSQL with HA, disaster recovery, and declarative management. | ✅      | [Releases](https://github.com/cloudnative-pg/cloudnative-pg/releases) |
+| **CloudNativePG**                  | v1.29.0 | Kubernetes-native operator for PostgreSQL with HA, disaster recovery, and declarative management. | ✅      | [Releases](https://github.com/cloudnative-pg/cloudnative-pg/releases) |
 | **Zalando Postgres Operator**      | v1.15.1 | Automated HA and operational simplicity for PostgreSQL on Kubernetes. Uses Patroni + Spilo.       | ✅      | [Releases](https://github.com/zalando/postgres-operator/releases)     |
 | **Crunchy Data Postgres Operator** | —       | Kubernetes-native operator by Crunchy Data with robust scaling, HA, and backup.                   | ⬜      | —                                                                     |
 | **KubeDB PostgreSQL Operator**     | —       | Multi-database Kubernetes operator (part of KubeDB ecosystem).                                    | ⬜      | —                                                                     |
@@ -66,8 +66,9 @@ This directory contains PostgreSQL database configurations organized by cluster.
 
 ## Related Documentation
 
-- **Database Guide:** [`docs/databases/002-database-integration.md`](../../../docs/databases/002-database-integration.md)
+- **Database Guide:** [`docs/databases/002-database-integration.md`](../../../../docs/databases/002-database-integration.md)
+- **PostgreSQL DRP:** [`docs/databases/010-drp.md`](../../../../docs/databases/010-drp.md)
 - **Poolers Documentation:** [`clusters/README.md`](clusters/README.md)
-- **DR bootstrap runbook:** [`docs/databases/runbooks/cnpg-dr-replica-bootstrap.md`](../../../docs/databases/runbooks/cnpg-dr-replica-bootstrap.md)
-- **PgCat Troubleshooting (legacy):** [`docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md`](../../../docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md)
+- **CNPG HA/DR Deep Dive:** [`docs/databases/005-ha-dr-deep-dive.md`](../../../../docs/databases/005-ha-dr-deep-dive.md)
+- **PgCat Troubleshooting (legacy):** [`docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md`](../../../../docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md)
 

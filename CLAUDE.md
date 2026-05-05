@@ -367,7 +367,7 @@ make flux-sync
 - **API Reference**: [`docs/api/api.md`](docs/api/api.md) - Complete API documentation
 - **Setup Guide**: [`docs/platform/setup.md`](docs/platform/setup.md) - Deployment instructions
 - **Configuration**: [`docs/api/api.md`](docs/api/api.md) - Environment variables and config
-- **Database**: [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) - Database architecture and patterns; [`docs/databases/010-documents.md`](docs/databases/010-documents.md) - Further reading (internals, replication, ops)
+- **Database**: [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) - Database architecture and patterns; [`docs/databases/010-drp.md`](docs/databases/010-drp.md) - PostgreSQL DRP, RTO/RPO, PITR; [`docs/databases/011-documents.md`](docs/databases/011-documents.md) - further reading
 
 ### Find Files by Purpose
 

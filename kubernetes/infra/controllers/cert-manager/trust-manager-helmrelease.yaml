@@ -1,0 +1,55 @@
+# trust-manager — distributes CA bundles across namespaces.
+# Sister project to cert-manager (same Jetstack/Venafi org).
+# Reads sources from the cert-manager namespace (= trust namespace) and
+# writes ConfigMaps named `homelab-ca-bundle` to every namespace labeled
+# `platform.duynhlab.dev/needs-trust=true`.
+# Chart docs: https://cert-manager.io/docs/trust/trust-manager/installation/
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: trust-manager
+  namespace: cert-manager
+spec:
+  interval: 10m
+  timeout: 10m
+  chart:
+    spec:
+      chart: trust-manager
+      sourceRef:
+        kind: HelmRepository
+        name: jetstack
+        namespace: flux-system
+      version: "0.20.0"
+  install:
+    crds: CreateReplace
+    createNamespace: false
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  dependsOn:
+    - name: cert-manager
+      namespace: cert-manager
+  values:
+    # Trust namespace = where Bundle sources (Secret/ConfigMap) are read from.
+    # Defaults to the release namespace; pinned explicit for clarity.
+    app:
+      trust:
+        namespace: cert-manager
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+    # Default CA package (Mozilla via Debian Bookworm trust-pkg) — kept enabled
+    # so Bundles using `useDefaultCAs: true` resolve immediately.
+    defaultPackageImage:
+      repository: quay.io/jetstack/trust-pkg-debian-bookworm
+      tag: "20230311.0"
+    secretTargets:
+      enabled: false

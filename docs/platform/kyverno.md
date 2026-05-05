@@ -26,7 +26,7 @@ so the highest-value Kyverno features are:
 | 7 | ValidatingAdmissionPolicy (CEL/VAP) | ❌ | — | Wait for K8s 1.32 GA |
 | 8 | Pod Security Standards | ✅ | 1 | Baseline cluster-wide, restricted on apps |
 | 9 | PolicyReport CRD | ✅ | 1 | Auto, no config |
-| 10 | Policy Reporter UI | ✅ planned | 2 | `kyverno.duynhne.me` |
+| 10 | Policy Reporter UI | ✅ planned | 2 | `kyverno.duynh.me` |
 | 11 | Background scan | ✅ | 1 | Catches pre-Kyverno resources |
 | 12 | Auto-gen rules | ✅ | 1 | Default-on |
 | 13 | JMESPath / context | ✅ when needed | — | Use sparingly (latency) |
@@ -162,7 +162,7 @@ kubectl logs -n kyverno -l app.kubernetes.io/component=admission-controller --ta
 - **Metrics**: `serviceMonitor.enabled: true` in HelmRelease → VMAgent scrape →
   VictoriaMetrics → Grafana (import dashboard ID `15983`)
 - **Reports**: Aggregate via `kubectl get policyreport -A` or the upcoming
-  policy-reporter UI at `kyverno.duynhne.me`
+  policy-reporter UI at `kyverno.duynh.me`
 
 ## References
 

@@ -1,0 +1,30 @@
+# Distributes the homelab CA bundle to every namespace labeled
+# `platform.duynhlab.dev/needs-trust=true` as ConfigMap/homelab-ca-bundle
+# (key: ca-bundle.pem). Combines:
+#   - useDefaultCAs: Mozilla CA set (for Let's Encrypt / public TLS later)
+#   - ConfigMap: homelab-ca-source (committed copy of homelab-ca tls.crt)
+# Workloads mount the ConfigMap at /etc/ssl/certs/homelab-ca.crt (subPath).
+#
+# JKS / PKCS#12 outputs are intentionally disabled — all workloads in this
+# project are Go (uses /etc/ssl/certs/ at runtime) and don't need keystores.
+apiVersion: trust.cert-manager.io/v1alpha1
+kind: Bundle
+metadata:
+  name: homelab-ca-bundle
+spec:
+  sources:
+    - useDefaultCAs: true
+    - configMap:
+        name: homelab-ca-source
+        key: ca.crt
+  target:
+    configMap:
+      key: ca-bundle.pem
+    # additionalFormats:
+    #   jks:
+    #     key: bundle.jks
+    #   pkcs12:
+    #     key: bundle.p12
+    namespaceSelector:
+      matchLabels:
+        platform.duynhlab.dev/needs-trust: "true"

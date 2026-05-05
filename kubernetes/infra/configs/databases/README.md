@@ -7,7 +7,7 @@ This directory contains PostgreSQL database configurations organized by cluster.
 
 | Operator                           | Version | Description                                                                                       | In Use | Releases                                                              |
 | ---------------------------------- | ------- | ------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------- |
-| **CloudNativePG**                  | v1.28.1 | Kubernetes-native operator for PostgreSQL with HA, disaster recovery, and declarative management. | ✅      | [Releases](https://github.com/cloudnative-pg/cloudnative-pg/releases) |
+| **CloudNativePG**                  | v1.29.0 | Kubernetes-native operator for PostgreSQL with HA, disaster recovery, and declarative management. | ✅      | [Releases](https://github.com/cloudnative-pg/cloudnative-pg/releases) |
 | **Zalando Postgres Operator**      | v1.15.1 | Automated HA and operational simplicity for PostgreSQL on Kubernetes. Uses Patroni + Spilo.       | ✅      | [Releases](https://github.com/zalando/postgres-operator/releases)     |
 | **Crunchy Data Postgres Operator** | —       | Kubernetes-native operator by Crunchy Data with robust scaling, HA, and backup.                   | ⬜      | —                                                                     |
 | **KubeDB PostgreSQL Operator**     | —       | Multi-database Kubernetes operator (part of KubeDB ecosystem).                                    | ⬜      | —                                                                     |
@@ -43,8 +43,8 @@ This directory contains PostgreSQL database configurations organized by cluster.
 | -------------------- | ------------------------------------------------------------------------ | ------------------------ | ------------------- | -------------------------------------------------------- |
 | auth-db              | postgres_exporter v0.18.1 (sidecar, :9187) + PgBouncer exporter v0.11.0 | Vector v0.52.0 (sidecar) | WAL-G               | `s3://pg-backups-zalando/auth-db/`                       |
 | supporting-shared-db | pg_exporter (Pigsty) v1.2.0 (sidecar, :9630)                            | Vector v0.52.0 (sidecar) | WAL-G               | `s3://pg-backups-zalando/user-db/`                       |
-| cnpg-db              | CNPG built-in (PodMonitor) + PgDog OpenMetrics (:9090)                   | CNPG built-in (stdout)   | Barman Object Store | `s3://pg-backups-cnpg/cnpg-db/`, retention 30d           |
-| cnpg-db-replica      | CNPG built-in (PodMonitor)                                               | CNPG built-in (stdout)   | Barman Object Store | `s3://pg-backups-cnpg/cnpg-db-replica/`, retention 7d    |
+| cnpg-db              | CNPG built-in (PodMonitor) + PgDog OpenMetrics (:9090)                   | CNPG built-in (stdout)   | Barman Cloud Plugin + ObjectStore | `s3://pg-backups-cnpg/cnpg-db/`, retention 30d           |
+| cnpg-db-replica      | CNPG built-in (PodMonitor)                                               | CNPG built-in (stdout)   | Barman Cloud Plugin + ObjectStore | `s3://pg-backups-cnpg/cnpg-db-replica/`, retention 7d    |
 
 
 ## Extensions
@@ -61,13 +61,15 @@ This directory contains PostgreSQL database configurations organized by cluster.
 
 | Path | Flux Kustomization | Contents |
 |------|--------------------|----------|
+| `configs/cnpg-barman-plugin` | `cnpg-barman-plugin-local` | Barman Cloud Plugin deployment + `ObjectStore` CRD, applied before CNPG clusters |
 | `configs/databases` | `databases-local` | Zalando clusters, `cnpg-db` (+ PgDog, backups, `Backup` on-demand `cnpg-db-initial`) |
 | `configs/databases-cnpg-dr` | `databases-cnpg-dr-local` | `cnpg-db-replica` only; `dependsOn: databases-local` |
 
 ## Related Documentation
 
-- **Database Guide:** [`docs/databases/002-database-integration.md`](../../../docs/databases/002-database-integration.md)
+- **Database Guide:** [`docs/databases/002-database-integration.md`](../../../../docs/databases/002-database-integration.md)
+- **PostgreSQL DRP:** [`docs/databases/010-drp.md`](../../../../docs/databases/010-drp.md)
 - **Poolers Documentation:** [`clusters/README.md`](clusters/README.md)
-- **DR bootstrap runbook:** [`docs/databases/runbooks/cnpg-dr-replica-bootstrap.md`](../../../docs/databases/runbooks/cnpg-dr-replica-bootstrap.md)
-- **PgCat Troubleshooting (legacy):** [`docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md`](../../../docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md)
+- **CNPG HA/DR Deep Dive:** [`docs/databases/005-ha-dr-deep-dive.md`](../../../../docs/databases/005-ha-dr-deep-dive.md)
+- **PgCat Troubleshooting (legacy):** [`docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md`](../../../../docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md)
 

@@ -1,5 +1,9 @@
 # PostgreSQL Replication & HA: A Deep Dive
 
+This is the canonical sync/async replication deep dive. For DRP policy,
+incident decision flow, RTO/RPO ownership, and restore evidence, see
+[010-drp.md](./010-drp.md).
+
 ## 1. Executive Summary
 
 You are running **3 operational PostgreSQL clusters** + **1 DR replica cluster** with a hybrid architecture optimized for specific workload needs.

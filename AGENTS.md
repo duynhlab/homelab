@@ -67,6 +67,21 @@ legitimately violate baseline are whitelisted via PolicyException with
 owner and TTL annotations.
 ```
 
+### Branching & Push Policy
+
+**NEVER push directly to `main`.** No exceptions. All changes go through a feature branch and PR.
+
+- Create a branch with conventional prefix before any work:
+  - `feat/<short-desc>` — new feature or capability
+  - `fix/<short-desc>` — bug fix
+  - `chore/<short-desc>` — tooling, deps, refactor with no behavior change
+  - `docs/<short-desc>` — documentation only
+  - `refactor/<short-desc>` — code restructure, no behavior change
+  - `ci/<short-desc>` — CI/CD pipeline changes
+- One logical change per branch. Keep branches short-lived.
+- Push the branch (`git push -u origin <branch>`), then open a PR against `main`.
+- Squash-merge via PR. Never `git push origin main` from a local checkout, ever.
+
 ---
 
 ## Documentation Standards
@@ -318,7 +333,8 @@ flux-system (bootstrap)
   ├── kong-local (depends: cert-manager) — Kong HelmRelease (mounts kong-proxy-tls)
   ├── kong-config-local (depends: kong + cert-manager) — Ingress resources
   ├── secrets-local (depends: controllers)
-  ├── databases-local (depends: secrets + monitoring)
+  ├── cnpg-barman-plugin-local (depends: controllers + cert-manager) — Barman Cloud Plugin + ObjectStore CRD
+  ├── databases-local (depends: secrets + monitoring + cnpg-barman-plugin)
   ├── databases-cnpg-dr-local (depends: databases + secrets) — DR replica
   ├── monitoring-local (depends: controllers) — VMSingle, VLSingle, Grafana, alerting
   ├── kyverno-policies-local (depends: controllers + monitoring) — admission policies
@@ -367,7 +383,7 @@ make flux-sync
 - **API Reference**: [`docs/api/api.md`](docs/api/api.md) - Complete API documentation
 - **Setup Guide**: [`docs/platform/setup.md`](docs/platform/setup.md) - Deployment instructions
 - **Configuration**: [`docs/api/api.md`](docs/api/api.md) - Environment variables and config
-- **Database**: [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) - Database architecture and patterns; [`docs/databases/010-documents.md`](docs/databases/010-documents.md) - Further reading (internals, replication, ops)
+- **Database**: [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) - Database architecture and patterns; [`docs/databases/010-drp.md`](docs/databases/010-drp.md) - PostgreSQL DRP, RTO/RPO, PITR; [`docs/databases/011-documents.md`](docs/databases/011-documents.md) - further reading
 
 ### Find Files by Purpose
 

@@ -1,5 +1,11 @@
 # Runbook: Zalando Postgres Operator -- Scaling from 1 to 3 Nodes
 
+This is the operator-specific runbook for scaling a Zalando/Patroni cluster
+from a single instance to local HA. For platform-wide DRP policy, RTO/RPO
+ownership, standby taxonomy, and restore evidence, see
+[../010-drp.md](../010-drp.md). For Zalando operator internals, see
+[../003.2-operator-zalando.md](../003.2-operator-zalando.md).
+
 ## Table of Contents
 
 0. [RPO, RTO and the HA Trade-offs](#0-rpo-rto-and-the-ha-trade-offs)

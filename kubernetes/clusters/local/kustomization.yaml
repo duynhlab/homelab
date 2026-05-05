@@ -7,6 +7,7 @@ resources:
   - sources/
   - controllers.yaml     # Namespaces + operators (monitoring, databases, slo)
   - cert-manager-config.yaml
+  - cnpg-barman-plugin.yaml # Barman Cloud Plugin + ObjectStore CRD before CNPG clusters
   - kong.yaml               # Kong HelmRelease (depends on cert-manager-local for kong-proxy-tls Secret)
   - kong-config.yaml         # Kong Ingress routes + plugins (depends on kong + cert-manager)
   - secrets.yaml         # Vault + ESO (Must be before databases)

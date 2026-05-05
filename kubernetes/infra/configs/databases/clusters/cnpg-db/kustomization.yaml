@@ -12,6 +12,7 @@ resources:
   - secrets/cnpg-db-order-secret-order-ns.yaml
   - secrets/pgdog-cnpg-credentials.yaml
   # pg-backup-rustfs-credentials: managed by ClusterExternalSecret (configs/secrets/cluster-external-secrets/)
+  - objectstore.yaml
   - instance.yaml
   - extensions.yaml
   - configmaps/monitoring-queries.yaml

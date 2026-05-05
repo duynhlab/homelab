@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.92.0] - 2026-05-06
+
+### Added
+
+- Let's Encrypt DNS-01 ClusterIssuers (`letsencrypt-prod`, `letsencrypt-staging`)
+  using Cloudflare DNS provider for the `duynh.me` zone
+  (`kubernetes/infra/configs/cert-manager/clusterissuers.yaml`).
+- `ExternalSecret/cloudflare-api-token` in `cert-manager` namespace, synced
+  from OpenBAO at `secret/data/local/infra/cloudflare/api-token`.
+- `scripts/setup-hosts.sh` helper to install `*.duynh.me` entries into
+  `/etc/hosts` (idempotent, marker-managed block).
+
+### Changed
+
+- Domain rename: all platform hostnames migrated from `*.duynhne.me` to
+  `*.duynh.me` (the actually-registered Cloudflare zone). Frontend host
+  changed from `duynhne.me` to `local.duynh.me` (subdomain to keep the apex
+  free for a future public landing page).
+- `kong-proxy-tls` Certificate now issued by `letsencrypt-prod` (was
+  `homelab-ca`). Wildcard `*.duynh.me` (+ apex `duynh.me` + explicit
+  `local.duynh.me`) — Kong terminates TLS at the edge with a publicly-trusted
+  cert; no per-Ingress `tls:` block needed.
+- All 25 Ingress resources updated to the new hosts and force HTTPS via
+  `konghq.com/protocols: "https"` + `konghq.com/https-redirect-status-code: "301"`.
+  HTTP requests return `301` to the same path on HTTPS.
+- Kong global CORS plugin origins updated to `https://local.duynh.me` +
+  `https://duynh.me` (was `*.duynhne.me`).
+- `cert-manager-local` Kustomization now `dependsOn: [secrets-local]` so the
+  `cloudflare-api-token` Secret exists before the ClusterIssuer is created.
+
 ## [0.91.0] - 2026-05-05
 
 ### Added

@@ -1,4 +1,4 @@
-# Global CORS plugin — allows frontend (duynhne.me) to call APIs (gateway.duynhne.me)
+# Global CORS plugin — allows frontend (local.duynh.me) to call APIs (gateway.duynh.me)
 ---
 apiVersion: configuration.konghq.com/v1
 kind: KongClusterPlugin
@@ -11,8 +11,8 @@ metadata:
 plugin: cors
 config:
   origins:
-    - "https://duynhne.me"
-    - "http://duynhne.me"
+    - "https://local.duynh.me"
+    - "https://duynh.me"
     - "http://localhost:3001"
     - "http://localhost:8000"
   methods:

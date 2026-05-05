@@ -5,6 +5,7 @@ kind: ClusterPolicy
 metadata:
   name: disallow-default-namespace
   annotations:
+    pod-policies.kyverno.io/autogen-controllers: none
     policies.kyverno.io/title: Disallow default namespace
     policies.kyverno.io/category: Multi-Tenancy, Best Practices
     policies.kyverno.io/severity: medium

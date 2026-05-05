@@ -32,7 +32,7 @@ spec:
           replicaCount: << inputs.replicaCount | int >>
           image:
             repository: ghcr.io/duynhlab/frontend/frontend
-            tag: sha-0931742
+            tag: sha-a88aa90
             pullPolicy: IfNotPresent
           service:
             type: ClusterIP

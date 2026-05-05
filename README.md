@@ -221,9 +221,6 @@ automatically by `make cluster-up`.
 | Postgres Operator UI | <https://pgui.duynh.me> | Cluster management |
 | VM / VL / Flux MCP | <https://vm-mcp.duynh.me/mcp> · <https://vl-mcp.duynh.me/mcp> · <https://flux-mcp.duynh.me/mcp> | MCP servers for AI assistants |
 
-**Fallback (no `/etc/hosts`):** `make flux-ui` starts a port-forward bundle.
-Stop it with `pkill -f 'kubectl port-forward'`.
-
 ### Deployment
 
 ```bash

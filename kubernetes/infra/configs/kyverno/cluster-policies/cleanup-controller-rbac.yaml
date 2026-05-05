@@ -1,0 +1,13 @@
+# Grants kyverno cleanup-controller permission to delete Pods.
+# Aggregated into kyverno:cleanup-controller via the rbac.kyverno.io label.
+# Required by ClusterCleanupPolicy/cleanup-completed-pods.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kyverno:cleanup-controller:pods
+  labels:
+    rbac.kyverno.io/aggregate-to-cleanup-controller: "true"
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch, delete]

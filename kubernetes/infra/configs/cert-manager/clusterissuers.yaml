@@ -72,3 +72,51 @@ spec:
 #       - http01:
 #           ingress:
 #             class: kong
+
+# --- Let's Encrypt (DNS-01 via Cloudflare) -----------------------------------
+# DNS-01 works for local domains too — only needs the API token to update TXT
+# records on the public Cloudflare zone. The Kind cluster never has to be
+# reachable from the internet. Wildcard certs (*.duynh.me) only work via DNS-01.
+#
+# Token secret (api-token key) is synced from OpenBAO by the ExternalSecret
+# kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml.
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    email: duyhenry250897@gmail.com
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token
+        selector:
+          dnsZones:
+            - duynh.me
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    email: duyhenry250897@gmail.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token
+        selector:
+          dnsZones:
+            - duynh.me

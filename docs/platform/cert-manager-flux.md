@@ -186,7 +186,7 @@ metadata:
   name: letsencrypt-staging
 spec:
   acme:
-    email: acme@duynhne.me
+    email: acme@duynh.me
     server: https://acme-staging-v02.api.letsencrypt.org/directory
     privateKeySecretRef:
       name: letsencrypt-staging-account-key
@@ -201,7 +201,7 @@ metadata:
   name: letsencrypt-prod
 spec:
   acme:
-    email: acme@duynhne.me
+    email: acme@duynh.me
     server: https://acme-v02.api.letsencrypt.org/directory
     privateKeySecretRef:
       name: letsencrypt-prod-account-key
@@ -217,18 +217,18 @@ spec:
 
 ## 6. Certificate resources — eight microservices (template)
 
-One **Certificate** per hostname (per namespace). DNS names below follow `gateway.duynhne.me` style from [api-naming-convention.md](../api/api-naming-convention.md); **replace** `duynhne.me` with your domain.
+One **Certificate** per hostname (per namespace). DNS names below follow `gateway.duynh.me` style from [api-naming-convention.md](../api/api-naming-convention.md); **replace** `local.duynh.me` with your domain.
 
 | Service      | Namespace      | Example DNS name              |
 |-------------|----------------|-------------------------------|
-| auth        | auth           | auth.duynhne.me              |
-| user        | user           | user.duynhne.me              |
-| product     | product        | product.duynhne.me           |
-| cart        | cart           | cart.duynhne.me              |
-| order       | order          | order.duynhne.me             |
-| review      | review         | review.duynhne.me            |
-| notification| notification   | notification.duynhne.me      |
-| shipping    | shipping       | shipping.duynhne.me          |
+| auth        | auth           | auth.duynh.me              |
+| user        | user           | user.duynh.me              |
+| product     | product        | product.duynh.me           |
+| cart        | cart           | cart.duynh.me              |
+| order       | order          | order.duynh.me             |
+| review      | review         | review.duynh.me            |
+| notification| notification   | notification.duynh.me      |
+| shipping    | shipping       | shipping.duynh.me          |
 
 **File:** `kubernetes/infra/configs/cert-manager/certificates-microservices.yaml`
 
@@ -245,7 +245,7 @@ spec:
     kind: ClusterIssuer
     name: letsencrypt-staging
   dnsNames:
-    - auth.duynhne.me
+    - auth.duynh.me
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -258,7 +258,7 @@ spec:
     kind: ClusterIssuer
     name: letsencrypt-staging
   dnsNames:
-    - user.duynhne.me
+    - user.duynh.me
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -271,7 +271,7 @@ spec:
     kind: ClusterIssuer
     name: letsencrypt-staging
   dnsNames:
-    - product.duynhne.me
+    - product.duynh.me
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -284,7 +284,7 @@ spec:
     kind: ClusterIssuer
     name: letsencrypt-staging
   dnsNames:
-    - cart.duynhne.me
+    - cart.duynh.me
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -297,7 +297,7 @@ spec:
     kind: ClusterIssuer
     name: letsencrypt-staging
   dnsNames:
-    - order.duynhne.me
+    - order.duynh.me
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -310,7 +310,7 @@ spec:
     kind: ClusterIssuer
     name: letsencrypt-staging
   dnsNames:
-    - review.duynhne.me
+    - review.duynh.me
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -323,7 +323,7 @@ spec:
     kind: ClusterIssuer
     name: letsencrypt-staging
   dnsNames:
-    - notification.duynhne.me
+    - notification.duynh.me
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -336,7 +336,7 @@ spec:
     kind: ClusterIssuer
     name: letsencrypt-staging
   dnsNames:
-    - shipping.duynhne.me
+    - shipping.duynh.me
 ```
 
 Switch `letsencrypt-staging` → `letsencrypt-prod` when DNS + HTTP-01 are verified.
@@ -366,10 +366,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - auth.duynhne.me
+        - auth.duynh.me
       secretName: auth-tls
   rules:
-    - host: auth.duynhne.me
+    - host: auth.duynh.me
       http:
         paths:
           - path: /
@@ -388,7 +388,7 @@ Use the `Certificate` manifests from section 6; Ingress references `secretName` 
 ```yaml
 spec:
   tls:
-    - hosts: [auth.duynhne.me]
+    - hosts: [auth.duynh.me]
       secretName: auth-tls
 ```
 
@@ -436,7 +436,7 @@ Add `cert-manager-config.yaml` to `kubernetes/clusters/local/kustomization.yaml`
 ## 9. Deployment (step-by-step)
 
 1. **Ingress controller** — HTTP-01 needs a working Ingress with a **public** IP/DNS. On Kind, use [ingress-nginx](https://kubernetes.github.io/ingress-nginx/deploy/) or match your platform. **Local Kind without public DNS:** certificates stay **Pending**; use **staging** issuer or **mkcert**/self-signed for dev.
-2. **DNS** — Create **A/AAAA** (or CNAME) for each `*.duynhne.me` host → load balancer IP.
+2. **DNS** — Create **A/AAAA** (or CNAME) for each `*.duynh.me` host → load balancer IP.
 3. **Commit** HelmRepository, namespaces, `controllers/cert-manager`, `configs/cert-manager`, Flux `cert-manager-local`, and `kustomization.yaml` updates.
 4. **Push** to the branch Flux watches; **reconcile** (or wait for interval).
 5. **Verify** cert-manager pods: `kubectl -n cert-manager get pods`.
@@ -547,11 +547,11 @@ spec:
             project: my-gcp-project
         selector:
           dnsNames:
-            - "*.duynhne.me"
-            - "duynhne.me"
+            - "*.duynh.me"
+            - "local.duynh.me"
 ```
 
-3. Use **one** `Certificate` with `dnsNames: ["*.duynhne.me","duynhne.me"]` and a single TLS secret referenced by multiple Ingresses (same namespace limitations apply — wildcards are often **one namespace** or shared cert; plan accordingly).
+3. Use **one** `Certificate` with `dnsNames: ["*.duynh.me","local.duynh.me"]` and a single TLS secret referenced by multiple Ingresses (same namespace limitations apply — wildcards are often **one namespace** or shared cert; plan accordingly).
 
 ---
 

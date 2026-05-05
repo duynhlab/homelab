@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [0.90.1] - 2026-05-05
+
+### Added
+
+- Add a production-ready PostgreSQL DRP guide covering HA, DR, PITR,
+  RTO/RPO targets, standby taxonomy, recovery decision flow, restore evidence,
+  and the CNPG Barman Cloud Plugin migration track.
+- Add focused operator deep dives for CloudNativePG and Zalando Postgres
+  Operator, while keeping the operator comparison page as a concise decision
+  guide.
+- Add a refreshed CNPG DR replica bootstrap runbook that points to the
+  canonical DRP and CNPG HA/DR deep dive.
+
+### Changed
+
+- Rename the PostgreSQL further-reading page from `010-documents.md` to
+  `011-documents.md` so `010-drp.md` can become the canonical DRP document.
+- Refresh database docs, README indexes, and agent navigation links for the
+  new DRP and operator deep-dive structure.
+- Correct stale CNPG backup documentation to describe `cnpg-db` as synchronous
+  quorum `ANY 1` rather than async-only.
+- Rework the PostgreSQL backup/restore runbook around the current
+  `cnpg-db`, `cnpg-db-replica`, `auth-db`, and `supporting-shared-db`
+  topology.
+
 ## [0.90.0] - 2026-05-04
 
 ### Changed

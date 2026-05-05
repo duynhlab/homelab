@@ -1,178 +1,161 @@
 # PostgreSQL Backup and Restore Runbook
 
-This runbook covers backup/restore procedures for the 4 PostgreSQL clusters using RustFS (S3-compatible) as object storage. Reference: [docs/databases/006-backup-strategy.md](../../databases/006-backup-strategy.md).
+This runbook covers backup and restore procedures for the current PostgreSQL
+clusters using RustFS (S3-compatible) object storage.
 
-## Table of Contents
+Reference docs:
 
-1. [Overview](#overview)
-2. [CloudNativePG (product-db, transaction-shared-db)](#cloudnativepg-product-db-transaction-shared-db)
-3. [Zalando (auth-db, supporting-shared-db)](#zalando-auth-db-supporting-shared-db)
-4. [Verification Checklist](#verification-checklist)
-
----
+- [Database DRP](../../databases/010-drp.md)
+- [Backup Strategy](../../databases/006-backup-strategy.md)
+- [Database Integration](../../databases/002-database-integration.md)
 
 ## Overview
 
-| Cluster         | Operator      | Backup Method | Restore Method |
-|-----------------|---------------|---------------|----------------|
-| product-db      | CloudNativePG | barmanObjectStore + ScheduledBackup | Bootstrap recovery from object store |
-| transaction-shared-db  | CloudNativePG | barmanObjectStore + ScheduledBackup | Bootstrap recovery from object store |
-| auth-db         | Zalando       | WAL-G (operator-level) | Clone from S3 / pg_restore |
-| supporting-shared-db   | Zalando       | WAL-G (operator-level) | Clone from S3 / pg_restore |
+| Cluster | Operator | Backup method | Restore method |
+|---------|----------|---------------|----------------|
+| `cnpg-db` | CloudNativePG | Barman object store + `Backup` / `ScheduledBackup` | Bootstrap recovery from `s3://pg-backups-cnpg/cnpg-db/` |
+| `cnpg-db-replica` | CloudNativePG | Barman object store for its own DR prefix | Replica cluster or restore from object store |
+| `auth-db` | Zalando | WAL-G via Spilo/operator env | Clone/restore from WAL-G object-store backup |
+| `supporting-shared-db` | Zalando | WAL-G via Spilo/operator env | Clone/restore from WAL-G object-store backup |
 
----
-
-## CloudNativePG (product-db, transaction-shared-db)
+## CloudNativePG: `cnpg-db`
 
 ### Prerequisites
 
-- RustFS running in `rustfs` namespace
-- Buckets `pg-backups-zalando` / `pg-backups-cnpg` created (CronJob `setup-pg-backup-buckets` in rustfs namespace)
-- Secret `pg-backup-rustfs-credentials` in cluster namespace
-- At least one successful base backup + WAL archiving
+- RustFS is running in namespace `rustfs`.
+- Bucket `pg-backups-cnpg` exists.
+- Secret `pg-backup-rustfs-credentials` exists in namespace `product`.
+- `cnpg-db` has at least one completed base backup.
+- `cnpg-db` reports `ContinuousArchiving=True`.
 
-### Manual Backup (product-db)
+### Check backup health
 
 ```bash
-# Trigger immediate backup
-kubectl cnpg backup product-db -n product
+kubectl get cluster,backup,scheduledbackup -n product
+kubectl get cluster cnpg-db -n product -o jsonpath='{range .status.conditions[*]}{.type}={.status} reason={.reason}{"\n"}{end}'
+```
 
-# Or create Backup CR
+Expected:
+
+- `Backup` resources show `completed`.
+- `ScheduledBackup` resources have recent `LAST BACKUP`.
+- `ContinuousArchiving=True`.
+- `LastBackupSucceeded=True`.
+
+### Trigger manual backup
+
+If the CNPG kubectl plugin is installed:
+
+```bash
+kubectl cnpg backup cnpg-db -n product
+```
+
+Plain Kubernetes fallback:
+
+```bash
 kubectl apply -f - <<EOF
 apiVersion: postgresql.cnpg.io/v1
 kind: Backup
 metadata:
-  name: product-db-manual-$(date +%Y%m%d-%H%M)
+  name: cnpg-db-manual-$(date +%Y%m%d-%H%M)
   namespace: product
 spec:
   cluster:
-    name: product-db
+    name: cnpg-db
   method: barmanObjectStore
 EOF
 ```
 
-### List Backups
+### Restore to a new cluster
+
+Use the checked-in restore example as the starting point:
 
 ```bash
-kubectl cnpg backup list product-db -n product
+kubectl apply -f kubernetes/infra/configs/databases/clusters/cnpg-db/restore-cluster-example.yaml
+kubectl get cluster -n product -w
 ```
 
-### Restore to New Cluster (product-db)
-
-1. **Create restore cluster manifest** (example: `product-db-restore`):
+The example restores from:
 
 ```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: product-db-restore
-  namespace: product
-  annotations:
-    # Required: skip WAL archive check when restoring to new cluster name
-    cnpg.io/skipEmptyWalArchiveCheck: "enabled"
-spec:
-  instances: 1  # Start with 1 for restore, scale after
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
-  bootstrap:
-    recovery:
-      source: product-db-backup
-      database: product
-      owner: product
-      secret:
-        name: product-db-secret
-  externalClusters:
-    - name: product-db-backup
-      barmanObjectStore:
-        destinationPath: s3://pg-backups-cnpg/product-db/
-        endpointURL: http://rustfs-svc.rustfs.svc.cluster.local:9000
-        serverName: product-db  # Matches backup path prefix
-        s3Credentials:
-          accessKeyId:
-            name: pg-backup-rustfs-credentials
-            key: ACCESS_KEY_ID
-          secretAccessKey:
-            name: pg-backup-rustfs-credentials
-            key: ACCESS_SECRET_KEY
-        wal:
-          maxParallel: 4
-  storage:
-    size: 10Gi
-    storageClass: standard
-  resources:
-    requests:
-      memory: "128Mi"
-      cpu: "50m"
-    limits:
-      memory: "128Mi"
-      cpu: "100m"
+externalClusters:
+  - name: cnpg-db-backup
+    barmanObjectStore:
+      destinationPath: s3://pg-backups-cnpg/cnpg-db/
+      endpointURL: http://rustfs-svc.rustfs.svc.cluster.local:9000
+      serverName: cnpg-db-cluster
 ```
 
-2. **Apply and wait**:
+### Point-in-time recovery
 
-```bash
-kubectl apply -f product-db-restore.yaml
-kubectl get cluster -n product -w
-# Wait until status: Cluster in healthy state
-```
-
-3. **Verify**:
-
-```bash
-kubectl exec -it product-db-restore-1 -n product -- psql -U product -d product -c "\dt"
-kubectl exec -it product-db-restore-1 -n product -- psql -U product -d product -c "SELECT count(*) FROM products;"
-```
-
-### Point-in-Time Recovery (PITR)
-
-To restore to a specific timestamp (e.g., before a DROP TABLE):
-
-1. **Note the incident time** (e.g., `2025-01-28 10:30:00+00`)
-
-2. **Add recoveryTarget to bootstrap.recovery**:
+To restore before a bad data change, add a recovery target to the restore
+cluster manifest:
 
 ```yaml
 bootstrap:
   recovery:
-    source: product-db-backup
+    source: cnpg-db-backup
     recoveryTarget:
-      targetTime: "2025-01-28 10:29:00+00"  # Just before incident
-    database: product
-    owner: product
-    secret:
-      name: product-db-secret
+      targetTime: "2026-05-05 03:00:00+00"
 ```
 
-3. **Apply and verify** as in "Restore to New Cluster" above.
+Use a timestamp just before the incident. After restore, validate schema, row
+counts, and application smoke tests before routing traffic or extracting data.
 
-### Verification Checklist (CNPG)
+### Validate CNPG restore
 
-- [ ] Backup CR shows `Completed` status
-- [ ] WAL files visible in RustFS: `s3://pg-backups-cnpg/product-db/` (via mc or aws cli)
-- [ ] Restore cluster reaches `Cluster in healthy state`
-- [ ] Schema matches: `\dt` shows expected tables
-- [ ] Row counts match (or expected for PITR)
-- [ ] Application can connect and query
+```bash
+kubectl exec -it cnpg-db-restore-1 -n product -- psql -U product -d product -c "\dt"
+kubectl exec -it cnpg-db-restore-1 -n product -- psql -U product -d product -c "SELECT count(*) FROM products;"
+```
 
----
+## CloudNativePG: `cnpg-db-replica`
 
-## Zalando (auth-db, supporting-shared-db)
+`cnpg-db-replica` is a DR replica cluster that follows the `cnpg-db` backup/WAL
+archive path. It is not part of the normal app write path.
 
-### WAL-G Backup Configuration
+Check status:
 
-Zalando clusters use WAL-G for PITR backup to RustFS. Configuration is operator-level:
-- **ConfigMap**: `postgres-operator/zalando-walg-config` (non-sensitive)
-- **Secret**: `pg-backup-rustfs-credentials` (per cluster namespace: user, auth, review)
-- **Bucket**: `pg-backups-zalando` with cluster-specific paths (spilo/{cluster-name}/...)
+```bash
+kubectl get cluster cnpg-db-replica -n product -o wide
+kubectl get pods -n product -l cnpg.io/cluster=cnpg-db-replica
+```
 
-### Restore to New Cluster (supporting-shared-db)
+Before promotion:
 
-1. **Get source cluster UID**:
+- Confirm the original primary cluster is down or intentionally frozen.
+- Confirm split-brain risk is controlled.
+- Confirm the replay point is acceptable for the incident RPO.
+- Get incident commander approval.
+
+Promotion and cutover details live in [010-drp.md](../../databases/010-drp.md).
+
+## Zalando: `auth-db` and `supporting-shared-db`
+
+### WAL-G backup configuration
+
+Zalando clusters use WAL-G through Spilo. Configuration is injected through:
+
+- Operator config / pod environment ConfigMap.
+- Namespace-local `pg-backup-rustfs-credentials` Secret.
+- Cluster-specific `WALG_S3_PREFIX` values in the PostgreSQL manifest.
+
+Current paths:
+
+| Cluster | Path |
+|---------|------|
+| `auth-db` | `s3://pg-backups-zalando/auth-db/` |
+| `supporting-shared-db` | `s3://pg-backups-zalando/user-db/` |
+
+### Restore a Zalando cluster
+
+1. Get source cluster UID:
 
 ```bash
 kubectl get postgresql supporting-shared-db -n user -o jsonpath='{.metadata.uid}'
 ```
 
-2. **Create clone cluster** with `clone` section (uses WAL-G env from pod_environment_configmap/secret):
+2. Create a clone cluster manifest:
 
 ```yaml
 apiVersion: acid.zalan.do/v1
@@ -185,7 +168,7 @@ spec:
   numberOfInstances: 1
   clone:
     cluster: supporting-shared-db
-    uid: "<paste-source-cluster-uid>"
+    uid: "<source-cluster-uid>"
     s3_endpoint: "http://rustfs-svc.rustfs.svc.cluster.local:9000"
     s3_force_path_style: true
   volume:
@@ -194,15 +177,17 @@ spec:
     user: user
     notification: notification.notification
     shipping: shipping.shipping
+    review: review.review
   users:
     user: [createdb]
     notification.notification: [createdb]
     shipping.shipping: [createdb]
+    review.review: [createdb]
   postgresql:
     version: "16"
 ```
 
-3. **Apply and verify**:
+3. Apply and verify:
 
 ```bash
 kubectl apply -f supporting-shared-db-restore.yaml
@@ -210,43 +195,35 @@ kubectl get postgresql -n user -w
 kubectl exec -it supporting-shared-db-restore-0 -n user -- psql -U user -d user -c "\l"
 ```
 
-### Selective Restore (Logical pg_dump)
+## Validation Checklist
 
-For single-DB restore (e.g., only `notification` from supporting-shared-db):
+- [ ] Backup or restore resource reached successful state.
+- [ ] WAL archive health was checked.
+- [ ] Restored cluster reached healthy state.
+- [ ] Schema list matches expected databases.
+- [ ] Row counts for critical tables match the expected restore target.
+- [ ] Application smoke test passed.
+- [ ] Credentials and pooler/direct endpoints are correct.
+- [ ] RTO/RPO evidence was recorded.
 
-1. **Take logical backup** (manual or enable `enableLogicalBackup` on cluster)
-2. **Restore to target**:
-
-```bash
-# From backup file in S3
-pg_restore -h target-host -U notification -d notification -Fc backup_notification.dump
-```
-
----
-
-## Verification Checklist
-
-### After Restore
-
-1. **Schema**: `\dt` in each database
-2. **Row counts**: `SELECT count(*) FROM <main_tables>`
-3. **Application smoke test**: curl API endpoints that use the DB
-4. **Connection**: Verify pooler/direct connection works
-5. **Secrets**: Ensure app secrets (product-db-secret, etc.) exist and match
-
-### Common Issues
+## Common Issues
 
 | Issue | Resolution |
 |-------|------------|
-| `Expected empty archive` | Add `cnpg.io/skipEmptyWalArchiveCheck: "enabled"` when restoring to new cluster name |
-| Bucket not found | CronJob `setup-pg-backup-buckets` in rustfs namespace creates buckets every 30min; trigger manually if needed |
-| S3 connection refused | Verify RustFS service: `kubectl get svc -n rustfs` |
-| No backups listed | Ensure WAL archiving is active; check cluster status and backup CRs |
+| `Expected empty archive` | Use `cnpg.io/skipEmptyWalArchiveCheck: "enabled"` only when restoring to a new archive path and after understanding archive collision risk |
+| Bucket not found | Verify the RustFS bucket setup job and RustFS service |
+| No backups listed | Check `Backup`, `ScheduledBackup`, cluster backup config, and object-store credentials |
+| Restore starts but never becomes healthy | Check recovery job logs, WAL availability, PostgreSQL image version, and recovery-critical GUC parity |
+| Application cannot connect after restore | Verify service DNS, pooler config, database owner secrets, and `sslmode` requirements |
 
----
+## Evidence to Capture
 
-## Related Documentation
+For every restore drill or incident recovery, capture:
 
-- [backup.md](../../databases/006-backup-strategy.md) - Strategy, retention, bucket layout
-- [database.md](../../databases/002-database-integration.md) - Cluster architecture
-- [RustFS README](../../../kubernetes/infra/controllers/storage/rustfs/README.md) - Object storage setup
+- Backup ID and completion timestamp.
+- Recovery target timestamp or LSN.
+- Restore start/end timestamps.
+- Cluster status output.
+- Row-count/schema validation output.
+- Application smoke test result.
+- Final measured RTO and estimated RPO.

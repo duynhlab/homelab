@@ -2,6 +2,10 @@
 
 How multiple PostgreSQL instances work together for High Availability and Disaster Recovery using CloudNativePG.
 
+This page is the CNPG technical deep dive. For the production-ready DRP,
+recovery decision flow, RTO/RPO ownership, and drill evidence checklist, see
+[010-drp.md](./010-drp.md).
+
 > **Prerequisites**: Read [001-postgresql-internals.md](./001-postgresql-internals.md) first for single-instance PostgreSQL mechanics (processes, memory, WAL, MVCC). This document builds on those fundamentals.
 
 ---
@@ -498,6 +502,7 @@ RELOAD;            -- Hot-reload config (no restart)
 - [002-database-integration.md](./002-database-integration.md) -- All clusters overview
 - [004-replication-strategy.md](./004-replication-strategy.md) -- Replication modes and synchronous_commit deep-dive
 - [006-backup-strategy.md](./006-backup-strategy.md) -- Backup architecture, retention, restore
+- [010-drp.md](./010-drp.md) -- Production-ready DRP, recovery decision flow, and evidence checklist
 - [008-pooler.md](./008-pooler.md) -- PgDog R/W splitting configuration
 - Cluster manifests: `kubernetes/infra/configs/databases/clusters/cnpg-db/`
 - DR replica: `kubernetes/infra/configs/databases/clusters/cnpg-db-replica/`

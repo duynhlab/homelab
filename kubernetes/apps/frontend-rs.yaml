@@ -2,7 +2,7 @@ apiVersion: fluxcd.controlplane.io/v1
 kind: ResourceSet
 metadata:
   name: rs-frontend
-  namespace: default
+  namespace: frontend
 spec:
   inputs:
     - name: frontend
@@ -12,7 +12,7 @@ spec:
       kind: HelmRelease
       metadata:
         name: << inputs.name >>
-        namespace: default
+        namespace: frontend
       spec:
         interval: 10m
         timeout: 10m
@@ -32,8 +32,8 @@ spec:
           replicaCount: << inputs.replicaCount | int >>
           image:
             repository: ghcr.io/duynhlab/frontend/frontend
-            tag: latest
-            pullPolicy: Always
+            tag: sha-5d75f8b
+            pullPolicy: IfNotPresent
           service:
             type: ClusterIP
             port: 80

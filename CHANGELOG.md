@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Frontend was deployed in the `default` namespace with image tag `:latest`,
+  violating Kyverno `disallow-default-namespace` (Enforce) and `disallow-latest-tag`
+  policies. ReplicaSet could not create Pods (`admission webhook denied`),
+  blocking the HelmRelease. Created namespace `frontend`, moved the
+  `rs-frontend` ResourceSet, HelmRelease, and Kong Ingress into it, and pinned
+  the image tag to `sha-5d75f8b` (= digest of the previous `:latest`).
 - OpenBAO bootstrap was passing `token_reviewer_jwt=$(SA token)` when configuring
   the Kubernetes auth method. That projected SA token has a 1h TTL, OpenBAO
   cannot refresh it, and after expiry **every** ESO login returned `403

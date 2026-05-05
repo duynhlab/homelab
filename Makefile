@@ -7,9 +7,6 @@ SHELL := /usr/bin/env bash -o pipefail
 
 ##@ General
 
-.PHONY: all
-all: up ## Create cluster, install Flux, deploy everything
-
 .PHONY: up
 up: cluster-up flux-up flux-push ## Bootstrap complete environment
 
@@ -68,12 +65,11 @@ postgres-alert-audit: ## Run PostgreSQL alert audit checks
 ##@ Utilities
 
 .PHONY: prereqs
-prereqs: ## Check prerequisites (flux, kubectl, kind, docker)
-	@echo "Checking prerequisites:"
-	@which flux >/dev/null 2>&1 && echo "  ✓ flux" || echo "  ✗ flux (install: brew install fluxcd/tap/flux)"
-	@which kubectl >/dev/null 2>&1 && echo "  ✓ kubectl" || echo "  ✗ kubectl"
-	@which kind >/dev/null 2>&1 && echo "  ✓ kind" || echo "  ✗ kind"
-	@which helm >/dev/null 2>&1 && echo "  ✓ helm" || echo "  ✗ helm"
+prereqs: ## Check prerequisites (flux, kubectl, kind, helm, docker)
+	@for bin in flux kubectl kind helm docker; do \
+	  if command -v $$bin >/dev/null 2>&1; then echo "  OK   $$bin"; \
+	  else echo "  MISS $$bin"; fi; \
+	done
 
 .PHONY: help
 help: ## Display this help

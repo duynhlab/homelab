@@ -63,8 +63,8 @@ kubectl describe prometheusservicelevel my-service -n monitoring
 # Look for: GEN OK=true
 
 # Check SLO metrics in VictoriaMetrics (any of):
-#   - http://vmui.duynhne.me/vmui  (VMSingle web UI)
-#   - http://slo.duynhne.me        (Sloth Web UI — v0.16.0+)
+#   - http://vmui.duynh.me/vmui  (VMSingle web UI)
+#   - http://slo.duynh.me        (Sloth Web UI — v0.16.0+)
 # Query: slo:sli_error:ratio_rate5m{sloth_service="my-service"}
 ```
 
@@ -107,8 +107,8 @@ After enabling SLO for a new service:
 - [ ] `kubectl get prometheusservicelevel -n monitoring` shows the service
 - [ ] `kubectl describe prometheusservicelevel <service> -n monitoring` shows `GEN OK=true`
 - [ ] `kubectl get prometheusrule -n monitoring | grep sloth` shows generated rules
-- [ ] VictoriaMetrics query `slo:sli_error:ratio_rate5m{sloth_service="<service>"}` returns data (via [vmui.duynhne.me](http://vmui.duynhne.me/vmui))
-- [ ] The service appears in the **[Sloth Web UI](http://slo.duynhne.me)** with all 3 SLOs and a non-empty SLI chart
+- [ ] VictoriaMetrics query `slo:sli_error:ratio_rate5m{sloth_service="<service>"}` returns data (via [vmui.duynh.me](http://vmui.duynh.me/vmui))
+- [ ] The service appears in the **[Sloth Web UI](http://slo.duynh.me)** with all 3 SLOs and a non-empty SLI chart
 - [ ] Grafana SLO dashboards show the new service
 
 ## Troubleshooting
@@ -133,7 +133,7 @@ Verify the service is being scraped via VMAgent / VMSingle:
 
 ```bash
 # VMSingle UI
-open http://vmui.duynhne.me/vmui
+open http://vmui.duynh.me/vmui
 #   Query: up{job="microservices", app="<service>"}
 #   Query: request_duration_seconds_count{app="<service>"}
 

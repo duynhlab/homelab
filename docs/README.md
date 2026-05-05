@@ -10,7 +10,7 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 docs/
 ├── api/                          # API documentation
 │   ├── api.md                    # Complete API reference (canonical /api/v1)
-│   ├── api-naming-convention.md # Draft v1.0.0: gateway URL naming (gateway.duynhne.me), does not replace api.md
+│   ├── api-naming-convention.md # Draft v1.0.0: gateway URL naming (gateway.duynh.me), does not replace api.md
 │   └── gke-internal-dns.md      # GKE cluster.local, Cloud DNS private zones, multi-environment
 ├── databases/                    # Database documentation
 │   ├── 002-database-integration.md               # PostgreSQL architecture
@@ -114,7 +114,7 @@ docs/
    - Step-by-step guide
    - Automatic monitoring setup
 
-4. **[API naming convention (draft v1.0.0)](./api/api-naming-convention.md)** - Gateway URL layout (`gateway.duynhne.me`), Chợ Tốt–style segments + Google notes; does not replace `api.md`
+4. **[API naming convention (draft v1.0.0)](./api/api-naming-convention.md)** - Gateway URL layout (`gateway.duynh.me`), Chợ Tốt–style segments + Google notes; does not replace `api.md`
 
 5. **[GKE internal & private DNS](./api/gke-internal-dns.md)** - `cluster.local`, Cloud DNS private zones, multi-environment naming
 
@@ -290,7 +290,8 @@ docs/
 
 - [Setup Guide](./platform/setup.md) - Complete deployment and configuration guide
 - [Application Delivery](./platform/application-delivery.md) - ResourceSet patterns & templates
-- [cert-manager + Flux](./platform/cert-manager-flux.md) - TLS with Let's Encrypt, HelmRelease, Ingress
+- [cert-manager + Flux](./platform/cert-manager-flux.md) - TLS with Let's Encrypt, HelmRelease, Ingress, trust-manager
+- [Trust Distribution (trust-manager)](./security/trust-distribution.md) - CA bundle distribution to namespaces via trust-manager Bundle CRD
 - [CI/CD](./platform/cicd.md) - CI/CD pipelines and workflows
 - [Git Branching & Release](./platform/gitflow.md) - Hybrid Enterprise Gitflow standard (dev/staging/main + immutable tags)
 - [SonarCloud](./platform/sonarcloud.md) - SonarCloud integration

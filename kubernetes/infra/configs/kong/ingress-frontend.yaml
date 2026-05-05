@@ -1,18 +1,22 @@
-# Frontend SPA — served at duynhne.me
+# Frontend SPA — served at https://local.duynh.me
 # Kong routes all non-API traffic to the frontend Nginx container (static files + SPA fallback).
-# TLS terminated by Kong using the default proxy certificate (kong-proxy-tls secret mounted via HelmRelease).
+# TLS terminated by Kong using the default proxy certificate (kong-proxy-tls secret
+# mounted via HelmRelease) — wildcard *.duynh.me from Let's Encrypt covers this host.
+# `konghq.com/protocols: https` + redirect annotation force HTTP -> HTTPS at Kong.
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: frontend
-  namespace: default
+  namespace: frontend
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
 spec:
   ingressClassName: kong
   rules:
-    - host: duynhne.me
+    - host: local.duynh.me
       http:
         paths:
           - path: /

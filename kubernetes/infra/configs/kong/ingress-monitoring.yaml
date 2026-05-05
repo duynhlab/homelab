@@ -1,9 +1,9 @@
 # Monitoring & Infrastructure Ingress routes
-# Each service gets a dedicated subdomain under *.duynhne.me
+# Each service gets a dedicated subdomain under *.duynh.me
 # Accessible via /etc/hosts → Kong NodePort (80/443)
 # TLS terminated by Kong using the default proxy certificate (kong-proxy-tls).
 
-# Grafana — grafana.duynhne.me
+# Grafana — grafana.duynh.me
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -12,10 +12,12 @@ metadata:
   namespace: monitoring
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
 spec:
   ingressClassName: kong
   rules:
-    - host: grafana.duynhne.me
+    - host: grafana.duynh.me
       http:
         paths:
           - path: /
@@ -26,7 +28,7 @@ spec:
                 port:
                   number: 3000
 ---
-# VictoriaMetrics (VMSingle) — vmui.duynhne.me
+# VictoriaMetrics (VMSingle) — vmui.duynh.me
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -34,10 +36,12 @@ metadata:
   namespace: monitoring
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
 spec:
   ingressClassName: kong
   rules:
-    - host: vmui.duynhne.me
+    - host: vmui.duynh.me
       http:
         paths:
           - path: /
@@ -48,7 +52,7 @@ spec:
                 port:
                   number: 8428
 ---
-# VMAlert — vmalert.duynhne.me
+# VMAlert — vmalert.duynh.me
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -56,10 +60,12 @@ metadata:
   namespace: monitoring
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
 spec:
   ingressClassName: kong
   rules:
-    - host: vmalert.duynhne.me
+    - host: vmalert.duynh.me
       http:
         paths:
           - path: /
@@ -70,7 +76,7 @@ spec:
                 port:
                   number: 8080
 ---
-# Karma (Alertmanager dashboard) — karma.duynhne.me
+# Karma (Alertmanager dashboard) — karma.duynh.me
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -78,10 +84,12 @@ metadata:
   namespace: monitoring
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
 spec:
   ingressClassName: kong
   rules:
-    - host: karma.duynhne.me
+    - host: karma.duynh.me
       http:
         paths:
           - path: /
@@ -92,7 +100,7 @@ spec:
                 port:
                   number: 8080
 ---
-# Jaeger — jaeger.duynhne.me
+# Jaeger — jaeger.duynh.me
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -100,10 +108,12 @@ metadata:
   namespace: monitoring
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
 spec:
   ingressClassName: kong
   rules:
-    - host: jaeger.duynhne.me
+    - host: jaeger.duynh.me
       http:
         paths:
           - path: /
@@ -114,7 +124,7 @@ spec:
                 port:
                   number: 16686
 ---
-# Tempo — tempo.duynhne.me
+# Tempo — tempo.duynh.me
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -122,10 +132,12 @@ metadata:
   namespace: monitoring
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
 spec:
   ingressClassName: kong
   rules:
-    - host: tempo.duynhne.me
+    - host: tempo.duynh.me
       http:
         paths:
           - path: /
@@ -136,7 +148,7 @@ spec:
                 port:
                   number: 3200
 ---
-# Pyroscope — pyroscope.duynhne.me
+# Pyroscope — pyroscope.duynh.me
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -144,10 +156,12 @@ metadata:
   namespace: monitoring
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
 spec:
   ingressClassName: kong
   rules:
-    - host: pyroscope.duynhne.me
+    - host: pyroscope.duynh.me
       http:
         paths:
           - path: /
@@ -158,7 +172,7 @@ spec:
                 port:
                   number: 4040
 ---
-# VictoriaLogs — logs.duynhne.me
+# VictoriaLogs — logs.duynh.me
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -166,10 +180,12 @@ metadata:
   namespace: monitoring
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
 spec:
   ingressClassName: kong
   rules:
-    - host: logs.duynhne.me
+    - host: logs.duynh.me
       http:
         paths:
           - path: /
@@ -180,7 +196,7 @@ spec:
                 port:
                   number: 9428
 ---
-# Sloth UI — slo.duynhne.me
+# Sloth UI — slo.duynh.me
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -188,10 +204,12 @@ metadata:
   namespace: monitoring
   annotations:
     konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
 spec:
   ingressClassName: kong
   rules:
-    - host: slo.duynhne.me
+    - host: slo.duynh.me
       http:
         paths:
           - path: /

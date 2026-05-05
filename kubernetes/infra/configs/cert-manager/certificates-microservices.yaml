@@ -1,7 +1,11 @@
-# TLS certificate for Kong API Gateway — single cert for the gateway domain.
-# Kong terminates TLS at the edge; individual service certs are not needed.
-# Uses homelab-ca (self-signed, works offline).
-# For production: switch issuerRef to letsencrypt-prod and update dnsNames.
+# TLS certificate for Kong API Gateway — single wildcard cert for *.duynh.me.
+# Kong terminates TLS at the edge with this default cert (mounted via
+# secretVolumes in the HelmRelease) — no per-Ingress TLS section required.
+#
+# Issued by Let's Encrypt (DNS-01 via Cloudflare). Wildcard *.duynh.me covers
+# all single-label subdomains (gateway.duynh.me, grafana.duynh.me, …).
+# A second SAN local.duynh.me is included explicitly to make intent obvious
+# (it is already covered by the wildcard, but the redundancy documents it).
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -10,14 +14,17 @@ metadata:
   namespace: kong
 spec:
   secretName: kong-proxy-tls
-  duration: 8760h # 1 year
-  renewBefore: 720h # 30 days
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
   issuerRef:
     kind: ClusterIssuer
-    name: homelab-ca
+    name: letsencrypt-prod
+  commonName: duynh.me
   dnsNames:
-    - gateway.duynhne.me
-    - "*.duynhne.me"
-    - localhost
-  ipAddresses:
-    - "127.0.0.1"
+    - duynh.me
+    - "*.duynh.me"
+    - local.duynh.me

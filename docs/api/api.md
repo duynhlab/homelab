@@ -5,7 +5,7 @@
 > **Architecture:** 3-Layer (Web / Logic / Core)
 > **URL shape:** Variant A — `/{service}/v1/{audience}/{resource…}` (see [`api-naming-convention.md`](api-naming-convention.md))
 
-> Services mount Variant A paths **directly** on their HTTP routers. Browser traffic hits them at `https://gateway.duynhne.me/…`; service-to-service traffic hits them at `http://{svc}.{ns}.svc.cluster.local:8080/…`. There is no separate "cluster" path any more — the path is the path.
+> Services mount Variant A paths **directly** on their HTTP routers. Browser traffic hits them at `https://gateway.duynh.me/…`; service-to-service traffic hits them at `http://{svc}.{ns}.svc.cluster.local:8080/…`. There is no separate "cluster" path any more — the path is the path.
 
 ---
 
@@ -13,8 +13,8 @@
 
 Single source of truth for every HTTP path in the platform. Audience (`public` / `private` / `internal`) is encoded in the URL:
 
-- `public` — no auth; browser-reachable via `gateway.duynhne.me`.
-- `private` — JWT required; browser-reachable via `gateway.duynhne.me`.
+- `public` — no auth; browser-reachable via `gateway.duynh.me`.
+- `private` — JWT required; browser-reachable via `gateway.duynh.me`.
 - `internal` — service-to-service; **never** on the gateway.
 
 No client-side orchestration for aggregation endpoints — frontend MUST use the `/details` variants.
@@ -425,7 +425,7 @@ func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 | notification | notification | 8080 | — | `/notification/v1/private/notifications/*` | `POST /notification/v1/internal/notify/{email,sms}` |
 | shipping | shipping | 8080 | `/shipping/v1/public/{track,estimate}` | — | `GET /shipping/v1/internal/orders/:orderId` |
 
-Same path, two hosts: browser hits `https://gateway.duynhne.me/…`; services hit each other at `http://{svc}.{ns}.svc.cluster.local:8080/…`. Internal audiences are never published to the gateway. Full per-endpoint detail: [`api-naming-convention.md`](api-naming-convention.md).
+Same path, two hosts: browser hits `https://gateway.duynh.me/…`; services hit each other at `http://{svc}.{ns}.svc.cluster.local:8080/…`. Internal audiences are never published to the gateway. Full per-endpoint detail: [`api-naming-convention.md`](api-naming-convention.md).
 
 ---
 

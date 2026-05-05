@@ -11,7 +11,7 @@ The SLO (Service Level Objective) system provides automated monitoring and alert
 - Multi-window multi-burn-rate alerts (Google SRE pattern)
 - Error budget tracking
 - Grafana dashboards (auto-deployed)
-- **Built-in Sloth Web UI** at [http://slo.duynhne.me](http://slo.duynhne.me) — service/SLO browser, live SLI charts, burn-rate views, alert state filtering (new in v0.16.0)
+- **Built-in Sloth Web UI** at [http://slo.duynh.me](http://slo.duynh.me) — service/SLO browser, live SLI charts, burn-rate views, alert state filtering (new in v0.16.0)
 - **K8s transformer plugins** — Sloth now renders the prometheus-operator `PrometheusRule` via a dynamic `unstructured` transformer plugin (`sloth.dev/k8stransform/prom-operator-prometheus-rule/v1`), and one SLO can emit multiple K8s objects (new in v0.16.0)
 
 ## Architecture
@@ -31,7 +31,7 @@ flowchart TD
     VMA -->|queries| VMS["VMSingle"]
     VMA -->|notifies| VMAM["VMAlertmanager"]
     VMS -->|Prometheus-compatible API| Grafana["Grafana Dashboards"]
-    VMS -->|Prometheus-compatible API| SlothUI["Sloth Web UI<br/>slo.duynhne.me"]
+    VMS -->|Prometheus-compatible API| SlothUI["Sloth Web UI<br/>slo.duynh.me"]
 
     SM["ServiceMonitor<br/>component: api"] -->|convert| VMSS["VMServiceScrape"]
     VMSS --> VMAgent["VMAgent"]
@@ -148,7 +148,7 @@ slo:current_burn_rate:ratio{sloth_service="auth", sloth_slo="availability"}
 
 The `sloth server` sub-command ships a built-in read-only web UI. We run it as a separate Deployment in `monitoring` (the upstream Helm chart only deploys the controller) and expose it through Kong.
 
-**URL**: [http://slo.duynhne.me](http://slo.duynhne.me)
+**URL**: [http://slo.duynh.me](http://slo.duynh.me)
 
 Features:
 
@@ -162,7 +162,7 @@ Features:
 
 **Manifest**: [`kubernetes/infra/configs/monitoring/sloth/sloth-ui.yaml`](../../../kubernetes/infra/configs/monitoring/sloth/sloth-ui.yaml). Image tag is pinned alongside the controller HelmRelease — bump both together.
 
-**Local DNS**: add `127.0.0.1 slo.duynhne.me` to `/etc/hosts` (see [main README access points](../../../README.md#access-points)).
+**Local DNS**: add `127.0.0.1 slo.duynh.me` to `/etc/hosts` (see [main README access points](../../../README.md#access-points)).
 
 ## Grafana Dashboards
 
@@ -171,7 +171,7 @@ Auto-deployed via Grafana Operator:
 - **Sloth SLO Overview** (ID: 14643) -- high-level summary of all SLOs
 - **Sloth SLO Detailed** (ID: 14348) -- per-service SLO metrics and error budgets
 
-Access: http://grafana.duynhne.me (folder: SLO).
+Access: http://grafana.duynh.me (folder: SLO).
 
 The Grafana dashboards and the Sloth UI are complementary: Grafana for long-form, customizable panels and cross-stack correlation; Sloth UI for the canonical SLO/error-budget view straight from upstream.
 
@@ -188,7 +188,7 @@ The Grafana dashboards and the Sloth UI are complementary: Grafana for long-form
 - SLO Template: [`duyhenryer/charts` repo](https://github.com/duyhenryer/charts/blob/main/charts/mop/templates/slo.yaml)
 - Sloth Operator (controller): `kubernetes/infra/controllers/metrics/sloth-operator.yaml`
 - Sloth Web UI (Deployment + Service + PodMonitor): `kubernetes/infra/configs/monitoring/sloth/sloth-ui.yaml`
-- Sloth UI Ingress: `kubernetes/infra/configs/kong/ingress-monitoring.yaml` (`slo.duynhne.me`)
+- Sloth UI Ingress: `kubernetes/infra/configs/kong/ingress-monitoring.yaml` (`slo.duynh.me`)
 - ServiceMonitor: `kubernetes/infra/configs/monitoring/servicemonitors/microservices.yaml`
 
 ### External References

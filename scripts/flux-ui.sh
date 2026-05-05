@@ -71,7 +71,7 @@ kubectl port-forward -n kong svc/kong-kong-proxy 8000:80 8443:443 > /dev/null 2>
 
 # Frontend (direct access, bypassing Kong)
 echo "Starting Frontend port forward (3001)..."
-kubectl port-forward -n default svc/frontend 3001:80 > /dev/null 2>&1 &
+kubectl port-forward -n frontend svc/frontend 3001:80 > /dev/null 2>&1 &
 
 # Wait for port forwards to be ready
 echo "Waiting for port forwards to be ready..."
@@ -92,8 +92,8 @@ echo "Pyroscope:           http://localhost:4040"
 echo "VictoriaLogs:        http://localhost:9428"
 echo "RustFS Console:      http://localhost:9001 (API: 9000)"
 echo "Postgres Operator UI: http://localhost:8081"
-echo "Kong Gateway (HTTP):  http://gateway.duynhne.me:8000"
-echo "Kong Gateway (HTTPS): https://gateway.duynhne.me:8443"
+echo "Kong Gateway (HTTP):  http://gateway.duynh.me:8000"
+echo "Kong Gateway (HTTPS): https://gateway.duynh.me:8443"
 echo "Frontend (direct):   http://localhost:3001"
 echo ""
 echo "To stop port forwarding: pkill -f 'kubectl port-forward'"

@@ -22,7 +22,10 @@ For detailed architecture, configuration, and components of each cluster, please
 
 ### DR replica troubleshooting
 
-See **[cnpg-dr-replica-bootstrap.md](../../../../../docs/databases/runbooks/cnpg-dr-replica-bootstrap.md)** — base backup prerequisite, `full-recovery` job errors, and `min_wal_size` / `wal_segment_size` CrashLoop.
+See **[PostgreSQL DRP](../../../../../docs/databases/010-drp.md)** for the
+recovery decision flow and DR promotion controls, and
+**[HA and DR Architecture Deep-Dive](../../../../../docs/databases/005-ha-dr-deep-dive.md)**
+for CNPG recovery internals.
 
 ---
 
@@ -117,7 +120,7 @@ When a Product Service calls `INSERT INTO products (name, price) VALUES ('Widget
 
 For full explanations with detailed diagrams, tables, and EC2/VM mapping, see:
 
-**[PostgreSQL Internals Deep Dive (cnpg-db)](../../../../docs/databases/001-postgresql-internals.md)**
+**[PostgreSQL Internals Deep Dive (cnpg-db)](../../../../../docs/databases/001-postgresql-internals.md)**
 
 Topics covered:
 - INSERT/UPDATE workflow with sequence diagrams
@@ -134,7 +137,7 @@ Topics covered:
 
 ## Related Documentation
 
-- **Database Architecture Overview**: [`docs/databases/002-database-integration.md`](../../../../docs/databases/002-database-integration.md)
-- **PgCat Troubleshooting (legacy)**: [`docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md`](../../../../docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md)
-- **Monitoring Setup**: [`docs/observability/metrics/README.md`](../../../../docs/observability/metrics/README.md)
-- **Replication Deep Dive**: [`docs/databases/004-replication-strategy.md`](../../../../docs/databases/004-replication-strategy.md)
+- **Database Architecture Overview**: [`docs/databases/002-database-integration.md`](../../../../../docs/databases/002-database-integration.md)
+- **PgCat Troubleshooting (legacy)**: [`docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md`](../../../../../docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md)
+- **Monitoring Setup**: [`docs/observability/metrics/README.md`](../../../../../docs/observability/metrics/README.md)
+- **Replication Deep Dive**: [`docs/databases/004-replication-strategy.md`](../../../../../docs/databases/004-replication-strategy.md)

@@ -527,6 +527,7 @@ Token stored in `localStorage.authToken`, sent as `Authorization: Bearer <token>
 - **Observability**: [`docs/observability/README.md`](docs/observability/README.md), [`docs/observability/tracing/README.md`](docs/observability/tracing/README.md), [`docs/observability/logging/README.md`](docs/observability/logging/README.md), [`docs/observability/profiling/README.md`](docs/observability/profiling/README.md)
 - **SLO**: [`docs/observability/slo/README.md`](docs/observability/slo/README.md), [`docs/observability/slo/getting_started.md`](docs/observability/slo/getting_started.md)
 - **Secrets**: [`docs/secrets/secrets-management.md`](docs/secrets/secrets-management.md), [`docs/secrets/openbao.md`](docs/secrets/openbao.md) (OpenBAO architecture + Flux/sealed runbook in §13)
+- **Trust Distribution**: [`docs/security/trust-distribution.md`](docs/security/trust-distribution.md) — namespaces opt into the homelab CA bundle by setting label `platform.duynhlab.dev/needs-trust=true`. trust-manager creates `ConfigMap/homelab-ca-bundle` with key `ca-bundle.pem`. Mount and set `SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.pem`.
 - **k6**: [`docs/testing/k6.md`](docs/testing/k6.md)
 - **Docs Index**: [`docs/README.md`](docs/README.md)
 

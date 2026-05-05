@@ -1,0 +1,29 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cnpg-barman-plugin-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: infrastructure
+spec:
+  interval: 10m
+  timeout: 10m
+  retryInterval: 2m
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+  path: ./configs/cnpg-barman-plugin
+  prune: true
+  wait: true
+  dependsOn:
+    - name: controllers-local
+    - name: cert-manager-local
+  healthChecks:
+    - apiVersion: apiextensions.k8s.io/v1
+      kind: CustomResourceDefinition
+      name: objectstores.barmancloud.cnpg.io
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: barman-cloud
+      namespace: cloudnative-pg

@@ -912,13 +912,17 @@ flowchart LR
 
 ### cnpg-db Status
 
-**Current:** **Barman Object Store** backup **is** configured on the cluster. Base backups and WAL are stored at **`s3://pg-backups-cnpg/cnpg-db/`** (`spec.backup.barmanObjectStore` in `instance.yaml`, with credentials from the `pg-backup-rustfs-credentials` secret). Scheduled backups are defined under `kubernetes/infra/configs/databases/clusters/cnpg-db/backup/` (e.g. daily and every-6h `ScheduledBackup` resources).
+**Current:** **Barman Cloud Plugin** backup **is** configured on the cluster. Base backups and WAL are stored at **`s3://pg-backups-cnpg/cnpg-db/`** through the `cnpg-db-backup-store` `ObjectStore` CR, with credentials from the `pg-backup-rustfs-credentials` secret. Scheduled backups are defined under `kubernetes/infra/configs/databases/clusters/cnpg-db/backup/` and use `method: plugin`.
 
 **Reference shape (already applied in-repo):**
 ```yaml
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: cnpg-db-backup-store
 spec:
-  backup:
-    barmanObjectStore:
+  retentionPolicy: "30d"
+  configuration:
       destinationPath: s3://pg-backups-cnpg/cnpg-db/
       s3Credentials:
         accessKeyId:
@@ -927,7 +931,6 @@ spec:
         secretAccessKey:
           name: pg-backup-rustfs-credentials
           key: ACCESS_SECRET_KEY
-    retentionPolicy: "30d"
 ```
 
 ---

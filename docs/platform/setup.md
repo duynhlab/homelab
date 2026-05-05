@@ -237,9 +237,10 @@ monitoring/
 1. `controllers-local`: Provisions namespaces and core operators.
 2. `secrets-local`: Deploys OpenBAO/ESO (Depends on `controllers-local`).
 3. `monitoring-local`: Deploys observability stack (Depends on `controllers-local`).
-4. `databases-local`: Provisions persistence layer (Depends on `secrets-local`, `monitoring-local`).
-5. `kyverno-policies-local`: Admission policies (Depends on `controllers-local`, `monitoring-local`). See [kyverno.md](kyverno.md).
-6. `apps-local`: Deploys business logic (Depends on `databases-local`, `monitoring-local`).
+4. `cnpg-barman-plugin-local`: Installs the CNPG Barman Cloud Plugin and `ObjectStore` CRD (Depends on `controllers-local`, `cert-manager-local`).
+5. `databases-local`: Provisions persistence layer (Depends on `secrets-local`, `monitoring-local`, `cnpg-barman-plugin-local`).
+6. `kyverno-policies-local`: Admission policies (Depends on `controllers-local`, `monitoring-local`). See [kyverno.md](kyverno.md).
+7. `apps-local`: Deploys business logic (Depends on `databases-local`, `monitoring-local`).
 
 ---
 

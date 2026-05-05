@@ -333,7 +333,8 @@ flux-system (bootstrap)
   ├── kong-local (depends: cert-manager) — Kong HelmRelease (mounts kong-proxy-tls)
   ├── kong-config-local (depends: kong + cert-manager) — Ingress resources
   ├── secrets-local (depends: controllers)
-  ├── databases-local (depends: secrets + monitoring)
+  ├── cnpg-barman-plugin-local (depends: controllers + cert-manager) — Barman Cloud Plugin + ObjectStore CRD
+  ├── databases-local (depends: secrets + monitoring + cnpg-barman-plugin)
   ├── databases-cnpg-dr-local (depends: databases + secrets) — DR replica
   ├── monitoring-local (depends: controllers) — VMSingle, VLSingle, Grafana, alerting
   ├── kyverno-policies-local (depends: controllers + monitoring) — admission policies

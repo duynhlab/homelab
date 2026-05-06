@@ -67,8 +67,8 @@ flowchart TD
     end
 
     subgraph Domains["Domain Routing"]
-        FERoute["local.local.duynh.me /*"]:::fe
-        APIRoute["gateway.local.duynh.me /{service}/v1/{public,private}/…"]:::api
+        FERoute["local.duynh.me /*"]:::fe
+        APIRoute["gateway.duynh.me /{service}/v1/{public,private}/…"]:::api
         MonRoute["*.duynh.me (monitoring/infra)"]:::infra
     end
 
@@ -312,7 +312,8 @@ minute limit × 60 × 0.5 = hour limit (assume 50% sustained)
 
 | Plugin | Type | Scope | Configuration |
 |--------|------|-------|---------------|
-| **CORS** | Traffic Control | Global | Origins: `local.duynh.me`, methods: GET/POST/PUT/PATCH/DELETE/OPTIONS |
+| **CORS** | Traffic Control | Global | Origins: `https://local.duynh.me`, `https://duynh.me`; methods: GET/POST/PUT/PATCH/DELETE/OPTIONS |
+| **HTTPS Redirect** | Traffic Control | Per-Ingress annotations | `konghq.com/protocols: "https"` + `konghq.com/https-redirect-status-code: "301"` on every Ingress forces HTTP→HTTPS 301 |
 | **Prometheus** | Observability | Global | Status codes, latency, bandwidth, upstream health |
 | **Rate Limiting** | Traffic Control | API routes | 10/s, 200/min, 5000/hr, local policy |
 | **Request Size Limiting** | Security | API routes | 10 MB max payload |
@@ -381,11 +382,11 @@ Currently, auth is handled at the application level (auth-service). Gateway-leve
 | HelmRelease | `kubernetes/infra/controllers/kong/helmrelease.yaml` | Kong KIC deployment (DB-less, chart v2.44.0) |
 | Plugins | `kubernetes/infra/configs/kong/plugins.yaml` | Global CORS + Prometheus, API rate limiting + request size limiting |
 | Frontend Ingress | `kubernetes/infra/configs/kong/ingress-frontend.yaml` | Routes `local.duynh.me /` to frontend |
-| API Ingress | `kubernetes/infra/configs/kong/ingress-api.yaml` | Routes `gateway.local.duynh.me /{service}/v1/{public,private}/…` to services (rate-limited, pass-through) |
+| API Ingress | `kubernetes/infra/configs/kong/ingress-api.yaml` | Routes `gateway.duynh.me /{service}/v1/{public,private}/…` to services (rate-limited, pass-through) |
 | Monitoring Ingress | `kubernetes/infra/configs/kong/ingress-monitoring.yaml` | Routes monitoring tools (Grafana, VM, Jaeger, etc.) |
 | Infra Ingress | `kubernetes/infra/configs/kong/ingress-infra.yaml` | Routes infra tools (Flux UI, RustFS, OpenBAO, PG UI) |
 | MCP Ingress | `kubernetes/infra/configs/kong/ingress-mcp.yaml` | Routes MCP servers (VM, VL, Flux) |
-| TLS Certificate | `kubernetes/infra/configs/cert-manager/certificates-microservices.yaml` | `kong-proxy-tls` via homelab-ca |
+| TLS Certificate | `kubernetes/infra/configs/cert-manager/certificates-microservices.yaml` | `kong-proxy-tls` issued by `letsencrypt-prod` ClusterIssuer (Cloudflare DNS-01); SANs: `duynh.me`, `*.duynh.me`, `local.duynh.me` |
 | ServiceMonitor | `kubernetes/infra/configs/monitoring/servicemonitors/kong.yaml` | Prometheus metrics scraping |
 
 ---
@@ -394,14 +395,14 @@ Currently, auth is handled at the application level (auth-service). Gateway-leve
 
 ### Prerequisites
 
-Add to `/etc/hosts`:
+Run the helper to populate `/etc/hosts` with every `*.duynh.me` host the platform exposes:
 
-```
-127.0.0.1  local.duynh.me
-127.0.0.1  gateway.duynh.me
+```bash
+sudo ./scripts/setup-hosts.sh
+# remove later: sudo ./scripts/setup-hosts.sh remove
 ```
 
-See `README.md` for the full `/etc/hosts` block with all domains.
+The script edits a marker-managed block, so it is idempotent and reversible.
 
 ### Access via Kong (NodePort)
 
@@ -410,32 +411,43 @@ Kong runs as NodePort with Kind port mappings (80→30080, 443→30443). After `
 | URL | Description |
 |-----|-------------|
 | `https://local.duynh.me` | Frontend (React SPA) |
-| `http://gateway.duynh.me/product/v1/public/products` | API route example (Variant A) |
+| `https://gateway.duynh.me/product/v1/public/products` | API route example (Variant A) |
 | `https://grafana.duynh.me` | Grafana dashboards |
 
-### Fallback: Port Forwarding
-
-If NodePort mapping is not available:
-
-```bash
-make flux-ui
-
-# Or manually:
-kubectl port-forward -n kong svc/kong-kong-proxy 8000:80 8443:443
-```
+Kong forces HTTPS via per-Ingress annotation; HTTP requests return `301` to the HTTPS URL.
 
 ---
 
 ## TLS / cert-manager
 
-The homelab uses a **self-signed CA** chain (works offline):
+Kong terminates TLS with a public-trust wildcard cert from **Let's Encrypt**, issued via Cloudflare DNS-01. The Kind cluster never has to be reachable from the internet — the solver only needs API access to the Cloudflare zone to publish a TXT record.
 
-1. `selfsigned-bootstrap` — ClusterIssuer that bootstraps itself
-2. `homelab-ca` — Certificate (10-year CA) signed by the bootstrap issuer
-3. `homelab-ca` — ClusterIssuer backed by the CA cert, signs all service certificates
-4. `kong-proxy-tls` — Certificate for `*.duynh.me` signed by the CA
+```mermaid
+flowchart LR
+  Bao[(OpenBAO<br/>secret/local/infra/cloudflare/api-token)]
+  Bao --> ESO[ExternalSecret<br/>cert-manager/cloudflare-api-token]
+  ESO --> Sec[Secret<br/>cloudflare-api-token]
+  Sec --> Issuer[ClusterIssuer<br/>letsencrypt-prod]
+  Issuer --> Cert[Certificate<br/>kong/kong-proxy-tls<br/>SANs: duynh.me, *.duynh.me, local.duynh.me]
+  Cert --> KongSec[Secret<br/>kong/kong-proxy-tls]
+  KongSec --> Pod[Kong pod<br/>secretVolume → ssl_cert env]
+```
 
-For production, uncomment the Let's Encrypt issuers in `clusterissuers.yaml` and switch the certificate's `issuerRef` to `letsencrypt-prod`.
+**Pipeline:**
+
+1. The Cloudflare API token is seeded into OpenBAO at `secret/local/infra/cloudflare/api-token` (key `api_token`). This is **bootstrap-only** and not in Git — re-seed it after every cluster recreate.
+2. ESO syncs it to `Secret/cloudflare-api-token` in the `cert-manager` namespace via `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`.
+3. ClusterIssuers `letsencrypt-staging` and `letsencrypt-prod` reference that Secret for the Cloudflare DNS-01 solver, scoped to `dnsZones: [duynh.me]`.
+4. Certificate `kong-proxy-tls` (in `kong` ns) requests the wildcard from `letsencrypt-prod` and lands the result in `Secret/kong-proxy-tls` (mounted as `ssl_cert`/`ssl_cert_key` by the Kong pod).
+
+**Two PKIs coexist** in the cluster (see [`docs/security/trust-distribution.md`](../security/trust-distribution.md)):
+
+| PKI | Purpose | Distributed by |
+|---|---|---|
+| Let's Encrypt (`letsencrypt-prod`) | Browser-facing TLS on every `*.duynh.me` host | Kong's `kong-proxy-tls` Secret |
+| `homelab-ca` (self-signed ClusterIssuer) | Internal mTLS leaves (webhooks, future service mesh) | trust-manager → `homelab-ca-bundle` ConfigMap in labeled namespaces |
+
+Switch a leaf certificate to staging by editing its `issuerRef` to `letsencrypt-staging` (avoids LE prod rate limits while iterating).
 
 ---
 
@@ -474,7 +486,7 @@ Adding any `internal` audience to a gateway Ingress is a safety/privacy regressi
 
 ```
 controllers-local (cert-manager HelmRelease + Kong CRDs + namespaces)
-  → cert-manager-local (homelab-ca ClusterIssuer + kong-proxy-tls Certificate → Secret)
+  → cert-manager-local (homelab-ca + letsencrypt-prod ClusterIssuers + kong-proxy-tls Certificate → Secret; dependsOn secrets-local for cloudflare-api-token)
   → kong-local (Kong HelmRelease — mounts kong-proxy-tls Secret at startup)
   → kong-config-local (Ingress resources + KongClusterPlugins)
   → apps-local (microservices + frontend)
@@ -534,8 +546,18 @@ kubectl get certificate -A
 ```
 
 **Expected**:
-- ClusterIssuers `homelab-ca` and `selfsigned-bootstrap` both `Ready: True`
-- Certificate `kong-proxy-tls` in `kong` namespace is `Ready: True`
+- ClusterIssuers `selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod` all `Ready: True`
+- Certificate `kong-proxy-tls` in `kong` namespace is `Ready: True` and `Issuer: letsencrypt-prod`
+- `Secret/cloudflare-api-token` present in `cert-manager` namespace (synced by ESO)
+
+If `letsencrypt-*` issuers are NotReady with `secret "cloudflare-api-token" not found`, seed the token into OpenBAO and reconcile `secrets-local`:
+
+```bash
+ROOT=$(kubectl get secret -n openbao openbao-init-keys -o jsonpath='{.data.root_token}' | base64 -d)
+kubectl exec -n openbao openbao-0 -- sh -c "BAO_TOKEN=$ROOT bao kv put secret/local/infra/cloudflare/api-token api_token=cfut_..."
+flux reconcile ks secrets-local --with-source
+flux reconcile ks cert-manager-local --with-source
+```
 
 ### Step 6: Check Ingress Resources
 
@@ -568,56 +590,60 @@ curl -s -o /dev/null -w "%{http_code}\n" https://local.duynh.me/
 # Expected: 200
 
 # Auth — login (public)
-TOKEN=$(curl -s -X POST http://gateway.duynh.me/auth/v1/public/login \
+TOKEN=$(curl -s -X POST https://gateway.duynh.me/auth/v1/public/login \
   -H "Content-Type: application/json" \
   -d '{"username":"alice","password":"password123"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))")
 echo "Token: ${TOKEN:0:30}..."
 # Expected: jwt-token-v1-...
 
-# Products (public, anonymous)
+# Confirm HTTP→HTTPS redirect (Kong returns 301)
 curl -s -o /dev/null -w "%{http_code}\n" http://gateway.duynh.me/product/v1/public/products
+# Expected: 301
+
+# Products (public, anonymous)
+curl -s -o /dev/null -w "%{http_code}\n" https://gateway.duynh.me/product/v1/public/products
 # Expected: 200
 
 # Cart (private — requires JWT)
 curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $TOKEN" \
-  http://gateway.duynh.me/cart/v1/private/cart
+  https://gateway.duynh.me/cart/v1/private/cart
 # Expected: 200
 
 # Orders
 curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $TOKEN" \
-  http://gateway.duynh.me/order/v1/private/orders
+  https://gateway.duynh.me/order/v1/private/orders
 # Expected: 200
 
 # Users profile
 curl -s -H "Authorization: Bearer $TOKEN" \
-  http://gateway.duynh.me/user/v1/private/users/profile
+  https://gateway.duynh.me/user/v1/private/users/profile
 # Expected: 200 with user JSON
 
 # Notifications
 curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $TOKEN" \
-  http://gateway.duynh.me/notification/v1/private/notifications
+  https://gateway.duynh.me/notification/v1/private/notifications
 # Expected: 200
 
 # Reviews (public list)
-curl -s -o /dev/null -w "%{http_code}\n" http://gateway.duynh.me/review/v1/public/reviews
+curl -s -o /dev/null -w "%{http_code}\n" https://gateway.duynh.me/review/v1/public/reviews
 # Expected: 400 (product_id query param required) — confirms routing works
 
 # Shipping track (public)
 curl -s -o /dev/null -w "%{http_code}\n" \
-  "http://gateway.duynh.me/shipping/v1/public/track?tracking_number=TRACK123"
+  "https://gateway.duynh.me/shipping/v1/public/track?tracking_number=TRACK123"
 # Expected: 200 or 404
 
 # Legacy /api/v1/* is gone everywhere (services + gateway) — expected 404
 curl -s -o /dev/null -w "legacy /api/v1 on gateway: %{http_code}\n" \
-  http://gateway.duynh.me/api/v1/products
+  https://gateway.duynh.me/api/v1/products
 
 # Internal endpoint NOT on gateway — expected 404
 curl -s -o /dev/null -w "notify/email on gateway: %{http_code}\n" \
-  -X POST http://gateway.duynh.me/notification/v1/internal/notify/email
+  -X POST https://gateway.duynh.me/notification/v1/internal/notify/email
 
 # Check rate limit headers
-curl -sI http://gateway.duynh.me/product/v1/public/products 2>&1 | grep -i ratelimit
+curl -sI https://gateway.duynh.me/product/v1/public/products 2>&1 | grep -i ratelimit
 # Expected: RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset headers
 ```
 
@@ -626,7 +652,7 @@ curl -sI http://gateway.duynh.me/product/v1/public/products 2>&1 | grep -i ratel
 ### Step 8: Test CORS Headers
 
 ```bash
-curl -s -X OPTIONS http://gateway.duynh.me/product/v1/public/products \
+curl -s -X OPTIONS https://gateway.duynh.me/product/v1/public/products \
   -H "Origin: https://local.duynh.me" \
   -H "Access-Control-Request-Method: GET" \
   -D - -o /dev/null 2>&1 | grep -i "access-control"
@@ -647,7 +673,7 @@ access-control-max-age: 3600
 ```bash
 # Rapid-fire 15 requests (limit is 10/s)
 for i in $(seq 1 15); do
-  code=$(curl -s -o /dev/null -w "%{http_code}" http://gateway.duynh.me/product/v1/public/products)
+  code=$(curl -s -o /dev/null -w "%{http_code}" https://gateway.duynh.me/product/v1/public/products)
   echo "Request $i: $code"
 done
 # Expected: First ~10 return 200, remaining return 429
@@ -775,8 +801,13 @@ Ensure the `Origin` header matches one of the configured origins exactly (includ
 
 ```bash
 kubectl describe certificate kong-proxy-tls -n kong
-kubectl describe clusterissuer homelab-ca
+kubectl describe clusterissuer letsencrypt-prod
+kubectl describe order,challenge -n kong
+kubectl get secret cloudflare-api-token -n cert-manager  # must exist; ESO synced from OpenBAO
+kubectl logs -n cert-manager deploy/cert-manager --tail=50
 ```
+
+DNS-01 failure modes (most common): missing/invalid CF token in OpenBAO, ESO `ClusterSecretStore openbao` not Ready, Cloudflare zone not delegated, propagation delay (LE retries automatically).
 
 ---
 

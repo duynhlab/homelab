@@ -1,6 +1,6 @@
-# cert-manager + Let's Encrypt + Flux CD (8 microservices)
+# cert-manager + Let's Encrypt + Flux CD
 
-This guide provides **Helm values**, **Flux CD v2** manifests (`HelmRepository`, `HelmRelease`, `Kustomization`), **ClusterIssuer** (Let's Encrypt staging + production, HTTP-01), **Certificate** templates for all eight backend services, **Ingress** examples with cert-manager annotations, deployment steps, and troubleshooting.
+This guide documents how cert-manager is wired into Flux in this repo: **two ClusterIssuer families** (internal `homelab-ca` + public `letsencrypt-{staging,prod}`), a **single `kong-proxy-tls` wildcard cert** issued via **Cloudflare DNS-01**, and **trust-manager** distributing the homelab CA bundle.
 
 **Repository paths (implemented in this repo):**
 
@@ -9,12 +9,15 @@ This guide provides **Helm values**, **Flux CD v2** manifests (`HelmRepository`,
 | Jetstack `HelmRepository` | [`kubernetes/clusters/local/sources/helm/jetstack.yaml`](../../kubernetes/clusters/local/sources/helm/jetstack.yaml) |
 | cert-manager `HelmRelease` | [`kubernetes/infra/controllers/cert-manager/helmrelease.yaml`](../../kubernetes/infra/controllers/cert-manager/helmrelease.yaml) |
 | trust-manager `HelmRelease` | [`kubernetes/infra/controllers/cert-manager/trust-manager-helmrelease.yaml`](../../kubernetes/infra/controllers/cert-manager/trust-manager-helmrelease.yaml) |
-| ClusterIssuers + Certificates | [`kubernetes/infra/configs/cert-manager/`](../../kubernetes/infra/configs/cert-manager/) |
-| CA bundle distribution (trust-manager) | [`docs/security/trust-distribution.md`](../security/trust-distribution.md) |
+| ClusterIssuers (selfsigned + homelab-ca + LE) | [`kubernetes/infra/configs/cert-manager/clusterissuers.yaml`](../../kubernetes/infra/configs/cert-manager/clusterissuers.yaml) |
+| Kong proxy Certificate | [`kubernetes/infra/configs/cert-manager/certificates-microservices.yaml`](../../kubernetes/infra/configs/cert-manager/certificates-microservices.yaml) |
+| trust-manager Bundle | [`kubernetes/infra/configs/cert-manager/bundles.yaml`](../../kubernetes/infra/configs/cert-manager/bundles.yaml) |
+| Committed CA PEM (Bundle source) | [`kubernetes/infra/configs/cert-manager/ca-source/homelab-ca.crt`](../../kubernetes/infra/configs/cert-manager/ca-source/homelab-ca.crt) |
+| CA bundle distribution deep-dive | [`docs/security/trust-distribution.md`](../security/trust-distribution.md) |
+| Cloudflare API token ExternalSecret | [`kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`](../../kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml) |
 | Flux `Kustomization` (configs) | [`kubernetes/clusters/local/cert-manager-config.yaml`](../../kubernetes/clusters/local/cert-manager-config.yaml) |
-| Ingress example (optional; not in default kustomize) | [`kubernetes/infra/configs/cert-manager/ingress-example.yaml`](../../kubernetes/infra/configs/cert-manager/ingress-example.yaml) |
 
-**Preference — ACME solver:** **HTTP-01** is the default below (works with **Ingress** controllers such as ingress-nginx, GKE Ingress, Traefik). Use **DNS-01** (wildcard certs, no HTTP reachability) when you control a DNS API (e.g. Cloud DNS, Cloudflare); an optional pattern is noted in [DNS-01 / wildcard](#dns-01--wildcard-optional).
+**ACME solver:** **DNS-01 via Cloudflare** is the only solver in use. The Kind cluster does not need to be reachable from the internet — only Cloudflare API access (publish a TXT on the `duynh.me` zone) is required. HTTP-01 is intentionally not configured (it would require a public LB).
 
 **Compatibility:** Flux **Kustomization** `kustomize.toolkit.fluxcd.io/v1`, **HelmRelease** `helm.toolkit.fluxcd.io/v2`, **GitOps** best practices (declarative sources, `dependsOn`, prune).
 
@@ -24,31 +27,42 @@ This guide provides **Helm values**, **Flux CD v2** manifests (`HelmRepository`,
 
 ```mermaid
 flowchart LR
-  subgraph flux [Flux]
-    HR[HelmRelease cert-manager + trust-manager]
-    K[configs/cert-manager Kustomization]
+  subgraph flux[Flux]
+    HR[HelmRelease<br/>cert-manager + trust-manager]
+    K[Kustomization<br/>cert-manager-local]
   end
-  subgraph cm [cert-manager + trust-manager]
-    CI[ClusterIssuer LE / homelab-ca]
-    C[Certificate per namespace]
-    CA[CA Certificate<br/>homelab-ca]
+  subgraph eso[OpenBAO + ESO]
+    Bao[(OpenBAO<br/>secret/local/infra/cloudflare/api-token)]
+    ES[ExternalSecret<br/>cloudflare-api-token]
+    Sec[Secret<br/>cloudflare-api-token]
+  end
+  subgraph cm[cert-manager + trust-manager]
+    SS[ClusterIssuer<br/>selfsigned-bootstrap]
+    CA[Certificate<br/>homelab-ca]
+    HCA[ClusterIssuer<br/>homelab-ca]
+    LES[ClusterIssuer<br/>letsencrypt-staging]
+    LEP[ClusterIssuer<br/>letsencrypt-prod]
+    KCert[Certificate<br/>kong/kong-proxy-tls<br/>SANs: duynh.me, *.duynh.me, local.duynh.me]
     CACOPY[ConfigMap<br/>homelab-ca-source<br/>committed PEM]
-    TM[Bundle homelab-ca-bundle]
-    OUT[ConfigMap homelab-ca-bundle<br/>across labeled namespaces]
-  end
-  subgraph edge [Edge]
-    IG[Ingress + HTTP-01 solver]
+    Bundle[Bundle<br/>homelab-ca-bundle]
+    OUT[ConfigMap<br/>homelab-ca-bundle<br/>across labeled namespaces]
   end
   HR --> cm
-  K --> CI
-  CI --> C
-  CI --> CA
-  CA -. one-time export .-> CACOPY
-  CACOPY --> TM
-  TM --> OUT
-  C --> IG
-  LE[Let's Encrypt] <--> IG
+  K --> SS --> CA --> HCA
+  Bao --> ES --> Sec --> LES & LEP
+  LEP --> KCert
+  CA -. one-time export .-> CACOPY --> Bundle --> OUT
+  LE[Let's Encrypt ACME] <-->|DNS-01 TXT on duynh.me zone| LEP
+  LE <-->|staging| LES
+  CF[Cloudflare API] <--> LEP & LES
 ```
+
+**Two coexisting PKIs:**
+
+| PKI | Issuer chain | Used by | Trusted by |
+|---|---|---|---|
+| Internal | `selfsigned-bootstrap` → `homelab-ca` Certificate → `homelab-ca` ClusterIssuer | Webhooks, future internal mTLS | Workloads that mount `homelab-ca-bundle` (trust-manager) |
+| Public | `letsencrypt-staging` / `letsencrypt-prod` (DNS-01 via Cloudflare) | `kong-proxy-tls` (browser-facing wildcard) | Browsers (Mozilla bundle covers LE roots) |
 
 ---
 
@@ -173,224 +187,132 @@ resources:
 
 ---
 
-## 5. ClusterIssuer — Let's Encrypt (staging + production, HTTP-01)
+## 5. ClusterIssuers (selfsigned + homelab-ca + Let's Encrypt DNS-01)
 
-Replace `acme@YOURDOMAIN` and `nginx` (Ingress class) to match your cluster.
-
-**File:** `kubernetes/infra/configs/cert-manager/clusterissuers.yaml`
+The real file at `kubernetes/infra/configs/cert-manager/clusterissuers.yaml` declares **four** ClusterIssuers in a single manifest:
 
 ```yaml
+# Step 1: bootstrap issuer (self-signs the homelab CA cert)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-bootstrap
+spec:
+  selfSigned: {}
+---
+# Step 2: homelab CA cert (10-year, ECDSA P-256), signed by the bootstrap issuer
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: homelab-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: homelab-ca
+  duration: 87600h
+  secretName: homelab-ca-secret
+  privateKey: { algorithm: ECDSA, size: 256 }
+  issuerRef: { kind: ClusterIssuer, name: selfsigned-bootstrap, group: cert-manager.io }
+---
+# Step 3: homelab CA ClusterIssuer — signs internal leaves
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: homelab-ca
+spec:
+  ca: { secretName: homelab-ca-secret }
+---
+# Step 4: Let's Encrypt staging — DNS-01 via Cloudflare, scoped to duynh.me
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: letsencrypt-staging
 spec:
   acme:
-    email: acme@duynh.me
+    email: duyhenry250897@gmail.com
     server: https://acme-staging-v02.api.letsencrypt.org/directory
-    privateKeySecretRef:
-      name: letsencrypt-staging-account-key
+    privateKeySecretRef: { name: letsencrypt-staging-account-key }
     solvers:
-      - http01:
-          ingress:
-            class: nginx
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token
+        selector:
+          dnsZones: [duynh.me]
 ---
+# Step 5: Let's Encrypt prod — same shape, prod ACME endpoint
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: letsencrypt-prod
 spec:
   acme:
-    email: acme@duynh.me
+    email: duyhenry250897@gmail.com
     server: https://acme-v02.api.letsencrypt.org/directory
-    privateKeySecretRef:
-      name: letsencrypt-prod-account-key
+    privateKeySecretRef: { name: letsencrypt-prod-account-key }
     solvers:
-      - http01:
-          ingress:
-            class: nginx
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token
+        selector:
+          dnsZones: [duynh.me]
 ```
 
-**GKE Ingress (default class):** use `gce` or your IngressClass name instead of `nginx`. **Traefik:** set `ingressClassName` / class per [cert-manager HTTP-01](https://cert-manager.io/docs/configuration/acme/http01/).
+**Pre-requisite Secret — `cloudflare-api-token`** (`cert-manager` namespace, key `api-token`) is synced from OpenBAO by the ExternalSecret in `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`. The OpenBAO path is `secret/local/infra/cloudflare/api-token` (key `api_token`); the value is **bootstrap-only** — not in Git — and must be re-seeded after every cluster recreate (`bao kv put …`). Operator runbook: [`docs/secrets/secrets-management.md`](../secrets/secrets-management.md#bootstrap-only-secrets).
 
 ---
 
-## 6. Certificate resources — eight microservices (template)
+## 6. Kong proxy Certificate (single wildcard for all browser-facing hosts)
 
-One **Certificate** per hostname (per namespace). DNS names below follow `gateway.duynh.me` style from [api-naming-convention.md](../api/api-naming-convention.md); **replace** `local.duynh.me` with your domain.
-
-| Service      | Namespace      | Example DNS name              |
-|-------------|----------------|-------------------------------|
-| auth        | auth           | auth.duynh.me              |
-| user        | user           | user.duynh.me              |
-| product     | product        | product.duynh.me           |
-| cart        | cart           | cart.duynh.me              |
-| order       | order          | order.duynh.me             |
-| review      | review         | review.duynh.me            |
-| notification| notification   | notification.duynh.me      |
-| shipping    | shipping       | shipping.duynh.me          |
+Kong terminates TLS centrally. There is **one** Certificate — `kong/kong-proxy-tls` — covering every `*.duynh.me` host (apex, wildcard, and the explicit frontend FQDN `local.duynh.me`). Per-service Certificates are not used; Ingresses do not carry `tls:` blocks because Kong serves the cert via `default-ssl-cert`.
 
 **File:** `kubernetes/infra/configs/cert-manager/certificates-microservices.yaml`
 
 ```yaml
-# Repeat pattern: metadata.namespace + dnsNames must match your Ingress host.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: auth-tls
-  namespace: auth
+  name: kong-proxy-tls
+  namespace: kong
 spec:
-  secretName: auth-tls
+  secretName: kong-proxy-tls
+  duration: 2160h          # 90d — LE max
+  renewBefore: 720h        # 30d before expiry
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  commonName: duynh.me
+  dnsNames:
+    - duynh.me
+    - "*.duynh.me"
+    - local.duynh.me
   issuerRef:
     kind: ClusterIssuer
-    name: letsencrypt-staging
-  dnsNames:
-    - auth.duynh.me
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: user-tls
-  namespace: user
-spec:
-  secretName: user-tls
-  issuerRef:
-    kind: ClusterIssuer
-    name: letsencrypt-staging
-  dnsNames:
-    - user.duynh.me
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: product-tls
-  namespace: product
-spec:
-  secretName: product-tls
-  issuerRef:
-    kind: ClusterIssuer
-    name: letsencrypt-staging
-  dnsNames:
-    - product.duynh.me
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: cart-tls
-  namespace: cart
-spec:
-  secretName: cart-tls
-  issuerRef:
-    kind: ClusterIssuer
-    name: letsencrypt-staging
-  dnsNames:
-    - cart.duynh.me
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: order-tls
-  namespace: order
-spec:
-  secretName: order-tls
-  issuerRef:
-    kind: ClusterIssuer
-    name: letsencrypt-staging
-  dnsNames:
-    - order.duynh.me
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: review-tls
-  namespace: review
-spec:
-  secretName: review-tls
-  issuerRef:
-    kind: ClusterIssuer
-    name: letsencrypt-staging
-  dnsNames:
-    - review.duynh.me
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: notification-tls
-  namespace: notification
-spec:
-  secretName: notification-tls
-  issuerRef:
-    kind: ClusterIssuer
-    name: letsencrypt-staging
-  dnsNames:
-    - notification.duynh.me
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: shipping-tls
-  namespace: shipping
-spec:
-  secretName: shipping-tls
-  issuerRef:
-    kind: ClusterIssuer
-    name: letsencrypt-staging
-  dnsNames:
-    - shipping.duynh.me
+    name: letsencrypt-prod
 ```
 
-Switch `letsencrypt-staging` → `letsencrypt-prod` when DNS + HTTP-01 are verified.
+Switch `letsencrypt-prod` → `letsencrypt-staging` while iterating to avoid LE prod rate limits.
 
-### Wildcard (one cert for many hosts)
+### Adding a new browser-facing host
 
-Requires **DNS-01** and a **DNS provider** solver (not HTTP-01). See [DNS-01 / wildcard](#dns-01--wildcard-optional).
+If a new subdomain (e.g. `newtool.duynh.me`) is added to a Kong Ingress, **no Certificate change is needed** — it is already covered by the `*.duynh.me` SAN. Just add the host to `scripts/setup-hosts.sh` and create the Ingress.
 
 ---
 
-## 7. Ingress examples (TLS + cert-manager)
+## 7. Ingress wiring (Kong, no per-Ingress TLS block)
 
-### Option A — Ingress shim (recommended): annotations only
+This platform uses **Kong** as the only ingress controller. Kong terminates TLS at the proxy with the wildcard `kong-proxy-tls` Secret; Ingress objects do **not** carry `tls:` blocks and do **not** use the `cert-manager.io/cluster-issuer` annotation. They only:
 
-cert-manager creates/manages the Certificate from Ingress annotations; **do not** duplicate a separate `Certificate` for the same host unless you know what you’re doing.
+- declare hosts (`*.duynh.me`),
+- force HTTPS via per-Ingress annotations:
+  - `konghq.com/protocols: "https"`
+  - `konghq.com/https-redirect-status-code: "301"`
 
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: auth
-  namespace: auth
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-staging
-    # kubernetes.io/ingress.class: nginx   # if not using ingressClassName
-spec:
-  ingressClassName: nginx
-  tls:
-    - hosts:
-        - auth.duynh.me
-      secretName: auth-tls
-  rules:
-    - host: auth.duynh.me
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: auth
-                port:
-                  number: 8080
-```
-
-### Option B — Explicit `Certificate` + Ingress referencing existing secret
-
-Use the `Certificate` manifests from section 6; Ingress references `secretName` that cert-manager populates:
-
-```yaml
-spec:
-  tls:
-    - hosts: [auth.duynh.me]
-      secretName: auth-tls
-```
+For the full Kong setup (CORS, rate limiting, ingress catalog, verification runbook) see [`docs/platform/kong-gateway.md`](kong-gateway.md).
 
 ---
 
@@ -404,6 +326,8 @@ kind: Kustomization
 resources:
   - clusterissuers.yaml
   - certificates-microservices.yaml
+  - bundles.yaml
+  - ca-source/
 ```
 
 **File:** `kubernetes/clusters/local/cert-manager-config.yaml`
@@ -414,10 +338,9 @@ kind: Kustomization
 metadata:
   name: cert-manager-local
   namespace: flux-system
-  labels:
-    app.kubernetes.io/component: infrastructure
 spec:
   interval: 10m
+  retryInterval: 2m
   timeout: 5m
   sourceRef:
     kind: OCIRepository
@@ -427,22 +350,34 @@ spec:
   wait: true
   dependsOn:
     - name: controllers-local
+    - name: secrets-local       # cloudflare-api-token Secret must exist before LE issuers reconcile
 ```
 
-Add `cert-manager-config.yaml` to `kubernetes/clusters/local/kustomization.yaml` **after** `controllers.yaml` and **before** `apps.yaml`.
+`cert-manager-config.yaml` is registered in `kubernetes/clusters/local/kustomization.yaml` between `controllers.yaml`/`secrets.yaml` and `kong-local`/`apps.yaml`.
 
 ---
 
 ## 9. Deployment (step-by-step)
 
-1. **Ingress controller** — HTTP-01 needs a working Ingress with a **public** IP/DNS. On Kind, use [ingress-nginx](https://kubernetes.github.io/ingress-nginx/deploy/) or match your platform. **Local Kind without public DNS:** certificates stay **Pending**; use **staging** issuer or **mkcert**/self-signed for dev.
-2. **DNS** — Create **A/AAAA** (or CNAME) for each `*.duynh.me` host → load balancer IP.
-3. **Commit** HelmRepository, namespaces, `controllers/cert-manager`, `configs/cert-manager`, Flux `cert-manager-local`, and `kustomization.yaml` updates.
-4. **Push** to the branch Flux watches; **reconcile** (or wait for interval).
-5. **Verify** cert-manager pods: `kubectl -n cert-manager get pods`.
-6. **Verify** ClusterIssuers: `kubectl get clusterissuer`.
-7. **Verify** Certificates: `kubectl get certificate -A`.
-8. **Switch to prod** issuer when staging succeeds: update Ingress annotations or `Certificate.spec.issuerRef.name` to `letsencrypt-prod`.
+1. **Seed Cloudflare API token in OpenBAO** (host setup, runs once per fresh cluster):
+   ```bash
+   ROOT=$(kubectl get secret -n openbao openbao-init-keys -o jsonpath='{.data.root_token}' | base64 -d)
+   kubectl exec -n openbao openbao-0 -- sh -c \
+     "BAO_TOKEN=$ROOT bao kv put secret/local/infra/cloudflare/api-token api_token=cfut_..."
+   ```
+2. **Reconcile** `secrets-local` so ESO syncs `cloudflare-api-token` into the `cert-manager` namespace:
+   ```bash
+   flux reconcile ks secrets-local --with-source
+   ```
+3. **Reconcile** `cert-manager-local` — the `letsencrypt-{staging,prod}` ClusterIssuers go Ready; cert-manager creates an Order on `kong-proxy-tls`, publishes the DNS-01 TXT, LE validates, Secret `kong-proxy-tls` lands in the `kong` namespace.
+4. **Reconcile** `kong-local` (and `kong-config-local`) — Kong pod starts and mounts the Secret as `ssl_cert`/`ssl_cert_key`.
+5. **Verify**:
+   ```bash
+   kubectl get clusterissuer
+   kubectl get certificate -A
+   kubectl get secret kong-proxy-tls -n kong
+   ```
+6. **Browser test**: `https://local.duynh.me` (after `sudo ./scripts/setup-hosts.sh`) should show a green padlock with a Let's Encrypt-issued cert covering `*.duynh.me`.
 
 ---
 
@@ -469,13 +404,15 @@ flux get kustomizations
 flux reconcile kustomization cert-manager-local --with-source
 ```
 
-**Common issues**
+**Common issues (DNS-01)**
 
 | Symptom | Check |
 |--------|--------|
-| Certificate Pending | DNS not pointing to LB; Ingress class mismatch; firewall |
-| HTTP-01 fails | Host not reachable on port 80 from internet; wrong Ingress class in ClusterIssuer |
-| Rate limit (429) | Let's Encrypt staging for tests; avoid deleting/recreating too often |
+| `Secret "cloudflare-api-token" not found` on ClusterIssuer | OpenBAO not seeded → see §9 step 1; or `ClusterSecretStore openbao` NotReady (ESO can't auth to OpenBAO — see [openbao runbook](../secrets/openbao.md)) |
+| Order stuck in `pending` | DNS-01 challenge waiting on Cloudflare TXT propagation — cert-manager retries automatically (1–2 min) |
+| `cloudflare API call failed` | Token revoked or scope wrong (needs Zone\:Read + DNS\:Edit on `duynh.me`); regenerate and re-seed OpenBAO |
+| LE prod rate-limit (429) | Iterate on `letsencrypt-staging` first; switch `issuerRef` to `prod` only when SANs are stable |
+| Cert SAN mismatch in browser | Check `kubectl describe cert kong-proxy-tls -n kong` — SANs must include the host being browsed; add to `dnsNames` and reissue |
 
 ---
 
@@ -533,25 +470,24 @@ Full runbook in `docs/security/trust-distribution.md` § 5.
 
 ---
 
-## DNS-01 / wildcard (optional)
+## DNS-01 / wildcard — already the default
 
-1. Create a **ClusterIssuer** (or Issuer) with a **DNS01** solver for your provider ([cert-manager DNS providers](https://cert-manager.io/docs/configuration/acme/dns01/)).
-2. Example (structure only — credentials via Secret referenced by issuer):
+This section is kept as a back-reference; the actual DNS-01 wiring is described in §5 (ClusterIssuers) and §6 (Certificate). The Cloudflare solver looks like:
 
 ```yaml
 spec:
   acme:
     solvers:
       - dns01:
-          cloudDNS:
-            project: my-gcp-project
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token
         selector:
-          dnsNames:
-            - "*.duynh.me"
-            - "local.duynh.me"
+          dnsZones: [duynh.me]
 ```
 
-3. Use **one** `Certificate` with `dnsNames: ["*.duynh.me","local.duynh.me"]` and a single TLS secret referenced by multiple Ingresses (same namespace limitations apply — wildcards are often **one namespace** or shared cert; plan accordingly).
+The wildcard SAN `*.duynh.me` covers every Kong-fronted host with one Certificate; no per-namespace duplication is needed because TLS terminates at Kong, not at the upstream pods.
 
 ---
 

@@ -299,7 +299,8 @@ docs/
 ### Secrets
 
 - [Secrets Management](./secrets/secrets-management.md) - OpenBAO + ESO guide for centralized secret management
-- [OpenBAO](./secrets/openbao.md) - OpenBAO HA architecture & operations
+- [OpenBAO](./secrets/openbao.md) - OpenBAO HA architecture & operations (incl. reviewer-JWT pitfall, bootstrap-only Cloudflare token)
+- [Trust Distribution](./security/trust-distribution.md) - trust-manager `homelab-ca-bundle` and the LE / homelab-CA dual-PKI split
 - [OpenBAO Production Plan](./secrets/openbao-production-plan.md) - Production migration plan (EKS/GKE)
 - [Vault (Archived)](./secrets/vault.md) - Legacy Vault dev mode docs (historical reference)
 - [Backlog (P1/P2)](./secrets/backlog.md) - Pending improvements: rotation, audit logging, PushSecret, dynamic secrets
@@ -336,6 +337,8 @@ docs/
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
 - **APM Stack** - Tempo + Jaeger (tracing), OTel Collector (fan-out), Pyroscope (profiling), Loki + VictoriaLogs + Vector (logging)
 - **Secrets Stack** - OpenBAO (HA Raft) + External Secrets Operator for centralized secret management
+- **TLS / PKI** - cert-manager with **dual issuers**: Let's Encrypt (DNS-01 via Cloudflare) for browser-facing `*.duynh.me`; self-signed `homelab-ca` for future internal mTLS, distributed via trust-manager `homelab-ca-bundle`
+- **Bootstrap-only secrets** - Cloudflare API token (`secret/local/infra/cloudflare/api-token`) is operator-supplied (not in Git, not seeded by `openbao-bootstrap`); re-seed after every fresh cluster
 - **k6 Load Testing** - Helm-managed load generators
 
 ### Common Tasks
@@ -392,4 +395,4 @@ make flux-push && make flux-sync
 
 ---
 
-**Last Updated**: February 2026
+**Last Updated**: May 2026

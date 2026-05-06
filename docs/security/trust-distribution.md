@@ -37,6 +37,21 @@ trust-manager solves this exactly. Pros over reflector / kubernetes-replicator:
 - **Output formats**: PEM by default, optional JKS / PKCS#12 for Java / .NET
   workloads (disabled here — Go uses PEM only).
 
+### 1.5 Two coexisting PKIs (read this first)
+
+The cluster runs **two independent issuer chains** that serve different audiences. trust-manager only distributes **one** of them.
+
+| PKI | Used for | Trust source on the client | Distributed by trust-manager? |
+|---|---|---|---|
+| **Let's Encrypt** (`letsencrypt-prod` / `letsencrypt-staging`, DNS-01 via Cloudflare) | Browser-facing TLS on the Kong proxy — `gateway.duynh.me`, `*.duynh.me` (single `kong-proxy-tls` wildcard) | Mozilla root store (already in browsers and the `useDefaultCAs: true` portion of `homelab-ca-bundle`) | No — public roots are already trusted everywhere |
+| **homelab-ca** (self-signed via cert-manager `selfsigned-bootstrap` → `homelab-ca` ClusterIssuer) | Future internal mTLS / private TLS endpoints **not** exposed via the public DNS name | Distributed via `homelab-ca-bundle` ConfigMap to namespaces labeled `platform.duynhlab.dev/needs-trust=true` | Yes — this is the entire reason trust-manager exists |
+
+**Implications**
+
+- A pod calling `https://gateway.duynh.me` does not need `homelab-ca-bundle` to verify Kong; the cert is signed by Let's Encrypt and the Mozilla CAs in the same bundle (or in the system trust store) already cover it. The bundle is for *future* private endpoints.
+- Do **not** issue any leaf cert from `homelab-ca` for a hostname that is also resolvable to the Kong proxy — that would create two competing TLS chains for the same SNI and confuse clients.
+- Adding a new browser-facing host means adding a SAN to `kong-proxy-tls` (Let's Encrypt path), **not** issuing a homelab-ca cert.
+
 ---
 
 ## 2. Architecture
@@ -113,7 +128,9 @@ kubectl get cm homelab-ca-bundle -n my-namespace -o jsonpath='{.data.ca-bundle\.
 | Namespace | Why |
 |---|---|
 | `monitoring` | Future Vector / Grafana outbound HTTPS to homelab-CA-signed targets |
-| `auth` | Pilot — backend service that may call `https://gateway.duynh.me` for cross-service traffic |
+| `auth` | Pilot — backend service that may call future private (homelab-CA-signed) endpoints |
+
+> **Note**: `gateway.duynh.me` is **not** a reason to opt in. It is signed by Let's Encrypt and trusted via the Mozilla bundle (already inside `homelab-ca-bundle` thanks to `useDefaultCAs: true`, and present in every container's system trust store). Opt a namespace in only when it consumes a **homelab-CA-signed** endpoint.
 
 Add more namespaces by appending the label and merging via PR.
 
@@ -194,17 +211,20 @@ Each rotation step is a separate PR with its own review and rollback.
 
 ## 6. Bootstrap (first-time install)
 
-Already done in this repo at commit `feat/trust-manager`. To redo from scratch
-in another cluster:
+The `homelab-ca.crt` PEM is already committed at
+[`kubernetes/infra/configs/cert-manager/ca-source/homelab-ca.crt`](../../kubernetes/infra/configs/cert-manager/ca-source/homelab-ca.crt)
+for the current cluster's CA. The export step below is **only** needed when
+bootstrapping a fresh cluster (a new cluster generates a new CA private key, so
+the committed PEM no longer matches and must be regenerated):
 
 ```bash
-# After cert-manager has issued homelab-ca-secret:
+# After cert-manager has issued homelab-ca-secret in the new cluster:
 mkdir -p kubernetes/infra/configs/cert-manager/ca-source
 kubectl get secret homelab-ca-secret -n cert-manager \
   -o jsonpath='{.data.tls\.crt}' | base64 -d \
   > kubernetes/infra/configs/cert-manager/ca-source/homelab-ca.crt
 
-# kustomization.yaml — already in repo, no changes needed.
+# kustomization.yaml already references the file — no changes needed.
 # Commit the .crt file. CA certs are public; only tls.key is sensitive.
 ```
 

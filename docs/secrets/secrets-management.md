@@ -118,8 +118,11 @@ All secrets are stored in OpenBAO's KV v2 secrets engine under the `secret/` pat
 |------|-------------|----------|
 | `secret/local/infra/rustfs/backup-zalando` | RustFS S3 credentials (bucket: pg-backups-zalando) | Zalando clusters (auth-db, supporting-shared-db) |
 | `secret/local/infra/rustfs/backup-cnpg` | RustFS S3 credentials (bucket: pg-backups-cnpg) | CNPG clusters (cnpg-db, cnpg-db-replica) |
+| `secret/local/infra/cloudflare/api-token` | Cloudflare API token (Zone\:Read + DNS\:Edit on `duynh.me`) | cert-manager `letsencrypt-{staging,prod}` ClusterIssuers (DNS-01 solver) |
 
-**Keys**: `access_key_id`, `secret_access_key`
+**Keys**: `access_key_id`, `secret_access_key` for RustFS rows; `api_token` for Cloudflare.
+
+> ⚠️ **Bootstrap-only secret**: the Cloudflare token is **not** seeded by the OpenBAO bootstrap script (it is operator-supplied) and **not** in Git. Re-seed it after every fresh cluster — see [Bootstrap-only secrets](#bootstrap-only-secrets) below.
 
 ### Pooler Credentials
 
@@ -183,6 +186,14 @@ metadata:
 | `pgdog-cnpg-credentials` | product | `secret/data/local/databases/pgdog-cnpg/credentials` | Available (not consumed) |
 
 > **Note**: Pooler charts don't currently support `secretRef`. Secrets are created for future use.
+
+### Infrastructure ExternalSecrets (per-namespace)
+
+| K8s Secret | Namespace | Source path (OpenBAO) | Source key | K8s key |
+|------------|-----------|-----------------------|------------|---------|
+| `cloudflare-api-token` | `cert-manager` | `secret/data/local/infra/cloudflare/api-token` | `api_token` | `api-token` |
+
+Defined at `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml` (kind `ExternalSecret`, despite the directory name — the cert-manager ClusterIssuer only needs the Secret in one namespace).
 
 ---
 
@@ -273,6 +284,31 @@ spec:
 
 4. **Deploy**: `make flux-push && make flux-sync`
 
+### Bootstrap-only secrets
+
+A few secrets are **operator-supplied** — they are not in Git and not seeded by the OpenBAO bootstrap script, so they must be re-applied after every fresh cluster:
+
+| Path | Why | Used by |
+|---|---|---|
+| `secret/local/infra/cloudflare/api-token` (key `api_token`) | API tokens are personal credentials, must not be committed | cert-manager `letsencrypt-prod` / `letsencrypt-staging` ClusterIssuers → `kong-proxy-tls` |
+
+```bash
+ROOT=$(kubectl get secret -n openbao openbao-init-keys -o jsonpath='{.data.root_token}' | base64 -d)
+kubectl exec -n openbao openbao-0 -- sh -c \
+  "BAO_TOKEN=$ROOT bao kv put secret/local/infra/cloudflare/api-token api_token=cfut_..."
+flux reconcile ks secrets-local --with-source
+flux reconcile ks cert-manager-local --with-source
+```
+
+If cert-manager already failed waiting for the Secret, also force ESO to re-sync immediately:
+
+```bash
+kubectl annotate clustersecretstore openbao force-sync=$(date +%s) --overwrite
+kubectl rollout restart deploy/cert-manager -n cert-manager
+```
+
+Long-term mitigation options are tracked in [`tamsu.md`](../../tamsu.md) (combination of a local `~/.homelab/secrets.env` bootstrap script + persisting the OpenBAO PVC across `make down`).
+
 ### Rotating a Secret
 
 1. **Update in OpenBAO**:
@@ -306,7 +342,40 @@ kubectl describe externalsecret <name> -n <namespace>
 kubectl get clustersecretstore openbao
 ```
 
-#### OpenBAO Authentication Failing
+#### OpenBAO Authentication Failing (`permission denied` from ESO ~1h after bootstrap)
+
+**Symptom**: every ExternalSecret reports `ClusterSecretStore "openbao" is not ready`; ESO logs show `Code: 403. Errors: * permission denied` on `/v1/auth/kubernetes/login`. Often appears 1–2 hours after `make up`, not at start.
+
+**Root cause** (commit `fb14349`): the bootstrap Job used to write `auth/kubernetes/config` with `token_reviewer_jwt` set to its own projected SA token, which expires after 1h (BoundServiceAccountTokenVolume). Once expired, every Kubernetes-auth login fails. Fix is to omit `token_reviewer_jwt` and set `disable_local_ca_jwt=false` so OpenBAO uses its own pod's auto-rotated SA token to call `TokenReview`.
+
+**Verify**:
+
+```bash
+kubectl logs job/openbao-bootstrap -n openbao
+ROOT=$(kubectl get secret openbao-init-keys -n openbao -o jsonpath='{.data.root_token}' | base64 -d)
+kubectl exec -n openbao openbao-0 -- sh -c "BAO_TOKEN=$ROOT bao read auth/kubernetes/config"
+# Expect: token_reviewer_jwt_set=false, disable_local_ca_jwt=false
+```
+
+**Runtime fix** (deadlocked because `secrets-local` is what installs the fix — break the loop manually):
+
+```bash
+kubectl exec -n openbao openbao-0 -- sh -c \
+  "BAO_TOKEN=$ROOT bao write auth/kubernetes/config \
+    kubernetes_host=https://10.96.0.1:443 \
+    kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+    disable_local_ca_jwt=false token_reviewer_jwt=''"
+kubectl annotate clustersecretstore openbao force-sync=$(date +%s) --overwrite
+```
+
+**Persistent fix**: re-run the bootstrap Job (it now ships the corrected script):
+
+```bash
+kubectl delete job -n openbao openbao-bootstrap
+flux reconcile ks secrets-local --with-source
+```
+
+#### OpenBAO Authentication Failing (general)
 
 ```bash
 kubectl logs job/openbao-bootstrap -n openbao

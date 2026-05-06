@@ -247,6 +247,10 @@ sequenceDiagram
     ESO->>K8s: Create/Update K8s Secret
 ```
 
+> ⚠️ **Reviewer-JWT pitfall (commit `fb14349`)** — When configuring `auth/kubernetes/config`, **omit** `token_reviewer_jwt` and set `disable_local_ca_jwt=false`. OpenBAO will then call `TokenReview` using its own pod's auto-rotated SA token (long-lived projected token, refreshed by kubelet).
+>
+> If you instead pass `token_reviewer_jwt=@/var/run/secrets/.../token` from the bootstrap Job's pod, that token is bound by `BoundServiceAccountTokenVolume` to ~1 h. After it expires every login fails with `permission denied` and ESO breaks platform-wide. See [§13 — `Authentication Failing`](#authentication-failing) for the runtime recovery procedure.
+
 ### OIDC Auth — Developer / Data Team
 
 ```mermaid
@@ -300,6 +304,9 @@ secret/{environment}/{category}/{service}/{resource}
 | `secret/local/databases/pgdog-cnpg/credentials` | `username`, `password` | PgDog pooler admin |
 | `secret/local/infra/rustfs/backup-zalando` | `access_key_id`, `secret_access_key` | WAL-G S3 (auth, user, review) |
 | `secret/local/infra/rustfs/backup-cnpg` | `access_key_id`, `secret_access_key` | Barman S3 (product, cart) |
+| `secret/local/infra/cloudflare/api-token` ⚠️ | `api_token` | cert-manager `letsencrypt-{staging,prod}` ClusterIssuers (DNS-01 solver) |
+
+> ⚠️ **Bootstrap-only**: the Cloudflare token is **not** seeded by `openbao-bootstrap` (it is operator-supplied) and **not** in Git. Re-seed after every fresh cluster — see [§12.1 Step 7 — Bootstrap-only Cloudflare token](#step-7--seed-bootstrap-only-cloudflare-token-operator).
 
 ### 5.2 Database Secrets Engine — Dynamic Credentials
 
@@ -819,6 +826,27 @@ kubectl create job --from=cronjob/openbao-bootstrap openbao-bootstrap-manual -n 
 kubectl exec -n openbao openbao-0 -- bao token revoke $ROOT_TOKEN
 ```
 
+### Step 7 — Seed bootstrap-only Cloudflare token (operator)
+
+The Cloudflare API token used by cert-manager DNS-01 is **operator-supplied**: it is **not** in Git and **not** seeded by the bootstrap Job. Re-seed it after every fresh cluster, then trigger downstream reconciles:
+
+```bash
+# Re-fetch root token from K8s Secret (kept across pod restarts via PVC)
+ROOT=$(kubectl get secret -n openbao openbao-init-keys -o jsonpath='{.data.root_token}' | base64 -d)
+
+kubectl exec -n openbao openbao-0 -- sh -c \
+  "BAO_TOKEN=$ROOT bao kv put secret/local/infra/cloudflare/api-token api_token=cfut_..."
+
+# Force ESO to re-sync the per-namespace ExternalSecret in cert-manager
+kubectl annotate clustersecretstore openbao force-sync=$(date +%s) --overwrite
+
+# Make Flux re-evaluate cert-manager (will issue letsencrypt-prod cert once the Secret lands)
+flux reconcile ks secrets-local --with-source
+flux reconcile ks cert-manager-local --with-source
+```
+
+Verify: `kubectl get secret cloudflare-api-token -n cert-manager` should exist with key `api-token`. The `kong-proxy-tls` Certificate then transitions to `Ready=True`.
+
 ### 12.2 Unseal After Node Restart
 
 ```bash
@@ -944,6 +972,40 @@ kubectl run -it --rm test --image=curlimages/curl -n external-secrets-system \
 ```
 
 ### Authentication Failing
+
+#### `permission denied` ~1 h after bootstrap (reviewer-JWT pitfall, fb14349)
+
+**Symptom**: every ExternalSecret reports `ClusterSecretStore "openbao" is not ready`; ESO logs show `Code: 403 ... permission denied` on `/v1/auth/kubernetes/login`. Often appears 1–2 h after `make up`, not at start.
+
+**Root cause**: legacy bootstrap wrote `auth/kubernetes/config` with `token_reviewer_jwt` set to its own projected SA token (1 h TTL via `BoundServiceAccountTokenVolume`). After expiry, every K8s-auth login fails. Fix in `fb14349`: omit `token_reviewer_jwt` and set `disable_local_ca_jwt=false` so OpenBAO uses its own pod's auto-rotated SA token.
+
+**Verify**:
+
+```bash
+ROOT=$(kubectl get secret openbao-init-keys -n openbao -o jsonpath='{.data.root_token}' | base64 -d)
+kubectl exec -n openbao openbao-0 -- sh -c "BAO_TOKEN=$ROOT bao read auth/kubernetes/config"
+# Expect: token_reviewer_jwt_set=false, disable_local_ca_jwt=false
+```
+
+**Runtime fix** (deadlock: `secrets-local` is what installs the fix — break the loop manually):
+
+```bash
+kubectl exec -n openbao openbao-0 -- sh -c \
+  "BAO_TOKEN=$ROOT bao write auth/kubernetes/config \
+    kubernetes_host=https://10.96.0.1:443 \
+    kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+    disable_local_ca_jwt=false token_reviewer_jwt=''"
+kubectl annotate clustersecretstore openbao force-sync=$(date +%s) --overwrite
+```
+
+**Persistent fix** (bootstrap script now ships corrected logic):
+
+```bash
+kubectl delete job -n openbao openbao-bootstrap
+flux reconcile ks secrets-local --with-source
+```
+
+#### General K8s auth checks
 
 ```bash
 # Check Kubernetes auth config in OpenBAO
@@ -1166,6 +1228,7 @@ bao lease revoke -prefix database/creds/
 | `kubernetes/infra/configs/secrets/openbao-bootstrap/` | Init scripts (phased) |
 | `kubernetes/infra/configs/secrets/cluster-secret-store.yaml` | ClusterSecretStore (openbao) |
 | `kubernetes/infra/configs/secrets/cluster-external-secrets/` | ClusterExternalSecret definitions |
+| `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml` | `ExternalSecret` (per-namespace) for cert-manager DNS-01 — file lives in CES dir but is `kind: ExternalSecret` since cert-manager only needs the Secret in one namespace |
 | `kubernetes/infra/configs/databases/clusters/*/secrets/` | Per-cluster ExternalSecret definitions |
 
 ### Helm Sources

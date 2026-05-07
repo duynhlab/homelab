@@ -1,3 +1,29 @@
+# Secrets, TLS & Trust — Folder Hub
+
+> Entry point for everything secrets, certificate, and trust-related on the platform.
+>
+> The platform's secrets pipeline is one chain — pulling them apart loses context:
+>
+> ```
+> OpenBAO  →  ESO  →  K8s Secret  →  cert-manager  →  trust-manager
+> ```
+>
+> All four pieces (and the docs that describe them) live in this folder.
+
+## What's in this folder
+
+| Doc | When to read |
+|---|---|
+| **This file (`README.md`)** — OpenBAO architecture & operations | OpenBAO internals: HA/Raft, seal/unseal, auth methods, secret engines, lease/policy model, day-2 ops, troubleshooting |
+| [`secrets-management.md`](./secrets-management.md) | "How do I add / consume / rotate a secret in this repo?" — ESO patterns, per-namespace ExternalSecret mapping, naming conventions, monitoring |
+| [`cert-manager.md`](./cert-manager.md) | cert-manager controller, ClusterIssuers (selfsigned + homelab-ca + Let's Encrypt DNS-01), `kong-proxy-tls` wildcard, deployment runbook, cert/issuer troubleshooting |
+| [`trust-distribution.md`](./trust-distribution.md) | trust-manager `homelab-ca-bundle` distribution, two-PKI split, namespace opt-in label, CA rotation runbook |
+| [`production-plan.md`](./production-plan.md) | Long-form migration plan from Vault dev → OpenBAO HA on EKS/GKE (auto-unseal, OIDC, dynamic DB creds) |
+| [`backlog.md`](./backlog.md) | P1/P2 backlog with industry citations |
+| [`vault.md`](./vault.md) | Archived legacy Vault dev-mode docs (kept as historical reference) |
+
+---
+
 # OpenBAO Architecture & Operations Guide
 
 > **Status**: Migration target — replacing HashiCorp Vault (Dev Mode) with OpenBAO HA
@@ -1275,9 +1301,11 @@ gantt
 
 ## 18. Related Documentation
 
-- [Production Plan](./openbao-production-plan.md) — Feature selection matrix and architecture decisions
+- [Production Plan](./production-plan.md) — Feature selection matrix and architecture decisions
 - [Secrets Management Guide](./secrets-management.md) — ESO patterns, path conventions, operations
-- [Vault Architecture & Bootstrap](./vault.md) — Current Vault dev mode (being replaced)
+- [cert-manager](./cert-manager.md) — Certificate issuers and `kong-proxy-tls` wildcard pipeline
+- [Trust Distribution](./trust-distribution.md) — trust-manager `homelab-ca-bundle` distribution
+- [Vault Architecture & Bootstrap](./vault.md) — Archived Vault dev-mode docs
 - [Secrets Backlog](./backlog.md) — Pending improvements
 - [OpenBAO Documentation](https://openbao.org/docs)
 - [OpenBAO Helm Chart](https://openbao.org/docs/platform/k8s/helm)

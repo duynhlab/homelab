@@ -13,7 +13,7 @@ This guide documents how cert-manager is wired into Flux in this repo: **two Clu
 | Kong proxy Certificate | [`kubernetes/infra/configs/cert-manager/certificates-microservices.yaml`](../../kubernetes/infra/configs/cert-manager/certificates-microservices.yaml) |
 | trust-manager Bundle | [`kubernetes/infra/configs/cert-manager/bundles.yaml`](../../kubernetes/infra/configs/cert-manager/bundles.yaml) |
 | Committed CA PEM (Bundle source) | [`kubernetes/infra/configs/cert-manager/ca-source/homelab-ca.crt`](../../kubernetes/infra/configs/cert-manager/ca-source/homelab-ca.crt) |
-| CA bundle distribution deep-dive | [`docs/security/trust-distribution.md`](../security/trust-distribution.md) |
+| CA bundle distribution deep-dive | [`./trust-distribution.md`](./trust-distribution.md) |
 | Cloudflare API token ExternalSecret | [`kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`](../../kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml) |
 | Flux `Kustomization` (configs) | [`kubernetes/clusters/local/cert-manager-config.yaml`](../../kubernetes/clusters/local/cert-manager-config.yaml) |
 
@@ -261,7 +261,7 @@ spec:
           dnsZones: [duynh.me]
 ```
 
-**Pre-requisite Secret — `cloudflare-api-token`** (`cert-manager` namespace, key `api-token`) is synced from OpenBAO by the ExternalSecret in `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`. The OpenBAO path is `secret/local/infra/cloudflare/api-token` (key `api_token`); the value is **bootstrap-only** — not in Git — and must be re-seeded after every cluster recreate (`bao kv put …`). Operator runbook: [`docs/secrets/secrets-management.md`](../secrets/secrets-management.md#bootstrap-only-secrets).
+**Pre-requisite Secret — `cloudflare-api-token`** (`cert-manager` namespace, key `api-token`) is synced from OpenBAO by the ExternalSecret in `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`. The OpenBAO path is `secret/local/infra/cloudflare/api-token` (key `api_token`); the value is **bootstrap-only** — not in Git — and must be re-seeded after every cluster recreate (`bao kv put …`). Operator runbook: [`./secrets-management.md`](./secrets-management.md#bootstrap-only-secrets).
 
 ---
 
@@ -408,7 +408,7 @@ flux reconcile kustomization cert-manager-local --with-source
 
 | Symptom | Check |
 |--------|--------|
-| `Secret "cloudflare-api-token" not found` on ClusterIssuer | OpenBAO not seeded → see §9 step 1; or `ClusterSecretStore openbao` NotReady (ESO can't auth to OpenBAO — see [openbao runbook](../secrets/openbao.md)) |
+| `Secret "cloudflare-api-token" not found` on ClusterIssuer | OpenBAO not seeded → see §9 step 1; or `ClusterSecretStore openbao` NotReady (ESO can't auth to OpenBAO — see [openbao runbook](./README.md)) |
 | Order stuck in `pending` | DNS-01 challenge waiting on Cloudflare TXT propagation — cert-manager retries automatically (1–2 min) |
 | `cloudflare API call failed` | Token revoked or scope wrong (needs Zone\:Read + DNS\:Edit on `duynh.me`); regenerate and re-seed OpenBAO |
 | LE prod rate-limit (429) | Iterate on `letsencrypt-staging` first; switch `issuerRef` to `prod` only when SANs are stable |
@@ -418,76 +418,9 @@ flux reconcile kustomization cert-manager-local --with-source
 
 ## 11. trust-manager — distributing the homelab CA bundle
 
-cert-manager creates `homelab-ca-secret` in the `cert-manager` namespace only.
-Workloads in **other** namespaces that need to validate TLS connections signed
-by the homelab CA (k6 → gateway, future Vector → HTTPS sinks, in-cluster HTTPS
-clients) need that CA in their own namespace. trust-manager solves this with
-a single cluster-scoped `Bundle` CRD.
+cert-manager creates `homelab-ca-secret` only in the `cert-manager` namespace. Workloads in other namespaces that need to validate TLS connections signed by the homelab CA use trust-manager to receive a cluster-scoped `Bundle` synced as a per-namespace ConfigMap.
 
-**Full deep-dive:** [`docs/security/trust-distribution.md`](../security/trust-distribution.md)
-
-**Quick reference**
-
-```yaml
-# Bundle: combines Mozilla CAs + homelab CA, syncs to labeled namespaces.
-apiVersion: trust.cert-manager.io/v1alpha1
-kind: Bundle
-metadata:
-  name: homelab-ca-bundle
-spec:
-  sources:
-    - useDefaultCAs: true
-    - configMap:
-        name: homelab-ca-source
-        key: ca.crt
-  target:
-    configMap:
-      key: ca-bundle.pem
-    namespaceSelector:
-      matchLabels:
-        platform.duynhlab.dev/needs-trust: "true"
-```
-
-**Opt a namespace in:**
-
-```yaml
-metadata:
-  name: my-namespace
-  labels:
-    platform.duynhlab.dev/needs-trust: "true"
-```
-
-trust-manager creates `ConfigMap/homelab-ca-bundle` in that namespace within
-~10s. Mount as `/etc/ssl/certs/ca-bundle.pem` and set `SSL_CERT_FILE` for Go
-clients.
-
-**Why not point Bundle directly at `homelab-ca-secret`?** Rotation safety. We
-commit the CA cert as a static file under
-`kubernetes/infra/configs/cert-manager/ca-source/homelab-ca.crt` and let the
-Bundle read from a kustomize-generated ConfigMap. CA rollover then happens
-through PRs that bundle old + new CA simultaneously, never an atomic swap.
-Full runbook in `docs/security/trust-distribution.md` § 5.
-
----
-
-## DNS-01 / wildcard — already the default
-
-This section is kept as a back-reference; the actual DNS-01 wiring is described in §5 (ClusterIssuers) and §6 (Certificate). The Cloudflare solver looks like:
-
-```yaml
-spec:
-  acme:
-    solvers:
-      - dns01:
-          cloudflare:
-            apiTokenSecretRef:
-              name: cloudflare-api-token
-              key: api-token
-        selector:
-          dnsZones: [duynh.me]
-```
-
-The wildcard SAN `*.duynh.me` covers every Kong-fronted host with one Certificate; no per-namespace duplication is needed because TLS terminates at Kong, not at the upstream pods.
+**Full deep-dive (architecture, opt-in label, rotation runbook):** [`./trust-distribution.md`](./trust-distribution.md).
 
 ---
 

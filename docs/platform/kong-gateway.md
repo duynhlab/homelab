@@ -420,34 +420,14 @@ Kong forces HTTPS via per-Ingress annotation; HTTP requests return `301` to the 
 
 ## TLS / cert-manager
 
-Kong terminates TLS with a public-trust wildcard cert from **Let's Encrypt**, issued via Cloudflare DNS-01. The Kind cluster never has to be reachable from the internet — the solver only needs API access to the Cloudflare zone to publish a TXT record.
+Kong terminates TLS with a public-trust wildcard cert (`*.duynh.me`) from **Let's Encrypt**, issued via Cloudflare DNS-01. The Certificate (`kong-proxy-tls` in the `kong` ns) is mounted as `ssl_cert`/`ssl_cert_key` on the Kong pod via a secretVolume.
 
-```mermaid
-flowchart LR
-  Bao[(OpenBAO<br/>secret/local/infra/cloudflare/api-token)]
-  Bao --> ESO[ExternalSecret<br/>cert-manager/cloudflare-api-token]
-  ESO --> Sec[Secret<br/>cloudflare-api-token]
-  Sec --> Issuer[ClusterIssuer<br/>letsencrypt-prod]
-  Issuer --> Cert[Certificate<br/>kong/kong-proxy-tls<br/>SANs: duynh.me, *.duynh.me, local.duynh.me]
-  Cert --> KongSec[Secret<br/>kong/kong-proxy-tls]
-  KongSec --> Pod[Kong pod<br/>secretVolume → ssl_cert env]
-```
+Full pipeline (OpenBAO → ESO → cert-manager → Kong), DNS-01 prerequisites, the dual-PKI split (Let's Encrypt vs `homelab-ca`), and troubleshooting are documented in:
 
-**Pipeline:**
+- [`docs/secrets/cert-manager.md`](../secrets/cert-manager.md) — controller, ClusterIssuers, `kong-proxy-tls` Certificate, deployment runbook
+- [`docs/secrets/trust-distribution.md`](../secrets/trust-distribution.md) — trust-manager `homelab-ca-bundle`, two-PKI rationale
 
-1. The Cloudflare API token is seeded into OpenBAO at `secret/local/infra/cloudflare/api-token` (key `api_token`). This is **bootstrap-only** and not in Git — re-seed it after every cluster recreate.
-2. ESO syncs it to `Secret/cloudflare-api-token` in the `cert-manager` namespace via `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`.
-3. ClusterIssuers `letsencrypt-staging` and `letsencrypt-prod` reference that Secret for the Cloudflare DNS-01 solver, scoped to `dnsZones: [duynh.me]`.
-4. Certificate `kong-proxy-tls` (in `kong` ns) requests the wildcard from `letsencrypt-prod` and lands the result in `Secret/kong-proxy-tls` (mounted as `ssl_cert`/`ssl_cert_key` by the Kong pod).
-
-**Two PKIs coexist** in the cluster (see [`docs/security/trust-distribution.md`](../security/trust-distribution.md)):
-
-| PKI | Purpose | Distributed by |
-|---|---|---|
-| Let's Encrypt (`letsencrypt-prod`) | Browser-facing TLS on every `*.duynh.me` host | Kong's `kong-proxy-tls` Secret |
-| `homelab-ca` (self-signed ClusterIssuer) | Internal mTLS leaves (webhooks, future service mesh) | trust-manager → `homelab-ca-bundle` ConfigMap in labeled namespaces |
-
-Switch a leaf certificate to staging by editing its `issuerRef` to `letsencrypt-staging` (avoids LE prod rate limits while iterating).
+To switch the wildcard to LE staging while iterating (avoid prod rate limits), change `kong-proxy-tls.issuerRef` to `letsencrypt-staging`.
 
 ---
 
@@ -550,14 +530,7 @@ kubectl get certificate -A
 - Certificate `kong-proxy-tls` in `kong` namespace is `Ready: True` and `Issuer: letsencrypt-prod`
 - `Secret/cloudflare-api-token` present in `cert-manager` namespace (synced by ESO)
 
-If `letsencrypt-*` issuers are NotReady with `secret "cloudflare-api-token" not found`, seed the token into OpenBAO and reconcile `secrets-local`:
-
-```bash
-ROOT=$(kubectl get secret -n openbao openbao-init-keys -o jsonpath='{.data.root_token}' | base64 -d)
-kubectl exec -n openbao openbao-0 -- sh -c "BAO_TOKEN=$ROOT bao kv put secret/local/infra/cloudflare/api-token api_token=cfut_..."
-flux reconcile ks secrets-local --with-source
-flux reconcile ks cert-manager-local --with-source
-```
+If `letsencrypt-*` issuers are NotReady with `secret "cloudflare-api-token" not found`, the token has not been seeded into OpenBAO yet. Operator runbook: [`docs/secrets/secrets-management.md` § Bootstrap-only secrets](../secrets/secrets-management.md#bootstrap-only-secrets).
 
 ### Step 6: Check Ingress Resources
 
@@ -799,15 +772,7 @@ Ensure the `Origin` header matches one of the configured origins exactly (includ
 
 ### cert-manager certificate not Ready
 
-```bash
-kubectl describe certificate kong-proxy-tls -n kong
-kubectl describe clusterissuer letsencrypt-prod
-kubectl describe order,challenge -n kong
-kubectl get secret cloudflare-api-token -n cert-manager  # must exist; ESO synced from OpenBAO
-kubectl logs -n cert-manager deploy/cert-manager --tail=50
-```
-
-DNS-01 failure modes (most common): missing/invalid CF token in OpenBAO, ESO `ClusterSecretStore openbao` not Ready, Cloudflare zone not delegated, propagation delay (LE retries automatically).
+See [`docs/secrets/cert-manager.md` § Troubleshooting & validation](../secrets/cert-manager.md#10-troubleshooting--validation).
 
 ---
 

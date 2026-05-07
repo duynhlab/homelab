@@ -4,7 +4,7 @@
 >
 > **P0 (Critical)**: Completed. See [CHANGELOG v0.50.9](../../CHANGELOG.md).
 >
-> **Note**: This project has migrated from HashiCorp Vault (dev mode) to **OpenBAO (HA Raft)**. References to "Vault" in code examples below should use `bao` CLI and OpenBAO paths. P2.1 (audit) and P2.3 (HA) are now complete via the OpenBAO migration. See [openbao.md](./openbao.md) for current architecture.
+> **Note**: This project has migrated from HashiCorp Vault (dev mode) to **OpenBAO (HA Raft)**. References to "Vault" in code examples below should use `bao` CLI and OpenBAO paths. P2.1 (audit) and P2.3 (HA) are now complete via the OpenBAO migration. See [README.md](./README.md) for current architecture.
 
 ---
 
@@ -413,7 +413,9 @@ spec:
 
 ---
 
-### P2.3: Vault Standalone / HA Migration Templates
+### ~~P2.3: Vault Standalone / HA Migration Templates~~ (COMPLETED)
+
+**Status**: ✅ Done. OpenBAO HA Raft 3-node cluster is deployed (`openbao-0/1/2` in `openbao` ns, `kubernetes/infra/controllers/secrets/openbao/helmrelease.yaml`). See [README.md](./README.md) for current architecture.
 
 **Priority**: P2 | **Effort**: Small (1 hour) | **Risk**: None (templates only)
 

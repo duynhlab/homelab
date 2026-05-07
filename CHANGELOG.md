@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [Unreleased]
+
+### Changed
+
+- **docs**: Reorganized `docs/secrets/` as the hub for the entire OpenBAO → ESO → cert-manager → trust-manager chain.
+  - Moved `docs/platform/cert-manager-flux.md` → `docs/secrets/cert-manager.md`.
+  - Moved `docs/security/trust-distribution.md` → `docs/secrets/trust-distribution.md`.
+  - Renamed `docs/secrets/openbao.md` → `docs/secrets/README.md` (folder entry point).
+  - Renamed `docs/secrets/openbao-production-plan.md` → `docs/secrets/production-plan.md`.
+  - Deduplicated KV catalog, reviewer-JWT pitfall runbook, TLS pipeline diagrams, and file reference tables (single source of truth in `docs/secrets/README.md`).
+  - Trimmed `docs/platform/kong-gateway.md` §TLS / cert-manager section to short links into `docs/secrets/`.
+  - Marked backlog items P2.1 (audit logging) and P2.3 (HA migration templates) as DONE — already implemented via OpenBAO HA Raft + Vector audit forwarding.
+  - Updated inbound links in `docs/README.md`, root `README.md`, `AGENTS.md`.
+
 ## [0.92.0] - 2026-05-06
 
 ### Added

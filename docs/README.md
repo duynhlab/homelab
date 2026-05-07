@@ -72,7 +72,6 @@ docs/
 │       └── microservices-alerts.md      # Per-alert investigation guide
 ├── platform/                     # Platform/deployment documentation
 │   ├── setup.md                  # GitOps deployment guide
-│   ├── cert-manager-flux.md      # cert-manager + Let's Encrypt + Flux (Helm, Ingress, TLS)
 │   ├── application-delivery.md    # ResourceSet patterns & templates
 │   ├── cicd.md                   # CI/CD pipelines
 │   ├── gitflow.md                # Git branching & release standard
@@ -85,10 +84,13 @@ docs/
 │       ├── pgcat_upstream_connectivity_errors.md
 │       ├── postgres_backup_restore.md  # PostgreSQL backup/restore procedures
 │       └── loki_kubernetes_logs_debug.md  # Loki log debugging
-├── secrets/                      # Secrets management documentation
-│   ├── secrets-management.md     # OpenBAO + ESO guide
-│   ├── openbao.md                # OpenBAO architecture & operations
-│   ├── openbao-production-plan.md # OpenBAO production migration plan
+├── secrets/                      # Secrets, TLS & trust distribution (one chain)
+│   ├── README.md                 # OpenBAO architecture & operations (folder hub)
+│   ├── secrets-management.md     # Per-app ESO usage, add/rotate runbooks
+│   ├── cert-manager.md           # cert-manager + Let's Encrypt + Flux (Helm, Ingress, TLS)
+│   ├── trust-distribution.md     # trust-manager Bundle (homelab-ca-bundle), dual-PKI
+│   ├── production-plan.md        # OpenBAO production migration plan (EKS/GKE)
+│   ├── backlog.md                # P1/P2 backlog
 │   └── vault.md                  # Vault configuration details (archived)
 └── testing/                      # Testing documentation
     └── k6.md                     # k6 load testing guide
@@ -290,8 +292,8 @@ docs/
 
 - [Setup Guide](./platform/setup.md) - Complete deployment and configuration guide
 - [Application Delivery](./platform/application-delivery.md) - ResourceSet patterns & templates
-- [cert-manager + Flux](./platform/cert-manager-flux.md) - TLS with Let's Encrypt, HelmRelease, Ingress, trust-manager
-- [Trust Distribution (trust-manager)](./security/trust-distribution.md) - CA bundle distribution to namespaces via trust-manager Bundle CRD
+- [cert-manager + Flux](./secrets/cert-manager.md) - TLS with Let's Encrypt, HelmRelease, Ingress, trust-manager
+- [Trust Distribution (trust-manager)](./secrets/trust-distribution.md) - CA bundle distribution to namespaces via trust-manager Bundle CRD
 - [CI/CD](./platform/cicd.md) - CI/CD pipelines and workflows
 - [Git Branching & Release](./platform/gitflow.md) - Hybrid Enterprise Gitflow standard (dev/staging/main + immutable tags)
 - [SonarCloud](./platform/sonarcloud.md) - SonarCloud integration
@@ -299,9 +301,10 @@ docs/
 ### Secrets
 
 - [Secrets Management](./secrets/secrets-management.md) - OpenBAO + ESO guide for centralized secret management
-- [OpenBAO](./secrets/openbao.md) - OpenBAO HA architecture & operations (incl. reviewer-JWT pitfall, bootstrap-only Cloudflare token)
-- [Trust Distribution](./security/trust-distribution.md) - trust-manager `homelab-ca-bundle` and the LE / homelab-CA dual-PKI split
-- [OpenBAO Production Plan](./secrets/openbao-production-plan.md) - Production migration plan (EKS/GKE)
+- [OpenBAO](./secrets/README.md) - OpenBAO HA architecture & operations (incl. reviewer-JWT pitfall, bootstrap-only Cloudflare token)
+- [cert-manager + Flux](./secrets/cert-manager.md) - TLS with Let's Encrypt, HelmRelease, Ingress
+- [Trust Distribution](./secrets/trust-distribution.md) - trust-manager `homelab-ca-bundle` and the LE / homelab-CA dual-PKI split
+- [OpenBAO Production Plan](./secrets/production-plan.md) - Production migration plan (EKS/GKE)
 - [Vault (Archived)](./secrets/vault.md) - Legacy Vault dev mode docs (historical reference)
 - [Backlog (P1/P2)](./secrets/backlog.md) - Pending improvements: rotation, audit logging, PushSecret, dynamic secrets
 

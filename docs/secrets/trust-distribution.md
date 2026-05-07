@@ -264,6 +264,6 @@ flux reconcile kustomization cert-manager-config-local --with-source
 - trust-manager docs: <https://cert-manager.io/docs/trust/trust-manager/>
 - trust-manager API reference: <https://cert-manager.io/docs/trust/trust-manager/api-reference/>
 - cert-manager `Bundle` API: `trust.cert-manager.io/v1alpha1`
-- cert-manager + Flux integration: [`docs/platform/cert-manager-flux.md`](../platform/cert-manager-flux.md)
+- cert-manager + Flux integration: [`./cert-manager.md`](./cert-manager.md)
 - Why static CA copy is preferred over reading the cert-manager Secret directly:
   [trust-manager docs — Preparing for Production](https://cert-manager.io/docs/trust/trust-manager/#preparing-for-production)

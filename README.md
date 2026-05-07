@@ -265,8 +265,8 @@ Full index in [`docs/README.md`](docs/README.md). Quick links:
 **Platform**
 
 - [Kong gateway](docs/platform/kong-gateway.md) — routing, CORS, rate-limit, TLS
-- [cert-manager + Flux](docs/platform/cert-manager-flux.md) — issuer chain, DNS-01
-- [Trust distribution](docs/security/trust-distribution.md) — homelab CA bundle via trust-manager
+- [cert-manager + Flux](docs/secrets/cert-manager.md) — issuer chain, DNS-01
+- [Trust distribution](docs/secrets/trust-distribution.md) — homelab CA bundle via trust-manager
 - [Kyverno policies](docs/security/policy-catalog.md) — admission rules, exception process
 
 **Data**

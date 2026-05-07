@@ -1,8 +1,8 @@
 # Secrets Management Guide
 
-> **Status**: Local/Dev environment using **OpenBAO (HA)** + External Secrets Operator (ESO)
+> **Scope**: How application teams add, consume, and rotate secrets in this repo.
 >
-> **Target**: Standardized secret management across all microservices and infrastructure
+> For OpenBAO architecture (HA/Raft, seal, auth methods, secret engines, lease model) read [`README.md`](./README.md). For TLS read [`cert-manager.md`](./cert-manager.md) and [`trust-distribution.md`](./trust-distribution.md).
 
 ---
 
@@ -91,56 +91,9 @@ secret/{environment}/{category}/{service-or-component}/{resource}
 | `{service-or-component}` | `auth`, `product`, `pgdog-cnpg`, `rustfs` | Specific service or infra component |
 | `{resource}` | `credentials`, `jwt-signing-key`, `api-keys`, `backup-credentials` | Type of secret |
 
-This convention enables:
+For the **full canonical KV catalog** (all paths currently seeded plus future-app placeholders) see [`README.md` §5.1 KV v2 — Static Secrets](./README.md#51-kv-v2--static-secrets).
 
-- **Granular policies** per category (e.g., `secret/data/+/databases/*`)
-- **Multi-environment** with the same paths (just swap `local` for `prod`)
-- **Scalable onboarding** -- new services follow the same pattern
-- **Self-documenting** -- the path tells you what, where, and why
-
-## Secret Paths
-
-All secrets are stored in OpenBAO's KV v2 secrets engine under the `secret/` path.
-
-### Database Credentials
-
-| Path | Description | Consumer |
-|------|-------------|----------|
-| `secret/local/databases/product/credentials` | Product DB credentials | product service |
-| `secret/local/databases/cart/credentials` | Cart DB credentials (cnpg-db) | cart service |
-| `secret/local/databases/order/credentials` | Order DB credentials (cnpg-db) | order service |
-
-**Keys**: `username`, `password`
-
-### Infrastructure Credentials
-
-| Path | Description | Consumer |
-|------|-------------|----------|
-| `secret/local/infra/rustfs/backup-zalando` | RustFS S3 credentials (bucket: pg-backups-zalando) | Zalando clusters (auth-db, supporting-shared-db) |
-| `secret/local/infra/rustfs/backup-cnpg` | RustFS S3 credentials (bucket: pg-backups-cnpg) | CNPG clusters (cnpg-db, cnpg-db-replica) |
-| `secret/local/infra/cloudflare/api-token` | Cloudflare API token (Zone\:Read + DNS\:Edit on `duynh.me`) | cert-manager `letsencrypt-{staging,prod}` ClusterIssuers (DNS-01 solver) |
-
-**Keys**: `access_key_id`, `secret_access_key` for RustFS rows; `api_token` for Cloudflare.
-
-> ⚠️ **Bootstrap-only secret**: the Cloudflare token is **not** seeded by the OpenBAO bootstrap script (it is operator-supplied) and **not** in Git. Re-seed it after every fresh cluster — see [Bootstrap-only secrets](#bootstrap-only-secrets) below.
-
-### Pooler Credentials
-
-| Path | Description | Consumer |
-|------|-------------|----------|
-| `secret/local/databases/pgdog-cnpg/credentials` | PgDog (cnpg-db) credentials | pgdog-cnpg pooler |
-
-**Keys (pgdog)**: `username`, `password`
-
-### Future App Secrets (Ready for Onboarding)
-
-| Path | Use Case |
-|------|----------|
-| `secret/local/services/auth/jwt-signing-key` | JWT signing key for auth service |
-| `secret/local/services/notification/smtp-credentials` | Email provider credentials |
-| `secret/local/services/product/stripe-api-key` | Payment integration |
-| `secret/local/infra/otel-collector/api-token` | Observability infra |
-| `secret/prod/services/auth/jwt-signing-key` | Same secret, production env |
+> ⚠️ **Bootstrap-only secret**: `secret/local/infra/cloudflare/api-token` (key `api_token`) is operator-supplied and not in Git. Re-seed after every fresh cluster — see [Bootstrap-only secrets](#bootstrap-only-secrets) below.
 
 ---
 
@@ -344,83 +297,17 @@ kubectl get clustersecretstore openbao
 
 #### OpenBAO Authentication Failing (`permission denied` from ESO ~1h after bootstrap)
 
-**Symptom**: every ExternalSecret reports `ClusterSecretStore "openbao" is not ready`; ESO logs show `Code: 403. Errors: * permission denied` on `/v1/auth/kubernetes/login`. Often appears 1–2 hours after `make up`, not at start.
-
-**Root cause** (commit `fb14349`): the bootstrap Job used to write `auth/kubernetes/config` with `token_reviewer_jwt` set to its own projected SA token, which expires after 1h (BoundServiceAccountTokenVolume). Once expired, every Kubernetes-auth login fails. Fix is to omit `token_reviewer_jwt` and set `disable_local_ca_jwt=false` so OpenBAO uses its own pod's auto-rotated SA token to call `TokenReview`.
-
-**Verify**:
-
-```bash
-kubectl logs job/openbao-bootstrap -n openbao
-ROOT=$(kubectl get secret openbao-init-keys -n openbao -o jsonpath='{.data.root_token}' | base64 -d)
-kubectl exec -n openbao openbao-0 -- sh -c "BAO_TOKEN=$ROOT bao read auth/kubernetes/config"
-# Expect: token_reviewer_jwt_set=false, disable_local_ca_jwt=false
-```
-
-**Runtime fix** (deadlocked because `secrets-local` is what installs the fix — break the loop manually):
-
-```bash
-kubectl exec -n openbao openbao-0 -- sh -c \
-  "BAO_TOKEN=$ROOT bao write auth/kubernetes/config \
-    kubernetes_host=https://10.96.0.1:443 \
-    kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
-    disable_local_ca_jwt=false token_reviewer_jwt=''"
-kubectl annotate clustersecretstore openbao force-sync=$(date +%s) --overwrite
-```
-
-**Persistent fix**: re-run the bootstrap Job (it now ships the corrected script):
-
-```bash
-kubectl delete job -n openbao openbao-bootstrap
-flux reconcile ks secrets-local --with-source
-```
-
-#### OpenBAO Authentication Failing (general)
-
-```bash
-kubectl logs job/openbao-bootstrap -n openbao
-kubectl port-forward svc/openbao -n openbao 8200:8200
-export BAO_ADDR=http://localhost:8200
-export BAO_TOKEN=$(kubectl get secret openbao-init-keys -n openbao -o jsonpath='{.data.root_token}' | base64 -d)
-bao auth list
-bao read auth/kubernetes/config
-```
+Reviewer-JWT pitfall (commit `fb14349`) — root cause + runtime fix + persistent fix are documented in [`README.md` §13 — Authentication Failing](./README.md#authentication-failing). Also covers general K8s auth checks.
 
 #### OpenBAO Sealed After Restart
 
-```bash
-# Check seal status
-kubectl exec openbao-0 -n openbao -- bao status
-
-# Get unseal key and unseal all nodes
-UNSEAL_KEY=$(kubectl get secret openbao-init-keys -n openbao -o jsonpath='{.data.unseal_key}' | base64 -d)
-for i in 0 1 2; do
-  kubectl exec openbao-$i -n openbao -- bao operator unseal "$UNSEAL_KEY"
-done
-```
+See [`README.md` §12.2 Unseal After Node Restart](./README.md#122-unseal-after-node-restart).
 
 ---
 
 ## File Reference
 
-### Infrastructure Files
-
-| File | Purpose |
-|------|---------|
-| `kubernetes/infra/controllers/secrets/openbao/helmrelease.yaml` | OpenBAO HelmRelease (HA Raft) |
-| `kubernetes/infra/controllers/secrets/external-secrets/helmrelease.yaml` | ESO HelmRelease (v2.1.0) |
-| `kubernetes/infra/configs/secrets/openbao-bootstrap/` | OpenBAO bootstrap (Job, ConfigMap, SA, RBAC) |
-| `kubernetes/infra/configs/secrets/cluster-secret-store.yaml` | ClusterSecretStore |
-| `kubernetes/infra/configs/secrets/cluster-external-secrets/` | ClusterExternalSecret definitions |
-| `kubernetes/infra/configs/databases/clusters/*/secrets/` | Per-cluster ExternalSecret definitions |
-| `kubernetes/infra/configs/monitoring/servicemonitors/external-secrets.yaml` | ESO metrics ServiceMonitor |
-
-### Helm Sources
-
-| File | Purpose |
-|------|---------|
-| `kubernetes/clusters/local/sources/helm/openbao.yaml` | OpenBAO Helm repo |
-| `kubernetes/clusters/local/sources/helm/external-secrets.yaml` | ESO Helm repo |
+See [`README.md` §16 File Reference](./README.md#16-file-reference) for the canonical list of OpenBAO + ESO + cert-manager files.
 
 ---
 
@@ -484,8 +371,10 @@ Replace Shamir with cloud KMS for automatic unseal:
 
 ## Related Documentation
 
-- [OpenBAO Architecture & Operations](./openbao.md)
-- [OpenBAO Production Plan](./openbao-production-plan.md)
-- [Secrets Backlog (P1/P2)](./backlog.md) - Detailed specs for pending improvements
+- [OpenBAO Architecture & Operations](./README.md) — the canonical reference for OpenBAO internals
+- [cert-manager](./cert-manager.md) — consumes the `cloudflare-api-token` Secret synced here
+- [Trust Distribution](./trust-distribution.md) — distributes the homelab CA bundle
+- [OpenBAO Production Plan](./production-plan.md) — EKS/GKE roadmap
+- [Secrets Backlog (P1/P2)](./backlog.md) — pending improvements
 - [External Secrets Operator Docs](https://external-secrets.io/)
 - [OpenBAO Docs](https://openbao.org/docs/)

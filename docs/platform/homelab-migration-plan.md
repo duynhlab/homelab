@@ -20,8 +20,9 @@
 5. [Final Stack: Current vs Phase 1 vs Phase 2](#5-final-stack-current-vs-phase-1-vs-phase-2)
 6. [RAM Budget on M720q (32GB)](#6-ram-budget-on-m720q-32gb)
 7. [Disk Budget on M720q (1TB NVMe + 500GB SATA)](#7-disk-budget-on-m720q-1tb-nvme--500gb-sata)
-8. [Roadmap](#8-roadmap)
-9. [Open Decisions](#9-open-decisions)
+8. [Public Exposure: Tailscale vs Cloudflare Zero Trust](#8-public-exposure-tailscale-vs-cloudflare-zero-trust)
+9. [Roadmap](#9-roadmap)
+10. [Open Decisions](#10-open-decisions)
 
 ---
 
@@ -306,28 +307,148 @@ Phase 1 — 1 node, headroom-friendly:
 
 ---
 
-## 8. Roadmap
+## 8. Public Exposure: Tailscale vs Cloudflare Zero Trust
+
+Homelab cần expose 2 loại traffic ra ngoài:
+
+- **Private** — Grafana, VictoriaMetrics UI, ArgoCD/Flux UI, kubectl/talosctl, SSH, Postgres exec → chỉ mình mình + cộng tác viên (≤ 5 user). Không bao giờ cho Internet công cộng chạm vào.
+- **Public** — Frontend React (`gateway.duynhne.me`), microservice API public endpoints (`/auth/v1/public/*`, `/product/v1/public/*`, …), webhook endpoints, blog. Anyone on Internet phải reach được, browser thuần (không cài client).
+
+Hai sản phẩm cùng dùng được nhưng **mục đích khác nhau**. Đây là phân tích deep, đối chiếu với requirement của repo này.
+
+### 8.1. Bản chất kỹ thuật khác nhau ở đâu
+
+| Khía cạnh | **Tailscale** (Funnel + Serve + Subnet Router) | **Cloudflare One** (cloudflared Tunnel + Access) |
+|---|---|---|
+| **Mô hình mạng** | Mesh VPN trên WireGuard. Mỗi node = peer trong tailnet. Coordination server (control plane) chỉ trao đổi public key + ACL; data plane peer-to-peer trực tiếp khi NAT cho phép, fallback qua DERP relay. | Outbound-only tunnel HTTP/2 + QUIC từ `cloudflared` lên Cloudflare edge (Anycast 300+ PoP). Không peer-to-peer; mọi byte chạy qua edge. |
+| **Identity model** | Identity = device key + tag/user (SSO). Phù hợp **người + máy đáng tin**. | Identity = HTTP request được Access policy chấp nhận (email OTP, Google/GitHub SSO, mTLS, IP, geolocation). Phù hợp **mọi browser request**. |
+| **Public Internet reach** | **Funnel**: chỉ port `443/8443/10000`, hostname cố định `<node>.<tailnet>.ts.net`, **không custom domain**, bandwidth bị throttle non-configurable, no WAF, no caching. | **Tunnel public hostname**: bất kỳ domain nào trên Cloudflare DNS, full WAF / DDoS / CDN / Bot Management / Rate Limiting / Cache, custom Page Rules. |
+| **Private reach (admin)** | Subnet Router + MagicDNS → SSH/kubectl/Postgres native, không cần proxy HTTP. Đường thẳng giữa laptop ↔ pod IP. | WARP client + Private Network route + Access app → bắt buộc qua edge, latency +30-80 ms (tùy vị trí PoP). Có thể proxy SSH/RDP qua browser-based render. |
+| **Free tier limits** | 100 device, 3 user, ACL đầy đủ, **Funnel free** nhưng kèm bandwidth cap. | **Zero Trust Free**: 50 user, **unlimited Tunnel**, full Access policies, full WAF rule, full Cache. |
+| **Latency cho public** | Funnel: client → DERP relay → node (1 hop extra). Slower than direct CDN. | Edge PoP gần client (< 50 ms p95 toàn cầu), TLS terminate tại edge, gửi qua tunnel đã sẵn warm. |
+| **TLS** | Auto LetsEncrypt qua Tailscale, hostname cố định. | Auto-managed bởi Cloudflare (Universal SSL hoặc Advanced Certificate Manager), domain của bạn. |
+| **Source IP visibility** | Origin thấy IP DERP relay (không phải IP client thật). | Origin thấy IP Cloudflare edge; client IP qua header `CF-Connecting-IP`. |
+| **Streaming media restriction** | Không. | **Có** — TOS section 2.8 cấm dùng tunnel để serve large video/audio (HLS, MP4 streaming). Vi phạm → bị tắt tunnel. Frontend SPA + REST API thì OK. |
+| **K8s integration** | **Tailscale Operator**: `IngressClass: tailscale`, annotation `tailscale.com/funnel: "true"` để publish Service ra Funnel; `tailscale.com/expose: "true"` để publish vào tailnet. CRD `Connector` cho subnet router declarative. | **`cloudflared` Deployment**: 1 pod (hoặc HPA 2-3 replica) chạy `cloudflared tunnel run`, config qua ConfigMap (`ingress: hostname → service.namespace.svc.cluster.local:port`). Hoặc dùng third-party operator (`stringke/cloudflare-operator`) cho declarative tunnel + Access. |
+| **Kong Gateway tương tác** | Kong vẫn nguyên si. Funnel chỉ proxy `host_header → Kong Service IP` → Kong route theo path như cũ. | `cloudflared` ingress rule trỏ `gateway.duynhne.me → http://kong-proxy.kong.svc:80`. Kong vẫn handle path routing, JWT, rate limit (kết hợp với Cloudflare WAF cấp ngoài). |
+
+### 8.2. Use case mapping cho repo này
+
+| Endpoint / dịch vụ | Audience | Recommended | Lý do |
+|---|---|---|---|
+| `gateway.duynhne.me` (Frontend SPA + public API) | Public Internet | **Cloudflare Tunnel + Access (no policy)** | Cần custom domain, WAF, CDN cho assets, latency thấp toàn cầu, source IP cho audit log. |
+| `/auth/v1/public/login`, `/product/v1/public/products` | Public Internet | **Cloudflare Tunnel** (cùng host trên) | Ăn theo Kong route. Cloudflare Rate Limiting bảo vệ login brute force trước khi vào Kong. |
+| `grafana.duynhne.me`, `vmui.duynhne.me`, `flux.duynhne.me` | Mình + 1-2 cộng tác viên | **Cloudflare Tunnel + Access policy** (allow email `@example.com`) | Browser-only. Access OTP / Google SSO. Không cần cài Tailscale lên máy của partner. Audit log đầy đủ. |
+| `talosctl`, `kubectl`, `kubectl exec`, `psql` | Chỉ mình | **Tailscale Subnet Router** | Native TCP, không HTTP. WARP client cũng làm được nhưng tunnel-over-edge → kubectl exec/port-forward chậm khó chịu. Tailscale direct peer-to-peer = fast. |
+| SSH vào node M720q | Chỉ mình | **Tailscale SSH** (zero-config, ACL key auth) | Khỏi mở port 22, khỏi quản key file. ACL `tag:admin → tag:server`. |
+| Webhook từ GitHub Actions vào cluster (nếu cần) | GitHub egress IP | **Cloudflare Tunnel + Access service token** | mTLS hoặc service token, GitHub Actions có official action. |
+| Backup → Cloudflare R2 | Egress only | **Không cần expose** | `cloudflared` chỉ outbound, R2 access bằng API token. |
+| Demo cho recruiter / talk public | Public Internet, ngắn hạn | **Tailscale Funnel** (nếu lười cấu hình DNS) | Quick share `https://demo.tailxxxx.ts.net` không setup gì. Cho demo 1-2h thì OK. |
+
+### 8.3. Architecture đề xuất (Phase 1 + Phase 2)
+
+```mermaid
+flowchart LR
+    subgraph Internet["Public Internet"]
+        Browser[End user browser]
+        Recruiter[Demo viewer]
+    end
+
+    subgraph CFEdge["Cloudflare Edge (Anycast)"]
+        WAF[WAF + Rate Limit + Cache]
+        Access[Access Policy<br/>SSO / OTP / mTLS]
+    end
+
+    subgraph Tailnet["Tailscale Tailnet"]
+        Laptop[Laptop / iPad<br/>tailscale up]
+        Funnel[Funnel demo URL]
+    end
+
+    subgraph Homelab["Homelab — M720q"]
+        Cloudflared[cloudflared Deployment<br/>2 replicas]
+        TSOp[Tailscale Operator<br/>Subnet Router + IngressClass]
+        Kong[Kong Gateway]
+        Apps[Frontend + 8 microservices]
+        Grafana[Grafana / VMUI / Flux UI]
+        K8sAPI[Talos kube-apiserver:6443]
+    end
+
+    Browser -->|gateway.duynhne.me| WAF
+    WAF --> Cloudflared
+    Cloudflared --> Kong
+    Kong --> Apps
+
+    Browser -.->|grafana.duynhne.me| Access
+    Access -->|allow @email| Cloudflared
+    Cloudflared --> Grafana
+
+    Laptop -->|MagicDNS<br/>10.0.0.0/24| TSOp
+    TSOp --> K8sAPI
+    TSOp --> Grafana
+
+    Recruiter -.->|demo URL| Funnel
+    Funnel --> Apps
+```
+
+### 8.4. Kết luận: dùng cả hai, đúng vai trò
+
+**Quy tắc đơn giản**:
+
+- **Bất cứ thứ gì browser của người lạ cần chạm → Cloudflare Tunnel + (optional) Access policy**.
+- **Bất cứ thứ gì cần TCP/SSH/native protocol cho mình hoặc đội nhỏ → Tailscale**.
+- **Funnel chỉ dùng cho demo throwaway**, không phải production exposure.
+
+**Chi phí**:
+
+- Cloudflare Zero Trust Free: 0 USD, đủ 50 user, unlimited tunnel.
+- Tailscale Free: 0 USD, đủ 100 device / 3 user.
+- → Tổng **0 USD/tháng** cho cả setup, scale tới mức homelab cá nhân thừa thãi.
+
+**RAM cost trên cluster** (đã include trong section 6):
+
+- `cloudflared` 2 replica × ~50 MB = **0.1 GB**
+- Tailscale Operator + 1 subnet router pod = **0.2 GB**
+- → Tổng **0.3 GB** — không thay đổi RAM budget hiện tại.
+
+**TOS guardrail** (quan trọng):
+
+- Cloudflare Tunnel **cấm streaming media lớn** (HLS/MP4 video) qua tunnel free — TOS section 2.8. Frontend React + JSON API thì hoàn toàn hợp lệ. Nếu sau này host video / podcast → đẩy assets lên R2 + signed URL, không qua tunnel.
+- Funnel có **bandwidth cap** không công bố cụ thể (rate limit khi vượt). Production traffic không nên dùng Funnel.
+
+### 8.5. Migration step (gộp vào Roadmap section 9)
+
+1. **Tháng 0-1**: deploy `cloudflared` Deployment + Tunnel cho `gateway.duynhne.me` (thay thế Kind-time `make flux-ui` port-forward). Frontend public từ ngày đầu.
+2. **Tháng 1-2**: deploy Tailscale Operator. Subnet router cho `kube-apiserver` và pod CIDR. Bỏ kubeconfig dùng IP public, chuyển sang MagicDNS.
+3. **Tháng 2**: thêm Cloudflare Access policy cho Grafana / VMUI / Flux UI. Email OTP + Google SSO.
+4. **Tháng 3**: Tailscale ACL chặt (tag-based). `tag:admin → tag:server:22`, `tag:admin → tag:server:6443`. Disable SSH password.
+5. **Tháng 6+**: nếu mở demo cho talk → bật Funnel cho 1 hostname riêng, tắt sau khi xong.
+
+---
+
+## 9. Roadmap
 
 | Tháng | Hardware | Software milestone |
 |---|---|---|
 | **0** | Mua node 1 + switch (7tr) | Talos single-node + migrate Kind stack |
 | **1–2** | — | VolSync + Kopia → Cloudflare R2 backup setup |
-| **2–3** | — | Tailscale Operator, cloudflared tunnel (nếu cần) |
+| **0–1** | — | cloudflared Tunnel cho `gateway.duynhne.me` (public), Cloudflare Access cho Grafana/VMUI |
+| **1–2** | — | Tailscale Operator + Subnet Router (kubectl, talosctl, psql qua MagicDNS) |
 | **3–6** | — | Trim observability, validate stack stability, run smooth |
 | **6–12** | Mua node 2+3 + UPS (14tr) | Talos HA cluster, Ceph 3-replica, OpenBAO Raft 3 |
 | **12+** | (Optional) 2.5GbE / 10GbE upgrade | chaos engineering, tuppr |
 
 ---
 
-## 9. Open Decisions
+## 10. Open Decisions
 
 Cần chốt trước khi bắt đầu Phase 1:
 
 1. **OS**: Talos Linux (immutable, opinionated) hay Ubuntu Server + k3s (debug dễ hơn nhưng kém immutable)?
 2. **OpenBAO Phase 1**: single replica (không HA, backup PVC qua VolSync) hay vẫn deploy 3 replica trên 1 node (HA giả, tốn 3× RAM)?
 3. **Bootstrap secret**: SOPS + age (commit encrypted vào Git, giải mã khi bootstrap) hay giữ pattern `~/.homelab/secrets.env` script-based?
-4. **Public expose**: chỉ Tailscale (private) hay add cloudflared tunnel (host blog/app ra internet)?
+4. ~~**Public expose**~~ — **CHỐT**: Cloudflare Tunnel cho public/admin browser, Tailscale cho TCP/SSH/native. Chi tiết section 8.
 5. **MCP servers**: giữ Phase 1 (vì đang dùng AI assistant) hay bỏ tiết kiệm RAM?
+6. **Cloudflare Tunnel deploy method**: HelmRelease với manual `cloudflared` token trong OpenBAO, hay dùng `stringke/cloudflare-operator` declarative (CRD `Tunnel`/`AccessApplication`)?
 
 Trả lời 5 câu này → finalize Talos config skeleton + repo migration plan từ Kind sang Talos.
 

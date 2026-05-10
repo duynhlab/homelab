@@ -129,8 +129,7 @@ Flux automatically deploys in correct dependency order via `dependsOn` field in 
 
 3. apps-local
    └── dependsOn: [configs-local]
-   └── 9 Backend Microservices + Frontend + K6
-   └── K6 depends on all microservices via HelmRelease dependsOn
+   └── 9 Backend Microservices + Frontend
 ```
 
 **Result:** Applications **will NOT start** until `configs-local` is ready. Flux enforces this automatically.
@@ -252,7 +251,6 @@ kubernetes/clusters/local/
 1. **Test deployment:** `make cluster-up && make flux-install && make flux-push`
 2. **Verify all services:** `make flux-status`
 3. **Access Grafana:** http://localhost:3000
-4. **Load test:** K6 runs automatically after apps deploy
 
 ---
 

@@ -20,7 +20,7 @@
 `cert-manager` issues certificates inside one namespace per `Certificate`
 resource. The matching `Secret` (e.g. `homelab-ca-secret` in `cert-manager`) is
 not visible to any other namespace. Workloads in other namespaces that need to
-**verify** TLS connections signed by the homelab CA — k6 load tests against
+**verify** TLS connections signed by the homelab CA — load test runners against
 `https://gateway.duynh.me`, Vector pushing logs to an HTTPS sink, in-cluster
 HTTP clients calling sibling services through the gateway — would otherwise
 resort to `InsecureSkipVerify=true` or hand-copied CA files.

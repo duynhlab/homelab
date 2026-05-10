@@ -92,8 +92,6 @@ docs/
 │   ├── production-plan.md        # OpenBAO production migration plan (EKS/GKE)
 │   ├── backlog.md                # P1/P2 backlog
 │   └── vault.md                  # Vault configuration details (archived)
-└── testing/                      # Testing documentation
-    └── k6.md                     # k6 load testing guide
 ```
 
 ---
@@ -218,14 +216,6 @@ docs/
     - Database verification and troubleshooting
     - Monitoring and best practices
 
-### Testing
-
-1. **[k6 Load Testing](./testing/k6.md)** - Load testing setup and architecture
-    - System architecture with filtering
-    - Multiple scenarios (5 user personas)
-    - Deployment configurations
-    - Best practices (v0.6.14+)
-
 ### Runbooks & Troubleshooting
 
 1. **[Metrics Audit Fixes](./runbooks/metrics-audit-fixes.md)** - Metrics audit runbook with before/after code, PromQL verification, dashboard impact
@@ -308,10 +298,6 @@ docs/
 - [Vault (Archived)](./secrets/vault.md) - Legacy Vault dev mode docs (historical reference)
 - [Backlog (P1/P2)](./secrets/backlog.md) - Pending improvements: rotation, audit logging, PushSecret, dynamic secrets
 
-### Testing
-
-- [k6 Load Testing](./testing/k6.md) - Complete load testing guide with architecture
-
 ### Runbooks
 
 - [Metrics Audit Fixes](./runbooks/metrics-audit-fixes.md) - Before/after metrics audit with PromQL verification
@@ -342,7 +328,6 @@ docs/
 - **Secrets Stack** - OpenBAO (HA Raft) + External Secrets Operator for centralized secret management
 - **TLS / PKI** - cert-manager with **dual issuers**: Let's Encrypt (DNS-01 via Cloudflare) for browser-facing `*.duynh.me`; self-signed `homelab-ca` for future internal mTLS, distributed via trust-manager `homelab-ca-bundle`
 - **Bootstrap-only secrets** - Cloudflare API token (`secret/local/infra/cloudflare/api-token`) is operator-supplied (not in Git, not seeded by `openbao-bootstrap`); re-seed after every fresh cluster
-- **k6 Load Testing** - Helm-managed load generators
 
 ### Common Tasks
 

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **docs**: Removed all remaining k6 load testing references from current docs (k6 itself was retired in a previous release; CHANGELOG historical entries preserved). Deleted `docs/testing/k6.md` and the empty `docs/testing/` directory.
+
 ### Changed
 
 - **docs**: Reorganized `docs/secrets/` as the hub for the entire OpenBAO → ESO → cert-manager → trust-manager chain.

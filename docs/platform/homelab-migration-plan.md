@@ -213,7 +213,7 @@ Cả 2 đều **production-grade homelab pattern** nhưng đắt về cognitive 
 | **Image mirror** | ❌ | ❌ | Harbor (nếu network chậm) |
 | **Postgres** | 3 cluster + DR | 3 cluster, 1 instance mỗi cluster | 3 cluster HA, 3 instance mỗi cluster |
 | **Observability** | Full stack (VM + Tempo + VL + Vector + Pyroscope + Grafana) ✅ | Full stack ✅ (retention 7d) | Full stack ✅ (retention 30d) |
-| **Apps** | 8 microservices + frontend + k6 ✅ | Same ✅ | Same ✅ |
+| **Apps** | 8 microservices + frontend ✅ | Same ✅ | Same ✅ |
 
 ### Net change
 
@@ -251,7 +251,6 @@ Phase 1 — 1 node, headroom-friendly:
 | Valkey cache | 0.3GB | |
 | 8 microservices | 1.6GB | ~200MB/service Go |
 | Frontend (nginx + React build) | 0.1GB | |
-| K6 load test (idle) | 0.1GB | |
 | MCP servers (3) | 0.5GB | Có thể bỏ nếu không dùng AI assistant |
 | kube-system overhead (CoreDNS, metrics-server, …) | 0.5GB | |
 | Buffer / OS cache | 4.0GB | Page cache cho I/O performance |
@@ -266,7 +265,6 @@ Phase 1 — 1 node, headroom-friendly:
 | Bỏ Pyroscope | 0.5GB | Mất profiling — chỉ cần khi debug perf |
 | Bỏ DR replica (cnpg-db-replica) | 0.5GB | Đỡ tải, backup VolSync vẫn OK |
 | Bỏ MCP servers | 0.5GB | Chỉ enable khi dùng AI assistant |
-| Bỏ K6 deployment | 0.1GB | Chạy ad-hoc thôi |
 | Trim VM retention 7d → 3d | 0.5GB | Mất history dài |
 | Bỏ Kyverno (giữ admission policy mode `audit`) | 0.4GB | Mất enforcement |
 
@@ -317,7 +315,7 @@ Phase 1 — 1 node, headroom-friendly:
 | **2–3** | — | Tailscale Operator, cloudflared tunnel (nếu cần) |
 | **3–6** | — | Trim observability, validate stack stability, run smooth |
 | **6–12** | Mua node 2+3 + UPS (14tr) | Talos HA cluster, Ceph 3-replica, OpenBAO Raft 3 |
-| **12+** | (Optional) 2.5GbE / 10GbE upgrade | k6 load test, chaos engineering, tuppr |
+| **12+** | (Optional) 2.5GbE / 10GbE upgrade | chaos engineering, tuppr |
 
 ---
 

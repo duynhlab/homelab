@@ -16,7 +16,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 | [API Gateway](#api-gateway) | Kong (or Envoy/APISIX), north-south entry point | Not started |
 | [Networking & Zero-Trust](#networking--zero-trust) | Tailscale, Cloudflare Tunnel, identity-based access | Partial |
 | [Storage](#storage) | Rook-Ceph, OpenEBS (when not Kind) | Planned |
-| [Reliability & Operations](#reliability--operations) | k6, runbooks, chaos engineering, DR | Partial |
+| [Reliability & Operations](#reliability--operations) | runbooks, chaos engineering, DR | Partial |
 | [Distributed Systems Theory](#distributed-systems-theory) | CAP, consensus, partitions, sagas | Learning |
 | [Platform Engineering & Enablement](#platform-engineering--enablement) | Templates, onboarding, self-service | Partial |
 | [Learning Resources & Interview Prep](#learning-resources--interview-prep) | ADRs, talking points, trade-off practice | Learning |
@@ -29,7 +29,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 
 - **Kustomize bases/overlays + GitOps deployment** — `kubernetes/apps/`, `kubernetes/infra/`, `kubernetes/clusters/`, Flux Kustomizations
 - **Flux Operator with OCI sync** — `kubernetes/clusters/local/`, Kind cluster `homelab`, OCI registry `homelab-registry:5000` (localhost:5050)
-- **CI/CD pipelines for container images** — Service repos + `duyhenryer/shared-workflows` (build-images, build-init-images, build-k6-images); this repo: `ci.yml` (validate)
+- **CI/CD pipelines for container images** — Service repos + `duyhenryer/shared-workflows` (build-images, build-init-images); this repo: `ci.yml` (validate)
 - **Helm chart publishing to OCI registry** — Charts in `duyhenryer/charts` repo, OCI `ghcr.io/duyhenryer/charts`
 - **GHCR multi-level image naming** — `ghcr.io/duynhlab/<repo>/<image>:<tag>` for auto-linking packages to repos
 - **Shared reusable CI/CD workflows** — `duyhenryer/shared-workflows` (docker-build-go, docker-build, go-check)
@@ -130,7 +130,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 ## Security & Secrets
 
 - **Cosign image signing (backend)** — `.github/workflows/build-be.yml` (keyless signing)
-- Cosign signing for frontend, init, k6 images (parity with backend)
+- Cosign signing for frontend and init images (parity with backend)
 - **External Secrets Operator + OpenBAO (HA Raft)** — `kubernetes/infra/controllers/secrets/`, `kubernetes/infra/configs/secrets/`
   - OpenBAO 3-node HA + ESO + ClusterSecretStore (migrated from Vault dev mode)
   - DB credentials, backup credentials, pooler credentials synced via ESO
@@ -239,7 +239,6 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 
 ## Reliability & Operations
 
-- **k6 load testing** — `services/k6/`, `.github/workflows/build-k6.yml`
 - **Runbooks/troubleshooting docs** — `docs/runbooks/troubleshooting/`
 - Chaos engineering with Litmus or Chaos Mesh
 - [~] **Disaster recovery**:

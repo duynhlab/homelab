@@ -202,7 +202,7 @@ Open [vmalert.duynh.me](http://vmalert.duynh.me) and search for the alert name (
 
 ### Force the alert to fire (synthetic load)
 
-Real traffic is the safest source. If you must synthesise, use the existing k6 suite documented in [`docs/testing/k6.md`](../../testing/k6.md) — it already targets the public endpoints via Kong. **Do not** invent endpoints (`/api/error`, `/api/slow`) — none exist in the services. To exercise the availability SLO, point k6 at a real handler and induce errors via the chaos test scenarios shipped with the suite.
+Real traffic is the safest source. If you need to synthesise traffic for testing burn-rate alerts, generate it ad-hoc against the public endpoints via Kong — **do not** invent endpoints (`/api/error`, `/api/slow`) — none exist in the services. To exercise the availability SLO, target a real handler and induce errors via fault injection or by toggling a feature flag.
 
 ### Test the routing without real traffic
 

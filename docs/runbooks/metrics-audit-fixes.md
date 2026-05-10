@@ -307,7 +307,7 @@ if span.SpanContext().HasTraceID() {
 ### Verification
 
 1. Deploy the updated middleware
-2. Generate traffic (e.g., via k6 load test)
+2. Generate traffic (ad-hoc requests against public endpoints)
 3. Open Grafana -> Response time P99 panel
 4. Enable "Exemplars" toggle in query options
 5. Exemplar dots should appear on the time series

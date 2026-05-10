@@ -322,7 +322,7 @@ make flux-push    # 3. Deploy All (Flux reconciles in dependency order)
    - MCP Servers: victoria-metrics-mcp, victoria-logs-mcp, flux-operator-mcp
    - Databases: PostgreSQL operators, 3 clusters + DR replica, connection poolers
    - SLO: Sloth Operator + 8 PrometheusServiceLevel CRDs
-3. **Applications** - 8 microservices + frontend + k6 load testing
+3. **Applications** - 8 microservices + frontend
 
 **Dependency Chain:**
 
@@ -370,7 +370,7 @@ make flux-sync
 - **Migrations**: Flyway 11.19.0 with 8 migration images
 - **Operators**: Zalando Postgres Operator (v1.15.1), CloudNativePG Operator (v1.29.0)
 - **SLO**: Managed via Sloth Operator (PrometheusServiceLevel CRDs)
-- **CI/CD**: GitHub Actions workflows (build-images, build-init-images, build-k6-images, helm-release)
+- **CI/CD**: GitHub Actions workflows (build-images, build-init-images, helm-release)
 
 ---
 
@@ -528,7 +528,6 @@ Token stored in `localStorage.authToken`, sent as `Authorization: Bearer <token>
 - **SLO**: [`docs/observability/slo/README.md`](docs/observability/slo/README.md), [`docs/observability/slo/getting_started.md`](docs/observability/slo/getting_started.md)
 - **Secrets**: [`docs/secrets/secrets-management.md`](docs/secrets/secrets-management.md), [`docs/secrets/README.md`](docs/secrets/README.md) (OpenBAO architecture + Flux/sealed runbook in §13)
 - **Trust Distribution**: [`docs/secrets/trust-distribution.md`](docs/secrets/trust-distribution.md) — namespaces opt into the homelab CA bundle by setting label `platform.duynhlab.dev/needs-trust=true`. trust-manager creates `ConfigMap/homelab-ca-bundle` with key `ca-bundle.pem`. Mount and set `SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.pem`.
-- **k6**: [`docs/testing/k6.md`](docs/testing/k6.md)
 - **Docs Index**: [`docs/README.md`](docs/README.md)
 
 ---

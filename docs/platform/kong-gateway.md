@@ -46,6 +46,42 @@ Kong Ingress Controller (KIC) runs in **DB-less mode** — all configuration is 
 4. **Production-proven** — Used by Stripe, Nasdaq, Honeywell, Samsung at massive scale
 5. **Extensible** — Custom plugins in Lua, Go, Python, JavaScript via PDK (Plugin Development Kit)
 
+### DB-less vs Database mode
+
+Kong runs in two deployment topologies. This project uses **DB-less** (Ingress Controller mode); the table below explains why.
+
+| Khía cạnh | **DB-less (declarative)** | **Database (Postgres)** |
+|---|---|---|
+| **Config source** | YAML file / ConfigMap / Kubernetes CRDs | Admin API ghi vào Postgres |
+| **State** | In-memory only, load lúc start | Persistent, shared giữa các node |
+| **Scaling** | Mỗi pod load YAML độc lập, stateless | Tất cả node đọc chung DB |
+| **Config update** | Reload toàn bộ (`/config` endpoint hoặc rolling restart) | Per-entity CRUD via Admin API, propagate qua DB |
+| **Admin API** | Read-only (`GET` only) | Full CRUD |
+| **Plugin support** | ~95% (không có: rate-limiting `cluster` policy, OAuth2 token store, ACL với consumer động, một số plugin cần persistent state) | 100% |
+| **Consumer / Credential** | Khai báo trong YAML / `KongConsumer` CRD (static) | Tạo/xóa runtime qua Admin API |
+| **Rate-limiting policies** | `local`, `redis` | `local`, `cluster`, `redis` |
+| **Vitals / Analytics** | Không (Enterprise only via Redis) | Có với Postgres backend |
+| **HA / multi-node** | Stateless, scale ngang dễ, không SPOF | Cần HA Postgres → thêm operational burden |
+| **Cold start** | Nhanh (load YAML) | Cần DB ready trước |
+| **GitOps fit** | ⭐ Tốt nhất — config = file trong Git | Khó — state nằm trong DB, dễ drift |
+| **Use case** | Kubernetes Ingress, edge proxy, immutable infra | Kong as API platform với nhiều team self-service |
+
+**Khi nào dùng DB-less:**
+
+- Kubernetes với Ingress Controller (case của repo này)
+- GitOps workflow (config trong Git, Flux reconcile)
+- Không cần dynamic consumer/credential management
+- Muốn giảm operational surface (1 component thay vì 2)
+
+**Khi nào dùng Database mode:**
+
+- Nhiều team tự tạo route/consumer qua Admin API hoặc Kong Manager UI
+- Kong Enterprise với Vitals, RBAC, Workspaces
+- Plugin yêu cầu persistent state (OAuth2 token introspection cache lâu, ACL động)
+- Không có Konnect (cloud control plane)
+
+**Trong repo này:** Kong chạy **DB-less** (Ingress Controller mode). Tất cả Ingress/route khai báo qua Kubernetes CRDs (`Ingress`, `KongPlugin`); Flux reconcile config từ Git → drift = 0; Postgres dành cho app data, không lãng phí cho Kong control plane. **Không nên đổi sang DB mode** trừ khi onboard Kong Enterprise + Konnect.
+
 ---
 
 ## Architecture

@@ -1,6 +1,6 @@
 # Microservices Observability Platform
 
-A GitOps-managed Kubernetes homelab cluster running on Kind (planned to graduate to a server).
+A GitOps-managed Kubernetes homelab cluster running on Kind (planned to graduate to a dedicated server — Kind's ephemeral PVCs make OpenBAO bootstrap painful on every `make up`; see [`tamsu.md`](tamsu.md)).
 
 ---
 
@@ -149,7 +149,7 @@ and [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
 
 | Concern | Choice |
 |---|---|
-| Kubernetes | Kind (local) — planned graduation to a server |
+| Kubernetes | Kind (local) — planned graduation to a dedicated server (persistent PVCs for OpenBAO) |
 | Packaging | Helm 3 + Kustomize |
 | GitOps | Flux Operator, ResourceSets, OCI artifacts |
 | API gateway / Ingress | Kong Ingress Controller |

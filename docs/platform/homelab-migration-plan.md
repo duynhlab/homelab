@@ -23,6 +23,7 @@
 8. [Public Exposure: Tailscale vs Cloudflare Zero Trust](#8-public-exposure-tailscale-vs-cloudflare-zero-trust)
 9. [Roadmap](#9-roadmap)
 10. [Open Decisions](#10-open-decisions)
+11. [References](#references)
 
 ---
 
@@ -415,7 +416,111 @@ flowchart LR
 - Cloudflare Tunnel **cấm streaming media lớn** (HLS/MP4 video) qua tunnel free — TOS section 2.8. Frontend React + JSON API thì hoàn toàn hợp lệ. Nếu sau này host video / podcast → đẩy assets lên R2 + signed URL, không qua tunnel.
 - Funnel có **bandwidth cap** không công bố cụ thể (rate limit khi vượt). Production traffic không nên dùng Funnel.
 
-### 8.5. Migration step (gộp vào Roadmap section 9)
+### 8.5. Deep dive: Tailscale Operator (CRDs) vs cloudflared
+
+Để **chọn đúng** thay vì chỉ "biết cả hai", soi từng góc kỹ thuật mà 2 sản phẩm khác biệt — đặc biệt là **mô hình deploy trên K8s** (CRDs + controller behavior), vốn là điểm quyết định trên GitOps repo này.
+
+#### 8.5.1. Tailscale Kubernetes Operator — CRD inventory
+
+Tailscale Operator (Helm chart `tailscale-operator`, namespace `tailscale`) cài 1 controller pod + on-demand các "proxy pod" StatefulSet. Yêu cầu:
+
+- OAuth client (Tailscale admin → Settings → OAuth clients) với scopes `devices:core` + `auth_keys`.
+- Tag `tag:k8s-operator` + tag dành cho proxy (`tag:k8s`) khai báo trong tailnet policy file (ACL).
+
+**CRD list (API group `tailscale.com/v1alpha1`, version v1.96.x):**
+
+| CRD | Mục đích | Use case homelab |
+|---|---|---|
+| `Connector` | Subnet router + exit node declarative. Set `spec.subnetRouter.advertiseRoutes` để quảng bá CIDR (kube-apiserver, pod CIDR, service CIDR, mạng LAN nhà) vào tailnet. `spec.exitNode: true` để node thành exit. | **Quan trọng nhất** cho homelab. 1 `Connector` cover toàn bộ in-cluster + LAN. Laptop bật Tailscale → routing thẳng tới `10.0.0.0/24` + service CIDR mà không cần kubectl port-forward. |
+| `ProxyClass` | Customize template của các proxy pod operator sinh ra (resources, tolerations, nodeSelector, image, env, sidecar metrics port). Reference bằng annotation `tailscale.com/proxy-class: <name>` trên Service/Ingress. | Bắt buộc khi muốn proxy pod có `resources.requests/limits` (Kyverno PSS sẽ block nếu thiếu — repo này enforce). Cũng để inject Prometheus scrape annotation. |
+| `ProxyGroup` | StatefulSet **HA** của proxy pods (thay vì 1 pod/Service). Type: `ingress` (incoming traffic) hoặc `egress` (outbound to tailnet). Replicas ≥ 2 → rolling update zero-downtime. | Hữu ích Phase 2 (3-node Talos): expose Kong/Grafana qua Tailscale với 2 replica → restart 1 node không drop session. Phase 1 (1 node) thì 1 replica đủ. |
+| `ProxyGroupPolicy` | Áp dụng ProxyClass cho cả ProxyGroup. | Cùng concept, scope StatefulSet. |
+| `DNSConfig` | Khai báo nameserver MagicDNS bên trong cluster để pod K8s **cũng** resolve được `*.<tailnet>.ts.net` (mặc định CoreDNS không biết tailnet). | Khi pod cần gọi service nằm bên ngoài cluster qua tailnet (ví dụ NAS, máy đào trên LAN). Phase 1 chưa cần, Phase 2+ có thể cần. |
+| `Recorder` | Deploy `tsrecorder` để ghi session Tailscale SSH (compliance). | Overkill cho homelab cá nhân. Bỏ qua. |
+| `Tailnet` | Multi-tailnet routing (1 operator, nhiều tailnet). | Không cần. |
+
+**Cách expose Service (không cần Ingress controller riêng):**
+
+```yaml
+# Cách 1 — Annotation trên Service (đơn giản nhất, không tạo Ingress)
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: monitoring
+  annotations:
+    tailscale.com/expose: "true"            # publish vào tailnet (private)
+    tailscale.com/hostname: "grafana"       # MagicDNS: grafana.<tailnet>.ts.net
+    tailscale.com/proxy-class: "homelab"    # áp dụng resources từ ProxyClass
+spec:
+  type: ClusterIP
+  ...
+```
+
+```yaml
+# Cách 2 — Ingress với ingressClassName: tailscale
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-public
+  annotations:
+    tailscale.com/funnel: "true"            # publish ra Internet qua Funnel
+spec:
+  ingressClassName: tailscale
+  rules: [...]                              # path-based routing tới backend Service
+  tls: [{ hosts: ["grafana.<tailnet>.ts.net"] }]
+```
+
+#### 8.5.2. cloudflared — deployment topology
+
+cloudflared **không có CRDs first-party**. 3 cách deploy phổ biến trên K8s:
+
+| Phương pháp | Ưu | Nhược |
+|---|---|---|
+| **Helm chart `cloudflare/cloudflared`** + Tunnel token sealed | Đơn giản, 1 HelmRelease. Token tạo 1 lần trên Cloudflare Dashboard → cất OpenBAO. Ingress rule khai báo trong `values.yaml` (`config.ingress`) hoặc ConfigMap. | Không declarative cho Tunnel object & Access policy — vẫn phải bấm dashboard / Terraform riêng. Reload config khi đổi ingress rule = restart pod. |
+| **Third-party operator: `adyanth/cloudflare-operator`** (CRDs `Tunnel`, `TunnelBinding`, `ClusterTunnel`) | Fully declarative. Tạo Tunnel + binding Service → tunnel routes update tự động. Hỗ trợ ClusterTunnel (1 tunnel cho cả cluster, các Service tự bind). | Operator độc lập (không official), update cadence chậm hơn cloudflared upstream. Không quản Access policy (vẫn dashboard/TF). |
+| **`stringke/cloudflare-operator`** (cũ, ít active) | Có CRD `Tunnel` + `AccessApplication`. | Maintenance thưa, không khuyến nghị 2025. |
+| **Pulumi/Terraform Cloudflare provider + cloudflared HelmRelease** | Tunnel + Access policy hoàn toàn IaC. Tách rõ cấp control (TF) vs data (cloudflared). | Phải learn TF, drift detection riêng (atlantis/spacelift hoặc tf-controller). Đáng làm khi đội nhiều người. |
+
+Khuyến nghị **cho repo này (1 user, Flux-only)**: **Helm chart cloudflared + token sealed trong OpenBAO** cho Phase 0-3. Khi cần CRDs declarative thật sự → đổi sang `adyanth/cloudflare-operator` (Phase 6+).
+
+#### 8.5.3. Bảng so sánh đầy đủ — homelab perspective
+
+| Tiêu chí | **Tailscale Operator** | **cloudflared (Cloudflare Tunnel)** |
+|---|---|---|
+| **Loại truy cập** | Private mesh — chỉ thiết bị đã join tailnet thấy được. Funnel = public, hạn chế. | Public Internet (Tunnel public hostname) hoặc private (Tunnel + Access + WARP). |
+| **Lớp giao thức** | L3/L4 — bất kỳ TCP/UDP (kubectl, ssh, psql, MySQL, RDP, SMB, NFS). | L7 HTTP/HTTPS chủ yếu (Tunnel public hostname); Tunnel `private network` route hỗ trợ L4 nhưng cần WARP client. |
+| **Custom domain** | Không trên Funnel (chỉ `*.<tailnet>.ts.net`). MagicDNS cho tailnet. | Có — bất kỳ domain Cloudflare DNS. |
+| **WAF / DDoS / CDN** | Không. | Có (Cloudflare edge full feature). |
+| **Latency** | Direct P2P khi NAT cho phép → gần như zero overhead. DERP relay khi NAT đối xứng. | Luôn qua edge PoP (~20-50ms tùy vị trí). |
+| **Browser-only access cho non-techie** | Phải cài Tailscale client → friction. | Yes — chỉ cần browser + (optional) Access SSO/OTP. |
+| **K8s native objects** | CRDs `Connector`/`ProxyClass`/`ProxyGroup` + IngressClass `tailscale` + Service annotations. **First-party**. | Không có CRDs official. Helm chart + ConfigMap, hoặc 3rd-party operator. |
+| **Auth/Authz** | ACL file (HuJSON) declarative, tag-based. Tích hợp SSO (Google/Microsoft/GitHub/Okta/OIDC). | Access policies (per app, ad-hoc UI hoặc TF), OTP/SSO/mTLS/service token. |
+| **Audit log** | Configuration audit + Network flow logs (paid tiers). | Access logs (login, evaluation), Tunnel logs. Free tier có. |
+| **Source IP của client** | Origin thấy IP DERP relay khi qua Funnel. P2P thì thấy IP Tailscale. | Header `CF-Connecting-IP`. |
+| **Bandwidth cap** | Funnel có cap (Tailscale chưa công bố), nói chung không phù hợp serve traffic production. | Tunnel free **unlimited bandwidth** cho Cloudflare-CDN-cacheable traffic. Cấm large video streaming (TOS 2.8). |
+| **HA trên 1 node** | 1 subnet router pod đủ; nếu chết, tailnet reroute (vài giây). ProxyGroup chỉ ý nghĩa khi ≥ 2 node. | 1 pod cloudflared đủ. HPA 2-3 replica = zero-downtime restart. |
+| **Outbound only (NAT-friendly)** | Có — không cần expose port nào. | Có — chỉ outbound 7844/TCP+UDP (QUIC). |
+| **Free tier (homelab)** | 100 device, 3 user, unlimited Funnel cho personal. | 50 user Zero Trust, unlimited Tunnel/bandwidth. |
+| **Vendor lock-in escape** | Headscale (open-source server) thay thế control plane → 100% self-hosted. | Không có Cloudflare-edge-replacement; nếu lock-out → fall back self-host ingress. |
+| **Production-grade trên K8s** | v1.96 (Oct 2025), được Tailscale official maintain. Stable cho ingress/subnet router; ProxyGroup HA ổn định từ v1.78+. | cloudflared chính chủ rất ổn (đã chạy >5 năm production scale). 3rd-party operator stability tùy maintainer. |
+| **Phù hợp nhất cho** | Admin access (kubectl/SSH/DB), in-house tools cho team có cài client, IoT/NAS peer-to-peer. | Public-facing apps cần WAF + CDN, expose web UI cho cộng tác viên không cài client, webhook inbound. |
+
+#### 8.5.4. Quy tắc phân loại endpoint (cheat sheet)
+
+```mermaid
+flowchart TD
+    Start[New endpoint cần expose] --> Q1{Browser của<br/>người ngoài tailnet?}
+    Q1 -->|Có| Q2{Cần custom domain<br/>+ WAF/CDN?}
+    Q1 -->|Không, chỉ mình + team có Tailscale| TS[Tailscale Operator<br/>annotation expose:true]
+    Q2 -->|Có| CF[Cloudflare Tunnel<br/>+ Access policy nếu cần auth]
+    Q2 -->|Không, demo throwaway| Funnel[Tailscale Funnel]
+    TS --> Q3{Là TCP non-HTTP<br/>kubectl/SSH/psql?}
+    Q3 -->|Có| TSrouter[Connector subnet router]
+    Q3 -->|Không HTTP service| TSexpose[Service annotation:<br/>tailscale.com/expose=true]
+```
+
+### 8.6. Migration step (gộp vào Roadmap section 9)
 
 1. **Tháng 0-1**: deploy `cloudflared` Deployment + Tunnel cho `gateway.duynhne.me` (thay thế Kind-time `make flux-ui` port-forward). Frontend public từ ngày đầu.
 2. **Tháng 1-2**: deploy Tailscale Operator. Subnet router cho `kube-apiserver` và pod CIDR. Bỏ kubeconfig dùng IP public, chuyển sang MagicDNS.
@@ -465,3 +570,26 @@ Trước khi mua phần cứng:
 - [ ] Có cần expose service ra internet thật không? (Quyết định cloudflared vs chỉ Tailscale)
 - [ ] Mua Lenovo M720q ở đâu (HN: Mai Hắc Đế / Lê Thanh Nghị, hoặc Shopee shop có ≥1000 đánh giá)
 - [ ] Hỏi shop: adapter 90W zin, 2 khe M.2 đều enable, có WiFi M.2 card không
+
+---
+
+## References
+
+### Tailscale
+- [Tailscale Kubernetes Operator (official docs)](https://tailscale.com/kb/1236/kubernetes-operator) — install, OAuth, ingress/expose annotations, subnet router CRD, Funnel.
+- [Tailscale Kubernetes feature page](https://tailscale.com/docs/features/kubernetes-operator) — feature overview, ProxyClass/ProxyGroup HA.
+- [Tailscale Operator CRD spec explorer (kubespec.dev)](https://kubespec.dev/tailscale-operator) — full schema cho `Connector`, `ProxyClass`, `ProxyGroup`, `DNSConfig`, `Recorder`, `Tailnet` (v1.96.x).
+- [Tailscale for Homelab](https://tailscale.com/use-cases/homelab) — pattern phổ biến: NAS, Pi-hole, Home Assistant, mesh-VPN không port-forward.
+- [Tailscale Funnel](https://tailscale.com/kb/1223/tailscale-funnel) — expose tailnet service ra Internet, hạn chế port & bandwidth.
+- [Tailscale SSH](https://tailscale.com/kb/1193/tailscale-ssh) — zero-config SSH với ACL key auth.
+
+### Cloudflare
+- [Cloudflare Tunnel overview](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) — kiến trúc cloudflared, public hostname, private network.
+- [Run cloudflared in Kubernetes](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/deployment-guides/kubernetes/) — Helm + token deployment.
+- [Cloudflare Zero Trust / Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) — policy types (email/OTP/SSO/mTLS/service token).
+- [`adyanth/cloudflare-operator`](https://github.com/adyanth/cloudflare-operator) — third-party CRDs (`Tunnel`, `ClusterTunnel`, `TunnelBinding`) cho cloudflared declarative.
+- [Cloudflare Tunnel TOS section 2.8](https://www.cloudflare.com/service-specific-terms-application-services/#content-delivery-network-terms) — restriction về large video/audio streaming qua tunnel free.
+
+### Reference homelab repos
+- [`jfroy/flatops`](https://github.com/jfroy/flatops) — Talos + Cilium + Rook-Ceph + Envoy Gateway + cloudflared + tuppr.
+- [`haraldkoch/kochhaus-home`](https://github.com/haraldkoch/kochhaus-home) — Cilium + Envoy + cert-manager + ESO + 1Password + SOPS + Rook/Longhorn + VolSync.

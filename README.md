@@ -12,9 +12,7 @@ SLOs with burn-rate alerts, and a single source of truth in Git delivered via Fl
 
 **Key features:**
 
-- 8 microservices behind one Kong API gateway with **Variant A** edge naming —
-  single URL shape `/{service}/v1/{audience}/…`, browser and in-cluster callers use the
-  same path. Kong is pure pass-through (no rewrites).
+- 8 microservices behind a single Kong API gateway with a **Unified Routing Convention**. All endpoints follow a strict `/{service}/v1/{audience}/…` URL shape, allowing browser and in-cluster callers to use the exact same paths. Kong acts as a pure pass-through proxy without any URL rewrites.
 - Frontend on `https://local.duynh.me`, API gateway on `https://gateway.duynh.me`.
   TLS terminated by Kong with a publicly-trusted Let's Encrypt wildcard cert.
 - Full observability: VictoriaMetrics, Tempo + Jaeger, VictoriaLogs + Vector, Pyroscope,
@@ -133,7 +131,7 @@ and [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
 |---|---|
 | Language / runtime | Go 1.25 |
 | HTTP framework | Gin |
-| API shape | Variant A — `/{service}/v1/{audience}/…` |
+| API shape | Unified URL — `/{service}/v1/{audience}/…` |
 | Architecture | Web → Logic → Core (per service) |
 | Cache | Valkey (Redis-compatible), Cache-Aside in Logic layer |
 

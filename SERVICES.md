@@ -1,12 +1,12 @@
 # 📦 Services & Repositories
 
-This project follows a **Polyrepo** architecture. The `monitoring` repository acts as the central **Infrastructure & GitOps** hub, while application code resides in independent repositories.
+This project follows a **Polyrepo** architecture. The `homelab` repository acts as the central **Infrastructure & GitOps** hub, while application code resides in independent repositories.
 
 ## 🏭 Infrastructure & Core
 
 | Component | Repository | Description | Status |
 |-----------|------------|-------------|--------|
-| **Infrastructure** | [duynhlab/monitoring](https://github.com/duynhlab/monitoring) | GitOps, Helm Charts, K8s Manifests, Docs | [![CI](https://github.com/duynhlab/monitoring/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/monitoring/actions) |
+| **Infrastructure** | [duynhlab/homelab](https://github.com/duynhlab/homelab) | GitOps, Helm Charts, K8s Manifests, Docs | [![CI](https://github.com/duynhlab/homelab/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/homelab/actions) |
 | **Shared Workflows** | [duyhenryer/shared-workflows](https://github.com/duyhenryer/shared-workflows) | Reusable GitHub Actions (CI/CD) | [![CI](https://github.com/duyhenryer/shared-workflows/actions/workflows/ci.yml/badge.svg)](https://github.com/duyhenryer/shared-workflows/actions) |
 | **Common Lib** | [duynhlab/pkg](https://github.com/duynhlab/pkg) | Shared Go Maven/Library | [![CI](https://github.com/duynhlab/pkg/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/pkg/actions) |
 

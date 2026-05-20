@@ -1,6 +1,6 @@
 # Microservices Observability Platform
 
-A GitOps-managed Kubernetes homelab cluster running on Kind (planned to graduate to a dedicated server — Kind's ephemeral PVCs make OpenBAO bootstrap painful on every `make up`; see [`tamsu.md`](tamsu.md)).
+A GitOps-managed Kubernetes homelab cluster running on Kind.
 
 ---
 

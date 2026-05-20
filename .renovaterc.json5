@@ -3,8 +3,8 @@
   extends: [
     "config:recommended",
     "docker:enableMajor",
-    ":automergeBranch",
-    ":automergeMinor",
+    // ":automergeBranch",
+    // ":automergeMinor",
     ":dependencyDashboard",
     ":disableRateLimiting",
     ":semanticCommits",

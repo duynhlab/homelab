@@ -312,7 +312,7 @@ Phase 1 — 1 node, headroom-friendly:
 
 Homelab cần expose 2 loại traffic ra ngoài:
 
-- **Private** — Grafana, VictoriaMetrics UI, ArgoCD/Flux UI, kubectl/talosctl, SSH, Postgres exec → chỉ mình mình + cộng tác viên (≤ 5 user). Không bao giờ cho Internet công cộng chạm vào.
+- **Private** — Grafana, VictoriaMetrics UI, Flux UI, kubectl/talosctl, SSH, Postgres exec → chỉ mình mình + cộng tác viên (≤ 5 user). Không bao giờ cho Internet công cộng chạm vào.
 - **Public** — Frontend React (`gateway.duynhne.me`), microservice API public endpoints (`/auth/v1/public/*`, `/product/v1/public/*`, …), webhook endpoints, blog. Anyone on Internet phải reach được, browser thuần (không cài client).
 
 Hai sản phẩm cùng dùng được nhưng **mục đích khác nhau**. Đây là phân tích deep, đối chiếu với requirement của repo này.
@@ -522,11 +522,124 @@ flowchart TD
 
 ### 8.6. Migration step (gộp vào Roadmap section 9)
 
-1. **Tháng 0-1**: deploy `cloudflared` Deployment + Tunnel cho `gateway.duynhne.me` (thay thế Kind-time `make flux-ui` port-forward). Frontend public từ ngày đầu.
+1. **Tháng 0-1**: deploy `cloudflared` Deployment + Tunnel cho `gateway.duynh.me` (thay thế Kind-time `make flux-ui` port-forward). Frontend public từ ngày đầu.
 2. **Tháng 1-2**: deploy Tailscale Operator. Subnet router cho `kube-apiserver` và pod CIDR. Bỏ kubeconfig dùng IP public, chuyển sang MagicDNS.
 3. **Tháng 2**: thêm Cloudflare Access policy cho Grafana / VMUI / Flux UI. Email OTP + Google SSO.
 4. **Tháng 3**: Tailscale ACL chặt (tag-based). `tag:admin → tag:server:22`, `tag:admin → tag:server:6443`. Disable SSH password.
 5. **Tháng 6+**: nếu mở demo cho talk → bật Funnel cho 1 hostname riêng, tắt sau khi xong.
+
+### 8.7. Mapping 19 hostname `*.duynh.me` → cloudflared + Access
+
+Hiện trạng `/etc/hosts` của bạn map 19 hostname về `127.0.0.1` (Kind dev-time). Sau migration, **tất cả** đi qua **1 cloudflared Tunnel** → Kong (Kong giữ nguyên ingress rules), Cloudflare Access gate per-hostname.
+
+#### Mapping table
+
+| Hostname | Audience | Cloudflare Access policy | Backend (cloudflared ingress) | Ghi chú |
+|---|---|---|---|---|
+| `gateway.duynh.me` | **Public** | _no policy_ | `http://kong-proxy.kong.svc:80` | Frontend SPA + public API. WAF + Rate Limit ngoài. |
+| `local.duynh.me` | Dev local only | **Không expose** | — | Giữ `/etc/hosts` cho dev, không cần Tunnel. |
+| `grafana.duynh.me` | Mình + team | Access: email `@your-domain.com` (OTP) | `http://kong-proxy.kong.svc:80` | Kong routes theo Host header. |
+| `vmui.duynh.me` | Mình + team | Access: email allowlist | Kong | VictoriaMetrics query UI. |
+| `vmalert.duynh.me` | Mình + team | Access: email allowlist | Kong | |
+| `karma.duynh.me` | Mình + team | Access: email allowlist | Kong | Alertmanager dashboard. |
+| `jaeger.duynh.me` | Mình + team | Access: email allowlist | Kong | |
+| `tempo.duynh.me` | Mình | Access: chỉ email cá nhân | Kong | |
+| `pyroscope.duynh.me` | Mình | Access: chỉ email cá nhân | Kong | |
+| `logs.duynh.me` | Mình + team | Access: email allowlist | Kong | VictoriaLogs UI — **sensitive** (chứa app logs). |
+| `slo.duynh.me` | Mình + team | Access: email allowlist | Kong | Sloth UI. |
+| `ui.duynh.me` | Mình | Access: chỉ email cá nhân | Kong | Flux Web UI — **rất sensitive** (control plane). |
+| `source.duynh.me` | Mình | Access: chỉ email cá nhân | Kong | RustFS Console. |
+| `openbao.duynh.me` | **Chỉ mình** | Access: email + **device posture** (WARP managed) | Kong | OpenBAO UI — secret manager, **bắt buộc** thêm posture check hoặc đặt sau Tailscale luôn. |
+| `pgui.duynh.me` | Mình | Access: chỉ email cá nhân | Kong | Postgres Operator UI. |
+| `vm-mcp.duynh.me` | AI assistant (mình) | Access: service token | Kong | MCP server cho LLM client. |
+| `vl-mcp.duynh.me` | AI assistant (mình) | Access: service token | Kong | |
+| `flux-mcp.duynh.me` | AI assistant (mình) | Access: service token | Kong | |
+
+**Cân nhắc bổ sung**:
+- `openbao.duynh.me`, `ui.duynh.me`, `pgui.duynh.me`, `flux-mcp.duynh.me` — **control plane**. Có thể chọn **không expose ra Cloudflare** mà chỉ qua Tailscale (`*.duynh.me` → set ACL trong tailnet). An toàn hơn 1 lớp. Quyết định theo personal threat model.
+- 3 MCP hostname dùng **service token** vì client là LLM (Claude/Crush) — không có browser tương tác user.
+
+#### Cloudflared deployment skeleton
+
+**1 cloudflared HelmRelease + 1 Tunnel**, routes khai báo trong ConfigMap (single source of truth):
+
+```yaml
+# kubernetes/infra/configs/cloudflared/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudflared-config
+  namespace: cloudflared
+data:
+  config.yaml: |
+    tunnel: duynh-homelab
+    credentials-file: /etc/cloudflared/creds/credentials.json
+    metrics: 0.0.0.0:2000
+    no-autoupdate: true
+    ingress:
+      # Public — no Access
+      - hostname: gateway.duynh.me
+        service: http://kong-proxy.kong.svc.cluster.local:80
+        originRequest:
+          httpHostHeader: gateway.duynh.me
+
+      # Private — Cloudflare Access gates these at edge (policies in Zero Trust UI / Terraform)
+      - hostname: grafana.duynh.me
+        service: http://kong-proxy.kong.svc.cluster.local:80
+      - hostname: vmui.duynh.me
+        service: http://kong-proxy.kong.svc.cluster.local:80
+      - hostname: vmalert.duynh.me
+        service: http://kong-proxy.kong.svc.cluster.local:80
+      - hostname: karma.duynh.me
+        service: http://kong-proxy.kong.svc.cluster.local:80
+      - hostname: jaeger.duynh.me
+        service: http://kong-proxy.kong.svc.cluster.local:80
+      - hostname: tempo.duynh.me
+        service: http://kong-proxy.kong.svc.cluster.local:80
+      - hostname: pyroscope.duynh.me
+        service: http://kong-proxy.kong.svc.cluster.local:80
+      - hostname: logs.duynh.me
+        service: http://kong-proxy.kong.svc.cluster.local:80
+      - hostname: slo.duynh.me
+        service: http://kong-proxy.kong.svc.cluster.local:80
+      - hostname: ui.duynh.me
+        service: http://kong-proxy.kong.svc.cluster.local:80
+      - hostname: source.duynh.me
+        service: http://kong-proxy.kong.svc.cluster.local:80
+      - hostname: openbao.duynh.me
+        service: http://kong-proxy.kong.svc.cluster.local:80
+      - hostname: pgui.duynh.me
+        service: http://kong-proxy.kong.svc.cluster.local:80
+
+      # MCP — service-token Access (clients = LLM agents, not browsers)
+      - hostname: vm-mcp.duynh.me
+        service: http://kong-proxy.kong.svc.cluster.local:80
+      - hostname: vl-mcp.duynh.me
+        service: http://kong-proxy.kong.svc.cluster.local:80
+      - hostname: flux-mcp.duynh.me
+        service: http://kong-proxy.kong.svc.cluster.local:80
+
+      # Catch-all (required)
+      - service: http_status:404
+```
+
+**Lưu ý quan trọng**:
+1. Kong **không cần đổi** — Kong giữ nguyên `ingress-*.yaml` hiện có; cloudflared chỉ là L7 entry point thay cho NodePort 30080. Kong tiếp tục route theo `Host` header.
+2. **DNS records** trên Cloudflare: mỗi hostname tạo 1 CNAME → `<tunnel-id>.cfargotunnel.com` (cloudflared tự tạo qua `cloudflared tunnel route dns`, hoặc khai báo Terraform/CRD `adyanth/cloudflare-operator`).
+3. **Sau khi expose**: xóa các dòng `127.0.0.1 *.duynh.me` khỏi `/etc/hosts` — Cloudflare DNS public sẽ resolve. Giữ lại 1 dòng `127.0.0.1 local.duynh.me` cho frontend dev local.
+4. **TLS**: Cloudflare terminate TLS tại edge; cloudflared → Kong là HTTP cleartext nội bộ. Hoặc bật Kong HTTPS + dùng `originServerName` trong ingress rule nếu muốn end-to-end TLS.
+5. **Access policy** quản qua Cloudflare Zero Trust Dashboard (manual) hoặc Terraform `cloudflare_zero_trust_access_application` resource — recommend Terraform cho 19 app này.
+
+#### Phân loại policy theo nhóm
+
+| Nhóm | Hostname | Access type | Lý do |
+|---|---|---|---|
+| Public | `gateway.duynh.me` | None | Frontend phục vụ end user. |
+| Team browser | `grafana`, `vmui`, `vmalert`, `karma`, `jaeger`, `logs`, `slo` | Email OTP + Google SSO (allowlist) | Operator hằng ngày, cộng tác viên cần xem. |
+| Personal browser | `tempo`, `pyroscope`, `ui`, `source`, `pgui` | Chỉ email cá nhân | Control plane / debug riêng. |
+| High-sensitivity | `openbao` | Email + device posture (WARP) HOẶC **chỉ Tailscale** | Secret manager — rủi ro cao nhất. |
+| Machine (LLM) | `vm-mcp`, `vl-mcp`, `flux-mcp` | Service token | Client là agent, không phải browser. |
+| Dev only | `local.duynh.me` | Không expose | `/etc/hosts` 127.0.0.1, frontend dev. |
 
 ---
 

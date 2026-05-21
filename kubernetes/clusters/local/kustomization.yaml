@@ -11,6 +11,8 @@ resources:
   - kong.yaml               # Kong HelmRelease (depends on cert-manager-local for kong-proxy-tls Secret)
   - kong-config.yaml         # Kong Ingress routes + plugins (depends on kong + cert-manager)
   - secrets.yaml         # Vault + ESO (Must be before databases)
+  - caching.yaml         # Valkey (depends on monitoring-local for ServiceMonitor CRD)
+  - storage.yaml         # RustFS (depends on secrets-local for ESO-managed credentials)
   - databases.yaml       # DB Instances (Must be before apps)
   - databases-cnpg-dr.yaml  # CNPG DR replica (depends on databases-local)
   - monitoring.yaml      # Grafana + Prometheus Configs

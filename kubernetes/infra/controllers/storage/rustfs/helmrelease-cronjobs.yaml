@@ -73,9 +73,15 @@ spec:
             echo "=== Done ==="
         env:
           - name: AWS_ACCESS_KEY_ID
-            value: rustfsadmin
+            valueFrom:
+              secretKeyRef:
+                name: rustfs-credentials
+                key: RUSTFS_ACCESS_KEY
           - name: AWS_SECRET_ACCESS_KEY
-            value: rustfsadmin
+            valueFrom:
+              secretKeyRef:
+                name: rustfs-credentials
+                key: RUSTFS_SECRET_KEY
         resources:
           requests:
             cpu: 10m

@@ -8,8 +8,8 @@ resources:
   - tracing/
   - profiling/
   - databases/
-  - caching/
-  - storage/
+  # caching/ — moved to its own Kustomization (caching-local) so it can dependsOn monitoring-local (ServiceMonitor CRD)
+  # storage/ — moved to its own Kustomization (storage-local) so it can dependsOn secrets-local (ESO Secret rustfs-credentials)
   - secrets/
   - cert-manager/
   # kong/ — moved to its own Kustomization (kong-local) so it can dependsOn cert-manager-local

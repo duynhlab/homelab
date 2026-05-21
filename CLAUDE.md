@@ -319,7 +319,9 @@ flux-system (bootstrap)
   ├── kong-config-local (depends: kong + cert-manager) — Ingress resources
   ├── secrets-local (depends: controllers)
   ├── cnpg-barman-plugin-local (depends: controllers + cert-manager) — Barman Cloud Plugin + ObjectStore CRD
-  ├── databases-local (depends: secrets + monitoring + cnpg-barman-plugin)
+  ├── caching-local (depends: controllers + monitoring) — Valkey (needs ServiceMonitor CRD)
+  ├── storage-local (depends: controllers + secrets) — RustFS (creds via ESO)
+  ├── databases-local (depends: secrets + monitoring + cnpg-barman-plugin + storage)
   ├── databases-cnpg-dr-local (depends: databases + secrets) — DR replica
   ├── monitoring-local (depends: controllers) — VMSingle, VLSingle, Grafana, alerting
   ├── kyverno-policies-local (depends: controllers + monitoring) — admission policies
@@ -353,7 +355,7 @@ make flux-sync
 - **3 PostgreSQL Clusters + DR**: auth-db (Zalando), supporting-shared-db (Zalando), cnpg-db (CNPG, hosts product/cart/order), cnpg-db-replica (CNPG DR)
 - **Connection Poolers**: PgBouncer (Auth, Shared), PgDog (cnpg-db)
 - **Migrations**: Flyway 11.19.0 with 8 migration images
-- **Operators**: Zalando Postgres Operator (v1.15.1), CloudNativePG Operator (v1.29.0)
+- **Operators**: Zalando Postgres Operator (v1.15.1), CloudNativePG Operator (v1.29.1)
 - **SLO**: Managed via Sloth Operator (PrometheusServiceLevel CRDs)
 - **CI/CD**: GitHub Actions workflows (build-images, build-init-images, build-k6-images, helm-release)
 

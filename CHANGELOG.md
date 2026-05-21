@@ -9,12 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Removed
+### Added
 
-- **docs**: Removed all remaining k6 load testing references from current docs (k6 itself was retired in a previous release; CHANGELOG historical entries preserved). Deleted `docs/testing/k6.md` and the empty `docs/testing/` directory.
+- **infra (OpenBAO)**: Added `openbao-unsealer` CronJob (every minute) under `kubernetes/infra/configs/secrets/openbao-bootstrap/` that re-unseals any Sealed pod using the `unseal_key` from the existing `openbao-init-keys` Secret. The bootstrap Job is one-shot, so after pod restarts (OOM/eviction/node reboot/Helm upgrade) the 3 Raft nodes re-sealed with Shamir and the whole secrets cascade (`cert-manager-local`, `databases-local`, `kong-local`, `apps-local`) blocked indefinitely. The CronJob is idempotent: skips already-unsealed pods, exits cleanly if the cluster has not been initialised yet. Production still needs transit-seal or cloud KMS — this is the Kind/local workaround.
 
 ### Changed
 
+- **infra (CloudNativePG)**: Bumped operator image tag from `1.29.0` → `1.29.1` in the HelmRelease values and refreshed doc references (`AGENTS.md`, `CLAUDE.md`, `docs/databases/00{2,3,3.1,6,9}*.md`, `kubernetes/infra/configs/databases/README.md`).
+- **infra (GitOps layout)**: Moved the Barman Cloud Plugin bundle (CRD + RBAC + controller Deployment + cert-manager Issuer/Certificate) from `kubernetes/infra/configs/cnpg-barman-plugin/` to `kubernetes/infra/controllers/databases/cnpg-barman-plugin/`. It is a controller, not a config. The standalone Flux Kustomization `cnpg-barman-plugin-local` keeps its `dependsOn: [controllers-local, cert-manager-local]`; only the `path` changed.
+- **infra (GitOps ordering)**: Split `caching/` and `storage/` out of the `controllers-local` bundle into their own Flux Kustomizations:
+  - `caching-local` — `dependsOn: [controllers-local, monitoring-local]` so the `ServiceMonitor` CRD installed by `monitoring-local` exists before the Valkey HelmRelease renders. Fixes `no matches for kind "ServiceMonitor" in version "monitoring.coreos.com/v1"` install failure.
+  - `storage-local` — `dependsOn: [controllers-local, secrets-local]` so ESO can reconcile `Secret/rustfs-credentials` before RustFS installs.
+  - `databases-local` now additionally `dependsOn: storage-local` so ScheduledBackup targets are reachable.
+- **infra (RustFS)**: Sourced root credentials from OpenBAO (`secret/local/infra/rustfs/root`) via an `ExternalSecret` that creates `Secret/rustfs-credentials`. RustFS HelmRelease now uses `secret.existingSecret: rustfs-credentials` and the bucket-bootstrap CronJob reads creds via `valueFrom.secretKeyRef`. Removes the hard-coded `rustfsadmin/rustfsadmin` defaults rejected by chart `0.3.0`. `backup-zalando` and `backup-cnpg` paths point at the same root credentials so existing buckets remain accessible; per-operator service accounts + bucket-scoped IAM are tracked as a future improvement.
 - **docs**: Reorganized `docs/secrets/` as the hub for the entire OpenBAO → ESO → cert-manager → trust-manager chain.
   - Moved `docs/platform/cert-manager-flux.md` → `docs/secrets/cert-manager.md`.
   - Moved `docs/security/trust-distribution.md` → `docs/secrets/trust-distribution.md`.
@@ -24,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Trimmed `docs/platform/kong-gateway.md` §TLS / cert-manager section to short links into `docs/secrets/`.
   - Marked backlog items P2.1 (audit logging) and P2.3 (HA migration templates) as DONE — already implemented via OpenBAO HA Raft + Vector audit forwarding.
   - Updated inbound links in `docs/README.md`, root `README.md`, `AGENTS.md`.
+
+### Removed
+
+- **docs**: Removed all remaining k6 load testing references from current docs (k6 itself was retired in a previous release; CHANGELOG historical entries preserved). Deleted `docs/testing/k6.md` and the empty `docs/testing/` directory.
 
 ## [0.92.0] - 2026-05-06
 

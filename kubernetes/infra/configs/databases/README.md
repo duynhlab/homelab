@@ -7,7 +7,7 @@ This directory contains PostgreSQL database configurations organized by cluster.
 
 | Operator                           | Version | Description                                                                                       | In Use | Releases                                                              |
 | ---------------------------------- | ------- | ------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------- |
-| **CloudNativePG**                  | v1.29.0 | Kubernetes-native operator for PostgreSQL with HA, disaster recovery, and declarative management. | ✅      | [Releases](https://github.com/cloudnative-pg/cloudnative-pg/releases) |
+| **CloudNativePG**                  | v1.29.1 | Kubernetes-native operator for PostgreSQL with HA, disaster recovery, and declarative management. | ✅      | [Releases](https://github.com/cloudnative-pg/cloudnative-pg/releases) |
 | **Zalando Postgres Operator**      | v1.15.1 | Automated HA and operational simplicity for PostgreSQL on Kubernetes. Uses Patroni + Spilo.       | ✅      | [Releases](https://github.com/zalando/postgres-operator/releases)     |
 | **Crunchy Data Postgres Operator** | —       | Kubernetes-native operator by Crunchy Data with robust scaling, HA, and backup.                   | ⬜      | —                                                                     |
 | **KubeDB PostgreSQL Operator**     | —       | Multi-database Kubernetes operator (part of KubeDB ecosystem).                                    | ⬜      | —                                                                     |
@@ -61,7 +61,7 @@ This directory contains PostgreSQL database configurations organized by cluster.
 
 | Path | Flux Kustomization | Contents |
 |------|--------------------|----------|
-| `configs/cnpg-barman-plugin` | `cnpg-barman-plugin-local` | Barman Cloud Plugin deployment + `ObjectStore` CRD, applied before CNPG clusters |
+| `controllers/databases/cnpg-barman-plugin` | `cnpg-barman-plugin-local` | Barman Cloud Plugin deployment + `ObjectStore` CRD, applied before CNPG clusters |
 | `configs/databases` | `databases-local` | Zalando clusters, `cnpg-db` (+ PgDog, backups, `Backup` on-demand `cnpg-db-initial`) |
 | `configs/databases-cnpg-dr` | `databases-cnpg-dr-local` | `cnpg-db-replica` only; `dependsOn: databases-local` |
 

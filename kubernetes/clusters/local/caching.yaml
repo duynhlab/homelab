@@ -2,7 +2,7 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: cnpg-barman-plugin-local
+  name: caching-local
   namespace: flux-system
   labels:
     app.kubernetes.io/component: infrastructure
@@ -13,17 +13,16 @@ spec:
   sourceRef:
     kind: OCIRepository
     name: infrastructure-oci
-  path: ./controllers/databases/cnpg-barman-plugin
+  path: ./controllers/caching
   prune: true
   wait: true
+  # Valkey chart creates a ServiceMonitor (monitoring.coreos.com/v1), so the
+  # CRD installed by monitoring-local must be Established before this applies.
   dependsOn:
     - name: controllers-local
-    - name: cert-manager-local
+    - name: monitoring-local
   healthChecks:
-    - apiVersion: apiextensions.k8s.io/v1
-      kind: CustomResourceDefinition
-      name: objectstores.barmancloud.cnpg.io
-    - apiVersion: apps/v1
-      kind: Deployment
-      name: barman-cloud
-      namespace: cloudnative-pg
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: valkey
+      namespace: cache-system

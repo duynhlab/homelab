@@ -105,7 +105,7 @@ flowchart LR
 #### cnpg-db (CloudNativePG)
 
 - **Namespace:** product
-- **Operator:** CloudNativePG v1.29.0
+- **Operator:** CloudNativePG v1.29.1
 - **PostgreSQL:** 18.1-system-trixie
 - **Topology:** 3 instances (1 primary + 2 replicas), synchronous quorum `ANY 1` for HA
 - **Scope:** 3 DBs (`product`, `cart`, `order`) on one CNPG cluster; apps connect via PgDog
@@ -148,7 +148,7 @@ RustFS (S3-compatible) is deployed in namespace `rustfs`. Backups are split into
 
 ### Credentials
 
-Each operator has its own **OpenBAO path** for backup credentials, distributed via separate ClusterExternalSecrets. Both currently use shared admin credentials (`rustfsadmin`) -- dedicated per-operator service accounts with bucket-scoped IAM policies are a planned future improvement.
+Each operator has its own **OpenBAO path** for backup credentials, distributed via separate ClusterExternalSecrets. All paths currently resolve to the RustFS root credentials seeded at `secret/local/infra/rustfs/root` (shared with the RustFS HelmRelease) -- dedicated per-operator service accounts with bucket-scoped IAM policies are a planned future improvement.
 
 | OpenBAO Path | Bucket | Consumer | ClusterExternalSecret |
 |------------|--------|----------|----------------------|
@@ -160,7 +160,7 @@ Each operator has its own **OpenBAO path** for backup credentials, distributed v
   - **Zalando/WAL-G keys**: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
 - **Bucket creation**: CronJob `setup-pg-backup-buckets` in namespace `rustfs` (runs every 30min, idempotent).
 
-> **Future**: Replace `rustfsadmin` values in OpenBAO with dedicated service account credentials + IAM policies. No ESO or K8s manifest changes required -- only OpenBAO values need updating.
+> **Future**: Replace the shared root credentials in OpenBAO with dedicated per-operator service accounts + bucket-scoped IAM policies. No ESO or K8s manifest changes required -- only OpenBAO values need updating.
 
 ---
 

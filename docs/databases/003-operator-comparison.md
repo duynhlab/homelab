@@ -12,7 +12,7 @@ internals and feature details:
 
 | Dimension | CloudNativePG | Zalando Postgres Operator |
 |-----------|---------------|---------------------------|
-| Current version in repo | Operator image `1.29.0` | Operator `v1.15.1` |
+| Current version in repo | Operator image `1.29.1` | Operator `v1.15.1` |
 | HA model | CNPG operator + instance manager | Patroni inside Spilo pods |
 | Pod model | Custom pod controller, no StatefulSets | StatefulSet-managed Spilo pods |
 | Coordination | Kubernetes API | Patroni DCS via Kubernetes Endpoints/ConfigMaps |

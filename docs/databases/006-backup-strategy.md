@@ -19,7 +19,11 @@ evidence, see [010-drp.md](./010-drp.md).
 4. [Bucket Layout](#bucket-layout)
 5. [Retention and targets (RPO/RTO)](#retention-and-targets-rporto)
 6. [Physical backup (enterprise patterns)](#physical-backup-enterprise-patterns)
-7. [Backup tooling overview (market tools vs current stack)](#backup-tooling-overview-market-tools-vs-current-stack)
+7. [Backup tooling landscape (WAL-G vs pgBackRest vs Barman)](#backup-tooling-landscape-wal-g-vs-pgbackrest-vs-barman)
+   - [Tool deep-dives (WAL-G, pgBackRest, Barman)](#tool-deep-dives-wal-g-pgbackrest-barman)
+   - [Side-by-side comparison](#side-by-side-comparison)
+   - [Operator → tool coupling](#operator--tool-coupling)
+   - [What we use today and why](#what-we-use-today-and-why)
 8. [Comparison (physical options)](#comparison-physical-options)
 9. [Trade-offs matrix (frequency vs RPO/RTO/cost)](#trade-offs-matrix-frequency-vs-rporto-cost)
 10. [PITR window and retention impact](#pitr-window-and-retention-impact)
@@ -263,11 +267,9 @@ Example: e-commerce DB 100GB. Corruption detected at 15:00. Last base backup at 
 
 Key insight: more frequent base backups reduce risk of corrupted base backups, but do not always reduce RTO significantly.
 
-### Current implementation (what is deployed now)
+### Current implementation
 
-- `cnpg-db` (CNPG): Barman to `s3://pg-backups-cnpg/cnpg-db/`; retention and schedules from `backup` / `ScheduledBackup` in the cluster manifest (bucket `pg-backups-cnpg`).
-- `cnpg-db-replica` (CNPG): Barman to `s3://pg-backups-cnpg/cnpg-db-replica/` (DR replica backups; same bucket, separate prefix).
-- All Zalando clusters (auth-db, supporting-shared-db): `BACKUP_NUM_TO_RETAIN: "7"` in `zalando-walg-config`, bucket `pg-backups-zalando`.
+See [What we use today and why](#what-we-use-today-and-why) for the per-cluster tool mapping and rationale.
 
 ### Recommended production baseline (starting point)
 
@@ -294,27 +296,159 @@ Key insight: more frequent base backups reduce risk of corrupted base backups, b
 - **Restore drills**: scheduled restore-to-new-cluster rehearsals (the only proof backups work).
 - **Monitoring**: age of last successful backup, recent failures, and object-store errors.
 
-### CNPG direction (production note)
+## Backup tooling landscape (WAL-G vs pgBackRest vs Barman)
 
-CloudNativePG deprecated in-tree `barmanObjectStore` starting 1.26. The current
-manifests use the **Barman Cloud Plugin (CNPG-I)** with `ObjectStore` CRs for
-long-term production compatibility.
+Three PostgreSQL physical-backup tools dominate the ecosystem today: **WAL-G**, **pgBackRest**, and **Barman / Barman Cloud**. All three implement “base backup + WAL archive + PITR”, but their design centers, operational models, and feature gaps differ. Understanding those differences makes the operator choice (and any future migration) defensible.
 
-## Backup tooling overview (market tools vs current stack)
+### Tool deep-dives (WAL-G, pgBackRest, Barman)
 
-### What we use today
+#### WAL-G
 
-- **CNPG clusters** (`cnpg-db`, `cnpg-db-replica`): Barman Cloud Plugin via CNPG `ObjectStore` CRs, storing base backups + WAL in RustFS bucket `pg-backups-cnpg` under prefixes `cnpg-db/` and `cnpg-db-replica/`.
-- **Zalando clusters** (auth-db, supporting-shared-db): WAL-G via Spilo, storing base backups + WAL in RustFS bucket `pg-backups-zalando`.
+Upstream: [wal-g/wal-g](https://github.com/wal-g/wal-g).
 
-### High-level comparison of common tools
+**Origin / maintainers**: Originally Citus Data, now primarily maintained by Yandex; widely used inside the Spilo / Patroni / Zalando stack and at large Postgres-on-S3 deployments.
 
-| Tool | Type | PITR support | Best for | Notes | Fit in this repo |
-|------|------|--------------|----------|-------|------------------|
-| **Barman (EDB)** | Physical backup + WAL archiving | Yes | Standardized PITR workflows, enterprise ops | CNPG integrates via Barman Cloud tooling | **Used** (cnpg-db via CNPG) |
-| **WAL-G** | Physical backup + WAL archiving | Yes | Fast object-store backups, cloud-native | Used by Zalando Spilo images | **Used** (supporting-shared-db via Zalando) |
-| **pgBackRest** | Physical backup + WAL archiving | Yes | Standalone Postgres clusters, robust features | Strong retention/compression, great for non-operator setups | Not used (could replace WAL-G/Barman in non-operator setups) |
-| **pgagroal** | Connection pooler | No | Connection pooling | **Not a backup tool** | Not applicable |
+**Design center**: A single Go binary that pushes/pulls base backups and WAL segments straight to object storage. Optimized for cloud object stores (S3, GCS, Azure Blob, Yandex, Swift), not local NFS.
+
+**Strengths**:
+- Native S3-first design — no intermediate “backup server” needed; each Postgres node ships its own data to the bucket.
+- High-parallelism upload/download (`WALG_UPLOAD_CONCURRENCY`, `WALG_DOWNLOAD_CONCURRENCY`); fast on large clusters.
+- Flexible compression (`lz4`, `zstd`, `brotli`, `lzma`) with a clear speed-vs-ratio trade-off — `lz4` (default) for speed, `zstd`/`brotli` for ~3× better ratio.
+- Rich client-side encryption: libsodium, OpenPGP, AWS KMS, Yandex KMS, envelope encryption (PGP-encrypted-by-KMS).
+- Delta backups (`WALG_DELTA_MAX_STEPS`) shrink base-backup size for slowly-changing data.
+- Multi-engine: same tool covers Postgres, MySQL, MongoDB, FoundationDB, Greenplum — useful in polyglot platforms.
+- Bundled inside the **Spilo** image — zero extra packaging when using the Zalando operator.
+
+**Weaknesses**:
+- Configuration is entirely env-var driven; sprawling variable surface (`WALG_*`, `WALE_*`, `AWS_*`) is easy to misconfigure.
+- No first-class “catalog” / inventory UX — listing/inspecting backups is per-CLI-call, not a managed catalog like Barman’s.
+- Retention semantics are coarser than pgBackRest (no native diff/incr matrix; relies on `backup-mark` + `backup-delete` patterns).
+- Restore tooling assumes you know the layout — PITR/restore drills require more glue scripting than pgBackRest or Barman.
+- Smaller doc surface for non-S3 backends; community tutorials skew Spilo/Yandex.
+
+**Typical deployments**: Zalando Postgres Operator (Spilo), Citus, large Yandex Cloud Postgres footprints, custom Patroni clusters that want a single binary.
+
+#### pgBackRest
+
+Upstream: [pgbackrest/pgbackrest](https://github.com/pgbackrest/pgbackrest).
+
+**Origin / maintainers**: Crunchy Data; the reference backup tool for the Crunchy PGO operator and the de-facto choice for many large standalone Postgres deployments.
+
+**Design center**: A C-based backup tool with its own daemon-less architecture, designed around a **repository** abstraction (local, NFS, S3, Azure, GCS) and first-class **incremental / differential / full** backup types.
+
+**Strengths**:
+- Native **full / differential / incremental** backup matrix with automatic dependency tracking — the richest backup-type model of the three.
+- Block-level delta restore (`--delta`) that uses checksums to skip unchanged files; very fast for re-syncing after a failed restore.
+- High-parallelism with internal process pool (`--process-max`); typically the fastest at restore on large DBs.
+- Compression: `gz`, `bz2`, `lz4`, `zst`; encryption: client-side `aes-256-cbc` (always client-side even on S3 with SSE).
+- Multi-repo support (up to 4 repos) — can write to local NFS and S3 simultaneously for the same cluster, useful for 3-2-1 backup strategies.
+- Robust retention policies per backup type (`repo-retention-full`, `repo-retention-diff`, `repo-retention-archive`).
+- Excellent observability: `info` command returns structured JSON; integrates cleanly with monitoring.
+
+**Weaknesses**:
+- Tightly coupled to its repository layout — moving repos between backends needs explicit migration.
+- Requires SSH or a dedicated repo host for multi-node clusters in some topologies (less of an issue in K8s where each pod owns its repo path).
+- Not bundled in Spilo or CNPG — bringing pgBackRest into a non-Crunchy operator means custom sidecars / images.
+- Single-engine: Postgres only.
+
+**Typical deployments**: Crunchy PGO operator, standalone enterprise Postgres clusters, environments with on-prem + cloud dual-repo requirements.
+
+#### Barman / Barman Cloud
+
+Upstream: [EnterpriseDB/barman](https://github.com/EnterpriseDB/barman); CNPG plugin: [cloudnative-pg/plugin-barman-cloud](https://github.com/cloudnative-pg/plugin-barman-cloud).
+
+**Origin / maintainers**: EnterpriseDB (EDB) / 2ndQuadrant lineage; the reference backup tool for **CloudNativePG** and many EDB customers.
+
+Two flavors that are easy to confuse:
+
+- **Barman (classic)**: A centralized **backup server** that pulls backups via SSH/rsync or pg_basebackup + streaming replication. Maintains a catalog, schedules jobs, handles retention, exposes a CLI (`barman backup`, `barman list-backup`, `barman recover`). Best for fleets of Postgres servers backed up to shared storage.
+- **Barman Cloud**: A set of standalone CLI tools (`barman-cloud-backup`, `barman-cloud-wal-archive`, `barman-cloud-restore`, `barman-cloud-backup-delete`) that ship backups directly to S3 / Azure Blob / GCS. **No central server**, designed to be invoked from the Postgres node itself or from a sidecar — this is the flavor CNPG uses.
+
+**Strengths**:
+- *(classic)* Mature **catalog + retention engine** (`REDUNDANCY n`, `RECOVERY WINDOW OF n DAYS`) with the cleanest semantics of the three.
+- *(classic)* First-class **streaming WAL archiving** via `pg_receivewal` + replication slots — near-zero-RPO WAL shipping without `archive_command`.
+- *(classic)* Centralized fleet management; one Barman server can back up dozens of Postgres clusters.
+- *(classic)* Strong incremental backup support (`reuse_backup=link` rsync-based, or native page-level incremental on Postgres 17+).
+- *(classic)* Parallel backup workers (`parallel_jobs`), bandwidth throttling, retry policies.
+- *(cloud)* No backup server to operate; fits cloud-native / K8s patterns where backups live in object storage and the “catalog” is the bucket layout.
+- *(cloud)* Per-WAL compression choice (`--gzip`, `--bzip2`, `--xz`, `--snappy`, `--zstd`, `--lz4`) with `--compression-level`.
+- *(cloud)* S3 SSE + KMS, Azure encryption scopes, GCS KMS — server-side encryption is first-class.
+- *(cloud)* Retention via `barman-cloud-backup-delete --retention-policy "RECOVERY WINDOW OF 7 DAYS"`; same semantics as the classic catalog.
+- *(cloud)* **CNPG-I plugin** wraps these CLIs as `ObjectStore` CRs, so users get declarative backup config without operating Barman Cloud directly.
+
+**Weaknesses**:
+- *(classic)* Needs a dedicated server (compute, storage, monitoring); operational footprint is larger than WAL-G or pgBackRest in cloud-native deployments.
+- *(cloud)* No catalog UX; restores depend on `barman-cloud-backup-list` against the bucket, with no central inventory.
+- *(both)* Slower than WAL-G or pgBackRest in raw upload throughput on very large clusters (Python-based, less internal parallelism per process).
+- *(both)* Encryption is delegated to the storage backend (SSE/KMS); no built-in client-side encryption like WAL-G libsodium or pgBackRest aes-256-cbc.
+- *(both)* Single-engine: Postgres only.
+
+**Typical deployments**: CloudNativePG (via Barman Cloud Plugin), EDB enterprise customers, fleets centralized on a Barman server, environments that need strict recovery-window retention semantics.
+
+### Side-by-side comparison
+
+Capability matrix (✅ first-class, ⚠️ supported but with caveats, ❌ not supported):
+
+| Capability | WAL-G | pgBackRest | Barman (classic) | Barman Cloud |
+|---|---|---|---|---|
+| **Language / footprint** | Go, single binary | C, single binary | Python, server daemon | Python, CLI tools |
+| **Architecture** | Per-node → object store | Per-node → repo (local/S3) | Central server pulls from PG | Per-node → object store |
+| **PITR** | ✅ | ✅ | ✅ | ✅ |
+| **Full backup** | ✅ | ✅ | ✅ | ✅ |
+| **Incremental backup** | ⚠️ delta only | ✅ full/diff/incr matrix | ✅ rsync `reuse_backup=link` + PG17 page-level | ❌ |
+| **Differential backup** | ❌ | ✅ | ⚠️ via reuse_backup | ❌ |
+| **Delta restore (checksum-skip)** | ❌ | ✅ `--delta` | ⚠️ rsync mode | ❌ |
+| **Parallel upload** | ✅ env-tunable | ✅ `--process-max` | ✅ `parallel_jobs` | ⚠️ via `--max-concurrency` |
+| **Parallel restore** | ✅ | ✅ (typically fastest) | ✅ | ⚠️ |
+| **Compression** | lz4, zstd, brotli, lzma | gz, bz2, lz4, zst | gzip, bzip2, custom | gzip, bzip2, xz, snappy, zstd, lz4 |
+| **Client-side encryption** | ✅ libsodium, PGP, AWS/YC KMS | ✅ aes-256-cbc | ⚠️ via OS / filesystem | ❌ (relies on S3 SSE / KMS) |
+| **S3-compatible (RustFS/MinIO)** | ✅ `AWS_ENDPOINT` | ✅ `repo-s3-endpoint` | ⚠️ via FUSE / mounted | ✅ `--endpoint-url` |
+| **Streaming WAL (no `archive_command`)** | ❌ | ⚠️ async via `archive_command` | ✅ `pg_receivewal` + slot | ❌ |
+| **Retention model** | manual / `backup-mark` | full/diff/archive counts or time | REDUNDANCY / RECOVERY WINDOW | RECOVERY WINDOW |
+| **Multi-repo (e.g. local + S3)** | ❌ | ✅ up to 4 repos | ⚠️ separate servers | ❌ |
+| **Catalog / inventory** | ❌ (per-CLI) | ✅ `info` JSON | ✅ rich catalog | ⚠️ bucket listing |
+| **Multi-engine (MySQL/Mongo)** | ✅ | ❌ Postgres only | ❌ | ❌ |
+| **First-class operator integration** | Bundled in Spilo (Zalando) | Sidecar in Crunchy PGO | — | CNPG-I plugin (`ObjectStore` CR) |
+| **License** | Apache 2.0 | MIT | GPLv3 | GPLv3 |
+
+### Operator → tool coupling
+
+The choice of backup tool is mostly **decided by the operator**, not by the team — each operator integrates one tool first-class and treats others as “bring your own sidecar”:
+
+| Operator | First-class tool | Why this coupling |
+|---|---|---|
+| **Zalando Postgres Operator** (Spilo) | **WAL-G** | Spilo image bundles WAL-G; backup config is via env vars (`WAL_S3_BUCKET`, `BACKUP_SCHEDULE`, `BACKUP_NUM_TO_RETAIN`). Replacing it means rebuilding the Spilo image — not realistic. |
+| **CloudNativePG (CNPG)** | **Barman Cloud** (via CNPG-I plugin) | `barmanObjectStore` was in-tree until 1.25; CNPG 1.26+ moved to the **Barman Cloud Plugin** with `ObjectStore` CRs. Declarative, first-class supported by EDB (CNPG’s sponsor). |
+| **Crunchy PGO** | **pgBackRest** | PGO ships a pgBackRest sidecar in every PG pod; backups, restores, and clones all run through the `pgbackrest` CLI inside the operator’s reconcile loop. |
+| **StackGres** | **WAL-G** (default) + Babelfish/extension hooks | WAL-G under the hood, exposed through `SGObjectStorage` CRs. |
+| **Standalone Patroni / vanilla Postgres** | Any | Free choice — most teams pick **pgBackRest** for the retention model or **WAL-G** for S3-native simplicity. |
+
+Decision flow when picking an operator for a new cluster:
+
+```mermaid
+flowchart TD
+  Start[New Postgres cluster] --> Q1{Operator already chosen?}
+  Q1 -- Yes --> UseBundled[Use the operator's first-class tool<br/>WAL-G, Barman Cloud, or pgBackRest]
+  Q1 -- No --> Q2{Need rich incremental<br/>+ delta restore?}
+  Q2 -- Yes --> PGO[Crunchy PGO + pgBackRest]
+  Q2 -- No --> Q3{Need declarative<br/>K8s-native backup CRs?}
+  Q3 -- Yes --> CNPG[CNPG + Barman Cloud Plugin]
+  Q3 -- No --> Q4{Need multi-engine<br/>or polyglot stack?}
+  Q4 -- Yes --> Zalando[Zalando + WAL-G]
+  Q4 -- No --> Free[Standalone Patroni<br/>pick WAL-G or pgBackRest]
+```
+
+### What we use today and why
+
+| Cluster | Operator | Backup tool | Rationale |
+|---|---|---|---|
+| `auth-db`, `supporting-shared-db` | Zalando | **WAL-G** via Spilo, bucket `pg-backups-zalando`, `BACKUP_NUM_TO_RETAIN=7` in `zalando-walg-config` | Tool comes for free with the Spilo image; no reason to swap. |
+| `cnpg-db` | CloudNativePG | **Barman Cloud Plugin** (CNPG-I) + `ObjectStore` CR, `s3://pg-backups-cnpg/cnpg-db/` | Declarative `ObjectStore` + `ScheduledBackup` CRs; CNPG 1.26+ deprecated in-tree `barmanObjectStore`, so the plugin is the long-term path. |
+| `cnpg-db-replica` | CloudNativePG | **Barman Cloud Plugin**, `s3://pg-backups-cnpg/cnpg-db-replica/` | Same bucket as primary, separate prefix; DR cluster keeps its own backups for independent recovery. |
+
+Both tools write to the **same RustFS** with **per-operator bucket isolation** (`pg-backups-zalando`, `pg-backups-cnpg`), which keeps blast radius and credential scope per operator without forcing a single tool across the platform.
+
+**Why we did not standardize on one tool**: standardizing would mean either rebuilding Spilo without WAL-G (not realistic) or moving CNPG off its first-class Barman Cloud Plugin (loses declarative CRs and operator-supported upgrades). The cost of running two well-supported tools — each native to its operator — is lower than the cost of fighting either operator.
 
 ## Comparison (physical options)
 

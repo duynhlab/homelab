@@ -13,7 +13,7 @@ spec:
   sourceRef:
     kind: OCIRepository
     name: infrastructure-oci
-  path: ./configs/cnpg-barman-plugin
+  path: ./controllers/databases/cnpg-barman-plugin
   prune: true
   wait: true
   dependsOn:

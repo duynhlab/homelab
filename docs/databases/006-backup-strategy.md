@@ -105,7 +105,7 @@ flowchart LR
 #### cnpg-db (CloudNativePG)
 
 - **Namespace:** product
-- **Operator:** CloudNativePG v1.29.0
+- **Operator:** CloudNativePG v1.29.1
 - **PostgreSQL:** 18.1-system-trixie
 - **Topology:** 3 instances (1 primary + 2 replicas), synchronous quorum `ANY 1` for HA
 - **Scope:** 3 DBs (`product`, `cart`, `order`) on one CNPG cluster; apps connect via PgDog

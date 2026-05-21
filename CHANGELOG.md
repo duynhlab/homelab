@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **infra (OpenBAO)**: Added `openbao-unsealer` CronJob (every minute) under `kubernetes/infra/configs/secrets/openbao-bootstrap/` that re-unseals any Sealed pod using the `unseal_key` from the existing `openbao-init-keys` Secret. The bootstrap Job is one-shot, so after pod restarts (OOM/eviction/node reboot/Helm upgrade) the 3 Raft nodes re-sealed with Shamir and the whole secrets cascade (`cert-manager-local`, `databases-local`, `kong-local`, `apps-local`) blocked indefinitely. The CronJob is idempotent: skips already-unsealed pods, exits cleanly if the cluster has not been initialised yet. Production still needs transit-seal or cloud KMS — this is the Kind/local workaround.
+
 ### Changed
 
 - **infra (CloudNativePG)**: Bumped operator image tag from `1.29.0` → `1.29.1` in the HelmRelease values and refreshed doc references (`AGENTS.md`, `CLAUDE.md`, `docs/databases/00{2,3,3.1,6,9}*.md`, `kubernetes/infra/configs/databases/README.md`).

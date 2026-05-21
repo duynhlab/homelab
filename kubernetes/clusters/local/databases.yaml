@@ -24,6 +24,7 @@ spec:
     - name: secrets-local
     - name: monitoring-local
     - name: cnpg-barman-plugin-local
+    - name: storage-local
   
   healthChecks:
     - apiVersion: acid.zalan.do/v1

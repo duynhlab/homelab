@@ -58,11 +58,11 @@ spec:
       console:
         port: 9001
     
-    # Credentials
+    # Credentials — sourced from OpenBAO via ExternalSecret (see external-secret.yaml).
+    # The chart rejects the well-known default rustfsadmin/rustfsadmin since v0.3.0;
+    # we keep credentials in OpenBAO and reference the synced Secret by name.
     secret:
-      rustfs:
-        access_key: rustfsadmin
-        secret_key: rustfsadmin
+      existingSecret: rustfs-credentials
     
     # Storage (Kind cluster uses "standard" StorageClass, not "local-path")
     storageclass:

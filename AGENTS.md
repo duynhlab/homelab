@@ -334,7 +334,9 @@ flux-system (bootstrap)
   ├── kong-config-local (depends: kong + cert-manager) — Ingress resources
   ├── secrets-local (depends: controllers)
   ├── cnpg-barman-plugin-local (depends: controllers + cert-manager) — Barman Cloud Plugin + ObjectStore CRD
-  ├── databases-local (depends: secrets + monitoring + cnpg-barman-plugin)
+  ├── caching-local (depends: controllers + monitoring) — Valkey (needs ServiceMonitor CRD)
+  ├── storage-local (depends: controllers + secrets) — RustFS (creds via ESO)
+  ├── databases-local (depends: secrets + monitoring + cnpg-barman-plugin + storage)
   ├── databases-cnpg-dr-local (depends: databases + secrets) — DR replica
   ├── monitoring-local (depends: controllers) — VMSingle, VLSingle, Grafana, alerting
   ├── kyverno-policies-local (depends: controllers + monitoring) — admission policies

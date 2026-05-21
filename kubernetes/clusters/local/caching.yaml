@@ -1,0 +1,28 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: caching-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: infrastructure
+spec:
+  interval: 10m
+  timeout: 10m
+  retryInterval: 2m
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+  path: ./controllers/caching
+  prune: true
+  wait: true
+  # Valkey chart creates a ServiceMonitor (monitoring.coreos.com/v1), so the
+  # CRD installed by monitoring-local must be Established before this applies.
+  dependsOn:
+    - name: controllers-local
+    - name: monitoring-local
+  healthChecks:
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: valkey
+      namespace: cache-system

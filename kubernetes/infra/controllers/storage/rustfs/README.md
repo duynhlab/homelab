@@ -26,7 +26,11 @@ kubectl port-forward -n rustfs svc/rustfs 9000:9000 9001:9001
 
 # API: http://localhost:9000
 # Console: http://localhost:9001
-# Default credentials: rustfsadmin / rustfsadmin
+# Credentials: stored in OpenBAO at secret/local/infra/rustfs/root
+#              synced into Secret/rustfs-credentials by ExternalSecret.
+# Read with:
+#   kubectl -n rustfs get secret rustfs-credentials \
+#     -o jsonpath='{.data.RUSTFS_ACCESS_KEY}' | base64 -d
 ```
 
 ## Switch to Distributed Mode

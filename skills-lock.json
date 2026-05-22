@@ -4,17 +4,20 @@
     "gitops-cluster-debug": {
       "source": "fluxcd/agent-skills",
       "sourceType": "github",
-      "computedHash": "6017de3b526abb75ff32a2cd14297dd6b368b8c376112f0ab9b875e280805324"
+      "skillPath": "skills/gitops-cluster-debug/SKILL.md",
+      "computedHash": "db60680108a3fc03c3eeb6c4bb4528123368157e3618d951b06a30594b9fd726"
     },
     "gitops-knowledge": {
       "source": "fluxcd/agent-skills",
       "sourceType": "github",
-      "computedHash": "a5efeeae68b77cb9e81efd905074df964ea5c956722c0563e263e6ab509961e4"
+      "skillPath": "skills/gitops-knowledge/SKILL.md",
+      "computedHash": "ae5d5bdabbd5ef334ec203f943f208852ad5528eee4f42ca9b41774f05b45895"
     },
     "gitops-repo-audit": {
       "source": "fluxcd/agent-skills",
       "sourceType": "github",
-      "computedHash": "abf9992d693ae68193535bc1053a191321ada875e1f7d779255de0e8e3ddc582"
+      "skillPath": "skills/gitops-repo-audit/SKILL.md",
+      "computedHash": "14c803efe28b157ffb0508a82eaadfbf34e3398d45af59ebeb69cb02a727768d"
     },
     "postgres": {
       "source": "planetscale/database-skills",

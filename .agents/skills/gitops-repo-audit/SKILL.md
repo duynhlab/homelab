@@ -146,7 +146,6 @@ Load reference files when you need deeper information:
 - **[best-practices.md](references/best-practices.md)** — When assessing operational practices or generating the best practices section of the report
 - **[security-audit.md](references/security-audit.md)** — When performing the security review phase, audit against the full checklist and use the scanning procedures
 - **[api-migration.md](references/api-migration.md)** — When deprecated APIs are found, include the migration steps in the report
-- **[homelab-validation.md](references/homelab-validation.md)** — When auditing this workspace’s `homelab` repo: how `scripts/flux-validate.sh` relates to this skill’s `validate.sh`
 
 ## Edge Cases
 
@@ -158,5 +157,4 @@ Load reference files when you need deeper information:
 - **Multi-repo analysis**: When asked to analyze multiple related repos (fleet + infra + apps), analyze each independently but note the cross-repo relationships (GitRepository/OCIRepository references between repos).
 - **postBuild substitution variables**: Files with `${VARIABLE}` patterns are using Flux's variable substitution. Don't flag these as broken YAML — they're resolved at reconciliation time.
 - **Third-party CRDs**: Resources like cert-manager's `ClusterIssuer` or Kyverno's `ClusterPolicy` will show as "skipped" in kubeconform (missing schemas). This is expected — only Flux CRD schemas are downloaded. Don't flag these as validation failures.
-- **duynhne/homelab**: Prefer the repo’s `./scripts/flux-validate.sh` for overlay parity with Flux; see [homelab-validation.md](references/homelab-validation.md). Root `kubernetes/infra` Kustomize was fixed to build cleanly; full-tree `validate.sh` should pass on a clean checkout.
 - **Kustomize build files**: `kustomization.yaml` files with `apiVersion: kustomize.config.k8s.io/v1beta1` are Kustomize build configs, not Flux CRDs.

@@ -187,11 +187,21 @@ Or add the entries manually:
 ```
 127.0.0.1 local.duynh.me
 127.0.0.1 gateway.duynh.me
-127.0.0.1 grafana.duynh.me   vmui.duynh.me     vmalert.duynh.me
-127.0.0.1 karma.duynh.me     jaeger.duynh.me   tempo.duynh.me
-127.0.0.1 pyroscope.duynh.me logs.duynh.me     slo.duynh.me
-127.0.0.1 ui.duynh.me        source.duynh.me   openbao.duynh.me
-127.0.0.1 pgui.duynh.me      vm-mcp.duynh.me   vl-mcp.duynh.me
+127.0.0.1 grafana.duynh.me
+127.0.0.1 vmui.duynh.me
+127.0.0.1 vmalert.duynh.me
+127.0.0.1 karma.duynh.me
+127.0.0.1 jaeger.duynh.me
+127.0.0.1 tempo.duynh.me
+127.0.0.1 pyroscope.duynh.me
+127.0.0.1 logs.duynh.me
+127.0.0.1 slo.duynh.me
+127.0.0.1 ui.duynh.me
+127.0.0.1 source.duynh.me
+127.0.0.1 openbao.duynh.me
+127.0.0.1 pgui.duynh.me
+127.0.0.1 vm-mcp.duynh.me
+127.0.0.1 vl-mcp.duynh.me
 127.0.0.1 flux-mcp.duynh.me
 ```
 
@@ -246,38 +256,6 @@ Detailed walkthrough: [`docs/platform/setup.md`](docs/platform/setup.md).
 
 Full index in [`docs/README.md`](docs/README.md). Quick links:
 
-**Getting started**
-
-- [Setup guide](docs/platform/setup.md) — deployment, prerequisites, troubleshooting
-- [Application delivery](docs/platform/application-delivery.md) — ResourceSet patterns, onboarding a service
-- [API reference](docs/api/api.md) — request/response shapes, error model
-- [API naming convention](docs/api/api-naming-convention.md) — Variant A URL shape, full route inventory
-
-**Observability**
-
-- [Observability overview](docs/observability/README.md) — middleware chain, APM integration
-- [Metrics guide](docs/observability/metrics/README.md) — custom metrics, VictoriaMetrics
-- [Grafana dashboards](docs/observability/grafana/dashboard-reference.md) — 15 curated dashboards
-- [SLOs](docs/observability/slo/README.md) — SLIs, error budgets, burn-rate alerts
-
-**Platform**
-
-- [Kong gateway](docs/platform/kong-gateway.md) — routing, CORS, rate-limit, TLS
-- [cert-manager + Flux](docs/secrets/cert-manager.md) — issuer chain, DNS-01
-- [Trust distribution](docs/secrets/trust-distribution.md) — homelab CA bundle via trust-manager
-- [Kyverno policies](docs/security/policy-catalog.md) — admission rules, exception process
-
-**Data**
-
-- [Database integration](docs/databases/002-database-integration.md) — clusters, poolers, migrations
-- [Further reading](docs/databases/010-documents.md) — internals, replication, ops
-
-**Reference**
-
-- [SERVICES.md](SERVICES.md) — service repositories
-- [AGENTS.md](AGENTS.md) — AI agent guide
-- [CHANGELOG.md](CHANGELOG.md) — release notes
-
 ---
 
-**Built with ❤️ for learning observability.**
+**Built with ❤️.**

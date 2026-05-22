@@ -49,7 +49,7 @@ PostgreSQL uses a **process-based model** where each connection spawns a new OS 
 **Architecture:**
 - **Sidecar Pattern**: Deployed tightly coupled with the PostgreSQL pod.
 - **Communication**: Application -> K8s Service (`-pooler`) -> PgBouncer Pod -> Localhost `5432`.
-- **High Availability**: 2 replicas by default (stateless).
+- **High Availability**: 3 replicas (stateless) — tolerates 1 pod loss plus a concurrent rolling update.
 
 **Trade-offs:**
 - ✅ **Pros**:
@@ -106,6 +106,7 @@ PostgreSQL uses a **process-based model** where each connection spawns a new OS 
 - ✅ **Pros**:
     - **Modern Stack**: Rust memory safety and performance.
     - **Helm Managed**: Easy deployment via standard chart.
+    - **High Availability**: 3 replicas with soft `podAntiAffinity` and `PodDisruptionBudget` (`minAvailable: 2`) — tolerates 1 pod loss plus concurrent voluntary disruption.
 - ❌ **Cons**:
     - **Young Project**: Less community documentation than PgBouncer.
     - **Feature Overlap**: Very similar to PgCat; selected here to demonstrate/evaluate CloudNativePG integration patterns.

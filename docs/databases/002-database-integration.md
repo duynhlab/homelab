@@ -16,8 +16,8 @@
 
 | Operator                   | Version   | Cluster Name      | PostgreSQL Ver. | Nodes      | Pooler Type              | Pooler Details                    |
 |----------------------------|-----------|-------------------|-----------------|------------|--------------------------|------------------------------------|
-| Zalando Postgres Operator  | v1.15.1   | auth-db           | 17              | 3 (HA)     | PgBouncer Sidecar        | 2 instances                        |
-| Zalando Postgres Operator  | v1.15.1   | supporting-shared-db     | 16              | 1          | PgBouncer Sidecar        | 2 instances                        |
+| Zalando Postgres Operator  | v1.15.1   | auth-db           | 17              | 3 (HA)     | PgBouncer Sidecar        | 3 instances                        |
+| Zalando Postgres Operator  | v1.15.1   | supporting-shared-db     | 16              | 1          | PgBouncer Sidecar        | 3 instances                        |
 | CloudNativePG Operator     | v1.29.1   | cnpg-db                  | 18              | 3 (HA)     | PgDog Standalone         | product, cart, order; sync (ANY 1) |
 | CloudNativePG Operator     | v1.29.1   | cnpg-db-replica          | 18              | 1          | —                        | DR replica; object-store recovery    |
 ---
@@ -284,7 +284,7 @@ CloudNativePG clusters use **PodMonitor** CRDs to enable Prometheus scraping of 
 #### auth-db
 
 - **3 instances** (1 leader + 2 standbys), PostgreSQL 17, streaming replication
-- **Pooler**: PgBouncer sidecar (2 instances), endpoint `auth-db-pooler.auth:5432`
+- **Pooler**: PgBouncer sidecar (3 instances), endpoint `auth-db-pooler.auth:5432`
 - **Namespace**: `auth`
 - **Dual connection pattern**: Main container uses PgBouncer; init container uses direct connection (for DDL)
 - **Sidecars**: postgres_exporter + Vector (log collection to Loki)
@@ -297,7 +297,7 @@ CloudNativePG clusters use **PodMonitor** CRDs to enable Prometheus scraping of 
 
 - **1 instance** (single, no HA), PostgreSQL 16
 - **Databases**: `user`, `notification`, `shipping`, `review` (shared database pattern)
-- **Pooler**: PgBouncer sidecar (2 instances), endpoint `supporting-shared-db-pooler.user:5432`
+- **Pooler**: PgBouncer sidecar (3 instances), endpoint `supporting-shared-db-pooler.user:5432`
 - **Namespace**: `user` (cluster location), cross-namespace secrets for `notification`, `shipping`, and `review`
 - **Sidecars**: postgres_exporter + Vector (log collection to Loki)
 - **Extensions**: pg_stat_statements, pg_cron, pg_trgm, pgcrypto, pg_stat_kcache
@@ -903,7 +903,7 @@ Connection poolers solve the "too many connections" problem by reusing PostgreSQ
 **Deployment:** Built-in sidecar via Zalando operator
 
 **Key Settings:**
-- **numberOfInstances**: 2 (HA)
+- **numberOfInstances**: 3 (HA)
 - **mode**: `transaction`
 - **Resources**: CPU 100m, Memory 128Mi
 

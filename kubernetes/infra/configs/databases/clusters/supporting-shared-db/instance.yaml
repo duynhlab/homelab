@@ -88,7 +88,7 @@ spec:
   # Services connect via: supporting-shared-db-pooler.user.svc.cluster.local:5432
   # Note: PgBouncer requires SSL connections (sslmode=require)
   connectionPooler:
-    numberOfInstances: 2
+    numberOfInstances: 3
     schema: pooler
     user: pooler
     mode: transaction  # Transaction pooling for short-lived connections

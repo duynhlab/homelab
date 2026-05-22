@@ -48,7 +48,7 @@ spec:
   
   # Connection pooler (PgBouncer) configuration - Keep existing
   connectionPooler:
-    numberOfInstances: 2
+    numberOfInstances: 3
     schema: pooler
     user: pooler
     mode: transaction  # Transaction pooling for short-lived connections

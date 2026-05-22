@@ -86,7 +86,7 @@ flowchart TB
 | **shared_buffers** | 256MB | `postgresql.parameters.shared_buffers` |
 | **max_connections** | 200 | `postgresql.parameters.max_connections` |
 | **wal_buffers** | 16MB | `postgresql.parameters.wal_buffers` |
-| **Pooler** | PgDog (1 replica) | HelmRelease `replicas: 1` |
+| **Pooler** | PgDog (3 replicas, HA) | HelmRelease `replicas: 3`, soft `podAntiAffinity`, PDB `minAvailable: 2` |
 | **Pool Mode** | Transaction | `poolMode: transaction` |
 
 ### End-to-End Request Flow

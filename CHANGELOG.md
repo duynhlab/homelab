@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **infra (database poolers)**: Bumped all 3 PostgreSQL connection poolers to 3 replicas for HA — `auth-db` PgBouncer sidecar (Zalando) `2→3`, `supporting-shared-db` PgBouncer sidecar (Zalando) `2→3`, and `cnpg-db` PgDog HelmRelease `1→3`. Enabled soft `podAntiAffinity` and `PodDisruptionBudget` (`minAvailable: 2`) on the PgDog HelmRelease. PgDog was previously a SPOF in front of the 3-node CNPG cluster gating product/cart/order traffic; 3 replicas tolerate 1 pod loss plus a concurrent rolling update (need ≥2 healthy at any moment). Updated `docs/databases/00{1,2,8}*.md` to reflect the new replica counts and PgDog HA topology.
 - **infra (CloudNativePG)**: Bumped operator image tag from `1.29.0` → `1.29.1` in the HelmRelease values and refreshed doc references (`AGENTS.md`, `CLAUDE.md`, `docs/databases/00{2,3,3.1,6,9}*.md`, `kubernetes/infra/configs/databases/README.md`).
 - **infra (GitOps layout)**: Moved the Barman Cloud Plugin bundle (CRD + RBAC + controller Deployment + cert-manager Issuer/Certificate) from `kubernetes/infra/configs/cnpg-barman-plugin/` to `kubernetes/infra/controllers/databases/cnpg-barman-plugin/`. It is a controller, not a config. The standalone Flux Kustomization `cnpg-barman-plugin-local` keeps its `dependsOn: [controllers-local, cert-manager-local]`; only the `path` changed.
 - **infra (GitOps ordering)**: Split `caching/` and `storage/` out of the `controllers-local` bundle into their own Flux Kustomizations:

@@ -31,7 +31,7 @@ spec:
     remediation:
       retries: 3
   values:
-    replicas: 1
+    replicas: 3
     port: 6432
     openMetricsPort: 9090
     openMetricsNamespace: "pgdog_"
@@ -100,9 +100,9 @@ spec:
       scrapeTimeout: 10s
 
     podAntiAffinity:
-      enabled: false
+      enabled: true
       type: soft
 
     podDisruptionBudget:
-      enabled: false
-      minAvailable: 1
+      enabled: true
+      minAvailable: 2

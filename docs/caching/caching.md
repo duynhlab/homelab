@@ -38,7 +38,7 @@ flowchart TD
     Valkey["Valkey Cache<br/>Kubernetes Service"]
     PostgreSQL["PostgreSQL Database"]
     
-    Frontend -->|"HTTP GET /api/v1/products/:id"| WebHandler
+    Frontend -->|"GET /product/v1/public/products/:id"| WebHandler
     WebHandler -->|"Function call"| LogicService
     LogicService -->|"GetProductOrSet"| ProductCache
     ProductCache -->|"1. Check cache"| CacheClient
@@ -92,32 +92,47 @@ We implement a **Locking Mechanism** (using Redis `SETNX`) to ensure only **one*
 
 ## Cache-Aside Pattern Flow
 
-### GET /api/v1/products (List Products)
+The product service mounts caching only on **read** endpoints below. Routes are defined in `cmd/main.go` of [`product-service`](https://github.com/duynhlab/product-service):
 
-1. **Logic Layer** calls `productCache.GetProductList(ctx, filters)`
-2. **Cache Hit** → Return cached products and total count immediately
-3. **Cache Miss** → 
-   - Call `productRepo.FindAll(ctx, filters)` and `productRepo.Count(ctx, filters)`
-   - Query PostgreSQL database
-   - Write result to cache via `productCache.SetProductList(ctx, filters, products, total)`
-   - Return data
+| Method | Path | Audience | Caching |
+|---|---|---|---|
+| `GET` | `/product/v1/public/products` | public | list cache (`product:list:…`) |
+| `GET` | `/product/v1/public/products/:id` | public | detail cache (`product:{id}`) + stampede lock |
+| `GET` | `/product/v1/public/products/:id/details` | public | reuses detail cache (aggregates reviews) |
+| `POST` | `/product/v1/internal/products` | **internal** (service-to-service only — not on gateway) | invalidates list cache |
 
-### GET /api/v1/products/:id (Single Product)
+### `GET /product/v1/public/products` — list products
 
-1. **Logic Layer** calls `productCache.GetProductOrSet(ctx, id, fetchFunc)`
+1. **Logic Layer** calls `productCache.GetProductList(ctx, filters)`.
+2. **Cache hit** → return cached products and total count immediately.
+3. **Cache miss** →
+   - Call `productRepo.FindAll(ctx, filters)` and `productRepo.Count(ctx, filters)`.
+   - Query PostgreSQL.
+   - Write result back via `productCache.SetProductList(ctx, filters, products, total)`.
+   - Return data.
+
+### `GET /product/v1/public/products/:id` — single product
+
+1. **Logic Layer** calls `productCache.GetProductOrSet(ctx, id, fetchFunc)`.
 2. **ProductCache** checks cache:
-   - **Hit**: Returns cached product immediately.
-   - **Miss**: Tries to acquire distributed lock (`lock:product:{id}`).
-3. **Locking Logic**:
-   - **Acquired**: Calls `fetchFunc` (queries DB), updates cache, releases lock, returns data.
-   - **Locked (Busy)**: Waits (spins) until data appears in cache, then returns it.
-   - **benefit**: Only 1 request hits the DB even if 1,000 requests arrive simultaneously.
+   - **Hit**: return cached product immediately.
+   - **Miss**: try to acquire distributed lock (`lock:product:{id}`, TTL 5s).
+3. **Locking logic**:
+   - **Acquired**: call `fetchFunc` (DB query), `SET product:{id}` (TTL `CACHE_TTL_PRODUCT_DETAIL`, default 10m), release lock, return data.
+   - **Busy**: spin every 50ms (re-checking cache) up to 500ms; on timeout fall back to `fetchFunc` to keep the request available.
+   - **Benefit**: only 1 request hits the DB even if thousands arrive simultaneously.
 
-### POST /api/v1/products (Create Product)
+### `GET /product/v1/public/products/:id/details` — aggregation
 
-1. Create product in database via repository
-2. **Cache Invalidation**: Call `productCache.InvalidateProductList(ctx)` to delete list cache keys
-3. This ensures new products appear in subsequent list queries
+Reuses the same single-product cache path (calls `ProductService.GetProduct` internally) and then aggregates review data from the review service. The product portion benefits from the detail cache and stampede lock; review aggregation is not cached at this layer.
+
+### `POST /product/v1/internal/products` — create product (internal only)
+
+> This route is on the **internal** audience and is **not exposed on the gateway**. It is reachable only via in-cluster service DNS (NetworkPolicy enforces the boundary). See `docs/api/api-naming-convention.md`.
+
+1. Validate price, persist via `productRepo.Create(ctx, product)`.
+2. **Cache invalidation**: call `productCache.InvalidateProductList(ctx)` to delete list cache keys so the new product appears in subsequent list queries.
+3. Single-product detail cache is **not** invalidated here (a newly created `:id` cannot already exist in the detail cache).
 
 ## Cache Key Structure
 
@@ -228,7 +243,7 @@ Valkey supports the following `maxmemory-policy` options:
 
 **Configuration:**
 
-Eviction policy is configured via `valkeyConfig` in HelmRelease (see [Deployment](#deployment) section).
+Eviction policy is configured via `valkeyConfig` in [`kubernetes/infra/controllers/caching/valkey/helmrelease.yaml`](../../kubernetes/infra/controllers/caching/valkey/helmrelease.yaml) (currently `maxmemory-policy allkeys-lru`).
 
 
 ## Observability
@@ -278,12 +293,12 @@ rate(valkey_keyspace_hits_total[5m]) /
 
 2. **Check Product service logs:**
    ```bash
-   kubectl logs -n product deployment/product-service | grep -i cache
+   kubectl logs -n product deployment/product | grep -i cache
    ```
 
 3. **Verify configuration:**
    ```bash
-   kubectl get deployment product-service -n product -o yaml | grep CACHE
+   kubectl get deployment product -n product -o yaml | grep CACHE
    ```
 
 4. **Test connection manually:**
@@ -323,10 +338,15 @@ kubectl exec -n product -it deploy/product -- nc -zv valkey.cache-system.svc.clu
 ```
 
 **2. Trigger Cache Population**
-Make a request to the product service (using an ephemeral curl pod if needed):
+Hit the public read endpoints (which is what populates the cache). Via the gateway:
 ```bash
-# Launch a temporary pod to curl the internal service
-kubectl run -it --rm curl-test --image=curlimages/curl --restart=Never -n product -- curl -v http://product.product.svc.cluster.local:8080/products
+curl -sS https://gateway.duynh.me/product/v1/public/products | jq '.[0:2]'
+curl -sS https://gateway.duynh.me/product/v1/public/products/14 | jq
+```
+Or from inside the cluster (e.g. an ephemeral curl pod):
+```bash
+kubectl run -it --rm curl-test --image=curlimages/curl --restart=Never -n product -- \
+  curl -v http://product.product.svc.cluster.local:8080/product/v1/public/products
 ```
 
 **3. Inspect Cache Keys**

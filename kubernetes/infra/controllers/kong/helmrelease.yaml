@@ -90,4 +90,13 @@ spec:
         cpu: 200m
         memory: 256Mi
 
-    replicaCount: 1
+    # Two replicas for HA — Kong is a stateless DB-less ingress proxy and scales
+    # horizontally without coordination. The redundancy makes the PDB below safe
+    # (a drain can evict one pod while the other keeps serving traffic).
+    replicaCount: 2
+
+    # Chart-native PodDisruptionBudget. minAvailable: 1 keeps at least one Kong
+    # pod serving during voluntary disruptions (node drains, rollouts).
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1

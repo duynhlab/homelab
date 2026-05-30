@@ -1,0 +1,227 @@
+# Local end-to-end test stack for the duynhlab e-commerce platform.
+#
+# Brings up: Postgres (7 DBs) + Redis cache + per-service Flyway migrations
+# + 7 Go services + an nginx pass-through gateway + the React frontend.
+#
+# Build contexts point at sibling repos (../../<service>), so all repos must be
+# checked out next to homelab/. Run from this directory:
+#   docker compose up -d --build
+# Then open the SPA at http://localhost:3000 (API gateway at http://localhost:8080).
+#
+# Tracing/profiling are disabled; auth uses the real opaque-token login flow
+# (demo login: alice / password123).
+
+x-svc-env: &svc-env
+  ENV: development
+  TRACING_ENABLED: "false"
+  PROFILING_ENABLED: "false"
+  METRICS_ENABLED: "true"
+  LOG_LEVEL: info
+  LOG_FORMAT: json
+  PORT: "8080"
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_USER: postgres
+  DB_PASSWORD: postgres
+  DB_SSLMODE: disable
+
+x-svc-healthcheck: &svc-healthcheck
+  test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+  interval: 10s
+  timeout: 3s
+  retries: 12
+  start_period: 15s
+
+x-flyway-env: &flyway-env
+  FLYWAY_USER: postgres
+  FLYWAY_PASSWORD: postgres
+  FLYWAY_CONNECT_RETRIES: "30"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  cache:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---- Flyway migrations (one-shot, per service DB) ----
+  auth-migrate:
+    build: { context: ../../auth-service/db/migrations }
+    command: ["migrate"]
+    environment: { <<: *flyway-env, FLYWAY_URL: "jdbc:postgresql://postgres:5432/auth?sslmode=disable" }
+    depends_on: { postgres: { condition: service_healthy } }
+    restart: "no"
+  user-migrate:
+    build: { context: ../../user-service/db/migrations }
+    command: ["migrate"]
+    environment: { <<: *flyway-env, FLYWAY_URL: "jdbc:postgresql://postgres:5432/user?sslmode=disable" }
+    depends_on: { postgres: { condition: service_healthy } }
+    restart: "no"
+  product-migrate:
+    build: { context: ../../product-service/db/migrations }
+    command: ["migrate"]
+    environment: { <<: *flyway-env, FLYWAY_URL: "jdbc:postgresql://postgres:5432/product?sslmode=disable" }
+    depends_on: { postgres: { condition: service_healthy } }
+    restart: "no"
+  cart-migrate:
+    build: { context: ../../cart-service/db/migrations }
+    command: ["migrate"]
+    environment: { <<: *flyway-env, FLYWAY_URL: "jdbc:postgresql://postgres:5432/cart?sslmode=disable" }
+    depends_on: { postgres: { condition: service_healthy } }
+    restart: "no"
+  order-migrate:
+    build: { context: ../../order-service/db/migrations }
+    command: ["migrate"]
+    environment: { <<: *flyway-env, FLYWAY_URL: "jdbc:postgresql://postgres:5432/order?sslmode=disable" }
+    depends_on: { postgres: { condition: service_healthy } }
+    restart: "no"
+  review-migrate:
+    build: { context: ../../review-service/db/migrations }
+    command: ["migrate"]
+    environment: { <<: *flyway-env, FLYWAY_URL: "jdbc:postgresql://postgres:5432/review?sslmode=disable" }
+    depends_on: { postgres: { condition: service_healthy } }
+    restart: "no"
+  shipping-migrate:
+    build: { context: ../../shipping-service/db/migrations }
+    command: ["migrate"]
+    environment: { <<: *flyway-env, FLYWAY_URL: "jdbc:postgresql://postgres:5432/shipping?sslmode=disable" }
+    depends_on: { postgres: { condition: service_healthy } }
+    restart: "no"
+
+  # ---- Backend services ----
+  auth:
+    build: { context: ../../auth-service }
+    environment: { <<: *svc-env, SERVICE_NAME: auth, DB_NAME: auth }
+    healthcheck: *svc-healthcheck
+    depends_on:
+      postgres: { condition: service_healthy }
+      auth-migrate: { condition: service_completed_successfully }
+
+  user:
+    build: { context: ../../user-service }
+    environment:
+      <<: *svc-env
+      SERVICE_NAME: user
+      DB_NAME: user
+      AUTH_SERVICE_URL: http://auth:8080
+    healthcheck: *svc-healthcheck
+    depends_on:
+      postgres: { condition: service_healthy }
+      user-migrate: { condition: service_completed_successfully }
+      auth: { condition: service_healthy }
+
+  shipping:
+    build: { context: ../../shipping-service }
+    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping }
+    healthcheck: *svc-healthcheck
+    depends_on:
+      postgres: { condition: service_healthy }
+      shipping-migrate: { condition: service_completed_successfully }
+
+  review:
+    build: { context: ../../review-service }
+    environment:
+      <<: *svc-env
+      SERVICE_NAME: review
+      DB_NAME: review
+      AUTH_SERVICE_URL: http://auth:8080
+    healthcheck: *svc-healthcheck
+    depends_on:
+      postgres: { condition: service_healthy }
+      review-migrate: { condition: service_completed_successfully }
+      auth: { condition: service_healthy }
+
+  product:
+    build: { context: ../../product-service }
+    environment:
+      <<: *svc-env
+      SERVICE_NAME: product
+      DB_NAME: product
+      CACHE_ENABLED: "true"
+      CACHE_HOST: cache
+      CACHE_PORT: "6379"
+      REVIEW_SERVICE_URL: http://review:8080
+    healthcheck: *svc-healthcheck
+    depends_on:
+      postgres: { condition: service_healthy }
+      product-migrate: { condition: service_completed_successfully }
+      cache: { condition: service_healthy }
+      review: { condition: service_healthy }
+
+  cart:
+    build: { context: ../../cart-service }
+    environment:
+      <<: *svc-env
+      SERVICE_NAME: cart
+      DB_NAME: cart
+      AUTH_SERVICE_URL: http://auth:8080
+    healthcheck: *svc-healthcheck
+    depends_on:
+      postgres: { condition: service_healthy }
+      cart-migrate: { condition: service_completed_successfully }
+      auth: { condition: service_healthy }
+
+  order:
+    build: { context: ../../order-service }
+    environment:
+      <<: *svc-env
+      SERVICE_NAME: order
+      DB_NAME: order
+      AUTH_SERVICE_URL: http://auth:8080
+      CART_SERVICE_URL: http://cart:8080
+      SHIPPING_SERVICE_URL: http://shipping:8080
+    healthcheck: *svc-healthcheck
+    depends_on:
+      postgres: { condition: service_healthy }
+      order-migrate: { condition: service_completed_successfully }
+      auth: { condition: service_healthy }
+      cart: { condition: service_healthy }
+      shipping: { condition: service_healthy }
+
+  # ---- Gateway (pass-through + CORS) ----
+  gateway:
+    image: nginx:alpine
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8080:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/gateway/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      auth: { condition: service_healthy }
+      user: { condition: service_healthy }
+      product: { condition: service_healthy }
+      cart: { condition: service_healthy }
+      order: { condition: service_healthy }
+      review: { condition: service_healthy }
+      shipping: { condition: service_healthy }
+
+  # ---- Frontend (built with the gateway origin baked in) ----
+  frontend:
+    build:
+      context: ../../frontend
+      args:
+        API_BASE_URL: http://localhost:8080
+    ports:
+      - "3001:80"
+    depends_on:
+      gateway: { condition: service_healthy }

@@ -223,5 +223,11 @@ services:
         API_BASE_URL: http://localhost:8080
     ports:
       - "3001:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     depends_on:
       gateway: { condition: service_healthy }

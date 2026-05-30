@@ -11,6 +11,7 @@ docs/
 ├── api/                          # API documentation
 │   ├── api.md                    # Complete API reference (canonical /api/v1)
 │   ├── api-naming-convention.md # Draft v1.0.0: gateway URL naming (gateway.duynh.me), does not replace api.md
+│   ├── grpc-internal-comms.md   # Proposed/Draft: gRPC for internal east-west comms (phased roadmap)
 │   └── gke-internal-dns.md      # GKE cluster.local, Cloud DNS private zones, multi-environment
 ├── databases/                    # Database documentation
 │   ├── 002-database-integration.md               # PostgreSQL architecture
@@ -186,7 +187,9 @@ docs/
 
 2. **[API naming convention (draft v1.0.0)](./api/api-naming-convention.md)** - Edge/gateway naming exploration; canonical routes remain in `api.md`
 
-3. **[GKE internal & private DNS](./api/gke-internal-dns.md)** - In-cluster DNS and Cloud DNS private zones
+3. **[gRPC internal comms (proposed/draft)](./api/grpc-internal-comms.md)** - Selective gRPC for internal east-west calls; dual-port, HTTP/2 LB pitfall, phased roadmap
+
+4. **[GKE internal & private DNS](./api/gke-internal-dns.md)** - In-cluster DNS and Cloud DNS private zones
 
 ### Databases
 
@@ -261,6 +264,7 @@ docs/
 ### API
 
 - [API Reference](./api/api.md) - Complete API documentation
+- [gRPC Internal Comms (proposed/draft)](./api/grpc-internal-comms.md) - Selective gRPC for internal east-west calls; dual-port, HTTP/2 LB pitfall, phased roadmap
 
 ### Databases
 

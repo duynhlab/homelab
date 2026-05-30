@@ -10,6 +10,7 @@ metadata:
     environment: local
     platform.duynhlab/backup: "walg"
     platform.duynhlab.dev/needs-trust: "true"
+    platform.duynhlab.dev/tier: app
   name: auth
 ---
 apiVersion: v1
@@ -18,6 +19,7 @@ metadata:
   labels:
     environment: local
     platform.duynhlab/backup: "cnpg"
+    platform.duynhlab.dev/tier: app
   name: cart
 ---
 apiVersion: v1
@@ -61,6 +63,7 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+    platform.duynhlab.dev/tier: app
   name: notification
 ---
 apiVersion: v1
@@ -68,6 +71,7 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+    platform.duynhlab.dev/tier: app
   name: order
 ---
 apiVersion: v1
@@ -83,6 +87,7 @@ metadata:
   labels:
     environment: local
     platform.duynhlab/backup: "cnpg"
+    platform.duynhlab.dev/tier: app
   name: product
 ---
 apiVersion: v1
@@ -90,6 +95,7 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+    platform.duynhlab.dev/tier: app
   name: review
 ---
 apiVersion: v1
@@ -104,6 +110,7 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+    platform.duynhlab.dev/tier: app
   name: shipping
 ---
 apiVersion: v1
@@ -112,6 +119,7 @@ metadata:
   labels:
     environment: local
     platform.duynhlab/backup: "walg"
+    platform.duynhlab.dev/tier: app
   name: user
 ---
 apiVersion: v1

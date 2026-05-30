@@ -14,7 +14,7 @@ Source manifests live in `kubernetes/infra/configs/kyverno/cluster-policies/`.
 | `cleanup-completed-pods` | 4 | Enforce | Enforce | n/a | Cleanup, every 30m |
 | `verify-images-cosign` | 2 | planned | planned | Ignore | `ghcr.io/duynhlab/*` |
 | `require-network-policy` | 2 | planned | planned | Ignore | App namespaces |
-| `default-deny-networkpolicy` | 3 | planned | planned | Ignore | Tenant namespaces |
+| `default-deny-networkpolicy` | 3 | Generate | Generate | n/a | App-tier namespaces (`platform.duynhlab.dev/tier: app`) |
 | `add-default-labels` | 3 | planned | planned | Ignore | All Pods |
 
 ## Acceptance criteria for AI-generated manifests
@@ -43,3 +43,17 @@ Any manifest produced by AI agents for this repo MUST satisfy:
 - **Tier 2** — High-value security (image verify, NetworkPolicy validate). Enforced after Tier 1 stable.
 - **Tier 3** — Mutate / Generate convenience policies. Optional but recommended.
 - **Tier 4** — Cleanup / housekeeping. Always Enforce.
+
+## NetworkPolicy enforcement
+
+`default-deny-networkpolicy` now exists and **generates** a `deny-all-ingress`
+NetworkPolicy into every namespace labelled `platform.duynhlab.dev/tier: app`
+(`generateExisting: true`, `synchronize: true`). The matching explicit allow
+policies (`allow-internal-callers`, per the caller matrix) live in
+`kubernetes/infra/configs/network-policies/` and are reconciled by the
+`network-policies-local` Flux Kustomization.
+
+> **kindnet caveat:** the current Kind cluster runs kindnet, which does **not**
+> enforce NetworkPolicy. Both the generated and the authored policies are inert
+> until an enforcing CNI (Cilium/Calico) replaces kindnet. They are authored
+> ready so the boundary becomes effective the moment such a CNI is installed.

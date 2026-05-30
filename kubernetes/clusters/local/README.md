@@ -127,7 +127,12 @@ Flux automatically deploys in correct dependency order via `dependsOn` field in 
    └── dependsOn: [controllers-local]
    └── Applies instances/configs (monitoring, apm, databases, slo)
 
-3. apps-local
+3. network-policies-local
+   └── dependsOn: [controllers-local]
+   └── Ingress NetworkPolicies per app namespace (inert on kindnet; effective
+       once an enforcing CNI like Cilium/Calico is installed)
+
+4. apps-local
    └── dependsOn: [configs-local]
    └── 9 Backend Microservices + Frontend
 ```

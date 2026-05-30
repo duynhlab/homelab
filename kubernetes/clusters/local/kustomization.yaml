@@ -17,5 +17,6 @@ resources:
   - databases-cnpg-dr.yaml  # CNPG DR replica (depends on databases-local)
   - monitoring.yaml      # Grafana + Prometheus Configs
   - kyverno.yaml         # Admission policies (depends on controllers + monitoring)
+  - network-policies.yaml   # Ingress NetworkPolicies (inert on kindnet; depends on controllers)
   - mcp.yaml             # MCP servers (depends on monitoring)
   - apps.yaml            # Microservices

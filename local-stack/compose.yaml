@@ -211,6 +211,8 @@ services:
       SHIPPING_SERVICE_URL: http://shipping:8080
       # When set, order calls shipping over gRPC (Phase 1 pilot); unset = REST fallback.
       SHIPPING_GRPC_ADDR: dns:///shipping:9090
+      # order publishes an "order created" notification here (best-effort, gRPC).
+      NOTIFICATION_GRPC_ADDR: dns:///notification:9090
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }

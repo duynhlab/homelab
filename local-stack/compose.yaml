@@ -113,7 +113,9 @@ services:
   # ---- Backend services ----
   auth:
     build: { context: ../../auth-service }
-    environment: { <<: *svc-env, SERVICE_NAME: auth, DB_NAME: auth }
+    # gRPC AuthService.GetMe always runs on :9090 for east-west /me validation;
+    # HTTP :8080 is unchanged. Consumers reach it at dns:///auth:9090.
+    environment: { <<: *svc-env, SERVICE_NAME: auth, DB_NAME: auth, GRPC_PORT: "9090" }
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -125,7 +127,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: user
       DB_NAME: user
-      AUTH_SERVICE_URL: http://auth:8080
+      AUTH_GRPC_ADDR: dns:///auth:9090
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -134,9 +136,9 @@ services:
 
   shipping:
     build: { context: ../../shipping-service }
-    # GRPC_ENABLED turns on the internal gRPC server on :9090 (Phase 1 pilot);
-    # HTTP :8080 is unchanged. order reaches it at dns:///shipping:9090.
-    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping, GRPC_ENABLED: "true", GRPC_PORT: "9090" }
+    # gRPC ShippingService always runs on :9090; HTTP :8080 is unchanged.
+    # order reaches it at dns:///shipping:9090.
+    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping, GRPC_PORT: "9090" }
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -148,7 +150,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: review
       DB_NAME: review
-      AUTH_SERVICE_URL: http://auth:8080
+      AUTH_GRPC_ADDR: dns:///auth:9090
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -161,7 +163,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: notification
       DB_NAME: notification
-      AUTH_SERVICE_URL: http://auth:8080
+      AUTH_GRPC_ADDR: dns:///auth:9090
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -177,7 +179,7 @@ services:
       CACHE_ENABLED: "true"
       CACHE_HOST: cache
       CACHE_PORT: "6379"
-      REVIEW_SERVICE_URL: http://review:8080
+      REVIEW_GRPC_ADDR: dns:///review:9090
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -191,7 +193,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: cart
       DB_NAME: cart
-      AUTH_SERVICE_URL: http://auth:8080
+      AUTH_GRPC_ADDR: dns:///auth:9090
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -204,11 +206,13 @@ services:
       <<: *svc-env
       SERVICE_NAME: order
       DB_NAME: order
-      AUTH_SERVICE_URL: http://auth:8080
+      AUTH_GRPC_ADDR: dns:///auth:9090
       CART_SERVICE_URL: http://cart:8080
       SHIPPING_SERVICE_URL: http://shipping:8080
       # When set, order calls shipping over gRPC (Phase 1 pilot); unset = REST fallback.
       SHIPPING_GRPC_ADDR: dns:///shipping:9090
+      # order publishes an "order created" notification here (best-effort, gRPC).
+      NOTIFICATION_GRPC_ADDR: dns:///notification:9090
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }

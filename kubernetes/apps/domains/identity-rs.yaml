@@ -108,6 +108,16 @@ spec:
           - name: AUTH_SERVICE_URL
             value: << inputs.auth_url >>
           <<- end >>
+          <<- if (index inputs "grpc_enabled") >>
+          - name: GRPC_ENABLED
+            value: "true"
+          - name: GRPC_PORT
+            value: << index inputs "grpc_port" | default "9090" | quote >>
+          <<- end >>
+          <<- if (index inputs "shipping_grpc_addr") >>
+          - name: SHIPPING_GRPC_ADDR
+            value: << inputs.shipping_grpc_addr >>
+          <<- end >>
         resources:
           requests:
             memory: "32Mi"

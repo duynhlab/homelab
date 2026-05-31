@@ -3,10 +3,10 @@
 | Attribute | Value |
 |-----------|--------|
 | **Version** | **v0.1.0** |
-| **Status** | **Proposed / Draft** — explainer + phased roadmap, NOT an implemented design |
+| **Status** | **Partially implemented** — Phase 0–1 shipped (`order → shipping` pilot live, REST fallback); Phase 2–3 planned. See [§7 roadmap](#7-phased-roadmap). |
 | **Scope** | Internal (east-west) service-to-service calls only |
 | **Relation** | Complements [`api-naming-convention.md`](api-naming-convention.md) (HTTP/JSON URL surface stays the law of the land) |
-| **Last updated** | 2026-05-30 |
+| **Last updated** | 2026-05-31 |
 
 ## TL;DR
 
@@ -232,6 +232,68 @@ Described here, not implemented. No manifests in this doc.
 ## 7. Phased roadmap
 
 Each phase has explicit success criteria and a one-step rollback.
+
+**Status:** Phase 0 and Phase 1 are **implemented** — the `order → shipping` hop
+runs over gRPC and is verified in the local stack (`order` dials
+`dns:///shipping:9090`; `shipping` serves gRPC on `:9090` with REST fallback via
+feature flag). GitOps env wiring is input-gated and rolling out. Phase 2–3 are
+**planned**.
+
+```mermaid
+flowchart LR
+    P0["<b>Phase 0</b><br/>Scaffolding<br/>buf · proto · pkg helpers"]:::done
+    P1["<b>Phase 1</b><br/>Pilot: order → shipping<br/>(flagged, REST fallback)"]:::done
+    P2["<b>Phase 2</b><br/>auth /me · product → review<br/>notification publish"]:::next
+    P3["<b>Phase 3</b><br/>Harden: mTLS · NetworkPolicy<br/>gRPC health probes"]:::future
+    P0 --> P1 --> P2 --> P3
+
+    classDef done fill:#1f7a33,stroke:#0d3d18,color:#fff
+    classDef next fill:#b36b00,stroke:#5c3600,color:#fff
+    classDef future fill:#4d4d4d,stroke:#1a1a1a,color:#fff
+```
+
+> 🟢 implemented · 🟠 next · ⚫ planned
+
+### Per-hop transport by phase
+
+Which east-west hops move to gRPC, and when. **Solid green** = gRPC live today;
+**dashed** = planned gRPC; everything from Kong stays HTTP/JSON (hard rule).
+
+```mermaid
+flowchart TD
+    B[Browser / SPA] -->|HTTPS JSON| K[Kong]
+    K -->|HTTP :8080| ORDER[order]
+    K -->|HTTP :8080| PRODUCT[product]
+    K -->|HTTP :8080| CART[cart]
+    K -->|HTTP :8080| AUTH[auth]
+    K -->|HTTP :8080| REVIEW[review]
+    K -->|HTTP :8080| NOTIF[notification]
+
+    %% Phase 1 — implemented
+    ORDER ==>|"gRPC :9090 — Phase 1 ✅"| SHIP[shipping]
+
+    %% Phase 2 — planned
+    ORDER -. "gRPC — Phase 2<br/>(/me)" .-> AUTH
+    PRODUCT -. "gRPC — Phase 2<br/>(/me)" .-> AUTH
+    CART -. "gRPC — Phase 2<br/>(/me)" .-> AUTH
+    PRODUCT -. "gRPC — Phase 2" .-> REVIEW
+    ORDER -. "gRPC — Phase 2<br/>publish on checkout" .-> NOTIF
+
+    %% Phase 2+ / Phase 0 design-only
+    ORDER -. "gRPC — Phase 2+<br/>(forwards JWT)" .-> CART
+    AUTH -. "proto only — Phase 0<br/>(not wired)" .-> USER[user]
+
+    linkStyle 7 stroke:#1f7a33,stroke-width:3px
+    classDef live fill:#e6f4ea,stroke:#1f7a33,color:#0d3d18
+    classDef plan fill:#fff,stroke:#888,color:#333,stroke-dasharray:4 3
+    class SHIP live
+    class AUTH,REVIEW,NOTIF,USER plan
+```
+
+> Note: `every service → auth /me` is shown via the representative
+> `order`/`product`/`cart` callers; in Phase 2 **all** JWT-validating services use
+> the same gRPC hop. `notification`'s browser-facing routes (list/count/get/
+> mark-read) **stay REST** — only the internal `notify/*` publish path is gRPC.
 
 ### Phase 0 — Scaffolding (no runtime change)
 

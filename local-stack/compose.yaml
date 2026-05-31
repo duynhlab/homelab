@@ -179,7 +179,7 @@ services:
       CACHE_ENABLED: "true"
       CACHE_HOST: cache
       CACHE_PORT: "6379"
-      REVIEW_SERVICE_URL: http://review:8080
+      REVIEW_GRPC_ADDR: dns:///review:9090
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }

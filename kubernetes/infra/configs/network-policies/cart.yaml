@@ -1,0 +1,33 @@
+# kindnet does not enforce NetworkPolicy; these are authored ready and become
+# effective once an enforcing CNI (Cilium/Calico) is installed.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-ingress
+  namespace: cart
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-internal-callers
+  namespace: cart
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kong
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: order
+      ports:
+        - protocol: TCP
+          port: 8080

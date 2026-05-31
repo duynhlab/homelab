@@ -53,6 +53,9 @@ policies (`allow-internal-callers`, per the caller matrix) live in
 `kubernetes/infra/configs/network-policies/` and are reconciled by the
 `network-policies-local` Flux Kustomization.
 
+**Full reference:** the per-service caller matrix, allowed-ingress topology
+diagram, and GitOps wiring live in [`network-policies.md`](network-policies.md).
+
 > **kindnet caveat:** the current Kind cluster runs kindnet, which does **not**
 > enforce NetworkPolicy. Both the generated and the authored policies are inert
 > until an enforcing CNI (Cilium/Calico) replaces kindnet. They are authored

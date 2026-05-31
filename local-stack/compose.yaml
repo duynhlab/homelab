@@ -103,6 +103,12 @@ services:
     environment: { <<: *flyway-env, FLYWAY_URL: "jdbc:postgresql://postgres:5432/shipping?sslmode=disable" }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
+  notification-migrate:
+    build: { context: ../../notification-service/db/migrations }
+    command: ["migrate"]
+    environment: { <<: *flyway-env, FLYWAY_URL: "jdbc:postgresql://postgres:5432/notification?sslmode=disable" }
+    depends_on: { postgres: { condition: service_healthy } }
+    restart: "no"
 
   # ---- Backend services ----
   auth:
@@ -147,6 +153,19 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       review-migrate: { condition: service_completed_successfully }
+      auth: { condition: service_healthy }
+
+  notification:
+    build: { context: ../../notification-service }
+    environment:
+      <<: *svc-env
+      SERVICE_NAME: notification
+      DB_NAME: notification
+      AUTH_SERVICE_URL: http://auth:8080
+    healthcheck: *svc-healthcheck
+    depends_on:
+      postgres: { condition: service_healthy }
+      notification-migrate: { condition: service_completed_successfully }
       auth: { condition: service_healthy }
 
   product:
@@ -218,6 +237,7 @@ services:
       order: { condition: service_healthy }
       review: { condition: service_healthy }
       shipping: { condition: service_healthy }
+      notification: { condition: service_healthy }
 
   # ---- Frontend (built with the gateway origin baked in) ----
   frontend:

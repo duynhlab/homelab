@@ -20,4 +20,4 @@ spec:
     db_sslmode: "disable"
     pool_max: "50"
     cache_enabled: "true"
-    review_url: "http://review.review.svc.cluster.local:8080"
+    review_grpc_addr: "dns:///review-grpc.review.svc.cluster.local:9090"

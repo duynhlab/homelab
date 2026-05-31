@@ -1,0 +1,87 @@
+# Headless Services exposing each gRPC server's :9090 port for east-west calls.
+#
+# The mop-chart renders a single ClusterIP Service on :8080 (HTTP) only; it has
+# no :9090 port. These standalone headless Services (clusterIP: None) select the
+# same pods (by the chart's app.kubernetes.io/{name,instance} labels) and expose
+# :9090 so callers can dial dns:///<svc>-grpc.<ns>.svc.cluster.local:9090.
+#
+# Headless + the gRPC client's dns:/// resolver + round_robin spreads RPCs across
+# all replicas — avoiding the HTTP/2 single-connection pinning that a normal
+# ClusterIP Service causes for gRPC. The gRPC server runs on every pod
+# unconditionally (GRPC_PORT default 9090), so no app flag is needed.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-grpc
+  namespace: auth
+  labels:
+    app.kubernetes.io/name: auth
+    app.kubernetes.io/component: grpc
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: auth
+    app.kubernetes.io/instance: auth
+  ports:
+    - name: grpc
+      protocol: TCP
+      port: 9090
+      targetPort: 9090
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shipping-grpc
+  namespace: shipping
+  labels:
+    app.kubernetes.io/name: shipping
+    app.kubernetes.io/component: grpc
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: shipping
+    app.kubernetes.io/instance: shipping
+  ports:
+    - name: grpc
+      protocol: TCP
+      port: 9090
+      targetPort: 9090
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: review-grpc
+  namespace: review
+  labels:
+    app.kubernetes.io/name: review
+    app.kubernetes.io/component: grpc
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: review
+    app.kubernetes.io/instance: review
+  ports:
+    - name: grpc
+      protocol: TCP
+      port: 9090
+      targetPort: 9090
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-grpc
+  namespace: notification
+  labels:
+    app.kubernetes.io/name: notification
+    app.kubernetes.io/component: grpc
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: notification
+    app.kubernetes.io/instance: notification
+  ports:
+    - name: grpc
+      protocol: TCP
+      port: 9090
+      targetPort: 9090

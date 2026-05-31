@@ -10,11 +10,11 @@ This document is the **understanding-the-system** prerequisite for implementing 
 
 ## 1. Platform shape
 
-- **7 Go backend services** (Go 1.26, Gin), each in its own repo + namespace, all listening on **`:8080`**, all exposing `GET /health` + `GET /ready`.
+- **8 Go backend services** (Go 1.26, Gin), each in its own repo + namespace, all listening on **`:8080`**, all exposing `GET /health` + `GET /ready`.
 - **1 React/Vite frontend** (SPA, served by nginx).
 - **3-layer architecture** per service: `web` (HTTP/validation/aggregation) → `logic` (business rules, no SQL) → `core` (domain + repository + DB). Frontend may only call the `web` layer.
 - **URL shape (Variant A):** `/{service}/v1/{audience}/{resource…}` with `audience ∈ public | private | internal`. The gateway (Kong in-cluster; nginx locally) is **pure pass-through** — no rewriting.
-- **`notification-service` exists in the platform but is NOT part of the local stack** (not cloned). The frontend's notification badge poll therefore 404s locally — harmless.
+- **`notification-service`** (in the `comms` domain alongside shipping) handles user notifications: browser-facing private routes (list/count/get/mark-read, JWT) plus internal `notify/email`/`notify/sms` (service-to-service). It is deployed in-cluster **and** runs in the local stack — the frontend's notification badge resolves against it.
 
 ```mermaid
 flowchart TD
@@ -26,6 +26,7 @@ flowchart TD
     GW --> ORD[order]
     GW --> REV[review]
     GW --> SHIP[shipping]
+    GW --> NOTIF[notification]
 
     subgraph EW["East-west (in-cluster, never on the gateway)"]
       USER -. JWT .-> AUTH
@@ -53,10 +54,11 @@ The local end-to-end stack (`local-stack/compose.yaml`) mirrors the platform wit
 | order | 8080 | `order` | — | zap | auth (JWT), shipping, cart |
 | review | 8080 | `review` | — | zap | auth (JWT) |
 | shipping | 8080 | `shipping` | — | zap | none |
+| notification | 8080 | `notification` | — | zap | auth (JWT) |
 | frontend | 80 → host 3001 | — | — | — | gateway only |
-| gateway | 80 → host 8080 | — | — | — | all 7 services |
+| gateway | 80 → host 8080 | — | — | — | all 8 services |
 
-> **In-cluster differences (production):** services connect to dedicated PostgreSQL clusters (auth-db/Zalando PG17 + PgBouncer; product/cart/order on CNPG PG18 with PgDog/PgCat; user/review/shipping on supporting/review clusters PG16). Locally these are collapsed into one Postgres with 7 databases. See [`../databases/`](../databases/).
+> **In-cluster differences (production):** services connect to dedicated PostgreSQL clusters (auth-db/Zalando PG17 + PgBouncer; product/cart/order on CNPG PG18 with PgDog/PgCat; user/review/shipping on supporting/review clusters PG16). Locally these are collapsed into one Postgres with 8 databases. See [`../databases/`](../databases/).
 > **Logging is not unified** — three loggers are in use (zerolog/clog/zap). Tracked as a `pkg` consolidation follow-up.
 
 ---
@@ -113,8 +115,11 @@ Each entry: **what it owns**, **what's implemented**, **what's mock/in-flight**,
 - **In-flight / notes:** the `internal/orders/:orderId` route is **consumed only by order**; it has **no in-app caller auth** (relies on NetworkPolicy in-cluster — see [`../security/`](../security/)).
 - **gRPC candidacy:** **Pilot target (Phase 1)** — order→shipping internal lookup.
 
-### notification — *not deployed locally*
-- Platform service for email/SMS/in-app notifications (internal endpoints). Absent from the local stack; documented for completeness. The frontend's notification-count poll 404s locally and is handled gracefully (badge shows 0).
+### notification — user notifications
+- **Owns:** `notifications`. Routes: PRIVATE (JWT, browser) `GET /notification/v1/private/notifications` (+ `/count`, `GET /:id`, `PATCH /:id` mark-read); INTERNAL (service-to-service) `POST /notification/v1/internal/notify/{email,sms}`.
+- **Implemented:** parameterized pgx, `rows.Err()` checks, solid graceful shutdown. Deployed in-cluster (comms domain, shared supporting DB) **and** in the local stack.
+- **In-flight / notes:** a code review found the recurring trio — auth **fail-open**, **IDOR** on `/:id`, and **seed sequence desync** — now fixed (PRs `fix/security-correctness-review` + `fix/seed-sequence-reset`), plus a hardcoded create-time `user_id`. The internal notify endpoints have **no caller wired yet**.
+- **gRPC candidacy:** **Phase 2** — the internal `notify/email`/`notify/sms` are a natural east-west gRPC target (design `notification.v1` + wire a first caller, e.g. order→notification). Browser routes stay REST.
 
 ### frontend — React SPA
 - Calls only the gateway at `/{service}/v1/{public,private}/…`; JWT stored in `localStorage.authToken` and sent as `Authorization: Bearer`. Uses server-side aggregation endpoints (`/products/:id/details`, `/orders/:id/details`) — no client-side orchestration. **gRPC is never browser-facing.**
@@ -174,8 +179,8 @@ Phase 1 of the [gRPC roadmap](grpc-internal-comms.md) is a **single pilot path: 
 | Duplicate CORS headers (service emits CORS + gateway) | product | Worked around at gateway; service-side removal recommended |
 | Logging not unified (zerolog/clog/zap) | all + `pkg` | Open — consolidate in `pkg` |
 | `GetUser` / internal `CreateUser` placeholder | user | Mock; internal create has no caller |
-| Internal routes rely on NetworkPolicy, no in-app caller auth | product, user, shipping | NetworkPolicies authored (see `../security/`); enforced only with an enforcing CNI |
-| `notification-service` not in local stack | notification | Out of local scope; badge poll 404s harmlessly |
+| Internal routes rely on NetworkPolicy, no in-app caller auth | product, user, shipping, notification | NetworkPolicies authored (see `../security/`); enforced only with an enforcing CNI |
+| Review findings (auth fail-open, IDOR, seed-seq desync, hardcoded user_id) | notification | Fixed in PRs (parity with sibling services) |
 | Seed sequence resets (PK collisions on first INSERT) | auth, cart, review, shipping | Fixed via `V*__fix_sequences.sql` migrations |
 
 ---

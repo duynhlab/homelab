@@ -60,6 +60,7 @@ calls, not a religion.
 | product → review (aggregation) | gRPC | Phase 2 |
 | order → shipping (internal order lookup) | **gRPC PILOT** | Phase 1 |
 | order → cart (forwards user JWT) | gRPC later | Phase 2+ |
+| order/shipping → notification (`notify/email`, `notify/sms`) | gRPC — **design proto + wire first caller** | Phase 2 |
 | any browser / SPA → Kong | **STAY REST** | — (hard rule) |
 | auth → user (registration) | not implemented — **design proto only** | Phase 0 |
 
@@ -254,14 +255,21 @@ Each phase has explicit success criteria and a one-step rollback.
   across `order → shipping`; **no RED/SLO regression**.
 - **Rollback:** flip the env flag off → `order` resumes the REST call. One step.
 
-### Phase 2 — auth /me and product → review
+### Phase 2 — auth /me, product → review, and notification publish
 
 - **Verify headless + `round_robin` spreads RPCs across both replicas first**
   (auth/product/cart/order are 2-replica — §3 must be solved here).
 - Cut `every service → auth /me` and `product → review` to gRPC; **forward JWT in
   metadata** for `/me`.
+- **Notification publish:** design `notification.v1` for the internal
+  `notify/email` / `notify/sms` endpoints and **wire the first caller** — e.g.
+  `order` publishing an "order created" notification on checkout. notification
+  has **no caller today**, so this both designs the proto and introduces the
+  producer (a fire-and-forget, internal, machine-to-machine call — a natural gRPC
+  fit). Its **browser-facing** routes (list/count/get/mark-read) **stay REST**.
 - **Success:** RPCs balanced across replicas (observable in per-pod metrics);
-  trace continuity; no SLO regression.
+  trace continuity; no SLO regression; a notification row appears for the
+  recipient after checkout.
 - **Rollback:** per-path env flag back to REST.
 
 ### Phase 3 — Standardize & harden

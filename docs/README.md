@@ -12,6 +12,7 @@ docs/
 │   ├── api.md                    # Complete API reference (canonical /api/v1)
 │   ├── api-naming-convention.md # Draft v1.0.0: gateway URL naming (gateway.duynh.me), does not replace api.md
 │   ├── grpc-internal-comms.md   # Proposed/Draft: gRPC for internal east-west comms (phased roadmap)
+│   ├── microservices.md         # Service catalog: per-service features, call graph, gRPC Phase 1 readiness
 │   └── gke-internal-dns.md      # GKE cluster.local, Cloud DNS private zones, multi-environment
 ├── databases/                    # Database documentation
 │   ├── 002-database-integration.md               # PostgreSQL architecture

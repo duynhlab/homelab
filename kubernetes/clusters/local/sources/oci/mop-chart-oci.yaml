@@ -8,6 +8,6 @@ metadata:
     app.kubernetes.io/component: helm-chart
 spec:
   interval: 10m
-  url: oci://ghcr.io/duyhenryer/charts/mop
+  url: oci://ghcr.io/duynhlab/helm-charts/mop
   ref:
-    semver: ">=0.1.0"
+    semver: ">=0.8.0"

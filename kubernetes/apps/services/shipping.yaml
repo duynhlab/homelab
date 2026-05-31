@@ -11,6 +11,7 @@ spec:
   defaultValues:
     name: shipping
     namespace: shipping
+    grpc_server: true
     replicaCount: 1
     db_host: "supporting-shared-db-pooler.user.svc.cluster.local"
     db_migration_host: "supporting-shared-db.user.svc.cluster.local"

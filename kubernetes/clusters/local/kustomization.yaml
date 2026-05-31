@@ -20,4 +20,3 @@ resources:
   - network-policies.yaml   # Ingress NetworkPolicies (inert on kindnet; depends on controllers)
   - mcp.yaml             # MCP servers (depends on monitoring)
   - apps.yaml            # Microservices
-  - grpc-services.yaml   # Headless :9090 Services for east-west gRPC (depends on apps)

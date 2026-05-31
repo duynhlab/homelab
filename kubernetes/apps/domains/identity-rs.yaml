@@ -50,6 +50,11 @@ spec:
           targetPort: 8080
           portName: http
         containerPort: 8080
+        <<- if (index inputs "grpc_server") >>
+        grpc:
+          enabled: true
+          port: 9090
+        <<- end >>
         env:
           - name: SERVICE_NAME
             value: << inputs.name >>

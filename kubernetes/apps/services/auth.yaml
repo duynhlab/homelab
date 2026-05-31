@@ -11,6 +11,7 @@ spec:
   defaultValues:
     name: auth
     namespace: auth
+    grpc_server: true
     replicaCount: 2
     db_host: "auth-db-pooler.auth.svc.cluster.local"
     db_migration_host: "auth-db.auth.svc.cluster.local"

@@ -49,3 +49,6 @@ debugs
 
 # CODE_REVIEW.md
 # CRITICAL_FIXES_SUMMARY.mdtea_debug.log
+
+# Claude Code agent worktrees (never commit)
+.claude/worktrees/

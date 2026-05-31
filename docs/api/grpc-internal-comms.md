@@ -8,6 +8,32 @@
 | **Relation** | Complements [`api-naming-convention.md`](api-naming-convention.md) (HTTP/JSON URL surface stays the law of the land) |
 | **Last updated** | 2026-05-31 |
 
+## Implementation status (2026-05-31)
+
+Phases 0 and 1 are **implemented** (pilot path: `order → shipping`). The remaining
+work is cluster port exposure.
+
+| Item | Status | Where |
+|------|--------|-------|
+| Phase 0 — `pkg` proto + stubs + `grpcx` helpers (otel, health, reflection, `round_robin`); `buf` lint/breaking in CI | ✅ implemented | `duynhlab/pkg` PR #3 |
+| Phase 1 — `shipping` serves `ShippingService.GetShipmentByOrder` on dual gRPC `:9090` behind `GRPC_ENABLED` | ✅ implemented | `shipping-service` PR #63 |
+| Phase 1 — `order` calls shipping via gRPC behind `SHIPPING_GRPC_ADDR`, REST fallback | ✅ implemented | `order-service` PR #61 |
+| Verified on Docker Compose — gRPC and REST responses **byte-identical**; one-env-var rollback | ✅ verified | `homelab/local-stack` |
+| Env wiring (`GRPC_ENABLED`/`GRPC_PORT`, `SHIPPING_GRPC_ADDR`) **input-gated** in compose + GitOps templates | ✅ implemented | `local-stack/compose.yaml`, `kubernetes/apps/domains/*-rs.yaml` |
+| Cluster gRPC **port exposure** (2nd Service port / headless Service for `round_robin`) | ⏳ pending | depends on `mop-chart` rendering a second port |
+
+**Env-var convention (now wired, default-off):**
+
+| Var | Role | Set on (InputProvider) | Example value |
+|-----|------|------------------------|---------------|
+| `GRPC_ENABLED` | start the gRPC server | callee (e.g. `grpc_enabled: true`) | `"true"` |
+| `GRPC_PORT` | gRPC listen port | callee (`grpc_port`) | `"9090"` |
+| `SHIPPING_GRPC_ADDR` | dial target for order→shipping | caller (`shipping_grpc_addr`) | `dns:///shipping-grpc.shipping.svc.cluster.local:9090` |
+
+Until the callee's Service exposes `:9090`, the cluster keeps using the REST path
+(set no inputs → gRPC env is not rendered). The Compose pilot exercises the full
+gRPC path today.
+
 ## TL;DR
 
 - Adopt gRPC **selectively** for internal east-west, machine-to-machine, latency-
@@ -307,7 +333,7 @@ flowchart TD
 - **Success:** CI green; stubs import cleanly into a service; no deployment change.
 - **Rollback:** delete the proto package; nothing runtime depends on it yet.
 
-### Phase 1 — Pilot: order → shipping
+### Phase 1 — Pilot: order → shipping ✅ implemented (app code + Compose; cluster port pending)
 
 - Add gRPC `:9090` to `shipping` (dual-port) behind a **feature flag**; `order`
   calls gRPC when the flag is on, **falls back to REST** when off.

@@ -1,0 +1,42 @@
+# Generate a default deny-all-ingress NetworkPolicy into every app-tier namespace.
+# Explicit allow policies live in kubernetes/infra/configs/network-policies/.
+# NOTE: kindnet does not enforce NetworkPolicy — the generated resource is inert
+# until an enforcing CNI (Cilium/Calico) is installed. generateExisting backfills
+# namespaces that already exist; synchronize keeps the generated policy in sync.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: default-deny-networkpolicy
+  annotations:
+    pod-policies.kyverno.io/autogen-controllers: none
+    policies.kyverno.io/title: Default deny-ingress NetworkPolicy
+    policies.kyverno.io/category: Multi-Tenancy, Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Namespace, NetworkPolicy
+    policies.kyverno.io/description: >-
+      Generates a default `deny-all-ingress` NetworkPolicy into every namespace
+      labelled `platform.duynhlab.dev/tier: app`, so each app namespace denies
+      ingress by default. Explicit allow policies are managed separately under
+      kubernetes/infra/configs/network-policies/.
+spec:
+  generateExisting: true
+  rules:
+    - name: generate-deny-all-ingress
+      match:
+        any:
+          - resources:
+              kinds: [Namespace]
+              selector:
+                matchLabels:
+                  platform.duynhlab.dev/tier: app
+      generate:
+        apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        name: deny-all-ingress
+        namespace: "{{request.object.metadata.name}}"
+        synchronize: true
+        data:
+          spec:
+            podSelector: {}
+            policyTypes:
+              - Ingress

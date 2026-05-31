@@ -1,0 +1,24 @@
+# Ingress NetworkPolicies fencing internal routes per app namespace.
+# INERT on the current Kind/kindnet cluster (kindnet does not enforce
+# NetworkPolicy); authored ready and effective once an enforcing CNI
+# (Cilium/Calico) is installed. Depends on controllers-local for namespaces.
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: network-policies-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: infrastructure
+spec:
+  interval: 10m
+  timeout: 5m
+  retryInterval: 2m
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+  path: ./configs/network-policies
+  prune: true
+  wait: true
+  dependsOn:
+    - name: controllers-local

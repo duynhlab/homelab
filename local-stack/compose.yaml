@@ -150,7 +150,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: review
       DB_NAME: review
-      AUTH_SERVICE_URL: http://auth:8080
+      AUTH_GRPC_ADDR: dns:///auth:9090
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -163,7 +163,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: notification
       DB_NAME: notification
-      AUTH_SERVICE_URL: http://auth:8080
+      AUTH_GRPC_ADDR: dns:///auth:9090
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -193,7 +193,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: cart
       DB_NAME: cart
-      AUTH_SERVICE_URL: http://auth:8080
+      AUTH_GRPC_ADDR: dns:///auth:9090
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -206,7 +206,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: order
       DB_NAME: order
-      AUTH_SERVICE_URL: http://auth:8080
+      AUTH_GRPC_ADDR: dns:///auth:9090
       CART_SERVICE_URL: http://cart:8080
       SHIPPING_SERVICE_URL: http://shipping:8080
       # When set, order calls shipping over gRPC (Phase 1 pilot); unset = REST fallback.

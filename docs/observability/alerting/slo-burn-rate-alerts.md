@@ -109,7 +109,7 @@ Every Sloth-generated alert carries:
 
 ## 3. Configuration — per-service overrides
 
-SLOs are wired through the [`mop` Helm chart](https://github.com/duyhenryer/charts/tree/main/charts/mop) — see [`getting_started.md`](../slo/getting_started.md) for the full flow. Alert behaviour is controlled by these values:
+SLOs are wired through the [`mop` Helm chart](https://github.com/duynhlab/helm-charts/tree/main/charts/mop) — see [`getting_started.md`](../slo/getting_started.md) for the full flow. Alert behaviour is controlled by these values:
 
 ```yaml
 slo:

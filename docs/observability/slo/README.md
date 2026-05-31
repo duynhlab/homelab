@@ -185,7 +185,7 @@ The Grafana dashboards and the Sloth UI are complementary: Grafana for long-form
 
 ### Manifests
 
-- SLO Template: [`duyhenryer/charts` repo](https://github.com/duyhenryer/charts/blob/main/charts/mop/templates/slo.yaml)
+- SLO Template: [`duynhlab/helm-charts` repo](https://github.com/duynhlab/helm-charts/blob/main/charts/mop/templates/slo.yaml)
 - Sloth Operator (controller): `kubernetes/infra/controllers/metrics/sloth-operator.yaml`
 - Sloth Web UI (Deployment + Service + PodMonitor): `kubernetes/infra/configs/monitoring/sloth/sloth-ui.yaml`
 - Sloth UI Ingress: `kubernetes/infra/configs/kong/ingress-monitoring.yaml` (`slo.duynh.me`)

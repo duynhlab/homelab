@@ -6,7 +6,8 @@ This project follows a **Polyrepo** architecture. The `homelab` repository acts 
 
 | Component | Repository | Description | Status |
 |-----------|------------|-------------|--------|
-| **Infrastructure** | [duynhlab/homelab](https://github.com/duynhlab/homelab) | GitOps, Helm Charts, K8s Manifests, Docs | [![CI](https://github.com/duynhlab/homelab/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/homelab/actions) |
+| **Infrastructure** | [duynhlab/homelab](https://github.com/duynhlab/homelab) | GitOps, K8s Manifests, Docs | [![CI](https://github.com/duynhlab/homelab/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/homelab/actions) |
+| **Helm Charts** | [duynhlab/helm-charts](https://github.com/duynhlab/helm-charts) | `mop` microservice chart (Deployment, HTTP + headless gRPC Services, migrations, SLO) — OCI `ghcr.io/duynhlab/helm-charts/mop` | [![CI](https://github.com/duynhlab/helm-charts/actions/workflows/e2e.yml/badge.svg)](https://github.com/duynhlab/helm-charts/actions) |
 | **Shared Workflows** | [duyhenryer/shared-workflows](https://github.com/duyhenryer/shared-workflows) | Reusable GitHub Actions (CI/CD) | [![CI](https://github.com/duyhenryer/shared-workflows/actions/workflows/ci.yml/badge.svg)](https://github.com/duyhenryer/shared-workflows/actions) |
 | **Common Lib** | [duynhlab/pkg](https://github.com/duynhlab/pkg) | Shared Go Maven/Library | [![CI](https://github.com/duynhlab/pkg/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/pkg/actions) |
 

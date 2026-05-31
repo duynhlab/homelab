@@ -30,7 +30,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 - **Kustomize bases/overlays + GitOps deployment** — `kubernetes/apps/`, `kubernetes/infra/`, `kubernetes/clusters/`, Flux Kustomizations
 - **Flux Operator with OCI sync** — `kubernetes/clusters/local/`, Kind cluster `homelab`, OCI registry `homelab-registry:5000` (localhost:5050)
 - **CI/CD pipelines for container images** — Service repos + `duyhenryer/shared-workflows` (build-images, build-init-images); this repo: `ci.yml` (validate)
-- **Helm chart publishing to OCI registry** — Charts in `duyhenryer/charts` repo, OCI `ghcr.io/duyhenryer/charts`
+- **Helm chart publishing to OCI registry** — `mop` chart in `duynhlab/helm-charts` (OCI `ghcr.io/duynhlab/helm-charts/mop`, Pages `duynhlab.github.io/helm-charts`); remaining charts in `duyhenryer/charts` (OCI `ghcr.io/duyhenryer/charts`)
 - **GHCR multi-level image naming** — `ghcr.io/duynhlab/<repo>/<image>:<tag>` for auto-linking packages to repos
 - **Shared reusable CI/CD workflows** — `duyhenryer/shared-workflows` (docker-build-go, docker-build, go-check)
 - **Dependabot for dependency management** — gomod, github-actions, docker across all 8 service repos

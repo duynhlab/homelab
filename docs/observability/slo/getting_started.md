@@ -70,7 +70,7 @@ kubectl describe prometheusservicelevel my-service -n monitoring
 
 ## Default SLO Values
 
-Defined in the mop chart's `values.yaml` ([`duyhenryer/charts` repo](https://github.com/duyhenryer/charts/blob/main/charts/mop/values.yaml)):
+Defined in the mop chart's `values.yaml` ([`duynhlab/helm-charts` repo](https://github.com/duynhlab/helm-charts/blob/main/charts/mop/values.yaml)):
 
 ```yaml
 slo:

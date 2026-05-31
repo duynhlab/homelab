@@ -20,7 +20,7 @@ gRPC, the servers are always-on (no feature flag), and there is no REST fallback
 | **Phase 2** — `/me` validation: all 5 consumers (user/cart/order/review/notification) validate via `auth.GetMe` over gRPC through the shared fail-closed `pkg/authmw` | ✅ gRPC-only | `pkg/authmw` + 5 services |
 | **Phase 2** — `product → review` aggregation | ✅ gRPC-only | review + product |
 | **Phase 2** — `order → notification` publish on checkout (best-effort) | ✅ | notification + order |
-| **Cluster** — headless `{auth,shipping,review,notification}-grpc` Services (`:9090`) + ResourceSet `*_GRPC_ADDR` env | ✅ | `kubernetes/infra/configs/grpc-services/`, `kubernetes/apps/domains/*-rs.yaml` |
+| **Cluster** — headless `{auth,shipping,review,notification}-grpc` Services (`:9090`) + ResourceSet `*_GRPC_ADDR` env | ✅ | mop chart (`grpc.enabled`), `kubernetes/apps/domains/*-rs.yaml`, `kubernetes/apps/services/*.yaml` |
 | **Phase 3** — NetworkPolicy fences `:9090`; gRPC health service registered | ✅ | `kubernetes/infra/configs/network-policies/` |
 | **Phase 3** — mTLS on `:9090` | ⏳ deferred | services use `insecure` creds; needs `grpcx` TLS + cert-manager |
 | Verified end-to-end on Docker Compose (login, `/me`, product reviews, checkout → notification) | ✅ | `homelab/local-stack` |
@@ -242,24 +242,27 @@ complementary layers, each answering a different question:
 
 ## 6. GitOps / infrastructure impact
 
-Implemented. Headless `{svc}-grpc` Services live in
-`kubernetes/infra/configs/grpc-services/` (reconciled by the `grpc-services-local`
-Flux Kustomization); the gRPC dial addresses are wired per-service through the
-domain ResourceSets (`kubernetes/apps/domains/*-rs.yaml`) + InputProviders. The
-mop-chart still renders the single HTTP `:8080` Service — the headless `:9090`
-Services are standalone manifests that select the same pods.
+Implemented, chart-native. The headless `{svc}-grpc` Service (`clusterIP: None`,
+`:9090`) is rendered by the **mop chart** ([`duynhlab/helm-charts`](https://github.com/duynhlab/helm-charts/blob/main/charts/mop/templates/service-grpc.yaml),
+`>=0.8.0`) whenever `grpc.enabled=true`; the gRPC dial addresses are wired
+per-service through the domain ResourceSets (`kubernetes/apps/domains/*-rs.yaml`)
++ InputProviders. There are no standalone gRPC Service manifests — the earlier
+`kubernetes/infra/configs/grpc-services/` stopgap was retired once the chart
+gained native support.
 
-- **Shared ResourceSet template** (`kubernetes/apps/domains/*-rs.yaml`): add a
-  second container port and a second Service port with `portName: grpc` on
-  `:9090`, **input-gated** exactly like the existing `<<- if (index inputs
-  "review_url") >>` pattern — so only services that opt in get the gRPC port.
-- **Headless Service option** for gRPC *callees* (`clusterIP: None`) to enable
-  client-side `round_robin` (§3). Also gated; HTTP callees are untouched.
+- **Chart values, input-gated** (`kubernetes/apps/domains/*-rs.yaml`): a
+  `grpc: { enabled: true, port: 9090 }` block guarded by `<<- if (index inputs
+  "grpc_server") >>`, so only the gRPC-server services render the headless
+  Service and the second container port. Callees opt in via `grpc_server: true`
+  on their InputProvider (`kubernetes/apps/services/{auth,shipping,review,notification}.yaml`).
+- **Headless Service** for gRPC *callees* (`clusterIP: None`) enables
+  client-side `round_robin` (§3). HTTP callees (`grpc.enabled` unset) are untouched.
 - **Env convention:** `*_GRPC_ADDR`, e.g.
   `AUTH_GRPC_ADDR=dns:///auth-grpc.auth.svc.cluster.local:9090`. The `dns:///`
   scheme is what activates the gRPC name resolver for `round_robin`.
-- **Probes unchanged in the pilot** — HTTP `/health` + `/ready` stay until a
-  service is gRPC-primary.
+- **Probes stay HTTP** — `/health` + `/ready` on `:8080`. The gRPC server shares
+  the pod process, so the HTTP probes already reflect gRPC health; the chart adds
+  no grpcurl probe.
 - **No Kong change.** Kong never sees gRPC; the gateway stays HTTP/JSON.
 - **OTLP env switch** (`OTEL_COLLECTOR_ENDPOINT` `:4318` → `:4317`) is **optional**
   and decoupled from this work.

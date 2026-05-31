@@ -1,10 +1,10 @@
 # Microservices Catalog
 
 > **Status:** Living reference · **Last updated:** 2026-05-30
-> **Purpose:** A single place to understand the **currently deployed microservices** — what each one does, what's implemented, what's still mock/in-flight, how they talk to each other, and which call paths are the inputs for the **gRPC east-west migration (Phase 1)**.
-> **Related:** [`api.md`](api.md) (per-endpoint contracts), [`api-naming-convention.md`](api-naming-convention.md) (URL shape), [`grpc-internal-comms.md`](grpc-internal-comms.md) (gRPC roadmap), [`../../local-stack/`](../../local-stack/) (local run).
+> **Purpose:** A single place to understand the **currently deployed microservices** — what each one does, what's implemented, what's still mock/in-flight, and how they talk to each other. All east-west calls now run over **gRPC** (see [`grpc-internal-comms.md`](grpc-internal-comms.md)).
+> **Related:** [`api.md`](api.md) (per-endpoint contracts), [`api-naming-convention.md`](api-naming-convention.md) (URL shape), [`grpc-internal-comms.md`](grpc-internal-comms.md) (gRPC east-west), [`../../local-stack/`](../../local-stack/) (local run).
 
-This document is the **understanding-the-system** prerequisite for implementing gRPC Phase 1. It does **not** restate every endpoint (see `api.md`); it focuses on per-service responsibility, data ownership, inter-service dependencies, current gaps, and gRPC candidacy.
+This document is the **understanding-the-system** reference. It does **not** restate every endpoint (see `api.md`); it focuses on per-service responsibility, data ownership, and inter-service dependencies. The per-service "gRPC candidacy" notes below are historical rationale — the east-west migration is now complete.
 
 ---
 
@@ -126,16 +126,20 @@ Each entry: **what it owns**, **what's implemented**, **what's mock/in-flight**,
 
 ---
 
-## 4. Inter-service communication map (the gRPC input)
+## 4. Inter-service communication map
 
-Every east-west hop today is **HTTP/JSON over Kubernetes Service DNS** (`http://{svc}.{ns}.svc.cluster.local:8080`, or `http://{svc}:8080` locally). These are exactly the edges a gRPC migration would convert.
+The east-west migration is **complete** — every service-to-service call below runs
+over **gRPC** (`:9090`, gRPC-only) via the shared `pkg/grpcx` + `pkg/authmw`. See
+[`grpc-internal-comms.md`](grpc-internal-comms.md). The browser/Kong edge and the
+order→cart cart-read stay HTTP/JSON.
 
-| Caller | Callee | Path | Audience | Failure mode today |
-|--------|--------|------|----------|--------------------|
-| every service | auth | `GET /auth/v1/private/me` | private (forwards user JWT) | hard 401 |
-| product | review | `GET /review/v1/public/reviews?product_id=…` | public | soft-fail → `[]` |
-| order | shipping | `GET /shipping/v1/internal/orders/:orderId` | internal | soft-fail → `null` shipment |
-| order | cart | `DELETE /cart/v1/private/cart` | private (forwards user JWT) | best-effort (detached ctx) |
+| Caller | Callee | Call | Transport | Failure mode |
+|--------|--------|------|-----------|--------------|
+| every service | auth | `AuthService.GetMe` (token in metadata) | **gRPC** | hard 401 (fail-closed) |
+| product | review | `ReviewService.GetProductReviews` | **gRPC** | soft-fail → `[]` |
+| order | shipping | `ShippingService.GetShipmentByOrder` | **gRPC** | soft-fail → `null` shipment |
+| order | notification | `NotificationService.SendEmail` (order-created) | **gRPC** | best-effort (detached ctx) |
+| order | cart | `GET /cart` (server-side pricing) + `DELETE /cart` | REST | best-effort clear |
 
 ```mermaid
 flowchart LR

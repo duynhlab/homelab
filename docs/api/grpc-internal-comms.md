@@ -2,37 +2,40 @@
 
 | Attribute | Value |
 |-----------|--------|
-| **Version** | **v0.1.0** |
-| **Status** | **Partially implemented** — Phase 0–1 shipped (`order → shipping` pilot live, REST fallback); Phase 2–3 planned. See [§7 roadmap](#7-phased-roadmap). |
+| **Version** | **v1.0.0** |
+| **Status** | **Implemented** — every east-west hop runs over gRPC (gRPC-only, no feature flag); cluster wired via headless Services; Phase 3 NetworkPolicy fences `:9090`, mTLS deferred. See [§7 roadmap](#7-phased-roadmap). |
 | **Scope** | Internal (east-west) service-to-service calls only |
 | **Relation** | Complements [`api-naming-convention.md`](api-naming-convention.md) (HTTP/JSON URL surface stays the law of the land) |
 | **Last updated** | 2026-05-31 |
 
-## Implementation status (2026-05-31)
+## Implementation status
 
-Phases 0 and 1 are **implemented** (pilot path: `order → shipping`). The remaining
-work is cluster port exposure.
+The migration is **complete**: every internal service-to-service call runs over
+gRPC, the servers are always-on (no feature flag), and there is no REST fallback.
 
-| Item | Status | Where |
-|------|--------|-------|
-| Phase 0 — `pkg` proto + stubs + `grpcx` helpers (otel, health, reflection, `round_robin`); `buf` lint/breaking in CI | ✅ implemented | `duynhlab/pkg` PR #3 |
-| Phase 1 — `shipping` serves `ShippingService.GetShipmentByOrder` on dual gRPC `:9090` behind `GRPC_ENABLED` | ✅ implemented | `shipping-service` PR #63 |
-| Phase 1 — `order` calls shipping via gRPC behind `SHIPPING_GRPC_ADDR`, REST fallback | ✅ implemented | `order-service` PR #61 |
-| Verified on Docker Compose — gRPC and REST responses **byte-identical**; one-env-var rollback | ✅ verified | `homelab/local-stack` |
-| Env wiring (`GRPC_ENABLED`/`GRPC_PORT`, `SHIPPING_GRPC_ADDR`) **input-gated** in compose + GitOps templates | ✅ implemented | `local-stack/compose.yaml`, `kubernetes/apps/domains/*-rs.yaml` |
-| Cluster gRPC **port exposure** (2nd Service port / headless Service for `round_robin`) | ⏳ pending | depends on `mop-chart` rendering a second port |
+| Hop / item | Status | Where |
+|------------|--------|-------|
+| **Phase 0** — `pkg/grpcx` (otel, health, reflection, `round_robin`, default RPC deadline, auth-metadata helpers) + `auth`/`shipping`/`review`/`notification` protos with committed stubs; `buf` lint/breaking in CI | ✅ | `duynhlab/pkg` (v0.2.0) |
+| **Phase 1** — `order → shipping` | ✅ gRPC-only | shipping + order |
+| **Phase 2** — `/me` validation: all 5 consumers (user/cart/order/review/notification) validate via `auth.GetMe` over gRPC through the shared fail-closed `pkg/authmw` | ✅ gRPC-only | `pkg/authmw` + 5 services |
+| **Phase 2** — `product → review` aggregation | ✅ gRPC-only | review + product |
+| **Phase 2** — `order → notification` publish on checkout (best-effort) | ✅ | notification + order |
+| **Cluster** — headless `{auth,shipping,review,notification}-grpc` Services (`:9090`) + ResourceSet `*_GRPC_ADDR` env | ✅ | `kubernetes/infra/configs/grpc-services/`, `kubernetes/apps/domains/*-rs.yaml` |
+| **Phase 3** — NetworkPolicy fences `:9090`; gRPC health service registered | ✅ | `kubernetes/infra/configs/network-policies/` |
+| **Phase 3** — mTLS on `:9090` | ⏳ deferred | services use `insecure` creds; needs `grpcx` TLS + cert-manager |
+| Verified end-to-end on Docker Compose (login, `/me`, product reviews, checkout → notification) | ✅ | `homelab/local-stack` |
 
-**Env-var convention (now wired, default-off):**
+**gRPC is the official east-west transport** — servers run unconditionally on
+`GRPC_PORT` (default `9090`); there is no `GRPC_ENABLED` flag and no REST fallback.
+Consumers dial the headless Services:
 
-| Var | Role | Set on (InputProvider) | Example value |
-|-----|------|------------------------|---------------|
-| `GRPC_ENABLED` | start the gRPC server | callee (e.g. `grpc_enabled: true`) | `"true"` |
-| `GRPC_PORT` | gRPC listen port | callee (`grpc_port`) | `"9090"` |
-| `SHIPPING_GRPC_ADDR` | dial target for order→shipping | caller (`shipping_grpc_addr`) | `dns:///shipping-grpc.shipping.svc.cluster.local:9090` |
-
-Until the callee's Service exposes `:9090`, the cluster keeps using the REST path
-(set no inputs → gRPC env is not rendered). The Compose pilot exercises the full
-gRPC path today.
+| Var | Role | Default |
+|-----|------|---------|
+| `GRPC_PORT` | gRPC listen port (all services) | `9090` |
+| `AUTH_GRPC_ADDR` | every service → auth `/me` | `dns:///auth-grpc.auth.svc.cluster.local:9090` |
+| `REVIEW_GRPC_ADDR` | product → review | `dns:///review-grpc.review.svc.cluster.local:9090` |
+| `SHIPPING_GRPC_ADDR` | order → shipping | `dns:///shipping-grpc.shipping.svc.cluster.local:9090` |
+| `NOTIFICATION_GRPC_ADDR` | order → notification | `dns:///notification-grpc.notification.svc.cluster.local:9090` |
 
 ## TL;DR
 
@@ -45,8 +48,9 @@ gRPC path today.
 - Solve the Kubernetes HTTP/2 load-balancing pitfall with a **headless Service +
   client-side `round_robin`** first. **Defer** a service mesh — it is
   disproportionate for a pilot and we run no mesh today.
-- Roll out **phased and pilot-first**, each phase gated on trace continuity and no
-  SLO regression, with **one-step env-flag rollback** to the REST path.
+- Rolled out **phased and pilot-first**, each phase gated on trace continuity and
+  no SLO regression. The cutover is now complete and **gRPC-only** — rollback is by
+  reverting the relevant PR (the REST fallback has been removed).
 
 ---
 
@@ -80,15 +84,15 @@ calls, not a religion.
 
 ### Candidate paths
 
-| Caller → callee | Decision | Phase |
-|-----------------|----------|-------|
-| every service → auth `/auth/v1/private/me` | gRPC | Phase 2 |
-| product → review (aggregation) | gRPC | Phase 2 |
-| order → shipping (internal order lookup) | **gRPC PILOT** | Phase 1 |
-| order → cart (forwards user JWT) | gRPC later | Phase 2+ |
-| order/shipping → notification (`notify/email`, `notify/sms`) | gRPC — **design proto + wire first caller** | Phase 2 |
+| Caller → callee | Decision | Status |
+|-----------------|----------|--------|
+| every service → auth `/auth/v1/private/me` | gRPC | ✅ gRPC-only (via `pkg/authmw`) |
+| product → review (aggregation) | gRPC | ✅ gRPC-only |
+| order → shipping (internal order lookup) | gRPC | ✅ gRPC-only |
+| order → notification (publish on checkout) | gRPC | ✅ best-effort |
+| order → cart (forwards user JWT) | REST today | not migrated (cart read on checkout still REST) |
 | any browser / SPA → Kong | **STAY REST** | — (hard rule) |
-| auth → user (registration) | not implemented — **design proto only** | Phase 0 |
+| auth → user (registration) | not implemented | proto-only candidate |
 
 > **Rule:** *If a browser can reach it, it stays REST.* gRPC is internal-only.
 > NetworkPolicy is the fence, not the absence of an Ingress rule.
@@ -184,7 +188,9 @@ The Phase 1 pilot callee, **shipping, runs 1 replica**, so the pinning gotcha is
 plumbing (codegen, interceptors, deadlines, tracing) before tackling LB.
 
 The Phase 2 callees — **auth, product, cart, order — run 2 replicas**, so the
-headless + `round_robin` fix **must be in place and verified before Phase 2 ships**.
+headless + `round_robin` fix is **in place**: standalone headless `{svc}-grpc`
+Services (`clusterIP: None`, `:9090`) front every gRPC callee, and clients dial
+them via `dns:///…-grpc.<ns>.svc.cluster.local:9090`.
 
 ---
 
@@ -236,7 +242,12 @@ complementary layers, each answering a different question:
 
 ## 6. GitOps / infrastructure impact
 
-Described here, not implemented. No manifests in this doc.
+Implemented. Headless `{svc}-grpc` Services live in
+`kubernetes/infra/configs/grpc-services/` (reconciled by the `grpc-services-local`
+Flux Kustomization); the gRPC dial addresses are wired per-service through the
+domain ResourceSets (`kubernetes/apps/domains/*-rs.yaml`) + InputProviders. The
+mop-chart still renders the single HTTP `:8080` Service — the headless `:9090`
+Services are standalone manifests that select the same pods.
 
 - **Shared ResourceSet template** (`kubernetes/apps/domains/*-rs.yaml`): add a
   second container port and a second Service port with `portName: grpc` on
@@ -259,31 +270,30 @@ Described here, not implemented. No manifests in this doc.
 
 Each phase has explicit success criteria and a one-step rollback.
 
-**Status:** Phase 0 and Phase 1 are **implemented** — the `order → shipping` hop
-runs over gRPC and is verified in the local stack (`order` dials
-`dns:///shipping:9090`; `shipping` serves gRPC on `:9090` with REST fallback via
-feature flag). GitOps env wiring is input-gated and rolling out. Phase 2–3 are
-**planned**.
+**Status:** Phases 0–2 are **implemented** and the cluster is wired — every
+east-west hop runs over gRPC (gRPC-only, servers always-on), reachable via
+headless `{svc}-grpc` Services. Phase 3 is partial: NetworkPolicy fences `:9090`
+and the gRPC health service is registered; **mTLS is deferred** (services use
+`insecure` credentials until it is wired into `grpcx` + cert-manager).
 
 ```mermaid
 flowchart LR
     P0["<b>Phase 0</b><br/>Scaffolding<br/>buf · proto · pkg helpers"]:::done
-    P1["<b>Phase 1</b><br/>Pilot: order → shipping<br/>(flagged, REST fallback)"]:::done
-    P2["<b>Phase 2</b><br/>auth /me · product → review<br/>notification publish"]:::next
-    P3["<b>Phase 3</b><br/>Harden: mTLS · NetworkPolicy<br/>gRPC health probes"]:::future
+    P1["<b>Phase 1</b><br/>order → shipping"]:::done
+    P2["<b>Phase 2</b><br/>/me · product → review<br/>notification publish"]:::done
+    P3["<b>Phase 3</b><br/>NetworkPolicy :9090 ✅ · health ✅<br/>mTLS deferred"]:::partial
     P0 --> P1 --> P2 --> P3
 
     classDef done fill:#1f7a33,stroke:#0d3d18,color:#fff
-    classDef next fill:#b36b00,stroke:#5c3600,color:#fff
-    classDef future fill:#4d4d4d,stroke:#1a1a1a,color:#fff
+    classDef partial fill:#b36b00,stroke:#5c3600,color:#fff
 ```
 
-> 🟢 implemented · 🟠 next · ⚫ planned
+> 🟢 implemented · 🟠 partial (mTLS deferred)
 
-### Per-hop transport by phase
+### Per-hop transport
 
-Which east-west hops move to gRPC, and when. **Solid green** = gRPC live today;
-**dashed** = planned gRPC; everything from Kong stays HTTP/JSON (hard rule).
+Every east-west hop is **gRPC-only** today (solid green, `:9090`); the browser/Kong
+edge and the order→cart cart-read stay HTTP/JSON.
 
 ```mermaid
 flowchart TD
@@ -295,31 +305,27 @@ flowchart TD
     K -->|HTTP :8080| REVIEW[review]
     K -->|HTTP :8080| NOTIF[notification]
 
-    %% Phase 1 — implemented
-    ORDER ==>|"gRPC :9090 — Phase 1 ✅"| SHIP[shipping]
+    %% All east-west hops are gRPC-only (:9090)
+    ORDER ==>|"gRPC /me"| AUTH
+    PRODUCT ==>|"gRPC /me"| AUTH
+    CART ==>|"gRPC /me"| AUTH
+    ORDER ==>|"gRPC shipment"| SHIP[shipping]
+    PRODUCT ==>|"gRPC reviews"| REVIEW
+    ORDER ==>|"gRPC publish"| NOTIF
 
-    %% Phase 2 — planned
-    ORDER -. "gRPC — Phase 2<br/>(/me)" .-> AUTH
-    PRODUCT -. "gRPC — Phase 2<br/>(/me)" .-> AUTH
-    CART -. "gRPC — Phase 2<br/>(/me)" .-> AUTH
-    PRODUCT -. "gRPC — Phase 2" .-> REVIEW
-    ORDER -. "gRPC — Phase 2<br/>publish on checkout" .-> NOTIF
+    %% Not migrated / candidate
+    ORDER -. "REST cart read" .-> CART
+    AUTH -. "proto-only candidate" .-> USER[user]
 
-    %% Phase 2+ / Phase 0 design-only
-    ORDER -. "gRPC — Phase 2+<br/>(forwards JWT)" .-> CART
-    AUTH -. "proto only — Phase 0<br/>(not wired)" .-> USER[user]
-
-    linkStyle 7 stroke:#1f7a33,stroke-width:3px
+    linkStyle 7,8,9,10,11,12 stroke:#1f7a33,stroke-width:3px
     classDef live fill:#e6f4ea,stroke:#1f7a33,color:#0d3d18
-    classDef plan fill:#fff,stroke:#888,color:#333,stroke-dasharray:4 3
-    class SHIP live
-    class AUTH,REVIEW,NOTIF,USER plan
+    class AUTH,SHIP,REVIEW,NOTIF live
 ```
 
-> Note: `every service → auth /me` is shown via the representative
-> `order`/`product`/`cart` callers; in Phase 2 **all** JWT-validating services use
-> the same gRPC hop. `notification`'s browser-facing routes (list/count/get/
-> mark-read) **stay REST** — only the internal `notify/*` publish path is gRPC.
+> `/me` is shown via representative `order`/`product`/`cart` callers; **all** five
+> JWT-validating services (incl. user, notification) use the same gRPC hop via the
+> shared `pkg/authmw`. `notification`'s browser-facing routes (list/count/get/
+> mark-read) **stay REST** — only the internal publish path is gRPC.
 
 ### Phase 0 — Scaffolding (no runtime change)
 
@@ -333,7 +339,7 @@ flowchart TD
 - **Success:** CI green; stubs import cleanly into a service; no deployment change.
 - **Rollback:** delete the proto package; nothing runtime depends on it yet.
 
-### Phase 1 — Pilot: order → shipping ✅ implemented (app code + Compose; cluster port pending)
+### Phase 1 — order → shipping ✅ implemented (gRPC-only; cluster wired)
 
 - Add gRPC `:9090` to `shipping` (dual-port) behind a **feature flag**; `order`
   calls gRPC when the flag is on, **falls back to REST** when off.
@@ -343,7 +349,7 @@ flowchart TD
   across `order → shipping`; **no RED/SLO regression**.
 - **Rollback:** flip the env flag off → `order` resumes the REST call. One step.
 
-### Phase 2 — auth /me, product → review, and notification publish
+### Phase 2 — auth /me, product → review, and notification publish ✅ implemented (gRPC-only)
 
 - **Verify headless + `round_robin` spreads RPCs across both replicas first**
   (auth/product/cart/order are 2-replica — §3 must be solved here).
@@ -360,7 +366,7 @@ flowchart TD
   recipient after checkout.
 - **Rollback:** per-path env flag back to REST.
 
-### Phase 3 — Standardize & harden
+### Phase 3 — Standardize & harden 🟠 partial (NetworkPolicy `:9090` ✅; mTLS deferred)
 
 - Standardize headless-Service LB across all gRPC callees.
 - Switch Kubernetes probes to **gRPC health probes** on gRPC-primary services.

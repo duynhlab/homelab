@@ -3,10 +3,10 @@
 | Attribute | Value |
 |-----------|-------|
 | **Status** | **Implemented (authored-ready)** — manifests reconciled by Flux; **inert on kindnet** until an enforcing CNI is installed |
-| **Scope** | Ingress fencing between app-tier namespaces (`:8080` HTTP) |
+| **Scope** | Ingress fencing between app-tier namespaces — HTTP `:8080` and gRPC `:9090` |
 | **Purpose** | Make the cluster the fence for `internal` audiences — internal routes are reachable only from explicitly allowed namespaces, not merely "absent from the Ingress" |
 | **Last updated** | 2026-05-31 |
-| **Related** | [`policy-catalog.md`](policy-catalog.md) (Kyverno catalog), [`../api/api-naming-convention.md`](../api/api-naming-convention.md) (audiences), [`../api/grpc-internal-comms.md`](../api/grpc-internal-comms.md) (gRPC `:9090`, Phase 3 adds NetworkPolicy for it) |
+| **Related** | [`policy-catalog.md`](policy-catalog.md) (Kyverno catalog), [`../api/api-naming-convention.md`](../api/api-naming-convention.md) (audiences), [`../api/grpc-internal-comms.md`](../api/grpc-internal-comms.md) (gRPC `:9090`, now fenced) |
 
 ## TL;DR
 
@@ -19,8 +19,9 @@
 - **kindnet does not enforce NetworkPolicy.** The manifests are authored ready and
   become effective the moment an enforcing CNI (Cilium / Calico) replaces kindnet.
   Treat them as the *declared* boundary, not an *active* one on the local Kind cluster.
-- Policies currently fence **HTTP `:8080` only**. The gRPC `:9090` port is **not**
-  covered yet — that is [gRPC roadmap Phase 3](../api/grpc-internal-comms.md#7-phased-roadmap).
+- Policies fence both **HTTP `:8080`** and **gRPC `:9090`**. The gRPC callees
+  (`auth`, `shipping`, `review`, `notification`) allow `:9090` from their gRPC
+  callers in the same `allow-internal-callers` rule.
 
 ---
 
@@ -53,7 +54,9 @@ is fenced by default even before its explicit allow policy lands.
 
 ## 2. Caller matrix
 
-Allowed **ingress** callers per callee (all on TCP `:8080`). `kong` is always
+Allowed **ingress** callers per callee (TCP `:8080`; the gRPC callees `auth`,
+`shipping`, `review`, `notification` also allow `:9090` from their gRPC callers).
+`kong` is always
 allowed (north-south gateway traffic); the rest mirror the east-west call graph.
 
 | Callee | Allowed callers | Why |
@@ -147,9 +150,10 @@ flowchart LR
   The manifests are validated and reconciled but have **no runtime effect** until an
   enforcing CNI is installed. This is intentional — the boundary is declared and
   GitOps-managed so it activates without a code change.
-- **HTTP `:8080` only.** gRPC `:9090` (the [east-west gRPC migration](../api/grpc-internal-comms.md))
-  is not in the `allow-internal-callers` port list. When a service goes gRPC-primary,
-  its policy must add `:9090` — tracked as **Phase 3** of the gRPC roadmap.
+- **HTTP `:8080` + gRPC `:9090`.** The gRPC callees (`auth`, `shipping`, `review`,
+  `notification`) fence `:9090` alongside `:8080`. mTLS on the gRPC port is the
+  remaining Phase-3 item — deferred until it is wired app-side (the services use
+  plaintext `insecure` credentials today); cert-manager config lands with that.
 - **Ingress only.** No egress policies today; egress fencing is out of scope for now.
 - **No DNS/observability carve-outs yet.** An enforcing CNI rollout will also need
   allows for kube-dns and the metrics/scrape path (VMAgent) — to be added with the CNI.

@@ -94,6 +94,10 @@ docs/
 │   ├── production-plan.md        # OpenBAO production migration plan (EKS/GKE)
 │   ├── backlog.md                # P1/P2 backlog
 │   └── vault.md                  # Vault configuration details (archived)
+└── security/                     # Admission control & network segmentation
+    ├── policy-catalog.md         # Kyverno ClusterPolicy catalog (tiers, modes, NetworkPolicy generate)
+    ├── policy-exceptions.md      # PolicyException register (owner + TTL)
+    └── network-policies.md       # East-west NetworkPolicy caller matrix + topology diagram
 ```
 
 ---

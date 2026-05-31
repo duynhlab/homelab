@@ -17,4 +17,3 @@ spec:
     db_secret: "notification.notification.supporting-shared-db.credentials.postgresql.acid.zalan.do"
     pool_max: "10"
     db_user: "notification.notification"
-    auth_url: "http://auth.auth.svc.cluster.local:8080"

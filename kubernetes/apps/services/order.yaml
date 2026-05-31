@@ -19,3 +19,6 @@ spec:
     db_secret: "cnpg-db-order-secret"
     db_sslmode: "disable"
     pool_max: "30"
+    # order calls shipping + publishes notifications over gRPC (headless :9090).
+    shipping_grpc_addr: "dns:///shipping-grpc.shipping.svc.cluster.local:9090"
+    notification_grpc_addr: "dns:///notification-grpc.notification.svc.cluster.local:9090"

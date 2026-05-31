@@ -100,23 +100,22 @@ spec:
           - name: CACHE_PORT
             value: "6379"
           <<- end >>
-          <<- if (index inputs "review_url") >>
-          - name: REVIEW_SERVICE_URL
-            value: << inputs.review_url >>
-          <<- end >>
-          <<- if (index inputs "auth_url") >>
-          - name: AUTH_SERVICE_URL
-            value: << inputs.auth_url >>
-          <<- end >>
-          <<- if (index inputs "grpc_enabled") >>
-          - name: GRPC_ENABLED
-            value: "true"
-          - name: GRPC_PORT
-            value: << index inputs "grpc_port" | default "9090" | quote >>
+          # Every backend service validates tokens at auth over gRPC (the /me hop).
+          # gRPC servers run unconditionally; consumers dial the headless :9090
+          # Services. AUTH_GRPC_ADDR defaults to the headless auth Service.
+          - name: AUTH_GRPC_ADDR
+            value: << index inputs "auth_grpc_addr" | default "dns:///auth-grpc.auth.svc.cluster.local:9090" >>
+          <<- if (index inputs "review_grpc_addr") >>
+          - name: REVIEW_GRPC_ADDR
+            value: << inputs.review_grpc_addr >>
           <<- end >>
           <<- if (index inputs "shipping_grpc_addr") >>
           - name: SHIPPING_GRPC_ADDR
             value: << inputs.shipping_grpc_addr >>
+          <<- end >>
+          <<- if (index inputs "notification_grpc_addr") >>
+          - name: NOTIFICATION_GRPC_ADDR
+            value: << inputs.notification_grpc_addr >>
           <<- end >>
         resources:
           requests:

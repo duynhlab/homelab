@@ -128,7 +128,9 @@ services:
 
   shipping:
     build: { context: ../../shipping-service }
-    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping }
+    # GRPC_ENABLED turns on the internal gRPC server on :9090 (Phase 1 pilot);
+    # HTTP :8080 is unchanged. order reaches it at dns:///shipping:9090.
+    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping, GRPC_ENABLED: "true", GRPC_PORT: "9090" }
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -186,6 +188,8 @@ services:
       AUTH_SERVICE_URL: http://auth:8080
       CART_SERVICE_URL: http://cart:8080
       SHIPPING_SERVICE_URL: http://shipping:8080
+      # When set, order calls shipping over gRPC (Phase 1 pilot); unset = REST fallback.
+      SHIPPING_GRPC_ADDR: dns:///shipping:9090
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }

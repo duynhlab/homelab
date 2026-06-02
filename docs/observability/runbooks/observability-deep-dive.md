@@ -190,8 +190,7 @@ flowchart TD
     end
 
     subgraph logs ["Pillar 3: Logs"]
-        Vector["Vector\n(DaemonSet)"] --> Loki["Loki v3.6.2"]
-        Vector --> VLSingle["VLSingle\n(:9428)"]
+        Vector["Vector\n(DaemonSet)"] --> VLSingle["VLSingle\n(:9428)"]
     end
 
     subgraph profiles ["Pillar 4: Profiles"]
@@ -206,7 +205,7 @@ flowchart TD
 
     VMSingle --> Grafana["Grafana\n(:3000)"]
     Tempo --> Grafana
-    Loki --> Grafana
+    VLSingle --> Grafana
     Pyroscope --> Grafana
     Jaeger --> JaegerUI["Jaeger UI\n(:16686)"]
 ```
@@ -215,7 +214,7 @@ flowchart TD
 |--------|------|----------|---------------------|
 | **Metrics** | VMSingle + VMAgent | Prometheus scrape (pull) | "Is something wrong?" (RED/USE signals) |
 | **Traces** | Tempo + Jaeger via OTel Collector | OTLP HTTP (push) | "Where is it slow?" (cross-service latency) |
-| **Logs** | Loki + VictoriaLogs via Vector | JSON over stdout (push) | "Why is it broken?" (error details, context) |
+| **Logs** | VictoriaLogs via Vector | JSON over stdout (push) | "Why is it broken?" (error details, context) |
 | **Profiles** | Pyroscope | pprof push | "Which code line is the bottleneck?" (CPU/memory flamegraphs) |
 
 ### Why 4 Pillars, Not Just Metrics
@@ -291,7 +290,7 @@ sequenceDiagram
 - Service name auto-detected from Kubernetes pod name
 
 **LoggingMiddleware** outputs:
-- Structured JSON to stdout (collected by Vector -> Loki/VictoriaLogs)
+- Structured JSON to stdout (collected by Vector -> VictoriaLogs)
 - Every log line includes: `trace_id`, `method`, `path`, `status`, `duration`, `client_ip`
 - ERROR-level for 4xx/5xx, INFO-level for successful requests
 
@@ -413,7 +412,7 @@ flowchart LR
     A["Alert fires\n(VMAlert)"] --> B["Metric spike\n(Grafana dashboard)"]
     B --> C["Click exemplar dot\n(traceID on histogram)"]
     C --> D["Trace in Tempo\n(see slow span)"]
-    D --> E["trace_id in Loki\n(see error logs)"]
+    D --> E["trace_id in VictoriaLogs\n(see error logs)"]
     E --> F["Flamegraph in Pyroscope\n(see CPU/memory hotspot)"]
 
     style A fill:#ff6b6b
@@ -433,7 +432,7 @@ sequenceDiagram
     participant Alert as VMAlert
     participant Dash as Grafana Dashboard
     participant Tempo as Tempo (Traces)
-    participant Loki as Loki (Logs)
+    participant VLogs as VictoriaLogs (Logs)
     participant Pyro as Pyroscope (Profiles)
 
     Alert->>Dash: AuthHighLatency fires (burn rate 6x)
@@ -445,10 +444,10 @@ sequenceDiagram
     Dash->>Tempo: Jump to trace (click exemplar link)
     Note over Tempo: Step 3: See trace waterfall<br/>auth (50ms) -> user (30ms) -> DB query (720ms!)<br/>Root cause: DB query took 720ms
 
-    Tempo->>Loki: Search by trace_id
-    Note over Loki: Step 4: Find correlated logs<br/>{trace_id="4bf92f..."}<br/>Log: "Slow query: SELECT * FROM users WHERE email LIKE '%@%'"<br/>Missing index on email column
+    Tempo->>VLogs: Search by trace_id
+    Note over VLogs: Step 4: Find correlated logs<br/>trace_id:"4bf92f..."<br/>Log: "Slow query: SELECT * FROM users WHERE email LIKE '%@%'"<br/>Missing index on email column
 
-    Loki->>Pyro: Check auth service CPU profile (same time range)
+    VLogs->>Pyro: Check auth service CPU profile (same time range)
     Note over Pyro: Step 5: Flamegraph shows<br/>60% CPU in database/sql.(*DB).Query<br/>Confirms DB is the bottleneck
 
     Note over Alert,Pyro: Resolution: Add index on users.email<br/>P95 drops from 800ms -> 150ms<br/>Burn rate returns to normal
@@ -459,10 +458,10 @@ sequenceDiagram
 | From | To | How |
 |------|-----|-----|
 | **Metrics -> Traces** | Exemplars | Click exemplar dot on histogram panel -> jump to Tempo trace |
-| **Traces -> Logs** | trace_id | Copy `trace_id` from span -> search in Loki: `{trace_id="..."}` |
+| **Traces -> Logs** | trace_id | Copy `trace_id` from span -> search in VictoriaLogs: `trace_id:"..."` |
 | **Logs -> Traces** | trace_id | Click `trace_id` in log entry -> "Query with Tempo" |
 | **Traces -> Profiles** | Service name + time range | Filter Pyroscope by same service and time window |
-| **Metrics -> Logs** | Time range + service | Same `app` label in metrics, same `service` label in Loki |
+| **Metrics -> Logs** | Time range + service | Same `app` label in metrics, same `service` field in VictoriaLogs |
 
 ### Exemplar Configuration
 
@@ -492,7 +491,7 @@ Use this framework for every interview question about observability. The **Befor
 
 **Before**: We had 8 Go microservices with no centralized monitoring. Each team checked logs by SSH-ing into pods and running `kubectl logs`. No alerting -- users reported issues before the team knew. No way to trace a request across services. MTTR was measured in hours because investigation was manual.
 
-**What you did**: Built a 4-pillar observability stack: metrics (VictoriaMetrics), traces (Tempo + Jaeger), logs (Loki via Vector), and continuous profiling (Pyroscope). Standardized a 3-middleware chain in all services so every request automatically emits metrics, traces, and structured logs with correlation.
+**What you did**: Built a 4-pillar observability stack: metrics (VictoriaMetrics), traces (Tempo + Jaeger), logs (VictoriaLogs via Vector), and continuous profiling (Pyroscope). Standardized a 3-middleware chain in all services so every request automatically emits metrics, traces, and structured logs with correlation.
 
 **How**:
 - Single `request_duration_seconds` histogram covers all RED signals (Rate, Errors, Duration)
@@ -536,7 +535,7 @@ Use this framework for every interview question about observability. The **Befor
 2. **Dashboard**: Open Grafana -> P95 panel shows spike at 14:30. Turn on Exemplars toggle
 3. **Exemplar**: Click the exemplar dot at the spike -> get `traceID: 4bf92f3577b34da6...`
 4. **Trace**: Jump to Tempo. See waterfall: auth (50ms) -> user (30ms) -> DB query (720ms). The DB span is the bottleneck
-5. **Logs**: Search Loki with `{trace_id="4bf92f3577b34da6"}`. Find: "Slow query: SELECT * FROM users WHERE..."
+5. **Logs**: Search VictoriaLogs with `trace_id:"4bf92f3577b34da6"`. Find: "Slow query: SELECT * FROM users WHERE..."
 6. **Profile**: Check Pyroscope flamegraph for auth service at 14:30. Confirms 60% CPU in `database/sql.Query`
 7. **Fix**: Add index on the problematic column. P95 drops from 800ms to 150ms. Burn rate returns to normal
 
@@ -571,7 +570,7 @@ Use this framework for every interview question about observability. The **Befor
 **How**:
 - **trace_id generation**: TracingMiddleware creates a root span with a unique `trace_id` for every request (W3C Trace Context standard)
 - **Metrics -> Traces**: Exemplars attach `traceID` label to histogram observations. Clicking an exemplar dot in Grafana jumps directly to the trace in Tempo
-- **Traces -> Logs**: LoggingMiddleware extracts `trace_id` from the span context and includes it in every JSON log line. Copy `trace_id` from a trace -> search in Loki
+- **Traces -> Logs**: LoggingMiddleware extracts `trace_id` from the span context and includes it in every JSON log line. Copy `trace_id` from a trace -> search in VictoriaLogs
 - **Logs -> Traces**: Grafana's "Query with Tempo" button on log entries with `trace_id`
 - **Traces -> Profiles**: Filter Pyroscope by service name and time range matching the trace
 - **Middleware order is critical**: Tracing first (creates context), Logging second (uses context), Prometheus third (uses context for exemplars)
@@ -757,7 +756,7 @@ When an alert fires, follow this checklist:
 - [ ] **2. Dashboard**: Open Grafana dashboard, filter by service. Check P95, error rate, RPS panels
 - [ ] **3. Exemplar**: Enable Exemplars on the relevant metric panel. Click the dot at the spike
 - [ ] **4. Trace**: In Tempo, read the trace waterfall. Find the slowest/failing span
-- [ ] **5. Logs**: Search Loki by `trace_id`. Read error messages and stack traces
+- [ ] **5. Logs**: Search VictoriaLogs by `trace_id`. Read error messages and stack traces
 - [ ] **6. Profile**: If the trace points to a code bottleneck, check Pyroscope flamegraph for the service
 - [ ] **7. Resolve**: Apply fix. Verify: dashboard shows recovery, SLO burn rate returns to normal
 - [ ] **8. Document**: Record the incident -- root cause, fix applied, prevention measures

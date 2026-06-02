@@ -7,7 +7,8 @@ Runbooks for investigating, troubleshooting, and resolving incidents in the obse
 | Runbook | Purpose | When to Use |
 |---------|---------|-------------|
 | [Observability Deep Dive](observability-deep-dive.md) | RED/USE/Golden Signals theory, 4-pillar stack architecture, middleware chain, correlation workflow, interview preparation | Learning, onboarding, interview prep |
-| [Microservices Alerts](microservices-alerts.md) | Per-alert investigation and resolution guide for all 18 application alerts | On-call, when an application alert fires |
+| [Infrastructure Alerts](infrastructure-alerts.md) | Per-alert investigation guide for infrastructure/platform alerts (nodes, control plane, Flux, cert-manager, VictoriaMetrics) | On-call, when an infrastructure alert fires |
+| [Microservices Alerts](microservices-alerts.md) | Per-alert investigation and resolution guide for all 17 application alerts | On-call, when an application alert fires |
 
 ## Runbook Structure
 

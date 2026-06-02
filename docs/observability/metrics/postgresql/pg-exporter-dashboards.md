@@ -53,7 +53,7 @@ This document analyzes the Grafana dashboards shipped in the Pigsty [pg_exporter
 | **Global Status** | Aliveness, Scrape Duration, Global Uptime, Global Error Rate, Instance table |
 | **Metrics** | Up Time, Exporter Aliveness, Scrape Duration, Errors Count Per Minute, Scrape Duration (per Server), Scrape Count Per Minute |
 | **Collectors** | Query Errors, Metrics Count, Query Duration, Query Cache Hit Rate, Cache TTL |
-| **PG Exporter Logs: ${ins}** | Logs per $__interval, Recent Logs (Loki) |
+| **PG Exporter Logs: ${ins}** | Logs per $__interval, Recent Logs (VictoriaLogs) |
 
 ### 2.4 Key PromQL Expressions
 
@@ -72,8 +72,8 @@ This document analyzes the Grafana dashboards shipped in the Pigsty [pg_exporter
 | Query Duration | `increase(pg_exporter_query_scrape_duration{ins="$ins"}[1m]) / increase(pg_exporter_query_scrape_total_count{ins="$ins"}[1m])` |
 | Query Cache Hit Rate | `increase(pg_exporter_query_scrape_hit_count{ins="$ins"}[5m]) / increase(pg_exporter_query_scrape_total_count{ins="$ins"}[5m])` |
 | Cache TTL | `pg_exporter_query_cache_ttl{ins="$ins"}`, `pgbouncer_exporter_query_cache_ttl{ins="$ins"}` |
-| Logs per interval | Loki: `count_over_time(({ip="$ip", src="syslog"} |~ "pg_exporter")[$__interval])` |
-| Recent Logs | Loki: `{ip="$ip"} |~ "pg_exporter"` |
+| Logs per interval | VictoriaLogs (upstream is Loki LogQL; adapt to LogsQL): `count_over_time(({ip="$ip", src="syslog"} |~ "pg_exporter")[$__interval])` |
+| Recent Logs | VictoriaLogs (upstream is Loki LogQL; adapt to LogsQL): `{ip="$ip"} |~ "pg_exporter"` |
 
 ### 2.5 Expected Metrics (pgsql-exporter dashboard)
 
@@ -186,7 +186,7 @@ From the dashboards and pg_exporter design:
 - **Changes**:
   - Update variable queries: replace `ins`/`cls`/`ip` with `kubernetes_pod_name` or `cluster_name` as appropriate.
   - Remove or hide panels that depend on `patroni_up`, `pgbackrest_exporter_agent_up`, `node_uname_info` if not available.
-  - Replace Loki queries (`{ip="$ip"}`) with LogQL matching our logging setup (e.g., `{kubernetes_pod_name=~"$instance"}`) or remove the logs row.
+  - Replace the upstream Loki LogQL queries (`{ip="$ip"}`) with VictoriaLogs LogsQL matching our logging setup (e.g., `_stream:{kubernetes_pod_name=~"$instance"}`) or remove the logs row.
 - **Pilot use**: Good for monitoring scrape health, duration, and errors of the supporting-shared-db pg_exporter.
 
 ### 5.2 pgrds-instance Dashboard

@@ -4,33 +4,31 @@
 
 **Objectives:**
 - Implement structured JSON logging with trace-id correlation
-- Understand the dual-ship architecture: one Vector agent → two backends (Loki + VictoriaLogs)
-- Query logs with LogQL (Loki) and LogsQL (VictoriaLogs)
+- Understand the single-backend architecture: one Vector agent → VictoriaLogs
+- Query logs with LogsQL (VictoriaLogs)
 - Correlate logs with traces in Grafana
 
 **Learning Outcomes:**
 - Structured logging best practices with Zap
 - Trace-ID propagation and correlation
-- LogQL query syntax for Loki
 - LogsQL query syntax for VictoriaLogs
-- Vector log collection, transformation, and multi-sink routing
+- Vector log collection, transformation, and sink routing
 - Log-to-trace correlation patterns
 
 **Keywords:**
-Structured Logging, JSON Logs, Trace-ID, Log Correlation, LogQL, LogsQL, Log Aggregation, Vector, Loki, VictoriaLogs, Zap Logger, Log Levels, Log Queries
+Structured Logging, JSON Logs, Trace-ID, Log Correlation, LogsQL, Log Aggregation, Vector, VictoriaLogs, Zap Logger, Log Levels, Log Queries
 
 **Technologies:**
 - Zap (Go structured logger)
-- Vector (log collection agent — single DaemonSet, dual-ship)
-- Loki (log storage + LogQL querying — default Grafana datasource)
-- VictoriaLogs / VLSingle (log storage + LogsQL querying — PG plan streams)
+- Vector (log collection agent — single DaemonSet)
+- VictoriaLogs / VLSingle (log storage + LogsQL querying — sole log backend, PG plan streams)
 - Grafana (log visualization + trace correlation)
 
 > **See also:** [VictoriaLogs](victorialogs.md) for VLSingle configuration, Vector sink headers, PG plan streams, and LogsQL verification commands.
 
 ## Overview
 
-All services use **structured JSON logging** with **trace-id correlation**. A single **Vector** DaemonSet collects logs cluster-wide and ships them to **two backends** simultaneously: **Loki** (default, Grafana-integrated) and **VictoriaLogs** (LogsQL, PostgreSQL plan analysis).
+All services use **structured JSON logging** with **trace-id correlation**. A single **Vector** DaemonSet collects logs cluster-wide and ships them to **VictoriaLogs** (LogsQL, the sole log backend; also handles PostgreSQL plan analysis).
 
 ## Architecture
 
@@ -47,34 +45,28 @@ flowchart TD
         ParsePG["parse_pg_json pipeline\nauto_explain plans"]
     end
 
-    subgraph loki ["Backend 1: Loki"]
-        LokiStore["Loki :3100\nLogQL"]
-        GrafanaExplore["Grafana Explore\nlog-to-trace correlation"]
-    end
-
-    subgraph vlogs ["Backend 2: VictoriaLogs"]
+    subgraph vlogs ["Backend: VictoriaLogs"]
         VLAll["VLSingle :9428\nall logs (LogsQL)"]
         VLPlans["PG query plans stream"]
+        GrafanaExplore["Grafana Explore\nlog-to-trace correlation"]
     end
 
     Pods --> KLogs
     CNPG --> KLogs
     KLogs --> AddLabels
     KLogs --> ParsePG
-    AddLabels --> LokiStore
     AddLabels --> VLAll
     ParsePG --> VLPlans
-    LokiStore --> GrafanaExplore
+    VLAll --> GrafanaExplore
 ```
 
-### Why two backends?
+### Why VictoriaLogs?
 
 | Backend | Query Language | Best For |
 |---------|---------------|----------|
-| **Loki** | LogQL | Grafana Explore, log-to-trace correlation (Tempo), pattern detection, Logs Drilldown |
-| **VictoriaLogs** | LogsQL | High-performance search, PostgreSQL plan analysis, learning LogsQL API |
+| **VictoriaLogs** | LogsQL | Grafana Explore, log-to-trace correlation (Tempo), high-performance search, PostgreSQL plan analysis |
 
-Both receive the same logs from a single Vector. No duplicate collection agents.
+VictoriaLogs is the single log sink. No duplicate collection agents, no second backend to operate.
 
 ## Log Format
 
@@ -162,23 +154,13 @@ Vector collects logs from all pods and:
 1. Parses JSON logs
 2. Extracts trace-id
 3. Adds service name and namespace labels
-4. Ships to **Loki** (all application logs)
-5. Ships to **VictoriaLogs** (all logs + dedicated PG plan stream)
+4. Ships to **VictoriaLogs** (all logs + dedicated PG plan stream)
 
 For VictoriaLogs sink details (headers, stream fields, PG plan pipeline), see [VictoriaLogs](victorialogs.md).
 
-### Loki Storage
-
-Logs are stored in Loki with labels:
-- `service`: Service name
-- `namespace`: Kubernetes namespace
-- `pod`: Pod name
-- `container`: Container name
-- `trace_id`: Trace ID (for correlation)
-
 ### VictoriaLogs Storage
 
-Logs are also stored in VictoriaLogs (VLSingle `:9428`) with stream fields:
+Logs are stored in VictoriaLogs (VLSingle `:9428`) with stream fields:
 - `namespace`, `service`, `pod_name`, `container_name`
 - Dedicated streams for PostgreSQL query plans (`cluster_name`, `database`, `query_id`)
 
@@ -195,13 +177,13 @@ See [VictoriaLogs](victorialogs.md) for complete configuration and verification.
 
 2. Open Grafana: http://localhost:3000
 
-3. Navigate to **Explore** → Select **Loki** datasource
+3. Navigate to **Explore** → Select **VictoriaLogs** datasource
 
-4. Query logs:
+4. Query logs (LogsQL):
    ```
-   {service="auth"} |= "error"
-   {trace_id="abc123"}
-   {namespace="auth"} | json | level="error"
+   _stream:{service="auth"} error
+   trace_id:abc123
+   _stream:{namespace="auth"} level:error
    ```
 
 ### VictoriaLogs (LogsQL)
@@ -236,58 +218,9 @@ For more LogsQL examples and troubleshooting, see [VictoriaLogs](victorialogs.md
 
 ### Trace-to-Log Correlation
 
-1. Open logs in Grafana (Loki datasource)
+1. Open logs in Grafana (VictoriaLogs datasource)
 2. Click on a log entry with trace_id
 3. Click "Query with Tempo" to view the trace
-
-## Grafana Logs Drilldown
-
-**Available in**: Grafana 11.6+ (you have 12.1.4) with Loki v3.2+ (you have 3.6.2)
-
-Grafana Logs Drilldown uses **pattern ingestion** and **level detection** to automatically analyze log patterns and identify common structures in your logs.
-
-### Features
-
-1. **Pattern Detection**: Automatically identifies recurring log patterns
-2. **Level Detection**: Automatically detects log levels (INFO, WARN, ERROR, etc.)
-3. **Volume Queries**: Query log volumes for capacity planning
-
-### Usage
-
-1. Navigate to **Explore** in Grafana
-2. Select **Loki** datasource
-3. Use the **Patterns** tab (new in Grafana 11.6+)
-4. Loki will show detected patterns and frequencies
-
-### Example Queries
-
-**Pattern analysis**:
-```logql
-{service="auth"} | pattern "<timestamp> <level> <message>"
-```
-
-**Volume queries** (enabled by `volume_enabled: true`):
-```logql
-sum by (service) (count_over_time({namespace="auth"}[5m]))
-```
-
-**Level detection** (automatic with `discover_log_levels: true`):
-```logql
-{service="auth", detected_level="error"}
-```
-
-### Configuration
-
-Pattern ingestion and level detection are enabled via:
-
-**Loki config:**
-- `--pattern-ingester.enabled=true` - Enable pattern detection
-- `--validation.discover-log-levels=true` - Enable log level detection
-- `discover_log_levels: true` in `limits_config`
-
-**Vector config:**
-- JSON parsing in `add_labels` transform - Extracts `level` field from structured log messages
-- Automatically promotes `level` from nested JSON to top-level field for Loki detection
 
 ## Vector Monitoring
 
@@ -299,7 +232,7 @@ Key Vector metrics (query in Grafana against the VictoriaMetrics datasource):
 
 - **`vector_events_processed_total`** - Total events processed by each component
 - **`vector_component_errors_total`** - Total errors by component  
-- **`vector_component_sent_bytes_total`** - Bytes sent to sinks (e.g. Loki)
+- **`vector_component_sent_bytes_total`** - Bytes sent to sinks (e.g. VictoriaLogs)
 - **`vector_component_received_bytes_total`** - Bytes received from sources
 - **`vector_buffer_events`** - Events currently in buffer
 - **`vector_utilization`** - Component utilization (0.0-1.0)
@@ -321,9 +254,9 @@ rate(vector_events_processed_total[5m])
 rate(vector_component_errors_total[5m])
 ```
 
-**Loki sink throughput** (bytes/sec):
+**VictoriaLogs sink throughput** (bytes/sec):
 ```promql
-rate(vector_component_sent_bytes_total{component_name=~"loki|victorialogs.*"}[5m])
+rate(vector_component_sent_bytes_total{component_name=~"victorialogs.*"}[5m])
 ```
 
 **Buffer utilization**:
@@ -364,40 +297,42 @@ Vector self-monitoring is configured via:
 
 ## Log Queries
 
+All queries below use LogsQL (VictoriaLogs). See [VictoriaLogs](victorialogs.md) for more.
+
 ### By Service
 
 ```
-{service="auth"}
+_stream:{service="auth"}
 ```
 
 ### By Trace ID
 
 ```
-{trace_id="abc123def456"}
+trace_id:abc123def456
 ```
 
 ### By Log Level
 
 ```
-{service="auth"} | json | level="error"
+_stream:{service="auth"} level:error
 ```
 
 ### By Time Range
 
 ```
-{service="auth"} [5m]
+_stream:{service="auth"} _time:5m
 ```
 
 ### Text Search
 
 ```
-{service="auth"} |= "login"
+_stream:{service="auth"} login
 ```
 
 ### JSON Field Filtering
 
 ```
-{service="auth"} | json | status=500
+_stream:{service="auth"} status:500
 ```
 
 ## Best Practices
@@ -410,7 +345,7 @@ Vector self-monitoring is configured via:
 
 ## Troubleshooting
 
-### Logs not appearing in Loki or VictoriaLogs
+### Logs not appearing in VictoriaLogs
 
 1. Check Vector pods:
    ```bash
@@ -422,17 +357,12 @@ Vector self-monitoring is configured via:
    kubectl logs -n kube-system -l app=vector
    ```
 
-3. Check Loki status:
-   ```bash
-   kubectl get pods -n monitoring -l app=loki
-   ```
-
-4. Check VictoriaLogs status:
+3. Check VictoriaLogs status:
    ```bash
    kubectl get pods -n monitoring -l app=vlsingle
    ```
 
-5. Verify log format: Ensure logs are in JSON format
+4. Verify log format: Ensure logs are in JSON format
 
 ### Trace-ID missing in logs
 
@@ -443,7 +373,6 @@ Vector self-monitoring is configured via:
 ## References
 
 - [Zap Logger Documentation](https://github.com/uber-go/zap)
-- [Loki Query Documentation](https://grafana.com/docs/loki/latest/logql/)
 - [VictoriaLogs Documentation](https://docs.victoriametrics.com/victorialogs/)
 - [LogsQL Query Language](https://docs.victoriametrics.com/victorialogs/logsql/)
 - [Vector Documentation](https://vector.dev/docs/)

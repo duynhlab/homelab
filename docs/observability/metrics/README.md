@@ -404,6 +404,27 @@ From Kubernetes infrastructure, scraped by VMAgent from kube-state-metrics.
 | `up` | Gauge | job, app, namespace, instance | Service availability. 1 = up, 0 = down. Use `count()` for healthy instance count. |
 | `kube_pod_container_status_restarts_total` | Counter | namespace, pod, container | Container restarts. Frequent restarts indicate OOM or crashes. Panel uses regex `^$app-[a-z0-9]+-[a-z0-9]+$` to filter. |
 
+### gRPC instrumentation (east-west)
+
+> **Status: in progress.** gRPC is the official east-west (service-to-service)
+> transport on `:9090`. The RED metrics described here are being wired now and
+> are **not yet deployed**; the scrape config is separate code work. Tracing on
+> the gRPC path is already live.
+
+Server-side gRPC handlers expose RED metrics (Rate, Errors, Duration) on the
+`:9090` port via the shared `pkg/grpcx` helpers. Unlike the HTTP `/metrics`
+endpoint (scraped on the `http` port), gRPC metrics are exposed on the gRPC
+server's own port and will be picked up by a dedicated **ServiceMonitor**
+endpoint targeting `:9090`. The same `request_duration_seconds`-style histogram
+model applies: one histogram yields rate (count), errors (gRPC status code), and
+latency (buckets) per RPC method.
+
+- **Metrics (in progress):** server-side gRPC RED on `:9090`, scraped via a
+  ServiceMonitor endpoint (separate from the HTTP `http`-port scrape).
+- **Traces (live):** `pkg/grpcx` installs `otelgrpc` client/server interceptors,
+  so gRPC spans propagate trace context end-to-end alongside HTTP spans. See
+  [gRPC internal comms](../../api/grpc-internal-comms.md).
+
 ---
 
 ## 4. Exemplars: Metrics-to-Traces Correlation
@@ -454,7 +475,7 @@ The Grafana dashboard contains **34 data panels** organized in **5 row groups**:
 4. **Row 4: Go Runtime & Memory** (6 panels) - Heap memory, RSS, goroutines/threads, GC duration/frequency
 5. **Row 5: Resources & Infrastructure** (5 panels) - Total memory/CPU/network per service, requests in flight, memory allocations
 
-> See [Grafana Dashboard Guide](./grafana-dashboard.md) for detailed query analysis, troubleshooting scenarios, and SRE best practices for all panels.
+> See [Grafana Dashboard Guide](../grafana/dashboard-reference.md) for detailed query analysis, troubleshooting scenarios, and SRE best practices for all panels.
 
 ### Variables
 
@@ -467,7 +488,7 @@ The dashboard uses **4 variables** for filtering:
 
 **Variable Cascading:** `$namespace` filters `$app` options dynamically. All panel queries include both `namespace=~"$namespace"` and `app=~"$app"` filters.
 
-> See [Variables & Regex Guide](./grafana-variables.md) for detailed variable configuration, regex patterns, and cascading best practices.
+> See [Variables & Regex Guide](../grafana/variables.md) for detailed variable configuration, regex patterns, and cascading best practices.
 
 ---
 
@@ -653,7 +674,7 @@ The "Total Network Traffic per Service" panel measures HTTP body size only, not 
 - **[Grafana Dashboard Guide](../grafana/dashboard-reference.md)** - Complete panel reference, query analysis, troubleshooting, SRE best practices
 - **[Variables & Regex Guide](../grafana/variables.md)** - Dashboard variables, regex patterns, cascading configuration
 - **[PromQL Guide](./promql-guide.md)** - PromQL functions, time range vs rate interval, counter handling
-- **[Metrics Audit Runbook](../../../docs/runbooks/metrics-audit-fixes.md)** - Before/after analysis for each metrics issue fixed, with PromQL verification queries
+- **[Metrics Audit Runbook](../../runbooks/metrics-audit-fixes.md)** - Before/after analysis for each metrics issue fixed, with PromQL verification queries
 - **[SLO Documentation](../slo/README.md)** - SLO definitions, SLI mappings, Sloth integration
 - **[VictoriaMetrics Docs](https://docs.victoriametrics.com/)** - Official VictoriaMetrics documentation
 - **[prometheus-operator-crds](https://prometheus-operator.dev/)** - CRD definitions (ServiceMonitor, PodMonitor, PrometheusRule)

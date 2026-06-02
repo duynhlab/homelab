@@ -169,9 +169,9 @@ datasource:
   url: http://jaeger-all-in-one.monitoring.svc.cluster.local:16686
   jsonData:
     tracesToLogsV2:
-      datasourceUid: loki
+      datasourceUid: victorialogs
     tracesToMetrics:
-      datasourceUid: prometheus
+      datasourceUid: victoriametrics
 ```
 
 ## Common Workflows

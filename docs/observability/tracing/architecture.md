@@ -10,11 +10,11 @@ This document explains the distributed tracing architecture used in this project
 
 ```mermaid
 flowchart TB
-    subgraph Apps["Microservices (9 Go services)"]
+    subgraph Apps["Microservices (8 Go services)"]
         Auth[auth]
         User[user]
         Product[product]
-        Others[...6 more]
+        Others[...5 more]
     end
     
     subgraph OTelCollector["OpenTelemetry Collector (fan-out layer)"]
@@ -352,7 +352,6 @@ spec:
 - OpenTelemetry Collector manifests: `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
 - Jaeger manifests: `kubernetes/infra/controllers/tracing/jaeger/jaeger.yaml`
 - [APM Overview](./README.md)
-- [Tracing Guide](./tracing.md)
 - [Jaeger Guide](./jaeger.md)
 
 ## References

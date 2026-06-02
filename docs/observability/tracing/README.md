@@ -100,6 +100,8 @@ flowchart LR
 5. Spans exported to **Tempo** via OTLP HTTP (batch export every 5s)
 6. **Grafana** queries Tempo for trace visualization
 
+> **Two backends, by design.** **Tempo** is the primary backend (queried in Grafana via TraceQL, durable storage). **Jaeger** is an alternative UI fed by the same OTel Collector fan-out (in-memory storage, standalone Jaeger UI). The dual-backend setup is intentional — Tempo for day-to-day Grafana workflows, Jaeger for its dedicated trace-search UI. See [architecture.md](architecture.md) and [jaeger.md](jaeger.md).
+
 ### Automatic Features
 
 | Feature | What It Does | Benefit |

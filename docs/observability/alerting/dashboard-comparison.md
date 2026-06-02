@@ -61,7 +61,7 @@ Deep-dive comparison of alert dashboard and receiver tools evaluated for this pr
 
 **Key weaknesses:**
 
-- Wiremind Helm chart lags behind upstream (app v0.83 vs latest v0.128); deploy via raw manifest or pin image tag
+- Wiremind Helm chart lags behind upstream (app v0.83 vs latest v0.128); deploy via raw manifest or pin image tag (this platform pins `ghcr.io/prymitive/karma:v0.129` via raw manifest)
 - Read-only for alert data (cannot acknowledge or assign alerts to team members)
 
 **Production relevance:** High. Karma is what most SRE teams use alongside Alertmanager. Learning it translates directly to production work.

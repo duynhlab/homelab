@@ -1267,8 +1267,8 @@ Triển khai Grafana Annotations để track các events quan trọng:
 - Hiển thị: Vùng được tô màu trên graphs
 
 #### 3. Logs-based Annotations
-- Pull annotations từ Loki logs
-- Query: `{job="grafana-annotations"}`
+- Pull annotations từ VictoriaLogs
+- Query (LogsQL): `_stream:{job="grafana-annotations"}`
 - Tự động từ log streams
 
 ---
@@ -1620,9 +1620,9 @@ echo "→ Check metrics: RPS, Error Rate, Latency có thay đổi?"
 
 ### Future Enhancements (Tương lai)
 
-#### 1. Loki-based Annotations
-- Stream annotations vào Loki
-- Query từ Loki: `{job="grafana-annotations"}`
+#### 1. Logs-based Annotations
+- Stream annotations vào VictoriaLogs
+- Query từ VictoriaLogs (LogsQL): `_stream:{job="grafana-annotations"}`
 - Persistent annotation history
 
 #### 2. Automated Annotations

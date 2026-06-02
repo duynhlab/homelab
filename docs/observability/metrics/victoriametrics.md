@@ -375,7 +375,7 @@ spec:
     limits:   { cpu: 100m, memory: 128Mi }
 ```
 
-Log ingestion is handled by the cluster-wide **Vector Agent** (`kube-system/vector`) which ships Kubernetes logs to both Loki and VLSingle. See [VictoriaLogs docs](../logging/victorialogs.md) for Vector sink configuration.
+Log ingestion is handled by the cluster-wide **Vector Agent** (`kube-system/vector`) which ships Kubernetes logs to VLSingle. See [VictoriaLogs docs](../logging/victorialogs.md) for Vector sink configuration.
 
 ---
 
@@ -539,7 +539,6 @@ flowchart LR
 flowchart LR
     Pods["Kubernetes Pods"] --> Vector["Vector Agent<br/>kube-system"]
     Vector -->|"jsonline :9428"| VLSingle_f["VLSingle<br/>victoria-logs"]
-    Vector -->|"loki API :3100"| Loki["Loki"]
 ```
 
 ---

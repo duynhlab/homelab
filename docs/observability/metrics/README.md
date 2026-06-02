@@ -406,24 +406,38 @@ From Kubernetes infrastructure, scraped by VMAgent from kube-state-metrics.
 
 ### gRPC instrumentation (east-west)
 
-> **Status: in progress.** gRPC is the official east-west (service-to-service)
-> transport on `:9090`. The RED metrics described here are being wired now and
-> are **not yet deployed**; the scrape config is separate code work. Tracing on
-> the gRPC path is already live.
+> **Status: live.** gRPC is the official east-west (service-to-service)
+> transport. Services export gRPC RED metrics via the shared `pkg/obsx` helpers
+> onto their existing `/metrics` endpoint -- scraped by the **same**
+> ServiceMonitor as the HTTP metrics, so the standard `app` / `namespace` target
+> labels are present. Tracing on the gRPC path is also live.
 
-Server-side gRPC handlers expose RED metrics (Rate, Errors, Duration) on the
-`:9090` port via the shared `pkg/grpcx` helpers. Unlike the HTTP `/metrics`
-endpoint (scraped on the `http` port), gRPC metrics are exposed on the gRPC
-server's own port and will be picked up by a dedicated **ServiceMonitor**
-endpoint targeting `:9090`. The same `request_duration_seconds`-style histogram
-model applies: one histogram yields rate (count), errors (gRPC status code), and
-latency (buckets) per RPC method.
+The metric names follow OpenTelemetry-to-Prometheus naming. The same histogram
+model as HTTP applies: one histogram yields rate (count), errors (gRPC status
+code), and latency (buckets) per RPC method.
 
-- **Metrics (in progress):** server-side gRPC RED on `:9090`, scraped via a
-  ServiceMonitor endpoint (separate from the HTTP `http`-port scrape).
+**Server side** -- `rpc_server_call_duration_seconds_{count,bucket,sum}`:
+
+| Label | Example | Notes |
+|-------|---------|-------|
+| `rpc_method` | `auth.v1.AuthService/GetMe` | Fully-qualified RPC |
+| `rpc_response_status_code` | `OK` | gRPC status; non-`OK` = error |
+| `rpc_system_name` | `grpc` | Constant |
+| `app` / `namespace` | `auth` / `auth` | Added by the ServiceMonitor (same as HTTP) |
+
+**Client side** -- `rpc_client_call_duration_seconds_{count,bucket,sum}`: same as
+above plus `server_address` and `server_port` (the upstream being called), minus
+`rpc_system_name`.
+
+- **Metrics (live):** server- and client-side gRPC RED on the existing
+  `/metrics`, scraped by the existing ServiceMonitor (no separate scrape config).
 - **Traces (live):** `pkg/grpcx` installs `otelgrpc` client/server interceptors,
   so gRPC spans propagate trace context end-to-end alongside HTTP spans. See
   [gRPC internal comms](../../api/grpc-internal-comms.md).
+
+These metrics power the **gRPC East-West (RED)** row in the microservices
+dashboard (server and client RPS / error rate / P95 latency, grouped by
+`rpc_method`). See [§5 Dashboard](#5-dashboard).
 
 ---
 
@@ -467,13 +481,14 @@ This eliminates manual trace hunting during incidents -- click on the P99 spike,
 
 ### Overview
 
-The Grafana dashboard contains **34 data panels** organized in **5 row groups**:
+The Grafana dashboard contains **40 data panels** organized in **6 row groups**:
 
 1. **Row 1: Overview & Key Metrics** (12 panels) - Response time percentiles (P50, P95, P99), RPS, Success/Error rates, Apdex, Up instances, Restarts
 2. **Row 2: Traffic & Requests** (4 panels) - Status code distribution, request rate by endpoint
 3. **Row 3: Errors & Performance** (8 panels) - Client errors (4xx), Server errors (5xx), error rate by method/endpoint, response time by endpoint
 4. **Row 4: Go Runtime & Memory** (6 panels) - Heap memory, RSS, goroutines/threads, GC duration/frequency
 5. **Row 5: Resources & Infrastructure** (5 panels) - Total memory/CPU/network per service, requests in flight, memory allocations
+6. **Row 6: gRPC East-West (RED)** (6 panels) - Server and client gRPC RPS / error rate (non-OK) / P95 latency, grouped by `rpc_method` (from `rpc_server_call_duration_seconds_*` and `rpc_client_call_duration_seconds_*`)
 
 > See [Grafana Dashboard Guide](../grafana/dashboard-reference.md) for detailed query analysis, troubleshooting scenarios, and SRE best practices for all panels.
 

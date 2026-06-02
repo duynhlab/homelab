@@ -61,6 +61,7 @@ for in-cluster (east-west) traffic. Same path, different host — Kong just forw
 |--------|------|----------|--------|
 | `POST` | `/auth/v1/public/login` | public | Browser |
 | `POST` | `/auth/v1/public/register` | public | Browser |
+| `POST` | `/auth/v1/private/logout` | private | Browser |
 | `GET` | `/auth/v1/private/me` | private | Browser + every service's JWT middleware |
 
 ### user-service (namespace `user`)
@@ -131,17 +132,17 @@ All private.
 
 ## Service-to-service calls
 
-Inside the cluster, callers use Kubernetes Service DNS + the Variant A path directly:
+The caller → callee → audience mapping for in-cluster east-west traffic:
 
-| Caller | Target | Path | Audience |
-|--------|--------|------|----------|
-| Every service's JWT middleware | auth-service | `http://auth.auth.svc.cluster.local:8080/auth/v1/private/me` | private (forwards user's JWT) |
-| order-service → aggregation | shipping-service | `http://shipping.shipping.svc.cluster.local:8080/shipping/v1/internal/orders/:orderId` | internal |
-| order-service → checkout cleanup | cart-service | `http://cart.cart.svc.cluster.local:8080/cart/v1/private/cart` | private (forwards user's JWT) |
-| product-service → aggregation | review-service | `http://review.review.svc.cluster.local:8080/review/v1/public/reviews?product_id=…` | public |
-| auth-service → registration | user-service | `http://user.user.svc.cluster.local:8080/user/v1/internal/users` | internal |
+| Caller | Target | Audience |
+|--------|--------|----------|
+| Every service's JWT middleware | auth-service (`/me` validation) | private (forwards user's JWT) |
+| order-service → aggregation | shipping-service | internal |
+| order-service → checkout cleanup | cart-service | private (forwards user's JWT) |
+| product-service → aggregation | review-service | public |
+| auth-service → registration | user-service | internal |
 
-Each caller keeps a `{TARGET}_SERVICE_URL` env var with a default pointing at the in-cluster DNS name; only the **URL suffix** is hard-coded.
+Most of these hops now run over **gRPC**, not HTTP. For transport (gRPC vs REST per hop), addresses, ports, and migration status, see [`grpc-internal-comms.md`](grpc-internal-comms.md) — it is authoritative for east-west transport.
 
 ## Registering a new route
 

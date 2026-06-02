@@ -9,55 +9,9 @@
 
 ---
 
-## Master API Overview
+## Route Inventory
 
-Single source of truth for every HTTP path in the platform. Audience (`public` / `private` / `internal`) is encoded in the URL:
-
-- `public` — no auth; browser-reachable via `gateway.duynh.me`.
-- `private` — JWT required; browser-reachable via `gateway.duynh.me`.
-- `internal` — service-to-service; **never** on the gateway.
-
-No client-side orchestration for aggregation endpoints — frontend MUST use the `/details` variants.
-
-### Browser-facing endpoints (routed through Kong)
-
-| Service | Method | Path | Aggregation? |
-|---------|--------|------|--------------|
-| **Auth** | `POST` | `/auth/v1/public/login` | |
-| **Auth** | `POST` | `/auth/v1/public/register` | |
-| **Auth** | `GET` | `/auth/v1/private/me` | |
-| **User** | `GET` | `/user/v1/public/users/:id` | |
-| **User** | `GET` | `/user/v1/private/users/profile` | |
-| **User** | `PUT` | `/user/v1/private/users/profile` | |
-| **Product** | `GET` | `/product/v1/public/products` | |
-| **Product** | `GET` | `/product/v1/public/products/:id` | |
-| **Product** | `GET` | `/product/v1/public/products/:id/details` | ✅ product + reviews |
-| **Cart** | `GET` / `POST` / `DELETE` | `/cart/v1/private/cart` | |
-| **Cart** | `GET` | `/cart/v1/private/cart/count` | |
-| **Cart** | `PATCH` / `DELETE` | `/cart/v1/private/cart/items/:itemId` | |
-| **Order** | `GET` | `/order/v1/private/orders` | |
-| **Order** | `GET` | `/order/v1/private/orders/:id` | |
-| **Order** | `GET` | `/order/v1/private/orders/:id/details` | ✅ order + shipment |
-| **Order** | `POST` | `/order/v1/private/orders` | |
-| **Review** | `GET` | `/review/v1/public/reviews?product_id={id}` | |
-| **Review** | `POST` | `/review/v1/private/reviews` | |
-| **Notification** | `GET` | `/notification/v1/private/notifications` | |
-| **Notification** | `GET` | `/notification/v1/private/notifications/count` | |
-| **Notification** | `GET` / `PATCH` | `/notification/v1/private/notifications/:id` | |
-| **Shipping** | `GET` | `/shipping/v1/public/track?tracking_number=…` | |
-| **Shipping** | `GET` | `/shipping/v1/public/estimate?origin&destination&weight` | |
-
-### Internal endpoints (in-cluster only — NOT on gateway)
-
-| Service | Method | Path | Caller |
-|---------|--------|------|--------|
-| **Product** | `POST` | `/product/v1/internal/products` | Admin / seed jobs |
-| **User** | `POST` | `/user/v1/internal/users` | auth-service during registration |
-| **Notification** | `POST` | `/notification/v1/internal/notify/email` | Any service publishing a notification |
-| **Notification** | `POST` | `/notification/v1/internal/notify/sms` | Any service publishing a notification |
-| **Shipping** | `GET` | `/shipping/v1/internal/orders/:orderId` | order-service (order-details aggregation) |
-
-Internal callers use Kubernetes Service DNS: `http://{svc}.{ns}.svc.cluster.local:8080` as host; the path suffix is identical to the table above.
+The complete, authoritative list of every HTTP path in the platform (browser-facing and internal) lives in [`api-naming-convention.md`](api-naming-convention.md) — the sole URL surface. This document covers per-endpoint request/response shapes and validation rules only; it does not duplicate the route inventory.
 
 ---
 
@@ -144,15 +98,15 @@ These endpoints combine multiple data sources to provide complete responses. **F
 **Aggregates:**
 - Product details (ProductService.GetProduct)
 - Related products (ProductService.GetRelatedProducts)
-- Stock information (mock data, pending inventory service)
-- Reviews (aggregated from review service via HTTP call; soft-fail to empty array if review service unavailable)
+- Stock information (real `stock_quantity` from the products table)
+- Reviews (aggregated from the review service over **gRPC**; soft-fails to an empty array `[]` if the review service is unavailable)
 
 **Logic Services Involved:**
 - `ProductService.GetProduct(ctx, id)`
 - `ProductService.GetRelatedProducts(ctx, id, limit)`
 
 **Configuration:**
-- Product service uses `REVIEW_SERVICE_URL` environment variable (default: `http://review.review.svc.cluster.local:8080`) to call review service for aggregation.
+- Product service dials the review service over gRPC using the `REVIEW_GRPC_ADDR` environment variable. The call soft-fails to `[]` on error so product details stay available. See [`grpc-internal-comms.md`](grpc-internal-comms.md) for transport details.
 
 #### Request
 
@@ -431,15 +385,6 @@ Same path, two hosts: browser hits `https://gateway.duynh.me/…`; services hit 
 
 ## Product Service
 
-### Endpoints (v1)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/product/v1/public/products` | List all products with filtering |
-| `GET` | `/product/v1/public/products/:id` | Get product by ID |
-| `GET` | `/product/v1/public/products/:id/details` | **Aggregated product details** |
-| `POST` | `/product/v1/internal/products` | Create new product (internal, in-cluster only) |
-
 ### GET /product/v1/public/products
 
 List all products with optional filtering.
@@ -566,16 +511,6 @@ Content-Type: application/json
 
 ## Cart Service
 
-### Endpoints (v1)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/cart/v1/private/cart` | Get user cart |
-| `POST` | `/cart/v1/private/cart` | Add item to cart |
-| `GET` | `/cart/v1/private/cart/count` | **Get cart item count** |
-| `PATCH` | `/cart/v1/private/cart/items/:itemId` | **Update cart item quantity** |
-| `DELETE` | `/cart/v1/private/cart/items/:itemId` | **Remove cart item** |
-
 ### GET /cart/v1/private/cart
 
 Get the current user's cart.
@@ -663,15 +598,6 @@ Authorization: Bearer <jwt_token>
 ---
 
 ## Order Service
-
-### Endpoints (v1)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/order/v1/private/orders` | Get all user orders |
-| `GET` | `/order/v1/private/orders/:id` | Get order by ID |
-| `GET` | `/order/v1/private/orders/:id/details` | **Aggregation: Get order with shipment** |
-| `POST` | `/order/v1/private/orders` | Create new order |
 
 ### GET /order/v1/private/orders
 
@@ -865,14 +791,6 @@ Authorization: Bearer <jwt_token>
 
 ## Auth Service
 
-### Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/auth/v1/public/login` | User login |
-| `POST` | `/auth/v1/public/register` | User registration |
-| `GET` | `/auth/v1/private/me` | Get current user from token |
-
 ### POST /auth/v1/public/login
 
 #### Request
@@ -930,27 +848,42 @@ Content-Type: application/json
 
 ---
 
+### POST /auth/v1/private/logout
+
+Revokes the caller's session token. Idempotent — returns `200 OK` on any well-formed request so clients can safely clear local state.
+
+#### Request
+
+```
+POST /auth/v1/private/logout
+Authorization: Bearer <jwt_token>
+```
+
+#### Response
+
+**200 OK**
+```json
+{
+  "message": "logged out"
+}
+```
+
+**Error Responses:**
+
+| Status | Body | Condition |
+|--------|------|-----------|
+| 401 | `{"error": "Invalid authorization format"}` | Missing or malformed `Authorization` header |
+| 500 | `{"error": "Internal server error"}` | Token revocation failed |
+
+---
+
 ## User Service
 
-### Endpoints (v1)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/user/v1/public/users/:id` | Get user by ID |
-| `GET` | `/user/v1/private/users/profile` | Get user profile |
-| `PUT` | `/user/v1/private/users/profile` | Update user profile |
-| `POST` | `/user/v1/internal/users` | Create new user (internal, in-cluster only) |
+Routes: see [`api-naming-convention.md`](api-naming-convention.md). No additional per-endpoint payload detail beyond the standard profile shape.
 
 ---
 
 ## Review Service
-
-### Endpoints (v1)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/review/v1/public/reviews?product_id={id}` | Get reviews for a product (**product_id required**) |
-| `POST` | `/review/v1/private/reviews` | Create new review (**user_id required**) |
 
 #### GET /review/v1/public/reviews
 
@@ -984,11 +917,12 @@ Content-Type: application/json
 
 #### POST /review/v1/private/reviews
 
+> **Note:** `user_id` is derived from the JWT subject by the Web Layer (auth middleware). Do not send `user_id` in the request body.
+
 **Request Body:**
 ```json
 {
   "product_id": "5",
-  "user_id": "1",
   "rating": 5,
   "title": "Great product!",
   "comment": "Highly recommend this product."
@@ -998,7 +932,6 @@ Content-Type: application/json
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `product_id` | string | Yes | Product ID |
-| `user_id` | string | Yes | User ID (authenticated user) |
 | `rating` | int | Yes | Rating 1-5 |
 | `title` | string | No | Review title |
 | `comment` | string | Yes | Review comment |
@@ -1027,16 +960,6 @@ Content-Type: application/json
 
 ## Notification Service
 
-### Endpoints (v1)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/notification/v1/private/notifications` | Get all notifications for user |
-| `GET` | `/notification/v1/private/notifications/:id` | Get notification by ID |
-| `PATCH` | `/notification/v1/private/notifications/:id` | Mark notification as read |
-| `POST` | `/notification/v1/internal/notify/email` | Send email notification |
-| `POST` | `/notification/v1/internal/notify/sms` | Send SMS notification |
-
 #### Notification Response Shape
 
 ```json
@@ -1064,14 +987,6 @@ Content-Type: application/json
 ---
 
 ## Shipping Service
-
-### Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/shipping/v1/public/track` | Track shipment by tracking number |
-| `GET` | `/shipping/v1/public/estimate` | Estimate shipping cost |
-| `GET` | `/shipping/v1/internal/orders/:orderId` | Get shipment by order ID |
 
 #### Track Shipment
 
@@ -1216,11 +1131,11 @@ All services include seed data via Flyway V2 migrations for immediate demo/local
 | David Brown | `david@example.com` | `password123` | Recent order with tracking |
 | Eve Davis | `eve@example.com` | `password123` | Inactive user |
 
-**Login Example**:
+**Login Example** (login binds `username`, not `email`):
 ```bash
 curl -X POST http://localhost:8080/auth/v1/public/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "alice@example.com", "password": "password123"}'
+  -d '{"username": "alice", "password": "password123"}'
 ```
 
 ### Seeded Data Summary
@@ -1335,10 +1250,10 @@ Seed data located in each service:
 # Check products
 curl http://localhost:8080/product/v1/public/products
 
-# Login as Alice
+# Login as Alice (login binds username, not email)
 TOKEN=$(curl -X POST http://localhost:8080/auth/v1/public/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "alice@example.com", "password": "password123"}' \
+  -d '{"username": "alice", "password": "password123"}' \
   | jq -r '.token')
 
 # Check Alice's cart

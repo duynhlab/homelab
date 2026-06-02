@@ -116,7 +116,7 @@ probes, and Prometheus scraping all keep working exactly as documented in
 
 ### Proto / contract management
 
-- **Protos live in `github.com/duynhne/pkg`** under `pkg/proto/<svc>/v1/`, with the
+- **Protos live in `github.com/duynhlab/pkg`** under `pkg/proto/<svc>/v1/`, with the
   **generated stubs committed** alongside the `.proto` sources. Consumers
   `go get` `pkg` and import the generated package — no codegen step in service
   CI, no proto-plugin version drift between repos.
@@ -270,6 +270,8 @@ gained native support.
 ---
 
 ## 7. Phased roadmap
+
+> **Historical migration plan — superseded by the gRPC-only cutover; see [Implementation status](#implementation-status) above.** The feature-flag and REST-fallback mechanics described per phase below are how the migration was *planned*; the cluster is now gRPC-only with always-on servers and no fallback.
 
 Each phase has explicit success criteria and a one-step rollback.
 

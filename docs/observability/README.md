@@ -23,7 +23,6 @@ flowchart TD
 
     subgraph pillar3 [Logs]
         Vector["Vector<br/>DaemonSet"]
-        Loki["Loki :3100"]
         VLogs["VictoriaLogs :9428"]
     end
 
@@ -42,19 +41,18 @@ flowchart TD
     end
 
     MW -->|"histogram, gauge, counter"| VMAgent
-    MW -->|"OTLP gRPC :4317"| OTel
+    MW -->|"OTLP HTTP :4318"| OTel
     MW -->|"stdout JSON"| Vector
     MW -->|"push"| Pyroscope
 
     VMAgent --> VMSingle
     OTel --> Tempo
     OTel --> Jaeger
-    Vector --> Loki
     Vector --> VLogs
 
     VMSingle --> Grafana
     Tempo --> Grafana
-    Loki --> Grafana
+    VLogs --> Grafana
     Jaeger --> Grafana
     Pyroscope --> Grafana
 
@@ -121,7 +119,7 @@ sequenceDiagram
 
     Note over MW: TracingMiddleware
     MW->>MW: Create root span
-    MW->>OTel: Export span (OTLP gRPC)
+    MW->>OTel: Export span (OTLP HTTP :4318)
 
     Note over MW: LoggingMiddleware
     MW->>MW: Extract trace-id
@@ -246,7 +244,7 @@ graph LR
 |--------|------|---------------------|------|
 | **Metrics** | VMSingle + VMAgent | "Is something wrong?" | [metrics/](metrics/README.md) |
 | **Traces** | Tempo + Jaeger via OTel Collector | "Where is it slow?" | [tracing/](tracing/README.md) |
-| **Logs** | Loki + VictoriaLogs via Vector | "Why is it broken?" | [logging/](logging/README.md) |
+| **Logs** | VictoriaLogs via Vector | "Why is it broken?" | [logging/](logging/README.md) |
 | **Profiles** | Pyroscope | "Which code line is the bottleneck?" | [profiling/](profiling/README.md) |
 
 ## Documentation Map
@@ -272,7 +270,7 @@ docs/observability/
 │   └── jaeger.md                 # Jaeger UI guide
 │
 ├── logging/                      # Pillar 3: Structured logging
-│   ├── README.md                 # Zap + Vector + Loki
+│   ├── README.md                 # Zap + Vector + VictoriaLogs
 │   └── victorialogs.md           # VictoriaLogs backend
 │
 ├── profiling/                    # Pillar 4: Continuous profiling
@@ -290,14 +288,16 @@ docs/observability/
 │
 ├── slo/                          # Service Level Objectives
 │   ├── README.md                 # Sloth Operator + SLO targets
-│   ├── alerting.md               # Multi-window burn-rate alerts
+│   ├── fundamentals.md           # SLI/SLO/error-budget concepts
 │   ├── error_budget_policy.md    # Error budget management
 │   ├── getting_started.md        # Enable SLOs for a service
 │   └── annotation-driven-slo-controller.md  # Future design
+│   # Burn-rate alert config lives in alerting/slo-burn-rate-alerts.md
 │
 └── runbooks/                     # Operational runbooks
     ├── README.md                 # Runbook index
     ├── observability-deep-dive.md  # Theory + interview prep
+    ├── infrastructure-alerts.md    # Infra/platform alert investigation guide
     └── microservices-alerts.md     # Per-alert investigation guide
 ```
 
@@ -313,8 +313,7 @@ docs/observability/
 | Tempo | monitoring | `tempo` | 3200 | Trace storage (OTLP receiver) |
 | Jaeger | monitoring | `jaeger-query` | 16686 | Trace query UI (alternative to Tempo) |
 | OTel Collector | monitoring | `otel-collector` | 4317 | Trace fan-out (OTLP gRPC ingress) |
-| Loki | monitoring | `loki` | 3100 | Log storage and query (LogQL) |
-| VictoriaLogs | monitoring | `vlsingle-victoria-logs` | 9428 | Log storage (LogsQL, alternative to Loki) |
+| VictoriaLogs | monitoring | `vlsingle-victoria-logs` | 9428 | Log storage and query (LogsQL, sole log backend) |
 | Vector | kube-system | DaemonSet | -- | Log collection from all pods |
 | Pyroscope | monitoring | `pyroscope` | 4040 | Continuous profiling |
 | Sloth | monitoring | operator | -- | SLO-to-PrometheusRule generator |
@@ -328,7 +327,7 @@ sequenceDiagram
     participant A as Alert fires
     participant M as Metrics (Grafana)
     participant T as Traces (Tempo/Jaeger)
-    participant L as Logs (Loki)
+    participant L as Logs (VictoriaLogs)
     participant P as Profiles (Pyroscope)
 
     A->>M: 1. Check dashboard -- which service, which signal?
@@ -344,7 +343,7 @@ sequenceDiagram
 
 - **Metrics → Traces**: Exemplars on `request_duration_seconds` histogram link to trace IDs
 - **Traces → Logs**: `trace_id` injected into every structured log line by LoggingMiddleware
-- **Logs → Traces**: Loki derived field extracts `trace_id` and links back to Tempo
+- **Logs → Traces**: VictoriaLogs datasource derived field extracts `trace_id` and links back to Tempo
 - **Traces → Profiles**: Pyroscope labels match service name for time-correlated flamegraphs
 
 ## Deployment
@@ -360,7 +359,7 @@ make flux-status     # Check status
 
 Flux reconciliation order:
 1. **Controllers** -- operators, CRDs (VictoriaMetrics Operator, Prometheus CRDs, Grafana Operator, Sloth)
-2. **Configs** -- monitoring stack (VMSingle, VMAgent, VMAlert, Grafana, Tempo, Loki, etc.)
+2. **Configs** -- monitoring stack (VMSingle, VMAgent, VMAlert, Grafana, Tempo, VictoriaLogs, etc.)
 3. **Apps** -- microservices (auto-discovered by VMAgent via ServiceMonitor)
 
 ## Quick Start: Accessing the Stack

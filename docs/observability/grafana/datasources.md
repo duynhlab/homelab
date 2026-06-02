@@ -102,16 +102,15 @@ Use the operational paths that do not depend on Grafana’s ruler UI:
 
 The VictoriaMetrics plugin supports PromQL-compatible queries and MetricsQL extras (`WITH`, `keep_metric_names`, etc.). See [VictoriaMetrics docs](https://docs.victoriametrics.com/metricsql/).
 
-## Logs: Loki vs VictoriaLogs plugin
+## Logs: VictoriaLogs
 
-Logs use a **dual-backend** pattern (Vector → Loki + VictoriaLogs), unrelated to the metrics datasource change.
+Logs use a **single-backend** pattern (Vector → VictoriaLogs), unrelated to the metrics datasource change.
 
 | Datasource | Type | Backend | Query language | Best for |
 |------------|------|---------|----------------|----------|
-| **Loki** | `loki` | Loki `:3100` | LogQL | Default dashboards, trace correlation |
-| **VictoriaLogs** | `victoriametrics-logs-datasource` | VLSingle `:9428` | LogsQL | VM plugin workflow, [`victorialogs.md`](../logging/victorialogs.md) |
+| **VictoriaLogs** | `victoriametrics-logs-datasource` | VLSingle `:9428` | LogsQL | Dashboards, trace correlation, VM plugin workflow, [`victorialogs.md`](../logging/victorialogs.md) |
 
-**CRDs**: `datasource-loki.yaml`, `datasource-victorialogs.yaml`.
+**CRD**: `datasource-victorialogs.yaml`.
 
 ## How read-only rules work: `vmalert.proxyURL`
 

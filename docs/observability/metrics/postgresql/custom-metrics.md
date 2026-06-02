@@ -216,27 +216,27 @@ curl http://localhost:9187/metrics | grep pg_replication
 curl http://localhost:9187/metrics | grep pg_postmaster
 ```
 
-### Check in Prometheus UI
+### Check in VMSingle UI (VMUI)
 
-**1. Access Prometheus:**
+**1. Access VMSingle:**
 ```bash
-kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090
+kubectl port-forward -n monitoring svc/vmsingle-victoria-metrics 8428:8428
 ```
 
-**2. Query in Prometheus UI:**
-- Go to: http://localhost:9090
+**2. Query in VMUI:**
+- Go to: http://localhost:8428/vmui
 - Enter query: `pg_stat_statements_calls`
 - Check labels and values
 
-### Check Prometheus targets
+### Check scrape targets
 
 ```bash
 # Verify postgres_exporter is being scraped
 kubectl get podmonitor -n auth postgresql-auth-db -o yaml
 
-# Check Prometheus targets
-kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090
-# Then visit: http://localhost:9090/targets
+# Check VMAgent targets
+kubectl port-forward -n monitoring svc/vmagent-victoria-metrics 8429:8429
+# Then visit: http://localhost:8429/targets
 ```
 
 ## Common Use Cases

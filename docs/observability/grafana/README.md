@@ -1,6 +1,6 @@
 # Grafana
 
-Grafana is the unified visualization layer for all 4 observability pillars. It connects to VMSingle (metrics), Tempo (traces), Loki (logs), VictoriaLogs (LogsQL via plugin), Jaeger (traces), and Pyroscope (profiles) through configured datasources.
+Grafana is the unified visualization layer for all 4 observability pillars. It connects to VMSingle (metrics), Tempo (traces), VictoriaLogs (logs, LogsQL via plugin), Jaeger (traces), and Pyroscope (profiles) through configured datasources.
 
 ## Deployment
 
@@ -27,22 +27,20 @@ All datasources are managed as `GrafanaDatasource` CRDs (GitOps, no manual confi
 | Datasource | Type | Default | URL | Purpose |
 |------------|------|---------|-----|---------|
 | VictoriaMetrics | `victoriametrics-metrics-datasource` | Yes | `vmsingle-victoria-metrics:8428` | Metrics (PromQL/MetricsQL), dashboards, Explore |
-| Loki | `loki` | No | `loki:3100` | Log queries (LogQL), trace correlation |
-| VictoriaLogs | `victoriametrics-logs-datasource` | No | `vlsingle-victoria-logs:9428` | Log queries (LogsQL), [plugin](https://grafana.com/grafana/plugins/victoriametrics-logs-datasource/) |
+| VictoriaLogs | `victoriametrics-logs-datasource` | No | `vlsingle-victoria-logs:9428` | Log queries (LogsQL), trace correlation, [plugin](https://grafana.com/grafana/plugins/victoriametrics-logs-datasource/) |
 | Tempo | `tempo` | No | `tempo:3200` | Trace queries |
 | Jaeger | `jaeger` | No | `jaeger-query:16686` | Trace search (alternative UI) |
 | Pyroscope | `grafana-pyroscope-datasource` | No | `pyroscope:4040` | Flamegraphs |
 
 See [datasources.md](datasources.md) for metrics datasource details and Grafana Alerting UI notes.
 
-**Loki** and **VictoriaLogs** are separate log backends (same logs ingested by Vector); use Loki for LogQL and default trace correlation, VictoriaLogs for LogsQL and the VM plugin workflow. See [datasources.md](datasources.md#logs-loki-vs-victorialogs-plugin).
+**VictoriaLogs** is the sole log backend (logs ingested by Vector); use it for LogsQL queries, trace correlation, and the VM plugin workflow. See [datasources.md](datasources.md#logs-victorialogs).
 
 **Datasource CRD files:**
 
 ```
 kubernetes/infra/configs/monitoring/grafana/
 ├── datasource-victoriametrics.yaml    # VictoriaMetrics plugin (default metrics DS)
-├── datasource-loki.yaml
 ├── datasource-victorialogs.yaml       # VictoriaLogs plugin
 ├── datasource-tempo.yaml
 ├── datasource-jaeger.yaml
@@ -100,7 +98,6 @@ See **[Grafana Alerting and datasource types](datasources.md#grafana-alerting-an
 kubernetes/infra/configs/monitoring/grafana/
 ├── grafana.yaml                       # Grafana CR (operator-managed)
 ├── datasource-victoriametrics.yaml    # VictoriaMetrics plugin (default metrics)
-├── datasource-loki.yaml
 ├── datasource-victorialogs.yaml       # VictoriaLogs plugin datasource
 ├── datasource-tempo.yaml
 ├── datasource-jaeger.yaml

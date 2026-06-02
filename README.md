@@ -13,12 +13,13 @@ SLOs with burn-rate alerts, and a single source of truth in Git delivered via Fl
 **Key features:**
 
 - 8 microservices behind a single Kong API gateway with a **Unified Routing Convention**. All endpoints follow a strict `/{service}/v1/{audience}/…` URL shape, allowing browser and in-cluster callers to use the exact same paths. Kong acts as a pure pass-through proxy without any URL rewrites.
+- **gRPC for east-west** service-to-service calls (auth `/me`, product→review, order→shipping/notification) — gRPC-only on `:9090` via the shared `pkg/grpcx`; browser/edge traffic stays HTTP/JSON. gRPC RED metrics surface on each service's `/metrics` via `pkg/obsx`.
 - Frontend on `https://local.duynh.me`, API gateway on `https://gateway.duynh.me`.
   TLS terminated by Kong with a publicly-trusted Let's Encrypt wildcard cert.
 - Full observability: VictoriaMetrics, Tempo + Jaeger, VictoriaLogs + Vector, Pyroscope,
   15 Grafana dashboards.
 - 3 PostgreSQL clusters (Zalando + CloudNativePG) + 1 DR replica, fronted by PgBouncer
-  and PgDog. Schema migrations via Flyway 11.
+  and PgDog. Schema migrations via Flyway 12.
 - Valkey (Redis-compatible) cache with Cache-Aside pattern in the Logic layer.
 - SLOs managed declaratively by Sloth Operator.
 - GitOps with Flux Operator, ResourceSets, OCI artifacts, and Kustomize.
@@ -110,7 +111,8 @@ flowchart TD
   annotations. Auth is **not** done at the gateway — every service validates JWTs
   in its own middleware (defence-in-depth).
 - **Microservices** — 4 bounded-context domains: identity, catalog, checkout, comms.
-  Each service is its own repo, its own namespace, its own database role.
+  Each service is its own repo, its own namespace, its own database role. East-west
+  calls run over gRPC (`pkg/grpcx`); the edge stays HTTP/JSON.
 - **Data** — 3 PostgreSQL clusters with operators (Zalando + CloudNativePG), behind
   poolers, with Flyway migrations. cnpg-db has a continuously-recovering DR replica.
 - **Observability** — OpenTelemetry-first across metrics, traces, logs, and profiles.
@@ -129,10 +131,11 @@ and [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
 
 | Concern | Choice |
 |---|---|
-| Language / runtime | Go 1.25 |
+| Language / runtime | Go 1.26 |
 | HTTP framework | Gin |
 | API shape | Unified URL — `/{service}/v1/{audience}/…` |
 | Architecture | Web → Logic → Core (per service) |
+| East-west transport | gRPC (`pkg/grpcx`) — gRPC-only on `:9090` |
 | Cache | Valkey (Redis-compatible), Cache-Aside in Logic layer |
 
 ### Data
@@ -141,7 +144,7 @@ and [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
 |---|---|
 | RDBMS | PostgreSQL (Zalando operator + CloudNativePG) — 3 clusters + 1 DR replica |
 | Connection poolers | PgBouncer (auth, shared) · PgDog (product/cart/order) |
-| Migrations | Flyway 11.19.0 |
+| Migrations | Flyway 12.7.0 |
 
 ### Platform
 

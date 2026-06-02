@@ -156,21 +156,9 @@ Service-to-service target URLs are injected as env vars (`AUTH_SERVICE_URL`, `RE
 
 ---
 
-## 5. gRPC Phase 1 — implemented (pilot: order → shipping)
+## 5. gRPC for east-west transport
 
-Phase 1 of the [gRPC roadmap](grpc-internal-comms.md) — the **order → shipping** internal lookup (`GET /shipping/v1/internal/orders/:orderId` used by order-details aggregation) — is **implemented and verified on the local Docker Compose stack**. It was chosen as the pilot because it is internal-only, simple request/response, has no browser impact, and soft-fails today (low blast radius).
-
-**What's implemented:**
-- **Phase 0 (`pkg`):** `proto/shipping/v1` contract + generated stubs, and `grpcx` helpers — gRPC server/client with `otelgrpc`, the gRPC health protocol, server reflection, and client-side `round_robin`; `buf` lint/breaking in CI. (`duynhlab/pkg` PR #3.)
-- **shipping (callee):** serves `ShippingService.GetShipmentByOrder` on a dual gRPC port `:9090` behind `GRPC_ENABLED`/`GRPC_PORT`; HTTP `:8080` unchanged; a missing shipment → empty response (soft-fail). (`shipping-service` PR #63.)
-- **order (caller):** calls shipping over gRPC when `SHIPPING_GRPC_ADDR` is set (`grpcx.Dial`), else the existing REST client — both behind one `shipmentFetcher` interface returning the identical `*Shipment`. (`order-service` PR #61.)
-- **Env wiring:** `GRPC_ENABLED`/`GRPC_PORT` (server) and `SHIPPING_GRPC_ADDR` (client) are **input-gated** (default-off) in `local-stack/compose.yaml` and the GitOps templates (`kubernetes/apps/domains/*-rs.yaml`).
-
-**Verified (Docker Compose):** the gRPC and REST order-details responses are **byte-identical**, and toggling `SHIPPING_GRPC_ADDR` is a **one-step rollback** between gRPC and REST. Contract preserved on both paths: soft-fail if shipping is down, OTel trace continuity (via `otelgrpc`), HTTP route stays mounted (dual-port).
-
-**Remaining for cluster enablement:** expose the callee's gRPC `:9090` on its Kubernetes Service (a second Service port / **headless Service** for `round_robin`) — depends on the shared `mop-chart` rendering a second port. Until then the cluster keeps the REST path (set no gRPC inputs); the Compose pilot exercises gRPC end-to-end. Full detail in [`grpc-internal-comms.md`](grpc-internal-comms.md).
-
-> **Scope note:** browser/Kong traffic and all `public`/`private` audiences **stay HTTP/JSON**. gRPC is east-west only.
+The gRPC migration is **complete and gRPC-only** — the transport details for every east-west hop (addresses, ports, status) live in [`grpc-internal-comms.md`](grpc-internal-comms.md). The transport column in §4 above reflects the current state.
 
 ---
 

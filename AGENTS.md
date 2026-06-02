@@ -48,7 +48,6 @@ kubernetes/
 scripts/      # Kind/Flux helpers (called by the Makefile)
 local-stack/  # Docker Compose e2e stack (Postgres + Redis + 8 services + nginx gateway + SPA)
 docs/         # Documentation (start at docs/README.md)
-specs/        # Specifications and research
 ```
 
 ## Build, test, deploy

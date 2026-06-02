@@ -247,7 +247,7 @@ kubectl rollout history deployment/$APP -n $NAMESPACE
 **Resolution**:
 1. Identify failing endpoint from per-endpoint error rate
 2. Use exemplars to jump from error metric to trace in Tempo
-3. Search trace_id in Loki for detailed error logs
+3. Search trace_id in VictoriaLogs for detailed error logs
 4. If new deployment: rollback with `kubectl rollout undo`
 5. If DB issue: check PostgreSQL alerts
 
@@ -637,7 +637,7 @@ flowchart TD
     IsDB -->|No| IsDownstream{Is the error\nin a downstream call?}
 
     IsDownstream -->|Yes| CheckDownstream["Check downstream service:\nup metric, error rate, latency"]
-    IsDownstream -->|No| CheckLogs["Search Loki by trace_id:\nGet stack trace / error message"]
+    IsDownstream -->|No| CheckLogs["Search VictoriaLogs by trace_id:\nGet stack trace / error message"]
 
     CheckLogs --> FixCode["Fix application code\nor configuration"]
     CheckPostgres --> FixDB["Fix database issue\n(connection pool, query, index)"]

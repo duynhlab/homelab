@@ -1,6 +1,6 @@
 # VictoriaLogs
 
-VictoriaLogs is deployed as an additional log storage backend alongside Loki. It provides high-performance log ingestion and querying using LogsQL.
+VictoriaLogs is the cluster's log storage backend. It provides high-performance log ingestion and querying using LogsQL.
 
 ## Architecture
 
@@ -20,7 +20,6 @@ flowchart TD
     end
 
     subgraph Sinks["Log Destinations"]
-        Loki[Loki]
         VLogsAll[VictoriaLogs - All Logs]
         VLogsPlans[VictoriaLogs - PG Plans]
         VLogsFailures[VictoriaLogs - Parse Failures]
@@ -32,7 +31,6 @@ flowchart TD
     KLogs --> AddLabels
     KLogs --> ParsePG
     
-    AddLabels --> Loki
     AddLabels --> VLogsAll
     
     ParsePG --> FilterExplain
@@ -43,13 +41,13 @@ flowchart TD
 
 ### Single Vector Design
 
-This deployment uses a **single cluster-wide Vector Agent** (`kube-system/vector`) that ships logs to **both** Loki and VictoriaLogs. The VictoriaLogs Helm chart's embedded Vector/collector is **disabled** to avoid conflicts.
+This deployment uses a **single cluster-wide Vector Agent** (`kube-system/vector`) that ships logs to VictoriaLogs. The VictoriaLogs Helm chart's embedded Vector/collector is **disabled** to avoid conflicts.
 
 **Why single Vector?**
 - Eliminates duplicate log collection
 - Simplifies configuration management
 - Reduces resource overhead
-- Consistent log processing across backends
+- Consistent log processing
 
 ## Components
 
@@ -144,7 +142,7 @@ Location: `kubernetes/infra/controllers/logging/vector/vector.yaml`
 The Vector config includes:
 - **Sources**: `kubernetes_logs`
 - **Transforms**: `add_labels`, `parse_pg_json`, `filter_pg_auto_explain`, `parse_pg_auto_explain`
-- **Sinks**: `loki`, `victorialogs_all`, `victorialogs_pg_plans`, `victorialogs_pg_parse_failures`
+- **Sinks**: `victorialogs_all`, `victorialogs_pg_plans`, `victorialogs_pg_parse_failures`
 
 ## Verification
 

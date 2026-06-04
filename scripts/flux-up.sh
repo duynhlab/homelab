@@ -2,29 +2,31 @@
 
 set -o errexit
 
-echo "Starting cluster bootstrap"
+# Bootstrap Flux Operator + FluxInstance via OpenTofu (controlplaneio-fluxcd
+# flux-operator-bootstrap module). Replaces the previous `helm install` +
+# `kubectl apply -k` flow; the FluxInstance manifest is still the single source
+# of truth at kubernetes/clusters/<cluster_name>/flux-system/instance.yaml.
+#
+# ORDERING: the module waits for the FluxInstance to become Ready, which
+# requires its sync source (oci://homelab-registry:5000/flux-cluster-sync) to
+# already exist in the registry. Run `make flux-push` BEFORE this script — the
+# `make up` target sequences cluster-up → flux-push → flux-up for that reason.
 
-# Install or upgrade Flux Operator via Helm (idempotent)
-# helm upgrade --install will install if not present, or upgrade if it exists
-echo "Installing/upgrading Flux Operator via Helm..."
-helm upgrade --install flux-operator oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator \
-    --namespace flux-system \
-    --create-namespace \
-    --wait
+tf_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../terraform" && pwd)"
+tf_bin="${TF_BIN:-tofu}"
 
-echo "Waiting for Flux Operator to be ready..."
-kubectl wait --for=condition=available --timeout=300s deployment/flux-operator -n flux-system
+if ! command -v "${tf_bin}" >/dev/null 2>&1; then
+  echo "error: '${tf_bin}' not found on PATH (install OpenTofu, or set TF_BIN=terraform)" >&2
+  exit 1
+fi
 
-echo "Applying FluxInstance CRD..."
-kubectl apply -k ./kubernetes/clusters/local/flux-system/
+echo "Bootstrapping Flux Operator via ${tf_bin} (${tf_dir})"
+"${tf_bin}" -chdir="${tf_dir}" init -input=false
+"${tf_bin}" -chdir="${tf_dir}" apply -input=false -auto-approve
 
-echo "Waiting for Flux controllers to be ready..."
-sleep 10
-kubectl wait --for=condition=ready --timeout=300s pod -l app.kubernetes.io/part-of=flux -n flux-system 2>/dev/null || true
-
-echo "✔ Flux Operator is ready"
+echo "✔ Flux Operator bootstrap applied"
 echo ""
 echo "Next steps:"
 echo "  1. Push manifests: make flux-push"
-echo "  2. Wait for reconciliation: make flux-sync"
+echo "  2. Trigger reconciliation: make flux-sync"
 echo "  3. Check status: make flux-status"

@@ -8,7 +8,8 @@ SHELL := /usr/bin/env bash -o pipefail
 ##@ General
 
 .PHONY: up
-up: cluster-up flux-up flux-push ## Bootstrap complete environment
+up: cluster-up flux-push flux-up ## Bootstrap complete environment
+	@echo "✔ Environment ready — run 'make flux-status' to watch reconciliation"
 
 .PHONY: down
 down: cluster-down ## Delete cluster and registry
@@ -29,8 +30,24 @@ cluster-down: ## Delete Kind cluster and registry
 ##@ Flux Operations
 
 .PHONY: flux-up
-flux-up: ## Bootstrap Flux Operator
+flux-up: ## Bootstrap Flux Operator (OpenTofu)
 	./scripts/flux-up.sh
+
+.PHONY: tf-init
+tf-init: ## OpenTofu init (terraform/)
+	tofu -chdir=terraform init -input=false
+
+.PHONY: tf-plan
+tf-plan: ## OpenTofu plan (expect zero diff once bootstrapped)
+	tofu -chdir=terraform plan -input=false
+
+.PHONY: tf-apply
+tf-apply: ## OpenTofu apply the Flux Operator bootstrap
+	tofu -chdir=terraform apply -input=false
+
+.PHONY: tf-destroy
+tf-destroy: ## OpenTofu destroy the bootstrap resources
+	tofu -chdir=terraform destroy -input=false
 
 .PHONY: flux-push
 flux-push: ## Push manifests to OCI registry
@@ -65,8 +82,8 @@ postgres-alert-audit: ## Run PostgreSQL alert audit checks
 ##@ Utilities
 
 .PHONY: prereqs
-prereqs: ## Check prerequisites (flux, kubectl, kind, helm, docker)
-	@for bin in flux kubectl kind helm docker; do \
+prereqs: ## Check prerequisites (flux, kubectl, kind, helm, docker, tofu)
+	@for bin in flux kubectl kind helm docker tofu; do \
 	  if command -v $$bin >/dev/null 2>&1; then echo "  OK   $$bin"; \
 	  else echo "  MISS $$bin"; fi; \
 	done

@@ -46,6 +46,7 @@ kubernetes/
   infra/      # Controllers + configs: monitoring, APM, databases, secrets, SLO, kyverno, kong
   apps/       # Domain ResourceSets + per-service InputProviders + frontend
 scripts/      # Kind/Flux helpers (called by the Makefile)
+terraform/    # OpenTofu root: Flux Operator + FluxInstance bootstrap (flux-operator-bootstrap module)
 local-stack/  # Docker Compose e2e stack (Postgres + Redis + 8 services + nginx gateway + SPA)
 docs/         # Documentation (start at docs/README.md)
 ```
@@ -55,10 +56,18 @@ docs/         # Documentation (start at docs/README.md)
 ```bash
 make validate     # Kustomize/manifest dry-run — run before every push
 make up           # Kind + Flux + apps (one-command bring-up)
+make flux-up      # OpenTofu bootstrap of Flux Operator + FluxInstance (terraform/)
+make tf-plan      # Flux bootstrap drift check — zero diff once applied
 make flux-status  # flux get all -A
 make flux-push    # publish manifests to the OCI registry
 make flux-sync    # force reconciliation
 ```
+
+- **Flux bootstrap is OpenTofu, not `kubectl apply`.** `make flux-up` runs
+  `tofu apply` in `terraform/`; a bootstrap `Job` installs the operator and the
+  `FluxInstance` (`kubernetes/clusters/<cluster>/flux-system/instance.yaml`),
+  then Flux adopts and reconciles steady-state. Edit the `FluxInstance` in that
+  YAML, never duplicate it in Terraform. See [`terraform/README.md`](terraform/README.md).
 
 - **e2e:** `cd local-stack && docker compose up -d --build` → SPA at `:3001`, API gateway at `:8080`. Demo login `alice` / `password123` (by **username**).
 - **Service dev:** in the service repo, `GOTOOLCHAIN=auto go build ./... && go test ./...`.

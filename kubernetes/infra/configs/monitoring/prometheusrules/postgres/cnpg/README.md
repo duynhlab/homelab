@@ -14,7 +14,7 @@ helm template x cnpg/cluster --version 0.6.0 -n product \
   | yq eval 'select(.kind == "PrometheusRule")' -
 ```
 
-`fullnameOverride=cnpg-db` must match the CloudNativePG `Cluster` name [`cnpg-db`](../../../databases/clusters/cnpg-db/instance.yaml) so `pod=~"cnpg-db-([1-9][0-9]*)$"` is correct.
+`fullnameOverride=cnpg-db` must match the CloudNativePG `Cluster` name [`cnpg-db`](../../../../databases/clusters/cnpg-db/instance.yaml) so `pod=~"cnpg-db-([1-9][0-9]*)$"` is correct.
 
 ## File ↔ upstream map
 
@@ -34,6 +34,7 @@ helm template x cnpg/cluster --version 0.6.0 -n product \
 
 - `cluster-fenced.yaml` — `CnpgClusterFenced` (kept when splitting from legacy `postgres-alerts`).
 - `cluster-wal-size-high.yaml` — `PostgresWALSizeHigh` (CNPG WAL directory size).
+- `operator-health.yaml` — `CNPGOperatorDown`, `CNPGControllerReconcileErrorsSpiking` (operator `/metrics` via chart PodMonitor, ns `cloudnative-pg`). Operator-scope, not per-cluster.
 
 ## Metrics inventory
 

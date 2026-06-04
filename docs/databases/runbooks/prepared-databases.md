@@ -235,7 +235,7 @@ Remove the entire `preparedDatabases` section from the manifest. Handle extensio
 - Extensions must be installed through Flyway migrations or manually
 - `pg_partman` (non-trusted) requires superuser and cannot be installed via Flyway
 
-**Status**: This is the currently applied fix. The `preparedDatabases` section is commented out in [instance.yaml](../../kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml).
+**Status**: This is the currently applied fix. The `preparedDatabases` section is commented out in [instance.yaml](../../../kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml).
 
 ---
 
@@ -443,5 +443,5 @@ If `pg_partman` is listed in `extwlist.extensions`, the database owner can creat
 - [Zalando Postgres Operator: From databases to preparedDatabases](https://opensource.zalando.com/postgres-operator/docs/user.html#from-databases-to-prepareddatabases)
 - [Zalando Postgres Operator: Cross-namespace secrets](https://opensource.zalando.com/postgres-operator/docs/user.html#manifest-roles)
 - [PostgreSQL 15 Release Notes: Privilege changes](https://www.postgresql.org/docs/15/release-15.html)
-- [Instance manifest](../../kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml)
+- [Instance manifest](../../../kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml)
 - [Extensions management guide](../009-extensions.md)

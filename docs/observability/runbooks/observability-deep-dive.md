@@ -135,7 +135,7 @@ flowchart LR
 
 USE monitoring focuses on **PostgreSQL** -- the most critical infrastructure component.
 
-Source: [`kubernetes/infra/configs/monitoring/prometheusrules/postgres/`](../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/README.md)
+Source: [`kubernetes/infra/configs/monitoring/prometheusrules/postgres/`](../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/README.md)
 
 | USE Signal | Metric / Alert | PromQL |
 |-----------|---------------|--------|
@@ -375,7 +375,7 @@ slo:current_burn_rate:ratio{sloth_service="auth", sloth_slo="availability"}
 
 ### Application Alerts (Layer 1: Threshold)
 
-In addition to SLO burn-rate alerts, static threshold alerts provide **fast detection** of obvious failures. These are defined in [`microservices-alerts.yaml`](../../kubernetes/infra/configs/monitoring/prometheusrules/microservices-alerts.yaml) with pre-aggregated recording rules in [`microservices-recording-rules.yaml`](../../kubernetes/infra/configs/monitoring/prometheusrules/microservices-recording-rules.yaml).
+In addition to SLO burn-rate alerts, static threshold alerts provide **fast detection** of obvious failures. These are defined in [`microservices/alerts.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/microservices/alerts.yaml) with pre-aggregated recording rules in [`microservices/recording-rules.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/microservices/recording-rules.yaml).
 
 | Group | Alerts | Severity | Framework |
 |-------|--------|----------|-----------|
@@ -784,7 +784,7 @@ For every answer, structure as:
 
 - [Microservices Alerts Runbook](microservices-alerts.md) -- Per-alert investigation guide, workflows, threshold tuning, future expansion
 - [Observability Overview](../README.md) -- Master index, 4-pillar architecture
-- [Architecture Guide](../architecture.md) -- 3-layer architecture & middleware chain
+- [Observability Architecture](../README.md#3-layer-observability-architecture) -- 3-layer architecture & middleware chain
 - [Metrics Reference](../metrics/README.md) -- RED method, label strategy, cardinality
 - [Grafana Dashboard Guide](../grafana/dashboard-reference.md) -- 34-panel dashboard reference
 - [VictoriaMetrics Stack](../metrics/victoriametrics.md) -- Dual CRD system, VM Operator

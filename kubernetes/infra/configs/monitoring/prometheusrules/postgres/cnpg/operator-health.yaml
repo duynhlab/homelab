@@ -1,0 +1,35 @@
+# CloudNativePG operator health (homelab-authored, NOT chart-generated).
+# The CNPG operator exposes controller-runtime /metrics, scraped via the
+# chart PodMonitor (monitoring.podMonitorEnabled: true, ns cloudnative-pg).
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-operator-health
+  namespace: cloudnative-pg
+  labels:
+    app.kubernetes.io/part-of: cnpg-chart-rules
+    platform.duynhlab.dev/source: homelab
+spec:
+  groups:
+    - name: cloudnative-pg/operator
+      interval: 1m
+      rules:
+        - alert: CNPGOperatorDown
+          expr: up{namespace="cloudnative-pg", job=~".*cloudnative-pg.*"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "CloudNativePG operator down"
+            description: "PodMonitor scrape of the CNPG operator /metrics has been failing for 5m in ns cloudnative-pg."
+
+        - alert: CNPGControllerReconcileErrorsSpiking
+          expr: |
+            increase(controller_runtime_reconcile_errors_total{namespace="cloudnative-pg", job=~".*cloudnative-pg.*"}[10m]) > 5
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CNPG reconcile errors on {{ $labels.controller }}"
+            description: "{{ $value }} reconcile errors in 10m on controller {{ $labels.controller }}."

@@ -3,12 +3,12 @@
 > **Purpose**: Per-alert investigation guide for Kubernetes infrastructure alerts covering the USE Method (Utilization, Saturation, Errors) for pods, nodes, workloads, cache, API server, and network.
 >
 > **Manifests**:
-> - [`kubernetes-pod-resources-alerts.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/kubernetes-pod-resources-alerts.yaml)
-> - [`kubernetes-workload-alerts.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/kubernetes-workload-alerts.yaml)
-> - [`kubernetes-node-alerts.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/kubernetes-node-alerts.yaml)
-> - [`valkey-alerts.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/valkey-alerts.yaml)
-> - [`kube-apiserver-alerts.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/kube-apiserver-alerts.yaml)
-> - [`kubernetes-network-rules.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/kubernetes-network-rules.yaml)
+> - [`kubernetes/pod-resources-alerts.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/kubernetes/pod-resources-alerts.yaml)
+> - [`kubernetes/workload-alerts.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/kubernetes/workload-alerts.yaml)
+> - [`kubernetes/node-alerts.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/kubernetes/node-alerts.yaml)
+> - [`valkey/alerts.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/valkey/alerts.yaml)
+> - [`kubernetes/apiserver-alerts.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/kubernetes/apiserver-alerts.yaml)
+> - [`kubernetes/network-rules.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/kubernetes/network-rules.yaml)
 >
 > **Last Updated**: 2026-03-31
 

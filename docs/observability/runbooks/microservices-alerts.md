@@ -2,9 +2,9 @@
 
 > **Purpose**: Per-alert investigation guide for the 18 application-level PrometheusRules covering RED/Golden Signals, Go runtime, and saturation.
 >
-> **Manifest**: [`kubernetes/infra/configs/monitoring/prometheusrules/microservices-alerts.yaml`](../../kubernetes/infra/configs/monitoring/prometheusrules/microservices-alerts.yaml)
+> **Manifest**: [`kubernetes/infra/configs/monitoring/prometheusrules/microservices/alerts.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/microservices/alerts.yaml)
 >
-> **Recording Rules**: [`kubernetes/infra/configs/monitoring/prometheusrules/microservices-recording-rules.yaml`](../../kubernetes/infra/configs/monitoring/prometheusrules/microservices-recording-rules.yaml)
+> **Recording Rules**: [`kubernetes/infra/configs/monitoring/prometheusrules/microservices/recording-rules.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/microservices/recording-rules.yaml)
 >
 > **Last Updated**: 2026-03-13
 

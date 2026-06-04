@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **infra (Flux bootstrap → OpenTofu)**: Migrated the Flux Operator bootstrap from the imperative `helm install flux-operator` + `kubectl apply -k` flow to a declarative OpenTofu root under `terraform/`. The root calls the `controlplaneio-fluxcd/flux-operator-bootstrap/kubernetes` module (v0.7.0), which runs a bootstrap Job that installs the operator, applies the FluxInstance (read from `kubernetes/clusters/<cluster>/flux-system/instance.yaml` via `file()` — single source of truth, no duplication), and **blocks until the FluxInstance is Ready**. New files: `terraform/{versions,providers,variables,main}.tf`, `.gitignore`, `example.tfvars`, `README.md`. Providers target the Kind context via `config_context = var.kube_context` (default `kind-homelab`). Local state + provider auth for now; S3 backend, exec-plugin auth, and the `managed_resources.secrets_yaml` GHCR pull secret are prepared as commented-out blocks for production. Verified end-to-end on a live Kind cluster (FluxInstance Ready on Flux v2.8.8, `tofu plan` zero-diff idempotent).
+
+### Changed
+
+- **infra (bootstrap ordering)**: Reordered `make up` from `cluster-up flux-up flux-push` to **`cluster-up flux-push flux-up`**. Because the OpenTofu bootstrap now waits for the FluxInstance to become Ready, the sync OCI artifact (`flux-cluster-sync:<cluster>`) must exist in the registry before bootstrap runs — `flux-push` therefore has to precede `flux-up`. Rewrote `scripts/flux-up.sh` to run `tofu -chdir=terraform init/apply` (honours `TF_BIN` override) instead of `helm`/`kubectl`, added `tf-init`/`tf-plan`/`tf-apply`/`tf-destroy` Makefile targets and the `tofu` prereq check, and documented the OpenTofu bootstrap in `AGENTS.md` and `docs/platform/setup.md`.
+
 - **infra (OpenBAO)**: Added `openbao-unsealer` CronJob (every minute) under `kubernetes/infra/configs/secrets/openbao-bootstrap/` that re-unseals any Sealed pod using the `unseal_key` from the existing `openbao-init-keys` Secret. The bootstrap Job is one-shot, so after pod restarts (OOM/eviction/node reboot/Helm upgrade) the 3 Raft nodes re-sealed with Shamir and the whole secrets cascade (`cert-manager-local`, `databases-local`, `kong-local`, `apps-local`) blocked indefinitely. The CronJob is idempotent: skips already-unsealed pods, exits cleanly if the cluster has not been initialised yet. Production still needs transit-seal or cloud KMS — this is the Kind/local workaround.
 
 ### Changed

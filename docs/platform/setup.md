@@ -17,6 +17,7 @@ Comprehensive guide to deploying the microservices platform using **GitOps**, **
 
 - **Cluster Management**: `make cluster-up`, `make cluster-down`
 - **Flux Operations**: `make flux-up`, `make flux-push`, `make flux-sync`, `make flux-status`, `make flux-logs`, `make flux-ui`
+- **OpenTofu (Flux bootstrap)**: `make tf-init`, `make tf-plan`, `make tf-apply`, `make tf-destroy`
 - **Utilities**: `make prereqs`, `make help`
 
 ---
@@ -107,11 +108,16 @@ make flux-up
 ```
 
 **Actions Performed:**
-- Validates Kind cluster status.
-- Ensures the local OCI registry Is operational.
-- Installs the Flux Operator via Helm.
-- Provisions the `FluxInstance` resource.
-- Awaits readiness of Flux controllers.
+- Runs `tofu init` + `tofu apply` in `terraform/` (the
+  `controlplaneio-fluxcd/flux-operator-bootstrap` module).
+- A bootstrap `Job` installs the Flux Operator and applies the `FluxInstance`
+  from `kubernetes/clusters/local/flux-system/instance.yaml`.
+- Flux then adopts those resources and reconciles steady-state.
+- Awaits readiness of the `FluxInstance` / Flux controllers.
+
+> OpenTofu owns only the ephemeral bootstrap mechanism; re-running `make flux-up`
+> with unchanged manifests is a no-op (`make tf-plan` shows zero diff). See
+> [`terraform/README.md`](../../terraform/README.md).
 
 **Verification:**
 ```bash

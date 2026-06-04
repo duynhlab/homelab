@@ -34,4 +34,4 @@ All microservices are hosted in the `duynhlab` organization.
 
 ## 🛠️ Setup
 
-To clone all repositories for local development, follow the instructions in [docs/platform/SETUP.md](docs/platform/SETUP.md).
+To clone all repositories for local development, follow the instructions in [docs/platform/setup.md](docs/platform/setup.md).

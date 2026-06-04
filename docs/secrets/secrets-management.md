@@ -130,7 +130,7 @@ metadata:
     platform.duynhlab/backup: "walg"   # For Zalando/WAL-G clusters
 ```
 
-**ResourceSet namespaces**: Microservice namespaces are also created by Flux **ResourceSet** templates under [`kubernetes/apps/domains/`](kubernetes/apps/domains/). If the `Namespace` resource there omits `platform.duynhlab/backup`, app reconciliation can overwrite metadata and **drop** the label from `controllers/namespaces.yaml`, so ClusterExternalSecret **stops** matching and `pg-backup-rustfs-credentials` is not created. Keep the label in the ResourceSet `Namespace` block (identity: fixed `walg`; catalog/checkout/comms: optional `platform_backup_label` in the ResourceSetInputProvider for `cnpg` where needed).
+**ResourceSet namespaces**: Microservice namespaces are also created by Flux **ResourceSet** templates under [`kubernetes/apps/domains/`](../../kubernetes/apps/domains/). If the `Namespace` resource there omits `platform.duynhlab/backup`, app reconciliation can overwrite metadata and **drop** the label from `controllers/namespaces.yaml`, so ClusterExternalSecret **stops** matching and `pg-backup-rustfs-credentials` is not created. Keep the label in the ResourceSet `Namespace` block (identity: fixed `walg`; catalog/checkout/comms: optional `platform_backup_label` in the ResourceSetInputProvider for `cnpg` where needed).
 
 ### Pooler Secrets
 

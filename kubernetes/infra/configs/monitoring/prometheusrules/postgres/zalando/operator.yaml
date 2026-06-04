@@ -1,0 +1,28 @@
+# Zalando operator health.
+# NOTE: the Zalando operator does NOT expose a Prometheus /metrics endpoint
+# (port 8080 is a JSON status API only) — there is no `up` target and no
+# controller-runtime/workqueue series. Monitor liveness via kube-state-metrics
+# pod phase instead of scraping.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zalando-postgres-operator
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: zalando-postgres-rules
+spec:
+  groups:
+    - name: zalando-postgres-operator
+      interval: 1m
+      rules:
+        - alert: ZalandoOperatorDown
+          expr: |
+            kube_pod_status_phase{namespace="postgres-operator", pod=~"postgres-operator-[a-f0-9]+-.*", phase="Running"} == 0
+            or absent(kube_pod_status_phase{namespace="postgres-operator", pod=~"postgres-operator-[a-f0-9]+-.*"})
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Zalando Postgres Operator not Running"
+            description: "postgres-operator pod in ns postgres-operator has not been Running for 5m (operator exposes no /metrics, so liveness is derived from kube-state-metrics)."

@@ -12,6 +12,7 @@ Split from the former `postgres-alerts.yaml` monolith so CNPG-specific alerts li
 | `performance.yaml` | Connection saturation & lock contention for **custom_** metrics (auth-db); extend for Pigsty if needed |
 | `storage.yaml` | Database size (`pg_*` / `pg_database_size_bytes`) without CNPG-only series |
 | `maintenance.yaml` | Dead tuples, checkpoints — Zalando / pg_exporter paths |
+| `operator.yaml` | Operator pod liveness via kube-state-metrics (Zalando exposes **no** `/metrics`) |
 
 ## Note on mixed exporters
 

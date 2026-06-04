@@ -151,8 +151,8 @@ Recording rule naming follows Pigsty convention: `pg:<level>:<metric>` (e.g., `p
 
 The former monolith `postgres-alerts.yaml` was split by operator:
 
-- **[`kubernetes/infra/configs/monitoring/prometheusrules/postgres/cnpg/`](../../../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/cnpg/)** — CloudNativePG: chart-aligned rules (one file per upstream `cluster-*.yaml` from [cloudnative-pg/charts](https://github.com/cloudnative-pg/charts) `cluster` chart), plus small extras (`CnpgClusterFenced`, `PostgresWALSizeHigh`). Namespace **`product`** for chart-derived resources (matches `cnpg-db` cluster).
-- **[`kubernetes/infra/configs/monitoring/prometheusrules/postgres/zalando/`](../../../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/zalando/)** — Zalando: availability, `custom_*` connection/blocking, storage, maintenance (namespace **`monitoring`**).
+- **[`kubernetes/infra/configs/monitoring/prometheusrules/postgres/cnpg/`](../../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/cnpg/)** — CloudNativePG: chart-aligned rules (one file per upstream `cluster-*.yaml` from [cloudnative-pg/charts](https://github.com/cloudnative-pg/charts) `cluster` chart), plus small extras (`CnpgClusterFenced`, `PostgresWALSizeHigh`). Namespace **`product`** for chart-derived resources (matches `cnpg-db` cluster).
+- **[`kubernetes/infra/configs/monitoring/prometheusrules/postgres/zalando/`](../../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/zalando/)** — Zalando: availability, `custom_*` connection/blocking, storage, maintenance (namespace **`monitoring`**).
 
 **Note**: Rules are evaluated by **VMAlert** against **VMSingle**; Grafana Alerting can show read-only rules proxied via VMSingle (see [`docs/observability/metrics/victoriametrics.md`](../victoriametrics.md)). Notifications are not routed until Alertmanager is enabled.
 

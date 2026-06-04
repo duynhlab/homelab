@@ -77,7 +77,7 @@ flowchart LR
 | **Errors** | :white_check_mark: | `job_app:request_duration_seconds:error_ratio5m` | `MicroserviceHighErrorRate`, `MicroserviceErrorRateCritical`, `MicroserviceNoSuccessfulRequests` |
 | **Duration** | :white_check_mark: | `job_app:request_duration_seconds:p95_5m`, `p99_5m` | `MicroserviceHighLatencyP95`, `MicroserviceHighLatencyP99`, `MicroserviceLatencyCritical` |
 
-**Manifest**: [`prometheusrules/microservices-alerts.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/microservices-alerts.yaml), [`prometheusrules/microservices-recording-rules.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/microservices-recording-rules.yaml)
+**Manifest**: [`prometheusrules/microservices/alerts.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/microservices/alerts.yaml), [`prometheusrules/microservices/recording-rules.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/microservices/recording-rules.yaml)
 
 ---
 

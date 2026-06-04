@@ -312,7 +312,7 @@ This platform uses **Kong** as the only ingress controller. Kong terminates TLS 
   - `konghq.com/protocols: "https"`
   - `konghq.com/https-redirect-status-code: "301"`
 
-For the full Kong setup (CORS, rate limiting, ingress catalog, verification runbook) see [`docs/platform/kong-gateway.md`](kong-gateway.md).
+For the full Kong setup (CORS, rate limiting, ingress catalog, verification runbook) see [`docs/platform/kong-gateway.md`](../platform/kong-gateway.md).
 
 ---
 

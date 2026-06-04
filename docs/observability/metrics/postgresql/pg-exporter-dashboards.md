@@ -214,4 +214,4 @@ From the dashboards and pg_exporter design:
 - [pg_exporter GitHub](https://github.com/pgsty/pg_exporter)
 - [pg_exporter README](https://github.com/pgsty/pg_exporter#readme) – "There are two monitoring dashboards in the `monitor/` directory"
 - [Pigsty Demo](https://demo.pigsty.io/ui/) – Live dashboards
-- [PostgreSQL Monitoring](./postgresql-monitoring.md) – Our supporting-shared-db pg_exporter pilot context
+- [PostgreSQL Monitoring](./monitoring.md) – Our supporting-shared-db pg_exporter pilot context

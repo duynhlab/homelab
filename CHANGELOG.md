@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
-## [Unreleased]
+## [0.94.0] - 2026-06-09
 
 ### Added
 
@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **infra (OpenBAO)**: Added `openbao-unsealer` CronJob (every minute) under `kubernetes/infra/configs/secrets/openbao-bootstrap/` that re-unseals any Sealed pod using the `unseal_key` from the existing `openbao-init-keys` Secret. The bootstrap Job is one-shot, so after pod restarts (OOM/eviction/node reboot/Helm upgrade) the 3 Raft nodes re-sealed with Shamir and the whole secrets cascade (`cert-manager-local`, `databases-local`, `kong-local`, `apps-local`) blocked indefinitely. The CronJob is idempotent: skips already-unsealed pods, exits cleanly if the cluster has not been initialised yet. Production still needs transit-seal or cloud KMS — this is the Kind/local workaround.
 
 ### Changed
+
+- **infra (Grafana dashboard)**: Migrated the **Microservices Observability Platform** dashboard out of homelab and into the dedicated [`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards) repo. `grafana-dashboard-main.yaml` now loads it via `GrafanaDashboard` `spec.url` (raw GitHub, `dashboard/microservices-dashboard.json`) with `allowCrossNamespaceImport`, `resyncPeriod: 30s`, and `contentCacheDuration: 48h` — same pattern as the Flux/VictoriaMetrics dashboards — instead of the local `configMapGenerator`. Dropped the in-repo `microservices-dashboard.json` and its `grafana-dashboard-main` ConfigMap from `dashboards/kustomization.yaml`; refreshed `docs/observability/grafana/README.md`. **Order:** the dashboard PR in `grafana-dashboards` must merge to `main` before this reconciles, or the operator gets a 404.
 
 - **infra (bootstrap ordering)**: Reordered `make up` from `cluster-up flux-up flux-push` to **`cluster-up flux-push flux-up`**. Because the OpenTofu bootstrap now waits for the FluxInstance to become Ready, the sync OCI artifact (`flux-cluster-sync:<cluster>`) must exist in the registry before bootstrap runs — `flux-push` therefore has to precede `flux-up`. Rewrote `scripts/flux-up.sh` to run `tofu -chdir=terraform init/apply` (honours `TF_BIN` override) instead of `helm`/`kubectl`, added `tf-init`/`tf-plan`/`tf-apply`/`tf-destroy` Makefile targets and the `tofu` prereq check, and documented the OpenTofu bootstrap in `AGENTS.md` and `docs/platform/setup.md`.
 - **docs (README)**: Refreshed stale facts in `README.md` — Go `1.25`→`1.26`, Flyway `11`/`11.19.0`→`12.7.0` — and documented gRPC as the official east-west transport (auth `/me`, product→review, order→shipping/notification; gRPC-only on `:9090` via `pkg/grpcx`, RED metrics on `/metrics` via `pkg/obsx`) in Key features, the architecture "at a glance" notes, and the tech-stack table. Verified the "15 Grafana dashboards" count is accurate.

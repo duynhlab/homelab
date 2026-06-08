@@ -71,8 +71,10 @@ Dashboards are managed as `GrafanaDashboard` CRDs or JSON ConfigMaps:
 
 | Dashboard | Panels | Location |
 |-----------|--------|----------|
-| Microservices Observability | 34 panels, 5 rows | `grafana/dashboards/microservices-dashboard.json` |
+| Microservices Observability | 34 panels, 5 rows | [`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards/blob/main/dashboard/microservices-dashboard.json) (`GrafanaDashboard` `spec.url` raw, not a local ConfigMap) |
 | CloudNativePG Cluster Overview | Upstream CNPG cluster + operator metrics | `grafana/dashboards/cloudnative-pg-cluster.json` |
+
+**Microservices Observability**: JSON is hosted in the [`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards) repo and loaded via `GrafanaDashboard` `spec.url` (raw GitHub), mapping `DS_PROMETHEUS` → `VictoriaMetrics`. Edit the dashboard in that repo; the operator re-syncs (`resyncPeriod: 30s`, `contentCacheDuration: 48h`).
 
 **CloudNativePG**: JSON is vendored from [cloudnative-pg/grafana-dashboards](https://github.com/cloudnative-pg/grafana-dashboards) (`charts/cluster/grafana-dashboard.json`), adapted for the VictoriaMetrics plugin (same pattern as other JSON dashboards). `GrafanaDashboard` maps `DS_PROMETHEUS` → `VictoriaMetrics`. Cluster DB metrics use `PodMonitor` resources under [`kubernetes/infra/configs/databases/clusters/`](../../../kubernetes/infra/configs/databases/clusters/) (e.g. `cnpg-db/monitoring/`); the CNPG **operator** `PodMonitor` is created when `monitoring.podMonitorEnabled` is true on the [`cloudnative-pg` HelmRelease](../../../kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml).
 
@@ -103,7 +105,8 @@ kubernetes/infra/configs/monitoring/grafana/
 ├── datasource-jaeger.yaml
 ├── datasource-pyroscope.yaml
 └── dashboards/
-    └── microservices-dashboard.json
+    ├── grafana-dashboard-main.yaml     # Microservices Observability (GrafanaDashboard, spec.url → grafana-dashboards repo)
+    └── *.json / grafana-dashboard-*.yaml  # other dashboards (ConfigMap or URL)
 ```
 
 ## Related Documentation

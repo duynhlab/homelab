@@ -7,9 +7,10 @@ spec:
     matchLabels:
       dashboards: grafana
   folder: "Observability"
-  configMapRef:
-    name: grafana-dashboard-main
-    key: microservices-dashboard.json
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  url: "https://raw.githubusercontent.com/duynhlab/grafana-dashboards/main/dashboard/microservices-dashboard.json"
+  contentCacheDuration: 48h
   datasources:
     - inputName: DS_PROMETHEUS
       datasourceName: VictoriaMetrics

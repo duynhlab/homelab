@@ -8,9 +8,10 @@ spec:
     matchLabels:
       dashboards: grafana
   folder: "Databases"
-  configMapRef:
-    name: grafana-dashboard-pg-exporter-self
-    key: pg-exporter-self.json
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  url: "https://raw.githubusercontent.com/duynhlab/grafana-dashboards/main/dashboard/pg-exporter-self.json"
+  contentCacheDuration: 48h
   datasources:
     - inputName: DS_PROMETHEUS
       datasourceName: VictoriaMetrics

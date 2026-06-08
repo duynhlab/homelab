@@ -8,9 +8,10 @@ spec:
     matchLabels:
       dashboards: grafana
   folder: "Databases"
-  configMapRef:
-    name: grafana-dashboard-pg-monitoring
-    key: pg-monitoring.json
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  url: "https://raw.githubusercontent.com/duynhlab/grafana-dashboards/main/dashboard/pg-monitoring.json"
+  contentCacheDuration: 48h
   datasources:
     - inputName: DS_PROMETHEUS
       datasourceName: VictoriaMetrics

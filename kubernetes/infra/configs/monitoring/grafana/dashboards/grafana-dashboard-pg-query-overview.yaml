@@ -8,9 +8,10 @@ spec:
     matchLabels:
       dashboards: grafana
   folder: "Databases"
-  configMapRef:
-    name: grafana-dashboard-pg-query-overview
-    key: pg-query-overview.json
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  url: "https://raw.githubusercontent.com/duynhlab/grafana-dashboards/main/dashboard/pg-query-overview.json"
+  contentCacheDuration: 48h
   datasources:
     - inputName: DS_PROMETHEUS
       datasourceName: VictoriaMetrics

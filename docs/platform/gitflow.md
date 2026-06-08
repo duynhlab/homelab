@@ -649,7 +649,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) for automated c
 - Never force-push `main`.
 
 ### Database rollback
-- Flyway migrations are forward-only by design.
+- golang-migrate migrations are forward-only by design (we ship `.up.sql` only).
 - For emergency rollback, create a new migration that reverses the schema change.
 
 ---

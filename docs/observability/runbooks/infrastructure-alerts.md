@@ -267,7 +267,7 @@ kubectl logs -n $NAMESPACE job/$JOB_NAME --tail=200
 
 **Resolution**:
 - Check job logs for the failure reason
-- For Flyway migration jobs: check database connectivity and SQL syntax
+- For the migration init container (golang-migrate): check database connectivity and SQL syntax
 - Retry: `kubectl delete job -n $NAMESPACE $JOB_NAME` (will be recreated if managed by Flux)
 
 ---

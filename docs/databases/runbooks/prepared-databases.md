@@ -207,7 +207,7 @@ kubectl exec -n user supporting-shared-db-0 -c postgres -- \
 
 ### Fix 1: Remove `preparedDatabases` (current choice)
 
-Remove the entire `preparedDatabases` section from the manifest. Handle extensions through Flyway migrations or manual installation.
+Remove the entire `preparedDatabases` section from the manifest. Handle extensions through golang-migrate migrations or manual installation.
 
 **What to change** in `instance.yaml`:
 
@@ -232,8 +232,8 @@ Remove the entire `preparedDatabases` section from the manifest. Handle extensio
 - No changes to service configurations
 
 **Cons**:
-- Extensions must be installed through Flyway migrations or manually
-- `pg_partman` (non-trusted) requires superuser and cannot be installed via Flyway
+- Extensions must be installed through golang-migrate migrations or manually
+- `pg_partman` (non-trusted) requires superuser and cannot be installed via golang-migrate
 
 **Status**: This is the currently applied fix. The `preparedDatabases` section is commented out in [instance.yaml](../../../kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml).
 
@@ -380,12 +380,12 @@ Restructure the database ownership to follow the convention expected by `prepare
 
 Since `preparedDatabases` is removed, extensions must be installed through other means.
 
-### Trusted extensions (via Flyway migrations)
+### Trusted extensions (via golang-migrate migrations)
 
-Trusted extensions can be created by the database owner (no superuser required). Add to the first Flyway migration in each service:
+Trusted extensions can be created by the database owner (no superuser required). Add to the first golang-migrate migration in each service:
 
 ```sql
--- V1__init.sql (or add to existing first migration)
+-- 000001_init.up.sql (or add to existing first migration)
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 CREATE EXTENSION IF NOT EXISTS "citext";
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -423,7 +423,7 @@ If `pg_partman` is listed in `extwlist.extensions`, the database owner can creat
 |----------|--------------------------|-----|
 | Single owner per database, owner follows `<dbname>_owner` convention | Yes | Fully supported by operator |
 | Cross-namespace secrets (`namespace.username` format) | **No** | Owner name conflicts with `<dbname>_owner` convention |
-| Only need extensions, no role hierarchy | **No** | Simpler to use Flyway migrations |
+| Only need extensions, no role hierarchy | **No** | Simpler to use golang-migrate migrations |
 | Need `{db}_reader` / `{db}_writer` role hierarchy | Yes | This is the primary purpose of `preparedDatabases` |
 | PostgreSQL 14 or earlier | Yes (with caution) | Works due to PUBLIC having CREATE, but still not correct |
 | PostgreSQL 15+ | Only if ownership matches | Strict privilege model exposes the naming conflict |
@@ -431,7 +431,7 @@ If `pg_partman` is listed in `extwlist.extensions`, the database owner can creat
 ### Rules
 
 1. **Never** combine `databases: { foo: custom_owner }` with `preparedDatabases: { foo: ... }` unless `custom_owner` is exactly `foo_owner`.
-2. If you need cross-namespace secrets, use `databases` + `users` sections only. Install extensions via Flyway or manually.
+2. If you need cross-namespace secrets, use `databases` + `users` sections only. Install extensions via golang-migrate or manually.
 3. If you need the full `preparedDatabases` role hierarchy, do NOT use `namespace.username` format in `databases`. Use `ClusterExternalSecret` or similar for cross-namespace credential delivery instead.
 4. Always test `preparedDatabases` changes on a fresh cluster (delete and recreate) because the operator only runs `preparedDatabases` on first creation, not on updates.
 

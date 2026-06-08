@@ -147,8 +147,6 @@ spec:
           periodSeconds: 5
         migrations:
           enabled: true
-          image: << index inputs "registry_url" | default "ghcr.io/duynhlab" >>/<< inputs.name >>-service/<< inputs.name >>-init:latest
-          imagePullPolicy: Always
           env:
             DB_HOST: << inputs.db_migration_host >>
             DB_PORT: "5432"

@@ -19,7 +19,7 @@ SLOs with burn-rate alerts, and a single source of truth in Git delivered via Fl
 - Full observability: VictoriaMetrics, Tempo + Jaeger, VictoriaLogs + Vector, Pyroscope,
   15 Grafana dashboards.
 - 3 PostgreSQL clusters (Zalando + CloudNativePG) + 1 DR replica, fronted by PgBouncer
-  and PgDog. Schema migrations via Flyway 12.
+  and PgDog. Schema migrations via golang-migrate, embedded in each service binary.
 - Valkey (Redis-compatible) cache with Cache-Aside pattern in the Logic layer.
 - SLOs managed declaratively by Sloth Operator.
 - GitOps with Flux Operator, ResourceSets, OCI artifacts, and Kustomize.
@@ -114,7 +114,7 @@ flowchart TD
   Each service is its own repo, its own namespace, its own database role. East-west
   calls run over gRPC (`pkg/grpcx`); the edge stays HTTP/JSON.
 - **Data** — 3 PostgreSQL clusters with operators (Zalando + CloudNativePG), behind
-  poolers, with Flyway migrations. cnpg-db has a continuously-recovering DR replica.
+  poolers, with golang-migrate migrations. cnpg-db has a continuously-recovering DR replica.
 - **Observability** — OpenTelemetry-first across metrics, traces, logs, and profiles.
   All four pillars converge in Grafana via shared exemplars.
 - **Delivery** — Flux Operator pulls OCI artifacts from a registry. Domain ResourceSets
@@ -144,7 +144,7 @@ and [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
 |---|---|
 | RDBMS | PostgreSQL (Zalando operator + CloudNativePG) — 3 clusters + 1 DR replica |
 | Connection poolers | PgBouncer (auth, shared) · PgDog (product/cart/order) |
-| Migrations | Flyway 12.7.0 |
+| Migrations | golang-migrate v4.19.1 (embedded in each service binary, run via the `migrate` subcommand) |
 
 ### Platform
 

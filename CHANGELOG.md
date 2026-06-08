@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+## [Unreleased]
+
+### Changed
+
+- **infra (migrations)**: Replaced Flyway with **golang-migrate v4.19.1**, embedded in each service binary (`pkg/migratex` + `embed.FS`) and run via a `migrate` subcommand. The mop chart's init container now reuses the **app image** (`args: ["migrate"]`, chart `0.9.0`) against the direct DB host instead of a separate Flyway `<svc>-init` image; the domain ResourceSets drop `migrations.image` and `mop-chart-oci` tracks `>=0.9.0`. `local-stack` `*-migrate` services run the app image's `migrate`. This removes the JVM Flyway image and its recurring bundled-JAR CVE `.trivyignore` maintenance across all 8 services. Verified end-to-end on Docker Compose (all `*-migrate` exit 0; `schema_migrations` replaces `flyway_schema_history`; login/product/checkout green via the SPA).
+
 ## [0.94.0] - 2026-06-09
 
 ### Added

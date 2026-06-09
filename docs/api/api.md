@@ -1117,7 +1117,7 @@ The major version lives between the service and the audience (Variant A). Bumpin
 
 ### Overview
 
-All services include seed data via Flyway V2 migrations for immediate demo/local/dev functionality. Seed data is automatically loaded during database initialization.
+All services include seed data via golang-migrate `000002_*.up.sql` migrations for immediate demo/local/dev functionality. Seed data is automatically loaded during database initialization.
 
 ### Demo Users
 
@@ -1229,8 +1229,8 @@ All seed migrations use `ON CONFLICT DO NOTHING` to safely handle:
 ### Environment Configuration
 
 **Local/Dev/Demo**: ✅ Seed data enabled (default)  
-**Staging**: ⚠️ Optional (configure via Flyway target version)  
-**Production**: ❌ Disabled (use Flyway target or separate migration path)
+**Staging**: ⚠️ Optional (configure via golang-migrate target version)  
+**Production**: ❌ Disabled (use golang-migrate target or separate migration path)
 
 ### Migration Files
 
@@ -1238,11 +1238,11 @@ Seed data located in each service:
 
 ```
 {service}-service/db/migrations/sql/
-├── V1__init_schema.sql      # Schema creation
-└── V2__seed_{service}.sql   # Demo data
+├── 000001_init_schema.up.sql   # Schema creation
+└── 000002_seed_{service}.up.sql # Demo data
 ```
 
-**Flyway Execution**: V1 → V2 (automatic, no manual intervention)
+**golang-migrate Execution**: 000001 → 000002 (automatic via the `migrate` subcommand, no manual intervention)
 
 ### Verification
 

@@ -90,7 +90,7 @@ flowchart LR
 - **Observability:** middleware chain **tracing → logging → metrics**; gRPC RED metrics surface on each service's existing `/metrics` via `pkg/obsx` (no extra port); `obsx.TraceIDFromContext` correlates logs with traces. Stack: VictoriaMetrics, Grafana, Tempo, VictoriaLogs (Loki removed), Pyroscope, Jaeger, Vector. SLO via Sloth.
 - **Caching:** Cache-Aside with Valkey for read-heavy endpoints.
 - **Diagrams:** **Mermaid only — never ASCII art** (`flowchart`, `sequenceDiagram`, etc.).
-- **Stack:** Go 1.26, Gin, PostgreSQL (Zalando + CloudNativePG operators, PgBouncer/PgDog poolers, Flyway 12.7.0 migrations), OpenTelemetry, Flux Operator + Kustomize + OCI, Kind + Helm 3, OpenBAO + External Secrets Operator.
+- **Stack:** Go 1.26, Gin, PostgreSQL (Zalando + CloudNativePG operators, PgBouncer/PgDog poolers, golang-migrate v4.19.1 migrations embedded in each service binary), OpenTelemetry, Flux Operator + Kustomize + OCI, Kind + Helm 3, OpenBAO + External Secrets Operator.
 
 ## Kyverno admission rules
 

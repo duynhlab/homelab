@@ -83,7 +83,6 @@ flowchart TD
         BUILD["docker-build<br/>(--load → scan → push)"]
         SIGN[docker-sign]
         TRIVY_RPT["trivy-report<br/>(SARIF, optional)"]
-        DBINIT["docker-db-init<br/>(--load → scan → push)"]
         NOTIFY_BUILD[notify]
     end
 
@@ -97,13 +96,11 @@ flowchart TD
     GOCHECK2 --> SONAR2
     GITLEAKS2 --> SONAR2
     SONAR2 --> BUILD
-    SONAR2 --> DBINIT
     BUILD --> SIGN
     BUILD --> TRIVY_RPT
     BUILD --> NOTIFY_BUILD
     SIGN --> NOTIFY_BUILD
     TRIVY_RPT --> NOTIFY_BUILD
-    DBINIT --> NOTIFY_BUILD
 
     style GITLEAKS fill:#22c55e,color:#fff,stroke:#16a34a,stroke-width:2px
     style GITLEAKS2 fill:#22c55e,color:#fff,stroke:#16a34a,stroke-width:2px
@@ -203,8 +200,6 @@ flowchart TD
         BUILD["docker-build-go.yml<br/>(--load → Trivy → push)"]
         SIGN["docker-sign.yml"]
 
-        DBINIT["docker-build-go.yml (migration)<br/>(--load → Trivy → push)"]
-
         TRIVY_RPT["trivy-scan.yml<br/>(SARIF report, optional)"]
 
         NOTIFY2["status.yml"]
@@ -212,7 +207,6 @@ flowchart TD
         GOCHECK2 --> SONAR2
         GITLEAKS2 --> SONAR2
         SONAR2 --> BUILD
-        SONAR2 --> DBINIT
         BUILD -->|"scan pass → pushed"| SIGN
         BUILD -.->|"scan fail"| BUILD_FAIL["Image NOT pushed"]
         BUILD -->|"optional reporting"| TRIVY_RPT
@@ -220,7 +214,6 @@ flowchart TD
         BUILD --> NOTIFY2
         SIGN --> NOTIFY2
         TRIVY_RPT --> NOTIFY2
-        DBINIT --> NOTIFY2
     end
     
     style GITLEAKS2 fill:#22c55e,color:#fff,stroke:#16a34a,stroke-width:2px
@@ -345,7 +338,7 @@ flowchart TD
 | **3** | `sonar` | **Always** | **SonarCloud Analysis**: waits for 2a and 2b. Downloads `coverage-report` and runs Sonar scan. **Quality Gate enforcement is configurable**. |
 | **4** | `notify` | **Always** | **Reporting**: posts final pipeline status to Slack and Google Sheets (runs even if previous steps failed). |
 
-> **Skipped on PR:** `docker-build` / `trivy-report` / `docker-sign` / `docker-db-init` jobs do NOT run on PRs to avoid pushing images for non-merged code.
+> **Skipped on PR:** `docker-build` / `trivy-report` / `docker-sign` jobs do NOT run on PRs to avoid pushing images for non-merged code.
 
 ---
 
@@ -361,8 +354,7 @@ flowchart TD
 | **3** | `docker-build` | **Push to dev/staging/main** | **Build + Scan + Push**: builds image locally (`--load`), scans with Trivy for CRITICAL/HIGH CVEs. **Only pushes to GHCR if scan passes.** Outputs `tags`, `digest`, and `scan-status`. |
 | **4** | `trivy-report` | **After build (optional)** | **Vulnerability Reporting**: detailed scan with SARIF upload to GitHub Security tab and Google Sheets. Non-blocking (`exit-code: '0'`). |
 | **5** | `docker-sign` | **After build passes** | **Image Signing**: signs the image with Cosign keyless (OIDC). Only runs if build (including scan) succeeded. |
-| **6** | `docker-db-init` | **Push to dev/staging/main** | **Migration Artifact**: builds, scans, and pushes the migration image (Flyway init image) to GHCR. Also uses scan-before-push. |
-| **7** | `notify` | **Always** | **Reporting**: posts final pipeline status to Slack and Google Sheets. |
+| **6** | `notify` | **Always** | **Reporting**: posts final pipeline status to Slack and Google Sheets. |
 
 ### 3. Flow: Tag Release (Production Deploy)
 **Trigger:** A `vX.Y.Z` tag is pushed to `main`.
@@ -400,15 +392,15 @@ act push -W .github/workflows/build.yml --detect-event
 
 ## Docker Image Naming Convention
 
-GHCR auto-grants `write_package` permission to images whose name **matches the GitHub repository name**. To avoid permission errors, the `image-name` input in the builder workflow must match the repo name. Migration images use the `{repo-name}-init` suffix as a separate GHCR package.
+GHCR auto-grants `write_package` permission to images whose name **matches the GitHub repository name**. To avoid permission errors, the `image-name` input in the builder workflow must match the repo name. Migrations ship inside the app image (golang-migrate, run via the `migrate` subcommand in an init container) — there is no separate migration image.
 
-| GitHub Repo | GHCR Image (app) | GHCR Image (migration) |
-|---|---|---|
-| `product-service` | `ghcr.io/duynhlab/product-service` | `ghcr.io/duynhlab/product-service-init` |
-| `auth-service` | `ghcr.io/duynhlab/auth-service` | `ghcr.io/duynhlab/auth-service-init` |
-| `user-service` | `ghcr.io/duynhlab/user-service` | `ghcr.io/duynhlab/user-service-init` |
+| GitHub Repo | GHCR Image (app) |
+|---|---|
+| `product-service` | `ghcr.io/duynhlab/product-service` |
+| `auth-service` | `ghcr.io/duynhlab/auth-service` |
+| `user-service` | `ghcr.io/duynhlab/user-service` |
 
-**Convention**: Always use the full GitHub repo name as `image-name` (e.g., `product-service`, not `product`). Append `-init` for migration images (e.g., `product-service-init`).
+**Convention**: Always use the full GitHub repo name as `image-name` (e.g., `product-service`, not `product`).
 
 > **Note**: Helm values may reference different image names/tags (e.g., `product:v6`) that are managed separately from CI. The CI-published images and Helm-deployed images do not need to share the same GHCR repo.
 

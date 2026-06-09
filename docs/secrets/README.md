@@ -463,7 +463,7 @@ erDiagram
 
     DB_OWNER {
         string username
-        string purpose "DDL + Flyway migrations"
+        string purpose "DDL + golang-migrate migrations"
         string managed_by "KV v2 static (ESO)"
         string rotation "90 days static role"
     }
@@ -1146,7 +1146,7 @@ flowchart LR
 
 ### Use Case 2: 90-Day Compliance Rotation (EKS/GKE)
 
-For static owner users required by Flyway migrations — scheduled automatic rotation every 90 days:
+For static owner users required by golang-migrate migrations — scheduled automatic rotation every 90 days:
 
 ```bash
 # Create static role with automatic rotation
@@ -1157,7 +1157,7 @@ bao write database/static-roles/product-owner \
   rotation_period=2160h   # 90 days
 
 # ESO pulls the rotated password at next refreshInterval
-# Flyway migration pods read from this secret before running
+# Migration init containers read from this secret before running
 ```
 
 ### Use Case 3: Developer Database Access (On-Demand)
@@ -1202,7 +1202,7 @@ VAULT_TOKEN=$(curl -sk https://openbao.openbao.svc.cluster.local:8200/v1/auth/ap
 # Read deploy config (1h token, non-renewable, limited to cicd-deploy policy)
 DB_MIGRATION_PASSWORD=$(curl -sk \
   -H "X-Vault-Token: $VAULT_TOKEN" \
-  https://openbao.openbao.svc.cluster.local:8200/v1/secret/data/local/cicd/flyway-config \
+  https://openbao.openbao.svc.cluster.local:8200/v1/secret/data/local/cicd/migrate-config \
   | jq -r '.data.data.password')
 ```
 
@@ -1234,7 +1234,7 @@ bao lease revoke -prefix database/creds/
 | App service DB creds (`*-app-rw`) | Dynamic | 1h / max 24h | ESO refreshInterval: 55m |
 | Developer DB creds | Dynamic | 8h / max 16h | OIDC session expiry |
 | Data team DB creds (`*-readonly`) | Dynamic | 8h / max 24h | OIDC session expiry |
-| Owner/DDL creds (Flyway) | Static role | 90 days | OpenBAO `rotation_period` |
+| Owner/DDL creds (golang-migrate) | Static role | 90 days | OpenBAO `rotation_period` |
 | ESO Vault token | Service token | 1h, renewable | Kubernetes auth TTL |
 | S3 backup creds (KV) | Static | N/A | Manual (`bao kv put`) |
 | PgDog pooler admin (KV) | Static | N/A | Manual |

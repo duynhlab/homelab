@@ -1,6 +1,6 @@
 # Local end-to-end test stack for the duynhlab e-commerce platform.
 #
-# Brings up: Postgres (7 DBs) + Redis cache + per-service Flyway migrations
+# Brings up: Postgres (7 DBs) + Redis cache + per-service golang-migrate migrations
 # + 7 Go services + an nginx pass-through gateway + the React frontend.
 #
 # Build contexts point at sibling repos (../../<service>), so all repos must be
@@ -32,11 +32,6 @@ x-svc-healthcheck: &svc-healthcheck
   retries: 12
   start_period: 15s
 
-x-flyway-env: &flyway-env
-  FLYWAY_USER: postgres
-  FLYWAY_PASSWORD: postgres
-  FLYWAY_CONNECT_RETRIES: "30"
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -60,53 +55,53 @@ services:
       timeout: 3s
       retries: 10
 
-  # ---- Flyway migrations (one-shot, per service DB) ----
+  # ---- golang-migrate migrations (one-shot, per service DB; app image `migrate`) ----
   auth-migrate:
-    build: { context: ../../auth-service/db/migrations }
+    build: { context: ../../auth-service }
     command: ["migrate"]
-    environment: { <<: *flyway-env, FLYWAY_URL: "jdbc:postgresql://postgres:5432/auth?sslmode=disable" }
+    environment: { <<: *svc-env, SERVICE_NAME: auth, DB_NAME: auth }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   user-migrate:
-    build: { context: ../../user-service/db/migrations }
+    build: { context: ../../user-service }
     command: ["migrate"]
-    environment: { <<: *flyway-env, FLYWAY_URL: "jdbc:postgresql://postgres:5432/user?sslmode=disable" }
+    environment: { <<: *svc-env, SERVICE_NAME: user, DB_NAME: user }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   product-migrate:
-    build: { context: ../../product-service/db/migrations }
+    build: { context: ../../product-service }
     command: ["migrate"]
-    environment: { <<: *flyway-env, FLYWAY_URL: "jdbc:postgresql://postgres:5432/product?sslmode=disable" }
+    environment: { <<: *svc-env, SERVICE_NAME: product, DB_NAME: product }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   cart-migrate:
-    build: { context: ../../cart-service/db/migrations }
+    build: { context: ../../cart-service }
     command: ["migrate"]
-    environment: { <<: *flyway-env, FLYWAY_URL: "jdbc:postgresql://postgres:5432/cart?sslmode=disable" }
+    environment: { <<: *svc-env, SERVICE_NAME: cart, DB_NAME: cart }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   order-migrate:
-    build: { context: ../../order-service/db/migrations }
+    build: { context: ../../order-service }
     command: ["migrate"]
-    environment: { <<: *flyway-env, FLYWAY_URL: "jdbc:postgresql://postgres:5432/order?sslmode=disable" }
+    environment: { <<: *svc-env, SERVICE_NAME: order, DB_NAME: order }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   review-migrate:
-    build: { context: ../../review-service/db/migrations }
+    build: { context: ../../review-service }
     command: ["migrate"]
-    environment: { <<: *flyway-env, FLYWAY_URL: "jdbc:postgresql://postgres:5432/review?sslmode=disable" }
+    environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   shipping-migrate:
-    build: { context: ../../shipping-service/db/migrations }
+    build: { context: ../../shipping-service }
     command: ["migrate"]
-    environment: { <<: *flyway-env, FLYWAY_URL: "jdbc:postgresql://postgres:5432/shipping?sslmode=disable" }
+    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   notification-migrate:
-    build: { context: ../../notification-service/db/migrations }
+    build: { context: ../../notification-service }
     command: ["migrate"]
-    environment: { <<: *flyway-env, FLYWAY_URL: "jdbc:postgresql://postgres:5432/notification?sslmode=disable" }
+    environment: { <<: *svc-env, SERVICE_NAME: notification, DB_NAME: notification }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
 

@@ -336,7 +336,7 @@ username_template = "v-k8s-{{.RoleName | truncate 20}}-{{unix_time}}"
 | App dynamic creds (services) | 1h | 24h | ESO `refreshInterval: 55m` |
 | Dev team dynamic creds | 8h | 16h | OIDC session expiry |
 | Data team readonly creds | 8h | 24h | OIDC session expiry |
-| Static owner creds (Flyway) | 90 days | — | Manual or scheduled job |
+| Static owner creds (golang-migrate) | 90 days | — | Manual or scheduled job |
 | S3/backup creds (KV) | N/A | — | Manual rotation (no auto-rotation) |
 | OIDC/CI tokens | 1h | 1h | Non-renewable |
 
@@ -527,7 +527,7 @@ Pod (product-service) → reads K8s Secret (cnpg-db-product-creds)
 
 ### Use Case 2: Rotation Every 90 Days (Compliance)
 
-For static owner credentials (Flyway migrations):
+For static owner credentials (golang-migrate migrations):
 
 ```bash
 # Triggered by CI/CD pipeline on schedule (GitHub Actions cron)

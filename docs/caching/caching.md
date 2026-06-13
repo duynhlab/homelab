@@ -472,12 +472,14 @@ kubectl exec -n cache-system deploy/valkey -- redis-cli GET "product:14"
 ---
 ## Future Enhancements
 
-- **Negative caching**: short-TTL cache entries for not-found ids to stop penetration under id-scanning.
-- **Cross-service invalidation**: an event/hook so non-product writers (e.g. stock changes) can invalidate the detail cache instead of waiting out the TTL.
-- **Cache warming**: Pre-populate cache on service startup
-- **Distributed caching**: Valkey cluster for high availability
-- **Cache compression**: Compress large cache values
-- **Cache metrics**: Custom Prometheus metrics for cache operations
+Prioritized; the first items close documented gaps from the cache review.
+
+1. **Negative caching** — short-TTL entries for not-found ids to stop penetration under id-scanning. (Closes the documented penetration gap.)
+2. **Stronger stampede under slow DB** — an in-process `singleflight` (or a larger waiter budget) so the single-flight guarantee holds when the DB itself is slow, not just on the happy path.
+3. **Uncancellable lock release** — release the stampede lock on `context.WithoutCancel` so a client disconnect mid-fetch frees the lock immediately instead of waiting out its TTL.
+4. **Cross-service invalidation** *(contingent)* — only if product writes (e.g. stock) ever move outside product-service; an event/hook to invalidate the detail cache instead of waiting out the TTL.
+5. **App-level cache metrics** — Prometheus hit/miss/error counters to complement the server-side `valkey_keyspace_*` metrics already scraped.
+6. **Valkey HA** *(lower priority since reads are fail-open)* — a cluster protects the cache tier under load, not availability (a Valkey outage already degrades to DB).
 
 ## References
 

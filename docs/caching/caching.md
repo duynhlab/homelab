@@ -133,6 +133,47 @@ The product service mounts caching only on **read** endpoints below. Routes are 
    - **Busy**: spin every 50ms (re-checking cache) up to 500ms; on timeout fall back to `fetchFunc` to keep the request available.
    - **Fail-open**: if Valkey itself errors (the `GET` or the lock `SETNX`), the read degrades straight to `fetchFunc` (DB) instead of returning an error — see [Resilience & Failure Modes](#resilience--failure-modes).
 
+#### Workflow (sequence)
+
+The full single-product read path — cache hit, stampede-locked miss, waiter spin, and fail-open:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Logic layer
+    participant PC as ProductCache
+    participant V as Valkey
+    participant DB as PostgreSQL
+
+    C->>PC: GetProductOrSet(id, fetchFunc)
+    PC->>V: GET product:{id}
+
+    alt Cache hit
+        V-->>PC: product JSON
+        PC-->>C: product
+    else Cache miss OR Valkey error (fail-open)
+        Note over PC,V: a Valkey error here is treated as a miss
+        PC->>V: SETNX lock:product:{id} = token (TTL 5s)
+
+        alt Lock acquired (owner)
+            V-->>PC: OK
+            PC->>DB: fetchFunc()  (FindByID)
+            DB-->>PC: product
+            PC->>V: SET product:{id} (TTL 10m + ≤10% jitter)
+            PC->>V: DeleteIfEqual lock = token (Lua compare-and-delete)
+            PC-->>C: product
+        else Lock busy (waiter)
+            V-->>PC: not set
+            loop every 50ms, up to 500ms
+                PC->>V: GET product:{id}
+                V-->>PC: hit → return product
+            end
+            Note over PC,DB: on timeout → fetchFunc() (DB fallback, stays available)
+            PC-->>C: product
+        end
+    end
+```
+
 ### `GET /product/v1/public/products/:id/details` — aggregation
 
 Reuses the same single-product cache path (calls `ProductService.GetProduct` internally) and then aggregates review data from the review service. The product portion benefits from the detail cache and stampede lock; review aggregation is not cached at this layer.
@@ -431,12 +472,16 @@ kubectl exec -n cache-system deploy/valkey -- redis-cli GET "product:14"
 ---
 ## Future Enhancements
 
-- **Negative caching**: short-TTL cache entries for not-found ids to stop penetration under id-scanning.
-- **Cross-service invalidation**: an event/hook so non-product writers (e.g. stock changes) can invalidate the detail cache instead of waiting out the TTL.
-- **Cache warming**: Pre-populate cache on service startup
-- **Distributed caching**: Valkey cluster for high availability
-- **Cache compression**: Compress large cache values
-- **Cache metrics**: Custom Prometheus metrics for cache operations
+Prioritized; the first items close documented gaps from the cache review.
+
+| # | Enhancement | Priority | Why / notes |
+|---|-------------|----------|-------------|
+| 1 | **Negative caching** | High | Short-TTL entries for not-found ids to stop penetration under id-scanning. Closes the documented penetration gap. |
+| 2 | **Stronger stampede under slow DB** | High | In-process `singleflight` (or a larger waiter budget) so the single-flight guarantee holds when the DB itself is slow, not just on the happy path. |
+| 3 | **Uncancellable lock release** | Medium | Release the stampede lock on `context.WithoutCancel` so a client disconnect mid-fetch frees the lock immediately instead of waiting out its TTL. |
+| 4 | **Cross-service invalidation** | Contingent | Only if product writes (e.g. stock) ever move outside product-service; an event/hook to invalidate the detail cache instead of waiting out the TTL. |
+| 5 | **App-level cache metrics** | Medium | Prometheus hit/miss/error counters to complement the server-side `valkey_keyspace_*` metrics already scraped. |
+| 6 | **Valkey HA** | Low | Reads are fail-open, so a cluster protects the cache tier under load, not availability (a Valkey outage already degrades to DB). |
 
 ## References
 

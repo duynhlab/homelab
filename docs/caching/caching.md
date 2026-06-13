@@ -13,7 +13,7 @@ Valkey caching is integrated into the Product service to improve performance for
 
 ## Architecture Integration
 
-Caching is implemented in the **Core Layer** (`internal/core/cache/`), following the same pattern as repository interfaces:
+The cache **abstraction** lives in the **Core Layer** (`internal/core/cache/`), following the same pattern as repository interfaces; the **cache-aside orchestration** (deciding when to read, populate, and invalidate) lives in the **Logic Layer**:
 
 ```mermaid
 flowchart TD

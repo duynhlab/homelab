@@ -590,7 +590,7 @@ spec:
 
 **pgAudit Log Output**:
 
-CloudNativePG outputs pgAudit logs in JSON format to standard output, which integrates with Kubernetes logging infrastructure (e.g., Vector, Loki).
+CloudNativePG outputs pgAudit logs in JSON format to standard output, which integrates with Kubernetes logging infrastructure (e.g., Vector, VictoriaLogs).
 
 **pgAudit Log Levels**:
 - `none`: No logging
@@ -779,7 +779,7 @@ spec:
    ```
 
 **pgAudit Log Output**:
-pgAudit logs are written to PostgreSQL log files, which are collected by sidecars (e.g., Vector) and forwarded to log aggregation systems (e.g., Loki).
+pgAudit logs are written to PostgreSQL log files, which are collected by sidecars (e.g., Vector) and forwarded to log aggregation systems (e.g., VictoriaLogs).
 
 **Best Practices**:
 - Set `shared_preload_libraries` during cluster creation
@@ -902,7 +902,7 @@ kubectl exec -it <pod-name> -n <namespace> -- ls -la /extensions/<extension-name
   - `system-trixie` image has pgaudit binary built-in (no ImageVolume needed)
   - `shared_preload_libraries` loads it at startup
   - Database resources run `CREATE EXTENSION` declaratively
-  - Logs output: JSON format to stdout, collected by Vector sidecar → Loki
+  - Logs output: JSON format to stdout, collected by Vector sidecar → VictoriaLogs
 - **Considerations**: 
   - Increases log volume significantly
   - May impact performance (especially with `pgaudit.log: "all"`)
@@ -979,7 +979,7 @@ kubectl exec -it <pod-name> -n <namespace> -c postgres -- ls -la /extensions/
 # View logs directly from pod
 kubectl logs <pod-name> -n <namespace> -c postgres | grep pgaudit
 
-# Or view in Loki/Grafana if logs are collected by Vector sidecar
+# Or view in VictoriaLogs/Grafana if logs are collected by Vector sidecar
 # Logs are in JSON format and include audit information
 ```
 

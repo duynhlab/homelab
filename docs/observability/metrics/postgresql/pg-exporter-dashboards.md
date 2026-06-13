@@ -72,8 +72,8 @@ This document analyzes the Grafana dashboards shipped in the Pigsty [pg_exporter
 | Query Duration | `increase(pg_exporter_query_scrape_duration{ins="$ins"}[1m]) / increase(pg_exporter_query_scrape_total_count{ins="$ins"}[1m])` |
 | Query Cache Hit Rate | `increase(pg_exporter_query_scrape_hit_count{ins="$ins"}[5m]) / increase(pg_exporter_query_scrape_total_count{ins="$ins"}[5m])` |
 | Cache TTL | `pg_exporter_query_cache_ttl{ins="$ins"}`, `pgbouncer_exporter_query_cache_ttl{ins="$ins"}` |
-| Logs per interval | VictoriaLogs (upstream is Loki LogQL; adapt to LogsQL): `count_over_time(({ip="$ip", src="syslog"} |~ "pg_exporter")[$__interval])` |
-| Recent Logs | VictoriaLogs (upstream is Loki LogQL; adapt to LogsQL): `{ip="$ip"} |~ "pg_exporter"` |
+| Logs per interval | VictoriaLogs (LogsQL): `count_over_time(({ip="$ip", src="syslog"} |~ "pg_exporter")[$__interval])` |
+| Recent Logs | VictoriaLogs (LogsQL): `{ip="$ip"} |~ "pg_exporter"` |
 
 ### 2.5 Expected Metrics (pgsql-exporter dashboard)
 

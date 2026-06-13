@@ -50,7 +50,7 @@ docs/
 │   │   ├── architecture.md       # Dual backend (Tempo + Jaeger)
 │   │   └── jaeger.md             # Jaeger UI guide
 │   ├── logging/                  # Pillar 3: Structured Logging
-│   │   ├── README.md             # Dual backend: Loki + VictoriaLogs (single Vector)
+│   │   ├── README.md             # VictoriaLogs (single Vector)
 │   │   └── victorialogs.md       # VictoriaLogs backend
 │   ├── profiling/                # Pillar 4: Continuous Profiling
 │   │   └── README.md             # Pyroscope (CPU, heap, goroutine)
@@ -85,7 +85,7 @@ docs/
 │       ├── pgcat_read_only_transaction_error.md
 │       ├── pgcat_upstream_connectivity_errors.md
 │       ├── postgres_backup_restore.md  # PostgreSQL backup/restore procedures
-│       └── loki_kubernetes_logs_debug.md  # Loki log debugging
+│       └── victorialogs_kubernetes_logs_debug.md  # VictoriaLogs log debugging
 ├── secrets/                      # Secrets, TLS & trust distribution (one chain)
 │   ├── README.md                 # OpenBAO architecture & operations (folder hub)
 │   ├── secrets-management.md     # Per-app ESO usage, add/rotate runbooks
@@ -177,9 +177,9 @@ docs/
 3. **[Tracing Architecture](./observability/tracing/architecture.md)** - Dual backend (Tempo + Jaeger)
 4. **[Jaeger Guide](./observability/tracing/jaeger.md)** - Jaeger UI usage, comparison with Tempo
 5. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
-6. **[Structured Logging](./observability/logging/README.md)** - Dual backend: Loki + VictoriaLogs (single Vector)
+6. **[Structured Logging](./observability/logging/README.md)** - VictoriaLogs (single Vector)
 7. **[VictoriaLogs](./observability/logging/victorialogs.md)** - VictoriaLogs deployment and configuration
-    - Single Vector architecture (dual-ship to Loki + VictoriaLogs)
+    - Single Vector architecture (ships to VictoriaLogs)
     - PostgreSQL auto_explain plan parsing pipeline
     - Verification and troubleshooting
 
@@ -231,7 +231,7 @@ docs/
 3. **[PgCat Read-Only Transaction](./runbooks/troubleshooting/pgcat_read_only_transaction_error.md)** - Fix read-only transaction errors
 4. **[PgCat Upstream Connectivity](./runbooks/troubleshooting/pgcat_upstream_connectivity_errors.md)** - Fix upstream connectivity errors
 5. **[PostgreSQL Backup/Restore](./runbooks/troubleshooting/postgres_backup_restore.md)** - Backup and restore procedures (CNPG vs Zalando)
-6. **[Loki Log Debugging](./runbooks/troubleshooting/loki_kubernetes_logs_debug.md)** - Kubernetes log debugging with Loki
+6. **[VictoriaLogs Log Debugging](./runbooks/troubleshooting/victorialogs_kubernetes_logs_debug.md)** - Kubernetes log debugging with VictoriaLogs
 
 ---
 
@@ -263,7 +263,7 @@ docs/
 - [Tracing Architecture](./observability/tracing/architecture.md) - Dual backend (Tempo + Jaeger)
 - [Jaeger Guide](./observability/tracing/jaeger.md) - Jaeger UI usage, comparison with Tempo
 - [Continuous Profiling](./observability/profiling/README.md) - Pyroscope setup
-- [Structured Logging](./observability/logging/README.md) - Dual backend: Loki + VictoriaLogs (single Vector)
+- [Structured Logging](./observability/logging/README.md) - VictoriaLogs (single Vector)
 - [VictoriaLogs](./observability/logging/victorialogs.md) - VictoriaLogs deployment (single Vector, dual-ship)
 
 ### API
@@ -314,7 +314,7 @@ docs/
 - [PgCat Read-Only Transaction](./runbooks/troubleshooting/pgcat_read_only_transaction_error.md) - Fix read-only transaction errors
 - [PgCat Upstream Connectivity](./runbooks/troubleshooting/pgcat_upstream_connectivity_errors.md) - Fix upstream connectivity errors
 - [PostgreSQL Backup/Restore](./runbooks/troubleshooting/postgres_backup_restore.md) - Backup and restore procedures
-- [Loki Log Debugging](./runbooks/troubleshooting/loki_kubernetes_logs_debug.md) - Kubernetes log debugging with Loki
+- [VictoriaLogs Log Debugging](./runbooks/troubleshooting/victorialogs_kubernetes_logs_debug.md) - Kubernetes log debugging with VictoriaLogs
 
 ---
 
@@ -333,7 +333,7 @@ docs/
 - **8 Microservices** - All services with v1 API (canonical)
 - **Monitoring Stack** - VictoriaMetrics Operator (VMAgent, VMSingle, VMAlert, VMAlertmanager) + prometheus-operator-crds + Grafana Operator + metrics-server
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
-- **APM Stack** - Tempo + Jaeger (tracing), OTel Collector (fan-out), Pyroscope (profiling), Loki + VictoriaLogs + Vector (logging)
+- **APM Stack** - Tempo + Jaeger (tracing), OTel Collector (fan-out), Pyroscope (profiling), VictoriaLogs + Vector (logging)
 - **Secrets Stack** - OpenBAO (HA Raft) + External Secrets Operator for centralized secret management
 - **TLS / PKI** - cert-manager with **dual issuers**: Let's Encrypt (DNS-01 via Cloudflare) for browser-facing `*.duynh.me`; self-signed `homelab-ca` for future internal mTLS, distributed via trust-manager `homelab-ca-bundle`
 - **Bootstrap-only secrets** - Cloudflare API token (`secret/local/infra/cloudflare/api-token`) is operator-supplied (not in Git, not seeded by `openbao-bootstrap`); re-seed after every fresh cluster

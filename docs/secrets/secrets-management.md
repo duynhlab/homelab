@@ -59,7 +59,7 @@ flowchart LR
 - **Mode**: HA with Raft integrated storage (3 replicas, 10Gi PVC per node)
 - **Auth Method**: Kubernetes (ServiceAccount-based via TokenReview API)
 - **Secrets Engine**: KV v2 at path `secret/`
-- **Audit Logging**: Stdout audit device (collected by Vector -> Loki)
+- **Audit Logging**: Stdout audit device (collected by Vector -> VictoriaLogs)
 - **Bootstrap**: Idempotent Job — init, unseal, configure on each deploy
 - **Seal**: Shamir (1-share) for Kind; AWS KMS / GCP KMS for EKS/GKE
 

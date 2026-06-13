@@ -15,6 +15,37 @@ The complete, authoritative list of every HTTP path in the platform (browser-fac
 
 ---
 
+## API conventions
+
+### Error envelope
+
+Every error response carries a human-readable `error` string **and** a stable,
+machine-readable `code` (added with the shared `pkg/httpx` helper):
+
+```json
+{ "error": "Product not found", "code": "NOT_FOUND" }
+```
+
+The `error` string may be reworded or localized; **`code` is the contract** clients
+should branch on. Codes: `VALIDATION_ERROR`, `NOT_FOUND`, `UNAUTHORIZED`,
+`FORBIDDEN`, `CONFLICT`, `INTERNAL_ERROR`. The per-endpoint tables below show the
+`error` message; `code` is added uniformly via `httpx.RespondError`.
+
+### List pagination
+
+Collection endpoints return a pagination envelope, not a bare array:
+
+```json
+{ "items": [ ... ], "page": 1, "page_size": 20, "total_items": 42, "total_pages": 3 }
+```
+
+Query params: `page` (default 1) and `page_size` (default 20, max 100); invalid or
+out-of-range values fall back to the defaults. Paginated lists: products, reviews,
+orders, notifications. (Note: `product` still accepts the legacy `limit` query param
+for page size; the other three use `page_size` — to be unified.)
+
+---
+
 ## 3-Layer Architecture Responsibility
 
 All backend services follow a strict 3-layer architecture. Understanding these layers is essential for both frontend and backend engineers.

@@ -10,8 +10,10 @@
 
 ## Implementation status
 
-The migration is **complete**: every internal service-to-service call runs over
+The migration is **complete**: the internal service-to-service calls run over
 gRPC, the servers are always-on (no feature flag), and there is no REST fallback.
+The one remaining exception is the `order → cart` cart-read on checkout, which is
+still REST (HTTP/JSON) — see the hop table below.
 
 | Hop / item | Status | Where |
 |------------|--------|-------|

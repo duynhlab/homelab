@@ -93,7 +93,7 @@ OpenBAO is a community fork of HashiCorp Vault created after the BSL license cha
 | **User Lockout** | Brute-force protection for OIDC users | Security hardening |
 | **Recovery Mode** | Emergency cluster recovery | Day-2 operations; when Raft quorum is lost |
 | **PGP/Keybase** | Encrypt unseal keys at initialization | Security ceremony; store encrypted shards offline |
-| **Audit Logging** | Already enabled (stdout → Vector → Loki) | Keep; extend to file backend for compliance |
+| **Audit Logging** | Already enabled (stdout → Vector → VictoriaLogs) | Keep; extend to file backend for compliance |
 
 #### Tier 4: Skip for Now
 
@@ -773,7 +773,7 @@ For this project's goals (learning + production patterns + EKS/GKE readiness):
 | **Do soon** | Fix CNPG hardcoded passwords; implement password policies |
 | **Do for team access** | OIDC auth for dev/data teams; Identity groups |
 | **Do for EKS/GKE** | Switch Transit auto-unseal → AWS KMS / GCP KMS; enable Namespaces |
-| **Do for compliance** | Static role 90-day rotation; audit log → Loki pipeline |
+| **Do for compliance** | Static role 90-day rotation; audit log → VictoriaLogs pipeline |
 | **Skip for now** | Transform engine, Mount migration, PGP ceremony (until real production) |
 
 The biggest immediate security wins are:

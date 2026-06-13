@@ -87,7 +87,7 @@ flowchart TD
                 kv["KV v2: secret/\nInfra, backup, pooler creds"]
                 db["Database: database/\nDynamic PostgreSQL creds"]
                 transit["Transit: transit/\nEncryption + auto-unseal"]
-                audit["Audit: file → stdout\nVector → Loki"]
+                audit["Audit: file → stdout\nVector → VictoriaLogs"]
             end
 
             subgraph authmethods["Auth Methods"]
@@ -1042,8 +1042,8 @@ SA_TOKEN=$(kubectl create token external-secrets -n external-secrets-system)
 curl -sk https://openbao.openbao.svc.cluster.local:8200/v1/auth/kubernetes/login \
   -d "{\"role\":\"eso-reader\",\"jwt\":\"$SA_TOKEN\"}"
 
-# Check audit log (Vector → Loki) for denied requests
-# In Grafana: {namespace="openbao", stream="stdout"} | json | type="response" | error!=""
+# Check audit log (Vector → VictoriaLogs) for denied requests
+# In Grafana (VictoriaLogs, LogsQL): _stream:{namespace="openbao"} stream:=stdout | unpack_json | type:=response error:!=""
 ```
 
 ### Dynamic Credentials Not Working
@@ -1219,8 +1219,8 @@ bao token revoke <token>
 # 3. Revoke all dynamic DB credentials they held
 bao lease revoke -prefix database/creds/
 
-# 4. Audit log shows exactly what they accessed (Grafana Loki query):
-# {namespace="openbao"} | json | auth_display_name="john.doe@company.com"
+# 4. Audit log shows exactly what they accessed (Grafana VictoriaLogs / LogsQL):
+# _stream:{namespace="openbao"} | unpack_json | auth_display_name:="john.doe@company.com"
 
 # 5. Create new OIDC session next time with MFA enforced
 ```

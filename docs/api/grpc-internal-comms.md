@@ -6,12 +6,14 @@
 | **Status** | **Implemented** — every east-west hop runs over gRPC (gRPC-only, no feature flag); cluster wired via headless Services; Phase 3 NetworkPolicy fences `:9090`, mTLS deferred. See [§7 roadmap](#7-phased-roadmap). |
 | **Scope** | Internal (east-west) service-to-service calls only |
 | **Relation** | Complements [`api-naming-convention.md`](api-naming-convention.md) (HTTP/JSON URL surface stays the law of the land) |
-| **Last updated** | 2026-05-31 |
+| **Last updated** | 2026-06-14 |
 
 ## Implementation status
 
-The migration is **complete**: every internal service-to-service call runs over
-gRPC, the servers are always-on (no feature flag), and there is no REST fallback.
+The migration is **complete** for the migrated hops: they run over gRPC, the servers
+are always-on (no feature flag), and there is no REST fallback. The **one documented
+exception is `order → cart`** (the checkout cart-read), which remains REST — see the
+hop table below.
 
 | Hop / item | Status | Where |
 |------------|--------|-------|
@@ -215,9 +217,40 @@ The four-pillar observability stack must not regress. gRPC keeps it intact:
   own OTLP exporter to `:4317` is **optional and independent** of this proposal —
   do it only if we want gRPC OTLP too; it is not a prerequisite.
 
+### Resilience & hardening (pkg/grpcx v0.6.0)
+
+The shared `grpcx` bootstrap sets safe defaults so individual services don't have to:
+
+| Concern | Default |
+|---|---|
+| **Handler panics** | Unary + stream **recovery interceptors** turn a panic into `codes.Internal` instead of crashing the shared HTTP+gRPC process. |
+| **Pod churn / scale** | Server `keepalive.MaxConnectionAge` (30m, +5m grace) forces clients to periodically reconnect → re-resolve the headless DNS and **rebalance** across replicas after a rolling deploy/scale. |
+| **Dead-peer detection** | Client `keepalive.ClientParameters` (Time 30s/Timeout 10s) detects a dead pod in seconds, not minutes. |
+| **Transient restarts** | Default service config **retries on `UNAVAILABLE`** (≤3 attempts, exp backoff) — safe, since UNAVAILABLE is a pre-processing transport failure. |
+| **Resource bounds** | `MaxConcurrentStreams` (1000) + explicit `MaxRecvMsgSize` (4 MiB). |
+| **Reflection** | Registered by default for `grpcurl`; set `GRPC_REFLECTION=false` in prod to stop schema disclosure. |
+
+**Server error-code mapping.** Callee handlers map domain errors to specific gRPC
+codes (`InvalidArgument` for bad input, `NotFound`/empty where the resource is
+optional, `Internal` only for genuine faults) rather than collapsing everything to
+`Internal` — so RED metrics aren't poisoned by client-induced errors and retry
+policies can key off the code correctly.
+
 ---
 
 ## 5. Security
+
+> ⚠️ **Current posture (be honest about it).** The three-layer model below is the
+> *target*. **Today, none of the three layers actively protect east-west gRPC:**
+> mTLS is deferred (clients dial with `insecure` credentials, so there is no service
+> identity); NetworkPolicy is authored but only enforced with an enforcing CNI (the
+> local cluster runs kindnet, which does **not** enforce it); and the
+> review/shipping/notification gRPC servers do **no inbound JWT/auth check**. Net
+> effect: any workload that can reach `:9090` can invoke internal RPCs — including
+> `notification.SendEmail` — unauthenticated. **mTLS (service identity) is the
+> prioritized next step**; until it lands, the only real fence is the network
+> boundary, and only where an enforcing CNI is present. (auth `GetMe` is the
+> exception — it validates the forwarded JWT.)
 
 gRPC does not replace the existing controls — it **layers with** them. Three
 complementary layers, each answering a different question:

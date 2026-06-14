@@ -287,7 +287,7 @@ CloudNativePG clusters use **PodMonitor** CRDs to enable Prometheus scraping of 
 - **Pooler**: PgBouncer sidecar (3 instances), endpoint `auth-db-pooler.auth:5432`
 - **Namespace**: `auth`
 - **Dual connection pattern**: Main container uses PgBouncer; init container uses direct connection (for DDL)
-- **Sidecars**: postgres_exporter + Vector (log collection to Loki)
+- **Sidecars**: postgres_exporter + Vector (log collection to VictoriaLogs)
 - **Extensions**: pg_stat_statements, pg_cron, pg_trgm, pgcrypto, pg_stat_kcache
 
 > **Topology diagram, endpoints, monitoring config**: See [auth-db README](../../kubernetes/infra/configs/databases/clusters/auth-db/README.md)
@@ -299,7 +299,7 @@ CloudNativePG clusters use **PodMonitor** CRDs to enable Prometheus scraping of 
 - **Databases**: `user`, `notification`, `shipping`, `review` (shared database pattern)
 - **Pooler**: PgBouncer sidecar (3 instances), endpoint `supporting-shared-db-pooler.user:5432`
 - **Namespace**: `user` (cluster location), cross-namespace secrets for `notification`, `shipping`, and `review`
-- **Sidecars**: postgres_exporter + Vector (log collection to Loki)
+- **Sidecars**: postgres_exporter + Vector (log collection to VictoriaLogs)
 - **Extensions**: pg_stat_statements, pg_cron, pg_trgm, pgcrypto, pg_stat_kcache
 
 > **Topology diagram, endpoints, cross-namespace secrets**: See [supporting-shared-db README](../../kubernetes/infra/configs/databases/clusters/supporting-shared-db/README.md)
@@ -330,18 +330,18 @@ Zalando clusters use **PodMonitor** CRDs to enable Prometheus scraping of `postg
 
 #### Log Collection with Vector Sidecar
 
-All Zalando PostgreSQL clusters include a **Vector sidecar** for log collection and shipping to Loki.
+All Zalando PostgreSQL clusters include a **Vector sidecar** for log collection and shipping to VictoriaLogs.
 
 **Configuration:**
 - **Vector ConfigMaps**: Located in each cluster's `configmaps/` folder (used by Zalando database instances as sidecar configs)
   - `kubernetes/infra/configs/databases/clusters/auth-db/configmaps/vector-sidecar.yaml` (Auth DB)
   - `kubernetes/infra/configs/databases/clusters/supporting-shared-db/configmaps/vector-sidecar.yaml` (Supporting DB)
 - **Log Location**: `/home/postgres/pgdata/pgroot/pg_log/*.log` (default Zalando Spilo log path)
-- **Loki Endpoint**: `http://loki.monitoring.svc.cluster.local:3100`
+- **VictoriaLogs Endpoint**: `http://vlsingle-victoria-logs.monitoring.svc.cluster.local:9428`
 - **Features**:
   - Multiline log parsing (PostgreSQL log format with timestamp detection)
   - Label injection (namespace, cluster, pod, container)
-  - Automatic log shipping to Loki
+  - Automatic log shipping to VictoriaLogs
 
 #### Custom Metrics with postgres_exporter
 

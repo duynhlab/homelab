@@ -214,7 +214,7 @@ monitoring/
 │   │   │   └── slo/                    # Service Level Objective operator
 │   │   ├── configs/                    # Component instances and configurations
 │   │   │   ├── monitoring/             # Grafana resources and ServiceMonitors
-│   │   │   ├── apm/                    # APM stack (Loki, Tempo, Pyroscope)
+│   │   │   ├── apm/                    # APM stack (Tempo, Pyroscope)
 │   │   │   ├── databases/              # PostgreSQL clusters and poolers
 │   │   │   └── slo/                    # SLO definitions (PrometheusServiceLevel)
 │   │   └── kustomization.yaml

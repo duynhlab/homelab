@@ -23,9 +23,13 @@ and the process survives worker/pod restarts.
 
 - **Feature:** order-fulfillment saga (flagship — exercises orchestration + retry + durable
   execution + compensation).
-- **Deploy:** [`alexandrevilain/temporal-operator`](https://github.com/alexandrevilain/temporal-operator)
-  (`TemporalCluster`/`TemporalNamespace` CRDs) — fits the platform's operator-heavy GitOps better
-  than the raw Helm chart; handles schema auto-setup + emits a `ServiceMonitor`.
+- **Deploy:** the official **[`temporalio/helm-charts`](https://github.com/temporalio/helm-charts)**
+  `temporal` chart (Flux `HelmRelease`), **server v1.27.x**. It installs no DB sub-chart — point it
+  at our external Postgres via `server.config.persistence.datastores` (`postgres12` plugin), use
+  **`existingSecret`** (ESO/OpenBAO) for credentials, run **schema setup as Jobs with
+  `useHelmHooks: false`** (Flux doesn't run Helm hooks the way the chart's defaults assume), and
+  **disable the bundled Cassandra / Elasticsearch / Prometheus / Grafana** (we have our own).
+  Chosen over the third-party operator: canonical, no extra CRDs/controller to run.
 - **Persistence:** a dedicated **CloudNativePG** `temporal-db` (default + `temporal_visibility`
   SQL stores). Advanced visibility stays **SQL** for now (Elasticsearch is a future option).
 - **Worker:** embedded in the owning service via a `worker` subcommand (mirrors the existing
@@ -93,11 +97,9 @@ of hammering. Workflow has a sane `WorkflowExecutionTimeout`.
 ```mermaid
 flowchart LR
     subgraph ns_temporal[ns temporal]
-        OP[temporal-operator]
-        TC[TemporalCluster<br/>frontend/history/matching/worker]
+        TC["Temporal server (Helm)<br/>frontend/history/matching/worker"]
         UI[Web UI]
         TDB[(CNPG temporal-db<br/>temporal + temporal_visibility)]
-        OP --> TC
         TC --> TDB
         TC --> UI
     end
@@ -110,18 +112,20 @@ flowchart LR
     OW -- OTLP --> Tempo
 ```
 
-- **Operator** in `kubernetes/infra/controllers/temporal/` (HelmRelease, image pinned).
+- **Temporal server** in `kubernetes/infra/configs/temporal/` — Flux `HelmRelease` of the official
+  `temporalio/temporal` chart (v1.27.x): datastores → `temporal-db` (default + `temporal_visibility`,
+  `postgres12` plugin), `existingSecret` (ESO), schema setup as Jobs (`useHelmHooks: false`),
+  `numHistoryShards: 512`, Web UI enabled, the `mop` namespace auto-created (retention 168h),
+  bundled cassandra/elasticsearch/prometheus/grafana **disabled**, resources/probes set for Kyverno.
 - **temporal-db** in `kubernetes/infra/configs/databases/clusters/temporal-db/` mirroring
   `cnpg-db` (HA, PgDog pooler, Barman backup, PodMonitor, ESO/OpenBAO secret).
-- **TemporalCluster + `mop` TemporalNamespace** (retention 168h) in
-  `kubernetes/infra/configs/temporal/`: pinned server version, `numHistoryShards: 512`,
-  `ui.enabled`, `metrics.prometheus.serviceMonitor.enabled`.
-- **Kong** ingress for the UI; **Grafana dashboard + PrometheusRule** (cluster-down, persistence
-  errors, task-queue backlog, workflow-failure rate).
-- **Flux**: `controllers → temporal-operator`; `databases → temporal-db`; new `temporal`
-  Kustomization (`dependsOn` databases) before `apps`; the order worker `dependsOn` temporal.
-- **Kyverno**: temporal pods must satisfy image-pin/probes/resources/PSS (set via CR/HelmRelease
-  values; a scoped+expiring PolicyException only if unavoidable).
+- **Kong** ingress `temporal-ui.duynh.me`; a `ServiceMonitor` for the Temporal metrics endpoint;
+  **Grafana dashboard + PrometheusRule** (cluster-down, persistence errors, task-queue backlog,
+  workflow-failure rate).
+- **Flux**: `databases → temporal-db`; new `temporal` Kustomization (`dependsOn` databases) before
+  `apps`; the order worker `dependsOn` temporal. (No separate operator/CRDs.)
+- **Kyverno**: chart pods must satisfy image-pin/probes/resources/PSS (set via HelmRelease values;
+  a scoped+expiring PolicyException only if unavoidable).
 
 ## 5. New contracts (`pkg/proto`, buf, backward-compatible)
 - **product**: `ReserveStock(items) → {ok}` · `ReleaseStock(items)`.
@@ -142,12 +146,20 @@ flowchart LR
 - **Durability:** kill the worker mid-run → it resumes and completes.
 - **Compensation:** force `CreateShipment` to fail → retries exhaust → stock released, order
   `failed`.
-- Infra: `TemporalCluster` Ready on Kind, UI via Kong, metrics in Grafana, Kyverno admits pods.
+- Infra: Temporal server pods Ready on Kind, schema set up, UI via Kong, metrics in Grafana,
+  Kyverno admits pods.
 
-## 8. Open questions
-- Temporal **server version** to pin (proposed: latest stable 1.27.x).
-- Confirm the 201 = `pending` async-fulfillment contract (proposed; affects the SPA's
-  post-checkout UX).
+## 8. Resolved decisions
+- **Server version:** Temporal **1.27.x** (pinned in the HelmRelease).
+- **Deploy:** the official `temporalio/temporal` Helm chart against the external CNPG `temporal-db`
+  (see §2) — not a third-party operator.
+- **Checkout contract:** **async** — `CreateOrder` returns **201 `pending`** immediately and the
+  saga finishes it (`confirmed`/`failed`); the SPA shows "Processing…" and polls
+  `GET /order/v1/private/orders/:id`. The request does **not** block on the saga: retries can take
+  seconds–minutes, blocking would couple user latency to downstream health and risk gateway/client
+  timeouts, and an API-pod restart would lose the response while the durable workflow keeps running.
+  *Future nicety (deferred):* Temporal **Update-With-Start** can return an early "accepted / stock
+  reserved" ack in the initial call while the rest continues async.
 
 ## Phases
 0 spec (this doc) → 1 infra → 2 `pkg` temporalx+proto (tag) → 3 product inventory →

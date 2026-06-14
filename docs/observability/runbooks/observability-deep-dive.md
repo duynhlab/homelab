@@ -157,7 +157,7 @@ Alert groups organized by USE category:
 
 ### Four Golden Signals -- Complete Coverage
 
-The Grafana dashboard (34 panels, 5 rows) maps directly to all 4 Golden Signals:
+The Grafana dashboard (40 panels, 6 rows) maps directly to all 4 Golden Signals:
 
 | Golden Signal | Dashboard Row | Key Panels | Metric |
 |---------------|--------------|-----------|--------|
@@ -320,7 +320,7 @@ Infrastructure endpoints (`/health`, `/ready`, `/metrics`) are filtered out befo
 ```mermaid
 flowchart TD
     HR["HelmRelease\nslo.enabled: true"] -->|render| PSL["PrometheusServiceLevel\n(per service)"]
-    PSL -->|watch| Sloth["Sloth Operator v0.15.0"]
+    PSL -->|watch| Sloth["Sloth Operator v0.16.0"]
     Sloth -->|generate| PR["PrometheusRules\n(recording + alerting)"]
     PR -->|evaluate| VMAlert["VMAlert"]
     VMAlert -->|query| VMSingle["VMSingle"]
@@ -519,7 +519,7 @@ Use this framework for every interview question about observability. The **Befor
 - **Path normalization**: `c.FullPath()` for bounded cardinality (~2,400 series across 8 services)
 - **Label strategy**: Application emits 3 labels, Prometheus adds 4 at scrape time, total 7 labels per metric
 
-**Result**: Single Grafana dashboard with 34 panels covering all 4 Golden Signals. Any engineer can answer "what's the P95 latency of the auth service right now?" in 3 seconds. Cardinality stays bounded as services scale.
+**Result**: Single Grafana dashboard with 40 panels covering all 4 Golden Signals. Any engineer can answer "what's the P95 latency of the auth service right now?" in 3 seconds. Cardinality stays bounded as services scale.
 
 ---
 
@@ -786,7 +786,7 @@ For every answer, structure as:
 - [Observability Overview](../README.md) -- Master index, 4-pillar architecture
 - [Observability Architecture](../README.md#3-layer-observability-architecture) -- 3-layer architecture & middleware chain
 - [Metrics Reference](../metrics/README.md) -- RED method, label strategy, cardinality
-- [Grafana Dashboard Guide](../grafana/dashboard-reference.md) -- 34-panel dashboard reference
+- [Grafana Dashboard Guide](../grafana/dashboard-reference.md) -- 40-panel dashboard reference
 - [VictoriaMetrics Stack](../metrics/victoriametrics.md) -- Dual CRD system, VM Operator
 - [Grafana Datasources](../grafana/datasources.md) -- Dual datasource strategy, vmalert.proxyURL
 - [SLO Documentation](../slo/README.md) -- SLO definitions, Sloth integration

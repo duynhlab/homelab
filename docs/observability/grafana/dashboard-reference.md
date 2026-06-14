@@ -2,7 +2,7 @@
 
 > **Audience**: SRE/DevOps Engineers  
 > **Dashboard**: Microservices Observability Platform  
-> **Total Panels**: 34 panels across 5 row groups  
+> **Total Panels**: 40 panels across 6 row groups *(live dashboard; the per-row breakdown in this guide reflects an earlier 34-panel / 5-row revision and is pending a refresh)*  
 > **Last Updated**: 2026-01-01
 
 ---

@@ -143,7 +143,7 @@ The platform exposes alerts at every layer of the pipeline. Use whichever fits t
 | **Grafana** | [grafana.duynh.me](http://grafana.duynh.me) | Dashboards: "Sloth SLO Overview" (14643), "Sloth SLO Detailed" (14348) |
 | **VMSingle (vmui)** | [vmui.duynh.me/vmui](http://vmui.duynh.me/vmui) | Ad-hoc PromQL on `slo:*` recording rules |
 
-For routing semantics (group_by, receivers, silences) see [`README.md`](./README.md) (the alerting overview) — VMAlertmanager today routes to a single `default` receiver; Slack/PagerDuty integration is planned.
+For routing semantics (group_by, receivers, silences) see [`README.md`](./README.md) (the alerting overview) — VMAlertmanager routes by severity to `slack-default`/`slack-critical` receivers; the `slack_api_url` is a placeholder pending secret injection, and PagerDuty is planned.
 
 ---
 
@@ -228,7 +228,7 @@ open http://karma.duynh.me
 - **Burn-rate maths assumes a stable traffic volume.** A service with very low RPS will see one bad request blow the short-window burn rate. Sloth mitigates this by computing the SLI as a ratio over a full window, but if you have <1 RPS sustained, expect noise.
 - **Mixed-traffic services** (background jobs piggybacking on the same `request_duration_seconds`) pollute the SLI. Filter at the SLI level (`handler!~"…"`) if needed.
 - **The SLI is a 30-day rolling window.** A burn from 25 days ago still counts toward today's budget. Don't be surprised if the budget is low even when current traffic is healthy.
-- **Routing is unfinished** — VMAlertmanager has only a `default` receiver. Until Slack/PagerDuty receivers are wired, "page" severity = "appears in Karma faster". Track via the [Future Roadmap in `alerting/README.md`](./README.md#future-roadmap).
+- **Notification delivery is pending** — VMAlertmanager has `slack-default`/`slack-critical` receivers wired, but `slack_api_url` is a placeholder. Until it is set (via External Secrets / OpenBAO), "page" severity = "appears in Karma faster". Track via the [Future Roadmap in `alerting/README.md`](./README.md#future-roadmap).
 - **Dashboards in VMAlert UI** show rule definitions only; "for live SLI shape, prefer the Sloth UI or Grafana SLO dashboards."
 
 ---

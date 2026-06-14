@@ -280,7 +280,7 @@ docs/observability/
 │   ├── README.md                 # Grafana overview + plugin management
 │   ├── rbac-multi-team.md        # Org roles, Teams, anonymous vs named users
 │   ├── datasources.md            # Dual datasource strategy (case study)
-│   ├── dashboard-reference.md    # Microservices dashboard (34 panels)
+│   ├── dashboard-reference.md    # Microservices dashboard (40 panels, 6 rows)
 │   └── variables.md              # Dashboard variables & regex
 │
 ├── alerting/                     # Alerting rules
@@ -386,3 +386,4 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 - [Alerting Strategy](alerting/README.md) -- 2-layer alerting (threshold + SLO burn-rate)
 - [SLO System](slo/README.md) -- Sloth Operator and burn-rate alerts
 - [Interview Prep](runbooks/observability-deep-dive.md) -- RED/USE/Golden Signals theory + structured answers
+- [Observability Review](observability-review.md) -- five-axis review of the current implementation (findings + recommendations)

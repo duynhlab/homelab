@@ -26,26 +26,26 @@ This split ensures GitHub does not append `(pull_request)` or `(push)` suffixes 
 
 ## Image Security: Scan Before Push
 
-**Critical design**: Images are scanned with Trivy **before** being pushed to GHCR. This prevents FluxCD from auto-deploying vulnerable images.
+**Critical design**: Images are scanned with Trivy **before** being pushed to GHCR. The gate is **calibrated** (see [`cicd-standard.md` §7](cicd-standard.md)): only **CRITICAL** blocks the push; **HIGH** is reported in the job summary + Security tab but does **not** block — so a freshly-disclosed base-image HIGH with no upstream fix yet can't hold every service hostage.
 
 ```mermaid
 flowchart LR
     subgraph ci["CI Pipeline"]
         BUILD["Build image<br/>(--load, local only)"]
-        SCAN["Trivy scan<br/>(local image)"]
-        PUSH["Push to GHCR<br/>(only if scan passes)"]
+        SCAN["Trivy scan → JSON<br/>(parse with jq)"]
+        PUSH["Push to GHCR"]
         SIGN["Cosign sign"]
     end
 
     BUILD --> SCAN
-    SCAN -->|"pass"| PUSH --> SIGN
-    SCAN -->|"fail"| STOP["Image never pushed"]
+    SCAN -->|"no CRITICAL<br/>(HIGH reported)"| PUSH --> SIGN
+    SCAN -->|"CRITICAL found"| STOP["Image never pushed"]
 
     style STOP fill:#ef4444,color:#fff
     style SIGN fill:#22c55e,color:#fff
 ```
 
-The `docker-build-go.yml` (and `docker-build-node.yml`) workflows handle this automatically via the `scan-before-push` input (default: `true`). See [`cicd-security-improvement-plan.md`](cicd-security-improvement-plan.md) for the full security architecture.
+The `docker-build-go.yml` (and `docker-build-node.yml`) workflows handle this via `scan-before-push` (default `true`); the block set is `scan-block-severity` (default `CRITICAL`) and the report set is `scan-severity` (default `CRITICAL,HIGH`). The pre-push scan writes a severity-count table + CVE list to the job summary. Accept a specific CVE only via a time-boxed `.trivyignore.yaml`. See [`cicd-standard.md` §7](cicd-standard.md) for the full policy.
 
 ## Shared Workflows
 

@@ -101,7 +101,18 @@ concurrency:
 
 ## 7. Image security
 
-- **Scan before push** (Trivy `CRITICAL,HIGH`, `exit-code: 1`) — failing scan blocks the push.
+- **Scan before push — calibrated gate** (Trivy): **block the push only on `CRITICAL`** (fixable);
+  **report `HIGH`/`MEDIUM`** in the job summary + Security tab **without blocking**. Driven by
+  `scan-block-severity` (default `CRITICAL`) vs `scan-severity` (report set, default
+  `CRITICAL,HIGH`), with `--ignore-unfixed`. Rationale: a freshly-disclosed `HIGH` in a base image
+  that has **no upstream fix yet** must not block every service from shipping — that's how you end
+  up unable to deploy through no fault of your own. Accept a *specific* CVE only via a **time-boxed
+  `.trivyignore.yaml`** (`expired_at:` + a statement), never by loosening the gate globally. The
+  pre-push scan writes a **severity table + CVE list to the job summary** so failures are visible.
+- **Base images:** `:latest` is mutable and makes scans non-deterministic (same Dockerfile passes
+  or fails depending on what the registry served). **Pin a digest** (Renovate-managed) and
+  **rebuild on a schedule** so base fixes land automatically — or use **Copacetic** to patch OS
+  CVEs in-image. Keep a best-effort `apk --no-cache upgrade` in the runtime stage.
 - **Sign** every pushed image with Cosign keyless OIDC — including the **`-init`** image.
 - **Naming is multi-level** (platform convention): `ghcr.io/duynhlab/<repo>/<image>` — the `mop`
   chart renders `<name>-service/<name>` **and** `<name>-service/<name>-init`. Scan **and sign
@@ -190,6 +201,8 @@ VictoriaMetrics (see [observability](../observability/README.md)).
 
 ## 15. Known follow-ups (post-transfer review)
 
+- **Base-image determinism:** pin runtime base digests (Renovate) + a scheduled nightly rebuild
+  (or Copacetic) so base-image CVE fixes land automatically — instead of `alpine:latest` (§7).
 - Cut `@v1` tags on `gha-workflows` and migrate consumers off `@main` (§3/§10).
 - Add Kyverno Cosign **signature-verification** policy with strict cert-identity (§7) — today
   signing is unverified.

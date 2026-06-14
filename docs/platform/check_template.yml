@@ -42,7 +42,7 @@ jobs:
   # 1. PR Checks (Branch Name + Slack "PR Opened")
   # ──────────────────────────────────────────────────
   pr-checks:
-    uses: duyhenryer/shared-workflows/.github/workflows/pr-checks.yml@main
+    uses: duynhlab/gha-workflows/.github/workflows/pr-checks.yml@main
     with:
       slack_channel_id: "{{SLACK_CHANNEL_ID}}"
     secrets:
@@ -52,7 +52,7 @@ jobs:
   # 2. Test & Lint
   # ──────────────────────────────────────────────────
   go-check:
-    uses: duyhenryer/shared-workflows/.github/workflows/go-check.yml@main
+    uses: duynhlab/gha-workflows/.github/workflows/go-check.yml@main
     with:
       command-test: 'go test -race -coverprofile=coverage.out ./...'
       lint: true
@@ -62,7 +62,7 @@ jobs:
   # 2b. Secret Detection (Gitleaks)
   # ──────────────────────────────────────────────────
   gitleaks:
-    uses: duyhenryer/shared-workflows/.github/workflows/gitleaks.yml@main
+    uses: duynhlab/gha-workflows/.github/workflows/gitleaks.yml@main
     permissions:
       contents: read
       security-events: write
@@ -72,7 +72,7 @@ jobs:
   # ──────────────────────────────────────────────────
   sonar:
     needs: [go-check, gitleaks]
-    uses: duyhenryer/shared-workflows/.github/workflows/sonarqube.yml@main
+    uses: duynhlab/gha-workflows/.github/workflows/sonarqube.yml@main
     with:
       project-key: 'duynhlab_${{ github.event.repository.name }}'
       organization: 'duynhlab'
@@ -86,7 +86,7 @@ jobs:
   notify:
     if: always()
     needs: [pr-checks, go-check, gitleaks, sonar]
-    uses: duyhenryer/shared-workflows/.github/workflows/status.yml@main
+    uses: duynhlab/gha-workflows/.github/workflows/status.yml@main
     with:
       slack_channel_id: "{{SLACK_CHANNEL_ID}}"
       slack_thread_ts: ${{ needs.pr-checks.outputs.slack_thread_ts }}

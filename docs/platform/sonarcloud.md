@@ -40,7 +40,7 @@ In each service repo CI, the Sonar step is wired via shared workflows. Example (
 ```yaml
 sonar:
   needs: go-check
-  uses: duyhenryer/shared-workflows/.github/workflows/sonarqube.yml@main
+  uses: duynhlab/gha-workflows/.github/workflows/sonarqube.yml@main
   with:
     project-key: 'duynhlab_cart-service'
     organization: 'duynhlab'
@@ -72,4 +72,4 @@ Coverage is generated per-repository during `go test -race -coverprofile=coverag
 
 - SonarCloud projects are per-repository (e.g. `duynhlab_auth-service`, `duynhlab_cart-service`)
 - [SonarCloud Test Coverage Docs](https://docs.sonarsource.com/sonarqube-cloud/enriching/test-coverage/overview/)
-- Shared workflow: `duyhenryer/shared-workflows/.github/workflows/sonarqube.yml`
+- Shared workflow: `duynhlab/gha-workflows/.github/workflows/sonarqube.yml`

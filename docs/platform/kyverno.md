@@ -32,7 +32,7 @@ so the highest-value Kyverno features are:
 | 13 | JMESPath / context | ✅ when needed | — | Use sparingly (latency) |
 | 14 | Foreach | ✅ | 1 | Required for resources/probes rules |
 | 15 | `kyverno-policies` Helm chart | ❌ | — | Forked rules into repo, no chart |
-| 16 | Kyverno CLI `test` | ✅ planned | 2 | CI gate in shared-workflows |
+| 16 | Kyverno CLI `test` | ✅ planned | 2 | CI gate in gha-workflows |
 | 17 | Reports server | ❌ | — | KinD scale doesn't need it |
 | 18 | Namespaced `Policy` | ✅ when needed | — | Most rules are ClusterPolicy |
 

@@ -40,7 +40,7 @@ Execute the following script to clone all required components:
 ```bash
 # Infrastructure Repositories
 git clone https://github.com/duynhlab/monitoring.git
-git clone https://github.com/duyhenryer/shared-workflows.git
+git clone https://github.com/duynhlab/gha-workflows.git
 git clone https://github.com/duynhlab/pkg.git
 
 # Microservices Repositories

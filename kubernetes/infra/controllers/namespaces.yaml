@@ -156,3 +156,10 @@ metadata:
   labels:
     environment: local
   name: frontend
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+  name: temporal

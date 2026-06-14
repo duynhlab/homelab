@@ -46,19 +46,19 @@ flowchart TD
     subgraph destinations ["6. Alert Destinations"]
         Karma["Karma :8080<br/>(alert dashboard)"]
         Grafana["Grafana<br/>(Alerting tab, drill-down)"]
-        Slack["Slack / PagerDuty<br/>(planned)"]
+        Slack["Slack (wired)<br/>PagerDuty (planned)"]
 
         VMAM -.->|"reads AM API"| Karma
         VMSingle -->|"vmalert.proxyURL"| Grafana
-        VMAM -.->|"webhook / pagerduty<br/>receivers (planned)"| Slack
+        VMAM -.->|"slack webhook (placeholder URL)<br/>pagerduty (planned)"| Slack
     end
 ```
 
 ### Current State
 
 - Stages 1-4 are fully operational (29+ threshold alerts, 48 SLO burn-rate alerts).
-- Stage 5 (VMAlertmanager) routes alerts but has only a `default` receiver with **no notification destination**.
-- Stage 6: Grafana provides read-only rule visibility via `vmalert.proxyURL`. **Karma** is the dedicated alert dashboard (reads VMAlertmanager API directly). Slack/PagerDuty integration is planned.
+- Stage 5 (VMAlertmanager) routes by severity to `slack-default` (`#alerts`) and `slack-critical` (`#alerts-critical`), with `watchdog-null` for the Watchdog and inhibition rules to suppress cascades. **Caveat:** `slack_api_url` is a committed placeholder (`<SLACK_WEBHOOK_URL>`), so no notifications actually deliver until it is set — ideally injected via External Secrets / OpenBAO rather than inlined in `configRawYaml`.
+- Stage 6: Grafana provides read-only rule visibility via `vmalert.proxyURL`. **Karma** is the dedicated alert dashboard (reads VMAlertmanager API directly). Slack receivers are wired (webhook URL pending injection); PagerDuty is planned.
 
 ## VictoriaMetrics vs Prometheus: Terminology Mapping
 
@@ -241,7 +241,8 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 | Layer 1: Database connection pool | PgBouncer/PgDog saturation alerts | Planned |
 | Layer 1: Infrastructure | Node CPU/memory/disk pressure | Planned |
 | Layer 1: Kubernetes | Pod OOM, CrashLoopBackOff, pending pods | Planned |
-| Integration | PagerDuty/Slack routing in VMAlertmanager | Planned |
+| Integration | Slack routing in VMAlertmanager (severity-based receivers) | Wired (webhook URL placeholder — inject via secret) |
+| Integration | PagerDuty routing in VMAlertmanager | Planned |
 
 ## Related Documentation
 

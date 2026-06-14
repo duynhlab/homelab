@@ -184,10 +184,10 @@ flowchart LR
     VMAM["VMAlertmanager :9093"]
     Karma["Karma<br/>(quick glance, silence mgmt)"]
     Grafana["Grafana<br/>(drill-down, dashboards, correlation)"]
-    Future["Slack / PagerDuty<br/>(planned notification receivers)"]
+    Future["Slack (wired)<br/>PagerDuty (planned)"]
 
     VMAM -->|"AM API"| Karma
-    VMAM -.->|"webhook / pagerduty<br/>(planned)"| Future
+    VMAM -.->|"slack webhook (placeholder URL)<br/>pagerduty (planned)"| Future
     VMSingle["VMSingle :8428"] -->|"vmalert.proxyURL"| Grafana
 ```
 

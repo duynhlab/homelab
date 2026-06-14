@@ -25,19 +25,20 @@ toward production.
 |---|---|---|
 | "Sloth is deployed but non-functional — no `PrometheusServiceLevel` CRs, no burn-rate alerts." | **NOISE** | All 4 domain ResourceSets set `slo.enabled: true` (`kubernetes/apps/domains/{identity,catalog,checkout,comms}-rs.yaml`). The `mop` chart renders a `PrometheusServiceLevel` **per service at deploy time** (`docs/observability/slo/README.md`); Sloth turns those into burn-rate `PrometheusRule`s that VMAlert evaluates. The CRs are render-time, not static YAML — their absence from the repo is by design. |
 | "Loki is a single-replica `emptyDir` SPOF." | **NOISE → surfaces a real defect** | Loki is **not deployed at all** — `kubernetes/infra/controllers/logging/kustomization.yaml` includes only `vector/`. The leftover Loki files are dead code (see below). |
+| "There is no PVC-near-full alert; small PVCs can silently fill." | **NOISE** | `KubePersistentVolumeFillingUp` (warning, <15% free) and `KubePersistentVolumeFillingUpCritical` (critical, <5%) already exist **cluster-wide with no namespace filter** (`prometheusrules/kubernetes/workload-alerts.yaml`) — they already cover the VMSingle/VLSingle PVCs. Adding another would be a duplicate. |
 
 ## Findings — confirmed actionable
 
 | # | Severity | Finding | Location |
 |---|----------|---------|----------|
 | 1 | 🟠 Med | **Dead Loki manifests** contradict the "VictoriaLogs-only" design. The deployment/service/configmap and a Grafana datasource + dashboard exist on disk but are wired into **no** kustomization. | `controllers/logging/loki/*`, `configs/monitoring/grafana/datasource-loki.yaml`, `configs/monitoring/grafana/dashboards/grafana-dashboard-loki.yaml` |
-| 2 | 🟠 Med | **No PVC-near-full alert.** Metrics + logs PVCs are small (20Gi each) with `removePvcAfterDelete: true`; `kubelet_volume_stats_*` is already scraped, so the alert is free to add. A full PVC silently halts ingestion. | `configs/monitoring/prometheusrules/` |
-| 3 | 🟡 Low | **Tempo has no target-down alert** even though it *is* scraped (`servicemonitors/tempo.yaml`); the `VMServiceDown` rule's regex matches only VM components. | `prometheusrules/victoriametrics/health-alerts.yaml` |
-| 4 | 🟡 Low | **Three alerts fire on a single eval (no `for:`)** → flaky on transient restarts/reloads: `VMTooManyRestarts`, `VMAlertConfigurationReloadFailure`, `VMAgentConfigurationReloadFailure`. | `prometheusrules/victoriametrics/{health,vmalert,vmagent}-alerts.yaml` |
-| 5 | 🟡 Low | **Doc drift.** Dashboard is **40 panels / 6 rows**, not 34/5 (`metrics/README.md` was already correct; the others lagged). One runbook diagram shows Sloth **v0.15.0** (deployed: v0.16.0). Alerting docs said Slack/routing was "planned / single default receiver" — it is in fact **wired** (see #6). | `grafana/*`, `runbooks/observability-deep-dive.md`, `alerting/*` |
+| 2 | 🟡 Low | **Tempo has no target-down alert** even though it *is* scraped (`servicemonitors/tempo.yaml`); the `VMServiceDown` rule's regex matches only VM components. Fixed with a `TempoDown` rule in a new `prometheusrules/observability/` subdir. | `prometheusrules/observability/tempo-alerts.yaml` |
+| 3 | 🟡 Low | **Two config-reload alerts fire on a single eval (no `for:`)** → noisy on a transient hot-reload during a config rollout: `VMAlertConfigurationReloadFailure`, `VMAgentConfigurationReloadFailure`. (`VMTooManyRestarts` was considered but **left as-is** — its `changes(...[15m]) > 2` window already debounces, and a `for:` would *delay* genuine crashloop detection.) | `prometheusrules/victoriametrics/{vmalert,vmagent}-alerts.yaml` |
+| 4 | 🟡 Low | **Doc drift.** Dashboard is **40 panels / 6 rows**, not 34/5 (`metrics/README.md` was already correct; the others lagged). One runbook diagram shows Sloth **v0.15.0** (deployed: v0.16.0). Alerting docs said Slack/routing was "planned / single default receiver" — it is in fact **wired** (placeholder webhook). | `grafana/*`, `runbooks/observability-deep-dive.md`, `alerting/*` |
 
-*(Findings 1–5 are addressed in this change set; the doc-drift fixes ship with this review,
-the manifest fixes 1–4 in a companion PR.)*
+*(Doc-drift fixes (#4) ship with this review; the manifest fixes (#1–#3) in a companion PR.
+A fifth candidate — a PVC-near-full alert — was dropped: `KubePersistentVolumeFillingUp`
+already covers it cluster-wide, see the reconciled table above.)*
 
 ## Findings — documented recommendations (intentionally not changed now)
 
@@ -64,15 +65,17 @@ the manifest fixes 1–4 in a companion PR.)*
 ## Five-axis summary
 
 - **Correctness** — Scrape coverage is good for the apps/DB/gateway/control-plane tier; the
-  gaps are the *observability components themselves* (#3, recommendation above). Alert rules are
-  sound apart from the missing `for:` (#4).
-- **Readability** — Docs are well-structured (A−). Main drift was numeric/version (#5), now fixed.
+  gaps are the *observability components themselves* (missing scrapes for OTel/Pyroscope/Vector,
+  recommendation above). Alert rules are sound apart from Tempo's missing down-alert (#2) and
+  the two reload alerts' missing `for:` (#3).
+- **Readability** — Docs are well-structured (A−). Main drift was numeric/version (#4), now fixed.
 - **Architecture** — Clean: operator-managed VM stack, Sloth render-time SLOs, Vector→VictoriaLogs,
   OTel fan-out to Tempo+Jaeger. The dead Loki files (#1) are the one architectural smell.
 - **Security** — Anonymous-admin Grafana and the inline Slack-webhook placeholder are the notable
   items; both are homelab-acceptable and documented above.
 - **Performance / cost** — Cardinality is controlled (kube-apiserver metric-relabel allowlist,
-  bounded path labels). Small PVCs (20Gi) are the main scaling limit → motivates #2.
+  bounded path labels). Small PVCs (20Gi) are the main scaling limit, already covered by the
+  existing `KubePersistentVolumeFillingUp` alert.
 
 ## Related
 

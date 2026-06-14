@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **docs (observability)**: Added `docs/observability/observability-review.md` — a five-axis review (correctness/readability/architecture/security/performance) of the current observability implementation (docs + the GitOps stack under `kubernetes/infra/`), severity-calibrated for a Kind homelab. Records two reconciled false-positives (Sloth SLOs are render-time CRs from the `mop` chart, not missing; Loki is not deployed, only orphaned files remain) and lists confirmed defects (dead Loki manifests, no PVC-near-full alert, Tempo missing target-down, three alerts missing `for:`) vs documented recommendations (no scrape coverage for OTel/Pyroscope/Vector, Tempo/Pyroscope `emptyDir`, Slack webhook placeholder, Grafana anonymous-admin). Linked from the observability index.
+- **docs (observability)**: Added `docs/observability/observability-review.md` — a five-axis review (correctness/readability/architecture/security/performance) of the current observability implementation (docs + the GitOps stack under `kubernetes/infra/`), severity-calibrated for a Kind homelab. Records three reconciled false-positives (Sloth SLOs are render-time CRs from the `mop` chart, not missing; Loki is not deployed, only orphaned files remain; a PVC-near-full alert already exists cluster-wide via `KubePersistentVolumeFillingUp`) and lists confirmed defects (dead Loki manifests, Tempo missing target-down, two config-reload alerts missing `for:`) vs documented recommendations (no scrape coverage for OTel/Pyroscope/Vector, Tempo/Pyroscope `emptyDir`, Slack webhook placeholder, Grafana anonymous-admin). Linked from the observability index.
 
 ### Changed
 

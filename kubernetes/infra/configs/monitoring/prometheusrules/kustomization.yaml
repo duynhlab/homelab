@@ -7,6 +7,7 @@ resources:
   - postgres/
   - kong/
   - victoriametrics/
+  - observability/
   - valkey/
   - gitops/
   - watchdog.yaml

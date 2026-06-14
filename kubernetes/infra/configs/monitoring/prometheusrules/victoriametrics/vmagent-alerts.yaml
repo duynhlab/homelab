@@ -65,6 +65,7 @@ spec:
             vm_promscrape_config_last_reload_successful != 1
             or
             vmagent_relabel_config_last_reload_successful != 1
+          for: 5m
           labels:
             severity: warning
           annotations:

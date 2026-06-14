@@ -1,0 +1,31 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: observability-tempo-alerts
+  namespace: monitoring
+  labels:
+    prometheus: victoria-metrics
+    role: alert-rules
+spec:
+  groups:
+    # Health of the APM/tracing backend. Tempo is scraped via
+    # servicemonitors/tempo.yaml (selector app=tempo, /metrics); the VM-stack
+    # VMServiceDown rule only matches VictoriaMetrics jobs, so Tempo had no
+    # down-alert. The job label is matched by substring so it survives the
+    # operator's job-naming (service name "tempo").
+    #
+    # Note: OTel Collector, Pyroscope and Vector are not yet scraped, so a
+    # target-down alert for them would never fire — adding scrape coverage is
+    # tracked in docs/observability/observability-review.md.
+    - name: observability-tracing
+      interval: 30s
+      rules:
+        - alert: TempoDown
+          expr: up{job=~".*tempo.*"} == 0
+          for: 5m
+          labels:
+            severity: warning
+            category: observability
+          annotations:
+            summary: "Tempo is down ({{ $labels.instance }})"
+            description: "Tempo tracing backend target {{ $labels.instance }} (job {{ $labels.job }}) has been down for more than 5 minutes — distributed traces are not being ingested or queryable."

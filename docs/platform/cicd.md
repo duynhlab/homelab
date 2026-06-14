@@ -2,6 +2,8 @@
 
 This document describes the CI/CD pipeline for all microservices (`auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`) and the `frontend` in a **polyrepo** setup.
 
+> The org-wide **policy** (action SHA-pinning, least-privilege permissions, image signing/verification, required-checks matrix, versioning) lives in [`cicd-standard.md`](cicd-standard.md). This page is the pipeline *how-to*.
+
 ## Branching & Release Standard
 
 This pipeline operates under the **Hybrid Enterprise Gitflow** model defined in [`gitflow.md`](gitflow.md):
@@ -47,7 +49,7 @@ The `docker-build-go.yml` (and `docker-build-node.yml`) workflows handle this au
 
 ## Shared Workflows
 
-Each service repository reuses workflows from `duyhenryer/shared-workflows`:
+Each service repository reuses workflows from `duynhlab/gha-workflows`:
 - `pr-checks.yml` (PR validation + Slack PR events)
 - `go-check.yml` (tests + optional lint + coverage artifact)
 - `gitleaks.yml` (Secret scanning + SARIF output)
@@ -553,7 +555,7 @@ Add `sbom: true` to the builder workflow call in your service `build.yml`:
 
 ```yaml
 docker-build:
-  uses: duyhenryer/shared-workflows/.github/workflows/docker-build-go.yml@main
+  uses: duynhlab/gha-workflows/.github/workflows/docker-build-go.yml@main
   with:
     image-name: 'auth-service'
     push: true
@@ -669,4 +671,4 @@ curl    8.17.0-r1   apk   CVE-2025-14819  Medium
 
 ### Current Status
 
-SBOM support is **wired up but off by default** (`sbom: false`). To enable it for a service, add `sbom: true` to the `docker-build` job in that service's `build.yml`. No changes to shared-workflows are needed.
+SBOM support is **wired up but off by default** (`sbom: false`). To enable it for a service, add `sbom: true` to the `docker-build` job in that service's `build.yml`. No changes to gha-workflows are needed.

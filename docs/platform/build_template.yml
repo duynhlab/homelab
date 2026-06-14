@@ -43,7 +43,7 @@ jobs:
   # ──────────────────────────────────────────────────
   go-check:
     if: "!startsWith(github.ref, 'refs/tags/')"
-    uses: duyhenryer/shared-workflows/.github/workflows/go-check.yml@main
+    uses: duynhlab/gha-workflows/.github/workflows/go-check.yml@main
     with:
       command-test: 'go test -race -coverprofile=coverage.out ./...'
       lint: true
@@ -54,7 +54,7 @@ jobs:
   # ──────────────────────────────────────────────────
   gitleaks:
     if: "!startsWith(github.ref, 'refs/tags/')"
-    uses: duyhenryer/shared-workflows/.github/workflows/gitleaks.yml@main
+    uses: duynhlab/gha-workflows/.github/workflows/gitleaks.yml@main
     permissions:
       contents: read
       security-events: write
@@ -64,7 +64,7 @@ jobs:
   # ──────────────────────────────────────────────────
   sonar:
     needs: [go-check, gitleaks]
-    uses: duyhenryer/shared-workflows/.github/workflows/sonarqube.yml@main
+    uses: duynhlab/gha-workflows/.github/workflows/sonarqube.yml@main
     with:
       project-key: 'duynhlab_${{ github.event.repository.name }}'
       organization: 'duynhlab'
@@ -81,7 +81,7 @@ jobs:
   docker-build:
     needs: [go-check, sonar]
     if: "!startsWith(github.ref, 'refs/tags/')"
-    uses: duyhenryer/shared-workflows/.github/workflows/docker-build-go.yml@main
+    uses: duynhlab/gha-workflows/.github/workflows/docker-build-go.yml@main
     with:
       image-name: ${{ github.event.repository.name }}
       push: true
@@ -102,7 +102,7 @@ jobs:
   trivy-report:
     needs: [docker-build]
     if: needs.docker-build.outputs.scan-status == 'pass'
-    uses: duyhenryer/shared-workflows/.github/workflows/trivy-scan.yml@main
+    uses: duynhlab/gha-workflows/.github/workflows/trivy-scan.yml@main
     with:
       image-ref: ghcr.io/${{ github.repository }}/${{ github.event.repository.name }}@${{ needs.docker-build.outputs.digest }}
       severity: 'CRITICAL,HIGH,MEDIUM'
@@ -119,7 +119,7 @@ jobs:
   # ──────────────────────────────────────────────────
   docker-sign:
     needs: [docker-build]
-    uses: duyhenryer/shared-workflows/.github/workflows/docker-sign.yml@main
+    uses: duynhlab/gha-workflows/.github/workflows/docker-sign.yml@main
     with:
       tags: ${{ needs.docker-build.outputs.tags }}
       digest: ${{ needs.docker-build.outputs.digest }}
@@ -136,7 +136,7 @@ jobs:
   docker-db-init:
     needs: [go-check, sonar]
     if: "!startsWith(github.ref, 'refs/tags/')"
-    uses: duyhenryer/shared-workflows/.github/workflows/docker-build-go.yml@main
+    uses: duynhlab/gha-workflows/.github/workflows/docker-build-go.yml@main
     with:
       image-name: '${{ github.event.repository.name }}-init'
       dockerfile: 'db/migrations/Dockerfile'
@@ -157,7 +157,7 @@ jobs:
   notify:
     if: always()
     needs: [go-check, gitleaks, sonar, docker-build, trivy-report, docker-sign, docker-db-init]
-    uses: duyhenryer/shared-workflows/.github/workflows/status.yml@main
+    uses: duynhlab/gha-workflows/.github/workflows/status.yml@main
     with:
       slack_channel_id: "{{SLACK_CHANNEL_ID}}"
       gsheet_spreadsheet_id: "{{GSHEET_SPREADSHEET}}"

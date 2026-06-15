@@ -1,10 +1,15 @@
 # Temporal server alerts. Scraped via the operator-managed ServiceMonitor
 # (spec.metrics.prometheus.scrapeConfig.serviceMonitor in cluster.yaml).
 #
-# Kept to a target-down signal for now — richer alerts (persistence errors,
-# task-queue backlog, workflow-failure rate) land in Phase 8 once the exact
-# server metric names are confirmed from a live scrape, to avoid rules that
-# reference metrics that never exist.
+# The error-rate metric names (service_requests/service_errors,
+# persistence_requests/persistence_errors) are the Temporal server's documented
+# Prometheus metrics, taken from the official dashboards
+# (github.com/temporalio/dashboards, server/server-general.json). Ratios use
+# clamp_min on the denominator so they never divide by zero / false-fire when
+# idle. Final population check is on `make up` (Kind, operator-scraped). Workflow
+# /activity-level RED metrics need the Temporal SDK MetricsHandler wired into
+# pkg/temporalx (tracked follow-up) and a Grafana dashboard adapted from the
+# official server-general.json — see docs/architecture/temporal-order-fulfillment.md.
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
@@ -28,3 +33,25 @@ spec:
           annotations:
             summary: "Temporal server target down ({{ $labels.instance }})"
             description: "Temporal server target {{ $labels.instance }} (job {{ $labels.job }}) has been down for >5m — durable workflow execution is impaired."
+
+        - alert: TemporalServiceErrorRateHigh
+          expr: |
+            sum(rate(service_errors[5m])) / clamp_min(sum(rate(service_requests[5m])), 1) > 0.05
+          for: 10m
+          labels:
+            severity: warning
+            category: platform
+          annotations:
+            summary: "Temporal service error rate high (>5%)"
+            description: "Temporal frontend/service error ratio has exceeded 5% for >10m — RPCs into the cluster are failing; check the history/matching/frontend services and persistence."
+
+        - alert: TemporalPersistenceErrorRateHigh
+          expr: |
+            sum(rate(persistence_errors[5m])) / clamp_min(sum(rate(persistence_requests[5m])), 1) > 0.02
+          for: 10m
+          labels:
+            severity: warning
+            category: platform
+          annotations:
+            summary: "Temporal persistence error rate high (>2%)"
+            description: "Temporal persistence error ratio has exceeded 2% for >10m — the temporal-db (CNPG) may be degraded; durable state writes are at risk."

@@ -13,7 +13,7 @@ spec:
         kind: HelmRepository
         name: rustfs
         namespace: flux-system
-      version: "0.3.0"
+      version: "0.8.0"
   releaseName: rustfs
   targetNamespace: rustfs
   

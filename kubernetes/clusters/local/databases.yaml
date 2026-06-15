@@ -39,3 +39,7 @@ spec:
       kind: Cluster
       name: cnpg-db
       namespace: product
+    - apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
+      name: temporal-db
+      namespace: temporal

@@ -9,7 +9,7 @@
 # idle. Final population check is on `make up` (Kind, operator-scraped). Workflow
 # /activity-level RED metrics need the Temporal SDK MetricsHandler wired into
 # pkg/temporalx (tracked follow-up) and a Grafana dashboard adapted from the
-# official server-general.json — see docs/architecture/temporal-order-fulfillment.md.
+# official server-general.json — see docs/api/temporal-order-fulfillment.md.
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule

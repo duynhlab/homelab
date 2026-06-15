@@ -8,12 +8,18 @@ Complete documentation for the Go REST API Monitoring & Observability Platform.
 
 ```
 docs/
-├── api/                          # API documentation
+├── api/                          # API & implementation documentation
 │   ├── api.md                    # Complete API reference (canonical /api/v1)
 │   ├── api-naming-convention.md # Draft v1.0.0: gateway URL naming (gateway.duynh.me), does not replace api.md
-│   ├── grpc-internal-comms.md   # Proposed/Draft: gRPC for internal east-west comms (phased roadmap)
-│   ├── microservices.md         # Service catalog: per-service features, call graph, gRPC Phase 1 readiness
+│   ├── grpc-internal-comms.md   # Implemented: gRPC for internal east-west comms
+│   ├── microservices.md         # Service catalog: per-service features, call graph
+│   ├── temporal-order-fulfillment.md # Implemented: Temporal saga — why/when/how, design, infra, ops
+│   ├── api-architecture-review.md    # Architecture/API review: findings + planned items
 │   └── gke-internal-dns.md      # GKE cluster.local, Cloud DNS private zones, multi-environment
+├── decisions/                    # Architecture Decision Records (ADRs)
+│   ├── README.md                 # ADR conventions + index
+│   ├── ADR-001-adopt-temporal-for-order-fulfillment.md
+│   └── ADR-002-deploy-temporal-via-operator.md
 ├── databases/                    # Database documentation
 │   ├── 002-database-integration.md               # PostgreSQL architecture
 │   ├── 003-operator-comparison.md               # CloudNativePG vs Zalando decision guide
@@ -195,7 +201,11 @@ docs/
 
 3. **[gRPC internal comms (proposed/draft)](./api/grpc-internal-comms.md)** - Selective gRPC for internal east-west calls; dual-port, HTTP/2 LB pitfall, phased roadmap
 
-4. **[GKE internal & private DNS](./api/gke-internal-dns.md)** - In-cluster DNS and Cloud DNS private zones
+4. **[Temporal order-fulfillment saga (implemented)](./api/temporal-order-fulfillment.md)** - Why/when to use Temporal, the durable saga design, contracts, infra, ops — with [ADR-001](./decisions/ADR-001-adopt-temporal-for-order-fulfillment.md)/[ADR-002](./decisions/ADR-002-deploy-temporal-via-operator.md)
+
+5. **[API & architecture review](./api/api-architecture-review.md)** - Findings (pagination, error code, shared-DB, mTLS…) with resolved + planned status
+
+6. **[GKE internal & private DNS](./api/gke-internal-dns.md)** - In-cluster DNS and Cloud DNS private zones
 
 ### Databases
 
@@ -271,6 +281,14 @@ docs/
 
 - [API Reference](./api/api.md) - Complete API documentation
 - [gRPC Internal Comms (proposed/draft)](./api/grpc-internal-comms.md) - Selective gRPC for internal east-west calls; dual-port, HTTP/2 LB pitfall, phased roadmap
+- [Temporal Order-Fulfillment Saga](./api/temporal-order-fulfillment.md) - Durable order saga (why/when/how, design, infra, ops)
+- [API & Architecture Review](./api/api-architecture-review.md) - Architecture/API findings with resolved + planned status
+
+### Decisions (ADRs)
+
+- [ADR index](./decisions/README.md) - Architecture Decision Records (the *why* behind significant choices)
+- [ADR-001: Adopt Temporal for order fulfillment](./decisions/ADR-001-adopt-temporal-for-order-fulfillment.md)
+- [ADR-002: Deploy Temporal via the operator](./decisions/ADR-002-deploy-temporal-via-operator.md)
 
 ### Databases
 

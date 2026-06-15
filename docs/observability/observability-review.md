@@ -80,4 +80,4 @@ already covers it cluster-wide, see the reconciled table above.)*
 ## Related
 
 - [Observability index](README.md) · [Alerting](alerting/README.md) · [SLO](slo/README.md)
-- [API architecture review](../architecture/api-architecture-review.md) — companion review
+- [API architecture review](../api/api-architecture-review.md) — companion review

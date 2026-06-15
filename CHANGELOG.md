@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **docs (Temporal/architecture)**: Systematized the Temporal docs into `docs/api/` and added formal ADRs. Moved `temporal-order-fulfillment.md` (rewritten to a senior reference: **why** Temporal, **when** to use it / when not, what it buys, then the saga design / contracts / infra / ops / roadmap) and `api-architecture-review.md` (open findings reframed as a **Planned** section) out of the ad-hoc `docs/architecture/` into `docs/api/`; that directory is now removed. Added `docs/decisions/` with **ADR-001** (Adopt Temporal — alternatives: outbox, queue choreography, hand-rolled orchestration) and **ADR-002** (Deploy via the alexandrevilain operator — vs the official Helm chart / vendored manifests; the 1.24.2→1.27.x server constraint). Repointed in-repo references (`prometheusrule.yaml`, `observability-review.md`) and the service-repo code comments (`order-service`, `pkg`) to the new path; updated `docs/README.md`. (The `[0.100.0]` entry keeps the old path as accurate history — CHANGELOG is append-only.)
+
 ## [0.100.0] - 2026-06-15
 
 ### Added

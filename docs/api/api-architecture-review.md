@@ -1,24 +1,30 @@
 # API & 3-Layer Architecture Review
 
-> **Axis:** Architecture (with API/interface design).
-> **Date:** 2026-06-13.
-> **Method:** Applied the `api-and-interface-design` and `code-review-and-quality`
-> (architecture axis) skills against (a) the design docs in `docs/api`, `docs/caching`,
-> `docs/databases`, `docs/observability`, and (b) the **actual Go source** of two
-> representative services (`product-service`, `order-service`) plus the shared `pkg`
-> library.
-> **Outcome:** Review only — **no code was changed**. Findings are severity-labelled
-> with a recommended direction each.
+| Attribute | Value |
+|-----------|-------|
+| **Type** | Point-in-time architecture/API review (findings + tracked resolution) |
+| **Status** | Most findings resolved; remaining items tracked in [§0 Open / planned](#0-status--open-items) |
+| **Axis** | Architecture (with API/interface design) |
+| **Reviewed** | 2026-06-13 |
+| **Method** | Applied the `api-and-interface-design` + `code-review-and-quality` (architecture axis) skills against the design docs (`docs/api`, `docs/caching`, `docs/databases`, `docs/observability`) and the **actual Go source** of `product-service`, `order-service`, and shared `pkg`. Review only — no code changed in the review itself. |
 
-> **Resolution status (2026-06-13, follow-up implementation):**
-> - ✅ **#2 Pagination** — standard `{items,page,page_size,total_items,total_pages}` envelope (`pkg/httpx`) on products/reviews/orders/notifications.
-> - ✅ **#3 Error code** — additive `{"error","code"}` via `httpx.RespondError` across all 8 services.
-> - ✅ **#9 Logger** — shared `pkg/logger/zapx` adopted by the 6 zap services.
-> - ✅ **#8 Caching doc** — `caching.md` layer wording corrected.
-> - ✅ **3-layer fix** — notification-service repo moved to `internal/core/repository` with an injected pool.
-> - ✅ **#7** — already documented (`grpc-internal-comms.md` hop table); opening claim made precise.
-> - ⏸️ **#1 Shared-DB HA** and **#4 gRPC mTLS** — deferred to separate infra work (out of this code round).
-> - ↔️ **#5 / #6** — cache-invalidation ownership & soft-fail convention: documentation follow-ups, not yet written.
+## 0. Status — open items
+
+Findings are severity-labelled in §3. Resolution status:
+
+**✅ Done (follow-up implementation, 2026-06-13):**
+- **#2 Pagination** — standard `{items,page,page_size,total_items,total_pages}` envelope (`pkg/httpx`) on products/reviews/orders/notifications.
+- **#3 Error code** — additive `{"error","code"}` via `httpx.RespondError` across all 8 services.
+- **#9 Logger** — shared `pkg/logger/zapx` adopted by the 6 zap services.
+- **#8 Caching doc** — `caching.md` layer wording corrected.
+- **3-layer fix** — notification-service repo moved to `internal/core/repository` with an injected pool.
+- **#7** — already documented (`grpc-internal-comms.md` hop table); opening claim made precise.
+
+**⏳ Planned (not yet done — tracked here):**
+- **#1 Shared-DB HA** — give `supporting-shared-db` the same HA treatment as `cnpg-db` (≥3 nodes) + document the shared-tier SLO. Deferred to separate infra work.
+- **#4 gRPC east-west mTLS** — wire `pkg/grpcx` TLS creds to the existing `homelab-ca-bundle`. The top security-adjacent architecture debt.
+- **#5 Cache-invalidation ownership** — document the "one service owns each cache namespace; cross-service reads accept TTL-bounded staleness" invariant in `caching.md`.
+- **#6 Soft-fail vs hard-fail convention** — add an "Aggregation failure modes" section to `api.md`.
 
 ---
 

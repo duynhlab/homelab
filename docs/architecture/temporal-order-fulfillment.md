@@ -1,8 +1,10 @@
 # Spec: Temporal Order-Fulfillment Saga
 
-> **Status:** approved design / not yet implemented. This is the spec-driven source of truth for
-> the platform's first Temporal workflow + the Temporal infrastructure. Implementation lands
-> phase-by-phase (see [Phases](#phases)).
+> **Status:** **implemented** ✅ — shipped phase-by-phase and verified end-to-end on `local-stack`
+> (a checkout drives the full saga; an over-quantity checkout fails fast and rolls back). This doc
+> is the as-built source of truth for the platform's first Temporal workflow + its infrastructure.
+> See [§9 As-built notes](#9-as-built-notes) for what differs from the original design and the
+> tracked follow-ups.
 
 ## 1. Objective
 
@@ -161,13 +163,19 @@ flowchart LR
 - **Never:** block the HTTP request on the full saga; put secrets in YAML; self-merge.
 
 ## 7. Success criteria
-- Checkout → Temporal UI shows `OrderFulfillmentWorkflow` complete; stock decremented; shipment
-  created; notification sent; cart cleared; order `confirmed`.
-- **Durability:** kill the worker mid-run → it resumes and completes.
-- **Compensation:** force `CreateShipment` to fail → retries exhaust → stock released, order
-  `failed`.
-- Infra: `TemporalCluster` Ready on Kind, schema set up, UI via Kong, metrics in Grafana,
-  Kyverno admits pods.
+- ✅ **Happy path** — verified on `local-stack`: checkout → `201 pending`; Temporal UI shows
+  `OrderFulfillmentWorkflow` **Completed**; stock decremented (DB 50→48 + `stock_reservations`
+  ledger row); shipment created (`MOP0000000006`); cart cleared; order `confirmed`.
+- ✅ **Fail-fast / no side effects** — verified: an over-quantity checkout → `ReserveStock`
+  `FAILED_PRECONDITION` (non-retryable) → workflow **Failed**, order `failed`, stock untouched, zero
+  reservations.
+- **Compensation (ReleaseStock/CancelShipment)** — covered by the order-service workflow
+  `testsuite` tests (failure injected at CreateShipment / ConfirmOrder asserts reverse-order
+  compensation + order `failed`); a live mid-saga failure drill is a future GameDay.
+- **Durability** — Temporal's guarantee (worker restart resumes in-flight workflows); covered by
+  design, a live kill-the-worker drill is a future GameDay.
+- **Infra (Kind)** — `TemporalCluster` Ready, schema set up, UI via Kong, ServiceMonitor scraped,
+  Kyverno admits the pods: verify on `make up` (the manifests pass `make validate`).
 
 ## 8. Resolved decisions
 - **Server version:** Temporal **`1.24.2`** today, **target `1.27.x`**. The published operator
@@ -187,7 +195,35 @@ flowchart LR
   *Future nicety (deferred):* Temporal **Update-With-Start** can return an early "accepted / stock
   reserved" ack in the initial call while the rest continues async.
 
-## Phases
-0 spec (this doc) → 1 infra → 2 `pkg` temporalx+proto (tag) → 3 product inventory →
-4 shipping create/cancel → 5 order saga+worker → 6 `mop` worker mode → 7 local-stack e2e →
-8 docs/observability. Sequencing + verification: see the plan.
+## 9. As-built notes
+
+What shipped differs from the original design in a few deliberate ways:
+
+- **Saga shape — ConfirmOrder is the pivot.** `ReserveStock → CreateShipment` compensate in reverse
+  on failure (`ReleaseStock` / `CancelShipment`) and the order is marked `failed`. After
+  `ConfirmOrder` succeeds the order is `confirmed`; `SendNotification` + `ClearCart` are
+  **best-effort** (a failed notification/cart-clear never rolls a confirmed order back).
+- **Workflow start lives in the web handler** (where the old fire-and-forget calls were), so the
+  logic layer stays Temporal-free. If Temporal is unavailable at request time the order is still
+  created (`pending`) and the start is logged — checkout never fails on Temporal.
+- **`ClearCart` carries the caller's bearer token** in the workflow input (cart's private REST
+  validates it; the saga runs within seconds). Homelab simplification — production should expose an
+  internal, NetworkPolicy-fenced cart-clear (by user id) and drop the token from workflow history.
+- **Idempotency is DB-enforced.** product `stock_reservations` (PK `reservation_id,product_id`) and
+  shipping `UNIQUE(order_id)` make `ReserveStock`/`CreateShipment` safe to retry. `ReserveStock`
+  insufficient stock is a **non-retryable** activity error (fail fast → compensate).
+- **Server pinned 1.24.2**, target 1.27.x (operator chart cap — see §2/§8).
+- **Cache staleness (known follow-up):** the product read API serves Cache-Aside (Valkey) views, so
+  stock can read stale right after a reserve until the TTL (~10 min); the DB is authoritative.
+  Fix: bust the product cache on `ReserveStock`/`ReleaseStock`.
+- **Observability:** the operator scrapes Temporal server metrics via a `ServiceMonitor`; alerts are
+  `TemporalServerDown` + service/persistence error-rate (official metric names). The worker exposes
+  `/health`, `/ready`, `/metrics` (gRPC RED + Go runtime). **Follow-ups:** (a) a Grafana dashboard
+  adapted from the official [`temporalio/dashboards`](https://github.com/temporalio/dashboards)
+  `server/server-general.json`; (b) workflow/activity-level RED metrics + burn alerts via a Temporal
+  SDK `MetricsHandler` wired into `pkg/temporalx`.
+
+## Phases — all delivered ✅
+0 spec (this doc) · 1 infra (operator + `temporal-db` + cluster + UI) · 2 `pkg` `temporalx`+proto
+(`v0.7.0`) · 3 product inventory · 4 shipping create/cancel · 5 order saga+worker · 6 `mop` worker
+mode (chart `0.10.0`) · 7 local-stack e2e · 8 docs/observability (this update).

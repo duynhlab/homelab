@@ -1,0 +1,14 @@
+# The Temporal namespace the platform's workflows run in (the order-fulfillment
+# saga registers here). Distinct from the Kubernetes `temporal` namespace.
+---
+apiVersion: temporal.io/v1beta1
+kind: TemporalNamespace
+metadata:
+  name: mop
+  namespace: temporal
+spec:
+  clusterRef:
+    name: temporal
+  description: "duynhlab platform workflows (order-fulfillment saga)"
+  retentionPeriod: 168h # 7 days
+  allowDeletion: true

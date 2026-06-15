@@ -1,0 +1,82 @@
+# Temporal server, reconciled by the temporal-operator.
+# Two SQL stores live in the CNPG `temporal-db` cluster (see
+# configs/databases/clusters/temporal-db/); the `temporal` role password is the
+# CNPG-generated `temporal-db-app` secret.
+#
+# Server pinned to 1.24.x: operator v0.20.0 (published chart 0.6.0) supports
+# ">=1.14.0 <1.25.0". Bump once the operator re-publishes its chart for v0.22.0.
+#
+# Resources are set on every operator-created pod (services / ui / admintools /
+# schema jobs) so they satisfy the cluster-wide Kyverno resource policy.
+---
+apiVersion: temporal.io/v1beta1
+kind: TemporalCluster
+metadata:
+  name: temporal
+  namespace: temporal
+spec:
+  version: 1.24.2
+  numHistoryShards: 512
+
+  jobResources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+  persistence:
+    defaultStore:
+      sql:
+        user: temporal
+        pluginName: postgres12
+        databaseName: temporal
+        connectAddr: temporal-db-rw.temporal.svc.cluster.local:5432
+        connectProtocol: tcp
+      passwordSecretRef:
+        name: temporal-db-app
+        key: password
+    visibilityStore:
+      sql:
+        user: temporal
+        pluginName: postgres12
+        databaseName: temporal_visibility
+        connectAddr: temporal-db-rw.temporal.svc.cluster.local:5432
+        connectProtocol: tcp
+      passwordSecretRef:
+        name: temporal-db-app
+        key: password
+
+  services:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+
+  ui:
+    enabled: true
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        memory: 128Mi
+
+  admintools:
+    enabled: true
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        memory: 128Mi
+
+  metrics:
+    enabled: true
+    prometheus:
+      listenPort: 9090
+      scrapeConfig:
+        serviceMonitor:
+          enabled: true

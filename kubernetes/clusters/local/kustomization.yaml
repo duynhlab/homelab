@@ -19,4 +19,5 @@ resources:
   - kyverno.yaml         # Admission policies (depends on controllers + monitoring)
   - network-policies.yaml   # Ingress NetworkPolicies (inert on kindnet; depends on controllers)
   - mcp.yaml             # MCP servers (depends on monitoring)
+  - temporal.yaml        # Temporal server (depends on controllers + databases + cert-manager + monitoring)
   - apps.yaml            # Microservices

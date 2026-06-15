@@ -1,0 +1,53 @@
+# Temporal operator (alexandrevilain/temporal-operator).
+# Installs the TemporalCluster / TemporalNamespace CRDs and the controller that
+# reconciles them into running Temporal deployments. The controller is
+# cluster-scoped (watches all namespaces) but lives in `temporal`.
+#
+# Version note: the published Helm chart tops out at 0.6.0 (operator v0.20.0),
+# which supports Temporal server ">=1.14.0 <1.25.0". Server is therefore pinned
+# to 1.24.x in configs/temporal/cluster.yaml. Bumping to 1.27.x requires the
+# operator to re-publish its chart for v0.22.0 (server range extends to <1.29.0);
+# Renovate tracks the HelmRepository for that release.
+#
+# Webhook certs are issued by cert-manager (self-signed issuer); cert-manager is
+# installed in the same controllers wave, so the first reconcile may retry until
+# its CRDs exist.
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: temporal-operator
+  namespace: temporal
+  labels:
+    app.kubernetes.io/component: controller
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: temporal-operator
+      version: "0.6.0"
+      sourceRef:
+        kind: HelmRepository
+        name: temporal-operator
+        namespace: flux-system
+  install:
+    crds: Create
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  values:
+    manager:
+      resources:
+        requests:
+          cpu: 10m
+          memory: 64Mi
+        limits:
+          cpu: 500m
+          memory: 128Mi
+    webhook:
+      certManager:
+        certificate:
+          enabled: true

@@ -1,12 +1,18 @@
 # Local end-to-end test stack for the duynhlab e-commerce platform.
 #
-# Brings up: Postgres (7 DBs) + Redis cache + per-service golang-migrate migrations
-# + 7 Go services + an nginx pass-through gateway + the React frontend.
+# Brings up: Postgres (8 DBs) + Redis cache + per-service golang-migrate migrations
+# + 8 Go services + a Temporal dev server + the order-fulfillment worker + an
+# nginx pass-through gateway + the React frontend.
 #
 # Build contexts point at sibling repos (../../<service>), so all repos must be
 # checked out next to homelab/. Run from this directory:
 #   docker compose up -d --build
-# Then open the SPA at http://localhost:3000 (API gateway at http://localhost:8080).
+# Then open the SPA at http://localhost:3000 (API gateway at http://localhost:8080,
+# Temporal UI at http://localhost:8233).
+#
+# A checkout starts the OrderFulfillmentWorkflow: it reserves stock (product),
+# creates a shipment (shipping), confirms the order, notifies, and clears the
+# cart — with reverse-order compensation on failure. Watch it in the Temporal UI.
 #
 # Tracing/profiling are disabled; auth uses the real opaque-token login flow
 # (demo login: alice / password123).
@@ -54,6 +60,21 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # ---- Temporal dev server (in-memory; drives the order-fulfillment saga) ----
+  # `server start-dev` bundles frontend (:7233) + Web UI (:8233) in one container
+  # and auto-registers the `mop` namespace. In-memory persistence (ephemeral).
+  temporal:
+    image: temporalio/temporal:1.7.2
+    command: ["server", "start-dev", "--ip", "0.0.0.0", "--namespace", "mop", "--log-level", "warn"]
+    ports:
+      - "7233:7233" # frontend gRPC
+      - "8233:8233" # Web UI (http://localhost:8233)
+    healthcheck:
+      test: ["CMD", "temporal", "workflow", "list", "--address", "localhost:7233", "--namespace", "mop"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
 
   # ---- golang-migrate migrations (one-shot, per service DB; app image `migrate`) ----
   auth-migrate:
@@ -175,6 +196,8 @@ services:
       CACHE_HOST: cache
       CACHE_PORT: "6379"
       REVIEW_GRPC_ADDR: dns:///review:9090
+      # product serves the saga's ReserveStock/ReleaseStock on gRPC :9090.
+      GRPC_PORT: "9090"
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -206,8 +229,13 @@ services:
       SHIPPING_SERVICE_URL: http://shipping:8080
       # When set, order calls shipping over gRPC (Phase 1 pilot); unset = REST fallback.
       SHIPPING_GRPC_ADDR: dns:///shipping:9090
-      # order publishes an "order created" notification here (best-effort, gRPC).
       NOTIFICATION_GRPC_ADDR: dns:///notification:9090
+      # CreateOrder commits the order (pending) then starts the Temporal saga,
+      # which drives confirm + notification + cart-clear. The worker runs in the
+      # order-worker service below.
+      TEMPORAL_HOSTPORT: temporal:7233
+      TEMPORAL_NAMESPACE: mop
+      TASK_QUEUE: order-fulfillment
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -215,6 +243,32 @@ services:
       auth: { condition: service_healthy }
       cart: { condition: service_healthy }
       shipping: { condition: service_healthy }
+      temporal: { condition: service_healthy }
+
+  # ---- Order fulfillment worker (Temporal: runs the saga's activities) ----
+  order-worker:
+    build: { context: ../../order-service }
+    command: ["worker"]
+    environment:
+      <<: *svc-env
+      SERVICE_NAME: order
+      DB_NAME: order
+      CART_SERVICE_URL: http://cart:8080
+      SHIPPING_GRPC_ADDR: dns:///shipping:9090
+      NOTIFICATION_GRPC_ADDR: dns:///notification:9090
+      PRODUCT_GRPC_ADDR: dns:///product:9090
+      TEMPORAL_HOSTPORT: temporal:7233
+      TEMPORAL_NAMESPACE: mop
+      TASK_QUEUE: order-fulfillment
+    healthcheck: *svc-healthcheck
+    depends_on:
+      postgres: { condition: service_healthy }
+      order-migrate: { condition: service_completed_successfully }
+      temporal: { condition: service_healthy }
+      product: { condition: service_healthy }
+      shipping: { condition: service_healthy }
+      notification: { condition: service_healthy }
+      cart: { condition: service_healthy }
 
   # ---- Gateway (pass-through + CORS) ----
   gateway:

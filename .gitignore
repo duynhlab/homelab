@@ -52,3 +52,6 @@ debugs
 
 # Claude Code agent worktrees (never commit)
 .claude/worktrees/
+
+# Local codegraph index (never commit)
+.codegraph/

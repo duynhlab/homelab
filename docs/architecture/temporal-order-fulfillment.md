@@ -24,9 +24,17 @@ and the process survives worker/pod restarts.
 - **Feature:** order-fulfillment saga (flagship — exercises orchestration + retry + durable
   execution + compensation).
 - **Deploy:** **[`alexandrevilain/temporal-operator`](https://github.com/alexandrevilain/temporal-operator)**
-  (`TemporalCluster` + `TemporalNamespace` CRDs), **server v1.27.x** — fits the platform's
-  operator-heavy GitOps, reconciles the cluster declaratively, handles schema create/upgrade on
-  version bumps, and emits a `ServiceMonitor`.
+  (`TemporalCluster` + `TemporalNamespace` CRDs) via a Flux `HelmRepository` + `HelmRelease` —
+  fits the platform's operator-heavy GitOps, reconciles the cluster declaratively, handles schema
+  create/upgrade on version bumps, and emits a `ServiceMonitor`.
+  - **Server version — pinned to `1.24.2` for now (target `1.27.x`):** the operator's *published
+    Helm chart* tops out at `0.6.0` (operator **v0.20.0**, which supports Temporal server
+    `>=1.14.0 <1.25.0`). Operator **v0.22.0** supports `<1.29.0` (i.e. 1.27.x) but ships **only raw
+    release manifests — no published chart**. To keep a clean Helm/Renovate install we run the
+    chart and pin the server to **1.24.2** today; bump to **1.27.x** once the operator re-publishes
+    its chart for v0.22.0 (Renovate tracks the `HelmRepository`). Vendoring the v0.22.0 manifests
+    was considered and rejected (≈5k lines of vendored CRDs, no Renovate, manual re-vendor + Kyverno
+    patch on every upgrade).
   - **Known limitations (accepted for this homelab scope):** the operator does **not** provide
     native **auto-scaling** of the Temporal services, nor **multi-cluster replication** setup. Fine
     for a single-cluster homelab; revisit if those become requirements.
@@ -114,21 +122,26 @@ flowchart LR
         OW[order worker<br/>task queue: order-fulfillment]
     end
     OW -- gRPC :7233 --> TC
-    Kong[Kong] -- temporal-ui.duynh.me --> UI
+    Kong[Kong] -- temporal.duynh.me --> UI
     TC -- /metrics --> VM[VictoriaMetrics]
     OW -- OTLP --> Tempo
 ```
 
-- **Operator** in `kubernetes/infra/controllers/temporal/` — `temporal-operator` HelmRelease
-  (image pinned); installs the `TemporalCluster`/`TemporalNamespace` CRDs.
+- **Operator** in `kubernetes/infra/controllers/temporal/` — `temporal-operator` `HelmRepository`
+  + `HelmRelease` (chart `0.6.0`); installs the `TemporalCluster`/`TemporalNamespace` CRDs. Webhook
+  certs via cert-manager.
 - **TemporalCluster + `mop` TemporalNamespace** (retention 168h) in
-  `kubernetes/infra/configs/temporal/`: server **v1.27.x**, `numHistoryShards: 512`, persistence →
-  `temporal-db` (default + `temporal_visibility` via `passwordSecretRef` from ESO), `ui.enabled`,
-  `metrics.prometheus.serviceMonitor.enabled`, resources/probes set for Kyverno.
-- **temporal-db** in `kubernetes/infra/configs/databases/clusters/temporal-db/` mirroring
-  `cnpg-db` (HA, PgDog pooler, Barman backup, PodMonitor, ESO/OpenBAO secret).
-- **Kong** ingress `temporal-ui.duynh.me`; **Grafana dashboard + PrometheusRule** (cluster-down,
-  persistence errors, task-queue backlog, workflow-failure rate).
+  `kubernetes/infra/configs/temporal/`: server **`1.24.2`** (target 1.27.x — see §2),
+  `numHistoryShards: 512`, persistence → `temporal-db` (default + `temporal_visibility` via
+  `passwordSecretRef` from the **CNPG-generated `temporal-db-app` secret**), `ui.enabled`,
+  `admintools.enabled`, `metrics.prometheus.serviceMonitor.enabled`, resources set on every
+  operator-created pod for Kyverno (probes are operator-managed).
+- **temporal-db** in `kubernetes/infra/configs/databases/clusters/temporal-db/` — CloudNativePG
+  cluster with the two stores (`temporal` + `temporal_visibility`). Single instance for now
+  (Temporal HA is at the service layer); scaling + Barman backups are a follow-up.
+- **Kong** ingress `temporal.duynh.me`; **`TemporalServerDown`** PrometheusRule. A Grafana
+  dashboard + richer alerts (persistence errors, task-queue backlog, workflow-failure rate) land in
+  Phase 8 once metric names are confirmed from a live scrape.
 - **Flux**: `controllers → temporal-operator`; `databases → temporal-db`; new `temporal`
   Kustomization (`dependsOn` databases) before `apps`; the order worker `dependsOn` temporal.
 - **Kyverno**: temporal pods must satisfy image-pin/probes/resources/PSS (set via CR/HelmRelease
@@ -157,9 +170,13 @@ flowchart LR
   Kyverno admits pods.
 
 ## 8. Resolved decisions
-- **Server version:** Temporal **1.27.x** (pinned in the `TemporalCluster`).
-- **Deploy:** `alexandrevilain/temporal-operator` (`TemporalCluster`/`TemporalNamespace` CRDs)
-  against the external CNPG `temporal-db` (§2). Accepted gaps: no native auto-scaling, no
+- **Server version:** Temporal **`1.24.2`** today, **target `1.27.x`**. The published operator
+  chart (`0.6.0` / operator v0.20.0) only supports server `<1.25.0`; the v0.22.0 operator that
+  supports 1.27.x has no published chart. We keep the clean Helm/Renovate install and bump the
+  server to 1.27.x once the chart is re-published (§2).
+- **Deploy:** `alexandrevilain/temporal-operator` via `HelmRepository` + `HelmRelease` (chart
+  `0.6.0`), `TemporalCluster`/`TemporalNamespace` CRDs, against the external CNPG `temporal-db` (§2)
+  using the **CNPG-generated `temporal-db-app`** secret. Accepted gaps: no native auto-scaling, no
   multi-cluster replication. The official `temporalio/helm-charts` is documented as the
   alternative (§2), not chosen.
 - **Checkout contract:** **async** — `CreateOrder` returns **201 `pending`** immediately and the

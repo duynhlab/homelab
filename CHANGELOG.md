@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.100.0] - 2026-06-15
+
 ### Added
 
 - **infra/docs (Temporal)**: Phase 8 — finalized the Temporal order-fulfillment epic. Added grounded server-metric alerts to `configs/temporal/prometheusrule.yaml` (`TemporalServiceErrorRateHigh`, `TemporalPersistenceErrorRateHigh` — using the documented Temporal server metrics `service_requests`/`service_errors` and `persistence_requests`/`persistence_errors` from the official `temporalio/dashboards`, with `clamp_min` denominators so they never divide-by-zero / false-fire when idle), alongside the existing `TemporalServerDown`. Marked the spec `docs/architecture/temporal-order-fulfillment.md` **implemented** and added §9 "As-built notes" (saga pivot semantics, workflow-start-in-handler, ClearCart token simplification, DB-enforced idempotency, server pinned 1.24.2, and the two tracked observability follow-ups: a Grafana dashboard adapted from the official `server-general.json`, and workflow/activity RED metrics via a Temporal SDK `MetricsHandler` in `pkg/temporalx`). The saga was verified end-to-end on `local-stack` (happy path → order `confirmed`; over-quantity → fail-fast rollback).

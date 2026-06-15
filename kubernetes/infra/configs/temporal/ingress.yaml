@@ -1,0 +1,26 @@
+# Temporal Web UI via Kong — temporal.duynh.me
+# TLS terminated by Kong using the default proxy certificate (kong-proxy-tls).
+# The operator exposes the UI as the `temporal-ui` Service on :8080.
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: temporal-ui
+  namespace: temporal
+  annotations:
+    konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: temporal.duynh.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: temporal-ui
+                port:
+                  number: 8080

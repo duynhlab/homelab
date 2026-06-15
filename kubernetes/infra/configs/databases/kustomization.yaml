@@ -7,4 +7,5 @@ resources:
   - clusters/auth-db/
   - clusters/supporting-shared-db/
   - clusters/cnpg-db/
+  - clusters/temporal-db/
   # cnpg-db-replica: see configs/databases-cnpg-dr/ (Flux databases-cnpg-dr-local, dependsOn databases-local)

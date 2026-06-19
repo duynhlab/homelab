@@ -246,6 +246,7 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 
 ## Related Documentation
 
+- [Alert Catalog](./alert-catalog.md) -- every deployed alert (145 rules + SLO burn-rate) by domain, with metric, impact, and coverage-gap analysis
 - [Alert Dashboard Comparison](dashboard-comparison.md) -- deep-dive tool comparison (Karma, Alerta, UAR, Siren, Grafana)
 - [Microservices Alerts Runbook](../runbooks/microservices-alerts.md) -- per-alert investigation and resolution
 - [SLO System](../slo/README.md) -- Sloth Operator, SLO targets, error budgets

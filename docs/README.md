@@ -33,6 +33,10 @@ docs/
 │   ├── 005-ha-dr-deep-dive.md        # HA vs DR (cnpg-db-replica)
 │   ├── 001-postgresql-internals.md  # PostgreSQL internals deep dive
 │   ├── 010-drp.md                    # PostgreSQL DRP, RTO/RPO, PITR, restore evidence
+│   ├── 010.1-rpo-rto-planning.md     # Per-tier RPO/RTO targets vs as-built
+│   ├── 010.2-restore-and-failover-drills.md  # Drill cadence, roles, evidence log
+│   ├── 010.3-cross-region-dr.md      # Cross-zone/cross-region DR roadmap
+│   ├── 010.4-emergency-recovery.md   # "Start here when it's down" runbook
 │   ├── 011-documents.md              # Further reading / document map
 │   └── runbooks/                     # Database ops runbooks
 │       ├── endpoints-to-configmaps.md
@@ -235,6 +239,12 @@ docs/
     - Database verification and troubleshooting
     - Monitoring and best practices
 
+4. **[PostgreSQL Disaster Recovery](./databases/010-drp.md)** - HA, DR, RPO/RTO, PITR, standby taxonomy, and restore evidence
+    - [RPO/RTO Planning](./databases/010.1-rpo-rto-planning.md) - per-tier targets vs as-built, mapped to clusters
+    - [Restore & Failover Drills](./databases/010.2-restore-and-failover-drills.md) - drill cadence, roles, and evidence log
+    - [Cross-Region / Cross-Zone DR](./databases/010.3-cross-region-dr.md) - roadmap to independent failure domains
+    - [Emergency Recovery](./databases/010.4-emergency-recovery.md) - "start here when it's down" runbook
+
 ### Runbooks & Troubleshooting
 
 1. **[Metrics Audit Fixes](./runbooks/metrics-audit-fixes.md)** - Metrics audit runbook with before/after code, PromQL verification, dashboard impact
@@ -303,6 +313,10 @@ docs/
 - [Replication Strategy](./databases/004-replication-strategy.md) - Replication strategy
 - [HA & DR Deep Dive](./databases/005-ha-dr-deep-dive.md) - cnpg-db vs cnpg-db-replica (object-store DR)
 - [PostgreSQL DRP](./databases/010-drp.md) - DRP, RTO/RPO, PITR, standby taxonomy, and restore evidence
+    - [RPO/RTO Planning](./databases/010.1-rpo-rto-planning.md) - per-tier targets vs as-built, mapped to clusters
+    - [Restore & Failover Drills](./databases/010.2-restore-and-failover-drills.md) - drill cadence, roles, and evidence log
+    - [Cross-Region / Cross-Zone DR](./databases/010.3-cross-region-dr.md) - roadmap to independent failure domains
+    - [Emergency Recovery](./databases/010.4-emergency-recovery.md) - "start here when it's down" runbook
 - [PostgreSQL Further Reading](./databases/011-documents.md) - Curated external references
 - [PostgreSQL Internals](./databases/001-postgresql-internals.md) - Deep dive using cnpg-db examples
 

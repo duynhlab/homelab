@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **docs (databases/DR)**: Added four DR child playbooks under `docs/databases/010-drp.md` — `010.1-rpo-rto-planning.md` (per-tier RPO/RTO **targets vs as-built**, mapped to the real clusters), `010.2-restore-and-failover-drills.md` (drill cadence + roles + a sign-off **evidence log** template), `010.3-cross-region-dr.md` (the co-located-today → cross-zone → cross-region **roadmap**), and `010.4-emergency-recovery.md` (a "start here when it's down" runbook chaining HA failover / DR promotion / PITR / bootstrap-from-object-store). Operational pages that link back to the theory in `010`/`006`/`005` rather than duplicating it; registered in `docs/README.md`. The review also recorded two infra gaps as **known gaps** (not fixed here): `temporal-db` has no backups/WAL archiving, and the Zalando clusters have no backup-age/failure alerting.
+
 - **infra (Temporal)**: Deployed the order-fulfillment **worker in-cluster** — a second `mop` release (`kubernetes/apps/order-worker.yaml`, same order image, `args: ["worker"]`, `service.enabled: false`) carrying the order DB + downstream addresses + `TEMPORAL_HOSTPORT`/`TEMPORAL_NAMESPACE`/`TASK_QUEUE`/`PRODUCT_GRPC_ADDR`; `apps-local` now `dependsOn` `temporal-local`. Previously the saga only ran in `local-stack`; now `make up` actually fulfils orders in-cluster. (`docs/api/temporal-order-fulfillment.md` §7 updated to the separate-release model.)
 
 ### Fixed

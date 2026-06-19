@@ -9,10 +9,12 @@
 > **`pkg` tests**, the **`pkg/httpx`** pagination + machine-readable error-`code` envelope,
 > **`pkg/logger/zapx`**, the internal-route **NetworkPolicies** (`configs/network-policies/*`), and
 > the **gateway-host doc reconciliation** (`duynhne.me` → `duynh.me`). Also resolved since the
-> review: product review-client `MaxIdleConnsPerHost` throttle and user `allowUnauthenticatedFallback`.
+> review: **auth logout / session revocation** (`POST /auth/v1/private/logout` → `auth.Logout` →
+> session `Delete`), product review-client `MaxIdleConnsPerHost` throttle, and user
+> `allowUnauthenticatedFallback`.
 >
 > This file now tracks only the **remaining MEDIUM/LOW** items. **Verified** = re-checked against
-> current `main` (2026-06-16); **carried** = from the 2026-05-30 review, re-verify before acting.
+> current `main` (2026-06-19); **carried** = from the 2026-05-30 review, re-verify before acting.
 
 ---
 
@@ -36,7 +38,6 @@
 | Finding | Location | Sev | Verified |
 |---------|----------|-----|----------|
 | `User.Password` still serialises (`json:"password,omitempty"`, not `json:"-"`) | `internal/core/domain/user.go` | MEDIUM | ✅ still serializable |
-| No logout / session revocation; expired rows accumulate | sessions repo | MEDIUM | carried |
 | Session-create failure swallowed → login "succeeds" with a dead token | `internal/logic/v1/service.go` | LOW | carried |
 
 ## review-service

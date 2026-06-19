@@ -1,22 +1,7 @@
 # Platform Code Review — Open Items
 
-> **Original review:** 2026-05-30 (per-repo source review across the 7 Go services, `pkg`, `frontend`).
-> **Updated:** 2026-06-16 — pruned to remaining items only.
->
-> **Resolved & removed from this file** (all live on `main`): every **Critical / High / clear-bug**
-> finding (the 8 `fix/security-correctness-review` PRs merged 2026-05-30), plus the top deferred
-> recommendations — shared fail-closed **`pkg/authmw`** (kills the copy-paste auth-bypass class),
-> **`pkg` tests**, the **`pkg/httpx`** pagination + machine-readable error-`code` envelope,
-> **`pkg/logger/zapx`**, the internal-route **NetworkPolicies** (`configs/network-policies/*`), and
-> the **gateway-host doc reconciliation** (`duynhne.me` → `duynh.me`). Also resolved since the
-> review: **auth logout / session revocation** (`POST /auth/v1/private/logout` → `auth.Logout` →
-> session `Delete`), product review-client `MaxIdleConnsPerHost` throttle, and user
-> `allowUnauthenticatedFallback`.
->
-> This file now tracks only the **remaining MEDIUM/LOW** items. **Verified** = re-checked against
-> current `main` (2026-06-19); **carried** = from the 2026-05-30 review, re-verify before acting.
-
----
+> Remaining (not-yet-done) items from the 2026-05-30 platform review; resolved items are removed.
+> **Verified** = re-checked against `main` (2026-06-19); **carried** = from the original review, re-verify before acting.
 
 ## Cross-cutting / new
 
@@ -93,12 +78,3 @@
 | Invalid `LOG_LEVEL` silently falls back to `info` with no warning | logger | MEDIUM | carried |
 | `zerolog.TimeFieldFormat` is a process-global side effect; whole-second resolution | logger | MEDIUM | carried |
 | Doc comment claims it reads `LOG_LEVEL` env; it takes a param | logger | LOW | carried |
-
----
-
-## Suggested next order
-
-1. **Checkout `price` server-side derivation** (frontend) — the only remaining clear **tampering** vector.
-2. **Product cache-bust on reserve** — close the stock-staleness gap the saga introduced.
-3. **Public DTO trimming** (shipping `track`, review `user_id`) + **auth `Password` `json:"-"`** — small, removes data-exposure.
-4. The rest (pool tuning, dead code, `ON CONFLICT` upsert, single-logger standard) — opportunistic cleanup.

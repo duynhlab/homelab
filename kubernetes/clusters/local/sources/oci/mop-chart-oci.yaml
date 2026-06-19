@@ -10,4 +10,7 @@ spec:
   interval: 10m
   url: oci://ghcr.io/duynhlab/helm-charts/mop
   ref:
-    semver: ">=0.9.0"
+    # >=0.12.0: the chart's reworked value shape (service.enabled, service.http.*,
+    # service.grpc.*, top-level args/command). The domain ResourceSets emit this
+    # shape; older charts are incompatible.
+    semver: ">=0.12.0"

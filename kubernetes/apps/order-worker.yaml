@@ -1,0 +1,121 @@
+# Order-fulfillment Temporal worker — a SECOND release of the order image that
+# runs its `worker` subcommand (no HTTP API, no Service). It polls the
+# `order-fulfillment` task queue and runs the saga's activities
+# (see docs/api/temporal-order-fulfillment.md §7). Modelled on the mop chart's
+# examples/order-worker.yaml: same image as `order`, `args: ["worker"]`,
+# `service.enabled: false`. Deployed directly (not via the checkout ResourceSet)
+# because its shape is a one-off — no Service, no migrations, Temporal env.
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: order-worker
+  namespace: order
+spec:
+  interval: 10m
+  timeout: 10m
+  chartRef:
+    kind: OCIRepository
+    name: mop-chart-oci
+    namespace: flux-system
+  releaseName: order-worker
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    name: order-worker
+    replicaCount: 1
+    image:
+      # Same image as the order API — just a different subcommand.
+      repository: ghcr.io/duynhlab/order-service/order
+      tag: latest
+      pullPolicy: Always
+    # Run the worker subcommand; it serves /health, /ready, /metrics on :8080 but
+    # no app traffic, so the Service is skipped.
+    args: ["worker"]
+    service:
+      enabled: false
+    env:
+      - name: SERVICE_NAME
+        value: order-worker
+      - name: PORT
+        value: "8080"
+      - name: ENV
+        value: "production"
+      - name: OTEL_COLLECTOR_ENDPOINT
+        value: otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318
+      - name: OTEL_SAMPLE_RATE
+        value: "0.1"
+      - name: PYROSCOPE_ENDPOINT
+        value: http://pyroscope.monitoring.svc.cluster.local:4040
+      - name: LOG_LEVEL
+        value: info
+      - name: LOG_FORMAT
+        value: json
+      - name: TRACING_ENABLED
+        value: "true"
+      - name: PROFILING_ENABLED
+        value: "true"
+      - name: METRICS_ENABLED
+        value: "true"
+      # DB — the worker's ConfirmOrder/FailOrder activities update the order row
+      # (same pooler as the order API).
+      - name: DB_HOST
+        value: pgdog-cnpg.product.svc.cluster.local
+      - name: DB_PORT
+        value: "6432"
+      - name: DB_NAME
+        value: order
+      - name: DB_USER
+        value: order
+      - name: DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: cnpg-db-order-secret
+            key: password
+      - name: DB_SSLMODE
+        value: disable
+      - name: DB_POOL_MAX_CONNECTIONS
+        value: "10"
+      - name: DB_POOL_MODE
+        value: transaction
+      # Temporal — what the worker connects to and the queue it polls.
+      - name: TEMPORAL_HOSTPORT
+        value: temporal-frontend.temporal.svc.cluster.local:7233
+      - name: TEMPORAL_NAMESPACE
+        value: mop
+      - name: TASK_QUEUE
+        value: order-fulfillment
+      # Downstream services the activities call (gRPC east-west + cart REST).
+      - name: PRODUCT_GRPC_ADDR
+        value: dns:///product-grpc.product.svc.cluster.local:9090
+      - name: SHIPPING_GRPC_ADDR
+        value: dns:///shipping-grpc.shipping.svc.cluster.local:9090
+      - name: NOTIFICATION_GRPC_ADDR
+        value: dns:///notification-grpc.notification.svc.cluster.local:9090
+      - name: CART_SERVICE_URL
+        value: http://cart.cart.svc.cluster.local:8080
+    resources:
+      requests:
+        memory: "48Mi"
+        cpu: "20m"
+      limits:
+        memory: "128Mi"
+        cpu: "100m"
+    livenessProbe:
+      enabled: true
+      httpGet:
+        path: /health
+        port: 8080
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readinessProbe:
+      enabled: true
+      httpGet:
+        path: /ready
+        port: 8080
+      initialDelaySeconds: 5
+      periodSeconds: 5

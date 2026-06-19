@@ -22,7 +22,10 @@ spec:
   dependsOn:
     - name: databases-local
     - name: monitoring-local
-  
+    # The order-worker dials Temporal at startup (fatal if unreachable), so apps
+    # must not deploy until the Temporal cluster is Ready.
+    - name: temporal-local
+
   # Health checks for apps (per-domain ResourceSets)
   healthChecks:
     - apiVersion: fluxcd.controlplane.io/v1

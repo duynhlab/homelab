@@ -171,10 +171,13 @@ Deployed via the **`alexandrevilain/temporal-operator`** (see **[ADR-002](../dec
   Temporal + the downstreams, registers the workflow/activities, and polls the task queue. It also
   serves `/health`, `/ready`, `/metrics` (the process has no app HTTP, but needs probes + a scrape
   target).
-- **In-cluster.** The `mop` chart (`duynhlab/helm-charts`, chart `0.10.0`) renders the worker via
-  **`worker.enabled: true`** — a separate `<name>-worker` Deployment with its own selector. The order
-  domain ResourceSet sets `worker.enabled` + `TEMPORAL_HOSTPORT` / `TEMPORAL_NAMESPACE` / `TASK_QUEUE`
-  / `PRODUCT_GRPC_ADDR`.
+- **In-cluster.** The worker is a **second release of the same `mop` chart** (`duynhlab/helm-charts`,
+  ≥`0.12.0`): same image, `args: ["worker"]`, `service.enabled: false`. In homelab it's the
+  `order-worker` HelmRelease (`kubernetes/apps/order-worker.yaml`, namespace `order`) carrying the
+  order DB + downstream addresses + `TEMPORAL_HOSTPORT` / `TEMPORAL_NAMESPACE` / `TASK_QUEUE` /
+  `PRODUCT_GRPC_ADDR`. `apps-local` `dependsOn` `temporal-local` so it deploys after the cluster is
+  Ready. (Earlier drafts used a `worker.enabled` chart toggle; the chart was reworked to the
+  separate-release model.)
 - **Locally.** `local-stack/compose.yaml` runs a `temporalio/temporal` dev server (frontend `:7233`,
   Web UI `:8233`) + an `order-worker` container; `docker compose up -d --build` then a checkout
   exercises the live saga.

@@ -45,16 +45,17 @@ spec:
           tag: latest
           pullPolicy: Always
         service:
-          type: ClusterIP
-          port: 8080
-          targetPort: 8080
-          portName: http
-        containerPort: 8080
-        <<- if (index inputs "grpc_server") >>
-        grpc:
           enabled: true
-          port: 9090
-        <<- end >>
+          type: ClusterIP
+          http:
+            port: 8080
+            containerPort: 8080
+          <<- if (index inputs "grpc_server") >>
+          grpc:
+            enabled: true
+            port: 9090
+            containerPort: 9090
+          <<- end >>
         env:
           - name: SERVICE_NAME
             value: << inputs.name >>

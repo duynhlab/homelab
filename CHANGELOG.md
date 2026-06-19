@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **infra (Temporal)**: Deployed the order-fulfillment **worker in-cluster** — a second `mop` release (`kubernetes/apps/order-worker.yaml`, same order image, `args: ["worker"]`, `service.enabled: false`) carrying the order DB + downstream addresses + `TEMPORAL_HOSTPORT`/`TEMPORAL_NAMESPACE`/`TASK_QUEUE`/`PRODUCT_GRPC_ADDR`; `apps-local` now `dependsOn` `temporal-local`. Previously the saga only ran in `local-stack`; now `make up` actually fulfils orders in-cluster. (`docs/api/temporal-order-fulfillment.md` §7 updated to the separate-release model.)
+
+### Fixed
+
+- **infra (apps delivery)**: Reconciled the 4 domain ResourceSets (`apps/domains/{catalog,checkout,comms,identity}-rs.yaml`) with the reworked `mop` chart's value shape — they emitted the pre-rework shape (`service.port`/`service.targetPort`, top-level `containerPort`/`grpc.enabled`) that chart **≥0.12.0 ignores**, which would have dropped the `:9090` gRPC Service from every east-west service (`auth`/`product`/`shipping`/`review`/`notification`) once that chart resolved. Now emit `service.enabled` + `service.http.{port,containerPort}` + `service.grpc.{enabled,port,containerPort}`, and pinned `mop-chart-oci` to `>=0.12.0`. Verified by rendering the chart with the new shape (gRPC Service + both container ports present; worker renders no Service).
+
 ### Changed
 
 - **docs (Temporal/architecture)**: Systematized the Temporal docs into `docs/api/` and added formal ADRs. Moved `temporal-order-fulfillment.md` (rewritten to a senior reference: **why** Temporal, **when** to use it / when not, what it buys, then the saga design / contracts / infra / ops / roadmap) and `api-architecture-review.md` (open findings reframed as a **Planned** section) out of the ad-hoc `docs/architecture/` into `docs/api/`; that directory is now removed. Added `docs/decisions/` with **ADR-001** (Adopt Temporal — alternatives: outbox, queue choreography, hand-rolled orchestration) and **ADR-002** (Deploy via the alexandrevilain operator — vs the official Helm chart / vendored manifests; the 1.24.2→1.27.x server constraint). Repointed in-repo references (`prometheusrule.yaml`, `observability-review.md`) and the service-repo code comments (`order-service`, `pkg`) to the new path; updated `docs/README.md`. (The `[0.100.0]` entry keeps the old path as accurate history — CHANGELOG is append-only.)

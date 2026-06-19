@@ -57,7 +57,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
   - [x] VLSingle replaces VictoriaLogs Helm chart (operator-managed, 7d retention, 20Gi)
   - [x] Auto-converts Prometheus CRDs (ServiceMonitor, PodMonitor, PrometheusRule) to VM equivalents
   - [x] Documentation: `docs/observability/metrics/victoriametrics/README.md`
-- **Grafana dashboards** — 23 dashboards in `kubernetes/infra/configs/monitoring/grafana/dashboards/` (microservices, Tempo, CNPG, pg-monitoring, pg-query, PgBouncer, PgDog, replication-lag, Redis, Kong, SLO, Vector, VictoriaMetrics, Flux, Kubernetes)
+- **Grafana dashboards** — `GrafanaDashboard` CRDs in `kubernetes/infra/configs/monitoring/grafana/dashboards/` load JSON via `spec.url` from the dedicated `duynhlab/grafana-dashboards` repo (microservices, Tempo, CNPG, pg-monitoring/query, PgBouncer, PgDog, replication-lag, Redis, Kong, SLO, Vector, VictoriaMetrics, Flux, Kubernetes)
 - **SLI/SLO monitoring with Sloth** — `kubernetes/infra/configs/monitoring/slo/` (9 PrometheusServiceLevel CRDs)
 - **Distributed tracing with Tempo** — `kubernetes/infra/controllers/tracing/tempo/`
 - **Logging with VictoriaLogs + Vector** — `kubernetes/infra/controllers/logging/` (Loki removed; VictoriaLogs via VLSingle operator-managed CRD + Vector agent for collection)
@@ -82,7 +82,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 - **PostgreSQL with CloudNativePG operator** — `kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml`, clusters: `cnpg-db`, `cnpg-db-replica` (DR)
 - **PostgreSQL with Zalando operator** — `kubernetes/infra/controllers/databases/zalando-operator.yaml`, clusters: `auth-db`, `supporting-shared-db`
 - **Connection poolers** — PgBouncer (Zalando sidecar), PgDog (`cnpg-db` — product, cart, order)
-- **SQL migrations with Flyway** — `services/*/db/migrations/Dockerfile`, `.github/workflows/build-init.yml`
+- **SQL migrations with golang-migrate** — embedded in each service binary (`pkg/migratex` + `embed.FS`, `db/migrations/sql/*.up.sql`), run via the `migrate` subcommand (no separate migration image; replaced Flyway)
 - **PostgreSQL internals deep-dive** — `docs/databases/001-postgresql-internals.md`
 - **PostgreSQL internals mastery** — `docs/databases/001-postgresql-internals.md`:
   - Buffer pool tuning (shared_buffers, effective_cache_size, work_mem)
@@ -149,8 +149,8 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
   - Seccomp/AppArmor profiles for workloads
   - CIS Kubernetes Benchmark compliance scan (kube-bench)
   - Vulnerability management pipeline (scan → triage → remediate → verify)
-- Policy-as-code with Kyverno or OPA/Gatekeeper (enforce image policies, labels, resource limits)
-- Network policies for namespace isolation (Calico/Cilium)
+- **Policy-as-code with Kyverno** — `kubernetes/infra/configs/kyverno/` (cluster-policies: image-pin, required probes/resources, PSS baseline+restricted; time-boxed exceptions) — `docs/security/policy-catalog.md`
+- **Network policies for east-west isolation** — `kubernetes/infra/configs/network-policies/*.yaml` (per-service deny-all-ingress + allow-internal-callers; inert on kindnet locally, enforced with a policy CNI) — `docs/security/network-policies.md`
 - RBAC least-privilege review (ServiceAccounts, ClusterRoles)
 - Encryption at rest and in transit (TLS for DB connections, mTLS between services)
 
@@ -174,9 +174,10 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 - **OpenTelemetry instrumentation** — `services/*/middleware/tracing.go`
 - **React frontend with API client** — `frontend/`
 - **golangci-lint enforcement** — 60+ linters across all 8 service repos, CI-gated
-- **Shared Go package library** — `github.com/duynhlab/pkg` (zerolog logger, reusable modules)
+- **Shared Go package library** — `github.com/duynhlab/pkg`: `grpcx` (gRPC server/client bootstrap), `authmw` (fail-closed JWT middleware), `obsx` (OTel metrics), `httpx` (pagination + error envelope), `migratex` (embedded migrations), `temporalx` (Temporal client/worker), `proto/*` (versioned contracts), loggers
 - **Developer documentation standards** — AGENTS.md (3-layer coding rules, code quality) + README.md (dev guide) across all repos
-- gRPC services with Protobuf definitions
+- **gRPC services with Protobuf definitions** — `github.com/duynhlab/pkg/proto/{auth,product,shipping,review,notification}/v1` (+ order saga contracts), `pkg/grpcx`; east-west is gRPC-only (`docs/api/grpc-internal-comms.md`)
+- **Durable workflow orchestration (Temporal)** — order-fulfillment **saga** (reserve stock → create shipment → confirm → notify → clear cart, with reverse-order compensation + idempotent activities); `worker` subcommand + in-cluster `order-worker` release; operator + `temporal-db` infra. `docs/api/temporal-order-fulfillment.md`, ADR-001/002
 - Message queue system (NATS/Kafka/Redis Streams) with workers
 - Rate limiting and API quotas
 - Circuit breakers and retry policies
@@ -268,7 +269,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
   - Eventual consistency and conflict resolution (CRDTs, vector clocks)
 - **Distributed transactions**:
   - Two-phase commit (2PC) and its limitations
-  - Saga pattern for microservices
+  - Saga pattern for microservices — ✅ **implemented** (Temporal order-fulfillment saga with reverse-order compensation; `docs/api/temporal-order-fulfillment.md`, ADR-001)
   - Outbox pattern for reliable messaging
 
 ---
@@ -286,8 +287,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 
 ## Learning Resources & Interview Prep
 
-- Document "why" for each technology choice (ADRs)
-- Create architecture decision records in `docs/adr/`
+- [~] **Architecture decision records** — `docs/decisions/` (ADR-001 Adopt Temporal, ADR-002 Deploy via the operator + index); document the "why" for the remaining major choices
 - Prepare talking points for each completed item
 - Practice explaining trade-offs (e.g., Zalando vs CloudNativePG)
 

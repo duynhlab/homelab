@@ -50,9 +50,17 @@ config:
   bandwidth_metrics: true
   upstream_health_metrics: true
 ---
-# API rate limiting — protects backend services from abuse
+# API rate limiting — protects backend services from abuse.
 # Applied per-consumer (if authenticated) or per-IP (anonymous).
-# Policy: local (per-node counter, suitable for single-replica Kong).
+#
+# Policy `local` = each Kong pod keeps its own in-memory counter. Kong runs
+# 2 replicas (see controllers/kong/helmrelease.yaml), and the Service
+# load-balances without affinity, so the effective cluster limit is up to
+# ~2x these numbers and is approximate. DB-less mode does NOT support the
+# `cluster` policy; a true cluster-wide counter would require `policy: redis`
+# (the platform has Valkey) at the cost of a request-path dependency.
+# For a homelab we keep `local` and halve the numbers so the ~2x lands near
+# the intended ceiling — this is abuse hygiene, not exact accounting.
 apiVersion: configuration.konghq.com/v1
 kind: KongClusterPlugin
 metadata:
@@ -63,9 +71,9 @@ metadata:
     global: "false"
 plugin: rate-limiting
 config:
-  second: 10
-  minute: 200
-  hour: 5000
+  second: 5
+  minute: 100
+  hour: 2500
   policy: local
   fault_tolerant: true
   hide_client_headers: false
@@ -87,3 +95,44 @@ config:
   allowed_payload_size: 10
   size_unit: megabytes
   require_content_length: false
+---
+# Global correlation ID — generate X-Request-ID per request, forward it
+# upstream, and echo it back to the client. This makes the X-Request-ID that
+# the CORS plugin already exposes real (nothing was generating it before) and
+# gives Kong access logs ↔ a client-visible request handle.
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: correlation-id
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "true"
+plugin: correlation-id
+config:
+  header_name: X-Request-ID
+  generator: uuid
+  echo_downstream: true
+---
+# Global security response headers — applied to every proxied response.
+# `add` only sets a header if the upstream did not already send it.
+# HSTS is safe because Kong terminates TLS (https-only ingress).
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: security-headers
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "true"
+plugin: response-transformer
+config:
+  add:
+    headers:
+      - "X-Content-Type-Options:nosniff"
+      - "Referrer-Policy:strict-origin-when-cross-origin"
+      - "X-Frame-Options:DENY"
+      - "Strict-Transport-Security:max-age=31536000; includeSubDomains"
+  remove:
+    headers:
+      - "Server"

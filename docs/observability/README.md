@@ -284,7 +284,8 @@ docs/observability/
 │   └── variables.md              # Dashboard variables & regex
 │
 ├── alerting/                     # Alerting rules
-│   └── README.md                 # 2-layer alerting strategy
+│   ├── README.md                 # 2-layer alerting strategy
+│   └── alert-catalog.md          # Full alert reference (145 rules) + coverage gaps
 │
 ├── slo/                          # Service Level Objectives
 │   ├── README.md                 # Sloth Operator + SLO targets
@@ -384,6 +385,7 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 - [VictoriaMetrics Operator](metrics/victoriametrics.md) -- migration from kube-prometheus-stack
 - [Grafana Datasources](grafana/datasources.md) -- VictoriaMetrics plugin metrics datasource
 - [Alerting Strategy](alerting/README.md) -- 2-layer alerting (threshold + SLO burn-rate)
+- [Alert Catalog](alerting/alert-catalog.md) -- full reference of all deployed alerts + coverage-gap analysis
 - [SLO System](slo/README.md) -- Sloth Operator and burn-rate alerts
 - [Interview Prep](runbooks/observability-deep-dive.md) -- RED/USE/Golden Signals theory + structured answers
 - [Observability Review](observability-review.md) -- five-axis review of the current implementation (findings + recommendations)

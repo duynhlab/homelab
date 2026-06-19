@@ -71,7 +71,8 @@ docs/
 │   │   ├── dashboard-reference.md # Microservices dashboard (34 panels)
 │   │   └── variables.md          # Dashboard variables & regex
 │   ├── alerting/                 # Alerting rules
-│   │   └── README.md             # 2-layer alerting strategy
+│   │   ├── README.md             # 2-layer alerting strategy
+│   │   └── alert-catalog.md      # Full alert reference (145 rules) + coverage gaps
 │   ├── slo/                      # Service Level Objectives
 │   │   ├── README.md             # Sloth Operator + SLO targets
 │   │   ├── getting_started.md    # Enable SLO via Helm values

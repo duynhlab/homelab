@@ -357,9 +357,3 @@ Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-an
 - **Outage triple-fire:** `MicroserviceNoTraffic` + `MicroserviceNoSuccessfulRequests` + `KongNoTraffic` can all fire for one outage — group them and use Alertmanager inhibition.
 - **Tuning signals, not incidents:** `PostgresCheckpointsTooFrequent`, `PostgresDeadTuplesHigh`, `PostgresDatabaseSizeLarge`, `MicroserviceHighGCFrequency/HighGCPressure` are capacity/tuning signals — they should stay `warning`/`info`, never page (the user-facing symptom is already covered by latency/apdex/SLO).
 - **`KubeletTooManyPods`** is a static-ceiling cause alert — low value unless actually near the pod/node limit.
-
-## References
-
-- **context7-verified:** `/temporalio/documentation` (worker-health: schedule-to-start, backlog, sync-match), `/cloudnative-pg/cloudnative-pg` (monitoring.md: WAL archiving distinct from backup), `/kong/developer.konghq.com` (status-code metrics).
-- **General (mixins / community):** kube-prometheus-stack (`alertmanager.rules`, k8s mixins), node-exporter mixin, etcd mixin, kube-state-metrics mixin, redis_exporter community rules.
-- Platform: [alerting README](./README.md), [SLO burn-rate alerts](./slo-burn-rate-alerts.md), [observability index](../README.md).

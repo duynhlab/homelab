@@ -125,14 +125,29 @@ flowchart TD
 Every request flows through Kong's plugin pipeline. Plugins execute in a defined order based on priority:
 
 ```
-Request → CORS (global) → Prometheus (global) → Rate Limiting (per-route) → Upstream
+Request → CORS → correlation-id → Prometheus → Rate Limiting (per-route) → Upstream
+       → (response) security-headers → Client
 ```
 
-| Plugin | Scope | Priority | Purpose |
-|--------|-------|----------|---------|
-| `cors-policy` | Global | High | CORS headers for cross-origin requests |
-| `prometheus-metrics` | Global | Medium | Metrics collection for every request |
-| `rate-limiting-api` | Per-route (API only) | Medium | Protects backend services from abuse |
+| Plugin | Scope | Purpose |
+|--------|-------|---------|
+| `cors-policy` (`cors`) | Global | CORS headers for cross-origin requests; exposes `X-Request-ID` |
+| `correlation-id` | Global | Generates `X-Request-ID` per request, echoed downstream |
+| `prometheus-metrics` (`prometheus`) | Global | Metrics for every request (status/latency/bandwidth) |
+| `security-headers` (`response-transformer`) | Global | Adds `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, HSTS; strips `Server` |
+| `rate-limiting-api` | Per-route (API only) | Protects backends from abuse (`local` policy, ~2× across 2 replicas) |
+| `request-size-limiting-api` | Per-route (API only) | Rejects oversized payloads (10 MB) |
+
+### Authentication — validated in services, NOT at Kong
+
+There is deliberately **no `jwt` / `openid-connect` / `key-auth` plugin** on the gateway.
+Every backend service validates the JWT itself (`pkg/authmw`, fail-closed) and resolves
+identity via `auth.GetMe` over gRPC — that is the single source of truth. Kong stays an
+auth-agnostic pass-through proxy; `…/private/` routes are not rejected at the edge, the
+**services** return `401`. Putting JWT at Kong would be redundant, drift from the in-service
+check, and (under HS256) require handing the signing key to the gateway. Full rationale and
+the revisit criteria (only if auth-service moves to RS256/ES256) are in
+**[ADR-003](../decisions/ADR-003-jwt-validation-in-services-not-kong.md)**.
 
 ---
 

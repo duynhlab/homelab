@@ -1,3 +1,17 @@
+# Kong gateway plugins (DB-less, OSS bundled).
+#
+# Global (all routes):   cors-policy, prometheus-metrics, correlation-id, security-headers
+# Per-route (API only):  rate-limiting-api, request-size-limiting-api
+#                        (attached via `konghq.com/plugins` on the api-* Ingresses)
+#
+# NO authentication plugin here — by design. JWT is validated in the SERVICES
+# (`pkg/authmw`, fail-closed, identity via `auth.GetMe` over gRPC), not at the
+# gateway. Adding Kong's `jwt` plugin would be redundant with the in-service
+# check, create a second source of truth that drifts, and (under HS256) hand
+# the signing key to Kong. Decision + revisit criteria (RS256/ES256):
+#   docs/decisions/ADR-003-jwt-validation-in-services-not-kong.md
+# Do not add a jwt/openid-connect/key-auth plugin without superseding ADR-003.
+---
 # Global CORS plugin — allows frontend (local.duynh.me) to call APIs (gateway.duynh.me)
 ---
 apiVersion: configuration.konghq.com/v1

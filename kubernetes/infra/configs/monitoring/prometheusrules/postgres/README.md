@@ -15,11 +15,3 @@ The former monolith `postgres-alerts.yaml` was removed in favor of this layout.
 - Zalando-specific alerts are owned in [`zalando/`](zalando/) and should not include CNPG branches.
 - Dedupe decisions are made by symptom/scope; keep intended warning/critical pairs, remove only true duplicates.
 
-## Guardrail check
-
-Run `make postgres-alert-audit` after reconciliation to quickly check:
-- Flux readiness for monitoring/database layers.
-- Duplicate PostgreSQL alert names.
-- Metric backing for enabled rules (`cnpg_*`, `custom_*`, `kube_*`, `kubelet_*`).
-- VMAlert runtime rule errors.
-

@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **infra (Temporal)**: Deployed the order-fulfillment **worker in-cluster** — a second `mop` release (`kubernetes/apps/order-worker.yaml`, same order image, `args: ["worker"]`, `service.enabled: false`) carrying the order DB + downstream addresses + `TEMPORAL_HOSTPORT`/`TEMPORAL_NAMESPACE`/`TASK_QUEUE`/`PRODUCT_GRPC_ADDR`; `apps-local` now `dependsOn` `temporal-local`. Previously the saga only ran in `local-stack`; now `make up` actually fulfils orders in-cluster. (`docs/api/temporal-order-fulfillment.md` §7 updated to the separate-release model.)
 
+### Removed
+
+- **chore (scripts/docs)**: Removed the unused `scripts/postgres-alert-audit.sh` (and its `make postgres-alert-audit` target + the "Guardrail check" section in `prometheusrules/postgres/README.md`) — a one-off local audit helper superseded by the alert catalog. Also trimmed the `References` section from `docs/observability/alerting/alert-catalog.md`.
+
 ### Fixed
 
 - **infra (apps delivery)**: Reconciled the 4 domain ResourceSets (`apps/domains/{catalog,checkout,comms,identity}-rs.yaml`) with the reworked `mop` chart's value shape — they emitted the pre-rework shape (`service.port`/`service.targetPort`, top-level `containerPort`/`grpc.enabled`) that chart **≥0.12.0 ignores**, which would have dropped the `:9090` gRPC Service from every east-west service (`auth`/`product`/`shipping`/`review`/`notification`) once that chart resolved. Now emit `service.enabled` + `service.http.{port,containerPort}` + `service.grpc.{enabled,port,containerPort}`, and pinned `mop-chart-oci` to `>=0.12.0`. Verified by rendering the chart with the new shape (gRPC Service + both container ports present; worker renders no Service).

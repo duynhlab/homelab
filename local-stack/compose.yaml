@@ -284,6 +284,8 @@ services:
       KONG_ADMIN_LISTEN: "off"
       KONG_STATUS_LISTEN: "0.0.0.0:8100"
       KONG_PLUGINS: bundled
+      # Drop server_tokens (Server/Via fingerprint), keep latency debug headers
+      KONG_HEADERS: latency_tokens
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
     volumes:

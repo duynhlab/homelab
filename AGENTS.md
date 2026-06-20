@@ -47,7 +47,7 @@ kubernetes/
   apps/       # Domain ResourceSets + per-service InputProviders + frontend
 scripts/      # Kind/Flux helpers (called by the Makefile)
 terraform/    # OpenTofu root: Flux Operator + FluxInstance bootstrap (flux-operator-bootstrap module)
-local-stack/  # Docker Compose e2e stack (Postgres + Redis + 8 services + nginx gateway + SPA)
+local-stack/  # Docker Compose e2e stack (Postgres + Redis + 8 services + Kong DB-less gateway + SPA)
 docs/         # Documentation (start at docs/README.md)
 ```
 

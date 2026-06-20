@@ -1,0 +1,77 @@
+# Local API gateway — Kong DB-less (declarative), mirroring the in-cluster Kong.
+#
+# Same shape as the cluster (kubernetes/infra/configs/kong/): Variant A
+# pass-through routing /{service}/v1/... -> {service}:8080 (no rewrite), the
+# same plugin set, so local e2e exercises the real gateway, not an nginx stand-in.
+#
+# Differences from the cluster (intentional, local-only):
+#   - HTTP on :8000 (no TLS locally) -> no HSTS header, no https-redirect.
+#   - rate-limiting policy `local` is exact here (single Kong container).
+#   - CORS origin is the local SPA (http://localhost:3001).
+_format_version: "3.0"
+
+services:
+  - name: auth
+    url: http://auth:8080
+    routes: [{ name: auth, paths: ["/auth/"], strip_path: false }]
+  - name: user
+    url: http://user:8080
+    routes: [{ name: user, paths: ["/user/"], strip_path: false }]
+  - name: product
+    url: http://product:8080
+    routes: [{ name: product, paths: ["/product/"], strip_path: false }]
+  - name: cart
+    url: http://cart:8080
+    routes: [{ name: cart, paths: ["/cart/"], strip_path: false }]
+  - name: order
+    url: http://order:8080
+    routes: [{ name: order, paths: ["/order/"], strip_path: false }]
+  - name: review
+    url: http://review:8080
+    routes: [{ name: review, paths: ["/review/"], strip_path: false }]
+  - name: shipping
+    url: http://shipping:8080
+    routes: [{ name: shipping, paths: ["/shipping/"], strip_path: false }]
+  - name: notification
+    url: http://notification:8080
+    routes: [{ name: notification, paths: ["/notification/"], strip_path: false }]
+
+# Global plugins (apply to every route) — mirror the cluster KongClusterPlugins.
+plugins:
+  - name: cors
+    config:
+      origins: ["http://localhost:3001"]
+      methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+      headers: [Content-Type, Authorization, X-Request-ID]
+      exposed_headers: [X-Request-ID, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset]
+      credentials: true
+      max_age: 3600
+  - name: correlation-id
+    config:
+      header_name: X-Request-ID
+      generator: uuid
+      echo_downstream: true
+  - name: response-transformer   # security headers (HSTS omitted — local is HTTP)
+    config:
+      add:
+        headers:
+          - "X-Content-Type-Options:nosniff"
+          - "Referrer-Policy:strict-origin-when-cross-origin"
+          - "X-Frame-Options:DENY"
+      remove:
+        headers: ["Server"]
+  - name: rate-limiting
+    config:
+      second: 5
+      minute: 100
+      hour: 2500
+      policy: local
+      fault_tolerant: true
+      hide_client_headers: false
+      error_code: 429
+      error_message: "Rate limit exceeded. Please slow down."
+  - name: request-size-limiting
+    config:
+      allowed_payload_size: 10
+      size_unit: megabytes
+      require_content_length: false

@@ -19,3 +19,4 @@ settled decisions.
 |-----|-------|--------|
 | [ADR-001](ADR-001-adopt-temporal-for-order-fulfillment.md) | Adopt Temporal for order fulfillment | Accepted |
 | [ADR-002](ADR-002-deploy-temporal-via-operator.md) | Deploy Temporal via the alexandrevilain operator | Accepted |
+| [ADR-003](ADR-003-jwt-validation-in-services-not-kong.md) | Keep JWT validation in services, not the Kong gateway | Accepted |

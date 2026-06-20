@@ -75,10 +75,6 @@ flux-status: ## Show Flux status (all resources)
 validate: ## Validate Kubernetes manifests (Kustomize)
 	./scripts/flux-validate.sh
 
-.PHONY: postgres-alert-audit
-postgres-alert-audit: ## Run PostgreSQL alert audit checks
-	./scripts/postgres-alert-audit.sh
-
 ##@ Utilities
 
 .PHONY: prereqs

@@ -1,8 +1,8 @@
 # Local end-to-end test stack for the duynhlab e-commerce platform.
 #
 # Brings up: Postgres (8 DBs) + Redis cache + per-service golang-migrate migrations
-# + 8 Go services + a Temporal dev server + the order-fulfillment worker + an
-# nginx pass-through gateway + the React frontend.
+# + 8 Go services + a Temporal dev server + the order-fulfillment worker + a
+# Kong DB-less gateway (mirrors the in-cluster Kong) + the React frontend.
 #
 # Build contexts point at sibling repos (../../<service>), so all repos must be
 # checked out next to homelab/. Run from this directory:
@@ -272,16 +272,30 @@ services:
 
   # ---- Gateway (pass-through + CORS) ----
   gateway:
-    image: nginx:alpine
+    # Kong DB-less — same gateway as the cluster (replaces the old nginx
+    # stand-in). Declarative config in ./gateway/kong.yml mirrors the
+    # in-cluster Kong (routing + CORS + correlation-id + security headers +
+    # rate/size limits) so local e2e exercises the real gateway behaviour.
+    image: kong:3.2
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/kong.yml
+      KONG_PROXY_LISTEN: "0.0.0.0:8000"
+      KONG_ADMIN_LISTEN: "off"
+      KONG_STATUS_LISTEN: "0.0.0.0:8100"
+      KONG_PLUGINS: bundled
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
     volumes:
-      - ./gateway/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./gateway/kong.yml:/kong/kong.yml:ro
     ports:
-      - "8080:80"
+      - "8080:8000"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/gateway/health"]
+      test: ["CMD", "kong", "health"]
       interval: 10s
-      timeout: 3s
-      retries: 10
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     depends_on:
       auth: { condition: service_healthy }
       user: { condition: service_healthy }

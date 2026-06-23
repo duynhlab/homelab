@@ -1,0 +1,11 @@
+# VictoriaMetrics datasource (Prometheus-compatible) for the local stack — backs the RED
+# dashboard built from the OTel Collector's spanmetrics connector output.
+apiVersion: 1
+datasources:
+  - name: VictoriaMetrics
+    type: prometheus
+    uid: victoriametrics
+    access: proxy
+    url: http://victoria-metrics:8428
+    jsonData:
+      httpMethod: POST

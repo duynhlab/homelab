@@ -1,0 +1,11 @@
+# Loads dashboard JSON from /var/lib/grafana/dashboards (mounted from ./observability/grafana/dashboards).
+apiVersion: 1
+providers:
+  - name: local-stack
+    orgId: 1
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

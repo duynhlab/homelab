@@ -1,13 +1,32 @@
-# OTel Collector for the local stack — receives standard OTLP-HTTP from the 8 Go
-# services (otlptracehttp posts to :4318/v1/traces) and re-exports to VictoriaTraces'
-# non-standard ingest path. This mirrors the in-cluster collector
-# (kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml), trimmed
-# to the single VictoriaTraces backend used locally.
+# OTel Collector for the local stack (contrib distro — needed for the spanmetrics connector).
+# Receives standard OTLP-HTTP from the 8 Go services (otlptracehttp posts to :4318/v1/traces) and:
+#   1. re-exports traces to VictoriaTraces' non-standard ingest path, and
+#   2. derives RED metrics (calls + latency histogram, by service) via the spanmetrics connector
+#      and remote-writes them to VictoriaMetrics for the RED dashboard.
+# Locally this stands in for Tempo's metrics-generator (which produces span_metrics in-cluster).
 receivers:
   otlp:
     protocols:
       http:
         endpoint: 0.0.0.0:4318
+
+processors:
+  # OTel-recommended default in every pipeline — batches spans/metrics before export.
+  batch: {}
+
+connectors:
+  spanmetrics:
+    namespace: spanmetrics # → metric names spanmetrics_calls_total / spanmetrics_duration_*
+    histogram:
+      explicit:
+        buckets: [1ms, 2ms, 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s]
+    # service.name, span.name, span.kind, status.code are built-in dimensions — don't repeat them.
+    dimensions:
+      - name: http.method
+      - name: http.route
+    exemplars:
+      enabled: true
+    metrics_flush_interval: 15s
 
 exporters:
   otlphttp/victoriatraces:
@@ -15,6 +34,10 @@ exporters:
     tls:
       insecure: true
     compression: gzip
+  prometheusremotewrite:
+    endpoint: http://victoria-metrics:8428/api/v1/write
+    resource_to_telemetry_conversion:
+      enabled: true # keep service.name etc. as labels on the derived metrics
   # Logs span counts to `docker logs otel-collector` so ingest is easy to confirm.
   debug:
     verbosity: normal
@@ -23,4 +46,9 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      exporters: [otlphttp/victoriatraces, debug]
+      processors: [batch]
+      exporters: [otlphttp/victoriatraces, spanmetrics, debug]
+    metrics:
+      receivers: [spanmetrics]
+      processors: [batch]
+      exporters: [prometheusremotewrite]

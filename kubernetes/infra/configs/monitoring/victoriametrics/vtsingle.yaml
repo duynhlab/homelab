@@ -1,0 +1,36 @@
+# VTSingle - VictoriaTraces single-node trace storage (Operator-managed).
+# Pilot: a THIRD tracing backend alongside Tempo + Jaeger (the OTel Collector
+# fans the same OTLP traces to all three). VictoriaTraces stores traces in the
+# VictoriaLogs engine — no object storage needed — and consolidates tracing onto
+# the same VM Operator as metrics (VMSingle) + logs (VLSingle).
+#
+# Single port :10428 serves OTLP-HTTP ingest (/insert/opentelemetry/v1/traces),
+# the Jaeger query API (/select/jaeger, used by the Grafana Jaeger datasource),
+# LogsQL (/select/logsql/query), and /metrics (operator auto-creates a VMServiceScrape).
+# Image is pinned (v0.x, pre-1.0 / fast-moving). Docs: https://docs.victoriametrics.com/victoriatraces/
+apiVersion: operator.victoriametrics.com/v1
+kind: VTSingle
+metadata:
+  name: victoria-traces
+  namespace: monitoring
+spec:
+  retentionPeriod: "7d"
+  removePvcAfterDelete: true
+  useStrictSecurity: true
+
+  image:
+    repository: victoriametrics/victoria-traces
+    tag: v0.6.0
+
+  storage:
+    resources:
+      requests:
+        storage: 10Gi
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi

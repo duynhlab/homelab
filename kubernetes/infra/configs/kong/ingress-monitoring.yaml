@@ -124,6 +124,30 @@ spec:
                 port:
                   number: 16686
 ---
+# VictoriaTraces — victoriatraces.duynh.me (UI + Jaeger query API on :10428)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: victoriatraces
+  namespace: monitoring
+  annotations:
+    konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: victoriatraces.duynh.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vtsingle-victoria-traces
+                port:
+                  number: 10428
+---
 # Tempo — tempo.duynh.me
 apiVersion: networking.k8s.io/v1
 kind: Ingress

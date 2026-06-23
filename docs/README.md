@@ -59,7 +59,8 @@ docs/
 │   │   ├── README.md             # Tracing guide (Tempo + OTel)
 │   │   ├── architecture.md       # Dual backend (Tempo + Jaeger)
 │   │   ├── jaeger.md             # Jaeger UI guide
-│   │   └── backends-comparison.md # Tempo vs Jaeger vs VictoriaTraces
+│   │   ├── backends-comparison.md # Tempo vs Jaeger vs VictoriaTraces
+│   │   └── victoriatraces.md     # VictoriaTraces pilot (3rd backend)
 │   ├── logging/                  # Pillar 3: Structured Logging
 │   │   ├── README.md             # VictoriaLogs (single Vector)
 │   │   └── victorialogs.md       # VictoriaLogs backend
@@ -190,6 +191,7 @@ docs/
 3. **[Tracing Architecture](./observability/tracing/architecture.md)** - Dual backend (Tempo + Jaeger)
 4. **[Jaeger Guide](./observability/tracing/jaeger.md)** - Jaeger UI usage, comparison with Tempo
 5. **[Backend Comparison](./observability/tracing/backends-comparison.md)** - Tempo vs Jaeger vs VictoriaTraces (+ roadmap)
+6. **[VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md)** - 3rd backend via the VM operator
 5. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
 6. **[Structured Logging](./observability/logging/README.md)** - VictoriaLogs (single Vector)
 7. **[VictoriaLogs](./observability/logging/victorialogs.md)** - VictoriaLogs deployment and configuration
@@ -286,6 +288,8 @@ docs/
 - [Distributed Tracing](./observability/tracing/README.md) - Tempo integration
 - [Tracing Architecture](./observability/tracing/architecture.md) - Dual backend (Tempo + Jaeger)
 - [Jaeger Guide](./observability/tracing/jaeger.md) - Jaeger UI usage, comparison with Tempo
+- [Backend Comparison](./observability/tracing/backends-comparison.md) - Tempo vs Jaeger vs VictoriaTraces
+- [VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md) - 3rd backend via the VM operator
 - [Continuous Profiling](./observability/profiling/README.md) - Pyroscope setup
 - [Structured Logging](./observability/logging/README.md) - VictoriaLogs (single Vector)
 - [VictoriaLogs](./observability/logging/victorialogs.md) - VictoriaLogs deployment (single Vector, dual-ship)

@@ -79,14 +79,16 @@ services:
       timeout: 5s
       retries: 30
 
-  # ---- Observability: traces fan into VictoriaTraces via an OTel Collector ----
-  # Services emit OTLP-HTTP to the collector (:4318); the collector re-exports to
-  # VictoriaTraces' custom ingest path (:10428/insert/opentelemetry/v1/traces) —
-  # the std OTLP SDK can't target that path directly, so the collector is required.
-  # Audit traces in Grafana (:3002 → Explore → VictoriaTraces). This mirrors the
-  # in-cluster topology: services → otel-collector → VictoriaTraces → Grafana.
+  # ---- Observability: traces → VictoriaTraces; span-derived RED metrics → VictoriaMetrics ----
+  # Services emit OTLP-HTTP to the collector (:4318). The collector (a) re-exports traces to
+  # VictoriaTraces' custom ingest path (the std OTLP SDK can't target it directly, so the
+  # collector is required), and (b) runs the spanmetrics connector to derive RED metrics
+  # (calls/duration by service) which it remote-writes to VictoriaMetrics. Audit traces in
+  # Grafana Explore → VictoriaTraces; view the RED dashboard backed by VictoriaMetrics.
+  # Mirrors the in-cluster topology (services → otel-collector → VictoriaTraces/Grafana),
+  # with spanmetrics standing in for Tempo's metrics-generator locally.
   otel-collector:
-    image: otel/opentelemetry-collector:0.140.0
+    image: otel/opentelemetry-collector-contrib:0.140.0 # contrib: spanmetrics connector lives here
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./observability/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
@@ -94,6 +96,7 @@ services:
       - "4318:4318" # OTLP-HTTP (also handy for a host-side telemetrygen smoke test)
     depends_on:
       victoria-traces: { condition: service_started }
+      victoria-metrics: { condition: service_started }
 
   victoria-traces:
     image: victoriametrics/victoria-traces:v0.6.0
@@ -106,6 +109,16 @@ services:
     ports:
       - "10428:10428" # OTLP ingest + Jaeger query API + LogsQL + vmui
 
+  victoria-metrics:
+    image: victoriametrics/victoria-metrics:v1.146.0
+    command:
+      - "-storageDataPath=/victoria-metrics-data"
+      - "-retentionPeriod=7d"
+    volumes:
+      - victoria-metrics-data:/victoria-metrics-data
+    ports:
+      - "8428:8428" # remote-write (/api/v1/write) + PromQL + vmui
+
   grafana:
     image: grafana/grafana:12.4.4
     environment:
@@ -114,10 +127,12 @@ services:
       GF_AUTH_DISABLE_LOGIN_FORM: "true"
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
-      - "3002:3000" # http://localhost:3002 → Explore → VictoriaTraces
+      - "3002:3000" # http://localhost:3002 → Explore (traces) + RED dashboard
     depends_on:
       victoria-traces: { condition: service_started }
+      victoria-metrics: { condition: service_started }
 
   # ---- golang-migrate migrations (one-shot, per service DB; app image `migrate`) ----
   auth-migrate:
@@ -174,7 +189,7 @@ services:
     build: { context: ../../auth-service }
     # gRPC AuthService.GetMe always runs on :9090 for east-west /me validation;
     # HTTP :8080 is unchanged. Consumers reach it at dns:///auth:9090.
-    environment: { <<: *svc-env, SERVICE_NAME: auth, DB_NAME: auth, GRPC_PORT: "9090" }
+    environment: { <<: *svc-env, SERVICE_NAME: auth, OTEL_SERVICE_NAME: auth, DB_NAME: auth, GRPC_PORT: "9090" }
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -185,6 +200,7 @@ services:
     environment:
       <<: *svc-env
       SERVICE_NAME: user
+      OTEL_SERVICE_NAME: user
       DB_NAME: user
       AUTH_GRPC_ADDR: dns:///auth:9090
     healthcheck: *svc-healthcheck
@@ -197,7 +213,7 @@ services:
     build: { context: ../../shipping-service }
     # gRPC ShippingService always runs on :9090; HTTP :8080 is unchanged.
     # order reaches it at dns:///shipping:9090.
-    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping, GRPC_PORT: "9090" }
+    environment: { <<: *svc-env, SERVICE_NAME: shipping, OTEL_SERVICE_NAME: shipping, DB_NAME: shipping, GRPC_PORT: "9090" }
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -208,6 +224,7 @@ services:
     environment:
       <<: *svc-env
       SERVICE_NAME: review
+      OTEL_SERVICE_NAME: review
       DB_NAME: review
       AUTH_GRPC_ADDR: dns:///auth:9090
     healthcheck: *svc-healthcheck
@@ -221,6 +238,7 @@ services:
     environment:
       <<: *svc-env
       SERVICE_NAME: notification
+      OTEL_SERVICE_NAME: notification
       DB_NAME: notification
       AUTH_GRPC_ADDR: dns:///auth:9090
     healthcheck: *svc-healthcheck
@@ -234,6 +252,7 @@ services:
     environment:
       <<: *svc-env
       SERVICE_NAME: product
+      OTEL_SERVICE_NAME: product
       DB_NAME: product
       CACHE_ENABLED: "true"
       CACHE_HOST: cache
@@ -253,6 +272,7 @@ services:
     environment:
       <<: *svc-env
       SERVICE_NAME: cart
+      OTEL_SERVICE_NAME: cart
       DB_NAME: cart
       AUTH_GRPC_ADDR: dns:///auth:9090
     healthcheck: *svc-healthcheck
@@ -266,6 +286,7 @@ services:
     environment:
       <<: *svc-env
       SERVICE_NAME: order
+      OTEL_SERVICE_NAME: order
       DB_NAME: order
       AUTH_GRPC_ADDR: dns:///auth:9090
       CART_SERVICE_URL: http://cart:8080
@@ -295,6 +316,7 @@ services:
     environment:
       <<: *svc-env
       SERVICE_NAME: order
+      OTEL_SERVICE_NAME: order
       DB_NAME: order
       CART_SERVICE_URL: http://cart:8080
       SHIPPING_GRPC_ADDR: dns:///shipping:9090
@@ -370,3 +392,4 @@ services:
 
 volumes:
   victoria-traces-data:
+  victoria-metrics-data:

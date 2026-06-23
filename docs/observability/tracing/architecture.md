@@ -50,16 +50,16 @@ flowchart TB
 - **Configuration**: `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
 - **Ports**: 4317 (gRPC), 4318 (HTTP), 8888 (metrics)
 
-**3. Tempo (Primary Backend)**
-- **Purpose**: Production tracing backend
-- **Storage**: Object storage (S3/GCS compatible)
+**3. Tempo (Primary Backend)** — `grafana/tempo:2.10.5`
+- **Purpose**: Durable tracing backend
+- **Storage**: **RustFS S3** (`tempo-traces` bucket), **7-day** block retention
 - **Query**: Via Grafana (TraceQL)
-- **Integration**: Grafana datasource
+- **Integration**: Grafana datasource (+ traces↔logs↔metrics correlation)
 
-**4. Jaeger v2 (Alternative Backend)**
-- **Purpose**: Alternative UI, migration testing
-- **Storage**: In-memory (100k traces max)
-- **Query**: Built-in Jaeger UI (port 16686)
+**4. Jaeger v2 (Alternative Backend)** — `jaegertracing/jaeger` Helm chart, all-in-one
+- **Purpose**: Alternative UI, learning / comparison
+- **Storage**: **In-memory (100k traces max), ephemeral** — Jaeger has no S3/object-storage backend (persistence would need badger-PVC or external ES/ClickHouse)
+- **Query**: Built-in Jaeger UI (port 16686, `jaeger-query` Service)
 - **Integration**: Grafana datasource
 
 ## Why Dual Backends?
@@ -223,25 +223,24 @@ service:
 
 ### Current Limitations
 
-1. **Jaeger Storage**: In-memory only (data lost on restart)
+1. **Jaeger Storage**: in-memory **by design** (data lost on restart) — Jaeger has **no S3/object-storage backend**, and Tempo is the durable store (RustFS S3, 7-day retention), so Jaeger is kept ephemeral as the secondary/learning UI.
 2. **Collector HA**: Single replica (no redundancy)
 3. **Monitoring**: Limited collector metrics visibility
 4. **Security**: No TLS between components
 
 ### Recommended Improvements
 
-**1. Persistent Storage for Jaeger:**
+**1. Persistent storage for Jaeger (if ever needed):** Jaeger can't use S3/RustFS — the persistence options are **badger on a PVC** (single-node) or an external **Elasticsearch/OpenSearch/Cassandra/ClickHouse**:
 ```yaml
-# kubernetes/infra/controllers/tracing/jaeger/jaeger.yaml (conceptual example)
-storage:
-  type: badger
-  badger:
-    ephemeral: false
-    directory: /badger
+# kubernetes/infra/controllers/tracing/jaeger/jaeger.yaml (conceptual — NOT deployed)
+backends:
+  primary_store:
+    badger:
+      ephemeral: false      # persist to a PVC
+      directory: /var/lib/jaeger-badger
 ```
-- Requires PVC
-- Data survives pod restarts
-- Suitable for POC/small deployments
+- Requires a PVC; data survives pod restarts
+- Currently we keep `memory` and let **Tempo** own durable storage — see [backends-comparison.md](backends-comparison.md)
 
 **2. High Availability:**
 ```yaml

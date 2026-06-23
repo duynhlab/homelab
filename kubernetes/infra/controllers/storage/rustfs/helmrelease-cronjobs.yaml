@@ -2,7 +2,8 @@
 # Creates per-operator buckets for backup isolation
 # Runs periodically (idempotent) - safe to re-run
 #
-# Buckets: pg-backups-zalando (Zalando/WAL-G), pg-backups-cnpg (CloudNativePG/Barman)
+# Buckets: pg-backups-zalando (Zalando/WAL-G), pg-backups-cnpg (CloudNativePG/Barman),
+#          tempo-traces (Grafana Tempo trace blocks)
 #
 # Chart: cronjobs v0.2.0 from oci://ghcr.io/duyhenryer/charts/cronjobs
 # Verify: kubectl get cronjob -n rustfs
@@ -67,6 +68,7 @@ spec:
             echo "=== Creating buckets ==="
             mc mb --ignore-existing rustfs/pg-backups-zalando
             mc mb --ignore-existing rustfs/pg-backups-cnpg
+            mc mb --ignore-existing rustfs/tempo-traces
 
             echo "=== Verifying ==="
             mc ls rustfs/

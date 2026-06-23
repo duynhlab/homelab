@@ -9,7 +9,7 @@ Jaeger is an open-source distributed tracing platform that runs alongside Grafan
 ### Access Jaeger UI
 
 ```bash
-kubectl port-forward -n monitoring svc/jaeger-all-in-one 16686:16686
+kubectl port-forward -n monitoring svc/jaeger-query 16686:16686
 ```
 
 Open: http://localhost:16686
@@ -145,18 +145,38 @@ flowchart TB
 
 ### Jaeger All-in-One
 
-Located at: `kubernetes/infra/controllers/tracing/jaeger/jaeger.yaml`
+Located at: `kubernetes/infra/controllers/tracing/jaeger/jaeger.yaml`. Deployed via the
+**`jaegertracing/jaeger` Helm chart** (Jaeger v2, all-in-one) — **not** the Jaeger Operator.
 
 ```yaml
-allInOne:
-  enabled: true
-  env:
-    - name: COLLECTOR_OTLP_ENABLED
-      value: "true"
-
-storage:
-  type: memory  # or badger for persistence
+# jaeger_storage backend (Jaeger v2 OTel-collector config)
+backends:
+  primary_store:
+    memory:
+      max_traces: 100000   # in-memory ring buffer
 ```
+
+### Storage — in-memory here, and why (vs Tempo on RustFS)
+
+Jaeger in this project runs **in-memory** (`max_traces: 100000`): traces are a bounded ring
+buffer **lost on every pod restart** — intentionally, because Jaeger is kept only as a
+**second UI for learning/comparison**; **Tempo is the durable backend** (object storage on
+RustFS, 7-day retention).
+
+**Important asymmetry:** unlike Tempo, **Jaeger has no S3 / object-storage backend.** Its
+persistence options are:
+
+| Option | Type | Fit |
+|--------|------|-----|
+| `memory` (current) | in-process ring buffer | ephemeral; lost on restart |
+| `badger` | embedded KV on a **PVC** | single-node persistence (homelab) |
+| Elasticsearch / OpenSearch | external search cluster | production, heavy |
+| Cassandra / ClickHouse | external database | production, heavy |
+
+So "make Jaeger durable on RustFS" is **not possible** — Jaeger can't speak S3. To persist it
+you'd switch to `badger` (a PVC) for single-node, or stand up an external ES/ClickHouse. We
+deliberately keep `memory` and let **Tempo** own durable trace storage. See the
+[backend comparison](./backends-comparison.md).
 
 ### Grafana Datasource
 
@@ -166,12 +186,12 @@ Located at: `kubernetes/infra/configs/monitoring/grafana/datasource-jaeger.yaml`
 datasource:
   name: Jaeger
   type: jaeger
-  url: http://jaeger-all-in-one.monitoring.svc.cluster.local:16686
+  url: http://jaeger-query.monitoring.svc.cluster.local:16686
   jsonData:
     tracesToLogsV2:
       datasourceUid: victorialogs
     tracesToMetrics:
-      datasourceUid: victoriametrics
+      datasourceUid: prometheus
 ```
 
 ## Common Workflows

@@ -14,7 +14,8 @@ Track requests as they flow through multiple microservices to understand perform
 
 **Technologies:**
 - **OpenTelemetry**: Industry-standard tracing instrumentation
-- **Grafana Tempo**: Distributed tracing backend (v2.9.0 with metrics-generator)
+- **Grafana Tempo**: primary tracing backend (v2.10.5 with metrics-generator) — durable on **RustFS S3** (`tempo-traces` bucket, **7-day** block retention)
+- **Jaeger**: secondary UI (Helm chart, all-in-one) — **in-memory / ephemeral** (lost on restart)
 - **W3C Trace Context**: Standard for trace propagation between services
 
 ---
@@ -100,7 +101,7 @@ flowchart LR
 5. Spans exported to **Tempo** via OTLP HTTP (batch export every 5s)
 6. **Grafana** queries Tempo for trace visualization
 
-> **Two backends, by design.** **Tempo** is the primary backend (queried in Grafana via TraceQL, durable storage). **Jaeger** is an alternative UI fed by the same OTel Collector fan-out (in-memory storage, standalone Jaeger UI). The dual-backend setup is intentional — Tempo for day-to-day Grafana workflows, Jaeger for its dedicated trace-search UI. See [architecture.md](architecture.md) and [jaeger.md](jaeger.md).
+> **Two backends, by design.** **Tempo** is the primary backend (queried in Grafana via TraceQL) and the **durable** store — traces live in **RustFS S3** (`tempo-traces` bucket) with **7-day** retention. **Jaeger** is an alternative UI fed by the same OTel Collector fan-out, kept on **in-memory storage (ephemeral — traces are lost on pod restart)** because Jaeger has no S3/object-storage backend (see [jaeger.md](jaeger.md#storage--in-memory-here-and-why-vs-tempo-on-rustfs)). The dual-backend setup is intentional — Tempo for durable day-to-day Grafana workflows, Jaeger for its dedicated trace-search UI / learning. See [architecture.md](architecture.md), [jaeger.md](jaeger.md), and the [backend comparison](backends-comparison.md).
 
 ### Automatic Features
 
@@ -429,4 +430,4 @@ attribute.String("db.table", "users")
 
 ---
 
-**Last Updated**: December 9, 2025 - Tempo v2.9.0 with metrics-generator (v0.6.9)
+**Last Updated**: June 2026 — Tempo v2.10.5 (metrics-generator) on RustFS S3, 7-day retention; Jaeger in-memory (secondary UI)

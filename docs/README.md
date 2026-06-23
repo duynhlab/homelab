@@ -58,7 +58,8 @@ docs/
 │   ├── tracing/                  # Pillar 2: Distributed Tracing
 │   │   ├── README.md             # Tracing guide (Tempo + OTel)
 │   │   ├── architecture.md       # Dual backend (Tempo + Jaeger)
-│   │   └── jaeger.md             # Jaeger UI guide
+│   │   ├── jaeger.md             # Jaeger UI guide
+│   │   └── backends-comparison.md # Tempo vs Jaeger vs VictoriaTraces
 │   ├── logging/                  # Pillar 3: Structured Logging
 │   │   ├── README.md             # VictoriaLogs (single Vector)
 │   │   └── victorialogs.md       # VictoriaLogs backend
@@ -188,6 +189,7 @@ docs/
 2. **[Distributed Tracing](./observability/tracing/README.md)** - Tempo integration guide
 3. **[Tracing Architecture](./observability/tracing/architecture.md)** - Dual backend (Tempo + Jaeger)
 4. **[Jaeger Guide](./observability/tracing/jaeger.md)** - Jaeger UI usage, comparison with Tempo
+5. **[Backend Comparison](./observability/tracing/backends-comparison.md)** - Tempo vs Jaeger vs VictoriaTraces (+ roadmap)
 5. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
 6. **[Structured Logging](./observability/logging/README.md)** - VictoriaLogs (single Vector)
 7. **[VictoriaLogs](./observability/logging/victorialogs.md)** - VictoriaLogs deployment and configuration

@@ -61,14 +61,24 @@ data:
 
     compactor:
       compaction:
-        block_retention: 1h
-        compacted_block_retention: 10m
+        block_retention: 168h          # 7 days (was 1h) — matches VMSingle/VLSingle retention
+        compacted_block_retention: 1h
 
     storage:
       trace:
-        backend: local
-        local:
-          path: /var/tempo/traces
+        # Durable object storage on the in-cluster RustFS (S3-compatible).
+        # Creds come from env (${...}) — see -config.expand-env in the Deployment.
+        backend: s3
+        s3:
+          bucket: tempo-traces
+          endpoint: rustfs-svc.rustfs.svc.cluster.local:9000
+          access_key: ${ACCESS_KEY_ID}
+          secret_key: ${ACCESS_SECRET_KEY}
+          insecure: true               # RustFS is plain HTTP (no TLS in-cluster)
+          forcepathstyle: true         # RustFS is S3-compatible, not S3-native
+          region: us-east-1
+        wal:
+          path: /var/tempo/wal          # local WAL (emptyDir) before blocks flush to S3
         pool:
           max_workers: 100
           queue_depth: 10000

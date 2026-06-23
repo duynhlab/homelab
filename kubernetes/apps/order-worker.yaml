@@ -49,6 +49,20 @@ spec:
         value: otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318
       - name: OTEL_SAMPLE_RATE
         value: "0.1"
+      # OTel SDK reads OTEL_SERVICE_NAME (not SERVICE_NAME); without it
+      # service.name falls back to brittle hostname parsing.
+      - name: OTEL_SERVICE_NAME
+        value: order-worker
+      - name: POD_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.name
+      - name: POD_NAMESPACE
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+      - name: OTEL_RESOURCE_ATTRIBUTES
+        value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME)"
       - name: PYROSCOPE_ENDPOINT
         value: http://pyroscope.monitoring.svc.cluster.local:4040
       - name: LOG_LEVEL

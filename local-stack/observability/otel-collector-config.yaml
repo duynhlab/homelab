@@ -1,0 +1,26 @@
+# OTel Collector for the local stack — receives standard OTLP-HTTP from the 8 Go
+# services (otlptracehttp posts to :4318/v1/traces) and re-exports to VictoriaTraces'
+# non-standard ingest path. This mirrors the in-cluster collector
+# (kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml), trimmed
+# to the single VictoriaTraces backend used locally.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  otlphttp/victoriatraces:
+    traces_endpoint: http://victoria-traces:10428/insert/opentelemetry/v1/traces
+    tls:
+      insecure: true
+    compression: gzip
+  # Logs span counts to `docker logs otel-collector` so ingest is easy to confirm.
+  debug:
+    verbosity: normal
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [otlphttp/victoriatraces, debug]

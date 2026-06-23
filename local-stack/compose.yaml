@@ -14,12 +14,15 @@
 # creates a shipment (shipping), confirms the order, notifies, and clears the
 # cart — with reverse-order compensation on failure. Watch it in the Temporal UI.
 #
-# Tracing/profiling are disabled; auth uses the real opaque-token login flow
-# (demo login: alice / password123).
+# Tracing fans into VictoriaTraces (via an OTel Collector) — audit it in Grafana
+# at http://localhost:3002 (Explore → VictoriaTraces). Profiling stays disabled;
+# auth uses the real opaque-token login flow (demo login: alice / password123).
 
 x-svc-env: &svc-env
   ENV: development
-  TRACING_ENABLED: "false"
+  TRACING_ENABLED: "true"
+  OTEL_COLLECTOR_ENDPOINT: otel-collector:4318 # host:port; the OTLP-HTTP SDK appends /v1/traces
+  OTEL_SAMPLE_RATE: "1.0"                       # sample everything locally (prod default 0.1)
   PROFILING_ENABLED: "false"
   METRICS_ENABLED: "true"
   LOG_LEVEL: info
@@ -75,6 +78,46 @@ services:
       interval: 5s
       timeout: 5s
       retries: 30
+
+  # ---- Observability: traces fan into VictoriaTraces via an OTel Collector ----
+  # Services emit OTLP-HTTP to the collector (:4318); the collector re-exports to
+  # VictoriaTraces' custom ingest path (:10428/insert/opentelemetry/v1/traces) —
+  # the std OTLP SDK can't target that path directly, so the collector is required.
+  # Audit traces in Grafana (:3002 → Explore → VictoriaTraces). This mirrors the
+  # in-cluster topology: services → otel-collector → VictoriaTraces → Grafana.
+  otel-collector:
+    image: otel/opentelemetry-collector:0.140.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4318:4318" # OTLP-HTTP (also handy for a host-side telemetrygen smoke test)
+    depends_on:
+      victoria-traces: { condition: service_started }
+
+  victoria-traces:
+    image: victoriametrics/victoria-traces:v0.6.0
+    command:
+      - "-httpListenAddr=:10428"
+      - "-storageDataPath=/victoria-traces-data"
+      - "-retentionPeriod=7d"
+    volumes:
+      - victoria-traces-data:/victoria-traces-data
+    ports:
+      - "10428:10428" # OTLP ingest + Jaeger query API + LogsQL + vmui
+
+  grafana:
+    image: grafana/grafana:12.4.4
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3002:3000" # http://localhost:3002 → Explore → VictoriaTraces
+    depends_on:
+      victoria-traces: { condition: service_started }
 
   # ---- golang-migrate migrations (one-shot, per service DB; app image `migrate`) ----
   auth-migrate:
@@ -324,3 +367,6 @@ services:
       start_period: 5s
     depends_on:
       gateway: { condition: service_healthy }
+
+volumes:
+  victoria-traces-data:

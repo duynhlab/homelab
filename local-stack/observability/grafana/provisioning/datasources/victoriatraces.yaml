@@ -1,0 +1,16 @@
+# Grafana datasource for the local stack — VictoriaTraces is queried through the
+# Grafana Jaeger datasource type (VT exposes the Jaeger query API at /select/jaeger;
+# there is no native VT plugin). Mirrors the in-cluster datasource
+# (kubernetes/infra/configs/monitoring/grafana/datasource-victoriatraces.yaml),
+# minus the logs/metrics correlation we don't run locally.
+apiVersion: 1
+datasources:
+  - name: VictoriaTraces
+    type: jaeger
+    uid: victoriatraces
+    access: proxy
+    url: http://victoria-traces:10428/select/jaeger
+    isDefault: true
+    jsonData:
+      nodeGraph:
+        enabled: true

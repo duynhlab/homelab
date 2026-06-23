@@ -77,6 +77,22 @@ exporters:
   *(LogsQL field names map from OTLP attributes; verify the exact field syntax against your own
   trace data — the Jaeger datasource is the primary query path in Grafana.)*
 
+## Try it locally (docker-compose)
+
+The [`local-stack`](../../../local-stack/README.md) wires the same path on a laptop — no cluster
+needed: the 8 services emit OTLP-HTTP to an **OTel Collector**, which re-exports to a single-node
+**VictoriaTraces** container, and you audit traces in a bundled **Grafana**.
+
+```bash
+cd local-stack && docker compose up -d --build
+# generate spans: log in alice/password123 at http://localhost:3001 and run a checkout
+open http://localhost:3002   # Grafana → Explore → VictoriaTraces → pick a service
+```
+
+The collector is mandatory because the services' standard OTLP-HTTP SDK posts to `…/v1/traces`,
+which can't be retargeted at VictoriaTraces' `/insert/opentelemetry/v1/traces` ingest path directly.
+Quick ingest check: `curl 'http://localhost:10428/select/jaeger/api/services'`.
+
 ## Status
 
 Pilot only — verified standalone (v0.6.0 ingests OTLP-HTTP traces; the Jaeger API returns them).

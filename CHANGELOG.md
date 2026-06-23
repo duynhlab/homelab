@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **infra (tracing)**: Injected **`OTEL_SERVICE_NAME`** (+ Downward-API `POD_NAME`/`POD_NAMESPACE` + `OTEL_RESOURCE_ATTRIBUTES` for `service.namespace`/`service.instance.id`) into the 4 domain ResourceSets (`apps/domains/{identity,catalog,checkout,comms}-rs.yaml`) and `apps/order-worker.yaml`. The Go OTel SDK reads **`OTEL_SERVICE_NAME`, not `SERVICE_NAME`**; the cluster only set `SERVICE_NAME`, so `service.name` fell back to brittle hostname string-surgery (`detectServiceInfo`'s "strip last 2 dash-parts") — fragile for non-Deployment workloads and a foot-gun the local-stack masks (it now sets `OTEL_SERVICE_NAME` per service). Trace/metric service identity in prod is now authoritative (`<< inputs.name >>`); the hostname-parsing branch remains only as a harmless fallback. Found by the 2026-06 OTEL review.
+
 - **infra (apps delivery)**: Reconciled the 4 domain ResourceSets (`apps/domains/{catalog,checkout,comms,identity}-rs.yaml`) with the reworked `mop` chart's value shape — they emitted the pre-rework shape (`service.port`/`service.targetPort`, top-level `containerPort`/`grpc.enabled`) that chart **≥0.12.0 ignores**, which would have dropped the `:9090` gRPC Service from every east-west service (`auth`/`product`/`shipping`/`review`/`notification`) once that chart resolved. Now emit `service.enabled` + `service.http.{port,containerPort}` + `service.grpc.{enabled,port,containerPort}`, and pinned `mop-chart-oci` to `>=0.12.0`. Verified by rendering the chart with the new shape (gRPC Service + both container ports present; worker renders no Service).
 
 ### Changed

@@ -69,6 +69,21 @@ spec:
             value: << index inputs "otel_endpoint" | default "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318" >>
           - name: OTEL_SAMPLE_RATE
             value: "0.1"
+          # Authoritative service identity — the OTel SDK reads OTEL_SERVICE_NAME
+          # (not SERVICE_NAME); without it service.name falls back to brittle
+          # hostname parsing. Downward API also sets namespace + instance id.
+          - name: OTEL_SERVICE_NAME
+            value: << inputs.name >>
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: OTEL_RESOURCE_ATTRIBUTES
+            value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME)"
           - name: PYROSCOPE_ENDPOINT
             value: << index inputs "pyroscope_endpoint" | default "http://pyroscope.monitoring.svc.cluster.local:4040" >>
           - name: LOG_LEVEL

@@ -43,6 +43,13 @@ spec:
           endpoint: tempo.monitoring.svc.cluster.local:4317
           tls:
             insecure: true
+        otlphttp/victoriatraces:
+          # VictoriaTraces OTLP-HTTP ingest (single port :10428). gRPC :4317 is
+          # TLS-by-default, so use HTTP. Pilot: 3rd backend alongside Tempo + Jaeger.
+          traces_endpoint: http://vtsingle-victoria-traces.monitoring.svc.cluster.local:10428/insert/opentelemetry/v1/traces
+          tls:
+            insecure: true
+          compression: gzip
       extensions:
         health_check:
           endpoint: 0.0.0.0:13133
@@ -73,6 +80,7 @@ spec:
             exporters:
             - otlp/tempo
             - otlp/jaeger
+            - otlphttp/victoriatraces
             processors:
             - memory_limiter
             - batch

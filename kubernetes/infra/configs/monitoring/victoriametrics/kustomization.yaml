@@ -8,3 +8,4 @@ resources:
   - vmalert.yaml
   - vmalertmanager.yaml
   - vlsingle.yaml
+  - vtsingle.yaml

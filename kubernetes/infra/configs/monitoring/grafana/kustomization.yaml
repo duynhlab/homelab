@@ -6,6 +6,7 @@ resources:
   - datasource-victorialogs.yaml
   - datasource-tempo.yaml
   - datasource-jaeger.yaml
+  - datasource-victoriatraces.yaml
   - datasource-pyroscope.yaml
   - datasource-victoriametrics.yaml
   - dashboards/

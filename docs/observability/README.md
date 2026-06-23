@@ -268,7 +268,8 @@ docs/observability/
 │   ├── README.md                 # Tracing guide (Tempo + OTel)
 │   ├── architecture.md           # Dual backend (Tempo + Jaeger)
 │   ├── jaeger.md                 # Jaeger UI guide
-│   └── backends-comparison.md    # Tempo vs Jaeger vs VictoriaTraces
+│   ├── backends-comparison.md    # Tempo vs Jaeger vs VictoriaTraces
+│   └── victoriatraces.md         # VictoriaTraces pilot (3rd backend)
 │
 ├── logging/                      # Pillar 3: Structured logging
 │   ├── README.md                 # Zap + Vector + VictoriaLogs

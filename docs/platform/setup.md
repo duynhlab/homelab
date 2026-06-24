@@ -254,7 +254,7 @@ monitoring/
 4. `kong-local`: Kong HelmRelease (Depends on `cert-manager-local` — mounts `kong-proxy-tls` Secret as a volume).
 5. `kong-config-local`: KongClusterPlugins + Ingress resources for every host (Depends on `kong-local`).
 6. `monitoring-local`: Deploys observability stack (Depends on `controllers-local`).
-7. `cnpg-barman-plugin-local`: Installs the CNPG Barman Cloud Plugin and `ObjectStore` CRD (Depends on `controllers-local`, `cert-manager-local`).
+7. `cnpg-barman-plugin-local`: Installs the CNPG Barman Cloud Plugin via the `plugin-barman-cloud` Helm chart (from the `cnpg` HelmRepository) and its `ObjectStore` CRD (Depends on `controllers-local`, `cert-manager-local`).
 8. `databases-local`: Provisions persistence layer (Depends on `secrets-local`, `monitoring-local`, `cnpg-barman-plugin-local`).
 9. `databases-cnpg-dr-local`: CNPG DR replica (Depends on `databases-local`, `secrets-local`).
 10. `kyverno-policies-local`: Admission policies (Depends on `controllers-local`, `monitoring-local`). See [kyverno.md](kyverno.md).

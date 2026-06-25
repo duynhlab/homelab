@@ -69,6 +69,7 @@ spec:
             mc mb --ignore-existing rustfs/pg-backups-zalando
             mc mb --ignore-existing rustfs/pg-backups-cnpg
             mc mb --ignore-existing rustfs/tempo-traces
+            mc mb --ignore-existing rustfs/pyroscope-profiles
 
             echo "=== Verifying ==="
             mc ls rustfs/

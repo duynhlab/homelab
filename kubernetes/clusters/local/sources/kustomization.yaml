@@ -21,6 +21,7 @@ resources:
   - helm/postgres-operator.yaml
   - helm/postgres-operator-ui.yaml
   - helm/cnpg.yaml
+  - helm/grafana.yaml
   - helm/sloth.yaml
   - helm/vector.yaml
   - helm/opentelemetry.yaml

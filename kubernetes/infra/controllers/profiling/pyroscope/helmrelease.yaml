@@ -1,0 +1,92 @@
+# Grafana Pyroscope continuous-profiling backend, single-binary mode, installed
+# via the official Helm chart (replaces the hand-vendored raw manifests).
+#
+# Pyroscope v2 keeps a local metastore (raft) that must survive restarts, so the
+# chart's PVC is enabled; long-term profile blocks go to the in-cluster RustFS
+# (S3-compatible) bucket pyroscope-profiles with 7d retention — mirroring Tempo.
+# fullnameOverride pins the Service to `pyroscope:4040` so the Grafana datasource
+# and Kong ingress keep working unchanged.
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: pyroscope
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/component: profiling
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: pyroscope
+      version: "2.1.0"
+      sourceRef:
+        kind: HelmRepository
+        name: grafana
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    pyroscope:
+      replicaCount: 1
+      fullnameOverride: pyroscope
+      image:
+        tag: "2.1.0"
+      extraArgs:
+        log.level: warn
+        # Expand ${ACCESS_KEY_ID}/${ACCESS_SECRET_KEY} from the env into the config.
+        config.expand-env: "true"
+      extraCustomEnvVars:
+        - name: ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: pyroscope-rustfs-credentials
+              key: ACCESS_KEY_ID
+        - name: ACCESS_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: pyroscope-rustfs-credentials
+              key: ACCESS_SECRET_KEY
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        seccompProfile:
+          type: RuntimeDefault
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          memory: 512Mi
+      # Persistent volume holds the v2 metastore (raft) + local scratch; profile
+      # blocks are flushed to RustFS S3 below.
+      persistence:
+        enabled: true
+        size: 10Gi
+        storageClassName: standard
+      # Deep-merged over the chart's default config.
+      structuredConfig:
+        storage:
+          backend: s3
+          s3:
+            endpoint: rustfs-svc.rustfs.svc.cluster.local:9000
+            bucket_name: pyroscope-profiles
+            region: us-east-1
+            access_key_id: ${ACCESS_KEY_ID}
+            secret_access_key: ${ACCESS_SECRET_KEY}
+            insecure: true            # RustFS is plain HTTP in-cluster
+            force_path_style: true    # RustFS is S3-compatible, not S3-native
+        limits:
+          compactor_blocks_retention_period: 168h   # 7 days, matches Tempo/VM
+    serviceMonitor:
+      enabled: true
+    minio:
+      enabled: false

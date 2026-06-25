@@ -56,8 +56,9 @@ metadata:
   labels:
     environment: local
     platform.duynhlab.dev/needs-trust: "true"
-    # Receive the RustFS S3 credential for Tempo trace storage (ClusterExternalSecret)
+    # Receive the RustFS S3 credentials for Tempo trace + Pyroscope profile storage (ClusterExternalSecret)
     platform.duynhlab/s3: "tempo"
+    platform.duynhlab/s3-pyroscope: "true"
   name: monitoring
 ---
 apiVersion: v1

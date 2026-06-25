@@ -1,0 +1,12 @@
+# Pyroscope datasource for the local stack — backs continuous profiling
+# (flame graphs) in Grafana Explore. The 8 services push pprof data to the
+# pyroscope container (PROFILING_ENABLED=true + PYROSCOPE_ENDPOINT in compose).
+# Mirrors the in-cluster datasource
+# (kubernetes/infra/configs/monitoring/grafana/datasource-pyroscope.yaml).
+apiVersion: 1
+datasources:
+  - name: Pyroscope
+    type: grafana-pyroscope-datasource
+    uid: pyroscope
+    access: proxy
+    url: http://pyroscope:4040

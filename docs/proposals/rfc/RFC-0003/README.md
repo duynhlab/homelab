@@ -1,12 +1,8 @@
 # RFC-0003 Inventory ownership and stock semantics
 
-**Status:** provisional
-
-**Scope:** platform-wide
-
-**Creation date:** 2026-06-26
-
-**Last update:** 2026-06-26
+| Status | Scope | Created | Last updated |
+|--------|-------|---------|--------------|
+| provisional | platform-wide | 2026-06-26 | 2026-06-26 |
 
 ## Summary
 

@@ -1,12 +1,8 @@
 # RFC-0005 supporting-shared-db: HA or split
 
-**Status:** provisional
-
-**Scope:** infra
-
-**Creation date:** 2026-06-26
-
-**Last update:** 2026-06-26
+| Status | Scope | Created | Last updated |
+|--------|-------|---------|--------------|
+| provisional | infra | 2026-06-26 | 2026-06-26 |
 
 ## Summary
 

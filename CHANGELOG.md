@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **docs (proposals)**: Converted each RFC's bold-label header (`**Status:** …`) to a `| Status | Scope | Created | Last updated |` **metadata table** — the `RFC-0000` template plus `RFC-0001`..`RFC-0007` — matching the ADR header-table style for a consistent look across both trees.
+
 - **docs (proposals)**: Restructured **ADRs to mirror the RFC layout** — each ADR now lives in its own folder (`docs/proposals/adr/ADR-NNN-slug/README.md`, was a flat file) with room for per-ADR diagrams/assets, and a new **`ADR-0000-template/`** parallels `RFC-0000`. Each ADR's metadata table gains a **Related RFC** column cross-linking the proposal that spawned it (ADR-001/002 → RFC-0001; ADR-003 → none); numbering stays independent. Also gave the table a `| Status | Date |` shape (was prose headings). Fixed the ADR→`docs/api/` links broken since the move to `docs/proposals/` (`../api/` → `../../../api/`); repointed all referrers.
 
 - **docs (proposals)**: Added a **`docs/proposals/`** hub grouping design proposals + decisions under one place, split into **`rfc/`** (Requests for Comments) and **`adr/`** (Architecture Decision Records, moved from `docs/decisions/`). Ships the umbrella `README.md` (RFC↔ADR flow + when-to-use-which), the RFC `README.md` (when-to-RFC, taxonomy, status lifecycle, index + a **backlog** consolidated from a repo-wide inventory), an improved `RFC-0000` template (Flux-style + a **required Mermaid diagram** and Security/Observability/Rollout sections), and **RFC-0001 — Temporal for durable cross-service orchestration** (retrospective `implemented`, owns the Temporal roadmap). `TODO.md` (kept — learning) cross-links the process.

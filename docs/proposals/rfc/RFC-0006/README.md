@@ -1,12 +1,8 @@
 # RFC-0006 Service mesh evaluation (Istio Ambient vs Linkerd)
 
-**Status:** provisional
-
-**Scope:** infra
-
-**Creation date:** 2026-06-26
-
-**Last update:** 2026-06-26
+| Status | Scope | Created | Last updated |
+|--------|-------|---------|--------------|
+| provisional | infra | 2026-06-26 | 2026-06-26 |
 
 > **Provisional.** This RFC *evaluates* a service mesh and makes a recommendation;
 > it proposes **no implementation**. It is the superset sibling of

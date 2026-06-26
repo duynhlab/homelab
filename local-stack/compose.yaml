@@ -23,7 +23,8 @@ x-svc-env: &svc-env
   TRACING_ENABLED: "true"
   OTEL_COLLECTOR_ENDPOINT: otel-collector:4318 # host:port; the OTLP-HTTP SDK appends /v1/traces
   OTEL_SAMPLE_RATE: "1.0"                       # sample everything locally (prod default 0.1)
-  PROFILING_ENABLED: "false"
+  PROFILING_ENABLED: "true"                     # local Pyroscope (disable to skip profiling)
+  PYROSCOPE_ENDPOINT: http://pyroscope:4040
   METRICS_ENABLED: "true"
   LOG_LEVEL: info
   LOG_FORMAT: json
@@ -119,6 +120,16 @@ services:
     ports:
       - "8428:8428" # remote-write (/api/v1/write) + PromQL + vmui
 
+  # ---- Continuous profiling: Pyroscope (single-binary, ephemeral local storage) ----
+  # The 8 services push pprof data here (PROFILING_ENABLED=true + PYROSCOPE_ENDPOINT
+  # in x-svc-env). View flame graphs in Grafana → Explore → Pyroscope.
+  pyroscope:
+    image: grafana/pyroscope:2.1.0
+    ports:
+      - "4040:4040" # Pyroscope UI/API; services reach it in-network at pyroscope:4040
+    volumes:
+      - pyroscope-data:/data
+
   grafana:
     image: grafana/grafana:12.4.4
     environment:
@@ -133,6 +144,7 @@ services:
     depends_on:
       victoria-traces: { condition: service_started }
       victoria-metrics: { condition: service_started }
+      pyroscope: { condition: service_started }
 
   # ---- golang-migrate migrations (one-shot, per service DB; app image `migrate`) ----
   auth-migrate:
@@ -393,3 +405,4 @@ services:
 volumes:
   victoria-traces-data:
   victoria-metrics-data:
+  pyroscope-data:

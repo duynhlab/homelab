@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **docs (proposals)**: Seeded four `provisional` proposal RFCs from the backlog (each with a Mermaid diagram, grounded in the code/docs): **RFC-0002** East-west mTLS for internal gRPC, **RFC-0003** Inventory ownership and stock semantics, **RFC-0004** Cross-service caching and invalidation, **RFC-0005** `supporting-shared-db` HA-or-split. Moved from the backlog into the RFC index; proposals only — no implementation.
 
+- **docs (proposals)**: Added two more `provisional` RFCs — **RFC-0006** Service mesh evaluation (Istio Ambient vs Linkerd vs mesh-less; framed as the heavier alternative to RFC-0002) and **RFC-0007** Disaster-recovery drills program (recurring PITR/failover drills + evidence log + Barman plugin acceptance). Moved from the backlog into the index.
+
 ### Changed
 
 - **docs (API)**: Retired the redundant `docs/api/api-architecture-review.md` — its one non-duplicated finding (aggregation soft/best-effort/hard-fail conventions) merged into `docs/api/api.md` as a new section, its open findings moved to the RFC backlog, and its 2 live links repointed. `temporal-order-fulfillment.md` §9 roadmap now points to RFC-0001 (single source).

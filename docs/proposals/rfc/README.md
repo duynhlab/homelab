@@ -58,6 +58,8 @@ made are recorded as one or more **ADRs**, and the RFC moves to `implemented`.
 | [RFC-0003](RFC-0003/) | Inventory ownership and stock semantics | platform-wide | provisional |
 | [RFC-0004](RFC-0004/) | Cross-service caching and invalidation | platform-wide | provisional |
 | [RFC-0005](RFC-0005/) | supporting-shared-db: HA or split | infra | provisional |
+| [RFC-0006](RFC-0006/) | Service mesh evaluation (Istio Ambient vs Linkerd) | infra | provisional |
+| [RFC-0007](RFC-0007/) | Disaster-recovery drills program | infra | provisional |
 
 ## Backlog — candidate RFCs
 
@@ -66,8 +68,6 @@ here). Each gets a number when someone writes it up.
 
 | Candidate | Scope | Source |
 |-----------|-------|--------|
-| **DR drills program** (PITR/failover evidence; Barman plugin acceptance) | infra | `docs/databases/010*-*` |
-| **Service mesh** decision (Istio Ambient / Linkerd) | infra | `TODO.md` |
 | **Atlantis** PR-driven Terraform | infra | `TODO.md` |
 | **Alert delivery** (Slack via OpenBAO + PagerDuty) | infra | `docs/observability/alerting/` |
 | **Kong-JWT reconsideration** (gateway vs services) | platform-wide | `docs/platform/kong-gateway.md`, ADR-003 |

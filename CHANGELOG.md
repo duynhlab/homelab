@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **observability (Temporal)**: Added the **Temporal — Workflows & Activities** Grafana dashboard (`GrafanaDashboard` CR → `grafana-dashboards/dashboard/observability/temporal.json`, "Observability" folder). Panels cover workflow completion/failure rate + end-to-end latency, activity execution rate/failure/latency by type, and worker task slots + worker→server request error ratio — the worker-side Temporal SDK RED metrics (`pkg/temporalx`). Closes RFC-0001 future-work item 4.
+
 - **docs (proposals)**: Converted each RFC's bold-label header (`**Status:** …`) to a `| Status | Scope | Created | Last updated |` **metadata table** — the `RFC-0000` template plus `RFC-0001`..`RFC-0007` — matching the ADR header-table style for a consistent look across both trees.
 
 - **docs (proposals)**: Restructured **ADRs to mirror the RFC layout** — each ADR now lives in its own folder (`docs/proposals/adr/ADR-NNN-slug/README.md`, was a flat file) with room for per-ADR diagrams/assets, and a new **`ADR-0000-template/`** parallels `RFC-0000`. Each ADR's metadata table gains a **Related RFC** column cross-linking the proposal that spawned it (ADR-001/002 → RFC-0001; ADR-003 → none); numbering stays independent. Also gave the table a `| Status | Date |` shape (was prose headings). Fixed the ADR→`docs/api/` links broken since the move to `docs/proposals/` (`../api/` → `../../../api/`); repointed all referrers.

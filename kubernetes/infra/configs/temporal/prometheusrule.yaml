@@ -6,10 +6,13 @@
 # Prometheus metrics, taken from the official dashboards
 # (github.com/temporalio/dashboards, server/server-general.json). Ratios use
 # clamp_min on the denominator so they never divide by zero / false-fire when
-# idle. Final population check is on `make up` (Kind, operator-scraped). Workflow
-# /activity-level RED metrics need the Temporal SDK MetricsHandler wired into
-# pkg/temporalx (tracked follow-up) and a Grafana dashboard adapted from the
-# official server-general.json — see docs/api/temporal-order-fulfillment.md.
+# idle. Final population check is on `make up` (Kind, operator-scraped).
+#
+# Worker-side (SDK) workflow/activity RED metrics are now emitted by pkg/temporalx
+# (OTel MetricsHandler, pkg v0.10.0) and scraped via the order-worker PodMonitor;
+# the `temporal-worker` group below alerts on them. A Grafana dashboard adapted
+# from the official server-general.json is the remaining follow-up — see
+# docs/api/temporal-order-fulfillment.md.
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
@@ -55,3 +58,57 @@ spec:
           annotations:
             summary: "Temporal persistence error rate high (>2%)"
             description: "Temporal persistence error ratio has exceeded 2% for >10m — the temporal-db (CNPG) may be degraded; durable state writes are at risk."
+
+    # Worker-side (SDK) RED metrics from the order-fulfillment worker, scraped via
+    # the order-worker PodMonitor. Names are the Temporal Go SDK OTel metrics
+    # (pkg/temporalx) — note the SDK exports "counters" as gauges (no _total), so
+    # rate() is applied to the cumulative gauges. Denominators use clamp_min so the
+    # ratios never divide by zero / false-fire when the worker is idle.
+    - name: temporal-worker
+      interval: 30s
+      rules:
+        - alert: TemporalWorkflowFailureRateHigh
+          expr: |
+            sum(rate(temporal_workflow_failed[10m]))
+              / clamp_min(sum(rate(temporal_workflow_completed[10m])) + sum(rate(temporal_workflow_failed[10m])), 1) > 0.05
+          for: 10m
+          labels:
+            severity: warning
+            category: platform
+          annotations:
+            summary: "Temporal workflow failure rate high (>5%)"
+            description: "More than 5% of workflows reached a failed terminal state over 10m — the order-fulfillment saga is compensating/rolling back; check the worker logs and the activities it calls."
+
+        - alert: TemporalActivityFailureRateHigh
+          expr: |
+            sum(rate(temporal_activity_execution_failed[10m]))
+              / clamp_min(sum(rate(temporal_activity_execution_latency_seconds_count[10m])), 1) > 0.05
+          for: 10m
+          labels:
+            severity: warning
+            category: platform
+          annotations:
+            summary: "Temporal activity failure rate high (>5%)"
+            description: "More than 5% of activity executions failed over 10m — a downstream call (product/shipping/notification/cart) is erroring; retries are firing and may exhaust."
+
+        - alert: TemporalWorkerRequestErrorRateHigh
+          expr: |
+            sum(rate(temporal_request_failure[5m])) / clamp_min(sum(rate(temporal_request[5m])), 1) > 0.05
+          for: 10m
+          labels:
+            severity: warning
+            category: platform
+          annotations:
+            summary: "Temporal worker→server request error rate high (>5%)"
+            description: "The worker's RPCs to the Temporal frontend are failing (>5% over 10m) — check connectivity to temporal-frontend and the server's health."
+
+        - alert: TemporalWorkerTaskSlotsExhausted
+          expr: |
+            min(temporal_worker_task_slots_available) == 0
+          for: 10m
+          labels:
+            severity: warning
+            category: platform
+          annotations:
+            summary: "Temporal worker task slots exhausted"
+            description: "A worker task-slot pool has been at zero available slots for >10m — the worker is saturated and cannot accept new workflow/activity tasks; consider raising concurrency or replicas."

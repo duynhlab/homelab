@@ -1,0 +1,28 @@
+# The order-fulfillment Temporal worker is a mop release with service.enabled:false
+# (no Service), so the microservices-api ServiceMonitor (which selects Services
+# labelled component:api) does not reach it. Scrape the worker pod directly for the
+# Temporal SDK workflow/activity RED metrics it exposes on :8080/metrics
+# (pkg/temporalx OTel MetricsHandler). See docs/api/temporal-order-fulfillment.md.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: order-worker
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: temporal
+spec:
+  namespaceSelector:
+    matchNames:
+      - order
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: order-worker
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      relabelings:
+        - replacement: order-worker
+          targetLabel: job
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: instance

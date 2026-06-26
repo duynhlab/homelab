@@ -167,15 +167,19 @@ flowchart LR
 
 - Worker↔cluster gRPC `:7233` is **plaintext** today; NetworkPolicy is the fence. east-west
   mTLS is a platform-wide backlog RFC.
-- `ClearCart` currently carries the caller's bearer token in the workflow **input/history**
-  (homelab simplification). The internal NetworkPolicy-fenced cart-clear (future work) drops it.
+- `ClearCart` no longer carries a bearer token in the workflow **input/history**: it calls
+  cart's internal, NetworkPolicy-fenced `DELETE /cart/v1/internal/cart/{userID}` by user id
+  (shipped — see Future work). The pre-pivot activities remain plaintext gRPC, fenced by NetworkPolicy.
 
 ## Observability & SLO impact
 
 - Temporal **server** metrics scraped via `ServiceMonitor`; alerts `TemporalServerDown`,
   `TemporalServiceErrorRateHigh`, `TemporalPersistenceErrorRateHigh`.
 - Worker exposes gRPC RED + Go-runtime metrics; workflow/activity spans join the request's
-  trace in Tempo. **Workflow/activity RED metrics** are still missing (future work).
+  trace in Tempo. **Workflow/activity RED metrics** are now emitted by the Temporal SDK
+  `MetricsHandler` in `pkg/temporalx` (pkg v0.10.0), scraped via the `order-worker` PodMonitor;
+  the `temporal-worker` PrometheusRule group alerts on workflow/activity/request failure rates
+  and task-slot exhaustion.
 
 ## Testing / verification
 
@@ -189,10 +193,10 @@ flowchart LR
 Owned here (replaces the roadmap previously inline in `temporal-order-fulfillment.md` §9):
 
 - ⏳ **Bump server 1.24.2 → 1.27.x** once the operator re-publishes its chart for v0.22.0 (ADR-002; Renovate-tracked).
-- ⏳ **Cache-bust on reserve** — invalidate the product Valkey cache on `ReserveStock`/`ReleaseStock` (stale reads ~10 min until TTL today; DB is authoritative).
-- ⏳ **Workflow/activity RED metrics + burn alerts** via a Temporal SDK `MetricsHandler` in `pkg/temporalx`.
+- ✅ **Cache-bust on reserve** — `ReserveStock`/`ReleaseStock` invalidate the affected `product:{id}` Valkey keys (product-service; detail-only, list cache left to TTL).
+- ✅ **Workflow/activity RED metrics + burn alerts** — Temporal SDK `MetricsHandler` in `pkg/temporalx` (v0.10.0); scraped via the `order-worker` PodMonitor; `temporal-worker` alert group.
 - ⏳ **Grafana dashboard** adapted from `temporalio/dashboards` `server-general.json`.
-- ⏳ **Internal cart-clear** (NetworkPolicy-fenced, by user id) so the bearer token leaves workflow input/history.
+- ✅ **Internal cart-clear** (NetworkPolicy-fenced, by user id) — `DELETE /cart/v1/internal/cart/{userID}`; the bearer token no longer enters workflow input/history.
 - ⏳ **temporal-db HA + Barman backups** (single instance today; undefined RPO/RTO).
 - ⏳ **GameDay drills** for durability + live mid-saga compensation paths.
 
@@ -200,6 +204,7 @@ Owned here (replaces the roadmap previously inline in `temporal-order-fulfillmen
 
 - Phase 1b — operator + `TemporalCluster`/`temporal-db` deployed; `pkg` contracts + `temporalx` (tagged `pkg v0.7.0`).
 - Phase 8 — server-metric alerts; saga marked implemented; end-to-end verified.
+- Phase 9 — future-work follow-ups: cache-bust on reserve/release, internal cart-clear (token out of workflow history), worker workflow/activity RED metrics (`pkg` v0.10.0 + `order-worker` PodMonitor + `temporal-worker` alerts).
 - See `CHANGELOG.md` for dated entries.
 
 ## Related

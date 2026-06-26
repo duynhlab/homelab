@@ -14,12 +14,16 @@ docs/
 │   ├── grpc-internal-comms.md   # Implemented: gRPC for internal east-west comms
 │   ├── microservices.md         # Service catalog: per-service features, call graph
 │   ├── temporal-order-fulfillment.md # Implemented: Temporal saga — why/when/how, design, infra, ops
-│   ├── api-architecture-review.md    # Architecture/API review: findings + planned items
 │   └── gke-internal-dns.md      # GKE cluster.local, Cloud DNS private zones, multi-environment
-├── decisions/                    # Architecture Decision Records (ADRs)
-│   ├── README.md                 # ADR conventions + index
-│   ├── ADR-001-adopt-temporal-for-order-fulfillment.md
-│   └── ADR-002-deploy-temporal-via-operator.md
+├── proposals/                    # Design proposals & decisions
+│   ├── README.md                 # umbrella: ADR vs RFC + flow + links
+│   ├── adr/                      # Architecture Decision Records
+│   │   ├── README.md             # ADR conventions + index
+│   │   └── ADR-001 / ADR-002 / ADR-003
+│   └── rfc/                      # Requests for Comments
+│       ├── README.md             # process + index + backlog
+│       ├── RFC-0000/             # template
+│       └── RFC-0001/             # Temporal (implemented)
 ├── databases/                    # Database documentation
 │   ├── 002-database-integration.md               # PostgreSQL architecture
 │   ├── 003-operator-comparison.md               # CloudNativePG vs Zalando decision guide
@@ -210,9 +214,9 @@ docs/
 
 3. **[gRPC internal comms (proposed/draft)](./api/grpc-internal-comms.md)** - Selective gRPC for internal east-west calls; dual-port, HTTP/2 LB pitfall, phased roadmap
 
-4. **[Temporal order-fulfillment saga (implemented)](./api/temporal-order-fulfillment.md)** - Why/when to use Temporal, the durable saga design, contracts, infra, ops — with [ADR-001](./decisions/ADR-001-adopt-temporal-for-order-fulfillment.md)/[ADR-002](./decisions/ADR-002-deploy-temporal-via-operator.md)
+4. **[Temporal order-fulfillment saga (implemented)](./api/temporal-order-fulfillment.md)** - Why/when to use Temporal, the durable saga design, contracts, infra, ops — with [ADR-001](./proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment.md)/[ADR-002](./proposals/adr/ADR-002-deploy-temporal-via-operator.md)
 
-5. **[API & architecture review](./api/api-architecture-review.md)** - Findings (pagination, error code, shared-DB, mTLS…) with resolved + planned status
+5. **[RFCs — propose & track substantial changes](./proposals/rfc/)** - RFC process, index, and the consolidated backlog (the old API/architecture review is retired — its findings merged into `api.md`, open items moved to the RFC backlog)
 
 6. **[GKE internal & private DNS](./api/gke-internal-dns.md)** - In-cluster DNS and Cloud DNS private zones
 
@@ -299,13 +303,13 @@ docs/
 - [API Reference](./api/api.md) - Complete API documentation
 - [gRPC Internal Comms (proposed/draft)](./api/grpc-internal-comms.md) - Selective gRPC for internal east-west calls; dual-port, HTTP/2 LB pitfall, phased roadmap
 - [Temporal Order-Fulfillment Saga](./api/temporal-order-fulfillment.md) - Durable order saga (why/when/how, design, infra, ops)
-- [API & Architecture Review](./api/api-architecture-review.md) - Architecture/API findings with resolved + planned status
+- [RFCs](./proposals/rfc/) - Propose & track substantial changes (process + index + backlog)
 
 ### Decisions (ADRs)
 
-- [ADR index](./decisions/README.md) - Architecture Decision Records (the *why* behind significant choices)
-- [ADR-001: Adopt Temporal for order fulfillment](./decisions/ADR-001-adopt-temporal-for-order-fulfillment.md)
-- [ADR-002: Deploy Temporal via the operator](./decisions/ADR-002-deploy-temporal-via-operator.md)
+- [ADR index](./proposals/adr/README.md) - Architecture Decision Records (the *why* behind significant choices)
+- [ADR-001: Adopt Temporal for order fulfillment](./proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment.md)
+- [ADR-002: Deploy Temporal via the operator](./proposals/adr/ADR-002-deploy-temporal-via-operator.md)
 
 ### Databases
 

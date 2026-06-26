@@ -5,7 +5,7 @@
 | **Version** | **v1.0.0** |
 | **Status** | **Implemented** ✅ — shipped and verified end-to-end on `local-stack` (a checkout drives the full saga; an over-quantity checkout fails fast and rolls back). |
 | **Scope** | Durable orchestration of cross-service workflows. The flagship (and currently only) workflow is order fulfillment; this doc is also the platform reference for **why/when** to use Temporal and **how** it is wired. |
-| **Relation** | Decisions: [ADR-001 Adopt Temporal](../decisions/ADR-001-adopt-temporal-for-order-fulfillment.md), [ADR-002 Deploy via the operator](../decisions/ADR-002-deploy-temporal-via-operator.md). East-west transport: [`grpc-internal-comms.md`](grpc-internal-comms.md). Service map: [`microservices.md`](microservices.md). |
+| **Relation** | Decisions: [ADR-001 Adopt Temporal](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment.md), [ADR-002 Deploy via the operator](../proposals/adr/ADR-002-deploy-temporal-via-operator.md). East-west transport: [`grpc-internal-comms.md`](grpc-internal-comms.md). Service map: [`microservices.md`](microservices.md). |
 | **Last updated** | 2026-06-15 |
 
 > **TL;DR** — Checkout used to be synchronous + fire-and-forget, so partial failures silently lost
@@ -35,7 +35,7 @@ execution**: workflow + activity state is persisted at every step, so a crash re
 it left off; activities retry under a policy; and the saga pattern (append a compensation as each
 step succeeds, run them in reverse on failure) is expressed as ordinary, testable Go. The full
 rationale and the alternatives we rejected (transactional outbox, message-queue choreography,
-hand-rolled orchestration) are in **[ADR-001](../decisions/ADR-001-adopt-temporal-for-order-fulfillment.md)**.
+hand-rolled orchestration) are in **[ADR-001](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment.md)**.
 
 ## 2. When to use Temporal (and when not)
 
@@ -157,7 +157,7 @@ flowchart LR
     OW -- OTLP --> Tempo
 ```
 
-Deployed via the **`alexandrevilain/temporal-operator`** (see **[ADR-002](../decisions/ADR-002-deploy-temporal-via-operator.md)** for why the operator over the official Helm chart, and the server-version constraint):
+Deployed via the **`alexandrevilain/temporal-operator`** (see **[ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator.md)** for why the operator over the official Helm chart, and the server-version constraint):
 
 - **Operator** — `controllers/temporal/`: `HelmRepository` + `HelmRelease` (chart `0.6.0`); installs the `TemporalCluster`/`TemporalNamespace` CRDs; webhook certs via cert-manager.
 - **`TemporalCluster` + `mop` `TemporalNamespace`** (retention 168h) — `configs/temporal/`: server **`1.24.2`** (target 1.27.x — ADR-002), `numHistoryShards: 512`, persistence → `temporal-db` (default + `temporal_visibility`) via the **CNPG-generated `temporal-db-app`** secret, `ui.enabled`, `admintools.enabled`, `metrics.prometheus.serviceMonitor.enabled`, resources set on every operator-created pod for Kyverno.
@@ -206,17 +206,6 @@ Deliberate deviations from the original design:
 - **Idempotency is DB-enforced** — product `stock_reservations` (PK `reservation_id,product_id`),
   shipping `UNIQUE(order_id)`.
 
-**Roadmap / planned (⏳):**
-
-- ⏳ **Bump server to 1.27.x** once the operator re-publishes its Helm chart for v0.22.0 (ADR-002).
-- ⏳ **Cache-bust on reserve** — the product read API serves Cache-Aside (Valkey) views, so stock can
-  read stale right after a reserve until the TTL (~10 min); the DB is authoritative. Fix: invalidate
-  the product cache on `ReserveStock`/`ReleaseStock`.
-- ⏳ **Workflow/activity RED metrics + burn alerts** via a Temporal SDK `MetricsHandler` in
-  `pkg/temporalx` (the worker currently exposes only gRPC RED + Go-runtime metrics).
-- ⏳ **Grafana dashboard** adapted from the official
-  [`temporalio/dashboards`](https://github.com/temporalio/dashboards) `server/server-general.json`.
-- ⏳ **Internal cart-clear** (NetworkPolicy-fenced, by user id) so the bearer token can be dropped
-  from workflow input/history.
-- ⏳ **temporal-db HA + Barman backups**; **GameDay drills** for the durability (kill-the-worker) and
-  live mid-saga compensation paths (covered today by `testsuite` unit tests).
+**Roadmap / planned (⏳):** tracked as **Future work in [RFC-0001](../proposals/rfc/RFC-0001/)** —
+server bump 1.27.x, cache-bust on reserve, workflow/activity RED metrics, Grafana
+dashboard, internal cart-clear, temporal-db HA + Barman backups, and GameDay drills.

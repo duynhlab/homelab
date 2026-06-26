@@ -5,6 +5,10 @@ itself, the *alternatives* we rejected (and why), and the *consequences* we acce
 the **why** that code and manifests can't — so future engineers (and agents) don't re-litigate
 settled decisions.
 
+> **ADR vs RFC:** an [RFC](../rfc/) *proposes* a substantial change (discussed before
+> building); an ADR *records* the decision it produced. An accepted RFC typically spawns
+> one or more ADRs.
+
 ## Conventions
 
 - One file per decision: `ADR-NNN-short-slug.md`, numbered sequentially.

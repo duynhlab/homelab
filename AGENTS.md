@@ -20,7 +20,7 @@ Observability, and Docs** hub; application code lives in separate repos (see
 - One logical change per branch; keep them short-lived. `git push -u origin <branch>`, then open a PR against `main`.
 - Verify identity before committing: `git config user.email` must be the duynhlab personal identity (never the work/opswat one).
 
-**Before coding:** identify scope (infra/GitOps → here; app code → the service repo; reusable CI → `duyhenryer/shared-workflows`), read this file and the relevant `docs/`, plan, then implement.
+**Before coding:** identify scope (infra/GitOps → here; app code → the service repo; reusable CI → `duynhlab/gha-workflows`), read this file and the relevant `docs/`, plan, then implement.
 
 ## Behavioral guidelines
 
@@ -35,7 +35,7 @@ Reduce common LLM coding mistakes. Bias toward caution over speed; use judgment 
 
 - **`duynhlab` microservices platform** — 8 Go microservices + a React frontend, each in its own namespace.
 - **This repo (`homelab`):** GitOps (Flux Operator + Kustomize + OCI), observability, databases/secrets infra, and docs. No application source here.
-- **Service repos:** `auth/user/product/cart/order/review/shipping/notification-service`, `frontend`; shared Go library `duynhlab/pkg`; chart `duynhlab/helm-charts` (the `mop` chart). Reusable CI in `duyhenryer/shared-workflows`.
+- **Service repos:** `auth/user/product/cart/order/review/shipping/notification-service`, `frontend`; shared Go library `duynhlab/pkg`; chart `duynhlab/helm-charts` (the `mop` chart). Reusable CI in `duynhlab/gha-workflows`.
 - Full index: [`SERVICES.md`](SERVICES.md), [`docs/README.md`](docs/README.md).
 
 ## Repository layout

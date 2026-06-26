@@ -2,6 +2,8 @@
 
 A practical checklist for learning DevOps/SRE skills through this project. Items marked with references point to actual implementations in this repo.
 
+> This is a learning tracker. **Substantial** proposals (new capabilities, breaking/security/UX changes) are designed as [RFCs](docs/proposals/rfc/) instead.
+
 ### Sections at a glance
 
 | Section | Purpose | Status |
@@ -207,7 +209,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
   - [x] Recording rules (RED metrics, latency percentiles, bandwidth) — `kong-recording-rules.yaml`
   - [x] Grafana dashboard — `grafana-dashboard-kong.yaml`
   - [x] Plugins applied — CORS, rate-limiting (`local`, halved for 2 replicas), request-size-limiting, prometheus, security headers (`response-transformer`), correlation-id (`X-Request-ID`) — `kong/plugins.yaml`
-  - [x] Plugins deliberately NOT applied — JWT/auth stays in services ([ADR-003](docs/decisions/ADR-003-jwt-validation-in-services-not-kong.md)); `request-transformer` skipped (NetworkPolicy + OTel already cover its uses)
+  - [x] Plugins deliberately NOT applied — JWT/auth stays in services ([ADR-003](docs/proposals/adr/ADR-003-jwt-validation-in-services-not-kong.md)); `request-transformer` skipped (NetworkPolicy + OTel already cover its uses)
   - [x] Route configuration for all APIs — per-service Ingress, Variant A pass-through (`kong/ingress-api.yaml`)
 - Alternative API gateways: Envoy Gateway, APISIX, Gloo (evaluate vs Kong for this stack)
 - [ ] API Gateway + Gateway API (Kubernetes standard) for ingress and routing
@@ -288,7 +290,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 
 ## Learning Resources & Interview Prep
 
-- [~] **Architecture decision records** — `docs/decisions/` (ADR-001 Adopt Temporal, ADR-002 Deploy via the operator + index); document the "why" for the remaining major choices
+- [~] **Architecture decision records** — `docs/proposals/adr/` (ADR-001 Adopt Temporal, ADR-002 Deploy via the operator + index); document the "why" for the remaining major choices
 - Prepare talking points for each completed item
 - Practice explaining trade-offs (e.g., Zalando vs CloudNativePG)
 

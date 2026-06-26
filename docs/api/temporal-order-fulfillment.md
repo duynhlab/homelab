@@ -206,17 +206,6 @@ Deliberate deviations from the original design:
 - **Idempotency is DB-enforced** — product `stock_reservations` (PK `reservation_id,product_id`),
   shipping `UNIQUE(order_id)`.
 
-**Roadmap / planned (⏳):**
-
-- ⏳ **Bump server to 1.27.x** once the operator re-publishes its Helm chart for v0.22.0 (ADR-002).
-- ⏳ **Cache-bust on reserve** — the product read API serves Cache-Aside (Valkey) views, so stock can
-  read stale right after a reserve until the TTL (~10 min); the DB is authoritative. Fix: invalidate
-  the product cache on `ReserveStock`/`ReleaseStock`.
-- ⏳ **Workflow/activity RED metrics + burn alerts** via a Temporal SDK `MetricsHandler` in
-  `pkg/temporalx` (the worker currently exposes only gRPC RED + Go-runtime metrics).
-- ⏳ **Grafana dashboard** adapted from the official
-  [`temporalio/dashboards`](https://github.com/temporalio/dashboards) `server/server-general.json`.
-- ⏳ **Internal cart-clear** (NetworkPolicy-fenced, by user id) so the bearer token can be dropped
-  from workflow input/history.
-- ⏳ **temporal-db HA + Barman backups**; **GameDay drills** for the durability (kill-the-worker) and
-  live mid-saga compensation paths (covered today by `testsuite` unit tests).
+**Roadmap / planned (⏳):** tracked as **Future work in [RFC-0001](../rfcs/RFC-0001/)** —
+server bump 1.27.x, cache-bust on reserve, workflow/activity RED metrics, Grafana
+dashboard, internal cart-clear, temporal-db HA + Barman backups, and GameDay drills.

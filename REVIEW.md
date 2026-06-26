@@ -2,6 +2,8 @@
 
 > Remaining (not-yet-done) items from the 2026-05-30 platform review; resolved items are removed.
 > **Verified** = re-checked against `main` (2026-06-19); **carried** = from the original review, re-verify before acting.
+>
+> Small findings live here; **substantial** changes graduate to an [RFC](docs/rfcs/).
 
 ## Cross-cutting / new
 

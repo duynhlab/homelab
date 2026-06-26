@@ -118,6 +118,23 @@ flowchart TD
 
 These endpoints combine multiple data sources to provide complete responses. **Frontend MUST use these endpoints. No client-side orchestration allowed.**
 
+### Aggregation failure modes & conventions
+
+When an aggregation calls multiple sources, the failure handling is **explicit and
+consistent** across all services:
+
+- **Soft-fail (optional enrichment)** — a missing/unavailable secondary source returns
+  partial data, never an error. Examples: product→review soft-fails reviews to `[]`;
+  order→shipment soft-fails the shipment field to `null`. The primary entity stays available.
+- **Best-effort (post-pivot side effects)** — user-visible side effects after the critical
+  path (notifications, cart-clear in the order saga) are fire-and-forget/logged; their
+  failure never rolls back an already-committed result.
+- **Hard-fail (critical path)** — anything the response is *meaningless* without (the
+  primary entity, or a pre-pivot saga step) returns an error / triggers compensation.
+
+Rule of thumb: **enrichment soft-fails, side effects are best-effort, the critical path
+hard-fails.** See [RFC-0001](../rfcs/RFC-0001/) for the order saga's pivot semantics.
+
 ---
 
 ### GET /product/v1/public/products/:id/details

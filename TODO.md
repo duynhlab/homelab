@@ -2,6 +2,8 @@
 
 A practical checklist for learning DevOps/SRE skills through this project. Items marked with references point to actual implementations in this repo.
 
+> This is a learning tracker. **Substantial** proposals (new capabilities, breaking/security/UX changes) are designed as [RFCs](docs/rfcs/) instead.
+
 ### Sections at a glance
 
 | Section | Purpose | Status |

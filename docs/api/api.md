@@ -133,7 +133,7 @@ consistent** across all services:
   primary entity, or a pre-pivot saga step) returns an error / triggers compensation.
 
 Rule of thumb: **enrichment soft-fails, side effects are best-effort, the critical path
-hard-fails.** See [RFC-0001](../rfcs/RFC-0001/) for the order saga's pivot semantics.
+hard-fails.** See [RFC-0001](../proposals/rfc/RFC-0001/) for the order saga's pivot semantics.
 
 ---
 

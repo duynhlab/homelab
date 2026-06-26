@@ -11,11 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **docs (RFCs)**: Added an **RFC process** under `docs/rfcs/` — the single home for proposing/tracking *substantial* changes across the platform (infra **and** microservices). Ships `README.md` (when-to-RFC, RFC↔ADR↔TODO↔REVIEW taxonomy, status lifecycle, index + a consolidated **backlog** seeded from a repo-wide inventory), an improved `RFC-0000` template (Flux-style + a **required Mermaid diagram** and Security/Observability/Rollout sections), and **RFC-0001 — Temporal for durable cross-service orchestration** (retrospective `implemented`, owns the Temporal roadmap). Cross-linked from `TODO.md`/`REVIEW.md`/`docs/decisions`.
+- **docs (proposals)**: Added a **`docs/proposals/`** hub grouping design proposals + decisions under one place, split into **`rfc/`** (Requests for Comments) and **`adr/`** (Architecture Decision Records, moved from `docs/decisions/`). Ships the umbrella `README.md` (RFC↔ADR flow + when-to-use-which), the RFC `README.md` (when-to-RFC, taxonomy, status lifecycle, index + a **backlog** consolidated from a repo-wide inventory), an improved `RFC-0000` template (Flux-style + a **required Mermaid diagram** and Security/Observability/Rollout sections), and **RFC-0001 — Temporal for durable cross-service orchestration** (retrospective `implemented`, owns the Temporal roadmap). `TODO.md` (kept — learning) cross-links the process.
 
 ### Changed
 
 - **docs (API)**: Retired the redundant `docs/api/api-architecture-review.md` — its one non-duplicated finding (aggregation soft/best-effort/hard-fail conventions) merged into `docs/api/api.md` as a new section, its open findings moved to the RFC backlog, and its 2 live links repointed. `temporal-order-fulfillment.md` §9 roadmap now points to RFC-0001 (single source).
+
+### Removed
+
+- **docs**: Retired `REVIEW.md` — its open code-review findings moved to a single GitHub tracking issue (#373); small bugs live there, substantial ones graduate to an RFC.
 
 - **infra (profiling)**: Reworked **Pyroscope** from a hand-vendored raw manifest (`pyroscope/pyroscope:latest` — the deprecated pre-Grafana edition, `:latest` violating Kyverno, `emptyDir`+24h so all profiles vanished on restart, an unmounted legacy ConfigMap, and no `securityContext`) to the **official Grafana Pyroscope Helm chart** (`2.1.0`, single-binary). Profile blocks now persist on the in-cluster **RustFS (S3)** `pyroscope-profiles` bucket with **7d** retention (`compactor_blocks_retention_period: 168h`, matching Tempo/VM), a PVC holds the v2 metastore across restarts, and the chart applies a hardened `securityContext` + a `ServiceMonitor`. `fullnameOverride: pyroscope` keeps the `pyroscope:4040` Service so the Grafana datasource and Kong ingress are unchanged. New `grafana` `HelmRepository` source + `pyroscope-rustfs` `ClusterExternalSecret` (+ `pyroscope-profiles` bucket in the RustFS setup CronJob). Found by the profiling review.
 

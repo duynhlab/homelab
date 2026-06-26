@@ -147,7 +147,7 @@ auth-agnostic pass-through proxy; `…/private/` routes are not rejected at the 
 **services** return `401`. Putting JWT at Kong would be redundant, drift from the in-service
 check, and (under HS256) require handing the signing key to the gateway. Full rationale and
 the revisit criteria (only if auth-service moves to RS256/ES256) are in
-**[ADR-003](../decisions/ADR-003-jwt-validation-in-services-not-kong.md)**.
+**[ADR-003](../proposals/adr/ADR-003-jwt-validation-in-services-not-kong.md)**.
 
 ---
 

@@ -80,4 +80,4 @@ already covers it cluster-wide, see the reconciled table above.)*
 ## Related
 
 - [Observability index](README.md) · [Alerting](alerting/README.md) · [SLO](slo/README.md)
-- [API reference](../api/api.md) · [RFCs & backlog](../rfcs/) — the former API/architecture review was retired (findings merged into `api.md`, open items → RFC backlog)
+- [API reference](../api/api.md) · [RFCs & backlog](../proposals/rfc/) — the former API/architecture review was retired (findings merged into `api.md`, open items → RFC backlog)

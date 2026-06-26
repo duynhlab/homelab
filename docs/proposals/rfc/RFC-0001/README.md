@@ -12,7 +12,7 @@
 > verified. It exists as the worked example for the [RFC process](../README.md) and as
 > the single home for Temporal's remaining roadmap (see [Future work](#future-work)).
 > The operational reference — endpoints, deploy/run, ops — stays in
-> [`docs/api/temporal-order-fulfillment.md`](../../api/temporal-order-fulfillment.md);
+> [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md);
 > this RFC owns the *why*, the *design rationale*, and the *roadmap*.
 
 ## Summary
@@ -80,7 +80,7 @@ are best-effort — a failed notification/cart-clear never rolls back a confirme
 
 ### Alternatives
 
-Considered and rejected in **[ADR-001](../../decisions/ADR-001-adopt-temporal-for-order-fulfillment.md)**:
+Considered and rejected in **[ADR-001](../../adr/ADR-001-adopt-temporal-for-order-fulfillment.md)**:
 transactional outbox, message-queue choreography, hand-rolled orchestration. Temporal won
 on durable execution + first-class compensation + execution visibility.
 
@@ -148,7 +148,7 @@ flowchart LR
 - **Deployment:** the **`alexandrevilain/temporal-operator`** (HelmRelease, chart `0.6.0`)
   installs the `TemporalCluster`/`TemporalNamespace` CRDs; webhook certs via cert-manager.
   Why the operator over the official Helm chart / vendored manifests is in
-  **[ADR-002](../../decisions/ADR-002-deploy-temporal-via-operator.md)**.
+  **[ADR-002](../../adr/ADR-002-deploy-temporal-via-operator.md)**.
 - **Cluster:** server **`1.24.2`** (operator chart caps `<1.25.0`; bump tracked below),
   `numHistoryShards: 512`, persistence on the CNPG `temporal-db` (`temporal` +
   `temporal_visibility`) via the generated `temporal-db-app` secret, Web UI + admintools +
@@ -208,6 +208,6 @@ Owned here (replaces the roadmap previously inline in `temporal-order-fulfillmen
 
 ## Related
 
-- ADRs: [ADR-001 Adopt Temporal](../../decisions/ADR-001-adopt-temporal-for-order-fulfillment.md), [ADR-002 Deploy via the operator](../../decisions/ADR-002-deploy-temporal-via-operator.md).
-- Operational reference: [`docs/api/temporal-order-fulfillment.md`](../../api/temporal-order-fulfillment.md).
-- East-west transport: [`docs/api/grpc-internal-comms.md`](../../api/grpc-internal-comms.md).
+- ADRs: [ADR-001 Adopt Temporal](../../adr/ADR-001-adopt-temporal-for-order-fulfillment.md), [ADR-002 Deploy via the operator](../../adr/ADR-002-deploy-temporal-via-operator.md).
+- Operational reference: [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md).
+- East-west transport: [`docs/api/grpc-internal-comms.md`](../../../api/grpc-internal-comms.md).

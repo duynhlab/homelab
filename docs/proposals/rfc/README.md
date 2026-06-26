@@ -28,10 +28,10 @@ those belong in the trackers below.
 
 | Artifact | Purpose | Lives in | Lifecycle |
 |----------|---------|----------|-----------|
-| **RFC** | Propose a **substantial change** (design doc + diagram), discussed **before** building | `docs/rfcs/RFC-NNNN/` | `provisional → implementable → implemented` (or `deferred`/`rejected`/`withdrawn`/`replaced`) |
-| **ADR** | **Record a decision** already made + its rationale (Nygard) — often **spawned by** an RFC | [`docs/decisions/`](../decisions/) | `Proposed → Accepted → Superseded` |
-| **TODO.md** | Personal **learning / skills** checklist | [repo root](../../TODO.md) | checkboxes |
-| **REVIEW.md** | Open **code-review findings** (bugs, small improvements) | [repo root](../../REVIEW.md) | removed when fixed |
+| **RFC** | Propose a **substantial change** (design doc + diagram), discussed **before** building | `docs/proposals/rfc/RFC-NNNN/` | `provisional → implementable → implemented` (or `deferred`/`rejected`/`withdrawn`/`replaced`) |
+| **ADR** | **Record a decision** already made + its rationale (Nygard) — often **spawned by** an RFC | [`docs/proposals/adr/`](../adr/) | `Proposed → Accepted → Superseded` |
+| **TODO.md** | Personal **learning / skills** checklist | [repo root](../../../TODO.md) | checkboxes |
+| **Findings tracker** | Open **code-review findings** (bugs, small improvements) | [GitHub issues](https://github.com/duynhlab/homelab/issues/373) | ticked when fixed |
 
 **Flow:** an RFC is *accepted* → implementation begins → the concrete decisions it
 made are recorded as one or more **ADRs**, and the RFC moves to `implemented`.

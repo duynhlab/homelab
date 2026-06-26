@@ -15,5 +15,6 @@ resources:
   - podmonitors/podmonitor-zalando-auth-db.yaml
   - podmonitors/podmonitor-zalando-supporting-shared-db.yaml
   - podmonitors/podmonitor-flux-system.yaml
+  - podmonitors/podmonitor-order-worker.yaml
   # PrometheusRules — organized by domain (see prometheusrules/kustomization.yaml)
   - prometheusrules/

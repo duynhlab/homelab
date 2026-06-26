@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **observability (Temporal)**: Added the **Temporal — Workflows & Activities** Grafana dashboard (`GrafanaDashboard` CR → `grafana-dashboards/dashboard/observability/temporal.json`, "Observability" folder). Panels cover workflow completion/failure rate + end-to-end latency, activity execution rate/failure/latency by type, and worker task slots + worker→server request error ratio — the worker-side Temporal SDK RED metrics (`pkg/temporalx`). Closes RFC-0001 future-work item 4.
+- **observability (Temporal worker)**: Scrape the order-fulfillment worker's Temporal SDK **workflow/activity RED metrics** (emitted by `pkg/temporalx` v0.10.0's OTel `MetricsHandler`) — the worker is a `service.enabled:false` mop release, so added an `order-worker` **PodMonitor** (the `microservices-api` ServiceMonitor can't reach it). Added a `temporal-worker` PrometheusRule group alerting on workflow/activity/request **failure rates** and **task-slot exhaustion**. Metric names verified against a live local-stack checkout (SDK exports counters as gauges, no `_total`; latencies are `_seconds` histograms). Closes RFC-0001 future-work items: cache-bust on reserve, internal cart-clear, and worker RED metrics.
 
 - **docs (proposals)**: Converted each RFC's bold-label header (`**Status:** …`) to a `| Status | Scope | Created | Last updated |` **metadata table** — the `RFC-0000` template plus `RFC-0001`..`RFC-0007` — matching the ADR header-table style for a consistent look across both trees.
 

@@ -54,6 +54,10 @@ made are recorded as one or more **ADRs**, and the RFC moves to `implemented`.
 | RFC | Title | Scope | Status |
 |-----|-------|-------|--------|
 | [RFC-0001](RFC-0001/) | Temporal for durable cross-service orchestration | platform-wide | implemented |
+| [RFC-0002](RFC-0002/) | East-west mTLS for internal gRPC | platform-wide | provisional |
+| [RFC-0003](RFC-0003/) | Inventory ownership and stock semantics | platform-wide | provisional |
+| [RFC-0004](RFC-0004/) | Cross-service caching and invalidation | platform-wide | provisional |
+| [RFC-0005](RFC-0005/) | supporting-shared-db: HA or split | infra | provisional |
 
 ## Backlog — candidate RFCs
 
@@ -62,10 +66,6 @@ here). Each gets a number when someone writes it up.
 
 | Candidate | Scope | Source |
 |-----------|-------|--------|
-| East-west **gRPC/Temporal mTLS** (drop the "later phase") | platform-wide | `pkg/grpcx`, `pkg/temporalx`, `docs/api/grpc-internal-comms.md` |
-| **Cross-service caching & invalidation** strategy | platform-wide | `docs/databases/*caching*`, product-service |
-| **Inventory ownership** (product vs dedicated service) — unblocks the order saga TODOs | platform-wide | `order-service/internal/logic/v1/service.go` |
-| **Shared-DB HA / split** (`supporting-shared-db` SPOF couples 4 services) | infra | `docs/databases/010-drp.md` |
 | **DR drills program** (PITR/failover evidence; Barman plugin acceptance) | infra | `docs/databases/010*-*` |
 | **Service mesh** decision (Istio Ambient / Linkerd) | infra | `TODO.md` |
 | **Atlantis** PR-driven Terraform | infra | `TODO.md` |

@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **docs (proposals)**: Added a **`docs/proposals/`** hub grouping design proposals + decisions under one place, split into **`rfc/`** (Requests for Comments) and **`adr/`** (Architecture Decision Records, moved from `docs/decisions/`). Ships the umbrella `README.md` (RFC↔ADR flow + when-to-use-which), the RFC `README.md` (when-to-RFC, taxonomy, status lifecycle, index + a **backlog** consolidated from a repo-wide inventory), an improved `RFC-0000` template (Flux-style + a **required Mermaid diagram** and Security/Observability/Rollout sections), and **RFC-0001 — Temporal for durable cross-service orchestration** (retrospective `implemented`, owns the Temporal roadmap). `TODO.md` (kept — learning) cross-links the process.
 
+- **docs (proposals)**: Seeded four `provisional` proposal RFCs from the backlog (each with a Mermaid diagram, grounded in the code/docs): **RFC-0002** East-west mTLS for internal gRPC, **RFC-0003** Inventory ownership and stock semantics, **RFC-0004** Cross-service caching and invalidation, **RFC-0005** `supporting-shared-db` HA-or-split. Moved from the backlog into the RFC index; proposals only — no implementation.
+
 ### Changed
 
 - **docs (API)**: Retired the redundant `docs/api/api-architecture-review.md` — its one non-duplicated finding (aggregation soft/best-effort/hard-fail conventions) merged into `docs/api/api.md` as a new section, its open findings moved to the RFC backlog, and its 2 live links repointed. `temporal-order-fulfillment.md` §9 roadmap now points to RFC-0001 (single source).

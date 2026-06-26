@@ -9,7 +9,7 @@
 # gateway. Adding Kong's `jwt` plugin would be redundant with the in-service
 # check, create a second source of truth that drifts, and (under HS256) hand
 # the signing key to Kong. Decision + revisit criteria (RS256/ES256):
-#   docs/proposals/adr/ADR-003-jwt-validation-in-services-not-kong.md
+#   docs/proposals/adr/ADR-003-jwt-validation-in-services-not-kong/
 # Do not add a jwt/openid-connect/key-auth plugin without superseding ADR-003.
 ---
 # Global CORS plugin — allows frontend (local.duynh.me) to call APIs (gateway.duynh.me)

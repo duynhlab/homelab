@@ -264,6 +264,6 @@ TBD — provisional; no implementation yet.
 
 - East-west transport & current posture: [`docs/api/grpc-internal-comms.md`](../../../api/grpc-internal-comms.md) (§5 Security, Phase 3).
 - [RFC-0001 Temporal](../RFC-0001/README.md) — the worker↔cluster link this RFC also secures (its Non-Goal #3).
-- [ADR-003 JWT validation in services, not Kong](../../adr/ADR-003-jwt-validation-in-services-not-kong.md) — the user-identity layer mTLS complements.
+- [ADR-003 JWT validation in services, not Kong](../../adr/ADR-003-jwt-validation-in-services-not-kong/) — the user-identity layer mTLS complements.
 - PKI: [`docs/secrets/cert-manager.md`](../../../secrets/cert-manager.md) (`homelab-ca`, trust-manager), [`docs/secrets/trust-distribution.md`](../../../secrets/trust-distribution.md).
 - Code: `duynhlab/pkg` `grpcx` (`Dial`/`NewServer`/`metadata.go`), `temporalx`.

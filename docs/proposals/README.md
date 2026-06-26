@@ -7,8 +7,8 @@ split by artifact type:
   (design doc + diagram), discussed on a PR **before** it's built. Numbered
   `RFC-NNNN`, each in its own folder. Start at [`rfc/README.md`](rfc/README.md).
 - **[`adr/`](adr/) — Architecture Decision Records.** **Record a decision** already
-  made and its rationale (short, Nygard-style). Numbered `ADR-NNN`. Start at
-  [`adr/README.md`](adr/README.md).
+  made and its rationale (short, Nygard-style). Numbered `ADR-NNN`, each in its own
+  folder. Start at [`adr/README.md`](adr/README.md).
 
 ## How they fit together
 

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **infra (profiling)**: Reworked **Pyroscope** from a hand-vendored raw manifest (`pyroscope/pyroscope:latest` — the deprecated pre-Grafana edition, `:latest` violating Kyverno, `emptyDir`+24h so all profiles vanished on restart, an unmounted legacy ConfigMap, and no `securityContext`) to the **official Grafana Pyroscope Helm chart** (`2.1.0`, single-binary). Profile blocks now persist on the in-cluster **RustFS (S3)** `pyroscope-profiles` bucket with **7d** retention (`compactor_blocks_retention_period: 168h`, matching Tempo/VM), a PVC holds the v2 metastore across restarts, and the chart applies a hardened `securityContext` + a `ServiceMonitor`. `fullnameOverride: pyroscope` keeps the `pyroscope:4040` Service so the Grafana datasource and Kong ingress are unchanged. New `grafana` `HelmRepository` source + `pyroscope-rustfs` `ClusterExternalSecret` (+ `pyroscope-profiles` bucket in the RustFS setup CronJob). Found by the profiling review.
+
+### Added
+
+- **infra (observability)**: Wired **traces → profiles** correlation — the Tempo datasource gets a `tracesToProfiles` link to the Pyroscope datasource (join `service.name` → `service_name`, `process_cpu` profile type), so a span links to the flame graph of the code that ran during it (the in-service `pyroscope.profile.id` span attribute is set by `obsx.TracerProviderWithProfiles`). Added a `PyroscopeDown` alert (`up{job=~".*pyroscope.*"}`) under `prometheusrules/observability/`, mirroring `TempoDown`. Rewrote `docs/observability/profiling/` to match the implementation (was pre-overhaul boilerplate: zap vs zerolog, missing `PROFILING_ENABLED`, no storage/retention or correlation sections).
+
 ## [0.101.0] - 2026-06-24
 
 ### Added

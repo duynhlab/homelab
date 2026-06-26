@@ -3,3 +3,4 @@ kind: Kustomization
 
 resources:
   - tempo-alerts.yaml
+  - pyroscope-alerts.yaml

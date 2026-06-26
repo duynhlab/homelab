@@ -15,6 +15,12 @@ spec:
         - trace_id
       tracesToMetrics:
         datasourceUid: prometheus
+      tracesToProfiles:
+        datasourceUid: pyroscope
+        tags:
+        - key: service.name
+          value: service_name
+        profileTypeId: process_cpu:cpu:nanoseconds:cpu:nanoseconds
     name: Tempo
     type: tempo
     uid: tempo

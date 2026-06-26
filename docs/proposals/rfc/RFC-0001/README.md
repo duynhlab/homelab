@@ -1,12 +1,8 @@
 # RFC-0001 Temporal for durable cross-service orchestration
 
-**Status:** implemented
-
-**Scope:** platform-wide
-
-**Creation date:** 2026-06-26
-
-**Last update:** 2026-06-26
+| Status | Scope | Created | Last updated |
+|--------|-------|---------|--------------|
+| implemented | platform-wide | 2026-06-26 | 2026-06-26 |
 
 > This is a **retrospective** RFC: Temporal order-fulfillment is already shipped and
 > verified. It exists as the worked example for the [RFC process](../README.md) and as

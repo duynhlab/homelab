@@ -2,22 +2,16 @@
 
 <!-- The title must be short and descriptive. -->
 
-**Status:** provisional
+| Status | Scope | Created | Last updated |
+|--------|-------|---------|--------------|
+| provisional | platform-wide | YYYY-MM-DD | YYYY-MM-DD |
 
 <!--
-One of: provisional, implementable, implemented, deferred, rejected, withdrawn, replaced.
+Status: one of provisional, implementable, implemented, deferred, rejected, withdrawn, replaced.
+Scope:  one of infra | service:<name> | platform-wide.
+        "infra" = homelab/GitOps; "service:<name>" = a microservice repo; "platform-wide" = both.
+Created / Last updated: YYYY-MM-DD.
 -->
-
-**Scope:** platform-wide
-
-<!--
-One of: infra | service:<name> | platform-wide.
-"infra" = homelab/GitOps; "service:<name>" = a microservice repo; "platform-wide" = both.
--->
-
-**Creation date:** YYYY-MM-DD
-
-**Last update:** YYYY-MM-DD
 
 ## Summary
 

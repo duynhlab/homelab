@@ -1,12 +1,8 @@
 # RFC-0002 East-west mTLS for internal gRPC
 
-**Status:** provisional
-
-**Scope:** platform-wide
-
-**Creation date:** 2026-06-26
-
-**Last update:** 2026-06-26
+| Status | Scope | Created | Last updated |
+|--------|-------|---------|--------------|
+| provisional | platform-wide | 2026-06-26 | 2026-06-26 |
 
 > **Provisional.** Proposes a design; nothing is implemented. Owns the *why* and
 > *design rationale* for the mTLS backlog item that

@@ -1,12 +1,8 @@
 # ADR-002: Deploy Temporal via the alexandrevilain operator
 
-## Status
-
-Accepted
-
-## Date
-
-2026-06-15
+| Status | Date |
+|--------|------|
+| Accepted | 2026-06-15 |
 
 ## Context
 

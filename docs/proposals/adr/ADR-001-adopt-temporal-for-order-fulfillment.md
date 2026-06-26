@@ -1,12 +1,8 @@
 # ADR-001: Adopt Temporal for order fulfillment
 
-## Status
-
-Accepted
-
-## Date
-
-2026-06-15
+| Status | Date |
+|--------|------|
+| Accepted | 2026-06-15 |
 
 ## Context
 

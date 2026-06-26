@@ -20,7 +20,7 @@ Observability, and Docs** hub; application code lives in separate repos (see
 - One logical change per branch; keep them short-lived. `git push -u origin <branch>`, then open a PR against `main`.
 - Verify identity before committing: `git config user.email` must be the duynhlab personal identity (never the work/opswat one).
 
-**Before coding:** identify scope (infra/GitOps → here; app code → the service repo; reusable CI → `duyhenryer/shared-workflows`), read this file and the relevant `docs/`, plan, then implement.
+**Before coding:** identify scope (infra/GitOps → here; app code → the service repo; reusable CI → `duynhlab/gha-workflows`), read this file and the relevant `docs/`, plan, then implement.
 
 ## Behavioral guidelines
 

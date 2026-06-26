@@ -214,7 +214,7 @@ docs/
 
 3. **[gRPC internal comms (proposed/draft)](./api/grpc-internal-comms.md)** - Selective gRPC for internal east-west calls; dual-port, HTTP/2 LB pitfall, phased roadmap
 
-4. **[Temporal order-fulfillment saga (implemented)](./api/temporal-order-fulfillment.md)** - Why/when to use Temporal, the durable saga design, contracts, infra, ops — with [ADR-001](./proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment.md)/[ADR-002](./proposals/adr/ADR-002-deploy-temporal-via-operator.md)
+4. **[Temporal order-fulfillment saga (implemented)](./api/temporal-order-fulfillment.md)** - Why/when to use Temporal, the durable saga design, contracts, infra, ops — with [ADR-001](./proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/)/[ADR-002](./proposals/adr/ADR-002-deploy-temporal-via-operator/)
 
 5. **[RFCs — propose & track substantial changes](./proposals/rfc/)** - RFC process, index, and the consolidated backlog (the old API/architecture review is retired — its findings merged into `api.md`, open items moved to the RFC backlog)
 
@@ -308,8 +308,8 @@ docs/
 ### Decisions (ADRs)
 
 - [ADR index](./proposals/adr/README.md) - Architecture Decision Records (the *why* behind significant choices)
-- [ADR-001: Adopt Temporal for order fulfillment](./proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment.md)
-- [ADR-002: Deploy Temporal via the operator](./proposals/adr/ADR-002-deploy-temporal-via-operator.md)
+- [ADR-001: Adopt Temporal for order fulfillment](./proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/)
+- [ADR-002: Deploy Temporal via the operator](./proposals/adr/ADR-002-deploy-temporal-via-operator/)
 
 ### Databases
 

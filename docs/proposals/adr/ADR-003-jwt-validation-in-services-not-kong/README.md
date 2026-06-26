@@ -1,12 +1,8 @@
 # ADR-003: Keep JWT validation in services, not at the Kong gateway
 
-## Status
-
-Accepted
-
-## Date
-
-2026-06-20
+| Status | Date | Related RFC |
+|--------|------|-------------|
+| Accepted | 2026-06-20 | — |
 
 ## Context
 

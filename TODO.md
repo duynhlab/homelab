@@ -209,7 +209,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
   - [x] Recording rules (RED metrics, latency percentiles, bandwidth) — `kong-recording-rules.yaml`
   - [x] Grafana dashboard — `grafana-dashboard-kong.yaml`
   - [x] Plugins applied — CORS, rate-limiting (`local`, halved for 2 replicas), request-size-limiting, prometheus, security headers (`response-transformer`), correlation-id (`X-Request-ID`) — `kong/plugins.yaml`
-  - [x] Plugins deliberately NOT applied — JWT/auth stays in services ([ADR-003](docs/proposals/adr/ADR-003-jwt-validation-in-services-not-kong.md)); `request-transformer` skipped (NetworkPolicy + OTel already cover its uses)
+  - [x] Plugins deliberately NOT applied — JWT/auth stays in services ([ADR-003](docs/proposals/adr/ADR-003-jwt-validation-in-services-not-kong/)); `request-transformer` skipped (NetworkPolicy + OTel already cover its uses)
   - [x] Route configuration for all APIs — per-service Ingress, Variant A pass-through (`kong/ingress-api.yaml`)
 - Alternative API gateways: Envoy Gateway, APISIX, Gloo (evaluate vs Kong for this stack)
 - [ ] API Gateway + Gateway API (Kubernetes standard) for ingress and routing

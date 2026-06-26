@@ -1,12 +1,8 @@
 # ADR-001: Adopt Temporal for order fulfillment
 
-## Status
-
-Accepted
-
-## Date
-
-2026-06-15
+| Status | Date | Related RFC |
+|--------|------|-------------|
+| Accepted | 2026-06-15 | [RFC-0001](../../rfc/RFC-0001/) |
 
 ## Context
 
@@ -33,7 +29,7 @@ Adopt **[Temporal](https://temporal.io/)** (Go SDK) as the workflow engine and i
 fulfillment as a Temporal **saga**: a durable `OrderFulfillmentWorkflow` started after the order
 commits, with one activity per step, per-activity `RetryPolicy`, and compensations run in reverse on
 failure. The HTTP request stays async (`201 pending`); the workflow drives the order to
-`confirmed`/`failed`. See the [implementation guide](../api/temporal-order-fulfillment.md).
+`confirmed`/`failed`. See the [implementation guide](../../../api/temporal-order-fulfillment.md).
 
 ## Alternatives considered
 
@@ -71,12 +67,12 @@ failure. The HTTP request stays async (`201 pending`); the workflow drives the o
 ## Consequences
 
 - A new platform capability + dependency: a Temporal cluster (server + `temporal-db`) and a
-  **worker** per owning service (`worker` subcommand). Deployment choice is **[ADR-002](ADR-002-deploy-temporal-via-operator.md)**.
+  **worker** per owning service (`worker` subcommand). Deployment choice is **[ADR-002](../ADR-002-deploy-temporal-via-operator/)**.
 - Activities must be **idempotent** (retries) and workflow code **deterministic** — enforced by
   design + `testsuite` tests.
 - New idempotent gRPC contracts (`pkg` `v0.7.0`): product `ReserveStock`/`ReleaseStock`, shipping
   `CreateShipment`/`CancelShipment`.
 - Checkout becomes **async** (`201 pending`); the SPA polls for the terminal status.
 - When to reach for Temporal again (and when not) is documented in the
-  [guide §2](../api/temporal-order-fulfillment.md#2-when-to-use-temporal-and-when-not) — it is for
+  [guide §2](../../../api/temporal-order-fulfillment.md#2-when-to-use-temporal-and-when-not) — it is for
   durable multi-step orchestration, not for ordinary request/response.

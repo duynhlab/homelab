@@ -1,16 +1,12 @@
 # ADR-002: Deploy Temporal via the alexandrevilain operator
 
-## Status
-
-Accepted
-
-## Date
-
-2026-06-15
+| Status | Date | Related RFC |
+|--------|------|-------------|
+| Accepted | 2026-06-15 | [RFC-0001](../../rfc/RFC-0001/) |
 
 ## Context
 
-[ADR-001](ADR-001-adopt-temporal-for-order-fulfillment.md) commits us to running Temporal. We need
+[ADR-001](../ADR-001-adopt-temporal-for-order-fulfillment/) commits us to running Temporal. We need
 to deploy and operate a Temporal **server** (frontend/history/matching/worker services + Web UI +
 schema management) in a Flux + Kustomize + OCI GitOps cluster, with persistence on our existing
 CloudNativePG stack, scraped by VictoriaMetrics, and admitted by Kyverno (image-pin, probes,
@@ -65,4 +61,4 @@ a `TemporalCluster` CR and the namespace as a `TemporalNamespace` CR (`mop`). Pe
 - **Kyverno** is satisfied by setting resources on every operator-created pod (services/ui/admintools/
   schema-jobs) in the CR; probes are operator-managed.
 - Manifests live in `kubernetes/infra/{controllers,configs}/temporal/`; see the
-  [implementation guide §6](../api/temporal-order-fulfillment.md#6-infrastructure).
+  [implementation guide §6](../../../api/temporal-order-fulfillment.md#6-infrastructure).

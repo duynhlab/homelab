@@ -51,6 +51,55 @@ make it an observability signal rather than a debugging session:
 It is designed to run **always-on in production** at low overhead, turning "profile when
 something breaks" into "the profile is already there when something breaks."
 
+## How sampling works — a worked example
+
+Say a checkout takes **2 s** and you don't know which function is slow:
+
+```go
+func Checkout() {
+    ValidateUser()
+    GetCart()
+    CalculateTax()
+    GenerateInvoice()
+}
+```
+
+Pyroscope does **not** read your code or time every function call. It relies on the Go
+runtime's **sampling CPU profiler**: ~100 times per second (every ~10 ms) it records
+*which function is currently on the CPU* — a stack snapshot. Over a few seconds that's
+thousands of cheap snapshots:
+
+```mermaid
+flowchart LR
+    APP["Checkout() running"] -- "every ~10 ms: capture on-CPU stack" --> S["samples"]
+    S --> AGG["aggregate by function"]
+    AGG --> FG["flame graph (% of CPU)"]
+```
+
+Each snapshot names whichever function was executing — e.g. `GenerateInvoice`,
+`GenerateInvoice`, `CalculateTax`, `GenerateInvoice`, `GenerateInvoice`, … After ~1,000
+samples you simply **count** them:
+
+| Function | Samples | ≈ CPU time |
+|---|---:|---:|
+| `GenerateInvoice()` | 700 | **70%** |
+| `CalculateTax()` | 150 | 15% |
+| `GetCart()` | 100 | 10% |
+| `ValidateUser()` | 50 | 5% |
+
+The conclusion isn't "the API is slow" — it's "**`GenerateInvoice()` is burning ~70% of
+the CPU**." In Grafana that function is the widest frame in the flame graph, so you spot
+it at a glance.
+
+Two consequences fall out of this design:
+
+- **Low overhead** — counting periodic snapshots costs far less than instrumenting every
+  call, which is why it's safe to leave on in production.
+- **Statistical, not exact** — a single request gives few samples; accuracy comes from
+  *continuous* sampling across many requests (hence "continuous profiling"). The same
+  mechanism applies to the other profile types below (e.g. heap samples by allocation
+  site instead of CPU time).
+
 ## What Pyroscope can analyze
 
 `obsx.SetupProfiling()` registers **10 Go profile types**. Each answers a different

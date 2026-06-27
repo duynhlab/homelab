@@ -79,32 +79,47 @@ flowchart LR
     AGG --> FG["flame graph (% of CPU)"]
 ```
 
-Each snapshot names whatever was executing. After ~1,000 samples you simply **count**
-them (illustrative split for `CreateOrder`):
+Each snapshot names whatever was executing. After enough samples you simply **count**
+them per function. Here is a **real capture** — `service_name="order"`, CPU profile
+collected from local-stack while six clients hammered checkout for 75 s (≈ 2.2 CPU-seconds
+sampled), grouped by where the on-CPU time actually went:
 
-| On-CPU frame (real call) | Samples | ≈ CPU |
-|---|---:|---:|
-| JSON (de)serialization — `ShouldBindJSON` + cart unmarshal in `loadCartItems` + `c.JSON` | 520 | **52%** |
-| `orderService.CreateOrder` — validation + the item-enrich loop | 190 | 19% |
-| `startFulfillment` → `ExecuteWorkflow` — encoding `OrderFulfillmentInput` | 160 | 16% |
-| `orderRepo.Create` — pgx row encoding (not the DB wait) | 90 | 9% |
-| everything else | 40 | 4% |
+| Where the CPU went (measured) | ≈ CPU |
+|---|---:|
+| Go runtime — GC + scheduler | **57%** |
+| Network syscalls (the I/O boundary) | 16% |
+| gRPC client/transport (worker → Temporal) | 6% |
+| Temporal SDK worker (poll loop + payload encoding) | 5% |
+| OTel / Pyroscope agent overhead | 3% |
+| HTTP server (gin) — incl. the whole `CreateOrder` handler ≈ 2.7% | <1% app |
 
-The conclusion isn't "the API is slow" — it's "**JSON (de)serialization is burning ~half
-the CPU**." In Grafana that frame is the widest in the flame graph, so you spot it at a
-glance.
+**Read that honestly: checkout is _not_ CPU-bound.** The `CreateOrder` HTTP handler is
+~2.7% of CPU — its business logic barely registers. What dominates is the Go runtime
+(GC + scheduler) plus network syscalls, i.e. the cost of shuffling bytes in and out, not
+computing anything. (Two quirks of this capture: at this low utilization the *fixed*
+overhead — GC, scheduler, the profiler itself — naturally leads; and in local-stack the
+order **worker** shares `service_name=order` with the API, so its background Temporal
+poll loop shows up too. In the cluster the worker is a separate `order-worker` series.)
 
-**Crucial subtlety — CPU profile ≠ latency.** A CPU profile only counts *on-CPU* time.
-The genuinely slow parts of this checkout — `GetCart` (HTTP to cart), `orderRepo.Create`
-(DB round-trip), `ExecuteWorkflow` (RPC to Temporal) — are mostly **I/O wait**, so they
-barely register in the CPU flame graph; they show up in the **Tempo trace** instead. So
-the two signals answer different questions:
+**The key lesson — CPU profile ≠ latency.** A CPU profile counts only *on-CPU* time. The
+genuinely slow parts of checkout — `GetCart` (HTTP to cart), `orderRepo.Create` (DB
+round-trip), `ExecuteWorkflow` (RPC to Temporal) — are **I/O wait**, so they're nearly
+invisible here; they show up in the **Tempo trace** instead. The two signals answer
+different questions:
 
 - *Why is the request slow (wall-clock)?* → the **trace** (the I/O spans).
-- *What is burning CPU (cost / throughput)?* → the **profile** (here, serialization).
+- *What is burning CPU (cost / throughput)?* → the **profile**.
 
-This is exactly why this platform links them: from a slow span you jump to the CPU flame
-graph for the same code, and decide which lever to pull.
+So for this checkout the profile delivers a useful *negative* result ("don't bother
+optimizing CPU, the time is in I/O — go look at the trace"). The flame graph earns its
+keep when a service *does* burn CPU — a tight loop, large-payload (de)serialization,
+crypto, compression — where that work shows up as a wide app frame you can click straight
+to. This is exactly why the platform links the two: from a slow span you jump to the CPU
+flame graph for the same code and decide which lever to pull.
+
+> Reproduce: `cd local-stack` → drive checkout load → `curl
+> "localhost:4040/pyroscope/render?query=process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name=\"order\"}&from=<t0>&until=<t1>&format=json"`,
+> or just open Grafana → Explore → Profiles.
 
 Two more consequences of the sampling design:
 

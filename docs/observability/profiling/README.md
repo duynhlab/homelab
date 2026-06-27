@@ -53,52 +53,67 @@ something breaks" into "the profile is already there when something breaks."
 
 ## How sampling works — a worked example
 
-Say a checkout takes **2 s** and you don't know which function is slow:
+Take this platform's real checkout entry point, `OrderHandler.CreateOrder`
+(`order-service/internal/web/v1/handler.go`). It does several things in sequence:
 
 ```go
-func Checkout() {
-    ValidateUser()
-    GetCart()
-    CalculateTax()
-    GenerateInvoice()
+func (h *OrderHandler) CreateOrder(c *gin.Context) {
+    c.ShouldBindJSON(&req)              // decode the request JSON
+    h.handleIdempotentReplay(...)      // idempotency lookup (DB)
+    items, _ := h.loadCartItems(ctx, c) // cartClient.GetCart → HTTP + JSON unmarshal
+    order, _ := h.orderService.CreateOrder(ctx, req) // validate + enrich loop → orderRepo.Create (DB tx)
+    h.startFulfillment(c, zapLogger, order)          // ExecuteWorkflow → encode input + RPC to Temporal
+    c.JSON(http.StatusCreated, order)  // encode the response JSON
 }
 ```
 
-Pyroscope does **not** read your code or time every function call. It relies on the Go
-runtime's **sampling CPU profiler**: ~100 times per second (every ~10 ms) it records
-*which function is currently on the CPU* — a stack snapshot. Over a few seconds that's
-thousands of cheap snapshots:
+Suppose a checkout takes **2 s** and you don't know where the CPU goes. Pyroscope does
+**not** read your code or time every call. It relies on the Go runtime's **sampling CPU
+profiler**: ~100 times per second (every ~10 ms) it records *which function is on the CPU
+right now* — a stack snapshot. Over many requests that's thousands of cheap snapshots:
 
 ```mermaid
 flowchart LR
-    APP["Checkout() running"] -- "every ~10 ms: capture on-CPU stack" --> S["samples"]
+    APP["CreateOrder running"] -- "every ~10 ms: capture on-CPU stack" --> S["samples"]
     S --> AGG["aggregate by function"]
     AGG --> FG["flame graph (% of CPU)"]
 ```
 
-Each snapshot names whichever function was executing — e.g. `GenerateInvoice`,
-`GenerateInvoice`, `CalculateTax`, `GenerateInvoice`, `GenerateInvoice`, … After ~1,000
-samples you simply **count** them:
+Each snapshot names whatever was executing. After ~1,000 samples you simply **count**
+them (illustrative split for `CreateOrder`):
 
-| Function | Samples | ≈ CPU time |
+| On-CPU frame (real call) | Samples | ≈ CPU |
 |---|---:|---:|
-| `GenerateInvoice()` | 700 | **70%** |
-| `CalculateTax()` | 150 | 15% |
-| `GetCart()` | 100 | 10% |
-| `ValidateUser()` | 50 | 5% |
+| JSON (de)serialization — `ShouldBindJSON` + cart unmarshal in `loadCartItems` + `c.JSON` | 520 | **52%** |
+| `orderService.CreateOrder` — validation + the item-enrich loop | 190 | 19% |
+| `startFulfillment` → `ExecuteWorkflow` — encoding `OrderFulfillmentInput` | 160 | 16% |
+| `orderRepo.Create` — pgx row encoding (not the DB wait) | 90 | 9% |
+| everything else | 40 | 4% |
 
-The conclusion isn't "the API is slow" — it's "**`GenerateInvoice()` is burning ~70% of
-the CPU**." In Grafana that function is the widest frame in the flame graph, so you spot
-it at a glance.
+The conclusion isn't "the API is slow" — it's "**JSON (de)serialization is burning ~half
+the CPU**." In Grafana that frame is the widest in the flame graph, so you spot it at a
+glance.
 
-Two consequences fall out of this design:
+**Crucial subtlety — CPU profile ≠ latency.** A CPU profile only counts *on-CPU* time.
+The genuinely slow parts of this checkout — `GetCart` (HTTP to cart), `orderRepo.Create`
+(DB round-trip), `ExecuteWorkflow` (RPC to Temporal) — are mostly **I/O wait**, so they
+barely register in the CPU flame graph; they show up in the **Tempo trace** instead. So
+the two signals answer different questions:
+
+- *Why is the request slow (wall-clock)?* → the **trace** (the I/O spans).
+- *What is burning CPU (cost / throughput)?* → the **profile** (here, serialization).
+
+This is exactly why this platform links them: from a slow span you jump to the CPU flame
+graph for the same code, and decide which lever to pull.
+
+Two more consequences of the sampling design:
 
 - **Low overhead** — counting periodic snapshots costs far less than instrumenting every
   call, which is why it's safe to leave on in production.
 - **Statistical, not exact** — a single request gives few samples; accuracy comes from
   *continuous* sampling across many requests (hence "continuous profiling"). The same
-  mechanism applies to the other profile types below (e.g. heap samples by allocation
-  site instead of CPU time).
+  mechanism applies to the other profile types below (e.g. the heap profiler samples by
+  allocation site instead of by CPU time).
 
 ## What Pyroscope can analyze
 

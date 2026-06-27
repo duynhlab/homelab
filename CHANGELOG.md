@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **docs (observability)**: Rewrote `docs/observability/profiling/README.md` into a full technical reference (Overview · Purpose · Continuous Profiling concept · What Pyroscope analyzes · Architecture · How it works · What we applied · Comparison · Benefits · Operations). Corrected the stale "profiling disabled in local-stack" claim (it now runs `grafana/pyroscope:2.1.0` with `PROFILING_ENABLED=true`) and fixed the matching `local-stack/compose.yaml` header comment. Values verified against the live deployment + `pkg/obsx`.
+
 - **docs (API)**: Retired the redundant `docs/api/api-architecture-review.md` — its one non-duplicated finding (aggregation soft/best-effort/hard-fail conventions) merged into `docs/api/api.md` as a new section, its open findings moved to the RFC backlog, and its 2 live links repointed. `temporal-order-fulfillment.md` §9 roadmap now points to RFC-0001 (single source).
 
 ### Removed

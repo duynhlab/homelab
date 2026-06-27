@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.102.0] - 2026-06-27
+
 ### Added
 
 - **observability (Temporal worker)**: Scrape the order-fulfillment worker's Temporal SDK **workflow/activity RED metrics** (emitted by `pkg/temporalx` v0.10.0's OTel `MetricsHandler`) — the worker is a `service.enabled:false` mop release, so added an `order-worker` **PodMonitor** (the `microservices-api` ServiceMonitor can't reach it). Added a `temporal-worker` PrometheusRule group alerting on workflow/activity/request **failure rates** and **task-slot exhaustion**. Metric names verified against a live local-stack checkout (SDK exports counters as gauges, no `_total`; latencies are `_seconds` histograms). Closes RFC-0001 future-work items: cache-bust on reserve, internal cart-clear, and worker RED metrics.

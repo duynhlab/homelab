@@ -16,7 +16,7 @@ flowchart TD
   dev -->|"Promote MR"| uat["uat (optional)"]
   uat -->|"Promote MR"| main["main"]
   main -->|"Tag vX.Y.Z"| releaseTag["release tag"]
-  releaseTag --> prod["deploy production"]
+  releaseTag --> prod["deploy to prod"]
 
   main -->|"critical fix"| hotfix["hotfix/TICKET"]
   hotfix -->|"MR"| main
@@ -28,7 +28,7 @@ flowchart TD
 
 | Branch | Purpose | Deploys to | Protected |
 |--------|---------|------------|-----------|
-| `main` | Production-ready code | production namespace | Yes (require MR + approvals) |
+| `main` | Production-ready code | prod namespace | Yes (require MR + approvals) |
 | `uat` | Release candidate for QA/UAT | uat namespace | Yes (require MR) |
 | `dev` | Internal integration, daily development | dev namespace | Yes (require MR) |
 
@@ -106,7 +106,7 @@ sequenceDiagram
     Dev->>Main: git tag -s v1.2.0
     Main->>GHCR: tag pipeline retags as v1.2.0 (no rebuild)
     GHCR->>Flux: image update detected
-    Flux->>Flux: reconcile production namespace
+    Flux->>Flux: reconcile prod namespace
 ```
 
 ### 3.1 Feature -> dev
@@ -171,7 +171,7 @@ This is the critical path. Source is `uat` (if used) or `dev` (if uat is skipped
 | 3 | Tech lead | GitHub UI | Merge MR | `push main`: build, scan, sign -> image `sha-abc123` + `latest` |
 | 4 | Tech lead | **Local terminal** | Create signed release tag (commands below) | -- |
 | 5 | (automatic) | CI | Tag `v*` push detected -> retag existing digest as `v1.2.0` (**no rebuild**) | Release pipeline |
-| 6 | (automatic) | Flux | Image `v1.2.0` detected -> reconcile production namespace | Smoke tests (prod) |
+| 6 | (automatic) | Flux | Image `v1.2.0` detected -> reconcile prod namespace | Smoke tests (prod) |
 | 7 | Tech lead | **Local terminal** | Back-merge `main` -> `dev` (and `uat` if active) | -- |
 | 8 | Tech lead | kubectl / Flux UI | Verify production deployment | -- |
 
@@ -191,7 +191,7 @@ git push origin v1.2.0
 What happens after `git push origin v1.2.0`:
 1. CI detects `tags/v*` push event.
 2. Release pipeline runs: retags the **existing** `sha-abc123` digest as `v1.2.0` in GHCR. No rebuild.
-3. Flux detects image `v1.2.0` -> reconciles production namespace.
+3. Flux detects image `v1.2.0` -> reconciles prod namespace.
 4. Pods roll out with the new image.
 
 **Step 7 -- Back-merge** (who: Tech lead, where: local terminal):
@@ -341,7 +341,7 @@ After each deployment, automated verification runs against the live environment.
 |-------------|---------|--------|-------------|
 | **dev** | Push to `dev` (after deploy) | Smoke tests (health + readiness endpoints) | Alert in Slack, block promotion to uat |
 | **uat** | Push to `uat` (after deploy) | Smoke + integration tests, Lighthouse CI (frontend), regression tests | Alert in Slack, block promotion to main |
-| **production** | Tag `v*` (after deploy) | Smoke tests (read-only health check), SLO validation | Alert on-call, trigger rollback runbook |
+| **prod** | Tag `v*` (after deploy) | Smoke tests (read-only health check), SLO validation | Alert on-call, trigger rollback runbook |
 
 **Smoke test scope** (minimum per service):
 

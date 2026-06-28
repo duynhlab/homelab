@@ -92,8 +92,7 @@ docs/
 ├── platform/                     # Platform/deployment documentation
 │   ├── setup.md                  # GitOps deployment guide
 │   ├── application-delivery.md    # ResourceSet patterns & templates
-│   ├── cicd.md                   # CI/CD pipelines
-│   ├── cicd-standard.md          # CI/CD standard (policy: pinning, permissions, signing)
+│   ├── cicd.md                   # CI/CD pipelines + standard/policy (pinning, permissions, signing, GoReleaser)
 │   ├── gitflow.md                # Git branching & release standard
 │   └── sonarcloud.md             # SonarCloud integration
 ├── runbooks/                     # Operational runbooks
@@ -337,8 +336,7 @@ docs/
 - [Application Delivery](./platform/application-delivery.md) - ResourceSet patterns & templates
 - [cert-manager + Flux](./secrets/cert-manager.md) - TLS with Let's Encrypt, HelmRelease, Ingress, trust-manager
 - [Trust Distribution (trust-manager)](./secrets/trust-distribution.md) - CA bundle distribution to namespaces via trust-manager Bundle CRD
-- [CI/CD](./platform/cicd.md) - CI/CD pipelines and workflows
-- [CI/CD Standard](./platform/cicd-standard.md) - Company CI/CD policy: action SHA-pinning, least-privilege permissions, image signing/verification, required-checks matrix
+- [CI/CD](./platform/cicd.md) - CI/CD pipelines, workflows, **and the standard/policy** (action SHA-pinning, least-privilege permissions, image signing/verification, required-checks matrix, GoReleaser binary releases)
 - [Git Branching & Release](./platform/gitflow.md) - Hybrid Enterprise Gitflow standard (dev/staging/main + immutable tags)
 - [SonarCloud](./platform/sonarcloud.md) - SonarCloud integration
 

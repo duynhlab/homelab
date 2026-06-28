@@ -13,33 +13,33 @@ This document defines the **production-ready branching strategy** for all micros
 ```mermaid
 flowchart TD
   feature["feature/TICKET"] -->|"MR into dev"| dev["dev"]
-  dev -->|"Promote MR"| staging["staging (optional)"]
-  staging -->|"Promote MR"| main["main"]
+  dev -->|"Promote MR"| uat["uat (optional)"]
+  uat -->|"Promote MR"| main["main"]
   main -->|"Tag vX.Y.Z"| releaseTag["release tag"]
-  releaseTag --> prod["deploy production"]
+  releaseTag --> prod["deploy to prod"]
 
   main -->|"critical fix"| hotfix["hotfix/TICKET"]
   hotfix -->|"MR"| main
   hotfix -.->|"back-merge"| dev
-  hotfix -.->|"back-merge"| staging
+  hotfix -.->|"back-merge"| uat
 ```
 
 ### Persistent Branches
 
 | Branch | Purpose | Deploys to | Protected |
 |--------|---------|------------|-----------|
-| `main` | Production-ready code | production namespace | Yes (require MR + approvals) |
-| `staging` | Release candidate for QA/UAT | staging namespace | Yes (require MR) |
+| `main` | Production-ready code | prod namespace | Yes (require MR + approvals) |
+| `uat` | Release candidate for QA/UAT | uat namespace | Yes (require MR) |
 | `dev` | Internal integration, daily development | dev namespace | Yes (require MR) |
 
-`staging` is **optional** per service. Teams not ready for a 3-tier promotion can merge directly from `dev` to `main`. The CI template supports both modes.
+`uat` is **optional** per service. Teams not ready for a 3-tier promotion can merge directly from `dev` to `main`. The CI template supports both modes.
 
 ### Ephemeral Branches
 
 | Branch pattern | Created from | Merges into | Lifetime |
 |----------------|-------------|-------------|----------|
 | `feature/<ticket>` | `dev` | `dev` | Hours to days (max 1 week) |
-| `hotfix/<ticket>` | `main` | `main` + back-merge to `dev` (and `staging` if active) | Hours |
+| `hotfix/<ticket>` | `main` | `main` + back-merge to `dev` (and `uat` if active) | Hours |
 
 ---
 
@@ -84,7 +84,7 @@ sequenceDiagram
     autonumber
     participant Dev as Developer
     participant DevBranch as dev
-    participant Staging as staging
+    participant UAT as uat
     participant Main as main
     participant GHCR as GHCR Registry
     participant Flux as Flux GitOps
@@ -94,11 +94,11 @@ sequenceDiagram
     Note over DevBranch: dev namespace updated
 
     rect rgb(200, 200, 200)
-        Note over Staging: OPTIONAL: staging tier
-        Dev->>Staging: open MR dev -> staging
-        Staging->>Staging: QA review + approve
-        Staging->>GHCR: CI builds sha-abc123 + rc-abc123
-        Note over Staging: staging namespace updated
+        Note over UAT: OPTIONAL: uat tier
+        Dev->>UAT: open MR dev -> uat
+        UAT->>UAT: QA review + approve
+        UAT->>GHCR: CI builds sha-abc123 + rc-abc123
+        Note over UAT: uat namespace updated
     end
 
     Dev->>Main: open MR -> main (2 approvals)
@@ -106,7 +106,7 @@ sequenceDiagram
     Dev->>Main: git tag -s v1.2.0
     Main->>GHCR: tag pipeline retags as v1.2.0 (no rebuild)
     GHCR->>Flux: image update detected
-    Flux->>Flux: reconcile production namespace
+    Flux->>Flux: reconcile prod namespace
 ```
 
 ### 3.1 Feature -> dev
@@ -134,45 +134,45 @@ git push origin feature/ABC-123
 #   CI auto-triggers: builds image, pushes to GHCR, Flux deploys to dev namespace
 ```
 
-### 3.2 dev -> staging (OPTIONAL)
+### 3.2 dev -> uat (OPTIONAL)
 
-> **When to use staging**: Services with QA/UAT requirements, user-facing features that need manual testing, or services where a release candidate must be validated before production.
+> **When to use uat**: Services with QA/UAT requirements, user-facing features that need manual testing, or services where a release candidate must be validated before production.
 >
 > **When to skip**: Internal services, infrastructure tooling, or teams doing continuous deployment directly from `dev` to `main`. If skipping, go directly to section 3.3.
 
 | Step | Who | Where | Action | CI auto-trigger |
 |------|-----|-------|--------|-----------------|
-| 1 | Tech lead | GitHub UI | Open MR: `dev` -> `staging` | `pull_request`: test, lint, sonar |
+| 1 | Tech lead | GitHub UI | Open MR: `dev` -> `uat` | `pull_request`: test, lint, sonar |
 | 2 | Tech lead | GitHub UI | Review + approve (1 approval) | -- |
-| 3 | Tech lead | GitHub UI | Merge MR | `push staging`: build, scan, sign -> image `sha-abc123` + `rc-abc123` |
-| 4 | (automatic) | Flux | Deploy to staging namespace | Smoke + integration + regression tests |
-| 5 | QA team | Staging env | Manual QA/UAT testing | -- |
+| 3 | Tech lead | GitHub UI | Merge MR | `push uat`: build, scan, sign -> image `sha-abc123` + `rc-abc123` |
+| 4 | (automatic) | Flux | Deploy to uat namespace | Smoke + integration + regression tests |
+| 5 | QA team | UAT env | Manual QA/UAT testing | -- |
 
 ```bash
 # Step 1-3: Tech lead, GitHub UI
-#   Open MR: dev -> staging
-#   Staging is now FEATURE-FROZEN: only bug fixes allowed, no new features
+#   Open MR: dev -> uat
+#   UAT is now FEATURE-FROZEN: only bug fixes allowed, no new features
 #   Wait for CI checks + approval -> merge
-#   CI auto-triggers: builds RC image, Flux deploys to staging namespace
+#   CI auto-triggers: builds RC image, Flux deploys to uat namespace
 
-# Step 5: QA team tests on staging environment
-#   If bugs found: fix on dev, cherry-pick or re-promote to staging
+# Step 5: QA team tests on uat environment
+#   If bugs found: fix on dev, cherry-pick or re-promote to uat
 #   If QA passes: proceed to section 3.3
 ```
 
 ### 3.3 Release to production (-> main -> tag)
 
-This is the critical path. Source is `staging` (if used) or `dev` (if staging is skipped).
+This is the critical path. Source is `uat` (if used) or `dev` (if uat is skipped).
 
 | Step | Who | Where | Action | CI auto-trigger |
 |------|-----|-------|--------|-----------------|
-| 1 | Tech lead | GitHub UI | Open MR: `staging` -> `main` (or `dev` -> `main`) | `pull_request`: test, lint, sonar |
+| 1 | Tech lead | GitHub UI | Open MR: `uat` -> `main` (or `dev` -> `main`) | `pull_request`: test, lint, sonar |
 | 2 | Tech lead + QA | GitHub UI | Review + approve (**2 approvals required**: tech lead + QA) | -- |
 | 3 | Tech lead | GitHub UI | Merge MR | `push main`: build, scan, sign -> image `sha-abc123` + `latest` |
 | 4 | Tech lead | **Local terminal** | Create signed release tag (commands below) | -- |
 | 5 | (automatic) | CI | Tag `v*` push detected -> retag existing digest as `v1.2.0` (**no rebuild**) | Release pipeline |
-| 6 | (automatic) | Flux | Image `v1.2.0` detected -> reconcile production namespace | Smoke tests (prod) |
-| 7 | Tech lead | **Local terminal** | Back-merge `main` -> `dev` (and `staging` if active) | -- |
+| 6 | (automatic) | Flux | Image `v1.2.0` detected -> reconcile prod namespace | Smoke tests (prod) |
+| 7 | Tech lead | **Local terminal** | Back-merge `main` -> `dev` (and `uat` if active) | -- |
 | 8 | Tech lead | kubectl / Flux UI | Verify production deployment | -- |
 
 **Step 4 -- Create release tag** (who: Tech lead, where: local terminal):
@@ -191,7 +191,7 @@ git push origin v1.2.0
 What happens after `git push origin v1.2.0`:
 1. CI detects `tags/v*` push event.
 2. Release pipeline runs: retags the **existing** `sha-abc123` digest as `v1.2.0` in GHCR. No rebuild.
-3. Flux detects image `v1.2.0` -> reconciles production namespace.
+3. Flux detects image `v1.2.0` -> reconciles prod namespace.
 4. Pods roll out with the new image.
 
 **Step 7 -- Back-merge** (who: Tech lead, where: local terminal):
@@ -203,11 +203,11 @@ git pull origin dev
 git merge main --no-edit
 git push origin dev
 
-# If staging is active, also back-merge into staging
-git checkout staging
-git pull origin staging
+# If uat is active, also back-merge into uat
+git checkout uat
+git pull origin uat
 git merge main --no-edit
-git push origin staging
+git push origin uat
 ```
 
 > Never skip back-merge. Forgotten merges cause regressions in the next release cycle.
@@ -241,7 +241,7 @@ flowchart TD
   hotfix -->|"MR + fix"| main_dst["main"]
   main_dst -->|"tag vX.Y.Z+1"| patch["patch release"]
   hotfix -.->|"back-merge MR"| dev_bm["dev"]
-  hotfix -.->|"back-merge MR"| staging_bm["staging"]
+  hotfix -.->|"back-merge MR"| staging_bm["uat"]
 ```
 
 ### Runbook
@@ -265,7 +265,7 @@ git pull origin main
 git tag -s v1.2.1 -m "Hotfix: prevent token replay attack"
 git push origin v1.2.1
 
-# 5. Back-merge to dev (and staging if active)
+# 5. Back-merge to dev (and uat if active)
 git checkout dev
 git pull origin dev
 git merge main
@@ -274,9 +274,9 @@ git push origin dev
 
 **Rules**:
 - Hotfix branches always start from `main`, never from `dev`.
-- Fix on `main` first, then back-merge to `dev`/`staging`.
+- Fix on `main` first, then back-merge to `dev`/`uat`.
 - Never skip back-merge; forgotten fixes cause regressions in the next release.
-- If a `staging` branch has an active release candidate, merge hotfix into `staging` too.
+- If a `uat` branch has an active release candidate, merge hotfix into `uat` too.
 
 ---
 
@@ -301,7 +301,7 @@ vMAJOR.MINOR.PATCH
 | Event | Image tags produced | Purpose |
 |-------|-------------------|---------|
 | Push to `dev` | `sha-<short>`, `dev-<run>` | Integration testing |
-| Push to `staging` | `sha-<short>`, `rc-<sha>` | QA/UAT candidate |
+| Push to `uat` | `sha-<short>`, `rc-<sha>` | QA/UAT candidate |
 | Push to `main` | `sha-<short>`, `latest` | Production candidate |
 | Git tag `v*` | `v1.2.3`, `sha-<short>` | Immutable production release |
 
@@ -325,9 +325,9 @@ CI and post-deploy verification are separated into two phases: **pre-merge check
 
 | Trigger | Branch/Ref | Jobs | Artifacts |
 |---------|-----------|------|-----------|
-| `pull_request` | `dev`, `staging`, `main` | test, lint, sonar | None (checks only) |
+| `pull_request` | `dev`, `uat`, `main` | test, lint, sonar | None (checks only) |
 | `push` | `dev` | test, sonar, build, scan, sign | `sha-<short>`, `dev-<run>` |
-| `push` | `staging` | test, sonar, build, scan, sign | `sha-<short>`, `rc-<sha>` |
+| `push` | `uat` | test, sonar, build, scan, sign | `sha-<short>`, `rc-<sha>` |
 | `push` | `main` | test, sonar, build, scan, sign | `sha-<short>`, `latest` |
 | `push` | `tags/v*` | retag digest, release metadata | `vX.Y.Z` (no rebuild) |
 
@@ -339,9 +339,9 @@ After each deployment, automated verification runs against the live environment.
 
 | Environment | Trigger | Checks | Fail action |
 |-------------|---------|--------|-------------|
-| **dev** | Push to `dev` (after deploy) | Smoke tests (health + readiness endpoints) | Alert in Slack, block promotion to staging |
-| **staging** | Push to `staging` (after deploy) | Smoke + integration tests, Lighthouse CI (frontend), regression tests | Alert in Slack, block promotion to main |
-| **production** | Tag `v*` (after deploy) | Smoke tests (read-only health check), SLO validation | Alert on-call, trigger rollback runbook |
+| **dev** | Push to `dev` (after deploy) | Smoke tests (health + readiness endpoints) | Alert in Slack, block promotion to uat |
+| **uat** | Push to `uat` (after deploy) | Smoke + integration tests, Lighthouse CI (frontend), regression tests | Alert in Slack, block promotion to main |
+| **prod** | Tag `v*` (after deploy) | Smoke tests (read-only health check), SLO validation | Alert on-call, trigger rollback runbook |
 
 **Smoke test scope** (minimum per service):
 
@@ -357,13 +357,13 @@ curl -sf http://${SERVICE}.${NAMESPACE}.svc.cluster.local:8080/ready
 curl -sf http://${SERVICE}.${NAMESPACE}.svc.cluster.local:8080/api/v1/ping
 ```
 
-**Staging-only checks** (in addition to smoke):
+**UAT-only checks** (in addition to smoke):
 - Integration tests against real database (test data)
 - Lighthouse CI for frontend services (performance budget)
 - API regression tests (contract validation against OpenAPI spec)
 - Load baseline (compare p99 latency against previous release)
 
-**Key principle**: The same image that passes staging verification is promoted to production. No rebuild, no retest of unit/integration -- only live health validation in prod.
+**Key principle**: The same image that passes uat verification is promoted to production. No rebuild, no retest of unit/integration -- only live health validation in prod.
 
 ```mermaid
 flowchart LR
@@ -374,7 +374,7 @@ flowchart LR
         sonar --> img["build image"] --> scan["trivy scan"] --> sign["cosign sign"]
     end
     subgraph postdeploy ["Post-Deploy Verification"]
-        smoke["smoke tests"] --> integ["integration tests\n(staging only)"]
+        smoke["smoke tests"] --> integ["integration tests\n(uat only)"]
         integ --> lighthouse["Lighthouse CI\n(frontend only)"]
         integ --> regression["API regression"]
     end
@@ -421,7 +421,7 @@ Following the [Swissquote pattern](https://medium.com/swissquote-engineering/git
 ```mermaid
 flowchart TD
     subgraph rulesets ["Rulesets (cumulative)"]
-        base["1. Base Protection\ntargets: main, staging, dev"]
+        base["1. Base Protection\ntargets: main, uat, dev"]
         prod["2. Production Gate\ntargets: main only"]
         tags["3. Release Tags\ntargets: v* tags"]
     end
@@ -711,7 +711,7 @@ At Enterprise scale (1000 repos), adopt the [Swissquote pattern](https://medium.
 
 ### Immutable Artifact Rule
 
-- Every merged commit to `dev`/`staging`/`main` produces a signed, immutable image.
+- Every merged commit to `dev`/`uat`/`main` produces a signed, immutable image.
 - Production deployments reference digest or semver tag, never `latest` alone.
 - SBOM is attached to every production image (enable `sbom: true` in CI).
 - Tag immutability is enforced at the GHCR level — tags cannot be overwritten.
@@ -721,8 +721,8 @@ At Enterprise scale (1000 repos), adopt the [Swissquote pattern](https://medium.
 | From | To | Allowed by | Rebuild? |
 |------|----|-----------|----------|
 | `feature/*` | `dev` | Any team member (1 approval) | Yes (CI builds on push to dev) |
-| `dev` | `staging` | Tech lead (1 approval) | Yes (CI builds on push to staging) |
-| `staging` | `main` | Tech lead + QA (2 approvals) | Yes (CI builds on push to main) |
+| `dev` | `uat` | Tech lead (1 approval) | Yes (CI builds on push to uat) |
+| `uat` | `main` | Tech lead + QA (2 approvals) | Yes (CI builds on push to main) |
 | `main` + tag `v*` | Production | Release manager (tag push) | No (reuses existing digest) |
 | `hotfix/*` | `main` | Tech lead (expedited, 1 approval min) | Yes (CI builds on push to main) |
 
@@ -774,12 +774,12 @@ flowchart LR
 ## Quick Reference
 
 ```
-feature/ABC-123   -->  MR  -->  dev  -->  MR  -->  staging  -->  MR  -->  main  -->  tag v1.2.0
+feature/ABC-123   -->  MR  -->  dev  -->  MR  -->  uat  -->  MR  -->  main  -->  tag v1.2.0
                                                    (optional)
 
 hotfix/PROD-456   -->  MR  -->  main  -->  tag v1.2.1
                        |
-                       +--->  back-merge to dev (and staging)
+                       +--->  back-merge to dev (and uat)
 ```
 
 | Question | Answer |

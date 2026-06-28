@@ -1,6 +1,6 @@
 # Build Template — Push-only workflow
 #
-# Triggers on: push to dev/staging/main, tag v*
+# Triggers on: push to dev/uat/main, tag v*
 # Purpose: build Docker images, scan before push, sign, notify
 #
 # This workflow only handles push events. By not mixing pull_request triggers,
@@ -10,7 +10,7 @@
 # If vulnerabilities are found, the image is never pushed to the registry.
 # This prevents FluxCD from auto-deploying vulnerable images.
 #
-# Staging optional: services not using staging simply never push to that branch.
+# UAT optional: services not using uat simply never push to that branch.
 #
 # Dynamic naming: Uses ${{ github.event.repository.name }} so this file is
 # identical across all service repos — no placeholders to replace for image names.
@@ -25,7 +25,7 @@ name: Build
 
 on:
   push:
-    branches: [dev, staging, main]
+    branches: [dev, uat, main]
     tags: ['v*']
 
 permissions:

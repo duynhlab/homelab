@@ -1,6 +1,6 @@
 # Check Template — PR-only workflow
 #
-# Triggers on: pull_request to dev/staging/main
+# Triggers on: pull_request to dev/uat/main
 # Purpose: run tests, lint, secret scanning, SonarCloud analysis
 #
 # This workflow only handles pull_request events. By not mixing push triggers,
@@ -30,7 +30,7 @@ name: Check
 
 on:
   pull_request:
-    branches: [dev, staging, main]
+    branches: [dev, uat, main]
 
 permissions:
   contents: read

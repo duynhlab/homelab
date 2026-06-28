@@ -12,8 +12,8 @@ This document describes the CI/CD pipeline for all microservices (`auth`, `user`
 This pipeline operates under the **Hybrid Enterprise Gitflow** model defined in [`gitflow.md`](gitflow.md):
 
 - **`dev`** — internal integration; every push builds and deploys to the dev namespace.
-- **`staging`** (optional) — release candidate; QA/UAT before production.
-- **`main`** — production-ready code; merged from `staging` (or `dev` if staging is skipped).
+- **`uat`** (optional) — release candidate; QA/UAT before production.
+- **`main`** — production-ready code; merged from `uat` (or `dev` if uat is skipped).
 - **`vX.Y.Z` tags** on `main` — immutable production releases; trigger release pipeline.
 - **`feature/*`** from `dev`, **`hotfix/*`** from `main`.
 
@@ -29,9 +29,9 @@ This pipeline operates under the **Hybrid Enterprise Gitflow** model defined in 
 This split ensures GitHub does not append `(pull_request)` or `(push)` suffixes to status check names, making ruleset matching predictable. See [`ruleset-automation.md`](ruleset-automation.md) for details on how check names are constructed and enforced.
 
 > **Triggers today vs the Gitflow target.** The [`gitflow.md`](gitflow.md) model describes a
-> `dev → staging → main` promotion. The **currently wired** CI triggers are: `check.yml` on
+> `dev → uat → main` promotion. The **currently wired** CI triggers are: `check.yml` on
 > **PRs to `main`**, `build.yml` on **push to `main`**, and `release.yml` on **`v*` tags**. The
-> `dev`/`staging` branch builds shown in some diagrams below are the Gitflow *target*, not yet
+> `dev`/`uat` branch builds shown in some diagrams below are the Gitflow *target*, not yet
 > wired into the service workflows.
 
 ## Image Security: Scan Before Push
@@ -148,20 +148,20 @@ flowchart TD
 flowchart LR
     subgraph branches ["Branch Promotion"]
         F["feature/*"] -->|"MR"| D["dev"]
-        D -->|"Promote MR"| S["staging"]
+        D -->|"Promote MR"| S["uat"]
         S -->|"Promote MR"| M["main"]
         M -->|"Tag"| T["v1.2.0"]
     end
 
     subgraph ci_pr ["PR Events (checks only)"]
         PR_D["MR -> dev: test + lint + sonar"]
-        PR_S["MR -> staging: test + lint + sonar"]
+        PR_S["MR -> uat: test + lint + sonar"]
         PR_M["MR -> main: test + lint + sonar"]
     end
 
     subgraph ci_push ["Push Events (build + deliver)"]
         P_D["push dev: build sha + dev-N"]
-        P_S["push staging: build sha + rc-sha"]
+        P_S["push uat: build sha + rc-sha"]
         P_M["push main: build sha + latest"]
         P_T["tag v*: GoReleaser binary release<br/>(image digest also retagged)"]
     end
@@ -197,11 +197,11 @@ flowchart TD
     style GITLEAKS fill:#22c55e,color:#fff,stroke:#16a34a,stroke-width:2px
 ```
 
-### 5. Build & Delivery Flow (Push to dev / staging / main)
+### 5. Build & Delivery Flow (Push to dev / uat / main)
 
-On push to any persistent branch (`dev`, `staging`, `main`), the full build pipeline runs. Images are **scanned before push** — if Trivy finds CRITICAL/HIGH CVEs, the image is never pushed to the registry and the pipeline fails.
+On push to any persistent branch (`dev`, `uat`, `main`), the full build pipeline runs. Images are **scanned before push** — if Trivy finds CRITICAL/HIGH CVEs, the image is never pushed to the registry and the pipeline fails.
 
-After each deployment, **post-deploy verification** runs automatically: smoke tests on all environments, plus integration/regression tests on staging. See [`gitflow.md` section 6.2](gitflow.md#62-post-deploy-verification) for the full verification matrix.
+After each deployment, **post-deploy verification** runs automatically: smoke tests on all environments, plus integration/regression tests on uat. See [`gitflow.md` section 6.2](gitflow.md#62-post-deploy-verification) for the full verification matrix.
 
 ```mermaid
 flowchart TD
@@ -253,7 +253,7 @@ sequenceDiagram
     participant Cosign as docker-sign
     participant Slack as Slack
 
-    Dev->>GA: Open MR (feature -> dev / dev -> staging / staging -> main)
+    Dev->>GA: Open MR (feature -> dev / dev -> uat / uat -> main)
     GA->>PR: Run pr-checks
     PR->>PR: Validate branch name
     PR-->>Slack: Notify PR event
@@ -272,7 +272,7 @@ sequenceDiagram
     Sonar->>GA: Download artifact coverage-report
     Sonar->>Sonar: Scan and check quality gate
 
-    alt Push to dev/staging/main
+    alt Push to dev/uat/main
       GA->>Build: Build image locally (--load, no push)
       Build->>Trivy: Scan local image for vulnerabilities
       alt Scan passes
@@ -340,7 +340,7 @@ flowchart TD
 ## Detailed Process Flows
 
 ### 1. Flow: Pull Request (Validation)
-**Trigger:** Developer opens or updates a Pull Request targeting `dev`, `staging`, or `main`.
+**Trigger:** Developer opens or updates a Pull Request targeting `dev`, `uat`, or `main`.
 **Goal:** Verify code quality, security, and functionality **before** merging.
 
 | Step | Job Name | Trigger Condition | Action & Responsibility |
@@ -356,7 +356,7 @@ flowchart TD
 ---
 
 ### 2. Flow: Push to Persistent Branch (Delivery)
-**Trigger:** PR is merged into `dev`, `staging`, or `main`.
+**Trigger:** PR is merged into `dev`, `uat`, or `main`.
 **Goal:** Build an immutable artifact, scan it **before pushing**, sign it, and deploy to the corresponding environment.
 
 | Step | Job Name | Trigger Condition | Action & Responsibility |
@@ -364,7 +364,7 @@ flowchart TD
 | **1** | `go-check` | **Always** | **Regression Check**: re-runs tests and uploads fresh `coverage-report` artifact. (Lint is PR-only.) |
 | **1b** | `gitleaks` | **Always** | **Secret Scanning**: scans git history for secrets in parallel with `go-check`. |
 | **2** | `sonar` | **Always** | **Analysis Update**: updates SonarCloud branch analysis based on the coverage artifact. |
-| **3** | `docker-build` | **Push to dev/staging/main** | **Build + Scan + Push**: builds image locally (`--load`), scans with Trivy for CRITICAL/HIGH CVEs. **Only pushes to GHCR if scan passes.** Outputs `tags`, `digest`, and `scan-status`. |
+| **3** | `docker-build` | **Push to dev/uat/main** | **Build + Scan + Push**: builds image locally (`--load`), scans with Trivy for CRITICAL/HIGH CVEs. **Only pushes to GHCR if scan passes.** Outputs `tags`, `digest`, and `scan-status`. |
 | **4** | `trivy-report` | **After build (optional)** | **Vulnerability Reporting**: detailed scan with SARIF upload to GitHub Security tab and Google Sheets. Non-blocking (`exit-code: '0'`). |
 | **5** | `docker-sign` | **After build passes** | **Image Signing**: signs the image with Cosign keyless (OIDC). Only runs if build (including scan) succeeded. |
 | **6** | `notify` | **Always** | **Reporting**: posts final pipeline status to Slack and Google Sheets. |
@@ -887,7 +887,7 @@ Migration is a separate tracked effort; this documents the goal.
 - **Secrets** in GitHub Secrets / OpenBAO — never in YAML. CI holds no prod secrets; signing
   uses OIDC. Note: GitHub log redaction is best-effort — mask transformed/derived secrets
   explicitly and audit logs.
-- **GitHub Environments** (`dev`/`staging`/`prod`) only gate anything if the deploy/sign/promote
+- **GitHub Environments** (`dev`/`uat`/`prod`) only gate anything if the deploy/sign/promote
   job **declares `environment: prod`** — add it, with required reviewers on prod.
 - **Artifact retention:** coverage `retention-days: 1`; prune old GHCR tags on a schedule; keep
   SBOM/signature attestations with the digest.

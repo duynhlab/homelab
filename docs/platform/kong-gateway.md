@@ -316,7 +316,7 @@ When limit is exceeded (HTTP 429):
 
 | Policy | Accuracy | Performance | When to Use |
 |--------|----------|-------------|-------------|
-| **`local`** | Per-node only (inexact with multiple replicas) | Fastest (in-memory) | Single replica, dev/staging |
+| **`local`** | Per-node only (inexact with multiple replicas) | Fastest (in-memory) | Single replica, dev/uat |
 | **`cluster`** | Cluster-wide (uses Kong DB) | Moderate | DB-mode Kong, small clusters |
 | **`redis`** | Cluster-wide (external counter) | Moderate | Multi-replica, production scale |
 

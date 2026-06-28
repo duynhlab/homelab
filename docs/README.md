@@ -337,7 +337,7 @@ docs/
 - [cert-manager + Flux](./secrets/cert-manager.md) - TLS with Let's Encrypt, HelmRelease, Ingress, trust-manager
 - [Trust Distribution (trust-manager)](./secrets/trust-distribution.md) - CA bundle distribution to namespaces via trust-manager Bundle CRD
 - [CI/CD](./platform/cicd.md) - CI/CD pipelines, workflows, **and the standard/policy** (action SHA-pinning, least-privilege permissions, image signing/verification, required-checks matrix, GoReleaser binary releases)
-- [Git Branching & Release](./platform/gitflow.md) - Hybrid Enterprise Gitflow standard (dev/staging/main + immutable tags)
+- [Git Branching & Release](./platform/gitflow.md) - Hybrid Enterprise Gitflow standard (dev/uat/main + immutable tags)
 - [SonarCloud](./platform/sonarcloud.md) - SonarCloud integration
 
 ### Secrets

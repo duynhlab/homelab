@@ -1277,7 +1277,7 @@ All seed migrations use `ON CONFLICT DO NOTHING` to safely handle:
 ### Environment Configuration
 
 **Local/Dev/Demo**: ✅ Seed data enabled (default)  
-**Staging**: ⚠️ Optional (configure via golang-migrate target version)  
+**UAT**: ⚠️ Optional (configure via golang-migrate target version)  
 **Production**: ❌ Disabled (use golang-migrate target or separate migration path)
 
 ### Migration Files

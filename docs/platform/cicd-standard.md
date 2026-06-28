@@ -32,6 +32,7 @@
 | `docker-build-go.yml` / `-node.yml` | build, **scan-before-push** (Trivy), SBOM, push | push |
 | `trivy-scan.yml` | post-push CVE report (SARIF) | push |
 | `docker-sign.yml` | Cosign keyless signing (OIDC) | push |
+| `goreleaser.yml` | GoReleaser binary release → GitHub Release (tarball + `.sha256` + `build-info.env` for `packages`) | `v*` tag |
 | `tf-lint.yml` | `terraform fmt` + TFLint | PR (IaC repos) |
 | `status.yml` | Slack/Sheets run status | PR, push |
 

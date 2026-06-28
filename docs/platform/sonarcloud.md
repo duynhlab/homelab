@@ -7,7 +7,7 @@ SonarCloud provides static code analysis, code quality checks, and security scan
 | Property | Value |
 |----------|-------|
 | **Platform** | [SonarCloud](https://sonarcloud.io) (Free Plan) |
-| **Project Key** | `duynhlab_monitoring` |
+| **Project Key** | per-repository: `duynhlab_<repo>` (e.g. `duynhlab_auth-service`, `duynhlab_order-service`) |
 | **Organization** | `duynhlab` |
 | **Workflow** | `.github/workflows/sonarqube.yml` |
 
@@ -48,6 +48,21 @@ sonar:
   secrets:
     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 ```
+
+## Quality Gate (new-code coverage ≥ 80%)
+
+Each Go service repo enforces SonarCloud's Quality Gate with a **≥ 80% coverage on new code**
+condition (plus the default reliability/security/duplication conditions). "New code" = lines
+changed in the PR / since the previous version, so the gate pushes coverage **forward** without
+demanding the whole legacy codebase be backfilled.
+
+- The condition is configured **in SonarCloud** (Quality Gate), not in the workflow. When adding
+  new conditionals, cover **both** branches or the gate fails the PR / `main` analysis.
+- **Coverage exclusions** (so integration-tested layers don't drag the gate): service repos
+  exclude `**/cmd/**`, `**/db/migrations/**`, and `**/core/repository/**` (the DB layer is
+  integration-tested, not unit-tested) via `sonar-project.properties`.
+- The PR workflow may run with `fail-on-quality-gate: false` (non-blocking on the PR job), but the
+  **branch analysis still records the gate** — a red `main` gate is the signal to fix coverage.
 
 ## Coverage
 

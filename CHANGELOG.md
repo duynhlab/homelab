@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.102.0] - 2026-06-27
+### Changed
+
+- **docs (platform/CI-CD)**: Refreshed the CI/CD docs for the new **GoReleaser binary-release** pipeline and fixed stale claims. `cicd.md`: the `v*`-tag flow is now documented as a **GoReleaser binary release** (was wrongly described as "retag the Docker digest, no rebuild"); added a detailed **Binary Releases (GoReleaser)** section (artifact contract — tarball/`.sha256`/`build-info.env` — config locations, and how it feeds `packages`); added `release.yml`/`goreleaser.yml` to the workflow split + shared-workflow list; corrected the `build.yml` trigger to **`main`-only** (+ a note distinguishing the Gitflow `dev/staging` target from currently-wired triggers); removed the contradictory migration-image node; repointed a broken `cicd-security-improvement-plan.md` link to `kyverno.md`/`cicd-standard.md`. `cicd-standard.md`: added `goreleaser.yml` to the reusable-workflow catalog. `sonarcloud.md`: fixed the project-key example to the per-repo `duynhlab_<repo>` pattern and documented the **≥80% new-code coverage** Quality Gate + its exclusions.
 
 ### Added
 

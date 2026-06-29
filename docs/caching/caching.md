@@ -315,6 +315,22 @@ Valkey supports the following `maxmemory-policy` options:
 | **volatile-random** | Randomly evicts keys with TTL | Only evicts keys with expiration |
 | **volatile-ttl** | Evicts keys with shortest remaining TTL | Prioritizes expiring keys first |
 
+A quick way to choose — pick the **scope** (any key vs only keys that carry a TTL),
+then the **signal** used to decide what to drop (recency / frequency / age / random):
+
+```mermaid
+flowchart TD
+    Q1{"Evict any key, or only keys with a TTL?"}
+    Q1 -->|"any key (a pure cache)"| AK["allkeys-*"]
+    Q1 -->|"only TTL'd keys"| VOL["volatile-*"]
+    AK --> S{"By which signal?"}
+    VOL --> S
+    S -->|recency| LRU["…-lru — drop least recently used"]
+    S -->|frequency| LFU["…-lfu — drop least frequently used"]
+    S -->|"age / soonest to expire"| AGE["volatile-ttl — drop nearest expiry"]
+    S -->|"none / cheapest"| RND["…-random — drop a random key"]
+```
+
 ### Policy Comparison
 
 **All-keys vs Volatile:**
@@ -342,9 +358,53 @@ Valkey supports the following `maxmemory-policy` options:
 - Consider if you have "hot products" that are accessed frequently
 - Better for access frequency-based patterns
 
+**Tradeoff (every decision is one):** `allkeys-lru` here is *approximate* — Valkey
+samples a handful of keys instead of tracking a true global LRU, and it is **not**
+frequency-aware, so a burst of one-off reads can evict a genuinely hot key. It also
+assumes the working set fits under `maxmemory`; if it doesn't, you get constant
+eviction churn (watch the `ValkeyHighEvictionRate` alert). `allkeys-lfu` buys
+frequency-awareness at a small per-key bookkeeping cost.
+
 **Configuration:**
 
 Eviction policy is configured via `valkeyConfig` in [`kubernetes/infra/controllers/caching/valkey/helmrelease.yaml`](../../kubernetes/infra/controllers/caching/valkey/helmrelease.yaml) (currently `maxmemory-policy allkeys-lru`).
+
+
+## Distributed Cache (concept & current state)
+
+> **Current state:** a **single-node** Valkey (`cache-system` namespace, no
+> replication, no persistence). Everything below is **concept + the scale-up path**
+> if it ever outgrows one node — not deployed today.
+
+A **distributed cache** spreads entries across several nodes so capacity and
+throughput scale past one box, and one node failing doesn't drop the whole cache:
+
+- **Partitioning (sharding)** — keys split across nodes; **consistent hashing** maps
+  each key to a node so adding/removing a node re-homes only a small slice of keys,
+  not the whole keyspace.
+- **Replication** — each shard has replica(s) for availability and read scaling.
+- **Hot keys** — one very popular key can overload its shard; mitigate with a small
+  client/local cache for that key, or by splitting it.
+- **Write strategy** — *Cache-Aside* (what we use: the app reads the cache and loads
+  the DB on a miss) vs *read-through / write-through* (the cache sits inline and
+  loads/persists for you) vs *write-behind* (async flush — fastest writes, weakest
+  durability).
+
+```mermaid
+flowchart LR
+    App["services"] -->|"key → consistent hash"| Ring{"hash ring"}
+    Ring --> A[("shard A<br/>+ replica")]
+    Ring --> B[("shard B<br/>+ replica")]
+    Ring --> C[("shard C<br/>+ replica")]
+```
+
+**Scale-up path here** (only if one node is genuinely the bottleneck): Valkey
+**primary + replica** (read scaling + failover) → **Valkey Cluster** (sharded,
+consistent hashing). The Cache-Aside code is unchanged — the client just points at
+a cluster endpoint. **Tradeoff:** more nodes buy capacity and availability but add
+cross-node consistency, rebalancing, and operational cost; not worth it until a
+single node can't keep up (reads here already fail-open to PostgreSQL, so an outage
+degrades rather than breaks).
 
 
 ## Observability

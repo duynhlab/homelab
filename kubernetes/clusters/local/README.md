@@ -141,7 +141,7 @@ Flux automatically deploys in correct dependency order via `dependsOn` field in 
 
 ## PodDisruptionBudgets
 
-PDBs are added only where there is real redundancy: Kong (`replicaCount: 2`, `minAvailable: 1`) and OpenBAO (HA 3-node Raft, `maxUnavailable: 1`). Single-replica components (cert-manager, ESO, Loki, Tempo, VMSingle) need to be scaled to 2 before a PDB is added, otherwise a `minAvailable: 1` PDB makes the lone pod undrainable and deadlocks node drains/upgrades.
+PDBs are added only where there is real redundancy: Kong (`replicaCount: 2`, `minAvailable: 1`) and OpenBAO (HA 3-node Raft, `maxUnavailable: 1`). Single-replica components (cert-manager, ESO, Tempo, VMSingle, VictoriaLogs) need to be scaled to 2 before a PDB is added, otherwise a `minAvailable: 1` PDB makes the lone pod undrainable and deadlocks node drains/upgrades.
 
 **Verify dependencies:**
 ```bash

@@ -380,7 +380,7 @@ sequenceDiagram
     participant PG as PostgreSQL (cnpg-db)
     participant App as Application Pod
 
-    note over ESO,App: Every 55 minutes (before 1h lease expires)
+    note over ESO,App: Every 1h refresh (before the lease expires)
 
     ESO->>BAO: GET /v1/database/creds/product-app-rw\n(using K8s auth token)
     BAO->>PG: CREATE ROLE "v-k8s-product-app-rw-1711584000"\nWITH LOGIN PASSWORD 'Xk9mN3pQ...'\nVALID UNTIL '2026-03-27T15:00:00Z'
@@ -480,7 +480,7 @@ flowchart TD
     subgraph solution["OpenBAO Solution"]
         s1["✅ cart + order owners\nbacked by ExternalSecret\n(KV v2 static)"]
         s2["✅ Application users\nare dynamic (1h TTL)\nv-k8s-{role}-{ts}"]
-        s3["✅ Auto-rotation\nESO refreshes at 55m\nOld user dropped"]
+        s3["✅ Auto-rotation\nESO refreshes (1h)\nOld user dropped"]
         s4["✅ Team access\nDev team gets 8h creds\nData team gets read-only"]
     end
 
@@ -562,7 +562,7 @@ sequenceDiagram
     BAO-->>ESO: {username, password, lease_id, ttl: 1h}
     ESO->>K8s: Update Secret cnpg-db-product-app-creds
 
-    note over Flux,PG: Rotation (every 55m)
+    note over Flux,PG: Rotation (every 1h refresh)
 
     ESO->>BAO: GET /v1/database/creds/product-app-rw  (fresh)
     BAO->>PG: CREATE ROLE "v-k8s-product-app-rw-{new_ts}"
@@ -793,7 +793,7 @@ Every dynamic credential in OpenBAO has a **lease** — a time-bounded grant to 
 stateDiagram-v2
     [*] --> Issued : bao read database/creds/product-app-rw
     Issued --> Active : App uses credentials
-    Active --> Renewed : ESO renews at 55m (before 1h TTL)
+    Active --> Renewed : ESO renews each 1h refresh (before lease expiry)
     Renewed --> Active : New TTL reset to 1h
     Active --> Expired : TTL elapsed (not renewed)
     Expired --> Revoked : OpenBAO auto-revokes
@@ -1173,7 +1173,7 @@ Microservice `product-service` never stores a database password. Each pod gets f
 flowchart LR
     pod["product-service Pod"]
     secret["K8s Secret\ncnpg-db-product-app-creds\n{username: v-k8s-product-...\npassword: Xk9m...}"]
-    eso2["ESO (refreshes every 55m)"]
+    eso2["ESO (refreshes every 1h)"]
     bao2["OpenBAO\ndatabase/creds/product-app-rw"]
     pg2["PostgreSQL\ncnpg-db"]
 
@@ -1270,7 +1270,7 @@ bao lease revoke -prefix database/creds/
 
 | Credential | Type | TTL | Rotation Mechanism |
 |-----------|------|-----|-------------------|
-| App service DB creds (`*-app-rw`) | Dynamic | 1h / max 24h | ESO refreshInterval: 55m |
+| App service DB creds (`*-app-rw`) | Dynamic | 1h / max 24h | ESO refreshInterval: 1h |
 | Developer DB creds | Dynamic | 8h / max 16h | OIDC session expiry |
 | Data team DB creds (`*-readonly`) | Dynamic | 8h / max 24h | OIDC session expiry |
 | Owner/DDL creds (golang-migrate) | Static role | 90 days | OpenBAO `rotation_period` |

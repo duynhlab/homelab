@@ -53,7 +53,7 @@ flowchart TD
 
     subgraph Sidecars["Sidecars per Pod"]
         Exporter["postgres_exporter:9187"]
-        Vector["vector - logs to Loki"]
+        Vector["vector - logs to VictoriaLogs"]
     end
 
     AuthService --> PoolerSvc

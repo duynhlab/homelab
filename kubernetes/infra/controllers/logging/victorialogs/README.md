@@ -20,7 +20,6 @@ flowchart TD
     end
 
     subgraph Sinks["Log Destinations"]
-        Loki[Loki]
         VLogsAll[VictoriaLogs - All Logs]
         VLogsPlans[VictoriaLogs - PG Plans]
         VLogsFailures[VictoriaLogs - Parse Failures]
@@ -32,7 +31,6 @@ flowchart TD
     KLogs --> AddLabels
     KLogs --> ParsePG
     
-    AddLabels --> Loki
     AddLabels --> VLogsAll
     
     ParsePG --> FilterExplain
@@ -50,7 +48,6 @@ flowchart LR
     end
 
     subgraph Storage["Log Storage"]
-        Loki[Loki<br/>LogQL]
         VLogs[VictoriaLogs<br/>LogsQL]
     end
 
@@ -58,17 +55,15 @@ flowchart LR
         Grafana[Grafana]
     end
 
-    Vector -->|All Logs| Loki
     Vector -->|All Logs + PG Plans| VLogs
-    Loki --> Grafana
     VLogs --> Grafana
 ```
 
 ## Key Design Decisions
 
-1. **Single Vector Agent**: One cluster-wide Vector DaemonSet ships to both Loki and VictoriaLogs
+1. **Single Vector Agent**: One cluster-wide Vector DaemonSet ships to VictoriaLogs (the sole log backend; Loki was removed in v0.94.0)
 2. **Collector Disabled**: VictoriaLogs embedded Vector/collector is disabled (`vector.enabled: false`)
-3. **Dual Shipping**: Logs go to both backends for comparison and migration flexibility
+3. **Single Backend**: VictoriaLogs is the only log sink — no second backend to operate
 
 ## Endpoints
 

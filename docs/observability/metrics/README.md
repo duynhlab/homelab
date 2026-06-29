@@ -139,9 +139,10 @@ Status of each methodology across the platform (✅ implemented, ❌ scoped out)
 | **SLO** | Microservices | ✅ | 48 Sloth-generated burn-rate rules |
 | etcd / kubelet / ingress / node_exporter | Cluster | ❌ | Scoped out for Kind — see [metrics-infra.md](metrics-infra.md#not-covered-scoped-out-for-kind) |
 
-> The detailed manifest index (alert files, recording-rule files, dashboards,
-> runbooks) lives with each layer: [apps](metrics-apps.md#manifest-index),
-> [infra](metrics-infra.md#manifest-index).
+> Every deployed alert and recording rule — exact manifest files, counts, and
+> production impact — is catalogued authoritatively in the
+> [Alert Catalog](../alerting/alert-catalog.md); each layer doc links its relevant
+> domain.
 
 ## Documentation map
 

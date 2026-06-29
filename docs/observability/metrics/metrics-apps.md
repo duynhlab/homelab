@@ -317,12 +317,21 @@ raw IDs, emails, or IPs in labels.
 
 ## Manifest index
 
-| File (under `kubernetes/infra/configs/monitoring/`) | Purpose |
+The metrics layer owns the **scrape config**; the alert and recording rules that
+consume these metrics are owned by the alerting docs — the authoritative,
+per-domain index (exact files, counts, and production impact) is the
+[Alert Catalog](../alerting/alert-catalog.md).
+
+| Manifest (under `kubernetes/infra/configs/monitoring/`) | Purpose |
 |------|---------|
-| `servicemonitors/microservices.yaml` | Single ServiceMonitor for all services |
-| `prometheusrules/microservices/alerts.yaml` | 18 RED + Golden alerts |
-| `prometheusrules/microservices/recording-rules.yaml` | 15 RED pre-aggregation rules |
-| `slo/{service}.yaml` | Per-service SLO CRDs → 48 Sloth burn-rate rules |
+| `servicemonitors/microservices.yaml` | Single ServiceMonitor scraping every `component: api` service |
+
+- **Alerts + recording rules** — the RED/Golden microservice alerts and the RED
+  pre-aggregation rules (`prometheusrules/microservices/`): see
+  [Alert Catalog → Microservices](../alerting/alert-catalog.md#1-microservices-red-metrics)
+  and [Alerting Strategy](../alerting/README.md#layer-1-threshold-alerts-immediate-detection).
+- **SLOs** — rendered per service by the `mop` chart (not a repo path) and
+  expanded by Sloth into burn-rate alerts. See [SLO docs](../slo/README.md).
 
 Runbook: [`microservices-alerts.md`](../runbooks/microservices-alerts.md).
 

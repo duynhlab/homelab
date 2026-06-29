@@ -15,8 +15,8 @@
 # If vulnerabilities are found, the image is never pushed to the registry.
 # This prevents FluxCD from auto-deploying vulnerable images.
 #
-# Binary release: set repo variable ENABLE_BINARY_RELEASE=true to also publish
-# a GoReleaser binary release (keyless-signed) on v* tags.
+# Binary release: the release-binary job publishes a GoReleaser binary release
+# (keyless-signed) on v* tags. Omit that job for services without one.
 #
 # UAT optional: services not using uat simply never push to that branch.
 #
@@ -156,12 +156,12 @@ jobs:
 
   # ──────────────────────────────────────────────────
   # 3e. Binary Release (GoReleaser, keyless-signed) — v* tags only
-  # Gated by repo variable ENABLE_BINARY_RELEASE=true. Builds the Go binary,
-  # publishes a GitHub Release with checksums.txt + cosign signature.
+  # Builds the Go binary, publishes a GitHub Release with checksums.txt + cosign
+  # signature. Opt out by removing this job (and its entry in notify.needs).
   # ──────────────────────────────────────────────────
   release-binary:
     needs: [go-check, sonar]
-    if: startsWith(github.ref, 'refs/tags/v') && vars.ENABLE_BINARY_RELEASE == 'true'
+    if: startsWith(github.ref, 'refs/tags/v')
     uses: duynhlab/gha-workflows/.github/workflows/goreleaser.yml@main
     secrets: inherit
     permissions:

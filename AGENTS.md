@@ -18,9 +18,14 @@ Observability, and Docs** hub; application code lives in separate repos (see
 - **Never push to `main`.** No exceptions. Branch → PR → squash-merge.
 - Prefix: `feat/` `fix/` `chore/` `docs/` `refactor/` `ci/` `<short-desc>`.
 - One logical change per branch; keep them short-lived. `git push -u origin <branch>`, then open a PR against `main`.
-- Verify identity before committing: `git config user.email` must be the duynhlab personal identity (never the work/opswat one).
+- Verify identity before committing: `git config user.email` must be the **duynhlab** personal identity. Likewise the **`gh` CLI must be the `duynhne` account** (the duynhlab GitHub identity) — `gh auth switch --user duynhne` if a PR call fails with an authorization error.
 
 **Before coding:** identify scope (infra/GitOps → here; app code → the service repo; reusable CI → `duynhlab/gha-workflows`), read this file and the relevant `docs/`, plan, then implement.
+
+**Proposals & decisions** — substantial/contested changes are designed *before* building:
+- **RFC** (`docs/proposals/rfc/RFC-NNNN/`) proposes a substantial change (design + a Mermaid diagram + tradeoffs); **ADR** (`docs/proposals/adr/ADR-NNN-slug/`) records a decision already made (Nygard: context · decision · alternatives · consequences). An accepted RFC usually spawns one or more ADRs.
+- Small bugs/cleanups → the GitHub issue tracker; learning items → `TODO.md`. Not everything needs an RFC.
+- Copy the `RFC-0000` / `ADR-0000` templates and update the index in the respective `README.md`. Hub: [`docs/proposals/`](docs/proposals/).
 
 ## Behavioral guidelines
 
@@ -111,10 +116,19 @@ Every manifest applied to the cluster must satisfy admission:
   monitoring-local → kyverno-policies, mcp
   apps-local (depends: databases + monitoring)
   ```
-- **CHANGELOG is append-only.** Add new entries at the **top** of `[Unreleased]`; never edit or remove historical entries.
+- **CHANGELOG.** Add **concise, grouped** entries (`Added`/`Changed`/`Removed`, one line per change) at the **top** of `[Unreleased]`. **Released sections are append-only** — never edit or remove `[X.Y.Z]` history. Cutting a release = rename `[Unreleased]` → `[X.Y.Z] - YYYY-MM-DD` (condensing the entries then is fine) and add a fresh empty `[Unreleased]` on top.
 - **Image naming:** `ghcr.io/duynhlab/<repo>/<image>` (multi-level). The `mop` chart renders `<name>-service/<name>` + `<name>-service/<name>-init`.
 - **Add a service:** create `kubernetes/apps/services/<name>.yaml` (`ResourceSetInputProvider`, label `platform.duynhlab.dev/domain: <domain>`); the domain ResourceSet auto-discovers it. `make validate && make sync`. Guide: [`docs/platform/application-delivery.md`](docs/platform/application-delivery.md).
 - **Demo creds:** `alice` / `password123` — login by `username`, not email.
+
+## Docs conventions
+
+Docs are a first-class deliverable in this repo. When writing or refactoring them:
+- **English only**; **Mermaid only** for diagrams (never ASCII art — see Architecture).
+- Follow the house shape (model: [`docs/observability/profiling/README.md`](docs/observability/profiling/README.md)): one-line hook → status/quick-facts table → overview/concept → architecture (Mermaid) → how-it-works-in-this-platform → operations → references → a `_Last updated: …_` footer.
+- **Be accurate to the deployed reality.** Mark designed-but-not-yet-deployed things as **planned** (don't describe targets as current); cross-check claims against the manifests.
+- **Synthesize external material in-house** — learn from articles/newsletters, then write it in our own words + Mermaid; **don't embed third-party links** (official product docs already in a References section are fine).
+- One hub per area; link every new doc from [`docs/README.md`](docs/README.md) and the area index.
 
 ## Reference
 
@@ -128,4 +142,7 @@ Every manifest applied to the cluster must satisfy admission:
 | Databases | [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) |
 | Secrets | [`docs/secrets/README.md`](docs/secrets/README.md) |
 | Kong gateway | [`docs/platform/kong-gateway.md`](docs/platform/kong-gateway.md) |
+| Caching | [`docs/caching/caching.md`](docs/caching/caching.md) |
+| Alerts catalog | [`docs/observability/alerting/alert-catalog.md`](docs/observability/alerting/alert-catalog.md) |
+| Proposals (RFC/ADR) | [`docs/proposals/`](docs/proposals/) |
 | Repos | [`SERVICES.md`](SERVICES.md) |

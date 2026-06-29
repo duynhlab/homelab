@@ -10,6 +10,7 @@ spec:
   type: Static
   defaultValues:
     name: cart
+    image_tag: "1.0.1" # {"$imagepolicy": "flux-system:cart:tag"}
     namespace: cart
     platform_backup_label: "cnpg"
     replicaCount: 2

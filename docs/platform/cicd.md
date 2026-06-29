@@ -17,7 +17,7 @@ This pipeline operates under the **Hybrid Enterprise Gitflow** model defined in 
 - **`vX.Y.Z` tags** on `main` — immutable production releases; trigger release pipeline.
 - **`feature/*`** from `dev`, **`hotfix/*`** from `main`.
 
-**Container images** on a branch push (`dev`/`uat`/`main`) are tagged with an immutable `sha-<short>` — **no mutable `latest`**. A **`v*` tag** runs the full pipeline (test, scan, build, sign) and produces the **versioned image** `:X.Y.Z` (+ `:X.Y`) — a fresh build on the tag, not a digest retag. The same `v*` tag also publishes a **GoReleaser binary release** (Go binary + GitHub Release, keyless-signed) when `ENABLE_BINARY_RELEASE=true` (see [Binary Releases](#binary-releases-goreleaser)). Production deploys pin `:X.Y.Z` or a digest. See [`gitflow.md`](gitflow.md) for the full branching model, tagging policy, runbooks, and governance rules.
+**Container images** on a branch push (`dev`/`uat`/`main`) are tagged with an immutable `sha-<short>` — **no mutable `latest`**. A **`v*` tag** runs the full pipeline (test, scan, build, sign) and produces the **versioned image** `:X.Y.Z` (+ `:X.Y`) — a fresh build on the tag, not a digest retag. The same `v*` tag also publishes a **GoReleaser binary release** (Go binary + GitHub Release, keyless-signed) (see [Binary Releases](#binary-releases-goreleaser)). Production deploys pin `:X.Y.Z` or a digest. See [`gitflow.md`](gitflow.md) for the full branching model, tagging policy, runbooks, and governance rules.
 
 **Branch enforcement** is managed via **GitHub Rulesets** (not legacy Branch Protection). Each service repo has 3 layered rulesets: Base Protection (all branches), Production Gate (`main` only), and Release Tags (`v*`). Required status checks (`go-check / Test`) are configured in the Base Protection ruleset, ensuring CI must pass before any merge. See [`gitflow.md` section 7](gitflow.md#7-github-rulesets-branch-enforcement) for the full ruleset configuration, CODEOWNERS integration, and setup guide.
 
@@ -410,12 +410,12 @@ Standard GoReleaser supply-chain layout (as used by Kubernetes, cosign, Cilium):
 - **Per service** — a `.goreleaser.yaml` (schema v2: `builds` with `binary: bin/<repo>`,
   `archives` `name_template`, combined `checksums.txt`, `signs:` cosign keyless,
   `release.replace_existing_artifacts: true`). The build is wired into `build.yml` as the
-  tag-gated `release-binary` job (no separate `release.yml`), enabled by repo variable
-  `ENABLE_BINARY_RELEASE=true`.
+  tag-gated `release-binary` job (no separate `release.yml`); omit that job for services
+  without a binary release.
 
 ```mermaid
 flowchart LR
-    TAG["git tag vX.Y.Z<br/>(service repo)"] --> BY["build.yml<br/>release-binary job (ENABLE_BINARY_RELEASE)"]
+    TAG["git tag vX.Y.Z<br/>(service repo)"] --> BY["build.yml<br/>release-binary job (v* tags)"]
     BY --> GR["gha-workflows/goreleaser.yml<br/>(GoReleaser + cosign keyless)"]
     GR --> REL["GitHub Release<br/>tar.gz + checksums.txt + .sig/.pem (+ SBOM)"]
     REL -. "download (future fetch-releases.sh)" .-> PKG["packages<br/>(mega-RPM)"]
@@ -425,8 +425,8 @@ flowchart LR
 
 1. Add `.goreleaser.yaml` (copy an existing service's; change `project_name`/`binary` to
    `<svc>-service`).
-2. Set repo variable `ENABLE_BINARY_RELEASE=true` (the `release-binary` job in `build.yml` is
-   already wired to fire on `v*` tags).
+2. Ensure the `release-binary` job is present in `build.yml` (it fires on `v*` tags; omit it
+   for a service that has no binary release).
 3. Cut a tag: `git tag vX.Y.Z && git push origin vX.Y.Z`. The Release appears with the
    assets above.
 

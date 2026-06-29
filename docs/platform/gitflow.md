@@ -190,7 +190,7 @@ git push origin v1.2.0
 
 What happens after `git push origin v1.2.0`:
 1. CI detects `tags/v*` push event.
-2. Release pipeline runs the full build on the tag: test, scan, build & push the versioned image `v1.2.0` (+ `v1.2`), and cosign-sign it. If `ENABLE_BINARY_RELEASE=true`, it also publishes the keyless-signed GoReleaser binary release.
+2. Release pipeline runs the full build on the tag: test, scan, build & push the versioned image `v1.2.0` (+ `v1.2`), and cosign-sign it. It also publishes the keyless-signed GoReleaser binary release (when the `release-binary` job is present).
 3. Flux detects image `v1.2.0` -> reconciles prod namespace.
 4. Pods roll out with the new image.
 

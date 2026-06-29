@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **docs (proposals)**: Added **RFC-0008 — Production secrets hardening & local/prod parity** (`provisional`, infra). Defines the production target (KMS/Transit auto-unseal, TLS, dynamic / non-committed credentials, OIDC, fail-closed durable audit, root-token revocation, ESO HA) that closes the secrets audit's Critical/High findings, and — the key part — a **local-vs-prod parity & testing matrix** stating what Kind can validate vs what needs a cloud/staging cluster, plus a prod-overlay approach and a pre-prod gate. Proposal only; cross-linked from `docs/secrets/production-plan.md`.
+
 - **observability (Temporal worker)**: Scrape the order-fulfillment worker's Temporal SDK **workflow/activity RED metrics** (emitted by `pkg/temporalx` v0.10.0's OTel `MetricsHandler`) — the worker is a `service.enabled:false` mop release, so added an `order-worker` **PodMonitor** (the `microservices-api` ServiceMonitor can't reach it). Added a `temporal-worker` PrometheusRule group alerting on workflow/activity/request **failure rates** and **task-slot exhaustion**. Metric names verified against a live local-stack checkout (SDK exports counters as gauges, no `_total`; latencies are `_seconds` histograms). Closes RFC-0001 future-work items: cache-bust on reserve, internal cart-clear, and worker RED metrics.
 
 - **docs (proposals)**: Converted each RFC's bold-label header (`**Status:** …`) to a `| Status | Scope | Created | Last updated |` **metadata table** — the `RFC-0000` template plus `RFC-0001`..`RFC-0007` — matching the ADR header-table style for a consistent look across both trees.

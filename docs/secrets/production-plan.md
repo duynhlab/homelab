@@ -5,6 +5,12 @@
 **Scope**: Secrets management redesign for local Kind + EKS/GKE deployments
 **Purpose**: Learning, production patterns, team access control, credential rotation
 
+> This long-form plan is formalised as **[RFC-0008 — Production secrets hardening
+> & local/prod parity](../proposals/rfc/RFC-0008/)**, which adds the decision record,
+> the local-vs-prod **parity & testing matrix** (what Kind can validate vs what needs
+> a cloud/staging cluster), and the pre-prod gate. Read that for the authoritative
+> hardening scope; this doc is the detailed working plan.
+
 ---
 
 ## 1. Current State Audit

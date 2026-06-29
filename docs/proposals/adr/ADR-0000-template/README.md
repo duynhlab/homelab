@@ -11,6 +11,11 @@ Status: Proposed → Accepted → (Superseded by ADR-XXX | Deprecated).
 Related RFC: the RFC this decision was spawned by, or — if there is none.
 -->
 
+> **Don't forget: every decision is a tradeoff.** Record what you gave up, not just
+> what you gained — the rejected **Alternatives** (with *why* they lost) and the
+> **Consequences** you're accepting (the bad as well as the good). A decision with
+> no downside listed hasn't been examined hard enough.
+
 ## Context
 
 <!--

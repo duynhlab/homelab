@@ -13,6 +13,11 @@ Scope:  one of infra | service:<name> | platform-wide.
 Created / Last updated: YYYY-MM-DD.
 -->
 
+> **Don't forget: every decision is a tradeoff.** Make the costs explicit, not just
+> the upside — capture the alternatives you rejected and *why* (**Alternatives**),
+> and the downsides of the choice (**Design Details → drawbacks**, **Rollout &
+> rollback**). An RFC with no stated tradeoff is usually under-analyzed.
+
 ## Summary
 
 <!-- One paragraph explaining the proposed feature or enhancement. -->

@@ -6,6 +6,7 @@ Kong Ingress Controller (KIC) runs in **DB-less mode** — all configuration is 
 
 ## Table of Contents
 
+- [What is an API gateway?](#what-is-an-api-gateway)
 - [Why Kong?](#why-kong)
 - [Architecture](#architecture)
 - [Domain Routing Strategy](#domain-routing-strategy)
@@ -18,6 +19,39 @@ Kong Ingress Controller (KIC) runs in **DB-less mode** — all configuration is 
 - [Troubleshooting](#troubleshooting)
 - [Design Decisions](#design-decisions)
 - [Future Roadmap](#future-roadmap)
+
+---
+
+## What is an API gateway?
+
+An **API gateway** is the single front door for client traffic: one endpoint in
+front of many backend services that applies cross-cutting concerns *once* at the
+edge instead of in every service. Core responsibilities:
+
+- **Routing & composition** — match host/path and forward to the right service;
+  optionally aggregate calls or translate protocols.
+- **TLS termination** — terminate HTTPS at the edge with one certificate.
+- **Authentication / authorization** — optionally validate tokens at the edge.
+- **Traffic control** — rate limiting, request-size limits, CORS, retries.
+- **Observability** — one consistent place for access logs, metrics, and a
+  correlation/request id that ties a request to its downstream spans.
+
+**Tradeoffs (every decision is one):**
+
+- **Central control vs. single point of failure** — one place to secure, route, and
+  observe, but it *must* run HA (here: 2 replicas + a PodDisruptionBudget) or it
+  takes the whole API surface down with it.
+- **An extra network hop** — a little latency in exchange for doing TLS, routing,
+  and rate-limiting in one place rather than N.
+- **Edge auth vs. service-side auth** — validating JWTs at the gateway means fewer
+  moving parts but a *second* source of truth. This platform deliberately keeps
+  **auth in the services** (single source of truth, fail-closed) — see
+  [ADR-003](../proposals/adr/ADR-003-jwt-validation-in-services-not-kong/).
+
+In this platform Kong is a **pass-through** gateway: it routes, terminates TLS,
+rate-limits, and adds CORS / security-headers / correlation-id / metrics — but does
+**not** authenticate, rewrite paths, or hold business logic (see
+[Architecture](#architecture) and [Routing Rules](#routing-rules)).
 
 ---
 

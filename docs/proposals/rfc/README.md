@@ -5,6 +5,9 @@ to the duynhlab platform — infrastructure (this repo) *and* the microservice c
 In many cases a new feature or enhancement is proposed here first, discussed on a
 pull request, and only then implemented.
 
+> **Don't forget: every decision is a tradeoff.** A good RFC states what the choice
+> *costs* (rejected alternatives + drawbacks + rollback), not just what it buys.
+
 ## When to write an RFC
 
 Write an RFC for a **substantial** change — one that needs a design + review + a

@@ -91,12 +91,15 @@ docs/
 │       ├── README.md             # Runbook index
 │       ├── observability-deep-dive.md   # Theory + interview prep
 │       └── microservices-alerts.md      # Per-alert investigation guide
+├── caching/                     # Valkey cache: Cache-Aside, eviction policies, distributed-cache concept
+│   └── caching.md
 ├── platform/                     # Platform/deployment documentation
 │   ├── setup.md                  # GitOps deployment guide
 │   ├── application-delivery.md    # ResourceSet patterns & templates
 │   ├── cicd.md                   # CI/CD pipelines + standard/policy (pinning, permissions, signing, GoReleaser)
 │   ├── gitflow.md                # Git branching & release standard
-│   └── sonarcloud.md             # SonarCloud integration
+│   ├── sonarcloud.md             # SonarCloud integration
+│   └── kong-gateway.md           # Kong API gateway — concept + DB-less, plugins, routing, rate-limiting
 ├── runbooks/                     # Operational runbooks
 │   ├── metrics-audit-fixes.md    # Metrics audit runbook (before/after fixes)
 │   └── troubleshooting/          # Troubleshooting guides
@@ -330,6 +333,10 @@ docs/
 - [PostgreSQL Further Reading](./databases/011-documents.md) - Curated external references
 - [PostgreSQL Internals](./databases/001-postgresql-internals.md) - Deep dive using cnpg-db examples
 
+### Caching
+
+- [Caching (Valkey)](./caching/caching.md) - Cache-Aside, stampede prevention, eviction policies (with tradeoffs), and the distributed-cache concept
+
 ### Platform
 
 - [Setup Guide](./platform/setup.md) - Complete deployment and configuration guide
@@ -339,6 +346,7 @@ docs/
 - [CI/CD](./platform/cicd.md) - CI/CD pipelines, workflows, **and the standard/policy** (action SHA-pinning, least-privilege permissions, image signing/verification, required-checks matrix, GoReleaser binary releases)
 - [Git Branching & Release](./platform/gitflow.md) - Hybrid Enterprise Gitflow standard (dev/uat/main + immutable tags)
 - [SonarCloud](./platform/sonarcloud.md) - SonarCloud integration
+- [Kong API Gateway](./platform/kong-gateway.md) - API-gateway concept + tradeoffs; DB-less Kong (plugins, routing, rate-limiting, TLS)
 
 ### Secrets
 

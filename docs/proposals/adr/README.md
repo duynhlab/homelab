@@ -17,6 +17,7 @@ settled decisions.
 - Format (Nygard style): a `| Status | Date | Related RFC |` metadata table at the top
   (Related RFC = the RFC that spawned it, or `—`), then **Context · Decision ·
   Alternatives considered · Consequences**.
+- **Every decision is a tradeoff** — always record the rejected *Alternatives* (and why) and the *Consequences* you accept (the bad as well as the good). A decision with no downside listed hasn't been examined hard enough.
 - **Lifecycle:** `Proposed → Accepted → (Superseded by ADR-XXX | Deprecated)`.
 - **Append-only:** don't rewrite history. When a decision changes, write a new ADR that supersedes
   the old one and update the old one's Status.

@@ -208,6 +208,13 @@ rendered by the **mop Helm chart** (`mop-chart-oci`, `ghcr.io/duynhlab`) when th
 service's HelmRelease sets `slo.enabled: true`. Sloth then generates the
 burn-rate `PrometheusRule`s from those CRDs. See [SLO System](../slo/README.md).
 
+> **Scrape configs** (the `ServiceMonitor` / `PodMonitor` objects that decide
+> *what* is collected, as opposed to *what fires*) live with the metrics docs:
+> [application metrics](../metrics/metrics-apps.md) and
+> [infrastructure metrics](../metrics/metrics-infra.md). This page and the
+> [Alert Catalog](./alert-catalog.md) are the source of truth for the alert and
+> recording rules those metrics feed.
+
 ## Alert Dashboard: Karma
 
 [Karma](https://github.com/prymitive/karma) is the dedicated alert dashboard, reading directly from VMAlertmanager's Alertmanager-compatible API.
@@ -247,6 +254,8 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 ## Related Documentation
 
 - [Alert Catalog](./alert-catalog.md) -- every deployed alert (145 rules + SLO burn-rate) by domain, with metric, impact, and coverage-gap analysis
+- [Application metrics (RED)](../metrics/metrics-apps.md) -- the metrics these alerts fire on + the microservices ServiceMonitor scrape config
+- [Infrastructure metrics (USE)](../metrics/metrics-infra.md) -- the USE coverage these Kubernetes/Valkey alerts back
 - [Alert Dashboard Comparison](dashboard-comparison.md) -- deep-dive tool comparison (Karma, Alerta, UAR, Siren, Grafana)
 - [Microservices Alerts Runbook](../runbooks/microservices-alerts.md) -- per-alert investigation and resolution
 - [SLO System](../slo/README.md) -- Sloth Operator, SLO targets, error budgets

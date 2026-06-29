@@ -38,21 +38,23 @@ the USE alerts below.
 
 ## USE method coverage
 
-| Resource | Utilization | Saturation | Errors | Manifest |
-|----------|:-----------:|:----------:|:------:|----------|
-| **Pod CPU** | ✅ throttling % | ✅ CFS periods | ✅ OOMKill | `kubernetes-pod-resources-alerts.yaml` |
-| **Pod Memory** | ✅ near-limit % | ✅ working set vs limit | ✅ OOMKill | `kubernetes-pod-resources-alerts.yaml` |
-| **Node** | ✅ KSM conditions | ✅ pressure flags | ✅ NotReady | `kubernetes-node-alerts.yaml` |
-| **PVC / Disk** | ✅ available/capacity | ✅ filling up | ✅ < 5% critical | `kubernetes-workload-alerts.yaml` |
-| **Network** | ✅ RX/TX recording rules | — | ✅ error rate | `kubernetes-network-rules.yaml` |
-| **K8s Workloads** | ✅ replica status | ✅ HPA maxed | ✅ job failures, mismatch | `kubernetes-workload-alerts.yaml` |
-| **API Server** | ✅ CPU, memory | ✅ inflight requests | ✅ 5xx rate | `kube-apiserver-alerts.yaml` |
-| **PostgreSQL** | ✅ connections, TPS, cache hit | ✅ connection saturation, locks | ✅ replication lag, offline | [databases](postgresql/monitoring.md) |
-| **Valkey / Redis** | ✅ memory ratio | ✅ evictions, connections | ✅ down, rejected | `valkey-alerts.yaml` |
+| Resource | Utilization | Saturation | Errors |
+|----------|:-----------:|:----------:|:------:|
+| **Pod CPU** | ✅ throttling % | ✅ CFS periods | ✅ OOMKill |
+| **Pod Memory** | ✅ near-limit % | ✅ working set vs limit | ✅ OOMKill |
+| **Node** | ✅ KSM conditions | ✅ pressure flags | ✅ NotReady |
+| **PVC / Disk** | ✅ available/capacity | ✅ filling up | ✅ < 5% critical |
+| **Network** | ✅ RX/TX recording rules | — | ✅ error rate |
+| **K8s Workloads** | ✅ replica status | ✅ HPA maxed | ✅ job failures, mismatch |
+| **API Server** | ✅ CPU, memory | ✅ inflight requests | ✅ 5xx rate |
+| **PostgreSQL** | ✅ connections, TPS, cache hit | ✅ connection saturation, locks | ✅ replication lag, offline |
+| **Valkey / Redis** | ✅ memory ratio | ✅ evictions, connections | ✅ down, rejected |
 
-> Request-driven microservices use **RED**, not USE — see
-> [metrics-apps.md](metrics-apps.md). Databases and cache USE detail lives in the
-> [databases layer](postgresql/monitoring.md).
+> The backing alert/recording rules per resource (exact files + counts) are in
+> the [Alert Catalog](../alerting/alert-catalog.md) — see [§ Manifest
+> index](#manifest-index). Request-driven microservices use **RED**, not USE
+> (see [metrics-apps.md](metrics-apps.md)); database and cache USE detail lives in
+> the [databases layer](postgresql/monitoring.md).
 
 ### Not covered (scoped out for Kind)
 
@@ -89,25 +91,15 @@ headers, TLS overhead, and health-check traffic.
 
 ## Manifest index
 
-### Alert rules
+Infrastructure alert and recording rules are owned by the alerting docs — the
+authoritative, per-domain index (exact files under
+`prometheusrules/kubernetes/` and `prometheusrules/valkey/`, with counts and
+production impact) is the [Alert Catalog](../alerting/alert-catalog.md):
 
-| File | Category | Count | Methodology |
-|------|----------|:-----:|-------------|
-| `kubernetes-pod-resources-alerts.yaml` | Containers | 5 | USE |
-| `kubernetes-workload-alerts.yaml` | Workloads | 6 | USE |
-| `kubernetes-node-alerts.yaml` | Nodes | 5 | USE + Golden |
-| `valkey-alerts.yaml` | Cache | 7 | USE + RED |
-| `kube-apiserver-alerts.yaml` | Control plane | 4 | Golden |
-| `kubernetes-network-rules.yaml` | Network | 1 | USE |
+- [Kubernetes](../alerting/alert-catalog.md#6-kubernetes) — nodes, workloads, pods, API server, control plane, network
+- [Valkey cache](../alerting/alert-catalog.md#3-valkey-cache)
 
-### Recording rules
-
-| File | Count | Purpose |
-|------|:-----:|---------|
-| `valkey-recording-rules.yaml` | 4 | Cache USE pre-aggregation |
-| `kubernetes-network-rules.yaml` | 2 | Network USE pre-aggregation |
-
-Database alert/recording manifests are indexed in the
+Database manifests are indexed in the
 [databases layer](postgresql/monitoring.md); application RED manifests in
 [metrics-apps.md](metrics-apps.md#manifest-index). Runbook:
 [`infrastructure-alerts.md`](../runbooks/infrastructure-alerts.md).

@@ -59,7 +59,7 @@ flowchart LR
 - **Mode**: HA with Raft integrated storage (3 replicas, 10Gi PVC per node)
 - **Auth Method**: Kubernetes (ServiceAccount-based via TokenReview API)
 - **Secrets Engine**: KV v2 at path `secret/`
-- **Audit Logging**: Stdout audit device (collected by Vector -> VictoriaLogs)
+- **Audit Logging**: Stdout audit device → Vector → VictoriaLogs. Enabled **best-effort** in the bootstrap (not fail-closed; `auditStorage` off) — durable/fail-closed audit is a production hardening item.
 - **Bootstrap**: Idempotent Job — init, unseal, configure on each deploy
 - **Seal**: Shamir (1-share) for Kind; AWS KMS / GCP KMS for EKS/GKE
 
@@ -260,7 +260,7 @@ kubectl annotate clustersecretstore openbao force-sync=$(date +%s) --overwrite
 kubectl rollout restart deploy/cert-manager -n cert-manager
 ```
 
-Long-term mitigation options are tracked in [`tamsu.md`](../../tamsu.md) (combination of a local `~/.homelab/secrets.env` bootstrap script + persisting the OpenBAO PVC across `make down`).
+Long-term mitigation options under consideration: a local `~/.homelab/secrets.env` bootstrap script, and persisting the OpenBAO PVC across `make down` so the cluster keeps its seeded secrets.
 
 ### Rotating a Secret
 
@@ -378,3 +378,7 @@ Replace Shamir with cloud KMS for automatic unseal:
 - [Secrets Backlog (P1/P2)](./backlog.md) — pending improvements
 - [External Secrets Operator Docs](https://external-secrets.io/)
 - [OpenBAO Docs](https://openbao.org/docs/)
+
+---
+
+_Last updated: 2026-06-29 — ESO + OpenBAO via Kubernetes auth, KV v2 static secrets (`refreshInterval: 1h`). Local Kind; production hardening tracked in [`production-plan.md`](./production-plan.md)._

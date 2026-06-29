@@ -782,3 +782,7 @@ The biggest immediate security wins are:
 3. Replace wildcard ESO policy with scoped per-path policies
 4. Fix hardcoded `postgres` passwords in CNPG postInitSQL
 5. Implement database engine with dynamic credentials (kills static password problem entirely)
+
+---
+
+_Last updated: 2026-06-29 — **Plan / target state** for OpenBAO on EKS/GKE; not the deployed state. What runs on local Kind today is summarised in the [`README.md`](./README.md) current-state banner. Note: the database secrets engine, OIDC, KMS auto-unseal, and TLS described here are **planned, not yet deployed**._

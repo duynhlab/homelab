@@ -20,15 +20,22 @@ API on `:8428`).
 A **counter** is a Prometheus metric type that only ever increases (monotonic).
 It resets to `0` on process restart, pod restart, or crash/redeploy:
 
+```mermaid
+xychart-beta
+    title "Raw counter value — drops to 0 at the 10:15 restart"
+    x-axis ["10:00", "10:05", "10:10", "10:15", "10:20", "10:25"]
+    y-axis "Counter" 0 --> 6000
+    line [5000, 5500, 6000, 0, 300, 600]
 ```
-Time    Counter   Event
-10:00   5,000
-10:05   5,500     +500 requests
-10:10   6,000     +500 requests
-10:15   0         ← POD RESTART
-10:20   300       +300 requests (from 0)
-10:25   600       +300 requests
-```
+
+| Time | Counter | Event |
+|------|--------:|-------|
+| 10:00 | 5,000 | — |
+| 10:05 | 5,500 | +500 requests |
+| 10:10 | 6,000 | +500 requests |
+| 10:15 | 0 | pod restart |
+| 10:20 | 300 | +300 requests (from 0) |
+| 10:25 | 600 | +300 requests |
 
 ## The problem: querying a raw counter
 
@@ -60,17 +67,25 @@ rate(counter[window]) = (value_end - value_start) / window_seconds
 rate(request_duration_seconds_count{app="auth"}[5m])
 ```
 
-How resets are handled — a negative delta is treated as a reset and ignored:
+How resets are handled — a negative delta is treated as a reset and ignored,
+leaving a single small dip that recovers:
 
+```mermaid
+xychart-beta
+    title "rate() — one dip at the restart, then it recovers (req/s)"
+    x-axis ["10:05", "10:10", "10:15", "10:20", "10:25"]
+    y-axis "req/s" 0 --> 2
+    line [1.67, 1.67, 0, 1.0, 1.0]
 ```
-10:00 → 5,000
-10:05 → 5,500   rate = (5,500 - 5,000) / 300s = 1.67 req/s
-10:10 → 6,000   rate = (6,000 - 5,500) / 300s = 1.67 req/s
-[RESTART]
-10:15 → 0       rate = 0      (negative delta ignored)
-10:20 → 300     rate = 300/300s = 1.0 req/s
-10:25 → 600     rate = (600-300)/300s = 1.0 req/s
-```
+
+| Time | Counter | `rate()` |
+|------|--------:|----------|
+| 10:00 | 5,000 | — |
+| 10:05 | 5,500 | (5,500 − 5,000) / 300s = 1.67 req/s |
+| 10:10 | 6,000 | (6,000 − 5,500) / 300s = 1.67 req/s |
+| 10:15 | 0 | 0 (negative delta ignored) |
+| 10:20 | 300 | 300 / 300s = 1.0 req/s |
+| 10:25 | 600 | (600 − 300) / 300s = 1.0 req/s |
 
 Characteristics: auto-detects resets, leaves only a single small dip at the
 restart, returns an easy-to-read per-second value, and extrapolates the first/last
@@ -90,15 +105,22 @@ increase(counter[window]) = rate(counter[window]) * window_seconds
 increase(request_duration_seconds_count{app="auth"}[$__range])
 ```
 
+```mermaid
+xychart-beta
+    title "increase() per 5m window — totals stay smooth across the reset"
+    x-axis ["10:05", "10:10", "10:15", "10:20", "10:25"]
+    y-axis "requests / 5m" 0 --> 600
+    line [500, 500, 0, 300, 300]
 ```
-10:00 → 5,000
-10:05 → 5,500   increase = 500
-10:10 → 6,000   increase = 500
-[RESTART]
-10:15 → 0       increase = 0   (reset ignored)
-10:20 → 300     increase = 300
-10:25 → 600     increase = 300
-```
+
+| Time | Counter | `increase()` |
+|------|--------:|--------------|
+| 10:00 | 5,000 | — |
+| 10:05 | 5,500 | 500 |
+| 10:10 | 6,000 | 500 |
+| 10:15 | 0 | 0 (reset ignored) |
+| 10:20 | 300 | 300 |
+| 10:25 | 600 | 300 |
 
 Characteristics: same reset handling as `rate()`, but returns an absolute total
 rather than a per-second value, and pairs with `$__range` to total over the whole
@@ -228,13 +250,13 @@ window `[$__range]`.
 
 Prometheus/VictoriaMetrics scrape continuously and compare consecutive samples:
 
-```
-t1: 5,000
-t2: 5,500   delta = +500   ✅
-t3: 6,000   delta = +500   ✅
-t4: 0       delta = -6,000  → RESET DETECTED
-t5: 300     delta = +300   ✅
-```
+| Sample | Value | Delta | |
+|--------|------:|------:|---|
+| t1 | 5,000 | — | |
+| t2 | 5,500 | +500 | ok |
+| t3 | 6,000 | +500 | ok |
+| t4 | 0 | −6,000 | **reset detected** |
+| t5 | 300 | +300 | ok |
 
 On a negative delta the engine assumes a reset, skips that step, and continues
 from the new value. It also extrapolates the first/last points of the window,

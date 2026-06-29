@@ -312,12 +312,3 @@ log.Info().Str("method", c.Request.Method).Str("path", c.Request.URL.Path).Msg("
 logger.Info("Service starting", zap.String("service", cfg.Service.Name), zap.String("port", cfg.Service.Port))
 logger.Info("HTTP request", zap.String("method", c.Request.Method), zap.String("path", c.Request.URL.Path))
 ```
-
----
-
-## References
-
-- [specs/active/context-aware-logging/research.md](../../specs/active/context-aware-logging/research.md) - Library comparison and deep dives
-- [specs/active/context-aware-logging/victorialogs-vector-research.md](../../specs/active/context-aware-logging/victorialogs-vector-research.md) - VictoriaLogs integration
-- [docs/observability/logging/README.md](../observability/logging/README.md) - Logging architecture, stack rationale (VictoriaLogs vs Loki), and scaling
-- [docs/observability/logging/victorialogs.md](../observability/logging/victorialogs.md) - VictoriaLogs backend & Vector pipeline ops

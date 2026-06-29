@@ -41,7 +41,7 @@ spec:
       headers: "latency_tokens"
       # Trust proxy protocol headers from port-forward
       trusted_ips: "0.0.0.0/0,::/0"
-      # JSON access logs — picked up by Vector DaemonSet → Loki + VictoriaLogs
+      # JSON access logs — picked up by Vector DaemonSet → VictoriaLogs
       proxy_access_log: "/dev/stdout"
       proxy_error_log: "/dev/stderr"
       # Default proxy TLS certificate (cert-manager issued, wildcard *.duynh.me)

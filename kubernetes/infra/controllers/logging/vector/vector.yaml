@@ -56,7 +56,7 @@ spec:
       # ========================================================================
       transforms:
         # ----------------------------------------------------------------------
-        # Transform: add_labels (existing - for Loki and general VictoriaLogs)
+        # Transform: add_labels (stream fields for VictoriaLogs)
         # ----------------------------------------------------------------------
         add_labels:
           type: remap
@@ -93,7 +93,7 @@ spec:
               .container_name = "unknown-container"
             }
             
-            # Extract stream (stdout/stderr) - required by Grafana Loki Kubernetes dashboard
+            # Extract stream (stdout/stderr) - kept as a log field for filtering
             if exists(.stream) {
               .stream = to_string!(.stream)
             } else {

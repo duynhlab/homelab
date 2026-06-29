@@ -15,8 +15,8 @@ spec:
     # operator's job-naming (service name "tempo").
     #
     # Note: OTel Collector, Pyroscope and Vector are not yet scraped, so a
-    # target-down alert for them would never fire — adding scrape coverage is
-    # tracked in docs/observability/observability-review.md.
+    # target-down alert for them would never fire — scrape coverage is not yet
+    # added.
     - name: observability-tracing
       interval: 30s
       rules:

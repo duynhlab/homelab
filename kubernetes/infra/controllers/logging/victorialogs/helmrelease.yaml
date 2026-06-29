@@ -4,7 +4,7 @@
 #
 # NOTE: Vector collector is DISABLED here.
 # Log ingestion is handled by the cluster-wide Vector Agent (kube-system/vector)
-# which ships logs to both Loki and VictoriaLogs.
+# which ships logs to VictoriaLogs (the sole log backend; Loki removed in v0.94.0).
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:

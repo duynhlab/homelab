@@ -331,7 +331,11 @@ See [`README.md` §16 File Reference](./README.md#16-file-reference) for the can
 
 ## Production Roadmap
 
-### Phase 1: Dynamic Database Secrets
+> **All phases below are planned, not deployed.** The current deployed state is in
+> the [`README.md`](./README.md) current-state banner; the authoritative hardening
+> scope is [RFC-0008](../proposals/rfc/RFC-0008/).
+
+### Phase 1: Dynamic Database Secrets (planned)
 
 Use OpenBAO's database secrets engine to generate short-lived PostgreSQL credentials on demand (eliminates static passwords entirely).
 

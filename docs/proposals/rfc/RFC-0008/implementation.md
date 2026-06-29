@@ -337,7 +337,7 @@ username_template = "v-k8s-{{.RoleName | truncate 20}}-{{unix_time}}"
 
 | Credential Type | TTL | Max TTL | Rotation Trigger |
 |----------------|-----|---------|-----------------|
-| App dynamic creds (services) | 1h | 24h | ESO `refreshInterval: 55m` |
+| App dynamic creds (services) | 1h | 24h | ESO `refreshInterval: 1h` |
 | Dev team dynamic creds | 8h | 16h | OIDC session expiry |
 | Data team readonly creds | 8h | 24h | OIDC session expiry |
 | Static owner creds (golang-migrate) | 90 days | — | Manual or scheduled job |
@@ -519,7 +519,7 @@ Services never see static passwords. ESO requests fresh dynamic credentials from
 Flow:
 Pod (product-service) → reads K8s Secret (cnpg-db-product-creds)
                                            ↑
-                       ESO refreshes every 55m (before 1h TTL)
+                       ESO refreshes every 1h (before the lease TTL)
                                            ↑
                        OpenBAO DB engine creates: v-k8s-product-app-rw-{ts}
                                            ↑

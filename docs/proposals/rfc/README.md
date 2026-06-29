@@ -74,6 +74,15 @@ here). Each gets a number when someone writes it up.
 | **Talos bare-metal migration** | infra | `docs/platform/homelab-migration-plan.md` |
 | **Chaos / GameDay program** | infra | `TODO.md`, DR docs |
 | **API v1→v2 versioning policy** | platform-wide | `docs/api/api-naming-convention.md` |
+| **Split OpenBAO bootstrap** (auth config vs secret seeding) | infra | secrets ESO review |
+| **Secret rotation** (CronJob / push) — largely superseded by dynamic DB creds in the production-hardening RFC | infra | secrets ESO review |
+| **PushSecret for operator-generated secrets** (sync CNPG/Zalando creds back to OpenBAO) | infra | secrets ESO review |
+
+> The broader secrets production hardening (KMS auto-unseal, TLS, dynamic DB creds,
+> OIDC, remove committed dev creds) + a local-vs-prod parity/testing matrix is its
+> own RFC — see the production-secrets-hardening RFC. Decisions already shipped
+> (OpenBAO HA, audit logging) are recorded in [ADR-005](../adr/ADR-005-openbao-ha-raft/)
+> and [ADR-004](../adr/ADR-004-enable-openbao-audit-logging/).
 
 > Temporal durability/DR (HA, Barman, GameDay) is tracked as **future work in
 > [RFC-0001](RFC-0001/)**, not a separate backlog row.

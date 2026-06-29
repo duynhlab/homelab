@@ -50,11 +50,13 @@ docs/
 │   ├── README.md                 # Master index + 4-pillar architecture
 │   ├── architecture.md           # 3-layer service architecture + APM integration
 │   ├── metrics/                  # Pillar 1: Metrics
-│   │   ├── README.md             # RED/USE/Golden Signals methodology
+│   │   ├── README.md             # Hub: fundamentals, stack, architecture, coverage
+│   │   ├── metrics-apps.md       # Application + gRPC east-west metrics (RED)
+│   │   ├── metrics-infra.md      # Cluster / infrastructure metrics (USE)
 │   │   ├── victoriametrics.md    # VictoriaMetrics Operator stack
 │   │   ├── vmauth.md             # VMAuth/vmauth HTTP proxy (auth.config, Operator CRs)
 │   │   ├── promql-guide.md       # PromQL reference
-│   │   └── postgresql/           # PostgreSQL-specific metrics
+│   │   └── postgresql/           # PostgreSQL-specific metrics (databases layer)
 │   │       ├── monitoring.md
 │   │       ├── custom-metrics.md
 │   │       ├── pg-exporter-dashboards.md

@@ -254,11 +254,13 @@ docs/observability/
 ├── README.md                     # This file: index + 3-layer architecture + APM integration
 │
 ├── metrics/                      # Pillar 1: Metrics collection & storage
-│   ├── README.md                 # RED/USE/Golden Signals methodology
+│   ├── README.md                 # Hub: fundamentals, stack, architecture, coverage
+│   ├── metrics-apps.md           # Application + gRPC east-west metrics (RED)
+│   ├── metrics-infra.md          # Cluster / infrastructure metrics (USE)
 │   ├── victoriametrics.md        # VictoriaMetrics Operator stack
 │   ├── vmauth.md                 # VMAuth/vmauth HTTP proxy (auth.config, CRs)
 │   ├── promql-guide.md           # PromQL reference
-│   └── postgresql/               # PostgreSQL-specific metrics
+│   └── postgresql/               # PostgreSQL-specific metrics (databases layer)
 │       ├── monitoring.md          # Monitoring overview
 │       ├── custom-metrics.md      # Custom pg_exporter queries
 │       ├── pg-exporter-dashboards.md

@@ -326,10 +326,10 @@ kill %1  # or pkill -f "kubectl port-forward"
 ```
 
 **Expected output:**
-- **Format Prometheus chuẩn**: `pg_stat_statements_calls{datname="review",query="...",queryid="...",server="localhost:5432",user="postgres"} 4`
-- **Debug output** (có dấu `*`): Nếu thấy output dạng `* collected metric "pg_stat_statements_calls" {...} was collected before...` → đây là debug output từ Prometheus client, metrics vẫn hoạt động bình thường
-- **HTTP 500 Error**: Nếu thấy HTTP 500 khi scrape → có thể do duplicate metrics. Đảm bảo `PG_EXPORTER_AUTO_DISCOVER_DATABASES` đã được xóa (deprecated và gây lỗi)
-- **Nếu không có output**: Check logs for errors (step 3), verify ConfigMap mount (step 1), và environment variable (step 2)
+- **Standard Prometheus format**: `pg_stat_statements_calls{datname="review",query="...",queryid="...",server="localhost:5432",user="postgres"} 4`
+- **Debug output** (lines starting with `*`): output such as `* collected metric "pg_stat_statements_calls" {...} was collected before...` is debug output from the Prometheus client — the metrics still work normally
+- **HTTP 500 error**: an HTTP 500 on scrape is usually caused by duplicate metrics. Make sure `PG_EXPORTER_AUTO_DISCOVER_DATABASES` has been removed (it is deprecated and triggers this error)
+- **No output**: check the logs for errors (step 3), verify the ConfigMap mount (step 1) and the environment variable (step 2)
 
 ### Metrics have wrong labels
 
@@ -338,6 +338,7 @@ kill %1  # or pkill -f "kubectl port-forward"
 
 ## Related Documentation
 
+- **PostgreSQL Monitoring**: [`monitoring.md`](monitoring.md) - Databases-layer entry point: 3-cluster strategy and exporters
 - **Database Guide**: [`docs/databases/002-database-integration.md`](../../../databases/002-database-integration.md) - Custom queries configuration
-- **Metrics Guide**: [`docs/observability/metrics/README.md`](../README.md) - General metrics documentation
-- **Prometheus Guide**: [`docs/observability/metrics/promql-guide.md`](../promql-guide.md) - PromQL functions and examples
+- **Metrics hub**: [`docs/observability/metrics/README.md`](../README.md) - Methodology, stack, and coverage
+- **PromQL Guide**: [`docs/observability/metrics/promql-guide.md`](../promql-guide.md) - PromQL functions and examples

@@ -205,7 +205,10 @@ The four-pillar observability stack must not regress. gRPC keeps it intact:
   HTTP→gRPC→HTTP call chain. No trace gaps.
 - **Metrics.** Prometheus `/metrics` stays on HTTP `:8080`, scraped exactly as
   today. gRPC adds RPC-level metrics via the same interceptors; the existing
-  RED dashboards are unaffected.
+  RED dashboards are unaffected. Metric names, labels
+  (`rpc_server/client_call_duration_seconds_*`), and the dashboard row are
+  documented in
+  [observability → application metrics](../observability/metrics/metrics-apps.md#grpc-instrumentation-east-west).
 - **Health.** Implement the **gRPC Health Checking Protocol** and use
   `grpc-health-probe`. During dual-port, **keep the HTTP `/health` and `/ready`
   probes** (they already work); only switch the Kubernetes probes to gRPC once a

@@ -10,6 +10,7 @@ spec:
   type: Static
   defaultValues:
     name: product
+    image_tag: "1.0.1" # {"$imagepolicy": "flux-system:product:tag"}
     namespace: product
     platform_backup_label: "cnpg"
     replicaCount: 2

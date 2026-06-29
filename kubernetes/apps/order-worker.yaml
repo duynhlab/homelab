@@ -30,9 +30,9 @@ spec:
     replicaCount: 1
     image:
       # Same image as the order API — just a different subcommand.
-      repository: ghcr.io/duynhlab/order-service/order
-      tag: latest
-      pullPolicy: Always
+      repository: ghcr.io/duynhlab/order-service/order-service
+      tag: "1.0.1"
+      pullPolicy: IfNotPresent
     # Run the worker subcommand; it serves /health, /ready, /metrics on :8080 but
     # no app traffic, so the Service is skipped.
     args: ["worker"]

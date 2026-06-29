@@ -41,9 +41,9 @@ spec:
         name: << inputs.name >>
         replicaCount: << inputs.replicaCount | int >>
         image:
-          repository: << index inputs "registry_url" | default "ghcr.io/duynhlab" >>/<< inputs.name >>-service/<< inputs.name >>
-          tag: latest
-          pullPolicy: Always
+          repository: << index inputs "registry_url" | default "ghcr.io/duynhlab" >>/<< inputs.name >>-service/<< inputs.name >>-service
+          tag: "<< inputs.image_tag >>"
+          pullPolicy: IfNotPresent
         service:
           enabled: true
           type: ClusterIP

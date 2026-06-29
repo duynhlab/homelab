@@ -1,386 +1,191 @@
-# PromQL Guide - Counter Metrics, rate(), increase(), and Time Intervals
+# PromQL Guide — Counters, rate(), increase(), and Time Intervals
 
-## Quick Summary
+How to query counter metrics correctly in this platform: why raw counters
+mislead, when to use `rate()` vs `increase()`, and how Grafana's **Time Range**
+and **Rate Interval** (`$rate`) interact. PromQL runs in Grafana against the
+**VictoriaMetrics** datasource; the backend is **VMSingle** (Prometheus-compatible
+API on `:8428`).
 
-In this platform, PromQL runs in Grafana against the **VictoriaMetrics** datasource; the backend is **VMSingle** (Prometheus-compatible API on `:8428`).
-
-**Objectives:**
-- Understand Prometheus Counter metrics and their behavior
-- Learn the difference between `rate()` and `increase()` functions
-- Understand Time Range vs Rate Interval in Grafana dashboards
-- Handle counter resets correctly in queries
-- Optimize dashboard settings for different use cases
-
-**Learning Outcomes:**
-- Counter metric characteristics (monotonic, resets on restart)
-- `rate()` function: calculates per-second rate
-- `increase()` function: calculates total increase over time range
-- Time Range: controls how far back to display data
-- Rate Interval: controls calculation granularity
-- Handling counter resets in PromQL queries
-- Best practices for counter metrics and dashboard configuration
-
-**Keywords:**
-Prometheus Counter, rate(), increase(), Counter Reset, Monotonic, Per-second Rate, Time Range, Rate Interval, PromQL Functions, Grafana Dashboard
-
-**Technologies:**
-- Prometheus (counter metrics)
-- PromQL (rate, increase functions)
-- Grafana (dashboard settings)
+| | |
+|---|---|
+| **Datasource** | VictoriaMetrics (VMSingle `:8428`) — PromQL/MetricsQL |
+| **Core functions** | `rate()`, `increase()` — both auto-handle counter resets |
+| **Dashboard knobs** | Time Range (`$__range`) vs Rate Interval (`$rate`) |
+| **Golden rule** | Never query a raw counter in a panel |
 
 ---
 
-## 📚 Nguồn Tham Khảo
+## Counter basics
 
-Tài liệu này dựa trên:
-- [Prometheus Official Documentation - rate()](https://prometheus.io/docs/prometheus/latest/querying/functions/#rate)
-- [Prometheus Counter Best Practices](https://prometheus.io/docs/practices/instrumentation/#counter)
-- [Stack Overflow: Handling Counter Resets](https://stackoverflow.com/questions/58069711/how-to-sum-prometheus-counters-when-k8s-pods-restart)
-- [SignOz: Handling Counters on Servers](https://signoz.io/guides/how-to-handle-counters-on-servers-in-prometheus/)
-- [Grafana Time Range Documentation](https://grafana.com/docs/grafana/latest/dashboards/time-range-controls/)
+A **counter** is a Prometheus metric type that only ever increases (monotonic).
+It resets to `0` on process restart, pod restart, or crash/redeploy:
 
----
-
-## 🔢 Counter Metric - Cơ Bản
-
-### Counter là gì?
-- Metric type trong Prometheus
-- **Chỉ tăng**, không giảm (monotonic increasing)
-- Reset về 0 khi:
-  - Process restart
-  - Pod restart (K8s)
-  - Application crash/redeploy
-
-### Ví dụ:
 ```
-Time    Counter Value   Event
+Time    Counter   Event
 10:00   5,000
-10:05   5,500           +500 requests
-10:10   6,000           +500 requests
-10:15   0               ← POD RESTART
-10:20   300             +300 requests (from 0)
-10:25   600             +300 requests
+10:05   5,500     +500 requests
+10:10   6,000     +500 requests
+10:15   0         ← POD RESTART
+10:20   300       +300 requests (from 0)
+10:25   600       +300 requests
 ```
 
----
+## The problem: querying a raw counter
 
-## ⚠️ Vấn Đề: Query Trực Tiếp Counter
-
-### Query:
 ```promql
 request_duration_seconds_count{app="auth"}
 ```
 
-### Grafana hiển thị:
+When the pod restarts the value drops to `0`, so the graph shows a cliff and the
+panel "loses" history:
+
+- Data appears to vanish on restart (drop to 0).
+- The graph is discontinuous.
+- It ignores the dashboard time selector.
+- It is an instant value — it reflects neither rate nor trend.
+
+The fix is to wrap counters in `rate()` or `increase()`, which detect resets and
+extrapolate across them.
+
+## Solution 1 — `rate()`
+
+`rate()` computes the **average per-second rate of increase** over a window and
+automatically handles counter resets.
+
 ```
-Before restart: 6,000 requests
-After restart:  0 requests    ← Nhảy về 0!
-5 min later:    300 requests
-```
-
-### Vấn đề:
-1. ❌ **Mất data** khi pod restart
-2. ❌ **Graph bị gián đoạn** (drop to 0)
-3. ❌ **Không tổng hợp** history từ Prometheus
-4. ❌ **Instant value** - không phản ánh rate/trend
-
----
-
-## ✅ Giải Pháp 1: `rate()` Function
-
-### `rate()` là gì?
-- Tính **tốc độ tăng trung bình** (per second)
-- **Tự động xử lý** counter resets
-- Dùng cho: Calculating rates (RPS, error rate, etc)
-
-### Công thức:
-```
-rate(counter[time_range]) = (value_end - value_start) / time_range_seconds
+rate(counter[window]) = (value_end - value_start) / window_seconds
 ```
 
-### Query:
 ```promql
 rate(request_duration_seconds_count{app="auth"}[5m])
 ```
 
-### Cách Prometheus xử lý counter reset:
+How resets are handled — a negative delta is treated as a reset and ignored:
 
-**Time Series Data:**
 ```
 10:00 → 5,000
 10:05 → 5,500   rate = (5,500 - 5,000) / 300s = 1.67 req/s
 10:10 → 6,000   rate = (6,000 - 5,500) / 300s = 1.67 req/s
-[RESTART DETECTED]
-10:15 → 0       rate = 0 / 300s = 0 (Prometheus ignores negative delta)
-10:20 → 300     rate = 300 / 300s = 1.0 req/s
-10:25 → 600     rate = (600 - 300) / 300s = 1.0 req/s
+[RESTART]
+10:15 → 0       rate = 0      (negative delta ignored)
+10:20 → 300     rate = 300/300s = 1.0 req/s
+10:25 → 600     rate = (600-300)/300s = 1.0 req/s
 ```
 
-**Grafana Graph:**
+Characteristics: auto-detects resets, leaves only a single small dip at the
+restart, returns an easy-to-read per-second value, and extrapolates the first/last
+points of the window. Use it for RPS, error rate, CPU rate, and network
+throughput.
+
+## Solution 2 — `increase()`
+
+`increase()` computes the **total increase** over a window (it is `rate()`
+multiplied by the window length) and also handles resets.
+
 ```
-RPS
- 2.0 ┤ ███████████
-     │            ╲
- 1.5 ┤             ╲
-     │              ╲___
- 1.0 ┤                  █████
-     │
- 0.5 ┤
-     └────────────────────────> Time
-               ↑
-           restart (1 dip, tự phục hồi)
-```
-
-### Đặc điểm:
-✅ **Auto-detect resets:** Prometheus phát hiện khi value giảm  
-✅ **Smooth graph:** Chỉ có 1 dip nhỏ khi restart  
-✅ **Per-second rate:** Dễ hiểu (5.2 req/s)  
-✅ **Extrapolation:** Prometheus ngoại suy cho first/last points
-
-### Use case:
-- RPS (Requests Per Second)
-- Error rate
-- CPU usage rate
-- Network throughput
-
----
-
-## ✅ Giải Pháp 2: `increase()` Function
-
-### `increase()` là gì?
-- Tính **tổng số tăng** trong time range
-- **Tự động xử lý** counter resets
-- Dùng cho: Calculating totals over time range
-
-### Công thức:
-```
-increase(counter[time_range]) = rate(counter[time_range]) * time_range_seconds
+increase(counter[window]) = rate(counter[window]) * window_seconds
 ```
 
-### Query:
 ```promql
 increase(request_duration_seconds_count{app="auth"}[$__range])
 ```
 
-### Cách Prometheus xử lý:
-
-**Time Series Data:**
 ```
 10:00 → 5,000
-10:05 → 5,500   increase = 5,500 - 5,000 = 500
-10:10 → 6,000   increase = 6,000 - 5,500 = 500
+10:05 → 5,500   increase = 500
+10:10 → 6,000   increase = 500
 [RESTART]
-10:15 → 0       increase = 0 (ignores reset)
-10:20 → 300     increase = 300 - 0 = 300
-10:25 → 600     increase = 600 - 300 = 300
+10:15 → 0       increase = 0   (reset ignored)
+10:20 → 300     increase = 300
+10:25 → 600     increase = 300
 ```
 
-**Grafana Graph:**
-```
-Requests (5m window)
- 600 ┤ ███████████
-     │            ╲
- 500 ┤             ╲___
-     │                 ████
- 300 ┤
-     │
- 100 ┤
-     └────────────────────────> Time
-               ↑
-           restart (smooth transition)
-```
+Characteristics: same reset handling as `rate()`, but returns an absolute total
+rather than a per-second value, and pairs with `$__range` to total over the whole
+dashboard window. Use it for total requests/errors over a period, stat panels,
+distribution pie charts, and SLO totals.
 
-### Đặc điểm:
-✅ **Auto-detect resets:** Giống rate()  
-✅ **Shows totals:** Tổng requests trong time window  
-✅ **Dashboard time range:** Dùng `$__range` cho full dashboard range  
-✅ **No per-second conversion:** Giá trị thô
+## Detailed comparison
 
-### Use case:
-- Total requests in time range
-- Total errors in last hour
-- Cumulative metrics for dashboards
+| | Raw counter | `rate()` | `increase()` |
+|---|---|---|---|
+| **Shows** | Instant value (6,000) | Per-second rate (5.2 req/s) | Total in window (15,432) |
+| **Unit** | Count | req/s | Count |
+| **Pod restart** | ❌ jumps to 0 | ✅ one small dip | ✅ totalled across resets |
+| **Time range** | ❌ ignores selector | uses `[window]` | ✅ respects `$__range` |
+| **Prometheus history** | ❌ unused | ✅ full | ✅ full |
+| **Use case** | Debug snapshots | RPS, throughput | Dashboard totals, SLO |
 
----
+Example queries:
 
-## 🆚 So Sánh Chi Tiết
-
-### 1. Raw Counter (Không có rate/increase)
-
-**Query:**
 ```promql
-sum(request_duration_seconds_count{app="auth"})
+sum(request_duration_seconds_count{app="auth"})                       # raw — avoid
+sum(rate(request_duration_seconds_count{app="auth"}[5m]))             # RPS
+sum(increase(request_duration_seconds_count{app="auth"}[$__range]))   # total in range
 ```
 
-| Aspect | Value |
-|--------|-------|
-| **Hiển thị** | Instant value (6,000) |
-| **Unit** | Count (absolute number) |
-| **Pod restart** | ❌ Jump to 0 |
-| **Time range** | ❌ Ignores dashboard time selector |
-| **Prometheus history** | ❌ Không dùng |
-| **Use case** | Debug, instant snapshots |
+## Time Range vs Rate Interval
 
-**Grafana Output:**
-```
-Total Requests: 6,000
-[After restart]
-Total Requests: 0      ← Mất hết!
-```
+Two independent Grafana concepts control how data is displayed:
 
----
+1. **Time Range** — *how far back* the dashboard shows data.
+2. **Rate Interval** (`$rate`) — *the granularity* of rate calculations.
 
-### 2. rate() Function
+### Time Range
 
-**Query:**
-```promql
-sum(rate(request_duration_seconds_count{app="auth"}[5m]))
-```
+The window the dashboard displays, set from the dropdown at the top-right
+("Last 5 minutes", "Last 6 hours", "Custom", …). It affects the `$__range`
+variable, `increase()` results, and the time-series X-axis.
 
-| Aspect | Value |
-|--------|-------|
-| **Hiển thị** | Per-second rate (5.2 req/s) |
-| **Unit** | req/s (rate) |
-| **Pod restart** | ✅ Auto-handled (1 small dip) |
-| **Time range** | Uses `[5m]` window |
-| **Prometheus history** | ✅ Full history |
-| **Use case** | RPS, throughput monitoring |
+| Common value | Use case |
+|--------------|----------|
+| Last 5 minutes | Real-time debugging |
+| Last 30 minutes | Recent activity |
+| Last 6 hours | Normal monitoring |
+| Last 24 hours | Daily review |
+| Last 7 days | Long-term trends |
 
-**Grafana Output:**
-```
-RPS: 5.2 req/s
-[After restart]
-RPS: 0 req/s (1 point)
-RPS: 4.8 req/s         ← Tự phục hồi!
-```
+### Rate Interval (`$rate`)
 
----
+The window used to compute **rate** in PromQL, set from the `$rate` dashboard
+variable. It affects `rate()` results and the smoothness of time-series graphs.
 
-### 3. increase() Function
+| Common value | Effect |
+|--------------|--------|
+| 1m | High detail, sensitive |
+| 5m | Balanced detail vs smoothness |
+| 30m | Smooth, removes noise |
+| 1h | Long-term trend |
 
-**Query:**
-```promql
-sum(increase(request_duration_seconds_count{app="auth"}[$__range]))
-```
+## Worked examples
 
-| Aspect | Value |
-|--------|-------|
-| **Hiển thị** | Total in time range (15,432) |
-| **Unit** | Count (total) |
-| **Pod restart** | ✅ Auto-handled (tổng hợp qua restarts) |
-| **Time range** | ✅ Respects dashboard selector (30m, 1h, etc) |
-| **Prometheus history** | ✅ Full history |
-| **Use case** | Dashboard totals, SLO monitoring |
+**"Total Request" — does NOT change with `$rate`** (depends only on Time Range):
 
-**Grafana Output:**
-```
-Total Requests (last 30m): 15,432
-[After restart still in 30m window]
-Total Requests (last 30m): 15,432  ← Giữ nguyên!
-```
-
----
-
-## 📅 Time Range vs Rate Interval
-
-Trong Grafana dashboard, có 2 khái niệm quan trọng ảnh hưởng đến cách hiển thị dữ liệu:
-
-1. **Time Range** (Khoảng thời gian hiển thị) - Kiểm soát "xem bao xa về quá khứ"
-2. **Rate Interval** (Độ mịn tính toán) - Kiểm soát "độ chi tiết của rate calculation"
-
-### Time Range (Khoảng thời gian hiển thị) 📅
-
-**Định nghĩa:**
-Time Range là khoảng thời gian mà dashboard hiển thị dữ liệu, từ thời điểm bắt đầu đến hiện tại.
-
-**Cách thay đổi:**
-- Click vào dropdown ở góc trên bên phải dashboard
-- Chọn "Last 5 minutes", "Last 30 minutes", "Last 6 hours", etc.
-- Hoặc chọn "Custom" để nhập thời gian cụ thể
-
-**Các giá trị phổ biến:**
-- **Last 5 minutes** - Debug real-time
-- **Last 30 minutes** - Hoạt động gần đây
-- **Last 6 hours** - Monitoring bình thường
-- **Last 24 hours** - Review hàng ngày
-- **Last 7 days** - Xu hướng dài hạn
-
-**Queries bị ảnh hưởng:**
-- `$__range` variable
-- `increase()` function
-- Time series X-axis
-
----
-
-### Rate Interval (Độ mịn tính toán) ⏱️
-
-**Định nghĩa:**
-Rate Interval (`$rate` variable) là khoảng thời gian để tính **rate** (tốc độ thay đổi) trong Prometheus queries.
-
-**Cách thay đổi:**
-- Click vào dropdown "Rate" ở góc trên bên trái dashboard
-- Chọn "1m", "5m", "30m", "1h", etc.
-
-**Các giá trị phổ biến:**
-- **1m** - Chi tiết cao, nhạy cảm
-- **5m** - Cân bằng detail vs smoothness
-- **30m** - Mịn, bỏ noise
-- **1h** - Xu hướng dài hạn
-
-**Queries bị ảnh hưởng:**
-- `$rate` variable
-- `rate()` function
-- Độ mịn của time series graphs
-
----
-
-## 📊 Ví Dụ Thực Tế
-
-### Panel "Total Request" - KHÔNG thay đổi với $rate
-
-**Query:**
 ```promql
 sum(increase(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$__range]))
 ```
 
-**Giải thích:**
-- Sử dụng `$__range` (Time Range)
-- **KHÔNG** sử dụng `$rate`
-- Tính tổng requests trong toàn bộ Time Range
-
-**Ví dụ:**
 ```
 Time Range: Last 6 hours
-$rate: 30m → Total Request = 21,600 requests
-$rate: 5m  → Total Request = 21,600 requests (KHÔNG ĐỔI)
+$rate = 30m → 21,600 requests
+$rate = 5m  → 21,600 requests (unchanged)
 ```
 
----
+**"Total RPS" — changes with `$rate`** (depends on the rate window):
 
-### Panel "Total RPS" - THAY ĐỔI với $rate
-
-**Query:**
 ```promql
 sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$rate]))
 ```
 
-**Giải thích:**
-- Sử dụng `$rate` (Rate Interval)
-- **KHÔNG** sử dụng `$__range`
-- Tính RPS dựa trên window này
-
-**Ví dụ:**
 ```
 Time Range: Last 6 hours
-$rate: 30m → RPS = 60 (trung bình 30 phút)
-$rate: 5m  → RPS = 65 (trung bình 5 phút, nhạy hơn)
+$rate = 30m → RPS = 60 (30-minute average)
+$rate = 5m  → RPS = 65 (5-minute average, more sensitive)
 ```
 
----
+**"Success Rate %" — both numerator and denominator use `$rate`** for
+consistency:
 
-### Panel "Success Rate %" - THAY ĐỔI với $rate
-
-**Query:**
 ```promql
 (
   sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", code=~"2.."}[$rate]))
@@ -389,299 +194,109 @@ $rate: 5m  → RPS = 65 (trung bình 5 phút, nhạy hơn)
 ) * 100
 ```
 
-**Giải thích:**
-- Cả numerator và denominator đều dùng `$rate`
-- Đảm bảo consistency trong calculation
-- Thay đổi khi đổi $rate
-
----
-
-### Bảng so sánh
-
-| Panel Name | Query Function | Uses Time Range? | Uses Rate Interval? | Changes with $rate? |
-|------------|----------------|------------------|---------------------|---------------------|
+| Panel | Function | Uses Time Range? | Uses `$rate`? | Changes with `$rate`? |
+|-------|----------|:---:|:---:|:---:|
 | Total Request | `increase($__range)` | ✅ | ❌ | ❌ |
 | Total RPS | `rate($rate)` | ❌ | ✅ | ✅ |
 | Success Rate % | `rate($rate)` | ❌ | ✅ | ✅ |
 | Error Rate % | `rate($rate)` | ❌ | ✅ | ✅ |
-| Response Time p95 | `rate($rate)` | ❌ | ✅ | ✅ |
-| Memory usage | `rate($rate)` | ❌ | ✅ | ✅ |
-| CPU usage | `rate($rate)` | ❌ | ✅ | ✅ |
+| Response Time P95 | `rate($rate)` | ❌ | ✅ | ✅ |
+| Memory / CPU usage | `rate($rate)` | ❌ | ✅ | ✅ |
 
----
+## Best practices
 
-## 🎯 Best Practices
+**Raw counter** — avoid in panels; use only for instant debug, testing, or when
+restarts are impossible.
 
-### Khi nào dùng Raw Counter?
-```promql
-request_duration_seconds_count{...}
-```
-❌ **KHÔNG nên** dùng trong dashboard panels  
-✅ **CHỈ dùng** cho:
-- Debug instant state
-- Testing/development
-- Khi chắc chắn không có restarts
+**`rate()`** — RPS, error-rate, and any "per second" panel; window `[5m]` or the
+`[$rate]` variable.
 
----
+**`increase()`** — totals in stat panels, distribution charts, SLO totals;
+window `[$__range]`.
 
-### Khi nào dùng rate()?
-```promql
-rate(request_duration_seconds_count{...}[5m])
-```
-✅ **Dùng** cho:
-- RPS panels (Requests Per Second)
-- Error rate panels
-- Any "per second" metrics
-- Time series graphs showing rates
+**Rule of thumb:** keep Rate Interval ≈ 1/10–1/20 of the Time Range.
 
-**Recommended time range:** `[5m]` hoặc `[$rate]` variable
-
----
-
-### Khi nào dùng increase()?
-```promql
-increase(request_duration_seconds_count{...}[$__range])
-```
-✅ **Dùng** cho:
-- Total counters in dashboards
-- Stat panels showing totals
-- Pie charts (distribution over time)
-- SLO monitoring (total errors in 1h)
-
-**Recommended time range:** `[$__range]` (dashboard time selector)
-
----
-
-### Rule of Thumb: Time Range vs Rate Interval
-
-```
-Rate Interval ≈ 1/10 to 1/20 của Time Range
-```
-
-### Các combination được khuyến nghị
-
-| Time Range | Recommended $rate | Use Case |
-|------------|-------------------|----------|
+| Time Range | Recommended `$rate` | Use case |
+|------------|---------------------|----------|
 | Last 5 minutes | 1m | Real-time debugging |
 | Last 30 minutes | 5m | Recent activity |
 | Last 6 hours | 30m | Normal monitoring |
 | Last 24 hours | 1h | Daily trends |
 | Last 7 days | 6h | Weekly patterns |
 
-### Ví dụ cụ thể
+## Counter-reset detection (how it works)
 
-**Time Range = 6 hours (360 minutes)**
-- Recommended $rate = 18-36 minutes
-- Chọn 30m là hợp lý ✅
+Prometheus/VictoriaMetrics scrape continuously and compare consecutive samples:
 
-**Time Range = 24 hours (1440 minutes)**
-- Recommended $rate = 72-144 minutes
-- Chọn 1h (60m) hoặc 2h (120m) ✅
-
----
-
-## 📈 Prometheus Counter Reset Detection
-
-### Cách Prometheus phát hiện reset:
-
-1. **Scrape liên tục:**
-   ```
-   t1: counter = 5,000
-   t2: counter = 5,500  → delta = +500 ✅
-   t3: counter = 6,000  → delta = +500 ✅
-   t4: counter = 0      → delta = -6,000 ❌ (RESET DETECTED!)
-   t5: counter = 300    → delta = +300 ✅
-   ```
-
-2. **rate()/increase() handling:**
-   - Nếu `delta < 0` → Assume counter reset
-   - Bỏ qua data point có negative delta
-   - Tiếp tục tính từ value mới
-
-3. **Extrapolation:**
-   - Prometheus ngoại suy first/last points
-   - Assumes counter bắt đầu từ 0 nếu không có data trước đó
-
----
-
-## 🔧 Fix Cho Dashboard Hiện Tại
-
-### Panel: "Total Request" (Stat)
-
-**CŨ (SAI):**
-```promql
-sum(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"})
 ```
-→ Nhảy về 0 khi pod restart
-
-**MỚI (ĐÚNG):**
-```promql
-sum(increase(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$__range]))
+t1: 5,000
+t2: 5,500   delta = +500   ✅
+t3: 6,000   delta = +500   ✅
+t4: 0       delta = -6,000  → RESET DETECTED
+t5: 300     delta = +300   ✅
 ```
-→ Tổng requests trong dashboard time range
+
+On a negative delta the engine assumes a reset, skips that step, and continues
+from the new value. It also extrapolates the first/last points of the window,
+assuming the counter started at 0 when there is no prior data.
+
+## Scenarios
+
+| Goal | Time Range | `$rate` | Result |
+|------|-----------|---------|--------|
+| Troubleshoot a spike | Last 1 hour | 5m | Pinpoints when the spike occurred; RPS panels stay sensitive; totals remain correct |
+| Daily review | Last 24 hours | 1h | Peak hours visible; smooth, low-noise trends |
+| Capacity planning | Last 7–30 days | 6h–1d | Growth trends and weekly/monthly patterns |
+
+## Performance notes
+
+| Query | Complexity | Notes |
+|-------|-----------|-------|
+| Raw counter | O(1) | Instant, fastest |
+| `rate([5m])` | O(n) | Scans a 5m window, moderate |
+| `increase([$__range])` | O(n) | Scans the full range, slowest for large ranges |
+
+For 30m–1h dashboards `increase([$__range])` is fine; for 7d+ ranges consider a
+fixed window such as `[1d]` instead of `[$__range]`.
+
+## FAQ
+
+**Why doesn't "Total Request" change when I change `$rate`?** It uses
+`increase($__range)`, which depends only on the Time Range.
+
+**Why does RPS change with `$rate`?** It uses `rate($rate)`; a smaller window is
+more sensitive.
+
+**What `$rate` should I pick?** ≈ 1/10–1/20 of the Time Range (6h → 30m).
+
+**How are Time Range and `$rate` related?** They are independent: Time Range is
+"how far back", `$rate` is "how granular". Choose them together sensibly.
+
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| Graph too noisy | Increase `$rate` (5m → 30m) |
+| Can't see spike detail | Decrease `$rate` (30m → 5m) |
+| "Total Request" changes with `$rate` | Query likely uses `$rate`; switch to `$__range` |
+| RPS doesn't change with `$rate` | Query likely uses `$__range`; switch to `$rate` |
+
+## Key takeaways
+
+1. Never query a raw counter in a panel.
+2. Always wrap counters in `rate()` or `increase()`.
+3. `rate()` → rates (req/s); `increase()` → totals (count).
+4. `increase([$__range])` is best for dashboard stat panels.
+5. Counter resets are handled automatically.
+6. Time Range and Rate Interval are independent — choose them together.
+
+## References
+
+- [rate()](https://prometheus.io/docs/prometheus/latest/querying/functions/#rate) · [increase()](https://prometheus.io/docs/prometheus/latest/querying/functions/#increase) · [Counter type](https://prometheus.io/docs/concepts/metric_types/#counter)
+- [Prometheus instrumentation](https://prometheus.io/docs/practices/instrumentation/) · [Naming conventions](https://prometheus.io/docs/practices/naming/)
+- [Grafana time-range controls](https://grafana.com/docs/grafana/latest/dashboards/time-range-controls/) · [Dashboard variables](https://grafana.com/docs/grafana/latest/dashboards/variables/)
+- [Application metrics (RED)](metrics-apps.md) · [Metrics hub](README.md)
 
 ---
 
-### Panel: "Total Requests by Endpoint" (Pie)
-
-**CŨ (SAI):**
-```promql
-sum(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}) by (path, code)
-```
-→ Phân bố instant, mất data khi restart
-
-**MỚI (ĐÚNG):**
-```promql
-sum(increase(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$__range])) by (path)
-```
-→ Phân bố trong time range, tổng hợp qua restarts
-
----
-
-## 📊 Scenarios Thực Tế
-
-### Scenario 1: Troubleshooting Spike 🔍
-
-**Mục tiêu:** Tìm chính xác thời điểm xảy ra spike
-
-**Settings:**
-- Time Range: Last 1 hour (narrow down)
-- Rate Interval: 5m (chi tiết cao)
-
-**Kết quả:**
-- Thấy được spike xảy ra lúc nào
-- RPS panels nhạy cảm, thấy rõ pattern
-- Total Request vẫn chính xác
-
----
-
-### Scenario 2: Daily Review 📊
-
-**Mục tiêu:** Hiểu patterns trong ngày
-
-**Settings:**
-- Time Range: Last 24 hours
-- Rate Interval: 1h (smooth trends)
-
-**Kết quả:**
-- Thấy được peak hours
-- Trends mịn, dễ đọc
-- Không bị noise làm rối
-
----
-
-### Scenario 3: Capacity Planning 📈
-
-**Mục tiêu:** Lập kế hoạch capacity dài hạn
-
-**Settings:**
-- Time Range: Last 7 days hoặc 30 days
-- Rate Interval: 6h hoặc 1d
-
-**Kết quả:**
-- Thấy được xu hướng tăng trưởng
-- Patterns tuần/tháng
-- Dữ liệu cho capacity planning
-
----
-
-## ⚡ Performance Notes
-
-### Query Complexity:
-
-| Query | Complexity | Explanation |
-|-------|-----------|-------------|
-| Raw counter | O(1) | Instant query, fastest |
-| rate([5m]) | O(n) | Scan 5m window, moderate |
-| increase([$__range]) | O(n) | Scan full time range, slowest* |
-
-*Slowest khi time range lớn (1d, 7d), nhưng vẫn acceptable
-
-### Khuyến nghị:
-- Dashboards thường dùng 30m-1h time range → `increase([$__range])` OK
-- Nếu dùng 7d+ time range → Consider limiting với `[1d]` thay vì `[$__range]`
-
----
-
-## ❓ FAQ
-
-### Q: Tại sao Total Request không đổi khi tôi thay $rate?
-**A:** Vì Total Request dùng `increase($__range)`, chỉ phụ thuộc vào Time Range, không phụ thuộc vào $rate.
-
-### Q: Tại sao RPS thay đổi khi tôi thay $rate?
-**A:** Vì RPS dùng `rate($rate)`, tính rate dựa trên window $rate. Window nhỏ hơn → nhạy hơn.
-
-### Q: Nên chọn $rate bao nhiêu?
-**A:** Theo rule of thumb: $rate ≈ 1/10 đến 1/20 của Time Range. Ví dụ: Time Range = 6h → $rate = 30m.
-
-### Q: Time Range và $rate có liên quan gì?
-**A:** Chúng độc lập nhau nhưng nên chọn hợp lý. Time Range = "xem bao xa", $rate = "độ chi tiết".
-
-### Q: Khi nào nên giảm $rate?
-**A:** Khi troubleshooting spike, cần thấy chi tiết. Giảm $rate để thấy pattern rõ hơn.
-
-### Q: Khi nào nên tăng $rate?
-**A:** Khi xem trends dài hạn, muốn graph mịn. Tăng $rate để bỏ noise.
-
----
-
-## 🛠️ Troubleshooting Tips
-
-### Problem: Graph quá nhạy, nhiều noise
-**Solution:** Tăng $rate (5m → 30m)
-
-### Problem: Không thấy spike chi tiết
-**Solution:** Giảm $rate (30m → 5m)
-
-### Problem: Total Request thay đổi khi đổi $rate
-**Solution:** Kiểm tra query, có thể dùng `$rate` thay vì `$__range`
-
-### Problem: RPS không thay đổi khi đổi $rate
-**Solution:** Kiểm tra query, có thể dùng `$__range` thay vì `$rate`
-
----
-
-## ✅ Kết Luận
-
-### Key Takeaways:
-
-1. ⚠️ **KHÔNG** query raw counter trong dashboards
-2. ✅ **LUÔN** dùng `rate()` hoặc `increase()`
-3. 🔄 `rate()` → cho rates (req/s)
-4. 📊 `increase()` → cho totals (count)
-5. 🎯 `increase([$__range])` → best cho dashboard stat panels
-6. 🚀 Prometheus **tự động** handle counter resets
-7. 📅 Time Range và Rate Interval độc lập nhưng nên chọn hợp lý
-8. 📏 Rule of thumb: $rate ≈ 1/10 đến 1/20 của Time Range
-
-### Dashboard Update:
-- Fix "Total Request" panel → dùng `increase([$__range])`
-- Fix "Total Requests by Endpoint" → dùng `increase([$__range])`
-- Keep "RPS" panels → đã dùng `rate()` đúng rồi ✅
-
----
-
-## 🔗 Tài Liệu Tham Khảo
-
-1. **Prometheus Official:**
-   - [rate() function](https://prometheus.io/docs/prometheus/latest/querying/functions/#rate)
-   - [increase() function](https://prometheus.io/docs/prometheus/latest/querying/functions/#increase)
-   - [Counter metric type](https://prometheus.io/docs/concepts/metric_types/#counter)
-
-2. **Best Practices:**
-   - [Prometheus Instrumentation](https://prometheus.io/docs/practices/instrumentation/)
-   - [Naming Conventions](https://prometheus.io/docs/practices/naming/)
-
-3. **Grafana:**
-   - [Time Range Controls](https://grafana.com/docs/grafana/latest/dashboards/time-range-controls/)
-   - [Dashboard Variables](https://grafana.com/docs/grafana/latest/dashboards/variables/)
-
-4. **Community Resources:**
-   - [Stack Overflow: Counter Resets](https://stackoverflow.com/questions/58069711/how-to-sum-prometheus-counters-when-k8s-pods-restart)
-   - [SignOz Guide](https://signoz.io/guides/how-to-handle-counters-on-servers-in-prometheus/)
-
----
-
-**Last Updated**: 2026-01-01  
-**Version**: 1.0  
-**Maintainer**: SRE Team
+_Last updated: 2026-06-29 — counters, `rate()` vs `increase()`, Time Range vs `$rate` on VictoriaMetrics._

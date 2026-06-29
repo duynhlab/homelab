@@ -44,6 +44,14 @@ out-of-range values fall back to the defaults. Paginated lists: products, review
 orders, notifications. (Note: `product` still accepts the legacy `limit` query param
 for page size; the other three use `page_size` — to be unified.)
 
+### Observability
+
+Every request is measured with the **RED method** from a single
+`request_duration_seconds` histogram, and east-west gRPC calls emit matching RED
+metrics on the same `/metrics` endpoint. How requests are instrumented, labelled,
+and turned into SLOs is documented in
+[observability → application metrics](../observability/metrics/metrics-apps.md).
+
 ---
 
 ## 3-Layer Architecture Responsibility

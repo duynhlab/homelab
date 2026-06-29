@@ -1,14 +1,22 @@
 # Build Template — Push-only workflow
 #
 # Triggers on: push to dev/uat/main, tag v*
-# Purpose: build Docker images, scan before push, sign, notify
+# Purpose: build & sign Docker images; on a v* tag also build the versioned
+# image (:X.Y.Z) and publish the keyless-signed binary release.
 #
 # This workflow only handles push events. By not mixing pull_request triggers,
 # GitHub status check names stay clean (no "(push)" suffix).
 #
+# Image tags (see gha-workflows/docker-build-go.yml): branch push -> :sha-<short>;
+# tag v* -> :X.Y.Z + :X.Y. No mutable :latest. A v* tag runs the FULL pipeline
+# (test, scan, build, sign) so the released image is freshly verified.
+#
 # Security: Images are scanned with Trivy BEFORE pushing to GHCR.
 # If vulnerabilities are found, the image is never pushed to the registry.
 # This prevents FluxCD from auto-deploying vulnerable images.
+#
+# Binary release: set repo variable ENABLE_BINARY_RELEASE=true to also publish
+# a GoReleaser binary release (keyless-signed) on v* tags.
 #
 # UAT optional: services not using uat simply never push to that branch.
 #
@@ -38,11 +46,10 @@ permissions:
 
 jobs:
   # ──────────────────────────────────────────────────
-  # 1. Test & Lint (gate before build)
-  # Skipped on: tag pushes (code already tested on branch)
+  # 1. Test & Lint (gate before build) — runs on branches AND tags
+  # (a v* tag re-verifies the code before cutting the release).
   # ──────────────────────────────────────────────────
   go-check:
-    if: "!startsWith(github.ref, 'refs/tags/')"
     uses: duynhlab/gha-workflows/.github/workflows/go-check.yml@main
     with:
       command-test: 'go test -race -coverprofile=coverage.out ./...'
@@ -53,7 +60,6 @@ jobs:
   # 1b. Secret Detection (Gitleaks)
   # ──────────────────────────────────────────────────
   gitleaks:
-    if: "!startsWith(github.ref, 'refs/tags/')"
     uses: duynhlab/gha-workflows/.github/workflows/gitleaks.yml@main
     permissions:
       contents: read
@@ -74,13 +80,11 @@ jobs:
 
   # ──────────────────────────────────────────────────
   # 3a. Build, Scan & Push Docker Image
-  # Image is built locally, scanned with Trivy, and
-  # only pushed to GHCR if the scan passes.
-  # NOT on: tags (no rebuild at release time)
+  # Built locally, scanned with Trivy, pushed only if the scan passes.
+  # Branch push -> :sha-<short>; tag v* -> :X.Y.Z + :X.Y (versioned release image).
   # ──────────────────────────────────────────────────
   docker-build:
     needs: [go-check, sonar]
-    if: "!startsWith(github.ref, 'refs/tags/')"
     uses: duynhlab/gha-workflows/.github/workflows/docker-build-go.yml@main
     with:
       image-name: ${{ github.event.repository.name }}
@@ -135,7 +139,6 @@ jobs:
   # ──────────────────────────────────────────────────
   docker-db-init:
     needs: [go-check, sonar]
-    if: "!startsWith(github.ref, 'refs/tags/')"
     uses: duynhlab/gha-workflows/.github/workflows/docker-build-go.yml@main
     with:
       image-name: '${{ github.event.repository.name }}-init'
@@ -152,11 +155,25 @@ jobs:
       actions: read
 
   # ──────────────────────────────────────────────────
+  # 3e. Binary Release (GoReleaser, keyless-signed) — v* tags only
+  # Gated by repo variable ENABLE_BINARY_RELEASE=true. Builds the Go binary,
+  # publishes a GitHub Release with checksums.txt + cosign signature.
+  # ──────────────────────────────────────────────────
+  release-binary:
+    needs: [go-check, sonar]
+    if: startsWith(github.ref, 'refs/tags/v') && vars.ENABLE_BINARY_RELEASE == 'true'
+    uses: duynhlab/gha-workflows/.github/workflows/goreleaser.yml@main
+    secrets: inherit
+    permissions:
+      contents: write
+      id-token: write
+
+  # ──────────────────────────────────────────────────
   # 4. Final Status Notification
   # ──────────────────────────────────────────────────
   notify:
     if: always()
-    needs: [go-check, gitleaks, sonar, docker-build, trivy-report, docker-sign, docker-db-init]
+    needs: [go-check, gitleaks, sonar, docker-build, trivy-report, docker-sign, docker-db-init, release-binary]
     uses: duynhlab/gha-workflows/.github/workflows/status.yml@main
     with:
       slack_channel_id: "{{SLACK_CHANNEL_ID}}"

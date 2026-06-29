@@ -102,9 +102,9 @@ sequenceDiagram
     end
 
     Dev->>Main: open MR -> main (2 approvals)
-    Main->>GHCR: CI builds sha-abc123 + latest
+    Main->>GHCR: CI builds sha-abc123
     Dev->>Main: git tag -s v1.2.0
-    Main->>GHCR: tag pipeline retags as v1.2.0 (no rebuild)
+    Main->>GHCR: tag pipeline builds versioned image v1.2.0 (full build, scan, sign)
     GHCR->>Flux: image update detected
     Flux->>Flux: reconcile prod namespace
 ```
@@ -168,9 +168,9 @@ This is the critical path. Source is `uat` (if used) or `dev` (if uat is skipped
 |------|-----|-------|--------|-----------------|
 | 1 | Tech lead | GitHub UI | Open MR: `uat` -> `main` (or `dev` -> `main`) | `pull_request`: test, lint, sonar |
 | 2 | Tech lead + QA | GitHub UI | Review + approve (**2 approvals required**: tech lead + QA) | -- |
-| 3 | Tech lead | GitHub UI | Merge MR | `push main`: build, scan, sign -> image `sha-abc123` + `latest` |
+| 3 | Tech lead | GitHub UI | Merge MR | `push main`: build, scan, sign -> image `sha-abc123` |
 | 4 | Tech lead | **Local terminal** | Create signed release tag (commands below) | -- |
-| 5 | (automatic) | CI | Tag `v*` push detected -> retag existing digest as `v1.2.0` (**no rebuild**) | Release pipeline |
+| 5 | (automatic) | CI | Tag `v*` push detected -> full build + scan + sign -> versioned image `v1.2.0` | Release pipeline |
 | 6 | (automatic) | Flux | Image `v1.2.0` detected -> reconcile prod namespace | Smoke tests (prod) |
 | 7 | Tech lead | **Local terminal** | Back-merge `main` -> `dev` (and `uat` if active) | -- |
 | 8 | Tech lead | kubectl / Flux UI | Verify production deployment | -- |
@@ -190,7 +190,7 @@ git push origin v1.2.0
 
 What happens after `git push origin v1.2.0`:
 1. CI detects `tags/v*` push event.
-2. Release pipeline runs: retags the **existing** `sha-abc123` digest as `v1.2.0` in GHCR. No rebuild.
+2. Release pipeline runs the full build on the tag: test, scan, build & push the versioned image `v1.2.0` (+ `v1.2`), and cosign-sign it. If `ENABLE_BINARY_RELEASE=true`, it also publishes the keyless-signed GoReleaser binary release.
 3. Flux detects image `v1.2.0` -> reconciles prod namespace.
 4. Pods roll out with the new image.
 
@@ -302,10 +302,10 @@ vMAJOR.MINOR.PATCH
 |-------|-------------------|---------|
 | Push to `dev` | `sha-<short>`, `dev-<run>` | Integration testing |
 | Push to `uat` | `sha-<short>`, `rc-<sha>` | QA/UAT candidate |
-| Push to `main` | `sha-<short>`, `latest` | Production candidate |
-| Git tag `v*` | `v1.2.3`, `sha-<short>` | Immutable production release |
+| Push to `main` | `sha-<short>` | Production candidate |
+| Git tag `v*` | `v1.2.3`, `v1.2` | Immutable production release (full build on the tag) |
 
-**Critical rule**: `latest` is a convenience alias. Production deployments must reference either `vX.Y.Z` or a digest (`sha256:...`). Never deploy `latest` as the sole identifier.
+**Critical rule**: no mutable `latest` tag is produced. Production deployments reference either `vX.Y.Z` or a digest (`sha256:...`). The `v1.2` alias floats to the newest patch — never pin it; pin the full `vX.Y.Z` or digest.
 
 ### Tag Signing
 
@@ -328,8 +328,8 @@ CI and post-deploy verification are separated into two phases: **pre-merge check
 | `pull_request` | `dev`, `uat`, `main` | test, lint, sonar | None (checks only) |
 | `push` | `dev` | test, sonar, build, scan, sign | `sha-<short>`, `dev-<run>` |
 | `push` | `uat` | test, sonar, build, scan, sign | `sha-<short>`, `rc-<sha>` |
-| `push` | `main` | test, sonar, build, scan, sign | `sha-<short>`, `latest` |
-| `push` | `tags/v*` | retag digest, release metadata | `vX.Y.Z` (no rebuild) |
+| `push` | `main` | test, sonar, build, scan, sign | `sha-<short>` |
+| `push` | `tags/v*` | test, sonar, build, scan, sign (+ binary release) | `vX.Y.Z`, `vX.Y` (full build) |
 
 See [`check_template.yml`](check_template.yml) (PR-only checks) and [`build_template.yml`](build_template.yml) (push-only build & delivery) for the reference workflows.
 
@@ -363,7 +363,7 @@ curl -sf http://${SERVICE}.${NAMESPACE}.svc.cluster.local:8080/api/v1/ping
 - API regression tests (contract validation against OpenAPI spec)
 - Load baseline (compare p99 latency against previous release)
 
-**Key principle**: The same image that passes uat verification is promoted to production. No rebuild, no retest of unit/integration -- only live health validation in prod.
+**Key principle**: the production image is built from the same commit that passed uat, freshly built + scanned + signed on the `v*` tag and pinned by version. Promotion = deploy that versioned image; prod adds live health validation on top of the tag-time re-verification.
 
 ```mermaid
 flowchart LR
@@ -723,7 +723,7 @@ At Enterprise scale (1000 repos), adopt the [Swissquote pattern](https://medium.
 | `feature/*` | `dev` | Any team member (1 approval) | Yes (CI builds on push to dev) |
 | `dev` | `uat` | Tech lead (1 approval) | Yes (CI builds on push to uat) |
 | `uat` | `main` | Tech lead + QA (2 approvals) | Yes (CI builds on push to main) |
-| `main` + tag `v*` | Production | Release manager (tag push) | No (reuses existing digest) |
+| `main` + tag `v*` | Production | Release manager (tag push) | Yes (full versioned build + scan + sign on the tag) |
 | `hotfix/*` | `main` | Tech lead (expedited, 1 approval min) | Yes (CI builds on push to main) |
 
 ### Audit Trail

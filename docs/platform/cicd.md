@@ -17,7 +17,7 @@ This pipeline operates under the **Hybrid Enterprise Gitflow** model defined in 
 - **`vX.Y.Z` tags** on `main` — immutable production releases; trigger release pipeline.
 - **`feature/*`** from `dev`, **`hotfix/*`** from `main`.
 
-**Container images** are **built once per commit** (on push to `main`) with an immutable `sha-<short>` tag; promotion between environments reuses the same digest — **no image rebuild occurs at tag time**. `latest` exists as a convenience alias but is never the sole deployment reference. Separately, a **`v*` tag** triggers a **GoReleaser binary release** (a Go binary + GitHub Release for the `packages` project) — that *does* compile, but it is a distinct artifact from the container image (see [Binary Releases](#binary-releases-goreleaser)). See [`gitflow.md`](gitflow.md) for the full branching model, tagging policy, runbooks, and governance rules.
+**Container images** on a branch push (`dev`/`uat`/`main`) are tagged with an immutable `sha-<short>` — **no mutable `latest`**. A **`v*` tag** runs the full pipeline (test, scan, build, sign) and produces the **versioned image** `:X.Y.Z` (+ `:X.Y`) — a fresh build on the tag, not a digest retag. The same `v*` tag also publishes a **GoReleaser binary release** (Go binary + GitHub Release, keyless-signed) when `ENABLE_BINARY_RELEASE=true` (see [Binary Releases](#binary-releases-goreleaser)). Production deploys pin `:X.Y.Z` or a digest. See [`gitflow.md`](gitflow.md) for the full branching model, tagging policy, runbooks, and governance rules.
 
 **Branch enforcement** is managed via **GitHub Rulesets** (not legacy Branch Protection). Each service repo has 3 layered rulesets: Base Protection (all branches), Production Gate (`main` only), and Release Tags (`v*`). Required status checks (`go-check / Test`) are configured in the Base Protection ruleset, ensuring CI must pass before any merge. See [`gitflow.md` section 7](gitflow.md#7-github-rulesets-branch-enforcement) for the full ruleset configuration, CODEOWNERS integration, and setup guide.
 
@@ -68,7 +68,7 @@ Each service repository reuses workflows from `duynhlab/gha-workflows`:
 - `docker-build-node.yml` (build, scan before push, push Docker image for Node.js services — same outputs)
 - `trivy-scan.yml` (Post-push Trivy image scan — SARIF + Google Sheets reporting, non-blocking)
 - `docker-sign.yml` (Cosign keyless image signing)
-- `goreleaser.yml` (binary release on `v*` tags — GoReleaser → GitHub Release; tarball + `.sha256` + `build-info.env`, see [Binary Releases](#binary-releases-goreleaser))
+- `goreleaser.yml` (binary release on `v*` tags — GoReleaser → GitHub Release; tarball + `checksums.txt` + cosign keyless signature, see [Binary Releases](#binary-releases-goreleaser))
 - `status.yml` (final Slack + Google Sheets status notification)
 
 The pipeline follows a **"Build Once, Analyze Everywhere"** pattern: `go-check` produces a `coverage.out` artifact that `sonarqube` consumes (no need to rerun tests for analysis).
@@ -162,8 +162,8 @@ flowchart LR
     subgraph ci_push ["Push Events (build + deliver)"]
         P_D["push dev: build sha + dev-N"]
         P_S["push uat: build sha + rc-sha"]
-        P_M["push main: build sha + latest"]
-        P_T["tag v*: GoReleaser binary release<br/>(image digest also retagged)"]
+        P_M["push main: build sha-short"]
+        P_T["tag v*: full versioned image build<br/>+ GoReleaser binary release"]
     end
 
     F -.-> PR_D
@@ -289,7 +289,7 @@ sequenceDiagram
     end
 
     alt Tag v* on main
-      Note over GA,Build: GoReleaser builds the binary + GitHub Release<br/>(image digest may also be retagged vX.Y.Z)
+      Note over GA,Build: Full versioned image build (:vX.Y.Z) + GoReleaser binary release
       GA-->>Slack: Release notification
     end
 
@@ -376,10 +376,10 @@ flowchart TD
 
 | Step | Job Name | Action & Responsibility |
 |------|----------|-------------------------|
-| **1** | `release` (calls `goreleaser.yml`) | Checkout (full history) → setup Go → generate `build-info.env` → run **GoReleaser** (`release --clean`): builds `bin/<repo>` (`CGO_ENABLED=0`, `-trimpath`, `-ldflags "-s -w -X main.version=…"`, `./cmd`, linux/amd64), archives it, and creates the GitHub Release. |
+| **1** | `release-binary` (calls `goreleaser.yml`) | Checkout (full history) → setup Go → install Cosign → run **GoReleaser** (`release --clean`): builds `bin/<repo>` (`CGO_ENABLED=0`, `-trimpath`, `-ldflags "-s -w -X main.version=…"`, `./cmd`, linux/amd64), archives it, writes a combined `checksums.txt`, **keyless-signs the checksums** (cosign OIDC), and creates the GitHub Release. |
 
-> Unlike the **container image** (built once on `main`, never rebuilt at tag time), this binary
-> release **does compile** on the tag — it is a separate artifact stream for `packages`.
+> On a `v*` tag the **container image** is also built (a fresh versioned `:X.Y.Z` build); this
+> binary release is a separate artifact stream for `packages`. Version comes from the git tag.
 
 ---
 
@@ -392,31 +392,32 @@ This exists to feed the **`packages`** project (the `dnf install duynhlab` mega-
 
 ### Artifact contract (per service, per `vX.Y.Z`)
 
-The assets deliberately match `packages/scripts/build-local.sh` so `packages` can consume them
-unchanged:
+Standard GoReleaser supply-chain layout (as used by Kubernetes, cosign, Cilium):
 
 | Asset | Detail |
 |---|---|
 | `<repo>-<version>-linux-amd64.tar.gz` | the archive; `<repo>` = `<svc>-service`, `<version>` = tag without `v`. Contains **`bin/<repo>`** (+ `README`/`LICENSE` when present). |
-| `<tarball>.sha256` | per-file checksum (GoReleaser `checksum.split: true`). |
-| `build-info.env` | sidecar: `SERVICE` (short name), `TYPE=backend`, `VERSION`, `GIT_SHA`, `GOOS=linux`, `GOARCH=amd64`, `SCHEMA_VERSION` (= highest `db/migrations/sql/*.up.sql`), `BUILT_AT`, `SOURCE=github-release`. |
+| `checksums.txt` | single combined SHA-256 checksum file covering all artifacts. |
+| `checksums.txt.sig` / `checksums.txt.pem` | cosign **keyless** (OIDC) signature + certificate over `checksums.txt`. |
+| SBOM | syft SBOM per archive (supply-chain). |
 
 ### Where the config lives
 
 - **Shared workflow** — `duynhlab/gha-workflows/.github/workflows/goreleaser.yml`: checkout
-  (`fetch-depth: 0`) → setup Go → generate `build-info.env` (the SCHEMA_VERSION scan + git/tag
-  metadata live here, once) → `goreleaser/goreleaser-action@v7` (SHA-pinned) `release --clean`.
-  `permissions: contents: write`; the GoReleaser **CLI** is constrained to `~> v2` (independent of
-  the action major v7).
+  (`fetch-depth: 0`) → setup Go → install Cosign → `goreleaser/goreleaser-action@v7` (SHA-pinned)
+  `release --clean`. `permissions: contents: write` + `id-token: write` (keyless); the GoReleaser
+  **CLI** is constrained to `~> v2` (independent of the action major v7).
 - **Per service** — a `.goreleaser.yaml` (schema v2: `builds` with `binary: bin/<repo>`,
-  `archives` `name_template`, `checksum.split`, `release.extra_files: build-info.env`) and a
-  `.github/workflows/release.yml` (`on: push tags v*` → calls the shared workflow).
+  `archives` `name_template`, combined `checksums.txt`, `signs:` cosign keyless,
+  `release.replace_existing_artifacts: true`). The build is wired into `build.yml` as the
+  tag-gated `release-binary` job (no separate `release.yml`), enabled by repo variable
+  `ENABLE_BINARY_RELEASE=true`.
 
 ```mermaid
 flowchart LR
-    TAG["git tag vX.Y.Z<br/>(service repo)"] --> RY["release.yml"]
-    RY --> GR["gha-workflows/goreleaser.yml<br/>(gen build-info.env → GoReleaser)"]
-    GR --> REL["GitHub Release<br/>tar.gz + .sha256 + build-info.env"]
+    TAG["git tag vX.Y.Z<br/>(service repo)"] --> BY["build.yml<br/>release-binary job (ENABLE_BINARY_RELEASE)"]
+    BY --> GR["gha-workflows/goreleaser.yml<br/>(GoReleaser + cosign keyless)"]
+    GR --> REL["GitHub Release<br/>tar.gz + checksums.txt + .sig/.pem (+ SBOM)"]
     REL -. "download (future fetch-releases.sh)" .-> PKG["packages<br/>(mega-RPM)"]
 ```
 
@@ -424,8 +425,9 @@ flowchart LR
 
 1. Add `.goreleaser.yaml` (copy an existing service's; change `project_name`/`binary` to
    `<svc>-service`).
-2. Add `.github/workflows/release.yml` calling `goreleaser.yml@main` on `v*` tags.
-3. Cut a tag: `git tag vX.Y.Z && git push origin vX.Y.Z`. The Release appears with the three
+2. Set repo variable `ENABLE_BINARY_RELEASE=true` (the `release-binary` job in `build.yml` is
+   already wired to fire on `v*` tags).
+3. Cut a tag: `git tag vX.Y.Z && git push origin vX.Y.Z`. The Release appears with the
    assets above.
 
 > **Note:** the `packages` consumer side (`fetch-releases.sh` to download these instead of

@@ -1,380 +1,184 @@
-# Structured Logging Guide
+# Logging
 
-## Quick Summary
+The **logs pillar** of the platform — the "**why is it broken?**" signal
+(alongside metrics "is something wrong?", traces "where is it slow?", and
+profiles "which line of code?"; see [`../README.md`](../README.md)). Every pod's
+stdout is collected by one Vector agent and stored in VictoriaLogs, queryable
+with LogsQL and correlated to traces by `trace_id`.
 
-**Objectives:**
-- Implement structured JSON logging with trace-id correlation
-- Understand the single-backend architecture: one Vector agent → VictoriaLogs
-- Query logs with LogsQL (VictoriaLogs)
-- Correlate logs with traces in Grafana
+| | |
+|---|---|
+| **Collector** | Vector — one cluster-wide **DaemonSet** (`kube-system`), `kubernetes_logs` source |
+| **Storage** | VictoriaLogs **VLSingle** `:9428` (`monitoring`, VM Operator CRD) — 7-day retention, 20Gi PVC |
+| **Query** | LogsQL (VictoriaLogs) |
+| **Visualization** | Grafana — `victorialogs` datasource (`victoriametrics-logs-datasource`) |
+| **Correlation** | `trace_id` field ↔ Tempo (log→trace and trace→log) |
+| **App logging** | How services emit logs (libraries, format, levels, wiring) → [`../../api/logs.md`](../../api/logs.md) |
 
-**Learning Outcomes:**
-- Structured logging best practices with Zap
-- Trace-ID propagation and correlation
-- LogsQL query syntax for VictoriaLogs
-- Vector log collection, transformation, and sink routing
-- Log-to-trace correlation patterns
+> This doc is the **architecture** view: the pipeline, why this stack, and how it
+> scales. For **how to implement logging in a service** — log libraries
+> (Zap/clog/zerolog), the JSON field contract, the level schema, trace-id wiring,
+> and onboarding — see the API-layer source of truth,
+> [**Logging Standards**](../../api/logs.md). Backend/ops detail (VLSingle config,
+> Vector pipeline, endpoints, verification) lives in [`victorialogs.md`](victorialogs.md).
 
-**Keywords:**
-Structured Logging, JSON Logs, Trace-ID, Log Correlation, LogsQL, Log Aggregation, Vector, VictoriaLogs, Zap Logger, Log Levels, Log Queries
-
-**Technologies:**
-- Zap (Go structured logger)
-- Vector (log collection agent — single DaemonSet)
-- VictoriaLogs / VLSingle (log storage + LogsQL querying — sole log backend, PG plan streams)
-- Grafana (log visualization + trace correlation)
-
-> **See also:** [VictoriaLogs](victorialogs.md) for VLSingle configuration, Vector sink headers, PG plan streams, and LogsQL verification commands.
+---
 
 ## Overview
 
-All services use **structured JSON logging** with **trace-id correlation**. A single **Vector** DaemonSet collects logs cluster-wide and ships them to **VictoriaLogs** (LogsQL, the sole log backend; also handles PostgreSQL plan analysis).
+All services log **structured JSON to stdout**; nothing writes log files. A single
+**Vector** DaemonSet tails every container on its node, tags each line with stream
+fields (`namespace`, `service`, `pod_name`, `container_name`), and ships it to
+**VictoriaLogs** over HTTP. VictoriaLogs is the **sole** log backend (Loki was
+removed) and also carries a dedicated stream of parsed **PostgreSQL
+`auto_explain`** query plans. Because every line keeps the `trace_id` the
+application logged, a log and its distributed trace join on one id.
 
 ## Architecture
 
 ```mermaid
-flowchart TD
-    subgraph sources ["Log Sources"]
-        Pods["Kubernetes Pods\n8 microservices + infra"]
-        CNPG["CloudNativePG\nPostgreSQL logs"]
+flowchart LR
+    subgraph sources["Sources"]
+        Pods["Pods (8 services + infra)<br/>stdout JSON"]
+        CNPG["CloudNativePG<br/>auto_explain plans"]
     end
-
-    subgraph vector ["Vector Agent (kube-system)"]
-        KLogs["kubernetes_logs source"]
-        AddLabels["add_labels transform\n+namespace, +service, +pod"]
-        ParsePG["parse_pg_json pipeline\nauto_explain plans"]
+    subgraph vector["Vector DaemonSet · kube-system"]
+        KL["kubernetes_logs"]
+        AL["add_labels<br/>namespace/service/pod/container"]
+        PG["parse_pg_json →<br/>filter/parse auto_explain"]
     end
-
-    subgraph vlogs ["Backend: VictoriaLogs"]
-        VLAll["VLSingle :9428\nall logs (LogsQL)"]
-        VLPlans["PG query plans stream"]
-        GrafanaExplore["Grafana Explore\nlog-to-trace correlation"]
-    end
-
-    Pods --> KLogs
-    CNPG --> KLogs
-    KLogs --> AddLabels
-    KLogs --> ParsePG
-    AddLabels --> VLAll
-    ParsePG --> VLPlans
-    VLAll --> GrafanaExplore
+    Pods --> KL
+    CNPG --> KL
+    KL --> AL
+    KL --> PG
+    AL -->|"/insert/jsonline"| VL[("VictoriaLogs VLSingle :9428<br/>monitoring · 7d / 20Gi")]
+    PG -->|"PG-plans stream"| VL
+    VL --> GRAF["Grafana Explore<br/>(LogsQL)"]
+    GRAF <-. "trace_id ↔ Tempo" .-> TEMPO["Tempo"]
 ```
 
-### Why VictoriaLogs?
+**One agent, one backend.** A single cluster-wide Vector DaemonSet does all
+collection — the VictoriaLogs Helm chart's embedded collector is **disabled** so
+there is no duplicate ingestion. Vector applies two pipelines: the *all-logs*
+pipeline (label + ship) and the *PostgreSQL* pipeline (extract `auto_explain`
+execution plans into their own stream). Both land in one VLSingle instance.
+Pipeline internals, sink headers, and stream definitions are in
+[`victorialogs.md`](victorialogs.md).
 
-| Backend | Query Language | Best For |
-|---------|---------------|----------|
-| **VictoriaLogs** | LogsQL | Grafana Explore, log-to-trace correlation (Tempo), high-performance search, PostgreSQL plan analysis |
+## Why VictoriaLogs (and why not Loki / ELK)
 
-VictoriaLogs is the single log sink. No duplicate collection agents, no second backend to operate.
+The platform standardised on VictoriaLogs and **removed Loki** (CHANGELOG
+`v0.83.0` architectural switch, `v0.94.0` dead-manifest cleanup): one backend, no
+second system to operate, native trace correlation, and `auto_explain` plan
+analysis out of the box.
 
-## Log Format
+| | **VictoriaLogs** (chosen) | Loki | ELK / OpenSearch |
+|---|---|---|---|
+| Query language | LogsQL (full-text **and** structured) | LogQL | Lucene / KQL |
+| Index model | Columnar + bounded **streams** | Label index + chunks | Inverted index |
+| High-cardinality fields | Tolerant — put them in the message, not the stream | **Fragile** — high-cardinality labels degrade it | Tolerant but RAM/disk-heavy |
+| Resource footprint | Very low (single small binary) | Low–moderate | High (JVM, shards) |
+| Trace correlation | Native (`trace_id` ↔ Tempo) | Native | Plugin/manual |
+| Ops cost | Minimal | Moderate | High |
 
-All logs are in JSON format with the following structure:
+### Strengths / weaknesses
 
-```json
-{
-  "timestamp": "2024-01-15T10:30:45.123Z",
-  "level": "info",
-  "message": "HTTP request",
-  "trace_id": "abc123def456",
-  "method": "GET",
-  "path": "/api/v1/users",
-  "status": 200,
-  "duration": 0.045,
-  "client_ip": "10.0.0.1",
-  "user_agent": "Mozilla/5.0...",
-  "caller": "middleware/logging.go:123"
-}
+**Strengths** — tiny resource footprint; tolerant of high-cardinality fields
+(`trace_id`, `query_id` live in the message, never as stream labels); LogsQL does
+both full-text and structured filtering; single-binary simplicity; native Grafana
+plugin and Tempo correlation; Elasticsearch-compatible ingest endpoint.
+
+**Weaknesses (honest)** — **VLSingle is single-node**: no replication/HA, so it is
+homelab-grade as deployed; LogsQL is less widely known than LogQL/KQL; the
+community/ecosystem is smaller than Loki's or Elastic's; the 7d / 20Gi window is
+small and **PVC fill is the practical limit** (covered by the
+`KubePersistentVolumeFillingUp` alert).
+
+## Scaling to 1000+ microservices
+
+What this design does well at scale, and the upgrade path:
+
+- **Collection scales with the cluster.** Vector is a DaemonSet — one agent per
+  node — so ingest capacity grows automatically as you add nodes; there is no
+  central aggregator to become a bottleneck.
+- **Cardinality stays bounded by design.** Stream fields are deliberately
+  low-cardinality (`namespace`, `service`, `pod_name`, `container_name`).
+  High-cardinality values (`trace_id`, `user_id`, `query_id`) stay in the log
+  body, so the index does not explode — this is exactly the failure mode that
+  forces label discipline on Loki. The rule at 1000+ services: **never promote a
+  high-cardinality field to a stream field.**
+- **Volume control at the edge.** Drop or sample noisy/debug lines in Vector
+  transforms *before* they are shipped, to keep ingest and storage in check.
+- **Backpressure is handled.** Vector's buffer (`when_full: drop_newest`) protects
+  the pipeline under bursts; at scale, size buffers up or switch to disk buffers.
+- **Storage sizing.** 7d / 20Gi suits a homelab; size production by
+  *ingest-rate × retention* (VictoriaLogs compresses well). Use tiered retention
+  if needed.
+- **Horizontal scale-out when one node isn't enough.** Migrate **VLSingle →
+  VictoriaLogs cluster** (`vlinsert` / `vlstorage` / `vlselect`) for horizontal
+  scale and replication — same LogsQL, same ingest contract, no app changes.
+
+> This homelab runs 8 services + infra today; the above is the scale-up path, not
+> something stress-tested here. The 1000+ framing follows the same large-scale
+> references the platform uses elsewhere (Uber M3, Grab/Shopee) — see
+> [observability deep-dive](../runbooks/observability-deep-dive.md).
+
+## Querying & correlation
+
+Query in **Grafana → Explore → VictoriaLogs** (or the LogsQL HTTP API). Common
+LogsQL:
+
+```logsql
+_stream:{service="auth"}                 # all logs for a service
+_stream:{service="auth"} level:error     # filter by a JSON field
+trace_id:abc123def456                    # everything for one trace
+_stream:{namespace="product"} _time:5m   # recent, by namespace
 ```
 
-## Trace-ID in Logs
+- **Log → trace:** open a log line with a `trace_id` → *Query with Tempo* jumps to
+  the trace.
+- **Trace → log:** in a Tempo span, the **Logs** tab shows the correlated lines
+  (Tempo `tracesToLogsV2` → `victorialogs` datasource).
 
-Every log entry includes a `trace_id` field that:
-- Links logs to distributed traces
-- Enables log-to-trace correlation in Grafana
-- Allows searching logs by trace-id
+More examples, verification commands, and the PG-plan stream are in
+[`victorialogs.md`](victorialogs.md#verification).
 
-## Log Levels
-
-- **INFO**: Normal operations (HTTP requests, successful operations)
-- **WARN**: Warning conditions (failed tracing initialization, etc.)
-- **ERROR**: Error conditions (HTTP errors, failed operations)
-- **FATAL**: Critical errors (server startup failures)
-
-## Automatic Logging
-
-### HTTP Request Logging
-
-All HTTP requests are automatically logged with:
-- Method, path, status code
-- Request duration
-- Client IP and user agent
-- Trace ID
-
-### Error Logging
-
-HTTP errors (4xx, 5xx) are automatically logged at ERROR level.
-
-## Manual Logging
-
-### Using Logger from Context
-
-```go
-import (
-    "github.com/duynhlab/monitoring/pkg/middleware"
-    "go.uber.org/zap"
-)
-
-func handler(c *gin.Context) {
-    logger := middleware.GetLoggerFromContext(c, baseLogger)
-    
-    logger.Info("Processing order",
-        zap.String("order_id", orderID),
-        zap.String("user_id", userID),
-    )
-}
-```
-
-### Adding Custom Fields
-
-```go
-logger.Info("User created",
-    zap.String("user_id", userID),
-    zap.String("email", email),
-    zap.Int("age", age),
-)
-```
-
-## Log Collection
-
-### Vector Configuration
-
-Vector collects logs from all pods and:
-1. Parses JSON logs
-2. Extracts trace-id
-3. Adds service name and namespace labels
-4. Ships to **VictoriaLogs** (all logs + dedicated PG plan stream)
-
-For VictoriaLogs sink details (headers, stream fields, PG plan pipeline), see [VictoriaLogs](victorialogs.md).
-
-### VictoriaLogs Storage
-
-Logs are stored in VictoriaLogs (VLSingle `:9428`) with stream fields:
-- `namespace`, `service`, `pod_name`, `container_name`
-- Dedicated streams for PostgreSQL query plans (`cluster_name`, `database`, `query_id`)
-
-See [VictoriaLogs](victorialogs.md) for complete configuration and verification.
-
-## Viewing Logs
-
-### Grafana
-
-1. Port-forward Grafana:
-   ```bash
-   kubectl port-forward -n monitoring svc/grafana-service 3000:3000
-   ```
-
-2. Open Grafana: http://localhost:3000
-
-3. Navigate to **Explore** → Select **VictoriaLogs** datasource
-
-4. Query logs (LogsQL):
-   ```
-   _stream:{service="auth"} error
-   trace_id:abc123
-   _stream:{namespace="auth"} level:error
-   ```
-
-### VictoriaLogs (LogsQL)
-
-**Grafana Explore (recommended):**
-
-1. Port-forward Grafana: `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`
-2. Open **Explore**, select datasource **VictoriaLogs** (type `victoriametrics-logs-datasource`, UID `victorialogs`).
-3. Run a LogsQL query (e.g. `*` for all logs, or `_stream:{namespace="product"}`). See the [VictoriaLogs Grafana plugin](https://grafana.com/grafana/plugins/victoriametrics-logs-datasource/).
-
-Provisioning: [`datasource-victorialogs.yaml`](../../../kubernetes/infra/configs/monitoring/grafana/datasource-victorialogs.yaml) → `http://vlsingle-victoria-logs.monitoring.svc.cluster.local:9428`.
-
-**CLI / API (no Grafana):**
+## Operations quick-start
 
 ```bash
-# Port-forward to VictoriaLogs
+# Explore logs in Grafana
+kubectl port-forward -n monitoring svc/grafana-service 3000:3000   # → Explore → VictoriaLogs
+
+# Query VictoriaLogs directly
 kubectl port-forward -n monitoring svc/vlsingle-victoria-logs 9428:9428
-
-# Query logs by namespace
 curl -G 'http://localhost:9428/select/logsql/query' \
-  --data-urlencode 'query=_stream:{namespace="product"}' \
-  --data-urlencode 'limit=10'
+  --data-urlencode 'query=_stream:{namespace="product"}' --data-urlencode 'limit=10'
+
+# Is the pipeline healthy?
+kubectl get pods -n kube-system -l app.kubernetes.io/name=vector
+kubectl get vlsingle -n monitoring
 ```
 
-For more LogsQL examples and troubleshooting, see [VictoriaLogs](victorialogs.md#verification).
+Vector self-monitoring (its own throughput/error/buffer metrics, alerts, and
+dashboard) and full backend troubleshooting are in
+[`victorialogs.md`](victorialogs.md).
 
-### Log-to-Trace Correlation
-
-1. Open a trace in Grafana (Tempo datasource)
-2. Click on a span
-3. View correlated logs in the **Logs** tab
-
-### Trace-to-Log Correlation
-
-1. Open logs in Grafana (VictoriaLogs datasource)
-2. Click on a log entry with trace_id
-3. Click "Query with Tempo" to view the trace
-
-## Vector Monitoring
-
-Vector exposes internal metrics in **Prometheus text format** (`prometheus_exporter` sink). **VMAgent** scrapes those targets and remote-writes to **VMSingle**, so you can monitor pipeline health in Grafana like any other workload metric.
-
-### Available Metrics
-
-Key Vector metrics (query in Grafana against the VictoriaMetrics datasource):
-
-- **`vector_events_processed_total`** - Total events processed by each component
-- **`vector_component_errors_total`** - Total errors by component  
-- **`vector_component_sent_bytes_total`** - Bytes sent to sinks (e.g. VictoriaLogs)
-- **`vector_component_received_bytes_total`** - Bytes received from sources
-- **`vector_buffer_events`** - Events currently in buffer
-- **`vector_utilization`** - Component utilization (0.0-1.0)
-
-### Querying Vector Metrics
-
-**Check Vector health**:
-```promql
-up{job="vector"}
-```
-
-**Events processed per second**:
-```promql
-rate(vector_events_processed_total[5m])
-```
-
-**Error rate**:
-```promql
-rate(vector_component_errors_total[5m])
-```
-
-**VictoriaLogs sink throughput** (bytes/sec):
-```promql
-rate(vector_component_sent_bytes_total{component_name=~"victorialogs.*"}[5m])
-```
-
-**Buffer utilization**:
-```promql
-vector_buffer_events
-```
-
-### Monitoring Vector in Grafana
-
-**Option 1: Pre-built Dashboard** (Recommended)
-
-1. Navigate to **Dashboards** in Grafana
-2. Open the **Vector** dashboard (imported from Grafana.com ID: 21954)
-3. View comprehensive Vector metrics:
-   - Events per second by component
-   - Component error rates
-   - Buffer utilization
-   - Throughput (bytes/sec)
-   - Component health status
-
-**Option 2: Manual Queries via Explore**
-
-1. Navigate to **Explore** in Grafana
-2. Select the **VictoriaMetrics** metrics datasource (PromQL-compatible; see [datasources.md](../grafana/datasources.md))
-3. Query Vector metrics (namespace: `vector_*`)
-
-**Recommended Alerts**:
-- High error rate: `rate(vector_component_errors_total[5m]) > 10`
-- Buffer overflow: `vector_buffer_events > 10000`
-- Low throughput: `rate(vector_events_processed_total[5m]) < 100`
-
-### Configuration
-
-Vector self-monitoring is configured via:
-- **Source**: `internal_metrics` (collects Vector's internal metrics)
-- **Sink**: `prometheus_exporter` (exposes metrics on port 9090)
-- **ServiceMonitor → VMServiceScrape**: VMAgent scrapes Vector on a 30s interval (Prometheus Operator CRDs are converted by the VictoriaMetrics Operator)
-
-## Log Queries
-
-All queries below use LogsQL (VictoriaLogs). See [VictoriaLogs](victorialogs.md) for more.
-
-### By Service
+## Documentation map
 
 ```
-_stream:{service="auth"}
+logging/
+├── README.md         # This hub — architecture, why-this-stack, scaling
+└── victorialogs.md   # Backend & pipeline ops: VLSingle config, Vector pipeline,
+                      # endpoints, streams, self-monitoring, verification, runbooks
+../../api/logs.md      # App logging standards & implementation (onboarding)
 ```
-
-### By Trace ID
-
-```
-trace_id:abc123def456
-```
-
-### By Log Level
-
-```
-_stream:{service="auth"} level:error
-```
-
-### By Time Range
-
-```
-_stream:{service="auth"} _time:5m
-```
-
-### Text Search
-
-```
-_stream:{service="auth"} login
-```
-
-### JSON Field Filtering
-
-```
-_stream:{service="auth"} status:500
-```
-
-## Best Practices
-
-1. **Use structured fields**: Always use zap fields instead of string formatting
-2. **Include context**: Add relevant business context (user ID, order ID, etc.)
-3. **Don't log sensitive data**: Never log passwords, tokens, or PII
-4. **Use appropriate levels**: Use ERROR for errors, INFO for normal operations
-5. **Keep messages concise**: Use short, descriptive messages
-
-## Troubleshooting
-
-### Logs not appearing in VictoriaLogs
-
-1. Check Vector pods:
-   ```bash
-   kubectl get pods -n kube-system -l app=vector
-   ```
-
-2. Check Vector logs:
-   ```bash
-   kubectl logs -n kube-system -l app=vector
-   ```
-
-3. Check VictoriaLogs status:
-   ```bash
-   kubectl get pods -n monitoring -l app=vlsingle
-   ```
-
-4. Verify log format: Ensure logs are in JSON format
-
-### Trace-ID missing in logs
-
-1. Verify logging middleware is added
-2. Check that trace context is being propagated
-3. Verify trace-id is being extracted correctly
 
 ## References
 
-- [Zap Logger Documentation](https://github.com/uber-go/zap)
-- [VictoriaLogs Documentation](https://docs.victoriametrics.com/victorialogs/)
-- [LogsQL Query Language](https://docs.victoriametrics.com/victorialogs/logsql/)
-- [Vector Documentation](https://vector.dev/docs/)
-- [VictoriaLogs (project-specific)](victorialogs.md)
+- [App logging standards (onboarding)](../../api/logs.md) · [VictoriaLogs backend & ops](victorialogs.md)
+- [Observability overview](../README.md) · [Grafana datasources](../grafana/datasources.md)
+- [VictoriaLogs docs](https://docs.victoriametrics.com/victorialogs/) · [LogsQL](https://docs.victoriametrics.com/victorialogs/logsql/) · [Vector docs](https://vector.dev/docs/)
 
+---
+
+_Last updated: 2026-06-29 — single Vector DaemonSet → VictoriaLogs VLSingle `:9428` (7d/20Gi), LogsQL, `trace_id` ↔ Tempo; Loki removed._

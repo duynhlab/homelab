@@ -68,8 +68,8 @@ docs/
 │   │   ├── backends-comparison.md # Tempo vs Jaeger vs VictoriaTraces
 │   │   └── victoriatraces.md     # VictoriaTraces pilot (3rd backend)
 │   ├── logging/                  # Pillar 3: Structured Logging
-│   │   ├── README.md             # VictoriaLogs (single Vector)
-│   │   └── victorialogs.md       # VictoriaLogs backend
+│   │   ├── README.md             # Architecture, why-this-stack, scaling
+│   │   └── victorialogs.md       # VictoriaLogs backend & Vector pipeline ops
 │   ├── profiling/                # Pillar 4: Continuous Profiling
 │   │   └── README.md             # Pyroscope (CPU, heap, goroutine)
 │   ├── grafana/                  # Visualization layer
@@ -198,7 +198,7 @@ docs/
 5. **[Backend Comparison](./observability/tracing/backends-comparison.md)** - Tempo vs Jaeger vs VictoriaTraces (+ roadmap)
 6. **[VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md)** - 3rd backend via the VM operator
 5. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
-6. **[Structured Logging](./observability/logging/README.md)** - VictoriaLogs (single Vector)
+6. **[Logging](./observability/logging/README.md)** - Architecture, VictoriaLogs vs Loki, scaling
 7. **[VictoriaLogs](./observability/logging/victorialogs.md)** - VictoriaLogs deployment and configuration
     - Single Vector architecture (ships to VictoriaLogs)
     - PostgreSQL auto_explain plan parsing pipeline
@@ -296,7 +296,7 @@ docs/
 - [Backend Comparison](./observability/tracing/backends-comparison.md) - Tempo vs Jaeger vs VictoriaTraces
 - [VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md) - 3rd backend via the VM operator
 - [Continuous Profiling](./observability/profiling/README.md) - Pyroscope setup
-- [Structured Logging](./observability/logging/README.md) - VictoriaLogs (single Vector)
+- [Logging](./observability/logging/README.md) - Architecture, VictoriaLogs vs Loki, scaling
 - [VictoriaLogs](./observability/logging/victorialogs.md) - VictoriaLogs deployment (single Vector, dual-ship)
 
 ### API

@@ -18,9 +18,7 @@
 | [`secrets-management.md`](./secrets-management.md) | "How do I add / consume / rotate a secret in this repo?" — ESO patterns, per-namespace ExternalSecret mapping, naming conventions, monitoring |
 | [`cert-manager.md`](./cert-manager.md) | cert-manager controller, ClusterIssuers (selfsigned + homelab-ca + Let's Encrypt DNS-01), `kong-proxy-tls` wildcard, deployment runbook, cert/issuer troubleshooting |
 | [`trust-distribution.md`](./trust-distribution.md) | trust-manager `homelab-ca-bundle` distribution, two-PKI split, namespace opt-in label, CA rotation runbook |
-| [`production-plan.md`](./production-plan.md) | Long-form migration plan from Vault dev → OpenBAO HA on EKS/GKE (auto-unseal, OIDC, dynamic DB creds) |
-| [Secrets proposals](../proposals/) | Decisions ([ADR-004](../proposals/adr/ADR-004-enable-openbao-audit-logging/) audit, [ADR-005](../proposals/adr/ADR-005-openbao-ha-raft/) HA) + RFC backlog (rotation, PushSecret, production hardening) |
-| [`vault.md`](./vault.md) | Archived legacy Vault dev-mode docs (kept as historical reference) |
+| [Secrets proposals](../proposals/) | Decisions ([ADR-004](../proposals/adr/ADR-004-enable-openbao-audit-logging/) audit, [ADR-005](../proposals/adr/ADR-005-openbao-ha-raft/) HA) + [RFC-0008](../proposals/rfc/RFC-0008/) production hardening (with its [implementation.md](../proposals/rfc/RFC-0008/implementation.md) — the long-form migration plan) + RFC backlog |
 
 ---
 
@@ -48,7 +46,7 @@
 > | Root token | ❌ persisted, **not revoked** after bootstrap | revoked; OIDC / AppRole |
 >
 > **These local-only choices are unsafe for production.** The hardening path and a
-> local-vs-prod parity/testing matrix live in [`production-plan.md`](./production-plan.md).
+> local-vs-prod parity/testing matrix live in [RFC-0008](../proposals/rfc/RFC-0008/).
 > Any section below describing dynamic credentials, leases, OIDC, or auto-unseal is
 > **planned**, not deployed.
 
@@ -76,6 +74,13 @@
 | DB credentials | ❌ Static `postgres/postgres` | ✅ Dynamic, TTL-based, per-service |
 | Multi-environment | ❌ One flat namespace | ✅ Namespaces: `local/`, `staging/`, `prod/` |
 | License | ❌ BSL (non-OSS) | ✅ Apache 2.0 |
+
+> This table is the canonical **Vault → OpenBAO** comparison (the legacy
+> `vault.md` dev-mode doc has been retired). The decision and the rejected
+> alternatives are recorded in
+> [ADR-005](../proposals/adr/ADR-005-openbao-ha-raft/); the dev-vs-prod
+> seal/TLS/credential tradeoffs and how to close them are in
+> [RFC-0008](../proposals/rfc/RFC-0008/) and the current-state banner above.
 
 ---
 
@@ -361,7 +366,7 @@ secret/{environment}/{category}/{service}/{resource}
 > **⚠ Planned — not yet deployed.** The bootstrap enables only KV v2, Kubernetes
 > auth, and audit; the database secrets engine is **not** enabled. Application
 > credentials today are **static KV v2** values. This section describes the
-> production design (tracked in [`production-plan.md`](./production-plan.md)).
+> production design (tracked in [RFC-0008](../proposals/rfc/RFC-0008/)).
 
 The **database secrets engine** would generate short-lived, unique PostgreSQL credentials on demand, so no static application passwords need exist.
 
@@ -1335,11 +1340,10 @@ gantt
 
 ## 18. Related Documentation
 
-- [Production Plan](./production-plan.md) — Feature selection matrix and architecture decisions
+- [RFC-0008 — Production secrets hardening](../proposals/rfc/RFC-0008/) (+ [implementation.md](../proposals/rfc/RFC-0008/implementation.md) — feature selection, architecture, DB redesign, install phases)
 - [Secrets Management Guide](./secrets-management.md) — ESO patterns, path conventions, operations
 - [cert-manager](./cert-manager.md) — Certificate issuers and `kong-proxy-tls` wildcard pipeline
 - [Trust Distribution](./trust-distribution.md) — trust-manager `homelab-ca-bundle` distribution
-- [Vault Architecture & Bootstrap](./vault.md) — Archived Vault dev-mode docs
 - [Secrets proposals](../proposals/) — ADR-004/005 (audit, HA) + RFC backlog (rotation, PushSecret, hardening)
 - [OpenBAO Documentation](https://openbao.org/docs)
 - [OpenBAO Helm Chart](https://openbao.org/docs/platform/k8s/helm)
@@ -1348,4 +1352,4 @@ gantt
 
 ---
 
-_Last updated: 2026-06-29 — OpenBAO HA (3-node Raft) + ESO via Kubernetes auth. **Deployed today:** KV v2 static secrets + best-effort audit. **Planned (not deployed):** dynamic DB creds, OIDC, KMS auto-unseal, TLS — see [`production-plan.md`](./production-plan.md). **Local Kind only — not production-hardened.**_
+_Last updated: 2026-06-29 — OpenBAO HA (3-node Raft) + ESO via Kubernetes auth. **Deployed today:** KV v2 static secrets + best-effort audit. **Planned (not deployed):** dynamic DB creds, OIDC, KMS auto-unseal, TLS — see [RFC-0008](../proposals/rfc/RFC-0008/). **Local Kind only — not production-hardened.**_

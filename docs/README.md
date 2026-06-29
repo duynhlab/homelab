@@ -109,10 +109,8 @@ docs/
 │   ├── README.md                 # OpenBAO architecture & operations (folder hub)
 │   ├── secrets-management.md     # Per-app ESO usage, add/rotate runbooks
 │   ├── cert-manager.md           # cert-manager + Let's Encrypt + Flux (Helm, Ingress, TLS)
-│   ├── trust-distribution.md     # trust-manager Bundle (homelab-ca-bundle), dual-PKI
-│   ├── production-plan.md        # OpenBAO production migration plan (EKS/GKE)
-│   ├── backlog.md                # P1/P2 backlog
-│   └── vault.md                  # Vault configuration details (archived)
+│   └── trust-distribution.md     # trust-manager Bundle (homelab-ca-bundle), dual-PKI
+│                                 # (production hardening → docs/proposals/rfc/RFC-0008/)
 └── security/                     # Admission control & network segmentation
     ├── policy-catalog.md         # Kyverno ClusterPolicy catalog (tiers, modes, NetworkPolicy generate)
     ├── policy-exceptions.md      # PolicyException register (owner + TTL)
@@ -348,9 +346,7 @@ docs/
 - [OpenBAO](./secrets/README.md) - OpenBAO HA architecture & operations (incl. reviewer-JWT pitfall, bootstrap-only Cloudflare token)
 - [cert-manager + Flux](./secrets/cert-manager.md) - TLS with Let's Encrypt, HelmRelease, Ingress
 - [Trust Distribution](./secrets/trust-distribution.md) - trust-manager `homelab-ca-bundle` and the LE / homelab-CA dual-PKI split
-- [OpenBAO Production Plan](./secrets/production-plan.md) - Production migration plan (EKS/GKE)
-- [Vault (Archived)](./secrets/vault.md) - Legacy Vault dev mode docs (historical reference)
-- [Secrets decisions & backlog](./proposals/) - ADR-004 (audit) + ADR-005 (OpenBAO HA); RFC backlog for rotation / PushSecret / production hardening
+- [Secrets decisions & hardening](./proposals/) - ADR-004 (audit) + ADR-005 (OpenBAO HA); [RFC-0008](./proposals/rfc/RFC-0008/) production hardening + parity/testing matrix (+ its implementation.md migration plan); RFC backlog for rotation / PushSecret
 
 ### Runbooks
 

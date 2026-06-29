@@ -2,6 +2,11 @@
 
 VictoriaLogs is the cluster's log storage backend. It provides high-performance log ingestion and querying using LogsQL.
 
+> Backend & pipeline **ops reference**. For the logging architecture, the
+> why-this-stack rationale, and scaling, see the [logging hub](README.md); for how
+> services emit logs (libraries, format, levels), see
+> [Logging Standards](../../api/logs.md).
+
 ## Architecture
 
 ```mermaid
@@ -144,6 +149,30 @@ The Vector config includes:
 - **Transforms**: `add_labels`, `parse_pg_json`, `filter_pg_auto_explain`, `parse_pg_auto_explain`
 - **Sinks**: `victorialogs_all`, `victorialogs_pg_plans`, `victorialogs_pg_parse_failures`
 
+## Vector self-monitoring
+
+Vector exposes its own metrics in **Prometheus text format** (`internal_metrics`
+source → `prometheus_exporter` sink on port `9090`). VMAgent scrapes them
+(`ServiceMonitor` → `VMServiceScrape`, converted by the VM Operator, 30s interval)
+and remote-writes to VMSingle, so pipeline health is queryable in Grafana against
+the VictoriaMetrics datasource like any other workload.
+
+Key metrics (PromQL):
+
+```promql
+up{job="vector"}                                                   # agent health
+rate(vector_events_processed_total[5m])                            # events/sec by component
+rate(vector_component_errors_total[5m])                            # error rate
+rate(vector_component_sent_bytes_total{component_name=~"victorialogs.*"}[5m])  # sink throughput
+vector_buffer_events                                               # buffer depth
+```
+
+A pre-built Vector dashboard (Grafana.com ID `21954`) covers events/sec, error
+rates, buffer utilization, and throughput. Suggested alerts: high error rate
+(`rate(vector_component_errors_total[5m]) > 10`), buffer overflow
+(`vector_buffer_events > 10000`), low throughput
+(`rate(vector_events_processed_total[5m]) < 100`).
+
 ## Verification
 
 ### Check Operator Resources
@@ -258,3 +287,7 @@ If Vector is consuming too much memory:
 | VLSingle CRD | `kubernetes/infra/configs/monitoring/victoriametrics/vlsingle.yaml` |
 | VM Operator | `kubernetes/infra/controllers/metrics/victoria-metrics-operator.yaml` |
 | Vector HelmRelease | `kubernetes/infra/controllers/logging/vector/vector.yaml` |
+
+---
+
+_Last updated: 2026-06-29 — VLSingle `:9428` (VM Operator, 7d/20Gi), single Vector DaemonSet (all-logs + PG auto_explain streams), Vector self-monitoring via VMAgent._

@@ -274,8 +274,8 @@ docs/observability/
 │   └── victoriatraces.md         # VictoriaTraces pilot (3rd backend)
 │
 ├── logging/                      # Pillar 3: Structured logging
-│   ├── README.md                 # Zap + Vector + VictoriaLogs
-│   └── victorialogs.md           # VictoriaLogs backend
+│   ├── README.md                 # Architecture, why-this-stack, scaling
+│   └── victorialogs.md           # VictoriaLogs backend & Vector pipeline ops
 │
 ├── profiling/                    # Pillar 4: Continuous profiling
 │   └── README.md                 # Pyroscope (CPU, heap, goroutine)

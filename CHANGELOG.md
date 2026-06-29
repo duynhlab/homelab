@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **docs (observability/logging)**: Reframed `docs/observability/logging/README.md` as an architecture hub (overview diagram, **VictoriaLogs vs Loki/ELK** comparison, strengths/weaknesses, **scaling to 1000+ services**), removing the app-implementation overlap (Zap code, log format/levels) which is owned by the onboarding deep-dive `docs/api/logs.md`. Moved Vector self-monitoring into `victorialogs.md` (+ status footer), added two-way links between the logging hub and `api/logs.md`, and refreshed the doc-map descriptions. Docs only.
+
 - **docs (observability/metrics)**: Restructured `docs/observability/metrics/` into a hub + per-layer set — `README.md` as the hub (fundamentals, stack, architecture, coverage-by-layer), new `metrics-apps.md` (RED) and `metrics-infra.md` (USE), removed the folded-in `monitoring-coverage.md`, normalized `promql-guide.md` + `postgresql/custom-metrics.md` to English, repointed alert/recording-rule references to `alerting/alert-catalog.md`, and added two-way links with `docs/api/`. Docs only.
 
 - **docs (platform/Gitflow)**: Renamed the **`staging` release-candidate tier → `uat`** (User Acceptance Testing) across the branching/CI docs to match common enterprise practice — the promotion is now **`dev → uat → main` (prod)**. Updated `gitflow.md`, `cicd.md`, `build_template.yml`, the `docs/README.md` gitflow line, the api.md migration-target env, and `kong-gateway.md` (`dev/uat`). `letsencrypt-staging` and the OpenBAO secret-path env list are intentionally untouched (a broader platform-wide env normalization is a separate follow-up).

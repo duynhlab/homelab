@@ -10,6 +10,10 @@
 
 This document defines centralized logging standards for all microservices. All services must output **JSON format** logs for compatibility with VictoriaLogs and OpenTelemetry tracing.
 
+> This is the **implementation & standards** doc (how a service logs). For the
+> logging **pipeline architecture**, why-this-stack rationale, and scaling, see
+> [observability → logging](../observability/logging/README.md).
+
 **Current status:**
 - **2 services**: cart (clog), auth (zerolog)
 - **6 services**: product, order, review, notification, shipping, user (Zap)
@@ -315,4 +319,5 @@ logger.Info("HTTP request", zap.String("method", c.Request.Method), zap.String("
 
 - [specs/active/context-aware-logging/research.md](../../specs/active/context-aware-logging/research.md) - Library comparison and deep dives
 - [specs/active/context-aware-logging/victorialogs-vector-research.md](../../specs/active/context-aware-logging/victorialogs-vector-research.md) - VictoriaLogs integration
-- [docs/observability/logging/README.md](../observability/logging/README.md) - Structured logging guide (Zap-focused)
+- [docs/observability/logging/README.md](../observability/logging/README.md) - Logging architecture, stack rationale (VictoriaLogs vs Loki), and scaling
+- [docs/observability/logging/victorialogs.md](../observability/logging/victorialogs.md) - VictoriaLogs backend & Vector pipeline ops

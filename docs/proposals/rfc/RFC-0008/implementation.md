@@ -1,15 +1,13 @@
-# OpenBAO Production-Ready Plan
-## Migrating from HashiCorp Vault (Dev Mode) to OpenBAO HA
+# RFC-0008 — Implementation detail: OpenBAO production migration
 
-**Date**: 2026-03-27
-**Scope**: Secrets management redesign for local Kind + EKS/GKE deployments
-**Purpose**: Learning, production patterns, team access control, credential rotation
+> Companion to **[RFC-0008 — Production secrets hardening & local/prod parity](./README.md)**.
+> The RFC README holds the proposal, the decision, the local-vs-prod **parity & testing
+> matrix**, and the pre-prod gate; **this file is the detailed working plan** — feature
+> selection, architecture, database-credential redesign, installation phases, and day-2
+> procedures. It is a **plan / target state**, not the deployed reality (see the
+> [secrets README current-state banner](../../../secrets/README.md)).
 
-> This long-form plan is formalised as **[RFC-0008 — Production secrets hardening
-> & local/prod parity](../proposals/rfc/RFC-0008/)**, which adds the decision record,
-> the local-vs-prod **parity & testing matrix** (what Kind can validate vs what needs
-> a cloud/staging cluster), and the pre-prod gate. Read that for the authoritative
-> hardening scope; this doc is the detailed working plan.
+**Original date**: 2026-03-27 · **Scope**: local Kind + EKS/GKE.
 
 ---
 
@@ -791,4 +789,4 @@ The biggest immediate security wins are:
 
 ---
 
-_Last updated: 2026-06-29 — **Plan / target state** for OpenBAO on EKS/GKE; not the deployed state. What runs on local Kind today is summarised in the [`README.md`](./README.md) current-state banner. Note: the database secrets engine, OIDC, KMS auto-unseal, and TLS described here are **planned, not yet deployed**._
+_Last updated: 2026-06-29 — **Plan / target state** for OpenBAO on EKS/GKE; not the deployed state. What runs on local Kind today is summarised in the [secrets README current-state banner](../../../secrets/README.md). Note: the database secrets engine, OIDC, KMS auto-unseal, and TLS described here are **planned, not yet deployed**._

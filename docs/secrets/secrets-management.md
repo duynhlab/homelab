@@ -375,7 +375,7 @@ Replace Shamir with cloud KMS for automatic unseal:
 - [cert-manager](./cert-manager.md) — consumes the `cloudflare-api-token` Secret synced here
 - [Trust Distribution](./trust-distribution.md) — distributes the homelab CA bundle
 - [OpenBAO Production Plan](./production-plan.md) — EKS/GKE roadmap
-- [Secrets Backlog (P1/P2)](./backlog.md) — pending improvements
+- [Secrets proposals](../proposals/) — ADR-004/005 (audit, HA) + RFC backlog (rotation, PushSecret, hardening)
 - [External Secrets Operator Docs](https://external-secrets.io/)
 - [OpenBAO Docs](https://openbao.org/docs/)
 

@@ -19,7 +19,7 @@
 | [`cert-manager.md`](./cert-manager.md) | cert-manager controller, ClusterIssuers (selfsigned + homelab-ca + Let's Encrypt DNS-01), `kong-proxy-tls` wildcard, deployment runbook, cert/issuer troubleshooting |
 | [`trust-distribution.md`](./trust-distribution.md) | trust-manager `homelab-ca-bundle` distribution, two-PKI split, namespace opt-in label, CA rotation runbook |
 | [`production-plan.md`](./production-plan.md) | Long-form migration plan from Vault dev → OpenBAO HA on EKS/GKE (auto-unseal, OIDC, dynamic DB creds) |
-| [`backlog.md`](./backlog.md) | P1/P2 backlog with industry citations |
+| [Secrets proposals](../proposals/) | Decisions ([ADR-004](../proposals/adr/ADR-004-enable-openbao-audit-logging/) audit, [ADR-005](../proposals/adr/ADR-005-openbao-ha-raft/) HA) + RFC backlog (rotation, PushSecret, production hardening) |
 | [`vault.md`](./vault.md) | Archived legacy Vault dev-mode docs (kept as historical reference) |
 
 ---
@@ -1340,7 +1340,7 @@ gantt
 - [cert-manager](./cert-manager.md) — Certificate issuers and `kong-proxy-tls` wildcard pipeline
 - [Trust Distribution](./trust-distribution.md) — trust-manager `homelab-ca-bundle` distribution
 - [Vault Architecture & Bootstrap](./vault.md) — Archived Vault dev-mode docs
-- [Secrets Backlog](./backlog.md) — Pending improvements
+- [Secrets proposals](../proposals/) — ADR-004/005 (audit, HA) + RFC backlog (rotation, PushSecret, hardening)
 - [OpenBAO Documentation](https://openbao.org/docs)
 - [OpenBAO Helm Chart](https://openbao.org/docs/platform/k8s/helm)
 - [External Secrets Operator](https://external-secrets.io/)

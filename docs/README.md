@@ -350,7 +350,7 @@ docs/
 - [Trust Distribution](./secrets/trust-distribution.md) - trust-manager `homelab-ca-bundle` and the LE / homelab-CA dual-PKI split
 - [OpenBAO Production Plan](./secrets/production-plan.md) - Production migration plan (EKS/GKE)
 - [Vault (Archived)](./secrets/vault.md) - Legacy Vault dev mode docs (historical reference)
-- [Backlog (P1/P2)](./secrets/backlog.md) - Pending improvements: rotation, audit logging, PushSecret, dynamic secrets
+- [Secrets decisions & backlog](./proposals/) - ADR-004 (audit) + ADR-005 (OpenBAO HA); RFC backlog for rotation / PushSecret / production hardening
 
 ### Runbooks
 

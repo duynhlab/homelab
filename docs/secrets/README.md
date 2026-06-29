@@ -19,7 +19,7 @@
 | [`cert-manager.md`](./cert-manager.md) | cert-manager controller, ClusterIssuers (selfsigned + homelab-ca + Let's Encrypt DNS-01), `kong-proxy-tls` wildcard, deployment runbook, cert/issuer troubleshooting |
 | [`trust-distribution.md`](./trust-distribution.md) | trust-manager `homelab-ca-bundle` distribution, two-PKI split, namespace opt-in label, CA rotation runbook |
 | [`production-plan.md`](./production-plan.md) | Long-form migration plan from Vault dev → OpenBAO HA on EKS/GKE (auto-unseal, OIDC, dynamic DB creds) |
-| [`backlog.md`](./backlog.md) | P1/P2 backlog with industry citations |
+| [Secrets proposals](../proposals/) | Decisions ([ADR-004](../proposals/adr/ADR-004-enable-openbao-audit-logging/) audit, [ADR-005](../proposals/adr/ADR-005-openbao-ha-raft/) HA) + RFC backlog (rotation, PushSecret, production hardening) |
 | [`vault.md`](./vault.md) | Archived legacy Vault dev-mode docs (kept as historical reference) |
 
 ---
@@ -29,6 +29,28 @@
 > **Status**: Migration target — replacing HashiCorp Vault (Dev Mode) with OpenBAO HA
 >
 > **Scope**: Installation, management, operations, and use cases for local Kind + EKS/GKE deployments
+
+> ### ⚠ Current deployment state vs. planned
+>
+> Much of this guide describes the **production target**. What the local Kind
+> cluster **actually runs today**:
+>
+> | Capability | Deployed now (local Kind) | Planned for prod |
+> |---|---|---|
+> | Storage / HA | ✅ OpenBAO HA, 3-node Raft, PVC | same |
+> | App secret delivery | ✅ ESO + **KV v2 static** secrets (`refreshInterval: 1h`) | + dynamic DB creds |
+> | Auth (ESO) | ✅ Kubernetes auth, least-privilege `eso-read` policy | + OIDC for humans |
+> | Audit | ⚠ `file → stdout` **best-effort** (enablement is not fail-closed; `auditStorage` off) | durable, fail-closed |
+> | **Database secrets engine / dynamic creds** | ❌ **not enabled** — §5.2, §6, §10, §14 describe the *planned* design | enable DB engine |
+> | Unseal | ❌ **Shamir key + root token in a K8s Secret** (`openbao-init-keys`), re-read by a 60s unsealer CronJob | KMS / Transit auto-unseal |
+> | TLS | ❌ disabled (`tlsDisable: true`; plaintext HTTP in-cluster) | TLS via cert-manager |
+> | Credentials | ❌ dev passwords **seeded from Git** (e.g. `*-K1nd-2026!`) | generated / dynamic, none in Git |
+> | Root token | ❌ persisted, **not revoked** after bootstrap | revoked; OIDC / AppRole |
+>
+> **These local-only choices are unsafe for production.** The hardening path and a
+> local-vs-prod parity/testing matrix live in [`production-plan.md`](./production-plan.md).
+> Any section below describing dynamic credentials, leases, OIDC, or auto-unseal is
+> **planned**, not deployed.
 
 ---
 
@@ -336,7 +358,12 @@ secret/{environment}/{category}/{service}/{resource}
 
 ### 5.2 Database Secrets Engine — Dynamic Credentials
 
-The **database secrets engine** generates short-lived, unique PostgreSQL credentials on demand. No static passwords exist anywhere.
+> **⚠ Planned — not yet deployed.** The bootstrap enables only KV v2, Kubernetes
+> auth, and audit; the database secrets engine is **not** enabled. Application
+> credentials today are **static KV v2** values. This section describes the
+> production design (tracked in [`production-plan.md`](./production-plan.md)).
+
+The **database secrets engine** would generate short-lived, unique PostgreSQL credentials on demand, so no static application passwords need exist.
 
 #### How It Works
 
@@ -426,6 +453,13 @@ DROP ROLE IF EXISTS "{{name}}";
 ---
 
 ## 6. Database Credential Workflows
+
+> **⚠ Mixed state.** The `cart`/`order` owners are still created with hardcoded
+> passwords in CNPG `postInitSQL` (`instance.yaml`). An ExternalSecret for those
+> creds exists but is effectively **bypassed** — the same password is duplicated in
+> Git, so it is not a single source of truth and rotating it in OpenBAO would not
+> change the DB user. The "OpenBAO Solution" column below is the **planned** target;
+> dynamic application users are not yet enabled.
 
 ### 6.1 Current State Problems
 
@@ -1306,8 +1340,12 @@ gantt
 - [cert-manager](./cert-manager.md) — Certificate issuers and `kong-proxy-tls` wildcard pipeline
 - [Trust Distribution](./trust-distribution.md) — trust-manager `homelab-ca-bundle` distribution
 - [Vault Architecture & Bootstrap](./vault.md) — Archived Vault dev-mode docs
-- [Secrets Backlog](./backlog.md) — Pending improvements
+- [Secrets proposals](../proposals/) — ADR-004/005 (audit, HA) + RFC backlog (rotation, PushSecret, hardening)
 - [OpenBAO Documentation](https://openbao.org/docs)
 - [OpenBAO Helm Chart](https://openbao.org/docs/platform/k8s/helm)
 - [External Secrets Operator](https://external-secrets.io/)
 - [CloudNativePG External Secrets Integration](https://cloudnative-pg.io/docs/1.28/cncf-projects/external-secrets)
+
+---
+
+_Last updated: 2026-06-29 — OpenBAO HA (3-node Raft) + ESO via Kubernetes auth. **Deployed today:** KV v2 static secrets + best-effort audit. **Planned (not deployed):** dynamic DB creds, OIDC, KMS auto-unseal, TLS — see [`production-plan.md`](./production-plan.md). **Local Kind only — not production-hardened.**_

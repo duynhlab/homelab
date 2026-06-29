@@ -429,3 +429,7 @@ cert-manager creates `homelab-ca-secret` only in the `cert-manager` namespace. W
 - [cert-manager — Installation (Helm)](https://cert-manager.io/docs/installation/helm/)
 - [Flux — HelmRelease](https://fluxcd.io/flux/components/helm/helmreleases/)
 - [Let's Encrypt — Staging](https://letsencrypt.org/docs/staging-environment/)
+
+---
+
+_Last updated: 2026-06-29 — cert-manager + Let's Encrypt (DNS-01 via Cloudflare) for the `kong-proxy-tls` wildcard; `cloudflare-api-token` is bootstrap-only (operator-supplied, not in Git)._

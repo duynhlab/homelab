@@ -5,6 +5,12 @@
 **Scope**: Secrets management redesign for local Kind + EKS/GKE deployments
 **Purpose**: Learning, production patterns, team access control, credential rotation
 
+> This long-form plan is formalised as **[RFC-0008 — Production secrets hardening
+> & local/prod parity](../proposals/rfc/RFC-0008/)**, which adds the decision record,
+> the local-vs-prod **parity & testing matrix** (what Kind can validate vs what needs
+> a cloud/staging cluster), and the pre-prod gate. Read that for the authoritative
+> hardening scope; this doc is the detailed working plan.
+
 ---
 
 ## 1. Current State Audit
@@ -782,3 +788,7 @@ The biggest immediate security wins are:
 3. Replace wildcard ESO policy with scoped per-path policies
 4. Fix hardcoded `postgres` passwords in CNPG postInitSQL
 5. Implement database engine with dynamic credentials (kills static password problem entirely)
+
+---
+
+_Last updated: 2026-06-29 — **Plan / target state** for OpenBAO on EKS/GKE; not the deployed state. What runs on local Kind today is summarised in the [`README.md`](./README.md) current-state banner. Note: the database secrets engine, OIDC, KMS auto-unseal, and TLS described here are **planned, not yet deployed**._

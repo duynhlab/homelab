@@ -60,6 +60,7 @@ made are recorded as one or more **ADRs**, and the RFC moves to `implemented`.
 | [RFC-0005](RFC-0005/) | supporting-shared-db: HA or split | infra | provisional |
 | [RFC-0006](RFC-0006/) | Service mesh evaluation (Istio Ambient vs Linkerd) | infra | provisional |
 | [RFC-0007](RFC-0007/) | Disaster-recovery drills program | infra | provisional |
+| [RFC-0008](RFC-0008/) | Production secrets hardening & local/prod parity | infra | provisional |
 
 ## Backlog — candidate RFCs
 
@@ -74,6 +75,15 @@ here). Each gets a number when someone writes it up.
 | **Talos bare-metal migration** | infra | `docs/platform/homelab-migration-plan.md` |
 | **Chaos / GameDay program** | infra | `TODO.md`, DR docs |
 | **API v1→v2 versioning policy** | platform-wide | `docs/api/api-naming-convention.md` |
+| **Split OpenBAO bootstrap** (auth config vs secret seeding) | infra | secrets ESO review |
+| **Secret rotation** (CronJob / push) — largely superseded by dynamic DB creds in [RFC-0008](RFC-0008/) | infra | secrets ESO review |
+| **PushSecret for operator-generated secrets** (sync CNPG/Zalando creds back to OpenBAO) | infra | secrets ESO review |
+
+> The broader secrets production hardening (KMS auto-unseal, TLS, dynamic DB creds,
+> OIDC, remove committed dev creds) + a local-vs-prod parity/testing matrix is its
+> own RFC — [RFC-0008](RFC-0008/). Decisions already shipped
+> (OpenBAO HA, audit logging) are recorded in [ADR-005](../adr/ADR-005-openbao-ha-raft/)
+> and [ADR-004](../adr/ADR-004-enable-openbao-audit-logging/).
 
 > Temporal durability/DR (HA, Barman, GameDay) is tracked as **future work in
 > [RFC-0001](RFC-0001/)**, not a separate backlog row.

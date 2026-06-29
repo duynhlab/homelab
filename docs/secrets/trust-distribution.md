@@ -267,3 +267,7 @@ flux reconcile kustomization cert-manager-config-local --with-source
 - cert-manager + Flux integration: [`./cert-manager.md`](./cert-manager.md)
 - Why static CA copy is preferred over reading the cert-manager Secret directly:
   [trust-manager docs — Preparing for Production](https://cert-manager.io/docs/trust/trust-manager/#preparing-for-production)
+
+---
+
+_Last updated: 2026-06-29 — trust-manager distributes the `homelab-ca` bundle to opted-in namespaces (`platform.duynhlab.dev/needs-trust=true`); dual-PKI (public Let's Encrypt + private homelab-ca)._

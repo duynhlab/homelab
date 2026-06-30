@@ -90,6 +90,27 @@ sonar:
   passes `sonar.go.coverage.reportPaths=coverage.out,coverage-integration.out`,
   so the **repository layer's integration coverage counts** toward the gate.
 
+### Execution model & image-pull cost
+
+- **Runs on the runner host, not inside a job container.** testcontainers talks
+  to the runner's own Docker daemon and starts Postgres as a **sibling** container.
+  We deliberately do **not** run `go test` inside a container with the Docker
+  socket mounted, nor docker-in-docker — that adds networking complexity (the
+  test process can't reach the mapped port by `localhost`) for no benefit here.
+- **Each run pulls `postgres:16-alpine`** (~tens of seconds) — a clean runner has
+  no image cache. This is the main cost of the integration job; budget for it
+  (the unit job stays fast and independent).
+- **Alternatives considered (and why not):**
+  - A GitHub Actions `services:` Postgres is faster but loses testcontainers'
+    ergonomics — programmatic lifecycle, applying the repo's real migrations, and
+    per-test isolation. We chose fidelity (real schema, real driver) over a few
+    seconds. Revisit with image caching / a pinned digest if pull time bites.
+  - docker-in-docker / socket-mount-into-container: rejected (complexity above).
+- **Local gotcha:** running the integration suite many times can saturate the
+  local Docker daemon (leftover containers → `pgxpool.Pool.Close` / ryuk hangs).
+  Clean up with `docker rm -f $(docker ps -aq --filter label=org.testcontainers=true)`.
+  CI runners are fresh each run, so this only affects local loops.
+
 ## Linting (`golangci-lint`)
 
 CI's lint job runs **`golangci-lint` v2.6.0** with the repo's `.golangci.yml` —

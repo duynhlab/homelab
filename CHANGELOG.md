@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **docs (proposals)**: **RFC-0009** — production-grade API gateway (signed RS256 JWT + Kong OSS edge auth, defense-in-depth, Valkey rate-limiting, OSS-vs-Enterprise map). Added a **Priority** column + current-focus callout to the RFC index; backlog now tracks Authorization (RBAC/ABAC) and gateway improvements.
 
+### Changed
+
+- **infra (kong)**: Rate limiting moved from `policy: local` to a cluster-wide **Valkey** counter (`policy: redis`, db 1) so both Kong replicas share one limit (RFC-0009 Phase 1). local-stack mirrors this — its `cache` container is now Valkey (`valkey/valkey:8-alpine`) and the gateway depends on it.
+
 ## [0.102.0] - 2026-06-29
 
 ### Added

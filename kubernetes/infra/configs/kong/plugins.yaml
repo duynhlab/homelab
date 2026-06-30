@@ -67,14 +67,18 @@ config:
 # API rate limiting — protects backend services from abuse.
 # Applied per-consumer (if authenticated) or per-IP (anonymous).
 #
-# Policy `local` = each Kong pod keeps its own in-memory counter. Kong runs
-# 2 replicas (see controllers/kong/helmrelease.yaml), and the Service
-# load-balances without affinity, so the effective cluster limit is up to
-# ~2x these numbers and is approximate. DB-less mode does NOT support the
-# `cluster` policy; a true cluster-wide counter would require `policy: redis`
-# (the platform has Valkey) at the cost of a request-path dependency.
-# For a homelab we keep `local` and halve the numbers so the ~2x lands near
-# the intended ceiling — this is abuse hygiene, not exact accounting.
+# Policy `redis` = a single cluster-wide counter in Valkey, shared by both Kong
+# replicas (see controllers/kong/helmrelease.yaml), so these numbers are the real
+# ceiling (no per-pod ~2x fudge). DB-less mode does NOT support the `cluster`
+# policy; `redis` is the only way to a shared counter. Cost: Valkey is now on the
+# request path — `fault_tolerant: true` means a Valkey outage fails OPEN (requests
+# allowed, limiting degrades to off) rather than 500-ing.
+#
+# Nested `redis` block: required by Kong 3.9 (the cluster's gateway version; the
+# flat `redis_*` fields are deprecated after 4.0). `database: 1` isolates the
+# keyspace from the product Cache-Aside (db 0). Note: Valkey's `allkeys-lru` is
+# instance-wide, so under memory pressure counters can still be evicted — an
+# evicted counter merely resets its window early, consistent with fail-open.
 apiVersion: configuration.konghq.com/v1
 kind: KongClusterPlugin
 metadata:
@@ -88,7 +92,12 @@ config:
   second: 5
   minute: 100
   hour: 2500
-  policy: local
+  policy: redis
+  redis:
+    host: valkey.cache-system.svc.cluster.local
+    port: 6379
+    database: 1
+    timeout: 2000
   fault_tolerant: true
   hide_client_headers: false
   error_code: 429

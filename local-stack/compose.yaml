@@ -59,9 +59,9 @@ services:
       retries: 20
 
   cache:
-    image: redis:7-alpine
+    image: valkey/valkey:8-alpine
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -377,6 +377,7 @@ services:
       retries: 12
       start_period: 10s
     depends_on:
+      cache: { condition: service_healthy }
       auth: { condition: service_healthy }
       user: { condition: service_healthy }
       product: { condition: service_healthy }

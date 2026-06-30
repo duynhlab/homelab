@@ -21,16 +21,15 @@ This pipeline operates under the **Hybrid Enterprise Gitflow** model defined in 
 
 **Branch enforcement** is managed via **GitHub Rulesets** (not legacy Branch Protection). Each service repo has 3 layered rulesets: Base Protection (all branches), Production Gate (`main` only), and Release Tags (`v*`). Required status checks (`go-check / Test`) are configured in the Base Protection ruleset, ensuring CI must pass before any merge. See [`gitflow.md` section 7](gitflow.md#7-github-rulesets-branch-enforcement) for the full ruleset configuration, CODEOWNERS integration, and setup guide.
 
-**Workflow split**: Each service repo uses **three workflow files** instead of a single `ci.yml`:
+**Workflow split**: Each service repo uses **two workflow files** instead of a single `ci.yml`:
 - **`check.yml`** (PR only) -- runs tests, lint, secret scanning, SonarCloud analysis
-- **`build.yml`** (push only) -- builds Docker images, scans **before push**, signs, notifies
-- **`release.yml`** (`v*` tag only) -- builds a Go **release binary** with GoReleaser and publishes a GitHub Release (see [Binary Releases](#binary-releases-goreleaser))
+- **`build.yml`** (push **and** `v*` tag) -- builds Docker images, scans **before push**, signs, notifies; on a `v*` tag it also runs the tag-gated `release-binary` job (GoReleaser binary + GitHub Release, see [Binary Releases](#binary-releases-goreleaser))
 
 This split ensures GitHub does not append `(pull_request)` or `(push)` suffixes to status check names, making ruleset matching predictable. See [`ruleset-automation.md`](ruleset-automation.md) for details on how check names are constructed and enforced.
 
 > **Triggers today vs the Gitflow target.** The [`gitflow.md`](gitflow.md) model describes a
 > `dev → uat → main` promotion. The **currently wired** CI triggers are: `check.yml` on
-> **PRs to `main`**, `build.yml` on **push to `main`**, and `release.yml` on **`v*` tags**. The
+> **PRs to `main`**, and `build.yml` on **push to `main`** + **`v*` tags** (the tag run also fires the `release-binary` job). The
 > `dev`/`uat` branch builds shown in some diagrams below are the Gitflow *target*, not yet
 > wired into the service workflows.
 
@@ -61,7 +60,7 @@ The `docker-build-go.yml` (and `docker-build-node.yml`) workflows handle this vi
 
 Each service repository reuses workflows from `duynhlab/gha-workflows`:
 - `pr-checks.yml` (PR validation + Slack PR events)
-- `go-check.yml` (unit tests + optional lint + optional `integration` job running `go test -tags=integration` with testcontainers; coverage artifacts — see [`testing.md`](testing.md))
+- `go-check.yml` (unit tests + optional lint + optional `integration` job running `go test -tags=integration` with testcontainers; coverage artifacts — see [Testing & Coverage](#testing--coverage))
 - `gitleaks.yml` (Secret scanning + SARIF output)
 - `sonarqube.yml` (SonarCloud analysis + optional Quality Gate enforcement)
 - `docker-build-go.yml` (build, scan before push, push Docker image for Go services — outputs `tags` + `digest` + `scan-status`)
@@ -370,7 +369,7 @@ flowchart TD
 | **6** | `notify` | **Always** | **Reporting**: posts final pipeline status to Slack and Google Sheets. |
 
 ### 3. Flow: Binary Release on `v*` Tag (GoReleaser)
-**Trigger:** A `vX.Y.Z` tag is pushed (the service's `release.yml`).
+**Trigger:** A `vX.Y.Z` tag is pushed (the tag-gated `release-binary` job in the service's `build.yml`).
 **Goal:** Build a Go **release binary** and publish a **GitHub Release** whose assets the
 [`packages`](#binary-releases-goreleaser) project can download (instead of compiling from source).
 
@@ -521,6 +520,159 @@ Ideas adopted from a reference CI/CD repository:
 
 ---
 
+## Testing & Coverage
+
+How the Go microservices are tested, how coverage is measured, and how CI enforces it.
+Pairs with [`sonarcloud.md`](sonarcloud.md) (the quality gate).
+
+### Layered testing (Web / Logic / Core)
+
+Tests follow the 3-layer architecture (see [`../api/api.md`](../api/api.md)). The
+layer boundaries are the natural test seams:
+
+| Layer | Package | Tested as | What it mocks |
+|-------|---------|-----------|---------------|
+| Web | `internal/web/v1` | unit — `httptest` + gin test mode | the Logic service interface |
+| Logic | `internal/logic/v1` | unit — pure | the repository interface (ports) |
+| gRPC | `internal/grpc/v1` | unit — call handlers directly | the Logic service interface |
+| Cross-cutting | `middleware` | unit — `httptest` + table-driven | — |
+| Config | `config` | unit — env-driven | — |
+| Core / repository | `internal/core/repository` | **integration** — real Postgres | nothing (real DB) |
+
+### Conventions (match the existing repos)
+
+- **Stdlib `testing` only** — no testify, no gomock for unit tests.
+- **Hand-written mocks**: a struct implementing the interface with configurable
+  result/err fields.
+- **Table-driven** subtests.
+- The only test-only dependency allowed is **testcontainers** (integration only).
+- Prefer the `golang-pro` workflow: `golangci-lint` + table-driven + `-race`.
+
+### Integration tests (testcontainers)
+
+The repository/data layer is tested against a **real PostgreSQL** — not mocked,
+not excluded.
+
+- File lives next to the impl, build-tagged so the default unit run skips it:
+  ```go
+  //go:build integration
+  ```
+- Uses `github.com/testcontainers/testcontainers-go` + `.../modules/postgres`:
+  start Postgres, apply `db/migrations/sql/*.up.sql`, exercise each repository
+  method (incl. not-found / idempotent paths).
+- **Wait strategy — important.** Use the log-based wait, NOT `ForListeningPort`
+  (the port opens during initdb's transient first start, then the server
+  restarts → connection reset → flaky/hung tests):
+  ```go
+  testcontainers.WithWaitStrategy(
+      wait.ForLog("database system is ready to accept connections").
+          WithOccurrence(2).
+          WithStartupTimeout(90 * time.Second),
+  )
+  ```
+- **Test-only footprint.** testcontainers pulls the Docker SDK into `go.mod` as
+  indirect deps, but behind the `integration` tag — `go build ./...` does **not**
+  link it into the service binary (verify: the binary build stays clean).
+- Run locally (needs a Docker daemon):
+  ```bash
+  go test -tags=integration ./internal/core/repository/...
+  ```
+
+### CI wiring (shared workflows in `gha-workflows`)
+
+`go-check.yml` and `sonarqube.yml` support the integration + merged-coverage flow.
+Each service wires it in **both** `build.yml` (push) and `check.yml` (PR):
+
+```yaml
+go-check:
+  uses: duynhlab/gha-workflows/.github/workflows/go-check.yml@main
+  with:
+    command-test: 'go test -race -coverprofile=coverage.out ./...'
+    lint: true
+    integration: true
+    integration-command: 'go test -tags=integration -covermode=atomic -coverprofile=coverage-integration.out ./internal/core/repository/...'
+  secrets: inherit
+
+sonar:
+  needs: [go-check, gitleaks]
+  uses: duynhlab/gha-workflows/.github/workflows/sonarqube.yml@main
+  with:
+    project-key: 'duynhlab_${{ github.event.repository.name }}'
+    organization: 'duynhlab'
+    integration-coverage: true   # merge coverage-integration.out into the report
+  secrets:
+    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+```
+
+- The `integration` job runs on `ubuntu-latest`, which ships a **running Docker
+  daemon** — testcontainers spawns sibling Postgres containers on the runner host.
+  We do **not** use docker-in-docker or socket-mounting into a job container.
+- The job uploads `coverage-integration.out`; the Sonar job downloads it and
+  passes `sonar.go.coverage.reportPaths=coverage.out,coverage-integration.out`,
+  so the **repository layer's integration coverage counts** toward the gate.
+
+#### Execution model & image-pull cost
+
+- **Runs on the runner host, not inside a job container.** testcontainers talks
+  to the runner's own Docker daemon and starts Postgres as a **sibling** container.
+  We deliberately do **not** run `go test` inside a container with the Docker
+  socket mounted, nor docker-in-docker — that adds networking complexity (the
+  test process can't reach the mapped port by `localhost`) for no benefit here.
+- **Each run pulls `postgres:16-alpine`** (~tens of seconds) — a clean runner has
+  no image cache. This is the main cost of the integration job; budget for it
+  (the unit job stays fast and independent).
+- **Why Ryuk is disabled on CI** (`TESTCONTAINERS_RYUK_DISABLED=true` in
+  `go-check.yml`): the runner is ephemeral (no orphan containers to reap), and
+  Ryuk's connect step intermittently **hangs** on GitHub runners — which timed out
+  the whole job. Each test's `t.Cleanup` still tears its container down.
+- **Alternatives considered (and why not):**
+  - A GitHub Actions `services:` Postgres is faster but loses testcontainers'
+    ergonomics — programmatic lifecycle, applying the repo's real migrations, and
+    per-test isolation. We chose fidelity (real schema, real driver) over a few
+    seconds. Revisit with image caching / a pinned digest if pull time bites.
+  - docker-in-docker / socket-mount-into-container: rejected (complexity above).
+- **Local gotcha:** running the integration suite many times can saturate the
+  local Docker daemon (leftover containers → `pgxpool.Pool.Close` / ryuk hangs).
+  Clean up with `docker rm -f $(docker ps -aq --filter label=org.testcontainers=true)`.
+  CI runners are fresh each run, so this only affects local loops.
+
+### Linting (`golangci-lint`)
+
+CI's lint job runs **`golangci-lint` v2.6.0** with the repo's `.golangci.yml` —
+much stricter than `go vet`. It MUST pass. Verify locally before pushing:
+
+```bash
+golangci-lint run --timeout=5m --config=.golangci.yml ./...
+```
+
+- **`unparam` gotcha.** Do not call an unexported helper from tests with the
+  **same constant arguments** it receives in production — `unparam` then reports
+  the parameter as "always receives X". Test generic helpers (e.g.
+  `getEnvDurationSeconds(key, default)`) with **varied** keys/defaults; that is
+  real coverage, not linter-gaming.
+
+### Coverage policy
+
+- **Quality gate: ≥ 80% coverage on new code** (configured in SonarCloud — see
+  [`sonarcloud.md`](sonarcloud.md)).
+- **Coverage exclusions** (counted-against-% only; still analyzed for issues),
+  via the `coverage-exclusions` input of `sonarqube.yml`:
+  `**/cmd/**`, `**/internal/core/database.go`, `**/db/migrations/**`,
+  `**/mocks/**`, `**/*_mock.go` — bootstrap/wiring/migrations/generated code.
+- The repository layer is **NOT excluded** — it is integration-tested and merged
+  into the report (above).
+
+### Pre-push checklist (per service)
+
+```bash
+go build ./...                                              # binary builds (no testcontainers linked)
+golangci-lint run --config=.golangci.yml ./...             # 0 issues
+go test -race ./...                                         # unit, green
+go test -tags=integration ./internal/core/repository/...   # integration, green (needs Docker)
+```
+
+---
+
 ## SBOM (Software Bill of Materials)
 
 ### What is SBOM?
@@ -633,13 +785,13 @@ After the image is pushed, anyone with read access can inspect the SBOM:
 
 ```bash
 # BuildKit native
-docker buildx imagetools inspect ghcr.io/duynhlab/auth-service:latest
+docker buildx imagetools inspect ghcr.io/duynhlab/auth-service:1.0.0
 
 # Cosign (verify SBOM attestation)
-cosign verify-attestation --type spdx ghcr.io/duynhlab/auth-service:latest
+cosign verify-attestation --type spdx ghcr.io/duynhlab/auth-service:1.0.0
 
 # Trivy (scan SBOM for CVEs without pulling full image)
-trivy image --sbom ghcr.io/duynhlab/auth-service:latest
+trivy image --sbom ghcr.io/duynhlab/auth-service:1.0.0
 ```
 
 ### Why Use SBOM?
@@ -679,13 +831,13 @@ curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh 
 
 ```bash
 # Table format (quick overview)
-syft ghcr.io/duynhlab/frontend/frontend:latest -o table
+syft ghcr.io/duynhlab/frontend/frontend:1.0.0 -o table
 
 # SPDX JSON (standard format, same as BuildKit generates)
-syft ghcr.io/duynhlab/frontend/frontend:latest -o spdx-json > frontend-sbom.spdx.json
+syft ghcr.io/duynhlab/frontend/frontend:1.0.0 -o spdx-json > frontend-sbom.spdx.json
 
 # CycloneDX JSON (alternative standard)
-syft ghcr.io/duynhlab/frontend/frontend:latest -o cyclonedx-json > frontend-sbom.cdx.json
+syft ghcr.io/duynhlab/frontend/frontend:1.0.0 -o cyclonedx-json > frontend-sbom.cdx.json
 ```
 
 #### Generate SBOM from a locally built image (podman)
@@ -703,10 +855,10 @@ syft frontend:local -o spdx-json > frontend-sbom.spdx.json
 
 ```bash
 # Full scan (all severities)
-grype ghcr.io/duynhlab/frontend/frontend:latest
+grype ghcr.io/duynhlab/frontend/frontend:1.0.0
 
 # Only show fixable vulnerabilities, fail on HIGH+
-grype ghcr.io/duynhlab/frontend/frontend:latest --only-fixed --fail-on high
+grype ghcr.io/duynhlab/frontend/frontend:1.0.0 --only-fixed --fail-on high
 
 # Scan a local image
 grype frontend:local
@@ -914,7 +1066,7 @@ VictoriaMetrics (see [observability](../observability/README.md)).
 
 ### 14. New-repo adoption checklist
 
-- [ ] `check.yml` (PR) + `build.yml` (push) + `release.yml` (`v*` tag) call the shared workflows
+- [ ] `check.yml` (PR) + `build.yml` (push + `v*` tag, incl. the tag-gated `release-binary` job) call the shared workflows
       (see [`build_template.yml`](build_template.yml) / [`check_template.yml`](check_template.yml)
       and [Binary Releases](#binary-releases-goreleaser)).
 - [ ] `permissions:` per §4; privileged jobs gated to trusted refs; concurrency per §6.

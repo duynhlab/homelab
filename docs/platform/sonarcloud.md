@@ -63,7 +63,7 @@ demanding the whole legacy codebase be backfilled.
   `**/db/migrations/**`, `**/mocks/**`, `**/*_mock.go` (bootstrap / wiring / migrations / generated).
   The **repository (DB) layer is NOT excluded** — it is integration-tested with testcontainers and
   its coverage is **merged** into the Sonar report via `integration-coverage: true`
-  (`coverage.out` + `coverage-integration.out`). See [`testing.md`](testing.md).
+  (`coverage.out` + `coverage-integration.out`). See [Testing & Coverage](cicd.md#testing--coverage).
 - The PR workflow may run with `fail-on-quality-gate: false` (non-blocking on the PR job), but the
   **branch analysis still records the gate** — a red `main` gate is the signal to fix coverage.
 
@@ -74,7 +74,7 @@ demanding the whole legacy codebase be backfilled.
 Coverage is generated per-repository during `go test -race -coverprofile=coverage.out ./...`
 (unit) plus `go test -tags=integration -coverprofile=coverage-integration.out ./internal/core/repository/...`
 (integration, testcontainers). Both profiles are merged in the Sonar scan via
-`sonar.go.coverage.reportPaths`. Full testing standard: [`testing.md`](testing.md).
+`sonar.go.coverage.reportPaths`. Full testing standard: [Testing & Coverage](cicd.md#testing--coverage).
 
 ### Frontend (React)
 

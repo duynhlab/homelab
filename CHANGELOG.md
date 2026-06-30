@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **docs (proposals)**: **RFC-0009** — production-grade API gateway (signed RS256 JWT + Kong OSS edge auth, defense-in-depth, Valkey rate-limiting, OSS-vs-Enterprise map). Added a **Priority** column + current-focus callout to the RFC index; backlog now tracks Authorization (RBAC/ABAC) and gateway improvements.
+
 ## [0.102.0] - 2026-06-29
 
 ### Added

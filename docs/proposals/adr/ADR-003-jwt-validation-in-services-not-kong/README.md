@@ -2,7 +2,13 @@
 
 | Status | Date | Related RFC |
 |--------|------|-------------|
-| Accepted | 2026-06-20 | — |
+| Superseded by [ADR-006](../ADR-006-rs256-jwt-kong-edge-auth/) | 2026-06-20 | — |
+
+> **Superseded by [ADR-006](../ADR-006-rs256-jwt-kong-edge-auth/) (2026-06-30).** The
+> revisit trigger below (move to RS256/ES256) was met: [RFC-0009](../../rfc/RFC-0009/)
+> adopts signed RS256 JWTs + Kong edge auth as defense-in-depth. Services still
+> validate (ADR-003's other half stands); ADR-006 *adds* an edge check and reverses the
+> "no Kong `jwt` plugin" stance. Body kept unchanged below for history.
 
 ## Context
 

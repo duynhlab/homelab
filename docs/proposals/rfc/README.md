@@ -8,6 +8,12 @@ pull request, and only then implemented.
 > **Don't forget: every decision is a tradeoff.** A good RFC states what the choice
 > *costs* (rejected alternatives + drawbacks + rollback), not just what it buys.
 
+> **▶ Current focus & sequencing.** Highest-priority active proposal:
+> **[RFC-0009](RFC-0009/)** (production-grade gateway + JWT edge auth). Recommended
+> security-track order: **RFC-0009 → [RFC-0002](RFC-0002/) → [RFC-0008](RFC-0008/)
+> (parallel) → [RFC-0006](RFC-0006/) (defer)**. The index below stays ordered by
+> number (a stable registry) — read the **Priority** column for what to pick up next.
+
 ## When to write an RFC
 
 Write an RFC for a **substantial** change — one that needs a design + review + a
@@ -54,16 +60,20 @@ made are recorded as one or more **ADRs**, and the RFC moves to `implemented`.
 
 ## Index
 
-| RFC | Title | Scope | Status |
-|-----|-------|-------|--------|
-| [RFC-0001](RFC-0001/) | Temporal for durable cross-service orchestration | platform-wide | implemented |
-| [RFC-0002](RFC-0002/) | East-west mTLS for internal gRPC | platform-wide | provisional |
-| [RFC-0003](RFC-0003/) | Inventory ownership and stock semantics | platform-wide | provisional |
-| [RFC-0004](RFC-0004/) | Cross-service caching and invalidation | platform-wide | provisional |
-| [RFC-0005](RFC-0005/) | supporting-shared-db: HA or split | infra | provisional |
-| [RFC-0006](RFC-0006/) | Service mesh evaluation (Istio Ambient vs Linkerd) | infra | provisional |
-| [RFC-0007](RFC-0007/) | Disaster-recovery drills program | infra | provisional |
-| [RFC-0008](RFC-0008/) | Production secrets hardening & local/prod parity | infra | provisional |
+> **Priority key:** **P0** active / highest · **P1** next · **P2** on-merit, unscheduled ·
+> **defer** parked · **done** shipped.
+
+| RFC | Title | Scope | Priority | Status |
+|-----|-------|-------|----------|--------|
+| [RFC-0001](RFC-0001/) | Temporal for durable cross-service orchestration | platform-wide | done | implemented |
+| [RFC-0002](RFC-0002/) | East-west mTLS for internal gRPC | platform-wide | P1 | provisional |
+| [RFC-0003](RFC-0003/) | Inventory ownership and stock semantics | platform-wide | P2 | provisional |
+| [RFC-0004](RFC-0004/) | Cross-service caching and invalidation | platform-wide | P2 | provisional |
+| [RFC-0005](RFC-0005/) | supporting-shared-db: HA or split | infra | P2 | provisional |
+| [RFC-0006](RFC-0006/) | Service mesh evaluation (Istio Ambient vs Linkerd) | infra | defer | provisional |
+| [RFC-0007](RFC-0007/) | Disaster-recovery drills program | infra | P2 | provisional |
+| [RFC-0008](RFC-0008/) | Production secrets hardening & local/prod parity | infra | P1 | provisional |
+| [RFC-0009](RFC-0009/) | Production-grade API gateway: signed JWT + Kong edge auth | platform-wide | P0 | provisional |
 
 ## Backlog — candidate RFCs
 
@@ -74,7 +84,8 @@ here). Each gets a number when someone writes it up.
 |-----------|-------|--------|
 | **Atlantis** PR-driven Terraform | infra | `TODO.md` |
 | **Alert delivery** (Slack via OpenBAO + PagerDuty) | infra | `docs/observability/alerting/` |
-| **Kong-JWT reconsideration** (gateway vs services) | platform-wide | `docs/platform/kong-gateway.md`, ADR-003 |
+| **Authorization (RBAC/ABAC)** — claim population + enforcement | platform-wide | [RFC-0009](RFC-0009/) O1 |
+| **Gateway improvements** — edge `proxy-cache` + dedicated per-env issuer domain | infra | [RFC-0009](RFC-0009/) O4/O6 |
 | **Talos bare-metal migration** | infra | `docs/platform/homelab-migration-plan.md` |
 | **Chaos / GameDay program** | infra | `TODO.md`, DR docs |
 | **API v1→v2 versioning policy** | platform-wide | `docs/api/api-naming-convention.md` |

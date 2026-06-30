@@ -6,7 +6,9 @@
 #
 # Differences from the cluster (intentional, local-only):
 #   - HTTP on :8000 (no TLS locally) -> no HSTS header, no https-redirect.
-#   - rate-limiting policy `local` is exact here (single Kong container).
+#   - rate-limiting uses `policy: redis` against the Valkey `cache` container
+#     (mirrors the cluster's shared counter). Kong 3.2 here needs the FLAT
+#     `redis_*` fields (the cluster's Kong 3.9 uses the nested `redis:` block).
 #   - CORS origin is the local SPA (http://localhost:3001).
 _format_version: "3.0"
 
@@ -65,7 +67,11 @@ plugins:
       second: 5
       minute: 100
       hour: 2500
-      policy: local
+      policy: redis
+      redis_host: cache
+      redis_port: 6379
+      redis_database: 1
+      redis_timeout: 2000
       fault_tolerant: true
       hide_client_headers: false
       error_code: 429

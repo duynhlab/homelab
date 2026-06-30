@@ -58,9 +58,12 @@ demanding the whole legacy codebase be backfilled.
 
 - The condition is configured **in SonarCloud** (Quality Gate), not in the workflow. When adding
   new conditionals, cover **both** branches or the gate fails the PR / `main` analysis.
-- **Coverage exclusions** (so integration-tested layers don't drag the gate): service repos
-  exclude `**/cmd/**`, `**/db/migrations/**`, and `**/core/repository/**` (the DB layer is
-  integration-tested, not unit-tested) via `sonar-project.properties`.
+- **Coverage exclusions** (counted-against-% only; still analyzed for issues), set via the
+  `coverage-exclusions` input of `sonarqube.yml`: `**/cmd/**`, `**/internal/core/database.go`,
+  `**/db/migrations/**`, `**/mocks/**`, `**/*_mock.go` (bootstrap / wiring / migrations / generated).
+  The **repository (DB) layer is NOT excluded** — it is integration-tested with testcontainers and
+  its coverage is **merged** into the Sonar report via `integration-coverage: true`
+  (`coverage.out` + `coverage-integration.out`). See [`testing.md`](testing.md).
 - The PR workflow may run with `fail-on-quality-gate: false` (non-blocking on the PR job), but the
   **branch analysis still records the gate** — a red `main` gate is the signal to fix coverage.
 
@@ -68,7 +71,10 @@ demanding the whole legacy codebase be backfilled.
 
 ### Go Services
 
-Coverage is generated per-repository during `go test -race -coverprofile=coverage.out ./...` and consumed by the Sonar workflow.
+Coverage is generated per-repository during `go test -race -coverprofile=coverage.out ./...`
+(unit) plus `go test -tags=integration -coverprofile=coverage-integration.out ./internal/core/repository/...`
+(integration, testcontainers). Both profiles are merged in the Sonar scan via
+`sonar.go.coverage.reportPaths`. Full testing standard: [`testing.md`](testing.md).
 
 ### Frontend (React)
 

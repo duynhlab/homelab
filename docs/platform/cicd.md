@@ -61,7 +61,7 @@ The `docker-build-go.yml` (and `docker-build-node.yml`) workflows handle this vi
 
 Each service repository reuses workflows from `duynhlab/gha-workflows`:
 - `pr-checks.yml` (PR validation + Slack PR events)
-- `go-check.yml` (tests + optional lint + coverage artifact)
+- `go-check.yml` (unit tests + optional lint + optional `integration` job running `go test -tags=integration` with testcontainers; coverage artifacts — see [`testing.md`](testing.md))
 - `gitleaks.yml` (Secret scanning + SARIF output)
 - `sonarqube.yml` (SonarCloud analysis + optional Quality Gate enforcement)
 - `docker-build-go.yml` (build, scan before push, push Docker image for Go services — outputs `tags` + `digest` + `scan-status`)

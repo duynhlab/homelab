@@ -444,6 +444,15 @@ flowchart LR
 | **Prometheus** | Observability | Global | Status codes, latency, bandwidth, upstream health |
 | **Rate Limiting** | Traffic Control | API routes | 10/s, 200/min, 5000/hr, local policy |
 | **Request Size Limiting** | Security | API routes | 10 MB max payload |
+| **IP Restriction** | Security | Internal ingresses | `ip-restriction-internal` — private/in-cluster CIDRs only (403 for public) on the admin/observability/MCP surfaces |
+| **Rate Limiting (admin)** | Traffic Control | Internal ingresses | `rate-limiting-admin` — 1200/min, 30000/hr (generous, for dashboard fan-out), shared Valkey counter |
+
+> **Internal-surface lockdown** (roadmap #1): the admin UIs (Grafana, OpenBAO,
+> Postgres/Flux/RustFS), the observability UIs, and the MCP endpoints are *not*
+> the public API — they carry `ip-restriction-internal` + `rate-limiting-admin`
+> so only private/in-cluster clients reach them. Because `trusted_ips` is kept
+> permissive for the Kind port-forward, this is **defense-in-depth**, not a hard
+> boundary — a real auth story (OIDC/SSO) is the follow-up.
 
 ### Kong Plugin Categories
 

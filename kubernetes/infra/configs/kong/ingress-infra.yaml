@@ -13,6 +13,7 @@ metadata:
     konghq.com/strip-path: "false"
     konghq.com/protocols: "https"
     konghq.com/https-redirect-status-code: "301"
+    konghq.com/plugins: ip-restriction-internal,rate-limiting-admin
 spec:
   ingressClassName: kong
   rules:
@@ -37,6 +38,7 @@ metadata:
     konghq.com/strip-path: "false"
     konghq.com/protocols: "https"
     konghq.com/https-redirect-status-code: "301"
+    konghq.com/plugins: ip-restriction-internal,rate-limiting-admin
 spec:
   ingressClassName: kong
   rules:
@@ -61,6 +63,7 @@ metadata:
     konghq.com/strip-path: "false"
     konghq.com/protocols: "https"
     konghq.com/https-redirect-status-code: "301"
+    konghq.com/plugins: ip-restriction-internal,rate-limiting-admin
 spec:
   ingressClassName: kong
   rules:
@@ -85,6 +88,7 @@ metadata:
     konghq.com/strip-path: "false"
     konghq.com/protocols: "https"
     konghq.com/https-redirect-status-code: "301"
+    konghq.com/plugins: ip-restriction-internal,rate-limiting-admin
 spec:
   ingressClassName: kong
   rules:

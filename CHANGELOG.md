@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **infra (kong)**: Kong edge resilience on the cluster (RFC-0009 roadmap #5) — every app Service now carries bounded timeouts + retries (`konghq.com/*` annotations via the `mop` chart's new `service.annotations`) and a `resilience-default` **KongUpstreamPolicy** (active `/health` + passive 5xx/timeout eject). Requires `mop` chart ≥ 0.13.0. (`trusted_ips` tightening deferred — kept permissive for the Kind port-forward.)
 - **infra (local-stack)**: Kong gateway gains edge resilience (RFC-0009 roadmap #5) — bounded per-service timeouts + retries, and named upstreams with active (`/health`) + passive (5xx/timeout eject = OSS circuit-breaking) health-checks. Chaos-tested: fail-fast + auto-recovery.
 - **infra (kong)**: Rate limiting moved from `policy: local` to a cluster-wide **Valkey** counter (`policy: redis`, db 1) so both Kong replicas share one limit (RFC-0009 Phase 1). local-stack mirrors this — its `cache` container is now Valkey (`valkey/valkey:8-alpine`) and the gateway depends on it.
 - **infra (local-stack)**: Added `AUTH_JWKS_URL` to the shared service env so services verify JWTs locally against the auth JWKS (`authmw.MiddlewareJWT`), exercising the RFC-0009 Phase 3 dual-verify path in local e2e.

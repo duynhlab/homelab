@@ -35,6 +35,10 @@ x-svc-env: &svc-env
   DB_USER: postgres
   DB_PASSWORD: postgres
   DB_SSLMODE: disable
+  # Local JWKS for service-side JWT verification (authmw.MiddlewareJWT). Issuer and
+  # audience use the auth-service defaults (https://gateway.duynh.me /
+  # duynhlab-platform), so only the URL needs overriding from the cluster default.
+  AUTH_JWKS_URL: http://auth:8080/auth/v1/public/jwks
 
 x-svc-healthcheck: &svc-healthcheck
   test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]

@@ -4,7 +4,7 @@ A one-command **Docker Compose** end-to-end stack for the duynhlab platform —
 the full request path plus a tracing + span-metrics observability stack, without
 a Kubernetes cluster.
 
-It runs: PostgreSQL (8 databases) · Redis · per-service golang-migrate jobs · the
+It runs: PostgreSQL (8 databases) · Valkey · per-service golang-migrate jobs · the
 **8 Go services** · a Temporal dev server + the order-fulfillment worker · a
 **Kong DB-less gateway** (mirrors the in-cluster Kong) · the **React SPA** ·
 an **OTel Collector → VictoriaTraces + VictoriaMetrics → Grafana** pipeline, and
@@ -35,7 +35,7 @@ First run builds every service image, so it takes a few minutes. Then:
 | VictoriaMetrics | http://localhost:8428 | remote-write + PromQL + vmui |
 | Pyroscope | http://localhost:4040 | continuous profiling (flame graphs) |
 
-Postgres and Redis are internal-only (reach the services through Kong, not directly).
+Postgres and Valkey are internal-only (reach the services through Kong, not directly).
 
 ## Architecture
 
@@ -44,7 +44,7 @@ flowchart LR
     SPA["React SPA :3001"] --> KONG["Kong :8080"]
     KONG --> SVC["8 Go services"]
     SVC --> PG[(PostgreSQL<br/>8 DBs)]
-    SVC --> REDIS[(Redis)]
+    SVC --> VALKEY[(Valkey)]
     SVC -. workflows .-> TMP["Temporal :7233<br/>+ worker"]
     SVC -- "OTLP-HTTP" --> COL["otel-collector :4318"]
     COL --> VT["VictoriaTraces :10428"]

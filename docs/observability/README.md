@@ -19,6 +19,7 @@ flowchart TD
         OTel["OTel Collector<br/>fan-out"]
         Tempo["Tempo<br/>storage"]
         Jaeger["Jaeger :16686<br/>query UI"]
+        VictoriaTraces["VictoriaTraces :10428<br/>pilot"]
     end
 
     subgraph pillar3 [Logs]
@@ -48,6 +49,7 @@ flowchart TD
     VMAgent --> VMSingle
     OTel --> Tempo
     OTel --> Jaeger
+    OTel --> VictoriaTraces
     Vector --> VLogs
 
     VMSingle --> Grafana
@@ -243,7 +245,7 @@ graph LR
 | Pillar | Tool | Question It Answers | Docs |
 |--------|------|---------------------|------|
 | **Metrics** | VMSingle + VMAgent | "Is something wrong?" | [metrics/](metrics/README.md) |
-| **Traces** | Tempo + Jaeger via OTel Collector | "Where is it slow?" | [tracing/](tracing/README.md) |
+| **Traces** | Tempo + Jaeger (+ VictoriaTraces pilot) via OTel Collector | "Where is it slow?" | [tracing/](tracing/README.md) |
 | **Logs** | VictoriaLogs via Vector | "Why is it broken?" | [logging/](logging/README.md) |
 | **Profiles** | Pyroscope | "Which code line is the bottleneck?" | [profiling/](profiling/README.md) |
 
@@ -268,7 +270,7 @@ docs/observability/
 │
 ├── tracing/                      # Pillar 2: Distributed tracing
 │   ├── README.md                 # Tracing guide (Tempo + OTel)
-│   ├── architecture.md           # Dual backend (Tempo + Jaeger)
+│   ├── architecture.md           # Triple backend (Tempo + Jaeger + VictoriaTraces pilot)
 │   ├── jaeger.md                 # Jaeger UI guide
 │   ├── backends-comparison.md    # Tempo vs Jaeger vs VictoriaTraces
 │   └── victoriatraces.md         # VictoriaTraces pilot (3rd backend)
@@ -317,6 +319,7 @@ docs/observability/
 | Grafana | monitoring | `grafana-service` | 3000 | Dashboards and visualization |
 | Tempo | monitoring | `tempo` | 3200 | Trace storage (OTLP receiver) |
 | Jaeger | monitoring | `jaeger-query` | 16686 | Trace query UI (alternative to Tempo) |
+| VictoriaTraces | monitoring | `vtsingle-victoria-traces` | 10428 | Trace storage pilot (`v0.6.0`, OTLP HTTP + Jaeger query API) |
 | OTel Collector | monitoring | `otel-collector` | 4317 | Trace fan-out (OTLP gRPC ingress) |
 | VictoriaLogs | monitoring | `vlsingle-victoria-logs` | 9428 | Log storage and query (LogsQL, sole log backend) |
 | Vector | kube-system | DaemonSet | -- | Log collection from all pods |

@@ -11,10 +11,13 @@ Kong Ingress Controller (KIC) runs in **DB-less mode** — all configuration is 
 - [Architecture](#architecture)
 - [Domain Routing Strategy](#domain-routing-strategy)
 - [Rate Limiting Deep Dive](#rate-limiting-deep-dive)
+- [Edge Resilience](#edge-resilience)
 - [Plugin Ecosystem](#plugin-ecosystem)
 - [Components](#components)
 - [Local Access](#local-access)
 - [TLS / cert-manager](#tls--cert-manager)
+- [Routing Rules](#routing-rules)
+- [Flux Dependency Chain](#flux-dependency-chain)
 - [Verification Runbook](#verification-runbook)
 - [Troubleshooting](#troubleshooting)
 - [Design Decisions](#design-decisions)
@@ -84,37 +87,37 @@ rate-limits, and adds CORS / security-headers / correlation-id / metrics — but
 
 Kong runs in two deployment topologies. This project uses **DB-less** (Ingress Controller mode); the table below explains why.
 
-| Khía cạnh | **DB-less (declarative)** | **Database (Postgres)** |
+| Aspect | **DB-less (declarative)** | **Database (Postgres)** |
 |---|---|---|
-| **Config source** | YAML file / ConfigMap / Kubernetes CRDs | Admin API ghi vào Postgres |
-| **State** | In-memory only, load lúc start | Persistent, shared giữa các node |
-| **Scaling** | Mỗi pod load YAML độc lập, stateless | Tất cả node đọc chung DB |
-| **Config update** | Reload toàn bộ (`/config` endpoint hoặc rolling restart) | Per-entity CRUD via Admin API, propagate qua DB |
+| **Config source** | YAML file / ConfigMap / Kubernetes CRDs | Admin API writes to Postgres |
+| **State** | In-memory only, loaded at start | Persistent, shared across nodes |
+| **Scaling** | Each pod loads YAML independently, stateless | All nodes read the shared DB |
+| **Config update** | Full reload (`/config` endpoint or rolling restart) | Per-entity CRUD via Admin API, propagated through the DB |
 | **Admin API** | Read-only (`GET` only) | Full CRUD |
-| **Plugin support** | ~95% (không có: rate-limiting `cluster` policy, OAuth2 token store, ACL với consumer động, một số plugin cần persistent state) | 100% |
-| **Consumer / Credential** | Khai báo trong YAML / `KongConsumer` CRD (static) | Tạo/xóa runtime qua Admin API |
+| **Plugin support** | ~95% (missing: rate-limiting `cluster` policy, OAuth2 token store, ACL with dynamic consumers, some plugins that need persistent state) | 100% |
+| **Consumer / Credential** | Declared in YAML / `KongConsumer` CRD (static) | Created/deleted at runtime via Admin API |
 | **Rate-limiting policies** | `local`, `redis` | `local`, `cluster`, `redis` |
-| **Vitals / Analytics** | Không (Enterprise only via Redis) | Có với Postgres backend |
-| **HA / multi-node** | Stateless, scale ngang dễ, không SPOF | Cần HA Postgres → thêm operational burden |
-| **Cold start** | Nhanh (load YAML) | Cần DB ready trước |
-| **GitOps fit** | ⭐ Tốt nhất — config = file trong Git | Khó — state nằm trong DB, dễ drift |
-| **Use case** | Kubernetes Ingress, edge proxy, immutable infra | Kong as API platform với nhiều team self-service |
+| **Vitals / Analytics** | No (Enterprise only via Redis) | Yes, with the Postgres backend |
+| **HA / multi-node** | Stateless, easy horizontal scale, no SPOF | Needs HA Postgres → extra operational burden |
+| **Cold start** | Fast (load YAML) | Requires the DB to be ready first |
+| **GitOps fit** | ⭐ Best — config = a file in Git | Hard — state lives in the DB, prone to drift |
+| **Use case** | Kubernetes Ingress, edge proxy, immutable infra | Kong as an API platform with many self-service teams |
 
-**Khi nào dùng DB-less:**
+**When to use DB-less:**
 
-- Kubernetes với Ingress Controller (case của repo này)
-- GitOps workflow (config trong Git, Flux reconcile)
-- Không cần dynamic consumer/credential management
-- Muốn giảm operational surface (1 component thay vì 2)
+- Kubernetes with the Ingress Controller (this repo's case)
+- GitOps workflow (config in Git, reconciled by Flux)
+- No need for dynamic consumer/credential management
+- Reduce the operational surface (1 component instead of 2)
 
-**Khi nào dùng Database mode:**
+**When to use Database mode:**
 
-- Nhiều team tự tạo route/consumer qua Admin API hoặc Kong Manager UI
-- Kong Enterprise với Vitals, RBAC, Workspaces
-- Plugin yêu cầu persistent state (OAuth2 token introspection cache lâu, ACL động)
-- Không có Konnect (cloud control plane)
+- Many teams create routes/consumers via the Admin API or Kong Manager UI
+- Kong Enterprise with Vitals, RBAC, Workspaces
+- Plugins that require persistent state (long-lived OAuth2 token introspection cache, dynamic ACL)
+- No Konnect (cloud control plane)
 
-**Trong repo này:** Kong chạy **DB-less** (Ingress Controller mode). Tất cả Ingress/route khai báo qua Kubernetes CRDs (`Ingress`, `KongPlugin`); Flux reconcile config từ Git → drift = 0; Postgres dành cho app data, không lãng phí cho Kong control plane. **Không nên đổi sang DB mode** trừ khi onboard Kong Enterprise + Konnect.
+**In this repo:** Kong runs **DB-less** (Ingress Controller mode). All Ingress/routes are declared via Kubernetes CRDs (`Ingress`, `KongPlugin`); Flux reconciles the config from Git → drift = 0; Postgres is reserved for app data, not wasted on the Kong control plane. **Do not switch to DB mode** unless onboarding Kong Enterprise + Konnect.
 
 ---
 
@@ -169,7 +172,7 @@ Request → CORS → correlation-id → Prometheus → Rate Limiting (per-route)
 | `correlation-id` | Global | Generates `X-Request-ID` per request, echoed downstream |
 | `prometheus-metrics` (`prometheus`) | Global | Metrics for every request (status/latency/bandwidth) |
 | `security-headers` (`response-transformer`) | Global | Adds `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, HSTS; strips `Server` |
-| `rate-limiting-api` | Per-route (API only) | Protects backends from abuse (`local` policy, ~2× across 2 replicas) |
+| `rate-limiting-api` | Per-route (API only) | Protects backends from abuse (`redis` policy — exact cluster-wide counter shared by both Kong replicas) |
 | `request-size-limiting-api` | Per-route (API only) | Rejects oversized payloads (10 MB) |
 
 ### Authentication — validated in services, NOT at Kong
@@ -300,7 +303,7 @@ flowchart TD
 
 ### Our Configuration
 
-We use the **OSS `rate-limiting` plugin** with `local` policy:
+We use the **OSS `rate-limiting` plugin** with `redis` policy:
 
 ```yaml
 # kubernetes/infra/configs/kong/plugins.yaml
@@ -310,10 +313,15 @@ metadata:
   name: rate-limiting-api
 plugin: rate-limiting
 config:
-  second: 10      # Burst protection
-  minute: 200     # Sustained load protection
-  hour: 5000      # Abuse prevention
-  policy: local   # Per-node counters (single Kong replica)
+  second: 5       # Burst protection
+  minute: 100     # Sustained load protection
+  hour: 2500      # Abuse prevention
+  policy: redis   # Shared counter in Valkey (exact across both Kong replicas)
+  redis:
+    host: valkey.cache-system.svc.cluster.local
+    port: 6379
+    database: 1
+    timeout: 2000
   fault_tolerant: true
   hide_client_headers: false
   error_code: 429
@@ -329,13 +337,13 @@ config:
 When rate limiting is active, Kong returns standard headers:
 
 ```
-RateLimit-Limit: 10
-RateLimit-Remaining: 7
+RateLimit-Limit: 5
+RateLimit-Remaining: 3
 RateLimit-Reset: 3
-X-RateLimit-Limit-Second: 10
-X-RateLimit-Remaining-Second: 7
-X-RateLimit-Limit-Minute: 200
-X-RateLimit-Remaining-Minute: 185
+X-RateLimit-Limit-Second: 5
+X-RateLimit-Remaining-Second: 3
+X-RateLimit-Limit-Minute: 100
+X-RateLimit-Remaining-Minute: 85
 ```
 
 When limit is exceeded (HTTP 429):
@@ -351,10 +359,10 @@ When limit is exceeded (HTTP 429):
 | Policy | Accuracy | Performance | When to Use |
 |--------|----------|-------------|-------------|
 | **`local`** | Per-node only (inexact with multiple replicas) | Fastest (in-memory) | Single replica, dev/uat |
-| **`cluster`** | Cluster-wide (uses Kong DB) | Moderate | DB-mode Kong, small clusters |
+| **`cluster`** | Cluster-wide (uses Kong DB) | Moderate | DB-mode Kong, small clusters (**not available in DB-less**) |
 | **`redis`** | Cluster-wide (external counter) | Moderate | Multi-replica, production scale |
 
-**Current choice: `local`** — We run a single Kong replica. When scaling to multiple replicas, switch to `redis` with Valkey (already deployed in `cache-system` namespace):
+**Current choice: `redis`** — We run **2 Kong replicas** (`replicaCount: 2` in the HelmRelease), so the counter must be shared or the limit would be enforced per pod. DB-less mode does **not** support the `cluster` policy, so `redis` against Valkey (already deployed in `cache-system`) is the way to a single cluster-wide counter:
 
 ```yaml
 config:
@@ -362,14 +370,18 @@ config:
   redis:
     host: valkey.cache-system.svc.cluster.local
     port: 6379
+    database: 1
+    timeout: 2000
 ```
 
-### Scaling Rate Limit Accuracy
+`database: 1` isolates the rate-limit keyspace from the product Cache-Aside (db 0).
 
-With `local` policy and N Kong replicas, the effective limit per node is `global_limit / N`. But traffic isn't perfectly balanced, so:
+### Rate Limit Accuracy
 
-- **2 replicas**: Set limit to `limit * 0.6` per node (allows 20% headroom)
-- **3+ replicas**: Use `redis` policy for accurate cluster-wide counters
+Because the `redis` policy keeps one shared counter in Valkey, the configured
+limits are the exact cluster-wide ceiling regardless of how many Kong replicas
+serve the request — no per-node fudge factor is needed. (The `local` policy is
+the single-replica alternative, where each pod counts independently.)
 
 ### Choosing Limits
 
@@ -377,9 +389,9 @@ Our limits are designed for a homelab/learning platform:
 
 | Limit | Value | Reasoning |
 |-------|-------|-----------|
-| `second: 10` | 10 req/s | Prevents rapid-fire abuse, allows normal browsing |
-| `minute: 200` | 200 req/min | ~3.3 req/s sustained, generous for real users |
-| `hour: 5000` | 5000 req/hr | ~83 req/min, prevents long-term scraping |
+| `second: 5` | 5 req/s | Prevents rapid-fire abuse, allows normal browsing |
+| `minute: 100` | 100 req/min | ~1.7 req/s sustained, generous for real users |
+| `hour: 2500` | 2500 req/hr | ~42 req/min, prevents long-term scraping |
 
 For production, calibrate based on actual traffic patterns:
 
@@ -442,7 +454,7 @@ flowchart LR
 | **CORS** | Traffic Control | Global | Origins: `https://local.duynh.me`, `https://duynh.me`; methods: GET/POST/PUT/PATCH/DELETE/OPTIONS |
 | **HTTPS Redirect** | Traffic Control | Per-Ingress annotations | `konghq.com/protocols: "https"` + `konghq.com/https-redirect-status-code: "301"` on every Ingress forces HTTP→HTTPS 301 |
 | **Prometheus** | Observability | Global | Status codes, latency, bandwidth, upstream health |
-| **Rate Limiting** | Traffic Control | API routes | 10/s, 200/min, 5000/hr, local policy |
+| **Rate Limiting** | Traffic Control | API routes | 5/s, 100/min, 2500/hr, redis policy (shared Valkey counter, db 1) |
 | **Request Size Limiting** | Security | API routes | 10 MB max payload |
 | **IP Restriction** | Security | Internal ingresses | `ip-restriction-internal` — private/in-cluster CIDRs only (403 for public) on the admin/observability/MCP surfaces |
 | **Rate Limiting (admin)** | Traffic Control | Internal ingresses | `rate-limiting-admin` — 1200/min, 30000/hr (generous, for dashboard fan-out), shared Valkey counter |
@@ -477,7 +489,7 @@ Currently, auth is handled at the application level (auth-service). Gateway-leve
 | Plugin | Purpose | Status |
 |--------|---------|--------|
 | `cors` | Cross-origin resource sharing | **Active** |
-| `ip-restriction` | Allow/deny by IP | Planned |
+| `ip-restriction` | Allow/deny by IP | **Active** (`ip-restriction-internal`, internal ingresses) |
 | `bot-detection` | Block known bots | Planned |
 | `acl` | Access control lists | Future |
 | `request-size-limiting` | Limit request body size | **Active** |
@@ -496,8 +508,8 @@ Currently, auth is handled at the application level (auth-service). Gateway-leve
 | Plugin | Purpose | Status |
 |--------|---------|--------|
 | `prometheus` | Metrics endpoint | **Active** |
-| `opentelemetry` | Distributed tracing (OTel) | Future |
-| `correlation-id` | Request correlation | Future |
+| `opentelemetry` | Distributed tracing (OTel) | **Active** (`opentelemetry-tracing`, global) |
+| `correlation-id` | Request correlation | **Active** (global) |
 | `http-log` | HTTP logging | Future |
 | `tcp-log` | TCP logging | Future |
 | `file-log` | File-based logging | Future |
@@ -516,7 +528,7 @@ Currently, auth is handled at the application level (auth-service). Gateway-leve
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| HelmRelease | `kubernetes/infra/controllers/kong/helmrelease.yaml` | Kong KIC deployment (DB-less, chart v2.44.0) |
+| HelmRelease | `kubernetes/infra/controllers/kong/helmrelease.yaml` | Kong KIC deployment (DB-less, chart 3.2.0 (Kong 3.9)) |
 | Plugins | `kubernetes/infra/configs/kong/plugins.yaml` | Global CORS + Prometheus, API rate limiting + request size limiting |
 | Frontend Ingress | `kubernetes/infra/configs/kong/ingress-frontend.yaml` | Routes `local.duynh.me /` to frontend |
 | API Ingress | `kubernetes/infra/configs/kong/ingress-api.yaml` | Routes `gateway.duynh.me /{service}/v1/{public,private}/…` to services (rate-limited, pass-through) |
@@ -644,7 +656,7 @@ kubectl get kongplugins -A
 
 **Expected**:
 
-- 4 `KongClusterPlugin`s: `cors-policy`, `prometheus-metrics`, `rate-limiting-api`, `request-size-limiting-api`.
+- 9 `KongClusterPlugin`s: `cors-policy`, `prometheus-metrics`, `rate-limiting-api`, `request-size-limiting-api`, `correlation-id`, `security-headers`, `ip-restriction-internal`, `rate-limiting-admin`, `opentelemetry-tracing`.
 - No namespaced `KongPlugin` resources needed — Kong is pure pass-through (services mount Variant A paths directly).
 
 ### Step 4: Check Kong Services
@@ -781,12 +793,12 @@ access-control-max-age: 3600
 ### Step 9: Test Rate Limiting
 
 ```bash
-# Rapid-fire 15 requests (limit is 10/s)
+# Rapid-fire 15 requests (limit is 5/s)
 for i in $(seq 1 15); do
   code=$(curl -s -o /dev/null -w "%{http_code}" https://gateway.duynh.me/product/v1/public/products)
   echo "Request $i: $code"
 done
-# Expected: First ~10 return 200, remaining return 429
+# Expected: First ~5 return 200, remaining return 429
 ```
 
 ### Step 10: Browser E2E Test (agent-browser)
@@ -930,15 +942,18 @@ Kong in DB-less mode stores all configuration in Kubernetes CRDs. No PostgreSQL 
 
 - OSS plugin covers our needs (fixed window, multiple time-based limits)
 - No Enterprise license required
-- `local` policy is optimal for single-replica Kong
-- Upgrade path is clear: switch to `redis` policy when scaling replicas
+- Works with the `redis` policy, which DB-less mode requires for a shared counter
+- No dependency on Kong's DB (the `cluster` policy is unavailable in DB-less)
 
-### Why `local` policy?
+### Why `redis` policy?
 
-- Single Kong replica = no counter sync needed
-- Zero external dependency (no Redis connection)
-- Fastest option (in-memory counters)
-- `fault_tolerant: true` ensures requests aren't blocked if counters fail
+- We run **2 Kong replicas**, so a per-node (`local`) counter would enforce the
+  limit per pod — the configured limits are only exact with a shared counter
+- DB-less mode does **not** support the `cluster` policy, so `redis` (against the
+  already-deployed Valkey in `cache-system`, db 1) is the only shared-counter option
+- `fault_tolerant: true` fails **open** on a Valkey outage — limiting degrades to
+  off rather than 500-ing requests
+- `local` remains the single-replica alternative (in-memory, zero dependency)
 
 ### Why `fault_tolerant: true`?
 
@@ -950,13 +965,18 @@ If the rate limiting counter encounters an error (memory pressure, internal issu
 
 ### Phase 2: Security Hardening
 
-- `ip-restriction` — Internal-only endpoints (monitoring, MCP)
-- `bot-detection` — Block known malicious bots
+- ~~`ip-restriction`~~ — ✅ Done (`ip-restriction-internal` on the admin/observability/MCP ingresses)
+- ~~`response-transformer` / security-headers~~ — ✅ Done (`security-headers` adds HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy globally)
 - ~~`request-size-limiting`~~ — ✅ Done (10MB limit, applied to API routes)
+- `bot-detection` — Block known malicious bots
 
-### Phase 3: Gateway-Level Auth
+### Phase 3: Gateway-Level Auth (planned, not yet deployed)
 
-- `jwt` — Validate JWT tokens at Kong, offload from 8 microservices
+Edge JWT is **not enforced today** — auth stays in the services (ADR-003). Moving
+validation to Kong depends on **[ADR-006](../proposals/adr/ADR-006-rs256-jwt-kong-edge-auth/)**
+(RS256 JWT + Kong edge auth) and **[RFC-0009](../proposals/rfc/RFC-0009/) Phase 4**:
+
+- `jwt` — Validate RS256 JWT tokens at Kong, offload from 8 microservices
 - `key-auth` — API key authentication for external integrations
 - `acl` — Consumer-based access control lists
 
@@ -964,7 +984,6 @@ If the rate limiting counter encounters an error (memory pressure, internal issu
 
 - `proxy-cache` — Cache GET responses at gateway level (reduce backend load)
 - `request-transformer` — Inject tracing headers, strip sensitive headers
-- `response-transformer` — Add security headers (HSTS, CSP, X-Frame-Options)
 
 ### Phase 5: Multi-Replica Scaling
 

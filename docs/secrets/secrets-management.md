@@ -49,7 +49,7 @@ flowchart LR
 | Component | Purpose | Namespace | Version |
 |-----------|---------|-----------|---------|
 | OpenBAO (HA) | Secret storage (3-node Raft) | `openbao` | 2.5.2 (Chart 0.26.2) |
-| External Secrets Operator | Sync secrets to K8s | `external-secrets-system` | **v2.1.0** |
+| External Secrets Operator | Sync secrets to K8s | `external-secrets-system` | **v2.5.0** |
 | ClusterSecretStore | OpenBAO connection config | cluster-scoped | `openbao` |
 | ClusterExternalSecret | Shared secrets across namespaces | cluster-scoped | Backup creds |
 | ExternalSecret | Per-secret definition | app namespaces | Creates K8s Secrets |
@@ -107,9 +107,9 @@ ESO-managed secrets use the **same name** as the original secret they replace (e
 
 | K8s Secret | Namespace | Source |
 |------------|-----------|--------|
-| `cnpg-db-secret` | product | `secret/data/local/databases/product/credentials` |
-| `cnpg-db-cart-secret` | cart | `secret/data/local/databases/cart/credentials` |
-| `cnpg-db-order-secret` | order | `secret/data/local/databases/order/credentials` |
+| `cnpg-db-secret` | product | `secret/data/local/databases/cnpg-db/product` |
+| `cnpg-db-cart-secret` | cart | `secret/data/local/databases/cnpg-db/cart` |
+| `cnpg-db-order-secret` | order | `secret/data/local/databases/cnpg-db/order` |
 
 ### Backup Secrets (ClusterExternalSecret)
 

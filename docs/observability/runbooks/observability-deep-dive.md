@@ -213,7 +213,7 @@ flowchart TD
 | Pillar | Tool | Protocol | Question It Answers |
 |--------|------|----------|---------------------|
 | **Metrics** | VMSingle + VMAgent | Prometheus scrape (pull) | "Is something wrong?" (RED/USE signals) |
-| **Traces** | Tempo + Jaeger via OTel Collector | OTLP HTTP (push) | "Where is it slow?" (cross-service latency) |
+| **Traces** | Tempo + Jaeger (+ VictoriaTraces pilot) via OTel Collector | OTLP HTTP (push) | "Where is it slow?" (cross-service latency) |
 | **Logs** | VictoriaLogs via Vector | JSON over stdout (push) | "Why is it broken?" (error details, context) |
 | **Profiles** | Pyroscope | pprof push | "Which code line is the bottleneck?" (CPU/memory flamegraphs) |
 
@@ -284,7 +284,7 @@ sequenceDiagram
 ### What Each Middleware Produces
 
 **TracingMiddleware** outputs:
-- Root span exported to OTel Collector -> Tempo + Jaeger
+- Root span exported to OTel Collector -> primary backends (Tempo + Jaeger; VictoriaTraces pilot)
 - Child spans created by handler/logic layer
 - W3C Trace Context header for cross-service propagation
 - Service name auto-detected from Kubernetes pod name
@@ -491,7 +491,7 @@ Use this framework for every interview question about observability. The **Befor
 
 **Before**: We had 8 Go microservices with no centralized monitoring. Each team checked logs by SSH-ing into pods and running `kubectl logs`. No alerting -- users reported issues before the team knew. No way to trace a request across services. MTTR was measured in hours because investigation was manual.
 
-**What you did**: Built a 4-pillar observability stack: metrics (VictoriaMetrics), traces (Tempo + Jaeger), logs (VictoriaLogs via Vector), and continuous profiling (Pyroscope). Standardized a 3-middleware chain in all services so every request automatically emits metrics, traces, and structured logs with correlation.
+**What you did**: Built a 4-pillar observability stack: metrics (VictoriaMetrics), traces (Tempo + Jaeger, with a VictoriaTraces pilot), logs (VictoriaLogs via Vector), and continuous profiling (Pyroscope). Standardized a 3-middleware chain in all services so every request automatically emits metrics, traces, and structured logs with correlation.
 
 **How**:
 - Single `request_duration_seconds` histogram covers all RED signals (Rate, Errors, Duration)

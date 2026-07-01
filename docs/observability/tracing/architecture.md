@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document explains the distributed tracing architecture used in this project, including the dual backend strategy (Jaeger + Tempo), OpenTelemetry Collector fan-out pattern, and SDK-based instrumentation approach.
+This document explains the distributed tracing architecture used in this project, including the triple-backend fan-out (Tempo + Jaeger + VictoriaTraces pilot), OpenTelemetry Collector fan-out pattern, and SDK-based instrumentation approach.
 
 ## Architecture
 
@@ -86,30 +86,33 @@ config that makes this reliable.
 - **Query**: Built-in Jaeger UI (port 16686, `jaeger-query` Service)
 - **Integration**: Grafana datasource
 
-## Why Dual Backends?
+## Why Multiple Backends?
+
+The OTel Collector fans out to **three** backends, each with a distinct role:
 
 ### Use Cases
 
-1. **Migration Strategy**
-   - Running both during transition from Jaeger to Tempo
-   - Validate Tempo meets all requirements
-   - Gradual cutover without service disruption
+1. **Tempo — durable primary**
+   - Day-to-day Grafana workflows (TraceQL, traces↔logs↔metrics correlation)
+   - Durable store on RustFS S3 (`tempo-traces` bucket, 7-day retention)
 
-2. **A/B Testing**
-   - Compare backend performance
-   - Evaluate features (UI, query language)
-   - Cost analysis
+2. **Jaeger — dedicated trace-search UI**
+   - Alternative UI, learning / comparison
+   - In-memory / ephemeral (no S3/object-storage backend)
 
-3. **Redundancy**
-   - Backup for critical traces
-   - Different retention policies
-   - Compliance requirements
+3. **VictoriaTraces — pilot (3rd backend)**
+   - Evaluates the **VM-operator consolidation** story: tracing managed by the
+     *same* VictoriaMetrics Operator and storage engine as metrics (`VMSingle`)
+     and logs (`VLSingle`), with **no object-storage dependency**
+   - `v0.6.0` (0.x, pre-GA) — a pilot, not a replacement; any consolidation is a
+     future ADR gated on ~1.0/GA. See [victoriatraces.md](victoriatraces.md) and
+     the [backend comparison](backends-comparison.md)
 
 ### Current Status
 
-This is a **POC/learning project**, so dual backends allow:
-- Learning both systems
-- Comparing approaches
+This is a **POC/learning project**, so multiple backends allow:
+- Learning each system
+- Comparing approaches (UI, query language, storage model)
 - Understanding trade-offs
 
 ## SDK vs Sidecar: Why SDK?
@@ -239,14 +242,16 @@ exporters:
   otlp/tempo:
     endpoint: tempo.monitoring.svc.cluster.local:4317
   otlp/jaeger:
-    endpoint: jaeger-collector.monitoring.svc.cluster.local:4317
+    endpoint: jaeger.monitoring.svc.cluster.local:4317
+  otlphttp/victoriatraces:          # pilot 3rd backend (OTLP HTTP, :10428)
+    traces_endpoint: http://vtsingle-victoria-traces.monitoring.svc.cluster.local:10428/insert/opentelemetry/v1/traces
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [otlp/tempo, otlp/jaeger]
+      exporters: [otlp/tempo, otlp/jaeger, otlphttp/victoriatraces]
 ```
 
 **Benefits:**
@@ -265,7 +270,7 @@ service:
 5. **Batch export** every 5 seconds (or when batch full)
 6. **OTLP HTTP** sent to OTel Collector
 7. **Collector processes** (memory limit, batch)
-8. **Fan-out** to Tempo and Jaeger via OTLP gRPC
+8. **Fan-out** to Tempo + Jaeger (OTLP gRPC) and VictoriaTraces (OTLP HTTP)
 9. **Backends store** traces
 10. **Query** via Grafana (Tempo) or Jaeger UI
 

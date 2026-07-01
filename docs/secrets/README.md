@@ -125,7 +125,7 @@ flowchart TD
         end
 
         subgraph eso_ns["Namespace: external-secrets-system"]
-            eso["External Secrets Operator\nv2.1.0"]
+            eso["External Secrets Operator\nv2.5.0"]
             css["ClusterSecretStore\nopenbao"]
         end
 

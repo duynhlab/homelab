@@ -197,9 +197,9 @@ All 4 domain ResourceSets share the same `resourcesTemplate`. This is duplicated
 
 ## 5. Image Tag Strategy
 
-### Static Tags (Current Default)
+### Pinned Tags (Current Default)
 
-All ResourceSets use a **static `latest` tag**. Every reconciliation pulls the newest image with that tag.
+Each service's `ResourceSetInputProvider` supplies an explicit `image_tag` input that the domain ResourceSet renders into the HelmRelease (`tag: "<< inputs.image_tag >>"`). Tags are pinned to a specific `sha` or `vX.Y.Z` per service — `:latest` is **banned by Kyverno admission** and never used.
 
 ### Dynamic Tags via OCIArtifactTag (Future)
 
@@ -209,7 +209,7 @@ To enable automatic semver-based rollouts, define a `ResourceSetInputProvider` o
 - Service has stable semver releases in GHCR
 - Team wants zero-touch deploys on image push
 
-**When to keep static tags:**
+**When to keep pinned tags:**
 - Early development / frequent iteration
 - No semver tags published yet
 

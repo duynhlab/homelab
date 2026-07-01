@@ -19,11 +19,11 @@ docs/
 │   ├── README.md                 # umbrella: ADR vs RFC + flow + links
 │   ├── adr/                      # Architecture Decision Records
 │   │   ├── README.md             # ADR conventions + index
-│   │   └── ADR-001 / ADR-002 / ADR-003
+│   │   └── ADR-001 … ADR-006     # Temporal ×2, JWT-in-services (superseded), OpenBAO audit/HA, RS256+edge-auth
 │   └── rfc/                      # Requests for Comments
 │       ├── README.md             # process + index + backlog
 │       ├── RFC-0000/             # template
-│       └── RFC-0001/             # Temporal (implemented)
+│       └── RFC-0001 … RFC-0009   # Temporal, mTLS, inventory, caching, shared-db, mesh, DR drills, secrets, API gateway
 ├── databases/                    # Database documentation
 │   ├── 002-database-integration.md               # PostgreSQL architecture
 │   ├── 003-operator-comparison.md               # CloudNativePG vs Zalando decision guide
@@ -305,6 +305,7 @@ docs/
 - [API Reference](./api/api.md) - Complete API documentation
 - [gRPC Internal Comms (proposed/draft)](./api/grpc-internal-comms.md) - Selective gRPC for internal east-west calls; dual-port, HTTP/2 LB pitfall, phased roadmap
 - [Temporal Order-Fulfillment Saga](./api/temporal-order-fulfillment.md) - Durable order saga (why/when/how, design, infra, ops)
+- [RFC-0009: Production-grade API gateway (signed JWT + Kong edge auth)](./proposals/rfc/RFC-0009/) - Partially implemented; supersedes ADR-003 via ADR-006
 - [RFCs](./proposals/rfc/) - Propose & track substantial changes (process + index + backlog)
 
 ### Decisions (ADRs)
@@ -312,6 +313,10 @@ docs/
 - [ADR index](./proposals/adr/README.md) - Architecture Decision Records (the *why* behind significant choices)
 - [ADR-001: Adopt Temporal for order fulfillment](./proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/)
 - [ADR-002: Deploy Temporal via the operator](./proposals/adr/ADR-002-deploy-temporal-via-operator/)
+- [ADR-003: Keep JWT validation in services, not at Kong](./proposals/adr/ADR-003-jwt-validation-in-services-not-kong/) - **Superseded by ADR-006**
+- [ADR-004: Enable OpenBAO audit logging](./proposals/adr/ADR-004-enable-openbao-audit-logging/) - Accepted
+- [ADR-005: Run OpenBAO HA (Raft) instead of Vault dev mode](./proposals/adr/ADR-005-openbao-ha-raft/) - Accepted
+- [ADR-006: Adopt RS256 signed JWTs + Kong edge authentication](./proposals/adr/ADR-006-rs256-jwt-kong-edge-auth/) - Accepted; implements [RFC-0009](./proposals/rfc/RFC-0009/)
 
 ### Databases
 
@@ -397,4 +402,4 @@ docs/
 
 ---
 
-**Last Updated**: May 2026
+**Last Updated**: 2026-07-01

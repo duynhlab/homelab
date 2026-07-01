@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | platform-wide | 2026-06-30 | 2026-06-30 |
+| partially implemented | platform-wide | 2026-06-30 | 2026-07-01 |
 
 > **Don't forget: every decision is a tradeoff.** This RFC moves the platform from
 > opaque DB-backed session tokens to stateless signed JWTs and adds a second
@@ -34,7 +34,7 @@ in production:
 
 This RFC is the **umbrella plan**. It supersedes [ADR-003](../../adr/ADR-003-jwt-validation-in-services-not-kong/)
 (whose own revisit-trigger — "if auth-service moves to RS256/ES256… re-open this
-ADR" — is now met) via a new **ADR-006**, and re-sequences
+ADR" — is now met) via [ADR-006](../../adr/ADR-006-rs256-jwt-kong-edge-auth/) (Accepted), and re-sequences
 [RFC-0002](../RFC-0002/) (east-west mTLS) to land *after* this work.
 
 ## Motivation
@@ -77,7 +77,7 @@ rate limiting.**
 - **Authorization (RBAC/ABAC).** There is no `roles` column today. JWTs will carry a
   `roles` claim as a **forward-compatible placeholder**, but real authz is a separate
   RFC (decision O1).
-- **OTel/tracing of the auth path** — deferred (debt, will be done later).
+- **OTel/tracing of the auth path** — ~~deferred~~ **done**: edge tracing landed (roadmap #2), Kong emits the root span and injects the W3C `traceparent` so the auth (and every) path is traced end-to-end.
 - **Admin-UI authentication** (Grafana/Kong-manager/etc.) — will be done, *after*
   the core auth refactor lands ("triển khai chuẩn trước, làm sau").
 - **Kong Enterprise / Konnect** — documented for comparison only; not adopted.
@@ -387,7 +387,7 @@ Repo: `auth-service` + consuming services. Once Phases 2–4 are stable:
 - Drop the `sessions` table (migration) and any dead opaque-token code.
 - **Verify:** no opaque tokens minted; `auth.GetMe` call rate ≈ 0; e2e green.
 
-### Phase 6 — resilience pass *(follow-up PR, O5)*
+### Phase 6 — resilience pass *(follow-up PR, O5)* — ✅ done
 
 Repo: `homelab`. Small, separate PR — not part of the auth cutover:
 
@@ -458,9 +458,9 @@ anti-pattern here.
 | Structured access logs | stdout → Vector → VictoriaLogs | ✅ **Have it** |
 | Rate limiting (cluster-wide) | rate-limiting `policy: redis` (Valkey) | 🟢 **This RFC — Phase 1** |
 | Edge authentication | jwt | 🟢 **This RFC — Phase 4** (defense-in-depth) |
-| Resilience: timeouts + passive health-check | core Upstream/Target | 🟡 **This RFC — Phase 6** (follow-up PR) |
-| IP allowlist on admin UIs | ip-restriction | 🟡 **Deferred — admin-security workstream** ("chuẩn trước, làm sau") |
-| Distributed tracing at edge | opentelemetry | 🟡 **Deferred — OTel debt** (committed later) |
+| Resilience: timeouts + passive health-check | core Upstream/Target (`KongUpstreamPolicy`) | 🟢 **Done — Phase 6** (per-service timeouts/retries + active/passive health-checks) |
+| IP allowlist on admin UIs | ip-restriction | 🟢 **Done — internal-surface lockdown** (`ip-restriction-internal` + `rate-limiting-admin` on the 17 admin/obs/MCP ingresses). Real admin *auth* (OIDC/SSO) still deferred |
+| Distributed tracing at edge | opentelemetry | 🟢 **Done** (`propagation.inject: [w3c]` forces the upstream `traceparent`; Kong bumped to 3.9 for the propagation block — 100% edge→service linkage) |
 | Edge caching (public GET) | proxy-cache | 🔵 **Future gateway-improvements RFC** (per-pod footgun; service Cache-Aside already covers it) |
 | Dedicated per-env issuer domain | `iss` convention | 🔵 **Future gateway-improvements RFC** (using shared `gateway.duynh.me` now — O6) |
 | Maintenance / kill-switch | request-termination | ⚪ **Optional** easy win — not scheduled |
@@ -525,7 +525,10 @@ Kong OSS gives you the cheap, high-value resilience knobs without Enterprise:
 
 ## Observability & SLO impact
 
-- Auth-path tracing is **deferred** (debt). Minimum to watch during rollout:
+- Edge/gateway tracing **shipped** (roadmap #2): the `opentelemetry` plugin injects
+  the W3C `traceparent` (`propagation.inject: [w3c]`) so the auth path — like every
+  path — is traced end-to-end; only per-span auth enrichment (custom claim/attribute
+  spans) remains as optional debt. Minimum to watch during rollout:
   auth-service 401/refresh rates, JWKS fetch errors in services (a spike → services
   about to fail closed), Kong `jwt` plugin 401 rate, rate-limit 429 rate after the
   Valkey switch.
@@ -578,7 +581,7 @@ a supersession, flip the *Status* field only, never rewrite the body.
 | ADR | Action | Why |
 |-----|--------|-----|
 | **ADR-003** (JWT validation in services, not Kong) | **Superseded by ADR-006** | Its own revisit-trigger ("if auth-service moves to RS256/ES256 *and* we need to shed bad tokens at the edge") is now met. Flip Status → `Superseded by ADR-006`. |
-| **ADR-006** (new) | **Create** — "Adopt RS256 JWT + Kong edge auth (defense-in-depth)" | Records the decision this RFC implements. |
+| **[ADR-006](../../adr/ADR-006-rs256-jwt-kong-edge-auth/)** | **Accepted** — "Adopt RS256 signed JWTs + Kong edge authentication" | Records the decision this RFC implements. |
 | **ADR-001 / ADR-002** (Temporal) | **No change** | Orchestration; unrelated to auth/gateway. |
 | **ADR-004** (OpenBAO audit logging) | **No change** (positive interaction) | The new JWT signing-key access is automatically covered by audit logging — a benefit, no edit. |
 | **ADR-005** (OpenBAO HA raft) | **No change** | Storage backend; the signing key rides on it. |
@@ -641,11 +644,23 @@ The original open questions were resolved on 2026-06-30:
 
 ## Implementation History
 
-- 2026-06-30 — RFC drafted (provisional). Not yet implemented.
+- 2026-06-30 — RFC drafted (provisional).
+- 2026-07-01 — **Partially implemented.** [ADR-006](../../adr/ADR-006-rs256-jwt-kong-edge-auth/)
+  Accepted, and three roadmap items shipped on the gateway
+  (`kubernetes/infra/configs/kong/plugins.yaml` + `kubernetes/apps/domains/*-rs.yaml`):
+  - **Internal-surface lockdown** — `ip-restriction-internal` + `rate-limiting-admin`
+    on the admin/obs/MCP ingresses (decision-map "IP allowlist on admin UIs").
+  - **Edge distributed tracing** — `opentelemetry` plugin with
+    `propagation.inject: [w3c]` (Kong bumped to 3.9) for 100% edge→service linkage.
+  - **Phase 6 resilience** — `KongUpstreamPolicy` (per-service bounded
+    timeouts/retries + active/passive health-checks).
+  - Also shipped earlier: **Phase 1** (rate-limit → Valkey) and, in the auth track,
+    **Phases 2–3** (auth-service RS256 JWT + JWKS, `pkg/authmw` local verification).
+  - **Pending:** Phase 4 (Kong edge `jwt` plugin) and Phase 5 (opaque→JWT cutover cleanup).
 
 ## Related
 
-- Supersedes: [ADR-003](../../adr/ADR-003-jwt-validation-in-services-not-kong/) (via ADR-006, to be created).
+- Supersedes: [ADR-003](../../adr/ADR-003-jwt-validation-in-services-not-kong/) (via [ADR-006](../../adr/ADR-006-rs256-jwt-kong-edge-auth/), Accepted).
 - Re-sequences: [RFC-0002](../RFC-0002/) (east-west mTLS).
 - Sibling: [RFC-0008](../RFC-0008/) (secrets hardening — shared OpenBAO/ESO pattern).
 - Context: [`docs/platform/kong-gateway.md`](../../../platform/kong-gateway.md),

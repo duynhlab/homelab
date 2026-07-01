@@ -30,7 +30,7 @@ http://{service}.{namespace}.svc.cluster.local:8080/{service}/v1/{audience}/{res
 for in-cluster (east-west) traffic. Same path, different host — Kong just forwards.
 
 - `{service}` ∈ `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`.
-- `{audience}` ∈ `public`, `private`, `internal`, `protected`.
+- `{audience}` ∈ `public`, `private`, `internal`, `protected` (`protected` is **planned — none deployed yet**).
 - `{resource…}` mirrors the collection/verb owned by the service.
 
 ## Audience segments
@@ -39,7 +39,7 @@ for in-cluster (east-west) traffic. Same path, different host — Kong just forw
 |-------|---------|-------------|-------------------|
 | `public` | Anonymous callers — no JWT required | Yes | N/A |
 | `private` | Authenticated user — `Authorization: Bearer <JWT>` | Yes | Service middleware (calls auth-service `/auth/v1/private/me`) |
-| `protected` | Signed webhooks / partner HMAC / IP allowlist | Yes (when added) | Per-route plugin or service middleware |
+| `protected` | Signed webhooks / partner HMAC / IP allowlist — **planned, none deployed yet** | Not yet (planned) | Per-route plugin or service middleware |
 | `internal` | Pod → Service — cluster-only | **No — never** | Kong not exposing the route + in-app controls (NetworkPolicies authored but enforced only once an enforcing CNI is present) |
 
 **Kong enforcement:** each `api-*` Ingress has one or two explicit `path:` entries — `/{service}/v1/public/` and/or `/{service}/v1/private/`. Internal audiences are never added to Ingress rules, so requests to `https://gateway.duynh.me/notification/v1/internal/notify/email` resolve to Kong's default 404.

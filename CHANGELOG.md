@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **docs (proposals)**: **RFC-0009** — production-grade API gateway (signed RS256 JWT + Kong OSS edge auth, defense-in-depth, Valkey rate-limiting, OSS-vs-Enterprise map). Added a **Priority** column + current-focus callout to the RFC index; backlog now tracks Authorization (RBAC/ABAC) and gateway improvements.
+- **infra (kong)**: Edge tracing (RFC-0009 roadmap #2) — Kong's `opentelemetry` plugin now emits a root request span and, via `propagation.inject: [w3c]`, forces a W3C `traceparent` onto every upstream request so the service span joins the same trace (**verified 100% edge→service linkage** in local-stack). Enabled by `tracing_instrumentations`/`tracing_sampling_rate` (cluster HelmRelease + local-stack `KONG_TRACING_*`). Tracing architecture docs + diagrams updated.
+
+### Changed
+
+- **infra (local-stack)**: Bumped the local Kong gateway **3.2 → 3.9** to match the cluster — this is what enables the `opentelemetry` `propagation` block (Kong ≥ 3.5) that fixes edge→service trace linkage, and it removes the version split (local rate-limiting now uses the same nested `redis:` block as the cluster instead of the deprecated flat `redis_*` fields).
+- **docs**: Refreshed documentation to deployed reality after a multi-area audit — `kong-gateway.md` (rate-limit 5/100/2500 + `policy: redis`/2 replicas, 9 KongClusterPlugins, chart 3.2.0/Kong 3.9, plugin/roadmap status, DB-less section translated to English, TOC); tracing docs (VictoriaTraces added as the 3rd fan-out backend, edge-linkage section); RFC-0009 status → *partially implemented* + ADR-006 links; `docs/README.md` proposals index (ADR-001–006, RFC-0000–0009); secrets (ESO 2.5.0, `cnpg-db/*` paths); Valkey naming (AGENTS.md, local-stack README); `application-delivery.md` image-tag; AGENTS.md auth-middleware/stack notes.
 
 ### Added
 

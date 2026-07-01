@@ -1,7 +1,7 @@
 # Caching Documentation
 
 > **Document Status:** Production  
-> **Last Updated:** 2026-06-14  
+> **Last Updated:** 2026-07-01  
 > **Cache System:** Valkey (Redis-compatible)  
 > **Pattern:** Cache-Aside (Read-Through)
 

@@ -52,7 +52,7 @@ kubernetes/
   apps/       # Domain ResourceSets + per-service InputProviders + frontend
 scripts/      # Kind/Flux helpers (called by the Makefile)
 terraform/    # OpenTofu root: Flux Operator + FluxInstance bootstrap (flux-operator-bootstrap module)
-local-stack/  # Docker Compose e2e stack (Postgres + Redis + 8 services + Kong DB-less gateway + SPA)
+local-stack/  # Docker Compose e2e stack (Postgres + Valkey + 8 services + Kong DB-less gateway + SPA)
 docs/         # Documentation (start at docs/README.md)
 ```
 
@@ -90,9 +90,9 @@ flowchart LR
 ```
 
 - **Frontend → Web layer only.** The SPA calls `/{service}/v1/{public,private}/…` via `VITE_API_BASE_URL`; never Logic/Core/DB. Aggregation happens server-side.
-- **API URL shape (Variant A):** `/{service}/v1/{audience}/{resource…}`, mounted directly on each service's router (Kong is pass-through, no rewrite). `{audience}` ∈ `public|private|internal|protected`. **Never** put `internal` routes on `ingress-api.yaml` — they're in-cluster only; **NetworkPolicy is the fence**, not the absence of an Ingress rule. JWT middleware lives in each service (validates via `auth.GetMe`), not Kong. Authoritative: [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
+- **API URL shape (Variant A):** `/{service}/v1/{audience}/{resource…}`, mounted directly on each service's router (Kong is pass-through, no rewrite). `{audience}` ∈ `public|private|internal|protected`. **Never** put `internal` routes on `ingress-api.yaml` — they're in-cluster only; **NetworkPolicy is the fence**, not the absence of an Ingress rule. Auth middleware lives in each service (`pkg/authmw`: verifies RS256 JWTs locally against a cached JWKS, with an opaque-token → `auth.GetMe` fallback), not Kong — edge JWT (RFC-0009 Phase 4) is planned, not yet deployed. Authoritative: [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
 - **gRPC is the official east-west transport** (auth `/me`, product→review, order→shipping, order→notification) — gRPC-only, always-on `:9090`, no feature flag, no REST fallback. Shared `pkg/grpcx`. Browser/Kong traffic stays HTTP/JSON.
-- **Observability:** middleware chain **tracing → logging → metrics**; gRPC RED metrics surface on each service's existing `/metrics` via `pkg/obsx` (no extra port); `obsx.TraceIDFromContext` correlates logs with traces. Stack: VictoriaMetrics, Grafana, Tempo, VictoriaLogs (Loki removed), Pyroscope, Jaeger, Vector. SLO via Sloth.
+- **Observability:** middleware chain **tracing → logging → metrics**; gRPC RED metrics surface on each service's existing `/metrics` via `pkg/obsx` (no extra port); `obsx.TraceIDFromContext` correlates logs with traces. Stack: VictoriaMetrics, Grafana, Tempo (+ VictoriaTraces pilot), VictoriaLogs (Loki removed), Pyroscope, Jaeger, Vector. SLO via Sloth. Kong emits edge spans (opentelemetry `inject:[w3c]`).
 - **Caching:** Cache-Aside with Valkey for read-heavy endpoints.
 - **Diagrams:** **Mermaid only — never ASCII art** (`flowchart`, `sequenceDiagram`, etc.).
 - **Stack:** Go 1.26, Gin, PostgreSQL (Zalando + CloudNativePG operators, PgBouncer/PgDog poolers, golang-migrate v4.19.1 migrations embedded in each service binary), OpenTelemetry, Flux Operator + Kustomize + OCI, Kind + Helm 3, OpenBAO + External Secrets Operator.

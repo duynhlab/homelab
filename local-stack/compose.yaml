@@ -436,7 +436,7 @@ services:
     # stand-in). Declarative config in ./gateway/kong.yml mirrors the
     # in-cluster Kong (routing + CORS + correlation-id + security headers +
     # rate/size limits) so local e2e exercises the real gateway behaviour.
-    image: kong:3.2
+    image: kong:3.9
     environment:
       KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /kong/kong.yml
@@ -444,6 +444,11 @@ services:
       KONG_ADMIN_LISTEN: "off"
       KONG_STATUS_LISTEN: "0.0.0.0:8100"
       KONG_PLUGINS: bundled
+      # Edge tracing: generate spans and propagate W3C traceparent so a trace
+      # starts at the gateway (not the service). Exported via the opentelemetry
+      # plugin (kong.yml) to the collector. Sample everything locally.
+      KONG_TRACING_INSTRUMENTATIONS: all
+      KONG_TRACING_SAMPLING_RATE: "1.0"
       # Drop server_tokens (Server/Via fingerprint), keep latency debug headers
       KONG_HEADERS: latency_tokens
       KONG_PROXY_ACCESS_LOG: /dev/stdout

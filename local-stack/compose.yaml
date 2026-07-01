@@ -211,6 +211,66 @@ services:
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
 
+  # ---- Dev-only demo seeds (one-shot). Seeding lives OUTSIDE the migration
+  # chain (prod never seeds); each runs its service's `seed` subcommand after
+  # that service's migrate. ----
+  user-seed:
+    build: { context: ../../user-service }
+    command: ["seed"]
+    environment: { <<: *svc-env, SERVICE_NAME: user, DB_NAME: user }
+    depends_on:
+      postgres: { condition: service_healthy }
+      user-migrate: { condition: service_completed_successfully }
+    restart: "no"
+  product-seed:
+    build: { context: ../../product-service }
+    command: ["seed"]
+    environment: { <<: *svc-env, SERVICE_NAME: product, DB_NAME: product }
+    depends_on:
+      postgres: { condition: service_healthy }
+      product-migrate: { condition: service_completed_successfully }
+    restart: "no"
+  cart-seed:
+    build: { context: ../../cart-service }
+    command: ["seed"]
+    environment: { <<: *svc-env, SERVICE_NAME: cart, DB_NAME: cart }
+    depends_on:
+      postgres: { condition: service_healthy }
+      cart-migrate: { condition: service_completed_successfully }
+    restart: "no"
+  order-seed:
+    build: { context: ../../order-service }
+    command: ["seed"]
+    environment: { <<: *svc-env, SERVICE_NAME: order, DB_NAME: order }
+    depends_on:
+      postgres: { condition: service_healthy }
+      order-migrate: { condition: service_completed_successfully }
+    restart: "no"
+  review-seed:
+    build: { context: ../../review-service }
+    command: ["seed"]
+    environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review }
+    depends_on:
+      postgres: { condition: service_healthy }
+      review-migrate: { condition: service_completed_successfully }
+    restart: "no"
+  shipping-seed:
+    build: { context: ../../shipping-service }
+    command: ["seed"]
+    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping }
+    depends_on:
+      postgres: { condition: service_healthy }
+      shipping-migrate: { condition: service_completed_successfully }
+    restart: "no"
+  notification-seed:
+    build: { context: ../../notification-service }
+    command: ["seed"]
+    environment: { <<: *svc-env, SERVICE_NAME: notification, DB_NAME: notification }
+    depends_on:
+      postgres: { condition: service_healthy }
+      notification-migrate: { condition: service_completed_successfully }
+    restart: "no"
+
   # ---- Backend services ----
   auth:
     build: { context: ../../auth-service }
@@ -235,6 +295,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       user-migrate: { condition: service_completed_successfully }
+      user-seed: { condition: service_completed_successfully }
       auth: { condition: service_healthy }
 
   shipping:
@@ -246,6 +307,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       shipping-migrate: { condition: service_completed_successfully }
+      shipping-seed: { condition: service_completed_successfully }
 
   review:
     build: { context: ../../review-service }
@@ -259,6 +321,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       review-migrate: { condition: service_completed_successfully }
+      review-seed: { condition: service_completed_successfully }
       auth: { condition: service_healthy }
 
   notification:
@@ -273,6 +336,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       notification-migrate: { condition: service_completed_successfully }
+      notification-seed: { condition: service_completed_successfully }
       auth: { condition: service_healthy }
 
   product:
@@ -292,6 +356,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       product-migrate: { condition: service_completed_successfully }
+      product-seed: { condition: service_completed_successfully }
       cache: { condition: service_healthy }
       review: { condition: service_healthy }
 
@@ -307,6 +372,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       cart-migrate: { condition: service_completed_successfully }
+      cart-seed: { condition: service_completed_successfully }
       auth: { condition: service_healthy }
 
   order:
@@ -332,6 +398,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       order-migrate: { condition: service_completed_successfully }
+      order-seed: { condition: service_completed_successfully }
       auth: { condition: service_healthy }
       cart: { condition: service_healthy }
       shipping: { condition: service_healthy }

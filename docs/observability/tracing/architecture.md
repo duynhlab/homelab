@@ -10,32 +10,56 @@ This document explains the distributed tracing architecture used in this project
 
 ```mermaid
 flowchart TB
+    Client([Browser / API client])
+
+    subgraph Edge["Kong API Gateway (edge)"]
+        Kong["opentelemetry plugin<br/>root request span + W3C traceparent"]
+    end
+
     subgraph Apps["Microservices (8 Go services)"]
         Auth[auth]
         User[user]
         Product[product]
         Others[...5 more]
     end
-    
+
     subgraph OTelCollector["OpenTelemetry Collector (fan-out layer)"]
         Receiver["OTLP Receiver (:4317 gRPC, :4318 HTTP)"]
         Processor["Batch Processor (memory limiter)"]
         Exporter[Exporters]
     end
-    
+
     subgraph Backends["Tracing Backends"]
         Tempo["Tempo (primary backend)"]
+        VT["VictoriaTraces"]
         Jaeger["Jaeger (alternative UI)"]
     end
-    
+
+    Client -->|HTTP| Kong
+    Kong -.->|"traceparent (W3C) — continues the trace"| Apps
+    Kong -->|"OTLP HTTP (edge span)"| Receiver
     Apps -->|"OTLP HTTP (SDK export)"| Receiver
     Receiver --> Processor
     Processor --> Exporter
-    Exporter -->|OTLP gRPC| Tempo
-    Exporter -->|OTLP gRPC| Jaeger
+    Exporter -->|OTLP| Tempo
+    Exporter -->|OTLP| VT
+    Exporter -->|OTLP| Jaeger
 ```
 
+The trace now **begins at the gateway**: Kong's `opentelemetry` plugin creates
+the root request span and injects the W3C `traceparent` so each service span is a
+child of the edge span (previously traces started at the service — a blind first
+hop). See [Edge → service linkage](#edge--service-linkage) for the propagation
+config that makes this reliable.
+
 ### Component Details
+
+**0. Kong API Gateway (edge)**
+- **Technology**: Kong `opentelemetry` plugin (`plugin: opentelemetry`, global)
+- **Enabled by**: `tracing_instrumentations: all` + `tracing_sampling_rate` in the Kong config (HelmRelease env for the cluster; `KONG_TRACING_*` for local-stack)
+- **Export**: OTLP HTTP to the same collector endpoint the services use (`…:4318/v1/traces`), `service.name=kong`
+- **Role**: creates the **root request span** for every proxied call and injects the W3C `traceparent` downstream, so the trace starts at the edge instead of the first service
+- **Config**: `kubernetes/infra/configs/kong/plugins.yaml` (`opentelemetry-tracing` KongClusterPlugin) + `kubernetes/infra/controllers/kong/helmrelease.yaml`; local mirror in `local-stack/gateway/kong.yml` + `local-stack/compose.yaml`
 
 **1. Microservices (SDK Approach)**
 - **Technology**: Go OpenTelemetry SDK
@@ -141,6 +165,48 @@ tracerProvider := sdktrace.NewTracerProvider(
 - Need custom instrumentation
 - Resource efficiency is important
 - Learning/POC environment
+
+## Edge → service linkage
+
+For Kong's edge span and the downstream service span to land in the **same
+trace**, Kong must inject a W3C `traceparent` onto the upstream request that the
+service then extracts. The catch: the OpenTelemetry plugin's default
+propagation is `inject: [preserve]`, which only re-injects a format it
+*extracted* — so for a browser call (no inbound trace header) it injects
+**nothing**, and the service starts a brand-new root (split traces).
+
+**Fix (required config):** force W3C injection on the plugin. This needs
+**Kong ≥ 3.5** (the `propagation` block):
+
+```yaml
+plugins:
+  - name: opentelemetry
+    config:
+      traces_endpoint: http://…:4318/v1/traces
+      propagation:
+        default_format: w3c
+        extract: [w3c, b3, jaeger, ot]
+        inject: [w3c]        # ← forces traceparent onto every upstream request
+```
+
+```mermaid
+flowchart LR
+    K["Kong edge span<br/>inject:[w3c] → traceparent on upstream"] -->|"service extracts (W3C propagator)"| L["service span = child<br/>(one trace)"]
+```
+
+**Verified:** local-stack (Kong **3.9**, sampling 1.0) links **100%** of proxied
+requests Kong→service after adding `inject: [w3c]` (was intermittent on Kong 3.2,
+which predates the `propagation` block). Service-to-service hops (the order saga
+over gRPC) were already linking, confirming the service-side W3C propagator works
+— no service change was needed.
+
+> **Cluster sampling note:** Kong samples head-based at `0.1` and each service
+> samples independently at `0.1`. Linkage (trace continuity) is guaranteed by
+> `inject: [w3c]`, but for both to *keep* a trace at 10% the services should use a
+> **`ParentBased`** sampler so they honour Kong's decision — otherwise a request
+> Kong sampled may be dropped by the service (and vice-versa). Tracked with the
+> existing OTel sampler follow-up; it affects sampling completeness, not the
+> linkage mechanism.
 
 ## Configuration
 

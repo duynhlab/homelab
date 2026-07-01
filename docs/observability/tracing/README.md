@@ -77,26 +77,29 @@ Track requests as they flow through multiple microservices to understand perform
 
 ```mermaid
 flowchart LR
-    A[User Request] -->|1. HTTP Request| B[Auth Service]
-    B -->|2. W3C traceparent header| C[Order Service]
-    C -->|3. traceparent propagated| D[Payment Service]
-    
-    B -.->|Spans| E[Tempo]
+    A[User Request] -->|1. HTTP Request| K[Kong gateway<br/>root span + traceparent]
+    K -->|2. W3C traceparent header| B[Auth Service]
+    B -->|3. traceparent propagated| C[Order Service]
+    C -->|propagated| D[Product Service]
+
+    K -.->|Spans| E[Tempo]
+    B -.->|Spans| E
     C -.->|Spans| E
     D -.->|Spans| E
-    
+
     E -->|TraceQL queries| F[Grafana]
-    
+
     style A fill:#e1f5ff
+    style K fill:#fff2cc
     style E fill:#ffe1e1
     style F fill:#e1ffe1
 ```
 
 ### Trace Flow
 
-1. **Request arrives** → Auth service creates **root span** with `trace_id`
-2. **W3C Trace Context** header (`traceparent`) propagated to downstream services
-3. Each service creates **child spans** for its operations
+1. **Request arrives** at **Kong** (edge), which creates the **root span** with `trace_id` and injects the W3C `traceparent` (its `opentelemetry` plugin)
+2. **W3C Trace Context** header (`traceparent`) propagated to the services and downstream
+3. Each service creates **child spans** for its operations (Kong forces a W3C `traceparent` via `inject: [w3c]` — see [edge→service linkage](architecture.md#edge--service-linkage))
 4. **10% sampling** decision made at root span (statistically significant)
 5. Spans exported to **Tempo** via OTLP HTTP (batch export every 5s)
 6. **Grafana** queries Tempo for trace visualization

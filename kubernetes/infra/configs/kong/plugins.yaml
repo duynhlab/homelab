@@ -210,3 +210,29 @@ config:
   hide_client_headers: false
   error_code: 429
   error_message: "Rate limit exceeded. Please slow down."
+---
+# Edge tracing — export Kong's spans (root request span + propagated W3C
+# traceparent) to the OTel collector so distributed traces begin at the gateway
+# instead of the service (roadmap #2). Global; span generation + sampling are set
+# by tracing_instrumentations / tracing_sampling_rate in the Kong HelmRelease env.
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: opentelemetry-tracing
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "true"
+plugin: opentelemetry
+config:
+  traces_endpoint: http://otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318/v1/traces
+  resource_attributes:
+    service.name: kong
+  # inject=[w3c] FORCES a W3C traceparent onto every upstream request. The
+  # default (`preserve`) injects nothing when the inbound request carries no
+  # trace header (e.g. a browser call), which leaves the service span in a
+  # separate trace. This guarantees edge->service linkage. (Kong >= 3.5.)
+  propagation:
+    default_format: w3c
+    extract: [w3c, b3, jaeger, ot]
+    inject: [w3c]

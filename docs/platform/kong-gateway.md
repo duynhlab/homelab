@@ -446,6 +446,7 @@ flowchart LR
 | **Request Size Limiting** | Security | API routes | 10 MB max payload |
 | **IP Restriction** | Security | Internal ingresses | `ip-restriction-internal` — private/in-cluster CIDRs only (403 for public) on the admin/observability/MCP surfaces |
 | **Rate Limiting (admin)** | Traffic Control | Internal ingresses | `rate-limiting-admin` — 1200/min, 30000/hr (generous, for dashboard fan-out), shared Valkey counter |
+| **OpenTelemetry** | Observability | Global | `opentelemetry-tracing` — edge span + `propagation.inject: [w3c]` (forces `traceparent` to upstream); OTLP→collector. Trace starts at the gateway — see [tracing/architecture.md](../observability/tracing/architecture.md#edge--service-linkage) |
 
 > **Internal-surface lockdown** (roadmap #1): the admin UIs (Grafana, OpenBAO,
 > Postgres/Flux/RustFS), the observability UIs, and the MCP endpoints are *not*

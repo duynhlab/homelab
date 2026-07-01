@@ -7,8 +7,8 @@
 # Differences from the cluster (intentional, local-only):
 #   - HTTP on :8000 (no TLS locally) -> no HSTS header, no https-redirect.
 #   - rate-limiting uses `policy: redis` against the Valkey `cache` container
-#     (mirrors the cluster's shared counter). Kong 3.2 here needs the FLAT
-#     `redis_*` fields (the cluster's Kong 3.9 uses the nested `redis:` block).
+#     (mirrors the cluster's shared counter). Kong here is 3.9 (matching the
+#     cluster), so it uses the nested `redis:` block — same as the cluster.
 #   - CORS origin is the local SPA (http://localhost:3001).
 _format_version: "3.0"
 
@@ -158,10 +158,11 @@ plugins:
       minute: 100
       hour: 2500
       policy: redis
-      redis_host: cache
-      redis_port: 6379
-      redis_database: 1
-      redis_timeout: 2000
+      redis:
+        host: cache
+        port: 6379
+        database: 1
+        timeout: 2000
       fault_tolerant: true
       hide_client_headers: false
       error_code: 429
@@ -171,3 +172,17 @@ plugins:
       allowed_payload_size: 10
       size_unit: megabytes
       require_content_length: false
+  # Edge tracing — export Kong's spans to the collector so distributed traces
+  # begin at the gateway. propagation.inject=[w3c] FORCES a W3C traceparent onto
+  # every upstream request (the default `preserve` injects nothing when the
+  # inbound request has no trace header, e.g. a browser call — which left ~40% of
+  # traces unlinked). Requires Kong >= 3.5 (the propagation block).
+  - name: opentelemetry
+    config:
+      traces_endpoint: http://otel-collector:4318/v1/traces
+      resource_attributes:
+        service.name: kong
+      propagation:
+        default_format: w3c
+        extract: [w3c, b3, jaeger, ot]
+        inject: [w3c]

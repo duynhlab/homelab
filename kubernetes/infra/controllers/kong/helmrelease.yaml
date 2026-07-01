@@ -35,6 +35,12 @@ spec:
     env:
       database: "off"
       plugins: "bundled"
+      # Edge tracing: generate spans + propagate W3C traceparent so distributed
+      # traces begin at the gateway (exported by the opentelemetry KongClusterPlugin).
+      # Sampling matches the services (0.1); full edge→service linkage also needs
+      # the services' ParentBased sampler (tracked separately).
+      tracing_instrumentations: "all"
+      tracing_sampling_rate: "0.1"
       # Hide the gateway software fingerprint: `latency_tokens` keeps the
       # X-Kong-*-Latency debug headers but drops `server_tokens`, so Kong no
       # longer emits `Server: kong/x.y.z` or `Via: kong/x.y.z`.

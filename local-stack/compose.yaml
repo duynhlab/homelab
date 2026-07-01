@@ -158,6 +158,16 @@ services:
     environment: { <<: *svc-env, SERVICE_NAME: auth, DB_NAME: auth }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
+  # Dev-only demo users (alice/password123). Seeding lives OUTSIDE the migration
+  # chain (prod never seeds); local-stack applies it explicitly after migrate.
+  auth-seed:
+    build: { context: ../../auth-service }
+    command: ["seed"]
+    environment: { <<: *svc-env, SERVICE_NAME: auth, DB_NAME: auth }
+    depends_on:
+      postgres: { condition: service_healthy }
+      auth-migrate: { condition: service_completed_successfully }
+    restart: "no"
   user-migrate:
     build: { context: ../../user-service }
     command: ["migrate"]
@@ -211,6 +221,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       auth-migrate: { condition: service_completed_successfully }
+      auth-seed: { condition: service_completed_successfully }
 
   user:
     build: { context: ../../user-service }

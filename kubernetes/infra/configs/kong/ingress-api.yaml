@@ -8,18 +8,22 @@
 # `internal` routes (service-to-service) are deliberately excluded
 # and reachable only via in-cluster Service DNS.
 #
-# Services keep validating JWTs themselves in their middleware
-# (defense-in-depth; Kong does not enforce auth).
+# EDGE AUTH (RFC-0009 Phase 4, ADR-006): `/private/` Ingresses carry the
+# `jwt-edge` plugin — Kong rejects signature-invalid / expired RS256 tokens at
+# the edge. `/public/` Ingresses stay anonymous (login/register/jwks/catalog).
+# Services STILL validate JWTs (pkg/authmw, authoritative) — defense-in-depth.
+# Services with both audiences are split into `-public` / `-private` Ingresses so
+# the plugin applies to private paths only.
 #
 # TLS is terminated by Kong using the default proxy certificate
 # (kong-proxy-tls secret, mounted via the HelmRelease secretVolumes).
 
 ---
-# Auth Service — public (login, register) + private (me)
+# Auth Service — public (login, register, jwks): anonymous
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: api-auth
+  name: api-auth-public
   namespace: auth
   annotations:
     konghq.com/strip-path: "false"
@@ -39,6 +43,24 @@ spec:
                 name: auth
                 port:
                   number: 8080
+---
+# Auth Service — private (me): edge JWT
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-auth-private
+  namespace: auth
+  annotations:
+    konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
+    konghq.com/plugins: rate-limiting-api,request-size-limiting-api,jwt-edge
+spec:
+  ingressClassName: kong
+  rules:
+    - host: gateway.duynh.me
+      http:
+        paths:
           - path: /auth/v1/private/
             pathType: Prefix
             backend:
@@ -47,11 +69,11 @@ spec:
                 port:
                   number: 8080
 ---
-# User Service — public GET /users/:id + private /users/profile
+# User Service — public GET /users/:id: anonymous
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: api-user
+  name: api-user-public
   namespace: user
   annotations:
     konghq.com/strip-path: "false"
@@ -71,6 +93,24 @@ spec:
                 name: user
                 port:
                   number: 8080
+---
+# User Service — private /users/profile: edge JWT
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-user-private
+  namespace: user
+  annotations:
+    konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
+    konghq.com/plugins: rate-limiting-api,request-size-limiting-api,jwt-edge
+spec:
+  ingressClassName: kong
+  rules:
+    - host: gateway.duynh.me
+      http:
+        paths:
           - path: /user/v1/private/
             pathType: Prefix
             backend:
@@ -79,7 +119,7 @@ spec:
                 port:
                   number: 8080
 ---
-# Product Service — public catalog (list, detail, aggregated details)
+# Product Service — public catalog (list, detail, aggregated details): anonymous
 # (POST /product/v1/internal/products is NOT exposed here)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -105,7 +145,7 @@ spec:
                 port:
                   number: 8080
 ---
-# Cart Service — private only (all routes require JWT)
+# Cart Service — private only: edge JWT
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -115,7 +155,7 @@ metadata:
     konghq.com/strip-path: "false"
     konghq.com/protocols: "https"
     konghq.com/https-redirect-status-code: "301"
-    konghq.com/plugins: rate-limiting-api,request-size-limiting-api
+    konghq.com/plugins: rate-limiting-api,request-size-limiting-api,jwt-edge
 spec:
   ingressClassName: kong
   rules:
@@ -130,7 +170,7 @@ spec:
                 port:
                   number: 8080
 ---
-# Order Service — private only (all routes require JWT)
+# Order Service — private only: edge JWT
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -140,7 +180,7 @@ metadata:
     konghq.com/strip-path: "false"
     konghq.com/protocols: "https"
     konghq.com/https-redirect-status-code: "301"
-    konghq.com/plugins: rate-limiting-api,request-size-limiting-api
+    konghq.com/plugins: rate-limiting-api,request-size-limiting-api,jwt-edge
 spec:
   ingressClassName: kong
   rules:
@@ -155,11 +195,11 @@ spec:
                 port:
                   number: 8080
 ---
-# Review Service — public list + private submit
+# Review Service — public list: anonymous
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: api-review
+  name: api-review-public
   namespace: review
   annotations:
     konghq.com/strip-path: "false"
@@ -179,6 +219,24 @@ spec:
                 name: review
                 port:
                   number: 8080
+---
+# Review Service — private submit: edge JWT
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-review-private
+  namespace: review
+  annotations:
+    konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
+    konghq.com/plugins: rate-limiting-api,request-size-limiting-api,jwt-edge
+spec:
+  ingressClassName: kong
+  rules:
+    - host: gateway.duynh.me
+      http:
+        paths:
           - path: /review/v1/private/
             pathType: Prefix
             backend:
@@ -187,7 +245,7 @@ spec:
                 port:
                   number: 8080
 ---
-# Notification Service — private only (user notifications).
+# Notification Service — private only: edge JWT.
 # /notification/v1/internal/notify/{email,sms} is NOT exposed here.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -198,7 +256,7 @@ metadata:
     konghq.com/strip-path: "false"
     konghq.com/protocols: "https"
     konghq.com/https-redirect-status-code: "301"
-    konghq.com/plugins: rate-limiting-api,request-size-limiting-api
+    konghq.com/plugins: rate-limiting-api,request-size-limiting-api,jwt-edge
 spec:
   ingressClassName: kong
   rules:
@@ -213,7 +271,7 @@ spec:
                 port:
                   number: 8080
 ---
-# Shipping Service — public track + estimate only.
+# Shipping Service — public track + estimate only: anonymous.
 # /shipping/v1/internal/orders/:orderId is NOT exposed here
 # (called only by order-service via in-cluster DNS).
 apiVersion: networking.k8s.io/v1

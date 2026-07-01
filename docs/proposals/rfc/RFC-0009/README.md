@@ -360,7 +360,7 @@ Repo: `duynhlab/pkg`, then every consuming service.
 - **Verify:** services 401 bad tokens with **no** `GetMe` call (defense-in-depth
   holds even before the edge plugin exists).
 
-### Phase 4 — Kong edge `jwt` plugin
+### Phase 4 — Kong edge `jwt` plugin — ✅ done
 
 Repo: `homelab`. **`iss` is the current shared gateway domain** (O6 decision):
 consumer credential `key` == `https://gateway.duynh.me`.
@@ -457,7 +457,7 @@ anti-pattern here.
 | API versioning (`/v1/`) | path, service-owned | ✅ **Have it** |
 | Structured access logs | stdout → Vector → VictoriaLogs | ✅ **Have it** |
 | Rate limiting (cluster-wide) | rate-limiting `policy: redis` (Valkey) | 🟢 **This RFC — Phase 1** |
-| Edge authentication | jwt | 🟢 **This RFC — Phase 4** (defense-in-depth) |
+| Edge authentication | jwt | 🟢 **Done — Phase 4** (`jwt-edge` on `/private/`, RS256, public key via ESO/OpenBAO; defense-in-depth) |
 | Resilience: timeouts + passive health-check | core Upstream/Target (`KongUpstreamPolicy`) | 🟢 **Done — Phase 6** (per-service timeouts/retries + active/passive health-checks) |
 | IP allowlist on admin UIs | ip-restriction | 🟢 **Done — internal-surface lockdown** (`ip-restriction-internal` + `rate-limiting-admin` on the 17 admin/obs/MCP ingresses). Real admin *auth* (OIDC/SSO) still deferred |
 | Distributed tracing at edge | opentelemetry | 🟢 **Done** (`propagation.inject: [w3c]` forces the upstream `traceparent`; Kong bumped to 3.9 for the propagation block — 100% edge→service linkage) |

@@ -1,0 +1,14 @@
+# RFC-0009 Phase 4 — the JWT issuer consumer. Its `jwt` credential (Secret
+# auth-issuer-jwt, delivered by ESO from OpenBAO) holds the RS256 public key the
+# `jwt-edge` plugin uses to verify access tokens at the edge. The credential's
+# `key` == the token `iss` (https://gateway.duynh.me).
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: auth-issuer
+  namespace: kong
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: auth-issuer
+credentials:
+  - auth-issuer-jwt

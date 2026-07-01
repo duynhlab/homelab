@@ -276,7 +276,47 @@ services:
     build: { context: ../../auth-service }
     # gRPC AuthService.GetMe always runs on :9090 for east-west /me validation;
     # HTTP :8080 is unchanged. Consumers reach it at dns:///auth:9090.
-    environment: { <<: *svc-env, SERVICE_NAME: auth, OTEL_SERVICE_NAME: auth, DB_NAME: auth, GRPC_PORT: "9090" }
+    environment:
+      <<: *svc-env
+      SERVICE_NAME: auth
+      OTEL_SERVICE_NAME: auth
+      DB_NAME: auth
+      GRPC_PORT: "9090"
+      # Edge JWT (RFC-0009 Phase 4): stable DEV-ONLY RS256 signing key so the
+      # gateway's jwt consumer credential (kong.yml holds the matching public
+      # half) stays valid across restarts. In the cluster this key comes from
+      # OpenBAO via ESO. iss/aud match the Kong jwt_secret key and authmw.
+      JWT_ISSUER: https://gateway.duynh.me
+      JWT_AUDIENCE: duynhlab-platform
+      JWT_PRIVATE_KEY_PEM: |
+        -----BEGIN PRIVATE KEY-----
+        MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDtVNmPLaVYsR0q
+        7epFZfj4Fvi4s/AQnw9+u59ywbzsbItKk6qGU0oAColkGG91gKDWWZ9GRS266fVU
+        k9t8mju5wAoo4eztoIN0RRQoYHDxREI0B1jJAUSJanLrmneGeeCP8H5eT1pqRiVP
+        gQe9L0ZRWGVL6emMH6xXz+eI8vMu7og4tXBLyIBLmUEn6NzuJgQNje/8gQP2puxQ
+        b56prNQUVFqTFbD4gI4+YJwh6B2UgYQeFb5l69BtuixfOLl2aSs6BdYxU0xDk0dL
+        yC/qv7UexnzonLe4suNb6oCDxMRkPetvfbyNv/02qNFUVkbaLN8cwqzLT38JCaoU
+        lVoN0a5VAgMBAAECggEAHSgBo0aZC9SUb//y+iwdIkNWMoC+kxgrY+ciX0uATW5H
+        TXXnKuHkEy24M8ERvlZ7S+IOQGiCxfX0kvuoKP5crIT0apHY1NeVlqze3Vf9wBIh
+        7PjjFiyO8i/O5vVezjk+VoiVybnHcotkDYidPgdnBNrOdP1LWRDSECalO+yW5hKg
+        tS7yk+axl60TxYVsLR4HCTvcADAjuAya7zFBTyCwuEqwC8p5X6Wjp/OZYlB1HgUn
+        ac+WSbRni810pksH8kRAWPUvxbGwsjnbbq+ciqjEYJnv71aTxSVmFGsTxe/IvtQB
+        UDaEyN/vHKYI+WWsZXyN8Ye4c1OPTm9kYjNwEsMUuQKBgQD/VCfXnpicPNPk0GWQ
+        jeSuJOmiywpNC8Va3pG+EiIXytOoWP/IL0dqoQ0sxUxE2as1nAVmYJ4dXJL0dm/U
+        2ybWFz4511vYMxWpP84pX8GSuQ7EnKdErz8BIhzPcPVjVY9p4INYTkwcwedlNMtU
+        6VA1I2aHSOQ7JeFSi5kt4PrhyQKBgQDt9JTagfOMs5TpqlQAxWSNlW8njYaFLpzj
+        fl9eIqy07UXEU98qsB6ei0wYZMcLR1ovGCyXehPIUPXbLOkYVGD9D7d9m7LfSsuj
+        9aNrzDBtUEjutxyooWTWPIhw8qVzLXv8NrmPGs7zJEhKWYjWUhi8w1MqKH2jpF6V
+        kRU4JecOLQKBgBHK9IfTFoF0v7NnTlyXdsMn8VwV2B7sXhFqBy/+pX+Q89T8dr6l
+        hM2KcZeYHCuEG6k9uSacPwh+xgLhKgPkTb2Hmx9+wXi8fprvxlcdxCiMWtoarJFd
+        wP88OFPAZGlKshbHvX9u3WD3pj9oQW8mXx+E2wU8cCMrDZup/L+0uOb5AoGAIJ+M
+        nNx+IIcqXlK8y5JEc+jN4XVUwQOf/MyBlK1aUj/Jdd4t1XNp70CXwSxn4ZL5uUUu
+        L+JLvgXjfxYMKwq+dVNnS7BB+L0PaD4wFoJbDVGZfijao//kjD6mUh3iMwVEX1K9
+        Y/I/9zO9OXxG92MwAwkgaMI+X2YUlZrbduQzZk0CgYEAsyXPJdPNUNIZu/fQBZVB
+        +66gXGbuXoSE8Ad76+7diPPbfAmKvUPXnd5HEfD1bd1pNcppp+bJIVGIpp7iRj26
+        IpN3u+E3f9+nsYgffNb/9eR4HUdJ0B2s1sezanHunJfJ1gzp0YdM56qLlaE5Vwnd
+        alsBBTTqdRNCDXK3HEuCYwM=
+        -----END PRIVATE KEY-----
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }

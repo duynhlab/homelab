@@ -172,6 +172,21 @@ spec:
           - name: NOTIFICATION_GRPC_ADDR
             value: << inputs.notification_grpc_addr >>
           <<- end >>
+          <<- if (index inputs "jwt_signing") >>
+          # RFC-0009 Phase 4: RS256 access-token signing key from OpenBAO (via ESO
+          # Secret auth-jwt-signing). iss/aud must match the Kong jwt-edge consumer
+          # credential and pkg/authmw. Empty key => auth would fall back to an
+          # ephemeral key (breaks edge verification), so this is required for auth.
+          - name: JWT_ISSUER
+            value: "https://gateway.duynh.me"
+          - name: JWT_AUDIENCE
+            value: "duynhlab-platform"
+          - name: JWT_PRIVATE_KEY_PEM
+            valueFrom:
+              secretKeyRef:
+                name: auth-jwt-signing
+                key: private-key
+          <<- end >>
         resources:
           requests:
             memory: "32Mi"

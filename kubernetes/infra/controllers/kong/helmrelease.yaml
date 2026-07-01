@@ -39,8 +39,11 @@ spec:
       # X-Kong-*-Latency debug headers but drops `server_tokens`, so Kong no
       # longer emits `Server: kong/x.y.z` or `Via: kong/x.y.z`.
       headers: "latency_tokens"
-      # Trust proxy protocol headers from port-forward
-      trusted_ips: "0.0.0.0/0,::/0"
+      # Trust proxy protocol headers from port-forward. Kept permissive
+      # (0.0.0.0/0) for now — full tightening (roadmap #3) is deferred to avoid
+      # breaking X-Forwarded-* behind the Kind port-forward; the private/
+      # in-cluster CIDRs are listed explicitly as the intended narrowed set.
+      trusted_ips: "0.0.0.0/0,::/0,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1/32,fc00::/7,::1/128"
       # JSON access logs — picked up by Vector DaemonSet → VictoriaLogs
       proxy_access_log: "/dev/stdout"
       proxy_error_log: "/dev/stderr"

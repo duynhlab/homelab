@@ -20,6 +20,32 @@ spec:
         platform.duynhlab/backup: << index inputs "platform_backup_label" | quote >>
         <<- end >>
     ---
+    # Edge resilience policy referenced by the Service annotation above.
+    apiVersion: configuration.konghq.com/v1beta1
+    kind: KongUpstreamPolicy
+    metadata:
+      name: resilience-default
+      namespace: << inputs.namespace >>
+    spec:
+      algorithm: round-robin
+      healthchecks:
+        active:
+          type: http
+          httpPath: /health
+          healthy:
+            interval: 5
+            successes: 2
+          unhealthy:
+            interval: 5
+            httpFailures: 3
+            timeouts: 3
+        passive:
+          healthy:
+            successes: 2
+          unhealthy:
+            httpFailures: 5
+            timeouts: 3
+    ---
     apiVersion: helm.toolkit.fluxcd.io/v2
     kind: HelmRelease
     metadata:
@@ -49,6 +75,14 @@ spec:
         service:
           enabled: true
           type: ClusterIP
+          # Kong edge resilience (RFC-0009 #5): per-service bounded timeouts +
+          # retries, and health-checks via the resilience-default KongUpstreamPolicy.
+          annotations:
+            konghq.com/connect-timeout: "3000"
+            konghq.com/read-timeout: "15000"
+            konghq.com/write-timeout: "15000"
+            konghq.com/retries: "2"
+            konghq.com/upstream-policy: resilience-default
           http:
             port: 8080
             containerPort: 8080

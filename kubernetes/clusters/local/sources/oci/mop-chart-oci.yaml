@@ -10,7 +10,8 @@ spec:
   interval: 10m
   url: oci://ghcr.io/duynhlab/helm-charts/mop
   ref:
-    # >=0.12.0: the chart's reworked value shape (service.enabled, service.http.*,
-    # service.grpc.*, top-level args/command). The domain ResourceSets emit this
-    # shape; older charts are incompatible.
-    semver: ">=0.12.0"
+    # >=0.13.0: adds service.annotations (Kong per-service resilience tuning) on
+    # top of the reworked value shape (service.enabled/http/grpc, top-level
+    # args/command). The domain ResourceSets emit this shape; older charts are
+    # incompatible.
+    semver: ">=0.13.0"

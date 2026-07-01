@@ -391,6 +391,48 @@ minute limit × 60 × 0.5 = hour limit (assume 50% sustained)
 
 ---
 
+## Edge Resilience
+
+The gateway fails fast and sheds unhealthy backends instead of hanging on a dead
+or slow upstream (RFC-0009 roadmap #5). Two layers, both plain Kong OSS:
+
+**1. Bounded timeouts + retries** — per-service, set as `konghq.com/*` annotations
+on each app Service (rendered by the `mop` chart's `service.annotations`, ≥ 0.13.0):
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| `connect-timeout` | 3s | fail fast on a dead pod instead of the 60s default |
+| `read-timeout` / `write-timeout` | 15s | cap slow upstreams |
+| `retries` | 2 | bounded — retries only on connection errors (no replay of a sent body), so no retry storm |
+
+**2. Health-checks (circuit-breaking)** — a `resilience-default` `KongUpstreamPolicy`
+in each app namespace, referenced by the Service's `konghq.com/upstream-policy`
+annotation:
+
+- **Active**: HTTP probe `GET /health` every 5s; 2 successes → healthy, 3 failures → ejected.
+- **Passive**: eject a target after 5 HTTP failures or 3 timeouts on real traffic —
+  the OSS approximation of a circuit breaker. K8s readiness already removes
+  not-ready pods from Endpoints; passive checks add fast ejection on 5xx bursts
+  from a pod that is still "ready".
+
+State is **per Kong replica** (each runs its own health-checker). local-stack
+mirrors this in its declarative config (`local-stack/gateway/kong.yml`), where a
+chaos test (`docker compose stop <svc>`) shows fail-fast (503 in ~2ms once
+ejected) and auto-recovery.
+
+> `trusted_ips` tightening (roadmap #3) is deferred — kept at `0.0.0.0/0` so
+> `X-Forwarded-*` keeps working behind the Kind port-forward.
+
+```mermaid
+flowchart LR
+    C[Client] --> K[Kong]
+    K -->|"timeout 3s/15s, retries 2"| U["upstream: svc.namespace"]
+    U -->|active /health + passive eject| P1[pod A ✓]
+    U -.->|ejected on 5xx/timeout| P2[pod B ✗]
+```
+
+---
+
 ## Plugin Ecosystem
 
 ### Active Plugins

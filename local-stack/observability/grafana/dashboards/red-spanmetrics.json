@@ -14,7 +14,7 @@
       {
         "name": "datasource",
         "type": "datasource",
-        "pluginId": "prometheus",
+        "query": "prometheus",
         "label": "Data source",
         "current": { "text": "VictoriaMetrics", "value": "victoriametrics" },
         "includeAll": false

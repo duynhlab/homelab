@@ -1,16 +1,17 @@
 # Kong gateway plugins (DB-less, OSS bundled).
 #
-# Global (all routes):   cors-policy, prometheus-metrics, correlation-id, security-headers
-# Per-route (API only):  rate-limiting-api, request-size-limiting-api
+# Global (all routes):   cors-policy, prometheus-metrics, correlation-id, security-headers, opentelemetry-tracing
+# Per-route (API only):  rate-limiting-api, request-size-limiting-api, jwt-edge
 #                        (attached via `konghq.com/plugins` on the api-* Ingresses)
 #
-# NO authentication plugin here — by design. JWT is validated in the SERVICES
-# (`pkg/authmw`, fail-closed, identity via `auth.GetMe` over gRPC), not at the
-# gateway. Adding Kong's `jwt` plugin would be redundant with the in-service
-# check, create a second source of truth that drifts, and (under HS256) hand
-# the signing key to Kong. Decision + revisit criteria (RS256/ES256):
-#   docs/proposals/adr/ADR-003-jwt-validation-in-services-not-kong/
-# Do not add a jwt/openid-connect/key-auth plugin without superseding ADR-003.
+# EDGE AUTH: `jwt-edge` (RS256) rejects signature-invalid / expired tokens on the
+# `/private/` routes at the edge — defense-in-depth. Services STILL verify
+# (`pkg/authmw`, fail-closed, authoritative): the edge is the coarse filter, the
+# service is the source of truth. This was enabled once auth moved to RS256 + JWKS
+# (the exact revisit trigger in ADR-003), which **ADR-006 / RFC-0009** record as
+# the supersession — Kong holds only the PUBLIC key (via ESO from OpenBAO), never
+# the signing key.
+#   docs/proposals/adr/ADR-006-rs256-jwt-kong-edge-auth/ (supersedes ADR-003)
 ---
 # Global CORS plugin — allows frontend (local.duynh.me) to call APIs (gateway.duynh.me)
 ---
@@ -236,3 +237,23 @@ config:
     default_format: w3c
     extract: [w3c, b3, jaeger, ot]
     inject: [w3c]
+---
+# Edge JWT (RFC-0009 Phase 4, ADR-006) — RS256 verification on `/private/` routes.
+# Matches the token `iss` claim to the auth-issuer consumer's jwt credential
+# (public key via ESO), and rejects expired tokens. run_on_preflight:false so
+# CORS OPTIONS preflight is not blocked. Attached per-Ingress via
+# `konghq.com/plugins: …,jwt-edge` on the private API Ingresses only.
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: jwt-edge
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "false"
+plugin: jwt
+config:
+  key_claim_name: iss
+  claims_to_verify:
+    - exp
+  run_on_preflight: false

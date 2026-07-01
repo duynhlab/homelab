@@ -27,7 +27,15 @@ services:
     read_timeout: 15000
     write_timeout: 15000
     retries: 2
-    routes: [{ name: auth, paths: ["/auth/"], strip_path: false }]
+    routes:
+      # Public (login/register/jwks) stays anonymous; private is edge-JWT gated.
+      - { name: auth-public, paths: ["/auth/v1/public/"], strip_path: false }
+      - name: auth-private
+        paths: ["/auth/v1/private/"]
+        strip_path: false
+        plugins:
+          - name: jwt
+            config: &jwtcfg { key_claim_name: iss, claims_to_verify: [exp], run_on_preflight: false }
   - name: user
     host: user.upstream
     port: 8080
@@ -36,7 +44,13 @@ services:
     read_timeout: 15000
     write_timeout: 15000
     retries: 2
-    routes: [{ name: user, paths: ["/user/"], strip_path: false }]
+    routes:
+      - { name: user-public, paths: ["/user/v1/public/"], strip_path: false }
+      - name: user-private
+        paths: ["/user/v1/private/"]
+        strip_path: false
+        plugins:
+          - { name: jwt, config: *jwtcfg }
   - name: product
     host: product.upstream
     port: 8080
@@ -54,7 +68,8 @@ services:
     read_timeout: 15000
     write_timeout: 15000
     retries: 2
-    routes: [{ name: cart, paths: ["/cart/"], strip_path: false }]
+    routes:
+      - { name: cart, paths: ["/cart/"], strip_path: false, plugins: [{ name: jwt, config: *jwtcfg }] }
   - name: order
     host: order.upstream
     port: 8080
@@ -63,7 +78,8 @@ services:
     read_timeout: 15000
     write_timeout: 15000
     retries: 2
-    routes: [{ name: order, paths: ["/order/"], strip_path: false }]
+    routes:
+      - { name: order, paths: ["/order/"], strip_path: false, plugins: [{ name: jwt, config: *jwtcfg }] }
   - name: review
     host: review.upstream
     port: 8080
@@ -72,7 +88,13 @@ services:
     read_timeout: 15000
     write_timeout: 15000
     retries: 2
-    routes: [{ name: review, paths: ["/review/"], strip_path: false }]
+    routes:
+      - { name: review-public, paths: ["/review/v1/public/"], strip_path: false }
+      - name: review-private
+        paths: ["/review/v1/private/"]
+        strip_path: false
+        plugins:
+          - { name: jwt, config: *jwtcfg }
   - name: shipping
     host: shipping.upstream
     port: 8080
@@ -90,7 +112,8 @@ services:
     read_timeout: 15000
     write_timeout: 15000
     retries: 2
-    routes: [{ name: notification, paths: ["/notification/"], strip_path: false }]
+    routes:
+      - { name: notification, paths: ["/notification/"], strip_path: false, plugins: [{ name: jwt, config: *jwtcfg }] }
 
 # Upstreams with health-checks. The `&hc` anchor is reused (identical policy).
 upstreams:
@@ -127,6 +150,26 @@ upstreams:
   - name: notification.upstream
     healthchecks: *hc
     targets: [{ target: notification:8080 }]
+
+# Edge JWT (RFC-0009 Phase 4): the consumer whose jwt credential the `jwt`
+# plugin matches by the token's `iss` claim. DEV-ONLY public key — the matching
+# private key is the throwaway JWT_PRIVATE_KEY_PEM on the auth service (compose).
+# The cluster delivers the real public key from OpenBAO via ESO instead.
+consumers:
+  - username: auth-issuer
+    jwt_secrets:
+      - key: https://gateway.duynh.me   # == token `iss`
+        algorithm: RS256
+        rsa_public_key: |
+          -----BEGIN PUBLIC KEY-----
+          MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7VTZjy2lWLEdKu3qRWX4
+          +Bb4uLPwEJ8PfrufcsG87GyLSpOqhlNKAAqJZBhvdYCg1lmfRkUtuun1VJPbfJo7
+          ucAKKOHs7aCDdEUUKGBw8URCNAdYyQFEiWpy65p3hnngj/B+Xk9aakYlT4EHvS9G
+          UVhlS+npjB+sV8/niPLzLu6IOLVwS8iAS5lBJ+jc7iYEDY3v/IED9qbsUG+eqazU
+          FFRakxWw+ICOPmCcIegdlIGEHhW+ZevQbbosXzi5dmkrOgXWMVNMQ5NHS8gv6r+1
+          HsZ86Jy3uLLjW+qAg8TEZD3rb328jb/9NqjRVFZG2izfHMKsy09/CQmqFJVaDdGu
+          VQIDAQAB
+          -----END PUBLIC KEY-----
 
 # Global plugins (apply to every route) — mirror the cluster KongClusterPlugins.
 plugins:

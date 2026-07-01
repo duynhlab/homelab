@@ -12,31 +12,121 @@
 #   - CORS origin is the local SPA (http://localhost:3001).
 _format_version: "3.0"
 
+# Edge resilience (mirrors the cluster KongUpstreamPolicy + Service annotations):
+#   - Bounded timeouts + retries per service (fail fast, no 60s hang / retry storm).
+#   - Each service routes through a named upstream with active (/health probe) +
+#     passive (eject on 5xx/timeout bursts = OSS circuit-breaking) health-checks.
+# NOTE: `trusted_ips` tightening (roadmap #3) is cluster-only — local is plain
+# HTTP with no X-Forwarded-* dependency, so narrowing it here has no effect.
 services:
   - name: auth
-    url: http://auth:8080
+    host: auth.upstream
+    port: 8080
+    protocol: http
+    connect_timeout: 3000
+    read_timeout: 15000
+    write_timeout: 15000
+    retries: 2
     routes: [{ name: auth, paths: ["/auth/"], strip_path: false }]
   - name: user
-    url: http://user:8080
+    host: user.upstream
+    port: 8080
+    protocol: http
+    connect_timeout: 3000
+    read_timeout: 15000
+    write_timeout: 15000
+    retries: 2
     routes: [{ name: user, paths: ["/user/"], strip_path: false }]
   - name: product
-    url: http://product:8080
+    host: product.upstream
+    port: 8080
+    protocol: http
+    connect_timeout: 3000
+    read_timeout: 15000
+    write_timeout: 15000
+    retries: 2
     routes: [{ name: product, paths: ["/product/"], strip_path: false }]
   - name: cart
-    url: http://cart:8080
+    host: cart.upstream
+    port: 8080
+    protocol: http
+    connect_timeout: 3000
+    read_timeout: 15000
+    write_timeout: 15000
+    retries: 2
     routes: [{ name: cart, paths: ["/cart/"], strip_path: false }]
   - name: order
-    url: http://order:8080
+    host: order.upstream
+    port: 8080
+    protocol: http
+    connect_timeout: 3000
+    read_timeout: 15000
+    write_timeout: 15000
+    retries: 2
     routes: [{ name: order, paths: ["/order/"], strip_path: false }]
   - name: review
-    url: http://review:8080
+    host: review.upstream
+    port: 8080
+    protocol: http
+    connect_timeout: 3000
+    read_timeout: 15000
+    write_timeout: 15000
+    retries: 2
     routes: [{ name: review, paths: ["/review/"], strip_path: false }]
   - name: shipping
-    url: http://shipping:8080
+    host: shipping.upstream
+    port: 8080
+    protocol: http
+    connect_timeout: 3000
+    read_timeout: 15000
+    write_timeout: 15000
+    retries: 2
     routes: [{ name: shipping, paths: ["/shipping/"], strip_path: false }]
   - name: notification
-    url: http://notification:8080
+    host: notification.upstream
+    port: 8080
+    protocol: http
+    connect_timeout: 3000
+    read_timeout: 15000
+    write_timeout: 15000
+    retries: 2
     routes: [{ name: notification, paths: ["/notification/"], strip_path: false }]
+
+# Upstreams with health-checks. The `&hc` anchor is reused (identical policy).
+upstreams:
+  - name: auth.upstream
+    healthchecks: &hc
+      active:
+        type: http
+        http_path: /health
+        healthy: { interval: 5, successes: 2 }
+        unhealthy: { interval: 5, http_failures: 3, timeouts: 3, tcp_failures: 3 }
+      passive:
+        healthy: { successes: 2 }
+        unhealthy: { http_failures: 5, timeouts: 3, tcp_failures: 3 }
+    targets:
+      - target: auth:8080
+  - name: user.upstream
+    healthchecks: *hc
+    targets: [{ target: user:8080 }]
+  - name: product.upstream
+    healthchecks: *hc
+    targets: [{ target: product:8080 }]
+  - name: cart.upstream
+    healthchecks: *hc
+    targets: [{ target: cart:8080 }]
+  - name: order.upstream
+    healthchecks: *hc
+    targets: [{ target: order:8080 }]
+  - name: review.upstream
+    healthchecks: *hc
+    targets: [{ target: review:8080 }]
+  - name: shipping.upstream
+    healthchecks: *hc
+    targets: [{ target: shipping:8080 }]
+  - name: notification.upstream
+    healthchecks: *hc
+    targets: [{ target: notification:8080 }]
 
 # Global plugins (apply to every route) — mirror the cluster KongClusterPlugins.
 plugins:

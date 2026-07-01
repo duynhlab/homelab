@@ -970,15 +970,11 @@ If the rate limiting counter encounters an error (memory pressure, internal issu
 - ~~`request-size-limiting`~~ — ✅ Done (10MB limit, applied to API routes)
 - `bot-detection` — Block known malicious bots
 
-### Phase 3: Gateway-Level Auth (planned, not yet deployed)
+### Phase 3: Gateway-Level Auth
 
-Edge JWT is **not enforced today** — auth stays in the services (ADR-003). Moving
-validation to Kong depends on **[ADR-006](../proposals/adr/ADR-006-rs256-jwt-kong-edge-auth/)**
-(RS256 JWT + Kong edge auth) and **[RFC-0009](../proposals/rfc/RFC-0009/) Phase 4**:
-
-- `jwt` — Validate RS256 JWT tokens at Kong, offload from 8 microservices
-- `key-auth` — API key authentication for external integrations
-- `acl` — Consumer-based access control lists
+- ~~`jwt`~~ — ✅ **Done** ([ADR-006](../proposals/adr/ADR-006-rs256-jwt-kong-edge-auth/) / [RFC-0009](../proposals/rfc/RFC-0009/) Phase 4): the `jwt-edge` plugin verifies RS256 tokens on `/private/` routes (matches the token `iss` to the `auth-issuer` consumer's public-key credential, delivered by ESO from OpenBAO; checks `exp`). Public routes stay anonymous. Services **still** verify (`pkg/authmw`, authoritative) — the edge is the coarse first filter (defense-in-depth); Kong holds only the **public** key, never the signing key.
+- `key-auth` — API key authentication for external integrations (planned)
+- `acl` — Consumer-based access control lists (planned; pairs with Authorization/RBAC — roadmap #3)
 
 ### Phase 4: Advanced Traffic Control
 

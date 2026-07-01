@@ -2,7 +2,7 @@
 
 | Status | Date | Related RFC |
 |--------|------|-------------|
-| Accepted | 2026-06-30 | [RFC-0009](../../rfc/RFC-0009/) |
+| Accepted (implemented) | 2026-06-30 | [RFC-0009](../../rfc/RFC-0009/) |
 
 > **Don't forget: every decision is a tradeoff.** This decision buys edge-side
 > rejection of bad tokens and a stateless, offline-verifiable identity — at the cost

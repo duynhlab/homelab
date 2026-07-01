@@ -159,3 +159,54 @@ config:
   remove:
     headers:
       - "Server"
+---
+# IP allowlist for internal-only surfaces (admin UIs, observability, MCP).
+# Allows private/in-cluster networks only; a public client is denied 403.
+# Applied via annotation to the infra/monitoring/MCP ingresses — NOT the public
+# API. NOTE: with trusted_ips permissive (0.0.0.0/0) Kong honours X-Forwarded-For,
+# so this is defense-in-depth, not a hard boundary — pair with real auth later.
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: ip-restriction-internal
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "false"
+plugin: ip-restriction
+config:
+  allow:
+    - "10.0.0.0/8"
+    - "172.16.0.0/12"
+    - "192.168.0.0/16"
+    - "127.0.0.1/32"
+    - "::1/128"
+    - "fc00::/7"
+  status: 403
+  message: "Forbidden: internal endpoint"
+---
+# Rate limiting for admin/observability/MCP surfaces. More generous than the API
+# limit because dashboards (e.g. Grafana) fan out many asset/API requests per
+# view. Shared Valkey counter (same store as the API limit, db 1).
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: rate-limiting-admin
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "false"
+plugin: rate-limiting
+config:
+  minute: 1200
+  hour: 30000
+  policy: redis
+  redis:
+    host: valkey.cache-system.svc.cluster.local
+    port: 6379
+    database: 1
+    timeout: 2000
+  fault_tolerant: true
+  hide_client_headers: false
+  error_code: 429
+  error_message: "Rate limit exceeded. Please slow down."

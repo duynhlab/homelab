@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **docs (proposals)**: **RFC-0009** — production-grade API gateway (signed RS256 JWT + Kong OSS edge auth, defense-in-depth, Valkey rate-limiting, OSS-vs-Enterprise map). Added a **Priority** column + current-focus callout to the RFC index; backlog now tracks Authorization (RBAC/ABAC) and gateway improvements.
 
+### Added
+
+- **infra (kong)**: Locked down internal surfaces (RFC-0009 roadmap #1, the top risk) — the 17 admin/observability/MCP ingresses (Grafana, OpenBAO/Postgres/Flux/RustFS UIs, VM/VMAlert/Karma/Jaeger/Tempo/Pyroscope/Logs/SLO, and the VM/VL/Flux MCP endpoints) now carry an `ip-restriction-internal` KongClusterPlugin (private/in-cluster CIDRs only → 403 for public) plus a generous `rate-limiting-admin` limit. Defense-in-depth (trusted_ips stays permissive); the public API path is unaffected.
+
 ### Changed
 
 - **infra (kong)**: Kong edge resilience on the cluster (RFC-0009 roadmap #5) — every app Service now carries bounded timeouts + retries (`konghq.com/*` annotations via the `mop` chart's new `service.annotations`) and a `resilience-default` **KongUpstreamPolicy** (active `/health` + passive 5xx/timeout eject). Requires `mop` chart ≥ 0.13.0. (`trusted_ips` tightening deferred — kept permissive for the Kind port-forward.)

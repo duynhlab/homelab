@@ -1,0 +1,30 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: profiling-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: infrastructure
+spec:
+  interval: 10m
+  timeout: 15m
+  retryInterval: 2m
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+  path: ./controllers/profiling
+  prune: true
+  wait: true
+  # Pyroscope stores profiles in RustFS (S3) via the pyroscope-rustfs-credentials
+  # Secret (ESO-managed, secrets-local) and needs RustFS running (storage-local).
+  # Same reason as tracing-local — kept out of controllers-local to avoid the
+  # controllers-local ↔ secrets-local wave deadlock. See debugs.md Bug 6.
+  dependsOn:
+    - name: secrets-local
+    - name: storage-local
+  healthChecks:
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: pyroscope
+      namespace: monitoring

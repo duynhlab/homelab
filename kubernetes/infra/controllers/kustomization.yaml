@@ -5,9 +5,9 @@ resources:
   - namespaces.yaml # Apply namespaces FIRST (must live under controllers/ for default Kustomize load rules)
   - metrics/
   - logging/
-  - tracing/
-  - profiling/
   - databases/
+  # tracing/ — moved to its own Kustomization (tracing-local) so it can dependsOn secrets-local + storage-local (Tempo needs tempo-rustfs-credentials ESO Secret + RustFS). Kept here would deadlock controllers-local (wait:true) ↔ secrets-local. See debugs.md Bug 6.
+  # profiling/ — moved to its own Kustomization (profiling-local) for the same reason (Pyroscope needs pyroscope-rustfs-credentials + RustFS).
   # caching/ — moved to its own Kustomization (caching-local) so it can dependsOn monitoring-local (ServiceMonitor CRD)
   # storage/ — moved to its own Kustomization (storage-local) so it can dependsOn secrets-local (ESO Secret rustfs-credentials)
   - secrets/

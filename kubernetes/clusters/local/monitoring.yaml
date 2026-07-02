@@ -28,7 +28,7 @@ spec:
       kind: Grafana
       name: grafana
       namespace: monitoring
-    - apiVersion: helm.toolkit.fluxcd.io/v2
-      kind: HelmRelease
-      name: tempo
-      namespace: monitoring
+    # Tempo readiness is gated by tracing-local now (it's a Deployment there, not a
+    # HelmRelease in this wave). The old `HelmRelease/tempo` check was stale — it
+    # referenced a resource that doesn't exist and would fail monitoring-local.
+    # (debugs.md Bug 6 / Bug 7)

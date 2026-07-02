@@ -67,7 +67,7 @@ data:
     storage:
       trace:
         # Durable object storage on the in-cluster RustFS (S3-compatible).
-        # Creds come from env (${...}) — see -config.expand-env in the Deployment.
+        # Creds come from env vars — see -config.expand-env in the Deployment.
         backend: s3
         s3:
           bucket: tempo-traces

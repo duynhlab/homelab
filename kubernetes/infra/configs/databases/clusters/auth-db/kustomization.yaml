@@ -9,3 +9,6 @@ resources:
   - configmaps/vector-sidecar.yaml
   - instance.yaml
   - monitoring/pgbouncer-exporter.yaml
+  # Idempotent guard that creates the `auth` DB if the operator's first-init
+  # skipped it (Bug 20). databases-local waits for this Job to Complete.
+  - ensure-databases-job.yaml

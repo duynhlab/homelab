@@ -68,6 +68,14 @@ spec:
       env:
         # Watch Ingress resources across all namespaces
         controller_ingress_class: kong
+      # KIC had no resources (chart default = unbounded → can spike + was OOM/137
+      # on cold-start). Bound it with comfortable headroom for KIC 3.x cold-start.
+      resources:
+        requests:
+          cpu: 25m
+          memory: 192Mi
+        limits:
+          memory: 512Mi
 
     # Proxy service — ClusterIP for port-forwarding (no LoadBalancer in Kind)
     proxy:
@@ -94,14 +102,16 @@ spec:
       http:
         containerPort: 8100
 
-    # Resource limits (homelab-friendly)
+    # Resource limits (homelab-friendly). Bumped: the Kong proxy cold-start peaks
+    # >500Mi, so the old 256Mi limit was OOMKilled (exitCode 137 → CrashLoop) and
+    # slow-boot tripped the liveness probe. See debugs.md Bug 10.
     resources:
       requests:
-        cpu: 50m
-        memory: 128Mi
-      limits:
-        cpu: 200m
+        cpu: 100m
         memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 768Mi
 
     # Two replicas for HA — Kong is a stateless DB-less ingress proxy and scales
     # horizontally without coordination. The redundancy makes the PDB below safe

@@ -8,3 +8,6 @@ resources:
   - configmaps/monitoring-queries.yaml
   - configmaps/vector-sidecar.yaml
   - instance.yaml
+  # Idempotent guard that creates user/notification/shipping/review DBs if the
+  # operator's first-init skipped them (Bug 20). databases-local waits for Complete.
+  - ensure-databases-job.yaml

@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **infra (local bring-up)**: Hardened the Kind/Flux bring-up so `make up`
+  reconciles to a stable, self-migrating cluster without manual steps. NetworkPolicy:
+  kindnet **does** enforce on K8s 1.30+, so app-tier `deny-all-ingress` was blocking
+  operators — added allow rules for CloudNativePG/Zalando → DB (status/Patroni/SQL/metrics)
+  and cross-namespace app → pooler (PgDog 6432 / PgBouncer 5432) so `databases-local`
+  and `apps-local` reconcile (stale "kindnet does not enforce" comments corrected).
+- **infra (databases)**: Idempotent `ensure-databases` Jobs on the Zalando clusters
+  (auth-db, supporting-shared-db) create the per-service databases if the operator's
+  first-init skipped them (slow spilo boot → CreateFailed → databases never created),
+  removing the need to `CREATE DATABASE` by hand. Dropped `auto_explain` from the
+  cnpg-db `Database` CR (preload-only module, no SQL control file).
+- **infra (temporal)**: Fixed the `TemporalCluster` manifest against the v1beta1 CRD —
+  per-service `frontend/history/matching/worker.resources` (no `spec.services.resources`),
+  `persistence.{default,visibility}Store.skipCreate: true` (DB pre-provisioned by CNPG,
+  role lacks CREATEDB), and a valid `admintools.version` (combined admin-tools tag).
+- **infra (flux waves)**: Registered the `temporal-operator` HelmRepository; split
+  `tracing`/`profiling` into their own Kustomizations (depend on secrets + storage) to
+  break the controllers↔secrets deadlock; `temporal` now `dependsOn cert-manager`.
+- **infra (storage/kong)**: Run-once RustFS bucket-init Job so Tempo/Pyroscope don't
+  crash-loop waiting for the periodic CronJob; bumped RustFS and Kong resource limits
+  to stop liveness-timeout / OOM CrashLoops.
+- **infra (cert-manager/secrets)**: Local Kind uses the self-signed `homelab-ca` issuer
+  (dropped the redundant wildcard SAN that failed ACME); ESO `eso-read` policy grants
+  `local/auth/*` and seeds a dev Cloudflare token; removed a literal `${...}` from a
+  Tempo config comment that broke `-config.expand-env`.
+
 ### Added
 
 - **infra (kong)**: Edge JWT auth (RFC-0009 Phase 4, ADR-006) — the `jwt-edge` KongClusterPlugin verifies RS256 access tokens on `/private/` routes (matches token `iss` to the `auth-issuer` consumer credential, checks `exp`); public routes stay anonymous; services still verify via `pkg/authmw` (defense-in-depth). Prerequisite fixed: the RS256 signing key is now **stable** — seeded in OpenBAO (`secret/local/auth/jwt-signing`) and delivered by ESO (private key → auth as `JWT_PRIVATE_KEY_PEM`; public key → Kong as the jwt credential), replacing the ephemeral per-restart key. `ingress-api` split into `-public`/`-private`. local-stack mirrors it (Kong 3.9, fixed dev key); verified public-anonymous / private good-token 200 / private bad-token 401 at the edge.

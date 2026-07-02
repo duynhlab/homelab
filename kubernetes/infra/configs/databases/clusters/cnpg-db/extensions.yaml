@@ -12,7 +12,9 @@ spec:
   extensions:
     - name: pgaudit
     - name: pg_stat_statements
-    - name: auto_explain
+    # auto_explain is a preload-only module (loaded via shared_preload_libraries in
+    # instance.yaml) — it has no SQL extension / control file, so `CREATE EXTENSION
+    # auto_explain` always fails "extension is not available". Not listed here.
     - name: pgcrypto
     - name: uuid-ossp
 ---

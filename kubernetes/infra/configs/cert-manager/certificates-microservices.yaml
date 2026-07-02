@@ -2,10 +2,12 @@
 # Kong terminates TLS at the edge with this default cert (mounted via
 # secretVolumes in the HelmRelease) — no per-Ingress TLS section required.
 #
-# Issued by Let's Encrypt (DNS-01 via Cloudflare). Wildcard *.duynh.me covers
-# all single-label subdomains (gateway.duynh.me, grafana.duynh.me, …).
-# A second SAN local.duynh.me is included explicitly to make intent obvious
-# (it is already covered by the wildcard, but the redundancy documents it).
+# Issued by Let's Encrypt (DNS-01 via Cloudflare) on prod. The LOCAL cluster
+# overlay patches issuerRef → the self-signed `homelab-ca` (Kind has no real
+# duynh.me DNS zone / Cloudflare token) — see clusters/local/cert-manager-config.yaml.
+# Wildcard *.duynh.me covers all single-label subdomains (gateway.duynh.me, …).
+# Do NOT add a redundant explicit SAN already covered by the wildcard (e.g.
+# local.duynh.me): ACME RFC 8555 §7.1.3 → CA rejects it (LE 400 "malformed").
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -27,4 +29,3 @@ spec:
   dnsNames:
     - duynh.me
     - "*.duynh.me"
-    - local.duynh.me

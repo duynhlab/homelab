@@ -597,7 +597,7 @@ Per-ingress `path:` entries are scoped to `public` and `private` audiences only 
 | Host | Path | Backend | Namespace | Rate limited |
 |------|------|---------|-----------|--------------|
 | `local.duynh.me` | `/` | `frontend:80` | frontend | No |
-| `gateway.duynh.me` | `/auth/v1/public/`, `/auth/v1/private/` | `auth:8080` | auth | Yes |
+| `gateway.duynh.me` | `/auth/v1/public/` | `auth:8080` | auth | Yes |
 | `gateway.duynh.me` | `/user/v1/public/`, `/user/v1/private/` | `user:8080` | user | Yes |
 | `gateway.duynh.me` | `/product/v1/public/` | `product:8080` | product | Yes |
 | `gateway.duynh.me` | `/cart/v1/private/` | `cart:8080` | cart | Yes |
@@ -700,7 +700,7 @@ kubectl get ingress -A
 | Namespace | Name | Host | Edge path |
 |-----------|------|------|-----------|
 | frontend | frontend | `local.duynh.me` | `/` |
-| auth | api-auth | `gateway.duynh.me` | `/auth/v1/` |
+| auth | api-auth-public | `gateway.duynh.me` | `/auth/v1/public/` |
 | user | api-user | `gateway.duynh.me` | `/user/v1/` |
 | product | api-product | `gateway.duynh.me` | `/product/v1/` |
 | cart | api-cart | `gateway.duynh.me` | `/cart/v1/` |
@@ -723,9 +723,9 @@ curl -s -o /dev/null -w "%{http_code}\n" https://local.duynh.me/
 TOKEN=$(curl -s -X POST https://gateway.duynh.me/auth/v1/public/login \
   -H "Content-Type: application/json" \
   -d '{"username":"alice","password":"password123"}' \
-  | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))")
+  | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))")
 echo "Token: ${TOKEN:0:30}..."
-# Expected: jwt-token-v1-...
+# Expected: eyJhbGciOiJSUzI1NiIs... (RS256 JWT)
 
 # Confirm HTTP→HTTPS redirect (Kong returns 301)
 curl -s -o /dev/null -w "%{http_code}\n" http://gateway.duynh.me/product/v1/public/products

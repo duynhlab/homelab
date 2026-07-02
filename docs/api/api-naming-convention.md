@@ -7,7 +7,7 @@
 | **Superseded** | `docs/api/api.md` cluster-only `/api/v1/*` shape (v0.85 and earlier) |
 | **Scope** | All HTTP URLs used by browsers, services, and admin/seed callers |
 | **Primary domain** | `local.duynh.me` — platform root; public API at `gateway.duynh.me` |
-| **Last updated** | 2026-04-17 |
+| **Last updated** | 2026-07-02 |
 
 ## Purpose
 
@@ -38,9 +38,9 @@ for in-cluster (east-west) traffic. Same path, different host — Kong just forw
 | Value | Meaning | On gateway? | Auth enforced by |
 |-------|---------|-------------|-------------------|
 | `public` | Anonymous callers — no JWT required | Yes | N/A |
-| `private` | Authenticated user — `Authorization: Bearer <JWT>` | Yes | Service middleware (calls auth-service `/auth/v1/private/me`) |
+| `private` | Authenticated user — `Authorization: Bearer <JWT>` | Yes | Kong edge `jwt` (coarse filter) + service middleware (`pkg/authmw` verifies RS256 locally against the cached JWKS) |
 | `protected` | Signed webhooks / partner HMAC / IP allowlist — **planned, none deployed yet** | Not yet (planned) | Per-route plugin or service middleware |
-| `internal` | Pod → Service — cluster-only | **No — never** | Kong not exposing the route + in-app controls (NetworkPolicies authored but enforced only once an enforcing CNI is present) |
+| `internal` | Pod → Service — cluster-only | **No — never** | Kong not exposing the route + NetworkPolicies (LIVE — kindnet enforces on K8s 1.30+) |
 
 **Kong enforcement:** each `api-*` Ingress has one or two explicit `path:` entries — `/{service}/v1/public/` and/or `/{service}/v1/private/`. Internal audiences are never added to Ingress rules, so requests to `https://gateway.duynh.me/notification/v1/internal/notify/email` resolve to Kong's default 404.
 
@@ -61,8 +61,9 @@ for in-cluster (east-west) traffic. Same path, different host — Kong just forw
 |--------|------|----------|--------|
 | `POST` | `/auth/v1/public/login` | public | Browser |
 | `POST` | `/auth/v1/public/register` | public | Browser |
-| `POST` | `/auth/v1/private/logout` | private | Browser |
-| `GET` | `/auth/v1/private/me` | private | Browser + every service's JWT middleware |
+| `POST` | `/auth/v1/public/refresh` | public | Browser (silent refresh) |
+| `POST` | `/auth/v1/public/logout` | public | Browser — body `{refresh_token}`, revokes the token family |
+| `GET` | `/auth/v1/public/jwks` | public | Every service's JWT middleware + Kong edge (verification keys) |
 
 ### user-service (namespace `user`)
 
@@ -136,7 +137,7 @@ The caller → callee → audience mapping for in-cluster east-west traffic:
 
 | Caller | Target | Audience |
 |--------|--------|----------|
-| Every service's JWT middleware | auth-service (`/me` validation) | private (forwards user's JWT) |
+| Every service's JWT middleware (JWKS refresh) | auth-service `/auth/v1/public/jwks` | public |
 | order-service → aggregation | shipping-service | internal |
 | order-service → checkout cleanup | cart-service | private (forwards user's JWT) |
 | product-service → aggregation | review-service | public |

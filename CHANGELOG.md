@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **docs (local-stack)**: Pre-push **E2E audit guide** — a two-phase checklist
+  (curl API-contract checks + a real-browser pass via the `agent-browser` CLI,
+  including a silent-refresh fault-injection recipe and pass criteria) in
+  `local-stack/README.md`.
+
+### Changed
+
+- **docs**: Post-Phase-5 accuracy sweep — corrected the remaining opaque/GetMe-era
+  claims: `network-policies.md` (auth is a JWKS hub, not a `/me` hub; no auth `:9090`),
+  `api-naming-convention.md` (public-only auth inventory, edge-jwt + local verify),
+  `metrics-apps.md` (RPC example → shipping), `kong-gateway.md` (auth route table +
+  login curl parses `access_token`), `docs/README.md` (RFC-0009 → implemented),
+  RFC-0009 "Before" heading, a Zalando runbook line, and a stale compose comment.
+
 ### Changed
 
 - **platform (auth)**: RFC-0009 **Phase 5** — opaque→JWT cutover complete; the RS256

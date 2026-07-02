@@ -120,7 +120,7 @@ Imagine `supporting-shared-db` handles 1000 transactions/second:
 | Cluster | Recommended | Why |
 |---------|------------|-----|
 | **cnpg-db** (product, cart, order) | Sync ANY 1 (RPO = 0 for 1 replica) | Financial data (cart/order). Losing an order is unacceptable. Worth the latency cost. |
-| **auth-db** (auth) | Async (RPO > 0) | Sessions/tokens can be regenerated. A few lost logins are tolerable. |
+| **auth-db** (auth) | Async (RPO > 0) | Refresh-token families can be re-issued (users re-login). A few lost logins are tolerable. |
 | **supporting-shared-db** (user, notification, shipping, review) | Async (RPO > 0) | User profiles and notifications are not financial-critical. Async gives best write performance. |
 
 ---

@@ -175,16 +175,24 @@ Request → CORS → correlation-id → Prometheus → Rate Limiting (per-route)
 | `rate-limiting-api` | Per-route (API only) | Protects backends from abuse (`redis` policy — exact cluster-wide counter shared by both Kong replicas) |
 | `request-size-limiting-api` | Per-route (API only) | Rejects oversized payloads (10 MB) |
 
-### Authentication — validated in services, NOT at Kong
+### Authentication — edge pre-check at Kong, services authoritative
 
-There is deliberately **no `jwt` / `openid-connect` / `key-auth` plugin** on the gateway.
-Every backend service validates the JWT itself (`pkg/authmw`, fail-closed) and resolves
-identity via `auth.GetMe` over gRPC — that is the single source of truth. Kong stays an
-auth-agnostic pass-through proxy; `…/private/` routes are not rejected at the edge, the
-**services** return `401`. Putting JWT at Kong would be redundant, drift from the in-service
-check, and (under HS256) require handing the signing key to the gateway. Full rationale and
-the revisit criteria (only if auth-service moves to RS256/ES256) are in
-**[ADR-003](../proposals/adr/ADR-003-jwt-validation-in-services-not-kong/)**.
+Two layers, both verifying the same RS256 signature (defense-in-depth,
+[ADR-006](../proposals/adr/ADR-006-rs256-jwt-kong-edge-auth/) — supersedes
+[ADR-003](../proposals/adr/ADR-003-jwt-validation-in-services-not-kong/)):
+
+- **Kong edge (`jwt-edge`, OSS `jwt` plugin)** on every `…/private/` Ingress —
+  matches the token's `iss` to the `auth-issuer` consumer credential (static
+  RS256 **public** key delivered by ESO from OpenBAO) and checks `exp`.
+  Bad/expired/missing tokens are shed at the gateway with `401`.
+- **Services (`pkg/authmw`, fail-closed)** verify the JWT **locally** against
+  the cached JWKS (`/auth/v1/public/jwks`), pinning issuer/audience/alg — this
+  remains the single source of truth. Since RFC-0009 **Phase 5** this is
+  JWT-only: the opaque-token `auth.GetMe` gRPC fallback was removed (auth no
+  longer runs a gRPC server), and `sessions` are gone — session lifetime is
+  managed by rotating refresh tokens (`/auth/v1/public/{refresh,logout}`).
+
+Kong never sees the private signing key (public-key verification only).
 
 ---
 

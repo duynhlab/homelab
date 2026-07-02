@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **platform (auth)**: RFC-0009 **Phase 5** — opaque→JWT cutover complete; the RS256
+  access token is the **only** credential. auth stopped issuing opaque session tokens
+  (the `sessions` table is dropped, `/auth/v1/private/me` and the gRPC `GetMe` server
+  are removed — auth is HTTP-only), `pkg/authmw` v0.12.0 verifies JWT-only (the five
+  consumer services drop the auth gRPC fallback client; a failed verifier init is now
+  fatal), and logout moved to `POST /auth/v1/public/logout` with `{refresh_token}`
+  (revokes the token family; the SPA runs on the access token with single-flight
+  silent refresh). Kong: the `api-auth-private` Ingress (and the local-stack
+  `auth-private` route) are gone — auth is public-only at the edge; the auth
+  NetworkPolicy drops the east-west `:9090` allow (JWKS on `:8080` stays). Docs
+  refreshed (RFC-0009 → implemented, ADR-006 phasing, api/microservices/gRPC/Kong).
+
 ### Fixed
 
 - **infra (local bring-up)**: Hardened the Kind/Flux bring-up so `make up`

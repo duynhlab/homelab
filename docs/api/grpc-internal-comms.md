@@ -6,7 +6,7 @@
 | **Status** | **Implemented** — every east-west hop runs over gRPC (gRPC-only, no feature flag); cluster wired via headless Services; Phase 3 NetworkPolicy fences `:9090`, mTLS deferred. See [§7 roadmap](#7-phased-roadmap). |
 | **Scope** | Internal (east-west) service-to-service calls only |
 | **Relation** | Complements [`api-naming-convention.md`](api-naming-convention.md) (HTTP/JSON URL surface stays the law of the land) |
-| **Last updated** | 2026-06-14 |
+| **Last updated** | 2026-07-02 |
 
 ## Implementation status
 
@@ -19,10 +19,10 @@ hop table below.
 |------------|--------|-------|
 | **Phase 0** — `pkg/grpcx` (otel, health, reflection, `round_robin`, default RPC deadline, auth-metadata helpers) + `auth`/`shipping`/`review`/`notification` protos with committed stubs; `buf` lint/breaking in CI | ✅ | `duynhlab/pkg` (v0.2.0) |
 | **Phase 1** — `order → shipping` | ✅ gRPC-only | shipping + order |
-| **Phase 2** — `/me` validation: all 5 consumers (user/cart/order/review/notification) validate via `auth.GetMe` over gRPC through the shared fail-closed `pkg/authmw` | ✅ gRPC-only | `pkg/authmw` + 5 services |
+| **Phase 2** — `/me` validation: all 5 consumers validated via `auth.GetMe` over gRPC through the shared fail-closed `pkg/authmw` | ⛔ retired by RFC-0009 Phase 5 (JWT-only authmw v0.12.0; `auth/v1` proto removed) | `pkg/authmw` + 5 services |
 | **Phase 2** — `product → review` aggregation | ✅ gRPC-only | review + product |
 | **Phase 2** — `order → notification` publish on checkout (best-effort) | ✅ | notification + order |
-| **Cluster** — headless `{auth,shipping,review,notification}-grpc` Services (`:9090`) + ResourceSet `*_GRPC_ADDR` env | ✅ | mop chart (`grpc.enabled`), `kubernetes/apps/domains/*-rs.yaml`, `kubernetes/apps/services/*.yaml` |
+| **Cluster** — headless `{shipping,review,notification}-grpc` Services (`:9090`) + ResourceSet `*_GRPC_ADDR` env (`auth-grpc` removed in Phase 5) | ✅ | mop chart (`grpc.enabled`), `kubernetes/apps/domains/*-rs.yaml`, `kubernetes/apps/services/*.yaml` |
 | **Phase 3** — NetworkPolicy fences `:9090`; gRPC health service registered | ✅ | `kubernetes/infra/configs/network-policies/` |
 | **Phase 3** — mTLS on `:9090` | ⏳ deferred | services use `insecure` creds; needs `grpcx` TLS + cert-manager |
 | Verified end-to-end on Docker Compose (login, `/me`, product reviews, checkout → notification) | ✅ | `homelab/local-stack` |
@@ -34,7 +34,6 @@ Consumers dial the headless Services:
 | Var | Role | Default |
 |-----|------|---------|
 | `GRPC_PORT` | gRPC listen port (all services) | `9090` |
-| `AUTH_GRPC_ADDR` | every service → auth `/me` | `dns:///auth-grpc.auth.svc.cluster.local:9090` |
 | `REVIEW_GRPC_ADDR` | product → review | `dns:///review-grpc.review.svc.cluster.local:9090` |
 | `SHIPPING_GRPC_ADDR` | order → shipping | `dns:///shipping-grpc.shipping.svc.cluster.local:9090` |
 | `NOTIFICATION_GRPC_ADDR` | order → notification | `dns:///notification-grpc.notification.svc.cluster.local:9090` |
@@ -69,8 +68,10 @@ calls, not a religion.
   500 that no compiler catches. A shared `.proto` generates the structs; a
   breaking change is caught at **compile time** (and in CI, see §7).
 - **Performance on the hottest path.** Binary Protobuf over a multiplexed HTTP/2
-  connection is cheaper than JSON-over-HTTP/1.1 on the busiest east-west hop:
-  **every service → auth `/auth/v1/private/me`** on every authenticated request.
+  connection is cheaper than JSON-over-HTTP/1.1 on the busiest east-west hop —
+  originally **every service → auth `/me`** on each authenticated request.
+  (That hop no longer exists: RFC-0009 Phase 5 moved token verification into
+  each service via JWKS, and the remaining gRPC hops below keep the benefit.)
 - **Built-in deadlines.** gRPC deadlines propagate across hops as a first-class
   concept, replacing ad-hoc per-client HTTP timeouts.
 
@@ -88,7 +89,7 @@ calls, not a religion.
 
 | Caller → callee | Decision | Status |
 |-----------------|----------|--------|
-| every service → auth `/auth/v1/private/me` | gRPC | ✅ gRPC-only (via `pkg/authmw`) |
+| every service → auth `/auth/v1/private/me` | gRPC | ⛔ **removed (Phase 5)** — services verify JWTs locally via JWKS; auth has no gRPC server |
 | product → review (aggregation) | gRPC | ✅ gRPC-only |
 | order → shipping (internal order lookup) | gRPC | ✅ gRPC-only |
 | order → notification (publish on checkout) | gRPC | ✅ best-effort |

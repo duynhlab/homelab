@@ -65,11 +65,11 @@ only the public key, ADR-003's key-exposure objection no longer applies.
 - **Operational cost.** A JWKS endpoint, key rotation, and — under OSS — **manual edge
   key choreography** (Kong holds a static public key, not JWKS); two places that verify
   must stay consistent.
-- **Phased, not-yet-fully-deployed.** Rollout follows RFC-0009: Phase 2 (auth mints
-  JWT + JWKS) → Phase 3 (`pkg/authmw` local verify) → Phase 4 (Kong edge plugin) →
-  Phase 5 (cutover). **Until Phase 4 ships, in-service validation as described in
-  ADR-003 remains the live mechanism** — this ADR records the decided direction, not a
-  completed migration.
+- **Phased rollout — completed 2026-07-02.** Rollout followed RFC-0009: Phase 2 (auth
+  mints JWT + JWKS) → Phase 3 (`pkg/authmw` local verify) → Phase 4 (Kong edge plugin)
+  → Phase 5 (cutover: opaque session tokens, the `sessions` table and the `auth.GetMe`
+  gRPC fallback are gone — JWT is the only credential; logout revokes the refresh-token
+  family).
 - **Revisit trigger:** adopting a service mesh ([RFC-0006](../../rfc/RFC-0006/)) could
   move edge/identity concerns into the mesh; moving to an external IdP / Enterprise
   OIDC would replace the OSS `jwt` edge mechanism. Re-open this ADR in either case.

@@ -28,14 +28,10 @@ services:
     write_timeout: 15000
     retries: 2
     routes:
-      # Public (login/register/jwks) stays anonymous; private is edge-JWT gated.
+      # Auth is public-only (Phase 5): login/register/refresh/jwks stay
+      # anonymous and logout authenticates by the refresh token in the body.
+      # /me and the /private/ prefix were removed with the opaque tokens.
       - { name: auth-public, paths: ["/auth/v1/public/"], strip_path: false }
-      - name: auth-private
-        paths: ["/auth/v1/private/"]
-        strip_path: false
-        plugins:
-          - name: jwt
-            config: &jwtcfg { key_claim_name: iss, claims_to_verify: [exp], run_on_preflight: false }
   - name: user
     host: user.upstream
     port: 8080
@@ -50,7 +46,8 @@ services:
         paths: ["/user/v1/private/"]
         strip_path: false
         plugins:
-          - { name: jwt, config: *jwtcfg }
+          - name: jwt
+            config: &jwtcfg { key_claim_name: iss, claims_to_verify: [exp], run_on_preflight: false }
   - name: product
     host: product.upstream
     port: 8080

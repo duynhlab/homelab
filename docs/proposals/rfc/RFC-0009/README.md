@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| partially implemented | platform-wide | 2026-06-30 | 2026-07-01 |
+| implemented | platform-wide | 2026-06-30 | 2026-07-02 |
 
 > **Don't forget: every decision is a tradeoff.** This RFC moves the platform from
 > opaque DB-backed session tokens to stateless signed JWTs and adds a second
@@ -378,7 +378,7 @@ consumer credential `key` == `https://gateway.duynh.me`.
 - **Verify:** public routes anonymous (login works); private routes 401 at the edge
   for bad tokens, 200 for good ones.
 
-### Phase 5 — cutover cleanup
+### Phase 5 — cutover cleanup — ✅ done
 
 Repo: `auth-service` + consuming services. Once Phases 2–4 are stable:
 
@@ -656,7 +656,14 @@ The original open questions were resolved on 2026-06-30:
     timeouts/retries + active/passive health-checks).
   - Also shipped earlier: **Phase 1** (rate-limit → Valkey) and, in the auth track,
     **Phases 2–3** (auth-service RS256 JWT + JWKS, `pkg/authmw` local verification).
-  - **Pending:** Phase 4 (Kong edge `jwt` plugin) and Phase 5 (opaque→JWT cutover cleanup).
+  - Phase 4 (Kong edge `jwt` plugin) shipped next; Phase 5 followed (below).
+- 2026-07-02 — **Implemented.** Phase 4 (Kong edge `jwt` on `/private/`) and
+  **Phase 5 (opaque→JWT cutover cleanup)** shipped: auth stopped issuing the
+  opaque session token (`sessions` table dropped, `/me` + gRPC `GetMe` removed,
+  auth is HTTP-only), `pkg/authmw` v0.12.0 is JWT-only (fallback client removed
+  from the 5 consumers), logout moved to `POST /auth/v1/public/logout` with
+  `{refresh_token}` (revokes the family), and the SPA switched to the access
+  token with single-flight silent refresh. All six phases are now live.
 
 ## Related
 

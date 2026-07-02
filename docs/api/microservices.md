@@ -1,6 +1,6 @@
 # Microservices Catalog
 
-> **Status:** Living reference · **Last updated:** 2026-05-30
+> **Status:** Living reference · **Last updated:** 2026-07-02
 > **Purpose:** A single place to understand the **currently deployed microservices** — what each one does, what's implemented, what's still mock/in-flight, and how they talk to each other. All east-west calls now run over **gRPC** (see [`grpc-internal-comms.md`](grpc-internal-comms.md)).
 > **Related:** [`api.md`](api.md) (per-endpoint contracts), [`api-naming-convention.md`](api-naming-convention.md) (URL shape), [`grpc-internal-comms.md`](grpc-internal-comms.md) (gRPC east-west), [`../../local-stack/`](../../local-stack/) (local run).
 
@@ -67,12 +67,11 @@ The local end-to-end stack (`local-stack/compose.yaml`) mirrors the platform wit
 
 Each entry: **what it owns**, **what's implemented**, **what's mock/in-flight**, and **gRPC candidacy**. Endpoint contracts live in [`api.md`](api.md).
 
-### auth — identity & sessions
-- **Owns:** users (credentials), sessions. Issues + validates session tokens.
-- **API:** `POST /auth/v1/public/{login,register}`, `GET /auth/v1/private/me`.
-- **Implemented:** opaque **CSPRNG** session tokens (32-byte, base64url) persisted in `sessions`; bcrypt password verification with a constant-time dummy-hash path on the user-not-found branch (no username enumeration); sentinel-error → HTTP-status mapping; generic binding-error messages (no internal leak). Unit/handler tests + fuzz + race-clean (tracer-init race fixed).
-- **In-flight / notes:** `/auth/v1/private/me` is the **hottest east-west call** — every authenticated request in every other service validates the bearer token here.
-- **gRPC candidacy:** **High** (Phase 2) — high-frequency, simple request/response, internal.
+### auth — identity
+- **Owns:** users (credentials), refresh-token families. Mints RS256 access tokens and serves the JWKS.
+- **API:** `POST /auth/v1/public/{login,register,refresh,logout}`, `GET /auth/v1/public/jwks` (public-only — `/private/me` was removed in RFC-0009 Phase 5).
+- **Implemented:** RS256 access tokens (1 h TTL, `kid`-published JWKS) + opaque **rotating refresh tokens** (sha256-hashed, family-tracked, reuse-detection revokes the family; logout revokes by presented refresh token); bcrypt password verification with a constant-time dummy-hash path on the user-not-found branch (no username enumeration); sentinel-error → HTTP-status mapping; generic binding-error messages (no internal leak). Unit/handler tests + fuzz + race-clean.
+- **Notes:** HTTP-only since Phase 5 — the gRPC `GetMe` server was removed; services verify JWTs locally against the cached JWKS, so there is **no** per-request east-west hop to auth.
 
 ### user — profiles
 - **Owns:** user profiles (name, phone, address).
@@ -135,7 +134,6 @@ order→cart cart-read stay HTTP/JSON.
 
 | Caller | Callee | Call | Transport | Failure mode |
 |--------|--------|------|-----------|--------------|
-| every service | auth | `AuthService.GetMe` (token in metadata) | **gRPC** | hard 401 (fail-closed) |
 | product | review | `ReviewService.GetProductReviews` | **gRPC** | soft-fail → `[]` |
 | order | shipping | `ShippingService.GetShipmentByOrder` | **gRPC** | soft-fail → `null` shipment |
 | order | notification | `NotificationService.SendEmail` (order-created) | **gRPC** | best-effort (detached ctx) |

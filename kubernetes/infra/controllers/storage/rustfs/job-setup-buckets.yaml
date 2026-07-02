@@ -1,0 +1,72 @@
+# Run-once Job to create RustFS buckets at bring-up.
+#
+# The setup-pg-backup-buckets CronJob (helmrelease-cronjobs.yaml) only fires on
+# its */30 schedule, so tempo-traces / pyroscope-profiles may not exist for up
+# to 30 min after RustFS is up — Tempo/Pyroscope then crash-loop on a missing
+# bucket. This Job creates the buckets immediately. It lives in the
+# ./controllers/storage path (storage-local, wait: true), so Flux blocks until
+# it completes; tracing-local / profiling-local dependsOn storage-local and
+# therefore only start once the buckets exist. Idempotent (mc mb
+# --ignore-existing) — the CronJob keeps them present thereafter.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rustfs-setup-buckets-init
+  namespace: rustfs
+spec:
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rustfs-setup-buckets-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              set -e
+              ENDPOINT="http://rustfs-svc.rustfs.svc.cluster.local:9000"
+
+              echo "=== Waiting for RustFS ==="
+              for i in 1 2 3 4 5 6 7 8 9 10; do
+                if mc alias set rustfs "$ENDPOINT" "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" 2>/dev/null; then
+                  echo "RustFS is ready."
+                  break
+                fi
+                echo "Attempt $i: RustFS not ready, retrying in 10s..."
+                sleep 10
+              done
+
+              echo "=== Creating buckets ==="
+              mc mb --ignore-existing rustfs/pg-backups-zalando
+              mc mb --ignore-existing rustfs/pg-backups-cnpg
+              mc mb --ignore-existing rustfs/tempo-traces
+              mc mb --ignore-existing rustfs/pyroscope-profiles
+
+              echo "=== Verifying ==="
+              mc ls rustfs/
+              echo "=== Done ==="
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: rustfs-credentials
+                  key: RUSTFS_ACCESS_KEY
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rustfs-credentials
+                  key: RUSTFS_SECRET_KEY
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi

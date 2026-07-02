@@ -1,0 +1,32 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: tracing-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: infrastructure
+spec:
+  interval: 10m
+  timeout: 15m
+  retryInterval: 2m
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+  path: ./controllers/tracing
+  prune: true
+  wait: true
+  # Tempo stores traces in RustFS (S3) using the tempo-rustfs-credentials Secret
+  # (ESO-managed, created by secrets-local) and needs RustFS running (storage-local).
+  # Kept OUT of controllers-local to avoid a wave deadlock: controllers-local
+  # (wait:true) would block on Tempo, which blocks on a Secret that secrets-local
+  # (dependsOn controllers-local) cannot create until controllers-local is Ready.
+  # See debugs.md Bug 6.
+  dependsOn:
+    - name: secrets-local
+    - name: storage-local
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: tempo
+      namespace: monitoring

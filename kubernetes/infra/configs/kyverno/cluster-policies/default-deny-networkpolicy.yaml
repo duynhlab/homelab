@@ -1,8 +1,10 @@
 # Generate a default deny-all-ingress NetworkPolicy into every app-tier namespace.
 # Explicit allow policies live in kubernetes/infra/configs/network-policies/.
-# NOTE: kindnet does not enforce NetworkPolicy — the generated resource is inert
-# until an enforcing CNI (Cilium/Calico) is installed. generateExisting backfills
-# namespaces that already exist; synchronize keeps the generated policy in sync.
+# NOTE: kindnet DOES enforce NetworkPolicy on Kind K8s 1.30+ (verified on 1.34.3) —
+# the generated deny-all is LIVE, so every app-tier namespace needs a matching
+# allow policy that exposes its operator + intra-ns + cross-ns dependencies (see
+# network-policies/). generateExisting backfills namespaces that already exist;
+# synchronize keeps the generated policy in sync.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:

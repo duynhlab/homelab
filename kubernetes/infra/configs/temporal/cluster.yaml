@@ -27,6 +27,11 @@ spec:
 
   persistence:
     defaultStore:
+      # DB is pre-provisioned by CNPG (bootstrap.initdb.database: temporal); the
+      # CNPG-generated `temporal` role has no CREATEDB, so the operator's
+      # temporal-sql-tool `create` step fails "permission denied to create
+      # database". skipCreate tells the operator the datastore already exists. (Bug 16)
+      skipCreate: true
       sql:
         user: temporal
         pluginName: postgres12
@@ -37,6 +42,9 @@ spec:
         name: temporal-db-app
         key: password
     visibilityStore:
+      # temporal_visibility is pre-created by CNPG postInitSQL; skip operator
+      # CREATE DATABASE for the same reason as defaultStore above. (Bug 16)
+      skipCreate: true
       sql:
         user: temporal
         pluginName: postgres12
@@ -48,12 +56,37 @@ spec:
         key: password
 
   services:
-    resources:
-      requests:
-        cpu: 50m
-        memory: 128Mi
-      limits:
-        memory: 512Mi
+    # v1beta1 TemporalCluster has no spec.services.resources — compute resources
+    # are declared per service (frontend/history/matching/worker) so every
+    # operator-created pod satisfies the cluster-wide Kyverno resource policy.
+    frontend:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
+    history:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
+    matching:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
+    worker:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
 
   ui:
     enabled: true
@@ -66,6 +99,11 @@ spec:
 
   admintools:
     enabled: true
+    # temporalio/admin-tools has no plain version tag (it uses a combined
+    # `<server>-tctl-<v>-cli-<v>` scheme), so the operator's default tag
+    # derivation from spec.version yields an empty tag → `temporalio/admin-tools:`
+    # → InvalidImageName. Pin the real admin-tools tag for server 1.24.2. (Bug 19)
+    version: "1.24.2-tctl-1.18.1-cli-0.13.2"
     resources:
       requests:
         cpu: 25m

@@ -22,6 +22,15 @@ metadata:
     app.kubernetes.io/component: controller
 spec:
   interval: 30m
+  # Install AFTER cert-manager is Ready. The chart renders a cert-manager
+  # Certificate/Issuer for the operator's admission webhook; applying those must
+  # pass the cert-manager validating webhook, whose pod isn't up yet in a
+  # cold-start controllers wave → parallel install hits "connection refused" and
+  # Stalls (RetriesExceeded). Same pattern as trust-manager-helmrelease.yaml.
+  # (debugs.md Bug 5)
+  dependsOn:
+    - name: cert-manager
+      namespace: cert-manager
   chart:
     spec:
       chart: temporal-operator
@@ -33,11 +42,11 @@ spec:
   install:
     crds: Create
     remediation:
-      retries: 3
+      retries: 5
   upgrade:
     crds: CreateReplace
     remediation:
-      retries: 3
+      retries: 5
   values:
     manager:
       resources:

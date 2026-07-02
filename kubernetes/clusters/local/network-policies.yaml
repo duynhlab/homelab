@@ -1,7 +1,7 @@
 # Ingress NetworkPolicies fencing internal routes per app namespace.
-# INERT on the current Kind/kindnet cluster (kindnet does not enforce
-# NetworkPolicy); authored ready and effective once an enforcing CNI
-# (Cilium/Calico) is installed. Depends on controllers-local for namespaces.
+# LIVE on this Kind cluster — kindnet DOES enforce NetworkPolicy on K8s 1.30+
+# (verified on 1.34.3). Depends on controllers-local for namespaces; databases-local
+# depends on this so operators init behind an already-fenced network (see Bug 20).
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization

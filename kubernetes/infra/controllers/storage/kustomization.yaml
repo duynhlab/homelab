@@ -5,5 +5,8 @@ kind: Kustomization
 resources:
   - rustfs/external-secret.yaml
   - rustfs/helmrelease.yaml
+  # Run-once Job: create buckets at bring-up so Tempo/Pyroscope don't crash-loop
+  # waiting for the */30 CronJob's first run (Bug 12).
+  - rustfs/job-setup-buckets.yaml
   # CronJob to ensure pg-backups-zalando/pg-backups-cnpg buckets exist (idempotent, runs periodically)
   - rustfs/helmrelease-cronjobs.yaml

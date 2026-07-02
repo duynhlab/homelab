@@ -70,11 +70,14 @@ spec:
       dataStorageSize: 1Gi
       logStorageSize: 256Mi
     
-    # Resources
+    # Resources. The old 100m/128Mi limits starved the S3 storage engine under
+    # concurrent Pyroscope block.bin + Tempo trace PUTs — request handling stalled
+    # past the liveness deadline ("context deadline exceeded") and kubelet killed
+    # the container in a CrashLoop. Bumped to give headroom for object writes. (Bug 18)
     resources:
       requests:
-        cpu: 20m
-        memory: 32Mi
-      limits:
         cpu: 100m
         memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi

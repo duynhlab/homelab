@@ -1,5 +1,5 @@
-# kindnet does not enforce NetworkPolicy; these are authored ready and become
-# effective once an enforcing CNI (Cilium/Calico) is installed.
+# NOTE: kindnet DOES enforce NetworkPolicy on Kind K8s 1.34+ (verified round 7) —
+# these rules are LIVE. Any ingress not explicitly allowed below is dropped.
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -54,3 +54,31 @@ spec:
           port: 8080
         - protocol: TCP
           port: 9090
+    # Zalando Postgres operator (postgres-operator ns) → auth-db: Patroni REST (8008)
+    # + SQL role/db init (5432). Without this the operator can't finish the DB →
+    # databases-local times out. (Bug 13)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: postgres-operator
+      ports:
+        - protocol: TCP
+          port: 8008
+        - protocol: TCP
+          port: 5432
+    # Metrics scrape (VMAgent, monitoring ns) → postgres-exporter sidecar.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9187
+    # Intra-namespace: Patroni peer coordination + PgBouncer → Postgres.
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8008
+        - protocol: TCP
+          port: 5432

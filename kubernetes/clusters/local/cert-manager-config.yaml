@@ -19,3 +19,16 @@ spec:
   dependsOn:
     - name: controllers-local
     - name: secrets-local
+  # LOCAL-ONLY: issue kong-proxy-tls from the self-signed `homelab-ca` instead of
+  # `letsencrypt-prod`. Kind has no real duynh.me DNS zone / Cloudflare token, so
+  # LE DNS-01 can't complete. Prod keeps letsencrypt-prod (its overlay has no such
+  # patch). See debugs.md Bug 9.
+  patches:
+    - target:
+        kind: Certificate
+        name: kong-proxy-tls
+        namespace: kong
+      patch: |
+        - op: replace
+          path: /spec/issuerRef/name
+          value: homelab-ca

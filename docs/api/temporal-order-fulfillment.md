@@ -6,7 +6,7 @@
 | **Status** | **Implemented** ✅ — shipped and verified end-to-end on `local-stack` (a checkout drives the full saga; an over-quantity checkout fails fast and rolls back). |
 | **Scope** | Durable orchestration of cross-service workflows. The flagship (and currently only) workflow is order fulfillment; this doc is also the platform reference for **why/when** to use Temporal and **how** it is wired. |
 | **Relation** | Decisions: [ADR-001 Adopt Temporal](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/), [ADR-002 Deploy via the operator](../proposals/adr/ADR-002-deploy-temporal-via-operator/). East-west transport: [`grpc-internal-comms.md`](grpc-internal-comms.md). Service map: [`microservices.md`](microservices.md). |
-| **Last updated** | 2026-06-15 |
+| **Last updated** | 2026-07-02 |
 
 > **TL;DR** — Checkout used to be synchronous + fire-and-forget, so partial failures silently lost
 > work (no inventory decrement, no shipment, lost notifications, no rollback). We replaced the
@@ -163,7 +163,7 @@ Deployed via the **`alexandrevilain/temporal-operator`** (see **[ADR-002](../pro
 - **`TemporalCluster` + `mop` `TemporalNamespace`** (retention 168h) — `configs/temporal/`: server **`1.24.2`** (target 1.27.x — ADR-002), `numHistoryShards: 512`, persistence → `temporal-db` (default + `temporal_visibility`) via the **CNPG-generated `temporal-db-app`** secret, `ui.enabled`, `admintools.enabled`, `metrics.prometheus.serviceMonitor.enabled`, resources set on every operator-created pod for Kyverno.
 - **`temporal-db`** — `configs/databases/clusters/temporal-db/`: a CloudNativePG cluster with the two SQL stores. Single instance for now (Temporal HA is at the service layer); scaling + Barman backups are a follow-up.
 - **Edge & alerts** — Kong ingress `temporal.duynh.me`; `TemporalServerDown` + service/persistence error-rate `PrometheusRule`s (`configs/temporal/prometheusrule.yaml`).
-- **Flux order** — `controllers → temporal-operator`; `databases → temporal-db`; a `temporal` Kustomization (`dependsOn` databases) before `apps`; the order worker `dependsOn` temporal.
+- **Flux order** — `controllers → temporal-operator` (the operator HelmRelease `dependsOn` cert-manager, since its chart renders a cert-manager `Certificate`/`Issuer` for the admission webhook); `databases → temporal-db`; a `temporal` Kustomization (`dependsOn` controllers, cert-manager, databases, monitoring) before `apps`; the order worker `dependsOn` temporal.
 
 ## 7. Deploy & run it
 

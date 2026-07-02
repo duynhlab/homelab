@@ -340,7 +340,7 @@ replicaCount: 2
 **What we use:**
 - Jaeger Helm chart (`jaegertracing/jaeger`)
 - GitOps-managed HelmRelease in this repo: `kubernetes/infra/controllers/tracing/jaeger/jaeger.yaml`
-- Reconciled by Flux (`controllers-local` → `configs-local` → `apps-local`)
+- Reconciled by Flux via the `tracing-local` Kustomization (path `./controllers/tracing`, `dependsOn: [secrets-local, storage-local]`)
 
 **Why Helm:**
 - ✅ Simple and straightforward

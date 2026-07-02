@@ -56,7 +56,7 @@ policies (`allow-internal-callers`, per the caller matrix) live in
 **Full reference:** the per-service caller matrix, allowed-ingress topology
 diagram, and GitOps wiring live in [`network-policies.md`](network-policies.md).
 
-> **kindnet caveat:** the current Kind cluster runs kindnet, which does **not**
-> enforce NetworkPolicy. Both the generated and the authored policies are inert
-> until an enforcing CNI (Cilium/Calico) replaces kindnet. They are authored
-> ready so the boundary becomes effective the moment such a CNI is installed.
+> **kindnet enforcement:** the current Kind cluster runs kindnet, which **does**
+> enforce NetworkPolicy (verified on K8s 1.34.3). Both the generated `deny-all-ingress`
+> and the authored `allow-internal-callers` policies are LIVE — any ingress not
+> explicitly allowed is dropped. No additional CNI is required.

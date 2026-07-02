@@ -264,7 +264,7 @@ flowchart TD
     end
 
     subgraph policies["Policies Issued"]
-        p_eso["eso-read-local\nread secret/local/*\nread database/creds/*"]
+        p_eso["eso-read\nread secret/{data,metadata}/local/{databases,infra,services,auth}/*\nread database/creds/*"]
         p_dev_rw["dev-team-rw\nread/write dev KV\ndynamic DB creds (rw)"]
         p_data_ro["data-team-ro\ndynamic DB creds (ro only)"]
         p_admin["devops-admin\nfull access"]
@@ -294,7 +294,7 @@ sequenceDiagram
     BAO->>K8s: POST /apis/authentication.k8s.io/v1/tokenreviews\n{token: "<SA token>"}
     K8s-->>BAO: TokenReview response\n{authenticated: true, serviceaccount: "external-secrets"}
     BAO->>BAO: Verify bound_service_account_names\nVerify bound_service_account_namespaces
-    BAO-->>ESO: Vault token\n{policies: ["eso-read-local"], ttl: "1h"}
+    BAO-->>ESO: Vault token\n{policies: ["eso-read"], ttl: "1h"}
     ESO->>BAO: GET /v1/secret/data/local/databases/cnpg-db/product\nAuthorization: Bearer <token>
     BAO-->>ESO: Secret data
     ESO->>K8s: Create/Update K8s Secret
@@ -357,9 +357,9 @@ secret/{environment}/{category}/{service}/{resource}
 | `secret/local/databases/pgdog-cnpg/credentials` | `username`, `password` | PgDog pooler admin |
 | `secret/local/infra/rustfs/backup-zalando` | `access_key_id`, `secret_access_key` | WAL-G S3 (auth, user, review) |
 | `secret/local/infra/rustfs/backup-cnpg` | `access_key_id`, `secret_access_key` | Barman S3 (product, cart) |
-| `secret/local/infra/cloudflare/api-token` ⚠️ | `api_token` | cert-manager `letsencrypt-{staging,prod}` ClusterIssuers (DNS-01 solver) |
+| `secret/local/infra/cloudflare/api-token` ⚠️ | `api_token` | cert-manager `letsencrypt-{staging,prod}` ClusterIssuers (DNS-01 solver) — **prod only**; on local Kind `kong-proxy-tls` is `homelab-ca`-issued |
 
-> ⚠️ **Bootstrap-only**: the Cloudflare token is **not** seeded by `openbao-bootstrap` (it is operator-supplied) and **not** in Git. Re-seed after every fresh cluster — see [§12.1 Step 7 — Bootstrap-only Cloudflare token](#step-7--seed-bootstrap-only-cloudflare-token-operator).
+> ⚠️ **Local vs prod**: on **local Kind** `openbao-bootstrap` **now seeds a dev placeholder** (`dev-cloudflare-placeholder`) so the `cloudflare-api-token` ExternalSecret syncs and doesn't block `secrets-local` (DNS-01 fails locally, which is fine — `kong-proxy-tls` is `homelab-ca`-issued). On **prod** the real token is **operator-supplied** and **not** in Git — re-seed after every fresh cluster — see [§12.1 Step 7 — Cloudflare token](#step-7--seed-bootstrap-only-cloudflare-token-operator).
 
 ### 5.2 Database Secrets Engine — Dynamic Credentials
 
@@ -698,7 +698,7 @@ flowchart TD
     end
 
     subgraph service["Service Policies"]
-        eso_read["eso-read-local\nRead secret/local/data/*\nRead secret/local/metadata/*\nRead database/creds/*-app-rw\nUsed by: ESO K8s auth role"]
+        eso_read["eso-read\nRead secret/{data,metadata}/local/{databases,infra,services,auth}/*\nRead database/creds/*-app-rw\nUsed by: ESO K8s auth role"]
         svc_product["service-product\nRead database/creds/product-app-rw\nUsed by: product SA (future direct auth)"]
     end
 
@@ -713,7 +713,7 @@ flowchart TD
 ### Policy Syntax Example
 
 ```hcl
-# eso-read-local: ESO service account policy (scoped paths, not wildcard)
+# eso-read: ESO service account policy (scoped paths, not wildcard)
 path "secret/data/local/databases/*" {
   capabilities = ["read", "list"]
 }
@@ -726,7 +726,20 @@ path "secret/data/local/infra/*" {
 path "secret/metadata/local/infra/*" {
   capabilities = ["read", "list"]
 }
-# Dynamic DB credentials
+path "secret/data/local/services/*" {
+  capabilities = ["read", "list"]
+}
+path "secret/metadata/local/services/*" {
+  capabilities = ["read", "list"]
+}
+# auth/* — auth JWT signing-key ExternalSecrets (RFC-0009 Phase 4 edge JWT)
+path "secret/data/local/auth/*" {
+  capabilities = ["read", "list"]
+}
+path "secret/metadata/local/auth/*" {
+  capabilities = ["read", "list"]
+}
+# Dynamic DB credentials (planned — DB engine not yet enabled)
 path "database/creds/*-app-rw" {
   capabilities = ["read"]
 }
@@ -893,7 +906,9 @@ kubectl exec -n openbao openbao-0 -- bao token revoke $ROOT_TOKEN
 
 ### Step 7 — Seed bootstrap-only Cloudflare token (operator)
 
-The Cloudflare API token used by cert-manager DNS-01 is **operator-supplied**: it is **not** in Git and **not** seeded by the bootstrap Job. Re-seed it after every fresh cluster, then trigger downstream reconciles:
+**Local Kind:** nothing to do — `openbao-bootstrap` seeds a **dev placeholder** (`api_token="dev-cloudflare-placeholder"`) so the ExternalSecret syncs. Local `kong-proxy-tls` is `homelab-ca`-issued, so the (failing) DNS-01 challenge is irrelevant.
+
+**Prod:** the real Cloudflare API token used by cert-manager DNS-01 is **operator-supplied** — **not** in Git. Override the placeholder with the real token after every fresh cluster, then trigger downstream reconciles:
 
 ```bash
 # Re-fetch root token from K8s Secret (kept across pod restarts via PVC)
@@ -1352,4 +1367,4 @@ gantt
 
 ---
 
-_Last updated: 2026-06-29 — OpenBAO HA (3-node Raft) + ESO via Kubernetes auth. **Deployed today:** KV v2 static secrets + best-effort audit. **Planned (not deployed):** dynamic DB creds, OIDC, KMS auto-unseal, TLS — see [RFC-0008](../proposals/rfc/RFC-0008/). **Local Kind only — not production-hardened.**_
+_Last updated: 2026-07-02 — OpenBAO HA (3-node Raft) + ESO via Kubernetes auth. **Deployed today:** KV v2 static secrets + best-effort audit; `eso-read` policy scopes `local/{databases,infra,services,auth}/*`; Cloudflare token dev-placeholder on local (bootstrap-seeded), operator-supplied on prod. **Planned (not deployed):** dynamic DB creds, OIDC, KMS auto-unseal, TLS — see [RFC-0008](../proposals/rfc/RFC-0008/). **Local Kind only — not production-hardened.**_

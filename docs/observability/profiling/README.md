@@ -162,7 +162,7 @@ Verified inventory of the actual deployment:
 | **Backend** | Grafana Pyroscope Helm `2.1.0`, single-binary, `fullnameOverride: pyroscope`, ns `monitoring` (`kubernetes/infra/controllers/profiling/pyroscope/helmrelease.yaml`) |
 | **Block storage** | RustFS S3 `rustfs-svc.rustfs.svc.cluster.local:9000`, bucket `pyroscope-profiles`, `force_path_style` + `insecure` (plain HTTP in-cluster), `compactor_blocks_retention_period: 168h` (7d, matches Tempo/VM) |
 | **Metastore** | PVC `10Gi` (`standard`) for the v2 raft metastore — survives restarts |
-| **Credentials** | `pyroscope-rustfs` `ClusterExternalSecret` → `pyroscope-rustfs-credentials` (from OpenBAO); bucket created by the RustFS setup CronJob |
+| **Credentials** | `pyroscope-rustfs` `ClusterExternalSecret` → `pyroscope-rustfs-credentials` (from OpenBAO); bucket created at bring-up by the run-once `rustfs-setup-buckets-init` Job (idempotently kept present by the `*/30` RustFS bucket CronJob) |
 | **Security** | `runAsNonRoot`, `runAsUser: 10001`, `allowPrivilegeEscalation: false`, drop `ALL` caps, `seccompProfile: RuntimeDefault` |
 | **Self-monitoring** | `serviceMonitor.enabled: true`; `PyroscopeDown` alert — `up{job=~".*pyroscope.*"} == 0` for 5m |
 | **Resources** | requests `100m` / `256Mi`, limit `512Mi` |
@@ -248,7 +248,9 @@ Set `PROFILING_ENABLED=false` to opt a service out.
    ```
 3. **Endpoint reachable?** `PYROSCOPE_ENDPOINT` resolves to `pyroscope.monitoring.svc.cluster.local:4040`.
 4. **Storage/creds?** Secret `pyroscope-rustfs-credentials` exists in `monitoring`
-   (ClusterExternalSecret `pyroscope-rustfs`) and the `pyroscope-profiles` bucket exists on RustFS.
+   (ClusterExternalSecret `pyroscope-rustfs`) and the `pyroscope-profiles` bucket exists on RustFS
+   (created at bring-up by the run-once `rustfs-setup-buckets-init` Job in namespace `rustfs`;
+   the `*/30` RustFS bucket CronJob only keeps it present thereafter).
 5. **Datasource healthy?** Grafana `Pyroscope` (Connections → Data sources).
 6. **Alert** — `PyroscopeDown` fires when `up{job=~".*pyroscope.*"} == 0` for 5m.
 
@@ -262,4 +264,4 @@ Set `PROFILING_ENABLED=false` to opt a service out.
 - [Traces to profiles](https://grafana.com/docs/grafana/latest/datasources/pyroscope/configure-traces-to-profiles/)
 
 ---
-_Last updated: 2026-06-27 — Pyroscope 2.1.0 (Helm, v2/single-binary), RustFS S3 7d retention, `obsx.SetupProfiling` (pkg v0.10.0), local-stack profiling enabled._
+_Last updated: 2026-07-02 — Pyroscope 2.1.0 (Helm, v2/single-binary), RustFS S3 7d retention, `obsx.SetupProfiling` (pkg v0.10.0), local-stack profiling enabled._

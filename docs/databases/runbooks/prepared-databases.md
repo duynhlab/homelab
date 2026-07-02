@@ -435,6 +435,8 @@ If `pg_partman` is listed in `extwlist.extensions`, the database owner can creat
 3. If you need the full `preparedDatabases` role hierarchy, do NOT use `namespace.username` format in `databases`. Use `ClusterExternalSecret` or similar for cross-namespace credential delivery instead.
 4. Always test `preparedDatabases` changes on a fresh cluster (delete and recreate) because the operator only runs `preparedDatabases` on first creation, not on updates.
 
+> **Note:** The same first-creation-only behavior applies to the databases under `spec.databases` — on a failed first init (e.g. `CreateFailed` from a slow cold boot) they are never (re)created, so app migrations fail with `database "…" does not exist`. After removing `preparedDatabases` (Fix 1), the per-service databases are additionally guaranteed by the idempotent `ensure-databases` Job in each Zalando cluster dir (`databases-local` wave), which connects as superuser and runs guarded `CREATE DATABASE … OWNER …`. See [supporting-shared-db/ensure-databases-job.yaml](../../../kubernetes/infra/configs/databases/clusters/supporting-shared-db/ensure-databases-job.yaml) and [003.2 Zalando operator deep dive](../003.2-operator-zalando.md#first-init-fragility-and-the-ensure-databases-job).
+
 ---
 
 ## References

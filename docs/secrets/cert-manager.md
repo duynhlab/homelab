@@ -1,6 +1,6 @@
 # cert-manager + Let's Encrypt + Flux CD
 
-This guide documents how cert-manager is wired into Flux in this repo: **two ClusterIssuer families** (internal `homelab-ca` + public `letsencrypt-{staging,prod}`), a **single `kong-proxy-tls` wildcard cert** issued via **Cloudflare DNS-01**, and **trust-manager** distributing the homelab CA bundle.
+This guide documents how cert-manager is wired into Flux in this repo: **two ClusterIssuer families** (internal `homelab-ca` + public `letsencrypt-{staging,prod}`), a **single `kong-proxy-tls` wildcard cert** issued via **Cloudflare DNS-01** on prod (the local Kind overlay patches it to the self-signed **`homelab-ca`** instead), and **trust-manager** distributing the homelab CA bundle.
 
 **Repository paths (implemented in this repo):**
 
@@ -42,7 +42,7 @@ flowchart LR
     HCA[ClusterIssuer<br/>homelab-ca]
     LES[ClusterIssuer<br/>letsencrypt-staging]
     LEP[ClusterIssuer<br/>letsencrypt-prod]
-    KCert[Certificate<br/>kong/kong-proxy-tls<br/>SANs: duynh.me, *.duynh.me, local.duynh.me]
+    KCert[Certificate<br/>kong/kong-proxy-tls<br/>SANs: duynh.me, *.duynh.me]
     CACOPY[ConfigMap<br/>homelab-ca-source<br/>committed PEM]
     Bundle[Bundle<br/>homelab-ca-bundle]
     OUT[ConfigMap<br/>homelab-ca-bundle<br/>across labeled namespaces]
@@ -50,7 +50,8 @@ flowchart LR
   HR --> cm
   K --> SS --> CA --> HCA
   Bao --> ES --> Sec --> LES & LEP
-  LEP --> KCert
+  LEP -->|prod| KCert
+  HCA -->|local Kind overlay patch| KCert
   CA -. one-time export .-> CACOPY --> Bundle --> OUT
   LE[Let's Encrypt ACME] <-->|DNS-01 TXT on duynh.me zone| LEP
   LE <-->|staging| LES
@@ -61,8 +62,10 @@ flowchart LR
 
 | PKI | Issuer chain | Used by | Trusted by |
 |---|---|---|---|
-| Internal | `selfsigned-bootstrap` → `homelab-ca` Certificate → `homelab-ca` ClusterIssuer | Webhooks, future internal mTLS | Workloads that mount `homelab-ca-bundle` (trust-manager) |
-| Public | `letsencrypt-staging` / `letsencrypt-prod` (DNS-01 via Cloudflare) | `kong-proxy-tls` (browser-facing wildcard) | Browsers (Mozilla bundle covers LE roots) |
+| Internal | `selfsigned-bootstrap` → `homelab-ca` Certificate → `homelab-ca` ClusterIssuer | Webhooks, future internal mTLS, **and `kong-proxy-tls` on local Kind** (via the overlay patch) | Workloads that mount `homelab-ca-bundle` (trust-manager) |
+| Public | `letsencrypt-staging` / `letsencrypt-prod` (DNS-01 via Cloudflare) | `kong-proxy-tls` (browser-facing wildcard) **on prod** | Browsers (Mozilla bundle covers LE roots) |
+
+> **Local vs prod:** on the local Kind cluster the `kong-proxy-tls` wildcard is issued by the internal `homelab-ca` (Kind has no real `duynh.me` DNS zone / Cloudflare token, so LE DNS-01 can't complete — a browser warning is expected unless `homelab-ca` is trusted). On prod it is Let's Encrypt via Cloudflare DNS-01. The switch is a `spec.patches` override in `clusters/local/cert-manager-config.yaml`; prod has no such patch.
 
 ---
 
@@ -261,13 +264,15 @@ spec:
           dnsZones: [duynh.me]
 ```
 
-**Pre-requisite Secret — `cloudflare-api-token`** (`cert-manager` namespace, key `api-token`) is synced from OpenBAO by the ExternalSecret in `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`. The OpenBAO path is `secret/local/infra/cloudflare/api-token` (key `api_token`); the value is **bootstrap-only** — not in Git — and must be re-seeded after every cluster recreate (`bao kv put …`). Operator runbook: [`./secrets-management.md`](./secrets-management.md#bootstrap-only-secrets).
+**Pre-requisite Secret — `cloudflare-api-token`** (`cert-manager` namespace, key `api-token`) is synced from OpenBAO by the ExternalSecret in `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`. The OpenBAO path is `secret/local/infra/cloudflare/api-token` (key `api_token`). On **local Kind** the `openbao-bootstrap` Job seeds a **dev placeholder** value so the ExternalSecret syncs and does not block `secrets-local` — the local `kong-proxy-tls` is `homelab-ca`-signed, so the (failing) DNS-01 solver never uses this token. On **prod** the token is **operator-supplied** — a real Cloudflare token, not in Git — and must be re-seeded after every cluster recreate (`bao kv put …`). Operator runbook: [`./secrets-management.md`](./secrets-management.md#bootstrap-only-secrets).
 
 ---
 
 ## 6. Kong proxy Certificate (single wildcard for all browser-facing hosts)
 
-Kong terminates TLS centrally. There is **one** Certificate — `kong/kong-proxy-tls` — covering every `*.duynh.me` host (apex, wildcard, and the explicit frontend FQDN `local.duynh.me`). Per-service Certificates are not used; Ingresses do not carry `tls:` blocks because Kong serves the cert via `default-ssl-cert`.
+Kong terminates TLS centrally. There is **one** Certificate — `kong/kong-proxy-tls` — covering the apex and wildcard (`duynh.me`, `*.duynh.me`); every browser-facing host (`local.duynh.me`, `gateway.duynh.me`, …) is covered by the `*.duynh.me` wildcard, not listed as an explicit SAN. Per-service Certificates are not used; Ingresses do not carry `tls:` blocks because Kong serves the cert via `default-ssl-cert`.
+
+> **No redundant SANs.** Do not add an explicit SAN that is already covered by the wildcard (e.g. `local.duynh.me`): ACME (RFC 8555 §7.1.3) rejects a SAN redundant with a wildcard in the same request (Let's Encrypt returns `400 malformed`).
 
 **File:** `kubernetes/infra/configs/cert-manager/certificates-microservices.yaml`
 
@@ -289,13 +294,14 @@ spec:
   dnsNames:
     - duynh.me
     - "*.duynh.me"
-    - local.duynh.me
   issuerRef:
     kind: ClusterIssuer
     name: letsencrypt-prod
 ```
 
-Switch `letsencrypt-prod` → `letsencrypt-staging` while iterating to avoid LE prod rate limits.
+> **Local overlay:** the base manifest above uses `letsencrypt-prod`, but `clusters/local/cert-manager-config.yaml` patches `issuerRef.name` → `homelab-ca` on the local Kind cluster (self-signed; no ACME). Only prod issues this cert from Let's Encrypt.
+
+On prod, switch `letsencrypt-prod` → `letsencrypt-staging` while iterating to avoid LE prod rate limits.
 
 ### Adding a new browser-facing host
 
@@ -369,7 +375,7 @@ spec:
    ```bash
    flux reconcile ks secrets-local --with-source
    ```
-3. **Reconcile** `cert-manager-local` — the `letsencrypt-{staging,prod}` ClusterIssuers go Ready; cert-manager creates an Order on `kong-proxy-tls`, publishes the DNS-01 TXT, LE validates, Secret `kong-proxy-tls` lands in the `kong` namespace.
+3. **Reconcile** `cert-manager-local` — on **local Kind** the overlay patches `kong-proxy-tls` to `homelab-ca`, so cert-manager signs the wildcard Secret directly (no ACME Order / DNS-01 / LE validation) and `kong-proxy-tls` lands in the `kong` namespace immediately. On **prod** the `letsencrypt-{staging,prod}` ClusterIssuers go Ready, cert-manager creates an Order, publishes the DNS-01 TXT, LE validates, and the Secret lands.
 4. **Reconcile** `kong-local` (and `kong-config-local`) — Kong pod starts and mounts the Secret as `ssl_cert`/`ssl_cert_key`.
 5. **Verify**:
    ```bash
@@ -377,7 +383,7 @@ spec:
    kubectl get certificate -A
    kubectl get secret kong-proxy-tls -n kong
    ```
-6. **Browser test**: `https://local.duynh.me` (after `sudo ./scripts/setup-hosts.sh`) should show a green padlock with a Let's Encrypt-issued cert covering `*.duynh.me`.
+6. **Browser test**: `https://local.duynh.me` (after `sudo ./scripts/setup-hosts.sh`). On **local Kind** the cert is `homelab-ca`-signed, so expect an untrusted-CA warning unless `homelab-ca` is added to the trust store. On **prod** it shows a green padlock with a Let's Encrypt-issued cert covering `*.duynh.me`.
 
 ---
 
@@ -432,4 +438,4 @@ cert-manager creates `homelab-ca-secret` only in the `cert-manager` namespace. W
 
 ---
 
-_Last updated: 2026-06-29 — cert-manager + Let's Encrypt (DNS-01 via Cloudflare) for the `kong-proxy-tls` wildcard; `cloudflare-api-token` is bootstrap-only (operator-supplied, not in Git)._
+_Last updated: 2026-07-02 — cert-manager + Let's Encrypt (DNS-01 via Cloudflare) for the `kong-proxy-tls` wildcard on prod; local Kind issues it from the self-signed `homelab-ca` (overlay patch). SANs `duynh.me`, `*.duynh.me`. `cloudflare-api-token` is a dev placeholder on local (bootstrap-seeded), operator-supplied on prod._

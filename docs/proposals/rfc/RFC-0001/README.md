@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| implemented | platform-wide | 2026-06-26 | 2026-06-26 |
+| implemented | platform-wide | 2026-06-26 | 2026-07-02 |
 
 > This is a **retrospective** RFC: Temporal order-fulfillment is already shipped and
 > verified. It exists as the worked example for the [RFC process](../README.md) and as
@@ -160,8 +160,10 @@ flowchart LR
 - **Enable/disable & default behavior:** checkout is async by default. If Temporal is
   unavailable the order is still created (`pending`) and the start is logged — **checkout
   never fails on Temporal**. The workflow start lives in the web handler so the logic layer stays Temporal-free.
-- **Flux order:** `controllers → temporal-operator`; `databases → temporal-db`; a `temporal`
-  Kustomization (`dependsOn` databases) before `apps`; `order-worker` `dependsOn` temporal.
+- **Flux order:** `controllers → temporal-operator` (the operator HelmRelease `dependsOn`
+  cert-manager — its chart renders a cert-manager `Certificate`/`Issuer` for the admission
+  webhook); `databases → temporal-db`; a `temporal` Kustomization (`dependsOn` controllers,
+  cert-manager, databases, monitoring) before `apps`; `order-worker` `dependsOn` temporal.
 
 ## Security considerations
 

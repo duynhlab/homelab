@@ -93,7 +93,7 @@ secret/{environment}/{category}/{service-or-component}/{resource}
 
 For the **full canonical KV catalog** (all paths currently seeded plus future-app placeholders) see [`README.md` §5.1 KV v2 — Static Secrets](./README.md#51-kv-v2--static-secrets).
 
-> ⚠️ **Bootstrap-only secret**: `secret/local/infra/cloudflare/api-token` (key `api_token`) is operator-supplied and not in Git. Re-seed after every fresh cluster — see [Bootstrap-only secrets](#bootstrap-only-secrets) below.
+> ⚠️ **`secret/local/infra/cloudflare/api-token`** (key `api_token`): on **local Kind** the `openbao-bootstrap` Job seeds a **dev placeholder** so the ExternalSecret syncs; on **prod** the real token is operator-supplied (not in Git) and re-seeded after every fresh cluster — see [Bootstrap-only secrets](#bootstrap-only-secrets) below.
 
 ---
 
@@ -239,11 +239,13 @@ spec:
 
 ### Bootstrap-only secrets
 
-A few secrets are **operator-supplied** — they are not in Git and not seeded by the OpenBAO bootstrap script, so they must be re-applied after every fresh cluster:
+A few secrets are **operator-supplied on prod** — the real value is not in Git and must be re-applied after every fresh cluster. On **local Kind** the OpenBAO bootstrap script now seeds a **dev placeholder** for these so the platform comes up unattended:
 
-| Path | Why | Used by |
-|---|---|---|
-| `secret/local/infra/cloudflare/api-token` (key `api_token`) | API tokens are personal credentials, must not be committed | cert-manager `letsencrypt-prod` / `letsencrypt-staging` ClusterIssuers → `kong-proxy-tls` |
+| Path | Local Kind | Prod | Used by |
+|---|---|---|---|
+| `secret/local/infra/cloudflare/api-token` (key `api_token`) | Dev placeholder seeded by `openbao-bootstrap` (DNS-01 fails locally, which is fine — `kong-proxy-tls` is `homelab-ca`-signed) | Real token, operator-supplied, not in Git | cert-manager `letsencrypt-prod` / `letsencrypt-staging` ClusterIssuers → `kong-proxy-tls` **(prod only)** |
+
+On local you rarely touch this. On prod, re-seed the real token with `bao kv put …` then reconcile downstream:
 
 ```bash
 ROOT=$(kubectl get secret -n openbao openbao-init-keys -o jsonpath='{.data.root_token}' | base64 -d)
@@ -385,4 +387,4 @@ Replace Shamir with cloud KMS for automatic unseal:
 
 ---
 
-_Last updated: 2026-06-29 — ESO + OpenBAO via Kubernetes auth, KV v2 static secrets (`refreshInterval: 1h`). Local Kind; production hardening tracked in [RFC-0008](../proposals/rfc/RFC-0008/)._
+_Last updated: 2026-07-02 — ESO + OpenBAO via Kubernetes auth, KV v2 static secrets (`refreshInterval: 1h`). Cloudflare token is a dev placeholder on local (bootstrap-seeded), operator-supplied on prod. Local Kind; production hardening tracked in [RFC-0008](../proposals/rfc/RFC-0008/)._

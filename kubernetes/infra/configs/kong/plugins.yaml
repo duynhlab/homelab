@@ -227,6 +227,12 @@ metadata:
 plugin: opentelemetry
 config:
   traces_endpoint: http://otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318/v1/traces
+  # OTel-logs PILOT (Kong >= 3.8): ship Kong RUNTIME logs via OTLP -> collector
+  # -> VictoriaLogs, trace-correlated. Runs ALONGSIDE Vector (which keeps
+  # tailing pod stdout, incl. the kong_json access log) for comparison.
+  # `access_logs_endpoint` (per-request logs with route/service context) is NOT
+  # in the OSS 3.9 schema — version-gated like OTel metrics (3.13+).
+  logs_endpoint: http://otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318/v1/logs
   resource_attributes:
     service.name: kong
   # inject=[w3c] FORCES a W3C traceparent onto every upstream request. The

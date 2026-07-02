@@ -47,12 +47,16 @@ flowchart LR
         AL["add_labels<br/>namespace/service/pod/container"]
         PG["parse_pg_json →<br/>filter/parse auto_explain"]
     end
+    KONG["Kong gateway<br/>kong_json access log (stdout)<br/>+ OTel runtime logs"]
     Pods --> KL
     CNPG --> KL
+    KONG --> KL
     KL --> AL
     KL --> PG
     AL -->|"/insert/jsonline"| VL[("VictoriaLogs VLSingle :9428<br/>monitoring · 7d / 20Gi")]
     PG -->|"PG-plans stream"| VL
+    KONG -.->|"OTLP logs (pilot)"| COL["otel-collector<br/>logs pipeline"]
+    COL -.->|"/insert/opentelemetry/v1/logs"| VL
     VL --> GRAF["Grafana Explore<br/>(LogsQL)"]
     GRAF <-. "trace_id ↔ Tempo" .-> TEMPO["Tempo"]
 ```
@@ -64,6 +68,16 @@ pipeline (label + ship) and the *PostgreSQL* pipeline (extract `auto_explain`
 execution plans into their own stream). Both land in one VLSingle instance.
 Pipeline internals, sink headers, and stream definitions are in
 [`victorialogs.md`](victorialogs.md).
+
+### Kong OTel-logs pilot (parallel path)
+
+Alongside Vector, Kong's `opentelemetry` plugin ships its **runtime logs** via
+OTLP (`logs_endpoint`, Kong ≥ 3.8) → otel-collector `logs` pipeline →
+VictoriaLogs' OTLP ingest. This is a **pilot** to compare against the Vector
+path (which remains primary and also carries Kong's `kong_json` access log
+from stdout). Per-request access logs over OTLP (`access_logs_endpoint`) are
+not available on Kong OSS 3.9. Tradeoff table + decision criteria:
+[`docs/platform/kong-gateway.md#observability`](../../platform/kong-gateway.md#observability).
 
 ## Why VictoriaLogs (and why not Loki / ELK)
 

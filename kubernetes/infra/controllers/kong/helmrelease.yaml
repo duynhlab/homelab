@@ -50,8 +50,15 @@ spec:
       # breaking X-Forwarded-* behind the Kind port-forward; the private/
       # in-cluster CIDRs are listed explicitly as the intended narrowed set.
       trusted_ips: "0.0.0.0/0,::/0,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1/32,fc00::/7,::1/128"
-      # JSON access logs — picked up by Vector DaemonSet → VictoriaLogs
-      proxy_access_log: "/dev/stdout"
+      # Structured JSON access logs (named nginx log_format `kong_json`) —
+      # picked up by the Vector DaemonSet → VictoriaLogs as parseable fields
+      # (status/latency/request_id...). nginx vars only: Kong route/service
+      # names are not available here (that context is version-gated behind the
+      # OTel access_logs_endpoint, not in OSS 3.9 — see plugins.yaml pilot note).
+      nginx_http_log_format: >-
+        kong_json escape=json
+        '{"time":"$time_iso8601","client":"$remote_addr","method":"$request_method","uri":"$request_uri","status":$status,"bytes":$body_bytes_sent,"request_time":$request_time,"upstream_time":"$upstream_response_time","upstream":"$upstream_addr","host":"$host","request_id":"$kong_request_id","user_agent":"$http_user_agent"}'
+      proxy_access_log: "/dev/stdout kong_json"
       proxy_error_log: "/dev/stderr"
       # Default proxy TLS certificate (cert-manager issued, wildcard *.duynh.me)
       ssl_cert: "/etc/secrets/kong-proxy-tls/tls.crt"

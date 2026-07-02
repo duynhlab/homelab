@@ -11,6 +11,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **infra (kong)**: **Structured JSON access logs** — a named nginx `log_format`
+  (`kong_json`: status, request/upstream latency, request_id, …) replaces the
+  default combined-format text on both the cluster HelmRelease and local-stack,
+  making the Vector → VictoriaLogs pipeline field-queryable (the old "JSON access
+  logs" comment finally became true). Plus an **OTel-logs pilot**: Kong's
+  `opentelemetry` plugin now also ships trace-correlated **runtime logs** via
+  `logs_endpoint` (Kong ≥ 3.8) → otel-collector `logs` pipeline → VictoriaLogs
+  OTLP ingest, running **alongside** Vector for comparison. local-stack gains
+  `victoria-logs` + a Vector container so both paths are testable offline.
+- **docs (kong)**: New **Observability** section in `kong-gateway.md` — current
+  state (metrics/traces/logs, all live) and the researched tradeoffs: keep the
+  `prometheus` plugin (OTel metrics needs Kong 3.13+, an Enterprise-train
+  version; OSS is 3.9), Vector stays the primary log shipper (OTel
+  `access_logs_endpoint` is likewise version-gated), plus the OSS-vs-Enterprise
+  release-train explainer and the pilot's decision criteria.
+
+### Added
+
 - **docs (local-stack)**: Pre-push **E2E audit guide** — a two-phase checklist
   (curl API-contract checks + a real-browser pass via the `agent-browser` CLI,
   including a silent-refresh fault-injection recipe and pass criteria) in

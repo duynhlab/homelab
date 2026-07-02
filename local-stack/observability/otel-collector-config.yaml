@@ -34,6 +34,14 @@ exporters:
     tls:
       insecure: true
     compression: gzip
+  # OTel-logs pilot sink: Kong's opentelemetry plugin (access_logs_endpoint /
+  # logs_endpoint, Kong >= 3.8) posts OTLP logs here; re-export to VictoriaLogs'
+  # OTLP ingest path.
+  otlphttp/victorialogs:
+    logs_endpoint: http://victoria-logs:9428/insert/opentelemetry/v1/logs
+    tls:
+      insecure: true
+    compression: gzip
   prometheusremotewrite:
     endpoint: http://victoria-metrics:8428/api/v1/write
     resource_to_telemetry_conversion:
@@ -52,3 +60,7 @@ service:
       receivers: [spanmetrics]
       processors: [batch]
       exporters: [prometheusremotewrite]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/victorialogs, debug]

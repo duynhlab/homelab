@@ -13,6 +13,7 @@ Kong Ingress Controller (KIC) runs in **DB-less mode** — all configuration is 
 - [Rate Limiting Deep Dive](#rate-limiting-deep-dive)
 - [Edge Resilience](#edge-resilience)
 - [Plugin Ecosystem](#plugin-ecosystem)
+- [Observability](#observability)
 - [Components](#components)
 - [Local Access](#local-access)
 - [TLS / cert-manager](#tls--cert-manager)
@@ -529,6 +530,71 @@ Currently, auth is handled at the application level (auth-service). Gateway-leve
 | `request-transformer` | Modify request headers/body | Add tracing headers |
 | `response-transformer` | Modify response headers | Security headers |
 | `correlation-id` | Add unique request ID | Distributed tracing |
+
+---
+
+## Observability
+
+How the gateway is monitored today, and the tradeoffs behind each choice. Kong
+positions its `opentelemetry` plugin as the unified telemetry path — evaluated
+below against this platform's VictoriaMetrics/VictoriaLogs/Vector stack.
+
+> **Why Kong shows two version lines.** Kong ships two editions on separate
+> release trains: **Kong Gateway (Enterprise)** — currently 3.14 LTS, image
+> `kong/kong-gateway` — and **Kong Gateway OSS/Community** — currently 3.9.x,
+> image `kong:3.9`, which this platform runs. Features documented as "3.10+"
+> through "3.14" exist only on the Enterprise train today; the OSS line stops
+> at 3.9. That version gate drives the metrics and access-log decisions below.
+
+### Current state (all live)
+
+| Signal | Producer | Pipeline | Consumer |
+|--------|----------|----------|----------|
+| **Metrics** | `prometheus` plugin (status codes, latency histograms, bandwidth, upstream health) on the status listener `:8100/metrics` | ServiceMonitor `configs/monitoring/servicemonitors/kong.yaml` → VMAgent (`selectAllByDefault`) → VictoriaMetrics | Grafana Kong dashboard (GrafanaDashboard CRD); 6 alert groups + recording rules in `configs/monitoring/prometheusrules/kong/` |
+| **Traces** | `opentelemetry` plugin — root span per request + forced W3C `traceparent` injection (100% edge→service linkage) | OTLP-HTTP → otel-collector → Tempo + Jaeger + VictoriaTraces | Grafana Explore / Jaeger UI |
+| **Access logs** | nginx `kong_json` log format on stdout — one JSON line per request (`status`, `request_time`, `upstream_time`, `request_id`, …) | Vector DaemonSet → VictoriaLogs (jsonline) | LogsQL queries by field |
+| **Runtime logs (pilot)** | `opentelemetry` plugin `logs_endpoint` (Kong ≥ 3.8) — trace-correlated OTLP log records | otel-collector `logs` pipeline → VictoriaLogs (OTLP ingest) | Runs **alongside** Vector for comparison |
+
+### Tradeoff: `prometheus` plugin vs OTel metrics
+
+**Decision: keep the `prometheus` plugin.** OTLP metrics export from the
+`opentelemetry` plugin requires Kong **3.13+** — an Enterprise-train version;
+it does not exist on OSS 3.9. Even when it becomes available:
+
+| | `prometheus` plugin (current) | OTel metrics (3.13+) |
+|---|---|---|
+| Availability | OSS 3.9 ✅ | Enterprise train only ❌ |
+| Model | Pull — VMAgent scrapes `:8100/metrics`, exactly how every other component is scraped | Push — OTLP to the collector, a second metrics path to operate |
+| Metric set | Purpose-built gateway RED: `kong_http_requests_total`, `kong_{kong,request,upstream}_latency_ms` histograms, bandwidth, upstream health, shared-dict memory | Generic OTel semconv; would need dashboard + 15-rule alert rewrite |
+| Investment | Dashboard + 6 alert groups + recording rules already built on these names | Restart from zero |
+
+**Revisit trigger:** the OSS line reaching 3.13-feature parity (or an
+Enterprise migration) *and* a concrete need to unify metrics onto OTLP.
+
+### Tradeoff: Vector vs OTel logs (pilot running)
+
+Kong's OTel pitch is one plugin for all three signals. On OSS 3.9 the log
+signal is **runtime logs only** — `access_logs_endpoint` (per-request logs
+carrying Kong route/service context that nginx variables cannot express) is
+version-gated like metrics. The pilot ships runtime logs via OTLP in parallel
+with Vector; the comparison to settle in a follow-up:
+
+| | Vector (primary) | OTel `logs_endpoint` (pilot) |
+|---|---|---|
+| Scope | Every pod in the cluster, incl. Kong's JSON access log | Kong runtime logs only (no access logs on 3.9) |
+| Delivery | DaemonSet with disk buffering — survives sink outages | Plugin in-memory queue — drops on collector outage |
+| Fields | Whatever is on stdout (access log = nginx vars; no route/service names) | Trace-correlated records with `service.*` resource attrs + introspection fields |
+| Coupling | Independent of Kong config | Lives in gateway config; adds per-request work in the log phase |
+| Verdict so far | Stays primary | Keep as pilot; promotes only if/when `access_logs_endpoint` reaches OSS — that would add the route/service context Vector cannot get from stdout |
+
+Local-stack mirrors both paths (Vector container + `victoria-logs` sink), so
+the comparison is testable offline — see `local-stack/README.md`.
+
+### Known gaps
+
+- Go services double-log through gin's default writer (`[GIN]` plain-text lines
+  next to the structured JSON) — service-repo cleanup, tracked separately.
+- Access logs lack Kong route/service names (nginx-var limitation, above).
 
 ---
 

@@ -220,6 +220,13 @@ plugins:
   - name: opentelemetry
     config:
       traces_endpoint: http://otel-collector:4318/v1/traces
+      # OTel-logs PILOT (Kong >= 3.8): ship Kong RUNTIME logs via OTLP to the
+      # collector -> VictoriaLogs, trace-correlated. Runs alongside the JSON
+      # stdout access log; in-cluster it runs alongside Vector for comparison.
+      # NOTE: `access_logs_endpoint` (per-request access logs with Kong
+      # route/service context) is NOT in the OSS 3.9 schema — version-gated
+      # like OTel metrics (3.13+). Revisit when the OSS line catches up.
+      logs_endpoint: http://otel-collector:4318/v1/logs
       resource_attributes:
         service.name: kong
       propagation:

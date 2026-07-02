@@ -50,6 +50,14 @@ spec:
           tls:
             insecure: true
           compression: gzip
+        otlphttp/victorialogs:
+          # OTel-logs pilot sink: Kong's opentelemetry plugin (logs_endpoint)
+          # posts OTLP runtime logs; re-export to VictoriaLogs' OTLP ingest.
+          # Runs alongside Vector (primary log shipper) for comparison.
+          logs_endpoint: http://vlsingle-victoria-logs.monitoring.svc.cluster.local:9428/insert/opentelemetry/v1/logs
+          tls:
+            insecure: true
+          compression: gzip
       extensions:
         health_check:
           endpoint: 0.0.0.0:13133
@@ -81,6 +89,14 @@ spec:
             - otlp/tempo
             - otlp/jaeger
             - otlphttp/victoriatraces
+            processors:
+            - memory_limiter
+            - batch
+            receivers:
+            - otlp
+          logs:
+            exporters:
+            - otlphttp/victorialogs
             processors:
             - memory_limiter
             - batch

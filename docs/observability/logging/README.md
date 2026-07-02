@@ -65,6 +65,16 @@ execution plans into their own stream). Both land in one VLSingle instance.
 Pipeline internals, sink headers, and stream definitions are in
 [`victorialogs.md`](victorialogs.md).
 
+### Kong OTel-logs pilot (parallel path)
+
+Alongside Vector, Kong's `opentelemetry` plugin ships its **runtime logs** via
+OTLP (`logs_endpoint`, Kong ≥ 3.8) → otel-collector `logs` pipeline →
+VictoriaLogs' OTLP ingest. This is a **pilot** to compare against the Vector
+path (which remains primary and also carries Kong's `kong_json` access log
+from stdout). Per-request access logs over OTLP (`access_logs_endpoint`) are
+not available on Kong OSS 3.9. Tradeoff table + decision criteria:
+[`docs/platform/kong-gateway.md#observability`](../../platform/kong-gateway.md#observability).
+
 ## Why VictoriaLogs (and why not Loki / ELK)
 
 The platform standardised on VictoriaLogs and **removed Loki** (CHANGELOG

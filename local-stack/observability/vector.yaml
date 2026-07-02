@@ -1,0 +1,42 @@
+# Vector for the local stack — mirrors the in-cluster DaemonSet pipeline
+# (kubernetes_logs -> transforms -> VictoriaLogs) using the docker_logs source.
+# Tails every compose container's stdout/stderr, lifts the service name and
+# parses JSON log lines (the Go services + Kong's kong_json access log), then
+# ships to VictoriaLogs' jsonline ingest — the same sink the cluster uses.
+# Runs ALONGSIDE the Kong OTel-logs pilot so both paths can be compared in one
+# VictoriaLogs instance (Vector rows carry `container_name`; OTel rows carry
+# `service.name`/`service.instance.id` resource attributes).
+
+sources:
+  docker:
+    type: docker_logs
+
+transforms:
+  shape:
+    type: remap
+    inputs: [docker]
+    source: |
+      # Service name from the compose service label; fall back to container name.
+      .service = .label."com.docker.compose.service"
+      if .service == null { .service = .container_name }
+      # Parse JSON log lines (Go services' zerolog/zap + Kong's kong_json access
+      # log); keep plain-text lines (e.g. gin's [GIN] lines) as raw messages.
+      parsed, err = parse_json(string!(.message))
+      if err == null {
+        . = merge!(., object!(parsed))
+      }
+      # Drop noisy fields Vector adds that the cluster pipeline doesn't keep.
+      del(.label); del(.image); del(.host); del(.source_type)
+
+sinks:
+  victorialogs:
+    type: http
+    inputs: [shape]
+    uri: http://victoria-logs:9428/insert/jsonline?_stream_fields=service,container_name&_msg_field=message&_time_field=timestamp
+    encoding:
+      codec: json
+    framing:
+      method: newline_delimited
+    request:
+      headers:
+        Content-Type: application/stream+json

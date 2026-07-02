@@ -104,6 +104,7 @@ services:
     depends_on:
       victoria-traces: { condition: service_started }
       victoria-metrics: { condition: service_started }
+      victoria-logs: { condition: service_started }
 
   victoria-traces:
     image: victoriametrics/victoria-traces:v0.6.0
@@ -115,6 +116,33 @@ services:
       - victoria-traces-data:/victoria-traces-data
     ports:
       - "10428:10428" # OTLP ingest + Jaeger query API + LogsQL + vmui
+
+  # Log pipeline sink (mirrors the in-cluster VLSingle). Receives BOTH paths:
+  #   1. Vector (below) tailing every container's stdout -> jsonline ingest
+  #   2. Kong's OTel runtime logs via the collector -> OTLP ingest
+  # so the Vector-vs-OTel comparison from the pilot is visible locally.
+  victoria-logs:
+    image: victoriametrics/victoria-logs:v1.51.0
+    command:
+      - "-httpListenAddr=:9428"
+      - "-storageDataPath=/victoria-logs-data"
+      - "-retentionPeriod=7d"
+    volumes:
+      - victoria-logs-data:/victoria-logs-data
+    ports:
+      - "9428:9428" # OTLP logs ingest + LogsQL query + vmui
+
+  # Vector — mirrors the in-cluster DaemonSet: tails all container logs (docker
+  # socket, read-only) and ships structured lines to VictoriaLogs. See
+  # observability/vector.yaml.
+  vector:
+    image: timberio/vector:0.50.0-alpine
+    command: ["--config", "/etc/vector/vector.yaml"]
+    volumes:
+      - ./observability/vector.yaml:/etc/vector/vector.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      victoria-logs: { condition: service_started }
 
   victoria-metrics:
     image: victoriametrics/victoria-metrics:v1.146.0
@@ -486,7 +514,15 @@ services:
       KONG_TRACING_SAMPLING_RATE: "1.0"
       # Drop server_tokens (Server/Via fingerprint), keep latency debug headers
       KONG_HEADERS: latency_tokens
-      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      # Structured JSON access logs (named nginx log_format) — one line per
+      # request with status/latency/request_id, parseable by any log pipeline.
+      # NOTE: nginx vars only — Kong route/service names are NOT in scope here
+      # (that context comes via the OTel access-logs pilot, see kong.yml).
+      # $$ = compose-escaped $ (nginx must see the literal variable).
+      KONG_NGINX_HTTP_LOG_FORMAT: >-
+        kong_json escape=json
+        '{"time":"$$time_iso8601","client":"$$remote_addr","method":"$$request_method","uri":"$$request_uri","status":$$status,"bytes":$$body_bytes_sent,"request_time":$$request_time,"upstream_time":"$$upstream_response_time","upstream":"$$upstream_addr","host":"$$host","request_id":"$$kong_request_id","user_agent":"$$http_user_agent"}'
+      KONG_PROXY_ACCESS_LOG: /dev/stdout kong_json
       KONG_PROXY_ERROR_LOG: /dev/stderr
     volumes:
       - ./gateway/kong.yml:/kong/kong.yml:ro
@@ -528,5 +564,6 @@ services:
 
 volumes:
   victoria-traces-data:
+  victoria-logs-data:
   victoria-metrics-data:
   pyroscope-data:

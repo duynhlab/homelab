@@ -367,8 +367,9 @@ make flux-status     # Check status
 
 Flux reconciliation order:
 1. **Controllers** -- operators, CRDs (VictoriaMetrics Operator, Prometheus CRDs, Grafana Operator, Sloth)
-2. **Configs** -- monitoring stack (VMSingle, VMAgent, VMAlert, Grafana, Tempo, VictoriaLogs, etc.)
-3. **Apps** -- microservices (auto-discovered by VMAgent via ServiceMonitor)
+2. **Configs** -- monitoring stack (VMSingle, VMAgent, VMAlert, Grafana, VictoriaLogs, etc.)
+3. **Tracing / Profiling** -- Tempo (`tracing-local`) and Pyroscope (`profiling-local`), each split out of the controllers wave and `dependsOn: [secrets-local, storage-local]` because they need the RustFS credentials Secret (ESO-managed) and RustFS running before they can start
+4. **Apps** -- microservices (auto-discovered by VMAgent via ServiceMonitor)
 
 ## Quick Start: Accessing the Stack
 

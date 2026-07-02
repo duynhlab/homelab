@@ -535,7 +535,7 @@ Currently, auth is handled at the application level (auth-service). Gateway-leve
 | Monitoring Ingress | `kubernetes/infra/configs/kong/ingress-monitoring.yaml` | Routes monitoring tools (Grafana, VM, Jaeger, etc.) |
 | Infra Ingress | `kubernetes/infra/configs/kong/ingress-infra.yaml` | Routes infra tools (Flux UI, RustFS, OpenBAO, PG UI) |
 | MCP Ingress | `kubernetes/infra/configs/kong/ingress-mcp.yaml` | Routes MCP servers (VM, VL, Flux) |
-| TLS Certificate | `kubernetes/infra/configs/cert-manager/certificates-microservices.yaml` | `kong-proxy-tls` issued by `letsencrypt-prod` ClusterIssuer (Cloudflare DNS-01); SANs: `duynh.me`, `*.duynh.me`, `local.duynh.me` |
+| TLS Certificate | `kubernetes/infra/configs/cert-manager/certificates-microservices.yaml` | `kong-proxy-tls` — `letsencrypt-prod` ClusterIssuer (Cloudflare DNS-01) on prod, self-signed `homelab-ca` on local Kind (overlay patch); SANs: `duynh.me`, `*.duynh.me` |
 | ServiceMonitor | `kubernetes/infra/configs/monitoring/servicemonitors/kong.yaml` | Prometheus metrics scraping |
 
 ---
@@ -569,14 +569,14 @@ Kong forces HTTPS via per-Ingress annotation; HTTP requests return `301` to the 
 
 ## TLS / cert-manager
 
-Kong terminates TLS with a public-trust wildcard cert (`*.duynh.me`) from **Let's Encrypt**, issued via Cloudflare DNS-01. The Certificate (`kong-proxy-tls` in the `kong` ns) is mounted as `ssl_cert`/`ssl_cert_key` on the Kong pod via a secretVolume.
+Kong terminates TLS with a wildcard cert (`*.duynh.me`). On **prod** this is a public-trust cert from **Let's Encrypt**, issued via Cloudflare DNS-01; on **local Kind** the `clusters/local` overlay patches the Certificate to the self-signed **`homelab-ca`** issuer (Kind has no real `duynh.me` DNS zone, so LE DNS-01 can't complete — expect a browser warning unless `homelab-ca` is trusted). The Certificate (`kong-proxy-tls` in the `kong` ns) is mounted as `ssl_cert`/`ssl_cert_key` on the Kong pod via a secretVolume.
 
 Full pipeline (OpenBAO → ESO → cert-manager → Kong), DNS-01 prerequisites, the dual-PKI split (Let's Encrypt vs `homelab-ca`), and troubleshooting are documented in:
 
 - [`docs/secrets/cert-manager.md`](../secrets/cert-manager.md) — controller, ClusterIssuers, `kong-proxy-tls` Certificate, deployment runbook
 - [`docs/secrets/trust-distribution.md`](../secrets/trust-distribution.md) — trust-manager `homelab-ca-bundle`, two-PKI rationale
 
-To switch the wildcard to LE staging while iterating (avoid prod rate limits), change `kong-proxy-tls.issuerRef` to `letsencrypt-staging`.
+On prod, to switch the wildcard to LE staging while iterating (avoid prod rate limits), change `kong-proxy-tls.issuerRef` to `letsencrypt-staging`. (Local Kind already overrides this to `homelab-ca`.)
 
 ---
 
@@ -615,7 +615,7 @@ Adding any `internal` audience to a gateway Ingress is a safety/privacy regressi
 
 ```
 controllers-local (cert-manager HelmRelease + Kong CRDs + namespaces)
-  → cert-manager-local (homelab-ca + letsencrypt-prod ClusterIssuers + kong-proxy-tls Certificate → Secret; dependsOn secrets-local for cloudflare-api-token)
+  → cert-manager-local (homelab-ca + letsencrypt-prod ClusterIssuers + kong-proxy-tls Certificate → Secret; local overlay patches kong-proxy-tls issuerRef → homelab-ca; dependsOn secrets-local for cloudflare-api-token, a dev placeholder locally)
   → kong-local (Kong HelmRelease — mounts kong-proxy-tls Secret at startup)
   → kong-config-local (Ingress resources + KongClusterPlugins)
   → apps-local (microservices + frontend)
@@ -676,10 +676,10 @@ kubectl get certificate -A
 
 **Expected**:
 - ClusterIssuers `selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod` all `Ready: True`
-- Certificate `kong-proxy-tls` in `kong` namespace is `Ready: True` and `Issuer: letsencrypt-prod`
+- Certificate `kong-proxy-tls` in `kong` namespace is `Ready: True`; `Issuer: homelab-ca` on local Kind (`letsencrypt-prod` on prod)
 - `Secret/cloudflare-api-token` present in `cert-manager` namespace (synced by ESO)
 
-If `letsencrypt-*` issuers are NotReady with `secret "cloudflare-api-token" not found`, the token has not been seeded into OpenBAO yet. Operator runbook: [`docs/secrets/secrets-management.md` § Bootstrap-only secrets](../secrets/secrets-management.md#bootstrap-only-secrets).
+On **prod**, if `letsencrypt-*` issuers are NotReady with `secret "cloudflare-api-token" not found`, the token has not been seeded into OpenBAO yet. Operator runbook: [`docs/secrets/secrets-management.md` § Bootstrap-only secrets](../secrets/secrets-management.md#bootstrap-only-secrets). On **local Kind** `kong-proxy-tls` is issued by `homelab-ca` (not the LE issuers), so this is not a local bring-up blocker.
 
 ### Step 6: Check Ingress Resources
 

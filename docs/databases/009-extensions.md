@@ -93,7 +93,7 @@ The consolidated `cnpg-db` cluster uses the **`system-trixie`** image (`ghcr.io/
 - **`cnpg-db`** (PostgreSQL 18, hosts product/cart/order):
   - Image: `system-trixie` (extensions built-in)
   - `shared_preload_libraries`: pgaudit, pg_stat_statements, auto_explain
-  - Database resource: pgaudit, pg_stat_statements, auto_explain, pgcrypto, uuid-ossp
+  - Database resource (product): pgaudit, pg_stat_statements, pgcrypto, uuid-ossp; (cart, order): pgaudit, pg_stat_statements. **auto_explain is preload-only (`shared_preload_libraries`); it has no SQL control file, so `CREATE EXTENSION auto_explain` fails "extension is not available" — never list it in a Database resource.**
   - See [`kubernetes/infra/configs/databases/clusters/cnpg-db/extensions.yaml`](../../kubernetes/infra/configs/databases/clusters/cnpg-db/extensions.yaml)
 
 #### Zalando Operator Clusters
@@ -577,7 +577,8 @@ spec:
   extensions:
     - name: pgaudit
     - name: pg_stat_statements
-    - name: auto_explain
+    # auto_explain is preload-only (in shared_preload_libraries); it has no control
+    # file — do NOT add it here (CREATE EXTENSION auto_explain fails).
     - name: pgcrypto
     - name: uuid-ossp
 ```
@@ -631,7 +632,8 @@ spec:
     # Extensions that require shared_preload_libraries (configured in instance.yaml)
     - name: pgaudit
     - name: pg_stat_statements
-    - name: auto_explain
+    # NOTE: auto_explain is ALSO preloaded, but it is preload-only — it has no SQL
+    # control file, so it must NOT be listed as a Database extension.
     # Extensions that only need CREATE EXTENSION
     - name: pgcrypto
     - name: uuid-ossp
@@ -655,7 +657,8 @@ spec:
   extensions:
     - name: pgaudit
     - name: pg_stat_statements
-    - name: auto_explain
+    # auto_explain is preload-only (in shared_preload_libraries); it has no control
+    # file — do NOT add it here (CREATE EXTENSION auto_explain fails).
     - name: pgcrypto
     - name: uuid-ossp
 ```
@@ -892,7 +895,7 @@ kubectl exec -it <pod-name> -n <namespace> -- ls -la /extensions/<extension-name
 **`cnpg-db`** (consolidated: product, cart, order):
 - **Image**: `system-trixie` (all extensions built-in)
 - **`shared_preload_libraries`**: pgaudit, pg_stat_statements, auto_explain
-- **Database resource**: pgaudit, pg_stat_statements, auto_explain, pgcrypto, uuid-ossp
+- **Database resource** (product): pgaudit, pg_stat_statements, pgcrypto, uuid-ossp; (cart, order): pgaudit, pg_stat_statements — **auto_explain is preload-only, never in a Database resource**
 - **Status**: ✅ Fully configured
 
 **`pgAudit`** (Audit Logging) - ✅ **Currently Implemented**:
@@ -1026,7 +1029,7 @@ kubectl describe database order-database -n cart
 
 | Cluster | Operator | Image | Preloaded | Database Resource Extensions |
 |---------|----------|-------|-----------|------------------------------|
-| `cnpg-db` | CloudNativePG | `system-trixie` | pgaudit, pg_stat_statements, auto_explain | pgaudit, pg_stat_statements, auto_explain, pgcrypto, uuid-ossp |
+| `cnpg-db` | CloudNativePG | `system-trixie` | pgaudit, pg_stat_statements, auto_explain | product: pgaudit, pg_stat_statements, pgcrypto, uuid-ossp; cart/order: pgaudit, pg_stat_statements (auto_explain is preload-only, not a Database resource) |
 | `auth-db` | Zalando | Spilo 17 | pg_stat_statements, pg_cron, pg_trgm, pgcrypto, pg_stat_kcache | N/A |
 | `supporting-shared-db` | Zalando | Spilo 16 | pg_stat_statements, pg_cron, pg_trgm, pgcrypto, pg_stat_kcache | N/A |
 

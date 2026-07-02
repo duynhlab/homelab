@@ -2,10 +2,10 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | **Implemented (authored-ready)** — manifests reconciled by Flux; **inert on kindnet** until an enforcing CNI is installed |
-| **Scope** | Ingress fencing between app-tier namespaces — HTTP `:8080` and gRPC `:9090` |
+| **Status** | **Implemented and enforced** — manifests reconciled by Flux; **actively enforced by kindnet** on the local Kind cluster (K8s 1.34.3) |
+| **Scope** | Ingress fencing across app-tier namespaces — app HTTP `:8080` / gRPC `:9090`, plus DB-tier ports (poolers, Patroni/CNPG status, exporters) |
 | **Purpose** | Make the cluster the fence for `internal` audiences — internal routes are reachable only from explicitly allowed namespaces, not merely "absent from the Ingress" |
-| **Last updated** | 2026-05-31 |
+| **Last updated** | 2026-07-02 |
 | **Related** | [`policy-catalog.md`](policy-catalog.md) (Kyverno catalog), [`../api/api-naming-convention.md`](../api/api-naming-convention.md) (audiences), [`../api/grpc-internal-comms.md`](../api/grpc-internal-comms.md) (gRPC `:9090`, now fenced) |
 
 ## TL;DR
@@ -16,9 +16,9 @@
   reach the pods on `:8080`; everything else is dropped.
 - The allowlist is **per-callee** and follows the real call graph — `auth` accepts
   every service (it serves `/me`), while `shipping` accepts only `kong` + `order`.
-- **kindnet does not enforce NetworkPolicy.** The manifests are authored ready and
-  become effective the moment an enforcing CNI (Cilium / Calico) replaces kindnet.
-  Treat them as the *declared* boundary, not an *active* one on the local Kind cluster.
+- **kindnet enforces NetworkPolicy** (verified on Kind K8s 1.34.3). These policies
+  are the *active* boundary on the local Kind cluster today — any ingress not
+  explicitly allowed is dropped. No additional CNI is required for enforcement.
 - Policies fence both **HTTP `:8080`** and **gRPC `:9090`**. The gRPC callees
   (`auth`, `shipping`, `review`, `notification`) allow `:9090` from their gRPC
   callers in the same `allow-internal-callers` rule.
@@ -74,6 +74,23 @@ allowed (north-south gateway traffic); the rest mirror the east-west call graph.
 > it, even within the cluster. Adding a new east-west call means adding the caller's
 > namespace to the callee's `allow-internal-callers` — not just opening an Ingress.
 
+### DB-tier allows
+
+The DB-hosting namespaces (`product` for the CNPG cluster; `auth` and `user` for
+the Zalando clusters) also allow the operators, the metrics scraper, and pooler
+traffic they depend on. Without these the operators cannot reach the database pods
+and `databases-local` / `apps-local` never reconcile:
+
+| Callee ns | Allowed source | Ports | Why |
+|-----------|----------------|-------|-----|
+| **product** | `cloudnative-pg` operator | `:8000` (status), `:5432` | Operator extracts instance status + manages SQL. |
+| **product** | `cart`, `order` (cross-ns) | `:6432` (PgDog), `:5432` (`cnpg-db-rw` migrations) | Sibling services use the pooler + migrate against the primary. |
+| **product** | intra-namespace | `:5432`, `:6432`, `:8000` | PgDog → Postgres, replica WAL streaming, product-service → pooler. |
+| **auth**, **user** | `postgres-operator` (Zalando) | `:8008` (Patroni), `:5432` (SQL init) | Operator inits Patroni + roles/databases. |
+| **user** | `review`, `notification`, `shipping` (cross-ns) | `:5432` (PgBouncer pooler + migrations) | Siblings share `supporting-shared-db`. |
+| **auth**, **user** | intra-namespace | `:8008`, `:5432` | Patroni peer coordination + PgBouncer → Postgres. |
+| **product/auth/user** | `monitoring` | `:9187` (exporter), `:9090` (PgDog metrics) | VMAgent scrapes the postgres/pooler exporters. |
+
 ---
 
 ## 3. Allowed-ingress topology
@@ -110,7 +127,9 @@ flowchart LR
     classDef hub fill:#b36b00,color:#fff,stroke:#5c3600
 ```
 
-> Edges are **ingress allows**, drawn caller → callee. Every edge is TCP `:8080`.
+> Edges are **ingress allows**, drawn caller → callee. This diagram shows only the
+> app HTTP/gRPC mesh (`:8080` / `:9090`); the DB-tier allows (operator → DB, app →
+> pooler, monitoring → exporter) are in [§2 DB-tier allows](#db-tier-allows).
 > Internal-audience routes (`notify/*`, shipping internal lookups) ride these same
 > hops — the NetworkPolicy is the fence, never an Ingress rule.
 
@@ -124,7 +143,7 @@ flowchart LR
     FLUX["Flux Kustomization<br/>network-policies-local"] -->|reconciles| ALLOW["allow-internal-callers<br/>(per service ns)"]
     DENY --> NET["Net allowlist per namespace"]
     ALLOW --> NET
-    NET -.->|"enforced only with<br/>Cilium/Calico CNI"| EFF["Effective boundary"]
+    NET -->|"enforced by kindnet<br/>(K8s 1.34.3)"| EFF["Effective boundary"]
 ```
 
 - **Manifests:** `kubernetes/infra/configs/network-policies/{auth,user,product,cart,order,review,notification,shipping}.yaml`
@@ -146,14 +165,14 @@ flowchart LR
 
 ## 5. Known limitations
 
-- **Not enforced on kindnet.** The local Kind cluster's CNI ignores NetworkPolicy.
-  The manifests are validated and reconciled but have **no runtime effect** until an
-  enforcing CNI is installed. This is intentional — the boundary is declared and
-  GitOps-managed so it activates without a code change.
+- **Enforced by kindnet.** The local Kind cluster (K8s 1.34.3) enforces these
+  NetworkPolicies at runtime — verified during the bring-up hardening pass. No
+  extra CNI (Cilium/Calico) is required; any ingress not explicitly allowed is dropped.
 - **HTTP `:8080` + gRPC `:9090`.** The gRPC callees (`auth`, `shipping`, `review`,
   `notification`) fence `:9090` alongside `:8080`. mTLS on the gRPC port is the
   remaining Phase-3 item — deferred until it is wired app-side (the services use
   plaintext `insecure` credentials today); cert-manager config lands with that.
 - **Ingress only.** No egress policies today; egress fencing is out of scope for now.
-- **No DNS/observability carve-outs yet.** An enforcing CNI rollout will also need
-  allows for kube-dns and the metrics/scrape path (VMAgent) — to be added with the CNI.
+- **Metrics scrape allowed; egress not fenced.** The metrics/scrape path
+  (monitoring → `:9187`/`:9090`) already has an allow rule. Policies are ingress-only,
+  so egress (incl. kube-dns) is unfenced today — egress fencing is out of scope for now.

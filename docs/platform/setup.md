@@ -254,11 +254,16 @@ monitoring/
 4. `kong-local`: Kong HelmRelease (Depends on `cert-manager-local` — mounts `kong-proxy-tls` Secret as a volume).
 5. `kong-config-local`: KongClusterPlugins + Ingress resources for every host (Depends on `kong-local`).
 6. `monitoring-local`: Deploys observability stack (Depends on `controllers-local`).
-7. `cnpg-barman-plugin-local`: Installs the CNPG Barman Cloud Plugin via the `plugin-barman-cloud` Helm chart (from the `cnpg` HelmRepository) and its `ObjectStore` CRD (Depends on `controllers-local`, `cert-manager-local`).
-8. `databases-local`: Provisions persistence layer (Depends on `secrets-local`, `monitoring-local`, `cnpg-barman-plugin-local`).
-9. `databases-cnpg-dr-local`: CNPG DR replica (Depends on `databases-local`, `secrets-local`).
-10. `kyverno-policies-local`: Admission policies (Depends on `controllers-local`, `monitoring-local`). See [kyverno.md](kyverno.md).
-11. `apps-local`: Deploys business logic (Depends on `databases-local`, `monitoring-local`).
+7. `storage-local`: Provisions RustFS (S3) object storage (Depends on `controllers-local`).
+8. `network-policies-local`: Provisions per-namespace NetworkPolicies so operators never race an un-fenced namespace (Depends on `controllers-local`).
+9. `tracing-local`: Deploys Tempo (Depends on `secrets-local`, `storage-local` — kept out of `controllers-local` to avoid a wave deadlock).
+10. `profiling-local`: Deploys Pyroscope (Depends on `secrets-local`, `storage-local` — same rationale as `tracing-local`).
+11. `cnpg-barman-plugin-local`: Installs the CNPG Barman Cloud Plugin via the `plugin-barman-cloud` Helm chart (from the `cnpg` HelmRepository) and its `ObjectStore` CRD (Depends on `controllers-local`, `cert-manager-local`).
+12. `databases-local`: Provisions persistence layer, including the CNPG `temporal-db` (Depends on `secrets-local`, `monitoring-local`, `cnpg-barman-plugin-local`, `storage-local`, `network-policies-local`).
+13. `databases-cnpg-dr-local`: CNPG DR replica (Depends on `databases-local`, `secrets-local`).
+14. `temporal-local`: Temporal server via the temporal-operator (`TemporalCluster` + `TemporalNamespace`), persistence on the CNPG `temporal-db` (Depends on `controllers-local`, `cert-manager-local`, `databases-local`, `monitoring-local`). The `temporal-operator` HelmRelease itself `dependsOn` cert-manager, since its chart renders a cert-manager `Certificate`/`Issuer` for the admission webhook.
+15. `kyverno-policies-local`: Admission policies (Depends on `controllers-local`, `monitoring-local`). See [kyverno.md](kyverno.md).
+16. `apps-local`: Deploys business logic (Depends on `databases-local`, `monitoring-local`). The `order-worker` release `dependsOn` `temporal-local`.
 
 ---
 

@@ -167,7 +167,7 @@ Consolidated **CloudNativePG** cluster for **product**, **cart**, and **order** 
 - **3 instances** (1 primary + 2 replicas), **synchronous quorum** `ANY 1` with required durability (see cluster `spec.postgresql.synchronous` in manifests)
 - **Databases**: `product`, `cart`, `order` on the same cluster; cluster lives in namespace **`product`**
 - **Pooler**: **PgDog** (HelmRelease `pgdog-cnpg`), unified endpoint **`pgdog-cnpg.product:6432`** — product, cart, and order services use this single entry point; PgDog routes writes to `cnpg-db-rw` and read traffic to `cnpg-db-r` per pool/database config
-- **Extensions**: pgaudit, pg_stat_statements, auto_explain, pgcrypto, uuid-ossp (via Database resources as configured)
+- **Extensions**: preloaded via `shared_preload_libraries` — pgaudit, pg_stat_statements, auto_explain; created via Database resources — pgaudit, pg_stat_statements, pgcrypto, uuid-ossp (product), pgaudit, pg_stat_statements (cart, order). auto_explain is preload-only (no SQL control file), so it is never in a Database resource.
 - **Features**: Logical replication slot sync for CDC (Debezium, Kafka Connect) where enabled
 
 > **Manifests, backup, pooler**: [`kubernetes/infra/configs/databases/clusters/cnpg-db/`](../../kubernetes/infra/configs/databases/clusters/cnpg-db/)
@@ -978,5 +978,13 @@ return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s&prefer_simple_protoco
 **Affected services (legacy):** Cart, Order when routed via **PgCat**; with **PgDog** as the unified pooler for **`cnpg-db`**, prefer validating DSN and pooler settings against `pgdog-cnpg` instead.
 
 **See:** [Full troubleshooting guide](../runbooks/troubleshooting/pgcat_prepared_statement_error.md) with diagrams and testing instructions.
+
+### Zalando `CreateFailed` leaves per-service databases uncreated
+
+**Problem:** App migrations fail with `database "…" does not exist` even though the Zalando cluster is `Running`.
+
+**Root Cause:** The Zalando operator creates the databases from `spec.databases` only during a *successful first-time* init. On a slow spilo cold boot the operator's DB-connection retry window can expire first → the cluster goes `CreateFailed`; later syncs bring up Patroni and roles but never (re)create the databases.
+
+**Mitigation:** Each Zalando cluster dir ships an idempotent `ensure-databases` Job (`databases-local` wave) that connects as the superuser and runs guarded `CREATE DATABASE … OWNER …`, so it self-heals on re-run. See [003.2 Zalando operator deep dive](./003.2-operator-zalando.md#first-init-fragility-and-the-ensure-databases-job) and [runbooks/prepared-databases.md](./runbooks/prepared-databases.md).
 
 

@@ -426,7 +426,7 @@ func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 
 | Service | Namespace | Port | Public (browser) | Private (browser) | Internal (in-cluster only) |
 |---------|-----------|------|------------------|-------------------|----------------------------|
-| auth | auth | 8080 | `/auth/v1/public/{login,register}` | `/auth/v1/private/me` | — |
+| auth | auth | 8080 | `/auth/v1/public/{login,register,refresh,logout,jwks}` | — (removed in RFC-0009 Phase 5) | — |
 | user | user | 8080 | `/user/v1/public/users/:id` | `/user/v1/private/users/profile` | `POST /user/v1/internal/users` |
 | product | product | 8080 | `/product/v1/public/products/*` | — | `POST /product/v1/internal/products` |
 | cart | cart | 8080 | — | `/cart/v1/private/cart/*` | — |
@@ -866,13 +866,19 @@ Content-Type: application/json
 **200 OK**
 ```json
 {
-  "token": "eyJhbG...",
+  "access_token": "eyJhbG...",
+  "refresh_token": "8f3k...",
+  "expires_in": 3600,
   "user": {
     "id": "1",
     "username": "user1"
   }
 }
 ```
+
+The `access_token` is an RS256 JWT (1 h TTL) — the only credential since
+RFC-0009 Phase 5; the opaque `token` field is gone. `refresh_token` is an
+opaque rotating token for `POST /auth/v1/public/refresh`.
 
 ---
 
@@ -904,15 +910,24 @@ Content-Type: application/json
 
 ---
 
-### POST /auth/v1/private/logout
+### POST /auth/v1/public/logout
 
-Revokes the caller's session token. Idempotent — returns `200 OK` on any well-formed request so clients can safely clear local state.
+Revokes the presented refresh token's **whole family** server-side, ending the
+session (the outstanding access token simply expires — JWTs are stateless).
+Public like `refresh`: it authenticates by the refresh token in the body, so a
+client with an expired access token can still revoke. Idempotent — returns
+`200 OK` even for an unknown/already-revoked token so clients can safely clear
+local state.
 
 #### Request
 
 ```
-POST /auth/v1/private/logout
-Authorization: Bearer <jwt_token>
+POST /auth/v1/public/logout
+Content-Type: application/json
+
+{
+  "refresh_token": "<refresh_token>"
+}
 ```
 
 #### Response
@@ -1201,7 +1216,6 @@ curl -X POST http://localhost:8080/auth/v1/public/login \
 | **Product** | `products` | 8 | Electronics, peripherals, accessories |
 | **Product** | `categories` | 4 | Electronics, Computers, Accessories, Peripherals |
 | **Auth** | `users` | 5 | Demo users with bcrypt-hashed passwords |
-| **Auth** | `sessions` | 2 | Active sessions for Alice and Bob |
 | **User** | `user_profiles` | 5 | Complete profiles with addresses |
 | **Cart** | `cart_items` | 5 | Alice (3 items), Bob (2 items) |
 | **Order** | `orders` | 5 | Mix of pending/completed/shipped |

@@ -19,7 +19,10 @@
 # (kong-proxy-tls secret, mounted via the HelmRelease secretVolumes).
 
 ---
-# Auth Service — public (login, register, jwks): anonymous
+# Auth Service — public (login, register, refresh, logout, jwks): anonymous.
+# Phase 5: auth has no /private/ routes any more — /me was removed (services
+# verify JWTs locally) and logout moved to /public/ (it authenticates by the
+# refresh token in the body, so an expired access token can still revoke).
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -37,31 +40,6 @@ spec:
       http:
         paths:
           - path: /auth/v1/public/
-            pathType: Prefix
-            backend:
-              service:
-                name: auth
-                port:
-                  number: 8080
----
-# Auth Service — private (me): edge JWT
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: api-auth-private
-  namespace: auth
-  annotations:
-    konghq.com/strip-path: "false"
-    konghq.com/protocols: "https"
-    konghq.com/https-redirect-status-code: "301"
-    konghq.com/plugins: rate-limiting-api,request-size-limiting-api,jwt-edge
-spec:
-  ingressClassName: kong
-  rules:
-    - host: gateway.duynh.me
-      http:
-        paths:
-          - path: /auth/v1/private/
             pathType: Prefix
             backend:
               service:

@@ -274,14 +274,13 @@ services:
   # ---- Backend services ----
   auth:
     build: { context: ../../auth-service }
-    # gRPC AuthService.GetMe always runs on :9090 for east-west /me validation;
-    # HTTP :8080 is unchanged. Consumers reach it at dns:///auth:9090.
+    # HTTP-only (Phase 5): the gRPC GetMe server was removed — services verify
+    # JWTs locally against the JWKS; nothing dials auth east-west any more.
     environment:
       <<: *svc-env
       SERVICE_NAME: auth
       OTEL_SERVICE_NAME: auth
       DB_NAME: auth
-      GRPC_PORT: "9090"
       # Edge JWT (RFC-0009 Phase 4): stable DEV-ONLY RS256 signing key so the
       # gateway's jwt consumer credential (kong.yml holds the matching public
       # half) stays valid across restarts. In the cluster this key comes from
@@ -330,7 +329,6 @@ services:
       SERVICE_NAME: user
       OTEL_SERVICE_NAME: user
       DB_NAME: user
-      AUTH_GRPC_ADDR: dns:///auth:9090
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -356,7 +354,6 @@ services:
       SERVICE_NAME: review
       OTEL_SERVICE_NAME: review
       DB_NAME: review
-      AUTH_GRPC_ADDR: dns:///auth:9090
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -371,7 +368,6 @@ services:
       SERVICE_NAME: notification
       OTEL_SERVICE_NAME: notification
       DB_NAME: notification
-      AUTH_GRPC_ADDR: dns:///auth:9090
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -407,7 +403,6 @@ services:
       SERVICE_NAME: cart
       OTEL_SERVICE_NAME: cart
       DB_NAME: cart
-      AUTH_GRPC_ADDR: dns:///auth:9090
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -422,7 +417,6 @@ services:
       SERVICE_NAME: order
       OTEL_SERVICE_NAME: order
       DB_NAME: order
-      AUTH_GRPC_ADDR: dns:///auth:9090
       CART_SERVICE_URL: http://cart:8080
       SHIPPING_SERVICE_URL: http://shipping:8080
       # When set, order calls shipping over gRPC (Phase 1 pilot); unset = REST fallback.

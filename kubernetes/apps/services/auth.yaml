@@ -12,7 +12,8 @@ spec:
     name: auth
     image_tag: "1.0.1" # {"$imagepolicy": "flux-system:auth:tag"}
     namespace: auth
-    grpc_server: true
+    # Phase 5: auth is HTTP-only — the gRPC GetMe server was removed (services
+    # verify JWTs locally against the JWKS), so no grpc_server input.
     jwt_signing: true # RFC-0009 Phase 4: inject RS256 signing key from OpenBAO (auth only)
     replicaCount: 2
     db_host: "auth-db-pooler.auth.svc.cluster.local"

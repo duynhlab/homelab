@@ -548,6 +548,40 @@ below against this platform's VictoriaMetrics/VictoriaLogs/Vector stack.
 
 ### Current state (all live)
 
+```mermaid
+flowchart LR
+    subgraph kong["Kong gateway"]
+        PROM["prometheus plugin<br/>:8100/metrics"]
+        OTELP["opentelemetry plugin"]
+        AJSON["kong_json access log<br/>(stdout)"]
+    end
+
+    subgraph pipelines["Pipelines"]
+        VMA["VMAgent<br/>(ServiceMonitor scrape)"]
+        COL["otel-collector"]
+        VEC["Vector DaemonSet<br/>(tails pod stdout)"]
+    end
+
+    subgraph backends["Backends → Grafana"]
+        VM[("VictoriaMetrics")]
+        VT[("Tempo · Jaeger ·<br/>VictoriaTraces")]
+        VL[("VictoriaLogs")]
+    end
+
+    PROM -->|pull 15s| VMA --> VM
+    OTELP -->|"OTLP traces"| COL --> VT
+    OTELP -.->|"OTLP runtime logs (pilot)"| COL -.-> VL
+    AJSON --> VEC --> VL
+
+    VM --> G["Grafana<br/>dashboard + 6 alert groups"]
+    VT --> G
+    VL --> G
+```
+
+> Solid = primary paths · dotted = the OTel-logs **pilot** running alongside
+> Vector. The three signals pivot on shared keys: `trace_id` (logs ↔ traces)
+> and `request_id` (access log ↔ correlation-id header).
+
 | Signal | Producer | Pipeline | Consumer |
 |--------|----------|----------|----------|
 | **Metrics** | `prometheus` plugin (status codes, latency histograms, bandwidth, upstream health) on the status listener `:8100/metrics` | ServiceMonitor `configs/monitoring/servicemonitors/kong.yaml` → VMAgent (`selectAllByDefault`) → VictoriaMetrics | Grafana Kong dashboard (GrafanaDashboard CRD); 6 alert groups + recording rules in `configs/monitoring/prometheusrules/kong/` |

@@ -47,12 +47,16 @@ flowchart LR
         AL["add_labels<br/>namespace/service/pod/container"]
         PG["parse_pg_json →<br/>filter/parse auto_explain"]
     end
+    KONG["Kong gateway<br/>kong_json access log (stdout)<br/>+ OTel runtime logs"]
     Pods --> KL
     CNPG --> KL
+    KONG --> KL
     KL --> AL
     KL --> PG
     AL -->|"/insert/jsonline"| VL[("VictoriaLogs VLSingle :9428<br/>monitoring · 7d / 20Gi")]
     PG -->|"PG-plans stream"| VL
+    KONG -.->|"OTLP logs (pilot)"| COL["otel-collector<br/>logs pipeline"]
+    COL -.->|"/insert/opentelemetry/v1/logs"| VL
     VL --> GRAF["Grafana Explore<br/>(LogsQL)"]
     GRAF <-. "trace_id ↔ Tempo" .-> TEMPO["Tempo"]
 ```

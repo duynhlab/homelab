@@ -61,6 +61,145 @@ Log in at http://localhost:3001 (`alice` / `password123`) and run a checkout. It
 drives the `OrderFulfillmentWorkflow` across auth → user → product → cart → order
 → shipping → notification — watch each activity in the **Temporal UI** (:8233).
 
+## E2E audit before pushing (backend + real browser)
+
+Run this audit on the full stack **before pushing any change that touches auth,
+the gateway, or the SPA**. It has two phases: API-contract checks with `curl`,
+then a real-browser pass driven by the `agent-browser` CLI (available locally as
+a Claude skill at `~/.claude/skills/agent-browser`; the examples below are plain
+shell and work without the skill too).
+
+> The stack builds services from the **sibling repos' current checkouts** — make
+> sure every repo is on the branch you intend to test, then
+> `docker compose up -d --build`.
+
+### Phase A — API contract (curl, ~1 min)
+
+```bash
+BASE=http://localhost:8080
+
+# A1. Login returns the JWT pair — and NO opaque `token` field
+R=$(curl -s -X POST $BASE/auth/v1/public/login -H 'Content-Type: application/json' \
+  -d '{"username":"alice","password":"password123"}')
+echo "$R" | python3 -c "import json,sys; d=json.load(sys.stdin); \
+  assert 'token' not in d, 'opaque token leaked'; \
+  assert d['access_token'].count('.')==2 and d['refresh_token'] and d['expires_in']; \
+  print('A1 OK', sorted(d.keys()))"
+AT=$(echo "$R" | python3 -c "import json,sys;print(json.load(sys.stdin)['access_token'])")
+RT=$(echo "$R" | python3 -c "import json,sys;print(json.load(sys.stdin)['refresh_token'])")
+
+# A2. Private routes 200 through Kong edge-jwt with a valid JWT
+for p in user/v1/private/users/profile cart/v1/private/cart order/v1/private/orders \
+         notification/v1/private/notifications; do
+  [ "$(curl -s -o /dev/null -w '%{http_code}' $BASE/$p -H "Authorization: Bearer $AT")" = 200 ] \
+    && echo "A2 OK /$p" || echo "A2 FAIL /$p"
+done
+
+# A3. Bad / missing token → 401 at the Kong edge (WWW-Authenticate header)
+curl -s -o /dev/null -w "A3 bad-token: %{http_code} (want 401)\n" \
+  $BASE/cart/v1/private/cart -H "Authorization: Bearer x.y.z"
+curl -s -o /dev/null -w "A3 no-token:  %{http_code} (want 401)\n" $BASE/cart/v1/private/cart
+
+# A4. Refresh rotates; replaying the OLD token → 401 AND revokes the family
+R2=$(curl -s -X POST $BASE/auth/v1/public/refresh -H 'Content-Type: application/json' \
+  -d "{\"refresh_token\":\"$RT\"}")
+RT2=$(echo "$R2" | python3 -c "import json,sys;print(json.load(sys.stdin)['refresh_token'])")
+curl -s -o /dev/null -w "A4 replay-old:      %{http_code} (want 401)\n" \
+  -X POST $BASE/auth/v1/public/refresh -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$RT\"}"
+curl -s -o /dev/null -w "A4 family-revoked:  %{http_code} (want 401)\n" \
+  -X POST $BASE/auth/v1/public/refresh -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$RT2\"}"
+
+# A5. Logout revokes; idempotent; subsequent refresh dies
+R3=$(curl -s -X POST $BASE/auth/v1/public/login -H 'Content-Type: application/json' \
+  -d '{"username":"alice","password":"password123"}')
+RT3=$(echo "$R3" | python3 -c "import json,sys;print(json.load(sys.stdin)['refresh_token'])")
+curl -s -o /dev/null -w "A5 logout:          %{http_code} (want 200)\n" \
+  -X POST $BASE/auth/v1/public/logout -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$RT3\"}"
+curl -s -o /dev/null -w "A5 refresh-after:   %{http_code} (want 401)\n" \
+  -X POST $BASE/auth/v1/public/refresh -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$RT3\"}"
+
+# A6. Removed surfaces stay removed
+curl -s -o /dev/null -w "A6 /private/me:     %{http_code} (want 404 — route gone at Kong)\n" \
+  $BASE/auth/v1/private/me -H "Authorization: Bearer $AT"
+docker compose exec -T postgres psql -U postgres -d auth -c '\dt' | grep -q sessions \
+  && echo "A6 FAIL: sessions table exists" || echo "A6 OK: no sessions table"
+```
+
+> Rapid-fire auth calls can trip Kong's rate limit (429). That is the gateway
+> working, not a bug — wait a few seconds and retry the step.
+
+### Phase B — real browser (agent-browser, ~2 min)
+
+`--args "--no-sandbox"` is required on Linux hosts with user-namespace
+restrictions (only needed on the first command of a session).
+
+```bash
+S="--session audit"
+
+# B1. Login through the UI, then verify what landed in localStorage
+agent-browser $S --args "--no-sandbox" batch "open http://localhost:3001/login" "wait 1500" "snapshot -i"
+# read the refs from the snapshot (username @eX, password @eY, Login button @eZ), then:
+agent-browser $S batch "fill @e8 alice" "fill @e9 password123" "click @e10" "wait 2000"
+agent-browser $S eval --stdin <<'EVALEOF'
+JSON.stringify({
+  access_is_jwt: (localStorage.getItem('authToken')||'').split('.').length === 3,
+  refresh_present: !!localStorage.getItem('authRefreshToken'),
+  user: JSON.parse(localStorage.getItem('authUser')||'null')?.username
+})
+EVALEOF
+# want: {"access_is_jwt":true,"refresh_present":true,"user":"alice"}
+
+# B2. SILENT REFRESH under fault injection — corrupt the JWT signature, then
+#     load a private page. The interceptor must refresh + retry, not bounce to /login.
+agent-browser $S eval --stdin <<'EVALEOF'
+(() => { const p = localStorage.getItem('authToken').split('.');
+  p[2] = p[2].slice(0,-5) + 'AAAAA'; localStorage.setItem('authToken', p.join('.'));
+  return 'token corrupted'; })()
+EVALEOF
+agent-browser $S batch "open http://localhost:3001/orders" "wait 3000"
+agent-browser $S eval --stdin <<'EVALEOF'
+JSON.stringify({
+  token_recovered: !(localStorage.getItem('authToken')||'').endsWith('AAAAA'),
+  bounced_to_login: window.location.pathname.includes('login')
+})
+EVALEOF
+# want: {"token_recovered":true,"bounced_to_login":false}
+agent-browser $S network requests --type xhr,fetch | grep -E "refresh|401|200" | tail -8
+# want this exact shape (single-flight: N concurrent 401s -> ONE refresh -> retries 200):
+#   GET  .../private/...              401
+#   GET  .../private/...              401
+#   POST /auth/v1/public/refresh      200      <-- exactly one
+#   GET  .../private/...              200
+#   GET  .../private/...              200
+
+# B3. Logout via the UI revokes server-side and clears the client
+agent-browser $S snapshot -i          # find the Logout button ref
+agent-browser $S batch "click @e13" "wait 2000"
+agent-browser $S eval 'JSON.stringify({cleared: !localStorage.getItem("authToken") && !localStorage.getItem("authRefreshToken"), path: location.pathname})'
+agent-browser $S network requests --method POST | grep logout   # want: .../public/logout ... 200
+
+# B4. Cleanup
+agent-browser $S close
+```
+
+### Pass criteria
+
+| # | Check | Expectation |
+|---|-------|-------------|
+| A1 | Login payload | `access_token` (JWT) + `refresh_token` + `expires_in`; **no `token`** |
+| A2 | Private routes w/ JWT | 200 through Kong edge-jwt |
+| A3 | Bad/missing token | 401 **at the edge** (`WWW-Authenticate` from Kong) |
+| A4 | Refresh reuse | old token 401 **and** whole family revoked |
+| A5 | Logout | 200, idempotent; refresh afterwards 401 |
+| A6 | Removed surfaces | `/auth/v1/private/*` 404; no `sessions` table |
+| B1 | UI login | JWT + refresh in localStorage |
+| B2 | Silent refresh | exactly **one** `POST /refresh` for concurrent 401s; retried 200s; no login bounce |
+| B3 | UI logout | `POST /public/logout` 200; storage cleared; redirect to `/login` |
+
+Any failed row blocks the push. When a change touches the order-fulfillment
+path, additionally run the saga (checkout in the SPA) and watch it complete in
+the Temporal UI.
+
 ## Tracing & RED metrics
 
 Tracing is **on** in this stack. The OTel Collector both stores traces

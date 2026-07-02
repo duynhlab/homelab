@@ -15,13 +15,15 @@
   the net effect is: *only* the namespaces named in `allow-internal-callers` can
   reach the pods on `:8080`; everything else is dropped.
 - The allowlist is **per-callee** and follows the real call graph — `auth` accepts
-  every service (it serves `/me`), while `shipping` accepts only `kong` + `order`.
+  every service (they fetch the JWKS from `/auth/v1/public/jwks`), while `shipping`
+  accepts only `kong` + `order`.
 - **kindnet enforces NetworkPolicy** (verified on Kind K8s 1.34.3). These policies
   are the *active* boundary on the local Kind cluster today — any ingress not
   explicitly allowed is dropped. No additional CNI is required for enforcement.
 - Policies fence both **HTTP `:8080`** and **gRPC `:9090`**. The gRPC callees
-  (`auth`, `shipping`, `review`, `notification`) allow `:9090` from their gRPC
-  callers in the same `allow-internal-callers` rule.
+  (`shipping`, `review`, `notification`) allow `:9090` from their gRPC callers in
+  the same `allow-internal-callers` rule. (auth is HTTP-only since RFC-0009
+  Phase 5 — its gRPC `GetMe` server and `:9090` allow were removed.)
 
 ---
 
@@ -54,14 +56,14 @@ is fenced by default even before its explicit allow policy lands.
 
 ## 2. Caller matrix
 
-Allowed **ingress** callers per callee (TCP `:8080`; the gRPC callees `auth`,
+Allowed **ingress** callers per callee (TCP `:8080`; the gRPC callees
 `shipping`, `review`, `notification` also allow `:9090` from their gRPC callers).
 `kong` is always
 allowed (north-south gateway traffic); the rest mirror the east-west call graph.
 
 | Callee | Allowed callers | Why |
 |--------|-----------------|-----|
-| **auth** | `kong` + **all 8 services** (incl. self) | Every service validates JWTs at `GET /auth/v1/private/me`. |
+| **auth** | `kong` + **all 8 services** (incl. self) | Every service refreshes the RS256 JWKS from `GET /auth/v1/public/jwks` (`:8080`); JWTs are verified locally. |
 | **user** | `kong` | Browser-only today; no service-to-service caller. |
 | **product** | `kong` | Browser-only; aggregates *outward* to review. |
 | **cart** | `kong`, `order` | `order` reads the cart during checkout. |
@@ -95,8 +97,8 @@ and `databases-local` / `apps-local` never reconcile:
 
 ## 3. Allowed-ingress topology
 
-Solid edges = explicit east-west allows; `auth` is the JWT-validation hub (every
-service is permitted to it for `/me`); `kong` is permitted to every service.
+Solid edges = explicit east-west allows; `auth` is the JWKS hub (every service is
+permitted to it to fetch `/auth/v1/public/jwks`); `kong` is permitted to every service.
 
 ```mermaid
 flowchart LR
@@ -113,8 +115,8 @@ flowchart LR
     %% North-south: gateway may reach every service
     KONG --> AUTH & USER & PRODUCT & CART & ORDER & REVIEW & NOTIF & SHIP
 
-    %% JWT validation hub: every service → auth /me
-    USER & PRODUCT & CART & ORDER & REVIEW & NOTIF & SHIP -->|"/me"| AUTH
+    %% JWKS hub: every service → auth /auth/v1/public/jwks (cached fetch)
+    USER & PRODUCT & CART & ORDER & REVIEW & NOTIF & SHIP -->|"jwks"| AUTH
 
     %% Business east-west
     PRODUCT -->|aggregate reviews| REVIEW
@@ -168,8 +170,8 @@ flowchart LR
 - **Enforced by kindnet.** The local Kind cluster (K8s 1.34.3) enforces these
   NetworkPolicies at runtime — verified during the bring-up hardening pass. No
   extra CNI (Cilium/Calico) is required; any ingress not explicitly allowed is dropped.
-- **HTTP `:8080` + gRPC `:9090`.** The gRPC callees (`auth`, `shipping`, `review`,
-  `notification`) fence `:9090` alongside `:8080`. mTLS on the gRPC port is the
+- **HTTP `:8080` + gRPC `:9090`.** The gRPC callees (`shipping`, `review`,
+  `notification`) fence `:9090` alongside `:8080` (auth is HTTP-only). mTLS on the gRPC port is the
   remaining Phase-3 item — deferred until it is wired app-side (the services use
   plaintext `insecure` credentials today); cert-manager config lands with that.
 - **Ingress only.** No egress policies today; egress fencing is out of scope for now.

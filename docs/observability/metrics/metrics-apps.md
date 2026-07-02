@@ -197,10 +197,10 @@ applies per RPC method.
 
 | Label | Example | Notes |
 |-------|---------|-------|
-| `rpc_method` | `auth.v1.AuthService/GetMe` | Fully-qualified RPC |
+| `rpc_method` | `shipping.v1.ShippingService/GetShipmentByOrder` | Fully-qualified RPC |
 | `rpc_response_status_code` | `OK` | gRPC status; non-`OK` = error |
 | `rpc_system_name` | `grpc` | Constant |
-| `app` / `namespace` | `auth` / `auth` | Injected by the ServiceMonitor |
+| `app` / `namespace` | `shipping` / `shipping` | Injected by the ServiceMonitor |
 
 **Client side** — `rpc_client_call_duration_seconds_{count,bucket,sum}`: as above
 plus `server_address` and `server_port` (the upstream called), minus

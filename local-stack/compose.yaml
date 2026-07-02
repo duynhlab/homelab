@@ -17,7 +17,8 @@
 # Tracing fans into VictoriaTraces (via an OTel Collector) — audit it in Grafana
 # at http://localhost:3002 (Explore → VictoriaTraces). Profiling is enabled — each
 # service pushes pprof to the local Pyroscope (:4040, Grafana → Explore → Pyroscope);
-# auth uses the real opaque-token login flow (demo login: alice / password123).
+# auth uses the real JWT login flow — RS256 access token + rotating refresh
+# token, edge-verified by Kong's jwt plugin (demo login: alice / password123).
 
 x-svc-env: &svc-env
   ENV: development

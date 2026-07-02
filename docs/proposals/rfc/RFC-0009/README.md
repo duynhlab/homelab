@@ -213,7 +213,7 @@ fudge (or keep them; decide explicitly).
 
 ## Architecture & Diagrams
 
-### Current state (opaque token, hot-path GetMe)
+### Before (opaque token, hot-path GetMe — removed in Phase 5)
 
 ```mermaid
 flowchart LR

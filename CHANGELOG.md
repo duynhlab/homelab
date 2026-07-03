@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **docs**: Deleted `docs/runbooks/metrics-audit-fixes.md` — a Feb-2026
+  point-in-time before/after audit report whose fixes merged long ago and whose
+  durable lessons (path-label cardinality via `c.FullPath()`, single-histogram
+  RED, exemplars) already live in `metrics-apps.md` and the deep-dive runbook;
+  it also described the old 34-panel dashboard. Index links cleaned up.
+
 ### Added
 
 - **infra (kong)**: **Structured JSON access logs** — a named nginx `log_format`

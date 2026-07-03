@@ -341,7 +341,6 @@ Runbook: [`microservices-alerts.md`](../runbooks/microservices-alerts.md).
 - [API → gRPC internal comms](../../api/grpc-internal-comms.md) · [API reference](../../api/api.md)
 - [PromQL Guide](promql-guide.md) · [SLO Documentation](../slo/README.md)
 - [Grafana Dashboard Guide](../grafana/dashboard-reference.md) · [Variables & Regex Guide](../grafana/variables.md)
-- [Metrics Audit Runbook](../../runbooks/metrics-audit-fixes.md)
 
 ---
 

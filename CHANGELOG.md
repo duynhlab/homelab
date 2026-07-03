@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **docs (observability)**: Corrected the OTel **sampling** docs to match shipped
+  reality — all 8 services use `ParentBased(TraceIDRatioBased)` (the
+  `parentbased_traceidratio` default) since 2026-06-23, not the bare
+  `TraceIDRatioBased` the docs claimed was "pending". Fixed `opentelemetry.md`,
+  `tracing/architecture.md`, `tracing/README.md` (root decides, downstream honours;
+  removed the false "`ENV` auto-adjusts sampling" claim — `OTEL_SAMPLE_RATE` is the
+  only knob).
+
 ## [0.103.0] - 2026-07-03
 
 ### Added

@@ -13,7 +13,7 @@ shows exactly how this platform uses it.
 | Signals in use | Traces ✅ (all services + Kong) · Logs ✅ (Kong runtime-logs **pilot**) · Metrics ❌ (Prometheus pull model instead) |
 | Protocol | OTLP — gRPC `:4317`, HTTP `:4318` |
 | Propagation | W3C Trace Context (`traceparent` header); Kong forces injection (`inject: [w3c]`) |
-| Sampling | 10% head sampling (`TraceIDRatioBased`; `ParentBased` wrapper **pending** — see [Sampling](#sampling)) |
+| Sampling | 10% head sampling, `ParentBased(TraceIDRatioBased)` — the official `parentbased_traceidratio` default (see [Sampling](#sampling)) |
 | Trace backends | Tempo (primary) + Jaeger (in-memory UI) + VictoriaTraces (pilot) |
 | Service identity | `OTEL_SERVICE_NAME` env, injected by the app ResourceSets |
 
@@ -112,15 +112,18 @@ Keeping every trace is expensive and unnecessary; this platform keeps ~10%
 (**head sampling** — the decision is made when the trace starts, per
 `trace_id`, via `TraceIDRatioBased`; env `OTEL_SAMPLE_RATE=0.1`).
 
-The subtlety is *who decides*. The intended design: Kong (root) decides once,
-everyone downstream honours it — that is what a `ParentBased` wrapper does
-(the official default, `parentbased_traceidratio`: sample the root by ratio,
-then follow the parent's decision). **Known gap:** the services configure
-`TraceIDRatioBased` *without* `ParentBased`, so each hop re-rolls the dice
-independently. `TraceIDRatioBased` is deterministic on `trace_id` and every
-hop uses the same 10%, so decisions *happen* to agree today — but any rate
-drift between components would tear traces apart. The fix (wrap in
-`ParentBased`) lives in the service repos and is pending; details in
+The subtlety is *who decides*. The design: Kong (root) decides once, everyone
+downstream honours it — that is what the `ParentBased` wrapper does (the
+official default, `parentbased_traceidratio`: sample the root by ratio, then
+follow the parent's decision). All services configure
+`ParentBased(TraceIDRatioBased(rate))` (`middleware/tracing.go`), so a service's
+own ratio only applies when it is the *root* of a trace; when it has a parent
+(the Kong→service edge, or a service→service gRPC hop) it always honours the
+parent's `sampled` flag. Concretely, per the OTel Go SDK: a sampled remote
+parent → `AlwaysOn`, an unsampled one → `AlwaysOff`. This makes sampling
+*complete* — a trace Kong keeps is kept whole downstream regardless of any per
+service rate drift (the deterministic `trace_id` hash is then just a
+belt-and-suspenders that also makes root decisions reproducible). Details in
 [tracing/architecture.md](tracing/architecture.md).
 
 ## Operations
@@ -156,4 +159,4 @@ Quick verification:
 - Official: [opentelemetry.io/docs/concepts](https://opentelemetry.io/docs/concepts/) — signals, SDK, propagation; [Collector docs](https://opentelemetry.io/docs/collector/); [sampling guidance](https://opentelemetry.io/docs/concepts/sampling/)
 - In-house: [tracing/README.md](tracing/README.md) · [tracing/architecture.md](tracing/architecture.md) · [logging/README.md](logging/README.md) · [../platform/kong-gateway.md](../platform/kong-gateway.md)
 
-_Last updated: 2026-07-03 — initial version: traces + Kong logs pilot on collector, ParentBased gap documented._
+_Last updated: 2026-07-03 — traces + Kong logs pilot on collector; sampling section corrected to reflect the shipped `ParentBased(TraceIDRatioBased)` sampler._

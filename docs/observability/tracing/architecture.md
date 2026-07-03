@@ -68,7 +68,7 @@ config that makes this reliable.
 - **Technology**: Go OpenTelemetry SDK
 - **Export Protocol**: OTLP HTTP
 - **Endpoint**: `otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318`
-- **Sampling**: 10% in production, 100% in development
+- **Sampling**: `ParentBased(TraceIDRatioBased)`, ratio 10% (prod default; dev sets `OTEL_SAMPLE_RATE=1.0` explicitly)
 - **Implementation**: `middleware/tracing.go` in each service repository (polyrepo)
 
 **2. OpenTelemetry Collector**
@@ -137,7 +137,9 @@ tracerProvider := sdktrace.NewTracerProvider(
         sdktrace.WithExportTimeout(30*time.Second),
     ),
     sdktrace.WithResource(res),
-    sdktrace.WithSampler(sdktrace.TraceIDRatioBased(cfg.Tracing.SampleRate)),
+    // ParentBased so downstream hops honour the root (Kong) decision — a service's
+    // own ratio only applies when it is the root of a trace (parentbased_traceidratio).
+    sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.TraceIDRatioBased(cfg.Tracing.SampleRate))),
 )
 ```
 
@@ -206,13 +208,17 @@ which predates the `propagation` block). Service-to-service hops (the order saga
 over gRPC) were already linking, confirming the service-side W3C propagator works
 — no service change was needed.
 
-> **Cluster sampling note:** Kong samples head-based at `0.1` and each service
-> samples independently at `0.1`. Linkage (trace continuity) is guaranteed by
-> `inject: [w3c]`, but for both to *keep* a trace at 10% the services should use a
-> **`ParentBased`** sampler so they honour Kong's decision — otherwise a request
-> Kong sampled may be dropped by the service (and vice-versa). Tracked with the
-> existing OTel sampler follow-up; it affects sampling completeness, not the
-> linkage mechanism.
+> **Cluster sampling note:** Kong samples head-based at `0.1` as the trace root.
+> Each service wraps its ratio in **`ParentBased`**
+> (`ParentBased(TraceIDRatioBased(rate))`, `middleware/tracing.go`), so it honours
+> Kong's `sampled` flag: a sampled remote parent → keep, an unsampled one → drop.
+> A service's own `0.1` ratio therefore only applies when it is itself the root of
+> a trace. This guarantees *sampling completeness* — a trace Kong keeps is kept
+> whole downstream regardless of any per-service rate drift — on top of the
+> `inject: [w3c]` linkage mechanism. Verified empirically: with a service forced to
+> root-rate `0.0` behind a Kong root at `1.0`, the service still records 100% of
+> its spans (it honours the parent), where a bare `TraceIDRatioBased(0.0)` would
+> drop them all.
 
 ## Configuration
 
@@ -289,14 +295,16 @@ service:
 
 ### Sampling Strategy
 
-**Current:**
-- **Production**: 10% sampling (`OTEL_SAMPLE_RATE=0.1`)
-- **Development**: 100% sampling (`OTEL_SAMPLE_RATE=1.0`)
+**Current:** `ParentBased(TraceIDRatioBased(OTEL_SAMPLE_RATE))` — the root decides
+by ratio, downstream honours the parent.
+- **Production**: `OTEL_SAMPLE_RATE=0.1` (10%; the SDK default when unset)
+- **Development**: `OTEL_SAMPLE_RATE=1.0` set explicitly (e.g. `local-stack`) — there
+  is no automatic ENV-based adjustment; the ratio is exactly `OTEL_SAMPLE_RATE`.
 
 **Rationale:**
 - Reduces storage and processing overhead
 - Still captures representative sample
-- Errors typically sampled at higher rate
+- `ParentBased` keeps sampled traces whole across services (no torn traces)
 
 **Future Improvements:**
 - Adaptive sampling based on error rate

@@ -578,9 +578,9 @@ new-code coverage, `go test -race`, golangci-lint, agent-skills review.
 - ADRs to spawn (agreed policy: **each ADR is written when its phase lands**,
   created as `Accepted` — the decision is made by then; ADRs stay short and
   link back here for the full design):
-  - ADR — double-entry ledger for money audit (**P2**; absorbs the
-    mockpay-as-separate-binary rationale where the webhook/recon design
-    depends on it)
+  - [ADR-007](../../adr/ADR-007-double-entry-payment-ledger/) — double-entry
+    ledger for money audit (**P2**, landed; the mockpay-as-separate-binary
+    rationale moves to its own ADR when P2.3 lands)
   - ADR — payment as pre-pivot saga step, authorize-early / capture-late
     (**P3**)
   - ADR — idempotency keys as shared `pkg/idempotency` (**P3**; absorbs the

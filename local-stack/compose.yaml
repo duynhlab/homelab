@@ -239,6 +239,12 @@ services:
     environment: { <<: *svc-env, SERVICE_NAME: notification, DB_NAME: notification }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
+  payment-migrate:
+    build: { context: ../../payment-service }
+    command: ["migrate"]
+    environment: { <<: *svc-env, SERVICE_NAME: payment, DB_NAME: payment }
+    depends_on: { postgres: { condition: service_healthy } }
+    restart: "no"
 
   # ---- Dev-only demo seeds (one-shot). Seeding lives OUTSIDE the migration
   # chain (prod never seeds); each runs its service's `seed` subcommand after
@@ -439,6 +445,20 @@ services:
       cart-seed: { condition: service_completed_successfully }
       auth: { condition: service_healthy }
 
+  payment:
+    # No seed job: payments are created by flows, not demo data.
+    build: { context: ../../payment-service }
+    environment:
+      <<: *svc-env
+      SERVICE_NAME: payment
+      OTEL_SERVICE_NAME: payment
+      DB_NAME: payment
+    healthcheck: *svc-healthcheck
+    depends_on:
+      postgres: { condition: service_healthy }
+      payment-migrate: { condition: service_completed_successfully }
+      auth: { condition: service_healthy }
+
   order:
     build: { context: ../../order-service }
     environment:
@@ -544,6 +564,7 @@ services:
       review: { condition: service_healthy }
       shipping: { condition: service_healthy }
       notification: { condition: service_healthy }
+      payment: { condition: service_healthy }
 
   # ---- Frontend (built with the gateway origin baked in) ----
   frontend:

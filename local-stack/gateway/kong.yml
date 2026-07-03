@@ -67,6 +67,18 @@ services:
     retries: 2
     routes:
       - { name: cart, paths: ["/cart/"], strip_path: false, plugins: [{ name: jwt, config: *jwtcfg }] }
+  - name: payment
+    host: payment.upstream
+    port: 8080
+    protocol: http
+    connect_timeout: 3000
+    read_timeout: 15000
+    write_timeout: 15000
+    retries: 2
+    routes:
+      # Only the private surface is exposed at the edge; /payment/v1/internal/
+      # stays cluster/compose-network-only (no route here, by design).
+      - { name: payment-private, paths: ["/payment/v1/private/"], strip_path: false, plugins: [{ name: jwt, config: *jwtcfg }] }
   - name: order
     host: order.upstream
     port: 8080
@@ -147,6 +159,9 @@ upstreams:
   - name: notification.upstream
     healthchecks: *hc
     targets: [{ target: notification:8080 }]
+  - name: payment.upstream
+    healthchecks: *hc
+    targets: [{ target: payment:8080 }]
 
 # Edge JWT (RFC-0009 Phase 4): the consumer whose jwt credential the `jwt`
 # plugin matches by the token's `iss` claim. DEV-ONLY public key — the matching

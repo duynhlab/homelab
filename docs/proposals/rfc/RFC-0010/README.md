@@ -567,5 +567,14 @@ new-code coverage, `go test -race`, golangci-lint, agent-skills review.
 - [api-naming-convention.md](../../../api/api-naming-convention.md) ·
   [grpc-internal-comms.md](../../../api/grpc-internal-comms.md) ·
   [temporal-order-fulfillment.md](../../../api/temporal-order-fulfillment.md)
-- ADRs to spawn on acceptance: payment-as-pre-pivot-saga-step;
-  double-entry-ledger-for-money-audit; idempotency-keys-as-shared-pkg.
+- ADRs to spawn (agreed policy: **each ADR is written when its phase lands**,
+  created as `Accepted` — the decision is made by then; ADRs stay short and
+  link back here for the full design):
+  - ADR — double-entry ledger for money audit (**P2**; absorbs the
+    mockpay-as-separate-binary rationale where the webhook/recon design
+    depends on it)
+  - ADR — payment as pre-pivot saga step, authorize-early / capture-late
+    (**P3**)
+  - ADR — idempotency keys as shared `pkg/idempotency` (**P3**; absorbs the
+    `422 PAYMENT_DECLINED` status introduction and the one-payment-per-order
+    `UNIQUE(order_id)` contract)

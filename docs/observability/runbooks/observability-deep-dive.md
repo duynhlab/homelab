@@ -4,7 +4,7 @@
 >
 > **Audience**: SRE/DevOps engineers preparing for interviews or onboarding to this platform.
 >
-> **Last Updated**: 2026-03-13
+> **Last Updated**: 2026-07-03
 
 ---
 
@@ -187,11 +187,13 @@ flowchart TD
     subgraph traces ["Pillar 2: Traces"]
         OTel["OTel Collector\n(OTLP receiver)"] --> Tempo["Tempo"]
         OTel --> Jaeger["Jaeger"]
+        OTel --> VT["VictoriaTraces\n(pilot)"]
     end
 
     subgraph logs ["Pillar 3: Logs"]
         Vector["Vector\n(DaemonSet)"] --> VLSingle["VLSingle\n(:9428)"]
     end
+    OTel -.->|"Kong runtime logs (pilot)"| VLSingle
 
     subgraph profiles ["Pillar 4: Profiles"]
         Pyroscope["Pyroscope\n(:4040)"]
@@ -287,7 +289,7 @@ sequenceDiagram
 - Root span exported to OTel Collector -> primary backends (Tempo + Jaeger; VictoriaTraces pilot)
 - Child spans created by handler/logic layer
 - W3C Trace Context header for cross-service propagation
-- Service name auto-detected from Kubernetes pod name
+- Service identity from `OTEL_SERVICE_NAME` (injected by the app ResourceSets; pod-name parsing is only the SDK fallback)
 
 **LoggingMiddleware** outputs:
 - Structured JSON to stdout (collected by Vector -> VictoriaLogs)
@@ -726,26 +728,26 @@ up{job="microservices"}
 count by (__name__) ({job="microservices"})
 ```
 
-### Key LogQL Queries
+### Key LogsQL Queries (VictoriaLogs)
 
-```logql
+```logsql
 # All logs for a service
-{service="auth"}
+_stream:{service="auth"}
 
-# Errors only
-{service="auth"} | json | level="error"
+# Errors only (level is a JSON field, auto-indexed)
+_stream:{service="auth"} level:error
 
 # Search by trace_id
-{trace_id="4bf92f3577b34da6a3ce929d0e0e4736"}
+trace_id:4bf92f3577b34da6a3ce929d0e0e4736
 
 # Slow requests (duration > 500ms)
-{service="auth"} | json | duration > 0.5
+_stream:{service="auth"} duration:>0.5
 
 # Text search
-{service="auth"} |= "timeout"
+_stream:{service="auth"} "timeout"
 
-# Log volume per service
-sum by (service) (count_over_time({namespace=~"auth|user|product"}[5m]))
+# Log volume per service (last 5m)
+_time:5m | stats by (service) count() logs
 ```
 
 ### Investigation Checklist
@@ -792,5 +794,5 @@ For every answer, structure as:
 - [SLO Documentation](../slo/README.md) -- SLO definitions, Sloth integration
 - [SLO Burn-Rate Alerts](../alerting/slo-burn-rate-alerts.md) -- Multi-window multi-burn-rate alerts
 - [Tracing Guide](../tracing/README.md) -- Distributed tracing details
-- [Logging Guide](../logging/README.md) -- Structured logging, LogQL
+- [Logging Guide](../logging/README.md) -- Structured logging, LogsQL
 - [Profiling Guide](../profiling/README.md) -- Continuous profiling, flamegraphs

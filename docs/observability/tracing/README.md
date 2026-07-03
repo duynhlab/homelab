@@ -42,9 +42,9 @@ Track requests as they flow through multiple microservices to understand perform
 **Without Tracing**: Check logs of all 8 services manually, guess which service is slow.
 
 **With Tracing**: 
-- See the entire request flow: `Gateway → Order → Payment → Inventory → Shipping`
-- Identify bottleneck: **Payment service took 2000ms** (everything else < 100ms)
-- Jump to Payment logs using `trace_id` to see exact error
+- See the entire request flow: `Kong → Order → Shipping / Notification`
+- Identify bottleneck: **Shipping service took 2000ms** (everything else < 100ms)
+- Jump to Shipping logs using `trace_id` to see exact error
 
 #### 2. **Performance Optimization** ⚡
 **Scenario**: Dashboard shows `/api/v1/orders` P95 latency = 800ms (SLO target: 500ms).
@@ -59,15 +59,15 @@ Track requests as they flow through multiple microservices to understand perform
 
 **With Tracing**:
 - Filter traces with `http.status_code=500`
-- See error pattern: `Order → Inventory → TIMEOUT`
-- Root cause: Inventory service timeout (30s → need circuit breaker)
+- See error pattern: `Order → Shipping → TIMEOUT`
+- Root cause: Shipping service timeout (30s → need circuit breaker)
 
 #### 4. **Service Dependency Mapping** 🗺️
-**Question**: "If I update `payment` service, which services will be affected?"
+**Question**: "If I update `shipping` service, which services will be affected?"
 
 **With Tracing (Service Graph)**:
-- Visualize dependencies: `Order → Payment`, `Shipping → Payment`
-- Plan deployment order: Update `Payment` last
+- Visualize dependencies: `Order → Shipping`, `Order → Notification`, `Product → Review` (gRPC east-west)
+- Plan deployment order: update `Shipping` before `Order`
 - Monitor impact with trace sampling
 
 ---
@@ -79,19 +79,22 @@ Track requests as they flow through multiple microservices to understand perform
 ```mermaid
 flowchart LR
     A[User Request] -->|1. HTTP Request| K[Kong gateway<br/>root span + traceparent]
-    K -->|2. W3C traceparent header| B[Auth Service]
-    B -->|3. traceparent propagated| C[Order Service]
-    C -->|propagated| D[Product Service]
+    K -->|2. W3C traceparent header| C[Order Service]
+    C -->|3. traceparent via gRPC metadata| D[Shipping Service]
 
-    K -.->|Spans| E[Tempo]
-    B -.->|Spans| E
-    C -.->|Spans| E
-    D -.->|Spans| E
+    K -.->|Spans OTLP| O[OTel Collector]
+    C -.->|Spans OTLP| O
+    D -.->|Spans OTLP| O
+
+    O --> E[Tempo]
+    O --> J[Jaeger]
+    O --> V[VictoriaTraces pilot]
 
     E -->|TraceQL queries| F[Grafana]
 
     style A fill:#e1f5ff
     style K fill:#fff2cc
+    style O fill:#f0e1ff
     style E fill:#ffe1e1
     style F fill:#e1ffe1
 ```
@@ -101,8 +104,8 @@ flowchart LR
 1. **Request arrives** at **Kong** (edge), which creates the **root span** with `trace_id` and injects the W3C `traceparent` (its `opentelemetry` plugin)
 2. **W3C Trace Context** header (`traceparent`) propagated to the services and downstream
 3. Each service creates **child spans** for its operations (Kong forces a W3C `traceparent` via `inject: [w3c]` — see [edge→service linkage](architecture.md#edge--service-linkage))
-4. **10% sampling** decision made at root span (statistically significant)
-5. Spans exported to **Tempo** via OTLP HTTP (batch export every 5s)
+4. **10% sampling** — Kong and each service currently sample **independently** at the same `TraceIDRatioBased` 10% (decisions agree because the sampler is deterministic on `trace_id`; wrapping in `ParentBased` so downstream hops honour the root decision is a pending service-repo fix — see the [sampling note](architecture.md#edge--service-linkage))
+5. Spans exported via OTLP HTTP (batch export every 5s) to the **OTel Collector**, which fans out to **Tempo**, **Jaeger**, and **VictoriaTraces**
 6. **Grafana** queries Tempo for trace visualization
 
 > **Three backends, by design.** **Tempo** is the primary backend (queried in Grafana via TraceQL) and the **durable** store — traces live in **RustFS S3** (`tempo-traces` bucket) with **7-day** retention. **Jaeger** is an alternative UI fed by the same OTel Collector fan-out, kept on **in-memory storage (ephemeral — traces are lost on pod restart)** because Jaeger has no S3/object-storage backend (see [jaeger.md](jaeger.md#storage--in-memory-here-and-why-vs-tempo-on-rustfs)). **VictoriaTraces** (`v0.6.0`) is a **pilot** 3rd fan-out target — VM-operator-managed, no object-storage dependency — evaluating tracing consolidation onto the VictoriaMetrics stack; Tempo stays primary/durable (see [victoriatraces.md](victoriatraces.md)). The multi-backend setup is intentional — Tempo for durable day-to-day Grafana workflows, Jaeger for its dedicated trace-search UI / learning, VictoriaTraces as a consolidation pilot. See [architecture.md](architecture.md), [jaeger.md](jaeger.md), and the [backend comparison](backends-comparison.md).
@@ -113,7 +116,7 @@ flowchart LR
 |---------|--------------|---------|
 | **10% Sampling** | Only trace 10% of requests | Cost-effective, production-ready |
 | **Request Filtering** | Skip `/health`, `/metrics` | Reduces noise by 30-40% |
-| **Service Detection** | Auto-detect service name from pod name | No manual config needed |
+| **Service Identity** | `OTEL_SERVICE_NAME` env injected by the app ResourceSets | Stable `service.name`, no per-service config |
 | **Graceful Shutdown** | Flush pending spans on SIGTERM | Zero data loss during rollouts |
 | **Error Recording** | Automatically mark error spans | Easy error filtering in Grafana |
 
@@ -135,21 +138,24 @@ kubectl port-forward -n monitoring svc/grafana-service 3000:3000
 
 ## Configuration
 
-### Quick Configuration via Helm
+### Quick Configuration via ResourceSets
 
-All tracing configuration is managed via HelmRelease values (`kubernetes/apps/*.yaml`):
+Tracing env vars are injected once per domain by the app ResourceSets
+(`kubernetes/apps/domains/*-rs.yaml`, plus `kubernetes/apps/order-worker.yaml`);
+per-service knobs come from the service's InputProvider
+(`kubernetes/apps/services/<name>.yaml`):
 
 ```yaml
-# kubernetes/apps/auth.yaml (values section)
+# kubernetes/apps/domains/checkout-rs.yaml (env section, per service)
 env:
-  - name: SERVICE_NAME
-    value: "auth"
   - name: OTEL_COLLECTOR_ENDPOINT
-    value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
+    value: << index inputs "otel_endpoint" | default "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318" >>
   - name: OTEL_SAMPLE_RATE
     value: "0.1"  # 10% sampling (0.0-1.0)
+  - name: OTEL_SERVICE_NAME
+    value: << inputs.name >>  # authoritative service.name
   - name: TRACING_ENABLED
-    value: "true"
+    value: << index inputs "tracing_enabled" | default "true" | quote >>
 ```
 
 **Deploy with custom sampling:**
@@ -189,16 +195,15 @@ These endpoints are **never traced** (reduces volume by 30-40%):
 | `/metrics` | Prometheus-compatible scrape endpoint (VMAgent) |
 | `/favicon.ico` | Browser noise |
 
-### Service Auto-Detection
+### Service Identity
 
-Service name and namespace are **auto-detected** from:
-
-1. `OTEL_SERVICE_NAME` env var (highest priority)
-2. Pod name pattern: `auth-75c98b4b9c-kdv2n` → `auth`
-3. Hostname (fallback)
-4. Namespace from: `/var/run/secrets/kubernetes.io/serviceaccount/namespace`
-
-**No manual configuration needed!**
+`service.name` comes from the **`OTEL_SERVICE_NAME` env var**, injected
+explicitly by every app ResourceSet (`kubernetes/apps/domains/*-rs.yaml`) —
+this is authoritative. The SDK's fallbacks (pod-name pattern parsing, then
+hostname) only apply if the env var is missing, and pod-name parsing is
+brittle — which is exactly why the ResourceSets set it. Namespace and
+instance id ride along via `OTEL_RESOURCE_ATTRIBUTES` (Downward API:
+`service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME)`).
 
 ---
 
@@ -434,4 +439,4 @@ attribute.String("db.table", "users")
 
 ---
 
-**Last Updated**: June 2026 — Tempo v2.10.5 (metrics-generator) on RustFS S3, 7-day retention; Jaeger in-memory (secondary UI); VictoriaTraces v0.6.0 (pilot 3rd backend)
+**Last Updated**: 2026-07-03 — collector fan-out drawn end-to-end; `OTEL_SERVICE_NAME` injected by ResourceSets; independent-sampling caveat (ParentBased pending); Tempo v2.10.5 on RustFS S3 (7d), Jaeger in-memory, VictoriaTraces v0.6.0 (pilot)

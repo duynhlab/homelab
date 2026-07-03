@@ -195,4 +195,4 @@ logging/
 
 ---
 
-_Last updated: 2026-06-29 — single Vector DaemonSet → VictoriaLogs VLSingle `:9428` (7d/20Gi), LogsQL, `trace_id` ↔ Tempo; Loki removed._
+_Last updated: 2026-07-03 — Vector DaemonSet → VictoriaLogs VLSingle `:9428` (7d/20Gi), LogsQL, `trace_id` ↔ Tempo; Loki removed; Kong OTel-logs pilot (`logs_endpoint` → collector → VLSingle OTLP ingest) alongside Vector._

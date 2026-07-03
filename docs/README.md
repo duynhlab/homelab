@@ -49,6 +49,7 @@ docs/
 ├── observability/                # Observability documentation
 │   ├── README.md                 # Master index + 4-pillar architecture
 │   ├── architecture.md           # 3-layer service architecture + APM integration
+│   ├── opentelemetry.md          # OpenTelemetry from zero: signals, SDK, collector, platform usage
 │   ├── metrics/                  # Pillar 1: Metrics
 │   │   ├── README.md             # Hub: fundamentals, stack, architecture, coverage
 │   │   ├── metrics-apps.md       # Application + gRPC east-west metrics (RED)
@@ -63,7 +64,7 @@ docs/
 │   │       └── pg-exporter-mapping.md
 │   ├── tracing/                  # Pillar 2: Distributed Tracing
 │   │   ├── README.md             # Tracing guide (Tempo + OTel)
-│   │   ├── architecture.md       # Dual backend (Tempo + Jaeger)
+│   │   ├── architecture.md       # Triple backend (Tempo + Jaeger + VictoriaTraces pilot)
 │   │   ├── jaeger.md             # Jaeger UI guide
 │   │   ├── backends-comparison.md # Tempo vs Jaeger vs VictoriaTraces
 │   │   └── victoriatraces.md     # VictoriaTraces pilot (3rd backend)

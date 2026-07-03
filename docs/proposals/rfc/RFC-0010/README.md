@@ -525,6 +525,14 @@ new-code coverage, `go test -race`, golangci-lint, agent-skills review.
 5. **Rollback**: flip `PAYMENT_ENABLED=false` (saga reverts to today's
    shape); payment deployment can stay running harmlessly. DB objects are
    additive; no destructive migrations in any phase.
+6. **Flag removal (do not skip)**: `PAYMENT_ENABLED` is scaffolding, not
+   architecture — the flag is evaluated once at workflow start (workflow
+   input, for Temporal determinism), and once payment has baked in the
+   cluster (suggested: 2 weeks of green SLO + zero flagged reconciliation
+   discrepancies), a dedicated **cleanup PR removes the flag and its two
+   guarded branches**, making payment a mandatory saga step. Leaving the
+   flag in place permanently doubles the tested behavior surface. This
+   cleanup is the explicit exit criterion that closes P3.
 
 ## Testing & verification
 

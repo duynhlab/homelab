@@ -102,7 +102,6 @@ docs/
 │   ├── sonarcloud.md             # SonarCloud integration
 │   └── kong-gateway.md           # Kong API gateway — concept + DB-less, plugins, routing, rate-limiting
 ├── runbooks/                     # Operational runbooks
-│   ├── metrics-audit-fixes.md    # Metrics audit runbook (before/after fixes)
 │   └── troubleshooting/          # Troubleshooting guides
 │       ├── pgcat_prepared_statement_error.md
 │       ├── pgcat_read_only_transaction_error.md
@@ -259,12 +258,11 @@ docs/
 
 ### Runbooks & Troubleshooting
 
-1. **[Metrics Audit Fixes](./runbooks/metrics-audit-fixes.md)** - Metrics audit runbook with before/after code, PromQL verification, dashboard impact
-2. **[PgCat Prepared Statement Error](./runbooks/troubleshooting/pgcat_prepared_statement_error.md)** - Fix intermittent 500 errors with PgCat connection pooler
-3. **[PgCat Read-Only Transaction](./runbooks/troubleshooting/pgcat_read_only_transaction_error.md)** - Fix read-only transaction errors
-4. **[PgCat Upstream Connectivity](./runbooks/troubleshooting/pgcat_upstream_connectivity_errors.md)** - Fix upstream connectivity errors
-5. **[PostgreSQL Backup/Restore](./runbooks/troubleshooting/postgres_backup_restore.md)** - Backup and restore procedures (CNPG vs Zalando)
-6. **[VictoriaLogs Log Debugging](./runbooks/troubleshooting/victorialogs_kubernetes_logs_debug.md)** - Kubernetes log debugging with VictoriaLogs
+1. **[PgCat Prepared Statement Error](./runbooks/troubleshooting/pgcat_prepared_statement_error.md)** - Fix intermittent 500 errors with PgCat connection pooler
+2. **[PgCat Read-Only Transaction](./runbooks/troubleshooting/pgcat_read_only_transaction_error.md)** - Fix read-only transaction errors
+3. **[PgCat Upstream Connectivity](./runbooks/troubleshooting/pgcat_upstream_connectivity_errors.md)** - Fix upstream connectivity errors
+4. **[PostgreSQL Backup/Restore](./runbooks/troubleshooting/postgres_backup_restore.md)** - Backup and restore procedures (CNPG vs Zalando)
+5. **[VictoriaLogs Log Debugging](./runbooks/troubleshooting/victorialogs_kubernetes_logs_debug.md)** - Kubernetes log debugging with VictoriaLogs
 
 ---
 
@@ -364,7 +362,6 @@ docs/
 
 ### Runbooks
 
-- [Metrics Audit Fixes](./runbooks/metrics-audit-fixes.md) - Before/after metrics audit with PromQL verification
 - [PgCat Prepared Statement Error](./runbooks/troubleshooting/pgcat_prepared_statement_error.md) - Fix intermittent 500 errors with connection pooler
 - [PgCat Read-Only Transaction](./runbooks/troubleshooting/pgcat_read_only_transaction_error.md) - Fix read-only transaction errors
 - [PgCat Upstream Connectivity](./runbooks/troubleshooting/pgcat_upstream_connectivity_errors.md) - Fix upstream connectivity errors

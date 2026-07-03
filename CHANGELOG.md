@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **local-stack (payment)**: Wired the new `payment-service` into the compose
+  stack — `payment` + `payment-migrate` services, `payment` database in
+  `init.sql`, and a Kong `payment-private` route (JWT) with the
+  `/payment/v1/internal/` surface deliberately left off the gateway. Verified
+  by a full e2e pass (idempotency replay/conflict, decline/transient triggers,
+  pagination, refund circle incl. over-refund rejection and the
+  captured→refunded flip).
+
+### Added
+
 - **docs (proposals)**: **RFC-0010** — payment-service (provisional, P0):
   Stripe-style PaymentIntents with mandatory idempotency keys, auth/capture
   state machine, append-only double-entry ledger + transactional outbox,

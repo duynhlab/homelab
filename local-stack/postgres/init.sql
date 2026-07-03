@@ -9,3 +9,4 @@ CREATE DATABASE "order";
 CREATE DATABASE review;
 CREATE DATABASE shipping;
 CREATE DATABASE notification;
+CREATE DATABASE payment;

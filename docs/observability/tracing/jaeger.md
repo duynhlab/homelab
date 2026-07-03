@@ -2,7 +2,7 @@
 
 ## Overview
 
-Jaeger is an open-source distributed tracing platform that runs alongside Grafana Tempo in this project. Both backends receive the same traces via OpenTelemetry Collector fan-out, giving you the flexibility to use either UI.
+Jaeger is an open-source distributed tracing platform that runs alongside Grafana Tempo (and the VictoriaTraces pilot — see [victoriatraces.md](victoriatraces.md)) in this project. All three backends receive the same traces via OpenTelemetry Collector fan-out, giving you the flexibility to use either UI.
 
 ## Quick Start
 
@@ -124,21 +124,24 @@ flowchart TB
         R[Receiver :4318]
         E1[Export to Tempo]
         E2[Export to Jaeger]
+        E3[Export to VictoriaTraces]
     end
     
     subgraph Backends
         Tempo[(Tempo<br/>Grafana query)]
         Jaeger[(Jaeger<br/>Standalone UI)]
+        VT[(VictoriaTraces<br/>pilot)]
     end
     
     Apps -->|OTLP| R
     R --> E1 --> Tempo
     R --> E2 --> Jaeger
+    R --> E3 --> VT
 ```
 
 **Key Points:**
 - Applications send to OTel Collector (not Jaeger directly)
-- Same traces appear in both Tempo and Jaeger
+- Same traces appear in Tempo, Jaeger, and VictoriaTraces (pilot)
 - No data duplication at application level
 
 ## Configuration
@@ -271,8 +274,8 @@ datasource:
 ### 1. Use Meaningful Service Names
 
 ```yaml
-# Good
-OTEL_SERVICE_NAME: "order-service"
+# Good (this platform injects the bare input name, e.g. "order")
+OTEL_SERVICE_NAME: "order"
 
 # Bad
 OTEL_SERVICE_NAME: "app1"

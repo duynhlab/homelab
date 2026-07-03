@@ -51,6 +51,8 @@ flowchart TD
     OTel --> Jaeger
     OTel --> VictoriaTraces
     Vector --> VLogs
+    Kong["Kong gateway"] -.->|"runtime logs OTLP (pilot)"| OTel
+    OTel -.->|"logs pipeline (pilot)"| VLogs
 
     VMSingle --> Grafana
     Tempo --> Grafana
@@ -254,6 +256,7 @@ graph LR
 ```
 docs/observability/
 ├── README.md                     # This file: index + 3-layer architecture + APM integration
+├── opentelemetry.md              # OpenTelemetry from zero: signals, SDK, collector, how we use it
 │
 ├── metrics/                      # Pillar 1: Metrics collection & storage
 │   ├── README.md                 # Hub: fundamentals, stack, architecture, coverage
@@ -320,7 +323,7 @@ docs/observability/
 | Tempo | monitoring | `tempo` | 3200 | Trace storage (OTLP receiver) |
 | Jaeger | monitoring | `jaeger-query` | 16686 | Trace query UI (alternative to Tempo) |
 | VictoriaTraces | monitoring | `vtsingle-victoria-traces` | 10428 | Trace storage pilot (`v0.6.0`, OTLP HTTP + Jaeger query API) |
-| OTel Collector | monitoring | `otel-collector` | 4317 | Trace fan-out (OTLP gRPC ingress) |
+| OTel Collector | monitoring | `otel-collector` | 4317 | Trace fan-out + logs pipeline (Kong OTel-logs pilot) — OTLP ingress |
 | VictoriaLogs | monitoring | `vlsingle-victoria-logs` | 9428 | Log storage and query (LogsQL, sole log backend) |
 | Vector | kube-system | DaemonSet | -- | Log collection from all pods |
 | Pyroscope | monitoring | `pyroscope` | 4040 | Continuous profiling |
@@ -389,6 +392,7 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ## Related Documentation
 
+- [OpenTelemetry explainer](opentelemetry.md) -- OTel from zero: signals, SDK, collector, and how this platform uses them
 - [Metrics: RED/USE/Golden Signals](metrics/README.md) -- metrics methodology
 - [VictoriaMetrics Operator](metrics/victoriametrics.md) -- migration from kube-prometheus-stack
 - [Grafana Datasources](grafana/datasources.md) -- VictoriaMetrics plugin metrics datasource

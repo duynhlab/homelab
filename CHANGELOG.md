@@ -9,16 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Removed
-
-- **docs**: Deleted `docs/runbooks/metrics-audit-fixes.md` — a Feb-2026
-  point-in-time before/after audit report whose fixes merged long ago and whose
-  durable lessons (path-label cardinality via `c.FullPath()`, single-histogram
-  RED, exemplars) already live in `metrics-apps.md` and the deep-dive runbook;
-  it also described the old 34-panel dashboard. Index links cleaned up.
+## [0.103.0] - 2026-07-03
 
 ### Added
 
+- **docs (observability)**: New `opentelemetry.md` — OTel explained from zero
+  (signals, spans, propagation, resource attrs, OTLP, collector) plus how this
+  platform wires it (traces + Kong logs pilot; metrics stay Prometheus-pull).
 - **infra (kong)**: **Structured JSON access logs** — a named nginx `log_format`
   (`kong_json`: status, request/upstream latency, request_id, …) replaces the
   default combined-format text on both the cluster HelmRelease and local-stack,
@@ -34,25 +31,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   version; OSS is 3.9), Vector stays the primary log shipper (OTel
   `access_logs_endpoint` is likewise version-gated), plus the OSS-vs-Enterprise
   release-train explainer and the pilot's decision criteria.
-
-### Added
-
 - **docs (local-stack)**: Pre-push **E2E audit guide** — a two-phase checklist
   (curl API-contract checks + a real-browser pass via the `agent-browser` CLI,
   including a silent-refresh fault-injection recipe and pass criteria) in
   `local-stack/README.md`.
+- **infra (kong)**: Edge JWT auth (RFC-0009 Phase 4, ADR-006) — the `jwt-edge` KongClusterPlugin verifies RS256 access tokens on `/private/` routes (matches token `iss` to the `auth-issuer` consumer credential, checks `exp`); public routes stay anonymous; services still verify via `pkg/authmw` (defense-in-depth). Prerequisite fixed: the RS256 signing key is now **stable** — seeded in OpenBAO (`secret/local/auth/jwt-signing`) and delivered by ESO (private key → auth as `JWT_PRIVATE_KEY_PEM`; public key → Kong as the jwt credential), replacing the ephemeral per-restart key. `ingress-api` split into `-public`/`-private`. local-stack mirrors it (Kong 3.9, fixed dev key); verified public-anonymous / private good-token 200 / private bad-token 401 at the edge.
+- **docs (proposals)**: **RFC-0009** — production-grade API gateway (signed RS256 JWT + Kong OSS edge auth, defense-in-depth, Valkey rate-limiting, OSS-vs-Enterprise map). Added a **Priority** column + current-focus callout to the RFC index; backlog now tracks Authorization (RBAC/ABAC) and gateway improvements.
+- **infra (kong)**: Edge tracing (RFC-0009 roadmap #2) — Kong's `opentelemetry` plugin now emits a root request span and, via `propagation.inject: [w3c]`, forces a W3C `traceparent` onto every upstream request so the service span joins the same trace (**verified 100% edge→service linkage** in local-stack). Enabled by `tracing_instrumentations`/`tracing_sampling_rate` (cluster HelmRelease + local-stack `KONG_TRACING_*`). Tracing architecture docs + diagrams updated.
+- **infra (kong)**: Locked down internal surfaces (RFC-0009 roadmap #1, the top risk) — the 17 admin/observability/MCP ingresses (Grafana, OpenBAO/Postgres/Flux/RustFS UIs, VM/VMAlert/Karma/Jaeger/Tempo/Pyroscope/Logs/SLO, and the VM/VL/Flux MCP endpoints) now carry an `ip-restriction-internal` KongClusterPlugin (private/in-cluster CIDRs only → 403 for public) plus a generous `rate-limiting-admin` limit. Defense-in-depth (trusted_ips stays permissive); the public API path is unaffected.
 
 ### Changed
 
+- **docs (observability)**: OTel accuracy sweep — collector's `logs` pipeline
+  now drawn everywhere the collector appears (README, victoriametrics, tracing
+  architecture, deep-dive runbook); service identity corrected to injected
+  `OTEL_SERVICE_NAME` (was "auto-detected from pod name"); independent-sampling
+  caveat (ParentBased pending) replaces the "decided at root span" claim;
+  runbook LogQL queries rewritten in LogsQL; fictional trace examples replaced
+  with real call paths; VictoriaTraces added to the Jaeger fan-out diagram.
 - **docs**: Post-Phase-5 accuracy sweep — corrected the remaining opaque/GetMe-era
   claims: `network-policies.md` (auth is a JWKS hub, not a `/me` hub; no auth `:9090`),
   `api-naming-convention.md` (public-only auth inventory, edge-jwt + local verify),
   `metrics-apps.md` (RPC example → shipping), `kong-gateway.md` (auth route table +
   login curl parses `access_token`), `docs/README.md` (RFC-0009 → implemented),
   RFC-0009 "Before" heading, a Zalando runbook line, and a stale compose comment.
-
-### Changed
-
 - **platform (auth)**: RFC-0009 **Phase 5** — opaque→JWT cutover complete; the RS256
   access token is the **only** credential. auth stopped issuing opaque session tokens
   (the `sessions` table is dropped, `/auth/v1/private/me` and the gRPC `GetMe` server
@@ -64,6 +66,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `auth-private` route) are gone — auth is public-only at the edge; the auth
   NetworkPolicy drops the east-west `:9090` allow (JWKS on `:8080` stays). Docs
   refreshed (RFC-0009 → implemented, ADR-006 phasing, api/microservices/gRPC/Kong).
+- **infra (local-stack)**: Bumped the local Kong gateway **3.2 → 3.9** to match the cluster — this is what enables the `opentelemetry` `propagation` block (Kong ≥ 3.5) that fixes edge→service trace linkage, and it removes the version split (local rate-limiting now uses the same nested `redis:` block as the cluster instead of the deprecated flat `redis_*` fields).
+- **docs**: Refreshed documentation to deployed reality after a multi-area audit — `kong-gateway.md` (rate-limit 5/100/2500 + `policy: redis`/2 replicas, 9 KongClusterPlugins, chart 3.2.0/Kong 3.9, plugin/roadmap status, DB-less section translated to English, TOC); tracing docs (VictoriaTraces added as the 3rd fan-out backend, edge-linkage section); RFC-0009 status → *partially implemented* + ADR-006 links; `docs/README.md` proposals index (ADR-001–006, RFC-0000–0009); secrets (ESO 2.5.0, `cnpg-db/*` paths); Valkey naming (AGENTS.md, local-stack README); `application-delivery.md` image-tag; AGENTS.md auth-middleware/stack notes.
+- **infra (kong)**: Kong edge resilience on the cluster (RFC-0009 roadmap #5) — every app Service now carries bounded timeouts + retries (`konghq.com/*` annotations via the `mop` chart's new `service.annotations`) and a `resilience-default` **KongUpstreamPolicy** (active `/health` + passive 5xx/timeout eject). Requires `mop` chart ≥ 0.13.0. (`trusted_ips` tightening deferred — kept permissive for the Kind port-forward.)
+- **infra (local-stack)**: Kong gateway gains edge resilience (RFC-0009 roadmap #5) — bounded per-service timeouts + retries, and named upstreams with active (`/health`) + passive (5xx/timeout eject = OSS circuit-breaking) health-checks. Chaos-tested: fail-fast + auto-recovery.
+- **infra (kong)**: Rate limiting moved from `policy: local` to a cluster-wide **Valkey** counter (`policy: redis`, db 1) so both Kong replicas share one limit (RFC-0009 Phase 1). local-stack mirrors this — its `cache` container is now Valkey (`valkey/valkey:8-alpine`) and the gateway depends on it.
+- **infra (local-stack)**: Added `AUTH_JWKS_URL` to the shared service env so services verify JWTs locally against the auth JWKS (`authmw.MiddlewareJWT`), exercising the RFC-0009 Phase 3 dual-verify path in local e2e.
 
 ### Fixed
 
@@ -93,27 +101,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `local/auth/*` and seeds a dev Cloudflare token; removed a literal `${...}` from a
   Tempo config comment that broke `-config.expand-env`.
 
-### Added
-
-- **infra (kong)**: Edge JWT auth (RFC-0009 Phase 4, ADR-006) — the `jwt-edge` KongClusterPlugin verifies RS256 access tokens on `/private/` routes (matches token `iss` to the `auth-issuer` consumer credential, checks `exp`); public routes stay anonymous; services still verify via `pkg/authmw` (defense-in-depth). Prerequisite fixed: the RS256 signing key is now **stable** — seeded in OpenBAO (`secret/local/auth/jwt-signing`) and delivered by ESO (private key → auth as `JWT_PRIVATE_KEY_PEM`; public key → Kong as the jwt credential), replacing the ephemeral per-restart key. `ingress-api` split into `-public`/`-private`. local-stack mirrors it (Kong 3.9, fixed dev key); verified public-anonymous / private good-token 200 / private bad-token 401 at the edge.
-- **docs (proposals)**: **RFC-0009** — production-grade API gateway (signed RS256 JWT + Kong OSS edge auth, defense-in-depth, Valkey rate-limiting, OSS-vs-Enterprise map). Added a **Priority** column + current-focus callout to the RFC index; backlog now tracks Authorization (RBAC/ABAC) and gateway improvements.
-- **infra (kong)**: Edge tracing (RFC-0009 roadmap #2) — Kong's `opentelemetry` plugin now emits a root request span and, via `propagation.inject: [w3c]`, forces a W3C `traceparent` onto every upstream request so the service span joins the same trace (**verified 100% edge→service linkage** in local-stack). Enabled by `tracing_instrumentations`/`tracing_sampling_rate` (cluster HelmRelease + local-stack `KONG_TRACING_*`). Tracing architecture docs + diagrams updated.
-
-### Changed
-
-- **infra (local-stack)**: Bumped the local Kong gateway **3.2 → 3.9** to match the cluster — this is what enables the `opentelemetry` `propagation` block (Kong ≥ 3.5) that fixes edge→service trace linkage, and it removes the version split (local rate-limiting now uses the same nested `redis:` block as the cluster instead of the deprecated flat `redis_*` fields).
-- **docs**: Refreshed documentation to deployed reality after a multi-area audit — `kong-gateway.md` (rate-limit 5/100/2500 + `policy: redis`/2 replicas, 9 KongClusterPlugins, chart 3.2.0/Kong 3.9, plugin/roadmap status, DB-less section translated to English, TOC); tracing docs (VictoriaTraces added as the 3rd fan-out backend, edge-linkage section); RFC-0009 status → *partially implemented* + ADR-006 links; `docs/README.md` proposals index (ADR-001–006, RFC-0000–0009); secrets (ESO 2.5.0, `cnpg-db/*` paths); Valkey naming (AGENTS.md, local-stack README); `application-delivery.md` image-tag; AGENTS.md auth-middleware/stack notes.
-
-### Added
-
-- **infra (kong)**: Locked down internal surfaces (RFC-0009 roadmap #1, the top risk) — the 17 admin/observability/MCP ingresses (Grafana, OpenBAO/Postgres/Flux/RustFS UIs, VM/VMAlert/Karma/Jaeger/Tempo/Pyroscope/Logs/SLO, and the VM/VL/Flux MCP endpoints) now carry an `ip-restriction-internal` KongClusterPlugin (private/in-cluster CIDRs only → 403 for public) plus a generous `rate-limiting-admin` limit. Defense-in-depth (trusted_ips stays permissive); the public API path is unaffected.
-
-### Changed
-
-- **infra (kong)**: Kong edge resilience on the cluster (RFC-0009 roadmap #5) — every app Service now carries bounded timeouts + retries (`konghq.com/*` annotations via the `mop` chart's new `service.annotations`) and a `resilience-default` **KongUpstreamPolicy** (active `/health` + passive 5xx/timeout eject). Requires `mop` chart ≥ 0.13.0. (`trusted_ips` tightening deferred — kept permissive for the Kind port-forward.)
-- **infra (local-stack)**: Kong gateway gains edge resilience (RFC-0009 roadmap #5) — bounded per-service timeouts + retries, and named upstreams with active (`/health`) + passive (5xx/timeout eject = OSS circuit-breaking) health-checks. Chaos-tested: fail-fast + auto-recovery.
-- **infra (kong)**: Rate limiting moved from `policy: local` to a cluster-wide **Valkey** counter (`policy: redis`, db 1) so both Kong replicas share one limit (RFC-0009 Phase 1). local-stack mirrors this — its `cache` container is now Valkey (`valkey/valkey:8-alpine`) and the gateway depends on it.
-- **infra (local-stack)**: Added `AUTH_JWKS_URL` to the shared service env so services verify JWTs locally against the auth JWKS (`authmw.MiddlewareJWT`), exercising the RFC-0009 Phase 3 dual-verify path in local e2e.
 
 ## [0.102.0] - 2026-06-29
 

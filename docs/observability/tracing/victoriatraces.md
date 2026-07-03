@@ -71,7 +71,7 @@ exporters:
 
   ```bash
   curl -X POST "http://localhost:10428/select/logsql/query" \
-    --data-urlencode 'query=resource.service.name:product-service' --data-urlencode 'limit=50'
+    --data-urlencode 'query=resource.service.name:product' --data-urlencode 'limit=50'
   ```
 
   *(LogsQL field names map from OTLP attributes; verify the exact field syntax against your own
@@ -95,6 +95,8 @@ Quick ingest check: `curl 'http://localhost:10428/select/jaeger/api/services'`.
 
 ## Status
 
-Pilot only — verified standalone (v0.6.0 ingests OTLP-HTTP traces; the Jaeger API returns them).
-Live 3-way fan-out + Grafana datasource verification happens on the cluster. Tempo + Jaeger are
-unchanged. See [backends-comparison.md](./backends-comparison.md) for the decision context.
+Pilot, wired in the manifests — the collector's 3-way fan-out exporter and the Grafana
+`victoriatraces` datasource are both deployed config (`otel-collector.yaml`,
+`datasource-victoriatraces.yaml`); v0.6.0 verified standalone (ingests OTLP-HTTP traces; the
+Jaeger API returns them). Tempo + Jaeger are unchanged and Tempo stays primary/durable.
+See [backends-comparison.md](./backends-comparison.md) for the decision context.

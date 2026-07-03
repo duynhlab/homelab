@@ -44,6 +44,8 @@ flowchart TB
     Exporter -->|OTLP| Tempo
     Exporter -->|OTLP| VT
     Exporter -->|OTLP| Jaeger
+    Kong -.->|"OTLP HTTP (runtime logs, pilot)"| Receiver
+    Exporter -.->|"logs pipeline (pilot)"| VLogs["VictoriaLogs"]
 ```
 
 The trace now **begins at the gateway**: Kong's `opentelemetry` plugin creates
@@ -59,6 +61,7 @@ config that makes this reliable.
 - **Enabled by**: `tracing_instrumentations: all` + `tracing_sampling_rate` in the Kong config (HelmRelease env for the cluster; `KONG_TRACING_*` for local-stack)
 - **Export**: OTLP HTTP to the same collector endpoint the services use (`…:4318/v1/traces`), `service.name=kong`
 - **Role**: creates the **root request span** for every proxied call and injects the W3C `traceparent` downstream, so the trace starts at the edge instead of the first service
+- **Logs (pilot)**: the same plugin also sets `logs_endpoint` (Kong ≥ 3.8) — Kong **runtime** logs ship via OTLP to the collector's `logs` pipeline → VictoriaLogs, alongside Vector (see [../logging/README.md](../logging/README.md))
 - **Config**: `kubernetes/infra/configs/kong/plugins.yaml` (`opentelemetry-tracing` KongClusterPlugin) + `kubernetes/infra/controllers/kong/helmrelease.yaml`; local mirror in `local-stack/gateway/kong.yml` + `local-stack/compose.yaml`
 
 **1. Microservices (SDK Approach)**
@@ -70,7 +73,7 @@ config that makes this reliable.
 
 **2. OpenTelemetry Collector**
 - **Deployment**: Kubernetes Deployment (1 replica, scalable)
-- **Function**: Fan-out layer, receives traces and distributes to backends
+- **Function**: Fan-out layer — a `traces` pipeline distributing to the three backends, plus a `logs` pipeline (Kong runtime-logs pilot → VictoriaLogs)
 - **Configuration**: `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
 - **Ports**: 4317 (gRPC), 4318 (HTTP), 8888 (metrics)
 
@@ -218,12 +221,14 @@ over gRPC) were already linking, confirming the service-side W3C propagator work
 All microservices use consistent configuration via Helm values:
 
 ```yaml
-# kubernetes/apps/*.yaml (values section)
+# kubernetes/apps/domains/*-rs.yaml (env section, per service)
 env:
   - name: OTEL_COLLECTOR_ENDPOINT
     value: "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
   - name: OTEL_SAMPLE_RATE
     value: "0.1"  # 10% sampling
+  - name: OTEL_SERVICE_NAME
+    value: << inputs.name >>  # authoritative service.name
   - name: TRACING_ENABLED
     value: "true"
 ```
@@ -246,12 +251,19 @@ exporters:
   otlphttp/victoriatraces:          # pilot 3rd backend (OTLP HTTP, :10428)
     traces_endpoint: http://vtsingle-victoria-traces.monitoring.svc.cluster.local:10428/insert/opentelemetry/v1/traces
 
+  otlphttp/victorialogs:            # Kong runtime-logs pilot (OTLP HTTP, :9428)
+    logs_endpoint: http://vlsingle-victoria-logs.monitoring.svc.cluster.local:9428/insert/opentelemetry/v1/logs
+
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch]
       exporters: [otlp/tempo, otlp/jaeger, otlphttp/victoriatraces]
+    logs:                           # Kong OTel-logs pilot (runs alongside Vector)
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/victorialogs]
 ```
 
 **Benefits:**
@@ -263,8 +275,9 @@ service:
 
 ### Trace Lifecycle
 
-1. **Request arrives** at microservice
-2. **SDK creates span** via Gin middleware
+0. **Request hits Kong** — the `opentelemetry` plugin opens the **root span** and injects `traceparent` upstream
+1. **Request arrives** at the microservice carrying that `traceparent`
+2. **SDK creates span** via Gin middleware (child of the edge span)
 3. **Span attributes** added (service name, HTTP method, path)
 4. **Span ends** and queued for export
 5. **Batch export** every 5 seconds (or when batch full)

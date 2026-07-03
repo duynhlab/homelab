@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **docs (proposals)**: **RFC-0010** — payment-service (provisional, P0):
+  Stripe-style PaymentIntents with mandatory idempotency keys, auth/capture
+  state machine, append-only double-entry ledger + transactional outbox,
+  `mockpay` provider (HMAC webhooks, deterministic failure triggers),
+  reconciliation job, and the order-saga rewire (Authorize pre-pivot /
+  Capture pre-confirm, Void/Refund compensations). RFC index gains the row
+  (and RFC-0009 corrected to done/implemented, matching its README).
+
 ### Changed
 
 - **docs (observability)**: Corrected the OTel **sampling** docs to match shipped

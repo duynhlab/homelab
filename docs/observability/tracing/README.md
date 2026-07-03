@@ -104,7 +104,7 @@ flowchart LR
 1. **Request arrives** at **Kong** (edge), which creates the **root span** with `trace_id` and injects the W3C `traceparent` (its `opentelemetry` plugin)
 2. **W3C Trace Context** header (`traceparent`) propagated to the services and downstream
 3. Each service creates **child spans** for its operations (Kong forces a W3C `traceparent` via `inject: [w3c]` — see [edge→service linkage](architecture.md#edge--service-linkage))
-4. **10% sampling** — Kong and each service currently sample **independently** at the same `TraceIDRatioBased` 10% (decisions agree because the sampler is deterministic on `trace_id`; wrapping in `ParentBased` so downstream hops honour the root decision is a pending service-repo fix — see the [sampling note](architecture.md#edge--service-linkage))
+4. **10% sampling** — Kong (root) decides by ratio; each service wraps its ratio in `ParentBased` (`ParentBased(TraceIDRatioBased(rate))`), so downstream hops honour the root's `sampled` flag and traces stay whole — a service's own ratio only applies when it is itself the root (see the [sampling note](architecture.md#edge--service-linkage))
 5. Spans exported via OTLP HTTP (batch export every 5s) to the **OTel Collector**, which fans out to **Tempo**, **Jaeger**, and **VictoriaTraces**
 6. **Grafana** queries Tempo for trace visualization
 
@@ -168,8 +168,8 @@ make sync  # Push manifests and trigger Flux reconciliation
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OTEL_COLLECTOR_ENDPOINT` | `otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318` | OTel Collector OTLP HTTP endpoint |
-| `OTEL_SAMPLE_RATE` | `0.1` (10%) | Trace sampling rate (0.0-1.0) |
-| `ENV` | `production` | Auto-adjust sampling: `development`=100%, others=10% |
+| `OTEL_SAMPLE_RATE` | `0.1` (10%) | Trace sampling rate (0.0-1.0) — the only sampling knob; wrapped in `ParentBased` |
+| `ENV` | `production` | Environment label (`dev`/`staging`/`production`). Does **not** auto-adjust sampling — set `OTEL_SAMPLE_RATE` explicitly for higher rates |
 
 ### Sampling Strategy
 
@@ -178,6 +178,10 @@ make sync  # Push manifests and trigger Flux reconciliation
 | **Production** | 10% | Cost-effective, statistically valid | Low |
 | **Staging** | 50% | More coverage for testing | Medium |
 | **Development** | 100% | Full debugging visibility | High |
+
+These are **recommended** rates you set explicitly per environment via
+`OTEL_SAMPLE_RATE` (e.g. `local-stack` sets `1.0`) — there is no automatic
+mapping from `ENV` to a rate.
 
 **Why 10% is enough:**
 - Statistically significant for performance analysis
@@ -439,4 +443,4 @@ attribute.String("db.table", "users")
 
 ---
 
-**Last Updated**: 2026-07-03 — collector fan-out drawn end-to-end; `OTEL_SERVICE_NAME` injected by ResourceSets; independent-sampling caveat (ParentBased pending); Tempo v2.10.5 on RustFS S3 (7d), Jaeger in-memory, VictoriaTraces v0.6.0 (pilot)
+**Last Updated**: 2026-07-03 — collector fan-out drawn end-to-end; `OTEL_SERVICE_NAME` injected by ResourceSets; sampling corrected to the shipped `ParentBased(TraceIDRatioBased)` (root decides, downstream honours; no auto ENV mapping); Tempo v2.10.5 on RustFS S3 (7d), Jaeger in-memory, VictoriaTraces v0.6.0 (pilot)

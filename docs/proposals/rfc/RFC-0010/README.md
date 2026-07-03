@@ -153,15 +153,15 @@ JSON, standard pagination envelope, `user_id` always from the JWT (never the
 body), amounts as **integer minor units** (`2000` = $20.00) with ISO-4217
 `currency`.
 
-| Route | Audience | Purpose |
-|-------|----------|---------|
-| `POST /payment/v1/private/payments` | private | Create a PaymentIntent (authorize). **`Idempotency-Key` header required** |
-| `GET /payment/v1/private/payments/{id}` | private | Fetch one intent (owner-only) — includes `refunded_minor` + derived `partially_refunded` (also present in list items) |
-| `GET /payment/v1/private/payments` | private | Paginated history for the JWT user |
-| `POST /payment/v1/internal/payments/{id}/refunds` | internal | Create a (partial) refund. **`Idempotency-Key` required** — refund idempotency is separate from charge idempotency. Internal-only: refunds are issued by the saga compensation or an operator, **not** by end users (a self-service "refund me but keep the goods" button is not a feature; a returns flow is future work) |
-| `POST /payment/v1/public/webhooks/mockpay` | public | Provider webhook receiver — anonymous at the edge, authenticated **in-app** by HMAC signature |
-| `POST /payment/v1/internal/reconciliation/runs` | internal | Trigger a reconciliation run (cluster-only) |
-| `GET /payment/v1/internal/reconciliation/runs/{id}` | internal | Run status + discrepancy report |
+| Method | Route | Audience | Purpose |
+|--------|-------|----------|---------|
+| `POST` | `/payment/v1/private/payments` | private | Create a PaymentIntent (authorize). **`Idempotency-Key` header required** |
+| `GET` | `/payment/v1/private/payments/{id}` | private | Fetch one intent (owner-only) — includes `refunded_minor` + derived `partially_refunded` (also present in list items) |
+| `GET` | `/payment/v1/private/payments` | private | Paginated history for the JWT user |
+| `POST` | `/payment/v1/internal/payments/{id}/refunds` | internal | Create a (partial) refund. **`Idempotency-Key` required** — refund idempotency is separate from charge idempotency. Internal-only: refunds are issued by the saga compensation or an operator, **not** by end users (a self-service "refund me but keep the goods" button is not a feature; a returns flow is future work) |
+| `POST` | `/payment/v1/public/webhooks/mockpay` | public | Provider webhook receiver — anonymous at the edge, authenticated **in-app** by HMAC signature |
+| `POST` | `/payment/v1/internal/reconciliation/runs` | internal | Trigger a reconciliation run (cluster-only) |
+| `GET` | `/payment/v1/internal/reconciliation/runs/{id}` | internal | Run status + discrepancy report |
 
 **Who creates the intent.** One payment per order (`UNIQUE(order_id)`), two
 possible creators, phased explicitly:

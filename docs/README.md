@@ -111,8 +111,7 @@ docs/
 │   ├── kong-gateway.md           # Kong API gateway — concept + DB-less, plugins, routing, rate-limiting
 │   ├── kyverno.md                # Kyverno admission-policy platform guide
 │   ├── mcp-servers.md            # MCP servers wired into the platform
-│   ├── ruleset-automation.md     # GitHub ruleset automation
-│   └── homelab-migration-plan.md # Structure/migration plan
+│   └── ruleset-automation.md     # GitHub ruleset automation
 ├── runbooks/                     # Operational runbooks
 │   └── troubleshooting/          # Troubleshooting guides
 │       ├── pgcat_prepared_statement_error.md

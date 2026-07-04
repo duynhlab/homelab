@@ -75,6 +75,7 @@ made are recorded as one or more **ADRs**, and the RFC moves to `implemented`.
 | [RFC-0008](RFC-0008/) | Production secrets hardening & local/prod parity | infra | P1 | provisional |
 | [RFC-0009](RFC-0009/) | Production-grade API gateway: signed JWT + Kong edge auth | platform-wide | done | implemented |
 | [RFC-0010](RFC-0010/) | Payment service: PaymentIntent, ledger & charge/refund saga step | platform-wide | P0 | implementable (P1–P2 landed) |
+| [RFC-0011](RFC-0011/) | Homelab migration: Kind to bare-metal Talos (1 → 3 node HA) | infra | P2 | provisional |
 
 ## Backlog — candidate RFCs
 
@@ -87,7 +88,6 @@ here). Each gets a number when someone writes it up.
 | **Alert delivery** (Slack via OpenBAO + PagerDuty) | infra | `docs/observability/alerting/` |
 | **Authorization (RBAC/ABAC)** — claim population + enforcement | platform-wide | [RFC-0009](RFC-0009/) O1 |
 | **Gateway improvements** — edge `proxy-cache` + dedicated per-env issuer domain | infra | [RFC-0009](RFC-0009/) O4/O6 |
-| **Talos bare-metal migration** | infra | `docs/platform/homelab-migration-plan.md` |
 | **Chaos / GameDay program** | infra | `TODO.md`, DR docs |
 | **API v1→v2 versioning policy** | platform-wide | `docs/api/api-naming-convention.md` |
 | **Split OpenBAO bootstrap** (auth config vs secret seeding) | infra | secrets ESO review |

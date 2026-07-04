@@ -2,7 +2,13 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | platform-wide | 2026-07-03 | 2026-07-03 |
+| implementable | platform-wide | 2026-07-03 | 2026-07-04 |
+
+> **Progress:** **P1 ✅** and **P2 ✅** have landed — scaffold + API + state machine
+> + idempotency (P1); double-entry ledger ([ADR-007](../../adr/ADR-007-double-entry-payment-ledger/)),
+> transactional outbox, `mockpay` provider ([ADR-008](../../adr/ADR-008-mockpay-standalone-provider/)),
+> and the HMAC webhook receiver + emitter (P2). **P3–P6 are planned** (see the
+> phase table). Status moves to `implemented` when P6 ships.
 
 > **Tradeoff:** a payment service concentrates the hardest distributed-systems
 > problems (idempotency, async confirmation, money-grade audit trails) into one
@@ -424,8 +430,8 @@ e2e-verified in local-stack before push (house rule).
 
 | Phase | Scope | Repos touched |
 |-------|-------|---------------|
-| **P1** | Repo scaffold (order-service as model: 3-layer, `migratex`, `authmw`, `obsx`, middleware copy, gha-workflows CI + Sonar), payments/refunds REST API, state machine, idempotency keys | new `payment-service`, `pkg` (httpx error codes) |
-| **P2** | `mockpay` binary, webhook receiver + `webhook_events` dedup, double-entry ledger, outbox | `payment-service` |
+| **P1 ✅** | Repo scaffold (order-service as model: 3-layer, `migratex`, `authmw`, `obsx`, middleware copy, gha-workflows CI + Sonar), payments/refunds REST API, state machine, idempotency keys | new `payment-service`, `pkg` (httpx error codes) |
+| **P2 ✅** | `mockpay` binary, webhook receiver + `webhook_events` dedup, double-entry ledger, outbox | `payment-service` |
 | **P3** | `payment.v1` proto + gRPC server; **extract `pkg/idempotency`** from P1's implementation; order saga rewire (insert Authorize/Capture + compensations in `internal/saga/workflow.go`, minor-units conversion at the boundary), `PAYMENT_GRPC_ADDR` env; shipping `CancelShipment` idempotency regression test; doc sweep (incl. the stale kindnet line in `grpc-internal-comms.md`) | `pkg`, `order-service`, `shipping-service`, homelab (order-worker + 4 domain `*-rs.yaml`, docs) |
 | **P4** | Reconciliation job + seeded breaks, fault-injection triggers, full local-stack e2e (compose blocks, kong.yml routes, init.sql) | `payment-service`, homelab `local-stack/` |
 | **P5** | Cluster GitOps: `services/payment.yaml` InputProvider (checkout domain), cnpg-db `postInitSQL` + PgDog pooler + **two** ExternalSecrets (product ns + payment ns), webhook HMAC secret (OpenBAO `secret/local/payment/webhook-hmac` → ESO), NetworkPolicy (Kong→:8080; order→:9090), Kong `api-payment` ingresses, **add `payment` to the 3 Kyverno policies that hardcode namespace lists** | homelab |

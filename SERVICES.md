@@ -25,6 +25,10 @@ All microservices are hosted in the `duynhlab` organization.
 | **Review** | [duynhlab/review-service](https://github.com/duynhlab/review-service) | 8006 | [![CI](https://github.com/duynhlab/review-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/review-service/actions) | `ghcr.io/duynhlab/review-service/review-service` |
 | **Notification** | [duynhlab/notification-service](https://github.com/duynhlab/notification-service) | 8007 | [![CI](https://github.com/duynhlab/notification-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/notification-service/actions) | `ghcr.io/duynhlab/notification-service/notification-service` |
 | **Shipping** | [duynhlab/shipping-service](https://github.com/duynhlab/shipping-service) | 8008 | [![CI](https://github.com/duynhlab/shipping-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/shipping-service/actions) | `ghcr.io/duynhlab/shipping-service/shipping-service` |
+| **Payment** | [duynhlab/payment-service](https://github.com/duynhlab/payment-service) | 8009 | [![CI](https://github.com/duynhlab/payment-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/payment-service/actions) | `ghcr.io/duynhlab/payment-service/payment-service` |
+
+> **Payment** is built and runs in local-stack (checkout domain); cluster GitOps
+> deployment is [RFC-0010](docs/proposals/rfc/RFC-0010/) P5.
 
 ## 💻 Frontend
 

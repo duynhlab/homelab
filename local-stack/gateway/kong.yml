@@ -79,6 +79,10 @@ services:
       # Only the private surface is exposed at the edge; /payment/v1/internal/
       # stays cluster/compose-network-only (no route here, by design).
       - { name: payment-private, paths: ["/payment/v1/private/"], strip_path: false, plugins: [{ name: jwt, config: *jwtcfg }] }
+      # Public webhook route — anonymous at the edge (no jwt); the HMAC signature
+      # is the credential, verified in the service. The global rate-limiting
+      # plugin still applies, capping abuse of this unauthenticated path.
+      - { name: payment-webhooks, paths: ["/payment/v1/public/webhooks/"], strip_path: false }
   - name: order
     host: order.upstream
     port: 8080

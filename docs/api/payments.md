@@ -21,7 +21,7 @@ Two money systems always drift eventually — reconciliation is how the platform
 
 | | |
 |---|---|
-| **Status** | Deployed (local-stack) — detect-only v1, [ADR-011](../proposals/adr/ADR-011-detect-only-reconciliation/) |
+| **Status** | Deployed (local-stack, e2e-verified) · cluster manifests landed (RFC-0010 P5) — first bring-up verification pending · detect-only v1, [ADR-011](../proposals/adr/ADR-011-detect-only-reconciliation/) |
 | **Where** | payment-service: background ticker (5 min) + internal API |
 | **Compares** | `payments` table ↔ mockpay `GET /transactions`, matched by `provider_payment_id` |
 | **Classes** | `missing_internal` · `missing_provider` · `amount_mismatch` · `status_mismatch` |
@@ -108,9 +108,10 @@ The provider's data is untrusted input:
 
 #### Reading the report
 
-The internal API (internal audience — never routed through the gateway; today
-the local-stack fence is Kong omitting the route plus the compose network, and
-NetworkPolicy becomes the fence when payment lands on the cluster):
+The internal API (internal audience — never routed through the gateway; on the
+cluster the payment NetworkPolicy is the fence — Kong reaches :8080 only, the
+order namespace alone reaches :9090 — and in local-stack Kong simply omits the
+route):
 
 ```bash
 # trigger one pass (single-flighted: a concurrent trigger answers 409;
@@ -179,4 +180,4 @@ insufficient_funds, `19` transient-then-succeed):
 
 ---
 
-_Last updated: 2026-07-04_
+_Last updated: 2026-07-05_

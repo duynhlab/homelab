@@ -14,6 +14,7 @@ docs/
 │   ├── grpc-internal-comms.md   # Implemented: gRPC for internal east-west comms
 │   ├── microservices.md         # Service catalog: per-service features, call graph
 │   ├── temporal-order-fulfillment.md # Implemented: Temporal saga — why/when/how, design, infra, ops
+│   ├── reconciliation.md        # Implemented: payment<->provider drift detection (detect-only v1)
 │   ├── graceful-shutdown.md     # Graceful shutdown pattern (drain, readiness, timeouts)
 │   ├── logs.md                  # Structured logging conventions
 │   └── gke-internal-dns.md      # GKE cluster.local, Cloud DNS private zones, multi-environment
@@ -102,9 +103,8 @@ docs/
 │       └── microservices-alerts.md      # Per-alert investigation guide
 ├── caching/                     # Valkey cache: Cache-Aside, eviction policies, distributed-cache concept
 │   └── caching.md
-├── payments/                     # Payment subsystem operational docs
-│   ├── README.md                 # area hub (links the RFC-0010 design record)
-│   └── reconciliation.md         # payment<->provider drift detection (detect-only v1)
+├── payments/                     # Payment subsystem hub (links the RFC-0010 design record)
+│   └── README.md
 ├── platform/                     # Platform/deployment documentation
 │   ├── setup.md                  # GitOps deployment guide
 │   ├── application-delivery.md    # ResourceSet patterns & templates
@@ -318,6 +318,7 @@ docs/
 - [API Reference](./api/api.md) - Complete API documentation
 - [gRPC Internal Comms (proposed/draft)](./api/grpc-internal-comms.md) - Selective gRPC for internal east-west calls; dual-port, HTTP/2 LB pitfall, phased roadmap
 - [Temporal Order-Fulfillment Saga](./api/temporal-order-fulfillment.md) - Durable order saga (why/when/how, design, infra, ops)
+- [Payment↔Provider Reconciliation](./api/reconciliation.md) - Drift detection: discrepancy classes, equivalence rules, internal API (detect-only v1)
 - [RFC-0009: Production-grade API gateway (signed JWT + Kong edge auth)](./proposals/rfc/RFC-0009/) - Partially implemented; supersedes ADR-003 via ADR-006
 - [RFC-0010: Payment service (PaymentIntent, ledger, charge/refund saga step)](./proposals/rfc/RFC-0010/) - Implementable; P1–P4 landed (ledger, outbox, mockpay, webhooks, saga wiring, reconciliation) → ADR-007…011
 - [RFC-0011: Homelab migration — Kind to bare-metal Talos](./proposals/rfc/RFC-0011/) - Provisional; 1 → 3 node HA path
@@ -341,7 +342,7 @@ docs/
 ### Payments
 
 - [Payments hub](./payments/README.md) - Payment subsystem docs + the RFC-0010 design record
-- [Reconciliation](./payments/reconciliation.md) - Payment↔provider drift detection: classes, equivalence rules, internal API, e2e evidence
+- [Reconciliation](./api/reconciliation.md) - Payment↔provider drift detection: classes, equivalence rules, internal API, e2e evidence
 
 ### Databases
 

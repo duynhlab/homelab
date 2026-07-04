@@ -73,6 +73,17 @@ spec:
           - host: cnpg-db-r.product.svc.cluster.local
             port: 5432
             poolSize: 30
+      # payment DB -- primary
+      - name: payment
+        host: cnpg-db-rw.product.svc.cluster.local
+        port: 5432
+        database: payment
+        poolSize: 30
+        poolMode: transaction
+        replicas:
+          - host: cnpg-db-r.product.svc.cluster.local
+            port: 5432
+            poolSize: 30
 
     # MUST match PostgreSQL role passwords + OpenBAO seed (openbao-bootstrap configmap)
     users:
@@ -85,6 +96,9 @@ spec:
       - name: order
         database: order
         password: "0rd3r-K1nd-2026!"
+      - name: payment
+        database: payment
+        password: "P4ym3nt-K1nd-2026!"
 
     resources:
       requests:

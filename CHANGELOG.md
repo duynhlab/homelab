@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **databases (payment)**: Groundwork for payment-service joining the cluster —
+  `payment` namespace (tier: app), OpenBAO seed
+  `secret/local/databases/cnpg-db/payment`, CNPG **managed role** + `Database`
+  CR (the cluster predates payment, so postInitSQL can't create them), ESO
+  credentials in product ns (basic-auth, doubles as the managed-role
+  passwordSecret) + payment ns, and PgDog pooler entries. Live-cluster
+  activation requires re-running the openbao-bootstrap Job (run-once).
+
 - **docs (api)**: **`docs/api/payments.md`** — the payment subsystem doc:
   design record (RFC-0010 + ADR-007…011) up top, then reconciliation
   (payment↔provider drift detection: the four discrepancy classes, benign

@@ -10,6 +10,8 @@ resources:
   - secrets/cnpg-db-cart-secret-cart-ns.yaml
   - secrets/cnpg-db-order-secret.yaml
   - secrets/cnpg-db-order-secret-order-ns.yaml
+  - secrets/cnpg-db-payment-secret.yaml
+  - secrets/cnpg-db-payment-secret-payment-ns.yaml
   - secrets/pgdog-cnpg-credentials.yaml
   # pg-backup-rustfs-credentials: managed by ClusterExternalSecret (configs/secrets/cluster-external-secrets/)
   - objectstore.yaml

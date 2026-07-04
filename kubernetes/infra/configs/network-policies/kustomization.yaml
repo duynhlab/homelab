@@ -9,3 +9,4 @@ resources:
   - review.yaml
   - notification.yaml
   - shipping.yaml
+  - payment.yaml

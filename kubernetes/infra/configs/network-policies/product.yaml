@@ -61,9 +61,11 @@ spec:
           port: 6432
         - protocol: TCP
           port: 8000
-    # App services in sibling namespaces (cart, order) → PgDog pooler (6432) for
-    # runtime + cnpg-db-rw for migration initContainers (5432). Without this the
-    # migration initContainer stalls in Init → apps-local times out. (Bug 13)
+    # App services in sibling namespaces (cart, order, payment) → PgDog pooler
+    # (6432) for runtime + cnpg-db-rw for migration initContainers (5432).
+    # Without this the migration initContainer stalls in Init → apps-local
+    # times out. (Bug 13) Payment uses 5432 for runtime too (direct TLS
+    # connection — its config refuses cleartext and PgDog has no TLS yet).
     - from:
         - namespaceSelector:
             matchLabels:
@@ -71,6 +73,9 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: order
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: payment
       ports:
         - protocol: TCP
           port: 6432

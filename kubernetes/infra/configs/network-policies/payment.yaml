@@ -1,0 +1,57 @@
+# NOTE: kindnet DOES enforce NetworkPolicy on Kind K8s 1.34+ — these rules are
+# LIVE. Any ingress not explicitly allowed below is dropped.
+#
+# Payment moves money, so its allows are deliberately tighter than the sibling
+# services' (which admit kong to every port): the edge reaches ONLY the HTTP
+# API, and the gRPC money transport (:9090) admits ONLY the order namespace
+# (the saga worker) — Kong has no business on it. The internal audience
+# (/payment/v1/internal/*) is additionally never routed at the gateway.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-ingress
+  namespace: payment
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-internal-callers
+  namespace: payment
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    # Edge: Kong → the HTTP API only (private routes + the public webhook
+    # receiver). Never :9090.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kong
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Saga: the order namespace (order-worker) → the gRPC money transport only.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: order
+      ports:
+        - protocol: TCP
+          port: 9090
+    # Intra-namespace pair (ADR-008): payment → mockpay (charges + the
+    # reconciliation job paging GET /transactions) and mockpay → payment
+    # (signed webhooks straight to the public receiver). mockpay is
+    # unauthenticated by design — this fence is its credential boundary.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: payment
+      ports:
+        - protocol: TCP
+          port: 8080

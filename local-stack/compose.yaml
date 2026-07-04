@@ -467,6 +467,9 @@ services:
       DB_NAME: payment
       # Real provider hop: payment calls mockpay over HTTP (empty = in-memory stub).
       MOCKPAY_URL: http://mockpay:8080
+      # Shared HMAC secret for verifying mockpay webhook signatures (must match
+      # the value mockpay signs with — wired on mockpay when it starts emitting).
+      MOCKPAY_WEBHOOK_SECRET: whsec_local_demo
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }

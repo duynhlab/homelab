@@ -1,0 +1,47 @@
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSetInputProvider
+metadata:
+  name: rsip-payment
+  namespace: default
+  labels:
+    app.kubernetes.io/part-of: backend-services
+    platform.duynhlab.dev/domain: checkout
+spec:
+  type: Static
+  defaultValues:
+    name: payment
+    image_tag: "1.0.0" # {"$imagepolicy": "flux-system:payment:tag"}
+    namespace: payment
+    # No platform_backup_label: that label routes CNPG/barman S3 credentials to
+    # namespaces hosting a database cluster — payment's data lives on cnpg-db
+    # in the product namespace, which is already backed up.
+    # Single replica, deliberately: the outbox relay has no SKIP LOCKED fence
+    # (single-writer assumption), the reconciliation ticker + its API
+    # single-flight are per-instance, and the idempotency column rename shipped
+    # as single-replica-safe. Fence those before scaling past 1.
+    replicaCount: 1
+    # Payment's config refuses cleartext DB in production (DB_SSLMODE must not
+    # be "disable") and PgDog terminates no TLS yet — so payment connects to
+    # CNPG directly over TLS (sslmode=require; CNPG serves its own certs).
+    # PgDog already carries payment backend entries — move payment behind the
+    # pooler when PgDog TLS lands.
+    db_host: "cnpg-db-rw.product.svc.cluster.local"
+    db_port: "5432"
+    db_migration_host: "cnpg-db-rw.product.svc.cluster.local"
+    db_secret: "cnpg-db-payment-secret"
+    db_sslmode: "require"
+    pool_max: "25"
+    # Internal gRPC server (:9090) — the order saga's money transport. The mop
+    # chart renders the payment-grpc Service from this.
+    grpc_server: true
+    # Reflection off in the cluster: this API surface moves money (grpcx
+    # registers reflection unless told otherwise). MUST stay the string
+    # "false": the template guard is truthiness-based, so a boolean false
+    # would drop the env entirely — leaving reflection ON.
+    grpc_reflection: "false"
+    # Real provider hop: the mockpay deployment in this namespace (empty would
+    # select the in-memory stub and disable reconciliation).
+    mockpay_url: "http://mockpay.payment.svc.cluster.local:8080"
+    # Shared HMAC secret (ExternalSecret payment-webhook-hmac): mockpay signs
+    # webhooks, payment verifies. Required — the config fails closed without it.
+    webhook_secret: "payment-webhook-hmac"

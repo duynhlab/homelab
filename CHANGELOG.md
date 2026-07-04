@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **apps (payment)**: payment-service joins the cluster — `rsip-payment`
+  InputProvider (checkout domain; gRPC server on, reflection off, image
+  `1.0.0`, single replica by design) and the **mockpay** provider as a second
+  deployment of the payment image (`mockpay` subcommand, ADR-008), signing
+  webhooks straight to payment's public receiver. Payment connects to CNPG
+  directly over TLS (its config refuses cleartext DB in production and PgDog
+  terminates no TLS yet); guarded `GRPC_REFLECTION`/`MOCKPAY_URL`/
+  `MOCKPAY_WEBHOOK_SECRET` envs added to the checkout ResourceSet template.
+  Ships with the payment NetworkPolicy — tighter than the siblings': Kong →
+  :8080 only, order ns → :9090 only (Kong never reaches the money transport),
+  intra-namespace :8080 for the payment↔mockpay pair — and payment joins the
+  product-namespace DB-access rule (5432, direct TLS).
+
 - **secrets (payment)**: Webhook HMAC secret for the payment<->mockpay pair —
   OpenBAO seed `secret/local/payment/webhook-hmac` + an ExternalSecret in the
   payment namespace (mockpay signs, payment verifies; both read the same

@@ -7,7 +7,7 @@ and its ADRs; this area holds the operational docs.
 
 | Doc | What it covers |
 |-----|----------------|
-| [Reconciliation](./reconciliation.md) | Detecting payment↔provider drift: classes, equivalence rules, the internal API, e2e evidence, v1 limits |
+| [Reconciliation](../api/reconciliation.md) | Detecting payment↔provider drift: classes, equivalence rules, the internal API, e2e evidence, v1 limits (lives in the API docs area) |
 
 ## Design record
 

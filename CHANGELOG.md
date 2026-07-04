@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **docs (proposals)**: **RFC-0011** — homelab migration from Kind to bare-metal
+  Talos on M720q mini PCs (provisional, P2): phased 1 → 3 node HA plan with
+  hardware/RAM/disk budgets, stack decisions (adopt Talos/Cilium/Rook-Ceph/
+  VolSync+Kopia→R2/Tailscale, keep Kong/ESO/cert-manager/Flux), roadmap, and
+  the 5 open decisions. Promoted from the backlog row; RFC index updated.
 - **local-stack (payment saga)**: Turned the order saga's payment steps on in
   compose — `PAYMENT_ENABLED=true` on `order` and `PAYMENT_GRPC_ADDR` (+ a
   `payment` dependency) on `order-worker` — so local e2e exercises the
@@ -50,6 +55,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tracing/architecture.md`, `tracing/README.md` (root decides, downstream honours;
   removed the false "`ENV` auto-adjusts sampling" claim — `OTEL_SAMPLE_RATE` is the
   only knob).
+
+### Removed
+
+- **docs (platform)**: `homelab-migration-plan.md` — superseded by RFC-0011
+  (content translated to English and restructured into the RFC template).
 
 ## [0.103.0] - 2026-07-03
 

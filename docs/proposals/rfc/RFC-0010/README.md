@@ -14,8 +14,11 @@
 > reconciliation + fault-injection e2e (P4) — **amended by
 > [ADR-011](../../adr/ADR-011-detect-only-reconciliation/): the shipped
 > reconciliation is detect-only; the auto-heal described in §Reconciliation job
-> is deferred to a later slice.** **P5–P6 are planned** (see the phase table).
-> Status moves to `implemented` when P6 ships.
+> is deferred to a later slice**; and the full cluster GitOps wiring (P5:
+> CNPG role/DB, secrets, workloads incl. mockpay, a tighter-than-siblings
+> NetworkPolicy, Kong routes, Kyverno lists, saga enablement — cluster e2e
+> verification runs at the next Kind bring-up). **P6 is planned** (see the
+> phase table). Status moves to `implemented` when P6 ships.
 
 > **Tradeoff:** a payment service concentrates the hardest distributed-systems
 > problems (idempotency, async confirmation, money-grade audit trails) into one
@@ -441,7 +444,7 @@ e2e-verified in local-stack before push (house rule).
 | **P2 ✅** | `mockpay` binary, webhook receiver + `webhook_events` dedup, double-entry ledger, outbox | `payment-service` |
 | **P3 ✅** | `payment.v1` proto + gRPC server; **extract `pkg/idempotency`** from P1's implementation; order saga rewire (insert Authorize/Capture + compensations in `internal/saga/workflow.go`, minor-units conversion at the boundary), `PAYMENT_GRPC_ADDR` env; shipping `CancelShipment` idempotency regression test; doc sweep (incl. the stale kindnet line in `grpc-internal-comms.md`) | `pkg`, `order-service`, `shipping-service`, homelab (order-worker + 4 domain `*-rs.yaml`, docs) |
 | **P4 ✅** | Reconciliation job (detect-only per ADR-011; seeded breaks folded into the drift-injection e2e), fault-injection triggers, full local-stack e2e (compose blocks, kong.yml routes, init.sql) | `payment-service`, homelab `local-stack/` |
-| **P5** | Cluster GitOps: `services/payment.yaml` InputProvider (checkout domain), cnpg-db `postInitSQL` + PgDog pooler + **two** ExternalSecrets (product ns + payment ns), webhook HMAC secret (OpenBAO `secret/local/payment/webhook-hmac` → ESO), NetworkPolicy (Kong→:8080; order→:9090), Kong `api-payment` ingresses, **add `payment` to the 3 Kyverno policies that hardcode namespace lists** | homelab |
+| **P5 ✅** | Cluster GitOps: `services/payment.yaml` InputProvider (checkout domain), cnpg-db `postInitSQL` + PgDog pooler + **two** ExternalSecrets (product ns + payment ns), webhook HMAC secret (OpenBAO `secret/local/payment/webhook-hmac` → ESO), NetworkPolicy (Kong→:8080; order→:9090), Kong `api-payment` ingresses, **add `payment` to the 3 Kyverno policies that hardcode namespace lists** | homelab |
 | **P6** | Frontend minimal: mock payment step in checkout (test-token picker), payment status on order detail | `frontend` |
 
 ### Impact on existing services (adaptation mandate)

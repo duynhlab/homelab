@@ -247,14 +247,15 @@ policies can key off the code correctly.
 > ⚠️ **Current posture (be honest about it).** The three-layer model below is the
 > *target*. **Today only the network layer actively protects east-west gRPC:**
 > mTLS is deferred (clients dial with `insecure` credentials, so there is no service
-> identity), and the review/shipping/notification gRPC servers do **no
+> identity), and the review/shipping/notification/payment gRPC servers do **no
 > inbound JWT/auth check**. NetworkPolicy **is** enforced — kindnet enforces
 > NetworkPolicy on the cluster's Kubernetes (≥ 1.30) locally, and a policy CNI does
 > in prod — so the per-namespace ingress rules limit *which* workloads can reach
 > `:9090`. Net effect: a workload in an allowed namespace can invoke internal RPCs
 > — including `notification.SendEmail` — unauthenticated; NetworkPolicy fences
-> *reachability*, not *identity*. **mTLS (service identity) is the prioritized next
-> step** to close that gap.
+> *reachability*, not *identity*. Payment's policy is deliberately the tightest
+> (its `:9090` moves money: only the order namespace is admitted, Kong never).
+> **mTLS (service identity) is the prioritized next step** to close that gap.
 
 gRPC does not replace the existing controls — it **layers with** them. Three
 complementary layers, each answering a different question:

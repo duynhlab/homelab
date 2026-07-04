@@ -9,98 +9,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.104.0] - 2026-07-05
+
 ### Added
 
-- **edge + saga (payment)**: Kong routes for payment — `/payment/v1/private/`
-  (edge JWT) and the anonymous `/payment/v1/public/webhooks/` (HMAC is the
-  credential); `internal` stays unrouted. `payment` joins the three Kyverno
-  namespace lists (probes, resources, PSS-restricted). The cluster saga is
-  wired: `PAYMENT_GRPC_ADDR` on order-worker and `PAYMENT_ENABLED=true` on the
-  order API via a guarded checkout-template env.
-
-- **apps (payment)**: payment-service joins the cluster — `rsip-payment`
-  InputProvider (checkout domain; gRPC server on, reflection off, image
-  `1.0.0`, single replica by design) and the **mockpay** provider as a second
-  deployment of the payment image (`mockpay` subcommand, ADR-008), signing
-  webhooks straight to payment's public receiver. Payment connects to CNPG
-  directly over TLS (its config refuses cleartext DB in production and PgDog
-  terminates no TLS yet); guarded `GRPC_REFLECTION`/`MOCKPAY_URL`/
-  `MOCKPAY_WEBHOOK_SECRET` envs added to the checkout ResourceSet template.
-  Ships with the payment NetworkPolicy — tighter than the siblings': Kong →
-  :8080 only, order ns → :9090 only (Kong never reaches the money transport),
-  intra-namespace :8080 for the payment↔mockpay pair — and payment joins the
-  product-namespace DB-access rule (5432, direct TLS).
-
-- **secrets (payment)**: Webhook HMAC secret for the payment<->mockpay pair —
-  OpenBAO seed `secret/local/payment/webhook-hmac` + an ExternalSecret in the
-  payment namespace (mockpay signs, payment verifies; both read the same
-  synced secret). Same run-once bootstrap-Job activation note as the DB seed.
-
-- **databases (payment)**: Groundwork for payment-service joining the cluster —
-  `payment` namespace (tier: app), OpenBAO seed
-  `secret/local/databases/cnpg-db/payment`, CNPG **managed role** + `Database`
-  CR (the cluster predates payment, so postInitSQL can't create them), ESO
-  credentials in product ns (basic-auth, doubles as the managed-role
-  passwordSecret) + payment ns, and PgDog pooler entries. Live-cluster
-  activation requires re-running the openbao-bootstrap Job (run-once).
-
-- **docs (api)**: **`docs/api/payments.md`** — the payment subsystem doc:
-  design record (RFC-0010 + ADR-007…011) up top, then reconciliation
-  (payment↔provider drift detection: the four discrepancy classes, benign
-  status-equivalence rules, the internal trigger/report API, fault-injection
-  e2e evidence, and v1 limits). **ADR-011** records the
-  detect-only decision (auto-heal deferred until the detector has soaked;
-  order-side captured-but-failed recon deferred to alert data). Docs/ADR
-  indexes updated (incl. RFC-0011 + RFC-0010 P1–P4 status in the docs tree).
-- **docs (proposals)**: **RFC-0011** — homelab migration from Kind to bare-metal
-  Talos on M720q mini PCs (provisional, P2): phased 1 → 3 node HA plan with
-  hardware/RAM/disk budgets, stack decisions (adopt Talos/Cilium/Rook-Ceph/
-  VolSync+Kopia→R2/Tailscale, keep Kong/ESO/cert-manager/Flux), roadmap, and
-  the 5 open decisions. Promoted from the backlog row; RFC index updated.
-- **local-stack (payment saga)**: Turned the order saga's payment steps on in
-  compose — `PAYMENT_ENABLED=true` on `order` and `PAYMENT_GRPC_ADDR` (+ a
-  `payment` dependency) on `order-worker` — so local e2e exercises the
-  authorize-early / capture-late flow with void/refund compensations.
-- **docs (proposals)**: **ADR-009** (authorize payment early, capture late in the
-  order saga — records the flow, the void-vs-refund compensation rule, and the
-  accepted `sagaUserID=0` risk + its compensating controls) and **ADR-010**
-  (extract idempotency into a shared `pkg/idempotency`, absorbing the `422
-  PAYMENT_DECLINED` status and `UNIQUE(order_id)` contract points). ADR index +
-  docs index updated.
-- **local-stack (payment)**: Wired the new `payment-service` into the compose
-  stack — `payment` + `payment-migrate` services, `payment` database in
-  `init.sql`, and a Kong `payment-private` route (JWT) with the
-  `/payment/v1/internal/` surface deliberately left off the gateway. Verified
-  by a full e2e pass (idempotency replay/conflict, decline/transient triggers,
-  pagination, refund circle incl. over-refund rejection and the
-  captured→refunded flip).
-- **docs (proposals)**: **RFC-0010** — payment-service (provisional, P0):
-  Stripe-style PaymentIntents with mandatory idempotency keys, auth/capture
-  state machine, append-only double-entry ledger + transactional outbox,
-  `mockpay` provider (HMAC webhooks, deterministic failure triggers),
-  reconciliation job, and the order-saga rewire (Authorize pre-pivot /
-  Capture pre-confirm, Void/Refund compensations). RFC index gains the row
-  (and RFC-0009 corrected to done/implemented, matching its README).
+- **Payment on the cluster (RFC-0010 P5)**: payment-service joins the GitOps
+  stack end to end — `payment` namespace (tier: app); CNPG **managed role** +
+  `Database` CR on the running cnpg-db (postInitSQL can't create them) with
+  ESO credentials (product ns basic-auth + payment ns) and PgDog entries;
+  webhook HMAC secret (OpenBAO seed + ExternalSecret); `rsip-payment`
+  InputProvider (checkout domain, image `1.0.0`, gRPC server on, reflection
+  off, single replica by design, direct-TLS CNPG connection) plus **mockpay**
+  as a second deployment of the payment image (ADR-008 subcommand pattern);
+  a deliberately tighter NetworkPolicy (Kong → :8080 only, order ns → :9090
+  only, intra-ns :8080 for the payment↔mockpay pair) + payment in the
+  product-ns DB rule; Kong routes (`/payment/v1/private/` edge-JWT + anonymous
+  `/payment/v1/public/webhooks/`; `internal` unrouted); payment in the three
+  Kyverno namespace lists; and the saga wired on (`PAYMENT_GRPC_ADDR` on
+  order-worker, `PAYMENT_ENABLED` on the order API). Cluster e2e verification
+  runs at the next Kind bring-up.
+- **Payment reconciliation (RFC-0010 P4)**: detect-only payment↔provider
+  drift detection shipped in payment-service (mockpay paged
+  `GET /transactions`, four discrepancy classes, benign status-equivalence
+  rules, single-flighted internal trigger/report API) — documented in
+  **`docs/api/payments.md`** and decided in **ADR-011** (auto-heal deferred
+  until the detector soaks). Verified by a local-stack fault-injection e2e
+  (decline / insufficient-funds / transient-retry / void compensation /
+  injected drift caught).
+- **local-stack (payment)**: payment-service + mockpay wired into compose with
+  the saga's payment steps enabled (`PAYMENT_ENABLED`, `PAYMENT_GRPC_ADDR`) —
+  full e2e passes: idempotency replay/conflict, decline/transient triggers,
+  refund circle, authorize-early/capture-late with void/refund compensations.
+- **docs (proposals)**: **RFC-0010** payment service (Stripe-style
+  PaymentIntents, ledger, outbox, mockpay, reconciliation, saga step) with
+  **ADR-009** (authorize-early/capture-late) and **ADR-010** (shared
+  `pkg/idempotency`); **RFC-0011** homelab migration Kind → bare-metal Talos
+  (1 → 3 node HA, provisional).
 
 ### Changed
 
-- **docs (grpc-internal-comms)**: Corrected the §5 security posture — kindnet
-  **does** enforce NetworkPolicy on Kubernetes ≥ 1.30, so the network layer is an
-  active reachability fence (not inert); dropped the stale `auth GetMe` exception
-  (removed in RFC-0009 Phase 5). `temporal-order-fulfillment.md` now documents the
-  payment steps behind `PAYMENT_ENABLED`.
-- **docs (observability)**: Corrected the OTel **sampling** docs to match shipped
-  reality — all 8 services use `ParentBased(TraceIDRatioBased)` (the
-  `parentbased_traceidratio` default) since 2026-06-23, not the bare
-  `TraceIDRatioBased` the docs claimed was "pending". Fixed `opentelemetry.md`,
-  `tracing/architecture.md`, `tracing/README.md` (root decides, downstream honours;
-  removed the false "`ENV` auto-adjusts sampling" claim — `OTEL_SAMPLE_RATE` is the
-  only knob).
+- **docs**: grpc-internal-comms §5 posture corrected (kindnet **does** enforce
+  NetworkPolicy on K8s ≥ 1.30; stale `auth GetMe` exception dropped; payment
+  noted as the tightest-fenced gRPC surface). OTel sampling docs corrected to
+  the shipped `ParentBased(TraceIDRatioBased)` reality. RFC-0010 status synced
+  everywhere it is stated (P1–P5 landed, ADR-011 amendment noted).
 
 ### Removed
 
-- **docs (platform)**: `homelab-migration-plan.md` — superseded by RFC-0011
-  (content translated to English and restructured into the RFC template).
+- **docs (platform)**: `homelab-migration-plan.md` — superseded by RFC-0011.
 
 ## [0.103.0] - 2026-07-03
 

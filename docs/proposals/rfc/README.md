@@ -74,7 +74,7 @@ made are recorded as one or more **ADRs**, and the RFC moves to `implemented`.
 | [RFC-0007](RFC-0007/) | Disaster-recovery drills program | infra | P2 | provisional |
 | [RFC-0008](RFC-0008/) | Production secrets hardening & local/prod parity | infra | P1 | provisional |
 | [RFC-0009](RFC-0009/) | Production-grade API gateway: signed JWT + Kong edge auth | platform-wide | done | implemented |
-| [RFC-0010](RFC-0010/) | Payment service: PaymentIntent, ledger & charge/refund saga step | platform-wide | P0 | implementable (P1–P4 landed) |
+| [RFC-0010](RFC-0010/) | Payment service: PaymentIntent, ledger & charge/refund saga step | platform-wide | P0 | implementable (P1–P5 landed) |
 | [RFC-0011](RFC-0011/) | Homelab migration: Kind to bare-metal Talos (1 → 3 node HA) | infra | P2 | provisional |
 
 ## Backlog — candidate RFCs

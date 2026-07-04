@@ -72,18 +72,17 @@ Two mechanisms make it correct:
 ```mermaid
 sequenceDiagram
     participant L as logic/v1
-    participant DB as Postgres (one tx)
+    participant DB as Postgres
     participant P as provider
-    L->>DB: BEGIN; CAS authorized→captured (RETURNING amount)
-    alt row flipped (1 row)
-        L->>DB: post balanced capture entries
-        DB-->>L: COMMIT
+    L->>DB: BEGIN + CAS authorized→captured
+    alt row flipped
+        L->>DB: post balanced capture entries + COMMIT
         L->>P: capture
         opt provider fails
-            L->>DB: BEGIN; CAS captured→authorized + reversal entries; COMMIT
+            L->>DB: reverse — CAS captured→authorized + reversal entries
         end
-    else stale (0 rows)
-        DB-->>L: ErrStaleTransition — nothing posted
+    else stale, 0 rows
+        DB-->>L: ErrStaleTransition, nothing posted
     end
 ```
 

@@ -37,6 +37,7 @@ spec:
                 - review
                 - notification
                 - shipping
+                - payment
       validate:
         podSecurity:
           level: restricted

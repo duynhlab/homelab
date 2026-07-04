@@ -184,6 +184,10 @@ spec:
                 name: << inputs.webhook_secret >>
                 key: secret
           <<- end >>
+          <<- if (index inputs "payment_enabled") >>
+          - name: PAYMENT_ENABLED
+            value: << inputs.payment_enabled | quote >>
+          <<- end >>
         resources:
           requests:
             memory: "32Mi"

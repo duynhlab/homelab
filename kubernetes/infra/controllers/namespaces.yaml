@@ -82,6 +82,14 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+    platform.duynhlab.dev/tier: app
+  name: payment
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
   name: postgres-operator
 ---
 apiVersion: v1

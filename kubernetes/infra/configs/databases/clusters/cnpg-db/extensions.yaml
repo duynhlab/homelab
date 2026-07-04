@@ -47,3 +47,19 @@ spec:
   extensions:
     - name: pgaudit
     - name: pg_stat_statements
+---
+# Payment Database — created declaratively (the cluster predates payment, so
+# postInitSQL cannot create it) with the same baseline extensions.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: payment-database
+  namespace: product
+spec:
+  name: payment
+  owner: payment
+  cluster:
+    name: cnpg-db
+  extensions:
+    - name: pgaudit
+    - name: pg_stat_statements

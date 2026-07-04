@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **secrets (payment)**: Webhook HMAC secret for the payment<->mockpay pair —
+  OpenBAO seed `secret/local/payment/webhook-hmac` + an ExternalSecret in the
+  payment namespace (mockpay signs, payment verifies; both read the same
+  synced secret). Same run-once bootstrap-Job activation note as the DB seed.
+
 - **databases (payment)**: Groundwork for payment-service joining the cluster —
   `payment` namespace (tier: app), OpenBAO seed
   `secret/local/databases/cnpg-db/payment`, CNPG **managed role** + `Database`

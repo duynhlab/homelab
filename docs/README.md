@@ -1,6 +1,6 @@
 # Documentation Index
 
-Complete documentation for the Go REST API Monitoring & Observability Platform.
+Documentation for the **duynhlab microservices platform** — 9 Go services + a React SPA, with GitOps (Flux Operator), observability, databases, secrets, and the RFC/ADR design record.
 
 ---
 
@@ -14,16 +14,20 @@ docs/
 │   ├── grpc-internal-comms.md   # Implemented: gRPC for internal east-west comms
 │   ├── microservices.md         # Service catalog: per-service features, call graph
 │   ├── temporal-order-fulfillment.md # Implemented: Temporal saga — why/when/how, design, infra, ops
+│   ├── graceful-shutdown.md     # Graceful shutdown pattern (drain, readiness, timeouts)
+│   ├── logs.md                  # Structured logging conventions
 │   └── gke-internal-dns.md      # GKE cluster.local, Cloud DNS private zones, multi-environment
 ├── proposals/                    # Design proposals & decisions
 │   ├── README.md                 # umbrella: ADR vs RFC + flow + links
 │   ├── adr/                      # Architecture Decision Records
 │   │   ├── README.md             # ADR conventions + index
-│   │   └── ADR-001 … ADR-006     # Temporal ×2, JWT-in-services (superseded), OpenBAO audit/HA, RS256+edge-auth
-│   └── rfc/                      # Requests for Comments
-│       ├── README.md             # process + index + backlog
-│       ├── RFC-0000/             # template
-│       └── RFC-0001 … RFC-0009   # Temporal, mTLS, inventory, caching, shared-db, mesh, DR drills, secrets, API gateway
+│   │   ├── ADR-0000-template/    # template
+│   │   └── ADR-001 … ADR-008     # Temporal ×2, JWT-in-services (superseded), OpenBAO audit/HA, RS256+edge-auth, payment ledger, mockpay
+│   ├── rfc/                      # Requests for Comments
+│   │   ├── README.md             # process + index + backlog
+│   │   ├── RFC-0000/             # template
+│   │   └── RFC-0001 … RFC-0010   # Temporal, mTLS, inventory, caching, shared-db, mesh, DR drills, secrets, API gateway, payment service
+│   └── *.md                      # loose reviews/roadmaps (auth-gateway, kong, otel-sampling; some .vi.md)
 ├── databases/                    # Database documentation
 │   ├── 002-database-integration.md               # PostgreSQL architecture
 │   ├── 003-operator-comparison.md               # CloudNativePG vs Zalando decision guide
@@ -45,6 +49,7 @@ docs/
 │   └── runbooks/                     # Database ops runbooks
 │       ├── endpoints-to-configmaps.md
 │       ├── prepared-databases.md
+│       ├── cnpg-dr-replica-bootstrap.md
 │       └── zalando-ha-scaling.md
 ├── observability/                # Observability documentation
 │   ├── README.md                 # Master index + 4-pillar architecture
@@ -77,20 +82,23 @@ docs/
 │   │   ├── README.md             # Grafana overview + plugins
 │   │   ├── rbac-multi-team.md    # Org roles, Teams, anonymous vs named users
 │   │   ├── datasources.md        # Dual datasource strategy (case study)
-│   │   ├── dashboard-reference.md # Microservices dashboard (34 panels)
+│   │   ├── dashboard-reference.md # Microservices dashboard (40 panels)
 │   │   └── variables.md          # Dashboard variables & regex
 │   ├── alerting/                 # Alerting rules
 │   │   ├── README.md             # 2-layer alerting strategy
-│   │   └── alert-catalog.md      # Full alert reference (145 rules) + coverage gaps
+│   │   ├── alert-catalog.md      # Full alert reference + coverage gaps
+│   │   ├── slo-burn-rate-alerts.md # Multi-window burn-rate alerts
+│   │   └── dashboard-comparison.md
 │   ├── slo/                      # Service Level Objectives
 │   │   ├── README.md             # Sloth Operator + SLO targets
+│   │   ├── fundamentals.md       # SLI/SLO/error-budget concepts
 │   │   ├── getting_started.md    # Enable SLO via Helm values
-│   │   ├── alerting.md           # Multi-window burn-rate alerts
 │   │   ├── error_budget_policy.md
 │   │   └── annotation-driven-slo-controller.md
 │   └── runbooks/                 # Operational runbooks
 │       ├── README.md             # Runbook index
 │       ├── observability-deep-dive.md   # Theory + interview prep
+│       ├── infrastructure-alerts.md     # Infra alert investigation guide
 │       └── microservices-alerts.md      # Per-alert investigation guide
 ├── caching/                     # Valkey cache: Cache-Aside, eviction policies, distributed-cache concept
 │   └── caching.md
@@ -100,7 +108,11 @@ docs/
 │   ├── cicd.md                   # CI/CD pipelines + standard/policy (pinning, permissions, signing, GoReleaser)
 │   ├── gitflow.md                # Git branching & release standard
 │   ├── sonarcloud.md             # SonarCloud integration
-│   └── kong-gateway.md           # Kong API gateway — concept + DB-less, plugins, routing, rate-limiting
+│   ├── kong-gateway.md           # Kong API gateway — concept + DB-less, plugins, routing, rate-limiting
+│   ├── kyverno.md                # Kyverno admission-policy platform guide
+│   ├── mcp-servers.md            # MCP servers wired into the platform
+│   ├── ruleset-automation.md     # GitHub ruleset automation
+│   └── homelab-migration-plan.md # Structure/migration plan
 ├── runbooks/                     # Operational runbooks
 │   └── troubleshooting/          # Troubleshooting guides
 │       ├── pgcat_prepared_statement_error.md
@@ -150,7 +162,7 @@ docs/
 
 1. **[Metrics Guide](./observability/metrics/README.md)** - Complete metrics documentation
    - 4 custom application metrics (RED method)
-   - 34 data panels + 5 row panels in Grafana dashboard
+   - 40 data panels across 6 row groups in the Grafana dashboard
    - Exemplars, path normalization, auto-discovery
 
 2. **[PromQL Guide](./observability/metrics/promql-guide.md)** - Complete guide to PromQL functions
@@ -164,7 +176,7 @@ docs/
    - Multi-select patterns
 
 4. **[Grafana Dashboard Guide](./observability/grafana/dashboard-reference.md)** - Complete dashboard reference for SRE/DevOps
-    - All 34 panels with query analysis and troubleshooting
+    - All panels with query analysis and troubleshooting
     - PromQL patterns and best practices (Google SRE, Prometheus docs)
     - Before/After comparisons for updated panels (Status Code, Apdex, 4xx/5xx)
     - SRE runbooks and incident response scenarios
@@ -194,12 +206,12 @@ docs/
     - Deployment and quick start
 
 2. **[Distributed Tracing](./observability/tracing/README.md)** - Tempo integration guide
-3. **[Tracing Architecture](./observability/tracing/architecture.md)** - Dual backend (Tempo + Jaeger)
+3. **[Tracing Architecture](./observability/tracing/architecture.md)** - Triple backend (Tempo + Jaeger + VictoriaTraces)
 4. **[Jaeger Guide](./observability/tracing/jaeger.md)** - Jaeger UI usage, comparison with Tempo
 5. **[Backend Comparison](./observability/tracing/backends-comparison.md)** - Tempo vs Jaeger vs VictoriaTraces (+ roadmap)
 6. **[VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md)** - 3rd backend via the VM operator
 5. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
-6. **[Logging](./observability/logging/README.md)** - Architecture, VictoriaLogs vs Loki, scaling
+6. **[Logging](./observability/logging/README.md)** - Architecture, VictoriaLogs + Vector, scaling
 7. **[VictoriaLogs](./observability/logging/victorialogs.md)** - VictoriaLogs deployment and configuration
     - Single Vector architecture (ships to VictoriaLogs)
     - PostgreSQL auto_explain plan parsing pipeline
@@ -208,7 +220,7 @@ docs/
 ### API Reference
 
 1. **[API Reference](./api/api.md)** - Complete API documentation
-    - All 8 microservices
+    - All 9 microservices
     - Endpoints, models, examples
     - Health checks and metrics
 
@@ -279,7 +291,7 @@ docs/
 - [Metrics Guide](./observability/metrics/README.md) - Comprehensive metrics documentation
 - [PromQL Guide](./observability/metrics/promql-guide.md) - Complete guide to PromQL functions, time range vs rate interval, and counter handling
 - [Variables & Regex](./observability/grafana/variables.md) - Filter patterns
-- [Grafana Dashboard Guide](./observability/grafana/dashboard-reference.md) - Complete SRE/DevOps dashboard reference (34 panels + annotations planning)
+- [Grafana Dashboard Guide](./observability/grafana/dashboard-reference.md) - Complete SRE/DevOps dashboard reference (40 panels + annotations planning)
 
 #### SLO/SRE
 - [SLO Overview](./observability/slo/README.md) - Architecture, SLI definitions, targets
@@ -291,12 +303,12 @@ docs/
 #### Observability Pillars
 - [Observability Overview](./observability/README.md) - Master index, 4-pillar architecture, 3-layer service architecture + APM integration
 - [Distributed Tracing](./observability/tracing/README.md) - Tempo integration
-- [Tracing Architecture](./observability/tracing/architecture.md) - Dual backend (Tempo + Jaeger)
+- [Tracing Architecture](./observability/tracing/architecture.md) - Triple backend (Tempo + Jaeger + VictoriaTraces)
 - [Jaeger Guide](./observability/tracing/jaeger.md) - Jaeger UI usage, comparison with Tempo
 - [Backend Comparison](./observability/tracing/backends-comparison.md) - Tempo vs Jaeger vs VictoriaTraces
 - [VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md) - 3rd backend via the VM operator
 - [Continuous Profiling](./observability/profiling/README.md) - Pyroscope setup
-- [Logging](./observability/logging/README.md) - Architecture, VictoriaLogs vs Loki, scaling
+- [Logging](./observability/logging/README.md) - Architecture, VictoriaLogs + Vector, scaling
 - [VictoriaLogs](./observability/logging/victorialogs.md) - VictoriaLogs deployment (single Vector, dual-ship)
 
 ### API
@@ -305,6 +317,7 @@ docs/
 - [gRPC Internal Comms (proposed/draft)](./api/grpc-internal-comms.md) - Selective gRPC for internal east-west calls; dual-port, HTTP/2 LB pitfall, phased roadmap
 - [Temporal Order-Fulfillment Saga](./api/temporal-order-fulfillment.md) - Durable order saga (why/when/how, design, infra, ops)
 - [RFC-0009: Production-grade API gateway (signed JWT + Kong edge auth)](./proposals/rfc/RFC-0009/) - Partially implemented; supersedes ADR-003 via ADR-006
+- [RFC-0010: Payment service (PaymentIntent, ledger, charge/refund saga step)](./proposals/rfc/RFC-0010/) - Implementable; P1–P2 landed (ledger, outbox, mockpay, webhooks) → ADR-007/008
 - [RFCs](./proposals/rfc/) - Propose & track substantial changes (process + index + backlog)
 
 ### Decisions (ADRs)
@@ -316,6 +329,8 @@ docs/
 - [ADR-004: Enable OpenBAO audit logging](./proposals/adr/ADR-004-enable-openbao-audit-logging/) - Accepted
 - [ADR-005: Run OpenBAO HA (Raft) instead of Vault dev mode](./proposals/adr/ADR-005-openbao-ha-raft/) - Accepted
 - [ADR-006: Adopt RS256 signed JWTs + Kong edge authentication](./proposals/adr/ADR-006-rs256-jwt-kong-edge-auth/) - Accepted; implements [RFC-0009](./proposals/rfc/RFC-0009/)
+- [ADR-007: Append-only double-entry payment ledger](./proposals/adr/ADR-007-double-entry-payment-ledger/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
+- [ADR-008: Run the mock payment provider as a standalone process](./proposals/adr/ADR-008-mockpay-standalone-provider/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
 
 ### Databases
 
@@ -380,9 +395,9 @@ docs/
 - **OCI Registry** - `localhost:5050` (local), stores Kubernetes manifests as artifacts
 - **Helm Chart** - Generic chart for all microservices (`charts/`)
 - **HelmRelease CRDs** - Flux manages Helm deployments declaratively
-- **34 Data Panels + 5 Row Panels** - Complete monitoring dashboard
+- **40 Data Panels + 6 Row Groups** - Complete monitoring dashboard
 - **4 Custom Metrics** - Application-level metrics (RED method)
-- **8 Microservices** - All services with v1 API (canonical)
+- **9 Microservices** - All services with v1 API (canonical)
 - **Monitoring Stack** - VictoriaMetrics Operator (VMAgent, VMSingle, VMAlert, VMAlertmanager) + prometheus-operator-crds + Grafana Operator + metrics-server
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
 - **APM Stack** - Tempo + Jaeger (tracing), OTel Collector (fan-out), Pyroscope (profiling), VictoriaLogs + Vector (logging)
@@ -400,4 +415,4 @@ docs/
 
 ---
 
-**Last Updated**: 2026-07-01
+**Last Updated**: 2026-07-04

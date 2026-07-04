@@ -36,3 +36,4 @@ settled decisions.
 | [ADR-008](ADR-008-mockpay-standalone-provider/) | Run the mock payment provider as a standalone process | Accepted | [RFC-0010](../rfc/RFC-0010/) |
 | [ADR-009](ADR-009-saga-authorize-early-capture-late/) | Authorize payment early, capture late in the order saga | Accepted | [RFC-0010](../rfc/RFC-0010/) |
 | [ADR-010](ADR-010-shared-idempotency-library/) | Extract idempotency into a shared pkg/idempotency library | Accepted | [RFC-0010](../rfc/RFC-0010/) |
+| [ADR-011](ADR-011-detect-only-reconciliation/) | Ship reconciliation detect-only; defer auto-heal | Accepted | [RFC-0010](../rfc/RFC-0010/) |

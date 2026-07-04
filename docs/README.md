@@ -22,11 +22,11 @@ docs/
 │   ├── adr/                      # Architecture Decision Records
 │   │   ├── README.md             # ADR conventions + index
 │   │   ├── ADR-0000-template/    # template
-│   │   └── ADR-001 … ADR-010     # Temporal ×2, JWT-in-services (superseded), OpenBAO audit/HA, RS256+edge-auth, payment ledger, mockpay, saga authorize/capture, shared idempotency
+│   │   └── ADR-001 … ADR-011     # Temporal ×2, JWT-in-services (superseded), OpenBAO audit/HA, RS256+edge-auth, payment ledger, mockpay, saga authorize/capture, shared idempotency, detect-only recon
 │   ├── rfc/                      # Requests for Comments
 │   │   ├── README.md             # process + index + backlog
 │   │   ├── RFC-0000/             # template
-│   │   └── RFC-0001 … RFC-0010   # Temporal, mTLS, inventory, caching, shared-db, mesh, DR drills, secrets, API gateway, payment service
+│   │   └── RFC-0001 … RFC-0011   # Temporal, mTLS, inventory, caching, shared-db, mesh, DR drills, secrets, API gateway, payment service, Talos migration
 │   └── *.md                      # loose reviews/roadmaps (auth-gateway, kong, otel-sampling; some .vi.md)
 ├── databases/                    # Database documentation
 │   ├── 002-database-integration.md               # PostgreSQL architecture
@@ -102,6 +102,9 @@ docs/
 │       └── microservices-alerts.md      # Per-alert investigation guide
 ├── caching/                     # Valkey cache: Cache-Aside, eviction policies, distributed-cache concept
 │   └── caching.md
+├── payments/                     # Payment subsystem operational docs
+│   ├── README.md                 # area hub (links the RFC-0010 design record)
+│   └── reconciliation.md         # payment<->provider drift detection (detect-only v1)
 ├── platform/                     # Platform/deployment documentation
 │   ├── setup.md                  # GitOps deployment guide
 │   ├── application-delivery.md    # ResourceSet patterns & templates
@@ -316,7 +319,8 @@ docs/
 - [gRPC Internal Comms (proposed/draft)](./api/grpc-internal-comms.md) - Selective gRPC for internal east-west calls; dual-port, HTTP/2 LB pitfall, phased roadmap
 - [Temporal Order-Fulfillment Saga](./api/temporal-order-fulfillment.md) - Durable order saga (why/when/how, design, infra, ops)
 - [RFC-0009: Production-grade API gateway (signed JWT + Kong edge auth)](./proposals/rfc/RFC-0009/) - Partially implemented; supersedes ADR-003 via ADR-006
-- [RFC-0010: Payment service (PaymentIntent, ledger, charge/refund saga step)](./proposals/rfc/RFC-0010/) - Implementable; P1–P2 landed (ledger, outbox, mockpay, webhooks) → ADR-007/008
+- [RFC-0010: Payment service (PaymentIntent, ledger, charge/refund saga step)](./proposals/rfc/RFC-0010/) - Implementable; P1–P4 landed (ledger, outbox, mockpay, webhooks, saga wiring, reconciliation) → ADR-007…011
+- [RFC-0011: Homelab migration — Kind to bare-metal Talos](./proposals/rfc/RFC-0011/) - Provisional; 1 → 3 node HA path
 - [RFCs](./proposals/rfc/) - Propose & track substantial changes (process + index + backlog)
 
 ### Decisions (ADRs)
@@ -332,6 +336,12 @@ docs/
 - [ADR-008: Run the mock payment provider as a standalone process](./proposals/adr/ADR-008-mockpay-standalone-provider/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
 - [ADR-009: Authorize payment early, capture late in the order saga](./proposals/adr/ADR-009-saga-authorize-early-capture-late/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
 - [ADR-010: Extract idempotency into a shared pkg/idempotency library](./proposals/adr/ADR-010-shared-idempotency-library/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
+- [ADR-011: Ship reconciliation detect-only; defer auto-heal](./proposals/adr/ADR-011-detect-only-reconciliation/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
+
+### Payments
+
+- [Payments hub](./payments/README.md) - Payment subsystem docs + the RFC-0010 design record
+- [Reconciliation](./payments/reconciliation.md) - Payment↔provider drift detection: classes, equivalence rules, internal API, e2e evidence
 
 ### Databases
 
@@ -412,7 +422,6 @@ docs/
 
 - **[AGENTS.md](../AGENTS.md)** - AI agent guide for navigating the codebase
 - **[README.md](../README.md)** - Project overview and quick start
-- **[.cursor/rules/](../.cursor/rules/)** - Development guidelines
 
 ---
 

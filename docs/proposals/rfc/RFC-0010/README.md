@@ -4,11 +4,18 @@
 |--------|-------|---------|--------------|
 | implementable | platform-wide | 2026-07-03 | 2026-07-04 |
 
-> **Progress:** **P1 ✅** and **P2 ✅** have landed — scaffold + API + state machine
+> **Progress:** **P1–P4 ✅** have landed — scaffold + API + state machine
 > + idempotency (P1); double-entry ledger ([ADR-007](../../adr/ADR-007-double-entry-payment-ledger/)),
 > transactional outbox, `mockpay` provider ([ADR-008](../../adr/ADR-008-mockpay-standalone-provider/)),
-> and the HMAC webhook receiver + emitter (P2). **P3–P6 are planned** (see the
-> phase table). Status moves to `implemented` when P6 ships.
+> and the HMAC webhook receiver + emitter (P2); `payment.v1` gRPC + shared
+> `pkg/idempotency` + the order-saga rewire behind `PAYMENT_ENABLED`
+> ([ADR-009](../../adr/ADR-009-saga-authorize-early-capture-late/),
+> [ADR-010](../../adr/ADR-010-shared-idempotency-library/)) (P3); and
+> reconciliation + fault-injection e2e (P4) — **amended by
+> [ADR-011](../../adr/ADR-011-detect-only-reconciliation/): the shipped
+> reconciliation is detect-only; the auto-heal described in §Reconciliation job
+> is deferred to a later slice.** **P5–P6 are planned** (see the phase table).
+> Status moves to `implemented` when P6 ships.
 
 > **Tradeoff:** a payment service concentrates the hardest distributed-systems
 > problems (idempotency, async confirmation, money-grade audit trails) into one
@@ -432,8 +439,8 @@ e2e-verified in local-stack before push (house rule).
 |-------|-------|---------------|
 | **P1 ✅** | Repo scaffold (order-service as model: 3-layer, `migratex`, `authmw`, `obsx`, middleware copy, gha-workflows CI + Sonar), payments/refunds REST API, state machine, idempotency keys | new `payment-service`, `pkg` (httpx error codes) |
 | **P2 ✅** | `mockpay` binary, webhook receiver + `webhook_events` dedup, double-entry ledger, outbox | `payment-service` |
-| **P3** | `payment.v1` proto + gRPC server; **extract `pkg/idempotency`** from P1's implementation; order saga rewire (insert Authorize/Capture + compensations in `internal/saga/workflow.go`, minor-units conversion at the boundary), `PAYMENT_GRPC_ADDR` env; shipping `CancelShipment` idempotency regression test; doc sweep (incl. the stale kindnet line in `grpc-internal-comms.md`) | `pkg`, `order-service`, `shipping-service`, homelab (order-worker + 4 domain `*-rs.yaml`, docs) |
-| **P4** | Reconciliation job + seeded breaks, fault-injection triggers, full local-stack e2e (compose blocks, kong.yml routes, init.sql) | `payment-service`, homelab `local-stack/` |
+| **P3 ✅** | `payment.v1` proto + gRPC server; **extract `pkg/idempotency`** from P1's implementation; order saga rewire (insert Authorize/Capture + compensations in `internal/saga/workflow.go`, minor-units conversion at the boundary), `PAYMENT_GRPC_ADDR` env; shipping `CancelShipment` idempotency regression test; doc sweep (incl. the stale kindnet line in `grpc-internal-comms.md`) | `pkg`, `order-service`, `shipping-service`, homelab (order-worker + 4 domain `*-rs.yaml`, docs) |
+| **P4 ✅** | Reconciliation job (detect-only per ADR-011; seeded breaks folded into the drift-injection e2e), fault-injection triggers, full local-stack e2e (compose blocks, kong.yml routes, init.sql) | `payment-service`, homelab `local-stack/` |
 | **P5** | Cluster GitOps: `services/payment.yaml` InputProvider (checkout domain), cnpg-db `postInitSQL` + PgDog pooler + **two** ExternalSecrets (product ns + payment ns), webhook HMAC secret (OpenBAO `secret/local/payment/webhook-hmac` → ESO), NetworkPolicy (Kong→:8080; order→:9090), Kong `api-payment` ingresses, **add `payment` to the 3 Kyverno policies that hardcode namespace lists** | homelab |
 | **P6** | Frontend minimal: mock payment step in checkout (test-token picker), payment status on order detail | `frontend` |
 

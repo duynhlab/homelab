@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **docs (payments)**: New `docs/payments/` area — **reconciliation.md**
+  (payment↔provider drift detection: the four discrepancy classes, benign
+  status-equivalence rules, the internal trigger/report API, fault-injection
+  e2e evidence, and v1 limits) + the area hub. **ADR-011** records the
+  detect-only decision (auto-heal deferred until the detector has soaked;
+  order-side captured-but-failed recon deferred to alert data). Docs/ADR
+  indexes updated (incl. RFC-0011 + RFC-0010 P1–P4 status in the docs tree).
 - **docs (proposals)**: **RFC-0011** — homelab migration from Kind to bare-metal
   Talos on M720q mini PCs (provisional, P2): phased 1 → 3 node HA plan with
   hardware/RAM/disk budgets, stack decisions (adopt Talos/Cilium/Rook-Ceph/

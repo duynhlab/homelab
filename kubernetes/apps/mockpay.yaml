@@ -1,0 +1,82 @@
+# mockpay — the mock payment provider, run as the `mockpay` subcommand of the
+# payment image (ADR-008: same one-image/second-deployment pattern as
+# order-worker). Unlike the worker it serves traffic: payment charges against
+# it over HTTP and the reconciliation job pages its GET /transactions, so the
+# Service stays enabled. It is unauthenticated by design — the NetworkPolicy
+# admitting only the payment namespace is the fence (ADR-008), and it gets no
+# gateway route of any kind.
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: mockpay
+  namespace: payment
+spec:
+  interval: 10m
+  timeout: 10m
+  chartRef:
+    kind: OCIRepository
+    name: mop-chart-oci
+    namespace: flux-system
+  releaseName: mockpay
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    name: mockpay
+    replicaCount: 1
+    image:
+      # Same image as the payment API — just a different subcommand.
+      repository: ghcr.io/duynhlab/payment-service/payment-service
+      tag: "1.0.0"
+      pullPolicy: IfNotPresent
+    args: ["mockpay"]
+    service:
+      enabled: true
+    env:
+      - name: SERVICE_NAME
+        value: mockpay
+      - name: PORT
+        value: "8080"
+      - name: ENV
+        value: "production"
+      - name: LOG_LEVEL
+        value: info
+      - name: LOG_FORMAT
+        value: json
+      # Signs every webhook it emits; payment verifies with the same secret
+      # (ExternalSecret payment-webhook-hmac, seeded in OpenBAO).
+      - name: MOCKPAY_WEBHOOK_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: payment-webhook-hmac
+            key: secret
+      # Webhooks go straight to payment's public receiver — the HMAC signature
+      # is the credential, so the in-cluster hop needs no gateway leg
+      # (local-stack routes via Kong only to exercise the edge).
+      - name: MOCKPAY_WEBHOOK_URL
+        value: http://payment.payment.svc.cluster.local:8080/payment/v1/public/webhooks/mockpay
+    resources:
+      requests:
+        memory: "32Mi"
+        cpu: "10m"
+      limits:
+        memory: "64Mi"
+        cpu: "50m"
+    livenessProbe:
+      enabled: true
+      httpGet:
+        path: /health
+        port: 8080
+      initialDelaySeconds: 10
+      periodSeconds: 10
+    readinessProbe:
+      enabled: true
+      httpGet:
+        path: /health
+        port: 8080
+      initialDelaySeconds: 3
+      periodSeconds: 5

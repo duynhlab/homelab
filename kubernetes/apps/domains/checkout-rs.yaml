@@ -169,6 +169,21 @@ spec:
           - name: NOTIFICATION_GRPC_ADDR
             value: << inputs.notification_grpc_addr >>
           <<- end >>
+          <<- if (index inputs "grpc_reflection") >>
+          - name: GRPC_REFLECTION
+            value: << inputs.grpc_reflection | quote >>
+          <<- end >>
+          <<- if (index inputs "mockpay_url") >>
+          - name: MOCKPAY_URL
+            value: << inputs.mockpay_url >>
+          <<- end >>
+          <<- if (index inputs "webhook_secret") >>
+          - name: MOCKPAY_WEBHOOK_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: << inputs.webhook_secret >>
+                key: secret
+          <<- end >>
         resources:
           requests:
             memory: "32Mi"

@@ -245,16 +245,16 @@ policies can key off the code correctly.
 ## 5. Security
 
 > ⚠️ **Current posture (be honest about it).** The three-layer model below is the
-> *target*. **Today, none of the three layers actively protect east-west gRPC:**
+> *target*. **Today only the network layer actively protects east-west gRPC:**
 > mTLS is deferred (clients dial with `insecure` credentials, so there is no service
-> identity); NetworkPolicy is authored but only enforced with an enforcing CNI (the
-> local cluster runs kindnet, which does **not** enforce it); and the
-> review/shipping/notification gRPC servers do **no inbound JWT/auth check**. Net
-> effect: any workload that can reach `:9090` can invoke internal RPCs — including
-> `notification.SendEmail` — unauthenticated. **mTLS (service identity) is the
-> prioritized next step**; until it lands, the only real fence is the network
-> boundary, and only where an enforcing CNI is present. (auth `GetMe` is the
-> exception — it validates the forwarded JWT.)
+> identity), and the review/shipping/notification gRPC servers do **no
+> inbound JWT/auth check**. NetworkPolicy **is** enforced — kindnet enforces
+> NetworkPolicy on the cluster's Kubernetes (≥ 1.30) locally, and a policy CNI does
+> in prod — so the per-namespace ingress rules limit *which* workloads can reach
+> `:9090`. Net effect: a workload in an allowed namespace can invoke internal RPCs
+> — including `notification.SendEmail` — unauthenticated; NetworkPolicy fences
+> *reachability*, not *identity*. **mTLS (service identity) is the prioritized next
+> step** to close that gap.
 
 gRPC does not replace the existing controls — it **layers with** them. Three
 complementary layers, each answering a different question:

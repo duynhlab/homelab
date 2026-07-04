@@ -499,6 +499,10 @@ services:
       TEMPORAL_HOSTPORT: temporal:7233
       TEMPORAL_NAMESPACE: mop
       TASK_QUEUE: order-fulfillment
+      # Turn the saga's payment steps on locally (authorize-early/capture-late +
+      # void/refund compensations). The API only reads the flag to stamp it on the
+      # workflow input; the order-worker is what dials + calls payment.
+      PAYMENT_ENABLED: "true"
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -522,6 +526,10 @@ services:
       SHIPPING_GRPC_ADDR: dns:///shipping:9090
       NOTIFICATION_GRPC_ADDR: dns:///notification:9090
       PRODUCT_GRPC_ADDR: dns:///product:9090
+      # Payment gRPC target for the saga's authorize/capture/void/refund steps.
+      # The worker dials this unconditionally (lazy); the workflow input decides
+      # whether the steps actually run.
+      PAYMENT_GRPC_ADDR: dns:///payment:9090
       TEMPORAL_HOSTPORT: temporal:7233
       TEMPORAL_NAMESPACE: mop
       TASK_QUEUE: order-fulfillment
@@ -534,6 +542,7 @@ services:
       shipping: { condition: service_healthy }
       notification: { condition: service_healthy }
       cart: { condition: service_healthy }
+      payment: { condition: service_healthy }
 
   # ---- Gateway (pass-through + CORS) ----
   gateway:

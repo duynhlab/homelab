@@ -22,7 +22,7 @@ docs/
 │   ├── adr/                      # Architecture Decision Records
 │   │   ├── README.md             # ADR conventions + index
 │   │   ├── ADR-0000-template/    # template
-│   │   └── ADR-001 … ADR-008     # Temporal ×2, JWT-in-services (superseded), OpenBAO audit/HA, RS256+edge-auth, payment ledger, mockpay
+│   │   └── ADR-001 … ADR-010     # Temporal ×2, JWT-in-services (superseded), OpenBAO audit/HA, RS256+edge-auth, payment ledger, mockpay, saga authorize/capture, shared idempotency
 │   ├── rfc/                      # Requests for Comments
 │   │   ├── README.md             # process + index + backlog
 │   │   ├── RFC-0000/             # template
@@ -331,6 +331,8 @@ docs/
 - [ADR-006: Adopt RS256 signed JWTs + Kong edge authentication](./proposals/adr/ADR-006-rs256-jwt-kong-edge-auth/) - Accepted; implements [RFC-0009](./proposals/rfc/RFC-0009/)
 - [ADR-007: Append-only double-entry payment ledger](./proposals/adr/ADR-007-double-entry-payment-ledger/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
 - [ADR-008: Run the mock payment provider as a standalone process](./proposals/adr/ADR-008-mockpay-standalone-provider/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
+- [ADR-009: Authorize payment early, capture late in the order saga](./proposals/adr/ADR-009-saga-authorize-early-capture-late/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
+- [ADR-010: Extract idempotency into a shared pkg/idempotency library](./proposals/adr/ADR-010-shared-idempotency-library/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
 
 ### Databases
 

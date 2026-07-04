@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **local-stack (payment saga)**: Turned the order saga's payment steps on in
+  compose — `PAYMENT_ENABLED=true` on `order` and `PAYMENT_GRPC_ADDR` (+ a
+  `payment` dependency) on `order-worker` — so local e2e exercises the
+  authorize-early / capture-late flow with void/refund compensations.
+- **docs (proposals)**: **ADR-009** (authorize payment early, capture late in the
+  order saga — records the flow, the void-vs-refund compensation rule, and the
+  accepted `sagaUserID=0` risk + its compensating controls) and **ADR-010**
+  (extract idempotency into a shared `pkg/idempotency`, absorbing the `422
+  PAYMENT_DECLINED` status and `UNIQUE(order_id)` contract points). ADR index +
+  docs index updated.
 - **local-stack (payment)**: Wired the new `payment-service` into the compose
   stack — `payment` + `payment-migrate` services, `payment` database in
   `init.sql`, and a Kong `payment-private` route (JWT) with the
@@ -18,9 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by a full e2e pass (idempotency replay/conflict, decline/transient triggers,
   pagination, refund circle incl. over-refund rejection and the
   captured→refunded flip).
-
-### Added
-
 - **docs (proposals)**: **RFC-0010** — payment-service (provisional, P0):
   Stripe-style PaymentIntents with mandatory idempotency keys, auth/capture
   state machine, append-only double-entry ledger + transactional outbox,
@@ -31,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **docs (grpc-internal-comms)**: Corrected the §5 security posture — kindnet
+  **does** enforce NetworkPolicy on Kubernetes ≥ 1.30, so the network layer is an
+  active reachability fence (not inert); dropped the stale `auth GetMe` exception
+  (removed in RFC-0009 Phase 5). `temporal-order-fulfillment.md` now documents the
+  payment steps behind `PAYMENT_ENABLED`.
 - **docs (observability)**: Corrected the OTel **sampling** docs to match shipped
   reality — all 8 services use `ParentBased(TraceIDRatioBased)` (the
   `parentbased_traceidratio` default) since 2026-06-23, not the bare

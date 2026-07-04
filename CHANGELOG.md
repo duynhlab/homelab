@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **edge + saga (payment)**: Kong routes for payment — `/payment/v1/private/`
+  (edge JWT) and the anonymous `/payment/v1/public/webhooks/` (HMAC is the
+  credential); `internal` stays unrouted. `payment` joins the three Kyverno
+  namespace lists (probes, resources, PSS-restricted). The cluster saga is
+  wired: `PAYMENT_GRPC_ADDR` on order-worker and `PAYMENT_ENABLED=true` on the
+  order API via a guarded checkout-template env.
+
 - **apps (payment)**: payment-service joins the cluster — `rsip-payment`
   InputProvider (checkout domain; gRPC server on, reflection off, image
   `1.0.0`, single replica by design) and the **mockpay** provider as a second

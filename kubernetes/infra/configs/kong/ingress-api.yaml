@@ -275,3 +275,56 @@ spec:
                 name: shipping
                 port:
                   number: 8080
+---
+# Payment Service — private payments API: edge JWT (the service re-validates,
+# authoritative). /payment/v1/internal/* (refunds, reconciliation) is
+# deliberately NOT exposed — in-cluster only, NetworkPolicy-fenced.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-payment-private
+  namespace: payment
+  annotations:
+    konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
+    konghq.com/plugins: rate-limiting-api,request-size-limiting-api,jwt-edge
+spec:
+  ingressClassName: kong
+  rules:
+    - host: gateway.duynh.me
+      http:
+        paths:
+          - path: /payment/v1/private/
+            pathType: Prefix
+            backend:
+              service:
+                name: payment
+                port:
+                  number: 8080
+---
+# Payment webhooks — public, anonymous: the HMAC signature over the raw body is
+# the credential (mockpay signs, payment verifies). Rate/size limits still apply.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-payment-webhooks
+  namespace: payment
+  annotations:
+    konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
+    konghq.com/plugins: rate-limiting-api,request-size-limiting-api
+spec:
+  ingressClassName: kong
+  rules:
+    - host: gateway.duynh.me
+      http:
+        paths:
+          - path: /payment/v1/public/webhooks/
+            pathType: Prefix
+            backend:
+              service:
+                name: payment
+                port:
+                  number: 8080

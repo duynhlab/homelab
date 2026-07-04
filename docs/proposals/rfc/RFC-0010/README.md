@@ -579,8 +579,9 @@ new-code coverage, `go test -race`, golangci-lint, agent-skills review.
   created as `Accepted` — the decision is made by then; ADRs stay short and
   link back here for the full design):
   - [ADR-007](../../adr/ADR-007-double-entry-payment-ledger/) — double-entry
-    ledger for money audit (**P2**, landed; the mockpay-as-separate-binary
-    rationale moves to its own ADR when P2.3 lands)
+    ledger for money audit (**P2**, landed)
+  - [ADR-008](../../adr/ADR-008-mockpay-standalone-provider/) — mockpay as a
+    standalone provider process (**P2.3**, landed)
   - ADR — payment as pre-pivot saga step, authorize-early / capture-late
     (**P3**)
   - ADR — idempotency keys as shared `pkg/idempotency` (**P3**; absorbs the

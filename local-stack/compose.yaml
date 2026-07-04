@@ -455,6 +455,10 @@ services:
       <<: *svc-env
       SERVICE_NAME: mockpay
       OTEL_SERVICE_NAME: mockpay
+      # Emit signed webhooks back through the edge (mirrors a real provider
+      # calling the public webhook URL). Secret must match payment's.
+      MOCKPAY_WEBHOOK_SECRET: whsec_local_demo
+      MOCKPAY_WEBHOOK_URL: http://gateway:8000/payment/v1/public/webhooks/mockpay
     healthcheck: *svc-healthcheck
 
   payment:

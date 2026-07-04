@@ -33,3 +33,4 @@ settled decisions.
 | [ADR-005](ADR-005-openbao-ha-raft/) | Run OpenBAO HA (Raft) instead of Vault dev mode | Accepted | — |
 | [ADR-006](ADR-006-rs256-jwt-kong-edge-auth/) | Adopt RS256 signed JWTs + Kong edge authentication | Accepted | [RFC-0009](../rfc/RFC-0009/) |
 | [ADR-007](ADR-007-double-entry-payment-ledger/) | Record money movement in an append-only double-entry ledger | Accepted | [RFC-0010](../rfc/RFC-0010/) |
+| [ADR-008](ADR-008-mockpay-standalone-provider/) | Run the mock payment provider as a standalone process | Accepted | [RFC-0010](../rfc/RFC-0010/) |

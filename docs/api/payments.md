@@ -1,4 +1,20 @@
-# Payment ↔ Provider Reconciliation
+# Payments
+
+The payment subsystem: a Stripe-style payment service (auth/capture state
+machine, idempotency, double-entry ledger, mock provider) wired into the order
+fulfillment saga. The *design* lives in the RFC/ADRs below; this doc covers the
+operational surface — today, reconciliation.
+
+## Design record
+
+- [RFC-0010: Payment service](../proposals/rfc/RFC-0010/) — the full design
+- [ADR-007](../proposals/adr/ADR-007-double-entry-payment-ledger/) — append-only double-entry ledger
+- [ADR-008](../proposals/adr/ADR-008-mockpay-standalone-provider/) — mockpay as a standalone process
+- [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) — authorize-early / capture-late in the order saga
+- [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared `pkg/idempotency`
+- [ADR-011](../proposals/adr/ADR-011-detect-only-reconciliation/) — detect-only reconciliation
+
+## Payment ↔ Provider Reconciliation
 
 Two money systems always drift eventually — reconciliation is how the platform
 *detects* that drift instead of learning about it from a customer complaint.
@@ -12,7 +28,7 @@ Two money systems always drift eventually — reconciliation is how the platform
 | **Heals?** | **No** — records + reports only; auto-heal is a deliberate later step |
 | **Report** | `reconciliation_runs` / `reconciliation_discrepancies` + internal API |
 
-## Why reconciliation exists
+### Why reconciliation exists
 
 A payment platform holds the same fact in two places: its own database (the
 `payments` row and the double-entry ledger, [ADR-007](../proposals/adr/ADR-007-double-entry-payment-ledger/))
@@ -32,7 +48,7 @@ exactly this reason: the ledger proves the *books are internally consistent*,
 and reconciliation proves the books *match reality*. One without the other is
 false confidence.
 
-## Architecture
+### Architecture
 
 ```mermaid
 flowchart LR
@@ -60,7 +76,7 @@ transaction ledger to exhaustion, and classify each pairing:
 When both amount and status differ, **amount wins** (one discrepancy per
 charge — fix the amount first; the next run catches residual status drift).
 
-### Expected pairings are not drift
+#### Expected pairings are not drift
 
 Raw status equality would flood the report with benign mismatches, so the
 classifier knows the two vocabularies differ:
@@ -74,7 +90,7 @@ classifier knows the two vocabularies differ:
   with *no* internal refund that the provider shows `refunded` is real drift
   and is flagged.
 
-### The detector defends itself
+#### The detector defends itself
 
 The provider's data is untrusted input:
 
@@ -88,9 +104,9 @@ The provider's data is untrusted input:
   a context detached from the caller's, so an aborted trigger request or a
   shutdown mid-pass can't strand a row in `running`.
 
-## Operations
+### Operations
 
-### Reading the report
+#### Reading the report
 
 The internal API (internal audience — never routed through the gateway; today
 the local-stack fence is Kong omitting the route plus the compose network, and
@@ -124,7 +140,7 @@ Amounts are **minor units** (cents) with the unit in the field name. Treat
 `detail`/`provider_status` as untrusted text if a UI ever renders them — they
 carry provider-controlled strings.
 
-### What to do with a discrepancy (v1 = a human decides)
+#### What to do with a discrepancy (v1 = a human decides)
 
 v1 deliberately does **not** self-correct ([ADR-011](../proposals/adr/ADR-011-detect-only-reconciliation/)).
 The runbook is: read the discrepancy, pull both sides (payment row + ledger
@@ -132,7 +148,7 @@ entries vs the provider record), decide which side is right, and correct via
 the normal APIs (refund endpoint, state transitions) — never by editing rows.
 Every correction then leaves its own audit trail.
 
-### Verified end-to-end (fault-injection e2e, 2026-07-04)
+#### Verified end-to-end (fault-injection e2e, 2026-07-04)
 
 Run against the full local-stack with the payment saga enabled, using mockpay's
 deterministic magic amounts (`amount % 100`: `02` decline, `95`
@@ -147,7 +163,7 @@ insufficient_funds, `19` transient-then-succeed):
 | clean reconciliation run | — | `completed`, 0 discrepancies (voided/captured pairs match) |
 | injected drift (`UPDATE … amount_minor+1`) | — | run detects `amount_mismatch` 1920 vs 1919 |
 
-### Known v1 limits (deliberate, tracked)
+#### Known v1 limits (deliberate, tracked)
 
 - **Refund amounts aren't reconciled** — the provider ledger reports a
   refunded *flag*, not amounts, so net-refund drift is out of scope until the
@@ -160,12 +176,6 @@ insufficient_funds, `19` transient-then-succeed):
 - **No metric or alert on `discrepancies_found > 0` yet** — detection surfaces
   as a ticker log line and via the report API, so today someone must go
   looking. Alerting rides with the heal slice.
-
-## References
-
-- [ADR-011: Detect-only reconciliation](../proposals/adr/ADR-011-detect-only-reconciliation/) — why v1 never heals
-- [ADR-007: Append-only double-entry ledger](../proposals/adr/ADR-007-double-entry-payment-ledger/) — the crash window this closes the visibility gap on
-- [RFC-0010](../proposals/rfc/RFC-0010/) — the payment service design, §Reconciliation job
 
 ---
 

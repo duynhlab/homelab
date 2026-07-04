@@ -85,7 +85,7 @@ alert data shows it's needed, not speculatively.
 - **Drift is now visible** — including the ADR-007 crash-between-commit-and-
   confirm window, which no internal check could see. Detection was verified
   end-to-end: an injected 1-minor-unit amount drift was caught and reported on
-  the first pass ([reconciliation doc](../../../api/reconciliation.md)).
+  the first pass ([payments doc](../../../api/payments.md)).
 - **Remediation is manual.** A discrepancy sits in the report until a human
   acts; there is no self-healing MTTR. Acceptable at current volume; the soak
   period is exactly for building the confidence to automate.

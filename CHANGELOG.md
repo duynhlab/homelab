@@ -9,7 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Metrics scrape labels**: the `microservices-api` ServiceMonitor and the
+  `order-worker` PodMonitor now select the standard
+  `app.kubernetes.io/component` label (`api` / `worker`) instead of the bare,
+  unprefixed `component`/`instance` labels — aligning with Kubernetes and Helm
+  recommended-label conventions (mop chart ≥ 0.14.0 renders the label).
+
 ### Fixed
+
+- **Microservices scrape target**: the `microservices-api` ServiceMonitor
+  selected a bare `component: api` label that the mop chart stopped rendering
+  after its single-Service refactor, leaving the selector dangling. Repointed
+  to `app.kubernetes.io/component: api` (emitted by mop ≥ 0.14.0) so the 8
+  services are discovered again.
 
 - **Order-details payment enrichment (RFC-0010 P6)**: wire `PAYMENT_GRPC_ADDR`
   into the order **API** deployment (not just the worker) so it can dial payment

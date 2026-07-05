@@ -27,6 +27,9 @@ spec:
       retries: 3
   values:
     name: order-worker
+    # Architectural component → app.kubernetes.io/component: worker (mop default
+    # is "api"). The order-worker PodMonitor selects on this label.
+    component: worker
     replicaCount: 1
     image:
       # Same image as the order API — just a different subcommand.

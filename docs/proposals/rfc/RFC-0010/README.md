@@ -520,7 +520,7 @@ new-code coverage, `go test -race`, golangci-lint, agent-skills review.
 ## Observability & SLO impact
 
 - **Free from the platform**: RED metrics via the shared middleware +
-  `component: api` ServiceMonitor; SLO (availability/latency) auto-rendered
+  `app.kubernetes.io/component: api` ServiceMonitor; SLO (availability/latency) auto-rendered
   by the `mop` chart (`slo.enabled: true` in checkout-rs); tracing via
   `middleware/tracing.go` (ParentBased sampler) + Kong edge spans; JSON logs
   → Vector → VictoriaLogs.

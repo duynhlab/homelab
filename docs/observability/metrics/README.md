@@ -110,7 +110,7 @@ manual wiring — detailed in [metrics-apps.md](metrics-apps.md):
 - **Label injection** — applications emit only 3 labels (`method`, `path`,
   `code`); VMAgent adds `app`/`namespace`/`job`/`instance` at scrape time.
 - **ServiceMonitor auto-discovery** — a single `ServiceMonitor` selects every
-  Service labelled `component: api` in any namespace, so new services (deployed
+  Service labelled `app.kubernetes.io/component: api` in any namespace, so new services (deployed
   via the `mop` chart) are scraped automatically.
 
 ## Metrics coverage by layer

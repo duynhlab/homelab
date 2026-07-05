@@ -25,4 +25,4 @@ spec:
     any: true
   selector:
     matchLabels:
-      component: api
+      app.kubernetes.io/component: api

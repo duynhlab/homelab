@@ -95,10 +95,10 @@ namespaceSelector:
   any: true
 selector:
   matchLabels:
-    component: api    # All mop chart services have this label
+    app.kubernetes.io/component: api    # All mop chart services have this label
 ```
 
-No manual namespace registration is needed. Any service deployed via the `mop` chart gets the `component: api` label and is automatically scraped.
+No manual namespace registration is needed. Any service deployed via the `mop` chart gets the `app.kubernetes.io/component: api` label and is automatically scraped.
 
 ## Verification Checklist
 

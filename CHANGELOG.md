@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **docs (proposals)**: **RFC-0012** — converge CNPG role & database management
+  on declarative CRDs (provisional, P1): CNPG 1.30 review (`DatabaseRole` CRD,
+  adoption/precedence semantics, 3 role-related security fixes), the cnpg-db
+  four-generation archaeology (initdb / cleartext postInitSQL / managed.roles /
+  Database CRs) as documented tech debt, and a 5-phase migration to a
+  per-service ExternalSecret + DatabaseRole + Database triplet, ending with
+  pg_hba connection isolation. RFC index updated.
+
 ## [0.104.0] - 2026-07-05
 
 ### Added

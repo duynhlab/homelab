@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Order-details payment enrichment (RFC-0010 P6)**: wire `PAYMENT_GRPC_ADDR`
+  into the order **API** deployment (not just the worker) so it can dial payment
+  for the `GetPayment` read behind order details — the code default points at the
+  plain `payment` Service, so the API needs the headless `payment-grpc` target on
+  the cluster and `payment:9090` in local-stack. Without it the enrichment
+  soft-failed and details never carried the payment snapshot.
+
 ### Added
 
 - **docs (proposals)**: **RFC-0012** — converge CNPG role & database management

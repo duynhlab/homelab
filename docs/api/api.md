@@ -1070,6 +1070,20 @@ Routes: see [`api-naming-convention.md`](api-naming-convention.md). No additiona
 | `read` | boolean | Whether notification has been read |
 | `created_at` | string | ISO 8601 timestamp when notification was created |
 
+#### PATCH /notification/v1/private/notifications/read-all
+
+Marks every unread notification for the authenticated user as read in one
+request (the SPA's "Mark all as read"). `user_id` is derived from the JWT; the
+update is owner-scoped and idempotent.
+
+**200 OK**
+```json
+{ "updated": 6 }
+```
+
+`updated` is the number of notifications flipped to read — `0` when there were
+none unread (still a success, not a 404).
+
 ---
 
 ## Shipping Service

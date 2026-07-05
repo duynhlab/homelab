@@ -119,6 +119,7 @@ All private.
 |--------|------|----------|--------|
 | `GET` | `/notification/v1/private/notifications` | private | Browser |
 | `GET` | `/notification/v1/private/notifications/count` | private | Browser (bell badge) |
+| `PATCH` | `/notification/v1/private/notifications/read-all` | private | Browser (mark all as read) |
 | `GET` / `PATCH` | `/notification/v1/private/notifications/:id` | private | Browser |
 | `POST` | `/notification/v1/internal/notify/email` | internal | Any service publishing a user notification |
 | `POST` | `/notification/v1/internal/notify/sms` | internal | Any service publishing a user notification |

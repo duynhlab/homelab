@@ -33,7 +33,7 @@ flowchart TD
     VMS -->|Prometheus-compatible API| Grafana["Grafana Dashboards"]
     VMS -->|Prometheus-compatible API| SlothUI["Sloth Web UI<br/>slo.duynh.me"]
 
-    SM["ServiceMonitor<br/>component: api"] -->|convert| VMSS["VMServiceScrape"]
+    SM["ServiceMonitor<br/>app.kubernetes.io/component: api"] -->|convert| VMSS["VMServiceScrape"]
     VMSS --> VMAgent["VMAgent"]
     VMAgent -->|remote write| VMS
 ```
@@ -43,7 +43,7 @@ flowchart TD
 2. The `mop` Helm chart renders a `PrometheusServiceLevel` CRD
 3. Sloth Operator watches the CRD and generates PrometheusRules
 4. The VictoriaMetrics Operator converts those rules to VMRules; VMAlert evaluates PromQL-compatible rules against VMSingle, tracks error budgets, and sends alerts to VMAlertmanager
-5. ServiceMonitors auto-discover targets via `component: api`; VMAgent scrapes metrics (after ServiceMonitor → VMServiceScrape conversion) and remote-writes to VMSingle
+5. ServiceMonitors auto-discover targets via `app.kubernetes.io/component: api`; VMAgent scrapes metrics (after ServiceMonitor → VMServiceScrape conversion) and remote-writes to VMSingle
 6. The standalone **Sloth UI** Deployment (separate from the controller) reads SLI/error-budget series back from VMSingle to render its dashboards
 
 ## SLO Definitions

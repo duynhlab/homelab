@@ -109,7 +109,7 @@ requestDuration = promauto.NewHistogramVec(
 
 A **single ServiceMonitor** discovers every microservice via label match in any
 namespace, so new services (deployed with the `mop` chart, which sets
-`component: api`) are scraped with no manual registration:
+`app.kubernetes.io/component: api`) are scraped with no manual registration:
 
 ```yaml
 # kubernetes/infra/configs/monitoring/servicemonitors/microservices.yaml
@@ -118,7 +118,7 @@ kind: ServiceMonitor
 metadata: { name: microservices-api, namespace: monitoring }
 spec:
   namespaceSelector: { any: true }
-  selector: { matchLabels: { component: api } }
+  selector: { matchLabels: { app.kubernetes.io/component: api } }
   endpoints:
     - port: http
       path: /metrics
@@ -131,9 +131,9 @@ spec:
 
 ```mermaid
 flowchart TD
-    SM["ServiceMonitor<br/>selector: component=api<br/>namespaceSelector: any"] -->|"VM Operator auto-convert"| VSS["VMServiceScrape"]
+    SM["ServiceMonitor<br/>selector: app.kubernetes.io/component=api<br/>namespaceSelector: any"] -->|"VM Operator auto-convert"| VSS["VMServiceScrape"]
     VSS --> VMA["VMAgent"]
-    VMA -->|"discovers component=api"| A["auth:8080/metrics"] & U["user:8080/metrics"] & N["new-service:8080/metrics"]
+    VMA -->|"discovers app.kubernetes.io/component=api"| A["auth:8080/metrics"] & U["user:8080/metrics"] & N["new-service:8080/metrics"]
     VMA -->|remote write| VMS[("VMSingle :8428")]
 ```
 
@@ -324,7 +324,7 @@ per-domain index (exact files, counts, and production impact) is the
 
 | Manifest (under `kubernetes/infra/configs/monitoring/`) | Purpose |
 |------|---------|
-| `servicemonitors/microservices.yaml` | Single ServiceMonitor scraping every `component: api` service |
+| `servicemonitors/microservices.yaml` | Single ServiceMonitor scraping every `app.kubernetes.io/component: api` service |
 
 - **Alerts + recording rules** — the RED/Golden microservice alerts and the RED
   pre-aggregation rules (`prometheusrules/microservices/`): see

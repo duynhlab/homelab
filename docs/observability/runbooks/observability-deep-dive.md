@@ -327,7 +327,7 @@ flowchart TD
     PR -->|evaluate| VMAlert["VMAlert"]
     VMAlert -->|query| VMSingle["VMSingle"]
     VMAlert -->|notify| VMAMgr["VMAlertmanager"]
-    SM["ServiceMonitor\ncomponent: api"] -->|"auto-convert"| VMAgent["VMAgent scrapes"]
+    SM["ServiceMonitor\napp.kubernetes.io/component: api"] -->|"auto-convert"| VMAgent["VMAgent scrapes"]
     VMAgent -->|"remote write"| VMSingle
 ```
 
@@ -499,7 +499,7 @@ Use this framework for every interview question about observability. The **Befor
 - Single `request_duration_seconds` histogram covers all RED signals (Rate, Errors, Duration)
 - `requests_in_flight` gauge adds saturation = all 4 Golden Signals from 2 metrics
 - TracingMiddleware -> LoggingMiddleware -> PrometheusMiddleware order ensures `trace_id` is available for exemplars and log correlation
-- Single `ServiceMonitor` with `component: api` label auto-discovers all services
+- Single `ServiceMonitor` with `app.kubernetes.io/component: api` label auto-discovers all services
 - Sloth Operator generates multi-window multi-burn-rate SLO alerts from `PrometheusServiceLevel` CRDs
 - VMAgent scrapes, VMSingle stores, VMAlert evaluates, VMAlertmanager routes
 - Everything deployed via Flux GitOps -- add a new service, it gets monitoring for free
@@ -650,7 +650,7 @@ downtime_reduction = (before - after) / before
 
 ### Q4: "110 services -- how did you handle that scale?"
 
-- **Single ServiceMonitor with label selector**: `matchLabels: { component: api }` auto-discovers any service with that label, in any namespace (`namespaceSelector.any: true`). No per-service scrape config needed
+- **Single ServiceMonitor with label selector**: `matchLabels: { app.kubernetes.io/component: api }` auto-discovers any service with that label, in any namespace (`namespaceSelector.any: true`). No per-service scrape config needed
 - **VMAgent scrapes all targets, single VMSingle stores**: 7-day retention, horizontal scaling possible with VMCluster when needed
 - **Standardized middleware**: Every service includes the same 3-middleware chain. Add the middleware, get RED metrics + traces + structured logs automatically. No per-service instrumentation
 - **GitOps onboarding**: Deploy a new service via Helm -> set `slo.enabled: true` -> it gets metrics, alerting, SLOs, dashboards, and log collection automatically. Zero additional configuration

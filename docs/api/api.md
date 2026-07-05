@@ -731,9 +731,9 @@ Authorization: Bearer <jwt_token>
 
 ### GET /order/v1/private/orders/:id/details
 
-**Aggregation Endpoint** - Get order with shipment information.
+**Aggregation Endpoint** - Get order with shipment and payment information.
 
-This endpoint combines order data with shipment tracking from the Shipping service. Used by frontend for strict 3-layer compliance (single endpoint per view).
+This endpoint combines order data with shipment tracking (Shipping service) and the payment snapshot (Payment service, over gRPC). Used by frontend for strict 3-layer compliance (single endpoint per view).
 
 #### Request
 
@@ -766,11 +766,24 @@ Authorization: Bearer <jwt_token>
     "estimated_delivery": "2026-01-10T18:00:00Z",
     "created_at": "2026-01-07T12:00:00Z",
     "updated_at": "2026-01-08T09:30:00Z"
+  },
+  "payment": {
+    "status": "captured",
+    "amount": 64.98,
+    "currency": "USD",
+    "refunded": 0
   }
 }
 ```
 
-**Note:** `shipment` may be `null` if no shipment exists for the order yet.
+**Note:** `shipment` and `payment` may each be `null` — `shipment` if none exists
+yet; `payment` if the payment feature is off, the order has no payment, or the
+payment service is briefly unreachable (the enrichment soft-fails so order
+details stay available). When present, `payment.status` is
+`authorized`/`captured`/`failed`/`voided`/`refunded`/`partially_refunded`
+(the last is derived when a refund is partial); `decline_code` appears only on
+`failed`, `refunded` only when a refund has been applied. See
+[payments.md](./payments.md#the-checkout-read-path-rfc-0010-p6).
 
 **Error Responses:**
 
@@ -802,7 +815,8 @@ Authorization: Bearer <jwt_token>
       "quantity": 2,
       "price": 29.99
     }
-  ]
+  ],
+  "payment_method": "tok_visa"
 }
 ```
 
@@ -813,6 +827,7 @@ Authorization: Bearer <jwt_token>
 | `items[].product_name` | string | Yes | Product name (denormalized for order record) |
 | `items[].quantity` | integer | Yes | Quantity (min=1) |
 | `items[].price` | number | Yes | Unit price at time of order |
+| `payment_method` | string | No | Opaque test token (`tok_…`) the saga charges. Validated for shape and rejected with **400** if PAN-like *before* the order is persisted; empty → a demo token. Never card data. See [payments.md](./payments.md#the-checkout-read-path-rfc-0010-p6). |
 
 #### Response
 

@@ -3,7 +3,8 @@
 The payment subsystem: a Stripe-style payment service (auth/capture state
 machine, idempotency, double-entry ledger, mock provider) wired into the order
 fulfillment saga. The *design* lives in the RFC/ADRs below; this doc covers the
-operational surface — today, reconciliation.
+operational surface — the checkout read path (how a payment reaches the UI) and
+reconciliation.
 
 ## Design record
 
@@ -13,6 +14,48 @@ operational surface — today, reconciliation.
 - [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) — authorize-early / capture-late in the order saga
 - [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared `pkg/idempotency`
 - [ADR-011](../proposals/adr/ADR-011-detect-only-reconciliation/) — detect-only reconciliation
+
+## The checkout read path (RFC-0010 P6)
+
+How a payment gets from the checkout form to the order-detail screen. The
+browser never talks to payment directly — it reads through order, which reads
+payment over gRPC.
+
+| | |
+|---|---|
+| **Status** | Deployed (local-stack, real-browser e2e-verified) · cluster manifests landed |
+| **Write** | Checkout sends `payment_method` (a `tok_` test token) on order create → the saga's `Authorize`/`Capture` |
+| **Read** | `payment.v1 GetPayment(order_id)` — internal gRPC, keyed by order id |
+| **Surfaced** | Order-details endpoint enriches with a `payment` object (soft-fail) |
+
+```mermaid
+flowchart LR
+    SPA["frontend (checkout)"] -->|"payment_method=tok_…"| OAPI["order API"]
+    OAPI -->|CreateOrder| Saga["order saga (Temporal)"]
+    Saga -->|"Authorize → Capture"| PAY["payment (gRPC)"]
+    SPA2["frontend (order detail)"] -->|GET /orders/id/details| OAPI
+    OAPI -->|"GetPayment(order_id)"| PAY
+```
+
+**Token flow (write).** The checkout picker offers opaque test tokens
+(`tok_visa`, `tok_mastercard`); the token is a *reference*, never card data.
+The order API validates its shape (`tok_` prefix, length, no PAN-like digit
+runs) and rejects a bad one with **400 before persisting anything** — the
+create request becomes durable Temporal history, so an invalid instrument must
+never enter it. An empty `payment_method` falls back to a demo token
+(byte-identical to the pre-P6 flow). mockpay decides the outcome from the
+**amount**, not the token: `amount_minor % 100` → `02` generic decline, `95`
+insufficient funds, `19` transient (retry succeeds).
+
+**Enrichment (read).** `GET /order/v1/private/orders/{id}/details` calls
+`GetPayment` after the owner-scoped order lookup, gated on `PAYMENT_ENABLED`,
+with a 2s timeout. It is **soft-fail** — if payment is unreachable the details
+still return, just without the `payment` object (mirrors the shipping
+enrichment). The order API needs `PAYMENT_GRPC_ADDR` for this, not just the
+worker. The `payment` object carries `status`, `amount`, `refunded`,
+`currency`, `decline_code`; a partial refund is **derived** as
+`partially_refunded` (stored status stays `captured` while
+`0 < refunded < amount`).
 
 ## Payment ↔ Provider Reconciliation
 

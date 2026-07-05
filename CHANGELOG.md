@@ -20,6 +20,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Payment read path + frontend (RFC-0010 P6)**: the checkout flow now shows
+  real payment state. `payment.v1 GetPayment` read RPC (`pkg` v0.15.0, plus
+  `refunded_minor` in v0.15.1); order-details enriches with a soft-fail
+  `payment` object (`status`/`amount`/`refunded`/`currency`/`decline_code`,
+  `partially_refunded` derived); checkout carries a `payment_method` test token
+  (PCI-safe `tok_` validation → 400 before persist); frontend adds a mock
+  test-token picker and a payment status box on the order detail. Real-browser
+  e2e-verified in local-stack. **RFC-0010 is now `implemented` (P1–P6 landed)**;
+  docs updated (`api/payments.md` checkout read path, `api/api.md` order create
+  + details, RFC/ADR indexes).
+
+### Changed
+
+- **RFC-0010** status → **implemented** (P1–P6); index and progress note updated.
+
+### Added
+
 - **docs (proposals)**: **RFC-0012** — converge CNPG role & database management
   on declarative CRDs (provisional, P1): CNPG 1.30 review (`DatabaseRole` CRD,
   adoption/precedence semantics, 3 role-related security fixes), the cnpg-db

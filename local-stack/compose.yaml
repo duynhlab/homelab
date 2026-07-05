@@ -500,9 +500,11 @@ services:
       TEMPORAL_NAMESPACE: mop
       TASK_QUEUE: order-fulfillment
       # Turn the saga's payment steps on locally (authorize-early/capture-late +
-      # void/refund compensations). The API only reads the flag to stamp it on the
-      # workflow input; the order-worker is what dials + calls payment.
+      # void/refund compensations). The API stamps the flag on the workflow input
+      # and also dials payment itself for the order-details payment enrichment
+      # (GetPayment) — so it needs the gRPC target too, not just the worker.
       PAYMENT_ENABLED: "true"
+      PAYMENT_GRPC_ADDR: dns:///payment:9090
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }

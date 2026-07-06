@@ -153,6 +153,7 @@ metrics/
 ├── metrics-infra.md     # Cluster / infrastructure metrics (USE)
 ├── victoriametrics.md   # The stack: VM Operator, dual CRDs, components, ops
 ├── promql-guide.md      # PromQL: counters, rate() vs increase(), $rate vs $__range
+├── streaming-aggregation.md  # At-scale playbook: in-flight aggregation, 2-tier vmagent (RFC-0013)
 └── postgresql/          # Databases layer
     ├── monitoring.md            # Entry point: 3-cluster strategy + exporters
     ├── custom-metrics.md        # postgres_exporter custom queries (Zalando)
@@ -192,6 +193,7 @@ histogram_quantile(0.95, sum by (le) (rate(request_duration_seconds_bucket{job="
 - [VictoriaMetrics Operator Stack](victoriametrics.md) — architecture, dual CRDs, components
 - [Application metrics (RED)](metrics-apps.md) · [Infrastructure metrics (USE)](metrics-infra.md) · [Database metrics](postgresql/monitoring.md)
 - [PromQL Guide](promql-guide.md) — counters, `rate()`/`increase()`, `$rate` vs `$__range`
+- [Streaming Aggregation](streaming-aggregation.md) — cardinality math + at-scale playbook (RFC-0013)
 - [SLO Documentation](../slo/README.md) — SLI mappings, Sloth integration
 - [Grafana Dashboard Guide](../grafana/dashboard-reference.md) · [Datasource Strategy](../grafana/datasources.md)
 - [VictoriaMetrics docs](https://docs.victoriametrics.com/) · [prometheus-operator CRDs](https://prometheus-operator.dev/)

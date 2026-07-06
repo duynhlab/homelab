@@ -148,11 +148,14 @@ metadata:
 | K8s Secret | Namespace | Source path (OpenBAO) | Source key | K8s key |
 |------------|-----------|-----------------------|------------|---------|
 | `cloudflare-api-token` | `cert-manager` | `secret/data/local/infra/cloudflare/api-token` | `api_token` | `api-token` |
-| `payment-webhook-hmac` | `payment` | `secret/data/local/payment/webhook-hmac` | `secret` | `secret` |
+| `payment-webhook-hmac` | `payment` | `secret/data/local/services/payment/webhook-hmac` | `secret` | `secret` |
 
 Defined at `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml` (kind `ExternalSecret`, despite the directory name — the cert-manager ClusterIssuer only needs the Secret in one namespace). `payment-webhook-hmac` is defined at `kubernetes/infra/configs/secrets/payment-webhook-external-secrets.yaml` — the shared HMAC key mockpay signs webhooks with and payment verifies.
 
-> ⚠️ **Convention exception:** `secret/local/payment/webhook-hmac` is a **3-level** path (`{env}/{service}/{resource}`) — it omits the `{category}` level and does **not** follow the standardised `secret/{env}/{category}/{service}/{resource}` hierarchy above. It should be `secret/local/services/payment/webhook-hmac`. Documented here as a known deviation; the live secret is **not** renamed to avoid a breaking change. _(Follow-up: rename to `.../services/payment/webhook-hmac`.)_
+> **Note:** `secret/local/services/payment/webhook-hmac` follows the standard 4-level
+> `secret/{env}/{category}/{service}/{resource}` hierarchy and sits inside the
+> `eso-read` `local/services/*` grant. (It was briefly seeded at the 3-level
+> `secret/local/payment/webhook-hmac` and renamed into convention.)
 
 ---
 

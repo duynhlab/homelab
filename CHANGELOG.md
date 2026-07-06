@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **`PAYMENT_ENABLED` feature flag (RFC-0010 P3.exit)**: the payment↔saga
+  rollout flag is gone — payment (authorize-early/capture-late + void/refund
+  compensations) is now an unconditional part of the order-fulfillment saga.
+  Dropped the env from the order API (`checkout-rs` template + `services/order.yaml`)
+  and `local-stack/compose.yaml`; docs updated (temporal-order-fulfillment, payments,
+  RFC-0010, ADR-009). Pairs with order-service removing the flag + dead branch.
+
 ### Changed
 
 - **Metrics scrape labels**: the `microservices-api` ServiceMonitor and the

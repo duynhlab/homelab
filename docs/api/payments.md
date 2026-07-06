@@ -48,11 +48,10 @@ never enter it. An empty `payment_method` falls back to a demo token
 insufficient funds, `19` transient (retry succeeds).
 
 **Enrichment (read).** `GET /order/v1/private/orders/{id}/details` calls
-`GetPayment` after the owner-scoped order lookup, gated on `PAYMENT_ENABLED`,
-with a 2s timeout. It is **soft-fail** — if payment is unreachable the details
-still return, just without the `payment` object (mirrors the shipping
-enrichment). The order API needs `PAYMENT_GRPC_ADDR` for this, not just the
-worker. The `payment` object carries `status`, `amount`, `refunded`,
+`GetPayment` after the owner-scoped order lookup, with a 2s timeout. It is
+**soft-fail** — if payment is unreachable the details still return, just without
+the `payment` object (mirrors the shipping enrichment). The order API needs
+`PAYMENT_GRPC_ADDR` for this, not just the worker. The `payment` object carries `status`, `amount`, `refunded`,
 `currency`, `decline_code`; a partial refund is **derived** as
 `partially_refunded` (stored status stays `captured` while
 `0 < refunded < amount`).

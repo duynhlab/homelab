@@ -499,11 +499,9 @@ services:
       TEMPORAL_HOSTPORT: temporal:7233
       TEMPORAL_NAMESPACE: mop
       TASK_QUEUE: order-fulfillment
-      # Turn the saga's payment steps on locally (authorize-early/capture-late +
-      # void/refund compensations). The API stamps the flag on the workflow input
-      # and also dials payment itself for the order-details payment enrichment
-      # (GetPayment) — so it needs the gRPC target too, not just the worker.
-      PAYMENT_ENABLED: "true"
+      # Payment gRPC target for the order-details enrichment (GetPayment). The
+      # saga's payment steps (authorize-early/capture-late + void/refund) are
+      # always on; the worker uses its own PAYMENT_GRPC_ADDR for the money ops.
       PAYMENT_GRPC_ADDR: dns:///payment:9090
     healthcheck: *svc-healthcheck
     depends_on:

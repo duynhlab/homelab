@@ -7,7 +7,7 @@ existing idempotent capture. Every other class stays detect-only. Off by default
 
 | Status | Date | Related RFC |
 |--------|------|-------------|
-| Proposed | 2026-07-06 | [RFC-0010](../../rfc/RFC-0010/) |
+| Accepted | 2026-07-06 | [RFC-0010](../../rfc/RFC-0010/) |
 
 > **Don't forget: every decision is a tradeoff.** Record what you gave up, not just
 > what you gained.
@@ -146,7 +146,7 @@ otherwise stands.
   behaviour until an operator opts in; the report still records `detected` for
   the healable class so a dry run shows what *would* heal.
 - **New schema.** `reconciliation_discrepancies` gains `resolution` +
-  `resolved_at` (migration in the implementation PR) so a run's corrections are
+  `resolved_at` (migration `000009_recon_resolution`) so a run's corrections are
   auditable alongside its detections.
 - **Revisit trigger:** if alert data shows Window 1 (provider-ahead's mirror) or
   `missing_provider` recurring often enough to need automation, re-open with a

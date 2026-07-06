@@ -22,6 +22,7 @@ hop table below.
 | **Phase 2** — `/me` validation: all 5 consumers validated via `auth.GetMe` over gRPC through the shared fail-closed `pkg/authmw` | ⛔ retired by RFC-0009 Phase 5 (JWT-only authmw v0.12.0; `auth/v1` proto removed) | `pkg/authmw` + 5 services |
 | **Phase 2** — `product → review` aggregation | ✅ gRPC-only | review + product |
 | **Phase 2** — `order → notification` publish on checkout (best-effort) | ✅ | notification + order |
+| **Payment (RFC-0010)** — `order` + `order-worker` → `payment` (saga capture/refund + `GetPayment` enrichment); `order-worker` → `product` (saga stock) | ✅ gRPC-only | payment + product + order + order-worker |
 | **Cluster** — headless `{shipping,review,notification}-grpc` Services (`:9090`) + ResourceSet `*_GRPC_ADDR` env (`auth-grpc` removed in Phase 5) | ✅ | mop chart (`grpc.enabled`), `kubernetes/apps/domains/*-rs.yaml`, `kubernetes/apps/services/*.yaml` |
 | **Phase 3** — NetworkPolicy fences `:9090`; gRPC health service registered | ✅ | `kubernetes/infra/configs/network-policies/` |
 | **Phase 3** — mTLS on `:9090` | ⏳ deferred | services use `insecure` creds; needs `grpcx` TLS + cert-manager |
@@ -35,8 +36,10 @@ Consumers dial the headless Services:
 |-----|------|---------|
 | `GRPC_PORT` | gRPC listen port (all services) | `9090` |
 | `REVIEW_GRPC_ADDR` | product → review | `dns:///review-grpc.review.svc.cluster.local:9090` |
-| `SHIPPING_GRPC_ADDR` | order → shipping | `dns:///shipping-grpc.shipping.svc.cluster.local:9090` |
-| `NOTIFICATION_GRPC_ADDR` | order → notification | `dns:///notification-grpc.notification.svc.cluster.local:9090` |
+| `SHIPPING_GRPC_ADDR` | order → shipping (+ order-worker) | `dns:///shipping-grpc.shipping.svc.cluster.local:9090` |
+| `NOTIFICATION_GRPC_ADDR` | order → notification (+ order-worker) | `dns:///notification-grpc.notification.svc.cluster.local:9090` |
+| `PAYMENT_GRPC_ADDR` | order → payment (+ order-worker saga) | `dns:///payment-grpc.payment.svc.cluster.local:9090` |
+| `PRODUCT_GRPC_ADDR` | order-worker → product | `dns:///product-grpc.product.svc.cluster.local:9090` |
 
 ## TL;DR
 
@@ -93,6 +96,8 @@ calls, not a religion.
 | product → review (aggregation) | gRPC | ✅ gRPC-only |
 | order → shipping (internal order lookup) | gRPC | ✅ gRPC-only |
 | order → notification (publish on checkout) | gRPC | ✅ best-effort |
+| order + order-worker → payment (saga capture/refund + enrichment) | gRPC | ✅ gRPC-only (RFC-0010) |
+| order-worker → product (saga stock) | gRPC | ✅ gRPC-only (RFC-0010) |
 | order → cart (forwards user JWT) | REST today | not migrated (cart read on checkout still REST) |
 | any browser / SPA → Kong | **STAY REST** | — (hard rule) |
 | auth → user (registration) | not implemented | proto-only candidate |
@@ -347,28 +352,31 @@ flowchart TD
     K -->|HTTP :8080| AUTH[auth]
     K -->|HTTP :8080| REVIEW[review]
     K -->|HTTP :8080| NOTIF[notification]
+    K -->|HTTP :8080| PAYMENT[payment]
 
     %% All east-west hops are gRPC-only (:9090)
-    ORDER ==>|"gRPC /me"| AUTH
-    PRODUCT ==>|"gRPC /me"| AUTH
-    CART ==>|"gRPC /me"| AUTH
     ORDER ==>|"gRPC shipment"| SHIP[shipping]
     PRODUCT ==>|"gRPC reviews"| REVIEW
     ORDER ==>|"gRPC publish"| NOTIF
+    ORDER ==>|"gRPC payment"| PAYMENT
+    WORKER[order-worker] ==>|"gRPC saga"| PAYMENT
+    WORKER ==>|"gRPC stock"| PRODUCT
 
     %% Not migrated / candidate
     ORDER -. "REST cart read" .-> CART
     AUTH -. "proto-only candidate" .-> USER[user]
 
-    linkStyle 7,8,9,10,11,12 stroke:#1f7a33,stroke-width:3px
+    linkStyle 8,9,10,11,12,13 stroke:#1f7a33,stroke-width:3px
     classDef live fill:#e6f4ea,stroke:#1f7a33,color:#0d3d18
-    class AUTH,SHIP,REVIEW,NOTIF live
+    class SHIP,REVIEW,NOTIF,PAYMENT,PRODUCT live
 ```
 
-> `/me` is shown via representative `order`/`product`/`cart` callers; **all** five
-> JWT-validating services (incl. user, notification) use the same gRPC hop via the
-> shared `pkg/authmw`. `notification`'s browser-facing routes (list/count/get/
-> mark-read) **stay REST** — only the internal publish path is gRPC.
+> There is **no** per-request east-west hop to `auth` any more — since RFC-0009
+> Phase 5 all JWT-validating services verify RS256 tokens locally against the
+> cached JWKS (`pkg/authmw`), so `auth` runs no gRPC server. `notification`'s
+> browser-facing routes (list/count/get/mark-read) **stay REST** — only the
+> internal publish path is gRPC. The `order-worker` (RFC-0010 Temporal saga)
+> drives the payment/product/shipping/notification hops from its activities.
 
 ### Phase 0 — Scaffolding (no runtime change)
 

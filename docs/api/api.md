@@ -434,6 +434,7 @@ func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 | review | review | 8080 | `GET /review/v1/public/reviews` | `POST /review/v1/private/reviews` | — |
 | notification | notification | 8080 | — | `/notification/v1/private/notifications/*` | `POST /notification/v1/internal/notify/{email,sms}` |
 | shipping | shipping | 8080 | `/shipping/v1/public/{track,estimate}` | — | `GET /shipping/v1/internal/orders/:orderId` |
+| payment | payment | 8080 | `POST /payment/v1/public/webhooks/mockpay` | `/payment/v1/private/payments/*` | `POST /payment/v1/internal/payments/:id/refunds`, `/payment/v1/internal/reconciliation/runs[/:id]` |
 
 Same path, two hosts: browser hits `https://gateway.duynh.me/…`; services hit each other at `http://{svc}.{ns}.svc.cluster.local:8080/…`. Internal audiences are never published to the gateway. Full per-endpoint detail: [`api-naming-convention.md`](api-naming-convention.md).
 
@@ -1371,7 +1372,7 @@ For comprehensive logging documentation including JSON format, log levels, libra
 
 **Summary:**
 - **2 services**: cart (clog), auth (zerolog)
-- **6 services**: product, order, review, notification, shipping, user (Zap)
+- **7 services**: product, order, review, notification, shipping, user, payment (Zap)
 - All logs must be JSON format with `time`, `level`, `msg`/`message`, `trace_id`
 
 ---

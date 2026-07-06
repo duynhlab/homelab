@@ -110,6 +110,9 @@ ESO-managed secrets use the **same name** as the original secret they replace (e
 | `cnpg-db-secret` | product | `secret/data/local/databases/cnpg-db/product` |
 | `cnpg-db-cart-secret` | cart | `secret/data/local/databases/cnpg-db/cart` |
 | `cnpg-db-order-secret` | order | `secret/data/local/databases/cnpg-db/order` |
+| `cnpg-db-payment-secret` | product, payment | `secret/data/local/databases/cnpg-db/payment` |
+
+The `cnpg-db-payment-secret` is materialised in **both** `product` (where the `payment` database/owner is created on `cnpg-db`) and `payment` (where the payment service consumes it to connect direct-TLS to `cnpg-db-rw`).
 
 ### Backup Secrets (ClusterExternalSecret)
 
@@ -145,8 +148,11 @@ metadata:
 | K8s Secret | Namespace | Source path (OpenBAO) | Source key | K8s key |
 |------------|-----------|-----------------------|------------|---------|
 | `cloudflare-api-token` | `cert-manager` | `secret/data/local/infra/cloudflare/api-token` | `api_token` | `api-token` |
+| `payment-webhook-hmac` | `payment` | `secret/data/local/payment/webhook-hmac` | `secret` | `secret` |
 
-Defined at `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml` (kind `ExternalSecret`, despite the directory name — the cert-manager ClusterIssuer only needs the Secret in one namespace).
+Defined at `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml` (kind `ExternalSecret`, despite the directory name — the cert-manager ClusterIssuer only needs the Secret in one namespace). `payment-webhook-hmac` is defined at `kubernetes/infra/configs/secrets/payment-webhook-external-secrets.yaml` — the shared HMAC key mockpay signs webhooks with and payment verifies.
+
+> ⚠️ **Convention exception:** `secret/local/payment/webhook-hmac` is a **3-level** path (`{env}/{service}/{resource}`) — it omits the `{category}` level and does **not** follow the standardised `secret/{env}/{category}/{service}/{resource}` hierarchy above. It should be `secret/local/services/payment/webhook-hmac`. Documented here as a known deviation; the live secret is **not** renamed to avoid a breaking change. _(Follow-up: rename to `.../services/payment/webhook-hmac`.)_
 
 ---
 
@@ -387,4 +393,4 @@ Replace Shamir with cloud KMS for automatic unseal:
 
 ---
 
-_Last updated: 2026-07-02 — ESO + OpenBAO via Kubernetes auth, KV v2 static secrets (`refreshInterval: 1h`). Cloudflare token is a dev placeholder on local (bootstrap-seeded), operator-supplied on prod. Local Kind; production hardening tracked in [RFC-0008](../proposals/rfc/RFC-0008/)._
+_Last updated: 2026-07-07 — ESO + OpenBAO via Kubernetes auth, KV v2 static secrets (`refreshInterval: 1h`). Cloudflare token is a dev placeholder on local (bootstrap-seeded), operator-supplied on prod. Added payment DB + webhook-hmac secrets. Local Kind; production hardening tracked in [RFC-0008](../proposals/rfc/RFC-0008/)._

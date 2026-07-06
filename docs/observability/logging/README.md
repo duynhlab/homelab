@@ -39,7 +39,7 @@ application logged, a log and its distributed trace join on one id.
 ```mermaid
 flowchart LR
     subgraph sources["Sources"]
-        Pods["Pods (8 services + infra)<br/>stdout JSON"]
+        Pods["Pods (9 services + infra)<br/>stdout JSON"]
         CNPG["CloudNativePG<br/>auto_explain plans"]
     end
     subgraph vector["Vector DaemonSet · kube-system"]
@@ -132,7 +132,7 @@ What this design does well at scale, and the upgrade path:
   VictoriaLogs cluster** (`vlinsert` / `vlstorage` / `vlselect`) for horizontal
   scale and replication — same LogsQL, same ingest contract, no app changes.
 
-> This homelab runs 8 services + infra today; the above is the scale-up path, not
+> This homelab runs 9 services + infra today; the above is the scale-up path, not
 > something stress-tested here. The 1000+ framing follows the same large-scale
 > references the platform uses elsewhere (Uber M3, Grab/Shopee) — see
 > [observability deep-dive](../runbooks/observability-deep-dive.md).

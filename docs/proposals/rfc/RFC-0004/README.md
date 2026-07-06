@@ -146,7 +146,7 @@ sequenceDiagram
   reverts a service to direct DB reads — no behavior change beyond latency. Reversible at any
   time; the bust calls become no-ops when caching is off.
 - **Operator visibility.** "In use" = non-empty `<owner>:*` keyspace in Valkey +
-  `valkey_keyspace_hits_total` climbing for that owner; per-app hit/miss counters (below).
+  `redis_keyspace_hits_total` climbing for that owner (the exporter is redis_exporter → `redis_*`); per-app hit/miss counters (below).
 - **Supersedes / absorbs.** This RFC **absorbs the RFC-0001 *cache-bust on reserve* future-work
   item** ([RFC-0001 §Future work](../RFC-0001/README.md#future-work)) and the *cross-service
   invalidation* (contingent) + *negative caching* + *stronger stampede* items from the
@@ -166,9 +166,9 @@ an id exists beyond what the public read already reveals (it returns 404 either 
 ## Observability & SLO impact
 
 - **Cache hit ratio** per owner from the already-scraped server metrics:
-  `rate(valkey_keyspace_hits_total[5m]) / (rate(valkey_keyspace_hits_total[5m]) + rate(valkey_keyspace_misses_total[5m]))`
+  `rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))`
   (target > 80% for read-heavy endpoints).
-- **Eviction / memory pressure:** `valkey_evicted_keys_total`, `valkey_memory_used_bytes`
+- **Eviction / memory pressure:** `redis_evicted_keys_total`, `redis_memory_used_bytes`
   against `maxmemory` (policy `allkeys-lru`) — rising evictions mean the working set exceeds
   memory and TTLs are being cut short.
 - **App-level counters (new):** per-service `cache_hit/miss/error/invalidation_total` to attribute

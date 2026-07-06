@@ -16,7 +16,7 @@ flowchart TB
         Kong["opentelemetry plugin<br/>root request span + W3C traceparent"]
     end
 
-    subgraph Apps["Microservices (8 Go services)"]
+    subgraph Apps["Microservices (9 Go services)"]
         Auth[auth]
         User[user]
         Product[product]

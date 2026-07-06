@@ -25,6 +25,7 @@ flowchart TD
         reviewIP["rsip-review<br/>domain: catalog"]
         cartIP["rsip-cart<br/>domain: checkout"]
         orderIP["rsip-order<br/>domain: checkout"]
+        paymentIP["rsip-payment<br/>domain: checkout"]
         notifIP["rsip-notification<br/>domain: comms"]
         shipIP["rsip-shipping<br/>domain: comms"]
     end
@@ -39,7 +40,7 @@ flowchart TD
     subgraph output [Generated Resources]
         hrIdentity["NS + HR: auth, user"]
         hrCatalog["NS + HR: product, review"]
-        hrCheckout["NS + HR: cart, order"]
+        hrCheckout["NS + HR: cart, order, payment"]
         hrComms["NS + HR: notification, shipping"]
     end
 
@@ -49,6 +50,7 @@ flowchart TD
     reviewIP -->|"label selector"| rsCatalog
     cartIP -->|"label selector"| rsCheckout
     orderIP -->|"label selector"| rsCheckout
+    paymentIP -->|"label selector"| rsCheckout
     notifIP -->|"label selector"| rsComms
     shipIP -->|"label selector"| rsComms
 
@@ -65,7 +67,7 @@ kubernetes/apps/
 ├── domains/                       # Domain ResourceSets (template + inputsFrom selector)
 │   ├── identity-rs.yaml           # rs-identity: auth, user
 │   ├── catalog-rs.yaml            # rs-catalog: product, review
-│   ├── checkout-rs.yaml           # rs-checkout: cart, order
+│   ├── checkout-rs.yaml           # rs-checkout: cart, order, payment
 │   └── comms-rs.yaml              # rs-comms: notification, shipping
 ├── services/                      # Per-service InputProviders (Static)
 │   ├── auth.yaml                  # labels: domain=identity
@@ -74,6 +76,7 @@ kubernetes/apps/
 │   ├── review.yaml                # labels: domain=catalog
 │   ├── cart.yaml                  # labels: domain=checkout
 │   ├── order.yaml                 # labels: domain=checkout
+│   ├── payment.yaml               # labels: domain=checkout
 │   ├── notification.yaml          # labels: domain=comms
 │   └── shipping.yaml              # labels: domain=comms
 └── frontend-rs.yaml               # rs-frontend (standalone, inline inputs)
@@ -95,7 +98,7 @@ Flux Kustomization with `path: ./` auto-discovers all YAML files recursively.
 |--------|------------|----------|-----------|
 | identity | `rs-identity` | auth, user | Shared auth-db, identity boundary |
 | catalog | `rs-catalog` | product, review | Product data + reviews, shared read patterns |
-| checkout | `rs-checkout` | cart, order | Transaction-shared-db, purchase flow |
+| checkout | `rs-checkout` | cart, order, payment | Transaction-shared-db, purchase flow |
 | comms | `rs-comms` | notification, shipping | Supporting-shared-db, auxiliary services |
 | frontend | `rs-frontend` | frontend | Standalone (React SPA, no DB) |
 
@@ -322,3 +325,7 @@ flux reconcile kustomization apps-local -n flux-system
 ---
 
 **Tip**: Always execute `make validate` before pushing. The validation script includes Flux Operator schemas for comprehensive verification.
+
+---
+
+_Last updated: 2026-07-07_

@@ -10,7 +10,7 @@ This document is the **understanding-the-system** reference. It does **not** res
 
 ## 1. Platform shape
 
-- **8 Go backend services** (Go 1.26, Gin), each in its own repo + namespace, all listening on **`:8080`**, all exposing `GET /health` + `GET /ready`.
+- **9 Go backend services** (Go 1.26, Gin), each in its own repo + namespace, all listening on **`:8080`**, all exposing `GET /health` + `GET /ready`.
 - **1 React/Vite frontend** (SPA, served by nginx).
 - **3-layer architecture** per service: `web` (HTTP/validation/aggregation) → `logic` (business rules, no SQL) → `core` (domain + repository + DB). Frontend may only call the `web` layer.
 - **URL shape (Variant A):** `/{service}/v1/{audience}/{resource…}` with `audience ∈ public | private | internal`. The gateway (Kong in-cluster; nginx locally) is **pure pass-through** — no rewriting.
@@ -27,15 +27,13 @@ flowchart TD
     GW --> REV[review]
     GW --> SHIP[shipping]
     GW --> NOTIF[notification]
+    GW --> PAY[payment]
 
     subgraph EW["East-west (in-cluster, never on the gateway)"]
-      USER -. JWT .-> AUTH
-      CART -. JWT .-> AUTH
-      ORD  -. JWT .-> AUTH
-      REV  -. JWT .-> AUTH
       PROD -->|"aggregate reviews"| REV
       ORD  -->|"aggregate shipment"| SHIP
       ORD  -->|"clear cart on checkout"| CART
+      ORD  -->|"payment (saga + enrichment)"| PAY
     end
 ```
 
@@ -55,10 +53,11 @@ The local end-to-end stack (`local-stack/compose.yaml`) mirrors the platform wit
 | review | 8080 | `review` | — | zap | auth (JWT) |
 | shipping | 8080 | `shipping` | — | zap | none |
 | notification | 8080 | `notification` | — | zap | auth (JWT) |
+| payment | 8080 | `payment` | — | zap | mockpay (provider); called by order (saga + enrichment) |
 | frontend | 80 → host 3001 | — | — | — | gateway only |
-| gateway | 80 → host 8080 | — | — | — | all 8 services |
+| gateway | 80 → host 8080 | — | — | — | all 9 services |
 
-> **In-cluster differences (production):** services connect to dedicated PostgreSQL clusters (auth-db/Zalando PG17 + PgBouncer; product/cart/order on CNPG PG18 with PgDog/PgCat; user/review/shipping on supporting/review clusters PG16). Locally these are collapsed into one Postgres with 8 databases. See [`../databases/`](../databases/).
+> **In-cluster differences (production):** services connect to dedicated PostgreSQL clusters (auth-db/Zalando PG17 + PgBouncer; product/cart/order on CNPG PG18 with PgDog/PgCat; user/review/shipping on supporting/review clusters PG16). Locally these are collapsed into one Postgres with 9 databases. See [`../databases/`](../databases/).
 > **Logging is not unified** — three loggers are in use (zerolog/clog/zap). Tracked as a `pkg` consolidation follow-up.
 
 ---
@@ -120,6 +119,12 @@ Each entry: **what it owns**, **what's implemented**, **what's mock/in-flight**,
 - **In-flight / notes:** a code review found the recurring trio — auth **fail-open**, **IDOR** on `/:id`, and **seed sequence desync** — now fixed (PRs `fix/security-correctness-review` + `fix/seed-sequence-reset`), plus a hardcoded create-time `user_id`. The internal notify endpoints have **no caller wired yet**.
 - **gRPC candidacy:** **Phase 2** — the internal `notify/email`/`notify/sms` are a natural east-west gRPC target (design `notification.v1` + wire a first caller, e.g. order→notification). Browser routes stay REST.
 
+### payment — payments (+ saga, reconciliation)
+- **Owns:** `payments`, refunds, the transactional outbox, and reconciliation runs. Deployed in-cluster (checkout domain, on `cnpg-db`) **and** in the local stack.
+- **API:** PRIVATE (JWT, browser) `GET|POST /payment/v1/private/payments` (+ `GET /:id`); PUBLIC `POST /payment/v1/public/webhooks/mockpay` (HMAC-signed body is the credential); INTERNAL (in-cluster) `POST /payment/v1/internal/payments/:id/refunds`, `POST /payment/v1/internal/reconciliation/runs`, `GET /payment/v1/internal/reconciliation/runs/:id`.
+- **Implemented (RFC-0010 P1–P6):** auth/capture flow against **mockpay** (the same image run as a second `mockpay` deployment); recovery-point idempotency; a single-writer outbox relay and a per-instance reconciliation ticker (single-replica by design — see the InputProvider notes). Connects to CNPG directly over TLS (`sslmode=require`).
+- **gRPC:** serves an internal gRPC server (`:9090`, reflection off) — the order saga's money transport. `order` (API, `GetPayment` enrichment) and `order-worker` (saga steps) dial it via `PAYMENT_GRPC_ADDR`.
+
 ### frontend — React SPA
 - Calls only the gateway at `/{service}/v1/{public,private}/…`; JWT stored in `localStorage.authToken` and sent as `Authorization: Bearer`. Uses server-side aggregation endpoints (`/products/:id/details`, `/orders/:id/details`) — no client-side orchestration. **gRPC is never browser-facing.**
 
@@ -137,20 +142,19 @@ order→cart cart-read stay HTTP/JSON.
 | product | review | `ReviewService.GetProductReviews` | **gRPC** | soft-fail → `[]` |
 | order | shipping | `ShippingService.GetShipmentByOrder` | **gRPC** | soft-fail → `null` shipment |
 | order | notification | `NotificationService.SendEmail` (order-created) | **gRPC** | best-effort (detached ctx) |
+| order | payment | `PaymentService.GetPayment` (order-details enrichment) + saga capture/refund | **gRPC** | soft-fail → no payment block; saga compensates |
 | order | cart | `GET /cart` (server-side pricing) + `DELETE /cart` | REST | best-effort clear |
 
 ```mermaid
 flowchart LR
-    PROD[product] -->|GET reviews?product_id| REV[review]
-    ORD[order] -->|GET internal/orders/:id| SHIP[shipping]
-    ORD -->|DELETE cart| CART[cart]
-    USER[user] -->|GET /me| AUTH[auth]
-    CART -->|GET /me| AUTH
-    ORD -->|GET /me| AUTH
-    REV -->|GET /me| AUTH
+    PROD[product] -->|gRPC GetProductReviews| REV[review]
+    ORD[order] -->|gRPC GetShipmentByOrder| SHIP[shipping]
+    ORD -->|gRPC SendEmail| NOTIF[notification]
+    ORD -->|gRPC GetPayment + saga| PAY[payment]
+    ORD -->|REST DELETE cart| CART[cart]
 ```
 
-Service-to-service target URLs are injected as env vars (`AUTH_SERVICE_URL`, `REVIEW_SERVICE_URL`, `SHIPPING_SERVICE_URL`, `CART_SERVICE_URL`) — see `local-stack/compose.yaml` and the cluster ResourceSet templates.
+Service-to-service target addresses are injected as env vars — gRPC hops via `*_GRPC_ADDR` (`REVIEW_GRPC_ADDR`, `SHIPPING_GRPC_ADDR`, `NOTIFICATION_GRPC_ADDR`, `PAYMENT_GRPC_ADDR`) and the one remaining REST hop via `CART_SERVICE_URL` — see `local-stack/compose.yaml` and the cluster ResourceSet templates.
 
 ---
 

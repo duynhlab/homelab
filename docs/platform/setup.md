@@ -39,12 +39,12 @@ Execute the following script to clone all required components:
 
 ```bash
 # Infrastructure Repositories
-git clone https://github.com/duynhlab/monitoring.git
+git clone https://github.com/duynhlab/homelab.git
 git clone https://github.com/duynhlab/gha-workflows.git
 git clone https://github.com/duynhlab/pkg.git
 
 # Microservices Repositories
-for service in auth user product cart order review notification shipping; do
+for service in auth user product cart order review notification shipping payment; do
   git clone https://github.com/duynhlab/${service}-service.git
 done
 
@@ -60,14 +60,17 @@ This creates a structured local environment with all necessary source code.
 
 ### Prerequisites
 
-Before the first `make up`, two host-side prerequisites must be in place:
+Before the first `make up`, one host-side prerequisite must be in place:
 
 1. **`/etc/hosts` entries for `*.duynh.me`** — Kong runs as NodePort and Kind maps host ports 80/443. Use the helper:
    ```bash
    sudo ./scripts/setup-hosts.sh           # adds the marker block
    sudo ./scripts/setup-hosts.sh remove    # cleans it up
    ```
-2. **Cloudflare API token in OpenBAO** — the `letsencrypt-prod` ClusterIssuer uses Cloudflare DNS-01 to issue the wildcard `*.duynh.me` cert that Kong terminates. The token is **bootstrap-only** (not in Git) and must be re-seeded after every fresh cluster:
+
+On **local Kind** that is enough: the `clusters/local` overlay patches the `kong-proxy-tls` Certificate to the self-signed **`homelab-ca`** issuer, so Kong terminates HTTPS with a self-signed wildcard (expect a browser warning unless `homelab-ca` is trusted). **No Cloudflare token or Let's Encrypt is needed locally.**
+
+**Prod only — Cloudflare API token in OpenBAO:** on prod the `letsencrypt-prod` ClusterIssuer uses Cloudflare DNS-01 to issue a publicly-trusted wildcard `*.duynh.me` cert. That token is **bootstrap-only** (not in Git) and must be re-seeded after every fresh cluster:
    ```bash
    ROOT=$(kubectl get secret -n openbao openbao-init-keys -o jsonpath='{.data.root_token}' | base64 -d)
    kubectl exec -n openbao openbao-0 -- sh -c \
@@ -75,9 +78,7 @@ Before the first `make up`, two host-side prerequisites must be in place:
    flux reconcile ks secrets-local --with-source
    flux reconcile ks cert-manager-local --with-source
    ```
-   ESO syncs the token to `Secret/cloudflare-api-token` in the `cert-manager` namespace via `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`.
-
-Without step 2, `cert-manager-local` reconciles but `kong-proxy-tls` stays NotReady and Kong cannot terminate HTTPS.
+   ESO syncs the token to `Secret/cloudflare-api-token` in the `cert-manager` namespace via `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`. Without it, the `letsencrypt-*` issuers stay NotReady on prod — but this is **not** a local bring-up blocker (`homelab-ca` issues `kong-proxy-tls` locally).
 
 ---
 
@@ -174,17 +175,17 @@ kubectl get prometheusservicelevel -n monitoring
 ```
 
 **Expected State:**
-- Namespaces for every domain provisioned (auth, user, product, cart, order, review, notification, shipping, frontend, kong, cert-manager, openbao, external-secrets-system, monitoring, apm, databases-cnpg-system, databases-zalando, kyverno, flux-system, …).
+- Namespaces for every domain provisioned (auth, user, product, cart, order, review, notification, shipping, payment, frontend, kong, cert-manager, openbao, external-secrets-system, monitoring, apm, databases-cnpg-system, databases-zalando, kyverno, flux-system, …).
 - 5 ResourceSets (`rs-identity`, `rs-catalog`, `rs-checkout`, `rs-comms`, `rs-frontend`) successfully reconciled.
-- HelmReleases for the 8 microservices + frontend in `Ready` state.
+- HelmReleases for the 9 microservices + frontend, plus the `mockpay` and `order-worker` releases (in the `payment` / `order` namespaces), in `Ready` state.
 - 3 PostgreSQL clusters (`auth-db`, `supporting-shared-db`, `cnpg-db`) + 1 DR replica (`cnpg-db-replica`) operational.
-- ClusterIssuers `selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod` Ready; `kong-proxy-tls` Certificate Ready and signed by `letsencrypt-prod`.
+- ClusterIssuers `selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod` Ready; `kong-proxy-tls` Certificate Ready — signed by `homelab-ca` on local Kind (`letsencrypt-prod` on prod).
 
 ---
 
 ## Accessing Services
 
-All user-facing endpoints go through Kong on `*.duynh.me` (terminated with the Let's Encrypt wildcard cert). Make sure `scripts/setup-hosts.sh` has been run.
+All user-facing endpoints go through Kong on `*.duynh.me` (on local Kind, terminated with the self-signed `homelab-ca` wildcard — expect a browser warning; prod uses the Let's Encrypt wildcard). Make sure `scripts/setup-hosts.sh` has been run.
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
@@ -204,7 +205,7 @@ The full host inventory lives in `scripts/setup-hosts.sh` and `docs/platform/kon
 ## Project Architecture
 
 ```
-monitoring/
+homelab/
 ├── kubernetes/
 │   ├── infra/                          # Core infrastructure definitions
 │   │   ├── controllers/                # Operators and CRD definitions
@@ -222,7 +223,7 @@ monitoring/
 │   │   ├── domains/                    # Domain ResourceSets (template + inputsFrom selector)
 │   │   │   ├── identity-rs.yaml        # rs-identity: auth, user
 │   │   │   ├── catalog-rs.yaml         # rs-catalog: product, review
-│   │   │   ├── checkout-rs.yaml        # rs-checkout: cart, order
+│   │   │   ├── checkout-rs.yaml        # rs-checkout: cart, order, payment
 │   │   │   └── comms-rs.yaml           # rs-comms: notification, shipping
 │   │   ├── services/                   # Per-service InputProviders (Static)
 │   │   │   ├── auth.yaml               # domain=identity
@@ -231,8 +232,11 @@ monitoring/
 │   │   │   ├── review.yaml             # domain=catalog
 │   │   │   ├── cart.yaml               # domain=checkout
 │   │   │   ├── order.yaml              # domain=checkout
+│   │   │   ├── payment.yaml            # domain=checkout
 │   │   │   ├── notification.yaml       # domain=comms
 │   │   │   └── shipping.yaml           # domain=comms
+│   │   ├── mockpay.yaml                # mockpay HelmRelease (payment ns, same image)
+│   │   ├── order-worker.yaml           # order-worker HelmRelease (order ns, Temporal saga)
 │   │   └── frontend-rs.yaml            # rs-frontend (standalone, namespace: frontend)
 │   └── clusters/                       # Environment-specific Flux configurations
 │       └── local/                      # Kind-specific local environment
@@ -263,9 +267,13 @@ monitoring/
 13. `databases-cnpg-dr-local`: CNPG DR replica (Depends on `databases-local`, `secrets-local`).
 14. `temporal-local`: Temporal server via the temporal-operator (`TemporalCluster` + `TemporalNamespace`), persistence on the CNPG `temporal-db` (Depends on `controllers-local`, `cert-manager-local`, `databases-local`, `monitoring-local`). The `temporal-operator` HelmRelease itself `dependsOn` cert-manager, since its chart renders a cert-manager `Certificate`/`Issuer` for the admission webhook.
 15. `kyverno-policies-local`: Admission policies (Depends on `controllers-local`, `monitoring-local`). See [kyverno.md](kyverno.md).
-16. `apps-local`: Deploys business logic (Depends on `databases-local`, `monitoring-local`). The `order-worker` release `dependsOn` `temporal-local`.
+16. `apps-local`: Deploys business logic (the `apps-local` Kustomization `dependsOn` `databases-local`, `monitoring-local`, and `temporal-local` — the `order-worker` dials Temporal at startup, so apps must not deploy until the Temporal cluster is Ready).
 
 ---
 
 For detailed API specifications, refer to [api.md](../api/api.md).  
 For persistence layer details, refer to [database.md](../databases/002-database-integration.md).
+
+---
+
+_Last updated: 2026-07-07_

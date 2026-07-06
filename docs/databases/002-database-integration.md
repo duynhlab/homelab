@@ -2,7 +2,7 @@
 ## Table of Contents
 
 1. [Quick Summary](#quick-summary) - Operators, clusters, poolers overview
-2. [Database Architecture](#database-architecture) - 3 clusters + DR overview diagram + tables
+2. [Database Architecture](#database-architecture) - 4 operational clusters + DR overview diagram + tables
 3. [CloudNativePG Operator](#cloudnativepg-operator) - Operator features, connection patterns, monitoring
 4. [Zalando Postgres Operator](#zalando-postgres-operator) - Operator features, secrets, monitoring, management
 5. [Connection Poolers](#connection-poolers) - PgBouncer, PgDog (active); PgCat (comparison / legacy) + configuration
@@ -18,21 +18,22 @@
 |----------------------------|-----------|-------------------|-----------------|------------|--------------------------|------------------------------------|
 | Zalando Postgres Operator  | v1.15.1   | auth-db           | 17              | 3 (HA)     | PgBouncer Sidecar        | 3 instances                        |
 | Zalando Postgres Operator  | v1.15.1   | supporting-shared-db     | 16              | 1          | PgBouncer Sidecar        | 3 instances                        |
-| CloudNativePG Operator     | v1.29.1   | cnpg-db                  | 18              | 3 (HA)     | PgDog Standalone         | product, cart, order; sync (ANY 1) |
+| CloudNativePG Operator     | v1.29.1   | cnpg-db                  | 18              | 3 (HA)     | PgDog Standalone         | product, cart, order; sync (ANY 1). payment also lives here but connects direct-TLS (bypasses PgDog) |
 | CloudNativePG Operator     | v1.29.1   | cnpg-db-replica          | 18              | 1          | —                        | DR replica; object-store recovery    |
+| CloudNativePG Operator     | v1.29.1   | temporal-db              | 18              | 1          | —                        | Temporal server backing store (namespace `temporal`); no backups / no WAL archiving yet |
 ---
 
 ## Database Architecture
 
 ### Overview
 
-The system uses **3 operational PostgreSQL clusters** + **1 DR replica** (Zalando: **auth-db**, **supporting-shared-db**; CloudNativePG: **cnpg-db** primary with **cnpg-db-replica** as disaster recovery) across operators and connection patterns. Application traffic for **product**, **cart**, and **order** shares **cnpg-db** and a single **PgDog** pooler (`pgdog-cnpg`).
+The system uses **4 operational PostgreSQL clusters** + **1 DR replica** (**5 clusters total**) — Zalando: **auth-db**, **supporting-shared-db**; CloudNativePG: **cnpg-db** primary with **cnpg-db-replica** as disaster recovery, plus **temporal-db** (the Temporal server's backing store in the `temporal` namespace) — across operators and connection patterns. Application traffic for **product**, **cart**, and **order** shares **cnpg-db** and a single **PgDog** pooler (`pgdog-cnpg`); **payment** also stores its `payment` database on **cnpg-db** but connects **directly over TLS** (see below), not through PgDog.
 
 ```mermaid
 flowchart TB
     subgraph Operators["PostgreSQL Operators"]
         Zalando["Zalando Operator v1.15.1 - 2 clusters"]
-        CloudNativePG["CloudNativePG Operator v1.29.1 - 2 clusters"]
+        CloudNativePG["CloudNativePG Operator v1.29.1 - 3 clusters<br/>(cnpg-db, cnpg-db-replica, temporal-db)"]
     end
     
     subgraph Services["Microservices by Namespace"]
@@ -118,7 +119,9 @@ flowchart TB
 | CloudNativePG | cnpg-db     | product      | product                    | product    | Manual (`cnpg-db-secret`) | `cnpg-db-rw.product:5432`  | PgDog      | 3 (1 primary + 2 replicas)     | CNPG sync (ANY 1)        | product     |
 | CloudNativePG | cnpg-db     | cart         | cart                       | cart       | Manual (`cnpg-db-cart-secret`) | `cnpg-db-rw.product:5432` | PgDog      | 3 (1 primary + 2 replicas)     | CNPG sync (ANY 1)        | cart        |
 | CloudNativePG | cnpg-db     | order        | order                      | order      | Manual (`cnpg-db-order-secret`) | `cnpg-db-rw.product:5432` | PgDog      | 3 (1 primary + 2 replicas)     | CNPG sync (ANY 1)        | order       |
+| CloudNativePG | cnpg-db     | payment      | payment                    | product + payment | Manual (`cnpg-db-payment-secret`) | `cnpg-db-rw.product:5432` (direct TLS, **not** PgDog) | — (direct) | 3 (1 primary + 2 replicas)     | CNPG sync (ANY 1)        | payment     |
 | CloudNativePG | cnpg-db-replica | —        | —                          | product    | —                         | —                          | —          | 1 (DR replica)                 | Object-store recovery    | product     |
+| CloudNativePG | temporal-db | temporal     | temporal                   | temporal   | Auto (CNPG `temporal-db-app`) | `temporal-db-rw.temporal:5432` | — (direct) | 1 (single instance)            | Single (no HA yet)       | temporal    |
 | Zalando       | auth-db        | auth         | auth                       | auth       | Auto (operator)            | `auth-db.auth:5432`           | PgBouncer  | 3 (1 leader + 2 standbys)      | Patroni HA               | auth        |
 | Zalando       | supporting-shared-db  | user         | user                       | user       | Auto (operator)            | `supporting-shared-db.user:5432`     | PgBouncer  | 1 (single instance)            | Patroni (single)         | user        |
 | Zalando       | supporting-shared-db  | notification | notification.notification  | notification| Auto (cross-ns)           | `supporting-shared-db.user:5432`     | PgBouncer  | 1 (single instance)            | Patroni (single)         | user        |
@@ -129,8 +132,9 @@ flowchart TB
 
 | Cluster         | App Endpoint (via Pooler)              | Pooler     | Mode      | Notes                   |
 |-----------------|----------------------------------------|------------|-----------|-------------------------|
-| cnpg-db         | `pgdog-cnpg.product:6432`              | PgDog      | Standalone| Single entry point for product, cart, order; R/W split to `cnpg-db-rw` / `cnpg-db-r` |
+| cnpg-db         | `pgdog-cnpg.product:6432`              | PgDog      | Standalone| Single entry point for product, cart, order; R/W split to `cnpg-db-rw` / `cnpg-db-r`. **payment bypasses this pooler** — connects direct-TLS to `cnpg-db-rw` |
 | cnpg-db-replica | —                                      | —          | —         | DR only; apps use primary `cnpg-db` after promotion / failover drill |
+| temporal-db     | —                                      | —          | —         | Temporal server connects directly; no pooler tier |
 | auth-db         | `auth-db-pooler.auth:5432`             | PgBouncer  | Standalone| -                       |
 | supporting-shared-db   | `supporting-shared-db-pooler.user:5432`       | PgBouncer  | Standalone| 4 databases: user, notification, shipping, review |
 
@@ -154,8 +158,9 @@ flowchart TB
 
 | Cluster            | Database(s)                 | Instances                       | Replication Type              |
 |--------------------|-----------------------------|----------------------------------|-------------------------------|
-| **cnpg-db**        | product, cart, order        | 3 (1 primary + 2 replicas)       | Synchronous quorum (ANY 1)    |
+| **cnpg-db**        | product, cart, order, payment | 3 (1 primary + 2 replicas)     | Synchronous quorum (ANY 1)    |
 | **cnpg-db-replica**| — (DR standby)              | 1                                | Continuous recovery from archive |
+| **temporal-db**    | temporal (Temporal server backing store) | 1                   | Single instance (no HA / no backups yet) |
 
 ---
 ### Clusters
@@ -165,8 +170,9 @@ flowchart TB
 Consolidated **CloudNativePG** cluster for **product**, **cart**, and **order** (replaces the former split of separate CNPG clusters for catalog vs checkout).
 
 - **3 instances** (1 primary + 2 replicas), **synchronous quorum** `ANY 1` with required durability (see cluster `spec.postgresql.synchronous` in manifests)
-- **Databases**: `product`, `cart`, `order` on the same cluster; cluster lives in namespace **`product`**
+- **Databases**: `product`, `cart`, `order`, `payment` on the same cluster; cluster lives in namespace **`product`**
 - **Pooler**: **PgDog** (HelmRelease `pgdog-cnpg`), unified endpoint **`pgdog-cnpg.product:6432`** — product, cart, and order services use this single entry point; PgDog routes writes to `cnpg-db-rw` and read traffic to `cnpg-db-r` per pool/database config
+- **payment (direct TLS, not pooled)**: the `payment` database also lives on `cnpg-db`, but payment-service connects **directly to `cnpg-db-rw.product:5432` over TLS** (`sslmode=require`; CNPG serves its own certs). Its config refuses cleartext DB and PgDog terminates no TLS yet, so payment bypasses the pooler. PgDog already carries payment backend entries — move payment behind the pooler once PgDog TLS lands. Its credentials come from `cnpg-db-payment-secret` (present in both the `product` and `payment` namespaces).
 - **Extensions**: preloaded via `shared_preload_libraries` — pgaudit, pg_stat_statements, auto_explain; created via Database resources — pgaudit, pg_stat_statements, pgcrypto, uuid-ossp (product), pgaudit, pg_stat_statements (cart, order). auto_explain is preload-only (no SQL control file), so it is never in a Database resource.
 - **Features**: Logical replication slot sync for CDC (Debezium, Kafka Connect) where enabled
 
@@ -202,7 +208,7 @@ Consolidated **CloudNativePG** cluster for **product**, **cart**, and **order** 
 - SSD-optimized settings
 
 **Multi-Database Support:**
-- **cnpg-db** hosts `product`, `cart`, and `order` on one cluster
+- **cnpg-db** hosts `product`, `cart`, `order`, and `payment` on one cluster (payment connects direct-TLS, not via PgDog)
 - **PgDog** provides multi-database routing and read/write splitting to CNPG `-rw` / `-r` services (replaces the former **PgCat** deployment for cart/order in active GitOps)
 
 ### Connection Patterns
@@ -986,5 +992,9 @@ return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s&prefer_simple_protoco
 **Root Cause:** The Zalando operator creates the databases from `spec.databases` only during a *successful first-time* init. On a slow spilo cold boot the operator's DB-connection retry window can expire first → the cluster goes `CreateFailed`; later syncs bring up Patroni and roles but never (re)create the databases.
 
 **Mitigation:** Each Zalando cluster dir ships an idempotent `ensure-databases` Job (`databases-local` wave) that connects as the superuser and runs guarded `CREATE DATABASE … OWNER …`, so it self-heals on re-run. See [003.2 Zalando operator deep dive](./003.2-operator-zalando.md#first-init-fragility-and-the-ensure-databases-job) and [runbooks/prepared-databases.md](./runbooks/prepared-databases.md).
+
+---
+
+_Last updated: 2026-07-07_
 
 

@@ -1,6 +1,6 @@
 # Git Branching & Release Standard
 
-This document defines the **production-ready branching strategy** for all microservice repositories in the `duynhlab` platform. It is designed to scale from the current 8 services to 1000+ repositories while maintaining traceability, blast-radius control, and fast incident response.
+This document defines the **production-ready branching strategy** for all microservice repositories in the `duynhlab` platform. It is designed to scale from the current 9 services to 1000+ repositories while maintaining traceability, blast-radius control, and fast incident response.
 
 **Model**: Hybrid Enterprise Flow (environment-aligned branch promotion + immutable tagging).
 

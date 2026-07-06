@@ -152,7 +152,7 @@ flowchart TD
     Kong --> MonRoute
 
     FERoute -->|"No rate limit"| FE["Frontend (Nginx + React SPA)"]:::fe
-    APIRoute -->|"Rate limited"| APIs["8 Microservices :8080"]:::api
+    APIRoute -->|"Rate limited"| APIs["9 Microservices :8080"]:::api
     MonRoute -->|"No rate limit"| Infra["Grafana, VM, Jaeger, ..."]:::infra
 
     Plugins -.->|"CORS → Prometheus → Rate Limiting"| Router
@@ -204,7 +204,7 @@ Clear separation of concerns — each domain has a single responsibility:
 | Domain | Responsibility | Rate Limited | Ingress File |
 |--------|---------------|--------------|--------------|
 | `local.duynh.me` | Frontend (React SPA) | No | `ingress-frontend.yaml` |
-| `gateway.duynh.me` | API Gateway (8 microservices) | **Yes** | `ingress-api.yaml` |
+| `gateway.duynh.me` | API Gateway (9 microservices) | **Yes** | `ingress-api.yaml` |
 | `grafana.duynh.me` | Grafana dashboards | No | `ingress-monitoring.yaml` |
 | `vmui.duynh.me` | VictoriaMetrics UI | No | `ingress-monitoring.yaml` |
 | `jaeger.duynh.me` | Distributed tracing | No | `ingress-monitoring.yaml` |
@@ -337,7 +337,7 @@ config:
   error_message: "Rate limit exceeded. Please slow down."
 ```
 
-**Applied to**: All 8 API ingresses via annotation `konghq.com/plugins: rate-limiting-api`
+**Applied to**: All 9 services' API ingresses via annotation `konghq.com/plugins: rate-limiting-api`
 
 **Not applied to**: Frontend (`local.duynh.me`), monitoring dashboards, MCP servers
 
@@ -491,7 +491,7 @@ Kong has 80+ bundled plugins. Here's what's relevant for this project:
 | `hmac-auth` | HMAC signature validation | Medium |
 | `ldap-auth` | LDAP/Active Directory | Medium |
 
-Currently, auth is handled at the application level (auth-service). Gateway-level auth could offload JWT validation from all 8 services.
+Currently, auth is handled at the application level (auth-service). Gateway-level auth could offload JWT validation from all 9 services.
 
 #### Security
 
@@ -705,6 +705,10 @@ Per-ingress `path:` entries are scoped to `public` and `private` audiences only 
 | `gateway.duynh.me` | `/review/v1/public/`, `/review/v1/private/` | `review:8080` | review | Yes |
 | `gateway.duynh.me` | `/notification/v1/private/` | `notification:8080` | notification | Yes |
 | `gateway.duynh.me` | `/shipping/v1/public/` | `shipping:8080` | shipping | Yes |
+| `gateway.duynh.me` | `/payment/v1/private/` | `payment:8080` | payment | Yes |
+| `gateway.duynh.me` | `/payment/v1/public/webhooks/` | `payment:8080` | payment | Yes |
+
+`api-payment-private` (`/payment/v1/private/`, edge JWT) and `api-payment-webhooks` (`/payment/v1/public/webhooks/`, anonymous — the HMAC signature over the raw body is the credential) are separate Ingresses so `jwt-edge` applies only to the private path.
 
 **Internal endpoints NOT routed here** (reachable only via Kubernetes Service DNS):
 
@@ -714,6 +718,8 @@ Per-ingress `path:` entries are scoped to `public` and `private` audiences only 
 | user | `POST /user/v1/internal/users` | auth-service during registration flow |
 | notification | `POST /notification/v1/internal/notify/{email,sms}` | Any service publishing a notification |
 | shipping | `GET /shipping/v1/internal/orders/:orderId` | order-service (order aggregation) |
+| payment | `POST /payment/v1/internal/payments/:id/refunds` | order-service (saga refund) |
+| payment | `POST /payment/v1/internal/reconciliation/runs`, `GET /payment/v1/internal/reconciliation/runs/:id` | Reconciliation trigger / status (in-cluster) |
 
 Adding any `internal` audience to a gateway Ingress is a safety/privacy regression — keep them private-by-network (NetworkPolicy + no public rule).
 
@@ -808,6 +814,8 @@ kubectl get ingress -A
 | review | api-review | `gateway.duynh.me` | `/review/v1/` |
 | notification | api-notification | `gateway.duynh.me` | `/notification/v1/` |
 | shipping | api-shipping | `gateway.duynh.me` | `/shipping/v1/` |
+| payment | api-payment-private | `gateway.duynh.me` | `/payment/v1/private/` |
+| payment | api-payment-webhooks | `gateway.duynh.me` | `/payment/v1/public/webhooks/` |
 | *(+ monitoring, infra, MCP ingresses)* | | | |
 
 ### Step 7: Test API Routes (curl)
@@ -1094,3 +1102,7 @@ If the rate limiting counter encounters an error (memory pressure, internal issu
 - Switch rate limiting from `local` to `redis` policy (Valkey backend)
 - Consider `KongConsumer` + `KongConsumerGroup` for tiered rate limits
 - Evaluate Kong Gateway API support (migrate from Ingress to HTTPRoute)
+
+---
+
+_Last updated: 2026-07-07_

@@ -27,8 +27,9 @@ All microservices are hosted in the `duynhlab` organization.
 | **Shipping** | [duynhlab/shipping-service](https://github.com/duynhlab/shipping-service) | 8008 | [![CI](https://github.com/duynhlab/shipping-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/shipping-service/actions) | `ghcr.io/duynhlab/shipping-service/shipping-service` |
 | **Payment** | [duynhlab/payment-service](https://github.com/duynhlab/payment-service) | 8009 | [![CI](https://github.com/duynhlab/payment-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/payment-service/actions) | `ghcr.io/duynhlab/payment-service/payment-service` |
 
-> **Payment** is built and runs in local-stack (checkout domain); cluster GitOps
-> deployment is [RFC-0010](docs/proposals/rfc/RFC-0010/) P5.
+> **Payment** ([RFC-0010](docs/proposals/rfc/RFC-0010/), P1–P6 shipped) is deployed
+> in-cluster via GitOps (checkout domain, alongside the `mockpay` provider and the
+> `order-worker` Temporal saga) **and** runs in local-stack.
 
 ## 💻 Frontend
 

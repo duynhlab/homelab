@@ -30,7 +30,7 @@ industry-standard methodologies, each answering a different question:
 | **USE** | Internal (resource) | **U**tilization, **S**aturation, **E**rrors | CPU, memory, disk, network, DB, cache | Brendan Gregg |
 | **Golden Signals** | Superset | Latency, Traffic, Errors, **Saturation** | Full-stack (RED + saturation) | Google SRE |
 
-**How they combine here:** the 8 Go microservices are request-driven, so they use
+**How they combine here:** the 9 Go microservices are request-driven, so they use
 **RED** — all three signals come from a single `request_duration_seconds`
 histogram, plus `requests_in_flight` for the 4th Golden Signal (saturation).
 Infrastructure (pods, nodes, databases, cache) is resource-driven, so it uses
@@ -87,7 +87,7 @@ routes firing alerts to VMAlertmanager.
 ```mermaid
 flowchart LR
     subgraph apps["Apps layer"]
-        SVC["8 Go services + order-worker<br/>/metrics — HTTP + gRPC RED"]
+        SVC["9 Go services + order-worker<br/>/metrics — HTTP + gRPC RED"]
     end
     subgraph infra["Infra layer"]
         KSM["kube-state-metrics<br/>up · restarts · USE"]
@@ -130,7 +130,7 @@ Status of each methodology across the platform (✅ implemented, ❌ scoped out)
 
 | Signal | Scope | Status | Implementation |
 |--------|-------|:------:|----------------|
-| **RED** (Rate/Errors/Duration) | 8 microservices | ✅ | `request_duration_seconds` → recording rules + 7 alerts + Apdex |
+| **RED** (Rate/Errors/Duration) | 9 microservices | ✅ | `request_duration_seconds` → recording rules + 17 alerts + Apdex |
 | **Latency** | API server | ✅ | `KubeAPIServerHighLatency` (P99 > 1s) |
 | **Traffic** | Microservices | ✅ | RPS recording rule + per-endpoint breakdown |
 | **Errors** | Infra / API server / PostgreSQL / Valkey | ✅ | OOMKill, CrashLoop, 5xx rate, ~25 PG alerts, Valkey down/rejected |

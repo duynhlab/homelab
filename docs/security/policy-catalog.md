@@ -6,7 +6,7 @@ Source manifests live in `kubernetes/infra/configs/kyverno/cluster-policies/`.
 | Policy | Tier | Mode (local) | Mode (prod) | failurePolicy | Scope |
 |--------|------|--------------|-------------|---------------|-------|
 | `pss-baseline` | 1 | Audit | Enforce | Ignore | All namespaces except platform |
-| `pss-restricted-apps` | 1 | Audit | Enforce | Ignore | App namespaces only (8) |
+| `pss-restricted-apps` | 1 | Audit | Enforce | Ignore | App namespaces only (9) |
 | `disallow-latest-tag` | 1 | Audit | Enforce | Ignore | All except platform |
 | `require-resources` | 1 | Audit | Enforce | Ignore | App namespaces only |
 | `require-probes` | 1 | Audit | Enforce | Ignore | App namespaces only |
@@ -60,3 +60,7 @@ diagram, and GitOps wiring live in [`network-policies.md`](network-policies.md).
 > enforce NetworkPolicy (verified on K8s 1.34.3). Both the generated `deny-all-ingress`
 > and the authored `allow-internal-callers` policies are LIVE — any ingress not
 > explicitly allowed is dropped. No additional CNI is required.
+
+---
+
+_Last updated: 2026-07-07_

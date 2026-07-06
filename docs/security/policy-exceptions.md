@@ -35,3 +35,7 @@ Source manifests live in `kubernetes/infra/configs/kyverno/exceptions/`.
 2. Re-test the workload — operator may have hardened in the meantime.
 3. If still required, renew with a fresh issue + new expiry.
 4. If no longer required, delete the manifest and remove the row.
+
+---
+
+_Last updated: 2026-07-07_

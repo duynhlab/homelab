@@ -14,6 +14,7 @@ reconciliation.
 - [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) — authorize-early / capture-late in the order saga
 - [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared `pkg/idempotency`
 - [ADR-011](../proposals/adr/ADR-011-detect-only-reconciliation/) — detect-only reconciliation
+- [ADR-012](../proposals/adr/ADR-012-reconciliation-auto-heal/) — flag-gated auto-heal of the lost-capture-response window
 
 ## The checkout read path (RFC-0010 P6)
 
@@ -63,11 +64,11 @@ Two money systems always drift eventually — reconciliation is how the platform
 
 | | |
 |---|---|
-| **Status** | Deployed (local-stack, e2e-verified) · cluster manifests landed (RFC-0010 P5) — first bring-up verification pending · detect-only v1, [ADR-011](../proposals/adr/ADR-011-detect-only-reconciliation/) |
+| **Status** | Deployed (local-stack, e2e-verified) · cluster manifests landed (RFC-0010 P5) — first bring-up verification pending · detect-only by default ([ADR-011](../proposals/adr/ADR-011-detect-only-reconciliation/)); one class flag-gated auto-heal via `RECON_HEAL_ENABLED` ([ADR-012](../proposals/adr/ADR-012-reconciliation-auto-heal/)) |
 | **Where** | payment-service: background ticker (5 min) + internal API |
 | **Compares** | `payments` table ↔ mockpay `GET /transactions`, matched by `provider_payment_id` |
 | **Classes** | `missing_internal` · `missing_provider` · `amount_mismatch` · `status_mismatch` |
-| **Heals?** | **No** — records + reports only; auto-heal is a deliberate later step |
+| **Heals?** | **Detect-only by default.** With `RECON_HEAL_ENABLED` (default off) it heals exactly one class — the lost-capture-response window (internal `authorized` vs provider `captured`) via an idempotent re-capture ([ADR-012](../proposals/adr/ADR-012-reconciliation-auto-heal/)); all other classes stay detect-only |
 | **Report** | `reconciliation_runs` / `reconciliation_discrepancies` + internal API |
 
 ### Why reconciliation exists
@@ -185,7 +186,9 @@ carry provider-controlled strings.
 
 #### What to do with a discrepancy (v1 = a human decides)
 
-v1 deliberately does **not** self-correct ([ADR-011](../proposals/adr/ADR-011-detect-only-reconciliation/)).
+v1 does **not** self-correct by default ([ADR-011](../proposals/adr/ADR-011-detect-only-reconciliation/));
+the sole exception is the flag-gated heal in [ADR-012](../proposals/adr/ADR-012-reconciliation-auto-heal/)
+(the lost-capture-response window). Every other class is human-corrected.
 The runbook is: read the discrepancy, pull both sides (payment row + ledger
 entries vs the provider record), decide which side is right, and correct via
 the normal APIs (refund endpoint, state transitions) — never by editing rows.
@@ -218,8 +221,10 @@ insufficient_funds, `19` transient-then-succeed):
   (the ticker alone writes ~288 runs/day).
 - **No metric or alert on `discrepancies_found > 0` yet** — detection surfaces
   as a ticker log line and via the report API, so today someone must go
-  looking. Alerting rides with the heal slice.
+  looking. (The heal slice has since shipped —
+  [ADR-012](../proposals/adr/ADR-012-reconciliation-auto-heal/) — but the
+  `discrepancies_found` metric/alert is still not wired.)
 
 ---
 
-_Last updated: 2026-07-05_
+_Last updated: 2026-07-07_

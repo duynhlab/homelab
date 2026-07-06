@@ -37,4 +37,4 @@ settled decisions.
 | [ADR-009](ADR-009-saga-authorize-early-capture-late/) | Authorize payment early, capture late in the order saga | Accepted | [RFC-0010](../rfc/RFC-0010/) |
 | [ADR-010](ADR-010-shared-idempotency-library/) | Extract idempotency into a shared pkg/idempotency library | Accepted | [RFC-0010](../rfc/RFC-0010/) |
 | [ADR-011](ADR-011-detect-only-reconciliation/) | Ship reconciliation detect-only; defer auto-heal | Accepted (heal for one class added by [ADR-012](ADR-012-reconciliation-auto-heal/)) | [RFC-0010](../rfc/RFC-0010/) |
-| [ADR-012](ADR-012-reconciliation-auto-heal/) | Auto-heal one reconciliation class — the lost-capture-response window | Proposed | [RFC-0010](../rfc/RFC-0010/) |
+| [ADR-012](ADR-012-reconciliation-auto-heal/) | Auto-heal one reconciliation class — the lost-capture-response window | Accepted | [RFC-0010](../rfc/RFC-0010/) |

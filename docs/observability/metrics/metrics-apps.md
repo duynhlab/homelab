@@ -163,6 +163,8 @@ if path == "" { path = "unknown" } // 404 / unmatched
 | Raw URL | `/api/v1/products/123`, `/456`, … | **Unbounded** |
 | Route pattern (`c.FullPath()`) | `/api/v1/products/:id` | **Bounded** (~20 routes) |
 
+With the original 8 services × ~20 routes × 3 methods × 5 status codes ≈ **2,400 series**
+(payment adds a small increment) — bounded and predictable.
 Measured (2026-07-06, one replica per service, live traffic): **49–720 series
 per service, Σ 2,777** across the 9 services — histogram label sets materialize
 lazily, so this grows toward the worst-case bound of ~1,800 series/replica

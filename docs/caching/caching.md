@@ -1,7 +1,6 @@
 # Caching Documentation
 
 > **Document Status:** Production  
-> **Last Updated:** 2026-07-01  
 > **Cache System:** Valkey (Redis-compatible)  
 > **Pattern:** Cache-Aside (Read-Through)
 
@@ -9,7 +8,7 @@
 
 ## Overview
 
-Valkey caching is integrated into the Product service to improve performance for read-heavy endpoints. The implementation follows the **Cache-Aside pattern** and includes **Stampede Prevention** (Distributed Locking) for hot keys, inspired by OpenAI's architecture.
+Valkey caching is integrated into the Product service to improve performance for read-heavy endpoints. The implementation follows the **Cache-Aside pattern** and includes **Stampede Prevention** (Distributed Locking) for hot keys, a pattern common in high-traffic read-scaling architectures.
 
 ## Architecture Integration
 
@@ -67,7 +66,7 @@ flowchart TD
 
 ## Cache Stampede Prevention
 
-> **Note:** This advanced pattern is inspired by OpenAI's PostgreSQL scaling architecture.
+> **Note:** This advanced pattern is common in high-traffic PostgreSQL read-scaling architectures.
 
 ### The Problem: Thundering Herd
 In a standard Cache-Aside pattern, a race condition occurs when a "hot" cache key expires:
@@ -180,7 +179,7 @@ Reuses the same single-product cache path (calls `ProductService.GetProduct` int
 
 ### `POST /product/v1/internal/products` — create product (internal only)
 
-> This route is on the **internal** audience and is **not exposed on the gateway**. It is reachable only via in-cluster service DNS. Today the boundary is Kong not exposing the route plus in-app controls; ingress NetworkPolicies are authored (`kubernetes/infra/configs/network-policies/`) but enforced only once an enforcing CNI (Cilium/Calico) replaces kindnet. See `docs/api/api-naming-convention.md`.
+> This route is on the **internal** audience and is **not exposed on the gateway**. It is reachable only via in-cluster service DNS. Today the boundary is Kong not exposing the route plus in-app controls; ingress NetworkPolicies are authored (`kubernetes/infra/configs/network-policies/`) and enforced by kindnet (Kind K8s 1.34+). See `docs/api/api-naming-convention.md`.
 
 1. Validate price, persist via `productRepo.Create(ctx, product)`.
 2. **Cache invalidation**: call `productCache.InvalidateProductList(ctx)` to delete list cache keys so the new product appears in subsequent list queries.
@@ -430,16 +429,16 @@ product.list (Logic Layer)
 
 Valkey metrics are scraped by Prometheus via ServiceMonitor:
 
-- `valkey_commands_processed_total`: Total commands processed
-- `valkey_connected_clients`: Number of connected clients
-- `valkey_memory_used_bytes`: Memory usage
-- `valkey_keyspace_hits_total`: Cache hits
-- `valkey_keyspace_misses_total`: Cache misses
+- `redis_commands_processed_total`: Total commands processed
+- `redis_connected_clients`: Number of connected clients
+- `redis_memory_used_bytes`: Memory usage
+- `redis_keyspace_hits_total`: Cache hits
+- `redis_keyspace_misses_total`: Cache misses
 
 **Cache Hit Rate:**
 ```
-rate(valkey_keyspace_hits_total[5m]) / 
-(rate(valkey_keyspace_hits_total[5m]) + rate(valkey_keyspace_misses_total[5m]))
+rate(redis_keyspace_hits_total[5m]) / 
+(rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))
 ```
 
 ## Troubleshooting
@@ -482,7 +481,7 @@ rate(valkey_keyspace_hits_total[5m]) /
 
 ### Performance Issues
 
-- Monitor Valkey memory usage: `valkey_memory_used_bytes`
+- Monitor Valkey memory usage: `redis_memory_used_bytes`
 - Check cache hit rate (should be > 80% for read-heavy endpoints)
 - Consider increasing TTL for stable data
 - Monitor cache operation latency in traces
@@ -540,7 +539,7 @@ Prioritized; the first items close documented gaps from the cache review.
 | 2 | **Stronger stampede under slow DB** | High | In-process `singleflight` (or a larger waiter budget) so the single-flight guarantee holds when the DB itself is slow, not just on the happy path. |
 | 3 | **Uncancellable lock release** | Medium | Release the stampede lock on `context.WithoutCancel` so a client disconnect mid-fetch frees the lock immediately instead of waiting out its TTL. |
 | 4 | **Cross-service invalidation** | Contingent | Only if product writes (e.g. stock) ever move outside product-service; an event/hook to invalidate the detail cache instead of waiting out the TTL. |
-| 5 | **App-level cache metrics** | Medium | Prometheus hit/miss/error counters to complement the server-side `valkey_keyspace_*` metrics already scraped. |
+| 5 | **App-level cache metrics** | Medium | Prometheus hit/miss/error counters to complement the server-side `redis_keyspace_*` metrics already scraped. |
 | 6 | **Valkey HA** | Low | Reads are fail-open, so a cluster protects the cache tier under load, not availability (a Valkey outage already degrades to DB). |
 
 ## References
@@ -549,3 +548,7 @@ Prioritized; the first items close documented gaps from the cache review.
 - [Redis Go Client](https://github.com/redis/go-redis)
 - [Cache-Aside Pattern](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Strategies.html)
 - [3-Layer Architecture](../api/api.md#3-layer-architecture-responsibility)
+
+---
+
+_Last updated: 2026-07-07_

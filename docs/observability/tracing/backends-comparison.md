@@ -14,7 +14,7 @@ the "consolidate tracing into the VM operator" story. See [victoriatraces.md](vi
 
 ```mermaid
 flowchart LR
-  Apps["8 services (OTel SDK)"] -->|OTLP| OC["OTel Collector"]
+  Apps["9 services (OTel SDK)"] -->|OTLP| OC["OTel Collector"]
   OC -->|otlp/tempo| T["Tempo 2.10.5<br/>(durable · RustFS S3)"]
   OC -->|otlp/jaeger| J["Jaeger v2 all-in-one<br/>(in-memory · ephemeral)"]
   OC -->|otlphttp/victoriatraces| V["VictoriaTraces v0.6.0<br/>(pilot · VLogs engine)"]

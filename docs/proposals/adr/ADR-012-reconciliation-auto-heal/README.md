@@ -73,15 +73,19 @@ reconciler heals **only** when all hold:
 2. internal status is `authorized`, **and**
 3. provider status is `captured`.
 
-For a matching row it calls the existing capture-convergence path
-(`Service.Capture` → `CaptureWithLedger`), which does a CAS `authorized→captured`
-and posts the balanced capture ledger entry in one transaction. Because that path
-is idempotent (an already-captured row is a no-op) the 5-minute recon cadence can
-re-run it harmlessly. The outcome is recorded on the discrepancy as a
-`resolution` (`detected | healed | skipped | failed`):
+For a matching row it calls the repository's `CaptureWithLedger` **directly** —
+the CAS `authorized→captured` plus the balanced capture ledger entry in one
+transaction. It does **not** go through `Service.Capture`, which would call the
+provider after the CAS; heal must never touch the provider (it already captured).
+Because that path is idempotent (an already-captured row is a no-op) the 5-minute
+recon cadence can re-run it harmlessly. The outcome is recorded on the
+discrepancy as a `resolution` (`detected | healed | skipped | failed`):
 
-- match → attempt convergence → `healed`, or `failed` (logged at `Error`,
-  alertable) if the capture path errors; a failure never aborts the run.
+- match → attempt convergence, then record by the **actual post-state**: `healed`
+  only when the row is genuinely captured; `skipped` when a concurrent
+  void/expiry won the CAS so it did not converge (still a real discrepancy the
+  next run re-detects); `failed` (logged at `Error`, alertable) if the capture
+  path errors. A failure never aborts the run.
 - every non-matching discrepancy → `skipped` (recorded, never touched).
 
 The provider port stays read-only; heal moves the **internal** row to match a
@@ -92,8 +96,9 @@ reconciles the ledger to a capture the provider already performed.
 flowchart TD
     D["discrepancy"] --> C{"RECON_HEAL_ENABLED<br/>and status_mismatch<br/>and internal=authorized<br/>and provider=captured?"}
     C -->|no| S["resolution = skipped<br/>(detect-only, as ADR-011)"]
-    C -->|yes| H["Service.Capture<br/>(CAS + capture ledger,<br/>idempotent)"]
-    H -->|ok| OK["resolution = healed"]
+    C -->|yes| H["CaptureWithLedger<br/>(CAS + capture ledger,<br/>idempotent, no provider call)"]
+    H -->|converged| OK["resolution = healed"]
+    H -->|lost CAS race| SK["resolution = skipped<br/>(re-detected next run)"]
     H -->|err| F["resolution = failed<br/>(Error log, alertable)"]
 ```
 

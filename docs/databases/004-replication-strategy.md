@@ -81,18 +81,18 @@ flowchart TB
 
 ---
 
-## 2. Khái niệm cơ bản (Basic Concepts)
+## 2. Basic Concepts
 
 Before diving into replication internals, here are the core concepts explained simply:
 
 | Term | Simple Explanation |
 |------|---------------------|
-| **WAL (Write-Ahead Log)** | "Nhật ký ghi trước" - mọi thay đổi được ghi vào file log trước khi ghi vào bảng. Giống sổ ghi chép trước khi cập nhật sổ chính. |
-| **Replication** | Sao chép dữ liệu từ Primary sang Replica - giống "backup realtime" trên server khác. |
-| **Primary** | Server ghi dữ liệu (read-write). |
-| **Replica** | Bản sao read-only - chỉ đọc, không ghi. |
-| **RPO (Recovery Point Objective)** | Mất tối đa bao nhiêu dữ liệu khi crash? RPO=0 = không mất gì. |
-| **RTO (Recovery Time Objective)** | Mất bao lâu để phục hồi? "Seconds" = failover tự động nhanh. |
+| **WAL (Write-Ahead Log)** | Every change is written to a log file before it is written to the table — like a scratch journal recorded before the main ledger is updated. |
+| **Replication** | Copying data from Primary to Replica — effectively a real-time backup on another server. |
+| **Primary** | The server that writes data (read-write). |
+| **Replica** | A read-only copy — reads only, never writes. |
+| **RPO (Recovery Point Objective)** | How much data can be lost on a crash? RPO=0 = none lost. |
+| **RTO (Recovery Time Objective)** | How long to recover? "Seconds" = fast automatic failover. |
 
 ### WAL Flow Diagram
 
@@ -105,7 +105,7 @@ flowchart LR
     Replica -->|5. Replay| Disk2[Replica Disk]
 ```
 
-**Tóm lại:** WAL là "nhật ký thay đổi". Primary ghi WAL trước, rồi stream sang Replica. Replica replay WAL để đồng bộ dữ liệu.
+**In short:** WAL is the change journal. The Primary writes WAL first, then streams it to the Replica, which replays the WAL to stay in sync.
 
 ---
 
@@ -114,7 +114,7 @@ flowchart LR
 ### Physical Replication (Streaming)
 This is "block-level" replication. PostgreSQL transmits 16MB **WAL** files (or streams WAL records) to replicas.
 
-*   **Mechanism**: "Copy this byte from offset A to offset B." (Giống photocopy - copy nguyên block dữ liệu)
+*   **Mechanism**: "Copy this byte from offset A to offset B" — like a photocopy that reproduces the raw data block.
 *   **Pros**: Extremely efficient, low overhead, replicates ALL changes (indexes, DDL, schema changes, user creation).
 *   **Cons**: Replicas must be read-only. Major version of Primary and Replica must match exactly.
 *   **Your Usage**: 3-node clusters (`cnpg-db`, `auth-db`) use physical streaming for HA.
@@ -122,7 +122,7 @@ This is "block-level" replication. PostgreSQL transmits 16MB **WAL** files (or s
 ### Logical Replication
 This is "row-level" replication. It decodes the WAL into a stream of logical changes (INSERT, UPDATE, DELETE).
 
-*   **Mechanism**: "Insert row {id: 1, name: 'Apple'} into table 'products'." (Giống dictation - đọc từng dòng thay đổi)
+*   **Mechanism**: "Insert row {id: 1, name: 'Apple'} into table 'products'" — like dictation that reads out each changed row.
 *   **Pros**: Flexible. Can replicate between different OSs, Postgres versions, or to external systems (Kafka/Debezium).
 *   **Cons**: Higher CPU usage (decoding). Typically doesn't replicate DDL (CREATE TABLE) automatically.
 *   **Your Usage**: `cnpg-db` has `wal_level: logical` - ready for CDC (Debezium) even though internal HA is physical.
@@ -142,7 +142,7 @@ flowchart LR
     end
 ```
 
-**Tóm lại:** Physical = copy nguyên block (nhanh, đơn giản). Logical = copy từng dòng thay đổi (linh hoạt, có thể gửi ra Kafka).
+**In short:** Physical = copy the whole block (fast, simple). Logical = copy each changed row (flexible, can feed external systems like Kafka).
 
 ---
 
@@ -150,14 +150,14 @@ flowchart LR
 
 The critical setting is `synchronous_commit`. It determines **when** the database tells the client "Success!".
 
-### Ví dụ đời thường (Real-World Analogy)
+### Real-World Analogy
 
 | Mode | Analogy | Trade-off |
 |------|---------|-----------|
-| **Async (`local`)** | Gửi email - server báo "Đã gửi" ngay. Email có thể chưa tới hộp người nhận. | Nhanh nhưng có rủi ro mất dữ liệu |
-| **Sync (`on`)** | Chuyển phát nhanh - chờ người nhận ký xác nhận mới xong. | Chắc chắn nhưng chậm hơn |
+| **Async (`local`)** | Sending an email — the server says "Sent" immediately. It may not have reached the recipient's inbox yet. | Fast, but risks data loss |
+| **Sync (`on`)** | Signed courier delivery — not done until the recipient signs for it. | Certain, but slower |
 
-**Tóm lại:** `synchronous_commit` quyết định KHI NÀO database báo "Success" cho client - ngay khi ghi xong (async) hay chờ replica xác nhận (sync).
+**In short:** `synchronous_commit` decides WHEN the database reports "Success" to the client — as soon as it is written locally (async) or after a replica acknowledges (sync).
 
 ### Diagram: The Commit Wait
 
@@ -221,7 +221,7 @@ flowchart TB
     Single -->|"No failover - single point of failure"| S1
 ```
 
-**Tóm lại:** 3-node clusters có failover tự động. Single-instance cluster (supporting-shared-db) không có replica - nếu node chết thì service down.
+**In short:** 3-node clusters have automatic failover. A single-instance cluster (supporting-shared-db) has no replica — if the node dies, the service is down.
 
 ---
 
@@ -243,7 +243,7 @@ flowchart TB
 
 *   **Implication**: Streaming replication still propagates mistakes instantly to in-cluster standbys. **Replication alone cannot undo** a `DROP TABLE` on the primary. **PITR** (base backup + archived WAL) is what allows rolling back or cloning to a point before the error.
 
-**Tóm lại:** Replication = chống sập server. PITR = chống lỗi người (DROP TABLE, migration sai).
+**In short:** Replication protects against a server crash. PITR protects against human error (DROP TABLE, a bad migration).
 
 ---
 
@@ -316,9 +316,7 @@ cnpg-db: `synchronous.method: any`, `number: 1` - commits when any 1 replica ack
 
 ---
 
-## 7. Cascading Replication (OpenAI Pattern)
-
-> **Source**: [OpenAI Blog - Scaling PostgreSQL](https://openai.com/index/scaling-postgresql/)
+## 7. Cascading Replication
 
 ### Problem: Direct WAL Streaming to 50+ Replicas
 
@@ -337,11 +335,11 @@ flowchart TD
     end
 ```
 
-**Tóm lại:** Primary phải stream WAL tới 50+ replicas → CPU/Network quá tải.
+**In short:** The Primary has to stream WAL to 50+ replicas → CPU/network overload.
 
 ### Solution: Cascading Replication
 
-Primary chỉ stream tới vài Intermediate replicas. Intermediate relay WAL tới Downstream replicas:
+The Primary streams only to a few intermediate replicas, which relay the WAL onward to downstream replicas:
 
 ```mermaid
 flowchart TD
@@ -378,10 +376,10 @@ flowchart TD
 |----------|----------|---------------|
 | < 10 | Direct replication | cnpg-db, auth-db |
 | 10-30 | Consider cascading | - |
-| 30+ | Cascading recommended | OpenAI: ~50 replicas |
+| 30+ | Cascading recommended | hyperscale: ~50 replicas |
 | Multi-region | Intermediate per region | - |
 
-**Note:** CloudNativePG does not natively support cascading. Your 3-node clusters use direct replication. See [cascading-replication-lab.md](../../specs/active/openai-postgresql-scaling/cascading-replication-lab.md) for learning.
+**Note:** CloudNativePG does not natively support cascading. Your 3-node clusters use direct replication — cascading is a pattern to reach for only at large replica counts, which this platform is far from.
 
 ### Trade-offs
 
@@ -395,7 +393,7 @@ flowchart TD
 
 ## 8. Read/Write Splitting & Connection Pooling
 
-### Read/Write Splitting (OpenAI Pattern)
+### Read/Write Splitting
 
 Application sends writes to Primary, reads to Replicas. Pooler (PgBouncer/PgCat/PgDog) routes intelligently:
 
@@ -444,7 +442,7 @@ sequenceDiagram
     Note over P,S: Async: COMMIT returns immediately
 ```
 
-**Tóm lại:** Mỗi replica = 1 WAL Sender trên Primary. 50 replicas = 50 WAL Sender processes → lý do cần Cascading.
+**In short:** Each replica = one WAL Sender on the Primary. 50 replicas = 50 WAL Sender processes → the reason cascading is needed at scale.
 
 ### Connection Pooling Impact
 
@@ -454,7 +452,7 @@ sequenceDiagram
 | N app connections = N DB connections | N app connections → 20-50 DB connections |
 | Connection storms crash DB | Pooler throttles and queues |
 
-**Pool modes:** Transaction mode (OpenAI, your clusters) - connection returned after each COMMIT/ROLLBACK.
+**Pool modes:** Transaction mode (common at scale; your clusters) - connection returned after each COMMIT/ROLLBACK.
 
 ---
 
@@ -462,7 +460,7 @@ sequenceDiagram
 
 ### Single Point of Failure (SPOF)
 
-Nếu database chết, toàn bộ app chết:
+If the database dies, the whole app goes down:
 
 ```mermaid
 flowchart TD
@@ -474,7 +472,7 @@ flowchart TD
 
 ### HA Hot Standby
 
-Có Standby luôn sync. Primary chết → Standby promote → Failover:
+A standby stays continuously in sync. Primary dies → standby is promoted → failover:
 
 ```mermaid
 flowchart TD
@@ -487,35 +485,27 @@ flowchart TD
     end
 ```
 
-**Tóm lại:** SPOF = 1 node chết = app down. HA = Standby sẵn sàng thay thế.
+**In short:** SPOF = one node dies = app down. HA = a standby is ready to take over.
 
 ---
 
-## 10. OpenAI Scaling Insights (Summary)
+## 10. Hyperscale scaling insights (Summary)
 
-> **Source**: [OpenAI Blog](https://openai.com/index/scaling-postgresql/) | **Specs**: [specs/active/openai-postgresql-scaling/](../../specs/active/openai-postgresql-scaling/)
-
-OpenAI scales PostgreSQL to **800M+ users** with:
+Large hyperscale deployments scale PostgreSQL to hundreds of millions of users with a layered strategy:
 
 | Layer | Techniques |
 |-------|------------|
 | **Application** | Query optimization, caching with stampede prevention, workload isolation, multi-layer rate limiting |
-| **Database** | Read replicas, write offload to CosmosDB, PgBouncer pooling, cascading replication |
-| **Infrastructure** | Azure PostgreSQL, multi-region, ~50 read replicas |
+| **Database** | Read replicas, write offload to a secondary store, PgBouncer pooling, cascading replication |
+| **Infrastructure** | Managed PostgreSQL, multi-region, ~50 read replicas |
 
 ### Key Takeaways
 
-1. **Keep it simple** - OpenAI avoided sharding. Scale with replicas + caching first.
-2. **Cache stampede prevention** - Use distributed lock (Redis SETNX) so only 1 request fetches on cache miss. *Product service implements this.*
+1. **Keep it simple** - these deployments avoided sharding. Scale with replicas + caching first.
+2. **Cache stampede prevention** - Use a distributed lock (Redis SETNX) so only 1 request fetches on cache miss. *Product service implements this.*
 3. **Connection pooling is mandatory** - PgBouncer/PgCat reduces connections 50-100x.
 4. **Cascading for 30+ replicas** - Primary → Intermediate → Downstream.
 5. **Application-first optimization** - Optimize queries, add caching, rate limiting before scaling infrastructure.
-
-### References
-
-- [research.md](../../specs/active/openai-postgresql-scaling/research.md) - Full architecture with diagrams
-- [application-layer-optimization.md](../../specs/active/openai-postgresql-scaling/application-layer-optimization.md) - Query, cache, rate limit patterns
-- [cascading-replication-lab.md](../../specs/active/openai-postgresql-scaling/cascading-replication-lab.md) - Lab for cascading replication
 
 ---
 
@@ -538,3 +528,7 @@ OpenAI scales PostgreSQL to **800M+ users** with:
 |----------|----------|-------------------|
 | **CloudNativePG** | cnpg-db, cnpg-db-replica | 18 |
 | **Zalando Postgres Operator** | auth-db, supporting-shared-db | 16/17 |
+
+---
+
+_Last updated: 2026-07-07_

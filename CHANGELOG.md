@@ -13,8 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **RFC-0013 — app-metrics cardinality audit & streaming-aggregation scale
   playbook**: audit of all 9 services' custom metrics (verdicts + defect table
-  D1–D6; measured baseline 2,777 series @ 1 replica; cart middleware drift,
-  payment missing from the restart alert), the at-scale playbook
+  D1–D5; measured baseline 2,777 series @ 1 replica; payment missing from the
+  restart alert), the at-scale playbook
   `docs/observability/metrics/streaming-aggregation.md` (cardinality math,
   two-tier vmagent design, decision flowchart), and a planned additive shadow
   pilot on the VMAgent CR (P3). `metrics-apps.md` hardened per P1: canonical

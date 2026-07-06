@@ -70,8 +70,8 @@ the 500 ms latency threshold:
 
 This is the **canonical fleet bucket set** — every service must use exactly
 these values. Divergent buckets break cross-service `histogram_quantile()`
-comparisons and blunt SLO precision (cart drifted once:
-[RFC-0013](../../proposals/rfc/RFC-0013/README.md) D1).
+comparisons and blunt SLO precision
+([RFC-0013](../../proposals/rfc/RFC-0013/README.md)).
 
 | Bucket (s) | Purpose |
 |------------|---------|
@@ -180,7 +180,7 @@ SHA.
 **No-drift rule** — `middleware/prometheus.go` is intentionally identical
 across all 9 service repos (the order-service copy is the reference). Any
 change must be replicated fleet-wide in the same change-set; a diverging copy
-is a defect even if it "works" (see RFC-0013 D1/D4).
+is a defect even if it "works" (see RFC-0013 D3).
 
 **Infrastructure-endpoint filtering** — `/health`, `/ready`, `/metrics`,
 `/readiness`, `/liveness` return early in the middleware before any metric is

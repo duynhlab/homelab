@@ -56,7 +56,7 @@ on our real GitOps stack, not a throwaway demo.
 - VMSingle → VMCluster migration; retention/downsampling policy.
 - New business/DB/cache instrumentation (tracked separately).
 - Extracting the copy-pasted middleware into `pkg` — named here as root-cause
-  remediation (D4) but a cross-9-repo effort tracked outside this RFC.
+  remediation (D3) but a cross-9-repo effort tracked outside this RFC.
 
 ## Proposal
 
@@ -177,7 +177,7 @@ flowchart TD
 
 | Service | Series/replica | Dominant extras |
 |---|---|---|
-| cart | 720 | drifted middleware (D1) |
+| cart | 720 | most route×code combos materialized |
 | product | 530 | 51 `rpc_client_*` |
 | notification | 410 | |
 | auth | 392 | |
@@ -196,28 +196,26 @@ is already exceeded at 1 replica — corrected in P1.
 
 | Metric family | Labels | Type | Naming | Bounded | Fleet-consistent | Verdict |
 |---|---|---|---|---|---|---|
-| `request_duration_seconds` | method, path, code | ✅ histogram | ✅ | ✅ | ❌ cart buckets + missing exemplars | **pass** (8/9) · **fail** cart → D1 |
+| `request_duration_seconds` | method, path, code | ✅ histogram | ✅ | ✅ | ✅ | **pass** |
 | `requests_in_flight` | method, path | ✅ gauge | ✅ | ✅ | ✅ | **pass** |
-| `request_size_bytes` / `response_size_bytes` | method, path, code | ✅ histogram | ✅ | ✅ | ❌ cart observes size with `code=""` at request start | **pass-with-notes** — only `_sum` is consumed (bandwidth rules); the 12 `_bucket` series/combo have no consumer today (rubric #8). Candidate to slim when the middleware is centralized (D4). |
-| `requests_total`, `error_rate_total` (cart only) | method, path, code | ✅/❌ | ❌ `error_rate_total` is a counter named like a rate | ✅ | ❌ cart-only | **fail** → D1 |
+| `request_size_bytes` / `response_size_bytes` | method, path, code | ✅ histogram | ✅ | ✅ | ✅ | **pass-with-notes** — only `_sum` is consumed (bandwidth rules); the 12 `_bucket` series/combo have no consumer today (rubric #8). Candidate to slim when the middleware is centralized (D3). |
 | `rpc_server_*` / `rpc_client_*` (otelgrpc) | rpc_service, rpc_method, status code | ✅ | OTel conv. | ✅ | ✅ | **pass-with-notes** — no rule/alert consumes them yet (known gap, out of scope here) |
 | `temporal_*` (SDK) | SDK-defined | ✅ | SDK conv. | ✅ | ✅ | **pass** |
 | `go_*` / `process_*` | target only | ✅ | ✅ | ✅ | ✅ | **pass** — consumed by runtime alerts |
 
 Headline: **the platform passes the article-grade hygiene test** — route
-templates everywhere, no request-scoped IDs, bounded label sets. The failures
-are consistency failures, not cardinality bombs.
+templates everywhere, no request-scoped IDs, bounded label sets. The remaining
+defects are coverage/doc-accuracy issues, not cardinality bombs.
 
 #### Defects (each with its fix phase)
 
 | # | Severity | Defect | Fix |
 |---|---|---|---|
-| **D1** | Required | **cart-service middleware drift** (only copy of 9 that diverges; 95 diff lines): (a) buckets `[…,0.25,0.5,1,2.5,…]` lack the fleet's 0.2/0.3/0.75 SLO-precision points; (b) two redundant counters `requests_total` + `error_rate_total` duplicating `request_duration_seconds_count` (and `error_rate_total` violates naming); (c) **no traceID exemplars** — cart latency spikes can't deep-link to traces; (d) unmatched-route label `"unmatched"` vs fleet `"unknown"` — splits fleet queries; (e) `request_size_bytes` observed at request start with `code=""` — phantom label value. Fix: restore cart to the reference copy. | P4 (cart-service) |
-| **D2** | Required | `MicroserviceHighRestartRate` hardcodes 8 namespaces — **payment missing** (`kubernetes/infra/configs/monitoring/prometheusrules/microservices/alerts.yaml:44`). Payment pod crash-loops would never fire this alert. Fix: add payment; prefer deriving from a label over a hardcoded list. | P4 (homelab) |
-| **D3** | Required | Stale "8 services" claims after payment landed (RFC-0010 P5): headers of `alerts.yaml`/`recording-rules.yaml`, SLO docs "8 services / 24 SLOs", scattered observability docs. (`metrics-apps.md` already corrected in P1.) Fix: sweep to 9 / 27. | P4 (docs) |
-| **D4** | Consider | Root cause of D1: `middleware/prometheus.go` is copy-pasted across 9 repos with no drift guard. Fix direction: extract to a shared package in `duynhlab/pkg` (e.g. `pkg/metricsx`) — **tracked as a follow-up `TODO.md` item, not a phase here** (cross-9-repo effort). | Follow-up |
-| **D5** | Required | Standard doc inaccuracies: fleet series figure (~2,400) stale vs measured 2,777 @ 1 replica; canonical bucket set and forbidden-label list exist only implicitly in a code snippet; exemplar status contradicted between `TODO.md` ("not wired in Grafana") and `metrics-apps.md` ("configured"). Fix: amend `metrics-apps.md` (this PR) — measured table, canonical bucket constant, forbidden-label list, no-drift rule; reconcile the exemplar claim to "emitted by services; Grafana exemplar display pending" pointing at `TODO.md`. | **P1 ✅ (this PR)** |
-| **D6** | Consider | local-stack spanmetrics series carry unbounded-over-time resource labels (`process_pid`, `process_command_args`, `host_name`, `os_description`, …) via `resource_to_telemetry_conversion` — every container restart re-mints all 1,846+ series (order alone). Local-stack-only (cluster path uses Tempo), but it is a live example of the churn class this RFC is about. Fix: allowlist spanmetrics dimensions / drop resource conversion in the local-stack collector. | P4 (local-stack) |
+| **D1** | Required | `MicroserviceHighRestartRate` hardcodes 8 namespaces — **payment missing** (`kubernetes/infra/configs/monitoring/prometheusrules/microservices/alerts.yaml:44`). Payment pod crash-loops would never fire this alert. Fix: add payment; prefer deriving from a label over a hardcoded list. | P4 (homelab) |
+| **D2** | Required | Stale "8 services" headers in the rule manifests (`alerts.yaml`/`recording-rules.yaml`) after payment landed (RFC-0010 P5); the prose docs were swept separately. Contested leftover: SLO docs say "payment ships no SLO yet", but `checkout-rs.yaml` applies `slo.enabled: true` unconditionally to every service it renders — payment included — which would make it 9 × 3 = 27 SLOs. Fix: correct the manifest headers to 9 and verify the rendered `PrometheusServiceLevel` set at the next cluster bring-up, then align the SLO counts (24 vs 27) to reality. | P4 (docs) |
+| **D3** | Consider | `middleware/prometheus.go` is copy-pasted across 9 repos with no drift guard. Fix direction: extract to a shared package in `duynhlab/pkg` (e.g. `pkg/metricsx`) and harden the reference while at it (bound the `method` label to known verbs, `defer` the in-flight `Dec()`, skip negative `ContentLength` observations) — **tracked as a follow-up `TODO.md` item, not a phase here** (cross-9-repo effort). | Follow-up |
+| **D4** | Required | Standard doc inaccuracies: fleet series figure (~2,400) stale vs measured 2,777 @ 1 replica; canonical bucket set and forbidden-label list exist only implicitly in a code snippet; exemplar status contradicted between `TODO.md` ("not wired in Grafana") and `metrics-apps.md` ("configured"). Fix: amend `metrics-apps.md` (this PR) — measured table, canonical bucket constant, forbidden-label list, no-drift rule; reconcile the exemplar claim to "emitted by services; Grafana exemplar display pending" pointing at `TODO.md`. | **P1 ✅ (this PR)** |
+| **D5** | Consider | local-stack spanmetrics series carry unbounded-over-time resource labels (`process_pid`, `process_command_args`, `host_name`, `os_description`, …) via `resource_to_telemetry_conversion` — every container restart re-mints all 1,846+ series (order alone). Local-stack-only (cluster path uses Tempo), but it is a live example of the churn class this RFC is about. Fix: allowlist spanmetrics dimensions / drop resource conversion in the local-stack collector. | P4 (local-stack) |
 
 ### B. Cardinality math (headline)
 
@@ -293,11 +291,11 @@ one more config surface on the CR.
 
 | Phase | Scope | Repos touched |
 |-------|-------|---------------|
-| **P1 — Audit & standard hardening ✅ (this PR)** | Rubric, measured baseline, verdicts, D-table (all above); amend `metrics-apps.md`: canonical bucket set, forbidden-label list, no-drift rule, measured numbers, exemplar-claim reconciliation (D5). *Exit: every custom metric has a verdict; amendments merged.* | homelab (docs) |
+| **P1 — Audit & standard hardening ✅ (this PR)** | Rubric, measured baseline, verdicts, D-table (all above); amend `metrics-apps.md`: canonical bucket set, forbidden-label list, no-drift rule, measured numbers, exemplar-claim reconciliation (D4). *Exit: every custom metric has a verdict; amendments merged.* | homelab (docs) |
 | **P2 — Scale playbook ✅ (this PR)** | `docs/observability/metrics/streaming-aggregation.md` + index wiring. *Exit: doc merged, diagrams render, marked not-deployed.* | homelab (docs) |
 | **P3a — Shadow pilot** | `streamAggrConfig` on the VMAgent CR as specified; verification protocol below. *Exit: aggregated series present without `instance`/`pod`; raw counts unchanged; `vm_streamaggr_*` healthy; 1-week equivalence soak vs `job_app:*` within tolerance.* | homelab (kubernetes) |
 | **P3b — Adopt or remove (gated)** | Cut fleet-level consumers over to aggregated series and retire duplicated recording rules, **or** remove the shadow; spawn **ADR-013** with the decision + numbers. *Exit: ADR-013 merged; VMAlert zero rule-eval errors; Sloth SLO series advancing.* | homelab |
-| **P4 — Remediation** | D1 cart restore-to-reference (+regression: CI diff against reference or golden test), D2 payment regex, D3 doc sweep, D6 spanmetrics dimensions. *Exit: cart diff clean; payment matched by restart alert; stale "8 services" grep empty.* | cart-service, homelab |
+| **P4 — Remediation** | D1 payment regex, D2 manifest-header sweep + SLO-count verification, D5 spanmetrics dimensions. *Exit: payment matched by restart alert; stale "8 services" grep empty in manifests; SLO count claim verified against rendered CRs.* | homelab |
 
 ## Security considerations
 
@@ -343,9 +341,9 @@ tests.
 ## Testing / verification
 
 **P1 (done for this RFC):** middleware copies diffed CRLF-normalized against
-the order-service reference (8 identical, cart drifted); series measured live
-via `/api/v1/query` `count({__name__!=""}) by (job)` and per-service `/metrics`
-line counts; route counts grepped per repo (11–17).
+the order-service reference; series measured live via `/api/v1/query`
+`count({__name__!=""}) by (job)` and per-service `/metrics` line counts; route
+counts grepped per repo (11–17).
 
 **P3a protocol:**
 
@@ -365,14 +363,15 @@ line counts; route counts grepped per repo (11–17).
 7. Consumers: VMAlert reports zero rule-eval errors; Sloth SLO recording
    series advancing; RED dashboard spot-check.
 
-**P4:** cart middleware diff vs reference returns empty; `promtool`-style rule
-lint via `make validate`; grep sweep for `"8 services"`/`8 Go microservices`
-in monitoring docs returns only historical (CHANGELOG/RFC) hits.
+**P4:** `promtool`-style rule lint via `make validate`; grep sweep for
+`"8 services"`/`8 Go microservices` in monitoring manifests returns only
+historical (CHANGELOG/RFC) hits; `kubectl get prometheusservicelevels -A`
+settles the 24-vs-27 SLO count (D2).
 
 ## Implementation History
 
 - 2026-07-06 — baseline measured (local-stack, 1 replica each): per-service
-  series 49–720, Σ 2,777; middleware diff 8/9 identical, cart +95 lines.
+  series 49–720, Σ 2,777.
 - 2026-07-07 — RFC created; P1 audit + `metrics-apps.md` amendments + P2
   playbook land in the same PR.
 
@@ -383,4 +382,4 @@ in monitoring docs returns only historical (CHANGELOG/RFC) hits.
 - [metrics hub](../../../observability/metrics/README.md) · [alerting](../../../observability/alerting/README.md) (2-layer model — streaming aggregation complements, does not replace it)
 - RFC-0010 (rollout-pattern precedent: flagged shadow → verify → cutover → cleanup)
 - ADR-013 — to be spawned by P3b with the adopt/remove decision
-- Follow-up tracker (D4): extract shared metrics middleware into `duynhlab/pkg`
+- Follow-up tracker (D3): extract shared metrics middleware into `duynhlab/pkg` + harden the reference (method-label allowlist, deferred in-flight `Dec()`, negative-`ContentLength` guard)

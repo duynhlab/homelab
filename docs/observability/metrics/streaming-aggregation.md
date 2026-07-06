@@ -55,7 +55,7 @@ worst-case bound as more route×status combinations are hit):
 
 | Service | Series/replica (measured) | Notes |
 |---|---|---|
-| cart | 720 | drifted middleware: extra counters + more combos (RFC-0013 D1) |
+| cart | 720 | most route×code combos materialized |
 | product | 530 | + 51 `rpc_client_*` (gRPC → review) |
 | notification | 410 | |
 | auth | 392 | |

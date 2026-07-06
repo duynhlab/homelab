@@ -265,6 +265,7 @@ docs/observability/
 │   ├── victoriametrics.md        # VictoriaMetrics Operator stack
 │   ├── vmauth.md                 # VMAuth/vmauth HTTP proxy (auth.config, CRs)
 │   ├── promql-guide.md           # PromQL reference
+│   ├── streaming-aggregation.md  # At-scale playbook: in-flight aggregation (RFC-0013)
 │   └── postgresql/               # PostgreSQL-specific metrics (databases layer)
 │       ├── monitoring.md          # Monitoring overview
 │       ├── custom-metrics.md      # Custom pg_exporter queries

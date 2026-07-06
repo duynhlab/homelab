@@ -77,6 +77,7 @@ made are recorded as one or more **ADRs**, and the RFC moves to `implemented`.
 | [RFC-0010](RFC-0010/) | Payment service: PaymentIntent, ledger & charge/refund saga step | platform-wide | P0 | implemented (P1–P6 landed) |
 | [RFC-0011](RFC-0011/) | Homelab migration: Kind to bare-metal Talos (1 → 3 node HA) | infra | P2 | provisional |
 | [RFC-0012](RFC-0012/) | Converge CNPG role & database management on declarative CRDs | infra | P1 | provisional |
+| [RFC-0013](RFC-0013/) | App-metrics cardinality audit & streaming-aggregation scale playbook | platform-wide | P2 | provisional |
 
 ## Backlog — candidate RFCs
 

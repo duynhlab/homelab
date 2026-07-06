@@ -1,7 +1,7 @@
 # Application Metrics (RED)
 
 The **application layer** of the metrics pillar: the RED signals (Rate, Errors,
-Duration) for the 8 Go microservices and their gRPC east-west calls, plus Go
+Duration) for the 9 Go microservices and their gRPC east-west calls, plus Go
 runtime health and the instrumentation that produces it. For methodology theory,
 the stack, and the other layers, start at the [metrics hub](README.md).
 
@@ -67,6 +67,11 @@ flowchart LR
 `request_duration_seconds` buckets are **SLO-tuned** with extra precision around
 the 500 ms latency threshold:
 `0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1, 2, 5, 10`.
+
+This is the **canonical fleet bucket set** — every service must use exactly
+these values. Divergent buckets break cross-service `histogram_quantile()`
+comparisons and blunt SLO precision (cart drifted once:
+[RFC-0013](../../proposals/rfc/RFC-0013/README.md) D1).
 
 | Bucket (s) | Purpose |
 |------------|---------|
@@ -158,8 +163,22 @@ if path == "" { path = "unknown" } // 404 / unmatched
 | Raw URL | `/api/v1/products/123`, `/456`, … | **Unbounded** |
 | Route pattern (`c.FullPath()`) | `/api/v1/products/:id` | **Bounded** (~20 routes) |
 
-With 8 services × ~20 routes × 3 methods × 5 status codes ≈ **2,400 series** —
-bounded and predictable.
+Measured (2026-07-06, one replica per service, live traffic): **49–720 series
+per service, Σ 2,777** across the 9 services — histogram label sets materialize
+lazily, so this grows toward the worst-case bound of ~1,800 series/replica
+(~48 route×code combos × 32 histogram series + ~250 runtime). Bounded and
+predictable either way; the full model and at-scale projection live in the
+[streaming-aggregation playbook](streaming-aggregation.md#the-cardinality-math).
+
+**Forbidden as label values** (unbounded or request-scoped — these belong in
+logs/traces, never metrics): `user_id`, `request_id`, `trace_id`, `session_id`,
+`email`, IP addresses, raw URL paths, order/cart/payment IDs, pod UID, image
+SHA.
+
+**No-drift rule** — `middleware/prometheus.go` is intentionally identical
+across all 9 service repos (the order-service copy is the reference). Any
+change must be replicated fleet-wide in the same change-set; a diverging copy
+is a defect even if it "works" (see RFC-0013 D1/D4).
 
 **Infrastructure-endpoint filtering** — `/health`, `/ready`, `/metrics`,
 `/readiness`, `/liveness` return early in the middleware before any metric is
@@ -259,9 +278,11 @@ links a latency spike straight to the exact Tempo trace.
 3. Exemplar dots appear on the graph; click one to get the `traceID`, then click
    through to Tempo.
 
-**Prerequisites** (all already configured): VMSingle stores exemplars natively;
-tracing middleware runs before Prometheus middleware; Grafana has the Tempo
-datasource.
+**Prerequisites**: the emit side is fully configured — VMSingle stores
+exemplars natively, tracing middleware runs before Prometheus middleware, and
+Grafana has the Tempo datasource. The Grafana **display** side (exemplar
+toggle wired into the shipped RED dashboard panels) is still a pending item in
+`TODO.md`; until then, enable the toggle manually per panel as described above.
 
 ## Memory leak detection
 
@@ -344,4 +365,4 @@ Runbook: [`microservices-alerts.md`](../runbooks/microservices-alerts.md).
 
 ---
 
-_Last updated: 2026-06-29 — RED via `request_duration_seconds`, gRPC east-west RED on `/metrics`, exemplars → Tempo._
+_Last updated: 2026-07-07 — RFC-0013 P1: measured cardinality baseline, canonical bucket set, forbidden-label list, no-drift rule, exemplar-status reconciliation._

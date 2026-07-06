@@ -9,7 +9,7 @@ compensations, orchestrated by Temporal) is what we run instead.
 |---|---|
 | **Status** | Reference / learning (concept doc) |
 | **Scope** | Platform-wide — order, product, shipping, payment |
-| **Applies to** | The order-fulfillment saga (RFC-0010 P3, live behind `PAYMENT_ENABLED`) |
+| **Applies to** | The order-fulfillment saga (RFC-0010 P3) |
 | **Decisions** | [ADR-001](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/) (saga over alternatives) · [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) (authorize-early/capture-late) · [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) (shared idempotency) |
 | **See also** | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) (the live saga), [payments.md](./payments.md), [RFC-0010](../proposals/rfc/RFC-0010/) |
 
@@ -195,8 +195,8 @@ remaining steps (notify, clear cart) until they succeed.
 ## 6. How this platform does it (RFC-0010 P3)
 
 The order-fulfillment saga (`order-service/internal/saga/workflow.go`), driven by a
-Temporal worker. Bracketed steps run only when `PAYMENT_ENABLED` is on (off = the
-pre-payment saga, byte-identical):
+Temporal worker — payment is an unconditional part of every run
+(the `PAYMENT_ENABLED` rollout flag was removed in P3.exit):
 
 ```mermaid
 sequenceDiagram

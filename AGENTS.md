@@ -38,9 +38,9 @@ Reduce common LLM coding mistakes. Bias toward caution over speed; use judgment 
 
 ## Project overview
 
-- **`duynhlab` microservices platform** — 8 Go microservices + a React frontend, each in its own namespace.
+- **`duynhlab` microservices platform** — 9 Go microservices + a React frontend, each in its own namespace.
 - **This repo (`homelab`):** GitOps (Flux Operator + Kustomize + OCI), observability, databases/secrets infra, and docs. No application source here.
-- **Service repos:** `auth/user/product/cart/order/review/shipping/notification-service`, `frontend`; shared Go library `duynhlab/pkg`; chart `duynhlab/helm-charts` (the `mop` chart). Reusable CI in `duynhlab/gha-workflows`.
+- **Service repos:** `auth/user/product/cart/order/review/shipping/notification/payment-service`, `frontend`; shared Go library `duynhlab/pkg`; chart `duynhlab/helm-charts` (the `mop` chart). Reusable CI in `duynhlab/gha-workflows`.
 - Full index: [`SERVICES.md`](SERVICES.md), [`docs/README.md`](docs/README.md).
 
 ## Repository layout
@@ -52,7 +52,7 @@ kubernetes/
   apps/       # Domain ResourceSets + per-service InputProviders + frontend
 scripts/      # Kind/Flux helpers (called by the Makefile)
 terraform/    # OpenTofu root: Flux Operator + FluxInstance bootstrap (flux-operator-bootstrap module)
-local-stack/  # Docker Compose e2e stack (Postgres + Valkey + 8 services + Kong DB-less gateway + SPA)
+local-stack/  # Docker Compose e2e stack (Postgres + Valkey + 9 services + mockpay + Kong DB-less gateway + SPA)
 docs/         # Documentation (start at docs/README.md)
 ```
 
@@ -91,7 +91,7 @@ flowchart LR
 
 - **Frontend → Web layer only.** The SPA calls `/{service}/v1/{public,private}/…` via `VITE_API_BASE_URL`; never Logic/Core/DB. Aggregation happens server-side.
 - **API URL shape (Variant A):** `/{service}/v1/{audience}/{resource…}`, mounted directly on each service's router (Kong is pass-through, no rewrite). `{audience}` ∈ `public|private|internal|protected`. **Never** put `internal` routes on `ingress-api.yaml` — they're in-cluster only; **NetworkPolicy is the fence**, not the absence of an Ingress rule. Auth middleware lives in each service (`pkg/authmw`: verifies RS256 JWTs locally against a cached JWKS — JWT-only since RFC-0009 Phase 5; the opaque-token `auth.GetMe` fallback and auth's gRPC server were removed), not Kong. Additionally, Kong runs edge JWT (RFC-0009 Phase 4, ADR-006) on `/private/` routes — rejecting bad/expired RS256 tokens at the gateway as a coarse first filter, with the service check still authoritative. Authoritative: [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
-- **gRPC is the official east-west transport** (product→review, order→shipping, order→notification) — gRPC-only, always-on `:9090`, no feature flag, no REST fallback. (auth's `/me` GetMe RPC was removed in Phase 5 — services verify JWTs locally.) Shared `pkg/grpcx`. Browser/Kong traffic stays HTTP/JSON.
+- **gRPC is the official east-west transport** (product→review, order→shipping, order→notification, order→payment) — gRPC-only, always-on `:9090`, no feature flag, no REST fallback. (auth's `/me` GetMe RPC was removed in Phase 5 — services verify JWTs locally.) Shared `pkg/grpcx`. Browser/Kong traffic stays HTTP/JSON.
 - **Observability:** middleware chain **tracing → logging → metrics**; gRPC RED metrics surface on each service's existing `/metrics` via `pkg/obsx` (no extra port); `obsx.TraceIDFromContext` correlates logs with traces. Stack: VictoriaMetrics, Grafana, Tempo (+ VictoriaTraces pilot), VictoriaLogs (Loki removed), Pyroscope, Jaeger, Vector. SLO via Sloth. Kong emits edge spans (opentelemetry `inject:[w3c]`).
 - **Caching:** Cache-Aside with Valkey for read-heavy endpoints.
 - **Diagrams:** **Mermaid only — never ASCII art** (`flowchart`, `sequenceDiagram`, etc.).
@@ -114,7 +114,7 @@ Every manifest applied to the cluster must satisfy admission:
   flux-system → controllers-local → {cert-manager → kong → kong-config, secrets,
   cnpg-barman-plugin, caching, storage} → databases → databases-cnpg-dr
   monitoring-local → kyverno-policies, mcp
-  apps-local (depends: databases + monitoring)
+  apps-local (depends: databases + monitoring + temporal-local)
   ```
 - **CHANGELOG.** Add **concise, grouped** entries (`Added`/`Changed`/`Removed`, one line per change) at the **top** of `[Unreleased]`. **Released sections are append-only** — never edit or remove `[X.Y.Z]` history. Cutting a release = rename `[Unreleased]` → `[X.Y.Z] - YYYY-MM-DD` (condensing the entries then is fine) and add a fresh empty `[Unreleased]` on top.
 - **Image naming:** `ghcr.io/duynhlab/<repo>/<image>` (multi-level). The `mop` chart renders `<name>-service/<name>` + `<name>-service/<name>-init`.

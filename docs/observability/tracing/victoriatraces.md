@@ -15,7 +15,7 @@ with **no object-storage dependency**.
 
 ```mermaid
 flowchart LR
-  Apps["8 services (OTel SDK)"] -->|OTLP| OC["OTel Collector"]
+  Apps["9 services (OTel SDK)"] -->|OTLP| OC["OTel Collector"]
   OC -->|otlp/tempo| T["Tempo (durable · RustFS)"]
   OC -->|otlp/jaeger| J["Jaeger (in-memory)"]
   OC -->|otlphttp/victoriatraces| V["VictoriaTraces VTSingle :10428"]
@@ -80,7 +80,7 @@ exporters:
 ## Try it locally (docker-compose)
 
 The [`local-stack`](../../../local-stack/README.md) wires the same path on a laptop — no cluster
-needed: the 8 services emit OTLP-HTTP to an **OTel Collector**, which re-exports to a single-node
+needed: the 9 services emit OTLP-HTTP to an **OTel Collector**, which re-exports to a single-node
 **VictoriaTraces** container, and you audit traces in a bundled **Grafana**.
 
 ```bash

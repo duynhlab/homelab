@@ -1,6 +1,6 @@
 # Observability Documentation
 
-Comprehensive observability for the `duynhlab` microservices platform -- 8 Go services, 4 PostgreSQL clusters, all running on Kubernetes with GitOps (Flux).
+Comprehensive observability for the `duynhlab` microservices platform -- 9 Go services, 5 PostgreSQL clusters, all running on Kubernetes with GitOps (Flux).
 
 ## Architecture
 
@@ -294,7 +294,9 @@ docs/observability/
 │
 ├── alerting/                     # Alerting rules
 │   ├── README.md                 # 2-layer alerting strategy
-│   └── alert-catalog.md          # Full alert reference (145 rules) + coverage gaps
+│   ├── alert-catalog.md          # Full alert reference (150 rules) + coverage gaps
+│   ├── slo-burn-rate-alerts.md   # SLO burn-rate methodology + config
+│   └── dashboard-comparison.md   # Alerting/dashboard tooling comparison
 │
 ├── slo/                          # Service Level Objectives
 │   ├── README.md                 # Sloth Operator + SLO targets
@@ -400,3 +402,7 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 - [Alert Catalog](alerting/alert-catalog.md) -- full reference of all deployed alerts + coverage-gap analysis
 - [SLO System](slo/README.md) -- Sloth Operator and burn-rate alerts
 - [Interview Prep](runbooks/observability-deep-dive.md) -- RED/USE/Golden Signals theory + structured answers
+
+---
+
+_Last updated: 2026-07-07_

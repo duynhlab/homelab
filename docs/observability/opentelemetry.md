@@ -73,7 +73,7 @@ fans out to three different trace backends without touching a line of Go.
 ```mermaid
 flowchart LR
     subgraph Producers
-        SVC["8 Go services<br/>(obsx SDK, OTLP/HTTP)"]
+        SVC["9 Go services<br/>(obsx SDK, OTLP/HTTP)"]
         KONG["Kong gateway<br/>(opentelemetry plugin)"]
     end
     subgraph Collector["otel-collector (monitoring)"]

@@ -13,7 +13,7 @@
 
 Specify the **single** URL shape used everywhere in the platform — frontend, service handlers, service-to-service callers. There is no separate "cluster" vs "edge" path any more; services register Variant A paths directly on their Gin routers and Kong passes requests through without rewriting.
 
-The shape is inspired by Chợ Tốt's multi-segment edge layout and refined with ideas from the [Google API Design Guide](https://cloud.google.com/apis/design).
+The shape is inspired by a multi-segment edge layout and refined with ideas from the Google API Design Guide (see [References](#references)).
 
 ## URL shape
 
@@ -29,7 +29,7 @@ http://{service}.{namespace}.svc.cluster.local:8080/{service}/v1/{audience}/{res
 
 for in-cluster (east-west) traffic. Same path, different host — Kong just forwards.
 
-- `{service}` ∈ `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`.
+- `{service}` ∈ `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`, `payment`.
 - `{audience}` ∈ `public`, `private`, `internal`, `protected` (`protected` is **planned — none deployed yet**).
 - `{resource…}` mirrors the collection/verb owned by the service.
 
@@ -132,6 +132,17 @@ All private.
 | `GET` | `/shipping/v1/public/estimate?origin&destination&weight` | public | Browser |
 | `GET` | `/shipping/v1/internal/orders/:orderId` | internal | order-service (order-details aggregation) |
 
+### payment-service (namespace `payment`)
+
+| Method | Path | Audience | Caller |
+|--------|------|----------|--------|
+| `POST` | `/payment/v1/public/webhooks/mockpay` | public | mockpay provider (HMAC-signed body is the credential) |
+| `GET` / `POST` | `/payment/v1/private/payments` | private | Browser |
+| `GET` | `/payment/v1/private/payments/:id` | private | Browser |
+| `POST` | `/payment/v1/internal/payments/:id/refunds` | internal | order-service (saga refund) |
+| `POST` | `/payment/v1/internal/reconciliation/runs` | internal | Reconciliation trigger (in-cluster) |
+| `GET` | `/payment/v1/internal/reconciliation/runs/:id` | internal | Reconciliation status (in-cluster) |
+
 ## Service-to-service calls
 
 The caller → callee → audience mapping for in-cluster east-west traffic:
@@ -142,6 +153,7 @@ The caller → callee → audience mapping for in-cluster east-west traffic:
 | order-service → aggregation | shipping-service | internal |
 | order-service → checkout cleanup | cart-service | private (forwards user's JWT) |
 | product-service → aggregation | review-service | public |
+| order-service → payment (order-details enrichment + saga) | payment-service | internal (gRPC) |
 | auth-service → registration | user-service | internal |
 
 Most of these hops now run over **gRPC**, not HTTP. For transport (gRPC vs REST per hop), addresses, ports, and migration status, see [`grpc-internal-comms.md`](grpc-internal-comms.md) — it is authoritative for east-west transport.
@@ -169,6 +181,10 @@ https://static.duynh.me/storage/app/v5/<release>/assets/header.css
 ```
 
 Immutable file names (content hash) + explicit `Cache-Control` for chunks.
+
+## References
+
+- Google API Design Guide — <https://cloud.google.com/apis/design>
 
 ## History
 

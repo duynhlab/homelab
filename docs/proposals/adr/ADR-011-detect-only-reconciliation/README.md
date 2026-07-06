@@ -5,7 +5,7 @@ it — automated money movement stays off until the detector has earned trust.
 
 | Status | Date | Related RFC |
 |--------|------|-------------|
-| Accepted | 2026-07-04 | [RFC-0010](../../rfc/RFC-0010/) |
+| Accepted (partially superseded by [ADR-012](../ADR-012-reconciliation-auto-heal/) — one class auto-healed) | 2026-07-04 | [RFC-0010](../../rfc/RFC-0010/) |
 
 > **Don't forget: every decision is a tradeoff.** Record what you gave up, not just
 > what you gained.
@@ -51,7 +51,9 @@ flowchart LR
 **Auto-heal becomes a future slice**, unlocked only after the detector has
 soaked: a stretch of runs where every flagged discrepancy was a true positive
 and every known drift was caught. The RFC's capped heal rules remain the design
-for that slice.
+for that slice. *(That slice has since landed narrowly:
+[ADR-012](../ADR-012-reconciliation-auto-heal/) auto-heals one class — the
+lost-capture-response window — behind a default-off flag.)*
 
 **Order↔payment reconciliation is deferred.** The captured-but-failed-order
 window (confirm fails *and* the saga's refund compensation also fails) is

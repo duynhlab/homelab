@@ -19,12 +19,13 @@ the end-to-end pipeline (ingestion → VMAlert → Alertmanager → notify), see
 
 ## Summary
 
-**145 statically-defined alerts** across 11 domains, plus **48 Sloth-generated** SLO
-burn-rate alerts (2 × 24 SLOs).
+**150 statically-defined alerts** across 11 domains, plus **48 Sloth-generated** SLO
+burn-rate alerts (2 × 24 SLOs). The 24 SLOs cover the original 8 catalog/identity/comms
+services; `payment` ships no SLO yet.
 
 | Domain | Count | Protects |
 |--------|-------|----------|
-| [Microservices (RED)](#1-microservices-red-metrics) | 17 | The 8 Go services — user-facing request health |
+| [Microservices (RED)](#1-microservices-red-metrics) | 17 | The 9 Go services — user-facing request health |
 | [Kong gateway](#2-kong-gateway) | 13 | The single API ingress for the whole platform |
 | [Valkey cache](#3-valkey-cache) | 7 | Cache-aside layer in front of PostgreSQL |
 | [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 24 | `cnpg-db` + DR replica + backups |
@@ -32,7 +33,7 @@ burn-rate alerts (2 × 24 SLOs).
 | [Kubernetes](#6-kubernetes) | 29 | Nodes, workloads, pods, API server, control plane, network |
 | [GitOps (Flux + cert-manager)](#7-gitops-flux--cert-manager) | 9 | Delivery pipeline + TLS |
 | [VictoriaMetrics self-health](#8-victoriametrics-self-health) | 31 | The monitoring system itself |
-| [Tempo / Temporal / Watchdog](#9-tempo--temporal--watchdog) | 5 | Tracing, workflows, dead-man's-switch |
+| [Tempo / Temporal / Pyroscope / Watchdog](#9-tempo--temporal--pyroscope--watchdog) | 10 | Tracing, workflows, profiling, dead-man's-switch |
 | [SLO burn-rate (Sloth)](#slo-burn-rate-alerts-sloth-generated) | 48 (generated) | Error-budget burn across all services |
 
 ---
@@ -277,17 +278,26 @@ Source: `prometheusrules/victoriametrics/*.yaml`. **The monitoring system watchi
 | VMSingleTooHighSlowInsertsRate | warning | slow inserts >5% | Insufficient RAM for active series | 15m |
 | VMSingleMetadataCacheUtilizationIsTooHigh | warning | metadata cache >95% | Metadata API responses incomplete | 15m |
 
-## 9. Tempo / Temporal / Watchdog
+## 9. Tempo / Temporal / Pyroscope / Watchdog
 
-Source: `prometheusrules/observability/tempo-alerts.yaml`, `temporal/prometheusrule.yaml`, `prometheusrules/watchdog.yaml`.
+Source: `prometheusrules/observability/tempo-alerts.yaml`, `prometheusrules/observability/pyroscope-alerts.yaml`, `temporal/prometheusrule.yaml`, `prometheusrules/watchdog.yaml`.
 
 | Alert | Sev | Metric & trigger | Impact | for |
 |-------|-----|------------------|--------|-----|
 | TempoDown | warning | `up{tempo}==0` | Traces not ingested; request-path visibility lost | 5m |
+| PyroscopeDown | warning | `up{job=~".*pyroscope.*"}==0` | Continuous profiles not ingested/queryable | 5m |
 | TemporalServerDown | critical | `up{temporal}==0` | Durable workflows halt — order fulfilment blocked | 5m |
 | TemporalServiceErrorRateHigh | warning | `service_errors`/`service_requests` >5% | Clients can't submit/query workflows | 10m |
 | TemporalPersistenceErrorRateHigh | warning | `persistence_errors`/`persistence_requests` >2% | Workflow state not persisting — data risk | 10m |
+| TemporalWorkflowFailureRateHigh | warning | failed-workflow ratio >5% | Order-fulfilment saga compensating/rolling back | 10m |
+| TemporalActivityFailureRateHigh | warning | failed-activity ratio >5% | A downstream call (product/shipping/notification/cart) erroring; retries may exhaust | 10m |
+| TemporalWorkerRequestErrorRateHigh | warning | worker→frontend RPC error ratio >5% | Worker can't reach `temporal-frontend` | 10m |
+| TemporalWorkerTaskSlotsExhausted | warning | `min(temporal_worker_task_slots_available)==0` | Worker saturated; tasks queue and stall | 10m |
 | **Watchdog** | none | `vector(1)` (always fires) | Dead-man's-switch: if it stops, the **entire alert pipeline is dead** (no alert can be delivered) | — |
+
+Temporal is now monitored at **both** the infra layer (server/service/persistence health) and
+the **work layer** (workflow/activity failure rates, worker→server RPC health, task-slot
+saturation). Pyroscope profiling-backend health is covered by `PyroscopeDown`.
 
 ---
 
@@ -319,7 +329,7 @@ implemented yet — they are recommendations.
 ### Top 5 highest-value additions
 
 1. **AlertmanagerFailedToSendAlerts** — Watchdog proves the pipeline *up to* Alertmanager; nothing proves AM can actually reach the receiver (Slack/PagerDuty/email). A silent receiver failure swallows every other alert. (`VMAlertAlertmanagerErrors` covers only vmalert→AM, not AM→receiver.)
-2. **Temporal schedule-to-start latency + task-queue backlog** — the best leading indicators that workers are under-provisioned; tasks pile up before any error fires. Temporal is currently monitored only at the infra layer, not the work layer.
+2. **Temporal schedule-to-start latency + task-queue backlog** — the best leading indicators that workers are under-provisioned; tasks pile up before any error fires. The work layer is now covered for failure rates and task-slot saturation (§9), but these *latency/backlog* leading indicators are still missing.
 3. **ValkeyReplicationLinkDown** (`redis_master_link_up==0`) — the actual Valkey HA/durability failure mode; currently unmonitored.
 4. **CNPGContinuousArchivingFailing** — WAL archiving can stall (breaking PITR) while the last base backup still looks "recent", so `PostgresBackupTooOld` alone is insufficient.
 5. **etcdDatabaseQuotaLowSpace** + **KubeStateMetricsListErrors** — the two classic cluster-wide *silent* failures: an etcd quota freeze (`mvcc: database space exceeded`), and a KSM outage that silently stops every KSM-sourced k8s alert from evaluating.
@@ -350,6 +360,10 @@ Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-an
 
 - **Zalando clusters have no backup-age/failure alert** — the backup alerts cover CNPG metrics only; `auth-db`/`supporting-shared-db` WAL-G backups are unmonitored.
 - **`temporal-db` has no backups / no WAL archiving** — and therefore no backup alert either.
+- **`payment` reconciliation has no SLI/alert yet** — the payment service ships no SLO, and
+  there is no alert on stuck/failed reconciliation (including the heal `resolution='failed'`
+  outcome introduced by ADR-012). Payment request health is covered only by the generic
+  microservice RED alerts (§1), not by a payment-specific reconciliation signal.
 
 ### Noise / cause-vs-symptom notes
 
@@ -357,3 +371,7 @@ Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-an
 - **Outage triple-fire:** `MicroserviceNoTraffic` + `MicroserviceNoSuccessfulRequests` + `KongNoTraffic` can all fire for one outage — group them and use Alertmanager inhibition.
 - **Tuning signals, not incidents:** `PostgresCheckpointsTooFrequent`, `PostgresDeadTuplesHigh`, `PostgresDatabaseSizeLarge`, `MicroserviceHighGCFrequency/HighGCPressure` are capacity/tuning signals — they should stay `warning`/`info`, never page (the user-facing symptom is already covered by latency/apdex/SLO).
 - **`KubeletTooManyPods`** is a static-ceiling cause alert — low value unless actually near the pod/node limit.
+
+---
+
+_Last updated: 2026-07-07_

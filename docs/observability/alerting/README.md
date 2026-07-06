@@ -9,7 +9,7 @@ End-to-end view of how metrics become alerts, from ingestion through evaluation 
 ```mermaid
 flowchart TD
     subgraph ingestion ["1. Metrics Ingestion"]
-        Targets["Targets<br/>(8 microservices, PostgreSQL,<br/>external-secrets, Tempo)"]
+        Targets["Targets<br/>(9 microservices, PostgreSQL,<br/>external-secrets, Tempo)"]
         VMAgent["VMAgent<br/>(scraper)"]
         Targets -->|"ServiceMonitor<br/>PodMonitor"| VMAgent
     end
@@ -253,7 +253,7 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 
 ## Related Documentation
 
-- [Alert Catalog](./alert-catalog.md) -- every deployed alert (145 rules + SLO burn-rate) by domain, with metric, impact, and coverage-gap analysis
+- [Alert Catalog](./alert-catalog.md) -- every deployed alert (150 rules + SLO burn-rate) by domain, with metric, impact, and coverage-gap analysis
 - [Application metrics (RED)](../metrics/metrics-apps.md) -- the metrics these alerts fire on + the microservices ServiceMonitor scrape config
 - [Infrastructure metrics (USE)](../metrics/metrics-infra.md) -- the USE coverage these Kubernetes/Valkey alerts back
 - [Alert Dashboard Comparison](dashboard-comparison.md) -- deep-dive tool comparison (Karma, Alerta, UAR, Siren, Grafana)
@@ -263,3 +263,7 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 - [SLO Fundamentals](../slo/fundamentals.md) -- SLA/SLO/SLI/Error Budget primer
 - [Grafana Datasources](../grafana/datasources.md) -- how read-only rules display works
 - [Observability Deep Dive](../runbooks/observability-deep-dive.md) -- theory and interview prep
+
+---
+
+_Last updated: 2026-07-07_

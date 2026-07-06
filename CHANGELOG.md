@@ -43,6 +43,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **docs (proposals): ADR-012** — auto-heal one reconciliation class (the
+  lost-capture-response window): the reconciler may now self-correct an internal
+  `authorized` row against a provider `captured` charge by re-driving the existing
+  idempotent capture. Every other drift class stays detect-only; off by default
+  (`RECON_HEAL_ENABLED`). Supersedes the detect-only stance of ADR-011. ADR index updated.
+
 - **Payment read path + frontend (RFC-0010 P6)**: the checkout flow now shows
   real payment state. `payment.v1 GetPayment` read RPC (`pkg` v0.15.0, plus
   `refunded_minor` in v0.15.1); order-details enriches with a soft-fail

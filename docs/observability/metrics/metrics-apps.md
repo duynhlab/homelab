@@ -1,7 +1,7 @@
 # Application Metrics (RED)
 
 The **application layer** of the metrics pillar: the RED signals (Rate, Errors,
-Duration) for the 8 Go microservices and their gRPC east-west calls, plus Go
+Duration) for the 9 Go microservices and their gRPC east-west calls, plus Go
 runtime health and the instrumentation that produces it. For methodology theory,
 the stack, and the other layers, start at the [metrics hub](README.md).
 
@@ -158,8 +158,8 @@ if path == "" { path = "unknown" } // 404 / unmatched
 | Raw URL | `/api/v1/products/123`, `/456`, … | **Unbounded** |
 | Route pattern (`c.FullPath()`) | `/api/v1/products/:id` | **Bounded** (~20 routes) |
 
-With 8 services × ~20 routes × 3 methods × 5 status codes ≈ **2,400 series** —
-bounded and predictable.
+With the original 8 services × ~20 routes × 3 methods × 5 status codes ≈ **2,400 series**
+(payment adds a small increment) — bounded and predictable.
 
 **Infrastructure-endpoint filtering** — `/health`, `/ready`, `/metrics`,
 `/readiness`, `/liveness` return early in the middleware before any metric is

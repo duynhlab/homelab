@@ -2,7 +2,7 @@
 
 > Plain-English primer on SLA / SLO / SLI / Error Budget / Burn Rate, written
 > against this platform's actual stack (Sloth v0.16.0 + VictoriaMetrics +
-> 8 microservices on Kong). Read this **before**
+> 9 microservices on Kong). Read this **before**
 > [`getting_started.md`](./getting_started.md) and the
 > [SLO system overview](./README.md). Once you've internalised it, jump to
 > [`alerting/slo-burn-rate-alerts.md`](../alerting/slo-burn-rate-alerts.md)
@@ -68,7 +68,7 @@ A good SLI is a **ratio of good events to total events**, evaluated over a windo
 
 ### What we use
 
-All 8 microservices share the same metric — `request_duration_seconds` — emitted by the standard middleware (see [`docs/observability/tracing/architecture.md`](../tracing/architecture.md)). From it we derive **3 SLIs per service**:
+All 9 microservices share the same metric — `request_duration_seconds` — emitted by the standard middleware (see [`docs/observability/tracing/architecture.md`](../tracing/architecture.md)). From it we derive **3 SLIs per service** for the original 8 services (payment ships no SLO yet):
 
 | SLI | Good = | Bad = | PromQL skeleton |
 |---|---|---|---|

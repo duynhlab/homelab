@@ -5,7 +5,6 @@
 | **Status** | **Implemented and enforced** — manifests reconciled by Flux; **actively enforced by kindnet** on the local Kind cluster (K8s 1.34.3) |
 | **Scope** | Ingress fencing across app-tier namespaces — app HTTP `:8080` / gRPC `:9090`, plus DB-tier ports (poolers, Patroni/CNPG status, exporters) |
 | **Purpose** | Make the cluster the fence for `internal` audiences — internal routes are reachable only from explicitly allowed namespaces, not merely "absent from the Ingress" |
-| **Last updated** | 2026-07-02 |
 | **Related** | [`policy-catalog.md`](policy-catalog.md) (Kyverno catalog), [`../api/api-naming-convention.md`](../api/api-naming-convention.md) (audiences), [`../api/grpc-internal-comms.md`](../api/grpc-internal-comms.md) (gRPC `:9090`, now fenced) |
 
 ## TL;DR
@@ -15,8 +14,9 @@
   the net effect is: *only* the namespaces named in `allow-internal-callers` can
   reach the pods on `:8080`; everything else is dropped.
 - The allowlist is **per-callee** and follows the real call graph — `auth` accepts
-  every service (they fetch the JWKS from `/auth/v1/public/jwks`), while `shipping`
-  accepts only `kong` + `order`.
+  the original eight services (they fetch the JWKS from `/auth/v1/public/jwks`), while
+  `shipping` accepts only `kong` + `order`, and `payment` (the 9th service) is the
+  tightest: `kong`→`:8080` only, `order`→`:9090` only, plus intra-ns `payment`↔`mockpay`.
 - **kindnet enforces NetworkPolicy** (verified on Kind K8s 1.34.3). These policies
   are the *active* boundary on the local Kind cluster today — any ingress not
   explicitly allowed is dropped. No additional CNI is required for enforcement.
@@ -57,13 +57,14 @@ is fenced by default even before its explicit allow policy lands.
 ## 2. Caller matrix
 
 Allowed **ingress** callers per callee (TCP `:8080`; the gRPC callees
-`shipping`, `review`, `notification` also allow `:9090` from their gRPC callers).
+`shipping`, `review`, `notification` also allow `:9090` from their gRPC callers, and
+`payment` allows `:9090` from `order` only).
 `kong` is always
 allowed (north-south gateway traffic); the rest mirror the east-west call graph.
 
 | Callee | Allowed callers | Why |
 |--------|-----------------|-----|
-| **auth** | `kong` + **all 8 services** (incl. self) | Every service refreshes the RS256 JWKS from `GET /auth/v1/public/jwks` (`:8080`); JWTs are verified locally. |
+| **auth** | `kong` + **the original 8 services** (incl. self) | Every service refreshes the RS256 JWKS from `GET /auth/v1/public/jwks` (`:8080`); JWTs are verified locally. |
 | **user** | `kong` | Browser-only today; no service-to-service caller. |
 | **product** | `kong` | Browser-only; aggregates *outward* to review. |
 | **cart** | `kong`, `order` | `order` reads the cart during checkout. |
@@ -71,10 +72,16 @@ allowed (north-south gateway traffic); the rest mirror the east-west call graph.
 | **review** | `kong`, `product` | `product` aggregates reviews into product details. |
 | **notification** | `kong`, `order`, `shipping` | Both publish notifications (order-created, shipment updates). |
 | **shipping** | `kong`, `order` | `order` looks up / creates shipments. |
+| **payment** | `kong` (`:8080` only), `order` (`:9090` only), intra-ns `payment` (`:8080`, for `mockpay`↔`payment`) | Payment moves money, so its allows are the tightest: the edge reaches only the HTTP API, the gRPC money transport admits only the order saga worker, and `mockpay`↔`payment` is fenced intra-namespace (ADR-008). |
 
 > The matrix is **deny-by-default**: a caller not listed for a callee cannot reach
 > it, even within the cluster. Adding a new east-west call means adding the caller's
 > namespace to the callee's `allow-internal-callers` — not just opening an Ingress.
+
+> **Gap — payment ↛ auth JWKS:** `payment` is **not** in `auth`'s `allow-internal-callers`
+> list (which still enumerates only the original eight). If payment verifies JWTs on
+> its `/private/` routes via a JWKS fetch, add `payment` to `auth.yaml` so it can reach
+> `/auth/v1/public/jwks` through the fence.
 
 ### DB-tier allows
 
@@ -86,7 +93,7 @@ and `databases-local` / `apps-local` never reconcile:
 | Callee ns | Allowed source | Ports | Why |
 |-----------|----------------|-------|-----|
 | **product** | `cloudnative-pg` operator | `:8000` (status), `:5432` | Operator extracts instance status + manages SQL. |
-| **product** | `cart`, `order` (cross-ns) | `:6432` (PgDog), `:5432` (`cnpg-db-rw` migrations) | Sibling services use the pooler + migrate against the primary. |
+| **product** | `cart`, `order`, `payment` (cross-ns) | `:6432` (PgDog), `:5432` (`cnpg-db-rw`) | `cart`/`order` use the pooler + migrate against the primary; `payment` connects **direct-TLS to `cnpg-db-rw:5432`** for runtime (it bypasses PgDog) as well as migrations. |
 | **product** | intra-namespace | `:5432`, `:6432`, `:8000` | PgDog → Postgres, replica WAL streaming, product-service → pooler. |
 | **auth**, **user** | `postgres-operator` (Zalando) | `:8008` (Patroni), `:5432` (SQL init) | Operator inits Patroni + roles/databases. |
 | **user** | `review`, `notification`, `shipping` (cross-ns) | `:5432` (PgBouncer pooler + migrations) | Siblings share `supporting-shared-db`. |
@@ -111,11 +118,12 @@ flowchart LR
     REVIEW[review]
     NOTIF[notification]
     SHIP[shipping]
+    PAYMENT[payment]:::pay
 
     %% North-south: gateway may reach every service
-    KONG --> AUTH & USER & PRODUCT & CART & ORDER & REVIEW & NOTIF & SHIP
+    KONG --> AUTH & USER & PRODUCT & CART & ORDER & REVIEW & NOTIF & SHIP & PAYMENT
 
-    %% JWKS hub: every service → auth /auth/v1/public/jwks (cached fetch)
+    %% JWKS hub: the original eight services → auth /auth/v1/public/jwks (cached fetch)
     USER & PRODUCT & CART & ORDER & REVIEW & NOTIF & SHIP -->|"jwks"| AUTH
 
     %% Business east-west
@@ -124,9 +132,11 @@ flowchart LR
     ORDER -->|create shipment| SHIP
     ORDER -->|publish| NOTIF
     SHIP -->|publish| NOTIF
+    ORDER -->|":9090 pay saga"| PAYMENT
 
     classDef gw fill:#5b21b6,color:#fff,stroke:#3b0d6e
     classDef hub fill:#b36b00,color:#fff,stroke:#5c3600
+    classDef pay fill:#0d5c3d,color:#fff,stroke:#063020
 ```
 
 > Edges are **ingress allows**, drawn caller → callee. This diagram shows only the
@@ -148,7 +158,7 @@ flowchart LR
     NET -->|"enforced by kindnet<br/>(K8s 1.34.3)"| EFF["Effective boundary"]
 ```
 
-- **Manifests:** `kubernetes/infra/configs/network-policies/{auth,user,product,cart,order,review,notification,shipping}.yaml`
+- **Manifests:** `kubernetes/infra/configs/network-policies/{auth,user,product,cart,order,review,notification,shipping,payment}.yaml`
   (+ `kustomization.yaml`). Each file holds `deny-all-ingress` + `allow-internal-callers`.
 - **Generated baseline:** `kubernetes/infra/configs/kyverno/cluster-policies/default-deny-networkpolicy.yaml`.
 - **Reconciliation:** Flux Kustomization `network-policies-local`
@@ -171,10 +181,15 @@ flowchart LR
   NetworkPolicies at runtime — verified during the bring-up hardening pass. No
   extra CNI (Cilium/Calico) is required; any ingress not explicitly allowed is dropped.
 - **HTTP `:8080` + gRPC `:9090`.** The gRPC callees (`shipping`, `review`,
-  `notification`) fence `:9090` alongside `:8080` (auth is HTTP-only). mTLS on the gRPC port is the
+  `notification`, and `payment` — the latter `:9090` from `order` only) fence `:9090`
+  alongside `:8080` (auth is HTTP-only). mTLS on the gRPC port is the
   remaining Phase-3 item — deferred until it is wired app-side (the services use
   plaintext `insecure` credentials today); cert-manager config lands with that.
 - **Ingress only.** No egress policies today; egress fencing is out of scope for now.
 - **Metrics scrape allowed; egress not fenced.** The metrics/scrape path
   (monitoring → `:9187`/`:9090`) already has an allow rule. Policies are ingress-only,
   so egress (incl. kube-dns) is unfenced today — egress fencing is out of scope for now.
+
+---
+
+_Last updated: 2026-07-07_

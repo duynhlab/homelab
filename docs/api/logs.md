@@ -231,7 +231,7 @@ We follow a standardized log level schema (aligned with Syslog/Zerolog):
 ### Kubernetes Configuration
 
 **Current state** (`kubernetes/apps/`):
-- All 8 services: `LOG_LEVEL: "info"`, `LOG_FORMAT: "json"`
+- All 9 services: `LOG_LEVEL: "info"`, `LOG_FORMAT: "json"`
 - Config validation: `validLogLevels = ["debug", "info", "warn", "error"]`
 
 **Runtime configurability:** clog and zerolog `Setup(level string)` now parse and apply `LOG_LEVEL` from config. Cart and auth pass `cfg.Logging.Level` to `Setup()` at startup.

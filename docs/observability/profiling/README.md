@@ -115,7 +115,7 @@ local PVC only holds the v2 metastore (raft) and scratch, so a pod restart loses
   of silently no-op'ing; startup is guarded by `sync.Once`; the returned shutdown func
   flushes and stops the profiler on exit.
 
-**Per-service wiring** — every service (all 8 + the `order-worker`) calls the same gate in
+**Per-service wiring** — every service (all 9 + the `order-worker`) calls the same gate in
 `cmd/main.go`; profiling is a config flag, not bespoke code:
 
 ```go
@@ -167,7 +167,7 @@ Verified inventory of the actual deployment:
 | **Self-monitoring** | `serviceMonitor.enabled: true`; `PyroscopeDown` alert — `up{job=~".*pyroscope.*"} == 0` for 5m |
 | **Resources** | requests `100m` / `256Mi`, limit `512Mi` |
 | **Access** | Grafana datasource `uid: pyroscope` (`http://pyroscope.monitoring.svc.cluster.local:4040`); Kong ingress `pyroscope.duynh.me` |
-| **Client** | `obsx.SetupProfiling` in all 8 services + `order-worker`; **on by default** (`PROFILING_ENABLED=true`, `PYROSCOPE_ENDPOINT=http://pyroscope.monitoring.svc.cluster.local:4040`) |
+| **Client** | `obsx.SetupProfiling` in all 9 services + `order-worker`; **on by default** (`PROFILING_ENABLED=true`, `PYROSCOPE_ENDPOINT=http://pyroscope.monitoring.svc.cluster.local:4040`) |
 | **local-stack** | `grafana/pyroscope:2.1.0` container + Grafana Pyroscope datasource; `PROFILING_ENABLED: "true"` in the `x-svc-env` anchor; storage is an **ephemeral** volume (`pyroscope-data`), no S3 |
 
 > Migrated from a hand-vendored raw manifest (`pyroscope/pyroscope:latest`, `emptyDir`

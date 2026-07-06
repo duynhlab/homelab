@@ -13,8 +13,8 @@
 > [ADR-010](../../adr/ADR-010-shared-idempotency-library/)) (P3); and
 > reconciliation + fault-injection e2e (P4) — **amended by
 > [ADR-011](../../adr/ADR-011-detect-only-reconciliation/): the shipped
-> reconciliation is detect-only; the auto-heal described in §Reconciliation job
-> is deferred to a later slice**; and the full cluster GitOps wiring (P5:
+> reconciliation is detect-only by default; the broad auto-heal described in
+> §Reconciliation job did not ship as originally designed**; and the full cluster GitOps wiring (P5:
 > CNPG role/DB, secrets, workloads incl. mockpay, a tighter-than-siblings
 > NetworkPolicy, Kong routes, Kyverno lists, saga enablement — cluster e2e
 > verification runs at the next Kind bring-up); and the frontend read path
@@ -22,12 +22,12 @@
 > a mock test-token picker at checkout + a payment status box on the order
 > detail, real-browser e2e-verified in local-stack). **All phases P1–P6 have
 > landed; this RFC is `implemented`.** The `PAYMENT_ENABLED` flag has since been
-> removed (P3.exit — payment is now unconditional). The deferred auto-heal is
-> now designed as a **narrow, flag-gated** slice
-> ([ADR-012](../../adr/ADR-012-reconciliation-auto-heal/): heal only the
-> lost-capture-response window; all other classes stay detect-only per
-> [ADR-011](../../adr/ADR-011-detect-only-reconciliation/)), tracked separately
-> from this RFC.
+> removed (P3.exit — payment is now unconditional). The narrow, flag-gated
+> auto-heal has since **shipped**
+> ([ADR-012](../../adr/ADR-012-reconciliation-auto-heal/): heals only the
+> lost-capture-response window behind `RECON_HEAL_ENABLED` (default off); all
+> other classes stay detect-only per
+> [ADR-011](../../adr/ADR-011-detect-only-reconciliation/)).
 
 > **Tradeoff:** a payment service concentrates the hardest distributed-systems
 > problems (idempotency, async confirmation, money-grade audit trails) into one
@@ -88,7 +88,8 @@ lessons none of the existing 8 services can teach:
    network hop, HMAC-signed webhooks (with deliberate duplicates and
    reordering), a paginated transactions API, deterministic failure triggers.
 6. Reconciliation job comparing ledger vs provider, classifying discrepancies
-   and auto-healing the deterministic ones.
+   and auto-healing the deterministic ones. *(amended — see ADR-011/ADR-012;
+   only the `authorized`→`captured` window is auto-healed.)*
 7. Order saga integration: `AuthorizePayment` pre-pivot, `CapturePayment`
    immediately before `ConfirmOrder`, compensations `VoidPayment` /
    `RefundPayment`.
@@ -374,7 +375,10 @@ test-mode ways:
 
 In-service cron (v1; no new deployable): pages `GET /transactions`, matches
 by `provider_payment_id` (stored on every payment at authorize time — the
-shared identifier that makes reconciliation automatable), and classifies:
+shared identifier that makes reconciliation automatable), and classifies
+(the per-class **Action** below is the *original* design — amended, see
+ADR-011/ADR-012: v1 ships detect-only, and only the
+`status_mismatch` `authorized`→`captured` window is auto-healed):
 
 | Class | Meaning | Action |
 |-------|---------|--------|
@@ -492,7 +496,8 @@ new-code coverage, `go test -race`, golangci-lint, agent-skills review.
 - Payment is **off until P3 merges the saga rewire**, and that rewire ships
   behind an order-service config flag (`PAYMENT_ENABLED`, default false →
   saga behaves exactly as today). Flipping it off restores the current
-  moneyless checkout at any time.
+  moneyless checkout at any time. *(Historical — the flag was removed in
+  P3.exit; payment is now unconditional.)*
 - Detection: saga step visibility in Temporal UI; payment RED metrics +
   business metrics (below); reconciliation discrepancy counts.
 
@@ -539,6 +544,9 @@ new-code coverage, `go test -race`, golangci-lint, agent-skills review.
   appear automatically in Temporal UI + Tempo.
 
 ## Rollout & rollback
+
+> *Historical — the `PAYMENT_ENABLED` flag referenced in steps 3, 5, and 6 was
+> removed in P3.exit; payment is now an unconditional saga step.*
 
 1. Merge RFC (provisional → implementable after review).
 2. P1–P2 are payment-service-internal — deployable to local-stack with zero

@@ -7,19 +7,20 @@ A GitOps-managed Kubernetes homelab cluster running on Kind.
 ## Overview
 
 Production-grade microservices platform built to practise day-2 SRE work end-to-end:
-8 Go services, full observability (metrics / traces / logs / profiles), HA PostgreSQL,
+9 Go services, full observability (metrics / traces / logs / profiles), HA PostgreSQL,
 SLOs with burn-rate alerts, and a single source of truth in Git delivered via Flux.
 
 **Key features:**
 
-- 8 microservices behind a single Kong API gateway with a **Unified Routing Convention**. All endpoints follow a strict `/{service}/v1/{audience}/…` URL shape, allowing browser and in-cluster callers to use the exact same paths. Kong acts as a pure pass-through proxy without any URL rewrites.
-- **gRPC for east-west** service-to-service calls (auth `/me`, product→review, order→shipping/notification) — gRPC-only on `:9090` via the shared `pkg/grpcx`; browser/edge traffic stays HTTP/JSON. gRPC RED metrics surface on each service's `/metrics` via `pkg/obsx`.
+- 9 microservices behind a single Kong API gateway with a **Unified Routing Convention**. All endpoints follow a strict `/{service}/v1/{audience}/…` URL shape, allowing browser and in-cluster callers to use the exact same paths. Kong acts as a pure pass-through proxy without any URL rewrites.
+- **gRPC for east-west** service-to-service calls (product→review, order→shipping/notification, order→payment) — gRPC-only on `:9090` via the shared `pkg/grpcx`; browser/edge traffic stays HTTP/JSON. gRPC RED metrics surface on each service's `/metrics` via `pkg/obsx`.
 - Frontend on `https://local.duynh.me`, API gateway on `https://gateway.duynh.me`.
-  TLS terminated by Kong with a publicly-trusted Let's Encrypt wildcard cert.
+  TLS terminated by Kong — on local Kind with a self-signed `homelab-ca` wildcard
+  (expect a browser warning); prod uses a publicly-trusted Let's Encrypt wildcard.
 - Full observability: VictoriaMetrics, Tempo + Jaeger, VictoriaLogs + Vector, Pyroscope,
   15 Grafana dashboards.
-- 3 PostgreSQL clusters (Zalando + CloudNativePG) + 1 DR replica, fronted by PgBouncer
-  and PgDog. Schema migrations via golang-migrate, embedded in each service binary.
+- 3 application PostgreSQL clusters + `temporal-db` + 1 DR replica (Zalando + CloudNativePG),
+  fronted by PgBouncer and PgDog. Schema migrations via golang-migrate, embedded in each service binary.
 - Valkey (Redis-compatible) cache with Cache-Aside pattern in the Logic layer.
 - SLOs managed declaratively by Sloth Operator.
 - GitOps with Flux Operator, ResourceSets, OCI artifacts, and Kustomize.
@@ -49,7 +50,7 @@ flowchart TD
     FE["🌐 Frontend<br/>local.duynh.me"]:::frontend
     Kong["Kong Ingress<br/>gateway.duynh.me<br/>(TLS, CORS, rate-limit)"]:::layer
 
-    subgraph Microservices ["8 microservices · 3-layer architecture"]
+    subgraph Microservices ["9 microservices · 3-layer architecture"]
         WebLayer["Web<br/>(HTTP, validation, aggregation)"]:::layer
         LogicLayer["Logic<br/>(business rules, Cache-Aside)"]:::layer
         CoreLayer["Core<br/>(domain models, repositories)"]:::layer
@@ -106,15 +107,17 @@ flowchart TD
 
 **At a glance:**
 
-- **Edge** — Kong terminates TLS with a Let's Encrypt wildcard cert (`*.duynh.me`),
+- **Edge** — Kong terminates TLS with a wildcard cert (`*.duynh.me`) — self-signed
+  `homelab-ca` on local Kind (browser warning), Let's Encrypt on prod —
   enforces CORS, rate-limit, and request-size-limit. Force HTTP → HTTPS via Kong
   annotations. Auth is **not** done at the gateway — every service validates JWTs
   in its own middleware (defence-in-depth).
 - **Microservices** — 4 bounded-context domains: identity, catalog, checkout, comms.
   Each service is its own repo, its own namespace, its own database role. East-west
   calls run over gRPC (`pkg/grpcx`); the edge stays HTTP/JSON.
-- **Data** — 3 PostgreSQL clusters with operators (Zalando + CloudNativePG), behind
-  poolers, with golang-migrate migrations. cnpg-db has a continuously-recovering DR replica.
+- **Data** — 3 application PostgreSQL clusters + `temporal-db` with operators (Zalando +
+  CloudNativePG), behind poolers, with golang-migrate migrations. cnpg-db has a
+  continuously-recovering DR replica.
 - **Observability** — OpenTelemetry-first across metrics, traces, logs, and profiles.
   All four pillars converge in Grafana via shared exemplars.
 - **Delivery** — Flux Operator pulls OCI artifacts from a registry. Domain ResourceSets
@@ -142,7 +145,7 @@ and [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
 
 | Concern | Choice |
 |---|---|
-| RDBMS | PostgreSQL (Zalando operator + CloudNativePG) — 3 clusters + 1 DR replica |
+| RDBMS | PostgreSQL (Zalando operator + CloudNativePG) — 3 application clusters + `temporal-db` + 1 DR replica |
 | Connection poolers | PgBouncer (auth, shared) · PgDog (product/cart/order) |
 | Migrations | golang-migrate v4.19.1 (embedded in each service binary, run via the `migrate` subcommand) |
 
@@ -154,7 +157,7 @@ and [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
 | Packaging | Helm 3 + Kustomize |
 | GitOps | Flux Operator, ResourceSets, OCI artifacts |
 | API gateway / Ingress | Kong Ingress Controller |
-| TLS | cert-manager + Let's Encrypt (DNS-01 via Cloudflare) |
+| TLS | cert-manager — self-signed `homelab-ca` on local Kind, Let's Encrypt (DNS-01 via Cloudflare) on prod |
 | Secrets | OpenBAO (HA Raft, 3-node) + External Secrets Operator |
 | Admission policies | Kyverno (PSS baseline + restricted) |
 
@@ -174,8 +177,9 @@ and [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
 ## Access Points
 
 All hostnames resolve to `127.0.0.1` and are routed by Kong. TLS is terminated at
-Kong with a wildcard `*.duynh.me` cert from Let's Encrypt — browsers trust it
-out of the box, no CA install needed.
+Kong with a wildcard `*.duynh.me` cert. On local Kind this is the self-signed
+`homelab-ca` cert (expect a browser warning unless `homelab-ca` is trusted); prod
+uses a publicly-trusted Let's Encrypt wildcard.
 
 ### Set up `/etc/hosts`
 

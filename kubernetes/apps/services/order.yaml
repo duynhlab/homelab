@@ -23,12 +23,8 @@ spec:
     # order calls shipping + publishes notifications over gRPC (headless :9090).
     shipping_grpc_addr: "dns:///shipping-grpc.shipping.svc.cluster.local:9090"
     notification_grpc_addr: "dns:///notification-grpc.notification.svc.cluster.local:9090"
-    # Turn the saga's payment steps on (authorize-early / capture-late +
-    # void/refund compensations). The API stamps this on the workflow input;
-    # the worker makes the saga calls. MUST stay a string — the template
-    # guard is truthiness-based.
-    payment_enabled: "true"
-    # The API dials payment itself for the order-details payment enrichment
-    # (GetPayment). Explicit because the code default points at the plain
-    # `payment` Service name, not the headless `payment-grpc` one.
+    # The API dials payment for the order-details enrichment (GetPayment).
+    # Explicit because the code default points at the plain `payment` Service
+    # name, not the headless `payment-grpc` one. The saga's payment steps are
+    # always on (no feature flag); the worker uses its own PAYMENT_GRPC_ADDR.
     payment_grpc_addr: "dns:///payment-grpc.payment.svc.cluster.local:9090"

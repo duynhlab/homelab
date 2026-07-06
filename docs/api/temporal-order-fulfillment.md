@@ -94,14 +94,15 @@ the order `failed`. Once `ConfirmOrder` succeeds the order is `confirmed` and **
 best-effort** — a failed notification or cart-clear is logged but never rolls a confirmed order
 back.
 
-**Payment (behind `PAYMENT_ENABLED`, default off).** When enabled, the saga becomes
-**authorize-early / capture-late**: `AuthorizePayment` runs before step 1 (a hold — a decline
-fails the order before any stock/shipment work), and `CapturePayment` runs after step 2, just
-before the `ConfirmOrder` pivot. Compensation is capture-state-dependent — a pre-capture failure
-runs `VoidPayment` (release the hold), a pivot failure runs `RefundPayment` (return the money) —
+**Payment (authorize-early / capture-late).** Payment is an unconditional part of
+every saga run: `AuthorizePayment` runs before step 1 (a hold — a decline fails the order
+before any stock/shipment work), and `CapturePayment` runs after step 2, just before the
+`ConfirmOrder` pivot. Compensation is capture-state-dependent — a pre-capture failure runs
+`VoidPayment` (release the hold), a pivot failure runs `RefundPayment` (return the money) —
 composed reverse-order with `CancelShipment` / `ReleaseStock`. All payment calls are idempotent by
-the natural key `order:<id>`, so Temporal retries are safe. With the flag off, the flow is exactly
-the five steps above. Rationale and tradeoffs: [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/).
+the natural key `order:<id>`, so Temporal retries are safe. Rationale and tradeoffs:
+[ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/). (The `PAYMENT_ENABLED`
+rollout flag was removed once payment became permanent — P3.exit.)
 
 ```mermaid
 sequenceDiagram

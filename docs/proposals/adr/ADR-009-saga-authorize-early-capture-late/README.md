@@ -97,9 +97,9 @@ flowchart LR
 - **Payment authorizes with a fixed demo token** while behind the flag — there is
   no checkout UI collecting a real method until the frontend phase; the flag must
   never be enabled in an environment wired to a real provider before then.
-- **`PAYMENT_ENABLED` is temporary.** Its removal (and the two guarded branches)
-  is RFC-0010 P3's exit criterion, after a soak of green SLO + clean
-  reconciliation — the flag must not become permanent debt.
+- **`PAYMENT_ENABLED` was temporary — now removed (P3.exit).** The flag and its
+  two guarded branches were the rollout scaffolding; once payment became
+  permanent the flag was deleted and payment is now unconditional in the saga.
 
 ---
 

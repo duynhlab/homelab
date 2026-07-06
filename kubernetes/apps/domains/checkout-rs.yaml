@@ -184,10 +184,6 @@ spec:
                 name: << inputs.webhook_secret >>
                 key: secret
           <<- end >>
-          <<- if (index inputs "payment_enabled") >>
-          - name: PAYMENT_ENABLED
-            value: << inputs.payment_enabled | quote >>
-          <<- end >>
           <<- if (index inputs "payment_grpc_addr") >>
           - name: PAYMENT_GRPC_ADDR
             value: << inputs.payment_grpc_addr >>

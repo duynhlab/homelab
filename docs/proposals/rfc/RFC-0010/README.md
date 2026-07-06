@@ -21,10 +21,10 @@
 > (P6: `payment.v1 GetPayment` read RPC → order-details payment enrichment →
 > a mock test-token picker at checkout + a payment status box on the order
 > detail, real-browser e2e-verified in local-stack). **All phases P1–P6 have
-> landed; this RFC is `implemented`.** The `PAYMENT_ENABLED` flag removal
-> (P3's exit criterion, after a green soak) and the deferred auto-heal
-> ([ADR-011](../../adr/ADR-011-detect-only-reconciliation/)) are the only
-> follow-ups, tracked separately from this RFC.
+> landed; this RFC is `implemented`.** The `PAYMENT_ENABLED` flag has since been
+> removed (P3.exit — payment is now unconditional); the deferred auto-heal
+> ([ADR-011](../../adr/ADR-011-detect-only-reconciliation/)) is the only
+> remaining follow-up, tracked separately from this RFC.
 
 > **Tradeoff:** a payment service concentrates the hardest distributed-systems
 > problems (idempotency, async confirmation, money-grade audit trails) into one

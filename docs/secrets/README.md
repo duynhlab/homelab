@@ -356,12 +356,12 @@ secret/{environment}/{category}/{service}/{resource}
 | `secret/local/databases/cnpg-db/order` | `username`, `password` | CNPG order owner |
 | `secret/local/databases/cnpg-db/payment` | `username`, `password` | CNPG payment owner (consumed in `product` + `payment` ns) |
 | `secret/local/databases/pgdog-cnpg/credentials` | `username`, `password` | PgDog pooler admin |
-| `secret/local/payment/webhook-hmac` ⚠️ | `secret` | payment ↔ mockpay webhook HMAC (shared signing key) |
+| `secret/local/services/payment/webhook-hmac` | `secret` | payment ↔ mockpay webhook HMAC (shared signing key) |
 | `secret/local/infra/rustfs/backup-zalando` | `access_key_id`, `secret_access_key` | WAL-G S3 (auth, user, review) |
 | `secret/local/infra/rustfs/backup-cnpg` | `access_key_id`, `secret_access_key` | Barman S3 (product, cart) |
 | `secret/local/infra/cloudflare/api-token` ⚠️ | `api_token` | cert-manager `letsencrypt-{staging,prod}` ClusterIssuers (DNS-01 solver) — **prod only**; on local Kind `kong-proxy-tls` is `homelab-ca`-issued |
 
-> ⚠️ **Convention exception — `secret/local/payment/webhook-hmac`**: this path is **3-level** (`{env}/{service}/{resource}`), skipping the `{category}` level, so it does **not** match the standard `secret/{env}/{category}/{service}/{resource}` structure. It also falls **outside the `eso-read` policy prefixes** (which grant only `local/{databases,infra,services,auth}/*`), so reading it relies on the bootstrap seeding it under a path the policy must separately cover. Renaming it to `secret/local/services/payment/webhook-hmac` would fix both the convention *and* bring it under the existing `local/services/*` grant. The live secret is left as-is here to avoid a breaking change. _(Follow-up: rename to `.../services/payment/webhook-hmac`.)_
+> **Note — `secret/local/services/payment/webhook-hmac`**: follows the standard 4-level `secret/{env}/{category}/{service}/{resource}` structure and is covered by the existing `eso-read` `local/services/*` grant. (It was briefly seeded at the 3-level `secret/local/payment/webhook-hmac`, which sat outside every `eso-read` prefix; renaming it into `local/services/*` fixed both the convention and the RBAC scope.)
 
 > ⚠️ **Local vs prod**: on **local Kind** `openbao-bootstrap` **now seeds a dev placeholder** (`dev-cloudflare-placeholder`) so the `cloudflare-api-token` ExternalSecret syncs and doesn't block `secrets-local` (DNS-01 fails locally, which is fine — `kong-proxy-tls` is `homelab-ca`-issued). On **prod** the real token is **operator-supplied** and **not** in Git — re-seed after every fresh cluster — see [§12.1 Step 7 — Cloudflare token](#step-7--seed-bootstrap-only-cloudflare-token-operator).
 

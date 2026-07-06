@@ -54,6 +54,9 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: shipping
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: payment
       ports:
         - protocol: TCP
           port: 8080

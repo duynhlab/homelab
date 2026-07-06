@@ -14,6 +14,7 @@ docs/
 │   ├── grpc-internal-comms.md   # Implemented: gRPC for internal east-west comms
 │   ├── microservices.md         # Service catalog: per-service features, call graph
 │   ├── temporal-order-fulfillment.md # Implemented: Temporal saga — why/when/how, design, infra, ops
+│   ├── saga-vs-2pc.md           # Learning: saga vs two-phase commit — theory + the payment saga
 │   ├── payments.md              # Implemented: payment subsystem — design record + reconciliation (detect-only v1)
 │   ├── graceful-shutdown.md     # Graceful shutdown pattern (drain, readiness, timeouts)
 │   ├── logs.md                  # Structured logging conventions
@@ -230,6 +231,8 @@ docs/
 
 4. **[Temporal order-fulfillment saga (implemented)](./api/temporal-order-fulfillment.md)** - Why/when to use Temporal, the durable saga design, contracts, infra, ops — with [ADR-001](./proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/)/[ADR-002](./proposals/adr/ADR-002-deploy-temporal-via-operator/)
 
+   ↳ **[Saga vs two-phase commit (learning)](./api/saga-vs-2pc.md)** - Why 2PC doesn't fit microservices and how the payment saga achieves consistency without it (theory + tradeoffs)
+
 5. **[RFCs — propose & track substantial changes](./proposals/rfc/)** - RFC process, index, and the consolidated backlog (the old API/architecture review is retired — its findings merged into `api.md`, open items moved to the RFC backlog)
 
 6. **[GKE internal & private DNS](./api/gke-internal-dns.md)** - In-cluster DNS and Cloud DNS private zones
@@ -316,6 +319,7 @@ docs/
 - [API Reference](./api/api.md) - Complete API documentation
 - [gRPC Internal Comms (proposed/draft)](./api/grpc-internal-comms.md) - Selective gRPC for internal east-west calls; dual-port, HTTP/2 LB pitfall, phased roadmap
 - [Temporal Order-Fulfillment Saga](./api/temporal-order-fulfillment.md) - Durable order saga (why/when/how, design, infra, ops)
+- [Saga vs Two-Phase Commit](./api/saga-vs-2pc.md) - Learning deep-dive: why 2PC doesn't fit microservices; saga theory, compensations, idempotency, and how the payment saga applies them
 - [Payments](./api/payments.md) - Payment subsystem: design record (RFC-0010 + ADRs) + payment↔provider reconciliation (detect-only v1)
 - [RFC-0009: Production-grade API gateway (signed JWT + Kong edge auth)](./proposals/rfc/RFC-0009/) - Partially implemented; supersedes ADR-003 via ADR-006
 - [RFC-0010: Payment service (PaymentIntent, ledger, charge/refund saga step)](./proposals/rfc/RFC-0010/) - Implemented; P1–P6 landed (ledger, outbox, mockpay, webhooks, saga wiring, reconciliation, cluster GitOps, frontend read path) → ADR-007…011

@@ -22,9 +22,12 @@
 > a mock test-token picker at checkout + a payment status box on the order
 > detail, real-browser e2e-verified in local-stack). **All phases P1–P6 have
 > landed; this RFC is `implemented`.** The `PAYMENT_ENABLED` flag has since been
-> removed (P3.exit — payment is now unconditional); the deferred auto-heal
-> ([ADR-011](../../adr/ADR-011-detect-only-reconciliation/)) is the only
-> remaining follow-up, tracked separately from this RFC.
+> removed (P3.exit — payment is now unconditional). The deferred auto-heal is
+> now designed as a **narrow, flag-gated** slice
+> ([ADR-012](../../adr/ADR-012-reconciliation-auto-heal/): heal only the
+> lost-capture-response window; all other classes stay detect-only per
+> [ADR-011](../../adr/ADR-011-detect-only-reconciliation/)), tracked separately
+> from this RFC.
 
 > **Tradeoff:** a payment service concentrates the hardest distributed-systems
 > problems (idempotency, async confirmation, money-grade audit trails) into one

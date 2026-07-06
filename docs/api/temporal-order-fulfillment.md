@@ -53,6 +53,18 @@ Reach for it deliberately.
 Rule of thumb: **orchestration of stateful, multi-step, must-not-be-lost work → Temporal;
 stateless request/response → don't.**
 
+### Saga vs 2PC (why not a distributed transaction)
+
+Checkout writes to four separate service databases (order, product/stock,
+shipping, payment) plus an external card provider, so it can't be one ACID
+transaction. The classic cross-resource-atomic answer — **two-phase commit
+(2PC)** — needs a blocking coordinator and XA-capable participants, neither of
+which holds across independent microservices or a third-party payment API. So
+this saga trades immediate consistency for availability: local commits per step,
+**compensations** to undo on failure, **eventual consistency** overall. The full
+theory (2PC mechanics, why it's rejected here, the saga tradeoff table) lives in
+[**saga-vs-2pc.md**](./saga-vs-2pc.md).
+
 ## 3. What it buys us (realized)
 
 The order saga turns the gaps above into guarantees:

@@ -1,8 +1,11 @@
 # Microservices Catalog
 
-> **Status:** Living reference · **Last updated:** 2026-07-02
-> **Purpose:** A single place to understand the **currently deployed microservices** — what each one does, what's implemented, what's still mock/in-flight, and how they talk to each other. All east-west calls now run over **gRPC** (see [`grpc-internal-comms.md`](grpc-internal-comms.md)).
-> **Related:** [`api.md`](api.md) (per-endpoint contracts), [`api-naming-convention.md`](api-naming-convention.md) (URL shape), [`grpc-internal-comms.md`](grpc-internal-comms.md) (gRPC east-west), [`../../local-stack/`](../../local-stack/) (local run).
+| | |
+|---|---|
+| **Status** | Living reference — the **understanding-the-system** catalog |
+| **Covers** | Per-service responsibility, data ownership, inter-service call graph |
+| **Related** | [api.md](api.md) (payloads) · [naming convention](api-naming-convention.md) (routes) · [gRPC east-west](grpc-internal-comms.md) · [local-stack](../../local-stack/) |
+| **Area hub** | [docs/api/README.md](README.md) |
 
 This document is the **understanding-the-system** reference. It does **not** restate every endpoint (see `api.md`); it focuses on per-service responsibility, data ownership, and inter-service dependencies. The per-service "gRPC candidacy" notes below are historical rationale — the east-west migration is now complete.
 
@@ -178,3 +181,5 @@ The gRPC migration is **complete and gRPC-only** — the transport details for e
 ---
 
 *Run the whole platform locally for verification: `cd local-stack && DOCKER_BUILDKIT=0 docker compose up -d --build` → SPA at http://localhost:3001, gateway at http://localhost:8080 (demo login `alice` / `password123`).*
+
+_Last updated: 2026-07-07 — status table + area-hub link (content unchanged since 2026-07-02)._

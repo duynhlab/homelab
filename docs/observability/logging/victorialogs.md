@@ -5,7 +5,7 @@ VictoriaLogs is the cluster's log storage backend. It provides high-performance 
 > Backend & pipeline **ops reference**. For the logging architecture, the
 > why-this-stack rationale, and scaling, see the [logging hub](README.md); for how
 > services emit logs (libraries, format, levels), see
-> [Logging Standards](../../api/logs.md).
+> [Logging Standards](logging-standards.md).
 
 ## Architecture
 

@@ -13,13 +13,13 @@ with LogsQL and correlated to traces by `trace_id`.
 | **Query** | LogsQL (VictoriaLogs) |
 | **Visualization** | Grafana — `victorialogs` datasource (`victoriametrics-logs-datasource`) |
 | **Correlation** | `trace_id` field ↔ Tempo (log→trace and trace→log) |
-| **App logging** | How services emit logs (libraries, format, levels, wiring) → [`../../api/logs.md`](../../api/logs.md) |
+| **App logging** | How services emit logs (libraries, format, levels, wiring) → [`logging-standards.md`](logging-standards.md) |
 
 > This doc is the **architecture** view: the pipeline, why this stack, and how it
 > scales. For **how to implement logging in a service** — log libraries
 > (Zap/clog/zerolog), the JSON field contract, the level schema, trace-id wiring,
-> and onboarding — see the API-layer source of truth,
-> [**Logging Standards**](../../api/logs.md). Backend/ops detail (VLSingle config,
+> and onboarding — see the source of truth,
+> [**Logging Standards**](logging-standards.md). Backend/ops detail (VLSingle config,
 > Vector pipeline, endpoints, verification) lives in [`victorialogs.md`](victorialogs.md).
 
 ---
@@ -184,12 +184,12 @@ logging/
 ├── README.md         # This hub — architecture, why-this-stack, scaling
 └── victorialogs.md   # Backend & pipeline ops: VLSingle config, Vector pipeline,
                       # endpoints, streams, self-monitoring, verification, runbooks
-../../api/logs.md      # App logging standards & implementation (onboarding)
+logging-standards.md   # App logging standards & implementation (onboarding)
 ```
 
 ## References
 
-- [App logging standards (onboarding)](../../api/logs.md) · [VictoriaLogs backend & ops](victorialogs.md)
+- [App logging standards (onboarding)](logging-standards.md) · [VictoriaLogs backend & ops](victorialogs.md)
 - [Observability overview](../README.md) · [Grafana datasources](../grafana/datasources.md)
 - [VictoriaLogs docs](https://docs.victoriametrics.com/victorialogs/) · [LogsQL](https://docs.victoriametrics.com/victorialogs/logsql/) · [Vector docs](https://vector.dev/docs/)
 

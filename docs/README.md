@@ -8,17 +8,15 @@ Documentation for the **duynhlab microservices platform** — 9 Go services + a 
 
 ```
 docs/
-├── api/                          # API & implementation documentation
-│   ├── api.md                    # Complete API reference (canonical /api/v1)
-│   ├── api-naming-convention.md # Draft v1.0.0: gateway URL naming (gateway.duynh.me), does not replace api.md
-│   ├── grpc-internal-comms.md   # Implemented: gRPC for internal east-west comms
-│   ├── microservices.md         # Service catalog: per-service features, call graph
+├── api/                          # API surface & subsystem deep-dives
+│   ├── README.md                 # Area hub: how the api docs fit together
+│   ├── api-naming-convention.md # v2.0.0 Adopted: the sole URL surface + complete route inventory
+│   ├── api.md                    # Payload reference: per-endpoint request/response + validation
+│   ├── microservices.md         # System catalog: per-service ownership + call graph
+│   ├── grpc-internal-comms.md   # Implemented: gRPC-only internal east-west comms
 │   ├── temporal-order-fulfillment.md # Implemented: Temporal saga — why/when/how, design, infra, ops
 │   ├── saga-vs-2pc.md           # Learning: saga vs two-phase commit — theory + the payment saga
-│   ├── payments.md              # Implemented: payment subsystem — design record + reconciliation (detect-only v1)
-│   ├── graceful-shutdown.md     # Graceful shutdown pattern (drain, readiness, timeouts)
-│   ├── logs.md                  # Structured logging conventions
-│   └── gke-internal-dns.md      # GKE cluster.local, Cloud DNS private zones, multi-environment
+│   └── payments.md              # Implemented: payment subsystem — design record + reconciliation
 ├── proposals/                    # Design proposals & decisions
 │   ├── README.md                 # umbrella: ADR vs RFC + flow + links
 │   ├── adr/                      # Architecture Decision Records
@@ -76,6 +74,7 @@ docs/
 │   │   └── victoriatraces.md     # VictoriaTraces pilot (3rd backend)
 │   ├── logging/                  # Pillar 3: Structured Logging
 │   │   ├── README.md             # Architecture, why-this-stack, scaling
+│   │   ├── logging-standards.md  # App-side logging conventions (libraries, levels, JSON fields)
 │   │   └── victorialogs.md       # VictoriaLogs backend & Vector pipeline ops
 │   ├── profiling/                # Pillar 4: Continuous Profiling
 │   │   └── README.md             # Pyroscope (CPU, heap, goroutine)
@@ -104,7 +103,9 @@ docs/
 ├── caching/                     # Valkey cache: Cache-Aside, eviction policies, distributed-cache concept
 │   └── caching.md
 ├── platform/                     # Platform/deployment documentation
-│   ├── setup.md                  # GitOps deployment guide
+│   ├── setup.md                  # GitOps deployment guide (+ seed data & demo accounts)
+│   ├── graceful-shutdown.md      # Graceful shutdown pattern (drain, readiness, timeouts)
+│   ├── gke-internal-dns.md       # GKE cluster.local, Cloud DNS private zones, multi-environment
 │   ├── application-delivery.md    # ResourceSet patterns & templates
 │   ├── cicd.md                   # CI/CD pipelines + standard/policy (pinning, permissions, signing, GoReleaser)
 │   ├── gitflow.md                # Git branching & release standard
@@ -147,14 +148,11 @@ docs/
    - Step-by-step instructions
    - Troubleshooting common issues
 
-3. **[API Reference](./api/api.md)** - API endpoints and adding new microservices
-   - Requirements and conventions
-   - Step-by-step guide
-   - Automatic monitoring setup
+3. **[API area hub](./api/README.md)** - How the api docs fit together (routes / payloads / catalog / subsystems)
 
-4. **[API naming convention (draft v1.0.0)](./api/api-naming-convention.md)** - Gateway URL layout (`gateway.duynh.me`), marketplace-style path segments + Google notes; does not replace `api.md`
+4. **[API naming convention (v2.0.0 Adopted)](./api/api-naming-convention.md)** - The sole URL surface: Variant A shape, audiences, and the complete route inventory
 
-5. **[GKE internal & private DNS](./api/gke-internal-dns.md)** - `cluster.local`, Cloud DNS private zones, multi-environment naming
+5. **[GKE internal & private DNS](./platform/gke-internal-dns.md)** - `cluster.local`, Cloud DNS private zones, multi-environment naming
 
 ### Observability
 
@@ -219,22 +217,21 @@ docs/
 
 ### API Reference
 
-1. **[API Reference](./api/api.md)** - Complete API documentation
-    - All 9 microservices
-    - Endpoints, models, examples
-    - Health checks and metrics
+1. **[API area hub](./api/README.md)** - Start here: routes vs payloads vs catalog, and every subsystem doc
 
-2. **[API naming convention (draft v1.0.0)](./api/api-naming-convention.md)** - Edge/gateway naming exploration; canonical routes remain in `api.md`
+2. **[API naming convention (v2.0.0 Adopted)](./api/api-naming-convention.md)** - The sole URL surface + complete route inventory
 
-3. **[gRPC internal comms (proposed/draft)](./api/grpc-internal-comms.md)** - Selective gRPC for internal east-west calls; dual-port, HTTP/2 LB pitfall, phased roadmap
+3. **[API Reference](./api/api.md)** - Per-endpoint payloads and validation for all 9 services
 
-4. **[Temporal order-fulfillment saga (implemented)](./api/temporal-order-fulfillment.md)** - Why/when to use Temporal, the durable saga design, contracts, infra, ops — with [ADR-001](./proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/)/[ADR-002](./proposals/adr/ADR-002-deploy-temporal-via-operator/)
+4. **[gRPC internal comms (implemented)](./api/grpc-internal-comms.md)** - gRPC-only east-west; dual-port, HTTP/2 LB pitfall, observability, security
+
+5. **[Temporal order-fulfillment saga (implemented)](./api/temporal-order-fulfillment.md)** - Why/when to use Temporal, the durable saga design, contracts, infra, ops — with [ADR-001](./proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/)/[ADR-002](./proposals/adr/ADR-002-deploy-temporal-via-operator/)
 
    ↳ **[Saga vs two-phase commit (learning)](./api/saga-vs-2pc.md)** - Why 2PC doesn't fit microservices and how the payment saga achieves consistency without it (theory + tradeoffs)
 
-5. **[RFCs — propose & track substantial changes](./proposals/rfc/)** - RFC process, index, and the consolidated backlog (the old API/architecture review is retired — its findings merged into `api.md`, open items moved to the RFC backlog)
+6. **[RFCs — propose & track substantial changes](./proposals/rfc/)** - RFC process, index, and the consolidated backlog (the old API/architecture review is retired — its findings merged into `api.md`, open items moved to the RFC backlog)
 
-6. **[GKE internal & private DNS](./api/gke-internal-dns.md)** - In-cluster DNS and Cloud DNS private zones
+7. **[GKE internal & private DNS](./platform/gke-internal-dns.md)** - In-cluster DNS and Cloud DNS private zones
 
 ### Databases
 
@@ -311,12 +308,15 @@ docs/
 - [VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md) - 3rd backend via the VM operator
 - [Continuous Profiling](./observability/profiling/README.md) - Pyroscope setup
 - [Logging](./observability/logging/README.md) - Architecture, VictoriaLogs + Vector, scaling
+- [Logging Standards](./observability/logging/logging-standards.md) - App-side logging conventions (libraries, levels, JSON fields)
 - [VictoriaLogs](./observability/logging/victorialogs.md) - VictoriaLogs deployment (single Vector, dual-ship)
 
 ### API
 
-- [API Reference](./api/api.md) - Complete API documentation
-- [gRPC Internal Comms (proposed/draft)](./api/grpc-internal-comms.md) - Selective gRPC for internal east-west calls; dual-port, HTTP/2 LB pitfall, phased roadmap
+- [API area hub](./api/README.md) - Routes / payloads / catalog / subsystem docs, in one map
+- [API naming convention (v2.0.0 Adopted)](./api/api-naming-convention.md) - Sole URL surface + route inventory
+- [API Reference](./api/api.md) - Per-endpoint payloads and validation
+- [gRPC Internal Comms (implemented)](./api/grpc-internal-comms.md) - gRPC-only internal east-west calls; dual-port, HTTP/2 LB pitfall
 - [Temporal Order-Fulfillment Saga](./api/temporal-order-fulfillment.md) - Durable order saga (why/when/how, design, infra, ops)
 - [Saga vs Two-Phase Commit](./api/saga-vs-2pc.md) - Learning deep-dive: why 2PC doesn't fit microservices; saga theory, compensations, idempotency, and how the payment saga applies them
 - [Payments](./api/payments.md) - Payment subsystem: design record (RFC-0010 + ADRs) + payment↔provider reconciliation (detect-only v1)

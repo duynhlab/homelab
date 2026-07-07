@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **docs/api area refactor**: new area hub `docs/api/README.md`; `api.md`
+  thinned to the pure payload reference (seed data → `platform/setup.md`,
+  pgx driver rationale → `databases/002-database-integration.md`, duplicate
+  services roster → naming-convention link, stale build/HelmRelease
+  conventions dropped, dead `.token` snippet fixed); relocated `logs.md` →
+  `observability/logging/logging-standards.md`, `graceful-shutdown.md` +
+  `gke-internal-dns.md` → `docs/platform/`; `docs/README.md` descriptions
+  corrected (naming convention is v2.0.0 Adopted sole URL surface; gRPC
+  east-west is implemented, not draft); status tables + `_Last updated:_`
+  footers normalized across the area.
+
 ### Added
 
 - **RFC-0013 — app-metrics cardinality audit & streaming-aggregation scale

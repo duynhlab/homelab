@@ -1,6 +1,6 @@
 # GKE internal DNS on GCP (`cluster.local`, Cloud DNS private zones, multi-environment)
 
-> **Purpose:** Complements the **internal / in-cluster** section in [`api-naming-convention.md`](api-naming-convention.md) — explains Kubernetes default DNS, Cloud DNS **private zones**, and naming split by environment (`dev` / `uat` / `prod`).
+> **Purpose:** Complements the **internal / in-cluster** section in [`api-naming-convention.md`](../api/api-naming-convention.md) — explains Kubernetes default DNS, Cloud DNS **private zones**, and naming split by environment (`dev` / `uat` / `prod`).
 
 ---
 
@@ -19,7 +19,7 @@ A Kubernetes Service has a full DNS name (FQDN) of the form:
 <service-name>.<namespace>.svc.cluster.local
 ```
 
-**Examples** (aligned with [`api-naming-convention.md`](api-naming-convention.md)):
+**Examples** (aligned with [`api-naming-convention.md`](../api/api-naming-convention.md)):
 
 | Service | Namespace | FQDN |
 |---------|-----------|------|
@@ -165,3 +165,7 @@ POST http://notification.notification.svc.cluster.local:8080/notification/v1/int
 follow the **default Kubernetes DNS model** — Cloud DNS is not required.
 
 If you want names like `notification.prod.gke.internal`, use a **private zone + records** (section 4) and, if needed, **CoreDNS forward** (section 4.3).
+
+---
+
+_Last updated: 2026-07-07 — moved from docs/api (learning/reference doc; content unchanged)._

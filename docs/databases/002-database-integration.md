@@ -947,6 +947,56 @@ Previously used as a standalone pooler for cart/order against CNPG. **Current Gi
 - Read/write splitting and replica awareness without running separate pooler stacks per workload
 - Aligns with consolidated cluster topology (single CNPG cluster + single pooler tier)
 
+## Go PostgreSQL driver (pgx)
+
+All microservices use **pgx/v5** as the PostgreSQL driver.
+
+**Driver Comparison:**
+
+| Feature | lib/pq | pgx/v5 |
+|---------|--------|--------|
+| GitHub Stars | 9.8k | 13.2k |
+| Maintenance | Maintenance mode (since 2023) | Actively maintained |
+| Prepared Statements | Server-side (cached on PostgreSQL) | Client-side / Simple protocol |
+| Connection Pooling | Manual (`sql.DB` config) | Built-in (`pgxpool`) |
+| Binary Protocol | Limited | Full support |
+| PostgreSQL Types | Basic | Extended (JSONB, arrays, hstore) |
+| Performance | Good | Better (native binary protocol) |
+
+**Why pgx Instead of lib/pq?**
+
+1. **Connection Pooler Compatibility**: lib/pq uses server-side prepared statements which cause errors with transaction pooling:
+   ```
+   pq: bind message supplies 1 parameters, but prepared statement "" requires 2
+   ```
+   pgx uses client-side prepared statements / simple protocol, fully compatible with PgCat/PgBouncer.
+
+2. **Active Development**: pgx is actively maintained with regular updates, while lib/pq is in maintenance mode since 2023.
+
+3. **Better Performance**: pgx implements PostgreSQL's binary protocol natively.
+
+4. **Native Connection Pool**: `pgxpool.Pool` is designed for PostgreSQL, providing better control than `sql.DB` generic pool.
+
+**Code Example:**
+
+```go
+import (
+    "context"
+    "github.com/jackc/pgx/v5/pgxpool"
+)
+
+func Connect(ctx context.Context) (*pgxpool.Pool, error) {
+    dsn := "postgresql://user:pass@host:5432/db?sslmode=disable&pool_max_conns=25"
+    return pgxpool.New(ctx, dsn)
+}
+```
+
+> [!NOTE]
+> See [pgcat_prepared_statement_error.md](../runbooks/troubleshooting/pgcat_prepared_statement_error.md) for detailed troubleshooting.
+
+
+---
+
 ## Related Documentation
 
 - **[Backup Strategy](./006-backup-strategy.md)** - Backup architecture, retention, bucket layout

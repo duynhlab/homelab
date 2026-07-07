@@ -12,7 +12,7 @@ This document defines centralized logging standards for all microservices. All s
 
 > This is the **implementation & standards** doc (how a service logs). For the
 > logging **pipeline architecture**, why-this-stack rationale, and scaling, see
-> [observability → logging](../observability/logging/README.md).
+> [observability → logging](README.md).
 
 **Current status:**
 - **2 services**: cart (clog), auth (zerolog)

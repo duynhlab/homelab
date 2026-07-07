@@ -231,3 +231,7 @@ Deliberate deviations from the original design:
 **Roadmap / planned (⏳):** tracked as **Future work in [RFC-0001](../proposals/rfc/RFC-0001/)** —
 server bump 1.27.x, cache-bust on reserve, workflow/activity RED metrics, Grafana
 dashboard, internal cart-clear, temporal-db HA + Barman backups, and GameDay drills.
+
+---
+
+_Last updated: 2026-07-02 — implemented + as-built notes (footer added 2026-07-07)._

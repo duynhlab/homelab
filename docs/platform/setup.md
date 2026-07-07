@@ -202,6 +202,160 @@ The full host inventory lives in `scripts/setup-hosts.sh` and `docs/platform/kon
 
 ---
 
+## Seed Data & Demo Accounts
+
+### Overview
+
+All services include seed data via golang-migrate `000002_*.up.sql` migrations for immediate demo/local/dev functionality. Seed data is automatically loaded during database initialization.
+
+### Demo Users
+
+5 test users are available for authentication:
+
+| User | Email | Password | Purpose |
+|------|-------|----------|---------|
+| Alice Johnson | `alice@example.com` | `password123` | Active shopper (2 orders, cart items) |
+| Bob Smith | `bob@example.com` | `password123` | Cart only, no orders yet |
+| Carol White | `carol@example.com` | `password123` | Frequent reviewer |
+| David Brown | `david@example.com` | `password123` | Recent order with tracking |
+| Eve Davis | `eve@example.com` | `password123` | Inactive user |
+
+**Login Example** (login binds `username`, not `email`):
+```bash
+curl -X POST http://localhost:8080/auth/v1/public/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "alice", "password": "password123"}'
+```
+
+### Seeded Data Summary
+
+| Service | Table | Records | Description |
+|---------|-------|---------|-------------|
+| **Product** | `products` | 8 | Electronics, peripherals, accessories |
+| **Product** | `categories` | 4 | Electronics, Computers, Accessories, Peripherals |
+| **Auth** | `users` | 5 | Demo users with bcrypt-hashed passwords |
+| **User** | `user_profiles` | 5 | Complete profiles with addresses |
+| **Cart** | `cart_items` | 5 | Alice (3 items), Bob (2 items) |
+| **Order** | `orders` | 5 | Mix of pending/completed/shipped |
+| **Order** | `order_items` | 8 | Order line items |
+| **Review** | `reviews` | 12 | Product reviews (3-5 stars) |
+| **Notification** | `notifications` | 8 | Order/shipping/promo notifications |
+| **Shipping** | `shipments` | 3 | USPS, FedEx, UPS tracking |
+
+### Data Relationships
+
+Cross-service references use fixed IDs for consistency:
+
+```mermaid
+flowchart TD
+    AuthUsers["auth.users (IDs: 1-5)"]
+    ProductProducts["product.products (IDs: 1-8)"]
+
+    UserProfiles["user.user_profiles"]
+    CartItems["cart.cart_items"]
+    Orders["order.orders"]
+    Reviews["review.reviews"]
+    Notifications["notification.notifications"]
+
+    OrderItems["order.order_items"]
+    Shipments["shipping.shipments"]
+
+    %% Top-down: sources -> consumers
+    AuthUsers -->|user_id| UserProfiles
+    AuthUsers -->|user_id| CartItems
+    AuthUsers -->|user_id| Orders
+    AuthUsers -->|user_id| Reviews
+    AuthUsers -->|user_id| Notifications
+
+    ProductProducts -->|product_id| CartItems
+    ProductProducts -->|product_id| Reviews
+    ProductProducts -->|product_id| OrderItems
+
+    %% Orders -> downstream relations
+    Orders -->|order_id| OrderItems
+    Orders -->|order_id| Shipments
+```
+
+### Example Seeded Products
+
+| ID | Name | Price | Category | Stock |
+|----|------|-------|----------|-------|
+| 1 | Wireless Mouse | $29.99 | Electronics | 50 |
+| 2 | Mechanical Keyboard | $79.99 | Peripherals | 30 |
+| 3 | USB-C Hub | $39.99 | Computers | 25 |
+| 4 | Laptop Stand | $44.99 | Accessories | 40 |
+| 5 | Webcam HD | $59.99 | Electronics | 20 |
+| 6 | Monitor 24" | $149.99 | Electronics | 15 |
+| 7 | Gaming Headset | $89.99 | Accessories | 35 |
+| 8 | External SSD 1TB | $99.99 | Computers | 18 |
+
+### Alice's Cart (Example)
+
+```json
+{
+  "user_id": 1,
+  "items": [
+    {"product_id": 1, "product_name": "Wireless Mouse", "quantity": 2, "price": 29.99},
+    {"product_id": 2, "product_name": "Mechanical Keyboard", "quantity": 1, "price": 79.99},
+    {"product_id": 5, "product_name": "Webcam HD", "quantity": 1, "price": 59.99}
+  ],
+  "subtotal": 169.97,
+  "shipping": 5.00,
+  "total": 174.97
+}
+```
+
+### Idempotency
+
+All seed migrations use `ON CONFLICT DO NOTHING` to safely handle:
+- Pod restarts
+- Re-running migrations
+- Multiple deployments
+
+**Safe to restart services** - Seed data won't be inserted twice.
+
+### Environment Configuration
+
+**Local/Dev/Demo**: ✅ Seed data enabled (default)  
+**UAT**: ⚠️ Optional (configure via golang-migrate target version)  
+**Production**: ❌ Disabled (use golang-migrate target or separate migration path)
+
+### Migration Files
+
+Seed data located in each service:
+
+```
+{service}-service/db/migrations/sql/
+├── 000001_init_schema.up.sql   # Schema creation
+└── 000002_seed_{service}.up.sql # Demo data
+```
+
+**golang-migrate Execution**: 000001 → 000002 (automatic via the `migrate` subcommand, no manual intervention)
+
+### Verification
+
+```bash
+# Check products
+curl http://localhost:8080/product/v1/public/products
+
+# Login as Alice (login binds username, not email)
+TOKEN=$(curl -X POST http://localhost:8080/auth/v1/public/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "alice", "password": "password123"}' \
+  | jq -r '.access_token')
+
+# Check Alice's cart
+curl http://localhost:8080/cart/v1/private/cart \
+  -H "Authorization: Bearer $TOKEN"
+
+# Check Alice's orders
+curl http://localhost:8080/order/v1/private/orders \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+
+---
+
 ## Project Architecture
 
 ```

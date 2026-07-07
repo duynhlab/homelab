@@ -443,3 +443,7 @@ flowchart TD
   `round_robin` covers LB without it.
 - **Proto-break blast radius** is mitigated by `buf breaking` in CI — a breaking
   change fails the build before it can reach a consumer.
+
+---
+
+_Last updated: 2026-07-02 — implemented, gRPC-only east-west (footer added 2026-07-07)._

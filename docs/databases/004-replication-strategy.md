@@ -531,4 +531,14 @@ Large hyperscale deployments scale PostgreSQL to hundreds of millions of users w
 
 ---
 
+## References
+
+The cascading-replication, read/write-splitting, and layered-scaling patterns in
+§7, §8, and §10 are synthesized in-house from a large-scale PostgreSQL scaling
+case study:
+
+- OpenAI — Scaling PostgreSQL to the next level: https://openai.com/index/scaling-postgresql/
+
+---
+
 _Last updated: 2026-07-07_

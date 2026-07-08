@@ -13,6 +13,10 @@ receivers:
 processors:
   # OTel-recommended default in every pipeline — batches spans/metrics before export.
   batch: {}
+  # RFC-0014 D-5: defensive — the Go SDK exports cumulative temporality, but any
+  # delta sample that slips through stores in VM as-is and silently breaks rate().
+  deltatocumulative:
+    max_stale: 5m
 
 connectors:
   spanmetrics:
@@ -42,6 +46,14 @@ exporters:
     tls:
       insecure: true
     compression: gzip
+  # RFC-0014 P1: app OTLP metrics go to VictoriaMetrics' native OTLP ingest
+  # (HTTP protobuf only — VM accepts neither OTLP/gRPC nor JSON). Semconv →
+  # PromQL naming happens in VM via -opentelemetry.usePrometheusNaming.
+  otlphttp/victoriametrics:
+    metrics_endpoint: http://victoria-metrics:8428/opentelemetry/v1/metrics
+    tls:
+      insecure: true
+    compression: gzip
   prometheusremotewrite:
     endpoint: http://victoria-metrics:8428/api/v1/write
     resource_to_telemetry_conversion:
@@ -56,10 +68,18 @@ service:
       receivers: [otlp]
       processors: [batch]
       exporters: [otlphttp/victoriatraces, spanmetrics, debug]
-    metrics:
+    # spanmetrics-derived RED metrics keep their remote-write path unchanged.
+    metrics/spanmetrics:
       receivers: [spanmetrics]
       processors: [batch]
       exporters: [prometheusremotewrite]
+    # RFC-0014 P1: semconv app metrics pushed by the services (otelgin, otelgrpc,
+    # runtime, Temporal SDK via obsx SetupObservability) — dual-emit next to the
+    # scraped /metrics endpoint until the P3 cutover.
+    metrics/apps:
+      receivers: [otlp]
+      processors: [deltatocumulative, batch]
+      exporters: [otlphttp/victoriametrics]
     logs:
       receivers: [otlp]
       processors: [batch]

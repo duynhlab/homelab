@@ -148,6 +148,14 @@ services:
     image: victoriametrics/victoria-metrics:v1.146.0
     command:
       - "-storageDataPath=/victoria-metrics-data"
+      # RFC-0014 P1 (D-1/D-2): OTLP ingest shaping. usePrometheusNaming turns
+      # http.server.request.duration (unit s) into http_server_request_duration_seconds_*;
+      # promoteAll defaults to TRUE upstream, so the allowlist below must ship with
+      # an explicit false or SDK defaults churn a full series set per restart.
+      - "-opentelemetry.usePrometheusNaming"
+      - "-opentelemetry.promoteAllResourceAttributes=false"
+      - "-opentelemetry.promoteResourceAttributes=service.name,service.version,k8s.namespace.name,k8s.pod.name,deployment.environment.name"
+      - "-opentelemetry.promoteScopeMetadata=false"
       - "-retentionPeriod=7d"
     volumes:
       - victoria-metrics-data:/victoria-metrics-data

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`docs/observability/opentelemetry.md` → instrumentation policy page
+  (RFC-0014 P0)**: normative rules (one wiring point via `pkg` v0.16.0
+  `obsx.SetupObservability`, semconv v1.41 pin, mandatory Views/bucket sets,
+  default-off rollout flags, 15s export interval, no client_golang for new
+  metrics), current-vs-target pipeline diagrams, updated env table. Pairs
+  with pkg v0.16.0 (duynhlab/pkg#37); RFC-0014 phase table marks P0 done.
+
+
 ### Added
 
 - **RFC-0014 — full OpenTelemetry adoption** (provisional): migrate all 9

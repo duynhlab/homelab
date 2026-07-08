@@ -26,7 +26,7 @@ docs/
 │   ├── rfc/                      # Requests for Comments
 │   │   ├── README.md             # process + index + backlog
 │   │   ├── RFC-0000/             # template
-│   │   └── RFC-0001 … RFC-0012   # Temporal, mTLS, inventory, caching, shared-db, mesh, DR drills, secrets, API gateway, payment service, Talos migration, declarative CNPG roles
+│   │   └── RFC-0001 … RFC-0014   # Temporal, mTLS, …, payment service, Talos migration, declarative CNPG roles, metrics audit & scale playbook, full OpenTelemetry adoption
 │   └── *.md                      # loose reviews/roadmaps (auth-gateway, kong, otel-sampling; some .vi.md)
 ├── databases/                    # Database documentation
 │   ├── 002-database-integration.md               # PostgreSQL architecture
@@ -324,6 +324,7 @@ docs/
 - [RFC-0010: Payment service (PaymentIntent, ledger, charge/refund saga step)](./proposals/rfc/RFC-0010/) - Implemented; P1–P6 landed (ledger, outbox, mockpay, webhooks, saga wiring, reconciliation, cluster GitOps, frontend read path) → ADR-007…011
 - [RFC-0011: Homelab migration — Kind to bare-metal Talos](./proposals/rfc/RFC-0011/) - Provisional; 1 → 3 node HA path
 - [RFC-0012: Declarative CNPG role & database management](./proposals/rfc/RFC-0012/) - Implemented (P0–P4); per-service triplets on CNPG `DatabaseRole`/`Database` CRDs + pg_hba isolation
+- [RFC-0014: Full OpenTelemetry adoption](./proposals/rfc/RFC-0014/) - Provisional; OTLP push for metrics/logs/traces + semconv naming, phases P0–P5, consumer tracking table
 - [RFCs](./proposals/rfc/) - Propose & track substantial changes (process + index + backlog)
 
 ### Decisions (ADRs)

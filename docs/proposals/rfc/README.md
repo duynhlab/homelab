@@ -78,6 +78,7 @@ made are recorded as one or more **ADRs**, and the RFC moves to `implemented`.
 | [RFC-0011](RFC-0011/) | Homelab migration: Kind to bare-metal Talos (1 → 3 node HA) | infra | P2 | provisional |
 | [RFC-0012](RFC-0012/) | Converge CNPG role & database management on declarative CRDs | infra | done | implemented (P0–P4 landed) |
 | [RFC-0013](RFC-0013/) | App-metrics cardinality audit & streaming-aggregation scale playbook | platform-wide | P2 | provisional |
+| [RFC-0014](RFC-0014/) | Full OpenTelemetry adoption: OTLP push for metrics, logs and traces | platform-wide | P1 | provisional |
 
 ## Backlog — candidate RFCs
 

@@ -213,7 +213,7 @@ defects are coverage/doc-accuracy issues, not cardinality bombs.
 |---|---|---|---|
 | **D1** | Required | `MicroserviceHighRestartRate` hardcodes 8 namespaces — **payment missing** (`kubernetes/infra/configs/monitoring/prometheusrules/microservices/alerts.yaml:44`). Payment pod crash-loops would never fire this alert. Fix: add payment; prefer deriving from a label over a hardcoded list. | P4 (homelab) |
 | **D2** | Required | Stale "8 services" headers in the rule manifests (`alerts.yaml`/`recording-rules.yaml`) after payment landed (RFC-0010 P5); the prose docs were swept separately. Contested leftover: SLO docs say "payment ships no SLO yet", but `checkout-rs.yaml` applies `slo.enabled: true` unconditionally to every service it renders — payment included — which would make it 9 × 3 = 27 SLOs. Fix: correct the manifest headers to 9 and verify the rendered `PrometheusServiceLevel` set at the next cluster bring-up, then align the SLO counts (24 vs 27) to reality. | P4 (docs) |
-| **D3** | Consider | `middleware/prometheus.go` is copy-pasted across 9 repos with no drift guard. Fix direction: extract to a shared package in `duynhlab/pkg` (e.g. `pkg/metricsx`) and harden the reference while at it (bound the `method` label to known verbs, `defer` the in-flight `Dec()`, skip negative `ContentLength` observations) — **tracked as a follow-up `TODO.md` item, not a phase here** (cross-9-repo effort). | Follow-up |
+| **D3** | Consider | `middleware/prometheus.go` is copy-pasted across 9 repos with no drift guard. Fix direction: extract to a shared package in `duynhlab/pkg` (e.g. `pkg/metricsx`) and harden the reference while at it (bound the `method` label to known verbs, `defer` the in-flight `Dec()`, skip negative `ContentLength` observations) — **tracked as a follow-up `TODO.md` item, not a phase here** (cross-9-repo effort). *Update 2026-07-08: superseded by [RFC-0014](../RFC-0014/) D-11 — `pkg/obsx` v2 `SetupObservability` absorbs this with wider scope.* | Follow-up |
 | **D4** | Required | Standard doc inaccuracies: fleet series figure (~2,400) stale vs measured 2,777 @ 1 replica; canonical bucket set and forbidden-label list exist only implicitly in a code snippet; exemplar status contradicted between `TODO.md` ("not wired in Grafana") and `metrics-apps.md` ("configured"). Fix: amend `metrics-apps.md` (this PR) — measured table, canonical bucket constant, forbidden-label list, no-drift rule; reconcile the exemplar claim to "emitted by services; Grafana exemplar display pending" pointing at `TODO.md`. | **P1 ✅ (this PR)** |
 | **D5** | Consider | local-stack spanmetrics series carry unbounded-over-time resource labels (`process_pid`, `process_command_args`, `host_name`, `os_description`, …) via `resource_to_telemetry_conversion` — every container restart re-mints all 1,846+ series (order alone). Local-stack-only (cluster path uses Tempo), but it is a live example of the churn class this RFC is about. Fix: allowlist spanmetrics dimensions / drop resource conversion in the local-stack collector. | P4 (local-stack) |
 
@@ -374,6 +374,12 @@ settles the 24-vs-27 SLO count (D2).
   series 49–720, Σ 2,777.
 - 2026-07-07 — RFC created; P1 audit + `metrics-apps.md` amendments + P2
   playbook land in the same PR.
+
+> **Interaction with [RFC-0014](../RFC-0014/) (2026-07-08):** the P3a/P3b
+> shadow pilot proceeds unchanged while RFC-0014 dual-emits (the old metric
+> family stays alive through its P3); the pilot's match pattern is rewritten
+> to `http_server_request_duration_seconds.*` at RFC-0014 P5. D3 is superseded
+> by RFC-0014 D-11; this RFC's P4 manifest-header sweep folds into RFC-0014 P5.
 
 ## Related
 

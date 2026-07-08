@@ -173,7 +173,8 @@ Consolidated **CloudNativePG** cluster for **product**, **cart**, and **order** 
 - **Databases**: `product`, `cart`, `order`, `payment` on the same cluster; cluster lives in namespace **`product`**
 - **Pooler**: **PgDog** (HelmRelease `pgdog-cnpg`), unified endpoint **`pgdog-cnpg.product:6432`** — product, cart, and order services use this single entry point; PgDog routes writes to `cnpg-db-rw` and read traffic to `cnpg-db-r` per pool/database config
 - **payment (direct TLS, not pooled)**: the `payment` database also lives on `cnpg-db`, but payment-service connects **directly to `cnpg-db-rw.product:5432` over TLS** (`sslmode=require`; CNPG serves its own certs). Its config refuses cleartext DB and PgDog terminates no TLS yet, so payment bypasses the pooler. PgDog already carries payment backend entries — move payment behind the pooler once PgDog TLS lands. Its credentials come from `cnpg-db-payment-secret` (present in both the `product` and `payment` namespaces).
-- **Extensions**: preloaded via `shared_preload_libraries` — pgaudit, pg_stat_statements, auto_explain; created via Database resources — pgaudit, pg_stat_statements, pgcrypto, uuid-ossp (product), pgaudit, pg_stat_statements (cart, order). auto_explain is preload-only (no SQL control file), so it is never in a Database resource.
+- **Extensions**: preloaded via `shared_preload_libraries` — pgaudit, pg_stat_statements, auto_explain; created via the `Database` CR in each service triplet — pgaudit, pg_stat_statements, pgcrypto, uuid-ossp (product), pgaudit, pg_stat_statements (cart, order, payment). auto_explain is preload-only (no SQL control file), so it is never in a Database resource.
+- **Roles & databases**: declarative per-service triplets under `services/` — see [012 — Declarative Role & Database Management](./012-declarative-role-management.md)
 - **Features**: Logical replication slot sync for CDC (Debezium, Kafka Connect) where enabled
 
 > **Manifests, backup, pooler**: [`kubernetes/infra/configs/databases/clusters/cnpg-db/`](../../kubernetes/infra/configs/databases/clusters/cnpg-db/)
@@ -236,11 +237,19 @@ Consolidated **CloudNativePG** cluster for **product**, **cart**, and **order** 
 - `resources`: CPU and memory limits
 - `storage.size`: Persistent volume size
 
-**Secret Management:**
-- CloudNativePG requires pre-created secrets
-- Secrets must be created before cluster deployment
-- Secret format: `{cluster-name}-secret` in cluster namespace
-- Contains: `username`, `password` keys
+**Role, Database & Secret Management (RFC-0012):**
+- Every service database is a **per-service triplet** — `ExternalSecret` +
+  `DatabaseRole` + `Database` in one file under
+  `clusters/cnpg-db/services/<name>.yaml` ([ADR-013](../proposals/adr/ADR-013-per-service-db-triplet/))
+- Credentials flow OpenBAO → ESO → `kubernetes.io/basic-auth` Secret
+  (`cnpg.io/reload: "true"`); no credential exists in any manifest, and the
+  PgDog pooler receives passwords via Flux `valuesFrom`
+  ([ADR-014](../proposals/adr/ADR-014-pooler-credentials-valuesfrom/))
+- `bootstrap.initdb` in `instance.yaml` is a structural placeholder (product);
+  the product triplet adopts it — from-scratch builds and restores converge
+- Concepts and semantics: [012 — Declarative Role & Database Management](./012-declarative-role-management.md);
+  recipes: [add a service database](./runbooks/add-service-database.md),
+  [rotate a password](./runbooks/rotate-cnpg-service-password.md)
 
 ### Monitoring
 

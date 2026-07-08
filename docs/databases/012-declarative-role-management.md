@@ -6,7 +6,7 @@ database is created by SQL in Git, and no credential ever appears in a manifest.
 
 | | |
 |---|---|
-| **Status** | All four services on triplets (RFC-0012 P1–P3); connection isolation via `pg_hba` (P4) **planned** |
+| **Status** | Complete (RFC-0012 P1–P4): all four services on triplets, connection isolation via `pg_hba` live |
 | **Decision record** | [ADR-013 — per-service database triplet](../proposals/adr/ADR-013-per-service-db-triplet/) |
 | **Operator** | CloudNativePG v1.30.0 (`DatabaseRole` CRD since 1.30) |
 | **Cluster** | `cnpg-db` (namespace `product`); DR replica `cnpg-db-replica` receives roles/databases via WAL, no CRs of its own |
@@ -133,6 +133,25 @@ Replica behavior: roles and databases replicate through WAL to
 - **Roll back a migrated role:** re-add the inline `managed.roles` entry — it
   takes precedence immediately; the `DatabaseRole` drops to `applied: false`
   and can be deleted later (`retain` leaves the catalog untouched).
+- **Verify connection isolation (P4, [ADR-015](../proposals/adr/ADR-015-pg-hba-connection-isolation/)):**
+  the 4×4 matrix must be 4 allows + 12 `pg_hba.conf rejects connection`:
+
+  ```bash
+  for u in product cart order payment; do
+    pw=$(kubectl get secret -n product cnpg-db-$([ $u = product ] || echo ${u}-)secret \
+      -o jsonpath='{.data.password}' | base64 -d)
+    for d in product cart order payment; do
+      kubectl run hba-$u-$d --rm --restart=Never -n product --quiet -it \
+        --image=ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie -- \
+        psql "host=cnpg-db-rw.product user=$u dbname=$d password=$pw connect_timeout=5" \
+        -tAc 'select 1' >/dev/null 2>&1 && echo "$u->$d ALLOW" || echo "$u->$d reject"
+    done
+  done
+  ```
+
+  Regression alongside: pgdog e2e, payment direct login, one migration Job
+  re-run, `cnpg-db-replica` advancing, PodMonitor scrape, auth-failure watch
+  in VictoriaLogs for the first hour.
 
 ## References
 
@@ -144,4 +163,4 @@ Replica behavior: roles and databases replicate through WAL to
 
 ---
 
-_Last updated: 2026-07-08 (RFC-0012 P3)_
+_Last updated: 2026-07-08 (RFC-0012 P4)_

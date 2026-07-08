@@ -40,3 +40,4 @@ settled decisions.
 | [ADR-012](ADR-012-reconciliation-auto-heal/) | Auto-heal one reconciliation class — the lost-capture-response window | Accepted | [RFC-0010](../rfc/RFC-0010/) |
 | [ADR-013](ADR-013-per-service-db-triplet/) | Per-service database triplet (ExternalSecret + DatabaseRole + Database) on cnpg-db | Accepted | [RFC-0012](../rfc/RFC-0012/) |
 | [ADR-014](ADR-014-pooler-credentials-valuesfrom/) | PgDog pooler credentials via Flux valuesFrom targetPath | Accepted | [RFC-0012](../rfc/RFC-0012/) |
+| [ADR-015](ADR-015-pg-hba-connection-isolation/) | Database connection isolation via declarative pg_hba | Accepted | [RFC-0012](../rfc/RFC-0012/) |

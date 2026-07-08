@@ -1,21 +1,24 @@
 # OpenTelemetry (OTel)
 
 OpenTelemetry is the common language every service and Kong use to describe
-"what just happened" during a request — this doc explains it from zero, then
-shows exactly how this platform uses it.
+"what just happened" during a request. This doc explains it from zero, shows
+how this platform uses it today, and — since [RFC-0014](../proposals/rfc/RFC-0014/README.md)
+— is the **authoritative instrumentation policy page**: the invariants every
+service and PR must respect.
 
 ## Quick facts
 
 | Item | Value |
 |------|-------|
-| SDK | OpenTelemetry Go SDK, wired by `pkg/obsx` (OTLP/HTTP export) |
+| SDK | OpenTelemetry Go **v1.44.0**, wired by **`pkg/obsx` `SetupObservability`** (one call in `main()`) |
+| Semconv | **v1.41.0**, pinned in `pkg/obsx` — bumps only via a deliberate pkg release |
 | Collector | `otel-collector` (contrib distribution, `monitoring` namespace) |
-| Signals in use | Traces ✅ (all services + Kong) · Logs ✅ (Kong runtime-logs **pilot**) · Metrics ❌ (Prometheus pull model instead) |
-| Protocol | OTLP — gRPC `:4317`, HTTP `:4318` |
-| Propagation | W3C Trace Context (`traceparent` header); Kong forces injection (`inject: [w3c]`) |
-| Sampling | 10% head sampling, `ParentBased(TraceIDRatioBased)` — the official `parentbased_traceidratio` default (see [Sampling](#sampling)) |
+| Signals | Traces ✅ (all services + Kong) · Metrics 🚧 (OTLP push rolling out per RFC-0014, flag default **off**) · Logs 🚧 (otelzap bridge rolling out per RFC-0014, flag default **off**; Kong runtime-logs pilot ✅) |
+| Protocol | OTLP — HTTP/protobuf `:4318` for everything (VictoriaMetrics/VictoriaLogs accept nothing else) |
+| Propagation | W3C Trace Context (`traceparent`); Kong forces injection (`inject: [w3c]`) |
+| Sampling | 10% head sampling, `ParentBased(TraceIDRatioBased)` (see [Sampling](#sampling)) |
 | Trace backends | Tempo (primary) + Jaeger (in-memory UI) + VictoriaTraces (pilot) |
-| Service identity | `OTEL_SERVICE_NAME` env, injected by the app ResourceSets |
+| Service identity | `OTEL_SERVICE_NAME` + Downward API envs, injected by the app ResourceSets |
 
 ## OTel in plain words
 
@@ -35,52 +38,108 @@ comes in three forms — the three OTel **signals**:
 Before OpenTelemetry, every vendor had its own agent, wire format, and API —
 switching backends meant re-instrumenting the code. OTel is the CNCF-standard
 answer: **one API, one SDK, one wire protocol (OTLP)**, and any backend that
-speaks it. This platform leans on that portability: the same span stream
-fans out to three different trace backends without touching a line of Go.
+speaks it. This platform leans on that portability: the same span stream fans
+out to three trace backends without touching a line of Go, and RFC-0014
+extends the same idea to metrics and logs.
 
-## The building blocks
+## The building blocks — and who imports what
 
-- **API vs SDK** — the *API* is the neutral interface the code calls
-  (`tracer.Start(ctx, "name")`); the *SDK* is the engine behind it that
-  actually samples, batches, and exports. Libraries depend only on the API;
-  the application wires the SDK once at startup (here: `obsx` in `main.go`).
-- **Span and trace** — a *span* is one leg of the trip (one HTTP handler, one
-  DB query) with a start time, duration, attributes, and a parent. A *trace*
-  is the whole trip: every span sharing one `trace_id`, forming a tree.
-- **Context propagation** — for spans from different services to join the
-  same tree, the `trace_id` must travel with the request. The W3C
-  `traceparent` HTTP header (and its gRPC metadata twin) is that boarding
-  pass. Kong stamps it onto every upstream request (`inject: [w3c]`), and
-  each service passes it on via `pkg/grpcx` / HTTP middleware.
-- **Resource attributes** — the name tag on everything a process emits:
-  `service.name`, `service.namespace`, `service.instance.id`. Here they come
-  from env vars injected by the domain ResourceSets
-  (`kubernetes/apps/domains/*-rs.yaml`): `OTEL_SERVICE_NAME` (authoritative —
-  without it the SDK falls back to brittle hostname parsing) plus
-  `OTEL_RESOURCE_ATTRIBUTES` built from the Downward API.
-- **OTLP** — the OpenTelemetry Protocol, the single wire format for all
-  three signals. gRPC on `:4317`, HTTP/protobuf on `:4318`. Services and
-  Kong both use OTLP/HTTP to `:4318`.
-- **Collector** — a standalone process that sits between producers and
-  backends, like a mail room: **receivers** accept telemetry (here: OTLP),
-  **processors** shape it (here: `memory_limiter`, `batch`), **exporters**
-  deliver it. A **pipeline** wires receiver → processors → exporters *per
-  signal*. Producers stay dumb — they know one address; the collector owns
-  the fan-out, so adding/removing a backend is a collector-only change.
+The OTel spec's core rule: *libraries depend only on the API; if no SDK is
+installed, API calls are no-ops.* That split is why instrumentation can live
+in shared code without forcing a telemetry runtime on anyone:
+
+| Layer | Go modules | Who imports it here |
+|---|---|---|
+| **API** | `go.opentelemetry.io/otel`, `otel/trace`, `otel/metric`, `otel/log` (bridge API) | Library/shared code: `pkg/obsx`, `pkg/grpcx`, middleware |
+| **SDK** | `otel/sdk`, `otel/sdk/metric`, `otel/sdk/log`, `otel/sdk/resource` | **Only `pkg/obsx.SetupObservability`** — services never wire the SDK directly |
+| **Exporters** (SDK plugins) | `otlptracehttp`, `otlpmetrichttp`, `otlploghttp` | `pkg/obsx` only |
+| **Contrib** | `otelgin`, `otelgrpc` (+`filters`), `instrumentation/runtime`, `bridges/otelzap` | Router middleware; the rest via `pkg/obsx`/`pkg/grpcx` |
+
+Other concepts, in one line each:
+
+- **Span / trace** — a span is one leg of the trip (one handler, one DB
+  query); a trace is every span sharing one `trace_id`, forming a tree.
+- **Context propagation** — the `trace_id` travels in the W3C `traceparent`
+  header (or gRPC metadata); Kong stamps it at the edge, `pkg/grpcx`/HTTP
+  middleware pass it on.
+- **Resource attributes** — the name tag on everything a process emits
+  (`service.name`, `k8s.namespace.name`, …). Built by `obsx` from env.
+- **OTLP** — the single wire format for all three signals. This platform
+  standardizes on **HTTP/protobuf `:4318`** end-to-end (D-6): the
+  VictoriaMetrics/VictoriaLogs OTLP ingests accept neither gRPC nor JSON.
+- **Collector** — the mail room between producers and backends: receivers →
+  processors → exporters, one pipeline per signal. Producers know one
+  address; the collector owns the fan-out.
+- **Views** — SDK-side reshaping of metrics at aggregation time (bucket
+  boundaries, dropped attributes). This platform's Views are **mandatory
+  policy**, not tuning (see below).
+
+## Platform instrumentation policy (RFC-0014 — normative)
+
+These are the rules; PRs that violate them get rejected. Rationale lives in
+[RFC-0014](../proposals/rfc/RFC-0014/README.md).
+
+1. **One wiring point.** Services call `obsx.SetupObservability(ctx, cfg)`
+   once in `main()` and defer its `Shutdown`. No service builds an OTel
+   provider, exporter, or resource by hand.
+
+   ```go
+   obs, err := obsx.SetupObservability(ctx, obsx.ConfigFromEnv())
+   if err != nil { /* fail startup */ }
+   defer obs.Shutdown(shutdownCtx)
+
+   // logs (when OTEL_LOGS_ENABLED): tee next to the stdout core —
+   // ZapCore is level-gated and never nil, so the tee is unconditional.
+   logger := zap.New(zapcore.NewTee(stdoutCore, obs.ZapCore(serviceName, zapcore.InfoLevel)))
+   ```
+
+2. **client_golang is legacy-frozen.** No new `prometheus.*`/`promauto`
+   instruments in app code — new metrics use the OTel Meter API with semconv
+   names. The existing `middleware/prometheus.go` stays untouched until the
+   RFC-0014 P3 cutover removes it.
+3. **Semconv v1.41 is pinned** in `pkg/obsx`; the (SDK, contrib, semconv)
+   triple bumps only as a deliberate pkg release with its integration test.
+4. **Never set `OTEL_SEMCONV_STABILITY_OPT_IN`.** Any value containing `rpc`
+   silently renames `rpc_*` metrics to the legacy milliseconds form and
+   breaks every consumer.
+5. **The Views are law.** `http.server.request.duration` carries the platform
+   13-bucket set `{0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1, 2, 5, 10}`
+   (keeps the 0.2/0.3/0.75 SLO points and the `le=2` Apdex bound that semconv
+   defaults lack); `body.size` histograms use the byte set; `rpc.client.call.duration`
+   drops `server.address`/`server.port` (pod-IP churn). Changing a bucket is
+   an RFC-level decision, not a service PR.
+6. **Rollout flags default OFF.** `OTEL_METRICS_ENABLED` / `OTEL_LOGS_ENABLED`
+   turn signals on per service (dual-emit, canary-first). Flipping one is a
+   values change reviewed against the RFC-0014
+   [tracking table](../proposals/rfc/RFC-0014/tracking.md).
+7. **Export interval is 15 s** (`OTEL_METRIC_EXPORT_INTERVAL_SECONDS`) — it
+   matches the historical scrape interval so burn-rate math never shifted.
+   Don't "optimize" it to the SDK's 60 s default.
+8. **No secrets/PII in labels or resource attributes.** Label values surface
+   in dashboards, alerts and URLs; `OTEL_RESOURCE_ATTRIBUTES` values become
+   labels on every signal (the vmagent allowlist is the backstop, not an
+   excuse).
+9. **Health and reflection RPCs are not telemetry.** `pkg/grpcx` filters them
+   from spans and metrics; don't work around it.
+10. **Cardinality backstop**: the SDK's 2000-attribute-set limit per
+    instrument stays on; an `otel.metric.overflow` datapoint is an alert, not
+    noise.
 
 ## How it works in this platform
+
+Current state (traces live; metrics/logs pipelines exist, app flags off):
 
 ```mermaid
 flowchart LR
     subgraph Producers
-        SVC["9 Go services<br/>(obsx SDK, OTLP/HTTP)"]
+        SVC["9 Go services<br/>obsx SetupObservability<br/>traces ✅ · metrics/logs behind flags"]
         KONG["Kong gateway<br/>(opentelemetry plugin)"]
     end
     subgraph Collector["otel-collector (monitoring)"]
         TP["traces pipeline<br/>memory_limiter → batch"]
         LP["logs pipeline<br/>memory_limiter → batch"]
     end
-    SVC -->|"spans :4318"| TP
+    SVC -->|"OTLP/HTTP :4318"| TP
     KONG -->|"spans :4318"| TP
     KONG -.->|"runtime logs (pilot)"| LP
     TP --> TEMPO["Tempo (primary)"]
@@ -89,22 +148,29 @@ flowchart LR
     LP -.-> VL["VictoriaLogs"]
 ```
 
-- **Traces** — every service exports spans via `obsx`; Kong opens the root
-  span at the edge so traces start at the gateway. The collector fans out to
-  three backends (Tempo is the Grafana default; Jaeger is a dev UI;
-  VictoriaTraces is a pilot — see
-  [tracing/backends-comparison.md](tracing/backends-comparison.md)).
-- **Logs** — the primary log path is **not** OTel: Vector tails pod stdout
-  into VictoriaLogs. The collector's `logs` pipeline carries one pilot
-  stream: Kong **runtime** logs via the plugin's `logs_endpoint` (Kong ≥ 3.8),
-  running alongside Vector for comparison
-  ([logging/README.md](logging/README.md)).
-- **Metrics** — intentionally not OTel. The stack is pull-based
-  (VMAgent scrapes `/metrics`; Kong's `prometheus` plugin on `:8100`), with
-  dashboards, recording rules, and alerts already built on it. Kong's OTel
-  *metrics* export also needs Kong 3.13+ (Enterprise train; OSS is 3.9).
-  Revisit if OSS catches up — until then OTel here means traces + the logs
-  pilot.
+Target state per RFC-0014 (phases P1–P4; **planned**, marked here so this doc
+never claims it early):
+
+```mermaid
+flowchart LR
+    SVC2["9 Go services + order-worker<br/>OTLP: traces + metrics + logs"] --> COL2["otel-collector<br/>+ metrics pipeline<br/>(memory_limiter → deltatocumulative → batch)"]
+    COL2 -->|"otlphttp proto"| VMA["vmagent :8429 OTLP ingest<br/>-opentelemetry.usePrometheusNaming<br/>+ resource-attr allowlist + relabel"]
+    VMA --> VMS[("VMSingle")]
+    COL2 -->|"VL-Stream-Fields:<br/>service.name,k8s.namespace.name"| VLX[("VictoriaLogs<br/>trace_id = queryable field")]
+    COL2 --> T3["Tempo"]
+    CHK["checkout-service (exempt)"] -->|scrape + stdout| LEGACY["legacy path<br/>(trimmed ServiceMonitor + Vector)"]
+```
+
+- **Traces** — unchanged: every service exports spans via `obsx`; Kong opens
+  the root span at the edge; the collector fans out to three backends.
+- **Metrics** — transitioning: today the fleet is scraped (client_golang RED
+  on `/metrics`); under the flag, services *additionally* push semconv
+  metrics over OTLP (dual-emit) until the P3 cutover. Details, mapping tables
+  and the consumer checklist: [RFC-0014](../proposals/rfc/RFC-0014/README.md).
+- **Logs** — today Vector tails stdout; under the flag, zap records tee
+  through the level-gated otelzap bridge to VictoriaLogs, where `TraceId`
+  becomes a **queryable `trace_id` field** (this is what repairs the
+  traces↔logs correlation). Vector remains for non-instrumented pods forever.
 
 ## Sampling
 
@@ -116,28 +182,31 @@ The subtlety is *who decides*. The design: Kong (root) decides once, everyone
 downstream honours it — that is what the `ParentBased` wrapper does (the
 official default, `parentbased_traceidratio`: sample the root by ratio, then
 follow the parent's decision). All services configure
-`ParentBased(TraceIDRatioBased(rate))` (`middleware/tracing.go`), so a service's
-own ratio only applies when it is the *root* of a trace; when it has a parent
-(the Kong→service edge, or a service→service gRPC hop) it always honours the
-parent's `sampled` flag. Concretely, per the OTel Go SDK: a sampled remote
-parent → `AlwaysOn`, an unsampled one → `AlwaysOff`. This makes sampling
-*complete* — a trace Kong keeps is kept whole downstream regardless of any per
-service rate drift (the deterministic `trace_id` hash is then just a
-belt-and-suspenders that also makes root decisions reproducible). Details in
+`ParentBased(TraceIDRatioBased(rate))` (now inside `obsx.SetupObservability`),
+so a service's own ratio only applies when it is the *root* of a trace; when
+it has a parent (the Kong→service edge, or a service→service gRPC hop) it
+always honours the parent's `sampled` flag. Concretely, per the OTel Go SDK: a
+sampled remote parent → `AlwaysOn`, an unsampled one → `AlwaysOff`. This makes
+sampling *complete* — a trace Kong keeps is kept whole downstream. Details in
 [tracing/architecture.md](tracing/architecture.md).
 
 ## Operations
 
-Env vars injected by the app ResourceSets (`kubernetes/apps/domains/*-rs.yaml`,
-`kubernetes/apps/order-worker.yaml`):
+Env vars read by `obsx.ConfigFromEnv` (injected by the app ResourceSets,
+`kubernetes/apps/domains/*-rs.yaml`, `kubernetes/apps/order-worker.yaml`):
 
-| Env | Value | Meaning |
-|-----|-------|---------|
-| `OTEL_COLLECTOR_ENDPOINT` | `otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318` | Where `obsx` sends OTLP/HTTP |
-| `OTEL_SERVICE_NAME` | `<< inputs.name >>` (e.g. `order`) | Authoritative `service.name` |
-| `OTEL_RESOURCE_ATTRIBUTES` | `service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME)` | Extra identity via Downward API |
-| `OTEL_SAMPLE_RATE` | `0.1` | Head-sampling ratio |
-| `TRACING_ENABLED` | `true` | `obsx` kill switch per service |
+| Env | Default | Meaning |
+|-----|---------|---------|
+| `OTEL_COLLECTOR_ENDPOINT` | `otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318` | OTLP/HTTP target for all signals |
+| `OTEL_SERVICE_NAME` / `SERVICE_NAME` | — | Authoritative `service.name` |
+| `SERVICE_VERSION` | — | semconv `service.version` |
+| `K8S_NAMESPACE_NAME`, `K8S_POD_NAME` | Downward API | semconv k8s identity on the Resource |
+| `DEPLOYMENT_ENVIRONMENT` | — | semconv `deployment.environment.name` |
+| `TRACING_ENABLED` | `true` | Traces kill switch per service |
+| `OTEL_SAMPLE_RATE` | `0.1` | Head-sampling ratio (root decisions) |
+| `OTEL_METRICS_ENABLED` | **`false`** | RFC-0014 P1 rollout flag — OTLP metrics + runtime instrumentation |
+| `OTEL_LOGS_ENABLED` | **`false`** | RFC-0014 P4 rollout flag — otelzap → OTLP logs |
+| `OTEL_METRIC_EXPORT_INTERVAL_SECONDS` | `15` | PeriodicReader interval (policy #7) |
 
 Note: `OTEL_COLLECTOR_ENDPOINT` and `OTEL_SAMPLE_RATE` are platform names read
 by `obsx`, not the standard SDK vars (`OTEL_EXPORTER_OTLP_ENDPOINT`,
@@ -147,16 +216,16 @@ Quick verification:
 
 - **Traces arriving** — Grafana → Explore → **Tempo** → search
   `service.name = order` (or the Jaeger UI service dropdown).
-- **Kong pilot logs arriving** — Explore → **VictoriaLogs** →
-  `service.name:kong` (LogsQL).
+- **OTLP metrics arriving** (flagged services) — VMSingle/vmui:
+  `http_server_request_duration_seconds_bucket{app="<svc>"}` with 13 buckets.
+- **OTLP logs arriving** (flagged services) — Explore → **VictoriaLogs** →
+  `trace_id:"<id>"` returns the request's lines.
 - **Collector health** — `kubectl -n monitoring logs deploy/otel-collector-opentelemetry-collector`;
   zpages on `:55679`.
-- **Log ↔ trace pivot** — a `trace_id` in any log line links to the Tempo
-  trace (and back) via the Grafana datasource correlations.
 
 ## References
 
-- Official: [opentelemetry.io/docs/concepts](https://opentelemetry.io/docs/concepts/) — signals, SDK, propagation; [Collector docs](https://opentelemetry.io/docs/collector/); [sampling guidance](https://opentelemetry.io/docs/concepts/sampling/)
-- In-house: [tracing/README.md](tracing/README.md) · [tracing/architecture.md](tracing/architecture.md) · [logging/README.md](logging/README.md) · [../platform/kong-gateway.md](../platform/kong-gateway.md)
+- Official: [opentelemetry.io/docs/concepts](https://opentelemetry.io/docs/concepts/) · [Go SDK](https://opentelemetry.io/docs/languages/go/) · [versioning & stability](https://opentelemetry.io/docs/specs/otel/versioning-and-stability/) · [Collector](https://opentelemetry.io/docs/collector/) · [sampling](https://opentelemetry.io/docs/concepts/sampling/) · [VictoriaMetrics OTel](https://docs.victoriametrics.com/victoriametrics/integrations/opentelemetry/) · [VictoriaLogs OTel](https://docs.victoriametrics.com/victorialogs/data-ingestion/opentelemetry/)
+- In-house: [RFC-0014](../proposals/rfc/RFC-0014/README.md) (design record + tracking) · [tracing/README.md](tracing/README.md) · [tracing/architecture.md](tracing/architecture.md) · [logging/README.md](logging/README.md) · [metrics/streaming-aggregation.md](metrics/streaming-aggregation.md) · [../platform/kong-gateway.md](../platform/kong-gateway.md)
 
-_Last updated: 2026-07-03 — traces + Kong logs pilot on collector; sampling section corrected to reflect the shipped `ParentBased(TraceIDRatioBased)` sampler._
+_Last updated: 2026-07-08 — RFC-0014 P0: promoted to the platform instrumentation policy page (obsx SetupObservability, semconv v1.41 pin, mandatory Views, rollout flags); educational core and sampling section unchanged._

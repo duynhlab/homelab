@@ -1,6 +1,9 @@
 # Consolidated Primary Database Cluster (CloudNativePG)
 # Merged from product-db + transaction-shared-db into single HA cluster
-# Databases: product, cart, order
+# Databases: product, cart, order, payment — defined as per-service triplets
+# under services/ (RFC-0012, ADR-013); this file is infrastructure only.
+# The bootstrap.initdb database/owner/secret are structural placeholders on
+# a fresh cluster — the product triplet adopts them declaratively.
 # HA: 3 instances (1 primary, 1 sync replica, 1 async replica)
 # DR: WAL archived to RustFS for cnpg-db-replica continuous recovery
 apiVersion: postgresql.cnpg.io/v1
@@ -130,15 +133,6 @@ spec:
       encoding: "UTF8"
       localeCType: "C"
       localeCollate: "C"
-      # DEPRECATED (RFC-0012 P2, removed in P3): these passwords are stale on
-      # purpose — the live values rotated to OpenBAO-only. On a fresh initdb
-      # the cart/order DatabaseRoles (services/) adopt these roles and ALTER
-      # the passwords to the OpenBAO values within one reconcile.
-      postInitSQL:
-        - CREATE USER cart WITH PASSWORD 'C4rt-K1nd-2026!';
-        - CREATE DATABASE cart OWNER cart;
-        - CREATE USER "order" WITH PASSWORD '0rd3r-K1nd-2026!';
-        - CREATE DATABASE "order" OWNER "order";
 
   # Roles live in per-service DatabaseRole CRs under services/ (RFC-0012,
   # ADR-013) — do not re-add an inline managed.roles entry except as the

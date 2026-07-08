@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **initdb minimalized + product triplet + recipe (RFC-0012 P3)**: the
+  cleartext `postInitSQL` block is gone from `instance.yaml` (grep gate:
+  no `WITH PASSWORD` under `kubernetes/`); `services/product.yaml` adopts
+  the initdb-created role/database (same `cnpg-db-secret` for bootstrap
+  and DatabaseRole); dead config removed (`extensions.yaml` emptied out,
+  unused `pgdog-cnpg-credentials` ESO + seed); new recipe
+  `docs/databases/runbooks/add-service-database.md`; CNPG sections of
+  `002-database-integration.md` rewritten around the triplet.
 - **cart/order triplets + pooler valuesFrom + password rotation (RFC-0012
   P2, ADR-014)**: `services/cart.yaml` + `services/order.yaml` (basic-auth
   ESO secrets replace the Opaque copies); PgDog HelmRelease loses its four

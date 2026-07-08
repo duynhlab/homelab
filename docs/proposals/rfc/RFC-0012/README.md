@@ -437,6 +437,13 @@ flowchart TB
   cart/order). Rotation runbook:
   `docs/databases/runbooks/rotate-cnpg-service-password.md`. Live rotation
   choreography executes at the next kind bring-up.
+- 2026-07-08 — **P3 landed:** `postInitSQL` removed (no `WITH PASSWORD`
+  anywhere under `kubernetes/`); product triplet adopts the initdb
+  placeholders; dead config deleted (`extensions.yaml`,
+  `pgdog-cnpg-credentials` ESO + seed); add-a-service recipe published
+  (`docs/databases/runbooks/add-service-database.md`); docs/002 CNPG
+  sections rewritten. The kind-rebuild + restore drills (P3's definition
+  of done) run at the next bring-up.
 
 ## Related
 

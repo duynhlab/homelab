@@ -323,7 +323,7 @@ docs/
 - [RFC-0009: Production-grade API gateway (signed JWT + Kong edge auth)](./proposals/rfc/RFC-0009/) - Partially implemented; supersedes ADR-003 via ADR-006
 - [RFC-0010: Payment service (PaymentIntent, ledger, charge/refund saga step)](./proposals/rfc/RFC-0010/) - Implemented; P1–P6 landed (ledger, outbox, mockpay, webhooks, saga wiring, reconciliation, cluster GitOps, frontend read path) → ADR-007…011
 - [RFC-0011: Homelab migration — Kind to bare-metal Talos](./proposals/rfc/RFC-0011/) - Provisional; 1 → 3 node HA path
-- [RFC-0012: Declarative CNPG role & database management](./proposals/rfc/RFC-0012/) - Implementable (P0–P2 landed); converge on CNPG `DatabaseRole`/`Database` CRDs
+- [RFC-0012: Declarative CNPG role & database management](./proposals/rfc/RFC-0012/) - Implementable (P0–P3 landed); converge on CNPG `DatabaseRole`/`Database` CRDs
 - [RFCs](./proposals/rfc/) - Propose & track substantial changes (process + index + backlog)
 
 ### Decisions (ADRs)

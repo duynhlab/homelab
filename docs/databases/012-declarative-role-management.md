@@ -6,7 +6,7 @@ database is created by SQL in Git, and no credential ever appears in a manifest.
 
 | | |
 |---|---|
-| **Status** | Rolling out via [RFC-0012](../proposals/rfc/RFC-0012/) — payment/cart/order migrated (P1–P2); product + initdb cleanup (P3), pg_hba isolation (P4) **planned** |
+| **Status** | All four services on triplets (RFC-0012 P1–P3); connection isolation via `pg_hba` (P4) **planned** |
 | **Decision record** | [ADR-013 — per-service database triplet](../proposals/adr/ADR-013-per-service-db-triplet/) |
 | **Operator** | CloudNativePG v1.30.0 (`DatabaseRole` CRD since 1.30) |
 | **Cluster** | `cnpg-db` (namespace `product`); DR replica `cnpg-db-replica` receives roles/databases via WAL, no CRs of its own |
@@ -92,8 +92,10 @@ Each service file under `clusters/cnpg-db/services/` declares, in order:
    path deterministic.
 
 The `Cluster` spec (`instance.yaml`) keeps only infrastructure plus a minimal
-`bootstrap.initdb` — after P3 lands, its `database`/`owner` fields are
-structural placeholders that the product triplet adopts declaratively.
+`bootstrap.initdb` — its `database`/`owner`/`secret` fields are structural
+placeholders that the product triplet adopts declaratively (both must point
+at the same `cnpg-db-secret`). `postInitSQL` is gone: a from-scratch build
+and a backup restore now converge to the same roles and databases.
 
 Replica behavior: roles and databases replicate through WAL to
 `cnpg-db-replica`; a `DatabaseRole` pointed at a replica reports `unknown`
@@ -106,13 +108,14 @@ Replica behavior: roles and databases replicate through WAL to
 | payment | triplet (`services/payment.yaml`) | **P1 — landed** |
 | cart | triplet (`services/cart.yaml`) | **P2 — landed** (live rotation runs at next bring-up) |
 | order | triplet (`services/order.yaml`) | **P2 — landed** (live rotation runs at next bring-up) |
-| product | `bootstrap.initdb` + `cnpg-db-secret` | P3 (planned) — triplet adopts the initdb-created role |
+| product | triplet (`services/product.yaml`) — also the `bootstrap.initdb` placeholder identity | **P3 — landed** |
 
 ## Operations
 
 - **Add a service database:** one new file in `services/` + an OpenBAO seed
-  entry + the app-namespace secret copy + a PgDog `users[]` entry. Recipe (P3):
-  `docs/databases/runbooks/add-service-database.md`. Never edit `instance.yaml`.
+  entry + the app-namespace secret copy + a PgDog `users[]` entry.
+  Recipe: [add-service-database](./runbooks/add-service-database.md). Never
+  edit `instance.yaml`.
 - **Adopt an existing role (migration):** snapshot first —
   `SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb,
   rolcanlogin, rolreplication, rolconnlimit, rolvaliduntil, rolbypassrls FROM
@@ -141,4 +144,4 @@ Replica behavior: roles and databases replicate through WAL to
 
 ---
 
-_Last updated: 2026-07-08 (RFC-0012 P2)_
+_Last updated: 2026-07-08 (RFC-0012 P3)_

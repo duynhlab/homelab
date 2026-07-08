@@ -1,0 +1,101 @@
+# payment — per-service database triplet (RFC-0012, ADR-013).
+#
+# One file per service: ExternalSecret (credentials from OpenBAO) +
+# DatabaseRole (the service identity) + Database (owned by that role).
+# Role is declared before Database: CNPG documents no ordering guarantee
+# between the two, but role-first makes the happy path deterministic
+# (a Database whose owner does not exist yet fails and retries).
+#
+# ExternalSecret for cnpg-db payment database credentials — product namespace.
+# OpenBAO path: secret/data/local/databases/cnpg-db/payment
+#
+# Rendered as kubernetes.io/basic-auth (not Opaque like the older cart/order
+# copies): this secret doubles as the passwordSecret for the DatabaseRole
+# below, and CNPG requires basic-auth there. The username/password keys stay
+# compatible with app-style secretKeyRef use.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: cnpg-db-payment-secret
+  namespace: product
+  labels:
+    app.kubernetes.io/name: cnpg-db-payment-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: cnpg-db-payment-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: cnpg-db-payment-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+          cnpg.io/reload: "true"
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: secret/data/local/databases/cnpg-db/payment
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: secret/data/local/databases/cnpg-db/payment
+        property: password
+---
+# The service's PostgreSQL identity. Written out IN FULL: creating a
+# DatabaseRole for an existing role ADOPTS it — the operator alters every
+# attribute to match the manifest, including attributes the manifest omits
+# (omitted memberships are revoked, omitted connectionLimit resets to -1,
+# omitted validUntil becomes infinity). validUntil is omitted on purpose:
+# app identities never expire.
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: cnpg-db-role-payment
+  namespace: product
+spec:
+  cluster:
+    name: cnpg-db
+  name: payment
+  comment: "payment-service application role (RFC-0012)"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: true
+  replication: false
+  bypassrls: false
+  connectionLimit: -1
+  inRoles: []
+  passwordSecret:
+    name: cnpg-db-payment-secret
+  # retain: deleting this CR must never DROP a production role.
+  databaseRoleReclaimPolicy: retain
+---
+# Payment Database — created declaratively (the cluster predates payment, so
+# postInitSQL cannot create it) with the same baseline extensions.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: payment-database
+  namespace: product
+spec:
+  name: payment
+  owner: payment
+  cluster:
+    name: cnpg-db
+  extensions:
+    - name: pgaudit
+    - name: pg_stat_statements
+  # retain: deleting this CR must never DROP a production database.
+  databaseReclaimPolicy: retain

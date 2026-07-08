@@ -29,6 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Per-service database triplet — payment pilot (RFC-0012 P1, ADR-013)**: new
+  `clusters/cnpg-db/services/payment.yaml` declares ExternalSecret +
+  fully-specified `DatabaseRole` + `Database` (reclaim `retain`); the inline
+  `managed.roles` stanza is gone from `instance.yaml` and the payment
+  `Database` CR moved out of `extensions.yaml`. New deep-dive
+  `docs/databases/012-declarative-role-management.md`.
 - **RFC-0013 — app-metrics cardinality audit & streaming-aggregation scale
   playbook**: audit of all 9 services' custom metrics (verdicts + defect table
   D1–D5; measured baseline 2,777 series @ 1 replica; payment missing from the

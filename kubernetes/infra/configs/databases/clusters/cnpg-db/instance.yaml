@@ -138,17 +138,10 @@ spec:
         - CREATE USER "order" WITH PASSWORD '0rd3r-K1nd-2026!';
         - CREATE DATABASE "order" OWNER "order";
 
-  # Roles added AFTER the cluster was first initialized must be managed
-  # declaratively — postInitSQL only runs on an empty-PVC initdb, so it can
-  # never create them on a running cluster. The password comes from the
-  # basic-auth secret ESO renders from the same OpenBAO seed as the app copy.
-  managed:
-    roles:
-      - name: payment
-        ensure: present
-        login: true
-        passwordSecret:
-          name: cnpg-db-payment-secret
+  # Roles live in per-service DatabaseRole CRs under services/ (RFC-0012,
+  # ADR-013) — do not re-add an inline managed.roles entry except as the
+  # deliberate rollback lever: an inline entry with the same role name takes
+  # precedence and flips the DatabaseRole to applied: false.
 
   storage:
     size: 10Gi

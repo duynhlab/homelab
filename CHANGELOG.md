@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **pg_hba connection isolation (RFC-0012 P4, ADR-015)**: `cnpg-db` now
+  rejects every cross-service connection at the front door — one allow per
+  (role, database) pair (`hostssl` for payment, `host` for the non-TLS
+  pgdog/migration pairs) + trailing reject, declarative in the Cluster
+  spec, applied by reload. RFC-0012 → implemented.
 - **initdb minimalized + product triplet + recipe (RFC-0012 P3)**: the
   cleartext `postInitSQL` block is gone from `instance.yaml` (grep gate:
   no `WITH PASSWORD` under `kubernetes/`); `services/product.yaml` adopts

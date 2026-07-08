@@ -32,6 +32,23 @@ spec:
       - pg_stat_statements
       - auto_explain
 
+    # Connection isolation (RFC-0012 P4, ADR-015): each service role connects
+    # only to its own database. CNPG inserts these BETWEEN its fixed rules
+    # (local peer for instance manager/exporter, cert-based hostssl for
+    # streaming_replica) and its default host-all catch-all — so the trailing
+    # reject preempts the catch-all without touching operator paths.
+    # First match wins. `host` (not hostssl) for the pgdog/migration pairs:
+    # those clients connect without TLS today; tighten per-pair to hostssl
+    # once pooler upstream TLS lands. Applied by reload, not restart.
+    # Adding a service? Add its allow line ABOVE the reject (the one
+    # exception to "never touch instance.yaml" — HBA is cluster infra).
+    pg_hba:
+      - hostssl payment payment all scram-sha-256
+      - host    product product all scram-sha-256
+      - host    cart    cart    all scram-sha-256
+      - host    order   order   all scram-sha-256
+      - host    all     all     all reject
+
     synchronous:
       method: any
       number: 1

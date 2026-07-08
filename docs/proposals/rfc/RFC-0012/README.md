@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| implementable | infra | 2026-07-05 | 2026-07-08 |
+| implemented | infra | 2026-07-05 | 2026-07-08 |
 
 > **Origin:** a CloudNativePG v1.30.0 release review (June 2026) surfaced the new
 > `DatabaseRole` CRD — and, while mapping it against this platform, an archaeology
@@ -444,9 +444,24 @@ flowchart TB
   (`docs/databases/runbooks/add-service-database.md`); docs/002 CNPG
   sections rewritten. The kind-rebuild + restore drills (P3's definition
   of done) run at the next bring-up.
+- 2026-07-08 — **P4 landed, RFC implemented:** declarative `pg_hba` on
+  `cnpg-db` — one allow per (role, database) pair (`hostssl` for payment,
+  `host` for the non-TLS pgdog/migration pairs) + trailing reject
+  ([ADR-015](../../adr/ADR-015-pg-hba-connection-isolation/)). Spawned ADRs:
+  [013](../../adr/ADR-013-per-service-db-triplet/) ·
+  [014](../../adr/ADR-014-pooler-credentials-valuesfrom/) ·
+  [015](../../adr/ADR-015-pg-hba-connection-isolation/). Deferred/tracked:
+  live-cluster drill backlog (P2 rotation, P3 rebuild + restore parity, P4
+  isolation matrix) runs at next bring-up; `host`→`hostssl` tightening waits
+  on PgDog upstream TLS; DatabaseRole-stuck alert rule is a non-blocking
+  follow-up.
 
 ## Related
 
+- Spawned ADRs: [ADR-013](../../adr/ADR-013-per-service-db-triplet/) (per-service
+  triplet) · [ADR-014](../../adr/ADR-014-pooler-credentials-valuesfrom/) (pooler
+  credentials via valuesFrom) ·
+  [ADR-015](../../adr/ADR-015-pg-hba-connection-isolation/) (pg_hba isolation)
 - [RFC-0008](../RFC-0008/) — production secrets hardening (cleartext removal
   and rotation land there conceptually; this RFC executes the DB slice)
 - [RFC-0005](../RFC-0005/) — supporting-shared-db (Zalando) future; explicitly

@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CloudNativePG operator 1.29.1 → 1.30.0 (RFC-0012 P0)**: chart pinned to
+  0.29.0 so chart-managed CRDs stay coherent with the image; ships three
+  security fixes (CVE-2026-55765 SCRAM-encoded role DDL, CVE-2026-55769 pinned
+  `search_path` on pooled connections, GHSA-7qwx-x8ff-3px9 ECDSA-gated
+  instance-manager endpoints) and serves the new `DatabaseRole` CRD.
 - **docs/api area refactor**: new area hub `docs/api/README.md`; `api.md`
   thinned to the pure payload reference (seed data → `platform/setup.md`,
   pgx driver rationale → `databases/002-database-integration.md`, duplicate

@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | infra | 2026-07-05 | 2026-07-05 |
+| implementable | infra | 2026-07-05 | 2026-07-08 |
 
 > **Origin:** a CloudNativePG v1.30.0 release review (June 2026) surfaced the new
 > `DatabaseRole` CRD — and, while mapping it against this platform, an archaeology
@@ -416,6 +416,11 @@ flowchart TB
 
 - 2026-07-05 — RFC created (provisional) from the CNPG 1.30 release review and
   the `cnpg-db` four-generation archaeology.
+- 2026-07-08 — Open decisions resolved (triplet placement: centralized under
+  `clusters/cnpg-db/services/`; take 1.30.0 immediately at P0; P4 is
+  `pg_hba`-only, no `REVOKE` layer; `clientCertificate` stays deferred).
+  Status → implementable. **P0 landed:** operator 1.29.1 → 1.30.0 (chart
+  pinned to 0.29.0), `DatabaseRole` CRD served.
 
 ## Related
 

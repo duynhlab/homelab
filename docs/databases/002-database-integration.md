@@ -18,9 +18,9 @@
 |----------------------------|-----------|-------------------|-----------------|------------|--------------------------|------------------------------------|
 | Zalando Postgres Operator  | v1.15.1   | auth-db           | 17              | 3 (HA)     | PgBouncer Sidecar        | 3 instances                        |
 | Zalando Postgres Operator  | v1.15.1   | supporting-shared-db     | 16              | 1          | PgBouncer Sidecar        | 3 instances                        |
-| CloudNativePG Operator     | v1.29.1   | cnpg-db                  | 18              | 3 (HA)     | PgDog Standalone         | product, cart, order; sync (ANY 1). payment also lives here but connects direct-TLS (bypasses PgDog) |
-| CloudNativePG Operator     | v1.29.1   | cnpg-db-replica          | 18              | 1          | —                        | DR replica; object-store recovery    |
-| CloudNativePG Operator     | v1.29.1   | temporal-db              | 18              | 1          | —                        | Temporal server backing store (namespace `temporal`); no backups / no WAL archiving yet |
+| CloudNativePG Operator     | v1.30.0   | cnpg-db                  | 18              | 3 (HA)     | PgDog Standalone         | product, cart, order; sync (ANY 1). payment also lives here but connects direct-TLS (bypasses PgDog) |
+| CloudNativePG Operator     | v1.30.0   | cnpg-db-replica          | 18              | 1          | —                        | DR replica; object-store recovery    |
+| CloudNativePG Operator     | v1.30.0   | temporal-db              | 18              | 1          | —                        | Temporal server backing store (namespace `temporal`); no backups / no WAL archiving yet |
 ---
 
 ## Database Architecture
@@ -33,7 +33,7 @@ The system uses **4 operational PostgreSQL clusters** + **1 DR replica** (**5 cl
 flowchart TB
     subgraph Operators["PostgreSQL Operators"]
         Zalando["Zalando Operator v1.15.1 - 2 clusters"]
-        CloudNativePG["CloudNativePG Operator v1.29.1 - 3 clusters<br/>(cnpg-db, cnpg-db-replica, temporal-db)"]
+        CloudNativePG["CloudNativePG Operator v1.30.0 - 3 clusters<br/>(cnpg-db, cnpg-db-replica, temporal-db)"]
     end
     
     subgraph Services["Microservices by Namespace"]
@@ -145,7 +145,7 @@ flowchart TB
 
 ### Overview
 
-**CloudNativePG Operator** (v1.29.1) is a Kubernetes-native operator for PostgreSQL with its own built-in Instance Manager for high availability. It does **not** use Patroni -- the operator itself handles failover, promotion, and lifecycle management through the Kubernetes API.
+**CloudNativePG Operator** (v1.30.0) is a Kubernetes-native operator for PostgreSQL with its own built-in Instance Manager for high availability. It does **not** use Patroni -- the operator itself handles failover, promotion, and lifecycle management through the Kubernetes API.
 
 **Key Features:**
 - Kubernetes-native CRDs for cluster management

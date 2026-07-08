@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **cart/order triplets + pooler valuesFrom + password rotation (RFC-0012
+  P2, ADR-014)**: `services/cart.yaml` + `services/order.yaml` (basic-auth
+  ESO secrets replace the Opaque copies); PgDog HelmRelease loses its four
+  inline cleartext passwords — per-user Flux `valuesFrom` targetPath
+  injection from the same ESO Secrets; all four cnpg-db passwords rotated
+  in the OpenBAO seed; new runbook
+  `docs/databases/runbooks/rotate-cnpg-service-password.md`.
 - **Per-service database triplet — payment pilot (RFC-0012 P1, ADR-013)**: new
   `clusters/cnpg-db/services/payment.yaml` declares ExternalSecret +
   fully-specified `DatabaseRole` + `Database` (reclaim `retain`); the inline

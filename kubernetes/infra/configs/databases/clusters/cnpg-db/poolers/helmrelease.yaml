@@ -3,9 +3,10 @@
 # LSN monitoring: detects replication lag, bans lagging replicas
 # Prepared statements: extended mode (no prefer_simple_protocol needed)
 #
-# SECURITY NOTE: Inline passwords (dev-only).
-# Vault-backed secret: pgdog-cnpg-credentials (namespace: product)
-# OpenBAO path: secret/data/local/databases/pgdog-cnpg/credentials
+# User passwords come from the per-service ESO basic-auth Secrets via Flux
+# valuesFrom targetPath (RFC-0012 P2, ADR-014) — no credentials in values.
+# helm-controller re-reads valuesFrom only at reconcile time: after a
+# password rotation, run `flux reconcile helmrelease pgdog-cnpg -n product`.
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -30,6 +31,25 @@ spec:
   upgrade:
     remediation:
       retries: 3
+  # Indices are positional against values.users below — keep both lists in
+  # the same order: [0]=product, [1]=cart, [2]=order, [3]=payment.
+  valuesFrom:
+    - kind: Secret
+      name: cnpg-db-secret
+      valuesKey: password
+      targetPath: "users[0].password"
+    - kind: Secret
+      name: cnpg-db-cart-secret
+      valuesKey: password
+      targetPath: "users[1].password"
+    - kind: Secret
+      name: cnpg-db-order-secret
+      valuesKey: password
+      targetPath: "users[2].password"
+    - kind: Secret
+      name: cnpg-db-payment-secret
+      valuesKey: password
+      targetPath: "users[3].password"
   values:
     replicas: 3
     port: 6432
@@ -85,20 +105,17 @@ spec:
             port: 5432
             poolSize: 30
 
-    # MUST match PostgreSQL role passwords + OpenBAO seed (openbao-bootstrap configmap)
+    # Passwords injected per-user by spec.valuesFrom (order must match the
+    # targetPath indices above).
     users:
       - name: product
         database: product
-        password: "Pr0duct-K1nd-2026!"
       - name: cart
         database: cart
-        password: "C4rt-K1nd-2026!"
       - name: order
         database: order
-        password: "0rd3r-K1nd-2026!"
       - name: payment
         database: payment
-        password: "P4ym3nt-K1nd-2026!"
 
     resources:
       requests:

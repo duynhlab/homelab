@@ -428,6 +428,15 @@ flowchart TB
   `docs/databases/012-declarative-role-management.md` added. Live-cluster
   adoption verification (pg_authid snapshot diff, `applied: true`, payment
   e2e) pending the next kind bring-up.
+- 2026-07-08 — **P2 landed:** cart + order migrated to triplets
+  (basic-auth ESO secrets replace the Opaque copies); **scope widened over
+  the RFC text** — the PgDog HelmRelease carried inline cleartext passwords
+  for all four users, so the pooler moved to Flux `valuesFrom` targetPath
+  injection ([ADR-014](../../adr/ADR-014-pooler-credentials-valuesfrom/))
+  and **all four** passwords rotated in the OpenBAO seed (not just
+  cart/order). Rotation runbook:
+  `docs/databases/runbooks/rotate-cnpg-service-password.md`. Live rotation
+  choreography executes at the next kind bring-up.
 
 ## Related
 

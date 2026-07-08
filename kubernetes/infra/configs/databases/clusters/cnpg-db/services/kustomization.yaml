@@ -5,4 +5,6 @@ kind: Kustomization
 # ExternalSecret + DatabaseRole + Database. Adding a service database means
 # adding one file here, never editing instance.yaml.
 resources:
+  - cart.yaml
+  - order.yaml
   - payment.yaml

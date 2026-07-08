@@ -6,7 +6,7 @@ database is created by SQL in Git, and no credential ever appears in a manifest.
 
 | | |
 |---|---|
-| **Status** | Rolling out via [RFC-0012](../proposals/rfc/RFC-0012/) — payment migrated (P1); cart/order + rotation (P2), product + initdb cleanup (P3), pg_hba isolation (P4) **planned** |
+| **Status** | Rolling out via [RFC-0012](../proposals/rfc/RFC-0012/) — payment/cart/order migrated (P1–P2); product + initdb cleanup (P3), pg_hba isolation (P4) **planned** |
 | **Decision record** | [ADR-013 — per-service database triplet](../proposals/adr/ADR-013-per-service-db-triplet/) |
 | **Operator** | CloudNativePG v1.30.0 (`DatabaseRole` CRD since 1.30) |
 | **Cluster** | `cnpg-db` (namespace `product`); DR replica `cnpg-db-replica` receives roles/databases via WAL, no CRs of its own |
@@ -104,8 +104,8 @@ Replica behavior: roles and databases replicate through WAL to
 | Service | Mechanism today | Target phase |
 |---------|-----------------|--------------|
 | payment | triplet (`services/payment.yaml`) | **P1 — landed** |
-| cart | `postInitSQL` (cleartext in Git) + Opaque ESO secret | P2 (planned) — triplet + password rotation |
-| order | `postInitSQL` (cleartext in Git) + Opaque ESO secret | P2 (planned) — triplet + password rotation |
+| cart | triplet (`services/cart.yaml`) | **P2 — landed** (live rotation runs at next bring-up) |
+| order | triplet (`services/order.yaml`) | **P2 — landed** (live rotation runs at next bring-up) |
 | product | `bootstrap.initdb` + `cnpg-db-secret` | P3 (planned) — triplet adopts the initdb-created role |
 
 ## Operations
@@ -120,8 +120,7 @@ Replica behavior: roles and databases replicate through WAL to
   copy any memberships into `inRoles`, merge the CR and the removal of any
   inline entry in the same PR, then diff the snapshot after (`rolpassword`
   changes are expected — `ALTER ROLE` re-salts the SCRAM verifier).
-- **Rotate a password:** runbook (P2)
-  `docs/databases/runbooks/rotate-cnpg-service-password.md`. Short form: new
+- **Rotate a password:** [runbook](./runbooks/rotate-cnpg-service-password.md). Short form: new
   version in OpenBAO → force ESO sync → CNPG applies `ALTER ROLE` via reload
   label → reconcile the PgDog HelmRelease → rollout-restart the app.
 - **Watch:** `kubectl get databaseroles,databases -n product` — anything
@@ -142,4 +141,4 @@ Replica behavior: roles and databases replicate through WAL to
 
 ---
 
-_Last updated: 2026-07-08 (RFC-0012 P1)_
+_Last updated: 2026-07-08 (RFC-0012 P2)_

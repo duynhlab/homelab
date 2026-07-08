@@ -80,11 +80,14 @@ moving to the next step.
 
    ```bash
    flux reconcile helmrelease pgdog-cnpg -n product
+   kubectl rollout restart deploy/pgdog-cnpg -n product
    kubectl rollout status deploy/pgdog-cnpg -n product
    ```
 
-   If the pods did not roll (chart without a config-checksum annotation),
-   `kubectl rollout restart deploy/pgdog-cnpg -n product`.
+   The restart is **mandatory**: the pgdog chart (verified on v0.39 via
+   `helm template`) puts `users.toml` in a Secret but stamps no
+   config-checksum annotation on the Deployment, so a values change alone
+   never rolls the pods.
 
 5. **Restart the app** so env-injected credentials refresh:
 

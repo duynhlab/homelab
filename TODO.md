@@ -70,7 +70,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 - [x] **Actionable alerts with runbook links** — 30+ PrometheusRules across microservices, Kubernetes, PostgreSQL, Valkey, Kong, cert-manager, VictoriaMetrics, Flux with runbook_url annotations
 - Anomaly detection and synthetic monitoring
 - [~] **Exemplars: link metrics → traces in Grafana** — Tempo→metrics/logs correlation configured (tracesToMetrics, tracesToLogs in datasources); metrics→traces via exemplars not yet wired
-- **Extract the shared HTTP-metrics middleware into `duynhlab/pkg`** (e.g. `pkg/metricsx`) — `middleware/prometheus.go` is copy-pasted across all 9 service repos with no drift guard (RFC-0013 D3). Harden the reference in the same move: bound the `method` label to known HTTP verbs (unbounded attacker-controlled label values today), `defer` the in-flight `Dec()` (handler panic leaks the gauge), skip negative `ContentLength` observations (chunked requests), gate exemplars on `IsSampled()` — then fan the single copy back out
+- [~] **Extract the shared HTTP-metrics middleware into `duynhlab/pkg`** — superseded by [RFC-0014](docs/proposals/rfc/RFC-0014/) D-11: `pkg/obsx` v2 `SetupObservability` absorbs the metrics middleware together with tracing/logging/resource init (P0), and the client_golang copies are deleted at P3/P5; the hardening items (method allowlist, deferred Dec, ContentLength guard) carry into the OTel middleware equivalent
 - Log-based alerting (VictoriaLogs alerting rules → VMAlert)
 - OpenTelemetry integration with Prometheus naming (VMAgent + OTel Collector metrics pipeline)
 - [x] **Grafana Operator** — `kubernetes/infra/controllers/metrics/grafana-operator.yaml`, `kubernetes/infra/configs/monitoring/grafana/`:

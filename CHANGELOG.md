@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **RFC-0014 — full OpenTelemetry adoption** (provisional): migrate all 9
+  services + order-worker (checkout-service exempt) to OTLP push for
+  metrics/logs/traces through the existing otel-collector, with semconv
+  naming adopted via VictoriaMetrics' `-opentelemetry.usePrometheusNaming`;
+  decisions D-1…D-14, phases P0–P5 (dual-emit, never a flag day), consumer
+  blast-radius checklist in `RFC-0014/tracking.md` (17 alerts, 15 recording
+  rules, mop SLIs, 27 dashboard panels, 19 docs files). Supersedes the
+  observability review's hybrid verdict and RFC-0013's D3 middleware-extract
+  tracker; RFC-0013's streamAggr pilot proceeds unchanged until P5.
+
 ### Changed
 
 - **CloudNativePG operator 1.29.1 → 1.30.0 (RFC-0012 P0)**: chart pinned to

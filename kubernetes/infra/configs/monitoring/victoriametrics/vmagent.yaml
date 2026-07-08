@@ -23,6 +23,31 @@ spec:
       cpu: 200m
       memory: 256Mi
 
+  # RFC-0014 P1 (D-3): OTLP-pushed series carry resource-attr labels
+  # (service_name, k8s_namespace_name after Prometheus-naming translation);
+  # copy them onto the app/namespace labels every alert, recording rule and
+  # dashboard groups by. regex (.+) guards scraped series (empty source label
+  # never matches, so their existing app/namespace values are untouched).
+  inlineRelabelConfig:
+    - action: replace
+      source_labels: [service_name]
+      regex: "(.+)"
+      target_label: app
+    - action: replace
+      source_labels: [k8s_namespace_name]
+      regex: "(.+)"
+      target_label: namespace
+
   extraArgs:
     # Scrape interval matches the existing Prometheus config
     promscrape.suppressDuplicateScrapeTargetErrors: "true"
+    # RFC-0014 P1 (D-1/D-2): OTLP ingest on :8429/opentelemetry/v1/metrics.
+    # usePrometheusNaming: http.server.request.duration (s) → PromQL name
+    # http_server_request_duration_seconds_*. promoteAll* defaults to TRUE
+    # upstream — the explicit false + allowlist is the churn-bomb guard
+    # (SDK-default service.instance.id/process.pid would re-mint every series
+    # each restart). Scope metadata off: otel_scope_* labels have no consumer.
+    opentelemetry.usePrometheusNaming: "true"
+    opentelemetry.promoteAllResourceAttributes: "false"
+    opentelemetry.promoteResourceAttributes: "service.name,service.version,k8s.namespace.name,k8s.pod.name,deployment.environment.name"
+    opentelemetry.promoteScopeMetadata: "false"

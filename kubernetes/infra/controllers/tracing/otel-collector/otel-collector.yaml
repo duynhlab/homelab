@@ -58,6 +58,15 @@ spec:
           tls:
             insecure: true
           compression: gzip
+        otlphttp/victoriametrics:
+          # RFC-0014 P1: semconv app metrics (dual-emit) → vmagent's OTLP ingest,
+          # NOT VMSingle direct — vmagent keeps the single choke point for
+          # relabeling (service_name→app) and the RFC-0013 streamAggr pilot.
+          # HTTP protobuf only (VM accepts neither OTLP/gRPC nor JSON).
+          metrics_endpoint: http://vmagent-victoria-metrics.monitoring.svc.cluster.local:8429/opentelemetry/v1/metrics
+          tls:
+            insecure: true
+          compression: gzip
       extensions:
         health_check:
           endpoint: 0.0.0.0:13133
@@ -70,8 +79,12 @@ spec:
           timeout: 5s
         memory_limiter:
           check_interval: 1s
-          limit_mib: 200
-          spike_limit_mib: 50
+          limit_mib: 400
+          spike_limit_mib: 100
+        # RFC-0014 D-5: defensive — cumulative is the SDK default, but a delta
+        # sample stored in VM silently breaks rate().
+        deltatocumulative:
+          max_stale: 5m
       receivers:
         otlp:
           protocols:
@@ -99,6 +112,15 @@ spec:
             - otlphttp/victorialogs
             processors:
             - memory_limiter
+            - batch
+            receivers:
+            - otlp
+          metrics:
+            exporters:
+            - otlphttp/victoriametrics
+            processors:
+            - memory_limiter
+            - deltatocumulative
             - batch
             receivers:
             - otlp
@@ -148,10 +170,10 @@ spec:
     resources:
       limits:
         cpu: 200m
-        memory: 256Mi
+        memory: 512Mi
       requests:
         cpu: 50m
-        memory: 64Mi
+        memory: 128Mi
     service:
       type: ClusterIP
     serviceAccount:

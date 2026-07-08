@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **OTLP metrics pipeline (RFC-0014 P1a)**: otel-collector gains a `metrics`
+  pipeline (`memory_limiter → deltatocumulative → batch`) exporting to
+  vmagent's OTLP ingest (`:8429/opentelemetry/v1/metrics`, HTTP protobuf);
+  vmagent gets the D-1/D-2 flags (`usePrometheusNaming`,
+  `promoteAllResourceAttributes=false` + allowlist, `promoteScopeMetadata=false`
+  — the upstream defaults promote everything) and the regex-guarded
+  `service_name→app` / `k8s_namespace_name→namespace` relabel (D-3);
+  local-stack mirrors both (collector `metrics/apps` pipeline + VM flags).
+  No service pushes yet — canary follows in P1b.
+
+
 ### Changed
 
 - **`docs/observability/opentelemetry.md` → instrumentation policy page

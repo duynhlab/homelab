@@ -103,8 +103,8 @@ pattern) + `.vi.md`. Plus exemplar-claim corrections (D-14) and
 |---|---|---|
 | `servicemonitors/microservices.yaml` | trim selector to checkout-service only (D-13) | pending |
 | `podmonitors/podmonitor-order-worker.yaml` | retire | pending |
-| vmagent CR | flags D-1/D-2 + relabel D-3 (lands in **P1**, before any push) | pending |
-| otel-collector HelmRelease | metrics pipeline + resources + VL-Stream-Fields header | pending |
+| vmagent CR | flags D-1/D-2 + relabel D-3 (lands in **P1**, before any push) | **done (P1a)** — usePrometheusNaming, promoteAll=false + allowlist, promoteScopeMetadata=false, regex-guarded relabel |
+| otel-collector HelmRelease | metrics pipeline + resources + VL-Stream-Fields header | **metrics pipeline + resources done (P1a)** — VL-Stream-Fields header comes with P4 |
 
 ---
 _Last updated: 2026-07-08 — initial inventory (measured at main `a862b6f`)._

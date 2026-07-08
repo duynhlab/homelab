@@ -421,6 +421,13 @@ flowchart TB
   `pg_hba`-only, no `REVOKE` layer; `clientCertificate` stays deferred).
   Status → implementable. **P0 landed:** operator 1.29.1 → 1.30.0 (chart
   pinned to 0.29.0), `DatabaseRole` CRD served.
+- 2026-07-08 — **P1 landed:** payment migrated to the per-service triplet
+  (`services/payment.yaml`), inline `managed.roles` removed from
+  `instance.yaml`; pattern recorded as
+  [ADR-013](../../adr/ADR-013-per-service-db-triplet/); deep-dive doc
+  `docs/databases/012-declarative-role-management.md` added. Live-cluster
+  adoption verification (pg_authid snapshot diff, `applied: true`, payment
+  e2e) pending the next kind bring-up.
 
 ## Related
 

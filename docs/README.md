@@ -22,7 +22,7 @@ docs/
 │   ├── adr/                      # Architecture Decision Records
 │   │   ├── README.md             # ADR conventions + index
 │   │   ├── ADR-0000-template/    # template
-│   │   └── ADR-001 … ADR-012     # Temporal ×2, JWT-in-services (superseded), OpenBAO audit/HA, RS256+edge-auth, payment ledger, mockpay, saga authorize/capture, shared idempotency, detect-only recon, recon auto-heal
+│   │   └── ADR-001 … ADR-013     # Temporal ×2, JWT-in-services (superseded), OpenBAO audit/HA, RS256+edge-auth, payment ledger, mockpay, saga authorize/capture, shared idempotency, detect-only recon, recon auto-heal
 │   ├── rfc/                      # Requests for Comments
 │   │   ├── README.md             # process + index + backlog
 │   │   ├── RFC-0000/             # template
@@ -323,7 +323,7 @@ docs/
 - [RFC-0009: Production-grade API gateway (signed JWT + Kong edge auth)](./proposals/rfc/RFC-0009/) - Partially implemented; supersedes ADR-003 via ADR-006
 - [RFC-0010: Payment service (PaymentIntent, ledger, charge/refund saga step)](./proposals/rfc/RFC-0010/) - Implemented; P1–P6 landed (ledger, outbox, mockpay, webhooks, saga wiring, reconciliation, cluster GitOps, frontend read path) → ADR-007…011
 - [RFC-0011: Homelab migration — Kind to bare-metal Talos](./proposals/rfc/RFC-0011/) - Provisional; 1 → 3 node HA path
-- [RFC-0012: Declarative CNPG role & database management](./proposals/rfc/RFC-0012/) - Provisional; converge on CNPG `DatabaseRole`/`Database` CRDs
+- [RFC-0012: Declarative CNPG role & database management](./proposals/rfc/RFC-0012/) - Implementable (P0–P1 landed); converge on CNPG `DatabaseRole`/`Database` CRDs
 - [RFCs](./proposals/rfc/) - Propose & track substantial changes (process + index + backlog)
 
 ### Decisions (ADRs)
@@ -341,6 +341,7 @@ docs/
 - [ADR-010: Extract idempotency into a shared pkg/idempotency library](./proposals/adr/ADR-010-shared-idempotency-library/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
 - [ADR-011: Ship reconciliation detect-only; defer auto-heal](./proposals/adr/ADR-011-detect-only-reconciliation/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
 - [ADR-012: Auto-heal one reconciliation class (lost-capture-response window)](./proposals/adr/ADR-012-reconciliation-auto-heal/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/); supersedes the detect-only stance of ADR-011 for a single drift class (off by default)
+- [ADR-013: Per-service database triplet on cnpg-db](./proposals/adr/ADR-013-per-service-db-triplet/) - Accepted; from [RFC-0012](./proposals/rfc/RFC-0012/); ExternalSecret + DatabaseRole + Database, one file per service
 
 ### Payments
 
@@ -363,6 +364,7 @@ docs/
     - [Restore & Failover Drills](./databases/010.2-restore-and-failover-drills.md) - drill cadence, roles, and evidence log
     - [Cross-Region / Cross-Zone DR](./databases/010.3-cross-region-dr.md) - roadmap to independent failure domains
     - [Emergency Recovery](./databases/010.4-emergency-recovery.md) - "start here when it's down" runbook
+- [Declarative Role & Database Management](./databases/012-declarative-role-management.md) - Per-service triplet (ExternalSecret + DatabaseRole + Database) on cnpg-db; RFC-0012 rollout state
 - [PostgreSQL Further Reading](./databases/011-documents.md) - Curated external references
 - [PostgreSQL Internals](./databases/001-postgresql-internals.md) - Deep dive using cnpg-db examples
 

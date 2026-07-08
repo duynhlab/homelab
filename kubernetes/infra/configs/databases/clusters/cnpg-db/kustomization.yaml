@@ -6,9 +6,7 @@ kind: Kustomization
 # Order: secrets -> instance -> services (triplets) -> extensions -> poolers -> monitoring -> backup
 resources:
   - secrets/cnpg-db-secret.yaml
-  - secrets/cnpg-db-cart-secret.yaml
   - secrets/cnpg-db-cart-secret-cart-ns.yaml
-  - secrets/cnpg-db-order-secret.yaml
   - secrets/cnpg-db-order-secret-order-ns.yaml
   - secrets/cnpg-db-payment-secret-payment-ns.yaml
   - secrets/pgdog-cnpg-credentials.yaml

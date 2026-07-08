@@ -39,3 +39,4 @@ settled decisions.
 | [ADR-011](ADR-011-detect-only-reconciliation/) | Ship reconciliation detect-only; defer auto-heal | Accepted (heal for one class added by [ADR-012](ADR-012-reconciliation-auto-heal/)) | [RFC-0010](../rfc/RFC-0010/) |
 | [ADR-012](ADR-012-reconciliation-auto-heal/) | Auto-heal one reconciliation class — the lost-capture-response window | Accepted | [RFC-0010](../rfc/RFC-0010/) |
 | [ADR-013](ADR-013-per-service-db-triplet/) | Per-service database triplet (ExternalSecret + DatabaseRole + Database) on cnpg-db | Accepted | [RFC-0012](../rfc/RFC-0012/) |
+| [ADR-014](ADR-014-pooler-credentials-valuesfrom/) | PgDog pooler credentials via Flux valuesFrom targetPath | Accepted | [RFC-0012](../rfc/RFC-0012/) |

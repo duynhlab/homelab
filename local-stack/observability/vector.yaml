@@ -10,6 +10,22 @@
 sources:
   docker:
     type: docker_logs
+    # RFC-0014 P4: the 9 Go services ship their own logs over OTLP (otelzap
+    # tee -> collector -> VictoriaLogs), so Vector must NOT tail them too —
+    # one line would land twice. Vector keeps every other container (infra,
+    # frontend, mockpay, gateway) and stays the fallback if a service's
+    # OTEL_LOGS_ENABLED is switched off (flip requires removing it here).
+    exclude_containers:
+      - local-stack-auth-1
+      - local-stack-user-1
+      - local-stack-product-1
+      - local-stack-cart-1
+      - local-stack-order-1
+      - local-stack-order-worker-1
+      - local-stack-review-1
+      - local-stack-shipping-1
+      - local-stack-notification-1
+      - local-stack-payment-1
 
 transforms:
   shape:

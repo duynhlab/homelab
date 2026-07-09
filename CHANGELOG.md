@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **RFC-0014 observability explainer** (`docs/observability/rfc-0014-explainer.md`):
+  a beginner-friendly, old-vs-new walkthrough of the client_golang→OpenTelemetry
+  migration — big-picture diagrams, a "central post office" Collector analogy,
+  per-signal pull-vs-push / logs / traces sections, an end-to-end request
+  sequence, the Collector governance pipeline, and correlation fields. Linked
+  from the docs index and the observability hub. The `observability/README.md`
+  Architecture diagram was redrawn in the OTel-demo style (services → Collector
+  → color-coded backends) and its app-log path corrected to the OTLP tee.
+
 ### Changed
 
 - **Docs swept to the OTLP/semconv reality (RFC-0014 P5)**: ~19 observability

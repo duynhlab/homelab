@@ -54,6 +54,7 @@ docs/
 ├── observability/                # Observability documentation
 │   ├── README.md                 # Master index + 4-pillar architecture
 │   ├── opentelemetry.md          # OpenTelemetry from zero: signals, SDK, collector, platform usage
+│   ├── rfc-0014-explainer.md     # RFC-0014 explained: old client_golang vs new OTLP (beginner, old-vs-new)
 │   ├── metrics/                  # Pillar 1: Metrics
 │   │   ├── README.md             # Hub: fundamentals, stack, architecture, coverage
 │   │   ├── metrics-apps.md       # Application + gRPC east-west metrics (RED)
@@ -199,6 +200,7 @@ docs/
 #### Observability (4 Pillars)
 
 1. **[Observability Overview](./observability/README.md)** - Master index, 4-pillar architecture
+   - **[RFC-0014 explainer](./observability/rfc-0014-explainer.md)** - old-vs-new, plain-language (start here if new)
     - Metrics, Tracing, Logging, Profiling
     - Component inventory and correlation workflow
     - Deployment and quick start
@@ -301,6 +303,7 @@ docs/
 
 #### Observability Pillars
 - [Observability Overview](./observability/README.md) - Master index, 4-pillar architecture, 3-layer service architecture + APM integration
+- [RFC-0014 explainer](./observability/rfc-0014-explainer.md) - old client_golang vs new OpenTelemetry (OTLP push), beginner-friendly
 - [Distributed Tracing](./observability/tracing/README.md) - Tempo integration
 - [Tracing Architecture](./observability/tracing/architecture.md) - Triple backend (Tempo + Jaeger + VictoriaTraces)
 - [Jaeger Guide](./observability/tracing/jaeger.md) - Jaeger UI usage, comparison with Tempo

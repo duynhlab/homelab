@@ -1,8 +1,10 @@
 # ADR-016: Metrics cutover to the OTLP push pipeline
 
 Retire the scrape pipeline for the nine platform services: the OTLP-path
-rules, SLOs and dashboard become canonical, the apps' ServiceMonitor shrinks
-to a `legacy-checkout` fence, and the order-worker PodMonitor is deleted.
+rules, SLOs and dashboard become canonical, and the apps' ServiceMonitor and
+the order-worker PodMonitor are deleted. The RFC's `legacy-checkout` fence is
+dropped at landing time — checkout-service was never integrated into the
+platform, so there is nothing to fence.
 
 | Status | Date | Related RFC |
 |--------|------|-------------|
@@ -37,11 +39,13 @@ Two facts discovered during verification shaped the cutover:
 
 One homelab commit swaps the pipeline end to end:
 
-1. **ServiceMonitor `microservices-api` → `legacy-checkout`** (D-13): scoped
-   to the `checkout` namespace only, keeping `job="microservices"` so the
-   fenced scrape-era alert group still evaluates for the exempt service. The
-   fence pre-exists checkout's deployment; its retirement condition (checkout
-   adopts obsx, or is decommissioned) is documented on the object.
+1. **ServiceMonitor `microservices-api` deleted** (D-13, amended at
+   landing): the RFC designed a `legacy-checkout` fence for the exempt
+   checkout-service, but that repo was never integrated into the platform —
+   no deployment, no namespace, no series. A fence guarding nothing is pure
+   maintenance surface, so owner decision: delete the ServiceMonitor and the
+   fenced rule group outright. If checkout ever integrates, it adopts pkg
+   obsx directly and joins the OTLP pipeline like every other service.
 2. **PodMonitor `order-worker` deleted** — the worker pushes OTLP like every
    other service; its Temporal metrics keep their names.
 3. **The P2 copies become canonical**: `alerts-otel.yaml`/`recording-rules-
@@ -79,8 +83,8 @@ the rollback is a single file.
 ## Consequences
 
 - PromQL consumers use only the semconv names; `request_duration_seconds*`
-  ingest continues solely for `app="checkout-service"` (none until checkout
-  deploys).
+  ingest stops entirely — no scrape pipeline remains for application
+  metrics.
 - Liveness semantics change: pod death is detected by heartbeat-series
   absence (~5 minutes of VictoriaMetrics staleness lag) instead of a failed
   scrape (~15 s). Accepted in D-4; the pod-kill drill runs at the next

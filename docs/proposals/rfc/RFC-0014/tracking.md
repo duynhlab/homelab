@@ -101,7 +101,7 @@ pattern) + `.vi.md`. Plus exemplar-claim corrections (D-14) and
 
 | Object | Action | Status |
 |---|---|---|
-| `servicemonitors/microservices.yaml` | trim selector to checkout-service only (D-13) | **done (P3)** — renamed `legacy-checkout`, namespace-scoped |
+| `servicemonitors/microservices.yaml` | trim selector to checkout-service only (D-13) | **done (P3, amended)** — deleted outright: checkout-service was never integrated, nothing to fence (ADR-016) |
 | `podmonitors/podmonitor-order-worker.yaml` | retire | **done (P3)** — Temporal metric names verified identical on OTLP first |
 | vmagent CR | flags D-1/D-2 + relabel D-3 (lands in **P1**, before any push) | **done (P1a)** — usePrometheusNaming, promoteAll=false + allowlist, promoteScopeMetadata=false, regex-guarded relabel |
 | otel-collector HelmRelease | metrics pipeline + resources + VL-Stream-Fields header | **metrics pipeline + resources done (P1a)** — VL-Stream-Fields header comes with P4 |

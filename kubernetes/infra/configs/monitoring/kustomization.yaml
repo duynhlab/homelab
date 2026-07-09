@@ -5,7 +5,6 @@ resources:
   - victoriametrics/
   - karma/
   - sloth/
-  - servicemonitors/microservices.yaml
   - servicemonitors/external-secrets.yaml
   - servicemonitors/tempo.yaml
   - servicemonitors/kong.yaml

@@ -1,6 +1,6 @@
 # PrometheusRule for microservice application alerts (RED/Golden Signals) on
-# the OTLP push pipeline (RFC-0014 P3 cutover — these ARE the canonical alerts;
-# the scrape-era groups retired with the cutover, except legacy-checkout below).
+# the OTLP push pipeline (RFC-0014 P3 cutover — these ARE the canonical
+# alerts; the scrape-era groups retired with the cutover).
 # Layer 1: simple threshold alerts. Layer 2 (SLO burn-rate) is Sloth — see
 # docs/observability/slo/.
 #
@@ -17,9 +17,6 @@
 #     alerts are replaced by MicroserviceGCThrash (used vs GC goal).
 #   - MicroserviceHighRestartRate is kube-state-metrics-based and lives on
 #     unchanged.
-#   - legacy-checkout: the exempt checkout-service keeps its scrape-era alerts,
-#     fenced at the bottom of this file (retirement condition in the D-13 note
-#     on servicemonitors/microservices.yaml).
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -305,50 +302,3 @@ spec:
             description: "{{ $labels.app }} heap has been within 5% of the GC goal for 15 minutes — the collector is running back-to-back. High allocation rate or an undersized heap; consider GOGC/GOMEMLIMIT tuning."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighgcpressure"
 
-    # --- legacy-checkout (D-13 fence) ---
-    # The exempt checkout-service stays on the scrape pipeline (see the
-    # legacy-checkout ServiceMonitor). These are the scrape-era alert
-    # expressions scoped to that one service; delete this group together with
-    # the ServiceMonitor when checkout adopts obsx or is decommissioned.
-    - name: legacy-checkout
-      interval: 1m
-      rules:
-        - alert: LegacyCheckoutDown
-          expr: up{job="microservices", app="checkout-service"} == 0
-          for: 1m
-          labels:
-            severity: critical
-            category: availability
-          annotations:
-            summary: "checkout-service instance down ({{ $labels.namespace }})"
-            description: "Instance {{ $labels.instance }} of checkout-service has been unreachable for more than 1 minute (legacy scrape path)."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicedown"
-
-        - alert: LegacyCheckoutHighErrorRate
-          expr: |
-            (
-              sum by (namespace) (rate(request_duration_seconds_count{job="microservices", app="checkout-service", code=~"5.."}[5m]))
-              / sum by (namespace) (rate(request_duration_seconds_count{job="microservices", app="checkout-service"}[5m]))
-            ) > 0.05
-          for: 5m
-          labels:
-            severity: warning
-            category: errors
-          annotations:
-            summary: "High 5xx error rate for checkout-service ({{ $labels.namespace }})"
-            description: "checkout-service 5xx error rate is {{ $value | humanizePercentage }} (threshold: 5%, legacy scrape path)."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehigherrorrate"
-
-        - alert: LegacyCheckoutHighLatencyP95
-          expr: |
-            histogram_quantile(0.95,
-              sum by (namespace, le) (rate(request_duration_seconds_bucket{job="microservices", app="checkout-service"}[5m]))
-            ) > 1
-          for: 10m
-          labels:
-            severity: warning
-            category: latency
-          annotations:
-            summary: "High P95 latency for checkout-service ({{ $labels.namespace }})"
-            description: "checkout-service P95 latency is {{ $value | humanizeDuration }} (threshold: 1s, legacy scrape path)."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighlatencyp95"

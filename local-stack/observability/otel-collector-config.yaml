@@ -38,11 +38,15 @@ exporters:
     tls:
       insecure: true
     compression: gzip
-  # OTel-logs pilot sink: Kong's opentelemetry plugin (access_logs_endpoint /
-  # logs_endpoint, Kong >= 3.8) posts OTLP logs here; re-export to VictoriaLogs'
-  # OTLP ingest path.
+  # OTLP logs sink (RFC-0014 P4): the 9 Go services' otelzap tee AND Kong's
+  # opentelemetry plugin post OTLP logs here; re-export to VictoriaLogs'
+  # OTLP ingest path. VL-Stream-Fields makes service.name a log-STREAM field
+  # (indexed stream identity) instead of a regular field — one stream per
+  # service, and trace_id stays a queryable regular field.
   otlphttp/victorialogs:
     logs_endpoint: http://victoria-logs:9428/insert/opentelemetry/v1/logs
+    headers:
+      VL-Stream-Fields: "service.name"
     tls:
       insecure: true
     compression: gzip

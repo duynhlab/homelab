@@ -92,6 +92,12 @@ spec:
             port: 9090
             containerPort: 9090
           <<- end >>
+        # RFC-0014 P4: this pod ships its own logs over OTLP (otelzap tee) —
+        # the label tells the Vector DaemonSet to skip its stdout (double-
+        # ingest guard). Tied to the same input as OTEL_LOGS_ENABLED so a
+        # kill-switch flip also hands the pod back to Vector.
+        labels:
+          platform.duynhlab.dev/otlp-logs: << index inputs "otel_logs_enabled" | default "true" | quote >>
         env:
           - name: SERVICE_NAME
             value: << inputs.name >>
@@ -131,6 +137,10 @@ spec:
                 fieldPath: metadata.name
           - name: DEPLOYMENT_ENVIRONMENT
             value: "production"
+          # RFC-0014 P4: OTLP logs — default on (fleet cutover); the RSIP
+          # input is the per-service kill switch (also flips the Vector label).
+          - name: OTEL_LOGS_ENABLED
+            value: << index inputs "otel_logs_enabled" | default "true" | quote >>
           # RFC-0014 P3: OTLP is the only metrics pipeline — default on
           # fleet-wide; the RSIP input remains as a per-service kill switch.
           - name: OTEL_METRICS_ENABLED

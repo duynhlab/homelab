@@ -28,6 +28,10 @@ x-svc-env: &svc-env
   # RFC-0014 P3: OTLP is the only metrics pipeline (pkg v0.17.0 defaults it
   # on; OTEL_METRICS_ENABLED=false is the kill switch).
   DEPLOYMENT_ENVIRONMENT: local
+  # RFC-0014 P4: app logs ship over OTLP fleet-wide (otelzap tee); Vector
+  # skips these containers. =false is the kill switch (re-add the container
+  # to Vector's tailing by removing it from exclude_containers too).
+  OTEL_LOGS_ENABLED: "true"
   PROFILING_ENABLED: "true"                     # local Pyroscope (disable to skip profiling)
   PYROSCOPE_ENDPOINT: http://pyroscope:4040
   LOG_LEVEL: info

@@ -41,7 +41,13 @@ spec:
     args: ["worker"]
     service:
       enabled: false
+    # RFC-0014 P4: the worker ships its own logs over OTLP — Vector skips
+    # pods carrying this label (double-ingest guard).
+    labels:
+      platform.duynhlab.dev/otlp-logs: "true"
     env:
+      - name: OTEL_LOGS_ENABLED
+        value: "true"
       - name: SERVICE_NAME
         value: order-worker
       - name: PORT

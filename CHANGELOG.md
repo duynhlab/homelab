@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **gRPC access logging (RFC-0014 P4)**: `grpcx.NewServer` now takes the
+  service logger and chains a server-side access-log interceptor — one
+  structured line per incoming east-west RPC (`trace_id`, `method`, `code`,
+  `duration`, `peer`; OK→Info, else Error), through the OTLP-teed logger into
+  VictoriaLogs. Health/reflection skipped; recovered panics logged as
+  `code=Internal`. Documented in `docs/api/grpc-internal-comms.md` (§4). pkg
+  v0.18.1.
+
 ### Changed
 
 - **OTLP metrics default-on fleet-wide (RFC-0014 P3 code-removal wave)**: the

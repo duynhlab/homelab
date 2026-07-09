@@ -301,10 +301,15 @@ spec:
         # exposes no pause-time metric (verified 2026-07-09). Sustained
         # used≈goal means the pacer is constantly triggering — the same
         # GC-thrash condition the pause alerts approximated.
+        # sum by (app, namespace) is load-bearing: go_memory_used_bytes carries
+        # a go_memory_type label (stack/other) that go_memory_gc_goal_bytes
+        # lacks — a bare comparison never matches (verified live: 0 series).
+        # Summing the types slightly overcounts vs the heap-only goal;
+        # acceptable for thrash detection.
         - alert: MicroserviceGCThrashOtel
           expr: |
-            go_memory_used_bytes{app!=""}
-            > 0.95 * go_memory_gc_goal_bytes{app!=""}
+            sum by (app, namespace) (go_memory_used_bytes{app!=""})
+            > 0.95 * sum by (app, namespace) (go_memory_gc_goal_bytes{app!=""})
           for: 15m
           labels:
             severity: warning

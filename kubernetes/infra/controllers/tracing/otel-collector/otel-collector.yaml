@@ -51,10 +51,13 @@ spec:
             insecure: true
           compression: gzip
         otlphttp/victorialogs:
-          # OTel-logs pilot sink: Kong's opentelemetry plugin (logs_endpoint)
-          # posts OTLP runtime logs; re-export to VictoriaLogs' OTLP ingest.
-          # Runs alongside Vector (primary log shipper) for comparison.
+          # OTLP logs sink (RFC-0014 P4): the 9 Go services' otelzap tee AND
+          # Kong's opentelemetry plugin post OTLP logs here; re-export to
+          # VictoriaLogs. VL-Stream-Fields makes service.name the log-stream
+          # identity; trace_id stays a queryable regular field.
           logs_endpoint: http://vlsingle-victoria-logs.monitoring.svc.cluster.local:9428/insert/opentelemetry/v1/logs
+          headers:
+            VL-Stream-Fields: "service.name"
           tls:
             insecure: true
           compression: gzip

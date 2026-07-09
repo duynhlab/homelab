@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one path); the product service flips `OTEL_LOGS_ENABLED=true` as the
   canary. Verified: `trace_id:"<id>"` in VictoriaLogs returns the request's
   log lines — the broken log↔trace correlation is fixed at the root.
+- **Cluster OTLP logs pipeline (RFC-0014 P4)**: the collector's VictoriaLogs
+  exporter gains `VL-Stream-Fields: service.name`; the Vector DaemonSet
+  skips pods labeled `platform.duynhlab.dev/otlp-logs=true` (double-ingest
+  guard); the domain ResourceSets and order-worker set that label plus
+  `OTEL_LOGS_ENABLED` via a new `otel_logs_enabled` input (default `"true"`,
+  per-service kill switch that flips the label and the env together —
+  Vector resumes instantly on rollback).
 
 ### Changed
 

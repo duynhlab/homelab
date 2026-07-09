@@ -21,11 +21,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   otelgin equivalent yet; GC-pause alerts replaced by a used-vs-goal
   pacing-pressure alert.
 
+- **Cluster OTLP metrics env (RFC-0014 P1 cluster slice)**: the four domain
+  ResourceSets and the order-worker inject `K8S_NAMESPACE_NAME` +
+  `K8S_POD_NAME` (Downward API — the exact names obsx reads for the k8s
+  resource attributes) and `DEPLOYMENT_ENVIRONMENT=production`; new
+  `otel_metrics_enabled` RSIP input (default `"false"`) gates the dual-emit
+  flag, flipped `"true"` for the product canary only.
 - **OTLP metrics canary env (RFC-0014 P1b)**: local-stack `product` gets
   `OTEL_METRICS_ENABLED=true` + `DEPLOYMENT_ENVIRONMENT=local` — first
   service dual-emitting semconv metrics over OTLP (pairs with
   product-service pkg v0.16.0 adoption); fleet stays off until the canary
   soaks.
+- **OTLP metrics dual-emit env (RFC-0014 P1b/P1c)**: local-stack sets
+  `OTEL_METRICS_ENABLED=true` + `DEPLOYMENT_ENVIRONMENT=local` in the shared
+  `x-svc-env` anchor — all 9 services dual-emit semconv metrics over OTLP
+  (product canary e2e-verified first, then fleet-wide; pairs with the 9
+  service repos' pkg v0.16.0 `SetupObservability` adoption PRs).
 - **OTLP metrics pipeline (RFC-0014 P1a)**: otel-collector gains a `metrics`
   pipeline (`memory_limiter → deltatocumulative → batch`) exporting to
   vmagent's OTLP ingest (`:8429/opentelemetry/v1/metrics`, HTTP protobuf);

@@ -118,6 +118,23 @@ spec:
                 fieldPath: metadata.namespace
           - name: OTEL_RESOURCE_ATTRIBUTES
             value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME)"
+          # RFC-0014 D-2: obsx reads these exact names for the Kubernetes
+          # resource attributes on the OTLP path (k8s.namespace.name and
+          # k8s.pod.name are on vmagent's promote allowlist).
+          - name: K8S_NAMESPACE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: K8S_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: DEPLOYMENT_ENVIRONMENT
+            value: "production"
+          # RFC-0014 P1 rollout flag — default off; flip per service via the
+          # RSIP input (canary first, fleet after soak).
+          - name: OTEL_METRICS_ENABLED
+            value: << index inputs "otel_metrics_enabled" | default "false" | quote >>
           - name: PYROSCOPE_ENDPOINT
             value: << index inputs "pyroscope_endpoint" | default "http://pyroscope.monitoring.svc.cluster.local:4040" >>
           - name: LOG_LEVEL

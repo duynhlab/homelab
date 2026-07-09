@@ -660,7 +660,7 @@ kubectl port-forward -n monitoring svc/vmsingle-victoria-metrics 8428:8428
 
 # Query via curl
 curl -s 'http://localhost:8428/api/v1/query' \
-  --data-urlencode 'query=up{job="microservices"}' | jq .
+  --data-urlencode 'query=go_goroutine_count{app!=""}' | jq .   # app liveness: OTLP push has no up{}; see D-4 heartbeat
 ```
 
 ### Query Logs

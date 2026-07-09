@@ -54,8 +54,8 @@ for page size; the other three use `page_size` — to be unified.)
 ### Observability
 
 Every request is measured with the **RED method** from a single
-`request_duration_seconds` histogram, and east-west gRPC calls emit matching RED
-metrics on the same `/metrics` endpoint. How requests are instrumented, labelled,
+`http_server_request_duration_seconds` histogram, and east-west gRPC calls emit
+matching RED (`rpc_*`) metrics, all pushed over OTLP. How requests are instrumented, labelled,
 and turned into SLOs is documented in
 [observability → application metrics](../observability/metrics/metrics-apps.md).
 
@@ -1115,4 +1115,4 @@ The major version lives between the service and the audience (Variant A). Bumpin
 
 ---
 
-_Last updated: 2026-07-07 — thinned to the payload reference: seed data → platform/setup, pgx rationale → databases, roster → naming convention; stale build/HelmRelease conventions dropped._
+_Last updated: 2026-07-09 — renamed the RED histogram to semconv `http_server_request_duration_seconds` (OTLP push, RFC-0014 P3); thinned to the payload reference: seed data → platform/setup, pgx rationale → databases, roster → naming convention; stale build/HelmRelease conventions dropped._

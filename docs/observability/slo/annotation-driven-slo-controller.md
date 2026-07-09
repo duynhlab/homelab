@@ -48,7 +48,7 @@ metadata:
 
     # Optional overrides (defaults from controller config)
     slo.platform/team: "platform"
-    slo.platform/metric-name: "request_duration_seconds"
+    slo.platform/metric-name: "http_server_request_duration_seconds"
     slo.platform/job-label: "microservices"
 ```
 
@@ -62,7 +62,7 @@ metadata:
 | `slo.platform/latency-threshold` | No | `0.5` | Latency threshold (seconds) |
 | `slo.platform/error-rate-objective` | No | `99.0` | Error rate target (%) |
 | `slo.platform/team` | No | `platform` | Team label on PrometheusServiceLevel |
-| `slo.platform/metric-name` | No | `request_duration_seconds` | Base metric name |
+| `slo.platform/metric-name` | No | `http_server_request_duration_seconds` | Base metric name |
 | `slo.platform/job-label` | No | `microservices` | Prometheus job label |
 
 ## Implementation Outline
@@ -105,7 +105,7 @@ func (r *SLOReconciler) buildPrometheusServiceLevel(
     latThreshold := getString(ann, "slo.platform/latency-threshold", "0.5")
     errObj := parseFloat(ann, "slo.platform/error-rate-objective", 99.0)
     team := getString(ann, "slo.platform/team", "platform")
-    metric := getString(ann, "slo.platform/metric-name", "request_duration_seconds")
+    metric := getString(ann, "slo.platform/metric-name", "http_server_request_duration_seconds")
     job := getString(ann, "slo.platform/job-label", "microservices")
 
     psl := &slothv1.PrometheusServiceLevel{

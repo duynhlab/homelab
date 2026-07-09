@@ -13,7 +13,7 @@ service and PR must respect.
 | SDK | OpenTelemetry Go **v1.44.0**, wired by **`pkg/obsx` `SetupObservability`** (one call in `main()`) |
 | Semconv | **v1.41.0**, pinned in `pkg/obsx` — bumps only via a deliberate pkg release |
 | Collector | `otel-collector` (contrib distribution, `monitoring` namespace) |
-| Signals | Traces ✅ (all services + Kong) · Metrics 🚧 (OTLP push rolling out per RFC-0014, flag default **off**) · Logs 🚧 (otelzap bridge rolling out per RFC-0014, flag default **off**; Kong runtime-logs pilot ✅) |
+| Signals | Traces ✅ (all services + Kong) · Metrics ✅ (OTLP push, fleet-wide since RFC-0014 P3; `/metrics` scrape retired) · Logs ✅ (otelzap → OTLP, fleet-wide since RFC-0014 P4; Kong runtime-logs pilot ✅) |
 | Protocol | OTLP — HTTP/protobuf `:4318` for everything (VictoriaMetrics/VictoriaLogs accept nothing else) |
 | Propagation | W3C Trace Context (`traceparent`); Kong forces injection (`inject: [w3c]`) |
 | Sampling | 10% head sampling, `ParentBased(TraceIDRatioBased)` (see [Sampling](#sampling)) |
@@ -93,10 +93,10 @@ These are the rules; PRs that violate them get rejected. Rationale lives in
    logger := zap.New(zapcore.NewTee(stdoutCore, obs.ZapCore(serviceName, zapcore.InfoLevel)))
    ```
 
-2. **client_golang is legacy-frozen.** No new `prometheus.*`/`promauto`
-   instruments in app code — new metrics use the OTel Meter API with semconv
-   names. The existing `middleware/prometheus.go` stays untouched until the
-   RFC-0014 P3 cutover removes it.
+2. **client_golang is retired.** No `prometheus.*`/`promauto` instruments in
+   app code — metrics use the OTel Meter API with semconv names. The old
+   `middleware/prometheus.go` and its `/metrics` scrape endpoint were removed
+   at the RFC-0014 P3 cutover.
 3. **Semconv v1.41 is pinned** in `pkg/obsx`; the (SDK, contrib, semconv)
    triple bumps only as a deliberate pkg release with its integration test.
 4. **Never set `OTEL_SEMCONV_STABILITY_OPT_IN`.** Any value containing `rpc`
@@ -108,9 +108,11 @@ These are the rules; PRs that violate them get rejected. Rationale lives in
    defaults lack); `body.size` histograms use the byte set; `rpc.client.call.duration`
    drops `server.address`/`server.port` (pod-IP churn). Changing a bucket is
    an RFC-level decision, not a service PR.
-6. **Rollout flags default OFF.** `OTEL_METRICS_ENABLED` / `OTEL_LOGS_ENABLED`
-   turn signals on per service (dual-emit, canary-first). Flipping one is a
-   values change reviewed against the RFC-0014
+6. **Rollout flags are now ON fleet-wide.** `OTEL_METRICS_ENABLED` /
+   `OTEL_LOGS_ENABLED` completed their canary-first, per-service rollout at the
+   P3/P4 cutovers and are enabled fleet-wide (set via the shared svc-env
+   anchor). They remain as per-service kill switches; flipping one *off* is an
+   incident action, tracked against the RFC-0014
    [tracking table](../proposals/rfc/RFC-0014/tracking.md).
 7. **Export interval is 15 s** (`OTEL_METRIC_EXPORT_INTERVAL_SECONDS`) — it
    matches the historical scrape interval so burn-rate math never shifted.
@@ -127,12 +129,13 @@ These are the rules; PRs that violate them get rejected. Rationale lives in
 
 ## How it works in this platform
 
-Current state (traces live; metrics/logs pipelines exist, app flags off):
+The signals in flight — all three live fleet-wide since the RFC-0014 P3/P4
+cutovers (the metrics path is detailed in the next diagram):
 
 ```mermaid
 flowchart LR
     subgraph Producers
-        SVC["9 Go services<br/>obsx SetupObservability<br/>traces ✅ · metrics/logs behind flags"]
+        SVC["9 Go services<br/>obsx SetupObservability<br/>traces + logs via OTLP (metrics → next diagram)"]
         KONG["Kong gateway<br/>(opentelemetry plugin)"]
     end
     subgraph Collector["otel-collector (monitoring)"]
@@ -148,8 +151,7 @@ flowchart LR
     LP -.-> VL["VictoriaLogs"]
 ```
 
-Target state per RFC-0014 (phases P1–P4; **planned**, marked here so this doc
-never claims it early):
+The metrics path in full (live per RFC-0014 P1–P4):
 
 ```mermaid
 flowchart LR
@@ -158,19 +160,24 @@ flowchart LR
     VMA --> VMS[("VMSingle")]
     COL2 -->|"VL-Stream-Fields:<br/>service.name,k8s.namespace.name"| VLX[("VictoriaLogs<br/>trace_id = queryable field")]
     COL2 --> T3["Tempo"]
-    CHK["checkout-service (exempt)"] -->|scrape + stdout| LEGACY["legacy path<br/>(trimmed ServiceMonitor + Vector)"]
 ```
+
+> Note: the RFC designed a `legacy-checkout` scrape fence for checkout-service,
+> but checkout-service was never deployed/integrated — the fence was dropped at
+> landing (ADR-016). No app service is scraped for metrics anymore.
 
 - **Traces** — unchanged: every service exports spans via `obsx`; Kong opens
   the root span at the edge; the collector fans out to three backends.
-- **Metrics** — transitioning: today the fleet is scraped (client_golang RED
-  on `/metrics`); under the flag, services *additionally* push semconv
-  metrics over OTLP (dual-emit) until the P3 cutover. Details, mapping tables
-  and the consumer checklist: [RFC-0014](../proposals/rfc/RFC-0014/README.md).
-- **Logs** — today Vector tails stdout; under the flag, zap records tee
-  through the level-gated otelzap bridge to VictoriaLogs, where `TraceId`
-  becomes a **queryable `trace_id` field** (this is what repairs the
-  traces↔logs correlation). Vector remains for non-instrumented pods forever.
+- **Metrics** — OTLP push, fleet-wide: services emit semconv metrics through
+  the OTel Meter API to the collector, which forwards them to vmagent's OTLP
+  ingest and on to VMSingle. The `/metrics` scrape and client_golang RED were
+  removed at the P3 cutover. Exemplars are not available on this path
+  (VictoriaMetrics won't-fix, D-14). Details, mapping tables and the consumer
+  checklist: [RFC-0014](../proposals/rfc/RFC-0014/README.md).
+- **Logs** — zap records tee through the level-gated otelzap bridge to
+  VictoriaLogs, where `TraceId` becomes a **queryable `trace_id` field** (this
+  is what repairs the traces↔logs correlation). Vector remains for
+  non-instrumented pods forever.
 
 ## Sampling
 
@@ -204,8 +211,8 @@ Env vars read by `obsx.ConfigFromEnv` (injected by the app ResourceSets,
 | `DEPLOYMENT_ENVIRONMENT` | — | semconv `deployment.environment.name` |
 | `TRACING_ENABLED` | `true` | Traces kill switch per service |
 | `OTEL_SAMPLE_RATE` | `0.1` | Head-sampling ratio (root decisions) |
-| `OTEL_METRICS_ENABLED` | **`false`** | RFC-0014 P1 rollout flag — OTLP metrics + runtime instrumentation |
-| `OTEL_LOGS_ENABLED` | **`false`** | RFC-0014 P4 rollout flag — otelzap → OTLP logs |
+| `OTEL_METRICS_ENABLED` | **`true`** | OTLP metrics + runtime instrumentation — on fleet-wide since the RFC-0014 P3 cutover (kept as a kill switch) |
+| `OTEL_LOGS_ENABLED` | **`true`** | otelzap → OTLP logs — on fleet-wide since the RFC-0014 P4 cutover (kept as a kill switch) |
 | `OTEL_METRIC_EXPORT_INTERVAL_SECONDS` | `15` | PeriodicReader interval (policy #7) |
 
 Note: `OTEL_COLLECTOR_ENDPOINT` and `OTEL_SAMPLE_RATE` are platform names read
@@ -216,9 +223,9 @@ Quick verification:
 
 - **Traces arriving** — Grafana → Explore → **Tempo** → search
   `service.name = order` (or the Jaeger UI service dropdown).
-- **OTLP metrics arriving** (flagged services) — VMSingle/vmui:
+- **OTLP metrics arriving** — VMSingle/vmui:
   `http_server_request_duration_seconds_bucket{app="<svc>"}` with 13 buckets.
-- **OTLP logs arriving** (flagged services) — Explore → **VictoriaLogs** →
+- **OTLP logs arriving** — Explore → **VictoriaLogs** →
   `trace_id:"<id>"` returns the request's lines.
 - **Collector health** — `kubectl -n monitoring logs deploy/otel-collector-opentelemetry-collector`;
   zpages on `:55679`.
@@ -228,4 +235,4 @@ Quick verification:
 - Official: [opentelemetry.io/docs/concepts](https://opentelemetry.io/docs/concepts/) · [Go SDK](https://opentelemetry.io/docs/languages/go/) · [versioning & stability](https://opentelemetry.io/docs/specs/otel/versioning-and-stability/) · [Collector](https://opentelemetry.io/docs/collector/) · [sampling](https://opentelemetry.io/docs/concepts/sampling/) · [VictoriaMetrics OTel](https://docs.victoriametrics.com/victoriametrics/integrations/opentelemetry/) · [VictoriaLogs OTel](https://docs.victoriametrics.com/victorialogs/data-ingestion/opentelemetry/)
 - In-house: [RFC-0014](../proposals/rfc/RFC-0014/README.md) (design record + tracking) · [tracing/README.md](tracing/README.md) · [tracing/architecture.md](tracing/architecture.md) · [logging/README.md](logging/README.md) · [metrics/streaming-aggregation.md](metrics/streaming-aggregation.md) · [../platform/kong-gateway.md](../platform/kong-gateway.md)
 
-_Last updated: 2026-07-08 — RFC-0014 P0: promoted to the platform instrumentation policy page (obsx SetupObservability, semconv v1.41 pin, mandatory Views, rollout flags); educational core and sampling section unchanged._
+_Last updated: 2026-07-09 — RFC-0014 P5 sweep: metrics/logs now OTLP push fleet-wide (P3/P4 cutovers), `/metrics` scrape retired, checkout-service fence dropped (ADR-016), exemplars retired (D-14); educational core and sampling section unchanged._

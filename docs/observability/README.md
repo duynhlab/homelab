@@ -11,7 +11,7 @@ flowchart TD
     end
 
     subgraph pillar1 [Metrics]
-        VMAgent["VMAgent<br/>scrape"]
+        VMAgent["VMAgent<br/>OTLP ingest + infra scrape"]
         VMSingle["VMSingle :8428<br/>storage + query"]
     end
 
@@ -41,8 +41,8 @@ flowchart TD
         Sloth["Sloth Operator<br/>SLO → PrometheusRules"]
     end
 
-    MW -->|"histogram, gauge, counter"| VMAgent
-    MW -->|"OTLP HTTP :4318"| OTel
+    MW -->|"OTLP metrics + traces :4318"| OTel
+    OTel -->|"OTLP metrics"| VMAgent
     MW -->|"stdout JSON"| Vector
     MW -->|"push"| Pyroscope
 
@@ -76,11 +76,10 @@ graph TD
     A[HTTP Request] --> B[Gin Router]
     B --> C[Middleware Chain]
 
-    C --> D[TracingMiddleware<br/>Creates root span]
+    C --> D["TracingMiddleware (otelgin)<br/>root span + http.server.* metrics"]
     D --> E[LoggingMiddleware<br/>Extracts trace-id]
-    E --> F[MetricsMiddleware<br/>Records HTTP metrics]
 
-    F --> H[Web Layer v1<br/>web/v1/handler.go]
+    E --> H[Web Layer v1<br/>web/v1/handler.go]
     H --> J[Parse Request<br/>Validate Input<br/>Create Web Span]
     J --> L[Logic Layer v1<br/>logic/v1/service.go]
     L --> N[Business Logic<br/>Create Logic Span<br/>Cache-Aside]
@@ -100,7 +99,7 @@ graph TD
 
 ### End-to-End Request with APM
 
-Tracing and profiling are out-of-band: spans go through the OTel Collector before reaching Tempo/Jaeger, log lines hit stdout and are picked up by the Vector DaemonSet, and metrics are pull-based via VMAgent scrapes.
+Tracing and profiling are out-of-band: spans go through the OTel Collector before reaching Tempo/Jaeger, log lines hit stdout and are picked up by the Vector DaemonSet, and app metrics are pushed over OTLP (SDK → OTel Collector → VMAgent OTLP ingest → VMSingle) — VMAgent still scrapes the infra exporters (kube-state, cAdvisor, pg_exporter, …).
 
 ```mermaid
 sequenceDiagram
@@ -125,22 +124,22 @@ sequenceDiagram
     MW->>MW: Create root span
     MW->>OTel: Export span (OTLP HTTP :4318)
 
+    Note over MW: otelgin (in TracingMiddleware) records http.server.* metrics on response
+    MW->>OTel: Metrics (OTLP HTTP :4318)
+
     Note over MW: LoggingMiddleware
     MW->>MW: Extract trace-id
-    MW-->>Vector: stdout JSON line (request)
-
-    Note over MW: MetricsMiddleware
-    MW->>MW: Record HTTP metrics
+    MW->>OTel: Log record (zap OTLP tee, request)
 
     MW->>Web: Call handler
     Web->>Web: Parse, validate, create web span
     Web->>OTel: Export span
-    Web-->>Vector: stdout JSON line (handler)
+    Web->>OTel: Log record (OTLP tee, handler)
     Web->>Logic: Call business logic
 
     Logic->>Logic: Execute rules, create logic span
     Logic->>OTel: Export span
-    Logic-->>Vector: stdout JSON line (business)
+    Logic->>OTel: Log record (OTLP tee, business)
     Logic->>Core: DB / cache via repository
     Core-->>Logic: Domain objects
 
@@ -156,8 +155,9 @@ sequenceDiagram
     Note over Vector,VLogs: Vector ships parsed lines
     Vector->>VLogs: HTTP ingest
 
-    Note over VMAgent,VMSingle: Pull-based metrics
-    VMAgent->>MW: GET /metrics (every 30s)
+    Note over OTel,VMSingle: OTLP push metrics
+    MW->>OTel: OTLP metrics (:4318)
+    OTel->>VMAgent: OTLP forward
     VMAgent->>VMSingle: Remote write
 
     Note over Pyro: Continuous profiling (push)
@@ -195,7 +195,7 @@ func Login(c *gin.Context) {
 
 - Business logic, validation, transformation, rule enforcement
 - Cache-Aside against Valkey for read-heavy paths
-- Creates spans with `layer=logic`; custom business metrics exposed on `/metrics` (scraped by VMAgent); appears in CPU/heap profiles pushed to Pyroscope
+- Creates spans with `layer=logic`; custom business metrics emitted via the OTel Meter API and pushed over OTLP; appears in CPU/heap profiles pushed to Pyroscope
 
 ```go
 func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*domain.AuthResponse, error) {
@@ -216,7 +216,7 @@ func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*doma
 #### Core Layer (`core/`)
 
 - Domain models (`core/domain/`), DB connection (`core/database.go`, PostgreSQL via PgBouncer / PgDog), cache client (`core/cache/`, Valkey)
-- **No business logic** — pure data structures + thin infra adapters. DB/cache spans bubble up via instrumentation; pool / hit-rate metrics exposed on `/metrics`.
+- **No business logic** — pure data structures + thin infra adapters. DB/cache spans bubble up via instrumentation; pool / hit-rate metrics pushed over OTLP.
 
 ### Trace-ID Propagation
 
@@ -319,7 +319,7 @@ docs/observability/
 | Component | Namespace | Service | Port | Purpose |
 |-----------|-----------|---------|------|---------|
 | VMSingle | monitoring | `vmsingle-victoria-metrics` | 8428 | Metrics storage + Prometheus-compatible API |
-| VMAgent | monitoring | `vmagent-victoria-metrics` | 8429 | Metrics scraping (replaces Prometheus scraper) |
+| VMAgent | monitoring | `vmagent-victoria-metrics` | 8429 | OTLP metrics ingest (app push) + infra scraping (replaces Prometheus scraper) |
 | VMAlert | monitoring | `vmalert-victoria-metrics` | 8080 | Rule evaluation (alerting + recording rules) |
 | VMAlertmanager | monitoring | `vmalertmanager-victoria-metrics` | 9093 | Alert routing and notification |
 | Grafana | monitoring | `grafana-service` | 3000 | Dashboards and visualization |
@@ -345,7 +345,7 @@ sequenceDiagram
     participant P as Profiles (Pyroscope)
 
     A->>M: 1. Check dashboard -- which service, which signal?
-    M->>T: 2. Click exemplar -- jump to trace
+    M->>T: 2. Pivot by service + time window to traces
     T->>T: 3. Find slow span -- which operation?
     T->>L: 4. Copy trace_id -- search logs
     L->>L: 5. Read error context
@@ -355,7 +355,7 @@ sequenceDiagram
 
 **Key correlation mechanisms:**
 
-- **Metrics → Traces**: Exemplars on `request_duration_seconds` histogram link to trace IDs
+- **Metrics → Traces**: exemplars are **not available** (VictoriaMetrics won't-fix, RFC-0014 D-14) — pivot from a metric to traces by service + time window, or via the `trace_id` field now carried on logs (below)
 - **Traces → Logs**: `trace_id` injected into every structured log line by LoggingMiddleware
 - **Logs → Traces**: VictoriaLogs datasource derived field extracts `trace_id` and links back to Tempo
 - **Traces → Profiles**: Pyroscope labels match service name for time-correlated flamegraphs
@@ -375,7 +375,7 @@ Flux reconciliation order:
 1. **Controllers** -- operators, CRDs (VictoriaMetrics Operator, Prometheus CRDs, Grafana Operator, Sloth)
 2. **Configs** -- monitoring stack (VMSingle, VMAgent, VMAlert, Grafana, VictoriaLogs, etc.)
 3. **Tracing / Profiling** -- Tempo (`tracing-local`) and Pyroscope (`profiling-local`), each split out of the controllers wave and `dependsOn: [secrets-local, storage-local]` because they need the RustFS credentials Secret (ESO-managed) and RustFS running before they can start
-4. **Apps** -- microservices (auto-discovered by VMAgent via ServiceMonitor)
+4. **Apps** -- microservices (push OTLP metrics to the collector; no ServiceMonitor scrape for app services)
 
 ## Quick Start: Accessing the Stack
 
@@ -406,4 +406,4 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-07-07_
+_Last updated: 2026-07-09 — app metrics moved to OTLP push (RFC-0014 P3); exemplar-based metric→trace correlation retired (D-14)._

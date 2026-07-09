@@ -39,7 +39,7 @@ Default: VictoriaMetrics
 ### 2️⃣ **$app** (Application Filter)
 ```yaml
 Type: query
-Query: label_values(request_duration_seconds_count{namespace=~"$namespace"}, app)
+Query: label_values(go_goroutine_count{namespace=~"$namespace"}, app)
 Purpose: Filter by application name
 Default: All
 Include All: true
@@ -59,13 +59,13 @@ Options:
   - (auto-discover new apps)
 ```
 
-**Label Source (v0.5.0+):**
-> **Note**: The `app` label is automatically added by Prometheus during scrape from the pod's `app` label via ServiceMonitor relabel_configs. Applications do not emit this label themselves.
+**Label Source (OTLP push):**
+> **Note**: The `app` label comes from the OTLP resource attribute `service_name`, which VMAgent relabels to `app` on ingest. The app services push metrics via OTLP (no `/metrics` scrape, no ServiceMonitor relabel_configs). The variable is keyed off `go_goroutine_count` because that series is always present per app, whereas the request metric only appears once traffic flows.
 
 **Usage in queries:**
 ```promql
 # Example: RPS
-sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$rate]))
+sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$rate]))
 
 # When "All" selected: app=~".*", namespace=~".*"
 # When specific app: app=~"auth", namespace=~"auth"
@@ -77,7 +77,7 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$r
 ### 3️⃣ **$namespace** (Namespace Filter)
 ```yaml
 Type: query
-Query: label_values(request_duration_seconds_count, namespace)
+Query: label_values(go_goroutine_count, namespace)
 Purpose: Filter by Kubernetes namespace
 Default: All (service namespaces: auth, user, product, etc., and monitoring)
 Include All: true
@@ -92,8 +92,8 @@ Options:
   - (any user namespaces, excluding system ones)
 ```
 
-**Label Source (v0.5.0+):**
-> **Note**: The `namespace` label is automatically added by Prometheus during scrape from the pod's namespace via ServiceMonitor relabel_configs. Applications do not emit this label themselves.
+**Label Source (OTLP push):**
+> **Note**: The `namespace` label comes from the OTLP resource attribute `k8s_namespace_name`, which VMAgent relabels to `namespace` on ingest — not from ServiceMonitor relabel_configs (the app services push OTLP, they are not scraped).
 
 **Regex Breakdown:**
 ```regex
@@ -133,7 +133,7 @@ Default: 5m
 **Usage in queries:**
 ```promql
 # Example: Request rate
-sum(rate(request_duration_seconds_count{app=~"$app"}[$rate]))
+sum(rate(http_server_request_duration_seconds_count{app=~"$app"}[$rate]))
 
 # When $rate = 5m
 # Actual query: rate(...[5m])
@@ -244,8 +244,8 @@ $rate (independent)
 ### Variable shows no options
 **Problem:** Dropdown is empty
 **Solution:** 
-- Check Prometheus is running
-- Verify metric exists: `request_duration_seconds_count`
+- Check VictoriaMetrics (VMSingle) is running
+- Verify the variable's keying metric exists: `go_goroutine_count` (always present per app; the request metric only appears once traffic flows)
 - Check namespace filter isn't too restrictive
 - Verify namespace variable is set correctly (affects app variable)
 
@@ -302,7 +302,7 @@ $rate (independent)
 
 ---
 
-**Last Updated:** 2026-01-05
+**Last Updated:** 2026-07-09
 **Dashboard Version:** 1.0
 **Author:** DevOps Team
 

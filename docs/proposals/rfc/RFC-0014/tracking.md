@@ -61,9 +61,9 @@ Label rename applied everywhere: `method→http_request_method`,
 
 | SLI | Old query basis | New | Status |
 |---|---|---|---|
-| availability (error+total) | `request_duration_seconds_count{job=~"microservices", code=~"5.."}` | `http_server_request_duration_seconds_count{http_response_status_code=~"5.."}` — **`job` selector must be replaced by an `app!=""`-style selector** | pending |
-| latency (error = total − bucket{le=threshold}) | `request_duration_seconds_bucket{le=<thr>}` | new family — thresholds 0.2/0.3/0.5 depend on the 13-bucket View | pending |
-| error-rate (4xx\|5xx) | `..._count{code=~"4..|5.."}` | new family/labels | pending |
+| availability (error+total) | `request_duration_seconds_count{job=~"microservices", code=~"5.."}` | `http_server_request_duration_seconds_count{http_response_status_code=~"5.."}` (no `job` selector) | **done (P3)** — mop 0.16.0 `slo.yaml` canonical (helm-charts#13) |
+| latency (error = total − bucket{le=threshold}) | `request_duration_seconds_bucket{le=<thr>}` | new family — thresholds depend on the 13-bucket View | **done (P3)** |
+| error-rate (4xx\|5xx) | `..._count{code=~"4..|5.."}` | new family/labels | **done (P3)** |
 
 Every Sloth-generated `slo:sli_error:ratio_rate*` rule and burn-rate alert
 regenerates from these — treat the mop bump + homelab rules as one reviewed
@@ -73,19 +73,19 @@ pair (risk #3).
 
 | Group | Panels | Status |
 |---|---|---|
-| Stats row (P50/P95/P99, RPS total/success/error, success/error %, Apdex, total requests) | 9 | pending |
-| Endpoint breakdowns (`by (path)` → `by (http_route)`) | 4 | pending |
-| Method+endpoint rates / 4xx / 5xx | 4 | pending |
-| Latency timeseries (`by (le, path, code)`) | 3 | pending |
-| Runtime row (RSS→cAdvisor, goroutines→`go_goroutine_count`, GC ×2) | 4 | pending |
-| Network traffic (`*_size_bytes_sum` → `*_body_size_bytes_sum`) | 1 | pending |
-| In-flight | 1 | pending |
-| Template variables (`label_values(request_duration_seconds_count, namespace/app)` → keyed off `go_goroutine_count`) | 2 | pending |
-| *(new)* gRPC east-west row | 1 | pending |
+| Stats row (P50/P95/P99, RPS total/success/error, success/error %, Apdex, total requests) | 9 | **done (P3)** |
+| Endpoint breakdowns (`by (path)` → `by (http_route)`) | 4 | **done (P3)** |
+| Method+endpoint rates / 4xx / 5xx | 4 | **done (P3)** |
+| Latency timeseries (`by (le, path, code)`) | 3 | **done (P3)** |
+| Runtime row (RSS→cAdvisor, goroutines→`go_goroutine_count`, GC ×2) | 4 | **done (P3)** |
+| Network traffic (`*_size_bytes_sum` → `*_body_size_bytes_sum`) | 1 | **done (P3)** |
+| In-flight | 1 | **done (P3)** |
+| Template variables (`label_values(request_duration_seconds_count, namespace/app)` → keyed off `go_goroutine_count`) | 2 | **done (P3)** |
+| *(new)* gRPC east-west row | 1 | **done (P3)** |
 
-Strategy: create "(new)" copies during P2, swap at P3, delete old at P5.
+Strategy: created "(new)" copies in P2, swapped at P3 (`microservices-dashboard-otel.json` canonical, grafana-dashboards#7/#8); **legacy `microservices-dashboard.json` deleted in P5**.
 
-## 5. Docs sweep (P5) — 19 files / 140 lines referencing `request_duration_seconds`
+## 5. Docs sweep (P5) — ✅ done — 19 files referencing `request_duration_seconds`
 
 `docs/observability/`: grafana/dashboard-reference.md · runbooks/observability-deep-dive.md ·
 runbooks/microservices-alerts.md · metrics/metrics-apps.md (full rewrite — the
@@ -104,7 +104,7 @@ pattern) + `.vi.md`. Plus exemplar-claim corrections (D-14) and
 | `servicemonitors/microservices.yaml` | trim selector to checkout-service only (D-13) | **done (P3, amended)** — deleted outright: checkout-service was never integrated, nothing to fence (ADR-016) |
 | `podmonitors/podmonitor-order-worker.yaml` | retire | **done (P3)** — Temporal metric names verified identical on OTLP first |
 | vmagent CR | flags D-1/D-2 + relabel D-3 (lands in **P1**, before any push) | **done (P1a)** — usePrometheusNaming, promoteAll=false + allowlist, promoteScopeMetadata=false, regex-guarded relabel |
-| otel-collector HelmRelease | metrics pipeline + resources + VL-Stream-Fields header | **metrics pipeline + resources done (P1a)** — VL-Stream-Fields header comes with P4 |
+| otel-collector HelmRelease | metrics pipeline + resources + VL-Stream-Fields header | **done** — metrics pipeline/resources (P1a); VL-Stream-Fields header + Vector label-exclusion (P4, homelab#477) |
 
 ---
-_Last updated: 2026-07-09 — P3 cutover (ADR-016): OTLP-path rules/SLO/dashboard canonical, scrape retired to the legacy-checkout fence; Temporal dashboard verified name-stable across pipelines. Remaining: pod-kill drill + Sloth window at next make up; P5 docs sweep; code-removal wave._
+_Last updated: 2026-07-09 — P4 (logs wave: OTLP logs + trace_id in VictoriaLogs + gRPC access-log) and P5 (docs sweep) landed. RFC-0014 complete bar the live-cluster drill (pod-kill D-4 + Sloth window at the next `make up`). The two `blocked-upstream` rows (requests_in_flight / http.server.active_requests) await an otelgin release._

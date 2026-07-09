@@ -86,7 +86,7 @@ the source.
 | **Network / Disk I/O** | Not available | TX/RX, read/write bytes |
 
 The "Total Network Traffic per Service" panel therefore measures HTTP body size
-only (via `request_size_bytes` / `response_size_bytes`), missing TCP/HTTP
+only (via `http_server_request_body_size_bytes` / `http_server_response_body_size_bytes`), missing TCP/HTTP
 headers, TLS overhead, and health-check traffic.
 
 ## Manifest index
@@ -112,4 +112,4 @@ Database manifests are indexed in the
 
 ---
 
-_Last updated: 2026-06-29 — USE coverage via kube-state-metrics; control-plane components scoped out on Kind._
+_Last updated: 2026-07-09 — USE coverage via kube-state-metrics; control-plane components scoped out on Kind; HTTP body-size metrics renamed to semconv (RFC-0014 P3)._

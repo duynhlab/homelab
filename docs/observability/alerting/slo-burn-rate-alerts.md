@@ -174,9 +174,9 @@ When a Sloth-generated alert fires, work the problem in this order:
 
 | SLO | First Grafana panel | First PromQL query |
 |---|---|---|
-| Availability | "Microservice errors" → 5xx by endpoint | `sum by(handler)(rate(request_duration_seconds_count{app="<svc>",code=~"5.."}[5m]))` |
-| Latency | "Microservice latency" → p95 by endpoint | `histogram_quantile(0.95, sum by(le,handler)(rate(request_duration_seconds_bucket{app="<svc>"}[5m])))` |
-| Error rate | "Microservice errors" → 4xx & 5xx by endpoint | same as availability with `code=~"4..|5.."` |
+| Availability | "Microservice errors" → 5xx by endpoint | `sum by(http_route)(rate(http_server_request_duration_seconds_count{app="<svc>",http_response_status_code=~"5.."}[5m]))` |
+| Latency | "Microservice latency" → p95 by endpoint | `histogram_quantile(0.95, sum by(le,http_route)(rate(http_server_request_duration_seconds_bucket{app="<svc>"}[5m])))` |
+| Error rate | "Microservice errors" → 4xx & 5xx by endpoint | same as availability with `http_response_status_code=~"4..|5.."` |
 
 ---
 
@@ -226,7 +226,7 @@ open http://karma.duynh.me
 ## 7. Known limitations / gotchas
 
 - **Burn-rate maths assumes a stable traffic volume.** A service with very low RPS will see one bad request blow the short-window burn rate. Sloth mitigates this by computing the SLI as a ratio over a full window, but if you have <1 RPS sustained, expect noise.
-- **Mixed-traffic services** (background jobs piggybacking on the same `request_duration_seconds`) pollute the SLI. Filter at the SLI level (`handler!~"…"`) if needed.
+- **Mixed-traffic services** (background jobs piggybacking on the same `http_server_request_duration_seconds`) pollute the SLI. Filter at the SLI level (`http_route!~"…"`) if needed.
 - **The SLI is a 30-day rolling window.** A burn from 25 days ago still counts toward today's budget. Don't be surprised if the budget is low even when current traffic is healthy.
 - **Notification delivery is pending** — VMAlertmanager has `slack-default`/`slack-critical` receivers wired, but `slack_api_url` is a placeholder. Until it is set (via External Secrets / OpenBAO), "page" severity = "appears in Karma faster". Track via the [Future Roadmap in `alerting/README.md`](./README.md#future-roadmap).
 - **Dashboards in VMAlert UI** show rule definitions only; "for live SLI shape, prefer the Sloth UI or Grafana SLO dashboards."

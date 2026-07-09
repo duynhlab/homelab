@@ -68,13 +68,13 @@ A good SLI is a **ratio of good events to total events**, evaluated over a windo
 
 ### What we use
 
-All 9 microservices share the same metric — `request_duration_seconds` — emitted by the standard middleware (see [`docs/observability/tracing/architecture.md`](../tracing/architecture.md)). From it we derive **3 SLIs per service** for the original 8 services (payment ships no SLO yet):
+All 9 microservices share the same metric — `http_server_request_duration_seconds` (OTel semconv) — emitted by the standard middleware (see [`docs/observability/tracing/architecture.md`](../tracing/architecture.md)). From it we derive **3 SLIs per service** for the original 8 services (payment ships no SLO yet):
 
 | SLI | Good = | Bad = | PromQL skeleton |
 |---|---|---|---|
-| **Availability** | not 5xx | 5xx | `count{code=~"5.."}` / `count` |
+| **Availability** | not 5xx | 5xx | `count{http_response_status_code=~"5.."}` / `count` |
 | **Latency** | served in < 500 ms | took >= 500 ms | `(count - bucket{le="0.5"})` / `count` |
-| **Error Rate** | not 4xx & not 5xx | any 4xx or 5xx | `count{code=~"4..|5.."}` / `count` |
+| **Error Rate** | not 4xx & not 5xx | any 4xx or 5xx | `count{http_response_status_code=~"4..|5.."}` / `count` |
 
 (Full PromQL forms are in [`README.md`](./README.md#sli-queries-promql).)
 
@@ -226,7 +226,7 @@ Full layering and pipeline diagrams: [`alerting/README.md`](../alerting/README.m
 | Alerting on raw error % | Same threshold can't serve a 99% and a 99.99% service. | We alert on **burn rate**, not error %. |
 | Single-window alerts | Either flap on transient blips or miss slow burns. | Sloth uses **two windows × two thresholds**. |
 | Ignoring the policy when budget burns | Alerts fire forever; team learns to mute. | [`error_budget_policy.md`](./error_budget_policy.md) — explicit gates on deploys. |
-| "We can't measure it" | True for some custom flows; engineering punts on SLOs. | Standard `request_duration_seconds` middleware in every service — every microservice automatically gets 3 SLOs. |
+| "We can't measure it" | True for some custom flows; engineering punts on SLOs. | Standard `http_server_request_duration_seconds` middleware in every service — every microservice automatically gets 3 SLOs. |
 
 ---
 

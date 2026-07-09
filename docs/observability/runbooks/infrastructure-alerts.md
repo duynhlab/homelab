@@ -95,7 +95,7 @@ container_memory_working_set_bytes{namespace="$NAMESPACE", pod="$POD"}
 **Resolution**:
 - Increase memory limits if usage is stable at high levels
 - If Go service: check heap profiles via Pyroscope, tune `GOMEMLIMIT`
-- Check for memory leak pattern: steadily increasing `go_memstats_alloc_bytes` without returning to baseline
+- Check for memory leak pattern: steadily increasing `go_memory_used_bytes` (OTel runtime; the `go_memstats_*` client_golang gauges were retired at the RFC-0014 P3 cutover) without returning to baseline
 
 **Related alerts**: `KubePodOOMKilled` (fires if memory hits the hard limit)
 

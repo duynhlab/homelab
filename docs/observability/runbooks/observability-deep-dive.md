@@ -4,7 +4,7 @@
 >
 > **Audience**: SRE/DevOps engineers preparing for interviews or onboarding to this platform.
 >
-> **Last Updated**: 2026-07-03
+> **Last Updated**: 2026-07-09
 
 ---
 
@@ -108,28 +108,28 @@ flowchart LR
 
 ### RED Implementation
 
-A **single histogram** `request_duration_seconds` is the source of truth for all three RED signals. Prometheus histograms automatically generate `_bucket`, `_count`, and `_sum` sub-metrics, so one metric definition covers everything.
+A **single histogram** `http_server_request_duration_seconds` (OpenTelemetry semconv, emitted by `otelgin`) is the source of truth for all three RED signals. The histogram automatically generates `_bucket`, `_count`, and `_sum` sub-metrics, so one metric definition covers everything.
 
 ```mermaid
 flowchart LR
-    H["request_duration_seconds\n(histogram)"] --> B["_bucket{le=...}"]
+    H["http_server_request_duration_seconds\n(histogram)"] --> B["_bucket{le=...}"]
     H --> C["_count"]
     H --> S["_sum"]
 
     C --> Rate["Rate\nrate(_count[5m])"]
-    C --> Errors["Errors\nrate(_count{code=~'5..'}[5m])"]
+    C --> Errors["Errors\nrate(_count{http_response_status_code=~'5..'}[5m])"]
     B --> Duration["Duration\nhistogram_quantile(0.95, _bucket)"]
 ```
 
 | RED Signal | PromQL Query | Source |
 |-----------|-------------|--------|
-| **Rate** (Traffic) | `rate(request_duration_seconds_count{job="microservices"}[5m])` | `_count` |
-| **Errors** | `rate(request_duration_seconds_count{job="microservices", code=~"5.."}[5m])` | `_count` + code filter |
-| **Duration** (P95) | `histogram_quantile(0.95, rate(request_duration_seconds_bucket{job="microservices"}[5m]))` | `_bucket` |
-| Error Rate % | `rate(request_duration_seconds_count{code=~"5.."}[5m]) / rate(request_duration_seconds_count[5m])` | Ratio of `_count` |
+| **Rate** (Traffic) | `rate(http_server_request_duration_seconds_count{app!=""}[5m])` | `_count` |
+| **Errors** | `rate(http_server_request_duration_seconds_count{app!="", http_response_status_code=~"5.."}[5m])` | `_count` + status filter |
+| **Duration** (P95) | `histogram_quantile(0.95, rate(http_server_request_duration_seconds_bucket{app!=""}[5m]))` | `_bucket` |
+| Error Rate % | `rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]) / rate(http_server_request_duration_seconds_count[5m])` | Ratio of `_count` |
 | Apdex Score | `(sum(rate(_bucket{le="0.5"}[5m])) + 0.5 * sum(rate(_bucket{le="2.0"}[5m]) - rate(_bucket{le="0.5"}[5m]))) / sum(rate(_count[5m]))` | `_bucket` thresholds |
 
-**Why ONE histogram is enough**: No redundant counter metrics needed. A single `histogram.Observe()` call per request produces Rate, Errors, Duration, SLO compliance, and Apdex. This follows the same pattern as Uber (M3 platform, 6B time series), Grab/Shopee (1000+ microservices), and Google SRE.
+**Why ONE histogram is enough**: No redundant counter metrics needed. A single histogram observation per request produces Rate, Errors, Duration, SLO compliance, and Apdex. This follows the same pattern as Uber (M3 platform, 6B time series), Grab/Shopee (1000+ microservices), and Google SRE.
 
 ### USE Implementation
 
@@ -141,10 +141,12 @@ Source: [`kubernetes/infra/configs/monitoring/prometheusrules/postgres/`](../../
 |-----------|---------------|--------|
 | **Utilization** | Connection usage | `custom_connection_limits_current_connections / custom_connection_limits_max_connections` |
 | **Saturation** | `PostgresConnectionSaturation` (>80%) | `current_connections / max_connections > 0.8` |
-| **Saturation** | `requests_in_flight` gauge | `requests_in_flight{job="microservices"}` |
+| **Saturation** | in-flight request gauge | **removed** — no OTel equivalent (see note below) |
 | **Errors** | `PostgresDown` | `pg_up == 0` |
 | **Errors** | `CnpgDown` | `cnpg_collector_up == 0` |
 | **Errors** | `PostgresReplicationLagHigh` | `pg_replication_lag > 30` |
+
+> **In-flight saturation gauge removed (RFC-0014).** The old `requests_in_flight` gauge had **no OpenTelemetry equivalent** — `otelgin` v0.69 does not emit `http_server_active_requests` (verified live 2026-07-09). The gauge and its in-flight saturation alerts retired with the `/metrics` scrape; restoring an active-request signal is blocked upstream. Service-side saturation is now inferred from Go runtime metrics instead.
 
 Alert groups organized by USE category:
 
@@ -161,10 +163,10 @@ The Grafana dashboard (40 panels, 6 rows) maps directly to all 4 Golden Signals:
 
 | Golden Signal | Dashboard Row | Key Panels | Metric |
 |---------------|--------------|-----------|--------|
-| **Latency** | Row 1: Overview | P99, P95, P50 Response Time | `histogram_quantile(0.95, request_duration_seconds_bucket)` |
-| **Traffic** | Row 1 + Row 2 | Total RPS, Request Rate by Endpoint | `rate(request_duration_seconds_count[5m])` |
-| **Errors** | Row 1 + Row 3 | Error Rate %, Client 4xx, Server 5xx | `rate(request_duration_seconds_count{code=~"5.."}[5m])` |
-| **Saturation** | Row 5 | Requests In Flight | `requests_in_flight{job="microservices"}` |
+| **Latency** | Row 1: Overview | P99, P95, P50 Response Time | `histogram_quantile(0.95, http_server_request_duration_seconds_bucket)` |
+| **Traffic** | Row 1 + Row 2 | Total RPS, Request Rate by Endpoint | `rate(http_server_request_duration_seconds_count[5m])` |
+| **Errors** | Row 1 + Row 3 | Error Rate %, Client 4xx, Server 5xx | `rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])` |
+| **Saturation** | Row 5 | Go runtime (goroutines, heap, GC) | `go_goroutine_count{app!=""}` |
 
 ---
 
@@ -177,11 +179,12 @@ flowchart TD
     end
 
     subgraph middleware ["Middleware Chain (in each service)"]
-        M1["TracingMiddleware"] --> M2["LoggingMiddleware"] --> M3["PrometheusMiddleware"]
+        M1["TracingMiddleware\n(otelgin: spans + HTTP metrics)"] --> M2["LoggingMiddleware"]
     end
 
     subgraph metrics ["Pillar 1: Metrics"]
-        VMAgent["VMAgent\n(scrapes /metrics)"] --> VMSingle["VMSingle\n(:8428)"]
+        VMAgent["VMAgent\n(OTLP ingest + infra scrape)"] --> VMSingle["VMSingle\n(:8428)"]
+        Infra["Infra exporters\n(pg_exporter, kube-state, cAdvisor)"] -.->|"scrape /metrics"| VMAgent
     end
 
     subgraph traces ["Pillar 2: Traces"]
@@ -200,10 +203,10 @@ flowchart TD
     end
 
     S --> middleware
-    M3 -.->|"/metrics endpoint"| VMAgent
-    M1 -.->|"OTLP HTTP :4318"| OTel
+    M1 -.->|"OTLP traces + metrics HTTP :4318"| OTel
     M2 -.->|"stdout JSON"| Vector
     S -.->|"pprof push"| Pyroscope
+    OTel -.->|"OTLP metrics"| VMAgent
 
     VMSingle --> Grafana["Grafana\n(:3000)"]
     Tempo --> Grafana
@@ -214,7 +217,7 @@ flowchart TD
 
 | Pillar | Tool | Protocol | Question It Answers |
 |--------|------|----------|---------------------|
-| **Metrics** | VMSingle + VMAgent | Prometheus scrape (pull) | "Is something wrong?" (RED/USE signals) |
+| **Metrics** | VMSingle + VMAgent | OTLP push (app metrics); scrape (pull) for infra exporters | "Is something wrong?" (RED/USE signals) |
 | **Traces** | Tempo + Jaeger (+ VictoriaTraces pilot) via OTel Collector | OTLP HTTP (push) | "Where is it slow?" (cross-service latency) |
 | **Logs** | VictoriaLogs via Vector | JSON over stdout (push) | "Why is it broken?" (error details, context) |
 | **Profiles** | Pyroscope | pprof push | "Which code line is the bottleneck?" (CPU/memory flamegraphs) |
@@ -233,83 +236,76 @@ Each pillar answers a progressively deeper question. Together, they reduce inves
 
 ## 4. Middleware Chain: How Services Emit Data
 
-The middleware chain runs in a **fixed order** for every HTTP request across all 9 services. The order matters because each middleware depends on data produced by the previous one.
+The middleware chain runs in a **fixed order** for every HTTP request across all 9 services. Since the P3 OTel cutover there are only **two** middlewares — the order matters because Logging depends on the `trace_id` produced by Tracing.
 
 ### The Fixed Order
 
 ```go
-r.Use(middleware.TracingMiddleware())     // 1st: creates root span + trace_id
+r.Use(middleware.TracingMiddleware())     // 1st: otelgin — creates root span + trace_id,
+                                           //      and auto-records the HTTP semconv metrics
 r.Use(middleware.LoggingMiddleware(logger)) // 2nd: injects trace_id into logs
-r.Use(middleware.PrometheusMiddleware())   // 3rd: records metrics with exemplar (traceID)
 ```
+
+There is **no separate metrics middleware** anymore. The old `client_golang` PrometheusMiddleware was deleted in the P3 cutover; the HTTP semconv metrics (`http_server_request_duration_seconds`, …) are now emitted automatically by **`otelgin`** instrumentation — the same instrumentation that installs the tracing middleware — via the global `MeterProvider` set up by `obsx.SetupObservability`.
 
 ### Why Order Matters
 
 ```mermaid
 sequenceDiagram
     participant Req as HTTP Request
-    participant TM as TracingMiddleware
+    participant TM as TracingMiddleware (otelgin)
     participant LM as LoggingMiddleware
-    participant PM as PrometheusMiddleware
     participant H as Handler
 
     Req->>TM: Incoming request
-    Note over TM: Creates root span<br/>Generates trace_id<br/>Sets W3C traceparent header
+    Note over TM: Creates root span<br/>Generates trace_id<br/>Sets W3C traceparent header<br/>Starts otelgin metric timing
 
     TM->>LM: Pass request with trace context
     Note over LM: Extracts trace_id from span<br/>Creates logger with trace_id field<br/>Stores logger in gin.Context
 
-    LM->>PM: Pass request with logger + trace context
-    Note over PM: Reads trace_id from span<br/>Attaches as exemplar to histogram<br/>Records request_duration_seconds
-
-    PM->>H: Pass request to business handler
+    LM->>H: Pass request with logger + trace context
     Note over H: Uses logger from context<br/>Creates child spans<br/>Business logic executes
 
-    H-->>PM: Response
-    Note over PM: Records duration, status code,<br/>request/response size
-
-    PM-->>LM: Response
+    H-->>LM: Response
     Note over LM: Logs completed request<br/>with trace_id, duration, status
 
     LM-->>TM: Response
-    Note over TM: Ends root span<br/>Exports to OTel Collector
+    Note over TM: Ends root span (exports to OTel Collector)<br/>otelgin records http_server_request_duration_seconds<br/>(OTLP via global MeterProvider, no exemplars)
 ```
 
 | Middleware | Runs | Produces | Depends On |
 |-----------|------|----------|------------|
-| **TracingMiddleware** | First | Root span, `trace_id`, W3C `traceparent` header | Nothing (creates context) |
+| **TracingMiddleware** (`otelgin`) | First | Root span, `trace_id`, W3C `traceparent` header — **and** the `http_server_request_duration_seconds` histogram (OTLP, auto-recorded by otelgin) | Nothing (creates context) |
 | **LoggingMiddleware** | Second | Structured JSON logs with `trace_id` field | `trace_id` from TracingMiddleware |
-| **PrometheusMiddleware** | Third | `request_duration_seconds` histogram with `traceID` exemplar | `trace_id` from TracingMiddleware |
 
-**If you reversed the order**: PrometheusMiddleware would have no trace context, so exemplars would be empty. LoggingMiddleware would have no `trace_id` to inject. Correlation between pillars would break.
+**If you reversed the order**: LoggingMiddleware would have no `trace_id` to inject, so logs could not be correlated with traces. (There is no separate metrics middleware — otelgin records the metrics; and metrics no longer carry exemplars — see [Correlation](#6-correlation-connecting-the-pillars).)
 
 ### What Each Middleware Produces
 
-**TracingMiddleware** outputs:
+**TracingMiddleware** (`otelgin`) outputs:
 - Root span exported to OTel Collector -> primary backends (Tempo + Jaeger; VictoriaTraces pilot)
 - Child spans created by handler/logic layer
 - W3C Trace Context header for cross-service propagation
 - Service identity from `OTEL_SERVICE_NAME` (injected by the app ResourceSets; pod-name parsing is only the SDK fallback)
+- **HTTP semconv metrics** (auto-recorded by otelgin via the global `MeterProvider`, exported over OTLP):
+  - `http_server_request_duration_seconds` (histogram) -- RED: Rate, Errors, Duration
+  - `http_server_request_body_size_bytes` (histogram) -- RX bandwidth
+  - `http_server_response_body_size_bytes` (histogram) -- TX bandwidth
+  - No in-flight/active-request gauge -- `otelgin` v0.69 does not emit `http_server_active_requests` (saturation now comes from Go runtime metrics)
 
 **LoggingMiddleware** outputs:
 - Structured JSON to stdout (collected by Vector -> VictoriaLogs)
 - Every log line includes: `trace_id`, `method`, `path`, `status`, `duration`, `client_ip`
 - ERROR-level for 4xx/5xx, INFO-level for successful requests
 
-**PrometheusMiddleware** outputs (4 metrics):
-- `request_duration_seconds` (histogram) -- RED: Rate, Errors, Duration
-- `requests_in_flight` (gauge) -- Saturation (4th Golden Signal)
-- `request_size_bytes` (histogram) -- RX bandwidth
-- `response_size_bytes` (histogram) -- TX bandwidth
-
 ### Label Strategy
 
-Applications emit only **3 labels**: `method`, `path`, `code`. Prometheus automatically adds **4 more** during scrape via ServiceMonitor relabeling: `app`, `namespace`, `job`, `instance`.
+Applications emit the semconv HTTP labels `http_request_method`, `http_route`, `http_response_status_code` on each request metric. The `app` and `namespace` labels are **derived from OTLP resource attributes** (`service.name`, `k8s.namespace.name`) and materialised by a vmagent relabel step (`service_name -> app`, `k8s_namespace_name -> namespace`) on the OTLP ingest path -- **not** by ServiceMonitor `relabel_configs` (there is no `/metrics` scrape and no `job` label for the app services anymore).
 
-Total: **7 labels per metric**. Bounded cardinality:
+Bounded cardinality:
 - the original 8 services x 20 routes x 3 methods x 5 status codes = **2,400 series** (predictable and manageable; payment adds a small increment)
 
-Path normalization uses `c.FullPath()` (Gin route pattern like `/api/v1/products/:id`) instead of raw URLs, preventing cardinality explosion from dynamic path parameters.
+Route normalization uses the Gin route pattern (`http_route`, e.g. `/api/v1/products/:id`) instead of raw URLs, preventing cardinality explosion from dynamic path parameters.
 
 Infrastructure endpoints (`/health`, `/ready`, `/metrics`) are filtered out before metric collection, so metrics reflect actual user traffic only.
 
@@ -327,7 +323,7 @@ flowchart TD
     PR -->|evaluate| VMAlert["VMAlert"]
     VMAlert -->|query| VMSingle["VMSingle"]
     VMAlert -->|notify| VMAMgr["VMAlertmanager"]
-    SM["ServiceMonitor\napp.kubernetes.io/component: api"] -->|"auto-convert"| VMAgent["VMAgent scrapes"]
+    OTelC["OTel Collector\n(app OTLP metrics)"] -->|"OTLP ingest"| VMAgent["VMAgent"]
     VMAgent -->|"remote write"| VMSingle
 ```
 
@@ -385,8 +381,8 @@ In addition to SLO burn-rate alerts, static threshold alerts provide **fast dete
 | **Errors** | `MicroserviceHighErrorRate` (>5%), `MicroserviceErrorRateCritical` (>15%), `MicroserviceNoSuccessfulRequests` | warning/critical | RED: Errors |
 | **Latency** | `MicroserviceHighLatencyP95` (>1s), `MicroserviceHighLatencyP99` (>2s), `MicroserviceLatencyCritical` (P95>2s) | warning/critical | RED: Duration |
 | **Traffic** | `MicroserviceNoTraffic`, `MicroserviceApdexCritical` (<0.5) | warning | RED: Rate |
-| **Saturation** | `MicroserviceHighRequestsInFlight` (>50), `MicroserviceRequestsInFlightCritical` (>100) | warning/critical | Golden: Saturation |
-| **Runtime** | `MicroserviceGoroutineLeak`, `MicroserviceHighMemoryUsage`, `MicroserviceHighGCPressure/Frequency` | warning | USE: Saturation |
+| **Saturation** | Go runtime pressure (see Runtime) — in-flight alerts retired with the scrape (no OTel active-request gauge) | warning/critical | Golden: Saturation |
+| **Runtime** | `MicroserviceGoroutineLeak` (`go_goroutine_count`), `MicroserviceHighMemoryUsage`, `MicroserviceGCThrash` (`go_memory_used_bytes` within 5% of `go_memory_gc_goal_bytes`) | warning | USE: Saturation |
 
 Full per-alert runbook with investigation workflows: [Microservices Alerts Runbook](microservices-alerts.md)
 
@@ -412,9 +408,9 @@ The real power of 4-pillar observability is **correlation** -- jumping between p
 ```mermaid
 flowchart LR
     A["Alert fires\n(VMAlert)"] --> B["Metric spike\n(Grafana dashboard)"]
-    B --> C["Click exemplar dot\n(traceID on histogram)"]
-    C --> D["Trace in Tempo\n(see slow span)"]
-    D --> E["trace_id in VictoriaLogs\n(see error logs)"]
+    B --> C["Filter VictoriaLogs by\napp + time window\n(grab a trace_id)"]
+    C --> D["Trace in Tempo\n(traces<->logs correlation,\nsee slow span)"]
+    D --> E["trace_id back to VictoriaLogs\n(see error logs)"]
     E --> F["Flamegraph in Pyroscope\n(see CPU/memory hotspot)"]
 
     style A fill:#ff6b6b
@@ -440,14 +436,14 @@ sequenceDiagram
     Alert->>Dash: AuthHighLatency fires (burn rate 6x)
     Note over Dash: Step 1: Check P95 panel<br/>P95 jumped from 200ms to 800ms at 14:30
 
-    Dash->>Dash: Enable Exemplars toggle on P95 panel
-    Note over Dash: Step 2: Click exemplar dot at spike<br/>Get traceID: 4bf92f3577b34da6...
+    Dash->>VLogs: Filter by app="auth" around 14:30
+    Note over VLogs: Step 2: Find a slow/error request line<br/>Copy trace_id: 4bf92f3577b34da6...
 
-    Dash->>Tempo: Jump to trace (click exemplar link)
+    VLogs->>Tempo: Open trace (traces<->logs correlation)
     Note over Tempo: Step 3: See trace waterfall<br/>auth (50ms) -> user (30ms) -> DB query (720ms!)<br/>Root cause: DB query took 720ms
 
-    Tempo->>VLogs: Search by trace_id
-    Note over VLogs: Step 4: Find correlated logs<br/>trace_id:"4bf92f..."<br/>Log: "Slow query: SELECT * FROM users WHERE email LIKE '%@%'"<br/>Missing index on email column
+    Tempo->>VLogs: Pivot back to logs by trace_id
+    Note over VLogs: Step 4: Read correlated logs<br/>trace_id:"4bf92f..."<br/>Log: "Slow query: SELECT * FROM users WHERE email LIKE '%@%'"<br/>Missing index on email column
 
     VLogs->>Pyro: Check auth service CPU profile (same time range)
     Note over Pyro: Step 5: Flamegraph shows<br/>60% CPU in database/sql.(*DB).Query<br/>Confirms DB is the bottleneck
@@ -459,29 +455,21 @@ sequenceDiagram
 
 | From | To | How |
 |------|-----|-----|
-| **Metrics -> Traces** | Exemplars | Click exemplar dot on histogram panel -> jump to Tempo trace |
-| **Traces -> Logs** | trace_id | Copy `trace_id` from span -> search in VictoriaLogs: `trace_id:"..."` |
-| **Logs -> Traces** | trace_id | Click `trace_id` in log entry -> "Query with Tempo" |
+| **Metrics -> Logs** | Time range + `app` | Metric spike identifies the service + window; filter VictoriaLogs by the same `app` label |
+| **Logs -> Traces** | trace_id | Click `trace_id` in a log entry -> "Query with Tempo" (VictoriaLogs indexes the `trace_id` field) |
+| **Traces -> Logs** | trace_id | Tempo traces<->logs correlation: from a span, pivot to VictoriaLogs `trace_id:"..."` |
 | **Traces -> Profiles** | Service name + time range | Filter Pyroscope by same service and time window |
-| **Metrics -> Logs** | Time range + service | Same `app` label in metrics, same `service` field in VictoriaLogs |
 
-### Exemplar Configuration
+### Why No Exemplars (RFC-0014 D-14)
 
-Exemplars are the critical link between metrics and traces. They are attached in the PrometheusMiddleware:
+Exemplars -- the old direct "click a dot on the histogram, jump to the trace" link -- are **gone**, and this is **accepted**. VictoriaMetrics does not support exemplar storage (upstream won't-fix), so the metrics->traces jump can no longer ride on the metric itself.
 
-```go
-span := trace.SpanFromContext(c.Request.Context())
-if span.SpanContext().HasTraceID() {
-    requestDuration.WithLabelValues(method, path, statusCode).(prometheus.ExemplarObserver).ObserveWithExemplar(
-        duration, prometheus.Labels{"traceID": span.SpanContext().TraceID().String()},
-    )
-}
-```
+The bridge is now **`trace_id`** rather than exemplars. Every log line carries the `trace_id` field, which VictoriaLogs indexes (fixed in RFC-0014 P4), and Tempo's traces<->logs correlation links a trace to those logs both ways. So the metric->trace pivot becomes **metric spike -> VictoriaLogs (filter by `app` + time window, grab a `trace_id`) -> Tempo trace**. One extra hop through logs, but no data lost.
 
 **Prerequisites** (all already configured):
-1. TracingMiddleware runs **before** PrometheusMiddleware (span exists when metrics are recorded)
-2. Grafana has Tempo datasource configured
-3. Exemplar storage enabled on metrics backend
+1. TracingMiddleware runs **before** LoggingMiddleware, so every log line gets a `trace_id`
+2. VictoriaLogs indexes the `trace_id` field (queryable, P4)
+3. Grafana has the Tempo datasource with traces<->logs correlation configured
 
 ---
 
@@ -493,18 +481,18 @@ Use this framework for every interview question about observability. The **Befor
 
 **Before**: We had 9 Go microservices with no centralized monitoring. Each team checked logs by SSH-ing into pods and running `kubectl logs`. No alerting -- users reported issues before the team knew. No way to trace a request across services. MTTR was measured in hours because investigation was manual.
 
-**What you did**: Built a 4-pillar observability stack: metrics (VictoriaMetrics), traces (Tempo + Jaeger, with a VictoriaTraces pilot), logs (VictoriaLogs via Vector), and continuous profiling (Pyroscope). Standardized a 3-middleware chain in all services so every request automatically emits metrics, traces, and structured logs with correlation.
+**What you did**: Built a 4-pillar observability stack: metrics (VictoriaMetrics), traces (Tempo + Jaeger, with a VictoriaTraces pilot), logs (VictoriaLogs via Vector), and continuous profiling (Pyroscope). Standardized a 2-middleware chain (tracing via otelgin, then logging) in all services so every request automatically emits metrics, traces, and structured logs with correlation.
 
 **How**:
-- Single `request_duration_seconds` histogram covers all RED signals (Rate, Errors, Duration)
-- `requests_in_flight` gauge adds saturation = all 4 Golden Signals from 2 metrics
-- TracingMiddleware -> LoggingMiddleware -> PrometheusMiddleware order ensures `trace_id` is available for exemplars and log correlation
-- Single `ServiceMonitor` with `app.kubernetes.io/component: api` label auto-discovers all services
+- Single `http_server_request_duration_seconds` histogram (OTel semconv) covers all RED signals (Rate, Errors, Duration)
+- Go runtime metrics (`go_goroutine_count`, heap, GC) add saturation = all 4 Golden Signals
+- TracingMiddleware -> LoggingMiddleware order ensures `trace_id` is available for log correlation; otelgin (the tracing instrumentation) auto-records the HTTP metrics — no separate metrics middleware
+- Services **push OTLP** metrics (SDK -> OTel Collector -> VMAgent OTLP ingest); no per-service scrape config, `app`/`namespace` derived from OTLP resource attributes via vmagent relabel
 - Sloth Operator generates multi-window multi-burn-rate SLO alerts from `PrometheusServiceLevel` CRDs
-- VMAgent scrapes, VMSingle stores, VMAlert evaluates, VMAlertmanager routes
+- VMAgent ingests (OTLP) + remote-writes, VMSingle stores, VMAlert evaluates, VMAlertmanager routes
 - Everything deployed via Flux GitOps -- add a new service, it gets monitoring for free
 
-**Result**: Alert-to-root-cause path reduced from hours to minutes. 4-pillar correlation means a metric spike leads directly to the offending trace, then to error logs, then to the flamegraph showing the bottleneck. 24 SLOs across the original 8 services with automated error budget tracking. MTTR improved by ~40%.
+**Result**: Alert-to-root-cause path reduced from hours to minutes. 4-pillar correlation means a metric spike leads to the correlated logs (by `app` + `trace_id`), then to the offending trace, then to the flamegraph showing the bottleneck. 24 SLOs across the original 8 services with automated error budget tracking. MTTR improved by ~40%.
 
 ---
 
@@ -515,11 +503,11 @@ Use this framework for every interview question about observability. The **Befor
 **What you did**: Implemented the RED method as the primary monitoring framework for all microservices, supplemented by USE for PostgreSQL infrastructure. Together, these cover all Four Golden Signals.
 
 **How**:
-- **RED** (for APIs): One histogram `request_duration_seconds` with labels `method`, `path`, `code`. Rate = `rate(_count[5m])`, Errors = `rate(_count{code=~"5.."}[5m])`, Duration = `histogram_quantile(0.95, rate(_bucket[5m]))`
+- **RED** (for APIs): One histogram `http_server_request_duration_seconds` with semconv labels `http_request_method`, `http_route`, `http_response_status_code`. Rate = `rate(_count[5m])`, Errors = `rate(_count{http_response_status_code=~"5.."}[5m])`, Duration = `histogram_quantile(0.95, rate(_bucket[5m]))`
 - **USE** (for Postgres): Utilization = `connections / max_connections`, Saturation = alert at 80% threshold, Errors = `pg_up == 0`
-- **Golden Signals**: RED covers 3/4 signals. Adding `requests_in_flight` gauge covers Saturation = all 4 signals
-- **Path normalization**: `c.FullPath()` for bounded cardinality (~2,400 series across the original 8 services)
-- **Label strategy**: Application emits 3 labels, Prometheus adds 4 at scrape time, total 7 labels per metric
+- **Golden Signals**: RED covers 3/4 signals. Go runtime saturation (goroutines, heap, GC) covers the 4th (there is no OTel active-request gauge)
+- **Route normalization**: Gin route pattern (`http_route`) for bounded cardinality (~2,400 series across the original 8 services)
+- **Label strategy**: Application emits the semconv HTTP labels; `app`/`namespace` come from OTLP resource attributes via vmagent relabel (no `job`/scrape labels)
 
 **Result**: Single Grafana dashboard with 40 panels covering all 4 Golden Signals. Any engineer can answer "what's the P95 latency of the auth service right now?" in 3 seconds. Cardinality stays bounded as services scale.
 
@@ -534,14 +522,14 @@ Use this framework for every interview question about observability. The **Befor
 **How** (step-by-step):
 
 1. **Alert**: `AuthHighLatency` fires -- Sloth detects P95 > 500ms, burn rate 6x
-2. **Dashboard**: Open Grafana -> P95 panel shows spike at 14:30. Turn on Exemplars toggle
-3. **Exemplar**: Click the exemplar dot at the spike -> get `traceID: 4bf92f3577b34da6...`
-4. **Trace**: Jump to Tempo. See waterfall: auth (50ms) -> user (30ms) -> DB query (720ms). The DB span is the bottleneck
-5. **Logs**: Search VictoriaLogs with `trace_id:"4bf92f3577b34da6"`. Find: "Slow query: SELECT * FROM users WHERE..."
+2. **Dashboard**: Open Grafana -> P95 panel shows spike at 14:30
+3. **Logs**: Filter VictoriaLogs by `app="auth"` around 14:30, pick a slow request line, copy `trace_id: 4bf92f3577b34da6...`
+4. **Trace**: Open the trace in Tempo (traces<->logs correlation). See waterfall: auth (50ms) -> user (30ms) -> DB query (720ms). The DB span is the bottleneck
+5. **Logs (pivot back)**: With `trace_id:"4bf92f3577b34da6"`, read the correlated logs. Find: "Slow query: SELECT * FROM users WHERE..."
 6. **Profile**: Check Pyroscope flamegraph for auth service at 14:30. Confirms 60% CPU in `database/sql.Query`
 7. **Fix**: Add index on the problematic column. P95 drops from 800ms to 150ms. Burn rate returns to normal
 
-**Result**: Total investigation time: 8 minutes (from alert to root cause). Previously this would have been 2+ hours. The key is exemplars -- they provide the direct link from a metric spike to the exact trace that caused it.
+**Result**: Total investigation time: 8 minutes (from alert to root cause). Previously this would have been 2+ hours. The key is `trace_id` -- indexed in VictoriaLogs and wired into Tempo's traces<->logs correlation, it links a metric spike to the exact trace and logs that caused it (exemplars are not available on VictoriaMetrics -- RFC-0014 D-14).
 
 ---
 
@@ -571,13 +559,13 @@ Use this framework for every interview question about observability. The **Befor
 
 **How**:
 - **trace_id generation**: TracingMiddleware creates a root span with a unique `trace_id` for every request (W3C Trace Context standard)
-- **Metrics -> Traces**: Exemplars attach `traceID` label to histogram observations. Clicking an exemplar dot in Grafana jumps directly to the trace in Tempo
-- **Traces -> Logs**: LoggingMiddleware extracts `trace_id` from the span context and includes it in every JSON log line. Copy `trace_id` from a trace -> search in VictoriaLogs
-- **Logs -> Traces**: Grafana's "Query with Tempo" button on log entries with `trace_id`
+- **Metrics -> Logs**: A metric spike identifies the `app` + time window; filter VictoriaLogs by the same `app` label to find the offending requests (VictoriaMetrics has no exemplars -- RFC-0014 D-14 -- so there is no direct metric->trace dot)
+- **Traces -> Logs**: LoggingMiddleware extracts `trace_id` from the span context and includes it in every JSON log line; Tempo's traces<->logs correlation pivots from a span to VictoriaLogs `trace_id:"..."`
+- **Logs -> Traces**: Grafana's "Query with Tempo" button on log entries with `trace_id` (VictoriaLogs indexes the field)
 - **Traces -> Profiles**: Filter Pyroscope by service name and time range matching the trace
-- **Middleware order is critical**: Tracing first (creates context), Logging second (uses context), Prometheus third (uses context for exemplars)
+- **Middleware order is critical**: Tracing first (creates context, and otelgin auto-records the HTTP metrics), Logging second (injects `trace_id`) — only two middlewares since the P3 cutover
 
-**Result**: Any investigation path works. Start from a metric alert, jump to a trace, pivot to logs, drill into a flamegraph. Or start from a log error, find the trace, see which service was slow. The `trace_id` ties everything together -- one ID, four data sources, complete picture.
+**Result**: Any investigation path works. Start from a metric alert, pivot to logs, jump to a trace, drill into a flamegraph. Or start from a log error, find the trace, see which service was slow. The `trace_id` ties everything together -- one ID, four data sources, complete picture.
 
 ---
 
@@ -601,7 +589,7 @@ Before the monitoring stack, downtime was tracked manually via incident tickets.
 - Average: ~60 min downtime/month across all services (estimated from incident logs)
 
 **After (automated tracking)**:
-- Uptime tracked via Prometheus `up` metric: `avg_over_time(up{job="microservices"}[30d])` gives actual availability per service
+- App services push OTLP (no `up` scrape metric), so availability is tracked from the SLO error ratio and a heartbeat-absence signal (`go_goroutine_count{app!=""}` disappearing -- RFC-0014 D-4) rather than `up{...}==0`
 - SLI recording rules from Sloth: `slo:sli_error:ratio_rate5m` tracks real-time error ratios
 - Downtime = SLO violation windows: `1 - slo:sli_error:ratio_rate5m` over a 30-day period, summed in minutes
 - Average: ~48 min downtime/month after the stack was operational
@@ -626,7 +614,7 @@ downtime_reduction = (before - after) / before
 
 **After (4-pillar observability)**:
 - MTTR starts precisely when VMAlert fires (timestamp recorded)
-- Investigation: alert -> dashboard -> exemplar -> trace -> logs -> root cause in <10 min
+- Investigation: alert -> dashboard -> logs (`app` + `trace_id`) -> trace -> root cause in <10 min
 - Resolution tracked: alert resolved timestamp (auto) or manual close
 - Average MTTR: ~55 minutes
 
@@ -650,18 +638,19 @@ downtime_reduction = (before - after) / before
 
 ### Q4: "110 services -- how did you handle that scale?"
 
-- **Single ServiceMonitor with label selector**: `matchLabels: { app.kubernetes.io/component: api }` auto-discovers any service with that label, in any namespace (`namespaceSelector.any: true`). No per-service scrape config needed
-- **VMAgent scrapes all targets, single VMSingle stores**: 7-day retention, horizontal scaling possible with VMCluster when needed
-- **Standardized middleware**: Every service includes the same 3-middleware chain. Add the middleware, get RED metrics + traces + structured logs automatically. No per-service instrumentation
+- **OTLP push, no per-service scrape config**: Services export OTLP to the OTel Collector; VMAgent ingests centrally. `app`/`namespace` come from OTLP resource attributes via a single vmagent relabel rule -- no ServiceMonitor per service. (ServiceMonitor scrape is retained only for infra exporters.)
+- **Single VMSingle stores**: VMAgent ingests + remote-writes; 7-day retention, horizontal scaling possible with VMCluster when needed
+- **Standardized middleware**: Every service includes the same 2-middleware chain (otelgin tracing + logging). otelgin auto-records RED metrics; the chain adds traces + structured logs. No per-service instrumentation
 - **GitOps onboarding**: Deploy a new service via Helm -> set `slo.enabled: true` -> it gets metrics, alerting, SLOs, dashboards, and log collection automatically. Zero additional configuration
-- **Bounded cardinality**: Path normalization (`c.FullPath()`) + bounded label set = predictable storage growth regardless of traffic volume
+- **Bounded cardinality**: Route normalization (`http_route`) + bounded label set = predictable storage growth regardless of traffic volume
 
 ### Q5: "What was the hardest part / biggest challenge?"
 
 - **Migration from Prometheus to VictoriaMetrics Operator**: Required understanding the dual CRD system (Prometheus CRDs for compatibility with third-party charts + VM CRDs for the operator-managed runtime). Had to keep `ServiceMonitor`, `PodMonitor`, `PrometheusRule` CRDs while replacing the Prometheus server with VMSingle/VMAgent/VMAlert. The VM Operator's auto-conversion feature (`disable_prometheus_converter: false`) bridges the two systems
 - **Storage format bugs**: The `VMSingle` `volumeClaimTemplate` spec had incorrect nesting that the operator silently ignored, causing pods to restart without persistent storage. Required reading the operator source code to debug
-- **Cardinality control**: Early iterations used raw URL paths as labels, causing unbounded cardinality growth. Switched to `c.FullPath()` (Gin route patterns) for predictable series count
-- **Middleware ordering**: The PrometheusMiddleware exemplar feature silently produced empty exemplars when placed before TracingMiddleware. Required understanding the data dependency chain
+- **Cardinality control**: Early iterations used raw URL paths as labels, causing unbounded cardinality growth. Switched to the Gin route pattern (`http_route`) for predictable series count
+- **Middleware ordering**: Log correlation silently broke when LoggingMiddleware ran before TracingMiddleware -- log lines had no `trace_id`. Required understanding the data dependency chain (tracing first, then logging; otelgin records the metrics off the tracing instrumentation)
+- **Losing exemplars in the OTel cutover**: The Prometheus-era stack linked metrics->traces via exemplars; VictoriaMetrics does not support them (RFC-0014 D-14). Re-wiring the metric->trace pivot through `trace_id`-indexed logs + Tempo traces<->logs correlation kept the investigation path intact without exemplars
 
 ### Q6: "If you had to do it again, what would you change?"
 
@@ -692,25 +681,25 @@ Start all port-forwards: `./scripts/flux-ui.sh`
 
 ```promql
 # RED: Rate (requests per second)
-rate(request_duration_seconds_count{job="microservices", app="$app"}[5m])
+rate(http_server_request_duration_seconds_count{app="$app"}[5m])
 
 # RED: Errors (5xx per second)
-rate(request_duration_seconds_count{job="microservices", app="$app", code=~"5.."}[5m])
+rate(http_server_request_duration_seconds_count{app="$app", http_response_status_code=~"5.."}[5m])
 
 # RED: Duration (P95 latency)
-histogram_quantile(0.95, rate(request_duration_seconds_bucket{job="microservices", app="$app"}[5m]))
+histogram_quantile(0.95, rate(http_server_request_duration_seconds_bucket{app="$app"}[5m]))
 
 # Error rate percentage
-rate(request_duration_seconds_count{code=~"5.."}[5m]) / rate(request_duration_seconds_count[5m]) * 100
+rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]) / rate(http_server_request_duration_seconds_count[5m]) * 100
 
-# Saturation (concurrent requests)
-requests_in_flight{job="microservices", app="$app"}
+# Saturation (Go runtime -- no OTel active-request gauge)
+go_goroutine_count{app="$app"}
 
 # Apdex score (satisfied < 0.5s, tolerating < 2s)
 (
-  sum(rate(request_duration_seconds_bucket{le="0.5", app="$app"}[5m]))
-  + 0.5 * (sum(rate(request_duration_seconds_bucket{le="2.0", app="$app"}[5m])) - sum(rate(request_duration_seconds_bucket{le="0.5", app="$app"}[5m])))
-) / sum(rate(request_duration_seconds_count{app="$app"}[5m]))
+  sum(rate(http_server_request_duration_seconds_bucket{le="0.5", app="$app"}[5m]))
+  + 0.5 * (sum(rate(http_server_request_duration_seconds_bucket{le="2.0", app="$app"}[5m])) - sum(rate(http_server_request_duration_seconds_bucket{le="0.5", app="$app"}[5m])))
+) / sum(rate(http_server_request_duration_seconds_count{app="$app"}[5m]))
 
 # SLO: Error budget remaining
 slo:error_budget_remaining:ratio{sloth_service="auth", sloth_slo="availability"}
@@ -721,11 +710,12 @@ slo:current_burn_rate:ratio{sloth_service="auth", sloth_slo="availability"}
 # USE: PostgreSQL connection utilization
 custom_connection_limits_current_connections / custom_connection_limits_max_connections
 
-# Service availability
-up{job="microservices"}
+# Service liveness (heartbeat-absence -- D-4; no up{} for pushed apps)
+count by (app,namespace,k8s_pod_name)(last_over_time(go_goroutine_count{app!=""}[15m]))
+  unless count by (app,namespace,k8s_pod_name)(go_goroutine_count{app!=""})
 
 # Cardinality check (series per metric)
-count by (__name__) ({job="microservices"})
+count by (__name__) ({app!=""})
 ```
 
 ### Key LogsQL Queries (VictoriaLogs)
@@ -756,9 +746,9 @@ When an alert fires, follow this checklist:
 
 - [ ] **1. Identify**: Which SLO is burning? Which service? What severity (page/ticket)?
 - [ ] **2. Dashboard**: Open Grafana dashboard, filter by service. Check P95, error rate, RPS panels
-- [ ] **3. Exemplar**: Enable Exemplars on the relevant metric panel. Click the dot at the spike
-- [ ] **4. Trace**: In Tempo, read the trace waterfall. Find the slowest/failing span
-- [ ] **5. Logs**: Search VictoriaLogs by `trace_id`. Read error messages and stack traces
+- [ ] **3. Logs**: Filter VictoriaLogs by `app` + the spike's time window. Grab a `trace_id` from a slow/error line
+- [ ] **4. Trace**: In Tempo (traces<->logs correlation), read the trace waterfall. Find the slowest/failing span
+- [ ] **5. Logs (pivot)**: Search VictoriaLogs by `trace_id`. Read error messages and stack traces
 - [ ] **6. Profile**: If the trace points to a code bottleneck, check Pyroscope flamegraph for the service
 - [ ] **7. Resolve**: Apply fix. Verify: dashboard shows recovery, SLO burn rate returns to normal
 - [ ] **8. Document**: Record the incident -- root cause, fix applied, prevention measures
@@ -767,9 +757,9 @@ When an alert fires, follow this checklist:
 
 | Framework | Signals | Use For | Our Implementation |
 |-----------|---------|---------|-------------------|
-| **RED** | Rate, Errors, Duration | APIs, microservices | `request_duration_seconds` histogram |
-| **USE** | Utilization, Saturation, Errors | Infrastructure, DBs | PostgreSQL alerts, `requests_in_flight` |
-| **4 Golden Signals** | Latency, Traffic, Errors, Saturation | Full stack | RED + `requests_in_flight` = all 4 covered |
+| **RED** | Rate, Errors, Duration | APIs, microservices | `http_server_request_duration_seconds` histogram |
+| **USE** | Utilization, Saturation, Errors | Infrastructure, DBs | PostgreSQL alerts, Go runtime metrics |
+| **4 Golden Signals** | Latency, Traffic, Errors, Saturation | Full stack | RED + Go runtime saturation = all 4 covered |
 
 ### Interview Framework
 

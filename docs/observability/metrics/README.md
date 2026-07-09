@@ -8,12 +8,12 @@ of code* (see [`../README.md`](../README.md)).
 
 | | |
 |---|---|
-| **Collector** | VMAgent — scrapes every target's `/metrics` every `15s` |
+| **Collectors** | OTel Collector — receives **OTLP push** from the 9 apps + order-worker; VMAgent — scrapes **infra exporters'** `/metrics` every `15s` |
 | **Storage** | VMSingle `:8428` — single-binary TSDB + Prometheus-compatible PromQL/MetricsQL API |
 | **CRDs** | `prometheus-operator-crds` (definitions only) → auto-converted to VM CRDs by the VM Operator |
 | **Rules / alerts** | VMAlert (recording + alerting) → VMAlertmanager; SLO burn-rate via Sloth |
 | **Visualization** | Grafana (VictoriaMetrics datasource) |
-| **Correlation** | Exemplars carry `traceID` → click a latency spike straight into Tempo |
+| **Correlation** | Shared `trace_id` field pivots metrics↔logs↔traces (VictoriaLogs + Tempo traces↔logs); VictoriaMetrics does **not** support exemplars (RFC-0014 D-14) |
 
 ---
 
@@ -31,10 +31,13 @@ industry-standard methodologies, each answering a different question:
 | **Golden Signals** | Superset | Latency, Traffic, Errors, **Saturation** | Full-stack (RED + saturation) | Google SRE |
 
 **How they combine here:** the 9 Go microservices are request-driven, so they use
-**RED** — all three signals come from a single `request_duration_seconds`
-histogram, plus `requests_in_flight` for the 4th Golden Signal (saturation).
-Infrastructure (pods, nodes, databases, cache) is resource-driven, so it uses
-**USE**. The Four Golden Signals are the umbrella that both roll up into.
+**RED** — all three signals come from a single `http_server_request_duration_seconds`
+histogram. (The scrape-era `requests_in_flight` saturation gauge has **no OTel
+equivalent** — otelgin v0.69 doesn't emit `http.server.active_requests` — so the
+4th Golden Signal for apps is now inferred from container working-set and GC
+pacing rather than an in-flight counter.) Infrastructure (pods, nodes, databases,
+cache) is resource-driven, so it uses **USE**. The Four Golden Signals are the
+umbrella that both roll up into.
 
 **SLOs** sit on top of the metrics. Service Level Objectives (e.g. "99% of
 requests < 500ms", "99.9% availability") are defined per service and compiled by
@@ -64,9 +67,11 @@ server or `kube-prometheus-stack`. The reasons:
 
 - **Lower footprint** — VMSingle uses far less RAM/disk than Prometheus for the
   same series count, which matters on a Kind homelab and keeps prod cheap.
-- **Drop-in compatibility** — VMSingle speaks the Prometheus remote-write,
-  PromQL, and exemplar APIs, so Grafana, dashboards, and queries are unchanged;
-  MetricsQL adds conveniences on top.
+- **Drop-in compatibility** — VMSingle speaks the Prometheus remote-write and
+  PromQL APIs, so Grafana, dashboards, and queries are unchanged; MetricsQL adds
+  conveniences on top. (VictoriaMetrics does **not** support exemplars — an
+  accepted trade-off of the OTLP cutover, RFC-0014 D-14; correlation is via the
+  shared `trace_id` field instead.)
 - **One operator, familiar CRDs** — the VM Operator consumes the *same*
   `ServiceMonitor` / `PodMonitor` / `PrometheusRule` CRDs the ecosystem already
   emits (Valkey charts, Sloth, etc.), auto-converting them to native VM scrape
@@ -78,40 +83,50 @@ Full architecture, the dual-CRD model, and component deep-dive:
 
 ## Architecture
 
-One pipeline serves all three layers. VMAgent auto-discovers targets from
-`ServiceMonitor`/`PodMonitor` objects (converted to VM scrape CRDs), scrapes
-`/metrics`, injects target labels (`app`, `namespace`, `job`, `instance`), and
-remote-writes to VMSingle. Grafana queries VMSingle; VMAlert evaluates rules and
-routes firing alerts to VMAlertmanager.
+Two ingest paths feed one store. The **9 Go apps + order-worker push OTLP**
+(SDK → OTel Collector → VMAgent's OTLP ingest → VMSingle) — there is **no
+`/metrics` scrape** for them. **Infra exporters** (kube-state-metrics, cAdvisor,
+postgres/Valkey exporters) are still **scraped** by VMAgent via
+`ServiceMonitor`/`PodMonitor` objects (converted to VM scrape CRDs) every 15s.
+App series get their `app`/`namespace` labels from OTLP resource attributes plus
+VMAgent relabeling (`service_name→app`, `k8s_namespace_name→namespace`) — not
+from scrape target labels, and with **no `job` label** on the push path. Grafana
+queries VMSingle; VMAlert evaluates rules and routes firing alerts to
+VMAlertmanager.
 
 ```mermaid
 flowchart LR
     subgraph apps["Apps layer"]
-        SVC["9 Go services + order-worker<br/>/metrics — HTTP + gRPC RED"]
+        SVC["9 Go services + order-worker<br/>OTLP push — HTTP + gRPC RED"]
     end
     subgraph infra["Infra layer"]
-        KSM["kube-state-metrics<br/>up · restarts · USE"]
+        KSM["kube-state-metrics / cAdvisor<br/>restarts · USE"]
     end
     subgraph db["Databases layer"]
         PGE["postgres_exporter / pg_exporter / CNPG<br/>Valkey exporter"]
     end
 
-    SVC & KSM & PGE -->|"scrape /metrics 15s<br/>+ label injection"| VMA["VMAgent"]
+    SVC -->|"OTLP push"| OTEL["OTel Collector"]
+    OTEL -->|"OTLP export"| VMA["VMAgent<br/>(OTLP ingest + relabel)"]
+    KSM & PGE -->|"scrape /metrics 15s"| VMA
     VMA -->|remote write| VMS[("VMSingle :8428")]
     VMS --> GRAF["Grafana"]
     VMS --> VMAL["VMAlert"] --> AM["VMAlertmanager"]
-    SVC -. "exemplar traceID" .-> TEMPO["Tempo"]
-    GRAF -. "exemplar click-through" .-> TEMPO
+    SVC -. "trace_id in spans + logs" .-> CORR["Tempo / VictoriaLogs<br/>(no exemplars — D-14)"]
 ```
 
 Two cross-cutting conventions make this scale to any number of services without
 manual wiring — detailed in [metrics-apps.md](metrics-apps.md):
 
-- **Label injection** — applications emit only 3 labels (`method`, `path`,
-  `code`); VMAgent adds `app`/`namespace`/`job`/`instance` at scrape time.
-- **ServiceMonitor auto-discovery** — a single `ServiceMonitor` selects every
-  Service labelled `app.kubernetes.io/component: api` in any namespace, so new services (deployed
-  via the `mop` chart) are scraped automatically.
+- **Resource-attribute labels** — app series carry semconv metric attributes
+  (`http_request_method`, `http_route`, `http_response_status_code`); their
+  `app`/`namespace` come from OTLP resource attributes via VMAgent relabel
+  (`service_name→app`, `k8s_namespace_name→namespace`). The push path has **no
+  `job` label**.
+- **Zero-wiring onboarding** — a service scales in automatically the moment its
+  SDK starts exporting OTLP; there is no per-service ServiceMonitor to add.
+  (Infra exporters are still discovered via a `ServiceMonitor`/`PodMonitor`
+  scrape selector.)
 
 ## Metrics coverage by layer
 
@@ -120,7 +135,7 @@ runbooks:
 
 | Layer | What it covers | Methodology | Reference |
 |-------|----------------|-------------|-----------|
-| **Applications** | HTTP RED (`request_duration_seconds`), saturation, request/response size, Go runtime, **gRPC east-west RED**, exemplars, instrumentation | RED + Golden | [**metrics-apps.md**](metrics-apps.md) |
+| **Applications** | HTTP RED (`http_server_request_duration_seconds`), request/response body size, Go runtime, **gRPC east-west RED**, `trace_id` correlation, instrumentation | RED + Golden | [**metrics-apps.md**](metrics-apps.md) |
 | **Infrastructure** | `up`, container restarts, pod/node/API-server resources, network | USE + Golden | [**metrics-infra.md**](metrics-infra.md) |
 | **Databases** | PostgreSQL (Zalando + CNPG), custom queries, PgBouncer/pooler, Valkey | USE | [**postgresql/monitoring.md**](postgresql/monitoring.md) |
 
@@ -130,11 +145,11 @@ Status of each methodology across the platform (✅ implemented, ❌ scoped out)
 
 | Signal | Scope | Status | Implementation |
 |--------|-------|:------:|----------------|
-| **RED** (Rate/Errors/Duration) | 9 microservices | ✅ | `request_duration_seconds` → recording rules + 17 alerts + Apdex |
+| **RED** (Rate/Errors/Duration) | 9 microservices | ✅ | `http_server_request_duration_seconds` → recording rules + 16 alerts + Apdex |
 | **Latency** | API server | ✅ | `KubeAPIServerHighLatency` (P99 > 1s) |
 | **Traffic** | Microservices | ✅ | RPS recording rule + per-endpoint breakdown |
 | **Errors** | Infra / API server / PostgreSQL / Valkey | ✅ | OOMKill, CrashLoop, 5xx rate, ~25 PG alerts, Valkey down/rejected |
-| **Saturation** | Microservices / pods / nodes / API server / PG / Valkey | ✅ | `requests_in_flight`, CPU throttle, memory pressure, inflight, connections, evictions |
+| **Saturation** | Microservices / pods / nodes / API server / PG / Valkey | ✅ | CPU throttle, memory pressure, connections, evictions (app-level `requests_in_flight` retired — no OTel equivalent; apps saturate via container working-set + GC pacing) |
 | **USE** | Pod CPU/mem, node, PVC, network, PostgreSQL, Valkey, workloads | ✅ | See [metrics-infra.md](metrics-infra.md) + [databases](postgresql/monitoring.md) |
 | **SLO** | Microservices | ✅ | 48 Sloth-generated burn-rate rules |
 | etcd / kubelet / ingress / node_exporter | Cluster | ❌ | Scoped out for Kind — see [metrics-infra.md](metrics-infra.md#not-covered-scoped-out-for-kind) |
@@ -179,13 +194,13 @@ flux reconcile kustomization monitoring-local --with-source
 Sample RED queries (microservices):
 
 ```promql
-# Rate (RPS)
-sum(rate(request_duration_seconds_count{job="microservices"}[5m]))
+# Rate (RPS) — OTLP push path has no job label; select on app
+sum(rate(http_server_request_duration_seconds_count{app!=""}[5m]))
 # Error ratio
-sum(rate(request_duration_seconds_count{job="microservices", code=~"5.."}[5m]))
-  / sum(rate(request_duration_seconds_count{job="microservices"}[5m]))
+sum(rate(http_server_request_duration_seconds_count{app!="", http_response_status_code=~"5.."}[5m]))
+  / sum(rate(http_server_request_duration_seconds_count{app!=""}[5m]))
 # Duration (P95)
-histogram_quantile(0.95, sum by (le) (rate(request_duration_seconds_bucket{job="microservices"}[5m])))
+histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{app!=""}[5m])))
 ```
 
 ## References
@@ -200,4 +215,4 @@ histogram_quantile(0.95, sum by (le) (rate(request_duration_seconds_bucket{job="
 
 ---
 
-_Last updated: 2026-06-29 — VictoriaMetrics (VMAgent + VMSingle `:8428`), 3-layer coverage (apps/infra/databases), SLO via Sloth._
+_Last updated: 2026-07-09 — OTLP push for apps + VMAgent scrape for infra, VMSingle `:8428`, 3-layer coverage (apps/infra/databases), SLO via Sloth._

@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Docs swept to the OTLP/semconv reality (RFC-0014 P5)**: ~19 observability
+  docs re-pointed from `request_duration_seconds{method,path,code}` +
+  `job="microservices"` to `http_server_request_duration_seconds` +
+  `http_request_method`/`http_route`/`http_response_status_code` (no `job`);
+  recording-rule names `job_app:*`→`app:*`; `up{}` liveness → D-4
+  heartbeat-absence; scrape narratives → OTLP push (VMAgent scrape kept only
+  for infra exporters). Exemplar claims corrected to the lost-but-replaced
+  reality (D-14): correlation is now the `trace_id` field in VictoriaLogs +
+  Tempo traces↔logs. `metrics-apps.md` (the contract doc) rewritten.
+  `requests_in_flight` and GC-pause docs marked removed/no-OTel-equivalent.
+  RFC-0013 banner-marked superseded (metric naming) by RFC-0014 P3; RFC-0014
+  phase table + tracking.md marked P4/P5 done.
+
 ### Added
 
 - **OTLP logs pipeline + canary (RFC-0014 P4)**: the local-stack collector's

@@ -219,12 +219,54 @@ The four-pillar observability stack must not regress. gRPC keeps it intact:
   `grpc-health-probe`. During dual-port, **keep the HTTP `/health` and `/ready`
   probes** (they already work); only switch the Kubernetes probes to gRPC once a
   service is gRPC-primary.
+- **Logging.** A shared **access-log interceptor** in `grpcx` (server-side) emits
+  one structured line per incoming RPC — the gRPC counterpart of the HTTP request
+  log — so east-west calls are visible in VictoriaLogs alongside edge traffic. See
+  [Access logging](#access-logging-east-west) below.
 - **Debugging.** Enable **server reflection** so `grpcurl` can introspect and call
   services without a local copy of the protos — the gRPC analogue of `curl`.
 - **OTLP exporter.** The collector already accepts OTLP on **gRPC `:4317`** and
   **HTTP `:4318`**. Services currently export over `:4318`. Switching the app's
   own OTLP exporter to `:4317` is **optional and independent** of this proposal —
   do it only if we want gRPC OTLP too; it is not a prerequisite.
+
+### Access logging (east-west)
+
+Before RFC-0014 P4, an east-west RPC had spans and RED metrics but **no per-call
+log line** — the HTTP `LoggingMiddleware` is a Gin middleware and never sees gRPC
+traffic. `grpcx.NewServer(logger, …)` now chains a server-side access-log
+interceptor (unary + stream) that logs each incoming RPC through the service's
+OTLP-teed zap logger, so the line lands on the same `{service.name=…}` stream in
+VictoriaLogs as the service's HTTP and application logs.
+
+| Aspect | Behavior |
+|---|---|
+| **Fields** | `trace_id`, `method` (`info.FullMethod`), `code` (gRPC status string), `duration`, `peer` (caller pod address) |
+| **Level** | `OK` → Info; any other code → Error (mirrors the HTTP logger's `>=400 → Error`) |
+| **Side** | **Server (callee) only.** The caller already has the client span + `rpc_client_*` metrics; logging both ends would double every east-west line. |
+| **Skipped** | Health checks (`/grpc.health.v1.Health/`) and reflection (`/grpc.reflection.`) — the same infra set `telemetryFilter` excludes from traces/metrics, so kubelet probes and keepalive pings don't flood the log. |
+| **Panics** | A handler panic is recovered to `codes.Internal` (recovery interceptor, inner) and **still logged** as an Error line with `code=Internal` — the access interceptor is chained outermost so it observes the recovered result. |
+
+**Field-naming vs the HTTP log (deliberate):** `trace_id` / `method` / `duration`
+match exactly, so a `trace_id:"…"` query spans both protocols. The outcome and
+caller fields differ on purpose — gRPC uses `code`/`peer`, HTTP uses
+`status`/`client_ip` — because a gRPC status code is a distinct enum (reusing the
+integer `status` field would make it mixed-type in VictoriaLogs) and `peer` is the
+in-cluster caller, not the edge client behind Kong. Cross-protocol filtering
+therefore keys on `trace_id`, not a shared status field.
+
+```mermaid
+flowchart LR
+    C["caller<br/>(otelgrpc client span<br/>+ rpc_client_* metrics)"] -->|"RPC"| S
+    subgraph S["callee — grpcx.NewServer(logger)"]
+        AL["accessLogUnary<br/>(outermost)"] --> RC["recoveryUnary<br/>(inner)"] --> H["business handler"]
+    end
+    AL -->|"one line per RPC<br/>trace_id · method · code · duration · peer"| Z["zap (OTLP tee)"]
+    Z --> COL["otel-collector"] --> VL["VictoriaLogs<br/>{service.name=…}"]
+```
+
+Introduced in `pkg` v0.18.1 (the v0.18.0 interceptor had the recovery/access-log
+chain inverted, so recovered panics were never logged — fixed in v0.18.1).
 
 ### Resilience & hardening (pkg/grpcx v0.6.0)
 

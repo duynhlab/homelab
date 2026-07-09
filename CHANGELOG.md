@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **New-name alert & recording-rule copies (RFC-0014 P2)**: `alerts-otel.yaml`
+  (12 ported alerts + D-4 heartbeat-absence pair replacing `up{}` + new
+  pipeline-health and gRPC east-west alerts, all labeled `pipeline: otel`) and
+  `recording-rules-otel.yaml` (14 re-minted `app:*` records + a new gRPC RED
+  group) evaluate side-by-side with the legacy groups; Alertmanager routes
+  `pipeline="otel"` to a new `#alerts-otel-staging` receiver. Deviations vs
+  the plan (verified against live OTLP series): `requests_in_flight` has no
+  otelgin equivalent yet; GC-pause alerts replaced by a used-vs-goal
+  pacing-pressure alert.
+
 - **Cluster OTLP metrics env (RFC-0014 P1 cluster slice)**: the four domain
   ResourceSets and the order-worker inject `K8S_NAMESPACE_NAME` +
   `K8S_POD_NAME` (Downward API — the exact names obsx reads for the k8s

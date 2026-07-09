@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Metrics cutover to OTLP (RFC-0014 P3, ADR-016)**: the OTLP-path alerts/
+  recording rules become canonical (files renamed over the legacy ones, alert
+  names keep their runbook anchors, D-4 heartbeat liveness replaces `up{}`);
+  the apps' ServiceMonitor and the order-worker PodMonitor are deleted
+  (checkout-service was never integrated, so the RFC's legacy-checkout
+  fence is dropped — ADR-016; Temporal metric names verified identical on
+  the push path first); Alertmanager staging route/receiver
+  removed; the main Grafana dashboard CR re-points at the OTel dashboard;
+  local-stack provisions the adapted local copies (microservices + Temporal).
+
 ### Added
 
 - **New-name alert & recording-rule copies (RFC-0014 P2)**: `alerts-otel.yaml`

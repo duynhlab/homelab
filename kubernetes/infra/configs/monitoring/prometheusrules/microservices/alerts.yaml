@@ -1,9 +1,22 @@
-# PrometheusRule for microservice application alerts (RED/Golden Signals).
-# Layer 1: Simple threshold alerts for immediate detection.
-# Layer 2 (SLO burn-rate) is handled by Sloth Operator -- see docs/observability/slo/.
+# PrometheusRule for microservice application alerts (RED/Golden Signals) on
+# the OTLP push pipeline (RFC-0014 P3 cutover — these ARE the canonical
+# alerts; the scrape-era groups retired with the cutover).
+# Layer 1: simple threshold alerts. Layer 2 (SLO burn-rate) is Sloth — see
+# docs/observability/slo/.
 #
-# Metrics source: PrometheusMiddleware in all 8 services (request_duration_seconds,
-# requests_in_flight, Go runtime). Scraped by VMAgent via ServiceMonitor (job="microservices").
+# Metrics source: OTLP push (pkg obsx SetupObservability) -> otel-collector ->
+# vmagent OTLP ingest. No job label on this path; vmagent relabeling (D-3)
+# maps service_name->app and k8s_namespace_name->namespace, so selectors key
+# on {app!=""}.
+#
+# Deviations from the scrape era (verified against live series, 2026-07-09):
+#   - requests_in_flight has NO otelgin equivalent (http.server.active_requests
+#     is not emitted by otelgin v0.69) — the two saturation alerts retired with
+#     the scrape; re-add when otelgin ships the metric.
+#   - The Go runtime instrumentation exposes no GC pause metrics; the two GC
+#     alerts are replaced by MicroserviceGCThrash (used vs GC goal).
+#   - MicroserviceHighRestartRate is kube-state-metrics-based and lives on
+#     unchanged.
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -11,45 +24,55 @@ metadata:
   namespace: monitoring
 spec:
   groups:
-    # --- Availability ---
+    # --- Availability (D-4: up{} replacement — push path has no scrape liveness) ---
     - name: microservices-availability
       interval: 1m
       rules:
+        # A pod is "down" when its runtime heartbeat series (go_goroutine_count,
+        # emitted every 15s by the SDK) existed in the last 15m but no longer
+        # does. VictoriaMetrics keeps returning the last sample for ~5m
+        # (staleness window), so detection lags a pod kill by about 5 minutes —
+        # accepted in RFC-0014 D-4 and verified by the P3 pod-kill test.
         - alert: MicroserviceDown
-          expr: up{job="microservices"} == 0
-          for: 1m
+          expr: |
+            count by (app, namespace, k8s_pod_name) (last_over_time(go_goroutine_count{app!=""}[15m]))
+            unless count by (app, namespace, k8s_pod_name) (go_goroutine_count{app!=""})
+          for: 2m
           labels:
             severity: critical
             category: availability
           annotations:
-            summary: "Microservice instance down ({{ $labels.namespace }}/{{ $labels.app }})"
-            description: "Instance {{ $labels.instance }} of {{ $labels.app }} has been unreachable for more than 1 minute."
+            summary: "Microservice instance stopped reporting ({{ $labels.namespace }}/{{ $labels.app }})"
+            description: "Pod {{ $labels.k8s_pod_name }} of {{ $labels.app }} stopped pushing runtime metrics (heartbeat series vanished). OTLP-path liveness (D-4)."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicedown"
 
         - alert: MicroserviceAllInstancesDown
           expr: |
-            count by (app, namespace) (up{job="microservices"} == 1) == 0
-            and count by (app, namespace) (up{job="microservices"}) > 0
-          for: 1m
+            count by (app, namespace) (last_over_time(go_goroutine_count{app!=""}[15m])) > 0
+            unless count by (app, namespace) (go_goroutine_count{app!=""})
+          for: 2m
           labels:
             severity: critical
             category: availability
           annotations:
-            summary: "All instances of {{ $labels.app }} are down ({{ $labels.namespace }})"
-            description: "Every instance of {{ $labels.app }} in namespace {{ $labels.namespace }} is unreachable. Complete service outage."
+            summary: "All instances of {{ $labels.app }} stopped reporting ({{ $labels.namespace }})"
+            description: "Every pod of {{ $labels.app }} stopped pushing runtime metrics. Complete service outage or a broken OTLP pipeline — check the pipeline-health alert to disambiguate."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microserviceallinstancesdown"
 
-        - alert: MicroserviceHighRestartRate
+        # NEW (RFC-0014): the push pipeline itself is now a dependency of every
+        # alert above — page when the collector fails to export metric points.
+        # Requires the collector's self-telemetry scrape (:8888).
+        - alert: OtelMetricsPipelineExportFailures
           expr: |
-            increase(kube_pod_container_status_restarts_total{namespace=~"auth|user|product|cart|order|review|notification|shipping"}[15m]) > 3
+            sum by (exporter) (rate(otelcol_exporter_send_failed_metric_points_total[5m])) > 0
           for: 5m
           labels:
-            severity: warning
+            severity: critical
             category: availability
           annotations:
-            summary: "High restart rate ({{ $labels.namespace }}/{{ $labels.pod }})"
-            description: "Container {{ $labels.container }} in pod {{ $labels.pod }} has restarted {{ $value | humanize }} times in 15 minutes. Possible CrashLoopBackOff."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighrestartrate"
+            summary: "OTel collector failing to export metrics ({{ $labels.exporter }})"
+            description: "The collector dropped metric points for 5 minutes ({{ $value | humanize }} points/s). Every OTLP-path alert is blind while this fires."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/observability-deep-dive.md"
 
     # --- Errors (RED: Errors) ---
     - name: microservices-errors
@@ -58,8 +81,8 @@ spec:
         - alert: MicroserviceHighErrorRate
           expr: |
             (
-              sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices", code=~"5.."}[5m]))
-              / sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices"}[5m]))
+              sum by (app, namespace) (rate(http_server_request_duration_seconds_count{app!="", http_response_status_code=~"5.."}[5m]))
+              / sum by (app, namespace) (rate(http_server_request_duration_seconds_count{app!=""}[5m]))
             ) > 0.05
           for: 5m
           labels:
@@ -73,8 +96,8 @@ spec:
         - alert: MicroserviceErrorRateCritical
           expr: |
             (
-              sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices", code=~"5.."}[5m]))
-              / sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices"}[5m]))
+              sum by (app, namespace) (rate(http_server_request_duration_seconds_count{app!="", http_response_status_code=~"5.."}[5m]))
+              / sum by (app, namespace) (rate(http_server_request_duration_seconds_count{app!=""}[5m]))
             ) > 0.15
           for: 5m
           labels:
@@ -87,8 +110,8 @@ spec:
 
         - alert: MicroserviceNoSuccessfulRequests
           expr: |
-            sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices", code=~"2.."}[10m])) == 0
-            and sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices"}[1h])) > 0
+            sum by (app, namespace) (rate(http_server_request_duration_seconds_count{app!="", http_response_status_code=~"2.."}[10m])) == 0
+            and sum by (app, namespace) (rate(http_server_request_duration_seconds_count{app!=""}[1h])) > 0
           for: 10m
           labels:
             severity: critical
@@ -98,6 +121,23 @@ spec:
             description: "{{ $labels.app }} has returned zero 2xx responses in the last 10 minutes but had traffic in the prior hour. All requests may be failing."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicenosuccessfulrequests"
 
+        # NEW (RFC-0014): gRPC east-west finally gets monitoring, on the names
+        # that survive the cutover. Callee-side error ratio per service.
+        - alert: GrpcServerHighErrorRate
+          expr: |
+            (
+              sum by (app, namespace) (rate(rpc_server_call_duration_seconds_count{app!="", rpc_response_status_code!="OK"}[5m]))
+              / sum by (app, namespace) (rate(rpc_server_call_duration_seconds_count{app!=""}[5m]))
+            ) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+            category: errors
+          annotations:
+            summary: "High gRPC error rate on {{ $labels.app }} ({{ $labels.namespace }})"
+            description: "{{ $labels.app }} is failing {{ $value | humanizePercentage }} of incoming gRPC calls (threshold: 5%). East-west path — check the calling service's saga/retry behavior too."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md"
+
     # --- Latency (RED: Duration / Golden: Latency) ---
     - name: microservices-latency
       interval: 1m
@@ -105,7 +145,7 @@ spec:
         - alert: MicroserviceHighLatencyP95
           expr: |
             histogram_quantile(0.95,
-              sum by (app, namespace, le) (rate(request_duration_seconds_bucket{job="microservices"}[5m]))
+              sum by (app, namespace, le) (rate(http_server_request_duration_seconds_bucket{app!=""}[5m]))
             ) > 1
           for: 10m
           labels:
@@ -119,7 +159,7 @@ spec:
         - alert: MicroserviceHighLatencyP99
           expr: |
             histogram_quantile(0.99,
-              sum by (app, namespace, le) (rate(request_duration_seconds_bucket{job="microservices"}[5m]))
+              sum by (app, namespace, le) (rate(http_server_request_duration_seconds_bucket{app!=""}[5m]))
             ) > 2
           for: 10m
           labels:
@@ -133,7 +173,7 @@ spec:
         - alert: MicroserviceLatencyCritical
           expr: |
             histogram_quantile(0.95,
-              sum by (app, namespace, le) (rate(request_duration_seconds_bucket{job="microservices"}[5m]))
+              sum by (app, namespace, le) (rate(http_server_request_duration_seconds_bucket{app!=""}[5m]))
             ) > 2
           for: 5m
           labels:
@@ -144,14 +184,30 @@ spec:
             description: "{{ $labels.app }} P95 latency is {{ $value | humanizeDuration }} (threshold: 2s). Most requests are severely degraded."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicelatencycritical"
 
+        # NEW (RFC-0014): callee-side gRPC latency — internal calls have a much
+        # tighter budget than edge HTTP (they compose into edge latency).
+        - alert: GrpcServerHighLatencyP95
+          expr: |
+            histogram_quantile(0.95,
+              sum by (app, namespace, le) (rate(rpc_server_call_duration_seconds_bucket{app!=""}[5m]))
+            ) > 0.5
+          for: 10m
+          labels:
+            severity: warning
+            category: latency
+          annotations:
+            summary: "High gRPC P95 latency on {{ $labels.app }} ({{ $labels.namespace }})"
+            description: "{{ $labels.app }} P95 for incoming gRPC calls is {{ $value | humanizeDuration }} (threshold: 500ms). East-west latency compounds into every edge request that fans out."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md"
+
     # --- Traffic (RED: Rate / Golden: Traffic) ---
     - name: microservices-traffic
       interval: 1m
       rules:
         - alert: MicroserviceNoTraffic
           expr: |
-            sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices"}[10m])) == 0
-            and sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices"}[1h])) > 0
+            sum by (app, namespace) (rate(http_server_request_duration_seconds_count{app!=""}[10m])) == 0
+            and sum by (app, namespace) (rate(http_server_request_duration_seconds_count{app!=""}[1h])) > 0
           for: 10m
           labels:
             severity: warning
@@ -161,16 +217,18 @@ spec:
             description: "{{ $labels.app }} has received zero requests in the last 10 minutes but had traffic in the prior hour. Possible routing issue or upstream failure."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicenotraffic"
 
+        # The le="0.5" and le="2" boundaries exist ONLY because obsx pins the
+        # 13-bucket View (RFC-0014 D-7) — semconv's advised buckets lack le=2.
         - alert: MicroserviceApdexCritical
           expr: |
             (
-              sum by (app, namespace) (rate(request_duration_seconds_bucket{job="microservices", le="0.5"}[5m]))
+              sum by (app, namespace) (rate(http_server_request_duration_seconds_bucket{app!="", le="0.5"}[5m]))
               + 0.5 * (
-                sum by (app, namespace) (rate(request_duration_seconds_bucket{job="microservices", le="2"}[5m]))
-                - sum by (app, namespace) (rate(request_duration_seconds_bucket{job="microservices", le="0.5"}[5m]))
+                sum by (app, namespace) (rate(http_server_request_duration_seconds_bucket{app!="", le="2"}[5m]))
+                - sum by (app, namespace) (rate(http_server_request_duration_seconds_bucket{app!="", le="0.5"}[5m]))
               )
             )
-            / sum by (app, namespace) (rate(request_duration_seconds_count{job="microservices"}[5m]))
+            / sum by (app, namespace) (rate(http_server_request_duration_seconds_count{app!=""}[5m]))
             < 0.5
           for: 10m
           labels:
@@ -181,42 +239,20 @@ spec:
             description: "{{ $labels.app }} Apdex score is {{ $value | humanize }} (threshold: 0.5). Majority of users are experiencing unacceptable response times."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microserviceapdexcritical"
 
-    # --- Saturation (Golden: Saturation) ---
-    - name: microservices-saturation
-      interval: 1m
-      rules:
-        - alert: MicroserviceHighRequestsInFlight
-          expr: |
-            sum by (app, namespace) (requests_in_flight{job="microservices"}) > 50
-          for: 5m
-          labels:
-            severity: warning
-            category: saturation
-          annotations:
-            summary: "High concurrent requests for {{ $labels.app }} ({{ $labels.namespace }})"
-            description: "{{ $labels.app }} has {{ $value | humanize }} concurrent requests in flight (threshold: 50). Service may be approaching capacity."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighrequestsinflight"
-
-        - alert: MicroserviceRequestsInFlightCritical
-          expr: |
-            sum by (app, namespace) (requests_in_flight{job="microservices"}) > 100
-          for: 2m
-          labels:
-            severity: critical
-            category: saturation
-          annotations:
-            summary: "Critical concurrent requests for {{ $labels.app }} ({{ $labels.namespace }})"
-            description: "{{ $labels.app }} has {{ $value | humanize }} concurrent requests in flight (threshold: 100). Service is overloaded."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicerequestsinflightcritical"
-
     # --- Go Runtime ---
+    # requests_in_flight saturation alerts intentionally have no copy here —
+    # see the header. Saturation stays on the legacy scrape until otelgin
+    # emits http.server.active_requests.
     - name: microservices-runtime
       interval: 1m
       rules:
+        # deriv() replaces the old rate(): go_goroutine_count is a gauge, and
+        # rate() on a gauge undercounts across dips — a deliberate semantic
+        # fix carried with the rename (noted in tracking.md).
         - alert: MicroserviceGoroutineLeak
           expr: |
-            go_goroutines{job="microservices"} > 1000
-            and rate(go_goroutines{job="microservices"}[15m]) > 0.17
+            go_goroutine_count{app!=""} > 1000
+            and deriv(go_goroutine_count{app!=""}[15m]) > 0.17
           for: 15m
           labels:
             severity: warning
@@ -226,38 +262,43 @@ spec:
             description: "{{ $labels.app }} has {{ $value | humanize }} goroutines and the count is steadily increasing. Possible forgotten defer cancel(), unclosed channels, or blocking operations."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicegoroutineleak"
 
+        # Semantic change (RFC-0014): RSS threshold → limits-aware working set
+        # from cAdvisor. Fires on % of the container's memory limit, so it
+        # tracks Kyverno-mandated limits instead of a fixed 512Mi.
         - alert: MicroserviceHighMemoryUsage
           expr: |
-            process_resident_memory_bytes{job="microservices"} > 536870912
+            container_memory_working_set_bytes{namespace=~"auth|user|product|cart|order|review|notification|shipping|payment", container!="", container!="POD"}
+            / on (namespace, pod, container)
+              kube_pod_container_resource_limits{resource="memory"}
+            > 0.9
           for: 15m
           labels:
             severity: warning
             category: runtime
           annotations:
-            summary: "High memory usage ({{ $labels.namespace }}/{{ $labels.app }})"
-            description: "{{ $labels.app }} RSS is {{ $value | humanize1024 }}B (threshold: 512Mi). Check for memory leaks via Pyroscope heap profiles."
+            summary: "High memory usage ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Container {{ $labels.container }} working set is at {{ $value | humanizePercentage }} of its memory limit. Check for leaks via Pyroscope heap profiles before the OOM killer does."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighmemoryusage"
 
-        - alert: MicroserviceHighGCPressure
+        # Replaces BOTH GC-pause alerts: the OTel Go runtime instrumentation
+        # exposes no pause-time metric (verified 2026-07-09). Sustained
+        # used≈goal means the pacer is constantly triggering — the same
+        # GC-thrash condition the pause alerts approximated.
+        # sum by (app, namespace) is load-bearing: go_memory_used_bytes carries
+        # a go_memory_type label (stack/other) that go_memory_gc_goal_bytes
+        # lacks — a bare comparison never matches (verified live: 0 series).
+        # Summing the types slightly overcounts vs the heap-only goal;
+        # acceptable for thrash detection.
+        - alert: MicroserviceGCThrash
           expr: |
-            rate(go_gc_duration_seconds_sum{job="microservices"}[5m]) > 0.5
+            sum by (app, namespace) (go_memory_used_bytes{app!=""})
+            > 0.95 * sum by (app, namespace) (go_memory_gc_goal_bytes{app!=""})
           for: 15m
           labels:
             severity: warning
             category: runtime
           annotations:
-            summary: "High GC pressure ({{ $labels.namespace }}/{{ $labels.app }})"
-            description: "{{ $labels.app }} is spending {{ $value | humanize }}s per second in garbage collection (threshold: 0.5s/s). High memory allocation rate or insufficient heap."
+            summary: "GC pacing pressure ({{ $labels.namespace }}/{{ $labels.app }})"
+            description: "{{ $labels.app }} heap has been within 5% of the GC goal for 15 minutes — the collector is running back-to-back. High allocation rate or an undersized heap; consider GOGC/GOMEMLIMIT tuning."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighgcpressure"
 
-        - alert: MicroserviceHighGCFrequency
-          expr: |
-            rate(go_gc_duration_seconds_count{job="microservices"}[5m]) > 10
-          for: 15m
-          labels:
-            severity: warning
-            category: runtime
-          annotations:
-            summary: "High GC frequency ({{ $labels.namespace }}/{{ $labels.app }})"
-            description: "{{ $labels.app }} is running {{ $value | humanize }} GC cycles per second (threshold: 10/s). Consider increasing GOGC or reducing allocations."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighgcfrequency"

@@ -25,13 +25,11 @@ x-svc-env: &svc-env
   TRACING_ENABLED: "true"
   OTEL_COLLECTOR_ENDPOINT: otel-collector:4318 # host:port; the OTLP-HTTP SDK appends /v1/traces
   OTEL_SAMPLE_RATE: "1.0"                       # sample everything locally (prod default 0.1)
-  # RFC-0014 P1 dual-emit: semconv metrics over OTLP alongside the scraped
-  # /metrics endpoint (fleet-wide after the product canary soaked).
-  OTEL_METRICS_ENABLED: "true"
+  # RFC-0014 P3: OTLP is the only metrics pipeline (pkg v0.17.0 defaults it
+  # on; OTEL_METRICS_ENABLED=false is the kill switch).
   DEPLOYMENT_ENVIRONMENT: local
   PROFILING_ENABLED: "true"                     # local Pyroscope (disable to skip profiling)
   PYROSCOPE_ENDPOINT: http://pyroscope:4040
-  METRICS_ENABLED: "true"
   LOG_LEVEL: info
   LOG_FORMAT: json
   PORT: "8080"

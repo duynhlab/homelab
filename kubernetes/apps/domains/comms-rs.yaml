@@ -131,10 +131,10 @@ spec:
                 fieldPath: metadata.name
           - name: DEPLOYMENT_ENVIRONMENT
             value: "production"
-          # RFC-0014 P1 rollout flag — default off; flip per service via the
-          # RSIP input (canary first, fleet after soak).
+          # RFC-0014 P3: OTLP is the only metrics pipeline — default on
+          # fleet-wide; the RSIP input remains as a per-service kill switch.
           - name: OTEL_METRICS_ENABLED
-            value: << index inputs "otel_metrics_enabled" | default "false" | quote >>
+            value: << index inputs "otel_metrics_enabled" | default "true" | quote >>
           - name: PYROSCOPE_ENDPOINT
             value: << index inputs "pyroscope_endpoint" | default "http://pyroscope.monitoring.svc.cluster.local:4040" >>
           - name: LOG_LEVEL

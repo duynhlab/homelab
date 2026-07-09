@@ -424,6 +424,10 @@ services:
       <<: *svc-env
       SERVICE_NAME: product
       OTEL_SERVICE_NAME: product
+      # RFC-0014 P1b canary: dual-emit — semconv metrics over OTLP alongside
+      # the scraped /metrics endpoint (fleet stays off until the canary soaks).
+      OTEL_METRICS_ENABLED: "true"
+      DEPLOYMENT_ENVIRONMENT: local
       DB_NAME: product
       CACHE_ENABLED: "true"
       CACHE_HOST: cache

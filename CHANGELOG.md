@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **OTLP metrics canary env (RFC-0014 P1b)**: local-stack `product` gets
+  `OTEL_METRICS_ENABLED=true` + `DEPLOYMENT_ENVIRONMENT=local` — first
+  service dual-emitting semconv metrics over OTLP (pairs with
+  product-service pkg v0.16.0 adoption); fleet stays off until the canary
+  soaks.
 - **OTLP metrics pipeline (RFC-0014 P1a)**: otel-collector gains a `metrics`
   pipeline (`memory_limiter → deltatocumulative → batch`) exporting to
   vmagent's OTLP ingest (`:8429/opentelemetry/v1/metrics`, HTTP protobuf);

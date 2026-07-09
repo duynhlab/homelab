@@ -33,8 +33,8 @@ flowchart TD
     VMS -->|Prometheus-compatible API| Grafana["Grafana Dashboards"]
     VMS -->|Prometheus-compatible API| SlothUI["Sloth Web UI<br/>slo.duynh.me"]
 
-    SM["ServiceMonitor<br/>app.kubernetes.io/component: api"] -->|convert| VMSS["VMServiceScrape"]
-    VMSS --> VMAgent["VMAgent"]
+    App["Service SDK<br/>(OTLP push)"] --> OC["otel-collector"]
+    OC --> VMAgent["VMAgent<br/>(OTLP ingest + relabel)"]
     VMAgent -->|remote write| VMS
 ```
 
@@ -43,7 +43,7 @@ flowchart TD
 2. The `mop` Helm chart renders a `PrometheusServiceLevel` CRD
 3. Sloth Operator watches the CRD and generates PrometheusRules
 4. The VictoriaMetrics Operator converts those rules to VMRules; VMAlert evaluates PromQL-compatible rules against VMSingle, tracks error budgets, and sends alerts to VMAlertmanager
-5. ServiceMonitors auto-discover targets via `app.kubernetes.io/component: api`; VMAgent scrapes metrics (after ServiceMonitor → VMServiceScrape conversion) and remote-writes to VMSingle
+5. The 9 Go services push metrics via OTLP (SDK → otel-collector → VMAgent OTLP ingest); VMAgent relabels the OTLP resource attributes (`service_name`→`app`, `k8s_namespace_name`→`namespace`) and remote-writes to VMSingle. There is no `/metrics` scrape for the app services anymore — VMAgent's ServiceMonitor/VMServiceScrape path now covers only infra exporters (postgres, kube-state, cAdvisor, etc.)
 6. The standalone **Sloth UI** Deployment (separate from the controller) reads SLI/error-budget series back from VMSingle to render its dashboards
 
 ## SLO Definitions
@@ -58,40 +58,39 @@ Each service has **3 SLOs** with default targets (overridable per-service via He
 
 ### SLI Queries (PromQL)
 
-All SLIs use the same base metric `request_duration_seconds` with Sloth's `{{.window}}` template:
+All SLIs use the same base metric `http_server_request_duration_seconds` (OTel semconv) with Sloth's `{{.window}}` template:
 
 **Availability** (5xx only):
 ```promql
 # errorQuery
-sum(rate(request_duration_seconds_count{app="<service>", namespace="<ns>", job=~"microservices", code=~"5.."}[{{.window}}]))
+sum(rate(http_server_request_duration_seconds_count{app="<service>", namespace="<ns>", http_response_status_code=~"5.."}[{{.window}}]))
 # totalQuery
-sum(rate(request_duration_seconds_count{app="<service>", namespace="<ns>", job=~"microservices"}[{{.window}}]))
+sum(rate(http_server_request_duration_seconds_count{app="<service>", namespace="<ns>"}[{{.window}}]))
 ```
 
 **Latency** (total - fast = slow):
 ```promql
 # errorQuery (requests slower than threshold)
-sum(rate(request_duration_seconds_count{...}[{{.window}}])) - sum(rate(request_duration_seconds_bucket{..., le="0.5"}[{{.window}}]))
+sum(rate(http_server_request_duration_seconds_count{...}[{{.window}}])) - sum(rate(http_server_request_duration_seconds_bucket{..., le="0.5"}[{{.window}}]))
 # totalQuery
-sum(rate(request_duration_seconds_count{...}[{{.window}}]))
+sum(rate(http_server_request_duration_seconds_count{...}[{{.window}}]))
 ```
 
 **Error Rate** (4xx + 5xx):
 ```promql
 # errorQuery
-sum(rate(request_duration_seconds_count{..., code=~"4..|5.."}[{{.window}}]))
+sum(rate(http_server_request_duration_seconds_count{..., http_response_status_code=~"4..|5.."}[{{.window}}]))
 # totalQuery
-sum(rate(request_duration_seconds_count{...}[{{.window}}]))
+sum(rate(http_server_request_duration_seconds_count{...}[{{.window}}]))
 ```
 
 ### Query Labels
 
 | Label | Source | Example |
 |---|---|---|
-| `app` | Helm chart `name` | `auth` |
-| `namespace` | Kubernetes namespace | `auth` |
-| `job` | ServiceMonitor relabeling | `microservices` |
-| `code` | Application metric | `200`, `404`, `500` |
+| `app` | OTLP resource attr `service_name`, VMAgent relabel → `app` | `auth` |
+| `namespace` | OTLP resource attr `k8s_namespace_name`, VMAgent relabel → `namespace` | `auth` |
+| `http_response_status_code` | Application metric (OTel semconv) | `200`, `404`, `500` |
 
 ## SLO Targets
 
@@ -189,7 +188,7 @@ The Grafana dashboards and the Sloth UI are complementary: Grafana for long-form
 - Sloth Operator (controller): `kubernetes/infra/controllers/metrics/sloth-operator.yaml`
 - Sloth Web UI (Deployment + Service + PodMonitor): `kubernetes/infra/configs/monitoring/sloth/sloth-ui.yaml`
 - Sloth UI Ingress: `kubernetes/infra/configs/kong/ingress-monitoring.yaml` (`slo.duynh.me`)
-- ServiceMonitor: `kubernetes/infra/configs/monitoring/servicemonitors/microservices.yaml`
+- OTLP metrics pipeline (app services push, no scrape): `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
 
 ### External References
 

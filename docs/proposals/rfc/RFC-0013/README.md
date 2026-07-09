@@ -2,7 +2,18 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | platform-wide | 2026-07-07 | 2026-07-07 |
+| superseded (metric naming) | platform-wide | 2026-07-07 | 2026-07-09 |
+
+> **⚠️ Superseded by [RFC-0014](../RFC-0014/) (P3 cutover, 2026-07-09).** The metric
+> names, labels, and streaming-aggregation match patterns below reflect the
+> **pre-cutover** client_golang world (`request_duration_seconds{method,path,code}`,
+> `job="microservices"`, `requests_in_flight`). The platform now emits semconv
+> names over OTLP (`http_server_request_duration_seconds`, labels
+> `http_request_method`/`http_route`/`http_response_status_code`, no `job`). This
+> RFC is preserved **as the historical audit record** — its findings and rubric
+> stand; do not read its queries as current. For the live streaming-aggregation
+> pattern on the new names see
+> [streaming-aggregation.md](../../../observability/metrics/streaming-aggregation.md).
 
 > **Progress**: P1 (audit + standard hardening) and P2 (scale playbook) land with
 > this RFC. P3a/P3b (homelab shadow pilot → adopt) and P4 (remediation) are

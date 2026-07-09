@@ -40,7 +40,7 @@ xychart-beta
 ## The problem: querying a raw counter
 
 ```promql
-request_duration_seconds_count{app="auth"}
+http_server_request_duration_seconds_count{app="auth"}
 ```
 
 When the pod restarts the value drops to `0`, so the graph shows a cliff and the
@@ -64,7 +64,7 @@ rate(counter[window]) = (value_end - value_start) / window_seconds
 ```
 
 ```promql
-rate(request_duration_seconds_count{app="auth"}[5m])
+rate(http_server_request_duration_seconds_count{app="auth"}[5m])
 ```
 
 How resets are handled — a negative delta is treated as a reset and ignored,
@@ -102,7 +102,7 @@ increase(counter[window]) = rate(counter[window]) * window_seconds
 ```
 
 ```promql
-increase(request_duration_seconds_count{app="auth"}[$__range])
+increase(http_server_request_duration_seconds_count{app="auth"}[$__range])
 ```
 
 ```mermaid
@@ -141,9 +141,9 @@ distribution pie charts, and SLO totals.
 Example queries:
 
 ```promql
-sum(request_duration_seconds_count{app="auth"})                       # raw — avoid
-sum(rate(request_duration_seconds_count{app="auth"}[5m]))             # RPS
-sum(increase(request_duration_seconds_count{app="auth"}[$__range]))   # total in range
+sum(http_server_request_duration_seconds_count{app="auth"})                       # raw — avoid
+sum(rate(http_server_request_duration_seconds_count{app="auth"}[5m]))             # RPS
+sum(increase(http_server_request_duration_seconds_count{app="auth"}[$__range]))   # total in range
 ```
 
 ## Time Range vs Rate Interval
@@ -184,7 +184,7 @@ variable. It affects `rate()` results and the smoothness of time-series graphs.
 **"Total Request" — does NOT change with `$rate`** (depends only on Time Range):
 
 ```promql
-sum(increase(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$__range]))
+sum(increase(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$__range]))
 ```
 
 ```
@@ -196,7 +196,7 @@ $rate = 5m  → 21,600 requests (unchanged)
 **"Total RPS" — changes with `$rate`** (depends on the rate window):
 
 ```promql
-sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$rate]))
+sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$rate]))
 ```
 
 ```
@@ -210,9 +210,9 @@ consistency:
 
 ```promql
 (
-  sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", code=~"2.."}[$rate]))
+  sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace", http_response_status_code=~"2.."}[$rate]))
   /
-  sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$rate]))
+  sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$rate]))
 ) * 100
 ```
 
@@ -321,4 +321,4 @@ more sensitive.
 
 ---
 
-_Last updated: 2026-06-29 — counters, `rate()` vs `increase()`, Time Range vs `$rate` on VictoriaMetrics._
+_Last updated: 2026-07-09 — counters, `rate()` vs `increase()`, Time Range vs `$rate` on VictoriaMetrics._

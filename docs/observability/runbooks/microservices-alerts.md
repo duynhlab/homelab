@@ -6,7 +6,7 @@
 >
 > **Recording Rules**: [`kubernetes/infra/configs/monitoring/prometheusrules/microservices/recording-rules.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/microservices/recording-rules.yaml)
 >
-> **Last Updated**: 2026-03-13
+> **Last Updated**: 2026-07-09
 
 ---
 
@@ -81,8 +81,7 @@ flowchart TD
 | | `MicroserviceRequestsInFlightCritical` | critical | 2m | Golden: Saturation |
 | **Runtime** | `MicroserviceGoroutineLeak` | warning | 15m | USE: Saturation |
 | | `MicroserviceHighMemoryUsage` | warning | 15m | USE: Utilization |
-| | `MicroserviceHighGCPressure` | warning | 15m | USE: Saturation |
-| | `MicroserviceHighGCFrequency` | warning | 15m | USE: Saturation |
+| | `MicroserviceGCThrash` | warning | 15m | USE: Saturation |
 
 ---
 
@@ -90,7 +89,7 @@ flowchart TD
 
 ### MicroserviceDown
 
-**Fires when**: A single microservice instance is unreachable (`up == 0`) for more than 1 minute.
+**Fires when**: A microservice stops emitting metrics for more than 1 minute. The apps push OTLP (SDK -> otel-collector -> vmagent) and no longer expose a `/metrics` scrape target, so there is no `up` series -- liveness is inferred from **heartbeat absence** (no fresh `go_goroutine_count` samples). Detection lags a pod kill by ~5 minutes due to VictoriaMetrics staleness (accepted, RFC-0014 D-4).
 
 **Severity**: critical
 
@@ -98,7 +97,7 @@ flowchart TD
 - Pod crashed (OOMKilled, application panic, segfault)
 - Pod evicted (node resource pressure)
 - Deployment rollout in progress
-- Network policy blocking Prometheus scrape
+- NetworkPolicy or collector outage breaking the OTLP push path (SDK -> otel-collector -> vmagent)
 
 **Investigation**:
 
@@ -117,8 +116,9 @@ kubectl rollout status deployment/$APP -n $NAMESPACE
 ```
 
 ```promql
-# Verify: which instances are down?
-up{job="microservices", app="$APP"} == 0
+# Verify: which pods stopped emitting metrics? (heartbeat absence, D-4)
+count by (app, namespace, k8s_pod_name) (last_over_time(go_goroutine_count{app="$APP"}[15m]))
+  unless count by (app, namespace, k8s_pod_name) (go_goroutine_count{app="$APP"})
 
 # Check restart history
 increase(kube_pod_container_status_restarts_total{namespace="$NAMESPACE", pod=~"$APP.*"}[1h])
@@ -223,10 +223,10 @@ kubectl logs -n $NAMESPACE $POD_NAME --previous --tail=50
 
 ```promql
 # Error rate by service
-job_app:request_duration_seconds:error_ratio5m{app="$APP"}
+app:http_server_request_duration_seconds:error_ratio5m{app="$APP"}
 
 # Error rate by endpoint (find the hot path)
-job_app_path:request_duration_seconds:error_rate5m{app="$APP"} > 0
+app_route:http_server_request_duration_seconds:error_rate5m{app="$APP"} > 0
 
 # Was there a deployment recently?
 kube_pod_container_status_restarts_total{namespace="$NAMESPACE"}
@@ -246,10 +246,9 @@ kubectl rollout history deployment/$APP -n $NAMESPACE
 
 **Resolution**:
 1. Identify failing endpoint from per-endpoint error rate
-2. Use exemplars to jump from error metric to trace in Tempo
-3. Search trace_id in VictoriaLogs for detailed error logs
-4. If new deployment: rollback with `kubectl rollout undo`
-5. If DB issue: check PostgreSQL alerts
+2. Search the `trace_id` field in VictoriaLogs for the error logs, then open the linked trace in Tempo (traces<->logs correlation). Exemplars are not available -- VictoriaMetrics does not support them (RFC-0014 D-14)
+3. If new deployment: rollback with `kubectl rollout undo`
+4. If DB issue: check PostgreSQL alerts
 
 ---
 
@@ -281,10 +280,10 @@ Same investigation as `MicroserviceHighErrorRate` but with higher urgency. At 15
 
 ```promql
 # Check status code distribution
-sum by (code) (rate(request_duration_seconds_count{job="microservices", app="$APP"}[5m]))
+sum by (http_response_status_code) (rate(http_server_request_duration_seconds_count{app="$APP"}[5m]))
 
 # Is there traffic at all?
-job_app:request_duration_seconds:rate5m{app="$APP"}
+app:http_server_request_duration_seconds:rate5m{app="$APP"}
 ```
 
 **Resolution**:
@@ -312,16 +311,17 @@ job_app:request_duration_seconds:rate5m{app="$APP"}
 
 ```promql
 # P95 latency by service
-job_app:request_duration_seconds:p95_5m{app="$APP"}
+app:http_server_request_duration_seconds:p95_5m{app="$APP"}
 
 # P95 by endpoint (find slow endpoints)
-job_app_path:request_duration_seconds:p95_5m{app="$APP"}
+app_route:http_server_request_duration_seconds:p95_5m{app="$APP"}
 
-# Check concurrent requests (saturation causing latency?)
-job_app:requests_in_flight:sum{app="$APP"}
+# Check saturation: the in-flight signal is no longer emitted -- otelgin exposes no
+# http_server_active_requests, so the requests-in-flight alerts retired (RFC-0014 D-14)
 
-# Check GC pressure (GC pauses causing latency?)
-rate(go_gc_duration_seconds_sum{job="microservices", app="$APP"}[5m])
+# Check GC thrash (GC churn causing latency?). There is no GC-pause metric under OTLP;
+# instead watch the heap riding its GC goal (>0.95 = thrashing):
+go_memory_used_bytes{app="$APP"} / go_memory_gc_goal_bytes{app="$APP"}
 ```
 
 **Grafana panels to check**:
@@ -331,10 +331,10 @@ rate(go_gc_duration_seconds_sum{job="microservices", app="$APP"}[5m])
 
 **Resolution**:
 1. Identify slow endpoint from per-endpoint P95
-2. Click exemplar on the latency spike -> jump to trace in Tempo
+2. Find the slow request in VictoriaLogs (filter on high latency), then open its `trace_id` in Tempo (traces<->logs correlation). Exemplars are not available -- VictoriaMetrics does not support them (RFC-0014 D-14)
 3. In the trace waterfall, find the slowest span (DB query? external API?)
 4. If DB: add index, optimize query, check `PostgresConnectionSaturation` alert
-5. If GC: check `MicroserviceHighGCPressure` alert, review Pyroscope CPU profile
+5. If GC: check `MicroserviceGCThrash` alert, review Pyroscope CPU profile
 6. If saturation: scale up replicas
 
 ---
@@ -399,10 +399,11 @@ kubectl get ingress -n $NAMESPACE
 
 ```promql
 # Verify zero traffic
-job_app:request_duration_seconds:rate5m{app="$APP"}
+app:http_server_request_duration_seconds:rate5m{app="$APP"}
 
-# Check if the target is still being scraped
-up{job="microservices", app="$APP"}
+# Check if the service is still emitting metrics (heartbeat, D-4) -- the apps push
+# OTLP and expose no scrape target, so there is no `up` series
+count by (app, namespace, k8s_pod_name) (go_goroutine_count{app="$APP"})
 ```
 
 **Resolution**:
@@ -425,17 +426,17 @@ Apdex below 0.5 means the majority of users are experiencing "frustrating" respo
 
 ```promql
 # Current Apdex
-job_app:request_duration_seconds:apdex5m{app="$APP"}
+app:http_server_request_duration_seconds:apdex5m{app="$APP"}
 
 # Breakdown: what percentage of requests are satisfied/tolerating/frustrating?
 # Satisfied (< 0.5s)
-sum(rate(request_duration_seconds_bucket{job="microservices", app="$APP", le="0.5"}[5m]))
-/ sum(rate(request_duration_seconds_count{job="microservices", app="$APP"}[5m]))
+sum(rate(http_server_request_duration_seconds_bucket{app="$APP", le="0.5"}[5m]))
+/ sum(rate(http_server_request_duration_seconds_count{app="$APP"}[5m]))
 
 # Frustrating (> 2s)
 1 - (
-  sum(rate(request_duration_seconds_bucket{job="microservices", app="$APP", le="2"}[5m]))
-  / sum(rate(request_duration_seconds_count{job="microservices", app="$APP"}[5m]))
+  sum(rate(http_server_request_duration_seconds_bucket{app="$APP", le="2"}[5m]))
+  / sum(rate(http_server_request_duration_seconds_count{app="$APP"}[5m]))
 )
 ```
 
@@ -444,6 +445,8 @@ sum(rate(request_duration_seconds_bucket{job="microservices", app="$APP", le="0.
 ---
 
 ## 6. Saturation Alerts
+
+> **Retired (RFC-0014 D-14):** The in-flight saturation signal (`requests_in_flight`) is no longer emitted -- otelgin exposes no `http_server_active_requests` equivalent, so the `MicroserviceHighRequestsInFlight` and `MicroserviceRequestsInFlightCritical` alerts and the `app:requests_in_flight:sum` recording rule were retired. The subsections below are kept for design context; the in-flight queries return no data on the OTLP pipeline. Use latency and traffic rate as the saturation proxy instead.
 
 ### MicroserviceHighRequestsInFlight
 
@@ -460,14 +463,14 @@ sum(rate(request_duration_seconds_bucket{job="microservices", app="$APP", le="0.
 **Investigation**:
 
 ```promql
-# Current in-flight requests
-job_app:requests_in_flight:sum{app="$APP"}
+# Current in-flight requests -- NOT EMITTED under OTLP (record retired, D-14):
+# job_app:requests_in_flight:sum was removed; there is no http_server_active_requests
 
 # Correlate with traffic rate
-job_app:request_duration_seconds:rate5m{app="$APP"}
+app:http_server_request_duration_seconds:rate5m{app="$APP"}
 
 # Correlate with latency (slow responses = more in-flight)
-job_app:request_duration_seconds:p95_5m{app="$APP"}
+app:http_server_request_duration_seconds:p95_5m{app="$APP"}
 ```
 
 **Resolution**:
@@ -510,10 +513,10 @@ At 100+ in-flight requests, the service is likely overloaded. Responses will be 
 
 ```promql
 # Current goroutine count
-go_goroutines{job="microservices", app="$APP"}
+go_goroutine_count{app="$APP"}
 
 # Rate of increase (should be ~0 in healthy state)
-rate(go_goroutines{job="microservices", app="$APP"}[15m])
+rate(go_goroutine_count{app="$APP"}[15m])
 ```
 
 ```bash
@@ -546,36 +549,46 @@ curl http://localhost:6060/debug/pprof/goroutine?debug=2
 
 **Investigation**:
 
+> **Metric remap (RFC-0014 P3 cutover):** `process_resident_memory_bytes` and the
+> `go_memstats_*` series were `client_golang` names retired with the scrape. The OTLP
+> Go-runtime set is `go_memory_used_bytes` (label `go_memory_type=stack|other`),
+> `go_memory_allocated_bytes_total`, `go_memory_allocations_total`, `go_memory_gc_goal_bytes`.
+> Container RSS now comes from cAdvisor (`container_memory_working_set_bytes`), which is
+> labelled `namespace`/`pod`/`container` (not `app`), so select by namespace + pod regex.
+
 ```promql
-# RSS over time
-process_resident_memory_bytes{job="microservices", app="$APP"}
+# Working-set memory (limits-aware RSS, cAdvisor -- retired process_resident_memory_bytes)
+container_memory_working_set_bytes{namespace=~"$NAMESPACE", pod=~"$APP.*", container!=""}
 
-# Heap allocated (Go-managed)
-go_memstats_alloc_bytes{job="microservices", app="$APP"}
+# Go heap in use (retired go_memstats_alloc_bytes / go_memstats_heap_inuse_bytes)
+sum by (app) (go_memory_used_bytes{app="$APP"})
 
-# Heap in-use (retained after GC)
-go_memstats_heap_inuse_bytes{job="microservices", app="$APP"}
+# Split by region (stack vs other) to spot which segment grows
+go_memory_used_bytes{app="$APP"}
 
-# If heap_inuse grows steadily post-GC = memory leak
+# Allocation rate (no frees counter in OTel; watch churn instead)
+rate(go_memory_allocations_total{app="$APP"}[5m])
+
+# If go_memory_used_bytes grows steadily post-GC = memory leak
 ```
 
-**Grafana panels**: Row 4: Heap Allocated, Heap In-Use, Process Memory (RSS)
+**Grafana panels**: Row 4: Go Memory Used (by type), Working-Set Memory (container)
 
 **Resolution**:
 1. Check Pyroscope heap profile (alloc_space, inuse_space) for the service
-2. If heap_inuse grows post-GC: memory leak -- identify the growing data structure
-3. If RSS high but heap stable: non-Go memory (CGO, mmap) -- check with `pprof`
+2. If `go_memory_used_bytes` grows post-GC: memory leak -- identify the growing data structure
+3. If working-set is high but Go heap is stable: non-Go memory (CGO, mmap) -- check with `pprof`
 4. Increase memory limit as stopgap, fix the leak in code
 
 ---
 
-### MicroserviceHighGCPressure
+### MicroserviceGCThrash
 
-**Fires when**: GC duration rate exceeds 0.5 seconds per second for 15 minutes.
+**Fires when**: Heap in use (`go_memory_used_bytes`) stays within 5% of the GC goal (`go_memory_gc_goal_bytes`) for 15 minutes -- the collector fires back-to-back because live data keeps pushing the heap up against its target, so throughput and latency suffer.
 
 **Severity**: warning
 
-The Go garbage collector is spending more than 50% of CPU time on garbage collection. Application throughput is severely impacted.
+> **Why not GC pause / frequency?** The OTLP Go runtime instrumentation exposes **no** GC-pause or GC-cycle-count metric (`go_gc_duration_seconds_*` was a `client_golang` series that disappeared with the scrape). The former `MicroserviceHighGCPressure` and `MicroserviceHighGCFrequency` alerts were replaced by this single **GC-thrash** signal (RFC-0014 D-14).
 
 **Possible causes**:
 - Very high allocation rate (creating many short-lived objects)
@@ -585,14 +598,11 @@ The Go garbage collector is spending more than 50% of CPU time on garbage collec
 **Investigation**:
 
 ```promql
-# GC duration rate (seconds of GC per second of wall time)
-rate(go_gc_duration_seconds_sum{job="microservices", app="$APP"}[5m])
+# Heap riding its GC goal (>0.95 = thrashing)
+go_memory_used_bytes{app="$APP"} / go_memory_gc_goal_bytes{app="$APP"}
 
-# GC frequency
-rate(go_gc_duration_seconds_count{job="microservices", app="$APP"}[5m])
-
-# Memory allocation rate
-rate(go_memstats_frees_total{job="microservices", app="$APP"}[5m])
+# Heap growth trend
+rate(go_memory_used_bytes{app="$APP"}[5m])
 ```
 
 **Resolution**:
@@ -601,20 +611,6 @@ rate(go_memstats_frees_total{job="microservices", app="$APP"}[5m])
 3. Set `GOGC=200` to reduce GC frequency (trade memory for CPU)
 4. Use `sync.Pool` for frequently allocated objects
 5. Reduce allocation rate in hot paths
-
----
-
-### MicroserviceHighGCFrequency
-
-**Fires when**: GC runs more than 10 times per second for 15 minutes.
-
-**Severity**: warning
-
-Frequent GC cycles (even if each is fast) cause latency jitter due to stop-the-world pauses.
-
-**Investigation**: Same as `MicroserviceHighGCPressure`.
-
-**Resolution**: Same as above. Increasing `GOGC` or reducing allocation rate are the primary fixes.
 
 ---
 
@@ -628,7 +624,7 @@ flowchart TD
 
     CheckDashboard --> IdentifyEndpoint["Identify failing endpoint\nfrom per-endpoint error rate"]
 
-    IdentifyEndpoint --> CheckExemplar["Click exemplar on error metric\n-> jump to trace in Tempo"]
+    IdentifyEndpoint --> CheckExemplar["Find the request in VictoriaLogs\n-> open its trace_id in Tempo\n(no exemplars, D-14)"]
 
     CheckExemplar --> ReadTrace["Read trace waterfall:\nWhich span has error status?"]
 
@@ -652,15 +648,15 @@ flowchart TD
 
     CheckP95 --> IdentifyEndpoint["Find slowest endpoint"]
 
-    IdentifyEndpoint --> CheckExemplar["Click exemplar at latency spike\n-> jump to trace in Tempo"]
+    IdentifyEndpoint --> CheckExemplar["Find the slow request in VictoriaLogs\n-> open its trace_id in Tempo\n(no exemplars, D-14)"]
 
     CheckExemplar --> ReadTrace["Read trace waterfall:\nWhich span is slowest?"]
 
     ReadTrace --> IsDB{Slowest span\nis DB query?}
     IsDB -->|Yes| CheckDBMetrics["Check:\n- PostgresConnectionSaturation\n- PostgresLockContention\n- Query plan (EXPLAIN)"]
-    IsDB -->|No| IsGC{High GC\npressure?}
+    IsDB -->|No| IsGC{GC\nthrash?}
 
-    IsGC -->|Yes| CheckRuntime["Check Go Runtime alerts:\nGC Pressure, Memory, Goroutines"]
+    IsGC -->|Yes| CheckRuntime["Check Go Runtime alerts:\nGC Thrash, Memory, Goroutines"]
     IsGC -->|No| IsSaturation{High\nin-flight?}
 
     IsSaturation -->|Yes| ScaleUp["Scale up replicas\nor add rate limiting"]
@@ -675,7 +671,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Start["Alert: MicroserviceNoTraffic"] --> IsUp{Is the service\nup? Check up metric}
+    Start["Alert: MicroserviceNoTraffic"] --> IsUp{Service still\nemitting metrics?\n(heartbeat, D-4)}
 
     IsUp -->|No| FollowDown["Follow MicroserviceDown\nrunbook"]
     IsUp -->|Yes| CheckEndpoints["Check Service endpoints:\nkubectl get endpoints -n NS APP"]
@@ -702,7 +698,7 @@ flowchart TD
     IsGoroutine -->|No| IsHeap{Heap growing\nafter GC?}
 
     IsHeap -->|Yes| CheckHeapProfile["Pyroscope heap profile:\nFind growing allocations"]
-    IsHeap -->|No| IsGCHigh{GC duration\nor frequency high?}
+    IsHeap -->|No| IsGCHigh{Heap riding\nits GC goal?}
 
     IsGCHigh -->|Yes| CheckAllocProfile["Pyroscope alloc_objects profile:\nFind top allocators"]
     IsGCHigh -->|No| StableState["System is stable\nAlert may auto-resolve"]
@@ -739,7 +735,7 @@ Alert thresholds are intentionally conservative. Tune them based on your service
 - alert: ProductServiceHighLatencyP95
   expr: |
     histogram_quantile(0.95,
-      sum by (le) (rate(request_duration_seconds_bucket{job="microservices", app="product"}[5m]))
+      sum by (le) (rate(http_server_request_duration_seconds_bucket{app="product"}[5m]))
     ) > 0.5
   for: 10m
   labels:
@@ -751,14 +747,14 @@ Alert thresholds are intentionally conservative. Tune them based on your service
 ```promql
 # Check historical P95 range for a service
 histogram_quantile(0.95,
-  sum by (le) (rate(request_duration_seconds_bucket{job="microservices", app="$APP"}[5m]))
+  sum by (le) (rate(http_server_request_duration_seconds_bucket{app="$APP"}[5m]))
 )
 
 # Check historical error rate range
-job_app:request_duration_seconds:error_ratio5m{app="$APP"}
+app:http_server_request_duration_seconds:error_ratio5m{app="$APP"}
 
 # Check normal goroutine count range
-go_goroutines{job="microservices", app="$APP"}
+go_goroutine_count{app="$APP"}
 ```
 
 Set thresholds at **2-3x the normal peak** for warning and **5x** for critical.
@@ -829,7 +825,7 @@ Add alerts for application-side database health signals:
 
 | Phase | What | Depends On | Effort |
 |-------|------|-----------|--------|
-| Phase 1 (done) | Application RED/Golden alerts | `request_duration_seconds` | This PR |
+| Phase 1 (done) | Application RED/Golden alerts | `http_server_request_duration_seconds` | This PR |
 | Phase 2 | DB connection pool from app side | Application-level DB metrics | Medium |
 | Phase 3 | Valkey cache alerts | Cache metrics in product service | Medium |
 | Phase 4 | Cross-service dependency alerts | HTTP client instrumentation | High |
@@ -847,7 +843,7 @@ Add alerts for application-side database health signals:
 | **RED** | Errors | `MicroserviceHighErrorRate`, `MicroserviceErrorRateCritical`, `MicroserviceNoSuccessfulRequests` |
 | **RED** | Duration | `MicroserviceHighLatencyP95`, `MicroserviceHighLatencyP99`, `MicroserviceLatencyCritical`, `MicroserviceApdexCritical` |
 | **USE** | Utilization | `MicroserviceHighMemoryUsage` |
-| **USE** | Saturation | `MicroserviceHighRequestsInFlight`, `MicroserviceRequestsInFlightCritical`, `MicroserviceGoroutineLeak`, `MicroserviceHighGCPressure`, `MicroserviceHighGCFrequency` |
+| **USE** | Saturation | `MicroserviceHighRequestsInFlight`, `MicroserviceRequestsInFlightCritical` (retired, D-14), `MicroserviceGoroutineLeak`, `MicroserviceGCThrash` |
 | **USE** | Errors | `MicroserviceDown`, `MicroserviceAllInstancesDown`, `MicroserviceHighRestartRate` |
 | **Golden** | Latency | All RED Duration alerts + `MicroserviceApdexCritical` |
 | **Golden** | Traffic | `MicroserviceNoTraffic` |
@@ -867,7 +863,7 @@ Add alerts for application-side database health signals:
 - Every alert has `runbook_url` annotation pointing to investigation steps
 - Two-layer approach: Layer 1 (threshold, 1-10 min detection) + Layer 2 (SLO burn-rate, 5-60 min detection)
 
-**Result**: Detection time for complete outages dropped from 30+ minutes (SLO burn-rate detection) to 1-2 minutes (threshold detection). Layer 1 catches obvious failures fast; Layer 2 catches subtle degradation with high signal quality. Combined with 4-pillar correlation (exemplar -> trace -> logs -> profile), total investigation time is under 10 minutes for most incidents.
+**Result**: Detection time for complete outages dropped from 30+ minutes (SLO burn-rate detection) to 1-2 minutes (threshold detection). Layer 1 catches obvious failures fast; Layer 2 catches subtle degradation with high signal quality. Combined with 4-pillar correlation (`trace_id` in logs -> trace -> profile; exemplars are not used since VictoriaMetrics does not support them, RFC-0014 D-14), total investigation time is under 10 minutes for most incidents.
 
 ---
 

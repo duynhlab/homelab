@@ -9,9 +9,13 @@ End-to-end view of how metrics become alerts, from ingestion through evaluation 
 ```mermaid
 flowchart TD
     subgraph ingestion ["1. Metrics Ingestion"]
-        Targets["Targets<br/>(9 microservices, PostgreSQL,<br/>external-secrets, Tempo)"]
-        VMAgent["VMAgent<br/>(scraper)"]
-        Targets -->|"ServiceMonitor<br/>PodMonitor"| VMAgent
+        Apps["9 Go apps + order-worker"]
+        Infra["Infra exporters<br/>(PostgreSQL, kube-state,<br/>cAdvisor, Tempo)"]
+        OTEL["OTel Collector"]
+        VMAgent["VMAgent<br/>(OTLP ingest + scraper)"]
+        Apps -->|"OTLP push"| OTEL
+        OTEL -->|"OTLP export"| VMAgent
+        Infra -->|"ServiceMonitor<br/>PodMonitor scrape"| VMAgent
     end
 
     subgraph storage ["2. Storage"]
@@ -81,7 +85,7 @@ This project uses the **VictoriaMetrics stack** instead of Prometheus. VM Operat
 flowchart TD
     subgraph layer1 ["Layer 1: Threshold Alerts"]
         PR1["PrometheusRule CRDs<br/>microservices/alerts.yaml<br/>postgres/cnpg + postgres/zalando"]
-        T1["17 application alerts<br/>PostgreSQL: chart + Zalando split"]
+        T1["16 application alerts<br/>PostgreSQL: chart + Zalando split"]
     end
 
     subgraph layer2 ["Layer 2: SLO Burn-Rate Alerts"]
@@ -116,27 +120,32 @@ flowchart TD
 
 Direct metric threshold checks. Fire immediately when a condition is met.
 
-**Application alerts** (`microservices/alerts.yaml`, 17 alerts, 6 groups):
+**Application alerts** (`microservices/alerts.yaml`, 16 alerts, 5 groups — OTLP push pipeline, RFC-0014 P3):
 
 | Group | Alerts | Examples |
 |-------|--------|----------|
-| Availability | 3 | `MicroserviceDown`, `MicroserviceAllInstancesDown`, `MicroserviceHighRestartRate` |
-| Errors | 3 | `MicroserviceHighErrorRate`, `MicroserviceErrorRateCritical`, `MicroserviceNoSuccessfulRequests` |
-| Latency | 3 | `MicroserviceHighLatencyP95`, `MicroserviceHighLatencyP99`, `MicroserviceLatencyCritical` |
+| Availability | 3 | `MicroserviceDown`, `MicroserviceAllInstancesDown` (both D-4 heartbeat-absence), `OtelMetricsPipelineExportFailures` |
+| Errors | 4 | `MicroserviceHighErrorRate`, `MicroserviceErrorRateCritical`, `MicroserviceNoSuccessfulRequests`, `GrpcServerHighErrorRate` |
+| Latency | 4 | `MicroserviceHighLatencyP95`, `MicroserviceHighLatencyP99`, `MicroserviceLatencyCritical`, `GrpcServerHighLatencyP95` |
 | Traffic | 2 | `MicroserviceNoTraffic`, `MicroserviceApdexCritical` |
-| Saturation | 2 | `MicroserviceHighRequestsInFlight`, `MicroserviceRequestsInFlightCritical` |
-| Go Runtime | 4 | `MicroserviceGoroutineLeak`, `MicroserviceHighMemoryUsage`, `MicroserviceHighGCPressure`, `MicroserviceHighGCFrequency` |
+| Runtime | 3 | `MicroserviceGoroutineLeak`, `MicroserviceHighMemoryUsage`, `MicroserviceGCThrash` |
+
+> The scrape-era **Saturation** group (`MicroserviceHighRequestsInFlight` / `…Critical`) retired with the cutover — otelgin v0.69 emits no `http.server.active_requests`. The two GC-pause alerts collapsed into `MicroserviceGCThrash` (no OTel GC-pause metric). `MicroserviceDown`/`…AllInstancesDown` moved from `up{}` scrape liveness to a `go_goroutine_count` heartbeat-absence check (D-4).
 
 **PostgreSQL alerts** ([`prometheusrules/postgres/`](../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/README.md)): CNPG chart-aligned rules under `postgres/cnpg/` (e.g. `CNPGClusterOffline`, HA, replication, disk, logical replication) and Zalando rules under `postgres/zalando/` (`PostgresDown`, `custom_*` saturation, etc.). Backup alerts remain in `postgres-backup-alerts.yaml`.
 
 **Recording rules** (`microservices/recording-rules.yaml`):
 
-Pre-aggregated metrics for dashboard and alert performance:
-- `job_app:request_duration_seconds:rate5m` (per-service RPS)
-- `job_app:request_duration_seconds:error_rate5m` (per-service error rate)
-- `job_app:request_duration_seconds:p95_5m` / `p99_5m` (latency percentiles)
-- `job_app:apdex:ratio_rate5m` (Apdex score)
-- `job_app:request_in_flight:sum` (in-flight requests)
+Pre-aggregated metrics for dashboard and alert performance (records live under
+the `app:` prefix — no `job` on the OTLP push path):
+- `app:http_server_request_duration_seconds:rate5m` (per-service RPS)
+- `app:http_server_request_duration_seconds:error_rate5m` (per-service 5xx rate)
+- `app:http_server_request_duration_seconds:p95_5m` / `p99_5m` (latency percentiles)
+- `app:http_server_request_duration_seconds:apdex5m` (Apdex score)
+- `app_route:http_server_request_duration_seconds:rate5m` (per-endpoint breakdown)
+- `app:rpc_server_call_duration_seconds:rate5m` / `:error_rate5m` / `:p95_5m` (gRPC east-west RED — new in RFC-0014)
+
+> The scrape-era `job_app:request_in_flight:sum` in-flight record is **removed** — there is no OTel `http.server.active_requests` to aggregate.
 
 ### Layer 2: SLO Burn-Rate Alerts (Error Budget)
 
@@ -208,8 +217,9 @@ rendered by the **mop Helm chart** (`mop-chart-oci`, `ghcr.io/duynhlab`) when th
 service's HelmRelease sets `slo.enabled: true`. Sloth then generates the
 burn-rate `PrometheusRule`s from those CRDs. See [SLO System](../slo/README.md).
 
-> **Scrape configs** (the `ServiceMonitor` / `PodMonitor` objects that decide
-> *what* is collected, as opposed to *what fires*) live with the metrics docs:
+> **Collection configs** (what is collected, as opposed to *what fires*) live
+> with the metrics docs: apps **push OTLP** (no ServiceMonitor); infra exporters
+> are **scraped** via `ServiceMonitor` / `PodMonitor`. See
 > [application metrics](../metrics/metrics-apps.md) and
 > [infrastructure metrics](../metrics/metrics-infra.md). This page and the
 > [Alert Catalog](./alert-catalog.md) are the source of truth for the alert and
@@ -241,7 +251,7 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 
 | Phase | Scope | Status |
 |-------|-------|--------|
-| Layer 1: Application alerts | 17 alerts (RED + Golden Signals) | Implemented |
+| Layer 1: Application alerts | 16 alerts (RED + gRPC + Golden Signals) | Implemented |
 | Layer 1: PostgreSQL alerts | 14 alerts (availability, performance, storage) | Implemented |
 | Layer 2: SLO alerts | 48 alerts (8 services x 3 SLOs x 2 severities) | Implemented |
 | Alert dashboard | Karma reading VMAlertmanager API | Implemented |
@@ -253,8 +263,8 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 
 ## Related Documentation
 
-- [Alert Catalog](./alert-catalog.md) -- every deployed alert (150 rules + SLO burn-rate) by domain, with metric, impact, and coverage-gap analysis
-- [Application metrics (RED)](../metrics/metrics-apps.md) -- the metrics these alerts fire on + the microservices ServiceMonitor scrape config
+- [Alert Catalog](./alert-catalog.md) -- every deployed alert (149 rules + SLO burn-rate) by domain, with metric, impact, and coverage-gap analysis
+- [Application metrics (RED)](../metrics/metrics-apps.md) -- the metrics these alerts fire on + the microservices OTLP push pipeline
 - [Infrastructure metrics (USE)](../metrics/metrics-infra.md) -- the USE coverage these Kubernetes/Valkey alerts back
 - [Alert Dashboard Comparison](dashboard-comparison.md) -- deep-dive tool comparison (Karma, Alerta, UAR, Siren, Grafana)
 - [Microservices Alerts Runbook](../runbooks/microservices-alerts.md) -- per-alert investigation and resolution
@@ -266,4 +276,4 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 
 ---
 
-_Last updated: 2026-07-07_
+_Last updated: 2026-07-09_

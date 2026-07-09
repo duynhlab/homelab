@@ -3,7 +3,7 @@
 > **Audience**: SRE/DevOps Engineers  
 > **Dashboard**: Microservices Observability Platform  
 > **Total Panels**: 40 panels across 6 row groups *(live dashboard; the per-row breakdown in this guide reflects an earlier 34-panel / 5-row revision and is pending a refresh)*  
-> **Last Updated**: 2026-01-01
+> **Last Updated**: 2026-07-09
 
 ---
 
@@ -76,12 +76,13 @@ graph TD
 - `sum() by (label)` - Aggregation with grouping
 
 **Metric Labels**:
-- `app` - Service name (injected by ServiceMonitor)
-- `namespace` - Kubernetes namespace (injected by ServiceMonitor)
-- `job` - Scrape job name (`microservices` for all services)
-- `method` - HTTP method (GET, POST, PUT, DELETE) - from app
-- `path` - Request path (/api/v1/users) - from app
-- `code` - HTTP status code (200, 404, 500) - from app
+- `app` - Service name (from the OTLP `service.name` resource attribute; vmagent relabels `service_name` → `app`)
+- `namespace` - Kubernetes namespace (from the OTLP `k8s.namespace.name` resource attribute; vmagent relabels `k8s_namespace_name` → `namespace`)
+- `http_request_method` - HTTP method (GET, POST, PUT, DELETE) - semconv attribute from the app
+- `http_route` - Matched route template (`/api/v1/users`) - semconv attribute from the app
+- `http_response_status_code` - HTTP status code (200, 404, 500) - semconv attribute from the app
+
+> **No `job` label on app series.** The 9 Go services + order-worker **push OTLP** (SDK → otel-collector → vmagent OTLP ingest → VictoriaMetrics); there is no `/metrics` scrape and therefore no `job` label. A vmagent scrape (ServiceMonitor) still exists **only for infra exporters** (postgres/pg_exporter, kube-state-metrics, cAdvisor), not the app services.
 
 ---
 
@@ -93,13 +94,13 @@ graph TD
 
 **Query**:
 ```promql
-histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", job=~"microservices", code=~"2.."}[$rate])) by (le))
+histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", http_response_status_code=~"2.."}[$rate])) by (le))
 ```
 
 **Query Explanation**:
 - `histogram_quantile(0.99, ...)` - Calculate 99th percentile
 - `rate(..._bucket{...}[$rate])` - Per-second rate of histogram buckets
-- `code=~"2.."` - Only successful requests (200-299)
+- `http_response_status_code=~"2.."` - Only successful requests (200-299)
 - `sum(...) by (le)` - Aggregate across services, preserve bucket boundaries
 - **Result**: 99% of successful requests complete faster than this value
 
@@ -129,7 +130,7 @@ histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{app=~"$app", n
 
 **Query**:
 ```promql
-histogram_quantile(0.95, sum(rate(request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", job=~"microservices", code=~"2.."}[$rate])) by (le))
+histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", http_response_status_code=~"2.."}[$rate])) by (le))
 ```
 
 **Query Explanation**:
@@ -163,7 +164,7 @@ histogram_quantile(0.95, sum(rate(request_duration_seconds_bucket{app=~"$app", n
 
 **Query**:
 ```promql
-histogram_quantile(0.5, sum(rate(request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", job=~"microservices", code=~"2.."}[$rate])) by (le))
+histogram_quantile(0.5, sum(rate(http_server_request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", http_response_status_code=~"2.."}[$rate])) by (le))
 ```
 
 **Query Explanation**:
@@ -196,7 +197,7 @@ histogram_quantile(0.5, sum(rate(request_duration_seconds_bucket{app=~"$app", na
 
 **Query**:
 ```promql
-sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices"}[$rate]))
+sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$rate]))
 ```
 
 **Query Explanation**:
@@ -231,11 +232,11 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", jo
 
 **Query**:
 ```promql
-sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices", code=~"2.."}[$rate]))
+sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace", http_response_status_code=~"2.."}[$rate]))
 ```
 
 **Query Explanation**:
-- `code=~"2.."` - Regex filter for 200-299 status codes
+- `http_response_status_code=~"2.."` - Regex filter for 200-299 status codes
 - Measures **productive traffic** only
 - **Golden Signal**: Success rate
 
@@ -257,11 +258,11 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", jo
 
 **Query**:
 ```promql
-sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices", code=~"4..|5.."}[$rate]))
+sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace", http_response_status_code=~"4..|5.."}[$rate]))
 ```
 
 **Query Explanation**:
-- `code=~"4..|5.."` - Regex for both 400-499 and 500-599
+- `http_response_status_code=~"4..|5.."` - Regex for both 400-499 and 500-599
 - **Combined error rate** across client and server errors
 - Rapid indicator of service health
 
@@ -291,7 +292,7 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", jo
 
 **Query**:
 ```promql
-(sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices", code=~"2.."}[$rate])) / sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices"}[$rate]))) * 100
+(sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace", http_response_status_code=~"2.."}[$rate])) / sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$rate]))) * 100
 ```
 
 **Query Explanation**:
@@ -325,7 +326,7 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", jo
 
 **Query**:
 ```promql
-(sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices", code=~"4..|5.."}[$rate])) / sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices"}[$rate]))) * 100
+(sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace", http_response_status_code=~"4..|5.."}[$rate])) / sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$rate]))) * 100
 ```
 
 **Query Explanation**:
@@ -361,7 +362,7 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", jo
 
 **Query**:
 ```promql
-(sum(rate(request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", job=~"microservices", le="0.5"}[$rate])) + 0.5 * (sum(rate(request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", job=~"microservices", le="2"}[$rate])) - sum(rate(request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", job=~"microservices", le="0.5"}[$rate])))) / (sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices"}[$rate])) > 0 or vector(1))
+(sum(rate(http_server_request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", le="0.5"}[$rate])) + 0.5 * (sum(rate(http_server_request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", le="2"}[$rate])) - sum(rate(http_server_request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", le="0.5"}[$rate])))) / (sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$rate])) > 0 or vector(1))
 ```
 
 **Query Explanation**:
@@ -403,7 +404,7 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", jo
 
 **Query**:
 ```promql
-sum(increase(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices"}[$__range]))
+sum(increase(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$__range]))
 ```
 
 **Query Explanation**:
@@ -431,18 +432,28 @@ sum(increase(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"
 
 **Query**:
 ```promql
-count(up{job=~"microservices", app=~"$app", namespace=~"$namespace"})
+count(count by (app, namespace, k8s_pod_name)(go_goroutine_count{app=~"$app", namespace=~"$namespace"}))
 ```
 
 **Query Explanation**:
-- `up` - Prometheus metric: 1 if target reachable, 0 if down
-- `count()` - Number of healthy instances
-- **Result**: Total running pods for selected services
+- The 9 Go services push OTLP, so there is **no `up` series** for them — nothing scrapes a `/metrics` endpoint. Instead, count the pods currently emitting a heartbeat metric: every live pod reports `go_goroutine_count`.
+- `count by (app, namespace, k8s_pod_name)(...)` - one entry per reporting pod
+- outer `count(...)` - Number of pods currently pushing metrics
+- **Result**: Running pods for the selected services
 
 **Why This Metric**:
 - Availability monitoring
 - Scaling verification: "Did HPA create new pods?"
 - Incident detection: Sudden drop = mass pod failures
+
+**Liveness / down detection (D-4 heartbeat-absence)**:
+With no `up` series, a downed pod is detected by the *absence* of its heartbeat rather than `up == 0`:
+```promql
+count by (app, namespace, k8s_pod_name)(last_over_time(go_goroutine_count{app!=""}[15m]))
+  unless
+count by (app, namespace, k8s_pod_name)(go_goroutine_count{app!=""})
+```
+Detection lags a pod kill by ~5m (VictoriaMetrics staleness) — accepted in RFC-0014 D-4.
 
 **What to Do When**:
 - **Sudden drop**: Check pod status, node health, resource limits
@@ -499,12 +510,12 @@ kubectl logs <pod-name> -n <namespace> --previous  # Check crashed container log
 
 **Query**:
 ```promql
-sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices"}[$rate])) by (code)
+sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$rate])) by (http_response_status_code)
 ```
 
 **Query Explanation**:
 - `rate(..._count{...}[$rate])` - Per-second rate over time window
-- `sum(...) by (code)` - Group by HTTP status code
+- `sum(...) by (http_response_status_code)` - Group by HTTP status code
 - **Pie chart automatically converts to percentages**
 - **Result**: Real-time traffic distribution by status code (req/sec)
 
@@ -514,10 +525,10 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", jo
 - Client vs server errors at a glance
 
 **BEFORE/AFTER Fix**:
-- **BEFORE**: `sum(request_duration_seconds_count{...}) by (code)` (cumulative counter)
+- **BEFORE**: `sum(http_server_request_duration_seconds_count{...}) by (http_response_status_code)` (cumulative counter)
   - **Problem**: Ever-increasing totals since pod start
   - **Result**: Misleading percentages based on historical data
-- **AFTER**: `sum(rate(..._count{...}[$rate])) by (code)` (rate-based)
+- **AFTER**: `sum(rate(..._count{...}[$rate])) by (http_response_status_code)` (rate-based)
   - **Benefit**: Shows current traffic distribution (req/sec)
   - **Industry Standard**: Google SRE, Prometheus best practices
 
@@ -542,12 +553,12 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", jo
 
 **Query**:
 ```promql
-sum(increase(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices"}[$__range])) by (path)
+sum(increase(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$__range])) by (http_route)
 ```
 
 **Query Explanation**:
 - `increase(...[$__range])` - Total requests over dashboard time range
-- `sum(...) by (path)` - Group by endpoint path
+- `sum(...) by (http_route)` - Group by endpoint path
 - **Result**: Total requests per endpoint (historical)
 
 **Why This Metric**:
@@ -570,7 +581,7 @@ sum(increase(request_duration_seconds_count{app=~"$app", namespace=~"$namespace"
 
 **Query**:
 ```promql
-sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices"}[$rate])) by (path)
+sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$rate])) by (http_route)
 ```
 
 **Query Explanation**:
@@ -598,7 +609,7 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", jo
 
 **Query**:
 ```promql
-sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices"}[$rate])) by (path)
+sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$rate])) by (http_route)
 ```
 
 **Note**: Same query as Panel 23 - likely duplicate or different visualization settings.
@@ -613,11 +624,11 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", jo
 
 **Query**:
 ```promql
-sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices"}[$rate])) by (method, path)
+sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$rate])) by (http_request_method, http_route)
 ```
 
 **Query Explanation**:
-- `sum(...) by (method, path)` - Group by **both** HTTP method and endpoint
+- `sum(...) by (http_request_method, http_route)` - Group by **both** HTTP method and endpoint
 - **Result**: Breakdown showing GET /api/v1/users, POST /api/v1/users separately
 
 **Why This Metric**:
@@ -638,7 +649,7 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", jo
 
 **Query**:
 ```promql
-(sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices", code=~"4..|5.."}[$rate])) by (method, path) / sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices"}[$rate])) by (method, path)) * 100 > 0
+(sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace", http_response_status_code=~"4..|5.."}[$rate])) by (http_request_method, http_route) / sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace"}[$rate])) by (http_request_method, http_route)) * 100 > 0
 ```
 
 **Query Explanation**:
@@ -671,11 +682,11 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", jo
 
 **Query**:
 ```promql
-sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices", code=~"4.."}[$rate])) by (app)
+sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace", http_response_status_code=~"4.."}[$rate])) by (app)
 ```
 
 **Query Explanation**:
-- `code=~"4.."` - Regex matches 400-499 status codes
+- `http_response_status_code=~"4.."` - Regex matches 400-499 status codes
 - `sum(...) by (app)` - Show 4xx rate per service
 - **Result**: Client-side error rate in req/sec by service
 
@@ -719,11 +730,11 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", jo
 
 **Query**:
 ```promql
-sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices", code=~"5.."}[$rate])) by (app)
+sum(rate(http_server_request_duration_seconds_count{app=~"$app", namespace=~"$namespace", http_response_status_code=~"5.."}[$rate])) by (app)
 ```
 
 **Query Explanation**:
-- `code=~"5.."` - Regex matches 500-599 status codes
+- `http_response_status_code=~"5.."` - Regex matches 500-599 status codes
 - **Result**: Server-side error rate in req/sec by service
 - **Critical metric**: 5xx = service problems, not client issues
 
@@ -747,7 +758,7 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", jo
 - **Any 5xx errors**: Immediate investigation required
 - **High 500 errors**: Application bugs - check logs, recent deployments
 - **High 502/504 errors**: Dependency issues - check upstream services
-- **High 503 errors**: Service overloaded - check CPU, memory, requests in flight (Panel 19)
+- **High 503 errors**: Service overloaded - check CPU, memory, and latency saturation (in-flight retired; see Panel 19)
 - **Spike after deployment**: Rollback immediately, investigate bug
 - **Gradual increase**: Resource exhaustion - check memory leaks (Panel 31-33)
 
@@ -769,15 +780,15 @@ sum(rate(request_duration_seconds_count{app=~"$app", namespace=~"$namespace", jo
 
 **Query**:
 ```promql
-histogram_quantile(0.95, sum(rate(request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", job=~"microservices"}[$rate])) by (le, path, code))
+histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace"}[$rate])) by (le, http_route, http_response_status_code))
 ```
 
 **Query Explanation**:
 - `histogram_quantile(0.95, ...)` - Calculate P95 per group
-- `sum(...) by (le, path, code)` - **Per endpoint and status code**
+- `sum(...) by (le, http_route, http_response_status_code)` - **Per endpoint and status code**
 - **Result**: P95 latency for each endpoint+code combination
 
-**Legend Format**: `{{code}} {{path}}`
+**Legend Format**: `{{http_response_status_code}} {{http_route}}`
 - Shows HTTP status code and endpoint path in single column
 - Example: `404 /api/v1/shipping/estimate`
 - **Note**: Grafana timeseries panels do not support splitting legend labels into separate columns. The code and path must remain in a single Name column.
@@ -800,14 +811,14 @@ histogram_quantile(0.95, sum(rate(request_duration_seconds_bucket{app=~"$app", n
 
 **Query**:
 ```promql
-histogram_quantile(0.50, sum(rate(request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", job=~"microservices"}[$rate])) by (le, path, code))
+histogram_quantile(0.50, sum(rate(http_server_request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace"}[$rate])) by (le, http_route, http_response_status_code))
 ```
 
 **Query Explanation**:
 - Median latency per endpoint and status code
 - Shows typical performance per endpoint
 
-**Legend Format**: `{{code}} {{path}}`
+**Legend Format**: `{{http_response_status_code}} {{http_route}}`
 - Example: `200 /api/v1/users`
 
 **Use Case**: Compare with Panel 13 to understand latency distribution per endpoint.
@@ -820,14 +831,14 @@ histogram_quantile(0.50, sum(rate(request_duration_seconds_bucket{app=~"$app", n
 
 **Query**:
 ```promql
-histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace", job=~"microservices"}[$rate])) by (le, path, code))
+histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{app=~"$app", namespace=~"$namespace"}[$rate])) by (le, http_route, http_response_status_code))
 ```
 
 **Query Explanation**:
 - Tail latency per endpoint
 - Highlights endpoints with worst outliers
 
-**Legend Format**: `{{code}} {{path}}`
+**Legend Format**: `{{http_response_status_code}} {{http_route}}`
 - Example: `201 /api/v1/cart`
 
 **Use Case**: Identify which endpoints have variable latency or occasional slowness.
@@ -836,19 +847,21 @@ histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{app=~"$app", n
 
 ## Row 4: Go Runtime & Memory
 
-### Panel 31: Heap Allocated Memory (ID: 31)
+### Panel 31: Heap Used Memory (ID: 31) ⚠️ UPDATED
 
 **Type**: timeseries | **Unit**: bytes | **Row**: Go Runtime & Memory
 
+**Status**: The client_golang `go_memstats_alloc_bytes` gauge was **retired at the P3 cutover** (no `/metrics` scrape on the OTLP path). The OTel Go runtime instrumentation reports **used memory by type**, not the client_golang heap gauges.
+
 **Query**:
 ```promql
-sum(go_memstats_alloc_bytes{app=~"$app", namespace=~"$namespace", job=~"microservices"}) by (app)
+sum(go_memory_used_bytes{app=~"$app", namespace=~"$namespace"}) by (app)
 ```
 
 **Query Explanation**:
-- `go_memstats_alloc_bytes` - Currently allocated heap memory
-- **Go runtime metric** from standard library
-- **Result**: Active heap allocations per service
+- `go_memory_used_bytes` - live memory in use (OTel Go runtime metric; carries `go_memory_type=stack|other`)
+- `sum(...) by (app)` - total across memory types and pods per service
+- **Result**: Used memory per service (split by `go_memory_type` if you need stack vs other)
 
 **Why This Metric**:
 - Memory leak detection
@@ -867,66 +880,72 @@ sum(go_memstats_alloc_bytes{app=~"$app", namespace=~"$namespace", job=~"microser
 
 ---
 
-### Panel 32: Heap In-Use Memory (ID: 32)
+### Panel 32: Used Memory by Type (ID: 32) ⚠️ UPDATED
 
 **Type**: timeseries | **Unit**: bytes | **Row**: Go Runtime & Memory
 
+**Status**: The client_golang `go_memstats_heap_inuse_bytes` gauge was **retired at the P3 cutover**. OTel reports used memory by type (`go_memory_type=stack|other`), so the heap-span breakdown is replaced with a per-type split of `go_memory_used_bytes`.
+
 **Query**:
 ```promql
-sum(go_memstats_heap_inuse_bytes{app=~"$app", namespace=~"$namespace", job=~"microservices"}) by (app)
+sum(go_memory_used_bytes{app=~"$app", namespace=~"$namespace"}) by (app, go_memory_type)
 ```
 
 **Query Explanation**:
-- `heap_inuse_bytes` - Memory spans in use by heap
-- **Difference**: Alloc = objects, InUse = memory spans (includes fragmentation)
+- `go_memory_type=stack` - goroutine stacks; `go_memory_type=other` - everything else the runtime tracks
+- `sum(...) by (app, go_memory_type)` - one series per service per memory type
+- **Difference vs Panel 31**: Panel 31 is the total used, this splits it by type
 
 **What to Do When**:
-- **InUse > Alloc**: Normal (includes metadata, fragmentation)
-- **InUse keeps growing**: OS not reclaiming memory - check GOGC settings
+- **`other` growing steadily**: Heap growth / possible leak - profile with pprof
+- **`stack` growing**: Goroutine growth - cross-check Panel 21
 
 ---
 
-### Panel 33: Process Memory (RSS) (ID: 33)
+### Panel 33: Container Working-Set Memory (ID: 33) ⚠️ UPDATED
 
 **Type**: timeseries | **Unit**: bytes | **Row**: Go Runtime & Memory
 
+**Status**: The client_golang `process_resident_memory_bytes` (RSS) gauge was **retired at the P3 cutover** — there is no process-level RSS metric on the OTLP path. Container working-set from cAdvisor is used instead; it is limits-aware and is the **same source the `MicroserviceGCThrash` / memory alerts read**.
+
 **Query**:
 ```promql
-sum(process_resident_memory_bytes{app=~"$app", namespace=~"$namespace", job=~"microservices"}) by (app)
+sum(container_memory_working_set_bytes{namespace=~"$namespace", pod=~"^$app-[a-z0-9]+-[a-z0-9]+$", container!=""}) by (pod)
 ```
 
 **Query Explanation**:
-- `process_resident_memory_bytes` - **OS-level metric**: actual RAM used
-- Includes Go heap + stack + off-heap (CGo, mmap)
+- `container_memory_working_set_bytes` - **cAdvisor metric**: memory the kernel cannot evict (what the OOM killer watches)
+- cAdvisor series carry `pod`/`namespace`/`container` labels (not `app`), so match on `namespace` + a pod regex and `container!=""` to drop the pause container
+- **Result**: Working-set memory per pod
 
 **Why This Metric**:
-- Detect OOM kills: RSS approaching memory limit = danger
-- Off-heap memory leaks: RSS grows but heap stable
+- Detect OOM kills: working-set approaching the memory limit = danger
+- Off-heap growth: working-set grows while Go used memory (Panel 31) stays flat
 
 **What to Do When**:
-- **RSS approaching pod memory limit**: Risk of OOM kill - increase limits
-- **RSS >> heap**: Off-heap allocations (CGo, file mappings) - investigate
-- **RSS stable but heap growing**: Normal Go memory retention
+- **Working-set approaching pod memory limit**: Risk of OOM kill - increase limits
+- **Working-set >> Go used memory**: Off-heap allocations (CGo, file mappings) - investigate
+- **Working-set stable but Go used memory growing**: Normal Go memory retention
 
 ---
 
-### Panel 21: Goroutines & Threads (ID: 21)
+### Panel 21: Goroutines (ID: 21) ⚠️ UPDATED
 
 **Type**: timeseries | **Unit**: short (count) | **Row**: Go Runtime & Memory
 
+**Status**: The `go_threads` (OS thread count) series is **removed / not emitted** — the OTel Go runtime set has no thread-count equivalent (same class as the retired `requests_in_flight`). The goroutine gauge remains as `go_goroutine_count`.
+
 **Query**:
 ```promql
-sum(go_goroutines{app=~"$app", namespace=~"$namespace", job=~"microservices"}) by (app)
-sum(go_threads{app=~"$app", namespace=~"$namespace", job=~"microservices"}) by (app)
+sum(go_goroutine_count{app=~"$app", namespace=~"$namespace"}) by (app)
 ```
 
 **Query Explanation**:
-- `go_goroutines` - Active goroutines
-- `go_threads` - OS threads (much lower than goroutines)
+- `go_goroutine_count` - Active goroutines (OTel Go runtime metric)
 
 **Why This Metric**:
 - **Goroutine leak detection** - common Go bug
-- Threads stable, goroutines growing = goroutine leak
+- Steadily growing goroutines with flat traffic = goroutine leak
 
 **Goroutine Leak Causes**:
 - Forgotten `defer cancel()` in contexts
@@ -937,7 +956,6 @@ sum(go_threads{app=~"$app", namespace=~"$namespace", job=~"microservices"}) by (
 **What to Do When**:
 - **Goroutines steadily increasing**: Goroutine leak - capture goroutine profile
 - **Thousands of goroutines**: Check for leaks with `go tool pprof`
-- **Threads increasing**: Unusual - investigate CGo or syscall blocking
 
 **Investigation**:
 ```bash
@@ -947,29 +965,32 @@ go tool pprof http://<service>:8080/debug/pprof/goroutine  # Interactive profili
 
 ---
 
-### Panel 20: GC Duration (ID: 20)
+### Panel 20: GC Pressure (GC-thrash) (ID: 20) ⚠️ UPDATED
 
-**Type**: timeseries | **Unit**: seconds | **Row**: Go Runtime & Memory
+**Type**: timeseries | **Unit**: percentunit | **Row**: Go Runtime & Memory
+
+**Status**: The Prometheus `go_gc_duration_seconds_*` pause summary is **no longer emitted** — the OTel Go runtime instrumentation has **no GC pause metric**. GC health is now tracked as *GC-thrash*: how close live heap sits to the GC goal. When used memory rides within ~5% of the goal, the collector runs back-to-back.
 
 **Query**:
 ```promql
-sum(increase(go_gc_duration_seconds_sum{app=~"$app", namespace=~"$namespace", job=~"microservices"}[5m])) by (app) / 300
+go_memory_used_bytes{app=~"$app", namespace=~"$namespace"}
+  / go_memory_gc_goal_bytes{app=~"$app", namespace=~"$namespace"}
 ```
 
 **Query Explanation**:
-- `go_gc_duration_seconds_sum` - Cumulative GC pause time
-- `increase(...[5m]) / 300` - Average GC pause per second over 5 minutes
-- **Result**: GC overhead as fraction of time
+- `go_memory_used_bytes` - live heap in use (OTel Go runtime metric)
+- `go_memory_gc_goal_bytes` - heap size that triggers the next GC
+- **Result**: a ratio persistently near 1.0 (within 5%) indicates GC-thrash and fires the `MicroserviceGCThrash` alert
 
 **Why This Metric**:
-- High GC duration = less time for actual work
+- Detects sustained GC pressure without a pause-time metric
 - Memory pressure indicator
-- Latency impact: GC pauses block application
+- Latency impact: back-to-back GC steals CPU from request handling
 
 **What to Do When**:
-- **GC duration increasing**: Memory pressure - reduce allocations or increase heap size
-- **GC duration > 10% of time**: Severe pressure - urgent optimization needed
-- **Correlates with P95/P99 spikes**: GC causing latency - tune GOGC
+- **Ratio near 1.0 sustained**: GC-thrash - reduce allocations or raise the memory limit / GOGC
+- **Correlates with P95/P99 spikes**: GC stealing CPU - tune GOGC or scale out
+- **Ratio low and stable**: Healthy headroom
 
 **Go GC Tuning**:
 - `GOGC=100` (default) - GC when heap doubles
@@ -978,44 +999,50 @@ sum(increase(go_gc_duration_seconds_sum{app=~"$app", namespace=~"$namespace", jo
 
 ---
 
-### Panel 34: GC Frequency (ID: 34)
+### Panel 34: GC Goal Headroom (ID: 34) ⚠️ UPDATED
 
-**Type**: timeseries | **Unit**: short (GCs/sec) | **Row**: Go Runtime & Memory
+**Type**: timeseries | **Unit**: bytes | **Row**: Go Runtime & Memory
+
+**Status**: The `go_gc_duration_seconds_count` cycle counter is **no longer emitted** (no OTel equivalent), so GC *frequency* is no longer chartable. Instead, plot live heap against the GC goal to see the headroom behind Panel 20's GC-thrash ratio.
 
 **Query**:
 ```promql
-sum(rate(go_gc_duration_seconds_count{app=~"$app", namespace=~"$namespace", job=~"microservices"}[5m])) by (app)
+go_memory_used_bytes{app=~"$app", namespace=~"$namespace"}
+go_memory_gc_goal_bytes{app=~"$app", namespace=~"$namespace"}
 ```
 
 **Query Explanation**:
-- `go_gc_duration_seconds_count` - Total number of GC cycles
-- `rate(...)` - GC cycles per second
+- `go_memory_used_bytes` - live heap in use
+- `go_memory_gc_goal_bytes` - heap size that triggers the next GC
+- **Result**: two series whose converging gap signals rising GC pressure
 
 **Why This Metric**:
-- Frequent GC = high allocation rate or small heap
-- Combine with GC duration for full picture
+- Shrinking gap between used and goal = rising GC pressure (feeds Panel 20)
+- Complements the GC-thrash ratio with absolute byte context
 
 **What to Do When**:
-- **High GC frequency**: Reduce allocations (use sync.Pool, reuse buffers)
-- **Low frequency but high duration**: Large heap - consider splitting service
-- **Frequency spikes with traffic**: Normal allocation pattern
+- **Used approaching goal**: Reduce allocations (use sync.Pool, reuse buffers) or raise the limit
+- **Goal much larger than used**: Healthy headroom
+- **Gap collapsing under traffic**: Allocation pressure - profile hot paths
 
 ---
 
 ## Row 5: Resources & Infrastructure
 
-### Panel 16: Total Memory per Service (ID: 16)
+### Panel 16: Total Memory per Service (ID: 16) ⚠️ UPDATED
 
 **Type**: timeseries | **Unit**: bytes | **Row**: Resources & Infrastructure
 
+**Status**: The client_golang `go_memstats_alloc_bytes` gauge was **retired at the P3 cutover**. OTel reports used memory by type, so this aggregates `go_memory_used_bytes`.
+
 **Query**:
 ```promql
-sum(go_memstats_alloc_bytes{app=~"$app", namespace=~"$namespace", job=~"microservices"}) by (app)
+sum(go_memory_used_bytes{app=~"$app", namespace=~"$namespace"}) by (app)
 ```
 
 **Query Explanation**:
-- `sum(...) by (app)` - **Aggregate across ALL pods in service**
-- Example: auth with 3 pods = sum of all 3 pods' memory
+- `sum(...) by (app)` - **Aggregate across ALL pods and memory types in the service**
+- Example: auth with 3 pods = sum of all 3 pods' used memory
 
 **Why This Metric**:
 - **Capacity planning**: Total memory footprint per service
@@ -1029,19 +1056,21 @@ sum(go_memstats_alloc_bytes{app=~"$app", namespace=~"$namespace", job=~"microser
 
 ---
 
-### Panel 17: Total CPU per Service (ID: 17)
+### Panel 17: Total CPU per Service (ID: 17) ⚠️ UPDATED
 
 **Type**: timeseries | **Unit**: percent | **Row**: Resources & Infrastructure
 
+**Status**: The client_golang `process_cpu_seconds_total` counter was **retired at the P3 cutover** — no process-level CPU metric on the OTLP path. Container CPU usage from cAdvisor is used instead.
+
 **Query**:
 ```promql
-sum(rate(process_cpu_seconds_total{app=~"$app", namespace=~"$namespace", job=~"microservices"}[5m])) by (app) * 100
+sum(rate(container_cpu_usage_seconds_total{namespace=~"$namespace", pod=~"^$app-[a-z0-9]+-[a-z0-9]+$", container!=""}[5m])) by (namespace) * 100
 ```
 
 **Query Explanation**:
-- `process_cpu_seconds_total` - Cumulative CPU seconds used
+- `container_cpu_usage_seconds_total` - **cAdvisor counter**: cumulative CPU seconds per container
 - `rate(...) * 100` - CPU usage as percentage (100% = 1 core)
-- `sum(...) by (app)` - Total across all pods
+- cAdvisor carries `pod`/`namespace`/`container` (not `app`); each service runs in its own namespace, so `by (namespace)` is the per-service total across pods
 
 **Why This Metric**:
 - Service-level CPU consumption
@@ -1061,13 +1090,13 @@ sum(rate(process_cpu_seconds_total{app=~"$app", namespace=~"$namespace", job=~"m
 
 **Query**:
 ```promql
-sum(rate(response_size_bytes_sum{app=~"$app", namespace=~"$namespace", job=~"microservices"}[5m])) by (app)  # TX
-sum(rate(request_size_bytes_sum{app=~"$app", namespace=~"$namespace", job=~"microservices"}[5m])) by (app)   # RX
+sum(rate(http_server_response_body_size_bytes_sum{app=~"$app", namespace=~"$namespace"}[5m])) by (app)  # TX
+sum(rate(http_server_request_body_size_bytes_sum{app=~"$app", namespace=~"$namespace"}[5m])) by (app)   # RX
 ```
 
 **Query Explanation**:
-- `response_size_bytes_sum` - Total response body bytes (TX)
-- `request_size_bytes_sum` - Total request body bytes (RX)
+- `http_server_response_body_size_bytes_sum` - Total response body bytes (TX)
+- `http_server_request_body_size_bytes_sum` - Total request body bytes (RX)
 - **Result**: Bandwidth consumption per service
 
 **Why This Metric**:
@@ -1085,50 +1114,40 @@ sum(rate(request_size_bytes_sum{app=~"$app", namespace=~"$namespace", job=~"micr
 
 ---
 
-### Panel 19: Total Requests In Flight per Service (ID: 19)
+### Panel 19: Total Requests In Flight per Service (ID: 19) ⚠️ RETIRED
 
 **Type**: timeseries | **Unit**: short (count) | **Row**: Resources & Infrastructure
 
-**Query**:
-```promql
-sum(requests_in_flight{app=~"$app", namespace=~"$namespace", job=~"microservices"}) by (app)
-```
+**Status**: **Removed / not emitted.** After the RFC-0014 metrics cutover this panel has no data source. The old `requests_in_flight` gauge came from the hand-rolled Prometheus middleware; on the OTLP push path it has **no equivalent** — otelgin v0.69 does **not** emit `http_server_active_requests` (verified live 2026-07-09). The in-flight saturation alerts were retired together with the `/metrics` scrape. Restoring an active-requests gauge is **blocked upstream** (pending otelgin support).
 
-**Query Explanation**:
-- `requests_in_flight` - Gauge: currently processing requests
-- `sum(...) by (app)` - Total concurrent requests across all pods
-
-**Why This Metric**:
+**Why it mattered** (for when a replacement lands):
 - **Saturation signal** (4 Golden Signals: Latency, Traffic, Errors, Saturation)
 - Queue depth indicator
 - Service capacity verification
 
-**What to Do When**:
-- **High in-flight requests**: Service saturated - scale horizontally
-- **In-flight growing unbounded**: Requests piling up - check slow dependencies
-- **In-flight = 0 but traffic exists**: Fast responses (good) or instrumentation issue
-- **In-flight correlates with P95/P99**: Queueing causing latency
-
-**Saturation Threshold**: Depends on service, typically warn at 80% of capacity.
+**Interim substitute**: use latency (Panels 1-3, 13-15) and CPU/memory saturation (Panels 16-17) as saturation proxies until an OTel active-requests metric is available.
 
 ---
 
-### Panel 22: Total Memory Allocations per Service (ID: 22)
+### Panel 22: Allocation Rate per Service (ID: 22) ⚠️ UPDATED
 
-**Type**: timeseries | **Unit**: short (count) | **Row**: Resources & Infrastructure
+**Type**: timeseries | **Unit**: ops (allocs/sec) | **Row**: Resources & Infrastructure
+
+**Status**: The client_golang `go_memstats_frees_total` counter was **retired at the P3 cutover** — the OTel Go runtime set exposes **no frees counter**. Allocation churn is tracked by the allocation rate instead.
 
 **Query**:
 ```promql
-sum(go_memstats_frees_total{app=~"$app", namespace=~"$namespace", job=~"microservices"}) by (app)
+sum(rate(go_memory_allocations_total{app=~"$app", namespace=~"$namespace"}[5m])) by (app)
 ```
 
 **Query Explanation**:
-- `go_memstats_frees_total` - Cumulative memory frees (counter)
-- Indicates GC activity and allocation churn
+- `go_memory_allocations_total` - cumulative heap allocation count (OTel Go runtime metric); frees are not exposed
+- `rate(...)` - allocations per second, the allocation-pressure signal
+- **Result**: allocation rate per service
 
 **Why This Metric**:
 - Allocation pressure indicator
-- Correlate with GC frequency
+- Correlate with GC pressure (Panel 20)
 - Optimization target: Reduce allocations
 
 **What to Do When**:
@@ -1221,11 +1240,11 @@ sum(metric{...}) by (app)
 
 | Function | Purpose | Example |
 |----------|---------|---------|
-| `rate()` | Per-second rate over interval | `rate(request_duration_seconds_count[5m])` |
-| `increase()` | Total increase over interval | `increase(request_duration_seconds_count[1h])` |
+| `rate()` | Per-second rate over interval | `rate(http_server_request_duration_seconds_count[5m])` |
+| `increase()` | Total increase over interval | `increase(http_server_request_duration_seconds_count[1h])` |
 | `histogram_quantile()` | Calculate percentile | `histogram_quantile(0.95, ...)` |
 | `sum()` | Aggregate values | `sum(metric) by (label)` |
-| `count()` | Count time series | `count(up{...})` |
+| `count()` | Count time series | `count(go_goroutine_count{...})` (no `up` for OTLP-push apps) |
 
 ---
 
@@ -1645,6 +1664,6 @@ echo "→ Check metrics: RPS, Error Rate, Latency có thay đổi?"
 
 ---
 
-**Last Updated**: 2026-01-01  
+**Last Updated**: 2026-07-09  
 **Version**: 1.0  
 **Maintainer**: SRE Team

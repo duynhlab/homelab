@@ -19,13 +19,13 @@ the end-to-end pipeline (ingestion → VMAlert → Alertmanager → notify), see
 
 ## Summary
 
-**150 statically-defined alerts** across 11 domains, plus **48 Sloth-generated** SLO
+**149 statically-defined alerts** across 11 domains, plus **48 Sloth-generated** SLO
 burn-rate alerts (2 × 24 SLOs). The 24 SLOs cover the original 8 catalog/identity/comms
 services; `payment` ships no SLO yet.
 
 | Domain | Count | Protects |
 |--------|-------|----------|
-| [Microservices (RED)](#1-microservices-red-metrics) | 17 | The 9 Go services — user-facing request health |
+| [Microservices (RED)](#1-microservices-red-metrics) | 16 | The 9 Go services — user-facing request + gRPC health |
 | [Kong gateway](#2-kong-gateway) | 13 | The single API ingress for the whole platform |
 | [Valkey cache](#3-valkey-cache) | 7 | Cache-aside layer in front of PostgreSQL |
 | [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 24 | `cnpg-db` + DR replica + backups |
@@ -40,27 +40,28 @@ services; `payment` ships no SLO yet.
 
 ## 1. Microservices (RED metrics)
 
-Source: `prometheusrules/microservices/alerts.yaml`. SLI base metric: `request_duration_seconds`.
+Source: `prometheusrules/microservices/alerts.yaml` (OTLP push pipeline — RFC-0014 P3 cutover; the scrape-era groups retired with the cutover). SLI base metric: `http_server_request_duration_seconds`. No `job` label on the push path — selectors key on `{app!=""}` (vmagent D-3 relabel maps `service_name→app`, `k8s_namespace_name→namespace`).
 
 | Alert | Sev | Metric & trigger | Impact — why it must alert | for |
 |-------|-----|------------------|----------------------------|-----|
-| MicroserviceDown | critical | `up{job="microservices"}==0` | One instance unreachable; its traffic is dropped | 1m |
-| MicroserviceAllInstancesDown | critical | `count(up==1)==0` per service | Full service outage — every request to it fails | 1m |
-| MicroserviceHighRestartRate | warning | `increase(kube_pod_container_status_restarts_total[15m])>3` | CrashLoop/flapping → capacity loss, cold-start latency | 5m |
-| MicroserviceHighErrorRate | warning | 5xx ratio of `request_duration_seconds_count` >5% | 1-in-20 users get server errors | 5m |
+| MicroserviceDown | critical | D-4 heartbeat-absence: `go_goroutine_count{app!=""}` series present in the last 15m but now gone (per app/namespace/pod) | One instance stopped reporting; detection lags a pod kill ~5m (VM staleness), accepted in D-4 | 2m |
+| MicroserviceAllInstancesDown | critical | same heartbeat-absence, per `(app,namespace)` — every pod gone | Full service outage, or a broken OTLP pipeline | 2m |
+| OtelMetricsPipelineExportFailures | critical | `rate(otelcol_exporter_send_failed_metric_points_total[5m])>0` | Collector dropping metric points — every OTLP-path alert is blind | 5m |
+| MicroserviceHighErrorRate | warning | 5xx ratio of `http_server_request_duration_seconds_count` >5% | 1-in-20 users get server errors | 5m |
 | MicroserviceErrorRateCritical | critical | 5xx ratio >15% | Major failure; rollback/mitigation now | 5m |
-| MicroserviceNoSuccessfulRequests | critical | `rate(...{code=~"2.."})==0` 10m, had traffic before | Zero successes despite prior traffic — likely total failure | 10m |
-| MicroserviceHighLatencyP95 | warning | `histogram_quantile(0.95, request_duration_seconds_bucket)>1s` | Half of requests user-noticeably slow | 10m |
+| MicroserviceNoSuccessfulRequests | critical | `rate(...{http_response_status_code=~"2.."})==0` 10m, had traffic before | Zero successes despite prior traffic — likely total failure | 10m |
+| GrpcServerHighErrorRate | warning | non-OK ratio of `rpc_server_call_duration_seconds_count` >5% | East-west gRPC calls failing; callee unhealthy | 5m |
+| MicroserviceHighLatencyP95 | warning | `histogram_quantile(0.95, http_server_request_duration_seconds_bucket)>1s` | Half of requests user-noticeably slow | 10m |
 | MicroserviceHighLatencyP99 | warning | P99 >2s | Tail latency spike | 10m |
 | MicroserviceLatencyCritical | critical | P95 >2s | Timeout territory; SLA breach | 5m |
+| GrpcServerHighLatencyP95 | warning | gRPC P95 (`rpc_server_call_duration_seconds_bucket`) >500ms | East-west latency compounds into every edge request that fans out | 10m |
 | MicroserviceNoTraffic | warning | `rate(count[10m])==0`, had traffic | Routing broken / upstream down | 10m |
 | MicroserviceApdexCritical | warning | apdex <0.5 | >50% of users get unacceptable response times | 10m |
-| MicroserviceHighRequestsInFlight | warning | `requests_in_flight>50` | Approaching capacity; queuing begins | 5m |
-| MicroserviceRequestsInFlightCritical | critical | `requests_in_flight>100` | Overloaded; failures imminent | 2m |
-| MicroserviceGoroutineLeak | warning | `go_goroutines>1000` and rising | Leak → eventual OOM | 15m |
-| MicroserviceHighMemoryUsage | warning | `process_resident_memory_bytes>512Mi` | OOMKill risk | 15m |
-| MicroserviceHighGCPressure | warning | `rate(go_gc_duration_seconds_sum[5m])>0.5` | >50% CPU in GC | 15m |
-| MicroserviceHighGCFrequency | warning | `rate(go_gc_duration_seconds_count[5m])>10` | Extreme memory pressure | 15m |
+| MicroserviceGoroutineLeak | warning | `go_goroutine_count>1000` and `deriv(...[15m])>0.17` | Leak → eventual OOM | 15m |
+| MicroserviceHighMemoryUsage | warning | container working-set >90% of the memory limit (`container_memory_working_set_bytes` / `kube_pod_container_resource_limits`) | OOMKill risk | 15m |
+| MicroserviceGCThrash | warning | `go_memory_used_bytes` >95% of `go_memory_gc_goal_bytes` | GC running back-to-back; high allocation / undersized heap | 15m |
+
+> **Scrape-era alerts retired at the P3 cutover.** `MicroserviceHighRequestsInFlight` / `MicroserviceRequestsInFlightCritical` (saturation) are **removed** — otelgin v0.69 emits no `http.server.active_requests`, so there is no OTel in-flight metric (re-add when it ships). `MicroserviceHighGCPressure` + `MicroserviceHighGCFrequency` (GC pause) are **replaced** by the single `MicroserviceGCThrash` — the OTel Go runtime exposes no GC-pause metric. `MicroserviceDown` / `MicroserviceAllInstancesDown` moved from `up{}` scrape liveness to the D-4 heartbeat-absence check above. The former scrape-era `MicroserviceHighRestartRate` is not part of the OTLP alert set — CrashLoop/restart is covered by `KubePodCrashLooping` (§6).
 
 ## 2. Kong gateway
 
@@ -309,7 +310,7 @@ Not hand-written: the `mop` chart renders a `PrometheusServiceLevel` CR per serv
 
 - **8 services × 3 SLOs = 24 SLOs → 48 alerts.** SLOs: **Availability** (99.5%, non-5xx
   ratio), **Latency** (95% < 500ms), **Error rate** (99%, non-4xx/5xx) — all from
-  `request_duration_seconds`, against a **30-day** error budget.
+  `http_server_request_duration_seconds`, against a **30-day** error budget.
 - **Page alert** — fast burn (14.4× over 1h, confirmed on 5m) → on-call.
 - **Ticket alert** — slow burn (6× over 6h, confirmed on 30m) → business hours.
 
@@ -369,9 +370,9 @@ Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-an
 
 - **Latency duplication:** raw `MicroserviceHighLatencyP95/P99/LatencyCritical` overlap the Sloth latency SLO burn-rate. Keep the SLO burn-rate as page-worthy; consider demoting the raw P95/P99 statics to ticket/warning to cut duplicate pages.
 - **Outage triple-fire:** `MicroserviceNoTraffic` + `MicroserviceNoSuccessfulRequests` + `KongNoTraffic` can all fire for one outage — group them and use Alertmanager inhibition.
-- **Tuning signals, not incidents:** `PostgresCheckpointsTooFrequent`, `PostgresDeadTuplesHigh`, `PostgresDatabaseSizeLarge`, `MicroserviceHighGCFrequency/HighGCPressure` are capacity/tuning signals — they should stay `warning`/`info`, never page (the user-facing symptom is already covered by latency/apdex/SLO).
+- **Tuning signals, not incidents:** `PostgresCheckpointsTooFrequent`, `PostgresDeadTuplesHigh`, `PostgresDatabaseSizeLarge`, `MicroserviceGCThrash` are capacity/tuning signals — they should stay `warning`/`info`, never page (the user-facing symptom is already covered by latency/apdex/SLO).
 - **`KubeletTooManyPods`** is a static-ceiling cause alert — low value unless actually near the pod/node limit.
 
 ---
 
-_Last updated: 2026-07-07_
+_Last updated: 2026-07-09_

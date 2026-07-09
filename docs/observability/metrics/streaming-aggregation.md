@@ -70,11 +70,11 @@ Worst-case bound per replica for the fleet-standard middleware
 (~12 non-infra routes × ~4 status codes = ~48 combos):
 
 ```
-request_duration_seconds : 48 combos × (14 bucket lines + _sum + _count) ≈ 768
-request/response_size    : 48 combos × (6 bucket lines + _sum + _count) × 2 ≈ 768
-requests_in_flight       : ~12 (method×path, no code)
-go_* / process_* runtime : ~250
-                         ≈ 1,800 series / replica worst-case
+http_server_request_duration_seconds       : 48 combos × (14 bucket lines + _sum + _count) ≈ 768
+http_server_(request|response)_body_size_bytes : 48 combos × (6 bucket lines + _sum + _count) × 2 ≈ 768
+(http_server_active_requests)               : not emitted — otelgin v0.69 has no in-flight gauge
+go_* / process_* runtime                    : ~250
+                                            ≈ 1,800 series / replica worst-case
 ```
 
 ### The same math at fleet scale
@@ -106,7 +106,7 @@ TSDB at all.
 
 | Approach | Why it falls short at scale |
 |---|---|
-| **Recording rules** (our `job_app:*`) | Evaluated *after* ingestion — storage already paid for the raw series; the rules **add** series on top. Rule evaluation itself fans in the full raw cardinality every interval. Right tool at small scale; a cost *amplifier* at large scale. |
+| **Recording rules** (our `app:*`) | Evaluated *after* ingestion — storage already paid for the raw series; the rules **add** series on top. Rule evaluation itself fans in the full raw cardinality every interval. Right tool at small scale; a cost *amplifier* at large scale. |
 | **Relabel-dropping `instance`** | Aggregation-by-deletion is wrong: two replicas' samples collide into one series with conflicting values (last-write-wins garbage). Dropping is only safe for series you discard entirely. |
 | **Scaling storage horizontally** (cluster/Thanos/Mimir) | Pays to store cardinality that has no readers. Necessary eventually for HA/retention — but it scales the *bill*, not the signal-to-noise. |
 | **StatsD-style client aggregation** | Moves aggregation into app processes and a bespoke protocol; loses the pull model, per-replica health (`up`), and exemplars. |
@@ -122,14 +122,14 @@ vmagent (and single-node VictoriaMetrics) can apply aggregation rules on the
 aggregation state; every `interval` the state flushes as new output series.
 
 ```yaml
-- match: 'request_duration_seconds_bucket'   # series selector
+- match: 'http_server_request_duration_seconds_bucket'  # series selector
   interval: 1m                               # aggregation window
   without: [instance, pod]                   # labels to aggregate away
   outputs: [total]                           # aggregation function(s)
 ```
 
 Output naming is collision-proof by construction:
-`request_duration_seconds_bucket:1m_without_instance_pod_total` — the raw
+`http_server_request_duration_seconds_bucket:1m_without_instance_pod_total` — the raw
 series (if kept) and the aggregate can coexist.
 
 ### Choosing outputs by metric type
@@ -140,7 +140,7 @@ most common mistake:
 | Metric type | Correct outputs | Wrong (and why) |
 |---|---|---|
 | Counter (`*_total`, histogram `_bucket`/`_count`/`_sum`) | `total` (cumulative, counter-reset aware) or `increase` | `sum_samples` — sums raw cumulative values, produces garbage across resets/restarts |
-| Gauge (`requests_in_flight`, queue depth) | `avg`, `max`, `min`, `last` | `sum`/`total` — the sum of point-in-time gauges across replicas is meaningful only if you truly want fleet total; `total` treats them as counters |
+| Gauge (queue depth, active connections) | `avg`, `max`, `min`, `last` | `sum`/`total` — the sum of point-in-time gauges across replicas is meaningful only if you truly want fleet total; `total` treats them as counters |
 | Latency distribution | aggregate the existing histogram series with `total`, or `quantiles(...)`/`histogram_bucket` on raw values | per-replica percentiles averaged together — percentiles don't average |
 
 ### Histogram invariants
@@ -166,7 +166,7 @@ aggregators will strip:
 ```mermaid
 flowchart LR
     subgraph Apps["1000+ services × N replicas"]
-        A1["service pods<br/>/metrics"]
+        A1["service pods<br/>(OTLP push / scrape)"]
     end
     subgraph T1["Tier 1 — stateless routers (vmagent)"]
         R1["router-1"]
@@ -247,8 +247,11 @@ answer flips, and for platforms where it is already "yes".
 
 ## How it works in this platform (pilot shape)
 
-The homelab's scrape path is `ServiceMonitor → VMAgent → VMSingle`. The VM
-Operator exposes streaming aggregation declaratively on the `VMAgent` CR, so
+The homelab's app metrics now arrive by **OTLP push** (`obsx SDK →
+otel-collector → vmagent OTLP ingest → VMSingle`; the per-app `/metrics` scrape
+was retired in RFC-0014 P3). Streaming aggregation lives on vmagent's
+remote-write path, so it applies regardless of how samples enter. The VM
+Operator exposes it declaratively on the `VMAgent` CR, so
 the pilot is a GitOps-only change to
 [`vmagent.yaml`](../../../kubernetes/infra/configs/monitoring/victoriametrics/vmagent.yaml)
 — no new components, no router tier (one vmagent = one aggregator = the
@@ -264,30 +267,29 @@ spec:
       # recording rules, dashboards keep reading raw series untouched.
       streamAggrConfig:
         rules:
-          # Fleet-level RED without per-replica identity.
+          # Fleet-level RED without per-replica identity. App series arrive
+          # via OTLP push (no `job`/`instance` label; the per-replica label is
+          # `k8s_pod_name` from the OTLP resource), so select on `app` and
+          # strip `k8s_pod_name`.
           # One rule covers _bucket/_count/_sum -> same `without` list,
           # preserving histogram_quantile() on the aggregated set.
-          - match: '{__name__=~"request_duration_seconds(_bucket|_count|_sum)", job="microservices"}'
+          - match: '{__name__=~"http_server_request_duration_seconds(_bucket|_count|_sum)", app!=""}'
             interval: 1m
-            without: [instance, pod]
+            without: [k8s_pod_name]
             outputs: [total]
-          # Gauge: fleet view needs avg and worst-replica.
-          - match: '{__name__="requests_in_flight", job="microservices"}'
-            interval: 1m
-            without: [instance, pod]
-            outputs: [avg, max]
+          # The in-flight gauge rule was dropped: otelgin (v0.69) emits no
+          # active-requests metric, so `requests_in_flight` no longer exists
+          # after the RFC-0014 P3 cutover.
 ```
 
 What this yields in VMSingle, next to the raw series:
 
 ```
-request_duration_seconds_bucket:1m_without_instance_pod_total{app="cart", path="...", le="0.5"}
-request_duration_seconds_count:1m_without_instance_pod_total{app="cart", path="..."}
-requests_in_flight:1m_without_instance_pod_avg{app="cart", path="..."}
-requests_in_flight:1m_without_instance_pod_max{app="cart", path="..."}
+http_server_request_duration_seconds_bucket:1m_without_k8s_pod_name_total{app="cart", http_route="...", le="0.5"}
+http_server_request_duration_seconds_count:1m_without_k8s_pod_name_total{app="cart", http_route="..."}
 ```
 
-These are the same shapes the `job_app:*` recording rules compute after
+These are the same shapes the `app:*` recording rules compute after
 ingestion — which is the point: the shadow phase compares the two for
 equivalence before any consumer is switched (RFC-0013 P3b).
 
@@ -333,4 +335,4 @@ the flux-system/monitoring pipeline):
 - In-repo: [metrics hub](README.md) · [metrics-apps.md](metrics-apps.md) · [RFC-0013](../../proposals/rfc/RFC-0013/README.md)
 
 ---
-_Last updated: 2026-07-06 — initial playbook (RFC-0013 P2)._
+_Last updated: 2026-07-09 — re-pointed the pilot to semconv/OTLP metric names (RFC-0014 P3); app path is OTLP push, not scrape._

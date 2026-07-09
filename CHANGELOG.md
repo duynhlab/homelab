@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Cluster OTLP metrics env (RFC-0014 P1 cluster slice)**: the four domain
+  ResourceSets and the order-worker inject `K8S_NAMESPACE_NAME` +
+  `K8S_POD_NAME` (Downward API — the exact names obsx reads for the k8s
+  resource attributes) and `DEPLOYMENT_ENVIRONMENT=production`; new
+  `otel_metrics_enabled` RSIP input (default `"false"`) gates the dual-emit
+  flag, flipped `"true"` for the product canary only.
 - **OTLP metrics canary env (RFC-0014 P1b)**: local-stack `product` gets
   `OTEL_METRICS_ENABLED=true` + `DEPLOYMENT_ENVIRONMENT=local` — first
   service dual-emitting semconv metrics over OTLP (pairs with

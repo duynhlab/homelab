@@ -209,9 +209,9 @@ docs/
 5. **[Backend Comparison](./observability/tracing/backends-comparison.md)** - Tempo vs Jaeger vs VictoriaTraces (+ roadmap)
 6. **[VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md)** - 3rd backend via the VM operator
 5. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
-6. **[Logging](./observability/logging/README.md)** - Architecture, VictoriaLogs + Vector, scaling
+6. **[Logging](./observability/logging/README.md)** - Architecture: OTLP app logs (otelzap tee) + Vector for non-instrumented pods, scaling
 7. **[VictoriaLogs](./observability/logging/victorialogs.md)** - VictoriaLogs deployment and configuration
-    - Single Vector architecture (ships to VictoriaLogs)
+    - OTLP app-log ingest + Vector for non-instrumented pods (DB/Kong/frontend/infra)
     - PostgreSQL auto_explain plan parsing pipeline
     - Verification and troubleshooting
 
@@ -307,9 +307,9 @@ docs/
 - [Backend Comparison](./observability/tracing/backends-comparison.md) - Tempo vs Jaeger vs VictoriaTraces
 - [VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md) - 3rd backend via the VM operator
 - [Continuous Profiling](./observability/profiling/README.md) - Pyroscope setup
-- [Logging](./observability/logging/README.md) - Architecture, VictoriaLogs + Vector, scaling
+- [Logging](./observability/logging/README.md) - Architecture: OTLP app logs (otelzap tee) + Vector for non-instrumented pods
 - [Logging Standards](./observability/logging/logging-standards.md) - App-side logging conventions (libraries, levels, JSON fields)
-- [VictoriaLogs](./observability/logging/victorialogs.md) - VictoriaLogs deployment (single Vector, dual-ship)
+- [VictoriaLogs](./observability/logging/victorialogs.md) - VictoriaLogs deployment (OTLP app logs + Vector for non-instrumented pods)
 
 ### API
 

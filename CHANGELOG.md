@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Logging & tracing docs refreshed for RFC-0014 P4** (P5 only swept the
+  metrics-family docs): `logging/README.md`, `logging-standards.md` and
+  `victorialogs.md` now describe the dual-path reality — app logs via the
+  otelzap→OTLP tee (fleet-wide, `trace_id` a queryable field in VictoriaLogs)
+  with Vector kept for non-instrumented pods (DBs, Kong access log, PG
+  `auto_explain`, frontend); the logger narrative reconciled to the P4 zapx
+  convergence (auth off zerolog, cart off clog). `tracing/architecture.md`
+  SDK-wiring updated to `pkg/obsx.SetupObservability` + otelgin/otelgrpc (was
+  the pre-consolidation per-repo `middleware/tracing.go` + raw exporter). Docs
+  index logging-pillar descriptions updated.
+
+### Changed
+
 - **Docs swept to the OTLP/semconv reality (RFC-0014 P5)**: ~19 observability
   docs re-pointed from `request_duration_seconds{method,path,code}` +
   `job="microservices"` to `http_server_request_duration_seconds` +

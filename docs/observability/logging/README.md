@@ -2,13 +2,17 @@
 
 The **logs pillar** of the platform — the "**why is it broken?**" signal
 (alongside metrics "is something wrong?", traces "where is it slow?", and
-profiles "which line of code?"; see [`../README.md`](../README.md)). Every pod's
-stdout is collected by one Vector agent and stored in VictoriaLogs, queryable
-with LogsQL and correlated to traces by `trace_id`.
+profiles "which line of code?"; see [`../README.md`](../README.md)). Logs reach
+VictoriaLogs by **two complementary paths**: instrumented Go services ship over
+**OTLP** (otelzap → OpenTelemetry Collector), and everything not OTel-instrumented
+(databases, Kong access log, the frontend, system pods) is tailed by **Vector**.
+Both land in one backend, queryable with LogsQL and correlated to traces by
+`trace_id`.
 
 | | |
 |---|---|
-| **Collector** | Vector — one cluster-wide **DaemonSet** (`kube-system`), `kubernetes_logs` source |
+| **App-log path** | otelzap tee → OTLP (`otlploghttp`) → **OpenTelemetry Collector** → VictoriaLogs (fleet-wide since RFC-0014 P4) |
+| **Infra-log path** | Vector — one cluster-wide **DaemonSet** (`kube-system`), `kubernetes_logs` source — DBs, Kong access log, PG `auto_explain`, frontend, system pods |
 | **Storage** | VictoriaLogs **VLSingle** `:9428` (`monitoring`, VM Operator CRD) — 7-day retention, 20Gi PVC |
 | **Query** | LogsQL (VictoriaLogs) |
 | **Visualization** | Grafana — `victorialogs` datasource (`victoriametrics-logs-datasource`) |
@@ -16,66 +20,78 @@ with LogsQL and correlated to traces by `trace_id`.
 | **App logging** | How services emit logs (libraries, format, levels, wiring) → [`logging-standards.md`](logging-standards.md) |
 
 > This doc is the **architecture** view: the pipeline, why this stack, and how it
-> scales. For **how to implement logging in a service** — log libraries
-> (Zap/clog/zerolog), the JSON field contract, the level schema, trace-id wiring,
-> and onboarding — see the source of truth,
+> scales. For **how to implement logging in a service** — the `zapx` logger, the
+> otelzap tee, the JSON field contract, the level schema, trace-id wiring, and
+> onboarding — see the source of truth,
 > [**Logging Standards**](logging-standards.md). Backend/ops detail (VLSingle config,
 > Vector pipeline, endpoints, verification) lives in [`victorialogs.md`](victorialogs.md).
+> For the full before/after migration story, see the
+> [**RFC-0014 explainer**](../rfc-0014-explainer.md).
 
 ---
 
 ## Overview
 
-All services log **structured JSON to stdout**; nothing writes log files. A single
-**Vector** DaemonSet tails every container on its node, tags each line with stream
-fields (`namespace`, `service`, `pod_name`, `container_name`), and ships it to
-**VictoriaLogs** over HTTP. VictoriaLogs is the **sole** log backend (Loki was
-removed) and also carries a dedicated stream of parsed **PostgreSQL
-`auto_explain`** query plans. Because every line keeps the `trace_id` the
-application logged, a log and its distributed trace join on one id.
+The platform has **two log paths into one backend**:
+
+- **App path (OTLP).** The 9 Go services + the order-worker emit structured JSON
+  with `zapx`, and their zap core is **tee'd** — one branch to stdout (for
+  `kubectl logs`), one through an **otelzap** bridge → OTLP log exporter
+  (`otlploghttp`) → **OpenTelemetry Collector** → VictoriaLogs. The Collector's
+  VictoriaLogs exporter sets `VL-Stream-Fields: service.name`, so each service
+  gets its own stream and **`trace_id` is a first-class queryable field**. This is
+  the fleet-wide path since RFC-0014 P4.
+- **Infra path (Vector).** Everything **not** OTel-instrumented — databases
+  (CloudNativePG, incl. parsed **`auto_explain`** query plans), Kong's access log,
+  the frontend, and system pods — is tailed by a single **Vector** DaemonSet and
+  shipped over the jsonline endpoint. Vector explicitly **excludes the app pods**
+  (they carry `platform.duynhlab.dev/otlp-logs=true`), so the two paths never
+  double-ingest.
+
+VictoriaLogs is the **sole** log backend (Loki was removed). Because both paths
+preserve the `trace_id`, a log and its distributed trace join on one id.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    subgraph sources["Sources"]
-        Pods["Pods (9 services + infra)<br/>stdout JSON"]
+    subgraph apps["Instrumented Go services (9 + order-worker)"]
+        Z["zapx core (tee)"]
+        Z -->|stdout| KLOGS["kubectl logs"]
+        Z -->|"otelzap → otlploghttp"| OTLP
+    end
+    subgraph infra["Non-instrumented workloads"]
         CNPG["CloudNativePG<br/>auto_explain plans"]
+        KONG["Kong access log<br/>(kong_json stdout)"]
+        FE["Frontend + system pods"]
     end
-    subgraph vector["Vector DaemonSet · kube-system"]
-        KL["kubernetes_logs"]
-        AL["add_labels<br/>namespace/service/pod/container"]
-        PG["parse_pg_json →<br/>filter/parse auto_explain"]
-    end
-    KONG["Kong gateway<br/>kong_json access log (stdout)<br/>+ OTel runtime logs"]
-    Pods --> KL
-    CNPG --> KL
-    KONG --> KL
-    KL --> AL
-    KL --> PG
-    AL -->|"/insert/jsonline"| VL[("VictoriaLogs VLSingle :9428<br/>monitoring · 7d / 20Gi")]
-    PG -->|"PG-plans stream"| VL
-    KONG -.->|"OTLP logs (pilot)"| COL["otel-collector<br/>logs pipeline"]
-    COL -.->|"/insert/opentelemetry/v1/logs"| VL
+    OTLP["OTLP logs :4318"] --> COL["OpenTelemetry Collector<br/>logs pipeline"]
+    CNPG --> VEC["Vector DaemonSet · kube-system<br/>(excludes app pods)"]
+    KONG --> VEC
+    FE --> VEC
+    KONGRT["Kong opentelemetry plugin<br/>runtime logs"] -.->|OTLP| COL
+    COL -->|"/insert/opentelemetry/v1/logs<br/>VL-Stream-Fields: service.name"| VL[("VictoriaLogs VLSingle :9428<br/>monitoring · 7d / 20Gi")]
+    VEC -->|"/insert/jsonline"| VL
     VL --> GRAF["Grafana Explore<br/>(LogsQL)"]
     GRAF <-. "trace_id ↔ Tempo" .-> TEMPO["Tempo"]
 ```
 
-**One agent, one backend.** A single cluster-wide Vector DaemonSet does all
-collection — the VictoriaLogs Helm chart's embedded collector is **disabled** so
-there is no duplicate ingestion. Vector applies two pipelines: the *all-logs*
-pipeline (label + ship) and the *PostgreSQL* pipeline (extract `auto_explain`
-execution plans into their own stream). Both land in one VLSingle instance.
+**Two paths, one backend, no double-ingest.** App logs travel over OTLP; Vector
+handles only the workloads OTel can't instrument. Vector still runs two pipelines
+of its own — the *infra* pipeline (label + ship) and the *PostgreSQL* pipeline
+(extract `auto_explain` execution plans into their own stream) — and the
+VictoriaLogs Helm chart's embedded collector stays **disabled** so Vector remains
+the single agent for that path. App pods are excluded from Vector by label
+(`platform.duynhlab.dev/otlp-logs=true`), which is the double-ingest guard.
 Pipeline internals, sink headers, and stream definitions are in
 [`victorialogs.md`](victorialogs.md).
 
-### Kong OTel-logs pilot (parallel path)
+### Kong logs (both paths)
 
-Alongside Vector, Kong's `opentelemetry` plugin ships its **runtime logs** via
-OTLP (`logs_endpoint`, Kong ≥ 3.8) → otel-collector `logs` pipeline →
-VictoriaLogs' OTLP ingest. This is a **pilot** to compare against the Vector
-path (which remains primary and also carries Kong's `kong_json` access log
-from stdout). Per-request access logs over OTLP (`access_logs_endpoint`) are
+Kong feeds **both** paths, complementary not duplicate: its `opentelemetry`
+plugin ships **runtime logs** over OTLP (`logs_endpoint`, Kong ≥ 3.8) →
+OpenTelemetry Collector, while Vector still tails Kong's **`kong_json` access
+log** from stdout. Per-request access logs over OTLP (`access_logs_endpoint`) are
 not available on Kong OSS 3.9. Tradeoff table + decision criteria:
 [`docs/platform/kong-gateway.md#observability`](../../platform/kong-gateway.md#observability).
 
@@ -112,9 +128,10 @@ small and **PVC fill is the practical limit** (covered by the
 
 What this design does well at scale, and the upgrade path:
 
-- **Collection scales with the cluster.** Vector is a DaemonSet — one agent per
-  node — so ingest capacity grows automatically as you add nodes; there is no
-  central aggregator to become a bottleneck.
+- **Collection scales with the cluster.** Both paths scale horizontally: Vector is
+  a DaemonSet — one agent per node — so infra-log ingest grows as you add nodes,
+  and the app-log OTLP path scales with Collector replicas. Neither has a single
+  central aggregator that becomes a bottleneck.
 - **Cardinality stays bounded by design.** Stream fields are deliberately
   low-cardinality (`namespace`, `service`, `pod_name`, `container_name`).
   High-cardinality values (`trace_id`, `user_id`, `query_id`) stay in the log
@@ -195,4 +212,4 @@ logging-standards.md   # App logging standards & implementation (onboarding)
 
 ---
 
-_Last updated: 2026-07-03 — Vector DaemonSet → VictoriaLogs VLSingle `:9428` (7d/20Gi), LogsQL, `trace_id` ↔ Tempo; Loki removed; Kong OTel-logs pilot (`logs_endpoint` → collector → VLSingle OTLP ingest) alongside Vector._
+_Last updated: 2026-07-09 — dual-path logging: app logs over OTLP (otelzap → OpenTelemetry Collector → VictoriaLogs, `VL-Stream-Fields: service.name`, fleet-wide since RFC-0014 P4) + Vector DaemonSet for non-instrumented workloads (DBs, Kong access log, PG `auto_explain`, frontend); VictoriaLogs VLSingle `:9428` (7d/20Gi), LogsQL, `trace_id` ↔ Tempo; Loki removed._

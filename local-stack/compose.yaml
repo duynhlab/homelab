@@ -426,6 +426,10 @@ services:
       <<: *svc-env
       SERVICE_NAME: product
       OTEL_SERVICE_NAME: product
+      # RFC-0014 P4 canary: product ships its zap logs over OTLP first
+      # (otelzap tee -> collector -> VictoriaLogs); fleet follows once the
+      # trace_id correlation is verified end to end.
+      OTEL_LOGS_ENABLED: "true"
       DB_NAME: product
       CACHE_ENABLED: "true"
       CACHE_HOST: cache

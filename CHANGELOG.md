@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **OTLP logs pipeline + canary (RFC-0014 P4)**: the local-stack collector's
+  VictoriaLogs exporter gains `VL-Stream-Fields: service.name` (per-service
+  log streams; `trace_id` stays a queryable regular field); Vector excludes
+  the 9 Go service containers (their logs now arrive over OTLP — one line,
+  one path); the product service flips `OTEL_LOGS_ENABLED=true` as the
+  canary. Verified: `trace_id:"<id>"` in VictoriaLogs returns the request's
+  log lines — the broken log↔trace correlation is fixed at the root.
+
 ### Changed
 
 - **OTLP metrics default-on fleet-wide (RFC-0014 P3 code-removal wave)**: the

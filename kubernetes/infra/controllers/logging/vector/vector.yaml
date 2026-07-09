@@ -42,7 +42,12 @@ spec:
         kubernetes_logs:
           type: kubernetes_logs
           extra_field_selector: ""
-          extra_label_selector: ""
+          # RFC-0014 P4: pods that ship their own logs over OTLP (otelzap tee
+          # -> collector -> VictoriaLogs) carry this label — Vector must not
+          # tail them too, or every line lands twice. Flipping a service's
+          # otel_logs_enabled input to "false" flips the label with it, and
+          # Vector resumes instantly (the RFC's rollback path).
+          extra_label_selector: "platform.duynhlab.dev/otlp-logs!=true"
           exclude_paths_glob_patterns:
             - "**/*.gz"
             - "**/*.tmp"

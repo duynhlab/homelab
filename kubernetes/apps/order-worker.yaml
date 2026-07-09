@@ -89,8 +89,6 @@ spec:
         value: "true"
       - name: PROFILING_ENABLED
         value: "true"
-      - name: METRICS_ENABLED
-        value: "true"
       # DB — the worker's ConfirmOrder/FailOrder activities update the order row
       # (same pooler as the order API).
       - name: DB_HOST

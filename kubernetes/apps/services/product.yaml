@@ -21,7 +21,4 @@ spec:
     db_sslmode: "disable"
     pool_max: "50"
     cache_enabled: "true"
-    # RFC-0014 P1 canary: product dual-emits semconv metrics over OTLP first;
-    # the rest of the fleet keeps the template default ("false") until soak.
-    otel_metrics_enabled: "true"
     review_grpc_addr: "dns:///review-grpc.review.svc.cluster.local:9090"

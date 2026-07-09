@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **OTLP metrics default-on fleet-wide (RFC-0014 P3 code-removal wave)**: the
+  domain ResourceSets flip `otel_metrics_enabled` to default `"true"` (the
+  RSIP input stays as a per-service kill switch) and the product canary
+  override is removed; local-stack and the order-worker drop the scrape-era
+  `METRICS_ENABLED` env and the now-redundant `OTEL_METRICS_ENABLED` (pkg
+  v0.17.0 defaults metrics on). Pairs with the 9 service-repo PRs deleting
+  the Prometheus middleware, `/metrics` route and bridge call.
+
+### Changed
+
 - **Metrics cutover to OTLP (RFC-0014 P3, ADR-016)**: the OTLP-path alerts/
   recording rules become canonical (files renamed over the legacy ones, alert
   names keep their runbook anchors, D-4 heartbeat liveness replaces `up{}`);

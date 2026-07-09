@@ -1,7 +1,17 @@
+# RFC-0014 P3 (D-13): the legacy-checkout fence. After the metrics cutover the
+# nine platform services push OTLP (no scrape); this ServiceMonitor keeps the
+# legacy pull pipeline alive ONLY for the exempt checkout-service (namespace
+# "checkout", not deployed yet — the fence pre-exists its arrival), preserving
+# job="microservices" so the legacy-checkout rule group keeps working with
+# zero changes in that repo.
+#
+# Retirement condition (RFC-0014 D-13): delete this object plus the
+# legacy-checkout rule group when checkout-service either adopts pkg obsx
+# SetupObservability or is decommissioned.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: microservices-api
+  name: legacy-checkout
   namespace: monitoring
 spec:
   endpoints:
@@ -22,7 +32,8 @@ spec:
       targetLabel: app
     scrapeTimeout: 10s
   namespaceSelector:
-    any: true
+    matchNames:
+      - checkout
   selector:
     matchLabels:
       app.kubernetes.io/component: api

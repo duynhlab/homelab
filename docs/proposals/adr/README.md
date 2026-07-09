@@ -41,3 +41,4 @@ settled decisions.
 | [ADR-013](ADR-013-per-service-db-triplet/) | Per-service database triplet (ExternalSecret + DatabaseRole + Database) on cnpg-db | Accepted | [RFC-0012](../rfc/RFC-0012/) |
 | [ADR-014](ADR-014-pooler-credentials-valuesfrom/) | PgDog pooler credentials via Flux valuesFrom targetPath | Accepted | [RFC-0012](../rfc/RFC-0012/) |
 | [ADR-015](ADR-015-pg-hba-connection-isolation/) | Database connection isolation via declarative pg_hba | Accepted | [RFC-0012](../rfc/RFC-0012/) |
+| [ADR-016](ADR-016-otel-metrics-cutover/) | Metrics cutover to the OTLP push pipeline | Accepted | [RFC-0014](../rfc/RFC-0014/) |

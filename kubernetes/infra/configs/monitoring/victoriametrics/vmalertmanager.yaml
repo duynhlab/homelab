@@ -19,12 +19,6 @@ spec:
       repeat_interval: 4h
       receiver: 'slack-default'
       routes:
-        # RFC-0014 P2: new-name (OTLP-path) alert copies soak in a staging
-        # channel and must NEVER page the real receivers — matched FIRST and
-        # without continue. Route removed at P3 cutover.
-        - receiver: 'slack-otel-staging'
-          matchers:
-            - pipeline="otel"
         - receiver: 'slack-critical'
           matchers:
             - severity="critical"
@@ -51,17 +45,6 @@ spec:
         equal: ['job']
 
     receivers:
-      - name: 'slack-otel-staging'
-        slack_configs:
-          - channel: '#alerts-otel-staging'
-            send_resolved: true
-            title: '[OTEL-SOAK {{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
-            text: |-
-              {{ range .Alerts }}
-              *Alert:* {{ .Labels.alertname }} - {{ .Labels.severity }}
-              *Namespace:* {{ .Labels.namespace }}
-              *Description:* {{ .Annotations.description }}
-              {{ end }}
       - name: 'slack-default'
         slack_configs:
           - channel: '#alerts'

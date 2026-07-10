@@ -15,7 +15,7 @@ this directory (`001`-`010`).
 
 ## Operator documentation
 
-- [CloudNativePG documentation](https://cloudnative-pg.io/docs/1.29/)
+- [CloudNativePG documentation](https://cloudnative-pg.io/docs/1.30/)
 - [CloudNativePG Barman Cloud Plugin](https://cloudnative-pg.io/plugin-barman-cloud/)
 - [Zalando Postgres Operator documentation](https://postgres-operator.readthedocs.io/en/latest/)
 - [Patroni documentation](https://patroni.readthedocs.io/en/latest/)

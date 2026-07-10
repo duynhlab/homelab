@@ -4,9 +4,9 @@
 
 | Cluster | Operator | Namespace | Instances | Replication | Pooler | Pooler Endpoint | Direct Endpoint |
 |---------|----------|-----------|-----------|-------------|--------|-----------------|-----------------|
-| **auth-db** | Zalando | auth | 3 (1 Leader + 2 Standbys) | Streaming (async) | PgBouncer (2 pods) | `auth-db-pooler.auth.svc:5432` | `auth-db.auth.svc:5432` |
-| **supporting-shared-db** | Zalando | user | 1 | N/A | PgBouncer (2 pods) | `supporting-shared-db-pooler.user.svc:5432` | `supporting-shared-db.user.svc:5432` |
-| **cnpg-db** | CloudNativePG | product | 3 (1 Primary + 1 Sync + 1 Async Replica) | Sync (ANY 1) | PgDog (1 pod) | `pgdog-cnpg.product.svc:6432` | `cnpg-db-rw.product.svc:5432` |
+| **auth-db** | Zalando | auth | 3 (1 Leader + 2 Standbys) | Streaming (async) | PgBouncer (3 pods) | `auth-db-pooler.auth.svc:5432` | `auth-db.auth.svc:5432` |
+| **supporting-shared-db** | Zalando | user | 1 | N/A | PgBouncer (3 pods) | `supporting-shared-db-pooler.user.svc:5432` | `supporting-shared-db.user.svc:5432` |
+| **cnpg-db** | CloudNativePG | product | 3 (1 Primary + 1 Sync + 1 Async Replica) | Sync (ANY 1) | PgDog (3 pods) | `pgdog-cnpg.product.svc:6432` | `cnpg-db-rw.product.svc:5432` |
 | **cnpg-db-replica** | CloudNativePG | product | 1 (Designated Primary) | WAL recovery from object store | — | — | `cnpg-db-replica-rw.product.svc:5432` |
 
 ---
@@ -17,7 +17,7 @@ For detailed architecture, configuration, and components of each cluster, please
 
 - **[auth-db](auth-db/README.md)**: Authentication service database.
 - **[supporting-shared-db](supporting-shared-db/README.md)**: Shared database for User, Notification, Shipping, and Review services.
-- **[cnpg-db](cnpg-db/)**: Consolidated CNPG cluster hosting Product, Cart, and Order databases (merged from former product-db + transaction-shared-db). Includes PgDog pooler, backup, and monitoring.
+- **[cnpg-db](cnpg-db/)**: Consolidated CNPG cluster hosting Product, Cart, Order, and Payment databases (merged from former product-db + transaction-shared-db; payment app connects direct-TLS). Includes PgDog pooler, backup, and monitoring.
 - **[cnpg-db-replica](cnpg-db-replica/)**: DR replica cluster; continuously recovers from cnpg-db WAL archive. Promotable to standalone primary. Deployed via Flux **`configs/databases-cnpg-dr`** (`databases-cnpg-dr-local` depends on `databases-local`).
 
 ### DR replica troubleshooting
@@ -52,7 +52,7 @@ This section uses **cnpg-db** as a learning vehicle to understand PostgreSQL int
 
 | Component | Endpoint | Port | Role |
 |-----------|----------|------|------|
-| **PgDog Pooler** | `pgdog-cnpg.product.svc.cluster.local` | 6432 | Connection pooling, R/W splitting (product, cart, order) |
+| **PgDog Pooler** | `pgdog-cnpg.product.svc.cluster.local` | 6432 | Connection pooling, R/W splitting (product, cart, order, payment) |
 | **CNPG RW Service** | `cnpg-db-rw.product.svc.cluster.local` | 5432 | Write queries (auto-routes to primary) |
 | **CNPG R Service** | `cnpg-db-r.product.svc.cluster.local` | 5432 | Read queries (load-balanced replicas) |
 | **CNPG RO Service** | `cnpg-db-ro.product.svc.cluster.local` | 5432 | Read-only (any instance) |

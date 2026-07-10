@@ -48,7 +48,7 @@ flowchart TB
     P1 -->|"archive_command\n(WAL segments)"| ObjStore
     ObjStore -->|"restore_command\n(continuous recovery)"| DR1
 
-    PgDog -->|"RW: product, cart, order"| P1
+    PgDog -->|"RW: product, cart, order, payment"| P1
     PgDog -->|"RO: SELECT queries"| P2
     PgDog -->|"RO: SELECT queries"| P3
   end

@@ -13,7 +13,7 @@ Postgres query plans, the frontend). Profiles push straight to Pyroscope.
 
 ```mermaid
 flowchart TB
-    subgraph apps["Go services (obsx SDK)"]
+    subgraph apps["9 Go microservices (obsx SDK)"]
         SVC["otelgin · otelgrpc<br/>zap→OTLP tee · runtime metrics"]
     end
     subgraph infra["Non-instrumented pods"]

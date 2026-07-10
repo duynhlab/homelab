@@ -62,7 +62,7 @@ flowchart LR
 ```
 kubernetes/
   infra/
-    controllers/kyverno/         # HelmRelease (Kyverno chart 3.3.4)
+    controllers/kyverno/         # HelmRelease (Kyverno chart 3.8.1)
     configs/kyverno/
       cluster-policies/          # ClusterPolicy resources
       exceptions/                # PolicyException resources
@@ -81,7 +81,7 @@ can be re-pushed without restarting Kyverno.
 | 0 | 1 day | Install Kyverno, no policies. Verify Flux still reconciles. |
 | 1 | 7 days | Tier 1 policies in **Audit** mode. Watch `PolicyReport` via Grafana. |
 | 2 | 1 day | Add `PolicyException` for legitimate operator violations. |
-| 3 | indefinite | Flip Tier 1 policies to **Enforce**. |
+| 3 | indefinite | Flip Tier 1 policies to **Enforce**. *(Current state: still **Audit** for every Tier-1 policy except `disallow-default-namespace`, which is Enforce.)* |
 | 4 | 14 days | Tier 2 (verifyImages, NetworkPolicy validate) in Audit. |
 | 5+ | — | Tier 3 mutate/generate, Tier 4 cleanup. |
 
@@ -169,3 +169,7 @@ kubectl logs -n kyverno -l app.kubernetes.io/component=admission-controller --ta
 - Policy catalog: [`docs/security/policy-catalog.md`](../security/policy-catalog.md)
 - Active exceptions: [`docs/security/policy-exceptions.md`](../security/policy-exceptions.md)
 - Upstream docs: <https://kyverno.io/docs/>
+
+---
+
+_Last updated: 2026-07-10 — chart pin 3.8.1; rollout table annotated with the current Audit-mode reality._

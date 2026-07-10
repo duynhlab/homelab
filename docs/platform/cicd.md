@@ -1,6 +1,6 @@
 # CI/CD Pipeline Documentation
 
-This document describes the CI/CD pipeline for all microservices (`auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`) and the `frontend` in a **polyrepo** setup.
+This document describes the CI/CD pipeline for all microservices (`auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`, `payment`) and the `frontend` in a **polyrepo** setup.
 
 > This page covers **both** the pipeline *how-to* (below) and the org-wide *standard/policy* —
 > action SHA-pinning, least-privilege permissions, image signing/verification, the required-checks
@@ -198,7 +198,7 @@ flowchart TD
 
 ### 5. Build & Delivery Flow (Push to dev / uat / main)
 
-On push to any persistent branch (`dev`, `uat`, `main`), the full build pipeline runs. Images are **scanned before push** — if Trivy finds CRITICAL/HIGH CVEs, the image is never pushed to the registry and the pipeline fails.
+On push to any persistent branch (`dev`, `uat`, `main`), the full build pipeline runs. Images are **scanned before push** — the calibrated gate blocks on **CRITICAL** CVEs (HIGH is reported, not blocking); a blocked image is never pushed to the registry and the pipeline fails.
 
 After each deployment, **post-deploy verification** runs automatically: smoke tests on all environments, plus integration/regression tests on uat. See [`gitflow.md` section 6.2](gitflow.md#62-post-deploy-verification) for the full verification matrix.
 
@@ -275,12 +275,12 @@ sequenceDiagram
       GA->>Build: Build image locally (--load, no push)
       Build->>Trivy: Scan local image for vulnerabilities
       alt Scan passes
-        Trivy->>Build: Clean — no CRITICAL/HIGH CVEs
+        Trivy->>Build: Clean — no blocking (CRITICAL) CVEs
         Build->>GHCR: Push image (sha-short + branch alias)
         Build->>GA: Output tags, digest, scan-status=pass
         GA->>Cosign: Sign image with keyless OIDC
       else Scan fails
-        Trivy->>Build: CRITICAL/HIGH CVEs found
+        Trivy->>Build: CRITICAL CVEs found (blocking)
         Note over Build,GHCR: Image NEVER pushed to registry
         Build->>GA: scan-status=fail, job fails
         Note over GA,Cosign: Signing SKIPPED (no image to sign)
@@ -363,7 +363,7 @@ flowchart TD
 | **1** | `go-check` | **Always** | **Regression Check**: re-runs tests and uploads fresh `coverage-report` artifact. (Lint is PR-only.) |
 | **1b** | `gitleaks` | **Always** | **Secret Scanning**: scans git history for secrets in parallel with `go-check`. |
 | **2** | `sonar` | **Always** | **Analysis Update**: updates SonarCloud branch analysis based on the coverage artifact. |
-| **3** | `docker-build` | **Push to dev/uat/main** | **Build + Scan + Push**: builds image locally (`--load`), scans with Trivy for CRITICAL/HIGH CVEs. **Only pushes to GHCR if scan passes.** Outputs `tags`, `digest`, and `scan-status`. |
+| **3** | `docker-build` | **Push to dev/uat/main** | **Build + Scan + Push**: builds image locally (`--load`), scans with Trivy (blocks on CRITICAL; HIGH reported). **Only pushes to GHCR if scan passes.** Outputs `tags`, `digest`, and `scan-status`. |
 | **4** | `trivy-report` | **After build (optional)** | **Vulnerability Reporting**: detailed scan with SARIF upload to GitHub Security tab and Google Sheets. Non-blocking (`exit-code: '0'`). |
 | **5** | `docker-sign` | **After build passes** | **Image Signing**: signs the image with Cosign keyless (OIDC). Only runs if build (including scan) succeeded. |
 | **6** | `notify` | **Always** | **Reporting**: posts final pipeline status to Slack and Google Sheets. |
@@ -457,17 +457,16 @@ act push -W .github/workflows/build.yml --detect-event
 
 ## Docker Image Naming Convention
 
-GHCR auto-grants `write_package` permission to images whose name **matches the GitHub repository name**. To avoid permission errors, the `image-name` input in the builder workflow must match the repo name. Migrations ship inside the app image (golang-migrate, run via the `migrate` subcommand in an init container) — there is no separate migration image.
+Images are **multi-level**: `ghcr.io/duynhlab/<repo>/<image>` — the builder workflow publishes under the repository path (`ghcr.io/${{ github.repository }}/<image>`), and the `mop` chart consumes `<name>-service/<name>-service` (plus the `-init` image). Migrations ship inside the app image (golang-migrate, run via the `migrate` subcommand in an init container) — there is no separate migration image.
 
 | GitHub Repo | GHCR Image (app) |
 |---|---|
-| `product-service` | `ghcr.io/duynhlab/product-service` |
-| `auth-service` | `ghcr.io/duynhlab/auth-service` |
-| `user-service` | `ghcr.io/duynhlab/user-service` |
+| `product-service` | `ghcr.io/duynhlab/product-service/product-service` |
+| `auth-service` | `ghcr.io/duynhlab/auth-service/auth-service` |
+| `payment-service` | `ghcr.io/duynhlab/payment-service/payment-service` (+ the same image runs the `mockpay` deployment) |
+| `frontend` | `ghcr.io/duynhlab/frontend/frontend` |
 
-**Convention**: Always use the full GitHub repo name as `image-name` (e.g., `product-service`, not `product`).
-
-> **Note**: Helm values may reference different image names/tags (e.g., `product:v6`) that are managed separately from CI. The CI-published images and Helm-deployed images do not need to share the same GHCR repo.
+**Convention**: the image name matches the repo name under the repo path (multi-level) — see the org-wide policy in [§7](#7-image-security) and `AGENTS.md`. Kyverno admission requires this shape and rejects `:latest`.
 
 ---
 
@@ -512,7 +511,7 @@ The build workflow is split by stack (`docker-build-go.yml`, `docker-build-node.
 
 Ideas adopted from a reference CI/CD repository:
 
-- **Scan-before-push pattern**: Images are built locally (`--load`), scanned with Trivy, and only pushed to GHCR if no CRITICAL/HIGH CVEs are found. This prevents FluxCD from auto-deploying vulnerable images.
+- **Scan-before-push pattern**: Images are built locally (`--load`), scanned with Trivy, and only pushed to GHCR if no blocking (CRITICAL) CVEs are found. This prevents FluxCD from auto-deploying vulnerable images.
 - **Explicit pipeline pattern**: Each service repo explicitly chains `build → sign` as separate jobs rather than using a wrapper workflow. This gives each repo full control over the pipeline and makes the flow visible in the GitHub Actions UI.
 - **Future extensions** (not yet implemented):
   - **Kyverno admission control**: Kubernetes admission controller verifying Cosign signatures at deploy time (defense-in-depth).
@@ -1088,3 +1087,7 @@ VictoriaMetrics (see [observability](../observability/README.md)).
 - Normalize consumer drift: SonarCloud `project-key` (dynamic vs hardcoded) and Trivy severity
   thresholds (build vs check). Prefer named secrets over `secrets: inherit`.
 - Remove the dead `go-version` input from `sonarqube.yml` (unused; next interface bump).
+
+---
+
+_Last updated: 2026-07-10 — payment added to scope; image naming corrected to the multi-level `ghcr.io/duynhlab/<repo>/<image>` shape; scan-gate wording aligned with the calibrated CRITICAL-only block._

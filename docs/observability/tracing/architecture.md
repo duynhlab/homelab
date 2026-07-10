@@ -69,7 +69,7 @@ config that makes this reliable.
 - **Export Protocol**: OTLP HTTP
 - **Endpoint**: `otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318`
 - **Sampling**: `ParentBased(TraceIDRatioBased)`, ratio 10% (prod default; dev sets `OTEL_SAMPLE_RATE=1.0` explicitly)
-- **Implementation**: `middleware/tracing.go` in each service repository (polyrepo)
+- **Implementation**: `pkg/obsx.SetupObservability()` — one call in each service's `main()` wires the `TracerProvider` + W3C propagator; `otelgin`/`otelgrpc` create the spans (no per-repo `middleware/tracing.go`)
 
 **2. OpenTelemetry Collector**
 - **Deployment**: Kubernetes Deployment (1 replica, scalable)
@@ -122,26 +122,25 @@ This is a **POC/learning project**, so multiple backends allow:
 
 ### Current Approach: OpenTelemetry SDK
 
-**Implementation:**
-```go
-// middleware/tracing.go (in each service repository)
-exporter, _ := otlptracehttp.New(ctx,
-    otlptracehttp.WithEndpoint(cfg.Tracing.Endpoint),
-    otlptracehttp.WithInsecure(),
-    otlptracehttp.WithCompression(otlptracehttp.GzipCompression),
-)
+**Implementation:** services never build the exporter, `TracerProvider`, or
+propagator by hand. The shared **`pkg/obsx.SetupObservability()`** wires all of
+that once (one call in `main()`); span instrumentation comes from the
+`otelgin` (HTTP) and `otelgrpc` (east-west) contrib middlewares. See the
+[OpenTelemetry policy page](../opentelemetry.md).
 
-tracerProvider := sdktrace.NewTracerProvider(
-    sdktrace.WithBatcher(exporter,
-        sdktrace.WithBatchTimeout(5*time.Second),
-        sdktrace.WithExportTimeout(30*time.Second),
-    ),
-    sdktrace.WithResource(res),
-    // ParentBased so downstream hops honour the root (Kong) decision — a service's
-    // own ratio only applies when it is the root of a trace (parentbased_traceidratio).
-    sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.TraceIDRatioBased(cfg.Tracing.SampleRate))),
-)
+```go
+// main() — one wiring point per service (pkg/obsx)
+obs, err := obsx.SetupObservability(ctx, obsx.ConfigFromEnv())
+if err != nil { /* fail startup */ }
+defer obs.Shutdown(shutdownCtx)
 ```
+
+Inside `SetupObservability`, `obsx` builds the OTLP trace exporter
+(`otlptracehttp`), batches it into an `sdktrace.TracerProvider`, sets the W3C
+`traceparent` propagator, and installs the sampler
+`ParentBased(TraceIDRatioBased(rate))` — so downstream hops honour the root
+(Kong) decision and a service's own ratio only applies when it is itself the
+root of a trace.
 
 **Advantages:**
 - ✅ **Full Control**: Custom instrumentation, sampling, attributes
@@ -210,7 +209,7 @@ over gRPC) were already linking, confirming the service-side W3C propagator work
 
 > **Cluster sampling note:** Kong samples head-based at `0.1` as the trace root.
 > Each service wraps its ratio in **`ParentBased`**
-> (`ParentBased(TraceIDRatioBased(rate))`, `middleware/tracing.go`), so it honours
+> (`ParentBased(TraceIDRatioBased(rate))`, set inside `obsx.SetupObservability`), so it honours
 > Kong's `sampled` flag: a sampled remote parent → keep, an unsampled one → drop.
 > A service's own `0.1` ratio therefore only applies when it is itself the root of
 > a trace. This guarantees *sampling completeness* — a trace Kong keeps is kept
@@ -453,3 +452,5 @@ spec:
 - [CNCF Observability Best Practices](https://www.cncf.io/blog/)
 - [Jaeger v2 Deployment Guide](https://www.jaegertracing.io/docs/2.13/deployment/kubernetes/)
 - [OpenTelemetry Operator](https://opentelemetry.io/docs/platforms/kubernetes/operator/)
+
+_Last updated: 2026-07-09 — SDK wiring consolidated into `pkg/obsx.SetupObservability` (one call in `main()`); `otelgin`/`otelgrpc` provide span instrumentation._

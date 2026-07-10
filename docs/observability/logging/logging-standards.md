@@ -1,202 +1,116 @@
 # Logging Standards
 
 > **Document Status:** Production  
-> **Last Updated:** 2026-01-31  
-> **Integration:** VictoriaLogs + OpenTelemetry
+> **Last Updated:** 2026-07-09  
+> **Integration:** VictoriaLogs + OpenTelemetry (otelzap → OTLP)
 
 ---
 
 ## Overview
 
-This document defines centralized logging standards for all microservices. All services must output **JSON format** logs for compatibility with VictoriaLogs and OpenTelemetry tracing.
+This document defines centralized logging standards for all microservices. Every
+service outputs **structured JSON** using the shared **`zapx`** logger, and its
+zap core is **tee'd** into the OpenTelemetry log pipeline (see
+[OpenTelemetry Integration](#opentelemetry-integration)).
 
 > This is the **implementation & standards** doc (how a service logs). For the
 > logging **pipeline architecture**, why-this-stack rationale, and scaling, see
 > [observability → logging](README.md).
 
-**Current status:**
-- **2 services**: cart (clog), auth (zerolog)
-- **6 services**: product, order, review, notification, shipping, user (Zap)
-- No migration planned - both approaches coexist
+**Current status (RFC-0014 P4):**
+- The fleet has **converged on `zapx`** (`github.com/duynhlab/pkg/logger/zapx`):
+  **auth** migrated off zerolog and **cart** off clog, joining the six services
+  already on zap. One logger, one JSON contract, one tee.
+- Every service's zap core is tee'd through an **otelzap** bridge → OTLP →
+  OpenTelemetry Collector → VictoriaLogs (stdout is still emitted for
+  `kubectl logs`).
 
 ---
 
 ## Microservices Logging Status
 
-| Service | Library | Notes |
-|---------|---------|-------|
-| **cart** | clog (slog wrapper) | Context-first API, zero dependencies |
-| **auth** | zerolog | Chainable API, zero-allocation JSON |
-| **product** | zap | Primary logger |
-| **order** | zap | Primary logger |
-| **review** | zap | Primary logger |
-| **notification** | zap | Primary logger |
-| **shipping** | zap | Primary logger |
-| **user** | zap | Primary logger |
+All services use the shared **`zapx`** adapter; the "Was" column records the
+pre-P4 library each replaced.
+
+| Service | Logger | Was |
+|---------|--------|-----|
+| **auth** | zapx | zerolog |
+| **cart** | zapx | clog |
+| **product** | zapx | zap (reference impl) |
+| **order** | zapx | zap |
+| **review** | zapx | zap |
+| **notification** | zapx | zap |
+| **shipping** | zapx | zap |
+| **user** | zapx | zap |
 
 ---
 
 ## Pod Log Verification
 
-Verify cart/auth service logs in Kubernetes:
+Verify service logs in Kubernetes (same command and format for every service —
+substitute the namespace/deployment):
 
 ```bash
-# Verify cart (clog) logs - JSON format, trace_id
-kubectl logs -n cart deployment/cart --tail=50
-
-# Verify auth (zerolog) logs - JSON format, trace_id
+# Uniform zapx JSON, with trace_id when a span is active
 kubectl logs -n auth deployment/auth --tail=50
+kubectl logs -n cart deployment/cart --tail=50
 ```
 
-### Log Output Analysis (Verified)
+### Log Output Format
 
-**Cart (clog) sample output:**
+Every service emits the same `zapx` JSON shape — ISO8601 `timestamp`, lowercase
+`level`, `message`, and `caller` keys — with `trace_id`/`span_id` present when a
+span is active. Representative line:
+
 ```json
-{"time":"2026-01-31T02:12:04.4558351Z","level":"INFO","msg":"HTTP request","trace_id":"94c290a2e22a985f6f9fa2337e476443","method":"GET","path":"/health","status":200,"duration":134284,"client_ip":"10.244.1.1","user_agent":"kube-probe/1.33"}
+{"level":"info","timestamp":"2026-07-09T02:12:04.455Z","caller":"middleware/logging.go:42","message":"HTTP request","trace_id":"94c290a2e22a985f6f9fa2337e476443","method":"GET","path":"/health","status":200,"duration":0.000134,"client_ip":"10.244.1.1","user_agent":"kube-probe/1.33"}
 ```
 
-**Auth (zerolog) sample output:**
-```json
-{"level":"info","trace_id":"a2ca3d67166eb58ba9917d91032e5d44","method":"GET","path":"/health","status":200,"duration":0.086978,"client_ip":"10.244.2.1","user_agent":"kube-probe/1.33","time":1769825539,"message":"HTTP request"}
-```
-
-**Findings:**
-
-| Aspect | Cart (clog) | Auth (zerolog) | Standardization |
-|--------|-------------|----------------|-----------------|
-| **time** | ISO8601 | Unix | Prefer ISO8601 for VictoriaLogs |
-| **level** | Uppercase `INFO` | Lowercase `info` | Document preferred format |
-| **message field** | `msg` | `message` | Vector uses `VL-Msg-Field: message,msg` |
-| **trace_id** | Present | Present | OK |
-| **span_id** | Not in HTTP logs | Not in HTTP logs | OK (appears when span exists) |
-| **duration** | Integer (nanoseconds) | Float (seconds) | Consider standardizing unit |
+Because the format is now uniform, the pre-P4 `msg`-vs-`message` and
+ISO8601-vs-Unix inconsistencies (cart on clog, auth on zerolog) are gone. The
+stdout line above is what `kubectl logs` shows; the same record is also exported
+over OTLP to VictoriaLogs by the otelzap tee.
 
 ---
 
-## Available Logging Libraries
+## The `zapx` logger
 
-### Zap (`go.uber.org/zap`)
+All services build the logger from the shared adapter
+(`github.com/duynhlab/pkg/logger/zapx`), which centralizes the production zap
+configuration the zap-based services previously duplicated in each
+`middleware/logging.go`:
 
-- **Current Usage**: 6 services (product, order, review, notification, shipping, user)
-- **Status**: Primary logger for majority of services
-- **Features**: High performance, structured logging
-- **Tracing**: Manual implementation required
-- **Dependencies**: ~10 packages
+- **JSON encoder** with `TimeKey: "timestamp"` (ISO8601), `MessageKey: "message"`,
+  `LevelKey: "level"`, `CallerKey: "caller"`.
+- Level parsed from `LOG_LEVEL` (`debug|info|warn|error`, defaults to `info`).
+- `WithContext` / `FromContext` helpers carry a request-scoped logger.
 
-### clog (`github.com/chainguard-dev/clog`)
-
-- **Current Usage**: 1 service (cart)
-- **Base**: Wrapper for `log/slog` (Go 1.21+ standard library)
-- **Features**: Zero dependencies, context-first API, native JSON support
-- **Tracing**: Easy integration via Handler middleware
-- **Dependencies**: 0 (uses stdlib)
-
-### zerolog (`github.com/rs/zerolog`)
-
-- **Current Usage**: 1 service (auth)
-- **Features**: Zero-allocation JSON logger, chainable API
-- **Tracing**: Native support
-- **Dependencies**: ~3 packages
-
----
-
-## Library Comparison
-
-| Feature | Zap | clog (slog wrapper) | Zerolog |
-|---------|-----|----------------------|---------|
-| **JSON Output** | High performance | Native | High performance |
-| **Tracing Support** | Manual (fields) | Easy with Handler | Native support |
-| **API Style** | Fluent / Type-safe | Printf / KV | Chainable |
-| **Context Propagation** | Manual wrapper | Built-in | Built-in |
-| **Dependencies** | ~10 | 0 (stdlib) | ~3 |
-| **Usage** | 6 services | cart | auth |
-
----
-
-## Selection Reasons
-
-### Why clog (cart)?
-
-- Zero dependencies (uses Go stdlib)
-- Context-first API (`clog.FromContext(ctx)`)
-- Native JSON support via `slog.JSONHandler`
-- Cloud-native design (Kubernetes, GCP)
-- Easy OpenTelemetry integration via Handler middleware
-- Future-proof (Go standard library)
-
-### Why zerolog (auth)?
-
-- Zero-allocation JSON logging
-- Chainable API (developer-friendly)
-- Native tracing support
-- High performance
-- Simple API
-
-### Zap (6 services)
-
-- Primary logger for product, order, review, notification, shipping, user
-- Manual tracing integration required
-- More dependencies than clog/zerolog
-
----
-
-## Deep Dives
-
-### clog (slog wrapper) Implementation
-
-**Architecture:** Wrapper over `log/slog` with custom `TracingHandler`.
-
-**Setup** (`pkg/logger/clog/logger.go` in the `duynhlab/pkg` repository):
+**Setup** (`pkg/logger/zapx/logger.go` in the `duynhlab/pkg` repository):
 ```go
-func Setup(level string) {
-    slogLevel := parseSlogLevel(level)  // debug, info, warn, error from LOG_LEVEL
-    handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-        Level: slogLevel,
-    })
-    logger := slog.New(&TracingHandler{handler: handler})
-    slog.SetDefault(logger)
+func New(level string) (*zap.Logger, error) {
+    cfg := zap.NewProductionConfig()
+    cfg.Level = zap.NewAtomicLevelAt(parseLevel(level))
+    cfg.EncoderConfig.TimeKey = "timestamp"
+    cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+    cfg.EncoderConfig.MessageKey = "message"
+    cfg.EncoderConfig.LevelKey = "level"
+    cfg.EncoderConfig.CallerKey = "caller"
+    return cfg.Build()
 }
 ```
 
-**TracingHandler** injects `trace_id` and `span_id` from OpenTelemetry context:
-```go
-func (h *TracingHandler) Handle(ctx context.Context, r slog.Record) error {
-    if span := trace.SpanFromContext(ctx); span.SpanContext().IsValid() {
-        r.AddAttrs(
-            slog.String("trace_id", span.SpanContext().TraceID().String()),
-            slog.String("span_id", span.SpanContext().SpanID().String()),
-        )
-    }
-    return h.handler.Handle(ctx, r)
-}
-```
+**Usage:** `logger.Info("HTTP request", zap.String("method", c.Request.Method), zap.String("path", c.Request.URL.Path))`.
 
-**Usage:** `clog.InfoContext(ctx, "message", "key", value)` or `slog.Info("message", "key", value)`
+`trace_id`/`span_id` are injected from the OpenTelemetry span context in the
+logging middleware, so a log line and its trace join on one id.
 
-### zerolog Implementation
+### Why the fleet converged on `zapx`
 
-**Architecture:** Pure Go, zero-allocation design.
-
-**Setup** (`pkg/logger/zerolog/logger.go` in the `duynhlab/pkg` repository):
-```go
-func Setup(level string) {
-    zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-    zerolog.SetGlobalLevel(parseZerologLevel(level))  // debug, info, warn, error from LOG_LEVEL
-    log.Logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
-}
-```
-
-**Context with trace:** `WithContext(ctx)` creates sub-logger with `trace_id` and `span_id` when span exists.
-
-**Usage:** `log.Info().Str("key", "value").Msg("message")`
-
-### Zap Implementation
-
-**Current patterns:** 6 services use Zap with JSON encoder. Configuration in `middleware/logging.go`:
-- `TimeKey`: "timestamp"
-- `MessageKey`: "message"
-- `LevelKey`: "level"
-- Manual trace_id injection in logging middleware
+Before RFC-0014 P4, three loggers coexisted (zap on six services, clog on cart,
+zerolog on auth). The otelzap tee (below) needs one uniform zap core, so auth and
+cart were migrated onto `zapx`. Converging also removes the field-shape
+divergence (`msg` vs `message`, Unix vs ISO8601 time) that previously forced
+`VL-Msg-Field: message,msg` workarounds in the ingest path.
 
 ---
 
@@ -216,17 +130,17 @@ We follow a standardized log level schema (aligned with Syslog/Zerolog):
 
 ### Library Level Mapping
 
-| User Standard | Zap | clog (slog) | zerolog |
-|----------------|-----|--------------|---------|
-| panic (5) | PanicLevel (4) | N/A (Error+panic) | PanicLevel (5) |
-| fatal (4) | FatalLevel (5) | N/A (Error+exit) | FatalLevel (4) |
-| error (3) | ErrorLevel (2) | LevelError (8) | ErrorLevel (3) |
-| warn (2) | WarnLevel (1) | LevelWarn (4) | WarnLevel (2) |
-| info (1) | InfoLevel (0) | LevelInfo (0) | InfoLevel (1) |
-| debug (0) | DebugLevel (-1) | LevelDebug (-4) | DebugLevel (0) |
-| trace (-1) | N/A | Custom (-8) | TraceLevel (-1) |
+The fleet is uniformly on zap, so the mapping is single-column:
 
-**Notes:** slog does not have panic/fatal levels by design. Use Error + panic() or Error + os.Exit().
+| User Standard | Zap (`zapcore.Level`) |
+|----------------|-----------------------|
+| panic (5) | PanicLevel (4) |
+| fatal (4) | FatalLevel (5) |
+| error (3) | ErrorLevel (2) |
+| warn (2) | WarnLevel (1) |
+| info (1) | InfoLevel (0) |
+| debug (0) | DebugLevel (-1) |
+| trace (-1) | N/A (zap has no trace level) |
 
 ### Kubernetes Configuration
 
@@ -234,7 +148,10 @@ We follow a standardized log level schema (aligned with Syslog/Zerolog):
 - All 9 services: `LOG_LEVEL: "info"`, `LOG_FORMAT: "json"`
 - Config validation: `validLogLevels = ["debug", "info", "warn", "error"]`
 
-**Runtime configurability:** clog and zerolog `Setup(level string)` now parse and apply `LOG_LEVEL` from config. Cart and auth pass `cfg.Logging.Level` to `Setup()` at startup.
+**Runtime configurability:** `zapx.New(level)` parses and applies `LOG_LEVEL` at
+startup for every service. The **same level also gates the otelzap tee** — the
+OTLP bridge is level-gated (`obs.ZapCore(name, minLevel)`) so debug records that
+never reach the stdout core are not silently exported over OTLP either.
 
 ---
 
@@ -244,71 +161,83 @@ We follow a standardized log level schema (aligned with Syslog/Zerolog):
 
 | Field | Description | Notes |
 |-------|-------------|-------|
-| `time` | Timestamp | ISO8601 preferred; zerolog defaults to Unix |
-| `level` | Log level | INFO/info both observed |
-| `msg` or `message` | Log message | clog uses `msg`, zerolog uses `message` |
-| `trace_id` | OpenTelemetry Trace ID | Automatically injected - verified in cart and auth |
+| `timestamp` | Timestamp | ISO8601 (zapx `ISO8601TimeEncoder`) |
+| `level` | Log level | Lowercase (`info`, `error`, …) |
+| `message` | Log message | Uniform `message` key (was `msg` on clog) |
+| `caller` | Source location | `file:line` of the log call |
+| `trace_id` | OpenTelemetry Trace ID | Injected when a span is active |
 | `span_id` | OpenTelemetry Span ID | When span exists in context |
 
 ### VictoriaLogs Compatibility
 
-- **VL-Msg-Field**: Use `message,msg` (comma-separated) to support both clog and zerolog
-- **VL-Time-Field**: Use `time` - both ISO8601 and Unix parseable
-- **Field naming**: clog outputs `msg`, zerolog outputs `message`
+- **App path (OTLP):** otelzap maps the zap `message` to the OTLP log body and
+  attaches fields as attributes; the Collector's VictoriaLogs exporter sets
+  `VL-Stream-Fields: service.name` (one stream per service) and keeps `trace_id`
+  as a queryable field.
+- **Infra path (Vector jsonline):** `VL-Msg-Field: message`, `VL-Time-Field: timestamp`.
+  Vector's `VL-Msg-Field: message,msg` fallback remains only for non-app sources
+  that may still emit `msg`.
 
 ---
 
 ## Service Logging Summary
 
-- **2 services**: cart (clog), auth (zerolog)
-- **6 services**: product, order, review, notification, shipping, user (Zap)
-- No migration planned - both approaches coexist
+- **All 9 services + order-worker**: converged on **`zapx`** (auth off zerolog,
+  cart off clog, six already on zap) — one JSON contract, one otelzap tee.
 
 ---
 
 ## Integration with Observability Stack
 
+Logs reach VictoriaLogs by **two complementary paths** (see the
+[logging hub](README.md) for the full picture): app services over **OTLP**, and
+non-instrumented workloads via **Vector**.
+
 ### VictoriaLogs Integration
 
-- Log ingestion via Vector
-- Field mapping: `VL-Msg-Field: message,msg` (support cart and auth)
-- Stream fields configuration
+- **App logs — OTLP.** The `zapx` core is tee'd
+  (`zapcore.NewTee(stdoutCore, obs.ZapCore(serviceName, minLevel))`): one branch
+  writes stdout for `kubectl logs`, the other bridges through **otelzap** → OTLP
+  log exporter (`otlploghttp`) → OpenTelemetry Collector → VictoriaLogs' OTLP
+  ingest (`/insert/opentelemetry/v1/logs`). The exporter header
+  `VL-Stream-Fields: service.name` yields one stream per service.
+- **Infra logs — Vector.** Databases, Kong's access log, the frontend, and system
+  pods are tailed by the single Vector DaemonSet and shipped over `/insert/jsonline`.
+  App pods carry `platform.duynhlab.dev/otlp-logs=true` and are **excluded** from
+  Vector — the double-ingest guard.
 
 ### OpenTelemetry Integration
 
-- Automatic trace_id injection (verified in both cart and auth)
-- span_id when span exists in context
-- Context propagation
-- Correlation with traces
+- **otelzap tee → OTLP-logs export.** Application logs are exported over OTLP
+  alongside traces and metrics; `OTEL_LOGS_ENABLED` gates the exporter (enabled
+  fleet-wide since RFC-0014 P4).
+- The bridge is **level-gated** to the service's configured level, so debug
+  records suppressed on stdout are not exported over OTLP either.
+- `trace_id`/`span_id` are injected from the span context; `trace_id` is a
+  first-class queryable field in VictoriaLogs, correlating logs with traces.
 
 ---
 
 ## Known Issues
 
-1. **Gin default logger**: Both cart and auth output `[GIN] 2026/01/31 - 02:12:04 | 200 | ...` plain text. Gin framework uses its own logger, not structured logger. Consider `gin.DefaultWriter` redirect or custom middleware.
+1. **Gin default logger**: Gin's framework logger emits `[GIN] … | 200 | …` plain
+   text, bypassing the structured `zapx` logger. Consider a `gin.DefaultWriter`
+   redirect or custom middleware.
 
-2. **Pyroscope DEBUG**: Plain text `[DEBUG] uploading at...` from Pyroscope library - third-party, not app-controlled.
-
-3. **Field inconsistency**: Document `msg` vs `message` and time format. Vector uses `VL-Msg-Field: message,msg` to support both.
+2. **Pyroscope DEBUG**: Plain text `[DEBUG] uploading at...` from the Pyroscope
+   library — third-party, not app-controlled.
 
 ---
 
 ## Examples
 
-### clog (cart)
-```go
-slog.Info("Service starting", "service", cfg.Service.Name, "port", cfg.Service.Port)
-clog.InfoContext(ctx, "HTTP request", "method", c.Request.Method, "path", c.Request.URL.Path)
-```
+Uniform `zapx` usage across all services:
 
-### zerolog (auth)
-```go
-log.Info().Str("service", cfg.Service.Name).Str("port", cfg.Service.Port).Msg("Service starting")
-log.Info().Str("method", c.Request.Method).Str("path", c.Request.URL.Path).Msg("HTTP request")
-```
-
-### Zap (6 services)
 ```go
 logger.Info("Service starting", zap.String("service", cfg.Service.Name), zap.String("port", cfg.Service.Port))
 logger.Info("HTTP request", zap.String("method", c.Request.Method), zap.String("path", c.Request.URL.Path))
 ```
+
+---
+
+_Last updated: 2026-07-09 — fleet converged on `zapx` (auth off zerolog, cart off clog); otelzap tee → OTLP-logs export (fleet-wide since RFC-0014 P4); dual-path ingest (app OTLP + Vector infra) into VictoriaLogs._

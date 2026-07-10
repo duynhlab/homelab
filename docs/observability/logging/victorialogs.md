@@ -54,6 +54,16 @@ This deployment uses a **single cluster-wide Vector Agent** (`kube-system/vector
 - Reduces resource overhead
 - Consistent log processing
 
+> **Vector is one of two ingest paths.** Since RFC-0014 P4, the instrumented Go
+> services ship their logs over **OTLP** (otelzap → OpenTelemetry Collector →
+> VictoriaLogs' `/insert/opentelemetry/v1/logs`, with `VL-Stream-Fields: service.name`),
+> **not** through Vector — the app pods are excluded from Vector's
+> `kubernetes_logs` source by label. Vector remains the ingest path for
+> **non-instrumented workloads** (databases + PG `auto_explain` plans, Kong's
+> access log, the frontend, system pods) and pushes them over `/insert/jsonline`.
+> The two paths land in the same VLSingle and never double-ingest. Pipeline
+> architecture: [logging hub](README.md); the app-log contract: [Logging Standards](logging-standards.md).
+
 ## Components
 
 | Component | CRD/Kind | Namespace | Purpose |
@@ -82,7 +92,8 @@ After `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`, use **
 
 | Endpoint | Purpose | Used By |
 |----------|---------|---------|
-| `/insert/jsonline` | JSON Lines ingestion | Vector sinks |
+| `/insert/jsonline` | JSON Lines ingestion | Vector sinks (infra logs) |
+| `/insert/opentelemetry/v1/logs` | OTLP logs ingestion (`VL-Stream-Fields: service.name`) | OpenTelemetry Collector (app logs) |
 | `/insert/elasticsearch` | Elasticsearch-compatible bulk API | Alternative ingestion |
 | `/select/logsql/query` | LogsQL query endpoint | Grafana datasource |
 
@@ -290,4 +301,4 @@ If Vector is consuming too much memory:
 
 ---
 
-_Last updated: 2026-06-29 — VLSingle `:9428` (VM Operator, 7d/20Gi), single Vector DaemonSet (all-logs + PG auto_explain streams), Vector self-monitoring via VMAgent._
+_Last updated: 2026-07-09 — VLSingle `:9428` (VM Operator, 7d/20Gi); dual ingest: app logs via OTLP (`/insert/opentelemetry/v1/logs`, `VL-Stream-Fields: service.name`) since RFC-0014 P4, Vector DaemonSet for non-instrumented workloads (infra + PG auto_explain streams) via `/insert/jsonline`; Vector self-monitoring via VMAgent._

@@ -16,6 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `https`/`caBundle` shape labeled planned; OpenBAO-namespace field replaced by
   KV path-prefix isolation (OSS has no namespaces); cert-manager chart pin
   `v1.20.2`; trust-distribution reconcile commands → `cert-manager-local`.
+- **product gRPC in-cluster**: add the missing `grpc_server: true` input on
+  `rsip-product` so the mop chart renders the `product-grpc` headless Service
+  that order-worker's saga stock steps dial; refresh stale manifest comments
+  (temporal PrometheusRule PodMonitor reference, PSS "8 microservices").
+### Changed
+
+- **docs/api accuracy sweep + feature matrix**: `microservices.md` rebuilt as a
+  per-service feature matrix (feature → API → technique) with a platform-wide
+  technique index; route inventory gains the cart internal saga-clear route;
+  auth-gRPC remnants removed from `grpc-internal-comms.md`; saga docs pick up
+  `SendReceipt`/`SendRefundNotification` and the shipped internal cart-clear;
+  api.md adds auth refresh/JWKS + payment payload sections and fixes the
+  register response envelope; payments.md reaper note updated.
 
 ## [0.105.0] - 2026-07-10
 

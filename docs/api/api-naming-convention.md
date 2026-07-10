@@ -7,7 +7,7 @@
 | **Superseded** | `docs/api/api.md` cluster-only `/api/v1/*` shape (v0.85 and earlier) |
 | **Scope** | All HTTP URLs used by browsers, services, and admin/seed callers |
 | **Primary domain** | `local.duynh.me` — platform root; public API at `gateway.duynh.me` |
-| **Last updated** | 2026-07-02 |
+| **Last updated** | 2026-07-10 |
 
 ## Purpose
 
@@ -72,7 +72,7 @@ for in-cluster (east-west) traffic. Same path, different host — Kong just forw
 | `GET` | `/user/v1/public/users/:id` | public | Browser |
 | `GET` | `/user/v1/private/users/profile` | private | Browser |
 | `PUT` | `/user/v1/private/users/profile` | private | Browser |
-| `POST` | `/user/v1/internal/users` | internal | auth-service during registration |
+| `POST` | `/user/v1/internal/users` | internal | *No in-cluster caller today* (auth registers into its own DB; reserved for a future registration fan-out) |
 
 ### product-service (namespace `product`)
 
@@ -85,15 +85,12 @@ for in-cluster (east-west) traffic. Same path, different host — Kong just forw
 
 ### cart-service (namespace `cart`)
 
-All private.
-
-| Method | Path | Caller |
-|--------|------|--------|
-| `GET` / `POST` / `DELETE` | `/cart/v1/private/cart` | Browser |
-| `GET` | `/cart/v1/private/cart/count` | Browser (badge) |
-| `PATCH` / `DELETE` | `/cart/v1/private/cart/items/:itemId` | Browser |
-
-Also callable by `order-service` with a forwarded `Authorization` header (DELETE after checkout).
+| Method | Path | Audience | Caller |
+|--------|------|----------|--------|
+| `GET` / `POST` / `DELETE` | `/cart/v1/private/cart` | private | Browser; `GET` also by order-service (server-side pricing, forwarded `Authorization`) |
+| `GET` | `/cart/v1/private/cart/count` | private | Browser (badge) |
+| `PATCH` / `DELETE` | `/cart/v1/private/cart/items/:itemId` | private | Browser |
+| `DELETE` | `/cart/v1/internal/cart/:userId` | internal | order-worker (saga `ClearCart` — tokenless, NetworkPolicy-fenced) |
 
 ### order-service (namespace `order`)
 
@@ -103,7 +100,7 @@ All private.
 |--------|------|--------|
 | `GET` | `/order/v1/private/orders` | Browser |
 | `GET` | `/order/v1/private/orders/:id` | Browser |
-| `GET` | `/order/v1/private/orders/:id/details` | Browser (aggregates shipment) |
+| `GET` | `/order/v1/private/orders/:id/details` | Browser (aggregates shipment + payment) |
 | `POST` | `/order/v1/private/orders` | Browser |
 
 ### review-service (namespace `review`)
@@ -139,7 +136,7 @@ All private.
 | `POST` | `/payment/v1/public/webhooks/mockpay` | public | mockpay provider (HMAC-signed body is the credential) |
 | `GET` / `POST` | `/payment/v1/private/payments` | private | Browser |
 | `GET` | `/payment/v1/private/payments/:id` | private | Browser |
-| `POST` | `/payment/v1/internal/payments/:id/refunds` | internal | order-service (saga refund) |
+| `POST` | `/payment/v1/internal/payments/:id/refunds` | internal | In-cluster ops (the saga's refunds run over gRPC `PaymentService.Refund`) |
 | `POST` | `/payment/v1/internal/reconciliation/runs` | internal | Reconciliation trigger (in-cluster) |
 | `GET` | `/payment/v1/internal/reconciliation/runs/:id` | internal | Reconciliation status (in-cluster) |
 
@@ -150,11 +147,12 @@ The caller → callee → audience mapping for in-cluster east-west traffic:
 | Caller | Target | Audience |
 |--------|--------|----------|
 | Every service's JWT middleware (JWKS refresh) | auth-service `/auth/v1/public/jwks` | public |
-| order-service → aggregation | shipping-service | internal |
-| order-service → checkout cleanup | cart-service | private (forwards user's JWT) |
-| product-service → aggregation | review-service | public |
-| order-service → payment (order-details enrichment + saga) | payment-service | internal (gRPC) |
-| auth-service → registration | user-service | internal |
+| order-service → aggregation (shipment + payment) | shipping-service, payment-service | internal (gRPC) |
+| order-service → server-side pricing | cart-service | private (forwards user's JWT) |
+| order-worker → saga steps (stock, shipment, money, email) | product-, shipping-, payment-, notification-service | internal (gRPC) |
+| order-worker → saga cart-clear | cart-service `/cart/v1/internal/cart/:userId` | internal (tokenless) |
+| product-service → aggregation | review-service | internal (gRPC) |
+| auth-service → registration | user-service | **Planned** — no in-cluster caller today (auth registers into its own DB) |
 
 Most of these hops now run over **gRPC**, not HTTP. For transport (gRPC vs REST per hop), addresses, ports, and migration status, see [`grpc-internal-comms.md`](grpc-internal-comms.md) — it is authoritative for east-west transport.
 

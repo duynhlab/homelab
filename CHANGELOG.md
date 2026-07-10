@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **product gRPC in-cluster**: add the missing `grpc_server: true` input on
+  `rsip-product` so the mop chart renders the `product-grpc` headless Service
+  that order-worker's saga stock steps dial; refresh stale manifest comments
+  (temporal PrometheusRule PodMonitor reference, PSS "8 microservices").
 ### Changed
 
 - **docs/api accuracy sweep + feature matrix**: `microservices.md` rebuilt as a

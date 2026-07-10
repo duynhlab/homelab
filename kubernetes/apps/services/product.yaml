@@ -22,3 +22,7 @@ spec:
     pool_max: "50"
     cache_enabled: "true"
     review_grpc_addr: "dns:///review-grpc.review.svc.cluster.local:9090"
+    # product serves gRPC on :9090 (ReserveStock/ReleaseStock — the saga's
+    # stock steps, dialed by order-worker); the chart renders the product-grpc
+    # headless Service from this.
+    grpc_server: true

@@ -98,9 +98,9 @@ flowchart TB
 
 What actually moved: **metrics** (pull → push, P3) and **logs** (Vector-only →
 OTLP push, P4). **Traces** were already OTel; RFC-0014 just folded their wiring
-into the same one-call setup. `checkout-service` is the lone exception — it was
-never migrated and still runs the old client_golang code, so it's a handy live
-reference of "before."
+into the same one-call setup. There is no exempt service: `checkout-service`
+was never deployed to the cluster, so the planned `legacy-checkout` fence was
+dropped at P3 landing ([ADR-016](../proposals/adr/ADR-016-otel-metrics-cutover/)).
 
 ---
 
@@ -143,7 +143,7 @@ Think of the whole pipeline as a **central post office**:
 service had to run an HTTP handler and register every metric by hand.
 
 ```go
-// BEFORE — checkout-service/middleware/prometheus.go (client_golang, still live there)
+// BEFORE — the retired client_golang middleware (checkout-service never shipped)
 var reqDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
     Name:    "request_duration_seconds",
     Buckets: []float64{0.005, 0.01, /* … */, 10},
@@ -313,8 +313,9 @@ the trace, click **traces→logs** (filters VictoriaLogs by `trace_id`), and
 ## 8. Inside the Collector — the governance pipeline
 
 The Collector is where platform-wide policy lives, so one config governs every
-service. Each signal has its own pipeline: **receiver → processors → exporters**,
-with a **connector** (spanmetrics) deriving metrics from traces locally.
+service. Each signal has its own pipeline: **receiver → processors → exporters**
+— there are no connectors; RED metrics come from the services' own OTel SDK
+metrics, not from span-derivation.
 
 ```mermaid
 flowchart LR
@@ -323,21 +324,18 @@ flowchart LR
         ml[/"memory_limiter"/]
         d2c[/"deltatocumulative<br/>(metrics)"/]
         batch[/"batch"/]
-        sm[/"spanmetrics connector<br/>(traces → RED metrics, local)"/]
         rcv --> ml --> batch
         ml --> d2c --> batch
-        rcv --> sm
     end
     batch -->|"metrics"| vma[/"vmagent :8429<br/>(usePrometheusNaming,<br/>service_name→app relabel)"/]
     vma --> vm[(VictoriaMetrics)]
     batch -->|"logs (VL-Stream-Fields: service.name)"| vl[(VictoriaLogs)]
     batch -->|"traces"| tr[(Tempo · Jaeger · VictoriaTraces)]
-    sm --> vm
     classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
     classDef metric fill:#ffe8cc,stroke:#e8590c,color:#111;
     classDef log fill:#d3f9d8,stroke:#2f9e44,color:#111;
     classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
-    class rcv,ml,d2c,batch,sm otc;
+    class rcv,ml,d2c,batch otc;
     class vma,vm metric;
     class vl log;
     class tr trace;
@@ -348,8 +346,8 @@ Why each processor matters: **memory_limiter** protects the Collector from OOM
 under a telemetry burst; **deltatocumulative** normalizes metric temporality so
 `rate()` stays correct; **batch** amortizes network cost; **vmagent** is the
 single place name-translation, relabeling and cardinality control happen (D-1/2/3).
-On the cluster, span-derived RED metrics come from Tempo's metrics-generator
-instead of the local spanmetrics connector.
+(Tempo's metrics-generator is configured but writes nowhere — `remote_write: []` —
+so RED metrics come exclusively from the services' SDK metrics.)
 
 ---
 
@@ -394,4 +392,4 @@ the drift the old three-style world suffered from.
 - [Metrics deep-dive](metrics/metrics-apps.md) · [Tracing](tracing/README.md) · [Logging](logging/README.md) · [Profiling](profiling/README.md)
 - [Observability hub](README.md) · [RFC-0014](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-07-09 — initial explainer for the RFC-0014 OTLP migration (old-vs-new)._
+_Last updated: 2026-07-10 — corrected to the landed reality: no exempt checkout-service (fence dropped, ADR-016) and no spanmetrics connector (RED metrics come from the SDK)._

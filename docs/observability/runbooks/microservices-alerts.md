@@ -6,7 +6,7 @@
 >
 > **Recording Rules**: [`kubernetes/infra/configs/monitoring/prometheusrules/microservices/recording-rules.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/microservices/recording-rules.yaml)
 >
-> **Last Updated**: 2026-07-09
+> **Last Updated**: 2026-07-10 (HighRestartRate marked retired → `KubePodCrashLooping`; in-flight/GC retirements re-attributed off D-14)
 
 ---
 
@@ -68,7 +68,6 @@ flowchart TD
 |-------|-------|----------|-----|-----------|
 | **Availability** | `MicroserviceDown` | critical | 1m | Golden: Errors |
 | | `MicroserviceAllInstancesDown` | critical | 1m | Golden: Errors |
-| | `MicroserviceHighRestartRate` | warning | 5m | Golden: Errors |
 | **Errors** | `MicroserviceHighErrorRate` | warning | 5m | RED: Errors |
 | | `MicroserviceErrorRateCritical` | critical | 5m | RED: Errors |
 | | `MicroserviceNoSuccessfulRequests` | critical | 10m | RED: Errors |
@@ -130,7 +129,7 @@ increase(kube_pod_container_status_restarts_total{namespace="$NAMESPACE", pod=~"
 3. If CrashLoopBackOff: check application logs for startup errors
 4. If network issue: check NetworkPolicy and Service endpoints
 
-**Related alerts**: `MicroserviceAllInstancesDown`, `MicroserviceHighRestartRate`
+**Related alerts**: `MicroserviceAllInstancesDown`, `KubePodCrashLooping`
 
 ---
 
@@ -165,16 +164,21 @@ flux get helmrelease -n $NAMESPACE
 
 **Resolution**:
 1. If bad deployment: `kubectl rollout undo deployment/$APP -n $NAMESPACE`
-2. If dependency failure: check database alerts (`PostgresDown`, `CnpgDown`)
+2. If dependency failure: check database alerts (`PostgresDown`, `CNPGClusterOffline`)
 3. If resource issue: check `kubectl describe namespace $NAMESPACE` for quotas
 
 **Escalation**: This is a full outage. If not resolved in 15 minutes, escalate to team lead.
 
 ---
 
-### MicroserviceHighRestartRate
+### MicroserviceHighRestartRate (retired)
 
-**Fires when**: A container restarts more than 3 times in 15 minutes.
+> **Retired** — this kube-state-based alert was never deployed on the OTLP
+> pipeline; crash-loops are covered by `KubePodCrashLooping`
+> (`prometheusrules/kubernetes/pod-resources-alerts.yaml`). The investigation
+> steps below remain useful for any restart storm.
+
+**Fires when** (historical): a container restarts more than 3 times in 15 minutes.
 
 **Severity**: warning
 
@@ -317,7 +321,7 @@ app:http_server_request_duration_seconds:p95_5m{app="$APP"}
 app_route:http_server_request_duration_seconds:p95_5m{app="$APP"}
 
 # Check saturation: the in-flight signal is no longer emitted -- otelgin exposes no
-# http_server_active_requests, so the requests-in-flight alerts retired (RFC-0014 D-14)
+# http_server_active_requests, so the requests-in-flight alerts retired (RFC-0014 — otelgin gap)
 
 # Check GC thrash (GC churn causing latency?). There is no GC-pause metric under OTLP;
 # instead watch the heap riding its GC goal (>0.95 = thrashing):
@@ -446,7 +450,7 @@ sum(rate(http_server_request_duration_seconds_bucket{app="$APP", le="0.5"}[5m]))
 
 ## 6. Saturation Alerts
 
-> **Retired (RFC-0014 D-14):** The in-flight saturation signal (`requests_in_flight`) is no longer emitted -- otelgin exposes no `http_server_active_requests` equivalent, so the `MicroserviceHighRequestsInFlight` and `MicroserviceRequestsInFlightCritical` alerts and the `app:requests_in_flight:sum` recording rule were retired. The subsections below are kept for design context; the in-flight queries return no data on the OTLP pipeline. Use latency and traffic rate as the saturation proxy instead.
+> **Retired (RFC-0014 — otelgin exposes no equivalent):** The in-flight saturation signal (`requests_in_flight`) is no longer emitted -- otelgin exposes no `http_server_active_requests` equivalent, so the `MicroserviceHighRequestsInFlight` and `MicroserviceRequestsInFlightCritical` alerts and the `app:requests_in_flight:sum` recording rule were retired. The subsections below are kept for design context; the in-flight queries return no data on the OTLP pipeline. Use latency and traffic rate as the saturation proxy instead.
 
 ### MicroserviceHighRequestsInFlight
 
@@ -463,7 +467,7 @@ sum(rate(http_server_request_duration_seconds_bucket{app="$APP", le="0.5"}[5m]))
 **Investigation**:
 
 ```promql
-# Current in-flight requests -- NOT EMITTED under OTLP (record retired, D-14):
+# Current in-flight requests -- NOT EMITTED under OTLP (record retired):
 # job_app:requests_in_flight:sum was removed; there is no http_server_active_requests
 
 # Correlate with traffic rate
@@ -588,7 +592,7 @@ rate(go_memory_allocations_total{app="$APP"}[5m])
 
 **Severity**: warning
 
-> **Why not GC pause / frequency?** The OTLP Go runtime instrumentation exposes **no** GC-pause or GC-cycle-count metric (`go_gc_duration_seconds_*` was a `client_golang` series that disappeared with the scrape). The former `MicroserviceHighGCPressure` and `MicroserviceHighGCFrequency` alerts were replaced by this single **GC-thrash** signal (RFC-0014 D-14).
+> **Why not GC pause / frequency?** The OTLP Go runtime instrumentation exposes **no** GC-pause or GC-cycle-count metric (`go_gc_duration_seconds_*` was a `client_golang` series that disappeared with the scrape). The former `MicroserviceHighGCPressure` and `MicroserviceHighGCFrequency` alerts were replaced by this single **GC-thrash** signal (RFC-0014 — the OTLP runtime instrumentation exposes no GC-pause series).
 
 **Possible causes**:
 - Very high allocation rate (creating many short-lived objects)
@@ -843,8 +847,8 @@ Add alerts for application-side database health signals:
 | **RED** | Errors | `MicroserviceHighErrorRate`, `MicroserviceErrorRateCritical`, `MicroserviceNoSuccessfulRequests` |
 | **RED** | Duration | `MicroserviceHighLatencyP95`, `MicroserviceHighLatencyP99`, `MicroserviceLatencyCritical`, `MicroserviceApdexCritical` |
 | **USE** | Utilization | `MicroserviceHighMemoryUsage` |
-| **USE** | Saturation | `MicroserviceHighRequestsInFlight`, `MicroserviceRequestsInFlightCritical` (retired, D-14), `MicroserviceGoroutineLeak`, `MicroserviceGCThrash` |
-| **USE** | Errors | `MicroserviceDown`, `MicroserviceAllInstancesDown`, `MicroserviceHighRestartRate` |
+| **USE** | Saturation | `MicroserviceHighRequestsInFlight`, `MicroserviceRequestsInFlightCritical` (retired — otelgin gap), `MicroserviceGoroutineLeak`, `MicroserviceGCThrash` |
+| **USE** | Errors | `MicroserviceDown`, `MicroserviceAllInstancesDown`, `KubePodCrashLooping` |
 | **Golden** | Latency | All RED Duration alerts + `MicroserviceApdexCritical` |
 | **Golden** | Traffic | `MicroserviceNoTraffic` |
 | **Golden** | Errors | All RED Errors alerts + Availability alerts |

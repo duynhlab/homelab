@@ -46,7 +46,7 @@ flowchart TD
 
 ### Single Vector Design
 
-This deployment uses a **single cluster-wide Vector Agent** (`kube-system/vector`) that ships logs to VictoriaLogs. The VictoriaLogs Helm chart's embedded Vector/collector is **disabled** to avoid conflicts.
+This deployment uses a **single cluster-wide Vector Agent** (`kube-system/vector`) that ships logs to VictoriaLogs. VictoriaLogs is deployed as the operator-managed `VLSingle` CRD — no Helm-chart-embedded collector exists to conflict with.
 
 **Why single Vector?**
 - Eliminates duplicate log collection

@@ -23,9 +23,7 @@ flowchart TB
     subgraph col["OpenTelemetry Collector"]
         RCV[/"otlp receiver :4318 / :4317"/]
         PROC[/"memory_limiter → deltatocumulative → batch"/]
-        SM[/"spanmetrics connector"/]
         RCV --> PROC
-        RCV --> SM
     end
 
     VEC["Vector DaemonSet"]
@@ -54,7 +52,6 @@ flowchart TB
     Kong["Kong (edge)"] -.->|"runtime logs OTLP"| RCV
 
     PROC -->|"metrics OTLP"| VMAgent --> VMSingle
-    SM -->|"remote_write"| VMSingle
     PROC -->|"traces"| Tempo
     PROC -->|"traces"| Jaeger
     PROC -->|"traces"| VT
@@ -76,7 +73,7 @@ flowchart TB
     classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
     classDef profile fill:#f3d9fa,stroke:#9c36b5,color:#111;
     classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
-    class RCV,PROC,SM otc;
+    class RCV,PROC otc;
     class VMSingle,VMAgent metric;
     class VLogs,VEC log;
     class Tempo,Jaeger,VT trace;
@@ -315,7 +312,7 @@ docs/observability/
 │
 ├── alerting/                     # Alerting rules
 │   ├── README.md                 # 2-layer alerting strategy
-│   ├── alert-catalog.md          # Full alert reference (150 rules) + coverage gaps
+│   ├── alert-catalog.md          # Full alert reference (149 rules) + coverage gaps
 │   ├── slo-burn-rate-alerts.md   # SLO burn-rate methodology + config
 │   └── dashboard-comparison.md   # Alerting/dashboard tooling comparison
 │
@@ -346,7 +343,7 @@ docs/observability/
 | Tempo | monitoring | `tempo` | 3200 | Trace storage (OTLP receiver) |
 | Jaeger | monitoring | `jaeger-query` | 16686 | Trace query UI (alternative to Tempo) |
 | VictoriaTraces | monitoring | `vtsingle-victoria-traces` | 10428 | Trace storage pilot (`v0.6.0`, OTLP HTTP + Jaeger query API) |
-| OTel Collector | monitoring | `otel-collector` | 4317 | Trace fan-out + logs pipeline (Kong OTel runtime logs) — OTLP ingress |
+| OTel Collector | monitoring | `otel-collector` | 4317 | OTLP ingress — metrics (→ vmagent), logs (app tee + Kong runtime), trace fan-out |
 | VictoriaLogs | monitoring | `vlsingle-victoria-logs` | 9428 | Log storage and query (LogsQL, sole log backend) |
 | Vector | kube-system | DaemonSet | -- | Log shipping for **non-instrumented** pods (DBs, Kong access log, PG plans, frontend); app logs go OTLP |
 | Pyroscope | monitoring | `pyroscope` | 4040 | Continuous profiling |
@@ -426,4 +423,4 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-07-09 — architecture diagram redrawn (OTLP-push, RFC-0014); app logs via OTLP tee (P4), Vector for non-instrumented pods; added RFC-0014 explainer link._
+_Last updated: 2026-07-10 — dropped the fictional spanmetrics connector from the diagram (collector has no connectors); alert count 149; collector inventory row covers all three pipelines._

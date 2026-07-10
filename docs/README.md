@@ -12,7 +12,7 @@ docs/
 │   ├── README.md                 # Area hub: how the api docs fit together
 │   ├── api-naming-convention.md # v2.0.0 Adopted: the sole URL surface + complete route inventory
 │   ├── api.md                    # Payload reference: per-endpoint request/response + validation
-│   ├── microservices.md         # System catalog: per-service ownership + call graph
+│   ├── microservices.md         # Feature matrix: per-service features → API → technique + call graph
 │   ├── grpc-internal-comms.md   # Implemented: gRPC-only internal east-west comms
 │   ├── temporal-order-fulfillment.md # Implemented: Temporal saga — why/when/how, design, infra, ops
 │   ├── saga-vs-2pc.md           # Learning: saga vs two-phase commit — theory + the payment saga
@@ -22,7 +22,7 @@ docs/
 │   ├── adr/                      # Architecture Decision Records
 │   │   ├── README.md             # ADR conventions + index
 │   │   ├── ADR-0000-template/    # template
-│   │   └── ADR-001 … ADR-015     # Temporal ×2, JWT-in-services (superseded), OpenBAO audit/HA, RS256+edge-auth, payment ledger, mockpay, saga authorize/capture, shared idempotency, detect-only recon, recon auto-heal
+│   │   └── ADR-001 … ADR-016     # Temporal ×2, JWT-in-services (superseded), OpenBAO audit/HA, RS256+edge-auth, payment ledger, mockpay, saga authorize/capture, shared idempotency, detect-only recon, recon auto-heal, CNPG triplets ×3, OTel metrics cutover
 │   ├── rfc/                      # Requests for Comments
 │   │   ├── README.md             # process + index + backlog
 │   │   ├── RFC-0000/             # template
@@ -46,11 +46,14 @@ docs/
 │   ├── 010.3-cross-region-dr.md      # Cross-zone/cross-region DR roadmap
 │   ├── 010.4-emergency-recovery.md   # "Start here when it's down" runbook
 │   ├── 011-documents.md              # Further reading / document map
+│   ├── 012-declarative-role-management.md  # RFC-0012 per-service triplets (ExternalSecret + DatabaseRole + Database)
 │   └── runbooks/                     # Database ops runbooks
 │       ├── endpoints-to-configmaps.md
 │       ├── prepared-databases.md
 │       ├── cnpg-dr-replica-bootstrap.md
-│       └── zalando-ha-scaling.md
+│       ├── zalando-ha-scaling.md
+│       ├── add-service-database.md   # Add a service DB to cnpg-db (RFC-0012 triplet)
+│       └── rotate-cnpg-service-password.md  # Rotate a cnpg-db service password end-to-end
 ├── observability/                # Observability documentation
 │   ├── README.md                 # Master index + 4-pillar architecture
 │   ├── opentelemetry.md          # OpenTelemetry from zero: signals, SDK, collector, platform usage
@@ -62,6 +65,7 @@ docs/
 │   │   ├── victoriametrics.md    # VictoriaMetrics Operator stack
 │   │   ├── vmauth.md             # VMAuth/vmauth HTTP proxy (auth.config, Operator CRs)
 │   │   ├── promql-guide.md       # PromQL reference
+│   │   ├── streaming-aggregation.md  # VictoriaMetrics stream aggregation (vmagent)
 │   │   └── postgresql/           # PostgreSQL-specific metrics (databases layer)
 │   │       ├── monitoring.md
 │   │       ├── custom-metrics.md
@@ -258,7 +262,7 @@ docs/
     - CNPG vs EC2/VM operational differences
     - Backup/restore, scaling, and sharding concepts
     - Cross-namespace secrets visualization for supporting-shared-db
-    - Connection patterns (direct, PgBouncer, PgCat)
+    - Connection patterns (direct, PgBouncer, PgDog — PgCat is legacy)
     - Environment variables and Helm configuration
     - Database verification and troubleshooting
     - Monitoring and best practices
@@ -271,11 +275,11 @@ docs/
 
 ### Runbooks & Troubleshooting
 
-1. **[PgCat Prepared Statement Error](./runbooks/troubleshooting/pgcat_prepared_statement_error.md)** - Fix intermittent 500 errors with PgCat connection pooler
-2. **[PgCat Read-Only Transaction](./runbooks/troubleshooting/pgcat_read_only_transaction_error.md)** - Fix read-only transaction errors
-3. **[PgCat Upstream Connectivity](./runbooks/troubleshooting/pgcat_upstream_connectivity_errors.md)** - Fix upstream connectivity errors
-4. **[PostgreSQL Backup/Restore](./runbooks/troubleshooting/postgres_backup_restore.md)** - Backup and restore procedures (CNPG vs Zalando)
-5. **[VictoriaLogs Log Debugging](./runbooks/troubleshooting/victorialogs_kubernetes_logs_debug.md)** - Kubernetes log debugging with VictoriaLogs
+1. **[PostgreSQL Backup/Restore](./runbooks/troubleshooting/postgres_backup_restore.md)** - Backup and restore procedures (CNPG vs Zalando)
+2. **[VictoriaLogs Log Debugging](./runbooks/troubleshooting/victorialogs_kubernetes_logs_debug.md)** - Kubernetes log debugging with VictoriaLogs
+3. **[Add a service database](./databases/runbooks/add-service-database.md)** - RFC-0012 triplet flow on cnpg-db
+4. **[Rotate a cnpg-db service password](./databases/runbooks/rotate-cnpg-service-password.md)** - End-to-end rotation via OpenBAO → triplet → PgDog
+5. *Legacy (PgCat retired — kept for archaeology; no PgDog runbook exists yet):* [prepared-statement](./runbooks/troubleshooting/pgcat_prepared_statement_error.md) · [read-only txn](./runbooks/troubleshooting/pgcat_read_only_transaction_error.md) · [upstream connectivity](./runbooks/troubleshooting/pgcat_upstream_connectivity_errors.md)
 
 ---
 
@@ -348,6 +352,7 @@ docs/
 - [ADR-013: Per-service database triplet on cnpg-db](./proposals/adr/ADR-013-per-service-db-triplet/) - Accepted; from [RFC-0012](./proposals/rfc/RFC-0012/); ExternalSecret + DatabaseRole + Database, one file per service
 - [ADR-014: PgDog pooler credentials via Flux valuesFrom](./proposals/adr/ADR-014-pooler-credentials-valuesfrom/) - Accepted; from [RFC-0012](./proposals/rfc/RFC-0012/); per-user targetPath injection from ESO Secrets, no credentials in Helm values
 - [ADR-015: Connection isolation via declarative pg_hba](./proposals/adr/ADR-015-pg-hba-connection-isolation/) - Accepted; from [RFC-0012](./proposals/rfc/RFC-0012/); per-pair allow + trailing reject, applied by reload
+- [ADR-016: OTel metrics cutover](./proposals/adr/ADR-016-otel-metrics-cutover/) - Accepted; from [RFC-0014](./proposals/rfc/RFC-0014/); apps ServiceMonitor deleted (checkout never integrated — no fence), D-4 absence alerts activated in the same commit
 
 ### Payments
 
@@ -388,6 +393,11 @@ docs/
 - [Git Branching & Release](./platform/gitflow.md) - Hybrid Enterprise Gitflow standard (dev/uat/main + immutable tags)
 - [SonarCloud](./platform/sonarcloud.md) - SonarCloud integration
 - [Kong API Gateway](./platform/kong-gateway.md) - API-gateway concept + tradeoffs; DB-less Kong (plugins, routing, rate-limiting, TLS)
+- [Kyverno](./platform/kyverno.md) - Admission policies: tiers, Audit→Enforce rollout, exceptions
+- [Graceful Shutdown](./platform/graceful-shutdown.md) - Readiness-drain + signal handling pattern (all 9 services)
+- [GKE internal & private DNS](./platform/gke-internal-dns.md) - In-cluster DNS and Cloud DNS private zones
+- [MCP Servers](./platform/mcp-servers.md) - In-cluster MCP servers (VictoriaMetrics/Logs, Flux, Grafana)
+- [Ruleset Automation](./platform/ruleset-automation.md) - GitHub repo ruleset provisioning
 
 ### Secrets
 
@@ -397,13 +407,19 @@ docs/
 - [Trust Distribution](./secrets/trust-distribution.md) - trust-manager `homelab-ca-bundle` and the LE / homelab-CA dual-PKI split
 - [Secrets decisions & hardening](./proposals/) - ADR-004 (audit) + ADR-005 (OpenBAO HA); [RFC-0008](./proposals/rfc/RFC-0008/) production hardening + parity/testing matrix (+ its implementation.md migration plan); RFC backlog for rotation / PushSecret
 
+### Security
+
+- [Policy Catalog](./security/policy-catalog.md) - Kyverno ClusterPolicy catalog (tiers, modes, acceptance criteria)
+- [Policy Exceptions](./security/policy-exceptions.md) - PolicyException register (owner + TTL)
+- [Network Policies](./security/network-policies.md) - East-west NetworkPolicy caller matrix + topology
+
 ### Runbooks
 
-- [PgCat Prepared Statement Error](./runbooks/troubleshooting/pgcat_prepared_statement_error.md) - Fix intermittent 500 errors with connection pooler
-- [PgCat Read-Only Transaction](./runbooks/troubleshooting/pgcat_read_only_transaction_error.md) - Fix read-only transaction errors
-- [PgCat Upstream Connectivity](./runbooks/troubleshooting/pgcat_upstream_connectivity_errors.md) - Fix upstream connectivity errors
 - [PostgreSQL Backup/Restore](./runbooks/troubleshooting/postgres_backup_restore.md) - Backup and restore procedures
 - [VictoriaLogs Log Debugging](./runbooks/troubleshooting/victorialogs_kubernetes_logs_debug.md) - Kubernetes log debugging with VictoriaLogs
+- [Add a service database](./databases/runbooks/add-service-database.md) - RFC-0012 triplet flow
+- [Rotate a cnpg-db service password](./databases/runbooks/rotate-cnpg-service-password.md) - End-to-end rotation
+- *Legacy PgCat (retired):* [prepared-statement](./runbooks/troubleshooting/pgcat_prepared_statement_error.md) · [read-only txn](./runbooks/troubleshooting/pgcat_read_only_transaction_error.md) · [upstream](./runbooks/troubleshooting/pgcat_upstream_connectivity_errors.md)
 
 ---
 
@@ -436,4 +452,4 @@ docs/
 
 ---
 
-**Last Updated**: 2026-07-04
+**Last Updated**: 2026-07-10 — Security category added; ADR-016 indexed; Platform category completed (kyverno, graceful-shutdown, gke-dns, mcp, rulesets); databases 012 + 2 runbooks linked; PgCat runbooks demoted to legacy

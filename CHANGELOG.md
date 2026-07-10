@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **docs index & proposals navigation**: docs/README gains a Security
+  category, the missing Platform entries (kyverno, graceful-shutdown,
+  gke-dns, mcp-servers, ruleset-automation), ADR-016 (tree + Decisions),
+  databases 012 + the 2 unlinked runbooks, streaming-aggregation in the
+  metrics tree; PgCat runbooks demoted to legacy; RFC index: 0009 focus
+  callout retired, 0010/0014 rows → done/implemented; RFC-0010 Related
+  links ADR-009..012; RFC-0009 trailing tool-artifact tags removed; dead
+  `specs/active` links repointed; caching.md documents the Kong
+  rate-limit consumer on Valkey db 1 (gateway request path).
 - **platform docs setup/cicd drift**: `make up` order corrected (`flux-push`
   before `flux-up`, quick-start + detailed steps); VictoriaMetrics wording
   (no Prometheus server); temporal-db in the expected state; caching/mcp

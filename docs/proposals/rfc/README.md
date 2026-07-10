@@ -8,10 +8,10 @@ pull request, and only then implemented.
 > **Don't forget: every decision is a tradeoff.** A good RFC states what the choice
 > *costs* (rejected alternatives + drawbacks + rollback), not just what it buys.
 
-> **▶ Current focus & sequencing.** Highest-priority active proposal:
-> **[RFC-0009](RFC-0009/)** (production-grade gateway + JWT edge auth). Recommended
-> security-track order: **RFC-0009 → [RFC-0002](RFC-0002/) → [RFC-0008](RFC-0008/)
-> (parallel) → [RFC-0006](RFC-0006/) (defer)**. The index below stays ordered by
+> **▶ Current focus & sequencing.** RFC-0009 shipped (implemented — JWT + Kong
+> edge auth). Highest-priority *active* proposal on the security track:
+> **[RFC-0002](RFC-0002/)** (east-west mTLS), then **[RFC-0008](RFC-0008/)**
+> (parallel) → **[RFC-0006](RFC-0006/)** (defer). The index below stays ordered by
 > number (a stable registry) — read the **Priority** column for what to pick up next.
 
 ## When to write an RFC
@@ -74,11 +74,11 @@ made are recorded as one or more **ADRs**, and the RFC moves to `implemented`.
 | [RFC-0007](RFC-0007/) | Disaster-recovery drills program | infra | P2 | provisional |
 | [RFC-0008](RFC-0008/) | Production secrets hardening & local/prod parity | infra | P1 | provisional |
 | [RFC-0009](RFC-0009/) | Production-grade API gateway: signed JWT + Kong edge auth | platform-wide | done | implemented |
-| [RFC-0010](RFC-0010/) | Payment service: PaymentIntent, ledger & charge/refund saga step | platform-wide | P0 | implemented (P1–P6 landed) |
+| [RFC-0010](RFC-0010/) | Payment service: PaymentIntent, ledger & charge/refund saga step | platform-wide | done | implemented (P1–P6 landed) |
 | [RFC-0011](RFC-0011/) | Homelab migration: Kind to bare-metal Talos (1 → 3 node HA) | infra | P2 | provisional |
 | [RFC-0012](RFC-0012/) | Converge CNPG role & database management on declarative CRDs | infra | done | implemented (P0–P4 landed) |
 | [RFC-0013](RFC-0013/) | App-metrics cardinality audit & streaming-aggregation scale playbook | platform-wide | P2 | provisional |
-| [RFC-0014](RFC-0014/) | Full OpenTelemetry adoption: OTLP push for metrics, logs and traces | platform-wide | P1 | provisional |
+| [RFC-0014](RFC-0014/) | Full OpenTelemetry adoption: OTLP push for metrics, logs and traces | platform-wide | done | implemented (live-cluster drill pending) |
 
 ## Backlog — candidate RFCs
 

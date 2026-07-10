@@ -615,8 +615,13 @@ new-code coverage, `go test -race`, golangci-lint, agent-skills review.
     ledger for money audit (**P2**, landed)
   - [ADR-008](../../adr/ADR-008-mockpay-standalone-provider/) — mockpay as a
     standalone provider process (**P2.3**, landed)
-  - ADR — payment as pre-pivot saga step, authorize-early / capture-late
-    (**P3**)
-  - ADR — idempotency keys as shared `pkg/idempotency` (**P3**; absorbs the
+  - [ADR-009](../../adr/ADR-009-saga-authorize-early-capture-late/) — payment
+    as pre-pivot saga step, authorize-early / capture-late (**P3**, landed)
+  - [ADR-010](../../adr/ADR-010-shared-idempotency-library/) — idempotency keys
+    as shared `pkg/idempotency` (**P3**, landed; absorbs the
     `422 PAYMENT_DECLINED` status introduction and the one-payment-per-order
     `UNIQUE(order_id)` contract)
+  - [ADR-011](../../adr/ADR-011-detect-only-reconciliation/) — detect-only
+    reconciliation (**P5**, landed)
+  - [ADR-012](../../adr/ADR-012-reconciliation-auto-heal/) — flag-gated
+    auto-heal of the lost-capture-response window (landed)

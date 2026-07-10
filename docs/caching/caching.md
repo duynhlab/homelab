@@ -368,6 +368,24 @@ frequency-awareness at a small per-key bookkeeping cost.
 
 Eviction policy is configured via `valkeyConfig` in [`kubernetes/infra/controllers/caching/valkey/helmrelease.yaml`](../../kubernetes/infra/controllers/caching/valkey/helmrelease.yaml) (currently `maxmemory-policy allkeys-lru`).
 
+## Second consumer: Kong rate-limit counters (db 1)
+
+The same Valkey instance backs **Kong's distributed rate limiting**
+(`rate-limiting-api` + `rate-limiting-admin` KongClusterPlugins, `policy: redis`)
+— which puts Valkey **on the gateway request path**, not just the product read
+path. Keyspaces are isolated by database index:
+
+| Consumer | DB index | Purpose | Failure mode |
+|---|---|---|---|
+| product-service cache-aside | `0` | product/list cache | fail-open → DB |
+| Kong rate limiting | `1` | shared counters across both Kong replicas | `fault_tolerant: true` → requests pass unlimited |
+
+**Eviction caveat:** `allkeys-lru` applies to the whole instance — under memory
+pressure it can evict *rate-limit counters* as readily as cache entries
+(a counter reset momentarily raises a client's remaining quota). Acceptable at
+homelab scale; a dedicated instance (or `volatile-*` policy) is the production
+answer. See [kong-gateway.md](../platform/kong-gateway.md) for the plugin config.
+
 
 ## Distributed Cache (concept & current state)
 
@@ -551,4 +569,4 @@ Prioritized; the first items close documented gaps from the cache review.
 
 ---
 
-_Last updated: 2026-07-07_
+_Last updated: 2026-07-10 — documented the second Valkey consumer (Kong rate-limit counters on db 1, on the gateway request path) and the shared-eviction caveat._

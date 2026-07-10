@@ -1,6 +1,6 @@
 # PostgreSQL Backup Strategy
 
-This document defines a **production-ready physical backup strategy** (base backup + WAL archiving) for **all 3 PostgreSQL clusters + DR replica** using **RustFS (S3-compatible)** as the backup target, with per-operator bucket isolation:
+This document defines a **production-ready physical backup strategy** (base backup + WAL archiving) for the **operational PostgreSQL clusters + DR replica** (auth-db, supporting-shared-db, cnpg-db — `temporal-db` currently has **no backups**, see [010.1](010.1-rpo-rto-planning.md)) using **RustFS (S3-compatible)** as the backup target, with per-operator bucket isolation:
 
 - **Bucket `pg-backups-zalando`**: `auth-db`, `supporting-shared-db` (Zalando / WAL-G)
 - **Bucket `pg-backups-cnpg`**: `cnpg-db` (primary), `cnpg-db-replica` (DR) — CloudNativePG / Barman; separate S3 prefixes in the same bucket
@@ -100,9 +100,10 @@ flowchart LR
 
 | Cluster         | Operator      | Namespace | PostgreSQL | Instances | Databases                    | Pooler     | HA Pattern |
 |-----------------|---------------|-----------|------------|-----------|------------------------------|------------|------------|
-| cnpg-db         | CloudNativePG | product   | 18         | 3         | product, cart, order         | PgDog      | Sync quorum `ANY 1`; DR cluster `cnpg-db-replica` |
-| auth-db         | Zalando       | auth      | 16         | 3         | auth                         | PgBouncer  | Patroni HA |
-| supporting-shared-db   | Zalando       | user      | 16         | 1 (SPOF)  | user, notification, shipping | PgBouncer  | Single     |
+| cnpg-db         | CloudNativePG | product   | 18         | 3         | product, cart, order, payment | PgDog (payment app: direct-TLS) | Sync quorum `ANY 1`; DR cluster `cnpg-db-replica` |
+| auth-db         | Zalando       | auth      | 17         | 3         | auth                         | PgBouncer  | Patroni HA |
+| supporting-shared-db   | Zalando       | user      | 16         | 1 (SPOF)  | user, notification, shipping, review | PgBouncer  | Single     |
+| temporal-db     | CloudNativePG | temporal  | 18         | 1         | temporal                     | —          | Single — **no backups / no DR** |
 
 ### Detailed Cluster Profiles
 
@@ -112,8 +113,8 @@ flowchart LR
 - **Operator:** CloudNativePG v1.30.0
 - **PostgreSQL:** 18.1-system-trixie
 - **Topology:** 3 instances (1 primary + 2 replicas), synchronous quorum `ANY 1` for HA
-- **Scope:** 3 DBs (`product`, `cart`, `order`) on one CNPG cluster; apps connect via PgDog
-- **Pooler:** PgDog (routes to this cluster for all three databases)
+- **Scope:** 4 DBs (`product`, `cart`, `order`, `payment`) on one CNPG cluster; apps connect via PgDog (payment: direct-TLS)
+- **Pooler:** PgDog (routes to this cluster; 3 replicas)
 - **Secret:** `cnpg-db-secret` (manual)
 - **Backup scope:** Physical backup + WAL archiving (PITR) to RustFS at `s3://pg-backups-cnpg/cnpg-db/`; restore-to-new-cluster drills.
 - **DR replica cluster (`cnpg-db-replica`):** separate CloudNativePG `Cluster` for disaster recovery; Barman backups at `s3://pg-backups-cnpg/cnpg-db-replica/` (same bucket `pg-backups-cnpg`, distinct prefix from primary).
@@ -124,8 +125,8 @@ flowchart LR
 - **Operator:** Zalando v1.15.1
 - **PostgreSQL:** 16
 - **Topology:** 1 instance (SPOF), no replication
-- **Scope:** 3 DB (`user`, `notification`, `shipping`) + cross-namespace secrets
-- **Pooler:** PgBouncer sidecar (2 instances)
+- **Scope:** 4 DBs (`user`, `notification`, `shipping`, `review`) + cross-namespace secrets
+- **Pooler:** PgBouncer sidecar (3 instances)
 - **Secret:** Auto-generated; cross-namespace for notification, shipping
 - **Backup scope:** Physical backup + WAL archiving (PITR) to RustFS; DR-ready because SPOF.
 
@@ -532,3 +533,7 @@ Best practices:
 - [010-drp.md](./010-drp.md) - Production-ready DRP, recovery decision flow, and restore-drill evidence
 - [postgres_backup_restore.md](../runbooks/troubleshooting/postgres_backup_restore.md) - Runbook for backup/restore procedures
 - [RustFS README](../../kubernetes/infra/controllers/storage/rustfs/README.md) - RustFS deployment and access
+
+---
+
+_Last updated: 2026-07-10 — cluster inventory refreshed (auth PG17, +payment on cnpg-db, +review on supporting, pooler counts, temporal-db no-backup row)._

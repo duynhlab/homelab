@@ -58,7 +58,7 @@ change to `instance.yaml`**.
      index. Indices are positional — always append at the end, never insert
      mid-list ([ADR-014](../../proposals/adr/ADR-014-pooler-credentials-valuesfrom/)).
 
-5. **P4+ (once connection isolation is live):** add the service's `pg_hba`
+5. **pg_hba (connection isolation is live — RFC-0012 P4):** add the service's `pg_hba`
    allow rule in `instance.yaml` above the trailing reject — the one
    exception to "never touch instance.yaml", because HBA is cluster
    infrastructure, not a service definition.

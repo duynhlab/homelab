@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **local gateway wording**: microservices.md said the local stack fronts
+  services with nginx — it is Kong 3.9 DB-less (`gateway/kong.yml`, edge
+  JWT parity with the cluster); gateway table row corrected to 8000→8080;
+  local-stack README counts bumped 8 → 9 (services + databases).
+
 - **docs index & proposals navigation**: docs/README gains a Security
   category, the missing Platform entries (kyverno, graceful-shutdown,
   gke-dns, mcp-servers, ruleset-automation), ADR-016 (tree + Decisions),

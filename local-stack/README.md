@@ -4,8 +4,8 @@ A one-command **Docker Compose** end-to-end stack for the duynhlab platform —
 the full request path plus a tracing + span-metrics observability stack, without
 a Kubernetes cluster.
 
-It runs: PostgreSQL (8 databases) · Valkey · per-service golang-migrate jobs · the
-**8 Go services** · a Temporal dev server + the order-fulfillment worker · a
+It runs: PostgreSQL (9 databases) · Valkey · per-service golang-migrate jobs · the
+**9 Go services** (+ the `mockpay` provider) · a Temporal dev server + the order-fulfillment worker · a
 **Kong DB-less gateway** (mirrors the in-cluster Kong) · the **React SPA** ·
 an **OTel Collector → VictoriaTraces + VictoriaMetrics → Grafana** pipeline, and
 **Pyroscope** continuous profiling.
@@ -28,7 +28,7 @@ First run builds every service image, so it takes a few minutes. Then:
 | Component | URL | Notes |
 |-----------|-----|-------|
 | SPA (frontend) | http://localhost:3001 | demo login `alice` / `password123` (by **username**) |
-| API gateway (Kong) | http://localhost:8080 | pass-through to all 8 services |
+| API gateway (Kong) | http://localhost:8080 | pass-through to all 9 services |
 | Temporal Web UI | http://localhost:8233 | watch the saga |
 | **Grafana** | **http://localhost:3002** | Explore (traces) + RED dashboard; anonymous admin |
 | VictoriaTraces | http://localhost:10428 | trace ingest + Jaeger query API + vmui |
@@ -42,7 +42,7 @@ Postgres and Valkey are internal-only (reach the services through Kong, not dire
 ```mermaid
 flowchart LR
     SPA["React SPA :3001"] --> KONG["Kong :8080"]
-    KONG --> SVC["8 Go services"]
+    KONG --> SVC["9 Go services"]
     SVC --> PG[(PostgreSQL<br/>8 DBs)]
     SVC --> VALKEY[(Valkey)]
     SVC -. workflows .-> TMP["Temporal :7233<br/>+ worker"]
@@ -209,7 +209,7 @@ metrics-generator locally.
 
 ```mermaid
 flowchart LR
-    SVC["8 services<br/>(OTLP-HTTP)"] --> COL["otel-collector :4318"]
+    SVC["9 services<br/>(OTLP-HTTP)"] --> COL["otel-collector :4318"]
     COL --> VT["VictoriaTraces :10428"]
     COL -->|"spanmetrics"| VM["VictoriaMetrics :8428"]
     VT --> EXP["Grafana Explore<br/>(span waterfall)"]
@@ -221,7 +221,7 @@ The **OTel Collector is required**: the services' standard OTLP-HTTP SDK posts t
 `/insert/opentelemetry/v1/traces` ingest path directly. The collector receives
 standard OTLP and re-exports to VT.
 
-- Tracing is wired for all 8 services via the shared `x-svc-env` anchor
+- Tracing is wired for all 9 services via the shared `x-svc-env` anchor
   (`TRACING_ENABLED=true`, `OTEL_COLLECTOR_ENDPOINT=otel-collector:4318`,
   `OTEL_SAMPLE_RATE=1.0`), with a per-service `OTEL_SERVICE_NAME` so trace/metric
   service names are real (`auth`, `product`, …), not the container hostname.
@@ -261,7 +261,7 @@ histogram_quantile(0.95, sum by (le, service_name) (rate(spanmetrics_duration_mi
 
 ### Continuous profiling (Pyroscope)
 
-Profiling is **on** locally: the 8 services push pprof data to the `pyroscope`
+Profiling is **on** locally: the 9 services push pprof data to the `pyroscope`
 container (`PROFILING_ENABLED=true` + `PYROSCOPE_ENDPOINT=http://pyroscope:4040`
 in `x-svc-env`). View flame graphs in **Grafana → Explore → Pyroscope** (pick a
 service + profile type: CPU, alloc, inuse, goroutines, mutex/block), or the

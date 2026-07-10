@@ -2,67 +2,83 @@
 
 Comprehensive observability for the `duynhlab` microservices platform -- 9 Go services, 5 PostgreSQL clusters, all running on Kubernetes with GitOps (Flux).
 
+> **New to the stack?** Start with the [RFC-0014 explainer](rfc-0014-explainer.md) — old-vs-new, plain-language, diagrams.
+
 ## Architecture
 
+Since RFC-0014 the 9 Go services + order-worker **push** all three signals over
+OTLP to one OpenTelemetry Collector, which fans each out to its backend. Vector
+is the side path for everything without an OTel SDK (databases, Kong access log,
+Postgres query plans, the frontend). Profiles push straight to Pyroscope.
+
 ```mermaid
-flowchart TD
-    subgraph services [8 Microservices]
-        MW["Middleware Chain<br/>Tracing → Logging → Metrics"]
+flowchart TB
+    subgraph apps["Go services (obsx SDK)"]
+        SVC["otelgin · otelgrpc<br/>zap→OTLP tee · runtime metrics"]
+    end
+    subgraph infra["Non-instrumented pods"]
+        INF["DBs · Kong access log · PG plans · frontend"]
     end
 
-    subgraph pillar1 [Metrics]
-        VMAgent["VMAgent<br/>OTLP ingest + infra scrape"]
-        VMSingle["VMSingle :8428<br/>storage + query"]
+    subgraph col["OpenTelemetry Collector"]
+        RCV["otlp receiver :4318 / :4317"]
+        PROC["memory_limiter → deltatocumulative → batch"]
+        SM["spanmetrics connector"]
+        RCV --> PROC
+        RCV --> SM
     end
 
-    subgraph pillar2 [Traces]
-        OTel["OTel Collector<br/>fan-out"]
-        Tempo["Tempo<br/>storage"]
-        Jaeger["Jaeger :16686<br/>query UI"]
-        VictoriaTraces["VictoriaTraces :10428<br/>pilot"]
+    VEC["Vector DaemonSet"]
+
+    subgraph be["Backends"]
+        VMAgent["vmagent :8429<br/>OTLP ingest + infra scrape"]
+        VMSingle[("VictoriaMetrics :8428")]
+        Tempo[("Tempo")]
+        Jaeger[("Jaeger :16686")]
+        VT[("VictoriaTraces :10428")]
+        VLogs[("VictoriaLogs :9428")]
+        Pyro[("Pyroscope :4040")]
     end
 
-    subgraph pillar3 [Logs]
-        Vector["Vector<br/>DaemonSet"]
-        VLogs["VictoriaLogs :9428"]
+    subgraph alert["Alerting"]
+        VMAlert["VMAlert"]
+        VMAM["VMAlertmanager"]
+        Sloth["Sloth → PrometheusRules"]
     end
 
-    subgraph pillar4 [Profiles]
-        Pyroscope["Pyroscope :4040"]
-    end
+    Grafana{{"Grafana"}}
 
-    subgraph viz [Visualization]
-        Grafana["Grafana :3000"]
-    end
+    SVC -->|"OTLP push (metrics·logs·traces) :4318"| RCV
+    SVC -->|"pprof push"| Pyro
+    INF -->|"stdout"| VEC
+    Kong["Kong (edge)"] -.->|"runtime logs OTLP"| RCV
 
-    subgraph alert [Alerting]
-        VMAlert["VMAlert<br/>rule evaluation"]
-        VMAlertmanager["VMAlertmanager<br/>routing"]
-        Sloth["Sloth Operator<br/>SLO → PrometheusRules"]
-    end
-
-    MW -->|"OTLP metrics + traces :4318"| OTel
-    OTel -->|"OTLP metrics"| VMAgent
-    MW -->|"stdout JSON"| Vector
-    MW -->|"push"| Pyroscope
-
-    VMAgent --> VMSingle
-    OTel --> Tempo
-    OTel --> Jaeger
-    OTel --> VictoriaTraces
-    Vector --> VLogs
-    Kong["Kong gateway"] -.->|"runtime logs OTLP (pilot)"| OTel
-    OTel -.->|"logs pipeline (pilot)"| VLogs
+    PROC -->|"metrics OTLP"| VMAgent --> VMSingle
+    SM -->|"remote_write"| VMSingle
+    PROC -->|"traces"| Tempo
+    PROC -->|"traces"| Jaeger
+    PROC -->|"traces"| VT
+    PROC -->|"logs (VL-Stream-Fields)"| VLogs
+    VEC -->|"jsonline"| VLogs
 
     VMSingle --> Grafana
     Tempo --> Grafana
-    VLogs --> Grafana
     Jaeger --> Grafana
-    Pyroscope --> Grafana
+    VT --> Grafana
+    VLogs --> Grafana
+    Pyro --> Grafana
 
-    VMSingle -->|"vmalert.proxyURL"| VMAlert
-    VMAlert --> VMAlertmanager
+    VMSingle -->|"vmalert.proxyURL"| VMAlert --> VMAM
     Sloth --> VMAlert
+
+    classDef metric fill:#e6584622,stroke:#e65846;
+    classDef log fill:#22c55e22,stroke:#22c55e;
+    classDef trace fill:#3b82f622,stroke:#3b82f6;
+    classDef profile fill:#a855f722,stroke:#a855f7;
+    class VMSingle,VMAgent metric;
+    class VLogs,VEC log;
+    class Tempo,Jaeger,VT trace;
+    class Pyro profile;
 ```
 
 ## 3-Layer Service Architecture & APM Integration
@@ -99,7 +115,7 @@ graph TD
 
 ### End-to-End Request with APM
 
-Tracing and profiling are out-of-band: spans go through the OTel Collector before reaching Tempo/Jaeger, log lines hit stdout and are picked up by the Vector DaemonSet, and app metrics are pushed over OTLP (SDK → OTel Collector → VMAgent OTLP ingest → VMSingle) — VMAgent still scrapes the infra exporters (kube-state, cAdvisor, pg_exporter, …).
+Tracing and profiling are out-of-band: spans go through the OTel Collector before reaching Tempo/Jaeger, app logs are teed to OTLP (Vector still ships the non-instrumented pods), and app metrics are pushed over OTLP (SDK → OTel Collector → VMAgent OTLP ingest → VMSingle) — VMAgent still scrapes the infra exporters (kube-state, cAdvisor, pg_exporter, …).
 
 ```mermaid
 sequenceDiagram
@@ -111,7 +127,6 @@ sequenceDiagram
     participant Core as Core Layer
     participant OTel as OTel Collector
     participant Tempo
-    participant Vector as Vector DaemonSet
     participant VLogs as VictoriaLogs
     participant VMAgent
     participant VMSingle
@@ -145,15 +160,13 @@ sequenceDiagram
 
     Logic-->>Web: Result
     Web-->>MW: Response
-    MW-->>Vector: stdout JSON line (response)
+    MW->>OTel: Log record (OTLP tee, response)
     MW->>OTel: Complete root span
     Gin-->>Client: HTTP Response
 
     Note over OTel,Tempo: OTel Collector fan-out
     OTel->>Tempo: otlp/tempo (4317)
-
-    Note over Vector,VLogs: Vector ships parsed lines
-    Vector->>VLogs: HTTP ingest
+    OTel->>VLogs: logs (VL-Stream-Fields: service.name)
 
     Note over OTel,VMSingle: OTLP push metrics
     MW->>OTel: OTLP metrics (:4318)
@@ -248,7 +261,7 @@ graph LR
 |--------|------|---------------------|------|
 | **Metrics** | VMSingle + VMAgent | "Is something wrong?" | [metrics/](metrics/README.md) |
 | **Traces** | Tempo + Jaeger (+ VictoriaTraces pilot) via OTel Collector | "Where is it slow?" | [tracing/](tracing/README.md) |
-| **Logs** | VictoriaLogs via Vector | "Why is it broken?" | [logging/](logging/README.md) |
+| **Logs** | VictoriaLogs (OTLP tee; Vector for infra) | "Why is it broken?" | [logging/](logging/README.md) |
 | **Profiles** | Pyroscope | "Which code line is the bottleneck?" | [profiling/](profiling/README.md) |
 
 ## Documentation Map
@@ -328,7 +341,7 @@ docs/observability/
 | VictoriaTraces | monitoring | `vtsingle-victoria-traces` | 10428 | Trace storage pilot (`v0.6.0`, OTLP HTTP + Jaeger query API) |
 | OTel Collector | monitoring | `otel-collector` | 4317 | Trace fan-out + logs pipeline (Kong OTel-logs pilot) — OTLP ingress |
 | VictoriaLogs | monitoring | `vlsingle-victoria-logs` | 9428 | Log storage and query (LogsQL, sole log backend) |
-| Vector | kube-system | DaemonSet | -- | Log collection from all pods |
+| Vector | kube-system | DaemonSet | -- | Log shipping for **non-instrumented** pods (DBs, Kong access log, PG plans, frontend); app logs go OTLP |
 | Pyroscope | monitoring | `pyroscope` | 4040 | Continuous profiling |
 | Sloth | monitoring | operator | -- | SLO-to-PrometheusRule generator |
 
@@ -406,4 +419,4 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-07-09 — app metrics moved to OTLP push (RFC-0014 P3); exemplar-based metric→trace correlation retired (D-14)._
+_Last updated: 2026-07-09 — architecture diagram redrawn (OTLP-push, RFC-0014); app logs via OTLP tee (P4), Vector for non-instrumented pods; added RFC-0014 explainer link._

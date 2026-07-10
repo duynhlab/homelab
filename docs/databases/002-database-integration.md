@@ -486,7 +486,7 @@ Password rotation is a critical security practice for production databases. Zala
 - **Application users**: Every 180 days (or per compliance policy)
 - **Emergency rotation**: Immediately upon security incident
 
-**Reference:** For detailed procedures and External Secrets Operator integration, see [`specs/active/Zalando-operator/research.md`](../../specs/active/Zalando-operator/research.md#password-rotation-in-kubernetes-secrets).
+**Reference:** rotation runbook: [runbooks/rotate-cnpg-service-password.md](runbooks/rotate-cnpg-service-password.md) (CNPG) and [003.2-operator-zalando.md](003.2-operator-zalando.md) (Zalando; the former `specs/active` research notes were retired).
 
 #### Native Zalando Password Rotation
 
@@ -526,7 +526,7 @@ flowchart TD
 - ✅ **Zero-downtime** - ESO syncs before expiration
 - ✅ **Compliance** - Meets security policy requirements
 
-**Configuration:** See [`specs/active/Zalando-operator/research.md`](../../specs/active/Zalando-operator/research.md#external-secrets-operator-approach-automatic-rotation) for detailed ESO setup instructions.
+**Configuration:** see [../secrets/secrets-management.md](../secrets/secrets-management.md) for the ESO setup (the former `specs/active` research notes were retired).
 
 **Note:** ESO integration is planned for future implementation. Current setup uses native Zalando password rotation.
 

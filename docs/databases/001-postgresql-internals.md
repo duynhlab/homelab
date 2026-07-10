@@ -1005,5 +1005,4 @@ PgDog fronts **three application databases** on this cluster — **product**, **
 - **Replication strategy**: [`004-replication-strategy.md`](./004-replication-strategy.md)
 - **Backup strategy**: [`006-backup-strategy.md`](./006-backup-strategy.md)
 - **Poolers (PgBouncer, PgCat, PgDog)**: [`008-pooler.md`](./008-pooler.md)
-- **Performance tuning research**: [`specs/active/postgresql-performance-tuning/research.md`](../../specs/active/postgresql-performance-tuning/research.md)
-- **PostgreSQL deep dive notes**: [`specs/active/postgresql-deep-dive/internals.md`](../../specs/active/postgresql-deep-dive/internals.md)
+- **Related in-repo docs**: [002-database-integration.md](002-database-integration.md) · [007-architecture.md](007-architecture.md) (the former `specs/active` research notes were retired)

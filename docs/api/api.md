@@ -758,6 +758,7 @@ Create a new order.
 POST /order/v1/private/orders
 Content-Type: application/json
 Authorization: Bearer <jwt_token>
+Idempotency-Key: <client-generated key>   # optional
 
 {
   "items": [
@@ -780,6 +781,10 @@ Authorization: Bearer <jwt_token>
 | `items[].quantity` | integer | Yes | Quantity (min=1) |
 | `items[].price` | number | Yes | Unit price at time of order |
 | `payment_method` | string | No | Opaque test token (`tok_…`) the saga charges. Validated for shape and rejected with **400** if PAN-like *before* the order is persisted; empty → a demo token. Never card data. See [payments.md](./payments.md#the-checkout-read-path-rfc-0010-p6). |
+
+An optional **`Idempotency-Key` header** makes the create replay-safe: a retry
+with the same key returns the previously created order (`201`, same body)
+without reading the cart or starting a second saga.
 
 #### Response
 
@@ -838,7 +843,8 @@ Content-Type: application/json
   "expires_in": 3600,
   "user": {
     "id": "1",
-    "username": "user1"
+    "username": "user1",
+    "email": "user1@example.com"
   }
 }
 ```
@@ -866,14 +872,96 @@ Content-Type: application/json
 
 #### Response
 
-**201 Created**
+**201 Created** — same envelope as login (the user is signed in immediately):
 ```json
 {
-  "id": "123",
-  "username": "newuser",
-  "email": "new@example.com"
+  "access_token": "eyJhbG...",
+  "refresh_token": "8f3k...",
+  "expires_in": 3600,
+  "user": {
+    "id": "123",
+    "username": "newuser",
+    "email": "new@example.com"
+  }
 }
 ```
+
+---
+
+### POST /auth/v1/public/refresh
+
+Rotates the presented refresh token and mints a fresh access token. Each
+refresh token is **single-use**: the response carries its successor. Replaying
+an already-used token is treated as theft — the whole token family is revoked
+and every session on it must log in again.
+
+#### Request
+
+```
+POST /auth/v1/public/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "<refresh_token>"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `refresh_token` | string | Yes | The current (unused) refresh token |
+
+#### Response
+
+**200 OK** — same envelope as login; `refresh_token` is the **new** rotated token:
+```json
+{
+  "access_token": "eyJhbG...",
+  "refresh_token": "9q2m...",
+  "expires_in": 3600,
+  "user": {
+    "id": "1",
+    "username": "user1",
+    "email": "user1@example.com"
+  }
+}
+```
+
+**Error Responses:**
+
+| Status | Body | Condition |
+|--------|------|-----------|
+| 400 | `{"error": "Invalid request body"}` | Missing/malformed JSON or `refresh_token` |
+| 401 | `{"error": "Invalid refresh token"}` | Unknown/expired token, or reuse of a rotated token (family revoked) |
+| 500 | `{"error": "Internal server error"}` | Server error |
+
+---
+
+### GET /auth/v1/public/jwks
+
+Publishes the RSA public key set every service's JWT middleware (and Kong's
+edge check) verifies against. Responses carry `Cache-Control: public,
+max-age=300` — verifiers cache the key set for 5 minutes.
+
+#### Response
+
+**200 OK**
+```json
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "use": "sig",
+      "alg": "RS256",
+      "kid": "<base64url key id>",
+      "n": "<base64url modulus>",
+      "e": "<base64url exponent>"
+    }
+  ]
+}
+```
+
+Exactly one key today; the `kid` matches the JWT header so verifiers can pick
+the right key across future rotations.
 
 ---
 
@@ -1062,6 +1150,92 @@ Returns shipment info for a specific order (used by order aggregation endpoint).
 
 ---
 
+## Payment Service
+
+The payment subsystem's design record and operational surface (reconciliation,
+webhooks, the saga's gRPC money steps) live in [payments.md](payments.md) and
+[RFC-0010](../proposals/rfc/RFC-0010/); this section covers the browser-facing
+payload contracts only. Amounts are integers in **minor units**
+(`amount_minor`, e.g. cents).
+
+### POST /payment/v1/private/payments
+
+Idempotent authorize (and optionally capture) of a payment intent. The
+**`Idempotency-Key` header is required** — a replay with the same key returns
+the stored outcome verbatim. `user_id` comes from the JWT, never the body.
+
+#### Request
+
+```
+POST /payment/v1/private/payments
+Content-Type: application/json
+Authorization: Bearer <jwt_token>
+Idempotency-Key: <client-generated key>   # required
+
+{
+  "order_id": 123,
+  "amount_minor": 6498,
+  "currency": "USD",
+  "capture_method": "manual",
+  "payment_method": "tok_visa"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `order_id` | integer | No | Order to attach the payment to |
+| `amount_minor` | integer | Yes | Positive, bounded (minor units) |
+| `currency` | string | No | 3-letter uppercase code; default `USD` |
+| `capture_method` | string | No | `manual` (default) or `automatic` |
+| `payment_method` | string | Yes | Opaque `tok_…` token — PAN-like digit runs rejected with 400 |
+
+#### Response
+
+**201 Created** — the payment object:
+```json
+{
+  "id": 1,
+  "user_id": 42,
+  "order_id": 123,
+  "amount_minor": 6498,
+  "currency": "USD",
+  "status": "authorized",
+  "capture_method": "manual",
+  "payment_method": "tok_visa",
+  "provider_payment_id": "mp_...",
+  "authorized_at": "2026-07-10T08:00:00Z",
+  "refunded_minor": 0,
+  "created_at": "2026-07-10T08:00:00Z",
+  "updated_at": "2026-07-10T08:00:00Z"
+}
+```
+
+**Error Responses:**
+
+| Status | Body | Condition |
+|--------|------|-----------|
+| 400 | `{"error": "<validation message>"}` | Missing `Idempotency-Key`, bad amount/currency/capture_method, non-`tok_` payment method |
+| 401 | `{"error": "Authentication required"}` | No valid JWT |
+| 409 | `{"error": "Invalid payment state transition"}` | State-machine conflict |
+| 422 | `{"error": "payment declined", "code": "PAYMENT_DECLINED", "payment": {…}}` | Provider decline — the payment object carries `decline_code` |
+| 503 | `{"error": "provider unavailable, retry"}` | Transient provider failure |
+
+### GET /payment/v1/private/payments · GET /payment/v1/private/payments/:id
+
+Owner-scoped reads (JWT `user_id`): the list returns the standard pagination
+envelope of payment objects (shape above); the single read returns one payment
+or `404`.
+
+### Internal & webhook surfaces
+
+`POST /payment/v1/internal/payments/:id/refunds` (idempotent partial refund —
+body `{"amount_minor": n, "reason": "…"}`, requires `Idempotency-Key`, returns
+`201` with the refund object), the reconciliation runs API, and the HMAC-signed
+`POST /payment/v1/public/webhooks/mockpay` are in-cluster/provider contracts —
+payloads and mechanics are documented in [payments.md](payments.md).
+
+---
+
 ## Common Response Patterns
 
 ### Error Response Format
@@ -1115,4 +1289,4 @@ The major version lives between the service and the audience (Variant A). Bumpin
 
 ---
 
-_Last updated: 2026-07-09 — renamed the RED histogram to semconv `http_server_request_duration_seconds` (OTLP push, RFC-0014 P3); thinned to the payload reference: seed data → platform/setup, pgx rationale → databases, roster → naming convention; stale build/HelmRelease conventions dropped._
+_Last updated: 2026-07-10 — added auth refresh/JWKS and Payment Service payload sections; register response corrected to the full auth envelope; documented the order-create `Idempotency-Key` header._

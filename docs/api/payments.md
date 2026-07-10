@@ -217,8 +217,8 @@ insufficient_funds, `19` transient-then-succeed):
 - **Currency isn't carried on the report** (single-currency platform today).
 - **Full scan + full provider sweep per pass** — must be windowed
   (rolling recent window + slow full sweep) before production-scale volume.
-- **No retention reaper yet** for `reconciliation_runs`/`_discrepancies`
-  (the ticker alone writes ~288 runs/day).
+- ~~No retention reaper yet~~ — **shipped**: an hourly reaper prunes
+  `reconciliation_runs` (and cascading `_discrepancies`) older than **30 days**.
 - **No metric or alert on `discrepancies_found > 0` yet** — detection surfaces
   as a ticker log line and via the report API, so today someone must go
   looking. (The heal slice has since shipped —
@@ -227,4 +227,4 @@ insufficient_funds, `19` transient-then-succeed):
 
 ---
 
-_Last updated: 2026-07-07_
+_Last updated: 2026-07-10 — reconciliation retention reaper marked shipped (hourly, 30 d)._

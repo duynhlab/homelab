@@ -119,7 +119,7 @@ Imagine `supporting-shared-db` handles 1000 transactions/second:
 
 | Cluster | Recommended | Why |
 |---------|------------|-----|
-| **cnpg-db** (product, cart, order) | Sync ANY 1 (RPO = 0 for 1 replica) | Financial data (cart/order). Losing an order is unacceptable. Worth the latency cost. |
+| **cnpg-db** (product, cart, order, payment) | Sync ANY 1 (RPO = 0 for 1 replica) | Financial data (cart/order). Losing an order is unacceptable. Worth the latency cost. |
 | **auth-db** (auth) | Async (RPO > 0) | Refresh-token families can be re-issued (users re-login). A few lost logins are tolerable. |
 | **supporting-shared-db** (user, notification, shipping, review) | Async (RPO > 0) | User profiles and notifications are not financial-critical. Async gives best write performance. |
 
@@ -648,7 +648,7 @@ Retaining PVCs is a safety feature -- if you scale back up to 3, the replicas ca
 | **RPO** | 0 | > 0 | N/A |
 | **RTO** | ~10-30s | ~10-30s | **No failover** |
 | **Pooler** | PgDog | PgBouncer | PgBouncer |
-| **Databases** | product, cart, order | auth | user, notification, shipping, review |
+| **Databases** | product, cart, order, payment | auth | user, notification, shipping, review |
 | **Risk** | Low | Low | **High (4 services affected)** |
 
 ### After Scaling supporting-shared-db to 3 Nodes

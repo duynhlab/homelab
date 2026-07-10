@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   split (`-public`/`-private`); stale payment↛JWKS gap removed from
   network-policies (auth admits all 9 namespaces); policy-catalog image
   criterion corrected to the multi-level `<repo>/<image>` shape.
+- **databases docs inventory drift**: PgDog scope corrected to the 4 `cnpg-db`
+  databases (payment added everywhere it was omitted; payment app noted as
+  direct-TLS past the pooler); pooler replica/instance counts 1–2 → 3
+  (PgDog + both PgBouncers); auth-db PG17; supporting +review; temporal-db
+  (no backups) added to inventories; extension declarations re-pointed to
+  the RFC-0012 `services/*.yaml` triplets (dead `extensions.yaml` links);
+  CNPG doc links 1.29 → 1.30; exporter versions refreshed in the infra
+  databases READMEs; add-service runbook pg_hba wording → present tense.
 
 - **observability docs OTLP drift**: dropped the fictional spanmetrics
   connector and retired `ServiceMonitor/microservices-api` references

@@ -6,13 +6,13 @@ incident decision flow, RTO/RPO ownership, and restore evidence, see
 
 ## 1. Executive Summary
 
-You are running **3 operational PostgreSQL clusters** + **1 DR replica cluster** with a hybrid architecture optimized for specific workload needs.
+You are running **4 operational PostgreSQL clusters** (incl. `temporal-db`) + **1 DR replica cluster** with a hybrid architecture optimized for specific workload needs.
 
 ### Cluster overview
 
 | Cluster | Operator | Namespace | Instances | Sync Mode | Pooler | Services |
 |--------|----------|-----------|-----------|-----------|--------|----------|
-| **cnpg-db** | CloudNativePG | product | 3 | Synchronous (`on`, ANY 1) | PgDog | product, cart, order |
+| **cnpg-db** | CloudNativePG | product | 3 | Synchronous (`on`, ANY 1) | PgDog | product, cart, order, payment |
 | **cnpg-db-replica** | CloudNativePG | product | 1 | DR (restore from object store) | — | DR replica of cnpg-db |
 | **auth-db** | Zalando | auth | 3 | Async (`local`) | PgBouncer | auth |
 | **supporting-shared-db** | Zalando | user | 1 | N/A (single node) | PgBouncer | user, notification, shipping, review |
@@ -70,7 +70,7 @@ flowchart TB
 ```
 
 **Key findings:**
-- **cnpg-db**: 3-node HA with synchronous quorum (**ANY 1** standby). Commits that complete under this policy have **RPO = 0** relative to acknowledged standbys. Hosts **product**, **cart**, and **order** databases; **PgDog** is the pooler.
+- **cnpg-db**: 3-node HA with synchronous quorum (**ANY 1** standby). Commits that complete under this policy have **RPO = 0** relative to acknowledged standbys. Hosts **product**, **cart**, **order**, and **payment** databases; **PgDog** is the pooler (payment app: direct-TLS).
 - **cnpg-db-replica**: Single-instance cluster used for **disaster recovery**, continuously fed from **object-store backups** (not in-band streaming HA for the same namespace workloads). See [DR replica cluster](#dr-replica-cluster-cnpg-db-replica) below and [005-ha-dr-deep-dive.md](005-ha-dr-deep-dive.md).
 - **auth-db**: 3-node async. Fast writes, possible small data loss on crash.
 - **supporting-shared-db**: Single instance, no HA. No replication. Hosts 4 databases (user, notification, shipping, review).
@@ -517,7 +517,7 @@ Large hyperscale deployments scale PostgreSQL to hundreds of millions of users w
 | **Sync Mode** | Synchronous (`on`, ANY 1) | N/A (async catch-up from archive) | Async (`local`) | N/A |
 | **Instances** | 3 | 1 | 3 | 1 |
 | **Pooler** | PgDog | — | PgBouncer | PgBouncer |
-| **Databases** | product, cart, order | mirror of cnpg-db (DR) | auth | user, notification, shipping, review |
+| **Databases** | product, cart, order, payment | mirror of cnpg-db (DR) | auth | user, notification, shipping, review |
 | **Failover RPO** | **0** (for commits acknowledged per sync policy) | Depends on restore/replay lag | >0 (Possible small loss) | N/A |
 | **Failover RTO** | Seconds (Auto) | Workflow-dependent (DR) | Seconds (Auto) | N/A |
 | **PITR Status** | Configured | Configured | Configured | Configured |

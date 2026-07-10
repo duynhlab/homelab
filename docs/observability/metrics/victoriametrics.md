@@ -102,14 +102,15 @@ This is the most important concept to understand. The cluster runs **two separat
 
 | Resource | File | Creator |
 |----------|------|---------|
-| `ServiceMonitor/microservices-api` | `configs/monitoring/servicemonitors/microservices.yaml` | Manual (platform team) |
 | `ServiceMonitor/external-secrets` | `configs/monitoring/servicemonitors/external-secrets.yaml` | Manual (platform team) |
 | `ServiceMonitor/tempo` | `configs/monitoring/servicemonitors/tempo.yaml` | Manual (platform team) |
+| `ServiceMonitor/kong` | `configs/monitoring/servicemonitors/kong.yaml` | Manual (platform team) |
+| `ServiceMonitor/kube-apiserver` | `configs/monitoring/servicemonitors/kube-apiserver.yaml` | Manual (platform team) |
 | `PodMonitor/postgresql-auth-db` | `configs/monitoring/podmonitors/podmonitor-zalando-auth-db.yaml` | Manual (platform team) |
 | `PodMonitor/postgresql-supporting-shared-db` | `configs/monitoring/podmonitors/podmonitor-zalando-supporting-shared-db.yaml` | Manual (platform team) |
 | `PrometheusRule` (PostgreSQL, many) | `configs/monitoring/prometheusrules/postgres/` | Manual (platform team) |
-| `PrometheusRule/postgres-backup-alerts` | `configs/monitoring/prometheusrules/postgres-backup-alerts.yaml` | Manual (platform team) |
-| `PrometheusRule/pg-exporter-recording-rules` | `configs/monitoring/prometheusrules/pg-exporter-recording-rules.yaml` | Manual (platform team) |
+| `PrometheusRule/postgres-backup-alerts` | `configs/monitoring/prometheusrules/postgres/backup-alerts.yaml` | Manual (platform team) |
+| `PrometheusRule/pg-exporter-recording-rules` | `configs/monitoring/prometheusrules/postgres/pg-exporter-recording-rules.yaml` | Manual (platform team) |
 | `ServiceMonitor` (valkey) | Created at runtime by Helm chart | Valkey chart (`serviceMonitor.enabled: true`) |
 | `PodMonitor` (e.g. `cnpg-db`) | `configs/databases/clusters/*/monitoring/` | Manual (platform team) |
 | `PrometheusRule` (SLO rules) | Created at runtime by Sloth | Sloth Operator (from PrometheusServiceLevel) |
@@ -153,7 +154,7 @@ Additionally, the VM Operator **auto-creates** VM resources by converting Promet
 
 | Source (Prometheus CRD) | Auto-created (VM CRD) |
 |-------------------------|-----------------------|
-| `ServiceMonitor/microservices-api` | `VMServiceScrape/microservices-api` |
+| `ServiceMonitor/tempo` | `VMServiceScrape/tempo` |
 | `PodMonitor/postgresql-auth-db` | `VMPodScrape/postgresql-auth-db` |
 | `PrometheusRule` under `postgres/cnpg/`, `postgres/zalando/` | Corresponding `VMRule` per resource |
 | ...all other Prometheus resources | ...corresponding VM resources |
@@ -357,7 +358,7 @@ Currently configured with a `default` receiver (no-op). Add webhook, Slack, Page
 | **CRD** | `operator.victoriametrics.com/v1 / VLSingle` |
 | **Manifest** | `kubernetes/infra/configs/monitoring/victoriametrics/vlsingle.yaml` |
 | **Service** | `vlsingle-victoria-logs.monitoring.svc:9428` |
-| **Ingest endpoints** | `/insert/jsonline` (Vector) · `/insert/opentelemetry/v1/logs` (OTel collector — Kong runtime logs) |
+| **Ingest endpoints** | `/insert/jsonline` (Vector) · `/insert/opentelemetry/v1/logs` (OTel collector — app logs from the 9 services + Kong runtime logs) |
 | **Query endpoint** | `/select/logsql/query` |
 
 Configuration:
@@ -448,20 +449,18 @@ healthChecks:
 ```mermaid
 flowchart LR
     subgraph sources ["Metric Sources"]
-        Apps["Microservices<br/>/metrics endpoint"]
+        Apps["Microservices<br/>OTLP push (RFC-0014)"]
         PG["PostgreSQL<br/>pg_exporter"]
         ESO["External Secrets<br/>/metrics"]
         TempoSvc["Tempo<br/>/metrics"]
     end
 
     subgraph promCRD ["Prometheus CRDs (your YAML)"]
-        SM1["ServiceMonitor<br/>microservices-api"]
         PM1["PodMonitor<br/>postgresql-auth-db"]
         SM2["ServiceMonitor<br/>tempo"]
     end
 
     subgraph autoConv ["VM Operator auto-converts"]
-        VMSS1["VMServiceScrape<br/>microservices-api"]
         VMPS1["VMPodScrape<br/>postgresql-auth-db"]
         VMSS2["VMServiceScrape<br/>tempo"]
     end
@@ -475,18 +474,16 @@ flowchart LR
         Grafana_f["Grafana<br/>:3000"]
     end
 
-    SM1 --> VMSS1
     PM1 --> VMPS1
     SM2 --> VMSS2
 
-    VMSS1 --> VMAgent_f
     VMPS1 --> VMAgent_f
     VMSS2 --> VMAgent_f
 
     VMAgent_f -->|"remote write"| VMSingle_f
     VMSingle_f -->|"PromQL / MetricsQL"| Grafana_f
 
-    Apps -.->|scrape| VMAgent_f
+    Apps -.->|"OTLP push :8429"| VMAgent_f
     PG -.->|scrape| VMAgent_f
     ESO -.->|scrape| VMAgent_f
     TempoSvc -.->|scrape| VMAgent_f
@@ -537,9 +534,10 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    Pods["Kubernetes Pods"] --> Vector["Vector Agent<br/>kube-system"]
+    Pods["Non-instrumented pods"] --> Vector["Vector Agent<br/>kube-system"]
     Vector -->|"jsonline :9428"| VLSingle_f["VLSingle<br/>victoria-logs"]
-    Kong_f["Kong gateway"] -.->|"runtime logs OTLP"| OTelC_f["OTel Collector"]
+    Apps_l["9 Go services (zap tee)"] -.->|"logs OTLP"| OTelC_f["OTel Collector"]
+    Kong_f["Kong gateway"] -.->|"runtime logs OTLP"| OTelC_f
     OTelC_f -.->|"OTLP :9428"| VLSingle_f
 ```
 
@@ -796,3 +794,7 @@ kubectl get helmreleases -A -o wide
 - [VLSingle Documentation](https://docs.victoriametrics.com/operator/resources/vlsingle/)
 - [MetricsQL (PromQL superset)](https://docs.victoriametrics.com/metricsql/)
 - [LogsQL (VictoriaLogs query language)](https://docs.victoriametrics.com/victorialogs/logsql/)
+
+---
+
+_Last updated: 2026-07-10 — rewritten for the OTLP-push reality: retired `ServiceMonitor/microservices-api` references removed (apps push, RFC-0014 P3), rule paths corrected to `prometheusrules/postgres/`, log-flow diagram covers the app OTLP tee._

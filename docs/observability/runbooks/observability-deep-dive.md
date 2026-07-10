@@ -196,7 +196,7 @@ flowchart TD
     subgraph logs ["Pillar 3: Logs"]
         Vector["Vector\n(DaemonSet)"] --> VLSingle["VLSingle\n(:9428)"]
     end
-    OTel -.->|"Kong runtime logs (pilot)"| VLSingle
+    OTel -.->|"Kong runtime logs"| VLSingle
 
     subgraph profiles ["Pillar 4: Profiles"]
         Pyroscope["Pyroscope\n(:4040)"]

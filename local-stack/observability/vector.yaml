@@ -3,7 +3,7 @@
 # Tails every compose container's stdout/stderr, lifts the service name and
 # parses JSON log lines (the Go services + Kong's kong_json access log), then
 # ships to VictoriaLogs' jsonline ingest — the same sink the cluster uses.
-# Runs ALONGSIDE the Kong OTel-logs pilot so both paths can be compared in one
+# Runs ALONGSIDE Kong's OTel runtime logs — complementary paths into one
 # VictoriaLogs instance (Vector rows carry `container_name`; OTel rows carry
 # `service.name`/`service.instance.id` resource attributes).
 

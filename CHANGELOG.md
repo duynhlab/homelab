@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`observability/README.md` Architecture, the five `rfc-0014-explainer.md`
   flowcharts, `logging/README.md` dual-path, `tracing/architecture.md`). Visual
   only — topology and labels unchanged.
+- **Dropped the stale "pilot" wording for Kong runtime-logs over OTLP** — the
+  path is a permanent complement to Vector, not a pilot; updated across
+  `tracing/architecture.md`, `README.md`, `opentelemetry.md`,
+  `metrics/victoriametrics.md`, `runbooks/observability-deep-dive.md`, and the
+  `local-stack/observability/vector.yaml` comment. (VictoriaTraces stays a pilot.)
 - **Logging & tracing docs refreshed for RFC-0014 P4** (P5 only swept the
   metrics-family docs): `logging/README.md`, `logging-standards.md` and
   `victorialogs.md` now describe the dual-path reality — app logs via the

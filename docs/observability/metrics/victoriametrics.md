@@ -357,7 +357,7 @@ Currently configured with a `default` receiver (no-op). Add webhook, Slack, Page
 | **CRD** | `operator.victoriametrics.com/v1 / VLSingle` |
 | **Manifest** | `kubernetes/infra/configs/monitoring/victoriametrics/vlsingle.yaml` |
 | **Service** | `vlsingle-victoria-logs.monitoring.svc:9428` |
-| **Ingest endpoints** | `/insert/jsonline` (Vector) · `/insert/opentelemetry/v1/logs` (OTel collector — Kong logs pilot) |
+| **Ingest endpoints** | `/insert/jsonline` (Vector) · `/insert/opentelemetry/v1/logs` (OTel collector — Kong runtime logs) |
 | **Query endpoint** | `/select/logsql/query` |
 
 Configuration:
@@ -539,7 +539,7 @@ flowchart LR
 flowchart LR
     Pods["Kubernetes Pods"] --> Vector["Vector Agent<br/>kube-system"]
     Vector -->|"jsonline :9428"| VLSingle_f["VLSingle<br/>victoria-logs"]
-    Kong_f["Kong gateway"] -.->|"runtime logs OTLP (pilot)"| OTelC_f["OTel Collector"]
+    Kong_f["Kong gateway"] -.->|"runtime logs OTLP"| OTelC_f["OTel Collector"]
     OTelC_f -.->|"OTLP :9428"| VLSingle_f
 ```
 

@@ -6,14 +6,14 @@
 | **Status** | **Implemented** — every east-west hop runs over gRPC (gRPC-only, no feature flag); cluster wired via headless Services; Phase 3 NetworkPolicy fences `:9090`, mTLS deferred. See [§7 roadmap](#7-phased-roadmap). |
 | **Scope** | Internal (east-west) service-to-service calls only |
 | **Relation** | Complements [`api-naming-convention.md`](api-naming-convention.md) (HTTP/JSON URL surface stays the law of the land) |
-| **Last updated** | 2026-07-02 |
+| **Last updated** | 2026-07-10 |
 
 ## Implementation status
 
 The migration is **complete** for the migrated hops: they run over gRPC, the servers
 are always-on (no feature flag), and there is no REST fallback. The **one documented
-exception is `order → cart`** (the checkout cart-read), which remains REST — see the
-hop table below.
+exception is the `order → cart` pair** (the checkout pricing read + the saga's
+tokenless internal cart-clear), which remains REST — see the hop table below.
 
 | Hop / item | Status | Where |
 |------------|--------|-------|
@@ -21,12 +21,12 @@ hop table below.
 | **Phase 1** — `order → shipping` | ✅ gRPC-only | shipping + order |
 | **Phase 2** — `/me` validation: all 5 consumers validated via `auth.GetMe` over gRPC through the shared fail-closed `pkg/authmw` | ⛔ retired by RFC-0009 Phase 5 (JWT-only authmw v0.12.0; `auth/v1` proto removed) | `pkg/authmw` + 5 services |
 | **Phase 2** — `product → review` aggregation | ✅ gRPC-only | review + product |
-| **Phase 2** — `order → notification` publish on checkout (best-effort) | ✅ | notification + order |
+| **Phase 2** — `order → notification` publish on checkout (best-effort; the saga worker drives it today) | ✅ | notification + order |
 | **Payment (RFC-0010)** — `order` + `order-worker` → `payment` (saga capture/refund + `GetPayment` enrichment); `order-worker` → `product` (saga stock) | ✅ gRPC-only | payment + product + order + order-worker |
-| **Cluster** — headless `{shipping,review,notification}-grpc` Services (`:9090`) + ResourceSet `*_GRPC_ADDR` env (`auth-grpc` removed in Phase 5) | ✅ | mop chart (`grpc.enabled`), `kubernetes/apps/domains/*-rs.yaml`, `kubernetes/apps/services/*.yaml` |
+| **Cluster** — headless `{review,shipping,notification,payment}-grpc` Services (`:9090`) + ResourceSet `*_GRPC_ADDR` env (`auth-grpc` removed in Phase 5). ⚠️ `rsip-product` lacks `grpc_server: true`, so **`product-grpc` is not rendered in-cluster** even though order-worker dials it (`order-worker.yaml`) — known gap | ✅ (product gap) | mop chart (`grpc.enabled`), `kubernetes/apps/domains/*-rs.yaml`, `kubernetes/apps/services/*.yaml` |
 | **Phase 3** — NetworkPolicy fences `:9090`; gRPC health service registered | ✅ | `kubernetes/infra/configs/network-policies/` |
 | **Phase 3** — mTLS on `:9090` | ⏳ deferred | services use `insecure` creds; needs `grpcx` TLS + cert-manager |
-| Verified end-to-end on Docker Compose (login, `/me`, product reviews, checkout → notification) | ✅ | `homelab/local-stack` |
+| Verified end-to-end on Docker Compose (login, local JWKS verification, product reviews, checkout → notification) | ✅ | `homelab/local-stack` |
 
 **gRPC is the official east-west transport** — servers run unconditionally on
 `GRPC_PORT` (default `9090`); there is no `GRPC_ENABLED` flag and no REST fallback.
@@ -94,11 +94,12 @@ calls, not a religion.
 |-----------------|----------|--------|
 | every service → auth `/auth/v1/private/me` | gRPC | ⛔ **removed (Phase 5)** — services verify JWTs locally via JWKS; auth has no gRPC server |
 | product → review (aggregation) | gRPC | ✅ gRPC-only |
-| order → shipping (internal order lookup) | gRPC | ✅ gRPC-only |
-| order → notification (publish on checkout) | gRPC | ✅ best-effort |
-| order + order-worker → payment (saga capture/refund + enrichment) | gRPC | ✅ gRPC-only (RFC-0010) |
-| order-worker → product (saga stock) | gRPC | ✅ gRPC-only (RFC-0010) |
-| order → cart (forwards user JWT) | REST today | not migrated (cart read on checkout still REST) |
+| order → shipping (order-details shipment read) | gRPC | ✅ gRPC-only |
+| order-worker → shipping (saga `CreateShipment`/`CancelShipment`) | gRPC | ✅ gRPC-only |
+| order-worker → notification (saga emails, best-effort) | gRPC | ✅ best-effort |
+| order + order-worker → payment (saga authorize/capture/void/refund + `GetPayment` enrichment) | gRPC | ✅ gRPC-only (RFC-0010) |
+| order-worker → product (saga `ReserveStock`/`ReleaseStock`) | gRPC | ✅ gRPC-only (RFC-0010) |
+| order → cart (pricing read, forwards user JWT; saga clear via tokenless internal route) | REST today | not migrated (both cart hops stay REST) |
 | any browser / SPA → Kong | **STAY REST** | — (hard rule) |
 | auth → user (registration) | not implemented | proto-only candidate |
 
@@ -137,17 +138,17 @@ probes, and Prometheus scraping all keep working exactly as documented in
 
 ```mermaid
 flowchart LR
-    subgraph Today["Today — all HTTP/JSON"]
+    subgraph Today["Before — all HTTP/JSON"]
         B1[Browser] -->|HTTPS JSON| K1[Kong]
         K1 -->|HTTP :8080| S1[order :8080]
         S1 -->|HTTP/1.1 JSON :8080| SH1[shipping :8080]
-        S1 -->|HTTP/1.1 JSON :8080| A1[auth :8080]
+        S1 -->|HTTP/1.1 JSON :8080| N1[notification :8080]
     end
-    subgraph Target["Target — gRPC internal, REST edge"]
+    subgraph Target["Now — gRPC internal, REST edge"]
         B2[Browser] -->|HTTPS JSON| K2[Kong]
         K2 -->|HTTP :8080| S2[order :8080 + :9090]
         S2 -->|gRPC HTTP/2 :9090| SH2[shipping :9090]
-        S2 -->|gRPC HTTP/2 :9090| A2[auth :9090]
+        S2 -->|gRPC HTTP/2 :9090| N2[notification :9090]
     end
 ```
 
@@ -316,10 +317,10 @@ complementary layers, each answering a different question:
 - **mTLS** is **defense-in-depth**, issued via the existing **cert-manager /
   trust-manager `homelab-ca-bundle`** PKI. It authenticates the *service*, not the
   user.
-- **JWT carries the user identity.** For user-scoped calls (`/me` validation and
-  `order → cart`), forward the caller's JWT in gRPC **metadata** under the
-  `authorization` key — the gRPC equivalent of the `Authorization` header the
-  services forward today.
+- **JWT carries the user identity.** For user-scoped calls (today only the
+  `order → cart` pricing read, which is REST), forward the caller's JWT — for a
+  future user-scoped gRPC hop that means **metadata** under the `authorization`
+  key, the gRPC equivalent of the `Authorization` header.
 - These are **complementary, not a substitution**: NetworkPolicy fences the
   network, mTLS proves service identity, JWT proves user identity.
 
@@ -339,12 +340,14 @@ gained native support.
   `grpc: { enabled: true, port: 9090 }` block guarded by `<<- if (index inputs
   "grpc_server") >>`, so only the gRPC-server services render the headless
   Service and the second container port. Callees opt in via `grpc_server: true`
-  on their InputProvider (`kubernetes/apps/services/{auth,shipping,review,notification}.yaml`).
+  on their InputProvider (`kubernetes/apps/services/{review,shipping,notification,payment}.yaml`;
+  ⚠️ `product.yaml` is missing the input — see the known gap in
+  [Implementation status](#implementation-status)).
 - **Headless Service** for gRPC *callees* (`clusterIP: None`) enables
   client-side `round_robin` (§3). HTTP callees (`grpc.enabled` unset) are untouched.
 - **Env convention:** `*_GRPC_ADDR`, e.g.
-  `AUTH_GRPC_ADDR=dns:///auth-grpc.auth.svc.cluster.local:9090`. The `dns:///`
-  scheme is what activates the gRPC name resolver for `round_robin`.
+  `SHIPPING_GRPC_ADDR=dns:///shipping-grpc.shipping.svc.cluster.local:9090`. The
+  `dns:///` scheme is what activates the gRPC name resolver for `round_robin`.
 - **Probes stay HTTP** — `/health` + `/ready` on `:8080`. The gRPC server shares
   the pod process, so the HTTP probes already reflect gRPC health; the chart adds
   no grpcurl probe.
@@ -383,7 +386,7 @@ flowchart LR
 ### Per-hop transport
 
 Every east-west hop is **gRPC-only** today (solid green, `:9090`); the browser/Kong
-edge and the order→cart cart-read stay HTTP/JSON.
+edge and the two order→cart hops (pricing read, internal cart-clear) stay HTTP/JSON.
 
 ```mermaid
 flowchart TD
@@ -397,18 +400,20 @@ flowchart TD
     K -->|HTTP :8080| PAYMENT[payment]
 
     %% All east-west hops are gRPC-only (:9090)
-    ORDER ==>|"gRPC shipment"| SHIP[shipping]
+    ORDER ==>|"gRPC shipment read"| SHIP[shipping]
     PRODUCT ==>|"gRPC reviews"| REVIEW
-    ORDER ==>|"gRPC publish"| NOTIF
-    ORDER ==>|"gRPC payment"| PAYMENT
-    WORKER[order-worker] ==>|"gRPC saga"| PAYMENT
+    ORDER ==>|"gRPC payment read"| PAYMENT
+    WORKER[order-worker] ==>|"gRPC saga money"| PAYMENT
     WORKER ==>|"gRPC stock"| PRODUCT
+    WORKER ==>|"gRPC shipment lifecycle"| SHIP
+    WORKER ==>|"gRPC emails"| NOTIF
 
     %% Not migrated / candidate
-    ORDER -. "REST cart read" .-> CART
+    ORDER -. "REST cart pricing read" .-> CART
+    WORKER -. "REST internal cart-clear" .-> CART
     AUTH -. "proto-only candidate" .-> USER[user]
 
-    linkStyle 8,9,10,11,12,13 stroke:#1f7a33,stroke-width:3px
+    linkStyle 8,9,10,11,12,13,14 stroke:#1f7a33,stroke-width:3px
     classDef live fill:#e6f4ea,stroke:#1f7a33,color:#0d3d18
     class SHIP,REVIEW,NOTIF,PAYMENT,PRODUCT live
 ```
@@ -488,4 +493,4 @@ flowchart TD
 
 ---
 
-_Last updated: 2026-07-02 — implemented, gRPC-only east-west (footer added 2026-07-07)._
+_Last updated: 2026-07-10 — stale auth-gRPC remnants removed (diagram, env-var and InputProvider examples); hop tables/diagram completed with the order-worker saga hops (stock, shipment lifecycle, emails) and the tokenless internal cart-clear; flagged the missing `grpc_server` input on `rsip-product`._

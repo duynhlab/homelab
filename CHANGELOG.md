@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **platform docs setup/cicd drift**: `make up` order corrected (`flux-push`
+  before `flux-up`, quick-start + detailed steps); VictoriaMetrics wording
+  (no Prometheus server); temporal-db in the expected state; caching/mcp
+  Kustomizations added to the dependency graph; cicd.md gains payment +
+  the multi-level image naming + CRITICAL-only scan-gate alignment;
+  graceful-shutdown table gains payment; kyverno chart pin 3.8.1 + current
+  Audit-mode annotation; application-delivery layout gains mockpay +
+  order-worker; `setup-hosts.sh` + docs gain `victoriatraces.duynh.me`.
 - **kong/security docs drift**: `jwt-edge` counted and marked Active
   (10 KongClusterPlugins, ADR-006 defense-in-depth note); redis
   rate-limiting marked done in the roadmap; user/review ingress rows

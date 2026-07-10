@@ -79,7 +79,9 @@ kubernetes/apps/
 │   ├── payment.yaml               # labels: domain=checkout
 │   ├── notification.yaml          # labels: domain=comms
 │   └── shipping.yaml              # labels: domain=comms
-└── frontend-rs.yaml               # rs-frontend (standalone, inline inputs)
+├── frontend-rs.yaml               # rs-frontend (standalone, inline inputs)
+├── mockpay.yaml                   # standalone HelmRelease — mock payment provider (payment ns)
+└── order-worker.yaml              # standalone HelmRelease — Temporal saga worker (order ns)
 ```
 
 Flux Kustomization with `path: ./` auto-discovers all YAML files recursively.
@@ -260,7 +262,7 @@ To enable automatic semver-based rollouts, define a `ResourceSetInputProvider` o
 | **Blast radius** | ~25% (one domain) |
 | **Merge conflicts** | None (1 file per service) |
 | **Onboarding time** | < 5 min (create InputProvider + push) |
-| **Health granularity** | 1 check per domain (5 total) |
+| **Health granularity** | 1 check per domain (5 total); `mockpay` + `order-worker` are standalone HelmReleases outside the domain checks |
 | **Team autonomy** | Full (each service owns its InputProvider) |
 
 ### Beyond 50 Services: Further Scaling
@@ -328,4 +330,4 @@ flux reconcile kustomization apps-local -n flux-system
 
 ---
 
-_Last updated: 2026-07-07_
+_Last updated: 2026-07-10 — file layout completed with the standalone mockpay + order-worker HelmReleases._

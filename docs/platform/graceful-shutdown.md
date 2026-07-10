@@ -1,7 +1,7 @@
 # Graceful Shutdown
 
 > **Document Status:** Production  
-> **Last Updated:** 2026-01-28
+> **Last Updated:** 2026-07-10 (payment added to the config table; pattern re-verified against the current zap/OTLP services)
 
 ---
 
@@ -256,6 +256,7 @@ All services use consistent settings via Helm values:
 | review | 5s | 10s | 30 |
 | notification | 5s | 10s | 30 |
 | shipping | 5s | 10s | 30 |
+| payment | 5s | 10s | 30 |
 
 ---
 

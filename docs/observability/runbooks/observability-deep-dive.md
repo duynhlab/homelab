@@ -4,7 +4,7 @@
 >
 > **Audience**: SRE/DevOps engineers preparing for interviews or onboarding to this platform.
 >
-> **Last Updated**: 2026-07-09
+> **Last Updated**: 2026-07-10 (logs pillar dual-path OTLP+Vector; `CNPGClusterOffline` naming; burn-rate windows aligned with Sloth)
 
 ---
 
@@ -143,7 +143,7 @@ Source: [`kubernetes/infra/configs/monitoring/prometheusrules/postgres/`](../../
 | **Saturation** | `PostgresConnectionSaturation` (>80%) | `current_connections / max_connections > 0.8` |
 | **Saturation** | in-flight request gauge | **removed** — no OTel equivalent (see note below) |
 | **Errors** | `PostgresDown` | `pg_up == 0` |
-| **Errors** | `CnpgDown` | `cnpg_collector_up == 0` |
+| **Errors** | `CNPGClusterOffline` | `cnpg_collector_up == 0` |
 | **Errors** | `PostgresReplicationLagHigh` | `pg_replication_lag > 30` |
 
 > **In-flight saturation gauge removed (RFC-0014).** The old `requests_in_flight` gauge had **no OpenTelemetry equivalent** — `otelgin` v0.69 does not emit `http_server_active_requests` (verified live 2026-07-09). The gauge and its in-flight saturation alerts retired with the `/metrics` scrape; restoring an active-request signal is blocked upstream. Service-side saturation is now inferred from Go runtime metrics instead.
@@ -152,7 +152,7 @@ Alert groups organized by USE category:
 
 | Alert Group | USE Signal | Alerts |
 |-------------|-----------|--------|
-| `postgres-availability` | Errors | `PostgresDown`, `CnpgDown`, `PostgresReplicationLagHigh`, `PostgresReplicationLagCritical`, `CnpgClusterFenced` |
+| `postgres-availability` | Errors | `PostgresDown`, `CNPGClusterOffline`, `PostgresReplicationLagHigh`, `PostgresReplicationLagCritical`, `CnpgClusterFenced` |
 | `postgres-performance` | Utilization + Saturation | `PostgresConnectionSaturation`, `PostgresConnectionSaturationCritical`, `PostgresLockContention` |
 | `postgres-storage` | Utilization | `PostgresDatabaseSizeLarge`, `PostgresWALSizeHigh` |
 | `postgres-maintenance` | Saturation | `PostgresDeadTuplesHigh`, `PostgresCheckpointsTooFrequent` |
@@ -194,9 +194,9 @@ flowchart TD
     end
 
     subgraph logs ["Pillar 3: Logs"]
-        Vector["Vector\n(DaemonSet)"] --> VLSingle["VLSingle\n(:9428)"]
+        Vector["Vector\n(DaemonSet,\nnon-instrumented pods)"] --> VLSingle["VLSingle\n(:9428)"]
     end
-    OTel -.->|"Kong runtime logs"| VLSingle
+    OTel -.->|"app logs (zap tee, P4)\n+ Kong runtime logs"| VLSingle
 
     subgraph profiles ["Pillar 4: Profiles"]
         Pyroscope["Pyroscope\n(:4040)"]
@@ -204,7 +204,7 @@ flowchart TD
 
     S --> middleware
     M1 -.->|"OTLP traces + metrics HTTP :4318"| OTel
-    M2 -.->|"stdout JSON"| Vector
+    M2 -.->|"OTLP logs (zap tee)"| OTel
     S -.->|"pprof push"| Pyroscope
     OTel -.->|"OTLP metrics"| VMAgent
 
@@ -219,7 +219,7 @@ flowchart TD
 |--------|------|----------|---------------------|
 | **Metrics** | VMSingle + VMAgent | OTLP push (app metrics); scrape (pull) for infra exporters | "Is something wrong?" (RED/USE signals) |
 | **Traces** | Tempo + Jaeger (+ VictoriaTraces pilot) via OTel Collector | OTLP HTTP (push) | "Where is it slow?" (cross-service latency) |
-| **Logs** | VictoriaLogs via Vector | JSON over stdout (push) | "Why is it broken?" (error details, context) |
+| **Logs** | VictoriaLogs — app logs via OTLP tee (P4); Vector for non-instrumented pods | OTLP push + jsonline | "Why is it broken?" (error details, context) |
 | **Profiles** | Pyroscope | pprof push | "Which code line is the bottleneck?" (CPU/memory flamegraphs) |
 
 ### Why 4 Pillars, Not Just Metrics
@@ -294,7 +294,7 @@ sequenceDiagram
   - No in-flight/active-request gauge -- `otelgin` v0.69 does not emit `http_server_active_requests` (saturation now comes from Go runtime metrics)
 
 **LoggingMiddleware** outputs:
-- Structured JSON to stdout (collected by Vector -> VictoriaLogs)
+- Structured zap output, teed over OTLP to VictoriaLogs (Vector collects only non-instrumented pods)
 - Every log line includes: `trace_id`, `method`, `path`, `status`, `duration`, `client_ip`
 - ERROR-level for 4xx/5xx, INFO-level for successful requests
 
@@ -349,8 +349,8 @@ Following Google SRE best practice, alerts fire based on **burn rate** across **
 
 | Alert Type | 1h Burn Rate | 6h Burn Rate | Time to Budget Exhaustion | Action |
 |------------|-------------|-------------|---------------------------|--------|
-| **Page** (critical) | 15x | 6x | ~2 days | Wake someone up |
-| **Ticket** (warning) | 4x | 2x | ~7 days | Fix within 24h |
+| **Page** (critical) | 14.4x (5m/1h) | 6x (30m/6h) | ~2 days | Wake someone up |
+| **Ticket** (warning) | 6x (30m/6h) | 1x (2h/1d) | ~7 days | Fix within 24h |
 
 **Burn rate calculation**:
 ```
@@ -377,7 +377,7 @@ In addition to SLO burn-rate alerts, static threshold alerts provide **fast dete
 
 | Group | Alerts | Severity | Framework |
 |-------|--------|----------|-----------|
-| **Availability** | `MicroserviceDown`, `MicroserviceAllInstancesDown`, `MicroserviceHighRestartRate` | critical/warning | Golden: Errors |
+| **Availability** | `MicroserviceDown`, `MicroserviceAllInstancesDown`, `KubePodCrashLooping` | critical/warning | Golden: Errors |
 | **Errors** | `MicroserviceHighErrorRate` (>5%), `MicroserviceErrorRateCritical` (>15%), `MicroserviceNoSuccessfulRequests` | warning/critical | RED: Errors |
 | **Latency** | `MicroserviceHighLatencyP95` (>1s), `MicroserviceHighLatencyP99` (>2s), `MicroserviceLatencyCritical` (P95>2s) | warning/critical | RED: Duration |
 | **Traffic** | `MicroserviceNoTraffic`, `MicroserviceApdexCritical` (<0.5) | warning | RED: Rate |
@@ -392,7 +392,7 @@ Dedicated PostgreSQL alerts cover database infrastructure health:
 
 | Group | Alerts | Severity |
 |-------|--------|----------|
-| **Availability** | `PostgresDown`, `CnpgDown`, `PostgresReplicationLagHigh/Critical`, `CnpgClusterFenced` | critical/warning |
+| **Availability** | `PostgresDown`, `CNPGClusterOffline`, `PostgresReplicationLagHigh/Critical`, `CnpgClusterFenced` | critical/warning |
 | **Performance** | `PostgresConnectionSaturation`, `PostgresConnectionSaturationCritical`, `PostgresLockContention` | warning/critical |
 | **Storage** | `PostgresDatabaseSizeLarge`, `PostgresWALSizeHigh` | warning |
 | **Maintenance** | `PostgresDeadTuplesHigh`, `PostgresCheckpointsTooFrequent` | warning |

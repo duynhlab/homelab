@@ -37,7 +37,7 @@ pilot (see [victoriatraces.md](victoriatraces.md)).
 | Ingestion | OTLP, Jaeger, Zipkin | OTLP (v2), Jaeger, Zipkin | **OTLP only** |
 | Query | **TraceQL** (scoped attrs + structural operators `>>`/`~`) | tag / duration / service filters (no query language) | **LogsQL** + **Jaeger query API** — **no TraceQL** |
 | Grafana | **Native datasource** + traces↔logs↔metrics↔profiles correlation | Jaeger datasource / standalone UI | via the **Jaeger datasource** (no native VT datasource) |
-| Service graph / span metrics | metrics-generator → remote_write to VM | dependency graph; SPM (needs a metrics backend) | built-in service-graph generation |
+| Service graph / span metrics | metrics-generator configured but **inert** (`remote_write: []` — writes nowhere) | dependency graph; SPM (needs a metrics backend) | built-in service-graph generation |
 | Operator on this platform | Helm/manifests | Helm chart (all-in-one) | **`VTSingle`/`VTCluster` CRDs** — drop-in to the **VictoriaMetrics Operator** |
 | Correlation sweet spot | single-pane Grafana across all 4 pillars | own UI | tightest **log↔trace** (traces *are* VictoriaLogs data, same LogsQL) |
 

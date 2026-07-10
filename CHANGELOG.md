@@ -20,6 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CNPG doc links 1.29 → 1.30; exporter versions refreshed in the infra
   databases READMEs; add-service runbook pg_hba wording → present tense.
 
+- **observability docs OTLP drift**: dropped the fictional spanmetrics
+  connector and retired `ServiceMonitor/microservices-api` references
+  (OTLP push since RFC-0014 P3); RFC-0014 README + explainer corrected to
+  the landed reality (no checkout exemption/fence — ADR-016, now linked;
+  status → implemented); alert layers/counts fixed (node/pod Implemented,
+  PG 34, 149 static); Tempo metrics-generator marked inert
+  (`remote_write: []`); VictoriaLogs wording → VLSingle CRD; runbooks:
+  dual-path logs, `CNPGClusterOffline`, HighRestartRate retired, D-14
+  re-attributions, Sloth burn-rate windows.
 - **secrets docs accuracy**: operational OpenBAO examples corrected to the
   deployed `http://` endpoint (TLS is RFC-0008, planned) and the target
   `https`/`caBundle` shape labeled planned; OpenBAO-namespace field replaced by
@@ -29,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `rsip-product` so the mop chart renders the `product-grpc` headless Service
   that order-worker's saga stock steps dial; refresh stale manifest comments
   (temporal PrometheusRule PodMonitor reference, PSS "8 microservices").
+
 ### Changed
 
 - **docs/api accuracy sweep + feature matrix**: `microservices.md` rebuilt as a

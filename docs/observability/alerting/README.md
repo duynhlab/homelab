@@ -60,7 +60,7 @@ flowchart TD
 
 ### Current State
 
-- Stages 1-4 are fully operational (29+ threshold alerts, 48 SLO burn-rate alerts).
+- Stages 1-4 are fully operational (149 static alerts, 48 Sloth SLO burn-rate alerts — see the [alert catalog](alert-catalog.md)).
 - Stage 5 (VMAlertmanager) routes by severity to `slack-default` (`#alerts`) and `slack-critical` (`#alerts-critical`), with `watchdog-null` for the Watchdog and inhibition rules to suppress cascades. **Caveat:** `slack_api_url` is a committed placeholder (`<SLACK_WEBHOOK_URL>`), so no notifications actually deliver until it is set — ideally injected via External Secrets / OpenBAO rather than inlined in `configRawYaml`.
 - Stage 6: Grafana provides read-only rule visibility via `vmalert.proxyURL`. **Karma** is the dedicated alert dashboard (reads VMAlertmanager API directly). Slack receivers are wired (webhook URL pending injection); PagerDuty is planned.
 
@@ -252,12 +252,12 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 | Phase | Scope | Status |
 |-------|-------|--------|
 | Layer 1: Application alerts | 16 alerts (RED + gRPC + Golden Signals) | Implemented |
-| Layer 1: PostgreSQL alerts | 14 alerts (availability, performance, storage) | Implemented |
+| Layer 1: PostgreSQL alerts | 34 alerts (24 CNPG + 10 Zalando — availability, performance, storage, backups) | Implemented |
 | Layer 2: SLO alerts | 48 alerts (8 services x 3 SLOs x 2 severities) | Implemented |
 | Alert dashboard | Karma reading VMAlertmanager API | Implemented |
 | Layer 1: Database connection pool | PgBouncer/PgDog saturation alerts | Planned |
-| Layer 1: Infrastructure | Node CPU/memory/disk pressure | Planned |
-| Layer 1: Kubernetes | Pod OOM, CrashLoopBackOff, pending pods | Planned |
+| Layer 1: Infrastructure | Node memory/disk/PID pressure, NotReady, unschedulable | Implemented (`kubernetes/node-alerts.yaml`) |
+| Layer 1: Kubernetes | Pod OOM, CrashLoopBackOff, pending pods | Implemented (`kubernetes/pod-resources-alerts.yaml`, `workload-alerts.yaml`) |
 | Integration | Slack routing in VMAlertmanager (severity-based receivers) | Wired (webhook URL placeholder — inject via secret) |
 | Integration | PagerDuty routing in VMAlertmanager | Planned |
 
@@ -276,4 +276,4 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 
 ---
 
-_Last updated: 2026-07-09_
+_Last updated: 2026-07-10 — node/pod/k8s alert layers flipped to Implemented; PostgreSQL count 34; totals aligned with the alert catalog (149 + 48 Sloth)._

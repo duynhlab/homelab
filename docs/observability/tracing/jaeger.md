@@ -28,7 +28,7 @@ make sync
 |---------|--------|-------|
 | **UI** | Standalone, feature-rich | Via Grafana |
 | **Query Language** | Service + Tags | TraceQL (powerful) |
-| **Service Graph** | Built-in dependency graph | Via metrics-generator |
+| **Service Graph** | Built-in dependency graph | Via metrics-generator (configured but inert — `remote_write: []`) |
 | **Compare Traces** | Built-in compare feature | Not available |
 | **Trace Timeline** | Detailed, expandable | Basic in Grafana |
 | **Storage** | Memory, Badger, ES, Cassandra | Local, S3, GCS, Azure |

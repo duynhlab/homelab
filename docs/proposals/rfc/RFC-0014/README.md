@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | platform-wide | 2026-07-08 | 2026-07-08 |
+| implemented (live-cluster drill pending) | platform-wide | 2026-07-08 | 2026-07-10 |
 
 > **Don't forget: every decision is a tradeoff.** This RFC deliberately accepts
 > a large, measured blast radius (every metrics consumer is renamed) in
@@ -22,8 +22,9 @@ names adopted immediately**. Metrics land in VictoriaMetrics via its OTLP
 ingest (through vmagent, so relabeling and stream aggregation keep their
 single choke point), logs land in VictoriaLogs with `trace_id` as a real
 queryable field (fixing the platform's broken log↔trace correlation), traces
-keep flowing to Tempo. `checkout-service` is exempt and stays on the legacy
-path behind a fenced `legacy-checkout` surface.
+keep flowing to Tempo. (The originally planned `checkout-service` exemption
+was dropped at P3 landing — the service was never integrated in-cluster, so
+there was nothing to fence; see [ADR-016](../../adr/ADR-016-otel-metrics-cutover/).)
 
 ## Motivation
 
@@ -66,8 +67,8 @@ Three forces converge:
 
 ### Non-Goals
 
-- `checkout-service` migration (exempt; fenced legacy surface, zero changes in
-  that repo).
+- `checkout-service` migration (moot at landing — the service was never
+  integrated in-cluster; the planned fence was dropped, ADR-016).
 - VMSingle → VMCluster, retention/downsampling changes.
 - An exemplar-capable TSDB path (accepted loss; correlation via logs+traces).
 - New business/DB/cache instrumentation (tracked separately).
@@ -162,13 +163,11 @@ and logs pipelines already exist there):
 ```mermaid
 flowchart LR
     S9["9 services + order-worker<br/>OTLP :4318"] --> RCV["otel-collector (Deployment ×1, 512Mi)<br/>metrics: memory_limiter → deltatocumulative → batch<br/>logs / traces: memory_limiter → batch"]
-    CHK["checkout-service (EXEMPT)"]
     RCV -->|"otlphttp proto"| VMA["vmagent :8429 /opentelemetry/v1/metrics<br/>-opentelemetry.usePrometheusNaming<br/>-opentelemetry.promoteResourceAttributes=allowlist<br/>relabel: service_name→app, k8s_namespace_name→namespace<br/>streamAggr (RFC-0013 P3)"]
     VMA --> VMS[("VMSingle")]
     RCV -->|"otlphttp proto<br/>VL-Stream-Fields:<br/>service.name,k8s.namespace.name"| VL[("VictoriaLogs<br/>trace_id = queryable field")]
     RCV -->|otlp| TMP["Tempo (+Jaeger, VictoriaTraces)"]
-    CHK -->|"scrape (trimmed ServiceMonitor)"| VMA
-    CHK -->|stdout| VEC["Vector DaemonSet<br/>(non-app pods only after P4)"] --> VL
+    VEC["Vector DaemonSet<br/>(non-app pods only after P4)"] --> VL
     INF["infra exporters: ksm, kong,<br/>DBs, cAdvisor — scrape stays"] --> VMA
     VMS & VL & TMP --> GRAF["Grafana · vmalert · Sloth"]
 ```
@@ -191,7 +190,7 @@ flowchart LR
 | D-10 | grpcx | `otelgrpc.WithFilter` (health + reflection RPCs stop minting series/spans) + Views dropping `server.address`/`server.port` on client metrics (pod-IP churn). |
 | D-11 | pkg/metricsx tracker | **Superseded** → `pkg/obsx` v2 `SetupObservability` absorbs prometheus + tracing + logging + resource init (same root cause, wider seam; kills the ×9 duplication). |
 | D-12 | Loggers | Converge on **zapx + otelzap bridge**; `clog` retired, `zerolog` frozen (checkout-only import). 7/9 services are already zapx — smallest blast radius; OTLP normalizes the record shape so the 3-schema drift cannot recur. |
-| D-13 | checkout exemption | ServiceMonitor trimmed to select only checkout (keeps `job="microservices"`); old-name alert/rule group retained scoped `app="checkout-service"` in a fenced `legacy-checkout` group with a documented retirement condition; Vector keeps its stdout. Zero changes in the checkout repo. |
+| D-13 | checkout exemption | **Amended at P3 landing (ADR-016):** checkout-service was never integrated in-cluster, so the ServiceMonitor was deleted outright and no `legacy-checkout` fence exists. (Original plan: trim the ServiceMonitor to checkout + keep a fenced old-name group.) |
 | D-14 | Exemplars | Accept the loss on the VictoriaMetrics path (upstream won't-fix; they were already dead end-to-end). Correlation = `trace_id` in logs + Tempo. Docs updated to say so. |
 
 ### Metric mapping (old → semconv → PromQL-visible)
@@ -227,9 +226,9 @@ streamAggr pattern · ServiceMonitor + order-worker PodMonitor retired.
 | **P0 — pkg obsx v2 + policy page ✅** | `SetupObservability(ctx, cfg)`: Resource (Downward API env), TracerProvider (unchanged), MeterProvider (15 s reader + Views), LoggerProvider + otelzap tee, `runtime.Start`, one shutdown; grpcx `WithFilter`; temporalx `OnError`; metrics/logs providers behind `OTEL_METRICS_ENABLED` / `OTEL_LOGS_ENABLED` (default **off**). Rewrite `docs/observability/opentelemetry.md` as the policy page (semconv v1.41 invariant, bucket sets, allowlist, cardinality posture, "never set `OTEL_SEMCONV_STABILITY_OPT_IN`"). *Exit: pkg release tagged; unit tests prove the Views (13-bucket set applied, `server.address` dropped). Rollback: don't bump the dep.* | pkg, homelab (docs) |
 | **P1 — dual-emit metrics** *(local-stack ✅ 2026-07-09: 9 service PRs + collector/VM pipeline + env fleet-wide, canary e2e-verified; cluster still pending — mop Downward API envs `K8S_NAMESPACE_NAME`/`K8S_POD_NAME` + values flip)* | Services bump pkg + set `OTEL_METRICS_ENABLED=true`; client_golang middleware and `/metrics` untouched — **both pipelines live**. Homelab: collector metrics pipeline; vmagent D-1/D-2 flags + D-3 relabel; Downward API env into the mop values. **Ordering: vmagent flags land and one canary service is verified before the fleet.** *Exit: `http_server_request_duration_seconds_bucket{app=…}` with 13 buckets + app/namespace labels; series delta ≈ 2× app series, zero churn labels, no `otel.metric.overflow`. Rollback: env flip per service.* | 9 service repos, homelab, helm-charts |
 | **P2 — consumer migration (side-by-side)** *(✅ 2026-07-09 — copies authored+verified on live series; soak compressed by owner decision, see ADR-016)* | New-name copies: 17 alerts (memory alert → cAdvisor; D-4 absence alerts authored, inactive), 15 recording rules (new record names), mop `slo.yaml` SLIs → Sloth regeneration, dashboard panels + template variables (re-keyed off `go_goroutine_count`), **new gRPC east-west alert pair + dashboard row** (the transport finally gets monitoring — on the names that will survive). Old + new groups evaluate together; new-name alerts route to a staging receiver. *Exit: ≥ 1 week soak with old-vs-new p95 / error-ratio / burn-rate agreeing within tolerance. Rollback: delete new groups.* | homelab, helm-charts, grafana-dashboards |
-| **P3 — metrics cutover** *(config cutover ✅ 2026-07-09, ADR-016 — D-13 amended at landing: checkout never integrated, fence dropped; pod-kill drill + Sloth window at next `make up`; code-removal wave pending)* | Retire the apps' ServiceMonitor (trim to checkout, D-13) + order-worker PodMonitor; activate D-4 alerts **in the same commit**; retire old-name groups (except `legacy-checkout`). *Later, separate PR wave:* remove client_golang middleware + `/metrics` + the otelprom bridge from services and pkg — deferring code removal is deliberate: re-applying the ServiceMonitor stays a one-file rollback until then. *Exit: no `request_duration_seconds` ingested for `app!="checkout-service"`; **pod-kill test proves the new liveness alert fires**; one full Sloth window on new SLIs. Spawns an ADR (next free number at landing time; ADR-013…015 are taken by RFC-0012) recording the cutover decisions.* | homelab, then 9 repos + pkg |
+| **P3 — metrics cutover** *(config cutover ✅ 2026-07-09, ADR-016 — D-13 amended at landing: checkout never integrated, fence dropped; pod-kill drill + Sloth window at next `make up`; code-removal wave pending)* | Retire the apps' ServiceMonitor (trim to checkout, D-13) + order-worker PodMonitor; activate D-4 alerts **in the same commit**; retire old-name groups (except `legacy-checkout`). *Later, separate PR wave:* remove client_golang middleware + `/metrics` + the otelprom bridge from services and pkg — deferring code removal is deliberate: re-applying the ServiceMonitor stays a one-file rollback until then. *Exit: no `request_duration_seconds` ingested for `app!="checkout-service"`; **pod-kill test proves the new liveness alert fires**; one full Sloth window on new SLIs. Spawned [ADR-016](../../adr/ADR-016-otel-metrics-cutover/) recording the cutover decisions.* | homelab, then 9 repos + pkg |
 | **P4 — logs wave** *(✅ 2026-07-09 — logger convergence + OTLP-logs tee ×9 + gRPC access-log interceptor; `trace_id:"<id>"` returns app logs in VictoriaLogs, verified local-stack; cluster Vector label-exclusion + Tempo re-point landed, live check at next `make up`)* | auth (zerolog→zapx) and cart (clog→zapx) converge first; then per-service `OTEL_LOGS_ENABLED=true` (otelzap tee → OTLP → VictoriaLogs with `VL-Stream-Fields`) + a pod label excluding that pod's stdout from Vector (no double ingestion); stdout JSON kept for `kubectl logs`; 4xx log-level policy unified. Tempo `tracesToLogsV2` re-pointed at the real `trace_id` field; runbooks updated. *Exit: `trace_id:"<id>"` returns the request's app logs; volume within ±10% of the Vector baseline; no duplicate lines. Rollback: env flip + drop the pod label — Vector resumes instantly.* | pkg, 9 repos, homelab |
-| **P5 — cleanup + docs sweep** *(✅ 2026-07-09 — docs swept to semconv names, exemplar claims corrected to the trace_id-in-logs reality, legacy dashboard deleted; dead middleware already removed in the P3 code-removal wave)* | 19 docs files / 140 lines re-pointed to the new names; exemplar claims corrected; RFC-0013 P3 streamAggr pattern rewritten to `http_server_request_duration_seconds.*`; dead middleware deleted ×9; CHANGELOG; `legacy-checkout` fence documented with its retirement condition. *Exit: `grep -r request_duration_seconds` hits only `legacy-checkout` + historical RFC text.* | homelab, 9 repos |
+| **P5 — cleanup + docs sweep** *(✅ 2026-07-09 — docs swept to semconv names, exemplar claims corrected to the trace_id-in-logs reality, legacy dashboard deleted; dead middleware already removed in the P3 code-removal wave)* | 19 docs files / 140 lines re-pointed to the new names; exemplar claims corrected; RFC-0013 P3 streamAggr pattern rewritten to `http_server_request_duration_seconds.*`; dead middleware deleted ×9; CHANGELOG. *Exit: `grep -r request_duration_seconds` hits only historical RFC/ADR text (no fence exists — ADR-016).* | homelab, 9 repos |
 
 ### Enabling / disabling
 
@@ -347,8 +346,8 @@ one PR wave.
   alive); its match pattern is rewritten in P5. RFC-0013 P4's manifest-header
   sweep folds into P5 here.
 - **Consumers checklist**: [tracking.md](tracking.md).
-- **ADRs**: the P3 cutover spawns an ADR (per the ADR-when-phase-lands
-  policy; numbered at landing time — ADR-013…015 already belong to RFC-0012).
+- **ADRs**: the P3 cutover spawned
+  [ADR-016 — OTel metrics cutover](../../adr/ADR-016-otel-metrics-cutover/).
 - Docs to be produced: P0 rewrites
   [`docs/observability/opentelemetry.md`](../../../observability/opentelemetry.md)
   as the instrumentation policy page; every phase updates the affected

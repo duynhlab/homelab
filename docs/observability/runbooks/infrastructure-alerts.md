@@ -10,7 +10,7 @@
 > - [`kubernetes/apiserver-alerts.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/kubernetes/apiserver-alerts.yaml)
 > - [`kubernetes/network-rules.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/kubernetes/network-rules.yaml)
 >
-> **Last Updated**: 2026-03-31
+> **Last Updated**: 2026-07-10 (content re-verified against the deployed node/pod/workload alert rules)
 
 ---
 

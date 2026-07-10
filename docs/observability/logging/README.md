@@ -88,8 +88,8 @@ flowchart LR
 handles only the workloads OTel can't instrument. Vector still runs two pipelines
 of its own — the *infra* pipeline (label + ship) and the *PostgreSQL* pipeline
 (extract `auto_explain` execution plans into their own stream) — and the
-VictoriaLogs Helm chart's embedded collector stays **disabled** so Vector remains
-the single agent for that path. App pods are excluded from Vector by label
+VictoriaLogs itself is the operator-managed `VLSingle` CRD (no Helm-chart
+collector is deployed), so Vector remains the single agent for that path. App pods are excluded from Vector by label
 (`platform.duynhlab.dev/otlp-logs=true`), which is the double-ingest guard.
 Pipeline internals, sink headers, and stream definitions are in
 [`victorialogs.md`](victorialogs.md).

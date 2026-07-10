@@ -82,7 +82,7 @@ flowchart TB
 | **Operator** | CloudNativePG | `apiVersion: postgresql.cnpg.io/v1` |
 | **Instances** | 3 (1 primary + 1 sync replica + 1 async replica) | `spec.instances: 3` |
 | **Replication** | Synchronous replication: 1 sync + 1 async replica | `postgresql.synchronous` (`method: any`, `number: 1`, `dataDurability: required`) |
-| **Databases** | product, cart, order | Consolidated cluster (`spec.bootstrap` / prepared DBs) |
+| **Databases** | product, cart, order, payment | Consolidated cluster (`spec.bootstrap` / prepared DBs) |
 | **shared_buffers** | 256MB | `postgresql.parameters.shared_buffers` |
 | **max_connections** | 200 | `postgresql.parameters.max_connections` |
 | **wal_buffers** | 16MB | `postgresql.parameters.wal_buffers` |
@@ -939,12 +939,12 @@ spec:
 
 ### Scaling Reads
 
-PgDog fronts **three application databases** on this cluster — **product**, **cart**, and **order** — with **read/write splitting** (writes to the primary RW service, reads routed to replicas where configured per pool).
+PgDog fronts **four application databases** on this cluster — **product**, **cart**, **order**, and **payment** — with **read/write splitting** (writes to the primary RW service, reads routed to replicas where configured per pool).
 
 | Strategy | How | Complexity | cnpg-db Status |
 |----------|-----|------------|-------------------|
 | **Read replicas** | Route SELECTs to replicas | Low | **Available** (1 sync + 1 async standby) |
-| **PgDog read routing** | PgDog pools use CNPG `-rw` / read services for R/W split | Low | **Configured** (multi-database: product, cart, order) |
+| **PgDog read routing** | PgDog pools use CNPG `-rw` / read services for R/W split | Low | **Configured** (multi-database: product, cart, order, payment) |
 | **Connection pooling** | Reduce connection overhead | Low | **Configured** (PgDog) |
 
 ### Scaling Writes

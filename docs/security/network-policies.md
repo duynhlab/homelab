@@ -14,7 +14,7 @@
   the net effect is: *only* the namespaces named in `allow-internal-callers` can
   reach the pods on `:8080`; everything else is dropped.
 - The allowlist is **per-callee** and follows the real call graph — `auth` accepts
-  the original eight services (they fetch the JWKS from `/auth/v1/public/jwks`), while
+  all nine services incl. payment (they fetch the JWKS from `/auth/v1/public/jwks`), while
   `shipping` accepts only `kong` + `order`, and `payment` (the 9th service) is the
   tightest: `kong`→`:8080` only, `order`→`:9090` only, plus intra-ns `payment`↔`mockpay`.
 - **kindnet enforces NetworkPolicy** (verified on Kind K8s 1.34.3). These policies
@@ -64,7 +64,7 @@ allowed (north-south gateway traffic); the rest mirror the east-west call graph.
 
 | Callee | Allowed callers | Why |
 |--------|-----------------|-----|
-| **auth** | `kong` + **the original 8 services** (incl. self) | Every service refreshes the RS256 JWKS from `GET /auth/v1/public/jwks` (`:8080`); JWTs are verified locally. |
+| **auth** | `kong` + **all 9 services** (incl. self and payment) | Every service refreshes the RS256 JWKS from `GET /auth/v1/public/jwks` (`:8080`); JWTs are verified locally. |
 | **user** | `kong` | Browser-only today; no service-to-service caller. |
 | **product** | `kong` | Browser-only; aggregates *outward* to review. |
 | **cart** | `kong`, `order` | `order` reads the cart during checkout. |
@@ -77,11 +77,6 @@ allowed (north-south gateway traffic); the rest mirror the east-west call graph.
 > The matrix is **deny-by-default**: a caller not listed for a callee cannot reach
 > it, even within the cluster. Adding a new east-west call means adding the caller's
 > namespace to the callee's `allow-internal-callers` — not just opening an Ingress.
-
-> **Gap — payment ↛ auth JWKS:** `payment` is **not** in `auth`'s `allow-internal-callers`
-> list (which still enumerates only the original eight). If payment verifies JWTs on
-> its `/private/` routes via a JWKS fetch, add `payment` to `auth.yaml` so it can reach
-> `/auth/v1/public/jwks` through the fence.
 
 ### DB-tier allows
 
@@ -192,4 +187,4 @@ flowchart LR
 
 ---
 
-_Last updated: 2026-07-07_
+_Last updated: 2026-07-10 — stale payment↛JWKS gap removed (auth.yaml admits all 9 namespaces incl. payment)._

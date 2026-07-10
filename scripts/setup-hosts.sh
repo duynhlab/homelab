@@ -25,6 +25,7 @@ HOSTS=(
   vmalert.duynh.me
   karma.duynh.me
   jaeger.duynh.me
+  victoriatraces.duynh.me
   tempo.duynh.me
   pyroscope.duynh.me
   logs.duynh.me

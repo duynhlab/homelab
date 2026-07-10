@@ -33,7 +33,7 @@ The short version:
 
 | Cluster | Operator | Why |
 |---------|----------|-----|
-| `cnpg-db` | CloudNativePG | Primary cluster for product, cart, and order; PostgreSQL 18; sync quorum `ANY 1`; PgDog; backup/PITR; DR replica |
+| `cnpg-db` | CloudNativePG | Primary cluster for product, cart, order, and payment; PostgreSQL 18; sync quorum `ANY 1`; PgDog; backup/PITR; DR replica |
 | `cnpg-db-replica` | CloudNativePG | DR replica cluster following the `cnpg-db` object-store backup/WAL path |
 | `auth-db` | Zalando | 3-node Patroni HA, auto-generated secrets, PgBouncer |
 | `supporting-shared-db` | Zalando | Shared cluster with cross-namespace secrets; currently single-node and documented as a production gap |

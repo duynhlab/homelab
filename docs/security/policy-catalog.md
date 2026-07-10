@@ -22,7 +22,7 @@ Source manifests live in `kubernetes/infra/configs/kyverno/cluster-policies/`.
 Any manifest produced by AI agents for this repo MUST satisfy:
 
 1. **Namespace** explicit and not `default`.
-2. **Image** of the form `ghcr.io/duynhlab/<service>:<sha>` or `:vX.Y.Z`. Never `:latest`.
+2. **Image** of the multi-level form `ghcr.io/duynhlab/<repo>/<image>:<sha>` or `:vX.Y.Z` (e.g. `ghcr.io/duynhlab/product-service/product-service:abc1234`). Never `:latest`.
 3. **resources.requests** for `cpu` and `memory` declared on every container.
 4. **resources.limits.memory** declared (cpu limit is optional but recommended).
 5. **livenessProbe** and **readinessProbe** on the main container.
@@ -63,4 +63,4 @@ diagram, and GitOps wiring live in [`network-policies.md`](network-policies.md).
 
 ---
 
-_Last updated: 2026-07-07_
+_Last updated: 2026-07-10 — image acceptance criterion corrected to the multi-level `<repo>/<image>` shape._

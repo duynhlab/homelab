@@ -8,7 +8,7 @@ Comprehensive guide to deploying the microservices platform using **GitOps**, **
 
 ### Quick Start (Makefile)
 
-- **Bootstrap Environment**: `make up` (cluster-up + flux-up + flux-push)
+- **Bootstrap Environment**: `make up` (cluster-up + flux-push + flux-up — the OCI registry is pushed **before** the Flux bootstrap so the first reconcile finds the manifests)
 - **Synchronize Changes**: `make sync` (flux-push + flux-sync)
 - **Tear Down Environment**: `make down` (cluster-down)
 - **Validate Manifests**: `make validate`
@@ -102,7 +102,26 @@ docker ps | grep homelab-registry
 
 ---
 
-### Step 2: Bootstrap Flux Operator
+### Step 2: Publish Manifests to the OCI Registry
+
+```bash
+make flux-push
+```
+
+**Actions Performed:**
+- Publishes three OCI artifacts to the local registry:
+  - `flux-cluster-sync:local` (Source: `kubernetes/clusters/local/`)
+  - `flux-infra-sync:local` (Source: `kubernetes/infra/`)
+  - `flux-apps-sync:local` (Source: `kubernetes/apps/`)
+
+**Verification:**
+```bash
+docker ps | grep homelab-registry   # registry serving the pushed artifacts
+```
+
+---
+
+### Step 3: Bootstrap Flux Operator
 
 ```bash
 make flux-up
@@ -115,6 +134,12 @@ make flux-up
   from `kubernetes/clusters/local/flux-system/instance.yaml`.
 - Flux then adopts those resources and reconciles steady-state.
 - Awaits readiness of the `FluxInstance` / Flux controllers.
+- Flux then reconciles the pushed artifacts in dependency order:
+  - **Phase 1: Foundation** - Namespaces and Operators (Controllers).
+  - **Phase 2: Security & Monitoring** - OpenBAO/ESO, VictoriaMetrics/Grafana.
+  - **Phase 3: Data Layer** - PostgreSQL Clusters.
+  - **Phase 4: Applications** - Microservices (managed via ResourceSet).
+  - **Phase 5: Reliability** - SLO tracking via Sloth.
 
 > OpenTofu owns only the ephemeral bootstrap mechanism; re-running `make flux-up`
 > with unchanged manifests is a no-op (`make tf-plan` shows zero diff). See
@@ -123,31 +148,6 @@ make flux-up
 **Verification:**
 ```bash
 kubectl get pods -n flux-system
-```
-
----
-
-### Step 3: Deploy Infrastructure and Applications
-
-```bash
-make flux-push
-```
-
-**Actions Performed:**
-- Publishes three OCI artifacts to the local registry:
-  - `flux-cluster-sync:local` (Source: `kubernetes/clusters/local/`)
-  - `flux-infra-sync:local` (Source: `kubernetes/infra/`)
-  - `flux-apps-sync:local` (Source: `kubernetes/apps/`)
-
-- The Flux Operator reconciles resources in the following dependency order:
-  - **Phase 1: Foundation** - Namespaces and Operators (Controllers).
-  - **Phase 2: Security & Monitoring** - OpenBAO/ESO, Grafana/Prometheus.
-  - **Phase 3: Data Layer** - PostgreSQL Clusters.
-  - **Phase 4: Applications** - Microservices (managed via ResourceSet).
-  - **Phase 5: Reliability** - SLO tracking via Sloth.
-
-**Verification:**
-```bash
 make flux-status
 flux get kustomizations --watch
 ```
@@ -178,7 +178,7 @@ kubectl get prometheusservicelevel -n monitoring
 - Namespaces for every domain provisioned (auth, user, product, cart, order, review, notification, shipping, payment, frontend, kong, cert-manager, openbao, external-secrets-system, monitoring, apm, databases-cnpg-system, databases-zalando, kyverno, flux-system, …).
 - 5 ResourceSets (`rs-identity`, `rs-catalog`, `rs-checkout`, `rs-comms`, `rs-frontend`) successfully reconciled.
 - HelmReleases for the 9 microservices + frontend, plus the `mockpay` and `order-worker` releases (in the `payment` / `order` namespaces), in `Ready` state.
-- 3 PostgreSQL clusters (`auth-db`, `supporting-shared-db`, `cnpg-db`) + 1 DR replica (`cnpg-db-replica`) operational.
+- 4 PostgreSQL clusters (`auth-db`, `supporting-shared-db`, `cnpg-db`, `temporal-db`) + 1 DR replica (`cnpg-db-replica`) operational.
 - ClusterIssuers `selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod` Ready; `kong-proxy-tls` Certificate Ready — signed by `homelab-ca` on local Kind (`letsencrypt-prod` on prod).
 
 ---
@@ -194,6 +194,7 @@ All user-facing endpoints go through Kong on `*.duynh.me` (on local Kind, termin
 | Grafana | https://grafana.duynh.me | admin / admin |
 | VictoriaMetrics UI | https://vmui.duynh.me | - |
 | Jaeger UI | https://jaeger.duynh.me | - |
+| VictoriaTraces UI | https://victoriatraces.duynh.me | - |
 | VictoriaLogs UI | https://logs.duynh.me | - |
 | Flux UI | https://ui.duynh.me | - |
 | OpenBAO UI | https://openbao.duynh.me | root token from `openbao-init-keys` secret |
@@ -364,7 +365,7 @@ homelab/
 │   ├── infra/                          # Core infrastructure definitions
 │   │   ├── controllers/                # Operators and CRD definitions
 │   │   │   ├── namespaces.yaml         # Cluster-wide namespace definitions
-│   │   │   ├── monitoring/             # Prometheus and Grafana operators
+│   │   │   ├── monitoring/             # VictoriaMetrics and Grafana operators
 │   │   │   ├── databases/              # Database orchestration operators
 │   │   │   └── slo/                    # Service Level Objective operator
 │   │   ├── configs/                    # Component instances and configurations
@@ -412,7 +413,8 @@ homelab/
 4. `kong-local`: Kong HelmRelease (Depends on `cert-manager-local` — mounts `kong-proxy-tls` Secret as a volume).
 5. `kong-config-local`: KongClusterPlugins + Ingress resources for every host (Depends on `kong-local`).
 6. `monitoring-local`: Deploys observability stack (Depends on `controllers-local`).
-7. `storage-local`: Provisions RustFS (S3) object storage (Depends on `controllers-local`).
+7. `storage-local`: Provisions RustFS (S3) object storage (Depends on `controllers-local`, `secrets-local`).
+7a. `caching-local`: Valkey (product cache-aside db 0 + Kong rate-limit counters db 1 — on the gateway request path) (Depends on `controllers-local`).
 8. `network-policies-local`: Provisions per-namespace NetworkPolicies so operators never race an un-fenced namespace (Depends on `controllers-local`).
 9. `tracing-local`: Deploys Tempo (Depends on `secrets-local`, `storage-local` — kept out of `controllers-local` to avoid a wave deadlock).
 10. `profiling-local`: Deploys Pyroscope (Depends on `secrets-local`, `storage-local` — same rationale as `tracing-local`).
@@ -421,13 +423,14 @@ homelab/
 13. `databases-cnpg-dr-local`: CNPG DR replica (Depends on `databases-local`, `secrets-local`).
 14. `temporal-local`: Temporal server via the temporal-operator (`TemporalCluster` + `TemporalNamespace`), persistence on the CNPG `temporal-db` (Depends on `controllers-local`, `cert-manager-local`, `databases-local`, `monitoring-local`). The `temporal-operator` HelmRelease itself `dependsOn` cert-manager, since its chart renders a cert-manager `Certificate`/`Issuer` for the admission webhook.
 15. `kyverno-policies-local`: Admission policies (Depends on `controllers-local`, `monitoring-local`). See [kyverno.md](kyverno.md).
+15a. `mcp-local`: MCP servers (Depends on `monitoring-local`). See [mcp-servers.md](mcp-servers.md).
 16. `apps-local`: Deploys business logic (the `apps-local` Kustomization `dependsOn` `databases-local`, `monitoring-local`, and `temporal-local` — the `order-worker` dials Temporal at startup, so apps must not deploy until the Temporal cluster is Ready).
 
 ---
 
 For detailed API specifications, refer to [api.md](../api/api.md).  
-For persistence layer details, refer to [database.md](../databases/002-database-integration.md).
+For persistence layer details, refer to [002-database-integration.md](../databases/002-database-integration.md).
 
 ---
 
-_Last updated: 2026-07-07_
+_Last updated: 2026-07-10 — quick-start/step order aligned with the Makefile (`flux-push` before `flux-up`); VictoriaMetrics wording; temporal-db in the expected state; caching/mcp added to the dependency graph; VictoriaTraces host added._

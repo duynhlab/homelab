@@ -48,9 +48,11 @@ edge instead of in every service. Core responsibilities:
 - **An extra network hop** — a little latency in exchange for doing TLS, routing,
   and rate-limiting in one place rather than N.
 - **Edge auth vs. service-side auth** — validating JWTs at the gateway means fewer
-  moving parts but a *second* source of truth. This platform deliberately keeps
-  **auth in the services** (single source of truth, fail-closed) — see
-  [ADR-003](../proposals/adr/ADR-003-jwt-validation-in-services-not-kong/).
+  moving parts but a *second* source of truth. This platform keeps **auth
+  authoritative in the services** (single source of truth, fail-closed —
+  [ADR-003](../proposals/adr/ADR-003-jwt-validation-in-services-not-kong/)),
+  **plus** a coarse edge JWT check on `/private/` routes as defense-in-depth
+  ([ADR-006](../proposals/adr/ADR-006-kong-edge-jwt/), the `jwt-edge` plugin).
 
 In this platform Kong is a **pass-through** gateway: it routes, terminates TLS,
 rate-limits, and adds CORS / security-headers / correlation-id / metrics — but does
@@ -211,7 +213,7 @@ Clear separation of concerns — each domain has a single responsibility:
 | `logs.duynh.me` | VictoriaLogs | No | `ingress-monitoring.yaml` |
 | `ui.duynh.me` | Flux UI | No | `ingress-infra.yaml` |
 | `vm-mcp.duynh.me` | VictoriaMetrics MCP | No | `ingress-mcp.yaml` |
-| *(+ 8 more)* | See README.md | No | Various |
+| *(+ more: victoriatraces, tempo, pyroscope, karma, …)* | See `scripts/setup-hosts.sh` (authoritative host list) | No | Various |
 
 ### Why Separate Frontend and API Domains?
 
@@ -480,18 +482,18 @@ flowchart LR
 
 Kong has 80+ bundled plugins. Here's what's relevant for this project:
 
-#### Authentication (Future)
+#### Authentication
 
-| Plugin | Use Case | Complexity |
-|--------|----------|------------|
-| `key-auth` | API key authentication | Low |
-| `jwt` | JWT validation at gateway level | Medium |
-| `oauth2` | Full OAuth2 flow | High |
-| `basic-auth` | Username/password | Low |
-| `hmac-auth` | HMAC signature validation | Medium |
-| `ldap-auth` | LDAP/Active Directory | Medium |
+| Plugin | Use Case | Status |
+|--------|----------|--------|
+| `jwt` | Edge JWT validation on `/private/` routes (`jwt-edge` KongClusterPlugin) | **Active** — RS256 tokens rejected at the gateway as a coarse first filter ([ADR-006](../proposals/adr/ADR-006-kong-edge-jwt/)); the service-side check stays authoritative |
+| `key-auth` | API key authentication | Future |
+| `oauth2` | Full OAuth2 flow | Future |
+| `basic-auth` | Username/password | Future |
+| `hmac-auth` | HMAC signature validation | Future |
+| `ldap-auth` | LDAP/Active Directory | Future |
 
-Currently, auth is handled at the application level (auth-service). Gateway-level auth could offload JWT validation from all 9 services.
+Auth remains authoritative at the application level (`pkg/authmw` verifies against the JWKS); `jwt-edge` is defense-in-depth, not a second source of truth.
 
 #### Security
 
@@ -770,7 +772,7 @@ kubectl get kongplugins -A
 
 **Expected**:
 
-- 9 `KongClusterPlugin`s: `cors-policy`, `prometheus-metrics`, `rate-limiting-api`, `request-size-limiting-api`, `correlation-id`, `security-headers`, `ip-restriction-internal`, `rate-limiting-admin`, `opentelemetry-tracing`.
+- 10 `KongClusterPlugin`s: `cors-policy`, `prometheus-metrics`, `rate-limiting-api`, `request-size-limiting-api`, `correlation-id`, `security-headers`, `ip-restriction-internal`, `rate-limiting-admin`, `opentelemetry-tracing`, `jwt-edge`.
 - No namespaced `KongPlugin` resources needed — Kong is pure pass-through (services mount Variant A paths directly).
 
 ### Step 4: Check Kong Services
@@ -807,11 +809,13 @@ kubectl get ingress -A
 |-----------|------|------|-----------|
 | frontend | frontend | `local.duynh.me` | `/` |
 | auth | api-auth-public | `gateway.duynh.me` | `/auth/v1/public/` |
-| user | api-user | `gateway.duynh.me` | `/user/v1/` |
+| user | api-user-public | `gateway.duynh.me` | `/user/v1/public/` |
+| user | api-user-private | `gateway.duynh.me` | `/user/v1/private/` (jwt-edge) |
 | product | api-product | `gateway.duynh.me` | `/product/v1/` |
 | cart | api-cart | `gateway.duynh.me` | `/cart/v1/` |
 | order | api-order | `gateway.duynh.me` | `/order/v1/` |
-| review | api-review | `gateway.duynh.me` | `/review/v1/` |
+| review | api-review-public | `gateway.duynh.me` | `/review/v1/public/` |
+| review | api-review-private | `gateway.duynh.me` | `/review/v1/private/` (jwt-edge) |
 | notification | api-notification | `gateway.duynh.me` | `/notification/v1/` |
 | shipping | api-shipping | `gateway.duynh.me` | `/shipping/v1/` |
 | payment | api-payment-private | `gateway.duynh.me` | `/payment/v1/private/` |
@@ -1021,7 +1025,7 @@ kubectl describe ingress <name> -n <namespace>
 kubectl get kongclusterplugins rate-limiting-api -o yaml
 
 # Check annotation on ingress
-kubectl get ingress api-auth -n auth -o jsonpath='{.metadata.annotations}'
+kubectl get ingress api-auth-public -n auth -o jsonpath='{.metadata.annotations}'
 
 # Check Kong logs for plugin errors
 kubectl logs -n kong -l app.kubernetes.io/name=kong -c proxy --tail=50 | grep rate
@@ -1099,10 +1103,10 @@ If the rate limiting counter encounters an error (memory pressure, internal issu
 
 ### Phase 5: Multi-Replica Scaling
 
-- Switch rate limiting from `local` to `redis` policy (Valkey backend)
+- ~~Switch rate limiting from `local` to `redis` policy (Valkey backend)~~ — **done** (`policy: redis`, Valkey db 1, both rate-limit plugins)
 - Consider `KongConsumer` + `KongConsumerGroup` for tiered rate limits
 - Evaluate Kong Gateway API support (migrate from Ingress to HTTPRoute)
 
 ---
 
-_Last updated: 2026-07-07_
+_Last updated: 2026-07-10 — jwt-edge counted/active (10 KongClusterPlugins, ADR-006); redis rate-limit marked done; split user/review ingress names; host list pointer._

@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **kong/security docs drift**: `jwt-edge` counted and marked Active
+  (10 KongClusterPlugins, ADR-006 defense-in-depth note); redis
+  rate-limiting marked done in the roadmap; user/review ingress rows
+  split (`-public`/`-private`); stale payment↛JWKS gap removed from
+  network-policies (auth admits all 9 namespaces); policy-catalog image
+  criterion corrected to the multi-level `<repo>/<image>` shape.
 - **databases docs inventory drift**: PgDog scope corrected to the 4 `cnpg-db`
   databases (payment added everywhere it was omitted; payment app noted as
   direct-TLS past the pooler); pooler replica/instance counts 1–2 → 3

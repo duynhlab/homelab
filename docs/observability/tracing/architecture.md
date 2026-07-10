@@ -10,7 +10,7 @@ This document explains the distributed tracing architecture used in this project
 
 ```mermaid
 flowchart TB
-    Client([Browser / API client])
+    Client{{"Browser / API client"}}
 
     subgraph Edge["Kong API Gateway (edge)"]
         Kong["opentelemetry plugin<br/>root request span + W3C traceparent"]
@@ -24,28 +24,38 @@ flowchart TB
     end
 
     subgraph OTelCollector["OpenTelemetry Collector (fan-out layer)"]
-        Receiver["OTLP Receiver (:4317 gRPC, :4318 HTTP)"]
-        Processor["Batch Processor (memory limiter)"]
-        Exporter[Exporters]
+        Receiver[/"OTLP Receiver (:4317 gRPC, :4318 HTTP)"/]
+        Processor[/"Batch Processor (memory limiter)"/]
+        Exporter[/"Exporters"/]
     end
 
     subgraph Backends["Tracing Backends"]
-        Tempo["Tempo (primary backend)"]
-        VT["VictoriaTraces"]
-        Jaeger["Jaeger (alternative UI)"]
+        Tempo[("Tempo (primary backend)")]
+        VT[("VictoriaTraces")]
+        Jaeger[("Jaeger (alternative UI)")]
     end
 
     Client -->|HTTP| Kong
     Kong -.->|"traceparent (W3C) — continues the trace"| Apps
-    Kong -->|"OTLP HTTP (edge span)"| Receiver
-    Apps -->|"OTLP HTTP (SDK export)"| Receiver
+    Kong -.->|"OTLP HTTP (edge span)"| Receiver
+    Apps -.->|"OTLP HTTP (SDK export)"| Receiver
     Receiver --> Processor
     Processor --> Exporter
     Exporter -->|OTLP| Tempo
     Exporter -->|OTLP| VT
     Exporter -->|OTLP| Jaeger
-    Kong -.->|"OTLP HTTP (runtime logs, pilot)"| Receiver
-    Exporter -.->|"logs pipeline (pilot)"| VLogs["VictoriaLogs"]
+    Kong -.->|"OTLP HTTP (runtime logs)"| Receiver
+    Exporter -.->|"logs pipeline"| VLogs[("VictoriaLogs")]
+    classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
+    classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
+    classDef log fill:#d3f9d8,stroke:#2f9e44,color:#111;
+    class Receiver,Processor,Exporter otc;
+    class Tempo,VT,Jaeger trace;
+    class VLogs log;
+    style Edge fill:#eef2ff,color:#111;
+    style Apps fill:#eef2ff,color:#111;
+    style OTelCollector fill:#d0ebff,color:#111;
+    style Backends fill:#f1f3f5,color:#111;
 ```
 
 The trace now **begins at the gateway**: Kong's `opentelemetry` plugin creates
@@ -61,7 +71,7 @@ config that makes this reliable.
 - **Enabled by**: `tracing_instrumentations: all` + `tracing_sampling_rate` in the Kong config (HelmRelease env for the cluster; `KONG_TRACING_*` for local-stack)
 - **Export**: OTLP HTTP to the same collector endpoint the services use (`…:4318/v1/traces`), `service.name=kong`
 - **Role**: creates the **root request span** for every proxied call and injects the W3C `traceparent` downstream, so the trace starts at the edge instead of the first service
-- **Logs (pilot)**: the same plugin also sets `logs_endpoint` (Kong ≥ 3.8) — Kong **runtime** logs ship via OTLP to the collector's `logs` pipeline → VictoriaLogs, alongside Vector (see [../logging/README.md](../logging/README.md))
+- **Logs**: the same plugin also sets `logs_endpoint` (Kong ≥ 3.8) — Kong **runtime** logs ship via OTLP to the collector's `logs` pipeline → VictoriaLogs, alongside Vector (see [../logging/README.md](../logging/README.md))
 - **Config**: `kubernetes/infra/configs/kong/plugins.yaml` (`opentelemetry-tracing` KongClusterPlugin) + `kubernetes/infra/controllers/kong/helmrelease.yaml`; local mirror in `local-stack/gateway/kong.yml` + `local-stack/compose.yaml`
 
 **1. Microservices (SDK Approach)**
@@ -73,7 +83,7 @@ config that makes this reliable.
 
 **2. OpenTelemetry Collector**
 - **Deployment**: Kubernetes Deployment (1 replica, scalable)
-- **Function**: Fan-out layer — a `traces` pipeline distributing to the three backends, plus a `logs` pipeline (Kong runtime-logs pilot → VictoriaLogs)
+- **Function**: Fan-out layer — a `traces` pipeline distributing to the three backends, plus a `logs` pipeline (Kong runtime-logs → VictoriaLogs)
 - **Configuration**: `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
 - **Ports**: 4317 (gRPC), 4318 (HTTP), 8888 (metrics)
 
@@ -256,7 +266,7 @@ exporters:
   otlphttp/victoriatraces:          # pilot 3rd backend (OTLP HTTP, :10428)
     traces_endpoint: http://vtsingle-victoria-traces.monitoring.svc.cluster.local:10428/insert/opentelemetry/v1/traces
 
-  otlphttp/victorialogs:            # Kong runtime-logs pilot (OTLP HTTP, :9428)
+  otlphttp/victorialogs:            # Kong runtime-logs (OTLP HTTP, :9428)
     logs_endpoint: http://vlsingle-victoria-logs.monitoring.svc.cluster.local:9428/insert/opentelemetry/v1/logs
 
 service:
@@ -265,7 +275,7 @@ service:
       receivers: [otlp]
       processors: [memory_limiter, batch]
       exporters: [otlp/tempo, otlp/jaeger, otlphttp/victoriatraces]
-    logs:                           # Kong OTel-logs pilot (runs alongside Vector)
+    logs:                           # Kong OTel runtime logs (runs alongside Vector)
       receivers: [otlp]
       processors: [memory_limiter, batch]
       exporters: [otlphttp/victorialogs]

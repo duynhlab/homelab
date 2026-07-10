@@ -9,271 +9,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- **RFC-0014 observability explainer** (`docs/observability/rfc-0014-explainer.md`):
-  a beginner-friendly, old-vs-new walkthrough of the client_golang→OpenTelemetry
-  migration — big-picture diagrams, a "central post office" Collector analogy,
-  per-signal pull-vs-push / logs / traces sections, an end-to-end request
-  sequence, the Collector governance pipeline, and correlation fields. Linked
-  from the docs index and the observability hub. The `observability/README.md`
-  Architecture diagram was redrawn in the OTel-demo style (services → Collector
-  → color-coded backends) and its app-log path corrected to the OTLP tee.
-
-### Changed
-
-- **Logging & tracing docs refreshed for RFC-0014 P4** (P5 only swept the
-  metrics-family docs): `logging/README.md`, `logging-standards.md` and
-  `victorialogs.md` now describe the dual-path reality — app logs via the
-  otelzap→OTLP tee (fleet-wide, `trace_id` a queryable field in VictoriaLogs)
-  with Vector kept for non-instrumented pods (DBs, Kong access log, PG
-  `auto_explain`, frontend); the logger narrative reconciled to the P4 zapx
-  convergence (auth off zerolog, cart off clog). `tracing/architecture.md`
-  SDK-wiring updated to `pkg/obsx.SetupObservability` + otelgin/otelgrpc (was
-  the pre-consolidation per-repo `middleware/tracing.go` + raw exporter). Docs
-  index logging-pillar descriptions updated.
-
-### Changed
-
-- **Docs swept to the OTLP/semconv reality (RFC-0014 P5)**: ~19 observability
-  docs re-pointed from `request_duration_seconds{method,path,code}` +
-  `job="microservices"` to `http_server_request_duration_seconds` +
-  `http_request_method`/`http_route`/`http_response_status_code` (no `job`);
-  recording-rule names `job_app:*`→`app:*`; `up{}` liveness → D-4
-  heartbeat-absence; scrape narratives → OTLP push (VMAgent scrape kept only
-  for infra exporters). Exemplar claims corrected to the lost-but-replaced
-  reality (D-14): correlation is now the `trace_id` field in VictoriaLogs +
-  Tempo traces↔logs. `metrics-apps.md` (the contract doc) rewritten.
-  `requests_in_flight` and GC-pause docs marked removed/no-OTel-equivalent.
-  RFC-0013 banner-marked superseded (metric naming) by RFC-0014 P3; RFC-0014
-  phase table + tracking.md marked P4/P5 done.
+## [0.105.0] - 2026-07-10
 
 ### Added
 
-- **gRPC access logging (RFC-0014 P4)**: `grpcx.NewServer` now takes the
-  service logger and chains a server-side access-log interceptor — one
-  structured line per incoming east-west RPC (`trace_id`, `method`, `code`,
-  `duration`, `peer`; OK→Info, else Error), through the OTLP-teed logger into
-  VictoriaLogs. Health/reflection skipped; recovered panics logged as
-  `code=Internal`. Documented in `docs/api/grpc-internal-comms.md` (§4). pkg
-  v0.18.1.
-- **OTLP logs pipeline + canary (RFC-0014 P4)**: the local-stack collector's
-  VictoriaLogs exporter gains `VL-Stream-Fields: service.name` (per-service
-  log streams; `trace_id` stays a queryable regular field); Vector excludes
-  the 9 Go service containers (their logs now arrive over OTLP — one line,
-  one path); the product service flips `OTEL_LOGS_ENABLED=true` as the
-  canary. Verified: `trace_id:"<id>"` in VictoriaLogs returns the request's
-  log lines — the broken log↔trace correlation is fixed at the root.
-- **Cluster OTLP logs pipeline (RFC-0014 P4)**: the collector's VictoriaLogs
-  exporter gains `VL-Stream-Fields: service.name`; the Vector DaemonSet
-  skips pods labeled `platform.duynhlab.dev/otlp-logs=true` (double-ingest
-  guard); the domain ResourceSets and order-worker set that label plus
-  `OTEL_LOGS_ENABLED` via a new `otel_logs_enabled` input (default `"true"`,
-  per-service kill switch that flips the label and the env together —
-  Vector resumes instantly on rollback).
+- **RFC-0014 — full OpenTelemetry adoption (P0–P5, ADR-016)**: all 9 services +
+  order-worker migrated to OTLP push for metrics/logs/traces through the
+  otel-collector (checkout-service exempt). Collector gains `metrics` + `logs`
+  pipelines; vmagent gets the D-1/2/3 semconv flags + `service_name→app`
+  relabel; metrics went canary→fleet (P1–P3), logs added the `otelzap→OTLP`
+  tee with `VL-Stream-Fields: service.name` + a double-ingest guard (P4).
+  New-name alerts/recording rules (D-4 heartbeat-absence replaces `up{}`), a
+  gRPC access-log interceptor (`grpcx.NewServer`, pkg v0.18.1), and a
+  beginner-friendly `rfc-0014-explainer.md` (old-vs-new, OTel-demo-style
+  diagrams).
+- **RFC-0012 — declarative CNPG role/database triplets (P1–P4, ADR-013/014/015)**:
+  per-service ExternalSecret + `DatabaseRole` + `Database` (payment pilot →
+  cart/order → product), PgDog `valuesFrom` password injection + rotation,
+  `initdb` minimalized (no cleartext `postInitSQL`), pg_hba connection
+  isolation; add-database + password-rotation runbooks. RFC-0012 → implemented.
+- **RFC-0013 — app-metrics cardinality audit + streaming-aggregation playbook**:
+  9-service audit (baseline 2,777 series), at-scale two-tier vmagent design, a
+  planned shadow streamAggr pilot; `metrics-apps.md` hardened (canonical
+  buckets, forbidden-label list).
+- **RFC-0010 — payment read path + frontend (P6, ADR-012)**: `payment.v1
+  GetPayment` (pkg v0.15.0/0.15.1), order-details payment enrichment, checkout
+  `payment_method` test token, frontend status box; ADR-012 auto-heal for the
+  lost-capture-response window. RFC-0010 → implemented.
 
 ### Changed
 
-- **OTLP metrics default-on fleet-wide (RFC-0014 P3 code-removal wave)**: the
-  domain ResourceSets flip `otel_metrics_enabled` to default `"true"` (the
-  RSIP input stays as a per-service kill switch) and the product canary
-  override is removed; local-stack and the order-worker drop the scrape-era
-  `METRICS_ENABLED` env and the now-redundant `OTEL_METRICS_ENABLED` (pkg
-  v0.17.0 defaults metrics on). Pairs with the 9 service-repo PRs deleting
-  the Prometheus middleware, `/metrics` route and bridge call.
-
-### Changed
-
-- **Metrics cutover to OTLP (RFC-0014 P3, ADR-016)**: the OTLP-path alerts/
-  recording rules become canonical (files renamed over the legacy ones, alert
-  names keep their runbook anchors, D-4 heartbeat liveness replaces `up{}`);
-  the apps' ServiceMonitor and the order-worker PodMonitor are deleted
-  (checkout-service was never integrated, so the RFC's legacy-checkout
-  fence is dropped — ADR-016; Temporal metric names verified identical on
-  the push path first); Alertmanager staging route/receiver
-  removed; the main Grafana dashboard CR re-points at the OTel dashboard;
-  local-stack provisions the adapted local copies (microservices + Temporal).
-
-### Added
-
-- **New-name alert & recording-rule copies (RFC-0014 P2)**: `alerts-otel.yaml`
-  (12 ported alerts + D-4 heartbeat-absence pair replacing `up{}` + new
-  pipeline-health and gRPC east-west alerts, all labeled `pipeline: otel`) and
-  `recording-rules-otel.yaml` (14 re-minted `app:*` records + a new gRPC RED
-  group) evaluate side-by-side with the legacy groups; Alertmanager routes
-  `pipeline="otel"` to a new `#alerts-otel-staging` receiver. Deviations vs
-  the plan (verified against live OTLP series): `requests_in_flight` has no
-  otelgin equivalent yet; GC-pause alerts replaced by a used-vs-goal
-  pacing-pressure alert.
-
-- **Cluster OTLP metrics env (RFC-0014 P1 cluster slice)**: the four domain
-  ResourceSets and the order-worker inject `K8S_NAMESPACE_NAME` +
-  `K8S_POD_NAME` (Downward API — the exact names obsx reads for the k8s
-  resource attributes) and `DEPLOYMENT_ENVIRONMENT=production`; new
-  `otel_metrics_enabled` RSIP input (default `"false"`) gates the dual-emit
-  flag, flipped `"true"` for the product canary only.
-- **OTLP metrics canary env (RFC-0014 P1b)**: local-stack `product` gets
-  `OTEL_METRICS_ENABLED=true` + `DEPLOYMENT_ENVIRONMENT=local` — first
-  service dual-emitting semconv metrics over OTLP (pairs with
-  product-service pkg v0.16.0 adoption); fleet stays off until the canary
-  soaks.
-- **OTLP metrics dual-emit env (RFC-0014 P1b/P1c)**: local-stack sets
-  `OTEL_METRICS_ENABLED=true` + `DEPLOYMENT_ENVIRONMENT=local` in the shared
-  `x-svc-env` anchor — all 9 services dual-emit semconv metrics over OTLP
-  (product canary e2e-verified first, then fleet-wide; pairs with the 9
-  service repos' pkg v0.16.0 `SetupObservability` adoption PRs).
-- **OTLP metrics pipeline (RFC-0014 P1a)**: otel-collector gains a `metrics`
-  pipeline (`memory_limiter → deltatocumulative → batch`) exporting to
-  vmagent's OTLP ingest (`:8429/opentelemetry/v1/metrics`, HTTP protobuf);
-  vmagent gets the D-1/D-2 flags (`usePrometheusNaming`,
-  `promoteAllResourceAttributes=false` + allowlist, `promoteScopeMetadata=false`
-  — the upstream defaults promote everything) and the regex-guarded
-  `service_name→app` / `k8s_namespace_name→namespace` relabel (D-3);
-  local-stack mirrors both (collector `metrics/apps` pipeline + VM flags).
-  No service pushes yet — canary follows in P1b.
-
-
-### Changed
-
-- **`docs/observability/opentelemetry.md` → instrumentation policy page
-  (RFC-0014 P0)**: normative rules (one wiring point via `pkg` v0.16.0
-  `obsx.SetupObservability`, semconv v1.41 pin, mandatory Views/bucket sets,
-  default-off rollout flags, 15s export interval, no client_golang for new
-  metrics), current-vs-target pipeline diagrams, updated env table. Pairs
-  with pkg v0.16.0 (duynhlab/pkg#37); RFC-0014 phase table marks P0 done.
-
-
-### Added
-
-- **RFC-0014 — full OpenTelemetry adoption** (provisional): migrate all 9
-  services + order-worker (checkout-service exempt) to OTLP push for
-  metrics/logs/traces through the existing otel-collector, with semconv
-  naming adopted via VictoriaMetrics' `-opentelemetry.usePrometheusNaming`;
-  decisions D-1…D-14, phases P0–P5 (dual-emit, never a flag day), consumer
-  blast-radius checklist in `RFC-0014/tracking.md` (17 alerts, 15 recording
-  rules, mop SLIs, 27 dashboard panels, 19 docs files). Supersedes the
-  observability review's hybrid verdict and RFC-0013's D3 middleware-extract
-  tracker; RFC-0013's streamAggr pilot proceeds unchanged until P5.
-
-### Changed
-
-- **CloudNativePG operator 1.29.1 → 1.30.0 (RFC-0012 P0)**: chart pinned to
-  0.29.0 so chart-managed CRDs stay coherent with the image; ships three
-  security fixes (CVE-2026-55765 SCRAM-encoded role DDL, CVE-2026-55769 pinned
-  `search_path` on pooled connections, GHSA-7qwx-x8ff-3px9 ECDSA-gated
-  instance-manager endpoints) and serves the new `DatabaseRole` CRD.
-- **docs/api area refactor**: new area hub `docs/api/README.md`; `api.md`
-  thinned to the pure payload reference (seed data → `platform/setup.md`,
-  pgx driver rationale → `databases/002-database-integration.md`, duplicate
-  services roster → naming-convention link, stale build/HelmRelease
-  conventions dropped, dead `.token` snippet fixed); relocated `logs.md` →
-  `observability/logging/logging-standards.md`, `graceful-shutdown.md` +
-  `gke-internal-dns.md` → `docs/platform/`; `docs/README.md` descriptions
-  corrected (naming convention is v2.0.0 Adopted sole URL surface; gRPC
-  east-west is implemented, not draft); status tables + `_Last updated:_`
-  footers normalized across the area.
-
-### Added
-
-- **pg_hba connection isolation (RFC-0012 P4, ADR-015)**: `cnpg-db` now
-  rejects every cross-service connection at the front door — one allow per
-  (role, database) pair (`hostssl` for payment, `host` for the non-TLS
-  pgdog/migration pairs) + trailing reject, declarative in the Cluster
-  spec, applied by reload. RFC-0012 → implemented.
-- **initdb minimalized + product triplet + recipe (RFC-0012 P3)**: the
-  cleartext `postInitSQL` block is gone from `instance.yaml` (grep gate:
-  no `WITH PASSWORD` under `kubernetes/`); `services/product.yaml` adopts
-  the initdb-created role/database (same `cnpg-db-secret` for bootstrap
-  and DatabaseRole); dead config removed (`extensions.yaml` emptied out,
-  unused `pgdog-cnpg-credentials` ESO + seed); new recipe
-  `docs/databases/runbooks/add-service-database.md`; CNPG sections of
-  `002-database-integration.md` rewritten around the triplet.
-- **cart/order triplets + pooler valuesFrom + password rotation (RFC-0012
-  P2, ADR-014)**: `services/cart.yaml` + `services/order.yaml` (basic-auth
-  ESO secrets replace the Opaque copies); PgDog HelmRelease loses its four
-  inline cleartext passwords — per-user Flux `valuesFrom` targetPath
-  injection from the same ESO Secrets; all four cnpg-db passwords rotated
-  in the OpenBAO seed; new runbook
-  `docs/databases/runbooks/rotate-cnpg-service-password.md`.
-- **Per-service database triplet — payment pilot (RFC-0012 P1, ADR-013)**: new
-  `clusters/cnpg-db/services/payment.yaml` declares ExternalSecret +
-  fully-specified `DatabaseRole` + `Database` (reclaim `retain`); the inline
-  `managed.roles` stanza is gone from `instance.yaml` and the payment
-  `Database` CR moved out of `extensions.yaml`. New deep-dive
-  `docs/databases/012-declarative-role-management.md`.
-- **RFC-0013 — app-metrics cardinality audit & streaming-aggregation scale
-  playbook**: audit of all 9 services' custom metrics (verdicts + defect table
-  D1–D5; measured baseline 2,777 series @ 1 replica; payment missing from the
-  restart alert), the at-scale playbook
-  `docs/observability/metrics/streaming-aggregation.md` (cardinality math,
-  two-tier vmagent design, decision flowchart), and a planned additive shadow
-  pilot on the VMAgent CR (P3). `metrics-apps.md` hardened per P1: canonical
-  bucket set, forbidden-label list, no-drift rule, measured numbers.
+- **Metrics + logs cutover to OTLP push (RFC-0014 P3–P5)**: the OTLP-path
+  alerts/recording rules became canonical, semconv metric names adopted
+  (`http_server_request_duration_seconds` + `http_*` labels, `app:*` records),
+  ~19 observability docs swept off the scrape/`up{}`/exemplar world, the Grafana
+  CR re-pointed at the OTel dashboard. Observability diagrams restyled to the
+  OpenTelemetry-demo house style (colored subgraphs, pipeline node shapes); the
+  stale "pilot" wording for Kong runtime-logs over OTLP dropped (VictoriaTraces
+  stays a pilot).
+- **`opentelemetry.md` promoted to the instrumentation policy page (RFC-0014
+  P0)**: one wiring point (`obsx.SetupObservability`, pkg v0.16.0), semconv
+  v1.41 pin, mandatory Views/buckets, rollout flags.
+- **CloudNativePG 1.29.1 → 1.30.0 (RFC-0012 P0)**: three security fixes
+  (CVE-2026-55765/55769, GHSA-7qwx-x8ff-3px9); serves the `DatabaseRole` CRD.
+- **docs/api area refactor**: new `docs/api/README.md` hub; `api.md` thinned to
+  the payload reference; `logs.md`/`graceful-shutdown.md`/`gke-internal-dns.md`
+  relocated; status tables + footers normalized.
+- **Metrics scrape labels** → `app.kubernetes.io/component` (`api`/`worker`) on
+  the ServiceMonitor/PodMonitor (mop ≥ 0.14.0).
 
 ### Removed
 
-- **`PAYMENT_ENABLED` feature flag (RFC-0010 P3.exit)**: the payment↔saga
-  rollout flag is gone — payment (authorize-early/capture-late + void/refund
-  compensations) is now an unconditional part of the order-fulfillment saga.
-  Dropped the env from the order API (`checkout-rs` template + `services/order.yaml`)
-  and `local-stack/compose.yaml`; docs updated (temporal-order-fulfillment, payments,
-  RFC-0010, ADR-009). Pairs with order-service removing the flag + dead branch.
-
-### Changed
-
-- **Metrics scrape labels**: the `microservices-api` ServiceMonitor and the
-  `order-worker` PodMonitor now select the standard
-  `app.kubernetes.io/component` label (`api` / `worker`) instead of the bare,
-  unprefixed `component`/`instance` labels — aligning with Kubernetes and Helm
-  recommended-label conventions (mop chart ≥ 0.14.0 renders the label).
+- **`PAYMENT_ENABLED` feature flag (RFC-0010 P3.exit)**: payment is now an
+  unconditional part of the order-fulfillment saga; env dropped from the order
+  API + local-stack.
+- **Apps ServiceMonitor + order-worker PodMonitor (RFC-0014 P3)**: scrape of app
+  services retired in favour of OTLP push (infra exporters still scraped).
+  `requests_in_flight` and GC-pause metrics have no OTel equivalent yet (D-14).
 
 ### Fixed
 
-- **Microservices scrape target**: the `microservices-api` ServiceMonitor
-  selected a bare `component: api` label that the mop chart stopped rendering
-  after its single-Service refactor, leaving the selector dangling. Repointed
-  to `app.kubernetes.io/component: api` (emitted by mop ≥ 0.14.0) so the 8
-  services are discovered again.
-
+- **Microservices scrape target**: repointed the dangling `microservices-api`
+  ServiceMonitor selector to `app.kubernetes.io/component: api` (mop ≥ 0.14.0).
 - **Order-details payment enrichment (RFC-0010 P6)**: wire `PAYMENT_GRPC_ADDR`
-  into the order **API** deployment (not just the worker) so it can dial payment
-  for the `GetPayment` read behind order details — the code default points at the
-  plain `payment` Service, so the API needs the headless `payment-grpc` target on
-  the cluster and `payment:9090` in local-stack. Without it the enrichment
-  soft-failed and details never carried the payment snapshot.
-
-### Added
-
-- **docs (proposals): ADR-012** — auto-heal one reconciliation class (the
-  lost-capture-response window): the reconciler may now self-correct an internal
-  `authorized` row against a provider `captured` charge by re-driving the existing
-  idempotent capture. Every other drift class stays detect-only; off by default
-  (`RECON_HEAL_ENABLED`). Supersedes the detect-only stance of ADR-011. ADR index updated.
-
-- **Payment read path + frontend (RFC-0010 P6)**: the checkout flow now shows
-  real payment state. `payment.v1 GetPayment` read RPC (`pkg` v0.15.0, plus
-  `refunded_minor` in v0.15.1); order-details enriches with a soft-fail
-  `payment` object (`status`/`amount`/`refunded`/`currency`/`decline_code`,
-  `partially_refunded` derived); checkout carries a `payment_method` test token
-  (PCI-safe `tok_` validation → 400 before persist); frontend adds a mock
-  test-token picker and a payment status box on the order detail. Real-browser
-  e2e-verified in local-stack. **RFC-0010 is now `implemented` (P1–P6 landed)**;
-  docs updated (`api/payments.md` checkout read path, `api/api.md` order create
-  + details, RFC/ADR indexes).
-
-### Changed
-
-- **RFC-0010** status → **implemented** (P1–P6); index and progress note updated.
-
-### Added
-
-- **docs (proposals)**: **RFC-0012** — converge CNPG role & database management
-  on declarative CRDs (provisional, P1): CNPG 1.30 review (`DatabaseRole` CRD,
-  adoption/precedence semantics, 3 role-related security fixes), the cnpg-db
-  four-generation archaeology (initdb / cleartext postInitSQL / managed.roles /
-  Database CRs) as documented tech debt, and a 5-phase migration to a
-  per-service ExternalSecret + DatabaseRole + Database triplet, ending with
-  pg_hba connection isolation. RFC index updated.
+  into the order **API** (not just the worker) so `GetPayment` resolves;
+  without it the enrichment soft-failed.
 
 ## [0.104.0] - 2026-07-05
 

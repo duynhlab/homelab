@@ -13,7 +13,7 @@ service and PR must respect.
 | SDK | OpenTelemetry Go **v1.44.0**, wired by **`pkg/obsx` `SetupObservability`** (one call in `main()`) |
 | Semconv | **v1.41.0**, pinned in `pkg/obsx` — bumps only via a deliberate pkg release |
 | Collector | `otel-collector` (contrib distribution, `monitoring` namespace) |
-| Signals | Traces ✅ (all services + Kong) · Metrics ✅ (OTLP push, fleet-wide since RFC-0014 P3; `/metrics` scrape retired) · Logs ✅ (otelzap → OTLP, fleet-wide since RFC-0014 P4; Kong runtime-logs pilot ✅) |
+| Signals | Traces ✅ (all services + Kong) · Metrics ✅ (OTLP push, fleet-wide since RFC-0014 P3; `/metrics` scrape retired) · Logs ✅ (otelzap → OTLP, fleet-wide since RFC-0014 P4; Kong runtime-logs via OTLP ✅) |
 | Protocol | OTLP — HTTP/protobuf `:4318` for everything (VictoriaMetrics/VictoriaLogs accept nothing else) |
 | Propagation | W3C Trace Context (`traceparent`); Kong forces injection (`inject: [w3c]`) |
 | Sampling | 10% head sampling, `ParentBased(TraceIDRatioBased)` (see [Sampling](#sampling)) |
@@ -144,7 +144,7 @@ flowchart LR
     end
     SVC -->|"OTLP/HTTP :4318"| TP
     KONG -->|"spans :4318"| TP
-    KONG -.->|"runtime logs (pilot)"| LP
+    KONG -.->|"runtime logs"| LP
     TP --> TEMPO["Tempo (primary)"]
     TP --> JAEGER["Jaeger (in-memory UI)"]
     TP --> VT["VictoriaTraces (pilot)"]

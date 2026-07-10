@@ -58,22 +58,30 @@ flowchart LR
     subgraph apps["Instrumented Go services (9 + order-worker)"]
         Z["zapx core (tee)"]
         Z -->|stdout| KLOGS["kubectl logs"]
-        Z -->|"otelzap → otlploghttp"| OTLP
+        Z -.->|"otelzap → otlploghttp"| OTLP
     end
     subgraph infra["Non-instrumented workloads"]
         CNPG["CloudNativePG<br/>auto_explain plans"]
         KONG["Kong access log<br/>(kong_json stdout)"]
         FE["Frontend + system pods"]
     end
-    OTLP["OTLP logs :4318"] --> COL["OpenTelemetry Collector<br/>logs pipeline"]
-    CNPG --> VEC["Vector DaemonSet · kube-system<br/>(excludes app pods)"]
-    KONG --> VEC
-    FE --> VEC
+    OTLP[/"OTLP logs :4318"/] -.-> COL[/"OpenTelemetry Collector<br/>logs pipeline"/]
+    CNPG -.-> VEC["Vector DaemonSet · kube-system<br/>(excludes app pods)"]
+    KONG -.-> VEC
+    FE -.-> VEC
     KONGRT["Kong opentelemetry plugin<br/>runtime logs"] -.->|OTLP| COL
     COL -->|"/insert/opentelemetry/v1/logs<br/>VL-Stream-Fields: service.name"| VL[("VictoriaLogs VLSingle :9428<br/>monitoring · 7d / 20Gi")]
     VEC -->|"/insert/jsonline"| VL
-    VL --> GRAF["Grafana Explore<br/>(LogsQL)"]
-    GRAF <-. "trace_id ↔ Tempo" .-> TEMPO["Tempo"]
+    VL --> GRAF{{"Grafana Explore<br/>(LogsQL)"}}
+    GRAF <-. "trace_id ↔ Tempo" .-> TEMPO[("Tempo")]
+    classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
+    classDef log fill:#d3f9d8,stroke:#2f9e44,color:#111;
+    classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
+    class OTLP,COL otc;
+    class VL log;
+    class TEMPO trace;
+    style apps fill:#eef2ff,color:#111;
+    style infra fill:#d3f9d8,color:#111;
 ```
 
 **Two paths, one backend, no double-ingest.** App logs travel over OTLP; Vector

@@ -11,7 +11,7 @@ convention), **what they accept and return** (API reference), **who owns what**
 |---|---|---|
 | *What is the URL?* — shape, audiences, the complete route inventory | [**api-naming-convention.md**](api-naming-convention.md) | v2.0.0 **Adopted** — the sole URL surface |
 | *What does the endpoint take/return?* — payloads, validation, error codes | [**api.md**](api.md) | Living reference |
-| *Which service owns what, who calls whom?* — responsibilities, data ownership, call graph | [**microservices.md**](microservices.md) | Living reference |
+| *Which service builds what, with which technique?* — per-service feature matrix (feature → API → technique), data ownership, call graph | [**microservices.md**](microservices.md) | Living reference |
 
 One rule keeps them from overlapping: **routes are documented once** (in the
 naming convention), payloads once (in the API reference), ownership once (in
@@ -49,4 +49,4 @@ the catalog). If a doc needs one of the others, it links — it does not restate
 
 ---
 
-_Last updated: 2026-07-07 — area hub created (api refactor: thinned api.md, relocated logging/shutdown/DNS docs)._
+_Last updated: 2026-07-10 — microservices.md rebuilt as a per-service feature matrix (+ technique index)._

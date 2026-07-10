@@ -86,20 +86,22 @@ Each activity has a `RetryPolicy`; compensations run **in reverse** on failure.
 | 2 | `CreateShipment` → shipping (gRPC) | `CancelShipment` | idempotent by `order_id` |
 | 3 | **`ConfirmOrder`** → order core | `FailOrder` | status `pending → confirmed` — **the pivot** |
 | 4 | `SendNotification` → notification (gRPC) | — | best-effort (post-pivot) |
-| 5 | `ClearCart` → cart (REST) | — | best-effort (post-pivot) |
+| 5 | `SendReceipt` → notification (gRPC) | — | best-effort (post-pivot) receipt email |
+| 6 | `ClearCart` → cart (REST, tokenless internal `DELETE /cart/v1/internal/cart/:userId`) | — | best-effort (post-pivot) |
 
 **The pivot.** Steps 1–2 are the "transaction": if anything through `ConfirmOrder` fails, the
 workflow runs the registered compensations in reverse (`CancelShipment`, `ReleaseStock`) and marks
-the order `failed`. Once `ConfirmOrder` succeeds the order is `confirmed` and **steps 4–5 are
-best-effort** — a failed notification or cart-clear is logged but never rolls a confirmed order
-back.
+the order `failed`. Once `ConfirmOrder` succeeds the order is `confirmed` and **steps 4–6 are
+best-effort** — a failed notification, receipt, or cart-clear is logged but never rolls a confirmed
+order back.
 
 **Payment (authorize-early / capture-late).** Payment is an unconditional part of
 every saga run: `AuthorizePayment` runs before step 1 (a hold — a decline fails the order
 before any stock/shipment work), and `CapturePayment` runs after step 2, just before the
 `ConfirmOrder` pivot. Compensation is capture-state-dependent — a pre-capture failure runs
-`VoidPayment` (release the hold), a pivot failure runs `RefundPayment` (return the money) —
-composed reverse-order with `CancelShipment` / `ReleaseStock`. All payment calls are idempotent by
+`VoidPayment` (release the hold), a pivot failure runs `RefundPayment` (return the money, followed
+by a best-effort `SendRefundNotification` email) — composed reverse-order with `CancelShipment` /
+`ReleaseStock`. All payment calls are idempotent by
 the natural key `order:<id>`, so Temporal retries are safe. Rationale and tradeoffs:
 [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/). (The `PAYMENT_ENABLED`
 rollout flag was removed once payment became permanent — P3.exit.)
@@ -122,7 +124,8 @@ sequenceDiagram
     W->>S: CreateShipment (retry)
     W->>W: ConfirmOrder (pending->confirmed)
     W->>N: SendNotification (best-effort)
-    W->>C: ClearCart (best-effort)
+    W->>N: SendReceipt (best-effort)
+    W->>C: ClearCart (best-effort, internal route)
     Note over W: failure before the pivot ->\ncompensate in reverse, then FailOrder (pending->failed)
 ```
 
@@ -223,15 +226,17 @@ Deliberate deviations from the original design:
 - **Workflow start lives in the web handler** (where the old fire-and-forget calls were), so the
   logic layer stays Temporal-free. If Temporal is unavailable the order is still created (`pending`)
   and the start is logged — checkout never fails on Temporal.
-- **`ClearCart` carries the caller's bearer token** in the workflow input (cart's private REST
-  validates it; the saga runs within seconds). Homelab simplification — see the roadmap.
+- **`ClearCart` uses cart's tokenless internal route** (`DELETE /cart/v1/internal/cart/:userId`,
+  NetworkPolicy-fenced) — the workflow input carries no bearer token, so a saga that outlives the
+  user's access token still clears the cart.
 - **Idempotency is DB-enforced** — product `stock_reservations` (PK `reservation_id,product_id`),
   shipping `UNIQUE(order_id)`.
 
 **Roadmap / planned (⏳):** tracked as **Future work in [RFC-0001](../proposals/rfc/RFC-0001/)** —
 server bump 1.27.x, cache-bust on reserve, workflow/activity RED metrics, Grafana
-dashboard, internal cart-clear, temporal-db HA + Barman backups, and GameDay drills.
+dashboard, temporal-db HA + Barman backups, and GameDay drills. (The internal
+cart-clear shipped — see the as-built notes above.)
 
 ---
 
-_Last updated: 2026-07-02 — implemented + as-built notes (footer added 2026-07-07)._
+_Last updated: 2026-07-10 — step list completed (`SendReceipt`, `SendRefundNotification`); `ClearCart` now documented as the shipped tokenless internal cart route (was roadmap)._

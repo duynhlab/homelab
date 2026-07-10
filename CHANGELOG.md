@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **secrets docs accuracy**: operational OpenBAO examples corrected to the
+  deployed `http://` endpoint (TLS is RFC-0008, planned) and the target
+  `https`/`caBundle` shape labeled planned; OpenBAO-namespace field replaced by
+  KV path-prefix isolation (OSS has no namespaces); cert-manager chart pin
+  `v1.20.2`; trust-distribution reconcile commands → `cert-manager-local`.
+
 ## [0.105.0] - 2026-07-10
 
 ### Added

@@ -106,8 +106,8 @@ flowchart TD
                 bao0["openbao-0\nActive / Leader"]
                 bao1["openbao-1\nStandby"]
                 bao2["openbao-2\nStandby"]
-                bao0 <-->|"Raft replication\nTLS port 8201"| bao1
-                bao0 <-->|"Raft replication\nTLS port 8201"| bao2
+                bao0 <-->|"Raft replication\nport 8201 (TLS planned)"| bao1
+                bao0 <-->|"Raft replication\nport 8201 (TLS planned)"| bao2
             end
 
             subgraph engines["Secret Engines"]
@@ -607,7 +607,13 @@ flowchart LR
 
 ## 7. ESO Integration
 
-### ClusterSecretStore (Production)
+### ClusterSecretStore (target shape — TLS is planned, RFC-0008)
+
+> **Deployed reality:** the local store uses `server: "http://openbao.openbao.svc.cluster.local:8200"`
+> with no `caBundle` (`kubernetes/infra/configs/secrets/cluster-secret-store.yaml` — OpenBAO runs
+> `tlsDisable: true` locally). The `https` + `caBundle` shape below is the RFC-0008 target.
+> Multi-env isolation is by **KV path prefix** (`secret/local/…`), not an OpenBAO namespace —
+> OpenBAO (OSS) has no Enterprise-style namespaces feature.
 
 ```yaml
 apiVersion: external-secrets.io/v1
@@ -617,11 +623,10 @@ metadata:
 spec:
   provider:
     vault:
-      server: "https://openbao.openbao.svc.cluster.local:8200"
+      server: "https://openbao.openbao.svc.cluster.local:8200"  # planned (RFC-0008); http:// today
       path: "secret"
       version: "v2"
-      namespace: "local"           # OpenBAO namespace (multi-env isolation)
-      caBundle: <base64-ca-cert>   # cert-manager issued CA
+      caBundle: <base64-ca-cert>   # cert-manager issued CA (planned with TLS)
       auth:
         kubernetes:
           mountPath: "kubernetes"
@@ -1052,7 +1057,7 @@ kubectl get clustersecretstore openbao -o yaml | grep -A10 conditions
 
 # Verify OpenBAO is reachable from ESO namespace
 kubectl run -it --rm test --image=curlimages/curl -n external-secrets-system \
-  -- curl -sk https://openbao.openbao.svc.cluster.local:8200/v1/sys/health
+  -- curl -s http://openbao.openbao.svc.cluster.local:8200/v1/sys/health
 ```
 
 ### Authentication Failing
@@ -1097,7 +1102,7 @@ bao read auth/kubernetes/config
 
 # Test the K8s auth manually
 SA_TOKEN=$(kubectl create token external-secrets -n external-secrets-system)
-curl -sk https://openbao.openbao.svc.cluster.local:8200/v1/auth/kubernetes/login \
+curl -s http://openbao.openbao.svc.cluster.local:8200/v1/auth/kubernetes/login \
   -d "{\"role\":\"eso-reader\",\"jwt\":\"$SA_TOKEN\"}"
 
 # Check audit log (Vector → VictoriaLogs) for denied requests
@@ -1251,6 +1256,9 @@ bao read database/creds/order-readonly
 
 ### Use Case 5: CI/CD Pipeline Secret Access
 
+> **Planned pattern** — AppRole for CI is not wired yet, and the `https` endpoint
+> assumes RFC-0008 TLS (the deployed listener is `http`).
+
 ```bash
 # GitHub Actions workflow — AppRole auth
 VAULT_TOKEN=$(curl -sk https://openbao.openbao.svc.cluster.local:8200/v1/auth/approle/login \
@@ -1371,4 +1379,4 @@ gantt
 
 ---
 
-_Last updated: 2026-07-07 — OpenBAO HA (3-node Raft) + ESO via Kubernetes auth. **Deployed today:** KV v2 static secrets + best-effort audit; `eso-read` policy scopes `local/{databases,infra,services,auth}/*`; Cloudflare token dev-placeholder on local (bootstrap-seeded), operator-supplied on prod; payment DB + `payment/webhook-hmac` secrets added. **Planned (not deployed):** dynamic DB creds, OIDC, KMS auto-unseal, TLS — see [RFC-0008](../proposals/rfc/RFC-0008/). **Local Kind only — not production-hardened.**_
+_Last updated: 2026-07-10 — operational examples corrected to the deployed `http://` endpoint (TLS is RFC-0008, planned); OpenBAO HA (3-node Raft) + ESO via Kubernetes auth. **Deployed today:** KV v2 static secrets + best-effort audit; `eso-read` policy scopes `local/{databases,infra,services,auth}/*`; Cloudflare token dev-placeholder on local (bootstrap-seeded), operator-supplied on prod; payment DB + `payment/webhook-hmac` secrets added. **Planned (not deployed):** dynamic DB creds, OIDC, KMS auto-unseal, TLS — see [RFC-0008](../proposals/rfc/RFC-0008/). **Local Kind only — not production-hardened.**_

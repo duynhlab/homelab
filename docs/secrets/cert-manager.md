@@ -125,7 +125,7 @@ spec:
         kind: HelmRepository
         name: jetstack
         namespace: flux-system
-      version: "1.16.2"
+      version: "v1.20.2"
   install:
     crds: CreateReplace
     createNamespace: false
@@ -438,4 +438,4 @@ cert-manager creates `homelab-ca-secret` only in the `cert-manager` namespace. W
 
 ---
 
-_Last updated: 2026-07-02 — cert-manager + Let's Encrypt (DNS-01 via Cloudflare) for the `kong-proxy-tls` wildcard on prod; local Kind issues it from the self-signed `homelab-ca` (overlay patch). SANs `duynh.me`, `*.duynh.me`. `cloudflare-api-token` is a dev placeholder on local (bootstrap-seeded), operator-supplied on prod._
+_Last updated: 2026-07-10 — chart pin corrected to `v1.20.2`. cert-manager + Let's Encrypt (DNS-01 via Cloudflare) for the `kong-proxy-tls` wildcard on prod; local Kind issues it from the self-signed `homelab-ca` (overlay patch). SANs `duynh.me`, `*.duynh.me`. `cloudflare-api-token` is a dev placeholder on local (bootstrap-seeded), operator-supplied on prod._

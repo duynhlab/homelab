@@ -50,7 +50,7 @@ flowchart TB
     subgraph Poolers["Connection Poolers"]
         PgBouncerAuth["PgBouncer Sidecar - Auth"]
         PgBouncerSupporting["PgBouncer Sidecar - Supporting"]
-        PgDogCNPG["PgDog - unified pooler<br/>product, cart, order"]
+        PgDogCNPG["PgDog - unified pooler<br/>product, cart, order, payment"]
     end
     
     subgraph Clusters["PostgreSQL Clusters"]
@@ -864,7 +864,7 @@ ps aux | grep patroni
 
 ### Overview
 
-Connection poolers solve the "too many connections" problem by reusing PostgreSQL connections, allowing applications to handle 1000+ client connections with only 25-50 database connections. **Active** poolers in this repo: **PgBouncer** (Zalando sidecar) and **PgDog** (Helm chart for **cnpg-db**: product, cart, order). **PgCat** appears below only for **comparison** and **legacy** troubleshooting — it is not the current CNPG pooler.
+Connection poolers solve the "too many connections" problem by reusing PostgreSQL connections, allowing applications to handle 1000+ client connections with only 25-50 database connections. **Active** poolers in this repo: **PgBouncer** (Zalando sidecar) and **PgDog** (Helm chart for **cnpg-db**: product, cart, order, payment — the payment app connects direct-TLS past it). **PgCat** appears below only for **comparison** and **legacy** troubleshooting — it is not the current CNPG pooler.
 
 **Why Use Connection Poolers?**
 - PostgreSQL has limited connections (`max_connections` typically 100-200)
@@ -934,15 +934,15 @@ Connection poolers solve the "too many connections" problem by reusing PostgreSQ
 
 Previously used as a standalone pooler for cart/order against CNPG. **Current GitOps** uses **PgDog** (`pgdog-cnpg`) for all **`cnpg-db`** application databases. Keep PgCat in the [comparison matrix](#comparison-matrix) and runbooks when diagnosing older deployments.
 
-#### PgDog (cnpg-db — product, cart, order)
+#### PgDog (cnpg-db — product, cart, order, payment)
 
 **Deployment:** Helm chart (`helm.pgdog.dev/pgdog`) via Flux HelmRelease `pgdog-cnpg` in namespace `product`
 
 **Key Configuration (see `kubernetes/infra/configs/databases/clusters/cnpg-db/poolers/helmrelease.yaml`):**
-- **replicas**: 1 (dev; increase for HA in production)
+- **replicas**: 3 (PDB `minAvailable: 2`)
 - **port**: 6432 (PostgreSQL protocol)
 - **openMetricsPort**: 9090 (Prometheus metrics)
-- **Databases**: `product`, `cart`, `order` — each with `poolMode: transaction`, `poolSize`, and replica hosts pointing at `cnpg-db-r` / primary at `cnpg-db-rw`
+- **Databases**: `product`, `cart`, `order`, `payment` — each with `poolMode: transaction`, `poolSize`, and replica hosts pointing at `cnpg-db-r` / primary at `cnpg-db-rw` (the payment *app* connects direct-TLS to `cnpg-db-rw:5432`, bypassing the pooler)
 
 **Service Endpoint:**
 - `pgdog-cnpg.product.svc.cluster.local:6432`
@@ -1054,6 +1054,6 @@ return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s&prefer_simple_protoco
 
 ---
 
-_Last updated: 2026-07-07_
+_Last updated: 2026-07-10 — PgDog detail block reconciled with the overview (4 DBs incl. payment, replicas 3, PDB minAvailable 2)._
 
 

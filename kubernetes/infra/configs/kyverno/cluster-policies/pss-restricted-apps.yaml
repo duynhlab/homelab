@@ -1,7 +1,7 @@
 # Pod Security Standard — restricted profile (app namespaces only)
 # Reference: https://kubernetes.io/docs/concepts/security/pod-security-standards/#restricted
 #
-# Mode: Audit. The 8 microservices are greenfield Go apps and should pass restricted
+# Mode: Audit. The 9 microservices are greenfield Go apps and should pass restricted
 # from day one. Flip to Enforce after 14 days of clean reports.
 # Scope: ONLY application namespaces; never apply to operator/database namespaces.
 apiVersion: kyverno.io/v1

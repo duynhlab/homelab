@@ -8,9 +8,10 @@
 # clamp_min on the denominator so they never divide by zero / false-fire when
 # idle. Final population check is on `make up` (Kind, operator-scraped).
 #
-# Worker-side (SDK) workflow/activity RED metrics are now emitted by pkg/temporalx
-# (OTel MetricsHandler, pkg v0.10.0) and scraped via the order-worker PodMonitor;
-# the `temporal-worker` group below alerts on them. A Grafana dashboard adapted
+# Worker-side (SDK) workflow/activity RED metrics are emitted by pkg/temporalx
+# (OTel MetricsHandler) and arrive via OTLP push through the otel-collector
+# (the order-worker PodMonitor was retired at RFC-0014 P3); the
+# `temporal-worker` group below alerts on them. A Grafana dashboard adapted
 # from the official server-general.json is the remaining follow-up — see
 # docs/api/temporal-order-fulfillment.md.
 ---

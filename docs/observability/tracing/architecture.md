@@ -10,7 +10,7 @@ This document explains the distributed tracing architecture used in this project
 
 ```mermaid
 flowchart TB
-    Client([Browser / API client])
+    Client{{"Browser / API client"}}
 
     subgraph Edge["Kong API Gateway (edge)"]
         Kong["opentelemetry plugin<br/>root request span + W3C traceparent"]
@@ -24,28 +24,38 @@ flowchart TB
     end
 
     subgraph OTelCollector["OpenTelemetry Collector (fan-out layer)"]
-        Receiver["OTLP Receiver (:4317 gRPC, :4318 HTTP)"]
-        Processor["Batch Processor (memory limiter)"]
-        Exporter[Exporters]
+        Receiver[/"OTLP Receiver (:4317 gRPC, :4318 HTTP)"/]
+        Processor[/"Batch Processor (memory limiter)"/]
+        Exporter[/"Exporters"/]
     end
 
     subgraph Backends["Tracing Backends"]
-        Tempo["Tempo (primary backend)"]
-        VT["VictoriaTraces"]
-        Jaeger["Jaeger (alternative UI)"]
+        Tempo[("Tempo (primary backend)")]
+        VT[("VictoriaTraces")]
+        Jaeger[("Jaeger (alternative UI)")]
     end
 
     Client -->|HTTP| Kong
     Kong -.->|"traceparent (W3C) — continues the trace"| Apps
-    Kong -->|"OTLP HTTP (edge span)"| Receiver
-    Apps -->|"OTLP HTTP (SDK export)"| Receiver
+    Kong -.->|"OTLP HTTP (edge span)"| Receiver
+    Apps -.->|"OTLP HTTP (SDK export)"| Receiver
     Receiver --> Processor
     Processor --> Exporter
     Exporter -->|OTLP| Tempo
     Exporter -->|OTLP| VT
     Exporter -->|OTLP| Jaeger
     Kong -.->|"OTLP HTTP (runtime logs, pilot)"| Receiver
-    Exporter -.->|"logs pipeline (pilot)"| VLogs["VictoriaLogs"]
+    Exporter -.->|"logs pipeline (pilot)"| VLogs[("VictoriaLogs")]
+    classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
+    classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
+    classDef log fill:#d3f9d8,stroke:#2f9e44,color:#111;
+    class Receiver,Processor,Exporter otc;
+    class Tempo,VT,Jaeger trace;
+    class VLogs log;
+    style Edge fill:#eef2ff,color:#111;
+    style Apps fill:#eef2ff,color:#111;
+    style OTelCollector fill:#d0ebff,color:#111;
+    style Backends fill:#f1f3f5,color:#111;
 ```
 
 The trace now **begins at the gateway**: Kong's `opentelemetry` plugin creates

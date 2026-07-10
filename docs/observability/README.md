@@ -21,9 +21,9 @@ flowchart TB
     end
 
     subgraph col["OpenTelemetry Collector"]
-        RCV["otlp receiver :4318 / :4317"]
-        PROC["memory_limiter → deltatocumulative → batch"]
-        SM["spanmetrics connector"]
+        RCV[/"otlp receiver :4318 / :4317"/]
+        PROC[/"memory_limiter → deltatocumulative → batch"/]
+        SM[/"spanmetrics connector"/]
         RCV --> PROC
         RCV --> SM
     end
@@ -31,7 +31,7 @@ flowchart TB
     VEC["Vector DaemonSet"]
 
     subgraph be["Backends"]
-        VMAgent["vmagent :8429<br/>OTLP ingest + infra scrape"]
+        VMAgent[/"vmagent :8429<br/>OTLP ingest + infra scrape"/]
         VMSingle[("VictoriaMetrics :8428")]
         Tempo[("Tempo")]
         Jaeger[("Jaeger :16686")]
@@ -48,9 +48,9 @@ flowchart TB
 
     Grafana{{"Grafana"}}
 
-    SVC -->|"OTLP push (metrics·logs·traces) :4318"| RCV
-    SVC -->|"pprof push"| Pyro
-    INF -->|"stdout"| VEC
+    SVC -.->|"OTLP push (metrics·logs·traces) :4318"| RCV
+    SVC -.->|"pprof push"| Pyro
+    INF -.->|"stdout"| VEC
     Kong["Kong (edge)"] -.->|"runtime logs OTLP"| RCV
 
     PROC -->|"metrics OTLP"| VMAgent --> VMSingle
@@ -71,14 +71,21 @@ flowchart TB
     VMSingle -->|"vmalert.proxyURL"| VMAlert --> VMAM
     Sloth --> VMAlert
 
-    classDef metric fill:#e6584622,stroke:#e65846;
-    classDef log fill:#22c55e22,stroke:#22c55e;
-    classDef trace fill:#3b82f622,stroke:#3b82f6;
-    classDef profile fill:#a855f722,stroke:#a855f7;
+    classDef metric fill:#ffe8cc,stroke:#e8590c,color:#111;
+    classDef log fill:#d3f9d8,stroke:#2f9e44,color:#111;
+    classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
+    classDef profile fill:#f3d9fa,stroke:#9c36b5,color:#111;
+    classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
+    class RCV,PROC,SM otc;
     class VMSingle,VMAgent metric;
     class VLogs,VEC log;
     class Tempo,Jaeger,VT trace;
     class Pyro profile;
+    style apps fill:#eef2ff,color:#111;
+    style infra fill:#d3f9d8,color:#111;
+    style col fill:#d0ebff,color:#111;
+    style be fill:#f1f3f5,color:#111;
+    style alert fill:#ffe3e3,color:#111;
 ```
 
 ## 3-Layer Service Architecture & APM Integration

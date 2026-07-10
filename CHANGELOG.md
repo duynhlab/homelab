@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **RFC-0014 observability diagrams restyled** to the OpenTelemetry-demo house
+  style — colored per-signal subgraphs, parallelogram receiver/processor/
+  exporter nodes, cylinder datastores, hexagon UI, dotted push/scrape edges
+  (`observability/README.md` Architecture, the five `rfc-0014-explainer.md`
+  flowcharts, `logging/README.md` dual-path, `tracing/architecture.md`). Visual
+  only — topology and labels unchanged.
 - **Logging & tracing docs refreshed for RFC-0014 P4** (P5 only swept the
   metrics-family docs): `logging/README.md`, `logging-standards.md` and
   `victorialogs.md` now describe the dual-path reality — app logs via the

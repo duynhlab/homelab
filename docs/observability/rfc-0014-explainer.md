@@ -52,10 +52,17 @@ flowchart TB
         vmO[(VictoriaMetrics)]
         vlO[(VictoriaLogs)]
         tO[(Tempo/Jaeger)]
-        svcO -->|"Prometheus SCRAPES /metrics (pull, 15s)"| sm --> vmO
-        svcO -->|"stdout JSON"| vecO --> vlO
-        svcO -->|"OTLP traces"| tO
+        svcO -.->|"Prometheus SCRAPES /metrics (pull, 15s)"| sm --> vmO
+        svcO -.->|"stdout JSON"| vecO --> vlO
+        svcO -.->|"OTLP traces"| tO
     end
+    classDef metric fill:#ffe8cc,stroke:#e8590c,color:#111;
+    classDef log fill:#d3f9d8,stroke:#2f9e44,color:#111;
+    classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
+    class vmO metric;
+    class vlO log;
+    class tO trace;
+    style OLD fill:#ffe3e3,color:#111;
 ```
 
 **After RFC-0014.** Every service calls one function, `obsx.SetupObservability()`.
@@ -69,15 +76,24 @@ flowchart TB
     subgraph NEW["AFTER RFC-0014 (unified, OTLP push)"]
         direction TB
         svcN["Go service<br/>obsx.SetupObservability()<br/>otelgin · otelgrpc · zap→OTLP tee"]
-        col["OpenTelemetry Collector"]
+        col[/"OpenTelemetry Collector"/]
         vmN[(VictoriaMetrics)]
         vlN[(VictoriaLogs)]
         tN[(Tempo · Jaeger · VictoriaTraces)]
-        svcN -->|"OTLP push (metrics·logs·traces) :4318"| col
+        svcN -.->|"OTLP push (metrics·logs·traces) :4318"| col
         col -->|"metrics"| vmN
         col -->|"logs (trace_id field)"| vlN
         col -->|"traces"| tN
     end
+    classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
+    classDef metric fill:#ffe8cc,stroke:#e8590c,color:#111;
+    classDef log fill:#d3f9d8,stroke:#2f9e44,color:#111;
+    classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
+    class col otc;
+    class vmN metric;
+    class vlN log;
+    class tN trace;
+    style NEW fill:#e7f5ff,color:#111;
 ```
 
 What actually moved: **metrics** (pull → push, P3) and **logs** (Vector-only →
@@ -191,11 +207,22 @@ flowchart LR
     subgraph svc["Go service"]
         z["zap logger"]
         z --> so["stdout (kubectl logs)"]
-        z -->|"otelzap tee"| ex["OTLP log exporter"]
+        z -.->|"otelzap tee"| ex[/"OTLP log exporter"/]
     end
-    ex -->|"OTLP :4318"| col["OTel Collector"]
+    subgraph noni["Non-instrumented workloads"]
+        infra["DBs · Kong · frontend<br/>(no SDK)"]
+        vec["Vector<br/>(skips app pods)"]
+        infra -.->|"stdout"| vec
+    end
+    ex -.->|"OTLP :4318"| col[/"OTel Collector"/]
     col -->|"VL-Stream-Fields: service.name"| vl[(VictoriaLogs)]
-    infra["DBs · Kong · frontend<br/>(no SDK)"] -->|"stdout"| vec["Vector<br/>(skips app pods)"] --> vl
+    vec -->|"jsonline"| vl
+    classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
+    classDef log fill:#d3f9d8,stroke:#2f9e44,color:#111;
+    class ex,col otc;
+    class vl log;
+    style svc fill:#eef2ff,color:#111;
+    style noni fill:#d3f9d8,color:#111;
 ```
 
 Detail and the dual-path rationale: [logging/README.md](logging/README.md).
@@ -218,11 +245,15 @@ which fans out to Tempo + Jaeger + VictoriaTraces (cluster) or VictoriaTraces
 flowchart LR
     kong["Kong<br/>root span + traceparent"] -->|"HTTP + traceparent"| a["service A<br/>(otelgin)"]
     a -->|"gRPC + traceparent"| b["service B<br/>(otelgrpc)"]
-    a -->|"OTLP"| col["OTel Collector"]
-    b -->|"OTLP"| col
+    a -.->|"OTLP"| col[/"OTel Collector"/]
+    b -.->|"OTLP"| col
     col --> tempo[(Tempo)]
     col --> jaeger[(Jaeger)]
     col --> vt[(VictoriaTraces)]
+    classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
+    classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
+    class col otc;
+    class tempo,jaeger,vt trace;
 ```
 
 Detail: [tracing/README.md](tracing/README.md).
@@ -288,19 +319,29 @@ with a **connector** (spanmetrics) deriving metrics from traces locally.
 ```mermaid
 flowchart LR
     subgraph col["OpenTelemetry Collector"]
-        rcv["otlp receiver<br/>:4318 (+ :4317 cluster)"]
-        ml["memory_limiter"]
-        d2c["deltatocumulative<br/>(metrics)"]
-        batch["batch"]
-        sm["spanmetrics connector<br/>(traces → RED metrics, local)"]
+        rcv[/"otlp receiver<br/>:4318 (+ :4317 cluster)"/]
+        ml[/"memory_limiter"/]
+        d2c[/"deltatocumulative<br/>(metrics)"/]
+        batch[/"batch"/]
+        sm[/"spanmetrics connector<br/>(traces → RED metrics, local)"/]
         rcv --> ml --> batch
         ml --> d2c --> batch
         rcv --> sm
     end
-    batch -->|"metrics"| vma["vmagent :8429<br/>(usePrometheusNaming,<br/>service_name→app relabel)"] --> vm[(VictoriaMetrics)]
+    batch -->|"metrics"| vma[/"vmagent :8429<br/>(usePrometheusNaming,<br/>service_name→app relabel)"/]
+    vma --> vm[(VictoriaMetrics)]
     batch -->|"logs (VL-Stream-Fields: service.name)"| vl[(VictoriaLogs)]
     batch -->|"traces"| tr[(Tempo · Jaeger · VictoriaTraces)]
     sm --> vm
+    classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
+    classDef metric fill:#ffe8cc,stroke:#e8590c,color:#111;
+    classDef log fill:#d3f9d8,stroke:#2f9e44,color:#111;
+    classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
+    class rcv,ml,d2c,batch,sm otc;
+    class vma,vm metric;
+    class vl log;
+    class tr trace;
+    style col fill:#d0ebff,color:#111;
 ```
 
 Why each processor matters: **memory_limiter** protects the Collector from OOM

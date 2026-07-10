@@ -20,11 +20,11 @@ inter-service call graph.
 - **9 Go backend services** (Go 1.26, Gin), each in its own repo + namespace, all listening on **`:8080`**, all exposing `GET /health` + `GET /ready`.
 - **1 React/Vite frontend** (SPA, served by nginx).
 - **3-layer architecture** per service: `web` (HTTP/validation/aggregation) → `logic` (business rules, no SQL) → `core` (domain + repository + DB). Frontend may only call the `web` layer.
-- **URL shape (Variant A):** `/{service}/v1/{audience}/{resource…}` with `audience ∈ public | private | internal`. The gateway (Kong in-cluster; nginx locally) is **pure pass-through** — no rewriting.
+- **URL shape (Variant A):** `/{service}/v1/{audience}/{resource…}` with `audience ∈ public | private | internal`. The gateway is **Kong in both environments** — in-cluster and in the local stack (Kong 3.9 DB-less, declarative `local-stack/gateway/kong.yml` mirroring the cluster plugins incl. the edge-JWT check on private routes). Routing is **pure pass-through** — no rewriting.
 
 ```mermaid
 flowchart TD
-    Browser["Browser SPA (React)"] -->|"HTTPS /{service}/v1/{public,private}/…"| GW["Gateway (Kong / local nginx)<br/>pass-through + CORS"]
+    Browser["Browser SPA (React)"] -->|"HTTPS /{service}/v1/{public,private}/…"| GW["Gateway (Kong — cluster & local-stack)<br/>pass-through + CORS + edge JWT"]
     GW --> AUTH[auth]
     GW --> USER[user]
     GW --> PROD[product]
@@ -61,7 +61,7 @@ The local end-to-end stack (`local-stack/compose.yaml`) mirrors the platform wit
 | notification | 8080 | `notification` | — | auth (JWKS) |
 | payment | 8080 | `payment` | — | mockpay (provider); called by order (saga + enrichment) |
 | frontend | 80 → host 3001 | — | — | gateway only |
-| gateway | 80 → host 8080 | — | — | all 9 services |
+| gateway (Kong 3.9) | 8000 → host 8080 | — | — | all 9 services |
 
 > **In-cluster differences (production):** `auth-db` (Zalando PG17 + PgBouncer);
 > `cnpg-db` (CNPG PG18 behind the **PgDog** pooler — `product`/`cart`/`order`/`payment`
@@ -290,6 +290,6 @@ the cluster ResourceSet templates.
 
 ---
 
-*Run the whole platform locally for verification: `cd local-stack && DOCKER_BUILDKIT=0 docker compose up -d --build` → SPA at http://localhost:3001, gateway at http://localhost:8080 (demo login `alice` / `password123`).*
+*Run the whole platform locally for verification: `cd local-stack && docker compose up -d --build` → SPA at http://localhost:3001, Kong gateway at http://localhost:8080 (demo login `alice` / `password123`).*
 
-_Last updated: 2026-07-10 — service catalog rebuilt as a feature matrix (+ technique index); DB footnote corrected (PgDog only, review on supporting-shared-db); saga/gRPC call graph completed (stock, shipment, money, cart-clear hops); logging unified on zap._
+_Last updated: 2026-07-10 — local gateway corrected to Kong 3.9 DB-less (the nginx stand-in was replaced); feature-matrix rebuild + DB footnote + call graph from the same day._

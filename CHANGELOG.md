@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **kong/security docs drift**: `jwt-edge` counted and marked Active
+  (10 KongClusterPlugins, ADR-006 defense-in-depth note); redis
+  rate-limiting marked done in the roadmap; user/review ingress rows
+  split (`-public`/`-private`); stale payment↛JWKS gap removed from
+  network-policies (auth admits all 9 namespaces); policy-catalog image
+  criterion corrected to the multi-level `<repo>/<image>` shape.
+
 - **observability docs OTLP drift**: dropped the fictional spanmetrics
   connector and retired `ServiceMonitor/microservices-api` references
   (OTLP push since RFC-0014 P3); RFC-0014 README + explainer corrected to

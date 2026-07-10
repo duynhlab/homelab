@@ -245,7 +245,7 @@ kubectl describe bundle homelab-ca-bundle
 kubectl get cm homelab-ca-bundle -A
 
 # Reconcile after kustomize changes
-flux reconcile kustomization cert-manager-config-local --with-source
+flux reconcile kustomization cert-manager-local --with-source
 ```
 
 ### Troubleshooting
@@ -255,7 +255,7 @@ flux reconcile kustomization cert-manager-config-local --with-source
 | Bundle status `False` | `kubectl describe bundle homelab-ca-bundle` — usually missing source ConfigMap or wrong key |
 | ConfigMap not appearing in target ns | Namespace missing the label `platform.duynhlab.dev/needs-trust=true` |
 | ConfigMap exists but is empty | trust-manager pod logs — most often the Mozilla pkg image failed to pull |
-| Old CA still in bundle after rotation | Rebuild not triggered — `flux reconcile kustomization cert-manager-config-local --with-source` |
+| Old CA still in bundle after rotation | Rebuild not triggered — `flux reconcile kustomization cert-manager-local --with-source` |
 
 ---
 
@@ -270,4 +270,4 @@ flux reconcile kustomization cert-manager-config-local --with-source
 
 ---
 
-_Last updated: 2026-07-02 — trust-manager distributes the `homelab-ca` bundle to opted-in namespaces (`platform.duynhlab.dev/needs-trust=true`); dual-PKI (public Let's Encrypt on prod + private homelab-ca; on local Kind `kong-proxy-tls` is itself `homelab-ca`-issued)._
+_Last updated: 2026-07-10 — Flux reconcile commands corrected to `cert-manager-local`. trust-manager distributes the `homelab-ca` bundle to opted-in namespaces (`platform.duynhlab.dev/needs-trust=true`); dual-PKI (public Let's Encrypt on prod + private homelab-ca; on local Kind `kong-proxy-tls` is itself `homelab-ca`-issued)._

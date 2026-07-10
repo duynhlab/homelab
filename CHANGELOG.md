@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **secrets docs accuracy**: operational OpenBAO examples corrected to the
+  deployed `http://` endpoint (TLS is RFC-0008, planned) and the target
+  `https`/`caBundle` shape labeled planned; OpenBAO-namespace field replaced by
+  KV path-prefix isolation (OSS has no namespaces); cert-manager chart pin
+  `v1.20.2`; trust-distribution reconcile commands → `cert-manager-local`.
 - **product gRPC in-cluster**: add the missing `grpc_server: true` input on
   `rsip-product` so the mop chart renders the `product-grpc` headless Service
   that order-worker's saga stock steps dial; refresh stale manifest comments

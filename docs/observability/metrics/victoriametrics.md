@@ -104,7 +104,7 @@ This is the most important concept to understand. The cluster runs **two separat
 |----------|------|---------|
 | `ServiceMonitor/external-secrets` | `configs/monitoring/servicemonitors/external-secrets.yaml` | Manual (platform team) |
 | `ServiceMonitor/tempo` | `configs/monitoring/servicemonitors/tempo.yaml` | Manual (platform team) |
-| `ServiceMonitor/kong` | `configs/monitoring/servicemonitors/kong.yaml` | Manual (platform team) |
+| `ServiceMonitor/kong` | `controllers/kong/helmrelease.yaml` (`serviceMonitor.enabled: true`) | Kong chart (scrapes the proxy status port `:8100`) |
 | `ServiceMonitor/kube-apiserver` | `configs/monitoring/servicemonitors/kube-apiserver.yaml` | Manual (platform team) |
 | `PodMonitor/postgresql-auth-db` | `configs/monitoring/podmonitors/podmonitor-zalando-auth-db.yaml` | Manual (platform team) |
 | `PodMonitor/postgresql-supporting-shared-db` | `configs/monitoring/podmonitors/podmonitor-zalando-supporting-shared-db.yaml` | Manual (platform team) |
@@ -134,13 +134,15 @@ This is the most important concept to understand. The cluster runs **two separat
 | `vmalertmanagers.operator.victoriametrics.com` | VMAlertmanager | Alert notification router |
 | `vmservicescrapes.operator.victoriametrics.com` | VMServiceScrape | VM-native version of ServiceMonitor |
 | `vmpodscrapes.operator.victoriametrics.com` | VMPodScrape | VM-native version of PodMonitor |
+| `vmnodescrapes.operator.victoriametrics.com` | VMNodeScrape | Scrapes node-level targets (kubelet / cAdvisor) |
 | `vmrules.operator.victoriametrics.com` | VMRule | VM-native version of PrometheusRule |
 | `vlsingles.operator.victoriametrics.com` | VLSingle | Single-node log storage (**apiVersion: `v1`**, not `v1beta1`) |
+| `vtsingles.operator.victoriametrics.com` | VTSingle | Single-node trace storage (pilot, **apiVersion: `v1`**) |
 | `vmclusters.operator.victoriametrics.com` | VMCluster | Distributed metrics storage (HA) |
 | `vmauths.operator.victoriametrics.com` | VMAuth | Authentication/routing proxy |
 | `vmusers.operator.victoriametrics.com` | VMUser | User access definitions |
 
-**Who creates resources using these CRDs** (5 files in this repo):
+**Who creates resources using these CRDs** (7 files in this repo):
 
 | Resource | File | Purpose |
 |----------|------|---------|
@@ -149,6 +151,8 @@ This is the most important concept to understand. The cluster runs **two separat
 | `VMAlert/victoria-metrics` | `configs/monitoring/victoriametrics/vmalert.yaml` | Rule evaluation |
 | `VMAlertmanager/victoria-metrics` | `configs/monitoring/victoriametrics/vmalertmanager.yaml` | Alert routing |
 | `VLSingle/victoria-logs` | `configs/monitoring/victoriametrics/vlsingle.yaml` | Log storage |
+| `VTSingle/victoria-traces` | `configs/monitoring/victoriametrics/vtsingle.yaml` | Trace storage (pilot) |
+| `VMNodeScrape/kubelet-{cadvisor,volume-stats}` | `configs/monitoring/victoriametrics/vmnodescrape-kubelet.yaml` | Kubelet cAdvisor + volume-stats scraping (2 CRs) |
 
 Additionally, the VM Operator **auto-creates** VM resources by converting Prometheus CRDs:
 
@@ -339,17 +343,45 @@ spec:
   configRawYaml: |
     global:
       resolve_timeout: 5m
+      # Local/dev placeholder — a syntactically valid (non-delivering) webhook so
+      # the config loads. The real webhook is injected out-of-band into OpenBAO.
+      slack_api_url: 'https://hooks.slack.com/services/T00000000/B00000000/devLocalPlaceholderXXXXXXXX'
     route:
       group_by: ['alertname', 'namespace']
       group_wait: 30s
       group_interval: 5m
       repeat_interval: 4h
-      receiver: 'default'
+      receiver: 'slack-default'
+      routes:
+        - receiver: 'slack-critical'
+          matchers: [severity="critical"]
+          continue: true
+        - receiver: 'watchdog-null'
+          matchers: [alertname="Watchdog"]
+    inhibit_rules:
+      - source_matchers: [severity="critical"]
+        target_matchers: [severity="warning"]
+        equal: ['alertname', 'namespace']
+      - source_matchers: [alertname="KubeNodeNotReady"]
+        target_matchers: [severity=~"warning|critical"]
+        equal: ['node']
+      - source_matchers: [alertname="VMServiceDown"]
+        target_matchers: [severity="warning"]
+        equal: ['job']
     receivers:
-      - name: 'default'
+      - name: 'slack-default'     # → #alerts
+        slack_configs: [{ channel: '#alerts', send_resolved: true }]
+      - name: 'slack-critical'    # → #alerts-critical
+        slack_configs: [{ channel: '#alerts-critical', send_resolved: true }]
+      - name: 'watchdog-null'     # black-hole for the always-firing Watchdog
 ```
 
-Currently configured with a `default` receiver (no-op). Add webhook, Slack, PagerDuty, or email receivers under `receivers` when alerting destinations are ready.
+Slack **is** wired: a default route to `#alerts`, a `continue: true` branch that also
+sends `severity="critical"` alerts to `#alerts-critical`, and a null receiver that
+swallows the always-firing `Watchdog`. Three `inhibit_rules` suppress warning-level
+noise once a related critical fires. The `slack_api_url` committed here is a
+non-delivering **dev placeholder**; the real webhook is injected out-of-band into
+OpenBAO (never committed to this public repo).
 
 ### VLSingle (Log Storage)
 

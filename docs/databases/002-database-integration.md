@@ -41,6 +41,7 @@ flowchart TB
         ProductSvc["Product Service - namespace: product"]
         CartSvc["Cart Service - namespace: cart"]
         OrderSvc["Order Service - namespace: order"]
+        PaymentSvc["Payment Service - namespace: payment"]
         ReviewSvc["Review Service - namespace: review"]
         UserSvc["User Service - namespace: user"]
         NotificationSvc["Notification Service - namespace: notification"]
@@ -50,7 +51,7 @@ flowchart TB
     subgraph Poolers["Connection Poolers"]
         PgBouncerAuth["PgBouncer Sidecar - Auth"]
         PgBouncerSupporting["PgBouncer Sidecar - Supporting"]
-        PgDogCNPG["PgDog - unified pooler<br/>product, cart, order, payment"]
+        PgDogCNPG["PgDog - unified pooler<br/>product, cart, order"]
     end
     
     subgraph Clusters["PostgreSQL Clusters"]
@@ -79,7 +80,7 @@ flowchart TB
     
     subgraph CloudNativePGSvc["CloudNativePG Services - Auto-created"]
         CnpgRW["cnpg-db-rw - Primary Endpoint"]
-        CnpgR["cnpg-db-r - Replica Endpoint"]
+        CnpgR["cnpg-db-r - Read Endpoint (any instance, incl. primary)"]
     end
     
     Zalando --> AuthDBCluster
@@ -88,6 +89,7 @@ flowchart TB
     CloudNativePG --> CnpgDR
     
     CnpgRW --> CnpgPrimaryNode
+    CnpgR --> CnpgPrimaryNode
     CnpgR --> CnpgReplica1
     CnpgR --> CnpgReplica2
     
@@ -98,6 +100,7 @@ flowchart TB
     OrderSvc -->|via pooler| PgDogCNPG
     PgDogCNPG --> CnpgRW
     PgDogCNPG --> CnpgR
+    PaymentSvc -->|direct TLS| CnpgRW
     ReviewSvc -->|via pooler| PgBouncerSupporting
     UserSvc -->|via pooler| PgBouncerSupporting
     NotificationSvc -->|via pooler| PgBouncerSupporting
@@ -121,7 +124,7 @@ flowchart TB
 | CloudNativePG | cnpg-db     | order        | order                      | order      | Manual (`cnpg-db-order-secret`) | `cnpg-db-rw.product:5432` | PgDog      | 3 (1 primary + 2 replicas)     | CNPG sync (ANY 1)        | order       |
 | CloudNativePG | cnpg-db     | payment      | payment                    | product + payment | Manual (`cnpg-db-payment-secret`) | `cnpg-db-rw.product:5432` (direct TLS, **not** PgDog) | — (direct) | 3 (1 primary + 2 replicas)     | CNPG sync (ANY 1)        | payment     |
 | CloudNativePG | cnpg-db-replica | —        | —                          | product    | —                         | —                          | —          | 1 (DR replica)                 | Object-store recovery    | product     |
-| CloudNativePG | temporal-db | temporal     | temporal                   | temporal   | Auto (CNPG `temporal-db-app`) | `temporal-db-rw.temporal:5432` | — (direct) | 1 (single instance)            | Single (no HA yet)       | temporal    |
+| CloudNativePG | temporal-db | temporal, temporal_visibility | temporal                   | temporal   | Auto (CNPG `temporal-db-app`) | `temporal-db-rw.temporal:5432` | — (direct) | 1 (single instance)            | Single (no HA yet)       | temporal    |
 | Zalando       | auth-db        | auth         | auth                       | auth       | Auto (operator)            | `auth-db.auth:5432`           | PgBouncer  | 3 (1 leader + 2 standbys)      | Patroni HA               | auth        |
 | Zalando       | supporting-shared-db  | user         | user                       | user       | Auto (operator)            | `supporting-shared-db.user:5432`     | PgBouncer  | 1 (single instance)            | Patroni (single)         | user        |
 | Zalando       | supporting-shared-db  | notification | notification.notification  | notification| Auto (cross-ns)           | `supporting-shared-db.user:5432`     | PgBouncer  | 1 (single instance)            | Patroni (single)         | user        |

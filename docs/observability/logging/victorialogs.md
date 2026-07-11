@@ -163,10 +163,11 @@ The Vector config includes:
 ## Vector self-monitoring
 
 Vector exposes its own metrics in **Prometheus text format** (`internal_metrics`
-source → `prometheus_exporter` sink on port `9090`). VMAgent scrapes them
-(`ServiceMonitor` → `VMServiceScrape`, converted by the VM Operator, 30s interval)
-and remote-writes to VMSingle, so pipeline health is queryable in Grafana against
-the VictoriaMetrics datasource like any other workload.
+source → `prometheus_exporter` sink on port `9090`). The Vector chart's
+`podMonitor.enabled` creates a `PodMonitor`, which the VM Operator converts to a
+`VMPodScrape`; VMAgent scrapes it and remote-writes to VMSingle, so pipeline
+health is queryable in Grafana against the VictoriaMetrics datasource like any
+other workload.
 
 Key metrics (PromQL):
 

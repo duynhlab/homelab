@@ -125,13 +125,13 @@ Two dashboards adapted from [Pigsty](https://github.com/pgsty/pg_exporter/tree/m
 
 ## Recording Rules (pg_exporter)
 
-File: `kubernetes/infra/configs/monitoring/prometheusrules/pg-exporter-recording-rules.yaml`
+File: `kubernetes/infra/configs/monitoring/prometheusrules/postgres/pg-exporter-recording-rules.yaml`
 
 44 Prometheus recording rules required by the PG Exporter Instance dashboard, adapted from [Pigsty pgsql.yml](https://github.com/pgsty/pigsty/blob/main/files/victoria/rules/pgsql.yml).
 
 | Group | Rules | Description |
 |---|---|---|
-| pg-exporter-db | 22 | Database-level: `rate()` / `increase()` over `pg_db_*`, `pg_lock_count`, `pg_activity_count` |
+| pg-exporter-db | 23 | Database-level: `rate()` / `increase()` over `pg_db_*`, `pg_lock_count`, `pg_activity_count` |
 | pg-exporter-ins | 18 | Instance-level: `sum without(datname)` aggregations + WAL/timeline |
 | pg-exporter-cls | 1 | Cluster-level: `sum by (job, cls)` |
 | pg-exporter-objects | 2 | Table scan rate + query call rate |

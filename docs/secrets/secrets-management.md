@@ -48,7 +48,7 @@ flowchart LR
 
 | Component | Purpose | Namespace | Version |
 |-----------|---------|-----------|---------|
-| OpenBAO (HA) | Secret storage (3-node Raft) | `openbao` | 2.5.2 (Chart 0.26.2) |
+| OpenBAO (HA) | Secret storage (3-node Raft) | `openbao` | 2.5.x |
 | External Secrets Operator | Sync secrets to K8s | `external-secrets-system` | **v2.5.0** |
 | ClusterSecretStore | OpenBAO connection config | cluster-scoped | `openbao` |
 | ClusterExternalSecret | Shared secrets across namespaces | cluster-scoped | Backup creds |

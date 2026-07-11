@@ -283,7 +283,7 @@ the cluster ResourceSet templates.
 | Internal `POST /users` has no in-cluster caller | user | Wired to real persistence; auth registers into its own DB |
 | Internal HTTP notify twins + gRPC `SendSMS` unused | notification | No caller (saga emails go via gRPC `SendEmail`) |
 | Internal HTTP `GET /orders/:orderId` redundant | shipping | No caller — order reads shipment over gRPC |
-| Internal routes rely on NetworkPolicy, no in-app caller auth | product, user, cart, shipping, notification | NetworkPolicies authored (see [`../security/`](../security/)); enforced only with an enforcing CNI |
+| Internal routes rely on NetworkPolicy, no in-app caller auth | product, user, cart, shipping, notification | NetworkPolicies authored (see [`../security/`](../security/)); enforced (kindnet on Kind 1.34+; policy CNI in prod) |
 | Saga email recipient hardcoded (`noreply@orders.local`) | order, notification | Real customer-email lookup is a noted TODO |
 | Review findings (auth fail-open, IDOR, seed-seq desync, hardcoded user_id) | notification | Fixed (parity with sibling services) |
 | Seed sequence resets (PK collisions on first INSERT) | auth, cart, review, shipping | Fixed via `V*__fix_sequences.sql` migrations |

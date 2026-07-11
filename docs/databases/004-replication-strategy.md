@@ -16,6 +16,7 @@ You are running **4 operational PostgreSQL clusters** (incl. `temporal-db`) + **
 | **cnpg-db-replica** | CloudNativePG | product | 1 | DR (restore from object store) | — | DR replica of cnpg-db |
 | **auth-db** | Zalando | auth | 3 | Async (`local`) | PgBouncer | auth |
 | **supporting-shared-db** | Zalando | user | 1 | N/A (single node) | PgBouncer | user, notification, shipping, review |
+| **temporal-db** | CloudNativePG | temporal | 1 | N/A (single node, no backup) | — | temporal (`temporal`, `temporal_visibility`) |
 
 ### Architecture Diagram
 
@@ -511,22 +512,22 @@ Large hyperscale deployments scale PostgreSQL to hundreds of millions of users w
 
 ## 11. Summary Table for Your Infrastructure
 
-| Feature | cnpg-db | cnpg-db-replica | auth-db | supporting-shared-db |
-| :--- | :--- | :--- | :--- | :--- |
-| **Replication Type** | Physical (HA) + Logical (CDC) | Physical (DR from object store) | Physical | N/A (1 node) |
-| **Sync Mode** | Synchronous (`on`, ANY 1) | N/A (async catch-up from archive) | Async (`local`) | N/A |
-| **Instances** | 3 | 1 | 3 | 1 |
-| **Pooler** | PgDog | — | PgBouncer | PgBouncer |
-| **Databases** | product, cart, order, payment | mirror of cnpg-db (DR) | auth | user, notification, shipping, review |
-| **Failover RPO** | **0** (for commits acknowledged per sync policy) | Depends on restore/replay lag | >0 (Possible small loss) | N/A |
-| **Failover RTO** | Seconds (Auto) | Workflow-dependent (DR) | Seconds (Auto) | N/A |
-| **PITR Status** | Configured | Configured | Configured | Configured |
+| Feature | cnpg-db | cnpg-db-replica | auth-db | supporting-shared-db | temporal-db |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Replication Type** | Physical (HA) + Logical (CDC) | Physical (DR from object store) | Physical | N/A (1 node) | N/A (1 node) |
+| **Sync Mode** | Synchronous (`on`, ANY 1) | N/A (async catch-up from archive) | Async (`local`) | N/A | N/A |
+| **Instances** | 3 | 1 | 3 | 1 | 1 |
+| **Pooler** | PgDog | — | PgBouncer | PgBouncer | — |
+| **Databases** | product, cart, order, payment | mirror of cnpg-db (DR) | auth | user, notification, shipping, review | temporal, temporal_visibility |
+| **Failover RPO** | **0** (for commits acknowledged per sync policy) | Depends on restore/replay lag | >0 (Possible small loss) | N/A | N/A |
+| **Failover RTO** | Seconds (Auto) | Workflow-dependent (DR) | Seconds (Auto) | N/A | N/A |
+| **PITR Status** | Configured | Configured | Configured | Configured | Not configured (no backup) |
 
 ### Operators
 
 | Operator | Clusters | PostgreSQL Version |
 |----------|----------|-------------------|
-| **CloudNativePG** | cnpg-db, cnpg-db-replica | 18 |
+| **CloudNativePG** | cnpg-db, cnpg-db-replica, temporal-db | 18 |
 | **Zalando Postgres Operator** | auth-db, supporting-shared-db | 16/17 |
 
 ---

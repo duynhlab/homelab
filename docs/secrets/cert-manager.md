@@ -400,7 +400,7 @@ kubectl describe clusterissuer letsencrypt-staging
 kubectl get certificate,certificaterequest,order,challenge -A
 
 # One certificate detail
-kubectl -n auth describe certificate auth-tls
+kubectl -n kong describe certificate kong-proxy-tls
 
 # cert-manager logs
 kubectl -n cert-manager logs deploy/cert-manager -f

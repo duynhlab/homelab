@@ -37,7 +37,7 @@ PostgreSQL uses a **process-based model** where each connection spawns a new OS 
 | Cluster(s) | Pooler | Scope |
 | :--- | :--- | :--- |
 | `auth-db`, `supporting-shared-db` | PgBouncer (Zalando sidecar) | Per Zalando cluster |
-| `cnpg-db` | PgDog (Helm) | **product**, **cart**, and **order** databases on the unified CNPG primary |
+| `cnpg-db` | PgDog (Helm) | **product**, **cart**, **order**, and **payment** databases on the unified CNPG primary |
 
 ---
 
@@ -69,7 +69,7 @@ PostgreSQL uses a **process-based model** where each connection spawns a new OS 
 ---
 
 ### 3.2. PgCat (Standalone / Router)
-**Used by**: **Not used for CloudNativePG in this platform.** CNPG workloads previously split across separate clusters now run on a single primary cluster (`cnpg-db`); **PgDog** handles connection pooling and routing for **product**, **cart**, and **order** databases (see §3.3). PgCat remains documented here for comparison with PgDog and for teams evaluating Rust-based routers.
+**Used by**: **Not used for CloudNativePG in this platform.** CNPG workloads previously split across separate clusters now run on a single primary cluster (`cnpg-db`); **PgDog** handles connection pooling and routing for **product**, **cart**, **order**, and **payment** databases (see §3.3). PgCat remains documented here for comparison with PgDog and for teams evaluating Rust-based routers.
 
 **Architecture (reference):**
 - **Standalone Deployment**: Typical pattern is a separate Deployment (e.g. per namespace).

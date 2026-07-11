@@ -175,7 +175,7 @@ kubectl get prometheusservicelevel -n monitoring
 ```
 
 **Expected State:**
-- Namespaces for every domain provisioned (auth, user, product, cart, order, review, notification, shipping, payment, frontend, kong, cert-manager, openbao, external-secrets-system, monitoring, apm, databases-cnpg-system, databases-zalando, kyverno, flux-system, …).
+- Namespaces for every domain provisioned (auth, user, product, cart, order, review, notification, shipping, payment, frontend, kong, cert-manager, openbao, external-secrets-system, monitoring, cloudnative-pg, postgres-operator, database, kyverno, flux-system, …).
 - 5 ResourceSets (`rs-identity`, `rs-catalog`, `rs-checkout`, `rs-comms`, `rs-frontend`) successfully reconciled.
 - HelmReleases for the 9 microservices + frontend, plus the `mockpay` and `order-worker` releases (in the `payment` / `order` namespaces), in `Ready` state.
 - 4 PostgreSQL clusters (`auth-db`, `supporting-shared-db`, `cnpg-db`, `temporal-db`) + 1 DR replica (`cnpg-db-replica`) operational.
@@ -365,12 +365,13 @@ homelab/
 │   ├── infra/                          # Core infrastructure definitions
 │   │   ├── controllers/                # Operators and CRD definitions
 │   │   │   ├── namespaces.yaml         # Cluster-wide namespace definitions
-│   │   │   ├── monitoring/             # VictoriaMetrics and Grafana operators
+│   │   │   ├── metrics/                # VictoriaMetrics and Grafana operators
+│   │   │   ├── tracing/                # Tempo operator (traces)
+│   │   │   ├── profiling/              # Pyroscope (profiles)
 │   │   │   ├── databases/              # Database orchestration operators
 │   │   │   └── slo/                    # Service Level Objective operator
 │   │   ├── configs/                    # Component instances and configurations
 │   │   │   ├── monitoring/             # Grafana resources and ServiceMonitors
-│   │   │   ├── apm/                    # APM stack (Tempo, Pyroscope)
 │   │   │   ├── databases/              # PostgreSQL clusters and poolers
 │   │   │   └── slo/                    # SLO definitions (PrometheusServiceLevel)
 │   │   └── kustomization.yaml
@@ -411,10 +412,10 @@ homelab/
 2. `secrets-local`: Deploys OpenBAO + ESO and runs the OpenBAO bootstrap Job (Depends on `controllers-local`).
 3. `cert-manager-local`: ClusterIssuers (`selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod`), `kong-proxy-tls` Certificate, trust-manager Bundle (Depends on `controllers-local`, `secrets-local` — needs the synced `cloudflare-api-token` Secret).
 4. `kong-local`: Kong HelmRelease (Depends on `cert-manager-local` — mounts `kong-proxy-tls` Secret as a volume).
-5. `kong-config-local`: KongClusterPlugins + Ingress resources for every host (Depends on `kong-local`).
+5. `kong-config-local`: KongClusterPlugins + Ingress resources for every host (Depends on `kong-local`, `cert-manager-local`).
 6. `monitoring-local`: Deploys observability stack (Depends on `controllers-local`).
 7. `storage-local`: Provisions RustFS (S3) object storage (Depends on `controllers-local`, `secrets-local`).
-7a. `caching-local`: Valkey (product cache-aside db 0 + Kong rate-limit counters db 1 — on the gateway request path) (Depends on `controllers-local`).
+7a. `caching-local`: Valkey (product cache-aside db 0 + Kong rate-limit counters db 1 — on the gateway request path) (Depends on `controllers-local`, `monitoring-local`).
 8. `network-policies-local`: Provisions per-namespace NetworkPolicies so operators never race an un-fenced namespace (Depends on `controllers-local`).
 9. `tracing-local`: Deploys Tempo (Depends on `secrets-local`, `storage-local` — kept out of `controllers-local` to avoid a wave deadlock).
 10. `profiling-local`: Deploys Pyroscope (Depends on `secrets-local`, `storage-local` — same rationale as `tracing-local`).

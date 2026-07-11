@@ -99,7 +99,7 @@ local PVC only holds the v2 metastore (raft) and scratch, so a pod restart loses
 
 ## How it works in this platform
 
-**Client (`pkg/obsx/profiling.go`, pkg `v0.10.0`)** — `obsx.SetupProfiling()` wraps the
+**Client (`pkg/obsx/profiling.go`, pkg `v0.18.1`)** — `obsx.SetupProfiling()` wraps the
 `pyroscope-go` SDK (`v1.3.1`; span linking via `otel-profiling-go` `v0.6.0`):
 
 - **Identity** = `OTEL_SERVICE_NAME` → the Pyroscope `service_name` series (the same
@@ -264,4 +264,4 @@ Set `PROFILING_ENABLED=false` to opt a service out.
 - [Traces to profiles](https://grafana.com/docs/grafana/latest/datasources/pyroscope/configure-traces-to-profiles/)
 
 ---
-_Last updated: 2026-07-02 — Pyroscope 2.1.0 (Helm, v2/single-binary), RustFS S3 7d retention, `obsx.SetupProfiling` (pkg v0.10.0), local-stack profiling enabled._
+_Last updated: 2026-07-02 — Pyroscope 2.1.0 (Helm, v2/single-binary), RustFS S3 7d retention, `obsx.SetupProfiling` (pkg v0.18.1), local-stack profiling enabled._

@@ -26,7 +26,7 @@ docs/
 │   ├── rfc/                      # Requests for Comments
 │   │   ├── README.md             # process + index + backlog
 │   │   ├── RFC-0000/             # template
-│   │   └── RFC-0001 … RFC-0014   # Temporal, mTLS, …, payment service, Talos migration, declarative CNPG roles, metrics audit & scale playbook, full OpenTelemetry adoption
+│   │   └── RFC-0001 … RFC-0015   # Temporal, mTLS, …, payment service, Talos migration, declarative CNPG roles, metrics audit & scale playbook, full OpenTelemetry adoption, checkout service
 │   └── *.md                      # loose reviews/roadmaps (auth-gateway, kong, otel-sampling; some .vi.md)
 ├── databases/                    # Database documentation
 │   ├── 002-database-integration.md               # PostgreSQL architecture
@@ -214,9 +214,9 @@ docs/
 4. **[Jaeger Guide](./observability/tracing/jaeger.md)** - Jaeger UI usage, comparison with Tempo
 5. **[Backend Comparison](./observability/tracing/backends-comparison.md)** - Tempo vs Jaeger vs VictoriaTraces (+ roadmap)
 6. **[VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md)** - 3rd backend via the VM operator
-5. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
-6. **[Logging](./observability/logging/README.md)** - Architecture: OTLP app logs (otelzap tee) + Vector for non-instrumented pods, scaling
-7. **[VictoriaLogs](./observability/logging/victorialogs.md)** - VictoriaLogs deployment and configuration
+7. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
+8. **[Logging](./observability/logging/README.md)** - Architecture: OTLP app logs (otelzap tee) + Vector for non-instrumented pods, scaling
+9. **[VictoriaLogs](./observability/logging/victorialogs.md)** - VictoriaLogs deployment and configuration
     - OTLP app-log ingest + Vector for non-instrumented pods (DB/Kong/frontend/infra)
     - PostgreSQL auto_explain plan parsing pipeline
     - Verification and troubleshooting
@@ -367,7 +367,7 @@ docs/
 - [Architecture](./databases/007-architecture.md) - Database architecture overview
 - [Backup Strategy](./databases/006-backup-strategy.md) - Backup architecture and retention
 - [Extensions](./databases/009-extensions.md) - PostgreSQL extensions (operand built-in vs Image Volume models)
-- [Connection Poolers](./databases/008-pooler.md) - PgBouncer, PgCat, PgDog
+- [Connection Poolers](./databases/008-pooler.md) - PgBouncer, PgCat (legacy), PgDog
 - [Replication Strategy](./databases/004-replication-strategy.md) - Replication strategy
 - [HA & DR Deep Dive](./databases/005-ha-dr-deep-dive.md) - cnpg-db vs cnpg-db-replica (object-store DR)
 - [PostgreSQL DRP](./databases/010-drp.md) - DRP, RTO/RPO, PITR, standby taxonomy, and restore evidence

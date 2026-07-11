@@ -17,7 +17,7 @@ spec:
         tags:
         - trace_id
       tracesToMetrics:
-        datasourceUid: prometheus
+        datasourceUid: victoriametrics
     name: VictoriaTraces
     type: jaeger
     uid: victoriatraces

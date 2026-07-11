@@ -40,7 +40,7 @@ for in-cluster (east-west) traffic. Same path, different host — Kong just forw
 | `public` | Anonymous callers — no JWT required | Yes | N/A |
 | `private` | Authenticated user — `Authorization: Bearer <JWT>` | Yes | Kong edge `jwt` (coarse filter) + service middleware (`pkg/authmw` verifies RS256 locally against the cached JWKS) |
 | `protected` | Signed webhooks / partner HMAC / IP allowlist — **planned, none deployed yet** | Not yet (planned) | Per-route plugin or service middleware |
-| `internal` | Pod → Service — cluster-only | **No — never** | Kong not exposing the route + NetworkPolicies (LIVE — kindnet enforces on K8s 1.30+) |
+| `internal` | Pod → Service — cluster-only | **No — never** | Kong not exposing the route + NetworkPolicies (LIVE — kindnet enforces on K8s 1.34+) |
 
 **Kong enforcement:** each `api-*` Ingress has one or two explicit `path:` entries — `/{service}/v1/public/` and/or `/{service}/v1/private/`. Internal audiences are never added to Ingress rules, so requests to `https://gateway.duynh.me/notification/v1/internal/notify/email` resolve to Kong's default 404.
 

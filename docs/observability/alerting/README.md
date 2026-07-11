@@ -132,7 +132,7 @@ Direct metric threshold checks. Fire immediately when a condition is met.
 
 > The scrape-era **Saturation** group (`MicroserviceHighRequestsInFlight` / `…Critical`) retired with the cutover — otelgin v0.69 emits no `http.server.active_requests`. The two GC-pause alerts collapsed into `MicroserviceGCThrash` (no OTel GC-pause metric). `MicroserviceDown`/`…AllInstancesDown` moved from `up{}` scrape liveness to a `go_goroutine_count` heartbeat-absence check (D-4).
 
-**PostgreSQL alerts** ([`prometheusrules/postgres/`](../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/README.md)): CNPG chart-aligned rules under `postgres/cnpg/` (e.g. `CNPGClusterOffline`, HA, replication, disk, logical replication) and Zalando rules under `postgres/zalando/` (`PostgresDown`, `custom_*` saturation, etc.). Backup alerts remain in `postgres-backup-alerts.yaml`.
+**PostgreSQL alerts** ([`prometheusrules/postgres/`](../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/README.md)): CNPG chart-aligned rules under `postgres/cnpg/` (e.g. `CNPGClusterOffline`, HA, replication, disk, logical replication) and Zalando rules under `postgres/zalando/` (`PostgresDown`, `custom_*` saturation, etc.). Backup alerts remain in `postgres/backup-alerts.yaml`.
 
 **Recording rules** (`microservices/recording-rules.yaml`):
 

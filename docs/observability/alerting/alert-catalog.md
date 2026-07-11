@@ -19,7 +19,7 @@ the end-to-end pipeline (ingestion → VMAlert → Alertmanager → notify), see
 
 ## Summary
 
-**149 statically-defined alerts** across 11 domains, plus **48 Sloth-generated** SLO
+**149 statically-defined alerts** across 9 domains, plus **48 Sloth-generated** SLO
 burn-rate alerts (2 × 24 SLOs). The 24 SLOs cover the original 8 catalog/identity/comms
 services; `payment` ships no SLO yet.
 

@@ -142,8 +142,8 @@ flowchart TD
         end
     end
 
-    subgraph autounseal["Auto-Unseal"]
-        kind_unseal["Transit (local Kind)\nopenbao-unseal instance"]
+    subgraph autounseal["Unseal"]
+        kind_unseal["openbao-unsealer CronJob (local Kind)\nre-reads Shamir key from Secret, every minute"]
         eks_kms["AWS KMS\n(EKS / Production)"]
         gke_kms["GCP Cloud KMS\n(GKE / Production)"]
     end
@@ -201,7 +201,7 @@ Unsealing is the process of decrypting the root key so OpenBAO can serve request
 
 ```mermaid
 flowchart LR
-    subgraph shamir["Shamir Seal (default / local Kind)"]
+    subgraph shamir["Shamir Seal (production ceremony)"]
         sk["Unseal Key\nsplit into 5 shards\nthreshold: 3"]
         op1["Operator 1\n(holds shard 1)"]
         op2["Operator 2\n(holds shard 2)"]
@@ -216,10 +216,10 @@ flowchart LR
         kms --> env --> bao_a["OpenBAO Auto-Unseals\non pod start"]
     end
 
-    subgraph autounseal_transit["Transit Auto-Unseal (local Kind)"]
-        unseal_cluster["openbao-unseal\n(standalone, minimal)\nUnsealed manually once"]
-        transit_key["Transit Key: autounseal"]
-        unseal_cluster --> transit_key --> bao_t["HA Cluster Auto-Unseals\nvia Transit API"]
+    subgraph autounseal_local["Automated Unseal (local Kind)"]
+        unseal_secret["Shamir key: 1 share, threshold 1\nin K8s Secret openbao-init-keys"]
+        unsealer_cron["openbao-unsealer CronJob\n(runs every minute)"]
+        unseal_secret --> unsealer_cron --> bao_t["HA Cluster re-unsealed\nafter any restart"]
     end
 ```
 
@@ -341,11 +341,11 @@ Used for infrastructure credentials that cannot be dynamic (S3 backup keys, pool
 secret/{environment}/{category}/{service}/{resource}
 ```
 
-| Environment | Vault Namespace | Use |
+| Environment | KV path prefix | Use |
 |-------------|----------------|-----|
-| `local` | `local/` | Kind cluster |
-| `staging` | `staging/` | Staging environment |
-| `prod` | `prod/` | EKS / GKE production |
+| `local` | `secret/local/` | Kind cluster |
+| `staging` | `secret/staging/` | Staging environment |
+| `prod` | `secret/prod/` | EKS / GKE production |
 
 **Current KV paths** (seeded at bootstrap):
 
@@ -767,42 +767,29 @@ path "database/creds/*-readonly" {
 
 ---
 
-## 9. Namespaces (Multi-Environment)
+## 9. Multi-Environment (KV Path Prefixes)
 
-OpenBAO namespaces provide isolated environments within a single cluster instance. Each namespace has its own secret engines, auth methods, and policies.
+OpenBAO OSS has **no namespaces** (that is an Enterprise feature — consistent with §7). Multiple environments share a single instance, isolated by **KV v2 path prefixes** under one `secret/` mount (`secret/{environment}/…`) plus scoped policies. A single ESO `ClusterSecretStore` (`openbao`) targets that mount.
 
 ```mermaid
 flowchart TD
-    subgraph root_ns["Root Namespace"]
-        admin_auth["Admin Auth Methods\n(devops OIDC)\nManages child namespaces"]
+    subgraph instance["Single OpenBAO Instance — secret/ (KV v2 mount)"]
+        local_p["secret/local/…\nDev secrets, local values"]
+        staging_p["secret/staging/…\nStaging values (future)"]
+        prod_p["secret/prod/…\nProduction secrets (future EKS/GKE)"]
     end
 
-    subgraph local_ns["Namespace: local/"]
-        l_kv["KV v2: secret/\nDev secrets, local values"]
-        l_db["Database Engine\nPoints to Kind cluster DBs"]
-        l_auth["K8s Auth\nKind cluster SA tokens"]
+    subgraph auth["Auth + Policies"]
+        k8s_auth["K8s Auth\n(SA tokens)"]
+        policies["Scoped policies\n(per-prefix read paths)"]
     end
 
-    subgraph staging_ns["Namespace: staging/ (future)"]
-        s_kv["KV v2: secret/\nStaging values"]
-        s_db["Database Engine\nPoints to staging DBs"]
+    subgraph eso_store["ESO ClusterSecretStore"]
+        css["ClusterSecretStore: openbao\n(single store, all prefixes)"]
     end
 
-    subgraph prod_ns["Namespace: prod/ (future EKS/GKE)"]
-        p_kv["KV v2: secret/\nProduction secrets\n(no dev access)"]
-        p_db["Database Engine\nPoints to production DBs"]
-        p_auth["K8s Auth\nEKS/GKE SA tokens\n+ IRSA / Workload Identity"]
-    end
-
-    root_ns -->|"delegates admin"| local_ns & staging_ns & prod_ns
-
-    subgraph eso_stores["ESO ClusterSecretStores"]
-        css_local["ClusterSecretStore: openbao-local\nnamespace: local"]
-        css_prod["ClusterSecretStore: openbao-prod\nnamespace: prod"]
-    end
-
-    local_ns --> css_local
-    prod_ns --> css_prod
+    k8s_auth --> policies --> instance
+    instance --> css
 ```
 
 ---
@@ -968,7 +955,7 @@ kubectl exec -n openbao openbao-0 -- \
 
 ```bash
 # Rotate S3 backup credentials
-bao kv put local/secret/infra/rustfs/backup-cnpg \
+bao kv put secret/local/infra/rustfs/backup-cnpg \
   access_key_id=<new-key> \
   secret_access_key=<new-secret>
 

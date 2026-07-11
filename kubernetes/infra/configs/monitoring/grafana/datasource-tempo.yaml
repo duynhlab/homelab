@@ -8,13 +8,13 @@ spec:
     access: proxy
     jsonData:
       serviceMap:
-        datasourceUid: prometheus
+        datasourceUid: victoriametrics
       tracesToLogsV2:
         datasourceUid: victorialogs
         tags:
         - trace_id
       tracesToMetrics:
-        datasourceUid: prometheus
+        datasourceUid: victoriametrics
       tracesToProfiles:
         datasourceUid: pyroscope
         tags:

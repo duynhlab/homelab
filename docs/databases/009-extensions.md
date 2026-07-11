@@ -101,7 +101,7 @@ The consolidated `cnpg-db` cluster uses the **`system-trixie`** image (`ghcr.io/
 - **`auth-db`** (PostgreSQL 17): 
   - `shared_preload_libraries: "pg_stat_statements,pg_cron,pg_trgm,pgcrypto,pg_stat_kcache"`
 - **`supporting-shared-db`** (PostgreSQL 16):
-  - `shared_preload_libraries: "pg_stat_statements,pg_cron,pg_trgm,pgcrypto,pg_stat_kcache"`
+  - `shared_preload_libraries: "pg_stat_statements,pg_cron,pgcrypto,pg_stat_kcache,pgaudit"`
 
 ### Compatibility Check
 
@@ -120,7 +120,7 @@ The consolidated `cnpg-db` cluster uses the **`system-trixie`** image (`ghcr.io/
 
 ### The `parameters` Field vs the Dedicated Field
 
-In CloudNativePG 1.28, `shared_preload_libraries` is a **fixed parameter** and **cannot** be set via `spec.postgresql.parameters`. Attempting to do so results in:
+In CloudNativePG 1.30, `shared_preload_libraries` is a **fixed parameter** and **cannot** be set via `spec.postgresql.parameters`. Attempting to do so results in:
 
 ```
 Cluster.postgresql.cnpg.io "cnpg-db" is invalid: 
@@ -178,7 +178,7 @@ CloudNativePG supports the dynamic loading of PostgreSQL extensions into a Clust
 - Reduce operational surface with immutable, minimal base images
 
 **Requirements**:
-- PostgreSQL 18 or later ✅ (default in CloudNativePG 1.28)
+- PostgreSQL 18 or later ✅ (default in CloudNativePG 1.30)
 - Kubernetes 1.33+ with `ImageVolume` feature gate enabled ✅
 - Container runtime: containerd v2.1.0+ or CRI-O v1.31+ ✅
 - Extension container images matching PostgreSQL version, OS, and CPU architecture
@@ -722,7 +722,9 @@ Zalando Postgres Operator (v1.15.1) **allows** setting `shared_preload_libraries
 
 **Current Implementation**:
 
-All Zalando clusters use the same extension set:
+The two Zalando clusters use slightly different extension sets — `auth-db`
+includes `pg_trgm` (no `pgaudit`), while `supporting-shared-db` includes
+`pgaudit` (no `pg_trgm`):
 
 ```yaml
 apiVersion: acid.zalan.do/v1
@@ -733,7 +735,10 @@ spec:
   postgresql:
     version: "16"  # or "17" for auth-db
     parameters:
+      # auth-db:
       shared_preload_libraries: "pg_stat_statements,pg_cron,pg_trgm,pgcrypto,pg_stat_kcache"
+      # supporting-shared-db:
+      # shared_preload_libraries: "pg_stat_statements,pg_cron,pgcrypto,pg_stat_kcache,pgaudit"
       track_io_timing: "on"
       pg_stat_statements.max: "1000"
       pg_stat_statements.track: "all"
@@ -743,9 +748,10 @@ spec:
 **Extensions Used**:
 - **pg_stat_statements**: Query performance monitoring
 - **pg_cron**: Job scheduling
-- **pg_trgm**: Trigram matching for text search
+- **pg_trgm**: Trigram matching for text search (`auth-db` only)
 - **pgcrypto**: Cryptographic functions
 - **pg_stat_kcache**: Kernel-level cache statistics
+- **pgaudit**: Audit logging (`supporting-shared-db` only)
 
 **Adding pgAudit to Zalando Clusters**:
 
@@ -822,9 +828,9 @@ spec:
 
 **To Apply Changes**:
 ```bash
-# Recreate Kind cluster với ImageVolume enabled
+# Recreate Kind cluster with ImageVolume enabled
 make clean-all  # Clean existing cluster
-make cluster-up # Create new cluster với updated config
+make cluster-up # Create new cluster with updated config
 ```
 
 **Verify Feature Gate**:
@@ -895,7 +901,7 @@ kubectl exec -it <pod-name> -n <namespace> -- ls -la /extensions/<extension-name
 **`cnpg-db`** (consolidated: product, cart, order, payment):
 - **Image**: `system-trixie` (all extensions built-in)
 - **`shared_preload_libraries`**: pgaudit, pg_stat_statements, auto_explain
-- **Database resource** (product): pgaudit, pg_stat_statements, pgcrypto, uuid-ossp; (cart, order): pgaudit, pg_stat_statements — **auto_explain is preload-only, never in a Database resource**
+- **Database resource** (product): pgaudit, pg_stat_statements, pgcrypto, uuid-ossp; (cart, order, payment): pgaudit, pg_stat_statements — **auto_explain is preload-only, never in a Database resource**
 - **Status**: ✅ Fully configured
 
 **`pgAudit`** (Audit Logging) - ✅ **Currently Implemented**:
@@ -1002,9 +1008,9 @@ kubectl describe database order-database -n cart
 
 ## References
 
-- [CloudNativePG Image Volume Extensions](https://cloudnative-pg.io/docs/1.28/imagevolume_extensions/)
-- [CloudNativePG PostgreSQL Configuration](https://cloudnative-pg.io/docs/1.28/postgresql_conf/)
-- [CloudNativePG Declarative Database Management](https://cloudnative-pg.io/docs/1.28/declarative_database_management/)
+- [CloudNativePG Image Volume Extensions](https://cloudnative-pg.io/docs/1.30/imagevolume_extensions/)
+- [CloudNativePG PostgreSQL Configuration](https://cloudnative-pg.io/docs/1.30/postgresql_conf/)
+- [CloudNativePG Declarative Database Management](https://cloudnative-pg.io/docs/1.30/declarative_database_management/)
 - [PostgreSQL Extensions Containers](https://github.com/cloudnative-pg/postgres-extensions-containers)
 - [Kubernetes 1.33 Image Volumes Beta](https://kubernetes.io/blog/2025/04/29/kubernetes-v1-33-image-volume-beta/)
 - [Kind Feature Gates Configuration](https://kind.sigs.k8s.io/docs/user/configuration/#feature-gates)
@@ -1029,9 +1035,9 @@ kubectl describe database order-database -n cart
 
 | Cluster | Operator | Image | Preloaded | Database Resource Extensions |
 |---------|----------|-------|-----------|------------------------------|
-| `cnpg-db` | CloudNativePG | `system-trixie` | pgaudit, pg_stat_statements, auto_explain | product: pgaudit, pg_stat_statements, pgcrypto, uuid-ossp; cart/order: pgaudit, pg_stat_statements (auto_explain is preload-only, not a Database resource) |
+| `cnpg-db` | CloudNativePG | `system-trixie` | pgaudit, pg_stat_statements, auto_explain | product: pgaudit, pg_stat_statements, pgcrypto, uuid-ossp; cart/order/payment: pgaudit, pg_stat_statements (auto_explain is preload-only, not a Database resource) |
 | `auth-db` | Zalando | Spilo 17 | pg_stat_statements, pg_cron, pg_trgm, pgcrypto, pg_stat_kcache | N/A |
-| `supporting-shared-db` | Zalando | Spilo 16 | pg_stat_statements, pg_cron, pg_trgm, pgcrypto, pg_stat_kcache | N/A |
+| `supporting-shared-db` | Zalando | Spilo 16 | pg_stat_statements, pg_cron, pgcrypto, pg_stat_kcache, pgaudit | N/A |
 
 **Key points:**
 - CloudNativePG clusters use `system-trixie` image with built-in extensions (no ImageVolume needed currently)

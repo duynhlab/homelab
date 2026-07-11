@@ -67,10 +67,10 @@ All backend services follow a strict 3-layer architecture. Understanding these l
 
 ```mermaid
 flowchart TD
-    Frontend["FRONTEND (React SPA)\nCalls ONLY Web Layer endpoints"]
-    WebLayer["WEB LAYER\n- HTTP request/response handling\n- Request validation (JSON binding)\n- Authentication/Authorization\n- DTO mapping (request -> domain, domain -> response)\n- Aggregation of multiple Logic services\n- Error translation (domain errors -> HTTP status codes)\nLocation: internal/web/v1/handler.go (per service repo)"]
-    LogicLayer["LOGIC LAYER\n- Business rules and validation\n- Transaction orchestration\n- Repository interface usage (NO direct DB access)\n- Cross-service coordination\n- Domain error definitions\nLocation: internal/logic/v1/service.go (per service repo)\nConstraints:\n- NO SQL queries\n- NO database.GetDB() calls\n- NO HTTP handling"]
-    CoreLayer["CORE LAYER\n- Domain models (entities, value objects)\n- Repository interfaces (contracts)\n- Repository implementations (PostgreSQL)\n- Database connection management\n- Transaction implementation\nLocation:\n- internal/core/domain/ (models)\n- internal/core/repository/ (impl)\n- internal/core/database.go (conn)\n(per service repo)"]
+    Frontend["FRONTEND (React SPA)<br/>Calls ONLY Web Layer endpoints"]
+    WebLayer["WEB LAYER<br/>- HTTP request/response handling<br/>- Request validation (JSON binding)<br/>- Authentication/Authorization<br/>- DTO mapping (request -> domain, domain -> response)<br/>- Aggregation of multiple Logic services<br/>- Error translation (domain errors -> HTTP status codes)<br/>Location: internal/web/v1/handler.go (per service repo)"]
+    LogicLayer["LOGIC LAYER<br/>- Business rules and validation<br/>- Transaction orchestration<br/>- Repository interface usage (NO direct DB access)<br/>- Cross-service coordination<br/>- Domain error definitions<br/>Location: internal/logic/v1/service.go (per service repo)<br/>Constraints:<br/>- NO SQL queries<br/>- NO database.GetDB() calls<br/>- NO HTTP handling"]
+    CoreLayer["CORE LAYER<br/>- Domain models (entities, value objects)<br/>- Repository interfaces (contracts)<br/>- Repository implementations (PostgreSQL)<br/>- Database connection management<br/>- Transaction implementation<br/>Location:<br/>- internal/core/domain/ (models)<br/>- internal/core/repository/ (impl)<br/>- internal/core/database.go (conn)<br/>(per service repo)"]
 
     Frontend -->|"HTTP"| WebLayer
     WebLayer -->|"Function calls"| LogicLayer

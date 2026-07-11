@@ -23,7 +23,7 @@ tokenless internal cart-clear), which remains REST — see the hop table below.
 | **Phase 2** — `product → review` aggregation | ✅ gRPC-only | review + product |
 | **Phase 2** — `order → notification` publish on checkout (best-effort; the saga worker drives it today) | ✅ | notification + order |
 | **Payment (RFC-0010)** — `order` + `order-worker` → `payment` (saga capture/refund + `GetPayment` enrichment); `order-worker` → `product` (saga stock) | ✅ gRPC-only | payment + product + order + order-worker |
-| **Cluster** — headless `{review,shipping,notification,payment}-grpc` Services (`:9090`) + ResourceSet `*_GRPC_ADDR` env (`auth-grpc` removed in Phase 5). ⚠️ `rsip-product` lacks `grpc_server: true`, so **`product-grpc` is not rendered in-cluster** even though order-worker dials it (`order-worker.yaml`) — known gap | ✅ (product gap) | mop chart (`grpc.enabled`), `kubernetes/apps/domains/*-rs.yaml`, `kubernetes/apps/services/*.yaml` |
+| **Cluster** — headless `{product,review,shipping,notification,payment}-grpc` Services (`:9090`) + ResourceSet `*_GRPC_ADDR` env (`auth-grpc` removed in Phase 5) | ✅ | mop chart (`grpc.enabled`), `kubernetes/apps/domains/*-rs.yaml`, `kubernetes/apps/services/*.yaml` |
 | **Phase 3** — NetworkPolicy fences `:9090`; gRPC health service registered | ✅ | `kubernetes/infra/configs/network-policies/` |
 | **Phase 3** — mTLS on `:9090` | ⏳ deferred | services use `insecure` creds; needs `grpcx` TLS + cert-manager |
 | Verified end-to-end on Docker Compose (login, local JWKS verification, product reviews, checkout → notification) | ✅ | `homelab/local-stack` |
@@ -297,7 +297,7 @@ policies can key off the code correctly.
 > mTLS is deferred (clients dial with `insecure` credentials, so there is no service
 > identity), and the review/shipping/notification/payment gRPC servers do **no
 > inbound JWT/auth check**. NetworkPolicy **is** enforced — kindnet enforces
-> NetworkPolicy on the cluster's Kubernetes (≥ 1.30) locally, and a policy CNI does
+> NetworkPolicy on the cluster's Kubernetes (≥ 1.34) locally, and a policy CNI does
 > in prod — so the per-namespace ingress rules limit *which* workloads can reach
 > `:9090`. Net effect: a workload in an allowed namespace can invoke internal RPCs
 > — including `notification.SendEmail` — unauthenticated; NetworkPolicy fences
@@ -340,9 +340,7 @@ gained native support.
   `grpc: { enabled: true, port: 9090 }` block guarded by `<<- if (index inputs
   "grpc_server") >>`, so only the gRPC-server services render the headless
   Service and the second container port. Callees opt in via `grpc_server: true`
-  on their InputProvider (`kubernetes/apps/services/{review,shipping,notification,payment}.yaml`;
-  ⚠️ `product.yaml` is missing the input — see the known gap in
-  [Implementation status](#implementation-status)).
+  on their InputProvider (`kubernetes/apps/services/{product,review,shipping,notification,payment}.yaml`).
 - **Headless Service** for gRPC *callees* (`clusterIP: None`) enables
   client-side `round_robin` (§3). HTTP callees (`grpc.enabled` unset) are untouched.
 - **Env convention:** `*_GRPC_ADDR`, e.g.
@@ -493,4 +491,4 @@ flowchart TD
 
 ---
 
-_Last updated: 2026-07-10 — stale auth-gRPC remnants removed (diagram, env-var and InputProvider examples); hop tables/diagram completed with the order-worker saga hops (stock, shipment lifecycle, emails) and the tokenless internal cart-clear; flagged the missing `grpc_server` input on `rsip-product`._
+_Last updated: 2026-07-11 — closed the `product-grpc` gap (`rsip-product` now sets `grpc_server: true`, so `product-grpc` renders in-cluster); stale auth-gRPC remnants removed (diagram, env-var and InputProvider examples); hop tables/diagram completed with the order-worker saga hops (stock, shipment lifecycle, emails) and the tokenless internal cart-clear._

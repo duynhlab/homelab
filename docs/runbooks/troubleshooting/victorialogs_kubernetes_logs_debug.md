@@ -3,13 +3,13 @@
 **Symptom:** Grafana shows no Kubernetes logs in the **VictoriaLogs** datasource
 (Explore returns empty, or a logs panel is blank).
 
-**Architecture:** single cluster-wide Vector agent → VictoriaLogs (VLSingle) → Grafana.
+**Architecture:** per-node Vector agent (DaemonSet) → VictoriaLogs (VLSingle) → Grafana.
 
 ```mermaid
 flowchart LR
-    Pods[Kubernetes Pods] --> Vector["Vector agent\n(kube-system)"]
-    Vector -->|/insert/jsonline| VLogs["VictoriaLogs / VLSingle\n(monitoring :9428)"]
-    VLogs -->|/select/logsql/query| Grafana["Grafana\nVictoriaLogs datasource"]
+    Pods[Kubernetes Pods] --> Vector["Vector agent<br/>(kube-system, DaemonSet)"]
+    Vector -->|/insert/jsonline| VLogs["VictoriaLogs / VLSingle<br/>(monitoring :9428)"]
+    VLogs -->|/select/logsql/query| Grafana["Grafana<br/>VictoriaLogs datasource"]
 ```
 
 > Reference (endpoints, stream fields, sinks, config):

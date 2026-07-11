@@ -56,7 +56,7 @@ Per-service credential and reconcile flow:
 
 ```mermaid
 flowchart LR
-    OB[(OpenBAO<br/>single source)] -->|ESO sync 1h +<br/>cnpg.io/reload| S[Secret basic-auth<br/>cnpg-db-&lt;svc&gt;-secret]
+    OB[(OpenBAO<br/>single source)] -->|ESO sync 1h +<br/>cnpg.io/reload| S[Secret basic-auth<br/>cnpg-db-&lt;svc&gt;-secret<br/>product uses cnpg-db-secret]
     S --> DR2[DatabaseRole &lt;svc&gt;]
     DR2 -->|CREATE/ALTER ROLE<br/>SCRAM-encoded, log-suppressed| PG[(cnpg-db)]
     DB2[Database &lt;svc&gt;] -->|CREATE DATABASE<br/>OWNER &lt;svc&gt;| PG
@@ -76,7 +76,8 @@ logging around them, so cleartext never reaches PostgreSQL logs,
 Each service file under `clusters/cnpg-db/services/` declares, in order:
 
 1. **`ExternalSecret`** — renders `cnpg-db-<svc>-secret` in namespace `product`
-   from OpenBAO path `secret/data/local/databases/cnpg-db/<svc>`. Must be
+   from OpenBAO path `secret/data/local/databases/cnpg-db/<svc>` (product is
+   the exception: it reuses the initdb `cnpg-db-secret`). Must be
    `template.type: kubernetes.io/basic-auth` (CNPG requires basic-auth for
    `passwordSecret`) and carry the `cnpg.io/reload: "true"` label. App pods in
    other namespaces consume their own ESO copy of the same OpenBAO entry.

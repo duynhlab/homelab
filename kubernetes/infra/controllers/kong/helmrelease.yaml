@@ -119,6 +119,16 @@ spec:
       enabled: true
       trustCRDsExist: true
       interval: 15s
+      # Force job="kong" on both scraped endpoints (proxy status :8100 +
+      # ingress-controller cmetrics). The chart sets jobLabel: kong, but the
+      # Service carries no "kong" label, so the VM-operator VMServiceScrape
+      # otherwise derives job from the Service name (kong-kong-proxy) — which
+      # left up{job="kong"} empty and silently disabled KongDown + every Kong
+      # recording rule (prometheusrules/kong/*). This relabel restores the
+      # job="kong" the rules and alert-catalog expect.
+      relabelings:
+        - targetLabel: job
+          replacement: kong
 
     # Resource limits (homelab-friendly). Bumped: the Kong proxy cold-start peaks
     # >500Mi, so the old 256Mi limit was OOMKilled (exitCode 137 → CrashLoop) and

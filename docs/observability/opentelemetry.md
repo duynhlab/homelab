@@ -213,7 +213,7 @@ Env vars read by `obsx.ConfigFromEnv` (injected by the app ResourceSets,
 | `OTEL_SAMPLE_RATE` | `0.1` | Head-sampling ratio (root decisions) |
 | `OTEL_METRICS_ENABLED` | **`true`** | OTLP metrics + runtime instrumentation — on fleet-wide since the RFC-0014 P3 cutover (kept as a kill switch) |
 | `OTEL_LOGS_ENABLED` | **`true`** | otelzap → OTLP logs — on fleet-wide since the RFC-0014 P4 cutover (kept as a kill switch) |
-| `OTEL_METRIC_EXPORT_INTERVAL_SECONDS` | `15` | PeriodicReader interval (policy #7) |
+| `OTEL_METRIC_EXPORT_INTERVAL_SECONDS` | `15` | PeriodicReader interval (policy #7). **Not injected by the ResourceSets** — this is the `pkg/obsx` built-in default; override it only by setting the env var explicitly. |
 
 Note: `OTEL_COLLECTOR_ENDPOINT` and `OTEL_SAMPLE_RATE` are platform names read
 by `obsx`, not the standard SDK vars (`OTEL_EXPORTER_OTLP_ENDPOINT`,

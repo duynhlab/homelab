@@ -1,0 +1,50 @@
+# Example: Restore product-db from RustFS backup to new cluster
+# Use for DR drill or PITR. Apply manually - NOT part of default kustomization.
+#
+# Prerequisites:
+# - At least one successful base backup + WAL archiving
+# - Bucket pg-backups-cnpg exists in RustFS
+# - Secret pg-backup-rustfs-credentials in product namespace
+#
+# Usage:
+#   kubectl apply -f restore-cluster-example.yaml -n product
+#   kubectl get cluster -n product -w
+#
+# For PITR: Add recoveryTarget under bootstrap.recovery:
+#   recoveryTarget:
+#     targetTime: "2026-03-13 10:00:00+00"
+#
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: product-db-restore
+  namespace: product
+  annotations:
+    cnpg.io/skipEmptyWalArchiveCheck: "enabled"
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
+  bootstrap:
+    recovery:
+      source: product-db-backup
+      database: product
+      owner: product
+      secret:
+        name: product-db-secret
+  externalClusters:
+    - name: product-db-backup
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: product-db-backup-store
+          serverName: product-db-cluster
+  storage:
+    size: 10Gi
+    storageClass: standard
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"

@@ -16,7 +16,7 @@ spec:
       name: << inputs.namespace >>
       labels:
         environment: local
-        platform.duynhlab/backup: "walg"
+        platform.duynhlab/backup: "cnpg"
     ---
     # Edge resilience policy referenced by the Service annotation above.
     apiVersion: configuration.konghq.com/v1beta1

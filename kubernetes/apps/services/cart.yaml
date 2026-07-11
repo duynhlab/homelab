@@ -14,9 +14,9 @@ spec:
     namespace: cart
     platform_backup_label: "cnpg"
     replicaCount: 2
-    db_host: "pgdog-cnpg.product.svc.cluster.local"
+    db_host: "pgdog-product.product.svc.cluster.local"
     db_port: "6432"
-    db_migration_host: "cnpg-db-rw.product.svc.cluster.local"
-    db_secret: "cnpg-db-cart-secret"
+    db_migration_host: "product-db-rw.product.svc.cluster.local"
+    db_secret: "product-db-cart-secret"
     db_sslmode: "disable"
     pool_max: "30"

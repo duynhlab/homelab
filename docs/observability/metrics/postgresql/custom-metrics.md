@@ -2,11 +2,14 @@
 
 ## Overview
 
-PostgreSQL clusters (Zalando operator) use `postgres_exporter` sidecars with custom queries to expose additional metrics beyond standard PostgreSQL metrics. This guide explains how to query these custom metrics in Prometheus.
+All PostgreSQL clusters run on **CloudNativePG (CNPG)** and use the CNPG built-in
+exporter with a per-cluster custom-queries ConfigMap to expose additional metrics
+beyond the standard `cnpg_collector_*` metrics. This guide explains how to query
+these custom metrics.
 
 ## Naming Convention
 
-postgres_exporter converts custom queries to Prometheus metrics using this pattern:
+The exporter converts custom queries to metrics using this pattern:
 
 **Format**: `{query_name}_{column_name}`
 
@@ -14,6 +17,12 @@ postgres_exporter converts custom queries to Prometheus metrics using this patte
 - Query name: `pg_stat_statements`
 - Column: `calls`
 - Metric name: `pg_stat_statements_calls`
+
+> **CNPG prefix.** CloudNativePG prepends `cnpg_` to every metric the built-in
+> exporter emits, including those from custom queries. The logical query→column
+> mapping below is unprefixed for readability; in VictoriaMetrics the series
+> appears as `cnpg_pg_stat_statements_calls`, etc. Prefix the metric names in the
+> PromQL examples with `cnpg_` when querying the live store.
 
 ## Custom Metrics Available
 
@@ -98,9 +107,11 @@ postgres_exporter converts custom queries to Prometheus metrics using this patte
 
 ### Query Configuration Files
 
-Custom queries are defined in ConfigMaps:
-- **auth-db**: `kubernetes/infra/configs/databases/clusters/auth-db/configmaps/monitoring-queries.yaml`
-- **supporting-shared-db**: `kubernetes/infra/configs/databases/clusters/supporting-shared-db/configmaps/monitoring-queries.yaml`
+Custom queries are defined in a per-cluster ConfigMap, referenced from the CNPG
+`Cluster` `spec.monitoring.customQueriesConfigMapList`:
+- **auth-db**: `kubernetes/infra/configs/databases/clusters/auth-db/monitoring/`
+- **shared-db**: `kubernetes/infra/configs/databases/clusters/shared-db/monitoring/`
+- **product-db**: `kubernetes/infra/configs/databases/clusters/product-db/monitoring/`
 
 ### Query Structure
 
@@ -202,11 +213,16 @@ pg_replication_lag > 10
 
 ## Verification
 
+> **CNPG pod model.** There is no separate exporter sidecar. The CNPG instance
+> manager serves metrics on the pod at `:9187` from within the `postgres`
+> container; custom queries come from the ConfigMap in
+> `spec.monitoring.customQueriesConfigMapList`, not a mounted `queries.yaml`.
+
 ### Check if metrics are exposed
 
-**1. Port-forward to postgres_exporter:**
+**1. Port-forward to a CNPG instance pod:**
 ```bash
-kubectl port-forward -n auth auth-db-0 9187:9187
+kubectl port-forward -n auth auth-db-1 9187:9187
 ```
 
 **2. Query metrics endpoint:**
@@ -284,52 +300,45 @@ sum(rate(pg_stat_statements_shared_blks_hit[5m])) by (datname) /
 
 ### Metrics not appearing
 
-**1. Check if ConfigMap is mounted:**
+**1. Check the custom-queries ConfigMap is referenced and present:**
 ```bash
-kubectl exec -n auth auth-db-0 -c exporter -- ls -la /etc/postgres-exporter/
-kubectl exec -n auth auth-db-0 -c exporter -- cat /etc/postgres-exporter/queries.yaml
+kubectl get cluster -n auth auth-db -o jsonpath='{.spec.monitoring.customQueriesConfigMapList}'
+kubectl get configmap -n auth -l cnpg.io/cluster=auth-db
 ```
 
-**2. Check environment variable:**
+**2. Check the instance-manager logs for query errors:**
 ```bash
-kubectl exec -n auth auth-db-0 -c exporter -- env | grep PG_EXPORTER_EXTEND_QUERY_PATH
+kubectl logs -n auth auth-db-1 -c postgres | grep -i "monitoring\|error"
 ```
 
-**3. Check postgres_exporter logs:**
+**3. Verify pg_stat_statements is enabled:**
 ```bash
-kubectl logs -n auth auth-db-0 -c exporter | grep -i error
+kubectl exec -n auth auth-db-1 -c postgres -- psql -U postgres -c "SHOW shared_preload_libraries;"
 ```
 
-**4. Verify pg_stat_statements is enabled:**
+**4. Verify custom metrics are exposed:**
 ```bash
-kubectl exec -n auth auth-db-0 -c postgres -- psql -U postgres -c "SHOW shared_preload_libraries;"
-```
+# Option 1: Direct exec into the postgres container (no port-forward needed)
+kubectl exec -n auth auth-db-1 -c postgres -- curl -s http://localhost:9187/metrics | head -5
+kubectl exec -n auth auth-db-1 -c postgres -- curl -s http://localhost:9187/metrics | grep "^cnpg_pg_stat_statements_calls" | head -3
 
-**5. Verify custom metrics are exposed:**
-```bash
-# Option 1: Direct exec into pod (recommended - no port-forward needed)
-kubectl exec -n auth auth-db-0 -c exporter -- wget -qO- http://localhost:9187/metrics 2>&1 | head -5
-kubectl exec -n auth auth-db-0 -c exporter -- wget -qO- http://localhost:9187/metrics 2>&1 | grep "^pg_stat_statements_calls" | head -3
-
-# Option 2: Port-forward to postgres_exporter
-kubectl port-forward -n auth auth-db-0 9187:9187 &
+# Option 2: Port-forward to the instance pod
+kubectl port-forward -n auth auth-db-1 9187:9187 &
 
 # Wait a few seconds, then query metrics
 sleep 3
-curl -s http://localhost:9187/metrics | grep -E "pg_stat_statements_calls|pg_replication_lag|pg_postmaster_start_time_seconds" | head -10
+curl -s http://localhost:9187/metrics | grep -E "cnpg_pg_stat_statements_calls|cnpg_pg_replication_lag" | head -10
 
 # Or check for any custom metrics
-curl -s http://localhost:9187/metrics | grep "^pg_stat_statements\|^pg_replication\|^pg_postmaster"
+curl -s http://localhost:9187/metrics | grep "^cnpg_pg_stat_statements\|^cnpg_pg_replication"
 
 # Stop port-forward when done
 kill %1  # or pkill -f "kubectl port-forward"
 ```
 
 **Expected output:**
-- **Standard Prometheus format**: `pg_stat_statements_calls{datname="review",query="...",queryid="...",server="localhost:5432",user="postgres"} 4`
-- **Debug output** (lines starting with `*`): output such as `* collected metric "pg_stat_statements_calls" {...} was collected before...` is debug output from the Prometheus client — the metrics still work normally
-- **HTTP 500 error**: an HTTP 500 on scrape is usually caused by duplicate metrics. Make sure `PG_EXPORTER_AUTO_DISCOVER_DATABASES` has been removed (it is deprecated and triggers this error)
-- **No output**: check the logs for errors (step 3), verify the ConfigMap mount (step 1) and the environment variable (step 2)
+- **CNPG-prefixed format**: `cnpg_pg_stat_statements_calls{datname="review",query="...",queryid="...",user="postgres"} 4`
+- **No output**: check the instance-manager logs for errors (step 2) and verify the custom-queries ConfigMap is referenced (step 1)
 
 ### Metrics have wrong labels
 
@@ -338,7 +347,7 @@ kill %1  # or pkill -f "kubectl port-forward"
 
 ## Related Documentation
 
-- **PostgreSQL Monitoring**: [`monitoring.md`](monitoring.md) - Databases-layer entry point: 3-cluster strategy and exporters
+- **PostgreSQL Monitoring**: [`monitoring.md`](monitoring.md) - Databases-layer entry point: CNPG cluster inventory and the built-in exporter
 - **Database Guide**: [`docs/databases/002-database-integration.md`](../../../databases/002-database-integration.md) - Custom queries configuration
 - **Metrics hub**: [`docs/observability/metrics/README.md`](../README.md) - Methodology, stack, and coverage
 - **PromQL Guide**: [`docs/observability/metrics/promql-guide.md`](../promql-guide.md) - PromQL functions and examples

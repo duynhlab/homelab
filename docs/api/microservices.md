@@ -63,10 +63,10 @@ The local end-to-end stack (`local-stack/compose.yaml`) mirrors the platform wit
 | frontend | 80 → host 3001 | — | — | gateway only |
 | gateway (Kong 3.9) | 8000 → host 8080 | — | — | all 9 services |
 
-> **In-cluster differences (production):** `auth-db` (Zalando PG17 + PgBouncer);
-> `cnpg-db` (CNPG PG18 behind the **PgDog** pooler — `product`/`cart`/`order`/`payment`
+> **In-cluster differences (production):** `auth-db` (CloudNativePG, via the **pgdog-auth** pooler);
+> `product-db` (CloudNativePG behind the **pgdog-product** pooler — `product`/`cart`/`order`/`payment`
 > databases; payment connects **direct over TLS, bypassing PgDog**);
-> `supporting-shared-db` (PG16 — `user`/`review`/`shipping`/`notification`).
+> `shared-db` (CloudNativePG, via **pgdog-shared** — `user`/`review`/`shipping`/`notification`).
 > Locally these collapse into one Postgres with 9 databases. See [`../databases/`](../databases/).
 > **Logging is unified** — all 9 services log via the shared `pkg/logger` zap wrapper
 > (`zapx`), teed into the OTLP pipeline (RFC-0014 P4).
@@ -86,7 +86,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 ### auth — identity
 
 > Owns `users` (credentials) and refresh-token families; DB `auth` on `auth-db`
-> (Zalando PG17, via PgBouncer). Public-only HTTP — no JWT middleware, no gRPC
+> (CloudNativePG, via PgDog). Public-only HTTP — no JWT middleware, no gRPC
 > server (HTTP-only since RFC-0009 Phase 5; services verify JWTs locally).
 
 | Feature | API | Technique | Depends on | Status | Ref |
@@ -98,7 +98,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 
 ### user — profiles
 
-> Owns user profiles; DB `user` on `supporting-shared-db` (PG16). Verifies JWTs
+> Owns user profiles; DB `user` on `shared-db` (CloudNativePG). Verifies JWTs
 > locally via `pkg/authmw`.
 
 | Feature | API | Technique | Depends on | Status | Ref |
@@ -110,7 +110,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 ### product — catalog (+ cache, stock)
 
 > Owns products, categories, stock (~5k seeded rows locally); DB `product` on
-> `cnpg-db` (PG18, via PgDog). Valkey cache. Serves gRPC on `:9090`.
+> `product-db` (CloudNativePG, via PgDog). Valkey cache. Serves gRPC on `:9090`.
 
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
@@ -124,7 +124,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 
 ### cart — shopping cart
 
-> Owns `cart_items`; DB `cart` on `cnpg-db` (PG18, via PgDog). Verifies JWTs
+> Owns `cart_items`; DB `cart` on `product-db` (CloudNativePG, via PgDog). Verifies JWTs
 > locally via `pkg/authmw`.
 
 | Feature | API | Technique | Depends on | Status | Ref |
@@ -134,7 +134,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 
 ### order — orders & checkout fulfillment
 
-> Owns `orders`, `order_items`; DB `order` on `cnpg-db` (PG18, via PgDog).
+> Owns `orders`, `order_items`; DB `order` on `product-db` (CloudNativePG, via PgDog).
 > Verifies JWTs locally via `pkg/authmw`. **One binary, two deployments:**
 > `order` (API) and `order-worker` (Temporal worker — the `worker` subcommand of
 > the same binary). gRPC **client only** (no server).
@@ -149,8 +149,8 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 
 ### review — product reviews
 
-> Owns `reviews` (rating 1–5, comment); DB `review` on `supporting-shared-db`
-> (PG16). Verifies JWTs locally via `pkg/authmw`. Serves gRPC on `:9090`.
+> Owns `reviews` (rating 1–5, comment); DB `review` on `shared-db`
+> (CloudNativePG). Verifies JWTs locally via `pkg/authmw`. Serves gRPC on `:9090`.
 
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
@@ -160,7 +160,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 
 ### shipping — tracking, estimates & shipment lifecycle
 
-> Owns `shipments`; DB `shipping` on `supporting-shared-db` (PG16). No JWT
+> Owns `shipments`; DB `shipping` on `shared-db` (CloudNativePG). No JWT
 > middleware (public + internal surfaces only). Serves gRPC on `:9090`.
 
 | Feature | API | Technique | Depends on | Status | Ref |
@@ -172,7 +172,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 
 ### notification — user notifications
 
-> Owns `notifications`; DB `notification` on `supporting-shared-db` (PG16).
+> Owns `notifications`; DB `notification` on `shared-db` (CloudNativePG).
 > Verifies JWTs locally via `pkg/authmw` on private routes. Serves gRPC on
 > `:9090`. Deployed in-cluster (comms domain) **and** in the local stack — the
 > frontend's notification badge resolves against it.
@@ -186,7 +186,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 ### payment — payments, outbox & reconciliation
 
 > Owns `payments`, refunds, the transactional outbox, and reconciliation runs;
-> DB `payment` on `cnpg-db` — connects **direct over TLS, bypassing PgDog**.
+> DB `payment` on `product-db` — connects **direct over TLS, bypassing PgDog**.
 > Serves gRPC on `:9090` (reflection off). **Single replica by design**
 > (single-writer outbox + per-instance ticker). **mockpay** is a subcommand of
 > the same binary, run as a second deployment (provider selected via
@@ -292,4 +292,4 @@ the cluster ResourceSet templates.
 
 *Run the whole platform locally for verification: `cd local-stack && docker compose up -d --build` → SPA at http://localhost:3001, Kong gateway at http://localhost:8080 (demo login `alice` / `password123`).*
 
-_Last updated: 2026-07-10 — local gateway corrected to Kong 3.9 DB-less (the nginx stand-in was replaced); feature-matrix rebuild + DB footnote + call graph from the same day._
+_Last updated: 2026-07-11 — Zalando→CNPG migration: per-service DB placements updated to the CloudNativePG clusters (`auth-db`, `product-db`, `shared-db`) fronted by PgDog (`pgdog-auth`/`pgdog-product`/`pgdog-shared`). Earlier: local gateway corrected to Kong 3.9 DB-less (the nginx stand-in was replaced); feature-matrix rebuild + DB footnote + call graph from the same day._

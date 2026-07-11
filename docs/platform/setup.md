@@ -175,10 +175,10 @@ kubectl get prometheusservicelevel -n monitoring
 ```
 
 **Expected State:**
-- Namespaces for every domain provisioned (auth, user, product, cart, order, review, notification, shipping, payment, frontend, kong, cert-manager, openbao, external-secrets-system, monitoring, cloudnative-pg, postgres-operator, database, kyverno, flux-system, …).
+- Namespaces for every domain provisioned (auth, user, product, cart, order, review, notification, shipping, payment, frontend, kong, cert-manager, openbao, external-secrets-system, monitoring, cloudnative-pg, database, kyverno, flux-system, …).
 - 5 ResourceSets (`rs-identity`, `rs-catalog`, `rs-checkout`, `rs-comms`, `rs-frontend`) successfully reconciled.
 - HelmReleases for the 9 microservices + frontend, plus the `mockpay` and `order-worker` releases (in the `payment` / `order` namespaces), in `Ready` state.
-- 4 PostgreSQL clusters (`auth-db`, `supporting-shared-db`, `cnpg-db`, `temporal-db`) + 1 DR replica (`cnpg-db-replica`) operational.
+- 4 CloudNativePG clusters (`product-db`, `auth-db`, `shared-db`, `temporal-db`) + 1 DR replica (`product-db-replica`) operational.
 - ClusterIssuers `selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod` Ready; `kong-proxy-tls` Certificate Ready — signed by `homelab-ca` on local Kind (`letsencrypt-prod` on prod).
 
 ---
@@ -434,4 +434,4 @@ For persistence layer details, refer to [002-database-integration.md](../databas
 
 ---
 
-_Last updated: 2026-07-10 — quick-start/step order aligned with the Makefile (`flux-push` before `flux-up`); VictoriaMetrics wording; temporal-db in the expected state; caching/mcp added to the dependency graph; VictoriaTraces host added._
+_Last updated: 2026-07-11 — Zalando→CNPG migration: expected namespaces drop `postgres-operator`; expected clusters are the 4 CloudNativePG clusters (`product-db`, `auth-db`, `shared-db`, `temporal-db`) + `product-db-replica`. Earlier: quick-start/step order aligned with the Makefile (`flux-push` before `flux-up`); VictoriaMetrics wording; temporal-db in the expected state; caching/mcp added to the dependency graph; VictoriaTraces host added._

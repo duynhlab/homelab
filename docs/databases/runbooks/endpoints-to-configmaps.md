@@ -1,5 +1,9 @@
 # Runbook: Zalando Postgres Operator -- Migrate Patroni DCS from Endpoints to ConfigMaps
 
+> **Historical / reference.** The platform migrated all Postgres from the
+> Zalando operator to CloudNativePG (see 002/003). Zalando is no longer deployed
+> here — this doc is kept for learning.
+
 ## Table of Contents
 
 0. [Background: Why This Migration?](#0-background-why-this-migration)

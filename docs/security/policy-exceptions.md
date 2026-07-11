@@ -8,7 +8,7 @@ Source manifests live in `kubernetes/infra/configs/kyverno/exceptions/`.
 | Name | Policies waived | Targets | Owner | Expires | Justification |
 |------|------------------|---------|-------|---------|---------------|
 | `vector-hostpath` | `pss-baseline` | DaemonSet `vector-*` in `monitoring` | platform-team | 2026-12-31 | Tails container logs from `/var/log/pods` |
-| `postgres-operators` | `pss-baseline`, `require-resources` | Spilo + CNPG Pods in DB namespaces | platform-team | 2026-12-31 | Operator-defined securityContext for postgres lifecycle |
+| `postgres-operators` | `pss-baseline`, `require-resources` | CNPG Pods in DB namespaces | platform-team | 2026-12-31 | Operator-defined securityContext for postgres lifecycle |
 | `kong-openbao` | `pss-baseline` | All Pods in `kong`, `openbao` | platform-team | 2026-12-31 | Kong needs `NET_BIND_SERVICE`; OpenBAO needs `IPC_LOCK` |
 
 ## Workflow to add an exception
@@ -38,4 +38,4 @@ Source manifests live in `kubernetes/infra/configs/kyverno/exceptions/`.
 
 ---
 
-_Last updated: 2026-07-07_
+_Last updated: 2026-07-11 — `postgres-operators` target narrowed to CNPG Pods (Spilo removed with the Zalando operator)._

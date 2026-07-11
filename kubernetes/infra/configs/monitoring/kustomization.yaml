@@ -10,8 +10,6 @@ resources:
   - servicemonitors/kube-apiserver.yaml
   - grafana/
   # Note: CloudNativePG PodMonitors moved to configs/databases/monitoring/ to deploy AFTER database clusters
-  - podmonitors/podmonitor-zalando-auth-db.yaml
-  - podmonitors/podmonitor-zalando-supporting-shared-db.yaml
   - podmonitors/podmonitor-flux-system.yaml
   # PrometheusRules — organized by domain (see prometheusrules/kustomization.yaml)
   - prometheusrules/

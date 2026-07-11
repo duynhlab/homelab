@@ -1,0 +1,89 @@
+# order — per-service database triplet (RFC-0012, ADR-013).
+#
+# ExternalSecret for product-db order database credentials — product namespace.
+# OpenBAO path: secret/data/local/databases/product-db/order
+#
+# Rendered as kubernetes.io/basic-auth (the pre-triplet copy was Opaque):
+# this secret doubles as the passwordSecret for the DatabaseRole below, and
+# CNPG requires basic-auth there. Secret `type` is immutable — migrating a
+# live cluster requires deleting the old Opaque Secret so ESO recreates it
+# (see docs/databases/runbooks/rotate-cnpg-service-password.md).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: product-db-order-secret
+  namespace: product
+  labels:
+    app.kubernetes.io/name: product-db-order-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: product-db-order-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: product-db-order-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+          cnpg.io/reload: "true"
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: secret/data/local/databases/product-db/order
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: secret/data/local/databases/product-db/order
+        property: password
+---
+# Written out IN FULL — adoption resets omitted attributes (see payment.yaml).
+# spec.name "order" is a reserved SQL word; the operator quotes identifiers.
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: product-db-role-order
+  namespace: product
+spec:
+  cluster:
+    name: product-db
+  name: order
+  comment: "order-service application role (RFC-0012)"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: true
+  replication: false
+  bypassrls: false
+  connectionLimit: -1
+  inRoles: []
+  passwordSecret:
+    name: product-db-order-secret
+  databaseRoleReclaimPolicy: retain
+---
+# Order Database extensions (moved from extensions.yaml).
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: order-database
+  namespace: product
+spec:
+  name: order
+  owner: order
+  cluster:
+    name: product-db
+  extensions:
+    - name: pgaudit
+    - name: pg_stat_statements
+  databaseReclaimPolicy: retain

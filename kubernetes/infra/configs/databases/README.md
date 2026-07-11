@@ -7,8 +7,8 @@ This directory contains PostgreSQL database configurations organized by cluster.
 
 | Operator                           | Version | Description                                                                                       | In Use | Releases                                                              |
 | ---------------------------------- | ------- | ------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------- |
-| **CloudNativePG**                  | v1.30.0 | Kubernetes-native operator for PostgreSQL with HA, disaster recovery, and declarative management. | ✅      | [Releases](https://github.com/cloudnative-pg/cloudnative-pg/releases) |
-| **Zalando Postgres Operator**      | v1.15.1 | Automated HA and operational simplicity for PostgreSQL on Kubernetes. Uses Patroni + Spilo.       | ✅      | [Releases](https://github.com/zalando/postgres-operator/releases)     |
+| **CloudNativePG**                  | v1.30.0 | Kubernetes-native operator for PostgreSQL with HA, disaster recovery, and declarative management. Now hosts **all** Postgres clusters. | ✅      | [Releases](https://github.com/cloudnative-pg/cloudnative-pg/releases) |
+| **Zalando Postgres Operator**      | v1.15.1 | Patroni + Spilo operator. Previously ran `auth-db` and `supporting-shared-db`; **migrated to CloudNativePG** and no longer deployed (kept for reference in [`docs/databases/003.2-operator-zalando.md`](../../../../docs/databases/003.2-operator-zalando.md)). | ⬜      | [Releases](https://github.com/zalando/postgres-operator/releases)     |
 | **Crunchy Data Postgres Operator** | —       | Kubernetes-native operator by Crunchy Data with robust scaling, HA, and backup.                   | ⬜      | —                                                                     |
 | **KubeDB PostgreSQL Operator**     | —       | Multi-database Kubernetes operator (part of KubeDB ecosystem).                                    | ⬜      | —                                                                     |
 | **StackGres Postgres Operator**    | —       | Opinionated, fully managed PostgreSQL deployments with ease-of-use focus.                         | ⬜      | —                                                                     |
@@ -19,10 +19,11 @@ This directory contains PostgreSQL database configurations organized by cluster.
 
 | Cluster              | Operator      | PostgreSQL | Namespace | HA      | Pooler                                    | Services                             |
 | -------------------- | ------------- | ---------- | --------- | ------- | ----------------------------------------- | ------------------------------------ |
-| auth-db              | Zalando       | 17         | auth      | 3 nodes | PgBouncer (operator-managed, 3 instances) | Auth                                 |
-| supporting-shared-db | Zalando       | 16         | user      | 1 node  | PgBouncer (operator-managed, 3 instances) | User, Notification, Shipping, Review |
-| cnpg-db              | CloudNativePG | 18.1       | product   | 3 nodes | PgDog v0.39 (`pgdog-cnpg`, 3 replicas, PDB minAvailable 2) | Product, Cart, Order, Payment (payment app: direct-TLS) |
-| cnpg-db-replica      | CloudNativePG | 18.1       | product   | 1 node  | —                                         | DR (continuous WAL recovery)         |
+| product-db              | CloudNativePG | 18.1       | product   | 3 nodes (1 primary + 1 sync + 1 async) | PgDog v0.39 (`pgdog-product`) | Product, Cart, Order, Payment (payment app: direct-TLS) |
+| product-db-replica      | CloudNativePG | 18.1       | product   | 1 node  | —                                         | DR (continuous WAL recovery)         |
+| auth-db              | CloudNativePG | 18.1       | auth      | 3 nodes | PgDog v0.39 (`pgdog-auth`)                 | Auth                                 |
+| shared-db            | CloudNativePG | 18.1       | user      | 1 node  | PgDog v0.39 (`pgdog-shared`)               | User, Notification, Shipping, Review |
+| temporal-db          | CloudNativePG | 18.1       | temporal  | 1 node  | —                                         | Temporal (`temporal` + `temporal_visibility`) |
 
 
 ## Connection Endpoints
@@ -30,30 +31,37 @@ This directory contains PostgreSQL database configurations organized by cluster.
 
 | Cluster              | Pooler Endpoint                             | Direct Endpoint                                                              | Notes                                                   |
 | -------------------- | ------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------- |
-| auth-db              | `auth-db-pooler.auth.svc:5432`              | `auth-db.auth.svc:5432`                                                      | PgBouncer transaction mode, maxDBConnections 240/pooler |
-| supporting-shared-db | `supporting-shared-db-pooler.user.svc:5432` | `supporting-shared-db.user.svc:5432`                                         | PgBouncer transaction mode, 4 databases                 |
-| cnpg-db              | `pgdog-cnpg.product.svc:6432`               | RW: `cnpg-db-rw.product.svc:5432`, R: `cnpg-db-r.product.svc:5432`          | PgDog with R/W splitting; DBs: product, cart, order, payment (payment app: direct-TLS) |
-| cnpg-db-replica      | —                                           | `cnpg-db-replica-rw.product.svc:5432`                                        | DR only; promotable to standalone primary               |
+| product-db              | `pgdog-product.product.svc:6432`               | RW: `product-db-rw.product.svc:5432`, R: `product-db-r.product.svc:5432`          | PgDog with R/W splitting; DBs: product, cart, order, payment (payment app: direct-TLS) |
+| product-db-replica      | —                                           | `product-db-replica-rw.product.svc:5432`                                        | DR only; promotable to standalone primary               |
+| auth-db              | `pgdog-auth.auth.svc:6432`                   | RW: `auth-db-rw.auth.svc:5432`, R: `auth-db-r.auth.svc:5432`                  | PgDog; DB: auth                                         |
+| shared-db            | `pgdog-shared.user.svc:6432`                 | RW: `shared-db-rw.user.svc:5432`, R: `shared-db-r.user.svc:5432`             | PgDog; DBs: user, notification, shipping, review        |
+| temporal-db          | —                                           | RW: `temporal-db-rw.temporal.svc:5432`                                       | No pooler; DBs: temporal, temporal_visibility           |
 
 
 ## Monitoring & Backup
 
 
+All CNPG clusters expose the built-in exporter on `:9187` (scraped by a
+per-cluster `PodMonitor`); pgaudit + `auto_explain` logs go to stdout and are
+picked up by the cluster-wide Vector DaemonSet → VictoriaLogs. Backups use the
+**Barman Cloud Plugin** (per-cluster `ObjectStore`) into a single bucket
+`pg-backups-cnpg` with per-cluster prefixes, and a `ScheduledBackup` (daily
+02:00 + every 6h). `temporal-db` has neither a PodMonitor nor a backup.
+
 | Cluster              | Metrics Exporter                                                         | Log Shipper              | Backup Method       | Backup Target                                            |
 | -------------------- | ------------------------------------------------------------------------ | ------------------------ | ------------------- | -------------------------------------------------------- |
-| auth-db              | postgres_exporter v0.19.1 (sidecar, :9187) + PgBouncer exporter v0.12.0 | Vector v0.54.0 (sidecar) | WAL-G               | `s3://pg-backups-zalando/auth-db/`                       |
-| supporting-shared-db | pg_exporter (Pigsty) v1.2.2 (sidecar, :9630)                            | Vector v0.54.0 (sidecar) | WAL-G               | `s3://pg-backups-zalando/user-db/`                       |
-| cnpg-db              | CNPG built-in (PodMonitor) + PgDog OpenMetrics (:9090)                   | CNPG built-in (stdout)   | Barman Cloud Plugin + ObjectStore | `s3://pg-backups-cnpg/cnpg-db/`, retention 30d           |
-| cnpg-db-replica      | CNPG built-in (PodMonitor)                                               | CNPG built-in (stdout)   | Barman Cloud Plugin + ObjectStore | `s3://pg-backups-cnpg/cnpg-db-replica/`, retention 7d    |
+| product-db              | CNPG built-in :9187 (PodMonitor) + PgDog OpenMetrics :9090              | CNPG stdout → Vector DaemonSet | Barman Cloud Plugin + ObjectStore | `s3://pg-backups-cnpg/product-db/`, retention 30d           |
+| product-db-replica      | CNPG built-in :9187 (PodMonitor)                                        | CNPG stdout → Vector DaemonSet | Barman Cloud Plugin + ObjectStore | `s3://pg-backups-cnpg/product-db-replica/`, retention 7d    |
+| auth-db              | CNPG built-in :9187 (PodMonitor) + PgDog OpenMetrics :9090              | CNPG stdout → Vector DaemonSet | Barman Cloud Plugin + ObjectStore | `s3://pg-backups-cnpg/auth-db/`, retention 30d              |
+| shared-db            | CNPG built-in :9187 (PodMonitor) + PgDog OpenMetrics :9090              | CNPG stdout → Vector DaemonSet | Barman Cloud Plugin + ObjectStore | `s3://pg-backups-cnpg/shared-db/`, retention 30d            |
+| temporal-db          | CNPG built-in :9187                                                     | CNPG stdout → Vector DaemonSet | —                   | — (no backup)                                            |
 
 
 ## Extensions
 
-**Shared across Zalando clusters** (auth-db, supporting-shared-db):
-
-`pg_stat_statements`, `pg_cron`, `pg_trgm`, `pgcrypto`, `pg_stat_kcache`
-
-**cnpg-db** (CloudNativePG, declarative per-service via `services/*.yaml` — RFC-0012 triplets):
+All CNPG clusters load `pgaudit`, `pg_stat_statements`, and `auto_explain` via
+`shared_preload_libraries`. Per-database extensions are declared declaratively
+per service in each cluster's `services/*.yaml` (RFC-0012 triplets):
 
 `pgaudit`, `pg_stat_statements`, `auto_explain`, `pgcrypto`, `uuid-ossp`, `sync_replication_slots` (PG 18 native feature)
 
@@ -62,8 +70,8 @@ This directory contains PostgreSQL database configurations organized by cluster.
 | Path | Flux Kustomization | Contents |
 |------|--------------------|----------|
 | `controllers/databases/cnpg-barman-plugin` | `cnpg-barman-plugin-local` | Barman Cloud Plugin deployment + `ObjectStore` CRD, applied before CNPG clusters |
-| `configs/databases` | `databases-local` | Zalando clusters, `cnpg-db` (+ PgDog, backups, `Backup` on-demand `cnpg-db-initial`) |
-| `configs/databases-cnpg-dr` | `databases-cnpg-dr-local` | `cnpg-db-replica` only; `dependsOn: databases-local` |
+| `configs/databases` | `databases-local` | All CNPG clusters — `product-db`, `auth-db`, `shared-db`, `temporal-db` (+ PgDog poolers, backups, on-demand `*-initial` Backups) |
+| `configs/databases-cnpg-dr` | `databases-cnpg-dr-local` | `product-db-replica` only; `dependsOn: databases-local` |
 
 ## Related Documentation
 

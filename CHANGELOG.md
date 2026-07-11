@@ -11,12 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Metrics scraping for cert-manager, Kyverno and the Kong gateway proxy**: new
-  ServiceMonitors for cert-manager (`:9402`) and Kyverno (`:8000`); Kong proxy
-  metrics now come from the chart's built-in `serviceMonitor` (scrapes the proxy
-  status port `:8100` — `kong_http_requests_total` etc.), replacing a hand-rolled
-  scrape that hit the ingress-controller health port and pinned a false-positive
-  `KongDown` alert.
+- **Chart-native metrics scraping for cert-manager and the Kong gateway proxy**:
+  cert-manager now emits its own `ServiceMonitor` via
+  `prometheus.servicemonitor.enabled` (controller/webhook/cainjector on `:9402`);
+  Kong proxy metrics come from the chart's built-in `serviceMonitor` (scrapes the
+  proxy status port `:8100` — `kong_http_requests_total` etc.), replacing a
+  hand-rolled scrape that hit the ingress-controller health port and pinned a
+  false-positive `KongDown` alert. Kyverno already ships a native `serviceMonitor`
+  (VMAgent `selectAllByDefault` picks it up), so no extra CR is needed there.
 
 ### Changed
 

@@ -1,12 +1,13 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# auth-db cluster (CloudNativePG)
-# Single database: auth — a services/ triplet (RFC-0012)
-# The auth service runs in the same namespace (auth) as the cluster, so it
-# reads auth-db-secret directly — no cross-namespace app-ns Secret copies.
-# Order: instance -> services (triplet) -> configmaps -> poolers -> monitoring -> backup
+# shared-db cluster (CloudNativePG)
+# Databases: user, notification, shipping, review — each a services/ triplet (RFC-0012)
+# Order: secrets (app-ns copies) -> instance -> services (triplets) -> poolers -> monitoring -> backup
 resources:
+  - secrets/shared-db-notification-secret-notification-ns.yaml
+  - secrets/shared-db-shipping-secret-shipping-ns.yaml
+  - secrets/shared-db-review-secret-review-ns.yaml
   # pg-backup-rustfs-credentials: managed by ClusterExternalSecret (configs/secrets/cluster-external-secrets/)
   - objectstore.yaml
   - instance.yaml

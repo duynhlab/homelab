@@ -26,20 +26,17 @@ spec:
     - name: cnpg-barman-plugin-local
     - name: storage-local
     # Ordering hygiene: bring DB namespaces up behind their NetworkPolicies so
-    # operators never race an un-fenced namespace. NOTE: this does NOT fix Bug 20
-    # — that turned out to be the Zalando operator's DB-connection retry window
-    # expiring before a slow spilo cold boot (not an NP block); the real guard is
-    # the idempotent ensure-databases Job in each Zalando cluster dir.
+    # the CNPG operator never races an un-fenced namespace.
     - name: network-policies-local
-  
+
   healthChecks:
-    - apiVersion: acid.zalan.do/v1
-      kind: postgresql
+    - apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
       name: auth-db
       namespace: auth
-    - apiVersion: acid.zalan.do/v1
-      kind: postgresql
-      name: supporting-shared-db
+    - apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
+      name: shared-db
       namespace: user
     - apiVersion: postgresql.cnpg.io/v1
       kind: Cluster

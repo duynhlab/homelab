@@ -1,25 +1,26 @@
-# auth-db Primary Database Cluster (CloudNativePG)
-# Single database: auth — defined as a per-service triplet under services/
-# (RFC-0012, ADR-013); this file is infrastructure only.
-# The bootstrap.initdb database/owner/secret are structural placeholders on
-# a fresh cluster — the auth triplet adopts them declaratively.
-# HA: 3 instances (1 primary, 1 sync replica, 1 async replica)
-# DR: WAL archived to RustFS for continuous recovery
+# Shared Database Cluster (CloudNativePG)
+# Migrated from the Zalando supporting-shared-db to CNPG.
+# Databases: user, notification, shipping, review — defined as per-service
+# triplets under services/ (RFC-0012, ADR-013); this file is infrastructure
+# only. The bootstrap.initdb database/owner/secret are structural placeholders
+# on a fresh cluster — the user triplet adopts them declaratively.
+# Single-node: 1 instance (no HA replica), matching the old supporting-shared-db.
+# DR: WAL archived to RustFS for continuous recovery.
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: auth-db
-  namespace: auth
+  name: shared-db
+  namespace: user
 spec:
-  instances: 3
+  instances: 1
   imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
 
   plugins:
     - name: barman-cloud.cloudnative-pg.io
       isWALArchiver: true
       parameters:
-        barmanObjectName: auth-db-backup-store
-        serverName: auth-db-cluster
+        barmanObjectName: shared-db-backup-store
+        serverName: shared-db-cluster
 
   replicationSlots:
     highAvailability:
@@ -31,24 +32,27 @@ spec:
       - pg_stat_statements
       - auto_explain
 
-    # Connection isolation (RFC-0012 P4, ADR-015): the auth role connects
+    # Connection isolation (RFC-0012 P4, ADR-015): each service role connects
     # only to its own database. CNPG inserts these BETWEEN its fixed rules
     # (local peer for instance manager/exporter, cert-based hostssl for
     # streaming_replica) and its default host-all catch-all — so the trailing
     # reject preempts the catch-all without touching operator paths.
     # First match wins. `host` (not hostssl) for the pgdog/migration pairs:
-    # those clients connect without TLS today; tighten to hostssl once pooler
-    # upstream TLS lands. Applied by reload, not restart.
+    # those clients connect without TLS today; tighten per-pair to hostssl
+    # once pooler upstream TLS lands. Applied by reload, not restart.
     # Adding a service? Add its allow line ABOVE the reject (the one
     # exception to "never touch instance.yaml" — HBA is cluster infra).
+    # `user` is a reserved word but is a plain role/db token here — no quoting.
     pg_hba:
-      - host auth auth auth scram-sha-256
-      - host all  all  all  reject
+      - host user         user         user         scram-sha-256
+      - host notification notification notification scram-sha-256
+      - host shipping     shipping     shipping     scram-sha-256
+      - host review       review       review       scram-sha-256
+      - host all          all          all          reject
 
-    synchronous:
-      method: any
-      number: 1
-      dataDurability: required
+    # No synchronous block: a single-instance cluster has no replica to
+    # confirm writes — synchronous{any,1} would leave the primary unable to
+    # commit (never writable).
 
     parameters:
       # Connection settings
@@ -132,15 +136,15 @@ spec:
 
   monitoring:
     customQueriesConfigMap:
-      - name: auth-db-monitoring-queries
+      - name: shared-db-monitoring-queries
         key: custom-queries
 
   bootstrap:
     initdb:
-      database: auth
-      owner: auth
+      database: user
+      owner: user
       secret:
-        name: auth-db-secret
+        name: shared-db-secret
       dataChecksums: true
       walSegmentSize: 64
       encoding: "UTF8"
@@ -153,13 +157,13 @@ spec:
   # precedence and flips the DatabaseRole to applied: false.
 
   storage:
-    size: 5Gi
+    size: 2Gi
     storageClass: standard
 
   resources:
     requests:
-      memory: "512Mi"
+      memory: "256Mi"
       cpu: "100m"
     limits:
-      memory: "1Gi"
+      memory: "512Mi"
       cpu: "500m"

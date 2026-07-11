@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: auth-db-monitoring-queries
-  namespace: auth
+  name: shared-db-monitoring-queries
+  namespace: user
   labels:
     cnpg.io/reload: ""
 data:
@@ -24,7 +24,10 @@ data:
                and pg_stat_statements.query not like '%SAVEPOINT%'
                ORDER BY pg_stat_statements.total_exec_time DESC LIMIT 100"
       target_databases:
-        - "auth"
+        - "user"
+        - "notification"
+        - "shipping"
+        - "review"
       metrics:
         - user:
             usage: "LABEL"
@@ -133,7 +136,10 @@ data:
     pg_stat_user_tables_autovacuum:
       query: "SELECT current_database() AS datname, schemaname, relname, n_dead_tup, n_live_tup, autovacuum_count, autoanalyze_count FROM pg_stat_user_tables"
       target_databases:
-        - "auth"
+        - "user"
+        - "notification"
+        - "shipping"
+        - "review"
       metrics:
         - datname:
             usage: "LABEL"
@@ -160,7 +166,10 @@ data:
     pg_table_size:
       query: "SELECT current_database() AS datname, schemaname, tablename, pg_total_relation_size(format('%I.%I', schemaname, tablename)) as total_bytes, pg_relation_size(format('%I.%I', schemaname, tablename)) as table_bytes FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema') ORDER BY pg_total_relation_size(format('%I.%I', schemaname, tablename)) DESC LIMIT 30"
       target_databases:
-        - "auth"
+        - "user"
+        - "notification"
+        - "shipping"
+        - "review"
       metrics:
         - datname:
             usage: "LABEL"
@@ -181,7 +190,10 @@ data:
     pg_stat_user_indexes:
       query: "SELECT current_database() AS datname, schemaname, relname, indexrelname, idx_scan, idx_tup_read, idx_tup_fetch, pg_relation_size(indexrelid) as index_bytes FROM pg_stat_user_indexes"
       target_databases:
-        - "auth"
+        - "user"
+        - "notification"
+        - "shipping"
+        - "review"
       metrics:
         - datname:
             usage: "LABEL"

@@ -1,0 +1,19 @@
+# One-shot physical backup — useful for:
+# - kubectl wait --for=condition=ready backup/auth-db-initial -n auth (before relying on DR bootstrap)
+# - First base backup in object store when paired with ScheduledBackup (every-6h has immediate: true)
+#
+# Safe to keep in Git: once phase=completed, re-reconciliation does not re-run the backup.
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  name: auth-db-initial
+  namespace: auth
+  labels:
+    app.kubernetes.io/name: auth-db-backup
+    app.kubernetes.io/component: on-demand-backup
+spec:
+  cluster:
+    name: auth-db
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io

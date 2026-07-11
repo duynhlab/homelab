@@ -14,8 +14,9 @@ spec:
     namespace: review
     grpc_server: true
     replicaCount: 1
-    db_host: "supporting-shared-db-pooler.user.svc.cluster.local"
-    db_migration_host: "supporting-shared-db.user.svc.cluster.local"
-    db_secret: "review.review.supporting-shared-db.credentials.postgresql.acid.zalan.do"
-    pool_max: "10"
-    db_user: "review.review"
+    db_host: "pgdog-shared.user.svc.cluster.local"
+    db_port: "6432"
+    db_migration_host: "shared-db-rw.user.svc.cluster.local"
+    db_secret: "shared-db-review-secret"
+    db_sslmode: "disable"
+    pool_max: "30"

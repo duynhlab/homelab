@@ -13,26 +13,26 @@ Reference docs:
 
 | Cluster | Operator | Backup method | Restore method |
 |---------|----------|---------------|----------------|
-| `cnpg-db` | CloudNativePG | Barman object store + `Backup` / `ScheduledBackup` | Bootstrap recovery from `s3://pg-backups-cnpg/cnpg-db/` |
-| `cnpg-db-replica` | CloudNativePG | Barman object store for its own DR prefix | Replica cluster or restore from object store |
+| `product-db` | CloudNativePG | Barman object store + `Backup` / `ScheduledBackup` | Bootstrap recovery from `s3://pg-backups-cnpg/product-db/` |
+| `product-db-replica` | CloudNativePG | Barman object store for its own DR prefix | Replica cluster or restore from object store |
 | `auth-db` | Zalando | WAL-G via Spilo/operator env | Clone/restore from WAL-G object-store backup |
 | `supporting-shared-db` | Zalando | WAL-G via Spilo/operator env | Clone/restore from WAL-G object-store backup |
 
-## CloudNativePG: `cnpg-db`
+## CloudNativePG: `product-db`
 
 ### Prerequisites
 
 - RustFS is running in namespace `rustfs`.
 - Bucket `pg-backups-cnpg` exists.
 - Secret `pg-backup-rustfs-credentials` exists in namespace `product`.
-- `cnpg-db` has at least one completed base backup.
-- `cnpg-db` reports `ContinuousArchiving=True`.
+- `product-db` has at least one completed base backup.
+- `product-db` reports `ContinuousArchiving=True`.
 
 ### Check backup health
 
 ```bash
 kubectl get cluster,backup,scheduledbackup -n product
-kubectl get cluster cnpg-db -n product -o jsonpath='{range .status.conditions[*]}{.type}={.status} reason={.reason}{"\n"}{end}'
+kubectl get cluster product-db -n product -o jsonpath='{range .status.conditions[*]}{.type}={.status} reason={.reason}{"\n"}{end}'
 ```
 
 Expected:
@@ -47,7 +47,7 @@ Expected:
 If the CNPG kubectl plugin is installed:
 
 ```bash
-kubectl cnpg backup cnpg-db -n product
+kubectl cnpg backup product-db -n product
 ```
 
 Plain Kubernetes fallback:
@@ -57,11 +57,11 @@ kubectl apply -f - <<EOF
 apiVersion: postgresql.cnpg.io/v1
 kind: Backup
 metadata:
-  name: cnpg-db-manual-$(date +%Y%m%d-%H%M)
+  name: product-db-manual-$(date +%Y%m%d-%H%M)
   namespace: product
 spec:
   cluster:
-    name: cnpg-db
+    name: product-db
   method: plugin
   pluginConfiguration:
     name: barman-cloud.cloudnative-pg.io
@@ -73,7 +73,7 @@ EOF
 Use the checked-in restore example as the starting point:
 
 ```bash
-kubectl apply -f kubernetes/infra/configs/databases/clusters/cnpg-db/restore-cluster-example.yaml
+kubectl apply -f kubernetes/infra/configs/databases/clusters/product-db/restore-cluster-example.yaml
 kubectl get cluster -n product -w
 ```
 
@@ -81,12 +81,12 @@ The example restores from:
 
 ```yaml
 externalClusters:
-  - name: cnpg-db-backup
+  - name: product-db-backup
     plugin:
       name: barman-cloud.cloudnative-pg.io
       parameters:
-        barmanObjectName: cnpg-db-backup-store
-        serverName: cnpg-db-cluster
+        barmanObjectName: product-db-backup-store
+        serverName: product-db-cluster
 ```
 
 ### Point-in-time recovery
@@ -97,7 +97,7 @@ cluster manifest:
 ```yaml
 bootstrap:
   recovery:
-    source: cnpg-db-backup
+    source: product-db-backup
     recoveryTarget:
       targetTime: "2026-05-05 03:00:00+00"
 ```
@@ -108,20 +108,20 @@ counts, and application smoke tests before routing traffic or extracting data.
 ### Validate CNPG restore
 
 ```bash
-kubectl exec -it cnpg-db-restore-1 -n product -- psql -U product -d product -c "\dt"
-kubectl exec -it cnpg-db-restore-1 -n product -- psql -U product -d product -c "SELECT count(*) FROM products;"
+kubectl exec -it product-db-restore-1 -n product -- psql -U product -d product -c "\dt"
+kubectl exec -it product-db-restore-1 -n product -- psql -U product -d product -c "SELECT count(*) FROM products;"
 ```
 
-## CloudNativePG: `cnpg-db-replica`
+## CloudNativePG: `product-db-replica`
 
-`cnpg-db-replica` is a DR replica cluster that follows the `cnpg-db` backup/WAL
+`product-db-replica` is a DR replica cluster that follows the `product-db` backup/WAL
 archive path. It is not part of the normal app write path.
 
 Check status:
 
 ```bash
-kubectl get cluster cnpg-db-replica -n product -o wide
-kubectl get pods -n product -l cnpg.io/cluster=cnpg-db-replica
+kubectl get cluster product-db-replica -n product -o wide
+kubectl get pods -n product -l cnpg.io/cluster=product-db-replica
 ```
 
 Before promotion:

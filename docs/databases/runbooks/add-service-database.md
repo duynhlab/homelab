@@ -1,14 +1,14 @@
-# Runbook: Add a Service Database on cnpg-db
+# Runbook: Add a Service Database on product-db
 
 Give a new service its own database, role, and credentials on the shared
-`cnpg-db` cluster — one triplet file plus three registrations, and **never a
+`product-db` cluster — one triplet file plus three registrations, and **never a
 change to `instance.yaml`**.
 
 | | |
 |---|---|
 | **Pattern** | Per-service triplet: ExternalSecret + DatabaseRole + Database ([ADR-013](../../proposals/adr/ADR-013-per-service-db-triplet/)) |
 | **Time** | ~15 minutes + one PR |
-| **Reference triplet** | `kubernetes/infra/configs/databases/clusters/cnpg-db/services/payment.yaml` |
+| **Reference triplet** | `kubernetes/infra/configs/databases/clusters/product-db/services/payment.yaml` |
 | **Concepts** | [012 — Declarative Role & Database Management](../012-declarative-role-management.md) |
 
 ## Steps
@@ -19,7 +19,7 @@ change to `instance.yaml`**.
    `kubernetes/infra/configs/secrets/openbao-bootstrap/configmap.yaml`:
 
    ```bash
-   bao kv put secret/local/databases/cnpg-db/<svc> \
+   bao kv put secret/local/databases/product-db/<svc> \
      username="<svc>" \
      password="<generated>"
    ```
@@ -29,12 +29,12 @@ change to `instance.yaml`**.
    kustomization secrets-local --with-source`.
 
 2. **Create the triplet** —
-   `kubernetes/infra/configs/databases/clusters/cnpg-db/services/<svc>.yaml`,
+   `kubernetes/infra/configs/databases/clusters/product-db/services/<svc>.yaml`,
    copied from `payment.yaml`, in this order:
-   1. `ExternalSecret cnpg-db-<svc>-secret` (namespace `product`) —
+   1. `ExternalSecret product-db-<svc>-secret` (namespace `product`) —
       `template.type: kubernetes.io/basic-auth`, label `cnpg.io/reload: "true"`,
       OpenBAO path from step 1.
-   2. `DatabaseRole cnpg-db-role-<svc>` — **every attribute explicit** (adoption
+   2. `DatabaseRole product-db-role-<svc>` — **every attribute explicit** (adoption
       semantics; see the concept doc), `login: true`, all privilege flags
       `false`, `databaseRoleReclaimPolicy: retain`.
    3. `Database <svc>-database` — `owner: <svc>`, baseline extensions
@@ -45,12 +45,12 @@ change to `instance.yaml`**.
 
 3. **App-namespace secret copy** — the service's pods read credentials from
    their own namespace: add
-   `clusters/cnpg-db/secrets/cnpg-db-<svc>-secret-<svc>-ns.yaml` (clone the
+   `clusters/product-db/secrets/product-db-<svc>-secret-<svc>-ns.yaml` (clone the
    cart/order/payment `-ns` copies; plain Opaque is fine for app env use) and
    register it in the cluster `kustomization.yaml`.
 
 4. **Pooler entry** (skip if the service connects direct like payment) — in
-   `clusters/cnpg-db/poolers/helmrelease.yaml`:
+   `clusters/product-db/poolers/helmrelease.yaml`:
    - **Append** to `values.databases` and `values.users` (name + database
      only, no password).
    - **Append** a `valuesFrom` entry pointing at the new Secret with
@@ -73,7 +73,7 @@ change to `instance.yaml`**.
    kubectl get databaserole,database -n product | grep <svc>   # applied: true
    kubectl run psql-check --rm -it --restart=Never -n product \
      --image=ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie -- \
-     psql "host=cnpg-db-rw.product user=<svc> dbname=<svc> password=<from OpenBAO>" -c 'select 1'
+     psql "host=product-db-rw.product user=<svc> dbname=<svc> password=<from OpenBAO>" -c 'select 1'
    ```
 
 ## What you never do

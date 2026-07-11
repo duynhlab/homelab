@@ -38,7 +38,7 @@ docs/
 │   ├── 009-extensions.md             # PostgreSQL extensions
 │   ├── 008-pooler.md                 # Connection pooler documentation
 │   ├── 004-replication-strategy.md   # Replication strategy
-│   ├── 005-ha-dr-deep-dive.md        # HA vs DR (cnpg-db-replica)
+│   ├── 005-ha-dr-deep-dive.md        # HA vs DR (product-db-replica)
 │   ├── 001-postgresql-internals.md  # PostgreSQL internals deep dive
 │   ├── 010-drp.md                    # PostgreSQL DRP, RTO/RPO, PITR, restore evidence
 │   ├── 010.1-rpo-rto-planning.md     # Per-tier RPO/RTO targets vs as-built
@@ -52,8 +52,8 @@ docs/
 │       ├── prepared-databases.md
 │       ├── cnpg-dr-replica-bootstrap.md
 │       ├── zalando-ha-scaling.md
-│       ├── add-service-database.md   # Add a service DB to cnpg-db (RFC-0012 triplet)
-│       └── rotate-cnpg-service-password.md  # Rotate a cnpg-db service password end-to-end
+│       ├── add-service-database.md   # Add a service DB to product-db (RFC-0012 triplet)
+│       └── rotate-cnpg-service-password.md  # Rotate a product-db service password end-to-end
 ├── observability/                # Observability documentation
 │   ├── README.md                 # Master index + 4-pillar architecture
 │   ├── opentelemetry.md          # OpenTelemetry from zero: signals, SDK, collector, platform usage
@@ -251,7 +251,7 @@ docs/
     - Homelab cluster-to-operator mapping
     - Links to [CloudNativePG](./databases/003.1-operator-cnpg.md) and [Zalando](./databases/003.2-operator-zalando.md) deep dives
 
-3. **[PostgreSQL Internals Deep Dive](./databases/001-postgresql-internals.md)** - PostgreSQL internals using cnpg-db examples
+3. **[PostgreSQL Internals Deep Dive](./databases/001-postgresql-internals.md)** - PostgreSQL internals using product-db examples
     - INSERT/UPDATE workflow with sequence diagrams
     - Shared Buffers and Buffer Manager explained
     - WAL (Write-Ahead Log) and crash recovery
@@ -277,8 +277,8 @@ docs/
 
 1. **[PostgreSQL Backup/Restore](./runbooks/troubleshooting/postgres_backup_restore.md)** - Backup and restore procedures (CNPG vs Zalando)
 2. **[VictoriaLogs Log Debugging](./runbooks/troubleshooting/victorialogs_kubernetes_logs_debug.md)** - Kubernetes log debugging with VictoriaLogs
-3. **[Add a service database](./databases/runbooks/add-service-database.md)** - RFC-0012 triplet flow on cnpg-db
-4. **[Rotate a cnpg-db service password](./databases/runbooks/rotate-cnpg-service-password.md)** - End-to-end rotation via OpenBAO → triplet → PgDog
+3. **[Add a service database](./databases/runbooks/add-service-database.md)** - RFC-0012 triplet flow on product-db
+4. **[Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md)** - End-to-end rotation via OpenBAO → triplet → PgDog
 5. *Legacy (PgCat retired — kept for archaeology; no PgDog runbook exists yet):* [prepared-statement](./runbooks/troubleshooting/pgcat_prepared_statement_error.md) · [read-only txn](./runbooks/troubleshooting/pgcat_read_only_transaction_error.md) · [upstream connectivity](./runbooks/troubleshooting/pgcat_upstream_connectivity_errors.md)
 
 ---
@@ -349,7 +349,7 @@ docs/
 - [ADR-010: Extract idempotency into a shared pkg/idempotency library](./proposals/adr/ADR-010-shared-idempotency-library/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
 - [ADR-011: Ship reconciliation detect-only; defer auto-heal](./proposals/adr/ADR-011-detect-only-reconciliation/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
 - [ADR-012: Auto-heal one reconciliation class (lost-capture-response window)](./proposals/adr/ADR-012-reconciliation-auto-heal/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/); supersedes the detect-only stance of ADR-011 for a single drift class (off by default)
-- [ADR-013: Per-service database triplet on cnpg-db](./proposals/adr/ADR-013-per-service-db-triplet/) - Accepted; from [RFC-0012](./proposals/rfc/RFC-0012/); ExternalSecret + DatabaseRole + Database, one file per service
+- [ADR-013: Per-service database triplet on product-db](./proposals/adr/ADR-013-per-service-db-triplet/) - Accepted; from [RFC-0012](./proposals/rfc/RFC-0012/); ExternalSecret + DatabaseRole + Database, one file per service
 - [ADR-014: PgDog pooler credentials via Flux valuesFrom](./proposals/adr/ADR-014-pooler-credentials-valuesfrom/) - Accepted; from [RFC-0012](./proposals/rfc/RFC-0012/); per-user targetPath injection from ESO Secrets, no credentials in Helm values
 - [ADR-015: Connection isolation via declarative pg_hba](./proposals/adr/ADR-015-pg-hba-connection-isolation/) - Accepted; from [RFC-0012](./proposals/rfc/RFC-0012/); per-pair allow + trailing reject, applied by reload
 - [ADR-016: OTel metrics cutover](./proposals/adr/ADR-016-otel-metrics-cutover/) - Accepted; from [RFC-0014](./proposals/rfc/RFC-0014/); apps ServiceMonitor deleted (checkout never integrated — no fence), D-4 absence alerts activated in the same commit
@@ -369,15 +369,15 @@ docs/
 - [Extensions](./databases/009-extensions.md) - PostgreSQL extensions (operand built-in vs Image Volume models)
 - [Connection Poolers](./databases/008-pooler.md) - PgBouncer, PgCat (legacy), PgDog
 - [Replication Strategy](./databases/004-replication-strategy.md) - Replication strategy
-- [HA & DR Deep Dive](./databases/005-ha-dr-deep-dive.md) - cnpg-db vs cnpg-db-replica (object-store DR)
+- [HA & DR Deep Dive](./databases/005-ha-dr-deep-dive.md) - product-db vs product-db-replica (object-store DR)
 - [PostgreSQL DRP](./databases/010-drp.md) - DRP, RTO/RPO, PITR, standby taxonomy, and restore evidence
     - [RPO/RTO Planning](./databases/010.1-rpo-rto-planning.md) - per-tier targets vs as-built, mapped to clusters
     - [Restore & Failover Drills](./databases/010.2-restore-and-failover-drills.md) - drill cadence, roles, and evidence log
     - [Cross-Region / Cross-Zone DR](./databases/010.3-cross-region-dr.md) - roadmap to independent failure domains
     - [Emergency Recovery](./databases/010.4-emergency-recovery.md) - "start here when it's down" runbook
-- [Declarative Role & Database Management](./databases/012-declarative-role-management.md) - Per-service triplet (ExternalSecret + DatabaseRole + Database) on cnpg-db; RFC-0012 rollout state
+- [Declarative Role & Database Management](./databases/012-declarative-role-management.md) - Per-service triplet (ExternalSecret + DatabaseRole + Database) on product-db; RFC-0012 rollout state
 - [PostgreSQL Further Reading](./databases/011-documents.md) - Curated external references
-- [PostgreSQL Internals](./databases/001-postgresql-internals.md) - Deep dive using cnpg-db examples
+- [PostgreSQL Internals](./databases/001-postgresql-internals.md) - Deep dive using product-db examples
 
 ### Caching
 
@@ -418,7 +418,7 @@ docs/
 - [PostgreSQL Backup/Restore](./runbooks/troubleshooting/postgres_backup_restore.md) - Backup and restore procedures
 - [VictoriaLogs Log Debugging](./runbooks/troubleshooting/victorialogs_kubernetes_logs_debug.md) - Kubernetes log debugging with VictoriaLogs
 - [Add a service database](./databases/runbooks/add-service-database.md) - RFC-0012 triplet flow
-- [Rotate a cnpg-db service password](./databases/runbooks/rotate-cnpg-service-password.md) - End-to-end rotation
+- [Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md) - End-to-end rotation
 - *Legacy PgCat (retired):* [prepared-statement](./runbooks/troubleshooting/pgcat_prepared_statement_error.md) · [read-only txn](./runbooks/troubleshooting/pgcat_read_only_transaction_error.md) · [upstream](./runbooks/troubleshooting/pgcat_upstream_connectivity_errors.md)
 
 ---

@@ -1,6 +1,6 @@
-# cnpg-db Cluster Internals
+# product-db Cluster Internals
 
-Here are the specific request flows for the `cnpg-db` cluster, incorporating the `PgDog` pooler and `CloudNativePG` architecture.
+Here are the specific request flows for the `product-db` cluster, incorporating the `PgDog` pooler and `CloudNativePG` architecture.
 
 ## 1. Write Flow (INSERT/UPDATE)
 **Context:** Product Service performs an INSERT. `PgDog` routes to the **Primary** instance.
@@ -54,7 +54,7 @@ sequenceDiagram
 ```
 
 ## 2. Read Flow (SELECT)
-**Context:** Product Service performs a SELECT. `PgDog` is configured for read-splitting — it defines replica pools (`cnpg-db-r`) plus an `lsnCheck` for read-your-writes consistency — so `SELECT`s can be routed to replicas. Whether a given read is served by the primary or a replica depends on the live routing decision (runtime split not yet confirmed).
+**Context:** Product Service performs a SELECT. `PgDog` is configured for read-splitting — it defines replica pools (`product-db-r`) plus an `lsnCheck` for read-your-writes consistency — so `SELECT`s can be routed to replicas. Whether a given read is served by the primary or a replica depends on the live routing decision (runtime split not yet confirmed).
 
 ```mermaid
 sequenceDiagram
@@ -217,7 +217,7 @@ graph TD
     
     WALSender ==>|"Step 12: Stream WAL over network<br/>Synchronous: Wait for replica ACK<br/>Asynchronous: Don't wait"| WALReceiver
     
-    subgraph StandbyNode["cnpg-db replica pods (x2) - 1 sync + 1 async"]
+    subgraph StandbyNode["product-db replica pods (x2) - 1 sync + 1 async"]
         WALReceiver[WAL Receiver Process<br/>Receives WAL stream<br/>Writes to local pg_wal/]
         
         WALReceiver -->|"Step 13: Write WAL to disk"| StandbyWAL

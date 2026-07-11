@@ -43,15 +43,18 @@ flowchart TB
     end
 
     PgDog["PgDog Pooler\n:6432"]
-    ObjStore["RustFS Object Store\ns3://pg-backups-cnpg/cnpg-db/"]
-
-    P1 -->|"archive_command\n(WAL segments)"| ObjStore
-    ObjStore -->|"restore_command\n(continuous recovery)"| DR1
 
     PgDog -->|"RW: product, cart, order, payment"| P1
     PgDog -->|"RO: SELECT queries"| P2
     PgDog -->|"RO: SELECT queries"| P3
   end
+
+  subgraph rustfsNS ["Namespace: rustfs"]
+    ObjStore["RustFS Object Store\ns3://pg-backups-cnpg/cnpg-db/"]
+  end
+
+  P1 -->|"archive_command\n(WAL segments)"| ObjStore
+  ObjStore -->|"restore_command\n(continuous recovery)"| DR1
 
   ProductSvc["Product Service"] -->|6432| PgDog
   CartSvc["Cart Service"] -->|6432| PgDog

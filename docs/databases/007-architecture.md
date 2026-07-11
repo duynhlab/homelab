@@ -54,14 +54,14 @@ sequenceDiagram
 ```
 
 ## 2. Read Flow (SELECT)
-**Context:** Product Service performs a SELECT. `PgDog` currently routes to **Primary** (Read-Write) as read-splitting is not yet enabled.
+**Context:** Product Service performs a SELECT. `PgDog` is configured for read-splitting — it defines replica pools (`cnpg-db-r`) plus an `lsnCheck` for read-your-writes consistency — so `SELECT`s can be routed to replicas. Whether a given read is served by the primary or a replica depends on the live routing decision (runtime split not yet confirmed).
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant App as Product Service
     participant PgDog as PgDog (Pooler)
-    participant Backend as Postgres Backend (Primary)
+    participant Backend as Postgres Backend (Primary or Replica)
     participant Parser as Parser/Planner
     participant Executor as Executor
     participant Buffer as Shared Buffers
@@ -165,7 +165,7 @@ graph TD
     PhysicalDisk -->|"Return Page"| OSKernelLayer
     OSKernelLayer -->|"Copy to Buffer"| SharedBuffers
     
-    SharedBuffers["Shared Buffers (64MB)<br/>In-memory data cache<br/>Modified pages = dirty pages"]
+    SharedBuffers["Shared Buffers (256MB)<br/>In-memory data cache<br/>Modified pages = dirty pages"]
     
     %% ===== WAL LAYER - CRITICAL PATH =====
     SharedBuffers -->|"Step 7: BEFORE data persist<br/>Write-Ahead Logging<br/>Durability guarantee"| WALBuffers
@@ -217,7 +217,7 @@ graph TD
     
     WALSender ==>|"Step 12: Stream WAL over network<br/>Synchronous: Wait for replica ACK<br/>Asynchronous: Don't wait"| WALReceiver
     
-    subgraph StandbyNode["cnpg-db replica pods (x2) - Asynchronous Replication"]
+    subgraph StandbyNode["cnpg-db replica pods (x2) - 1 sync + 1 async"]
         WALReceiver[WAL Receiver Process<br/>Receives WAL stream<br/>Writes to local pg_wal/]
         
         WALReceiver -->|"Step 13: Write WAL to disk"| StandbyWAL
@@ -439,7 +439,7 @@ graph TD
         direction TB
         
         subgraph SharedBuffersArea["Shared Buffers - shared_buffers parameter"]
-            SharedBuffersData["Data & Index Pages Cache<br/>8KB blocks in memory<br/>LRU eviction policy<br/>Current: 64MB (Dev)<br/>Prod Target: 25-40% RAM"]
+            SharedBuffersData["Data & Index Pages Cache<br/>8KB blocks in memory<br/>LRU eviction policy<br/>Current: 256MB<br/>Prod Target: 25-40% RAM"]
         end
         
         subgraph WALBuffersArea["WAL Buffers - wal_buffers parameter"]

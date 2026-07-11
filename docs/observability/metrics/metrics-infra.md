@@ -61,14 +61,16 @@ the USE alerts below.
 | Resource | Reason |
 |----------|--------|
 | **etcd** | Metrics endpoint not accessible in Kind without host networking |
-| **kubelet / scheduler / controller-manager** | Not exposed via Services in Kind |
+| **scheduler / controller-manager** | Not exposed via Services in Kind |
 | **Ingress controller** | No ingress controller deployed |
 | **node_exporter** | Kind nodes are Docker containers; KSM conditions used instead |
 
 These are tracked for a production cluster: node_exporter (real node CPU/mem/disk
 I/O), etcd (leader elections, proposal latency, DB size), ingress controller
-metrics, kubelet (pod-startup latency), CoreDNS (DNS latency, NXDOMAIN), and
-cert-manager expiry alerts.
+metrics, scheduler/controller-manager, and CoreDNS (DNS latency, NXDOMAIN).
+(The kubelet **is** already scraped here via `VMNodeScrape` — cAdvisor container
+metrics plus volume-stats gauges; and cert-manager expiry alerts **are** deployed
+— see the [Alert Catalog](../alerting/alert-catalog.md).)
 
 ## Go process vs container (cAdvisor) metrics
 
@@ -96,7 +98,7 @@ authoritative, per-domain index (exact files under
 `prometheusrules/kubernetes/` and `prometheusrules/valkey/`, with counts and
 production impact) is the [Alert Catalog](../alerting/alert-catalog.md):
 
-- [Kubernetes](../alerting/alert-catalog.md#6-kubernetes) — nodes, workloads, pods, API server, control plane, network
+- [Kubernetes](../alerting/alert-catalog.md#5-kubernetes) — nodes, workloads, pods, API server, control plane, network
 - [Valkey cache](../alerting/alert-catalog.md#3-valkey-cache)
 
 Database manifests are indexed in the

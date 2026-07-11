@@ -26,13 +26,13 @@ docs/
 │   ├── rfc/                      # Requests for Comments
 │   │   ├── README.md             # process + index + backlog
 │   │   ├── RFC-0000/             # template
-│   │   └── RFC-0001 … RFC-0014   # Temporal, mTLS, …, payment service, Talos migration, declarative CNPG roles, metrics audit & scale playbook, full OpenTelemetry adoption
+│   │   └── RFC-0001 … RFC-0015   # Temporal, mTLS, …, payment service, Talos migration, declarative CNPG roles, metrics audit & scale playbook, full OpenTelemetry adoption, checkout service
 │   └── *.md                      # loose reviews/roadmaps (auth-gateway, kong, otel-sampling; some .vi.md)
 ├── databases/                    # Database documentation
 │   ├── 002-database-integration.md               # PostgreSQL architecture
 │   ├── 003-operator-comparison.md               # CloudNativePG vs Zalando decision guide
 │   ├── 003.1-operator-cnpg.md                   # CloudNativePG operator deep dive
-│   ├── 003.2-operator-zalando.md                # Zalando Postgres Operator deep dive
+│   ├── 003.2-operator-zalando.md                # Zalando Postgres Operator deep dive (historical/reference — operator removed)
 │   ├── 007-architecture.md           # Database architecture overview
 │   ├── 006-backup-strategy.md                 # Backup strategy and retention
 │   ├── 009-extensions.md             # PostgreSQL extensions
@@ -214,9 +214,9 @@ docs/
 4. **[Jaeger Guide](./observability/tracing/jaeger.md)** - Jaeger UI usage, comparison with Tempo
 5. **[Backend Comparison](./observability/tracing/backends-comparison.md)** - Tempo vs Jaeger vs VictoriaTraces (+ roadmap)
 6. **[VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md)** - 3rd backend via the VM operator
-5. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
-6. **[Logging](./observability/logging/README.md)** - Architecture: OTLP app logs (otelzap tee) + Vector for non-instrumented pods, scaling
-7. **[VictoriaLogs](./observability/logging/victorialogs.md)** - VictoriaLogs deployment and configuration
+7. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
+8. **[Logging](./observability/logging/README.md)** - Architecture: OTLP app logs (otelzap tee) + Vector for non-instrumented pods, scaling
+9. **[VictoriaLogs](./observability/logging/victorialogs.md)** - VictoriaLogs deployment and configuration
     - OTLP app-log ingest + Vector for non-instrumented pods (DB/Kong/frontend/infra)
     - PostgreSQL auto_explain plan parsing pipeline
     - Verification and troubleshooting
@@ -246,7 +246,7 @@ docs/
     - Overview diagram showing operators, services, poolers, and clusters
     - Individual cluster diagrams with secrets, connections, and patterns
 
-2. **[Operator Comparison](./databases/003-operator-comparison.md)** - CloudNativePG vs Zalando decision guide
+2. **[Operator Comparison](./databases/003-operator-comparison.md)** - CloudNativePG vs Zalando decision guide (reference/historical — the platform standardised on CloudNativePG; the Zalando operator was removed)
     - Concise decision matrix
     - Homelab cluster-to-operator mapping
     - Links to [CloudNativePG](./databases/003.1-operator-cnpg.md) and [Zalando](./databases/003.2-operator-zalando.md) deep dives
@@ -361,13 +361,13 @@ docs/
 ### Databases
 
 - [Database Guide](./databases/002-database-integration.md) - PostgreSQL database integration guide
-- [Operator Comparison](./databases/003-operator-comparison.md) - CloudNativePG vs Zalando decision guide
+- [Operator Comparison](./databases/003-operator-comparison.md) - CloudNativePG vs Zalando decision guide (reference/historical — standardised on CloudNativePG)
 - [CloudNativePG Operator](./databases/003.1-operator-cnpg.md) - CloudNativePG feature and operations deep dive
-- [Zalando Postgres Operator](./databases/003.2-operator-zalando.md) - Patroni/Spilo operator deep dive
+- [Zalando Postgres Operator](./databases/003.2-operator-zalando.md) - Patroni/Spilo operator deep dive (historical/reference — operator removed)
 - [Architecture](./databases/007-architecture.md) - Database architecture overview
 - [Backup Strategy](./databases/006-backup-strategy.md) - Backup architecture and retention
 - [Extensions](./databases/009-extensions.md) - PostgreSQL extensions (operand built-in vs Image Volume models)
-- [Connection Poolers](./databases/008-pooler.md) - PgBouncer, PgCat, PgDog
+- [Connection Poolers](./databases/008-pooler.md) - PgBouncer, PgCat (legacy), PgDog
 - [Replication Strategy](./databases/004-replication-strategy.md) - Replication strategy
 - [HA & DR Deep Dive](./databases/005-ha-dr-deep-dive.md) - cnpg-db vs cnpg-db-replica (object-store DR)
 - [PostgreSQL DRP](./databases/010-drp.md) - DRP, RTO/RPO, PITR, standby taxonomy, and restore evidence
@@ -452,4 +452,4 @@ docs/
 
 ---
 
-**Last Updated**: 2026-07-10 — Security category added; ADR-016 indexed; Platform category completed (kyverno, graceful-shutdown, gke-dns, mcp, rulesets); databases 012 + 2 runbooks linked; PgCat runbooks demoted to legacy
+**Last Updated**: 2026-07-11 — Zalando→CNPG migration: operator-comparison + Zalando deep-dive entries reframed as reference/historical (platform standardised on CloudNativePG). Security category added; ADR-016 indexed; Platform category completed (kyverno, graceful-shutdown, gke-dns, mcp, rulesets); databases 012 + 2 runbooks linked; PgCat runbooks demoted to legacy

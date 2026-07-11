@@ -4,10 +4,11 @@
 
 | Cluster | Operator | Namespace | Instances | Replication | Pooler | Pooler Endpoint | Direct Endpoint |
 |---------|----------|-----------|-----------|-------------|--------|-----------------|-----------------|
-| **auth-db** | Zalando | auth | 3 (1 Leader + 2 Standbys) | Streaming (async) | PgBouncer (3 pods) | `auth-db-pooler.auth.svc:5432` | `auth-db.auth.svc:5432` |
-| **supporting-shared-db** | Zalando | user | 1 | N/A | PgBouncer (3 pods) | `supporting-shared-db-pooler.user.svc:5432` | `supporting-shared-db.user.svc:5432` |
-| **cnpg-db** | CloudNativePG | product | 3 (1 Primary + 1 Sync + 1 Async Replica) | Sync (ANY 1) | PgDog (3 pods) | `pgdog-cnpg.product.svc:6432` | `cnpg-db-rw.product.svc:5432` |
-| **cnpg-db-replica** | CloudNativePG | product | 1 (Designated Primary) | WAL recovery from object store | — | — | `cnpg-db-replica-rw.product.svc:5432` |
+| **product-db** | CloudNativePG | product | 3 (1 Primary + 1 Sync + 1 Async Replica) | Sync (ANY 1) | PgDog (`pgdog-product`) | `pgdog-product.product.svc:6432` | `product-db-rw.product.svc:5432` |
+| **product-db-replica** | CloudNativePG | product | 1 (Designated Primary) | WAL recovery from object store | — | — | `product-db-replica-rw.product.svc:5432` |
+| **auth-db** | CloudNativePG | auth | 3 (1 Primary + 1 Sync + 1 Async Replica) | Sync (ANY 1) | PgDog (`pgdog-auth`) | `pgdog-auth.auth.svc:6432` | `auth-db-rw.auth.svc:5432` |
+| **shared-db** | CloudNativePG | user | 1 | N/A | PgDog (`pgdog-shared`) | `pgdog-shared.user.svc:6432` | `shared-db-rw.user.svc:5432` |
+| **temporal-db** | CloudNativePG | temporal | 1 | N/A | — | — | `temporal-db-rw.temporal.svc:5432` |
 
 ---
 
@@ -15,10 +16,11 @@
 
 For detailed architecture, configuration, and components of each cluster, please refer to their respective directories:
 
-- **[auth-db](auth-db/README.md)**: Authentication service database.
-- **[supporting-shared-db](supporting-shared-db/README.md)**: Shared database for User, Notification, Shipping, and Review services.
-- **[cnpg-db](cnpg-db/)**: Consolidated CNPG cluster hosting Product, Cart, Order, and Payment databases (merged from former product-db + transaction-shared-db; payment app connects direct-TLS). Includes PgDog pooler, backup, and monitoring.
-- **[cnpg-db-replica](cnpg-db-replica/)**: DR replica cluster; continuously recovers from cnpg-db WAL archive. Promotable to standalone primary. Deployed via Flux **`configs/databases-cnpg-dr`** (`databases-cnpg-dr-local` depends on `databases-local`).
+- **[product-db](product-db/)**: Consolidated CNPG cluster hosting Product, Cart, Order, and Payment databases (merged from former product-db + transaction-shared-db; payment app connects direct-TLS). Includes PgDog pooler, backup, and monitoring.
+- **[product-db-replica](product-db-replica/)**: DR replica cluster; continuously recovers from product-db WAL archive. Promotable to standalone primary. Deployed via Flux **`configs/databases-cnpg-dr`** (`databases-cnpg-dr-local` depends on `databases-local`).
+- **[auth-db](auth-db/)**: CNPG cluster for the Auth service (migrated from Zalando). 3-instance HA with PgDog pooler, backup, and monitoring.
+- **[shared-db](shared-db/)**: CNPG cluster (migrated from the former Zalando `supporting-shared-db`) for User, Notification, Shipping, and Review services. Single instance with PgDog pooler, backup, and monitoring.
+- **[temporal-db](temporal-db/)**: CNPG cluster backing Temporal (`temporal` + `temporal_visibility`). Single instance; no pooler and no backup.
 
 ### DR replica troubleshooting
 
@@ -31,7 +33,11 @@ for CNPG recovery internals.
 
 ## Connection Pooler Comparison
 
-| Feature | PgBouncer (Zalando) | PgDog | PgCat |
+**PgDog** is the only pooler deployed on the platform (`pgdog-product`,
+`pgdog-auth`, `pgdog-shared`). PgBouncer and PgCat are listed for comparison
+only.
+
+| Feature | PgBouncer | PgDog | PgCat |
 |---------|---------------------|-------|-------|
 | **Architecture** | Single-threaded (C) | Multi-threaded (Rust) | Multi-threaded (Rust) |
 | **Deployment** | Operator-managed | Helm chart | Kubernetes manifests |
@@ -46,16 +52,16 @@ for CNPG recovery internals.
 
 ## Explore Internal Cluster PostgreSQL
 
-This section uses **cnpg-db** as a learning vehicle to understand PostgreSQL internals. The same concepts apply whether PostgreSQL runs on Kubernetes (CloudNativePG) or VMs (EC2).
+This section uses **product-db** as a learning vehicle to understand PostgreSQL internals. The same concepts apply whether PostgreSQL runs on Kubernetes (CloudNativePG) or VMs (EC2).
 
-### cnpg-db Topology (Current Configuration)
+### product-db Topology (Current Configuration)
 
 | Component | Endpoint | Port | Role |
 |-----------|----------|------|------|
-| **PgDog Pooler** | `pgdog-cnpg.product.svc.cluster.local` | 6432 | Connection pooling, R/W splitting (product, cart, order, payment) |
-| **CNPG RW Service** | `cnpg-db-rw.product.svc.cluster.local` | 5432 | Write queries (auto-routes to primary) |
-| **CNPG R Service** | `cnpg-db-r.product.svc.cluster.local` | 5432 | Read queries (load-balanced replicas) |
-| **CNPG RO Service** | `cnpg-db-ro.product.svc.cluster.local` | 5432 | Read-only (any instance) |
+| **PgDog Pooler** | `pgdog-product.product.svc.cluster.local` | 6432 | Connection pooling, R/W splitting (product, cart, order, payment) |
+| **CNPG RW Service** | `product-db-rw.product.svc.cluster.local` | 5432 | Write queries (auto-routes to primary) |
+| **CNPG R Service** | `product-db-r.product.svc.cluster.local` | 5432 | Read queries (load-balanced replicas) |
+| **CNPG RO Service** | `product-db-ro.product.svc.cluster.local` | 5432 | Read-only (any instance) |
 | **Cluster** | 3 instances | - | 1 Primary + 1 Sync Replica + 1 Async Replica |
 
 ```mermaid
@@ -65,15 +71,15 @@ flowchart LR
     end
 
     subgraph Pooler["Connection Pooler"]
-        PgDog{{"🟣 PgDog<br/>pgdog-cnpg:6432"}}
+        PgDog{{"🟣 PgDog<br/>pgdog-product:6432"}}
     end
 
     subgraph CNPG["CloudNativePG Services"]
-        RW["cnpg-db-rw:5432"]
-        R["cnpg-db-r:5432"]
+        RW["product-db-rw:5432"]
+        R["product-db-r:5432"]
     end
 
-    subgraph Cluster["cnpg-db Cluster"]
+    subgraph Cluster["product-db Cluster"]
         Primary[("🔴 Primary")]
         Replica1[("🟢 Replica 1")]
         Replica2[("🟢 Replica 2")]
@@ -101,7 +107,7 @@ When a Product Service calls `INSERT INTO products (name, price) VALUES ('Widget
 | Step | Component | What Happens |
 |------|-----------|--------------|
 | 1 | **Go Driver** | Sends SQL over TCP to PgDog |
-| 2 | **PgDog** | Picks a pooled connection, forwards to `cnpg-db-rw` |
+| 2 | **PgDog** | Picks a pooled connection, forwards to `product-db-rw` |
 | 3 | **Backend Process** | PostgreSQL spawns/reuses a backend process for this connection |
 | 4 | **Parser** | Validates SQL syntax, builds parse tree |
 | 5 | **Planner** | Creates execution plan (trivial for INSERT) |
@@ -120,7 +126,7 @@ When a Product Service calls `INSERT INTO products (name, price) VALUES ('Widget
 
 For full explanations with detailed diagrams, tables, and EC2/VM mapping, see:
 
-**[PostgreSQL Internals Deep Dive (cnpg-db)](../../../../../docs/databases/001-postgresql-internals.md)**
+**[PostgreSQL Internals Deep Dive (product-db)](../../../../../docs/databases/001-postgresql-internals.md)**
 
 Topics covered:
 - INSERT/UPDATE workflow with sequence diagrams

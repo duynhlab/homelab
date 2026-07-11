@@ -60,7 +60,7 @@ flowchart TD
 
 ### Current State
 
-- Stages 1-4 are fully operational (149 static alerts, 48 Sloth SLO burn-rate alerts — see the [alert catalog](alert-catalog.md)).
+- Stages 1-4 are fully operational (163 static alerts, 48 Sloth SLO burn-rate alerts — see the [alert catalog](alert-catalog.md)).
 - Stage 5 (VMAlertmanager) routes by severity to `slack-default` (`#alerts`) and `slack-critical` (`#alerts-critical`), with `watchdog-null` for the Watchdog and inhibition rules to suppress cascades. **Caveat:** `slack_api_url` is a committed placeholder (`<SLACK_WEBHOOK_URL>`), so no notifications actually deliver until it is set — ideally injected via External Secrets / OpenBAO rather than inlined in `configRawYaml`.
 - Stage 6: Grafana provides read-only rule visibility via `vmalert.proxyURL`. **Karma** is the dedicated alert dashboard (reads VMAlertmanager API directly). Slack receivers are wired (webhook URL pending injection); PagerDuty is planned.
 
@@ -84,8 +84,8 @@ This project uses the **VictoriaMetrics stack** instead of Prometheus. VM Operat
 ```mermaid
 flowchart TD
     subgraph layer1 ["Layer 1: Threshold Alerts"]
-        PR1["PrometheusRule CRDs<br/>microservices/alerts.yaml<br/>postgres/cnpg + postgres/zalando"]
-        T1["16 application alerts<br/>PostgreSQL: chart + Zalando split"]
+        PR1["PrometheusRule CRDs<br/>microservices/alerts.yaml<br/>postgres/cnpg + cnpg-auth-db + cnpg-shared-db"]
+        T1["16 application alerts<br/>PostgreSQL: 48 all-CNPG (per cluster)"]
     end
 
     subgraph layer2 ["Layer 2: SLO Burn-Rate Alerts"]
@@ -132,7 +132,7 @@ Direct metric threshold checks. Fire immediately when a condition is met.
 
 > The scrape-era **Saturation** group (`MicroserviceHighRequestsInFlight` / `…Critical`) retired with the cutover — otelgin v0.69 emits no `http.server.active_requests`. The two GC-pause alerts collapsed into `MicroserviceGCThrash` (no OTel GC-pause metric). `MicroserviceDown`/`…AllInstancesDown` moved from `up{}` scrape liveness to a `go_goroutine_count` heartbeat-absence check (D-4).
 
-**PostgreSQL alerts** ([`prometheusrules/postgres/`](../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/README.md)): CNPG chart-aligned rules under `postgres/cnpg/` (e.g. `CNPGClusterOffline`, HA, replication, disk, logical replication) and Zalando rules under `postgres/zalando/` (`PostgresDown`, `custom_*` saturation, etc.). Backup alerts remain in `postgres-backup-alerts.yaml`.
+**PostgreSQL alerts** ([`prometheusrules/postgres/`](../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/README.md)): all CloudNativePG, chart-aligned rules deployed per cluster — `postgres/cnpg/` (`product-db` full set + operator-health singleton), `postgres/cnpg-auth-db/` (`auth-db` full HA set), `postgres/cnpg-shared-db/` (`shared-db` single-node subset). Backup alerts remain in `postgres/backup-alerts.yaml`. 48 rules total.
 
 **Recording rules** (`microservices/recording-rules.yaml`):
 
@@ -205,7 +205,7 @@ kubernetes/infra/configs/monitoring/
 │   ├── microservices/
 │   │   ├── alerts.yaml                     # Layer 1: application threshold alerts
 │   │   └── recording-rules.yaml            # Pre-aggregated recording rules
-│   └── postgres/                           # Layer 1: CNPG + Zalando PrometheusRules
+│   └── postgres/                           # Layer 1: all-CNPG PrometheusRules (cnpg/ + cnpg-auth-db/ + cnpg-shared-db/)
 └── victoriametrics/
     ├── vmalert.yaml                        # VMAlert (rule evaluator)
     └── vmalertmanager.yaml                 # VMAlertmanager (notification router)
@@ -252,10 +252,10 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 | Phase | Scope | Status |
 |-------|-------|--------|
 | Layer 1: Application alerts | 16 alerts (RED + gRPC + Golden Signals) | Implemented |
-| Layer 1: PostgreSQL alerts | 34 alerts (24 CNPG + 10 Zalando — availability, performance, storage, backups) | Implemented |
+| Layer 1: PostgreSQL alerts | 48 alerts (all CNPG: product-db + auth-db + shared-db per-cluster, + backups) | Implemented |
 | Layer 2: SLO alerts | 48 alerts (8 services x 3 SLOs x 2 severities) | Implemented |
 | Alert dashboard | Karma reading VMAlertmanager API | Implemented |
-| Layer 1: Database connection pool | PgBouncer/PgDog saturation alerts | Planned |
+| Layer 1: Database connection pool | PgDog pooler saturation alerts | Planned |
 | Layer 1: Infrastructure | Node memory/disk/PID pressure, NotReady, unschedulable | Implemented (`kubernetes/node-alerts.yaml`) |
 | Layer 1: Kubernetes | Pod OOM, CrashLoopBackOff, pending pods | Implemented (`kubernetes/pod-resources-alerts.yaml`, `workload-alerts.yaml`) |
 | Integration | Slack routing in VMAlertmanager (severity-based receivers) | Wired (webhook URL placeholder — inject via secret) |
@@ -263,7 +263,7 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 
 ## Related Documentation
 
-- [Alert Catalog](./alert-catalog.md) -- every deployed alert (149 rules + SLO burn-rate) by domain, with metric, impact, and coverage-gap analysis
+- [Alert Catalog](./alert-catalog.md) -- every deployed alert (163 rules + SLO burn-rate) by domain, with metric, impact, and coverage-gap analysis
 - [Application metrics (RED)](../metrics/metrics-apps.md) -- the metrics these alerts fire on + the microservices OTLP push pipeline
 - [Infrastructure metrics (USE)](../metrics/metrics-infra.md) -- the USE coverage these Kubernetes/Valkey alerts back
 - [Alert Dashboard Comparison](dashboard-comparison.md) -- deep-dive tool comparison (Karma, Alerta, UAR, Siren, Grafana)
@@ -276,4 +276,4 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 
 ---
 
-_Last updated: 2026-07-10 — node/pod/k8s alert layers flipped to Implemented; PostgreSQL count 34; totals aligned with the alert catalog (149 + 48 Sloth)._
+_Last updated: 2026-07-11 — Zalando→CNPG migration: PostgreSQL is all-CNPG (48 alerts per-cluster); totals aligned with the alert catalog (163 static + 48 Sloth)._

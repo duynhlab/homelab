@@ -2,7 +2,7 @@
 
 > **Audience**: SRE/DevOps Engineers  
 > **Dashboard**: Microservices Observability Platform  
-> **Total Panels**: 40 panels across 6 row groups *(live dashboard; the per-row breakdown in this guide reflects an earlier 34-panel / 5-row revision and is pending a refresh)*  
+> **Panels**: this guide documents the dashboard's rows and panels grouped into **5 row groups** (~35 panels). The count is **approximate** — the dashboard evolves in the external [`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards) repo (canonical `microservices-dashboard-otel.json`); verify the exact panel/row count there.  
 > **Last Updated**: 2026-07-09
 
 ---
@@ -27,7 +27,7 @@
 
 ```mermaid
 graph TD
-    Dashboard[Dashboard 34 Panels]
+    Dashboard[Microservices Dashboard: 5 row groups]
     Row1[Row 1: Overview 12 Panels]
     Row2[Row 2: Traffic 4 Panels]
     Row3[Row 3: Errors 8 Panels]

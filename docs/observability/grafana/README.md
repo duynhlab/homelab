@@ -7,7 +7,7 @@ Grafana is the unified visualization layer for all 4 observability pillars. It c
 Grafana is deployed via the **Grafana Operator** using a `Grafana` CR:
 
 - **CR**: `kubernetes/infra/configs/monitoring/grafana/grafana.yaml`
-- **Image**: `grafana/grafana:12.4.1`
+- **Image**: `grafana/grafana:13.0.1`
 - **Namespace**: `monitoring`
 - **Access**: anonymous login with Admin role (dev mode)
 
@@ -71,7 +71,7 @@ Dashboards are managed as `GrafanaDashboard` CRDs or JSON ConfigMaps:
 
 | Dashboard | Panels | Location |
 |-----------|--------|----------|
-| Microservices Observability | 40 panels, 6 rows | [`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards/blob/main/dashboard/microservices-dashboard.json) (`GrafanaDashboard` `spec.url` raw, not a local ConfigMap) |
+| Microservices Observability | ~40 panels (verify in repo) | [`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards/blob/main/dashboard/microservices-dashboard-otel.json) (`GrafanaDashboard` `spec.url` raw, not a local ConfigMap) |
 | CloudNativePG Cluster Overview | Upstream CNPG cluster + operator metrics | `grafana/dashboards/cloudnative-pg-cluster.json` |
 
 **Microservices Observability**: JSON is hosted in the [`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards) repo and loaded via `GrafanaDashboard` `spec.url` (raw GitHub), mapping `DS_PROMETHEUS` → `VictoriaMetrics`. Edit the dashboard in that repo; the operator re-syncs (`resyncPeriod: 30s`, `contentCacheDuration: 48h`).

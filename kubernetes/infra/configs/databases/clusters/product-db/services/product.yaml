@@ -1,0 +1,99 @@
+# product — per-service database triplet (RFC-0012, ADR-013).
+#
+# product is special in exactly one way: its Secret and role/database are
+# ALSO what bootstrap.initdb (instance.yaml) uses on a fresh cluster. The
+# initdb fields are structural placeholders; this triplet adopts the
+# initdb-created role and database declaratively, so a from-scratch build
+# and a backup restore converge to the same state. The DatabaseRole and
+# bootstrap.initdb.secret MUST keep pointing at the SAME Secret
+# (product-db-secret) — two sources for one password would fight.
+#
+# ExternalSecret for product-db bootstrap credentials (product DB owner).
+# OpenBAO path: secret/data/local/databases/product-db/product
+# basic-auth: required by CNPG bootstrap/app secrets and the DatabaseRole;
+# also feeds the PgDog valuesFrom (users[0]).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: product-db-secret
+  namespace: product
+  labels:
+    app.kubernetes.io/name: product-db-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: product-db-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: product-db-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+          cnpg.io/reload: "true"
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: secret/data/local/databases/product-db/product
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: secret/data/local/databases/product-db/product
+        property: password
+---
+# Written out IN FULL — adoption resets omitted attributes (see payment.yaml).
+# Adopts the role initdb created; CNPG's app-secret sync and this CR read
+# the same Secret, so they can never disagree.
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: product-db-role-product
+  namespace: product
+spec:
+  cluster:
+    name: product-db
+  name: product
+  comment: "product-service application role (RFC-0012)"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: true
+  replication: false
+  bypassrls: false
+  connectionLimit: -1
+  inRoles: []
+  passwordSecret:
+    name: product-db-secret
+  databaseRoleReclaimPolicy: retain
+---
+# Product Database extensions (moved from extensions.yaml).
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: product-database
+  namespace: product
+spec:
+  name: product
+  owner: product
+  cluster:
+    name: product-db
+  extensions:
+    - name: pgaudit
+    - name: pg_stat_statements
+    # auto_explain is a preload-only module (loaded via shared_preload_libraries in
+    # instance.yaml) — it has no SQL extension / control file, so `CREATE EXTENSION
+    # auto_explain` always fails "extension is not available". Not listed here.
+    - name: pgcrypto
+    - name: uuid-ossp
+  databaseReclaimPolicy: retain

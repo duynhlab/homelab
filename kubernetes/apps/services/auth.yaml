@@ -16,7 +16,9 @@ spec:
     # verify JWTs locally against the JWKS), so no grpc_server input.
     jwt_signing: true # RFC-0009 Phase 4: inject RS256 signing key from OpenBAO (auth only)
     replicaCount: 2
-    db_host: "auth-db-pooler.auth.svc.cluster.local"
-    db_migration_host: "auth-db.auth.svc.cluster.local"
-    db_secret: "auth.auth-db.credentials.postgresql.acid.zalan.do"
-    pool_max: "25"
+    db_host: "pgdog-auth.auth.svc.cluster.local"
+    db_port: "6432"
+    db_migration_host: "auth-db-rw.auth.svc.cluster.local"
+    db_secret: "auth-db-secret"
+    db_sslmode: "disable"
+    pool_max: "30"

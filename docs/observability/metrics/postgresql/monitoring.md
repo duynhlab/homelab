@@ -1,40 +1,38 @@
 # PostgreSQL Monitoring
 
+All PostgreSQL on the platform runs on **CloudNativePG (CNPG)**. Each cluster
+exposes the CNPG **built-in exporter on `:9187`** (metrics prefixed `cnpg_`) plus
+a custom-queries ConfigMap, scraped by a **per-cluster `PodMonitor`**.
+
 ## Architecture
 
 ```mermaid
 flowchart TD
-    subgraph zalando [Zalando Operator Clusters]
-        authDB["auth-db<br/>PG 17, 3 instances"]
-        supportDB["supporting-shared-db<br/>PG 16, 1 instance<br/>4 DBs: user, notification, shipping, review"]
-    end
-
     subgraph cnpg [CloudNativePG Clusters]
-        cnpgDB["cnpg-db<br/>PG 18, 3 instances<br/>3 DBs: product, cart, order"]
+        productDB["product-db (ns product)<br/>PG 18, 3 instances<br/>DBs: product, cart, order, payment"]
+        productDR["product-db-replica<br/>DR replica cluster"]
+        authDB["auth-db (ns auth)<br/>PG 18, 3 instances<br/>DB: auth"]
+        sharedDB["shared-db (ns user)<br/>PG 18, 1 instance<br/>DBs: user, notification, shipping, review"]
+        temporalDB["temporal-db (ns temporal)<br/>PG 18, 1 instance"]
     end
 
-    subgraph exporters [Metrics Exporters]
-        pgExp1["postgres_exporter v0.18.1<br/>sidecar + custom queries"]
-        pigsty["pg_exporter Pigsty<br/>sidecar, 600+ metrics<br/>auto-discovery, built-in pgBouncer"]
-        cnpgBuiltin["CNPG built-in exporter<br/>+ custom queries ConfigMap"]
+    subgraph exporters [Metrics Exporter]
+        cnpgBuiltin["CNPG built-in exporter :9187<br/>cnpg_* metrics + custom queries ConfigMap"]
     end
 
-    authDB --> pgExp1
-    supportDB --> pigsty
-    cnpgDB --> cnpgBuiltin
+    productDB --> cnpgBuiltin
+    productDR --> cnpgBuiltin
+    authDB --> cnpgBuiltin
+    sharedDB --> cnpgBuiltin
+    temporalDB --> cnpgBuiltin
 
     subgraph poolerMetrics [Pooler Metrics]
-        pgbExporter["pgbouncer-exporter<br/>port 9127"]
         pgdogMetrics["PgDog OpenMetrics<br/>port 9090"]
     end
 
-    authDB -.-> pgbExporter
-    cnpgDB -.-> pgdogMetrics
+    productDB -.-> pgdogMetrics
 
-    pgExp1 -->|":9187"| vma
-    pigsty -->|":9630"| vma
-    cnpgBuiltin -->|":9187"| vma
-    pgbExporter -->|":9127"| vma
+    cnpgBuiltin -->|"per-cluster PodMonitor :9187"| vma
     pgdogMetrics -->|":9090"| vma
 
     vma["VMAgent PodMonitor and ServiceMonitor scrape"] --> vms["VMSingle :8428"]
@@ -43,226 +41,126 @@ flowchart TD
     vmalert --> ruleCRs["PrometheusRule and VMRule CRs"]
 ```
 
-## Monitoring Coverage Matrix
+## Cluster inventory
 
-| Metric Layer | auth-db | supporting-shared-db | cnpg-db |
-|---|---|---|---|
-| **Operator** | Zalando | Zalando | CloudNativePG |
-| **Exporter** | postgres_exporter | pg_exporter (Pigsty) | CNPG built-in |
-| **Availability** | pg_up | pg_up (600+) | cnpg_collector_up |
-| **Replication lag** | pg_replication_lag | pg_repl_* | cnpg_collector_sync_replicas |
-| **WAL status** | - | pg_wal_* | cnpg_collector_pg_wal |
-| **Backup status** | - | - | cnpg_collector_last_*_backup |
-| **pg_stat_statements** | custom query | built-in collector | custom query |
-| **Connection stats** | built-in + custom_ | built-in collector | custom query |
-| **Lock contention** | custom_ query | built-in collector | custom query |
-| **Autovacuum/dead tuples** | built-in + custom_ | built-in collector | custom query |
-| **Table/index size** | custom_ query | built-in collector | custom query |
-| **Bloat estimation** | - | built-in collector | - |
-| **Checkpoints** | built-in collector | built-in collector | custom query |
-| **Database size** | built-in collector | built-in collector | custom query |
-| **Pooler metrics** | pgbouncer-exporter | pg_exporter built-in pgBouncer | PgDog OpenMetrics :9090 |
+| Cluster | Namespace | Instances | Databases | Exporter | Scrape |
+|---|---|---|---|---|---|
+| `product-db` (+ `product-db-replica` DR) | product | 3 | product, cart, order, payment | CNPG built-in `:9187` | per-cluster PodMonitor |
+| `auth-db` | auth | 3 | auth | CNPG built-in `:9187` | per-cluster PodMonitor |
+| `shared-db` | user | 1 | user, notification, shipping, review | CNPG built-in `:9187` | per-cluster PodMonitor |
+| `temporal-db` | temporal | 1 | temporal | CNPG built-in `:9187` | PodMonitor (`enablePodMonitor: true`) |
 
-## Exporter Comparison
+## Metric coverage
 
-### postgres_exporter (Prometheus Community)
+The CNPG built-in exporter emits `cnpg_collector_*` health/replication/backup
+metrics plus every custom query defined in the cluster's monitoring ConfigMap
+(CNPG auto-prefixes those with `cnpg_`).
 
-- **Used by**: auth-db (Zalando sidecar) + CNPG built-in exporter uses same query format
-- **Port**: 9187
-- **Default metrics**: ~50
-- **Custom queries**: YAML ConfigMap (`queries.yaml`)
-- **Strengths**: Industry standard, broad community, simple, low resource footprint
-- **Limitations**: No per-query caching/timeout, no version-aware planning, no auto-discovery
+| Metric layer | Source |
+|---|---|
+| Availability | `cnpg_collector_up` |
+| Replication (streaming) | `cnpg_collector_sync_replicas`, `cnpg_pg_replication_lag` |
+| WAL status | `cnpg_collector_pg_wal` |
+| Backup status | `cnpg_collector_last_available_backup_timestamp`, `cnpg_collector_last_failed_backup_timestamp` |
+| pg_stat_statements | custom query (`cnpg_pg_stat_statements_*`) |
+| Connection stats | custom query (`cnpg_pg_connection_limits_*`) |
+| Lock contention | custom query (`cnpg_pg_locks_count_*`, `cnpg_pg_blocking_queries_*`) |
+| Autovacuum / dead tuples | custom query (`cnpg_pg_stat_user_tables_autovacuum_*`) |
+| Table / index size | custom query (`cnpg_pg_table_size_*`, `cnpg_pg_stat_user_indexes_*`) |
+| Checkpoints | custom query (`cnpg_pg_stat_bgwriter_checkpoints_*`) |
+| Database size | custom query (`cnpg_pg_database_size_*`) |
+| Pooler metrics | PgDog OpenMetrics `:9090` |
 
-### pg_exporter (Pigsty) - Pilot on supporting-shared-db
+## Exporter: CNPG built-in
 
-- **Used by**: supporting-shared-db (pilot)
-- **Port**: 9630
-- **Default metrics**: 600+ from 50+ YAML collectors
-- **Key features tested in pilot**:
-  - **Auto-discovery**: Automatically scrapes user, notification, shipping databases
-  - **Built-in pgBouncer monitoring**: Collectors 0910-0940 (fills gap - supporting-shared-db had zero pgBouncer metrics)
-  - **Per-collector TTL caching**: Expensive queries (bloat) cached independently from fast queries (activity)
-  - **Per-collector timeout**: Default 100ms, prevents slow queries from blocking scrapes
-  - **Dynamic planning**: Adapts to PG version and server role (primary/standby)
-  - **Health check APIs**: `/primary`, `/replica`, `/health`, `/readiness`
+- **Used by**: all clusters — the built-in exporter is mandatory for CNPG and cannot be replaced.
+- **Port**: `9187`.
+- **Format**: postgres_exporter-compatible query format. CNPG prefixes **all** metrics (built-in collectors and custom queries) with `cnpg_`.
+- **Custom queries**: a per-cluster ConfigMap referenced from `spec.monitoring.customQueriesConfigMapList`; queries keep their original names and CNPG auto-prefixes the emitted metrics.
 
-### Decision Rationale
+> **Retired with the Zalando→CNPG migration.** The former Zalando/Spilo clusters
+> and their exporters were removed: the postgres_exporter sidecar (`:9187`) on
+> `auth-db`, the Pigsty **pg_exporter** (`:9630`, 600+ metrics) pilot on
+> `supporting-shared-db`, and the **pgbouncer-exporter** (`:9127`). The 44
+> pg-exporter recording rules and the pg_exporter Grafana dashboards were retired
+> along with them. The reference material for that pilot is kept for reference
+> only: [pg-exporter-dashboards.md](pg-exporter-dashboards.md),
+> [pg-exporter-mapping.md](pg-exporter-mapping.md).
 
-Hybrid approach chosen: custom queries for 3 clusters + pg_exporter pilot on 1 cluster.
+## Custom queries
 
-1. CNPG clusters must use built-in exporter (mandatory, cannot be replaced)
-2. Custom queries achieve ~90% coverage with zero new components
-3. pg_exporter pilot on supporting-shared-db validates the remaining 10% value
-4. Expansion path: if pilot succeeds, migrate auth-db to pg_exporter
+CNPG clusters define custom queries in a per-cluster monitoring ConfigMap. Queries
+keep their original names and CNPG auto-prefixes every emitted metric with `cnpg_`.
+Queries with `target_databases` include `current_database() AS datname` to
+disambiguate co-located databases on the multi-database clusters (e.g. product,
+cart, order, payment on `product-db`).
 
-## Collector Reference (pg_exporter)
-
-| Range | Domain | Key Collectors |
+| Query name | CNPG metric prefix | Purpose |
 |---|---|---|
-| 1xx | Basic | pg info, metadata, settings |
-| 2xx | Replication | replication lag, WAL receiver, downstream, sync standby, slots |
-| 3xx | Persistence | size, WAL, bgwriter, checkpointer, SSL, checkpoint, SLRU, shmem |
-| 4xx | Activity | connections by state, wait events, locks, transactions, queries |
-| 5xx | Progress | vacuum, indexing, clustering, basebackup, copy progress |
-| 6xx | Database | pg_database stats, conflicts, publications, subscriptions |
-| 7xx | Objects | tables, indexes, functions, sequences, partitions |
-| 8xx | Optional | table bloat, index bloat (disabled by default, slow) |
-| 9xx | pgBouncer | list, database, stat, pool |
+| pg_stat_statements | `cnpg_pg_stat_statements_*` | Top 100 queries by execution time |
+| pg_connection_limits | `cnpg_pg_connection_limits_*` | Connection saturation |
+| pg_locks_count | `cnpg_pg_locks_count_*` | Lock distribution |
+| pg_blocking_queries | `cnpg_pg_blocking_queries_*` | Queries waiting on locks |
+| pg_stat_user_tables_autovacuum | `cnpg_pg_stat_user_tables_autovacuum_*` | Dead tuples and vacuum activity |
+| pg_table_size | `cnpg_pg_table_size_*` | Table size (top 30) |
+| pg_stat_user_indexes | `cnpg_pg_stat_user_indexes_*` | Index usage and size |
+| pg_database_size | `cnpg_pg_database_size_*` | Database sizes |
+| pg_stat_bgwriter_checkpoints | `cnpg_pg_stat_bgwriter_checkpoints_*` | Checkpoint frequency and I/O |
 
-## Grafana Dashboards (pg_exporter)
+Per-metric query details (columns, labels, filtering) are documented in
+[custom-metrics.md](custom-metrics.md).
 
-Two dashboards adapted from [Pigsty](https://github.com/pgsty/pg_exporter/tree/main/monitor) for `supporting-shared-db`:
+### PromQL examples
 
-| Dashboard | File | UID | Panels | Description |
-|---|---|---|---|---|
-| PG Exporter Instance | `pg-exporter-instance.json` | `pg-exporter-instance` | 74 | Full instance monitoring: Overview, Activity, Sessions, Persist, Database, Table & Query |
-| PG Exporter Self-Monitoring | `pg-exporter-self.json` | `pg-exporter-self` | ~30 | Exporter health: scrape duration, collector errors, cache hits, uptime |
+```promql
+# Connection saturation
+cnpg_pg_connection_limits_current_connections / cnpg_pg_connection_limits_max_connections
 
-**Template variables**: `ins` (instance), `cls` (cluster), `datname` (database). The `cls` label is injected via `PG_EXPORTER_TAG=cls=supporting-shared-db` env var on the pg_exporter sidecar.
+# Dead-tuple ratio
+cnpg_pg_stat_user_tables_autovacuum_n_dead_tup
 
-**Provisioning**: GrafanaDashboard CRs in `kubernetes/infra/configs/monitoring/grafana/dashboards/`, folder "Databases". Dashboard variables still use the legacy name `DS_PROMETHEUS`; the `GrafanaDashboard` CR maps that input to the **VictoriaMetrics** datasource (`datasourceName: VictoriaMetrics`). See [`docs/observability/grafana/datasources.md`](../../grafana/datasources.md).
+# Top queries by execution time
+topk(10, rate(cnpg_pg_stat_statements_time_milliseconds[5m]))
 
-## Recording Rules (pg_exporter)
+# Database size
+cnpg_pg_database_size_size_bytes
 
-File: `kubernetes/infra/configs/monitoring/prometheusrules/pg-exporter-recording-rules.yaml`
+# Streaming replication lag (physical)
+cnpg_pg_replication_lag
+```
 
-44 Prometheus recording rules required by the PG Exporter Instance dashboard, adapted from [Pigsty pgsql.yml](https://github.com/pgsty/pigsty/blob/main/files/victoria/rules/pgsql.yml).
-
-| Group | Rules | Description |
-|---|---|---|
-| pg-exporter-db | 22 | Database-level: `rate()` / `increase()` over `pg_db_*`, `pg_lock_count`, `pg_activity_count` |
-| pg-exporter-ins | 18 | Instance-level: `sum without(datname)` aggregations + WAL/timeline |
-| pg-exporter-cls | 1 | Cluster-level: `sum by (job, cls)` |
-| pg-exporter-objects | 2 | Table scan rate + query call rate |
-
-Recording rule naming follows Pigsty convention: `pg:<level>:<metric>` (e.g., `pg:ins:xact_commit_rate1m`).
-
-## Alert Rules
-
-### postgres-backup-alerts.yaml (existing)
-
-| Alert | Severity | Condition | Clusters |
-|---|---|---|---|
-| PostgresBackupTooOld | warning | Last backup > 26 hours | CNPG only |
-| PostgresBackupFailed | critical | Backup failed in last hour | CNPG only |
+## Alert rules
 
 ### PostgreSQL `PrometheusRule` layout (`prometheusrules/postgres/`)
 
-The former monolith `postgres-alerts.yaml` was split by operator:
+CNPG alert rules are chart-generated per cluster (one file per upstream
+`cluster-*.yaml` from the [cloudnative-pg/charts](https://github.com/cloudnative-pg/charts)
+`cluster` chart), each in the cluster's own namespace:
 
-- **[`kubernetes/infra/configs/monitoring/prometheusrules/postgres/cnpg/`](../../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/cnpg/)** — CloudNativePG: chart-aligned rules (one file per upstream `cluster-*.yaml` from [cloudnative-pg/charts](https://github.com/cloudnative-pg/charts) `cluster` chart), plus small extras (`CnpgClusterFenced`, `PostgresWALSizeHigh`). Namespace **`product`** for chart-derived resources (matches `cnpg-db` cluster).
-- **[`kubernetes/infra/configs/monitoring/prometheusrules/postgres/zalando/`](../../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/zalando/)** — Zalando: availability, `custom_*` connection/blocking, storage, maintenance (namespace **`monitoring`**).
+- **[`postgres/cnpg/`](../../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/cnpg/)** — `product-db` (namespace `product`): the full HA set plus small extras (`CnpgClusterFenced`, `PostgresWALSizeHigh`) and the **global operator-health singleton** (`CNPGOperatorDown`, `CNPGControllerReconcileErrorsSpiking`, namespace `cloudnative-pg`).
+- **[`postgres/cnpg-auth-db/`](../../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/cnpg-auth-db/)** — `auth-db` (namespace `auth`): full HA set (offline, fencing, HA, connections, physical + logical replication, disk, WAL).
+- **[`postgres/cnpg-shared-db/`](../../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/cnpg-shared-db/)** — `shared-db` (namespace `user`): single-node subset (offline, connections, disk, WAL — no replication/HA rules).
 
-**Note**: Rules are evaluated by **VMAlert** against **VMSingle**; Grafana Alerting can show read-only rules proxied via VMSingle (see [`docs/observability/metrics/victoriametrics.md`](../victoriametrics.md)). Notifications are not routed until Alertmanager is enabled.
+Backup alerts (`PostgresBackupTooOld`, `PostgresBackupFailed`) live in
+`postgres/backup-alerts.yaml`. The full per-alert catalog with impact is in
+[alert-catalog.md](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg).
 
-## Custom Queries Reference
+**Note**: Rules are evaluated by **VMAlert** against **VMSingle**; Grafana Alerting can show read-only rules proxied via VMSingle (see [`docs/observability/metrics/victoriametrics.md`](../victoriametrics.md)). Notifications route through VMAlertmanager (Slack wired, webhook injected out-of-band).
 
-### Zalando Clusters (auth-db)
+## Audit and query-plan logging
 
-#### Why `custom_` Prefix (Renamed Queries)
+DB audit and query-plan logs do **not** use per-cluster exporters or sidecars.
+`pgaudit` (`pgaudit.log = 'ddl, write'`) and `auto_explain` output is written to
+the CNPG pod logs, tailed by the cluster-wide **Vector DaemonSet**, and shipped to
+**VictoriaLogs** as CNPG-parsed structured records — audit rows carry
+`logger: pgaudit` (CNPG parsing strips the literal `AUDIT:` prefix). See
+[VictoriaLogs](../../logging/victorialogs.md) for the pipeline.
 
-`postgres_exporter v0.18+` ships with built-in collectors (`stat_bgwriter`, `stat_user_tables`, `database`, `locks`, etc.) that register metric families at startup. If a custom query name produces metrics whose prefix collides with a built-in collector's metric namespace, the Prometheus client library returns a **duplicate registration error** on the `/metrics` endpoint. The scrape fails with an HTTP 500 and the error is visible in the exporter logs and in VMAgent scrape error metrics.
+## References
 
-For example, a custom query named `pg_database_size` would emit `pg_database_size_size_bytes`, but the built-in `database` collector already registers `pg_database_size_bytes`. The Prometheus client detects the shared prefix and rejects the conflicting metric family.
-
-To avoid this, all custom queries that conflicted were renamed with a `custom_` prefix.
-
-#### Rename Mapping
-
-| Original Name | New Name | Conflicting Built-in Collector |
-|---|---|---|
-| pg_connection_limits | custom_connection_limits | Naming pattern overlap caused registration error |
-| pg_blocking_queries | custom_blocking_queries | Naming pattern overlap caused registration error |
-| pg_stat_user_tables_autovacuum | custom_autovacuum_stats | `stat_user_tables` (registers `pg_stat_user_tables_n_dead_tup`, etc.) |
-| pg_table_size | custom_table_size | Naming pattern overlap caused registration error |
-| pg_stat_user_indexes | custom_stat_user_indexes | Naming pattern overlap caused registration error |
-
-#### Removed Queries (Built-in Equivalents)
-
-These queries were removed because `postgres_exporter v0.18+` built-in collectors already provide the same data:
-
-| Removed Query | Built-in Equivalent |
-|---|---|
-| pg_stat_activity_count | Built-in `pg_stat_activity_count` from default collectors |
-| pg_database_size | Built-in `pg_database_size_bytes` from `database` collector |
-| pg_stat_bgwriter_checkpoints | Built-in `pg_stat_bgwriter_checkpoints_*_total` from `stat_bgwriter` collector |
-
-#### Active Custom Queries
-
-| Query Name | Metrics | Purpose |
-|---|---|---|
-| pg_stat_statements | calls, time_milliseconds, rows, blk_* | Top 100 queries by execution time |
-| pg_replication | lag | Replication lag in seconds |
-| pg_postmaster | start_time_seconds | Postmaster start time |
-| custom_connection_limits | max_connections, current_connections | Connection saturation |
-| pg_locks_count | count by datname/mode | Lock distribution |
-| custom_blocking_queries | blocked_queries | Queries waiting on locks |
-| custom_autovacuum_stats | n_dead_tup, n_live_tup, autovacuum_count | Dead tuples and vacuum activity |
-| custom_table_size | total_bytes, table_bytes | Table size (top 30) |
-| custom_stat_user_indexes | idx_scan, index_bytes | Index usage and size (bottom 30 by scans) |
-
-### CNPG Cluster (cnpg-db)
-
-Queries keep original names; CNPG auto-prefixes all metrics with `cnpg_`.
-For `cnpg-db`, queries with `target_databases` include `current_database() AS datname` to disambiguate shared tables (product, cart, order databases coexist on the same cluster).
-
-| Query Name | CNPG Metric Prefix | Purpose |
-|---|---|---|
-| pg_stat_statements | cnpg_pg_stat_statements_* | Top 100 queries by execution time |
-| pg_connection_limits | cnpg_pg_connection_limits_* | Connection saturation |
-| pg_locks_count | cnpg_pg_locks_count_* | Lock distribution |
-| pg_blocking_queries | cnpg_pg_blocking_queries_* | Queries waiting on locks |
-| pg_stat_user_tables_autovacuum | cnpg_pg_stat_user_tables_autovacuum_* | Dead tuples and vacuum activity |
-| pg_table_size | cnpg_pg_table_size_* | Table size (top 30) |
-| pg_stat_user_indexes | cnpg_pg_stat_user_indexes_* | Index usage and size |
-| pg_database_size | cnpg_pg_database_size_* | Database sizes |
-| pg_stat_bgwriter_checkpoints | cnpg_pg_stat_bgwriter_checkpoints_* | Checkpoint frequency and I/O |
-
-### PromQL Examples
-
-```promql
-# Connection saturation - Zalando (custom_ prefix)
-custom_connection_limits_current_connections / custom_connection_limits_max_connections
-
-# Connection saturation - CNPG (cnpg_ prefix)
-cnpg_pg_connection_limits_current_connections / cnpg_pg_connection_limits_max_connections
-
-# Dead tuples - Zalando (built-in metric)
-pg_stat_user_tables_n_dead_tup / (pg_stat_user_tables_n_live_tup + pg_stat_user_tables_n_dead_tup)
-
-# Dead tuples - CNPG (custom query)
-cnpg_pg_stat_user_tables_autovacuum_n_dead_tup
-
-# Checkpoint request rate - Zalando (built-in metric)
-rate(pg_stat_bgwriter_checkpoints_req_total[5m])
-
-# Top queries by execution time
-topk(10, rate(pg_stat_statements_time_milliseconds[5m]))
-
-# Database size - Zalando (built-in) / CNPG (custom) / pg_exporter
-pg_database_size_bytes or cnpg_pg_database_size_size_bytes or pg_size_bytes
-```
-
-## Pilot Evaluation Template
-
-After 2 weeks of pg_exporter running on supporting-shared-db, evaluate:
-
-| Criterion | How to Measure | Target |
-|---|---|---|
-| Auto-discovery | `curl :9630/explain` - check discovered databases | All 3 DBs found |
-| pgBouncer monitoring | `curl :9630/metrics \| grep pgbouncer` | pgBouncer metrics present |
-| Cardinality | `count({cluster_name="supporting-shared-db"})` in VictoriaMetrics (Explore or `vmui`) | Document total series |
-| Resource usage | `kubectl top pod` for exporter container | Compare vs postgres_exporter |
-| Scrape duration | `pg_exporter_scrape_duration_seconds` | < 14s (scrapeTimeout) |
-| Collector errors | `curl :9630/stat` | No fatal collector failures |
-| Dashboard compatibility | Manual review | Effort to adapt existing dashboards |
-
-### Expansion Criteria
-
-Migrate additional Zalando clusters to pg_exporter if:
-- Auto-discovery works correctly for all databases
-- Resource usage is acceptable (< 2x postgres_exporter)
-- Scrape completes within timeout
-- Team finds 600+ metrics valuable for troubleshooting
-- Dashboard migration effort is justified by operational value
+- [Custom metrics query guide](custom-metrics.md) — CNPG custom queries, columns, PromQL
+- [Database Guide](../../../databases/002-database-integration.md) — custom queries configuration
+- [Metrics hub](../README.md) — methodology, stack, and coverage
+- [PromQL Guide](../promql-guide.md) — PromQL functions and examples
+- [Alert Catalog](../../alerting/alert-catalog.md) — every deployed PostgreSQL alert
+- Retired reference: [pg-exporter-dashboards.md](pg-exporter-dashboards.md), [pg-exporter-mapping.md](pg-exporter-mapping.md)

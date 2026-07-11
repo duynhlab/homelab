@@ -1,0 +1,18 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: auth-db-daily
+  namespace: auth
+  labels:
+    app.kubernetes.io/name: auth-db-backup
+    app.kubernetes.io/component: scheduled-backup
+    backup-frequency: daily
+spec:
+  schedule: "0 0 2 * * *"
+  cluster:
+    name: auth-db
+  backupOwnerReference: self
+  immediate: true
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io

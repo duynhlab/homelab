@@ -19,7 +19,7 @@ the end-to-end pipeline (ingestion → VMAlert → Alertmanager → notify), see
 
 ## Summary
 
-**149 statically-defined alerts** across 11 domains, plus **48 Sloth-generated** SLO
+**163 statically-defined alerts** across 8 domains, plus **48 Sloth-generated** SLO
 burn-rate alerts (2 × 24 SLOs). The 24 SLOs cover the original 8 catalog/identity/comms
 services; `payment` ships no SLO yet.
 
@@ -28,12 +28,11 @@ services; `payment` ships no SLO yet.
 | [Microservices (RED)](#1-microservices-red-metrics) | 16 | The 9 Go services — user-facing request + gRPC health |
 | [Kong gateway](#2-kong-gateway) | 13 | The single API ingress for the whole platform |
 | [Valkey cache](#3-valkey-cache) | 7 | Cache-aside layer in front of PostgreSQL |
-| [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 24 | `cnpg-db` + DR replica + backups |
-| [PostgreSQL — Zalando](#5-postgresql--zalando) | 10 | `auth-db`, `supporting-shared-db` |
-| [Kubernetes](#6-kubernetes) | 29 | Nodes, workloads, pods, API server, control plane, network |
-| [GitOps (Flux + cert-manager)](#7-gitops-flux--cert-manager) | 9 | Delivery pipeline + TLS |
-| [VictoriaMetrics self-health](#8-victoriametrics-self-health) | 31 | The monitoring system itself |
-| [Tempo / Temporal / Pyroscope / Watchdog](#9-tempo--temporal--pyroscope--watchdog) | 10 | Tracing, workflows, profiling, dead-man's-switch |
+| [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 48 | All four CNPG clusters (`product-db` + DR, `auth-db`, `shared-db`, `temporal-db`) + backups |
+| [Kubernetes](#5-kubernetes) | 29 | Nodes, workloads, pods, API server, control plane, network |
+| [GitOps (Flux + cert-manager)](#6-gitops-flux--cert-manager) | 9 | Delivery pipeline + TLS |
+| [VictoriaMetrics self-health](#7-victoriametrics-self-health) | 31 | The monitoring system itself |
+| [Tempo / Temporal / Pyroscope / Watchdog](#8-tempo--temporal--pyroscope--watchdog) | 10 | Tracing, workflows, profiling, dead-man's-switch |
 | [SLO burn-rate (Sloth)](#slo-burn-rate-alerts-sloth-generated) | 48 (generated) | Error-budget burn across all services |
 
 ---
@@ -61,7 +60,7 @@ Source: `prometheusrules/microservices/alerts.yaml` (OTLP push pipeline — RFC-
 | MicroserviceHighMemoryUsage | warning | container working-set >90% of the memory limit (`container_memory_working_set_bytes` / `kube_pod_container_resource_limits`) | OOMKill risk | 15m |
 | MicroserviceGCThrash | warning | `go_memory_used_bytes` >95% of `go_memory_gc_goal_bytes` | GC running back-to-back; high allocation / undersized heap | 15m |
 
-> **Scrape-era alerts retired at the P3 cutover.** `MicroserviceHighRequestsInFlight` / `MicroserviceRequestsInFlightCritical` (saturation) are **removed** — otelgin v0.69 emits no `http.server.active_requests`, so there is no OTel in-flight metric (re-add when it ships). `MicroserviceHighGCPressure` + `MicroserviceHighGCFrequency` (GC pause) are **replaced** by the single `MicroserviceGCThrash` — the OTel Go runtime exposes no GC-pause metric. `MicroserviceDown` / `MicroserviceAllInstancesDown` moved from `up{}` scrape liveness to the D-4 heartbeat-absence check above. The former scrape-era `MicroserviceHighRestartRate` is not part of the OTLP alert set — CrashLoop/restart is covered by `KubePodCrashLooping` (§6).
+> **Scrape-era alerts retired at the P3 cutover.** `MicroserviceHighRequestsInFlight` / `MicroserviceRequestsInFlightCritical` (saturation) are **removed** — otelgin v0.69 emits no `http.server.active_requests`, so there is no OTel in-flight metric (re-add when it ships). `MicroserviceHighGCPressure` + `MicroserviceHighGCFrequency` (GC pause) are **replaced** by the single `MicroserviceGCThrash` — the OTel Go runtime exposes no GC-pause metric. `MicroserviceDown` / `MicroserviceAllInstancesDown` moved from `up{}` scrape liveness to the D-4 heartbeat-absence check above. The former scrape-era `MicroserviceHighRestartRate` is not part of the OTLP alert set — CrashLoop/restart is covered by `KubePodCrashLooping` (§5).
 
 ## 2. Kong gateway
 
@@ -99,7 +98,19 @@ Source: `prometheusrules/valkey/alerts.yaml`. Base metrics: `redis_*` (redis_exp
 
 ## 4. PostgreSQL — CloudNativePG
 
-Source: `prometheusrules/postgres/cnpg/*.yaml` + `prometheusrules/postgres/backup-alerts.yaml`. Base metrics: `cnpg_*`.
+All PostgreSQL is CloudNativePG. Rules are chart-generated per cluster (one file per
+upstream `cluster-*.yaml`), deployed as:
+
+- `prometheusrules/postgres/cnpg/` — `product-db` (ns `product`): full HA set + `PostgresWALSizeHigh` + the **global** operator-health singleton (`CNPGOperatorDown`, `CNPGControllerReconcileErrorsSpiking`).
+- `prometheusrules/postgres/cnpg-auth-db/` — `auth-db` (ns `auth`): full HA set.
+- `prometheusrules/postgres/cnpg-shared-db/` — `shared-db` (ns `user`): single-node subset (offline, connections, disk, WAL — no HA/replication rules).
+- `prometheusrules/postgres/backup-alerts.yaml` — backup age/failure (label-driven; fires for any CNPG cluster emitting the metrics).
+
+Base metrics: `cnpg_*`. The alert **types** are catalogued once below; the same rule
+set is replicated per cluster, except the single-node `shared-db` which omits the
+HA/replication rules. **48 rules total** = `product-db` 22 (incl. the operator-health
+singleton) + `auth-db` 18 + `shared-db` 6 + 2 backup alerts. `temporal-db`
+(single-node) has a PodMonitor but no dedicated alert rules yet.
 
 | Alert | Sev | Metric & trigger | Impact | for |
 |-------|-----|------------------|--------|-----|
@@ -128,24 +139,7 @@ Source: `prometheusrules/postgres/cnpg/*.yaml` + `prometheusrules/postgres/backu
 | CNPGClusterLogicalReplicationStopped | warning | `cnpg_pg_stat_subscription_enabled==0` / stuck | Replication halted | 5m |
 | CNPGClusterLogicalReplicationStoppedCritical | critical | stopped + backlog ≥15m | Significant divergence; manual recovery | 15m |
 
-## 5. PostgreSQL — Zalando
-
-Source: `prometheusrules/postgres/zalando/*.yaml`. Base metrics: `pg_*` + `custom_*` (postgres_exporter via Spilo).
-
-| Alert | Sev | Metric & trigger | Impact | for |
-|-------|-----|------------------|--------|-----|
-| PostgresDown | critical | `pg_up==0` | Instance unreachable — service down | 1m |
-| PostgresReplicationLagHigh | warning | `pg_replication_lag` >30s | Standby data freshness slipping | 5m |
-| PostgresReplicationLagCritical | critical | `pg_replication_lag` >120s | Data-loss risk on failover | 5m |
-| PostgresConnectionSaturation | warning | current/max conns >80% | Connections may soon be refused | 5m |
-| PostgresConnectionSaturationCritical | critical | >95% | Connections being refused | 2m |
-| PostgresLockContention | warning | `custom_blocking_queries_blocked_queries` >5 | Blocked queries → app stalls/deadlock | 5m |
-| PostgresDatabaseSizeLarge | warning | `pg_database_size_bytes` >5GB | Backup/recovery time + perf impact | 10m |
-| PostgresDeadTuplesHigh | warning | dead tuples >100k | Autovacuum behind → bloat + slow queries | 30m |
-| PostgresCheckpointsTooFrequent | warning | req checkpoints rate >0.5/s | I/O pressure from `max_wal_size` | 15m |
-| ZalandoOperatorDown | critical | operator pod phase != Running | No cluster management for Zalando DBs | 5m |
-
-## 6. Kubernetes
+## 5. Kubernetes
 
 Source: `prometheusrules/kubernetes/*.yaml`. Most rules source from `kube-state-metrics` + `kubelet` + node-exporter.
 
@@ -208,7 +202,7 @@ Source: `prometheusrules/kubernetes/*.yaml`. Most rules source from `kube-state-
 |-------|-----|------------------|--------|-----|
 | KubeContainerNetworkErrors | warning | rx+tx errors >1/s | Packet loss; unreliable comms | 10m |
 
-## 7. GitOps (Flux + cert-manager)
+## 6. GitOps (Flux + cert-manager)
 
 Source: `prometheusrules/gitops/flux-alerts.yaml`, `prometheusrules/gitops/cert-manager-alerts.yaml`.
 
@@ -224,7 +218,7 @@ Source: `prometheusrules/gitops/flux-alerts.yaml`, `prometheusrules/gitops/cert-
 | CertManagerCertExpiryCritical | critical | expiry <24h | Imminent TLS outage | 15m |
 | CertManagerCertNotReady | warning | ready=False | Issuance/renewal failed | 15m |
 
-## 8. VictoriaMetrics self-health
+## 7. VictoriaMetrics self-health
 
 Source: `prometheusrules/victoriametrics/*.yaml`. **The monitoring system watching itself** — if these fire, metrics/alerts themselves are unreliable.
 
@@ -279,7 +273,7 @@ Source: `prometheusrules/victoriametrics/*.yaml`. **The monitoring system watchi
 | VMSingleTooHighSlowInsertsRate | warning | slow inserts >5% | Insufficient RAM for active series | 15m |
 | VMSingleMetadataCacheUtilizationIsTooHigh | warning | metadata cache >95% | Metadata API responses incomplete | 15m |
 
-## 9. Tempo / Temporal / Pyroscope / Watchdog
+## 8. Tempo / Temporal / Pyroscope / Watchdog
 
 Source: `prometheusrules/observability/tempo-alerts.yaml`, `prometheusrules/observability/pyroscope-alerts.yaml`, `temporal/prometheusrule.yaml`, `prometheusrules/watchdog.yaml`.
 
@@ -323,14 +317,14 @@ threshold alerts above are the cause/diagnostic layer.
 
 Audited against authoritative docs (context7 where available). The deployed set is **broadly
 sufficient and above industry norm** — RED + USE + SLO layering, plus unusually thorough
-CNPG/Zalando/VictoriaMetrics self-monitoring. The gaps cluster in **workflow health**,
+CNPG/VictoriaMetrics self-monitoring. The gaps cluster in **workflow health**,
 **alert-pipeline integrity**, and a few dropped **k8s-mixin** signals. None of these are
 implemented yet — they are recommendations.
 
 ### Top 5 highest-value additions
 
 1. **AlertmanagerFailedToSendAlerts** — Watchdog proves the pipeline *up to* Alertmanager; nothing proves AM can actually reach the receiver (Slack/PagerDuty/email). A silent receiver failure swallows every other alert. (`VMAlertAlertmanagerErrors` covers only vmalert→AM, not AM→receiver.)
-2. **Temporal schedule-to-start latency + task-queue backlog** — the best leading indicators that workers are under-provisioned; tasks pile up before any error fires. The work layer is now covered for failure rates and task-slot saturation (§9), but these *latency/backlog* leading indicators are still missing.
+2. **Temporal schedule-to-start latency + task-queue backlog** — the best leading indicators that workers are under-provisioned; tasks pile up before any error fires. The work layer is now covered for failure rates and task-slot saturation (§8), but these *latency/backlog* leading indicators are still missing.
 3. **ValkeyReplicationLinkDown** (`redis_master_link_up==0`) — the actual Valkey HA/durability failure mode; currently unmonitored.
 4. **CNPGContinuousArchivingFailing** — WAL archiving can stall (breaking PITR) while the last base backup still looks "recent", so `PostgresBackupTooOld` alone is insufficient.
 5. **etcdDatabaseQuotaLowSpace** + **KubeStateMetricsListErrors** — the two classic cluster-wide *silent* failures: an etcd quota freeze (`mvcc: database space exceeded`), and a KSM outage that silently stops every KSM-sourced k8s alert from evaluating.
@@ -359,8 +353,7 @@ implemented yet — they are recommendations.
 
 Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-and-next-improvements):
 
-- **Zalando clusters have no backup-age/failure alert** — the backup alerts cover CNPG metrics only; `auth-db`/`supporting-shared-db` WAL-G backups are unmonitored.
-- **`temporal-db` has no backups / no WAL archiving** — and therefore no backup alert either.
+- **`temporal-db` has no backups / no WAL archiving** — and therefore no backup alert either. (Since the Zalando→CNPG migration, `auth-db` and `shared-db` are CNPG and are covered by the label-driven backup alerts; `temporal-db` remains the outlier.)
 - **`payment` reconciliation has no SLI/alert yet** — the payment service ships no SLO, and
   there is no alert on stuck/failed reconciliation (including the heal `resolution='failed'`
   outcome introduced by ADR-012). Payment request health is covered only by the generic
@@ -375,4 +368,4 @@ Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-an
 
 ---
 
-_Last updated: 2026-07-09_
+_Last updated: 2026-07-11 — Zalando→CNPG migration: PostgreSQL is now a single all-CNPG domain (48 alerts across product-db/auth-db/shared-db + backups); the Zalando section and ZalandoOperatorDown were removed; total 163 across 8 domains._

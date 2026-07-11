@@ -1,0 +1,88 @@
+# PgDog Connection Pooler for auth-db (auth)
+# R/W splitting: SELECTs routed to replicas, writes to primary
+# LSN monitoring: detects replication lag, bans lagging replicas
+# Prepared statements: extended mode (no prefer_simple_protocol needed)
+#
+# User passwords come from the per-service ESO basic-auth Secrets via Flux
+# valuesFrom targetPath (RFC-0012 P2, ADR-014) — no credentials in values.
+# helm-controller re-reads valuesFrom only at reconcile time: after a
+# password rotation, run `flux reconcile helmrelease pgdog-auth -n auth`.
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: pgdog-auth
+  namespace: auth
+spec:
+  interval: 10m
+  timeout: 5m
+  chart:
+    spec:
+      chart: pgdog
+      interval: 5m
+      version: "v0.39"
+      sourceRef:
+        kind: HelmRepository
+        name: pgdogdev
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  # Indices are positional against values.users below — keep both lists in
+  # the same order: [0]=auth.
+  valuesFrom:
+    - kind: Secret
+      name: auth-db-secret
+      valuesKey: password
+      targetPath: "users[0].password"
+  values:
+    replicas: 3
+    port: 6432
+    openMetricsPort: 9090
+    openMetricsNamespace: "pgdog_"
+
+    lsnCheckDelay: 0
+    lsnCheckInterval: 5000
+
+    databases:
+      # auth DB -- primary
+      - name: auth
+        host: auth-db-rw.auth.svc.cluster.local
+        port: 5432
+        database: auth
+        poolSize: 30
+        poolMode: transaction
+        replicas:
+          - host: auth-db-r.auth.svc.cluster.local
+            port: 5432
+            poolSize: 30
+
+    # Passwords injected per-user by spec.valuesFrom (order must match the
+    # targetPath indices above).
+    users:
+      - name: auth
+        database: auth
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+    serviceMonitor:
+      enabled: true
+      interval: 15s
+      scrapeTimeout: 10s
+
+    podAntiAffinity:
+      enabled: true
+      type: soft
+
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 2

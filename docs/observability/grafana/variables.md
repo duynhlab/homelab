@@ -23,7 +23,7 @@ Grafana Variables, Dashboard Variables, Regex Patterns, Label Values, Multi-sele
 
 ## 📊 Dashboard Variables Overview
 
-Dashboard này sử dụng **4 variables động** để filter và customize metrics display:
+This dashboard uses **4 dynamic variables** to filter and customize the metrics display:
 
 ### 1️⃣ **$DS_PROMETHEUS** (Datasource)
 

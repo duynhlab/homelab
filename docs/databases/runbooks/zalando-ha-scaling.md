@@ -1,5 +1,9 @@
 # Runbook: Zalando Postgres Operator -- Scaling from 1 to 3 Nodes
 
+> **Historical / reference.** The platform migrated all Postgres from the
+> Zalando operator to CloudNativePG (see 002/003). Zalando is no longer deployed
+> here — this doc is kept for learning.
+
 This is the operator-specific runbook for scaling a Zalando/Patroni cluster
 from a single instance to local HA. For platform-wide DRP policy, RTO/RPO
 ownership, standby taxonomy, and restore evidence, see
@@ -229,8 +233,8 @@ Each pod runs the same sidecar containers defined in the manifest:
 
 | Sidecar | Image | Purpose |
 |---------|-------|---------|
-| `exporter` | `pgsty/pg_exporter:1.2.0` | Prometheus metrics (port 9630) |
-| `vector` | `timberio/vector:0.52.0-alpine` | Log collection to VictoriaLogs |
+| `exporter` | `pgsty/pg_exporter:1.2.2` | Prometheus metrics (port 9630) |
+| `vector` | `timberio/vector:0.54.0-alpine` | Log collection to VictoriaLogs |
 
 With 3 pods, you get **3x exporter** + **3x vector** sidecars.
 
@@ -240,7 +244,7 @@ The `connectionPooler` section is independent of `numberOfInstances`. PgBouncer 
 
 ```
 connectionPooler:
-  numberOfInstances: 2   # <-- stays the same
+  numberOfInstances: 3   # <-- stays the same
 ```
 
 Applications connect via `supporting-shared-db-pooler.user.svc.cluster.local:5432` -- this does not change.
@@ -259,6 +263,7 @@ flowchart TB
     subgraph pooler [PgBouncer Pooler]
         PB1["pgbouncer-0"]
         PB2["pgbouncer-1"]
+        PB3["pgbouncer-2"]
     end
 
     subgraph dbcluster ["supporting-shared-db (StatefulSet)"]
@@ -278,8 +283,10 @@ flowchart TB
     apps --> SvcPooler
     SvcPooler --> PB1
     SvcPooler --> PB2
+    SvcPooler --> PB3
     PB1 --> SvcLeader
     PB2 --> SvcLeader
+    PB3 --> SvcLeader
     SvcLeader --> Pod0
     SvcRepl --> Pod1
     SvcRepl --> Pod2
@@ -449,7 +456,7 @@ Source: `kubernetes/infra/configs/databases/clusters/supporting-shared-db/instan
 | Memory requests (vector sidecar) | 32Mi | 96Mi | +64Mi |
 | **Total CPU requests** | **170m** | **510m** | **+340m** |
 | **Total Memory requests** | **224Mi** | **672Mi** | **+448Mi** |
-| PgBouncer pods | 2 | 2 | no change |
+| PgBouncer pods | 3 | 3 | no change |
 
 ### Bootstrap Time Estimate
 

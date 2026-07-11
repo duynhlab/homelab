@@ -1,6 +1,10 @@
 # Pigsty pg_exporter Monitor Dashboards – Analysis
 
-This document analyzes the Grafana dashboards shipped in the Pigsty [pg_exporter](https://github.com/pgsty/pg_exporter) `monitor/` directory. The analysis supports the PostgreSQL monitoring pilot plan for `supporting-shared-db`.
+> **Retired:** the Pigsty pg_exporter (supporting-shared-db, `:9630`) was removed
+> with the Zalando→CNPG migration; CNPG uses its built-in `:9187` exporter. Kept
+> for reference.
+
+This document analyzes the Grafana dashboards shipped in the Pigsty [pg_exporter](https://github.com/pgsty/pg_exporter) `monitor/` directory. The analysis supported the PostgreSQL monitoring pilot plan for the former `supporting-shared-db`.
 
 **Source**: https://github.com/pgsty/pg_exporter/tree/main/monitor  
 **README reference**: "There are two monitoring dashboards in the `monitor/` directory."

@@ -137,7 +137,7 @@ runbooks:
 |-------|----------------|-------------|-----------|
 | **Applications** | HTTP RED (`http_server_request_duration_seconds`), request/response body size, Go runtime, **gRPC east-west RED**, `trace_id` correlation, instrumentation | RED + Golden | [**metrics-apps.md**](metrics-apps.md) |
 | **Infrastructure** | `up`, container restarts, pod/node/API-server resources, network | USE + Golden | [**metrics-infra.md**](metrics-infra.md) |
-| **Databases** | PostgreSQL (Zalando + CNPG), custom queries, PgBouncer/pooler, Valkey | USE | [**postgresql/monitoring.md**](postgresql/monitoring.md) |
+| **Databases** | PostgreSQL (all CloudNativePG), custom queries, PgDog pooler, Valkey | USE | [**postgresql/monitoring.md**](postgresql/monitoring.md) |
 
 ### Methodology coverage matrix
 
@@ -170,10 +170,10 @@ metrics/
 ├── promql-guide.md      # PromQL: counters, rate() vs increase(), $rate vs $__range
 ├── streaming-aggregation.md  # At-scale playbook: in-flight aggregation, 2-tier vmagent (RFC-0013)
 └── postgresql/          # Databases layer
-    ├── monitoring.md            # Entry point: 3-cluster strategy + exporters
-    ├── custom-metrics.md        # postgres_exporter custom queries (Zalando)
-    ├── pg-exporter-dashboards.md
-    └── pg-exporter-mapping.md   # Full pg_exporter metric reference
+    ├── monitoring.md            # Entry point: CNPG cluster inventory + built-in exporter
+    ├── custom-metrics.md        # CNPG custom queries
+    ├── pg-exporter-dashboards.md   # Retired Pigsty pg_exporter reference
+    └── pg-exporter-mapping.md      # Retired Pigsty pg_exporter metric reference
 ```
 
 ## Operations quick-start
@@ -215,4 +215,4 @@ histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_
 
 ---
 
-_Last updated: 2026-07-09 — OTLP push for apps + VMAgent scrape for infra, VMSingle `:8428`, 3-layer coverage (apps/infra/databases), SLO via Sloth._
+_Last updated: 2026-07-11 — databases layer is now all-CloudNativePG (Zalando→CNPG migration); PgDog pooler; pg_exporter docs retained as retired reference._

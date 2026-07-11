@@ -1,0 +1,24 @@
+# Single-node cluster (shared-db, ns user): HA/replication rules intentionally omitted — they never fire on 1 instance.
+# CNPG-only: WAL directory size (legacy split from postgres-alerts).
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: shared-db-cluster-wal-size-high
+  namespace: user
+  labels:
+    app.kubernetes.io/part-of: cnpg-chart-rules
+    cnpg.io/cluster: shared-db
+spec:
+  groups:
+    - name: cloudnative-pg/shared-db-wal
+      interval: 5m
+      rules:
+        - alert: PostgresWALSizeHigh
+          expr: cnpg_collector_pg_wal{value="size"} > 2e+9
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CNPG WAL size high ({{ $labels.namespace }}/{{ $labels.cluster }})"
+            description: "WAL directory size is {{ $value | humanize1024 }}B (threshold: 2GB)."

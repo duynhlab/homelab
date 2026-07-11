@@ -14,12 +14,9 @@ resources:
   - grafana-dashboard-pg-monitoring.yaml
   - grafana-dashboard-pg-query-drilldown.yaml
   - grafana-dashboard-pg-query-overview.yaml
-  - grafana-dashboard-pgbouncer.yaml
   - grafana-dashboard-postgres-replication-lag.yaml
   - grafana-dashboard-pgdog.yaml
   - grafana-dashboard-redis.yaml
-  - grafana-dashboard-pg-exporter-instance.yaml
-  - grafana-dashboard-pg-exporter-self.yaml
   - grafana-dashboard-kubernetes-cluster-overview.yaml
   - grafana-dashboard-kong.yaml
   # VictoriaMetrics stack dashboards

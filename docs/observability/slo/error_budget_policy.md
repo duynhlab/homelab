@@ -17,7 +17,7 @@ Error Budget = 1 - SLO Target
 | SLO Target | Error Budget | 30-day Budget | 7-day Budget |
 |------------|--------------|---------------|--------------|
 | 99.5% | 0.5% | 3.6 hours | 50.4 minutes |
-| 95.0% | 5.0% | 36 hours | 5.04 hours |
+| 95.0% | 5.0% | 36 hours | 8.4 hours |
 | 99.0% | 1.0% | 7.2 hours | 1.68 hours |
 
 ### 30-Day Budget Example
@@ -110,10 +110,10 @@ Query error budget remaining:
 
 ```promql
 # Error budget remaining (0-1 scale)
-slo:error_budget_remaining:ratio{service="auth"}
+slo:error_budget_remaining:ratio{sloth_service="auth", sloth_slo="availability"}
 
 # Error budget remaining (percentage)
-slo:error_budget_remaining:ratio{service="auth"} * 100
+slo:error_budget_remaining:ratio{sloth_service="auth", sloth_slo="availability"} * 100
 ```
 
 ### Burn Rate Monitoring
@@ -122,10 +122,7 @@ Query burn rate:
 
 ```promql
 # Current burn rate
-slo:error_budget_burn_rate:ratio{service="auth"}
-
-# Time to exhaustion (hours)
-slo:time_to_exhaustion_hours{service="auth"}
+slo:current_burn_rate:ratio{sloth_service="auth", sloth_slo="availability"}
 ```
 
 ## Budget Consumption by Team
@@ -136,10 +133,10 @@ Track budget consumption by team/service:
 
 ```promql
 # Budget consumed by service
-1 - slo:error_budget_remaining:ratio{service="auth"}
+1 - slo:error_budget_remaining:ratio{sloth_service="auth", sloth_slo="availability"}
 
 # Budget consumed percentage
-(1 - slo:error_budget_remaining:ratio{service="auth"}) * 100
+(1 - slo:error_budget_remaining:ratio{sloth_service="auth", sloth_slo="availability"}) * 100
 ```
 
 ### Reporting

@@ -46,10 +46,13 @@ spec:
     size: 5Gi
     storageClass: standard
 
+  # 500m was pinned (~499m live) by Temporal server's constant DB polling, starving
+  # the CNPG readiness probe → intermittent 0/1. Raised to 1 CPU (memory is fine at
+  # ~120Mi). CPU, not RAM, was the cause.
   resources:
     requests:
       memory: "256Mi"
-      cpu: "100m"
+      cpu: "250m"
     limits:
       memory: "512Mi"
-      cpu: "500m"
+      cpu: "1000m"

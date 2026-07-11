@@ -1,0 +1,139 @@
+# PgDog Connection Pooler for product-db (product, cart, order)
+# R/W splitting: SELECTs routed to replicas, writes to primary
+# LSN monitoring: detects replication lag, bans lagging replicas
+# Prepared statements: extended mode (no prefer_simple_protocol needed)
+#
+# User passwords come from the per-service ESO basic-auth Secrets via Flux
+# valuesFrom targetPath (RFC-0012 P2, ADR-014) — no credentials in values.
+# helm-controller re-reads valuesFrom only at reconcile time: after a
+# password rotation, run `flux reconcile helmrelease pgdog-product -n product`.
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: pgdog-product
+  namespace: product
+spec:
+  interval: 10m
+  timeout: 5m
+  chart:
+    spec:
+      chart: pgdog
+      interval: 5m
+      version: "v0.39"
+      sourceRef:
+        kind: HelmRepository
+        name: pgdogdev
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  # Indices are positional against values.users below — keep both lists in
+  # the same order: [0]=product, [1]=cart, [2]=order, [3]=payment.
+  valuesFrom:
+    - kind: Secret
+      name: product-db-secret
+      valuesKey: password
+      targetPath: "users[0].password"
+    - kind: Secret
+      name: product-db-cart-secret
+      valuesKey: password
+      targetPath: "users[1].password"
+    - kind: Secret
+      name: product-db-order-secret
+      valuesKey: password
+      targetPath: "users[2].password"
+    - kind: Secret
+      name: product-db-payment-secret
+      valuesKey: password
+      targetPath: "users[3].password"
+  values:
+    replicas: 3
+    port: 6432
+    openMetricsPort: 9090
+    openMetricsNamespace: "pgdog_"
+
+    lsnCheckDelay: 0
+    lsnCheckInterval: 5000
+
+    databases:
+      # product DB -- primary
+      - name: product
+        host: product-db-rw.product.svc.cluster.local
+        port: 5432
+        database: product
+        poolSize: 30
+        poolMode: transaction
+        replicas:
+          - host: product-db-r.product.svc.cluster.local
+            port: 5432
+            poolSize: 30
+      # cart DB -- primary
+      - name: cart
+        host: product-db-rw.product.svc.cluster.local
+        port: 5432
+        database: cart
+        poolSize: 30
+        poolMode: transaction
+        replicas:
+          - host: product-db-r.product.svc.cluster.local
+            port: 5432
+            poolSize: 30
+      # order DB -- primary
+      - name: order
+        host: product-db-rw.product.svc.cluster.local
+        port: 5432
+        database: order
+        poolSize: 30
+        poolMode: transaction
+        replicas:
+          - host: product-db-r.product.svc.cluster.local
+            port: 5432
+            poolSize: 30
+      # payment DB -- primary
+      - name: payment
+        host: product-db-rw.product.svc.cluster.local
+        port: 5432
+        database: payment
+        poolSize: 30
+        poolMode: transaction
+        replicas:
+          - host: product-db-r.product.svc.cluster.local
+            port: 5432
+            poolSize: 30
+
+    # Passwords injected per-user by spec.valuesFrom (order must match the
+    # targetPath indices above).
+    users:
+      - name: product
+        database: product
+      - name: cart
+        database: cart
+      - name: order
+        database: order
+      - name: payment
+        database: payment
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+    serviceMonitor:
+      enabled: true
+      interval: 15s
+      scrapeTimeout: 10s
+
+    podAntiAffinity:
+      enabled: true
+      type: soft
+
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 2

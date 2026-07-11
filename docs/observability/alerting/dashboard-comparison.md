@@ -12,7 +12,7 @@ Deep-dive comparison of alert dashboard and receiver tools evaluated for this pr
 
 | Tool | Type | Language | License | Latest Version | Active? |
 |------|------|----------|---------|----------------|---------|
-| [Karma](https://github.com/prymitive/karma) | Alertmanager API dashboard | Go + TypeScript | Apache-2.0 | v0.128 (Mar 2026) | Very active |
+| [Karma](https://github.com/prymitive/karma) | Alertmanager API dashboard | Go + TypeScript | Apache-2.0 | v0.131 (Mar 2026) | Very active |
 | [Alerta](https://github.com/alerta/alerta) | Full alert aggregation platform | Python | Apache-2.0 | v9.0.4 (Sep 2024) | Slowing |
 | [UAR](https://github.com/jamesread/uncomplicated-alert-receiver) | Webhook receiver + UI | Go | AGPL-3.0 | v1.2.0 | Small project |
 | [Siren](https://github.com/shamubernetes/siren) | Lightweight AM dashboard | TypeScript (Bun) | GPL-3.0 | v1.4.26 (Mar 2026) | Active, new |
@@ -61,7 +61,7 @@ Deep-dive comparison of alert dashboard and receiver tools evaluated for this pr
 
 **Key weaknesses:**
 
-- Wiremind Helm chart lags behind upstream (app v0.83 vs latest v0.128); deploy via raw manifest or pin image tag (this platform pins `ghcr.io/prymitive/karma:v0.129` via raw manifest)
+- Wiremind Helm chart lags behind upstream (app v0.83 vs latest v0.131); deploy via raw manifest or pin image tag (this platform pins `ghcr.io/prymitive/karma:v0.131` via raw manifest)
 - Read-only for alert data (cannot acknowledge or assign alerts to team members)
 
 **Production relevance:** High. Karma is what most SRE teams use alongside Alertmanager. Learning it translates directly to production work.
@@ -175,7 +175,7 @@ Deep-dive comparison of alert dashboard and receiver tools evaluated for this pr
 3. **Production skill transfer** -- Karma is the de facto standard Alertmanager dashboard in SRE teams. Learning it on a homelab translates directly to production work.
 4. **Lightweight** -- Single stateless container, no database, single env var. Same complexity as UAR/Siren but with significantly more features.
 5. **Multi-instance ready** -- When moving to production with HA Alertmanager (multiple replicas), Karma aggregates them automatically. This is a skill and architecture that scales.
-6. **Active maintenance** -- v0.128 (Mar 2026), frequent releases, healthy community.
+6. **Active maintenance** -- v0.131 (Mar 2026), frequent releases, healthy community.
 
 **Karma + Grafana complementary setup:**
 

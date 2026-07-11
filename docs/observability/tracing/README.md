@@ -286,7 +286,7 @@ middleware.AddSpanEvent(ctx, "payment.approved")
 1. **Record all errors** for debugging context
 2. **Add business IDs** (user_id, order_id) for filtering
 3. **Use child spans** for distinct operations (DB queries, external API calls)
-4. **Monitor trace volume** in VictoriaMetrics (Grafana Explore): `rate(tempo_spans_received_total[5m])`
+4. **Monitor trace volume** in VictoriaMetrics (Grafana Explore): `rate(tempo_distributor_spans_received_total[5m])`
 
 ### Don'ts ❌
 
@@ -352,7 +352,7 @@ middleware.AddSpanEvent(ctx, "payment.approved")
 
 3. **Monitor Tempo ingestion**:
    ```promql
-   rate(tempo_spans_received_total[5m])
+   rate(tempo_distributor_spans_received_total[5m])
    ```
 
 ### Problem: High memory usage
@@ -383,8 +383,8 @@ middleware.AddSpanEvent(ctx, "payment.approved")
 kubectl port-forward -n monitoring svc/grafana-service 3000:3000
 
 # Check Tempo metrics
-kubectl port-forward -n monitoring svc/tempo 9090:9090
-curl http://localhost:9090/metrics | grep tempo_spans
+kubectl port-forward -n monitoring svc/tempo 3200:3200
+curl http://localhost:3200/metrics | grep tempo_spans
 
 # View service logs with trace IDs
 kubectl logs -n auth -l app=auth | jq '.trace_id'

@@ -76,11 +76,13 @@ spec:
     # the container in a CrashLoop. Bumped to give headroom for object writes. (Bug 18)
     resources:
       requests:
-        cpu: 100m
+        cpu: 250m
         memory: 128Mi
       limits:
-        # 500m chronically throttled (~44% of periods) → Pyroscope profile-upload
-        # 422s cluster-wide + CNPG RetentionPolicyFailed + slow backups (debugs
-        # §O/§L). Raise to 1.5 CPU for concurrent walk_dir + PUT traffic.
-        cpu: "1500m"
+        # 500m chronically throttled → Pyroscope 422s + slow backups. Raised to
+        # 1.5 CPU, but the Zalando->CNPG migration added 3 CNPG clusters' Barman
+        # WAL/backup traffic on top of Tempo + Pyroscope, re-saturating it (live
+        # ~1281m/1500m → S3 PUT "context deadline exceeded" → Pyroscope 422 again).
+        # Raise to 2.5 CPU (host has ample cores).
+        cpu: "2500m"
         memory: 512Mi

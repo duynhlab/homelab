@@ -343,7 +343,7 @@ docs/observability/
 | Tempo | monitoring | `tempo` | 3200 | Trace storage (OTLP receiver) |
 | Jaeger | monitoring | `jaeger-query` | 16686 | Trace query UI (alternative to Tempo) |
 | VictoriaTraces | monitoring | `vtsingle-victoria-traces` | 10428 | Trace storage pilot (`v0.6.0`, OTLP HTTP + Jaeger query API) |
-| OTel Collector | monitoring | `otel-collector` | 4317 | OTLP ingress — metrics (→ vmagent), logs (app tee + Kong runtime), trace fan-out |
+| OTel Collector | monitoring | `otel-collector-opentelemetry-collector` | 4318 | OTLP/HTTP ingress — metrics (→ vmagent), logs (app tee + Kong runtime), trace fan-out |
 | VictoriaLogs | monitoring | `vlsingle-victoria-logs` | 9428 | Log storage and query (LogsQL, sole log backend) |
 | Vector | kube-system | DaemonSet | -- | Log shipping for **non-instrumented** pods (DBs, Kong access log, PG plans, frontend); app logs go OTLP |
 | Pyroscope | monitoring | `pyroscope` | 4040 | Continuous profiling |

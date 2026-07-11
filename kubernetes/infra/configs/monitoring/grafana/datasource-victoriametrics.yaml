@@ -9,7 +9,7 @@ spec:
     isDefault: true
     name: VictoriaMetrics
     type: victoriametrics-metrics-datasource
-    # uid: victoriametrics
+    uid: victoriametrics
     url: http://vmsingle-victoria-metrics.monitoring.svc:8428
     jsonData:
       httpMethod: POST

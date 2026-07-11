@@ -586,7 +586,7 @@ flowchart LR
 
 | Signal | Producer | Pipeline | Consumer |
 |--------|----------|----------|----------|
-| **Metrics** | `prometheus` plugin (status codes, latency histograms, bandwidth, upstream health) on the status listener `:8100/metrics` | ServiceMonitor `configs/monitoring/servicemonitors/kong.yaml` → VMAgent (`selectAllByDefault`) → VictoriaMetrics | Grafana Kong dashboard (GrafanaDashboard CRD); 6 alert groups + recording rules in `configs/monitoring/prometheusrules/kong/` |
+| **Metrics** | `prometheus` plugin (status codes, latency histograms, bandwidth, upstream health) on the status listener `:8100/metrics` | chart-native ServiceMonitor (`serviceMonitor.enabled` in `controllers/kong/helmrelease.yaml`) → VMAgent (`selectAllByDefault`) → VictoriaMetrics | Grafana Kong dashboard (GrafanaDashboard CRD); 6 alert groups + recording rules in `configs/monitoring/prometheusrules/kong/` |
 | **Traces** | `opentelemetry` plugin — root span per request + forced W3C `traceparent` injection (100% edge→service linkage) | OTLP-HTTP → otel-collector → Tempo + Jaeger + VictoriaTraces | Grafana Explore / Jaeger UI |
 | **Access logs** | nginx `kong_json` log format on stdout — one JSON line per request (`status`, `request_time`, `upstream_time`, `request_id`, …) | Vector DaemonSet → VictoriaLogs (jsonline) | LogsQL queries by field |
 | **Runtime logs (pilot)** | `opentelemetry` plugin `logs_endpoint` (Kong ≥ 3.8) — trace-correlated OTLP log records | otel-collector `logs` pipeline → VictoriaLogs (OTLP ingest) | Runs **alongside** Vector for comparison |
@@ -646,7 +646,7 @@ the comparison is testable offline — see `local-stack/README.md`.
 | Infra Ingress | `kubernetes/infra/configs/kong/ingress-infra.yaml` | Routes infra tools (Flux UI, RustFS, OpenBAO, PG UI) |
 | MCP Ingress | `kubernetes/infra/configs/kong/ingress-mcp.yaml` | Routes MCP servers (VM, VL, Flux) |
 | TLS Certificate | `kubernetes/infra/configs/cert-manager/certificates-microservices.yaml` | `kong-proxy-tls` — `letsencrypt-prod` ClusterIssuer (Cloudflare DNS-01) on prod, self-signed `homelab-ca` on local Kind (overlay patch); SANs: `duynh.me`, `*.duynh.me` |
-| ServiceMonitor | `kubernetes/infra/configs/monitoring/servicemonitors/kong.yaml` | Prometheus metrics scraping |
+| ServiceMonitor | chart-native (`serviceMonitor.enabled` in `kubernetes/infra/controllers/kong/helmrelease.yaml`) | Prometheus metrics scraping |
 
 ---
 
@@ -811,13 +811,13 @@ kubectl get ingress -A
 | auth | api-auth-public | `gateway.duynh.me` | `/auth/v1/public/` |
 | user | api-user-public | `gateway.duynh.me` | `/user/v1/public/` |
 | user | api-user-private | `gateway.duynh.me` | `/user/v1/private/` (jwt-edge) |
-| product | api-product | `gateway.duynh.me` | `/product/v1/` |
-| cart | api-cart | `gateway.duynh.me` | `/cart/v1/` |
-| order | api-order | `gateway.duynh.me` | `/order/v1/` |
+| product | api-product | `gateway.duynh.me` | `/product/v1/public/` |
+| cart | api-cart | `gateway.duynh.me` | `/cart/v1/private/` (jwt-edge) |
+| order | api-order | `gateway.duynh.me` | `/order/v1/private/` (jwt-edge) |
 | review | api-review-public | `gateway.duynh.me` | `/review/v1/public/` |
 | review | api-review-private | `gateway.duynh.me` | `/review/v1/private/` (jwt-edge) |
-| notification | api-notification | `gateway.duynh.me` | `/notification/v1/` |
-| shipping | api-shipping | `gateway.duynh.me` | `/shipping/v1/` |
+| notification | api-notification | `gateway.duynh.me` | `/notification/v1/private/` (jwt-edge) |
+| shipping | api-shipping | `gateway.duynh.me` | `/shipping/v1/public/` |
 | payment | api-payment-private | `gateway.duynh.me` | `/payment/v1/private/` |
 | payment | api-payment-webhooks | `gateway.duynh.me` | `/payment/v1/public/webhooks/` |
 | *(+ monitoring, infra, MCP ingresses)* | | | |

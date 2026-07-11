@@ -45,6 +45,7 @@ flowchart TB
     Exporter -->|OTLP| VT
     Exporter -->|OTLP| Jaeger
     Kong -.->|"OTLP HTTP (runtime logs)"| Receiver
+    Apps -.->|"OTLP HTTP (app otelzap logs)"| Receiver
     Exporter -.->|"logs pipeline"| VLogs[("VictoriaLogs")]
     classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
     classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
@@ -71,7 +72,7 @@ config that makes this reliable.
 - **Enabled by**: `tracing_instrumentations: all` + `tracing_sampling_rate` in the Kong config (HelmRelease env for the cluster; `KONG_TRACING_*` for local-stack)
 - **Export**: OTLP HTTP to the same collector endpoint the services use (`…:4318/v1/traces`), `service.name=kong`
 - **Role**: creates the **root request span** for every proxied call and injects the W3C `traceparent` downstream, so the trace starts at the edge instead of the first service
-- **Logs**: the same plugin also sets `logs_endpoint` (Kong ≥ 3.8) — Kong **runtime** logs ship via OTLP to the collector's `logs` pipeline → VictoriaLogs, alongside Vector (see [../logging/README.md](../logging/README.md))
+- **Logs**: the same plugin also sets `logs_endpoint` (Kong ≥ 3.8) — Kong **runtime** logs ship via OTLP to the collector's `logs` pipeline → VictoriaLogs. That same pipeline also carries the **fleet-wide app `otelzap` tee** (every service's structured logs, since RFC-0014 P4), alongside Vector (see [../logging/README.md](../logging/README.md))
 - **Config**: `kubernetes/infra/configs/kong/plugins.yaml` (`opentelemetry-tracing` KongClusterPlugin) + `kubernetes/infra/controllers/kong/helmrelease.yaml`; local mirror in `local-stack/gateway/kong.yml` + `local-stack/compose.yaml`
 
 **1. Microservices (SDK Approach)**
@@ -83,7 +84,7 @@ config that makes this reliable.
 
 **2. OpenTelemetry Collector**
 - **Deployment**: Kubernetes Deployment (1 replica, scalable)
-- **Function**: Fan-out layer — a `traces` pipeline distributing to the three backends, plus a `logs` pipeline (Kong runtime-logs → VictoriaLogs)
+- **Function**: Fan-out layer — a `traces` pipeline distributing to the three backends, plus a `logs` pipeline (fleet-wide app `otelzap` tee + Kong runtime-logs → VictoriaLogs)
 - **Configuration**: `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
 - **Ports**: 4317 (gRPC), 4318 (HTTP), 8888 (metrics)
 

@@ -129,6 +129,15 @@ CloudNativePG auto_explain logs are parsed and stored with:
 - `database` - PostgreSQL database name
 - `query_id` - PostgreSQL query ID
 
+### PostgreSQL Audit Logs
+
+All CNPG clusters enable `pgaudit` (`pgaudit.log = 'ddl, write'`). Audit records
+and `auto_explain` plans flow through the **same cluster-wide Vector DaemonSet** —
+there are **no per-cluster logging sidecars**. Audit rows land in VictoriaLogs as
+CNPG-parsed structured records carrying `logger: pgaudit` (CNPG parsing strips the
+literal `AUDIT:` prefix). Verified live for `auth-db`, `product-db`, and
+`shared-db`. Example query: `_stream:{namespace="auth"} logger:pgaudit`.
+
 ## Configuration
 
 ### VLSingle CRD (Operator-Managed)
@@ -163,10 +172,11 @@ The Vector config includes:
 ## Vector self-monitoring
 
 Vector exposes its own metrics in **Prometheus text format** (`internal_metrics`
-source → `prometheus_exporter` sink on port `9090`). VMAgent scrapes them
-(`ServiceMonitor` → `VMServiceScrape`, converted by the VM Operator, 30s interval)
-and remote-writes to VMSingle, so pipeline health is queryable in Grafana against
-the VictoriaMetrics datasource like any other workload.
+source → `prometheus_exporter` sink on port `9090`). The Vector chart's
+`podMonitor.enabled` creates a `PodMonitor`, which the VM Operator converts to a
+`VMPodScrape`; VMAgent scrapes it and remote-writes to VMSingle, so pipeline
+health is queryable in Grafana against the VictoriaMetrics datasource like any
+other workload.
 
 Key metrics (PromQL):
 
@@ -262,7 +272,7 @@ curl -G 'http://localhost:9428/select/logsql/query' \
 
 3. **Generate a slow query** to trigger auto_explain:
    ```sql
-   -- Connect to cnpg-db (product, cart, or order database)
+   -- Connect to product-db (product, cart, order, or payment database)
    SELECT pg_sleep(1);
    ```
 

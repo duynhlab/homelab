@@ -117,7 +117,7 @@ sequenceDiagram
     participant DB as product DB
 
     W->>P: ReserveStock(reservation_id=orderID, items)
-    P->>DB: BEGIN; guarded UPDATE stock_quantity; INSERT ledger; COMMIT
+    P->>DB: BEGIN, guarded UPDATE stock_quantity, INSERT ledger, COMMIT
     alt enough stock
         P-->>W: OK (reserved)
     else insufficient
@@ -126,7 +126,7 @@ sequenceDiagram
     end
     Note over W: on a later pre-pivot failure
     W->>P: ReleaseStock(reservation_id)
-    P->>DB: flip ledger 'reserved'->'released'; restore stock_quantity
+    P->>DB: flip ledger 'reserved'->'released', restore stock_quantity
     P-->>W: OK (idempotent)
 ```
 

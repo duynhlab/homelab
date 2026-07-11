@@ -101,18 +101,18 @@ For the **full canonical KV catalog** (all paths currently seeded plus future-ap
 
 ### Naming Convention
 
-ESO-managed secrets use the **same name** as the original secret they replace (e.g., `cnpg-db-secret`). The `managed-by: external-secrets` label identifies OpenBAO-backed secrets. No `-vault` suffix is used.
+ESO-managed secrets use the **same name** as the original secret they replace (e.g., `product-db-secret`). The `managed-by: external-secrets` label identifies OpenBAO-backed secrets. No `-vault` suffix is used.
 
 ### Database Secrets (ExternalSecret per cluster)
 
 | K8s Secret | Namespace | Source |
 |------------|-----------|--------|
-| `cnpg-db-secret` | product | `secret/data/local/databases/cnpg-db/product` |
-| `cnpg-db-cart-secret` | cart | `secret/data/local/databases/cnpg-db/cart` |
-| `cnpg-db-order-secret` | order | `secret/data/local/databases/cnpg-db/order` |
-| `cnpg-db-payment-secret` | product, payment | `secret/data/local/databases/cnpg-db/payment` |
+| `product-db-secret` | product | `secret/data/local/databases/product-db/product` |
+| `product-db-cart-secret` | cart | `secret/data/local/databases/product-db/cart` |
+| `product-db-order-secret` | order | `secret/data/local/databases/product-db/order` |
+| `product-db-payment-secret` | product, payment | `secret/data/local/databases/product-db/payment` |
 
-The `cnpg-db-payment-secret` is materialised in **both** `product` (where the `payment` database/owner is created on `cnpg-db`) and `payment` (where the payment service consumes it to connect direct-TLS to `cnpg-db-rw`).
+The `product-db-payment-secret` is materialised in **both** `product` (where the `payment` database/owner is created on `product-db`) and `payment` (where the payment service consumes it to connect direct-TLS to `product-db-rw`).
 
 ### Backup Secrets (ClusterExternalSecret)
 

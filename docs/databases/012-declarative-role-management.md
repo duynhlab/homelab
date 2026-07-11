@@ -1,7 +1,7 @@
 # Declarative Role & Database Management (CNPG)
 
 One file per service — an `ExternalSecret`, a `DatabaseRole`, and a `Database` —
-is the single pattern for every service database on `cnpg-db`; no role or
+is the single pattern for every service database on `product-db`; no role or
 database is created by SQL in Git, and no credential ever appears in a manifest.
 
 | | |
@@ -9,8 +9,8 @@ database is created by SQL in Git, and no credential ever appears in a manifest.
 | **Status** | Complete (RFC-0012 P1–P4): all four services on triplets, connection isolation via `pg_hba` live |
 | **Decision record** | [ADR-013 — per-service database triplet](../proposals/adr/ADR-013-per-service-db-triplet/) |
 | **Operator** | CloudNativePG v1.30.0 (`DatabaseRole` CRD since 1.30) |
-| **Cluster** | `cnpg-db` (namespace `product`); DR replica `cnpg-db-replica` receives roles/databases via WAL, no CRs of its own |
-| **Triplet location** | `kubernetes/infra/configs/databases/clusters/cnpg-db/services/<name>.yaml` |
+| **Cluster** | `product-db` (namespace `product`); DR replica `product-db-replica` receives roles/databases via WAL, no CRs of its own |
+| **Triplet location** | `kubernetes/infra/configs/databases/clusters/product-db/services/<name>.yaml` |
 | **Credential flow** | OpenBAO → ESO → `kubernetes.io/basic-auth` Secret (`cnpg.io/reload: "true"`) |
 
 ## Concept
@@ -56,14 +56,14 @@ Per-service credential and reconcile flow:
 
 ```mermaid
 flowchart LR
-    OB[(OpenBAO<br/>single source)] -->|ESO sync 1h +<br/>cnpg.io/reload| S[Secret basic-auth<br/>cnpg-db-&lt;svc&gt;-secret<br/>product uses cnpg-db-secret]
+    OB[(OpenBAO<br/>single source)] -->|ESO sync 1h +<br/>cnpg.io/reload| S[Secret basic-auth<br/>product-db-&lt;svc&gt;-secret<br/>product uses product-db-secret]
     S --> DR2[DatabaseRole &lt;svc&gt;]
-    DR2 -->|CREATE/ALTER ROLE<br/>SCRAM-encoded, log-suppressed| PG[(cnpg-db)]
+    DR2 -->|CREATE/ALTER ROLE<br/>SCRAM-encoded, log-suppressed| PG[(product-db)]
     DB2[Database &lt;svc&gt;] -->|CREATE DATABASE<br/>OWNER &lt;svc&gt;| PG
     S -->|same username/password| APP[service pod]
     APP -->|SCRAM via pooler| PL[PgDog]
     PL --> PG
-    PG -.->|WAL / object store| DRC[(cnpg-db-replica)]
+    PG -.->|WAL / object store| DRC[(product-db-replica)]
 ```
 
 Security notes on the write path: since 1.30 the operator SCRAM-SHA-256-encodes
@@ -73,15 +73,15 @@ logging around them, so cleartext never reaches PostgreSQL logs,
 
 ## How it works in this platform
 
-Each service file under `clusters/cnpg-db/services/` declares, in order:
+Each service file under `clusters/product-db/services/` declares, in order:
 
-1. **`ExternalSecret`** — renders `cnpg-db-<svc>-secret` in namespace `product`
-   from OpenBAO path `secret/data/local/databases/cnpg-db/<svc>` (product is
-   the exception: it reuses the initdb `cnpg-db-secret`). Must be
+1. **`ExternalSecret`** — renders `product-db-<svc>-secret` in namespace `product`
+   from OpenBAO path `secret/data/local/databases/product-db/<svc>` (product is
+   the exception: it reuses the initdb `product-db-secret`). Must be
    `template.type: kubernetes.io/basic-auth` (CNPG requires basic-auth for
    `passwordSecret`) and carry the `cnpg.io/reload: "true"` label. App pods in
    other namespaces consume their own ESO copy of the same OpenBAO entry.
-2. **`DatabaseRole` `cnpg-db-role-<svc>`** — all attributes explicit;
+2. **`DatabaseRole` `product-db-role-<svc>`** — all attributes explicit;
    `validUntil` omitted on purpose (the operator then manages expiry to
    `infinity`, correct for app identities); `login: true`; everything
    privileged (`superuser`, `createdb`, `createrole`, `replication`,
@@ -95,11 +95,11 @@ Each service file under `clusters/cnpg-db/services/` declares, in order:
 The `Cluster` spec (`instance.yaml`) keeps only infrastructure plus a minimal
 `bootstrap.initdb` — its `database`/`owner`/`secret` fields are structural
 placeholders that the product triplet adopts declaratively (both must point
-at the same `cnpg-db-secret`). `postInitSQL` is gone: a from-scratch build
+at the same `product-db-secret`). `postInitSQL` is gone: a from-scratch build
 and a backup restore now converge to the same roles and databases.
 
 Replica behavior: roles and databases replicate through WAL to
-`cnpg-db-replica`; a `DatabaseRole` pointed at a replica reports `unknown`
+`product-db-replica`; a `DatabaseRole` pointed at a replica reports `unknown`
 (unset `applied`), not an error, and reconciles normally after promotion.
 
 ### Migration state (RFC-0012 phases)
@@ -139,19 +139,19 @@ Replica behavior: roles and databases replicate through WAL to
 
   ```bash
   for u in product cart order payment; do
-    pw=$(kubectl get secret -n product cnpg-db-$([ $u = product ] || echo ${u}-)secret \
+    pw=$(kubectl get secret -n product product-db-$([ $u = product ] || echo ${u}-)secret \
       -o jsonpath='{.data.password}' | base64 -d)
     for d in product cart order payment; do
       kubectl run hba-$u-$d --rm --restart=Never -n product --quiet -it \
         --image=ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie -- \
-        psql "host=cnpg-db-rw.product user=$u dbname=$d password=$pw connect_timeout=5" \
+        psql "host=product-db-rw.product user=$u dbname=$d password=$pw connect_timeout=5" \
         -tAc 'select 1' >/dev/null 2>&1 && echo "$u->$d ALLOW" || echo "$u->$d reject"
     done
   done
   ```
 
   Regression alongside: pgdog e2e, payment direct login, one migration Job
-  re-run, `cnpg-db-replica` advancing, PodMonitor scrape, auth-failure watch
+  re-run, `product-db-replica` advancing, PodMonitor scrape, auth-failure watch
   in VictoriaLogs for the first hour.
 
 ## References

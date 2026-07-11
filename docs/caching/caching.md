@@ -220,7 +220,7 @@ must stay true, or the cache goes stale:
    invalidation. **If an update/delete path is ever added it MUST call `InvalidateProduct(ctx, id)`**
    (and `InvalidateProductList`), or the detail cache serves stale data for up to
    `CACHE_TTL_PRODUCT_DETAIL` (10m).
-2. **No other service writes product rows the cache reflects.** The `cnpg-db` cluster is shared
+2. **No other service writes product rows the cache reflects.** The `product-db` cluster is shared
    by product/cart/order; if another service mutates product data directly (e.g. decrements
    stock), product-service has **no invalidation hook** and serves stale detail data bounded by
    the 10m TTL. Today stock is not written this way; if it ever is, route the mutation through

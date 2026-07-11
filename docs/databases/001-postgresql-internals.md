@@ -1,6 +1,6 @@
-# PostgreSQL Internals Deep Dive (cnpg-db)
+# PostgreSQL Internals Deep Dive (product-db)
 
-A comprehensive guide to PostgreSQL internals using the `cnpg-db` cluster as a learning vehicle. This document covers how PostgreSQL works internally, whether running on Kubernetes (CloudNativePG) or VMs (EC2).
+A comprehensive guide to PostgreSQL internals using the `product-db` cluster as a learning vehicle. This document covers how PostgreSQL works internally, whether running on Kubernetes (CloudNativePG) or VMs (EC2).
 
 **Last Updated:** 2026-01-26
 
@@ -9,7 +9,7 @@ A comprehensive guide to PostgreSQL internals using the `cnpg-db` cluster as a l
 ## Table of Contents
 
 1. [Mental Model: Database vs Instance vs Schema](#1-mental-model-database-vs-instance-vs-schema)
-2. [cnpg-db Architecture](#2-cnpg-db-architecture)
+2. [product-db Architecture](#2-product-db-architecture)
 3. [INSERT/UPDATE/DELETE Workflow](#3-insertupdatedelete-workflow)
 4. [Shared Buffers and Buffer Manager](#4-shared-buffers-and-buffer-manager)
 5. [WAL (Write-Ahead Log)](#5-wal-write-ahead-log)
@@ -73,7 +73,7 @@ flowchart TB
 
 ---
 
-## 2. cnpg-db Architecture
+## 2. product-db Architecture
 
 ### Current Configuration (from manifests)
 
@@ -338,7 +338,7 @@ PostgreSQL uses **double buffering**:
 
 If you set `shared_buffers` to 90% of RAM, the OS has no space for its cache. Every buffer miss goes straight to disk (slow).
 
-**Recommendation for cnpg-db:**
+**Recommendation for product-db:**
 - Current: `shared_buffers: 256MB` (manifest-tuned for the cluster workload)
 - Production: 25-40% of available RAM on larger nodes (e.g., 2GB for an 8GB VM)
 
@@ -425,7 +425,7 @@ sequenceDiagram
     WALWriter->>Disk: fsync (async, ~200ms)
 ```
 
-**cnpg-db setting:** Default synchronous commit on the primary. Streaming replication uses **one synchronous** standby (quorum `number: 1`, `dataDurability: required`) plus **one asynchronous** replica; commits wait until at least one standby has received/flushed WAL, while the async replica may lag slightly.
+**product-db setting:** Default synchronous commit on the primary. Streaming replication uses **one synchronous** standby (quorum `number: 1`, `dataDurability: required`) plus **one asynchronous** replica; commits wait until at least one standby has received/flushed WAL, while the async replica may lag slightly.
 
 ### Background Processes for WAL/Data
 
@@ -495,7 +495,7 @@ The planner uses cost constants to estimate query cost:
 | `seq_page_cost` | 1.0 | 1.0 | Cost of sequential page read |
 | `random_page_cost` | 4.0 | 1.1-2.0 | Cost of random page read |
 
-**cnpg-db setting:** `random_page_cost: 1.1` (SSD-oriented; set in the cluster manifest).
+**product-db setting:** `random_page_cost: 1.1` (SSD-oriented; set in the cluster manifest).
 
 **Impact:** Higher `random_page_cost` makes the planner prefer sequential scans over index scans. On SSDs, random I/O is nearly as fast as sequential, so lower this value.
 
@@ -760,7 +760,7 @@ flowchart TB
 | **Data loss risk** | Possible if primary fails before WAL reaches replicas | Lower (standby has ack'd before commit returns) |
 | **Availability** | Higher (replica failure doesn't block commits) | Lower (enough standbys must be up to satisfy sync rules) |
 
-**cnpg-db:** Hybrid — **1 synchronous + 1 asynchronous** replica (see [§2](#2-cnpg-db-architecture)). Commits follow sync-quorum rules toward one standby; the other replica streams WAL without blocking commit.
+**product-db:** Hybrid — **1 synchronous + 1 asynchronous** replica (see [§2](#2-product-db-architecture)). Commits follow sync-quorum rules toward one standby; the other replica streams WAL without blocking commit.
 
 ### Replication Lag
 
@@ -910,20 +910,20 @@ flowchart LR
     Replay --> Running
 ```
 
-### cnpg-db Status
+### product-db Status
 
-**Current:** **Barman Cloud Plugin** backup **is** configured on the cluster. Base backups and WAL are stored at **`s3://pg-backups-cnpg/cnpg-db/`** through the `cnpg-db-backup-store` `ObjectStore` CR, with credentials from the `pg-backup-rustfs-credentials` secret. Scheduled backups are defined under `kubernetes/infra/configs/databases/clusters/cnpg-db/backup/` and use `method: plugin`.
+**Current:** **Barman Cloud Plugin** backup **is** configured on the cluster. Base backups and WAL are stored at **`s3://pg-backups-cnpg/product-db/`** through the `product-db-backup-store` `ObjectStore` CR, with credentials from the `pg-backup-rustfs-credentials` secret. Scheduled backups are defined under `kubernetes/infra/configs/databases/clusters/product-db/backup/` and use `method: plugin`.
 
 **Reference shape (already applied in-repo):**
 ```yaml
 apiVersion: barmancloud.cnpg.io/v1
 kind: ObjectStore
 metadata:
-  name: cnpg-db-backup-store
+  name: product-db-backup-store
 spec:
   retentionPolicy: "30d"
   configuration:
-      destinationPath: s3://pg-backups-cnpg/cnpg-db/
+      destinationPath: s3://pg-backups-cnpg/product-db/
       s3Credentials:
         accessKeyId:
           name: pg-backup-rustfs-credentials
@@ -941,7 +941,7 @@ spec:
 
 PgDog fronts **four application databases** on this cluster — **product**, **cart**, **order**, and **payment** — with **read/write splitting** (writes to the primary RW service, reads routed to replicas where configured per pool).
 
-| Strategy | How | Complexity | cnpg-db Status |
+| Strategy | How | Complexity | product-db Status |
 |----------|-----|------------|-------------------|
 | **Read replicas** | Route SELECTs to replicas | Low | **Available** (1 sync + 1 async standby) |
 | **PgDog read routing** | PgDog pools use CNPG `-rw` / read services for R/W split | Low | **Configured** (multi-database: product, cart, order, payment) |
@@ -958,7 +958,7 @@ PgDog fronts **four application databases** on this cluster — **product**, **c
 
 ### Sharding
 
-**Status:** NOT configured in cnpg-db. Sharding is complex and usually avoided unless necessary.
+**Status:** NOT configured in product-db. Sharding is complex and usually avoided unless necessary.
 
 | Option | Description | Complexity |
 |--------|-------------|------------|
@@ -991,7 +991,7 @@ PgDog fronts **four application databases** on this cluster — **product**, **c
 
 5. **MVCC = no read/write blocking**: Old versions persist until vacuum. Long transactions = bloat.
 
-6. **Streaming replication**: WAL Sender → WAL Receiver → Startup Process replay. Pure async trades durability for latency; sync quorum waits for standbys. **cnpg-db** uses **1 sync + 1 async** standby.
+6. **Streaming replication**: WAL Sender → WAL Receiver → Startup Process replay. Pure async trades durability for latency; sync quorum waits for standbys. **product-db** uses **1 sync + 1 async** standby.
 
 7. **CNPG abstracts operations**: Same PostgreSQL engine, different operational model. Understanding internals helps debug both.
 

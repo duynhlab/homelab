@@ -1,14 +1,14 @@
-# Runbook: Rotate a cnpg-db Service Password
+# Runbook: Rotate a product-db Service Password
 
-Rotate one (or all) service database passwords on `cnpg-db` with a
+Rotate one (or all) service database passwords on `product-db` with a
 new-connections-only blip of ~1–3 minutes. Works because every consumer —
 the `DatabaseRole`, the PgDog pooler, and the app pod — reads the same
 OpenBAO entry through ESO; nothing else holds the value.
 
 | | |
 |---|---|
-| **Scope** | `product`, `cart`, `order`, `payment` on `cnpg-db` |
-| **Source of truth** | OpenBAO `secret/local/databases/cnpg-db/<svc>` (KV v2 — old versions retained) |
+| **Scope** | `product`, `cart`, `order`, `payment` on `product-db` |
+| **Source of truth** | OpenBAO `secret/local/databases/product-db/<svc>` (KV v2 — old versions retained) |
 | **Consumers** | `DatabaseRole` (`cnpg.io/reload`), PgDog HelmRelease (`valuesFrom`), app pods (env `secretKeyRef` via the app-namespace ESO copy) |
 | **Design record** | [RFC-0012](../../proposals/rfc/RFC-0012/) · [ADR-013](../../proposals/adr/ADR-013-per-service-db-triplet/) · [ADR-014](../../proposals/adr/ADR-014-pooler-credentials-valuesfrom/) |
 
@@ -49,7 +49,7 @@ moving to the next step.
      ```bash
      kubectl exec -n openbao openbao-0 -- sh -c \
        'BAO_TOKEN=$(cat /openbao/data/root-token 2>/dev/null || echo "$BAO_DEV_ROOT_TOKEN_ID") \
-        bao kv put secret/local/databases/cnpg-db/<svc> username=<svc> password=<new>'
+        bao kv put secret/local/databases/product-db/<svc> username=<svc> password=<new>'
      ```
 
    KV v2 keeps prior versions — `bao kv rollback -version=<n>` is the
@@ -59,19 +59,19 @@ moving to the next step.
    product-namespace Secret and the app-namespace copy:
 
    ```bash
-   kubectl annotate externalsecret -n product cnpg-db-<svc>-secret \
+   kubectl annotate externalsecret -n product product-db-<svc>-secret \
      force-sync=$(date +%s) --overwrite
-   kubectl annotate externalsecret -n <svc> cnpg-db-<svc>-secret \
+   kubectl annotate externalsecret -n <svc> product-db-<svc>-secret \
      force-sync=$(date +%s) --overwrite
    ```
 
-   (`product` uses `cnpg-db-secret` in namespace `product` only.)
+   (`product` uses `product-db-secret` in namespace `product` only.)
 
 3. **CNPG applies `ALTER ROLE` automatically** — the `cnpg.io/reload` label
    on the product-namespace Secret triggers it within seconds. Verify:
 
    ```bash
-   kubectl get databaserole -n product cnpg-db-role-<svc> \
+   kubectl get databaserole -n product product-db-role-<svc> \
      -o jsonpath='{.status.applied}{" "}{.status.conditions}'
    ```
 
@@ -102,20 +102,20 @@ moving to the next step.
    ```bash
    kubectl run psql-check --rm -it --restart=Never -n product \
      --image=ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie -- \
-     psql "host=cnpg-db-rw.product user=<svc> dbname=<svc> password=<new>" -c 'select 1'
+     psql "host=product-db-rw.product user=<svc> dbname=<svc> password=<new>" -c 'select 1'
    ```
 
 ## One-time migration note (Opaque → basic-auth)
 
-Secret `type` is immutable. The pre-RFC-0012 `cnpg-db-secret`,
-`cnpg-db-cart-secret`, and `cnpg-db-order-secret` (namespace `product`) were
+Secret `type` is immutable. The pre-RFC-0012 `product-db-secret`,
+`product-db-cart-secret`, and `product-db-order-secret` (namespace `product`) were
 `Opaque`; the triplet manifests re-template them as `kubernetes.io/basic-auth`.
 On a cluster that still has the Opaque versions, delete them once so ESO
 recreates with the new type (`deletionPolicy: Retain` governs ExternalSecret
 deletion, not this):
 
 ```bash
-kubectl delete secret -n product cnpg-db-secret cnpg-db-cart-secret cnpg-db-order-secret
+kubectl delete secret -n product product-db-secret product-db-cart-secret product-db-order-secret
 # then force-sync as in step 2
 ```
 

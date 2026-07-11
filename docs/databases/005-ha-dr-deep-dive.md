@@ -30,15 +30,15 @@ recovery decision flow, RTO/RPO ownership, and drill evidence checklist, see
 ```mermaid
 flowchart TB
   subgraph productNS ["Namespace: product"]
-    subgraph primary ["cnpg-db -- Primary Cluster"]
-      P1["Primary (cnpg-db-1)"]
-      P2["Sync Replica (cnpg-db-2)"]
-      P3["Async Replica (cnpg-db-3)"]
+    subgraph primary ["product-db -- Primary Cluster"]
+      P1["Primary (product-db-1)"]
+      P2["Sync Replica (product-db-2)"]
+      P3["Async Replica (product-db-3)"]
       P1 -->|"sync WAL stream"| P2
       P1 -->|"async WAL stream"| P3
     end
 
-    subgraph dr ["cnpg-db-replica -- DR Cluster"]
+    subgraph dr ["product-db-replica -- DR Cluster"]
       DR1["Designated Primary (1 node)"]
     end
 
@@ -50,7 +50,7 @@ flowchart TB
   end
 
   subgraph rustfsNS ["Namespace: rustfs"]
-    ObjStore["RustFS Object Store\ns3://pg-backups-cnpg/cnpg-db/"]
+    ObjStore["RustFS Object Store\ns3://pg-backups-cnpg/product-db/"]
   end
 
   P1 -->|"archive_command\n(WAL segments)"| ObjStore
@@ -65,10 +65,10 @@ flowchart TB
 
 | Component | Role | Handles Writes | Handles Reads | Data Durability |
 |-----------|------|---------------|---------------|-----------------|
-| cnpg-db-1 (Primary) | Accept all writes, stream WAL | Yes | Yes (via PgDog) | Committed to local disk + sync replica |
-| cnpg-db-2 (Sync Replica) | Confirm WAL flush before client ACK | No | Yes (read scaling) | WAL flushed to disk before ACK |
-| cnpg-db-3 (Async Replica) | Receive WAL best-effort | No | Yes (read scaling) | Eventually consistent |
-| cnpg-db-replica (DR) | Replay WAL from object store | No | No (standby) | Delayed by `archive_timeout` (5 min) |
+| product-db-1 (Primary) | Accept all writes, stream WAL | Yes | Yes (via PgDog) | Committed to local disk + sync replica |
+| product-db-2 (Sync Replica) | Confirm WAL flush before client ACK | No | Yes (read scaling) | WAL flushed to disk before ACK |
+| product-db-3 (Async Replica) | Receive WAL best-effort | No | Yes (read scaling) | Eventually consistent |
+| product-db-replica (DR) | Replay WAL from object store | No | No (standby) | Delayed by `archive_timeout` (5 min) |
 
 ### Kubernetes Services
 
@@ -76,9 +76,9 @@ CloudNativePG creates three services per cluster:
 
 | Service | DNS | Resolves To | Use Case |
 |---------|-----|-------------|----------|
-| `-rw` | `cnpg-db-rw.product.svc` | Current primary | All writes + reads that need latest data |
-| `-r` | `cnpg-db-r.product.svc` | All readable instances | Read scaling (PgDog routes SELECTs here) |
-| `-ro` | `cnpg-db-ro.product.svc` | Replicas only (excludes primary) | Read-only workloads |
+| `-rw` | `product-db-rw.product.svc` | Current primary | All writes + reads that need latest data |
+| `-r` | `product-db-r.product.svc` | All readable instances | Read scaling (PgDog routes SELECTs here) |
+| `-ro` | `product-db-ro.product.svc` | Replicas only (excludes primary) | Read-only workloads |
 
 ### CNPG Instance Manager vs Patroni
 
@@ -101,7 +101,7 @@ WAL archiving bridges HA (streaming replication) and DR (object store recovery).
 
 ```mermaid
 flowchart LR
-  subgraph primary ["Primary (cnpg-db-1)"]
+  subgraph primary ["Primary (product-db-1)"]
     WALWriter["WAL Writer\n(background process)"]
     WALBuffer["WAL Buffers\n(shared memory, 16MB)"]
     WALFile["WAL Segment Files\n(pg_wal/, 64MB each)"]
@@ -113,7 +113,7 @@ flowchart LR
   end
 
   subgraph objstore ["RustFS Object Store"]
-    S3["s3://pg-backups-cnpg/cnpg-db/\nwals/"]
+    S3["s3://pg-backups-cnpg/product-db/\nwals/"]
   end
 
   subgraph drcluster ["DR Replica"]
@@ -169,15 +169,15 @@ Real-time, sub-second lag. WALSender on primary streams to WALReceiver on each r
 
 ```mermaid
 flowchart TB
-  subgraph primary ["cnpg-db Primary Cluster"]
-    P["Primary (cnpg-db-1)\nWALSender x2"]
-    SR["Sync Replica (cnpg-db-2)\nWALReceiver"]
-    AR["Async Replica (cnpg-db-3)\nWALReceiver"]
+  subgraph primary ["product-db Primary Cluster"]
+    P["Primary (product-db-1)\nWALSender x2"]
+    SR["Sync Replica (product-db-2)\nWALReceiver"]
+    AR["Async Replica (product-db-3)\nWALReceiver"]
     P -->|"sync: flush confirmed before client ACK"| SR
     P -->|"async: streamed best-effort"| AR
   end
 
-  subgraph dr ["cnpg-db-replica DR Cluster"]
+  subgraph dr ["product-db-replica DR Cluster"]
     DP["Designated Primary\n(restore_command from object store)"]
   end
 
@@ -202,16 +202,16 @@ postgresql:
 Translates to PostgreSQL parameter:
 
 ```
-synchronous_standby_names = 'ANY 1 (cnpg-db-2, cnpg-db-3)'
+synchronous_standby_names = 'ANY 1 (product-db-2, product-db-3)'
 ```
 
-This means: **any one** replica confirming WAL flush satisfies the sync requirement. If cnpg-db-2 is slow, cnpg-db-3 can satisfy it (and vice versa).
+This means: **any one** replica confirming WAL flush satisfies the sync requirement. If product-db-2 is slow, product-db-3 can satisfy it (and vice versa).
 
 ### Object Store Replication (DR)
 
 The DR replica does **not** use streaming replication. It polls the object store for new WAL segments:
 
-1. Primary archives WAL segment to `s3://pg-backups-cnpg/cnpg-db/wals/`
+1. Primary archives WAL segment to `s3://pg-backups-cnpg/product-db/wals/`
 2. DR replica's `restore_command` (via `barman-cloud-wal-restore`) checks for new segments
 3. When found, downloads and replays the WAL
 4. Lag = time since last `archive_timeout` forced a WAL switch (max 5 min)
@@ -293,8 +293,8 @@ COMMIT;  -- Waits until replica has applied the change
 ### Interaction with synchronous_standby_names
 
 - `synchronous_commit = 'on'` only waits for sync replicas if `synchronous_standby_names` is set
-- With `ANY 1 (cnpg-db-2, cnpg-db-3)`: whichever replica confirms first satisfies the wait
-- Async replica (cnpg-db-3) **can** become sync candidate if cnpg-db-2 is down
+- With `ANY 1 (product-db-2, product-db-3)`: whichever replica confirms first satisfies the wait
+- Async replica (product-db-3) **can** become sync candidate if product-db-2 is down
 
 ---
 
@@ -344,10 +344,10 @@ When CNPG promotes a replica:
 
 ```bash
 # Planned switchover (zero downtime, maintenance)
-kubectl cnpg switchover cnpg-db --force
+kubectl cnpg switchover product-db --force
 
 # Unplanned failover (after primary crash, verify state)
-kubectl cnpg status cnpg-db
+kubectl cnpg status product-db
 ```
 
 ---
@@ -356,26 +356,26 @@ kubectl cnpg status cnpg-db
 
 ### Prerequisites (bootstrap)
 
-- **Object store backup** — DR `bootstrap.recovery` needs a **completed** physical backup of `cnpg-db` in RustFS (`s3://pg-backups-cnpg/cnpg-db/`). On first cluster bring-up, apply `cnpg-db` and wait for scheduled/on-demand backups before the DR replica can finish `full-recovery` (or expect transient job `Error` until a backup exists).
-- **GitOps** — Flux applies `controllers/databases/cnpg-barman-plugin` before `configs/databases`, then `configs/databases-cnpg-dr` (`databases-cnpg-dr-local` `dependsOn: databases-local`) so the Barman Cloud Plugin, `ObjectStore` CRD, primary cluster, and `ScheduledBackup` / `Backup` resources exist before `cnpg-db-replica`.
-- **WAL GUC parity** — Data directory inherits primary `wal_segment_size` (e.g. 64MB). The DR cluster `spec.postgresql.parameters` must include `min_wal_size` (and related WAL settings) consistent with PostgreSQL rules: `min_wal_size >= 2 * wal_segment_size` (see [`cnpg-db-replica/instance.yaml`](../../kubernetes/infra/configs/databases/clusters/cnpg-db-replica/instance.yaml)).
+- **Object store backup** — DR `bootstrap.recovery` needs a **completed** physical backup of `product-db` in RustFS (`s3://pg-backups-cnpg/product-db/`). On first cluster bring-up, apply `product-db` and wait for scheduled/on-demand backups before the DR replica can finish `full-recovery` (or expect transient job `Error` until a backup exists).
+- **GitOps** — Flux applies `controllers/databases/cnpg-barman-plugin` before `configs/databases`, then `configs/databases-cnpg-dr` (`databases-cnpg-dr-local` `dependsOn: databases-local`) so the Barman Cloud Plugin, `ObjectStore` CRD, primary cluster, and `ScheduledBackup` / `Backup` resources exist before `product-db-replica`.
+- **WAL GUC parity** — Data directory inherits primary `wal_segment_size` (e.g. 64MB). The DR cluster `spec.postgresql.parameters` must include `min_wal_size` (and related WAL settings) consistent with PostgreSQL rules: `min_wal_size >= 2 * wal_segment_size` (see [`product-db-replica/instance.yaml`](../../kubernetes/infra/configs/databases/clusters/product-db-replica/instance.yaml)).
 
 ### Architecture
 
-The DR replica cluster (`cnpg-db-replica`) is a single-node cluster that continuously recovers from the primary cluster's WAL archive:
+The DR replica cluster (`product-db-replica`) is a single-node cluster that continuously recovers from the primary cluster's WAL archive:
 
 ```yaml
 spec:
   replica:
     enabled: true
-    source: cnpg-db-primary  # references externalClusters entry
+    source: product-db-primary  # references externalClusters entry
   externalClusters:
-    - name: cnpg-db-primary
+    - name: product-db-primary
       plugin:
         name: barman-cloud.cloudnative-pg.io
         parameters:
-          barmanObjectName: cnpg-db-backup-store
-          serverName: cnpg-db-cluster
+          barmanObjectName: product-db-backup-store
+          serverName: product-db-cluster
 ```
 
 ### Promotion Procedure
@@ -385,7 +385,7 @@ When the entire primary cluster is lost:
 1. **Verify DR cluster health**
 
 ```bash
-kubectl cnpg status cnpg-db-replica -n product
+kubectl cnpg status product-db-replica -n product
 # Ensure: "Continuous recovery in progress"
 ```
 
@@ -403,13 +403,13 @@ spec:
 
 ```yaml
 # In pgdog-cnpg HelmRelease, change hosts:
-host: cnpg-db-replica-rw.product.svc.cluster.local
+host: product-db-replica-rw.product.svc.cluster.local
 ```
 
 5. **Verify data consistency**
 
 ```bash
-kubectl cnpg status cnpg-db-replica -n product
+kubectl cnpg status product-db-replica -n product
 # Should show: Primary, accepting connections
 ```
 
@@ -472,19 +472,19 @@ FROM pg_stat_archiver;
 
 ```bash
 # Cluster status overview
-kubectl cnpg status cnpg-db -n product
+kubectl cnpg status product-db -n product
 
 # Promote DR replica to standalone
-kubectl cnpg promote cnpg-db-replica -n product
+kubectl cnpg promote product-db-replica -n product
 
 # Planned switchover (primary -> replica)
-kubectl cnpg switchover cnpg-db -n product
+kubectl cnpg switchover product-db -n product
 
 # Trigger on-demand backup
-kubectl cnpg backup cnpg-db -n product
+kubectl cnpg backup product-db -n product
 
 # Check backup status
-kubectl cnpg backup list cnpg-db -n product
+kubectl cnpg backup list product-db -n product
 ```
 
 ### PgDog Admin
@@ -510,5 +510,5 @@ RELOAD;            -- Hot-reload config (no restart)
 - [006-backup-strategy.md](./006-backup-strategy.md) -- Backup architecture, retention, restore
 - [010-drp.md](./010-drp.md) -- Production-ready DRP, recovery decision flow, and evidence checklist
 - [008-pooler.md](./008-pooler.md) -- PgDog R/W splitting configuration
-- Cluster manifests: `kubernetes/infra/configs/databases/clusters/cnpg-db/`
-- DR replica: `kubernetes/infra/configs/databases/clusters/cnpg-db-replica/`
+- Cluster manifests: `kubernetes/infra/configs/databases/clusters/product-db/`
+- DR replica: `kubernetes/infra/configs/databases/clusters/product-db-replica/`

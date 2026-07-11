@@ -295,7 +295,7 @@ sequenceDiagram
     K8s-->>BAO: TokenReview response\n{authenticated: true, serviceaccount: "external-secrets"}
     BAO->>BAO: Verify bound_service_account_names\nVerify bound_service_account_namespaces
     BAO-->>ESO: Vault token\n{policies: ["eso-read"], ttl: "1h"}
-    ESO->>BAO: GET /v1/secret/data/local/databases/cnpg-db/product\nAuthorization: Bearer <token>
+    ESO->>BAO: GET /v1/secret/data/local/databases/product-db/product\nAuthorization: Bearer <token>
     BAO-->>ESO: Secret data
     ESO->>K8s: Create/Update K8s Secret
 ```
@@ -351,10 +351,10 @@ secret/{environment}/{category}/{service}/{resource}
 
 | Path | Keys | Consumer |
 |------|------|---------|
-| `secret/local/databases/cnpg-db/product` | `username`, `password` | CNPG bootstrap owner |
-| `secret/local/databases/cnpg-db/cart` | `username`, `password` | CNPG cart owner |
-| `secret/local/databases/cnpg-db/order` | `username`, `password` | CNPG order owner |
-| `secret/local/databases/cnpg-db/payment` | `username`, `password` | CNPG payment owner (consumed in `product` + `payment` ns) |
+| `secret/local/databases/product-db/product` | `username`, `password` | CNPG bootstrap owner |
+| `secret/local/databases/product-db/cart` | `username`, `password` | CNPG cart owner |
+| `secret/local/databases/product-db/order` | `username`, `password` | CNPG order owner |
+| `secret/local/databases/product-db/payment` | `username`, `password` | CNPG payment owner (consumed in `product` + `payment` ns) |
 | `secret/local/databases/pgdog-cnpg/credentials` | `username`, `password` | PgDog pooler admin |
 | `secret/local/services/payment/webhook-hmac` | `secret` | payment ↔ mockpay webhook HMAC (shared signing key) |
 | `secret/local/infra/rustfs/backup-cnpg` | `access_key_id`, `secret_access_key` | Barman S3 (all CloudNativePG clusters — bucket `pg-backups-cnpg`) |
@@ -380,7 +380,7 @@ sequenceDiagram
     autonumber
     participant ESO as External Secrets Operator
     participant BAO as OpenBAO (Database Engine)
-    participant PG as PostgreSQL (cnpg-db)
+    participant PG as PostgreSQL (product-db)
     participant App as Application Pod
 
     note over ESO,App: Every 1h refresh (before the lease expires)
@@ -389,7 +389,7 @@ sequenceDiagram
     BAO->>PG: CREATE ROLE "v-k8s-product-app-rw-1711584000"\nWITH LOGIN PASSWORD 'Xk9mN3pQ...'\nVALID UNTIL '2026-03-27T15:00:00Z'
     BAO->>BAO: Record lease_id (TTL: 1h)\nSchedule revocation at expiry
     BAO-->>ESO: {username: "...", password: "...", lease_id: "...", ttl: "1h"}
-    ESO->>K8s: Update K8s Secret cnpg-db-product-creds
+    ESO->>K8s: Update K8s Secret product-db-product-creds
     App->>K8s: Mount secret (env/volume)
     App->>PG: Connect with new credentials
 
@@ -402,9 +402,9 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    subgraph cnpg_setup["cnpg-db Connection Setup (one-time)"]
+    subgraph cnpg_setup["product-db Connection Setup (one-time)"]
         vault_admin["vault_admin user\n(created in PG with CREATEROLE)\nstored as static role\nin OpenBAO"]
-        db_engine["OpenBAO Database Engine\ndatabase/config/cnpg-db\nconnection_url: postgres://...\nallowed_roles: *-app-rw, *-readonly"]
+        db_engine["OpenBAO Database Engine\ndatabase/config/product-db\nconnection_url: postgres://...\nallowed_roles: *-app-rw, *-readonly"]
         vault_admin --> db_engine
     end
 
@@ -537,7 +537,7 @@ erDiagram
     POSTGRESQL_CLUSTER ||--o{ MONITOR_USER : "1 per exporter"
 ```
 
-### 6.3 CloudNativePG (cnpg-db) — Credential Flow
+### 6.3 CloudNativePG (product-db) — Credential Flow
 
 ```mermaid
 sequenceDiagram
@@ -550,10 +550,10 @@ sequenceDiagram
 
     note over Flux,PG: Bootstrap Phase (cluster creation)
 
-    Flux->>ESO: Apply ExternalSecret cnpg-db-secret\n(namespace: product)
-    ESO->>BAO: Read secret/local/databases/cnpg-db/product\n{username: product_owner, password: <strong>}
-    ESO->>K8s: Create K8s Secret cnpg-db-secret
-    Flux->>CNPG: Apply Cluster cnpg-db\nbootstrap.initdb.secret: cnpg-db-secret
+    Flux->>ESO: Apply ExternalSecret product-db-secret\n(namespace: product)
+    ESO->>BAO: Read secret/local/databases/product-db/product\n{username: product_owner, password: <strong>}
+    ESO->>K8s: Create K8s Secret product-db-secret
+    Flux->>CNPG: Apply Cluster product-db\nbootstrap.initdb.secret: product-db-secret
     CNPG->>PG: CREATE DATABASE product OWNER product_owner
     CNPG->>PG: CREATE DATABASE cart OWNER cart_owner  (via managed.roles)
     CNPG->>PG: CREATE DATABASE "order" OWNER order_owner (via managed.roles)
@@ -563,7 +563,7 @@ sequenceDiagram
     ESO->>BAO: GET /v1/database/creds/product-app-rw
     BAO->>PG: CREATE ROLE "v-k8s-product-app-rw-{ts}" ...
     BAO-->>ESO: {username, password, lease_id, ttl: 1h}
-    ESO->>K8s: Update Secret cnpg-db-product-app-creds
+    ESO->>K8s: Update Secret product-db-product-app-creds
 
     note over Flux,PG: Rotation (every 1h refresh)
 
@@ -647,7 +647,7 @@ spec:
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
-  name: cnpg-db-secret
+  name: product-db-secret
   namespace: product
 spec:
   refreshInterval: 1h
@@ -655,7 +655,7 @@ spec:
     name: openbao
     kind: ClusterSecretStore
   target:
-    name: cnpg-db-secret
+    name: product-db-secret
     creationPolicy: Owner
     deletionPolicy: Retain
     template:
@@ -666,11 +666,11 @@ spec:
   data:
     - secretKey: username
       remoteRef:
-        key: secret/data/local/databases/cnpg-db/product
+        key: secret/data/local/databases/product-db/product
         property: username
     - secretKey: password
       remoteRef:
-        key: secret/data/local/databases/cnpg-db/product
+        key: secret/data/local/databases/product-db/product
         property: password
 ```
 
@@ -867,7 +867,7 @@ rule "charset" {
 Apply to a database role:
 ```bash
 bao write database/roles/product-app-rw \
-  db_name=cnpg-db \
+  db_name=product-db \
   password_policy="db-strong" \
   creation_statements="..." \
   default_ttl="1h" \
@@ -979,7 +979,7 @@ bao lease revoke database/creds/product-app-rw/abc123xyz
 bao lease revoke -prefix database/creds/product-app-rw/
 
 # Verify the PostgreSQL user was dropped
-kubectl exec -n product cnpg-db-1 -- \
+kubectl exec -n product product-db-1 -- \
   psql -U postgres -c "\du" | grep "v-k8s-product"
 ```
 
@@ -1002,13 +1002,13 @@ bao write auth/kubernetes/role/newservice \
 
 # 3. Configure DB role in OpenBAO database engine
 bao write database/roles/newservice-app-rw \
-  db_name=cnpg-db \
+  db_name=product-db \
   creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; ..." \
   password_policy=db-strong \
   default_ttl=1h \
   max_ttl=24h
 
-# 4. Create ExternalSecret manifest in kubernetes/infra/configs/databases/clusters/cnpg-db/secrets/
+# 4. Create ExternalSecret manifest in kubernetes/infra/configs/databases/clusters/product-db/secrets/
 ```
 
 ### 12.7 Check Status
@@ -1028,7 +1028,7 @@ kubectl get externalsecret -A
 kubectl get clustersecretstore openbao
 
 # Specific ExternalSecret state
-kubectl describe externalsecret cnpg-db-secret -n product
+kubectl describe externalsecret product-db-secret -n product
 ```
 
 ---
@@ -1105,10 +1105,10 @@ curl -s http://openbao.openbao.svc.cluster.local:8200/v1/auth/kubernetes/login \
 
 ```bash
 # Check database engine status
-bao read database/config/cnpg-db
+bao read database/config/product-db
 
 # Test connection manually
-bao write -f database/rotate-root/cnpg-db  # Tests connectivity (rotates root creds)
+bao write -f database/rotate-root/product-db  # Tests connectivity (rotates root creds)
 
 # Check database role definition
 bao read database/roles/product-app-rw
@@ -1188,10 +1188,10 @@ Microservice `product-service` never stores a database password. Each pod gets f
 ```mermaid
 flowchart LR
     pod["product-service Pod"]
-    secret["K8s Secret\ncnpg-db-product-app-creds\n{username: v-k8s-product-...\npassword: Xk9m...}"]
+    secret["K8s Secret\nproduct-db-product-app-creds\n{username: v-k8s-product-...\npassword: Xk9m...}"]
     eso2["ESO (refreshes every 1h)"]
     bao2["OpenBAO\ndatabase/creds/product-app-rw"]
-    pg2["PostgreSQL\ncnpg-db"]
+    pg2["PostgreSQL\nproduct-db"]
 
     pod -->|"envFrom / volumeMount"| secret
     eso2 -->|"creates/updates"| secret
@@ -1206,7 +1206,7 @@ For static owner users required by golang-migrate migrations — scheduled autom
 ```bash
 # Create static role with automatic rotation
 bao write database/static-roles/product-owner \
-  db_name=cnpg-db \
+  db_name=product-db \
   username=product_owner \
   rotation_statements=["ALTER USER \"{{name}}\" WITH PASSWORD '{{password}}';"] \
   rotation_period=2160h   # 90 days
@@ -1227,7 +1227,7 @@ bao read database/creds/cart-app-rw
 bao read database/creds/order-readonly
 
 # Connect directly
-psql -h cnpg-db-rw.product.svc.cluster.local \
+psql -h product-db-rw.product.svc.cluster.local \
      -U $(bao read -field=username database/creds/product-app-rw) \
      -d product
 ```

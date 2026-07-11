@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0015 — checkout service** (provisional): checkout session state machine
+  with price/stock re-validation against product, durably idempotent confirm
+  handed to order over a new `order.v1/CreateOrder` gRPC (order stays the
+  saga-starter), `AbandonedCheckoutWorkflow` durable-timer expiry, shipping
+  `GetQuote` + tax + promo totals; RFC-0016 named for async payment
+  Signal + order cancellation.
 - **Chart-native metrics scraping for cert-manager and the Kong gateway proxy**:
   cert-manager now emits its own `ServiceMonitor` via
   `prometheus.servicemonitor.enabled` (controller/webhook/cainjector on `:9402`);

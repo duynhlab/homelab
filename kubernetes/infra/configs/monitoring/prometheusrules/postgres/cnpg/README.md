@@ -10,11 +10,11 @@ Pinned chart: **`cluster` Helm chart `0.6.0`** (`helm repo add cnpg https://clou
 helm template x cnpg/cluster --version 0.6.0 -n product \
   --set cluster.monitoring.enabled=true \
   --set cluster.instances=3 \
-  --set fullnameOverride=cnpg-db \
+  --set fullnameOverride=product-db \
   | yq eval 'select(.kind == "PrometheusRule")' -
 ```
 
-`fullnameOverride=cnpg-db` must match the CloudNativePG `Cluster` name [`cnpg-db`](../../../../databases/clusters/cnpg-db/instance.yaml) so `pod=~"cnpg-db-([1-9][0-9]*)$"` is correct.
+`fullnameOverride=product-db` must match the CloudNativePG `Cluster` name [`product-db`](../../../../databases/clusters/product-db/instance.yaml) so `pod=~"product-db-([1-9][0-9]*)$"` is correct.
 
 ## File ↔ upstream map
 

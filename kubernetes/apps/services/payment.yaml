@@ -13,7 +13,7 @@ spec:
     image_tag: "1.1.0" # {"$imagepolicy": "flux-system:payment:tag"}
     namespace: payment
     # No platform_backup_label: that label routes CNPG/barman S3 credentials to
-    # namespaces hosting a database cluster — payment's data lives on cnpg-db
+    # namespaces hosting a database cluster — payment's data lives on product-db
     # in the product namespace, which is already backed up.
     # Single replica, deliberately: the outbox relay has no SKIP LOCKED fence
     # (single-writer assumption), the reconciliation ticker + its API
@@ -25,10 +25,10 @@ spec:
     # CNPG directly over TLS (sslmode=require; CNPG serves its own certs).
     # PgDog already carries payment backend entries — move payment behind the
     # pooler when PgDog TLS lands.
-    db_host: "cnpg-db-rw.product.svc.cluster.local"
+    db_host: "product-db-rw.product.svc.cluster.local"
     db_port: "5432"
-    db_migration_host: "cnpg-db-rw.product.svc.cluster.local"
-    db_secret: "cnpg-db-payment-secret"
+    db_migration_host: "product-db-rw.product.svc.cluster.local"
+    db_secret: "product-db-payment-secret"
     db_sslmode: "require"
     pool_max: "25"
     # Internal gRPC server (:9090) — the order saga's money transport. The mop

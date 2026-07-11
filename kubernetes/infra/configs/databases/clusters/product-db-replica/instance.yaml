@@ -1,10 +1,10 @@
 # DR Replica Cluster (CloudNativePG)
-# Single-node designated primary that continuously recovers from cnpg-db WAL archive
+# Single-node designated primary that continuously recovers from product-db WAL archive
 # Promotable to standalone primary for disaster recovery
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cnpg-db-replica
+  name: product-db-replica
   namespace: product
 spec:
   instances: 1
@@ -14,10 +14,10 @@ spec:
     - name: barman-cloud.cloudnative-pg.io
       isWALArchiver: true
       parameters:
-        barmanObjectName: cnpg-db-replica-backup-store
-        serverName: cnpg-db-replica-cluster
+        barmanObjectName: product-db-replica-backup-store
+        serverName: product-db-replica-cluster
 
-  # Must match or exceed cnpg-db primary for recovery-critical GUCs.
+  # Must match or exceed product-db primary for recovery-critical GUCs.
   # PostgreSQL refuses recovery when replica values < primary pg_controldata.
   postgresql:
     parameters:
@@ -32,19 +32,19 @@ spec:
 
   bootstrap:
     recovery:
-      source: cnpg-db-primary
+      source: product-db-primary
 
   replica:
     enabled: true
-    source: cnpg-db-primary
+    source: product-db-primary
 
   externalClusters:
-    - name: cnpg-db-primary
+    - name: product-db-primary
       plugin:
         name: barman-cloud.cloudnative-pg.io
         parameters:
-          barmanObjectName: cnpg-db-backup-store
-          serverName: cnpg-db-cluster
+          barmanObjectName: product-db-backup-store
+          serverName: product-db-cluster
 
   storage:
     size: 10Gi

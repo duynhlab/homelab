@@ -27,5 +27,5 @@ spec:
   healthChecks:
     - apiVersion: postgresql.cnpg.io/v1
       kind: Cluster
-      name: cnpg-db-replica
+      name: product-db-replica
       namespace: product

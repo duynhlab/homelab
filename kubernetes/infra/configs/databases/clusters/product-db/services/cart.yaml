@@ -1,7 +1,7 @@
 # cart — per-service database triplet (RFC-0012, ADR-013).
 #
-# ExternalSecret for cnpg-db cart database credentials — product namespace.
-# OpenBAO path: secret/data/local/databases/cnpg-db/cart
+# ExternalSecret for product-db cart database credentials — product namespace.
+# OpenBAO path: secret/data/local/databases/product-db/cart
 #
 # Rendered as kubernetes.io/basic-auth (the pre-triplet copy was Opaque):
 # this secret doubles as the passwordSecret for the DatabaseRole below, and
@@ -11,10 +11,10 @@
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
-  name: cnpg-db-cart-secret
+  name: product-db-cart-secret
   namespace: product
   labels:
-    app.kubernetes.io/name: cnpg-db-cart-secret
+    app.kubernetes.io/name: product-db-cart-secret
     app.kubernetes.io/component: database
     app.kubernetes.io/managed-by: external-secrets
 spec:
@@ -23,14 +23,14 @@ spec:
     name: openbao
     kind: ClusterSecretStore
   target:
-    name: cnpg-db-cart-secret
+    name: product-db-cart-secret
     creationPolicy: Owner
     deletionPolicy: Retain
     template:
       type: kubernetes.io/basic-auth
       metadata:
         labels:
-          app.kubernetes.io/name: cnpg-db-cart-secret
+          app.kubernetes.io/name: product-db-cart-secret
           app.kubernetes.io/component: database
           app.kubernetes.io/managed-by: external-secrets
           cnpg.io/reload: "true"
@@ -40,22 +40,22 @@ spec:
   data:
     - secretKey: username
       remoteRef:
-        key: secret/data/local/databases/cnpg-db/cart
+        key: secret/data/local/databases/product-db/cart
         property: username
     - secretKey: password
       remoteRef:
-        key: secret/data/local/databases/cnpg-db/cart
+        key: secret/data/local/databases/product-db/cart
         property: password
 ---
 # Written out IN FULL — adoption resets omitted attributes (see payment.yaml).
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole
 metadata:
-  name: cnpg-db-role-cart
+  name: product-db-role-cart
   namespace: product
 spec:
   cluster:
-    name: cnpg-db
+    name: product-db
   name: cart
   comment: "cart-service application role (RFC-0012)"
   login: true
@@ -68,7 +68,7 @@ spec:
   connectionLimit: -1
   inRoles: []
   passwordSecret:
-    name: cnpg-db-cart-secret
+    name: product-db-cart-secret
   databaseRoleReclaimPolicy: retain
 ---
 # Cart Database extensions (moved from extensions.yaml).
@@ -81,7 +81,7 @@ spec:
   name: cart
   owner: cart
   cluster:
-    name: cnpg-db
+    name: product-db
   extensions:
     - name: pgaudit
     - name: pg_stat_statements

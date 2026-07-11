@@ -5,11 +5,11 @@
 # The bootstrap.initdb database/owner/secret are structural placeholders on
 # a fresh cluster — the product triplet adopts them declaratively.
 # HA: 3 instances (1 primary, 1 sync replica, 1 async replica)
-# DR: WAL archived to RustFS for cnpg-db-replica continuous recovery
+# DR: WAL archived to RustFS for product-db-replica continuous recovery
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cnpg-db
+  name: product-db
   namespace: product
 spec:
   instances: 3
@@ -19,8 +19,8 @@ spec:
     - name: barman-cloud.cloudnative-pg.io
       isWALArchiver: true
       parameters:
-        barmanObjectName: cnpg-db-backup-store
-        serverName: cnpg-db-cluster
+        barmanObjectName: product-db-backup-store
+        serverName: product-db-cluster
 
   replicationSlots:
     highAvailability:
@@ -136,7 +136,7 @@ spec:
 
   monitoring:
     customQueriesConfigMap:
-      - name: cnpg-db-monitoring-queries
+      - name: product-db-monitoring-queries
         key: custom-queries
 
   bootstrap:
@@ -144,7 +144,7 @@ spec:
       database: product
       owner: product
       secret:
-        name: cnpg-db-secret
+        name: product-db-secret
       dataChecksums: true
       walSegmentSize: 64
       encoding: "UTF8"

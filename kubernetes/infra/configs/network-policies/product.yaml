@@ -28,7 +28,7 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
-    # CloudNativePG operator → cnpg-db instance manager (status/health probes that
+    # CloudNativePG operator → product-db instance manager (status/health probes that
     # drive Cluster readiness — without this databases-local times out) + SQL mgmt. (Bug 13)
     - from:
         - namespaceSelector:
@@ -62,7 +62,7 @@ spec:
         - protocol: TCP
           port: 8000
     # App services in sibling namespaces (cart, order, payment) → PgDog pooler
-    # (6432) for runtime + cnpg-db-rw for migration initContainers (5432).
+    # (6432) for runtime + product-db-rw for migration initContainers (5432).
     # Without this the migration initContainer stalls in Init → apps-local
     # times out. (Bug 13) Payment uses 5432 for runtime too (direct TLS
     # connection — its config refuses cleartext and PgDog has no TLS yet).

@@ -98,7 +98,7 @@ spec:
       # DB — the worker's ConfirmOrder/FailOrder activities update the order row
       # (same pooler as the order API).
       - name: DB_HOST
-        value: pgdog-cnpg.product.svc.cluster.local
+        value: pgdog-product.product.svc.cluster.local
       - name: DB_PORT
         value: "6432"
       - name: DB_NAME
@@ -108,7 +108,7 @@ spec:
       - name: DB_PASSWORD
         valueFrom:
           secretKeyRef:
-            name: cnpg-db-order-secret
+            name: product-db-order-secret
             key: password
       - name: DB_SSLMODE
         value: disable

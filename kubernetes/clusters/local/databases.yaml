@@ -43,7 +43,7 @@ spec:
       namespace: user
     - apiVersion: postgresql.cnpg.io/v1
       kind: Cluster
-      name: cnpg-db
+      name: product-db
       namespace: product
     - apiVersion: postgresql.cnpg.io/v1
       kind: Cluster

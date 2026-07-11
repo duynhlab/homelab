@@ -1,4 +1,4 @@
-# Example: Restore cnpg-db from RustFS backup to new cluster
+# Example: Restore product-db from RustFS backup to new cluster
 # Use for DR drill or PITR. Apply manually - NOT part of default kustomization.
 #
 # Prerequisites:
@@ -17,7 +17,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cnpg-db-restore
+  name: product-db-restore
   namespace: product
   annotations:
     cnpg.io/skipEmptyWalArchiveCheck: "enabled"
@@ -26,18 +26,18 @@ spec:
   imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
   bootstrap:
     recovery:
-      source: cnpg-db-backup
+      source: product-db-backup
       database: product
       owner: product
       secret:
-        name: cnpg-db-secret
+        name: product-db-secret
   externalClusters:
-    - name: cnpg-db-backup
+    - name: product-db-backup
       plugin:
         name: barman-cloud.cloudnative-pg.io
         parameters:
-          barmanObjectName: cnpg-db-backup-store
-          serverName: cnpg-db-cluster
+          barmanObjectName: product-db-backup-store
+          serverName: product-db-cluster
   storage:
     size: 10Gi
     storageClass: standard

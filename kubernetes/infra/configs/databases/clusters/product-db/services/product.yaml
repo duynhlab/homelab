@@ -6,19 +6,19 @@
 # initdb-created role and database declaratively, so a from-scratch build
 # and a backup restore converge to the same state. The DatabaseRole and
 # bootstrap.initdb.secret MUST keep pointing at the SAME Secret
-# (cnpg-db-secret) — two sources for one password would fight.
+# (product-db-secret) — two sources for one password would fight.
 #
-# ExternalSecret for cnpg-db bootstrap credentials (product DB owner).
-# OpenBAO path: secret/data/local/databases/cnpg-db/product
+# ExternalSecret for product-db bootstrap credentials (product DB owner).
+# OpenBAO path: secret/data/local/databases/product-db/product
 # basic-auth: required by CNPG bootstrap/app secrets and the DatabaseRole;
 # also feeds the PgDog valuesFrom (users[0]).
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
-  name: cnpg-db-secret
+  name: product-db-secret
   namespace: product
   labels:
-    app.kubernetes.io/name: cnpg-db-secret
+    app.kubernetes.io/name: product-db-secret
     app.kubernetes.io/component: database
     app.kubernetes.io/managed-by: external-secrets
 spec:
@@ -27,14 +27,14 @@ spec:
     name: openbao
     kind: ClusterSecretStore
   target:
-    name: cnpg-db-secret
+    name: product-db-secret
     creationPolicy: Owner
     deletionPolicy: Retain
     template:
       type: kubernetes.io/basic-auth
       metadata:
         labels:
-          app.kubernetes.io/name: cnpg-db-secret
+          app.kubernetes.io/name: product-db-secret
           app.kubernetes.io/component: database
           app.kubernetes.io/managed-by: external-secrets
           cnpg.io/reload: "true"
@@ -44,11 +44,11 @@ spec:
   data:
     - secretKey: username
       remoteRef:
-        key: secret/data/local/databases/cnpg-db/product
+        key: secret/data/local/databases/product-db/product
         property: username
     - secretKey: password
       remoteRef:
-        key: secret/data/local/databases/cnpg-db/product
+        key: secret/data/local/databases/product-db/product
         property: password
 ---
 # Written out IN FULL — adoption resets omitted attributes (see payment.yaml).
@@ -57,11 +57,11 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole
 metadata:
-  name: cnpg-db-role-product
+  name: product-db-role-product
   namespace: product
 spec:
   cluster:
-    name: cnpg-db
+    name: product-db
   name: product
   comment: "product-service application role (RFC-0012)"
   login: true
@@ -74,7 +74,7 @@ spec:
   connectionLimit: -1
   inRoles: []
   passwordSecret:
-    name: cnpg-db-secret
+    name: product-db-secret
   databaseRoleReclaimPolicy: retain
 ---
 # Product Database extensions (moved from extensions.yaml).
@@ -87,7 +87,7 @@ spec:
   name: product
   owner: product
   cluster:
-    name: cnpg-db
+    name: product-db
   extensions:
     - name: pgaudit
     - name: pg_stat_statements

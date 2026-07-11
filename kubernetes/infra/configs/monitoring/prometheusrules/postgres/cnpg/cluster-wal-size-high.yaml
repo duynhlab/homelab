@@ -3,14 +3,14 @@
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
-  name: cnpg-db-cluster-wal-size-high
+  name: product-db-cluster-wal-size-high
   namespace: product
   labels:
     app.kubernetes.io/part-of: cnpg-chart-rules
-    cnpg.io/cluster: cnpg-db
+    cnpg.io/cluster: product-db
 spec:
   groups:
-    - name: cloudnative-pg/cnpg-db-wal
+    - name: cloudnative-pg/product-db-wal
       interval: 5m
       rules:
         - alert: PostgresWALSizeHigh

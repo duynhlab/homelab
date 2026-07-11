@@ -1,19 +1,19 @@
-# Generated from cnpg/cluster chart v0.6.0 (helm template) with fullnameOverride=cnpg-db, namespace=product.
+# Generated from cnpg/cluster chart v0.6.0 (helm template) with fullnameOverride=product-db, namespace=product.
 # Do not edit expr by hand; re-render from chart and split, or bump chart version in README.
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
-  name: cnpg-db-cluster-ha-warning
+  name: product-db-cluster-ha-warning
   namespace: product
   labels:
     app.kubernetes.io/part-of: cnpg-chart-rules
-    cnpg.io/cluster: cnpg-db
+    cnpg.io/cluster: product-db
     platform.duynhlab.dev/source: cloudnative-pg-charts-cluster
     platform.duynhlab.dev/chart-version: 0.6.0
 spec:
   groups:
-  - name: cloudnative-pg/cnpg-db
+  - name: cloudnative-pg/product-db
     rules:
     - alert: CNPGClusterHAWarning
       annotations:
@@ -39,4 +39,4 @@ spec:
       labels:
         severity: warning
         namespace: product
-        cnpg_cluster: cnpg-db
+        cnpg_cluster: product-db

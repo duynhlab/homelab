@@ -1,7 +1,7 @@
 # order — per-service database triplet (RFC-0012, ADR-013).
 #
-# ExternalSecret for cnpg-db order database credentials — product namespace.
-# OpenBAO path: secret/data/local/databases/cnpg-db/order
+# ExternalSecret for product-db order database credentials — product namespace.
+# OpenBAO path: secret/data/local/databases/product-db/order
 #
 # Rendered as kubernetes.io/basic-auth (the pre-triplet copy was Opaque):
 # this secret doubles as the passwordSecret for the DatabaseRole below, and
@@ -11,10 +11,10 @@
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
-  name: cnpg-db-order-secret
+  name: product-db-order-secret
   namespace: product
   labels:
-    app.kubernetes.io/name: cnpg-db-order-secret
+    app.kubernetes.io/name: product-db-order-secret
     app.kubernetes.io/component: database
     app.kubernetes.io/managed-by: external-secrets
 spec:
@@ -23,14 +23,14 @@ spec:
     name: openbao
     kind: ClusterSecretStore
   target:
-    name: cnpg-db-order-secret
+    name: product-db-order-secret
     creationPolicy: Owner
     deletionPolicy: Retain
     template:
       type: kubernetes.io/basic-auth
       metadata:
         labels:
-          app.kubernetes.io/name: cnpg-db-order-secret
+          app.kubernetes.io/name: product-db-order-secret
           app.kubernetes.io/component: database
           app.kubernetes.io/managed-by: external-secrets
           cnpg.io/reload: "true"
@@ -40,11 +40,11 @@ spec:
   data:
     - secretKey: username
       remoteRef:
-        key: secret/data/local/databases/cnpg-db/order
+        key: secret/data/local/databases/product-db/order
         property: username
     - secretKey: password
       remoteRef:
-        key: secret/data/local/databases/cnpg-db/order
+        key: secret/data/local/databases/product-db/order
         property: password
 ---
 # Written out IN FULL — adoption resets omitted attributes (see payment.yaml).
@@ -52,11 +52,11 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole
 metadata:
-  name: cnpg-db-role-order
+  name: product-db-role-order
   namespace: product
 spec:
   cluster:
-    name: cnpg-db
+    name: product-db
   name: order
   comment: "order-service application role (RFC-0012)"
   login: true
@@ -69,7 +69,7 @@ spec:
   connectionLimit: -1
   inRoles: []
   passwordSecret:
-    name: cnpg-db-order-secret
+    name: product-db-order-secret
   databaseRoleReclaimPolicy: retain
 ---
 # Order Database extensions (moved from extensions.yaml).
@@ -82,7 +82,7 @@ spec:
   name: order
   owner: order
   cluster:
-    name: cnpg-db
+    name: product-db
   extensions:
     - name: pgaudit
     - name: pg_stat_statements

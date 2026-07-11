@@ -1,24 +1,24 @@
-# Generated from cnpg/cluster chart v0.6.0 (helm template) with fullnameOverride=cnpg-db, namespace=product.
+# Generated from cnpg/cluster chart v0.6.0 (helm template) with fullnameOverride=product-db, namespace=product.
 # Do not edit expr by hand; re-render from chart and split, or bump chart version in README.
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
-  name: cnpg-db-cluster-logical-replication-errors-critical
+  name: product-db-cluster-logical-replication-errors-critical
   namespace: product
   labels:
     app.kubernetes.io/part-of: cnpg-chart-rules
-    cnpg.io/cluster: cnpg-db
+    cnpg.io/cluster: product-db
     platform.duynhlab.dev/source: cloudnative-pg-charts-cluster
     platform.duynhlab.dev/chart-version: 0.6.0
 spec:
   groups:
-  - name: cloudnative-pg/cnpg-db
+  - name: cloudnative-pg/product-db
     rules:
     - alert: CNPGClusterLogicalReplicationErrorsCritical
       annotations:
         summary: CNPG Cluster critical logical replication errors
-        description: 'CloudNativePG Cluster''s "product/cnpg-db" "{{ .subname }}" subscription has experienced {{ $value }} errors in the last 5 minutes.
+        description: 'CloudNativePG Cluster''s "product/product-db" "{{ .subname }}" subscription has experienced {{ $value }} errors in the last 5 minutes.
 
 
           CRITICAL: High error rate indicates persistent replication issues requiring immediate attention. This could lead to significant data inconsistency or complete replication failure. Errors include both apply errors and sync errors. The subscription may stop working if errors continue.'
@@ -28,4 +28,4 @@ spec:
       labels:
         severity: critical
         namespace: product
-        cnpg_cluster: cnpg-db
+        cnpg_cluster: product-db

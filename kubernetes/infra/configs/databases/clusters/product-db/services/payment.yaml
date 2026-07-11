@@ -6,8 +6,8 @@
 # between the two, but role-first makes the happy path deterministic
 # (a Database whose owner does not exist yet fails and retries).
 #
-# ExternalSecret for cnpg-db payment database credentials — product namespace.
-# OpenBAO path: secret/data/local/databases/cnpg-db/payment
+# ExternalSecret for product-db payment database credentials — product namespace.
+# OpenBAO path: secret/data/local/databases/product-db/payment
 #
 # Rendered as kubernetes.io/basic-auth (not Opaque like the older cart/order
 # copies): this secret doubles as the passwordSecret for the DatabaseRole
@@ -16,10 +16,10 @@
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
-  name: cnpg-db-payment-secret
+  name: product-db-payment-secret
   namespace: product
   labels:
-    app.kubernetes.io/name: cnpg-db-payment-secret
+    app.kubernetes.io/name: product-db-payment-secret
     app.kubernetes.io/component: database
     app.kubernetes.io/managed-by: external-secrets
 spec:
@@ -28,14 +28,14 @@ spec:
     name: openbao
     kind: ClusterSecretStore
   target:
-    name: cnpg-db-payment-secret
+    name: product-db-payment-secret
     creationPolicy: Owner
     deletionPolicy: Retain
     template:
       type: kubernetes.io/basic-auth
       metadata:
         labels:
-          app.kubernetes.io/name: cnpg-db-payment-secret
+          app.kubernetes.io/name: product-db-payment-secret
           app.kubernetes.io/component: database
           app.kubernetes.io/managed-by: external-secrets
           cnpg.io/reload: "true"
@@ -45,11 +45,11 @@ spec:
   data:
     - secretKey: username
       remoteRef:
-        key: secret/data/local/databases/cnpg-db/payment
+        key: secret/data/local/databases/product-db/payment
         property: username
     - secretKey: password
       remoteRef:
-        key: secret/data/local/databases/cnpg-db/payment
+        key: secret/data/local/databases/product-db/payment
         property: password
 ---
 # The service's PostgreSQL identity. Written out IN FULL: creating a
@@ -61,11 +61,11 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole
 metadata:
-  name: cnpg-db-role-payment
+  name: product-db-role-payment
   namespace: product
 spec:
   cluster:
-    name: cnpg-db
+    name: product-db
   name: payment
   comment: "payment-service application role (RFC-0012)"
   login: true
@@ -78,7 +78,7 @@ spec:
   connectionLimit: -1
   inRoles: []
   passwordSecret:
-    name: cnpg-db-payment-secret
+    name: product-db-payment-secret
   # retain: deleting this CR must never DROP a production role.
   databaseRoleReclaimPolicy: retain
 ---
@@ -93,7 +93,7 @@ spec:
   name: payment
   owner: payment
   cluster:
-    name: cnpg-db
+    name: product-db
   extensions:
     - name: pgaudit
     - name: pg_stat_statements

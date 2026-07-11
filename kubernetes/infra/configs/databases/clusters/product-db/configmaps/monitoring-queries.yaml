@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: cnpg-db-monitoring-queries
+  name: product-db-monitoring-queries
   namespace: product
   labels:
     cnpg.io/reload: ""

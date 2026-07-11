@@ -1,5 +1,7 @@
 # NOTE: kindnet DOES enforce NetworkPolicy on Kind K8s 1.34+ (verified round 7) —
 # these rules are LIVE. Any ingress not explicitly allowed below is dropped.
+# auth namespace hosts: the auth service (HTTP :8080 incl. the JWKS endpoint),
+# the CNPG auth-db cluster (3-node HA), and the pgdog-auth pooler.
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -60,21 +62,19 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
-    # Zalando Postgres operator (postgres-operator ns) → auth-db: Patroni REST (8008)
-    # + SQL role/db init (5432). Without this the operator can't finish the DB →
-    # databases-local times out. (Bug 13)
+    # CloudNativePG operator → auth-db instance manager (status/health probes that
+    # drive Cluster readiness — without this databases-local times out) + SQL mgmt.
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: postgres-operator
+              kubernetes.io/metadata.name: cloudnative-pg
       ports:
         - protocol: TCP
-          port: 8008
+          port: 8000
         - protocol: TCP
           port: 5432
-    # Metrics scrape (VMAgent, monitoring ns) → postgres-exporter sidecar (9187)
-    # + the standalone pgbouncer-exporter Deployment (9127). Without 9127 the
-    # pgbouncer scrape times out → 0 pgbouncer_* series (debugs §I/§N #6).
+    # Metrics scrape (VMAgent, monitoring ns) → cnpg postgres_exporter (9187)
+    # + pgdog-auth pooler openmetrics (9090).
     - from:
         - namespaceSelector:
             matchLabels:
@@ -83,12 +83,15 @@ spec:
         - protocol: TCP
           port: 9187
         - protocol: TCP
-          port: 9127
-    # Intra-namespace: Patroni peer coordination + PgBouncer → Postgres.
+          port: 9090
+    # Intra-namespace: CNPG HA replica WAL streaming (5432) + auth-service/migration
+    # → PgDog (6432) + PgDog → Postgres (5432) + operator status probe (8000).
     - from:
         - podSelector: {}
       ports:
         - protocol: TCP
-          port: 8008
-        - protocol: TCP
           port: 5432
+        - protocol: TCP
+          port: 6432
+        - protocol: TCP
+          port: 8000

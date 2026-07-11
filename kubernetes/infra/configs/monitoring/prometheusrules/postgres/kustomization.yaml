@@ -27,8 +27,3 @@ resources:
   - cnpg/cluster-low_disk_space-critical.yaml
   - cnpg/cluster-low_disk_space-warning.yaml
   - cnpg/operator-health.yaml
-  - zalando/availability.yaml
-  - zalando/maintenance.yaml
-  - zalando/operator.yaml
-  - zalando/performance.yaml
-  - zalando/storage.yaml

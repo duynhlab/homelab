@@ -98,10 +98,10 @@ Flux Kustomization with `path: ./` auto-discovers all YAML files recursively.
 
 | Domain | ResourceSet | Services | Rationale |
 |--------|------------|----------|-----------|
-| identity | `rs-identity` | auth, user | Shared auth-db, identity boundary |
-| catalog | `rs-catalog` | product, review | Product data + reviews, shared read patterns |
-| checkout | `rs-checkout` | cart, order, payment | Transaction-shared-db, purchase flow |
-| comms | `rs-comms` | notification, shipping | Supporting-shared-db, auxiliary services |
+| identity | `rs-identity` | auth, user | auth-db (auth) + shared-db (user) on CNPG, identity boundary |
+| catalog | `rs-catalog` | product, review | product-db (product) + shared-db (review) on CNPG, shared read patterns |
+| checkout | `rs-checkout` | cart, order, payment | product-db (CNPG), purchase flow |
+| comms | `rs-comms` | notification, shipping | shared-db (CNPG), auxiliary services |
 | frontend | `rs-frontend` | frontend | Standalone (React SPA, no DB) |
 
 ### Label Convention
@@ -330,4 +330,4 @@ flux reconcile kustomization apps-local -n flux-system
 
 ---
 
-_Last updated: 2026-07-10 — file layout completed with the standalone mockpay + order-worker HelmReleases._
+_Last updated: 2026-07-11 — domain-mapping DB placements updated to the CloudNativePG clusters (product-db / auth-db / shared-db) after the Zalando→CNPG migration; file layout completed with the standalone mockpay + order-worker HelmReleases._

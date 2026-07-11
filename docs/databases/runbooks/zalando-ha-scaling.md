@@ -1,5 +1,9 @@
 # Runbook: Zalando Postgres Operator -- Scaling from 1 to 3 Nodes
 
+> **Historical / reference.** The platform migrated all Postgres from the
+> Zalando operator to CloudNativePG (see 002/003). Zalando is no longer deployed
+> here — this doc is kept for learning.
+
 This is the operator-specific runbook for scaling a Zalando/Patroni cluster
 from a single instance to local HA. For platform-wide DRP policy, RTO/RPO
 ownership, standby taxonomy, and restore evidence, see

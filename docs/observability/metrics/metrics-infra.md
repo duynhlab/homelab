@@ -98,7 +98,7 @@ authoritative, per-domain index (exact files under
 `prometheusrules/kubernetes/` and `prometheusrules/valkey/`, with counts and
 production impact) is the [Alert Catalog](../alerting/alert-catalog.md):
 
-- [Kubernetes](../alerting/alert-catalog.md#6-kubernetes) — nodes, workloads, pods, API server, control plane, network
+- [Kubernetes](../alerting/alert-catalog.md#5-kubernetes) — nodes, workloads, pods, API server, control plane, network
 - [Valkey cache](../alerting/alert-catalog.md#3-valkey-cache)
 
 Database manifests are indexed in the

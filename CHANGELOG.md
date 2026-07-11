@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CloudNativePG `auth-db` + `shared-db` clusters** completing the Zalando→CNPG
+  migration — each with a per-cluster PgDog pooler (`pgdog-auth` / `pgdog-shared`),
+  Barman Cloud backups, and postgres/pooler alert rules.
 - **RFC-0015 — checkout service** (provisional): checkout session state machine
   with price/stock re-validation against product, durably idempotent confirm
   handed to order over a new `order.v1/CreateOrder` gRPC (order stays the
@@ -28,9 +31,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Renamed `cnpg-db` → `product-db`** (+ `product-db-replica` DR); all application
+  databases now run on CloudNativePG behind PgDog poolers.
+- **Raised the VictoriaLogs memory limit** to absorb the added CNPG cluster log volume.
 - **Point the 9 services at the released RFC-0014 images** (`image_tag`
   `1.0.1`→`1.2.0`, payment `1.0.0`→`1.1.0`) so the cluster runs the `obsx` OTLP
   code (metrics/logs/traces) instead of the pre-RFC-0014 binaries.
+
+### Removed
+
+- **Zalando Postgres operator** — the operator, the `postgres-operator` namespace,
+  and the Spilo/Patroni runtime.
+- **WAL-G backups** — the `pg-backups-zalando` bucket and the `backup: walg`
+  credential mapping (every cluster now backs up via Barman to `pg-backups-cnpg`).
+- **PgBouncer + pg-exporter Grafana dashboards and recording rules** — no cluster
+  runs PgBouncer anymore.
+- **`postgres-operator-ui` ingress** (`pgui.duynh.me`).
 
 ### Fixed
 

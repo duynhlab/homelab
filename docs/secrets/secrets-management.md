@@ -71,7 +71,7 @@ Secrets are organized using a **hybrid strategy** for maintainability and scalab
 |----------|----------|-----------|-----------|
 | **DB credentials** | `configs/databases/clusters/*/secrets/` | ExternalSecret | Co-located with the DB cluster they serve |
 | **Pooler credentials** | `configs/databases/clusters/*/secrets/` | ExternalSecret | Co-located with the pooler they serve |
-| **Backup credentials** | `configs/secrets/cluster-external-secrets/` | ClusterExternalSecret | Shared across 5 namespaces via namespace labels |
+| **Backup credentials** | `configs/secrets/cluster-external-secrets/` | ClusterExternalSecret | Shared across the CloudNativePG cluster namespaces (product, auth, user) via namespace labels |
 | **Future shared secrets** | `configs/secrets/cluster-external-secrets/` | ClusterExternalSecret | Any secret needed by multiple namespaces |
 
 ---
@@ -120,20 +120,20 @@ Backup credentials use **ClusterExternalSecret** with namespace labels to auto-d
 
 | ClusterExternalSecret | Label Selector | Target Namespaces | Key Format |
 |----------------------|----------------|-------------------|------------|
-| `pg-backup-rustfs-cnpg` | `platform.duynhlab/backup: "cnpg"` | product, cart | CNPG/Barman: `ACCESS_KEY_ID`, `ACCESS_SECRET_KEY` |
-| `pg-backup-rustfs-walg` | `platform.duynhlab/backup: "walg"` | auth, user, review | WAL-G: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` |
+| `pg-backup-rustfs-cnpg` | `platform.duynhlab/backup: "cnpg"` | product, auth, user | CNPG/Barman: `ACCESS_KEY_ID`, `ACCESS_SECRET_KEY` |
 
-**Adding backup credentials to a new namespace**: Add the appropriate label to the namespace in `kubernetes/infra/controllers/namespaces.yaml`:
+Since the Zalando→CNPG migration every cluster backs up via Barman, so `cnpg` is the
+only backup label (the old WAL-G `pg-backup-rustfs-walg` / `backup: walg` mapping was removed).
+
+**Adding backup credentials to a new namespace**: Add the label to the namespace in `kubernetes/infra/controllers/namespaces.yaml`:
 
 ```yaml
 metadata:
   labels:
-    platform.duynhlab/backup: "cnpg"   # For CloudNativePG clusters
-    # or
-    platform.duynhlab/backup: "walg"   # For Zalando/WAL-G clusters
+    platform.duynhlab/backup: "cnpg"   # CloudNativePG / Barman backup credentials
 ```
 
-**ResourceSet namespaces**: Microservice namespaces are also created by Flux **ResourceSet** templates under [`kubernetes/apps/domains/`](../../kubernetes/apps/domains/). If the `Namespace` resource there omits `platform.duynhlab/backup`, app reconciliation can overwrite metadata and **drop** the label from `controllers/namespaces.yaml`, so ClusterExternalSecret **stops** matching and `pg-backup-rustfs-credentials` is not created. Keep the label in the ResourceSet `Namespace` block (identity: fixed `walg`; catalog/checkout/comms: optional `platform_backup_label` in the ResourceSetInputProvider for `cnpg` where needed).
+**ResourceSet namespaces**: Microservice namespaces are also created by Flux **ResourceSet** templates under [`kubernetes/apps/domains/`](../../kubernetes/apps/domains/). If the `Namespace` resource there omits `platform.duynhlab/backup`, app reconciliation can overwrite metadata and **drop** the label from `controllers/namespaces.yaml`, so ClusterExternalSecret **stops** matching and `pg-backup-rustfs-credentials` is not created. Keep the label in the ResourceSet `Namespace` block (now `cnpg` fleet-wide — set via `platform_backup_label` in the ResourceSetInputProvider where the domain hosts a CNPG cluster).
 
 ### Pooler Secrets
 
@@ -396,4 +396,4 @@ Replace Shamir with cloud KMS for automatic unseal:
 
 ---
 
-_Last updated: 2026-07-07 — ESO + OpenBAO via Kubernetes auth, KV v2 static secrets (`refreshInterval: 1h`). Cloudflare token is a dev placeholder on local (bootstrap-seeded), operator-supplied on prod. Added payment DB + webhook-hmac secrets. Local Kind; production hardening tracked in [RFC-0008](../proposals/rfc/RFC-0008/)._
+_Last updated: 2026-07-11 — Zalando→CNPG migration: WAL-G `pg-backup-rustfs-walg` / `backup: walg` mapping removed; `cnpg` is now the only backup label (Barman for every cluster). Earlier: ESO + OpenBAO via Kubernetes auth, KV v2 static secrets (`refreshInterval: 1h`); Cloudflare token is a dev placeholder on local (bootstrap-seeded), operator-supplied on prod; added payment DB + webhook-hmac secrets. Local Kind; production hardening tracked in [RFC-0008](../proposals/rfc/RFC-0008/)._

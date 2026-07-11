@@ -136,9 +136,9 @@ flowchart TD
         end
 
         subgraph db_ns["Database Namespaces"]
-            cnpg["cnpg-db\n(CloudNativePG PG18)"]
-            authdb["auth-db\n(Zalando PG17)"]
-            shareddb["supporting-shared-db\n(Zalando PG16)"]
+            productdb["product-db\n(CloudNativePG)"]
+            authdb["auth-db\n(CloudNativePG)"]
+            shareddb["shared-db\n(CloudNativePG)"]
         end
     end
 
@@ -159,7 +159,7 @@ flowchart TD
     k8ssecret --> appod
     eso --> css
     css --> raft
-    db --> cnpg
+    db --> productdb
     db --> authdb
     db --> shareddb
     autounseal --> raft
@@ -357,8 +357,7 @@ secret/{environment}/{category}/{service}/{resource}
 | `secret/local/databases/cnpg-db/payment` | `username`, `password` | CNPG payment owner (consumed in `product` + `payment` ns) |
 | `secret/local/databases/pgdog-cnpg/credentials` | `username`, `password` | PgDog pooler admin |
 | `secret/local/services/payment/webhook-hmac` | `secret` | payment ↔ mockpay webhook HMAC (shared signing key) |
-| `secret/local/infra/rustfs/backup-zalando` | `access_key_id`, `secret_access_key` | WAL-G S3 (auth, user, review) |
-| `secret/local/infra/rustfs/backup-cnpg` | `access_key_id`, `secret_access_key` | Barman S3 (product, cart) |
+| `secret/local/infra/rustfs/backup-cnpg` | `access_key_id`, `secret_access_key` | Barman S3 (all CloudNativePG clusters — bucket `pg-backups-cnpg`) |
 | `secret/local/infra/cloudflare/api-token` ⚠️ | `api_token` | cert-manager `letsencrypt-{staging,prod}` ClusterIssuers (DNS-01 solver) — **prod only**; on local Kind `kong-proxy-tls` is `homelab-ca`-issued |
 
 > **Note — `secret/local/services/payment/webhook-hmac`**: follows the standard 4-level `secret/{env}/{category}/{service}/{resource}` structure and is covered by the existing `eso-read` `local/services/*` grant. (It was briefly seeded at the 3-level `secret/local/payment/webhook-hmac`, which sat outside every `eso-read` prefix; renaming it into `local/services/*` fixed both the convention and the RBAC scope.)
@@ -575,32 +574,38 @@ sequenceDiagram
     BAO->>PG: DROP ROLE "v-k8s-product-app-rw-{old_ts}"  (on old lease expiry)
 ```
 
-### 6.4 Zalando Operator — Credential Strategy
+### 6.4 CloudNativePG (auth-db, shared-db) — Credential Strategy
 
-Zalando manages its own K8s secrets natively (creates `{user}.{cluster}.credentials.postgresql.acid.zalan.do`). The recommended strategy is **additive**: keep Zalando-managed owner secrets, add application users via OpenBAO dynamic engine.
+Every cluster now runs on **CloudNativePG**, so credentials follow the same ESO-first
+pattern everywhere: owner/role passwords come from OpenBAO KV v2, synced by ESO, and
+each service's role + database are declared with the **RFC-0012 triplet** (`ExternalSecret`
++ `DatabaseRole` + `Database`) that the operator applies. There are no operator-generated
+credential secrets to reconcile against.
+
+> **Historical:** the retired Zalando operator managed its own K8s secrets
+> (`{user}.{cluster}.credentials.postgresql.acid.zalan.do`). Since the Zalando→CNPG
+> migration, `auth-db` and `shared-db` are CloudNativePG and use ESO-provided creds
+> like every other cluster.
 
 ```mermaid
 flowchart LR
-    subgraph zalando_auth["auth-db (Zalando PG17)"]
-        z_owner["auth\n(owner, created by Zalando)\nK8s secret: auth.auth-db.credentials..."]
-        z_app["auth_app_rw\n(dynamic, OpenBAO DB engine)\nFor auth-service pods"]
-        z_readonly["auth_readonly\n(dynamic, OpenBAO DB engine)\nFor data team read access"]
-        z_pooler["pooler\n(Zalando managed)\nFor PgBouncer"]
+    subgraph cnpg_auth["auth-db (CloudNativePG)"]
+        a_owner["auth owner\n(ExternalSecret → KV v2)"]
+        a_roles["service role(s)\n(RFC-0012 triplet:\nDatabaseRole + Database)"]
     end
 
-    subgraph zalando_shared["supporting-shared-db (Zalando PG16)"]
-        zs_owners["user / notification /\nshipping / review owners\n(Zalando managed)"]
-        zs_apps["*_app_rw users\n(dynamic, OpenBAO)\nFor each service"]
-        zs_ro["*_readonly users\n(dynamic, OpenBAO)\nFor data team"]
+    subgraph cnpg_shared["shared-db (CloudNativePG)"]
+        s_owners["user / notification /\nshipping / review owners\n(ExternalSecret → KV v2)"]
+        s_roles["service role(s)\n(RFC-0012 triplet:\nDatabaseRole + Database)"]
     end
 
     subgraph management["Management"]
-        zalando_op["Zalando Operator\nmanages owner secrets"]
-        bao_db["OpenBAO DB Engine\nmanages app + readonly"]
+        eso_mgr["ESO\nsyncs owner creds from OpenBAO KV v2"]
+        cnpg_op["CloudNativePG Operator\napplies Database + DatabaseRole CRDs"]
     end
 
-    zalando_op --> z_owner & z_pooler & zs_owners
-    bao_db --> z_app & z_readonly & zs_apps & zs_ro
+    eso_mgr --> a_owner & s_owners
+    cnpg_op --> a_roles & s_roles
 ```
 
 ---
@@ -1366,4 +1371,4 @@ gantt
 
 ---
 
-_Last updated: 2026-07-10 — operational examples corrected to the deployed `http://` endpoint (TLS is RFC-0008, planned); OpenBAO HA (3-node Raft) + ESO via Kubernetes auth. **Deployed today:** KV v2 static secrets + best-effort audit; `eso-read` policy scopes `local/{databases,infra,services,auth}/*`; Cloudflare token dev-placeholder on local (bootstrap-seeded), operator-supplied on prod; payment DB + `payment/webhook-hmac` secrets added. **Planned (not deployed):** dynamic DB creds, OIDC, KMS auto-unseal, TLS — see [RFC-0008](../proposals/rfc/RFC-0008/). **Local Kind only — not production-hardened.**_
+_Last updated: 2026-07-11 — Zalando→CNPG migration: §6.4 rewritten for the all-CloudNativePG credential strategy (ESO + RFC-0012 triplets; Zalando note kept as historical); db-namespace diagram → product-db/auth-db/shared-db (CNPG); WAL-G `backup-zalando` KV row dropped (all clusters back up via Barman to `pg-backups-cnpg`). Earlier: operational examples corrected to the deployed `http://` endpoint (TLS is RFC-0008, planned); OpenBAO HA (3-node Raft) + ESO via Kubernetes auth. **Deployed today:** KV v2 static secrets + best-effort audit; `eso-read` policy scopes `local/{databases,infra,services,auth}/*`; Cloudflare token dev-placeholder on local (bootstrap-seeded), operator-supplied on prod; payment DB + `payment/webhook-hmac` secrets added. **Planned (not deployed):** dynamic DB creds, OIDC, KMS auto-unseal, TLS — see [RFC-0008](../proposals/rfc/RFC-0008/). **Local Kind only — not production-hardened.**_

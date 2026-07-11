@@ -1,9 +1,15 @@
 # PostgreSQL Backup Strategy
 
-This document defines a **production-ready physical backup strategy** (base backup + WAL archiving) for the **operational PostgreSQL clusters + DR replica** (auth-db, supporting-shared-db, cnpg-db — `temporal-db` currently has **no backups**, see [010.1](010.1-rpo-rto-planning.md)) using **RustFS (S3-compatible)** as the backup target, with per-operator bucket isolation:
+This document defines a **production-ready physical backup strategy** (base backup + WAL archiving) for the **operational PostgreSQL clusters + DR replica** (product-db, auth-db, shared-db — `temporal-db` currently has **no backups**, see [010.1](010.1-rpo-rto-planning.md)) using **RustFS (S3-compatible)** as the backup target. Every cluster runs on CloudNativePG and uses the **Barman Cloud Plugin** (`ObjectStore` CR) into a **single bucket with per-cluster prefixes**:
 
-- **Bucket `pg-backups-zalando`**: `auth-db`, `supporting-shared-db` (Zalando / WAL-G)
-- **Bucket `pg-backups-cnpg`**: `cnpg-db` (primary), `cnpg-db-replica` (DR) — CloudNativePG / Barman; separate S3 prefixes in the same bucket
+- **Bucket `pg-backups-cnpg`** (CloudNativePG / Barman Cloud Plugin):
+  - `product-db` → `s3://pg-backups-cnpg/product-db/` (retention 30d)
+  - `product-db-replica` → `s3://pg-backups-cnpg/product-db-replica/` (retention 7d, DR)
+  - `auth-db` → `s3://pg-backups-cnpg/auth-db/` (retention 30d)
+  - `shared-db` → `s3://pg-backups-cnpg/shared-db/` (retention 30d)
+
+Each cluster runs a daily `ScheduledBackup` (02:00) plus an every-6h backup. The
+former Zalando/WAL-G bucket `pg-backups-zalando` has been retired.
 
 For DRP policy, recovery decision flow, RTO/RPO ownership, and restore-drill
 evidence, see [010-drp.md](./010-drp.md).
@@ -12,8 +18,7 @@ evidence, see [010-drp.md](./010-drp.md).
 
 1. [Scope (production)](#scope-production)
 2. [Architecture Overview (physical backup to RustFS)](#architecture-overview-physical-backup-to-rustfs)
-   - [Runtime CNPG physical backup (cnpg-db)](#runtime-cnpg-physical-backup-cnpg-db)
-   - [Runtime Zalando physical backup (supporting-shared-db)](#runtime-zalando-physical-backup-supporting-shared-db)
+   - [Runtime CNPG physical backup (all clusters)](#runtime-cnpg-physical-backup-all-clusters)
    - [Runtime alerts (PrometheusRule)](#runtime-alerts-prometheusrule)
 3. [Cluster Inventory](#cluster-inventory)
 4. [Bucket Layout](#bucket-layout)
@@ -51,38 +56,27 @@ evidence, see [010-drp.md](./010-drp.md).
 
 Assumption: the database clusters already exist and the RustFS bucket is already created and reachable.
 
-### Runtime CNPG physical backup (cnpg-db)
+### Runtime CNPG physical backup (all clusters)
+
+All four backed-up clusters (product-db, product-db-replica, auth-db, shared-db)
+follow the same CloudNativePG Barman Cloud Plugin flow — only the
+`destinationPath` prefix differs:
 
 ```mermaid
 sequenceDiagram
   participant Sched as ScheduledBackup_0200
   participant CNPGOp as CNPG_Operator
-  participant Primary as CnpgDb_PrimaryPod
-  participant Barman as BarmanCloudTools
+  participant Primary as Cluster_PrimaryPod
+  participant Barman as BarmanCloudPlugin
   participant RustFS as RustFS_S3
 
-  Sched->>CNPGOp: schedule "0 0 2 * * *"
+  Sched->>CNPGOp: schedule "0 0 2 * * *" (+ every 6h)
   CNPGOp->>Primary: run online base backup
   Primary->>Barman: upload base backup + archive WAL
-  Note over Barman: destinationPath="s3://pg-backups-cnpg/cnpg-db/", endpointURL="http://rustfs-svc.rustfs.svc.cluster.local:9000"
+  Note over Barman: destinationPath="s3://pg-backups-cnpg/<cluster>/", endpointURL="http://rustfs-svc.rustfs.svc.cluster.local:9000"
   Barman->>RustFS: PUT base + WAL files
   RustFS-->>Barman: 200_OK
   Barman-->>CNPGOp: backup complete
-```
-
-### Runtime Zalando physical backup (supporting-shared-db)
-
-```mermaid
-sequenceDiagram
-  participant Spilo as SupportingDB_SpiloPod
-  participant WalG as WAL_G
-  participant RustFS as RustFS_S3
-
-  Note over Spilo: WAL_S3_BUCKET="pg-backups-zalando", AWS_ENDPOINT="http://rustfs-svc.rustfs.svc.cluster.local:9000"
-  Spilo->>WalG: scheduled base backup (BACKUP_SCHEDULE)
-  WalG->>RustFS: PUT base backup objects (spilo path)
-  Spilo->>WalG: archive_command pushes WAL segments
-  WalG->>RustFS: PUT WAL objects (PITR)
 ```
 
 ### Runtime alerts (PrometheusRule)
@@ -100,14 +94,14 @@ flowchart LR
 
 | Cluster         | Operator      | Namespace | PostgreSQL | Instances | Databases                    | Pooler     | HA Pattern |
 |-----------------|---------------|-----------|------------|-----------|------------------------------|------------|------------|
-| cnpg-db         | CloudNativePG | product   | 18         | 3         | product, cart, order, payment | PgDog (payment app: direct-TLS) | Sync quorum `ANY 1`; DR cluster `cnpg-db-replica` |
-| auth-db         | Zalando       | auth      | 17         | 3         | auth                         | PgBouncer  | Patroni HA |
-| supporting-shared-db   | Zalando       | user      | 16         | 1 (SPOF)  | user, notification, shipping, review | PgBouncer  | Single     |
-| temporal-db     | CloudNativePG | temporal  | 18         | 1         | temporal                     | —          | Single — **no backups / no DR** |
+| product-db         | CloudNativePG | product   | 18         | 3         | product, cart, order, payment | PgDog `pgdog-product` (payment app: direct-TLS) | Sync quorum `ANY 1`; DR cluster `product-db-replica` |
+| auth-db         | CloudNativePG | auth      | 18         | 3         | auth                         | PgDog `pgdog-auth`  | Sync quorum `ANY 1` |
+| shared-db   | CloudNativePG | user      | 18         | 1 (SPOF)  | user, notification, shipping, review | PgDog `pgdog-shared`  | Single     |
+| temporal-db     | CloudNativePG | temporal  | 18         | 1         | temporal, temporal_visibility | —          | Single — **no backups / no DR** |
 
 ### Detailed Cluster Profiles
 
-#### cnpg-db (CloudNativePG)
+#### product-db (CloudNativePG)
 
 - **Namespace:** product
 - **Operator:** CloudNativePG v1.30.0
@@ -115,57 +109,66 @@ flowchart LR
 - **Topology:** 3 instances (1 primary + 2 replicas), synchronous quorum `ANY 1` for HA
 - **Scope:** 4 DBs (`product`, `cart`, `order`, `payment`) on one CNPG cluster; apps connect via PgDog (payment: direct-TLS)
 - **Pooler:** PgDog (routes to this cluster; 3 replicas)
-- **Secret:** `cnpg-db-secret` (manual)
-- **Backup scope:** Physical backup + WAL archiving (PITR) to RustFS at `s3://pg-backups-cnpg/cnpg-db/`; restore-to-new-cluster drills.
-- **DR replica cluster (`cnpg-db-replica`):** separate CloudNativePG `Cluster` for disaster recovery; Barman backups at `s3://pg-backups-cnpg/cnpg-db-replica/` (same bucket `pg-backups-cnpg`, distinct prefix from primary).
+- **Secret:** `product-db-secret` (ESO / RFC-0012 triplet)
+- **Backup scope:** Physical backup + WAL archiving (PITR) to RustFS at `s3://pg-backups-cnpg/product-db/`; daily + every-6h `ScheduledBackup`; restore-to-new-cluster drills.
+- **DR replica cluster (`product-db-replica`):** separate CloudNativePG `Cluster` for disaster recovery; Barman backups at `s3://pg-backups-cnpg/product-db-replica/` (same bucket `pg-backups-cnpg`, distinct prefix from primary).
 
-#### supporting-shared-db (Zalando)
+#### auth-db (CloudNativePG)
+
+- **Namespace:** auth
+- **Operator:** CloudNativePG v1.30.0
+- **PostgreSQL:** 18
+- **Topology:** 3 instances (1 primary + 1 sync + 1 async replica), synchronous quorum `ANY 1`
+- **Scope:** `auth` database (RFC-0012 initdb-reuse triplet)
+- **Pooler:** PgDog (`pgdog-auth`)
+- **Backup scope:** Barman Cloud Plugin → `s3://pg-backups-cnpg/auth-db/` (30d); daily + every-6h `ScheduledBackup`.
+
+#### shared-db (CloudNativePG)
 
 - **Namespace:** user
-- **Operator:** Zalando v1.15.1
-- **PostgreSQL:** 16
+- **Operator:** CloudNativePG v1.30.0
+- **PostgreSQL:** 18
 - **Topology:** 1 instance (SPOF), no replication
-- **Scope:** 4 DBs (`user`, `notification`, `shipping`, `review`) + cross-namespace secrets
-- **Pooler:** PgBouncer sidecar (3 instances)
-- **Secret:** Auto-generated; cross-namespace for notification, shipping
-- **Backup scope:** Physical backup + WAL archiving (PITR) to RustFS; DR-ready because SPOF.
+- **Scope:** 4 DBs (`user`, `notification`, `shipping`, `review`); RFC-0012 triplets with cross-namespace `ExternalSecret`s for notification/shipping/review
+- **Pooler:** PgDog (`pgdog-shared`)
+- **Backup scope:** Barman Cloud Plugin → `s3://pg-backups-cnpg/shared-db/` (30d); daily + every-6h `ScheduledBackup`. DR-relevant because single-instance.
 
 ---
 
 ## Bucket Layout
 
-RustFS (S3-compatible) is deployed in namespace `rustfs`. Backups are split into **2 buckets by operator** for data isolation.
+RustFS (S3-compatible) is deployed in namespace `rustfs`. All CloudNativePG
+clusters back up into a **single bucket `pg-backups-cnpg`** with a
+**per-cluster prefix** (`ObjectStore` `destinationPath`).
 
 ### Layout
 
 | Bucket | Cluster | S3 path | Implementation |
 |--------|---------|---------|----------------|
-| `pg-backups-zalando` | auth-db | `s3://pg-backups-zalando/auth-db/` | WAL-G via Spilo |
-| `pg-backups-zalando` | supporting-shared-db | `s3://pg-backups-zalando/user-db/` | WAL-G via Spilo |
-| `pg-backups-cnpg` | cnpg-db | `s3://pg-backups-cnpg/cnpg-db/` | Barman Cloud Plugin + `ObjectStore` |
-| `pg-backups-cnpg` | cnpg-db-replica | `s3://pg-backups-cnpg/cnpg-db-replica/` | Barman Cloud Plugin + `ObjectStore` (DR cluster) |
+| `pg-backups-cnpg` | product-db | `s3://pg-backups-cnpg/product-db/` | Barman Cloud Plugin + `ObjectStore` |
+| `pg-backups-cnpg` | product-db-replica | `s3://pg-backups-cnpg/product-db-replica/` | Barman Cloud Plugin + `ObjectStore` (DR cluster) |
+| `pg-backups-cnpg` | auth-db | `s3://pg-backups-cnpg/auth-db/` | Barman Cloud Plugin + `ObjectStore` |
+| `pg-backups-cnpg` | shared-db | `s3://pg-backups-cnpg/shared-db/` | Barman Cloud Plugin + `ObjectStore` |
 
 ### S3 Endpoint
 
 - **Internal (in-cluster):** `http://rustfs-svc.rustfs.svc.cluster.local:9000`
-- **Buckets:** `pg-backups-zalando`, `pg-backups-cnpg`
+- **Bucket:** `pg-backups-cnpg`
 - **Path style:** Use path-style URLs for S3-compatible (RustFS/MinIO style)
 
 ### Credentials
 
-Each operator has its own **OpenBAO path** for backup credentials, distributed via separate ClusterExternalSecrets. All paths currently resolve to the RustFS root credentials seeded at `secret/local/infra/rustfs/root` (shared with the RustFS HelmRelease) -- dedicated per-operator service accounts with bucket-scoped IAM policies are a planned future improvement.
+Backup credentials come from **OpenBAO** via a ClusterExternalSecret. The path currently resolves to the RustFS root credentials seeded at `secret/local/infra/rustfs/root` (shared with the RustFS HelmRelease) -- a dedicated backup service account with bucket-scoped IAM policy is a planned future improvement.
 
 | OpenBAO Path | Bucket | Consumer | ClusterExternalSecret |
 |------------|--------|----------|----------------------|
-| `secret/local/infra/rustfs/backup-zalando` | `pg-backups-zalando` | Zalando clusters (auth-db, supporting-shared-db) | `pg-backup-rustfs-walg` |
-| `secret/local/infra/rustfs/backup-cnpg` | `pg-backups-cnpg` | CNPG clusters (cnpg-db, cnpg-db-replica) | `pg-backup-rustfs-cnpg` |
+| `secret/local/infra/rustfs/backup-cnpg` | `pg-backups-cnpg` | CNPG clusters (product-db, product-db-replica, auth-db, shared-db) | `pg-backup-rustfs-cnpg` |
 
 - **Kubernetes Secret**: `pg-backup-rustfs-credentials` (per namespace, created by ClusterExternalSecret).
   - **CNPG/Barman keys**: `ACCESS_KEY_ID`, `ACCESS_SECRET_KEY`
-  - **Zalando/WAL-G keys**: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
 - **Bucket creation**: CronJob `setup-pg-backup-buckets` in namespace `rustfs` (runs every 30min, idempotent).
 
-> **Future**: Replace the shared root credentials in OpenBAO with dedicated per-operator service accounts + bucket-scoped IAM policies. No ESO or K8s manifest changes required -- only OpenBAO values need updating.
+> **Future**: Replace the shared root credentials in OpenBAO with a dedicated backup service account + bucket-scoped IAM policy. No ESO or K8s manifest changes required -- only OpenBAO values need updating.
 
 ---
 
@@ -441,15 +444,25 @@ flowchart TD
 
 ### What we use today and why
 
+Since the migration to CloudNativePG, **every cluster uses the same tool** — the
+Barman Cloud Plugin — so there is no per-operator tool split anymore.
+
 | Cluster | Operator | Backup tool | Rationale |
 |---|---|---|---|
-| `auth-db`, `supporting-shared-db` | Zalando | **WAL-G** via Spilo, bucket `pg-backups-zalando`, `BACKUP_NUM_TO_RETAIN=7` in `zalando-walg-config` | Tool comes for free with the Spilo image; no reason to swap. |
-| `cnpg-db` | CloudNativePG | **Barman Cloud Plugin** (CNPG-I) + `ObjectStore` CR, `s3://pg-backups-cnpg/cnpg-db/` | Declarative `ObjectStore` + `ScheduledBackup` CRs; CNPG 1.26+ deprecated in-tree `barmanObjectStore`, so the plugin is the long-term path. |
-| `cnpg-db-replica` | CloudNativePG | **Barman Cloud Plugin**, `s3://pg-backups-cnpg/cnpg-db-replica/` | Same bucket as primary, separate prefix; DR cluster keeps its own backups for independent recovery. |
+| `product-db` | CloudNativePG | **Barman Cloud Plugin** (CNPG-I) + `ObjectStore` CR, `s3://pg-backups-cnpg/product-db/` (30d) | Declarative `ObjectStore` + `ScheduledBackup` CRs; CNPG 1.26+ deprecated in-tree `barmanObjectStore`, so the plugin is the long-term path. |
+| `product-db-replica` | CloudNativePG | **Barman Cloud Plugin**, `s3://pg-backups-cnpg/product-db-replica/` (7d) | Same bucket as primary, separate prefix; DR cluster keeps its own backups for independent recovery. |
+| `auth-db` | CloudNativePG | **Barman Cloud Plugin**, `s3://pg-backups-cnpg/auth-db/` (30d) | Same declarative pattern as product-db after migrating off Zalando/WAL-G. |
+| `shared-db` | CloudNativePG | **Barman Cloud Plugin**, `s3://pg-backups-cnpg/shared-db/` (30d) | Same declarative pattern; single-instance cluster so backups are its only recovery path. |
 
-Both tools write to the **same RustFS** with **per-operator bucket isolation** (`pg-backups-zalando`, `pg-backups-cnpg`), which keeps blast radius and credential scope per operator without forcing a single tool across the platform.
+All clusters write to the **same RustFS bucket** `pg-backups-cnpg` with
+**per-cluster prefixes**, which keeps recovery independent per cluster while
+sharing one credential and one bucket-creation job.
 
-**Why we did not standardize on one tool**: standardizing would mean either rebuilding Spilo without WAL-G (not realistic) or moving CNPG off its first-class Barman Cloud Plugin (loses declarative CRs and operator-supported upgrades). The cost of running two well-supported tools — each native to its operator — is lower than the cost of fighting either operator.
+**Why one tool now**: the Zalando operator (and its bundled WAL-G) is retired, so
+CloudNativePG's first-class Barman Cloud Plugin covers the whole fleet with
+declarative `ObjectStore`/`ScheduledBackup` CRs and operator-supported upgrades.
+WAL-G, pgBackRest, and classic Barman remain relevant as the tooling-landscape
+comparison above, not as deployed components.
 
 ## Comparison (physical options)
 
@@ -536,4 +549,4 @@ Best practices:
 
 ---
 
-_Last updated: 2026-07-10 — cluster inventory refreshed (auth PG17, +payment on cnpg-db, +review on supporting, pooler counts, temporal-db no-backup row)._
+_Last updated: 2026-07-11 — All clusters on CloudNativePG Barman Cloud Plugin into a single `pg-backups-cnpg` bucket with per-cluster prefixes (product-db/auth-db/shared-db 30d, product-db-replica 7d); Zalando/WAL-G and `pg-backups-zalando` retired (WAL-G kept only as tooling comparison)._

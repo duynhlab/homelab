@@ -19,8 +19,8 @@ SLOs with burn-rate alerts, and a single source of truth in Git delivered via Fl
   (expect a browser warning); prod uses a publicly-trusted Let's Encrypt wildcard.
 - Full observability: VictoriaMetrics, Tempo + Jaeger, VictoriaLogs + Vector, Pyroscope,
   15 Grafana dashboards.
-- 3 application PostgreSQL clusters + `temporal-db` + 1 DR replica (Zalando + CloudNativePG),
-  fronted by PgBouncer and PgDog. Schema migrations via golang-migrate, embedded in each service binary.
+- 3 application PostgreSQL clusters + `temporal-db` + 1 DR replica (all CloudNativePG),
+  fronted by PgDog. Schema migrations via golang-migrate, embedded in each service binary.
 - Valkey (Redis-compatible) cache with Cache-Aside pattern in the Logic layer.
 - SLOs managed declaratively by Sloth Operator.
 - GitOps with Flux Operator, ResourceSets, OCI artifacts, and Kustomize.
@@ -77,16 +77,17 @@ flowchart TD
         end
     end
 
-    subgraph Poolers ["Connection poolers"]
-        pb_auth["PgBouncer (auth)"]:::pooler
-        pb_shared["PgBouncer (shared)"]:::pooler
-        pdog["PgDog (product/cart/order)"]:::pooler
+    subgraph Poolers ["Connection poolers (PgDog)"]
+        pdog_product["pgdog-product"]:::pooler
+        pdog_auth["pgdog-auth"]:::pooler
+        pdog_shared["pgdog-shared"]:::pooler
     end
 
-    subgraph Databases ["PostgreSQL (HA)"]
-        db_auth[("auth-db<br/>Zalando")]:::database
-        db_shared[("supporting-shared-db<br/>Zalando")]:::database
-        db_cnpg[("cnpg-db<br/>CNPG (+ DR replica)")]:::database
+    subgraph Databases ["PostgreSQL (CloudNativePG, HA)"]
+        db_product[("product-db<br/>CNPG (+ DR replica)")]:::database
+        db_auth[("auth-db<br/>CNPG")]:::database
+        db_shared[("shared-db<br/>CNPG")]:::database
+        db_temporal[("temporal-db<br/>CNPG")]:::database
     end
 
     FE -->|HTTPS| Kong --> WebLayer
@@ -94,12 +95,12 @@ flowchart TD
     LogicLayer -->|Cache-Aside| valkey
     eso -.->|secrets| Databases
     eso -.->|secrets| CoreLayer
-    CoreLayer -->|SQL auth| pb_auth
-    CoreLayer -->|SQL shared| pb_shared
-    CoreLayer -->|SQL cnpg| pdog
-    pb_auth ==> db_auth
-    pb_shared ==> db_shared
-    pdog ==> db_cnpg
+    CoreLayer -->|SQL product/cart/order/payment| pdog_product
+    CoreLayer -->|SQL auth| pdog_auth
+    CoreLayer -->|SQL user/review/shipping/notification| pdog_shared
+    pdog_product ==> db_product
+    pdog_auth ==> db_auth
+    pdog_shared ==> db_shared
 
     class Microservices,SecretsDev servicebox
     class Observability obsGroup
@@ -115,8 +116,8 @@ flowchart TD
 - **Microservices** — 4 bounded-context domains: identity, catalog, checkout, comms.
   Each service is its own repo, its own namespace, its own database role. East-west
   calls run over gRPC (`pkg/grpcx`); the edge stays HTTP/JSON.
-- **Data** — 3 application PostgreSQL clusters + `temporal-db` with operators (Zalando +
-  CloudNativePG), behind poolers, with golang-migrate migrations. cnpg-db has a
+- **Data** — 3 application PostgreSQL clusters + `temporal-db` on CloudNativePG,
+  behind PgDog poolers, with golang-migrate migrations. product-db has a
   continuously-recovering DR replica.
 - **Observability** — OpenTelemetry-first across metrics, traces, logs, and profiles.
   All four pillars converge in Grafana via shared exemplars.
@@ -145,8 +146,8 @@ and [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
 
 | Concern | Choice |
 |---|---|
-| RDBMS | PostgreSQL (Zalando operator + CloudNativePG) — 3 application clusters + `temporal-db` + 1 DR replica |
-| Connection poolers | PgBouncer (auth, shared) · PgDog (product/cart/order) |
+| RDBMS | PostgreSQL (CloudNativePG operator) — 3 application clusters + `temporal-db` + 1 DR replica |
+| Connection poolers | PgDog (`pgdog-product` / `pgdog-auth` / `pgdog-shared`) |
 | Migrations | golang-migrate v4.19.1 (embedded in each service binary, run via the `migrate` subcommand) |
 
 ### Platform
@@ -206,7 +207,6 @@ Or add the entries manually:
 127.0.0.1 ui.duynh.me
 127.0.0.1 source.duynh.me
 127.0.0.1 openbao.duynh.me
-127.0.0.1 pgui.duynh.me
 127.0.0.1 vm-mcp.duynh.me
 127.0.0.1 vl-mcp.duynh.me
 127.0.0.1 flux-mcp.duynh.me
@@ -233,7 +233,6 @@ automatically by `make cluster-up`.
 | Flux UI | <https://ui.duynh.me> | GitOps reconciliation status |
 | RustFS Console | <https://source.duynh.me> | S3 object storage console |
 | OpenBAO | <https://openbao.duynh.me> | Secrets management UI |
-| Postgres Operator UI | <https://pgui.duynh.me> | Cluster management |
 | VM / VL / Flux MCP | <https://vm-mcp.duynh.me/mcp> · <https://vl-mcp.duynh.me/mcp> · <https://flux-mcp.duynh.me/mcp> | MCP servers for AI assistants |
 
 ### Deployment

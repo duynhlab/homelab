@@ -1,5 +1,9 @@
 # pg_exporter (Pigsty) Prometheus Metric Mapping
 
+> **Retired:** the Pigsty pg_exporter (supporting-shared-db, `:9630`) was removed
+> with the Zalando→CNPG migration; CNPG uses its built-in `:9187` exporter. Kept
+> for reference.
+
 > **Source**: Config files from [pgsty/pg_exporter](https://github.com/pgsty/pg_exporter) (main branch)  
 > **URL format**: `https://raw.githubusercontent.com/pgsty/pg_exporter/main/config/{filename}.yml`  
 > **Note**: Configs live in `config/`, not `config/collector/`

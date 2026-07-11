@@ -1,8 +1,11 @@
 # PostgreSQL Kubernetes Operators: Decision Guide
 
-This guide compares the two PostgreSQL operators used in this homelab and keeps
-the decision-making surface small. Use the focused deep dives for operator
-internals and feature details:
+This is a **conceptual** comparison of two PostgreSQL operators and keeps the
+decision-making surface small. **The platform now runs CloudNativePG only** —
+all Postgres was migrated off the Zalando operator, which is no longer deployed
+(see [002](./002-database-integration.md)). Zalando is retained here purely for
+comparison and learning. Use the focused deep dives for operator internals and
+feature details:
 
 - [003.1-operator-cnpg.md](./003.1-operator-cnpg.md) - CloudNativePG deep dive.
 - [003.2-operator-zalando.md](./003.2-operator-zalando.md) - Zalando Postgres Operator deep dive.
@@ -31,12 +34,15 @@ The short version:
 
 ## Current Homelab Mapping
 
+All clusters run on **CloudNativePG**:
+
 | Cluster | Operator | Why |
 |---------|----------|-----|
-| `cnpg-db` | CloudNativePG | Primary cluster for product, cart, order, and payment; PostgreSQL 18; sync quorum `ANY 1`; PgDog; backup/PITR; DR replica |
-| `cnpg-db-replica` | CloudNativePG | DR replica cluster following the `cnpg-db` object-store backup/WAL path |
-| `auth-db` | Zalando | 3-node Patroni HA, auto-generated secrets, PgBouncer |
-| `supporting-shared-db` | Zalando | Shared cluster with cross-namespace secrets; currently single-node and documented as a production gap |
+| `product-db` | CloudNativePG | Primary cluster for product, cart, order, and payment; PostgreSQL 18; sync quorum `ANY 1`; PgDog (`pgdog-product`); backup/PITR; DR replica |
+| `product-db-replica` | CloudNativePG | DR replica cluster following the `product-db` object-store backup/WAL path |
+| `auth-db` | CloudNativePG | 3-node HA (sync quorum `ANY 1`), PgDog (`pgdog-auth`), Barman backups; migrated from Zalando |
+| `shared-db` | CloudNativePG | Shared single-node cluster (user, notification, shipping, review) with PgDog (`pgdog-shared`); migrated from the former Zalando `supporting-shared-db` |
+| `temporal-db` | CloudNativePG | Single-node backing store for Temporal (`temporal` + `temporal_visibility`); no pooler, no backup |
 
 ## Architecture Difference
 

@@ -10,12 +10,14 @@ You are running **4 operational PostgreSQL clusters** (incl. `temporal-db`) + **
 
 ### Cluster overview
 
+All clusters run on **CloudNativePG**.
+
 | Cluster | Operator | Namespace | Instances | Sync Mode | Pooler | Services |
 |--------|----------|-----------|-----------|-----------|--------|----------|
-| **cnpg-db** | CloudNativePG | product | 3 | Synchronous (`on`, ANY 1) | PgDog | product, cart, order, payment |
-| **cnpg-db-replica** | CloudNativePG | product | 1 | DR (restore from object store) | — | DR replica of cnpg-db |
-| **auth-db** | Zalando | auth | 3 | Async (`local`) | PgBouncer | auth |
-| **supporting-shared-db** | Zalando | user | 1 | N/A (single node) | PgBouncer | user, notification, shipping, review |
+| **product-db** | CloudNativePG | product | 3 | Synchronous (`on`, ANY 1) | PgDog (`pgdog-product`) | product, cart, order, payment |
+| **product-db-replica** | CloudNativePG | product | 1 | DR (restore from object store) | — | DR replica of product-db |
+| **auth-db** | CloudNativePG | auth | 3 | Synchronous (`on`, ANY 1) | PgDog (`pgdog-auth`) | auth |
+| **shared-db** | CloudNativePG | user | 1 | N/A (single node) | PgDog (`pgdog-shared`) | user, notification, shipping, review |
 | **temporal-db** | CloudNativePG | temporal | 1 | N/A (single node, no backup) | — | temporal (`temporal`, `temporal_visibility`) |
 
 ### Architecture Diagram
@@ -23,8 +25,8 @@ You are running **4 operational PostgreSQL clusters** (incl. `temporal-db`) + **
 ```mermaid
 flowchart TB
   subgraph productNS ["product namespace"]
-    subgraph cnpgPrimary ["cnpg-db - Primary Cluster, 3 instances, Sync ANY 1, RPO=0"]
-      CnpgSvc["K8s Service: cnpg-db-rw / cnpg-db-r"]
+    subgraph cnpgPrimary ["product-db - Primary Cluster, 3 instances, Sync ANY 1, RPO=0"]
+      CnpgSvc["K8s Service: product-db-rw / product-db-r"]
       P1["Primary"]
       P2["Sync Replica"]
       P3["Async Replica"]
@@ -35,8 +37,8 @@ flowchart TB
       P1 -->|"async WAL stream"| P3
     end
 
-    subgraph cnpgDR ["cnpg-db-replica - DR Cluster, 1 instance"]
-      DRSvc["K8s Service: cnpg-db-replica-rw"]
+    subgraph cnpgDR ["product-db-replica - DR Cluster, 1 instance"]
+      DRSvc["K8s Service: product-db-replica-rw"]
       DR1["Designated Primary"]
       DRSvc --> DR1
     end
@@ -45,19 +47,20 @@ flowchart TB
   end
 
   subgraph objStores ["Backup Object Stores"]
-    PrimaryStore["s3://pg-backups-cnpg/cnpg-db/"]
-    DRStore["s3://pg-backups-cnpg/cnpg-db-replica/"]
+    PrimaryStore["s3://pg-backups-cnpg/product-db/"]
+    DRStore["s3://pg-backups-cnpg/product-db-replica/"]
   end
 
-  subgraph zalandoClusters ["Zalando Clusters"]
-    subgraph authCluster ["auth-db - 3 nodes, Async"]
-      AuthP["Leader"]
-      AuthS1["Standby 1"]
-      AuthS2["Standby 2"]
-      AuthP --> AuthS1
-      AuthP --> AuthS2
+  subgraph otherClusters ["Other CloudNativePG Clusters"]
+    subgraph authCluster ["auth-db - 3 nodes, Sync ANY 1"]
+      AuthP["Primary"]
+      AuthS1["Sync Replica"]
+      AuthS2["Async Replica"]
+      AuthP -->|"sync WAL stream"| AuthS1
+      AuthP -->|"async WAL stream"| AuthS2
     end
-    SupportingDB["supporting-shared-db - 1 node, No HA"]
+    SharedDB["shared-db - 1 node, No HA"]
+    TemporalDB["temporal-db - 1 node, No HA"]
   end
 
   ProductSvc["Product Service"] --> PgDog
@@ -71,14 +74,14 @@ flowchart TB
 ```
 
 **Key findings:**
-- **cnpg-db**: 3-node HA with synchronous quorum (**ANY 1** standby). Commits that complete under this policy have **RPO = 0** relative to acknowledged standbys. Hosts **product**, **cart**, **order**, and **payment** databases; **PgDog** is the pooler (payment app: direct-TLS).
-- **cnpg-db-replica**: Single-instance cluster used for **disaster recovery**, continuously fed from **object-store backups** (not in-band streaming HA for the same namespace workloads). See [DR replica cluster](#dr-replica-cluster-cnpg-db-replica) below and [005-ha-dr-deep-dive.md](005-ha-dr-deep-dive.md).
-- **auth-db**: 3-node async. Fast writes, possible small data loss on crash.
-- **supporting-shared-db**: Single instance, no HA. No replication. Hosts 4 databases (user, notification, shipping, review).
+- **product-db**: 3-node HA with synchronous quorum (**ANY 1** standby). Commits that complete under this policy have **RPO = 0** relative to acknowledged standbys. Hosts **product**, **cart**, **order**, and **payment** databases; **PgDog** is the pooler (payment app: direct-TLS).
+- **product-db-replica**: Single-instance cluster used for **disaster recovery**, continuously fed from **object-store backups** (not in-band streaming HA for the same namespace workloads). See [DR replica cluster](#dr-replica-cluster-product-db-replica) below and [005-ha-dr-deep-dive.md](005-ha-dr-deep-dive.md).
+- **auth-db**: 3-node HA with synchronous quorum (**ANY 1** standby), same posture as product-db — **RPO = 0** for commits acknowledged per the sync policy.
+- **shared-db**: Single instance, no HA. No replication. Hosts 4 databases (user, notification, shipping, review).
 
-### DR replica cluster (cnpg-db-replica)
+### DR replica cluster (product-db-replica)
 
-**cnpg-db-replica** is a separate CloudNativePG cluster (one instance) in the **product** namespace that tracks **cnpg-db** via **backup / WAL archive in object storage**. It is not a substitute for in-cluster synchronous HA; it exists so you can recover or fail over when the primary region or cluster is lost. Scheduling, promotion, and operational trade-offs are covered in [005-ha-dr-deep-dive.md](005-ha-dr-deep-dive.md).
+**product-db-replica** is a separate CloudNativePG cluster (one instance) in the **product** namespace that tracks **product-db** via **backup / WAL archive in object storage**. It is not a substitute for in-cluster synchronous HA; it exists so you can recover or fail over when the primary region or cluster is lost. Scheduling, promotion, and operational trade-offs are covered in [005-ha-dr-deep-dive.md](005-ha-dr-deep-dive.md).
 
 ---
 
@@ -118,7 +121,7 @@ This is "block-level" replication. PostgreSQL transmits 16MB **WAL** files (or s
 *   **Mechanism**: "Copy this byte from offset A to offset B" — like a photocopy that reproduces the raw data block.
 *   **Pros**: Extremely efficient, low overhead, replicates ALL changes (indexes, DDL, schema changes, user creation).
 *   **Cons**: Replicas must be read-only. Major version of Primary and Replica must match exactly.
-*   **Your Usage**: 3-node clusters (`cnpg-db`, `auth-db`) use physical streaming for HA.
+*   **Your Usage**: 3-node clusters (`product-db`, `auth-db`) use physical streaming for HA.
 
 ### Logical Replication
 This is "row-level" replication. It decodes the WAL into a stream of logical changes (INSERT, UPDATE, DELETE).
@@ -126,7 +129,7 @@ This is "row-level" replication. It decodes the WAL into a stream of logical cha
 *   **Mechanism**: "Insert row {id: 1, name: 'Apple'} into table 'products'" — like dictation that reads out each changed row.
 *   **Pros**: Flexible. Can replicate between different OSs, Postgres versions, or to external systems (Kafka/Debezium).
 *   **Cons**: Higher CPU usage (decoding). Typically doesn't replicate DDL (CREATE TABLE) automatically.
-*   **Your Usage**: `cnpg-db` has `wal_level: logical` - ready for CDC (Debezium) even though internal HA is physical.
+*   **Your Usage**: `product-db` has `wal_level: logical` - ready for CDC (Debezium) even though internal HA is physical.
 
 ### Physical vs Logical Diagram
 
@@ -190,14 +193,14 @@ sequenceDiagram
 2.  **`local`** (Default Async): "Success if written to My Disk."
     *   **Fastest safe mode**.
     *   **Risk**: If Primary dies immediately after, data is lost before reaching replica.
-    *   **Your Clusters**: `auth-db`, `supporting-shared-db`.
+    *   **Your Clusters**: none (single-node `shared-db`/`temporal-db` commit locally by nature; the HA clusters use `on`).
 3.  **`remote_write`**: "Success if Replica OS received it."
     *   Replica has it in RAM, but hasn't flushed to disk. 
     *   Survives Postgres crash, but not Replica OS crash.
 4.  **`on`** (Standard Sync): "Success if Replica flushed to Disk."
     *   **Zero Data Loss** guarantee.
     *   **Latency Cost**: Round-trip time (RTT) to replica + Disk I/O.
-    *   **Your Clusters**: `cnpg-db` only.
+    *   **Your Clusters**: `product-db` and `auth-db` (both `synchronous.method: any`, `number: 1`).
 5.  **`remote_apply`**: "Success if Replica has applied the SQL."
     *   Guarantees "Read-Your-Writes" on the replica immediately.
     *   **Slowest**.
@@ -206,7 +209,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart TB
-    subgraph HA [3-Node HA - cnpg-db, auth-db]
+    subgraph HA [3-Node HA - product-db, auth-db]
         Primary[Primary]
         R1[Replica 1]
         R2[Replica 2]
@@ -214,7 +217,7 @@ flowchart TB
         Primary --> R2
     end
 
-    subgraph Single [Single Instance - supporting-shared-db]
+    subgraph Single [Single Instance - shared-db]
         S1[Only Node]
     end
 
@@ -222,7 +225,7 @@ flowchart TB
     Single -->|"No failover - single point of failure"| S1
 ```
 
-**In short:** 3-node clusters have automatic failover. A single-instance cluster (supporting-shared-db) has no replica — if the node dies, the service is down.
+**In short:** 3-node clusters have automatic failover. A single-instance cluster (shared-db) has no replica — if the node dies, the service is down.
 
 ---
 
@@ -240,7 +243,7 @@ flowchart TB
 2.  **WAL Archiving**: Every 16MB WAL file is uploaded to S3.
 3.  **Restore**: To get to `14:00 PM`, you extract the `00:00 AM` snapshot and "replay" WAL files until `14:00`.
 
-**Configured today:** **cnpg-db** (and the DR path via **cnpg-db-replica**) use CloudNativePG **scheduled backups** and **WAL archiving** to object storage, which enables **PITR** and restores to a timestamp when procedures are followed.
+**Configured today:** **product-db** (and the DR path via **product-db-replica**) use CloudNativePG **scheduled backups** and **WAL archiving** to object storage, which enables **PITR** and restores to a timestamp when procedures are followed.
 
 *   **Implication**: Streaming replication still propagates mistakes instantly to in-cluster standbys. **Replication alone cannot undo** a `DROP TABLE` on the primary. **PITR** (base backup + archived WAL) is what allows rolling back or cloning to a point before the error.
 
@@ -311,9 +314,9 @@ FROM pg_replication_slots;
 | Syntax | Meaning | Your Usage |
 |--------|---------|------------|
 | **FIRST n (s1, s2, ...)** | Priority-based - wait for top n standbys | - |
-| **ANY n (s1, s2, ...)** | Quorum-based - wait for any n standbys | cnpg-db uses `method: any` |
+| **ANY n (s1, s2, ...)** | Quorum-based - wait for any n standbys | product-db, auth-db use `method: any` |
 
-cnpg-db: `synchronous.method: any`, `number: 1` - commits when any 1 replica acknowledges.
+product-db and auth-db: `synchronous.method: any`, `number: 1` - commits when any 1 replica acknowledges.
 
 ---
 
@@ -375,7 +378,7 @@ flowchart TD
 
 | Replicas | Approach | Your Clusters |
 |----------|----------|---------------|
-| < 10 | Direct replication | cnpg-db, auth-db |
+| < 10 | Direct replication | product-db, auth-db |
 | 10-30 | Consider cascading | - |
 | 30+ | Cascading recommended | hyperscale: ~50 replicas |
 | Multi-region | Intermediate per region | - |
@@ -420,7 +423,7 @@ flowchart TB
     PRIMARY -.->|WAL Stream| REP2
 ```
 
-**Your clusters:** cnpg-db (PgDog), auth-db/supporting-shared-db (PgBouncer).
+**Your clusters:** product-db, auth-db, and shared-db all front CloudNativePG with **PgDog** (`pgdog-product`, `pgdog-auth`, `pgdog-shared`).
 
 ### WAL Sender/Receiver Flow
 
@@ -512,14 +515,14 @@ Large hyperscale deployments scale PostgreSQL to hundreds of millions of users w
 
 ## 11. Summary Table for Your Infrastructure
 
-| Feature | cnpg-db | cnpg-db-replica | auth-db | supporting-shared-db | temporal-db |
+| Feature | product-db | product-db-replica | auth-db | shared-db | temporal-db |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Replication Type** | Physical (HA) + Logical (CDC) | Physical (DR from object store) | Physical | N/A (1 node) | N/A (1 node) |
-| **Sync Mode** | Synchronous (`on`, ANY 1) | N/A (async catch-up from archive) | Async (`local`) | N/A | N/A |
+| **Sync Mode** | Synchronous (`on`, ANY 1) | N/A (async catch-up from archive) | Synchronous (`on`, ANY 1) | N/A | N/A |
 | **Instances** | 3 | 1 | 3 | 1 | 1 |
-| **Pooler** | PgDog | — | PgBouncer | PgBouncer | — |
-| **Databases** | product, cart, order, payment | mirror of cnpg-db (DR) | auth | user, notification, shipping, review | temporal, temporal_visibility |
-| **Failover RPO** | **0** (for commits acknowledged per sync policy) | Depends on restore/replay lag | >0 (Possible small loss) | N/A | N/A |
+| **Pooler** | PgDog (`pgdog-product`) | — | PgDog (`pgdog-auth`) | PgDog (`pgdog-shared`) | — |
+| **Databases** | product, cart, order, payment | mirror of product-db (DR) | auth | user, notification, shipping, review | temporal, temporal_visibility |
+| **Failover RPO** | **0** (for commits acknowledged per sync policy) | Depends on restore/replay lag | **0** (for commits acknowledged per sync policy) | N/A | N/A |
 | **Failover RTO** | Seconds (Auto) | Workflow-dependent (DR) | Seconds (Auto) | N/A | N/A |
 | **PITR Status** | Configured | Configured | Configured | Configured | Not configured (no backup) |
 
@@ -527,8 +530,7 @@ Large hyperscale deployments scale PostgreSQL to hundreds of millions of users w
 
 | Operator | Clusters | PostgreSQL Version |
 |----------|----------|-------------------|
-| **CloudNativePG** | cnpg-db, cnpg-db-replica, temporal-db | 18 |
-| **Zalando Postgres Operator** | auth-db, supporting-shared-db | 16/17 |
+| **CloudNativePG** | product-db, product-db-replica, auth-db, shared-db, temporal-db | 18 |
 
 ---
 
@@ -542,4 +544,4 @@ case study:
 
 ---
 
-_Last updated: 2026-07-07_
+_Last updated: 2026-07-11 — All clusters now on CloudNativePG (Zalando retired); auth-db is sync ANY 1, all poolers are PgDog._

@@ -106,13 +106,10 @@ This is the most important concept to understand. The cluster runs **two separat
 | `ServiceMonitor/tempo` | `configs/monitoring/servicemonitors/tempo.yaml` | Manual (platform team) |
 | `ServiceMonitor/kong` | `controllers/kong/helmrelease.yaml` (`serviceMonitor.enabled: true`) | Kong chart (scrapes the proxy status port `:8100`) |
 | `ServiceMonitor/kube-apiserver` | `configs/monitoring/servicemonitors/kube-apiserver.yaml` | Manual (platform team) |
-| `PodMonitor/postgresql-auth-db` | `configs/monitoring/podmonitors/podmonitor-zalando-auth-db.yaml` | Manual (platform team) |
-| `PodMonitor/postgresql-supporting-shared-db` | `configs/monitoring/podmonitors/podmonitor-zalando-supporting-shared-db.yaml` | Manual (platform team) |
-| `PrometheusRule` (PostgreSQL, many) | `configs/monitoring/prometheusrules/postgres/` | Manual (platform team) |
+| `PrometheusRule` (PostgreSQL, many) | `configs/monitoring/prometheusrules/postgres/` (`cnpg/`, `cnpg-auth-db/`, `cnpg-shared-db/`) | Manual (platform team) |
 | `PrometheusRule/postgres-backup-alerts` | `configs/monitoring/prometheusrules/postgres/backup-alerts.yaml` | Manual (platform team) |
-| `PrometheusRule/pg-exporter-recording-rules` | `configs/monitoring/prometheusrules/postgres/pg-exporter-recording-rules.yaml` | Manual (platform team) |
 | `ServiceMonitor` (valkey) | Created at runtime by Helm chart | Valkey chart (`serviceMonitor.enabled: true`) |
-| `PodMonitor` (e.g. `cnpg-db`) | `configs/databases/clusters/*/monitoring/` | Manual (platform team) |
+| `PodMonitor` (CNPG per cluster) | `configs/databases/clusters/{product-db,auth-db,shared-db}/monitoring/podmonitor.yaml` (+ `temporal-db` via `enablePodMonitor`) | Manual (platform team) |
 | `PrometheusRule` (SLO rules) | Created at runtime by Sloth | Sloth Operator (from PrometheusServiceLevel) |
 
 **Why these CRDs are required**:
@@ -159,8 +156,8 @@ Additionally, the VM Operator **auto-creates** VM resources by converting Promet
 | Source (Prometheus CRD) | Auto-created (VM CRD) |
 |-------------------------|-----------------------|
 | `ServiceMonitor/tempo` | `VMServiceScrape/tempo` |
-| `PodMonitor/postgresql-auth-db` | `VMPodScrape/postgresql-auth-db` |
-| `PrometheusRule` under `postgres/cnpg/`, `postgres/zalando/` | Corresponding `VMRule` per resource |
+| `PodMonitor` (CNPG per cluster, e.g. `auth-db`) | `VMPodScrape` per resource |
+| `PrometheusRule` under `postgres/cnpg/`, `cnpg-auth-db/`, `cnpg-shared-db/` | Corresponding `VMRule` per resource |
 | ...all other Prometheus resources | ...corresponding VM resources |
 
 ### Auto-Conversion Flow
@@ -320,8 +317,7 @@ spec:
 ```
 
 VMAlert reads `VMRule` resources (including those auto-converted from `PrometheusRule`) and evaluates them against VMSingle. This means:
-- PostgreSQL alerts (`prometheusrules/postgres/`, `postgres-backup-alerts.yaml`)
-- pg_exporter recording rules (`pg-exporter-recording-rules.yaml`)
+- PostgreSQL alerts (`prometheusrules/postgres/` — `cnpg/`, `cnpg-auth-db/`, `cnpg-shared-db/`, `backup-alerts.yaml`)
 - Sloth-generated SLO rules
 
 All continue to work without any changes to the original `PrometheusRule` YAML files.
@@ -405,8 +401,11 @@ spec:
         storage: 20Gi
   resources:
     requests: { cpu: 20m, memory: 32Mi }
-    limits:   { cpu: 100m, memory: 128Mi }
+    limits:   { cpu: 100m, memory: 768Mi }
 ```
+
+The memory limit was raised to **768Mi** (from 128Mi, which OOMed under the
+fleet-wide log volume — including CNPG `pgaudit` + `auto_explain` records).
 
 Log ingestion is handled by the cluster-wide **Vector Agent** (`kube-system/vector`) which ships Kubernetes logs to VLSingle. See [VictoriaLogs docs](../logging/victorialogs.md) for Vector sink configuration.
 
@@ -482,18 +481,18 @@ healthChecks:
 flowchart LR
     subgraph sources ["Metric Sources"]
         Apps["Microservices<br/>OTLP push (RFC-0014)"]
-        PG["PostgreSQL<br/>pg_exporter"]
+        PG["PostgreSQL<br/>CNPG built-in :9187"]
         ESO["External Secrets<br/>/metrics"]
         TempoSvc["Tempo<br/>/metrics"]
     end
 
     subgraph promCRD ["Prometheus CRDs (your YAML)"]
-        PM1["PodMonitor<br/>postgresql-auth-db"]
+        PM1["PodMonitor<br/>CNPG per cluster"]
         SM2["ServiceMonitor<br/>tempo"]
     end
 
     subgraph autoConv ["VM Operator auto-converts"]
-        VMPS1["VMPodScrape<br/>postgresql-auth-db"]
+        VMPS1["VMPodScrape<br/>CNPG per cluster"]
         VMSS2["VMServiceScrape<br/>tempo"]
     end
 
@@ -526,16 +525,16 @@ flowchart LR
 ```mermaid
 flowchart LR
     subgraph rules ["Rule Sources"]
-        PR1["PrometheusRule<br/>postgres/*"]
+        PR1["PrometheusRule<br/>postgres/* (all CNPG)"]
         PR2["PrometheusRule<br/>postgres-backup-alerts"]
-        PR3["PrometheusRule<br/>pg-exporter-recording-rules"]
+        PR3["PrometheusRule<br/>microservices/alerts + recording-rules"]
         SlothPR["PrometheusRule<br/>SLO rules from Sloth"]
     end
 
     subgraph autoConv2 ["VM Operator auto-converts"]
-        VMR1["VMRule<br/>postgres/*"]
+        VMR1["VMRule<br/>postgres/* (all CNPG)"]
         VMR2["VMRule<br/>postgres-backup-alerts"]
-        VMR3["VMRule<br/>pg-exporter-recording-rules"]
+        VMR3["VMRule<br/>microservices"]
         VMR4["VMRule<br/>SLO rules"]
     end
 
@@ -829,4 +828,4 @@ kubectl get helmreleases -A -o wide
 
 ---
 
-_Last updated: 2026-07-10 — rewritten for the OTLP-push reality: retired `ServiceMonitor/microservices-api` references removed (apps push, RFC-0014 P3), rule paths corrected to `prometheusrules/postgres/`, log-flow diagram covers the app OTLP tee._
+_Last updated: 2026-07-11 — Zalando→CNPG migration: Zalando PodMonitors and the retired pg-exporter recording rules removed; CNPG per-cluster PodMonitors + `postgres/cnpg*` rule dirs; VLSingle memory raised to 768Mi for the fleet log volume._

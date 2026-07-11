@@ -3,7 +3,7 @@
 | Attribute | Value |
 |-----------|-------|
 | **Status** | **Implemented and enforced** — manifests reconciled by Flux; **actively enforced by kindnet** on the local Kind cluster (K8s 1.34.3) |
-| **Scope** | Ingress fencing across app-tier namespaces — app HTTP `:8080` / gRPC `:9090`, plus DB-tier ports (poolers, Patroni/CNPG status, exporters) |
+| **Scope** | Ingress fencing across app-tier namespaces — app HTTP `:8080` / gRPC `:9090`, plus DB-tier ports (poolers, CNPG status, exporters) |
 | **Purpose** | Make the cluster the fence for `internal` audiences — internal routes are reachable only from explicitly allowed namespaces, not merely "absent from the Ingress" |
 | **Related** | [`policy-catalog.md`](policy-catalog.md) (Kyverno catalog), [`../api/api-naming-convention.md`](../api/api-naming-convention.md) (audiences), [`../api/grpc-internal-comms.md`](../api/grpc-internal-comms.md) (gRPC `:9090`, now fenced) |
 
@@ -80,19 +80,19 @@ allowed (north-south gateway traffic); the rest mirror the east-west call graph.
 
 ### DB-tier allows
 
-The DB-hosting namespaces (`product` for the CNPG cluster; `auth` and `user` for
-the Zalando clusters) also allow the operators, the metrics scraper, and pooler
-traffic they depend on. Without these the operators cannot reach the database pods
+The DB-hosting namespaces (`product`, `auth`, and `user` — each hosts a
+CloudNativePG cluster) also allow the operator, the metrics scraper, and pooler
+traffic they depend on. Without these the operator cannot reach the database pods
 and `databases-local` / `apps-local` never reconcile:
 
 | Callee ns | Allowed source | Ports | Why |
 |-----------|----------------|-------|-----|
 | **product** | `cloudnative-pg` operator | `:8000` (status), `:5432` | Operator extracts instance status + manages SQL. |
-| **product** | `cart`, `order`, `payment` (cross-ns) | `:6432` (PgDog), `:5432` (`cnpg-db-rw`) | `cart`/`order` use the pooler + migrate against the primary; `payment` connects **direct-TLS to `cnpg-db-rw:5432`** for runtime (it bypasses PgDog) as well as migrations. |
+| **product** | `cart`, `order`, `payment` (cross-ns) | `:6432` (PgDog), `:5432` (`product-db-rw`) | `cart`/`order` use the pooler + migrate against the primary; `payment` connects **direct-TLS to `product-db-rw:5432`** for runtime (it bypasses PgDog) as well as migrations. |
 | **product** | intra-namespace | `:5432`, `:6432`, `:8000` | PgDog → Postgres, replica WAL streaming, product-service → pooler. |
-| **auth**, **user** | `postgres-operator` (Zalando) | `:8008` (Patroni), `:5432` (SQL init) | Operator inits Patroni + roles/databases. |
-| **user** | `review`, `notification`, `shipping` (cross-ns) | `:5432` (PgBouncer pooler + migrations) | Siblings share `supporting-shared-db`. |
-| **auth**, **user** | intra-namespace | `:8008`, `:5432` | Patroni peer coordination + PgBouncer → Postgres. |
+| **auth**, **user** | `cloudnative-pg` operator | `:8000` (status), `:5432` | Operator extracts instance status + manages SQL. |
+| **user** | `review`, `notification`, `shipping` (cross-ns) | `:6432` (PgDog), `:5432` (migrations) | Siblings share `shared-db` via `pgdog-shared`. |
+| **auth**, **user** | intra-namespace | `:5432`, `:6432`, `:8000` | PgDog → Postgres, WAL streaming, app → pooler. |
 | **product/auth/user** | `monitoring` | `:9187` (exporter), `:9090` (PgDog metrics) | VMAgent scrapes the postgres/pooler exporters. |
 
 ---
@@ -187,4 +187,4 @@ flowchart LR
 
 ---
 
-_Last updated: 2026-07-10 — stale payment↛JWKS gap removed (auth.yaml admits all 9 namespaces incl. payment)._
+_Last updated: 2026-07-11 — Zalando→CNPG migration: DB-tier allows reshaped to the CloudNativePG operator (`:8000`/`:5432`) + PgDog (`:6432`); Patroni `:8008` / PgBouncer rows dropped; `supporting-shared-db`→`shared-db`, `cnpg-db-rw`→`product-db-rw`. Earlier: stale payment↛JWKS gap removed (auth.yaml admits all 9 namespaces incl. payment)._

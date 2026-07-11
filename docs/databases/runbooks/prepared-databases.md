@@ -1,5 +1,9 @@
 # Runbook: Zalando `preparedDatabases` CreateFailed
 
+> **Historical / reference.** The platform migrated all Postgres from the
+> Zalando operator to CloudNativePG (see 002/003). Zalando is no longer deployed
+> here — this doc is kept for learning.
+
 ## Table of Contents
 
 1. [Symptom](#symptom)

@@ -7,8 +7,9 @@ resources:
   - sloth/
   - servicemonitors/external-secrets.yaml
   - servicemonitors/tempo.yaml
-  - servicemonitors/kong.yaml
   - servicemonitors/kube-apiserver.yaml
+  - servicemonitors/cert-manager.yaml
+  - servicemonitors/kyverno.yaml
   - grafana/
   # Note: CloudNativePG PodMonitors moved to configs/databases/monitoring/ to deploy AFTER database clusters
   - podmonitors/podmonitor-zalando-auth-db.yaml

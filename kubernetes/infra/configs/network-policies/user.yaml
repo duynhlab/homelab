@@ -39,7 +39,9 @@ spec:
           port: 8008
         - protocol: TCP
           port: 5432
-    # Metrics scrape (VMAgent, monitoring ns) → postgres-exporter sidecar.
+    # Metrics scrape (VMAgent, monitoring ns) → the Pigsty pg_exporter sidecar
+    # (supporting-shared-db uses :9630, not the CNPG :9187 default). Without 9630
+    # the scrape times out → 0 pg_* series + 44 recording rules empty (debugs §I/§N #6).
     - from:
         - namespaceSelector:
             matchLabels:
@@ -47,6 +49,8 @@ spec:
       ports:
         - protocol: TCP
           port: 9187
+        - protocol: TCP
+          port: 9630
     # Intra-namespace: Patroni peer coordination + PgBouncer → Postgres.
     - from:
         - podSelector: {}

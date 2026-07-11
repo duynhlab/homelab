@@ -1,0 +1,21 @@
+# Kyverno metrics (admission/background/cleanup/reports controllers) on :8000 —
+# kyverno_policy_results_total (pass/fail/error by policy) + admission latency.
+# The four *-metrics Services share app.kubernetes.io/part-of: kyverno and expose
+# the named port `metrics-port`; non-metrics Services lack it and are skipped.
+# kyverno ns has no NetworkPolicy (infra tier). debugs §N.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kyverno
+  namespace: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+      - kyverno
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: kyverno
+  endpoints:
+    - port: metrics-port
+      interval: 60s
+      scrapeTimeout: 30s

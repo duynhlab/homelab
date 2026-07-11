@@ -10,7 +10,7 @@ spec:
   type: Static
   defaultValues:
     name: review
-    image_tag: "1.0.1" # {"$imagepolicy": "flux-system:review:tag"}
+    image_tag: "1.2.0" # {"$imagepolicy": "flux-system:review:tag"}
     namespace: review
     grpc_server: true
     replicaCount: 1

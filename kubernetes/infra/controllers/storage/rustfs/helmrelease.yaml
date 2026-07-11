@@ -79,5 +79,8 @@ spec:
         cpu: 100m
         memory: 128Mi
       limits:
-        cpu: 500m
+        # 500m chronically throttled (~44% of periods) → Pyroscope profile-upload
+        # 422s cluster-wide + CNPG RetentionPolicyFailed + slow backups (debugs
+        # §O/§L). Raise to 1.5 CPU for concurrent walk_dir + PUT traffic.
+        cpu: "1500m"
         memory: 512Mi

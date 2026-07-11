@@ -42,8 +42,8 @@ spec:
     # Adding a service? Add its allow line ABOVE the reject (the one
     # exception to "never touch instance.yaml" — HBA is cluster infra).
     pg_hba:
-      - host auth auth auth scram-sha-256
-      - host all  all  all  reject
+      - host auth auth all scram-sha-256
+      - host all  all  all reject
 
     synchronous:
       method: any

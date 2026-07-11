@@ -44,11 +44,11 @@ spec:
     # exception to "never touch instance.yaml" — HBA is cluster infra).
     # `user` is a reserved word but is a plain role/db token here — no quoting.
     pg_hba:
-      - host user         user         user         scram-sha-256
-      - host notification notification notification scram-sha-256
-      - host shipping     shipping     shipping     scram-sha-256
-      - host review       review       review       scram-sha-256
-      - host all          all          all          reject
+      - host user         user         all scram-sha-256
+      - host notification notification all scram-sha-256
+      - host shipping     shipping     all scram-sha-256
+      - host review       review       all scram-sha-256
+      - host all          all          all reject
 
     # No synchronous block: a single-instance cluster has no replica to
     # confirm writes — synchronous{any,1} would leave the primary unable to

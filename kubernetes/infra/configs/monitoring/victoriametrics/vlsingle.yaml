@@ -16,10 +16,14 @@ spec:
       requests:
         storage: 20Gi
 
+  # 128Mi was OOMKilled repeatedly (exit 137) once the fleet-wide log volume grew
+  # (all CNPG postgres/pgaudit streams after the Zalando->CNPG migration). Each OOM
+  # restart drops Vector's sink connection and loses in-flight logs (e.g. sparse
+  # pgaudit records). Bumped for a homelab-scale single-node log store.
   resources:
     requests:
-      cpu: 20m
-      memory: 32Mi
+      cpu: 50m
+      memory: 192Mi
     limits:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 500m
+      memory: 768Mi

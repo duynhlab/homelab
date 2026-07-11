@@ -109,6 +109,17 @@ spec:
       http:
         containerPort: 8100
 
+    # Chart-native ServiceMonitor — scrapes the proxy's status port (8100, the
+    # Prometheus-plugin /metrics: kong_http_requests_total, latency, bandwidth,
+    # datastore_reachable) + the ingress-controller cmetrics port. Replaces the
+    # hand-rolled ServiceMonitor that scraped the wrong (health) port → false
+    # KongDown. The chart labels the proxy Service enable-metrics automatically
+    # when proxy is enabled. debugs §N/#4.
+    serviceMonitor:
+      enabled: true
+      trustCRDsExist: true
+      interval: 15s
+
     # Resource limits (homelab-friendly). Bumped: the Kong proxy cold-start peaks
     # >500Mi, so the old 256Mi limit was OOMKilled (exitCode 137 → CrashLoop) and
     # slow-boot tripped the liveness probe. See debugs.md Bug 10.

@@ -31,3 +31,10 @@ spec:
       kind: TemporalCluster
       name: temporal
       namespace: temporal
+    # Wait for the `mop` namespace to be REGISTERED in Temporal (not just the
+    # cluster Ready) so apps-local (order-worker dials namespace `mop` at
+    # startup) doesn't deploy before it exists (debugs BUGS-4).
+    - apiVersion: temporal.io/v1beta1
+      kind: TemporalNamespace
+      name: mop
+      namespace: temporal

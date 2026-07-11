@@ -7,7 +7,6 @@ resources:
   - sloth/
   - servicemonitors/external-secrets.yaml
   - servicemonitors/tempo.yaml
-  - servicemonitors/kong.yaml
   - servicemonitors/kube-apiserver.yaml
   - grafana/
   # Note: CloudNativePG PodMonitors moved to configs/databases/monitoring/ to deploy AFTER database clusters

@@ -9,8 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Chart-native metrics scraping for cert-manager and the Kong gateway proxy**:
+  cert-manager now emits its own `ServiceMonitor` via
+  `prometheus.servicemonitor.enabled` (controller/webhook/cainjector on `:9402`);
+  Kong proxy metrics come from the chart's built-in `serviceMonitor` (scrapes the
+  proxy status port `:8100` — `kong_http_requests_total` etc.), replacing a
+  hand-rolled scrape that hit the ingress-controller health port and pinned a
+  false-positive `KongDown` alert. Kyverno already ships a native `serviceMonitor`
+  (VMAgent `selectAllByDefault` picks it up), so no extra CR is needed there.
+
+### Changed
+
+- **Point the 9 services at the released RFC-0014 images** (`image_tag`
+  `1.0.1`→`1.2.0`, payment `1.0.0`→`1.1.0`) so the cluster runs the `obsx` OTLP
+  code (metrics/logs/traces) instead of the pre-RFC-0014 binaries.
+
 ### Fixed
 
+- **Local Kind bring-up races (make up)**: Zalando operator now gets
+  `enable_readiness_probe: true` so spilo pods gate on real readiness; the
+  `ensure-databases` Jobs **wait for the owner role** before `CREATE DATABASE`
+  instead of crash-looping; `temporal-operator` runs `replicaCount: 2` so its
+  `failurePolicy: Fail` webhook never drops to zero on a restart; `order-worker`
+  gets a `TemporalNamespace/mop` readiness gate + a higher CPU limit; the
+  VMAlertmanager config no longer ships an unparseable `<SLACK_WEBHOOK_URL>`
+  placeholder.
+- **DB-exporter metrics were NetworkPolicy-blocked**: allow `monitoring` → the
+  pgbouncer-exporter (`:9127`, auth) and the pg_exporter pilot (`:9630`, user)
+  so their series (and the pg recording rules) populate.
+- **RustFS CPU** raised (500m→1500m) — the chronic throttle caused cluster-wide
+  Pyroscope profile-upload 422s and slow backups.
 - **local gateway wording**: microservices.md said the local stack fronts
   services with nginx — it is Kong 3.9 DB-less (`gateway/kong.yml`, edge
   JWT parity with the cluster); gateway table row corrected to 8000→8080;

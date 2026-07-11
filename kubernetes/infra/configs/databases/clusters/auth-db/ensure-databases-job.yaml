@@ -68,6 +68,13 @@ spec:
                 if psql -tAc "SELECT 1 FROM pg_database WHERE datname = '$db'" | grep -q 1; then
                   echo "database '$db' already exists"
                 else
+                  # Wait for the owner role — the Zalando operator syncs roles
+                  # asynchronously; without this the Job would CREATE DATABASE
+                  # before the role exists and crash (debugs BUGS-2). Waiting
+                  # instead of crashing makes the Job converge with no restarts.
+                  until psql -tAc "SELECT 1 FROM pg_roles WHERE rolname = '$owner'" | grep -q 1; do
+                    echo "waiting for owner role '$owner'..."; sleep 5
+                  done
                   echo "creating database '$db' owner '$owner'"
                   psql -c "CREATE DATABASE \"$db\" OWNER \"$owner\""
                 fi

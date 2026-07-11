@@ -72,7 +72,9 @@ spec:
           port: 8008
         - protocol: TCP
           port: 5432
-    # Metrics scrape (VMAgent, monitoring ns) → postgres-exporter sidecar.
+    # Metrics scrape (VMAgent, monitoring ns) → postgres-exporter sidecar (9187)
+    # + the standalone pgbouncer-exporter Deployment (9127). Without 9127 the
+    # pgbouncer scrape times out → 0 pgbouncer_* series (debugs §I/§N #6).
     - from:
         - namespaceSelector:
             matchLabels:
@@ -80,6 +82,8 @@ spec:
       ports:
         - protocol: TCP
           port: 9187
+        - protocol: TCP
+          port: 9127
     # Intra-namespace: Patroni peer coordination + PgBouncer → Postgres.
     - from:
         - podSelector: {}

@@ -48,6 +48,10 @@ spec:
     remediation:
       retries: 5
   values:
+    # 2 replicas so the (failurePolicy: Fail) mutating webhook never drops to zero
+    # on a single pod restart — otherwise every TemporalCluster/Namespace dry-run
+    # is rejected during the gap (debugs BUGS-5). PDB is a follow-up.
+    replicaCount: 2
     manager:
       resources:
         requests:

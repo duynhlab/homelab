@@ -29,6 +29,10 @@ spec:
       wal_s3_bucket: pg-backups-zalando
     configKubernetes:
       cluster_domain: cluster.local
+      # Gate spilo pod Ready on real readiness (basebackup/WAL replay/role sync),
+      # not just container start — so the operator's role/db sync doesn't race a
+      # still-booting cluster (debugs BUGS-2/3).
+      enable_readiness_probe: true
       enable_cross_namespace_secret: true
       pod_environment_configmap: postgres-operator/zalando-walg-config
       pod_environment_secret: pg-backup-rustfs-credentials

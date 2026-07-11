@@ -56,3 +56,14 @@ spec:
         limits:
           cpu: 100m
           memory: 256Mi
+    # Metrics — chart-native ServiceMonitor (controller/webhook/cainjector expose
+    # /metrics on :9402). Replaces a hand-rolled ServiceMonitor for consistency
+    # with the other charts (kong, kyverno, valkey, pyroscope). The VictoriaMetrics
+    # operator converts it to a VMServiceScrape; VMAgent selectAllByDefault picks
+    # it up. cert-manager also ships a podmonitor toggle — servicemonitor matches
+    # the :9402 Service topology already verified in-cluster.
+    prometheus:
+      enabled: true
+      servicemonitor:
+        enabled: true
+        interval: 60s

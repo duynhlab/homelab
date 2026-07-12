@@ -180,10 +180,78 @@ curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: B
   [ (i['product_id'], i['price_changed'], i['unit_price']) for i in s['items'] ])"
 docker compose exec -T postgres psql -U postgres -d product -c \
   "UPDATE products SET price = price - 1 WHERE id = 1" >/dev/null
+
+# A10. Confirm handoff + abandonment (RFC-0015 P2). Full lifecycle: fresh
+#      session → address → shipping → payment → confirm (Idempotency-Key
+#      REQUIRED) → order created + fulfillment saga → replay = same order.
+AT0=$(curl -s -X POST $BASE/auth/v1/public/auth/login -H 'Content-Type: application/json' \
+  -d '{"username":"alice","password":"password123"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['access_token'])")
+curl -s -X POST $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT0" \
+  -H 'Content-Type: application/json' \
+  -d '{"product_id":"1","product_name":"Wireless Mouse","product_price":29.99,"quantity":1}' -o /dev/null
+S=$(curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT0")
+SID=$(echo "$S" | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+curl -s -o /dev/null -X PUT $BASE/checkout/v1/private/checkout/sessions/$SID/address \
+  -H "Authorization: Bearer $AT0" -H 'Content-Type: application/json' \
+  -d '{"full_name":"Alice","line1":"1 Main St","city":"HN","country":"VN"}'
+curl -s -o /dev/null -w "A10 shipping: %{http_code} (want 200 → shipping_set, fee 0 stub)\n" \
+  -X PUT $BASE/checkout/v1/private/checkout/sessions/$SID/shipping \
+  -H "Authorization: Bearer $AT0" -H 'Content-Type: application/json' \
+  -d '{"shipping_method":"standard"}'
+curl -s -o /dev/null -w "A10 payment:  %{http_code} (want 200 → ready)\n" \
+  -X PUT $BASE/checkout/v1/private/checkout/sessions/$SID/payment \
+  -H "Authorization: Bearer $AT0" -H 'Content-Type: application/json' \
+  -d '{"payment_method_token":"tok_visa_ok"}'
+curl -s -o /dev/null -w "A10 PAN reject: %{http_code} (want 400 — tok_ only, never persisted)\n" \
+  -X PUT $BASE/checkout/v1/private/checkout/sessions/$SID/payment \
+  -H "Authorization: Bearer $AT0" -H 'Content-Type: application/json' \
+  -d '{"payment_method_token":"tok_4111111111111111"}'
+curl -s -o /dev/null -w "A10 no-key:   %{http_code} (want 400 IDEMPOTENCY_KEY_REQUIRED)\n" \
+  -X POST $BASE/checkout/v1/private/checkout/sessions/$SID/confirm -H "Authorization: Bearer $AT0"
+KEY="a10-$(date +%s)"
+C=$(curl -s -X POST $BASE/checkout/v1/private/checkout/sessions/$SID/confirm \
+  -H "Authorization: Bearer $AT0" -H "Idempotency-Key: $KEY")
+OID=$(echo "$C" | python3 -c "import json,sys;print(json.load(sys.stdin).get('order_id',''))")
+echo "A10 confirm:  order $OID ($(echo "$C" | python3 -c "import json,sys;print(json.load(sys.stdin)['status'])"))"
+# Replay with the SAME key → the SAME order, no second saga.
+C2=$(curl -s -X POST $BASE/checkout/v1/private/checkout/sessions/$SID/confirm \
+  -H "Authorization: Bearer $AT0" -H "Idempotency-Key: $KEY")
+[ "$(echo "$C2" | python3 -c "import json,sys;print(json.load(sys.stdin).get('order_id',''))")" = "$OID" ] \
+  && echo "A10 replay:   OK same order $OID" || echo "A10 replay:   FAIL"
+# The order exists and its fulfillment saga ran (confirmed after a few seconds).
+sleep 5
+curl -s $BASE/order/v1/private/orders/$OID -H "Authorization: Bearer $AT0" | \
+  python3 -c "import json,sys; o=json.load(sys.stdin); print('A10 order:', o['id'], o['status'], '(want confirmed = saga ran)')"
+docker compose exec -T temporal temporal workflow list --namespace mop -q "WorkflowId = 'order-fulfillment-$OID'" 2>/dev/null | head -3
+
+# Abandonment (ADR-019): the DB deadline is the authority; the workflow timer
+# makes expiry proactive. Shorten the DB deadline and verify the outcome.
+AT1=$(curl -s -X POST $BASE/auth/v1/public/auth/login -H 'Content-Type: application/json' \
+  -d '{"username":"alice","password":"password123"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['access_token'])")
+curl -s -X POST $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT1" -H 'Content-Type: application/json' \
+  -d '{"product_id":"2","product_name":"USB Hub","product_price":79.99,"quantity":1}' -o /dev/null
+SID2=$(curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT1" | \
+  python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+docker compose exec -T postgres psql -U postgres -d checkout -c \
+  "UPDATE checkout_sessions SET expires_at = now() + interval '5 seconds' WHERE id = '$SID2'" >/dev/null
+sleep 8
+# Any read past the DB deadline answers 410 — the lazy backstop, worker or not:
+curl -s -o /dev/null -w "A10 lazy-410: %{http_code} (want 410 once past expires_at)\n" \
+  $BASE/checkout/v1/private/checkout/sessions/$SID2 -H "Authorization: Bearer $AT1"
+docker compose exec -T postgres psql -U postgres -d checkout -t -c \
+  "SELECT status, expired_reason FROM checkout_sessions WHERE id = '$SID2'"
+# want: expired | lazy (the read got there first) or timer (the worker did)
 ```
 
 > Rapid-fire auth calls can trip Kong's rate limit (429). That is the gateway
 > working, not a bug — wait a few seconds and retry the step.
+>
+> A10 abandonment timing: the workflow timer arms for the session's FULL TTL
+> (default 30m) at creation; shortening `expires_at` in SQL afterwards only
+> moves the LAZY deadline. To watch the timer itself fire quickly, run the
+> stack with `SESSION_TTL_SECONDS=15` on `checkout` + `checkout-worker`
+> instead, then create a session and leave it untouched — it flips to
+> `expired(timer)` in ~15s while the SPA shows 410 on reload.
 
 ### Phase B — real browser (agent-browser, ~2 min)
 

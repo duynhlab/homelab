@@ -25,6 +25,7 @@ tokenless internal cart-clear), which remains REST — see the hop table below.
 | **Phase 2** — `order → notification` publish on checkout (best-effort; the saga worker drives it today) | ✅ | notification + order |
 | **Payment (RFC-0010)** — `order` + `order-worker` → `payment` (saga capture/refund + `GetPayment` enrichment); `order-worker` → `product` (saga stock) | ✅ gRPC-only | payment + product + order + order-worker |
 | **Checkout (RFC-0015 P1)** — `checkout → cart` (`cart.v1/GetCart`, cart's first gRPC server — read-only, ADR-021) + `checkout → product` (`product.v1/GetProducts`, cache-bypassing price/stock read — ADR-020) | ✅ gRPC-only (local-stack; cluster at P5) | cart + product + checkout |
+| **Checkout confirm (RFC-0015 P2)** — `checkout → order` (`order.v1/CreateOrder`, order's FIRST gRPC server — idempotent by `(user_id, idempotency_key)`, replay-fingerprinted, saga kickoff with pending-only status gate + RejectDuplicate; ADR-018) | ✅ gRPC-only (local-stack; cluster at P5) | order + checkout + pkg |
 | **Cluster** — headless `{product,review,shipping,notification,payment}-grpc` Services (`:9090`) + ResourceSet `*_GRPC_ADDR` env (`auth-grpc` removed in Phase 5) | ✅ | mop chart (`grpc.enabled`), `kubernetes/apps/domains/*-rs.yaml`, `kubernetes/apps/services/*.yaml` |
 | **Phase 3** — NetworkPolicy fences `:9090`; gRPC health service registered | ✅ | `kubernetes/infra/configs/network-policies/` |
 | **Phase 3** — mTLS on `:9090` | ⏳ deferred | services use `insecure` creds; needs `grpcx` TLS + cert-manager |
@@ -42,6 +43,7 @@ Consumers dial the headless Services:
 | `NOTIFICATION_GRPC_ADDR` | order → notification (+ order-worker) | `dns:///notification-grpc.notification.svc.cluster.local:9090` |
 | `PAYMENT_GRPC_ADDR` | order → payment (+ order-worker saga) | `dns:///payment-grpc.payment.svc.cluster.local:9090` |
 | `PRODUCT_GRPC_ADDR` | order-worker → product; checkout → product | `dns:///product-grpc.product.svc.cluster.local:9090` |
+| `ORDER_GRPC_ADDR` | checkout → order (confirm handoff, ADR-018) | `dns:///order-grpc.order.svc.cluster.local:9090` |
 | `CART_GRPC_ADDR` | checkout → cart (read-only GetCart) | `dns:///cart-grpc.cart.svc.cluster.local:9090` |
 
 ## TL;DR

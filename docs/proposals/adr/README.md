@@ -43,5 +43,7 @@ settled decisions.
 | [ADR-015](ADR-015-pg-hba-connection-isolation/) | Database connection isolation via declarative pg_hba | Accepted | [RFC-0012](../rfc/RFC-0012/) |
 | [ADR-016](ADR-016-otel-metrics-cutover/) | Metrics cutover to the OTLP push pipeline | Accepted | [RFC-0014](../rfc/RFC-0014/) |
 | [ADR-017](ADR-017-api-path-collection-noun/) | Collection-noun segment after the audience in every API path | Accepted | — |
+| [ADR-018](ADR-018-checkout-order-boundary/) | Order stays the only orders-writer; checkout hands off via CreateOrder gRPC | Accepted | [RFC-0015](../rfc/RFC-0015/) |
+| [ADR-019](ADR-019-session-expiry-model/) | Session expiry = durable timer (wake-up) + lazy backstop (authority) | Accepted | [RFC-0015](../rfc/RFC-0015/) |
 | [ADR-020](ADR-020-checkout-revalidation-policy/) | Product is the checkout price authority; stock checked, never reserved | Accepted | [RFC-0015](../rfc/RFC-0015/) |
 | [ADR-021](ADR-021-cart-grpc-read-surface/) | Cart gains a read-only gRPC surface; writes stay on REST | Accepted | [RFC-0015](../rfc/RFC-0015/) |

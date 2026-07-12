@@ -7,7 +7,7 @@
 | **Superseded** | v2.0.0 free-form `{resource…}` (13 routes renamed, [ADR-017](../proposals/adr/ADR-017-api-path-collection-noun/)); `docs/api/api.md` cluster-only `/api/v1/*` shape (v0.85 and earlier) |
 | **Scope** | All HTTP URLs used by browsers, services, and admin/seed callers |
 | **Primary domain** | `local.duynh.me` — platform root; public API at `gateway.duynh.me` |
-| **Last updated** | 2026-07-12 (v3.0.1 — checkout joins the process-named exception: `checkout/sessions`) |
+| **Last updated** | 2026-07-13 (RFC-0015 P2: checkout shipping/payment/confirm routes) |
 
 ## Purpose
 
@@ -166,16 +166,20 @@ All private.
 | `POST` | `/payment/v1/internal/payments/reconciliation/runs` | internal | Reconciliation trigger (in-cluster) |
 | `GET` | `/payment/v1/internal/payments/reconciliation/runs/:id` | internal | Reconciliation status (in-cluster) |
 
-### checkout-service (namespace `checkout`) — RFC-0015 P1 (local-stack; cluster at P5)
+### checkout-service (namespace `checkout`) — RFC-0015 P1+P2 (local-stack; cluster at P5)
 
 All private (Kong edge JWT + in-service authmw); sessions owner-scoped by the
-JWT `user_id`. Shipping/payment/promo/confirm steps land in P2–P4.
+JWT `user_id`. Promo lands in P4; shipping fee/tax are 0-stubs until the P3
+GetQuote integration.
 
 | Method | Path | Audience | Caller |
 |--------|------|----------|--------|
 | `POST` | `/checkout/v1/private/checkout/sessions` | private | Browser — create (201) or return the active session (200, idempotent) |
 | `GET` | `/checkout/v1/private/checkout/sessions/:id` | private | Browser |
 | `PUT` | `/checkout/v1/private/checkout/sessions/:id/address` | private | Browser |
+| `PUT` | `/checkout/v1/private/checkout/sessions/:id/shipping` | private | Browser — choose method (P2: fee/tax 0-stub) |
+| `PUT` | `/checkout/v1/private/checkout/sessions/:id/payment` | private | Browser — attach `tok_…` reference (PAN-like → 400 pre-persist) |
+| `POST` | `/checkout/v1/private/checkout/sessions/:id/confirm` | private | Browser — idempotent order handoff; `Idempotency-Key` header REQUIRED (≤120 chars) |
 | `DELETE` | `/checkout/v1/private/checkout/sessions/:id` | private | Browser — cancel |
 
 ## Deprecated aliases (transitional — expand phase, ADR-017)

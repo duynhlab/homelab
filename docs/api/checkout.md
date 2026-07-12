@@ -96,7 +96,7 @@ checkout is a **client-only** service: nothing dials into it except Kong (no
 gRPC server, no internal HTTP surface). Every outbound east-west call is gRPC
 via `pkg/grpcx`.
 
-## API (P1 surface)
+## API
 
 All routes are `private` — Kong edge-JWT is the coarse filter, in-service
 `pkg/authmw` is authoritative, and sessions are **owner-scoped** by the JWT
@@ -107,11 +107,62 @@ All routes are `private` — Kong edge-JWT is the coarse filter, in-service
 | `POST` | `/checkout/v1/private/checkout/sessions` | Snapshot cart + re-validate prices → session `open`. **201** created, **200** existing active session (idempotent) | `409 CONFLICT` empty cart |
 | `GET` | `/checkout/v1/private/checkout/sessions/:id` | Session + items + totals | `404` unknown **or someone else's** (anti-IDOR — indistinguishable); `410 SESSION_EXPIRED` past TTL |
 | `PUT` | `/checkout/v1/private/checkout/sessions/:id/address` | Store the shipping address → `address_set` (re-editable from any pre-confirm state) | `400` missing/oversized fields; `409 INVALID_TRANSITION` from terminal states |
-| `DELETE` | `/checkout/v1/private/checkout/sessions/:id` | Cancel (idempotent on cancelled) | `409 INVALID_TRANSITION` on completed |
+| `PUT` | `/checkout/v1/private/checkout/sessions/:id/shipping` | `{"shipping_method": "standard"}` → `shipping_set`. **P2 stub:** fee and tax are 0 until the P3 GetQuote integration | `409 INVALID_TRANSITION` before an address exists |
+| `PUT` | `/checkout/v1/private/checkout/sessions/:id/payment` | `{"payment_method_token": "tok_…"}` → `ready`. Opaque `tok_` references ONLY — PAN-shaped input is rejected **before** any persistence and never echoed (the order/payment rule) | `400 VALIDATION_ERROR` non-tok\_ input |
+| `POST` | `/checkout/v1/private/checkout/sessions/:id/confirm` | The idempotent order handoff (below). Header `Idempotency-Key` REQUIRED (≤120 chars). **201** with the completed session incl. `order_id`; replays return the cached 201 | `400 IDEMPOTENCY_KEY_REQUIRED`; `409 PRICE_CHANGED` / `409 STOCK_UNAVAILABLE` (session requoted → `shipping_set`, **key not consumed** — re-review and confirm again with the same key); `409 CONFLICT` another confirm in flight; `409 IDEMPOTENCY_CONFLICT` same key, different session; `503` + `Retry-After` order/product transient (retry with the SAME key) |
+| `DELETE` | `/checkout/v1/private/checkout/sessions/:id` | Cancel (idempotent on cancelled AND on a session the timer just expired) | `409 INVALID_TRANSITION` on completed |
 
 Platform conventions apply: `snake_case` JSON, resources returned directly
 (no wrapper envelope), the `{"error","code"}` error envelope, and dollars on
 the wire (minor units internally, like order).
+
+## The confirm flow (P2) — one order per key, no matter what dies
+
+Confirm is the only step that leaves checkout's own database: it hands the
+validated session to order-service over gRPC (`order.v1/CreateOrder`,
+ADR-018) and must create **at most one order per (user, Idempotency-Key)**
+through any crash, retry, or race. Five mechanisms carry that guarantee:
+
+1. **Claim** (`pkg/idempotency`, ADR-010): the key row is the retry ledger.
+   A finished key replays its cached 201 verbatim; an in-flight key answers
+   `409`; the claim's request hash binds the key to THIS session id.
+2. **Session↔claim binding** (`confirm_key_id`): entering `confirming` CASes
+   the claim id onto the row. A different Idempotency-Key can never act on a
+   confirming (or completed) session — no second order, no post-hoc 201s.
+3. **Attempt marker before CreateOrder**: a checkpoint (`subject_id = 0`) is
+   written BEFORE the first order call, and price/stock re-validation runs
+   only while no marker exists. A requote (PRICE_CHANGED) therefore can never
+   coexist with an order that might already exist; marker re-entries always
+   re-drive the idempotent CreateOrder instead.
+4. **Deadline fencing**: the whole confirm runs under a 15s context; every
+   write is ctx-bound, and the 90s lock-takeover window (startup-validated to
+   be > 4× the deadline) therefore proves a taken-over owner is dead. Two
+   live executions of the same key cannot exist.
+5. **Transients never compensate**: order/product being down leaves the
+   session `confirming`+bound and releases the key — an immediate same-key
+   retry re-drives and converges (order-side idempotency makes the re-drive a
+   replay, never a duplicate).
+
+The known trade-off: a confirm that crashes and is never retried parks its
+session in `confirming` (never expirable, blocks new sessions for that user).
+The SPA persists the key per session so retry is always possible; the runbook
+covers manual recovery — the marker tells ops whether an order attempt ever
+happened (`subject_id IS NULL` ⇒ safe to unbind).
+
+## Abandonment (P2) — the timer is a wake-up, never a verdict
+
+`AbandonedCheckoutWorkflow` (one per session, Signal-With-Start from every
+mutation; task queue `checkout`) makes expiry *timely*; the DB deadline
+(`expires_at`, bumped to now+TTL by every successful mutation) stays the only
+*authority* (ADR-019). When the timer fires, the `ExpireIfDue` activity
+expires the row only if `expires_at <= now()`; if the deadline moved — a lost
+signal, a TTL change, an idempotent reuse — it answers "not due + remaining"
+and the workflow re-arms to the DB's own clock. Confirm/cancel signal
+`finalize`; terminal and `confirming` rows make the watch exit (a later
+mutation resurrects it). Losing Temporal entirely degrades expiry to the
+lazy backstop and nothing else. Watch
+`checkout_sessions_expired_total{reason}`: a lazy-majority means the worker
+is down.
 
 ## How it works — three mechanisms worth learning
 
@@ -179,4 +230,4 @@ unique index.
 - [grpc-internal-comms.md](./grpc-internal-comms.md) — the two new gRPC edges
 - [microservices.md](./microservices.md) — feature matrix
 
-_Last updated: 2026-07-12_
+_Last updated: 2026-07-13_

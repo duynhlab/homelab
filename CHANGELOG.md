@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0015 P2 — checkout confirm + abandonment (local-stack)**: order gains
+  its first gRPC server (`order.v1/CreateOrder` on `:9090` — idempotent by
+  `(user_id, idempotency_key)` with a replay fingerprint, pending-only saga
+  kickoff gate + `RejectDuplicate` dedup; ADR-018); checkout adds
+  `PUT …/shipping` (fee/tax 0-stub until P3), `PUT …/payment` (`tok_…` only,
+  PAN-like 400 pre-persist), and `POST …/sessions/:id/confirm` (required
+  `Idempotency-Key`, pkg/idempotency Claim→marker→CreateOrder→Finish with
+  session↔claim binding, deadline fencing, PRICE_CHANGED/STOCK_UNAVAILABLE
+  requote that never burns the key); `AbandonedCheckoutWorkflow` +
+  `checkout-worker` (DB-authoritative `ExpireIfDue` + re-arm; ADR-019);
+  confirm/expiry business metrics; local-stack `checkout-worker` service and
+  README audit section A10; ADR-018 + ADR-019.
+
 - **RFC-0015 P1 — checkout service (local-stack)**: checkout-service rebuilt
   on the platform 3-layer template (old `/api/v1/*` scaffold removed) serving
   `/checkout/v1/private/sessions` (create/get/address/cancel, FSM, one active

@@ -7,7 +7,7 @@
 | **Superseded** | v2.0.0 free-form `{resource…}` (13 routes renamed, [ADR-017](../proposals/adr/ADR-017-api-path-collection-noun/)); `docs/api/api.md` cluster-only `/api/v1/*` shape (v0.85 and earlier) |
 | **Scope** | All HTTP URLs used by browsers, services, and admin/seed callers |
 | **Primary domain** | `local.duynh.me` — platform root; public API at `gateway.duynh.me` |
-| **Last updated** | 2026-07-12 |
+| **Last updated** | 2026-07-12 (checkout `sessions` registered as planned) |
 
 ## Purpose
 
@@ -29,7 +29,7 @@ http://{service}.{namespace}.svc.cluster.local:8080/{service}/v1/{audience}/{res
 
 for in-cluster (east-west) traffic. Same path, different host — Kong just forwards.
 
-- `{service}` ∈ `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`, `payment`.
+- `{service}` ∈ `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`, `payment` (+ `checkout` — **planned, RFC-0015, none deployed yet**).
 - `{audience}` ∈ `public`, `private`, `internal`, `protected` (`protected` is **planned — none deployed yet**).
 - `{resource…}` **must start with a collection noun owned by the service** — see the rule below.
 
@@ -43,7 +43,10 @@ owns** — by default the plural of the service's domain noun:
 ```
 
 - Collections per service: `auth`\*, `users`, `products`, `cart`\*, `orders`,
-  `reviews`, `notifications`, `shipments`, `payments`.
+  `reviews`, `notifications`, `shipments`, `payments`; checkout (planned,
+  [RFC-0015](../proposals/rfc/RFC-0015/)) registers `sessions` — the owned
+  resource is the checkout session, so the noun follows the resource, not the
+  service name (same reasoning as shipping → `shipments`).
 - **Closed exception list (\*):** `auth` uses the literal `auth` segment (it
   owns no natural collection — `/auth/v1/public/auth/login`); `cart` is
   singular (a per-user singleton resource).

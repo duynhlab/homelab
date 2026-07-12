@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | platform-wide | 2026-07-11 | 2026-07-11 |
+| provisional | platform-wide | 2026-07-11 | 2026-07-12 |
 
 > **Don't forget: every decision is a tradeoff.** The headline tradeoffs in this
 > RFC: checkout does **not** own orders or the saga (it pays an extra internal
@@ -245,6 +245,10 @@ cart is a `409`.
 
 All routes are `private` (JWT; Kong edge-JWT applies). Following
 [`docs/api/api-naming-convention.md`](../../../api/api-naming-convention.md):
+checkout's registered collection noun is **`sessions`** per the v3.0.0
+collection-noun rule
+([ADR-017](../../adr/ADR-017-api-path-collection-noun/)) — the segment after
+`{audience}` on every route below.
 
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -604,6 +608,10 @@ Phased P1→P6 as above. Blast-radius notes:
   gRPC boundary (order/cart servers), Temporal scope split (RFC-0016),
   1-session-per-user + 30-min reset-on-activity TTL, P6 deprecation of the
   direct order path.
+- 2026-07-12 — aligned with the platform's ADR-017 (v3 collection-noun
+  paths): spawned-ADR numbers shifted to 018–022; checkout's collection noun
+  `sessions` registered (planned) in the naming convention. Route shapes were
+  already conformant — no path changed.
 
 ## Related
 
@@ -621,11 +629,13 @@ Phased P1→P6 as above. Blast-radius notes:
 - **RFC-0016 (planned)** — asynchronous payment confirmation via Temporal
   Signal (mockpay async-confirm mode) + post-confirmation order cancellation
   (CancelOrderWorkflow with conditional compensation).
-- Expected spawned ADRs: ADR-017 checkout/order boundary (`CreateOrder` gRPC;
-  order keeps orders-writer + saga-starter); ADR-018 session expiry (durable
-  timer + lazy backstop); ADR-019 re-validation policy (product as checkout
-  price authority; stock check-only); ADR-020 cart gRPC read surface (and
-  criteria for migrating cart writes); ADR-021 atomic promo redemption.
+- Expected spawned ADRs (shifted +1 on 2026-07-12 — ADR-017 was taken by the
+  platform's [api-path-collection-noun](../../adr/ADR-017-api-path-collection-noun/)
+  decision): ADR-018 checkout/order boundary (`CreateOrder` gRPC; order keeps
+  orders-writer + saga-starter); ADR-019 session expiry (durable timer + lazy
+  backstop); ADR-020 re-validation policy (product as checkout price
+  authority; stock check-only); ADR-021 cart gRPC read surface (and criteria
+  for migrating cart writes); ADR-022 atomic promo redemption.
 - Docs to update on implementation: [`docs/api/api.md`](../../../api/api.md),
   [`docs/api/api-naming-convention.md`](../../../api/api-naming-convention.md),
   [`docs/api/microservices.md`](../../../api/microservices.md),

@@ -159,7 +159,7 @@ If Pods must resolve `*.gke.internal` via VPC **Cloud DNS**, configure **CoreDNS
 URLs such as:
 
 ```http
-POST http://notification.notification.svc.cluster.local:8080/notification/v1/internal/notify/email
+POST http://notification.notification.svc.cluster.local:8080/notification/v1/internal/notifications/email
 ```
 
 follow the **default Kubernetes DNS model** — Cloud DNS is not required.

@@ -190,7 +190,7 @@ All user-facing endpoints go through Kong on `*.duynh.me` (on local Kind, termin
 | Service | URL | Credentials |
 |---------|-----|-------------|
 | Frontend (React SPA) | https://local.duynh.me | alice / password123 |
-| API Gateway | https://gateway.duynh.me | JWT from `/auth/v1/public/login` |
+| API Gateway | https://gateway.duynh.me | JWT from `/auth/v1/public/auth/login` |
 | Grafana | https://grafana.duynh.me | admin / admin |
 | VictoriaMetrics UI | https://vmui.duynh.me | - |
 | Jaeger UI | https://jaeger.duynh.me | - |
@@ -223,7 +223,7 @@ All services include seed data via golang-migrate `000002_*.up.sql` migrations f
 
 **Login Example** (login binds `username`, not `email`):
 ```bash
-curl -X POST http://localhost:8080/auth/v1/public/login \
+curl -X POST http://localhost:8080/auth/v1/public/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username": "alice", "password": "password123"}'
 ```
@@ -340,7 +340,7 @@ Seed data located in each service:
 curl http://localhost:8080/product/v1/public/products
 
 # Login as Alice (login binds username, not email)
-TOKEN=$(curl -X POST http://localhost:8080/auth/v1/public/login \
+TOKEN=$(curl -X POST http://localhost:8080/auth/v1/public/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username": "alice", "password": "password123"}' \
   | jq -r '.access_token')

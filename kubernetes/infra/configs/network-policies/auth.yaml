@@ -26,7 +26,7 @@ spec:
     # Phase 5: the gRPC GetMe server (:9090) was removed — JWTs are verified
     # locally, so the east-west :9090 allow is gone. Every service still
     # fetches the JWKS DIRECTLY from auth over HTTP
-    # (http://auth.auth.svc:8080/auth/v1/public/jwks, cached + background
+    # (http://auth.auth.svc:8080/auth/v1/public/auth/jwks, cached + background
     # refresh), so the app namespaces keep :8080 alongside kong.
     - from:
         - namespaceSelector:

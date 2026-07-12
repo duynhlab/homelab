@@ -452,7 +452,7 @@ flowchart TD
 - Cut `every service → auth /me` and `product → review` to gRPC; **forward JWT in
   metadata** for `/me`.
 - **Notification publish:** design `notification.v1` for the internal
-  `notify/email` / `notify/sms` endpoints and **wire the first caller** — e.g.
+  `notifications/email` / `notifications/sms` endpoints and **wire the first caller** — e.g.
   `order` publishing an "order created" notification on checkout. notification
   has **no caller today**, so this both designs the proto and introduces the
   producer (a fire-and-forget, internal, machine-to-machine call — a natural gRPC

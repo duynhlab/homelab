@@ -224,7 +224,7 @@ spec:
                   number: 8080
 ---
 # Notification Service — private only: edge JWT.
-# /notification/v1/internal/notify/{email,sms} is NOT exposed here.
+# /notification/v1/internal/notifications/{email,sms} is NOT exposed here.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -250,7 +250,7 @@ spec:
                   number: 8080
 ---
 # Shipping Service — public track + estimate only: anonymous.
-# /shipping/v1/internal/orders/:orderId is NOT exposed here
+# /shipping/v1/internal/shipments/orders/:orderId is NOT exposed here
 # (called only by order-service via in-cluster DNS).
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -321,6 +321,15 @@ spec:
     - host: gateway.duynh.me
       http:
         paths:
+          - path: /payment/v1/public/payments/webhooks/
+            pathType: Prefix
+            backend:
+              service:
+                name: payment
+                port:
+                  number: 8080
+          # Deprecated pre-v3 path — kept during the v3 rollout so in-flight
+          # mockpay retries keep landing. Remove at contract (ADR-017).
           - path: /payment/v1/public/webhooks/
             pathType: Prefix
             backend:

@@ -2,12 +2,12 @@
 
 | Attribute | Value |
 |-----------|--------|
-| **Version** | **v3.0.0** |
+| **Version** | **v3.0.1** |
 | **Status** | **Adopted** — sole URL surface (services mount these paths directly) |
 | **Superseded** | v2.0.0 free-form `{resource…}` (13 routes renamed, [ADR-017](../proposals/adr/ADR-017-api-path-collection-noun/)); `docs/api/api.md` cluster-only `/api/v1/*` shape (v0.85 and earlier) |
 | **Scope** | All HTTP URLs used by browsers, services, and admin/seed callers |
 | **Primary domain** | `local.duynh.me` — platform root; public API at `gateway.duynh.me` |
-| **Last updated** | 2026-07-12 (checkout P1 routes live in local-stack) |
+| **Last updated** | 2026-07-12 (v3.0.1 — checkout joins the process-named exception: `checkout/sessions`) |
 
 ## Purpose
 
@@ -43,13 +43,13 @@ owns** — by default the plural of the service's domain noun:
 ```
 
 - Collections per service: `auth`\*, `users`, `products`, `cart`\*, `orders`,
-  `reviews`, `notifications`, `shipments`, `payments`, and checkout →
-  `sessions` ([RFC-0015](../proposals/rfc/RFC-0015/)) — the owned resource is
-  the checkout session, so the noun follows the resource, not the service
-  name (same reasoning as shipping → `shipments`).
-- **Closed exception list (\*):** `auth` uses the literal `auth` segment (it
-  owns no natural collection — `/auth/v1/public/auth/login`); `cart` is
-  singular (a per-user singleton resource).
+  `reviews`, `notifications`, `shipments`, `payments`, `checkout`\*
+  ([RFC-0015](../proposals/rfc/RFC-0015/)).
+- **Closed exception list (\*):** process-named services with no natural
+  plural collection — `auth` and `checkout` — use the literal service-name
+  segment and nest their resources beneath it
+  (`/auth/v1/public/auth/login`, `/checkout/v1/private/checkout/sessions`);
+  `cart` is singular (a per-user singleton resource).
 - Secondary resources nest under the owned noun, they never start a new
   top-level segment: `payments/webhooks/mockpay`,
   `payments/reconciliation/runs` — **not** `webhooks/…`, `reconciliation/…`.
@@ -173,10 +173,10 @@ JWT `user_id`. Shipping/payment/promo/confirm steps land in P2–P4.
 
 | Method | Path | Audience | Caller |
 |--------|------|----------|--------|
-| `POST` | `/checkout/v1/private/sessions` | private | Browser — create (201) or return the active session (200, idempotent) |
-| `GET` | `/checkout/v1/private/sessions/:id` | private | Browser |
-| `PUT` | `/checkout/v1/private/sessions/:id/address` | private | Browser |
-| `DELETE` | `/checkout/v1/private/sessions/:id` | private | Browser — cancel |
+| `POST` | `/checkout/v1/private/checkout/sessions` | private | Browser — create (201) or return the active session (200, idempotent) |
+| `GET` | `/checkout/v1/private/checkout/sessions/:id` | private | Browser |
+| `PUT` | `/checkout/v1/private/checkout/sessions/:id/address` | private | Browser |
+| `DELETE` | `/checkout/v1/private/checkout/sessions/:id` | private | Browser — cancel |
 
 ## Deprecated aliases (transitional — expand phase, ADR-017)
 
@@ -250,3 +250,4 @@ Immutable file names (content hash) + explicit `Cache-Control` for chunks.
 | v1.1.0 | 2026-04-17 | Adopted Variant A at the edge. Services still mounted on `/api/v1/*`; Kong rewrote edge → cluster via per-namespace `pre-function` plugins. |
 | **v2.0.0** | **2026-04-17** | **Full migration — services mount Variant A paths directly, Kong is pure pass-through, `/api/v1/*` removed entirely. Internal audiences live only in-cluster (never on gateway).** Breaking change; frontend and all service-to-service callers updated in lockstep. |
 | **v3.0.0** | **2026-07-12** | **Collection-noun rule ([ADR-017](../proposals/adr/ADR-017-api-path-collection-noun/)) — the segment after `{audience}` must be a service-owned collection noun; 13 routes renamed (auth 5, shipping 3, notification 2, payment 3).** Expand→contract: live-caller routes keep deprecated aliases for one release; zero-caller internal routes renamed outright. |
+| v3.0.1 | 2026-07-12 | Checkout joins the process-named exception (with auth): owning segment is the literal `checkout`, resources nest beneath it (`checkout/sessions[…]`) — a bare `sessions` collection was ambiguous platform-wide. Applied before any consumer existed (pre-P3 SPA), so no aliases needed. |

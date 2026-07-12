@@ -153,28 +153,28 @@ AT9=$(curl -s -X POST $BASE/auth/v1/public/auth/login -H 'Content-Type: applicat
 curl -s -X POST $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT9" \
   -H 'Content-Type: application/json' \
   -d '{"product_id":"1","product_name":"Wireless Mouse","product_price":29.99,"quantity":1}' -o /dev/null
-S9=$(curl -s -X POST $BASE/checkout/v1/private/sessions -H "Authorization: Bearer $AT9")
+S9=$(curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT9")
 SID=$(echo "$S9" | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
 echo "A9 create:   session $SID ($(echo "$S9" | python3 -c "import json,sys;print(json.load(sys.stdin)['status'])"))"
 curl -s -o /dev/null -w "A9 re-create: %{http_code} (want 200 — idempotent, same session)\n" \
-  -X POST $BASE/checkout/v1/private/sessions -H "Authorization: Bearer $AT9"
+  -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT9"
 curl -s -o /dev/null -w "A9 get:       %{http_code} (want 200)\n" \
-  $BASE/checkout/v1/private/sessions/$SID -H "Authorization: Bearer $AT9"
+  $BASE/checkout/v1/private/checkout/sessions/$SID -H "Authorization: Bearer $AT9"
 curl -s -o /dev/null -w "A9 address:   %{http_code} (want 200 → address_set)\n" \
-  -X PUT $BASE/checkout/v1/private/sessions/$SID/address -H "Authorization: Bearer $AT9" \
+  -X PUT $BASE/checkout/v1/private/checkout/sessions/$SID/address -H "Authorization: Bearer $AT9" \
   -H 'Content-Type: application/json' \
   -d '{"full_name":"Alice","line1":"1 Main St","city":"HN","country":"VN"}'
 curl -s -o /dev/null -w "A9 cancel:    %{http_code} (want 200)\n" \
-  -X DELETE $BASE/checkout/v1/private/sessions/$SID -H "Authorization: Bearer $AT9"
+  -X DELETE $BASE/checkout/v1/private/checkout/sessions/$SID -H "Authorization: Bearer $AT9"
 curl -s -o /dev/null -w "A9 no-token:  %{http_code} (want 401 at the edge)\n" \
-  -X POST $BASE/checkout/v1/private/sessions
+  -X POST $BASE/checkout/v1/private/checkout/sessions
 curl -s -o /dev/null -w "A9 old path:  %{http_code} (want 404 — /api/v1/checkout removed)\n" \
   -X POST $BASE/api/v1/checkout
 # Price-change detection (the RFC-0015 P1 exit criterion): bump a catalog
 # price, create a fresh session, expect the line flagged.
 docker compose exec -T postgres psql -U postgres -d product -c \
   "UPDATE products SET price = price + 1 WHERE id = 1" >/dev/null
-curl -s -X POST $BASE/checkout/v1/private/sessions -H "Authorization: Bearer $AT9" | \
+curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT9" | \
   python3 -c "import json,sys; s=json.load(sys.stdin); \
   print('A9 price-change:', 'OK' if any(i['price_changed'] for i in s['items']) else 'FAIL', \
   [ (i['product_id'], i['price_changed'], i['unit_price']) for i in s['items'] ])"

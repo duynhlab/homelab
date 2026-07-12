@@ -9,7 +9,7 @@ order-service — which remains the only writer of orders.
 |-----------|-------|
 | **Design record** | [RFC-0015](../proposals/rfc/RFC-0015/) · [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) (re-validation) · [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) (cart read surface) |
 | **Status** | **P1 implemented** (sessions + re-validation, local-stack); P2 confirm + abandonment timer, P3 totals + SPA, P4 promo, P5 cluster, P6 legacy-path removal |
-| **Surface** | `/checkout/v1/private/sessions[…]` (collection noun `sessions`, ADR-017) — private-only, Kong edge-JWT + in-service `pkg/authmw` |
+| **Surface** | `/checkout/v1/private/checkout/sessions[…]` (process-named exception like auth — literal `checkout` segment, resources nested; v3.0.1) — private-only, Kong edge-JWT + in-service `pkg/authmw` |
 | **East-west** | gRPC only: cart `GetCart` (read-only), product `GetProducts` (cache-bypassing) |
 | **Data** | `checkout` DB — `checkout_sessions` + `checkout_session_items`; money in int64 minor units |
 | **Repo** | [duynhlab/checkout-service](https://github.com/duynhlab/checkout-service) |
@@ -84,7 +84,7 @@ mid-flight.
 ```mermaid
 flowchart LR
     SPA["SPA (React)"] --> Kong["Kong (edge JWT)"]
-    Kong -->|"/checkout/v1/private/sessions…"| CK["checkout-service"]
+    Kong -->|"/checkout/v1/private/checkout/sessions…"| CK["checkout-service"]
     CK -->|"gRPC GetCart (read-only, ADR-021)"| CART[cart]
     CK -->|"gRPC GetProducts (cache-bypass, ADR-020)"| PROD[product]
     CK --> DB[(checkout DB)]
@@ -104,10 +104,10 @@ All routes are `private` — Kong edge-JWT is the coarse filter, in-service
 
 | Method | Path | Purpose | Errors worth knowing |
 |--------|------|---------|----------------------|
-| `POST` | `/checkout/v1/private/sessions` | Snapshot cart + re-validate prices → session `open`. **201** created, **200** existing active session (idempotent) | `409 CONFLICT` empty cart |
-| `GET` | `/checkout/v1/private/sessions/:id` | Session + items + totals | `404` unknown **or someone else's** (anti-IDOR — indistinguishable); `410 SESSION_EXPIRED` past TTL |
-| `PUT` | `/checkout/v1/private/sessions/:id/address` | Store the shipping address → `address_set` (re-editable from any pre-confirm state) | `400` missing/oversized fields; `409 INVALID_TRANSITION` from terminal states |
-| `DELETE` | `/checkout/v1/private/sessions/:id` | Cancel (idempotent on cancelled) | `409 INVALID_TRANSITION` on completed |
+| `POST` | `/checkout/v1/private/checkout/sessions` | Snapshot cart + re-validate prices → session `open`. **201** created, **200** existing active session (idempotent) | `409 CONFLICT` empty cart |
+| `GET` | `/checkout/v1/private/checkout/sessions/:id` | Session + items + totals | `404` unknown **or someone else's** (anti-IDOR — indistinguishable); `410 SESSION_EXPIRED` past TTL |
+| `PUT` | `/checkout/v1/private/checkout/sessions/:id/address` | Store the shipping address → `address_set` (re-editable from any pre-confirm state) | `400` missing/oversized fields; `409 INVALID_TRANSITION` from terminal states |
+| `DELETE` | `/checkout/v1/private/checkout/sessions/:id` | Cancel (idempotent on cancelled) | `409 INVALID_TRANSITION` on completed |
 
 Platform conventions apply: `snake_case` JSON, resources returned directly
 (no wrapper envelope), the `{"error","code"}` error envelope, and dollars on

@@ -607,18 +607,19 @@ Authorization: Bearer <jwt_token>
 
 ## Checkout Service (RFC-0015 P1)
 
-Session orchestrator between the SPA and order — Variant A collection-noun
-paths (`sessions`, ADR-017), all **private** (Kong edge-JWT + in-service
+Session orchestrator between the SPA and order — Variant A paths under the
+literal `checkout` segment (process-named exception like auth, v3.0.1), all
+**private** (Kong edge-JWT + in-service
 authmw), owner-scoped by the JWT `user_id`. P1 ships the session lifecycle;
 shipping/payment/promo/confirm land in P2–P4. Full route inventory:
 [api-naming-convention.md](./api-naming-convention.md).
 
 | Method | Path | Notes |
 |--------|------|-------|
-| `POST` | `/checkout/v1/private/sessions` | Snapshot cart → session `open`; **201** created / **200** existing active session (idempotent); `409 CONFLICT` empty cart. Returns the session object directly (no wrapper); items carry `unit_price` (product-authoritative, dollars), `cart_price` (dollars), `price_changed`. Money is minor units internally, dollars on the wire — same as order/cart. |
-| `GET` | `/checkout/v1/private/sessions/:id` | Session + items + totals. `404` unknown/foreign (anti-IDOR); `410 SESSION_EXPIRED` past TTL (lazy check). |
-| `PUT` | `/checkout/v1/private/sessions/:id/address` | Body `{full_name, line1, line2?, city, region?, post_code?, country}` → `address_set`; `409 INVALID_TRANSITION` from terminal states. |
-| `DELETE` | `/checkout/v1/private/sessions/:id` | Cancel (idempotent on cancelled). |
+| `POST` | `/checkout/v1/private/checkout/sessions` | Snapshot cart → session `open`; **201** created / **200** existing active session (idempotent); `409 CONFLICT` empty cart. Returns the session object directly (no wrapper); items carry `unit_price` (product-authoritative, dollars), `cart_price` (dollars), `price_changed`. Money is minor units internally, dollars on the wire — same as order/cart. |
+| `GET` | `/checkout/v1/private/checkout/sessions/:id` | Session + items + totals. `404` unknown/foreign (anti-IDOR); `410 SESSION_EXPIRED` past TTL (lazy check). |
+| `PUT` | `/checkout/v1/private/checkout/sessions/:id/address` | Body `{full_name, line1, line2?, city, region?, post_code?, country}` → `address_set`; `409 INVALID_TRANSITION` from terminal states. |
+| `DELETE` | `/checkout/v1/private/checkout/sessions/:id` | Cancel (idempotent on cancelled). |
 
 Money: int64 minor units. Session TTL 30 min, reset semantics + durable timer
 arrive with P2 (`AbandonedCheckoutWorkflow`).

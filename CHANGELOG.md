@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **RFC-0015 aligned with ADR-017**: spawned-ADR numbers shifted to 018–022
+  (ADR-017 was taken by the path decision) and checkout's collection noun
+  `sessions` registered as planned in the naming convention.
 - **API paths → collection-noun rule (ADR-017, naming convention v3.0.0)**: 13
   routes renamed so the segment after `{audience}` is a service-owned collection
   noun — auth `/auth/v1/public/auth/*`, shipping `shipments/{track,estimate}` +

@@ -479,6 +479,12 @@ services:
       DB_NAME: checkout
       CART_GRPC_ADDR: dns:///cart:9090
       PRODUCT_GRPC_ADDR: dns:///product:9090
+      # P2 confirm handoff (ADR-018) + abandonment signals (ADR-019). Temporal
+      # being down only degrades expiry to the lazy backstop — never a crash.
+      ORDER_GRPC_ADDR: dns:///order:9090
+      TEMPORAL_HOSTPORT: temporal:7233
+      TEMPORAL_NAMESPACE: mop
+      TASK_QUEUE: checkout
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -486,6 +492,29 @@ services:
       auth: { condition: service_healthy }
       cart: { condition: service_healthy }
       product: { condition: service_healthy }
+      order: { condition: service_healthy }
+      temporal: { condition: service_healthy }
+
+  # ---- Checkout Temporal worker (AbandonedCheckoutWorkflow, ADR-019) ----
+  checkout-worker:
+    build: { context: ../../checkout-service }
+    command: ["worker"]
+    # Fail-fast like order-worker: an unreachable Temporal after the in-binary
+    # dial retry exits the process; compose restarts it through bring-up races.
+    restart: on-failure
+    environment:
+      <<: *svc-env
+      SERVICE_NAME: checkout
+      OTEL_SERVICE_NAME: checkout
+      DB_NAME: checkout
+      TEMPORAL_HOSTPORT: temporal:7233
+      TEMPORAL_NAMESPACE: mop
+      TASK_QUEUE: checkout
+    healthcheck: *svc-healthcheck
+    depends_on:
+      postgres: { condition: service_healthy }
+      checkout-migrate: { condition: service_completed_successfully }
+      temporal: { condition: service_healthy }
 
   # ---- Mock payment provider (a second deployment of the payment binary via
   # the `mockpay` subcommand — the real network hop behind payment's provider

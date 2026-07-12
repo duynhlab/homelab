@@ -345,7 +345,7 @@ flowchart TB
         RECON --> PDB
     end
     OW -->|"gRPC :9090 (saga money ops)"| PGRPC
-    KONG["Kong gateway"] -->|"/payment/v1/public/webhooks/mockpay"| PHTTP
+    KONG["Kong gateway"] -->|"/payment/v1/public/payments/webhooks/mockpay"| PHTTP
 
     classDef db fill:#1a1a1a,stroke:#3b82f6;
     class PDB db;

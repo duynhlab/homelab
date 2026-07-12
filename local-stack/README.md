@@ -79,7 +79,7 @@ shell and work without the skill too).
 BASE=http://localhost:8080
 
 # A1. Login returns the JWT pair — and NO opaque `token` field
-R=$(curl -s -X POST $BASE/auth/v1/public/login -H 'Content-Type: application/json' \
+R=$(curl -s -X POST $BASE/auth/v1/public/auth/login -H 'Content-Type: application/json' \
   -d '{"username":"alice","password":"password123"}')
 echo "$R" | python3 -c "import json,sys; d=json.load(sys.stdin); \
   assert 'token' not in d, 'opaque token leaked'; \
@@ -101,28 +101,50 @@ curl -s -o /dev/null -w "A3 bad-token: %{http_code} (want 401)\n" \
 curl -s -o /dev/null -w "A3 no-token:  %{http_code} (want 401)\n" $BASE/cart/v1/private/cart
 
 # A4. Refresh rotates; replaying the OLD token → 401 AND revokes the family
-R2=$(curl -s -X POST $BASE/auth/v1/public/refresh -H 'Content-Type: application/json' \
+R2=$(curl -s -X POST $BASE/auth/v1/public/auth/refresh -H 'Content-Type: application/json' \
   -d "{\"refresh_token\":\"$RT\"}")
 RT2=$(echo "$R2" | python3 -c "import json,sys;print(json.load(sys.stdin)['refresh_token'])")
 curl -s -o /dev/null -w "A4 replay-old:      %{http_code} (want 401)\n" \
-  -X POST $BASE/auth/v1/public/refresh -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$RT\"}"
+  -X POST $BASE/auth/v1/public/auth/refresh -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$RT\"}"
 curl -s -o /dev/null -w "A4 family-revoked:  %{http_code} (want 401)\n" \
-  -X POST $BASE/auth/v1/public/refresh -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$RT2\"}"
+  -X POST $BASE/auth/v1/public/auth/refresh -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$RT2\"}"
 
 # A5. Logout revokes; idempotent; subsequent refresh dies
-R3=$(curl -s -X POST $BASE/auth/v1/public/login -H 'Content-Type: application/json' \
+R3=$(curl -s -X POST $BASE/auth/v1/public/auth/login -H 'Content-Type: application/json' \
   -d '{"username":"alice","password":"password123"}')
 RT3=$(echo "$R3" | python3 -c "import json,sys;print(json.load(sys.stdin)['refresh_token'])")
 curl -s -o /dev/null -w "A5 logout:          %{http_code} (want 200)\n" \
-  -X POST $BASE/auth/v1/public/logout -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$RT3\"}"
+  -X POST $BASE/auth/v1/public/auth/logout -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$RT3\"}"
 curl -s -o /dev/null -w "A5 refresh-after:   %{http_code} (want 401)\n" \
-  -X POST $BASE/auth/v1/public/refresh -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$RT3\"}"
+  -X POST $BASE/auth/v1/public/auth/refresh -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$RT3\"}"
 
 # A6. Removed surfaces stay removed
 curl -s -o /dev/null -w "A6 /private/me:     %{http_code} (want 404 — route gone at Kong)\n" \
   $BASE/auth/v1/private/me -H "Authorization: Bearer $AT"
 docker compose exec -T postgres psql -U postgres -d auth -c '\dt' | grep -q sessions \
   && echo "A6 FAIL: sessions table exists" || echo "A6 OK: no sessions table"
+
+# A7. v3 collection-noun paths (ADR-017): new canonical 200 + deprecated
+#     aliases still answering during the expand phase (removed at contract)
+curl -s -o /dev/null -w "A7 shipments/track:     %{http_code} (want 200)\n" \
+  "$BASE/shipping/v1/public/shipments/track?tracking_number=1Z999AA10123456784"
+curl -s -o /dev/null -w "A7 shipments/estimate:  %{http_code} (want 200)\n" \
+  "$BASE/shipping/v1/public/shipments/estimate?origin=HN&destination=SG&weight=1"
+curl -s -o /dev/null -w "A7 alias track:         %{http_code} (want 200 — deprecated)\n" \
+  "$BASE/shipping/v1/public/track?tracking_number=1Z999AA10123456784"
+curl -s -o /dev/null -w "A7 alias login:         %{http_code} (want 200 — deprecated)\n" \
+  -X POST $BASE/auth/v1/public/login -H 'Content-Type: application/json' \
+  -d '{"username":"alice","password":"password123"}'
+
+# A8. Renamed zero-caller internal paths are gone (no aliases kept):
+#     these are cluster-internal, so probe the service containers directly.
+docker compose exec -T notification wget -q -O /dev/null -S \
+  --post-data '{}' --header 'Content-Type: application/json' \
+  http://localhost:8080/notification/v1/internal/notify/email 2>&1 | head -1
+# want: HTTP/1.1 404 (the /notifications/{email,sms} paths replaced notify/*)
+docker compose exec -T shipping wget -q -O /dev/null -S \
+  http://localhost:8080/shipping/v1/internal/orders/1 2>&1 | head -1
+# want: HTTP/1.1 404 (now /shipping/v1/internal/shipments/orders/:orderId)
 ```
 
 > Rapid-fire auth calls can trip Kong's rate limit (429). That is the gateway
@@ -168,7 +190,7 @@ agent-browser $S network requests --type xhr,fetch | grep -E "refresh|401|200" |
 # want this exact shape (single-flight: N concurrent 401s -> ONE refresh -> retries 200):
 #   GET  .../private/...              401
 #   GET  .../private/...              401
-#   POST /auth/v1/public/refresh      200      <-- exactly one
+#   POST /auth/v1/public/auth/refresh      200      <-- exactly one
 #   GET  .../private/...              200
 #   GET  .../private/...              200
 
@@ -176,7 +198,7 @@ agent-browser $S network requests --type xhr,fetch | grep -E "refresh|401|200" |
 agent-browser $S snapshot -i          # find the Logout button ref
 agent-browser $S batch "click @e13" "wait 2000"
 agent-browser $S eval 'JSON.stringify({cleared: !localStorage.getItem("authToken") && !localStorage.getItem("authRefreshToken"), path: location.pathname})'
-agent-browser $S network requests --method POST | grep logout   # want: .../public/logout ... 200
+agent-browser $S network requests --method POST | grep logout   # want: .../public/auth/logout ... 200
 
 # B4. Cleanup
 agent-browser $S close
@@ -192,9 +214,11 @@ agent-browser $S close
 | A4 | Refresh reuse | old token 401 **and** whole family revoked |
 | A5 | Logout | 200, idempotent; refresh afterwards 401 |
 | A6 | Removed surfaces | `/auth/v1/private/*` 404; no `sessions` table |
+| A7 | v3 paths (ADR-017) | new `shipments/*` + `auth/*` paths 200; deprecated aliases still 200 (expand phase) |
+| A8 | Renamed internal paths | old `notify/*` + `internal/orders/*` 404 in-container (no aliases) |
 | B1 | UI login | JWT + refresh in localStorage |
 | B2 | Silent refresh | exactly **one** `POST /refresh` for concurrent 401s; retried 200s; no login bounce |
-| B3 | UI logout | `POST /public/logout` 200; storage cleared; redirect to `/login` |
+| B3 | UI logout | `POST /public/auth/logout` 200; storage cleared; redirect to `/login` |
 
 Any failed row blocks the push. When a change touches the order-fulfillment
 path, additionally run the saga (checkout in the SPA) and watch it complete in

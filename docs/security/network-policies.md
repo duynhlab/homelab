@@ -14,7 +14,7 @@
   the net effect is: *only* the namespaces named in `allow-internal-callers` can
   reach the pods on `:8080`; everything else is dropped.
 - The allowlist is **per-callee** and follows the real call graph — `auth` accepts
-  all nine services incl. payment (they fetch the JWKS from `/auth/v1/public/jwks`), while
+  all nine services incl. payment (they fetch the JWKS from `/auth/v1/public/auth/jwks`), while
   `shipping` accepts only `kong` + `order`, and `payment` (the 9th service) is the
   tightest: `kong`→`:8080` only, `order`→`:9090` only, plus intra-ns `payment`↔`mockpay`.
 - **kindnet enforces NetworkPolicy** (verified on Kind K8s 1.34.3). These policies
@@ -64,7 +64,7 @@ allowed (north-south gateway traffic); the rest mirror the east-west call graph.
 
 | Callee | Allowed callers | Why |
 |--------|-----------------|-----|
-| **auth** | `kong` + **all 9 services** (incl. self and payment) | Every service refreshes the RS256 JWKS from `GET /auth/v1/public/jwks` (`:8080`); JWTs are verified locally. |
+| **auth** | `kong` + **all 9 services** (incl. self and payment) | Every service refreshes the RS256 JWKS from `GET /auth/v1/public/auth/jwks` (`:8080`); JWTs are verified locally. |
 | **user** | `kong` | Browser-only today; no service-to-service caller. |
 | **product** | `kong` | Browser-only; aggregates *outward* to review. |
 | **cart** | `kong`, `order` | `order` reads the cart during checkout. |
@@ -100,7 +100,7 @@ and `databases-local` / `apps-local` never reconcile:
 ## 3. Allowed-ingress topology
 
 Solid edges = explicit east-west allows; `auth` is the JWKS hub (every service is
-permitted to it to fetch `/auth/v1/public/jwks`); `kong` is permitted to every service.
+permitted to it to fetch `/auth/v1/public/auth/jwks`); `kong` is permitted to every service.
 
 ```mermaid
 flowchart LR
@@ -118,7 +118,7 @@ flowchart LR
     %% North-south: gateway may reach every service
     KONG --> AUTH & USER & PRODUCT & CART & ORDER & REVIEW & NOTIF & SHIP & PAYMENT
 
-    %% JWKS hub: the original eight services → auth /auth/v1/public/jwks (cached fetch)
+    %% JWKS hub: the original eight services → auth /auth/v1/public/auth/jwks (cached fetch)
     USER & PRODUCT & CART & ORDER & REVIEW & NOTIF & SHIP -->|"jwks"| AUTH
 
     %% Business east-west

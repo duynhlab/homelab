@@ -819,12 +819,12 @@ without reading the cart or starting a second saga.
 
 ## Auth Service
 
-### POST /auth/v1/public/login
+### POST /auth/v1/public/auth/login
 
 #### Request
 
 ```
-POST /auth/v1/public/login
+POST /auth/v1/public/auth/login
 Content-Type: application/json
 
 {
@@ -851,16 +851,16 @@ Content-Type: application/json
 
 The `access_token` is an RS256 JWT (1 h TTL) — the only credential since
 RFC-0009 Phase 5; the opaque `token` field is gone. `refresh_token` is an
-opaque rotating token for `POST /auth/v1/public/refresh`.
+opaque rotating token for `POST /auth/v1/public/auth/refresh`.
 
 ---
 
-### POST /auth/v1/public/register
+### POST /auth/v1/public/auth/register
 
 #### Request
 
 ```
-POST /auth/v1/public/register
+POST /auth/v1/public/auth/register
 Content-Type: application/json
 
 {
@@ -888,7 +888,7 @@ Content-Type: application/json
 
 ---
 
-### POST /auth/v1/public/refresh
+### POST /auth/v1/public/auth/refresh
 
 Rotates the presented refresh token and mints a fresh access token. Each
 refresh token is **single-use**: the response carries its successor. Replaying
@@ -898,7 +898,7 @@ and every session on it must log in again.
 #### Request
 
 ```
-POST /auth/v1/public/refresh
+POST /auth/v1/public/auth/refresh
 Content-Type: application/json
 
 {
@@ -936,7 +936,7 @@ Content-Type: application/json
 
 ---
 
-### GET /auth/v1/public/jwks
+### GET /auth/v1/public/auth/jwks
 
 Publishes the RSA public key set every service's JWT middleware (and Kong's
 edge check) verifies against. Responses carry `Cache-Control: public,
@@ -965,7 +965,7 @@ the right key across future rotations.
 
 ---
 
-### POST /auth/v1/public/logout
+### POST /auth/v1/public/auth/logout
 
 Revokes the presented refresh token's **whole family** server-side, ending the
 session (the outstanding access token simply expires — JWTs are stateless).
@@ -977,7 +977,7 @@ local state.
 #### Request
 
 ```
-POST /auth/v1/public/logout
+POST /auth/v1/public/auth/logout
 Content-Type: application/json
 
 {
@@ -1131,19 +1131,19 @@ none unread (still a success, not a 404).
 #### Track Shipment
 
 ```
-GET /shipping/v1/public/track?tracking_number=TRACK123
+GET /shipping/v1/public/shipments/track?tracking_number=TRACK123
 ```
 
 #### Estimate Shipping
 
 ```
-GET /shipping/v1/public/estimate?origin=NYC&destination=LA&weight=2.5
+GET /shipping/v1/public/shipments/estimate?origin=NYC&destination=LA&weight=2.5
 ```
 
 #### Get Shipment by Order ID
 
 ```
-GET /shipping/v1/internal/orders/123
+GET /shipping/v1/internal/shipments/orders/123
 ```
 
 Returns shipment info for a specific order (used by order aggregation endpoint).
@@ -1231,7 +1231,7 @@ or `404`.
 `POST /payment/v1/internal/payments/:id/refunds` (idempotent partial refund —
 body `{"amount_minor": n, "reason": "…"}`, requires `Idempotency-Key`, returns
 `201` with the refund object), the reconciliation runs API, and the HMAC-signed
-`POST /payment/v1/public/webhooks/mockpay` are in-cluster/provider contracts —
+`POST /payment/v1/public/payments/webhooks/mockpay` are in-cluster/provider contracts —
 payloads and mechanics are documented in [payments.md](payments.md).
 
 ---

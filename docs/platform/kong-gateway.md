@@ -189,7 +189,7 @@ Two layers, both verifying the same RS256 signature (defense-in-depth,
   RS256 **public** key delivered by ESO from OpenBAO) and checks `exp`.
   Bad/expired/missing tokens are shed at the gateway with `401`.
 - **Services (`pkg/authmw`, fail-closed)** verify the JWT **locally** against
-  the cached JWKS (`/auth/v1/public/jwks`), pinning issuer/audience/alg — this
+  the cached JWKS (`/auth/v1/public/auth/jwks`), pinning issuer/audience/alg — this
   remains the single source of truth. Since RFC-0009 **Phase 5** this is
   JWT-only: the opaque-token `auth.GetMe` gRPC fallback was removed (auth no
   longer runs a gRPC server), and `sessions` are gone — session lifetime is
@@ -718,10 +718,10 @@ Per-ingress `path:` entries are scoped to `public` and `private` audiences only 
 |---------|------|--------|
 | product | `POST /product/v1/internal/products` | Admin / seed jobs |
 | user | `POST /user/v1/internal/users` | auth-service during registration flow |
-| notification | `POST /notification/v1/internal/notify/{email,sms}` | Any service publishing a notification |
-| shipping | `GET /shipping/v1/internal/orders/:orderId` | order-service (order aggregation) |
+| notification | `POST /notification/v1/internal/notifications/{email,sms}` | Any service publishing a notification |
+| shipping | `GET /shipping/v1/internal/shipments/orders/:orderId` | order-service (order aggregation) |
 | payment | `POST /payment/v1/internal/payments/:id/refunds` | order-service (saga refund) |
-| payment | `POST /payment/v1/internal/reconciliation/runs`, `GET /payment/v1/internal/reconciliation/runs/:id` | Reconciliation trigger / status (in-cluster) |
+| payment | `POST /payment/v1/internal/payments/reconciliation/runs`, `GET /payment/v1/internal/payments/reconciliation/runs/:id` | Reconciliation trigger / status (in-cluster) |
 
 Adding any `internal` audience to a gateway Ingress is a safety/privacy regression — keep them private-by-network (NetworkPolicy + no public rule).
 
@@ -832,7 +832,7 @@ curl -s -o /dev/null -w "%{http_code}\n" https://local.duynh.me/
 # Expected: 200
 
 # Auth — login (public)
-TOKEN=$(curl -s -X POST https://gateway.duynh.me/auth/v1/public/login \
+TOKEN=$(curl -s -X POST https://gateway.duynh.me/auth/v1/public/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"alice","password":"password123"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))")
@@ -873,7 +873,7 @@ curl -s -o /dev/null -w "%{http_code}\n" https://gateway.duynh.me/review/v1/publ
 
 # Shipping track (public)
 curl -s -o /dev/null -w "%{http_code}\n" \
-  "https://gateway.duynh.me/shipping/v1/public/track?tracking_number=TRACK123"
+  "https://gateway.duynh.me/shipping/v1/public/shipments/track?tracking_number=TRACK123"
 # Expected: 200 or 404
 
 # Legacy /api/v1/* is gone everywhere (services + gateway) — expected 404
@@ -881,8 +881,8 @@ curl -s -o /dev/null -w "legacy /api/v1 on gateway: %{http_code}\n" \
   https://gateway.duynh.me/api/v1/products
 
 # Internal endpoint NOT on gateway — expected 404
-curl -s -o /dev/null -w "notify/email on gateway: %{http_code}\n" \
-  -X POST https://gateway.duynh.me/notification/v1/internal/notify/email
+curl -s -o /dev/null -w "notifications/email on gateway: %{http_code}\n" \
+  -X POST https://gateway.duynh.me/notification/v1/internal/notifications/email
 
 # Check rate limit headers
 curl -sI https://gateway.duynh.me/product/v1/public/products 2>&1 | grep -i ratelimit

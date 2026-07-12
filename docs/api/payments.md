@@ -159,10 +159,10 @@ route):
 ```bash
 # trigger one pass (single-flighted: a concurrent trigger answers 409;
 # disabled — stub provider — answers 503)
-curl -X POST http://payment:8080/payment/v1/internal/reconciliation/runs
+curl -X POST http://payment:8080/payment/v1/internal/payments/reconciliation/runs
 
 # fetch a run's report
-curl http://payment:8080/payment/v1/internal/reconciliation/runs/2
+curl http://payment:8080/payment/v1/internal/payments/reconciliation/runs/2
 ```
 
 ```json

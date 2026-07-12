@@ -2,12 +2,12 @@
 
 | Attribute | Value |
 |-----------|--------|
-| **Version** | **v2.0.0** |
+| **Version** | **v3.0.0** |
 | **Status** | **Adopted** — sole URL surface (services mount these paths directly) |
-| **Superseded** | `docs/api/api.md` cluster-only `/api/v1/*` shape (v0.85 and earlier) |
+| **Superseded** | v2.0.0 free-form `{resource…}` (13 routes renamed, [ADR-017](../proposals/adr/ADR-017-api-path-collection-noun/)); `docs/api/api.md` cluster-only `/api/v1/*` shape (v0.85 and earlier) |
 | **Scope** | All HTTP URLs used by browsers, services, and admin/seed callers |
 | **Primary domain** | `local.duynh.me` — platform root; public API at `gateway.duynh.me` |
-| **Last updated** | 2026-07-10 |
+| **Last updated** | 2026-07-12 |
 
 ## Purpose
 
@@ -31,7 +31,30 @@ for in-cluster (east-west) traffic. Same path, different host — Kong just forw
 
 - `{service}` ∈ `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`, `payment`.
 - `{audience}` ∈ `public`, `private`, `internal`, `protected` (`protected` is **planned — none deployed yet**).
-- `{resource…}` mirrors the collection/verb owned by the service.
+- `{resource…}` **must start with a collection noun owned by the service** — see the rule below.
+
+## Collection-noun rule (v3.0.0, ADR-017)
+
+The segment immediately after `{audience}` is a **collection noun the service
+owns** — by default the plural of the service's domain noun:
+
+```
+/{service}/v1/{audience}/{collection}/{resource…}
+```
+
+- Collections per service: `auth`\*, `users`, `products`, `cart`\*, `orders`,
+  `reviews`, `notifications`, `shipments`, `payments`.
+- **Closed exception list (\*):** `auth` uses the literal `auth` segment (it
+  owns no natural collection — `/auth/v1/public/auth/login`); `cart` is
+  singular (a per-user singleton resource).
+- Secondary resources nest under the owned noun, they never start a new
+  top-level segment: `payments/webhooks/mockpay`,
+  `payments/reconciliation/runs` — **not** `webhooks/…`, `reconciliation/…`.
+- Custom actions are sub-paths of the collection (`shipments/track`,
+  `notifications/read-all`); never a bare verb after the audience.
+- Lookup by a foreign key uses a nested segment on the owned collection:
+  `shipments/orders/:orderId`.
+- A new service MUST register its collection noun here before mounting routes.
 
 ## Audience segments
 
@@ -42,7 +65,7 @@ for in-cluster (east-west) traffic. Same path, different host — Kong just forw
 | `protected` | Signed webhooks / partner HMAC / IP allowlist — **planned, none deployed yet** | Not yet (planned) | Per-route plugin or service middleware |
 | `internal` | Pod → Service — cluster-only | **No — never** | Kong not exposing the route + NetworkPolicies (LIVE — kindnet enforces on K8s 1.34+) |
 
-**Kong enforcement:** each `api-*` Ingress has one or two explicit `path:` entries — `/{service}/v1/public/` and/or `/{service}/v1/private/`. Internal audiences are never added to Ingress rules, so requests to `https://gateway.duynh.me/notification/v1/internal/notify/email` resolve to Kong's default 404.
+**Kong enforcement:** each `api-*` Ingress has one or two explicit `path:` entries — `/{service}/v1/public/` and/or `/{service}/v1/private/`. Internal audiences are never added to Ingress rules, so requests to `https://gateway.duynh.me/notification/v1/internal/notifications/email` resolve to Kong's default 404.
 
 ## Hostnames
 
@@ -59,11 +82,11 @@ for in-cluster (east-west) traffic. Same path, different host — Kong just forw
 
 | Method | Path | Audience | Caller |
 |--------|------|----------|--------|
-| `POST` | `/auth/v1/public/login` | public | Browser |
-| `POST` | `/auth/v1/public/register` | public | Browser |
-| `POST` | `/auth/v1/public/refresh` | public | Browser (silent refresh) |
-| `POST` | `/auth/v1/public/logout` | public | Browser — body `{refresh_token}`, revokes the token family |
-| `GET` | `/auth/v1/public/jwks` | public | Every service's JWT middleware + Kong edge (verification keys) |
+| `POST` | `/auth/v1/public/auth/login` | public | Browser |
+| `POST` | `/auth/v1/public/auth/register` | public | Browser |
+| `POST` | `/auth/v1/public/auth/refresh` | public | Browser (silent refresh) |
+| `POST` | `/auth/v1/public/auth/logout` | public | Browser — body `{refresh_token}`, revokes the token family |
+| `GET` | `/auth/v1/public/auth/jwks` | public | Every service's JWT middleware + Kong edge (verification keys) |
 
 ### user-service (namespace `user`)
 
@@ -118,27 +141,45 @@ All private.
 | `GET` | `/notification/v1/private/notifications/count` | private | Browser (bell badge) |
 | `PATCH` | `/notification/v1/private/notifications/read-all` | private | Browser (mark all as read) |
 | `GET` / `PATCH` | `/notification/v1/private/notifications/:id` | private | Browser |
-| `POST` | `/notification/v1/internal/notify/email` | internal | Any service publishing a user notification |
-| `POST` | `/notification/v1/internal/notify/sms` | internal | Any service publishing a user notification |
+| `POST` | `/notification/v1/internal/notifications/email` | internal | Any service publishing a user notification |
+| `POST` | `/notification/v1/internal/notifications/sms` | internal | Any service publishing a user notification |
 
 ### shipping-service (namespace `shipping`)
 
 | Method | Path | Audience | Caller |
 |--------|------|----------|--------|
-| `GET` | `/shipping/v1/public/track?tracking_number=…` | public | Browser |
-| `GET` | `/shipping/v1/public/estimate?origin&destination&weight` | public | Browser |
-| `GET` | `/shipping/v1/internal/orders/:orderId` | internal | order-service (order-details aggregation) |
+| `GET` | `/shipping/v1/public/shipments/track?tracking_number=…` | public | Browser |
+| `GET` | `/shipping/v1/public/shipments/estimate?origin&destination&weight` | public | Browser |
+| `GET` | `/shipping/v1/internal/shipments/orders/:orderId` | internal | order-service (order-details aggregation) |
 
 ### payment-service (namespace `payment`)
 
 | Method | Path | Audience | Caller |
 |--------|------|----------|--------|
-| `POST` | `/payment/v1/public/webhooks/mockpay` | public | mockpay provider (HMAC-signed body is the credential) |
+| `POST` | `/payment/v1/public/payments/webhooks/mockpay` | public | mockpay provider (HMAC-signed body is the credential) |
 | `GET` / `POST` | `/payment/v1/private/payments` | private | Browser |
 | `GET` | `/payment/v1/private/payments/:id` | private | Browser |
 | `POST` | `/payment/v1/internal/payments/:id/refunds` | internal | In-cluster ops (the saga's refunds run over gRPC `PaymentService.Refund`) |
-| `POST` | `/payment/v1/internal/reconciliation/runs` | internal | Reconciliation trigger (in-cluster) |
-| `GET` | `/payment/v1/internal/reconciliation/runs/:id` | internal | Reconciliation status (in-cluster) |
+| `POST` | `/payment/v1/internal/payments/reconciliation/runs` | internal | Reconciliation trigger (in-cluster) |
+| `GET` | `/payment/v1/internal/payments/reconciliation/runs/:id` | internal | Reconciliation status (in-cluster) |
+
+## Deprecated aliases (transitional — expand phase, ADR-017)
+
+The v3.0.0 rename ships expand→contract. Routes that had **live callers** keep
+their pre-v3 path mounted as an alias (same handler) for one release; the
+contract release removes them:
+
+| Deprecated alias | Canonical path |
+|------------------|----------------|
+| `/auth/v1/public/{login,register,refresh,logout,jwks}` | `/auth/v1/public/auth/{…}` |
+| `/shipping/v1/public/{track,estimate}` | `/shipping/v1/public/shipments/{track,estimate}` |
+| `/payment/v1/public/webhooks/mockpay` | `/payment/v1/public/payments/webhooks/mockpay` |
+| `/payment/v1/internal/reconciliation/runs[/:id]` | `/payment/v1/internal/payments/reconciliation/runs[/:id]` |
+
+The zero-HTTP-caller internal routes (`/shipping/v1/internal/orders/:orderId`,
+`/notification/v1/internal/notify/{email,sms}` — both hops are gRPC) were
+renamed **without** aliases. Contract checklist lives in
+[ADR-017](../proposals/adr/ADR-017-api-path-collection-noun/).
 
 ## Service-to-service calls
 
@@ -146,7 +187,7 @@ The caller → callee → audience mapping for in-cluster east-west traffic:
 
 | Caller | Target | Audience |
 |--------|--------|----------|
-| Every service's JWT middleware (JWKS refresh) | auth-service `/auth/v1/public/jwks` | public |
+| Every service's JWT middleware (JWKS refresh) | auth-service `/auth/v1/public/auth/jwks` | public |
 | order-service → aggregation (shipment + payment) | shipping-service, payment-service | internal (gRPC) |
 | order-service → server-side pricing | cart-service | private (forwards user's JWT) |
 | order-worker → saga steps (stock, shipment, money, email) | product-, shipping-, payment-, notification-service | internal (gRPC) |
@@ -159,7 +200,7 @@ Most of these hops now run over **gRPC**, not HTTP. For transport (gRPC vs REST 
 ## Registering a new route
 
 1. Choose the audience — `public`, `private`, or `internal`. This is a permanent contract decision.
-2. Mount it in the owning service at `/{service}/v1/{audience}/{resource…}`. Apply JWT middleware only to the `/{service}/v1/private` router group.
+2. Mount it in the owning service at `/{service}/v1/{audience}/{collection}/{resource…}` — the collection noun per the rule above (register a new service's noun in this doc first). Apply JWT middleware only to the `/{service}/v1/private` router group.
 3. If it's `public` or `private` **and** browser-reachable, add a `path:` entry to `kubernetes/infra/configs/kong/ingress-api.yaml` for that service. If it's `internal`, do nothing — the service DNS is enough.
 4. Add a row to the route inventory above.
 5. Update the frontend `src/api/*.js` module if the browser calls it.
@@ -167,7 +208,7 @@ Most of these hops now run over **gRPC**, not HTTP. For transport (gRPC vs REST 
 ## Google-aligned practices (apply to `{resource…}` and bodies)
 
 - Plural nouns for collections; stable resource IDs.
-- Standard HTTP methods; custom actions as POST sub-paths.
+- Standard HTTP methods; custom actions as sub-paths of the owned collection (POST for mutating actions).
 - Consistent error envelope: `{ "error": "<message>" }`.
 - List endpoints: pagination (`page_size`, `page_token` or offset/limit — be consistent per service).
 - JSON field naming: `snake_case` across services (aligns with current handlers).
@@ -191,3 +232,4 @@ Immutable file names (content hash) + explicit `Cache-Control` for chunks.
 | v1.0.0 | 2026-04-09 | Initial Draft — Variant A vs B exploration, illustrative services. |
 | v1.1.0 | 2026-04-17 | Adopted Variant A at the edge. Services still mounted on `/api/v1/*`; Kong rewrote edge → cluster via per-namespace `pre-function` plugins. |
 | **v2.0.0** | **2026-04-17** | **Full migration — services mount Variant A paths directly, Kong is pure pass-through, `/api/v1/*` removed entirely. Internal audiences live only in-cluster (never on gateway).** Breaking change; frontend and all service-to-service callers updated in lockstep. |
+| **v3.0.0** | **2026-07-12** | **Collection-noun rule ([ADR-017](../proposals/adr/ADR-017-api-path-collection-noun/)) — the segment after `{audience}` must be a service-owned collection noun; 13 routes renamed (auth 5, shipping 3, notification 2, payment 3).** Expand→contract: live-caller routes keep deprecated aliases for one release; zero-caller internal routes renamed outright. |

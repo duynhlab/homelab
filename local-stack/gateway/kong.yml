@@ -82,7 +82,7 @@ services:
       # Public webhook route — anonymous at the edge (no jwt); the HMAC signature
       # is the credential, verified in the service. The global rate-limiting
       # plugin still applies, capping abuse of this unauthenticated path.
-      - { name: payment-webhooks, paths: ["/payment/v1/public/webhooks/"], strip_path: false }
+      - { name: payment-webhooks, paths: ["/payment/v1/public/payments/webhooks/", "/payment/v1/public/webhooks/"], strip_path: false } # 2nd path = deprecated pre-v3 alias, remove at contract (ADR-017)
   - name: order
     host: order.upstream
     port: 8080
@@ -116,7 +116,7 @@ services:
     read_timeout: 15000
     write_timeout: 15000
     retries: 2
-    routes: [{ name: shipping, paths: ["/shipping/"], strip_path: false }]
+    routes: [{ name: shipping, paths: ["/shipping/v1/public/"], strip_path: false }] # public-only — internal shipments stay off the edge (mirrors cluster ingress)
   - name: notification
     host: notification.upstream
     port: 8080
@@ -126,7 +126,7 @@ services:
     write_timeout: 15000
     retries: 2
     routes:
-      - { name: notification, paths: ["/notification/"], strip_path: false, plugins: [{ name: jwt, config: *jwtcfg }] }
+      - { name: notification, paths: ["/notification/v1/private/"], strip_path: false, plugins: [{ name: jwt, config: *jwtcfg }] } # private-only — internal notifications/* stay off the edge (mirrors cluster ingress)
 
 # Upstreams with health-checks. The `&hc` anchor is reused (identical policy).
 upstreams:

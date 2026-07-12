@@ -181,7 +181,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 |---|---|---|---|---|---|
 | **Notification inbox** | private `GET /notifications`, `GET /notifications/count`, `GET/PATCH /notifications/:id`, `PATCH /notifications/read-all` | JWT; owner-scoped reads/mutations (`(id, user_id)` — anti-IDOR); paginated list | auth JWKS | Implemented | — |
 | **Order emails** (saga side-effects) | internal gRPC `NotificationService.SendEmail` | called best-effort by the saga (order-created, receipt, refund notice) on a detached context | caller: order-worker | Implemented | [temporal saga](temporal-order-fulfillment.md) |
-| **Internal notify twins + SMS** | internal `POST /notify/email`, `POST /notify/sms`; gRPC `SendSMS` | HTTP twins of the gRPC path; SMS path fully unused | — | **No caller** | — |
+| **Internal notify twins + SMS** | internal `POST /notifications/email`, `POST /notifications/sms`; gRPC `SendSMS` | HTTP twins of the gRPC path; SMS path fully unused | — | **No caller** | — |
 
 ### payment — payments, outbox & reconciliation
 

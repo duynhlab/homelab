@@ -58,7 +58,7 @@ spec:
       # is the credential, so the in-cluster hop needs no gateway leg
       # (local-stack routes via Kong only to exercise the edge).
       - name: MOCKPAY_WEBHOOK_URL
-        value: http://payment.payment.svc.cluster.local:8080/payment/v1/public/webhooks/mockpay
+        value: http://payment.payment.svc.cluster.local:8080/payment/v1/public/payments/webhooks/mockpay
     resources:
       requests:
         memory: "32Mi"

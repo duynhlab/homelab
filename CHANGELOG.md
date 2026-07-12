@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **API paths → collection-noun rule (ADR-017, naming convention v3.0.0)**: 13
+  routes renamed so the segment after `{audience}` is a service-owned collection
+  noun — auth `/auth/v1/public/auth/*`, shipping `shipments/{track,estimate}` +
+  `shipments/orders/:orderId`, notification `notifications/{email,sms}`, payment
+  `payments/webhooks/mockpay` + `payments/reconciliation/runs`. Expand phase:
+  live-caller routes keep deprecated aliases for one release; frontend,
+  `AUTH_JWKS_URL` defaults, `MOCKPAY_WEBHOOK_URL`, Kong webhook Ingress path and
+  local-stack audit updated in lockstep.
+
+### Deprecated
+
+- Pre-v3 API paths (`/auth/v1/public/{login,register,refresh,logout,jwks}`,
+  `/shipping/v1/public/{track,estimate}`, `/payment/v1/public/webhooks/mockpay`,
+  `/payment/v1/internal/reconciliation/runs`) — served as aliases until the
+  ADR-017 contract release removes them.
+
 ### Added
 
 - **CloudNativePG `auth-db` + `shared-db` clusters** completing the Zalando→CNPG
@@ -50,6 +68,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Local-stack Kong routes scoped to audience prefixes**: `shipping` narrowed
+  `/shipping/` → `/shipping/v1/public/` and `notification` `/notification/` →
+  `/notification/v1/private/`, closing anonymous/JWT-holder access to the
+  `internal` HTTP surfaces through the local gateway (mirrors the cluster
+  Ingress trust model).
 - **Local Kind bring-up races (make up)**: Zalando operator now gets
   `enable_readiness_probe: true` so spilo pods gate on real readiness; the
   `ensure-databases` Jobs **wait for the owner role** before `CREATE DATABASE`

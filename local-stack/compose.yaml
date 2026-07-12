@@ -45,7 +45,7 @@ x-svc-env: &svc-env
   # Local JWKS for service-side JWT verification (authmw.MiddlewareJWT). Issuer and
   # audience use the auth-service defaults (https://gateway.duynh.me /
   # duynhlab-platform), so only the URL needs overriding from the cluster default.
-  AUTH_JWKS_URL: http://auth:8080/auth/v1/public/jwks
+  AUTH_JWKS_URL: http://auth:8080/auth/v1/public/auth/jwks
 
 x-svc-healthcheck: &svc-healthcheck
   test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
@@ -472,7 +472,7 @@ services:
       # Emit signed webhooks back through the edge (mirrors a real provider
       # calling the public webhook URL). Secret must match payment's.
       MOCKPAY_WEBHOOK_SECRET: whsec_local_demo
-      MOCKPAY_WEBHOOK_URL: http://gateway:8000/payment/v1/public/webhooks/mockpay
+      MOCKPAY_WEBHOOK_URL: http://gateway:8000/payment/v1/public/payments/webhooks/mockpay
     healthcheck: *svc-healthcheck
 
   payment:

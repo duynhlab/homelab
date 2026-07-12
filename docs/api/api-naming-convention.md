@@ -2,12 +2,12 @@
 
 | Attribute | Value |
 |-----------|--------|
-| **Version** | **v3.0.0** |
+| **Version** | **v3.0.1** |
 | **Status** | **Adopted** — sole URL surface (services mount these paths directly) |
 | **Superseded** | v2.0.0 free-form `{resource…}` (13 routes renamed, [ADR-017](../proposals/adr/ADR-017-api-path-collection-noun/)); `docs/api/api.md` cluster-only `/api/v1/*` shape (v0.85 and earlier) |
 | **Scope** | All HTTP URLs used by browsers, services, and admin/seed callers |
 | **Primary domain** | `local.duynh.me` — platform root; public API at `gateway.duynh.me` |
-| **Last updated** | 2026-07-12 (checkout `sessions` registered as planned) |
+| **Last updated** | 2026-07-12 (v3.0.1 — checkout joins the process-named exception: `checkout/sessions`) |
 
 ## Purpose
 
@@ -29,7 +29,7 @@ http://{service}.{namespace}.svc.cluster.local:8080/{service}/v1/{audience}/{res
 
 for in-cluster (east-west) traffic. Same path, different host — Kong just forwards.
 
-- `{service}` ∈ `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`, `payment` (+ `checkout` — **planned, RFC-0015, none deployed yet**).
+- `{service}` ∈ `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`, `payment`, `checkout` (RFC-0015 — P1 surface live in local-stack; cluster lands at P5).
 - `{audience}` ∈ `public`, `private`, `internal`, `protected` (`protected` is **planned — none deployed yet**).
 - `{resource…}` **must start with a collection noun owned by the service** — see the rule below.
 
@@ -43,13 +43,13 @@ owns** — by default the plural of the service's domain noun:
 ```
 
 - Collections per service: `auth`\*, `users`, `products`, `cart`\*, `orders`,
-  `reviews`, `notifications`, `shipments`, `payments`; checkout (planned,
-  [RFC-0015](../proposals/rfc/RFC-0015/)) registers `sessions` — the owned
-  resource is the checkout session, so the noun follows the resource, not the
-  service name (same reasoning as shipping → `shipments`).
-- **Closed exception list (\*):** `auth` uses the literal `auth` segment (it
-  owns no natural collection — `/auth/v1/public/auth/login`); `cart` is
-  singular (a per-user singleton resource).
+  `reviews`, `notifications`, `shipments`, `payments`, `checkout`\*
+  ([RFC-0015](../proposals/rfc/RFC-0015/)).
+- **Closed exception list (\*):** process-named services with no natural
+  plural collection — `auth` and `checkout` — use the literal service-name
+  segment and nest their resources beneath it
+  (`/auth/v1/public/auth/login`, `/checkout/v1/private/checkout/sessions`);
+  `cart` is singular (a per-user singleton resource).
 - Secondary resources nest under the owned noun, they never start a new
   top-level segment: `payments/webhooks/mockpay`,
   `payments/reconciliation/runs` — **not** `webhooks/…`, `reconciliation/…`.
@@ -166,6 +166,18 @@ All private.
 | `POST` | `/payment/v1/internal/payments/reconciliation/runs` | internal | Reconciliation trigger (in-cluster) |
 | `GET` | `/payment/v1/internal/payments/reconciliation/runs/:id` | internal | Reconciliation status (in-cluster) |
 
+### checkout-service (namespace `checkout`) — RFC-0015 P1 (local-stack; cluster at P5)
+
+All private (Kong edge JWT + in-service authmw); sessions owner-scoped by the
+JWT `user_id`. Shipping/payment/promo/confirm steps land in P2–P4.
+
+| Method | Path | Audience | Caller |
+|--------|------|----------|--------|
+| `POST` | `/checkout/v1/private/checkout/sessions` | private | Browser — create (201) or return the active session (200, idempotent) |
+| `GET` | `/checkout/v1/private/checkout/sessions/:id` | private | Browser |
+| `PUT` | `/checkout/v1/private/checkout/sessions/:id/address` | private | Browser |
+| `DELETE` | `/checkout/v1/private/checkout/sessions/:id` | private | Browser — cancel |
+
 ## Deprecated aliases (transitional — expand phase, ADR-017)
 
 The v3.0.0 rename ships expand→contract. Routes that had **live callers** keep
@@ -196,6 +208,8 @@ The caller → callee → audience mapping for in-cluster east-west traffic:
 | order-worker → saga steps (stock, shipment, money, email) | product-, shipping-, payment-, notification-service | internal (gRPC) |
 | order-worker → saga cart-clear | cart-service `/cart/v1/internal/cart/:userId` | internal (tokenless) |
 | product-service → aggregation | review-service | internal (gRPC) |
+| checkout-service → cart snapshot | cart-service `cart.v1/GetCart` | internal (gRPC, read-only — ADR-021) |
+| checkout-service → price/stock re-validation | product-service `product.v1/GetProducts` | internal (gRPC, cache-bypassing — ADR-020) |
 | auth-service → registration | user-service | **Planned** — no in-cluster caller today (auth registers into its own DB) |
 
 Most of these hops now run over **gRPC**, not HTTP. For transport (gRPC vs REST per hop), addresses, ports, and migration status, see [`grpc-internal-comms.md`](grpc-internal-comms.md) — it is authoritative for east-west transport.
@@ -236,3 +250,4 @@ Immutable file names (content hash) + explicit `Cache-Control` for chunks.
 | v1.1.0 | 2026-04-17 | Adopted Variant A at the edge. Services still mounted on `/api/v1/*`; Kong rewrote edge → cluster via per-namespace `pre-function` plugins. |
 | **v2.0.0** | **2026-04-17** | **Full migration — services mount Variant A paths directly, Kong is pure pass-through, `/api/v1/*` removed entirely. Internal audiences live only in-cluster (never on gateway).** Breaking change; frontend and all service-to-service callers updated in lockstep. |
 | **v3.0.0** | **2026-07-12** | **Collection-noun rule ([ADR-017](../proposals/adr/ADR-017-api-path-collection-noun/)) — the segment after `{audience}` must be a service-owned collection noun; 13 routes renamed (auth 5, shipping 3, notification 2, payment 3).** Expand→contract: live-caller routes keep deprecated aliases for one release; zero-caller internal routes renamed outright. |
+| v3.0.1 | 2026-07-12 | Checkout joins the process-named exception (with auth): owning segment is the literal `checkout`, resources nest beneath it (`checkout/sessions[…]`) — a bare `sessions` collection was ambiguous platform-wide. Applied before any consumer existed (pre-P3 SPA), so no aliases needed. |

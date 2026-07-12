@@ -54,21 +54,22 @@ The local end-to-end stack (`local-stack/compose.yaml`) mirrors the platform wit
 | auth | 8080 | `auth` | — | none (validated *by* everyone via JWKS) |
 | user | 8080 | `user` | — | auth (JWKS) |
 | product | 8080 | `product` | Valkey | auth (JWKS), review (gRPC) |
-| cart | 8080 | `cart` | — | auth (JWKS) |
+| cart | 8080 | `cart` | — | auth (JWKS); serves gRPC `GetCart` to checkout |
 | order | 8080 | `order` | — | auth (JWKS), Temporal, shipping/notification/payment/product (gRPC), cart (REST) |
 | review | 8080 | `review` | — | auth (JWKS) |
 | shipping | 8080 | `shipping` | — | none |
 | notification | 8080 | `notification` | — | auth (JWKS) |
 | payment | 8080 | `payment` | — | mockpay (provider); called by order (saga + enrichment) |
+| checkout | 8080 | `checkout` | — | auth (JWKS), cart + product (gRPC); reached only via Kong |
 | frontend | 80 → host 3001 | — | — | gateway only |
-| gateway (Kong 3.9) | 8000 → host 8080 | — | — | all 9 services |
+| gateway (Kong 3.9) | 8000 → host 8080 | — | — | all 10 services |
 
 > **In-cluster differences (production):** `auth-db` (CloudNativePG, via the **pgdog-auth** pooler);
 > `product-db` (CloudNativePG behind the **pgdog-product** pooler — `product`/`cart`/`order`/`payment`
 > databases; payment connects **direct over TLS, bypassing PgDog**);
 > `shared-db` (CloudNativePG, via **pgdog-shared** — `user`/`review`/`shipping`/`notification`).
 > Locally these collapse into one Postgres with 9 databases. See [`../databases/`](../databases/).
-> **Logging is unified** — all 9 services log via the shared `pkg/logger` zap wrapper
+> **Logging is unified** — all 10 services log via the shared `pkg/logger` zap wrapper
 > (`zapx`), teed into the OTLP pipeline (RFC-0014 P4).
 
 ---
@@ -117,10 +118,23 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 | **Catalog list/read** | public `GET /products`, `/products/:id` | cache-aside (Valkey): SETNX stampede lock (5 s TTL, token compare-and-delete release), TTL jitter 0–10 %, SCAN-based list invalidation; whitelisted sort/filter (injection-safe) | Valkey | Implemented | [caching](../caching/caching.md) |
 | **Product-details aggregation** | public `GET /products/:id/details` | server-side aggregation: reviews via gRPC `ReviewService.GetProductReviews` (3 s deadline, soft-fail → `[]`) + stock + related | review | Implemented | [gRPC](grpc-internal-comms.md) |
 | **Stock reservation** (saga step) | internal gRPC `ProductService.ReserveStock` / `ReleaseStock` | ledger-backed reservation, idempotent by `reservation_id` (= order id); insufficient stock → `FailedPrecondition` | caller: order-worker | Implemented | [temporal saga](temporal-order-fulfillment.md) |
+| **Checkout batch read** | internal gRPC `ProductService.GetProducts` | cache-bypassing price/stock batch (product = checkout price authority); int64 minor units; unknown ids omitted | caller: checkout | Implemented (RFC-0015 P1) | [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) |
 | **Product create** | internal `POST /products` | admin/seed path | — | Implemented | — |
 
 > **Known defect:** the service still emits its own CORS headers on top of the
 > gateway's (duplicate `Access-Control-Allow-Origin`) — see §6.
+
+### checkout — session orchestrator (RFC-0015 P1)
+
+> Owns `checkout_sessions` + `checkout_session_items`; DB `checkout` (local-stack;
+> cluster triplet at P5). Client-only — no gRPC server; nothing dials into it but Kong.
+
+| Feature | API | Technique | Depends on | Status | Ref |
+|---|---|---|---|---|---|
+| **Session lifecycle** | private `POST /sessions` (201/200 idempotent), `GET /sessions/:id`, `PUT /sessions/:id/address`, `DELETE /sessions/:id` | explicit FSM transition table (payment-style); one active session per user (partial unique index); owner-scoped anti-IDOR (foreign = 404) | auth JWKS, cart + product (gRPC) | Implemented (P1) | [RFC-0015](../proposals/rfc/RFC-0015/) |
+| **Price re-validation** | on `POST /sessions` | snapshot takes items from cart, prices from product (`GetProducts`, cache-bypassing); `price_changed` flag per line; product = price authority at checkout time | product (gRPC) | Implemented (P1; confirm gate at P2) | [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) |
+| **Lazy expiry** | every read/mutation | `now > expires_at` ⇒ `410 SESSION_EXPIRED` + best-effort `expired(lazy)` record; Temporal durable timer lands P2 — correctness never depends on the worker | — | Implemented (P1) | [RFC-0015](../proposals/rfc/RFC-0015/) |
+| **Shipping/payment/promo/confirm** | — | P2–P4 phases | — | Planned | [RFC-0015](../proposals/rfc/RFC-0015/) |
 
 ### cart — shopping cart
 
@@ -131,6 +145,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 |---|---|---|---|---|---|
 | **Cart CRUD** | private `GET/POST/DELETE /cart`, `GET /cart/count`, `PATCH/DELETE /cart/items/:itemId` | fail-closed JWT (`user_id` from token, never body); UPSERT `ON CONFLICT (user_id, product_id)`; server-side subtotal math (empty cart = 0 shipping) | auth JWKS | Implemented | — |
 | **Saga cart-clear** | internal `DELETE /cart/:userId` | tokenless in-cluster endpoint, NetworkPolicy-fenced; called best-effort by the saga's `ClearCart` step | caller: order-worker | Implemented | [temporal saga](temporal-order-fulfillment.md) |
+| **gRPC read surface** | `cart.v1/GetCart` (`:9090`) | read-only snapshot for checkout (RFC-0015); prices → int64 minor units at this boundary; writes deliberately stay REST (ADR-021) | caller: checkout | Implemented (local-stack; cluster P5) | [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) |
 
 ### order — orders & checkout fulfillment
 
@@ -227,7 +242,7 @@ browser-facing.**
 | **Idempotency** | Exactly-once effects under retries | HTTP `Idempotency-Key`: order create, payment create/refund. Saga natural keys: `reservation_id`, shipment `order_id`, payment recovery points | ADR-010 |
 | **Server-side aggregation** | No client-side orchestration | product `/details`, order `/details` (soft-fail enrichment) | — |
 | **Ownership-scoped queries** | Anti-IDOR — rows fetched with `(id, user_id)` | order, notification, payment, cart (token-derived `user_id`) | — |
-| **Embedded migrations** | Schema self-management per binary (golang-migrate) | all 9 services | [../databases/](../databases/) |
+| **Embedded migrations** | Schema self-management per binary (golang-migrate) | all 10 services | [../databases/](../databases/) |
 
 Rule: every value in a service table's **Technique** column appears here, and
 every row here is used by at least one service table — that is this doc's

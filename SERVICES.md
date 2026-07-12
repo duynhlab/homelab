@@ -25,11 +25,17 @@ All microservices are hosted in the `duynhlab` organization.
 | **Review** | [duynhlab/review-service](https://github.com/duynhlab/review-service) | 8006 | [![CI](https://github.com/duynhlab/review-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/review-service/actions) | `ghcr.io/duynhlab/review-service/review-service` |
 | **Notification** | [duynhlab/notification-service](https://github.com/duynhlab/notification-service) | 8007 | [![CI](https://github.com/duynhlab/notification-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/notification-service/actions) | `ghcr.io/duynhlab/notification-service/notification-service` |
 | **Shipping** | [duynhlab/shipping-service](https://github.com/duynhlab/shipping-service) | 8008 | [![CI](https://github.com/duynhlab/shipping-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/shipping-service/actions) | `ghcr.io/duynhlab/shipping-service/shipping-service` |
+| **Checkout** | [duynhlab/checkout-service](https://github.com/duynhlab/checkout-service) | — (Kong only) | [![CI](https://github.com/duynhlab/checkout-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/checkout-service/actions) | `ghcr.io/duynhlab/checkout-service/checkout-service` |
 | **Payment** | [duynhlab/payment-service](https://github.com/duynhlab/payment-service) | 8009 | [![CI](https://github.com/duynhlab/payment-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/payment-service/actions) | `ghcr.io/duynhlab/payment-service/payment-service` |
 
 > **Payment** ([RFC-0010](docs/proposals/rfc/RFC-0010/), P1–P6 shipped) is deployed
 > in-cluster via GitOps (checkout domain, alongside the `mockpay` provider and the
 > `order-worker` Temporal saga) **and** runs in local-stack.
+>
+> **Checkout** ([RFC-0015](docs/proposals/rfc/RFC-0015/), P1) is the session
+> orchestrator: cart snapshot + product-authoritative price re-validation +
+> session FSM. Local-stack now; cluster GitOps lands at P5. No host port —
+> reached only through Kong.
 
 ## 💻 Frontend
 

@@ -83,6 +83,18 @@ services:
       # is the credential, verified in the service. The global rate-limiting
       # plugin still applies, capping abuse of this unauthenticated path.
       - { name: payment-webhooks, paths: ["/payment/v1/public/payments/webhooks/", "/payment/v1/public/webhooks/"], strip_path: false } # 2nd path = deprecated pre-v3 alias, remove at contract (ADR-017)
+  - name: checkout
+    host: checkout.upstream
+    port: 8080
+    protocol: http
+    connect_timeout: 3000
+    read_timeout: 15000
+    write_timeout: 15000
+    retries: 2
+    routes:
+      # Private-only (RFC-0015): sessions API behind edge JWT; checkout has no
+      # public or internal HTTP surface.
+      - { name: checkout-private, paths: ["/checkout/v1/private/"], strip_path: false, plugins: [{ name: jwt, config: *jwtcfg }] }
   - name: order
     host: order.upstream
     port: 8080
@@ -142,6 +154,10 @@ upstreams:
         unhealthy: { http_failures: 5, timeouts: 3, tcp_failures: 3 }
     targets:
       - target: auth:8080
+  - name: checkout.upstream
+    healthchecks: *hc
+    targets:
+      - target: checkout:8080
   - name: user.upstream
     healthchecks: *hc
     targets: [{ target: user:8080 }]

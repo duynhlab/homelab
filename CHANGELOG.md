@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **RFC-0015 P1 — checkout service (local-stack)**: checkout-service rebuilt
+  on the platform 3-layer template (old `/api/v1/*` scaffold removed) serving
+  `/checkout/v1/private/sessions` (create/get/address/cancel, FSM, one active
+  session per user, lazy-expiry backstop, anti-IDOR); cart gains a read-only
+  `cart.v1/GetCart` gRPC server (ADR-021) and product a cache-bypassing
+  `GetProducts` batch read (ADR-020) — product is the checkout price
+  authority (`price_changed` flags close the stale-price gap); local-stack
+  wires the `checkout` DB, migrate job, Kong `/checkout/v1/private/` route
+  (edge JWT, no host port) and the README A9 audit; pkg v0.19.0 (cart.v1
+  proto, product GetProducts, checkout httpx codes).
+
 ### Changed
 
 - **RFC-0015 aligned with ADR-017**: spawned-ADR numbers shifted to 018–022

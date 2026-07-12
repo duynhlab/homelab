@@ -16,7 +16,8 @@ docs/
 │   ├── grpc-internal-comms.md   # Implemented: gRPC-only internal east-west comms
 │   ├── temporal-order-fulfillment.md # Implemented: Temporal saga — why/when/how, design, infra, ops
 │   ├── saga-vs-2pc.md           # Learning: saga vs two-phase commit — theory + the payment saga
-│   └── payments.md              # Implemented: payment subsystem — design record + reconciliation
+│   ├── payments.md              # Implemented: payment subsystem — design record + reconciliation
+│   └── checkout.md              # P1: checkout subsystem — session FSM, price re-validation, order handoff
 ├── proposals/                    # Design proposals & decisions
 │   ├── README.md                 # umbrella: ADR vs RFC + flow + links
 │   ├── adr/                      # Architecture Decision Records
@@ -353,6 +354,9 @@ docs/
 - [ADR-014: PgDog pooler credentials via Flux valuesFrom](./proposals/adr/ADR-014-pooler-credentials-valuesfrom/) - Accepted; from [RFC-0012](./proposals/rfc/RFC-0012/); per-user targetPath injection from ESO Secrets, no credentials in Helm values
 - [ADR-015: Connection isolation via declarative pg_hba](./proposals/adr/ADR-015-pg-hba-connection-isolation/) - Accepted; from [RFC-0012](./proposals/rfc/RFC-0012/); per-pair allow + trailing reject, applied by reload
 - [ADR-016: OTel metrics cutover](./proposals/adr/ADR-016-otel-metrics-cutover/) - Accepted; from [RFC-0014](./proposals/rfc/RFC-0014/); apps ServiceMonitor deleted (checkout never integrated — no fence), D-4 absence alerts activated in the same commit
+- [ADR-017: Collection-noun API paths](./proposals/adr/ADR-017-api-path-collection-noun/) - Accepted; the segment after the audience is a service-owned collection noun; 13 routes renamed (expand→contract)
+- [ADR-020: Checkout re-validation policy](./proposals/adr/ADR-020-checkout-revalidation-policy/) - Accepted; from [RFC-0015](./proposals/rfc/RFC-0015/); product is the checkout price authority, stock checked never reserved
+- [ADR-021: Cart gRPC read surface](./proposals/adr/ADR-021-cart-grpc-read-surface/) - Accepted; from [RFC-0015](./proposals/rfc/RFC-0015/); read-only GetCart for the checkout snapshot, writes stay REST
 
 ### Payments
 

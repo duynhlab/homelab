@@ -1,7 +1,7 @@
 # Local end-to-end test stack for the duynhlab e-commerce platform.
 #
-# Brings up: Postgres (8 DBs) + Redis cache + per-service golang-migrate migrations
-# + 8 Go services + a Temporal dev server + the order-fulfillment worker + a
+# Brings up: Postgres (10 DBs) + Redis cache + per-service golang-migrate migrations
+# + 10 Go services + a Temporal dev server + the order-fulfillment worker + a
 # Kong DB-less gateway (mirrors the in-cluster Kong) + the React frontend.
 #
 # Build contexts point at sibling repos (../../<service>), so all repos must be
@@ -169,7 +169,7 @@ services:
       - "8428:8428" # remote-write (/api/v1/write) + PromQL + vmui
 
   # ---- Continuous profiling: Pyroscope (single-binary, ephemeral local storage) ----
-  # The 8 services push pprof data here (PROFILING_ENABLED=true + PYROSCOPE_ENDPOINT
+  # The Go services push pprof data here (PROFILING_ENABLED=true + PYROSCOPE_ENDPOINT
   # in x-svc-env). View flame graphs in Grafana → Explore → Pyroscope.
   pyroscope:
     image: grafana/pyroscope:2.1.0
@@ -257,6 +257,14 @@ services:
     build: { context: ../../payment-service }
     command: ["migrate"]
     environment: { <<: *svc-env, SERVICE_NAME: payment, DB_NAME: payment }
+    depends_on: { postgres: { condition: service_healthy } }
+    restart: "no"
+
+  # checkout has no seed job — no demo data (RFC-0015 P1).
+  checkout-migrate:
+    build: { context: ../../checkout-service }
+    command: ["migrate"]
+    environment: { <<: *svc-env, SERVICE_NAME: checkout, DB_NAME: checkout }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
 
@@ -459,6 +467,26 @@ services:
       cart-seed: { condition: service_completed_successfully }
       auth: { condition: service_healthy }
 
+  # ---- Checkout (RFC-0015): session orchestrator — client-only, reached only
+  # through Kong (no host port, platform convention). Snapshots the cart via
+  # cart.v1/GetCart and re-validates prices via product.v1/GetProducts.
+  checkout:
+    build: { context: ../../checkout-service }
+    environment:
+      <<: *svc-env
+      SERVICE_NAME: checkout
+      OTEL_SERVICE_NAME: checkout
+      DB_NAME: checkout
+      CART_GRPC_ADDR: dns:///cart:9090
+      PRODUCT_GRPC_ADDR: dns:///product:9090
+    healthcheck: *svc-healthcheck
+    depends_on:
+      postgres: { condition: service_healthy }
+      checkout-migrate: { condition: service_completed_successfully }
+      auth: { condition: service_healthy }
+      cart: { condition: service_healthy }
+      product: { condition: service_healthy }
+
   # ---- Mock payment provider (a second deployment of the payment binary via
   # the `mockpay` subcommand — the real network hop behind payment's provider
   # port). Standalone: no DB, no migrations.
@@ -615,6 +643,7 @@ services:
       shipping: { condition: service_healthy }
       notification: { condition: service_healthy }
       payment: { condition: service_healthy }
+      checkout: { condition: service_healthy }
 
   # ---- Frontend (built with the gateway origin baked in) ----
   frontend:

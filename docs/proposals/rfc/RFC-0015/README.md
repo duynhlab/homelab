@@ -190,7 +190,7 @@ sequenceDiagram
     participant ORD as order (gRPC)
     participant T as Temporal
 
-    SPA->>Kong: POST /checkout/v1/private/sessions/:id/confirm (Idempotency-Key)
+    SPA->>Kong: POST /checkout/v1/private/checkout/sessions/:id/confirm (Idempotency-Key)
     Kong->>CK: (edge JWT verified, service re-verifies)
     CK->>CK: pkg/idempotency: claim key, resume from recovery point
     CK->>PROD: GetProducts(product_ids) — re-validate price + availability
@@ -219,7 +219,7 @@ input*, not the fulfillment contract.
 
 ### Checkout session and snapshot
 
-`POST /checkout/v1/private/sessions` snapshots the user's cart into
+`POST /checkout/v1/private/checkout/sessions` snapshots the user's cart into
 `checkout_session_items` — but with a deliberate authority shift:
 
 - **cart is the item-list authority** — which products, what quantities. Read
@@ -245,21 +245,21 @@ cart is a `409`.
 
 All routes are `private` (JWT; Kong edge-JWT applies). Following
 [`docs/api/api-naming-convention.md`](../../../api/api-naming-convention.md):
-checkout's registered collection noun is **`sessions`** per the v3.0.0
-collection-noun rule
-([ADR-017](../../adr/ADR-017-api-path-collection-noun/)) — the segment after
-`{audience}` on every route below.
+checkout, like auth, is a process-named service with no natural plural, so
+its owning segment is the literal **`checkout`** with resources (`sessions`)
+nested beneath it (naming convention v3.0.1,
+[ADR-017](../../adr/ADR-017-api-path-collection-noun/)).
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/checkout/v1/private/sessions` | Create (or return active) session: snapshot cart, re-validate prices, start/reset the abandonment timer |
-| GET | `/checkout/v1/private/sessions/:id` | Session + items + computed totals (owner-scoped) |
-| PUT | `/checkout/v1/private/sessions/:id/address` | Set shipping address → `address_set` |
-| PUT | `/checkout/v1/private/sessions/:id/shipping` | Choose method; fetches shipping `GetQuote`, computes tax → `shipping_set` |
-| PUT | `/checkout/v1/private/sessions/:id/payment` | Attach payment method — `tok_…` token only, PAN-like input rejected `400` before persist (same PCI-safe rule as order/payment) → `ready` |
-| POST | `/checkout/v1/private/sessions/:id/promo` | Apply a promo code (validity checked now; redemption counted at confirm) |
-| POST | `/checkout/v1/private/sessions/:id/confirm` | **`Idempotency-Key` header required** — re-validate, redeem promo, `CreateOrder`, → `completed` |
-| DELETE | `/checkout/v1/private/sessions/:id` | Cancel the session |
+| POST | `/checkout/v1/private/checkout/sessions` | Create (or return active) session: snapshot cart, re-validate prices, start/reset the abandonment timer |
+| GET | `/checkout/v1/private/checkout/sessions/:id` | Session + items + computed totals (owner-scoped) |
+| PUT | `/checkout/v1/private/checkout/sessions/:id/address` | Set shipping address → `address_set` |
+| PUT | `/checkout/v1/private/checkout/sessions/:id/shipping` | Choose method; fetches shipping `GetQuote`, computes tax → `shipping_set` |
+| PUT | `/checkout/v1/private/checkout/sessions/:id/payment` | Attach payment method — `tok_…` token only, PAN-like input rejected `400` before persist (same PCI-safe rule as order/payment) → `ready` |
+| POST | `/checkout/v1/private/checkout/sessions/:id/promo` | Apply a promo code (validity checked now; redemption counted at confirm) |
+| POST | `/checkout/v1/private/checkout/sessions/:id/confirm` | **`Idempotency-Key` header required** — re-validate, redeem promo, `CreateOrder`, → `completed` |
+| DELETE | `/checkout/v1/private/checkout/sessions/:id` | Cancel the session |
 
 New `httpx` error codes: `SESSION_EXPIRED`, `PRICE_CHANGED`,
 `STOCK_UNAVAILABLE`, `PROMO_INVALID`, `PROMO_EXPIRED`, `PROMO_EXHAUSTED`.
@@ -486,7 +486,7 @@ config; every phase independently shippable.
 
 | Phase | Deliverable | Exit criteria | Repos |
 |-------|-------------|---------------|-------|
-| **P1 — service + sessions + re-validation** | checkout-service scaffold (3-layer, `pkg` authmw/obsx/httpx/migratex, CI + Sonar); `checkout` DB; sessions CRUD + FSM + snapshot; **cart gRPC server (`GetCart`)**; **product `GetProducts`**; create-time re-validation; new error codes; local-stack: checkout container (host port `8010`) + Kong route + `init.sql` DB | Session lifecycle e2e in local-stack; a product price change between add-to-cart and session-create is detected and flagged | checkout-service (new), pkg, cart-service, product-service, homelab (local-stack) |
+| **P1 — service + sessions + re-validation** | checkout-service scaffold (3-layer, `pkg` authmw/obsx/httpx/migratex, CI + Sonar); `checkout` DB; sessions CRUD + FSM + snapshot; **cart gRPC server (`GetCart`)**; **product `GetProducts`**; create-time re-validation; new error codes; local-stack: checkout container (no host port — reached only through Kong, platform convention) + Kong route + `init.sql` DB | Session lifecycle e2e in local-stack; a product price change between add-to-cart and session-create is detected and flagged | checkout-service (new), pkg, cart-service, product-service, homelab (local-stack) |
 | **P2 — confirm + abandonment** | `pkg/idempotency` on confirm; **order gRPC server (`CreateOrder`)**; confirm→order handoff; `AbandonedCheckoutWorkflow` + checkout-worker + lazy backstop; (stretch) saga Query handler | Full checkout→order→saga→`confirmed` e2e; confirm replay with same key returns the same order, no double saga; abandoned session expires on TTL with worker up **and** is rejected with worker down | checkout-service, pkg, order-service, homelab (local-stack), (order-service stretch) |
 | **P3 — totals + SPA cutover** | shipping `GetQuote`; tax rules; totals in minor units; SPA multi-step checkout flow (dual-entry: legacy direct `POST /orders` stays live) | Totals correct across fee/tax/discount combinations; SPA completes a purchase through checkout; legacy path still passes regression | shipping-service, pkg, checkout-service, frontend |
 | **P4 — promo codes** | promo tables + apply + atomic confirm-time redemption + per-user limits | Concurrent-redemption race test: cap never exceeded; expired/exhausted codes rejected with correct codes | checkout-service |
@@ -612,6 +612,17 @@ Phased P1→P6 as above. Blast-radius notes:
   paths): spawned-ADR numbers shifted to 018–022; checkout's collection noun
   `sessions` registered (planned) in the naming convention. Route shapes were
   already conformant — no path changed.
+- 2026-07-12 — convention-owner review: routes nest under the literal
+  `checkout` segment (`/checkout/v1/private/checkout/sessions[…]`, naming
+  convention v3.0.1) — a bare `sessions` collection was ambiguous; applied
+  pre-P3 (no consumers), so no aliases.
+- 2026-07-12 — **P1 shipped** (local-stack): checkout-service rebuilt on the
+  platform template (old non-conforming scaffold removed); sessions
+  create/get/address/cancel + full FSM + lazy-expiry backstop; cart gRPC
+  server (`GetCart`, ADR-021) + product `GetProducts` (ADR-020) + pkg
+  v0.19.0 (cart.v1, checkout httpx codes). Deviation from the draft: no host
+  port `8010` — checkout follows the platform convention (services are
+  reached only through Kong).
 
 ## Related
 

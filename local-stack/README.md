@@ -4,8 +4,8 @@ A one-command **Docker Compose** end-to-end stack for the duynhlab platform —
 the full request path plus a tracing + span-metrics observability stack, without
 a Kubernetes cluster.
 
-It runs: PostgreSQL (9 databases) · Valkey · per-service golang-migrate jobs · the
-**9 Go services** (+ the `mockpay` provider) · a Temporal dev server + the order-fulfillment worker · a
+It runs: PostgreSQL (10 databases) · Valkey · per-service golang-migrate jobs · the
+**10 Go services** (+ the `mockpay` provider) · a Temporal dev server + the order-fulfillment worker · a
 **Kong DB-less gateway** (mirrors the in-cluster Kong) · the **React SPA** ·
 an **OTel Collector → VictoriaTraces + VictoriaMetrics → Grafana** pipeline, and
 **Pyroscope** continuous profiling.
@@ -28,7 +28,7 @@ First run builds every service image, so it takes a few minutes. Then:
 | Component | URL | Notes |
 |-----------|-----|-------|
 | SPA (frontend) | http://localhost:3001 | demo login `alice` / `password123` (by **username**) |
-| API gateway (Kong) | http://localhost:8080 | pass-through to all 9 services |
+| API gateway (Kong) | http://localhost:8080 | pass-through to all 10 services (checkout included — no host port, Kong only) |
 | Temporal Web UI | http://localhost:8233 | watch the saga |
 | **Grafana** | **http://localhost:3002** | Explore (traces) + RED dashboard; anonymous admin |
 | VictoriaTraces | http://localhost:10428 | trace ingest + Jaeger query API + vmui |
@@ -42,8 +42,8 @@ Postgres and Valkey are internal-only (reach the services through Kong, not dire
 ```mermaid
 flowchart LR
     SPA["React SPA :3001"] --> KONG["Kong :8080"]
-    KONG --> SVC["9 Go services"]
-    SVC --> PG[(PostgreSQL<br/>8 DBs)]
+    KONG --> SVC["10 Go services"]
+    SVC --> PG[(PostgreSQL<br/>10 DBs)]
     SVC --> VALKEY[(Valkey)]
     SVC -. workflows .-> TMP["Temporal :7233<br/>+ worker"]
     SVC -- "OTLP-HTTP" --> COL["otel-collector :4318"]
@@ -145,6 +145,41 @@ docker compose exec -T notification wget -q -O /dev/null -S \
 docker compose exec -T shipping wget -q -O /dev/null -S \
   http://localhost:8080/shipping/v1/internal/orders/1 2>&1 | head -1
 # want: HTTP/1.1 404 (now /shipping/v1/internal/shipments/orders/:orderId)
+
+# A9. Checkout sessions (RFC-0015 P1) — lifecycle through Kong edge-JWT.
+#     Cart must have at least one item (add via the SPA or cart API first).
+AT9=$(curl -s -X POST $BASE/auth/v1/public/auth/login -H 'Content-Type: application/json' \
+  -d '{"username":"alice","password":"password123"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['access_token'])")
+curl -s -X POST $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT9" \
+  -H 'Content-Type: application/json' \
+  -d '{"product_id":"1","product_name":"Wireless Mouse","product_price":29.99,"quantity":1}' -o /dev/null
+S9=$(curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT9")
+SID=$(echo "$S9" | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "A9 create:   session $SID ($(echo "$S9" | python3 -c "import json,sys;print(json.load(sys.stdin)['status'])"))"
+curl -s -o /dev/null -w "A9 re-create: %{http_code} (want 200 — idempotent, same session)\n" \
+  -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT9"
+curl -s -o /dev/null -w "A9 get:       %{http_code} (want 200)\n" \
+  $BASE/checkout/v1/private/checkout/sessions/$SID -H "Authorization: Bearer $AT9"
+curl -s -o /dev/null -w "A9 address:   %{http_code} (want 200 → address_set)\n" \
+  -X PUT $BASE/checkout/v1/private/checkout/sessions/$SID/address -H "Authorization: Bearer $AT9" \
+  -H 'Content-Type: application/json' \
+  -d '{"full_name":"Alice","line1":"1 Main St","city":"HN","country":"VN"}'
+curl -s -o /dev/null -w "A9 cancel:    %{http_code} (want 200)\n" \
+  -X DELETE $BASE/checkout/v1/private/checkout/sessions/$SID -H "Authorization: Bearer $AT9"
+curl -s -o /dev/null -w "A9 no-token:  %{http_code} (want 401 at the edge)\n" \
+  -X POST $BASE/checkout/v1/private/checkout/sessions
+curl -s -o /dev/null -w "A9 old path:  %{http_code} (want 404 — /api/v1/checkout removed)\n" \
+  -X POST $BASE/api/v1/checkout
+# Price-change detection (the RFC-0015 P1 exit criterion): bump a catalog
+# price, create a fresh session, expect the line flagged.
+docker compose exec -T postgres psql -U postgres -d product -c \
+  "UPDATE products SET price = price + 1 WHERE id = 1" >/dev/null
+curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT9" | \
+  python3 -c "import json,sys; s=json.load(sys.stdin); \
+  print('A9 price-change:', 'OK' if any(i['price_changed'] for i in s['items']) else 'FAIL', \
+  [ (i['product_id'], i['price_changed'], i['unit_price']) for i in s['items'] ])"
+docker compose exec -T postgres psql -U postgres -d product -c \
+  "UPDATE products SET price = price - 1 WHERE id = 1" >/dev/null
 ```
 
 > Rapid-fire auth calls can trip Kong's rate limit (429). That is the gateway
@@ -216,6 +251,7 @@ agent-browser $S close
 | A6 | Removed surfaces | `/auth/v1/private/*` 404; no `sessions` table |
 | A7 | v3 paths (ADR-017) | new `shipments/*` + `auth/*` paths 200; deprecated aliases still 200 (expand phase) |
 | A8 | Renamed internal paths | old `notify/*` + `internal/orders/*` 404 in-container (no aliases) |
+| A9 | Checkout sessions (RFC-0015) | lifecycle 201→200→200→200 through edge-JWT; no-token 401; `/api/v1/checkout` 404; price bump flags `price_changed` |
 | B1 | UI login | JWT + refresh in localStorage |
 | B2 | Silent refresh | exactly **one** `POST /refresh` for concurrent 401s; retried 200s; no login bounce |
 | B3 | UI logout | `POST /public/auth/logout` 200; storage cleared; redirect to `/login` |
@@ -233,7 +269,7 @@ metrics-generator locally.
 
 ```mermaid
 flowchart LR
-    SVC["9 services<br/>(OTLP-HTTP)"] --> COL["otel-collector :4318"]
+    SVC["10 services<br/>(OTLP-HTTP)"] --> COL["otel-collector :4318"]
     COL --> VT["VictoriaTraces :10428"]
     COL -->|"spanmetrics"| VM["VictoriaMetrics :8428"]
     VT --> EXP["Grafana Explore<br/>(span waterfall)"]

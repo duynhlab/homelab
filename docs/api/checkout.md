@@ -41,8 +41,9 @@ A session is an **auditable quote**:
 - **Snapshot.** Items come from cart (quantities, names) but **prices come
   from product** — two separate authorities: cart says *what* you are buying,
   product says *what it costs at checkout time* (ADR-020). Every line keeps
-  both `unit_price_minor` (product) and `cart_price_minor` (cart); when they
-  differ the line is flagged `price_changed: true` and the SPA can say "price
+  both prices — `unit_price` (product) and `cart_price` (cart) on the wire,
+  stored as `*_minor` cent columns internally. When they differ, the line is
+  flagged `price_changed: true` and the SPA can say "price
   changed since you added this" — an honest funnel instead of a silently
   different one.
 - **FSM.** State moves strictly forward through the funnel; edits under way

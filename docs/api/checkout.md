@@ -108,9 +108,9 @@ All routes are `private` — Kong edge-JWT is the coarse filter, in-service
 | `PUT` | `/checkout/v1/private/sessions/:id/address` | Store the shipping address → `address_set` (re-editable from any pre-confirm state) | `400` missing/oversized fields; `409 INVALID_TRANSITION` from terminal states |
 | `DELETE` | `/checkout/v1/private/sessions/:id` | Cancel (idempotent on cancelled) | `409 INVALID_TRANSITION` on completed |
 
-Platform conventions apply: `snake_case` JSON, the `{"error","code"}`
-envelope, and int64 minor units for money (`2999` = $29.99 — floats never
-cross a service boundary).
+Platform conventions apply: `snake_case` JSON, resources returned directly
+(no wrapper envelope), the `{"error","code"}` error envelope, and dollars on
+the wire (minor units internally, like order).
 
 ## How it works — three mechanisms worth learning
 

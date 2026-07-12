@@ -154,8 +154,8 @@ curl -s -X POST $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT9" \
   -H 'Content-Type: application/json' \
   -d '{"product_id":"1","product_name":"Wireless Mouse","product_price":29.99,"quantity":1}' -o /dev/null
 S9=$(curl -s -X POST $BASE/checkout/v1/private/sessions -H "Authorization: Bearer $AT9")
-SID=$(echo "$S9" | python3 -c "import json,sys;print(json.load(sys.stdin)['session']['id'])")
-echo "A9 create:   session $SID ($(echo "$S9" | python3 -c "import json,sys;print(json.load(sys.stdin)['session']['status'])"))"
+SID=$(echo "$S9" | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "A9 create:   session $SID ($(echo "$S9" | python3 -c "import json,sys;print(json.load(sys.stdin)['status'])"))"
 curl -s -o /dev/null -w "A9 re-create: %{http_code} (want 200 — idempotent, same session)\n" \
   -X POST $BASE/checkout/v1/private/sessions -H "Authorization: Bearer $AT9"
 curl -s -o /dev/null -w "A9 get:       %{http_code} (want 200)\n" \
@@ -175,9 +175,9 @@ curl -s -o /dev/null -w "A9 old path:  %{http_code} (want 404 — /api/v1/checko
 docker compose exec -T postgres psql -U postgres -d product -c \
   "UPDATE products SET price = price + 1 WHERE id = 1" >/dev/null
 curl -s -X POST $BASE/checkout/v1/private/sessions -H "Authorization: Bearer $AT9" | \
-  python3 -c "import json,sys; s=json.load(sys.stdin)['session']; \
+  python3 -c "import json,sys; s=json.load(sys.stdin); \
   print('A9 price-change:', 'OK' if any(i['price_changed'] for i in s['items']) else 'FAIL', \
-  [ (i['product_id'], i['price_changed']) for i in s['items'] ])"
+  [ (i['product_id'], i['price_changed'], i['unit_price']) for i in s['items'] ])"
 docker compose exec -T postgres psql -U postgres -d product -c \
   "UPDATE products SET price = price - 1 WHERE id = 1" >/dev/null
 ```

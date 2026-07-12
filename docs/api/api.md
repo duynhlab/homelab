@@ -605,6 +605,24 @@ Authorization: Bearer <jwt_token>
 
 ---
 
+## Checkout Service (RFC-0015 P1)
+
+Session orchestrator between the SPA and order — Variant A collection-noun
+paths (`sessions`, ADR-017), all **private** (Kong edge-JWT + in-service
+authmw), owner-scoped by the JWT `user_id`. P1 ships the session lifecycle;
+shipping/payment/promo/confirm land in P2–P4. Full route inventory:
+[api-naming-convention.md](./api-naming-convention.md).
+
+| Method | Path | Notes |
+|--------|------|-------|
+| `POST` | `/checkout/v1/private/sessions` | Snapshot cart → session `open`; **201** created / **200** existing active session (idempotent); `409 CONFLICT` empty cart. Items carry `unit_price_minor` (product-authoritative), `cart_price_minor`, `price_changed`. |
+| `GET` | `/checkout/v1/private/sessions/:id` | Session + items + totals. `404` unknown/foreign (anti-IDOR); `410 SESSION_EXPIRED` past TTL (lazy check). |
+| `PUT` | `/checkout/v1/private/sessions/:id/address` | Body `{full_name, line1, line2?, city, region?, post_code?, country}` → `address_set`; `409 INVALID_TRANSITION` from terminal states. |
+| `DELETE` | `/checkout/v1/private/sessions/:id` | Cancel (idempotent on cancelled). |
+
+Money: int64 minor units. Session TTL 30 min, reset semantics + durable timer
+arrive with P2 (`AbandonedCheckoutWorkflow`).
+
 ## Order Service
 
 ### GET /order/v1/private/orders

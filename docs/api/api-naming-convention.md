@@ -7,7 +7,7 @@
 | **Superseded** | v2.0.0 free-form `{resource…}` (13 routes renamed, [ADR-017](../proposals/adr/ADR-017-api-path-collection-noun/)); `docs/api/api.md` cluster-only `/api/v1/*` shape (v0.85 and earlier) |
 | **Scope** | All HTTP URLs used by browsers, services, and admin/seed callers |
 | **Primary domain** | `local.duynh.me` — platform root; public API at `gateway.duynh.me` |
-| **Last updated** | 2026-07-12 (checkout `sessions` registered as planned) |
+| **Last updated** | 2026-07-12 (checkout P1 routes live in local-stack) |
 
 ## Purpose
 
@@ -29,7 +29,7 @@ http://{service}.{namespace}.svc.cluster.local:8080/{service}/v1/{audience}/{res
 
 for in-cluster (east-west) traffic. Same path, different host — Kong just forwards.
 
-- `{service}` ∈ `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`, `payment` (+ `checkout` — **planned, RFC-0015, none deployed yet**).
+- `{service}` ∈ `auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`, `payment`, `checkout` (RFC-0015 — P1 surface live in local-stack; cluster lands at P5).
 - `{audience}` ∈ `public`, `private`, `internal`, `protected` (`protected` is **planned — none deployed yet**).
 - `{resource…}` **must start with a collection noun owned by the service** — see the rule below.
 
@@ -43,10 +43,10 @@ owns** — by default the plural of the service's domain noun:
 ```
 
 - Collections per service: `auth`\*, `users`, `products`, `cart`\*, `orders`,
-  `reviews`, `notifications`, `shipments`, `payments`; checkout (planned,
-  [RFC-0015](../proposals/rfc/RFC-0015/)) registers `sessions` — the owned
-  resource is the checkout session, so the noun follows the resource, not the
-  service name (same reasoning as shipping → `shipments`).
+  `reviews`, `notifications`, `shipments`, `payments`, and checkout →
+  `sessions` ([RFC-0015](../proposals/rfc/RFC-0015/)) — the owned resource is
+  the checkout session, so the noun follows the resource, not the service
+  name (same reasoning as shipping → `shipments`).
 - **Closed exception list (\*):** `auth` uses the literal `auth` segment (it
   owns no natural collection — `/auth/v1/public/auth/login`); `cart` is
   singular (a per-user singleton resource).
@@ -166,6 +166,18 @@ All private.
 | `POST` | `/payment/v1/internal/payments/reconciliation/runs` | internal | Reconciliation trigger (in-cluster) |
 | `GET` | `/payment/v1/internal/payments/reconciliation/runs/:id` | internal | Reconciliation status (in-cluster) |
 
+### checkout-service (namespace `checkout`) — RFC-0015 P1 (local-stack; cluster at P5)
+
+All private (Kong edge JWT + in-service authmw); sessions owner-scoped by the
+JWT `user_id`. Shipping/payment/promo/confirm steps land in P2–P4.
+
+| Method | Path | Audience | Caller |
+|--------|------|----------|--------|
+| `POST` | `/checkout/v1/private/sessions` | private | Browser — create (201) or return the active session (200, idempotent) |
+| `GET` | `/checkout/v1/private/sessions/:id` | private | Browser |
+| `PUT` | `/checkout/v1/private/sessions/:id/address` | private | Browser |
+| `DELETE` | `/checkout/v1/private/sessions/:id` | private | Browser — cancel |
+
 ## Deprecated aliases (transitional — expand phase, ADR-017)
 
 The v3.0.0 rename ships expand→contract. Routes that had **live callers** keep
@@ -196,6 +208,8 @@ The caller → callee → audience mapping for in-cluster east-west traffic:
 | order-worker → saga steps (stock, shipment, money, email) | product-, shipping-, payment-, notification-service | internal (gRPC) |
 | order-worker → saga cart-clear | cart-service `/cart/v1/internal/cart/:userId` | internal (tokenless) |
 | product-service → aggregation | review-service | internal (gRPC) |
+| checkout-service → cart snapshot | cart-service `cart.v1/GetCart` | internal (gRPC, read-only — ADR-021) |
+| checkout-service → price/stock re-validation | product-service `product.v1/GetProducts` | internal (gRPC, cache-bypassing — ADR-020) |
 | auth-service → registration | user-service | **Planned** — no in-cluster caller today (auth registers into its own DB) |
 
 Most of these hops now run over **gRPC**, not HTTP. For transport (gRPC vs REST per hop), addresses, ports, and migration status, see [`grpc-internal-comms.md`](grpc-internal-comms.md) — it is authoritative for east-west transport.

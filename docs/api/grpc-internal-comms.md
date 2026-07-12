@@ -12,8 +12,9 @@
 
 The migration is **complete** for the migrated hops: they run over gRPC, the servers
 are always-on (no feature flag), and there is no REST fallback. The **one documented
-exception is the `order → cart` pair** (the checkout pricing read + the saga's
+exception is the `order → cart` pair** (the legacy pricing read + the saga's
 tokenless internal cart-clear), which remains REST — see the hop table below.
+(cart itself now serves gRPC: checkout's read-only `GetCart`, RFC-0015 P1.)
 
 | Hop / item | Status | Where |
 |------------|--------|-------|
@@ -23,6 +24,7 @@ tokenless internal cart-clear), which remains REST — see the hop table below.
 | **Phase 2** — `product → review` aggregation | ✅ gRPC-only | review + product |
 | **Phase 2** — `order → notification` publish on checkout (best-effort; the saga worker drives it today) | ✅ | notification + order |
 | **Payment (RFC-0010)** — `order` + `order-worker` → `payment` (saga capture/refund + `GetPayment` enrichment); `order-worker` → `product` (saga stock) | ✅ gRPC-only | payment + product + order + order-worker |
+| **Checkout (RFC-0015 P1)** — `checkout → cart` (`cart.v1/GetCart`, cart's first gRPC server — read-only, ADR-021) + `checkout → product` (`product.v1/GetProducts`, cache-bypassing price/stock read — ADR-020) | ✅ gRPC-only (local-stack; cluster at P5) | cart + product + checkout |
 | **Cluster** — headless `{product,review,shipping,notification,payment}-grpc` Services (`:9090`) + ResourceSet `*_GRPC_ADDR` env (`auth-grpc` removed in Phase 5) | ✅ | mop chart (`grpc.enabled`), `kubernetes/apps/domains/*-rs.yaml`, `kubernetes/apps/services/*.yaml` |
 | **Phase 3** — NetworkPolicy fences `:9090`; gRPC health service registered | ✅ | `kubernetes/infra/configs/network-policies/` |
 | **Phase 3** — mTLS on `:9090` | ⏳ deferred | services use `insecure` creds; needs `grpcx` TLS + cert-manager |
@@ -39,7 +41,8 @@ Consumers dial the headless Services:
 | `SHIPPING_GRPC_ADDR` | order → shipping (+ order-worker) | `dns:///shipping-grpc.shipping.svc.cluster.local:9090` |
 | `NOTIFICATION_GRPC_ADDR` | order → notification (+ order-worker) | `dns:///notification-grpc.notification.svc.cluster.local:9090` |
 | `PAYMENT_GRPC_ADDR` | order → payment (+ order-worker saga) | `dns:///payment-grpc.payment.svc.cluster.local:9090` |
-| `PRODUCT_GRPC_ADDR` | order-worker → product | `dns:///product-grpc.product.svc.cluster.local:9090` |
+| `PRODUCT_GRPC_ADDR` | order-worker → product; checkout → product | `dns:///product-grpc.product.svc.cluster.local:9090` |
+| `CART_GRPC_ADDR` | checkout → cart (read-only GetCart) | `dns:///cart-grpc.cart.svc.cluster.local:9090` |
 
 ## TL;DR
 
@@ -99,7 +102,9 @@ calls, not a religion.
 | order-worker → notification (saga emails, best-effort) | gRPC | ✅ best-effort |
 | order + order-worker → payment (saga authorize/capture/void/refund + `GetPayment` enrichment) | gRPC | ✅ gRPC-only (RFC-0010) |
 | order-worker → product (saga `ReserveStock`/`ReleaseStock`) | gRPC | ✅ gRPC-only (RFC-0010) |
-| order → cart (pricing read, forwards user JWT; saga clear via tokenless internal route) | REST today | not migrated (both cart hops stay REST) |
+| order → cart (pricing read, forwards user JWT; saga clear via tokenless internal route) | REST today | not migrated (both cart hops stay REST; the redundant pricing read is removed at RFC-0015 P6) |
+| checkout → cart (session snapshot read) | gRPC | ✅ gRPC-only (RFC-0015 P1, ADR-021) |
+| checkout → product (price/stock re-validation) | gRPC | ✅ gRPC-only (RFC-0015 P1, ADR-020) |
 | any browser / SPA → Kong | **STAY REST** | — (hard rule) |
 | auth → user (registration) | not implemented | proto-only candidate |
 

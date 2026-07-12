@@ -486,7 +486,7 @@ config; every phase independently shippable.
 
 | Phase | Deliverable | Exit criteria | Repos |
 |-------|-------------|---------------|-------|
-| **P1 — service + sessions + re-validation** | checkout-service scaffold (3-layer, `pkg` authmw/obsx/httpx/migratex, CI + Sonar); `checkout` DB; sessions CRUD + FSM + snapshot; **cart gRPC server (`GetCart`)**; **product `GetProducts`**; create-time re-validation; new error codes; local-stack: checkout container (host port `8010`) + Kong route + `init.sql` DB | Session lifecycle e2e in local-stack; a product price change between add-to-cart and session-create is detected and flagged | checkout-service (new), pkg, cart-service, product-service, homelab (local-stack) |
+| **P1 — service + sessions + re-validation** | checkout-service scaffold (3-layer, `pkg` authmw/obsx/httpx/migratex, CI + Sonar); `checkout` DB; sessions CRUD + FSM + snapshot; **cart gRPC server (`GetCart`)**; **product `GetProducts`**; create-time re-validation; new error codes; local-stack: checkout container (no host port — reached only through Kong, platform convention) + Kong route + `init.sql` DB | Session lifecycle e2e in local-stack; a product price change between add-to-cart and session-create is detected and flagged | checkout-service (new), pkg, cart-service, product-service, homelab (local-stack) |
 | **P2 — confirm + abandonment** | `pkg/idempotency` on confirm; **order gRPC server (`CreateOrder`)**; confirm→order handoff; `AbandonedCheckoutWorkflow` + checkout-worker + lazy backstop; (stretch) saga Query handler | Full checkout→order→saga→`confirmed` e2e; confirm replay with same key returns the same order, no double saga; abandoned session expires on TTL with worker up **and** is rejected with worker down | checkout-service, pkg, order-service, homelab (local-stack), (order-service stretch) |
 | **P3 — totals + SPA cutover** | shipping `GetQuote`; tax rules; totals in minor units; SPA multi-step checkout flow (dual-entry: legacy direct `POST /orders` stays live) | Totals correct across fee/tax/discount combinations; SPA completes a purchase through checkout; legacy path still passes regression | shipping-service, pkg, checkout-service, frontend |
 | **P4 — promo codes** | promo tables + apply + atomic confirm-time redemption + per-user limits | Concurrent-redemption race test: cap never exceeded; expired/exhausted codes rejected with correct codes | checkout-service |
@@ -612,6 +612,13 @@ Phased P1→P6 as above. Blast-radius notes:
   paths): spawned-ADR numbers shifted to 018–022; checkout's collection noun
   `sessions` registered (planned) in the naming convention. Route shapes were
   already conformant — no path changed.
+- 2026-07-12 — **P1 shipped** (local-stack): checkout-service rebuilt on the
+  platform template (old non-conforming scaffold removed); sessions
+  create/get/address/cancel + full FSM + lazy-expiry backstop; cart gRPC
+  server (`GetCart`, ADR-021) + product `GetProducts` (ADR-020) + pkg
+  v0.19.0 (cart.v1, checkout httpx codes). Deviation from the draft: no host
+  port `8010` — checkout follows the platform convention (services are
+  reached only through Kong).
 
 ## Related
 

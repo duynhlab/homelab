@@ -62,14 +62,14 @@ The local end-to-end stack (`local-stack/compose.yaml`) mirrors the platform wit
 | payment | 8080 | `payment` | — | mockpay (provider); called by order (saga + enrichment) |
 | checkout | 8080 | `checkout` | — | auth (JWKS), cart + product (gRPC); reached only via Kong |
 | frontend | 80 → host 3001 | — | — | gateway only |
-| gateway (Kong 3.9) | 8000 → host 8080 | — | — | all 9 services |
+| gateway (Kong 3.9) | 8000 → host 8080 | — | — | all 10 services |
 
 > **In-cluster differences (production):** `auth-db` (CloudNativePG, via the **pgdog-auth** pooler);
 > `product-db` (CloudNativePG behind the **pgdog-product** pooler — `product`/`cart`/`order`/`payment`
 > databases; payment connects **direct over TLS, bypassing PgDog**);
 > `shared-db` (CloudNativePG, via **pgdog-shared** — `user`/`review`/`shipping`/`notification`).
 > Locally these collapse into one Postgres with 9 databases. See [`../databases/`](../databases/).
-> **Logging is unified** — all 9 services log via the shared `pkg/logger` zap wrapper
+> **Logging is unified** — all 10 services log via the shared `pkg/logger` zap wrapper
 > (`zapx`), teed into the OTLP pipeline (RFC-0014 P4).
 
 ---
@@ -242,7 +242,7 @@ browser-facing.**
 | **Idempotency** | Exactly-once effects under retries | HTTP `Idempotency-Key`: order create, payment create/refund. Saga natural keys: `reservation_id`, shipment `order_id`, payment recovery points | ADR-010 |
 | **Server-side aggregation** | No client-side orchestration | product `/details`, order `/details` (soft-fail enrichment) | — |
 | **Ownership-scoped queries** | Anti-IDOR — rows fetched with `(id, user_id)` | order, notification, payment, cart (token-derived `user_id`) | — |
-| **Embedded migrations** | Schema self-management per binary (golang-migrate) | all 9 services | [../databases/](../databases/) |
+| **Embedded migrations** | Schema self-management per binary (golang-migrate) | all 10 services | [../databases/](../databases/) |
 
 Rule: every value in a service table's **Technique** column appears here, and
 every row here is used by at least one service table — that is this doc's

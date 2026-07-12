@@ -16,7 +16,8 @@ docs/
 │   ├── grpc-internal-comms.md   # Implemented: gRPC-only internal east-west comms
 │   ├── temporal-order-fulfillment.md # Implemented: Temporal saga — why/when/how, design, infra, ops
 │   ├── saga-vs-2pc.md           # Learning: saga vs two-phase commit — theory + the payment saga
-│   └── payments.md              # Implemented: payment subsystem — design record + reconciliation
+│   ├── payments.md              # Implemented: payment subsystem — design record + reconciliation
+│   └── checkout.md              # P1: checkout subsystem — session FSM, price re-validation, order handoff
 ├── proposals/                    # Design proposals & decisions
 │   ├── README.md                 # umbrella: ADR vs RFC + flow + links
 │   ├── adr/                      # Architecture Decision Records

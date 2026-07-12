@@ -1,7 +1,7 @@
 # Local end-to-end test stack for the duynhlab e-commerce platform.
 #
 # Brings up: Postgres (10 DBs) + Redis cache + per-service golang-migrate migrations
-# + 8 Go services + a Temporal dev server + the order-fulfillment worker + a
+# + 10 Go services + a Temporal dev server + the order-fulfillment worker + a
 # Kong DB-less gateway (mirrors the in-cluster Kong) + the React frontend.
 #
 # Build contexts point at sibling repos (../../<service>), so all repos must be

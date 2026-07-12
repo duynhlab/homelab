@@ -23,6 +23,7 @@ the catalog). If a doc needs one of the others, it links — it does not restate
 |---|---|---|
 | [grpc-internal-comms.md](grpc-internal-comms.md) | East-west transport: gRPC-only on `:9090`, dual-port, HTTP/2 LB pitfall, observability, security | **Implemented** |
 | [payments.md](payments.md) | Payment subsystem: design record (RFC-0010 + ADRs), checkout read path, reconciliation | **Implemented** |
+| [checkout.md](checkout.md) | Checkout subsystem: session FSM, price re-validation, order handoff (RFC-0015 + ADR-020/021) | **P1 implemented** |
 | [temporal-order-fulfillment.md](temporal-order-fulfillment.md) | The durable order-fulfillment saga on Temporal: design, contracts, infra, ops | **Implemented** |
 | [saga-vs-2pc.md](saga-vs-2pc.md) | Theory: why 2PC doesn't fit microservices and how the saga gets consistency | Learning |
 

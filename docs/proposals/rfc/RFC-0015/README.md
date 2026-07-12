@@ -623,6 +623,23 @@ Phased P1→P6 as above. Blast-radius notes:
   v0.19.0 (cart.v1, checkout httpx codes). Deviation from the draft: no host
   port `8010` — checkout follows the platform convention (services are
   reached only through Kong).
+- 2026-07-13 — **P2 shipped** (local-stack): confirm handoff + abandonment.
+  order.v1/CreateOrder (order's first gRPC server; idempotent by
+  `(user_id, idempotency_key)` with a replay fingerprint, pending-only saga
+  kickoff gate + RejectDuplicate — ADR-018); checkout PUT shipping (fee/tax
+  0-stub until P3) + PUT payment (`tok_` only) + POST confirm
+  (pkg/idempotency Claim→marker→CreateOrder→Finish with session↔claim
+  binding and deadline fencing; PRICE_CHANGED/STOCK_UNAVAILABLE requote
+  never consumes the key); AbandonedCheckoutWorkflow + checkout-worker
+  (DB-authoritative ExpireIfDue + re-arm — ADR-019); confirm/expiry metrics;
+  pkg v0.20.0 (order.v1). Design hardened by two adversarial doubt cycles
+  per risky artifact (fresh-context reviewer + Codex CLI): the marker, the
+  binding, the deadline fence, and the wake-up-not-verdict timer all come
+  from review findings. Deviations from the draft: the confirm entry gate
+  requires the FSM `ready` state (draft implied confirm from `ready` only —
+  unchanged), and re-validation is skipped once an order attempt was ever
+  authorized (marker) — the draft's "re-validate at confirm" is preserved
+  for FIRST attempts only, by correctness necessity.
 
 ## Related
 

@@ -68,6 +68,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Local-stack Temporal bring-up race self-heals**: `order-worker` gets
+  `restart: on-failure` (mirrors the K8s pod restart) and order-service gained
+  a bounded startup dial retry, so a Temporal that turns healthy moments after
+  the containers start no longer leaves the worker dead and orders stuck
+  `pending` without a saga.
 - **Local-stack Kong routes scoped to audience prefixes**: `shipping` narrowed
   `/shipping/` → `/shipping/v1/public/` and `notification` `/notification/` →
   `/notification/v1/private/`, closing anonymous/JWT-holder access to the

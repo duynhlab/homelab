@@ -531,6 +531,11 @@ services:
   order-worker:
     build: { context: ../../order-service }
     command: ["worker"]
+    # The worker is fail-fast by design: an unreachable Temporal/downstream at
+    # startup (after the in-binary dial retry) exits the process. Mirror the
+    # K8s pod restart so a bring-up race self-heals instead of leaving the
+    # saga dead until a manual restart.
+    restart: on-failure
     environment:
       <<: *svc-env
       SERVICE_NAME: order

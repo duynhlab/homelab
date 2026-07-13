@@ -194,10 +194,19 @@ SID=$(echo "$S" | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])"
 curl -s -o /dev/null -X PUT $BASE/checkout/v1/private/checkout/sessions/$SID/address \
   -H "Authorization: Bearer $AT0" -H 'Content-Type: application/json' \
   -d '{"full_name":"Alice","line1":"1 Main St","city":"HN","country":"VN"}'
-curl -s -o /dev/null -w "A10 shipping: %{http_code} (want 200 → shipping_set, fee 0 stub)\n" \
+# P3: the fee is quoted by shipping (standard/VN = $3.00) and the flat tax
+# (tax_rules: VN 8%) applies on subtotal + fee — assert the composition.
+curl -s -X PUT $BASE/checkout/v1/private/checkout/sessions/$SID/shipping \
+  -H "Authorization: Bearer $AT0" -H 'Content-Type: application/json' \
+  -d '{"shipping_method":"standard"}' | python3 -c "import json,sys; s=json.load(sys.stdin); \
+  ok = s['shipping_fee']==3.0 and abs(s['tax']-round((s['subtotal']+3.0)*0.08,2))<0.011 \
+       and abs(s['total']-(s['subtotal']+s['shipping_fee']+s['tax']))<0.001; \
+  print('A10 shipping:', 'OK' if ok else 'FAIL', \
+        f\"fee={s['shipping_fee']} tax={s['tax']} total={s['total']} ({s['status']})\")"
+curl -s -o /dev/null -w "A10 bad-method: %{http_code} (want 400 — unknown quote input)\n" \
   -X PUT $BASE/checkout/v1/private/checkout/sessions/$SID/shipping \
   -H "Authorization: Bearer $AT0" -H 'Content-Type: application/json' \
-  -d '{"shipping_method":"standard"}'
+  -d '{"shipping_method":"drone"}'
 curl -s -o /dev/null -w "A10 payment:  %{http_code} (want 200 → ready)\n" \
   -X PUT $BASE/checkout/v1/private/checkout/sessions/$SID/payment \
   -H "Authorization: Bearer $AT0" -H 'Content-Type: application/json' \

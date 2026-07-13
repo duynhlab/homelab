@@ -179,7 +179,7 @@ A practical checklist for learning DevOps/SRE skills through this project. Items
 - **golangci-lint enforcement** — 60+ linters across all 8 service repos, CI-gated
 - **Shared Go package library** — `github.com/duynhlab/pkg`: `grpcx` (gRPC server/client bootstrap), `authmw` (fail-closed JWT middleware), `obsx` (OTel metrics), `httpx` (pagination + error envelope), `migratex` (embedded migrations), `temporalx` (Temporal client/worker), `proto/*` (versioned contracts), loggers
 - **Developer documentation standards** — AGENTS.md (3-layer coding rules, code quality) + README.md (dev guide) across all repos
-- **gRPC services with Protobuf definitions** — `github.com/duynhlab/pkg/proto/{auth,product,shipping,review,notification}/v1` (+ order saga contracts), `pkg/grpcx`; east-west is gRPC-only (`docs/api/grpc-internal-comms.md`)
+- **gRPC services with Protobuf definitions** — `github.com/duynhlab/pkg/proto/{auth,product,shipping,review,notification}/v1` (+ order saga contracts), `pkg/grpcx`; east-west is gRPC-only (`docs/api/api.md` § gRPC Runtime Model)
 - **Durable workflow orchestration (Temporal)** — order-fulfillment **saga** (reserve stock → create shipment → confirm → notify → clear cart, with reverse-order compensation + idempotent activities); `worker` subcommand + in-cluster `order-worker` release; operator + `temporal-db` infra. `docs/api/temporal-order-fulfillment.md`, ADR-001/002
 - Message queue system (NATS/Kafka/Redis Streams) with workers
 - Rate limiting and API quotas

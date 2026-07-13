@@ -79,7 +79,7 @@ API convention.
 
 | RPC | Caller | Request | Response behavior |
 |---|---|---|---|
-| `review.v1.ReviewService/GetProductReviews` | Product | `product_id` | All matching reviews; no matches return an empty list |
+| `review.v1.ReviewService/GetProductReviews` | Product | `product_id` | Up to 10,000 reviews in one page (larger sets truncate with a server-side warning); no matches return an empty list |
 
 The HTTP and gRPC adapters call the same logic layer. Product applies a
 three-second deadline and soft-fails the enrichment to an empty list.

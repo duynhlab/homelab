@@ -93,7 +93,7 @@ here). Each gets a number when someone writes it up.
 | **Authorization (RBAC/ABAC)** — claim population + enforcement | platform-wide | [RFC-0009](RFC-0009/) O1 |
 | **Gateway improvements** — edge `proxy-cache` + dedicated per-env issuer domain | infra | [RFC-0009](RFC-0009/) O4/O6 |
 | **Chaos / GameDay program** | infra | `TODO.md`, DR docs |
-| **API v1→v2 versioning policy** | platform-wide | `docs/api/api-naming-convention.md` |
+| **API v1→v2 versioning policy** | platform-wide | `docs/api/api.md#versioning-and-compatibility` |
 | **Split OpenBAO bootstrap** (auth config vs secret seeding) | infra | secrets ESO review |
 | **Secret rotation** (CronJob / push) — largely superseded by dynamic DB creds in [RFC-0008](RFC-0008/) | infra | secrets ESO review |
 | **PushSecret for operator-generated secrets** (sync CNPG/Zalando creds back to OpenBAO) | infra | secrets ESO review |

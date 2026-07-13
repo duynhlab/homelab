@@ -125,7 +125,7 @@ flowchart TD
   template per-service InputProviders so onboarding a service is one PR.
 
 Detailed architecture: [`docs/observability/README.md`](docs/observability/README.md)
-and [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
+and [`docs/api/api.md`](docs/api/api.md).
 
 ---
 
@@ -220,7 +220,7 @@ automatically by `make cluster-up`.
 | Category | URL | Purpose |
 |---|---|---|
 | Frontend | <https://local.duynh.me> | React SPA (calls the gateway cross-origin) |
-| API gateway | <https://gateway.duynh.me> | Single public API edge — see [api-naming-convention.md](docs/api/api-naming-convention.md) |
+| API gateway | <https://gateway.duynh.me> | Single public API edge — see [api.md § HTTP URL Model](docs/api/api.md#http-url-model) |
 | Grafana | <https://grafana.duynh.me> | Dashboards (anonymous viewer) |
 | VictoriaMetrics | <https://vmui.duynh.me/vmui> | Metrics query UI |
 | VMAlert | <https://vmalert.duynh.me> | Alert rule evaluation |

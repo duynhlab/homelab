@@ -565,7 +565,7 @@ Prioritized; the first items close documented gaps from the cache review.
 - [Valkey Documentation](https://valkey.io/)
 - [Redis Go Client](https://github.com/redis/go-redis)
 - [Cache-Aside Pattern](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Strategies.html)
-- [3-Layer Architecture](../api/api.md#3-layer-architecture-responsibility)
+- [3-Layer Architecture](../api/api.md#inside-each-service)
 
 ---
 

@@ -9,7 +9,7 @@ Auth turns credentials into short-lived RS256 access tokens and rotating refresh
 | **Owns** | Login credentials, password hashes, refresh-token families, JWT signing key |
 | **HTTP** | Public API on `:8080` |
 | **gRPC** | None; the former auth `GetMe` RPC was removed |
-| **Callers** | Browser, Kong, and service JWKS caches |
+| **Callers** | Browser and service JWKS caches (Kong verifies edge JWTs with a statically provisioned public key, not the JWKS endpoint) |
 
 ## Overview
 
@@ -24,9 +24,15 @@ flowchart LR
     HTTP --> Logic[auth logic]
     Logic --> DB[(auth database)]
     Logic --> Signer[RS256 signer]
-    Kong[Kong] -. cached JWKS .-> HTTP
     Services[Other services] -. cached JWKS .-> HTTP
+    OpenBAO[(OpenBAO)] -. static RS256 public key via ESO .-> Kong[Kong edge JWT]
 ```
+
+Kong's edge check does **not** fetch the JWKS: its `jwt-edge` plugin holds the
+RS256 public key as a statically provisioned consumer credential (an
+ExternalSecret from OpenBAO in the cluster; an inline key in the local-stack
+declarative config). Rotating the signing key therefore means updating that
+credential too — a JWKS refresh alone only covers the services.
 
 ## HTTP API
 

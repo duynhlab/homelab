@@ -50,9 +50,9 @@ flowchart LR
 }
 ```
 
-The list endpoint uses the shared pagination envelope. It accepts `page`,
-`page_size` (and legacy `limit`), plus service-defined category, search, sort,
-and order filters. Sort fields are allowlisted before SQL construction.
+The list endpoint uses the shared pagination envelope. It accepts `page` and
+`limit` (the envelope echoes the limit back as `pageSize`), plus
+service-defined category, search, sort, and order filters. Sort fields are allowlisted before SQL construction.
 
 ### Product-details aggregation
 

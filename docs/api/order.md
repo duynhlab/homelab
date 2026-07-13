@@ -73,8 +73,8 @@ the HTTP response adapter.
 {
   "order": { "id": "42", "status": "confirmed", "total": 94.99 },
   "shipment": {
-    "tracking_number": "TRACK-42",
-    "status": "created"
+    "tracking_number": "MOP0000000042",
+    "status": "pending"
   },
   "payment": {
     "status": "captured",
@@ -123,7 +123,7 @@ in every participating service document.
 | Component | Endpoint or queue |
 |---|---|
 | HTTP process | `/health` and `/ready` on `:8080` |
-| gRPC server | `order-grpc:9090`, headless in-cluster Service |
+| gRPC server | `order-grpc:9090` in-cluster Service (rendered from `grpc_server: true`, shipped with RFC-0015 P5); plain `order:9090` in local-stack |
 | Temporal worker | Task queue `order-fulfillment` |
 | Observability | HTTP/gRPC RED exported over OTLP, workflow traces, structured logs with shared trace IDs |
 

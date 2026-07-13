@@ -20,7 +20,7 @@ inter-service call graph.
 - **10 Go backend services** (Go 1.26, Gin), each in its own repo + namespace, all listening on **`:8080`**, all exposing `GET /health` + `GET /ready`.
 - **1 React/Vite frontend** (SPA, served by nginx).
 - **3-layer architecture** per service: `web` (HTTP/validation/aggregation) → `logic` (business rules, no SQL) → `core` (domain + repository + DB). Frontend may only call the `web` layer.
-- **URL shape (Variant A):** `/{service}/v1/{audience}/{resource…}` with `audience ∈ public | private | internal`. The gateway is **Kong in both environments** — in-cluster and in the local stack (Kong 3.9 DB-less, declarative `local-stack/gateway/kong.yml` mirroring the cluster plugins incl. the edge-JWT check on private routes). Routing is **pure pass-through** — no rewriting.
+- **URL shape (Variant A):** `/{service}/v1/{audience}/{resource…}` with `audience ∈ public | private | internal | protected`. The gateway is **Kong in both environments** — in-cluster and in the local stack (Kong 3.9 DB-less, declarative `local-stack/gateway/kong.yml` mirroring the cluster plugins incl. the edge-JWT check on private routes). Routing is **pure pass-through** — no rewriting.
 
 ```mermaid
 flowchart TD
@@ -49,7 +49,8 @@ flowchart TD
       WKR -->|"gRPC shipment"| SHIP
       WKR -->|"gRPC money"| PAY
       WKR -->|"gRPC delivery"| NOTIF
-      ORD -.->|"two REST exceptions"| CART
+      ORD -.->|"REST pricing read"| CART
+      WKR -.->|"REST cart-clear (internal)"| CART
     end
 ```
 
@@ -58,13 +59,13 @@ flowchart TD
 
 ## 2. Deployment snapshot (local stack)
 
-The local end-to-end stack (`local-stack/compose.yaml`) mirrors the platform with single shared infra. All containers are health-gated.
+The local end-to-end stack (`local-stack/compose.yaml`) mirrors the platform with single shared infra. Databases, cache, Temporal, the services, gateway, and frontend are health-gated; the observability containers start unguarded (`service_started`).
 
 | Service | Port (internal) | Database (local) | Cache | Inter-service deps |
 |---------|-----------------|------------------|-------|--------------------|
 | auth | 8080 | `auth` | — | none (validated *by* everyone via JWKS) |
 | user | 8080 | `user` | — | auth (JWKS) |
-| product | 8080 | `product` | Valkey | auth (JWKS), review (gRPC) |
+| product | 8080 | `product` | Valkey | review (gRPC) — no JWT middleware (public + internal surface only) |
 | cart | 8080 | `cart` | — | auth (JWKS); serves gRPC `GetCart` to checkout |
 | order | 8080 | `order` | — | auth (JWKS), Temporal, shipping/notification/payment/product (gRPC), cart (REST) |
 | review | 8080 | `review` | — | auth (JWKS) |
@@ -101,8 +102,8 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
-| **Token mint** (login/register) | public `POST /login`, `POST /register` | RS256 JWT (1 h TTL, `kid` header); bcrypt verification | — | Implemented | RFC-0009 |
-| **JWKS publish** | public `GET /jwks` | single-key JWKS, `Cache-Control: max-age=300` | — | Implemented | RFC-0009 |
+| **Token mint** (login/register) | public `POST /auth/login`, `POST /auth/register` | RS256 JWT (1 h TTL, `kid` header); bcrypt verification | — | Implemented | RFC-0009 |
+| **JWKS publish** | public `GET /auth/jwks` | single-key JWKS, `Cache-Control: max-age=300` | — | Implemented | RFC-0009 |
 | **Refresh rotation** | public `POST /refresh`, `POST /logout` | rotating refresh tokens: opaque 32-byte token, sha256 hash at rest, family-tracked, reuse detection revokes the family (30 d TTL) | — | Implemented | — |
 | **Login hardening** | (part of `/login`) | constant-time dummy-hash on user-not-found (no username enumeration); generic 401 for both bad-user and bad-password | — | Implemented | — |
 
@@ -119,7 +120,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 
 ### product — catalog (+ cache, stock)
 
-> Owns products, categories, stock (~5k seeded rows locally); DB `product` on
+> Owns products, categories, stock (13 demo rows seeded locally); DB `product` on
 > `product-db` (CloudNativePG, via PgDog). Valkey cache. Serves gRPC on `:9090`.
 
 | Feature | API | Technique | Depends on | Status | Ref |
@@ -142,12 +143,12 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
-| **Session lifecycle** | private `POST /sessions`, `GET /sessions/:id`, `PUT /sessions/:id/address`, `DELETE /sessions/:id` | explicit FSM, one active session per user, owner-scoped anti-IDOR, DB-authoritative TTL | auth JWKS, cart, product | Implemented (P1) | [checkout](checkout.md) |
+| **Session lifecycle** | private `POST /checkout/sessions`, `GET /checkout/sessions/:id`, `PUT /checkout/sessions/:id/address`, `DELETE /checkout/sessions/:id` (process-named `checkout` segment — see checkout.md) | explicit FSM, one active session per user, owner-scoped anti-IDOR, DB-authoritative TTL | auth JWKS, cart, product | Implemented (P1) | [checkout](checkout.md) |
 | **Price re-validation** | session create and confirm | cart owns quantities; product `GetProducts` owns current price and availability; changed lines are explicit | cart, product | Implemented (P1-P2) | ADR-020/021 |
 | **Shipping and totals** | private `PUT /sessions/:id/shipping` | shipping `GetQuote`; SQL recomputes subtotal + fee + tax - discount in minor units | shipping | Implemented (P3) | [checkout](checkout.md#totals-p3-implemented--one-composition-rule-owned-by-sql) |
 | **Payment selection** | private `PUT /sessions/:id/payment` | opaque `tok_` reference only; PAN-like input rejected before persistence | — | Implemented (P2) | [checkout](checkout.md) |
 | **Promo preview and redemption** | private `POST/DELETE /sessions/:id/promo` | preview on apply; serialized, idempotent redemption inside confirm | Postgres | Implemented (P4) | ADR-022 |
-| **Confirm and order handoff** | private `POST /sessions/:id/confirm` | required `Idempotency-Key`; confirm-time revalidation; gRPC `order.v1/CreateOrder` | product, order | Implemented (P2) | ADR-018 |
+| **Confirm and order handoff** | private `POST /checkout/sessions/:id/confirm` | required `Idempotency-Key`; confirm-time revalidation; gRPC `order.v1/CreateOrder` | product, order | Implemented (P2) | ADR-018 |
 | **Abandonment** | background Temporal workflow | durable wake-up plus DB-authoritative `expires_at`; lazy expiry remains the correctness backstop | Temporal | Implemented (P2) | ADR-019 |
 | **Cluster delivery** | — | ResourceSet input, CNPG triplet, gRPC caller NetworkPolicies | platform GitOps | **Planned (P5)** | RFC-0015 |
 
@@ -173,7 +174,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 |---|---|---|---|---|---|
 | **Order reads** | private `GET /orders`, `/orders/:id` | ownership-scoped queries (`WHERE id AND user_id` — anti-IDOR) | auth JWKS | Implemented | — |
 | **Checkout → durable fulfillment** | private `POST /orders` and internal gRPC `order.v1/CreateOrder` (both return a `pending` order and start the same durable workflow) | **Temporal saga** `OrderFulfillmentWorkflow` (workflow id `order-fulfillment-<orderID>`): authorize payment → reserve stock → create shipment → capture → **confirm (pivot)** → notify + receipt → clear cart; compensations run in reverse (void pre-capture / refund post-pivot); server-side order-math validation; atomic order+items insert; saga start on a detached 5 s context (checkout never fails on Temporal outage — order stays `pending`) | Temporal; product, shipping, payment, notification (gRPC); cart (REST) | Implemented | [Temporal Saga and 2PC](temporal-order-fulfillment.md) |
-| **Order-details aggregation** | private `GET /orders/:id/details` | gRPC fan-out with soft-fail enrichment: `GetShipmentByOrder` → `null` shipment, `GetPayment` → payment block omitted | shipping, payment | Implemented | [API call graph](api.md#current-east-west-call-graph) |
+| **Order-details aggregation** | private `GET /orders/:id/details` | gRPC fan-out with soft-fail enrichment: `GetShipmentByOrder` and `GetPayment` — the `shipment`/`payment` blocks are omitted (`omitempty`) when absent or unavailable | shipping, payment | Implemented | [API call graph](api.md#current-east-west-call-graph) |
 | **Server-side pricing** | — (calls cart) | REST `GET /cart/v1/private/cart` with the user's forwarded `Authorization` — cart is the pricing authority at checkout | cart | Implemented | — |
 | **Saga worker** | — (Temporal task queue `order-fulfillment`) | `worker` subcommand of the same image; registers workflow + activities; fail-fast if Temporal is unreachable | Temporal | Implemented | [temporal saga](temporal-order-fulfillment.md) |
 
@@ -195,10 +196,10 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
-| **Tracking** | public `GET /track` | lookup by `tracking_number` (legacy `trackingId` fallback); NULL-safe carrier scan | — | Implemented | — |
-| **Estimate** | public `GET /estimate` | weight validation rejects `≤0`/`NaN`/`±Inf` → 400 | — | Implemented | — |
+| **Tracking** | public `GET /shipments/track` | lookup by `tracking_number` (legacy `trackingId` fallback); NULL-safe carrier scan | — | Implemented | — |
+| **Estimate** | public `GET /shipments/estimate` | weight validation rejects `≤0`/`NaN`/`±Inf` → 400 | — | Implemented | — |
 | **Shipment lifecycle** (saga steps) | internal gRPC `ShippingService.CreateShipment` / `CancelShipment` | idempotent by `order_id` | caller: order-worker | Implemented | [temporal saga](temporal-order-fulfillment.md) |
-| **Shipment read for order details** | internal gRPC `GetShipmentByOrder` (HTTP twin: internal `GET /orders/:orderId`) | missing shipment → empty response (caller soft-fails to `null`) | caller: order | Implemented (HTTP twin has **no caller**) | [API call graph](api.md#current-east-west-call-graph) |
+| **Shipment read for order details** | internal gRPC `GetShipmentByOrder` (HTTP twin: internal `GET /shipments/orders/:orderId`) | missing shipment → empty response (caller soft-fails to `null`) | caller: order | Implemented (HTTP twin has **no caller**) | [API call graph](api.md#current-east-west-call-graph) |
 
 ### notification — user notifications
 
@@ -228,9 +229,9 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 | **Payment reads (browser)** | private `GET /payments`, `GET /payments/:id` | JWT; owner-scoped | auth JWKS | Implemented | [payments.md](payments.md) |
 | **Payment create (browser)** | private `POST /payments` | requires `Idempotency-Key`; token-only `payment_method` (`tok_…`, PAN-like digit runs rejected); shared validators across HTTP and gRPC | auth JWKS | Implemented | [payments.md](payments.md) |
 | **Payment enrichment for order details** | internal gRPC `GetPayment` (by order id) | read snapshot; caller soft-fails | caller: order | Implemented | [payments.md](payments.md) |
-| **Provider webhook** | public `POST /webhooks/mockpay` | **webhook HMAC**: `Mockpay-Signature: t=…,v1=…` — HMAC-SHA256 over the raw body, constant-time compare, ±5 min replay window, fail-closed on empty secret, 1 MiB body cap | mockpay | Implemented | RFC-0010 |
+| **Provider webhook** | public `POST /payments/webhooks/mockpay` | **webhook HMAC**: `Mockpay-Signature: t=…,v1=…` — HMAC-SHA256 over the raw body, constant-time compare, ±5 min replay window, fail-closed on empty secret, 1 MiB body cap | mockpay | Implemented | RFC-0010 |
 | **Outbox relay** | — (background loop) | **transactional outbox** — events enqueued in the same tx as the money movement, drained by a 10 s single-writer relay (at-least-once) | Postgres | Implemented | ADR-007 |
-| **Reconciliation** | internal `POST /reconciliation/runs`, `GET /reconciliation/runs/:id` + 5-min ticker | detect-only ledger comparison; auto-heal flag-gated (`RECON_HEAL_ENABLED`, lost-capture-response class only); hourly retention reaper (30 d) | mockpay ledger | Implemented | ADR-011/012 |
+| **Reconciliation** | internal `POST /payments/reconciliation/runs`, `GET /payments/reconciliation/runs/:id` + 5-min ticker | detect-only ledger comparison; auto-heal flag-gated (`RECON_HEAL_ENABLED`, lost-capture-response class only); hourly retention reaper (30 d) | mockpay ledger | Implemented | ADR-011/012 |
 
 ### frontend — React SPA
 
@@ -274,7 +275,7 @@ browser/Kong edge and the two order→cart hops stay HTTP/JSON.
 | Caller | Callee | Call | Transport | Failure mode |
 |--------|--------|------|-----------|--------------|
 | product | review | `ReviewService.GetProductReviews` | **gRPC** | soft-fail → `[]` |
-| order | shipping | `ShippingService.GetShipmentByOrder` | **gRPC** | soft-fail → `null` shipment |
+| order | shipping | `ShippingService.GetShipmentByOrder` | **gRPC** | soft-fail → `shipment` omitted |
 | order | payment | `PaymentService.GetPayment` (order-details enrichment) | **gRPC** | soft-fail → no payment block |
 | order-worker | product | `ProductService.ReserveStock` / `ReleaseStock` | **gRPC** | saga step / compensation |
 | order-worker | shipping | `ShippingService.CreateShipment` / `CancelShipment` | **gRPC** | saga step / compensation |
@@ -320,11 +321,11 @@ the cluster ResourceSet templates.
 | Duplicate CORS headers (service emits CORS + gateway) | product | Worked around at gateway; service-side removal still recommended (middleware present in code) |
 | Internal `POST /users` has no in-cluster caller | user | Wired to real persistence; auth registers into its own DB |
 | Internal HTTP notify twins + gRPC `SendSMS` unused | notification | No caller (saga emails go via gRPC `SendEmail`) |
-| Internal HTTP `GET /orders/:orderId` redundant | shipping | No caller — order reads shipment over gRPC |
+| Internal HTTP `GET /shipments/orders/:orderId` redundant | shipping | No caller — order reads shipment over gRPC |
 | Internal routes rely on NetworkPolicy, no in-app caller auth | product, user, cart, shipping, notification | NetworkPolicies authored (see [`../security/`](../security/)); enforced (kindnet on Kind 1.34+; policy CNI in prod) |
 | Saga email recipient hardcoded (`noreply@orders.local`) | order, notification | Real customer-email lookup is a noted TODO |
 | Review findings (auth fail-open, IDOR, seed-seq desync, hardcoded user_id) | notification | Fixed (parity with sibling services) |
-| Seed sequence resets (PK collisions on first INSERT) | auth, cart, review, shipping | Fixed via `V*__fix_sequences.sql` migrations |
+| Seed sequence resets (PK collisions on first INSERT) | auth, cart, review, shipping | Fixed via `setval()` calls inside the seed SQL (`db/seed/sql/000001_*.up.sql`) |
 
 ---
 

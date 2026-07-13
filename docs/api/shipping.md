@@ -44,10 +44,10 @@ accepted for compatibility.
 {
   "id": 9,
   "order_id": 42,
-  "tracking_number": "TRACK-42",
-  "carrier": "demo-carrier",
-  "status": "created",
-  "estimated_delivery": "2026-07-18",
+  "tracking_number": "MOP0000000042",
+  "carrier": "MOP Express",
+  "status": "pending",
+  "estimated_delivery": "2026-07-18T00:00:00Z",
   "created_at": "2026-07-13T09:00:00Z"
 }
 ```
@@ -65,10 +65,10 @@ accepted for compatibility.
   "origin": "HCM",
   "destination": "HN",
   "weight": 1.5,
-  "estimated_cost": 7.5,
-  "estimated_days": 3,
+  "estimated_cost": 17.25,
+  "estimated_days": 5,
   "currency": "USD",
-  "carrier": "demo-carrier"
+  "carrier": "Standard Shipping"
 }
 ```
 

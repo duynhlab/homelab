@@ -24,7 +24,7 @@ flowchart LR
     Worker[order-worker] -->|SendEmail gRPC| Notification
     Notification --> Logic[notification logic]
     Logic --> DB[(notification database)]
-    Logic -. provider adapter .-> Delivery[Email or SMS delivery]
+    Logic -->|status hardcoded 'sent'| DB2[notifications row — no real\nemail/SMS provider is wired]
 ```
 
 ## HTTP API
@@ -67,8 +67,8 @@ Foreign IDs therefore behave like missing IDs and return `404`.
 
 | RPC | Live caller | Required fields | Status |
 |---|---|---|---|
-| `SendEmail` | Order worker | `user_id`, `to`, `subject`, `body` | Implemented and used |
-| `SendSMS` | None | `user_id`, `to`, `message` | Implemented, no caller |
+| `SendEmail` | Order worker | valid `to` address (subject/body/user_id are accepted as-is — HTTP-binding validation is not enforced on the gRPC path) | Implemented and used |
+| `SendSMS` | None | non-blank `to` | Implemented, no caller |
 
 Both RPCs return the persisted notification snapshot. Domain validation maps bad
 recipients to `InvalidArgument`; unexpected delivery or storage failures map to
@@ -84,8 +84,10 @@ recipients to `InvalidArgument`; unexpected delivery or storage failures map to
 
 ## Operations
 
-HTTP probes are on `:8080`; gRPC is exposed only through the headless
-`notification-grpc:9090` Service and namespace NetworkPolicy. HTTP, gRPC, and
+HTTP probes are on `:8080`; gRPC listens on `:9090` — a second port on the
+same `notification` Service (the mop chart renders one multi-port Service; the
+old headless `notification-grpc` twin was removed) — fenced by the namespace
+NetworkPolicy. HTTP, gRPC, and
 runtime metrics export over OTLP.
 
 ## References

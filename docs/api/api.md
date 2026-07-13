@@ -44,7 +44,7 @@ flowchart TB
     HTTP --> Identity
     HTTP --> Shopping
     HTTP --> Fulfillment
-    Shopping <-->|"typed east-west gRPC :9090"| Fulfillment
+    Fulfillment -->|"typed east-west gRPC :9090"| Shopping
     Fulfillment -->|"durable workflows"| Temporal["Temporal"]
     Identity --> IDDB[("identity databases")]
     Shopping --> ShopDB[("catalog databases")]
@@ -255,11 +255,11 @@ state transitions live in exactly one service file.
 
 | Service | Owns | HTTP | gRPC role | Contract |
 |---------|------|------|-----------|----------|
-| Auth | Credentials, sessions, refresh tokens, JWKS | Public and private | None | [auth.md](./auth.md) |
+| Auth | Credentials, sessions, refresh tokens, JWKS | Public | None | [auth.md](./auth.md) |
 | User | User profile data | Public, private, internal | None | [user.md](./user.md) |
 | Product | Catalog, price, inventory | Public and internal | Server; Review client | [product.md](./product.md) |
 | Cart | Active shopping cart | Private and internal | Server | [cart.md](./cart.md) |
-| Order | Order record and fulfillment kickoff | Private and internal | Server; multiple clients | [order.md](./order.md) |
+| Order | Order record and fulfillment kickoff | Private | Server; multiple clients | [order.md](./order.md) |
 | Review | Product reviews | Public and private | Server | [review.md](./review.md) |
 | Notification | Notification records and delivery requests | Private and internal | Server | [notification.md](./notification.md) |
 | Shipping | Quotes and shipment lifecycle | Public and internal | Server | [shipping.md](./shipping.md) |
@@ -291,7 +291,7 @@ flowchart LR
     OrderAPI -->|"GetPayment"| Payment
     Worker["order worker"] -->|"Reserve / Release stock"| Product
     Worker -->|"Create / Cancel shipment"| Shipping
-    Worker -->|"Send email / SMS"| Notification
+    Worker -->|"Send email"| Notification
     Worker -->|"Authorize / Capture / Void / Refund"| Payment
     Checkout -->|"GetCart"| Cart
     Checkout -->|"GetProducts"| Product
@@ -308,7 +308,7 @@ flowchart LR
 | Order API | Payment | `GetPayment` | gRPC | Cluster and local-stack |
 | Order worker | Product | `ReserveStock`, `ReleaseStock` | gRPC | Cluster and local-stack |
 | Order worker | Shipping | `CreateShipment`, `CancelShipment` | gRPC | Cluster and local-stack |
-| Order worker | Notification | `SendEmail`, `SendSMS` | gRPC | Cluster and local-stack |
+| Order worker | Notification | `SendEmail` (`SendSMS` is served but has no live caller) | gRPC | Cluster and local-stack |
 | Order worker | Payment | `Authorize`, `Capture`, `Void`, `Refund` | gRPC | Cluster and local-stack |
 | Checkout | Cart | `GetCart` | gRPC | Local-stack; cluster planned |
 | Checkout | Product | `GetProducts` | gRPC | Local-stack; cluster planned |

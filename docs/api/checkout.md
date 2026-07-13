@@ -11,7 +11,7 @@ order-service — which remains the only writer of orders.
 | **Status** | **P1-P4 implemented in local-stack**: sessions, re-validation, confirm, abandonment, totals, SPA, and promo codes. **P5 cluster delivery and P6 legacy-path removal are planned.** |
 | **Surface** | `/checkout/v1/private/checkout/sessions[…]` (process-named exception like auth — literal `checkout` segment, resources nested; v3.0.1) — private-only, Kong edge-JWT + in-service `pkg/authmw` |
 | **East-west** | gRPC only: cart `GetCart`, product `GetProducts`, shipping `GetQuote`, and order `CreateOrder` |
-| **Data** | `checkout` DB — `checkout_sessions` + `checkout_session_items`; money in int64 minor units |
+| **Data** | `checkout` DB — `checkout_sessions`, `checkout_session_items`, `idempotency_keys` (P2), `tax_rules` (P3), `promo_codes` + `promo_redemptions` (P4); money in int64 minor units |
 | **Repo** | [duynhlab/checkout-service](https://github.com/duynhlab/checkout-service) |
 
 ## Why it exists (the problem)
@@ -108,7 +108,7 @@ All routes are `private` — Kong edge-JWT is the coarse filter, in-service
 | `POST` | `/checkout/v1/private/checkout/sessions` | Snapshot cart + re-validate prices → session `open`. **201** created, **200** existing active session (idempotent) | `409 CONFLICT` empty cart |
 | `GET` | `/checkout/v1/private/checkout/sessions/:id` | Session + items + totals | `404` unknown **or someone else's** (anti-IDOR — indistinguishable); `410 SESSION_EXPIRED` past TTL |
 | `PUT` | `/checkout/v1/private/checkout/sessions/:id/address` | Store the shipping address → `address_set` (re-editable from any pre-confirm state) | `400` missing/oversized fields; `409 INVALID_TRANSITION` from terminal states |
-| `PUT` | `/checkout/v1/private/checkout/sessions/:id/shipping` | `{"shipping_method": "standard"}` → `shipping_set`. The fee comes from shipping's `GetQuote` (method × destination region) and a flat tax (seeded `tax_rules`, basis points on subtotal + fee) composes the total — all in minor units, recomputed in SQL | `400 VALIDATION_ERROR` unknown method/region; `409 INVALID_TRANSITION` before an address exists; `503` shipping outage (retry) |
+| `PUT` | `/checkout/v1/private/checkout/sessions/:id/shipping` | `{"shipping_method": "standard"}` → `shipping_set`. The fee comes from shipping's `GetQuote` (method × destination region) and a flat tax (seeded `tax_rules`, basis points on subtotal + fee) composes the total — all in minor units, recomputed in SQL | `400 VALIDATION_ERROR` unknown method/region; `409 INVALID_TRANSITION` before an address exists; `500 INTERNAL_ERROR` on shipping outage (only confirm maps upstream failures to `503` + `Retry-After` — a known asymmetry) |
 | `PUT` | `/checkout/v1/private/checkout/sessions/:id/payment` | `{"payment_method_token": "tok_…"}` → `ready`. Opaque `tok_` references ONLY — PAN-shaped input is rejected **before** any persistence and never echoed (the order/payment rule) | `400 VALIDATION_ERROR` non-tok\_ input |
 | `POST` | `/checkout/v1/private/checkout/sessions/:id/confirm` | The idempotent order handoff (below). Header `Idempotency-Key` REQUIRED (≤120 chars). **201** with the completed session incl. `order_id`; replays return the cached 201 | `400 IDEMPOTENCY_KEY_REQUIRED`; `409 PRICE_CHANGED` / `409 STOCK_UNAVAILABLE` (session requoted → `shipping_set`, **key not consumed** — re-review and confirm again with the same key); `409 CONFLICT` another confirm in flight; `409 IDEMPOTENCY_CONFLICT` same key, different session; `503` + `Retry-After` order/product transient (retry with the SAME key) |
 | `DELETE` | `/checkout/v1/private/checkout/sessions/:id` | Cancel (idempotent on cancelled AND on a session the timer just expired) | `409 INVALID_TRANSITION` on completed |
@@ -229,8 +229,9 @@ unique index.
 
 ## Operations
 
-- **Local-stack:** service `checkout` + `checkout-migrate` job (no seed — no
-  demo data); Kong route `/checkout/v1/private/` (edge JWT); no host port
+- **Local-stack:** service `checkout` + `checkout-migrate` job + `checkout-worker`
+  (the AbandonedCheckoutWorkflow poller, task queue `checkout`); migrations seed
+  `tax_rules` and demo promo codes, sessions themselves have no seed; Kong route `/checkout/v1/private/` (edge JWT); no host port
   (platform convention — services are reached only through Kong). Audit:
   section **A9** in [`local-stack/README.md`](../../local-stack/README.md)
   (session lifecycle + price-change detection).
@@ -240,13 +241,14 @@ unique index.
   (1800).
 - **Observability:** obsx OTLP (RFC-0014) — traces (chain
   tracing→logging→metrics), RED metrics, teed logs. Business metrics
-  (`checkout_sessions_created_total`, `…_expired_total{reason}`,
-  `checkout_price_changed_total`) land with P2+ flows. Operational signal to
+  (`checkout_sessions_confirmed_total`, `checkout_sessions_expired_total{reason}`,
+  `checkout_price_changed_total`, `checkout_confirm_duration_seconds`,
+  `checkout_promo_redeemed_total`/`…_rejected_total`) land with P2+ flows. Operational signal to
   remember: a sustained majority of `expired{reason="lazy"}` means the worker
   is down or wedged.
 - **Cluster (P5):** RSIP under the existing `checkout` domain ResourceSet,
-  CNPG triplet, NetworkPolicies (Kong→8080; cart/product admit
-  checkout→9090). The netpol is a **release gate**: RFC-0015's east-west gRPC
+  CNPG triplet, NetworkPolicies (Kong→8080; cart, product, order, and shipping each admit
+  checkout→9090 — the full dial set of the confirm path). The netpol is a **release gate**: RFC-0015's east-west gRPC
   surface is unauthenticated by design and the fence is the policy.
 
 ## What checkout deliberately does NOT do (the boundary)

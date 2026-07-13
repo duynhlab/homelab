@@ -36,7 +36,7 @@ flowchart LR
     Worker --> Shipping
     Worker --> Payment
     Worker --> Notification
-    Worker -.->|"legacy REST clear"| Cart
+    Worker -.->|"internal REST clear (by design)"| Cart
 ```
 
 ## Why Temporal?
@@ -546,8 +546,8 @@ flowchart LR
 
 Deployed via the **`alexandrevilain/temporal-operator`** (see **[ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/)** for why the operator over the official Helm chart, and the server-version constraint):
 
-- **Operator** — `controllers/temporal/`: `HelmRepository` + `HelmRelease` (chart `0.6.0`); installs the `TemporalCluster`/`TemporalNamespace` CRDs; webhook certs via cert-manager.
-- **`TemporalCluster` + `mop` `TemporalNamespace`** (retention 168h) — `configs/temporal/`: server **`1.24.2`** (target 1.27.x — ADR-002), `numHistoryShards: 512`, persistence → `temporal-db` (default + `temporal_visibility`) via the **CNPG-generated `temporal-db-app`** secret, `ui.enabled`, `admintools.enabled`, `metrics.prometheus.serviceMonitor.enabled`, resources set on every operator-created pod for Kyverno.
+- **Operator** — `controllers/temporal/` holds the `HelmRelease` (chart `0.6.0`; its `HelmRepository` source lives in `clusters/local/sources/helm/`); installs the `TemporalCluster`/`TemporalNamespace` CRDs; webhook certs via cert-manager.
+- **`TemporalCluster` + `mop` `TemporalNamespace`** (retention 168h) — `configs/temporal/`: server **`1.24.2`** (target 1.27.x — ADR-002), `numHistoryShards: 512`, persistence → `temporal-db` (default + `temporal_visibility`) via the **CNPG-generated `temporal-db-app`** secret, `ui.enabled`, `admintools.enabled`, `metrics.prometheus.scrapeConfig.serviceMonitor.enabled`, resources set on every operator-created pod for Kyverno.
 - **`temporal-db`** — `configs/databases/clusters/temporal-db/`: a CloudNativePG cluster with the two SQL stores. Single instance for now (Temporal HA is at the service layer); scaling + Barman backups are a follow-up.
 - **Edge & alerts** — Kong ingress `temporal.duynh.me`; `TemporalServerDown` + service/persistence error-rate `PrometheusRule`s (`configs/temporal/prometheusrule.yaml`).
 - **Flux order** — `controllers → temporal-operator` (the operator HelmRelease `dependsOn` cert-manager, since its chart renders a cert-manager `Certificate`/`Issuer` for the admission webhook); `databases → temporal-db`; a `temporal` Kustomization (`dependsOn` controllers, cert-manager, databases, monitoring) before `apps`; the order worker `dependsOn` temporal.
@@ -585,9 +585,10 @@ Deployed via the **`alexandrevilain/temporal-operator`** (see **[ADR-002](../pro
 Deliberate deviations from the original design:
 
 - **Pivot = ConfirmOrder** (see §4); post-pivot steps are best-effort.
-- **Workflow start lives in the web handler** (where the old fire-and-forget calls were), so the
-  logic layer stays Temporal-free. If Temporal is unavailable the order is still created (`pending`)
-  and the start is logged — checkout never fails on Temporal.
+- **Workflow start is centralized in `internal/fulfillment`** (RFC-0015 P2, ADR-018): both the web
+  handler and the gRPC `CreateOrder` server delegate to the same starter, so the logic layer stays
+  Temporal-free. If Temporal is unavailable the order is still created (`pending`) and the start is
+  logged — order creation never fails on Temporal.
 - **`ClearCart` uses cart's tokenless internal route** (`DELETE /cart/v1/internal/cart/:userId`,
   NetworkPolicy-fenced) — the workflow input carries no bearer token, so a saga that outlives the
   user's access token still clears the cart.
@@ -595,9 +596,11 @@ Deliberate deviations from the original design:
   shipping `UNIQUE(order_id)`.
 
 **Roadmap / planned (⏳):** tracked as **Future work in [RFC-0001](../proposals/rfc/RFC-0001/)** —
-server bump 1.27.x, cache-bust on reserve, workflow/activity RED metrics, Grafana
-dashboard, temporal-db HA + Barman backups, and GameDay drills. (The internal
-cart-clear shipped — see the as-built notes above.)
+server bump 1.27.x, Grafana dashboard, temporal-db HA + Barman backups, and
+GameDay drills. Already shipped from that list: cache-bust on reserve
+(ReserveStock/ReleaseStock invalidate `product:{id}`), workflow/activity RED
+metrics (`pkg/temporalx` MetricsHandler), and the internal cart-clear (as-built
+notes above).
 
 
 ## References

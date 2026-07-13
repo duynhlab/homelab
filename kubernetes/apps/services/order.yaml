@@ -21,16 +21,16 @@ spec:
     db_sslmode: "disable"
     pool_max: "30"
     # order calls shipping + publishes notifications over gRPC (headless :9090).
-    shipping_grpc_addr: "dns:///shipping-grpc.shipping.svc.cluster.local:9090"
-    notification_grpc_addr: "dns:///notification-grpc.notification.svc.cluster.local:9090"
+    shipping_grpc_addr: "dns:///shipping.shipping.svc.cluster.local:9090"
+    notification_grpc_addr: "dns:///notification.notification.svc.cluster.local:9090"
     # The API dials payment for the order-details enrichment (GetPayment).
-    # Explicit because the code default points at the plain `payment` Service
-    # name, not the headless `payment-grpc` one. The saga's payment steps are
+    # Explicit because the code default points at the (correct) plain
+    # `payment` Service name — kept explicit for auditability. The saga's payment steps are
     # always on (no feature flag); the worker uses its own PAYMENT_GRPC_ADDR.
-    payment_grpc_addr: "dns:///payment-grpc.payment.svc.cluster.local:9090"
+    payment_grpc_addr: "dns:///payment.payment.svc.cluster.local:9090"
     # Internal gRPC server (:9090) — checkout's confirm handoff calls
-    # order.v1/CreateOrder (RFC-0015, ADR-018). The mop chart renders the
-    # order-grpc Service from this.
+    # order.v1/CreateOrder (RFC-0015, ADR-018). The mop chart adds a
+    # grpc:9090 port to the order Service.
     grpc_server: true
     # MUST stay the string "false": the template guard is truthiness-based,
     # so a boolean false would drop the env entirely — leaving reflection ON.

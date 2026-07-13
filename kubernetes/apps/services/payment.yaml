@@ -32,7 +32,7 @@ spec:
     db_sslmode: "require"
     pool_max: "25"
     # Internal gRPC server (:9090) — the order saga's money transport. The mop
-    # chart renders the payment-grpc Service from this.
+    # chart adds a grpc:9090 port to the payment Service.
     grpc_server: true
     # Reflection off in the cluster: this API surface moves money (grpcx
     # registers reflection unless told otherwise). MUST stay the string

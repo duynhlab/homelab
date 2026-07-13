@@ -125,16 +125,16 @@ spec:
         value: order-fulfillment
       # Downstream services the activities call (gRPC east-west + cart REST).
       - name: PRODUCT_GRPC_ADDR
-        value: dns:///product-grpc.product.svc.cluster.local:9090
+        value: dns:///product.product.svc.cluster.local:9090
       - name: SHIPPING_GRPC_ADDR
-        value: dns:///shipping-grpc.shipping.svc.cluster.local:9090
+        value: dns:///shipping.shipping.svc.cluster.local:9090
       - name: NOTIFICATION_GRPC_ADDR
-        value: dns:///notification-grpc.notification.svc.cluster.local:9090
+        value: dns:///notification.notification.svc.cluster.local:9090
       # Payment gRPC — the saga's money transport (authorize/capture/void/refund).
       # Dialed unconditionally (lazy); whether the steps run is decided by the
       # workflow input's PaymentEnabled, stamped by the order API.
       - name: PAYMENT_GRPC_ADDR
-        value: dns:///payment-grpc.payment.svc.cluster.local:9090
+        value: dns:///payment.payment.svc.cluster.local:9090
       - name: CART_SERVICE_URL
         value: http://cart.cart.svc.cluster.local:8080
     resources:

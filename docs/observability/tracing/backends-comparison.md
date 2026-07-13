@@ -74,3 +74,6 @@ The platform already runs the **VictoriaMetrics Operator** (VMSingle/VMAgent/VMA
 - [Tracing guide](./README.md) · [Architecture](./architecture.md) · [Jaeger guide](./jaeger.md)
 - VictoriaMetrics Operator (metrics + logs today): [observability metrics](../metrics/README.md)
 - Grafana Tempo: <https://grafana.com/docs/tempo/latest/> · Jaeger: <https://www.jaegertracing.io/docs/> · VictoriaTraces: <https://docs.victoriametrics.com/victoriatraces/>
+
+---
+_Last updated: 2026-07-10_

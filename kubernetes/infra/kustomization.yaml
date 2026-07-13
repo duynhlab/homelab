@@ -4,7 +4,7 @@
 # included only via controllers/kustomization.yaml (avoids duplicate ids and avoids
 # `../` paths that break `kustomize build` with the default load restrictor).
 #
-# Flux reconciles subpaths of this tree from OCI (e.g. ./controllers, ./configs/monitoring);
+# Flux reconciles subpaths of this tree from OCI (e.g. ./controllers, ./configs/observability);
 # see kubernetes/clusters/local/*.yaml and scripts/flux-validate.sh overlay list.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization

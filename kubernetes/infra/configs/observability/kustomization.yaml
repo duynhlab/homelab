@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Observability configs, organized by pillar (mirrors controllers/ and
+# docs/observability/). Collectors/operators live in controllers/; this tree
+# holds their configuration CRs.
+#   metrics/  — VictoriaMetrics CRs, scrape objects, rules, Karma
+#   logging/  — VictoriaLogs storage (Vector ships to it)
+#   tracing/  — VictoriaTraces pilot (Tempo config lives in controllers/tracing)
+#   grafana/  — dashboards + datasources (cross-pillar visualization)
+#   sloth/    — SLO tooling (cross-pillar)
+resources:
+  - metrics/
+  - logging/
+  - tracing/
+  - grafana/
+  - sloth/

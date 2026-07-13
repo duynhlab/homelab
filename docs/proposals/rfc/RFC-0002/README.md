@@ -263,3 +263,6 @@ TBD — provisional; no implementation yet.
 - [ADR-006 RS256 JWT + Kong edge auth](../../adr/ADR-006-rs256-jwt-kong-edge-auth/) (supersedes [ADR-003](../../adr/ADR-003-jwt-validation-in-services-not-kong/)) — the user-identity layer mTLS complements. **Sequence this RFC after [RFC-0009](../RFC-0009/):** the gateway/JWT work lands first, then east-west mTLS adds the service-identity layer beneath it.
 - PKI: [`docs/secrets/cert-manager.md`](../../../secrets/cert-manager.md) (`homelab-ca`, trust-manager), [`docs/secrets/trust-distribution.md`](../../../secrets/trust-distribution.md).
 - Code: `duynhlab/pkg` `grpcx` (`Dial`/`NewServer`/`metadata.go`), `temporalx`.
+
+---
+_Last updated: 2026-07-01_

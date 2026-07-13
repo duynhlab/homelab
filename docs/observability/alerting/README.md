@@ -132,7 +132,7 @@ Direct metric threshold checks. Fire immediately when a condition is met.
 
 > The scrape-era **Saturation** group (`MicroserviceHighRequestsInFlight` / `…Critical`) retired with the cutover — otelgin v0.69 emits no `http.server.active_requests`. The two GC-pause alerts collapsed into `MicroserviceGCThrash` (no OTel GC-pause metric). `MicroserviceDown`/`…AllInstancesDown` moved from `up{}` scrape liveness to a `go_goroutine_count` heartbeat-absence check (D-4).
 
-**PostgreSQL alerts** ([`prometheusrules/postgres/`](../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/README.md)): all CloudNativePG, chart-aligned rules deployed per cluster — `postgres/cnpg/` (`product-db` full set + operator-health singleton), `postgres/cnpg-auth-db/` (`auth-db` full HA set), `postgres/cnpg-shared-db/` (`shared-db` single-node subset). Backup alerts remain in `postgres/backup-alerts.yaml`. 48 rules total.
+**PostgreSQL alerts** ([`prometheusrules/postgres/`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/README.md)): all CloudNativePG, chart-aligned rules deployed per cluster — `postgres/cnpg/` (`product-db` full set + operator-health singleton), `postgres/cnpg-auth-db/` (`auth-db` full HA set), `postgres/cnpg-shared-db/` (`shared-db` single-node subset). Backup alerts remain in `postgres/backup-alerts.yaml`. 48 rules total.
 
 **Recording rules** (`microservices/recording-rules.yaml`):
 
@@ -200,7 +200,7 @@ See [Grafana Alerting and datasource types](../grafana/datasources.md#grafana-al
 ## Manifest Locations
 
 ```
-kubernetes/infra/configs/monitoring/
+kubernetes/infra/configs/observability/
 ├── prometheusrules/
 │   ├── microservices/
 │   │   ├── alerts.yaml                     # Layer 1: application threshold alerts
@@ -212,7 +212,7 @@ kubernetes/infra/configs/monitoring/
 ```
 
 **Layer 2 (SLO) definitions are not stored in this repo.** There is no
-`configs/monitoring/slo/` tree. Each service's `PrometheusServiceLevel` CRD is
+`configs/observability/slo/` tree. Each service's `PrometheusServiceLevel` CRD is
 rendered by the **mop Helm chart** (`mop-chart-oci`, `ghcr.io/duynhlab`) when the
 service's HelmRelease sets `slo.enabled: true`. Sloth then generates the
 burn-rate `PrometheusRule`s from those CRDs. See [SLO System](../slo/README.md).
@@ -237,7 +237,7 @@ burn-rate `PrometheusRule`s from those CRDs. See [SLO System](../slo/README.md).
 - Multi-instance aggregation (production HA Alertmanager support)
 - Alert history visualization (24h trend blocks for incident review)
 
-**Deployment:** Raw K8s manifest in `kubernetes/infra/configs/monitoring/karma/`.
+**Deployment:** Raw K8s manifest in `kubernetes/infra/configs/observability/metrics/karma/`.
 
 **Configuration:** Single environment variable pointing to VMAlertmanager:
 

@@ -57,3 +57,6 @@ Expected:
 For incident decisions, use the recovery decision flow in
 [../010-drp.md](../010-drp.md). Do not promote the DR replica until split-brain
 risk is controlled and the incident owner approves cutover.
+
+---
+_Last updated: 2026-07-11_

@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Logging pillar: VictoriaLogs storage (VLSingle CR, victoria-metrics
+# operator-managed). The collector (Vector DaemonSet) lives in
+# controllers/logging/.
+resources:
+  - victorialogs/vlsingle.yaml

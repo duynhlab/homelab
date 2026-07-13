@@ -372,3 +372,6 @@ kubernetes/infra/configs/databases/clusters/
 └── supporting-shared-db/
     └── instance.yaml         # numberOfInstances: 1
 ```
+
+---
+_Last updated: 2026-07-11_

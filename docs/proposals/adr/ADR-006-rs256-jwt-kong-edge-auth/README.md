@@ -74,3 +74,6 @@ only the public key, ADR-003's key-exposure objection no longer applies.
   move edge/identity concerns into the mesh; moving to an external IdP / Enterprise
   OIDC would replace the OSS `jwt` edge mechanism. Re-open this ADR in either case.
 </content>
+
+---
+_Last updated: 2026-07-02_

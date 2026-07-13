@@ -695,3 +695,6 @@ Phased P1→P6 as above. Blast-radius notes:
   [`docs/api/grpc-internal-comms.md`](../../../api/grpc-internal-comms.md),
   [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md),
   [`SERVICES.md`](../../../../SERVICES.md).
+
+---
+_Last updated: 2026-07-13_

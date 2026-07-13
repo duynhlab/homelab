@@ -631,3 +631,6 @@ Not from YAML config:
 ---
 
 *Generated from pgsty/pg_exporter main branch config files.*
+
+---
+_Last updated: 2026-07-11_

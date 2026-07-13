@@ -222,7 +222,7 @@ defects are coverage/doc-accuracy issues, not cardinality bombs.
 
 | # | Severity | Defect | Fix |
 |---|---|---|---|
-| **D1** | Required | `MicroserviceHighRestartRate` hardcodes 8 namespaces — **payment missing** (`kubernetes/infra/configs/monitoring/prometheusrules/microservices/alerts.yaml:44`). Payment pod crash-loops would never fire this alert. Fix: add payment; prefer deriving from a label over a hardcoded list. | P4 (homelab) |
+| **D1** | Required | `MicroserviceHighRestartRate` hardcodes 8 namespaces — **payment missing** (`kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/alerts.yaml:44`). Payment pod crash-loops would never fire this alert. Fix: add payment; prefer deriving from a label over a hardcoded list. | P4 (homelab) |
 | **D2** | Required | Stale "8 services" headers in the rule manifests (`alerts.yaml`/`recording-rules.yaml`) after payment landed (RFC-0010 P5); the prose docs were swept separately. Contested leftover: SLO docs say "payment ships no SLO yet", but `checkout-rs.yaml` applies `slo.enabled: true` unconditionally to every service it renders — payment included — which would make it 9 × 3 = 27 SLOs. Fix: correct the manifest headers to 9 and verify the rendered `PrometheusServiceLevel` set at the next cluster bring-up, then align the SLO counts (24 vs 27) to reality. | P4 (docs) |
 | **D3** | Consider | `middleware/prometheus.go` is copy-pasted across 9 repos with no drift guard. Fix direction: extract to a shared package in `duynhlab/pkg` (e.g. `pkg/metricsx`) and harden the reference while at it (bound the `method` label to known verbs, `defer` the in-flight `Dec()`, skip negative `ContentLength` observations) — **tracked as a follow-up `TODO.md` item, not a phase here** (cross-9-repo effort). *Update 2026-07-08: superseded by [RFC-0014](../RFC-0014/) D-11 — `pkg/obsx` v2 `SetupObservability` absorbs this with wider scope.* | Follow-up |
 | **D4** | Required | Standard doc inaccuracies: fleet series figure (~2,400) stale vs measured 2,777 @ 1 replica; canonical bucket set and forbidden-label list exist only implicitly in a code snippet; exemplar status contradicted between `TODO.md` ("not wired in Grafana") and `metrics-apps.md` ("configured"). Fix: amend `metrics-apps.md` (this PR) — measured table, canonical bucket constant, forbidden-label list, no-drift rule; reconcile the exemplar claim to "emitted by services; Grafana exemplar display pending" pointing at `TODO.md`. | **P1 ✅ (this PR)** |
@@ -261,7 +261,7 @@ the **process** (shadow → verify → cutover), which is precisely what transfe
 to the at-scale design.
 
 **P3a (shadow)** — one field on the existing CR
-(`kubernetes/infra/configs/monitoring/victoriametrics/vmagent.yaml`):
+(`kubernetes/infra/configs/observability/metrics/victoriametrics/vmagent.yaml`):
 
 ```yaml
 spec:
@@ -400,3 +400,6 @@ settles the 24-vs-27 SLO count (D2).
 - RFC-0010 (rollout-pattern precedent: flagged shadow → verify → cutover → cleanup)
 - ADR-013 — to be spawned by P3b with the adopt/remove decision
 - Follow-up tracker (D3): extract shared metrics middleware into `duynhlab/pkg` + harden the reference (method-label allowlist, deferred in-flight `Dec()`, negative-`ContentLength` guard)
+
+---
+_Last updated: 2026-07-09_

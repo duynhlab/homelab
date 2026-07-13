@@ -512,3 +512,6 @@ RELOAD;            -- Hot-reload config (no restart)
 - [008-pooler.md](./008-pooler.md) -- PgDog R/W splitting configuration
 - Cluster manifests: `kubernetes/infra/configs/databases/clusters/product-db/`
 - DR replica: `kubernetes/infra/configs/databases/clusters/product-db-replica/`
+
+---
+_Last updated: 2026-07-11_

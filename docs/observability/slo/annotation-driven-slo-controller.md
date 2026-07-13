@@ -241,3 +241,6 @@ The migration is safe because:
 - Both approaches generate the same `PrometheusServiceLevel` CRDs
 - Sloth Operator processes them identically
 - Controller uses server-side apply for idempotent updates
+
+---
+_Last updated: 2026-07-09_

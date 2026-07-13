@@ -51,3 +51,6 @@ Include any "revisit trigger" that would re-open this ADR.
 Append-only: don't rewrite history. When a decision changes, write a new ADR that
 supersedes this one and update this ADR's Status to "Superseded by ADR-XXX".
 -->
+
+---
+_Last updated: 2026-06-29_

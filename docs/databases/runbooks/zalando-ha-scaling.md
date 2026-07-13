@@ -682,3 +682,6 @@ All 3 clusters will have HA with automatic failover. The platform achieves **100
 - **Zalando Operator User Guide**: [Standby clusters](https://opensource.zalando.com/postgres-operator/docs/user.html#setting-up-a-standby-cluster)
 - **Zalando Operator Admin Guide**: [Rolling updates](https://postgres-operator.readthedocs.io/en/latest/administrator/#understanding-rolling-update-of-spilo-pods)
 - **Patroni documentation**: [patroni.readthedocs.io](https://patroni.readthedocs.io/en/latest/)
+
+---
+_Last updated: 2026-07-11_

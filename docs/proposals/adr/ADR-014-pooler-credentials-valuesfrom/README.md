@@ -97,3 +97,6 @@ so `valuesFrom` renders values identical to the removed inline ones.
   consumed) is now clearly dead — removed in P3 cleanup.
 - **Revisit trigger:** pgdog chart shipping native Secret-sourced user
   passwords; move to it and drop `valuesFrom`.
+
+---
+_Last updated: 2026-07-08_

@@ -55,3 +55,6 @@ KMS/Transit auto-unseal and TLS are the production target.
 ---
 
 <!-- Append-only: supersede with a new ADR rather than rewriting this one. -->
+
+---
+_Last updated: 2026-06-29_

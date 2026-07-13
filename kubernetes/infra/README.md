@@ -4,7 +4,7 @@ This directory holds **operators** (`controllers/`) and **workload configs** (`c
 
 ## Flux vs local Kustomize
 
-- **Flux** applies **subpaths** from the pushed OCI artifact (see `scripts/flux-push.sh`), e.g. `./controllers`, `./configs/monitoring`, `./configs/databases`. Each subpath has its own `kustomization.yaml`.
+- **Flux** applies **subpaths** from the pushed OCI artifact (see `scripts/flux-push.sh`), e.g. `./controllers`, `./configs/observability`, `./configs/databases`. Each subpath has its own `kustomization.yaml`.
 - **Root `kustomization.yaml` here** is a convenience **umbrella** to build operators + configs together (e.g. `kustomize build .` from `kubernetes/infra`). It must not duplicate resources included by children.
 - **Namespaces** live in [`controllers/namespaces.yaml`](controllers/namespaces.yaml) (under `controllers/` so plain `kustomize build kubernetes/infra` works without `--load-restrictor=LoadRestrictionsNone`).
 

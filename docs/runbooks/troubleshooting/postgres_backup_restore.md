@@ -230,3 +230,6 @@ For every restore drill or incident recovery, capture:
 - Row-count/schema validation output.
 - Application smoke test result.
 - Final measured RTO and estimated RPO.
+
+---
+_Last updated: 2026-07-11_

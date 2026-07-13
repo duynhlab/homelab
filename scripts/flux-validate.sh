@@ -38,7 +38,7 @@ kustomize_overlays=(
   "kubernetes/clusters/local"
   "kubernetes/infra/controllers"
   "kubernetes/infra/configs/databases"
-  "kubernetes/infra/configs/monitoring"
+  "kubernetes/infra/configs/observability"
   "kubernetes/infra/configs/secrets"
   "kubernetes/infra/configs/kyverno"
   "kubernetes/infra/configs/network-policies"

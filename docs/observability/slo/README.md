@@ -159,7 +159,7 @@ Features:
 
 **Backend**: queries the same VMSingle (`http://vmsingle-victoria-metrics.monitoring.svc:8428`) as VMAlert and Grafana — VictoriaMetrics' Prometheus-compatible API is fully supported. The UI itself is stateless; restart-safe.
 
-**Manifest**: [`kubernetes/infra/configs/monitoring/sloth/sloth-ui.yaml`](../../../kubernetes/infra/configs/monitoring/sloth/sloth-ui.yaml). Image tag is pinned alongside the controller HelmRelease — bump both together.
+**Manifest**: [`kubernetes/infra/configs/observability/sloth/sloth-ui.yaml`](../../../kubernetes/infra/configs/observability/sloth/sloth-ui.yaml). Image tag is pinned alongside the controller HelmRelease — bump both together.
 
 **Local DNS**: add `127.0.0.1 slo.duynh.me` to `/etc/hosts` (see [main README access points](../../../README.md#access-points)).
 
@@ -186,7 +186,7 @@ The Grafana dashboards and the Sloth UI are complementary: Grafana for long-form
 
 - SLO Template: [`duynhlab/helm-charts` repo](https://github.com/duynhlab/helm-charts/blob/main/charts/mop/templates/slo.yaml)
 - Sloth Operator (controller): `kubernetes/infra/controllers/metrics/sloth-operator.yaml`
-- Sloth Web UI (Deployment + Service + PodMonitor): `kubernetes/infra/configs/monitoring/sloth/sloth-ui.yaml`
+- Sloth Web UI (Deployment + Service + PodMonitor): `kubernetes/infra/configs/observability/sloth/sloth-ui.yaml`
 - Sloth UI Ingress: `kubernetes/infra/configs/kong/ingress-monitoring.yaml` (`slo.duynh.me`)
 - OTLP metrics pipeline (app services push, no scrape): `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
 
@@ -197,3 +197,6 @@ The Grafana dashboards and the Sloth UI are complementary: Grafana for long-form
 - [Sloth `server` command source](https://github.com/slok/sloth/blob/main/cmd/sloth/commands/server.go) -- all CLI flags for the UI (Prometheus address, basic auth, mTLS, custom headers, cache refresh)
 - [Google SRE Book -- SLOs](https://sre.google/sre-book/service-level-objectives/)
 - [Google SRE Workbook -- Alerting on SLOs](https://sre.google/workbook/alerting-on-slos/)
+
+---
+_Last updated: 2026-07-09_

@@ -32,3 +32,6 @@ flowchart LR
 
 > "ADR" is the industry-standard term (Nygard 2011; adr.github.io). RFC + ADR used
 > together is a common open-source pattern (e.g. Kubernetes, Flux).
+
+---
+_Last updated: 2026-06-26_

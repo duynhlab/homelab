@@ -163,3 +163,6 @@ make flux-push
 
 - [PgCat Read-Only Transaction Error](pgcat_read_only_transaction_error.md) - `SQLSTATE 25006` write-on-replica errors
 - [PgCat Upstream Connectivity Errors](pgcat_upstream_connectivity_errors.md) - Connection refused / shard down errors
+
+---
+_Last updated: 2026-07-10_

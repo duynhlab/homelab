@@ -1,14 +1,15 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# Metrics pillar: VictoriaMetrics operator CRs, scrape objects, recording/
+# alerting rules, and Karma (alerting rides the metrics pillar — VMAlert/
+# VMRule are metric-based).
 resources:
   - victoriametrics/
   - karma/
-  - sloth/
   - servicemonitors/external-secrets.yaml
   - servicemonitors/tempo.yaml
   - servicemonitors/kube-apiserver.yaml
-  - grafana/
   # Note: CloudNativePG PodMonitors moved to configs/databases/monitoring/ to deploy AFTER database clusters
   - podmonitors/podmonitor-flux-system.yaml
   # PrometheusRules — organized by domain (see prometheusrules/kustomization.yaml)

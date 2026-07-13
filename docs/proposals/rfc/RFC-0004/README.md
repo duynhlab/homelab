@@ -207,3 +207,6 @@ an id exists beyond what the public read already reveals (it returns 404 either 
 - [RFC-0003 Inventory ownership](../RFC-0003/) — where stock writes ultimately live; co-determines the cache owner for stock.
 - [Caching documentation](../../../caching/caching.md) — the existing product Cache-Aside, stampede prevention, ownership boundary, and the gaps this RFC addresses.
 - [`docs/databases/002-database-integration.md`](../../../databases/002-database-integration.md) — the shared `cnpg-db` cluster product/cart/order write to.
+
+---
+_Last updated: 2026-07-07_

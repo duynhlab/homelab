@@ -117,3 +117,6 @@ See [gitflow.md](gitflow.md) section 7 for the full ruleset specification.
 - [Gitflow standard](gitflow.md)
 - [CI/CD documentation](cicd.md)
 - [Check template](check_template.yml) / [Build template](build_template.yml)
+
+---
+_Last updated: 2026-04-12_

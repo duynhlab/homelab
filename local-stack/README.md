@@ -217,6 +217,21 @@ curl -s -o /dev/null -w "A10 PAN reject: %{http_code} (want 400 — tok_ only, n
   -d '{"payment_method_token":"tok_4111111111111111"}'
 curl -s -o /dev/null -w "A10 no-key:   %{http_code} (want 400 IDEMPOTENCY_KEY_REQUIRED)\n" \
   -X POST $BASE/checkout/v1/private/checkout/sessions/$SID/confirm -H "Authorization: Bearer $AT0"
+# P4: apply a promo (validated preview — never counts a use) and assert the
+# discount line + that the ORDER total equals the SESSION total (the saga
+# charges order.Total, so they must be the same number).
+curl -s -X POST $BASE/checkout/v1/private/checkout/sessions/$SID/promo \
+  -H "Authorization: Bearer $AT0" -H 'Content-Type: application/json' \
+  -d '{"code":"WELCOME10"}' | python3 -c "import json,sys; s=json.load(sys.stdin); \
+  ok = s['promo_code']=='WELCOME10' and abs(s['discount']-round(s['subtotal']*0.10,2))<0.011 \
+       and abs(s['total']-(s['subtotal']+s['shipping_fee']+s['tax']-s['discount']))<0.001; \
+  print('A10 promo:', 'OK' if ok else 'FAIL', f\"discount={s['discount']} total={s['total']}\")"
+curl -s -o /dev/null -w "A10 promo-bad:  %{http_code} (want 404 PROMO_INVALID)\n" \
+  -X POST $BASE/checkout/v1/private/checkout/sessions/$SID/promo \
+  -H "Authorization: Bearer $AT0" -H 'Content-Type: application/json' -d '{"code":"NOPE"}'
+curl -s -o /dev/null -w "A10 promo-exp:  %{http_code} (want 409 PROMO_EXPIRED)\n" \
+  -X POST $BASE/checkout/v1/private/checkout/sessions/$SID/promo \
+  -H "Authorization: Bearer $AT0" -H 'Content-Type: application/json' -d '{"code":"EXPIRED1"}'
 KEY="a10-$(date +%s)"
 C=$(curl -s -X POST $BASE/checkout/v1/private/checkout/sessions/$SID/confirm \
   -H "Authorization: Bearer $AT0" -H "Idempotency-Key: $KEY")
@@ -227,10 +242,17 @@ C2=$(curl -s -X POST $BASE/checkout/v1/private/checkout/sessions/$SID/confirm \
   -H "Authorization: Bearer $AT0" -H "Idempotency-Key: $KEY")
 [ "$(echo "$C2" | python3 -c "import json,sys;print(json.load(sys.stdin).get('order_id',''))")" = "$OID" ] \
   && echo "A10 replay:   OK same order $OID" || echo "A10 replay:   FAIL"
-# The order exists and its fulfillment saga ran (confirmed after a few seconds).
+# The order exists, its saga ran, AND its total equals the session total
+# (fee + tax + discount crossed the boundary — the P3 demo-fee gap is closed).
 sleep 5
+STOTAL=$(echo "$C" | python3 -c "import json,sys;print(json.load(sys.stdin)['total'])")
 curl -s $BASE/order/v1/private/orders/$OID -H "Authorization: Bearer $AT0" | \
-  python3 -c "import json,sys; o=json.load(sys.stdin); print('A10 order:', o['id'], o['status'], '(want confirmed = saga ran)')"
+  python3 -c "import json,sys; o=json.load(sys.stdin); \
+  print('A10 order:', o['id'], o['status'], f\"total={o['total']}\", \
+        '(want confirmed & total == session '+'$STOTAL'+')')"
+# One redemption exactly, order_id backfilled:
+docker compose exec -T postgres psql -U postgres -d checkout -t -c \
+  "SELECT code, order_id IS NOT NULL AS used FROM promo_redemptions ORDER BY id DESC LIMIT 1"
 docker compose exec -T temporal temporal workflow list --namespace mop -q "WorkflowId = 'order-fulfillment-$OID'" 2>/dev/null | head -3
 
 # Abandonment (ADR-019): the DB deadline is the authority; the workflow timer

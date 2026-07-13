@@ -169,7 +169,7 @@ All private.
 ### checkout-service (namespace `checkout`) — RFC-0015 P1+P2 (local-stack; cluster at P5)
 
 All private (Kong edge JWT + in-service authmw); sessions owner-scoped by the
-JWT `user_id`. Promo lands in P4.
+JWT `user_id`.
 
 | Method | Path | Audience | Caller |
 |--------|------|----------|--------|
@@ -178,7 +178,9 @@ JWT `user_id`. Promo lands in P4.
 | `PUT` | `/checkout/v1/private/checkout/sessions/:id/address` | private | Browser |
 | `PUT` | `/checkout/v1/private/checkout/sessions/:id/shipping` | private | Browser — choose method; fee from shipping `GetQuote`, flat tax on subtotal + fee (P3) |
 | `PUT` | `/checkout/v1/private/checkout/sessions/:id/payment` | private | Browser — attach `tok_…` reference (PAN-like → 400 pre-persist) |
-| `POST` | `/checkout/v1/private/checkout/sessions/:id/confirm` | private | Browser — idempotent order handoff; `Idempotency-Key` header REQUIRED (≤120 chars) |
+| `POST` | `/checkout/v1/private/checkout/sessions/:id/promo` | private | Browser — attach a code (validated preview; use counted only at confirm) |
+| `DELETE` | `/checkout/v1/private/checkout/sessions/:id/promo` | private | Browser — detach the code |
+| `POST` | `/checkout/v1/private/checkout/sessions/:id/confirm` | private | Browser — idempotent order handoff; `Idempotency-Key` header REQUIRED (≤120 chars); atomically redeems any applied promo (ADR-022) |
 | `DELETE` | `/checkout/v1/private/checkout/sessions/:id` | private | Browser — cancel |
 
 ## Deprecated aliases (transitional — expand phase, ADR-017)

@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0015 P4 — promo codes (local-stack)**: checkout gains
+  `POST/DELETE …/sessions/:id/promo` (apply = validated preview, never a
+  counted use) and atomic confirm-time redemption (ADR-022: one tx,
+  serialized per code, `UNIQUE(code, session_id)` anchor before expiry/cap
+  checks — crash re-drives count exactly once; both caps race-tested);
+  exhausted/expired at the gate strips to `shipping_set` and never consumes
+  the Idempotency-Key; discounts re-derive at every totals change. The order
+  handoff now carries fee/tax/discount (pkg v0.22.0) — closing a P3 gap
+  where the saga charged the legacy $5 demo fee instead of the session's
+  quoted fee and tax — and order fingerprints replays on the composed total.
+  SPA gains the promo field + discount line.
+
 - **RFC-0015 P3 — totals + SPA cutover (local-stack)**: shipping gains
   `shipping.v1/GetQuote` (static method × region rate table — the fee
   authority); checkout composes `total = subtotal + fee + tax − discount` in

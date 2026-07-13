@@ -94,7 +94,7 @@ metrics/streaming-aggregation.md · grafana/variables.md · alerting/alert-catal
 alerting/README.md · alerting/slo-burn-rate-alerts.md · slo/annotation-driven-slo-controller.md ·
 slo/getting_started.md · slo/fundamentals.md · runbooks/infrastructure-alerts.md ·
 observability/README.md · `docs/proposals/rfc/RFC-0013/README.md` (P3 pilot
-pattern) + `.vi.md`. Plus exemplar-claim corrections (D-14) and
+pattern). Plus exemplar-claim corrections (D-14) and
 `legacy-checkout` fence documentation.
 
 ## 6. Scrape objects (P3)

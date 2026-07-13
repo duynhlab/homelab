@@ -351,3 +351,6 @@ kill %1  # or pkill -f "kubectl port-forward"
 - **Database Guide**: [`docs/databases/002-database-integration.md`](../../../databases/002-database-integration.md) - Custom queries configuration
 - **Metrics hub**: [`docs/observability/metrics/README.md`](../README.md) - Methodology, stack, and coverage
 - **PromQL Guide**: [`docs/observability/metrics/promql-guide.md`](../promql-guide.md) - PromQL functions and examples
+
+---
+_Last updated: 2026-07-11_

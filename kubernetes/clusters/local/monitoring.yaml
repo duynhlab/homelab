@@ -15,7 +15,7 @@ spec:
     kind: OCIRepository
     name: infrastructure-oci
   
-  path: ./configs/monitoring
+  path: ./configs/observability
   
   prune: true
   wait: true

@@ -29,3 +29,6 @@ this directory (`001`-`010`).
 ## Operations and DevOps
 
 - [PostgreSQL for DevOps: production setup and operations](https://medium.com/@mecreate/postgresql-for-devops-production-setup-and-operations-2630f41ce779)
+
+---
+_Last updated: 2026-07-10_

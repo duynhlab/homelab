@@ -28,3 +28,10 @@ spec:
     # name, not the headless `payment-grpc` one. The saga's payment steps are
     # always on (no feature flag); the worker uses its own PAYMENT_GRPC_ADDR.
     payment_grpc_addr: "dns:///payment-grpc.payment.svc.cluster.local:9090"
+    # Internal gRPC server (:9090) — checkout's confirm handoff calls
+    # order.v1/CreateOrder (RFC-0015, ADR-018). The mop chart renders the
+    # order-grpc Service from this.
+    grpc_server: true
+    # MUST stay the string "false": the template guard is truthiness-based,
+    # so a boolean false would drop the env entirely — leaving reflection ON.
+    grpc_reflection: "false"

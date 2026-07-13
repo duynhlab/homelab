@@ -49,4 +49,13 @@ canonical material has only one owner.
 - [Canonical API guide](./api.md)
 - [ADR-017](../proposals/adr/ADR-017-api-path-collection-noun/)
 
+| Version | Date | Change |
+|---------|------|--------|
+| v1.0.0 | 2026-04-09 | Initial Draft — Variant A vs B exploration, illustrative services. |
+| v1.1.0 | 2026-04-17 | Adopted Variant A at the edge. Services still mounted on `/api/v1/*`; Kong rewrote edge → cluster via per-namespace `pre-function` plugins. |
+| **v2.0.0** | **2026-04-17** | **Full migration — services mount Variant A paths directly, Kong is pure pass-through, `/api/v1/*` removed entirely. Internal audiences live only in-cluster (never on gateway).** Breaking change; frontend and all service-to-service callers updated in lockstep. |
+| **v3.0.0** | **2026-07-12** | **Collection-noun rule ([ADR-017](../proposals/adr/ADR-017-api-path-collection-noun/)) — the segment after `{audience}` must be a service-owned collection noun; 13 routes renamed (auth 5, shipping 3, notification 2, payment 3).** Expand→contract: live-caller routes keep deprecated aliases for one release; zero-caller internal routes renamed outright. |
+| v3.0.1 | 2026-07-12 | Checkout joins the process-named exception (with auth): owning segment is the literal `checkout`, resources nest beneath it (`checkout/sessions[…]`) — a bare `sessions` collection was ambiguous platform-wide. Applied before any consumer existed (pre-P3 SPA), so no aliases needed. |
+
+---
 _Last updated: 2026-07-13_

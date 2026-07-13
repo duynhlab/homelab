@@ -93,3 +93,6 @@ host    all     all     all reject
   line), a scoped exception to ADR-013's "never touch instance.yaml".
 - Superuser has no remote path (`enableSuperuserAccess` off, local peer
   only) — emergency access is `kubectl exec` into the primary pod, unchanged.
+
+---
+_Last updated: 2026-07-08_

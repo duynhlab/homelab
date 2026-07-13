@@ -106,3 +106,6 @@ act.
 - **Revisit trigger:** if CNPG later ships `DatabaseRole`-level catalog
   reconciliation or an `ensure: absent` equivalent, revisit the drift-handling
   and role-removal notes above.
+
+---
+_Last updated: 2026-07-08_

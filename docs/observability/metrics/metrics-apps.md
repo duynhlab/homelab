@@ -130,7 +130,7 @@ allowlist (`promoteAllResourceAttributes: false`) so the SDK-default
 restart:
 
 ```yaml
-# kubernetes/infra/configs/monitoring/victoriametrics/vmagent.yaml
+# kubernetes/infra/configs/observability/metrics/victoriametrics/vmagent.yaml
 extraArgs:
   opentelemetry.usePrometheusNaming: "true"          # http.server.request.duration → http_server_request_duration_seconds_*
   opentelemetry.promoteAllResourceAttributes: "false"
@@ -373,7 +373,7 @@ consumer config, not a scrape config. The alert and recording rules that consume
 these metrics are catalogued (with counts and production impact) in the
 [Alert Catalog](../alerting/alert-catalog.md).
 
-| Manifest (under `kubernetes/infra/configs/monitoring/`) | Purpose |
+| Manifest (under `kubernetes/infra/configs/observability/`) | Purpose |
 |------|---------|
 | `victoriametrics/vmagent.yaml` | OTLP ingest args (`usePrometheusNaming`, resource-attr allowlist) + `service_name→app` / `k8s_namespace_name→namespace` relabel |
 | `prometheusrules/microservices/recording-rules.yaml` | RED/latency/Apdex/bandwidth + gRPC pre-aggregation under the `app:` / `app_route:` prefixes |

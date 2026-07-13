@@ -76,8 +76,41 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: payment
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: checkout
       ports:
         - protocol: TCP
           port: 6432
         - protocol: TCP
           port: 5432
+---
+# product-service gRPC (:9090, product.v1) — the saga's stock activities
+# (order ns) and checkout's re-validation (RFC-0015). The server shipped with
+# RFC-0015 P1, AFTER the last cluster audit, so no allow existed yet.
+#
+# A SEPARATE pod-scoped policy, not a rule in allow-internal-callers: PgDog
+# also listens on 9090 in this namespace (openmetrics), and a namespace-wide
+# allow would hand its metrics port to the app callers (doubt-cycle finding).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-product-grpc
+  namespace: product
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: product
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: order
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: checkout
+      ports:
+        - protocol: TCP
+          port: 9090

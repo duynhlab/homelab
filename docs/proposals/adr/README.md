@@ -48,3 +48,6 @@ settled decisions.
 | [ADR-020](ADR-020-checkout-revalidation-policy/) | Product is the checkout price authority; stock checked, never reserved | Accepted | [RFC-0015](../rfc/RFC-0015/) |
 | [ADR-021](ADR-021-cart-grpc-read-surface/) | Cart gains a read-only gRPC surface; writes stay on REST | Accepted | [RFC-0015](../rfc/RFC-0015/) |
 | [ADR-022](ADR-022-atomic-promo-redemption/) | Promo redemptions count atomically at confirm, before the attempt marker | Accepted | [RFC-0015](../rfc/RFC-0015/) |
+
+---
+_Last updated: 2026-07-13_

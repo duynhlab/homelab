@@ -15,8 +15,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   conventions now live in `docs/api/api.md`; each of the ten services has one
   contract file; Saga-vs-2PC learning moved beside the live Temporal workflow.
   Compatibility pages preserve links to the three former guide filenames.
+- **Observability configs reorganized by pillar**: `configs/monitoring/` →
+  `configs/observability/{metrics,logging,tracing,grafana,sloth}` — VLSingle
+  (logs) and VTSingle (traces) no longer hide inside `victoriametrics/`;
+  the tree now mirrors `controllers/` and `docs/observability/`. Same Flux
+  Kustomization (`monitoring-local`, path updated) and an identical rendered
+  object set (109/109 verified), so the cluster sees no change.
 
 ### Added
+
+- **RFC-0015 P5 — checkout on the cluster**: checkout database triplet on
+  product-db (ExternalSecret + DatabaseRole + Database, pg_hba line, PgDog
+  backend, OpenBAO seed, app-ns secret copy); `rsip-checkout` (image 0.2.0,
+  2 replicas, PgDog) + `checkout-worker` HelmRelease (order-worker pattern,
+  `checkout` task queue); cart and order gain `grpc_server: true`
+  (reflection off) so their gRPC Services render; NetworkPolicies — checkout
+  fenced to Kong→8080, cart/order/shipping admit checkout→9090, product
+  gains a pod-scoped `allow-product-grpc` (order + checkout → product.v1,
+  without exposing PgDog's 9090 openmetrics); `checkout` joins the three
+  Kyverno namespace lists; Kong `api-checkout-private` route (edge JWT) and
+  `Idempotency-Key` in the global CORS allowlist.
 
 - **RFC-0015 P4 — promo codes (local-stack)**: checkout gains
   `POST/DELETE …/sessions/:id/promo` (apply = validated preview, never a

@@ -109,3 +109,6 @@ Major milestones: first release with an initial version; GA; retirement/superses
 ## Related
 
 <!-- ADRs this RFC spawned, linked PRs, and related docs. -->
+
+---
+_Last updated: 2026-06-29_

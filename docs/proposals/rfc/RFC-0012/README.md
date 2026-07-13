@@ -475,3 +475,6 @@ flowchart TB
 - [`docs/secrets/README.md`](../../../secrets/README.md) — OpenBAO + ESO flow
 - CloudNativePG v1.30.0 release notes and the 1.30 declarative role/database
   management documentation (official docs)
+
+---
+_Last updated: 2026-07-08_

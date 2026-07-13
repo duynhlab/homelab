@@ -1006,3 +1006,6 @@ PgDog fronts **four application databases** on this cluster — **product**, **c
 - **Backup strategy**: [`006-backup-strategy.md`](./006-backup-strategy.md)
 - **Poolers (PgBouncer, PgCat, PgDog)**: [`008-pooler.md`](./008-pooler.md)
 - **Related in-repo docs**: [002-database-integration.md](002-database-integration.md) · [007-architecture.md](007-architecture.md) (the former `specs/active` research notes were retired)
+
+---
+_Last updated: 2026-07-11_

@@ -183,7 +183,7 @@ deliberately keep `memory` and let **Tempo** own durable trace storage. See the
 
 ### Grafana Datasource
 
-Located at: `kubernetes/infra/configs/monitoring/grafana/datasource-jaeger.yaml`
+Located at: `kubernetes/infra/configs/observability/grafana/datasource-jaeger.yaml`
 
 ```yaml
 datasource:
@@ -311,3 +311,6 @@ ctx, span := tracer.Start(ctx, "ProcessOrder")
 - [Tracing Guide](./README.md)
 - OTel Collector config: `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
 - [Jaeger Official Docs](https://www.jaegertracing.io/docs/)
+
+---
+_Last updated: 2026-07-10_

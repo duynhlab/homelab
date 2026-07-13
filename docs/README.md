@@ -61,7 +61,8 @@ docs/
 │       ├── cnpg-dr-replica-bootstrap.md
 │       ├── zalando-ha-scaling.md
 │       ├── add-service-database.md   # Add a service DB to product-db (RFC-0012 triplet)
-│       └── rotate-cnpg-service-password.md  # Rotate a product-db service password end-to-end
+│       ├── rotate-cnpg-service-password.md  # Rotate a product-db service password end-to-end
+│       └── pgdog-operations.md       # PgDog day-2 ops: rotations, backends, failure modes
 ├── observability/                # Observability documentation
 │   ├── README.md                 # Master index + 4-pillar architecture
 │   ├── opentelemetry.md          # OpenTelemetry from zero: signals, SDK, collector, platform usage
@@ -465,3 +466,6 @@ compatibility pages; new links should target the canonical guides above.
 ---
 
 **Last Updated**: 2026-07-11 — Zalando→CNPG migration: operator-comparison + Zalando deep-dive entries reframed as reference/historical (platform standardised on CloudNativePG). Security category added; ADR-016 indexed; Platform category completed (kyverno, graceful-shutdown, gke-dns, mcp, rulesets); databases 012 + 2 runbooks linked; PgCat runbooks demoted to legacy
+
+---
+_Last updated: 2026-07-13_

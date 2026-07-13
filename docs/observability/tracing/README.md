@@ -444,3 +444,6 @@ attribute.String("db.table", "users")
 ---
 
 **Last Updated**: 2026-07-10 — metrics-generator noted configured-but-inert (`remote_write: []`); collector fan-out drawn end-to-end; `OTEL_SERVICE_NAME` injected by ResourceSets; sampling corrected to the shipped `ParentBased(TraceIDRatioBased)` (root decides, downstream honours; no auto ENV mapping); Tempo v2.10.5 on RustFS S3 (7d), Jaeger in-memory, VictoriaTraces v0.6.0 (pilot)
+
+---
+_Last updated: 2026-07-11_

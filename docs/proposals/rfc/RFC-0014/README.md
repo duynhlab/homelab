@@ -358,3 +358,6 @@ one PR wave.
   [VictoriaMetrics OTel integration](https://docs.victoriametrics.com/victoriametrics/integrations/opentelemetry/) ·
   [VictoriaLogs OTel ingestion](https://docs.victoriametrics.com/victorialogs/data-ingestion/opentelemetry/) ·
   [vmagent](https://docs.victoriametrics.com/victoriametrics/vmagent/)
+
+---
+_Last updated: 2026-07-10_

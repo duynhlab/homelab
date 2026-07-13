@@ -26,3 +26,6 @@ Each alert runbook follows a consistent format:
 - [Grafana Datasources](../grafana/datasources.md) -- how to view rules in Grafana UI
 - [Database HA Scaling](../../databases/runbooks/zalando-ha-scaling.md) -- PostgreSQL HA runbook
 - [Prepared Databases](../../databases/runbooks/prepared-databases.md) -- preparedDatabases issue runbook
+
+---
+_Last updated: 2026-06-02_

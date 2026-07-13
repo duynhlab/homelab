@@ -253,3 +253,6 @@ the SLO. A run with no recorded evidence did not happen.
 - [`TODO.md` → Reliability & Operations](../../../../TODO.md) — PITR drill, DR
   runbooks periodically tested, game days, and chaos engineering (the (c)
   follow-on).
+
+---
+_Last updated: 2026-06-26_

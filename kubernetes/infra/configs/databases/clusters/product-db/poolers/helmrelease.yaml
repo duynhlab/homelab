@@ -32,7 +32,7 @@ spec:
     remediation:
       retries: 3
   # Indices are positional against values.users below — keep both lists in
-  # the same order: [0]=product, [1]=cart, [2]=order, [3]=payment.
+  # the same order: [0]=product, [1]=cart, [2]=order, [3]=payment, [4]=checkout.
   valuesFrom:
     - kind: Secret
       name: product-db-secret
@@ -50,6 +50,10 @@ spec:
       name: product-db-payment-secret
       valuesKey: password
       targetPath: "users[3].password"
+    - kind: Secret
+      name: product-db-checkout-secret
+      valuesKey: password
+      targetPath: "users[4].password"
   values:
     replicas: 3
     port: 6432
@@ -104,6 +108,17 @@ spec:
           - host: product-db-r.product.svc.cluster.local
             port: 5432
             poolSize: 30
+      # checkout DB -- primary
+      - name: checkout
+        host: product-db-rw.product.svc.cluster.local
+        port: 5432
+        database: checkout
+        poolSize: 30
+        poolMode: transaction
+        replicas:
+          - host: product-db-r.product.svc.cluster.local
+            port: 5432
+            poolSize: 30
 
     # Passwords injected per-user by spec.valuesFrom (order must match the
     # targetPath indices above).
@@ -116,6 +131,8 @@ spec:
         database: order
       - name: payment
         database: payment
+      - name: checkout
+        database: checkout
 
     resources:
       requests:

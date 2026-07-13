@@ -253,12 +253,12 @@ was retired in RFC-0014 P3). Streaming aggregation lives on vmagent's
 remote-write path, so it applies regardless of how samples enter. The VM
 Operator exposes it declaratively on the `VMAgent` CR, so
 the pilot is a GitOps-only change to
-[`vmagent.yaml`](../../../kubernetes/infra/configs/monitoring/victoriametrics/vmagent.yaml)
+[`vmagent.yaml`](../../../kubernetes/infra/configs/observability/metrics/victoriametrics/vmagent.yaml)
 — no new components, no router tier (one vmagent = one aggregator = the
 sharding invariants hold trivially):
 
 ```yaml
-# kubernetes/infra/configs/monitoring/victoriametrics/vmagent.yaml (pilot, RFC-0013 P3a)
+# kubernetes/infra/configs/observability/metrics/victoriametrics/vmagent.yaml (pilot, RFC-0013 P3a)
 spec:
   remoteWrite:
     - url: "http://vmsingle-victoria-metrics.monitoring.svc:8428/api/v1/write"

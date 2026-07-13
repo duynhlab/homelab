@@ -41,6 +41,10 @@ config:
     - Content-Type
     - Authorization
     - X-Request-ID
+    # Checkout confirm (RFC-0015): the SPA sends its idempotency key on the
+    # confirm POST — without this the preflight rejects it and the POST is
+    # never sent (twin of the local-stack kong.yml entry).
+    - Idempotency-Key
   exposed_headers:
     - X-Request-ID
     - RateLimit-Limit

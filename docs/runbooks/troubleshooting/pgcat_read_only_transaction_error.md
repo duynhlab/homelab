@@ -264,3 +264,6 @@ done
 
 - [PgCat Prepared Statement Error](pgcat_prepared_statement_error.md) - Different error: `bind message supplies X parameters`
 - [PgCat Upstream Connectivity Errors](pgcat_upstream_connectivity_errors.md) - Connection refused / shard down errors
+
+---
+_Last updated: 2026-07-10_

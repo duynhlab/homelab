@@ -6,6 +6,7 @@ kind: Kustomization
 # adding one file here, never editing instance.yaml.
 resources:
   - cart.yaml
+  - checkout.yaml
   - order.yaml
   - payment.yaml
   - product.yaml

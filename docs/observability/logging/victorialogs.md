@@ -75,7 +75,7 @@ This deployment uses a **single cluster-wide Vector Agent** (`kube-system/vector
 
 VictoriaLogs is available in Grafana as a **VictoriaLogs** datasource (plugin `victoriametrics-logs-datasource`), provisioned by GitOps:
 
-- **CR**: [`kubernetes/infra/configs/monitoring/grafana/datasource-victorialogs.yaml`](../../../kubernetes/infra/configs/monitoring/grafana/datasource-victorialogs.yaml)
+- **CR**: [`kubernetes/infra/configs/observability/grafana/datasource-victorialogs.yaml`](../../../kubernetes/infra/configs/observability/grafana/datasource-victorialogs.yaml)
 - **UID**: `victorialogs`
 - **URL**: `http://vlsingle-victoria-logs.monitoring.svc.cluster.local:9428`
 
@@ -142,7 +142,7 @@ literal `AUDIT:` prefix). Verified live for `auth-db`, `product-db`, and
 
 ### VLSingle CRD (Operator-Managed)
 
-Location: `kubernetes/infra/configs/monitoring/victoriametrics/vlsingle.yaml`
+Location: `kubernetes/infra/configs/observability/logging/victorialogs/vlsingle.yaml`
 
 Key settings:
 ```yaml
@@ -305,7 +305,7 @@ If Vector is consuming too much memory:
 
 | Resource | Path |
 |----------|------|
-| VLSingle CRD | `kubernetes/infra/configs/monitoring/victoriametrics/vlsingle.yaml` |
+| VLSingle CRD | `kubernetes/infra/configs/observability/logging/victorialogs/vlsingle.yaml` |
 | VM Operator | `kubernetes/infra/controllers/metrics/victoria-metrics-operator.yaml` |
 | Vector HelmRelease | `kubernetes/infra/controllers/logging/vector/vector.yaml` |
 

@@ -586,7 +586,7 @@ flowchart LR
 
 | Signal | Producer | Pipeline | Consumer |
 |--------|----------|----------|----------|
-| **Metrics** | `prometheus` plugin (status codes, latency histograms, bandwidth, upstream health) on the status listener `:8100/metrics` | chart-native ServiceMonitor (`serviceMonitor.enabled` in `controllers/kong/helmrelease.yaml`) → VMAgent (`selectAllByDefault`) → VictoriaMetrics | Grafana Kong dashboard (GrafanaDashboard CRD); 6 alert groups + recording rules in `configs/monitoring/prometheusrules/kong/` |
+| **Metrics** | `prometheus` plugin (status codes, latency histograms, bandwidth, upstream health) on the status listener `:8100/metrics` | chart-native ServiceMonitor (`serviceMonitor.enabled` in `controllers/kong/helmrelease.yaml`) → VMAgent (`selectAllByDefault`) → VictoriaMetrics | Grafana Kong dashboard (GrafanaDashboard CRD); 6 alert groups + recording rules in `configs/observability/metrics/prometheusrules/kong/` |
 | **Traces** | `opentelemetry` plugin — root span per request + forced W3C `traceparent` injection (100% edge→service linkage) | OTLP-HTTP → otel-collector → Tempo + Jaeger + VictoriaTraces | Grafana Explore / Jaeger UI |
 | **Access logs** | nginx `kong_json` log format on stdout — one JSON line per request (`status`, `request_time`, `upstream_time`, `request_id`, …) | Vector DaemonSet → VictoriaLogs (jsonline) | LogsQL queries by field |
 | **Runtime logs (pilot)** | `opentelemetry` plugin `logs_endpoint` (Kong ≥ 3.8) — trace-correlated OTLP log records | otel-collector `logs` pipeline → VictoriaLogs (OTLP ingest) | Runs **alongside** Vector for comparison |

@@ -789,3 +789,6 @@ hotfix/PROD-456   -->  MR  -->  main  -->  tag v1.2.1
 | How do I release to production? | Merge to `main`, then create `vX.Y.Z` tag |
 | What image tag do I deploy? | `vX.Y.Z` or `sha256:...` digest, never only `latest` |
 | How do I rollback? | Redeploy previous `vX.Y.Z` tag |
+
+---
+_Last updated: 2026-07-07_

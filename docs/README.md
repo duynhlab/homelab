@@ -53,7 +53,8 @@ docs/
 │       ├── cnpg-dr-replica-bootstrap.md
 │       ├── zalando-ha-scaling.md
 │       ├── add-service-database.md   # Add a service DB to product-db (RFC-0012 triplet)
-│       └── rotate-cnpg-service-password.md  # Rotate a product-db service password end-to-end
+│       ├── rotate-cnpg-service-password.md  # Rotate a product-db service password end-to-end
+│       └── pgdog-operations.md       # PgDog day-2 ops: rotations, backends, failure modes
 ├── observability/                # Observability documentation
 │   ├── README.md                 # Master index + 4-pillar architecture
 │   ├── opentelemetry.md          # OpenTelemetry from zero: signals, SDK, collector, platform usage

@@ -247,3 +247,6 @@ Full layering and pipeline diagrams: [`alerting/README.md`](../alerting/README.m
 - Google SRE Workbook — [Alerting on SLOs](https://sre.google/workbook/alerting-on-slos/) (origin of multi-window multi-burn-rate)
 - Google SRE Workbook — [Error Budget Policy template](https://sre.google/workbook/error-budget-policy/)
 - Sloth — [Introduction & concepts](https://sloth.dev/introduction/)
+
+---
+_Last updated: 2026-07-09_

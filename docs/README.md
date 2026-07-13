@@ -456,3 +456,6 @@ docs/
 ---
 
 **Last Updated**: 2026-07-11 — Zalando→CNPG migration: operator-comparison + Zalando deep-dive entries reframed as reference/historical (platform standardised on CloudNativePG). Security category added; ADR-016 indexed; Platform category completed (kyverno, graceful-shutdown, gke-dns, mcp, rulesets); databases 012 + 2 runbooks linked; PgCat runbooks demoted to legacy
+
+---
+_Last updated: 2026-07-13_

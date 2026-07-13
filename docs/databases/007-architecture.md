@@ -631,3 +631,6 @@ graph TD
     class WALSegments,WALArchiveStatus,XactStatus,LogicalRepl,ReplSlots,PgStat,PgStatTmp layer9Style
     class PgTblspc,PgTwophase,TempFiles,LockFile layer9Style
 ```
+
+---
+_Last updated: 2026-07-11_

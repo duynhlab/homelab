@@ -786,3 +786,6 @@ For every answer, structure as:
 - [Tracing Guide](../tracing/README.md) -- Distributed tracing details
 - [Logging Guide](../logging/README.md) -- Structured logging, LogsQL
 - [Profiling Guide](../profiling/README.md) -- Continuous profiling, flamegraphs
+
+---
+_Last updated: 2026-07-10_

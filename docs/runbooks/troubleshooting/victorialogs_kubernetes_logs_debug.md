@@ -146,3 +146,6 @@ flux get kustomizations -A | grep -E "logging|monitoring|vector"
 - [VictoriaLogs backend](../../observability/logging/victorialogs.md) — full reference
 - [Structured Logging overview](../../observability/logging/README.md)
 - LogsQL: https://docs.victoriametrics.com/victorialogs/logsql/
+
+---
+_Last updated: 2026-07-11_

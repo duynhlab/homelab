@@ -164,3 +164,6 @@ the CNPG pod logs, tailed by the cluster-wide **Vector DaemonSet**, and shipped 
 - [PromQL Guide](../promql-guide.md) — PromQL functions and examples
 - [Alert Catalog](../../alerting/alert-catalog.md) — every deployed PostgreSQL alert
 - Retired reference: [pg-exporter-dashboards.md](pg-exporter-dashboards.md), [pg-exporter-mapping.md](pg-exporter-mapping.md)
+
+---
+_Last updated: 2026-07-11_

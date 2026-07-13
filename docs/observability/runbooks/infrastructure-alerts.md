@@ -706,3 +706,6 @@ kubectl get networkpolicies -n $NAMESPACE
 | | `KubeAPIServerErrorRate` | warning | 10m | Golden: Errors |
 | | `KubeAPIServerHighInflight` | warning | 5m | Golden: Saturation |
 | **Network** | `KubeContainerNetworkErrors` | warning | 10m | USE: Errors |
+
+---
+_Last updated: 2026-07-10_

@@ -197,3 +197,6 @@ The Grafana dashboards and the Sloth UI are complementary: Grafana for long-form
 - [Sloth `server` command source](https://github.com/slok/sloth/blob/main/cmd/sloth/commands/server.go) -- all CLI flags for the UI (Prometheus address, basic auth, mTLS, custom headers, cache refresh)
 - [Google SRE Book -- SLOs](https://sre.google/sre-book/service-level-objectives/)
 - [Google SRE Workbook -- Alerting on SLOs](https://sre.google/workbook/alerting-on-slos/)
+
+---
+_Last updated: 2026-07-09_

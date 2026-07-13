@@ -322,3 +322,6 @@ pgcat_pools_waiting_clients{pool="cart"}
 
 - [PgCat Read-Only Transaction Error](pgcat_read_only_transaction_error.md) - `SQLSTATE 25006` write-on-replica errors
 - [PgCat Prepared Statement Error](pgcat_prepared_statement_error.md) - `bind message supplies X parameters` errors
+
+---
+_Last updated: 2026-07-10_

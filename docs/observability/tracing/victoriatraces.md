@@ -100,3 +100,6 @@ Pilot, wired in the manifests — the collector's 3-way fan-out exporter and the
 `datasource-victoriatraces.yaml`); v0.6.0 verified standalone (ingests OTLP-HTTP traces; the
 Jaeger API returns them). Tempo + Jaeger are unchanged and Tempo stays primary/durable.
 See [backends-comparison.md](./backends-comparison.md) for the decision context.
+
+---
+_Last updated: 2026-07-07_

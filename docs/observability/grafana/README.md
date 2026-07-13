@@ -118,3 +118,6 @@ kubernetes/infra/configs/monitoring/grafana/
 - [Variables](variables.md) -- dashboard variable configuration
 - [Alerting Strategy](../alerting/README.md) -- 2-layer alerting approach
 - [Metrics](../metrics/README.md) -- RED methodology and metric definitions
+
+---
+_Last updated: 2026-07-11_

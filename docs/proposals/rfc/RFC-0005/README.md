@@ -207,3 +207,6 @@ and PSS posture are unchanged (same pod spec, more replicas). No Kyverno impact
 - DB integration: [`002-database-integration.md`](../../../databases/002-database-integration.md).
 - Scaling runbook: [`runbooks/zalando-ha-scaling.md`](../../../databases/runbooks/zalando-ha-scaling.md).
 - Manifest: [`kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml`](../../../../kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml).
+
+---
+_Last updated: 2026-06-26_

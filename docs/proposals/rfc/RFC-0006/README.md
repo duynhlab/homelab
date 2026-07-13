@@ -246,3 +246,6 @@ TBD — provisional; deferred, no implementation. Revisit per the criteria above
   [`docs/api/grpc-internal-comms.md`](../../../api/grpc-internal-comms.md) (§3, §5, §8).
 - Network fence: [`docs/security/network-policies.md`](../../../security/network-policies.md).
 - Roadmap source: `TODO.md` → *Service Mesh & Traffic Management*.
+
+---
+_Last updated: 2026-06-26_

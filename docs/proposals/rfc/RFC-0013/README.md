@@ -400,3 +400,6 @@ settles the 24-vs-27 SLO count (D2).
 - RFC-0010 (rollout-pattern precedent: flagged shadow → verify → cutover → cleanup)
 - ADR-013 — to be spawned by P3b with the adopt/remove decision
 - Follow-up tracker (D3): extract shared metrics middleware into `duynhlab/pkg` + harden the reference (method-label allowlist, deferred in-flight `Dec()`, negative-`ContentLength` guard)
+
+---
+_Last updated: 2026-07-09_

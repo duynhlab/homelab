@@ -214,3 +214,6 @@ Owned here (replaces the roadmap previously inline in `temporal-order-fulfillmen
 - ADRs: [ADR-001 Adopt Temporal](../../adr/ADR-001-adopt-temporal-for-order-fulfillment/), [ADR-002 Deploy via the operator](../../adr/ADR-002-deploy-temporal-via-operator/).
 - Operational reference: [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md).
 - East-west transport: [`docs/api/grpc-internal-comms.md`](../../../api/grpc-internal-comms.md).
+
+---
+_Last updated: 2026-07-02_

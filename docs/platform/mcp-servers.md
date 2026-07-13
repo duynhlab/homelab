@@ -674,3 +674,6 @@ curl http://localhost:9090/health             # Flux MCP
 | VictoriaMetrics MCP GitHub | https://github.com/VictoriaMetrics/mcp-victoriametrics |
 | VictoriaLogs MCP GitHub | https://github.com/VictoriaMetrics/mcp-victorialogs |
 | VM Agent Skills | https://github.com/VictoriaMetrics/skills |
+
+---
+_Last updated: 2026-04-22_

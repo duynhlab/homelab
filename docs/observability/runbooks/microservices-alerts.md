@@ -880,3 +880,6 @@ Add alerts for application-side database health signals:
 - [PostgreSQL Alerts](../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/README.md) -- Database-level alerts (`cnpg/` + `zalando/`)
 - [Metrics Reference](../metrics/README.md) -- RED method, label strategy, cardinality
 - [Grafana Dashboard Guide](../grafana/dashboard-reference.md) -- Dashboard panel reference
+
+---
+_Last updated: 2026-07-10_

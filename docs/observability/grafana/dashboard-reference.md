@@ -1667,3 +1667,6 @@ echo "→ Check metrics: RPS, Error Rate, Latency có thay đổi?"
 **Last Updated**: 2026-07-09  
 **Version**: 1.0  
 **Maintainer**: SRE Team
+
+---
+_Last updated: 2026-07-11_

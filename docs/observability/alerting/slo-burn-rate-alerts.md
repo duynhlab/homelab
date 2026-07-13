@@ -242,3 +242,6 @@ open http://karma.duynh.me
 - [Microservices alerts runbook](../runbooks/microservices-alerts.md) — Layer-1 per-alert investigation
 - [Google SRE Workbook — Alerting on SLOs](https://sre.google/workbook/alerting-on-slos/) — origin of the method
 - [Sloth alerting docs](https://sloth.dev/usage/alerts/) — generator details and overrides
+
+---
+_Last updated: 2026-07-09_

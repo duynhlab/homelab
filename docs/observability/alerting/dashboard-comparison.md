@@ -218,3 +218,6 @@ Re-evaluate this decision if any of the following conditions change:
 | UAR | [jamesread/uncomplicated-alert-receiver](https://github.com/jamesread/uncomplicated-alert-receiver) | [Docs](https://jamesread.github.io/uncomplicated-alert-receiver/) | N/A |
 | Siren | [shamubernetes/siren](https://github.com/shamubernetes/siren) | README | N/A |
 | Notificator | [SoulKyu/notificator](https://github.com/SoulKyu/notificator) | README | N/A |
+
+---
+_Last updated: 2026-07-11_

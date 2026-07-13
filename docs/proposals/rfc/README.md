@@ -106,3 +106,6 @@ here). Each gets a number when someone writes it up.
 
 > Temporal durability/DR (HA, Barman, GameDay) is tracked as **future work in
 > [RFC-0001](RFC-0001/)**, not a separate backlog row.
+
+---
+_Last updated: 2026-07-11_

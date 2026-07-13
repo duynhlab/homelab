@@ -222,3 +222,6 @@ no data migration and no behavioral change to roll back.
 - RFC-0004 (caching) — *forward reference*: when product Cache-Aside / cache-bust gets its
   own RFC, the `available`-staleness hook is documented there.
 - Contracts: `pkg/proto/product/v1/product.proto` (`ReserveStock`/`ReleaseStock`).
+
+---
+_Last updated: 2026-07-11_

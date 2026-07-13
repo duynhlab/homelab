@@ -149,3 +149,6 @@ http_server_request_duration_seconds_count{app="<service>"}
 - [Burn-Rate Alerts](../alerting/slo-burn-rate-alerts.md) -- Alert configuration and runbooks
 - [SLO Fundamentals](./fundamentals.md) -- SLA/SLO/SLI/Error Budget primer
 - [Error Budget Policy](./error_budget_policy.md) -- Budget management guidelines
+
+---
+_Last updated: 2026-07-09_

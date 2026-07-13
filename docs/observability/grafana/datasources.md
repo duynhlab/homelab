@@ -144,3 +144,6 @@ Configured on `VMSingle` via `vmalert.proxyURL` in [`vmsingle.yaml`](../../../ku
 - [Variables](variables.md) — `$DS_PROMETHEUS` naming
 - [Alerting Strategy](../alerting/README.md)
 - [VictoriaMetrics Operator](../metrics/victoriametrics.md)
+
+---
+_Last updated: 2026-06-02_

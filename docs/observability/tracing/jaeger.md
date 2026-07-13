@@ -311,3 +311,6 @@ ctx, span := tracer.Start(ctx, "ProcessOrder")
 - [Tracing Guide](./README.md)
 - OTel Collector config: `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
 - [Jaeger Official Docs](https://www.jaegertracing.io/docs/)
+
+---
+_Last updated: 2026-07-10_

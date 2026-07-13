@@ -213,3 +213,6 @@ A: Some vmauth features (e.g. certain IP filters) are Enterprise. Check the [vma
 - [VMUser CRD](https://docs.victoriametrics.com/operator/resources/vmuser/)
 - [VictoriaMetrics Operator Stack](victoriametrics.md)
 - [Grafana multi-team RBAC](../grafana/rbac-multi-team.md)
+
+---
+_Last updated: 2026-03-21_

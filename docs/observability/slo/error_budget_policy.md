@@ -170,3 +170,6 @@ Use error budget to balance:
 - [Google SRE Book - Error Budgets](https://sre.google/sre-book/service-level-objectives/)
 - [Error Budget Policy Template](https://sre.google/workbook/error-budget-policy/)
 
+
+---
+_Last updated: 2026-07-11_

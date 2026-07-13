@@ -141,3 +141,6 @@ flowchart TD
 - [Anonymous authentication](https://grafana.com/docs/grafana/latest/setup-grafana/configure-security/configure-authentication/#anonymous-authentication)
 - [Grafana overview](README.md)
 - [VMAuth and vmauth](../metrics/vmauth.md)
+
+---
+_Last updated: 2026-03-21_

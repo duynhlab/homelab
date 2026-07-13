@@ -135,3 +135,6 @@ temporarily unavailable.
 - [004-replication-strategy.md](./004-replication-strategy.md) - Sync vs async replication and commit behavior.
 - [006-backup-strategy.md](./006-backup-strategy.md) - Backup, WAL archiving, PITR, and retention.
 - [010-drp.md](./010-drp.md) - Production-ready DRP model for this homelab.
+
+---
+_Last updated: 2026-07-11_

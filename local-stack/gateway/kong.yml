@@ -209,7 +209,9 @@ plugins:
     config:
       origins: ["http://localhost:3001"]
       methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-      headers: [Content-Type, Authorization, X-Request-ID]
+      # Idempotency-Key: the checkout confirm header (RFC-0015 P3 SPA flow) —
+      # without it the browser's CORS preflight silently blocks the POST.
+      headers: [Content-Type, Authorization, X-Request-ID, Idempotency-Key]
       exposed_headers: [X-Request-ID, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset]
       credentials: true
       max_age: 3600

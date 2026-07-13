@@ -640,6 +640,17 @@ Phased P1→P6 as above. Blast-radius notes:
   unchanged), and re-validation is skipped once an order attempt was ever
   authorized (marker) — the draft's "re-validate at confirm" is preserved
   for FIRST attempts only, by correctness necessity.
+- 2026-07-13 — **P3 shipped** (local-stack): totals + SPA cutover.
+  shipping.v1/GetQuote (static method × region rate table — the fee
+  authority; pkg v0.21.0); checkout composes
+  `total = subtotal + fee + tax − discount` in minor units from a seeded
+  `tax_rules` table (DEFAULT fallback), invalidates the quote on address
+  change, and recomputes tax on confirm-time requotes — the stored total is
+  always recomputed in SQL from persisted components. The SPA cuts
+  `/checkout` over to the multi-step session funnel (server FSM drives the
+  steps; one persisted Idempotency-Key per session; requotes re-render with
+  changed lines flagged) with the legacy one-shot flow kept at
+  `/checkout/legacy` (dual-entry until P6).
 
 ## Related
 

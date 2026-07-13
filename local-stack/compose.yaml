@@ -482,6 +482,8 @@ services:
       # P2 confirm handoff (ADR-018) + abandonment signals (ADR-019). Temporal
       # being down only degrades expiry to the lazy backstop — never a crash.
       ORDER_GRPC_ADDR: dns:///order:9090
+      # P3 quote authority for PUT …/shipping (fee + tax composition).
+      SHIPPING_GRPC_ADDR: dns:///shipping:9090
       TEMPORAL_HOSTPORT: temporal:7233
       TEMPORAL_NAMESPACE: mop
       TASK_QUEUE: checkout
@@ -493,6 +495,7 @@ services:
       cart: { condition: service_healthy }
       product: { condition: service_healthy }
       order: { condition: service_healthy }
+      shipping: { condition: service_healthy }
       temporal: { condition: service_healthy }
 
   # ---- Checkout Temporal worker (AbandonedCheckoutWorkflow, ADR-019) ----

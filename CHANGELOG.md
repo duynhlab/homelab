@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0015 P3 — totals + SPA cutover (local-stack)**: shipping gains
+  `shipping.v1/GetQuote` (static method × region rate table — the fee
+  authority); checkout composes `total = subtotal + fee + tax − discount` in
+  minor units from a seeded `tax_rules` table (DEFAULT fallback), invalidates
+  the quote on address change, and recomputes tax on confirm-time requotes;
+  the SPA cuts `/checkout` over to the multi-step session funnel (address →
+  shipping → payment → review, persisted per-session Idempotency-Key,
+  requote re-render) with the legacy one-shot flow kept at `/checkout/legacy`
+  (dual-entry until P6); compose wires `SHIPPING_GRPC_ADDR` into checkout.
+
 - **RFC-0015 P2 — checkout confirm + abandonment (local-stack)**: order gains
   its first gRPC server (`order.v1/CreateOrder` on `:9090` — idempotent by
   `(user_id, idempotency_key)` with a replay fingerprint, pending-only saga

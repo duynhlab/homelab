@@ -107,7 +107,7 @@ All routes are `private` — Kong edge-JWT is the coarse filter, in-service
 | `POST` | `/checkout/v1/private/checkout/sessions` | Snapshot cart + re-validate prices → session `open`. **201** created, **200** existing active session (idempotent) | `409 CONFLICT` empty cart |
 | `GET` | `/checkout/v1/private/checkout/sessions/:id` | Session + items + totals | `404` unknown **or someone else's** (anti-IDOR — indistinguishable); `410 SESSION_EXPIRED` past TTL |
 | `PUT` | `/checkout/v1/private/checkout/sessions/:id/address` | Store the shipping address → `address_set` (re-editable from any pre-confirm state) | `400` missing/oversized fields; `409 INVALID_TRANSITION` from terminal states |
-| `PUT` | `/checkout/v1/private/checkout/sessions/:id/shipping` | `{"shipping_method": "standard"}` → `shipping_set`. **P2 stub:** fee and tax are 0 until the P3 GetQuote integration | `409 INVALID_TRANSITION` before an address exists |
+| `PUT` | `/checkout/v1/private/checkout/sessions/:id/shipping` | `{"shipping_method": "standard"}` → `shipping_set`. The fee comes from shipping's `GetQuote` (method × destination region) and a flat tax (seeded `tax_rules`, basis points on subtotal + fee) composes the total — all in minor units, recomputed in SQL | `400 VALIDATION_ERROR` unknown method/region; `409 INVALID_TRANSITION` before an address exists; `503` shipping outage (retry) |
 | `PUT` | `/checkout/v1/private/checkout/sessions/:id/payment` | `{"payment_method_token": "tok_…"}` → `ready`. Opaque `tok_` references ONLY — PAN-shaped input is rejected **before** any persistence and never echoed (the order/payment rule) | `400 VALIDATION_ERROR` non-tok\_ input |
 | `POST` | `/checkout/v1/private/checkout/sessions/:id/confirm` | The idempotent order handoff (below). Header `Idempotency-Key` REQUIRED (≤120 chars). **201** with the completed session incl. `order_id`; replays return the cached 201 | `400 IDEMPOTENCY_KEY_REQUIRED`; `409 PRICE_CHANGED` / `409 STOCK_UNAVAILABLE` (session requoted → `shipping_set`, **key not consumed** — re-review and confirm again with the same key); `409 CONFLICT` another confirm in flight; `409 IDEMPOTENCY_CONFLICT` same key, different session; `503` + `Retry-After` order/product transient (retry with the SAME key) |
 | `DELETE` | `/checkout/v1/private/checkout/sessions/:id` | Cancel (idempotent on cancelled AND on a session the timer just expired) | `409 INVALID_TRANSITION` on completed |
@@ -115,6 +115,20 @@ All routes are `private` — Kong edge-JWT is the coarse filter, in-service
 Platform conventions apply: `snake_case` JSON, resources returned directly
 (no wrapper envelope), the `{"error","code"}` error envelope, and dollars on
 the wire (minor units internally, like order).
+
+## Totals (P3) — one composition rule, owned by SQL
+
+`total = subtotal + shipping_fee + tax − discount`, int64 minor units end to
+end (dollars only on the browser wire). The parts have owners: **product** is
+the price authority (subtotal), **shipping** is the fee authority
+(`GetQuote`; static method × region table — `standard`/`express`,
+domestic-VN vs rest-of-world), and **checkout** owns the flat tax rule
+(`tax_rules`: region → rate_bps with a `DEFAULT` fallback, applied to
+subtotal + fee). The stored total is always recomputed in SQL from persisted
+components, so no client value can drift it. Changing the address
+**invalidates the quote** in the same conditional write — method, fee, and
+tax reset and the funnel returns through `PUT …/shipping`; a confirm-time
+requote recomputes the tax on the fresh subtotal.
 
 ## The confirm flow (P2) — one order per key, no matter what dies
 
@@ -230,4 +244,4 @@ unique index.
 - [grpc-internal-comms.md](./grpc-internal-comms.md) — the two new gRPC edges
 - [microservices.md](./microservices.md) — feature matrix
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-13 (P3 totals)_

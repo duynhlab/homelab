@@ -169,15 +169,14 @@ All private.
 ### checkout-service (namespace `checkout`) — RFC-0015 P1+P2 (local-stack; cluster at P5)
 
 All private (Kong edge JWT + in-service authmw); sessions owner-scoped by the
-JWT `user_id`. Promo lands in P4; shipping fee/tax are 0-stubs until the P3
-GetQuote integration.
+JWT `user_id`. Promo lands in P4.
 
 | Method | Path | Audience | Caller |
 |--------|------|----------|--------|
 | `POST` | `/checkout/v1/private/checkout/sessions` | private | Browser — create (201) or return the active session (200, idempotent) |
 | `GET` | `/checkout/v1/private/checkout/sessions/:id` | private | Browser |
 | `PUT` | `/checkout/v1/private/checkout/sessions/:id/address` | private | Browser |
-| `PUT` | `/checkout/v1/private/checkout/sessions/:id/shipping` | private | Browser — choose method (P2: fee/tax 0-stub) |
+| `PUT` | `/checkout/v1/private/checkout/sessions/:id/shipping` | private | Browser — choose method; fee from shipping `GetQuote`, flat tax on subtotal + fee (P3) |
 | `PUT` | `/checkout/v1/private/checkout/sessions/:id/payment` | private | Browser — attach `tok_…` reference (PAN-like → 400 pre-persist) |
 | `POST` | `/checkout/v1/private/checkout/sessions/:id/confirm` | private | Browser — idempotent order handoff; `Idempotency-Key` header REQUIRED (≤120 chars) |
 | `DELETE` | `/checkout/v1/private/checkout/sessions/:id` | private | Browser — cancel |

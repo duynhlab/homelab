@@ -27,6 +27,16 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+    # No backup label: checkout's data lives on product-db in the product
+    # namespace, which is already backed up (same reasoning as payment).
+    platform.duynhlab.dev/tier: app
+  name: checkout
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
   name: cache-system
 ---
 apiVersion: v1

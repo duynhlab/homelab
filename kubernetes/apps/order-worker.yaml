@@ -34,7 +34,7 @@ spec:
     image:
       # Same image as the order API — just a different subcommand.
       repository: ghcr.io/duynhlab/order-service/order-service
-      tag: "1.2.0"
+      tag: "1.3.0"
       pullPolicy: IfNotPresent
     # Run the worker subcommand; it serves /health, /ready, /metrics on :8080 but
     # no app traffic, so the Service is skipped.

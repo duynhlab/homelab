@@ -10,7 +10,7 @@ spec:
   type: Static
   defaultValues:
     name: notification
-    image_tag: "1.2.0" # {"$imagepolicy": "flux-system:notification:tag"}
+    image_tag: "1.3.0" # {"$imagepolicy": "flux-system:notification:tag"}
     namespace: notification
     grpc_server: true
     replicaCount: 1

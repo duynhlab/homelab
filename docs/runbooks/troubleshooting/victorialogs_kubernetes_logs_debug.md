@@ -94,7 +94,7 @@ kubectl exec -n monitoring deploy/grafana -- \
 ```
 
 - **Datasource:** VictoriaLogs (plugin `victoriametrics-logs-datasource`), UID `victorialogs`
-- **Provisioned by:** `kubernetes/infra/configs/monitoring/grafana/datasource-victorialogs.yaml`
+- **Provisioned by:** `kubernetes/infra/configs/observability/grafana/datasource-victorialogs.yaml`
 - **URL:** `http://vlsingle-victoria-logs.monitoring.svc.cluster.local:9428`
 - **UI:** Connections → Data sources → VictoriaLogs → Save & Test
 

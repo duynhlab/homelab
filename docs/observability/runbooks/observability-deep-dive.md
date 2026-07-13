@@ -135,7 +135,7 @@ flowchart LR
 
 USE monitoring focuses on **PostgreSQL** -- the most critical infrastructure component.
 
-Source: [`kubernetes/infra/configs/monitoring/prometheusrules/postgres/`](../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/README.md)
+Source: [`kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/README.md)
 
 | USE Signal | Metric / Alert | PromQL |
 |-----------|---------------|--------|
@@ -373,7 +373,7 @@ slo:current_burn_rate:ratio{sloth_service="auth", sloth_slo="availability"}
 
 ### Application Alerts (Layer 1: Threshold)
 
-In addition to SLO burn-rate alerts, static threshold alerts provide **fast detection** of obvious failures. These are defined in [`microservices/alerts.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/microservices/alerts.yaml) with pre-aggregated recording rules in [`microservices/recording-rules.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/microservices/recording-rules.yaml).
+In addition to SLO burn-rate alerts, static threshold alerts provide **fast detection** of obvious failures. These are defined in [`microservices/alerts.yaml`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/alerts.yaml) with pre-aggregated recording rules in [`microservices/recording-rules.yaml`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/recording-rules.yaml).
 
 | Group | Alerts | Severity | Framework |
 |-------|--------|----------|-----------|

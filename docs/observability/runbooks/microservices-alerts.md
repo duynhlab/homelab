@@ -2,9 +2,9 @@
 
 > **Purpose**: Per-alert investigation guide for the 18 application-level PrometheusRules covering RED/Golden Signals, Go runtime, and saturation.
 >
-> **Manifest**: [`kubernetes/infra/configs/monitoring/prometheusrules/microservices/alerts.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/microservices/alerts.yaml)
+> **Manifest**: [`kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/alerts.yaml`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/alerts.yaml)
 >
-> **Recording Rules**: [`kubernetes/infra/configs/monitoring/prometheusrules/microservices/recording-rules.yaml`](../../../kubernetes/infra/configs/monitoring/prometheusrules/microservices/recording-rules.yaml)
+> **Recording Rules**: [`kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/recording-rules.yaml`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/recording-rules.yaml)
 >
 > **Last Updated**: 2026-07-10 (HighRestartRate marked retired → `KubePodCrashLooping`; in-flight/GC retirements re-attributed off D-14)
 
@@ -877,7 +877,7 @@ Add alerts for application-side database health signals:
 - [SLO Documentation](../slo/README.md) -- SLO definitions, Sloth integration (Layer 2 alerts)
 - [SLO Burn-Rate Alerts](../alerting/slo-burn-rate-alerts.md) -- Multi-window multi-burn-rate methodology
 - [Error Budget Policy](../slo/error_budget_policy.md) -- Budget gates and deployment decisions
-- [PostgreSQL Alerts](../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/README.md) -- Database-level alerts (`cnpg/` + `zalando/`)
+- [PostgreSQL Alerts](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/README.md) -- Database-level alerts (`cnpg/` + `zalando/`)
 - [Metrics Reference](../metrics/README.md) -- RED method, label strategy, cardinality
 - [Grafana Dashboard Guide](../grafana/dashboard-reference.md) -- Dashboard panel reference
 

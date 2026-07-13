@@ -102,12 +102,12 @@ This is the most important concept to understand. The cluster runs **two separat
 
 | Resource | File | Creator |
 |----------|------|---------|
-| `ServiceMonitor/external-secrets` | `configs/monitoring/servicemonitors/external-secrets.yaml` | Manual (platform team) |
-| `ServiceMonitor/tempo` | `configs/monitoring/servicemonitors/tempo.yaml` | Manual (platform team) |
+| `ServiceMonitor/external-secrets` | `configs/observability/metrics/servicemonitors/external-secrets.yaml` | Manual (platform team) |
+| `ServiceMonitor/tempo` | `configs/observability/metrics/servicemonitors/tempo.yaml` | Manual (platform team) |
 | `ServiceMonitor/kong` | `controllers/kong/helmrelease.yaml` (`serviceMonitor.enabled: true`) | Kong chart (scrapes the proxy status port `:8100`) |
-| `ServiceMonitor/kube-apiserver` | `configs/monitoring/servicemonitors/kube-apiserver.yaml` | Manual (platform team) |
-| `PrometheusRule` (PostgreSQL, many) | `configs/monitoring/prometheusrules/postgres/` (`cnpg/`, `cnpg-auth-db/`, `cnpg-shared-db/`) | Manual (platform team) |
-| `PrometheusRule/postgres-backup-alerts` | `configs/monitoring/prometheusrules/postgres/backup-alerts.yaml` | Manual (platform team) |
+| `ServiceMonitor/kube-apiserver` | `configs/observability/metrics/servicemonitors/kube-apiserver.yaml` | Manual (platform team) |
+| `PrometheusRule` (PostgreSQL, many) | `configs/observability/metrics/prometheusrules/postgres/` (`cnpg/`, `cnpg-auth-db/`, `cnpg-shared-db/`) | Manual (platform team) |
+| `PrometheusRule/postgres-backup-alerts` | `configs/observability/metrics/prometheusrules/postgres/backup-alerts.yaml` | Manual (platform team) |
 | `ServiceMonitor` (valkey) | Created at runtime by Helm chart | Valkey chart (`serviceMonitor.enabled: true`) |
 | `PodMonitor` (CNPG per cluster) | `configs/databases/clusters/{product-db,auth-db,shared-db}/monitoring/podmonitor.yaml` (+ `temporal-db` via `enablePodMonitor`) | Manual (platform team) |
 | `PrometheusRule` (SLO rules) | Created at runtime by Sloth | Sloth Operator (from PrometheusServiceLevel) |
@@ -143,13 +143,13 @@ This is the most important concept to understand. The cluster runs **two separat
 
 | Resource | File | Purpose |
 |----------|------|---------|
-| `VMSingle/victoria-metrics` | `configs/monitoring/victoriametrics/vmsingle.yaml` | Metrics storage |
-| `VMAgent/victoria-metrics` | `configs/monitoring/victoriametrics/vmagent.yaml` | Metrics scraping |
-| `VMAlert/victoria-metrics` | `configs/monitoring/victoriametrics/vmalert.yaml` | Rule evaluation |
-| `VMAlertmanager/victoria-metrics` | `configs/monitoring/victoriametrics/vmalertmanager.yaml` | Alert routing |
-| `VLSingle/victoria-logs` | `configs/monitoring/victoriametrics/vlsingle.yaml` | Log storage |
-| `VTSingle/victoria-traces` | `configs/monitoring/victoriametrics/vtsingle.yaml` | Trace storage (pilot) |
-| `VMNodeScrape/kubelet-{cadvisor,volume-stats}` | `configs/monitoring/victoriametrics/vmnodescrape-kubelet.yaml` | Kubelet cAdvisor + volume-stats scraping (2 CRs) |
+| `VMSingle/victoria-metrics` | `configs/observability/metrics/victoriametrics/vmsingle.yaml` | Metrics storage |
+| `VMAgent/victoria-metrics` | `configs/observability/metrics/victoriametrics/vmagent.yaml` | Metrics scraping |
+| `VMAlert/victoria-metrics` | `configs/observability/metrics/victoriametrics/vmalert.yaml` | Rule evaluation |
+| `VMAlertmanager/victoria-metrics` | `configs/observability/metrics/victoriametrics/vmalertmanager.yaml` | Alert routing |
+| `VLSingle/victoria-logs` | `configs/observability/logging/victorialogs/vlsingle.yaml` | Log storage |
+| `VTSingle/victoria-traces` | `configs/observability/tracing/victoriatraces/vtsingle.yaml` | Trace storage (pilot) |
+| `VMNodeScrape/kubelet-{cadvisor,volume-stats}` | `configs/observability/metrics/victoriametrics/vmnodescrape-kubelet.yaml` | Kubelet cAdvisor + volume-stats scraping (2 CRs) |
 
 Additionally, the VM Operator **auto-creates** VM resources by converting Prometheus CRDs:
 
@@ -241,7 +241,7 @@ admissionWebhooks:
 | Property | Value |
 |----------|-------|
 | **CRD** | `operator.victoriametrics.com/v1beta1 / VMSingle` |
-| **Manifest** | `kubernetes/infra/configs/monitoring/victoriametrics/vmsingle.yaml` |
+| **Manifest** | `kubernetes/infra/configs/observability/metrics/victoriametrics/vmsingle.yaml` |
 | **Service** | `vmsingle-victoria-metrics.monitoring.svc:8428` |
 | **VMUI** | `http://vmsingle-victoria-metrics.monitoring.svc:8428/vmui` |
 | **Prometheus API** | `http://vmsingle-victoria-metrics.monitoring.svc:8428/api/v1/query` |
@@ -273,7 +273,7 @@ VMSingle is fully Prometheus API compatible. Grafana, PromQL, and any tool that 
 | Property | Value |
 |----------|-------|
 | **CRD** | `operator.victoriametrics.com/v1beta1 / VMAgent` |
-| **Manifest** | `kubernetes/infra/configs/monitoring/victoriametrics/vmagent.yaml` |
+| **Manifest** | `kubernetes/infra/configs/observability/metrics/victoriametrics/vmagent.yaml` |
 | **Service** | `vmagent-victoria-metrics.monitoring.svc:8429` |
 | **Targets UI** | `http://vmagent-victoria-metrics.monitoring.svc:8429/targets` |
 
@@ -296,7 +296,7 @@ VMAgent reads `VMServiceScrape` and `VMPodScrape` resources (including those aut
 | Property | Value |
 |----------|-------|
 | **CRD** | `operator.victoriametrics.com/v1beta1 / VMAlert` |
-| **Manifest** | `kubernetes/infra/configs/monitoring/victoriametrics/vmalert.yaml` |
+| **Manifest** | `kubernetes/infra/configs/observability/metrics/victoriametrics/vmalert.yaml` |
 | **Service** | `vmalert-victoria-metrics.monitoring.svc:8080` |
 | **Rules UI** | `http://vmalert-victoria-metrics.monitoring.svc:8080/vmalert/groups` |
 
@@ -327,7 +327,7 @@ All continue to work without any changes to the original `PrometheusRule` YAML f
 | Property | Value |
 |----------|-------|
 | **CRD** | `operator.victoriametrics.com/v1beta1 / VMAlertmanager` |
-| **Manifest** | `kubernetes/infra/configs/monitoring/victoriametrics/vmalertmanager.yaml` |
+| **Manifest** | `kubernetes/infra/configs/observability/metrics/victoriametrics/vmalertmanager.yaml` |
 | **Service** | `vmalertmanager-victoria-metrics.monitoring.svc:9093` |
 
 Configuration:
@@ -384,7 +384,7 @@ OpenBAO (never committed to this public repo).
 | Property | Value |
 |----------|-------|
 | **CRD** | `operator.victoriametrics.com/v1 / VLSingle` |
-| **Manifest** | `kubernetes/infra/configs/monitoring/victoriametrics/vlsingle.yaml` |
+| **Manifest** | `kubernetes/infra/configs/observability/logging/victorialogs/vlsingle.yaml` |
 | **Service** | `vlsingle-victoria-logs.monitoring.svc:9428` |
 | **Ingest endpoints** | `/insert/jsonline` (Vector) · `/insert/opentelemetry/v1/logs` (OTel collector — app logs from the 9 services + Kong runtime logs) |
 | **Query endpoint** | `/select/logsql/query` |
@@ -576,7 +576,7 @@ flowchart LR
 
 ## Grafana Integration
 
-The Grafana metrics datasource ([`datasource-victoriametrics.yaml`](../../../kubernetes/infra/configs/monitoring/grafana/datasource-victoriametrics.yaml)) uses the **VictoriaMetrics plugin** (`victoriametrics-metrics-datasource`) and points to VMSingle:
+The Grafana metrics datasource ([`datasource-victoriametrics.yaml`](../../../kubernetes/infra/configs/observability/grafana/datasource-victoriametrics.yaml)) uses the **VictoriaMetrics plugin** (`victoriametrics-metrics-datasource`) and points to VMSingle:
 
 ```yaml
 spec:
@@ -612,7 +612,7 @@ kubernetes/
 │   ├── metrics-server.yaml                         # HelmRelease: Kubernetes Metrics Server
 │   └── sloth-operator.yaml                         # HelmRelease: Sloth SLO Operator
 │
-├── infra/configs/monitoring/
+├── infra/configs/observability/
 │   ├── kustomization.yaml                          # Includes victoriametrics/ + all monitors
 │   ├── victoriametrics/
 │   │   ├── kustomization.yaml

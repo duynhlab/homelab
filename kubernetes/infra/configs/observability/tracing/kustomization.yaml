@@ -1,0 +1,7 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Tracing pillar: VictoriaTraces pilot (VTSingle CR). The primary trace
+# backend (Tempo) and the OTel collector live in controllers/tracing/.
+resources:
+  - victoriatraces/vtsingle.yaml

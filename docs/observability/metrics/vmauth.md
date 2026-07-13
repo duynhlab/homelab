@@ -105,10 +105,10 @@ Detailed CR fields: [VMAuth](https://docs.victoriametrics.com/operator/resources
 
 | Component | Manifest / note | Role if VMAuth added later |
 |-----------|-------------------|----------------------------|
-| VMSingle | `kubernetes/infra/configs/monitoring/victoriametrics/vmsingle.yaml` | Primary PromQL `/api/v1/*` backend |
+| VMSingle | `kubernetes/infra/configs/observability/metrics/victoriametrics/vmsingle.yaml` | Primary PromQL `/api/v1/*` backend |
 | VMAgent | `.../vmagent.yaml` | Scrape UI `/targets`, remote-write paths if fronting agents |
 | VLSingle | `.../vlsingle.yaml` | Logs HTTP API `:9428` (separate from metrics) |
-| Grafana | `kubernetes/infra/configs/monitoring/grafana/grafana.yaml` | **Not** replaced by VMAuth for in-cluster datasource URLs by default |
+| Grafana | `kubernetes/infra/configs/observability/grafana/grafana.yaml` | **Not** replaced by VMAuth for in-cluster datasource URLs by default |
 | Datasources | `.../grafana/datasource-*.yaml` | Point to in-cluster Services (e.g. `vmsingle-victoria-metrics:8428`) |
 
 This repo **does not** ship `VMAuth` or `VMUser` YAML yet; the CRDs exist because the VictoriaMetrics Operator Helm chart installs them.

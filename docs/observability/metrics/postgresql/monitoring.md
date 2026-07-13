@@ -137,9 +137,9 @@ CNPG alert rules are chart-generated per cluster (one file per upstream
 `cluster-*.yaml` from the [cloudnative-pg/charts](https://github.com/cloudnative-pg/charts)
 `cluster` chart), each in the cluster's own namespace:
 
-- **[`postgres/cnpg/`](../../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/cnpg/)** — `product-db` (namespace `product`): the full HA set plus small extras (`CnpgClusterFenced`, `PostgresWALSizeHigh`) and the **global operator-health singleton** (`CNPGOperatorDown`, `CNPGControllerReconcileErrorsSpiking`, namespace `cloudnative-pg`).
-- **[`postgres/cnpg-auth-db/`](../../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/cnpg-auth-db/)** — `auth-db` (namespace `auth`): full HA set (offline, fencing, HA, connections, physical + logical replication, disk, WAL).
-- **[`postgres/cnpg-shared-db/`](../../../../kubernetes/infra/configs/monitoring/prometheusrules/postgres/cnpg-shared-db/)** — `shared-db` (namespace `user`): single-node subset (offline, connections, disk, WAL — no replication/HA rules).
+- **[`postgres/cnpg/`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/cnpg/)** — `product-db` (namespace `product`): the full HA set plus small extras (`CnpgClusterFenced`, `PostgresWALSizeHigh`) and the **global operator-health singleton** (`CNPGOperatorDown`, `CNPGControllerReconcileErrorsSpiking`, namespace `cloudnative-pg`).
+- **[`postgres/cnpg-auth-db/`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/cnpg-auth-db/)** — `auth-db` (namespace `auth`): full HA set (offline, fencing, HA, connections, physical + logical replication, disk, WAL).
+- **[`postgres/cnpg-shared-db/`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/cnpg-shared-db/)** — `shared-db` (namespace `user`): single-node subset (offline, connections, disk, WAL — no replication/HA rules).
 
 Backup alerts (`PostgresBackupTooOld`, `PostgresBackupFailed`) live in
 `postgres/backup-alerts.yaml`. The full per-alert catalog with impact is in

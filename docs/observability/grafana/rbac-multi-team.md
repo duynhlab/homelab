@@ -80,7 +80,7 @@ This is acceptable for **homelab**; production usually uses IdP (Keycloak, Googl
 
 The Grafana instance is configured in:
 
-`kubernetes/infra/configs/monitoring/grafana/grafana.yaml`
+`kubernetes/infra/configs/observability/grafana/grafana.yaml`
 
 Relevant settings (verify in file for exact values):
 

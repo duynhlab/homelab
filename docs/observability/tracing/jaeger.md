@@ -183,7 +183,7 @@ deliberately keep `memory` and let **Tempo** own durable trace storage. See the
 
 ### Grafana Datasource
 
-Located at: `kubernetes/infra/configs/monitoring/grafana/datasource-jaeger.yaml`
+Located at: `kubernetes/infra/configs/observability/grafana/datasource-jaeger.yaml`
 
 ```yaml
 datasource:

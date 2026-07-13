@@ -28,7 +28,7 @@ correlation is **log↔trace** via the same LogsQL your `VLSingle` already uses.
 
 ## Deployment — `VTSingle` (operator-managed)
 
-CR: [`kubernetes/infra/configs/monitoring/victoriametrics/vtsingle.yaml`](../../../kubernetes/infra/configs/monitoring/victoriametrics/vtsingle.yaml)
+CR: [`kubernetes/infra/configs/observability/tracing/victoriatraces/vtsingle.yaml`](../../../kubernetes/infra/configs/observability/tracing/victoriatraces/vtsingle.yaml)
 — a drop-in `operator.victoriametrics.com/v1` CRD, same ops model as `VMSingle`/`VLSingle`:
 
 | Field | Value |

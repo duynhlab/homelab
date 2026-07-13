@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Observability configs reorganized by pillar**: `configs/monitoring/` →
+  `configs/observability/{metrics,logging,tracing,grafana,sloth}` — VLSingle
+  (logs) and VTSingle (traces) no longer hide inside `victoriametrics/`;
+  the tree now mirrors `controllers/` and `docs/observability/`. Same Flux
+  Kustomization (`monitoring-local`, path updated) and an identical rendered
+  object set (109/109 verified), so the cluster sees no change.
+
 ### Added
 
 - **RFC-0015 P4 — promo codes (local-stack)**: checkout gains

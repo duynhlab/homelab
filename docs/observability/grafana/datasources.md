@@ -45,7 +45,7 @@ flowchart TD
 | **URL** | `http://vmsingle-victoria-metrics.monitoring.svc:8428` |
 | **Plugin** | `victoriametrics-metrics-datasource` (see [Grafana README](README.md#plugins)) |
 
-**CRD**: [`kubernetes/infra/configs/monitoring/grafana/datasource-victoriametrics.yaml`](../../../kubernetes/infra/configs/monitoring/grafana/datasource-victoriametrics.yaml)
+**CRD**: [`kubernetes/infra/configs/observability/grafana/datasource-victoriametrics.yaml`](../../../kubernetes/infra/configs/observability/grafana/datasource-victoriametrics.yaml)
 
 **Dashboard variable name**: many dashboards still use the variable name **`DS_PROMETHEUS`** for historical reasons; it resolves to the **VictoriaMetrics** datasource via `GrafanaDashboard` `datasources` mapping (`inputName` → `datasourceName: VictoriaMetrics`).
 
@@ -122,7 +122,7 @@ VMSingle can proxy rule endpoints to VMAlert:
 | `/api/v1/alerts` | VMAlert | Firing alerts |
 | `/vmalert/` | VMAlert | VMAlert UI |
 
-Configured on `VMSingle` via `vmalert.proxyURL` in [`vmsingle.yaml`](../../../kubernetes/infra/configs/monitoring/victoriametrics/vmsingle.yaml) (or equivalent).
+Configured on `VMSingle` via `vmalert.proxyURL` in [`vmsingle.yaml`](../../../kubernetes/infra/configs/observability/metrics/victoriametrics/vmsingle.yaml) (or equivalent).
 
 ## Interview reference
 

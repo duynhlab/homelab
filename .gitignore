@@ -55,3 +55,9 @@ debugs
 
 # Local codegraph index (never commit)
 .codegraph/
+
+# Vietnamese study notes are personal/local reading material — never tracked.
+*.vi.md
+# Loose local review notes under docs/proposals (kept out of the repo).
+docs/proposals/auth-gateway-review.md
+docs/proposals/kong-production-roadmap.md

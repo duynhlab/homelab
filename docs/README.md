@@ -28,7 +28,6 @@ docs/
 │   │   ├── README.md             # process + index + backlog
 │   │   ├── RFC-0000/             # template
 │   │   └── RFC-0001 … RFC-0015   # Temporal, mTLS, …, payment service, Talos migration, declarative CNPG roles, metrics audit & scale playbook, full OpenTelemetry adoption, checkout service
-│   └── *.md                      # loose reviews/roadmaps (auth-gateway, kong, otel-sampling; some .vi.md)
 ├── databases/                    # Database documentation
 │   ├── 002-database-integration.md               # PostgreSQL architecture
 │   ├── 003-operator-comparison.md               # CloudNativePG vs Zalando decision guide

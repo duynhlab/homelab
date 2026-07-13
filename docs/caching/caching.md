@@ -179,7 +179,7 @@ Reuses the same single-product cache path (calls `ProductService.GetProduct` int
 
 ### `POST /product/v1/internal/products` — create product (internal only)
 
-> This route is on the **internal** audience and is **not exposed on the gateway**. It is reachable only via in-cluster service DNS. Today the boundary is Kong not exposing the route plus in-app controls; ingress NetworkPolicies are authored (`kubernetes/infra/configs/network-policies/`) and enforced by kindnet (Kind K8s 1.34+). See `docs/api/api-naming-convention.md`.
+> This route is on the **internal** audience and is **not exposed on the gateway**. It is reachable only via in-cluster service DNS. Today the boundary is Kong not exposing the route plus in-app controls; ingress NetworkPolicies are authored (`kubernetes/infra/configs/network-policies/`) and enforced by kindnet (Kind K8s 1.34+). See the [API audience model](../api/api.md#audience-segments).
 
 1. Validate price, persist via `productRepo.Create(ctx, product)`.
 2. **Cache invalidation**: call `productCache.InvalidateProductList(ctx)` to delete list cache keys so the new product appears in subsequent list queries.

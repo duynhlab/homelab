@@ -1,10 +1,68 @@
-# Payments
+# Payment Service API
 
 The payment subsystem: a Stripe-style payment service (auth/capture state
 machine, idempotency, double-entry ledger, mock provider) wired into the order
 fulfillment saga. The *design* lives in the RFC/ADRs below; this doc covers the
-operational surface — the checkout read path (how a payment reaches the UI) and
+operational surface — its HTTP and gRPC contracts, the checkout read path, and
 reconciliation.
+
+| Attribute | Value |
+|-----------|-------|
+| **Status** | Running in local-stack; cluster manifests landed |
+| **HTTP base** | `/payment/v1/{public,private,internal}/payments` |
+| **gRPC** | `payment.v1.PaymentService` on `:9090` |
+| **Primary callers** | Order worker for writes; order API for details enrichment |
+| **Data authority** | Payment state, refunds, ledger entries, and reconciliation reports |
+| **Repository** | [duynhlab/payment-service](https://github.com/duynhlab/payment-service) |
+
+## Overview
+
+Payment owns the money lifecycle. Other services may request an operation,
+but only payment-service changes payment state or writes the double-entry
+ledger. The browser normally reaches payment information through order
+details; direct private payment routes remain available for owner-scoped
+queries and payment-intent creation.
+
+```mermaid
+flowchart LR
+    Browser -->|"private HTTP"| Payment["payment-service"]
+    Provider["mockpay provider"] -->|"signed webhook"| Payment
+    OrderAPI["order API"] -->|"gRPC GetPayment"| Payment
+    Worker["order worker"] -->|"gRPC money operations"| Payment
+    Payment --> DB[(payment DB)]
+    Payment --> Provider
+```
+
+## HTTP API
+
+| Method | Path | Audience | Purpose |
+|--------|------|----------|---------|
+| `POST` | `/payment/v1/private/payments` | Signed-in user | Create and authorize a payment intent; requires `Idempotency-Key` |
+| `GET` | `/payment/v1/private/payments` | Signed-in user | List the caller's payments with pagination |
+| `GET` | `/payment/v1/private/payments/:id` | Signed-in user | Read one owner-scoped payment |
+| `POST` | `/payment/v1/public/payments/webhooks/mockpay` | Provider | Apply an HMAC-verified provider event |
+| `POST` | `/payment/v1/internal/payments/:id/refunds` | In-cluster operator | Create an idempotent partial or full refund |
+| `POST` | `/payment/v1/internal/payments/reconciliation/runs` | In-cluster operator | Run reconciliation |
+| `GET` | `/payment/v1/internal/payments/reconciliation/runs/:id` | In-cluster operator | Read a reconciliation report |
+
+Private responses are owner-scoped using the JWT `user_id`. Internal routes
+are not published through Kong; NetworkPolicy is the cluster boundary. The
+public webhook is not anonymous in practice: its HMAC signature is the
+credential.
+
+## gRPC API
+
+| Method | Caller | Effect |
+|--------|--------|--------|
+| `Authorize` | Order worker | Create or replay an authorization for an order |
+| `Capture` | Order worker | Capture an authorized payment after earlier saga steps succeed |
+| `Void` | Order worker compensation | Release an authorization that has not been captured |
+| `Refund` | Order worker compensation | Return captured funds when a later failure must be compensated |
+| `GetPayment` | Order API | Read the payment snapshot by `order_id` for details enrichment |
+
+The protobuf contract lives in `duynhlab/pkg`. State-changing methods are
+idempotent because Temporal activities can be retried after timeouts or lost
+responses.
 
 ## Design record
 
@@ -225,6 +283,11 @@ insufficient_funds, `19` transient-then-succeed):
   [ADR-012](../proposals/adr/ADR-012-reconciliation-auto-heal/) — but the
   `discrepancies_found` metric/alert is still not wired.)
 
----
+## References
 
-_Last updated: 2026-07-10 — reconciliation retention reaper marked shipped (hourly, 30 d)._
+- [api.md](./api.md) — shared HTTP and gRPC conventions
+- [order.md](./order.md) — order API and fulfillment handoff
+- [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — Saga execution and compensation
+- [RFC-0010](../proposals/rfc/RFC-0010/) — payment-service design
+
+_Last updated: 2026-07-13_

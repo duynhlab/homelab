@@ -8,9 +8,9 @@ order-service — which remains the only writer of orders.
 | Attribute | Value |
 |-----------|-------|
 | **Design record** | [RFC-0015](../proposals/rfc/RFC-0015/) · [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) (re-validation) · [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) (cart read surface) |
-| **Status** | **P1 implemented** (sessions + re-validation, local-stack); P2 confirm + abandonment timer, P3 totals + SPA, P4 promo, P5 cluster, P6 legacy-path removal |
+| **Status** | **P1-P4 implemented in local-stack**: sessions, re-validation, confirm, abandonment, totals, SPA, and promo codes. **P5 cluster delivery and P6 legacy-path removal are planned.** |
 | **Surface** | `/checkout/v1/private/checkout/sessions[…]` (process-named exception like auth — literal `checkout` segment, resources nested; v3.0.1) — private-only, Kong edge-JWT + in-service `pkg/authmw` |
-| **East-west** | gRPC only: cart `GetCart` (read-only), product `GetProducts` (cache-bypassing) |
+| **East-west** | gRPC only: cart `GetCart`, product `GetProducts`, shipping `GetQuote`, and order `CreateOrder` |
 | **Data** | `checkout` DB — `checkout_sessions` + `checkout_session_items`; money in int64 minor units |
 | **Repo** | [duynhlab/checkout-service](https://github.com/duynhlab/checkout-service) |
 
@@ -59,9 +59,9 @@ A session is an **auditable quote**:
 stateDiagram-v2
     [*] --> open : POST /sessions
     open --> address_set : PUT address
-    address_set --> shipping_set : PUT shipping (P2)
-    shipping_set --> ready : PUT payment (P2)
-    ready --> confirming : POST confirm (P2)
+    address_set --> shipping_set : PUT shipping
+    shipping_set --> ready : PUT payment
+    ready --> confirming : POST confirm
     confirming --> completed : order created
     confirming --> shipping_set : PRICE_CHANGED (409)
     open --> cancelled : DELETE
@@ -88,8 +88,9 @@ flowchart LR
     CK -->|"gRPC GetCart (read-only, ADR-021)"| CART[cart]
     CK -->|"gRPC GetProducts (cache-bypass, ADR-020)"| PROD[product]
     CK --> DB[(checkout DB)]
-    CK -.->|"P2: gRPC CreateOrder"| ORD[order]
-    CK -.->|"P2: timer/Signal"| TMP[Temporal]
+    CK -->|"gRPC GetQuote"| SHIP[shipping]
+    CK -->|"gRPC CreateOrder"| ORD[order]
+    CK -->|"timer and Signal-With-Start"| TMP[Temporal]
 ```
 
 checkout is a **client-only** service: nothing dials into it except Kong (no
@@ -116,7 +117,7 @@ Platform conventions apply: `snake_case` JSON, resources returned directly
 (no wrapper envelope), the `{"error","code"}` error envelope, and dollars on
 the wire (minor units internally, like order).
 
-## Totals (P3) — one composition rule, owned by SQL
+## Totals (P3, implemented) — one composition rule, owned by SQL
 
 `total = subtotal + shipping_fee + tax − discount`, int64 minor units end to
 end (dollars only on the browser wire). The parts have owners: **product** is
@@ -130,7 +131,7 @@ components, so no client value can drift it. Changing the address
 tax reset and the funnel returns through `PUT …/shipping`; a confirm-time
 requote recomputes the tax on the fresh subtotal.
 
-## Promo codes (P4) — apply is a preview, confirm is the ledger
+## Promo codes (P4, implemented) — apply is a preview, confirm is the ledger
 
 `POST …/sessions/:id/promo {"code"}` attaches a code after a validated
 preview (existence, expiry, remaining global/per-user capacity) and never
@@ -150,7 +151,7 @@ gate strips the promo to `shipping_set` with a `409 PROMO_EXHAUSTED` /
 survives every rejection. Watch `checkout_promo_redeemed_total` vs
 `checkout_promo_rejected_total{reason}`.
 
-## The confirm flow (P2) — one order per key, no matter what dies
+## The confirm flow (P2, implemented) — one order per key, no matter what dies
 
 Confirm is the only step that leaves checkout's own database: it hands the
 validated session to order-service over gRPC (`order.v1/CreateOrder`,
@@ -183,7 +184,7 @@ The SPA persists the key per session so retry is always possible; the runbook
 covers manual recovery — the marker tells ops whether an order attempt ever
 happened (`subject_id IS NULL` ⇒ safe to unbind).
 
-## Abandonment (P2) — the timer is a wake-up, never a verdict
+## Abandonment (P2, implemented) — the timer is a wake-up, never a verdict
 
 `AbandonedCheckoutWorkflow` (one per session, Signal-With-Start from every
 mutation; task queue `checkout`) makes expiry *timely*; the DB deadline
@@ -234,7 +235,9 @@ unique index.
   section **A9** in [`local-stack/README.md`](../../local-stack/README.md)
   (session lifecycle + price-change detection).
 - **Key env:** `DB_*`, `AUTH_JWKS_URL`, `CART_GRPC_ADDR`,
-  `PRODUCT_GRPC_ADDR`, `SESSION_TTL_SECONDS` (1800).
+  `PRODUCT_GRPC_ADDR`, `SHIPPING_GRPC_ADDR`, `ORDER_GRPC_ADDR`,
+  `TEMPORAL_HOSTPORT`, `TEMPORAL_NAMESPACE`, and `SESSION_TTL_SECONDS`
+  (1800).
 - **Observability:** obsx OTLP (RFC-0014) — traces (chain
   tracing→logging→metrics), RED metrics, teed logs. Business metrics
   (`checkout_sessions_created_total`, `…_expired_total{reason}`,
@@ -248,8 +251,9 @@ unique index.
 
 ## What checkout deliberately does NOT do (the boundary)
 
-- **No orders writes, no saga starts** — order-service keeps its "insert
-  pending + StartWorkflow in one place" invariant (future ADR-018, P2).
+- **No order writes and no fulfillment saga starts** — checkout calls
+  order-service's idempotent `CreateOrder` gRPC method. Order-service keeps
+  the "insert pending + StartWorkflow in one place" invariant (ADR-018).
 - **No stock reservation** — availability is *checked* only; reserving stays
   with the saga's `ReserveStock` (RFC-0003). The TOCTOU window between check
   and reserve is a named, accepted tradeoff in the RFC.
@@ -260,8 +264,9 @@ unique index.
 
 - [RFC-0015](../proposals/rfc/RFC-0015/) — full design record (alternatives, phases, exit criteria)
 - [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) · [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/)
-- [api-naming-convention.md](./api-naming-convention.md) — route inventory · [api.md](./api.md#checkout-service-rfc-0015-p1) — request/response shapes
-- [grpc-internal-comms.md](./grpc-internal-comms.md) — the two new gRPC edges
+- [api.md](./api.md) — shared HTTP and gRPC conventions
+- [cart.md](./cart.md) · [product.md](./product.md) ·
+  [shipping.md](./shipping.md) · [order.md](./order.md) — dependency contracts
 - [microservices.md](./microservices.md) — feature matrix
 
-_Last updated: 2026-07-13 (P4 promo)_
+_Last updated: 2026-07-13_

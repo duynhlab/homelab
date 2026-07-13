@@ -1,7 +1,7 @@
 # Application Metrics (RED)
 
 The **application layer** of the metrics pillar: the RED signals (Rate, Errors,
-Duration) for the 9 Go microservices and their gRPC east-west calls, plus Go
+Duration) for the 9 currently cluster-deployed Go microservices and their gRPC east-west calls, plus Go
 runtime health and the instrumentation that produces it. Since the RFC-0014 P3
 cutover these metrics are **pushed over OTLP** (no `/metrics` scrape); names and
 labels follow OpenTelemetry semantic conventions. For methodology theory, the
@@ -189,7 +189,7 @@ SHA.
 
 **No-drift rule** — the observability wiring lives in the shared `pkg/obsx`
 `SetupObservability` (instrument names, buckets, Views, resource attributes),
-so all 9 services and order-worker instrument identically by construction. A
+so all cluster-deployed services and order-worker instrument identically by construction. A
 service pinning a different `pkg/obsx` version or overriding a View is a defect
 even if it "works" (see RFC-0013 D3, RFC-0014 D-7).
 
@@ -247,7 +247,7 @@ plus `server_address` and `server_port` (the upstream called), minus
 `pkg/grpcx` installs `otelgrpc` client/server interceptors so gRPC spans
 propagate trace context end-to-end alongside HTTP spans. For the transport
 design, dual-port services, health checks, and resilience defaults see
-[**API → gRPC internal comms**](../../api/grpc-internal-comms.md).
+[**API → gRPC runtime model**](../../api/api.md#grpc-runtime-model).
 
 ## Instrumentation
 
@@ -395,7 +395,7 @@ Runbook: [`microservices-alerts.md`](../runbooks/microservices-alerts.md).
 
 - [Metrics hub](README.md) · [Infrastructure metrics (USE)](metrics-infra.md) · [Database metrics](postgresql/monitoring.md)
 - [OpenTelemetry setup](../opentelemetry.md) · [RFC-0014: full OpenTelemetry adoption](../../proposals/rfc/RFC-0014/README.md)
-- [API → gRPC internal comms](../../api/grpc-internal-comms.md) · [API reference](../../api/api.md)
+- [API → gRPC runtime model](../../api/api.md#grpc-runtime-model) · [API reference](../../api/api.md)
 - [PromQL Guide](promql-guide.md) · [SLO Documentation](../slo/README.md)
 - [Grafana Dashboard Guide](../grafana/dashboard-reference.md) · [Variables & Regex Guide](../grafana/variables.md)
 

@@ -1,6 +1,6 @@
 # GKE internal DNS on GCP (`cluster.local`, Cloud DNS private zones, multi-environment)
 
-> **Purpose:** Complements the **internal / in-cluster** section in [`api-naming-convention.md`](../api/api-naming-convention.md) — explains Kubernetes default DNS, Cloud DNS **private zones**, and naming split by environment (`dev` / `uat` / `prod`).
+> **Purpose:** Complements the **internal / in-cluster** section in [`api.md`](../api/api.md#hostnames) — explains Kubernetes default DNS, Cloud DNS **private zones**, and naming split by environment (`dev` / `uat` / `prod`).
 
 ---
 
@@ -19,7 +19,7 @@ A Kubernetes Service has a full DNS name (FQDN) of the form:
 <service-name>.<namespace>.svc.cluster.local
 ```
 
-**Examples** (aligned with [`api-naming-convention.md`](../api/api-naming-convention.md)):
+**Examples** (aligned with [`api.md`](../api/api.md#hostnames)):
 
 | Service | Namespace | FQDN |
 |---------|-----------|------|
@@ -154,7 +154,7 @@ If Pods must resolve `*.gke.internal` via VPC **Cloud DNS**, configure **CoreDNS
 
 ---
 
-## 6. Relation to HTTP examples in `api-naming-convention`
+## 6. Relation to the API URL model
 
 URLs such as:
 

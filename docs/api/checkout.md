@@ -130,6 +130,26 @@ components, so no client value can drift it. Changing the address
 tax reset and the funnel returns through `PUT …/shipping`; a confirm-time
 requote recomputes the tax on the fresh subtotal.
 
+## Promo codes (P4) — apply is a preview, confirm is the ledger
+
+`POST …/sessions/:id/promo {"code"}` attaches a code after a validated
+preview (existence, expiry, remaining global/per-user capacity) and never
+counts a use — abandoned sessions never burn one; `DELETE …/promo` detaches.
+The discount re-derives from the current components at every totals change
+(percent stays a percentage of the live subtotal, fixed stays clamped so the
+total never goes negative) and rides `CreateOrder` so the charged total
+equals the session total.
+
+The **authoritative gate is the atomic redemption inside confirm**
+(ADR-022): one transaction, serialized per code (`FOR UPDATE`), with
+`UNIQUE (code, session_id)` as the idempotency anchor evaluated before any
+expiry/cap check — crash re-drives count exactly once, both caps hold under
+arbitrary concurrency (race-tested), and an exhausted/expired code at the
+gate strips the promo to `shipping_set` with a `409 PROMO_EXHAUSTED` /
+`409 PROMO_EXPIRED` carrying the fresh session body. The Idempotency-Key
+survives every rejection. Watch `checkout_promo_redeemed_total` vs
+`checkout_promo_rejected_total{reason}`.
+
 ## The confirm flow (P2) — one order per key, no matter what dies
 
 Confirm is the only step that leaves checkout's own database: it hands the
@@ -244,4 +264,4 @@ unique index.
 - [grpc-internal-comms.md](./grpc-internal-comms.md) — the two new gRPC edges
 - [microservices.md](./microservices.md) — feature matrix
 
-_Last updated: 2026-07-13 (P3 totals)_
+_Last updated: 2026-07-13 (P4 promo)_

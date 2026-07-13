@@ -47,6 +47,7 @@ spec:
       - host    product product all scram-sha-256
       - host    cart    cart    all scram-sha-256
       - host    order   order   all scram-sha-256
+      - host    checkout checkout all scram-sha-256
       - host    all     all     all reject
 
     synchronous:

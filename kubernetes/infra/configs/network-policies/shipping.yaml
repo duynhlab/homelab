@@ -33,3 +33,12 @@ spec:
           port: 8080
         - protocol: TCP
           port: 9090
+    # Checkout prices shipping via shipping.v1/GetQuote (RFC-0015 P3) —
+    # :9090 only, never the HTTP API.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: checkout
+      ports:
+        - protocol: TCP
+          port: 9090

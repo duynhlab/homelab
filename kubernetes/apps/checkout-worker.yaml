@@ -1,0 +1,146 @@
+# Abandoned-checkout Temporal worker — a SECOND release of the checkout image
+# that runs its `worker` subcommand (no HTTP API traffic, no Service). It polls
+# the `checkout` task queue and runs AbandonedCheckoutWorkflow's activity
+# (MarkSessionExpired — RFC-0015 P2, timer + lazy-backstop expiry). Modelled on
+# order-worker.yaml: same image as `checkout`, `args: ["worker"]`,
+# `service.enabled: false`. Deployed directly (not via the checkout ResourceSet)
+# because its shape is a one-off — no Service, no migrations, Temporal env.
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: checkout-worker
+  namespace: checkout
+spec:
+  interval: 10m
+  timeout: 10m
+  chartRef:
+    kind: OCIRepository
+    name: mop-chart-oci
+    namespace: flux-system
+  releaseName: checkout-worker
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    name: checkout-worker
+    # Architectural component → app.kubernetes.io/component: worker (mop default
+    # is "api"). Metrics reach VictoriaMetrics over OTLP push (RFC-0014 P3),
+    # so no scrape object is needed.
+    component: worker
+    replicaCount: 1
+    image:
+      # Same image as the checkout API — just a different subcommand.
+      repository: ghcr.io/duynhlab/checkout-service/checkout-service
+      tag: "0.2.0"
+      pullPolicy: IfNotPresent
+    # Run the worker subcommand; it serves /health, /ready, /metrics on :8080 but
+    # no app traffic, so the Service is skipped.
+    args: ["worker"]
+    service:
+      enabled: false
+    # RFC-0014 P4: the worker ships its own logs over OTLP — Vector skips
+    # pods carrying this label (double-ingest guard).
+    labels:
+      platform.duynhlab.dev/otlp-logs: "true"
+    env:
+      - name: OTEL_LOGS_ENABLED
+        value: "true"
+      - name: SERVICE_NAME
+        value: checkout-worker
+      - name: PORT
+        value: "8080"
+      - name: ENV
+        value: "production"
+      - name: OTEL_COLLECTOR_ENDPOINT
+        value: otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318
+      - name: OTEL_SAMPLE_RATE
+        value: "0.1"
+      # OTel SDK reads OTEL_SERVICE_NAME (not SERVICE_NAME); without it
+      # service.name falls back to brittle hostname parsing.
+      - name: OTEL_SERVICE_NAME
+        value: checkout-worker
+      - name: POD_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.name
+      - name: POD_NAMESPACE
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+      - name: OTEL_RESOURCE_ATTRIBUTES
+        value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME)"
+      # RFC-0014 D-2: obsx reads these exact names for the Kubernetes resource
+      # attributes on the OTLP path.
+      - name: K8S_NAMESPACE_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+      - name: K8S_POD_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.name
+      - name: DEPLOYMENT_ENVIRONMENT
+        value: "production"
+      - name: PYROSCOPE_ENDPOINT
+        value: http://pyroscope.monitoring.svc.cluster.local:4040
+      - name: LOG_LEVEL
+        value: info
+      - name: LOG_FORMAT
+        value: json
+      - name: TRACING_ENABLED
+        value: "true"
+      - name: PROFILING_ENABLED
+        value: "true"
+      # DB — the worker's MarkSessionExpired activity updates checkout_sessions
+      # (same pooler as the checkout API).
+      - name: DB_HOST
+        value: pgdog-product.product.svc.cluster.local
+      - name: DB_PORT
+        value: "6432"
+      - name: DB_NAME
+        value: checkout
+      - name: DB_USER
+        value: checkout
+      - name: DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: product-db-checkout-secret
+            key: password
+      - name: DB_SSLMODE
+        value: disable
+      - name: DB_POOL_MAX_CONNECTIONS
+        value: "10"
+      - name: DB_POOL_MODE
+        value: transaction
+      # Temporal — what the worker connects to and the queue it polls.
+      - name: TEMPORAL_HOSTPORT
+        value: temporal-frontend.temporal.svc.cluster.local:7233
+      - name: TEMPORAL_NAMESPACE
+        value: mop
+      - name: TASK_QUEUE
+        value: checkout
+    resources:
+      requests:
+        memory: "48Mi"
+        cpu: "20m"
+      limits:
+        memory: "128Mi"
+        cpu: "300m"
+    livenessProbe:
+      enabled: true
+      httpGet:
+        path: /health
+        port: 8080
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readinessProbe:
+      enabled: true
+      httpGet:
+        path: /ready
+        port: 8080
+      initialDelaySeconds: 5
+      periodSeconds: 5

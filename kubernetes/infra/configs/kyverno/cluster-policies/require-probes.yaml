@@ -33,6 +33,7 @@ spec:
                 - notification
                 - shipping
                 - payment
+                - checkout
       validate:
         message: "Containers must declare both livenessProbe and readinessProbe."
         foreach:

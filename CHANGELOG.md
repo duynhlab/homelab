@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0015 P5 — checkout on the cluster**: checkout database triplet on
+  product-db (ExternalSecret + DatabaseRole + Database, pg_hba line, PgDog
+  backend, OpenBAO seed, app-ns secret copy); `rsip-checkout` (image 0.2.0,
+  2 replicas, PgDog) + `checkout-worker` HelmRelease (order-worker pattern,
+  `checkout` task queue); cart and order gain `grpc_server: true`
+  (reflection off) so their gRPC Services render; NetworkPolicies — checkout
+  fenced to Kong→8080, cart/order/shipping admit checkout→9090, product
+  gains a pod-scoped `allow-product-grpc` (order + checkout → product.v1,
+  without exposing PgDog's 9090 openmetrics); `checkout` joins the three
+  Kyverno namespace lists; Kong `api-checkout-private` route (edge JWT) and
+  `Idempotency-Key` in the global CORS allowlist.
+
 - **RFC-0015 P4 — promo codes (local-stack)**: checkout gains
   `POST/DELETE …/sessions/:id/promo` (apply = validated preview, never a
   counted use) and atomic confirm-time redemption (ADR-022: one tx,

@@ -1,0 +1,85 @@
+# checkout — per-service database triplet (RFC-0012, ADR-013).
+#
+# ExternalSecret for product-db checkout database credentials — product namespace.
+# OpenBAO path: secret/data/local/databases/product-db/checkout
+#
+# Rendered as kubernetes.io/basic-auth: this secret doubles as the
+# passwordSecret for the DatabaseRole below, and CNPG requires basic-auth
+# there.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: product-db-checkout-secret
+  namespace: product
+  labels:
+    app.kubernetes.io/name: product-db-checkout-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: product-db-checkout-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: product-db-checkout-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+          cnpg.io/reload: "true"
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: secret/data/local/databases/product-db/checkout
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: secret/data/local/databases/product-db/checkout
+        property: password
+---
+# Written out IN FULL — adoption resets omitted attributes (see payment.yaml).
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: product-db-role-checkout
+  namespace: product
+spec:
+  cluster:
+    name: product-db
+  name: checkout
+  comment: "checkout-service application role (RFC-0015)"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: true
+  replication: false
+  bypassrls: false
+  connectionLimit: -1
+  inRoles: []
+  passwordSecret:
+    name: product-db-checkout-secret
+  databaseRoleReclaimPolicy: retain
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: checkout-database
+  namespace: product
+spec:
+  name: checkout
+  owner: checkout
+  cluster:
+    name: product-db
+  extensions:
+    - name: pgaudit
+    - name: pg_stat_statements
+  databaseReclaimPolicy: retain

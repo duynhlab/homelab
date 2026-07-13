@@ -10,3 +10,4 @@ resources:
   - notification.yaml
   - shipping.yaml
   - payment.yaml
+  - checkout.yaml

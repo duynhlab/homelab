@@ -1,0 +1,35 @@
+# NOTE: kindnet DOES enforce NetworkPolicy on Kind K8s 1.34+ — these rules are
+# LIVE. Any ingress not explicitly allowed below is dropped.
+#
+# Checkout is a gRPC CLIENT only (cart/product/order/shipping) — nothing dials
+# INTO it on :9090, so the edge reaches only the HTTP API. The worker takes no
+# app traffic at all (kubelet probes are host-level and bypass NetworkPolicy).
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-ingress
+  namespace: checkout
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-internal-callers
+  namespace: checkout
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    # Edge: Kong → the HTTP API only (/checkout/v1/private/*).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kong
+      ports:
+        - protocol: TCP
+          port: 8080

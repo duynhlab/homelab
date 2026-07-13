@@ -31,3 +31,12 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+    # Checkout reads the cart over cart.v1 gRPC (RFC-0015) — :9090 only,
+    # never the HTTP API.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: checkout
+      ports:
+        - protocol: TCP
+          port: 9090

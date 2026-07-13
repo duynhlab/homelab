@@ -34,6 +34,7 @@ spec:
                 - notification
                 - shipping
                 - payment
+                - checkout
       validate:
         message: "Containers must declare resources.requests.{cpu,memory} and resources.limits.{cpu,memory}."
         foreach:

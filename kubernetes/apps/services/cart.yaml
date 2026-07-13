@@ -20,3 +20,9 @@ spec:
     db_secret: "product-db-cart-secret"
     db_sslmode: "disable"
     pool_max: "30"
+    # Internal gRPC server (:9090) — checkout reads the cart over cart.v1
+    # (RFC-0015). The mop chart renders the cart-grpc Service from this.
+    grpc_server: true
+    # MUST stay the string "false": the template guard is truthiness-based,
+    # so a boolean false would drop the env entirely — leaving reflection ON.
+    grpc_reflection: "false"

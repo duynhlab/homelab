@@ -337,3 +337,30 @@ spec:
                 name: payment
                 port:
                   number: 8080
+---
+# Checkout Service — private checkout API: edge JWT (the service re-validates,
+# authoritative). Confirm carries the Idempotency-Key header — allowed through
+# the global CORS plugin (plugins.yaml). Nothing internal to expose.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-checkout-private
+  namespace: checkout
+  annotations:
+    konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
+    konghq.com/plugins: rate-limiting-api,request-size-limiting-api,jwt-edge
+spec:
+  ingressClassName: kong
+  rules:
+    - host: gateway.duynh.me
+      http:
+        paths:
+          - path: /checkout/v1/private/
+            pathType: Prefix
+            backend:
+              service:
+                name: checkout
+                port:
+                  number: 8080

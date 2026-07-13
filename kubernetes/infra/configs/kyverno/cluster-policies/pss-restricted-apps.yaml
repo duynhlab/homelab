@@ -38,6 +38,7 @@ spec:
                 - notification
                 - shipping
                 - payment
+                - checkout
       validate:
         podSecurity:
           level: restricted

@@ -15,10 +15,11 @@ spec:
     # No platform_backup_label: checkout's data lives on product-db in the
     # product namespace, which is already backed up (same reasoning as
     # payment).
-    # Two replicas deliberately: the confirm flow is multi-replica-safe by
-    # design — idempotency claims, session↔claim binding, and stale-lock
-    # takeover all live in the database (RFC-0015 P2), not in memory.
-    replicaCount: 2
+    # Single replica for local host capacity; the confirm flow is
+    # multi-replica-safe by design (idempotency claims, session↔claim
+    # binding, stale-lock takeover — all in the database, RFC-0015 P2),
+    # so scaling this up is a values change, not a design change.
+    replicaCount: 1
     db_host: "pgdog-product.product.svc.cluster.local"
     db_port: "6432"
     db_migration_host: "product-db-rw.product.svc.cluster.local"

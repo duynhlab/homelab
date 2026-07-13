@@ -15,7 +15,7 @@ spec:
     # Phase 5: auth is HTTP-only — the gRPC GetMe server was removed (services
     # verify JWTs locally against the JWKS), so no grpc_server input.
     jwt_signing: true # RFC-0009 Phase 4: inject RS256 signing key from OpenBAO (auth only)
-    replicaCount: 2
+    replicaCount: 1
     db_host: "pgdog-auth.auth.svc.cluster.local"
     db_port: "6432"
     db_migration_host: "auth-db-rw.auth.svc.cluster.local"

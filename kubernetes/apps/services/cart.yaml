@@ -13,7 +13,7 @@ spec:
     image_tag: "1.3.0" # {"$imagepolicy": "flux-system:cart:tag"}
     namespace: cart
     platform_backup_label: "cnpg"
-    replicaCount: 2
+    replicaCount: 1
     db_host: "pgdog-product.product.svc.cluster.local"
     db_port: "6432"
     db_migration_host: "product-db-rw.product.svc.cluster.local"

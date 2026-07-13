@@ -652,6 +652,20 @@ Phased P1→P6 as above. Blast-radius notes:
   changed lines flagged) with the legacy one-shot flow kept at
   `/checkout/legacy` (dual-entry until P6).
 
+- 2026-07-13 — **P4 shipped** (local-stack): promo codes. Apply/remove as a
+  validated preview (never a counted use); atomic confirm-time redemption
+  (ADR-022: redeem strictly BEFORE the attempt marker, ON CONFLICT
+  (code, session_id) anchor evaluated before expiry/caps, FOR UPDATE
+  serialization — both caps race-tested); exhausted/expired strips to
+  shipping_set and never consumes the Idempotency-Key; discounts re-derive
+  at every totals change. **Scope deviation from the phase table:** the wave
+  also touched pkg (v0.22.0) and order-service — implementation surfaced a
+  P3 gap where the saga charged subtotal + the legacy $5 demo fee instead
+  of the session's quoted fee/tax; CreateOrder now carries
+  fee/tax/discount, order persists them (migration 000007 restates
+  check_order_total as the full composition), and the e2e asserts
+  session total == order total == charged amount.
+
 ## Related
 
 - [RFC-0003](../RFC-0003/) — inventory ownership: why checkout checks but never

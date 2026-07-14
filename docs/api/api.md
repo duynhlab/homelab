@@ -310,10 +310,10 @@ flowchart LR
 | Order worker | Shipping | `CreateShipment`, `CancelShipment` | gRPC | Cluster and local-stack |
 | Order worker | Notification | `SendEmail` (`SendSMS` is served but has no live caller) | gRPC | Cluster and local-stack |
 | Order worker | Payment | `Authorize`, `Capture`, `Void`, `Refund` | gRPC | Cluster and local-stack |
-| Checkout | Cart | `GetCart` | gRPC | Local-stack; cluster planned |
-| Checkout | Product | `GetProducts` | gRPC | Local-stack; cluster planned |
-| Checkout | Shipping | `GetQuote` | gRPC | Local-stack; cluster planned |
-| Checkout | Order | `CreateOrder` | gRPC | Local-stack; cluster planned |
+| Checkout | Cart | `GetCart` | gRPC | Cluster and local-stack |
+| Checkout | Product | `GetProducts` | gRPC | Cluster and local-stack |
+| Checkout | Shipping | `GetQuote` | gRPC | Cluster and local-stack |
+| Checkout | Order | `CreateOrder` | gRPC | Cluster and local-stack |
 | Order | Cart | Pricing read | REST exception | Current; planned removal after checkout migration |
 | Order worker | Cart | Clear cart | REST exception | Current |
 

@@ -77,7 +77,7 @@ Keeping each fact in one place prevents three copies from drifting.
 | [api.md](./api.md) | HTTP and gRPC architecture, current call graph, HTTP/2 load balancing, security, observability | Implemented |
 | [microservices.md](./microservices.md) | Service feature matrix, ownership, dependencies, and known gaps | Living reference |
 | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) | Saga vs 2PC learning plus the live order workflow and Temporal operations | Implemented |
-| [checkout.md](./checkout.md) | Checkout FSM, price re-validation, totals, promo, confirm, and abandonment | P1-P4 local-stack; P5 cluster planned |
+| [checkout.md](./checkout.md) | Checkout FSM, price re-validation, totals, promo, confirm, and abandonment | P1-P5 shipped (local-stack + cluster); P6 legacy removal planned |
 | [payments.md](./payments.md) | Money state machine, idempotency, ledger, provider, and reconciliation | Implemented |
 
 ## Compatibility Pages

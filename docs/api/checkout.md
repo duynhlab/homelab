@@ -8,7 +8,7 @@ order-service — which remains the only writer of orders.
 | Attribute | Value |
 |-----------|-------|
 | **Design record** | [RFC-0015](../proposals/rfc/RFC-0015/) · [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) (re-validation) · [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) (cart read surface) |
-| **Status** | **P1-P4 implemented in local-stack**: sessions, re-validation, confirm, abandonment, totals, SPA, and promo codes. **P5 cluster delivery and P6 legacy-path removal are planned.** |
+| **Status** | **P1-P5 implemented**: sessions, re-validation, confirm, abandonment, totals, SPA, and promo codes run in local-stack **and on the cluster** (P5 shipped 2026-07-14: RSIP + worker, checkout DB on product-db, NetworkPolicies, Kong route). **P6 legacy-path removal is planned.** |
 | **Surface** | `/checkout/v1/private/checkout/sessions[…]` (process-named exception like auth — literal `checkout` segment, resources nested; v3.0.1) — private-only, Kong edge-JWT + in-service `pkg/authmw` |
 | **East-west** | gRPC only: cart `GetCart`, product `GetProducts`, shipping `GetQuote`, and order `CreateOrder` |
 | **Data** | `checkout` DB — `checkout_sessions`, `checkout_session_items`, `idempotency_keys` (P2), `tax_rules` (P3), `promo_codes` + `promo_redemptions` (P4); money in int64 minor units |

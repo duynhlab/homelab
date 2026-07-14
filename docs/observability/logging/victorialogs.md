@@ -11,37 +11,40 @@ VictoriaLogs is the cluster's log storage backend. It provides high-performance 
 
 ```mermaid
 flowchart TD
-    subgraph Sources["Log Sources"]
-        K8s[Kubernetes Pods]
-        CNPG[CloudNativePG Postgres]
+    subgraph sdk["OTLP application path"]
+        Apps["10 Go services + 2 workers<br/>zap OTLP tee"]
+        Kong["Kong runtime logs"]
+        Collector[/"OpenTelemetry Collector<br/>logs pipeline"/]
+        Apps -->|"OTLP/HTTP :4318"| Collector
+        Kong -->|"OTLP/HTTP"| Collector
     end
 
-    subgraph Vector["Vector Agent (kube-system)"]
-        KLogs[kubernetes_logs source]
-        AddLabels[add_labels transform]
-        ParsePG[parse_pg_json transform]
-        FilterExplain[filter_pg_auto_explain]
-        ParseExplain[parse_pg_auto_explain]
+    subgraph vectorPath["Vector path for workloads without an OTel SDK"]
+        Sources["Databases · frontend<br/>Kong access logs · system pods"]
+        Vector["Vector DaemonSet"]
+        Parse["label enrichment<br/>PostgreSQL + auto_explain parsing"]
+        Sources -->|"stdout / files"| Vector
+        Vector --> Parse
     end
 
-    subgraph Sinks["Log Destinations"]
-        VLogsAll[VictoriaLogs - All Logs]
-        VLogsPlans[VictoriaLogs - PG Plans]
-        VLogsFailures[VictoriaLogs - Parse Failures]
-    end
+    VLogs[("VictoriaLogs VLSingle :9428<br/>7d · 20Gi")]
+    Collector -->|"/insert/opentelemetry/v1/logs"| VLogs
+    Parse -->|"/insert/jsonline"| VLogs
+    VLogs --> Grafana{{"Grafana Explore<br/>LogsQL"}}
 
-    K8s --> KLogs
-    CNPG --> KLogs
-    
-    KLogs --> AddLabels
-    KLogs --> ParsePG
-    
-    AddLabels --> VLogsAll
-    
-    ParsePG --> FilterExplain
-    FilterExplain --> ParseExplain
-    ParseExplain --> VLogsPlans
-    ParseExplain --> VLogsFailures
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    class Apps service;
+    class Kong edge;
+    class Sources external;
+    class Collector collector;
+    class Vector,Parse,VLogs log;
+    class Grafana platform;
 ```
 
 ### Single Vector Design
@@ -311,4 +314,4 @@ If Vector is consuming too much memory:
 
 ---
 
-_Last updated: 2026-07-09 — VLSingle `:9428` (VM Operator, 7d/20Gi); dual ingest: app logs via OTLP (`/insert/opentelemetry/v1/logs`, `VL-Stream-Fields: service.name`) since RFC-0014 P4, Vector DaemonSet for non-instrumented workloads (infra + PG auto_explain streams) via `/insert/jsonline`; Vector self-monitoring via VMAgent._
+_Last updated: 2026-07-14 — VLSingle `:9428` (VM Operator, 7d/20Gi); dual ingest: app logs via OTLP (`/insert/opentelemetry/v1/logs`, `VL-Stream-Fields: service.name`) since RFC-0014 P4, Vector DaemonSet for non-instrumented workloads (infra + PG auto_explain streams) via `/insert/jsonline`; Vector self-monitoring via VMAgent._

@@ -6,7 +6,7 @@
 Track requests as they flow through multiple microservices to understand performance bottlenecks, debug errors, and visualize service dependencies.
 
 **Key Capabilities:**
-- ✅ Track request journey across 9 microservices
+- ✅ Track request journeys across all 10 microservices
 - ✅ Identify slow services and bottlenecks
 - ✅ Debug cross-service errors with full context
 - ✅ Correlate traces with logs (via trace_id)
@@ -37,9 +37,9 @@ Track requests as they flow through multiple microservices to understand perform
 ### Real-World Use Cases
 
 #### 1. **Debugging Cross-Service Issues** 🔍
-**Problem**: User reports "checkout is slow" but you have 9 microservices involved.
+**Problem**: User reports "checkout is slow" but the request crosses several services and workers.
 
-**Without Tracing**: Check logs of all 9 services manually, guess which service is slow.
+**Without tracing**: Check logs from every service and worker manually, then guess which hop is slow.
 
 **With Tracing**: 
 - See the entire request flow: `Kong → Order → Shipping / Notification`
@@ -82,9 +82,9 @@ flowchart LR
     K -->|2. W3C traceparent header| C[Order Service]
     C -->|3. traceparent via gRPC metadata| D[Shipping Service]
 
-    K -.->|Spans OTLP| O[OTel Collector]
-    C -.->|Spans OTLP| O
-    D -.->|Spans OTLP| O
+    K -->|Spans OTLP| O[OTel Collector]
+    C -->|Spans OTLP| O
+    D -->|Spans OTLP| O
 
     O --> E[Tempo]
     O --> J[Jaeger]
@@ -92,11 +92,16 @@ flowchart LR
 
     E -->|TraceQL queries| F[Grafana]
 
-    style A fill:#e1f5ff
-    style K fill:#fff2cc
-    style O fill:#f0e1ff
-    style E fill:#ffe1e1
-    style F fill:#e1ffe1
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    class A,K edge;
+    class C,D service;
+    class O collector;
+    class E,J,V trace;
+    class F platform;
 ```
 
 ### Trace Flow

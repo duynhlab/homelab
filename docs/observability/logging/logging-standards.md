@@ -145,7 +145,7 @@ The fleet is uniformly on zap, so the mapping is single-column:
 ### Kubernetes Configuration
 
 **Current state** (`kubernetes/apps/`):
-- All 9 services: `LOG_LEVEL: "info"`, `LOG_FORMAT: "json"`
+- All 10 services: `LOG_LEVEL: "info"`, `LOG_FORMAT: "json"`
 - Config validation: `validLogLevels = ["debug", "info", "warn", "error"]`
 
 **Runtime configurability:** `zapx.New(level)` parses and applies `LOG_LEVEL` at
@@ -182,7 +182,7 @@ never reach the stdout core are not silently exported over OTLP either.
 
 ## Service Logging Summary
 
-- **All 9 services + order-worker**: converged on **`zapx`** (auth off zerolog,
+- **All 10 services + both workers**: converged on **`zapx`** (auth off zerolog,
   cart off clog, six already on zap) — one JSON contract, one otelzap tee.
 
 ---
@@ -240,4 +240,4 @@ logger.Info("HTTP request", zap.String("method", c.Request.Method), zap.String("
 
 ---
 
-_Last updated: 2026-07-09 — fleet converged on `zapx` (auth off zerolog, cart off clog); otelzap tee → OTLP-logs export (fleet-wide since RFC-0014 P4); dual-path ingest (app OTLP + Vector infra) into VictoriaLogs._
+_Last updated: 2026-07-14 — fleet converged on `zapx` (auth off zerolog, cart off clog); otelzap tee → OTLP-logs export (fleet-wide since RFC-0014 P4); dual-path ingest (app OTLP + Vector infra) into VictoriaLogs._

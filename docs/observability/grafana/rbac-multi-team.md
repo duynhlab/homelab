@@ -104,6 +104,11 @@ flowchart TD
   FolderPerm[Folder permission None View Editor Admin]
   OrgRole -->|"Default ceiling"| UserCap[User capability]
   FolderPerm -->|"Override for folder"| UserCap
+
+  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  class OrgRole,FolderPerm data;
+  class UserCap platform;
 ```
 
 ### Anonymous single role vs named users
@@ -121,6 +126,11 @@ flowchart LR
     U2[Engineer Viewer]
     U3[Team folder Editor]
   end
+
+  classDef external fill:#64748b,color:#fff,stroke:#334155;
+  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  class A1,U1,U2,U3 external;
+  class A2 platform;
 ```
 
 ### Recommended multi-team layout (conceptual)
@@ -130,6 +140,11 @@ flowchart TD
   Teams[Teams SRE Backend Frontend]
   Folders[Folders platform services apps]
   Teams --> Folders
+
+  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  class Teams platform;
+  class Folders data;
 ```
 
 ---
@@ -143,4 +158,4 @@ flowchart TD
 - [VMAuth and vmauth](../metrics/vmauth.md)
 
 ---
-_Last updated: 2026-03-21_
+_Last updated: 2026-07-14_

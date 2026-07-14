@@ -2,7 +2,7 @@
 
 > Plain-English primer on SLA / SLO / SLI / Error Budget / Burn Rate, written
 > against this platform's actual stack (Sloth v0.16.0 + VictoriaMetrics +
-> 9 microservices on Kong). Read this **before**
+> 10 microservices on Kong). Read this **before**
 > [`getting_started.md`](./getting_started.md) and the
 > [SLO system overview](./README.md). Once you've internalised it, jump to
 > [`alerting/slo-burn-rate-alerts.md`](../alerting/slo-burn-rate-alerts.md)
@@ -19,7 +19,7 @@
 | **SLO** | A *target* on an SLI over a *window*. Internal commitment. | Engineering + Product | `availability >= 99.5%` over rolling 30 days |
 | **SLA** | A *contract* with an external party. Usually weaker than the SLO and has financial / legal consequences. | Legal + Sales | We don't have one — internal platform |
 | **Error Budget** | `1 - SLO`. The acceptable failure quota inside the window. | SRE + Product | `0.5%` of 30 days = 3.6 hours of "down" |
-| **Burn Rate** | How fast you are spending the budget *right now*, normalised so `1x` = "you'll exhaust it exactly at the end of the window" | Alerts | `15x` → budget gone in ~2 days, page someone |
+| **Burn Rate** | How fast you are spending the budget *right now*, normalised so `1x` = "you'll exhaust it exactly at the end of the window" | Alerts | `14.4x` → budget gone in ~2 days, page someone |
 
 If you remember nothing else: **SLI is what you measure, SLO is the line you draw, error budget is the room between them, burn rate is how fast you're eating that room.**
 
@@ -45,6 +45,13 @@ flowchart LR
 
     SLI -->|aggregated over window<br/>compared to target| SLO
     SLO -->|relax + add penalty| SLA
+
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    class SLI metric;
+    class SLO data;
+    class SLA external;
 ```
 
 **Hard rule:** `SLA target < SLO target < 100%`. The SLO must be *stricter* than the SLA so that you have a buffer to detect and fix problems before you owe a customer money.
@@ -68,7 +75,7 @@ A good SLI is a **ratio of good events to total events**, evaluated over a windo
 
 ### What we use
 
-All 9 microservices share the same metric — `http_server_request_duration_seconds` (OTel semconv) — emitted by the standard middleware (see [`docs/observability/tracing/architecture.md`](../tracing/architecture.md)). From it we derive **3 SLIs per service** for the original 8 services (payment ships no SLO yet):
+All 10 microservices share the same metric — `http_server_request_duration_seconds` (OTel semconv) — emitted by `otelgin` (see [`docs/observability/tracing/architecture.md`](../tracing/architecture.md)). From it we derive **3 SLIs per service** across all 10 services:
 
 | SLI | Good = | Bad = | PromQL skeleton |
 |---|---|---|---|
@@ -209,6 +216,11 @@ This repo runs **two alerting layers** on purpose:
 flowchart LR
     L1["Layer 1 — Threshold alerts<br/>e.g. MicroserviceDown,<br/>P95 latency > 1 s"] --> R1["Catch obvious failure<br/>(seconds-to-minutes)"]
     L2["Layer 2 — SLO burn-rate alerts<br/>page (14.4x) + ticket (6x)"] --> R2["Catch slow degradation<br/>that eats the budget"]
+
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    class L1,L2 metric;
+    class R1,R2 platform;
 ```
 
 **They're not redundant.** Threshold alerts answer *"is something broken right now?"*. SLO alerts answer *"are we on track to break our promise to users this month?"*. You need both.
@@ -249,4 +261,4 @@ Full layering and pipeline diagrams: [`alerting/README.md`](../alerting/README.m
 - Sloth — [Introduction & concepts](https://sloth.dev/introduction/)
 
 ---
-_Last updated: 2026-07-09_
+_Last updated: 2026-07-14_

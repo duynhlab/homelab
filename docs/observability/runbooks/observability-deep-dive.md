@@ -88,6 +88,11 @@ flowchart LR
     Duration --> Latency
     Errors_R --> Errors_G
     Saturation_U --> Saturation_G
+
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    class Rate,Errors_R,Duration,Utilization,Saturation_U,Errors_U metric;
+    class Traffic,Latency,Errors_G,Saturation_G platform;
 ```
 
 **Key insight**: RED gives you the **external view** (what users experience). USE gives you the **internal view** (what the infrastructure is doing). Golden Signals combine both into a unified monitoring model. In practice, if you implement RED + saturation monitoring, you have all Four Golden Signals covered.
@@ -100,7 +105,7 @@ flowchart LR
 | **Best for** | APIs, microservices | Infrastructure, databases | Full-stack (both) |
 | **Signals** | Rate, Errors, Duration | Utilization, Saturation, Errors | Latency, Traffic, Errors, Saturation |
 | **Missing** | Saturation (resource pressure) | Traffic (request rate) | Nothing (superset) |
-| **Our use** | Primary for 9 microservices | PostgreSQL connection pools | Dashboard covers all 4 |
+| **Our use** | Primary for all 10 services | PostgreSQL connection pools | Dashboard covers all 4 |
 
 ---
 
@@ -119,6 +124,11 @@ flowchart LR
     C --> Rate["Rate\nrate(_count[5m])"]
     C --> Errors["Errors\nrate(_count{http_response_status_code=~'5..'}[5m])"]
     B --> Duration["Duration\nhistogram_quantile(0.95, _bucket)"]
+
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    class H data;
+    class B,C,S,Rate,Errors,Duration metric;
 ```
 
 | RED Signal | PromQL Query | Source |
@@ -174,45 +184,82 @@ The Grafana dashboard (40 panels, 6 rows) maps directly to all 4 Golden Signals:
 
 ```mermaid
 flowchart TD
-    subgraph apps ["8 Microservices"]
-        S["auth, user, product, cart,\norder, review, notification, shipping"]
+    subgraph workloads["Instrumented workloads"]
+        services["10 Go services<br/>auth · user · product · cart · order<br/>review · notification · shipping · payment · checkout"]
+        workers["2 workers<br/>order-worker · checkout-worker"]
+        kong["Kong gateway"]
     end
 
-    subgraph middleware ["Middleware Chain (in each service)"]
-        M1["TracingMiddleware\n(otelgin: spans + HTTP metrics)"] --> M2["LoggingMiddleware"]
+    subgraph instrumentation["Application instrumentation"]
+        http["HTTP chain<br/>otelgin tracing + metrics → logging"]
+        workerObs["Worker SDK + zap OTLP tee"]
     end
 
-    subgraph metrics ["Pillar 1: Metrics"]
-        VMAgent["VMAgent\n(OTLP ingest + infra scrape)"] --> VMSingle["VMSingle\n(:8428)"]
-        Infra["Infra exporters\n(pg_exporter, kube-state, cAdvisor)"] -.->|"scrape /metrics"| VMAgent
+    subgraph collection["Collection"]
+        otel["OpenTelemetry Collector<br/>OTLP :4318"]
+        vector["Vector DaemonSet<br/>non-instrumented pod logs"]
+        infra["Infrastructure exporters<br/>CNPG · kube-state · cAdvisor"]
     end
 
-    subgraph traces ["Pillar 2: Traces"]
-        OTel["OTel Collector\n(OTLP receiver)"] --> Tempo["Tempo"]
-        OTel --> Jaeger["Jaeger"]
-        OTel --> VT["VictoriaTraces\n(pilot)"]
+    subgraph metrics["Pillar 1 · metrics"]
+        vmAgent["VMAgent<br/>OTLP ingest + scrape"]
+        vmSingle[("VMSingle :8428")]
     end
 
-    subgraph logs ["Pillar 3: Logs"]
-        Vector["Vector\n(DaemonSet,\nnon-instrumented pods)"] --> VLSingle["VLSingle\n(:9428)"]
-    end
-    OTel -.->|"app logs (zap tee, P4)\n+ Kong runtime logs"| VLSingle
-
-    subgraph profiles ["Pillar 4: Profiles"]
-        Pyroscope["Pyroscope\n(:4040)"]
+    subgraph traces["Pillar 2 · traces"]
+        tempo[("Tempo")]
+        jaeger[("Jaeger")]
+        victoriaTraces[("VictoriaTraces")]
     end
 
-    S --> middleware
-    M1 -.->|"OTLP traces + metrics HTTP :4318"| OTel
-    M2 -.->|"OTLP logs (zap tee)"| OTel
-    S -.->|"pprof push"| Pyroscope
-    OTel -.->|"OTLP metrics"| VMAgent
+    subgraph logs["Pillar 3 · logs"]
+        victoriaLogs[("VictoriaLogs :9428")]
+    end
 
-    VMSingle --> Grafana["Grafana\n(:3000)"]
-    Tempo --> Grafana
-    VLSingle --> Grafana
-    Pyroscope --> Grafana
-    Jaeger --> JaegerUI["Jaeger UI\n(:16686)"]
+    subgraph profiles["Pillar 4 · profiles"]
+        pyroscope[("Pyroscope :4040")]
+    end
+
+    services --> http -->|"OTLP traces · metrics · logs"| otel
+    workers --> workerObs -->|"OTLP traces · metrics · logs"| otel
+    kong -->|"OTLP spans + runtime logs"| otel
+    infra -->|scrape| vmAgent
+    vector -->|jsonline| victoriaLogs
+    otel -->|metrics| vmAgent -->|remote write| vmSingle
+    otel -->|logs| victoriaLogs
+    otel -->|traces| tempo
+    otel -->|traces| jaeger
+    otel -->|traces| victoriaTraces
+    services -->|pprof push| pyroscope
+    workers -->|pprof push| pyroscope
+
+    vmSingle --> grafana["Grafana"]
+    tempo --> grafana
+    victoriaTraces --> grafana
+    victoriaLogs --> grafana
+    pyroscope --> grafana
+    jaeger --> jaegerUI["Jaeger UI :16686"]
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef profile fill:#f3d9fa,color:#111,stroke:#9c36b5;
+    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    class services,http service;
+    class workers,workerObs worker;
+    class kong edge;
+    class vector,infra external;
+    class otel collector;
+    class vmAgent,vmSingle metric;
+    class victoriaLogs log;
+    class tempo,jaeger,victoriaTraces trace;
+    class pyroscope profile;
+    class grafana,jaegerUI platform;
 ```
 
 | Pillar | Tool | Protocol | Question It Answers |
@@ -236,7 +283,7 @@ Each pillar answers a progressively deeper question. Together, they reduce inves
 
 ## 4. Middleware Chain: How Services Emit Data
 
-The middleware chain runs in a **fixed order** for every HTTP request across all 9 services. Since the P3 OTel cutover there are only **two** middlewares — the order matters because Logging depends on the `trace_id` produced by Tracing.
+The middleware chain runs in a **fixed order** for every HTTP request across all 10 services. Since the P3 OTel cutover there are only **two** middlewares — the order matters because Logging depends on the `trace_id` produced by Tracing.
 
 ### The Fixed Order
 
@@ -283,7 +330,7 @@ sequenceDiagram
 ### What Each Middleware Produces
 
 **TracingMiddleware** (`otelgin`) outputs:
-- Root span exported to OTel Collector -> primary backends (Tempo + Jaeger; VictoriaTraces pilot)
+- Root span exported to OTel Collector -> all three trace backends (Tempo, Jaeger, and the VictoriaTraces pilot)
 - Child spans created by handler/logic layer
 - W3C Trace Context header for cross-service propagation
 - Service identity from `OTEL_SERVICE_NAME` (injected by the app ResourceSets; pod-name parsing is only the SDK fallback)
@@ -303,7 +350,7 @@ sequenceDiagram
 Applications emit the semconv HTTP labels `http_request_method`, `http_route`, `http_response_status_code` on each request metric. The `app` and `namespace` labels are **derived from OTLP resource attributes** (`service.name`, `k8s.namespace.name`) and materialised by a vmagent relabel step (`service_name -> app`, `k8s_namespace_name -> namespace`) on the OTLP ingest path -- **not** by ServiceMonitor `relabel_configs` (there is no `/metrics` scrape and no `job` label for the app services anymore).
 
 Bounded cardinality:
-- the original 8 services x 20 routes x 3 methods x 5 status codes = **2,400 series** (predictable and manageable; payment adds a small increment)
+- 10 services x 20 routes x 3 methods x 5 status codes = **3,000 series** (predictable and manageable)
 
 Route normalization uses the Gin route pattern (`http_route`, e.g. `/api/v1/products/:id`) instead of raw URLs, preventing cardinality explosion from dynamic path parameters.
 
@@ -320,14 +367,24 @@ flowchart TD
     HR["HelmRelease\nslo.enabled: true"] -->|render| PSL["PrometheusServiceLevel\n(per service)"]
     PSL -->|watch| Sloth["Sloth Operator v0.16.0"]
     Sloth -->|generate| PR["PrometheusRules\n(recording + alerting)"]
+
     PR -->|evaluate| VMAlert["VMAlert"]
     VMAlert -->|query| VMSingle["VMSingle"]
     VMAlert -->|notify| VMAMgr["VMAlertmanager"]
     OTelC["OTel Collector\n(app OTLP metrics)"] -->|"OTLP ingest"| VMAgent["VMAgent"]
     VMAgent -->|"remote write"| VMSingle
+
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    class HR,PSL,PR data;
+    class VMSingle,VMAgent metric;
+    class Sloth,VMAlert,VMAMgr platform;
+    class OTelC collector;
 ```
 
-Each of the original 8 services has **3 SLOs** (24 total), auto-generated by the `mop` Helm chart (the 9th service, `payment`, has no SLO yet):
+All 10 services have **3 SLOs** (30 total), auto-generated by the `mop` Helm chart through the domain ResourceSets:
 
 | SLO | Objective | SLI (What is measured) | Alert Name |
 |-----|-----------|------------------------|-----------|
@@ -347,10 +404,10 @@ Each of the original 8 services has **3 SLOs** (24 total), auto-generated by the
 
 Following Google SRE best practice, alerts fire based on **burn rate** across **multiple time windows**:
 
-| Alert Type | 1h Burn Rate | 6h Burn Rate | Time to Budget Exhaustion | Action |
-|------------|-------------|-------------|---------------------------|--------|
-| **Page** (critical) | 14.4x (5m/1h) | 6x (30m/6h) | ~2 days | Wake someone up |
-| **Ticket** (warning) | 6x (30m/6h) | 1x (2h/1d) | ~7 days | Fix within 24h |
+| Alert | Short window | Long window | Burn rate | Exhaustion | Action |
+|---|---|---|---|---|---|
+| **Page** (critical) | 5m | 1h | 14.4x | ~2 days | Wake someone up |
+| **Ticket** (warning) | 30m | 6h | 6x | ~5 days | Fix within 24h |
 
 **Burn rate calculation**:
 ```
@@ -413,12 +470,15 @@ flowchart LR
     D --> E["trace_id back to VictoriaLogs\n(see error logs)"]
     E --> F["Flamegraph in Pyroscope\n(see CPU/memory hotspot)"]
 
-    style A fill:#ff6b6b
-    style B fill:#ffd93d
-    style C fill:#6bcb77
-    style D fill:#4d96ff
-    style E fill:#ff922b
-    style F fill:#845ef7
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef profile fill:#f3d9fa,color:#111,stroke:#9c36b5;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    class A,B metric;
+    class C,E log;
+    class D trace;
+    class F profile;
 ```
 
 ### Concrete Debugging Walkthrough
@@ -492,7 +552,7 @@ Use this framework for every interview question about observability. The **Befor
 - VMAgent ingests (OTLP) + remote-writes, VMSingle stores, VMAlert evaluates, VMAlertmanager routes
 - Everything deployed via Flux GitOps -- add a new service, it gets monitoring for free
 
-**Result**: Alert-to-root-cause path reduced from hours to minutes. 4-pillar correlation means a metric spike leads to the correlated logs (by `app` + `trace_id`), then to the offending trace, then to the flamegraph showing the bottleneck. 24 SLOs across the original 8 services with automated error budget tracking. MTTR improved by ~40%.
+**Result**: Alert-to-root-cause path reduced from hours to minutes. 4-pillar correlation means a metric spike leads to the correlated logs (by `app` + `trace_id`), then to the offending trace, then to the flamegraph showing the bottleneck. 30 SLOs across all 10 services with automated error-budget tracking. MTTR improved by ~40%.
 
 ---
 
@@ -506,7 +566,7 @@ Use this framework for every interview question about observability. The **Befor
 - **RED** (for APIs): One histogram `http_server_request_duration_seconds` with semconv labels `http_request_method`, `http_route`, `http_response_status_code`. Rate = `rate(_count[5m])`, Errors = `rate(_count{http_response_status_code=~"5.."}[5m])`, Duration = `histogram_quantile(0.95, rate(_bucket[5m]))`
 - **USE** (for Postgres): Utilization = `connections / max_connections`, Saturation = alert at 80% threshold, Errors = `pg_up == 0`
 - **Golden Signals**: RED covers 3/4 signals. Go runtime saturation (goroutines, heap, GC) covers the 4th (there is no OTel active-request gauge)
-- **Route normalization**: Gin route pattern (`http_route`) for bounded cardinality (~2,400 series across the original 8 services)
+- **Route normalization**: Gin route pattern (`http_route`) for bounded cardinality (~3,000 theoretical route-series combinations across 10 services)
 - **Label strategy**: Application emits the semconv HTTP labels; `app`/`namespace` come from OTLP resource attributes via vmagent relabel (no `job`/scrape labels)
 
 **Result**: Single Grafana dashboard with 40 panels covering all 4 Golden Signals. Any engineer can answer "what's the P95 latency of the auth service right now?" in 3 seconds. Cardinality stays bounded as services scale.
@@ -542,10 +602,10 @@ Use this framework for every interview question about observability. The **Befor
 **How**:
 - Each service defines 3 SLOs via Helm values (`slo.enabled: true`): 99.5% availability, 95% < 500ms latency, 99% error rate
 - Sloth Operator watches `PrometheusServiceLevel` CRDs and generates `PrometheusRule` resources with multi-window recording rules
-- Burn rate alerts: **Page** (15x burn = budget gone in 2 days) and **Ticket** (4x burn = budget gone in 7 days)
+- Burn-rate alerts: **Page** (14.4x = budget gone in about 2 days) and **Ticket** (6x = about 5 days)
 - VMAlert evaluates these rules against VMSingle. VMAlertmanager routes notifications
 - Error budget tracking via `slo:error_budget_remaining:ratio` metric
-- 24 SLOs total (3 per service x the original 8 services), all auto-generated
+- 30 SLOs total (3 per service x all 10 services), all auto-generated
 
 **Result**: Meaningful alerts that fire based on business impact (error budget burn), not arbitrary thresholds. Page alerts mean "wake up, customers are impacted." Ticket alerts mean "fix this today." Error budget gives product teams concrete data for the reliability-vs-velocity trade-off discussion.
 
@@ -788,4 +848,4 @@ For every answer, structure as:
 - [Profiling Guide](../profiling/README.md) -- Continuous profiling, flamegraphs
 
 ---
-_Last updated: 2026-07-10_
+_Last updated: 2026-07-14_

@@ -79,7 +79,7 @@ Pyroscope server every 15s — there is no scrape and no sidecar agent.
 
 ```mermaid
 flowchart LR
-    subgraph svc[Each Go service / order-worker]
+    subgraph svc[10 Go services + 2 workers]
       SDK["obsx.SetupProfiling<br/>pyroscope-go SDK"]
     end
     SDK -- "push pprof / 15s<br/>(service_name + labels)" --> PYRO["Pyroscope :4040<br/>(ns monitoring, single-binary)"]
@@ -87,7 +87,19 @@ flowchart LR
     PYRO -- "v2 metastore (raft)" --> PVC[("PVC 10Gi")]
     PYRO --> GRAF["Grafana<br/>Explore Profiles"]
     TEMPO["Tempo"] -. "tracesToProfiles<br/>(service.name → service_name)" .-> PYRO
-    PYRO -. "ServiceMonitor /metrics" .-> VM["VictoriaMetrics<br/>(PyroscopeDown alert)"]
+    PYRO -->|"ServiceMonitor /metrics"| VM["VictoriaMetrics<br/>(PyroscopeDown alert)"]
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef profile fill:#f3d9fa,color:#111,stroke:#9c36b5;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    class SDK service;
+    class PYRO profile;
+    class S3,PVC data;
+    class GRAF platform;
+    class TEMPO trace;
+    class VM metric;
 ```
 
 Pyroscope is deployed in **v2 single-binary mode** (one pod runs all components). The
@@ -115,7 +127,7 @@ local PVC only holds the v2 metastore (raft) and scratch, so a pod restart loses
   of silently no-op'ing; startup is guarded by `sync.Once`; the returned shutdown func
   flushes and stops the profiler on exit.
 
-**Per-service wiring** — every service (all 9 + the `order-worker`) calls the same gate in
+**Per-service wiring** — every service and worker (10 services + 2 workers) calls the same gate in
 `cmd/main.go`; profiling is a config flag, not bespoke code:
 
 ```go
@@ -167,7 +179,7 @@ Verified inventory of the actual deployment:
 | **Self-monitoring** | `serviceMonitor.enabled: true`; `PyroscopeDown` alert — `up{job=~".*pyroscope.*"} == 0` for 5m |
 | **Resources** | requests `100m` / `256Mi`, limit `512Mi` |
 | **Access** | Grafana datasource `uid: pyroscope` (`http://pyroscope.monitoring.svc.cluster.local:4040`); Kong ingress `pyroscope.duynh.me` |
-| **Client** | `obsx.SetupProfiling` in all 9 services + `order-worker`; **on by default** (`PROFILING_ENABLED=true`, `PYROSCOPE_ENDPOINT=http://pyroscope.monitoring.svc.cluster.local:4040`) |
+| **Client** | `obsx.SetupProfiling` in all 10 services + both workers; **on by default** (`PROFILING_ENABLED=true`, `PYROSCOPE_ENDPOINT=http://pyroscope.monitoring.svc.cluster.local:4040`) |
 | **local-stack** | `grafana/pyroscope:2.1.0` container + Grafana Pyroscope datasource; `PROFILING_ENABLED: "true"` in the `x-svc-env` anchor; storage is an **ephemeral** volume (`pyroscope-data`), no S3 |
 
 > Migrated from a hand-vendored raw manifest (`pyroscope/pyroscope:latest`, `emptyDir`
@@ -264,4 +276,4 @@ Set `PROFILING_ENABLED=false` to opt a service out.
 - [Traces to profiles](https://grafana.com/docs/grafana/latest/datasources/pyroscope/configure-traces-to-profiles/)
 
 ---
-_Last updated: 2026-07-02 — Pyroscope 2.1.0 (Helm, v2/single-binary), RustFS S3 7d retention, `obsx.SetupProfiling` (pkg v0.18.1), local-stack profiling enabled._
+_Last updated: 2026-07-14 — Pyroscope 2.1.0 (Helm, v2/single-binary), RustFS S3 7d retention, `obsx.SetupProfiling` (pkg v0.18.1), local-stack profiling enabled._

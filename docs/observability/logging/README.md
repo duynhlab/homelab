@@ -34,7 +34,7 @@ Both land in one backend, queryable with LogsQL and correlated to traces by
 
 The platform has **two log paths into one backend**:
 
-- **App path (OTLP).** The 9 Go services + the order-worker emit structured JSON
+- **App path (OTLP).** The 10 Go services + both workers emit structured JSON
   with `zapx`, and their zap core is **tee'd** — one branch to stdout (for
   `kubectl logs`), one through an **otelzap** bridge → OTLP log exporter
   (`otlploghttp`) → **OpenTelemetry Collector** → VictoriaLogs. The Collector's
@@ -48,40 +48,49 @@ The platform has **two log paths into one backend**:
   (they carry `platform.duynhlab.dev/otlp-logs=true`), so the two paths never
   double-ingest.
 
-VictoriaLogs is the **sole** log backend (Loki was removed). Because both paths
-preserve the `trace_id`, a log and its distributed trace join on one id.
+VictoriaLogs is the **sole** log backend (Loki was removed). Application logs
+preserve `trace_id`, so they join directly to distributed traces. Infrastructure
+logs normally correlate by namespace, pod, and time unless their source also
+emits a trace ID.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    subgraph apps["Instrumented Go services (9 + order-worker)"]
+    subgraph apps["Instrumented workloads (10 services + 2 workers)"]
         Z["zapx core (tee)"]
         Z -->|stdout| KLOGS["kubectl logs"]
-        Z -.->|"otelzap → otlploghttp"| OTLP
+        Z -->|"otelzap → otlploghttp"| OTLP
     end
     subgraph infra["Non-instrumented workloads"]
         CNPG["CloudNativePG<br/>auto_explain plans"]
         KONG["Kong access log<br/>(kong_json stdout)"]
         FE["Frontend + system pods"]
     end
-    OTLP[/"OTLP logs :4318"/] -.-> COL[/"OpenTelemetry Collector<br/>logs pipeline"/]
-    CNPG -.-> VEC["Vector DaemonSet · kube-system<br/>(excludes app pods)"]
-    KONG -.-> VEC
-    FE -.-> VEC
-    KONGRT["Kong opentelemetry plugin<br/>runtime logs"] -.->|OTLP| COL
+    OTLP[/"OTLP logs :4318"/] --> COL[/"OpenTelemetry Collector<br/>logs pipeline"/]
+    CNPG --> VEC["Vector DaemonSet · kube-system<br/>(excludes app pods)"]
+    KONG --> VEC
+    FE --> VEC
+    KONGRT["Kong opentelemetry plugin<br/>runtime logs"] -->|OTLP| COL
     COL -->|"/insert/opentelemetry/v1/logs<br/>VL-Stream-Fields: service.name"| VL[("VictoriaLogs VLSingle :9428<br/>monitoring · 7d / 20Gi")]
     VEC -->|"/insert/jsonline"| VL
     VL --> GRAF{{"Grafana Explore<br/>(LogsQL)"}}
     GRAF <-. "trace_id ↔ Tempo" .-> TEMPO[("Tempo")]
-    classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
-    classDef log fill:#d3f9d8,stroke:#2f9e44,color:#111;
-    classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
-    class OTLP,COL otc;
+    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    class OTLP,COL collector;
     class VL log;
     class TEMPO trace;
-    style apps fill:#eef2ff,color:#111;
-    style infra fill:#d3f9d8,color:#111;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    class Z service;
+    class CNPG,KONG,FE external;
+    class KONGRT edge;
+    class VEC,KLOGS log;
+    class GRAF platform;
 ```
 
 **Two paths, one backend, no double-ingest.** App logs travel over OTLP; Vector
@@ -157,7 +166,7 @@ What this design does well at scale, and the upgrade path:
   VictoriaLogs cluster** (`vlinsert` / `vlstorage` / `vlselect`) for horizontal
   scale and replication — same LogsQL, same ingest contract, no app changes.
 
-> This homelab runs 9 services + infra today; the above is the scale-up path, not
+> This homelab runs 10 services + 2 workers + infra today; the above is the scale-up path, not
 > something stress-tested here. The 1000+ framing follows the same large-scale
 > references the platform uses elsewhere (Uber M3, Grab/Shopee) — see
 > [observability deep-dive](../runbooks/observability-deep-dive.md).
@@ -220,4 +229,4 @@ logging-standards.md   # App logging standards & implementation (onboarding)
 
 ---
 
-_Last updated: 2026-07-09 — dual-path logging: app logs over OTLP (otelzap → OpenTelemetry Collector → VictoriaLogs, `VL-Stream-Fields: service.name`, fleet-wide since RFC-0014 P4) + Vector DaemonSet for non-instrumented workloads (DBs, Kong access log, PG `auto_explain`, frontend); VictoriaLogs VLSingle `:9428` (7d/20Gi), LogsQL, `trace_id` ↔ Tempo; Loki removed._
+_Last updated: 2026-07-14 — dual-path logging: app logs over OTLP (otelzap → OpenTelemetry Collector → VictoriaLogs, `VL-Stream-Fields: service.name`, fleet-wide since RFC-0014 P4) + Vector DaemonSet for non-instrumented workloads (DBs, Kong access log, PG `auto_explain`, frontend); VictoriaLogs VLSingle `:9428` (7d/20Gi), LogsQL, `trace_id` ↔ Tempo; Loki removed._

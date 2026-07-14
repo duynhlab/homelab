@@ -82,7 +82,7 @@ graph TD
 - `http_route` - Matched route template (`/api/v1/users`) - semconv attribute from the app
 - `http_response_status_code` - HTTP status code (200, 404, 500) - semconv attribute from the app
 
-> **No `job` label on app series.** The 9 Go services + order-worker **push OTLP** (SDK → otel-collector → vmagent OTLP ingest → VictoriaMetrics); there is no `/metrics` scrape and therefore no `job` label. A vmagent scrape (ServiceMonitor) still exists **only for infra exporters** (postgres/pg_exporter, kube-state-metrics, cAdvisor), not the app services.
+> **No `job` label on app series.** The 10 Go services + 2 workers **push OTLP** (SDK → otel-collector → vmagent OTLP ingest → VictoriaMetrics); there is no `/metrics` scrape and therefore no `job` label. A vmagent scrape (ServiceMonitor) still exists **only for infra exporters** (postgres/pg_exporter, kube-state-metrics, cAdvisor), not the app services.
 
 ---
 
@@ -436,7 +436,7 @@ count(count by (app, namespace, k8s_pod_name)(go_goroutine_count{app=~"$app", na
 ```
 
 **Query Explanation**:
-- The 9 Go services push OTLP, so there is **no `up` series** for them — nothing scrapes a `/metrics` endpoint. Instead, count the pods currently emitting a heartbeat metric: every live pod reports `go_goroutine_count`.
+- The 10 Go services + 2 workers push OTLP, so there is **no `up` series** for them — nothing scrapes a `/metrics` endpoint. Instead, count the pods currently emitting a heartbeat metric: every live pod reports `go_goroutine_count`.
 - `count by (app, namespace, k8s_pod_name)(...)` - one entry per reporting pod
 - outer `count(...)` - Number of pods currently pushing metrics
 - **Result**: Running pods for the selected services
@@ -1669,4 +1669,4 @@ echo "→ Check metrics: RPS, Error Rate, Latency có thay đổi?"
 **Maintainer**: SRE Team
 
 ---
-_Last updated: 2026-07-11_
+_Last updated: 2026-07-14_

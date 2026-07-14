@@ -23,6 +23,14 @@ flowchart LR
   T --> G["Grafana (TraceQL +<br/>traces↔logs↔metrics)"]
   J --> JU["Jaeger UI"]
   V --> G
+  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+  classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+  classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  class Apps service;
+  class OC collector;
+  class T,J,V trace;
+  class G,JU platform;
 ```
 
 The OTel Collector fans the **same** traces to all three backends — see

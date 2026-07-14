@@ -1,7 +1,7 @@
 # Application Metrics (RED)
 
 The **application layer** of the metrics pillar: the RED signals (Rate, Errors,
-Duration) for the 9 currently cluster-deployed Go microservices and their gRPC east-west calls, plus Go
+Duration) for the 10 currently cluster-deployed Go microservices and their gRPC east-west calls, plus Go
 runtime health and the instrumentation that produces it. Since the RFC-0014 P3
 cutover these metrics are **pushed over OTLP** (no `/metrics` scrape); names and
 labels follow OpenTelemetry semantic conventions. For methodology theory, the
@@ -67,6 +67,10 @@ flowchart LR
     C --> Errors["Errors<br/>rate(_count{http_response_status_code=~'5..'}[5m])"]
     B --> Duration["Duration<br/>histogram_quantile(0.95, _bucket)"]
     B --> Apdex["Apdex<br/>_bucket{le=0.5} + _bucket{le=2}"]
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    class H,B,C metric;
+    class Rate,Errors,Duration,Apdex platform;
 ```
 
 | RED signal | PromQL | Sub-metric |
@@ -148,9 +152,22 @@ pipeline the moment their SDK points at the collector.
 
 ```mermaid
 flowchart TD
-    SDK["OTel SDK (pkg/obsx)<br/>9 Go services + order-worker<br/>otelgin + runtime.Start"] -->|"OTLP/HTTP :4318"| COL["otel-collector<br/>(memory_limiter → deltatocumulative → batch)"]
+    SDK["OTel SDK (pkg/obsx)<br/>10 Go services + 2 workers<br/>otelgin · otelgrpc · runtime.Start"] -->|"OTLP/HTTP :4318"| COL["otel-collector<br/>(memory_limiter → deltatocumulative → batch)"]
     COL -->|"otlphttp proto"| VMA["vmagent :8429 OTLP ingest<br/>usePrometheusNaming + resource-attr allowlist<br/>relabel service_name→app, k8s_namespace_name→namespace"]
     VMA -->|remote write| VMS[("VictoriaMetrics")]
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    class SDK service;
+    class COL collector;
+    class VMA,VMS metric;
 ```
 
 > **No app `/metrics` scrape exists anymore.** The scrape-era `ServiceMonitor`
@@ -173,10 +190,10 @@ pattern**, not the raw URL, so IDs don't explode cardinality:
 | Raw URL | `/api/v1/products/123`, `/456`, … | **Unbounded** |
 | Route pattern (`http.route`) | `/api/v1/products/:id` | **Bounded** (~20 routes) |
 
-With the original 8 services × ~20 routes × 3 methods × 5 status codes ≈ **2,400 series**
+With 10 services × ~20 routes × 3 methods × 5 status codes ≈ **3,000 series**
 (payment adds a small increment) — bounded and predictable.
 Measured (2026-07-06, one replica per service, live traffic): **49–720 series
-per service, Σ 2,777** across the 9 services — histogram label sets materialize
+per service, Σ 2,777** across the 9-service measurement snapshot — histogram label sets materialize
 lazily, so this grows toward the worst-case bound of ~1,800 series/replica
 (~48 route×status combos × 32 histogram series + runtime). Bounded and
 predictable either way; the full model and at-scale projection live in the
@@ -401,6 +418,6 @@ Runbook: [`microservices-alerts.md`](../runbooks/microservices-alerts.md).
 
 ---
 
-_Last updated: 2026-07-09 — RFC-0014 P5: rewritten for the OTLP-push semconv reality (metric/label renames, push pipeline, exemplars-lost correlation via trace_id, heartbeat availability, in-flight/GC-pause metrics retired)._
+_Last updated: 2026-07-14 — RFC-0014 P5: rewritten for the OTLP-push semconv reality (metric/label renames, push pipeline, exemplars-lost correlation via trace_id, heartbeat availability, in-flight/GC-pause metrics retired)._
 </content>
 </invoke>

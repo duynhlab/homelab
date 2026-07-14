@@ -87,12 +87,17 @@ flowchart LR
     gRPC["grpc/v1"] --> Logic
     Logic --> Core["core (domain, db, cache)"]
     Core --> DB[(PostgreSQL)]
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    class Web,gRPC,Logic,Core service;
+    class DB data;
 ```
 
 - **Frontend → Web layer only.** The SPA calls `/{service}/v1/{public,private}/…` via `VITE_API_BASE_URL`; never Logic/Core/DB. Aggregation happens server-side.
 - **API URL shape (Variant A):** `/{service}/v1/{audience}/{resource…}`, mounted directly on each service's router (Kong is pass-through, no rewrite). `{audience}` ∈ `public|private|internal|protected`. **Never** put `internal` routes on `ingress-api.yaml` — they're in-cluster only; **NetworkPolicy is the fence**, not the absence of an Ingress rule. Auth middleware lives in each service (`pkg/authmw`: verifies RS256 JWTs locally against a cached JWKS — JWT-only since RFC-0009 Phase 5; the opaque-token `auth.GetMe` fallback and auth's gRPC server were removed), not Kong. Additionally, Kong runs edge JWT (RFC-0009 Phase 4, ADR-006) on `/private/` routes — rejecting bad/expired RS256 tokens at the gateway as a coarse first filter, with the service check still authoritative. Authoritative: [`docs/api/api.md`](docs/api/api.md#http-url-model).
 - **gRPC is the official east-west transport** for migrated calls: product→review; order/order-worker→product, shipping, notification, and payment; checkout→cart, product, shipping, and order in local-stack. Servers are always-on at `:9090`, with no feature flag or REST fallback for migrated RPCs. The two order→cart calls remain documented REST exceptions. Auth's `GetMe` RPC was removed in Phase 5 because services verify JWTs locally. Browser/Kong traffic stays HTTP/JSON. Shared behavior lives in `pkg/grpcx`.
-- **Observability:** middleware chain **tracing → logging → metrics**; HTTP, gRPC, and runtime metrics export over OTLP via `pkg/obsx` (the scrape-era application `/metrics` endpoint was removed); `obsx.TraceIDFromContext` correlates logs with traces. Stack: VictoriaMetrics, Grafana, Tempo (+ VictoriaTraces pilot), VictoriaLogs (Loki removed), Pyroscope, Jaeger, Vector. SLO via Sloth. Kong emits edge spans (opentelemetry `inject:[w3c]`).
+- **Observability:** the HTTP middleware chain is **tracing (`otelgin`) → logging**; metrics are emitted by `otelgin`, `otelgrpc`, runtime instrumentation, and explicit business instruments, not a third middleware. HTTP, gRPC, and runtime metrics export over OTLP via `pkg/obsx` (the scrape-era application `/metrics` endpoint was removed); `obsx.TraceIDFromContext` correlates logs with traces. Stack: VictoriaMetrics, Grafana, Tempo (+ VictoriaTraces pilot), VictoriaLogs (Loki removed), Pyroscope, Jaeger, Vector. SLO via Sloth. Kong emits edge spans (opentelemetry `inject:[w3c]`).
 - **Caching:** Cache-Aside with Valkey for read-heavy endpoints.
 - **Diagrams:** **Mermaid only — never ASCII art** (`flowchart`, `sequenceDiagram`, etc.).
 - **Stack:** Go 1.26, Gin, PostgreSQL (CloudNativePG operator, PgDog pooler, Barman backups, golang-migrate v4.19.1 migrations embedded in each service binary), OpenTelemetry, Flux Operator + Kustomize + OCI, Kind + Helm 3, OpenBAO + External Secrets Operator.
@@ -129,6 +134,59 @@ Docs are a first-class deliverable in this repo. When writing or refactoring the
 - **Be accurate to the deployed reality.** Mark designed-but-not-yet-deployed things as **planned** (don't describe targets as current); cross-check claims against the manifests.
 - **Synthesize external material in-house** — learn from articles/newsletters, then write it in our own words + Mermaid; **don't embed third-party links** (official product docs already in a References section are fine).
 - One hub per area; link every new doc from [`docs/README.md`](docs/README.md) and the area index.
+
+### Diagram workflow
+
+Treat every architecture diagram as an executable summary of the repository,
+not decoration. [`docs/api/api.md`](docs/api/api.md#platform-api-topology) is the
+reference style.
+
+1. **Choose one question.** State whether the diagram explains topology, a
+   request path, ownership, lifecycle, or a historical migration. Split a
+   diagram that tries to answer more than one of these.
+2. **Verify current reality.** Check service code, `SERVICES.md`,
+   `local-stack/compose.yaml`, and the relevant Kubernetes manifests. A current
+   topology must include every relevant deployed service, worker, backend, and
+   protocol. Historical diagrams must say **historical** in the surrounding
+   text. Committed targets use **planned**; non-committed teaching examples use
+   **reference** and **not deployed** in their labels.
+3. **Use semantic structure.** Prefer domain/layer subgraphs, stable node IDs,
+   quoted labels, `<br/>` for intentional line breaks, and database shapes for
+   persistent stores. Label edges with protocols or ports only when that detail
+   helps answer the diagram's question.
+4. **Use semantic colors.** Architecture flowcharts use the shared palette
+   below. Signal-specific observability diagrams may additionally use the
+   metric/log/trace/profile classes. Do not invent decorative per-node colors
+   or rely on color alone to communicate state.
+
+   ```text
+   classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+   classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+   classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+   classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+   classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+   classDef external fill:#64748b,color:#fff,stroke:#334155;
+   classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+   classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+   classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+   classDef profile fill:#f3d9fa,color:#111,stroke:#9c36b5;
+   classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+   classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+   ```
+
+5. **Make state explicit.** Solid arrows are current paths. Dotted arrows mean
+   optional, indirect, reference, or documented exceptions and must have a
+   label. Planned nodes and edges must also contain the word `planned`; a dashed
+   border is supplementary, not the only signal.
+6. **Provide a legend at the right level.** A platform-wide architecture with
+   four or more semantic classes needs a compact legend. Area-level and smaller
+   diagrams may rely on the nearest area legend when they use exactly the same
+   palette. Sequence diagrams and data charts do not need class
+   definitions.
+7. **Render before review.** Render every changed Mermaid block with `mmdc` or
+   Kroki, inspect the output for clipping and ambiguous crossings, then run
+   link/fence checks. For an area-wide refactor, render every Mermaid block in
+   that area, including unchanged diagrams, to catch shared-reader regressions.
 
 ## Reference
 

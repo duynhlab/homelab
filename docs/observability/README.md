@@ -16,85 +16,112 @@ Postgres query plans, the frontend). Profiles push straight to Pyroscope.
 
 ```mermaid
 flowchart TB
-    subgraph apps["10 Go microservices + 2 workers (obsx SDK)"]
-        SVC["otelgin · otelgrpc<br/>zap→OTLP tee · runtime metrics"]
-    end
-    subgraph infra["Non-instrumented pods"]
-        INF["DBs · Kong access log · PG plans · frontend"]
+    subgraph workloads["Instrumented workloads"]
+        Services["10 Go services<br/>HTTP + gRPC"]
+        Workers["order-worker<br/>checkout-worker"]
     end
 
-    subgraph col["OpenTelemetry Collector"]
-        RCV[/"otlp receiver :4318 / :4317"/]
-        PROC[/"memory_limiter → deltatocumulative → batch"/]
-        RCV --> PROC
+    subgraph nonSdk["Workloads without an OTel SDK"]
+        Infra["Databases · frontend<br/>Kong access log · PG plans"]
+        Kong["Kong gateway<br/>runtime telemetry"]
     end
 
-    VEC["Vector DaemonSet"]
+    subgraph collectorNode["OpenTelemetry Collector"]
+        Receiver[/"OTLP receiver<br/>HTTP :4318 · gRPC :4317"/]
+        Processors[/"memory_limiter<br/>deltatocumulative · batch"/]
+        Receiver --> Processors
+    end
 
-    subgraph be["Backends"]
-        VMAgent[/"vmagent :8429<br/>OTLP ingest + infra scrape"/]
+    Vector["Vector DaemonSet"]
+
+    subgraph backends["Signal backends"]
+        VMAgent[/"VMAgent :8429<br/>OTLP ingest + infra scrape"/]
         VMSingle[("VictoriaMetrics :8428")]
-        Tempo[("Tempo")]
-        Jaeger[("Jaeger :16686")]
-        VT[("VictoriaTraces :10428")]
         VLogs[("VictoriaLogs :9428")]
+        Tempo[("Tempo<br/>durable on RustFS")]
+        Jaeger[("Jaeger<br/>in-memory UI")]
+        VT[("VictoriaTraces :10428<br/>pilot")]
         Pyro[("Pyroscope :4040")]
     end
 
-    subgraph alert["Alerting"]
+    subgraph alerting["Alert evaluation and routing"]
+        Sloth["Sloth"]
         VMAlert["VMAlert"]
         VMAM["VMAlertmanager"]
-        Sloth["Sloth → PrometheusRules"]
+        Sloth -->|"generated burn-rate rules"| VMAlert
+        VMAlert --> VMAM
     end
 
     Grafana{{"Grafana"}}
 
-    SVC -.->|"OTLP push (metrics·logs·traces) :4318"| RCV
-    SVC -.->|"pprof push"| Pyro
-    INF -.->|"stdout"| VEC
-    Kong["Kong (edge)"] -.->|"runtime logs OTLP"| RCV
-
-    PROC -->|"metrics OTLP"| VMAgent --> VMSingle
-    PROC -->|"traces"| Tempo
-    PROC -->|"traces"| Jaeger
-    PROC -->|"traces"| VT
-    PROC -->|"logs (VL-Stream-Fields)"| VLogs
-    VEC -->|"jsonline"| VLogs
+    Services & Workers -->|"OTLP metrics · logs · traces"| Receiver
+    Services & Workers -->|"pprof push"| Pyro
+    Infra -->|"stdout / files"| Vector
+    Kong -->|"OTLP runtime logs + spans"| Receiver
+    Processors -->|"metrics"| VMAgent
+    Processors -->|"logs"| VLogs
+    Processors -->|"traces"| Tempo
+    Processors -->|"traces"| Jaeger
+    Processors -->|"traces"| VT
+    Vector -->|"JSON line ingest"| VLogs
+    VMAgent -->|"remote write"| VMSingle
+    VMAlert -->|"PromQL"| VMSingle
 
     VMSingle --> Grafana
+    VLogs --> Grafana
     Tempo --> Grafana
     Jaeger --> Grafana
     VT --> Grafana
-    VLogs --> Grafana
     Pyro --> Grafana
 
-    VMSingle -->|"vmalert.proxyURL"| VMAlert --> VMAM
-    Sloth --> VMAlert
-
-    classDef metric fill:#ffe8cc,stroke:#e8590c,color:#111;
-    classDef log fill:#d3f9d8,stroke:#2f9e44,color:#111;
-    classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
-    classDef profile fill:#f3d9fa,stroke:#9c36b5,color:#111;
-    classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
-    classDef app fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef external fill:#64748b,color:#fff,stroke:#334155;
-    class RCV,PROC otc;
-    class VMSingle,VMAgent metric;
-    class VLogs,VEC log;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef profile fill:#f3d9fa,color:#111,stroke:#9c36b5;
+    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    class Services service;
+    class Workers worker;
+    class Receiver,Processors collector;
+    class VMAgent,VMSingle metric;
+    class Vector,VLogs log;
     class Tempo,Jaeger,VT trace;
     class Pyro profile;
-    class SVC app;
+    class Sloth,VMAlert,VMAM,Grafana platform;
     class Kong edge;
-    class Grafana,VMAlert,VMAM,Sloth platform;
-    class INF external;
-    style apps fill:#eef2ff,color:#111;
-    style infra fill:#d3f9d8,color:#111;
-    style col fill:#d0ebff,color:#111;
-    style be fill:#f1f3f5,color:#111;
-    style alert fill:#ffe3e3,color:#111;
+    class Infra external;
 ```
+```mermaid
+graph LR
+    subgraph Legend["Observability diagram legend"]
+        Edge["Edge / gateway"]:::edge
+        Service["Go service"]:::service
+        Worker["Worker"]:::worker
+        Collector["Collector / processor"]:::collector
+        Metric["Metrics path"]:::metric
+        Log["Logs path"]:::log
+        Trace["Traces path"]:::trace
+        Profile["Profiles path"]:::profile
+        Platform["Control / query plane"]:::platform
+        External["External / non-SDK workload"]:::external
+    end
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef profile fill:#f3d9fa,color:#111,stroke:#9c36b5;
+    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+```
+
 
 ## 3-Layer Service Architecture & APM Integration
 
@@ -104,28 +131,28 @@ Each Go service is structured as **web → logic → core**. APM data is emitted
 
 ```mermaid
 graph TD
-    A[HTTP Request] --> B[Gin Router]
-    B --> C[Middleware Chain]
+    A["HTTP request"] --> B["Gin router"]
+    B --> C["Middleware chain"]
 
     C --> D["TracingMiddleware (otelgin)<br/>root span + http.server.* metrics"]
-    D --> E[LoggingMiddleware<br/>Extracts trace-id]
+    D --> E["LoggingMiddleware<br/>request log + trace_id"]
 
-    E --> H[Web Layer v1<br/>web/v1/handler.go]
-    H --> J[Parse Request<br/>Validate Input<br/>Create Web Span]
-    J --> L[Logic Layer v1<br/>logic/v1/service.go]
-    L --> N[Business Logic<br/>Create Logic Span<br/>Cache-Aside]
-    N --> O[Core Layer<br/>core/domain/<br/>core/database.go<br/>core/cache/]
+    E --> H["Web layer<br/>web/v1"]
+    H --> J["Parse request<br/>validate input<br/>optional child span"]
+    J --> L["Logic layer<br/>logic/v1"]
+    L --> N["Business rules<br/>optional child span<br/>cache-aside"]
+    N --> O["Core layer<br/>domain · database · cache"]
 
-    O --> P[Return Result]
-    P --> Q[Format Response]
-    Q --> R[HTTP Response]
+    O --> P["Return domain result"]
+    P --> Q["Format response"]
+    Q --> R["HTTP response"]
 
-    style D fill:#e1f5ff
-    style E fill:#fff4e1
-    style F fill:#ffe1f5
-    style J fill:#e1ffe1
-    style N fill:#ffe1e1
-    style O fill:#f0e1ff
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    class A,R edge;
+    class B,C,D,E,H,J,L,N,P,Q service;
+    class O data;
 ```
 
 ### End-to-End Request with APM
@@ -250,22 +277,24 @@ func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*doma
 
 ```mermaid
 graph LR
-    A[HTTP Request<br/>traceparent header] --> B[TracingMiddleware<br/>Extract/Generate trace-id]
-    B --> C[LoggingMiddleware<br/>Add trace-id to logger]
-    C --> D[Web Handler<br/>Get logger from context]
-    D --> E[Logic Service<br/>Get logger from context]
-    E --> F[All Logs<br/>Include trace-id]
+    A["HTTP request<br/>traceparent header"] --> B["TracingMiddleware<br/>extract or create trace_id"]
+    B --> C["LoggingMiddleware<br/>attach trace_id to logger"]
+    C --> D["Web handler<br/>logger from context"]
+    D --> E["Logic service<br/>logger from context"]
+    E --> F["Structured logs<br/>include trace_id"]
 
-    B --> G[OpenTelemetry Context<br/>Propagate via context.Context]
-    G --> H[Web Span<br/>Parent: Root Span]
-    H --> I[Logic Span<br/>Parent: Web Span]
+    B --> G["OpenTelemetry context<br/>propagated by context.Context"]
+    G --> H["Web span<br/>child of root span"]
+    H --> I["Logic span<br/>child of web span"]
 
-    style B fill:#e1f5ff
-    style C fill:#fff4e1
-    style F fill:#fff4e1
-    style G fill:#e1f5ff
-    style H fill:#e1f5ff
-    style I fill:#e1f5ff
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    class A edge;
+    class C,D,E service;
+    class F log;
+    class B,G,H,I trace;
 ```
 
 > Note: `prometheus-operator-crds` is installed only so VictoriaMetrics Operator can transparently consume `ServiceMonitor` / `PodMonitor` / `PrometheusRule` resources — there is no Prometheus server running.
@@ -388,7 +417,7 @@ The investigation flow from alert to root cause:
 sequenceDiagram
     participant A as Alert fires
     participant M as Metrics (Grafana)
-    participant T as Traces (Tempo/Jaeger)
+    participant T as Traces (Tempo/Jaeger/VictoriaTraces)
     participant L as Logs (VictoriaLogs)
     participant P as Profiles (Pyroscope)
 

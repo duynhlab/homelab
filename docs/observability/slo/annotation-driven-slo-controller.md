@@ -16,14 +16,38 @@ Use an annotation-driven controller instead of Helm chart integration when:
 
 ```mermaid
 flowchart LR
-    A["Deployment<br/>(annotations)"] -->|watch| B["SLO Controller"]
-    B -->|create/update| C["PrometheusServiceLevel"]
-    C -->|reconcile| D["Sloth Operator"]
-    D -->|generate| E["PrometheusRules"]
-    E -->|evaluate| F["Prometheus"]
+    deployment["Deployment annotations<br/>(planned input)"]
+    controller["SLO Controller<br/>(planned)"]
+    psl["PrometheusServiceLevel"]
+    sloth["Sloth Operator"]
+    promRule["PrometheusRule"]
+    vmop["VM Operator"]
+    vmRule["VMRule"]
+    vmAlert["VMAlert"]
+    vmSingle[("VMSingle")]
+
+    deployment -.->|"planned: watch"| controller
+    controller -.->|"planned: create / update"| psl
+    psl -->|reconcile| sloth
+    sloth -->|generate| promRule
+    promRule -->|convert| vmop --> vmRule -->|evaluate| vmAlert
+    vmAlert -->|query| vmSingle
+
+    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    class deployment,controller planned;
+    class psl,promRule,vmRule data;
+    class sloth,vmop platform;
+    class vmAlert,vmSingle metric;
 ```
 
-The controller watches Deployments with `slo.platform/*` annotations and automatically creates/updates/deletes `PrometheusServiceLevel` CRDs. Sloth Operator then generates PrometheusRules as usual.
+In this proposed path, the controller would watch Deployments with
+`slo.platform/*` annotations and create, update, or delete
+`PrometheusServiceLevel` CRDs. The downstream path already exists: Sloth
+generates `PrometheusRule` resources, VM Operator converts them to `VMRule`,
+and VMAlert evaluates them against VMSingle.
 
 ## Annotation Design
 
@@ -243,4 +267,4 @@ The migration is safe because:
 - Controller uses server-side apply for idempotent updates
 
 ---
-_Last updated: 2026-07-09_
+_Last updated: 2026-07-14_

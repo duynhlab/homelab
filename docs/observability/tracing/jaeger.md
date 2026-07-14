@@ -114,29 +114,36 @@ Shows transitive dependencies:
 
 ```mermaid
 flowchart TB
-    subgraph Apps["Microservices"]
-        A1[auth]
-        A2[user]
-        A3[product]
+    subgraph workloads["Instrumented workloads"]
+        Services["10 Go services"]
+        Workers["2 Temporal workers"]
     end
-    
-    subgraph OTelCollector["OTel Collector"]
-        R[Receiver :4318]
-        E1[Export to Tempo]
-        E2[Export to Jaeger]
-        E3[Export to VictoriaTraces]
+
+    subgraph collectorNode["OpenTelemetry Collector"]
+        Receiver[/"OTLP receiver :4318"/]
+        Fanout[/"batch + trace exporters"/]
+        Receiver --> Fanout
     end
-    
-    subgraph Backends
-        Tempo[(Tempo<br/>Grafana query)]
-        Jaeger[(Jaeger<br/>Standalone UI)]
-        VT[(VictoriaTraces<br/>pilot)]
+
+    subgraph backends["Trace backends"]
+        Tempo[("Tempo<br/>primary · durable")]
+        Jaeger[("Jaeger<br/>in-memory UI")]
+        VT[("VictoriaTraces<br/>pilot")]
     end
-    
-    Apps -->|OTLP| R
-    R --> E1 --> Tempo
-    R --> E2 --> Jaeger
-    R --> E3 --> VT
+
+    Services & Workers -->|"OTLP spans"| Receiver
+    Fanout -->|"OTLP/gRPC"| Tempo
+    Fanout -->|"OTLP/gRPC"| Jaeger
+    Fanout -->|"OTLP/HTTP"| VT
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    class Services service;
+    class Workers worker;
+    class Receiver,Fanout collector;
+    class Tempo,Jaeger,VT trace;
 ```
 
 **Key Points:**
@@ -313,4 +320,4 @@ ctx, span := tracer.Start(ctx, "ProcessOrder")
 - [Jaeger Official Docs](https://www.jaegertracing.io/docs/)
 
 ---
-_Last updated: 2026-07-10_
+_Last updated: 2026-07-14_

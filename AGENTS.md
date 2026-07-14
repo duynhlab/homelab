@@ -198,7 +198,7 @@ reference style.
 | gRPC east-west | [`docs/api/api.md`](docs/api/api.md#grpc-runtime-model) |
 | Observability | [`docs/observability/README.md`](docs/observability/README.md) |
 | Databases | [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) |
-| Secrets | [`docs/secrets/README.md`](docs/secrets/README.md) |
+| Secrets | [`docs/secrets/README.md`](docs/secrets/README.md), [`docs/secrets/openbao.md`](docs/secrets/openbao.md) |
 | Kong gateway | [`docs/platform/kong-gateway.md`](docs/platform/kong-gateway.md) |
 | Caching | [`docs/caching/caching.md`](docs/caching/caching.md) |
 | Alerts catalog | [`docs/observability/alerting/alert-catalog.md`](docs/observability/alerting/alert-catalog.md) |

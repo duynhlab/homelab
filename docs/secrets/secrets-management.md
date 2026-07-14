@@ -2,7 +2,7 @@
 
 > **Scope**: How application teams add, consume, and rotate secrets in this repo.
 >
-> For OpenBAO architecture (HA/Raft, seal, auth methods, secret engines, lease model) read [`README.md`](./README.md). For TLS read [`cert-manager.md`](./cert-manager.md) and [`trust-distribution.md`](./trust-distribution.md).
+> For OpenBAO architecture (HA/Raft, seal, auth methods, secret engines, lease model) read [`openbao.md`](./openbao.md). For TLS read [`cert-manager.md`](./cert-manager.md) and [`trust-distribution.md`](./trust-distribution.md).
 
 ---
 
@@ -91,7 +91,7 @@ secret/{environment}/{category}/{service-or-component}/{resource}
 | `{service-or-component}` | `auth`, `product`, `pgdog-cnpg`, `rustfs` | Specific service or infra component |
 | `{resource}` | `credentials`, `jwt-signing-key`, `api-keys`, `backup-credentials` | Type of secret |
 
-For the **full canonical KV catalog** (all paths currently seeded plus future-app placeholders) see [`README.md` §5.1 KV v2 — Static Secrets](./README.md#51-kv-v2--static-secrets).
+For the **full canonical KV catalog** (all paths currently seeded plus future-app placeholders) see [`openbao.md` §5.1 KV v2 — Static Secrets](./openbao.md#51-kv-v2--static-secrets).
 
 > ⚠️ **`secret/local/infra/cloudflare/api-token`** (key `api_token`): on **local Kind** the `openbao-bootstrap` Job seeds a **dev placeholder** so the ExternalSecret syncs; on **prod** the real token is operator-supplied (not in Git) and re-seeded after every fresh cluster — see [Bootstrap-only secrets](#bootstrap-only-secrets) below.
 
@@ -308,17 +308,17 @@ kubectl get clustersecretstore openbao
 
 #### OpenBAO Authentication Failing (`permission denied` from ESO ~1h after bootstrap)
 
-Reviewer-JWT pitfall (commit `fb14349`) — root cause + runtime fix + persistent fix are documented in [`README.md` §13 — Authentication Failing](./README.md#authentication-failing). Also covers general K8s auth checks.
+Reviewer-JWT pitfall (commit `fb14349`) — root cause + runtime fix + persistent fix are documented in [Reviewer JWT auth failure](./runbooks/reviewer-jwt-auth-failure.md). General ESO sync checks live in [ESO sync failure](./runbooks/eso-sync-failure.md).
 
 #### OpenBAO Sealed After Restart
 
-See [`README.md` §12.2 Unseal After Node Restart](./README.md#122-unseal-after-node-restart).
+See [OpenBAO unseal and stuck reconciliation](./runbooks/openbao-unseal.md).
 
 ---
 
 ## File Reference
 
-See [`README.md` §16 File Reference](./README.md#16-file-reference) for the canonical list of OpenBAO + ESO + cert-manager files.
+See [`openbao.md` §File Reference](./openbao.md#16-file-reference) for the canonical list of OpenBAO + ESO + cert-manager files.
 
 ---
 
@@ -386,7 +386,7 @@ Replace Shamir with cloud KMS for automatic unseal:
 
 ## Related Documentation
 
-- [OpenBAO Architecture & Operations](./README.md) — the canonical reference for OpenBAO internals
+- [OpenBAO Architecture](./openbao.md) — the canonical reference for OpenBAO internals
 - [cert-manager](./cert-manager.md) — consumes the `cloudflare-api-token` Secret synced here
 - [Trust Distribution](./trust-distribution.md) — distributes the homelab CA bundle
 - [RFC-0008 — Production secrets hardening](../proposals/rfc/RFC-0008/) — EKS/GKE hardening + parity/testing matrix (+ [implementation.md](../proposals/rfc/RFC-0008/implementation.md))

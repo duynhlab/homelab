@@ -134,7 +134,10 @@ docs/
 │       ├── postgres_backup_restore.md  # PostgreSQL backup/restore procedures
 │       └── victorialogs_kubernetes_logs_debug.md  # VictoriaLogs log debugging
 ├── secrets/                      # Secrets, TLS & trust distribution (one chain)
-│   ├── README.md                 # OpenBAO architecture & operations (folder hub)
+│   ├── README.md                 # Homelab secrets/TLS/trust hub
+│   ├── openbao.md                # OpenBAO HA/Raft architecture and learning notes
+│   ├── runbooks/                 # OpenBAO/ESO recovery procedures
+│   ├── production-hardening.md   # Planned production target and guardrails
 │   ├── secrets-management.md     # Per-app ESO usage, add/rotate runbooks
 │   ├── cert-manager.md           # cert-manager + Let's Encrypt + Flux (Helm, Ingress, TLS)
 │   └── trust-distribution.md     # trust-manager Bundle (homelab-ca-bundle), dual-PKI
@@ -412,7 +415,10 @@ docs/
 ### Secrets
 
 - [Secrets Management](./secrets/secrets-management.md) - OpenBAO + ESO guide for centralized secret management
-- [OpenBAO](./secrets/README.md) - OpenBAO HA architecture & operations (incl. reviewer-JWT pitfall, bootstrap-only Cloudflare token)
+- [Secrets hub](./secrets/README.md) - Homelab-wide OpenBAO → ESO → cert-manager → trust-manager flow
+- [OpenBAO Architecture](./secrets/openbao.md) - OpenBAO HA/Raft internals, auth, engines, policies
+- [Secrets runbooks](./secrets/runbooks/) - OpenBAO/ESO troubleshooting and recovery
+- [Secrets Production Hardening](./secrets/production-hardening.md) - Planned TLS, KMS/Transit, OIDC, AppRole, and dynamic DB credentials
 - [cert-manager + Flux](./secrets/cert-manager.md) - TLS with Let's Encrypt, HelmRelease, Ingress
 - [Trust Distribution](./secrets/trust-distribution.md) - trust-manager `homelab-ca-bundle` and the LE / homelab-CA dual-PKI split
 - [Secrets decisions & hardening](./proposals/) - ADR-004 (audit) + ADR-005 (OpenBAO HA); [RFC-0008](./proposals/rfc/RFC-0008/) production hardening + parity/testing matrix (+ its implementation.md migration plan); RFC backlog for rotation / PushSecret

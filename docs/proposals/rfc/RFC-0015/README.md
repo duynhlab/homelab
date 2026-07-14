@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | platform-wide | 2026-07-11 | 2026-07-12 |
+| provisional | platform-wide | 2026-07-11 | 2026-07-14 |
 
 > **Don't forget: every decision is a tradeoff.** The headline tradeoffs in this
 > RFC: checkout does **not** own orders or the saga (it pays an extra internal
@@ -665,6 +665,20 @@ Phased P1→P6 as above. Blast-radius notes:
   fee/tax/discount, order persists them (migration 000007 restates
   check_order_total as the full composition), and the e2e asserts
   session total == order total == charged amount.
+- 2026-07-14 — **P5 shipped** (cluster): checkout runs on Kind behind Kong.
+  Delivered via homelab#505 (DB triplet on product-db, RSIP + worker,
+  NetworkPolicies, Kyverno lists, Kong route + CORS Idempotency-Key) and
+  #509 (fleet re-tag to the v3/RFC-0015 images and the single-Service chart
+  fixes). Cluster e2e green: A1–A9 regression, promo apply, **atomic
+  redemption proven exactly-once through a live outage** (order answered
+  Unavailable mid-confirm; the session parked and the same-key re-drive
+  converged to order 1 with session total == order total to the cent),
+  Idempotency-Key replay → same order, saga `OrderFulfillmentWorkflow`
+  Completed, `AbandonedCheckoutWorkflow` finalize signals Completed,
+  negative NetworkPolicy probes blocked, business metrics in
+  VictoriaMetrics over OTLP. Bring-up findings (chart 0.16 single-Service
+  addresses, auth JWKS allow-list, OpenBAO probe tolerances, staged
+  bring-up for constrained hosts) are recorded in the delivery PRs.
 
 ## Related
 
@@ -697,4 +711,4 @@ Phased P1→P6 as above. Blast-radius notes:
   [`SERVICES.md`](../../../../SERVICES.md).
 
 ---
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-14_

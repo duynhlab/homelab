@@ -5,7 +5,7 @@
 | **Status** | **Implemented and enforced** — manifests reconciled by Flux; **actively enforced by kindnet** on the local Kind cluster (K8s 1.34.3) |
 | **Scope** | Ingress fencing across app-tier namespaces — app HTTP `:8080` / gRPC `:9090`, plus DB-tier ports (poolers, CNPG status, exporters) |
 | **Purpose** | Make the cluster the fence for `internal` audiences — internal routes are reachable only from explicitly allowed namespaces, not merely "absent from the Ingress" |
-| **Related** | [`policy-catalog.md`](policy-catalog.md) (Kyverno catalog), [`../api/api-naming-convention.md`](../api/api-naming-convention.md) (audiences), [`../api/grpc-internal-comms.md`](../api/grpc-internal-comms.md) (gRPC `:9090`, now fenced) |
+| **Related** | [`policy-catalog.md`](policy-catalog.md) (Kyverno catalog), [`../api/api.md`](../api/api.md#audience-segments) (audiences), [gRPC security](../api/api.md#security) (`:9090` caller fences) |
 
 ## TL;DR
 
@@ -64,7 +64,7 @@ allowed (north-south gateway traffic); the rest mirror the east-west call graph.
 
 | Callee | Allowed callers | Why |
 |--------|-----------------|-----|
-| **auth** | `kong` + **all 9 services** (incl. self and payment) | Every service refreshes the RS256 JWKS from `GET /auth/v1/public/auth/jwks` (`:8080`); JWTs are verified locally. |
+| **auth** | `kong` + **all 9 currently deployed service namespaces** (including self and payment; checkout joins at planned P5) | Every service refreshes the RS256 JWKS from `GET /auth/v1/public/auth/jwks` (`:8080`); JWTs are verified locally. |
 | **user** | `kong` | Browser-only today; no service-to-service caller. |
 | **product** | `kong` | Browser-only; aggregates *outward* to review. |
 | **cart** | `kong`, `order` | `order` reads the cart during checkout. |

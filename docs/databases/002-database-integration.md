@@ -475,7 +475,7 @@ func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 - **[Backup Strategy](./006-backup-strategy.md)** - Backup architecture, retention, bucket layout
 - **[Backup/Restore Runbook](../runbooks/troubleshooting/postgres_backup_restore.md)** - Restore procedures (CNPG vs Zalando)
 - **[Setup Guide](../platform/setup.md)** - Complete deployment and configuration guide
-- **[Error Handling](../api/api.md#error-handling)** - Database error handling patterns
+- **[Error Envelope](../api/api.md#error-envelope)** - Shared API error contract for database failures
 - **[API Reference](../api/api.md)** - API endpoints using database
 - **[PgCat Prepared Statement Error](../runbooks/troubleshooting/pgcat_prepared_statement_error.md)** - Legacy: intermittent 500 errors when fronting PostgreSQL with **PgCat** in transaction mode
 

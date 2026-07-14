@@ -339,7 +339,7 @@ config:
   error_message: "Rate limit exceeded. Please slow down."
 ```
 
-**Applied to**: All 9 services' API ingresses via annotation `konghq.com/plugins: rate-limiting-api`
+**Applied to**: All 9 currently deployed service API ingresses via annotation `konghq.com/plugins: rate-limiting-api`
 
 **Not applied to**: Frontend (`local.duynh.me`), monitoring dashboards, MCP servers
 
@@ -692,7 +692,7 @@ On prod, to switch the wildcard to LE staging while iterating (avoid prod rate l
 
 ## Routing Rules
 
-URL shape is **Variant A** from [`api-naming-convention.md`](../api/api-naming-convention.md): `/{service}/v1/{audience}/{resource…}`. Services mount these paths directly on their HTTP routers; Kong is **pure pass-through** (`strip-path: false`, no rewrite plugin). Services keep validating JWTs themselves.
+URL shape is **Variant A** from [`api.md`](../api/api.md#http-url-model): `/{service}/v1/{audience}/{resource…}`. Services mount these paths directly on their HTTP routers; Kong is **pure pass-through** (`strip-path: false`, no rewrite plugin). Services keep validating JWTs themselves.
 
 Per-ingress `path:` entries are scoped to `public` and `private` audiences only — `internal` is never listed on the gateway, so requests to `https://gateway.duynh.me/notification/v1/internal/…` return Kong's default 404.
 

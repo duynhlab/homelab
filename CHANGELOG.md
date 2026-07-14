@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **API documentation organized by service**: shared HTTP and gRPC
+  conventions now live in `docs/api/api.md`; each of the ten services has one
+  contract file; Saga-vs-2PC learning moved beside the live Temporal workflow.
+  Compatibility pages preserve links to the three former guide filenames.
 - **Observability configs reorganized by pillar**: `configs/monitoring/` →
   `configs/observability/{metrics,logging,tracing,grafana,sloth}` — VLSingle
   (logs) and VTSingle (traces) no longer hide inside `victoriametrics/`;

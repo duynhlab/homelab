@@ -74,7 +74,7 @@ failure. The HTTP request stays async (`201 pending`); the workflow drives the o
   `CreateShipment`/`CancelShipment`.
 - Checkout becomes **async** (`201 pending`); the SPA polls for the terminal status.
 - When to reach for Temporal again (and when not) is documented in the
-  [guide §2](../../../api/temporal-order-fulfillment.md#2-when-to-use-temporal-and-when-not) — it is for
+  [guide — When to Use Temporal](../../../api/temporal-order-fulfillment.md#when-to-use-temporal) — it is for
   durable multi-step orchestration, not for ordinary request/response.
 
 ---

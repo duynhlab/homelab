@@ -38,9 +38,9 @@ Reduce common LLM coding mistakes. Bias toward caution over speed; use judgment 
 
 ## Project overview
 
-- **`duynhlab` microservices platform** — 9 Go microservices + a React frontend, each in its own namespace.
+- **`duynhlab` microservices platform** — 10 Go microservice repositories + a React frontend. Nine services are cluster-deployed; checkout P1-P4 runs in local-stack and its cluster P5 is planned.
 - **This repo (`homelab`):** GitOps (Flux Operator + Kustomize + OCI), observability, databases/secrets infra, and docs. No application source here.
-- **Service repos:** `auth/user/product/cart/order/review/shipping/notification/payment-service`, `frontend`; shared Go library `duynhlab/pkg`; chart `duynhlab/helm-charts` (the `mop` chart). Reusable CI in `duynhlab/gha-workflows`.
+- **Service repos:** `auth-service`, `user-service`, `product-service`, `cart-service`, `order-service`, `review-service`, `shipping-service`, `notification-service`, `payment-service`, `checkout-service`, and `frontend`; shared Go library `duynhlab/pkg`; chart `duynhlab/helm-charts` (the `mop` chart). Reusable CI in `duynhlab/gha-workflows`.
 - Full index: [`SERVICES.md`](SERVICES.md), [`docs/README.md`](docs/README.md).
 
 ## Repository layout
@@ -52,7 +52,7 @@ kubernetes/
   apps/       # Domain ResourceSets + per-service InputProviders + frontend
 scripts/      # Kind/Flux helpers (called by the Makefile)
 terraform/    # OpenTofu root: Flux Operator + FluxInstance bootstrap (flux-operator-bootstrap module)
-local-stack/  # Docker Compose e2e stack (Postgres + Valkey + 9 services + mockpay + Kong DB-less gateway + SPA)
+local-stack/  # Docker Compose e2e stack (Postgres + Valkey + 10 services + mockpay + Kong DB-less gateway + SPA)
 docs/         # Documentation (start at docs/README.md)
 ```
 
@@ -90,9 +90,9 @@ flowchart LR
 ```
 
 - **Frontend → Web layer only.** The SPA calls `/{service}/v1/{public,private}/…` via `VITE_API_BASE_URL`; never Logic/Core/DB. Aggregation happens server-side.
-- **API URL shape (Variant A):** `/{service}/v1/{audience}/{resource…}`, mounted directly on each service's router (Kong is pass-through, no rewrite). `{audience}` ∈ `public|private|internal|protected`. **Never** put `internal` routes on `ingress-api.yaml` — they're in-cluster only; **NetworkPolicy is the fence**, not the absence of an Ingress rule. Auth middleware lives in each service (`pkg/authmw`: verifies RS256 JWTs locally against a cached JWKS — JWT-only since RFC-0009 Phase 5; the opaque-token `auth.GetMe` fallback and auth's gRPC server were removed), not Kong. Additionally, Kong runs edge JWT (RFC-0009 Phase 4, ADR-006) on `/private/` routes — rejecting bad/expired RS256 tokens at the gateway as a coarse first filter, with the service check still authoritative. Authoritative: [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md).
-- **gRPC is the official east-west transport** (product→review, order→shipping, order→notification, order→payment) — gRPC-only, always-on `:9090`, no feature flag, no REST fallback. (auth's `/me` GetMe RPC was removed in Phase 5 — services verify JWTs locally.) Shared `pkg/grpcx`. Browser/Kong traffic stays HTTP/JSON.
-- **Observability:** middleware chain **tracing → logging → metrics**; gRPC RED metrics surface on each service's existing `/metrics` via `pkg/obsx` (no extra port); `obsx.TraceIDFromContext` correlates logs with traces. Stack: VictoriaMetrics, Grafana, Tempo (+ VictoriaTraces pilot), VictoriaLogs (Loki removed), Pyroscope, Jaeger, Vector. SLO via Sloth. Kong emits edge spans (opentelemetry `inject:[w3c]`).
+- **API URL shape (Variant A):** `/{service}/v1/{audience}/{resource…}`, mounted directly on each service's router (Kong is pass-through, no rewrite). `{audience}` ∈ `public|private|internal|protected`. **Never** put `internal` routes on `ingress-api.yaml` — they're in-cluster only; **NetworkPolicy is the fence**, not the absence of an Ingress rule. Auth middleware lives in each service (`pkg/authmw`: verifies RS256 JWTs locally against a cached JWKS — JWT-only since RFC-0009 Phase 5; the opaque-token `auth.GetMe` fallback and auth's gRPC server were removed), not Kong. Additionally, Kong runs edge JWT (RFC-0009 Phase 4, ADR-006) on `/private/` routes — rejecting bad/expired RS256 tokens at the gateway as a coarse first filter, with the service check still authoritative. Authoritative: [`docs/api/api.md`](docs/api/api.md#http-url-model).
+- **gRPC is the official east-west transport** for migrated calls: product→review; order/order-worker→product, shipping, notification, and payment; checkout→cart, product, shipping, and order in local-stack. Servers are always-on at `:9090`, with no feature flag or REST fallback for migrated RPCs. The two order→cart calls remain documented REST exceptions. Auth's `GetMe` RPC was removed in Phase 5 because services verify JWTs locally. Browser/Kong traffic stays HTTP/JSON. Shared behavior lives in `pkg/grpcx`.
+- **Observability:** middleware chain **tracing → logging → metrics**; HTTP, gRPC, and runtime metrics export over OTLP via `pkg/obsx` (the scrape-era application `/metrics` endpoint was removed); `obsx.TraceIDFromContext` correlates logs with traces. Stack: VictoriaMetrics, Grafana, Tempo (+ VictoriaTraces pilot), VictoriaLogs (Loki removed), Pyroscope, Jaeger, Vector. SLO via Sloth. Kong emits edge spans (opentelemetry `inject:[w3c]`).
 - **Caching:** Cache-Aside with Valkey for read-heavy endpoints.
 - **Diagrams:** **Mermaid only — never ASCII art** (`flowchart`, `sequenceDiagram`, etc.).
 - **Stack:** Go 1.26, Gin, PostgreSQL (CloudNativePG operator, PgDog pooler, Barman backups, golang-migrate v4.19.1 migrations embedded in each service binary), OpenTelemetry, Flux Operator + Kustomize + OCI, Kind + Helm 3, OpenBAO + External Secrets Operator.
@@ -136,8 +136,8 @@ Docs are a first-class deliverable in this repo. When writing or refactoring the
 |-------|-----------|
 | Docs index | [`docs/README.md`](docs/README.md) |
 | Setup / commands | [`docs/platform/setup.md`](docs/platform/setup.md) |
-| API (routes / payloads) | [`docs/api/api-naming-convention.md`](docs/api/api-naming-convention.md), [`docs/api/api.md`](docs/api/api.md) |
-| gRPC east-west | [`docs/api/grpc-internal-comms.md`](docs/api/grpc-internal-comms.md) |
+| API (shared rules and service contracts) | [`docs/api/api.md`](docs/api/api.md), [`docs/api/README.md`](docs/api/README.md#service-contracts) |
+| gRPC east-west | [`docs/api/api.md`](docs/api/api.md#grpc-runtime-model) |
 | Observability | [`docs/observability/README.md`](docs/observability/README.md) |
 | Databases | [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) |
 | Secrets | [`docs/secrets/README.md`](docs/secrets/README.md) |

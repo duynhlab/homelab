@@ -1,7 +1,7 @@
 # API routes on the public gateway (gateway.duynh.me).
 #
 # URL shape: /{service}/v1/{audience}/{resource...}  — Variant A
-# (see docs/api/api-naming-convention.md). Services mount these paths
+# (see docs/api/api.md#http-url-model). Services mount these paths
 # directly; Kong does NOT rewrite — pure pass-through.
 #
 # Only `public` and `private` audiences are exposed on the gateway.

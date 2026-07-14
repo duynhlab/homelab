@@ -1,6 +1,6 @@
 # Documentation Index
 
-Documentation for the **duynhlab microservices platform** — 9 Go services + a React SPA, with GitOps (Flux Operator), observability, databases, secrets, and the RFC/ADR design record.
+Documentation for the **duynhlab microservices platform** — 10 Go services + a React SPA, with GitOps (Flux Operator), observability, databases, secrets, and the RFC/ADR design record.
 
 ---
 
@@ -8,16 +8,24 @@ Documentation for the **duynhlab microservices platform** — 9 Go services + a 
 
 ```
 docs/
-├── api/                          # API surface & subsystem deep-dives
-│   ├── README.md                 # Area hub: how the api docs fit together
-│   ├── api-naming-convention.md # v2.0.0 Adopted: the sole URL surface + complete route inventory
-│   ├── api.md                    # Payload reference: per-endpoint request/response + validation
-│   ├── microservices.md         # Feature matrix: per-service features → API → technique + call graph
-│   ├── grpc-internal-comms.md   # Implemented: gRPC-only internal east-west comms
-│   ├── temporal-order-fulfillment.md # Implemented: Temporal saga — why/when/how, design, infra, ops
-│   ├── saga-vs-2pc.md           # Learning: saga vs two-phase commit — theory + the payment saga
-│   ├── payments.md              # Implemented: payment subsystem — design record + reconciliation
-│   └── checkout.md              # P1: checkout subsystem — session FSM, price re-validation, order handoff
+├── api/                          # API surface, service contracts, and workflow guides
+│   ├── README.md                 # Area hub and recommended learning path
+│   ├── api.md                    # Canonical shared HTTP + gRPC conventions and call graph
+│   ├── microservices.md          # Feature ownership, techniques, dependencies, known gaps
+│   ├── auth.md                   # Auth HTTP contract, refresh rotation, JWKS
+│   ├── user.md                   # User profile contract
+│   ├── product.md                # Catalog, aggregation, stock gRPC contract
+│   ├── cart.md                   # Cart HTTP contract + checkout gRPC read
+│   ├── order.md                  # Order HTTP/gRPC contract + Saga handoff
+│   ├── review.md                 # Review HTTP/gRPC contract
+│   ├── notification.md           # Inbox and delivery contracts
+│   ├── shipping.md               # Tracking, quotes, shipment gRPC contract
+│   ├── checkout.md               # P1-P4 local-stack checkout subsystem
+│   ├── payments.md               # Payment contract, ledger, reconciliation
+│   ├── temporal-order-fulfillment.md # Saga vs 2PC + live Temporal workflow and ops
+│   ├── api-naming-convention.md  # Compatibility page → api.md
+│   ├── grpc-internal-comms.md    # Compatibility page → api.md
+│   └── saga-vs-2pc.md            # Compatibility page → Temporal guide
 ├── proposals/                    # Design proposals & decisions
 │   ├── README.md                 # umbrella: ADR vs RFC + flow + links
 │   ├── adr/                      # Architecture Decision Records
@@ -156,7 +164,7 @@ docs/
 
 3. **[API area hub](./api/README.md)** - How the api docs fit together (routes / payloads / catalog / subsystems)
 
-4. **[API naming convention (v2.0.0 Adopted)](./api/api-naming-convention.md)** - The sole URL surface: Variant A shape, audiences, and the complete route inventory
+4. **[Shared API and communication guide](./api/api.md)** - URL model, audiences, common contracts, service index, and gRPC runtime
 
 5. **[GKE internal & private DNS](./platform/gke-internal-dns.md)** - `cluster.local`, Cloud DNS private zones, multi-environment naming
 
@@ -224,21 +232,22 @@ docs/
 
 ### API Reference
 
-1. **[API area hub](./api/README.md)** - Start here: routes vs payloads vs catalog, and every subsystem doc
+1. **[API area hub](./api/README.md)** - Start here for the learning path and all ten service contracts
 
-2. **[API naming convention (v2.0.0 Adopted)](./api/api-naming-convention.md)** - The sole URL surface + complete route inventory
+2. **[Shared API and communication guide](./api/api.md)** - URL naming, audiences, auth, errors, pagination, HTTP-vs-gRPC, current call graph, HTTP/2 load balancing, security, and observability
 
-3. **[API Reference](./api/api.md)** - Per-endpoint payloads and validation for all 9 services
+3. **[Microservices catalog](./api/microservices.md)** - Feature ownership, service dependencies, techniques, and known gaps
 
-4. **[gRPC internal comms (implemented)](./api/grpc-internal-comms.md)** - gRPC-only east-west; dual-port, HTTP/2 LB pitfall, observability, security
+4. **Service contracts** - [Auth](./api/auth.md), [User](./api/user.md), [Product](./api/product.md), [Cart](./api/cart.md), [Order](./api/order.md), [Review](./api/review.md), [Notification](./api/notification.md), [Shipping](./api/shipping.md), [Checkout](./api/checkout.md), and [Payment](./api/payments.md)
 
-5. **[Temporal order-fulfillment saga (implemented)](./api/temporal-order-fulfillment.md)** - Why/when to use Temporal, the durable saga design, contracts, infra, ops — with [ADR-001](./proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/)/[ADR-002](./proposals/adr/ADR-002-deploy-temporal-via-operator/)
+5. **[Temporal order-fulfillment Saga](./api/temporal-order-fulfillment.md)** - Saga vs 2PC theory, live workflow steps and compensations, infrastructure, and operations
 
-   ↳ **[Saga vs two-phase commit (learning)](./api/saga-vs-2pc.md)** - Why 2PC doesn't fit microservices and how the payment saga achieves consistency without it (theory + tradeoffs)
+6. **[RFCs — propose and track substantial changes](./proposals/rfc/)** - RFC process, index, and consolidated backlog
 
-6. **[RFCs — propose & track substantial changes](./proposals/rfc/)** - RFC process, index, and the consolidated backlog (the old API/architecture review is retired — its findings merged into `api.md`, open items moved to the RFC backlog)
+7. **[GKE internal and private DNS](./platform/gke-internal-dns.md)** - In-cluster DNS and Cloud DNS private zones
 
-7. **[GKE internal & private DNS](./platform/gke-internal-dns.md)** - In-cluster DNS and Cloud DNS private zones
+API naming, gRPC east-west, and Saga-vs-2PC legacy filenames remain as
+compatibility pages; new links should target the canonical guides above.
 
 ### Databases
 
@@ -321,13 +330,13 @@ docs/
 
 ### API
 
-- [API area hub](./api/README.md) - Routes / payloads / catalog / subsystem docs, in one map
-- [API naming convention (v2.0.0 Adopted)](./api/api-naming-convention.md) - Sole URL surface + route inventory
-- [API Reference](./api/api.md) - Per-endpoint payloads and validation
-- [gRPC Internal Comms (implemented)](./api/grpc-internal-comms.md) - gRPC-only internal east-west calls; dual-port, HTTP/2 LB pitfall
-- [Temporal Order-Fulfillment Saga](./api/temporal-order-fulfillment.md) - Durable order saga (why/when/how, design, infra, ops)
-- [Saga vs Two-Phase Commit](./api/saga-vs-2pc.md) - Learning deep-dive: why 2PC doesn't fit microservices; saga theory, compensations, idempotency, and how the payment saga applies them
-- [Payments](./api/payments.md) - Payment subsystem: design record (RFC-0010 + ADRs) + payment↔provider reconciliation (detect-only v1)
+- [API area hub](./api/README.md) - Learning path, document ownership, and all service contracts
+- [Shared API and communication guide](./api/api.md) - HTTP/gRPC conventions, current call graph, load balancing, security, and observability
+- [Microservices catalog](./api/microservices.md) - Feature ownership, techniques, dependencies, and known gaps
+- [Service contracts](./api/README.md#service-contracts) - One file for each of the ten Go services
+- [Temporal Order-Fulfillment Saga](./api/temporal-order-fulfillment.md) - Saga-vs-2PC learning, live compensations, Temporal infrastructure, and operations
+- [Checkout](./api/checkout.md) - P1-P4 local-stack session orchestration; P5 cluster planned
+- [Payments](./api/payments.md) - Payment API, state machine, ledger, provider, and reconciliation
 - [RFC-0009: Production-grade API gateway (signed JWT + Kong edge auth)](./proposals/rfc/RFC-0009/) - Partially implemented; supersedes ADR-003 via ADR-006
 - [RFC-0010: Payment service (PaymentIntent, ledger, charge/refund saga step)](./proposals/rfc/RFC-0010/) - Implemented; P1–P6 landed (ledger, outbox, mockpay, webhooks, saga wiring, reconciliation, cluster GitOps, frontend read path) → ADR-007…011
 - [RFC-0011: Homelab migration — Kind to bare-metal Talos](./proposals/rfc/RFC-0011/) - Provisional; 1 → 3 node HA path
@@ -398,7 +407,7 @@ docs/
 - [SonarCloud](./platform/sonarcloud.md) - SonarCloud integration
 - [Kong API Gateway](./platform/kong-gateway.md) - API-gateway concept + tradeoffs; DB-less Kong (plugins, routing, rate-limiting, TLS)
 - [Kyverno](./platform/kyverno.md) - Admission policies: tiers, Audit→Enforce rollout, exceptions
-- [Graceful Shutdown](./platform/graceful-shutdown.md) - Readiness-drain + signal handling pattern (all 9 services)
+- [Graceful Shutdown](./platform/graceful-shutdown.md) - Readiness-drain + signal handling pattern (all 10 services)
 - [GKE internal & private DNS](./platform/gke-internal-dns.md) - In-cluster DNS and Cloud DNS private zones
 - [MCP Servers](./platform/mcp-servers.md) - In-cluster MCP servers (VictoriaMetrics/Logs, Flux, Grafana)
 - [Ruleset Automation](./platform/ruleset-automation.md) - GitHub repo ruleset provisioning

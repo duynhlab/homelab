@@ -13,4 +13,4 @@ spec:
   interval: 10m
   url: oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-mcp
   ref:
-    semver: ">=0.2.0"
+    semver: "0.3.0"

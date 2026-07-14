@@ -20,7 +20,7 @@ spec:
 
   image:
     repository: victoriametrics/victoria-traces
-    tag: v0.6.0
+    tag: v0.9.4
 
   storage:
     resources:

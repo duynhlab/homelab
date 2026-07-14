@@ -53,8 +53,12 @@ Plugins are installed via the `GF_INSTALL_PLUGINS` environment variable in the G
 
 | Plugin | Version | Purpose |
 |--------|---------|---------|
-| `victoriametrics-metrics-datasource` | 0.23.1 | Native VictoriaMetrics datasource with MetricsQL support |
-| `victoriametrics-logs-datasource` | 0.26.3 | VictoriaLogs datasource with LogsQL in Explore and dashboards |
+| `victoriametrics-metrics-datasource` | 0.25.2 | Native VictoriaMetrics datasource with MetricsQL support |
+| `victoriametrics-logs-datasource` | 0.29.0 | VictoriaLogs datasource with LogsQL in Explore and dashboards |
+
+The metrics plugin includes its Grafana 13 variable-editor fix. The logs plugin
+now defaults to 50 result lines instead of 1000 to prevent heavy Explore
+queries from freezing the browser; datasource owners can still raise the limit.
 
 Both plugins must be listed in `allow_loading_unsigned_plugins` (comma-separated) since they are not signed by Grafana:
 
@@ -120,4 +124,4 @@ kubernetes/infra/configs/observability/grafana/
 - [Metrics](../metrics/README.md) -- RED methodology and metric definitions
 
 ---
-_Last updated: 2026-07-11_
+_Last updated: 2026-07-14 — VictoriaMetrics datasource v0.25.2 and VictoriaLogs datasource v0.29.0._

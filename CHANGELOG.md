@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **VictoriaMetrics stack refresh**: pin VM Operator chart `0.66.2`
+  (operator `v0.73.1`), which manages VictoriaMetrics `v1.147.0`,
+  VictoriaLogs `v1.51.0`, and matching CRDs; bump VictoriaTraces to
+  `v0.9.4`, Grafana VM/VL datasources to `v0.25.2`/`v0.29.0`, and pin
+  the VM/VL MCP charts to `0.3.0`/`0.1.0`. Cluster defaults and local-stack
+  images now resolve to the same reviewed core product releases.
 - **OpenTelemetry learning area**: the canonical instrumentation guide and
   beginner RFC-0014 explainer now live together under
   `docs/observability/opentelemetry/`; existing learning content and diagrams

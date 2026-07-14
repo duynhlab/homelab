@@ -118,7 +118,7 @@ The OTel Collector fans out to **three** backends, each with a distinct role:
    - Evaluates the **VM-operator consolidation** story: tracing managed by the
      *same* VictoriaMetrics Operator and storage engine as metrics (`VMSingle`)
      and logs (`VLSingle`), with **no object-storage dependency**
-   - `v0.6.0` (0.x, pre-GA) — a pilot, not a replacement; any consolidation is a
+   - `v0.9.4` (0.x, pre-GA) — a pilot, not a replacement; any consolidation is a
      future ADR gated on ~1.0/GA. See [victoriatraces.md](victoriatraces.md) and
      the [backend comparison](backends-comparison.md)
 
@@ -464,4 +464,4 @@ spec:
 - [Jaeger v2 Deployment Guide](https://www.jaegertracing.io/docs/2.13/deployment/kubernetes/)
 - [OpenTelemetry Operator](https://opentelemetry.io/docs/platforms/kubernetes/operator/)
 
-_Last updated: 2026-07-09 — SDK wiring consolidated into `pkg/obsx.SetupObservability` (one call in `main()`); `otelgin`/`otelgrpc` provide span instrumentation._
+_Last updated: 2026-07-14 — VictoriaTraces v0.9.4; SDK wiring consolidated into `pkg/obsx.SetupObservability` (one call in `main()`); `otelgin`/`otelgrpc` provide span instrumentation._

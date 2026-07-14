@@ -137,7 +137,7 @@ This is a **POC/learning project**, so multiple backends allow:
 propagator by hand. The shared **`pkg/obsx.SetupObservability()`** wires all of
 that once (one call in `main()`); span instrumentation comes from the
 `otelgin` (HTTP) and `otelgrpc` (east-west) contrib middlewares. See the
-[OpenTelemetry policy page](../opentelemetry.md).
+[OpenTelemetry policy page](../opentelemetry/README.md).
 
 ```go
 // main() — one wiring point per service (pkg/obsx)

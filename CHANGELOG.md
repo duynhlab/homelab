@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **OpenTelemetry learning area**: the canonical instrumentation guide and
+  beginner RFC-0014 explainer now live together under
+  `docs/observability/opentelemetry/`; existing learning content and diagrams
+  are preserved, with current worker coverage, environment differences, and
+  correlation semantics corrected against code and manifests.
 - **API documentation organized by service**: shared HTTP and gRPC
   conventions now live in `docs/api/api.md`; each of the ten services has one
   contract file; Saga-vs-2PC learning moved beside the live Temporal workflow.

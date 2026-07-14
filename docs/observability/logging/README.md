@@ -26,7 +26,7 @@ Both land in one backend, queryable with LogsQL and correlated to traces by
 > [**Logging Standards**](logging-standards.md). Backend/ops detail (VLSingle config,
 > Vector pipeline, endpoints, verification) lives in [`victorialogs.md`](victorialogs.md).
 > For the full before/after migration story, see the
-> [**RFC-0014 explainer**](../rfc-0014-explainer.md).
+> [**RFC-0014 explainer**](../opentelemetry/rfc-0014-explainer.md).
 
 ---
 

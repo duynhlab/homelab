@@ -20,6 +20,14 @@ flowchart LR
   OC -->|otlp/jaeger| J["Jaeger (in-memory)"]
   OC -->|otlphttp/victoriatraces| V["VictoriaTraces VTSingle :10428"]
   V --> G["Grafana (Jaeger datasource → /select/jaeger)"]
+  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+  classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+  classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  class Apps service;
+  class OC collector;
+  class T,J,V trace;
+  class G platform;
 ```
 
 VictoriaTraces stores traces in the **VictoriaLogs engine** (traces-as-logs) — so the tightest

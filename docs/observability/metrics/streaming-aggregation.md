@@ -35,7 +35,7 @@ But two factors are **not** controllable in application code:
 1. **`instance` (and `pod`)** — injected by the scrape layer, one value per
    replica. It multiplies every app series by the replica count, and every
    deploy/restart mints a fresh set (churn).
-2. **Fleet size** — 9 services today; a large platform runs hundreds to
+2. **Fleet size** — 10 services + 2 workers today; a large platform runs hundreds to
    thousands.
 
 At fleet scale, almost every operational question is asked at the
@@ -84,7 +84,7 @@ Take a conservative production shape — 600 realized series per replica
 
 | Fleet | Replicas | Active series (raw) | Samples/s (raw) | Active series with `instance` stripped |
 |---|---|---|---|---|
-| **9 services (this homelab)** | 1–2 | ~3k | ~200 | ~2.5k — *pointless, the multiplier is 1–2* |
+| **Measured 9-service snapshot (2026-07-06)** | 1–2 | ~3k | ~200 | ~2.5k — *pointless, the multiplier is 1–2* |
 | 100 services | ×5 | ~300k | ~20k | ~60k |
 | 1,000 services | ×10 | **~6M** | **~400k** | **~600k** |
 | 1,000 services + deploy churn | ×10, daily rollouts | 6M *active* + millions of stale-but-indexed | — | churn disappears too: aggregated series carry no per-pod identity |
@@ -155,6 +155,9 @@ two hard rules:
    never shard series by `le` (or `vmrange`) across aggregator instances.
 
 ## Architecture at scale — the two-tier pattern
+This is a **reference architecture, not a deployed or committed target** for
+the current homelab.
+
 
 One aggregator can't hold fleet state, and a load balancer in front of N
 aggregators is *wrong*, not just slow: aggregation is stateful, and correctness
@@ -165,21 +168,24 @@ aggregators will strip:
 
 ```mermaid
 flowchart LR
-    subgraph Apps["1000+ services × N replicas"]
-        A1["service pods<br/>(OTLP push / scrape)"]
+    subgraph Apps["Reference scale · not deployed"]
+        A1["1000+ services × N replicas<br/>(reference workloads)"]
     end
-    subgraph T1["Tier 1 — stateless routers (vmagent)"]
-        R1["router-1"]
-        R2["router-2"]
+    subgraph T1["Tier 1 · reference only"]
+        R1["vmagent router-1<br/>(reference)"]
+        R2["vmagent router-2<br/>(reference)"]
     end
-    subgraph T2["Tier 2 — stateful aggregators (vmagent StatefulSet)"]
-        G1["aggr-0<br/>streamAggr: without [instance, pod]"]
-        G2["aggr-1<br/>streamAggr: without [instance, pod]"]
+    subgraph T2["Tier 2 · reference only"]
+        G1["vmagent aggr-0<br/>without [instance, pod]<br/>(reference)"]
+        G2["vmagent aggr-1<br/>without [instance, pod]<br/>(reference)"]
     end
-    ST[("VictoriaMetrics<br/>(cluster at this scale)")]
-    A1 -->|scrape / OTLP push| R1 & R2
-    R1 & R2 -->|"remote-write, shardByURL<br/>ignoreLabels: instance, pod"| G1 & G2
-    G1 & G2 -->|"aggregated series only<br/>(dropInput on matched raw)"| ST
+    ST[("VictoriaMetrics cluster<br/>(reference)")]
+    A1 -.->|"reference: scrape / OTLP push"| R1 & R2
+    R1 & R2 -.->|"reference: remote write + shardByURL<br/>ignoreLabels: instance, pod"| G1 & G2
+    G1 & G2 -.->|"reference: aggregated series only<br/>dropInput on matched raw"| ST
+
+    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+    class A1,R1,R2,G1,G2,ST planned;
 ```
 
 Invariants that make this correct (each maps to a real failure mode):
@@ -238,6 +244,13 @@ flowchart TD
     F4 --> Q4["Single vmagent can't hold state /<br/>needs HA?"]
     Q4 -->|yes| F5["Two-tier: router shard tier +<br/>aggregator StatefulSet tier"]
     Q4 -->|no| F6["Single vmagent streamAggr<br/>(this homelab's pilot shape)"]
+
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    class Q0,Q1,Q2,Q3,Q4 metric;
+    class F4,F5,F6 data;
+    class N0,F1,F2,F3 platform;
 ```
 
 The homelab today answers the *first* question with "no" (~3k app series,
@@ -335,4 +348,4 @@ the flux-system/monitoring pipeline):
 - In-repo: [metrics hub](README.md) · [metrics-apps.md](metrics-apps.md) · [RFC-0013](../../proposals/rfc/RFC-0013/README.md)
 
 ---
-_Last updated: 2026-07-09 — re-pointed the pilot to semconv/OTLP metric names (RFC-0014 P3); app path is OTLP push, not scrape._
+_Last updated: 2026-07-14 — re-pointed the pilot to semconv/OTLP metric names (RFC-0014 P3); app path is OTLP push, not scrape._

@@ -32,6 +32,14 @@ flowchart TD
     VMSingle --> DSVM
     DSVM --> Dashboards
     DSVM --> Explore
+
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    class PrometheusRule data;
+
+    class VMSingle metric;
+    class VMAlert,VMOperator,VMAlertmanager,DSVM,Dashboards,Explore platform;
 ```
 
 ## Metrics datasource (CRD)
@@ -146,4 +154,4 @@ Configured on `VMSingle` via `vmalert.proxyURL` in [`vmsingle.yaml`](../../../ku
 - [VictoriaMetrics Operator](../metrics/victoriametrics.md)
 
 ---
-_Last updated: 2026-06-02_
+_Last updated: 2026-07-14_

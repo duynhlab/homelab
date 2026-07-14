@@ -8,7 +8,7 @@ of code* (see [`../README.md`](../README.md)).
 
 | | |
 |---|---|
-| **Collectors** | OTel Collector — receives **OTLP push** from the 9 apps + order-worker; VMAgent — scrapes **infra exporters'** `/metrics` every `15s` |
+| **Collectors** | OTel Collector — receives **OTLP push** from 10 services + 2 workers; VMAgent — scrapes **infra exporters'** `/metrics` every `15s` |
 | **Storage** | VMSingle `:8428` — single-binary TSDB + Prometheus-compatible PromQL/MetricsQL API |
 | **CRDs** | `prometheus-operator-crds` (definitions only) → auto-converted to VM CRDs by the VM Operator |
 | **Rules / alerts** | VMAlert (recording + alerting) → VMAlertmanager; SLO burn-rate via Sloth |
@@ -30,7 +30,7 @@ industry-standard methodologies, each answering a different question:
 | **USE** | Internal (resource) | **U**tilization, **S**aturation, **E**rrors | CPU, memory, disk, network, DB, cache | Brendan Gregg |
 | **Golden Signals** | Superset | Latency, Traffic, Errors, **Saturation** | Full-stack (RED + saturation) | Google SRE |
 
-**How they combine here:** the 9 Go microservices are request-driven, so they use
+**How they combine here:** the 10 Go microservices are request-driven, so they use
 **RED** — all three signals come from a single `http_server_request_duration_seconds`
 histogram. (The scrape-era `requests_in_flight` saturation gauge has **no OTel
 equivalent** — otelgin v0.69 doesn't emit `http.server.active_requests` — so the
@@ -58,6 +58,10 @@ flowchart LR
     RED --> G["Four Golden Signals"]
     USE --> G
     G --> SLO["SLOs / error budgets<br/>(Sloth → VMAlert)"]
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    class R,E1,D,U,S2,E3 metric;
+    class G,SLO platform;
 ```
 
 ## Monitoring stack & why
@@ -83,7 +87,7 @@ Full architecture, the dual-CRD model, and component deep-dive:
 
 ## Architecture
 
-Two ingest paths feed one store. The **9 Go apps + order-worker push OTLP**
+Two ingest paths feed one store. The **10 Go services + 2 workers push OTLP**
 (SDK → OTel Collector → VMAgent's OTLP ingest → VMSingle) — there is **no
 `/metrics` scrape** for them. **Infra exporters** (kube-state-metrics, cAdvisor,
 postgres/Valkey exporters) are still **scraped** by VMAgent via
@@ -97,7 +101,7 @@ VMAlertmanager.
 ```mermaid
 flowchart LR
     subgraph apps["Apps layer"]
-        SVC["9 Go services + order-worker<br/>OTLP push — HTTP + gRPC RED"]
+        SVC["10 Go services + 2 workers<br/>OTLP push · HTTP + gRPC + runtime"]
     end
     subgraph infra["Infra layer"]
         KSM["kube-state-metrics / cAdvisor<br/>restarts · USE"]
@@ -113,6 +117,18 @@ flowchart LR
     VMS --> GRAF["Grafana"]
     VMS --> VMAL["VMAlert"] --> AM["VMAlertmanager"]
     SVC -. "trace_id in spans + logs" .-> CORR["Tempo / VictoriaLogs<br/>(no exemplars — D-14)"]
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    class SVC service;
+    class KSM,PGE external;
+    class OTEL collector;
+    class VMA,VMS metric;
+    class VMAL,AM,GRAF platform;
+    class CORR trace;
 ```
 
 Two cross-cutting conventions make this scale to any number of services without
@@ -145,13 +161,13 @@ Status of each methodology across the platform (✅ implemented, ❌ scoped out)
 
 | Signal | Scope | Status | Implementation |
 |--------|-------|:------:|----------------|
-| **RED** (Rate/Errors/Duration) | 9 microservices | ✅ | `http_server_request_duration_seconds` → recording rules + 16 alerts + Apdex |
+| **RED** (Rate/Errors/Duration) | 10 microservices | ✅ | `http_server_request_duration_seconds` → recording rules + 16 alerts + Apdex |
 | **Latency** | API server | ✅ | `KubeAPIServerHighLatency` (P99 > 1s) |
 | **Traffic** | Microservices | ✅ | RPS recording rule + per-endpoint breakdown |
 | **Errors** | Infra / API server / PostgreSQL / Valkey | ✅ | OOMKill, CrashLoop, 5xx rate, ~25 PG alerts, Valkey down/rejected |
 | **Saturation** | Microservices / pods / nodes / API server / PG / Valkey | ✅ | CPU throttle, memory pressure, connections, evictions (app-level `requests_in_flight` retired — no OTel equivalent; apps saturate via container working-set + GC pacing) |
 | **USE** | Pod CPU/mem, node, PVC, network, PostgreSQL, Valkey, workloads | ✅ | See [metrics-infra.md](metrics-infra.md) + [databases](postgresql/monitoring.md) |
-| **SLO** | Microservices | ✅ | 48 Sloth-generated burn-rate rules |
+| **SLO** | Microservices | ✅ | 60 Sloth-generated burn-rate rules |
 | etcd / kubelet / ingress / node_exporter | Cluster | ❌ | Scoped out for Kind — see [metrics-infra.md](metrics-infra.md#not-covered-scoped-out-for-kind) |
 
 > Every deployed alert and recording rule — exact manifest files, counts, and
@@ -215,4 +231,4 @@ histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_
 
 ---
 
-_Last updated: 2026-07-11 — databases layer is now all-CloudNativePG (Zalando→CNPG migration); PgDog pooler; pg_exporter docs retained as retired reference._
+_Last updated: 2026-07-14 — databases layer is now all-CloudNativePG (Zalando→CNPG migration); PgDog pooler; pg_exporter docs retained as retired reference._

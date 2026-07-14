@@ -88,7 +88,7 @@ slo:
 
 ## How Metric Discovery Works (OTLP push)
 
-The 9 Go services no longer expose a `/metrics` endpoint for scraping. Each service's OpenTelemetry SDK **pushes** metrics via OTLP to the otel-collector, which forwards them to VMAgent's OTLP ingest and on to VMSingle. VMAgent relabels the OTLP resource attributes so the series carry `app` and `namespace`:
+The 10 Go services and 2 workers do not expose an application `/metrics` endpoint for scraping. Each service's OpenTelemetry SDK **pushes** metrics via OTLP to the otel-collector, which forwards them to VMAgent's OTLP ingest and on to VMSingle. VMAgent relabels the OTLP resource attributes so the series carry `app` and `namespace`:
 
 - `service_name` → `app`
 - `k8s_namespace_name` → `namespace`
@@ -151,4 +151,4 @@ http_server_request_duration_seconds_count{app="<service>"}
 - [Error Budget Policy](./error_budget_policy.md) -- Budget management guidelines
 
 ---
-_Last updated: 2026-07-09_
+_Last updated: 2026-07-14_

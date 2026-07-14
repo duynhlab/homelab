@@ -40,8 +40,8 @@ burn_rate = actual_error_rate / target_error_rate
 **Examples**:
 - **1x**: Consuming at target rate (budget exhausted in 30 days) ✅
 - **2x**: Consuming 2x faster (budget exhausted in 15 days) ⚠️
-- **4x**: Consuming 4x faster (budget exhausted in 7 days) 🔴
-- **15x**: Consuming 15x faster (budget exhausted in 2 days) 🚨
+- **6x**: Consuming 6x faster (budget exhausted in 5 days) 🔴
+- **14.4x**: Consuming 14.4x faster (budget exhausted in about 2 days) 🚨
 
 ### Time to Exhaustion
 

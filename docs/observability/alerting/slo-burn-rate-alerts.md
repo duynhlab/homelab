@@ -57,7 +57,7 @@ For a deeper derivation see the [SRE Workbook chapter on alerting on SLOs](https
 
 ## 2. What Sloth generates per SLO
 
-Each `PrometheusServiceLevel` produces a `PrometheusRule` containing **recording rules** + **2 alerts per SLO**. With our 8 SLO-covered services × 3 SLOs (availability, latency, error-rate) that's **24 SLOs / 48 alerts** (payment ships no SLO yet, so it is not counted).
+Each `PrometheusServiceLevel` produces a `PrometheusRule` containing **recording rules** + **2 alerts per SLO**. With all 10 services covered by 3 SLOs (availability, latency, and error rate), that is **30 SLOs / 60 alerts**.
 
 ### Recording rules (per SLO, per window)
 
@@ -244,4 +244,4 @@ open http://karma.duynh.me
 - [Sloth alerting docs](https://sloth.dev/usage/alerts/) — generator details and overrides
 
 ---
-_Last updated: 2026-07-09_
+_Last updated: 2026-07-14_

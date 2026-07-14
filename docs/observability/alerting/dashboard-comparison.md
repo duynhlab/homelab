@@ -184,11 +184,22 @@ flowchart LR
     VMAM["VMAlertmanager :9093"]
     Karma["Karma<br/>(quick glance, silence mgmt)"]
     Grafana["Grafana<br/>(drill-down, dashboards, correlation)"]
-    Future["Slack (wired)<br/>PagerDuty (planned)"]
+    Slack["Slack<br/>(configured, webhook pending)"]
+    PagerDuty["PagerDuty<br/>(planned)"]
 
     VMAM -->|"AM API"| Karma
-    VMAM -.->|"slack webhook (placeholder URL)<br/>pagerduty (planned)"| Future
+    VMAM -.->|"configured: delivery blocked"| Slack
+    VMAM -.->|"planned"| PagerDuty
     VMSingle["VMSingle :8428"] -->|"vmalert.proxyURL"| Grafana
+
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+    class VMSingle metric;
+    class VMAM,Karma,Grafana platform;
+    class Slack external;
+    class PagerDuty planned;
 ```
 
 Karma is the "quick glance + operate" tool. Grafana is the "investigate + correlate" tool. They serve different purposes and complement each other.
@@ -220,4 +231,4 @@ Re-evaluate this decision if any of the following conditions change:
 | Notificator | [SoulKyu/notificator](https://github.com/SoulKyu/notificator) | README | N/A |
 
 ---
-_Last updated: 2026-07-11_
+_Last updated: 2026-07-14_

@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Observability documentation refreshed**: diagrams now use the shared
+  semantic palette and explicit current/planned paths; service, worker, SLO,
+  alert, PostgreSQL, and telemetry topology facts match code and manifests.
+
 - **VictoriaMetrics stack refresh**: pin VM Operator chart `0.66.2`
   (operator `v0.73.1`), which manages VictoriaMetrics `v1.147.0`,
   VictoriaLogs `v1.51.0`, and matching CRDs; bump VictoriaTraces to

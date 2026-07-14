@@ -75,6 +75,22 @@ flowchart TD
 
     VMSingle -->|"Prometheus API :8428"| Grafana
     Vector -->|"jsonline :9428"| VLSingle
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    class PromCRDs,VMOp,Conv,Grafana platform;
+    class SM,PM,PR,VMSS,VMPS,VMR data;
+    class Valkey,Sloth,CNPG,Manual external;
+    class VMAgent,VMSingle metric;
+    class VMAlert,VMAMgr platform;
+    class Vector,VLSingle log;
 ```
 
 ---
@@ -183,6 +199,19 @@ flowchart LR
     CRD --> SM
     SM --> VMOp
     VMOp --> VMAgent
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    class CRD,SM data;
+    class VMOp platform;
+    class VMAgent metric;
 ```
 
 **Operator configuration** controlling this behavior (from `victoria-metrics-operator.yaml`):
@@ -386,7 +415,7 @@ OpenBAO (never committed to this public repo).
 | **CRD** | `operator.victoriametrics.com/v1 / VLSingle` |
 | **Manifest** | `kubernetes/infra/configs/observability/logging/victorialogs/vlsingle.yaml` |
 | **Service** | `vlsingle-victoria-logs.monitoring.svc:9428` |
-| **Ingest endpoints** | `/insert/jsonline` (Vector) · `/insert/opentelemetry/v1/logs` (OTel collector — app logs from the 9 services + Kong runtime logs) |
+| **Ingest endpoints** | `/insert/jsonline` (Vector) · `/insert/opentelemetry/v1/logs` (OTel collector — app logs from 10 services + 2 workers + Kong runtime logs) |
 | **Query endpoint** | `/select/logsql/query` |
 
 Configuration:
@@ -445,6 +474,22 @@ flowchart TD
     VMOp -->|"dependsOn"| OTel
     VMOp -->|"dependsOn"| Vector
     controllers -->|"dependsOn"| monitoring
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    class PromCRDs,VMOp,GrafanaOp,Sloth,Jaeger,OTel platform;
+    class Vector,VLSingle_k log;
+    class VMSingle_k,VMAgent_k metric;
+    class VMAlert_k,VMAMgr_k platform;
+    class SMs,PMs,PRs data;
+    class GrafanaCR platform;
 ```
 
 **controllers-local** deploys operators and waits for all health checks:
@@ -514,10 +559,25 @@ flowchart LR
     VMAgent_f -->|"remote write"| VMSingle_f
     VMSingle_f -->|"PromQL / MetricsQL"| Grafana_f
 
-    Apps -.->|"OTLP push :8429"| VMAgent_f
-    PG -.->|scrape| VMAgent_f
-    ESO -.->|scrape| VMAgent_f
-    TempoSvc -.->|scrape| VMAgent_f
+    Apps -->|"OTLP push :8429"| VMAgent_f
+    PG -->|scrape| VMAgent_f
+    ESO -->|scrape| VMAgent_f
+    TempoSvc -->|scrape| VMAgent_f
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    class Apps service;
+    class PG,ESO,TempoSvc external;
+    class PM1,SM2,VMPS1,VMSS2 data;
+    class VMAgent_f,VMSingle_f metric;
+    class Grafana_f platform;
 ```
 
 ### Alerting Flow
@@ -559,6 +619,19 @@ flowchart LR
 
     VMAlert_f <-->|"query metrics"| VMSingle_f2
     VMAlert_f -->|"firing alerts"| VMAMgr_f
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    class PR1,PR2,PR3,SlothPR,VMR1,VMR2,VMR3,VMR4 data;
+    class VMSingle_f2 metric;
+    class VMAlert_f,VMAMgr_f platform;
 ```
 
 ### Logs Flow
@@ -567,9 +640,24 @@ flowchart LR
 flowchart LR
     Pods["Non-instrumented pods"] --> Vector["Vector Agent<br/>kube-system"]
     Vector -->|"jsonline :9428"| VLSingle_f["VLSingle<br/>victoria-logs"]
-    Apps_l["9 Go services (zap tee)"] -.->|"logs OTLP"| OTelC_f["OTel Collector"]
-    Kong_f["Kong gateway"] -.->|"runtime logs OTLP"| OTelC_f
-    OTelC_f -.->|"OTLP :9428"| VLSingle_f
+    Apps_l["10 Go services + 2 workers<br/>(zap OTLP tee)"] -->|"logs OTLP"| OTelC_f["OTel Collector"]
+    Kong_f["Kong gateway"] -->|"runtime logs OTLP"| OTelC_f
+    OTelC_f -->|"OTLP :9428"| VLSingle_f
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    class Apps_l service;
+    class Kong_f edge;
+    class Pods external;
+    class OTelC_f collector;
+    class Vector,VLSingle_f log;
 ```
 
 ---
@@ -828,4 +916,4 @@ kubectl get helmreleases -A -o wide
 
 ---
 
-_Last updated: 2026-07-11 — Zalando→CNPG migration: Zalando PodMonitors and the retired pg-exporter recording rules removed; CNPG per-cluster PodMonitors + `postgres/cnpg*` rule dirs; VLSingle memory raised to 768Mi for the fleet log volume._
+_Last updated: 2026-07-14 — Zalando→CNPG migration: Zalando PodMonitors and the retired pg-exporter recording rules removed; CNPG per-cluster PodMonitors + `postgres/cnpg*` rule dirs; VLSingle memory raised to 768Mi for the fleet log volume._

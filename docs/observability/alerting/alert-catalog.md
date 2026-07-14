@@ -19,13 +19,13 @@ the end-to-end pipeline (ingestion → VMAlert → Alertmanager → notify), see
 
 ## Summary
 
-**163 statically-defined alerts** across 8 domains, plus **48 Sloth-generated** SLO
-burn-rate alerts (2 × 24 SLOs). The 24 SLOs cover the original 8 catalog/identity/comms
-services; `payment` ships no SLO yet.
+**163 statically-defined alerts** across 8 domains, plus **60 Sloth-generated** SLO
+burn-rate alerts (2 × 30 SLOs). The 30 SLOs cover all 10 Go services through
+the four domain ResourceSets.
 
 | Domain | Count | Protects |
 |--------|-------|----------|
-| [Microservices (RED)](#1-microservices-red-metrics) | 16 | The 9 Go services — user-facing request + gRPC health |
+| [Microservices (RED)](#1-microservices-red-metrics) | 16 | The 10 Go services; workers also contribute runtime heartbeat series |
 | [Kong gateway](#2-kong-gateway) | 13 | The single API ingress for the whole platform |
 | [Valkey cache](#3-valkey-cache) | 7 | Cache-aside layer in front of PostgreSQL |
 | [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 48 | All four CNPG clusters (`product-db` + DR, `auth-db`, `shared-db`, `temporal-db`) + backups |
@@ -33,7 +33,7 @@ services; `payment` ships no SLO yet.
 | [GitOps (Flux + cert-manager)](#6-gitops-flux--cert-manager) | 9 | Delivery pipeline + TLS |
 | [VictoriaMetrics self-health](#7-victoriametrics-self-health) | 31 | The monitoring system itself |
 | [Tempo / Temporal / Pyroscope / Watchdog](#8-tempo--temporal--pyroscope--watchdog) | 10 | Tracing, workflows, profiling, dead-man's-switch |
-| [SLO burn-rate (Sloth)](#slo-burn-rate-alerts-sloth-generated) | 48 (generated) | Error-budget burn across all services |
+| [SLO burn-rate (Sloth)](#slo-burn-rate-alerts-sloth-generated) | 60 (generated) | Error-budget burn across all 10 services |
 
 ---
 
@@ -302,7 +302,7 @@ Not hand-written: the `mop` chart renders a `PrometheusServiceLevel` CR per serv
 **Sloth operator** expands each into recording rules + **2 burn-rate alerts per SLO**. Detail:
 [slo-burn-rate-alerts.md](./slo-burn-rate-alerts.md).
 
-- **8 services × 3 SLOs = 24 SLOs → 48 alerts.** SLOs: **Availability** (99.5%, non-5xx
+- **10 services × 3 SLOs = 30 SLOs → 60 alerts.** SLOs: **Availability** (99.5%, non-5xx
   ratio), **Latency** (95% < 500ms), **Error rate** (99%, non-4xx/5xx) — all from
   `http_server_request_duration_seconds`, against a **30-day** error budget.
 - **Page alert** — fast burn (14.4× over 1h, confirmed on 5m) → on-call.
@@ -354,7 +354,7 @@ implemented yet — they are recommendations.
 Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-and-next-improvements):
 
 - **`temporal-db` has no backups / no WAL archiving** — and therefore no backup alert either. (Since the Zalando→CNPG migration, `auth-db` and `shared-db` are CNPG and are covered by the label-driven backup alerts; `temporal-db` remains the outlier.)
-- **`payment` reconciliation has no SLI/alert yet** — the payment service ships no SLO, and
+- **`payment` reconciliation has no dedicated SLI/alert yet** — generic HTTP SLOs cover payment, but
   there is no alert on stuck/failed reconciliation (including the heal `resolution='failed'`
   outcome introduced by ADR-012). Payment request health is covered only by the generic
   microservice RED alerts (§1), not by a payment-specific reconciliation signal.
@@ -368,4 +368,4 @@ Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-an
 
 ---
 
-_Last updated: 2026-07-11 — Zalando→CNPG migration: PostgreSQL is now a single all-CNPG domain (48 alerts across product-db/auth-db/shared-db + backups); the Zalando section and ZalandoOperatorDown were removed; total 163 across 8 domains._
+_Last updated: 2026-07-14 — 163 checked-in alerts plus 60 Sloth-generated alerts; all 10 services are SLO-enabled through the domain ResourceSets._

@@ -174,11 +174,11 @@ flowchart LR
     end
     SVC -->|"OTLP/HTTP :4318"| TP
     KONG -->|"spans :4318"| TP
-    KONG -.->|"runtime logs"| LP
+    KONG -->|"runtime logs"| LP
     TP --> TEMPO["Tempo (primary)"]
     TP --> JAEGER["Jaeger (in-memory UI)"]
     TP --> VT["VictoriaTraces (pilot)"]
-    LP -.-> VL["VictoriaLogs"]
+    LP --> VL["VictoriaLogs"]
 
     classDef app fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;

@@ -54,9 +54,9 @@ flowchart TB
         vmO[(VictoriaMetrics)]
         vlO[(VictoriaLogs)]
         tO[(Tempo/Jaeger)]
-        svcO -.->|"Prometheus SCRAPES /metrics (pull, 15s)"| sm --> vmO
-        svcO -.->|"stdout JSON"| vecO --> vlO
-        svcO -.->|"OTLP traces"| tO
+        svcO -->|"Prometheus SCRAPES /metrics (pull, 15s)"| sm --> vmO
+        svcO -->|"stdout JSON"| vecO --> vlO
+        svcO -->|"OTLP traces"| tO
     end
     classDef metric fill:#ffe8cc,stroke:#e8590c,color:#111;
     classDef log fill:#d3f9d8,stroke:#2f9e44,color:#111;
@@ -82,7 +82,7 @@ flowchart TB
         vmN[(VictoriaMetrics)]
         vlN[(VictoriaLogs)]
         tN[(Tempo · Jaeger · VictoriaTraces)]
-        svcN -.->|"OTLP push (metrics·logs·traces) :4318"| col
+        svcN -->|"OTLP push (metrics·logs·traces) :4318"| col
         col -->|"metrics"| vmN
         col -->|"logs (trace_id field)"| vlN
         col -->|"traces"| tN
@@ -212,14 +212,14 @@ flowchart LR
     subgraph svc["Go service"]
         z["zap logger"]
         z --> so["stdout (kubectl logs)"]
-        z -.->|"otelzap tee"| ex[/"OTLP log exporter"/]
+        z -->|"otelzap tee"| ex[/"OTLP log exporter"/]
     end
     subgraph noni["Non-instrumented workloads"]
         infra["DBs · Kong · frontend<br/>(no SDK)"]
         vec["Vector<br/>(skips app pods)"]
-        infra -.->|"stdout"| vec
+        infra -->|"stdout"| vec
     end
-    ex -.->|"OTLP :4318"| col[/"OTel Collector"/]
+    ex -->|"OTLP :4318"| col[/"OTel Collector"/]
     col -->|"VL-Stream-Fields: service.name"| vl[(VictoriaLogs)]
     vec -->|"jsonline"| vl
     classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
@@ -250,8 +250,8 @@ which fans out to Tempo + Jaeger + VictoriaTraces (cluster) or VictoriaTraces
 flowchart LR
     kong["Kong<br/>root span + traceparent"] -->|"HTTP + traceparent"| a["service A<br/>(otelgin)"]
     a -->|"gRPC + traceparent"| b["service B<br/>(otelgrpc)"]
-    a -.->|"OTLP"| col[/"OTel Collector"/]
-    b -.->|"OTLP"| col
+    a -->|"OTLP"| col[/"OTel Collector"/]
+    b -->|"OTLP"| col
     col --> tempo[(Tempo)]
     col --> jaeger[(Jaeger)]
     col --> vt[(VictoriaTraces)]

@@ -7,48 +7,70 @@ a custom-queries ConfigMap, scraped by a **per-cluster `PodMonitor`**.
 ## Architecture
 
 ```mermaid
-flowchart TD
-    subgraph cnpg [CloudNativePG Clusters]
-        productDB["product-db (ns product)<br/>PG 18, 3 instances<br/>DBs: product, cart, order, payment"]
-        productDR["product-db-replica<br/>DR replica cluster"]
-        authDB["auth-db (ns auth)<br/>PG 18, 3 instances<br/>DB: auth"]
-        sharedDB["shared-db (ns user)<br/>PG 18, 1 instance<br/>DBs: user, notification, shipping, review"]
-        temporalDB["temporal-db (ns temporal)<br/>PG 18, 1 instance"]
+flowchart LR
+    subgraph databases["CloudNativePG clusters"]
+        productDB["product-db<br/>product · 3 instances"]
+        productDR["product-db-replica<br/>product · DR"]
+        authDB["auth-db<br/>auth · 3 instances"]
+        sharedDB["shared-db<br/>user · 1 instance"]
+        temporalDB["temporal-db<br/>temporal · 1 instance"]
     end
 
-    subgraph exporters [Metrics Exporter]
-        cnpgBuiltin["CNPG built-in exporter :9187<br/>cnpg_* metrics + custom queries ConfigMap"]
+    subgraph poolers["PgDog poolers"]
+        productPgDog["pgdog-product<br/>OpenMetrics :9090"]
+        authPgDog["pgdog-auth<br/>OpenMetrics :9090"]
+        sharedPgDog["pgdog-shared<br/>OpenMetrics :9090"]
     end
 
-    productDB --> cnpgBuiltin
-    productDR --> cnpgBuiltin
-    authDB --> cnpgBuiltin
-    sharedDB --> cnpgBuiltin
-    temporalDB --> cnpgBuiltin
-
-    subgraph poolerMetrics [Pooler Metrics]
-        pgdogMetrics["PgDog OpenMetrics<br/>port 9090"]
+    subgraph discovery["Scrape discovery"]
+        cnpgMon["Per-cluster PodMonitor<br/>CNPG exporter :9187<br/>cnpg_* + custom queries"]
+        pgdogMon["ServiceMonitors<br/>PgDog :9090"]
     end
 
-    productDB -.-> pgdogMetrics
+    subgraph metrics["VictoriaMetrics"]
+        vma["VMAgent<br/>scrape + remote write"]
+        vms[("VMSingle :8428")]
+        vmop["VM Operator<br/>rule conversion"]
+        vmrule["VMRule"]
+        vmalert["VMAlert<br/>rule evaluation"]
+    end
 
-    cnpgBuiltin -->|"per-cluster PodMonitor :9187"| vma
-    pgdogMetrics -->|":9090"| vma
+    productDB -->|":9187"| cnpgMon
+    productDR -->|":9187"| cnpgMon
+    authDB -->|":9187"| cnpgMon
+    sharedDB -->|":9187"| cnpgMon
+    temporalDB -->|":9187"| cnpgMon
 
-    vma["VMAgent PodMonitor and ServiceMonitor scrape"] --> vms["VMSingle :8428"]
-    vms --> grafana["Grafana VictoriaMetrics datasource"]
-    vms --> vmalert["VMAlert evaluation"]
-    vmalert --> ruleCRs["PrometheusRule and VMRule CRs"]
+    productPgDog --> pgdogMon
+    authPgDog --> pgdogMon
+    sharedPgDog --> pgdogMon
+
+    cnpgMon -->|scrape| vma
+    pgdogMon -->|scrape| vma
+    vma -->|remote write| vms
+    vms -->|"PromQL / MetricsQL"| grafana["Grafana"]
+
+    ruleCRs["PostgreSQL PrometheusRule CRs"] --> vmop --> vmrule --> vmalert
+    vmalert -->|query| vms
+
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    class productDB,productDR,authDB,sharedDB,temporalDB,productPgDog,authPgDog,sharedPgDog external;
+    class cnpgMon,pgdogMon,ruleCRs,vmrule data;
+    class vma,vms metric;
+    class vmop,vmalert,grafana platform;
 ```
 
 ## Cluster inventory
 
-| Cluster | Namespace | Instances | Databases | Exporter | Scrape |
+| Cluster | Namespace | Instances | Databases | Database metrics | Pooler metrics |
 |---|---|---|---|---|---|
-| `product-db` (+ `product-db-replica` DR) | product | 3 | product, cart, order, payment | CNPG built-in `:9187` | per-cluster PodMonitor |
-| `auth-db` | auth | 3 | auth | CNPG built-in `:9187` | per-cluster PodMonitor |
-| `shared-db` | user | 1 | user, notification, shipping, review | CNPG built-in `:9187` | per-cluster PodMonitor |
-| `temporal-db` | temporal | 1 | temporal | CNPG built-in `:9187` | PodMonitor (`enablePodMonitor: true`) |
+| `product-db` (+ `product-db-replica` DR) | product | 3 | product, cart, order, payment | CNPG `:9187` via PodMonitor | `pgdog-product :9090` |
+| `auth-db` | auth | 3 | auth | CNPG `:9187` via PodMonitor | `pgdog-auth :9090` |
+| `shared-db` | user | 1 | user, notification, shipping, review | CNPG `:9187` via PodMonitor | `pgdog-shared :9090` |
+| `temporal-db` | temporal | 1 | temporal | CNPG `:9187` via PodMonitor | None |
 
 ## Metric coverage
 
@@ -166,4 +188,4 @@ the CNPG pod logs, tailed by the cluster-wide **Vector DaemonSet**, and shipped 
 - Retired reference: [pg-exporter-dashboards.md](pg-exporter-dashboards.md), [pg-exporter-mapping.md](pg-exporter-mapping.md)
 
 ---
-_Last updated: 2026-07-11_
+_Last updated: 2026-07-14_

@@ -11,52 +11,56 @@ This document explains the distributed tracing architecture used in this project
 ```mermaid
 flowchart TB
     Client{{"Browser / API client"}}
+    Kong["Kong gateway<br/>root span + W3C traceparent"]
 
-    subgraph Edge["Kong API Gateway (edge)"]
-        Kong["opentelemetry plugin<br/>root request span + W3C traceparent"]
+    subgraph workloads["Instrumented workloads"]
+        Services["10 Go services<br/>otelgin + otelgrpc"]
+        Workers["order-worker<br/>checkout-worker"]
+    end
+    Temporal["Temporal Server<br/>workflow + task queues"]
+
+
+    subgraph collectorNode["OpenTelemetry Collector fan-out"]
+        Receiver[/"OTLP receiver<br/>HTTP :4318 · gRPC :4317"/]
+        Processors[/"memory_limiter<br/>batch"/]
+        Receiver --> Processors
     end
 
-    subgraph Apps["Microservices (9 Go services)"]
-        Auth[auth]
-        User[user]
-        Product[product]
-        Others[...5 more]
+    subgraph backends["Trace backends"]
+        Tempo[("Tempo<br/>primary · RustFS S3")]
+        Jaeger[("Jaeger<br/>in-memory learning UI")]
+        VT[("VictoriaTraces v0.9.4<br/>pilot VTSingle")]
     end
 
-    subgraph OTelCollector["OpenTelemetry Collector (fan-out layer)"]
-        Receiver[/"OTLP Receiver (:4317 gRPC, :4318 HTTP)"/]
-        Processor[/"Batch Processor (memory limiter)"/]
-        Exporter[/"Exporters"/]
-    end
+    Grafana{{"Grafana"}}
+    JaegerUI{{"Jaeger UI"}}
 
-    subgraph Backends["Tracing Backends"]
-        Tempo[("Tempo (primary backend)")]
-        VT[("VictoriaTraces")]
-        Jaeger[("Jaeger (alternative UI)")]
-    end
+    Client -->|"HTTP"| Kong
+    Kong -->|"HTTP + traceparent"| Services
+    Services -->|"gRPC + traceparent"| Services
+    Services -->|"start workflow"| Temporal
+    Temporal -->|"task queue"| Workers
+    Kong -->|"OTLP edge spans"| Receiver
+    Services & Workers -->|"OTLP application spans"| Receiver
+    Processors -->|"OTLP/gRPC"| Tempo
+    Processors -->|"OTLP/gRPC"| Jaeger
+    Processors -->|"OTLP/HTTP"| VT
+    Tempo --> Grafana
+    VT --> Grafana
+    Jaeger --> JaegerUI
 
-    Client -->|HTTP| Kong
-    Kong -.->|"traceparent (W3C) — continues the trace"| Apps
-    Kong -.->|"OTLP HTTP (edge span)"| Receiver
-    Apps -.->|"OTLP HTTP (SDK export)"| Receiver
-    Receiver --> Processor
-    Processor --> Exporter
-    Exporter -->|OTLP| Tempo
-    Exporter -->|OTLP| VT
-    Exporter -->|OTLP| Jaeger
-    Kong -.->|"OTLP HTTP (runtime logs)"| Receiver
-    Apps -.->|"OTLP HTTP (app otelzap logs)"| Receiver
-    Exporter -.->|"logs pipeline"| VLogs[("VictoriaLogs")]
-    classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
-    classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
-    classDef log fill:#d3f9d8,stroke:#2f9e44,color:#111;
-    class Receiver,Processor,Exporter otc;
-    class Tempo,VT,Jaeger trace;
-    class VLogs log;
-    style Edge fill:#eef2ff,color:#111;
-    style Apps fill:#eef2ff,color:#111;
-    style OTelCollector fill:#d0ebff,color:#111;
-    style Backends fill:#f1f3f5,color:#111;
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    class Client,Kong edge;
+    class Services service;
+    class Workers worker;
+    class Receiver,Processors collector;
+    class Tempo,Jaeger,VT trace;
+    class Temporal,Grafana,JaegerUI platform;
 ```
 
 The trace now **begins at the gateway**: Kong's `opentelemetry` plugin creates
@@ -210,6 +214,10 @@ plugins:
 ```mermaid
 flowchart LR
     K["Kong edge span<br/>inject:[w3c] → traceparent on upstream"] -->|"service extracts (W3C propagator)"| L["service span = child<br/>(one trace)"]
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    class K edge;
+    class L service;
 ```
 
 **Verified:** local-stack (Kong **3.9**, sampling 1.0) links **100%** of proxied

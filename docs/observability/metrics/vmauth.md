@@ -128,47 +128,69 @@ This repo **does not** ship `VMAuth` or `VMUser` YAML yet; the CRDs exist becaus
 
 ## Diagrams
 
-### External client via VMAuth to VMSingle
+### Proposed external client path
 
 ```mermaid
 flowchart LR
-  Client[External client]
-  VMAuth[vmauth :8427]
-  VMSingle[VMSingle :8428]
-  Client -->|"HTTPS + auth"| VMAuth
-  VMAuth -->|"PromQL proxy"| VMSingle
+    client["External client"]
+    vmAuth["VMAuth :8427<br/>(planned)"]
+    vmSingle[("VMSingle :8428")]
+
+    client -.->|"planned: HTTPS + auth"| vmAuth
+    vmAuth -.->|"planned: PromQL proxy"| vmSingle
+
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+    class client external;
+    class vmAuth planned;
+    class vmSingle metric;
 ```
 
-### GitOps: VMAuth CR + VMUser resources
+### Proposed GitOps resources
 
 ```mermaid
 flowchart TD
-  Ingress[Ingress optional]
-  VMAuthCR[VMAuth CR]
-  VMUser1[VMUser SRE]
-  VMUser2[VMUser readonly]
-  Op[VM Operator]
-  Pod[vmauth Pod]
-  VS[VMSingle]
+    ingress["Ingress<br/>(planned, optional)"]
+    vmAuthCR["VMAuth CR<br/>(planned)"]
+    vmUserSRE["VMUser: SRE<br/>(planned)"]
+    vmUserRead["VMUser: read-only<br/>(planned)"]
+    operator["VM Operator"]
+    pod["VMAuth pod<br/>(planned)"]
+    vmSingle[("VMSingle")]
 
-  Ingress --> VMAuthCR
-  VMAuthCR --> Op
-  VMUser1 --> Op
-  VMUser2 --> Op
-  Op --> Pod
-  Pod --> VS
+    ingress -.->|"planned: route"| pod
+    vmAuthCR -.->|"planned: reconcile"| operator
+    vmUserSRE -.->|"planned: select"| operator
+    vmUserRead -.->|"planned: select"| operator
+    operator -.->|"planned: create"| pod
+    pod -.->|"planned: proxy"| vmSingle
+
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+    class operator platform;
+    class vmSingle metric;
+    class ingress,vmAuthCR,vmUserSRE,vmUserRead,pod planned;
 ```
 
-### In-cluster Grafana (anonymous) uses datasource proxy to VMSingle
+### Current in-cluster Grafana path
 
 ```mermaid
 flowchart LR
-  Browser[Browser port-forward]
-  Grafana[Grafana pod]
-  VMSingle[VMSingle ClusterIP]
+    browser["Browser<br/>port-forward"]
+    grafana["Grafana pod"]
+    vmSingle[("VMSingle ClusterIP")]
 
-  Browser --> Grafana
-  Grafana -->|"server-side proxy datasource"| VMSingle
+    browser --> grafana
+    grafana -->|"server-side datasource proxy"| vmSingle
+
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    class browser external;
+    class grafana platform;
+    class vmSingle metric;
 ```
 
 VMAuth is **not** on this path unless you change datasource URLs to point at a VMAuth Service.
@@ -177,14 +199,19 @@ VMAuth is **not** on this path unless you change datasource URLs to point at a V
 
 ```mermaid
 flowchart TD
-  Anon[Anonymous sessions]
-  OneRole["Single org_role for all"]
-  SRE[SRE user login]
-  Eng[Engineer user login]
+    anonymous["Anonymous sessions"]
+    oneRole["Single org_role for all"]
+    sre["SRE user login"]
+    engineer["Engineer user login"]
 
-  Anon --> OneRole
-  SRE --> AdminOrEditor["Admin or Editor"]
-  Eng --> Viewer["Viewer read-only"]
+    anonymous --> oneRole
+    sre --> admin["Admin or Editor"]
+    engineer --> viewer["Viewer read-only"]
+
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    class anonymous,sre,engineer external;
+    class oneRole,admin,viewer platform;
 ```
 
 ---
@@ -215,4 +242,4 @@ A: Some vmauth features (e.g. certain IP filters) are Enterprise. Check the [vma
 - [Grafana multi-team RBAC](../grafana/rbac-multi-team.md)
 
 ---
-_Last updated: 2026-03-21_
+_Last updated: 2026-07-14_

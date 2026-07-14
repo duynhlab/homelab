@@ -1,0 +1,26 @@
+# Dev-only demo seeds for the local cluster: one idempotent Job per seeding
+# service, using the seed subcommand baked into each service image (no
+# dependence on sibling repo checkouts). Runs after apps so the migrations
+# (app initContainers) have created the schema. Prod clusters never define
+# this Kustomization — seeding stays out of the deployable state, mirroring
+# local-stack's "seeding lives outside the migration chain" stance.
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: demo-seed-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: demo-data
+spec:
+  interval: 10m
+  timeout: 5m
+  retryInterval: 2m
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+  path: ./configs/demo-seed
+  prune: true
+  wait: true
+  dependsOn:
+    - name: apps-local

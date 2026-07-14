@@ -12,6 +12,7 @@ Comprehensive guide to deploying the microservices platform using **GitOps**, **
 - **Synchronize Changes**: `make sync` (flux-push + flux-sync)
 - **Tear Down Environment**: `make down` (cluster-down)
 - **Validate Manifests**: `make validate`
+- **Demo data seeds itself** on the local cluster: the `demo-seed-local` Kustomization runs one idempotent Job per seeding service (auth demo users incl. `alice`, product catalog, shipping rows) after apps are up, using the `seed` subcommand baked into each image. Prod never seeds — the Kustomization only exists under `clusters/local/`.
 
 ### Detailed Commands (Makefile)
 

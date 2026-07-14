@@ -75,6 +75,7 @@ flux-status: ## Show Flux status (all resources)
 validate: ## Validate Kubernetes manifests (Kustomize)
 	./scripts/flux-validate.sh
 
+
 ##@ Utilities
 
 .PHONY: prereqs

@@ -34,6 +34,15 @@ spec:
                 - shipping
                 - payment
                 - checkout
+      # Scope: traffic-serving pods only. Job-owned pods (migrations-style
+      # one-shots, demo seeds) never receive Service traffic, so probes are
+      # meaningless there — this matches the policy's stated intent (Kong
+      # must only route to ready Pods).
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.ownerReferences[0].kind || '' }}"
+            operator: NotEquals
+            value: Job
       validate:
         message: "Containers must declare both livenessProbe and readinessProbe."
         foreach:

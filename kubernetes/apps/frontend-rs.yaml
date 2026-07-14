@@ -32,14 +32,18 @@ spec:
           replicaCount: << inputs.replicaCount | int >>
           image:
             repository: ghcr.io/duynhlab/frontend/frontend
-            tag: sha-8c93e2d
+            tag: sha-2de5c9d
             pullPolicy: IfNotPresent
+          # mop >=0.14 values schema: the HTTP port pair lives under
+          # service.http (the old top-level port/targetPort/containerPort keys
+          # are silently ignored and the chart default 8080 wins — which broke
+          # this SPA behind Kong, since nginx listens on 80).
           service:
+            enabled: true
             type: ClusterIP
-            port: 80
-            targetPort: 80
-            portName: http
-          containerPort: 80
+            http:
+              port: 80
+              containerPort: 80
           resources:
             requests:
               cpu: 50m

@@ -380,7 +380,7 @@ these metrics are catalogued (with counts and production impact) in the
 | `prometheusrules/microservices/alerts.yaml` | RED/Golden + runtime + D-4 heartbeat-absence + collector-pipeline alerts |
 
 The `otel-collector` deployment (metrics pipeline) and the SDK exporter config
-live with the [OpenTelemetry](../opentelemetry.md) setup. There is no app
+live with the [OpenTelemetry](../opentelemetry/README.md) setup. There is no app
 `ServiceMonitor` — scrape configs remain only for infra exporters.
 
 - **Alerts + recording rules** — see
@@ -394,7 +394,7 @@ Runbook: [`microservices-alerts.md`](../runbooks/microservices-alerts.md).
 ## References
 
 - [Metrics hub](README.md) · [Infrastructure metrics (USE)](metrics-infra.md) · [Database metrics](postgresql/monitoring.md)
-- [OpenTelemetry setup](../opentelemetry.md) · [RFC-0014: full OpenTelemetry adoption](../../proposals/rfc/RFC-0014/README.md)
+- [OpenTelemetry setup](../opentelemetry/README.md) · [RFC-0014: full OpenTelemetry adoption](../../proposals/rfc/RFC-0014/README.md)
 - [API → gRPC runtime model](../../api/api.md#grpc-runtime-model) · [API reference](../../api/api.md)
 - [PromQL Guide](promql-guide.md) · [SLO Documentation](../slo/README.md)
 - [Grafana Dashboard Guide](../grafana/dashboard-reference.md) · [Variables & Regex Guide](../grafana/variables.md)

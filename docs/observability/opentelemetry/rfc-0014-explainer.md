@@ -3,9 +3,9 @@
 A from-zero walkthrough of **why and how** the platform moved its observability
 from the old hand-rolled Prometheus setup to **OpenTelemetry (OTLP push)** —
 told with old-vs-new diagrams and plain-language analogies. Start here if the
-stack is new to you; the deep-dives ([metrics](metrics/metrics-apps.md),
-[traces](tracing/README.md), [logs](logging/README.md),
-[policy](opentelemetry.md)) assume you already know this story.
+stack is new to you; the deep-dives ([metrics](../metrics/metrics-apps.md),
+[traces](../tracing/README.md), [logs](../logging/README.md),
+[policy](README.md)) assume you already know this story.
 
 | | |
 |---|---|
@@ -15,6 +15,7 @@ stack is new to you; the deep-dives ([metrics](metrics/metrics-apps.md),
 | **Transport** | OTLP/HTTP → OpenTelemetry Collector → backends |
 | **Backends** | VictoriaMetrics (metrics), VictoriaLogs (logs), Tempo/Jaeger/VictoriaTraces (traces), Pyroscope (profiles) |
 | **The one rule** | Instrument once, in `pkg/obsx`; services never touch the SDK directly |
+| **Current coverage** | 10 Go services + order-worker + checkout-worker; Kong starts edge traces and exports runtime logs |
 
 ---
 
@@ -26,9 +27,10 @@ the manifests and the policy page are hard to read cold. This doc builds the
 mental model **once**, comparing the old world we came from with the new one, so
 the rest of the docs make sense.
 
-One sentence to anchor everything: **every service now hands all of its
-telemetry to one local SDK, which pushes it to a central Collector, which sorts
-it and forwards each signal to the right database.** The rest is detail.
+One sentence to anchor everything: **every service and worker now hands its
+telemetry to one in-process SDK, which pushes it to a central Collector; the
+Collector processes each signal and forwards it to the right backend.** The
+rest is detail.
 
 ---
 
@@ -97,10 +99,12 @@ flowchart TB
 ```
 
 What actually moved: **metrics** (pull → push, P3) and **logs** (Vector-only →
-OTLP push, P4). **Traces** were already OTel; RFC-0014 just folded their wiring
-into the same one-call setup. There is no exempt service: `checkout-service`
-was never deployed to the cluster, so the planned `legacy-checkout` fence was
-dropped at P3 landing ([ADR-016](../proposals/adr/ADR-016-otel-metrics-cutover/)).
+OTLP push, P4). **Traces** were already OTel; RFC-0014 folded their wiring into
+the same one-call setup. At the P3 cutover, checkout-service had not yet been
+deployed to the cluster, so the planned `legacy-checkout` fence was dropped
+([ADR-016](../../proposals/adr/ADR-016-otel-metrics-cutover/)). RFC-0015 P5
+later deployed checkout and checkout-worker directly on the unified OTel path,
+so there is still no exempt application today.
 
 ---
 
@@ -143,7 +147,8 @@ Think of the whole pipeline as a **central post office**:
 service had to run an HTTP handler and register every metric by hand.
 
 ```go
-// BEFORE — the retired client_golang middleware (checkout-service never shipped)
+// BEFORE — retired client_golang middleware.
+// This old checkout path never shipped.
 var reqDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
     Name:    "request_duration_seconds",
     Buckets: []float64{0.005, 0.01, /* … */, 10},
@@ -184,7 +189,7 @@ The metric **names** changed too (`request_duration_seconds` →
 `http_server_request_duration_seconds`, labels `code/path/method` →
 `http_response_status_code/http_route/http_request_method`) because OTel uses
 **semantic conventions**. vmagent translates the OTLP names to Prometheus style
-on ingest. Full detail: [metrics/metrics-apps.md](metrics/metrics-apps.md).
+on ingest. Full detail: [metrics/metrics-apps.md](../metrics/metrics-apps.md).
 
 ---
 
@@ -225,7 +230,7 @@ flowchart LR
     style noni fill:#d3f9d8,color:#111;
 ```
 
-Detail and the dual-path rationale: [logging/README.md](logging/README.md).
+Detail and the dual-path rationale: [logging/README.md](../logging/README.md).
 
 ---
 
@@ -256,7 +261,7 @@ flowchart LR
     class tempo,jaeger,vt trace;
 ```
 
-Detail: [tracing/README.md](tracing/README.md).
+Detail: [tracing/README.md](../tracing/README.md).
 
 ---
 
@@ -283,7 +288,8 @@ gave us on VictoriaMetrics (exemplars are unsupported; accepted as D-14).
 ## 7. One request, end to end
 
 Putting it together — a single browser request, and where each signal goes.
-Notice everything shares one `trace_id`.
+Spans and in-context logs share one `trace_id`; metrics align through the same
+service identity and time window because this platform has no exemplars.
 
 ```mermaid
 sequenceDiagram
@@ -301,7 +307,7 @@ sequenceDiagram
     A-->>C: OTLP traces + metrics + logs
     R-->>C: OTLP traces + metrics + logs
     C->>B: fan out per signal
-    Note over B: one trace_id joins the span, the metrics exemplar-free, and the logs
+    Note right of B: trace_id joins spans and logs while service identity and time align metrics
 ```
 
 In Grafana you land on a metric spike, pivot to the trace by time+service, open
@@ -312,14 +318,17 @@ the trace, click **traces→logs** (filters VictoriaLogs by `trace_id`), and
 
 ## 8. Inside the Collector — the governance pipeline
 
-The Collector is where platform-wide policy lives, so one config governs every
-service. Each signal has its own pipeline: **receiver → processors → exporters**
-— there are no connectors; RED metrics come from the services' own OTel SDK
-metrics, not from span-derivation.
+The Kubernetes Collector is where platform-wide policy lives, so one config
+governs every service and worker. Each signal has its own pipeline:
+**receiver → processors → exporters**. The cluster config has no connectors;
+its RED metrics come from the application's own OTel SDK metrics, not from
+span derivation. Local-stack intentionally keeps a spanmetrics connector as a
+compatibility path, explained in the
+[current platform guide](README.md#cluster-and-local-stack-differences).
 
 ```mermaid
 flowchart LR
-    subgraph col["OpenTelemetry Collector"]
+    subgraph col["Kubernetes OpenTelemetry Collector"]
         rcv[/"otlp receiver<br/>:4318 (+ :4317 cluster)"/]
         ml[/"memory_limiter"/]
         d2c[/"deltatocumulative<br/>(metrics)"/]
@@ -347,28 +356,31 @@ under a telemetry burst; **deltatocumulative** normalizes metric temporality so
 `rate()` stays correct; **batch** amortizes network cost; **vmagent** is the
 single place name-translation, relabeling and cardinality control happen (D-1/2/3).
 (Tempo's metrics-generator is configured but writes nowhere — `remote_write: []` —
-so RED metrics come exclusively from the services' SDK metrics.)
+so cluster RED metrics come exclusively from the services' SDK metrics.)
 
 ---
 
 ## 9. Correlation — the fields that stitch the pillars together
 
-Correlation works because every signal carries the **same resource identity**
-and the **same trace id**. These come from the SDK's `Resource` (semconv v1.41)
-and the active span — set once in `obsx`, attached to everything.
+Correlation starts with the **same resource identity** on every signal. Spans
+and logs emitted inside an active span also carry the same `trace_id`; metrics
+do not carry it because this platform has no exemplars. Resource attributes
+come from the SDK Resource (semconv v1.41), while `trace_id` comes from the
+active span. Both are wired centrally in `obsx`.
 
 | Field | Set by | Joins |
 |---|---|---|
-| `trace_id` | active span (W3C) | trace ↔ its logs (VictoriaLogs field) ↔ its span metrics |
-| `service.name` | `OTEL_SERVICE_NAME` | which service produced any signal; Grafana traces→metrics/profiles |
+| `trace_id` | active span (W3C) | trace ↔ in-context logs in VictoriaLogs |
+| `service.name` | `OTEL_SERVICE_NAME` | all signals by producer; metrics correlate to traces by service + time |
 | `k8s.namespace.name` / `k8s.pod.name` | Downward API env | which pod; log/metric/trace all agree |
 | `deployment.environment.name` | `DEPLOYMENT_ENVIRONMENT` | local vs production separation |
 | `pyroscope.profile.id` | `otel-profiling-go` span attr | span ↔ its CPU flame graph |
 
 Grafana wires the pivots: Tempo `tracesToLogsV2` (tag `trace_id`),
-`tracesToProfiles` (`service.name`→`service_name`), `tracesToMetrics`. Exemplars
-(the old metric→trace link) are **not** used — VictoriaMetrics doesn't support
-them; the `trace_id` log field replaces that path (D-14).
+`tracesToProfiles` (`service.name`→`service_name`), and `tracesToMetrics`.
+Exemplars are **not** used because VictoriaMetrics does not support them.
+Trace-to-log navigation is exact by `trace_id`; metric-to-trace navigation is
+a scoped search by service and time (D-14).
 
 ---
 
@@ -388,8 +400,8 @@ the drift the old three-style world suffered from.
 
 ## References
 
-- [OpenTelemetry policy (normative)](opentelemetry.md) — the rules this doc explains informally
-- [Metrics deep-dive](metrics/metrics-apps.md) · [Tracing](tracing/README.md) · [Logging](logging/README.md) · [Profiling](profiling/README.md)
-- [Observability hub](README.md) · [RFC-0014](../proposals/rfc/RFC-0014/)
+- [OpenTelemetry policy (normative)](README.md) — the rules this doc explains informally
+- [Metrics deep-dive](../metrics/metrics-apps.md) · [Tracing](../tracing/README.md) · [Logging](../logging/README.md) · [Profiling](../profiling/README.md)
+- [Observability hub](../README.md) · [RFC-0014](../../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-07-10 — corrected to the landed reality: no exempt checkout-service (fence dropped, ADR-016) and no spanmetrics connector (RED metrics come from the SDK)._
+_Last updated: 2026-07-14 — moved beside the canonical OTel policy; clarified checkout chronology, environment-specific Collector behavior, and correlation without exemplars._

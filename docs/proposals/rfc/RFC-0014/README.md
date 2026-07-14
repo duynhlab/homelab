@@ -223,7 +223,7 @@ streamAggr pattern · ServiceMonitor + order-worker PodMonitor retired.
 
 | Phase | Scope | Repos touched |
 |-------|-------|---------------|
-| **P0 — pkg obsx v2 + policy page ✅** | `SetupObservability(ctx, cfg)`: Resource (Downward API env), TracerProvider (unchanged), MeterProvider (15 s reader + Views), LoggerProvider + otelzap tee, `runtime.Start`, one shutdown; grpcx `WithFilter`; temporalx `OnError`; metrics/logs providers behind `OTEL_METRICS_ENABLED` / `OTEL_LOGS_ENABLED` (default **off**). Rewrite `docs/observability/opentelemetry.md` as the policy page (semconv v1.41 invariant, bucket sets, allowlist, cardinality posture, "never set `OTEL_SEMCONV_STABILITY_OPT_IN`"). *Exit: pkg release tagged; unit tests prove the Views (13-bucket set applied, `server.address` dropped). Rollback: don't bump the dep.* | pkg, homelab (docs) |
+| **P0 — pkg obsx v2 + policy page ✅** | `SetupObservability(ctx, cfg)`: Resource (Downward API env), TracerProvider (unchanged), MeterProvider (15 s reader + Views), LoggerProvider + otelzap tee, `runtime.Start`, one shutdown; grpcx `WithFilter`; temporalx `OnError`; metrics/logs providers behind `OTEL_METRICS_ENABLED` / `OTEL_LOGS_ENABLED` (default **off**). Rewrite `docs/observability/opentelemetry/README.md` as the policy page (semconv v1.41 invariant, bucket sets, allowlist, cardinality posture, "never set `OTEL_SEMCONV_STABILITY_OPT_IN`"). *Exit: pkg release tagged; unit tests prove the Views (13-bucket set applied, `server.address` dropped). Rollback: don't bump the dep.* | pkg, homelab (docs) |
 | **P1 — dual-emit metrics** *(local-stack ✅ 2026-07-09: 9 service PRs + collector/VM pipeline + env fleet-wide, canary e2e-verified; cluster still pending — mop Downward API envs `K8S_NAMESPACE_NAME`/`K8S_POD_NAME` + values flip)* | Services bump pkg + set `OTEL_METRICS_ENABLED=true`; client_golang middleware and `/metrics` untouched — **both pipelines live**. Homelab: collector metrics pipeline; vmagent D-1/D-2 flags + D-3 relabel; Downward API env into the mop values. **Ordering: vmagent flags land and one canary service is verified before the fleet.** *Exit: `http_server_request_duration_seconds_bucket{app=…}` with 13 buckets + app/namespace labels; series delta ≈ 2× app series, zero churn labels, no `otel.metric.overflow`. Rollback: env flip per service.* | 9 service repos, homelab, helm-charts |
 | **P2 — consumer migration (side-by-side)** *(✅ 2026-07-09 — copies authored+verified on live series; soak compressed by owner decision, see ADR-016)* | New-name copies: 17 alerts (memory alert → cAdvisor; D-4 absence alerts authored, inactive), 15 recording rules (new record names), mop `slo.yaml` SLIs → Sloth regeneration, dashboard panels + template variables (re-keyed off `go_goroutine_count`), **new gRPC east-west alert pair + dashboard row** (the transport finally gets monitoring — on the names that will survive). Old + new groups evaluate together; new-name alerts route to a staging receiver. *Exit: ≥ 1 week soak with old-vs-new p95 / error-ratio / burn-rate agreeing within tolerance. Rollback: delete new groups.* | homelab, helm-charts, grafana-dashboards |
 | **P3 — metrics cutover** *(config cutover ✅ 2026-07-09, ADR-016 — D-13 amended at landing: checkout never integrated, fence dropped; pod-kill drill + Sloth window at next `make up`; code-removal wave pending)* | Retire the apps' ServiceMonitor (trim to checkout, D-13) + order-worker PodMonitor; activate D-4 alerts **in the same commit**; retire old-name groups (except `legacy-checkout`). *Later, separate PR wave:* remove client_golang middleware + `/metrics` + the otelprom bridge from services and pkg — deferring code removal is deliberate: re-applying the ServiceMonitor stays a one-file rollback until then. *Exit: no `request_duration_seconds` ingested for `app!="checkout-service"`; **pod-kill test proves the new liveness alert fires**; one full Sloth window on new SLIs. Spawned [ADR-016](../../adr/ADR-016-otel-metrics-cutover/) recording the cutover decisions.* | homelab, then 9 repos + pkg |
@@ -331,7 +331,7 @@ one PR wave.
   default-off flags, mandatory Views incl. the 13-bucket set and the
   rpc-client `server.address` drop, level-gated otelzap bridge), the grpcx
   health/reflection telemetry filter and the temporalx non-panic `OnError`;
-  `docs/observability/opentelemetry.md` promoted to the instrumentation
+  `docs/observability/opentelemetry/README.md` promoted to the instrumentation
   policy page. Reviewed by code-reviewer + security-auditor (all Required
   findings fixed, incl. the otelzap Debug-level parity issue).
 
@@ -349,7 +349,7 @@ one PR wave.
 - **ADRs**: the P3 cutover spawned
   [ADR-016 — OTel metrics cutover](../../adr/ADR-016-otel-metrics-cutover/).
 - Docs to be produced: P0 rewrites
-  [`docs/observability/opentelemetry.md`](../../../observability/opentelemetry.md)
+  [`docs/observability/opentelemetry/README.md`](../../../observability/opentelemetry/README.md)
   as the instrumentation policy page; every phase updates the affected
   `docs/observability/` pages (see tracking).
 - References (official docs): [OTel languages/Go](https://opentelemetry.io/docs/languages/go/) ·

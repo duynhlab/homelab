@@ -4,7 +4,7 @@ Comprehensive observability for the `duynhlab` microservices platform -- 10 Go
 services, 2 workers, and 5 PostgreSQL clusters running on Kubernetes with
 GitOps (Flux).
 
-> **New to the stack?** Start with the [RFC-0014 explainer](rfc-0014-explainer.md) — old-vs-new, plain-language, diagrams.
+> **New to the stack?** Start with the [RFC-0014 explainer](opentelemetry/rfc-0014-explainer.md) — old-vs-new, plain-language, diagrams.
 
 ## Architecture
 
@@ -284,7 +284,9 @@ graph LR
 ```
 docs/observability/
 ├── README.md                     # This file: index + 3-layer architecture + APM integration
-├── opentelemetry.md              # OpenTelemetry from zero: signals, SDK, collector, how we use it
+├── opentelemetry/                 # OTel instrumentation, transport, and migration
+│   ├── README.md                  # Canonical policy + current platform behavior
+│   └── rfc-0014-explainer.md     # Beginner old-vs-new walkthrough
 │
 ├── metrics/                      # Pillar 1: Metrics collection & storage
 │   ├── README.md                 # Hub: fundamentals, stack, architecture, coverage
@@ -423,7 +425,8 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ## Related Documentation
 
-- [OpenTelemetry explainer](opentelemetry.md) -- OTel from zero: signals, SDK, collector, and how this platform uses them
+- [OpenTelemetry guide](opentelemetry/README.md) -- OTel concepts, policy, SDK, Collector, and platform operations
+- [RFC-0014 explainer](opentelemetry/rfc-0014-explainer.md) -- beginner old-vs-new migration walkthrough
 - [Metrics: RED/USE/Golden Signals](metrics/README.md) -- metrics methodology
 - [VictoriaMetrics Operator](metrics/victoriametrics.md) -- migration from kube-prometheus-stack
 - [Grafana Datasources](grafana/datasources.md) -- VictoriaMetrics plugin metrics datasource

@@ -56,7 +56,7 @@ spec:
       valuesKey: password
       targetPath: "users[3].password"
   values:
-    replicas: 3
+    replicas: 1
     port: 6432
     openMetricsPort: 9090
     openMetricsNamespace: "pgdog_"
@@ -140,5 +140,4 @@ spec:
       type: soft
 
     podDisruptionBudget:
-      enabled: true
-      minAvailable: 2
+      enabled: false  # single replica — a PDB would only block node drains

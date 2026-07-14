@@ -23,6 +23,15 @@ flowchart TD
     Catalog --> Contracts
     Saga --> Order["order.md"]
     Saga --> Payment["payments.md"]
+
+    classDef hub fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef guide fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef contract fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef workflow fill:#f59e0b,color:#451a03,stroke:#b45309;
+    class Hub hub;
+    class Shared,Catalog guide;
+    class Contracts,Basic,Deep,Order,Payment contract;
+    class Saga workflow;
 ```
 
 The arrows show documentation ownership, not runtime traffic. Runtime traffic is

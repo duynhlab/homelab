@@ -25,6 +25,15 @@ flowchart LR
     Logic --> DB[(user_profiles)]
     Auth[auth-service] -. JWKS used by local verifier .-> User
     Future[Future registration fan-out] -. internal POST, no live caller .-> User
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef planned fill:#e2e8f0,color:#0f172a,stroke:#64748b,stroke-dasharray:5 5;
+    class SPA edge;
+    class User,Logic,Auth service;
+    class DB data;
+    class Future planned;
 ```
 
 ## HTTP API
@@ -105,4 +114,4 @@ PostgreSQL through the shared pooler-safe pgx setup.
 - [Auth service](auth.md)
 - [Microservices catalog](microservices.md)
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-14_

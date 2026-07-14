@@ -31,32 +31,122 @@ order, but only order writes the order.
 
 ```mermaid
 flowchart TB
-    Browser["Browser SPA"] -->|"HTTP/JSON"| Kong["Kong gateway<br/>pass-through + edge controls"]
-    Provider["Payment provider"] -->|"signed webhook"| Kong
-    Kong -->|"public/private/protected :8080"| HTTP["Service HTTP routers"]
+    Internet((Internet)) --> Browser["React SPA"]
+    Browser -->|"HTTP/JSON"| Kong["Kong gateway"]
+    Provider["MockPay / payment provider"] -->|"signed webhook"| Kong
 
-    subgraph Platform["10 Go service boundaries"]
-        Identity["Identity<br/>Auth · User"]
-        Shopping["Shopping<br/>Product · Cart · Review"]
-        Fulfillment["Fulfillment<br/>Checkout · Order · Shipping<br/>Payment · Notification"]
+    subgraph Platform["duynhlab application platform"]
+        direction TB
+        subgraph Identity["Identity domain"]
+            Auth["auth"]
+            User["user"]
+        end
+        subgraph Catalog["Catalog and shopping domain"]
+            Product["product"]
+            Review["review"]
+            Cart["cart"]
+        end
+        subgraph Fulfillment["Checkout and fulfillment domain"]
+            Checkout["checkout"]
+            Order["order"]
+            Shipping["shipping"]
+            Payment["payment"]
+            Notification["notification"]
+            CheckoutWorker["checkout-worker"]
+            OrderWorker["order-worker"]
+        end
+        Temporal["Temporal"]
     end
 
-    HTTP --> Identity
-    HTTP --> Shopping
-    HTTP --> Fulfillment
-    Fulfillment -->|"typed east-west gRPC :9090"| Shopping
-    Fulfillment -->|"durable workflows"| Temporal["Temporal"]
-    Identity --> IDDB[("identity databases")]
-    Shopping --> ShopDB[("catalog databases")]
-    Fulfillment --> FulfillDB[("fulfillment databases")]
-    Identity -->|"OTLP"| Collector["OpenTelemetry Collector"]
-    Shopping -->|"OTLP"| Collector
-    Fulfillment -->|"OTLP"| Collector
+    Kong -->|"HTTP :8080"| Auth
+    Kong -->|"HTTP :8080"| User
+    Kong -->|"HTTP :8080"| Product
+    Kong -->|"HTTP :8080"| Review
+    Kong -->|"HTTP :8080"| Cart
+    Kong -->|"HTTP :8080"| Checkout
+    Kong -->|"HTTP :8080"| Order
+    Kong -->|"HTTP :8080"| Shipping
+    Kong -->|"HTTP :8080"| Payment
+    Kong -->|"HTTP :8080"| Notification
+
+    Product -->|"gRPC reviews"| Review
+    Checkout -->|"gRPC GetCart"| Cart
+    Checkout -->|"gRPC GetProducts"| Product
+    Checkout -->|"gRPC GetQuote"| Shipping
+    Checkout -->|"gRPC CreateOrder"| Order
+    Order -->|"gRPC GetShipmentByOrder"| Shipping
+    Order -->|"gRPC GetPayment"| Payment
+    Order -->|"start order workflow"| Temporal
+    Temporal -->|"order task queue"| OrderWorker
+    Checkout -->|"start abandonment workflow"| Temporal
+    Temporal -->|"checkout task queue"| CheckoutWorker
+    OrderWorker -->|"gRPC stock"| Product
+    OrderWorker -->|"gRPC shipment"| Shipping
+    OrderWorker -->|"gRPC money"| Payment
+    OrderWorker -->|"gRPC email"| Notification
+    Order -.->|"REST pricing read"| Cart
+    OrderWorker -.->|"REST cart clear"| Cart
+    Payment -->|"provider HTTP"| Provider
+
+    subgraph Data["Data stores"]
+        AuthDB[("auth-db")]
+        ProductDB[("product-db")]
+        SharedDB[("shared-db")]
+        TemporalDB[("temporal-db")]
+        Valkey[("Valkey")]
+    end
+    Auth --> AuthDB
+    Product --> ProductDB
+    Cart --> ProductDB
+    Checkout --> ProductDB
+    CheckoutWorker -->|"expire sessions"| ProductDB
+    Order --> ProductDB
+    Payment --> ProductDB
+    User --> SharedDB
+    Review --> SharedDB
+    Shipping --> SharedDB
+    Notification --> SharedDB
+    Product --> Valkey
+    Temporal --> TemporalDB
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    class Browser,Kong edge;
+    class Auth,User,Product,Review,Cart,Checkout,Order,Shipping,Payment,Notification service;
+    class CheckoutWorker,OrderWorker worker;
+    class Temporal platform;
+    class AuthDB,ProductDB,SharedDB,TemporalDB,Valkey data;
+    class Internet,Provider external;
 ```
 
-This diagram is intentionally high-level. The exact RPC edges are in
+```mermaid
+graph LR
+    subgraph Legend["Diagram legend"]
+        Edge["Edge / client"]:::edge
+        Service["Go service"]:::service
+        Worker["Worker"]:::worker
+        PlatformNode["Workflow platform"]:::platform
+        DataNode[("Database / cache")]:::data
+        External["External system"]:::external
+    end
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+```
+
+The topology names every deployed service and worker. Solid arrows are current
+HTTP, gRPC, workflow, or data-store paths; dotted arrows are the two documented
+cart REST exceptions. Exact RPC names are in
 [Current East-West Call Graph](#current-east-west-call-graph), and each service
-file shows its own callers and data authority.
+file explains its own callers and data authority.
 
 ### Inside Each Service
 
@@ -72,6 +162,13 @@ flowchart LR
     GRPC --> Logic
     Logic --> Core["core"]
     Core --> DB[(service database)]
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    class Browser,Kong edge;
+    class Caller,Web,GRPC,Logic,Core service;
+    class DB data;
 ```
 
 | Layer | Responsibility | Must not do |
@@ -299,6 +396,11 @@ flowchart LR
     Checkout -->|"CreateOrder"| OrderAPI
     OrderAPI -.->|"legacy REST pricing read"| Cart
     Worker -.->|"legacy REST clear"| Cart
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    class Product,Review,OrderAPI,Shipping,Payment,Notification,Checkout,Cart service;
+    class Worker worker;
 ```
 
 | Caller | Callee | Contract | Transport | Deployment |

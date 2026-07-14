@@ -26,6 +26,17 @@ flowchart LR
     Logic --> Signer[RS256 signer]
     Services[Other services] -. cached JWKS .-> HTTP
     OpenBAO[(OpenBAO)] -. static RS256 public key via ESO .-> Kong[Kong edge JWT]
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    class SPA,Kong edge;
+    class HTTP,Logic,Services service;
+    class Signer platform;
+    class DB data;
+    class OpenBAO external;
 ```
 
 Kong's edge check does **not** fetch the JWKS: its `jwt-edge` plugin holds the
@@ -114,4 +125,4 @@ remain temporary aliases for the ADR-017 expand phase. New callers must use the
 - [RFC-0009: RS256 JWT and edge authentication](../proposals/rfc/RFC-0009/)
 - [ADR-006: Kong edge JWT](../proposals/adr/ADR-006-rs256-jwt-kong-edge-auth/)
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-14_

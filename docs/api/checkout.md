@@ -91,6 +91,15 @@ flowchart LR
     CK -->|"gRPC GetQuote"| SHIP[shipping]
     CK -->|"gRPC CreateOrder"| ORD[order]
     CK -->|"timer and Signal-With-Start"| TMP[Temporal]
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    class SPA,Kong edge;
+    class CK,CART,PROD,SHIP,ORD service;
+    class TMP platform;
+    class DB data;
 ```
 
 checkout is a **client-only** service: nothing dials into it except Kong (no
@@ -271,4 +280,4 @@ unique index.
   [shipping.md](./shipping.md) · [order.md](./order.md) — dependency contracts
 - [microservices.md](./microservices.md) — feature matrix
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-14_

@@ -4,7 +4,7 @@ Cart owns each user's mutable shopping basket and exposes a read-only snapshot t
 
 | Attribute | Value |
 |---|---|
-| **Status** | HTTP and gRPC implemented in local-stack; cluster checkout caller lands with RFC-0015 P5 |
+| **Status** | HTTP and gRPC implemented in local-stack; cluster checkout caller is deployed with RFC-0015 P5 |
 | **Repository** | [`duynhlab/cart-service`](https://github.com/duynhlab/cart-service) |
 | **Owns** | Per-user cart and cart items |
 | **HTTP** | Private browser API plus an internal clear route on `:8080` |
@@ -24,6 +24,15 @@ flowchart LR
     Order[legacy order create] -. REST read .-> Cart
     Worker[order-worker] -. internal DELETE .-> Cart
     Cart --> DB[(cart database)]
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    class SPA edge;
+    class Cart,Checkout,Order service;
+    class Worker worker;
+    class DB data;
 ```
 
 ## HTTP API
@@ -113,4 +122,4 @@ metrics are pushed over OTLP through the same observability pipeline.
 - [ADR-021: Cart gRPC read surface](../proposals/adr/ADR-021-cart-grpc-read-surface/)
 - [Order-fulfillment Saga](temporal-order-fulfillment.md)
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-14_

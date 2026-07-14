@@ -244,7 +244,7 @@ cart is a `409`.
 ### REST API (Variant A, browser-facing)
 
 All routes are `private` (JWT; Kong edge-JWT applies). Following
-[`docs/api/api-naming-convention.md`](../../../api/api-naming-convention.md):
+[collection noun rule](../../../api/api.md#collection-noun-rule):
 checkout, like auth, is a process-named service with no natural plural, so
 its owning segment is the literal **`checkout`** with resources (`sessions`)
 nested beneath it (naming convention v3.0.1,
@@ -704,9 +704,7 @@ Phased P1→P6 as above. Blast-radius notes:
   authority; stock check-only); ADR-021 cart gRPC read surface (and criteria
   for migrating cart writes); ADR-022 atomic promo redemption.
 - Docs to update on implementation: [`docs/api/api.md`](../../../api/api.md),
-  [`docs/api/api-naming-convention.md`](../../../api/api-naming-convention.md),
   [`docs/api/microservices.md`](../../../api/microservices.md),
-  [`docs/api/grpc-internal-comms.md`](../../../api/grpc-internal-comms.md),
   [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md),
   [`SERVICES.md`](../../../../SERVICES.md).
 

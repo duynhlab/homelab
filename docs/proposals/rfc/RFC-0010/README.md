@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| implemented | platform-wide | 2026-07-03 | 2026-07-05 |
+| implemented | platform-wide | 2026-07-03 | 2026-07-14 |
 
 > **Progress:** **P1–P4 ✅** have landed — scaffold + API + state machine
 > + idempotency (P1); double-entry ledger ([ADR-007](../../adr/ADR-007-double-entry-payment-ledger/)),
@@ -173,7 +173,7 @@ stateDiagram-v2
 ### REST API (Variant A, browser-facing)
 
 All routes follow the platform contract
-([api-naming-convention.md](../../../api/api-naming-convention.md)): flat
+([shared API guide](../../../api/api.md#http-url-model)): flat
 error envelope `{"error": "...", "code": "..."}` via `pkg/httpx`, snake_case
 JSON, standard pagination envelope, `user_id` always from the JWT (never the
 body), amounts as **integer minor units** (`2000` = $20.00) with ISO-4217
@@ -235,7 +235,7 @@ reserved amount.
 New proto in `duynhlab/pkg` `pkg/proto/payment/v1/` (buf lint/breaking in CI,
 generated stubs committed). Served always-on at `:9090` via `pkg/grpcx`
 (headless `payment-grpc` Service, `dns:///` + `round_robin` —
-[grpc-internal-comms.md](../../../api/grpc-internal-comms.md)).
+[gRPC runtime model](../../../api/api.md#grpc-runtime-model)).
 
 ```protobuf
 service PaymentService {
@@ -455,7 +455,7 @@ e2e-verified in local-stack before push (house rule).
 |-------|-------|---------------|
 | **P1 ✅** | Repo scaffold (order-service as model: 3-layer, `migratex`, `authmw`, `obsx`, middleware copy, gha-workflows CI + Sonar), payments/refunds REST API, state machine, idempotency keys | new `payment-service`, `pkg` (httpx error codes) |
 | **P2 ✅** | `mockpay` binary, webhook receiver + `webhook_events` dedup, double-entry ledger, outbox | `payment-service` |
-| **P3 ✅** | `payment.v1` proto + gRPC server; **extract `pkg/idempotency`** from P1's implementation; order saga rewire (insert Authorize/Capture + compensations in `internal/saga/workflow.go`, minor-units conversion at the boundary), `PAYMENT_GRPC_ADDR` env; shipping `CancelShipment` idempotency regression test; doc sweep (incl. the stale kindnet line in `grpc-internal-comms.md`) | `pkg`, `order-service`, `shipping-service`, homelab (order-worker + 4 domain `*-rs.yaml`, docs) |
+| **P3 ✅** | `payment.v1` proto + gRPC server; **extract `pkg/idempotency`** from P1's implementation; order saga rewire (insert Authorize/Capture + compensations in `internal/saga/workflow.go`, minor-units conversion at the boundary), `PAYMENT_GRPC_ADDR` env; shipping `CancelShipment` idempotency regression test; doc sweep (incl. the stale kindnet statement in the transport documentation) | `pkg`, `order-service`, `shipping-service`, homelab (order-worker + 4 domain `*-rs.yaml`, docs) |
 | **P4 ✅** | Reconciliation job (detect-only per ADR-011; seeded breaks folded into the drift-injection e2e), fault-injection triggers, full local-stack e2e (compose blocks, kong.yml routes, init.sql) | `payment-service`, homelab `local-stack/` |
 | **P5 ✅** | Cluster GitOps: `services/payment.yaml` InputProvider (checkout domain), cnpg-db `postInitSQL` + PgDog pooler + **two** ExternalSecrets (product ns + payment ns), webhook HMAC secret (OpenBAO `secret/local/services/payment/webhook-hmac` → ESO), NetworkPolicy (Kong→:8080; order→:9090), Kong `api-payment` ingresses, **add `payment` to the 3 Kyverno policies that hardcode namespace lists** | homelab |
 | **P6 ✅** | Read path + frontend: `payment.v1 GetPayment` read RPC (`pkg` v0.15.0, `refunded_minor` in v0.15.1); order-details payment enrichment (soft-fail `GetPayment`, carry `payment_method` through the saga with a PCI-safe `tok_` validation before persist); checkout mock test-token picker + payment status box on order detail | `pkg`, `payment-service`, `order-service`, `frontend`, homelab |
@@ -509,7 +509,7 @@ new-code coverage, `go test -race`, golangci-lint, agent-skills review.
   `order` namespace may reach payment `:9090`; enforcement by kindnet is
   **verified on the local cluster, K8s 1.34.3** —
   [network-policies.md](../../../security/network-policies.md); note
-  `grpc-internal-comms.md` §5 still carries a stale "kindnet does not
+  the transport documentation still carried a stale "kindnet does not
   enforce" line to be corrected in P3's doc sweep), and payment validates
   `order_id`/`user_id` consistency on every RPC. RFC-0002 is an explicit
   dependency for calling this production-grade.
@@ -605,8 +605,8 @@ new-code coverage, `go test -race`, golangci-lint, agent-skills review.
   reservation ledger patterns)
 - [RFC-0009](../RFC-0009/README.md) — API gateway & JWT edge auth (the auth
   model payment inherits; ESO secret pattern reused for the webhook HMAC)
-- [api-naming-convention.md](../../../api/api-naming-convention.md) ·
-  [grpc-internal-comms.md](../../../api/grpc-internal-comms.md) ·
+- [shared API guide](../../../api/api.md#http-url-model) ·
+  [gRPC runtime model](../../../api/api.md#grpc-runtime-model) ·
   [temporal-order-fulfillment.md](../../../api/temporal-order-fulfillment.md)
 - ADRs to spawn (agreed policy: **each ADR is written when its phase lands**,
   created as `Accepted` — the decision is made by then; ADRs stay short and
@@ -627,4 +627,4 @@ new-code coverage, `go test -race`, golangci-lint, agent-skills review.
     auto-heal of the lost-capture-response window (landed)
 
 ---
-_Last updated: 2026-07-10_
+_Last updated: 2026-07-14_

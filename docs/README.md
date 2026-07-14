@@ -20,12 +20,9 @@ docs/
 │   ├── review.md                 # Review HTTP/gRPC contract
 │   ├── notification.md           # Inbox and delivery contracts
 │   ├── shipping.md               # Tracking, quotes, shipment gRPC contract
-│   ├── checkout.md               # P1-P4 local-stack checkout subsystem
+│   ├── checkout.md               # P1-P5 checkout subsystem; P6 planned
 │   ├── payments.md               # Payment contract, ledger, reconciliation
-│   ├── temporal-order-fulfillment.md # Saga vs 2PC + live Temporal workflow and ops
-│   ├── api-naming-convention.md  # Compatibility page → api.md
-│   ├── grpc-internal-comms.md    # Compatibility page → api.md
-│   └── saga-vs-2pc.md            # Compatibility page → Temporal guide
+│   └── temporal-order-fulfillment.md # Saga vs 2PC + live Temporal workflow and ops
 ├── proposals/                    # Design proposals & decisions
 │   ├── README.md                 # umbrella: ADR vs RFC + flow + links
 │   ├── adr/                      # Architecture Decision Records
@@ -245,9 +242,6 @@ docs/
 6. **[RFCs — propose and track substantial changes](./proposals/rfc/)** - RFC process, index, and consolidated backlog
 
 7. **[GKE internal and private DNS](./platform/gke-internal-dns.md)** - In-cluster DNS and Cloud DNS private zones
-
-API naming, gRPC east-west, and Saga-vs-2PC legacy filenames remain as
-compatibility pages; new links should target the canonical guides above.
 
 ### Databases
 

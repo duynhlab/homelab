@@ -14,7 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **API documentation organized by service**: shared HTTP and gRPC
   conventions now live in `docs/api/api.md`; each of the ten services has one
   contract file; Saga-vs-2PC learning moved beside the live Temporal workflow.
-  Compatibility pages preserve links to the three former guide filenames.
+  The three superseded source files were removed after all live repository
+  links were repointed to canonical sections.
 - **Observability configs reorganized by pillar**: `configs/monitoring/` →
   `configs/observability/{metrics,logging,tracing,grafana,sloth}` — VLSingle
   (logs) and VTSingle (traces) no longer hide inside `victoriametrics/`;
@@ -228,7 +229,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **docs/api accuracy sweep + feature matrix**: `microservices.md` rebuilt as a
   per-service feature matrix (feature → API → technique) with a platform-wide
   technique index; route inventory gains the cart internal saga-clear route;
-  auth-gRPC remnants removed from `grpc-internal-comms.md`; saga docs pick up
+  auth-gRPC remnants removed from the shared API guide; saga docs pick up
   `SendReceipt`/`SendRefundNotification` and the shipped internal cart-clear;
   api.md adds auth refresh/JWKS + payment payload sections and fixes the
   register response envelope; payments.md reaper note updated.

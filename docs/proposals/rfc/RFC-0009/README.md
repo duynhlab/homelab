@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| implemented | platform-wide | 2026-06-30 | 2026-07-02 |
+| implemented | platform-wide | 2026-06-30 | 2026-07-14 |
 
 > **Don't forget: every decision is a tradeoff.** This RFC moves the platform from
 > opaque DB-backed session tokens to stateless signed JWTs and adds a second
@@ -671,7 +671,7 @@ The original open questions were resolved on 2026-06-30:
 - Re-sequences: [RFC-0002](../RFC-0002/) (east-west mTLS).
 - Sibling: [RFC-0008](../RFC-0008/) (secrets hardening — shared OpenBAO/ESO pattern).
 - Context: [`docs/platform/kong-gateway.md`](../../../platform/kong-gateway.md),
-  [`docs/api/api-naming-convention.md`](../../../api/api-naming-convention.md).
+  [shared API guide](../../../api/api.md#http-url-model).
 
 ---
-_Last updated: 2026-07-10_
+_Last updated: 2026-07-14_

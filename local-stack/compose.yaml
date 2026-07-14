@@ -113,7 +113,7 @@ services:
       victoria-logs: { condition: service_started }
 
   victoria-traces:
-    image: victoriametrics/victoria-traces:v0.6.0
+    image: victoriametrics/victoria-traces:v0.9.4
     command:
       - "-httpListenAddr=:10428"
       - "-storageDataPath=/victoria-traces-data"
@@ -151,7 +151,7 @@ services:
       victoria-logs: { condition: service_started }
 
   victoria-metrics:
-    image: victoriametrics/victoria-metrics:v1.146.0
+    image: victoriametrics/victoria-metrics:v1.147.0
     command:
       - "-storageDataPath=/victoria-metrics-data"
       # RFC-0014 P1 (D-1/D-2): OTLP ingest shaping. usePrometheusNaming turns

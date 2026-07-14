@@ -441,5 +441,5 @@ docker compose down -v     # also drop volumes for a clean slate
 
 - **Profiling is enabled locally** via the `pyroscope` container (see above). Set
   `PROFILING_ENABLED=false` in `x-svc-env` to turn it off.
-- VictoriaTraces is **v0.6.0 (0.x, pre-GA)** — the same pin as the cluster pilot.
+- VictoriaTraces is **v0.9.4 (0.x, pre-GA)** — the same pin as the cluster pilot.
   See [`docs/observability/tracing/victoriatraces.md`](../docs/observability/tracing/victoriatraces.md).

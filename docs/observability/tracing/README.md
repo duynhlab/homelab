@@ -16,7 +16,7 @@ Track requests as they flow through multiple microservices to understand perform
 - **OpenTelemetry**: Industry-standard tracing instrumentation
 - **Grafana Tempo**: primary tracing backend (v2.10.5; metrics-generator configured but inert — `remote_write: []`) — durable on **RustFS S3** (`tempo-traces` bucket, **7-day** block retention)
 - **Jaeger**: secondary UI (Helm chart, all-in-one) — **in-memory / ephemeral** (lost on restart)
-- **VictoriaTraces**: pilot 3rd backend (`v0.6.0`, VM-operator-managed, VictoriaLogs engine) — same OTel fan-out; see [victoriatraces.md](victoriatraces.md)
+- **VictoriaTraces**: pilot 3rd backend (`v0.9.4`, VM-operator-managed, VictoriaLogs engine) — same OTel fan-out; see [victoriatraces.md](victoriatraces.md)
 - **W3C Trace Context**: Standard for trace propagation between services
 
 ---
@@ -108,7 +108,7 @@ flowchart LR
 5. Spans exported via OTLP HTTP (batch export every 5s) to the **OTel Collector**, which fans out to **Tempo**, **Jaeger**, and **VictoriaTraces**
 6. **Grafana** queries Tempo for trace visualization
 
-> **Three backends, by design.** **Tempo** is the primary backend (queried in Grafana via TraceQL) and the **durable** store — traces live in **RustFS S3** (`tempo-traces` bucket) with **7-day** retention. **Jaeger** is an alternative UI fed by the same OTel Collector fan-out, kept on **in-memory storage (ephemeral — traces are lost on pod restart)** because Jaeger has no S3/object-storage backend (see [jaeger.md](jaeger.md#storage--in-memory-here-and-why-vs-tempo-on-rustfs)). **VictoriaTraces** (`v0.6.0`) is a **pilot** 3rd fan-out target — VM-operator-managed, no object-storage dependency — evaluating tracing consolidation onto the VictoriaMetrics stack; Tempo stays primary/durable (see [victoriatraces.md](victoriatraces.md)). The multi-backend setup is intentional — Tempo for durable day-to-day Grafana workflows, Jaeger for its dedicated trace-search UI / learning, VictoriaTraces as a consolidation pilot. See [architecture.md](architecture.md), [jaeger.md](jaeger.md), and the [backend comparison](backends-comparison.md).
+> **Three backends, by design.** **Tempo** is the primary backend (queried in Grafana via TraceQL) and the **durable** store — traces live in **RustFS S3** (`tempo-traces` bucket) with **7-day** retention. **Jaeger** is an alternative UI fed by the same OTel Collector fan-out, kept on **in-memory storage (ephemeral — traces are lost on pod restart)** because Jaeger has no S3/object-storage backend (see [jaeger.md](jaeger.md#storage--in-memory-here-and-why-vs-tempo-on-rustfs)). **VictoriaTraces** (`v0.9.4`) is a **pilot** 3rd fan-out target — VM-operator-managed, no object-storage dependency — evaluating tracing consolidation onto the VictoriaMetrics stack; Tempo stays primary/durable (see [victoriatraces.md](victoriatraces.md)). The multi-backend setup is intentional — Tempo for durable day-to-day Grafana workflows, Jaeger for its dedicated trace-search UI / learning, VictoriaTraces as a consolidation pilot. See [architecture.md](architecture.md), [jaeger.md](jaeger.md), and the [backend comparison](backends-comparison.md).
 
 ### Automatic Features
 
@@ -443,7 +443,7 @@ attribute.String("db.table", "users")
 
 ---
 
-**Last Updated**: 2026-07-10 — metrics-generator noted configured-but-inert (`remote_write: []`); collector fan-out drawn end-to-end; `OTEL_SERVICE_NAME` injected by ResourceSets; sampling corrected to the shipped `ParentBased(TraceIDRatioBased)` (root decides, downstream honours; no auto ENV mapping); Tempo v2.10.5 on RustFS S3 (7d), Jaeger in-memory, VictoriaTraces v0.6.0 (pilot)
+**Last Updated**: 2026-07-14 — metrics-generator noted configured-but-inert (`remote_write: []`); collector fan-out drawn end-to-end; `OTEL_SERVICE_NAME` injected by ResourceSets; sampling corrected to the shipped `ParentBased(TraceIDRatioBased)` (root decides, downstream honours; no auto ENV mapping); Tempo v2.10.5 on RustFS S3 (7d), Jaeger in-memory, VictoriaTraces v0.9.4 (pilot)
 
 ---
-_Last updated: 2026-07-11_
+_Last updated: 2026-07-14_

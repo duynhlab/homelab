@@ -277,7 +277,7 @@ spec:
   interval: 60m
   url: oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-mcp
   ref:
-    semver: ">=0.2.0"
+    semver: "0.3.0"
   layerSelector:
     mediaType: "application/vnd.cncf.helm.chart.content.v1.tar+gzip"
     operation: copy
@@ -676,4 +676,4 @@ curl http://localhost:9090/health             # Flux MCP
 | VM Agent Skills | https://github.com/VictoriaMetrics/skills |
 
 ---
-_Last updated: 2026-04-22_
+_Last updated: 2026-07-14 — VM MCP chart 0.3.0 and VL MCP chart 0.1.0 pinned._

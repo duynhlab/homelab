@@ -4,7 +4,7 @@ One place to learn how HTTP and gRPC contracts work across the duynhlab platform
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Implemented; checkout P1-P4 is local-stack only until planned cluster phase P5 |
+| **Status** | Implemented; checkout P1-P5 runs in local-stack and the cluster |
 | **Scope** | Shared HTTP conventions, gRPC conventions, and the current service call graph |
 | **Public transport** | HTTP/JSON through Kong on `:8080` |
 | **Internal transport** | gRPC on `:9090`; two documented cart REST exceptions remain |
@@ -448,9 +448,7 @@ must omit or clearly empty the enrichment; it must not fabricate data.
 | Remove a route alias | Only after usage is zero | Observe, announce, then remove |
 
 Deprecated HTTP aliases remain mounted during their migration window. New code
-must use the canonical collection-noun route. Compatibility pages for the old
-documentation filenames remain in this directory because service repositories,
-ADRs, RFCs, and historical changelogs link to them.
+must use the canonical collection-noun route.
 
 ## Changing an API
 
@@ -508,4 +506,4 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-14_

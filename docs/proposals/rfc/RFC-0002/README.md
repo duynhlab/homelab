@@ -2,14 +2,14 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | platform-wide | 2026-06-26 | 2026-06-26 |
+| provisional | platform-wide | 2026-06-26 | 2026-07-14 |
 
 > **Provisional.** Proposes a design; nothing is implemented. Owns the *why* and
 > *design rationale* for the mTLS backlog item that
-> [`grpc-internal-comms.md`](../../../api/grpc-internal-comms.md) §5 / Phase 3,
+> [shared API security model](../../../api/api.md#security),
 > [RFC-0001 Non-Goals](../RFC-0001/README.md#non-goals), and the `pkg/grpcx` +
-> `pkg/temporalx` source all defer. The operational reference stays in
-> `grpc-internal-comms.md`.
+> `pkg/temporalx` source all defer. The operational reference is the
+> [gRPC runtime model](../../../api/api.md#grpc-runtime-model).
 
 ## Summary
 
@@ -27,11 +27,10 @@ forwarded JWT (the user layer) cannot provide.
 East-west gRPC is **plaintext today.** `grpcx.Dial` uses
 `insecure.NewCredentials()`, `temporalx.Dial` has no TLS, and the
 review/shipping/notification servers do no inbound auth. As
-[`grpc-internal-comms.md`](../../../api/grpc-internal-comms.md) §5 admits bluntly:
+[shared API security model](../../../api/api.md#security) explains:
 any workload that can reach `:9090` can invoke internal RPCs — including
-`notification.SendEmail` — unauthenticated. The interim fence is NetworkPolicy, but
-it is only enforced where the CNI enforces it (kindnet, the local cluster's CNI,
-does **not**), and it answers only *who may connect?*, never *which service is this?*
+`notification.SendEmail` — unauthenticated. The interim fence is NetworkPolicy,
+enforced by kindnet on the local cluster, but it answers only *who may connect?*, never *which service is this?*
 
 mTLS closes that gap: it cryptographically proves **service identity** on every hop
 and encrypts the wire, independent of whether a CNI enforces NetworkPolicy. The PKI
@@ -89,7 +88,7 @@ Wire mTLS **in-process** into the shared transport helpers, trusting the existin
 | Option | Verdict | Why |
 |--------|---------|-----|
 | **(a)** In-service mTLS via cert-manager leaves wired into `pkg/grpcx` + `pkg/temporalx`, trusting `homelab-ca` | **RECOMMENDED** | The PKI (homelab-ca issuer + trust-manager bundle) is **already deployed for this exact purpose**. No new component, no sidecar, no data-plane hop. All workloads are Go and already read `/etc/ssl/certs/`. Change is confined to two `pkg` helpers + per-service `Certificate` manifests. |
-| **(b)** Service mesh (Istio Ambient / Linkerd) for mesh-native, sidecar/ztunnel mTLS | **Defer — own RFC** | Transparent L7 mTLS + identity, but we run no mesh; standing one up for ~9 hops is disproportionate (mirrors the §3 LB decision in `grpc-internal-comms.md`). A mesh is a platform-wide decision deserving its own RFC. |
+| **(b)** Service mesh (Istio Ambient / Linkerd) for mesh-native, sidecar/ztunnel mTLS | **Defer — own RFC** | Transparent L7 mTLS + identity, but we run no mesh; standing one up for ~9 hops is disproportionate (mirrors the [HTTP/2 load-balancing guidance](../../../api/api.md#kubernetes-http2-load-balancing)). A mesh is a platform-wide decision deserving its own RFC. |
 | **(c)** SPIFFE/SPIRE workload identity (SVIDs) | **Reject** | Strong identity model, but a whole new control plane + attestation pipeline. cert-manager already gives us short-lived, auto-rotated certs from a trusted CA — SPIRE's value-add is unneeded at this scale. |
 
 (a) is the lightest precisely because **trust-manager + `homelab-ca` are live** — the
@@ -200,7 +199,7 @@ cost (amortized by long-lived HTTP/2 connections); two `pkg` releases + a per-se
 
 - **Trust boundary:** mTLS authenticates the *service*; JWT-in-metadata still
   authenticates the *user* (unchanged) and NetworkPolicy still fences the network —
-  the three layers from `grpc-internal-comms.md` §5, now all active.
+  the three layers from the [API security model](../../../api/api.md#security), now all active.
 - **Authorization is coarse:** any leaf signed by `homelab-ca` is trusted by every
   service (CA-level trust, not per-peer allow-lists). Per-callee SAN/SPIFFE-ID
   authorization is possible later but is a non-goal here; NetworkPolicy remains the
@@ -258,11 +257,11 @@ TBD — provisional; no implementation yet.
 
 ## Related
 
-- East-west transport & current posture: [`docs/api/grpc-internal-comms.md`](../../../api/grpc-internal-comms.md) (§5 Security, Phase 3).
+- East-west transport & current posture: [shared API security model](../../../api/api.md#security).
 - [RFC-0001 Temporal](../RFC-0001/README.md) — the worker↔cluster link this RFC also secures (its Non-Goal #3).
 - [ADR-006 RS256 JWT + Kong edge auth](../../adr/ADR-006-rs256-jwt-kong-edge-auth/) (supersedes [ADR-003](../../adr/ADR-003-jwt-validation-in-services-not-kong/)) — the user-identity layer mTLS complements. **Sequence this RFC after [RFC-0009](../RFC-0009/):** the gateway/JWT work lands first, then east-west mTLS adds the service-identity layer beneath it.
 - PKI: [`docs/secrets/cert-manager.md`](../../../secrets/cert-manager.md) (`homelab-ca`, trust-manager), [`docs/secrets/trust-distribution.md`](../../../secrets/trust-distribution.md).
 - Code: `duynhlab/pkg` `grpcx` (`Dial`/`NewServer`/`metadata.go`), `temporalx`.
 
 ---
-_Last updated: 2026-07-01_
+_Last updated: 2026-07-14_

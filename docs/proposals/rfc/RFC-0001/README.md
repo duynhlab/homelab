@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| implemented | platform-wide | 2026-06-26 | 2026-07-02 |
+| implemented | platform-wide | 2026-06-26 | 2026-07-14 |
 
 > This is a **retrospective** RFC: Temporal order-fulfillment is already shipped and
 > verified. It exists as the worked example for the [RFC process](../README.md) and as
@@ -213,7 +213,7 @@ Owned here (replaces the roadmap previously inline in `temporal-order-fulfillmen
 
 - ADRs: [ADR-001 Adopt Temporal](../../adr/ADR-001-adopt-temporal-for-order-fulfillment/), [ADR-002 Deploy via the operator](../../adr/ADR-002-deploy-temporal-via-operator/).
 - Operational reference: [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md).
-- East-west transport: [`docs/api/grpc-internal-comms.md`](../../../api/grpc-internal-comms.md).
+- East-west transport: [shared API guide](../../../api/api.md#grpc-runtime-model).
 
 ---
-_Last updated: 2026-07-02_
+_Last updated: 2026-07-14_

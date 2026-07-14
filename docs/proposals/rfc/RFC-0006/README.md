@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | infra | 2026-06-26 | 2026-06-26 |
+| provisional | infra | 2026-06-26 | 2026-07-14 |
 
 > **Provisional.** This RFC *evaluates* a service mesh and makes a recommendation;
 > it proposes **no implementation**. It is the superset sibling of
@@ -33,10 +33,10 @@ hand-assembled:
 - **Service identity / encryption** — deferred to [RFC-0002](../RFC-0002/README.md)
   (cert-manager leaves wired into `pkg/grpcx`). East-west gRPC is plaintext today
   (`insecure.NewCredentials()`); see
-  [`grpc-internal-comms.md`](../../../api/grpc-internal-comms.md) §5.
+  [shared API security model](../../../api/api.md#security).
 - **Network fencing** — NetworkPolicy fences `:9090`
-  ([`network-policies.md`](../../../security/network-policies.md)), though kindnet
-  (the local CNI) does not enforce it.
+  ([`network-policies.md`](../../../security/network-policies.md)); kindnet
+  enforces these policies on the local cluster.
 - **L7 telemetry** — RED metrics, traces, and logs already flow through `pkg/obsx`
   to VictoriaMetrics / Tempo / VictoriaLogs (AGENTS.md observability stack).
 
@@ -81,7 +81,7 @@ Treat this as a three-way decision and recommend explicitly.
 **revisit a mesh when at least one revisit criterion below is true**. A mesh is a
 platform-wide commitment; adopting it for ~9 gRPC hops with no canary requirement
 mirrors the "defer the mesh" calls already made in
-[`grpc-internal-comms.md`](../../../api/grpc-internal-comms.md) §3/§8 and
+[gRPC runtime guidance](../../../api/api.md#grpc-runtime-model) and
 [RFC-0002 alternative (b)](../RFC-0002/README.md).
 
 **Revisit when any of these become true:**
@@ -243,9 +243,9 @@ TBD — provisional; deferred, no implementation. Revisit per the criteria above
 - [RFC-0002 East-west mTLS](../RFC-0002/README.md) — the lightweight in-process
   alternative this RFC is the superset of; a mesh would supersede it.
 - East-west transport & "defer the mesh" rationale:
-  [`docs/api/grpc-internal-comms.md`](../../../api/grpc-internal-comms.md) (§3, §5, §8).
+  [shared API guide](../../../api/api.md) (runtime, security, and observability).
 - Network fence: [`docs/security/network-policies.md`](../../../security/network-policies.md).
 - Roadmap source: `TODO.md` → *Service Mesh & Traffic Management*.
 
 ---
-_Last updated: 2026-06-26_
+_Last updated: 2026-07-14_

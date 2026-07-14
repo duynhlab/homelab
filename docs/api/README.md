@@ -8,7 +8,6 @@ Start here to learn the platform's shared API rules and then drill into one serv
 | **Canonical shared guide** | [api.md](./api.md) |
 | **Service map** | [microservices.md](./microservices.md) |
 | **Workflow guide** | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
-| **Compatibility policy** | Old filenames remain as forwarding pages so external links keep working |
 
 ## Documentation Map
 
@@ -24,13 +23,10 @@ flowchart TD
     Catalog --> Contracts
     Saga --> Order["order.md"]
     Saga --> Payment["payments.md"]
-    Legacy["3 compatibility filenames"] -.-> Shared
-    Legacy -.-> Saga
 ```
 
 The arrows show documentation ownership, not runtime traffic. Runtime traffic is
 shown in [api.md](./api.md#current-east-west-call-graph).
-
 
 ## Recommended Learning Path
 
@@ -80,17 +76,6 @@ Keeping each fact in one place prevents three copies from drifting.
 | [checkout.md](./checkout.md) | Checkout FSM, price re-validation, totals, promo, confirm, and abandonment | P1-P5 shipped (local-stack + cluster); P6 legacy removal planned |
 | [payments.md](./payments.md) | Money state machine, idempotency, ledger, provider, and reconciliation | Implemented |
 
-## Compatibility Pages
-
-These files are intentionally retained for inbound links. New documents should
-link to the canonical guide or exact section instead.
-
-| Old filename | Canonical destination |
-|--------------|-----------------------|
-| [api-naming-convention.md](./api-naming-convention.md) | [api.md](./api.md), especially HTTP URL Model |
-| [grpc-internal-comms.md](./grpc-internal-comms.md) | [api.md](./api.md), especially Current East-West Call Graph and gRPC Runtime Model |
-| [saga-vs-2pc.md](./saga-vs-2pc.md) | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
-
 ## Related Areas
 
 | Topic | Document |
@@ -115,4 +100,4 @@ link to the canonical guide or exact section instead.
 Every substantive claim must match the service code, local-stack wiring, and
 GitOps manifests. Mark designed but undeployed behavior as **planned**.
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-14_

@@ -54,8 +54,10 @@ service's domain noun:
   internal, notification `notify/*` — both hops are gRPC today) rename
   directly with no alias.
 
-The full route inventory and rule text live in
-[`docs/api/api-naming-convention.md`](../../../api/api-naming-convention.md) (v3.0.0).
+The rule text lives in the
+[collection noun rule](../../../api/api.md#collection-noun-rule);
+the per-service route inventories live in the
+[service contracts](../../../api/README.md#service-contracts).
 
 ## Alternatives considered
 
@@ -89,8 +91,8 @@ The full route inventory and rule text live in
   (`/payment/v1/private/payments`) — mild stutter, harmless; a two-release
   migration (expand now, contract later) with a window where deprecated
   aliases answer alongside canonical paths; auth's `auth/auth` segment reads
-  awkwardly and is codified as a permanent exception; the naming-convention
-  doc bumps to a breaking v3.0.0 and all its consumers (docs, audit scripts,
+  awkwardly and is codified as a permanent exception; the API convention
+  records a breaking v3.0.0 change and all its consumers (docs, audit scripts,
   service READMEs) had to move in lockstep.
 - The **contract release** must remove: the 8 service-side aliases, the old
   Kong webhook prefix (`/payment/v1/public/webhooks/`, cluster Ingress +
@@ -99,8 +101,9 @@ The full route inventory and rule text live in
 
 ## References
 
-- [`docs/api/api-naming-convention.md`](../../../api/api-naming-convention.md) — v3.0.0 rule + inventory
+- [Shared API collection noun rule](../../../api/api.md#collection-noun-rule)
+- [Service contracts](../../../api/README.md#service-contracts)
 - [ADR-003](../ADR-003-jwt-validation-in-services-not-kong/) · [ADR-006](../ADR-006-rs256-jwt-kong-edge-auth/) — the auth-path surfaces this rename touches
 - Google API Design Guide (collections & custom methods)
 
-_Last updated: 2026-07-12_
+_Last updated: 2026-07-14_

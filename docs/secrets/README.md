@@ -21,9 +21,12 @@ the internal CA bundle to opted-in namespaces.
 
 ## Architecture
 
+### Homelab Architecture
+
 ```mermaid
 graph TD
-subgraph secrets["Homelab Secrets, TLS, and Trust Pipeline"]
+subgraph homelab["Homelab Secrets, TLS, and Trust Pipeline"]
+    direction TB
     flux(Flux Kustomizations):::platform
     bootstrap(openbao-bootstrap Job):::worker
     bao(OpenBAO HA Raft<br/>namespace: openbao):::service
@@ -43,23 +46,38 @@ subgraph secrets["Homelab Secrets, TLS, and Trust Pipeline"]
     bootstrap -->|"init, unseal, seed KV v2, policies"| bao
     bao -->|"Kubernetes auth + KV v2 reads"| css
     css -->|"store reference"| eso
-    eso -->|"reconciles"| es
+    eso -->|"reconciles app secrets"| es
     es -->|"writes"| k8ssecret
     k8ssecret -->|"env / volume / secretKeyRef"| apps
-    bao -->|"KV: secret/local/infra/cloudflare/api-token"| cfsecret
-    cfsecret -->|"DNS-01 credential"| cm
+    eso -->|"syncs DNS-01 token"| cfsecret
+    cfsecret -->|"Cloudflare API token"| cm
     cm -->|"local: homelab-ca<br/>prod: Let's Encrypt DNS-01"| kong
     cm -->|"homelab CA source"| tm
     tm -->|"namespaceSelector: needs-trust=true"| cabundle
     cabundle -->|"mounted PEM trust store"| trusted
 end
 
+classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+classDef external fill:#64748b,color:#fff,stroke:#334155;
+classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+```
+
+### Legend
+
+```mermaid
+graph LR
 subgraph legend["Legend"]
-    l_edge(Edge):::edge
-    l_service(Service):::service
-    l_worker(Worker / Job):::worker
-    l_platform(Platform controller / CRD):::platform
-    l_data[(Secret / ConfigMap / Data)]:::data
+    l_edge["Edge / ingress-facing asset"]:::edge
+    l_service["Service / workload"]:::service
+    l_worker["Worker / Job"]:::worker
+    l_platform["Platform controller / CRD"]:::platform
+    l_data[(Secret / ConfigMap / data)]:::data
+    l_external["External dependency"]:::external
+    l_planned["Planned target"]:::planned
 end
 
 classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;

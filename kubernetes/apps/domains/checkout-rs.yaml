@@ -188,6 +188,18 @@ spec:
           - name: REVIEW_GRPC_ADDR
             value: << inputs.review_grpc_addr >>
           <<- end >>
+          <<- if (index inputs "cart_grpc_addr") >>
+          - name: CART_GRPC_ADDR
+            value: << inputs.cart_grpc_addr >>
+          <<- end >>
+          <<- if (index inputs "product_grpc_addr") >>
+          - name: PRODUCT_GRPC_ADDR
+            value: << inputs.product_grpc_addr >>
+          <<- end >>
+          <<- if (index inputs "order_grpc_addr") >>
+          - name: ORDER_GRPC_ADDR
+            value: << inputs.order_grpc_addr >>
+          <<- end >>
           <<- if (index inputs "shipping_grpc_addr") >>
           - name: SHIPPING_GRPC_ADDR
             value: << inputs.shipping_grpc_addr >>

@@ -10,10 +10,10 @@ spec:
   type: Static
   defaultValues:
     name: product
-    image_tag: "1.2.0" # {"$imagepolicy": "flux-system:product:tag"}
+    image_tag: "1.3.0" # {"$imagepolicy": "flux-system:product:tag"}
     namespace: product
     platform_backup_label: "cnpg"
-    replicaCount: 2
+    replicaCount: 1
     db_host: "pgdog-product.product.svc.cluster.local"
     db_port: "6432"
     db_migration_host: "product-db-rw.product.svc.cluster.local"
@@ -21,7 +21,7 @@ spec:
     db_sslmode: "disable"
     pool_max: "50"
     cache_enabled: "true"
-    review_grpc_addr: "dns:///review-grpc.review.svc.cluster.local:9090"
+    review_grpc_addr: "dns:///review.review.svc.cluster.local:9090"
     # product serves gRPC on :9090 (ReserveStock/ReleaseStock — the saga's
     # stock steps, dialed by order-worker); the chart renders the product-grpc
     # headless Service from this.

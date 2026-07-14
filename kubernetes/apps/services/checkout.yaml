@@ -15,10 +15,11 @@ spec:
     # No platform_backup_label: checkout's data lives on product-db in the
     # product namespace, which is already backed up (same reasoning as
     # payment).
-    # Two replicas deliberately: the confirm flow is multi-replica-safe by
-    # design — idempotency claims, session↔claim binding, and stale-lock
-    # takeover all live in the database (RFC-0015 P2), not in memory.
-    replicaCount: 2
+    # Single replica for local host capacity; the confirm flow is
+    # multi-replica-safe by design (idempotency claims, session↔claim
+    # binding, stale-lock takeover — all in the database, RFC-0015 P2),
+    # so scaling this up is a values change, not a design change.
+    replicaCount: 1
     db_host: "pgdog-product.product.svc.cluster.local"
     db_port: "6432"
     db_migration_host: "product-db-rw.product.svc.cluster.local"
@@ -26,8 +27,14 @@ spec:
     db_sslmode: "disable"
     pool_max: "25"
     # No grpc_server: checkout is a gRPC CLIENT only (cart/product/order/
-    # shipping); its own API surface is HTTP behind Kong. The upstream
-    # addresses and Temporal endpoint are NOT set here — the service's
-    # config defaults are already the cluster DNS names (cart-grpc.cart,
-    # order-grpc.order, …, temporal-frontend.temporal), and the platform
-    # convention is to set inputs only where the default is wrong.
+    # shipping); its own API surface is HTTP behind Kong.
+    # All four upstream addresses are explicit: the service's config defaults
+    # still say `<svc>-grpc.<ns>` but mop chart >=0.14 renders a single
+    # multi-port Service named `<svc>` (the headless `<svc>-grpc` twin was
+    # removed) — the defaults are wrong on the cluster until the service
+    # repo catches up.
+    cart_grpc_addr: "dns:///cart.cart.svc.cluster.local:9090"
+    product_grpc_addr: "dns:///product.product.svc.cluster.local:9090"
+    order_grpc_addr: "dns:///order.order.svc.cluster.local:9090"
+    shipping_grpc_addr: "dns:///shipping.shipping.svc.cluster.local:9090"
+    # Temporal default (temporal-frontend.temporal:7233) is correct as-is.

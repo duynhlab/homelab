@@ -10,7 +10,7 @@ spec:
   type: Static
   defaultValues:
     name: payment
-    image_tag: "1.1.0" # {"$imagepolicy": "flux-system:payment:tag"}
+    image_tag: "1.2.0" # {"$imagepolicy": "flux-system:payment:tag"}
     namespace: payment
     # No platform_backup_label: that label routes CNPG/barman S3 credentials to
     # namespaces hosting a database cluster — payment's data lives on product-db
@@ -32,7 +32,7 @@ spec:
     db_sslmode: "require"
     pool_max: "25"
     # Internal gRPC server (:9090) — the order saga's money transport. The mop
-    # chart renders the payment-grpc Service from this.
+    # chart adds a grpc:9090 port to the payment Service.
     grpc_server: true
     # Reflection off in the cluster: this API surface moves money (grpcx
     # registers reflection unless told otherwise). MUST stay the string

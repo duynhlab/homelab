@@ -23,35 +23,66 @@ inter-service call graph.
 - **URL shape (Variant A):** `/{service}/v1/{audience}/{resource…}` with `audience ∈ public | private | internal | protected`. The gateway is **Kong in both environments** — in-cluster and in the local stack (Kong 3.9 DB-less, declarative `local-stack/gateway/kong.yml` mirroring the cluster plugins incl. the edge-JWT check on private routes). Routing is **pure pass-through** — no rewriting.
 
 ```mermaid
-flowchart TD
-    Browser["Browser SPA"] -->|"HTTP/JSON"| GW["Kong pass-through + edge JWT"]
-    GW --> AUTH[auth]
-    GW --> USER[user]
-    GW --> PROD[product]
-    GW --> CART[cart]
-    GW --> ORD[order]
-    GW --> REV[review]
-    GW --> SHIP[shipping]
-    GW --> NOTIF[notification]
-    GW --> PAY[payment]
-    GW --> CHECK[checkout]
+flowchart TB
+    Browser["React SPA"] -->|"HTTP/JSON"| GW["Kong gateway"]
 
-    subgraph EW["East-west contracts"]
-      PROD -->|"gRPC reviews"| REV
-      ORD -->|"gRPC shipment read"| SHIP
-      ORD -->|"gRPC payment read"| PAY
-      CHECK -->|"gRPC cart, catalog, quote, order"| CART
-      CHECK --> PROD
-      CHECK --> SHIP
-      CHECK --> ORD
-      ORD -.->|"Temporal workflow"| WKR[order-worker]
-      WKR -->|"gRPC stock"| PROD
-      WKR -->|"gRPC shipment"| SHIP
-      WKR -->|"gRPC money"| PAY
-      WKR -->|"gRPC delivery"| NOTIF
-      ORD -.->|"REST pricing read"| CART
-      WKR -.->|"REST cart-clear (internal)"| CART
+    subgraph Identity["Identity"]
+        AUTH["auth"]
+        USER["user"]
     end
+    subgraph Shopping["Catalog and shopping"]
+        PROD["product"]
+        REV["review"]
+        CART["cart"]
+    end
+    subgraph Fulfillment["Checkout and fulfillment"]
+        CHECK["checkout"]
+        ORD["order"]
+        SHIP["shipping"]
+        PAY["payment"]
+        NOTIF["notification"]
+        CHECKW["checkout-worker"]
+        ORDW["order-worker"]
+    end
+    TMP["Temporal"]
+
+    GW --> AUTH
+    GW --> USER
+    GW --> PROD
+    GW --> REV
+    GW --> CART
+    GW --> CHECK
+    GW --> ORD
+    GW --> SHIP
+    GW --> PAY
+    GW --> NOTIF
+
+    PROD -->|"gRPC reviews"| REV
+    CHECK -->|"gRPC cart"| CART
+    CHECK -->|"gRPC catalog"| PROD
+    CHECK -->|"gRPC quote"| SHIP
+    CHECK -->|"gRPC create order"| ORD
+    ORD -->|"gRPC details"| SHIP
+    ORD -->|"gRPC details"| PAY
+    ORD -->|"start saga"| TMP
+    CHECK -->|"start expiry timer"| TMP
+    TMP -->|"order task queue"| ORDW
+    TMP -->|"checkout task queue"| CHECKW
+    ORDW -->|"gRPC stock"| PROD
+    ORDW -->|"gRPC shipment"| SHIP
+    ORDW -->|"gRPC money"| PAY
+    ORDW -->|"gRPC email"| NOTIF
+    ORD -.->|"REST pricing read"| CART
+    ORDW -.->|"REST cart clear"| CART
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    class Browser,GW edge;
+    class AUTH,USER,PROD,REV,CART,CHECK,ORD,SHIP,PAY,NOTIF service;
+    class CHECKW,ORDW worker;
+    class TMP platform;
 ```
 
 
@@ -134,12 +165,12 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 > **Known defect:** the service still emits its own CORS headers on top of the
 > gateway's (duplicate `Access-Control-Allow-Origin`) — see §6.
 
-### checkout — session orchestrator (RFC-0015 P1-P4)
+### checkout — session orchestrator (RFC-0015 P1-P5)
 
 > Owns `checkout_sessions`, item snapshots, totals, promo attachment, and
 > confirm idempotency. The service is client-only: Kong calls its HTTP API and
 > it calls cart, product, shipping, and order over gRPC. P1-P4 run in
-> local-stack; the cluster deployment and NetworkPolicies are planned for P5.
+> local-stack; P5 deploys the service and its NetworkPolicies to the cluster.
 
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
@@ -150,7 +181,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 | **Promo preview and redemption** | private `POST/DELETE /sessions/:id/promo` | preview on apply; serialized, idempotent redemption inside confirm | Postgres | Implemented (P4) | ADR-022 |
 | **Confirm and order handoff** | private `POST /checkout/sessions/:id/confirm` | required `Idempotency-Key`; confirm-time revalidation; gRPC `order.v1/CreateOrder` | product, order | Implemented (P2) | ADR-018 |
 | **Abandonment** | background Temporal workflow | durable wake-up plus DB-authoritative `expires_at`; lazy expiry remains the correctness backstop | Temporal | Implemented (P2) | ADR-019 |
-| **Cluster delivery** | — | ResourceSet input, CNPG triplet, gRPC caller NetworkPolicies | platform GitOps | **Planned (P5)** | RFC-0015 |
+| **Cluster delivery** | — | ResourceSet input, CNPG triplet, gRPC caller NetworkPolicies | platform GitOps | **Implemented (P5)** | RFC-0015 |
 
 ### cart — shopping cart
 
@@ -161,7 +192,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 |---|---|---|---|---|---|
 | **Cart CRUD** | private `GET/POST/DELETE /cart`, `GET /cart/count`, `PATCH/DELETE /cart/items/:itemId` | fail-closed JWT (`user_id` from token, never body); UPSERT `ON CONFLICT (user_id, product_id)`; server-side subtotal math (empty cart = 0 shipping) | auth JWKS | Implemented | — |
 | **Saga cart-clear** | internal `DELETE /cart/:userId` | tokenless in-cluster endpoint, NetworkPolicy-fenced; called best-effort by the saga's `ClearCart` step | caller: order-worker | Implemented | [temporal saga](temporal-order-fulfillment.md) |
-| **gRPC read surface** | `cart.v1/GetCart` (`:9090`) | read-only snapshot for checkout (RFC-0015); prices → int64 minor units at this boundary; writes deliberately stay REST (ADR-021) | caller: checkout | Implemented (local-stack; cluster P5) | [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) |
+| **gRPC read surface** | `cart.v1/GetCart` (`:9090`) | read-only snapshot for checkout (RFC-0015); prices → int64 minor units at this boundary; writes deliberately stay REST (ADR-021) | caller: checkout | Implemented (local-stack + cluster) | [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) |
 
 ### order — orders & checkout fulfillment
 
@@ -304,6 +335,11 @@ flowchart LR
     WKR -->|gRPC notification| NOTIF[notification]
     ORD -.->|REST pricing read| CART
     WKR -.->|REST internal clear| CART
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    class PROD,REV,ORD,SHIP,PAY,CHECK,CART,NOTIF service;
+    class WKR worker;
 ```
 
 
@@ -331,4 +367,4 @@ the cluster ResourceSet templates.
 
 *Run the whole platform locally for verification: `cd local-stack && docker compose up -d --build` → SPA at http://localhost:3001, Kong gateway at http://localhost:8080 (demo login `alice` / `password123`).*
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-14_

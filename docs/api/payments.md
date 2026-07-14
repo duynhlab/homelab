@@ -31,6 +31,17 @@ flowchart LR
     Worker["order worker"] -->|"gRPC money operations"| Payment
     Payment --> DB[(payment DB)]
     Payment --> Provider
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    class Browser edge;
+    class Payment,OrderAPI service;
+    class Worker worker;
+    class DB data;
+    class Provider external;
 ```
 
 ## HTTP API
@@ -290,4 +301,4 @@ insufficient_funds, `19` transient-then-succeed):
 - [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — Saga execution and compensation
 - [RFC-0010](../proposals/rfc/RFC-0010/) — payment-service design
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-14_

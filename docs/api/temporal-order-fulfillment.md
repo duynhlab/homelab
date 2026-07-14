@@ -37,6 +37,13 @@ flowchart LR
     Worker --> Payment
     Worker --> Notification
     Worker -.->|"internal REST clear (by design)"| Cart
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    class Checkout,Order,Product,Shipping,Payment,Notification,Cart service;
+    class Worker worker;
+    class Temporal platform;
 ```
 
 ## Why Temporal?
@@ -614,4 +621,4 @@ notes above).
 - [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared idempotency state machine
 - [RFC-0010](../proposals/rfc/RFC-0010/) — payment and fulfillment design
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-14_

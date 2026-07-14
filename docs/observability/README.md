@@ -1,19 +1,22 @@
 # Observability Documentation
 
-Comprehensive observability for the `duynhlab` microservices platform -- 9 Go services, 5 PostgreSQL clusters, all running on Kubernetes with GitOps (Flux).
+Comprehensive observability for the `duynhlab` microservices platform -- 10 Go
+services, 2 workers, and 5 PostgreSQL clusters running on Kubernetes with
+GitOps (Flux).
 
 > **New to the stack?** Start with the [RFC-0014 explainer](rfc-0014-explainer.md) — old-vs-new, plain-language, diagrams.
 
 ## Architecture
 
-Since RFC-0014 the 9 Go services + order-worker **push** all three signals over
-OTLP to one OpenTelemetry Collector, which fans each out to its backend. Vector
+Since RFC-0014 the 10 Go services plus order-worker and checkout-worker
+**push** all three signals over OTLP to one OpenTelemetry Collector, which fans
+each out to its backend. Vector
 is the side path for everything without an OTel SDK (databases, Kong access log,
 Postgres query plans, the frontend). Profiles push straight to Pyroscope.
 
 ```mermaid
 flowchart TB
-    subgraph apps["9 Go microservices (obsx SDK)"]
+    subgraph apps["10 Go microservices + 2 workers (obsx SDK)"]
         SVC["otelgin · otelgrpc<br/>zap→OTLP tee · runtime metrics"]
     end
     subgraph infra["Non-instrumented pods"]
@@ -73,11 +76,19 @@ flowchart TB
     classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
     classDef profile fill:#f3d9fa,stroke:#9c36b5,color:#111;
     classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
+    classDef app fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
     class RCV,PROC otc;
     class VMSingle,VMAgent metric;
     class VLogs,VEC log;
     class Tempo,Jaeger,VT trace;
     class Pyro profile;
+    class SVC app;
+    class Kong edge;
+    class Grafana,VMAlert,VMAM,Sloth platform;
+    class INF external;
     style apps fill:#eef2ff,color:#111;
     style infra fill:#d3f9d8,color:#111;
     style col fill:#d0ebff,color:#111;
@@ -423,4 +434,4 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-07-10 — dropped the fictional spanmetrics connector from the diagram (collector has no connectors); alert count 149; collector inventory row covers all three pipelines._
+_Last updated: 2026-07-14_

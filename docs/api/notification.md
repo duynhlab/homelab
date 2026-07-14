@@ -25,6 +25,15 @@ flowchart LR
     Notification --> Logic[notification logic]
     Logic --> DB[(notification database)]
     Logic -->|status hardcoded 'sent'| DB2[notifications row — no real\nemail/SMS provider is wired]
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    class SPA edge;
+    class Notification,Logic service;
+    class Worker worker;
+    class DB,DB2 data;
 ```
 
 ## HTTP API
@@ -96,4 +105,4 @@ runtime metrics export over OTLP.
 - [Order service](order.md)
 - [Order-fulfillment Saga](temporal-order-fulfillment.md)
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-14_

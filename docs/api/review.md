@@ -23,6 +23,13 @@ flowchart LR
     Product[product-service] -->|GetProductReviews gRPC| Review
     Review --> Logic[review logic]
     Logic --> DB[(review database)]
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    class SPA edge;
+    class Review,Product,Logic service;
+    class DB data;
 ```
 
 ## HTTP API
@@ -96,4 +103,4 @@ over OTLP.
 - [Product service](product.md)
 - [Microservices catalog](microservices.md)
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-14_

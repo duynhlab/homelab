@@ -15,7 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   conventions now live in `docs/api/api.md`; each of the ten services has one
   contract file; Saga-vs-2PC learning moved beside the live Temporal workflow.
   The three superseded source files were removed after all live repository
-  links were repointed to canonical sections.
+  links were repointed to canonical sections. Platform, service, workflow,
+  and telemetry diagrams now share role-based colors and expose every
+  deployed service and worker.
 - **Observability configs reorganized by pillar**: `configs/monitoring/` →
   `configs/observability/{metrics,logging,tracing,grafana,sloth}` — VLSingle
   (logs) and VTSingle (traces) no longer hide inside `victoriametrics/`;

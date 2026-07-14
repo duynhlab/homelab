@@ -25,6 +25,15 @@ flowchart LR
     Order[order details] -->|GetShipmentByOrder| Shipping
     Worker[order-worker] -->|CreateShipment / CancelShipment| Shipping
     Shipping --> DB[(shipping database)]
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    class SPA edge;
+    class Shipping,Checkout,Order service;
+    class Worker worker;
+    class DB data;
 ```
 
 ## HTTP API
@@ -100,4 +109,4 @@ namespaces to the gRPC port.
 - [Order service](order.md)
 - [Order-fulfillment Saga](temporal-order-fulfillment.md)
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-14_

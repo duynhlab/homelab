@@ -24,12 +24,23 @@ flowchart LR
     Checkout[checkout] -->|gRPC CreateOrder| Order
     Order --> DB[(order database)]
     Order -->|start workflow| Temporal[Temporal]
-    Worker[order-worker] -->|activities| Temporal
+    Temporal -->|task queue| Worker[order-worker]
     Worker --> Product[product]
     Worker --> Shipping[shipping]
     Worker --> Payment[payment]
     Worker --> Notification[notification]
     Worker -. internal clear .-> Cart[cart]
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    class SPA edge;
+    class Order,Checkout,Product,Shipping,Payment,Notification,Cart service;
+    class Worker worker;
+    class Temporal platform;
+    class DB data;
 ```
 
 ## HTTP API
@@ -135,4 +146,4 @@ in every participating service document.
 - [Order-fulfillment Saga](temporal-order-fulfillment.md)
 - [ADR-018: Checkout to Order boundary](../proposals/adr/ADR-018-checkout-order-boundary/)
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-14_

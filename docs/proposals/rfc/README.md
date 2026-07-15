@@ -80,6 +80,7 @@ made are recorded as one or more **ADRs**, and the RFC moves to `implemented`.
 | [RFC-0013](RFC-0013/) | App-metrics cardinality audit & streaming-aggregation scale playbook | platform-wide | — | superseded |
 | [RFC-0014](RFC-0014/) | Full OpenTelemetry adoption: OTLP push for metrics, logs and traces | platform-wide | done | implemented (live-cluster drill pending) |
 | [RFC-0015](RFC-0015/) | Checkout service: session state machine, price re-validation & order handoff | platform-wide | P0 | provisional |
+| [RFC-0017](RFC-0017/) | Platform telemetry standard: per-layer signal ownership + fleet instrumentation | platform-wide | P1 | provisional |
 
 ## Backlog — candidate RFCs
 

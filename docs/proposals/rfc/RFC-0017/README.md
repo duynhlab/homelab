@@ -138,6 +138,85 @@ flowchart TB
 **(1) rejected** — it is the current gap. **(2) rejected** — it reintroduces the
 per-service drift RFC-0014 spent effort deleting.
 
+## Key decisions (research-hardened)
+
+Verified against current library docs (context7) at the pinned versions before
+committing. These are the traps that would otherwise bite; each is baked into
+the shared `pkg` layer so services cannot diverge.
+
+**At a glance** (details below):
+
+| # | Area | The trap (what goes wrong) | The rule |
+|---|------|----------------------------|----------|
+| D-1 | DB span | full SQL becomes the span name → cardinality + PII | `WithTrimSQLInSpanName()` (span = `SELECT`) |
+| D-2 | DB PII | bind values / conn details leak into spans | forbid `WithIncludeQueryParameters`; disable conn details |
+| D-3 | DB pool | no pool-saturation gauges | `RecordStats(pool)` mandatory, fail-boot on error |
+| D-4 | DB spans | extra "acquire" span per query (2–3× volume) | `WithDisableAcquireTracer()` |
+| D-5 | DB pooler | extended protocol breaks PgDog + adds prepare spans | keep `SimpleProtocol` on pooled pools |
+| D-6 | wiring | pool built before providers → **0 spans, no error** | providers set/passed before any pool |
+| D-7 | temporality | forcing delta would fight VictoriaMetrics | keep **cumulative** (SDK default); collector processor is defensive |
+| D-8 | instrument | Counter used for a rises-and-falls value | Counter / UpDownCounter / gauge decision table |
+| D-9 | cardinality | unbounded labels → 2000-cap overflow, silent | bounded enum labels only; no ids/free-text/`err.Error()` |
+| D-10 | cache | `redisotel` logs raw command (`GET product:12345`) | `WithDBStatement(false)` + `WithPoolName` |
+| D-11 | money hop | trace header not propagated / signed | `otelhttp.NewTransport`; drain body every path |
+| D-12 | logs↔trace | bridge misses native `TraceId` without ctx | `Log(ctx)` helper; already level-gated + de-duped |
+
+**DB tracing (`otelpgx`, W0 shared pool helper):**
+- **D-1 — Trim SQL from span names.** `otelpgx` defaults to the *full SQL* as
+  the span name (`query SELECT … WHERE id=3`) → cardinality blow-up + PII in
+  Tempo. The helper MUST set `WithTrimSQLInSpanName()` (span = `SELECT`).
+- **D-2 — Never capture query parameters or connection details.** Forbid
+  `WithIncludeQueryParameters()` (writes bind values `%+v` → emails/tokens in
+  spans) in every environment; add `WithDisableConnectionDetailsInAttributes()`.
+- **D-3 — `RecordStats(pool)` is mandatory** and a *separate* call — without it
+  there are no pool-saturation gauges (the signal you want when PgDog is the
+  bottleneck). The helper calls it and fails bootstrap on error.
+- **D-4 — Disable the acquire tracer** (`WithDisableAcquireTracer()`): the
+  default emits an extra "acquire" span per connection checkout (2–3× span
+  volume fleet-wide); pool health is watched via D-3 metrics instead.
+- **D-5 — Simple protocol stays.** Keep `DefaultQueryExecMode =
+  QueryExecModeSimpleProtocol` on every PgDog-fronted pool — required for the
+  transaction-mode pooler *and* it removes per-SQL `prepare` spans. (Confirms
+  the existing jsonb-as-string gotcha; documented, not rediscovered.)
+- **D-6 — Providers before pools.** A pool built before `obsx` installs the
+  global providers binds to the no-op provider → **zero DB spans, no error**.
+  The helper takes the providers explicitly (or asserts they are set).
+  `otelpgx` uses `pgx.*`/`db.system` attributes, not semconv v1.41 `db.query.*`
+  — dashboards query the `pgx.*` namespace.
+
+**Metrics (`logic` business instruments):**
+- **D-7 — Temporality stays cumulative.** The SDK default is cumulative, which
+  is exactly what VictoriaMetrics wants; the collector's `deltatocumulative` is
+  a *defensive passthrough* for any delta source, not a reason to switch. Do
+  **not** force delta at the SDK. (Documented so it is never "fixed" wrongly.)
+- **D-8 — Instrument choice is explicit.** Monotonic domain count → `Counter`
+  (`_total`); a level that rises *and* falls known at mutation points →
+  `UpDownCounter`; a level sampled on read → observable gauge. `payment_outbox_pending`
+  is an `UpDownCounter`/gauge, never a counter.
+- **D-9 — Bounded labels, enforced.** The SDK caps cardinality at 2000
+  attribute-sets/metric then silently overflows; every label value is an
+  enumerable set (`result`/`outcome`/`op`/`error.type`), never an id, free text,
+  or `err.Error()`. Duration histograms use base unit `s` with the platform
+  bucket View (RFC-0014 D-7); money uses a minor-unit histogram with its own View.
+
+**Logs / cache / propagation:**
+- **D-10 — `redisotel` must not leak the command.** `WithDBStatement` is ON by
+  default → raw `GET product:12345` as `db.statement` (cardinality + PII); the
+  product cache client sets `WithDBStatement(false)` and `WithPoolName(<name>)`
+  per client so pool metrics stay separable.
+- **D-11 — Outbound trace propagation via `otelhttp.NewTransport`.** For the
+  payment→mockpay hop: it injects `traceparent` at RoundTrip (after the app
+  signs), so the HMAC scope stays body + whitelisted headers and the money hop
+  joins the trace. Client spans only end on body close/EOF → `defer Body.Close()`
+  + drain on **every** path, including non-2xx.
+- **D-12 — `otelzap` gets the context.** The bridge sets the native
+  `LogRecord.TraceId` only when `ctx` is passed as a zap field; today the
+  middleware injects `trace_id` as a *string* (queryable in VictoriaLogs — works
+  today), but a `logic`-layer `Log(ctx)` helper is added (W1) so OTLP-native
+  logs↔trace correlation works too. Its OTLP core is already level-gated
+  (`NewIncreaseLevelCore`) and the double-ingest guard (`otlp-logs` label) is in
+  place from RFC-0014 P4.
+
 ## Design Details
 
 ### `core` layer — DB tracing + error logs (uniform, all 10)
@@ -211,9 +290,51 @@ emits the server span); confirm the chain is exactly tracing → logging.
 
 ## Security considerations
 
-- **PII must never be a metric label or span attribute.** Remove `username`/
-  `email` span attributes (auth/user). Domain identity that must be captured for
-  forensics goes in **logs** (redacted per policy), not metrics/traces.
+### Cardinality & PII guardrail — the one rule to internalize
+
+Every metric label and span attribute is either **bounded & safe** or it does
+not belong there. This is the single most important review gate in the whole
+RFC, so it gets a picture and a table.
+
+*Why it matters:* each distinct label-value combination is a **separate time
+series**. A bounded value (`result=success|error`) adds a handful of series; an
+unbounded one (`user_id`, `order_id`, an error message) adds *one per value* —
+millions — which overflows the SDK's 2000-cap (D-9), blows up storage, and, if
+it's an id or email, **leaks PII** into metrics and traces that are searchable
+by anyone with a dashboard.
+
+```mermaid
+flowchart TD
+    V["a value you want to attach<br/>(to a metric label or span attribute)"] --> Q1{"Is the set of possible<br/>values small & fixed?<br/>(e.g. success|error, GET|POST)"}
+    Q1 -->|no| LOG["put it in a LOG or a span EVENT<br/>(free-form, not indexed as a series)"]
+    Q1 -->|yes| Q2{"Could it ever contain<br/>PII or a secret?<br/>(email, token, name)"}
+    Q2 -->|yes| LOG
+    Q2 -->|no| OK["OK as a metric label / span attribute"]
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    class V,Q1,Q2 service;
+    class OK data;
+    class LOG external;
+```
+
+| Value | Label / span-attribute? | Where it goes instead |
+|-------|-------------------------|------------------------|
+| `result` / `outcome` / `op` / `reason` (fixed enum) | ✅ yes | — |
+| `http_route` (matched template, ~20) | ✅ yes | — |
+| `channel` = email\|sms, `method` = standard\|express | ✅ yes | — |
+| `user_id`, `order_id`, `session_id`, `payment_id` | ❌ never | log / span event (or as the trace's own id) |
+| `promo_code`, email, username, token | ❌ never (PII) | redacted log only |
+| raw error string / `err.Error()` | ❌ never | log message; use a bounded `error.type` label |
+| full SQL text, redis key with an id | ❌ never | trimmed span name (D-1); statement off (D-10) |
+
+**This table is the PR review checklist for every W1–W3 change.** A new label or
+attribute that isn't in the left "✅" shape is a blocker.
+
+### Other security notes
+
+- Remove existing `username`/`email` span attributes (auth/user) in W1 (D-2).
 - Security-relevant domain events (`auth_login_attempts_total{result=invalid_credentials}`,
   `auth_refresh_operations_total{result=reuse_detected}`) become **alertable** —
   a direct security win over span-event-only visibility.
@@ -236,15 +357,19 @@ expected series), source-driven against the pinned OTel API, one service per
 PR, gauntlet-reviewed; the shared `pkg` helper gets a doubt-cycle before fleet
 rollout.
 
-- **W0 — `pkg` foundation:** `otelpgx` DB-tracer helper + business-metric
-  convention doc (+ optional `redisotel` helper). Tag `pkg`. Rollback: services
+- **W0 — `pkg` foundation:** the shared `otelpgx` pool helper with the mandated
+  safe defaults baked in (**D-1…D-6**) + the business-metric convention
+  (**D-8, D-9**) + optional `redisotel` helper. Tag `pkg`. Rollback: services
   simply don't adopt.
-- **W1 — `core`, uniform (all 10):** adopt DB tracing + structured repo-error
-  logs; delete redundant `http.request` spans; remove PII span attrs.
-- **W2 — `logic` business metrics, per service:** the catalog above, richer
-  domains first (payment, order, auth, product), then the rest; checkout's +4.
-- **W3 — special surfaces:** payment mockpay-hop tracing + `traceparent`
-  propagation; order saga custom metrics; product `redisotel` + hit/miss.
+- **W1 — `core`, uniform (all 10):** adopt the DB-tracer helper + structured
+  repo-error logs; delete redundant `http.request` spans; **remove PII span
+  attrs (D-2 rule)**; add the `Log(ctx)` helper (**D-12**).
+- **W2 — `logic` business metrics, per service:** the catalog above under the
+  bounded-label rule (**D-9**), richer domains first (payment, order, auth,
+  product), then the rest; checkout's +4.
+- **W3 — special surfaces:** payment mockpay-hop tracing + `traceparent` via
+  `otelhttp` (**D-11**); order saga custom metrics; product `redisotel` +
+  hit/miss (**D-10**).
 - **W4 — consume it:** fix the stale RED/runtime dashboard (drop dead
   scrape-era panels) and add a **separate** `$app`-templated business-metrics
   dashboard, in both the local-stack json and the cluster `grafana-dashboards`

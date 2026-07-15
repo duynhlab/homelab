@@ -257,9 +257,12 @@ model applies per RPC method.
 | `rpc_system_name` | `grpc` | Constant |
 | `app` / `namespace` | `shipping` / `shipping` | From OTLP resource attributes (vmagent relabel) |
 
-**Client side** — `rpc_client_call_duration_seconds_{count,bucket,sum}`: as above
-plus `server_address` and `server_port` (the upstream called), minus
-`rpc_system_name`.
+**Client side** — `rpc_client_call_duration_seconds_{count,bucket,sum}`: the same
+labels as the server side, minus `rpc_system_name`. otelgrpc *records*
+`server_address`/`server_port` on this instrument, but the mandatory `pkg/obsx`
+View for `rpc.client.call.duration` drops both (`NewDenyKeysFilter`) before
+export — under headless-DNS the upstream is a churning per-pod IP, so those
+labels never reach the exported/queryable series.
 
 `pkg/grpcx` installs `otelgrpc` client/server interceptors so gRPC spans
 propagate trace context end-to-end alongside HTTP spans. For the transport
@@ -270,16 +273,22 @@ design, dual-port services, health checks, and resilience defaults see
 
 Observability is wired once, in the shared `pkg/obsx.SetupObservability`, called
 from each service's `cmd/main.go`. It configures the OTel `MeterProvider` with
-the platform Views (13-bucket duration, byte buckets), installs the `otelgin`
-HTTP middleware, starts `runtime.Start` for the Go runtime metrics, and points
-the OTLP/HTTP exporter at `otel-collector`. There is **no hand-written
-Prometheus middleware and no `promauto` registry** anymore — the SDK emits the
-semconv instruments and vmagent translates the names on ingest.
+the platform Views (13-bucket duration, byte buckets), starts `runtime.Start`
+for the Go runtime metrics, points the OTLP/HTTP exporter at `otel-collector`,
+and installs those providers as the OTel globals. It does **not** install the
+`otelgin` HTTP middleware — each service's `TracingMiddleware` wraps
+`otelgin.Middleware`, which then reads the global providers `obsx` set. There is
+**no hand-written Prometheus middleware and no `promauto` registry** anymore —
+the SDK emits the semconv instruments and vmagent translates the names on
+ingest.
 
-The middleware chain is **tracing → logging → metrics**; because tracing runs
-first, the active span (and its `trace_id`) is on the request context by the
-time the metrics and logs are recorded, which is what enables cross-signal
-correlation below.
+The HTTP middleware chain is **tracing → logging** (two middleware only). HTTP
+server metrics are **not** produced by a separate metrics middleware: the same
+`otelgin` instrumentation that the tracing middleware wraps records both the
+span (via the TracerProvider) and the `http.server.*` metrics (via the global
+MeterProvider). Because tracing runs first, the active span (and its `trace_id`)
+is on the request context by the time the logs and metrics are recorded, which
+is what enables cross-signal correlation below.
 
 gRPC RED + tracing come from the `pkg/grpcx` interceptors. Route shapes,
 audiences, and SLO conventions: [API reference](../../api/api.md).

@@ -199,7 +199,7 @@ flowchart LR
     SVC2["10 Go services + 2 workers<br/>OTLP: traces + metrics + logs"] --> COL2["otel-collector<br/>+ metrics pipeline<br/>(memory_limiter → deltatocumulative → batch)"]
     COL2 -->|"otlphttp proto"| VMA["vmagent :8429 OTLP ingest<br/>-opentelemetry.usePrometheusNaming<br/>+ resource-attr allowlist + relabel"]
     VMA --> VMS[("VMSingle")]
-    COL2 -->|"VL-Stream-Fields:<br/>service.name,k8s.namespace.name"| VLX[("VictoriaLogs<br/>trace_id = queryable field")]
+    COL2 -->|"VL-Stream-Fields:<br/>service.name"| VLX[("VictoriaLogs<br/>trace_id = queryable field")]
     COL2 --> T3["Tempo"]
 
     classDef app fill:#06b6d4,color:#082f49,stroke:#0e7490;

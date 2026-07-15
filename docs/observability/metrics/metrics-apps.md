@@ -33,12 +33,36 @@ The instrument names and labels are OpenTelemetry semantic conventions
 `http.response.status_code`), translated to their PromQL form by vmagent's
 `usePrometheusNaming` on ingest.
 
-## Custom application metrics
+### Metric families at a glance
 
-Three HTTP metrics are emitted by the shared observability wiring (`pkg/obsx`,
-which installs the `otelgin` middleware). All also carry the OTLP
-resource-attribute labels (`app`, `namespace`, `k8s_pod_name`, …); only the
-per-request semconv labels are listed below.
+Three families, two very different origins. **RED** and **USE** are
+**auto-instrumented** — no per-service code, identical across the fleet — and
+answer *"is the service fast and healthy?"*. **Business** metrics are
+**hand-declared** in a service's own code and answer *"is the domain
+behaving?"* — auto-instrumentation cannot know them. RED/USE are not something
+a service author writes; a service only adds Business instruments.
+
+| Family | Method | Metric families | Type | Service scope | Source (who emits) |
+|--------|--------|-----------------|------|---------------|--------------------|
+| **Request** | RED | `http_server_request_duration_seconds`, `http_server_{request,response}_body_size_bytes` | Histogram | all 10 services | `otelgin` (auto) |
+| **East-west** | RED | `rpc_{server,client}_call_duration_seconds` | Histogram | services making/serving gRPC | `otelgrpc` via `pkg/grpcx` (auto) |
+| **Runtime** | USE | `go_goroutine_count`, `go_memory_*_bytes` | Gauge | all 10 services + 2 workers | `runtime.Start` (auto) |
+| **Container** | USE | `container_memory_working_set_bytes`, `container_cpu_*` | Gauge | every pod | cAdvisor (auto, cluster) |
+| **Business** | domain | `checkout_*` (see [§ Business metrics](#business-metrics-custom)) | Counter/Histogram | **checkout** only (today) | **hand-declared** in service code |
+
+> Business metrics are a **third pillar**, not RED or USE — those two are
+> already covered by the auto layer above, so never hand-write them. Today only
+> checkout-service declares Business instruments; other services rely entirely
+> on the auto families.
+
+## HTTP server metrics (auto-instrumented)
+
+These are **not custom** — three HTTP metrics are emitted by `otelgin` itself
+(the same instrumentation the tracing middleware wraps), feeding the global
+MeterProvider that `pkg/obsx` installs. `obsx` sets the providers; it does not
+install the `otelgin` middleware — each service's `TracingMiddleware` does. All
+three also carry the OTLP resource-attribute labels (`app`, `namespace`,
+`k8s_pod_name`, …); only the per-request semconv labels are listed below.
 
 | Metric | Type | App labels | Purpose |
 |--------|------|------------|---------|
@@ -269,6 +293,44 @@ propagate trace context end-to-end alongside HTTP spans. For the transport
 design, dual-port services, health checks, and resilience defaults see
 [**API → gRPC runtime model**](../../api/api.md#grpc-runtime-model).
 
+## Business metrics (custom)
+
+The RED/USE families above are auto-instrumented and identical everywhere;
+they measure the *transport and the runtime*, not the *domain*. Business
+metrics are the third pillar: **hand-declared** instruments that count
+domain events the libraries cannot see (a confirmed checkout, a burned promo).
+A service adds them with the OTel Meter API in its own `logic` layer — never
+with `promauto`, and never to re-implement RED/USE.
+
+**How they are declared** (checkout-service `internal/logic/v1/metrics.go`):
+a package-level `meter = otel.Meter("checkout")` rides the global
+MeterProvider `obsx` installs (a no-op before setup, so package-init is safe);
+instruments are `meter.Int64Counter(...)` / `meter.Float64Histogram(...)` with
+OTel dotted names, and are recorded with `.Add`/`.Record` + a **bounded**
+attribute where a metric splits by cause. vmagent's `usePrometheusNaming`
+renders the dotted name into the PromQL form (counter → `_total`, seconds
+histogram → `_seconds`).
+
+Only **checkout-service** declares Business metrics today; the table is keyed
+by Service so new owners append rows as they add their own.
+
+| Service | Metric (PromQL) | OTel instrument | Type | Labels | Purpose |
+|---------|-----------------|-----------------|------|--------|---------|
+| checkout | `checkout_sessions_confirmed_total` | `checkout.sessions.confirmed` | Counter | — | Sessions successfully confirmed into an order |
+| checkout | `checkout_sessions_expired_total` | `checkout.sessions.expired` | Counter | `reason` = `timer`\|`lazy` | Sessions expired, by who noticed (abandonment workflow vs read-path backstop) |
+| checkout | `checkout_price_changed_total` | `checkout.price.changed` | Counter | — | Confirms bounced with `PRICE_CHANGED`/`STOCK_UNAVAILABLE` (session requoted) |
+| checkout | `checkout_promo_redeemed_total` | `checkout.promo.redeemed` | Counter | — | Promo redemptions counted at confirm (P4) |
+| checkout | `checkout_promo_rejected_total` | `checkout.promo.rejected` | Counter | `reason` = `expired`\|`exhausted` | Promo rejections at the authoritative confirm gate |
+| checkout | `checkout_confirm_duration_seconds` | `checkout.confirm.duration` | Histogram (`s`) | — | End-to-end confirm handler duration |
+
+**Conventions Business metrics must follow** (same guardrails as the auto
+families): OTel dotted lowercase names, no unit baked into the name (use
+`WithUnit`), monotonic counters only for counts, and **bounded** label values
+only — a promo *reason* (5 values) is fine; a `promo_code`, `user_id`, or
+`session_id` is forbidden (unbounded — belongs in a log/trace, see
+[§ cardinality control](#app-side-cardinality-control)). Business latency
+histograms reuse the platform duration buckets via an `obsx` View like RED.
+
 ## Instrumentation
 
 Observability is wired once, in the shared `pkg/obsx.SetupObservability`, called
@@ -427,6 +489,6 @@ Runbook: [`microservices-alerts.md`](../runbooks/microservices-alerts.md).
 
 ---
 
-_Last updated: 2026-07-14 — RFC-0014 P5: rewritten for the OTLP-push semconv reality (metric/label renames, push pipeline, exemplars-lost correlation via trace_id, heartbeat availability, in-flight/GC-pause metrics retired)._
+_Last updated: 2026-07-14 — corrected the middleware chain and rpc-client labels against the pinned v0.69 libraries; added the metric-families-at-a-glance table (RED/USE/Business × service scope) and a dedicated Business metrics section (custom domain instruments, keyed by service)._
 </content>
 </invoke>

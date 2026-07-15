@@ -165,7 +165,7 @@ flowchart LR
     S9["9 services + order-worker<br/>OTLP :4318"] --> RCV["otel-collector (Deployment ×1, 512Mi)<br/>metrics: memory_limiter → deltatocumulative → batch<br/>logs / traces: memory_limiter → batch"]
     RCV -->|"otlphttp proto"| VMA["vmagent :8429 /opentelemetry/v1/metrics<br/>-opentelemetry.usePrometheusNaming<br/>-opentelemetry.promoteResourceAttributes=allowlist<br/>relabel: service_name→app, k8s_namespace_name→namespace<br/>streamAggr (RFC-0013 P3)"]
     VMA --> VMS[("VMSingle")]
-    RCV -->|"otlphttp proto<br/>VL-Stream-Fields:<br/>service.name,k8s.namespace.name"| VL[("VictoriaLogs<br/>trace_id = queryable field")]
+    RCV -->|"otlphttp proto<br/>VL-Stream-Fields:<br/>service.name"| VL[("VictoriaLogs<br/>trace_id = queryable field")]
     RCV -->|otlp| TMP["Tempo (+Jaeger, VictoriaTraces)"]
     VEC["Vector DaemonSet<br/>(non-app pods only after P4)"] --> VL
     INF["infra exporters: ksm, kong,<br/>DBs, cAdvisor — scrape stays"] --> VMA
@@ -198,11 +198,11 @@ flowchart LR
 | Old | Semconv instrument | PromQL name (after D-1) | Notes |
 |---|---|---|---|
 | `request_duration_seconds{method,path,code}` | `http.server.request.duration` (Stable, s) | `http_server_request_duration_seconds_*` | labels → `http_request_method`, `http_route`, `http_response_status_code` (+`url_scheme`). **View with the platform 13-bucket set is mandatory** — semconv defaults lack `le=2` (Apdex) and 0.2/0.3 (SLO points). |
-| `requests_in_flight` | `http.server.active_requests` | `http_server_active_requests` | no `http.route` attribute — per-path in-flight lost (all consumers `sum by (app)`; acceptable). |
+| `requests_in_flight` | `http.server.active_requests` | — (**not emitted**) | **As-built:** the pinned `otelgin` v0.69 creates only `request.duration` + `{request,response}.body.size` — no active-requests instrument — so there is no successor and the saturation metric + its 2 alerts were retired at cutover. See [metrics-apps.md](../../../observability/metrics/metrics-apps.md). |
 | `request/response_size_bytes` | `http.server.{request,response}.body.size` | `http_server_*_body_size_bytes_*` | semconv has no bucket advice → View with byte buckets. |
 | `up{job="microservices"}` | — (does not exist under push) | — | → D-4. |
 | `go_goroutines` | `go.goroutine.count` (contrib runtime) | `go_goroutine_count` | alert exprs rewritten. |
-| `go_gc_duration_seconds` (summary) | `go.memory.gc.pause.duration` (histogram) | `go_memory_gc_pause_duration_seconds_*` | same math on `_sum`/`_count`. |
+| `go_gc_duration_seconds` (summary) | — (**not emitted**) | — | **As-built:** although the `go.memory.gc.pause.duration` convention exists in semconv v1.41, the pinned contrib `runtime` v0.69 `Start()` registers only 8 instruments and never observes it, so nothing is exported — the GC-pause metric has no successor on this stack (verified against the pinned library source). See [metrics-apps.md](../../../observability/metrics/metrics-apps.md). |
 | `process_resident_memory_bytes` | **no Go-runtime equivalent** | — | memory alert moves to cAdvisor `container_memory_working_set_bytes` (limits-aware — an improvement). |
 | `rpc_*_call_duration_seconds` | already semconv | unchanged | gains Views + Filter. |
 

@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | platform-wide | 2026-07-14 | 2026-07-14 |
+| implementable | platform-wide | 2026-07-14 | 2026-07-14 |
 
 > **Don't forget: every decision is a tradeoff.** This RFC deliberately spends
 > effort instrumenting *every* service's data layer and domain — more code and
@@ -232,9 +232,22 @@ cache-op spans + a hit/miss counter.
 ### `logic` layer — per-service business-metrics catalog
 
 Curated from the audit; each is a `logic`-layer instrument with bounded labels.
-`checkout` is already implemented (RFC-0015 P4) and is the reference; its four
-funnel-completion additions are listed for parity. **Priority** guides wave
-order, not inclusion.
+
+**Reference pattern (from `checkout` + `payment`, the two most-instrumented
+services).** A service's *basic* set is small and follows the same shape those
+two already prove:
+1. **One primary outcome counter** with a bounded `result`/`outcome` label —
+   the domain KPI (checkout `sessions.confirmed`, payment `authorization{result}`).
+2. **The single most critical domain signal** — the thing that means money or
+   security is at risk (payment `reconciliation_discrepancies`, auth
+   `refresh{reuse_detected}`, order `saga_compensation`).
+3. *(only where it's a real objective)* one duration histogram
+   (checkout `confirm.duration`, payment `provider_request.duration`).
+
+**Basic tier = the `Priority: High` rows below** — that is what W1 implements
+now, per service. `Med`/`Low` rows are the richer later pass (W2). `checkout`
+is already done (RFC-0015 P4); its four funnel additions are the High rows in
+its block.
 
 | Service | Metric (PromQL) | Type | Bounded labels | Purpose | Priority |
 |---------|-----------------|------|----------------|---------|----------|
@@ -352,30 +365,34 @@ attribute that isn't in the left "✅" shape is a blocker.
 
 ## Rollout & rollback
 
-Waves; each service PR is TDD-first (a test asserts the instrument records the
-expected series), source-driven against the pinned OTel API, one service per
-PR, gauntlet-reviewed; the shared `pkg` helper gets a doubt-cycle before fleet
-rollout.
+**Vertical, one service per PR.** Each service PR fully instruments that service
+end to end — core DB tracing + repo-error logs + `web` hygiene + its *basic*
+(`Priority: High`) business metrics — so every PR ships a complete, deployable,
+reviewable unit (and is the cleanest learning increment). PRs are TDD-first (a
+test asserts each instrument records the expected series), source-driven against
+the pinned OTel API, gauntlet-reviewed; the shared `pkg` helper gets a
+doubt-cycle before the first service adopts it.
 
 - **W0 — `pkg` foundation:** the shared `otelpgx` pool helper with the mandated
-  safe defaults baked in (**D-1…D-6**) + the business-metric convention
-  (**D-8, D-9**) + optional `redisotel` helper. Tag `pkg`. Rollback: services
-  simply don't adopt.
-- **W1 — `core`, uniform (all 10):** adopt the DB-tracer helper + structured
-  repo-error logs; delete redundant `http.request` spans; **remove PII span
-  attrs (D-2 rule)**; add the `Log(ctx)` helper (**D-12**).
-- **W2 — `logic` business metrics, per service:** the catalog above under the
-  bounded-label rule (**D-9**), richer domains first (payment, order, auth,
-  product), then the rest; checkout's +4.
-- **W3 — special surfaces:** payment mockpay-hop tracing + `traceparent` via
-  `otelhttp` (**D-11**); order saga custom metrics; product `redisotel` +
-  hit/miss (**D-10**).
-- **W4 — consume it:** fix the stale RED/runtime dashboard (drop dead
+  safe defaults (**D-1…D-6**), the `Log(ctx)` helper (**D-12**), and the
+  business-metric convention (**D-8, D-9**). **Written fresh/clean — no
+  migration shims, no back-compat layer;** the current per-service
+  `database.go` pool build is replaced by the shared constructor. Tag `pkg`.
+- **W1 — per-service instrumentation** (one PR each, order by criticality:
+  **payment → order → auth → product → cart → shipping → review →
+  notification → user**; checkout's basics fold in with its funnel additions).
+  Each PR: adopt the DB-tracer helper + repo-error logs; drop the redundant
+  `http.request` span; remove PII span attrs (**D-2**); add the service's
+  **basic** business metrics (the `High` rows).
+- **W2 — richer + special surfaces:** the `Med`/`Low` catalog rows; payment
+  mockpay-hop tracing (**D-11**); order saga custom metrics; product
+  `redisotel` cache hit/miss (**D-10**).
+- **W3 — consume it:** fix the stale RED/runtime dashboard (drop dead
   scrape-era panels) and add a **separate** `$app`-templated business-metrics
   dashboard, in both the local-stack json and the cluster `grafana-dashboards`
   repo; alerts + SLOs; finalize docs.
 
-Each wave is independently revertable; W0 lands before anything depends on it.
+Each PR is independently revertable; W0 lands before any service adopts it.
 
 ## Testing / verification
 

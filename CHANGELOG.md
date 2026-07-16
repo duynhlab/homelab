@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **E2E audit Phase C (telemetry sanity)** in `local-stack/README.md`:
+  collector health, business-counter consistency, DB-client p95 sanity,
+  dashboard load, and trace-service checks — all self-tested against the live
+  stack; the audit is now a mandatory agent gate referenced from `AGENTS.md`.
 - **Database-client observability (RFC-0017 W4)**: `Database (client — otelpgx)`
   row on the local RED dashboard (query p95 by service/op, operation errors,
   pool in-flight/saturation/contention), 2 Valkey cache-pool panels on the
@@ -30,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **local-stack README refreshed to deployed reality**: checkout worker,
+  VictoriaLogs + Vector (logs pipeline) in the intro/table/diagram, native
+  app-metrics framing (span-metrics demoted to complement), service counts,
+  and `docker compose logs` for the collector.
 - **Microservices (OTel) local dashboard repaired**: dropped scrape-era dead
   panels (`up`, `process_cpu_seconds_total`, `requests_in_flight`, `go_memstats_*`,
   cAdvisor/kube panels) and consolidated the runtime rows into one coherent

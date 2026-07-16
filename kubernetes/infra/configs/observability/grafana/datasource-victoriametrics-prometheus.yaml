@@ -1,0 +1,33 @@
+# Prometheus-TYPE alias of the VictoriaMetrics datasource (same vmsingle URL).
+# Two Grafana features only work with a `prometheus`-type datasource:
+#   1. Alerting → "Data source managed" rules: Grafana's ruler API rejects
+#      other types ("unexpected datasource type"), so the ~183 vmalert rule
+#      groups (proxied by vmsingle via -vmalert.proxyURL) stay invisible
+#      without this alias.
+#   2. The upstream VictoriaMetrics dashboards (single-node / vmagent /
+#      vmalert) declare their `ds` variable as `query: prometheus` — with no
+#      prometheus-type datasource the dropdown is empty and every panel
+#      renders "datasource was not found".
+# The primary datasource (datasource-victoriametrics.yaml, VM plugin type)
+# stays the default for our own boards; this alias is query-compatible
+# because vmsingle speaks the Prometheus HTTP API.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: victoriametrics-prometheus-datasource
+  namespace: monitoring
+spec:
+  datasource:
+    access: proxy
+    isDefault: false
+    name: VictoriaMetrics (Prometheus)
+    type: prometheus
+    uid: victoriametrics-prometheus
+    url: http://vmsingle-victoria-metrics.monitoring.svc:8428
+    jsonData:
+      httpMethod: POST
+      timeInterval: 15s
+      manageAlerts: true
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana

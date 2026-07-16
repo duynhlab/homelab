@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Bump checkout (API + worker) to 0.3.1: the serve path now keeps a
+  background Temporal redial after startup-dial exhaustion (BUGS-6 — the
+  abandonment workflow could silently never start when a pod raced Temporal
+  at bring-up).
+
 ### Fixed
 
 - **Alert-ruler audit wave 2 (scrapes/limits)**: scraped the otel-collector's

@@ -35,7 +35,7 @@ spec:
     image:
       # Same image as the checkout API — just a different subcommand.
       repository: ghcr.io/duynhlab/checkout-service/checkout-service
-      tag: "0.3.0"
+      tag: "0.3.1"
       pullPolicy: IfNotPresent
     # Run the worker subcommand; it serves /health, /ready, /metrics on :8080 but
     # no app traffic, so the Service is skipped.

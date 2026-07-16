@@ -886,7 +886,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 24,
         "x": 0,
         "y": 27
       },
@@ -2080,7 +2080,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
+        "w": 12,
         "x": 0,
         "y": 102
       },
@@ -2165,179 +2165,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 8,
+        "w": 12,
+        "x": 12,
         "y": 102
-      },
-      "id": 211,
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "sortBy": "Max",
-          "sortDesc": true
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "expr": "sum by (rpc_method) (rate(rpc_server_call_duration_seconds_count{service_name=~\"$app\",  rpc_response_status_code!=\"OK\"}[$rate]))",
-          "legendFormat": "{{rpc_method}}",
-          "refId": "A"
-        }
-      ],
-      "title": "gRPC Server Error Rate (non-OK)",
-      "type": "timeseries",
-      "description": "Server-side gRPC error rate per method, counting calls where rpc_response_status_code != OK. Source: rpc_server_call_duration_seconds_count."
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "s"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 102
-      },
-      "id": 212,
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "sortBy": "Max",
-          "sortDesc": true
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.95, sum by (le, rpc_method) (rate(rpc_server_call_duration_seconds_bucket{service_name=~\"$app\", }[$rate])))",
-          "legendFormat": "{{rpc_method}}",
-          "refId": "A"
-        }
-      ],
-      "title": "gRPC Server P95 Latency",
-      "type": "timeseries",
-      "description": "Server-side gRPC 95th percentile call duration per method. Source: rpc_server_call_duration_seconds_bucket."
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "reqps"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 110
       },
       "id": 213,
       "options": {
@@ -2420,8 +2250,93 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 8,
+        "w": 12,
+        "x": 0,
+        "y": 110
+      },
+      "id": 211,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "sum by (rpc_method) (rate(rpc_server_call_duration_seconds_count{service_name=~\"$app\",  rpc_response_status_code!=\"OK\"}[$rate]))",
+          "legendFormat": "{{rpc_method}}",
+          "refId": "A"
+        }
+      ],
+      "title": "gRPC Server Error Rate (non-OK)",
+      "type": "timeseries",
+      "description": "Server-side gRPC error rate per method, counting calls where rpc_response_status_code != OK. Source: rpc_server_call_duration_seconds_count."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
         "y": 110
       },
       "id": 214,
@@ -2505,9 +2420,94 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 110
+        "w": 12,
+        "x": 0,
+        "y": 118
+      },
+      "id": 212,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, rpc_method) (rate(rpc_server_call_duration_seconds_bucket{service_name=~\"$app\", }[$rate])))",
+          "legendFormat": "{{rpc_method}}",
+          "refId": "A"
+        }
+      ],
+      "title": "gRPC Server P95 Latency",
+      "type": "timeseries",
+      "description": "Server-side gRPC 95th percentile call duration per method. Source: rpc_server_call_duration_seconds_bucket."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 118
       },
       "id": 215,
       "options": {
@@ -2545,7 +2545,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 118,
+        "y": 126,
         "w": 24,
         "h": 1
       },
@@ -2607,9 +2607,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
+        "w": 12,
         "x": 0,
-        "y": 119
+        "y": 127
       },
       "id": 216,
       "options": {
@@ -2692,9 +2692,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 119
+        "w": 12,
+        "x": 12,
+        "y": 127
       },
       "id": 217,
       "options": {
@@ -2777,9 +2777,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 119
+        "w": 24,
+        "x": 0,
+        "y": 135
       },
       "id": 218,
       "options": {
@@ -2821,7 +2821,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 127,
+        "y": 143,
         "w": 24,
         "h": 1
       }
@@ -2837,7 +2837,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 128,
+        "y": 144,
         "w": 12,
         "h": 8
       },
@@ -2889,7 +2889,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 128,
+        "y": 144,
         "w": 12,
         "h": 8
       },
@@ -2941,7 +2941,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 136,
+        "y": 152,
         "w": 12,
         "h": 8
       },
@@ -2993,7 +2993,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 136,
+        "y": 152,
         "w": 12,
         "h": 8
       },
@@ -3045,7 +3045,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 144,
+        "y": 160,
         "w": 12,
         "h": 8
       },
@@ -3097,7 +3097,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 144,
+        "y": 160,
         "w": 12,
         "h": 8
       },

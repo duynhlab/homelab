@@ -60,5 +60,7 @@ spec:
       replacement: kubelet
   metricRelabelConfigs:
     - source_labels: [__name__]
-      regex: kubelet_volume_stats_.+
+      # kubelet_running_pods + max-pods gauges ride along: KubeletTooManyPods
+      # needs them and this keep-filter silently dropped them (audit finding).
+      regex: kubelet_volume_stats_.+|kubelet_running_pods|kubelet_node_config_assigned_pod_cidr_max_pods
       action: keep

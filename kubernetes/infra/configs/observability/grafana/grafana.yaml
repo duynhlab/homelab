@@ -35,7 +35,8 @@ spec:
               value: "https://github.com/VictoriaMetrics/victoriametrics-datasource/releases/download/v0.25.2/victoriametrics-metrics-datasource-v0.25.2.zip;victoriametrics-metrics-datasource,https://github.com/VictoriaMetrics/victorialogs-datasource/releases/download/v0.29.0/victoriametrics-logs-datasource-v0.29.0.zip;victoriametrics-logs-datasource"
             resources:
               limits:
-                cpu: 100m
+                # 300m: 100m throttled continuously (KubePodCPUThrottlingHigh).
+                cpu: 300m
                 memory: 512Mi
               requests:
                 cpu: 100m

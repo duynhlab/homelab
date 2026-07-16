@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Alert-ruler audit wave 2 (scrapes/limits)**: scraped the otel-collector's
+  `:8888` self-telemetry and CoreDNS `:9153` (arms `OtelMetricsPipelineExportFailures`,
+  `OtelCollectorDown`, `CoreDNS*`; stops the `CoreDNSDown` false positive);
+  kubelet keep-regex now passes the two gauges `KubeletTooManyPods` needs;
+  disabled the target-less vm-mcp chart scrape and excluded the
+  operator-forced empty `temporal-internal-frontend` pool; raised throttled
+  CPU limits (vector 200m, VM operator 300m, Grafana 300m).
+
 ### Changed
 
 - Bump product to 1.4.1 (removes the hardcoded service-level CORS

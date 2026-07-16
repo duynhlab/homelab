@@ -167,7 +167,9 @@
               }
             ]
           },
-          "unit": "percentunit"
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
         },
         "overrides": []
       },
@@ -437,7 +439,9 @@
               }
             ]
           },
-          "unit": "percentunit"
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
         },
         "overrides": []
       },

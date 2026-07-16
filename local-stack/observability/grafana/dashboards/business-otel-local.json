@@ -118,7 +118,7 @@
       "id": 2,
       "type": "stat",
       "title": "Card decline rate",
-      "description": "Share of authorization attempts the provider declined.",
+      "description": "Share of authorization attempts declined over the selected time range (range-based: business events are sparse, so a small rate window would flicker to No data).",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -173,7 +173,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "(sum(rate(payment_authorization_total{result=\"declined\"}[$rate])) or vector(0)) / sum(rate(payment_authorization_total[$rate]))",
+          "expr": "(sum(increase(payment_authorization_total{result=\"declined\"}[$__range])) or vector(0)) / sum(increase(payment_authorization_total[$__range]))",
           "legendFormat": "Card decline rate",
           "refId": "A"
         }
@@ -480,7 +480,7 @@
       "id": 8,
       "type": "stat",
       "title": "Failed compensations (stuck money)",
-      "description": "Compensations that failed \u2014 the money-stuck signal. Target 0.",
+      "description": "Compensations that failed in the selected range \u2014 the money-stuck signal. Target 0.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -493,9 +493,9 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "ops",
+          "unit": "short",
           "custom": {},
-          "decimals": 3,
+          "decimals": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -531,7 +531,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(rate(order_saga_compensation_total{result=\"failed\"}[$rate])) or vector(0)",
+          "expr": "sum(increase(order_saga_compensation_total{result=\"failed\"}[$__range])) or vector(0)",
           "legendFormat": "Failed compensations (stuck money)",
           "refId": "A"
         }
@@ -541,7 +541,7 @@
       "id": 9,
       "type": "stat",
       "title": "Average order value",
-      "description": "AOV = order_value_minor sum/count, minor units \u00f7100.",
+      "description": "AOV over the selected range = order_value_minor sum/count, minor units \u00f7100.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -588,7 +588,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(rate(order_value_minor_sum[$rate])) / sum(rate(order_value_minor_count[$rate])) / 100",
+          "expr": "sum(increase(order_value_minor_sum[$__range])) / sum(increase(order_value_minor_count[$__range])) / 100",
           "legendFormat": "Average order value",
           "refId": "A"
         }
@@ -992,7 +992,7 @@
           "id": 17,
           "type": "stat",
           "title": "Cache hit ratio",
-          "description": "Valkey Cache-Aside effectiveness (RFC-0017 W2).",
+          "description": "Valkey Cache-Aside effectiveness over the selected range (RFC-0017 W2).",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -1047,7 +1047,7 @@
                 "type": "prometheus",
                 "uid": "${DS_PROMETHEUS}"
               },
-              "expr": "sum(rate(product_cache_gets_total{result=\"hit\"}[$rate])) / sum(rate(product_cache_gets_total{result=~\"hit|miss\"}[$rate]))",
+              "expr": "sum(increase(product_cache_gets_total{result=\"hit\"}[$__range])) / sum(increase(product_cache_gets_total{result=~\"hit|miss\"}[$__range]))",
               "legendFormat": "Cache hit ratio",
               "refId": "A"
             }
@@ -1283,7 +1283,7 @@
           "id": 20,
           "type": "timeseries",
           "title": "Items added by result",
-          "description": "",
+          "description": "Add-to-cart attempts by outcome (added vs rejected_invalid_qty) \u2014 top of the purchase funnel.",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -1457,7 +1457,7 @@
           "id": 23,
           "type": "timeseries",
           "title": "Shipments created by outcome",
-          "description": "",
+          "description": "CreateShipment outcomes \u2014 order-fulfillment saga step 2 (idempotent replays also return ok).",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -1509,7 +1509,7 @@
           "id": 24,
           "type": "timeseries",
           "title": "Shipments cancelled by outcome",
-          "description": "",
+          "description": "CancelShipment outcomes \u2014 saga compensation frequency.",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -1631,7 +1631,7 @@
           "id": 26,
           "type": "timeseries",
           "title": "Profile updates by result",
-          "description": "",
+          "description": "Profile-update attempts: successful writes vs authz rejections.",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -1798,7 +1798,7 @@
           "id": 29,
           "type": "stat",
           "title": "Average rating",
-          "description": "Mean star rating of new reviews.",
+          "description": "Mean star rating of reviews created in the selected range.",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -1845,7 +1845,7 @@
                 "type": "prometheus",
                 "uid": "${DS_PROMETHEUS}"
               },
-              "expr": "sum(rate(reviews_rating_sum[$rate])) / sum(rate(reviews_rating_count[$rate]))",
+              "expr": "sum(increase(reviews_rating_sum[$__range])) / sum(increase(reviews_rating_count[$__range]))",
               "legendFormat": "Average rating",
               "refId": "A"
             }
@@ -2055,8 +2055,8 @@
         {
           "id": 33,
           "type": "stat",
-          "title": "Confirmed rate",
-          "description": "Successful checkout confirmations.",
+          "title": "Sessions confirmed",
+          "description": "Checkout sessions confirmed into an order in the selected range \u2014 the funnel exit.",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -2069,9 +2069,9 @@
           },
           "fieldConfig": {
             "defaults": {
-              "unit": "ops",
+              "unit": "short",
               "custom": {},
-              "decimals": 3,
+              "decimals": 0,
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
@@ -2103,7 +2103,7 @@
                 "type": "prometheus",
                 "uid": "${DS_PROMETHEUS}"
               },
-              "expr": "sum(rate(checkout_sessions_confirmed_total[$rate]))",
+              "expr": "sum(increase(checkout_sessions_confirmed_total[$__range])) or vector(0)",
               "legendFormat": "Confirmed rate",
               "refId": "A"
             }
@@ -2185,7 +2185,7 @@
           "id": 35,
           "type": "timeseries",
           "title": "Promo redeemed vs rejected",
-          "description": "",
+          "description": "Promo funnel at the authoritative confirm gate: redemptions vs rejections by reason.",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"

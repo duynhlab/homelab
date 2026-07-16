@@ -446,6 +446,18 @@ Each PR is independently revertable; W0 lands before any service adopts it.
   `db_client_operation_duration_seconds` quantiles (pkg v0.24.0, pkg#48),
   fleet bump ×10, Database dashboard row + 4 `DBClient*`/`PgxPool*` alerts +
   runbook §12 (homelab#524). Fleet released as v1.4.0/v1.3.0/v0.3.0.
+- 2026-07-16 (evening) — **Fleet verified on Kind — RFC closed.** Two-round
+  `make up` gate: Round 1 clean bring-up in ~24 min (19/19 Kustomizations,
+  43/43 HelmReleases), full purchase saga over the Kong HTTPS edge, audit 5/6
+  (business series ×10, DB-scale grid + sane p95, chart-fed dashboards + 21
+  GrafanaDashboards synced, db-client alert group loaded) — and caught
+  **BUGS-1**: both worker manifests hardcoded pre-RFC image tags, so every
+  worker-side metric was absent (fixed in homelab#532, workers → 1.4.0/0.3.0).
+  Round 2 verified the fix: `order_saga_outcome_total{confirmed}`,
+  payment-activity/stock-reservation counters, and `db_client_*`/`pgxpool_*`
+  for both workers all live. Business-metric alerts + Sloth SLOs are
+  **de-scoped to a follow-up** (the W3 bullet above predates this split);
+  the ~16 unimplemented catalog rows remain backlog.
 - 2026-07-16 — Status → **implemented**. Shipped catalog documented in
   [metrics-catalog.md](../../../observability/metrics/metrics-catalog.md)
   (34 instruments); design-catalog divergences noted inline above. Remaining

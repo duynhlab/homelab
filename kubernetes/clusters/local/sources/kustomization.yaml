@@ -7,6 +7,7 @@ resources:
   - oci/infrastructure-oci.yaml
   - oci/apps-oci.yaml
   - oci/mop-chart-oci.yaml
+  - oci/grafana-dashboards-chart-oci.yaml
   - oci/grafana-operator-oci.yaml
   - oci/victoria-metrics-operator-oci.yaml
   - oci/cronjobs-oci.yaml

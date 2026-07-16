@@ -75,10 +75,21 @@ Dashboards are managed as `GrafanaDashboard` CRDs or JSON ConfigMaps:
 
 | Dashboard | Panels | Location |
 |-----------|--------|----------|
-| Microservices Observability | ~40 panels (verify in repo) | [`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards/blob/main/dashboard/microservices-dashboard-otel.json) (`GrafanaDashboard` `spec.url` raw, not a local ConfigMap) |
-| CloudNativePG Cluster Overview | Upstream CNPG cluster + operator metrics | `grafana/dashboards/cloudnative-pg-cluster.json` |
+| Microservices Observability | 8 rows / ~41 panels (RFC-0017 W3/W4) | [`duynhlab/helm-charts`](https://github.com/duynhlab/helm-charts) chart `grafana-dashboards` → ConfigMap → `GrafanaDashboard.configMapRef` |
+| Microservices — Business KPIs | 10 domain rows (RFC-0017) | same chart (`business-otel.json`) → `configMapRef` |
+| CloudNativePG Cluster Overview | Upstream CNPG cluster + operator metrics | `grafana-dashboards` repo, `dashboard/postgresql/cloudnative-pg-cluster.json` (`spec.url`) |
 
-**Microservices Observability**: JSON is hosted in the [`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards) repo and loaded via `GrafanaDashboard` `spec.url` (raw GitHub), mapping `DS_PROMETHEUS` → `VictoriaMetrics`. Edit the dashboard in that repo; the operator re-syncs (`resyncPeriod: 30s`, `contentCacheDuration: 48h`).
+**Microservices Observability + Business KPIs** (RFC-0017): the JSONs live in
+the [`duynhlab/helm-charts`](https://github.com/duynhlab/helm-charts) repo
+(`charts/grafana-dashboards/dashboards/microservices/`). A `HelmRelease`
+(`grafana-dashboards`, ns `monitoring`, chart via its own `OCIRepository`)
+renders them as ConfigMaps and the `GrafanaDashboard` CRs consume them via
+`configMapRef`, mapping `DS_PROMETHEUS` → `VictoriaMetrics`. **Edit the boards
+in that repo and bump the chart** — the old
+[`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards)
+repo is deprecated (its remaining legacy boards are still fetched via
+`spec.url` at their nested `dashboard/<area>/<name>.json` paths until they
+migrate).
 
 **CloudNativePG**: JSON is vendored from [cloudnative-pg/grafana-dashboards](https://github.com/cloudnative-pg/grafana-dashboards) (`charts/cluster/grafana-dashboard.json`), adapted for the VictoriaMetrics plugin (same pattern as other JSON dashboards). `GrafanaDashboard` maps `DS_PROMETHEUS` → `VictoriaMetrics`. Cluster DB metrics use `PodMonitor` resources under [`kubernetes/infra/configs/databases/clusters/`](../../../kubernetes/infra/configs/databases/clusters/) (e.g. `product-db/monitoring/`); the CNPG **operator** `PodMonitor` is created when `monitoring.podMonitorEnabled` is true on the [`cloudnative-pg` HelmRelease](../../../kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml).
 
@@ -108,9 +119,11 @@ kubernetes/infra/configs/observability/grafana/
 ├── datasource-tempo.yaml
 ├── datasource-jaeger.yaml
 ├── datasource-pyroscope.yaml
+├── dashboards-chart.yaml              # HelmRelease → helm-charts grafana-dashboards chart (RFC-0017 boards as ConfigMaps)
 └── dashboards/
-    ├── grafana-dashboard-main.yaml     # Microservices Observability (GrafanaDashboard, spec.url → grafana-dashboards repo)
-    └── *.json / grafana-dashboard-*.yaml  # other dashboards (ConfigMap or URL)
+    ├── grafana-dashboard-main.yaml     # Microservices Observability (configMapRef → chart ConfigMap)
+    ├── grafana-dashboard-business.yaml # Business KPIs (configMapRef → chart ConfigMap)
+    └── grafana-dashboard-*.yaml        # legacy boards (spec.url → grafana-dashboards repo nested paths, or grafana.com)
 ```
 
 ## Related Documentation
@@ -124,4 +137,4 @@ kubernetes/infra/configs/observability/grafana/
 - [Metrics](../metrics/README.md) -- RED methodology and metric definitions
 
 ---
-_Last updated: 2026-07-14 — VictoriaMetrics datasource v0.25.2 and VictoriaLogs datasource v0.29.0._
+_Last updated: 2026-07-16 — RFC-0017 boards now delivered by the helm-charts `grafana-dashboards` chart (`configMapRef`); Business KPIs board added; legacy-board source notes corrected._

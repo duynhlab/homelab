@@ -1,0 +1,15 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: grafana-dashboards-chart-oci
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: helm-chart
+spec:
+  interval: 10m
+  url: oci://ghcr.io/duynhlab/helm-charts/grafana-dashboards
+  ref:
+    # >=0.2.0: carries the RFC-0017 boards (refreshed microservices OTel +
+    # Business KPIs) as ConfigMaps the GrafanaDashboard CRs reference.
+    semver: ">=0.2.0"

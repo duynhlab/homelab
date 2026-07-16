@@ -1,0 +1,31 @@
+# Dashboards-as-code chart (duynhlab/helm-charts → grafana-dashboards).
+# Renders the RFC-0017 boards as ConfigMaps; the GrafanaDashboard CRs in
+# dashboards/ reference them via configMapRef (grafana-operator — no sidecar
+# runs here, so the chart's sidecar labels are inert). Only the two
+# RFC-0017 boards are consumed from the chart; the legacy boards still come
+# from their existing sources.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+spec:
+  interval: 10m
+  timeout: 5m
+  chartRef:
+    kind: OCIRepository
+    name: grafana-dashboards-chart-oci
+    namespace: flux-system
+  releaseName: grafana-dashboards
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    dashboards:
+      # temporal ships in the chart but the cluster's Temporal board still
+      # comes from its existing GrafanaDashboard source — keep it off here.
+      temporal:
+        enabled: false

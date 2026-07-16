@@ -2,19 +2,22 @@
 
 > **Audience**: SRE/DevOps Engineers  
 > **Dashboard**: Microservices Observability Platform  
-> **Panels**: this guide documents the dashboard's rows and panels grouped into **5 row groups** (~35 panels). The count is **approximate** — the dashboard evolves in the external [`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards) repo (canonical `microservices-dashboard-otel.json`); verify the exact panel/row count there.  
-> **Last Updated**: 2026-07-09
+> **Panels**: the board now has **8 rows (~41 panels)** since RFC-0017 W3/W4. The canonical JSON lives in the [`duynhlab/helm-charts`](https://github.com/duynhlab/helm-charts) repo (`charts/grafana-dashboards/dashboards/microservices/microservices-dashboard-otel.json`), delivered to the cluster as a chart ConfigMap consumed via `GrafanaDashboard.configMapRef` — the old `duynhlab/grafana-dashboards` repo is **deprecated**. The local-stack twin is `local-stack/observability/grafana/dashboards/microservices-otel-local.json`.  
+> **Last Updated**: 2026-07-16 — chart-sourced canonical + RFC-0017 W3/W4 revision note
+
+> **Board revision note (RFC-0017 W3/W4):** scrape-era dead panels **7, 8, 16, 17, 19, 22, 32, 33 were removed** (`up`, restarts, `process_cpu`, `go_memstats_*`, `requests_in_flight`, cAdvisor); panel 18 (network) moved into the runtime row; panel 12 widened; the two gRPC rows were re-laid as signal-paired 2-column lines; a **Database (client — otelpgx)** row was added. Sections below marked **🗑 REMOVED** are kept as historical context only.
 
 ---
 
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Row 1: Overview & Key Metrics](#row-1-overview--key-metrics) (12 panels)
+2. [Row 1: Overview & Key Metrics](#row-1-overview--key-metrics) (10 panels)
 3. [Row 2: Traffic & Requests](#row-2-traffic--requests) (4 panels)
-4. [Row 3: Errors & Performance](#row-3-errors--performance) (8 panels)
-5. [Row 4: Go Runtime & Memory](#row-4-go-runtime--memory) (6 panels)
-6. [Row 5: Resources & Infrastructure](#row-5-resources--infrastructure) (5 panels)
+4. [Row 3: Errors & Performance](#row-3-errors--performance) (7 panels)
+5. [Row 4: Go Runtime & HTTP I/O](#row-4-go-runtime--memory) (5 panels)
+6. [Row 5: Resources & Infrastructure — 🗑 REMOVED](#row-5-resources--infrastructure) (historical)
+7. [Rows 6–8: gRPC East-West + Database](#rows-68-grpc-east-west--database-client)
 7. [Common Patterns](#common-patterns)
 8. [Quick Reference](#quick-reference)
 9. [Grafana Annotations (Planned Feature)](#grafana-annotations-planned-feature)
@@ -27,18 +30,20 @@
 
 ```mermaid
 graph TD
-    Dashboard[Microservices Dashboard: 5 row groups]
-    Row1[Row 1: Overview 12 Panels]
+    Dashboard[Microservices Dashboard: 8 rows]
+    Row1[Row 1: Overview 10 Panels]
     Row2[Row 2: Traffic 4 Panels]
-    Row3[Row 3: Errors 8 Panels]
-    Row4[Row 4: Runtime 6 Panels]
-    Row5[Row 5: Resources 5 Panels]
+    Row3[Row 3: Errors 7 Panels]
+    Row4[Row 4: Runtime + HTTP I/O 5 Panels]
+    Row6[Rows 5-6: gRPC East-West RED 9 Panels]
+    Row8[Row 7: Database client 6 Panels]
     
     Dashboard --> Row1
     Dashboard --> Row2
     Dashboard --> Row3
     Dashboard --> Row4
-    Dashboard --> Row5
+    Dashboard --> Row6
+    Dashboard --> Row8
     
     Row1 --> Percentiles[P99/P95/P50]
     Row1 --> Traffic[RPS Metrics]
@@ -53,7 +58,8 @@ graph TD
     Row4 --> Memory[Heap/RSS]
     Row4 --> GC[GC Metrics]
     
-    Row5 --> Capacity[Service Aggregation]
+    Row6 --> GrpcRED[Server vs Client per signal]
+    Row8 --> DBHealth[Query p95 / errors / pool]
 ```
 
 ### Dashboard Variables
@@ -426,7 +432,7 @@ sum(increase(http_server_request_duration_seconds_count{app=~"$app", namespace=~
 
 ---
 
-### Panel 7: Up Instances (ID: 7)
+### Panel 7: Up Instances (ID: 7) 🗑 REMOVED (RFC-0017 W3)
 
 **Type**: stat | **Unit**: short (count) | **Row**: Overview & Key Metrics
 
@@ -464,7 +470,7 @@ Detection lags a pod kill by ~5m (VictoriaMetrics staleness) — accepted in RFC
 
 ---
 
-### Panel 8: Restarts (ID: 8)
+### Panel 8: Restarts (ID: 8) 🗑 REMOVED (RFC-0017 W3)
 
 **Type**: stat | **Unit**: short (count) | **Row**: Overview & Key Metrics
 
@@ -847,6 +853,8 @@ histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{ap
 
 ## Row 4: Go Runtime & Memory
 
+> Row title on the board is now **🔧 Go Runtime & HTTP I/O (OTel)** — panels 31 (Memory In-Use), 20, 21 (Goroutines), 34, and 18 (network, moved here). Panels 32/33 below are removed.
+
 ### Panel 31: Heap Used Memory (ID: 31) ⚠️ UPDATED
 
 **Type**: timeseries | **Unit**: bytes | **Row**: Go Runtime & Memory
@@ -880,7 +888,7 @@ sum(go_memory_used_bytes{app=~"$app", namespace=~"$namespace"}) by (app)
 
 ---
 
-### Panel 32: Used Memory by Type (ID: 32) ⚠️ UPDATED
+### Panel 32: Used Memory by Type (ID: 32) 🗑 REMOVED (RFC-0017 W3)
 
 **Type**: timeseries | **Unit**: bytes | **Row**: Go Runtime & Memory
 
@@ -902,7 +910,7 @@ sum(go_memory_used_bytes{app=~"$app", namespace=~"$namespace"}) by (app, go_memo
 
 ---
 
-### Panel 33: Container Working-Set Memory (ID: 33) ⚠️ UPDATED
+### Panel 33: Container Working-Set Memory (ID: 33) 🗑 REMOVED (RFC-0017 W3)
 
 **Type**: timeseries | **Unit**: bytes | **Row**: Go Runtime & Memory
 
@@ -1027,9 +1035,11 @@ go_memory_gc_goal_bytes{app=~"$app", namespace=~"$namespace"}
 
 ---
 
-## Row 5: Resources & Infrastructure
+## Row 5: Resources & Infrastructure — 🗑 REMOVED (RFC-0017 W3)
 
-### Panel 16: Total Memory per Service (ID: 16) ⚠️ UPDATED
+> This row **no longer exists on the board**: panels 16/17/19/22/33 queried scrape-era or cluster-only metrics that the OTLP pipeline never emits, and panel 18 moved into the runtime row. Kept for historical context.
+
+### Panel 16: Total Memory per Service (ID: 16) 🗑 REMOVED (RFC-0017 W3)
 
 **Type**: timeseries | **Unit**: bytes | **Row**: Resources & Infrastructure
 
@@ -1056,7 +1066,7 @@ sum(go_memory_used_bytes{app=~"$app", namespace=~"$namespace"}) by (app)
 
 ---
 
-### Panel 17: Total CPU per Service (ID: 17) ⚠️ UPDATED
+### Panel 17: Total CPU per Service (ID: 17) 🗑 REMOVED (RFC-0017 W3)
 
 **Type**: timeseries | **Unit**: percent | **Row**: Resources & Infrastructure
 
@@ -1114,7 +1124,7 @@ sum(rate(http_server_request_body_size_bytes_sum{app=~"$app", namespace=~"$names
 
 ---
 
-### Panel 19: Total Requests In Flight per Service (ID: 19) ⚠️ RETIRED
+### Panel 19: Total Requests In Flight per Service (ID: 19) 🗑 REMOVED (RFC-0017 W3)
 
 **Type**: timeseries | **Unit**: short (count) | **Row**: Resources & Infrastructure
 
@@ -1129,7 +1139,7 @@ sum(rate(http_server_request_body_size_bytes_sum{app=~"$app", namespace=~"$names
 
 ---
 
-### Panel 22: Allocation Rate per Service (ID: 22) ⚠️ UPDATED
+### Panel 22: Allocation Rate per Service (ID: 22) 🗑 REMOVED (RFC-0017 W3)
 
 **Type**: timeseries | **Unit**: ops (allocs/sec) | **Row**: Resources & Infrastructure
 
@@ -1156,6 +1166,22 @@ sum(rate(go_memory_allocations_total{app=~"$app", namespace=~"$namespace"}[5m]))
 - **Sudden increase**: Code change introduced excessive allocations
 
 ---
+
+## Rows 6–8: gRPC East-West + Database (client)
+
+Three rows added after this guide's per-panel sections were written; their
+queries and reading guides live with their metric documentation:
+
+- **🔗 gRPC East-West (RED)** — 3 lines, each pairing one signal **Server | Client**
+  (RPS, error rate, P95 on `rpc_{server,client}_call_duration_seconds`).
+  **🔗 Per Callee** — RPS | error-ratio + full-width P95 per callee.
+  See [metrics-apps → gRPC instrumentation](../metrics/metrics-apps.md#grpc-instrumentation-east-west).
+- **🗄️ Database (client — otelpgx)** — query p95 by service/op
+  (`db_client_operation_duration_seconds`, DB-scale buckets since pkg v0.24.0),
+  operation errors, pool in-flight/saturation/contention (`pgxpool_*`).
+  See [metrics-apps → DB client metrics](../metrics/metrics-apps.md#db-client-metrics-otelpgx)
+  and the four `DBClient*`/`PgxPool*` alerts in the
+  [alert catalog](../alerting/alert-catalog.md#1-microservices-red-metrics).
 
 ## Common Patterns
 

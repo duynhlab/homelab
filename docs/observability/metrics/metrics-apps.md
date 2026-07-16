@@ -48,12 +48,13 @@ a service author writes; a service only adds Business instruments.
 | **East-west** | RED | `rpc_{server,client}_call_duration_seconds` | Histogram | services making/serving gRPC | `otelgrpc` via `pkg/grpcx` (auto) |
 | **Runtime** | USE | `go_goroutine_count`, `go_memory_*_bytes` | Gauge | all 10 services + 2 workers | `runtime.Start` (auto) |
 | **Container** | USE | `container_memory_working_set_bytes`, `container_cpu_*` | Gauge | every pod | cAdvisor (auto, cluster) |
-| **Business** | domain | `checkout_*` (see [§ Business metrics](#business-metrics-custom)) | Counter/Histogram | **checkout** only (today) | **hand-declared** in service code |
+| **Business** | domain | per-service `<svc>_*` (see [§ Business metrics](#business-metrics-custom)) | Counter/Histogram | **all 10 services** (RFC-0017) | **hand-declared** in service code |
 
 > Business metrics are a **third pillar**, not RED or USE — those two are
-> already covered by the auto layer above, so never hand-write them. Today only
-> checkout-service declares Business instruments; other services rely entirely
-> on the auto families.
+> already covered by the auto layer above, so never hand-write them. Since
+> **RFC-0017** every service declares its own domain instruments (payments,
+> saga, auth, cache, …); the [Business KPIs dashboard](#dashboard) is built
+> entirely from them.
 
 ## HTTP server metrics (auto-instrumented)
 
@@ -293,6 +294,51 @@ propagate trace context end-to-end alongside HTTP spans. For the transport
 design, dual-port services, health checks, and resilience defaults see
 [**API → gRPC runtime model**](../../api/api.md#grpc-runtime-model).
 
+## OTel instrument types
+
+Every metric is emitted through one of a few **instrument types**. The type is
+not cosmetic — it decides what the SDK aggregates, which PromQL sub-series you
+get, and whether the metric even *has* buckets. Pick the type from the shape of
+the thing you are measuring:
+
+| Instrument | Shape it measures | Goes down? | PromQL output | Read it with | Platform examples |
+|------------|-------------------|-----------|---------------|--------------|-------------------|
+| **Counter** | a count of events that only grows | No (monotonic) | one `_total` series | `rate()` / `increase()` | `auth_registrations_total`, `payment_authorization_total`, `product_cache_gets_total` |
+| **UpDownCounter** | a running total that rises *and* falls | Yes | one series (no `_total`) | raw value / `last_over_time()` | *(none declared yet — an outbox backlog or an in-flight counter would fit)* |
+| **Histogram** | the *distribution* of a measured value | records values | `_bucket{le=…}` + `_sum` + `_count` | `histogram_quantile()`, `_sum/_count` for the mean | `http_server_request_duration_seconds`, `order_value_minor`, `reviews_rating`, `payment_provider_request_duration_seconds` |
+| **Gauge** (observable) | a point-in-time sample, read each collection | Yes | one series | raw value / `deriv()` | `go_goroutine_count`, `go_memory_used_bytes` |
+
+**The bucket insight.** Only **Histograms** have buckets. A Counter is a single
+running number, so asking for its `le=…` buckets is meaningless — that is why a
+counter-only metric shows *n/a* wherever a dashboard expects bucket boundaries.
+Buckets are how a histogram turns many observations into a distribution: each
+`_bucket{le=X}` counts observations ≤ X, and `histogram_quantile(0.95, …)`
+interpolates the p95 from those cumulative counts.
+
+**Why a seconds histogram needs explicit buckets.** `pkg/obsx` installs an SDK
+**View** (the canonical 13-bucket set above) *only* for the named HTTP/gRPC
+instruments. A brand-new business histogram — say `payment.provider.request.duration`
+— matches no View, so it falls back to the SDK's **default** boundaries, which
+are **millisecond-shaped** (`0, 5, 10, … 10000`). A sub-second call then lands
+entirely in the first bucket and every quantile collapses to ~0. The fix is to
+pass the platform bucket set explicitly when declaring the instrument:
+
+```go
+meter.Float64Histogram("payment.provider.request.duration",
+    metric.WithUnit("s"),
+    metric.WithExplicitBucketBoundaries(obsx.DurationBuckets...)) // else quantiles are useless
+```
+
+Money- and rating-scale histograms pick their own boundaries the same way
+(`order.value.minor` uses cent-scale buckets; `reviews.rating` uses `1,2,3,4,5`).
+
+**Names on the wire.** OTel instrument names are dotted
+(`payment.authorization.total`); vmagent's `usePrometheusNaming` renders them to
+PromQL form on ingest — a Counter gains `_total` (if not already present), a
+Histogram explodes into `_bucket`/`_sum`/`_count`, and a `WithUnit("s")`
+histogram gets a `_seconds` infix. That is why the dashboards query
+`payment_authorization_total` and `payment_provider_request_duration_seconds_bucket`.
+
 ## Business metrics (custom)
 
 The RED/USE families above are auto-instrumented and identical everywhere;
@@ -311,8 +357,11 @@ attribute where a metric splits by cause. vmagent's `usePrometheusNaming`
 renders the dotted name into the PromQL form (counter → `_total`, seconds
 histogram → `_seconds`).
 
-Only **checkout-service** declares Business metrics today; the table is keyed
-by Service so new owners append rows as they add their own.
+Since **RFC-0017** every service declares its own Business instruments. The
+table below keeps **checkout as the worked example**; the full per-service
+catalog lives in [RFC-0017](../../proposals/rfc/RFC-0017/README.md) and is what
+the [Business KPIs dashboard](#dashboard) visualizes. The table is keyed by
+Service so owners append their own rows.
 
 | Service | Metric (PromQL) | OTel instrument | Type | Labels | Purpose |
 |---------|-----------------|-----------------|------|--------|---------|
@@ -417,10 +466,16 @@ disambiguate "service down" from "pipeline broken".
 
 ## Dashboard
 
-The **Microservices dashboard** (RED + Golden Signals) groups panels into:
-Overview & key metrics, Traffic & requests, Errors & performance, Go runtime &
-memory, Resources & infrastructure, and **gRPC East-West (RED)** (server/client
-RPS, error rate, P95 by `rpc_method`).
+Two dashboards consume this layer. The **Microservices dashboard** (RED + Golden
+Signals) groups panels into: Overview & key metrics, Traffic & requests, Errors
+& performance, Go runtime & HTTP I/O, and **gRPC East-West (RED)** (server/client
+RPS, error rate, P95 by `rpc_method`). The **Business KPIs dashboard**
+(`business-otel-local`, RFC-0017) adds one collapsible **row per domain** —
+Payments, Orders/Saga, Auth, Product, Cart, Shipping, User, Review,
+Notification, Checkout — built from the hand-declared Business instruments (decline
+rate, saga outcomes, AOV, cache hit-ratio, promo redemptions, …). The
+local-stack ships both under `local-stack/observability/grafana/dashboards/`;
+the cluster twins render from the `mop`/helm charts.
 
 Which metric powers which panels:
 
@@ -489,6 +544,6 @@ Runbook: [`microservices-alerts.md`](../runbooks/microservices-alerts.md).
 
 ---
 
-_Last updated: 2026-07-14 — corrected the middleware chain and rpc-client labels against the pinned v0.69 libraries; added the metric-families-at-a-glance table (RED/USE/Business × service scope) and a dedicated Business metrics section (custom domain instruments, keyed by service)._
+_Last updated: 2026-07-16 — added the OTel instrument-types explainer (Counter/UpDownCounter/Histogram/Gauge, the bucket insight, explicit-bucket rule) and the RFC-0017 Business KPIs dashboard; corrected the fleet-wide business-metric coverage (all 10 services now, not checkout-only)._
 </content>
 </invoke>

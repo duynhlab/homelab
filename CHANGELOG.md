@@ -9,8 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Business KPIs Grafana dashboard (local-stack)**: new
+  `business-otel-local.json` with one collapsible row per domain (Payments,
+  Orders/Saga, Auth, Product, Cart, Shipping, User, Review, Notification,
+  Checkout), built off the RFC-0017 hand-declared business instruments.
+- **OTel instrument-types explainer** in `metrics-apps.md`: a beginner table
+  (Counter/UpDownCounter/Histogram/Gauge), the buckets-only-for-histograms
+  insight, and why a seconds histogram needs explicit bucket boundaries.
+
 ### Changed
 
+- **Microservices (OTel) local dashboard repaired**: dropped scrape-era dead
+  panels (`up`, `process_cpu_seconds_total`, `requests_in_flight`, `go_memstats_*`,
+  cAdvisor/kube panels) and consolidated the runtime rows into one coherent
+  Go-runtime + HTTP-I/O row using the emitted OTel metrics.
+- **Business-metric coverage corrected** in `metrics-apps.md`: all 10 services
+  declare their own business instruments since RFC-0017 (was documented as
+  checkout-only).
 - **Observability documentation refreshed**: diagrams now use the shared
   semantic palette and explicit current/planned paths; service, worker, SLO,
   alert, PostgreSQL, and telemetry topology facts match code and manifests.

@@ -17,10 +17,10 @@
         "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
-        "h": 1,
-        "w": 24,
         "x": 0,
-        "y": 0
+        "y": 0,
+        "w": 24,
+        "h": 1
       },
       "id": 100,
       "panels": [],
@@ -616,132 +616,16 @@
       "description": "Total requests in selected time range. Correlate with traffic spikes or incidents."
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 5
-      },
-      "id": 7,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "expr": "count(up{service_name=~\"$app\", })",
-          "refId": "A"
-        }
-      ],
-      "title": "Up Instances",
-      "type": "stat",
-      "description": "Number of healthy application instances. Monitor for scaling and failures."
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 5
-              }
-            ]
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 5
-      },
-      "id": 8,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "expr": "sum(kube_pod_container_status_restarts_total{ pod=~\"^$app-[a-z0-9]+-[a-z0-9]+$\"})",
-          "refId": "A"
-        }
-      ],
-      "title": "Restarts",
-      "type": "stat",
-      "description": "Pod restarts in time range. Frequent restarts indicate OOM or crashes."
-    },
-    {
       "collapsed": false,
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
-        "h": 1,
-        "w": 24,
         "x": 0,
-        "y": 9
+        "y": 9,
+        "w": 24,
+        "h": 1
       },
       "id": 101,
       "panels": [],
@@ -1041,10 +925,10 @@
         "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
-        "h": 1,
-        "w": 24,
         "x": 0,
-        "y": 35
+        "y": 35,
+        "w": 24,
+        "h": 1
       },
       "id": 102,
       "panels": [],
@@ -1679,14 +1563,14 @@
         "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
-        "h": 1,
-        "w": 24,
         "x": 0,
-        "y": 76
+        "y": 76,
+        "w": 24,
+        "h": 1
       },
       "id": 103,
       "panels": [],
-      "title": "\ud83d\udd27 Go Runtime & Memory",
+      "title": "\ud83d\udd27 Go Runtime & HTTP I/O (OTel)",
       "type": "row"
     },
     {
@@ -1765,14 +1649,18 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(go_memstats_alloc_bytes{service_name=~\"$app\", }) by (service_name)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum(go_memory_used_bytes{service_name=~\"$app\"}) by (service_name)",
           "legendFormat": "{{service_name}}",
           "refId": "A"
         }
       ],
-      "title": "Heap Allocated Memory",
+      "title": "Memory In-Use",
       "type": "timeseries",
-      "description": "Memory currently allocated on heap. If steadily increasing without dropping after GC, indicates memory leak."
+      "description": "OTel Go runtime: bytes currently in use (go.memory.used)."
     },
     {
       "datasource": {
@@ -1822,7 +1710,7 @@
               }
             ]
           },
-          "unit": "bytes"
+          "unit": "short"
         }
       },
       "gridPos": {
@@ -1830,266 +1718,6 @@
         "w": 12,
         "x": 12,
         "y": 77
-      },
-      "id": 32,
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "sortBy": "Max",
-          "sortDesc": true
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "expr": "sum(go_memstats_heap_inuse_bytes{service_name=~\"$app\", }) by (service_name)",
-          "legendFormat": "{{service_name}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Heap In-Use Memory",
-      "type": "timeseries",
-      "description": "Heap memory in use by app. Should return to baseline after GC. Steady growth indicates leak."
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "bytes"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 85
-      },
-      "id": 33,
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "sortBy": "Max",
-          "sortDesc": true
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "expr": "sum by (pod) (container_memory_working_set_bytes{ pod=~\"^$app-[a-z0-9]+-[a-z0-9]+$\", container!=\"\", container!=\"POD\"})",
-          "legendFormat": "{{pod}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Memory working set (cAdvisor)",
-      "type": "timeseries",
-      "description": "Container memory working set from cAdvisor (limits-aware: this is the value the OOM killer compares against the memory limit). The OTel Go runtime does not emit process RSS; cAdvisor is the replacement."
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 85
-      },
-      "id": 21,
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "sortBy": "Max",
-          "sortDesc": true
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "expr": "sum(go_goroutine_count{service_name=~\"$app\", }) by (service_name)",
-          "legendFormat": "{{service_name}} Goroutines",
-          "refId": "A"
-        },
-        {
-          "expr": "sum(go_threads{service_name=~\"$app\", }) by (service_name)",
-          "legendFormat": "{{service_name}} Threads",
-          "refId": "B"
-        }
-      ],
-      "title": "Goroutines & Threads",
-      "type": "timeseries",
-      "description": "Goroutine and OS thread count. Steadily increasing goroutines indicates goroutine leak (forgotten defer, unclosed channels). Stable count is normal."
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 85
       },
       "id": 20,
       "options": {
@@ -2118,6 +1746,91 @@
       "title": "Memory Allocation Rate",
       "type": "timeseries",
       "description": "Heap allocation rate (objects/s) from the OTel Go runtime. The OTel runtime emits no GC-pause metric; rising allocation rate is the leading indicator of GC pressure."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 85
+      },
+      "id": 21,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "sum(go_goroutine_count{service_name=~\"$app\", }) by (service_name)",
+          "legendFormat": "{{service_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Goroutines",
+      "type": "timeseries",
+      "description": "Goroutine and OS thread count. Steadily increasing goroutines indicates goroutine leak (forgotten defer, unclosed channels). Stable count is normal."
     },
     {
       "datasource": {
@@ -2209,193 +1922,6 @@
       "description": "Heap used vs the GC pacer goal from the OTel Go runtime. Sustained values near 1.0 mean the heap keeps hitting the GC goal \u2014 memory pressure / frequent GC cycles."
     },
     {
-      "collapsed": false,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 101
-      },
-      "id": 104,
-      "panels": [],
-      "title": "\ud83d\udda5\ufe0f Resources & Infrastructure (Service-Level)",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "bytes"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 102
-      },
-      "id": 16,
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "sortBy": "Max",
-          "sortDesc": true
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "expr": "sum(go_memstats_alloc_bytes{service_name=~\"$app\", }) by (service_name)",
-          "legendFormat": "{{service_name}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Total Memory per Service",
-      "type": "timeseries",
-      "description": "Total memory allocated by ALL pods in the service (aggregated). Example: user with 2 pods shows sum of both pods. Use for capacity planning and cost analysis."
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "percent"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 102
-      },
-      "id": 17,
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "sortBy": "Max",
-          "sortDesc": true
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "expr": "sum(rate(process_cpu_seconds_total{service_name=~\"$app\", }[5m])) by (service_name) * 100",
-          "legendFormat": "{{service_name}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Total CPU per Service",
-      "type": "timeseries",
-      "description": "Total CPU usage by ALL pods in the service (aggregated). Use for scaling decisions: 'Should we add more pods?' Higher values indicate need for horizontal scaling."
-    },
-    {
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -2448,9 +1974,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 24,
         "x": 0,
-        "y": 110
+        "y": 93
       },
       "id": 18,
       "options": {
@@ -2485,186 +2011,16 @@
       "description": "Total HTTP traffic (TX/RX) by ALL pods in the service. Use for bandwidth planning and cost estimation. Note: Only HTTP body size, not TCP/IP overhead."
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 110
-      },
-      "id": 19,
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "sortBy": "Max",
-          "sortDesc": true
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "expr": "sum(requests_in_flight{service_name=~\"$app\", }) by (service_name)",
-          "legendFormat": "{{service_name}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Total Requests In Flight per Service (legacy metric \u2014 no OTel equivalent yet)",
-      "type": "timeseries",
-      "description": "Total concurrent requests being processed by ALL pods in the service. High values indicate saturation (4 Golden Signals). Use to detect bottlenecks and validate service capacity."
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 118
-      },
-      "id": 22,
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "sortBy": "Max",
-          "sortDesc": true
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "expr": "sum(go_memstats_frees_total{service_name=~\"$app\", }) by (service_name)",
-          "legendFormat": "{{service_name}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Total Memory Allocations per Service",
-      "type": "timeseries",
-      "description": "Total memory frees by ALL pods in the service. Indicates GC activity. Use with GC Duration panel to detect memory pressure or allocation issues."
-    },
-    {
       "collapsed": false,
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
-        "h": 1,
-        "w": 24,
         "x": 0,
-        "y": 126
+        "y": 101,
+        "w": 24,
+        "h": 1
       },
       "id": 105,
       "panels": [],
@@ -2726,7 +2082,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 127
+        "y": 102
       },
       "id": 210,
       "options": {
@@ -2811,7 +2167,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 127
+        "y": 102
       },
       "id": 211,
       "options": {
@@ -2896,7 +2252,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 127
+        "y": 102
       },
       "id": 212,
       "options": {
@@ -2981,7 +2337,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 135
+        "y": 110
       },
       "id": 213,
       "options": {
@@ -3066,7 +2422,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 135
+        "y": 110
       },
       "id": 214,
       "options": {
@@ -3151,7 +2507,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 135
+        "y": 110
       },
       "id": 215,
       "options": {
@@ -3188,10 +2544,10 @@
         "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
-        "h": 1,
-        "w": 24,
         "x": 0,
-        "y": 143
+        "y": 118,
+        "w": 24,
+        "h": 1
       },
       "id": 106,
       "panels": [],
@@ -3253,7 +2609,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 144
+        "y": 119
       },
       "id": 216,
       "options": {
@@ -3338,7 +2694,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 144
+        "y": 119
       },
       "id": 217,
       "options": {
@@ -3423,7 +2779,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 144
+        "y": 119
       },
       "id": 218,
       "options": {

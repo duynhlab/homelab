@@ -232,7 +232,7 @@ spec:
             < 0.5
           for: 10m
           labels:
-            severity: warning
+            severity: critical
             category: traffic
           annotations:
             summary: "Critical Apdex score for {{ $labels.app }} ({{ $labels.namespace }})"
@@ -265,11 +265,21 @@ spec:
         # Semantic change (RFC-0014): RSS threshold → limits-aware working set
         # from cAdvisor. Fires on % of the container's memory limit, so it
         # tracks Kyverno-mandated limits instead of a fixed 512Mi.
+        # kube-state-metrics is scraped WITHOUT honorLabels, so the workload's
+        # own namespace/pod/container arrive as exported_* (the plain labels
+        # name the KSM pod itself — repo convention, see the CNPG rules
+        # README). The limits side is relabeled back so the join is
+        # satisfiable; a plain `on (namespace, pod, container)` join matched
+        # nothing and this alert was dead fleet-wide (audit 2026-07-17).
         - alert: MicroserviceHighMemoryUsage
           expr: |
-            container_memory_working_set_bytes{namespace=~"auth|user|product|cart|order|review|notification|shipping|payment", container!="", container!="POD"}
+            container_memory_working_set_bytes{namespace=~"auth|user|product|cart|order|review|notification|shipping|payment|checkout", container!="", container!="POD"}
             / on (namespace, pod, container)
-              kube_pod_container_resource_limits{resource="memory"}
+              label_replace(label_replace(label_replace(
+                kube_pod_container_resource_limits{resource="memory"},
+              "namespace", "$1", "exported_namespace", "(.+)"),
+              "pod", "$1", "exported_pod", "(.+)"),
+              "container", "$1", "exported_container", "(.+)")
             > 0.9
           for: 15m
           labels:

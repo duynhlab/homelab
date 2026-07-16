@@ -57,7 +57,7 @@ Source: `prometheusrules/microservices/alerts.yaml` (OTLP push pipeline — RFC-
 | MicroserviceLatencyCritical | critical | P95 >2s | Timeout territory; SLA breach | 5m |
 | GrpcServerHighLatencyP95 | warning | gRPC P95 (`rpc_server_call_duration_seconds_bucket`) >500ms | East-west latency compounds into every edge request that fans out | 10m |
 | MicroserviceNoTraffic | warning | `rate(count[10m])==0`, had traffic | Routing broken / upstream down | 10m |
-| MicroserviceApdexCritical | warning | apdex <0.5 | >50% of users get unacceptable response times | 10m |
+| MicroserviceApdexCritical | critical | apdex <0.5 | >50% of users get unacceptable response times | 10m |
 | MicroserviceGoroutineLeak | warning | `go_goroutine_count>1000` and `deriv(...[15m])>0.17` | Leak → eventual OOM | 15m |
 | MicroserviceHighMemoryUsage | warning | container working-set >90% of the memory limit (`container_memory_working_set_bytes` / `kube_pod_container_resource_limits`) | OOMKill risk | 15m |
 | DBClientQueryP95High | warning | `histogram_quantile(0.95, db_client_operation_duration_seconds_bucket{pgx_operation_type="query"})>100ms` | App-side DB latency — what the service experiences, regardless of server health (otelpgx, RFC-0017 W4) | 10m |

@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Memory alerts were dead fleet-wide**: `MicroserviceHighMemoryUsage` and
+  `KubePodMemoryNearLimit` joined cAdvisor series with kube-state-metrics
+  limits on `namespace/pod/container`, but KSM is scraped without honorLabels
+  so the real identity lives in `exported_*` — the join matched nothing (or
+  collapsed to one bogus series). Limits are now relabeled back before the
+  join (verified live: 28 real ratios). Also added the missing `checkout`
+  namespace to the microservices memory regex and raised
+  `MicroserviceApdexCritical` to `severity: critical` to match its name and
+  pager routing.
+
+### Fixed
+
 - **Alert-ruler audit wave 2 (scrapes/limits)**: scraped the otel-collector's
   `:8888` self-telemetry and CoreDNS `:9153` (arms `OtelMetricsPipelineExportFailures`,
   `OtelCollectorDown`, `CoreDNS*`; stops the `CoreDNSDown` false positive);

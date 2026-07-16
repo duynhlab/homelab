@@ -35,10 +35,20 @@ spec:
     - name: kubernetes-pod-memory
       interval: 1m
       rules:
+        # Same KSM label-collision fix as MicroserviceHighMemoryUsage: without
+        # honorLabels the limits' real identity lives in exported_* — the old
+        # sum-by join collapsed every limit into one bogus series keyed to the
+        # kube-state-metrics pod (audit 2026-07-17).
         - alert: KubePodMemoryNearLimit
           expr: |
-            sum by (namespace, pod, container) (container_memory_working_set_bytes{container!=""})
-            / sum by (namespace, pod, container) (kube_pod_container_resource_limits{resource="memory", container!=""})
+            sum by (namespace, pod, container) (container_memory_working_set_bytes{container!="", container!="POD"})
+            / sum by (namespace, pod, container) (
+                label_replace(label_replace(label_replace(
+                kube_pod_container_resource_limits{resource="memory"},
+              "namespace", "$1", "exported_namespace", "(.+)"),
+              "pod", "$1", "exported_pod", "(.+)"),
+              "container", "$1", "exported_container", "(.+)")
+              )
             > 0.9
           for: 15m
           labels:

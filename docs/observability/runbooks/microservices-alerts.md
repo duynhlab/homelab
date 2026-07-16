@@ -609,33 +609,16 @@ rate(go_memory_allocations_total{app="$APP"}[5m])
 
 ### MicroserviceGCThrash
 
-**Fires when**: Heap in use (`go_memory_used_bytes`) stays within 5% of the GC goal (`go_memory_gc_goal_bytes`) for 15 minutes -- the collector fires back-to-back because live data keeps pushing the heap up against its target, so throughput and latency suffer.
+**Retired 2026-07-17** (alert-ruler audit): the rule compared `go_memory_used_bytes`
+(which the OTel Go runtime only reports for `go_memory_type="stack"|"other"` — no
+heap series exists) against the heap-only `go_memory_gc_goal_bytes`. The summed
+non-heap value sat permanently at 1.15–1.37× the goal on every service, so the
+alert was a structural false positive on all 11 services and was removed.
 
-**Severity**: warning
-
-> **Why not GC pause / frequency?** The OTLP Go runtime instrumentation exposes **no** GC-pause or GC-cycle-count metric (`go_gc_duration_seconds_*` was a `client_golang` series that disappeared with the scrape). The former `MicroserviceHighGCPressure` and `MicroserviceHighGCFrequency` alerts were replaced by this single **GC-thrash** signal (RFC-0014 — the OTLP runtime instrumentation exposes no GC-pause series).
-
-**Possible causes**:
-- Very high allocation rate (creating many short-lived objects)
-- Heap size too small for workload
-- GOGC too low (default 100, forces frequent GC)
-
-**Investigation**:
-
-```promql
-# Heap riding its GC goal (>0.95 = thrashing)
-go_memory_used_bytes{app="$APP"} / go_memory_gc_goal_bytes{app="$APP"}
-
-# Heap growth trend
-rate(go_memory_used_bytes{app="$APP"}[5m])
-```
-
-**Resolution**:
-1. Check Pyroscope CPU profile -- look for `runtime.gcBgMarkWorker`
-2. Check Pyroscope alloc_objects profile -- find top allocators
-3. Set `GOGC=200` to reduce GC frequency (trade memory for CPU)
-4. Use `sync.Pool` for frequently allocated objects
-5. Reduce allocation rate in hot paths
+Its predecessors `MicroserviceHighGCPressure` / `MicroserviceHighGCFrequency`
+were already retired at RFC-0014 (no GC-pause series over OTLP). Revisit a
+GC-thrash signal when the SDK exposes a heap-live gauge; until then use
+Pyroscope CPU profiles (`runtime.gcBgMarkWorker`) to spot GC pressure.
 
 ---
 

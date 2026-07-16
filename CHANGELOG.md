@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Alert-ruler audit wave 1 (rules/docs)**: retired the structurally
+  false-positive `MicroserviceGCThrash`; fixed never-firing
+  `KongUpstreamTargetUnhealthy` (empty PromQL `and` intersection) and
+  `TemporalPersistenceErrorRateHigh` (nonexistent metric name); excluded
+  `CONNECT` from `KubeAPIServerHighLatency`; scoped the duplicated CNPG
+  fenced/WAL rules per cluster; repaired 4 space-broken runbook anchors, added
+  the 2 missing `*Critical` runbook sections and backup-alert runbook links;
+  added `OtelCollectorDown`; reconciled the alert catalog (164 static alerts,
+  gated + inactive-on-Kind rules now marked).
+
 ### Changed
 
 - Bump product to 1.4.1 (removes the hardcoded service-level CORS

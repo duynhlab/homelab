@@ -15,7 +15,7 @@ spec:
       interval: 5m
       rules:
         - alert: PostgresWALSizeHigh
-          expr: cnpg_collector_pg_wal{value="size"} > 2e+9
+          expr: cnpg_collector_pg_wal{value="size", namespace="user"} > 2e+9
           for: 15m
           labels:
             severity: warning

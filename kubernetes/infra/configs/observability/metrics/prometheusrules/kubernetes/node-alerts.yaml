@@ -37,7 +37,7 @@ spec:
           annotations:
             summary: "Node memory pressure ({{ $labels.node }})"
             description: "Node {{ $labels.node }} is under memory pressure. Kubelet may start evicting pods."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubenodememory pressure"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubenodememorypressure"
 
         - alert: KubeNodeDiskPressure
           expr: |

@@ -14,7 +14,7 @@ spec:
       interval: 1m
       rules:
         - alert: CnpgClusterFenced
-          expr: cnpg_collector_fencing_on == 1
+          expr: cnpg_collector_fencing_on{namespace="auth"} == 1
           for: 1m
           labels:
             severity: critical

@@ -187,9 +187,13 @@ spec:
       interval: 1m
       rules:
         - alert: KongUpstreamTargetUnhealthy
+          # max over the two "OK" states: PromQL `and` between vectors that
+          # differ on the state label has an empty intersection by definition —
+          # the previous expr could never fire (audit 2026-07-16).
           expr: |
-            kong_upstream_target_health{job="kong", state="healthchecks_off"} != 1
-            and kong_upstream_target_health{job="kong", state="healthy"} != 1
+            max by (upstream, target) (
+              kong_upstream_target_health{job="kong", state=~"healthy|healthchecks_off"}
+            ) != 1
           for: 2m
           labels:
             severity: warning

@@ -19,16 +19,18 @@ the end-to-end pipeline (ingestion → VMAlert → Alertmanager → notify), see
 
 ## Summary
 
-**163 statically-defined alerts** across 8 domains, plus **60 Sloth-generated** SLO
+**164 statically-defined alerts** across 8 domains, plus **60 Sloth-generated** SLO
 burn-rate alerts (2 × 30 SLOs). The 30 SLOs cover all 10 Go services through
-the four domain ResourceSets.
+the four domain ResourceSets. Two CNPG topology rules are **gated** (not
+deployed) and a subset is **inactive on Kind** (platform limitations) — both
+marked inline below.
 
 | Domain | Count | Protects |
 |--------|-------|----------|
-| [Microservices (RED)](#1-microservices-red-metrics) | 20 | The 10 Go services; workers also contribute runtime heartbeat series. Incl. 4 app-side DB-client alerts (RFC-0017 W4) |
+| [Microservices (RED)](#1-microservices-red-metrics) | 19 | The 10 Go services; workers also contribute runtime heartbeat series. Incl. 4 app-side DB-client alerts (RFC-0017 W4) |
 | [Kong gateway](#2-kong-gateway) | 13 | The single API ingress for the whole platform |
 | [Valkey cache](#3-valkey-cache) | 7 | Cache-aside layer in front of PostgreSQL |
-| [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 48 | All four CNPG clusters (`product-db` + DR, `auth-db`, `shared-db`, `temporal-db`) + backups |
+| [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 46 (+2 gated) | All four CNPG clusters (`product-db` + DR, `auth-db`, `shared-db`, `temporal-db`) + backups |
 | [Kubernetes](#5-kubernetes) | 29 | Nodes, workloads, pods, API server, control plane, network |
 | [GitOps (Flux + cert-manager)](#6-gitops-flux--cert-manager) | 9 | Delivery pipeline + TLS |
 | [VictoriaMetrics self-health](#7-victoriametrics-self-health) | 31 | The monitoring system itself |
@@ -58,13 +60,12 @@ Source: `prometheusrules/microservices/alerts.yaml` (OTLP push pipeline — RFC-
 | MicroserviceApdexCritical | warning | apdex <0.5 | >50% of users get unacceptable response times | 10m |
 | MicroserviceGoroutineLeak | warning | `go_goroutine_count>1000` and `deriv(...[15m])>0.17` | Leak → eventual OOM | 15m |
 | MicroserviceHighMemoryUsage | warning | container working-set >90% of the memory limit (`container_memory_working_set_bytes` / `kube_pod_container_resource_limits`) | OOMKill risk | 15m |
-| MicroserviceGCThrash | warning | `go_memory_used_bytes` >95% of `go_memory_gc_goal_bytes` | GC running back-to-back; high allocation / undersized heap | 15m |
 | DBClientQueryP95High | warning | `histogram_quantile(0.95, db_client_operation_duration_seconds_bucket{pgx_operation_type="query"})>100ms` | App-side DB latency — what the service experiences, regardless of server health (otelpgx, RFC-0017 W4) | 10m |
 | DBClientErrorRate | warning | `rate(db_client_operation_errors_total)>0.1/s` | Sustained DB operation failures (SQLSTATE, timeouts, broken conns) — requests are failing | 5m |
 | PgxPoolNearExhaustion | warning | `min_over_time(pgxpool_acquired_connections[5m]) ≥ 80%` of `pgxpool_max_connections` | Pool pinned at ceiling — new queries queue on Acquire | 5m |
 | PgxPoolAcquireWaitHigh | warning | `rate(pgxpool_empty_acquire_total)>1/s` | Acquires waiting for a free conn — earliest pool-saturation signal | 10m |
 
-> **Scrape-era alerts retired at the P3 cutover.** `MicroserviceHighRequestsInFlight` / `MicroserviceRequestsInFlightCritical` (saturation) are **removed** — otelgin v0.69 emits no `http.server.active_requests`, so there is no OTel in-flight metric (re-add when it ships). `MicroserviceHighGCPressure` + `MicroserviceHighGCFrequency` (GC pause) are **replaced** by the single `MicroserviceGCThrash` — the OTel Go runtime exposes no GC-pause metric. `MicroserviceDown` / `MicroserviceAllInstancesDown` moved from `up{}` scrape liveness to the D-4 heartbeat-absence check above. The former scrape-era `MicroserviceHighRestartRate` is not part of the OTLP alert set — CrashLoop/restart is covered by `KubePodCrashLooping` (§5).
+> **Scrape-era alerts retired at the P3 cutover.** `MicroserviceHighRequestsInFlight` / `MicroserviceRequestsInFlightCritical` (saturation) are **removed** — otelgin v0.69 emits no `http.server.active_requests`, so there is no OTel in-flight metric (re-add when it ships). `MicroserviceHighGCPressure` + `MicroserviceHighGCFrequency` (GC pause) were **replaced** by `MicroserviceGCThrash`, itself **retired 2026-07-17** (audit: the runtime family has no heap series — only stack/other — so the ratio vs the heap-only GC goal false-fired permanently). `MicroserviceDown` / `MicroserviceAllInstancesDown` moved from `up{}` scrape liveness to the D-4 heartbeat-absence check above. The former scrape-era `MicroserviceHighRestartRate` is not part of the OTLP alert set — CrashLoop/restart is covered by `KubePodCrashLooping` (§5).
 
 ## 2. Kong gateway
 
@@ -129,19 +130,21 @@ singleton) + `auth-db` 18 + `shared-db` 6 + 2 backup alerts. `temporal-db`
 | CNPGClusterPhysicalReplicationLagCritical | critical | `cnpg_pg_replication_lag` >15ms | Data-safety risk on failover | 5m |
 | CNPGClusterPhysicalReplicationLagWarning | warning | >1ms | Degraded replication | 5m |
 | CNPGClusterHighReplicationLag | warning | `cnpg_pg_replication_lag` >1s | Consistency risk primary↔replica | 5m |
-| CNPGClusterLowDiskSpaceCritical | critical | PVC usage >90% (`kubelet_volume_stats_*`) | Writes about to fail / crash | 5m |
-| CNPGClusterLowDiskSpaceWarning | warning | PVC usage >70% | Add capacity proactively | 5m |
+| CNPGClusterLowDiskSpaceCritical 💤 *inactive on Kind — local-path CSI reports no kubelet VolumeStats* | critical | PVC usage >90% (`kubelet_volume_stats_*`) | Writes about to fail / crash | 5m |
+| CNPGClusterLowDiskSpaceWarning 💤 *inactive on Kind (same)* | warning | PVC usage >70% | Add capacity proactively | 5m |
 | PostgresWALSizeHigh | warning | `cnpg_collector_pg_wal{size}` >2GB | WAL pileup → disk + recovery-time impact | 15m |
-| CNPGClusterZoneSpreadWarning | warning | unique zones <3 | Zone failure = data loss | 5m |
-| CNPGClusterInstancesOnSameNode | warning | >1 instance per node (`kube_pod_info`) | Node loss = total cluster loss | 5m |
+| CNPGClusterZoneSpreadWarning ⏸ *gated — commented out in kustomization until production (needs KSM zone labels)* | warning | unique zones <3 | Zone failure = data loss | 5m |
+| CNPGClusterInstancesOnSameNode ⏸ *gated — commented out in kustomization until production* | warning | >1 instance per node (`kube_pod_info`) | Node loss = total cluster loss | 5m |
 | PostgresBackupTooOld | warning | `cnpg_collector_last_available_backup_timestamp` >26h | Stale backups → data-loss exposure | 1h |
 | PostgresBackupFailed | critical | `cnpg_collector_last_failed_backup_timestamp` recent & > last success | Backup pipeline broken — unprotected | 5m |
-| CNPGClusterLogicalReplicationErrors | warning | apply+sync error counters increasing | Logical-replication divergence | 1m |
-| CNPGClusterLogicalReplicationErrorsCritical | critical | ≥5 errors in 5m | Persistent logical-replication failure | 0m |
-| CNPGClusterLogicalReplicationLagging | warning | receipt/apply lag >60s or buffered >1GB | Subscriber falling behind | 5m |
-| CNPGClusterLogicalReplicationLaggingCritical | critical | lag >300s or buffered >4GB | Disk-exhaustion + long recovery | 2m |
-| CNPGClusterLogicalReplicationStopped | warning | `cnpg_pg_stat_subscription_enabled==0` / stuck | Replication halted | 5m |
-| CNPGClusterLogicalReplicationStoppedCritical | critical | stopped + backlog ≥15m | Significant divergence; manual recovery | 15m |
+| CNPGClusterLogicalReplicationErrors 💤 | warning | apply+sync error counters increasing | Logical-replication divergence | 1m |
+| CNPGClusterLogicalReplicationErrorsCritical 💤 | critical | ≥5 errors in 5m | Persistent logical-replication failure | 0m |
+| CNPGClusterLogicalReplicationLagging 💤 | warning | receipt/apply lag >60s or buffered >1GB | Subscriber falling behind | 5m |
+| CNPGClusterLogicalReplicationLaggingCritical 💤 | critical | lag >300s or buffered >4GB | Disk-exhaustion + long recovery | 2m |
+| CNPGClusterLogicalReplicationStopped 💤 | warning | `cnpg_pg_stat_subscription_enabled==0` / stuck | Replication halted | 5m |
+| CNPGClusterLogicalReplicationStoppedCritical 💤 | critical | stopped + backlog ≥15m | Significant divergence; manual recovery | 15m |
+
+> 💤 **Inactive on this homelab** — logical replication has no subscriptions configured, so `cnpg_pg_stat_subscription_*` has no series; these arm automatically once a subscription exists.
 
 ## 5. Kubernetes
 
@@ -165,8 +168,8 @@ Source: `prometheusrules/kubernetes/*.yaml`. Most rules source from `kube-state-
 | KubeStatefulSetReplicasMismatch | warning | spec ≠ ready replicas | Data-consistency risk | 15m |
 | KubeJobFailed | warning | `kube_job_status_failed>0` | Batch/backup task failed | 5m |
 | KubeHPAMaxedOut | warning | current == max replicas | Can't elastically absorb load | 15m |
-| KubePersistentVolumeFillingUp | warning | PVC free <15% | Write failures imminent | 10m |
-| KubePersistentVolumeFillingUpCritical | critical | PVC free <5% | Immediate data-loss risk | 5m |
+| KubePersistentVolumeFillingUp 💤 *inactive on Kind — local-path CSI reports no kubelet VolumeStats* | warning | PVC free <15% | Write failures imminent | 10m |
+| KubePersistentVolumeFillingUpCritical 💤 *inactive on Kind (same)* | critical | PVC free <5% | Immediate data-loss risk | 5m |
 
 **Pod resources** (`pod-resources-alerts.yaml`)
 
@@ -189,12 +192,14 @@ Source: `prometheusrules/kubernetes/*.yaml`. Most rules source from `kube-state-
 
 **Control plane / etcd / DNS** (`controlplane-alerts.yaml`)
 
+> 💤 etcd rows: **inactive on Kind** — the control-plane static-pod etcd is not scraped (no cert-mounted scrape target); they arm on a cluster where etcd metrics are collected.
+
 | Alert | Sev | Metric & trigger | Impact | for |
 |-------|-----|------------------|--------|-----|
-| EtcdMembersDown | critical | `up{etcd}==0` | Quorum / split-brain risk; state at risk | 3m |
-| EtcdHighFsyncDurations | warning | WAL fsync P99 >0.5s | Leader instability | 10m |
-| EtcdHighCommitDurations | warning | commit P99 >0.25s | API/controller latency | 10m |
-| EtcdHighNumberOfLeaderChanges | warning | >3 elections/1h | Cluster instability | 5m |
+| EtcdMembersDown 💤 | critical | `up{etcd}==0` | Quorum / split-brain risk; state at risk | 3m |
+| EtcdHighFsyncDurations 💤 | warning | WAL fsync P99 >0.5s | Leader instability | 10m |
+| EtcdHighCommitDurations 💤 | warning | commit P99 >0.25s | API/controller latency | 10m |
+| EtcdHighNumberOfLeaderChanges 💤 | warning | >3 elections/1h | Cluster instability | 5m |
 | CoreDNSDown | critical | `absent(up{kube-dns}==1)` | All DNS fails — cluster networking broken | 5m |
 | CoreDNSHighErrorRate | warning | SERVFAIL >3% | Service discovery failing | 10m |
 | KubeletDown | critical | `absent(up{kubelet}==1)` | Pod lifecycle unmanageable | 5m |
@@ -367,9 +372,9 @@ Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-an
 
 - **Latency duplication:** raw `MicroserviceHighLatencyP95/P99/LatencyCritical` overlap the Sloth latency SLO burn-rate. Keep the SLO burn-rate as page-worthy; consider demoting the raw P95/P99 statics to ticket/warning to cut duplicate pages.
 - **Outage triple-fire:** `MicroserviceNoTraffic` + `MicroserviceNoSuccessfulRequests` + `KongNoTraffic` can all fire for one outage — group them and use Alertmanager inhibition.
-- **Tuning signals, not incidents:** `PostgresCheckpointsTooFrequent`, `PostgresDeadTuplesHigh`, `PostgresDatabaseSizeLarge`, `MicroserviceGCThrash` are capacity/tuning signals — they should stay `warning`/`info`, never page (the user-facing symptom is already covered by latency/apdex/SLO).
+- **Tuning signals, not incidents:** `PostgresCheckpointsTooFrequent`, `PostgresDeadTuplesHigh`, `PostgresDatabaseSizeLarge` are capacity/tuning signals — they should stay `warning`/`info`, never page (the user-facing symptom is already covered by latency/apdex/SLO).
 - **`KubeletTooManyPods`** is a static-ceiling cause alert — low value unless actually near the pod/node limit.
 
 ---
 
-_Last updated: 2026-07-14 — 163 checked-in alerts plus 60 Sloth-generated alerts; all 10 services are SLO-enabled through the domain ResourceSets._
+_Last updated: 2026-07-17 — 164 checked-in alerts (+2 gated) plus 60 Sloth-generated alerts; all 10 services are SLO-enabled through the domain ResourceSets._

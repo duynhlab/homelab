@@ -280,27 +280,11 @@ spec:
             description: "Container {{ $labels.container }} working set is at {{ $value | humanizePercentage }} of its memory limit. Check for leaks via Pyroscope heap profiles before the OOM killer does."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighmemoryusage"
 
-        # Replaces BOTH GC-pause alerts: the OTel Go runtime instrumentation
-        # exposes no pause-time metric (verified 2026-07-09). Sustained
-        # used≈goal means the pacer is constantly triggering — the same
-        # GC-thrash condition the pause alerts approximated.
-        # sum by (app, namespace) is load-bearing: go_memory_used_bytes carries
-        # a go_memory_type label (stack/other) that go_memory_gc_goal_bytes
-        # lacks — a bare comparison never matches (verified live: 0 series).
-        # Summing the types slightly overcounts vs the heap-only goal;
-        # acceptable for thrash detection.
-        - alert: MicroserviceGCThrash
-          expr: |
-            sum by (app, namespace) (go_memory_used_bytes{app!=""})
-            > 0.95 * sum by (app, namespace) (go_memory_gc_goal_bytes{app!=""})
-          for: 15m
-          labels:
-            severity: warning
-            category: runtime
-          annotations:
-            summary: "GC pacing pressure ({{ $labels.namespace }}/{{ $labels.app }})"
-            description: "{{ $labels.app }} heap has been within 5% of the GC goal for 15 minutes — the collector is running back-to-back. High allocation rate or an undersized heap; consider GOGC/GOMEMLIMIT tuning."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighgcpressure"
+        # MicroserviceGCThrash was retired 2026-07-17: it compared stack+other
+        # memory (the only go_memory_type values the OTel Go runtime exposes)
+        # against the heap-only GC goal — incommensurable quantities that kept
+        # the ratio permanently above threshold on every service (audit
+        # 2026-07-16). Revisit when the SDK exposes a heap-live gauge.
 
     # --- Database client (RFC-0017 W4: otelpgx per-service instrumentation) ---
     # App-side view of Postgres health: query latency/errors from the otelpgx

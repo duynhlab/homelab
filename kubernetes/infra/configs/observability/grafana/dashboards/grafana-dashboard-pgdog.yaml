@@ -26,7 +26,7 @@ spec:
   folder: "Databases"
   allowCrossNamespaceImport: true
   resyncPeriod: 30s
-  url: "https://raw.githubusercontent.com/duynhlab/grafana-dashboards/main/dashboard/pgdog.json"
+  url: "https://raw.githubusercontent.com/duynhlab/grafana-dashboards/main/dashboard/postgresql/pgdog.json"
   contentCacheDuration: 48h
   datasources:
     - inputName: DS_PROMETHEUS

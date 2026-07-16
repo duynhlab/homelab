@@ -10,7 +10,7 @@ spec:
   folder: "Cache"
   allowCrossNamespaceImport: true
   resyncPeriod: 30s
-  url: "https://raw.githubusercontent.com/duynhlab/grafana-dashboards/main/dashboard/redis.json"
+  url: "https://raw.githubusercontent.com/duynhlab/grafana-dashboards/main/dashboard/redis/redis.json"
   contentCacheDuration: 48h
   datasources:
     - inputName: DS_PROMETHEUS

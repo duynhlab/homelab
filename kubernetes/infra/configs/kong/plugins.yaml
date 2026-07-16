@@ -50,6 +50,10 @@ config:
     - RateLimit-Limit
     - RateLimit-Remaining
     - RateLimit-Reset
+    # Retry-After: the SPA reads it on 429 to show "wait Ns" — not a
+    # CORS-safelisted response header, so it must be exposed explicitly
+    # (twin of the local-stack kong.yml entry).
+    - Retry-After
   credentials: true
   max_age: 3600
 ---

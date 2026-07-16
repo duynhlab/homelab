@@ -212,7 +212,9 @@ plugins:
       # Idempotency-Key: the checkout confirm header (RFC-0015 P3 SPA flow) —
       # without it the browser's CORS preflight silently blocks the POST.
       headers: [Content-Type, Authorization, X-Request-ID, Idempotency-Key]
-      exposed_headers: [X-Request-ID, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset]
+      # Retry-After: the SPA reads it on 429 to show "wait Ns" — not a
+      # CORS-safelisted response header, so it must be exposed explicitly.
+      exposed_headers: [X-Request-ID, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset, Retry-After]
       credentials: true
       max_age: 3600
   - name: correlation-id

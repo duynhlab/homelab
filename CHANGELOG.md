@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Cluster dashboards from the helm-charts chart (RFC-0017 W3b)**: new
+  `grafana-dashboards` HelmRelease (OCI `ghcr.io/duynhlab/helm-charts`,
+  chart ≥0.2.0); the microservices OTel board now sources from the chart's
+  ConfigMap via `configMapRef` (replacing the retired `grafana-dashboards`
+  repo raw URL) and the Business KPIs board joins it. Only these two boards
+  move — legacy boards keep their existing sources.
+
 - **E2E audit Phase C (telemetry sanity)** in `local-stack/README.md`:
   collector health, business-counter consistency, DB-client p95 sanity,
   dashboard load, and trace-service checks — all self-tested against the live

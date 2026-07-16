@@ -4,6 +4,7 @@ namespace: monitoring
 
 resources:
   - grafana-dashboard-main.yaml
+  - grafana-dashboard-business.yaml
   - grafana-dashboard-slo-overview.yaml
   - grafana-dashboard-slo-detailed.yaml
   - grafana-dashboard-vector.yaml

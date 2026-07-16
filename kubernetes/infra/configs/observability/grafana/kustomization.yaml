@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - grafana.yaml
+  - dashboards-chart.yaml
   - datasource-victorialogs.yaml
   - datasource-tempo.yaml
   - datasource-jaeger.yaml

@@ -1,7 +1,7 @@
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
-  name: microservices-monitoring
+  name: microservices-business-kpis
 spec:
   instanceSelector:
     matchLabels:
@@ -9,11 +9,11 @@ spec:
   folder: "Observability"
   allowCrossNamespaceImport: true
   resyncPeriod: 30s
-  # RFC-0017: sourced from the grafana-dashboards chart (duynhlab/helm-charts)
-  # instead of the retired grafana-dashboards repo raw URL.
+  # RFC-0017 Business KPIs — one row per domain, from the fleet's
+  # hand-declared business instruments (grafana-dashboards chart).
   configMapRef:
-    name: grafana-dashboards-microservices-otel
-    key: microservices-otel.json
+    name: grafana-dashboards-business-otel
+    key: business-otel.json
   datasources:
     - inputName: DS_PROMETHEUS
       datasourceName: VictoriaMetrics

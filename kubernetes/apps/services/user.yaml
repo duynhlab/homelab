@@ -10,7 +10,7 @@ spec:
   type: Static
   defaultValues:
     name: user
-    image_tag: "1.3.0" # {"$imagepolicy": "flux-system:user:tag"}
+    image_tag: "1.4.0" # {"$imagepolicy": "flux-system:user:tag"}
     namespace: user
     replicaCount: 1
     db_host: "pgdog-shared.user.svc.cluster.local"

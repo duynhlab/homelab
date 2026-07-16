@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   disabled the target-less vm-mcp chart scrape and excluded the
   operator-forced empty `temporal-internal-frontend` pool; raised throttled
   CPU limits (vector 200m, VM operator 300m, Grafana 300m).
+- **Alert-ruler audit wave 1 (rules/docs)**: retired the structurally
+  false-positive `MicroserviceGCThrash`; fixed never-firing
+  `KongUpstreamTargetUnhealthy` (empty PromQL `and` intersection) and
+  `TemporalPersistenceErrorRateHigh` (nonexistent metric name); excluded
+  `CONNECT` from `KubeAPIServerHighLatency`; scoped the duplicated CNPG
+  fenced/WAL rules per cluster; repaired 4 space-broken runbook anchors, added
+  the 2 missing `*Critical` runbook sections and backup-alert runbook links;
+  added `OtelCollectorDown`; reconciled the alert catalog (164 static alerts,
+  gated + inactive-on-Kind rules now marked).
 
 ### Changed
 

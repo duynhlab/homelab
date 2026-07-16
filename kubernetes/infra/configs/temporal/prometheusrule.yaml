@@ -2,7 +2,7 @@
 # (spec.metrics.prometheus.scrapeConfig.serviceMonitor in cluster.yaml).
 #
 # The error-rate metric names (service_requests/service_errors,
-# persistence_requests/persistence_errors) are the Temporal server's documented
+# persistence_requests/persistence_error_with_type) are the Temporal server's documented
 # Prometheus metrics, taken from the official dashboards
 # (github.com/temporalio/dashboards, server/server-general.json). Ratios use
 # clamp_min on the denominator so they never divide by zero / false-fire when
@@ -51,7 +51,7 @@ spec:
 
         - alert: TemporalPersistenceErrorRateHigh
           expr: |
-            sum(rate(persistence_errors[5m])) / clamp_min(sum(rate(persistence_requests[5m])), 1) > 0.02
+            sum(rate(persistence_error_with_type[5m])) / clamp_min(sum(rate(persistence_requests[5m])), 1) > 0.02
           for: 10m
           labels:
             severity: warning
@@ -60,8 +60,9 @@ spec:
             summary: "Temporal persistence error rate high (>2%)"
             description: "Temporal persistence error ratio has exceeded 2% for >10m — the temporal-db (CNPG) may be degraded; durable state writes are at risk."
 
-    # Worker-side (SDK) RED metrics from the order-fulfillment worker, scraped via
-    # the order-worker PodMonitor. Names are the Temporal Go SDK OTel metrics
+    # Worker-side (SDK) RED metrics from the order-fulfillment worker, arriving
+    # via OTLP push through the otel-collector (the order-worker PodMonitor was
+    # retired at RFC-0014 P3). Names are the Temporal Go SDK OTel metrics
     # (pkg/temporalx) — note the SDK exports "counters" as gauges (no _total), so
     # rate() is applied to the cumulative gauges. Denominators use clamp_min so the
     # ratios never divide by zero / false-fire when the worker is idle.

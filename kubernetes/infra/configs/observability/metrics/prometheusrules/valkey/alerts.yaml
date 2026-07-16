@@ -39,7 +39,7 @@ spec:
           annotations:
             summary: "Valkey memory saturation ({{ $labels.namespace }}/{{ $labels.pod }})"
             description: "Valkey is using {{ $value | humanizePercentage }} of maxmemory. Evictions may start soon."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#valkeymemory saturation"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#valkeymemorysaturation"
 
         - alert: ValkeyMemorySaturationCritical
           expr: |
@@ -52,7 +52,7 @@ spec:
           annotations:
             summary: "Valkey memory critical ({{ $labels.namespace }}/{{ $labels.pod }})"
             description: "Valkey is using {{ $value | humanizePercentage }} of maxmemory. Evictions are likely active."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#valkeymemory saturationcritical"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#valkeymemorysaturationcritical"
 
         - alert: ValkeyHighEvictionRate
           expr: |

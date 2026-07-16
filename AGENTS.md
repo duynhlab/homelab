@@ -75,6 +75,10 @@ make flux-sync    # force reconciliation
   YAML, never duplicate it in Terraform. See [`terraform/README.md`](terraform/README.md).
 
 - **e2e:** `cd local-stack && docker compose up -d --build` → SPA at `:3001`, API gateway at `:8080`. Demo login `alice` / `password123` (by **username**).
+  **Mandatory before pushing** any change touching a service repo, `pkg`, Kong/gateway
+  config, `compose.yaml`, or the SPA: run the **E2E audit** (API contract + real
+  browser + telemetry sanity) in [`local-stack/README.md`](local-stack/README.md#e2e-audit-before-pushing-backend--real-browser)
+  — scope the phases to the change, paste the pass/fail table into the PR; a failed row blocks the push.
 - **Service dev:** in the service repo, `GOTOOLCHAIN=auto go build ./... && go test ./...`.
 
 ## Architecture & conventions

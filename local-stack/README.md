@@ -5,9 +5,11 @@ the full request path plus a tracing + span-metrics observability stack, without
 a Kubernetes cluster.
 
 It runs: PostgreSQL (10 databases) · Valkey · per-service golang-migrate jobs · the
-**10 Go services** (+ the `mockpay` provider) · a Temporal dev server + the order-fulfillment worker · a
+**10 Go services** (+ the `mockpay` provider) · a Temporal dev server + **two
+workers** (order-fulfillment, checkout-abandonment) · a
 **Kong DB-less gateway** (mirrors the in-cluster Kong) · the **React SPA** ·
-an **OTel Collector → VictoriaTraces + VictoriaMetrics → Grafana** pipeline, and
+an **OTel Collector → VictoriaTraces + VictoriaMetrics + VictoriaLogs → Grafana**
+pipeline (traces, metrics, and logs), **Vector** for container logs, and
 **Pyroscope** continuous profiling.
 
 ## Prerequisites
@@ -30,9 +32,10 @@ First run builds every service image, so it takes a few minutes. Then:
 | SPA (frontend) | http://localhost:3001 | demo login `alice` / `password123` (by **username**) |
 | API gateway (Kong) | http://localhost:8080 | pass-through to all 10 services (checkout included — no host port, Kong only) |
 | Temporal Web UI | http://localhost:8233 | watch the saga |
-| **Grafana** | **http://localhost:3002** | Explore (traces) + RED dashboard; anonymous admin |
+| **Grafana** | **http://localhost:3002** | dashboards (RED `microservices-otel-local`, **Business KPIs** `business-otel-local`, span-metrics, Temporal) + Explore; anonymous admin |
 | VictoriaTraces | http://localhost:10428 | trace ingest + Jaeger query API + vmui |
-| VictoriaMetrics | http://localhost:8428 | remote-write + PromQL + vmui |
+| VictoriaMetrics | http://localhost:8428 | OTLP/remote-write ingest + PromQL + vmui |
+| VictoriaLogs | http://localhost:9428 | OTLP log ingest (otelzap via collector) + Vector container logs + LogsQL |
 | Pyroscope | http://localhost:4040 | continuous profiling (flame graphs) |
 
 Postgres and Valkey are internal-only (reach the services through Kong, not directly).
@@ -45,12 +48,14 @@ flowchart LR
     KONG --> SVC["10 Go services"]
     SVC --> PG[(PostgreSQL<br/>10 DBs)]
     SVC --> VALKEY[(Valkey)]
-    SVC -. workflows .-> TMP["Temporal :7233<br/>+ worker"]
-    SVC -- "OTLP-HTTP" --> COL["otel-collector :4318"]
+    SVC -. workflows .-> TMP["Temporal :7233<br/>+ order & checkout workers"]
+    SVC -- "OTLP-HTTP<br/>traces·metrics·logs" --> COL["otel-collector :4318"]
     COL --> VT["VictoriaTraces :10428"]
-    COL -->|spanmetrics| VM["VictoriaMetrics :8428"]
+    COL -->|"app metrics + spanmetrics"| VM["VictoriaMetrics :8428"]
+    COL -->|logs| VL["VictoriaLogs :9428"]
     VT --> GRAF["Grafana :3002"]
     VM --> GRAF
+    VL --> GRAF
     SVC -- "pprof" --> PYRO["Pyroscope :4040"]
     PYRO --> GRAF
 ```
@@ -63,15 +68,25 @@ drives the `OrderFulfillmentWorkflow` across auth → user → product → cart 
 
 ## E2E audit before pushing (backend + real browser)
 
-Run this audit on the full stack **before pushing any change that touches auth,
-the gateway, or the SPA**. It has two phases: API-contract checks with `curl`,
-then a real-browser pass driven by the `agent-browser` CLI (available locally as
-a Claude skill at `~/.claude/skills/agent-browser`; the examples below are plain
-shell and work without the skill too).
+Run this audit on the full stack **before pushing any change that touches a
+service repo, `pkg`, the Kong/gateway config, `compose.yaml`, or the SPA**.
+It has three phases: API-contract checks with `curl` (A), a real-browser pass
+driven by the `agent-browser` CLI (B — available locally as a Claude skill at
+`~/.claude/skills/agent-browser`; the examples are plain shell and work without
+the skill too), and a telemetry sanity pass (C).
+
+> **Agents: this audit is mandatory, not advisory.** Scope the phases to the
+> change (an auth change runs A1–A6 + B; a checkout change runs A9–A10 + C; a
+> telemetry/pkg change runs C at minimum — when in doubt run everything), and
+> paste the pass/fail table into the PR description. A failed row blocks the
+> push. This is the "e2e local-stack trước khi PR" gate referenced from
+> [`AGENTS.md`](../AGENTS.md).
 
 > The stack builds services from the **sibling repos' current checkouts** — make
 > sure every repo is on the branch you intend to test, then
-> `docker compose up -d --build`.
+> `docker compose up -d --build` (use the CPU-capped `throttled` buildx builder
+> on weak machines). Pace bulk API calls ≥ 0.25s apart — Kong rate-limits at
+> 5 req/s and a 429 is the gateway working, not a bug.
 
 ### Phase A — API contract (curl, ~1 min)
 
@@ -338,6 +353,55 @@ agent-browser $S network requests --method POST | grep logout   # want: .../publ
 agent-browser $S close
 ```
 
+### Phase C — telemetry sanity (curl + PromQL, ~2 min)
+
+The stack ships the full RFC-0014/0017 telemetry pipeline; a change can pass
+A+B and still silently break it. Counters lag the flow by **~30–45s**
+(15s OTLP export + async saga) — always wait before reading.
+
+```bash
+VM=http://localhost:8428
+
+# C1. Pipeline health — the collector must not be dropping data
+#     (compose service name — there is no `otel-collector` container_name)
+docker compose logs --since 10m otel-collector 2>&1 \
+  | grep -ciE 'export.*fail|"level":"error"|\terror\t' \
+  | xargs -I{} sh -c '[ {} -eq 0 ] && echo "C1 OK collector clean" || echo "C1 FAIL: {} error lines"'
+
+# C2. Business counters move with the flow (run a checkout first, wait 45s):
+#     the three ends of the saga must agree — confirmed = saga = authorized.
+for m in checkout_sessions_confirmed_total 'order_saga_outcome_total{outcome="confirmed"}' \
+         'payment_authorization_total{result="authorized"}'; do
+  curl -s "$VM/api/v1/query" --data-urlencode "query=sum($m)" \
+    | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; \
+      print('C2', '$m'.split('{')[0], '=', r[0]['value'][1] if r else 'NO SERIES')"
+done
+
+# C3. DB client telemetry sane (RFC-0017 W4 — needs pkg >= v0.24.0 in the
+#     services): query p95 must be a real number, not bucket-collapse garbage.
+curl -s "$VM/api/v1/query" --data-urlencode \
+  'query=histogram_quantile(0.95, sum by (le) (rate(db_client_operation_duration_seconds_bucket{pgx_operation_type="query"}[5m])))' \
+  | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; \
+    v=float(r[0]['value'][1]) if r else None; \
+    print('C3 DB p95:', 'OK %.2fms' % (v*1000) if v and v < 0.5 else f'FAIL {v} (collapsed buckets? old pkg?)')"
+
+# C4. Both main dashboards load with no datasource/parse errors
+for d in microservices-otel-local business-otel-local; do
+  curl -s -o /dev/null -w "C4 $d: %{http_code} (want 200)\n" \
+    http://localhost:3002/api/dashboards/uid/$d
+done
+
+# C5. Trace + native-trace logs present for the flow just driven
+curl -s 'http://localhost:10428/select/jaeger/api/services' | python3 -c \
+  "import json,sys; s=json.load(sys.stdin)['data']; print('C5 traced services:', len(s), 'OK' if len(s)>=10 else 'FAIL')"
+```
+
+> A brand-new counter has **no series until its first increment** — "NO SERIES"
+> for an error/discrepancy counter on a healthy stack is correct, not a failure.
+> When a change alters histogram **buckets**, old- and new-grid series coexist
+> in one rate window for a few minutes and quantiles read garbage until the old
+> grid ages out (~4–5 min) — re-check before declaring failure.
+
 ### Pass criteria
 
 | # | Check | Expectation |
@@ -351,9 +415,15 @@ agent-browser $S close
 | A7 | v3 paths (ADR-017) | new `shipments/*` + `auth/*` paths 200; deprecated aliases still 200 (expand phase) |
 | A8 | Renamed internal paths | old `notify/*` + `internal/orders/*` 404 in-container (no aliases) |
 | A9 | Checkout sessions (RFC-0015) | lifecycle 201→200→200→200 through edge-JWT; no-token 401; `/api/v1/checkout` 404; price bump flags `price_changed` |
+| A10 | Confirm + abandonment (RFC-0015 P2–P4) | fee/tax/promo composition asserted; `Idempotency-Key` required; replay = same order; order total == session total; lazy-410 past `expires_at` |
 | B1 | UI login | JWT + refresh in localStorage |
 | B2 | Silent refresh | exactly **one** `POST /refresh` for concurrent 401s; retried 200s; no login bounce |
 | B3 | UI logout | `POST /public/auth/logout` 200; storage cleared; redirect to `/login` |
+| C1 | Collector | 0 export failures / error lines |
+| C2 | Business counters | confirmed = saga = authorized, incremented by the driven flow (after ~45s) |
+| C3 | DB client p95 | real ms-scale value (< 500ms), not bucket-collapse garbage |
+| C4 | Dashboards | both boards load via `/api/dashboards/uid/…` with 200 |
+| C5 | Traces | ≥ 10 services present in the Jaeger services list |
 
 Any failed row blocks the push. When a change touches the order-fulfillment
 path, additionally run the saga (checkout in the SPA) and watch it complete in
@@ -361,10 +431,14 @@ the Temporal UI.
 
 ## Tracing & RED metrics
 
-Tracing is **on** in this stack. The OTel Collector both stores traces
-(VictoriaTraces) and derives RED metrics from spans (VictoriaMetrics) — mirroring
-the cluster, with the spanmetrics connector standing in for Tempo's
-metrics-generator locally.
+Tracing is **on** in this stack. The OTel Collector stores traces
+(VictoriaTraces), forwards the services' **native app metrics** (HTTP/gRPC RED,
+Go runtime, business, DB-client — the OTLP push pipeline of RFC-0014/0017) and
+their OTLP logs (VictoriaLogs), and *additionally* derives span-based RED
+metrics via the spanmetrics connector — the latter standing in for Tempo's
+metrics-generator locally. The **primary** RED/business boards
+(`microservices-otel-local`, `business-otel-local`) read the native app
+metrics; the span-metrics board is the span-derived complement.
 
 ```mermaid
 flowchart LR
@@ -380,7 +454,7 @@ The **OTel Collector is required**: the services' standard OTLP-HTTP SDK posts t
 `/insert/opentelemetry/v1/traces` ingest path directly. The collector receives
 standard OTLP and re-exports to VT.
 
-- Tracing is wired for all 9 services via the shared `x-svc-env` anchor
+- Tracing is wired for all 10 services (+ both workers and mockpay) via the shared `x-svc-env` anchor
   (`TRACING_ENABLED=true`, `OTEL_COLLECTOR_ENDPOINT=otel-collector:4318`,
   `OTEL_SAMPLE_RATE=1.0`), with a per-service `OTEL_SERVICE_NAME` so trace/metric
   service names are real (`auth`, `product`, …), not the container hostname.
@@ -398,7 +472,7 @@ standard OTLP and re-exports to VT.
    to inspect the span waterfall.
 3. CLI checks:
    ```bash
-   docker logs otel-collector                               # debug exporter shows span counts
+   docker compose logs otel-collector                               # debug exporter shows span counts
    curl 'http://localhost:10428/select/jaeger/api/services' # services with traces
    curl -XPOST 'http://localhost:10428/select/logsql/query' \
      --data-urlencode 'query=* | count()'                   # total spans ingested
@@ -420,7 +494,7 @@ histogram_quantile(0.95, sum by (le, service_name) (rate(spanmetrics_duration_mi
 
 ### Continuous profiling (Pyroscope)
 
-Profiling is **on** locally: the 9 services push pprof data to the `pyroscope`
+Profiling is **on** locally: the 10 services push pprof data to the `pyroscope`
 container (`PROFILING_ENABLED=true` + `PYROSCOPE_ENDPOINT=http://pyroscope:4040`
 in `x-svc-env`). View flame graphs in **Grafana → Explore → Pyroscope** (pick a
 service + profile type: CPU, alloc, inuse, goroutines, mutex/block), or the

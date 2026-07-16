@@ -226,7 +226,6 @@ automatically by `make cluster-up`.
 | VMAlert | <https://vmalert.duynh.me> | Alert rule evaluation |
 | Karma | <https://karma.duynh.me> | Alertmanager dashboard |
 | Jaeger | <https://jaeger.duynh.me> | Distributed tracing UI |
-| Tempo | <https://tempo.duynh.me> | Trace backend API |
 | Pyroscope | <https://pyroscope.duynh.me> | Continuous profiling |
 | VictoriaLogs | <https://logs.duynh.me> | Log query UI |
 | Sloth UI | <https://slo.duynh.me> | SLO browser, SLI charts, burn-rate views |

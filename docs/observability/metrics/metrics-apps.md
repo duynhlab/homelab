@@ -402,10 +402,13 @@ renders the dotted name into the PromQL form (counter → `_total`, seconds
 histogram → `_seconds`).
 
 Since **RFC-0017** every service declares its own Business instruments. The
-table below keeps **checkout as the worked example**; the full per-service
-catalog lives in [RFC-0017](../../proposals/rfc/RFC-0017/README.md) and is what
-the [Business KPIs dashboard](#dashboard) visualizes. The table is keyed by
-Service so owners append their own rows.
+table below keeps **checkout as the worked example**; the **full shipped
+catalog — all 34 instruments across the 10 services, with every label value
+and its recording semantics — is
+[metrics-catalog.md](metrics-catalog.md#business-metrics--per-service-catalog)**,
+and is what the [Business KPIs dashboard](#dashboard) visualizes. (The RFC's
+own catalog table is the historical design; names and rows diverged during
+implementation.)
 
 | Service | Metric (PromQL) | OTel instrument | Type | Labels | Purpose |
 |---------|-----------------|-----------------|------|--------|---------|

@@ -152,6 +152,7 @@ runbooks:
 | Layer | What it covers | Methodology | Reference |
 |-------|----------------|-------------|-----------|
 | **Applications** | HTTP RED (`http_server_request_duration_seconds`), request/response body size, Go runtime, **gRPC east-west RED**, `trace_id` correlation, instrumentation | RED + Golden | [**metrics-apps.md**](metrics-apps.md) |
+| **Catalog (lookup)** | Every emitted series: auto families + all **34 business instruments** per service, with label values + semantics | — | [**metrics-catalog.md**](metrics-catalog.md) |
 | **Infrastructure** | `up`, container restarts, pod/node/API-server resources, network | USE + Golden | [**metrics-infra.md**](metrics-infra.md) |
 | **Databases** | PostgreSQL (all CloudNativePG), custom queries, PgDog pooler, Valkey | USE | [**postgresql/monitoring.md**](postgresql/monitoring.md) |
 
@@ -181,6 +182,7 @@ Status of each methodology across the platform (✅ implemented, ❌ scoped out)
 metrics/
 ├── README.md            # This hub — fundamentals, stack, architecture, coverage
 ├── metrics-apps.md      # Application + gRPC east-west metrics (RED)
+├── metrics-catalog.md   # Lookup catalog — every emitted series incl. all business metrics
 ├── metrics-infra.md     # Cluster / infrastructure metrics (USE)
 ├── victoriametrics.md   # The stack: VM Operator, dual CRDs, components, ops
 ├── promql-guide.md      # PromQL: counters, rate() vs increase(), $rate vs $__range

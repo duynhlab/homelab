@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| implementable | platform-wide | 2026-07-14 | 2026-07-14 |
+| implemented | platform-wide | 2026-07-14 | 2026-07-16 |
 
 > **Don't forget: every decision is a tradeoff.** This RFC deliberately spends
 > effort instrumenting *every* service's data layer and domain — more code and
@@ -231,6 +231,23 @@ cache-op spans + a hit/miss counter.
 
 ### `logic` layer — per-service business-metrics catalog
 
+> **Historical design — superseded by the shipped catalog.** The implemented
+> reference (all 34 shipped instruments, exact names, label values, and
+> recording semantics) is
+> [**docs/observability/metrics/metrics-catalog.md**](../../../observability/metrics/metrics-catalog.md).
+> The table below is the pre-implementation design; it diverged during W1/W2:
+> saga metrics gained the `order.` prefix (`order_saga_outcome_total`, …),
+> `product_cache_operations_total` shipped as `product_cache_gets_total`
+> (redisotel covers per-command detail), and several rows were **not
+> implemented** (backlog, not committed): `auth_login_attempts`,
+> `user_profile_created`, `product_stock_releases`,
+> `product_cache_stampede_lock`, `product_reviews_aggregation`,
+> `cart_operations`, `orders_created`, `reviews_created`,
+> `shipping_quote_requests`, `notification_send_total`,
+> `payment_captured_amount_minor`, `payment_outbox_pending`, and the four
+> checkout funnel rows (`sessions_created`, `confirm_rejected`,
+> `promo_applied`, `session_stage_reached`).
+
 Curated from the audit; each is a `logic`-layer instrument with bounded labels.
 
 **Reference pattern (from `checkout` + `payment`, the two most-instrumented
@@ -408,6 +425,32 @@ Each PR is independently revertable; W0 lands before any service adopts it.
 - 2026-07-14 — RFC drafted from a 10-service telemetry audit (3 layers × 3
   signals) + the doc-accuracy pass that exposed the checkout-only business-metric
   gap. `provisional` pending review.
+- 2026-07-15 — **W0** landed: `pkg` v0.23.0 — `dbx.NewPool` (otelpgx tracer with
+  the D-1…D-6 safe defaults + `RecordStats` pool metrics) and
+  `obsx.TraceContext` (native trace_id/span_id on OTLP log records) (pkg#47).
+- 2026-07-16 — **W1** landed: all 9 remaining services instrumented vertically
+  (dbx adoption, `http.request` span removed, PII span attrs dropped, High-tier
+  business metrics); payment#34 was the template.
+- 2026-07-16 — **W2** landed: Med/Low business metrics fleet-wide (7 PRs) +
+  special surfaces — payment mockpay-hop D-11 (payment#35), product redisotel
+  D-10 (product#123); checkout gap closed in one W0+W1+W2 PR (checkout#21).
+  Bucket lesson: every non-HTTP seconds histogram needs explicit boundaries.
+- 2026-07-16 — **W3** landed: local RED board repaired + Business KPIs board
+  (homelab#522/#523/#526); cluster channel switched to the
+  `duynhlab/helm-charts` `grafana-dashboards` chart via `configMapRef`
+  (helm-charts#15, homelab#527) — the W3 text above predates this and still
+  names the retired `grafana-dashboards` repo; legacy board URLs repaired
+  (homelab#528).
+- 2026-07-16 — **W4** landed (extension beyond the original waves): DB-client
+  observability — `obsx.DBDurationBuckets` View fixing
+  `db_client_operation_duration_seconds` quantiles (pkg v0.24.0, pkg#48),
+  fleet bump ×10, Database dashboard row + 4 `DBClient*`/`PgxPool*` alerts +
+  runbook §12 (homelab#524). Fleet released as v1.4.0/v1.3.0/v0.3.0.
+- 2026-07-16 — Status → **implemented**. Shipped catalog documented in
+  [metrics-catalog.md](../../../observability/metrics/metrics-catalog.md)
+  (34 instruments); design-catalog divergences noted inline above. Remaining
+  (not part of this RFC's exit): business-metric alerts + SLOs, unimplemented
+  catalog rows (backlog).
 
 ## Related
 

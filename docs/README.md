@@ -68,6 +68,7 @@ docs/
 │   ├── metrics/                  # Pillar 1: Metrics
 │   │   ├── README.md             # Hub: fundamentals, stack, architecture, coverage
 │   │   ├── metrics-apps.md       # Application + gRPC east-west metrics (RED)
+│   │   ├── metrics-catalog.md    # Lookup catalog — all emitted series incl. 34 business metrics
 │   │   ├── metrics-infra.md      # Cluster / infrastructure metrics (USE)
 │   │   ├── victoriametrics.md    # VictoriaMetrics Operator stack
 │   │   ├── vmauth.md             # VMAuth/vmauth HTTP proxy (auth.config, Operator CRs)

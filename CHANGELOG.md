@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Application metrics catalog** (`docs/observability/metrics/metrics-catalog.md`):
+  lookup tables for every emitted series — the auto-instrumented families
+  (HTTP/gRPC/runtime/DB-client/cache-pool) and all **34 shipped business
+  instruments** per service with exact label values, buckets, and recording
+  semantics. RFC-0017 marked **implemented**, its Implementation History filled
+  in (W0–W4), and its design catalog annotated with the shipped divergences.
+
 ### Fixed
 
 - **10 legacy Grafana dashboard sources repaired**: the `GrafanaDashboard` CRs

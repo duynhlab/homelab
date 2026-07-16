@@ -739,7 +739,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(increase(http_server_request_duration_seconds_count{service_name=~\"$app\", }[$__range])) by (http_route)",
+          "expr": "sum(increase(http_server_request_duration_seconds_count{service_name=~\"$app\", http_route!=\"\"}[$__range])) by (http_route)",
           "legendFormat": "{{http_route}}",
           "refId": "A"
         }
@@ -824,7 +824,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", }[$rate])) by (http_route)",
+          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", http_route!=\"\"}[$rate])) by (http_route)",
           "legendFormat": "{{http_route}}",
           "refId": "A"
         }
@@ -909,7 +909,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", }[$rate])) by (http_route)",
+          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", http_route!=\"\"}[$rate])) by (http_route)",
           "legendFormat": "{{http_route}}",
           "refId": "A"
         }
@@ -1011,7 +1011,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", }[$rate])) by (http_request_method, http_route)",
+          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", http_route!=\"\"}[$rate])) by (http_request_method, http_route)",
           "legendFormat": "{{http_request_method}} {{http_route}}",
           "refId": "A"
         }
@@ -1104,7 +1104,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\",  http_response_status_code=~\"4..|5..\"}[$rate])) by (http_request_method, http_route) / sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", }[$rate])) by (http_request_method, http_route)) * 100 > 0",
+          "expr": "(sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\",  http_response_status_code=~\"4..|5..\", http_route!=\"\"}[$rate])) by (http_request_method, http_route) / sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", http_route!=\"\"}[$rate])) by (http_request_method, http_route)) * 100 > 0",
           "legendFormat": "{{http_request_method}} {{http_route}}",
           "refId": "A"
         }
@@ -1377,7 +1377,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$app\", }[$rate])) by (le, http_route, http_response_status_code))",
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$app\", http_route!=\"\"}[$rate])) by (le, http_route, http_response_status_code))",
           "legendFormat": "{{http_response_status_code}} {{http_route}}",
           "refId": "A"
         }
@@ -1462,7 +1462,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$app\", }[$rate])) by (le, http_route, http_response_status_code))",
+          "expr": "histogram_quantile(0.50, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$app\", http_route!=\"\"}[$rate])) by (le, http_route, http_response_status_code))",
           "legendFormat": "{{http_response_status_code}} {{http_route}}",
           "refId": "A"
         }
@@ -1547,7 +1547,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$app\", }[$rate])) by (le, http_route, http_response_status_code))",
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$app\", http_route!=\"\"}[$rate])) by (le, http_route, http_response_status_code))",
           "legendFormat": "{{http_response_status_code}} {{http_route}}",
           "refId": "A"
         }

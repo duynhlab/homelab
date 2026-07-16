@@ -1,0 +1,19 @@
+# ServiceMonitor for the OTel collector's own telemetry (:8888).
+# The collector is the single OTLP funnel for all app metrics/traces/logs —
+# without this scrape otelcol_* has no series, leaving both
+# OtelMetricsPipelineExportFailures and OtelCollectorDown permanently blind
+# (alert-ruler audit 2026-07-16, finding #1).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: otel-collector
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opentelemetry-collector
+      app.kubernetes.io/instance: otel-collector
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics

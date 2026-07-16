@@ -29,8 +29,13 @@ spec:
             summary: "VMAgent fails to scrape one or more targets"
             description: "Job {{ $labels.job }} on instance {{ $labels.instance }} fails to scrape targets for last 15m."
 
+        # temporal-internal-frontend is excluded: the temporal-operator emits a
+        # ServiceMonitor for the internal frontend unconditionally even when
+        # services.internalFrontend is disabled (no per-service toggle exists),
+        # so that pool is empty by design on this cluster (alert-ruler audit).
         - alert: VMAgentScrapePoolHasNoTargets
-          expr: sum(vm_promscrape_scrape_pool_targets) without (status, instance, pod) == 0
+          expr: |
+            sum(vm_promscrape_scrape_pool_targets{scrape_job!~"serviceScrape/temporal/temporal-internal-frontend/.*"}) without (status, instance, pod) == 0
           for: 30m
           labels:
             severity: warning

@@ -69,5 +69,8 @@ spec:
       periodSeconds: 15
       failureThreshold: 10
 
+    # Scrape disabled: in mcp.mode=http the server exposes no Prometheus
+    # /metrics on :8080, so the chart's VMServiceScrape matched nothing and
+    # VMAgentScrapePoolHasNoTargets fired forever (alert-ruler audit).
     scrape:
-      enabled: true
+      enabled: false

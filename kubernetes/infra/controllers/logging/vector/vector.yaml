@@ -390,7 +390,8 @@ spec:
     # ==========================================================================
     resources:
       limits:
-        cpu: 50m
+        # 200m: 50m throttled continuously (KubePodCPUThrottlingHigh, audit).
+        cpu: 200m
         memory: 256Mi
       requests: 
         cpu: 20m

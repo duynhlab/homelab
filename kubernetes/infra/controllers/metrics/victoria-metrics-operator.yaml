@@ -41,7 +41,8 @@ spec:
         cpu: 20m
         memory: 64Mi
       limits:
-        cpu: 100m
+        # 300m: 100m throttled continuously (KubePodCPUThrottlingHigh, audit).
+        cpu: 300m
         memory: 128Mi
 
     # Admission webhooks (disabled for simplicity in local dev)

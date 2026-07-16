@@ -429,13 +429,13 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(\n  sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\",  http_response_status_code=~\"2..\"}[$rate]))\n  /\n  sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", }[$rate]))\n) * 100",
+          "expr": "(\n  sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\",  http_response_status_code!~\"5..\"}[$rate]))\n  /\n  sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", }[$rate]))\n) * 100",
           "refId": "A"
         }
       ],
-      "title": "Success Rate %",
+      "title": "Success Rate % (non-5xx)",
       "type": "stat",
-      "description": "Percentage of successful requests (2xx / total)."
+      "description": "Complement of Error Rate % (5xx): every request the service handled correctly, including 3xx/4xx responses to client mistakes. Success + Error = 100%."
     },
     {
       "datasource": {
@@ -491,13 +491,13 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(\n  sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\",  http_response_status_code=~\"4..|5..\"}[$rate]))\n  /\n  sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", }[$rate]))\n) * 100",
+          "expr": "(\n  sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\",  http_response_status_code=~\"5..\"}[$rate]))\n  /\n  sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", }[$rate]))\n) * 100",
           "refId": "A"
         }
       ],
-      "title": "Error Rate %",
+      "title": "Error Rate % (5xx)",
       "type": "stat",
-      "description": "Percentage of failed requests (4xx/5xx / total)."
+      "description": "Server-fault error ratio \u2014 matches the MicroserviceHighErrorRate alert and the availability SLO (both 5xx-only). Client 4xx are the service answering correctly; they stay visible in Error RPS (4xx/5xx), the status pie, and Client Errors (4xx)."
     },
     {
       "datasource": {
@@ -739,7 +739,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(increase(http_server_request_duration_seconds_count{service_name=~\"$app\", }[$__range])) by (http_route)",
+          "expr": "sum(increase(http_server_request_duration_seconds_count{service_name=~\"$app\", http_route!=\"\"}[$__range])) by (http_route)",
           "legendFormat": "{{http_route}}",
           "refId": "A"
         }
@@ -824,7 +824,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", }[$rate])) by (http_route)",
+          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", http_route!=\"\"}[$rate])) by (http_route)",
           "legendFormat": "{{http_route}}",
           "refId": "A"
         }
@@ -834,91 +834,6 @@
       "description": "Request rate per endpoint over time. Detects traffic spikes per API."
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "reqps"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 27
-      },
-      "id": 12,
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "sortBy": "Max",
-          "sortDesc": true
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", }[$rate])) by (http_route)",
-          "legendFormat": "{{http_route}}",
-          "refId": "A"
-        }
-      ],
-      "title": "RPS by Endpoint",
-      "type": "timeseries",
-      "description": "Request rate per endpoint path. Shows traffic distribution across different API endpoints over time."
-    },
-    {
       "collapsed": false,
       "datasource": {
         "type": "prometheus",
@@ -926,7 +841,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 35,
+        "y": 27,
         "w": 24,
         "h": 1
       },
@@ -990,7 +905,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 36
+        "y": 28
       },
       "id": 24,
       "options": {
@@ -1011,7 +926,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", }[$rate])) by (http_request_method, http_route)",
+          "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", http_route!=\"\"}[$rate])) by (http_request_method, http_route)",
           "legendFormat": "{{http_request_method}} {{http_route}}",
           "refId": "A"
         }
@@ -1083,7 +998,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 44
+        "y": 36
       },
       "id": 25,
       "options": {
@@ -1104,14 +1019,14 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\",  http_response_status_code=~\"4..|5..\"}[$rate])) by (http_request_method, http_route) / sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", }[$rate])) by (http_request_method, http_route)) * 100 > 0",
+          "expr": "(sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\",  http_response_status_code=~\"5..\", http_route!=\"\"}[$rate])) by (http_request_method, http_route) / sum(rate(http_server_request_duration_seconds_count{service_name=~\"$app\", http_route!=\"\"}[$rate])) by (http_request_method, http_route)) * 100",
           "legendFormat": "{{http_request_method}} {{http_route}}",
           "refId": "A"
         }
       ],
-      "title": "Error Rate by Method and Endpoint",
+      "title": "Server Error Rate by Method and Endpoint (5xx)",
       "type": "timeseries",
-      "description": "Percentage of 4xx/5xx errors by HTTP method and endpoint. Only displays combinations with error rate > 0%. Use this to quickly identify problematic endpoints."
+      "description": "5xx ratio per method+route \u2014 continuous series (0 baseline) so legend means are honest. Client 4xx per endpoint live in the Client Errors (4xx) panel."
     },
     {
       "datasource": {
@@ -1176,7 +1091,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 52
+        "y": 44
       },
       "id": 201,
       "options": {
@@ -1270,7 +1185,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 52
+        "y": 44
       },
       "id": 202,
       "options": {
@@ -1356,7 +1271,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 60
+        "y": 52
       },
       "id": 13,
       "options": {
@@ -1377,7 +1292,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$app\", }[$rate])) by (le, http_route, http_response_status_code))",
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$app\", http_route!=\"\"}[$rate])) by (le, http_route, http_response_status_code))",
           "legendFormat": "{{http_response_status_code}} {{http_route}}",
           "refId": "A"
         }
@@ -1441,7 +1356,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 60
+        "y": 52
       },
       "id": 14,
       "options": {
@@ -1462,7 +1377,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$app\", }[$rate])) by (le, http_route, http_response_status_code))",
+          "expr": "histogram_quantile(0.50, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$app\", http_route!=\"\"}[$rate])) by (le, http_route, http_response_status_code))",
           "legendFormat": "{{http_response_status_code}} {{http_route}}",
           "refId": "A"
         }
@@ -1526,7 +1441,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 68
+        "y": 60
       },
       "id": 15,
       "options": {
@@ -1547,7 +1462,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$app\", }[$rate])) by (le, http_route, http_response_status_code))",
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$app\", http_route!=\"\"}[$rate])) by (le, http_route, http_response_status_code))",
           "legendFormat": "{{http_response_status_code}} {{http_route}}",
           "refId": "A"
         }
@@ -1564,7 +1479,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 76,
+        "y": 68,
         "w": 24,
         "h": 1
       },
@@ -1628,7 +1543,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 77
+        "y": 69
       },
       "id": 31,
       "options": {
@@ -1717,7 +1632,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 77
+        "y": 69
       },
       "id": 20,
       "options": {
@@ -1802,7 +1717,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 85
+        "y": 77
       },
       "id": 21,
       "options": {
@@ -1891,7 +1806,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 85
+        "y": 77
       },
       "id": 34,
       "options": {
@@ -1976,7 +1891,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 93
+        "y": 85
       },
       "id": 18,
       "options": {
@@ -1996,12 +1911,12 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(rate(http_server_response_body_size_bytes_sum{service_name=~\"$app\", }[5m])) by (service_name)",
+          "expr": "sum(rate(http_server_response_body_size_bytes_sum{service_name=~\"$app\", }[$rate])) by (service_name)",
           "legendFormat": "{{service_name}} TX",
           "refId": "A"
         },
         {
-          "expr": "sum(rate(http_server_request_body_size_bytes_sum{service_name=~\"$app\", }[5m])) by (service_name)",
+          "expr": "sum(rate(http_server_request_body_size_bytes_sum{service_name=~\"$app\", }[$rate])) by (service_name)",
           "legendFormat": "{{service_name}} RX",
           "refId": "B"
         }
@@ -2018,7 +1933,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 101,
+        "y": 93,
         "w": 24,
         "h": 1
       },
@@ -2082,7 +1997,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 102
+        "y": 94
       },
       "id": 210,
       "options": {
@@ -2167,7 +2082,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 102
+        "y": 94
       },
       "id": 213,
       "options": {
@@ -2252,7 +2167,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 110
+        "y": 102
       },
       "id": 211,
       "options": {
@@ -2337,7 +2252,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 110
+        "y": 102
       },
       "id": 214,
       "options": {
@@ -2422,7 +2337,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 118
+        "y": 110
       },
       "id": 212,
       "options": {
@@ -2507,7 +2422,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 118
+        "y": 110
       },
       "id": 215,
       "options": {
@@ -2545,7 +2460,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 126,
+        "y": 118,
         "w": 24,
         "h": 1
       },
@@ -2609,7 +2524,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 127
+        "y": 119
       },
       "id": 216,
       "options": {
@@ -2694,7 +2609,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 127
+        "y": 119
       },
       "id": 217,
       "options": {
@@ -2779,7 +2694,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 135
+        "y": 127
       },
       "id": 218,
       "options": {
@@ -2821,7 +2736,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 143,
+        "y": 135,
         "w": 24,
         "h": 1
       }
@@ -2837,7 +2752,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 144,
+        "y": 136,
         "w": 12,
         "h": 8
       },
@@ -2889,7 +2804,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 144,
+        "y": 136,
         "w": 12,
         "h": 8
       },
@@ -2941,7 +2856,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 152,
+        "y": 144,
         "w": 12,
         "h": 8
       },
@@ -2993,7 +2908,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 152,
+        "y": 144,
         "w": 12,
         "h": 8
       },
@@ -3045,7 +2960,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 160,
+        "y": 152,
         "w": 12,
         "h": 8
       },
@@ -3056,7 +2971,9 @@
             "fillOpacity": 12,
             "showPoints": "never",
             "lineWidth": 1
-          }
+          },
+          "min": 0,
+          "max": 1
         },
         "overrides": []
       },
@@ -3097,7 +3014,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 160,
+        "y": 152,
         "w": 12,
         "h": 8
       },
@@ -3110,7 +3027,24 @@
             "lineWidth": 1
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "wait-time s/s"
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {

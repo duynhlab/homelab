@@ -10,4 +10,5 @@ resources:
   - datasource-victoriatraces.yaml
   - datasource-pyroscope.yaml
   - datasource-victoriametrics.yaml
+  - datasource-victoriametrics-prometheus.yaml
   - dashboards/

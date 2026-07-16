@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Prometheus-type Grafana datasource alias** `VictoriaMetrics (Prometheus)`
+  (same vmsingle URL): unlocks Alerting → data-source-managed rules (Grafana's
+  ruler API rejects the VM plugin type, hiding all vmalert groups) and fixes
+  the three upstream VM dashboards whose `ds` variable only lists
+  prometheus-type datasources ("datasource was not found").
 - **Kong CORS: expose `Retry-After`** in both stacks (local `kong.yml` +
   cluster KongClusterPlugin): the SPA reads it on 429 to show "wait Ns";
   without exposure the browser hides it cross-origin (audit finding).

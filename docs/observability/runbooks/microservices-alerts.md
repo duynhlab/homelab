@@ -24,6 +24,7 @@
 9. [Threshold Tuning Guide](#9-threshold-tuning-guide)
 10. [Future Expansion](#10-future-expansion)
 11. [Interview Reference](#11-interview-reference)
+12. [Database Client Alerts](#12-database-client-alerts-rfc-0017-w4)
 
 ---
 
@@ -831,6 +832,11 @@ Set thresholds at **2-3x the normal peak** for warning and **5x** for critical.
 
 ### Phase 2: Database Connection Alerts (from Application Side)
 
+> **✅ Realized (RFC-0017 W4)** as `DBClientQueryP95High` / `DBClientErrorRate` /
+> `PgxPoolNearExhaustion` / `PgxPoolAcquireWaitHigh` on the real otelpgx metric
+> names — see [§12](#12-database-client-alerts-rfc-0017-w4). The sketch below is
+> kept as the original design note (its hypothetical metric names never existed).
+
 Add alerts for application-side database health signals:
 
 ```yaml
@@ -930,6 +936,69 @@ Add alerts for application-side database health signals:
 - Two-layer approach: Layer 1 (threshold, 1-10 min detection) + Layer 2 (SLO burn-rate, 5-60 min detection)
 
 **Result**: Complete-outage detection now follows VictoriaMetrics staleness plus the 2-minute alert hold, typically about 5-7 minutes instead of waiting for a slow SLO burn. Layer 1 catches obvious failures; Layer 2 catches sustained degradation with higher signal quality. Four-pillar correlation (`trace_id` in logs -> trace -> profile; no exemplars, RFC-0014 D-14) then guides the investigation.
+
+---
+
+## 12. Database Client Alerts (RFC-0017 W4)
+
+App-side view of Postgres health from the otelpgx instrumentation in `pkg/dbx`
+(query metrics: `db_client_operation_*`; pool metrics: `pgxpool_*` via
+`RecordStats`). These fire on what the **service experiences** — server-side
+Postgres alerting (CNPG / postgres_exporter, catalog §4) is the complementary
+view. This realizes the §10 "Phase 2: Database Connection Alerts" expansion
+with the real metric names.
+
+### DBClientQueryP95High
+
+**Fires when**: P95 of `db_client_operation_duration_seconds_bucket{pgx_operation_type="query"}` exceeds 100ms for 10 minutes.
+
+**Severity**: warning
+
+**Possible causes**: missing index / plan regression, lock contention, pooler queueing, N+1 patterns, server CPU/IO pressure.
+
+**Investigation**:
+
+```promql
+# Which service, and how bad
+histogram_quantile(0.95, sum by (app, le)
+  (rate(db_client_operation_duration_seconds_bucket{pgx_operation_type="query"}[5m])))
+```
+
+Then pivot server-side: `pg_stat_statements` (top statements by mean time), `cnpg_pg_blocking_queries`, and the otelpgx query span (trace) for the exact SQL name. Note the buckets are DB-scale (`obsx.DBDurationBuckets`, pkg ≥ v0.24.0) — with older pkg the quantile is meaningless (everything in one bucket).
+
+### DBClientErrorRate
+
+**Fires when**: `db_client_operation_errors_total` grows >0.1/s for 5 minutes (otelpgx counts every non-`ErrNoRows` operation error).
+
+**Severity**: warning
+
+**Possible causes**: Postgres down/failing over, pooler (PgDog) unhealthy, statement timeouts, schema drift (SQLSTATE 42xxx), connection storms.
+
+**Investigation**: service logs carry the SQLSTATE on the query span (`pgx.sql_state` attribute); check CNPG cluster status and PgDog logs; correlate with `MicroserviceHighErrorRate` — DB errors usually surface as 5xx.
+
+### PgxPoolNearExhaustion
+
+**Fires when**: `pgxpool_acquired_connections` has stayed ≥80% of `pgxpool_max_connections` for 5 minutes (`min_over_time` — sustained, not a spike).
+
+**Severity**: warning
+
+**Possible causes**: slow queries holding conns (check DBClientQueryP95High), pool sized too small for the traffic level, conn leak (missing `Rows.Close`).
+
+**Investigation**:
+
+```promql
+sum by (app) (pgxpool_acquired_connections) / sum by (app) (pgxpool_max_connections)
+```
+
+Compare with query p95 and traffic; if latency is flat but the pool is pinned, grow `MaxConnections`; if latency rose first, fix the queries.
+
+### PgxPoolAcquireWaitHigh
+
+**Fires when**: `pgxpool_empty_acquire_total` (acquires that had to wait for a free conn) grows >1/s for 10 minutes — the earliest saturation signal, usually before hard exhaustion.
+
+**Severity**: warning
+
+**Investigation**: `pgxpool_empty_acquire_wait_time_nanoseconds_total` gives the total time spent waiting; divide by `pgxpool_empty_acquire_total` for mean wait per blocked acquire. Same remediation fork as PgxPoolNearExhaustion.
 
 ---
 

@@ -262,6 +262,50 @@ double as the availability heartbeat (see [§ Availability](#availability--the-h
 > instrumentation (verified live 2026-07-09) — the old
 > `go_gc_duration_seconds_*` has no successor.
 
+## DB client metrics (otelpgx)
+
+> **Status: live fleet-wide (RFC-0017 W4).** Every service that touches
+> Postgres builds its pool through `pkg/dbx.NewPool`, which wires the otelpgx
+> tracer (per-operation metrics + query spans) and `RecordStats` (pool
+> metrics) onto the same OTLP stream. This is the **app-side** view — what the
+> service experiences; the server-side view (postgres_exporter, CNPG) lives in
+> [Database metrics](postgresql/monitoring.md).
+
+**Per-operation (synchronous, from the tracer):**
+
+| Metric | Type | Labels | Purpose |
+|--------|------|--------|---------|
+| `db_client_operation_duration_seconds` | Histogram | `pgx_operation_type` = `query`\|`batch`\|`copy`\|`connect`\|`prepare`\|`acquire`, `db_system_name` | DB latency as the service sees it — p95/p99 per service and per op |
+| `db_client_operation_errors_total` | Counter | same | Non-`ErrNoRows` operation failures (SQLSTATE, timeouts, broken conns) |
+
+> **Bucket note (the W2 lesson, again):** otelpgx creates the duration
+> histogram via the semconv `dbconv` helper **without bucket hints**, so the
+> SDK's ms-shaped default made every sub-5s query collapse into one bucket
+> (observed p95 = 4750ms for ~1ms queries). Since **pkg v0.24.0** the
+> `obsx.DBDurationBuckets` View pins the semconv-advised DB-scale set
+> `[0.001 … 10]s`. A service on an older pkg emits useless quantiles.
+
+**Pool health (asynchronous, from `RecordStats`, ~1s interval):** 13
+`pgxpool_*` series per service — the ones the dashboard and alerts use:
+
+| Metric | Reading |
+|--------|---------|
+| `pgxpool_acquired_connections` | **In-flight**: conns currently checked out ≈ concurrent DB work |
+| `pgxpool_idle_connections` / `pgxpool_total_connections` / `pgxpool_max_connections` | Pool occupancy vs ceiling — saturation = acquired/max |
+| `pgxpool_empty_acquire_total` | Acquires that had to **wait** for a conn — earliest contention signal |
+| `pgxpool_empty_acquire_wait_time_nanoseconds_total` | Total time spent waiting; ÷ `empty_acquire_total` = mean wait |
+| `pgxpool_acquires_total`, `pgxpool_new_connections_total`, `pgxpool_max_lifetime_destroys_total`, … | Churn/lifecycle detail |
+
+Alerts on this layer: `DBClientQueryP95High`, `DBClientErrorRate`,
+`PgxPoolNearExhaustion`, `PgxPoolAcquireWaitHigh`
+([catalog §1](../alerting/alert-catalog.md#1-microservices-red-metrics)).
+
+> **Naming trap:** the `db_client_connections_*` series (usage, use_time in
+> **milliseconds**, hits/misses/timeouts) are **not Postgres** — they come from
+> **redisotel** instrumenting product's **Valkey cache** client, which still
+> uses the older semconv connection-pool names. Postgres pool health is
+> `pgxpool_*`; treat `db_client_connections_*` as cache-pool series.
+
 ## gRPC instrumentation (east-west)
 
 > **Status: live.** gRPC is the official east-west (service-to-service)
@@ -544,6 +588,6 @@ Runbook: [`microservices-alerts.md`](../runbooks/microservices-alerts.md).
 
 ---
 
-_Last updated: 2026-07-16 — added the OTel instrument-types explainer (Counter/UpDownCounter/Histogram/Gauge, the bucket insight, explicit-bucket rule) and the RFC-0017 Business KPIs dashboard; corrected the fleet-wide business-metric coverage (all 10 services now, not checkout-only)._
+_Last updated: 2026-07-16 — added the DB client metrics section (otelpgx per-operation + pgxpool pool health, the DBDurationBuckets fix, the redisotel naming trap) for RFC-0017 W4; earlier same day: the OTel instrument-types explainer and the Business KPIs dashboard._
 </content>
 </invoke>

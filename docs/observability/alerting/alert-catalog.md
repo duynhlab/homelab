@@ -25,7 +25,7 @@ the four domain ResourceSets.
 
 | Domain | Count | Protects |
 |--------|-------|----------|
-| [Microservices (RED)](#1-microservices-red-metrics) | 16 | The 10 Go services; workers also contribute runtime heartbeat series |
+| [Microservices (RED)](#1-microservices-red-metrics) | 20 | The 10 Go services; workers also contribute runtime heartbeat series. Incl. 4 app-side DB-client alerts (RFC-0017 W4) |
 | [Kong gateway](#2-kong-gateway) | 13 | The single API ingress for the whole platform |
 | [Valkey cache](#3-valkey-cache) | 7 | Cache-aside layer in front of PostgreSQL |
 | [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 48 | All four CNPG clusters (`product-db` + DR, `auth-db`, `shared-db`, `temporal-db`) + backups |
@@ -59,6 +59,10 @@ Source: `prometheusrules/microservices/alerts.yaml` (OTLP push pipeline — RFC-
 | MicroserviceGoroutineLeak | warning | `go_goroutine_count>1000` and `deriv(...[15m])>0.17` | Leak → eventual OOM | 15m |
 | MicroserviceHighMemoryUsage | warning | container working-set >90% of the memory limit (`container_memory_working_set_bytes` / `kube_pod_container_resource_limits`) | OOMKill risk | 15m |
 | MicroserviceGCThrash | warning | `go_memory_used_bytes` >95% of `go_memory_gc_goal_bytes` | GC running back-to-back; high allocation / undersized heap | 15m |
+| DBClientQueryP95High | warning | `histogram_quantile(0.95, db_client_operation_duration_seconds_bucket{pgx_operation_type="query"})>100ms` | App-side DB latency — what the service experiences, regardless of server health (otelpgx, RFC-0017 W4) | 10m |
+| DBClientErrorRate | warning | `rate(db_client_operation_errors_total)>0.1/s` | Sustained DB operation failures (SQLSTATE, timeouts, broken conns) — requests are failing | 5m |
+| PgxPoolNearExhaustion | warning | `min_over_time(pgxpool_acquired_connections[5m]) ≥ 80%` of `pgxpool_max_connections` | Pool pinned at ceiling — new queries queue on Acquire | 5m |
+| PgxPoolAcquireWaitHigh | warning | `rate(pgxpool_empty_acquire_total)>1/s` | Acquires waiting for a free conn — earliest pool-saturation signal | 10m |
 
 > **Scrape-era alerts retired at the P3 cutover.** `MicroserviceHighRequestsInFlight` / `MicroserviceRequestsInFlightCritical` (saturation) are **removed** — otelgin v0.69 emits no `http.server.active_requests`, so there is no OTel in-flight metric (re-add when it ships). `MicroserviceHighGCPressure` + `MicroserviceHighGCFrequency` (GC pause) are **replaced** by the single `MicroserviceGCThrash` — the OTel Go runtime exposes no GC-pause metric. `MicroserviceDown` / `MicroserviceAllInstancesDown` moved from `up{}` scrape liveness to the D-4 heartbeat-absence check above. The former scrape-era `MicroserviceHighRestartRate` is not part of the OTLP alert set — CrashLoop/restart is covered by `KubePodCrashLooping` (§5).
 

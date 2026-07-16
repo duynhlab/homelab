@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Database-client observability (RFC-0017 W4)**: `Database (client — otelpgx)`
+  row on the local RED dashboard (query p95 by service/op, operation errors,
+  pool in-flight/saturation/contention), 2 Valkey cache-pool panels on the
+  Business board's Product row, 4 app-side DB alerts
+  (`DBClientQueryP95High`, `DBClientErrorRate`, `PgxPoolNearExhaustion`,
+  `PgxPoolAcquireWaitHigh`) with runbook §12, and a DB-client metrics section
+  in `metrics-apps.md` (incl. the `db_client_connections_*` redisotel naming
+  trap).
+
 - **Business KPIs Grafana dashboard (local-stack)**: new
   `business-otel-local.json` with one collapsible row per domain (Payments,
   Orders/Saga, Auth, Product, Cart, Shipping, User, Review, Notification,

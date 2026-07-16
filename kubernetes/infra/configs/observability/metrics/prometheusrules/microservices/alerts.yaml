@@ -302,3 +302,72 @@ spec:
             description: "{{ $labels.app }} heap has been within 5% of the GC goal for 15 minutes — the collector is running back-to-back. High allocation rate or an undersized heap; consider GOGC/GOMEMLIMIT tuning."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighgcpressure"
 
+    # --- Database client (RFC-0017 W4: otelpgx per-service instrumentation) ---
+    # App-side view of Postgres health: query latency/errors from the otelpgx
+    # tracer (db_client_operation_*, DB-scale buckets via the obsx
+    # DBDurationBuckets View, pkg >= v0.24.0) and pool pressure from RecordStats
+    # (pgxpool_*). Server-side Postgres alerting (CNPG/postgres_exporter) is a
+    # separate group; this one fires on what the SERVICE experiences.
+    - name: microservices-db-client
+      interval: 1m
+      rules:
+        # pgx_operation_type="query" isolates real statement latency; connect/
+        # prepare/acquire have their own signals below and would dilute the SLI.
+        - alert: DBClientQueryP95High
+          expr: |
+            histogram_quantile(0.95,
+              sum by (app, namespace, le) (rate(db_client_operation_duration_seconds_bucket{app!="", pgx_operation_type="query"}[5m]))
+            ) > 0.1
+          for: 10m
+          labels:
+            severity: warning
+            category: database
+          annotations:
+            summary: "Slow DB queries from {{ $labels.app }} ({{ $labels.namespace }})"
+            description: "{{ $labels.app }} P95 DB query latency is {{ $value | humanizeDuration }} (threshold: 100ms). Check pg_stat_statements for the offending statement, missing indexes, or lock contention on the server side."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#dbclientqueryp95high"
+
+        # otelpgx increments this for any non-ErrNoRows operation error
+        # (SQLSTATE failures, timeouts, broken conns). Sustained errors mean the
+        # service is failing requests, whatever the server thinks of itself.
+        - alert: DBClientErrorRate
+          expr: |
+            sum by (app, namespace) (rate(db_client_operation_errors_total{app!=""}[5m])) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            category: database
+          annotations:
+            summary: "DB operation errors from {{ $labels.app }} ({{ $labels.namespace }})"
+            description: "{{ $labels.app }} is seeing {{ $value | humanize }} DB operation errors/s for 5 minutes. Check service logs (SQLSTATE on the query span), pooler health, and Postgres availability."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#dbclienterrorrate"
+
+        # Checked-out conns pinned at the pool ceiling = every new query waits.
+        # min() over the window (not avg) so only sustained exhaustion fires.
+        - alert: PgxPoolNearExhaustion
+          expr: |
+            min_over_time(pgxpool_acquired_connections{app!=""}[5m])
+            >= 0.8 * pgxpool_max_connections{app!=""}
+          for: 5m
+          labels:
+            severity: warning
+            category: database
+          annotations:
+            summary: "DB pool near exhaustion on {{ $labels.app }} ({{ $labels.namespace }})"
+            description: "{{ $labels.app }} has kept ≥80% of its pool connections checked out for 5 minutes. Queries are about to queue on Acquire — look for slow queries holding conns or an undersized pool."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#pgxpoolnearexhaustion"
+
+        # empty_acquire counts acquires that had to WAIT for a conn — the
+        # earliest saturation signal, firing before hard exhaustion.
+        - alert: PgxPoolAcquireWaitHigh
+          expr: |
+            sum by (app, namespace) (rate(pgxpool_empty_acquire_total{app!=""}[5m])) > 1
+          for: 10m
+          labels:
+            severity: warning
+            category: database
+          annotations:
+            summary: "DB pool contention on {{ $labels.app }} ({{ $labels.namespace }})"
+            description: "{{ $labels.app }} acquires are waiting for a free connection {{ $value | humanize }}/s over 10 minutes (pool contention). Correlate with pgxpool_empty_acquire_wait_time and query latency; grow the pool or shorten query hold time."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#pgxpoolacquirewaithigh"
+

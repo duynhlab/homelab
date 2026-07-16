@@ -32,7 +32,7 @@ spec:
           replicaCount: << inputs.replicaCount | int >>
           image:
             repository: ghcr.io/duynhlab/frontend/frontend
-            tag: "1.1.0" # {"$imagepolicy": "flux-system:frontend:tag"}
+            tag: "1.1.1" # {"$imagepolicy": "flux-system:frontend:tag"}
             pullPolicy: IfNotPresent
           # mop >=0.14 values schema: the HTTP port pair lives under
           # service.http (the old top-level port/targetPort/containerPort keys

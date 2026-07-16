@@ -26,11 +26,13 @@ spec:
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubeapiserverdown"
 
         # Golden Signal: Latency
+        # CONNECT is excluded like LIST|WATCH: exec/port-forward/attach are
+        # long-lived streams whose "latency" is the session length.
         - alert: KubeAPIServerHighLatency
           expr: |
             histogram_quantile(0.99,
               sum by (le, verb, resource) (
-                rate(apiserver_request_duration_seconds_bucket{job="apiserver", verb!~"LIST|WATCH"}[5m])
+                rate(apiserver_request_duration_seconds_bucket{job="apiserver", verb!~"LIST|WATCH|CONNECT"}[5m])
               )
             ) > 1
           for: 10m

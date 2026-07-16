@@ -85,7 +85,7 @@ spec:
           annotations:
             summary: "PVC filling up ({{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }})"
             description: "PVC {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} has less than 15% free space ({{ $value | humanizePercentage }} remaining)."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubepersistentvolume fillingup"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubepersistentvolumefillingup"
 
         - alert: KubePersistentVolumeFillingUpCritical
           expr: |

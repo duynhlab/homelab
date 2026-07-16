@@ -14,9 +14,10 @@ spec:
     # down-alert. The job label is matched by substring so it survives the
     # operator's job-naming (service name "tempo").
     #
-    # Note: OTel Collector, Pyroscope and Vector are not yet scraped, so a
-    # target-down alert for them would never fire — scrape coverage is not yet
-    # added.
+    # Note: Pyroscope and Vector are scraped (Pyroscope has its own
+    # PyroscopeDown alert; Vector via the chart-enabled PodMonitor). The OTel
+    # Collector's :8888 self-telemetry gets its scrape + OtelCollectorDown in
+    # the alert-audit scrape wave (2026-07).
     - name: observability-tracing
       interval: 30s
       rules:
@@ -29,3 +30,16 @@ spec:
           annotations:
             summary: "Tempo is down ({{ $labels.instance }})"
             description: "Tempo tracing backend target {{ $labels.instance }} (job {{ $labels.job }}) has been down for more than 5 minutes — distributed traces are not being ingested or queryable."
+
+        # Arms once the otel-collector :8888 self-telemetry ServiceMonitor
+        # lands (scrape wave of the same audit). The collector is the single
+        # OTLP funnel — when it is down, every app metric/trace/log stops.
+        - alert: OtelCollectorDown
+          expr: up{job=~".*otel-collector.*"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            category: observability
+          annotations:
+            summary: "OTel collector is down ({{ $labels.instance }})"
+            description: "The OpenTelemetry collector target has been down for more than 5 minutes — application metrics, traces and logs (the whole OTLP path) are not being ingested."

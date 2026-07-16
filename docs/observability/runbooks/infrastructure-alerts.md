@@ -327,6 +327,20 @@ kubectl get pvc -n $NAMESPACE $PVC -o jsonpath='{.status.capacity.storage}'
 
 ---
 
+### KubePersistentVolumeFillingUpCritical
+
+**Fires when**: PVC has less than 5% free space for 5 minutes — the escalation
+of [KubePersistentVolumeFillingUp](#kubepersistentvolumefillingup); same
+investigation queries apply.
+
+**Severity**: critical
+
+**Resolution**: act immediately — expand the PVC now (or free space) before the
+workload hits ENOSPC; databases can corrupt or fence on a full volume. If
+expansion is impossible, scale the writer down while you free space.
+
+---
+
 ## 3. Node Alerts
 
 ### KubeNodeNotReady
@@ -482,6 +496,21 @@ kubectl exec -n cache-system $POD -- redis-cli INFO memory
 - Increase `maxmemory` in Valkey Helm values
 - Review key TTLs: shorten TTLs for less critical data
 - Check eviction policy (`allkeys-lru` recommended for cache use case)
+
+---
+
+### ValkeyMemorySaturationCritical
+
+**Fires when**: Memory usage exceeds 95% of maxmemory — the escalation of
+[ValkeyMemorySaturation](#valkeymemorysaturation); same investigation queries
+apply.
+
+**Severity**: critical
+
+**Resolution**: at 95% mass evictions are imminent (cache hit-rate collapse →
+DB load spike). Raise `maxmemory` now or flush low-value key patterns; verify
+the eviction policy is `allkeys-lru` so the instance degrades instead of
+erroring on writes.
 
 ---
 

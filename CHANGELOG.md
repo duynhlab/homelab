@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ruler API rejects the VM plugin type, hiding all vmalert groups) and fixes
   the three upstream VM dashboards whose `ds` variable only lists
   prometheus-type datasources ("datasource was not found").
+- **Kong CORS: expose `Retry-After`** in both stacks (local `kong.yml` +
+  cluster KongClusterPlugin): the SPA reads it on 429 to show "wait Ns";
+  without exposure the browser hides it cross-origin (audit finding).
 - **Application metrics catalog** (`docs/observability/metrics/metrics-catalog.md`):
   lookup tables for every emitted series — the auto-instrumented families
   (HTTP/gRPC/runtime/DB-client/cache-pool) and all **34 shipped business

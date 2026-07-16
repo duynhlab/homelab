@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Bump product to 1.4.1 (removes the hardcoded service-level CORS
+  middleware that 403'd every browser request on the cluster).
+
 ### Added
 
 - **Prometheus-type Grafana datasource alias** `VictoriaMetrics (Prometheus)`

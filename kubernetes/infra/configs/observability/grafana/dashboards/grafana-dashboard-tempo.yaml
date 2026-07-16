@@ -10,7 +10,7 @@ spec:
   folder: "Observability"
   allowCrossNamespaceImport: true
   resyncPeriod: 30s
-  url: "https://raw.githubusercontent.com/duynhlab/grafana-dashboards/main/dashboard/tempo-observability-dashboard.json"
+  url: "https://raw.githubusercontent.com/duynhlab/grafana-dashboards/main/dashboard/observability/tempo-observability-dashboard.json"
   contentCacheDuration: 48h
   datasources:
     - inputName: DS_PROMETHEUS

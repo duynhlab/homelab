@@ -10,7 +10,7 @@ spec:
   folder: "Databases"
   allowCrossNamespaceImport: true
   resyncPeriod: 30s
-  url: "https://raw.githubusercontent.com/duynhlab/grafana-dashboards/main/dashboard/pg-monitoring.json"
+  url: "https://raw.githubusercontent.com/duynhlab/grafana-dashboards/main/dashboard/postgresql/pg-monitoring.json"
   contentCacheDuration: 48h
   datasources:
     - inputName: DS_PROMETHEUS

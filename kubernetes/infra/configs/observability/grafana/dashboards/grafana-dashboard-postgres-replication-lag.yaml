@@ -10,7 +10,7 @@ spec:
   folder: "Databases"
   allowCrossNamespaceImport: true
   resyncPeriod: 30s
-  url: "https://raw.githubusercontent.com/duynhlab/grafana-dashboards/main/dashboard/postgres-replication-lag.json"
+  url: "https://raw.githubusercontent.com/duynhlab/grafana-dashboards/main/dashboard/postgresql/postgres-replication-lag.json"
   contentCacheDuration: 48h
   datasources:
     - inputName: DS_PROMETHEUS

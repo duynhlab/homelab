@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **10 legacy Grafana dashboard sources repaired**: the `GrafanaDashboard` CRs
+  for pg-*, pgdog, cloudnative-pg, replication-lag, redis, kong,
+  kubernetes-overview, and tempo still pointed at flat
+  `dashboard/<name>.json` raw URLs that 404 since the `grafana-dashboards`
+  repo was restructured into subdirectories — those cluster boards had been
+  broken at source. URLs now point at the nested paths (verified 200 + valid
+  JSON for all ten).
+
 ### Added
 
 - **E2E audit Phase C (telemetry sanity)** in `local-stack/README.md`:

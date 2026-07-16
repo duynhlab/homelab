@@ -10,7 +10,7 @@ spec:
   type: Static
   defaultValues:
     name: payment
-    image_tag: "1.2.0" # {"$imagepolicy": "flux-system:payment:tag"}
+    image_tag: "1.3.0" # {"$imagepolicy": "flux-system:payment:tag"}
     namespace: payment
     # No platform_backup_label: that label routes CNPG/barman S3 credentials to
     # namespaces hosting a database cluster — payment's data lives on product-db

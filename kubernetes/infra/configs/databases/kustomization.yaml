@@ -4,8 +4,6 @@ kind: Kustomization
 # Database clusters organized by cluster name
 # Each cluster folder contains: instance, secrets, poolers (if any), monitoring
 resources:
-  - clusters/auth-db/
-  - clusters/shared-db/
+  - clusters/platform-db/
   - clusters/product-db/
-  - clusters/temporal-db/
   # product-db-replica: see configs/databases-cnpg-dr/ (Flux databases-cnpg-dr-local, dependsOn databases-local)

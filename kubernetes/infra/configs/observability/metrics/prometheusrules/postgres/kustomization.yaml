@@ -26,33 +26,26 @@ resources:
   - cnpg/cluster-low_disk_space-critical.yaml
   - cnpg/cluster-low_disk_space-warning.yaml
   - cnpg/operator-health.yaml
-  # auth-db (ns auth, 3-node HA): full rule set mirrored from cnpg/. operator-health is a global
+  # platform-db (ns platform, 3-node HA): full rule set mirrored from cnpg/. operator-health is a global
   # singleton (ns cloudnative-pg) — not duplicated per cluster.
-  - cnpg-auth-db/cluster-fenced.yaml
-  - cnpg-auth-db/cluster-ha-critical.yaml
-  - cnpg-auth-db/cluster-ha-warning.yaml
-  - cnpg-auth-db/cluster-high_connection-critical.yaml
-  - cnpg-auth-db/cluster-high_connection-warning.yaml
-  - cnpg-auth-db/cluster-high_replication_lag.yaml
-  - cnpg-auth-db/cluster-logical_replication_errors-critical.yaml
-  - cnpg-auth-db/cluster-logical_replication_errors.yaml
-  - cnpg-auth-db/cluster-logical_replication_lagging-critical.yaml
-  - cnpg-auth-db/cluster-logical_replication_lagging.yaml
-  - cnpg-auth-db/cluster-logical_replication_stopped-critical.yaml
-  - cnpg-auth-db/cluster-logical_replication_stopped.yaml
-  - cnpg-auth-db/cluster-offline.yaml
-  - cnpg-auth-db/cluster-physical_replication_lag-critical.yaml
-  - cnpg-auth-db/cluster-physical_replication_lag-warning.yaml
-  - cnpg-auth-db/cluster-wal-size-high.yaml
+  - cnpg-platform-db/cluster-fenced.yaml
+  - cnpg-platform-db/cluster-ha-critical.yaml
+  - cnpg-platform-db/cluster-ha-warning.yaml
+  - cnpg-platform-db/cluster-high_connection-critical.yaml
+  - cnpg-platform-db/cluster-high_connection-warning.yaml
+  - cnpg-platform-db/cluster-high_replication_lag.yaml
+  - cnpg-platform-db/cluster-logical_replication_errors-critical.yaml
+  - cnpg-platform-db/cluster-logical_replication_errors.yaml
+  - cnpg-platform-db/cluster-logical_replication_lagging-critical.yaml
+  - cnpg-platform-db/cluster-logical_replication_lagging.yaml
+  - cnpg-platform-db/cluster-logical_replication_stopped-critical.yaml
+  - cnpg-platform-db/cluster-logical_replication_stopped.yaml
+  - cnpg-platform-db/cluster-offline.yaml
+  - cnpg-platform-db/cluster-physical_replication_lag-critical.yaml
+  - cnpg-platform-db/cluster-physical_replication_lag-warning.yaml
+  - cnpg-platform-db/cluster-wal-size-high.yaml
   # Homelab default: gated — same rules as cnpg/ block above. See cnpg/README.md.
-  # - cnpg-auth-db/cluster-instances_on_same_node.yaml
-  # - cnpg-auth-db/cluster-zone_spread-warning.yaml
-  - cnpg-auth-db/cluster-low_disk_space-critical.yaml
-  - cnpg-auth-db/cluster-low_disk_space-warning.yaml
-  # shared-db (ns user, single-node): only rules that fire on 1 instance; HA/replication omitted.
-  - cnpg-shared-db/cluster-offline.yaml
-  - cnpg-shared-db/cluster-high_connection-critical.yaml
-  - cnpg-shared-db/cluster-high_connection-warning.yaml
-  - cnpg-shared-db/cluster-wal-size-high.yaml
-  - cnpg-shared-db/cluster-low_disk_space-critical.yaml
-  - cnpg-shared-db/cluster-low_disk_space-warning.yaml
+  # - cnpg-platform-db/cluster-instances_on_same_node.yaml
+  # - cnpg-platform-db/cluster-zone_spread-warning.yaml
+  - cnpg-platform-db/cluster-low_disk_space-critical.yaml
+  - cnpg-platform-db/cluster-low_disk_space-warning.yaml

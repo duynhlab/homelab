@@ -1,0 +1,101 @@
+# temporal — persistence role for Temporal server (RFC-0018).
+#
+# Temporal connects directly to platform-db-rw:5432 (no PgDog). The role and
+# both logical stores are pre-created by bootstrap.initdb postInitSQL in
+# instance.yaml; this triplet adopts them declaratively and binds the password
+# from OpenBAO via platform-db-temporal-secret.
+#
+# ExternalSecret for platform-db temporal database credentials.
+# OpenBAO path: secret/data/local/databases/platform-db/temporal
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: platform-db-temporal-secret
+  namespace: platform
+  labels:
+    app.kubernetes.io/name: platform-db-temporal-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: platform-db-temporal-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: platform-db-temporal-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+          cnpg.io/reload: "true"
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: secret/data/local/databases/platform-db/temporal
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: secret/data/local/databases/platform-db/temporal
+        property: password
+---
+# Adopts the role postInitSQL created; CNPG syncs password from the Secret.
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: platform-db-role-temporal
+  namespace: platform
+spec:
+  cluster:
+    name: platform-db
+  name: temporal
+  comment: "Temporal server persistence role (RFC-0018)"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: true
+  replication: false
+  bypassrls: false
+  connectionLimit: -1
+  inRoles: []
+  passwordSecret:
+    name: platform-db-temporal-secret
+  databaseRoleReclaimPolicy: retain
+---
+# temporal default store — adopted from postInitSQL.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: temporal-database
+  namespace: platform
+spec:
+  name: temporal
+  owner: temporal
+  cluster:
+    name: platform-db
+  extensions:
+    - name: pg_stat_statements
+  databaseReclaimPolicy: retain
+---
+# temporal_visibility advanced visibility store — adopted from postInitSQL.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: temporal-visibility-database
+  namespace: platform
+spec:
+  name: temporal_visibility
+  owner: temporal
+  cluster:
+    name: platform-db
+  extensions:
+    - name: pg_stat_statements
+  databaseReclaimPolicy: retain

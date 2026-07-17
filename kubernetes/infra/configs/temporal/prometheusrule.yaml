@@ -58,7 +58,7 @@ spec:
             category: platform
           annotations:
             summary: "Temporal persistence error rate high (>2%)"
-            description: "Temporal persistence error ratio has exceeded 2% for >10m — the temporal-db (CNPG) may be degraded; durable state writes are at risk."
+            description: "Temporal persistence error ratio has exceeded 2% for >10m — platform-db (CNPG) may be degraded; durable state writes are at risk."
 
     # Worker-side (SDK) RED metrics from the order-fulfillment worker, arriving
     # via OTLP push through the otel-collector (the order-worker PodMonitor was

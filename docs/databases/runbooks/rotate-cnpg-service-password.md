@@ -76,12 +76,20 @@ moving to the next step.
    ```
 
 4. **Reconcile the pooler immediately** — helm-controller re-reads
-   `valuesFrom` only at reconcile:
+   `valuesFrom` only at reconcile. For **`product-db`** services:
 
    ```bash
-   flux reconcile helmrelease pgdog-cnpg -n product
-   kubectl rollout restart deploy/pgdog-cnpg -n product
-   kubectl rollout status deploy/pgdog-cnpg -n product
+   flux reconcile helmrelease pgdog-product -n product
+   kubectl rollout restart deploy/pgdog-product -n product
+   kubectl rollout status deploy/pgdog-product -n product
+   ```
+
+   For **`platform-db`** services (auth, user, notification, shipping, review):
+
+   ```bash
+   flux reconcile helmrelease pgdog-platform -n platform
+   kubectl rollout restart deploy/pgdog-platform -n platform
+   kubectl rollout status deploy/pgdog-platform -n platform
    ```
 
    The restart is **mandatory**: the pgdog chart (verified on v0.39 via
@@ -130,4 +138,4 @@ A fresh `make up` needs none of this — Secrets are born basic-auth.
 
 ---
 
-_Last updated: 2026-07-08 (RFC-0012 P2)_
+_Last updated: 2026-07-17 (RFC-0018: pgdog-product / pgdog-platform pooler names)_

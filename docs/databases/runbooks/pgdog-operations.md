@@ -4,7 +4,7 @@ Day-2 operations for the PgDog connection poolers — status checks, rotations, 
 
 | Fact | Value |
 |------|-------|
-| Releases | `pgdog-product` (product ns), `pgdog-auth` (auth ns), `pgdog-shared` (user ns) — one per CNPG cluster |
+| Releases | `pgdog-platform` (platform ns), `pgdog-product` (product ns) — one per operational CNPG cluster |
 | Chart | `pgdog` `v0.39` from the `pgdogdev` HelmRepository (flux-system) |
 | Ports | `6432` SQL, `9090` openmetrics (`pgdog_` prefix) |
 | Topology | 3 replicas, soft anti-affinity, PDB `minAvailable: 2` |
@@ -16,9 +16,12 @@ Concept and trade-off background lives in [008-pooler.md](../008-pooler.md); thi
 ## Health & status
 
 ```bash
-kubectl get pods -n product -l app.kubernetes.io/name=pgdog        # 3/3 Running
-kubectl logs -n product deploy/pgdog-product --tail=50             # bans, auth errors
-flux get helmrelease pgdog-product -n product                      # reconcile state
+kubectl get pods -n platform -l app.kubernetes.io/name=pgdog        # pgdog-platform 3/3 Running
+kubectl get pods -n product -l app.kubernetes.io/name=pgdog        # pgdog-product 3/3 Running
+kubectl logs -n platform deploy/pgdog-platform --tail=50             # bans, auth errors
+kubectl logs -n product deploy/pgdog-product --tail=50
+flux get helmrelease pgdog-platform -n platform                      # reconcile state
+flux get helmrelease pgdog-product -n product
 ```
 
 Metrics (VictoriaMetrics, scraped via the chart's ServiceMonitor at 15s):
@@ -67,4 +70,4 @@ The full new-service flow (triplet, HBA, seeds) is [add-service-database.md](add
 - PgDog docs: https://docs.pgdog.dev/
 
 ---
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-17 — Added pgdog-platform (RFC-0018); product tier unchanged._

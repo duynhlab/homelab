@@ -69,7 +69,7 @@ made are recorded as one or more **ADRs**, and the RFC moves to `implemented`.
 | [RFC-0002](RFC-0002/) | East-west mTLS for internal gRPC | platform-wide | P1 | provisional |
 | [RFC-0003](RFC-0003/) | Inventory ownership and stock semantics | platform-wide | P2 | provisional |
 | [RFC-0004](RFC-0004/) | Cross-service caching and invalidation | platform-wide | P2 | provisional |
-| [RFC-0005](RFC-0005/) | supporting-shared-db: HA or split | infra | P2 | provisional |
+| [RFC-0005](RFC-0005/) | supporting-shared-db: HA or split | infra | P2 | provisional — **superseded by [RFC-0018](RFC-0018/)** (platform-db merge) |
 | [RFC-0006](RFC-0006/) | Service mesh evaluation (Istio Ambient vs Linkerd) | infra | defer | provisional |
 | [RFC-0007](RFC-0007/) | Disaster-recovery drills program | infra | P2 | provisional |
 | [RFC-0008](RFC-0008/) | Production secrets hardening & local/prod parity | infra | P1 | provisional |
@@ -81,6 +81,7 @@ made are recorded as one or more **ADRs**, and the RFC moves to `implemented`.
 | [RFC-0014](RFC-0014/) | Full OpenTelemetry adoption: OTLP push for metrics, logs and traces | platform-wide | done | implemented (live-cluster drill pending) |
 | [RFC-0015](RFC-0015/) | Checkout service: session state machine, price re-validation & order handoff | platform-wide | P0 | provisional |
 | [RFC-0017](RFC-0017/) | Platform telemetry standard: per-layer signal ownership + fleet instrumentation | platform-wide | P1 | implementable |
+| [RFC-0018](RFC-0018/) | Consolidate platform PostgreSQL: merge auth, shared, temporal into platform-db | infra | P1 | provisional |
 
 ## Backlog — candidate RFCs
 
@@ -109,4 +110,4 @@ here). Each gets a number when someone writes it up.
 > [RFC-0001](RFC-0001/)**, not a separate backlog row.
 
 ---
-_Last updated: 2026-07-11_
+_Last updated: 2026-07-17_

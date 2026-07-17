@@ -81,7 +81,7 @@ flowchart TD
 
 | Operator | Version | PostgreSQL Version | Clusters |
 |----------|---------|-------------------|----------|
-| **CloudNativePG** | v1.30.0 | 18.1 (default) | `product-db` (product, cart, order, payment), `product-db-replica` (DR), `auth-db` (auth), `shared-db` (user, notification, shipping, review), `temporal-db` |
+| **CloudNativePG** | v1.30.0 | 18.1 (default) | `platform-db` (auth, user, notification, shipping, review, temporal), `product-db` (product, cart, order, checkout, payment), `product-db-replica` (DR) |
 
 All Postgres runs on CloudNativePG; the Zalando operator has been retired (see [002](./002-database-integration.md), [003.2](./003.2-operator-zalando.md)).
 
@@ -93,12 +93,12 @@ All CNPG clusters use the **`system-trixie`** image (`ghcr.io/cloudnative-pg/pos
 
 | Cluster | Image | `shared_preload_libraries` | Per-database extensions (via `Database` CR) |
 |---------|-------|----------------------------|---------------------------------------------|
-| `product-db` | system-trixie | pgaudit, pg_stat_statements, auto_explain | product: pgaudit, pg_stat_statements, pgcrypto, uuid-ossp; cart/order/payment: pgaudit, pg_stat_statements |
-| `auth-db` | system-trixie | pgaudit, pg_stat_statements, auto_explain | auth: pgaudit, pg_stat_statements, pgcrypto, uuid-ossp |
-| `shared-db` | system-trixie | pgaudit, pg_stat_statements, auto_explain | user/notification/shipping/review: pgaudit, pg_stat_statements |
-| `temporal-db` | system-trixie | pgaudit, pg_stat_statements, auto_explain | — (managed by Temporal's own schema tooling) |
+| `platform-db` | system-trixie | pgaudit, pg_stat_statements, auto_explain | auth: pgaudit, pg_stat_statements, pgcrypto, uuid-ossp; user/notification/shipping/review: pgaudit, pg_stat_statements; temporal/temporal_visibility: managed by Temporal schema tooling |
+| `product-db` | system-trixie | pgaudit, pg_stat_statements, auto_explain | product: pgaudit, pg_stat_statements, pgcrypto, uuid-ossp; cart/order/checkout/payment: pgaudit, pg_stat_statements |
 
-Extension declarations live in each cluster's `services/` triplets, e.g. [`clusters/product-db/services/`](../../kubernetes/infra/configs/databases/clusters/product-db/services/) and [`clusters/auth-db/services/`](../../kubernetes/infra/configs/databases/clusters/auth-db/services/).
+Extension declarations live in each cluster's `services/` triplets, e.g.
+[`clusters/platform-db/services/`](../../kubernetes/infra/configs/databases/clusters/platform-db/services/)
+and [`clusters/product-db/services/`](../../kubernetes/infra/configs/databases/clusters/product-db/services/).
 
 ### Compatibility Check
 
@@ -713,10 +713,10 @@ Build a custom PostgreSQL image with extensions pre-installed. **Not recommended
 
 ### Zalando Operator (historical)
 
-> **Retired.** The Zalando operator is no longer deployed; `auth-db` and the
-> former `supporting-shared-db` (now `shared-db`) run on CloudNativePG and manage
-> extensions declaratively via `shared_preload_libraries` + RFC-0012 `Database`
-> triplets (see [Current State](#current-state)). Zalando managed
+> **Retired.** The Zalando operator is no longer deployed; platform persistence
+> now runs on `platform-db` (CloudNativePG) and manages extensions declaratively
+> via `shared_preload_libraries` + RFC-0012 `Database` triplets (see
+> [Current State](#current-state)). Zalando managed
 > `shared_preload_libraries` directly in `spec.postgresql.parameters` and created
 > extensions via `postInitSQL` or manual `CREATE EXTENSION`; kept here only as a
 > contrast to the CNPG model. Operator internals live in
@@ -828,7 +828,7 @@ kubectl exec -it <pod-name> -n <namespace> -- ls -la /extensions/<extension-name
   - Requires careful log management and retention policies
   - Currently configured with `pgaudit.log_catalog: "off"` to reduce noise
 
-#### For all CNPG clusters (auth-db, shared-db, temporal-db)
+#### For all CNPG clusters (platform-db, product-db)
 
 **Current Setup**: Every cluster uses the same `shared_preload_libraries`
 (pgaudit, pg_stat_statements, auto_explain) and declares per-database extensions
@@ -947,10 +947,8 @@ kubectl describe database order-database -n cart
 
 | Cluster | Operator | Image | Preloaded | Database Resource Extensions |
 |---------|----------|-------|-----------|------------------------------|
-| `product-db` | CloudNativePG | `system-trixie` | pgaudit, pg_stat_statements, auto_explain | product: pgaudit, pg_stat_statements, pgcrypto, uuid-ossp; cart/order/payment: pgaudit, pg_stat_statements (auto_explain is preload-only, not a Database resource) |
-| `auth-db` | CloudNativePG | `system-trixie` | pgaudit, pg_stat_statements, auto_explain | auth: pgaudit, pg_stat_statements, pgcrypto, uuid-ossp |
-| `shared-db` | CloudNativePG | `system-trixie` | pgaudit, pg_stat_statements, auto_explain | user/notification/shipping/review: pgaudit, pg_stat_statements |
-| `temporal-db` | CloudNativePG | `system-trixie` | pgaudit, pg_stat_statements, auto_explain | — |
+| `platform-db` | CloudNativePG | `system-trixie` | pgaudit, pg_stat_statements, auto_explain | auth: pgaudit, pg_stat_statements, pgcrypto, uuid-ossp; user/notification/shipping/review: pgaudit, pg_stat_statements |
+| `product-db` | CloudNativePG | `system-trixie` | pgaudit, pg_stat_statements, auto_explain | product: pgaudit, pg_stat_statements, pgcrypto, uuid-ossp; cart/order/checkout/payment: pgaudit, pg_stat_statements (auto_explain is preload-only, not a Database resource) |
 
 **Key points:**
 - All clusters run on CloudNativePG with the `system-trixie` image and built-in extensions (no ImageVolume needed currently)
@@ -961,4 +959,4 @@ kubectl describe database order-database -n cart
 
 ---
 
-_Last updated: 2026-07-11 — All clusters on CloudNativePG (Zalando retired); auth-db/shared-db/temporal-db extension inventory added, all sharing shared_preload pgaudit/pg_stat_statements/auto_explain via RFC-0012 triplets._
+_Last updated: 2026-07-17 (RFC-0018: platform-db consolidated cluster)_

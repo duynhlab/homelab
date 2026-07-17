@@ -178,7 +178,7 @@ kubectl get prometheusservicelevel -n monitoring
 - Namespaces for every domain provisioned (auth, user, product, cart, order, review, notification, shipping, payment, frontend, kong, cert-manager, openbao, external-secrets-system, monitoring, cloudnative-pg, database, kyverno, flux-system, …).
 - 5 ResourceSets (`rs-identity`, `rs-catalog`, `rs-checkout`, `rs-comms`, `rs-frontend`) successfully reconciled.
 - HelmReleases for the 9 microservices + frontend, plus the `mockpay` and `order-worker` releases (in the `payment` / `order` namespaces), in `Ready` state.
-- 4 CloudNativePG clusters (`product-db`, `auth-db`, `shared-db`, `temporal-db`) + 1 DR replica (`product-db-replica`) operational.
+- 3 CloudNativePG clusters (`platform-db`, `product-db`, `product-db-replica`) operational.
 - ClusterIssuers `selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod` Ready; `kong-proxy-tls` Certificate Ready — signed by `homelab-ca` on local Kind (`letsencrypt-prod` on prod).
 
 ---
@@ -420,9 +420,9 @@ homelab/
 9. `tracing-local`: Deploys Tempo (Depends on `secrets-local`, `storage-local` — kept out of `controllers-local` to avoid a wave deadlock).
 10. `profiling-local`: Deploys Pyroscope (Depends on `secrets-local`, `storage-local` — same rationale as `tracing-local`).
 11. `cnpg-barman-plugin-local`: Installs the CNPG Barman Cloud Plugin via the `plugin-barman-cloud` Helm chart (from the `cnpg` HelmRepository) and its `ObjectStore` CRD (Depends on `controllers-local`, `cert-manager-local`).
-12. `databases-local`: Provisions persistence layer, including the CNPG `temporal-db` (Depends on `secrets-local`, `monitoring-local`, `cnpg-barman-plugin-local`, `storage-local`, `network-policies-local`).
+12. `databases-local`: Provisions persistence layer, including the CNPG `platform-db` and `product-db` clusters (Depends on `secrets-local`, `monitoring-local`, `cnpg-barman-plugin-local`, `storage-local`, `network-policies-local`).
 13. `databases-cnpg-dr-local`: CNPG DR replica (Depends on `databases-local`, `secrets-local`).
-14. `temporal-local`: Temporal server via the temporal-operator (`TemporalCluster` + `TemporalNamespace`), persistence on the CNPG `temporal-db` (Depends on `controllers-local`, `cert-manager-local`, `databases-local`, `monitoring-local`). The `temporal-operator` HelmRelease itself `dependsOn` cert-manager, since its chart renders a cert-manager `Certificate`/`Issuer` for the admission webhook.
+14. `temporal-local`: Temporal server via the temporal-operator (`TemporalCluster` + `TemporalNamespace`), persistence on `platform-db-rw.platform:5432` (Depends on `controllers-local`, `cert-manager-local`, `databases-local`, `monitoring-local`). The `temporal-operator` HelmRelease itself `dependsOn` cert-manager, since its chart renders a cert-manager `Certificate`/`Issuer` for the admission webhook.
 15. `kyverno-policies-local`: Admission policies (Depends on `controllers-local`, `monitoring-local`). See [kyverno.md](kyverno.md).
 15a. `mcp-local`: MCP servers (Depends on `monitoring-local`). See [mcp-servers.md](mcp-servers.md).
 16. `apps-local`: Deploys business logic (the `apps-local` Kustomization `dependsOn` `databases-local`, `monitoring-local`, and `temporal-local` — the `order-worker` dials Temporal at startup, so apps must not deploy until the Temporal cluster is Ready).
@@ -434,4 +434,4 @@ For persistence layer details, refer to [002-database-integration.md](../databas
 
 ---
 
-_Last updated: 2026-07-11 — Zalando→CNPG migration: expected namespaces drop `postgres-operator`; expected clusters are the 4 CloudNativePG clusters (`product-db`, `auth-db`, `shared-db`, `temporal-db`) + `product-db-replica`. Earlier: quick-start/step order aligned with the Makefile (`flux-push` before `flux-up`); VictoriaMetrics wording; temporal-db in the expected state; caching/mcp added to the dependency graph; VictoriaTraces host added._
+_Last updated: 2026-07-17 — RFC-0018: expected clusters are 3 CNPG clusters (`platform-db`, `product-db`, `product-db-replica`); Temporal persistence on platform-db. Earlier: Zalando→CNPG migration; quick-start/step order aligned with the Makefile (`flux-push` before `flux-up`); VictoriaMetrics wording; caching/mcp added to the dependency graph; VictoriaTraces host added._

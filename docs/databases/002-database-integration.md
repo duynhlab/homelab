@@ -2,16 +2,17 @@
 ## Table of Contents
 
 1. [Quick Summary](#quick-summary) - Clusters, poolers overview
-2. [Database Architecture](#database-architecture) - 4 operational clusters + DR overview diagram + tables
+2. [Database Architecture](#database-architecture) - 2 operational clusters + DR overview diagram + tables
 3. [CloudNativePG Operator](#cloudnativepg-operator) - Operator features, per-cluster details, connection patterns, monitoring
 4. [Connection Poolers](#connection-poolers) - PgDog (active); PgBouncer / PgCat (comparison) + configuration
 5. [Related Documentation](#related-documentation) - Links to other docs
 6. [Troubleshooting](#troubleshooting) - Common issues and solutions
 
 > **Migration note.** All PostgreSQL now runs on **CloudNativePG**. The Zalando
-> operator (previously `auth-db` + `supporting-shared-db`) has been retired; its
-> databases moved to the CNPG `auth-db` and `shared-db` clusters. Zalando
-> internals are kept for reference only in
+> operator (previously `auth-db` + `supporting-shared-db`) has been retired; auth,
+> user, notification, shipping, review, and Temporal persistence now live on the
+> consolidated **`platform-db`** cluster (RFC-0018). Zalando internals are kept
+> for reference only in
 > [003.2 — Zalando Operator Deep Dive](./003.2-operator-zalando.md).
 
 > **Per-cluster details** (topology diagrams, endpoints, components): See each cluster's README in [`kubernetes/infra/configs/databases/clusters/`](../../kubernetes/infra/configs/databases/clusters/README.md)
@@ -21,112 +22,110 @@
 
 | Operator                   | Version   | Cluster Name      | PostgreSQL Ver. | Nodes      | Pooler Type              | Pooler Details                    |
 |----------------------------|-----------|-------------------|-----------------|------------|--------------------------|------------------------------------|
+| CloudNativePG Operator     | v1.30.0   | platform-db              | 18              | 3 (HA)     | PgDog (`pgdog-platform`) | auth, user, notification, shipping, review; sync (ANY 1). Temporal connects direct (no pooler) |
 | CloudNativePG Operator     | v1.30.0   | product-db               | 18              | 3 (HA)     | PgDog (`pgdog-product`)  | product, cart, order; sync (ANY 1). payment also lives here but connects direct-TLS (bypasses PgDog) |
 | CloudNativePG Operator     | v1.30.0   | product-db-replica       | 18              | 1          | —                        | DR replica; object-store recovery    |
-| CloudNativePG Operator     | v1.30.0   | auth-db                  | 18              | 3 (HA)     | PgDog (`pgdog-auth`)     | auth; sync (ANY 1)                   |
-| CloudNativePG Operator     | v1.30.0   | shared-db                | 18              | 1          | PgDog (`pgdog-shared`)   | user, notification, shipping, review |
-| CloudNativePG Operator     | v1.30.0   | temporal-db              | 18              | 1          | —                        | Temporal server backing store (namespace `temporal`); no backups / no WAL archiving |
 ---
 
 ## Database Architecture
 
 ### Overview
 
-All PostgreSQL runs on **CloudNativePG** (v1.30.0): **4 operational clusters** +
-**1 DR replica** (**5 clusters total**) — **product-db** (primary, ns `product`)
-with **product-db-replica** as disaster recovery, **auth-db** (ns `auth`),
-**shared-db** (ns `user`), and **temporal-db** (the Temporal server's backing
-store, ns `temporal`). Application traffic for **product**, **cart**, and
-**order** shares **product-db** through the **PgDog** pooler `pgdog-product`;
+All PostgreSQL runs on **CloudNativePG** (v1.30.0): **2 operational clusters** +
+**1 DR replica** (**3 clusters total**) — **platform-db** (ns `platform`, auth +
+supporting services + Temporal persistence), **product-db** (primary, ns `product`)
+with **product-db-replica** as disaster recovery. Application traffic for
+**auth**, **user**, **notification**, **shipping**, and **review** shares
+**platform-db** through the **PgDog** pooler `pgdog-platform`; the **Temporal**
+server connects **directly** to `platform-db-rw.platform:5432`. **product**,
+**cart**, and **order** share **product-db** through **`pgdog-product`**;
 **payment** also stores its `payment` database on **product-db** but connects
-**directly over TLS** (see below), not through PgDog. **auth** uses the
-`pgdog-auth` pooler; **user/notification/shipping/review** share **shared-db**
-via the `pgdog-shared` pooler. Backups use the **Barman Cloud Plugin** to an
-S3-compatible object store.
+**directly over TLS** (see below), not through PgDog. Backups use the **Barman
+Cloud Plugin** to an S3-compatible object store.
 
 ```mermaid
 flowchart TB
     subgraph Operator["PostgreSQL Operator"]
-        CloudNativePG["CloudNativePG Operator v1.30.0<br/>5 clusters (product-db, product-db-replica,<br/>auth-db, shared-db, temporal-db)"]
+        CloudNativePG["CloudNativePG Operator v1.30.0<br/>3 clusters (platform-db, product-db,<br/>product-db-replica)"]
     end
 
-    subgraph Services["Microservices by Namespace"]
-        AuthSvc["Auth Service - namespace: auth"]
-        ProductSvc["Product Service - namespace: product"]
-        CartSvc["Cart Service - namespace: cart"]
-        OrderSvc["Order Service - namespace: order"]
-        PaymentSvc["Payment Service - namespace: payment"]
-        ReviewSvc["Review Service - namespace: review"]
-        UserSvc["User Service - namespace: user"]
-        NotificationSvc["Notification Service - namespace: notification"]
-        ShippingSvc["Shipping Service - namespace: shipping"]
+    subgraph PlatformApps["Platform services"]
+        AuthSvc["Auth — ns auth"]
+        UserSvc["User — ns user"]
+        NotificationSvc["Notification — ns notification"]
+        ShippingSvc["Shipping — ns shipping"]
+        ReviewSvc["Review — ns review"]
+        TemporalSvc["Temporal — ns temporal"]
     end
 
-    subgraph Poolers["PgDog Poolers"]
-        PgDogAuth["pgdog-auth"]
-        PgDogShared["pgdog-shared"]
+    subgraph ProductApps["Product services"]
+        ProductSvc["Product — ns product"]
+        CartSvc["Cart — ns cart"]
+        OrderSvc["Order — ns order"]
+        PaymentSvc["Payment — ns payment"]
+    end
+
+    subgraph Poolers["PgDog poolers"]
+        PgDogPlatform["pgdog-platform<br/>auth, user, notification,<br/>shipping, review"]
         PgDogProduct["pgdog-product<br/>product, cart, order"]
     end
 
     subgraph Clusters["PostgreSQL Clusters (CloudNativePG, PG 18)"]
-        subgraph ProductCluster["product-db - HA: 3 instances"]
+        subgraph PlatformCluster["platform-db — HA: 3 instances"]
+            PlatPrimary[("Primary")]
+            PlatReplica1[("Sync Replica")]
+            PlatReplica2[("Async Replica")]
+        end
+
+        subgraph ProductCluster["product-db — HA: 3 instances"]
             ProductPrimary[("Primary")]
             ProductReplica1[("Sync Replica")]
             ProductReplica2[("Async Replica")]
         end
 
-        subgraph ProductDR["product-db-replica - DR: 1 instance"]
+        subgraph ProductDR["product-db-replica — DR: 1 instance"]
             ProductDRNode[("Designated primary<br/>object-store recovery")]
         end
-
-        subgraph AuthCluster["auth-db - HA: 3 instances"]
-            AuthPrimary[("Primary")]
-            AuthReplica1[("Sync Replica")]
-            AuthReplica2[("Async Replica")]
-        end
-
-        SharedDB[("shared-db - 1 instance<br/>DBs: user, notification, shipping, review")]
-        TemporalDB[("temporal-db - 1 instance<br/>DBs: temporal, temporal_visibility")]
     end
 
     subgraph ObjectStore["Backup / DR (Barman Cloud Plugin)"]
         Bucket[("Object store WAL archive<br/>s3://pg-backups-cnpg (per-cluster prefixes)")]
     end
 
-    subgraph ProductSvcEP["product-db Services - Auto-created"]
-        ProductRW["product-db-rw - Primary Endpoint"]
-        ProductR["product-db-r - Read Endpoint"]
+    subgraph ProductSvcEP["product-db Services — Auto-created"]
+        ProductRW["product-db-rw — Primary Endpoint"]
+        ProductR["product-db-r — Read Endpoint"]
     end
 
+    CloudNativePG --> PlatformCluster
     CloudNativePG --> ProductCluster
     CloudNativePG --> ProductDR
-    CloudNativePG --> AuthCluster
-    CloudNativePG --> SharedDB
-    CloudNativePG --> TemporalDB
 
     ProductRW --> ProductPrimary
     ProductR --> ProductReplica1
     ProductR --> ProductReplica2
 
-    AuthSvc -->|via pooler| PgDogAuth
-    PgDogAuth --> AuthPrimary
+    AuthSvc -->|via pooler| PgDogPlatform
+    UserSvc -->|via pooler| PgDogPlatform
+    NotificationSvc -->|via pooler| PgDogPlatform
+    ShippingSvc -->|via pooler| PgDogPlatform
+    ReviewSvc -->|via pooler| PgDogPlatform
+    TemporalSvc -->|direct :5432| PlatPrimary
+    PgDogPlatform --> PlatPrimary
+
     ProductSvc -->|via pooler| PgDogProduct
     CartSvc -->|via pooler| PgDogProduct
     OrderSvc -->|via pooler| PgDogProduct
     PgDogProduct --> ProductRW
     PgDogProduct --> ProductR
     PaymentSvc -->|direct TLS| ProductRW
-    ReviewSvc -->|via pooler| PgDogShared
-    UserSvc -->|via pooler| PgDogShared
-    NotificationSvc -->|via pooler| PgDogShared
-    ShippingSvc -->|via pooler| PgDogShared
-    PgDogShared --> SharedDB
 
-    AuthPrimary -.->|Sync ANY 1 + async| AuthReplica1
-    AuthPrimary -.->|Sync ANY 1 + async| AuthReplica2
+    PlatPrimary -.->|Sync ANY 1 + async| PlatReplica1
+    PlatPrimary -.->|Sync ANY 1 + async| PlatReplica2
     ProductPrimary -.->|Sync ANY 1 + async| ProductReplica1
     ProductPrimary -.->|Sync ANY 1 + async| ProductReplica2
     ProductPrimary -.->|WAL archive| Bucket
+    PlatPrimary -.->|WAL archive| Bucket
     ProductDRNode -.->|Continuous recovery| Bucket
 ```
 
@@ -138,27 +137,25 @@ so credentials come from OpenBAO via ESO rather than being operator-generated.
 
 | Cluster         | Database      | Owner        | Secret NS         | Secret Source              | Direct Connection                              | Pooler     | Instances                  | HA Pattern            | Namespace |
 |----------------|--------------|--------------|-------------------|----------------------------|------------------------------------------------|------------|----------------------------|-----------------------|-----------|
+| platform-db    | auth         | auth         | auth, platform    | ESO (`platform-db-secret`) | `platform-db-rw.platform:5432`                 | PgDog (`pgdog-platform`) | 3 (1 primary + 1 sync + 1 async) | CNPG sync (ANY 1) | platform  |
+| platform-db    | user         | user         | user, platform    | ESO (`platform-db-user-secret`) | `platform-db-rw.platform:5432`            | PgDog (`pgdog-platform`) | 3 (1 primary + 1 sync + 1 async) | CNPG sync (ANY 1) | platform  |
+| platform-db    | notification | notification | notification, platform | ESO (`platform-db-notification-secret`) | `platform-db-rw.platform:5432` | PgDog (`pgdog-platform`) | 3 (1 primary + 1 sync + 1 async) | CNPG sync (ANY 1) | platform  |
+| platform-db    | shipping     | shipping     | shipping, platform | ESO (`platform-db-shipping-secret`) | `platform-db-rw.platform:5432`          | PgDog (`pgdog-platform`) | 3 (1 primary + 1 sync + 1 async) | CNPG sync (ANY 1) | platform  |
+| platform-db    | review       | review       | review, platform  | ESO (`platform-db-review-secret`) | `platform-db-rw.platform:5432`            | PgDog (`pgdog-platform`) | 3 (1 primary + 1 sync + 1 async) | CNPG sync (ANY 1) | platform  |
+| platform-db    | temporal, temporal_visibility | temporal | temporal, platform | ESO (`platform-db-temporal-secret`) | `platform-db-rw.platform:5432` (direct, **not** PgDog) | — (direct) | 3 (1 primary + 1 sync + 1 async) | CNPG sync (ANY 1) | platform  |
 | product-db     | product      | product      | product           | ESO (`product-db-secret`)  | `product-db-rw.product:5432`                   | PgDog (`pgdog-product`) | 3 (1 primary + 1 sync + 1 async) | CNPG sync (ANY 1) | product   |
 | product-db     | cart         | cart         | cart              | ESO (`product-db-cart-secret`) | `product-db-rw.product:5432`               | PgDog (`pgdog-product`) | 3 (1 primary + 1 sync + 1 async) | CNPG sync (ANY 1) | cart      |
 | product-db     | order        | order        | order             | ESO (`product-db-order-secret`) | `product-db-rw.product:5432`              | PgDog (`pgdog-product`) | 3 (1 primary + 1 sync + 1 async) | CNPG sync (ANY 1) | order     |
 | product-db     | payment      | payment      | product + payment | ESO (`product-db-payment-secret`) | `product-db-rw.product:5432` (direct TLS, **not** PgDog) | — (direct) | 3 (1 primary + 1 sync + 1 async) | CNPG sync (ANY 1) | payment |
 | product-db-replica | —        | —            | product           | —                          | —                                              | —          | 1 (DR replica)             | Object-store recovery | product   |
-| auth-db        | auth         | auth         | auth              | ESO (`auth-db-secret`)     | `auth-db-rw.auth:5432`                         | PgDog (`pgdog-auth`) | 3 (1 primary + 1 sync + 1 async) | CNPG sync (ANY 1) | auth      |
-| shared-db      | user         | user         | user              | ESO (`shared-db-secret`)   | `shared-db-rw.user:5432`                       | PgDog (`pgdog-shared`) | 1 (single instance)      | Single (no HA)        | user      |
-| shared-db      | notification | notification | notification      | ESO (`shared-db-notification-secret`) | `shared-db-rw.user:5432`            | PgDog (`pgdog-shared`) | 1 (single instance)      | Single (no HA)        | user      |
-| shared-db      | shipping     | shipping     | shipping          | ESO (`shared-db-shipping-secret`) | `shared-db-rw.user:5432`                | PgDog (`pgdog-shared`) | 1 (single instance)      | Single (no HA)        | user      |
-| shared-db      | review       | review       | review            | ESO (`shared-db-review-secret`) | `shared-db-rw.user:5432`                  | PgDog (`pgdog-shared`) | 1 (single instance)      | Single (no HA)        | user      |
-| temporal-db    | temporal, temporal_visibility | temporal | temporal    | Auto (CNPG `temporal-db-app`) | `temporal-db-rw.temporal:5432`              | — (direct) | 1 (single instance)        | Single (no HA)        | temporal  |
 
 ### Pooler Summary
 
 | Cluster         | App Endpoint (via Pooler)              | Pooler     | Mode      | Notes                   |
 |-----------------|----------------------------------------|------------|-----------|-------------------------|
+| platform-db     | `pgdog-platform.platform.svc.cluster.local:6432` | PgDog | Standalone | 5 pooled DBs: auth, user, notification, shipping, review. **Temporal bypasses this pooler** — direct to `platform-db-rw` |
 | product-db      | `pgdog-product.product:6432`           | PgDog      | Standalone| Single entry point for product, cart, order; R/W split to `product-db-rw` / `product-db-r`. **payment bypasses this pooler** — connects direct-TLS to `product-db-rw` |
 | product-db-replica | —                                   | —          | —         | DR only; apps use primary `product-db` after promotion / failover drill |
-| auth-db         | `pgdog-auth.auth:6432`                 | PgDog      | Standalone| DB: auth                |
-| shared-db       | `pgdog-shared.user:6432`               | PgDog      | Standalone| 4 databases: user, notification, shipping, review |
-| temporal-db     | —                                      | —          | —         | Temporal server connects directly; no pooler tier |
 
 
 ---
@@ -180,14 +177,27 @@ so credentials come from OpenBAO via ESO rather than being operator-generated.
 
 | Cluster            | Database(s)                 | Instances                       | Replication Type              |
 |--------------------|-----------------------------|----------------------------------|-------------------------------|
+| **platform-db**    | auth, user, notification, shipping, review, temporal, temporal_visibility | 3 (1 primary + 1 sync + 1 async) | Synchronous quorum (ANY 1)    |
 | **product-db**     | product, cart, order, payment | 3 (1 primary + 1 sync + 1 async) | Synchronous quorum (ANY 1)    |
 | **product-db-replica**| — (DR standby)           | 1                                | Continuous recovery from archive |
-| **auth-db**        | auth                        | 3 (1 primary + 1 sync + 1 async) | Synchronous quorum (ANY 1)    |
-| **shared-db**      | user, notification, shipping, review | 1                       | Single instance (no HA)       |
-| **temporal-db**    | temporal, temporal_visibility (Temporal backing store) | 1    | Single instance (no HA / no backups) |
 
 ---
 ### Clusters
+
+#### platform-db
+
+Consolidated **CloudNativePG** cluster for **auth**, **user**, **notification**,
+**shipping**, **review**, and **Temporal** persistence (RFC-0018 — merges the
+former `auth-db`, `shared-db`, and `temporal-db` tiers).
+
+- **3 instances** (1 primary + 1 sync + 1 async replica), **synchronous quorum** `ANY 1`, PostgreSQL 18 — namespace **`platform`**
+- **Databases**: `auth`, `user`, `notification`, `shipping`, `review`, `temporal`, `temporal_visibility`
+- **Pooler**: **PgDog** (HelmRelease `pgdog-platform`), endpoint **`pgdog-platform.platform.svc.cluster.local:6432`** — auth, user, notification, shipping, and review services use this single entry point
+- **Temporal (direct, not pooled)**: the Temporal server connects **directly to `platform-db-rw.platform:5432`** (no PgDog); credentials from `platform-db-temporal-secret` (OpenBAO path `platform-db/temporal`)
+- **Roles & databases**: declarative RFC-0012 triplets under `services/`; OpenBAO compat paths `auth-db/*` and `shared-db/*` for app creds (see [openbao.md](../secrets/openbao.md))
+- **Backup**: Barman Cloud Plugin → `s3://pg-backups-cnpg/platform-db/`, retention 30d
+
+> **Manifests**: [`kubernetes/infra/configs/databases/clusters/platform-db/`](../../kubernetes/infra/configs/databases/clusters/platform-db/)
 
 #### product-db
 
@@ -215,34 +225,6 @@ Consolidated **CloudNativePG** cluster for **product**, **cart**, and **order** 
 - The operator uses Kubernetes API as the sole coordination layer -- no DCS, no etcd required.
 - For a conceptual comparison with Zalando's Patroni-based HA, see [Operator Comparison](./003-operator-comparison.md).
 
-#### auth-db
-
-- **3 instances** (1 primary + 1 sync + 1 async replica), **synchronous quorum** `ANY 1`, PostgreSQL 18 — migrated from the former Zalando `auth-db`.
-- **Database**: `auth`; cluster lives in namespace **`auth`**
-- **Pooler**: **PgDog** (HelmRelease `pgdog-auth`), endpoint **`pgdog-auth.auth:6432`**
-- **Roles & databases**: declarative RFC-0012 triplet under `services/` (initdb-reuse — the `auth` role/database created by `bootstrap.initdb` is adopted by the triplet)
-- **Backup**: Barman Cloud Plugin → `s3://pg-backups-cnpg/auth-db/`, retention 30d
-
-> **Manifests**: [`kubernetes/infra/configs/databases/clusters/auth-db/`](../../kubernetes/infra/configs/databases/clusters/auth-db/)
-
-#### shared-db
-
-- **1 instance** (single, no HA), PostgreSQL 18 — migrated from the former Zalando `supporting-shared-db`.
-- **Databases**: `user`, `notification`, `shipping`, `review` (shared-database pattern); cluster lives in namespace **`user`**
-- **Pooler**: **PgDog** (HelmRelease `pgdog-shared`), endpoint **`pgdog-shared.user:6432`**
-- **Roles & databases**: declarative RFC-0012 triplets under `services/` (`user` is an initdb-reuse triplet; notification/shipping/review are normal triplets with cross-namespace `ExternalSecret`s)
-- **Backup**: Barman Cloud Plugin → `s3://pg-backups-cnpg/shared-db/`, retention 30d
-
-> **Manifests**: [`kubernetes/infra/configs/databases/clusters/shared-db/`](../../kubernetes/infra/configs/databases/clusters/shared-db/)
-
-#### temporal-db
-
-- **1 instance** (single, no HA), PostgreSQL 18, namespace **`temporal`**
-- **Databases**: `temporal` (via `bootstrap.initdb`) + `temporal_visibility` (via `postInitSQL`)
-- **No pooler and no backup** — the Temporal server connects directly to `temporal-db-rw.temporal:5432`.
-
-> **Manifests**: [`kubernetes/infra/configs/databases/clusters/temporal-db/`](../../kubernetes/infra/configs/databases/clusters/temporal-db/)
-
 ### Features & Capabilities
 
 **High Availability:**
@@ -251,7 +233,7 @@ Consolidated **CloudNativePG** cluster for **product**, **cart**, and **order** 
 - Quorum-based failover available for synchronous replication clusters
 
 **Replication:**
-- **product-db**: synchronous quorum (**ANY 1**) with required durability across replicas; third replica may follow asynchronously per operator behavior
+- **platform-db** and **product-db**: synchronous quorum (**ANY 1**) with required durability across replicas
 - **product-db-replica**: standby fed from object-store WAL archive (DR)
 - Logical replication slot synchronization for CDC clients where configured
 
@@ -261,6 +243,7 @@ Consolidated **CloudNativePG** cluster for **product**, **cart**, and **order** 
 - SSD-optimized settings
 
 **Multi-Database Support:**
+- **platform-db** hosts auth, supporting services, and Temporal persistence on one HA cluster
 - **product-db** hosts `product`, `cart`, `order`, and `payment` on one cluster (payment connects direct-TLS, not via PgDog)
 - **PgDog** provides multi-database routing and read/write splitting to CNPG `-rw` / `-r` services (replaces the former **PgCat** deployment for cart/order in active GitOps)
 
@@ -268,9 +251,14 @@ Consolidated **CloudNativePG** cluster for **product**, **cart**, and **order** 
 
 > **Deep Dive**: For detailed architecture, trade-offs, and configuration of **PgDog**, **PgBouncer**, and **PgCat** (comparison / legacy), see [`docs/databases/008-pooler.md`](./008-pooler.md).
 
-#### PgDog (unified pooler for product-db)
+#### PgDog (unified pooler — platform-db and product-db)
 
-**Endpoint**: `pgdog-product.product:6432` (short form inside cluster: `pgdog-product.product.svc.cluster.local:6432`)
+**Platform endpoint**: `pgdog-platform.platform.svc.cluster.local:6432`
+
+- **Role**: Single pooler entry point for **auth**, **user**, **notification**, **shipping**, and **review** application traffic.
+- **Topology**: Routes writes to **`platform-db-rw`**, read workload to **`platform-db-r`**, per database definitions in the PgDog Helm values.
+
+**Product endpoint**: `pgdog-product.product.svc.cluster.local:6432`
 
 - **Role**: Single pooler entry point for **product**, **cart**, and **order** application traffic.
 - **Topology**: Routes writes to **`product-db-rw`**, read workload to **`product-db-r`**, per database definitions in the PgDog Helm values.
@@ -282,7 +270,7 @@ Consolidated **CloudNativePG** cluster for **product**, **cart**, and **order** 
 ### Configuration
 
 **Key Configuration Parameters:**
-- `instances`: **3** for **`product-db`** (1 primary + 2 replicas); **1** for **`product-db-replica`** (DR)
+- `instances`: **3** for **`platform-db`** and **`product-db`** (1 primary + 2 replicas); **1** for **`product-db-replica`** (DR)
 - `postgresql.parameters`: PostgreSQL configuration parameters
 - `postgresql.synchronous`: Synchronous replication settings on **`product-db`** (e.g. `method: any`, `number: 1`)
 - `replicationSlots.highAvailability.synchronizeLogicalDecoding`: Logical replication slot sync
@@ -325,11 +313,11 @@ CloudNativePG clusters use **PodMonitor** CRDs to enable Prometheus scraping of 
 ## Zalando Postgres Operator (retired)
 
 The platform previously ran two Zalando (Patroni/Spilo) clusters — `auth-db`
-and `supporting-shared-db`. Both were **migrated to CloudNativePG** (now the
-`auth-db` and `shared-db` clusters described above) and the Zalando operator is
+and `supporting-shared-db`. Both were **migrated to CloudNativePG** and consolidated
+into **`platform-db`** (RFC-0018); the Zalando operator is
 no longer deployed. Consequently the platform no longer uses:
 
-- **PgBouncer sidecars** — replaced by standalone **PgDog** poolers (`pgdog-auth`, `pgdog-shared`, `pgdog-product`).
+- **PgBouncer sidecars** — replaced by standalone **PgDog** poolers (`pgdog-platform`, `pgdog-product`).
 - **Zalando-generated secrets** (`*.credentials.postgresql.acid.zalan.do`) and cross-namespace secret injection — replaced by RFC-0012 declarative triplets (OpenBAO → ESO).
 - **WAL-G backups** to `pg-backups-zalando` — replaced by the **Barman Cloud Plugin** into `pg-backups-cnpg` (see [006 — Backup Strategy](./006-backup-strategy.md)).
 - **Patroni/Spilo runtime** (`patronictl`, `runit`/`sv`, the operator UI).
@@ -344,7 +332,7 @@ and the operator comparison in [003 — Operator Comparison](./003-operator-comp
 
 ### Overview
 
-Connection poolers solve the "too many connections" problem by reusing PostgreSQL connections, allowing applications to handle 1000+ client connections with only 25-50 database connections. The **only pooler deployed** in this repo is **PgDog** — three standalone Helm releases: `pgdog-product` (product-db: product, cart, order — the payment app connects direct-TLS past it), `pgdog-auth` (auth-db), and `pgdog-shared` (shared-db). **PgBouncer** (previously the Zalando sidecar) and **PgCat** (previously used for cart/order) appear below only for **comparison** — neither is deployed anymore.
+Connection poolers solve the "too many connections" problem by reusing PostgreSQL connections, allowing applications to handle 1000+ client connections with only 25-50 database connections. The **only poolers deployed** in this repo are **PgDog** — two standalone Helm releases: `pgdog-platform` (platform-db: auth, user, notification, shipping, review — Temporal connects direct past it), and `pgdog-product` (product-db: product, cart, order — the payment *app* connects direct over TLS, bypassing the pooler). **PgBouncer** (previously the Zalando sidecar) and **PgCat** (previously used for cart/order) appear below only for **comparison** — neither is deployed anymore.
 
 **Why Use Connection Poolers?**
 - PostgreSQL has limited connections (`max_connections` typically 100-200)
@@ -384,7 +372,7 @@ Connection poolers solve the "too many connections" problem by reusing PostgreSQ
 - Previously fronted cart/order against CNPG
 
 **Use PgDog (the deployed pooler) when:**
-- ✅ **CloudNativePG** clusters without a built-in pooler (all three clusters today)
+- ✅ **CloudNativePG** clusters without a built-in pooler (both operational clusters today)
 - ✅ Multi-database routing on a shared cluster (e.g. product + cart + order on product-db)
 - ✅ Read/write splitting to `-rw` / `-r` services with LSN-aware replica selection (see chart values)
 - ✅ Prepared statements in transaction mode (extended protocol) where configured
@@ -392,11 +380,17 @@ Connection poolers solve the "too many connections" problem by reusing PostgreSQ
 
 ### Current Implementation
 
-PgDog runs as three standalone Helm releases — `pgdog-product` (ns `product`),
-`pgdog-auth` (ns `auth`), and `pgdog-shared` (ns `user`) — all on the same
-chart, port `6432`, OpenMetrics `9090`. The `pgdog-product` release is detailed
-below; `pgdog-auth` and `pgdog-shared` follow the same shape for their
-respective databases.
+PgDog runs as two standalone Helm releases — `pgdog-platform` (ns `platform`)
+and `pgdog-product` (ns `product`) — on the same chart, port `6432`, OpenMetrics
+`9090`. The `pgdog-product` release is detailed below; `pgdog-platform` follows
+the same shape for its five pooled databases.
+
+#### PgDog (platform-db — auth, user, notification, shipping, review)
+
+**Deployment:** Helm chart (`helm.pgdog.dev/pgdog`) via Flux HelmRelease `pgdog-platform` in namespace `platform`
+
+**Service Endpoint:**
+- `pgdog-platform.platform.svc.cluster.local:6432`
 
 #### PgDog (product-db — product, cart, order, payment)
 
@@ -521,6 +515,6 @@ return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s&prefer_simple_protoco
 
 ---
 
-_Last updated: 2026-07-11 — Reflect Zalando→CloudNativePG migration: all clusters (product-db, product-db-replica, auth-db, shared-db, temporal-db) on CNPG with PgDog poolers and Barman backups._
+_Last updated: 2026-07-17 — RFC-0018 platform-db consolidation: 3 CNPG clusters (platform-db, product-db, product-db-replica), 2 PgDog poolers (pgdog-platform, pgdog-product); Temporal on platform-db with Barman backups._
 
 

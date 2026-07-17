@@ -402,7 +402,7 @@ spec:
 4. **Update PgDog** to point to the new cluster:
 
 ```yaml
-# In pgdog-cnpg HelmRelease, change hosts:
+# In pgdog-product HelmRelease, change hosts:
 host: product-db-replica-rw.product.svc.cluster.local
 ```
 
@@ -491,7 +491,7 @@ kubectl cnpg backup list product-db -n product
 
 ```bash
 # Connect to PgDog admin interface
-psql -h pgdog-cnpg.product.svc -p 6432 -U admin pgdog
+psql -h pgdog-product.product.svc -p 6432 -U admin pgdog
 
 # Inside PgDog admin:
 SHOW POOLS;        -- Connection pool status
@@ -514,4 +514,4 @@ RELOAD;            -- Hot-reload config (no restart)
 - DR replica: `kubernetes/infra/configs/databases/clusters/product-db-replica/`
 
 ---
-_Last updated: 2026-07-11_
+_Last updated: 2026-07-17 (RFC-0018: pgdog-product pooler name)_

@@ -102,6 +102,15 @@ metadata:
     environment: local
     platform.duynhlab/backup: "cnpg"
     platform.duynhlab.dev/tier: app
+  name: platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+    platform.duynhlab/backup: "cnpg"
+    platform.duynhlab.dev/tier: app
   name: product
 ---
 apiVersion: v1

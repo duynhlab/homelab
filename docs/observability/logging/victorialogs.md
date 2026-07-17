@@ -138,8 +138,8 @@ All CNPG clusters enable `pgaudit` (`pgaudit.log = 'ddl, write'`). Audit records
 and `auto_explain` plans flow through the **same cluster-wide Vector DaemonSet** —
 there are **no per-cluster logging sidecars**. Audit rows land in VictoriaLogs as
 CNPG-parsed structured records carrying `logger: pgaudit` (CNPG parsing strips the
-literal `AUDIT:` prefix). Verified live for `auth-db`, `product-db`, and
-`shared-db`. Example query: `_stream:{namespace="auth"} logger:pgaudit`.
+literal `AUDIT:` prefix). Verified live for `platform-db` and `product-db`.
+Example query: `_stream:{namespace="platform"} logger:pgaudit`.
 
 ## Configuration
 

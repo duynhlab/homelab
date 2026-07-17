@@ -13,9 +13,9 @@ spec:
     image_tag: "1.4.0" # {"$imagepolicy": "flux-system:user:tag"}
     namespace: user
     replicaCount: 1
-    db_host: "pgdog-shared.user.svc.cluster.local"
+    db_host: "pgdog-platform.platform.svc.cluster.local"
     db_port: "6432"
-    db_migration_host: "shared-db-rw.user.svc.cluster.local"
-    db_secret: "shared-db-secret"
+    db_migration_host: "platform-db-rw.platform.svc.cluster.local"
+    db_secret: "platform-db-user-secret"
     db_sslmode: "disable"
     pool_max: "30"

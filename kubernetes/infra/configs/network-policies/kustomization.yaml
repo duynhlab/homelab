@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - auth.yaml
   - user.yaml
+  - platform.yaml
   - product.yaml
   - cart.yaml
   - order.yaml

@@ -112,9 +112,8 @@ flowchart TD
         end
 
         subgraph db_ns["Database Namespaces"]
+            platformdb["platform-db\n(CloudNativePG)"]
             productdb["product-db\n(CloudNativePG)"]
-            authdb["auth-db\n(CloudNativePG)"]
-            shareddb["shared-db\n(CloudNativePG)"]
         end
     end
 
@@ -135,9 +134,8 @@ flowchart TD
     k8ssecret --> appod
     eso --> css
     css --> raft
+    db --> platformdb
     db --> productdb
-    db --> authdb
-    db --> shareddb
     autounseal --> raft
 ```
 
@@ -327,6 +325,12 @@ secret/{environment}/{category}/{service}/{resource}
 
 | Path | Keys | Consumer |
 |------|------|---------|
+| `secret/local/databases/auth-db/auth` | `username`, `password` | platform-db auth owner (compat path) |
+| `secret/local/databases/shared-db/user` | `username`, `password` | platform-db user owner (compat path) |
+| `secret/local/databases/shared-db/notification` | `username`, `password` | platform-db notification owner (compat path) |
+| `secret/local/databases/shared-db/shipping` | `username`, `password` | platform-db shipping owner (compat path) |
+| `secret/local/databases/shared-db/review` | `username`, `password` | platform-db review owner (compat path) |
+| `secret/local/databases/platform-db/temporal` | `username`, `password` | platform-db temporal owner (Temporal server) |
 | `secret/local/databases/product-db/product` | `username`, `password` | CNPG bootstrap owner |
 | `secret/local/databases/product-db/cart` | `username`, `password` | CNPG cart owner |
 | `secret/local/databases/product-db/order` | `username`, `password` | CNPG order owner |
@@ -550,7 +554,7 @@ sequenceDiagram
     BAO->>PG: DROP ROLE "v-k8s-product-app-rw-{old_ts}"  (on old lease expiry)
 ```
 
-### 6.4 CloudNativePG (auth-db, shared-db) — Credential Strategy
+### 6.4 CloudNativePG (`platform-db`, `product-db`) — Credential Strategy
 
 Every cluster now runs on **CloudNativePG**, so credentials follow the same ESO-first
 pattern everywhere: owner/role passwords come from OpenBAO KV v2, synced by ESO, and
@@ -559,20 +563,23 @@ each service's role + database are declared with the **RFC-0012 triplet** (`Exte
 credential secrets to reconcile against.
 
 > **Historical:** the retired Zalando operator managed its own K8s secrets
-> (`{user}.{cluster}.credentials.postgresql.acid.zalan.do`). Since the Zalando→CNPG
-> migration, `auth-db` and `shared-db` are CloudNativePG and use ESO-provided creds
-> like every other cluster.
+> (`{user}.{cluster}.credentials.postgresql.acid.zalan.do`). The former `auth-db`,
+> `shared-db`, and `temporal-db` clusters were consolidated into **`platform-db`**
+> (RFC-0018). OpenBAO keeps **compat paths** `auth-db/*` and `shared-db/*` for app
+> credentials; Temporal uses the new path `platform-db/temporal`.
 
 ```mermaid
 flowchart LR
-    subgraph cnpg_auth["auth-db (CloudNativePG)"]
-        a_owner["auth owner\n(ExternalSecret → KV v2)"]
-        a_roles["service role(s)\n(RFC-0012 triplet:\nDatabaseRole + Database)"]
+    subgraph cnpg_platform["platform-db (CloudNativePG)"]
+        p_auth["auth owner\n(compat: auth-db/auth)"]
+        p_shared["user / notification /\nshipping / review owners\n(compat: shared-db/*)"]
+        p_temporal["temporal owner\n(platform-db/temporal)"]
+        p_roles["service role(s)\n(RFC-0012 triplet:\nDatabaseRole + Database)"]
     end
 
-    subgraph cnpg_shared["shared-db (CloudNativePG)"]
-        s_owners["user / notification /\nshipping / review owners\n(ExternalSecret → KV v2)"]
-        s_roles["service role(s)\n(RFC-0012 triplet:\nDatabaseRole + Database)"]
+    subgraph cnpg_product["product-db (CloudNativePG)"]
+        prod_owners["product / cart / order / payment owners\n(ExternalSecret → KV v2)"]
+        prod_roles["service role(s)\n(RFC-0012 triplet:\nDatabaseRole + Database)"]
     end
 
     subgraph management["Management"]
@@ -580,8 +587,8 @@ flowchart LR
         cnpg_op["CloudNativePG Operator\napplies Database + DatabaseRole CRDs"]
     end
 
-    eso_mgr --> a_owner & s_owners
-    cnpg_op --> a_roles & s_roles
+    eso_mgr --> p_auth & p_shared & p_temporal & prod_owners
+    cnpg_op --> p_roles & prod_roles
 ```
 
 ---
@@ -938,4 +945,4 @@ gantt
 
 ---
 
-_Last updated: 2026-07-14 - Split from `docs/secrets/README.md`; operational procedures moved to `runbooks/`, while OpenBAO architecture, current-vs-planned notes, and learning diagrams remain here._
+_Last updated: 2026-07-17 — Split from `docs/secrets/README.md`; RFC-0018 platform-db paths and compat OpenBAO layout._

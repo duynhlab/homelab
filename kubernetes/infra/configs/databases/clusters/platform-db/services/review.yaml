@@ -1,0 +1,88 @@
+# review — per-service database triplet (RFC-0012, ADR-013).
+#
+# ExternalSecret for platform-db review database credentials — platform namespace.
+# OpenBAO path: secret/data/local/databases/shared-db/review (compat — pre-merge path)
+#
+# Rendered as kubernetes.io/basic-auth: this secret doubles as the
+# passwordSecret for the DatabaseRole below, and CNPG requires basic-auth
+# there. Secret `type` is immutable — migrating a live cluster requires
+# deleting the old Secret so ESO recreates it
+# (see docs/databases/runbooks/rotate-cnpg-service-password.md).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: platform-db-review-secret
+  namespace: platform
+  labels:
+    app.kubernetes.io/name: platform-db-review-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: platform-db-review-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: platform-db-review-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+          cnpg.io/reload: "true"
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: secret/data/local/databases/shared-db/review
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: secret/data/local/databases/shared-db/review
+        property: password
+---
+# Written out IN FULL — adoption resets omitted attributes.
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: platform-db-role-review
+  namespace: platform
+spec:
+  cluster:
+    name: platform-db
+  name: review
+  comment: "review-service application role (RFC-0012)"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: true
+  replication: false
+  bypassrls: false
+  connectionLimit: -1
+  inRoles: []
+  passwordSecret:
+    name: platform-db-review-secret
+  databaseRoleReclaimPolicy: retain
+---
+# review Database extensions.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: review-database
+  namespace: platform
+spec:
+  name: review
+  owner: review
+  cluster:
+    name: platform-db
+  extensions:
+    - name: pgaudit
+    - name: pg_stat_statements
+  databaseReclaimPolicy: retain

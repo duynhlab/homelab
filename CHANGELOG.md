@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`platform-db`** CNPG cluster (ns `platform`, HA ×3): merges former `auth-db`,
+  `shared-db`, and `temporal-db` logical databases; Barman backups under
+  `s3://pg-backups-cnpg/platform-db/`.
+- **`pgdog-platform`** PgDog pooler (×3, PDB `minAvailable: 2`) for auth, user,
+  notification, shipping, and review.
+- NetworkPolicy [`platform.yaml`](kubernetes/infra/configs/network-policies/platform.yaml);
+  Prometheus rules [`cnpg-platform-db/`](kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/cnpg-platform-db/).
+- OpenBAO bootstrap seed for `secret/local/databases/platform-db/temporal`.
+
+### Changed
+
+- Platform app RSIPs (auth, user, notification, shipping, review) →
+  `pgdog-platform.platform.svc.cluster.local:6432`; Temporal →
+  `platform-db-rw.platform.svc.cluster.local:5432`.
+- Hub docs and infra READMEs updated for **3 CNPG clusters / 2 PgDog poolers**
+  ([RFC-0018](docs/proposals/rfc/RFC-0018/)).
+
+### Removed
+
+- `auth-db`, `shared-db`, and `temporal-db` cluster manifests; `pgdog-auth` and
+  `pgdog-shared` poolers; `cnpg-auth-db/` and `cnpg-shared-db/` alert rules.
+
+
+### Added
+
+- **RFC-0018** ([`docs/proposals/rfc/RFC-0018/`](docs/proposals/rfc/RFC-0018/)): propose
+  consolidating `auth-db`, `shared-db`, and `temporal-db` into `platform-db`
+  (3 CNPG clusters total with unchanged `product-db` / `product-db-replica`);
+  includes documentation impact matrix and validation gate.
+
 ### Changed
 
 - Bump checkout (API + worker) to 0.3.1: the serve path now keeps a

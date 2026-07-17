@@ -1,0 +1,132 @@
+# platform-db — consolidated CNPG cluster (RFC-0018).
+# Merges auth-db + shared-db + temporal-db persistence.
+# App databases: auth, user, notification, shipping, review (RFC-0012 triplets);
+# temporal + temporal_visibility (Temporal server, direct :5432).
+# HA: 3 instances (1 primary, 1 sync replica, 1 async replica).
+# DR: WAL archived to RustFS (no separate platform-db-replica in this RFC).
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: platform-db
+  namespace: platform
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: platform-db-backup-store
+        serverName: platform-db-cluster
+
+  replicationSlots:
+    highAvailability:
+      synchronizeLogicalDecoding: true
+
+  postgresql:
+    shared_preload_libraries:
+      - pgaudit
+      - pg_stat_statements
+      - auto_explain
+
+    pg_hba:
+      - host auth         auth         all scram-sha-256
+      - host user         user         all scram-sha-256
+      - host notification notification all scram-sha-256
+      - host shipping     shipping     all scram-sha-256
+      - host review       review       all scram-sha-256
+      - host temporal     temporal     all scram-sha-256
+      - host all          all          all reject
+
+    synchronous:
+      method: any
+      number: 1
+      dataDurability: required
+
+    parameters:
+      max_connections: "200"
+      shared_buffers: "256MB"
+      effective_cache_size: "1.5GB"
+      maintenance_work_mem: "512MB"
+      work_mem: "32MB"
+      default_statistics_target: "100"
+      random_page_cost: "1.1"
+      effective_io_concurrency: "200"
+      checkpoint_completion_target: "0.9"
+      checkpoint_timeout: "15min"
+      wal_buffers: "16MB"
+      wal_level: "logical"
+      wal_compression: "on"
+      archive_timeout: "5min"
+      max_wal_senders: "10"
+      wal_keep_size: "1GB"
+      min_wal_size: "2GB"
+      max_wal_size: "8GB"
+      max_worker_processes: "8"
+      max_parallel_workers_per_gather: "4"
+      max_parallel_workers: "8"
+      max_parallel_maintenance_workers: "4"
+      autovacuum: "on"
+      autovacuum_max_workers: "3"
+      autovacuum_vacuum_scale_factor: "0.1"
+      autovacuum_analyze_scale_factor: "0.05"
+      autovacuum_vacuum_cost_delay: "10ms"
+      autovacuum_vacuum_cost_limit: "200"
+      log_statement: "mod"
+      log_min_duration_statement: "1000"
+      log_checkpoints: "on"
+      log_lock_waits: "on"
+      log_temp_files: "0"
+      log_autovacuum_min_duration: "1000"
+      log_connections: "on"
+      log_disconnections: "on"
+      logging_collector: "on"
+      password_encryption: "scram-sha-256"
+      pgaudit.log: "ddl, write"
+      pgaudit.log_catalog: "off"
+      pgaudit.log_parameter: "on"
+      pgaudit.log_statement_once: "off"
+      pgaudit.log_relation: "on"
+      pgaudit.log_rows: "on"
+      track_io_timing: "on"
+      pg_stat_statements.track: "all"
+      pg_stat_statements.max: "10000"
+      auto_explain.log_min_duration: "1s"
+      auto_explain.log_analyze: "on"
+      hot_standby_feedback: "on"
+      sync_replication_slots: "on"
+
+  monitoring:
+    customQueriesConfigMap:
+      - name: platform-db-monitoring-queries
+        key: custom-queries
+    enablePodMonitor: true
+
+  bootstrap:
+    initdb:
+      database: user
+      owner: user
+      secret:
+        name: platform-db-user-secret
+      dataChecksums: true
+      walSegmentSize: 64
+      encoding: "UTF8"
+      localeCType: "C"
+      localeCollate: "C"
+      postInitSQL:
+        - CREATE ROLE temporal WITH LOGIN
+        - CREATE DATABASE temporal OWNER temporal
+        - CREATE DATABASE temporal_visibility OWNER temporal
+
+  storage:
+    size: 10Gi
+    storageClass: standard
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"

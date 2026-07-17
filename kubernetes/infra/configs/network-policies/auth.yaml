@@ -1,7 +1,7 @@
 # NOTE: kindnet DOES enforce NetworkPolicy on Kind K8s 1.34+ (verified round 7) —
 # these rules are LIVE. Any ingress not explicitly allowed below is dropped.
-# auth namespace hosts: the auth service (HTTP :8080 incl. the JWKS endpoint),
-# the CNPG auth-db cluster (3-node HA), and the pgdog-auth pooler.
+# auth namespace hosts the auth service (HTTP :8080 incl. the JWKS endpoint).
+# Database traffic moved to platform-db / pgdog-platform (RFC-0018).
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -65,36 +65,3 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
-    # CloudNativePG operator → auth-db instance manager (status/health probes that
-    # drive Cluster readiness — without this databases-local times out) + SQL mgmt.
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: cloudnative-pg
-      ports:
-        - protocol: TCP
-          port: 8000
-        - protocol: TCP
-          port: 5432
-    # Metrics scrape (VMAgent, monitoring ns) → cnpg postgres_exporter (9187)
-    # + pgdog-auth pooler openmetrics (9090).
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: monitoring
-      ports:
-        - protocol: TCP
-          port: 9187
-        - protocol: TCP
-          port: 9090
-    # Intra-namespace: CNPG HA replica WAL streaming (5432) + auth-service/migration
-    # → PgDog (6432) + PgDog → Postgres (5432) + operator status probe (8000).
-    - from:
-        - podSelector: {}
-      ports:
-        - protocol: TCP
-          port: 5432
-        - protocol: TCP
-          port: 6432
-        - protocol: TCP
-          port: 8000

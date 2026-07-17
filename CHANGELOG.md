@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - NetworkPolicy [`platform.yaml`](kubernetes/infra/configs/network-policies/platform.yaml);
   Prometheus rules [`cnpg-platform-db/`](kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/cnpg-platform-db/).
 - OpenBAO bootstrap seed for `secret/local/databases/platform-db/temporal`.
+- **RFC-0019** ([`docs/proposals/rfc/RFC-0019/`](docs/proposals/rfc/RFC-0019/)): ClickHouse as supplementary OLAP — Phase B OTel logs/traces SQL (primary), Phase A optional commerce facts from Postgres; **planned**, no cluster manifests.
+- English ClickHouse learning guide ([`docs/observability/clickhouse/README.md`](docs/observability/clickhouse/README.md)).
 
 ### Changed
 

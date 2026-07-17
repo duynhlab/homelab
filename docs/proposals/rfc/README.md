@@ -82,6 +82,7 @@ made are recorded as one or more **ADRs**, and the RFC moves to `implemented`.
 | [RFC-0015](RFC-0015/) | Checkout service: session state machine, price re-validation & order handoff | platform-wide | P0 | provisional |
 | [RFC-0017](RFC-0017/) | Platform telemetry standard: per-layer signal ownership + fleet instrumentation | platform-wide | P1 | implementable |
 | [RFC-0018](RFC-0018/) | Consolidate platform PostgreSQL: merge auth, shared, temporal into platform-db | infra | P1 | provisional |
+| [RFC-0019](RFC-0019/) | ClickHouse for OTel logs/traces SQL (+ optional commerce analytics) | platform-wide | P2 | provisional |
 
 ## Backlog — candidate RFCs
 

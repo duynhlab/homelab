@@ -91,6 +91,8 @@ docs/
 │   │   └── victorialogs.md       # VictoriaLogs backend & Vector pipeline ops
 │   ├── profiling/                # Pillar 4: Continuous Profiling
 │   │   └── README.md             # Pyroscope (CPU, heap, goroutine)
+│   ├── clickhouse/               # ClickHouse learning guide (planned)
+│   │   └── README.md             # OLAP fundamentals, OTel Phase B primary, optional commerce Phase A
 │   ├── grafana/                  # Visualization layer
 │   │   ├── README.md             # Grafana overview + plugins
 │   │   ├── rbac-multi-team.md    # Org roles, Teams, anonymous vs named users
@@ -227,8 +229,9 @@ docs/
 5. **[Backend Comparison](./observability/tracing/backends-comparison.md)** - Tempo vs Jaeger vs VictoriaTraces (+ roadmap)
 6. **[VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md)** - 3rd backend via the VM operator
 7. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
-8. **[Logging](./observability/logging/README.md)** - Architecture: OTLP app logs (otelzap tee) + Vector for non-instrumented pods, scaling
-9. **[VictoriaLogs](./observability/logging/victorialogs.md)** - VictoriaLogs deployment and configuration
+8. **[ClickHouse learning guide](./observability/clickhouse/README.md)** - Planned OLAP candidate; OTel logs/traces SQL + optional commerce analytics ([RFC-0019](./proposals/rfc/RFC-0019/))
+9. **[Logging](./observability/logging/README.md)** - Architecture: OTLP app logs (otelzap tee) + Vector for non-instrumented pods, scaling
+10. **[VictoriaLogs](./observability/logging/victorialogs.md)** - VictoriaLogs deployment and configuration
     - OTLP app-log ingest + Vector for non-instrumented pods (DB/Kong/frontend/infra)
     - PostgreSQL auto_explain plan parsing pipeline
     - Verification and troubleshooting
@@ -325,6 +328,7 @@ docs/
 - [Backend Comparison](./observability/tracing/backends-comparison.md) - Tempo vs Jaeger vs VictoriaTraces
 - [VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md) - 3rd backend via the VM operator
 - [Continuous Profiling](./observability/profiling/README.md) - Pyroscope setup
+- [ClickHouse learning guide](./observability/clickhouse/README.md) - Planned OLAP; OTel SQL + optional commerce ([RFC-0019](./proposals/rfc/RFC-0019/))
 - [Logging](./observability/logging/README.md) - Architecture: OTLP app logs (otelzap tee) + Vector for non-instrumented pods
 - [Logging Standards](./observability/logging/logging-standards.md) - App-side logging conventions (libraries, levels, JSON fields)
 - [VictoriaLogs](./observability/logging/victorialogs.md) - VictoriaLogs deployment (OTLP app logs + Vector for non-instrumented pods)
@@ -343,6 +347,7 @@ docs/
 - [RFC-0011: Homelab migration — Kind to bare-metal Talos](./proposals/rfc/RFC-0011/) - Provisional; 1 → 3 node HA path
 - [RFC-0012: Declarative CNPG role & database management](./proposals/rfc/RFC-0012/) - Implemented (P0–P4); per-service triplets on CNPG `DatabaseRole`/`Database` CRDs + pg_hba isolation
 - [RFC-0014: Full OpenTelemetry adoption](./proposals/rfc/RFC-0014/) - Provisional; OTLP push for metrics/logs/traces + semconv naming, phases P0–P5, consumer tracking table
+- [RFC-0019: ClickHouse for OTel logs/traces SQL](./proposals/rfc/RFC-0019/) - Provisional; Phase B Collector→ClickHouse, Phase A optional Postgres facts; **planned**, no manifests
 - [RFCs](./proposals/rfc/) - Propose & track substantial changes (process + index + backlog)
 
 ### Decisions (ADRs)

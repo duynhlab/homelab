@@ -252,3 +252,72 @@ data:
         - buffers_checkpoint:
             usage: "COUNTER"
             description: "Buffers written during checkpoints"
+
+    # Oldest open transaction + idle-in-transaction age, instance-wide via
+    # pg_stat_activity (runs once per instance, not per database). Long or idle
+    # transactions pin dead tuples (bloat) and hold back xid freezing
+    # (wraparound). Feeds the long-running-txn panels and alert.
+    pg_long_running_transactions:
+      query: "SELECT
+                 coalesce(max(extract(epoch from (clock_timestamp() - xact_start))), 0) AS oldest_transaction_seconds,
+                 coalesce(max(extract(epoch from (clock_timestamp() - state_change))) FILTER (WHERE state = 'idle in transaction'), 0) AS oldest_idle_in_transaction_seconds,
+                 count(*) FILTER (WHERE state = 'idle in transaction') AS idle_in_transaction_count,
+                 coalesce(max(extract(epoch from (clock_timestamp() - query_start))) FILTER (WHERE state = 'active'), 0) AS longest_active_query_seconds
+               FROM pg_stat_activity
+               WHERE backend_type = 'client backend' AND pid <> pg_backend_pid()"
+      metrics:
+        - oldest_transaction_seconds:
+            usage: "GAUGE"
+            description: "Age of the oldest open client transaction, in seconds"
+        - oldest_idle_in_transaction_seconds:
+            usage: "GAUGE"
+            description: "Age of the longest session sitting idle in an open transaction, in seconds"
+        - idle_in_transaction_count:
+            usage: "GAUGE"
+            description: "Number of client sessions idle inside an open transaction"
+        - longest_active_query_seconds:
+            usage: "GAUGE"
+            description: "Runtime of the longest currently-executing query, in seconds"
+
+    # Live progress of running VACUUM / autovacuum operations. Rows exist only
+    # while a vacuum runs (usually none). Per-database so relid resolves in the
+    # connected database.
+    pg_stat_progress_vacuum:
+      query: "SELECT current_database() AS datname, p.pid::text AS pid, p.relid::regclass::text AS relname, p.phase,
+                 p.heap_blks_total, p.heap_blks_scanned, p.heap_blks_vacuumed, p.index_vacuum_count, p.num_dead_item_ids
+               FROM pg_stat_progress_vacuum p
+               WHERE p.datid = (SELECT oid FROM pg_database WHERE datname = current_database())"
+      target_databases:
+        - "auth"
+        - "user"
+        - "notification"
+        - "shipping"
+        - "review"
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Database the vacuumed table lives in"
+        - pid:
+            usage: "LABEL"
+            description: "Process ID of the vacuum worker"
+        - relname:
+            usage: "LABEL"
+            description: "Table currently being vacuumed"
+        - phase:
+            usage: "LABEL"
+            description: "Current vacuum phase (scanning heap, vacuuming indexes, ...)"
+        - heap_blks_total:
+            usage: "GAUGE"
+            description: "Total heap blocks in the table"
+        - heap_blks_scanned:
+            usage: "GAUGE"
+            description: "Heap blocks scanned so far (progress = scanned/total)"
+        - heap_blks_vacuumed:
+            usage: "GAUGE"
+            description: "Heap blocks vacuumed so far"
+        - index_vacuum_count:
+            usage: "GAUGE"
+            description: "Number of completed index vacuum cycles"
+        - num_dead_item_ids:
+            usage: "GAUGE"
+            description: "Dead item identifiers collected since the last index vacuum cycle"

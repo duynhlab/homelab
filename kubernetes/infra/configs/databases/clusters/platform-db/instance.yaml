@@ -36,8 +36,9 @@ spec:
       - host notification notification all scram-sha-256
       - host shipping     shipping     all scram-sha-256
       - host review       review       all scram-sha-256
-      - host temporal     temporal     all scram-sha-256
-      - host all          all          all reject
+      - host temporal            temporal all scram-sha-256
+      - host temporal_visibility temporal all scram-sha-256
+      - host all                 all      all reject
 
     synchronous:
       method: any

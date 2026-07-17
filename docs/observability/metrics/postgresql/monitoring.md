@@ -81,7 +81,7 @@ metrics plus every custom query defined in the cluster's monitoring ConfigMap
 | Lock contention | custom query (`cnpg_pg_locks_count_*`, `cnpg_pg_blocking_queries_*`) |
 | Autovacuum / dead tuples | custom query (`cnpg_pg_stat_user_tables_autovacuum_*`) |
 | Table / index size | custom query (`cnpg_pg_table_size_*`, `cnpg_pg_stat_user_indexes_*`) |
-| Checkpoints | custom query (`cnpg_pg_stat_bgwriter_checkpoints_*`) |
+| Checkpoints | custom query (`cnpg_pg_stat_checkpointer_*`) |
 | Database size | custom query (`cnpg_pg_database_size_*`) |
 | Pooler metrics | PgDog OpenMetrics `:9090` |
 
@@ -119,7 +119,7 @@ cart, order, payment on `product-db`).
 | pg_table_size | `cnpg_pg_table_size_*` | Table size (top 30) |
 | pg_stat_user_indexes | `cnpg_pg_stat_user_indexes_*` | Index usage and size |
 | pg_database_size | `cnpg_pg_database_size_*` | Database sizes |
-| pg_stat_bgwriter_checkpoints | `cnpg_pg_stat_bgwriter_checkpoints_*` | Checkpoint frequency and I/O |
+| pg_stat_checkpointer | `cnpg_pg_stat_checkpointer_*` | Checkpoint frequency and I/O |
 
 Per-metric query details (columns, labels, filtering) are documented in
 [custom-metrics.md](custom-metrics.md).

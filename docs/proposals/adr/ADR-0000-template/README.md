@@ -2,13 +2,14 @@
 
 <!-- A short, imperative description of the decision (e.g. "Adopt X", "Keep Y in Z"). -->
 
-| Status | Date | Related RFC |
-|--------|------|-------------|
-| Proposed | YYYY-MM-DD | [RFC-NNNN](../../rfc/RFC-NNNN/) |
+| Status | Date | Related RFC | Related research |
+|--------|------|-------------|------------------|
+| Proposed | YYYY-MM-DD | [RFC-NNNN](../../rfc/RFC-NNNN/) | [RFC-NNNN research.md](../../rfc/RFC-NNNN/research.md) or — |
 
 <!--
 Status: Proposed → Accepted → (Superseded by ADR-XXX | Deprecated).
 Related RFC: the RFC this decision was spawned by, or — if there is none.
+Related research: ./research.md in the RFC folder for mechanism background, or —.
 -->
 
 > **Don't forget: every decision is a tradeoff.** Record what you gave up, not just
@@ -20,8 +21,8 @@ Related RFC: the RFC this decision was spawned by, or — if there is none.
 
 <!--
 The forces at play: the problem, the constraints, and what made a decision necessary.
-State facts, not the decision. Enough that a future reader understands *why* without
-the surrounding conversation.
+State facts, not the decision. If spawned by an RFC, link Related research for
+mechanism background — do not re-copy the deep dive here.
 -->
 
 ## Decision
@@ -29,13 +30,15 @@ the surrounding conversation.
 <!--
 The decision, in active voice ("We will …"). One or two paragraphs. Be specific:
 versions, tools, the exact shape of what we're committing to.
+Optional: one small Mermaid diagram only if it clarifies the decision (rare).
+Otherwise link RFC / research.
 -->
 
 ## Alternatives considered
 
 <!--
-Each option we rejected, with Pros / Cons and *why* it lost. This is the most valuable
-part — it stops the decision being re-litigated later.
+Each option we rejected, with Pros / Cons and *why* it lost. May reference
+RFC-NNNN/research.md § Alternatives instead of duplicating the full analysis.
 -->
 
 ## Consequences
@@ -53,4 +56,4 @@ supersedes this one and update this ADR's Status to "Superseded by ADR-XXX".
 -->
 
 ---
-_Last updated: 2026-06-29_
+_Last updated: YYYY-MM-DD_

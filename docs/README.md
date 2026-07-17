@@ -31,8 +31,8 @@ docs/
 │   │   └── ADR-001 … ADR-016     # Temporal ×2, JWT-in-services (superseded), OpenBAO audit/HA, RS256+edge-auth, payment ledger, mockpay, saga authorize/capture, shared idempotency, detect-only recon, recon auto-heal, CNPG triplets ×3, OTel metrics cutover
 │   ├── rfc/                      # Requests for Comments
 │   │   ├── README.md             # process + index + backlog
-│   │   ├── RFC-0000/             # template
-│   │   └── RFC-0001 … RFC-0015   # Temporal, mTLS, …, payment service, Talos migration, declarative CNPG roles, metrics audit & scale playbook, full OpenTelemetry adoption, checkout service
+│   │   ├── RFC-0000/             # template (research.md + README.md)
+│   │   └── RFC-0001 … RFC-0018   # reserve number → research.md → README.md
 ├── databases/                    # Database documentation
 │   ├── 002-database-integration.md               # PostgreSQL architecture
 │   ├── 003-operator-comparison.md               # CloudNativePG vs Zalando decision guide
@@ -248,7 +248,7 @@ docs/
 
 5. **[Temporal order-fulfillment Saga](./api/temporal-order-fulfillment.md)** - Saga vs 2PC theory, live workflow steps and compensations, infrastructure, and operations
 
-6. **[RFCs — propose and track substantial changes](./proposals/rfc/)** - RFC process, index, and consolidated backlog
+6. **[RFCs — research then decide](./proposals/rfc/)** — owner approves next `RFC-NNNN` → `research.md` (plain-language + Context7) → `README.md` → optional `docs/<area>/` spin-off
 
 7. **[GKE internal and private DNS](./platform/gke-internal-dns.md)** - In-cluster DNS and Cloud DNS private zones
 

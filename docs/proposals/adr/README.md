@@ -5,18 +5,19 @@ itself, the *alternatives* we rejected (and why), and the *consequences* we acce
 the **why** that code and manifests can't — so future engineers (and agents) don't re-litigate
 settled decisions.
 
-> **ADR vs RFC:** an [RFC](../rfc/) *proposes* a substantial change (discussed before
-> building); an ADR *records* the decision it produced. An accepted RFC typically spawns
-> one or more ADRs.
+> **ADR vs RFC vs research:** an [RFC](../rfc/) *proposes* a substantial change after
+> [`research.md`](../rfc/RFC-0000/research.md) exploration; an ADR *records* the decision
+> it produced. Link **Related research** for mechanism background — do not re-copy the
+> deep dive in **Context**. An accepted RFC typically spawns one or more ADRs.
 
 ## Conventions
 
 - One folder per decision: `ADR-NNN-short-slug/README.md` (mirrors the RFC layout —
   keep any per-ADR diagrams/assets inside the folder), numbered sequentially. Start
   from [`ADR-0000-template/`](ADR-0000-template/).
-- Format (Nygard style): a `| Status | Date | Related RFC |` metadata table at the top
-  (Related RFC = the RFC that spawned it, or `—`), then **Context · Decision ·
-  Alternatives considered · Consequences**.
+- Format (Nygard style): `| Status | Date | Related RFC | Related research |` metadata
+  table at the top, then **Context · Decision · Alternatives considered · Consequences**.
+  Related research = `RFC-NNNN/research.md` when the RFC had a research phase, or `—`.
 - **Every decision is a tradeoff** — always record the rejected *Alternatives* (and why) and the *Consequences* you accept (the bad as well as the good). A decision with no downside listed hasn't been examined hard enough.
 - **Lifecycle:** `Proposed → Accepted → (Superseded by ADR-XXX | Deprecated)`.
 - **Append-only:** don't rewrite history. When a decision changes, write a new ADR that supersedes
@@ -50,4 +51,4 @@ settled decisions.
 | [ADR-022](ADR-022-atomic-promo-redemption/) | Promo redemptions count atomically at confirm, before the attempt marker | Accepted | [RFC-0015](../rfc/RFC-0015/) |
 
 ---
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-17_

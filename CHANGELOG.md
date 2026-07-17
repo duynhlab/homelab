@@ -26,6 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- RFC workflow: reserve `RFC-NNNN` with owner OK → `research.md` (real-world problem +
+  plain-language + Context7) → `README.md`; optional domain doc spin-off; templates in
+  [`RFC-0000/`](docs/proposals/rfc/RFC-0000/).
+- [`docs/proposals/rfc/README.md`](docs/proposals/rfc/README.md): registry cleanup —
+  drop Priority column and narrative focus block; merge process sections; backlog RFC-0016
+  row.
+- Removed `TODO.md` references from proposals workflow docs; planning artifacts are
+  RFC/ADR/backlog only.
+- [`docs/proposals/README.md`](docs/proposals/README.md): historical note — RFC-0001–0018
+  predate `research.md`; RFC-0019+ uses research-first workflow.
 - Platform app RSIPs (auth, user, notification, shipping, review) →
   `pgdog-platform.platform.svc.cluster.local:6432`; Temporal →
   `platform-db-rw.platform.svc.cluster.local:5432`.

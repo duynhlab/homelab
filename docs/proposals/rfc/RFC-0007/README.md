@@ -39,9 +39,10 @@ missing piece. Concretely:
   on-demand backup *and* restore/PITR drill exist and are recorded, the migration
   is "not fully production-accepted" and existing RustFS prefixes must not be
   deleted.
-- **TODO commitments are open.** The [Reliability & Operations](../../../../TODO.md)
-  backlog calls out "PITR drill (end-to-end)", "DR runbooks codified and
-  periodically tested", and "Game days (kill primary, network partition)".
+- **Open reliability commitments.** [`010-drp.md`](../../../databases/010-drp.md#known-gaps-and-next-improvements)
+  and the [RFC backlog — Chaos / GameDay](../README.md#backlog--candidate-rfcs) still call
+  for PITR drill (end-to-end), DR runbooks codified and periodically tested, and game days
+  (kill primary, network partition).
 
 ### Goals
 
@@ -106,8 +107,7 @@ owner (confirms the restore identity / object-store access).
 **Recommendation: (b) now, (c) later.** Scheduled-and-recorded drills are the
 cheapest path that produces the missing evidence and unblocks the Barman plugin.
 Automated chaos tooling is the natural follow-on once the manual scenarios have a
-known-good baseline — tracked against the
-[Reliability & Operations](../../../../TODO.md) chaos-engineering item.
+known-good baseline — tracked in the [RFC backlog — Chaos / GameDay](../README.md#backlog--candidate-rfcs).
 
 ## Architecture & Diagrams
 
@@ -250,9 +250,8 @@ the SLO. A run with no recorded evidence did not happen.
   kill-the-worker / mid-saga-compensation GameDay future work (Drill E).
 - [RFC-0005](../RFC-0005/) — `supporting-shared-db` HA; its failover drill is
   Drill D's deliverable.
-- [`TODO.md` → Reliability & Operations](../../../../TODO.md) — PITR drill, DR
-  runbooks periodically tested, game days, and chaos engineering (the (c)
-  follow-on).
+- [RFC backlog — Chaos / GameDay](../README.md#backlog--candidate-rfcs) — PITR drill, DR
+  runbooks periodically tested, game days, and chaos engineering (the (c) follow-on).
 
 ---
 _Last updated: 2026-06-26_

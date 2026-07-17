@@ -19,7 +19,7 @@ resolves identity via `auth.GetMe` over gRPC. JWTs are minted by the in-cluster 
 The `ingress-api.yaml` routes are pure pass-through and already state *"Services keep validating
 JWTs themselves… Kong does not enforce auth."*
 
-The TODO backlog listed "Plugins: … JWT/auth" for Kong, so we evaluated moving JWT verification to
+An earlier platform backlog item listed "Plugins: … JWT/auth" for Kong, so we evaluated moving JWT verification to
 the gateway with Kong's OSS `jwt` plugin (signature + registered-claim checks against a
 pre-registered `KongConsumer` credential keyed by the token's `iss`).
 

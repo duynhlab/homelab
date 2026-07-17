@@ -10,7 +10,7 @@ spec:
   type: Static
   defaultValues:
     name: checkout
-    image_tag: "0.3.0" # {"$imagepolicy": "flux-system:checkout:tag"}
+    image_tag: "0.3.1" # {"$imagepolicy": "flux-system:checkout:tag"}
     namespace: checkout
     # No platform_backup_label: checkout's data lives on product-db in the
     # product namespace, which is already backed up (same reasoning as

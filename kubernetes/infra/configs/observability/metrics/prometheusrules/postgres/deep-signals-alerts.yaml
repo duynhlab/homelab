@@ -147,3 +147,30 @@ spec:
         description: >-
           archive_command has failed in the last 30m on {{ $labels.cnpg_io_cluster }}. WAL is
           piling up in pg_wal and PITR/backup recovery is at risk — check the Barman object store.
+
+    # --- Long-running / idle transactions --------------------------------
+    - alert: CNPGLongRunningTransaction
+      expr: max by (cnpg_io_cluster) (cnpg_pg_long_running_transactions_oldest_transaction_seconds) > 300
+      for: 5m
+      labels:
+        severity: warning
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: Long-running transaction on {{ $labels.cnpg_io_cluster }}
+        description: >-
+          The oldest open transaction on {{ $labels.cnpg_io_cluster }} has been running for
+          {{ $value | printf "%.0f" }}s (>5m). It pins dead tuples (blocking VACUUM) and holds
+          back xid freezing — find and end it before bloat/wraparound builds up.
+
+    - alert: CNPGIdleInTransaction
+      expr: max by (cnpg_io_cluster) (cnpg_pg_long_running_transactions_oldest_idle_in_transaction_seconds) > 300
+      for: 5m
+      labels:
+        severity: warning
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: Session idle-in-transaction on {{ $labels.cnpg_io_cluster }}
+        description: >-
+          A session on {{ $labels.cnpg_io_cluster }} has sat idle inside an open transaction for
+          {{ $value | printf "%.0f" }}s (>5m). Idle-in-transaction sessions are the classic cause
+          of stalled autovacuum — set idle_in_transaction_session_timeout or fix the client.

@@ -1,12 +1,11 @@
 # PostgreSQL Backup Strategy
 
-This document defines a **production-ready physical backup strategy** (base backup + WAL archiving) for the **operational PostgreSQL clusters + DR replica** (product-db, auth-db, shared-db — `temporal-db` currently has **no backups**, see [010.1](010.1-rpo-rto-planning.md)) using **RustFS (S3-compatible)** as the backup target. Every cluster runs on CloudNativePG and uses the **Barman Cloud Plugin** (`ObjectStore` CR) into a **single bucket with per-cluster prefixes**:
+This document defines a **production-ready physical backup strategy** (base backup + WAL archiving) for the **operational PostgreSQL clusters + DR replica** (`platform-db`, `product-db`, `product-db-replica`) using **RustFS (S3-compatible)** as the backup target. Every cluster runs on CloudNativePG and uses the **Barman Cloud Plugin** (`ObjectStore` CR) into a **single bucket with per-cluster prefixes**:
 
 - **Bucket `pg-backups-cnpg`** (CloudNativePG / Barman Cloud Plugin):
+  - `platform-db` → `s3://pg-backups-cnpg/platform-db/` (retention 30d; includes `temporal` + `temporal_visibility`)
   - `product-db` → `s3://pg-backups-cnpg/product-db/` (retention 30d)
   - `product-db-replica` → `s3://pg-backups-cnpg/product-db-replica/` (retention 7d, DR)
-  - `auth-db` → `s3://pg-backups-cnpg/auth-db/` (retention 30d)
-  - `shared-db` → `s3://pg-backups-cnpg/shared-db/` (retention 30d)
 
 Each cluster runs a daily `ScheduledBackup` (02:00) plus an every-6h backup. The
 former Zalando/WAL-G bucket `pg-backups-zalando` has been retired.
@@ -58,7 +57,7 @@ Assumption: the database clusters already exist and the RustFS bucket is already
 
 ### Runtime CNPG physical backup (all clusters)
 
-All four backed-up clusters (product-db, product-db-replica, auth-db, shared-db)
+All three backed-up clusters (`platform-db`, `product-db`, `product-db-replica`)
 follow the same CloudNativePG Barman Cloud Plugin flow — only the
 `destinationPath` prefix differs:
 
@@ -94,12 +93,20 @@ flowchart LR
 
 | Cluster         | Operator      | Namespace | PostgreSQL | Instances | Databases                    | Pooler     | HA Pattern |
 |-----------------|---------------|-----------|------------|-----------|------------------------------|------------|------------|
+| platform-db     | CloudNativePG | platform  | 18         | 3         | auth, user, notification, shipping, review, temporal, temporal_visibility | PgDog `pgdog-platform` (Temporal: direct) | Sync quorum `ANY 1` |
 | product-db         | CloudNativePG | product   | 18         | 3         | product, cart, order, payment | PgDog `pgdog-product` (payment app: direct-TLS) | Sync quorum `ANY 1`; DR cluster `product-db-replica` |
-| auth-db         | CloudNativePG | auth      | 18         | 3         | auth                         | PgDog `pgdog-auth`  | Sync quorum `ANY 1` |
-| shared-db   | CloudNativePG | user      | 18         | 1 (SPOF)  | user, notification, shipping, review | PgDog `pgdog-shared`  | Single     |
-| temporal-db     | CloudNativePG | temporal  | 18         | 1         | temporal, temporal_visibility | —          | Single — **no backups / no DR** |
 
 ### Detailed Cluster Profiles
+
+#### platform-db (CloudNativePG)
+
+- **Namespace:** platform
+- **Operator:** CloudNativePG v1.30.0
+- **PostgreSQL:** 18
+- **Topology:** 3 instances (1 primary + 1 sync + 1 async replica), synchronous quorum `ANY 1` for HA
+- **Scope:** 7 logical DBs (`auth`, `user`, `notification`, `shipping`, `review`, `temporal`, `temporal_visibility`); apps connect via PgDog except Temporal (direct to `platform-db-rw`)
+- **Pooler:** PgDog (`pgdog-platform`)
+- **Backup scope:** Barman Cloud Plugin → `s3://pg-backups-cnpg/platform-db/` (30d); daily + every-6h `ScheduledBackup`; Temporal persistence covered by the same archive.
 
 #### product-db (CloudNativePG)
 
@@ -113,26 +120,6 @@ flowchart LR
 - **Backup scope:** Physical backup + WAL archiving (PITR) to RustFS at `s3://pg-backups-cnpg/product-db/`; daily + every-6h `ScheduledBackup`; restore-to-new-cluster drills.
 - **DR replica cluster (`product-db-replica`):** separate CloudNativePG `Cluster` for disaster recovery; Barman backups at `s3://pg-backups-cnpg/product-db-replica/` (same bucket `pg-backups-cnpg`, distinct prefix from primary).
 
-#### auth-db (CloudNativePG)
-
-- **Namespace:** auth
-- **Operator:** CloudNativePG v1.30.0
-- **PostgreSQL:** 18
-- **Topology:** 3 instances (1 primary + 1 sync + 1 async replica), synchronous quorum `ANY 1`
-- **Scope:** `auth` database (RFC-0012 initdb-reuse triplet)
-- **Pooler:** PgDog (`pgdog-auth`)
-- **Backup scope:** Barman Cloud Plugin → `s3://pg-backups-cnpg/auth-db/` (30d); daily + every-6h `ScheduledBackup`.
-
-#### shared-db (CloudNativePG)
-
-- **Namespace:** user
-- **Operator:** CloudNativePG v1.30.0
-- **PostgreSQL:** 18
-- **Topology:** 1 instance (SPOF), no replication
-- **Scope:** 4 DBs (`user`, `notification`, `shipping`, `review`); RFC-0012 triplets with cross-namespace `ExternalSecret`s for notification/shipping/review
-- **Pooler:** PgDog (`pgdog-shared`)
-- **Backup scope:** Barman Cloud Plugin → `s3://pg-backups-cnpg/shared-db/` (30d); daily + every-6h `ScheduledBackup`. DR-relevant because single-instance.
-
 ---
 
 ## Bucket Layout
@@ -145,10 +132,9 @@ clusters back up into a **single bucket `pg-backups-cnpg`** with a
 
 | Bucket | Cluster | S3 path | Implementation |
 |--------|---------|---------|----------------|
+| `pg-backups-cnpg` | platform-db | `s3://pg-backups-cnpg/platform-db/` | Barman Cloud Plugin + `ObjectStore` |
 | `pg-backups-cnpg` | product-db | `s3://pg-backups-cnpg/product-db/` | Barman Cloud Plugin + `ObjectStore` |
 | `pg-backups-cnpg` | product-db-replica | `s3://pg-backups-cnpg/product-db-replica/` | Barman Cloud Plugin + `ObjectStore` (DR cluster) |
-| `pg-backups-cnpg` | auth-db | `s3://pg-backups-cnpg/auth-db/` | Barman Cloud Plugin + `ObjectStore` |
-| `pg-backups-cnpg` | shared-db | `s3://pg-backups-cnpg/shared-db/` | Barman Cloud Plugin + `ObjectStore` |
 
 ### S3 Endpoint
 
@@ -162,7 +148,7 @@ Backup credentials come from **OpenBAO** via a ClusterExternalSecret. The path c
 
 | OpenBAO Path | Bucket | Consumer | ClusterExternalSecret |
 |------------|--------|----------|----------------------|
-| `secret/local/infra/rustfs/backup-cnpg` | `pg-backups-cnpg` | CNPG clusters (product-db, product-db-replica, auth-db, shared-db) | `pg-backup-rustfs-cnpg` |
+| `secret/local/infra/rustfs/backup-cnpg` | `pg-backups-cnpg` | CNPG clusters (platform-db, product-db, product-db-replica) | `pg-backup-rustfs-cnpg` |
 
 - **Kubernetes Secret**: `pg-backup-rustfs-credentials` (per namespace, created by ClusterExternalSecret).
   - **CNPG/Barman keys**: `ACCESS_KEY_ID`, `ACCESS_SECRET_KEY`
@@ -449,10 +435,9 @@ Barman Cloud Plugin — so there is no per-operator tool split anymore.
 
 | Cluster | Operator | Backup tool | Rationale |
 |---|---|---|---|
+| `platform-db` | CloudNativePG | **Barman Cloud Plugin** (CNPG-I) + `ObjectStore` CR, `s3://pg-backups-cnpg/platform-db/` (30d) | Consolidated platform tier; includes Temporal persistence (`temporal`, `temporal_visibility`). |
 | `product-db` | CloudNativePG | **Barman Cloud Plugin** (CNPG-I) + `ObjectStore` CR, `s3://pg-backups-cnpg/product-db/` (30d) | Declarative `ObjectStore` + `ScheduledBackup` CRs; CNPG 1.26+ deprecated in-tree `barmanObjectStore`, so the plugin is the long-term path. |
 | `product-db-replica` | CloudNativePG | **Barman Cloud Plugin**, `s3://pg-backups-cnpg/product-db-replica/` (7d) | Same bucket as primary, separate prefix; DR cluster keeps its own backups for independent recovery. |
-| `auth-db` | CloudNativePG | **Barman Cloud Plugin**, `s3://pg-backups-cnpg/auth-db/` (30d) | Same declarative pattern as product-db after migrating off Zalando/WAL-G. |
-| `shared-db` | CloudNativePG | **Barman Cloud Plugin**, `s3://pg-backups-cnpg/shared-db/` (30d) | Same declarative pattern; single-instance cluster so backups are its only recovery path. |
 
 All clusters write to the **same RustFS bucket** `pg-backups-cnpg` with
 **per-cluster prefixes**, which keeps recovery independent per cluster while
@@ -549,4 +534,4 @@ Best practices:
 
 ---
 
-_Last updated: 2026-07-11 — All clusters on CloudNativePG Barman Cloud Plugin into a single `pg-backups-cnpg` bucket with per-cluster prefixes (product-db/auth-db/shared-db 30d, product-db-replica 7d); Zalando/WAL-G and `pg-backups-zalando` retired (WAL-G kept only as tooling comparison)._
+_Last updated: 2026-07-17 — RFC-0018: platform-db consolidates auth/shared/temporal; Barman prefix `s3://pg-backups-cnpg/platform-db/` (30d); product tier unchanged._

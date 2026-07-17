@@ -30,7 +30,7 @@ marked inline below.
 | [Microservices (RED)](#1-microservices-red-metrics) | 19 | The 10 Go services; workers also contribute runtime heartbeat series. Incl. 4 app-side DB-client alerts (RFC-0017 W4) |
 | [Kong gateway](#2-kong-gateway) | 13 | The single API ingress for the whole platform |
 | [Valkey cache](#3-valkey-cache) | 7 | Cache-aside layer in front of PostgreSQL |
-| [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 46 (+2 gated) | All four CNPG clusters (`product-db` + DR, `auth-db`, `shared-db`, `temporal-db`) + backups |
+| [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 42 (+2 gated) | Two operational CNPG clusters (`platform-db`, `product-db`) + DR (`product-db-replica`) + backups |
 | [Kubernetes](#5-kubernetes) | 29 | Nodes, workloads, pods, API server, control plane, network |
 | [GitOps (Flux + cert-manager)](#6-gitops-flux--cert-manager) | 9 | Delivery pipeline + TLS |
 | [VictoriaMetrics self-health](#7-victoriametrics-self-health) | 31 | The monitoring system itself |
@@ -107,15 +107,12 @@ All PostgreSQL is CloudNativePG. Rules are chart-generated per cluster (one file
 upstream `cluster-*.yaml`), deployed as:
 
 - `prometheusrules/postgres/cnpg/` — `product-db` (ns `product`): full HA set + `PostgresWALSizeHigh` + the **global** operator-health singleton (`CNPGOperatorDown`, `CNPGControllerReconcileErrorsSpiking`).
-- `prometheusrules/postgres/cnpg-auth-db/` — `auth-db` (ns `auth`): full HA set.
-- `prometheusrules/postgres/cnpg-shared-db/` — `shared-db` (ns `user`): single-node subset (offline, connections, disk, WAL — no HA/replication rules).
+- `prometheusrules/postgres/cnpg-platform-db/` — `platform-db` (ns `platform`): full HA set; covers auth, user, notification, shipping, review, and Temporal persistence.
 - `prometheusrules/postgres/backup-alerts.yaml` — backup age/failure (label-driven; fires for any CNPG cluster emitting the metrics).
 
 Base metrics: `cnpg_*`. The alert **types** are catalogued once below; the same rule
-set is replicated per cluster, except the single-node `shared-db` which omits the
-HA/replication rules. **48 rules total** = `product-db` 22 (incl. the operator-health
-singleton) + `auth-db` 18 + `shared-db` 6 + 2 backup alerts. `temporal-db`
-(single-node) has a PodMonitor but no dedicated alert rules yet.
+set is replicated per HA cluster. **42 rules total** = `product-db` 22 (incl. the operator-health
+singleton) + `platform-db` 18 + 2 backup alerts.
 
 | Alert | Sev | Metric & trigger | Impact | for |
 |-------|-----|------------------|--------|-----|
@@ -362,7 +359,7 @@ implemented yet — they are recommendations.
 
 Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-and-next-improvements):
 
-- **`temporal-db` has no backups / no WAL archiving** — and therefore no backup alert either. (Since the Zalando→CNPG migration, `auth-db` and `shared-db` are CNPG and are covered by the label-driven backup alerts; `temporal-db` remains the outlier.)
+- **`platform-db-replica` DR cluster for platform tier** — not deployed in RFC-0018; product line retains `product-db-replica`.
 - **`payment` reconciliation has no dedicated SLI/alert yet** — generic HTTP SLOs cover payment, but
   there is no alert on stuck/failed reconciliation (including the heal `resolution='failed'`
   outcome introduced by ADR-012). Payment request health is covered only by the generic

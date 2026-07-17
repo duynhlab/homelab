@@ -23,7 +23,7 @@ spec:
   dependsOn:
     - name: controllers-local      # operator + TemporalCluster CRD
     - name: cert-manager-local     # operator webhook certificate
-    - name: databases-local        # temporal-db Ready (+ temporal-db-app secret)
+    - name: databases-local        # platform-db Ready (+ platform-db-temporal-secret in temporal ns)
     - name: monitoring-local       # ServiceMonitor CRD + Grafana/VM stack
 
   healthChecks:

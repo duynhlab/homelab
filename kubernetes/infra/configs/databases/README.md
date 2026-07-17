@@ -16,14 +16,15 @@ This directory contains PostgreSQL database configurations organized by cluster.
 
 ## Cluster Overview
 
+Three CloudNativePG clusters (two operational + one DR), two PgDog poolers
+([RFC-0018](../../../../docs/proposals/rfc/RFC-0018/)).
+
 
 | Cluster              | Operator      | PostgreSQL | Namespace | HA      | Pooler                                    | Services                             |
 | -------------------- | ------------- | ---------- | --------- | ------- | ----------------------------------------- | ------------------------------------ |
+| platform-db          | CloudNativePG | 18.1       | platform  | 3 nodes (1 primary + 1 sync + 1 async) | PgDog v0.39 (`pgdog-platform`) | Auth, User, Notification, Shipping, Review, Temporal |
 | product-db              | CloudNativePG | 18.1       | product   | 3 nodes (1 primary + 1 sync + 1 async) | PgDog v0.39 (`pgdog-product`) | Product, Cart, Order, Payment (payment app: direct-TLS) |
 | product-db-replica      | CloudNativePG | 18.1       | product   | 1 node  | —                                         | DR (continuous WAL recovery)         |
-| auth-db              | CloudNativePG | 18.1       | auth      | 3 nodes | PgDog v0.39 (`pgdog-auth`)                 | Auth                                 |
-| shared-db            | CloudNativePG | 18.1       | user      | 1 node  | PgDog v0.39 (`pgdog-shared`)               | User, Notification, Shipping, Review |
-| temporal-db          | CloudNativePG | 18.1       | temporal  | 1 node  | —                                         | Temporal (`temporal` + `temporal_visibility`) |
 
 
 ## Connection Endpoints
@@ -31,11 +32,9 @@ This directory contains PostgreSQL database configurations organized by cluster.
 
 | Cluster              | Pooler Endpoint                             | Direct Endpoint                                                              | Notes                                                   |
 | -------------------- | ------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------- |
+| platform-db          | `pgdog-platform.platform.svc:6432`               | RW: `platform-db-rw.platform.svc:5432`, R: `platform-db-r.platform.svc:5432`          | PgDog; DBs: auth, user, notification, shipping, review; Temporal direct to RW |
 | product-db              | `pgdog-product.product.svc:6432`               | RW: `product-db-rw.product.svc:5432`, R: `product-db-r.product.svc:5432`          | PgDog with R/W splitting; DBs: product, cart, order, payment (payment app: direct-TLS) |
 | product-db-replica      | —                                           | `product-db-replica-rw.product.svc:5432`                                        | DR only; promotable to standalone primary               |
-| auth-db              | `pgdog-auth.auth.svc:6432`                   | RW: `auth-db-rw.auth.svc:5432`, R: `auth-db-r.auth.svc:5432`                  | PgDog; DB: auth                                         |
-| shared-db            | `pgdog-shared.user.svc:6432`                 | RW: `shared-db-rw.user.svc:5432`, R: `shared-db-r.user.svc:5432`             | PgDog; DBs: user, notification, shipping, review        |
-| temporal-db          | —                                           | RW: `temporal-db-rw.temporal.svc:5432`                                       | No pooler; DBs: temporal, temporal_visibility           |
 
 
 ## Monitoring & Backup
@@ -46,15 +45,13 @@ per-cluster `PodMonitor`); pgaudit + `auto_explain` logs go to stdout and are
 picked up by the cluster-wide Vector DaemonSet → VictoriaLogs. Backups use the
 **Barman Cloud Plugin** (per-cluster `ObjectStore`) into a single bucket
 `pg-backups-cnpg` with per-cluster prefixes, and a `ScheduledBackup` (daily
-02:00 + every 6h). `temporal-db` has neither a PodMonitor nor a backup.
+02:00 + every 6h).
 
 | Cluster              | Metrics Exporter                                                         | Log Shipper              | Backup Method       | Backup Target                                            |
 | -------------------- | ------------------------------------------------------------------------ | ------------------------ | ------------------- | -------------------------------------------------------- |
+| platform-db          | CNPG built-in :9187 (PodMonitor) + PgDog OpenMetrics :9090              | CNPG stdout → Vector DaemonSet | Barman Cloud Plugin + ObjectStore | `s3://pg-backups-cnpg/platform-db/`, retention 30d           |
 | product-db              | CNPG built-in :9187 (PodMonitor) + PgDog OpenMetrics :9090              | CNPG stdout → Vector DaemonSet | Barman Cloud Plugin + ObjectStore | `s3://pg-backups-cnpg/product-db/`, retention 30d           |
 | product-db-replica      | CNPG built-in :9187 (PodMonitor)                                        | CNPG stdout → Vector DaemonSet | Barman Cloud Plugin + ObjectStore | `s3://pg-backups-cnpg/product-db-replica/`, retention 7d    |
-| auth-db              | CNPG built-in :9187 (PodMonitor) + PgDog OpenMetrics :9090              | CNPG stdout → Vector DaemonSet | Barman Cloud Plugin + ObjectStore | `s3://pg-backups-cnpg/auth-db/`, retention 30d              |
-| shared-db            | CNPG built-in :9187 (PodMonitor) + PgDog OpenMetrics :9090              | CNPG stdout → Vector DaemonSet | Barman Cloud Plugin + ObjectStore | `s3://pg-backups-cnpg/shared-db/`, retention 30d            |
-| temporal-db          | CNPG built-in :9187                                                     | CNPG stdout → Vector DaemonSet | —                   | — (no backup)                                            |
 
 
 ## Extensions
@@ -70,7 +67,7 @@ per service in each cluster's `services/*.yaml` (RFC-0012 triplets):
 | Path | Flux Kustomization | Contents |
 |------|--------------------|----------|
 | `controllers/databases/cnpg-barman-plugin` | `cnpg-barman-plugin-local` | Barman Cloud Plugin deployment + `ObjectStore` CRD, applied before CNPG clusters |
-| `configs/databases` | `databases-local` | All CNPG clusters — `product-db`, `auth-db`, `shared-db`, `temporal-db` (+ PgDog poolers, backups, on-demand `*-initial` Backups) |
+| `configs/databases` | `databases-local` | CNPG clusters — `platform-db`, `product-db` (+ PgDog poolers, backups, on-demand `*-initial` Backups) |
 | `configs/databases-cnpg-dr` | `databases-cnpg-dr-local` | `product-db-replica` only; `dependsOn: databases-local` |
 
 ## Related Documentation
@@ -80,4 +77,3 @@ per service in each cluster's `services/*.yaml` (RFC-0012 triplets):
 - **Poolers Documentation:** [`clusters/README.md`](clusters/README.md)
 - **CNPG HA/DR Deep Dive:** [`docs/databases/005-ha-dr-deep-dive.md`](../../../../docs/databases/005-ha-dr-deep-dive.md)
 - **PgCat Troubleshooting (legacy):** [`docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md`](../../../../docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md)
-

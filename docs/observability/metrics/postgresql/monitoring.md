@@ -9,17 +9,14 @@ a custom-queries ConfigMap, scraped by a **per-cluster `PodMonitor`**.
 ```mermaid
 flowchart LR
     subgraph databases["CloudNativePG clusters"]
+        platformDB["platform-db<br/>platform · 3 instances"]
         productDB["product-db<br/>product · 3 instances"]
         productDR["product-db-replica<br/>product · DR"]
-        authDB["auth-db<br/>auth · 3 instances"]
-        sharedDB["shared-db<br/>user · 1 instance"]
-        temporalDB["temporal-db<br/>temporal · 1 instance"]
     end
 
     subgraph poolers["PgDog poolers"]
+        platformPgDog["pgdog-platform<br/>OpenMetrics :9090"]
         productPgDog["pgdog-product<br/>OpenMetrics :9090"]
-        authPgDog["pgdog-auth<br/>OpenMetrics :9090"]
-        sharedPgDog["pgdog-shared<br/>OpenMetrics :9090"]
     end
 
     subgraph discovery["Scrape discovery"]
@@ -35,15 +32,12 @@ flowchart LR
         vmalert["VMAlert<br/>rule evaluation"]
     end
 
+    platformDB -->|":9187"| cnpgMon
     productDB -->|":9187"| cnpgMon
     productDR -->|":9187"| cnpgMon
-    authDB -->|":9187"| cnpgMon
-    sharedDB -->|":9187"| cnpgMon
-    temporalDB -->|":9187"| cnpgMon
 
+    platformPgDog --> pgdogMon
     productPgDog --> pgdogMon
-    authPgDog --> pgdogMon
-    sharedPgDog --> pgdogMon
 
     cnpgMon -->|scrape| vma
     pgdogMon -->|scrape| vma
@@ -57,7 +51,7 @@ flowchart LR
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    class productDB,productDR,authDB,sharedDB,temporalDB,productPgDog,authPgDog,sharedPgDog external;
+    class platformDB,productDB,productDR,platformPgDog,productPgDog external;
     class cnpgMon,pgdogMon,ruleCRs,vmrule data;
     class vma,vms metric;
     class vmop,vmalert,grafana platform;
@@ -67,10 +61,8 @@ flowchart LR
 
 | Cluster | Namespace | Instances | Databases | Database metrics | Pooler metrics |
 |---|---|---|---|---|---|
+| `platform-db` | platform | 3 | auth, user, notification, shipping, review, temporal, temporal_visibility | CNPG `:9187` via PodMonitor | `pgdog-platform :9090` |
 | `product-db` (+ `product-db-replica` DR) | product | 3 | product, cart, order, payment | CNPG `:9187` via PodMonitor | `pgdog-product :9090` |
-| `auth-db` | auth | 3 | auth | CNPG `:9187` via PodMonitor | `pgdog-auth :9090` |
-| `shared-db` | user | 1 | user, notification, shipping, review | CNPG `:9187` via PodMonitor | `pgdog-shared :9090` |
-| `temporal-db` | temporal | 1 | temporal | CNPG `:9187` via PodMonitor | None |
 
 ## Metric coverage
 
@@ -160,8 +152,7 @@ CNPG alert rules are chart-generated per cluster (one file per upstream
 `cluster` chart), each in the cluster's own namespace:
 
 - **[`postgres/cnpg/`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/cnpg/)** — `product-db` (namespace `product`): the full HA set plus small extras (`CnpgClusterFenced`, `PostgresWALSizeHigh`) and the **global operator-health singleton** (`CNPGOperatorDown`, `CNPGControllerReconcileErrorsSpiking`, namespace `cloudnative-pg`).
-- **[`postgres/cnpg-auth-db/`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/cnpg-auth-db/)** — `auth-db` (namespace `auth`): full HA set (offline, fencing, HA, connections, physical + logical replication, disk, WAL).
-- **[`postgres/cnpg-shared-db/`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/cnpg-shared-db/)** — `shared-db` (namespace `user`): single-node subset (offline, connections, disk, WAL — no replication/HA rules).
+- **[`postgres/cnpg-platform-db/`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/cnpg-platform-db/)** — `platform-db` (namespace `platform`): full HA set (offline, fencing, HA, connections, physical + logical replication, disk, WAL); covers auth, supporting services, and Temporal persistence.
 
 Backup alerts (`PostgresBackupTooOld`, `PostgresBackupFailed`) live in
 `postgres/backup-alerts.yaml`. The full per-alert catalog with impact is in
@@ -188,4 +179,4 @@ the CNPG pod logs, tailed by the cluster-wide **Vector DaemonSet**, and shipped 
 - Retired reference: [pg-exporter-dashboards.md](pg-exporter-dashboards.md), [pg-exporter-mapping.md](pg-exporter-mapping.md)
 
 ---
-_Last updated: 2026-07-14_
+_Last updated: 2026-07-17 — RFC-0018: platform-db + pgdog-platform inventory; cnpg-platform-db alert ownership._

@@ -4,11 +4,9 @@
 
 | Cluster | Operator | Namespace | Instances | Replication | Pooler | Pooler Endpoint | Direct Endpoint |
 |---------|----------|-----------|-----------|-------------|--------|-----------------|-----------------|
+| **platform-db** | CloudNativePG | platform | 3 (1 Primary + 1 Sync + 1 Async Replica) | Sync (ANY 1) | PgDog (`pgdog-platform`) | `pgdog-platform.platform.svc:6432` | `platform-db-rw.platform.svc:5432` |
 | **product-db** | CloudNativePG | product | 3 (1 Primary + 1 Sync + 1 Async Replica) | Sync (ANY 1) | PgDog (`pgdog-product`) | `pgdog-product.product.svc:6432` | `product-db-rw.product.svc:5432` |
 | **product-db-replica** | CloudNativePG | product | 1 (Designated Primary) | WAL recovery from object store | — | — | `product-db-replica-rw.product.svc:5432` |
-| **auth-db** | CloudNativePG | auth | 3 (1 Primary + 1 Sync + 1 Async Replica) | Sync (ANY 1) | PgDog (`pgdog-auth`) | `pgdog-auth.auth.svc:6432` | `auth-db-rw.auth.svc:5432` |
-| **shared-db** | CloudNativePG | user | 1 | N/A | PgDog (`pgdog-shared`) | `pgdog-shared.user.svc:6432` | `shared-db-rw.user.svc:5432` |
-| **temporal-db** | CloudNativePG | temporal | 1 | N/A | — | — | `temporal-db-rw.temporal.svc:5432` |
 
 ---
 
@@ -16,11 +14,9 @@
 
 For detailed architecture, configuration, and components of each cluster, please refer to their respective directories:
 
-- **[product-db](product-db/)**: Consolidated CNPG cluster hosting Product, Cart, Order, and Payment databases (merged from former product-db + transaction-shared-db; payment app connects direct-TLS). Includes PgDog pooler, backup, and monitoring.
+- **[platform-db](platform-db/)**: Consolidated CNPG cluster (RFC-0018) hosting Auth, User, Notification, Shipping, Review, and Temporal databases. 3-instance HA with PgDog pooler, Barman backup, and monitoring. Temporal connects direct to `platform-db-rw` (no pooler).
+- **[product-db](product-db/)**: Consolidated CNPG cluster hosting Product, Cart, Order, Checkout, and Payment databases (payment app connects direct-TLS). Includes PgDog pooler, backup, and monitoring.
 - **[product-db-replica](product-db-replica/)**: DR replica cluster; continuously recovers from product-db WAL archive. Promotable to standalone primary. Deployed via Flux **`configs/databases-cnpg-dr`** (`databases-cnpg-dr-local` depends on `databases-local`).
-- **[auth-db](auth-db/)**: CNPG cluster for the Auth service (migrated from Zalando). 3-instance HA with PgDog pooler, backup, and monitoring.
-- **[shared-db](shared-db/)**: CNPG cluster (migrated from the former Zalando `supporting-shared-db`) for User, Notification, Shipping, and Review services. Single instance with PgDog pooler, backup, and monitoring.
-- **[temporal-db](temporal-db/)**: CNPG cluster backing Temporal (`temporal` + `temporal_visibility`). Single instance; no pooler and no backup.
 
 ### DR replica troubleshooting
 
@@ -33,9 +29,8 @@ for CNPG recovery internals.
 
 ## Connection Pooler Comparison
 
-**PgDog** is the only pooler deployed on the platform (`pgdog-product`,
-`pgdog-auth`, `pgdog-shared`). PgBouncer and PgCat are listed for comparison
-only.
+**PgDog** is the only pooler deployed on the platform (`pgdog-platform`,
+`pgdog-product`). PgBouncer and PgCat are listed for comparison only.
 
 | Feature | PgBouncer | PgDog | PgCat |
 |---------|---------------------|-------|-------|

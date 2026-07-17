@@ -107,10 +107,9 @@ The local end-to-end stack (`local-stack/compose.yaml`) mirrors the platform wit
 | frontend | 80 → host 3001 | — | — | gateway only |
 | gateway (Kong 3.9) | 8000 → host 8080 | — | — | all 10 services |
 
-> **In-cluster differences (production):** `auth-db` (CloudNativePG, via the **pgdog-auth** pooler);
+> **In-cluster differences (production):** `platform-db` (CloudNativePG behind **`pgdog-platform.platform.svc.cluster.local:6432`** — auth/user/notification/shipping/review; Temporal connects **direct** to `platform-db-rw.platform:5432`);
 > `product-db` (CloudNativePG behind the **pgdog-product** pooler — `product`/`cart`/`order`/`payment`
-> databases; payment connects **direct over TLS, bypassing PgDog**);
-> `shared-db` (CloudNativePG, via **pgdog-shared** — `user`/`review`/`shipping`/`notification`).
+> databases; payment connects **direct over TLS, bypassing PgDog**).
 > Locally these collapse into one Postgres with 10 service databases. See [`../databases/`](../databases/).
 > **Logging is unified** — all 10 services log via the shared `pkg/logger` zap wrapper
 > (`zapx`), teed into the OTLP pipeline (RFC-0014 P4).
@@ -127,8 +126,8 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 
 ### auth — identity
 
-> Owns `users` (credentials) and refresh-token families; DB `auth` on `auth-db`
-> (CloudNativePG, via PgDog). Public-only HTTP — no JWT middleware, no gRPC
+> Owns `users` (credentials) and refresh-token families; DB `auth` on `platform-db`
+> (CloudNativePG, via PgDog `pgdog-platform`). Public-only HTTP — no JWT middleware, no gRPC
 > server (HTTP-only since RFC-0009 Phase 5; services verify JWTs locally).
 
 | Feature | API | Technique | Depends on | Status | Ref |
@@ -140,7 +139,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 
 ### user — profiles
 
-> Owns user profiles; DB `user` on `shared-db` (CloudNativePG). Verifies JWTs
+> Owns user profiles; DB `user` on `platform-db` (CloudNativePG, via `pgdog-platform`). Verifies JWTs
 > locally via `pkg/authmw`.
 
 | Feature | API | Technique | Depends on | Status | Ref |
@@ -211,8 +210,8 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 
 ### review — product reviews
 
-> Owns `reviews` (rating 1–5, comment); DB `review` on `shared-db`
-> (CloudNativePG). Verifies JWTs locally via `pkg/authmw`. Serves gRPC on `:9090`.
+> Owns `reviews` (rating 1–5, comment); DB `review` on `platform-db`
+> (CloudNativePG, via `pgdog-platform`). Verifies JWTs locally via `pkg/authmw`. Serves gRPC on `:9090`.
 
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
@@ -222,7 +221,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 
 ### shipping — tracking, estimates & shipment lifecycle
 
-> Owns `shipments`; DB `shipping` on `shared-db` (CloudNativePG). No JWT
+> Owns `shipments`; DB `shipping` on `platform-db` (CloudNativePG, via `pgdog-platform`). No JWT
 > middleware (public + internal surfaces only). Serves gRPC on `:9090`.
 
 | Feature | API | Technique | Depends on | Status | Ref |
@@ -234,7 +233,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Planned` / `No caller`.
 
 ### notification — user notifications
 
-> Owns `notifications`; DB `notification` on `shared-db` (CloudNativePG).
+> Owns `notifications`; DB `notification` on `platform-db` (CloudNativePG, via `pgdog-platform`).
 > Verifies JWTs locally via `pkg/authmw` on private routes. Serves gRPC on
 > `:9090`. Deployed in-cluster (comms domain) **and** in the local stack — the
 > frontend's notification badge resolves against it.

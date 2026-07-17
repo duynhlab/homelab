@@ -109,8 +109,7 @@ The exporter converts custom queries to metrics using this pattern:
 
 Custom queries are defined in a per-cluster ConfigMap, referenced from the CNPG
 `Cluster` `spec.monitoring.customQueriesConfigMapList`:
-- **auth-db**: `kubernetes/infra/configs/databases/clusters/auth-db/monitoring/`
-- **shared-db**: `kubernetes/infra/configs/databases/clusters/shared-db/monitoring/`
+- **platform-db**: `kubernetes/infra/configs/databases/clusters/platform-db/monitoring/`
 - **product-db**: `kubernetes/infra/configs/databases/clusters/product-db/monitoring/`
 
 ### Query Structure
@@ -164,14 +163,14 @@ time() - pg_postmaster_start_time_seconds
 
 ### Filtered Queries
 
-**1. Top 10 queries by execution count (auth-db):**
+**1. Top 10 queries by execution count (platform-db):**
 ```
-topk(10, rate(pg_stat_statements_calls{namespace="auth", datname="auth"}[5m]))
+topk(10, rate(pg_stat_statements_calls{namespace="platform", datname="auth"}[5m]))
 ```
 
-**2. Top 10 slowest queries (auth-db):**
+**2. Top 10 slowest queries (platform-db):**
 ```
-topk(10, rate(pg_stat_statements_time_milliseconds{namespace="auth", datname="auth"}[5m]) / rate(pg_stat_statements_calls{namespace="auth", datname="auth"}[5m]))
+topk(10, rate(pg_stat_statements_time_milliseconds{namespace="platform", datname="auth"}[5m]) / rate(pg_stat_statements_calls{namespace="platform", datname="auth"}[5m]))
 ```
 
 **3. Cache hit ratio per query:**
@@ -181,7 +180,7 @@ rate(pg_stat_statements_shared_blks_hit[5m]) / (rate(pg_stat_statements_shared_b
 
 **4. Replication lag for HA clusters:**
 ```
-pg_replication_lag{namespace="auth"}
+pg_replication_lag{namespace="platform"}
 ```
 
 **5. Query by specific queryid:**
@@ -222,7 +221,7 @@ pg_replication_lag > 10
 
 **1. Port-forward to a CNPG instance pod:**
 ```bash
-kubectl port-forward -n auth auth-db-1 9187:9187
+kubectl port-forward -n platform platform-db-1 9187:9187
 ```
 
 **2. Query metrics endpoint:**
@@ -248,7 +247,7 @@ kubectl port-forward -n monitoring svc/vmsingle-victoria-metrics 8428:8428
 
 ```bash
 # Verify postgres_exporter is being scraped
-kubectl get podmonitor -n auth postgresql-auth-db -o yaml
+kubectl get podmonitor -n platform platform-db -o yaml
 
 # Check VMAgent targets
 kubectl port-forward -n monitoring svc/vmagent-victoria-metrics 8429:8429
@@ -270,10 +269,10 @@ topk(10,
 
 ```promql
 # Replication lag
-pg_replication_lag{namespace="auth"}
+pg_replication_lag{namespace="platform"}
 
 # Alert if lag > 10 seconds
-pg_replication_lag{namespace="auth"} > 10
+pg_replication_lag{namespace="platform"} > 10
 ```
 
 ### 3. Track Query Performance Over Time
@@ -302,28 +301,28 @@ sum(rate(pg_stat_statements_shared_blks_hit[5m])) by (datname) /
 
 **1. Check the custom-queries ConfigMap is referenced and present:**
 ```bash
-kubectl get cluster -n auth auth-db -o jsonpath='{.spec.monitoring.customQueriesConfigMapList}'
-kubectl get configmap -n auth -l cnpg.io/cluster=auth-db
+kubectl get cluster -n platform platform-db -o jsonpath='{.spec.monitoring.customQueriesConfigMapList}'
+kubectl get configmap -n platform -l cnpg.io/cluster=platform-db
 ```
 
 **2. Check the instance-manager logs for query errors:**
 ```bash
-kubectl logs -n auth auth-db-1 -c postgres | grep -i "monitoring\|error"
+kubectl logs -n platform platform-db-1 -c postgres | grep -i "monitoring\|error"
 ```
 
 **3. Verify pg_stat_statements is enabled:**
 ```bash
-kubectl exec -n auth auth-db-1 -c postgres -- psql -U postgres -c "SHOW shared_preload_libraries;"
+kubectl exec -n platform platform-db-1 -c postgres -- psql -U postgres -c "SHOW shared_preload_libraries;"
 ```
 
 **4. Verify custom metrics are exposed:**
 ```bash
 # Option 1: Direct exec into the postgres container (no port-forward needed)
-kubectl exec -n auth auth-db-1 -c postgres -- curl -s http://localhost:9187/metrics | head -5
-kubectl exec -n auth auth-db-1 -c postgres -- curl -s http://localhost:9187/metrics | grep "^cnpg_pg_stat_statements_calls" | head -3
+kubectl exec -n platform platform-db-1 -c postgres -- curl -s http://localhost:9187/metrics | head -5
+kubectl exec -n platform platform-db-1 -c postgres -- curl -s http://localhost:9187/metrics | grep "^cnpg_pg_stat_statements_calls" | head -3
 
 # Option 2: Port-forward to the instance pod
-kubectl port-forward -n auth auth-db-1 9187:9187 &
+kubectl port-forward -n platform platform-db-1 9187:9187 &
 
 # Wait a few seconds, then query metrics
 sleep 3
@@ -353,4 +352,4 @@ kill %1  # or pkill -f "kubectl port-forward"
 - **PromQL Guide**: [`docs/observability/metrics/promql-guide.md`](../promql-guide.md) - PromQL functions and examples
 
 ---
-_Last updated: 2026-07-11_
+_Last updated: 2026-07-17 (RFC-0018: platform-db / product-db PodMonitor paths)_

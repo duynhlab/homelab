@@ -80,20 +80,21 @@ allowed (north-south gateway traffic); the rest mirror the east-west call graph.
 
 ### DB-tier allows
 
-The DB-hosting namespaces (`product`, `auth`, and `user` — each hosts a
+The DB-hosting namespaces (`platform`, `product` — each hosts a
 CloudNativePG cluster) also allow the operator, the metrics scraper, and pooler
 traffic they depend on. Without these the operator cannot reach the database pods
 and `databases-local` / `apps-local` never reconcile:
 
 | Callee ns | Allowed source | Ports | Why |
 |-----------|----------------|-------|-----|
+| **platform** | `cloudnative-pg` operator | `:8000` (status), `:5432` | Operator extracts instance status + manages SQL. |
+| **platform** | `auth`, `user`, `notification`, `shipping`, `review` (cross-ns) | `:6432` (PgDog), `:5432` (migrations) | Platform apps share `platform-db` via `pgdog-platform`. |
+| **platform** | `temporal` (cross-ns) | `:5432` | Temporal server connects **direct** to `platform-db-rw` (no PgDog). |
+| **platform** | intra-namespace | `:5432`, `:6432`, `:8000` | PgDog → Postgres, replica WAL streaming, pooler mesh. |
 | **product** | `cloudnative-pg` operator | `:8000` (status), `:5432` | Operator extracts instance status + manages SQL. |
 | **product** | `cart`, `order`, `payment` (cross-ns) | `:6432` (PgDog), `:5432` (`product-db-rw`) | `cart`/`order` use the pooler + migrate against the primary; `payment` connects **direct-TLS to `product-db-rw:5432`** for runtime (it bypasses PgDog) as well as migrations. |
 | **product** | intra-namespace | `:5432`, `:6432`, `:8000` | PgDog → Postgres, replica WAL streaming, product-service → pooler. |
-| **auth**, **user** | `cloudnative-pg` operator | `:8000` (status), `:5432` | Operator extracts instance status + manages SQL. |
-| **user** | `review`, `notification`, `shipping` (cross-ns) | `:6432` (PgDog), `:5432` (migrations) | Siblings share `shared-db` via `pgdog-shared`. |
-| **auth**, **user** | intra-namespace | `:5432`, `:6432`, `:8000` | PgDog → Postgres, WAL streaming, app → pooler. |
-| **product/auth/user** | `monitoring` | `:9187` (exporter), `:9090` (PgDog metrics) | VMAgent scrapes the postgres/pooler exporters. |
+| **platform/product** | `monitoring` | `:9187` (exporter), `:9090` (PgDog metrics) | VMAgent scrapes the postgres/pooler exporters. |
 
 ---
 
@@ -153,7 +154,7 @@ flowchart LR
     NET -->|"enforced by kindnet<br/>(K8s 1.34.3)"| EFF["Effective boundary"]
 ```
 
-- **Manifests:** `kubernetes/infra/configs/network-policies/{auth,user,product,cart,order,review,notification,shipping,payment}.yaml`
+- **Manifests:** `kubernetes/infra/configs/network-policies/{auth,user,product,platform,cart,order,review,notification,shipping,payment}.yaml`
   (+ `kustomization.yaml`). Each file holds `deny-all-ingress` + `allow-internal-callers`.
 - **Generated baseline:** `kubernetes/infra/configs/kyverno/cluster-policies/default-deny-networkpolicy.yaml`.
 - **Reconciliation:** Flux Kustomization `network-policies-local`
@@ -187,4 +188,4 @@ flowchart LR
 
 ---
 
-_Last updated: 2026-07-11 — Zalando→CNPG migration: DB-tier allows reshaped to the CloudNativePG operator (`:8000`/`:5432`) + PgDog (`:6432`); Patroni `:8008` / PgBouncer rows dropped; `supporting-shared-db`→`shared-db`, `cnpg-db-rw`→`product-db-rw`. Earlier: stale payment↛JWKS gap removed (auth.yaml admits all 9 namespaces incl. payment)._
+_Last updated: 2026-07-17 — RFC-0018: DB-tier allows for ns `platform` (`pgdog-platform` :6432, Temporal direct :5432); auth/user ns Postgres rules removed (apps egress to platform). Earlier: Zalando→CNPG migration; Patroni `:8008` / PgBouncer rows dropped._

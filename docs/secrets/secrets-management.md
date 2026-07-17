@@ -107,6 +107,12 @@ ESO-managed secrets use the **same name** as the original secret they replace (e
 
 | K8s Secret | Namespace | Source |
 |------------|-----------|--------|
+| `platform-db-secret` | auth, platform | `secret/data/local/databases/auth-db/auth` (compat) |
+| `platform-db-user-secret` | user, platform | `secret/data/local/databases/shared-db/user` (compat) |
+| `platform-db-notification-secret` | notification, platform | `secret/data/local/databases/shared-db/notification` (compat) |
+| `platform-db-shipping-secret` | shipping, platform | `secret/data/local/databases/shared-db/shipping` (compat) |
+| `platform-db-review-secret` | review, platform | `secret/data/local/databases/shared-db/review` (compat) |
+| `platform-db-temporal-secret` | temporal, platform | `secret/data/local/databases/platform-db/temporal` |
 | `product-db-secret` | product | `secret/data/local/databases/product-db/product` |
 | `product-db-cart-secret` | cart | `secret/data/local/databases/product-db/cart` |
 | `product-db-order-secret` | order | `secret/data/local/databases/product-db/order` |
@@ -120,7 +126,7 @@ Backup credentials use **ClusterExternalSecret** with namespace labels to auto-d
 
 | ClusterExternalSecret | Label Selector | Target Namespaces | Key Format |
 |----------------------|----------------|-------------------|------------|
-| `pg-backup-rustfs-cnpg` | `platform.duynhlab/backup: "cnpg"` | product, auth, user | CNPG/Barman: `ACCESS_KEY_ID`, `ACCESS_SECRET_KEY` |
+| `pg-backup-rustfs-cnpg` | `platform.duynhlab/backup: "cnpg"` | platform, product | CNPG/Barman: `ACCESS_KEY_ID`, `ACCESS_SECRET_KEY` |
 
 Since the Zalando→CNPG migration every cluster backs up via Barman, so `cnpg` is the
 only backup label (the old WAL-G `pg-backup-rustfs-walg` / `backup: walg` mapping was removed).
@@ -396,4 +402,4 @@ Replace Shamir with cloud KMS for automatic unseal:
 
 ---
 
-_Last updated: 2026-07-11 — Zalando→CNPG migration: WAL-G `pg-backup-rustfs-walg` / `backup: walg` mapping removed; `cnpg` is now the only backup label (Barman for every cluster). Earlier: ESO + OpenBAO via Kubernetes auth, KV v2 static secrets (`refreshInterval: 1h`); Cloudflare token is a dev placeholder on local (bootstrap-seeded), operator-supplied on prod; added payment DB + webhook-hmac secrets. Local Kind; production hardening tracked in [RFC-0008](../proposals/rfc/RFC-0008/)._
+_Last updated: 2026-07-17 — RFC-0018: platform-db secrets + backup label targets `platform` ns; product tier unchanged._

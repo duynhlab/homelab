@@ -289,7 +289,7 @@ docs/
 2. **[VictoriaLogs Log Debugging](./runbooks/troubleshooting/victorialogs_kubernetes_logs_debug.md)** - Kubernetes log debugging with VictoriaLogs
 3. **[Add a service database](./databases/runbooks/add-service-database.md)** - RFC-0012 triplet flow on product-db
 4. **[Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md)** - End-to-end rotation via OpenBAO → triplet → PgDog
-5. *Legacy (PgCat retired — kept for archaeology; no PgDog runbook exists yet):* [prepared-statement](./runbooks/troubleshooting/pgcat_prepared_statement_error.md) · [read-only txn](./runbooks/troubleshooting/pgcat_read_only_transaction_error.md) · [upstream connectivity](./runbooks/troubleshooting/pgcat_upstream_connectivity_errors.md)
+5. **[PgDog operations](./databases/runbooks/pgdog-operations.md)** — day-2 pooler ops (`pgdog-platform`, `pgdog-product`); legacy PgCat troubleshooting kept for archaeology: [prepared-statement](./runbooks/troubleshooting/pgcat_prepared_statement_error.md) · [read-only txn](./runbooks/troubleshooting/pgcat_read_only_transaction_error.md) · [upstream connectivity](./runbooks/troubleshooting/pgcat_upstream_connectivity_errors.md)
 
 ---
 

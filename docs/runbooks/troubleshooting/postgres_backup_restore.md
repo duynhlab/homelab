@@ -13,10 +13,97 @@ Reference docs:
 
 | Cluster | Operator | Backup method | Restore method |
 |---------|----------|---------------|----------------|
+| `platform-db` | CloudNativePG | Barman object store + `Backup` / `ScheduledBackup` | Bootstrap recovery from `s3://pg-backups-cnpg/platform-db/` |
 | `product-db` | CloudNativePG | Barman object store + `Backup` / `ScheduledBackup` | Bootstrap recovery from `s3://pg-backups-cnpg/product-db/` |
 | `product-db-replica` | CloudNativePG | Barman object store for its own DR prefix | Replica cluster or restore from object store |
-| `auth-db` | Zalando | WAL-G via Spilo/operator env | Clone/restore from WAL-G object-store backup |
-| `supporting-shared-db` | Zalando | WAL-G via Spilo/operator env | Clone/restore from WAL-G object-store backup |
+
+## CloudNativePG: `platform-db`
+
+### Prerequisites
+
+- RustFS is running in namespace `rustfs`.
+- Bucket `pg-backups-cnpg` exists.
+- Secret `pg-backup-rustfs-credentials` exists in namespace `platform`.
+- `platform-db` has at least one completed base backup.
+- `platform-db` reports `ContinuousArchiving=True`.
+
+### Check backup health
+
+```bash
+kubectl get cluster,backup,scheduledbackup -n platform
+kubectl get cluster platform-db -n platform -o jsonpath='{range .status.conditions[*]}{.type}={.status} reason={.reason}{"\n"}{end}'
+```
+
+Expected:
+
+- `Backup` resources show `completed`.
+- `ScheduledBackup` resources have recent `LAST BACKUP`.
+- `ContinuousArchiving=True`.
+- `LastBackupSucceeded=True`.
+
+### Trigger manual backup
+
+If the CNPG kubectl plugin is installed:
+
+```bash
+kubectl cnpg backup platform-db -n platform
+```
+
+Plain Kubernetes fallback:
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  name: platform-db-manual-$(date +%Y%m%d-%H%M)
+  namespace: platform
+spec:
+  cluster:
+    name: platform-db
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+EOF
+```
+
+### Restore to a new cluster
+
+Use a restore manifest patterned on
+`kubernetes/infra/configs/databases/clusters/platform-db/instance.yaml` with
+`bootstrap.recovery` pointing at the Barman object store:
+
+```yaml
+externalClusters:
+  - name: platform-db-backup
+    plugin:
+      name: barman-cloud.cloudnative-pg.io
+      parameters:
+        barmanObjectName: platform-db-backup-store
+        serverName: platform-db-cluster
+```
+
+### Point-in-time recovery
+
+Add a recovery target to the restore cluster manifest:
+
+```yaml
+bootstrap:
+  recovery:
+    source: platform-db-backup
+    recoveryTarget:
+      targetTime: "2026-05-05 03:00:00+00"
+```
+
+Use a timestamp just before the incident. After restore, validate schema, row
+counts, and application smoke tests before routing traffic or extracting data.
+
+### Validate CNPG restore
+
+```bash
+kubectl exec -it platform-db-restore-1 -n platform -- psql -U auth -d auth -c "\dt"
+kubectl exec -it platform-db-restore-1 -n platform -- psql -U user -d user -c "SELECT count(*) FROM users;"
+```
 
 ## CloudNativePG: `product-db`
 
@@ -133,71 +220,6 @@ Before promotion:
 
 Promotion and cutover details live in [010-drp.md](../../databases/010-drp.md).
 
-## Zalando: `auth-db` and `supporting-shared-db`
-
-### WAL-G backup configuration
-
-Zalando clusters use WAL-G through Spilo. Configuration is injected through:
-
-- Operator config / pod environment ConfigMap.
-- Namespace-local `pg-backup-rustfs-credentials` Secret.
-- Cluster-specific `WALG_S3_PREFIX` values in the PostgreSQL manifest.
-
-Current paths:
-
-| Cluster | Path |
-|---------|------|
-| `auth-db` | `s3://pg-backups-zalando/auth-db/` |
-| `supporting-shared-db` | `s3://pg-backups-zalando/user-db/` |
-
-### Restore a Zalando cluster
-
-1. Get source cluster UID:
-
-```bash
-kubectl get postgresql supporting-shared-db -n user -o jsonpath='{.metadata.uid}'
-```
-
-2. Create a clone cluster manifest:
-
-```yaml
-apiVersion: acid.zalan.do/v1
-kind: postgresql
-metadata:
-  name: supporting-shared-db-restore
-  namespace: user
-spec:
-  teamId: "platform"
-  numberOfInstances: 1
-  clone:
-    cluster: supporting-shared-db
-    uid: "<source-cluster-uid>"
-    s3_endpoint: "http://rustfs-svc.rustfs.svc.cluster.local:9000"
-    s3_force_path_style: true
-  volume:
-    size: 5Gi
-  databases:
-    user: user
-    notification: notification.notification
-    shipping: shipping.shipping
-    review: review.review
-  users:
-    user: [createdb]
-    notification.notification: [createdb]
-    shipping.shipping: [createdb]
-    review.review: [createdb]
-  postgresql:
-    version: "16"
-```
-
-3. Apply and verify:
-
-```bash
-kubectl apply -f supporting-shared-db-restore.yaml
-kubectl get postgresql -n user -w
-kubectl exec -it supporting-shared-db-restore-0 -n user -- psql -U user -d user -c "\l"
-```
-
 ## Validation Checklist
 
 - [ ] Backup or restore resource reached successful state.
@@ -232,4 +254,4 @@ For every restore drill or incident recovery, capture:
 - Final measured RTO and estimated RPO.
 
 ---
-_Last updated: 2026-07-11_
+_Last updated: 2026-07-17 (RFC-0018: platform-db CNPG Barman; Zalando section removed)_

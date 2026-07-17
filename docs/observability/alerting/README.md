@@ -101,8 +101,8 @@ This project uses the **VictoriaMetrics stack** instead of Prometheus. VM Operat
 ```mermaid
 flowchart TD
     subgraph layer1 ["Layer 1: Threshold Alerts"]
-        PR1["PrometheusRule CRDs<br/>microservices/alerts.yaml<br/>postgres/cnpg + cnpg-auth-db + cnpg-shared-db"]
-        T1["16 application alerts<br/>PostgreSQL: 48 all-CNPG (per cluster)"]
+        PR1["PrometheusRule CRDs<br/>microservices/alerts.yaml<br/>postgres/cnpg + cnpg-platform-db"]
+        T1["16 application alerts<br/>PostgreSQL: 42 all-CNPG (per cluster)"]
     end
 
     subgraph layer2 ["Layer 2: SLO Burn-Rate Alerts"]
@@ -160,7 +160,7 @@ Direct metric threshold checks. Fire immediately when a condition is met.
 
 > The scrape-era **Saturation** group (`MicroserviceHighRequestsInFlight` / `…Critical`) retired with the cutover — otelgin v0.69 emits no `http.server.active_requests`. The two GC-pause alerts collapsed into `MicroserviceGCThrash` (no OTel GC-pause metric). `MicroserviceDown`/`…AllInstancesDown` moved from `up{}` scrape liveness to a `go_goroutine_count` heartbeat-absence check (D-4).
 
-**PostgreSQL alerts** ([`prometheusrules/postgres/`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/README.md)): all CloudNativePG, chart-aligned rules deployed per cluster — `postgres/cnpg/` (`product-db` full set + operator-health singleton), `postgres/cnpg-auth-db/` (`auth-db` full HA set), `postgres/cnpg-shared-db/` (`shared-db` single-node subset). Backup alerts remain in `postgres/backup-alerts.yaml`. 48 rules total.
+**PostgreSQL alerts** ([`prometheusrules/postgres/`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/README.md)): all CloudNativePG, chart-aligned rules deployed per cluster — `postgres/cnpg/` (`product-db` full set + operator-health singleton), `postgres/cnpg-platform-db/` (`platform-db` full HA set). Backup alerts remain in `postgres/backup-alerts.yaml`. 42 rules total.
 
 **Recording rules** (`microservices/recording-rules.yaml`):
 
@@ -233,7 +233,7 @@ kubernetes/infra/configs/observability/
 │   ├── microservices/
 │   │   ├── alerts.yaml                     # Layer 1: application threshold alerts
 │   │   └── recording-rules.yaml            # Pre-aggregated recording rules
-│   └── postgres/                           # Layer 1: all-CNPG PrometheusRules (cnpg/ + cnpg-auth-db/ + cnpg-shared-db/)
+│   └── postgres/                           # Layer 1: all-CNPG PrometheusRules (cnpg/ + cnpg-platform-db/)
 └── victoriametrics/
     ├── vmalert.yaml                        # VMAlert (rule evaluator)
     └── vmalertmanager.yaml                 # VMAlertmanager (notification router)
@@ -280,7 +280,7 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 | Phase | Scope | Status |
 |-------|-------|--------|
 | Layer 1: Application alerts | 16 alerts (RED + gRPC + Golden Signals) | Implemented |
-| Layer 1: PostgreSQL alerts | 48 alerts (all CNPG: product-db + auth-db + shared-db per-cluster, + backups) | Implemented |
+| Layer 1: PostgreSQL alerts | 42 alerts (all CNPG: product-db + platform-db per-cluster, + backups) | Implemented |
 | Layer 2: SLO alerts | 60 alerts (10 services x 3 SLOs x 2 severities) | Implemented |
 | Alert dashboard | Karma reading VMAlertmanager API | Implemented |
 | Layer 1: Database connection pool | PgDog pooler saturation alerts | Planned |
@@ -304,4 +304,4 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 
 ---
 
-_Last updated: 2026-07-14 — Zalando→CNPG migration: PostgreSQL is all-CNPG (48 alerts per-cluster); diagram style and totals aligned with manifests (163 static + 60 Sloth)._
+_Last updated: 2026-07-17 — RFC-0018: PostgreSQL alerts 42 (cnpg + cnpg-platform-db per-cluster); diagram totals aligned with manifests._

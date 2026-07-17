@@ -1,7 +1,7 @@
 # Temporal server, reconciled by the temporal-operator.
-# Two SQL stores live in the CNPG `temporal-db` cluster (see
-# configs/databases/clusters/temporal-db/); the `temporal` role password is the
-# CNPG-generated `temporal-db-app` secret.
+# Two SQL stores live in the CNPG `platform-db` cluster (see
+# configs/databases/clusters/platform-db/); the `temporal` role password is in
+# `platform-db-temporal-secret` (ESO, copied to the temporal namespace).
 #
 # Server pinned to 1.24.x: operator v0.20.0 (published chart 0.6.0) supports
 # ">=1.14.0 <1.25.0". Bump once the operator re-publishes its chart for v0.22.0.
@@ -27,19 +27,19 @@ spec:
 
   persistence:
     defaultStore:
-      # DB is pre-provisioned by CNPG (bootstrap.initdb.database: temporal); the
-      # CNPG-generated `temporal` role has no CREATEDB, so the operator's
-      # temporal-sql-tool `create` step fails "permission denied to create
-      # database". skipCreate tells the operator the datastore already exists. (Bug 16)
+      # DB is pre-provisioned by CNPG (postInitSQL in platform-db instance.yaml);
+      # the `temporal` role has no CREATEDB, so the operator's temporal-sql-tool
+      # `create` step fails "permission denied to create database". skipCreate
+      # tells the operator the datastore already exists. (Bug 16)
       skipCreate: true
       sql:
         user: temporal
         pluginName: postgres12
         databaseName: temporal
-        connectAddr: temporal-db-rw.temporal.svc.cluster.local:5432
+        connectAddr: platform-db-rw.platform.svc.cluster.local:5432
         connectProtocol: tcp
       passwordSecretRef:
-        name: temporal-db-app
+        name: platform-db-temporal-secret
         key: password
     visibilityStore:
       # temporal_visibility is pre-created by CNPG postInitSQL; skip operator
@@ -49,10 +49,10 @@ spec:
         user: temporal
         pluginName: postgres12
         databaseName: temporal_visibility
-        connectAddr: temporal-db-rw.temporal.svc.cluster.local:5432
+        connectAddr: platform-db-rw.platform.svc.cluster.local:5432
         connectProtocol: tcp
       passwordSecretRef:
-        name: temporal-db-app
+        name: platform-db-temporal-secret
         key: password
 
   services:

@@ -1,0 +1,30 @@
+# Generated from cnpg/cluster chart v0.6.0 (helm template) with fullnameOverride=platform-db, namespace=platform.
+# Do not edit expr by hand; re-render from chart and split, or bump chart version in README.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: platform-db-cluster-high-connection-critical
+  namespace: platform
+  labels:
+    app.kubernetes.io/part-of: cnpg-chart-rules
+    cnpg.io/cluster: platform-db
+    platform.duynhlab.dev/source: cloudnative-pg-charts-cluster
+    platform.duynhlab.dev/chart-version: 0.6.0
+spec:
+  groups:
+  - name: cloudnative-pg/platform-db
+    rules:
+    - alert: CNPGClusterHighConnectionsCritical
+      annotations:
+        summary: CNPG Instance maximum number of connections critical!
+        description: 'CloudNativePG Cluster "platform/platform-db" instance {{ $labels.pod }} is using {{ $value }}% of
+
+          the maximum number of connections.'
+        runbook_url: https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/docs/runbooks/CNPGClusterHighConnectionsCritical.md
+      expr: sum by (pod) (cnpg_backends_total{namespace="platform", pod=~"platform-db-([1-9][0-9]*)$"}) / max by (pod) (cnpg_pg_settings_setting{name="max_connections", namespace="platform", pod=~"platform-db-([1-9][0-9]*)$"}) * 100 > 95
+      for: 5m
+      labels:
+        severity: critical
+        namespace: platform
+        cnpg_cluster: platform-db

@@ -32,17 +32,9 @@ spec:
   healthChecks:
     - apiVersion: postgresql.cnpg.io/v1
       kind: Cluster
-      name: auth-db
-      namespace: auth
-    - apiVersion: postgresql.cnpg.io/v1
-      kind: Cluster
-      name: shared-db
-      namespace: user
+      name: platform-db
+      namespace: platform
     - apiVersion: postgresql.cnpg.io/v1
       kind: Cluster
       name: product-db
       namespace: product
-    - apiVersion: postgresql.cnpg.io/v1
-      kind: Cluster
-      name: temporal-db
-      namespace: temporal

@@ -1,6 +1,6 @@
 # Connection Poolers Deep Dive
 
-This document provides a detailed analysis of the connection pooling strategies used in the platform, including architecture, trade-offs, and configuration details for **PgBouncer**, **PgCat**, and **PgDog**. **PgDog is the only pooler deployed** — one standalone Helm release per CloudNativePG cluster: `pgdog-product` (fronts `product-db`, pooling **product**, **cart**, **order**, **payment** — the payment *app* connects direct over TLS, bypassing the pooler), `pgdog-auth` (`auth-db`), and `pgdog-shared` (`shared-db`). **PgBouncer** (the former Zalando sidecar) and **PgCat** are documented here for **comparison only** — neither is deployed after the Zalando→CloudNativePG migration.
+This document provides a detailed analysis of the connection pooling strategies used in the platform, including architecture, trade-offs, and configuration details for **PgBouncer**, **PgCat**, and **PgDog**. **PgDog is the only pooler deployed** — two standalone Helm releases: `pgdog-platform` (fronts `platform-db`, pooling **auth**, **user**, **notification**, **shipping**, **review** — Temporal connects direct past it), and `pgdog-product` (`product-db`, pooling **product**, **cart**, **order** — the payment *app* connects direct over TLS, bypassing the pooler). **PgBouncer** (the former Zalando sidecar) and **PgCat** are documented here for **comparison only** — neither is deployed after the Zalando→CloudNativePG migration and RFC-0018 consolidation.
 
 ## 1. Why Connection Pooling?
 
@@ -30,18 +30,17 @@ PostgreSQL uses a **process-based model** where each connection spawns a new OS 
 | **Pool Modes** | Session, Transaction, Statement | Session, Transaction | Session, Transaction |
 | **Deployment** | Sidecar (Zalando) | Standalone Deployment | Standalone Helm Chart |
 | **Maturity** | Very High (Standard) | High (PostgresML maintained) | Moderate/New |
-| **Used In** | Not deployed (former Zalando sidecar) | Not deployed (see §3.2) | `product-db`, `auth-db`, `shared-db` (all CNPG clusters) |
+| **Used In** | Not deployed (former Zalando sidecar) | Not deployed (see §3.2) | `platform-db`, `product-db` (both CNPG clusters) |
 
 ### Current implementation
 
-**PgDog** is deployed as one standalone Helm release per CloudNativePG cluster
+**PgDog** is deployed as one standalone Helm release per operational CloudNativePG cluster
 (all on port `6432`, OpenMetrics `9090`):
 
 | Release | Cluster | Scope |
 | :--- | :--- | :--- |
-| `pgdog-product` | `product-db` | **product**, **cart**, **order**, and **payment** databases on the unified CNPG primary (payment app: direct-TLS) |
-| `pgdog-auth` | `auth-db` | **auth** database |
-| `pgdog-shared` | `shared-db` | **user**, **notification**, **shipping**, **review** databases |
+| `pgdog-platform` | `platform-db` | **auth**, **user**, **notification**, **shipping**, **review** (Temporal: direct to `platform-db-rw`) |
+| `pgdog-product` | `product-db` | **product**, **cart**, **order** (payment app: direct-TLS) |
 
 ---
 
@@ -49,7 +48,7 @@ PostgreSQL uses a **process-based model** where each connection spawns a new OS 
 
 ### 3.1. PgBouncer (Sidecar) — comparison only, no longer deployed
 
-**Formerly used by**: `auth-db`, `supporting-shared-db` under the Zalando operator. After the migration to CloudNativePG these clusters (`auth-db`, `shared-db`) are fronted by **PgDog** instead (see §3.3). The description below documents the PgBouncer sidecar model for comparison.
+**Formerly used by**: `auth-db`, `supporting-shared-db` under the Zalando operator. After the migration to CloudNativePG and RFC-0018 consolidation these workloads run on **`platform-db`**, fronted by **PgDog** (`pgdog-platform`) instead (see §3.3). The description below documents the PgBouncer sidecar model for comparison.
 
 **Architecture:**
 - **Sidecar Pattern**: Deployed tightly coupled with the PostgreSQL pod.
@@ -74,7 +73,7 @@ PostgreSQL uses a **process-based model** where each connection spawns a new OS 
 ---
 
 ### 3.2. PgCat (Standalone / Router)
-**Used by**: **Not used for CloudNativePG in this platform.** CNPG workloads previously split across separate clusters now run on a single primary cluster (`product-db`); **PgDog** handles connection pooling and routing for **product**, **cart**, **order**, and **payment** databases (see §3.3). PgCat remains documented here for comparison with PgDog and for teams evaluating Rust-based routers.
+**Used by**: **Not used for CloudNativePG in this platform.** CNPG workloads previously split across separate clusters now run on **`platform-db`** and **`product-db`**; **PgDog** handles connection pooling and routing (see §3.3). PgCat remains documented here for comparison with PgDog and for teams evaluating Rust-based routers.
 
 **Architecture (reference):**
 - **Standalone Deployment**: Typical pattern is a separate Deployment (e.g. per namespace).
@@ -100,7 +99,7 @@ PostgreSQL uses a **process-based model** where each connection spawns a new OS 
 ---
 
 ### 3.3. PgDog (Standalone / Router)
-**Used by**: **all CloudNativePG clusters** via one standalone Helm release each — `pgdog-product` (`product-db`: product, cart, order, payment — the payment app connects direct-TLS, bypassing PgDog), `pgdog-auth` (`auth-db`: auth), and `pgdog-shared` (`shared-db`: user, notification, shipping, review). PgDog is the sole pooler on the platform — it replaced both the Zalando PgBouncer sidecars and the earlier PgCat deployment.
+**Used by**: **both operational CloudNativePG clusters** via one standalone Helm release each — `pgdog-platform` (`platform-db`: auth, user, notification, shipping, review — Temporal connects direct, bypassing PgDog), and `pgdog-product` (`product-db`: product, cart, order — payment app connects direct-TLS, bypassing PgDog). PgDog is the sole pooler on the platform — it replaced both the Zalando PgBouncer sidecars and the earlier PgCat deployment.
 
 **Architecture:**
 - **Helm Chart**: Deployed via `pgdog` Helm chart (one release per cluster).
@@ -144,8 +143,8 @@ PostgreSQL uses a **process-based model** where each connection spawns a new OS 
 | **Simple / Standard** | **PgBouncer** | "Just works", minimal config, industry standard. |
 | **High Read Traffic** | **PgDog** (CNPG) / **PgCat** (generic) | PgDog routes CNPG traffic; PgCat-style parsers can split reads to replicas when enabled. |
 | **Sharding** | **PgCat** (generic) | Built-in sharding logic; not required for current `product-db` layout. |
-| **Extreme Concurrency** | **PgDog** | Multi-threaded Rust pooler for `product-db` (product / cart / order / payment). |
+| **Extreme Concurrency** | **PgDog** | Multi-threaded Rust pooler for `platform-db` and `product-db`. |
 
 ---
 
-_Last updated: 2026-07-11 — PgDog is now the sole deployed pooler (per-cluster releases pgdog-product/pgdog-auth/pgdog-shared); PgBouncer/PgCat kept for comparison only after the Zalando→CloudNativePG migration._
+_Last updated: 2026-07-17 — RFC-0018: 2 PgDog releases (`pgdog-platform`, `pgdog-product`); PgBouncer/PgCat kept for comparison only._

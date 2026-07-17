@@ -89,25 +89,23 @@ flowchart TB
     Payment -->|"provider HTTP"| Provider
 
     subgraph Data["Data stores"]
-        AuthDB[("auth-db")]
+        PlatformDB[("platform-db")]
         ProductDB[("product-db")]
-        SharedDB[("shared-db")]
-        TemporalDB[("temporal-db")]
         Valkey[("Valkey")]
     end
-    Auth --> AuthDB
+    Auth --> PlatformDB
     Product --> ProductDB
     Cart --> ProductDB
     Checkout --> ProductDB
     CheckoutWorker -->|"expire sessions"| ProductDB
     Order --> ProductDB
     Payment --> ProductDB
-    User --> SharedDB
-    Review --> SharedDB
-    Shipping --> SharedDB
-    Notification --> SharedDB
+    User --> PlatformDB
+    Review --> PlatformDB
+    Shipping --> PlatformDB
+    Notification --> PlatformDB
     Product --> Valkey
-    Temporal --> TemporalDB
+    Temporal --> PlatformDB
 
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
@@ -119,7 +117,7 @@ flowchart TB
     class Auth,User,Product,Review,Cart,Checkout,Order,Shipping,Payment,Notification service;
     class CheckoutWorker,OrderWorker worker;
     class Temporal platform;
-    class AuthDB,ProductDB,SharedDB,TemporalDB,Valkey data;
+    class PlatformDB,ProductDB,Valkey data;
     class Internet,Provider external;
 ```
 

@@ -38,11 +38,9 @@ All clusters run on **CloudNativePG**:
 
 | Cluster | Operator | Why |
 |---------|----------|-----|
-| `product-db` | CloudNativePG | Primary cluster for product, cart, order, and payment; PostgreSQL 18; sync quorum `ANY 1`; PgDog (`pgdog-product`); backup/PITR; DR replica |
+| `platform-db` | CloudNativePG | Consolidated platform cluster (auth, user, notification, shipping, review, temporal); 3-node HA (sync quorum `ANY 1`); PgDog (`pgdog-platform`); Barman backups |
+| `product-db` | CloudNativePG | Primary cluster for product, cart, order, checkout, and payment; PostgreSQL 18; sync quorum `ANY 1`; PgDog (`pgdog-product`); backup/PITR; DR replica |
 | `product-db-replica` | CloudNativePG | DR replica cluster following the `product-db` object-store backup/WAL path |
-| `auth-db` | CloudNativePG | 3-node HA (sync quorum `ANY 1`), PgDog (`pgdog-auth`), Barman backups; migrated from Zalando |
-| `shared-db` | CloudNativePG | Shared single-node cluster (user, notification, shipping, review) with PgDog (`pgdog-shared`); migrated from the former Zalando `supporting-shared-db` |
-| `temporal-db` | CloudNativePG | Single-node backing store for Temporal (`temporal` + `temporal_visibility`); no pooler, no backup |
 
 ## Architecture Difference
 
@@ -137,4 +135,4 @@ temporarily unavailable.
 - [010-drp.md](./010-drp.md) - Production-ready DRP model for this homelab.
 
 ---
-_Last updated: 2026-07-11_
+_Last updated: 2026-07-17 (RFC-0018: 3-cluster inventory)_

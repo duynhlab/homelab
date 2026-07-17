@@ -1,7 +1,7 @@
 # NOTE: kindnet DOES enforce NetworkPolicy on Kind K8s 1.34+ (verified round 7) —
 # these rules are LIVE. Any ingress not explicitly allowed below is dropped.
-# user namespace hosts: the user service (HTTP :8080), the CNPG shared-db cluster
-# (single node) serving user/notification/shipping/review, and the pgdog-shared pooler.
+# user namespace hosts the user service (HTTP :8080).
+# Database traffic moved to platform-db / pgdog-platform (RFC-0018).
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -31,54 +31,3 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
-    # CloudNativePG operator → shared-db instance manager (status/health probes that
-    # drive Cluster readiness — without this databases-local times out) + SQL mgmt.
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: cloudnative-pg
-      ports:
-        - protocol: TCP
-          port: 8000
-        - protocol: TCP
-          port: 5432
-    # Metrics scrape (VMAgent, monitoring ns) → cnpg postgres_exporter (9187)
-    # + pgdog-shared pooler openmetrics (9090).
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: monitoring
-      ports:
-        - protocol: TCP
-          port: 9187
-        - protocol: TCP
-          port: 9090
-    # Intra-namespace: user-service/migration → PgDog (6432) + PgDog → Postgres
-    # (5432) + operator status probe (8000).
-    - from:
-        - podSelector: {}
-      ports:
-        - protocol: TCP
-          port: 5432
-        - protocol: TCP
-          port: 6432
-        - protocol: TCP
-          port: 8000
-    # App services in sibling namespaces (notification, shipping, review) → PgDog
-    # pooler (6432) for runtime + shared-db-rw for migration initContainers (5432).
-    # Without this the migration initContainer stalls in Init → apps-local times out.
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: notification
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: shipping
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: review
-      ports:
-        - protocol: TCP
-          port: 6432
-        - protocol: TCP
-          port: 5432

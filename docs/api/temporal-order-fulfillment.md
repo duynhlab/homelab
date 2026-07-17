@@ -537,7 +537,7 @@ flowchart LR
         OP[temporal-operator]
         TC[TemporalCluster<br/>frontend/history/matching/worker]
         UI[Web UI]
-        TDB[(CNPG temporal-db<br/>temporal + temporal_visibility)]
+        TDB[(CNPG platform-db<br/>temporal + temporal_visibility<br/>direct :5432)]
         OP --> TC
         TC --> TDB
         TC --> UI
@@ -554,10 +554,10 @@ flowchart LR
 Deployed via the **`alexandrevilain/temporal-operator`** (see **[ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/)** for why the operator over the official Helm chart, and the server-version constraint):
 
 - **Operator** — `controllers/temporal/` holds the `HelmRelease` (chart `0.6.0`; its `HelmRepository` source lives in `clusters/local/sources/helm/`); installs the `TemporalCluster`/`TemporalNamespace` CRDs; webhook certs via cert-manager.
-- **`TemporalCluster` + `mop` `TemporalNamespace`** (retention 168h) — `configs/temporal/`: server **`1.24.2`** (target 1.27.x — ADR-002), `numHistoryShards: 512`, persistence → `temporal-db` (default + `temporal_visibility`) via the **CNPG-generated `temporal-db-app`** secret, `ui.enabled`, `admintools.enabled`, `metrics.prometheus.scrapeConfig.serviceMonitor.enabled`, resources set on every operator-created pod for Kyverno.
-- **`temporal-db`** — `configs/databases/clusters/temporal-db/`: a CloudNativePG cluster with the two SQL stores. Single instance for now (Temporal HA is at the service layer); scaling + Barman backups are a follow-up.
+- **`TemporalCluster` + `mop` `TemporalNamespace`** (retention 168h) — `configs/temporal/`: server **`1.24.2`** (target 1.27.x — ADR-002), `numHistoryShards: 512`, persistence → `platform-db-rw.platform:5432` (default + `temporal_visibility`) via **`platform-db-temporal-secret`**, `ui.enabled`, `admintools.enabled`, `metrics.prometheus.scrapeConfig.serviceMonitor.enabled`, resources set on every operator-created pod for Kyverno.
+- **`platform-db`** — `configs/databases/clusters/platform-db/`: consolidated CloudNativePG cluster (RFC-0018) hosting `temporal` + `temporal_visibility` alongside auth and supporting databases. 3-node HA; Barman backups at `s3://pg-backups-cnpg/platform-db/`.
 - **Edge & alerts** — Kong ingress `temporal.duynh.me`; `TemporalServerDown` + service/persistence error-rate `PrometheusRule`s (`configs/temporal/prometheusrule.yaml`).
-- **Flux order** — `controllers → temporal-operator` (the operator HelmRelease `dependsOn` cert-manager, since its chart renders a cert-manager `Certificate`/`Issuer` for the admission webhook); `databases → temporal-db`; a `temporal` Kustomization (`dependsOn` controllers, cert-manager, databases, monitoring) before `apps`; the order worker `dependsOn` temporal.
+- **Flux order** — `controllers → temporal-operator` (the operator HelmRelease `dependsOn` cert-manager, since its chart renders a cert-manager `Certificate`/`Issuer` for the admission webhook); `databases → platform-db`; a `temporal` Kustomization (`dependsOn` controllers, cert-manager, databases, monitoring) before `apps`; the order worker `dependsOn` temporal.
 
 ## Deploy and Run It
 
@@ -603,8 +603,7 @@ Deliberate deviations from the original design:
   shipping `UNIQUE(order_id)`.
 
 **Roadmap / planned (⏳):** tracked as **Future work in [RFC-0001](../proposals/rfc/RFC-0001/)** —
-server bump 1.27.x, Grafana dashboard, temporal-db HA + Barman backups, and
-GameDay drills. Already shipped from that list: cache-bust on reserve
+server bump 1.27.x, Grafana dashboard, platform-db DR replica cluster, and GameDay drills are follow-ups. Already shipped from that list: cache-bust on reserve
 (ReserveStock/ReleaseStock invalidate `product:{id}`), workflow/activity RED
 metrics (`pkg/temporalx` MetricsHandler), and the internal cart-clear (as-built
 notes above).
@@ -621,4 +620,4 @@ notes above).
 - [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared idempotency state machine
 - [RFC-0010](../proposals/rfc/RFC-0010/) — payment and fulfillment design
 
-_Last updated: 2026-07-14_
+_Last updated: 2026-07-17_

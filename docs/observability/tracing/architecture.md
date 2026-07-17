@@ -101,7 +101,7 @@ config that makes this reliable.
 **4. Jaeger v2 (Alternative Backend)** — `jaegertracing/jaeger` Helm chart, all-in-one
 - **Purpose**: Alternative UI, learning / comparison
 - **Storage**: **In-memory (100k traces max), ephemeral** — Jaeger has no S3/object-storage backend (persistence would need badger-PVC or external ES/ClickHouse)
-- **Query**: Built-in Jaeger UI (port 16686, `jaeger-query` Service)
+- **Query**: Built-in Jaeger UI (port 16686, `jaeger` Service)
 - **Integration**: Grafana datasource
 
 ## Why Multiple Backends?

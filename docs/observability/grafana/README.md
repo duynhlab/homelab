@@ -29,7 +29,7 @@ All datasources are managed as `GrafanaDatasource` CRDs (GitOps, no manual confi
 | VictoriaMetrics | `victoriametrics-metrics-datasource` | Yes | `vmsingle-victoria-metrics:8428` | Metrics (PromQL/MetricsQL), dashboards, Explore |
 | VictoriaLogs | `victoriametrics-logs-datasource` | No | `vlsingle-victoria-logs:9428` | Log queries (LogsQL), trace correlation, [plugin](https://grafana.com/grafana/plugins/victoriametrics-logs-datasource/) |
 | Tempo | `tempo` | No | `tempo:3200` | Trace queries |
-| Jaeger | `jaeger` | No | `jaeger-query:16686` | Trace search (alternative UI) |
+| Jaeger | `jaeger` | No | `jaeger:16686` | Trace search (alternative UI) |
 | Pyroscope | `grafana-pyroscope-datasource` | No | `pyroscope:4040` | Flamegraphs |
 
 See [datasources.md](datasources.md) for metrics datasource details and Grafana Alerting UI notes.

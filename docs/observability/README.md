@@ -401,7 +401,7 @@ cluster-scoped CRDs would make upgrades ambiguous.
 | VMAlertmanager | monitoring | `vmalertmanager-victoria-metrics` | 9093 | Alert routing and notification |
 | Grafana | monitoring | `grafana-service` | 3000 | Dashboards and visualization |
 | Tempo | monitoring | `tempo` | 3200 | Trace storage (OTLP receiver) |
-| Jaeger | monitoring | `jaeger-query` | 16686 | Trace query UI (alternative to Tempo) |
+| Jaeger | monitoring | `jaeger` | 16686 | Trace query UI (alternative to Tempo) |
 | VictoriaTraces | monitoring | `vtsingle-victoria-traces` | 10428 | Trace storage pilot (`v0.9.4`, OTLP HTTP + Jaeger query API) |
 | OTel Collector | monitoring | `otel-collector-opentelemetry-collector` | 4318 | OTLP/HTTP ingress — metrics (→ vmagent), logs (app tee + Kong runtime), trace fan-out |
 | VictoriaLogs | monitoring | `vlsingle-victoria-logs` | 9428 | Log storage and query (LogsQL, sole log backend) |
@@ -464,7 +464,7 @@ kubectl port-forward svc/grafana-service -n monitoring 3000:3000
 kubectl port-forward svc/vmsingle-victoria-metrics -n monitoring 8428:8428
 
 # Jaeger (trace search UI)
-kubectl port-forward svc/jaeger-query -n monitoring 16686:16686
+kubectl port-forward svc/jaeger -n monitoring 16686:16686
 
 # Pyroscope (flamegraphs)
 kubectl port-forward svc/pyroscope -n monitoring 4040:4040

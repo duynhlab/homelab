@@ -18,7 +18,7 @@ spec:
     name: Jaeger
     type: jaeger
     uid: jaeger
-    url: http://jaeger-query.monitoring.svc.cluster.local:16686
+    url: http://jaeger.monitoring.svc.cluster.local:16686
   instanceSelector:
     matchLabels:
       dashboards: grafana

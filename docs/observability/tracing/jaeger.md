@@ -9,7 +9,7 @@ Jaeger is an open-source distributed tracing platform that runs alongside Grafan
 ### Access Jaeger UI
 
 ```bash
-kubectl port-forward -n monitoring svc/jaeger-query 16686:16686
+kubectl port-forward -n monitoring svc/jaeger 16686:16686
 ```
 
 Open: http://localhost:16686
@@ -196,7 +196,7 @@ Located at: `kubernetes/infra/configs/observability/grafana/datasource-jaeger.ya
 datasource:
   name: Jaeger
   type: jaeger
-  url: http://jaeger-query.monitoring.svc.cluster.local:16686
+  url: http://jaeger.monitoring.svc.cluster.local:16686
   jsonData:
     tracesToLogsV2:
       datasourceUid: victorialogs

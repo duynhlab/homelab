@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Postgres **deep-signal alerts** ([`deep-signals-alerts.yaml`](kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/deep-signals-alerts.yaml)): blocked queries, deadlocks, autovacuum-behind, low cache-hit, temp-file spill, checkpoint pressure, XID wraparound (warn/critical), and WAL-archive failing — label-driven by `cnpg_io_cluster`, one file covering `platform-db` + `product-db`.
+- CNPG-native Grafana boards **`pg-query-performance`** (pg_stat_statements deep-dive) and **`pg-maintenance`** (locks, checkpointer, autovacuum, bloat), replacing four No-Data PMM boards; `pgdog` board gains a `pooler` selector.
 - **`platform-db`** CNPG cluster (ns `platform`, HA ×3): merges former `auth-db`,
   `shared-db`, and `temporal-db` logical databases; Barman backups under
   `s3://pg-backups-cnpg/platform-db/`.
@@ -34,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `auth-db`, `shared-db`, and `temporal-db` cluster manifests; `pgdog-auth` and
   `pgdog-shared` poolers; `cnpg-auth-db/` and `cnpg-shared-db/` alert rules.
+
+### Fixed
+
+- `platform-db` low-disk-space alerts queried `namespace="auth"` (stale render) and
+  could never fire; corrected to `namespace="platform"`.
 
 
 ### Added

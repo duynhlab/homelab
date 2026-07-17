@@ -1,0 +1,149 @@
+# Hand-authored deep-signal Postgres alerts (NOT chart-generated).
+# Label-driven by `cnpg_io_cluster`, so each rule fires per-cluster and covers
+# platform-db + product-db from one file. Consumes custom-query + default CNPG
+# metrics that the chart rules don't alert on. See docs custom-metrics.md.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: postgres-deep-signals
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: postgres-deep-signals
+    platform.duynhlab.dev/source: homelab-authored
+spec:
+  groups:
+  - name: postgres-deep-signals
+    rules:
+    # --- Contention -------------------------------------------------------
+    - alert: CNPGBlockedQueries
+      expr: max by (cnpg_io_cluster) (cnpg_pg_blocking_queries_blocked_queries) > 0
+      for: 10m
+      labels:
+        severity: warning
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: Queries blocked on locks ({{ $labels.cnpg_io_cluster }})
+        description: >-
+          {{ $value }} session(s) on {{ $labels.cnpg_io_cluster }} have been waiting on a
+          lock held by another session for >10m. Inspect pg_locks / pg_blocking_pids and the
+          Locks & Blocking panels.
+
+    - alert: CNPGDeadlocksIncreasing
+      expr: sum by (cnpg_io_cluster, datname) (increase(cnpg_pg_stat_database_deadlocks[10m])) > 0
+      for: 5m
+      labels:
+        severity: warning
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: Deadlocks detected on {{ $labels.cnpg_io_cluster }}/{{ $labels.datname }}
+        description: >-
+          {{ $value | printf "%.0f" }} deadlock(s) in the last 10m on database
+          {{ $labels.datname }}. Recurring deadlocks indicate a lock-ordering problem in the app.
+
+    # --- Autovacuum / bloat ----------------------------------------------
+    - alert: CNPGAutovacuumFallingBehind
+      expr: |-
+        (
+          cnpg_pg_stat_user_tables_autovacuum_n_dead_tup
+          / clamp_min(cnpg_pg_stat_user_tables_autovacuum_n_dead_tup
+                      + cnpg_pg_stat_user_tables_autovacuum_n_live_tup, 1)
+        ) > 0.2
+        and cnpg_pg_stat_user_tables_autovacuum_n_dead_tup > 1000
+      for: 30m
+      labels:
+        severity: warning
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: Autovacuum behind on {{ $labels.datname }}.{{ $labels.relname }}
+        description: >-
+          Table {{ $labels.cnpg_io_cluster }}/{{ $labels.datname }}.{{ $labels.relname }} has a
+          dead-tuple ratio >20% ({{ $value | printf "%.0f" }} dead) for 30m. Autovacuum is not
+          keeping up — expect bloat. Consider lowering autovacuum_vacuum_scale_factor for this table.
+
+    # --- Cache / I/O ------------------------------------------------------
+    - alert: CNPGLowCacheHitRatio
+      expr: |-
+        (
+          sum by (cnpg_io_cluster) (rate(cnpg_pg_stat_database_blks_hit[5m]))
+          / clamp_min(sum by (cnpg_io_cluster) (rate(cnpg_pg_stat_database_blks_hit[5m])
+                      + rate(cnpg_pg_stat_database_blks_read[5m])), 1)
+        ) < 0.90
+        and sum by (cnpg_io_cluster) (rate(cnpg_pg_stat_database_blks_hit[5m])
+             + rate(cnpg_pg_stat_database_blks_read[5m])) > 50
+      for: 15m
+      labels:
+        severity: warning
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: Buffer cache hit ratio <90% on {{ $labels.cnpg_io_cluster }}
+        description: >-
+          Shared-buffer hit ratio has been below 90% for 15m under real traffic. Working set may
+          no longer fit shared_buffers, or a large scan is evicting hot pages.
+
+    - alert: CNPGTempFileSpill
+      expr: sum by (cnpg_io_cluster) (rate(cnpg_pg_stat_database_temp_bytes[10m])) > 5e6
+      for: 15m
+      labels:
+        severity: warning
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: Queries spilling to disk on {{ $labels.cnpg_io_cluster }}
+        description: >-
+          >5 MB/s of temp files written for 15m on {{ $labels.cnpg_io_cluster }}. Sorts/hashes are
+          exceeding work_mem — tune work_mem or add indexes for the offending queries.
+
+    # --- Checkpoints ------------------------------------------------------
+    - alert: CNPGCheckpointPressure
+      expr: |-
+        sum by (cnpg_io_cluster) (rate(cnpg_pg_stat_checkpointer_checkpoints_req[30m]))
+        > sum by (cnpg_io_cluster) (rate(cnpg_pg_stat_checkpointer_checkpoints_timed[30m]))
+        and sum by (cnpg_io_cluster) (rate(cnpg_pg_stat_checkpointer_checkpoints_req[30m])) > 0.0005
+      for: 30m
+      labels:
+        severity: warning
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: Checkpoints forced by WAL pressure on {{ $labels.cnpg_io_cluster }}
+        description: >-
+          Requested checkpoints outpace timed ones for 30m — checkpoints are triggered by
+          max_wal_size rather than checkpoint_timeout. Raise max_wal_size / checkpoint_timeout.
+
+    # --- Transaction-ID wraparound ---------------------------------------
+    - alert: CNPGTransactionIDWraparoundWarning
+      expr: max by (cnpg_io_cluster, datname) (cnpg_pg_database_xid_age) > 1000000000
+      for: 30m
+      labels:
+        severity: warning
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: XID age >1B on {{ $labels.cnpg_io_cluster }}/{{ $labels.datname }}
+        description: >-
+          age(datfrozenxid) for {{ $labels.datname }} exceeds 1,000,000,000 (~47% of the 2^31
+          wraparound limit). A long-running transaction or stuck autovacuum is preventing freezing.
+
+    - alert: CNPGTransactionIDWraparoundCritical
+      expr: max by (cnpg_io_cluster, datname) (cnpg_pg_database_xid_age) > 1500000000
+      for: 10m
+      labels:
+        severity: critical
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: XID age >1.5B on {{ $labels.cnpg_io_cluster }}/{{ $labels.datname }}
+        description: >-
+          age(datfrozenxid) for {{ $labels.datname }} exceeds 1,500,000,000. Wraparound is
+          approaching; the database will refuse writes near 2^31. Find and kill the oldest
+          transaction and let anti-wraparound autovacuum complete.
+
+    # --- WAL archiving ----------------------------------------------------
+    - alert: CNPGWALArchiveFailing
+      expr: increase(cnpg_pg_stat_archiver_failed_count[30m]) > 0
+      for: 5m
+      labels:
+        severity: critical
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: WAL archiving failing on {{ $labels.cnpg_io_cluster }}
+        description: >-
+          archive_command has failed in the last 30m on {{ $labels.cnpg_io_cluster }}. WAL is
+          piling up in pg_wal and PITR/backup recovery is at risk — check the Barman object store.

@@ -4,6 +4,7 @@ kind: Kustomization
 
 resources:
   - backup-alerts.yaml
+  - deep-signals-alerts.yaml
   - cnpg/cluster-fenced.yaml
   - cnpg/cluster-ha-critical.yaml
   - cnpg/cluster-ha-warning.yaml

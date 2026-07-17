@@ -1,355 +1,242 @@
-# PostgreSQL Custom Metrics Query Guide
+# PostgreSQL Custom Metrics — query reference
+
+Every custom monitoring query the CNPG exporter runs, what it watches, why it
+matters operationally, and how to query and alert on it.
+
+| Quick facts | |
+|---|---|
+| Source | CNPG built-in exporter (`:9187`), per-cluster custom-queries ConfigMap |
+| Clusters | `platform-db` (ns `platform`), `product-db` (ns `product`) — identical query set |
+| Live queries | **12** (see reference below) |
+| Metric prefix | `cnpg_` — the exporter prepends it to every series (`cnpg_pg_stat_statements_calls`) |
+| Related alerts | [`alert-catalog.md` §4/§4b](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) |
 
 ## Overview
 
-All PostgreSQL clusters run on **CloudNativePG (CNPG)** and use the CNPG built-in
-exporter with a per-cluster custom-queries ConfigMap to expose additional metrics
-beyond the standard `cnpg_collector_*` metrics. This guide explains how to query
-these custom metrics.
+All PostgreSQL runs on **CloudNativePG**. Beyond the built-in `cnpg_collector_*`
+health metrics, each cluster loads a custom-queries ConfigMap
+(`spec.monitoring.customQueriesConfigMapList`) that turns hand-written SQL into
+Prometheus metrics. This page documents that custom set — it is the source of
+truth for the `pg-query-performance` and `pg-maintenance` Grafana boards and the
+deep-signal alerts.
 
-## Naming Convention
+## Naming convention
 
-The exporter converts custom queries to metrics using this pattern:
+The exporter maps `{query_name}_{column_name}` → metric, then CNPG prepends
+`cnpg_`. A column with `usage: LABEL` becomes a label; `COUNTER`/`GAUGE` become
+the value.
 
-**Format**: `{query_name}_{column_name}`
+- Query `pg_stat_statements`, column `calls` → **`cnpg_pg_stat_statements_calls`**.
 
-**Example**:
-- Query name: `pg_stat_statements`
-- Column: `calls`
-- Metric name: `pg_stat_statements_calls`
+> Every PromQL example below uses the live `cnpg_`-prefixed name. Series carry
+> `cnpg_io_cluster` (`platform-db`/`product-db`) and `namespace`; filter or group
+> by `cnpg_io_cluster` to separate clusters.
 
-> **CNPG prefix.** CloudNativePG prepends `cnpg_` to every metric the built-in
-> exporter emits, including those from custom queries. The logical query→column
-> mapping below is unprefixed for readability; in VictoriaMetrics the series
-> appears as `cnpg_pg_stat_statements_calls`, etc. Prefix the metric names in the
-> PromQL examples with `cnpg_` when querying the live store.
+## Custom query reference
 
-## Custom Metrics Available
+`[per-db]` = runs against each `target_databases` entry and carries a `datname`
+label. `[cluster]` = runs once per instance (instance-wide view).
 
-### 1. pg_stat_statements Metrics
+### Query performance
 
-**Query Name**: `pg_stat_statements`  
-**Purpose**: Query performance metrics (execution time, calls, cache hits, I/O statistics) - Top 100 queries
+#### `pg_stat_statements` `[per-db]`
 
-**Metrics Exposed**:
+- **What** — top 100 statements per database, ordered by total execution time
+  (excludes utility/`BEGIN`/`COMMIT`/`SAVEPOINT` noise and the `postgres` db).
+- **Columns** — labels `user, datname, queryid, query`; counters `calls`,
+  `time_milliseconds` (total exec time), `rows`, `shared_blks_{hit,read,dirtied,written}`,
+  `local_blks_*`, `temp_blks_{read,written}`, `blk_read_time`, `blk_write_time`
+  (PG17+ `shared_blk_*_time`, live only with `track_io_timing=on`).
+- **Why** — the single most useful tuning signal: find slow, chatty, cache-missing,
+  or disk-spilling queries. Requires the `pg_stat_statements` extension (CNPG
+  enables it automatically).
+- **PromQL**
+  ```promql
+  # Top 10 statements by exec time /s
+  topk(10, sum by (queryid, query) (rate(cnpg_pg_stat_statements_time_milliseconds{cnpg_io_cluster="platform-db"}[5m])))
+  # Mean latency per call
+  rate(cnpg_pg_stat_statements_time_milliseconds[5m]) / clamp_min(rate(cnpg_pg_stat_statements_calls[5m]), 1)
+  # Per-query cache hit ratio
+  rate(cnpg_pg_stat_statements_shared_blks_hit[5m]) / clamp_min(rate(cnpg_pg_stat_statements_shared_blks_hit[5m]) + rate(cnpg_pg_stat_statements_shared_blks_read[5m]), 1)
+  ```
+- **Alerts** — `CNPGLowCacheHitRatio`, `CNPGTempFileSpill` (via `pg_stat_database`); board: `pg-query-performance`.
 
-| Metric Name | Type | Description | Labels |
-|------------|------|-------------|--------|
-| `pg_stat_statements_calls` | COUNTER | Number of times executed | `user`, `datname`, `queryid`, `query` |
-| `pg_stat_statements_time_milliseconds` | COUNTER | Total time spent in the statement, in milliseconds | `user`, `datname`, `queryid`, `query` |
-| `pg_stat_statements_rows` | COUNTER | Total number of rows retrieved or affected | `user`, `datname`, `queryid`, `query` |
-| `pg_stat_statements_shared_blks_hit` | COUNTER | Total number of shared block cache hits | `user`, `datname`, `queryid`, `query` |
-| `pg_stat_statements_shared_blks_read` | COUNTER | Total number of shared blocks read | `user`, `datname`, `queryid`, `query` |
-| `pg_stat_statements_shared_blks_dirtied` | COUNTER | Total number of shared blocks dirtied | `user`, `datname`, `queryid`, `query` |
-| `pg_stat_statements_shared_blks_written` | COUNTER | Total number of shared blocks written | `user`, `datname`, `queryid`, `query` |
-| `pg_stat_statements_local_blks_hit` | COUNTER | Total number of local block cache hits | `user`, `datname`, `queryid`, `query` |
-| `pg_stat_statements_local_blks_read` | COUNTER | Total number of local blocks read | `user`, `datname`, `queryid`, `query` |
-| `pg_stat_statements_local_blks_dirtied` | COUNTER | Total number of local blocks dirtied | `user`, `datname`, `queryid`, `query` |
-| `pg_stat_statements_local_blks_written` | COUNTER | Total number of local blocks written | `user`, `datname`, `queryid`, `query` |
-| `pg_stat_statements_temp_blks_read` | COUNTER | Total number of temp blocks read | `user`, `datname`, `queryid`, `query` |
-| `pg_stat_statements_temp_blks_written` | COUNTER | Total number of temp blocks written | `user`, `datname`, `queryid`, `query` |
-| `pg_stat_statements_blk_read_time` | COUNTER | Total time spent reading blocks, in milliseconds | `user`, `datname`, `queryid`, `query` |
-| `pg_stat_statements_blk_write_time` | COUNTER | Total time spent writing blocks, in milliseconds | `user`, `datname`, `queryid`, `query` |
+### Sessions & contention
 
-**Labels**:
-- `user`: The user who executed the statement
-- `datname`: The database in which the statement was executed
-- `queryid`: Internal hash code, computed from the statement's parse tree
-- `query`: Processed query (truncated to 2000 characters)
+#### `pg_stat_activity_count` `[cluster]`
 
-**Query Details:**
-- **Filtering**: Query excludes:
-  - Queries containing `pg_stat_statements` (to avoid self-monitoring)
-  - `postgres` database (system database)
-  - `SET` statements
-  - `COMMIT` and `BEGIN` statements
-  - `SAVEPOINT` statements
-- **Ordering**: Results ordered by `total_exec_time DESC LIMIT 100` (top 100 slowest queries)
-- **Query Truncation**: Query text truncated to 2000 characters via `SUBSTRING()`
-- **Join**: Joins with `pg_database` to get database name (`datname`)
+- **What** — backend count grouped by database, connection `state`, and user.
+- **Columns** — labels `datname, state, usename`; gauge `count`.
+- **Why** — see connection mix (active vs idle vs `idle in transaction`) and which
+  user/db is holding connections; complements pooler metrics.
+- **PromQL** — `sum by (state) (cnpg_pg_stat_activity_count_count{cnpg_io_cluster="platform-db"})`
 
-### 2. pg_replication Metrics
+#### `pg_connection_limits` `[cluster]`
 
-**Query Name**: `pg_replication`  
-**Purpose**: Replication lag monitoring (critical for HA clusters)
+- **What** — current vs maximum connections.
+- **Columns** — gauges `max_connections`, `current_connections`.
+- **Why** — connection saturation ends in refused clients. Feeds the chart
+  `CNPGClusterHighConnections` alerts.
+- **PromQL** — `cnpg_pg_connection_limits_current_connections / cnpg_pg_connection_limits_max_connections`
 
-**Metrics Exposed**:
+#### `pg_locks_count` `[cluster]`
 
-| Metric Name | Type | Description | Labels |
-|------------|------|-------------|--------|
-| `pg_replication_lag` | GAUGE | Replication lag behind master in seconds | (standard Prometheus labels: `instance`, `job`, `namespace`, etc.) |
+- **What** — held locks grouped by database and lock `mode`.
+- **Columns** — labels `datname, mode`; gauge `count`.
+- **Why** — a spike in `ExclusiveLock`/`RowExclusiveLock` (or growth overall) flags
+  contention before it becomes a stall.
+- **PromQL** — `sum by (mode) (cnpg_pg_locks_count_count{cnpg_io_cluster="platform-db"})`
 
-**Note**: Returns 0 for primary/master, actual lag value for replicas
+#### `pg_blocking_queries` `[cluster]`
 
-**Query Details:**
-- **Query Logic**: 
-  - If `pg_is_in_recovery() = false` (primary/master): Returns 0
-  - If `pg_is_in_recovery() = true` (replica): Returns replication lag in seconds using `EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))`
-- **master flag**: `master: true` - Query only runs on primary/master instance
+- **What** — count of sessions currently **waiting on a lock** held by another.
+- **Columns** — gauge `blocked_queries` (cluster-level; no per-pid detail).
+- **Why** — the clearest lock-contention signal; sustained >0 means queries are stuck.
+- **PromQL** — `max by (cnpg_io_cluster) (cnpg_pg_blocking_queries_blocked_queries)`
+- **Alert** — `CNPGBlockedQueries`.
 
-### 3. pg_postmaster Metrics
+#### `pg_long_running_transactions` `[cluster]`
 
-**Query Name**: `pg_postmaster`  
-**Purpose**: PostgreSQL server start time
+- **What** — instance-wide age of the oldest transaction and idle-in-transaction
+  sessions (from `pg_stat_activity`).
+- **Columns** — gauges `oldest_transaction_seconds`, `oldest_idle_in_transaction_seconds`,
+  `idle_in_transaction_count`, `longest_active_query_seconds`.
+- **Why** — long/idle transactions pin dead tuples (blocking VACUUM) and hold back
+  xid freezing → the root cause of bloat and wraparound. The classic Senior-DBA signal.
+- **PromQL** — `max by (cnpg_io_cluster) (cnpg_pg_long_running_transactions_oldest_transaction_seconds)`
+- **Alerts** — `CNPGLongRunningTransaction`, `CNPGIdleInTransaction`; board: `pg-maintenance`.
 
-**Metrics Exposed**:
+### Autovacuum, bloat & maintenance
 
-| Metric Name | Type | Description | Labels |
-|------------|------|-------------|--------|
-| `pg_postmaster_start_time_seconds` | GAUGE | Time at which postmaster started (Unix timestamp) | (standard Prometheus labels) |
+#### `pg_stat_user_tables_autovacuum` `[per-db]`
 
-**Query Details:**
-- **Function**: Uses `pg_postmaster_start_time()` to get PostgreSQL server start time
-- **master flag**: `master: true` - Query only runs on primary/master instance
-- **Use Case**: Calculate uptime with `time() - pg_postmaster_start_time_seconds`
+- **What** — per-table live/dead tuples and vacuum/analyze counts.
+- **Columns** — labels `datname, schemaname, relname`; gauges `n_dead_tup`,
+  `n_live_tup`; counters `autovacuum_count`, `autoanalyze_count`.
+- **Why** — a high dead/(dead+live) ratio means autovacuum is falling behind → bloat,
+  slower scans, wasted disk.
+- **PromQL**
+  ```promql
+  cnpg_pg_stat_user_tables_autovacuum_n_dead_tup
+    / clamp_min(cnpg_pg_stat_user_tables_autovacuum_n_dead_tup + cnpg_pg_stat_user_tables_autovacuum_n_live_tup, 1)
+  ```
+- **Alert** — `CNPGAutovacuumFallingBehind`.
 
-## Configuration Reference
+#### `pg_stat_progress_vacuum` `[per-db]`
 
-### Query Configuration Files
+- **What** — live progress of **running** VACUUM/autovacuum operations. Emits rows
+  only while a vacuum is in flight (usually none).
+- **Columns** — labels `datname, pid, relname, phase`; gauges `heap_blks_total`,
+  `heap_blks_scanned`, `heap_blks_vacuumed`, `index_vacuum_count`, `num_dead_item_ids`.
+- **Why** — answers "is a big table vacuuming right now, and how far along?" during an
+  incident; distinguishes a stuck vacuum from a slow one.
+- **PromQL** — `cnpg_pg_stat_progress_vacuum_heap_blks_scanned / clamp_min(cnpg_pg_stat_progress_vacuum_heap_blks_total, 1)`
 
-Custom queries are defined in a per-cluster ConfigMap, referenced from the CNPG
-`Cluster` `spec.monitoring.customQueriesConfigMapList`:
-- **platform-db**: `kubernetes/infra/configs/databases/clusters/platform-db/monitoring/`
-- **product-db**: `kubernetes/infra/configs/databases/clusters/product-db/monitoring/`
+#### `pg_table_size` `[per-db]`
 
-### Query Structure
+- **What** — top 30 tables by size (heap + indexes + TOAST).
+- **Columns** — labels `datname, schemaname, tablename`; gauges `total_bytes`,
+  `table_bytes`.
+- **Why** — capacity planning and spotting unexpected growth / bloat.
+- **PromQL** — `topk(20, cnpg_pg_table_size_total_bytes{cnpg_io_cluster="platform-db"})`
 
-Each query in `queries.yaml` follows this structure:
+#### `pg_stat_user_indexes` `[per-db]`
+
+- **What** — per-index scan counts and size.
+- **Columns** — labels `datname, schemaname, relname, indexrelname`; counters
+  `idx_scan`, `idx_tup_read`, `idx_tup_fetch`; gauge `index_bytes`.
+- **Why** — `idx_scan == 0` marks **unused indexes** — dead weight that slows writes
+  and wastes space; drop candidates.
+- **PromQL** — `cnpg_pg_stat_user_indexes_index_bytes and (cnpg_pg_stat_user_indexes_idx_scan == 0)`
+
+### Storage & checkpoints
+
+#### `pg_database_size` `[cluster]`
+
+- **What** — size of each database.
+- **Columns** — label `datname`; gauge `size_bytes`.
+- **Why** — per-database growth trends and disk forecasting.
+- **PromQL** — `cnpg_pg_database_size_size_bytes{cnpg_io_cluster="platform-db"}`
+
+#### `pg_stat_checkpointer` `[cluster]`
+
+- **What** — checkpoint activity from `pg_stat_checkpointer` (PG17+).
+- **Columns** — counters `checkpoints_timed`, `checkpoints_req`,
+  `checkpoint_write_time`, `checkpoint_sync_time`, `buffers_checkpoint`.
+- **Why** — when `checkpoints_req` outpaces `checkpoints_timed`, checkpoints are being
+  forced by WAL pressure (`max_wal_size` too small) rather than the timeout — a tuning
+  signal.
+- **PromQL** — `rate(cnpg_pg_stat_checkpointer_checkpoints_req[30m]) > rate(cnpg_pg_stat_checkpointer_checkpoints_timed[30m])`
+- **Alert** — `CNPGCheckpointPressure`.
+
+> **Not custom queries.** Replication lag (`cnpg_pg_replication_lag`), WAL
+> (`cnpg_collector_pg_wal`), backups (`cnpg_collector_last_*_backup_timestamp`),
+> xid/mxid age (`cnpg_pg_database_xid_age`/`mxid_age`) and per-database
+> `pg_stat_database` come from CNPG's **built-in** collectors, documented in
+> [`monitoring.md`](monitoring.md).
+
+> **No latency heatmap.** `pg_stat_statements` exposes totals + calls only (no
+> per-bucket histogram), so a true query-latency-distribution heatmap is not
+> derivable from these metrics — the boards chart mean/total exec time instead.
+
+## Configuration reference
+
+Custom queries live in a per-cluster ConfigMap referenced from the CNPG `Cluster`
+`spec.monitoring.customQueriesConfigMapList`:
+
+- **platform-db** — `kubernetes/infra/configs/databases/clusters/platform-db/configmaps/monitoring-queries.yaml`
+- **product-db** — `kubernetes/infra/configs/databases/clusters/product-db/configmaps/monitoring-queries.yaml`
+
+Each query:
 
 ```yaml
 query_name:
   query: "SELECT ..."
-  master: true  # Optional: only run on primary/master
+  target_databases:          # optional — run per database and add a datname label
+    - "auth"
   metrics:
     - column_name:
         usage: "COUNTER|GAUGE|LABEL"
-        description: "Description"
+        description: "..."
 ```
 
-**Key Points:**
-- `master: true` - Query only executes on primary/master PostgreSQL instance (important for HA clusters)
-- `usage: "LABEL"` - Column becomes a label in Prometheus metrics
-- `usage: "COUNTER"` - Column becomes a counter metric
-- `usage: "GAUGE"` - Column becomes a gauge metric
-
-## Querying in Prometheus
-
-### Basic Queries
-
-**1. List all custom metrics:**
-```
-{__name__=~"pg_stat_statements_.*|pg_replication_lag|pg_postmaster_start_time_seconds"}
-```
-
-**2. Query execution count per query:**
-```
-rate(pg_stat_statements_calls[5m])
-```
-
-**3. Query execution time (average per call):**
-```
-rate(pg_stat_statements_time_milliseconds[5m]) / rate(pg_stat_statements_calls[5m])
-```
-
-**4. Replication lag:**
-```
-pg_replication_lag
-```
-
-**5. PostgreSQL uptime:**
-```
-time() - pg_postmaster_start_time_seconds
-```
-
-### Filtered Queries
-
-**1. Top 10 queries by execution count (platform-db):**
-```
-topk(10, rate(pg_stat_statements_calls{namespace="platform", datname="auth"}[5m]))
-```
-
-**2. Top 10 slowest queries (platform-db):**
-```
-topk(10, rate(pg_stat_statements_time_milliseconds{namespace="platform", datname="auth"}[5m]) / rate(pg_stat_statements_calls{namespace="platform", datname="auth"}[5m]))
-```
-
-**3. Cache hit ratio per query:**
-```
-rate(pg_stat_statements_shared_blks_hit[5m]) / (rate(pg_stat_statements_shared_blks_hit[5m]) + rate(pg_stat_statements_shared_blks_read[5m]))
-```
-
-**4. Replication lag for HA clusters:**
-```
-pg_replication_lag{namespace="platform"}
-```
-
-**5. Query by specific queryid:**
-```
-pg_stat_statements_calls{queryid="1234567890"}
-```
-
-### Advanced Queries
-
-**1. Total queries per second by database:**
-```
-sum(rate(pg_stat_statements_calls[5m])) by (datname, namespace)
-```
-
-**2. Average query execution time by database:**
-```
-sum(rate(pg_stat_statements_time_milliseconds[5m])) by (datname, namespace) / sum(rate(pg_stat_statements_calls[5m])) by (datname, namespace)
-```
-
-**3. I/O operations per second:**
-```
-sum(rate(pg_stat_statements_shared_blks_read[5m] + pg_stat_statements_shared_blks_written[5m])) by (datname, namespace)
-```
-
-**4. Replication lag alert (if > 10 seconds):**
-```
-pg_replication_lag > 10
-```
+- **`target_databases`** — the exporter runs the query once per listed database and
+  labels the result with `datname`. Omit it for an instance-wide query
+  (e.g. `pg_stat_activity`, `pg_stat_checkpointer`). The ConfigMap carries the
+  `cnpg.io/reload: ""` label, so edits are hot-reloaded without a pod restart.
+- **`usage`** — `LABEL` → Prometheus label; `COUNTER`/`GAUGE` → metric value.
 
 ## Verification
 
-> **CNPG pod model.** There is no separate exporter sidecar. The CNPG instance
-> manager serves metrics on the pod at `:9187` from within the `postgres`
-> container; custom queries come from the ConfigMap in
-> `spec.monitoring.customQueriesConfigMapList`, not a mounted `queries.yaml`.
-
-### Check if metrics are exposed
-
-**1. Port-forward to a CNPG instance pod:**
-```bash
-kubectl port-forward -n platform platform-db-1 9187:9187
-```
-
-**2. Query metrics endpoint:**
-```bash
-curl http://localhost:9187/metrics | grep pg_stat_statements
-curl http://localhost:9187/metrics | grep pg_replication
-curl http://localhost:9187/metrics | grep pg_postmaster
-```
-
-### Check in VMSingle UI (VMUI)
-
-**1. Access VMSingle:**
-```bash
-kubectl port-forward -n monitoring svc/vmsingle-victoria-metrics 8428:8428
-```
-
-**2. Query in VMUI:**
-- Go to: http://localhost:8428/vmui
-- Enter query: `pg_stat_statements_calls`
-- Check labels and values
-
-### Check scrape targets
+> **CNPG pod model.** No exporter sidecar — the instance manager serves `:9187`
+> from the `postgres` container; custom queries come from the ConfigMap, not a
+> mounted `queries.yaml`.
 
 ```bash
-# Verify postgres_exporter is being scraped
-kubectl get podmonitor -n platform platform-db -o yaml
+# New custom metrics present in the store (both clusters):
+kubectl -n monitoring port-forward svc/vmsingle-victoria-metrics 8428:8428 &
+curl -s 'http://localhost:8428/api/v1/label/__name__/values' | tr ',' '\n' \
+  | grep -E 'cnpg_pg_(stat_statements|locks_count|blocking_queries|long_running_transactions|stat_progress_vacuum|stat_user_tables_autovacuum|stat_checkpointer)'
 
-# Check VMAgent targets
-kubectl port-forward -n monitoring svc/vmagent-victoria-metrics 8429:8429
-# Then visit: http://localhost:8429/targets
+# Straight from an instance's exporter:
+kubectl exec -n platform platform-db-1 -c postgres -- \
+  curl -s http://localhost:9187/metrics | grep '^cnpg_pg_long_running_transactions'
 ```
 
-## Common Use Cases
+If a query is missing, check the instance-manager log for SQL errors and confirm
+the ConfigMap is referenced:
 
-### 1. Find Slow Queries
-
-```promql
-topk(10, 
-  rate(pg_stat_statements_time_milliseconds{namespace="review"}[5m]) / 
-  rate(pg_stat_statements_calls{namespace="review"}[5m])
-)
-```
-
-### 2. Monitor Replication Health
-
-```promql
-# Replication lag
-pg_replication_lag{namespace="platform"}
-
-# Alert if lag > 10 seconds
-pg_replication_lag{namespace="platform"} > 10
-```
-
-### 3. Track Query Performance Over Time
-
-```promql
-# Query execution rate
-rate(pg_stat_statements_calls{queryid="1234567890"}[5m])
-
-# Average execution time
-rate(pg_stat_statements_time_milliseconds{queryid="1234567890"}[5m]) / 
-rate(pg_stat_statements_calls{queryid="1234567890"}[5m])
-```
-
-### 4. Database I/O Statistics
-
-```promql
-# Cache hit ratio
-sum(rate(pg_stat_statements_shared_blks_hit[5m])) by (datname) / 
-(sum(rate(pg_stat_statements_shared_blks_hit[5m])) by (datname) + 
- sum(rate(pg_stat_statements_shared_blks_read[5m])) by (datname))
-```
-
-## Troubleshooting
-
-### Metrics not appearing
-
-**1. Check the custom-queries ConfigMap is referenced and present:**
 ```bash
+kubectl logs -n platform platform-db-1 -c postgres | grep -i 'monitoring\|error'
 kubectl get cluster -n platform platform-db -o jsonpath='{.spec.monitoring.customQueriesConfigMapList}'
-kubectl get configmap -n platform -l cnpg.io/cluster=platform-db
 ```
 
-**2. Check the instance-manager logs for query errors:**
-```bash
-kubectl logs -n platform platform-db-1 -c postgres | grep -i "monitoring\|error"
-```
+## Related documentation
 
-**3. Verify pg_stat_statements is enabled:**
-```bash
-kubectl exec -n platform platform-db-1 -c postgres -- psql -U postgres -c "SHOW shared_preload_libraries;"
-```
-
-**4. Verify custom metrics are exposed:**
-```bash
-# Option 1: Direct exec into the postgres container (no port-forward needed)
-kubectl exec -n platform platform-db-1 -c postgres -- curl -s http://localhost:9187/metrics | head -5
-kubectl exec -n platform platform-db-1 -c postgres -- curl -s http://localhost:9187/metrics | grep "^cnpg_pg_stat_statements_calls" | head -3
-
-# Option 2: Port-forward to the instance pod
-kubectl port-forward -n platform platform-db-1 9187:9187 &
-
-# Wait a few seconds, then query metrics
-sleep 3
-curl -s http://localhost:9187/metrics | grep -E "cnpg_pg_stat_statements_calls|cnpg_pg_replication_lag" | head -10
-
-# Or check for any custom metrics
-curl -s http://localhost:9187/metrics | grep "^cnpg_pg_stat_statements\|^cnpg_pg_replication"
-
-# Stop port-forward when done
-kill %1  # or pkill -f "kubectl port-forward"
-```
-
-**Expected output:**
-- **CNPG-prefixed format**: `cnpg_pg_stat_statements_calls{datname="review",query="...",queryid="...",user="postgres"} 4`
-- **No output**: check the instance-manager logs for errors (step 2) and verify the custom-queries ConfigMap is referenced (step 1)
-
-### Metrics have wrong labels
-
-- Check if Prometheus is applying relabel_configs correctly
-- Verify PodMonitor configuration includes correct label selectors
-
-## Related Documentation
-
-- **PostgreSQL Monitoring**: [`monitoring.md`](monitoring.md) - Databases-layer entry point: CNPG cluster inventory and the built-in exporter
-- **Database Guide**: [`docs/databases/002-database-integration.md`](../../../databases/002-database-integration.md) - Custom queries configuration
-- **Metrics hub**: [`docs/observability/metrics/README.md`](../README.md) - Methodology, stack, and coverage
-- **PromQL Guide**: [`docs/observability/metrics/promql-guide.md`](../promql-guide.md) - PromQL functions and examples
+- [`monitoring.md`](monitoring.md) — CNPG exporter overview + built-in collector metrics
+- [`alert-catalog.md`](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) — PostgreSQL alerts (chart set + deep-signal set)
+- [`docs/databases/002-database-integration.md`](../../../databases/002-database-integration.md) — database integration
+- [`promql-guide.md`](../promql-guide.md) — PromQL functions and examples
 
 ---
-_Last updated: 2026-07-17 (RFC-0018: platform-db / product-db PodMonitor paths)_
+_Last updated: 2026-07-18 (documented all 12 live custom queries; removed stale pg_replication/pg_postmaster)_

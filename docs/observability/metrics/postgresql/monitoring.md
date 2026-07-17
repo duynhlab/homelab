@@ -112,10 +112,13 @@ cart, order, payment on `product-db`).
 | Query name | CNPG metric prefix | Purpose |
 |---|---|---|
 | pg_stat_statements | `cnpg_pg_stat_statements_*` | Top 100 queries by execution time |
+| pg_stat_activity_count | `cnpg_pg_stat_activity_count_*` | Backends by database / state / user |
 | pg_connection_limits | `cnpg_pg_connection_limits_*` | Connection saturation |
 | pg_locks_count | `cnpg_pg_locks_count_*` | Lock distribution |
 | pg_blocking_queries | `cnpg_pg_blocking_queries_*` | Queries waiting on locks |
+| pg_long_running_transactions | `cnpg_pg_long_running_transactions_*` | Oldest / idle-in-transaction age |
 | pg_stat_user_tables_autovacuum | `cnpg_pg_stat_user_tables_autovacuum_*` | Dead tuples and vacuum activity |
+| pg_stat_progress_vacuum | `cnpg_pg_stat_progress_vacuum_*` | Live progress of running vacuums |
 | pg_table_size | `cnpg_pg_table_size_*` | Table size (top 30) |
 | pg_stat_user_indexes | `cnpg_pg_stat_user_indexes_*` | Index usage and size |
 | pg_database_size | `cnpg_pg_database_size_*` | Database sizes |
@@ -130,8 +133,12 @@ Per-metric query details (columns, labels, filtering) are documented in
 # Connection saturation
 cnpg_pg_connection_limits_current_connections / cnpg_pg_connection_limits_max_connections
 
-# Dead-tuple ratio
+# Dead-tuple ratio (dead / (dead + live))
 cnpg_pg_stat_user_tables_autovacuum_n_dead_tup
+  / clamp_min(cnpg_pg_stat_user_tables_autovacuum_n_dead_tup + cnpg_pg_stat_user_tables_autovacuum_n_live_tup, 1)
+
+# Oldest open / idle-in-transaction age (seconds)
+max by (cnpg_io_cluster) (cnpg_pg_long_running_transactions_oldest_transaction_seconds)
 
 # Top queries by execution time
 topk(10, rate(cnpg_pg_stat_statements_time_milliseconds[5m]))

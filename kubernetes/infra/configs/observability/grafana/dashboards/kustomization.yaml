@@ -12,10 +12,8 @@ resources:
   - grafana-dashboard-temporal.yaml
   # - grafana-dashboard-pgcat.yaml
   - grafana-dashboard-cloudnative-pg.yaml
-  - grafana-dashboard-pg-monitoring.yaml
-  - grafana-dashboard-pg-query-drilldown.yaml
-  - grafana-dashboard-pg-query-overview.yaml
-  - grafana-dashboard-postgres-replication-lag.yaml
+  - grafana-dashboard-pg-query-performance.yaml
+  - grafana-dashboard-pg-maintenance.yaml
   - grafana-dashboard-pgdog.yaml
   - grafana-dashboard-redis.yaml
   - grafana-dashboard-kubernetes-cluster-overview.yaml

@@ -1,0 +1,17 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: pg-maintenance
+  namespace: monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "Databases"
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  url: "https://raw.githubusercontent.com/duynhlab/grafana-dashboards/main/dashboard/postgresql/pg-maintenance.json"
+  contentCacheDuration: 48h
+  datasources:
+    - inputName: DS_PROMETHEUS
+      datasourceName: VictoriaMetrics

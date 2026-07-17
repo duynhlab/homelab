@@ -30,7 +30,7 @@ marked inline below.
 | [Microservices (RED)](#1-microservices-red-metrics) | 19 | The 10 Go services; workers also contribute runtime heartbeat series. Incl. 4 app-side DB-client alerts (RFC-0017 W4) |
 | [Kong gateway](#2-kong-gateway) | 13 | The single API ingress for the whole platform |
 | [Valkey cache](#3-valkey-cache) | 7 | Cache-aside layer in front of PostgreSQL |
-| [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 42 (+2 gated) | Two operational CNPG clusters (`platform-db`, `product-db`) + DR (`product-db-replica`) + backups |
+| [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 51 (+2 gated) | Two operational CNPG clusters (`platform-db`, `product-db`) + DR (`product-db-replica`) + backups + deep-signal alerts |
 | [Kubernetes](#5-kubernetes) | 29 | Nodes, workloads, pods, API server, control plane, network |
 | [GitOps (Flux + cert-manager)](#6-gitops-flux--cert-manager) | 9 | Delivery pipeline + TLS |
 | [VictoriaMetrics self-health](#7-victoriametrics-self-health) | 31 | The monitoring system itself |
@@ -110,9 +110,11 @@ upstream `cluster-*.yaml`), deployed as:
 - `prometheusrules/postgres/cnpg-platform-db/` — `platform-db` (ns `platform`): full HA set; covers auth, user, notification, shipping, review, and Temporal persistence.
 - `prometheusrules/postgres/backup-alerts.yaml` — backup age/failure (label-driven; fires for any CNPG cluster emitting the metrics).
 
+- `prometheusrules/postgres/deep-signals-alerts.yaml` — hand-authored deep-signal alerts (§4b), label-driven, one file for both clusters.
+
 Base metrics: `cnpg_*`. The alert **types** are catalogued once below; the same rule
-set is replicated per HA cluster. **42 rules total** = `product-db` 22 (incl. the operator-health
-singleton) + `platform-db` 18 + 2 backup alerts.
+set is replicated per HA cluster. **51 rules total** = `product-db` 22 (incl. the operator-health
+singleton) + `platform-db` 18 + 2 backup alerts + 9 deep-signal alerts.
 
 | Alert | Sev | Metric & trigger | Impact | for |
 |-------|-----|------------------|--------|-----|
@@ -142,6 +144,27 @@ singleton) + `platform-db` 18 + 2 backup alerts.
 | CNPGClusterLogicalReplicationStoppedCritical 💤 | critical | stopped + backlog ≥15m | Significant divergence; manual recovery | 15m |
 
 > 💤 **Inactive on this homelab** — logical replication has no subscriptions configured, so `cnpg_pg_stat_subscription_*` has no series; these arm automatically once a subscription exists.
+
+### 4b. Deep-signal alerts (hand-authored)
+
+`prometheusrules/postgres/deep-signals-alerts.yaml` (ns `monitoring`) — **not** chart-generated.
+Label-driven by `cnpg_io_cluster`, so each rule fires per-cluster and covers `platform-db` +
+`product-db` from one file. These consume the custom-query + default metrics the chart rules
+ignore (locks, deadlocks, autovacuum, cache, temp, checkpoints, wraparound, WAL archiving).
+
+| Alert | Sev | Metric & trigger | Impact | for |
+|-------|-----|------------------|--------|-----|
+| CNPGBlockedQueries | warning | `cnpg_pg_blocking_queries_blocked_queries` >0 | Sessions stuck behind a lock | 10m |
+| CNPGDeadlocksIncreasing | warning | `increase(cnpg_pg_stat_database_deadlocks[10m])` >0 | App lock-ordering bug; work rolled back | 5m |
+| CNPGAutovacuumFallingBehind | warning | dead/(dead+live) >20% & dead >1000 | Autovacuum behind → bloat | 30m |
+| CNPGLowCacheHitRatio | warning | `blks_hit/(hit+read)` <90% under load | Working set spilling out of shared_buffers | 15m |
+| CNPGTempFileSpill | warning | `rate(cnpg_pg_stat_database_temp_bytes)` >5 MB/s | Queries spilling to disk (work_mem too small) | 15m |
+| CNPGCheckpointPressure | warning | `rate(checkpoints_req) > rate(checkpoints_timed)` | Checkpoints forced by WAL pressure | 30m |
+| CNPGTransactionIDWraparoundWarning | warning | `cnpg_pg_database_xid_age` >1e9 (~47%) | Freezing stalled; wraparound risk building | 30m |
+| CNPGTransactionIDWraparoundCritical | critical | `cnpg_pg_database_xid_age` >1.5e9 | Writes will stop near 2^31 | 10m |
+| CNPGWALArchiveFailing | critical | `increase(cnpg_pg_stat_archiver_failed_count[30m])` >0 | PITR/backup recovery broken; WAL piling up | 5m |
+
+> `CNPGWALArchiveFailing` closes the previously-listed gap **CNPGContinuousArchivingFailing**.
 
 ## 5. Kubernetes
 
@@ -332,7 +355,7 @@ implemented yet — they are recommendations.
 1. **AlertmanagerFailedToSendAlerts** — Watchdog proves the pipeline *up to* Alertmanager; nothing proves AM can actually reach the receiver (Slack/PagerDuty/email). A silent receiver failure swallows every other alert. (`VMAlertAlertmanagerErrors` covers only vmalert→AM, not AM→receiver.)
 2. **Temporal schedule-to-start latency + task-queue backlog** — the best leading indicators that workers are under-provisioned; tasks pile up before any error fires. The work layer is now covered for failure rates and task-slot saturation (§8), but these *latency/backlog* leading indicators are still missing.
 3. **ValkeyReplicationLinkDown** (`redis_master_link_up==0`) — the actual Valkey HA/durability failure mode; currently unmonitored.
-4. **CNPGContinuousArchivingFailing** — WAL archiving can stall (breaking PITR) while the last base backup still looks "recent", so `PostgresBackupTooOld` alone is insufficient.
+4. ~~**CNPGContinuousArchivingFailing**~~ ✅ **Addressed** by `CNPGWALArchiveFailing` (§4b) — WAL archiving can stall (breaking PITR) while the last base backup still looks "recent", so `PostgresBackupTooOld` alone is insufficient.
 5. **etcdDatabaseQuotaLowSpace** + **KubeStateMetricsListErrors** — the two classic cluster-wide *silent* failures: an etcd quota freeze (`mvcc: database space exceeded`), and a KSM outage that silently stops every KSM-sourced k8s alert from evaluating.
 
 ### Full gap list
@@ -345,7 +368,7 @@ implemented yet — they are recommendations.
 | TemporalTaskQueueBacklogGrowing | Temporal | `temporal_approximate_backlog_count` rising | warning | Direct queue depth; consumers can't keep up | ✅ context7 `/temporalio/documentation` |
 | TemporalSyncMatchRateLow | Temporal | `poll_success_sync / poll_success < 0.95` | warning | Tasks not handed off synchronously → added latency | ✅ context7 `/temporalio/documentation` |
 | ValkeyReplicationLinkDown | Valkey | `redis_master_link_up==0` | critical | Replica link loss — data durability/HA failure | general (redis_exporter community) |
-| CNPGContinuousArchivingFailing | CNPG | archiver failed-count rising / `last_archived_wal` stalled | critical | PITR silently broken while backup-age looks healthy | ✅ context7 `/cloudnative-pg/cloudnative-pg` (monitoring.md) |
+| ~~CNPGContinuousArchivingFailing~~ ✅ shipped as `CNPGWALArchiveFailing` (§4b) | CNPG | archiver failed-count rising / `last_archived_wal` stalled | critical | PITR silently broken while backup-age looks healthy | ✅ context7 `/cloudnative-pg/cloudnative-pg` (monitoring.md) |
 | KubePersistentVolumeInodesFillingUp | Kubernetes | `kubelet_volume_stats_inodes_free / kubelet_volume_stats_inodes < 0.03` | warning/critical | A PV can wedge on inodes while bytes look fine | general (k8s mixin) |
 | KubeClientCertificateExpiration | Control plane | `apiserver_client_certificate_expiration_seconds` < 7d / 24h | warning/critical | In-cluster PKI expiry silently breaks the cluster | general (k8s mixin) |
 | NodeClockNotSynchronizing / NodeClockSkewDetected | Node | `node_timex_sync_status==0`; skew > 0.05s | warning | Skew corrupts cert validation, distributed locks, metric timestamps | general (node-exporter mixin) |

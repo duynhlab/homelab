@@ -2,17 +2,14 @@
 
 This directory is the **single home for proposing and tracking substantial changes**
 to the duynhlab platform — infrastructure (this repo) *and* the microservice code.
-In many cases a new feature or enhancement is proposed here first, discussed on a
-pull request, and only then implemented.
+Every substantial topic **reserves an RFC number first**, explores in **`research.md`**,
+then writes the decision in **`README.md`**.
+
+Overview and lifecycle diagram: [`docs/proposals/README.md`](../README.md). **Index and
+backlog live in this file.**
 
 > **Don't forget: every decision is a tradeoff.** A good RFC states what the choice
 > *costs* (rejected alternatives + drawbacks + rollback), not just what it buys.
-
-> **▶ Current focus & sequencing.** RFC-0009 shipped (implemented — JWT + Kong
-> edge auth). Highest-priority *active* proposal on the security track:
-> **[RFC-0002](RFC-0002/)** (east-west mTLS), then **[RFC-0008](RFC-0008/)**
-> (parallel) → **[RFC-0006](RFC-0006/)** (defer). The index below stays ordered by
-> number (a stable registry) — read the **Priority** column for what to pick up next.
 
 ## When to write an RFC
 
@@ -27,41 +24,53 @@ diagram *before* anyone builds it. Examples:
 - **Dropping capabilities** — sunsetting an integration with an external service.
 - **New platform capabilities/backends** — adopting a new datastore, mesh, or orchestrator.
 
-**Don't** write an RFC for bug fixes, cleanups, dependency bumps, or learning items —
-those belong in the trackers below.
+**Don't** write an RFC for bug fixes, cleanups, or dependency bumps — ship in a focused PR.
 
-## RFC vs ADR vs TODO vs REVIEW
+## Process
 
-> **Planning ⊋ RFC.** An RFC is only the *substantial* subset of planning. Small
-> planned work stays a TODO / finding / issue.
+| Artifact | File | Template | Question it answers |
+|----------|------|----------|---------------------|
+| **Template** | [`RFC-0000/`](RFC-0000/) | Copy source only — **never** a live proposal | — |
+| **Research** | `RFC-NNNN/research.md` | [`RFC-0000/research.md`](RFC-0000/research.md) | What **real-world problem** are we solving, how does the tech work, and how does it compare to what we run? |
+| **RFC** | `RFC-NNNN/README.md` | [`RFC-0000/README.md`](RFC-0000/README.md) | What do we decide, target architecture, rollout? |
+| **Domain doc** (optional) | `docs/<area>/<topic>/README.md` | [`AGENTS.md`](../../../AGENTS.md) docs conventions | How does it work **in this platform**? |
 
-| Artifact | Purpose | Lives in | Lifecycle |
-|----------|---------|----------|-----------|
-| **RFC** | Propose a **substantial change** (design doc + diagram), discussed **before** building | `docs/proposals/rfc/RFC-NNNN/` | `provisional → implementable → implemented` (or `deferred`/`rejected`/`withdrawn`/`replaced`) |
-| **ADR** | **Record a decision** already made + its rationale (Nygard) — often **spawned by** an RFC | [`docs/proposals/adr/`](../adr/) | `Proposed → Accepted → Superseded` |
-| **TODO.md** | Personal **learning / skills** checklist | [repo root](../../../TODO.md) | checkboxes |
-| **Findings tracker** | Open **code-review findings** (bugs, small improvements) | [GitHub issues](https://github.com/duynhlab/homelab/issues/373) | ticked when fixed |
+**Flow:** real-world problem in `research.md` → [research review gate](RFC-0000/research.md#research-review-gate)
+→ `README.md` → optional domain doc → implement → ADR(s) under [`adr/`](../adr/).
 
-**Flow:** an RFC is *accepted* → implementation begins → the concrete decisions it
-made are recorded as one or more **ADRs**, and the RFC moves to `implemented`.
+1. **Reserve number (owner OK required)** — propose the exact next slot (e.g. **RFC-0019**
+   = `max(RFC-NNNN) + 1`; do not backfill gaps unless the owner asks). On approval, in
+   the **same PR**: create `RFC-NNNN/`, copy [`RFC-0000/research.md`](RFC-0000/research.md)
+   only, add an index row with Status **`researching`**. Do **not** copy `README.md` yet.
+2. **Research phase** — iterate `research.md`; run Context7 audit; owner review loops
+   until the review gate passes.
+3. **RFC phase** — after owner **ready for RFC**, copy
+   [`RFC-0000/README.md`](RFC-0000/README.md) → `RFC-NNNN/README.md`; fill from research;
+   set Status **`provisional`** in this index (replaces `researching`).
+4. **Optional domain doc** — owner picks `docs/<area>/<topic>/README.md`; distill from
+   research; link both ways; register in [`docs/README.md`](../../README.md) and the area
+   index. Follow [`AGENTS.md`](../../../AGENTS.md) docs conventions (house shape, English,
+   **planned** vs **deployed**).
+5. **Implement** → Status `implemented` → spawn ADR(s) under [`adr/`](../adr/).
 
-## How to submit an RFC
+Keep diagrams/assets **inside the RFC folder** (or the chosen domain doc path). Mermaid
+may repeat across artifacts — label each diagram's question (*Mechanism*, *Target state*,
+*Homelab as-built*) and keep facts in sync.
 
-1. Copy [`RFC-0000/`](RFC-0000/) to `RFC-NNNN/` (next free number — assigned when you
-   open the PR) and fill in [`RFC-0000/README.md`](RFC-0000/README.md).
-2. Keep diagrams/assets **inside the RFC's directory**.
-3. Open a PR. Discussion happens on the PR; merge it as `provisional` (or
-   `implementable` once the design is settled).
-4. Update **Status** to `implemented` when it ships; add the spawned ADR links under
-   **Related**.
-
-**Status values:** `provisional` · `implementable` · `implemented` · `deferred` ·
-`rejected` · `withdrawn` · `replaced`.
+| Status | Meaning |
+|--------|---------|
+| **researching** | Number reserved; only `research.md` exists (title may be TBD) |
+| **provisional** | `README.md` exists; decision under review |
+| **implementable** | Design settled; ready to build |
+| **implemented** | Shipped |
+| **superseded** | Replaced by a later RFC or approach |
+| **deferred** · **rejected** · **withdrawn** · **replaced** | See RFC body |
+| **template** | Copy source only ([`RFC-0000/`](RFC-0000/)) |
 
 ## Index
 
-> **Priority key:** **P0** active / highest · **P1** next · **P2** on-merit, unscheduled ·
-> **defer** parked · **done** shipped.
+> Index ordered by RFC number (stable registry). Sequencing is owner-driven — see each
+> RFC's Status and linked README.
 
 | RFC | Title | Scope | Priority | Status |
 |-----|-------|-------|----------|--------|
@@ -86,29 +95,26 @@ made are recorded as one or more **ADRs**, and the RFC moves to `implemented`.
 
 ## Backlog — candidate RFCs
 
-Substantial themes gathered from across the repo (the place to manage them now lives
-here). Each gets a number when someone writes it up.
+Substantial themes gathered from across the repo. Each **reserves the next RFC number**
+when someone starts research (owner OK → `research.md` → index `researching`).
 
 | Candidate | Scope | Source |
 |-----------|-------|--------|
-| **Atlantis** PR-driven Terraform | infra | `TODO.md` |
+| **RFC-0016** — async payment confirmation via Temporal *(planned; no folder yet)* | platform-wide | [RFC-0015](RFC-0015/) |
+| **Atlantis** PR-driven Terraform | infra | [`terraform/`](../../../terraform/) |
 | **Alert delivery** (Slack via OpenBAO + PagerDuty) | infra | `docs/observability/alerting/` |
 | **Authorization (RBAC/ABAC)** — claim population + enforcement | platform-wide | [RFC-0009](RFC-0009/) O1 |
 | **Gateway improvements** — edge `proxy-cache` + dedicated per-env issuer domain | infra | [RFC-0009](RFC-0009/) O4/O6 |
-| **Chaos / GameDay program** | infra | `TODO.md`, DR docs |
+| **Chaos / GameDay program** | infra | [`docs/databases/010-drp.md`](../../databases/010-drp.md), DR docs |
 | **API v1→v2 versioning policy** | platform-wide | `docs/api/api.md#versioning-and-compatibility` |
 | **Split OpenBAO bootstrap** (auth config vs secret seeding) | infra | secrets ESO review |
 | **Secret rotation** (CronJob / push) — largely superseded by dynamic DB creds in [RFC-0008](RFC-0008/) | infra | secrets ESO review |
 | **PushSecret for operator-generated secrets** (sync CNPG/Zalando creds back to OpenBAO) | infra | secrets ESO review |
 
-> The broader secrets production hardening (KMS auto-unseal, TLS, dynamic DB creds,
-> OIDC, remove committed dev creds) + a local-vs-prod parity/testing matrix is its
-> own RFC — [RFC-0008](RFC-0008/). Decisions already shipped
-> (OpenBAO HA, audit logging) are recorded in [ADR-005](../adr/ADR-005-openbao-ha-raft/)
-> and [ADR-004](../adr/ADR-004-enable-openbao-audit-logging/).
-
-> Temporal durability/DR (HA, Barman, GameDay) is tracked as **future work in
-> [RFC-0001](RFC-0001/)**, not a separate backlog row.
+> **Related RFCs:** production secrets hardening → [RFC-0008](RFC-0008/) (shipped OpenBAO
+> HA and audit logging → [ADR-005](../adr/ADR-005-openbao-ha-raft/),
+> [ADR-004](../adr/ADR-004-enable-openbao-audit-logging/)); Temporal durability/DR →
+> [RFC-0001](RFC-0001/) (not a separate backlog row).
 
 ---
 _Last updated: 2026-07-17_

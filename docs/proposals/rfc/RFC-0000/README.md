@@ -1,15 +1,17 @@
 # RFC-NNNN Title
 
-<!-- The title must be short and descriptive. -->
+<!-- The title must be short and descriptive. Copy this file ONLY after research.md
+     review gate passes and the owner approves "ready for RFC". -->
 
-| Status | Scope | Created | Last updated |
-|--------|-------|---------|--------------|
-| provisional | platform-wide | YYYY-MM-DD | YYYY-MM-DD |
+| Status | Scope | Research | Created | Last updated |
+|--------|-------|----------|---------|--------------|
+| provisional | platform-wide | [./research.md](./research.md) — gate passed YYYY-MM-DD | YYYY-MM-DD | YYYY-MM-DD |
 
 <!--
 Status: one of provisional, implementable, implemented, deferred, rejected, withdrawn, replaced.
+        (Use researching in the index only while research.md exists without this README.)
 Scope:  one of infra | service:<name> | platform-wide.
-        "infra" = homelab/GitOps; "service:<name>" = a microservice repo; "platform-wide" = both.
+Research: link to ./research.md in this folder — required before provisional.
 Created / Last updated: YYYY-MM-DD.
 -->
 
@@ -18,13 +20,22 @@ Created / Last updated: YYYY-MM-DD.
 > and the downsides of the choice (**Design Details → drawbacks**, **Rollout &
 > rollback**). An RFC with no stated tradeoff is usually under-analyzed.
 
+## Prerequisites
+
+<!-- Do not publish this RFC until every item below is true. -->
+
+- [](./research.md) merged; [research review gate](./research.md#research-review-gate) ticked
+- Context7 audit complete (see research footer)
+- Owner approved **ready for RFC**
+- **Do not** repeat the mechanism deep-dive here — summarize and link `./research.md`
+
 ## Summary
 
-<!-- One paragraph explaining the proposed feature or enhancement. -->
+<!-- One paragraph — decision and delta only. Background lives in ./research.md -->
 
 ## Motivation
 
-<!-- Why this matters and the benefit to users. -->
+<!-- Why this matters now. Pull facts from research; do not re-teach concepts. -->
 
 ### Goals
 
@@ -39,7 +50,6 @@ Created / Last updated: YYYY-MM-DD.
 <!--
 The specifics of what you're proposing — enough detail for reviewers to understand it,
 without yet diving into full API/implementation specifics (those go in Design Details).
-If the RFC documents best practice, this section can be the documentation itself.
 -->
 
 ### User Stories
@@ -48,19 +58,22 @@ If the RFC documents best practice, this section can be the documentation itself
 
 ### Alternatives
 
-<!-- Plausible alternatives and why the proposal is superior. -->
+<!--
+Decision alternatives — may be a shorter subset of research.md § Alternatives.
+Link research for the full plain-language analysis.
+-->
 
 ## Architecture & Diagrams
 
 <!--
-REQUIRED. At least one Mermaid diagram (flowchart / sequenceDiagram / stateDiagram).
-This repo is Mermaid-only — never ASCII art. Show the components, the data/flow, and
-where this change sits. Put any image assets in this RFC's directory.
+REQUIRED. At least one Mermaid diagram (target state, rollout, or trust boundaries).
+May reuse or link mechanism diagrams from ./research.md — duplication OK if labelled.
+This repo is Mermaid-only — never ASCII art.
 -->
 
 ```mermaid
 flowchart LR
-    A[Component A] --> B[Component B]
+    A["Target component A"] --> B["Target component B"]
 ```
 
 ## Design Details
@@ -108,7 +121,10 @@ Major milestones: first release with an initial version; GA; retirement/superses
 
 ## Related
 
-<!-- ADRs this RFC spawned, linked PRs, and related docs. -->
+- [./research.md](./research.md) — plain-language research and Context7 audit trail
+- <!-- Optional: docs/<area>/<topic>/README.md if spun off -->
+- <!-- ADRs spawned when implemented -->
+- <!-- Linked PRs -->
 
 ---
-_Last updated: 2026-06-29_
+_Last updated: YYYY-MM-DD_

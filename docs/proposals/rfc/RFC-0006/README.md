@@ -245,7 +245,7 @@ TBD — provisional; deferred, no implementation. Revisit per the criteria above
 - East-west transport & "defer the mesh" rationale:
   [shared API guide](../../../api/api.md) (runtime, security, and observability).
 - Network fence: [`docs/security/network-policies.md`](../../../security/network-policies.md).
-- Roadmap source: `TODO.md` → *Service Mesh & Traffic Management*.
+- Origin: platform planning backlog; tracked as RFC-0006 (defer).
 
 ---
 _Last updated: 2026-07-14_

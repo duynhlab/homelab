@@ -23,9 +23,17 @@ Observability, and Docs** hub; application code lives in separate repos (see
 **Before coding:** identify scope (infra/GitOps → here; app code → the service repo; reusable CI → `duynhlab/gha-workflows`), read this file and the relevant `docs/`, plan, then implement.
 
 **Proposals & decisions** — substantial/contested changes are designed *before* building:
-- **RFC** (`docs/proposals/rfc/RFC-NNNN/`) proposes a substantial change (design + a Mermaid diagram + tradeoffs); **ADR** (`docs/proposals/adr/ADR-NNN-slug/`) records a decision already made (Nygard: context · decision · alternatives · consequences). An accepted RFC usually spawns one or more ADRs.
-- Small bugs/cleanups → the GitHub issue tracker; learning items → `TODO.md`. Not everything needs an RFC.
-- Copy the `RFC-0000` / `ADR-0000` templates and update the index in the respective `README.md`. Hub: [`docs/proposals/`](docs/proposals/).
+- **Research** (`docs/proposals/rfc/RFC-NNNN/research.md`) — plain-language deep dive +
+  Context7 audit; frame a **real-world problem** (on-call, design review, incident,
+  scale) then map what homelab practice proves. **Owner must approve the next RFC number**
+  before creating the folder. Status **`researching`** in the index until the review gate passes.
+- **RFC** (`RFC-NNNN/README.md`) — decision + target architecture + rollout; copy [`RFC-0000/README.md`](docs/proposals/rfc/RFC-0000/README.md) only after research gate + owner **ready for RFC**. Link `./research.md`; do not repeat the full tutorial.
+- **ADR** (`docs/proposals/adr/ADR-NNN-slug/`) records a decision already made (Nygard). Link **Related research** for background; ADR is the why, not the textbook.
+- **Optional domain doc** (`docs/<area>/<topic>/README.md`) — owner picks the area; distill from research using the house doc shape; link RFC research + README both ways.
+- Small bugs/cleanups and dependency bumps need no RFC — ship in a focused PR.
+  Substantial themes → RFC backlog ([`docs/proposals/rfc/README.md`](docs/proposals/rfc/README.md)).
+  Not everything needs an RFC number.
+- Templates: [`RFC-0000/`](docs/proposals/rfc/RFC-0000/) (`research.md` + `README.md`), [`ADR-0000-template/`](docs/proposals/adr/ADR-0000-template/). Hub: [`docs/proposals/`](docs/proposals/).
 
 ## Behavioral guidelines
 
@@ -138,6 +146,7 @@ Docs are a first-class deliverable in this repo. When writing or refactoring the
 - **Be accurate to the deployed reality.** Mark designed-but-not-yet-deployed things as **planned** (don't describe targets as current); cross-check claims against the manifests.
 - **Synthesize external material in-house** — learn from articles/newsletters, then write it in our own words + Mermaid; **don't embed third-party links** (official product docs already in a References section are fine).
 - One hub per area; link every new doc from [`docs/README.md`](docs/README.md) and the area index.
+- **RFC domain spin-off:** when an owner promotes research to `docs/<area>/<topic>/README.md`, use the house shape above, English only, link `RFC-NNNN/research.md` + `RFC-NNNN/README.md`. Diagrams may repeat research — keep labels accurate to deployed vs **planned** reality.
 
 ### Diagram workflow
 

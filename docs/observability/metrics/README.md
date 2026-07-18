@@ -154,7 +154,7 @@ runbooks:
 | **Applications** | HTTP RED (`http_server_request_duration_seconds`), request/response body size, Go runtime, **gRPC east-west RED**, `trace_id` correlation, instrumentation | RED + Golden | [**metrics-apps.md**](metrics-apps.md) |
 | **Catalog (lookup)** | Every emitted series: auto families + all **34 business instruments** per service, with label values + semantics | — | [**metrics-catalog.md**](metrics-catalog.md) |
 | **Infrastructure** | `up`, container restarts, pod/node/API-server resources, network | USE + Golden | [**metrics-infra.md**](metrics-infra.md) |
-| **Databases** | PostgreSQL (all CloudNativePG), custom queries, PgDog pooler, Valkey | USE | [**postgresql/monitoring.md**](postgresql/monitoring.md) |
+| **Databases** | PostgreSQL (all CloudNativePG), custom queries, PgDog pooler, Valkey | USE | [**postgresql/README.md**](postgresql/README.md) |
 
 ### Methodology coverage matrix
 
@@ -187,7 +187,7 @@ metrics/
 ├── victoriametrics.md   # The stack: VM Operator, dual CRDs, components, ops
 ├── promql-guide.md      # PromQL: counters, rate() vs increase(), $rate vs $__range
 ├── streaming-aggregation.md  # At-scale playbook: in-flight aggregation, 2-tier vmagent (RFC-0013)
-└── postgresql/          # Databases layer
+└── postgresql/          # Databases layer — hub, custom metrics, workflows, runbook links
     ├── monitoring.md            # Entry point: CNPG cluster inventory + built-in exporter
     ├── custom-metrics.md        # CNPG custom queries
     ├── pg-exporter-dashboards.md   # Retired Pigsty pg_exporter reference
@@ -224,7 +224,7 @@ histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_
 ## References
 
 - [VictoriaMetrics Operator Stack](victoriametrics.md) — architecture, dual CRDs, components
-- [Application metrics (RED)](metrics-apps.md) · [Infrastructure metrics (USE)](metrics-infra.md) · [Database metrics](postgresql/monitoring.md)
+- [Application metrics (RED)](metrics-apps.md) · [Infrastructure metrics (USE)](metrics-infra.md) · [Database metrics hub](postgresql/README.md)
 - [PromQL Guide](promql-guide.md) — counters, `rate()`/`increase()`, `$rate` vs `$__range`
 - [Streaming Aggregation](streaming-aggregation.md) — cardinality math + at-scale playbook (RFC-0013)
 - [SLO Documentation](../slo/README.md) — SLI mappings, Sloth integration

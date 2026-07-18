@@ -6,10 +6,13 @@ matters operationally, and how to query and alert on it.
 | Quick facts | |
 |---|---|
 | Source | CNPG built-in exporter (`:9187`), per-cluster custom-queries ConfigMap |
-| Clusters | `platform-db` (ns `platform`), `product-db` (ns `product`) — identical query set |
+| Clusters | `platform-db` (ns `platform`), `product-db` (ns `product`) — same 10 queries, different `target_databases` |
+| Per-db scope | platform: auth, user, notification, shipping, review · product: product, cart, order |
+| **Gap** | payment, checkout, temporal, temporal_visibility — no per-db custom metrics yet |
 | Live queries | **12** (see reference below) |
 | Metric prefix | `cnpg_` — the exporter prepends it to every series (`cnpg_pg_stat_statements_calls`) |
 | Related alerts | [`alert-catalog.md` §4/§4b](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) |
+| Runbooks | [`../../runbooks/postgresql/README.md`](../../runbooks/postgresql/README.md) |
 
 ## Overview
 
@@ -59,7 +62,10 @@ label. `[cluster]` = runs once per instance (instance-wide view).
   # Per-query cache hit ratio
   rate(cnpg_pg_stat_statements_shared_blks_hit[5m]) / clamp_min(rate(cnpg_pg_stat_statements_shared_blks_hit[5m]) + rate(cnpg_pg_stat_statements_shared_blks_read[5m]), 1)
   ```
-- **Alerts** — `CNPGLowCacheHitRatio`, `CNPGTempFileSpill` (via `pg_stat_database`); board: `pg-query-performance`.
+- **Alerts** — none fire on `pg_stat_statements` directly. `CNPGLowCacheHitRatio` and
+  `CNPGTempFileSpill` alert on the **built-in** `pg_stat_database`; `pg_stat_statements`
+  is the drill-down to isolate the offending query. Board: `pg-query-performance`.
+- **Runbooks** — [CNPGLowCacheHitRatio](../../runbooks/postgresql/CNPGLowCacheHitRatio.md), [CNPGTempFileSpill](../../runbooks/postgresql/CNPGTempFileSpill.md)
 
 ### Sessions & contention
 
@@ -70,14 +76,16 @@ label. `[cluster]` = runs once per instance (instance-wide view).
 - **Why** — see connection mix (active vs idle vs `idle in transaction`) and which
   user/db is holding connections; complements pooler metrics.
 - **PromQL** — `sum by (state) (cnpg_pg_stat_activity_count_count{cnpg_io_cluster="platform-db"})`
+- **Runbook** — diagnostic in [CNPGClusterHighConnectionsCritical](../../runbooks/postgresql/CNPGClusterHighConnectionsCritical.md)
 
 #### `pg_connection_limits` `[cluster]`
 
 - **What** — current vs maximum connections.
 - **Columns** — gauges `max_connections`, `current_connections`.
-- **Why** — connection saturation ends in refused clients. Feeds the chart
-  `CNPGClusterHighConnections` alerts.
+- **Why** — connection saturation ends in refused clients. Dashboard signal; chart
+  alerts use `cnpg_backends_total` instead (see [workflows.md](workflows.md)).
 - **PromQL** — `cnpg_pg_connection_limits_current_connections / cnpg_pg_connection_limits_max_connections`
+- **Runbooks** — [CNPGClusterHighConnectionsWarning](../../runbooks/postgresql/CNPGClusterHighConnectionsWarning.md), [CNPGClusterHighConnectionsCritical](../../runbooks/postgresql/CNPGClusterHighConnectionsCritical.md)
 
 #### `pg_locks_count` `[cluster]`
 
@@ -94,6 +102,7 @@ label. `[cluster]` = runs once per instance (instance-wide view).
 - **Why** — the clearest lock-contention signal; sustained >0 means queries are stuck.
 - **PromQL** — `max by (cnpg_io_cluster) (cnpg_pg_blocking_queries_blocked_queries)`
 - **Alert** — `CNPGBlockedQueries`.
+- **Runbook** — [CNPGBlockedQueries](../../runbooks/postgresql/CNPGBlockedQueries.md)
 
 #### `pg_long_running_transactions` `[cluster]`
 
@@ -105,6 +114,7 @@ label. `[cluster]` = runs once per instance (instance-wide view).
   xid freezing → the root cause of bloat and wraparound. The classic Senior-DBA signal.
 - **PromQL** — `max by (cnpg_io_cluster) (cnpg_pg_long_running_transactions_oldest_transaction_seconds)`
 - **Alerts** — `CNPGLongRunningTransaction`, `CNPGIdleInTransaction`; board: `pg-maintenance`.
+- **Runbooks** — [CNPGLongRunningTransaction](../../runbooks/postgresql/CNPGLongRunningTransaction.md), [CNPGIdleInTransaction](../../runbooks/postgresql/CNPGIdleInTransaction.md)
 
 ### Autovacuum, bloat & maintenance
 
@@ -121,6 +131,7 @@ label. `[cluster]` = runs once per instance (instance-wide view).
     / clamp_min(cnpg_pg_stat_user_tables_autovacuum_n_dead_tup + cnpg_pg_stat_user_tables_autovacuum_n_live_tup, 1)
   ```
 - **Alert** — `CNPGAutovacuumFallingBehind`.
+- **Runbook** — [CNPGAutovacuumFallingBehind](../../runbooks/postgresql/CNPGAutovacuumFallingBehind.md)
 
 #### `pg_stat_progress_vacuum` `[per-db]`
 
@@ -137,7 +148,7 @@ label. `[cluster]` = runs once per instance (instance-wide view).
 - **What** — top 30 tables by size (heap + indexes + TOAST).
 - **Columns** — labels `datname, schemaname, tablename`; gauges `total_bytes`,
   `table_bytes`.
-- **Why** — capacity planning and spotting unexpected growth / bloat.
+- **Why** — capacity planning — see [signals/capacity-planning.md](signals/capacity-planning.md).
 - **PromQL** — `topk(20, cnpg_pg_table_size_total_bytes{cnpg_io_cluster="platform-db"})`
 
 #### `pg_stat_user_indexes` `[per-db]`
@@ -145,39 +156,49 @@ label. `[cluster]` = runs once per instance (instance-wide view).
 - **What** — per-index scan counts and size.
 - **Columns** — labels `datname, schemaname, relname, indexrelname`; counters
   `idx_scan`, `idx_tup_read`, `idx_tup_fetch`; gauge `index_bytes`.
-- **Why** — `idx_scan == 0` marks **unused indexes** — dead weight that slows writes
-  and wastes space; drop candidates.
+- **Why** — unused indexes — see [signals/index-hygiene.md](signals/index-hygiene.md).
 - **PromQL** — `cnpg_pg_stat_user_indexes_index_bytes and (cnpg_pg_stat_user_indexes_idx_scan == 0)`
 
 ### Storage & checkpoints
 
-#### `pg_database_size` `[cluster]`
+Database size and checkpoint activity are served by CNPG's **built-in** default
+queries — the custom `pg_database_size` and `pg_stat_checkpointer` queries were
+removed (2026-07-18) as redundant (they shadowed a superset built-in):
 
-- **What** — size of each database.
-- **Columns** — label `datname`; gauge `size_bytes`.
-- **Why** — per-database growth trends and disk forecasting.
-- **PromQL** — `cnpg_pg_database_size_size_bytes{cnpg_io_cluster="platform-db"}`
-
-#### `pg_stat_checkpointer` `[cluster]`
-
-- **What** — checkpoint activity from `pg_stat_checkpointer` (PG17+).
-- **Columns** — counters `checkpoints_timed`, `checkpoints_req`,
-  `checkpoint_write_time`, `checkpoint_sync_time`, `buffers_checkpoint`.
-- **Why** — when `checkpoints_req` outpaces `checkpoints_timed`, checkpoints are being
-  forced by WAL pressure (`max_wal_size` too small) rather than the timeout — a tuning
-  signal.
-- **PromQL** — `rate(cnpg_pg_stat_checkpointer_checkpoints_req[30m]) > rate(cnpg_pg_stat_checkpointer_checkpoints_timed[30m])`
-- **Alert** — `CNPGCheckpointPressure`.
+- Database size → built-in `pg_database` → `cnpg_pg_database_size_bytes`
+  (+ `cnpg_pg_database_xid_age` / `cnpg_pg_database_mxid_age`).
+- Checkpoints → built-in `pg_stat_checkpointer` → `cnpg_pg_stat_checkpointer_checkpoints_req`
+  / `_checkpoints_timed` / `_write_time` / `_sync_time` / `_buffers_written`
+  (+ `_restartpoints_*`). Alert `CNPGCheckpointPressure` — runbook
+  [CNPGCheckpointPressure](../../runbooks/postgresql/CNPGCheckpointPressure.md).
 
 > **Not custom queries.** Replication lag (`cnpg_pg_replication_lag`), WAL
 > (`cnpg_collector_pg_wal`), backups (`cnpg_collector_last_*_backup_timestamp`),
-> xid/mxid age (`cnpg_pg_database_xid_age`/`mxid_age`) and per-database
-> `pg_stat_database` come from CNPG's **built-in** collectors, documented in
-> [`monitoring.md`](monitoring.md).
+> xid/mxid age (`cnpg_pg_database_xid_age`/`mxid_age`), database size
+> (`cnpg_pg_database_size_bytes`), checkpoints (`cnpg_pg_stat_checkpointer_*`) and
+> per-database `pg_stat_database` come from CNPG's **built-in** collectors —
+> full inventory in [`builtin-metrics.md`](builtin-metrics.md).
 
 > **No latency heatmap.** `pg_stat_statements` exposes totals + calls only (no
 > per-bucket histogram), so a true query-latency-distribution heatmap is not
 > derivable from these metrics — the boards chart mean/total exec time instead.
+
+## Writing a runbook from a custom query
+
+Use this checklist when adding a new custom query or promoting a dashboard signal
+to an alert. Template: [`../../runbooks/postgresql/_TEMPLATE.md`](../../runbooks/postgresql/_TEMPLATE.md).
+
+1. **Meaning** — state the SQL source view, metric name, threshold, and `for` duration.
+2. **Impact** — what breaks for users (latency, errors, data risk).
+3. **Diagnosis** — PromQL from the alert expr + drill-down; homelab `kubectl exec`
+   against `services/${CLUSTER}-rw`; name Grafana board row (`pg-maintenance` vs
+   `pg-query-performance`).
+4. **Mitigation** — safe ops first; link procedural docs under `docs/databases/runbooks/`.
+5. **Wire** — add `runbook_url` in `deep-signals-alerts.yaml` or chart post-render script.
+
+Homelab placeholders: `$NAMESPACE` = `platform`|`product`, `$CLUSTER` =
+`platform-db`|`product-db`. Filter PromQL with `cnpg_io_cluster`. For per-db
+queries use `queryid` in tickets, not the full `query` label.
 
 ## Configuration reference
 
@@ -202,7 +223,7 @@ query_name:
 
 - **`target_databases`** — the exporter runs the query once per listed database and
   labels the result with `datname`. Omit it for an instance-wide query
-  (e.g. `pg_stat_activity`, `pg_stat_checkpointer`). The ConfigMap carries the
+  (e.g. `pg_stat_activity_count`, `pg_blocking_queries`). The ConfigMap carries the
   `cnpg.io/reload: ""` label, so edits are hot-reloaded without a pod restart.
 - **`usage`** — `LABEL` → Prometheus label; `COUNTER`/`GAUGE` → metric value.
 
@@ -233,10 +254,13 @@ kubectl get cluster -n platform platform-db -o jsonpath='{.spec.monitoring.custo
 
 ## Related documentation
 
+- [README.md](README.md) — learning path and hub
+- [workflows.md](workflows.md) — diagnostic decision trees
 - [`monitoring.md`](monitoring.md) — CNPG exporter overview + built-in collector metrics
 - [`alert-catalog.md`](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) — PostgreSQL alerts (chart set + deep-signal set)
+- [`../../runbooks/postgresql/README.md`](../../runbooks/postgresql/README.md) — per-alert runbooks
 - [`docs/databases/002-database-integration.md`](../../../databases/002-database-integration.md) — database integration
 - [`promql-guide.md`](../promql-guide.md) — PromQL functions and examples
 
 ---
-_Last updated: 2026-07-18 (documented all 12 live custom queries; removed stale pg_replication/pg_postmaster)_
+_Last updated: 2026-07-18 — runbook links, target_databases gaps, runbook authoring checklist_

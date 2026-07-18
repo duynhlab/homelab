@@ -24,7 +24,7 @@ spec:
 
 
           CRITICAL: The subscriber is significantly behind the publisher. Immediate action required. This could lead to significant data inconsistency, disk space exhaustion on publisher, or extended recovery time.'
-        runbook_url: https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/docs/runbooks/CNPGClusterLogicalReplicationLagging.md
+        runbook_url: https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGClusterLogicalReplicationLagging.md
       expr: "(\n  # Receipt lag - not receiving WAL data\n  label_replace(max by (namespace, job, subname) (cnpg_pg_stat_subscription_receipt_lag_seconds), \"cluster\", \"$1\", \"job\", \".+/(.+)\") > 300\n) or (\n  # Apply lag - not applying received data\n  label_replace(max by (namespace, job, subname) (cnpg_pg_stat_subscription_apply_lag_seconds), \"cluster\", \"$1\", \"job\", \".+/(.+)\") > 300\n) or (\n  # LSN distance - large amount of pending data\n  label_replace(max by (namespace, job, subname) (cnpg_pg_stat_subscription_buffered_lag_bytes), \"cluster\", \"$1\", \"job\", \".+/(.+)\") / 1024^3 > 4\n)"
       for: 2m
       labels:

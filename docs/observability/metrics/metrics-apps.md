@@ -16,10 +16,43 @@ stack, and the other layers, start at the [metrics hub](README.md).
 | **Provenance** | `app` / `namespace` from OTLP resource attributes + vmagent relabel |
 | **Correlation** | `trace_id` field in VictoriaLogs + Tempo (exemplars lost — [D-14](../../proposals/rfc/RFC-0014/README.md)) |
 | **Dashboard** | Microservices dashboard (see [§ Dashboard](#dashboard)) |
+| **Runbooks** | [`../runbooks/microservices/README.md`](../runbooks/microservices/README.md) (one file per alert) |
+| **Hub** | Workflows & tuning: [`../runbooks/microservices-alerts.md`](../runbooks/microservices-alerts.md) |
 
 ---
 
-## Overview
+## Learning path
+
+1. **RED on one histogram** — read [Overview](#overview) and [HTTP server metrics](#http-server-metrics-auto-instrumented).
+2. **East-west gRPC** — same OTLP stream; see [gRPC server/client metrics](#grpc-server-and-client-metrics-auto-instrumented).
+3. **Runtime USE** — [Go runtime](#go-runtime-metrics-auto-instrumented) + [Availability heartbeat](#availability--the-heartbeat-not-up).
+4. **App-side DB** — [Database client metrics](#database-client-metrics-otelpgx-rfc-0017-w4) (complements server-side [PostgreSQL runbooks](../runbooks/postgresql/README.md)).
+5. **When an alert fires** — open the matching file in [`runbooks/microservices/`](../runbooks/microservices/README.md); use [workflows in the hub](../runbooks/microservices-alerts.md#4-investigation-workflows) for cross-signal triage.
+
+## Signal → alert map
+
+| Symptom / signal | Primary metrics | Layer-1 alert(s) | Runbook |
+|------------------|-----------------|------------------|---------|
+| Instance stopped reporting | `go_goroutine_count` heartbeat | `MicroserviceDown` | [MicroserviceDown](../runbooks/microservices/MicroserviceDown.md) |
+| All pods silent | heartbeat per `(app,namespace)` | `MicroserviceAllInstancesDown` | [MicroserviceAllInstancesDown](../runbooks/microservices/MicroserviceAllInstancesDown.md) |
+| Collector blind | `otelcol_exporter_send_failed_metric_points` | `OtelMetricsPipelineExportFailures` | [OtelMetricsPipelineExportFailures](../runbooks/microservices/OtelMetricsPipelineExportFailures.md) |
+| HTTP 5xx spike | `http_server_request_duration_seconds_count` | `MicroserviceHighErrorRate` / `MicroserviceErrorRateCritical` | [HighErrorRate](../runbooks/microservices/MicroserviceHighErrorRate.md) |
+| Zero 2xx | same + status filter | `MicroserviceNoSuccessfulRequests` | [NoSuccessfulRequests](../runbooks/microservices/MicroserviceNoSuccessfulRequests.md) |
+| gRPC callee errors | `rpc_server_call_duration_seconds_count` | `GrpcServerHighErrorRate` | [GrpcServerHighErrorRate](../runbooks/microservices/GrpcServerHighErrorRate.md) |
+| Slow HTTP | `http_server_request_duration_seconds_bucket` | P95/P99 / `MicroserviceLatencyCritical` | [HighLatencyP95](../runbooks/microservices/MicroserviceHighLatencyP95.md) |
+| Slow gRPC | `rpc_server_call_duration_seconds_bucket` | `GrpcServerHighLatencyP95` | [GrpcServerHighLatencyP95](../runbooks/microservices/GrpcServerHighLatencyP95.md) |
+| Routing / upstream | request rate → 0 | `MicroserviceNoTraffic` | [MicroserviceNoTraffic](../runbooks/microservices/MicroserviceNoTraffic.md) |
+| User-perceived slowness | Apdex recording rule | `MicroserviceApdexCritical` | [MicroserviceApdexCritical](../runbooks/microservices/MicroserviceApdexCritical.md) |
+| Goroutine climb | `go_goroutine_count` + `deriv()` | `MicroserviceGoroutineLeak` | [MicroserviceGoroutineLeak](../runbooks/microservices/MicroserviceGoroutineLeak.md) |
+| Memory near limit | cAdvisor working-set / limits | `MicroserviceHighMemoryUsage` | [MicroserviceHighMemoryUsage](../runbooks/microservices/MicroserviceHighMemoryUsage.md) |
+| Slow SQL (app view) | `db_client_operation_duration_seconds` | `DBClientQueryP95High` | [DBClientQueryP95High](../runbooks/microservices/DBClientQueryP95High.md) |
+| DB errors (app view) | `db_client_operation_errors_total` | `DBClientErrorRate` | [DBClientErrorRate](../runbooks/microservices/DBClientErrorRate.md) |
+| Pool pinned | `pgxpool_acquired_connections` | `PgxPoolNearExhaustion` | [PgxPoolNearExhaustion](../runbooks/microservices/PgxPoolNearExhaustion.md) |
+| Pool waits | `pgxpool_empty_acquire_total` | `PgxPoolAcquireWaitHigh` | [PgxPoolAcquireWaitHigh](../runbooks/microservices/PgxPoolAcquireWaitHigh.md) |
+
+Full catalog: [alert-catalog §1](../alerting/alert-catalog.md#1-microservices-red-metrics).
+
+---
 
 Microservices are request-driven, so they are measured with the **RED method**.
 The design principle, shared by every large-scale platform (Uber M3, Grab,
@@ -508,7 +541,7 @@ VictoriaMetrics keeps returning the last sample for ~5 m (staleness window), so
 detection **lags a pod kill by about 5 minutes** — accepted in RFC-0014 D-4 and
 verified by the P3 pod-kill test. The push pipeline itself is now an availability
 dependency, so a collector export-failure alert
-(`otelcol_exporter_send_failed_metric_points_total`) runs alongside to
+(`otelcol_exporter_send_failed_metric_points`) runs alongside to
 disambiguate "service down" from "pipeline broken".
 
 ## Dashboard
@@ -579,7 +612,7 @@ live with the [OpenTelemetry](../opentelemetry/README.md) setup. There is no app
 - **SLOs** — rendered per service by the `mop` chart (not a repo path) and
   expanded by Sloth into burn-rate alerts. See [SLO docs](../slo/README.md).
 
-Runbook: [`microservices-alerts.md`](../runbooks/microservices-alerts.md).
+Runbooks: [`runbooks/microservices/README.md`](../runbooks/microservices/README.md) (per alert) · hub [`microservices-alerts.md`](../runbooks/microservices-alerts.md).
 
 ## References
 
@@ -591,6 +624,6 @@ Runbook: [`microservices-alerts.md`](../runbooks/microservices-alerts.md).
 
 ---
 
-_Last updated: 2026-07-16 — added the DB client metrics section (otelpgx per-operation + pgxpool pool health, the DBDurationBuckets fix, the redisotel naming trap) for RFC-0017 W4; earlier same day: the OTel instrument-types explainer and the Business KPIs dashboard._
+_Last updated: 2026-07-18 — Phase 2 runbook split: learning path + signal→alert map; per-alert files under `runbooks/microservices/`._
 </content>
 </invoke>

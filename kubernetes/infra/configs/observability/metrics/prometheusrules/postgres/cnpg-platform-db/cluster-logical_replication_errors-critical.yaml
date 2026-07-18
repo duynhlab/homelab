@@ -22,7 +22,7 @@ spec:
 
 
           CRITICAL: High error rate indicates persistent replication issues requiring immediate attention. This could lead to significant data inconsistency or complete replication failure. Errors include both apply errors and sync errors. The subscription may stop working if errors continue.'
-        runbook_url: https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/docs/runbooks/CNPGClusterLogicalReplicationErrors.md
+        runbook_url: https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGClusterLogicalReplicationErrors.md
       expr: label_replace(increase(max by (namespace, job, subname) (cnpg_pg_stat_subscription_apply_error_count + cnpg_pg_stat_subscription_sync_error_count)[5m]), "cluster", "$1", "job", ".+/(.+)") >= 5
       for: 0m
       labels:

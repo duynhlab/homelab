@@ -21,3 +21,4 @@ spec:
           annotations:
             summary: "CNPG cluster fenced ({{ $labels.namespace }}/{{ $labels.cluster }})"
             description: "CloudNativePG cluster is fenced. All write operations are blocked."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CnpgClusterFenced.md"

@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **PostgreSQL alert runbooks** ([`docs/observability/runbooks/postgresql/`](docs/observability/runbooks/postgresql/)): 33 per-alert files (CNPG chart + deep-signal + homelab extras), `_TEMPLATE.md`, and index; `runbook_url` on deep-signal and chart PrometheusRules.
+- **PostgreSQL metrics learning hub** ([`docs/observability/metrics/postgresql/README.md`](docs/observability/metrics/postgresql/README.md)): workflows, signal guides (`signals/`), runbook links on custom-metrics; alert-catalog §4 Runbook column + `CNPGLongRunningTransaction` / `CNPGIdleInTransaction`.
+- **CNPG built-in metrics inventory** ([`docs/observability/metrics/postgresql/builtin-metrics.md`](docs/observability/metrics/postgresql/builtin-metrics.md)): the 13 default queries + `cnpg_collector_*` → metric → consuming-alert map, so operators know which built-in signals exist.
+- **Microservices application alert runbooks** ([`docs/observability/runbooks/microservices/`](docs/observability/runbooks/microservices/)): 19 per-alert files, `_TEMPLATE.md`, index; hub remains [`microservices-alerts.md`](docs/observability/runbooks/microservices-alerts.md); `runbook_url` on all rules in `prometheusrules/microservices/alerts.yaml`.
+- **Application metrics learning hub** ([`docs/observability/metrics/metrics-apps.md`](docs/observability/metrics/metrics-apps.md)): learning path + signal→alert map linking to per-alert runbooks.
 - Postgres **deep-signal alerts** ([`deep-signals-alerts.yaml`](kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/deep-signals-alerts.yaml)): blocked queries, deadlocks, autovacuum-behind, low cache-hit, temp-file spill, checkpoint pressure, XID wraparound (warn/critical), and WAL-archive failing — label-driven by `cnpg_io_cluster`, one file covering `platform-db` + `product-db`.
 - CNPG-native Grafana boards **`pg-query-performance`** (pg_stat_statements deep-dive) and **`pg-maintenance`** (locks, checkpointer, autovacuum, bloat), replacing four No-Data PMM boards; `pgdog` board gains a `pooler` selector.
 - **`platform-db`** CNPG cluster (ns `platform`, HA ×3): merges former `auth-db`,
@@ -26,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **PostgreSQL custom queries**: removed `pg_stat_checkpointer` and `pg_database_size`
+  from both cluster monitoring ConfigMaps — redundant with CNPG built-in default queries
+  (`pg_stat_checkpointer`, `pg_database`); docs repointed to the built-in metric names.
 - **infra (grafana)**: Pin `grafana/grafana` **13.0.1 → 13.1.0** (cluster `Grafana` CR + local-stack compose).
 - RFC workflow: reserve `RFC-NNNN` with owner OK → `research.md` (real-world problem +
   plain-language + Context7) → `README.md`; optional domain doc spin-off; templates in
@@ -52,6 +60,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `platform-db` low-disk-space alerts queried `namespace="auth"` (stale render) and
   could never fire; corrected to `namespace="platform"`.
+- `OtelMetricsPipelineExportFailures` never matched a series (dead alert): metric was
+  `otelcol_exporter_send_failed_metric_points_total`, corrected to the no-`_total`
+  name emitted by the collector self-telemetry.
+- `platform-db` metrics lacked the `cnpg_io_cluster` label (its `enablePodMonitor: true`
+  let the operator's label-less PodMonitor shadow the repo one) — deep-signal alert
+  grouping and runbook diagnosis for `platform-db` returned empty; fixed by matching
+  `product-db` (repo `PodMonitor` with `podTargetLabels`).
+- Runbook drift: `MicroserviceApdexCritical` severity (`warning`→`critical`),
+  `GrpcServerHighErrorRate` PromQL label (`rpc_grpc_status_code`→`rpc_response_status_code`),
+  `MicroserviceHighMemoryUsage` stale "checkout uncovered" note, `MicroserviceGoroutineLeak`
+  `rate()`→`deriv()`, physical-replication-lag units (`ms`→`s`), `CNPGCheckpointPressure`
+  psql columns + metric name, `CNPGClusterInstancesOnSameNode` `exported_node`→`node`,
+  `PostgresWALSizeHigh` `value="size"` selector, `CNPGClusterLogicalReplicationLagging`
+  metric name, stale cross-references to non-existent alerts, and de-duplicated runbook bodies.
+- Alert-catalog §1 table rows had a stray empty column (7 cells vs 6-col header).
 
 
 ### Added

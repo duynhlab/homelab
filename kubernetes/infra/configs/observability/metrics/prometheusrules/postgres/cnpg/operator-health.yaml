@@ -23,6 +23,7 @@ spec:
           annotations:
             summary: "CloudNativePG operator down"
             description: "PodMonitor scrape of the CNPG operator /metrics has been failing for 5m in ns cloudnative-pg."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGOperatorDown.md"
 
         - alert: CNPGControllerReconcileErrorsSpiking
           expr: |
@@ -33,3 +34,4 @@ spec:
           annotations:
             summary: "CNPG reconcile errors on {{ $labels.controller }}"
             description: "{{ $value }} reconcile errors in 10m on controller {{ $labels.controller }}."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGControllerReconcileErrorsSpiking.md"

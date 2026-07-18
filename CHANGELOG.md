@@ -58,6 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Retired `pg-exporter-mapping.md` and `pg-exporter-dashboards.md` (Pigsty
   pg_exporter reference for the removed `supporting-shared-db` pilot — no live
   infra, external links). Scrubbed their doc-index/tree references.
+- `metrics/postgresql/workflows.md` — the diagnostic decision trees / symptom
+  matrix were not pulling their weight; removed and scrubbed its references
+  (learning path, doc-map, trees). Per-alert diagnosis lives in the runbooks.
 - `metrics/postgresql/monitoring.md` — content was largely duplicative
   (architecture ↔ victoriametrics.md, coverage ↔ builtin/custom-metrics, inventory
   ↔ many docs). Consolidated its unique bits (scrape architecture, alert-rule

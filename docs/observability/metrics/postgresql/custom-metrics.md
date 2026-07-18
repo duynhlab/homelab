@@ -254,7 +254,6 @@ kubectl get cluster -n platform platform-db -o jsonpath='{.spec.monitoring.custo
 ## Related documentation
 
 - [README.md](README.md) — learning path and hub
-- [workflows.md](workflows.md) — diagnostic decision trees
 - [`builtin-metrics.md`](builtin-metrics.md) — CNPG built-in exporter + collector metrics
 - [`alert-catalog.md`](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) — PostgreSQL alerts (chart set + deep-signal set)
 - [`../../runbooks/postgresql/README.md`](../../runbooks/postgresql/README.md) — per-alert runbooks

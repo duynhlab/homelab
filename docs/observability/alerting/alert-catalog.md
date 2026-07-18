@@ -372,7 +372,7 @@ implemented yet — they are recommendations.
 | TemporalTaskQueueBacklogGrowing | Temporal | `temporal_approximate_backlog_count` rising | warning | Direct queue depth; consumers can't keep up | ✅ context7 `/temporalio/documentation` |
 | TemporalSyncMatchRateLow | Temporal | `poll_success_sync / poll_success < 0.95` | warning | Tasks not handed off synchronously → added latency | ✅ context7 `/temporalio/documentation` |
 | ValkeyReplicationLinkDown | Valkey | `redis_master_link_up==0` | critical | Replica link loss — data durability/HA failure | general (redis_exporter community) |
-| ~~CNPGContinuousArchivingFailing~~ ✅ shipped as `CNPGWALArchiveFailing` (§4b) | CNPG | archiver failed-count rising / `last_archived_wal` stalled | critical | PITR silently broken while backup-age looks healthy | ✅ context7 `/cloudnative-pg/cloudnative-pg` (monitoring.md) |
+| ~~CNPGContinuousArchivingFailing~~ ✅ shipped as `CNPGWALArchiveFailing` (§4b) | CNPG | archiver failed-count rising / `last_archived_wal` stalled | critical | PITR silently broken while backup-age looks healthy | ✅ context7 `/cloudnative-pg/cloudnative-pg` |
 | KubePersistentVolumeInodesFillingUp | Kubernetes | `kubelet_volume_stats_inodes_free / kubelet_volume_stats_inodes < 0.03` | warning/critical | A PV can wedge on inodes while bytes look fine | general (k8s mixin) |
 | KubeClientCertificateExpiration | Control plane | `apiserver_client_certificate_expiration_seconds` < 7d / 24h | warning/critical | In-cluster PKI expiry silently breaks the cluster | general (k8s mixin) |
 | NodeClockNotSynchronizing / NodeClockSkewDetected | Node | `node_timex_sync_status==0`; skew > 0.05s | warning | Skew corrupts cert validation, distributed locks, metric timestamps | general (node-exporter mixin) |

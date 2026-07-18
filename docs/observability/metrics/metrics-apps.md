@@ -302,7 +302,7 @@ double as the availability heartbeat (see [§ Availability](#availability--the-h
 > tracer (per-operation metrics + query spans) and `RecordStats` (pool
 > metrics) onto the same OTLP stream. This is the **app-side** view — what the
 > service experiences; the server-side view (postgres_exporter, CNPG) lives in
-> [Database metrics](postgresql/monitoring.md).
+> [Database metrics](postgresql/README.md).
 
 **Per-operation (synchronous, from the tracer):**
 
@@ -616,7 +616,7 @@ Runbooks: [`runbooks/microservices/README.md`](../runbooks/microservices/README.
 
 ## References
 
-- [Metrics hub](README.md) · [Infrastructure metrics (USE)](metrics-infra.md) · [Database metrics](postgresql/monitoring.md)
+- [Metrics hub](README.md) · [Infrastructure metrics (USE)](metrics-infra.md) · [Database metrics](postgresql/README.md)
 - [OpenTelemetry setup](../opentelemetry/README.md) · [RFC-0014: full OpenTelemetry adoption](../../proposals/rfc/RFC-0014/README.md)
 - [API → gRPC runtime model](../../api/api.md#grpc-runtime-model) · [API reference](../../api/api.md)
 - [PromQL Guide](promql-guide.md) · [SLO Documentation](../slo/README.md)

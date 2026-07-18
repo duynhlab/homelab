@@ -67,13 +67,13 @@ add per-table / per-statement / lock-level detail the built-ins do not cover.
   VMUI (`:8428`) should return one series per cluster. If `platform-db` is missing
   the `cnpg_io_cluster` label, check the cluster is using the repo `PodMonitor`
   (`enablePodMonitor` must be **false** so the operator's label-less PodMonitor does
-  not win — see [monitoring.md](monitoring.md)).
+  not win — see [README.md](README.md#scrape-architecture--rule-layout)).
 - **Do not shadow built-ins** with a same-named custom query — CNPG loads the custom
   set after the defaults, so a duplicate query name overrides and can drop columns.
 
 ## Related documentation
 
-- [monitoring.md](monitoring.md) — scrape architecture and coverage
+- [README.md](README.md#scrape-architecture--rule-layout) — scrape architecture & rule layout
 - [custom-metrics.md](custom-metrics.md) — the custom-query counterpart
 - [alert-catalog.md](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) — §4 / §4b PostgreSQL alerts
 - Runbooks: [postgresql/](../../runbooks/postgresql/)

@@ -16,8 +16,8 @@ runbooks for the platform database layer.
 
 ## Learning path
 
-1. **Architecture** — how metrics flow from CNPG → VMAgent → VictoriaMetrics:
-   [monitoring.md](monitoring.md)
+1. **Architecture** — scrape path + rule layout: [Scrape architecture & rule layout](#scrape-architecture--rule-layout)
+   below; full VM topology in [victoriametrics.md](../victoriametrics.md)
 2. **Signals** — what each query measures and how to PromQL it:
    built-in metrics [builtin-metrics.md](builtin-metrics.md), custom queries
    [custom-metrics.md](custom-metrics.md)
@@ -34,7 +34,6 @@ runbooks for the platform database layer.
 
 | Doc | Purpose |
 |-----|---------|
-| [monitoring.md](monitoring.md) | Stack architecture, cluster inventory, alert rule layout |
 | [builtin-metrics.md](builtin-metrics.md) | CNPG built-in metric inventory (default queries + collector) |
 | [custom-metrics.md](custom-metrics.md) | Custom query reference, PromQL, alert/runbook links |
 | [workflows.md](workflows.md) | Senior-DBA diagnostic flows |
@@ -51,6 +50,29 @@ runbooks for the platform database layer.
 
 Connection alerts and dashboards use built-in **`cnpg_backends_total`** and
 **`cnpg_pg_settings_setting{name="max_connections"}`**; see [workflows.md](workflows.md).
+
+## Scrape architecture & rule layout
+
+Each CNPG cluster runs the built-in exporter on `:9187` (all series prefixed `cnpg_` —
+built-in collectors plus custom queries referenced via `spec.monitoring.customQueriesConfigMap`),
+scraped by a **per-cluster `PodMonitor`**. PgDog poolers expose OpenMetrics on `:9090` via a
+`ServiceMonitor`. VMAgent scrapes both and remote-writes to VMSingle; VMAlert evaluates the
+PostgreSQL `PrometheusRule`s. Full VM topology and rule pipeline:
+[../victoriametrics.md](../victoriametrics.md).
+
+**Scraped clusters:** only `platform-db` (ns `platform`) and `product-db` (ns `product`) export
+metrics. `product-db-replica` is a DR replica and is **not scraped** — its pods carry
+`cnpg.io/cluster=product-db-replica`, which no PodMonitor selects (live `cnpg_io_cluster` label
+values are exactly `platform-db` and `product-db`).
+
+**Alert rules** — chart-generated per cluster under
+`prometheusrules/postgres/{cnpg,cnpg-platform-db}/`, plus `backup-alerts.yaml` and hand-authored
+`deep-signals-alerts.yaml`. Full catalog:
+[alert-catalog §4/§4b](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg).
+
+**Audit / query-plan logging** — `pgaudit` (`log: "ddl, write"`) and `auto_explain` write to CNPG
+pod logs, tailed by the Vector DaemonSet into VictoriaLogs (no separate exporter):
+[../../logging/victorialogs.md](../../logging/victorialogs.md).
 
 ## References
 

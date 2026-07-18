@@ -325,8 +325,8 @@ docs/observability/
 │   ├── promql-guide.md           # PromQL reference
 │   ├── streaming-aggregation.md  # At-scale playbook: in-flight aggregation (RFC-0013)
 │   └── postgresql/               # PostgreSQL metrics + learning hub
-│       ├── README.md             # Hub, learning path, runbook links
-│       ├── monitoring.md         # CNPG architecture
+│       ├── README.md             # Hub: architecture, learning path, runbook links
+│       ├── builtin-metrics.md    # CNPG built-in metric inventory
 │       ├── custom-metrics.md     # Custom query reference
 │       ├── workflows.md          # On-call decision trees
 │       └── signals/              # Dashboard-only signal guides

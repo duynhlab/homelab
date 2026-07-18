@@ -321,8 +321,7 @@ docs/observability/
 │   ├── README.md                 # Hub: fundamentals, stack, architecture, coverage
 │   ├── metrics-apps.md           # Application + gRPC east-west metrics (RED)
 │   ├── metrics-infra.md          # Cluster / infrastructure metrics (USE)
-│   ├── victoriametrics.md        # VictoriaMetrics Operator stack
-│   ├── vmauth.md                 # VMAuth/vmauth HTTP proxy (auth.config, CRs)
+│   ├── victoriametrics.md        # VictoriaMetrics Operator stack (incl. VMAuth planned)
 │   ├── promql-guide.md           # PromQL reference
 │   ├── streaming-aggregation.md  # At-scale playbook: in-flight aggregation (RFC-0013)
 │   └── postgresql/               # PostgreSQL metrics + learning hub

@@ -1,6 +1,6 @@
 # Grafana RBAC and multi-team access
 
-This document explains **Grafana organization roles**, **Teams**, and how they combine with **anonymous access** in this homelab. It complements [VMAuth / vmauth](../metrics/vmauth.md), which protects VictoriaMetrics HTTP APIs—not the Grafana UI.
+This document explains **Grafana organization roles**, **Teams**, and how they combine with **anonymous access** in this homelab. It complements [VMAuth / vmauth](../metrics/victoriametrics.md#vmauth--vmauth-planned), which protects VictoriaMetrics HTTP APIs—not the Grafana UI.
 
 ## Table of contents
 
@@ -90,7 +90,7 @@ Relevant settings (verify in file for exact values):
 
 **Security note:** With port-forward, treat Grafana as **sensitive**. For multi-team or shared networks: set anonymous to **Viewer** or disable anonymous and enable OAuth/login.
 
-**VMAuth** ([vmauth.md](../metrics/vmauth.md)) does **not** change the above: it protects VictoriaMetrics APIs, not Grafana’s anonymous Admin.
+**VMAuth** ([VictoriaMetrics stack doc — VMAuth planned](../metrics/victoriametrics.md#vmauth--vmauth-planned)) does **not** change the above: it protects VictoriaMetrics APIs, not Grafana’s anonymous Admin.
 
 ---
 
@@ -155,7 +155,7 @@ flowchart TD
 - [Configure Grafana](https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/)
 - [Anonymous authentication](https://grafana.com/docs/grafana/latest/setup-grafana/configure-security/configure-authentication/#anonymous-authentication)
 - [Grafana overview](README.md)
-- [VMAuth and vmauth](../metrics/vmauth.md)
+- [VMAuth and vmauth](../metrics/victoriametrics.md#vmauth--vmauth-planned)
 
 ---
 _Last updated: 2026-07-14_

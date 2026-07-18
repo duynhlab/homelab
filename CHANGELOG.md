@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **infra (grafana)**: Pin `grafana/grafana` **13.0.1 → 13.1.0** (cluster `Grafana` CR + local-stack compose).
 - RFC workflow: reserve `RFC-NNNN` with owner OK → `research.md` (real-world problem +
   plain-language + Context7) → `README.md`; optional domain doc spin-off; templates in
   [`RFC-0000/`](docs/proposals/rfc/RFC-0000/).

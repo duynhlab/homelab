@@ -28,6 +28,7 @@ spec:
           {{ $value }} session(s) on {{ $labels.cnpg_io_cluster }} have been waiting on a
           lock held by another session for >10m. Inspect pg_locks / pg_blocking_pids and the
           Locks & Blocking panels.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGBlockedQueries.md"
 
     - alert: CNPGDeadlocksIncreasing
       expr: sum by (cnpg_io_cluster, datname) (increase(cnpg_pg_stat_database_deadlocks[10m])) > 0
@@ -40,6 +41,7 @@ spec:
         description: >-
           {{ $value | printf "%.0f" }} deadlock(s) in the last 10m on database
           {{ $labels.datname }}. Recurring deadlocks indicate a lock-ordering problem in the app.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGDeadlocksIncreasing.md"
 
     # --- Autovacuum / bloat ----------------------------------------------
     - alert: CNPGAutovacuumFallingBehind
@@ -60,6 +62,7 @@ spec:
           Table {{ $labels.cnpg_io_cluster }}/{{ $labels.datname }}.{{ $labels.relname }} has a
           dead-tuple ratio >20% ({{ $value | printf "%.0f" }} dead) for 30m. Autovacuum is not
           keeping up — expect bloat. Consider lowering autovacuum_vacuum_scale_factor for this table.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGAutovacuumFallingBehind.md"
 
     # --- Cache / I/O ------------------------------------------------------
     - alert: CNPGLowCacheHitRatio
@@ -80,6 +83,7 @@ spec:
         description: >-
           Shared-buffer hit ratio has been below 90% for 15m under real traffic. Working set may
           no longer fit shared_buffers, or a large scan is evicting hot pages.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGLowCacheHitRatio.md"
 
     - alert: CNPGTempFileSpill
       expr: sum by (cnpg_io_cluster) (rate(cnpg_pg_stat_database_temp_bytes[10m])) > 5e6
@@ -92,6 +96,7 @@ spec:
         description: >-
           >5 MB/s of temp files written for 15m on {{ $labels.cnpg_io_cluster }}. Sorts/hashes are
           exceeding work_mem — tune work_mem or add indexes for the offending queries.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGTempFileSpill.md"
 
     # --- Checkpoints ------------------------------------------------------
     - alert: CNPGCheckpointPressure
@@ -108,6 +113,7 @@ spec:
         description: >-
           Requested checkpoints outpace timed ones for 30m — checkpoints are triggered by
           max_wal_size rather than checkpoint_timeout. Raise max_wal_size / checkpoint_timeout.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGCheckpointPressure.md"
 
     # --- Transaction-ID wraparound ---------------------------------------
     - alert: CNPGTransactionIDWraparoundWarning
@@ -121,6 +127,7 @@ spec:
         description: >-
           age(datfrozenxid) for {{ $labels.datname }} exceeds 1,000,000,000 (~47% of the 2^31
           wraparound limit). A long-running transaction or stuck autovacuum is preventing freezing.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGTransactionIDWraparoundWarning.md"
 
     - alert: CNPGTransactionIDWraparoundCritical
       expr: max by (cnpg_io_cluster, datname) (cnpg_pg_database_xid_age) > 1500000000
@@ -134,6 +141,7 @@ spec:
           age(datfrozenxid) for {{ $labels.datname }} exceeds 1,500,000,000. Wraparound is
           approaching; the database will refuse writes near 2^31. Find and kill the oldest
           transaction and let anti-wraparound autovacuum complete.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGTransactionIDWraparoundCritical.md"
 
     # --- WAL archiving ----------------------------------------------------
     - alert: CNPGWALArchiveFailing
@@ -147,6 +155,7 @@ spec:
         description: >-
           archive_command has failed in the last 30m on {{ $labels.cnpg_io_cluster }}. WAL is
           piling up in pg_wal and PITR/backup recovery is at risk — check the Barman object store.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGWALArchiveFailing.md"
 
     # --- Long-running / idle transactions --------------------------------
     - alert: CNPGLongRunningTransaction
@@ -161,6 +170,7 @@ spec:
           The oldest open transaction on {{ $labels.cnpg_io_cluster }} has been running for
           {{ $value | printf "%.0f" }}s (>5m). It pins dead tuples (blocking VACUUM) and holds
           back xid freezing — find and end it before bloat/wraparound builds up.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGLongRunningTransaction.md"
 
     - alert: CNPGIdleInTransaction
       expr: max by (cnpg_io_cluster) (cnpg_pg_long_running_transactions_oldest_idle_in_transaction_seconds) > 300
@@ -174,3 +184,4 @@ spec:
           A session on {{ $labels.cnpg_io_cluster }} has sat idle inside an open transaction for
           {{ $value | printf "%.0f" }}s (>5m). Idle-in-transaction sessions are the classic cause
           of stalled autovacuum — set idle_in_transaction_session_timeout or fix the client.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGIdleInTransaction.md"

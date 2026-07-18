@@ -44,7 +44,7 @@ spec:
           annotations:
             summary: "Microservice instance stopped reporting ({{ $labels.namespace }}/{{ $labels.app }})"
             description: "Pod {{ $labels.k8s_pod_name }} of {{ $labels.app }} stopped pushing runtime metrics (heartbeat series vanished). OTLP-path liveness (D-4)."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicedown"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/MicroserviceDown.md"
 
         - alert: MicroserviceAllInstancesDown
           expr: |
@@ -57,7 +57,7 @@ spec:
           annotations:
             summary: "All instances of {{ $labels.app }} stopped reporting ({{ $labels.namespace }})"
             description: "Every pod of {{ $labels.app }} stopped pushing runtime metrics. Complete service outage or a broken OTLP pipeline — check the pipeline-health alert to disambiguate."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microserviceallinstancesdown"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/MicroserviceAllInstancesDown.md"
 
         # NEW (RFC-0014): the push pipeline itself is now a dependency of every
         # alert above — page when the collector fails to export metric points.
@@ -72,7 +72,7 @@ spec:
           annotations:
             summary: "OTel collector failing to export metrics ({{ $labels.exporter }})"
             description: "The collector dropped metric points for 5 minutes ({{ $value | humanize }} points/s). Every OTLP-path alert is blind while this fires."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/observability-deep-dive.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OtelMetricsPipelineExportFailures.md"
 
     # --- Errors (RED: Errors) ---
     - name: microservices-errors
@@ -91,7 +91,7 @@ spec:
           annotations:
             summary: "High 5xx error rate for {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} 5xx error rate is {{ $value | humanizePercentage }} (threshold: 5%). Check application logs and traces."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehigherrorrate"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/MicroserviceHighErrorRate.md"
 
         - alert: MicroserviceErrorRateCritical
           expr: |
@@ -106,7 +106,7 @@ spec:
           annotations:
             summary: "Critical 5xx error rate for {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} 5xx error rate is {{ $value | humanizePercentage }} (threshold: 15%). Immediate investigation required."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microserviceerrorratecritical"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/MicroserviceErrorRateCritical.md"
 
         - alert: MicroserviceNoSuccessfulRequests
           expr: |
@@ -119,7 +119,7 @@ spec:
           annotations:
             summary: "No successful requests for {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} has returned zero 2xx responses in the last 10 minutes but had traffic in the prior hour. All requests may be failing."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicenosuccessfulrequests"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/MicroserviceNoSuccessfulRequests.md"
 
         # NEW (RFC-0014): gRPC east-west finally gets monitoring, on the names
         # that survive the cutover. Callee-side error ratio per service.
@@ -136,7 +136,7 @@ spec:
           annotations:
             summary: "High gRPC error rate on {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} is failing {{ $value | humanizePercentage }} of incoming gRPC calls (threshold: 5%). East-west path — check the calling service's saga/retry behavior too."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/GrpcServerHighErrorRate.md"
 
     # --- Latency (RED: Duration / Golden: Latency) ---
     - name: microservices-latency
@@ -154,7 +154,7 @@ spec:
           annotations:
             summary: "High P95 latency for {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} P95 latency is {{ $value | humanizeDuration }} (threshold: 1s). Check slow endpoints, database queries, and downstream dependencies."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighlatencyp95"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/MicroserviceHighLatencyP95.md"
 
         - alert: MicroserviceHighLatencyP99
           expr: |
@@ -168,7 +168,7 @@ spec:
           annotations:
             summary: "High P99 latency for {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} P99 latency is {{ $value | humanizeDuration }} (threshold: 2s). Tail latency indicates outlier slow requests."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighlatencyp99"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/MicroserviceHighLatencyP99.md"
 
         - alert: MicroserviceLatencyCritical
           expr: |
@@ -182,7 +182,7 @@ spec:
           annotations:
             summary: "Critical P95 latency for {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} P95 latency is {{ $value | humanizeDuration }} (threshold: 2s). Most requests are severely degraded."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicelatencycritical"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/MicroserviceLatencyCritical.md"
 
         # NEW (RFC-0014): callee-side gRPC latency — internal calls have a much
         # tighter budget than edge HTTP (they compose into edge latency).
@@ -198,7 +198,7 @@ spec:
           annotations:
             summary: "High gRPC P95 latency on {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} P95 for incoming gRPC calls is {{ $value | humanizeDuration }} (threshold: 500ms). East-west latency compounds into every edge request that fans out."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/GrpcServerHighLatencyP95.md"
 
     # --- Traffic (RED: Rate / Golden: Traffic) ---
     - name: microservices-traffic
@@ -215,7 +215,7 @@ spec:
           annotations:
             summary: "No traffic for {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} has received zero requests in the last 10 minutes but had traffic in the prior hour. Possible routing issue or upstream failure."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicenotraffic"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/MicroserviceNoTraffic.md"
 
         # The le="0.5" and le="2" boundaries exist ONLY because obsx pins the
         # 13-bucket View (RFC-0014 D-7) — semconv's advised buckets lack le=2.
@@ -237,7 +237,7 @@ spec:
           annotations:
             summary: "Critical Apdex score for {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} Apdex score is {{ $value | humanize }} (threshold: 0.5). Majority of users are experiencing unacceptable response times."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microserviceapdexcritical"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/MicroserviceApdexCritical.md"
 
     # --- Go Runtime ---
     # requests_in_flight saturation alerts intentionally have no copy here —
@@ -260,7 +260,7 @@ spec:
           annotations:
             summary: "Goroutine leak suspected ({{ $labels.namespace }}/{{ $labels.app }})"
             description: "{{ $labels.app }} has {{ $value | humanize }} goroutines and the count is steadily increasing. Possible forgotten defer cancel(), unclosed channels, or blocking operations."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicegoroutineleak"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/MicroserviceGoroutineLeak.md"
 
         # Semantic change (RFC-0014): RSS threshold → limits-aware working set
         # from cAdvisor. Fires on % of the container's memory limit, so it
@@ -288,7 +288,7 @@ spec:
           annotations:
             summary: "High memory usage ({{ $labels.namespace }}/{{ $labels.pod }})"
             description: "Container {{ $labels.container }} working set is at {{ $value | humanizePercentage }} of its memory limit. Check for leaks via Pyroscope heap profiles before the OOM killer does."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#microservicehighmemoryusage"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/MicroserviceHighMemoryUsage.md"
 
         # MicroserviceGCThrash was retired 2026-07-17: it compared stack+other
         # memory (the only go_memory_type values the OTel Go runtime exposes)
@@ -319,7 +319,7 @@ spec:
           annotations:
             summary: "Slow DB queries from {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} P95 DB query latency is {{ $value | humanizeDuration }} (threshold: 100ms). Check pg_stat_statements for the offending statement, missing indexes, or lock contention on the server side."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#dbclientqueryp95high"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/DBClientQueryP95High.md"
 
         # otelpgx increments this for any non-ErrNoRows operation error
         # (SQLSTATE failures, timeouts, broken conns). Sustained errors mean the
@@ -334,7 +334,7 @@ spec:
           annotations:
             summary: "DB operation errors from {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} is seeing {{ $value | humanize }} DB operation errors/s for 5 minutes. Check service logs (SQLSTATE on the query span), pooler health, and Postgres availability."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#dbclienterrorrate"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/DBClientErrorRate.md"
 
         # Checked-out conns pinned at the pool ceiling = every new query waits.
         # min() over the window (not avg) so only sustained exhaustion fires.
@@ -349,7 +349,7 @@ spec:
           annotations:
             summary: "DB pool near exhaustion on {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} has kept ≥80% of its pool connections checked out for 5 minutes. Queries are about to queue on Acquire — look for slow queries holding conns or an undersized pool."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#pgxpoolnearexhaustion"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PgxPoolNearExhaustion.md"
 
         # empty_acquire counts acquires that had to WAIT for a conn — the
         # earliest saturation signal, firing before hard exhaustion.
@@ -363,5 +363,5 @@ spec:
           annotations:
             summary: "DB pool contention on {{ $labels.app }} ({{ $labels.namespace }})"
             description: "{{ $labels.app }} acquires are waiting for a free connection {{ $value | humanize }}/s over 10 minutes (pool contention). Correlate with pgxpool_empty_acquire_wait_time and query latency; grow the pool or shorten query hold time."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices-alerts.md#pgxpoolacquirewaithigh"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PgxPoolAcquireWaitHigh.md"
 

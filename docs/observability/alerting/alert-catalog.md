@@ -43,27 +43,27 @@ marked inline below.
 
 Source: `prometheusrules/microservices/alerts.yaml` (OTLP push pipeline — RFC-0014 P3 cutover; the scrape-era groups retired with the cutover). SLI base metric: `http_server_request_duration_seconds`. No `job` label on the push path — selectors key on `{app!=""}` (vmagent D-3 relabel maps `service_name→app`, `k8s_namespace_name→namespace`).
 
-| Alert | Sev | Metric & trigger | Impact — why it must alert | for |
-|-------|-----|------------------|----------------------------|-----|
-| MicroserviceDown | critical | D-4 heartbeat-absence: `go_goroutine_count{app!=""}` series present in the last 15m but now gone (per app/namespace/pod) | One instance stopped reporting; detection lags a pod kill ~5m (VM staleness), accepted in D-4 | 2m |
-| MicroserviceAllInstancesDown | critical | same heartbeat-absence, per `(app,namespace)` — every pod gone | Full service outage, or a broken OTLP pipeline | 2m |
-| OtelMetricsPipelineExportFailures | critical | `rate(otelcol_exporter_send_failed_metric_points_total[5m])>0` | Collector dropping metric points — every OTLP-path alert is blind | 5m |
-| MicroserviceHighErrorRate | warning | 5xx ratio of `http_server_request_duration_seconds_count` >5% | 1-in-20 users get server errors | 5m |
-| MicroserviceErrorRateCritical | critical | 5xx ratio >15% | Major failure; rollback/mitigation now | 5m |
-| MicroserviceNoSuccessfulRequests | critical | `rate(...{http_response_status_code=~"2.."})==0` 10m, had traffic before | Zero successes despite prior traffic — likely total failure | 10m |
-| GrpcServerHighErrorRate | warning | non-OK ratio of `rpc_server_call_duration_seconds_count` >5% | East-west gRPC calls failing; callee unhealthy | 5m |
-| MicroserviceHighLatencyP95 | warning | `histogram_quantile(0.95, http_server_request_duration_seconds_bucket)>1s` | Half of requests user-noticeably slow | 10m |
-| MicroserviceHighLatencyP99 | warning | P99 >2s | Tail latency spike | 10m |
-| MicroserviceLatencyCritical | critical | P95 >2s | Timeout territory; SLA breach | 5m |
-| GrpcServerHighLatencyP95 | warning | gRPC P95 (`rpc_server_call_duration_seconds_bucket`) >500ms | East-west latency compounds into every edge request that fans out | 10m |
-| MicroserviceNoTraffic | warning | `rate(count[10m])==0`, had traffic | Routing broken / upstream down | 10m |
-| MicroserviceApdexCritical | critical | apdex <0.5 | >50% of users get unacceptable response times | 10m |
-| MicroserviceGoroutineLeak | warning | `go_goroutine_count>1000` and `deriv(...[15m])>0.17` | Leak → eventual OOM | 15m |
-| MicroserviceHighMemoryUsage | warning | container working-set >90% of the memory limit (`container_memory_working_set_bytes` / `kube_pod_container_resource_limits`) | OOMKill risk | 15m |
-| DBClientQueryP95High | warning | `histogram_quantile(0.95, db_client_operation_duration_seconds_bucket{pgx_operation_type="query"})>100ms` | App-side DB latency — what the service experiences, regardless of server health (otelpgx, RFC-0017 W4) | 10m |
-| DBClientErrorRate | warning | `rate(db_client_operation_errors_total)>0.1/s` | Sustained DB operation failures (SQLSTATE, timeouts, broken conns) — requests are failing | 5m |
-| PgxPoolNearExhaustion | warning | `min_over_time(pgxpool_acquired_connections[5m]) ≥ 80%` of `pgxpool_max_connections` | Pool pinned at ceiling — new queries queue on Acquire | 5m |
-| PgxPoolAcquireWaitHigh | warning | `rate(pgxpool_empty_acquire_total)>1/s` | Acquires waiting for a free conn — earliest pool-saturation signal | 10m |
+| Alert | Sev | Metric & trigger | Impact — why it must alert | for | Runbook |
+|-------|-----|------------------|----------------------------|-----|---------|
+| MicroserviceDown | critical | D-4 heartbeat-absence: `go_goroutine_count{app!=""}` series present in the last 15m but now gone (per app/namespace/pod) | One instance stopped reporting; detection lags a pod kill ~5m (VM staleness), accepted in D-4 | 2m | | [MicroserviceDown](../runbooks/microservices/MicroserviceDown.md) |
+| MicroserviceAllInstancesDown | critical | same heartbeat-absence, per `(app,namespace)` — every pod gone | Full service outage, or a broken OTLP pipeline | 2m | | [MicroserviceAllInstancesDown](../runbooks/microservices/MicroserviceAllInstancesDown.md) |
+| OtelMetricsPipelineExportFailures | critical | `rate(otelcol_exporter_send_failed_metric_points_total[5m])>0` | Collector dropping metric points — every OTLP-path alert is blind | 5m | | [OtelMetricsPipelineExportFailures](../runbooks/microservices/OtelMetricsPipelineExportFailures.md) |
+| MicroserviceHighErrorRate | warning | 5xx ratio of `http_server_request_duration_seconds_count` >5% | 1-in-20 users get server errors | 5m | | [MicroserviceHighErrorRate](../runbooks/microservices/MicroserviceHighErrorRate.md) |
+| MicroserviceErrorRateCritical | critical | 5xx ratio >15% | Major failure; rollback/mitigation now | 5m | | [MicroserviceErrorRateCritical](../runbooks/microservices/MicroserviceErrorRateCritical.md) |
+| MicroserviceNoSuccessfulRequests | critical | `rate(...{http_response_status_code=~"2.."})==0` 10m, had traffic before | Zero successes despite prior traffic — likely total failure | 10m | | [MicroserviceNoSuccessfulRequests](../runbooks/microservices/MicroserviceNoSuccessfulRequests.md) |
+| GrpcServerHighErrorRate | warning | non-OK ratio of `rpc_server_call_duration_seconds_count` >5% | East-west gRPC calls failing; callee unhealthy | 5m | | [GrpcServerHighErrorRate](../runbooks/microservices/GrpcServerHighErrorRate.md) |
+| MicroserviceHighLatencyP95 | warning | `histogram_quantile(0.95, http_server_request_duration_seconds_bucket)>1s` | Half of requests user-noticeably slow | 10m | | [MicroserviceHighLatencyP95](../runbooks/microservices/MicroserviceHighLatencyP95.md) |
+| MicroserviceHighLatencyP99 | warning | P99 >2s | Tail latency spike | 10m | | [MicroserviceHighLatencyP99](../runbooks/microservices/MicroserviceHighLatencyP99.md) |
+| MicroserviceLatencyCritical | critical | P95 >2s | Timeout territory; SLA breach | 5m | | [MicroserviceLatencyCritical](../runbooks/microservices/MicroserviceLatencyCritical.md) |
+| GrpcServerHighLatencyP95 | warning | gRPC P95 (`rpc_server_call_duration_seconds_bucket`) >500ms | East-west latency compounds into every edge request that fans out | 10m | | [GrpcServerHighLatencyP95](../runbooks/microservices/GrpcServerHighLatencyP95.md) |
+| MicroserviceNoTraffic | warning | `rate(count[10m])==0`, had traffic | Routing broken / upstream down | 10m | | [MicroserviceNoTraffic](../runbooks/microservices/MicroserviceNoTraffic.md) |
+| MicroserviceApdexCritical | critical | apdex <0.5 | >50% of users get unacceptable response times | 10m | | [MicroserviceApdexCritical](../runbooks/microservices/MicroserviceApdexCritical.md) |
+| MicroserviceGoroutineLeak | warning | `go_goroutine_count>1000` and `deriv(...[15m])>0.17` | Leak → eventual OOM | 15m | | [MicroserviceGoroutineLeak](../runbooks/microservices/MicroserviceGoroutineLeak.md) |
+| MicroserviceHighMemoryUsage | warning | container working-set >90% of the memory limit (`container_memory_working_set_bytes` / `kube_pod_container_resource_limits`) | OOMKill risk | 15m | | [MicroserviceHighMemoryUsage](../runbooks/microservices/MicroserviceHighMemoryUsage.md) |
+| DBClientQueryP95High | warning | `histogram_quantile(0.95, db_client_operation_duration_seconds_bucket{pgx_operation_type="query"})>100ms` | App-side DB latency — what the service experiences, regardless of server health (otelpgx, RFC-0017 W4) | 10m | | [DBClientQueryP95High](../runbooks/microservices/DBClientQueryP95High.md) |
+| DBClientErrorRate | warning | `rate(db_client_operation_errors_total)>0.1/s` | Sustained DB operation failures (SQLSTATE, timeouts, broken conns) — requests are failing | 5m | | [DBClientErrorRate](../runbooks/microservices/DBClientErrorRate.md) |
+| PgxPoolNearExhaustion | warning | `min_over_time(pgxpool_acquired_connections[5m]) ≥ 80%` of `pgxpool_max_connections` | Pool pinned at ceiling — new queries queue on Acquire | 5m | | [PgxPoolNearExhaustion](../runbooks/microservices/PgxPoolNearExhaustion.md) |
+| PgxPoolAcquireWaitHigh | warning | `rate(pgxpool_empty_acquire_total)>1/s` | Acquires waiting for a free conn — earliest pool-saturation signal | 10m | | [PgxPoolAcquireWaitHigh](../runbooks/microservices/PgxPoolAcquireWaitHigh.md) |
 
 > **Scrape-era alerts retired at the P3 cutover.** `MicroserviceHighRequestsInFlight` / `MicroserviceRequestsInFlightCritical` (saturation) are **removed** — otelgin v0.69 emits no `http.server.active_requests`, so there is no OTel in-flight metric (re-add when it ships). `MicroserviceHighGCPressure` + `MicroserviceHighGCFrequency` (GC pause) were **replaced** by `MicroserviceGCThrash`, itself **retired 2026-07-17** (audit: the runtime family has no heap series — only stack/other — so the ratio vs the heap-only GC goal false-fired permanently). `MicroserviceDown` / `MicroserviceAllInstancesDown` moved from `up{}` scrape liveness to the D-4 heartbeat-absence check above. The former scrape-era `MicroserviceHighRestartRate` is not part of the OTLP alert set — CrashLoop/restart is covered by `KubePodCrashLooping` (§5).
 
@@ -113,35 +113,37 @@ upstream `cluster-*.yaml`), deployed as:
 - `prometheusrules/postgres/deep-signals-alerts.yaml` — hand-authored deep-signal alerts (§4b), label-driven, one file for both clusters.
 
 Base metrics: `cnpg_*`. The alert **types** are catalogued once below; the same rule
-set is replicated per HA cluster. **51 rules total** = `product-db` 22 (incl. the operator-health
-singleton) + `platform-db` 18 + 2 backup alerts + 9 deep-signal alerts.
+set is replicated per HA cluster. **53 rules total** = `product-db` 22 (incl. the operator-health
+singleton) + `platform-db` 18 + 2 backup alerts + 11 deep-signal alerts.
 
-| Alert | Sev | Metric & trigger | Impact | for |
-|-------|-----|------------------|--------|-----|
-| CNPGClusterOffline | critical | `cnpg_collector_up` ready instances = 0 | DB fully down — total outage + data-loss risk | 5m |
-| CnpgClusterFenced | critical | `cnpg_collector_fencing_on==1` | All writes blocked (split-brain guard) | 1m |
-| CNPGClusterHACritical | critical | streaming replicas <1 | No standby — primary failure = data loss | 5m |
-| CNPGClusterHAWarning | warning | streaming replicas <2 | Degraded HA redundancy | 5m |
-| CNPGOperatorDown | critical | `up{namespace="cloudnative-pg"}==0` | Operator down — no cluster management | 5m |
-| CNPGControllerReconcileErrorsSpiking | warning | `increase(controller_runtime_reconcile_errors_total[10m])>5` | Cluster management degrading | 10m |
-| CNPGClusterHighConnectionsCritical | critical | backends / `max_connections` >95% | New connections refused | 5m |
-| CNPGClusterHighConnectionsWarning | warning | >80% | Approaching connection limit | 5m |
-| CNPGClusterPhysicalReplicationLagCritical | critical | `cnpg_pg_replication_lag` >15ms | Data-safety risk on failover | 5m |
-| CNPGClusterPhysicalReplicationLagWarning | warning | >1ms | Degraded replication | 5m |
-| CNPGClusterHighReplicationLag | warning | `cnpg_pg_replication_lag` >1s | Consistency risk primary↔replica | 5m |
-| CNPGClusterLowDiskSpaceCritical 💤 *inactive on Kind — local-path CSI reports no kubelet VolumeStats* | critical | PVC usage >90% (`kubelet_volume_stats_*`) | Writes about to fail / crash | 5m |
-| CNPGClusterLowDiskSpaceWarning 💤 *inactive on Kind (same)* | warning | PVC usage >70% | Add capacity proactively | 5m |
-| PostgresWALSizeHigh | warning | `cnpg_collector_pg_wal{size}` >2GB | WAL pileup → disk + recovery-time impact | 15m |
-| CNPGClusterZoneSpreadWarning ⏸ *gated — commented out in kustomization until production (needs KSM zone labels)* | warning | unique zones <3 | Zone failure = data loss | 5m |
-| CNPGClusterInstancesOnSameNode ⏸ *gated — commented out in kustomization until production* | warning | >1 instance per node (`kube_pod_info`) | Node loss = total cluster loss | 5m |
-| PostgresBackupTooOld | warning | `cnpg_collector_last_available_backup_timestamp` >26h | Stale backups → data-loss exposure | 1h |
-| PostgresBackupFailed | critical | `cnpg_collector_last_failed_backup_timestamp` recent & > last success | Backup pipeline broken — unprotected | 5m |
-| CNPGClusterLogicalReplicationErrors 💤 | warning | apply+sync error counters increasing | Logical-replication divergence | 1m |
-| CNPGClusterLogicalReplicationErrorsCritical 💤 | critical | ≥5 errors in 5m | Persistent logical-replication failure | 0m |
-| CNPGClusterLogicalReplicationLagging 💤 | warning | receipt/apply lag >60s or buffered >1GB | Subscriber falling behind | 5m |
-| CNPGClusterLogicalReplicationLaggingCritical 💤 | critical | lag >300s or buffered >4GB | Disk-exhaustion + long recovery | 2m |
-| CNPGClusterLogicalReplicationStopped 💤 | warning | `cnpg_pg_stat_subscription_enabled==0` / stuck | Replication halted | 5m |
-| CNPGClusterLogicalReplicationStoppedCritical 💤 | critical | stopped + backlog ≥15m | Significant divergence; manual recovery | 15m |
+Per-alert runbooks: [`runbooks/postgresql/README.md`](../runbooks/postgresql/README.md).
+
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| CNPGClusterOffline | critical | `cnpg_collector_up` ready instances = 0 | DB fully down — total outage + data-loss risk | 5m | [CNPGClusterOffline](../runbooks/postgresql/CNPGClusterOffline.md) |
+| CnpgClusterFenced | critical | `cnpg_collector_fencing_on==1` | All writes blocked (split-brain guard) | 1m | [CnpgClusterFenced](../runbooks/postgresql/CnpgClusterFenced.md) |
+| CNPGClusterHACritical | critical | streaming replicas <1 | No standby — primary failure = data loss | 5m | [CNPGClusterHACritical](../runbooks/postgresql/CNPGClusterHACritical.md) |
+| CNPGClusterHAWarning | warning | streaming replicas <2 | Degraded HA redundancy | 5m | [CNPGClusterHAWarning](../runbooks/postgresql/CNPGClusterHAWarning.md) |
+| CNPGOperatorDown | critical | `up{namespace="cloudnative-pg"}==0` | Operator down — no cluster management | 5m | [CNPGOperatorDown](../runbooks/postgresql/CNPGOperatorDown.md) |
+| CNPGControllerReconcileErrorsSpiking | warning | `increase(controller_runtime_reconcile_errors_total[10m])>5` | Cluster management degrading | 10m | [CNPGControllerReconcileErrorsSpiking](../runbooks/postgresql/CNPGControllerReconcileErrorsSpiking.md) |
+| CNPGClusterHighConnectionsCritical | critical | `cnpg_backends_total` / `max_connections` >95% | New connections refused | 5m | [CNPGClusterHighConnectionsCritical](../runbooks/postgresql/CNPGClusterHighConnectionsCritical.md) |
+| CNPGClusterHighConnectionsWarning | warning | >80% | Approaching connection limit | 5m | [CNPGClusterHighConnectionsWarning](../runbooks/postgresql/CNPGClusterHighConnectionsWarning.md) |
+| CNPGClusterPhysicalReplicationLagCritical | critical | `cnpg_pg_replication_lag` >15ms | Data-safety risk on failover | 5m | [CNPGClusterPhysicalReplicationLagCritical](../runbooks/postgresql/CNPGClusterPhysicalReplicationLagCritical.md) |
+| CNPGClusterPhysicalReplicationLagWarning | warning | >1ms | Degraded replication | 5m | [CNPGClusterPhysicalReplicationLagWarning](../runbooks/postgresql/CNPGClusterPhysicalReplicationLagWarning.md) |
+| CNPGClusterHighReplicationLag | warning | `cnpg_pg_replication_lag` >1s | Consistency risk primary↔replica | 5m | [CNPGClusterHighReplicationLag](../runbooks/postgresql/CNPGClusterHighReplicationLag.md) |
+| CNPGClusterLowDiskSpaceCritical 💤 *inactive on Kind — local-path CSI reports no kubelet VolumeStats* | critical | PVC usage >90% (`kubelet_volume_stats_*`) | Writes about to fail / crash | 5m | [CNPGClusterLowDiskSpaceCritical](../runbooks/postgresql/CNPGClusterLowDiskSpaceCritical.md) |
+| CNPGClusterLowDiskSpaceWarning 💤 *inactive on Kind (same)* | warning | PVC usage >70% | Add capacity proactively | 5m | [CNPGClusterLowDiskSpaceWarning](../runbooks/postgresql/CNPGClusterLowDiskSpaceWarning.md) |
+| PostgresWALSizeHigh | warning | `cnpg_collector_pg_wal{size}` >2GB | WAL pileup → disk + recovery-time impact | 15m | [PostgresWALSizeHigh](../runbooks/postgresql/PostgresWALSizeHigh.md) |
+| CNPGClusterZoneSpreadWarning ⏸ *gated — commented out in kustomization until production (needs KSM zone labels)* | warning | unique zones <3 | Zone failure = data loss | 5m | [CNPGClusterZoneSpreadWarning](../runbooks/postgresql/CNPGClusterZoneSpreadWarning.md) |
+| CNPGClusterInstancesOnSameNode ⏸ *gated — commented out in kustomization until production* | warning | >1 instance per node (`kube_pod_info`) | Node loss = total cluster loss | 5m | [CNPGClusterInstancesOnSameNode](../runbooks/postgresql/CNPGClusterInstancesOnSameNode.md) |
+| PostgresBackupTooOld | warning | `cnpg_collector_last_available_backup_timestamp` >26h | Stale backups → data-loss exposure | 1h | [postgres_backup_restore.md](../../runbooks/troubleshooting/postgres_backup_restore.md) |
+| PostgresBackupFailed | critical | `cnpg_collector_last_failed_backup_timestamp` recent & > last success | Backup pipeline broken — unprotected | 5m | [postgres_backup_restore.md](../../runbooks/troubleshooting/postgres_backup_restore.md) |
+| CNPGClusterLogicalReplicationErrors 💤 | warning | apply+sync error counters increasing | Logical-replication divergence | 1m | [CNPGClusterLogicalReplicationErrors](../runbooks/postgresql/CNPGClusterLogicalReplicationErrors.md) |
+| CNPGClusterLogicalReplicationErrorsCritical 💤 | critical | ≥5 errors in 5m | Persistent logical-replication failure | 0m | [CNPGClusterLogicalReplicationErrorsCritical](../runbooks/postgresql/CNPGClusterLogicalReplicationErrorsCritical.md) |
+| CNPGClusterLogicalReplicationLagging 💤 | warning | receipt/apply lag >60s or buffered >1GB | Subscriber falling behind | 5m | [CNPGClusterLogicalReplicationLagging](../runbooks/postgresql/CNPGClusterLogicalReplicationLagging.md) |
+| CNPGClusterLogicalReplicationLaggingCritical 💤 | critical | lag >300s or buffered >4GB | Disk-exhaustion + long recovery | 2m | [CNPGClusterLogicalReplicationLaggingCritical](../runbooks/postgresql/CNPGClusterLogicalReplicationLaggingCritical.md) |
+| CNPGClusterLogicalReplicationStopped 💤 | warning | `cnpg_pg_stat_subscription_enabled==0` / stuck | Replication halted | 5m | [CNPGClusterLogicalReplicationStopped](../runbooks/postgresql/CNPGClusterLogicalReplicationStopped.md) |
+| CNPGClusterLogicalReplicationStoppedCritical 💤 | critical | stopped + backlog ≥15m | Significant divergence; manual recovery | 15m | [CNPGClusterLogicalReplicationStoppedCritical](../runbooks/postgresql/CNPGClusterLogicalReplicationStoppedCritical.md) |
 
 > 💤 **Inactive on this homelab** — logical replication has no subscriptions configured, so `cnpg_pg_stat_subscription_*` has no series; these arm automatically once a subscription exists.
 
@@ -152,17 +154,19 @@ Label-driven by `cnpg_io_cluster`, so each rule fires per-cluster and covers `pl
 `product-db` from one file. These consume the custom-query + default metrics the chart rules
 ignore (locks, deadlocks, autovacuum, cache, temp, checkpoints, wraparound, WAL archiving).
 
-| Alert | Sev | Metric & trigger | Impact | for |
-|-------|-----|------------------|--------|-----|
-| CNPGBlockedQueries | warning | `cnpg_pg_blocking_queries_blocked_queries` >0 | Sessions stuck behind a lock | 10m |
-| CNPGDeadlocksIncreasing | warning | `increase(cnpg_pg_stat_database_deadlocks[10m])` >0 | App lock-ordering bug; work rolled back | 5m |
-| CNPGAutovacuumFallingBehind | warning | dead/(dead+live) >20% & dead >1000 | Autovacuum behind → bloat | 30m |
-| CNPGLowCacheHitRatio | warning | `blks_hit/(hit+read)` <90% under load | Working set spilling out of shared_buffers | 15m |
-| CNPGTempFileSpill | warning | `rate(cnpg_pg_stat_database_temp_bytes)` >5 MB/s | Queries spilling to disk (work_mem too small) | 15m |
-| CNPGCheckpointPressure | warning | `rate(checkpoints_req) > rate(checkpoints_timed)` | Checkpoints forced by WAL pressure | 30m |
-| CNPGTransactionIDWraparoundWarning | warning | `cnpg_pg_database_xid_age` >1e9 (~47%) | Freezing stalled; wraparound risk building | 30m |
-| CNPGTransactionIDWraparoundCritical | critical | `cnpg_pg_database_xid_age` >1.5e9 | Writes will stop near 2^31 | 10m |
-| CNPGWALArchiveFailing | critical | `increase(cnpg_pg_stat_archiver_failed_count[30m])` >0 | PITR/backup recovery broken; WAL piling up | 5m |
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| CNPGBlockedQueries | warning | `cnpg_pg_blocking_queries_blocked_queries` >0 | Sessions stuck behind a lock | 10m | [CNPGBlockedQueries](../runbooks/postgresql/CNPGBlockedQueries.md) |
+| CNPGDeadlocksIncreasing | warning | `increase(cnpg_pg_stat_database_deadlocks[10m])` >0 | App lock-ordering bug; work rolled back | 5m | [CNPGDeadlocksIncreasing](../runbooks/postgresql/CNPGDeadlocksIncreasing.md) |
+| CNPGAutovacuumFallingBehind | warning | dead/(dead+live) >20% & dead >1000 | Autovacuum behind → bloat | 30m | [CNPGAutovacuumFallingBehind](../runbooks/postgresql/CNPGAutovacuumFallingBehind.md) |
+| CNPGLowCacheHitRatio | warning | `blks_hit/(hit+read)` <90% under load | Working set spilling out of shared_buffers | 15m | [CNPGLowCacheHitRatio](../runbooks/postgresql/CNPGLowCacheHitRatio.md) |
+| CNPGTempFileSpill | warning | `rate(cnpg_pg_stat_database_temp_bytes)` >5 MB/s | Queries spilling to disk (work_mem too small) | 15m | [CNPGTempFileSpill](../runbooks/postgresql/CNPGTempFileSpill.md) |
+| CNPGCheckpointPressure | warning | `rate(checkpoints_req) > rate(checkpoints_timed)` | Checkpoints forced by WAL pressure | 30m | [CNPGCheckpointPressure](../runbooks/postgresql/CNPGCheckpointPressure.md) |
+| CNPGTransactionIDWraparoundWarning | warning | `cnpg_pg_database_xid_age` >1e9 (~47%) | Freezing stalled; wraparound risk building | 30m | [CNPGTransactionIDWraparoundWarning](../runbooks/postgresql/CNPGTransactionIDWraparoundWarning.md) |
+| CNPGTransactionIDWraparoundCritical | critical | `cnpg_pg_database_xid_age` >1.5e9 | Writes will stop near 2^31 | 10m | [CNPGTransactionIDWraparoundCritical](../runbooks/postgresql/CNPGTransactionIDWraparoundCritical.md) |
+| CNPGWALArchiveFailing | critical | `increase(cnpg_pg_stat_archiver_failed_count[30m])` >0 | PITR/backup recovery broken; WAL piling up | 5m | [CNPGWALArchiveFailing](../runbooks/postgresql/CNPGWALArchiveFailing.md) |
+| CNPGLongRunningTransaction | warning | `cnpg_pg_long_running_transactions_oldest_transaction_seconds` >300 | Pins dead tuples; blocks VACUUM / freezing | 5m | [CNPGLongRunningTransaction](../runbooks/postgresql/CNPGLongRunningTransaction.md) |
+| CNPGIdleInTransaction | warning | `cnpg_pg_long_running_transactions_oldest_idle_in_transaction_seconds` >300 | Idle-in-transaction stalls autovacuum | 5m | [CNPGIdleInTransaction](../runbooks/postgresql/CNPGIdleInTransaction.md) |
 
 > `CNPGWALArchiveFailing` closes the previously-listed gap **CNPGContinuousArchivingFailing**.
 

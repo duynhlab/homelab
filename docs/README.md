@@ -114,7 +114,9 @@ docs/
 │       ├── README.md             # Runbook index
 │       ├── observability-deep-dive.md   # Theory + interview prep
 │       ├── infrastructure-alerts.md     # Infra alert investigation guide
-│       └── microservices-alerts.md      # Per-alert investigation guide
+│       ├── microservices-alerts.md      # Workflows, tuning hub
+│       ├── microservices/               # Per-alert runbooks (19 files)
+│       └── postgresql/                  # Per-alert CNPG runbooks
 ├── caching/                     # Valkey cache: Cache-Aside, eviction policies, distributed-cache concept
 │   └── caching.md
 ├── platform/                     # Platform/deployment documentation
@@ -187,7 +189,13 @@ docs/
    - Time range vs rate interval
    - Best practices and troubleshooting
 
-3. **[Variables & Regex](./observability/grafana/variables.md)** - Dashboard variable patterns
+3. **[PostgreSQL metrics hub](./observability/metrics/postgresql/README.md)** - CNPG custom queries, workflows, signal guides
+
+4. **[PostgreSQL alert runbooks](./observability/runbooks/postgresql/README.md)** - Per-alert CNPG investigation (33 files)
+
+4b. **[Microservices alert runbooks](./observability/runbooks/microservices/README.md)** - Per-alert RED/Golden investigation (19 files); hub [`microservices-alerts.md`](./observability/runbooks/microservices-alerts.md)
+
+5. **[Variables & Regex](./observability/grafana/variables.md)** - Dashboard variable patterns
    - Filter configurations
    - Multi-select patterns
 

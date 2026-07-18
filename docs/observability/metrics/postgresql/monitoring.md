@@ -103,52 +103,13 @@ metrics plus every custom query defined in the cluster's monitoring ConfigMap
 
 ## Custom queries
 
-CNPG clusters define custom queries in a per-cluster monitoring ConfigMap. Queries
-keep their original names and CNPG auto-prefixes every emitted metric with `cnpg_`.
-Queries with `target_databases` include `current_database() AS datname` to
-disambiguate co-located databases on the multi-database clusters (e.g. product,
-cart, order, payment on `product-db`).
+Twelve SQL definitions per cluster ConfigMap — same queries, different
+`target_databases` per cluster. Full reference, PromQL, alert and runbook links:
+[custom-metrics.md](custom-metrics.md). Hub and learning path: [README.md](README.md).
 
-| Query name | CNPG metric prefix | Purpose |
-|---|---|---|
-| pg_stat_statements | `cnpg_pg_stat_statements_*` | Top 100 queries by execution time |
-| pg_stat_activity_count | `cnpg_pg_stat_activity_count_*` | Backends by database / state / user |
-| pg_connection_limits | `cnpg_pg_connection_limits_*` | Connection saturation |
-| pg_locks_count | `cnpg_pg_locks_count_*` | Lock distribution |
-| pg_blocking_queries | `cnpg_pg_blocking_queries_*` | Queries waiting on locks |
-| pg_long_running_transactions | `cnpg_pg_long_running_transactions_*` | Oldest / idle-in-transaction age |
-| pg_stat_user_tables_autovacuum | `cnpg_pg_stat_user_tables_autovacuum_*` | Dead tuples and vacuum activity |
-| pg_stat_progress_vacuum | `cnpg_pg_stat_progress_vacuum_*` | Live progress of running vacuums |
-| pg_table_size | `cnpg_pg_table_size_*` | Table size (top 30) |
-| pg_stat_user_indexes | `cnpg_pg_stat_user_indexes_*` | Index usage and size |
-| pg_database_size | `cnpg_pg_database_size_*` | Database sizes |
-| pg_stat_checkpointer | `cnpg_pg_stat_checkpointer_*` | Checkpoint frequency and I/O |
-
-Per-metric query details (columns, labels, filtering) are documented in
-[custom-metrics.md](custom-metrics.md).
-
-### PromQL examples
-
-```promql
-# Connection saturation
-cnpg_pg_connection_limits_current_connections / cnpg_pg_connection_limits_max_connections
-
-# Dead-tuple ratio (dead / (dead + live))
-cnpg_pg_stat_user_tables_autovacuum_n_dead_tup
-  / clamp_min(cnpg_pg_stat_user_tables_autovacuum_n_dead_tup + cnpg_pg_stat_user_tables_autovacuum_n_live_tup, 1)
-
-# Oldest open / idle-in-transaction age (seconds)
-max by (cnpg_io_cluster) (cnpg_pg_long_running_transactions_oldest_transaction_seconds)
-
-# Top queries by execution time
-topk(10, rate(cnpg_pg_stat_statements_time_milliseconds[5m]))
-
-# Database size
-cnpg_pg_database_size_size_bytes
-
-# Streaming replication lag (physical)
-cnpg_pg_replication_lag
-```
+Chart **connection alerts** use `cnpg_backends_total`; the custom query
+`pg_connection_limits` powers dashboards — both are documented in
+[workflows.md](workflows.md).
 
 ## Alert rules
 
@@ -165,6 +126,8 @@ Backup alerts (`PostgresBackupTooOld`, `PostgresBackupFailed`) live in
 `postgres/backup-alerts.yaml`. The full per-alert catalog with impact is in
 [alert-catalog.md](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg).
 
+Per-alert runbooks: [../../runbooks/postgresql/README.md](../../runbooks/postgresql/README.md).
+
 **Note**: Rules are evaluated by **VMAlert** against **VMSingle**; Grafana Alerting can show read-only rules proxied via VMSingle (see [`docs/observability/metrics/victoriametrics.md`](../victoriametrics.md)). Notifications route through VMAlertmanager (Slack wired, webhook injected out-of-band).
 
 ## Audit and query-plan logging
@@ -178,7 +141,10 @@ the CNPG pod logs, tailed by the cluster-wide **Vector DaemonSet**, and shipped 
 
 ## References
 
+- [PostgreSQL metrics hub](README.md) — learning path, document map
 - [Custom metrics query guide](custom-metrics.md) — CNPG custom queries, columns, PromQL
+- [Diagnostic workflows](workflows.md) — on-call decision trees
+- [PostgreSQL alert runbooks](../../runbooks/postgresql/README.md)
 - [Database Guide](../../../databases/002-database-integration.md) — custom queries configuration
 - [Metrics hub](../README.md) — methodology, stack, and coverage
 - [PromQL Guide](../promql-guide.md) — PromQL functions and examples
@@ -186,4 +152,4 @@ the CNPG pod logs, tailed by the cluster-wide **Vector DaemonSet**, and shipped 
 - Retired reference: [pg-exporter-dashboards.md](pg-exporter-dashboards.md), [pg-exporter-mapping.md](pg-exporter-mapping.md)
 
 ---
-_Last updated: 2026-07-17 — RFC-0018: platform-db + pgdog-platform inventory; cnpg-platform-db alert ownership._
+_Last updated: 2026-07-18 — link runbook hub; dedupe custom query table to custom-metrics.md_

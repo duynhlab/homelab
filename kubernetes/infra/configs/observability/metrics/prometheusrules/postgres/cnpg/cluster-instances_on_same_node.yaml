@@ -24,7 +24,7 @@ spec:
 
 
           A failure or scheduled downtime of a single node will lead to a potential service disruption and/or data loss.'
-        runbook_url: https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/docs/runbooks/CNPGClusterInstancesOnSameNode.md
+        runbook_url: https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGClusterInstancesOnSameNode.md
       # Chart uses namespace/pod; with VMAgent+KSM the workload is exported_pod/exported_namespace (target pod is KSM).
       expr: count by (node) (kube_pod_info{exported_namespace="product", exported_pod=~"product-db-([1-9][0-9]*)$"}) > 1
       for: 5m

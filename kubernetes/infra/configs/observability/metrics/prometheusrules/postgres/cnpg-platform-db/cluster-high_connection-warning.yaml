@@ -21,7 +21,7 @@ spec:
         description: 'CloudNativePG Cluster "platform/platform-db" instance {{ $labels.pod }} is using {{ $value }}% of
 
           the maximum number of connections.'
-        runbook_url: https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/docs/runbooks/CNPGClusterHighConnectionsWarning.md
+        runbook_url: https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGClusterHighConnectionsWarning.md
       expr: sum by (pod) (cnpg_backends_total{namespace="platform", pod=~"platform-db-([1-9][0-9]*)$"}) / max by (pod) (cnpg_pg_settings_setting{name="max_connections", namespace="platform", pod=~"platform-db-([1-9][0-9]*)$"}) * 100 > 80
       for: 5m
       labels:

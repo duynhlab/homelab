@@ -1,30 +1,26 @@
-# Runbook: Microservices Application Alerts
+# Runbook: Microservices Application Alerts (Hub)
 
-> **Purpose**: Per-alert investigation guide for the 16 active application
-> alerts, plus retained design context for two retired saturation alerts.
+> **Purpose**: Workflows, threshold tuning, and design context for OTLP-based
+> application alerts. **Per-alert investigation** lives in
+> [`microservices/`](microservices/README.md) (one file per alert).
 >
 > **Manifest**: [`kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/alerts.yaml`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/alerts.yaml)
 >
 > **Recording Rules**: [`kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/recording-rules.yaml`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/recording-rules.yaml)
 >
-> **Last Updated**: 2026-07-14 (active inventory and thresholds verified against the manifest; retired saturation guidance retained for learning)
+> **Metrics reference**: [`../metrics/metrics-apps.md`](../metrics/metrics-apps.md)
 
 ---
 
 ## Table of Contents
 
 1. [Alert Architecture](#1-alert-architecture)
-2. [Availability Alerts](#2-availability-alerts)
-3. [Error Alerts](#3-error-alerts)
-4. [Latency Alerts](#4-latency-alerts)
-5. [Traffic Alerts](#5-traffic-alerts)
-6. [Saturation Alerts](#6-saturation-alerts)
-7. [Go Runtime Alerts](#7-go-runtime-alerts)
-8. [Investigation Workflows](#8-investigation-workflows)
-9. [Threshold Tuning Guide](#9-threshold-tuning-guide)
-10. [Future Expansion](#10-future-expansion)
-11. [Interview Reference](#11-interview-reference)
-12. [Database Client Alerts](#12-database-client-alerts-rfc-0017-w4)
+2. [Per-Alert Runbooks](#2-per-alert-runbooks)
+3. [Saturation Alerts (retired)](#3-saturation-alerts-retired)
+4. [Investigation Workflows](#4-investigation-workflows)
+5. [Threshold Tuning Guide](#5-threshold-tuning-guide)
+6. [Future Expansion](#6-future-expansion)
+7. [Interview Reference](#7-interview-reference)
 
 ---
 
@@ -42,7 +38,8 @@ flowchart TD
         errors["Errors<br/>4 rules"]
         latency["Latency<br/>4 rules"]
         traffic["Traffic<br/>2 rules"]
-        runtime["Go runtime<br/>3 rules"]
+        runtime["Go runtime<br/>2 rules"]
+        dbclient["Database client<br/>4 rules"]
     end
 
     subgraph layer2["Layer 2: Sloth burn-rate alerts"]
@@ -62,7 +59,7 @@ flowchart TD
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef external fill:#64748b,color:#fff,stroke:#334155;
-    class availability,errors,latency,traffic,runtime metric;
+    class availability,errors,latency,traffic,runtime,dbclient metric;
     class sloAvailability,sloLatency,sloErrors data;
     class response platform;
     class retired external;
@@ -91,380 +88,42 @@ flowchart TD
 | | `MicroserviceLatencyCritical` | critical | 5m | RED: Duration | Active |
 | | `GrpcServerHighLatencyP95` | warning | 10m | RED: Duration | Active |
 | **Traffic** | `MicroserviceNoTraffic` | warning | 10m | RED: Rate | Active |
-| | `MicroserviceApdexCritical` | warning | 10m | Golden: Latency | Active |
+| | `MicroserviceApdexCritical` | critical | 10m | Golden: Latency | Active |
 | **Runtime** | `MicroserviceGoroutineLeak` | warning | 15m | USE: Saturation | Active |
 | | `MicroserviceHighMemoryUsage` | warning | 15m | USE: Utilization | Active |
-| | `MicroserviceGCThrash` | warning | 15m | USE: Saturation | Active |
+| | `MicroserviceGCThrash` | warning | 15m | USE: Saturation | Retired |
 | **Saturation** | `MicroserviceHighRequestsInFlight` | warning | 5m | Golden: Saturation | Retired |
 | | `MicroserviceRequestsInFlightCritical` | critical | 2m | Golden: Saturation | Retired |
+| **Database client** | `DBClientQueryP95High` | warning | 10m | App-side DB latency | Active |
+| | `DBClientErrorRate` | warning | 5m | App-side DB errors | Active |
+| | `PgxPoolNearExhaustion` | warning | 5m | Pool saturation | Active |
+| | `PgxPoolAcquireWaitHigh` | warning | 10m | Pool contention | Active |
+
+Per-alert files: [`microservices/README.md`](microservices/README.md).
 
 ---
 
-## 2. Availability Alerts
+## 2. Per-Alert Runbooks
 
-### MicroserviceDown
+All **19 active** alerts have dedicated runbooks under
+[`microservices/`](microservices/README.md). Alertmanager `runbook_url` annotations
+point to the matching `<AlertName>.md` file.
 
-**Fires when**: A previously seen `go_goroutine_count` heartbeat disappears and remains absent for 2 minutes. The apps push OTLP (SDK -> otel-collector -> vmagent), so there is no scraped `up` series. VictoriaMetrics staleness adds about 5 minutes before the 2-minute hold begins, making effective detection roughly 5-7 minutes (accepted in RFC-0014 D-4).
+| Group | Alerts |
+|-------|--------|
+| Availability | [MicroserviceDown](microservices/MicroserviceDown.md), [MicroserviceAllInstancesDown](microservices/MicroserviceAllInstancesDown.md), [OtelMetricsPipelineExportFailures](microservices/OtelMetricsPipelineExportFailures.md) |
+| Errors | [MicroserviceHighErrorRate](microservices/MicroserviceHighErrorRate.md), [MicroserviceErrorRateCritical](microservices/MicroserviceErrorRateCritical.md), [MicroserviceNoSuccessfulRequests](microservices/MicroserviceNoSuccessfulRequests.md), [GrpcServerHighErrorRate](microservices/GrpcServerHighErrorRate.md) |
+| Latency | [MicroserviceHighLatencyP95](microservices/MicroserviceHighLatencyP95.md), [MicroserviceHighLatencyP99](microservices/MicroserviceHighLatencyP99.md), [MicroserviceLatencyCritical](microservices/MicroserviceLatencyCritical.md), [GrpcServerHighLatencyP95](microservices/GrpcServerHighLatencyP95.md) |
+| Traffic | [MicroserviceNoTraffic](microservices/MicroserviceNoTraffic.md), [MicroserviceApdexCritical](microservices/MicroserviceApdexCritical.md) |
+| Runtime | [MicroserviceGoroutineLeak](microservices/MicroserviceGoroutineLeak.md), [MicroserviceHighMemoryUsage](microservices/MicroserviceHighMemoryUsage.md) |
+| Database client | [DBClientQueryP95High](microservices/DBClientQueryP95High.md), [DBClientErrorRate](microservices/DBClientErrorRate.md), [PgxPoolNearExhaustion](microservices/PgxPoolNearExhaustion.md), [PgxPoolAcquireWaitHigh](microservices/PgxPoolAcquireWaitHigh.md) |
 
-**Severity**: critical
-
-**Possible causes**:
-- Pod crashed (OOMKilled, application panic, segfault)
-- Pod evicted (node resource pressure)
-- Deployment rollout in progress
-- NetworkPolicy or collector outage breaking the OTLP push path (SDK -> otel-collector -> vmagent)
-
-**Investigation**:
-
-```bash
-# Check pod status
-kubectl get pods -n $NAMESPACE -l app=$APP
-
-# Check events
-kubectl describe pod -n $NAMESPACE $POD_NAME
-
-# Check recent logs
-kubectl logs -n $NAMESPACE -l app=$APP --tail=100
-
-# Check if deployment rollout in progress
-kubectl rollout status deployment/$APP -n $NAMESPACE
-```
-
-```promql
-# Verify: which pods stopped emitting metrics? (heartbeat absence, D-4)
-count by (app, namespace, k8s_pod_name) (last_over_time(go_goroutine_count{app="$APP"}[15m]))
-  unless count by (app, namespace, k8s_pod_name) (go_goroutine_count{app="$APP"})
-
-# Check restart history
-increase(kube_pod_container_status_restarts_total{namespace="$NAMESPACE", pod=~"$APP.*"}[1h])
-```
-
-**Resolution**:
-1. If rollout in progress: wait for completion, monitor new pods
-2. If OOMKilled: check Pyroscope heap profiles, increase memory limits
-3. If CrashLoopBackOff: check application logs for startup errors
-4. If network issue: check NetworkPolicy and Service endpoints
-
-**Related alerts**: `MicroserviceAllInstancesDown`, `KubePodCrashLooping`
+Retired alerts (`MicroserviceGCThrash`, in-flight saturation) remain documented below
+for design context only.
 
 ---
 
-### MicroserviceAllInstancesDown
-
-**Fires when**: Every instance of a service is down simultaneously. Complete outage.
-
-**Severity**: critical (page)
-
-**Possible causes**:
-- Failed deployment (bad image, broken config)
-- Shared dependency failure (database down, secret missing)
-- Namespace-wide issue (ResourceQuota exhausted, namespace deleted)
-- Node failure (all pods scheduled on same node)
-
-**Investigation**:
-
-```bash
-# Check all pods in namespace
-kubectl get pods -n $NAMESPACE
-
-# Check deployment spec
-kubectl describe deployment/$APP -n $NAMESPACE
-
-# Check events in namespace
-kubectl get events -n $NAMESPACE --sort-by=.metadata.creationTimestamp | tail -20
-
-# Check HelmRelease status
-kubectl get helmrelease -n $NAMESPACE
-flux get helmrelease -n $NAMESPACE
-```
-
-**Resolution**:
-1. If bad deployment: `kubectl rollout undo deployment/$APP -n $NAMESPACE`
-2. If dependency failure: check database alerts (`PostgresDown`, `CNPGClusterOffline`)
-3. If resource issue: check `kubectl describe namespace $NAMESPACE` for quotas
-
-**Escalation**: This is a full outage. If not resolved in 15 minutes, escalate to team lead.
-
----
-
-### MicroserviceHighRestartRate (retired)
-
-> **Retired** — this kube-state-based alert was never deployed on the OTLP
-> pipeline; crash-loops are covered by `KubePodCrashLooping`
-> (`prometheusrules/kubernetes/pod-resources-alerts.yaml`). The investigation
-> steps below remain useful for any restart storm.
-
-**Fires when** (historical): a container restarts more than 3 times in 15 minutes.
-
-**Severity**: warning
-
-**Possible causes**:
-- Application crash on startup (missing config, DB connection failure)
-- OOMKilled (memory limit too low for workload)
-- Liveness probe failure (probe too aggressive, application slow to start)
-- Init container failure (migration failed)
-
-**Investigation**:
-
-```bash
-# Check restart count and reason
-kubectl get pods -n $NAMESPACE -o wide
-kubectl describe pod -n $NAMESPACE $POD_NAME | grep -A5 "Last State"
-
-# Check for OOMKilled
-kubectl get pods -n $NAMESPACE -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.containerStatuses[0].lastState.terminated.reason}{"\n"}{end}'
-
-# Check previous container logs
-kubectl logs -n $NAMESPACE $POD_NAME --previous --tail=50
-```
-
-**Resolution**:
-1. If OOMKilled: increase memory limits in HelmRelease values, check Pyroscope for memory leaks
-2. If startup crash: fix application config, check OpenBAO secrets
-3. If liveness probe: increase `initialDelaySeconds` or probe timeout
-
----
-
-## 3. Error Alerts
-
-### MicroserviceHighErrorRate
-
-**Fires when**: 5xx error rate exceeds 5% of total traffic for 5 minutes.
-
-**Severity**: warning
-
-**Possible causes**:
-- Application bug (nil pointer, unhandled error)
-- Downstream dependency failure (database, external API)
-- Resource exhaustion (connection pool, file descriptors)
-- Bad deployment (new code with regression)
-
-**Investigation**:
-
-```promql
-# Error rate by service
-app:http_server_request_duration_seconds:error_ratio5m{app="$APP"}
-
-# Error rate by endpoint (find the hot path)
-app_route:http_server_request_duration_seconds:error_rate5m{app="$APP"} > 0
-
-# Was there a deployment recently?
-kube_pod_container_status_restarts_total{namespace="$NAMESPACE"}
-```
-
-```bash
-# Check application logs for errors
-kubectl logs -n $NAMESPACE -l app=$APP --tail=200 | grep -i error
-
-# Check recent deployments
-kubectl rollout history deployment/$APP -n $NAMESPACE
-```
-
-**Grafana panels to check**:
-- Row 1: Error Rate %
-- Row 3: Server Errors (5xx), Error Rate by Method and Endpoint
-
-**Resolution**:
-1. Identify failing endpoint from per-endpoint error rate
-2. Search the `trace_id` field in VictoriaLogs for the error logs, then open the linked trace in Tempo (traces<->logs correlation). Exemplars are not available -- VictoriaMetrics does not support them (RFC-0014 D-14)
-3. If new deployment: rollback with `kubectl rollout undo`
-4. If DB issue: check PostgreSQL alerts
-
----
-
-### MicroserviceErrorRateCritical
-
-**Fires when**: 5xx error rate exceeds 15% of total traffic for 5 minutes.
-
-**Severity**: critical
-
-Same investigation as `MicroserviceHighErrorRate` but with higher urgency. At 15% error rate, a significant portion of users are impacted.
-
-**Escalation**: If not identified within 10 minutes, consider rolling back the most recent deployment.
-
----
-
-### MicroserviceNoSuccessfulRequests
-
-**Fires when**: Zero 2xx responses for 10 minutes, but the service had traffic in the prior hour.
-
-**Severity**: critical
-
-**Possible causes**:
-- Complete application failure (all requests returning 5xx)
-- Misconfigured routing (Ingress/Service pointing to wrong port)
-- Database connection pool exhausted
-- Panic recovery returning 500 for every request
-
-**Investigation**:
-
-```promql
-# Check status code distribution
-sum by (http_response_status_code) (rate(http_server_request_duration_seconds_count{app="$APP"}[5m]))
-
-# Is there traffic at all?
-app:http_server_request_duration_seconds:rate5m{app="$APP"}
-```
-
-**Resolution**:
-1. If all 5xx: follow `MicroserviceErrorRateCritical` runbook
-2. If no traffic at all: follow `MicroserviceNoTraffic` runbook
-3. If all 4xx: check for authentication/authorization issues
-
----
-
-## 4. Latency Alerts
-
-### MicroserviceHighLatencyP95
-
-**Fires when**: P95 latency exceeds 1 second for 10 minutes.
-
-**Severity**: warning
-
-**Possible causes**:
-- Slow database queries (missing index, table scan)
-- Downstream service latency (cascading slowness)
-- Resource contention (CPU throttling, GC pressure)
-- Connection pool exhaustion (waiting for connections)
-
-**Investigation**:
-
-```promql
-# P95 latency by service
-app:http_server_request_duration_seconds:p95_5m{app="$APP"}
-
-# P95 by endpoint (find slow endpoints)
-app_route:http_server_request_duration_seconds:p95_5m{app="$APP"}
-
-# Check saturation: the in-flight signal is no longer emitted -- otelgin exposes no
-# http_server_active_requests, so the requests-in-flight alerts retired (RFC-0014 — otelgin gap)
-
-# Check GC thrash (GC churn causing latency?). There is no GC-pause metric under OTLP;
-# instead watch the heap riding its GC goal (>0.95 = thrashing):
-go_memory_used_bytes{app="$APP"} / go_memory_gc_goal_bytes{app="$APP"}
-```
-
-**Grafana panels to check**:
-- Row 1: P95 Response Time (stat panel)
-- Row 3: Response time 95th percentile (per endpoint)
-- Row 5: Requests In Flight
-
-**Resolution**:
-1. Identify slow endpoint from per-endpoint P95
-2. Find the slow request in VictoriaLogs (filter on high latency), then open its `trace_id` in Tempo (traces<->logs correlation). Exemplars are not available -- VictoriaMetrics does not support them (RFC-0014 D-14)
-3. In the trace waterfall, find the slowest span (DB query? external API?)
-4. If DB: add index, optimize query, check `PostgresConnectionSaturation` alert
-5. If GC: check `MicroserviceGCThrash` alert, review Pyroscope CPU profile
-6. If saturation: scale up replicas
-
----
-
-### MicroserviceHighLatencyP99
-
-**Fires when**: P99 latency exceeds 2 seconds for 10 minutes.
-
-**Severity**: warning
-
-P99 captures tail latency -- the worst 1% of requests. High P99 with normal P95 indicates occasional outlier requests.
-
-**Additional causes** (beyond P95 causes):
-- Retry storms from downstream clients
-- Lock contention in database
-- Cold start after idle (first request warming up caches)
-
----
-
-### MicroserviceLatencyCritical
-
-**Fires when**: P95 latency exceeds 2 seconds for 5 minutes.
-
-**Severity**: critical
-
-When P95 (not just P99) exceeds 2 seconds, the majority of requests are severely slow. This is a widespread performance degradation.
-
-**Escalation**: If DB-related, check `PostgresLockContention` and `PostgresConnectionSaturation`. If not resolved in 15 minutes, scale up replicas as a stopgap.
-
----
-
-## 5. Traffic Alerts
-
-### MicroserviceNoTraffic
-
-**Fires when**: Zero requests for 10 minutes, but the service had traffic in the prior hour.
-
-**Severity**: warning
-
-**Possible causes**:
-- Upstream service stopped calling this service
-- Ingress/Service misconfiguration (endpoints removed)
-- DNS resolution failure
-- Network policy blocking traffic
-- Deployment deleted the Service resource
-
-**Investigation**:
-
-```bash
-# Check Service endpoints
-kubectl get endpoints -n $NAMESPACE $APP
-
-# Check Service exists
-kubectl get svc -n $NAMESPACE $APP
-
-# Check if pods are ready
-kubectl get pods -n $NAMESPACE -l app=$APP -o wide
-
-# Check Ingress/route
-kubectl get ingress -n $NAMESPACE
-```
-
-```promql
-# Verify zero traffic
-app:http_server_request_duration_seconds:rate5m{app="$APP"}
-
-# Check if the service is still emitting metrics (heartbeat, D-4) -- the apps push
-# OTLP and expose no scrape target, so there is no `up` series
-count by (app, namespace, k8s_pod_name) (go_goroutine_count{app="$APP"})
-```
-
-**Resolution**:
-1. If endpoints empty: check Service selector matches pod labels
-2. If pods not ready: check readiness probe failures
-3. If upstream issue: check upstream service health
-4. May be expected during maintenance windows -- verify with team
-
----
-
-### MicroserviceApdexCritical
-
-**Fires when**: Apdex score drops below 0.5 for 10 minutes.
-
-**Severity**: warning
-
-Apdex below 0.5 means the majority of users are experiencing "frustrating" response times (> 2 seconds). This is worse than a simple latency alert because it accounts for the full distribution, not just a percentile.
-
-**Investigation**:
-
-```promql
-# Current Apdex
-app:http_server_request_duration_seconds:apdex5m{app="$APP"}
-
-# Breakdown: what percentage of requests are satisfied/tolerating/frustrating?
-# Satisfied (< 0.5s)
-sum(rate(http_server_request_duration_seconds_bucket{app="$APP", le="0.5"}[5m]))
-/ sum(rate(http_server_request_duration_seconds_count{app="$APP"}[5m]))
-
-# Frustrating (> 2s)
-1 - (
-  sum(rate(http_server_request_duration_seconds_bucket{app="$APP", le="2"}[5m]))
-  / sum(rate(http_server_request_duration_seconds_count{app="$APP"}[5m]))
-)
-```
-
-**Resolution**: Follow the latency investigation workflow. Low Apdex usually means widespread latency, not just tail latency.
-
----
-
-## 6. Saturation Alerts
+## 3. Saturation Alerts (retired)
 
 > **Retired (RFC-0014 — otelgin exposes no equivalent):** The in-flight saturation signal (`requests_in_flight`) is no longer emitted -- otelgin exposes no `http_server_active_requests` equivalent, so the `MicroserviceHighRequestsInFlight` and `MicroserviceRequestsInFlightCritical` alerts and the `app:requests_in_flight:sum` recording rule were retired. The subsections below are kept for design context; the in-flight queries return no data on the OTLP pipeline. Use latency and traffic rate as the saturation proxy instead.
 
@@ -515,114 +174,7 @@ At 100+ in-flight requests, the service is likely overloaded. Responses will be 
 
 ---
 
-## 7. Go Runtime Alerts
-
-### MicroserviceGoroutineLeak
-
-**Fires when**: Goroutine count exceeds 1,000 AND is steadily increasing for 15 minutes.
-
-**Severity**: warning
-
-**Possible causes**:
-- Forgotten `defer cancel()` on context
-- Unclosed channels (goroutine blocked on send/receive forever)
-- HTTP client without timeout (goroutine waiting on response indefinitely)
-- Goroutine spawned in loop without bound
-
-**Investigation**:
-
-```promql
-# Current goroutine count
-go_goroutine_count{app="$APP"}
-
-# Rate of increase (should be ~0 in healthy state)
-rate(go_goroutine_count{app="$APP"}[15m])
-```
-
-```bash
-# Get goroutine dump (if pprof exposed)
-kubectl port-forward -n $NAMESPACE svc/$APP 6060:6060
-curl http://localhost:6060/debug/pprof/goroutine?debug=2
-```
-
-**Grafana panels**: Row 4: Goroutines & Threads
-
-**Resolution**:
-1. Check Pyroscope goroutine profile for the service
-2. Look for goroutines stuck in `runtime.gopark` or `chan receive`
-3. Review recent code changes for missing context cancellation
-4. Restart the pod as a temporary fix: `kubectl delete pod -n $NAMESPACE $POD_NAME`
-
----
-
-### MicroserviceHighMemoryUsage
-
-**Fires when**: Container working-set memory exceeds 90% of its memory limit for 15 minutes.
-
-**Severity**: warning
-
-**Possible causes**:
-- Memory leak (growing maps, slices, or caches without eviction)
-- Large response bodies held in memory
-- Goroutine leak (each goroutine uses ~8KB stack)
-- Insufficient GOGC value (too much live data)
-
-**Investigation**:
-
-> **Current coverage gap:** the manifest's namespace selector covers nine
-> service namespaces but omits `checkout`. Checkout still emits Go runtime
-> metrics, but this cAdvisor-based memory alert does not evaluate checkout
-> containers until the selector is corrected.
-
-> **Metric remap (RFC-0014 P3 cutover):** `process_resident_memory_bytes` and the
-> `go_memstats_*` series were `client_golang` names retired with the scrape. The OTLP
-> Go-runtime set is `go_memory_used_bytes` (label `go_memory_type=stack|other`),
-> `go_memory_allocated_bytes_total`, `go_memory_allocations_total`, `go_memory_gc_goal_bytes`.
-> Container RSS now comes from cAdvisor (`container_memory_working_set_bytes`), which is
-> labelled `namespace`/`pod`/`container` (not `app`), so select by namespace + pod regex.
-
-```promql
-# Working-set memory (limits-aware RSS, cAdvisor -- retired process_resident_memory_bytes)
-container_memory_working_set_bytes{namespace=~"$NAMESPACE", pod=~"$APP.*", container!=""}
-
-# Go heap in use (retired go_memstats_alloc_bytes / go_memstats_heap_inuse_bytes)
-sum by (app) (go_memory_used_bytes{app="$APP"})
-
-# Split by region (stack vs other) to spot which segment grows
-go_memory_used_bytes{app="$APP"}
-
-# Allocation rate (no frees counter in OTel; watch churn instead)
-rate(go_memory_allocations_total{app="$APP"}[5m])
-
-# If go_memory_used_bytes grows steadily post-GC = memory leak
-```
-
-**Grafana panels**: Row 4: Go Memory Used (by type), Working-Set Memory (container)
-
-**Resolution**:
-1. Check Pyroscope heap profile (alloc_space, inuse_space) for the service
-2. If `go_memory_used_bytes` grows post-GC: memory leak -- identify the growing data structure
-3. If working-set is high but Go heap is stable: non-Go memory (CGO, mmap) -- check with `pprof`
-4. Increase memory limit as stopgap, fix the leak in code
-
----
-
-### MicroserviceGCThrash
-
-**Retired 2026-07-17** (alert-ruler audit): the rule compared `go_memory_used_bytes`
-(which the OTel Go runtime only reports for `go_memory_type="stack"|"other"` — no
-heap series exists) against the heap-only `go_memory_gc_goal_bytes`. The summed
-non-heap value sat permanently at 1.15–1.37× the goal on every service, so the
-alert was a structural false positive on all 11 services and was removed.
-
-Its predecessors `MicroserviceHighGCPressure` / `MicroserviceHighGCFrequency`
-were already retired at RFC-0014 (no GC-pause series over OTLP). Revisit a
-GC-thrash signal when the SDK exposes a heap-live gauge; until then use
-Pyroscope CPU profiles (`runtime.gcBgMarkWorker`) to spot GC pressure.
-
----
-
-## 8. Investigation Workflows
+## 4. Investigation Workflows
 
 ### Workflow A: "Service is returning 5xx"
 
@@ -760,7 +312,7 @@ flowchart TD
 
 ---
 
-## 9. Threshold Tuning Guide
+## 5. Threshold Tuning Guide
 
 Alert thresholds are intentionally conservative. Tune them based on your service's characteristics.
 
@@ -811,13 +363,13 @@ Set thresholds at **2-3x the normal peak** for warning and **5x** for critical.
 
 ---
 
-## 10. Future Expansion
+## 6. Future Expansion
 
 ### Phase 2: Database Connection Alerts (from Application Side)
 
 > **✅ Realized (RFC-0017 W4)** as `DBClientQueryP95High` / `DBClientErrorRate` /
 > `PgxPoolNearExhaustion` / `PgxPoolAcquireWaitHigh` on the real otelpgx metric
-> names — see [§12](#12-database-client-alerts-rfc-0017-w4). The sketch below is
+> names — see [DB client runbooks](microservices/README.md#index). The sketch below is
 > kept as the original design note (its hypothetical metric names never existed).
 
 Add alerts for application-side database health signals:
@@ -888,7 +440,7 @@ Add alerts for application-side database health signals:
 
 ---
 
-## 11. Interview Reference
+## 7. Interview Reference
 
 ### Mapping Alerts to Frameworks
 
@@ -912,7 +464,7 @@ Add alerts for application-side database health signals:
 **What you did**: Added Layer 1 threshold alerts to complement Layer 2 SLO alerts. Designed 5 active alert groups covering RED/Golden Signals plus Go runtime health; retained the retired saturation design as reference.
 
 **How**:
-- 16 active alert rules in 5 groups: availability, errors, latency, traffic, runtime
+- 19 active alert rules in 6 groups: availability, errors, latency, traffic, runtime, database client
 - Recording rules pre-aggregate common queries (5 groups, ~15 rules) for fast evaluation
 - Thresholds aligned with Grafana dashboard thresholds but more conservative to reduce noise
 - Every alert has `runbook_url` annotation pointing to investigation steps
@@ -922,78 +474,16 @@ Add alerts for application-side database health signals:
 
 ---
 
-## 12. Database Client Alerts (RFC-0017 W4)
-
-App-side view of Postgres health from the otelpgx instrumentation in `pkg/dbx`
-(query metrics: `db_client_operation_*`; pool metrics: `pgxpool_*` via
-`RecordStats`). These fire on what the **service experiences** — server-side
-Postgres alerting (CNPG / postgres_exporter, catalog §4) is the complementary
-view. This realizes the §10 "Phase 2: Database Connection Alerts" expansion
-with the real metric names.
-
-### DBClientQueryP95High
-
-**Fires when**: P95 of `db_client_operation_duration_seconds_bucket{pgx_operation_type="query"}` exceeds 100ms for 10 minutes.
-
-**Severity**: warning
-
-**Possible causes**: missing index / plan regression, lock contention, pooler queueing, N+1 patterns, server CPU/IO pressure.
-
-**Investigation**:
-
-```promql
-# Which service, and how bad
-histogram_quantile(0.95, sum by (app, le)
-  (rate(db_client_operation_duration_seconds_bucket{pgx_operation_type="query"}[5m])))
-```
-
-Then pivot server-side: `pg_stat_statements` (top statements by mean time), `cnpg_pg_blocking_queries`, and the otelpgx query span (trace) for the exact SQL name. Note the buckets are DB-scale (`obsx.DBDurationBuckets`, pkg ≥ v0.24.0) — with older pkg the quantile is meaningless (everything in one bucket).
-
-### DBClientErrorRate
-
-**Fires when**: `db_client_operation_errors_total` grows >0.1/s for 5 minutes (otelpgx counts every non-`ErrNoRows` operation error).
-
-**Severity**: warning
-
-**Possible causes**: Postgres down/failing over, pooler (PgDog) unhealthy, statement timeouts, schema drift (SQLSTATE 42xxx), connection storms.
-
-**Investigation**: service logs carry the SQLSTATE on the query span (`pgx.sql_state` attribute); check CNPG cluster status and PgDog logs; correlate with `MicroserviceHighErrorRate` — DB errors usually surface as 5xx.
-
-### PgxPoolNearExhaustion
-
-**Fires when**: `pgxpool_acquired_connections` has stayed ≥80% of `pgxpool_max_connections` for 5 minutes (`min_over_time` — sustained, not a spike).
-
-**Severity**: warning
-
-**Possible causes**: slow queries holding conns (check DBClientQueryP95High), pool sized too small for the traffic level, conn leak (missing `Rows.Close`).
-
-**Investigation**:
-
-```promql
-sum by (app) (pgxpool_acquired_connections) / sum by (app) (pgxpool_max_connections)
-```
-
-Compare with query p95 and traffic; if latency is flat but the pool is pinned, grow `MaxConnections`; if latency rose first, fix the queries.
-
-### PgxPoolAcquireWaitHigh
-
-**Fires when**: `pgxpool_empty_acquire_total` (acquires that had to wait for a free conn) grows >1/s for 10 minutes — the earliest saturation signal, usually before hard exhaustion.
-
-**Severity**: warning
-
-**Investigation**: `pgxpool_empty_acquire_wait_time_nanoseconds_total` gives the total time spent waiting; divide by `pgxpool_empty_acquire_total` for mean wait per blocked acquire. Same remediation fork as PgxPoolNearExhaustion.
-
----
 
 ## Related Documentation
 
-- [Observability Deep Dive Runbook](observability-deep-dive.md) -- RED/USE/Golden theory, middleware chain, interview answers
-- [SLO Documentation](../slo/README.md) -- SLO definitions, Sloth integration (Layer 2 alerts)
-- [SLO Burn-Rate Alerts](../alerting/slo-burn-rate-alerts.md) -- Multi-window multi-burn-rate methodology
-- [Error Budget Policy](../slo/error_budget_policy.md) -- Budget gates and deployment decisions
-- [PostgreSQL Alerts](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/README.md) -- Database-level alerts (all `cnpg*` rule directories)
-- [Metrics Reference](../metrics/README.md) -- RED method, label strategy, cardinality
-- [Grafana Dashboard Guide](../grafana/dashboard-reference.md) -- Dashboard panel reference
+- [Microservices runbook index](microservices/README.md)
+- [Observability Deep Dive Runbook](observability-deep-dive.md) — RED/USE/Golden theory, middleware chain
+- [SLO Documentation](../slo/README.md)
+- [SLO Burn-Rate Alerts](../alerting/slo-burn-rate-alerts.md)
+- [PostgreSQL runbooks](postgresql/README.md) — server-side CNPG alerts
+- [Metrics Reference](../metrics/metrics-apps.md)
+- [Grafana Dashboard Guide](../grafana/dashboard-reference.md)
 
 ---
-_Last updated: 2026-07-10_
+_Last updated: 2026-07-18_

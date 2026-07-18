@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **PostgreSQL alert runbooks** ([`docs/observability/runbooks/postgresql/`](docs/observability/runbooks/postgresql/)): 33 per-alert files (CNPG chart + deep-signal + homelab extras), `_TEMPLATE.md`, and index; `runbook_url` on deep-signal and chart PrometheusRules.
+- **PostgreSQL metrics learning hub** ([`docs/observability/metrics/postgresql/README.md`](docs/observability/metrics/postgresql/README.md)): workflows, signal guides (`signals/`), runbook links on custom-metrics; alert-catalog §4 Runbook column + `CNPGLongRunningTransaction` / `CNPGIdleInTransaction`.
+- **Microservices application alert runbooks** ([`docs/observability/runbooks/microservices/`](docs/observability/runbooks/microservices/)): 19 per-alert files, `_TEMPLATE.md`, index; hub remains [`microservices-alerts.md`](docs/observability/runbooks/microservices-alerts.md); `runbook_url` on all rules in `prometheusrules/microservices/alerts.yaml`.
+- **Application metrics learning hub** ([`docs/observability/metrics/metrics-apps.md`](docs/observability/metrics/metrics-apps.md)): learning path + signal→alert map linking to per-alert runbooks.
 - Postgres **deep-signal alerts** ([`deep-signals-alerts.yaml`](kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/deep-signals-alerts.yaml)): blocked queries, deadlocks, autovacuum-behind, low cache-hit, temp-file spill, checkpoint pressure, XID wraparound (warn/critical), and WAL-archive failing — label-driven by `cnpg_io_cluster`, one file covering `platform-db` + `product-db`.
 - CNPG-native Grafana boards **`pg-query-performance`** (pg_stat_statements deep-dive) and **`pg-maintenance`** (locks, checkpointer, autovacuum, bloat), replacing four No-Data PMM boards; `pgdog` board gains a `pooler` selector.
 - **`platform-db`** CNPG cluster (ns `platform`, HA ×3): merges former `auth-db`,

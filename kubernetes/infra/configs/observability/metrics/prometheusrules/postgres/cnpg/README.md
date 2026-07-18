@@ -49,3 +49,27 @@ Before enabling rules that depend on **kube-state-metrics / kubelet volume stats
 ## CNPG metrics stability note
 
 `cnpg_collector_up` and related series depend on exporter scrape health. If `/metrics` returns HTTP 500 due to duplicate metric labelsets, CNPG health alerts (for example `CNPGClusterOffline`) can fire falsely even when pods are running. The CNPG custom query config should scope `pg_stat_statements` per `current_database()` to avoid duplicate collections across target databases.
+
+## Homelab runbook URLs
+
+Chart-rendered rules ship with upstream `runbook_url` values. After re-rendering from
+the chart, repoint annotations to in-repo runbooks:
+
+```bash
+# From prometheusrules/postgres/
+find cnpg cnpg-platform-db -name '*.yaml' -print0 \
+  | xargs -0 sed -i \
+  's|https://github.com/cloudnative-pg/charts/blob/main/charts/cluster/docs/runbooks/|https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/|'
+
+# Upstream uses one file for physical lag — homelab splits warning/critical:
+find cnpg cnpg-platform-db -name 'cluster-physical_replication_lag-warning.yaml' -print0 \
+  | xargs -0 sed -i 's|CNPGClusterPhysicalReplicationLag.md|CNPGClusterPhysicalReplicationLagWarning.md|'
+find cnpg cnpg-platform-db -name 'cluster-physical_replication_lag-critical.yaml' -print0 \
+  | xargs -0 sed -i 's|CNPGClusterPhysicalReplicationLag.md|CNPGClusterPhysicalReplicationLagCritical.md|'
+find cnpg cnpg-platform-db -name 'cluster-logical_replication_stopped-critical.yaml' -print0 \
+  | xargs -0 sed -i 's|CNPGClusterLogicalReplicationStopped.md|CNPGClusterLogicalReplicationStoppedCritical.md|'
+```
+
+Homelab-only rules (`cluster-fenced`, `cluster-wal-size-high`, `operator-health`) and
+[`deep-signals-alerts.yaml`](../deep-signals-alerts.yaml) are maintained manually.
+Runbook index: [`docs/observability/runbooks/postgresql/README.md`](../../../../../../../docs/observability/runbooks/postgresql/README.md).

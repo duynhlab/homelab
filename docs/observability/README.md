@@ -325,11 +325,14 @@ docs/observability/
 │   ├── vmauth.md                 # VMAuth/vmauth HTTP proxy (auth.config, CRs)
 │   ├── promql-guide.md           # PromQL reference
 │   ├── streaming-aggregation.md  # At-scale playbook: in-flight aggregation (RFC-0013)
-│   └── postgresql/               # PostgreSQL-specific metrics (databases layer)
-│       ├── monitoring.md          # Monitoring overview
-│       ├── custom-metrics.md      # Custom pg_exporter queries
-│       ├── pg-exporter-dashboards.md
-│       └── pg-exporter-mapping.md
+│   └── postgresql/               # PostgreSQL metrics + learning hub
+│       ├── README.md             # Hub, learning path, runbook links
+│       ├── monitoring.md         # CNPG architecture
+│       ├── custom-metrics.md     # Custom query reference
+│       ├── workflows.md          # On-call decision trees
+│       ├── signals/              # Dashboard-only signal guides
+│       ├── pg-exporter-dashboards.md  # Retired reference
+│       └── pg-exporter-mapping.md     # Retired reference
 │
 ├── tracing/                      # Pillar 2: Distributed tracing
 │   ├── README.md                 # Tracing guide (Tempo + OTel)
@@ -373,7 +376,9 @@ docs/observability/
     ├── README.md                 # Runbook index
     ├── observability-deep-dive.md  # Theory + interview prep
     ├── infrastructure-alerts.md    # Infra/platform alert investigation guide
-    └── microservices-alerts.md     # Per-alert investigation guide
+    ├── microservices-alerts.md     # Workflows, tuning hub
+    ├── microservices/              # Per-alert runbooks (19 files)
+    └── postgresql/                 # CNPG per-alert runbooks (33 files)
 ```
 
 ## Component Inventory

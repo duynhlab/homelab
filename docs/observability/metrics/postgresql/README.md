@@ -21,13 +21,11 @@ runbooks for the platform database layer.
 2. **Signals** — what each query measures and how to PromQL it:
    built-in metrics [builtin-metrics.md](builtin-metrics.md), custom queries
    [custom-metrics.md](custom-metrics.md)
-3. **Workflows** — on-call decision trees and correlation:
-   [workflows.md](workflows.md)
-4. **Runbooks** — per-alert Meaning / Impact / Diagnosis / Mitigation:
+3. **Runbooks** — per-alert Meaning / Impact / Diagnosis / Mitigation:
    [../runbooks/postgresql/README.md](../../runbooks/postgresql/README.md)
-5. **Deep internals** — PostgreSQL concepts with homelab examples:
+4. **Deep internals** — PostgreSQL concepts with homelab examples:
    [../../databases/001-postgresql-internals.md](../../../databases/001-postgresql-internals.md)
-6. **Emergency** — cluster down triage (before runbook detail):
+5. **Emergency** — cluster down triage (before runbook detail):
    [../../databases/010.4-emergency-recovery.md](../../../databases/010.4-emergency-recovery.md)
 
 ## Document map
@@ -36,7 +34,6 @@ runbooks for the platform database layer.
 |-----|---------|
 | [builtin-metrics.md](builtin-metrics.md) | CNPG built-in metric inventory (default queries + collector) |
 | [custom-metrics.md](custom-metrics.md) | Custom query reference, PromQL, alert/runbook links |
-| [workflows.md](workflows.md) | Senior-DBA diagnostic flows |
 | [signals/capacity-planning.md](signals/capacity-planning.md) | Database/table size signals (no alert) |
 | [signals/index-hygiene.md](signals/index-hygiene.md) | Unused index detection (no alert) |
 
@@ -49,7 +46,8 @@ runbooks for the platform database layer.
 | PgDog pooler | `pgdog_*` via `:9090` | — (investigate via connection runbooks) |
 
 Connection alerts and dashboards use built-in **`cnpg_backends_total`** and
-**`cnpg_pg_settings_setting{name="max_connections"}`**; see [workflows.md](workflows.md).
+**`cnpg_pg_settings_setting{name="max_connections"}`**; see the
+[HighConnections runbook](../../runbooks/postgresql/CNPGClusterHighConnectionsCritical.md).
 
 ## Scrape architecture & rule layout
 

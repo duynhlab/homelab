@@ -328,7 +328,6 @@ docs/observability/
 │       ├── README.md             # Hub: architecture, learning path, runbook links
 │       ├── builtin-metrics.md    # CNPG built-in metric inventory
 │       ├── custom-metrics.md     # Custom query reference
-│       ├── workflows.md          # On-call decision trees
 │       └── signals/              # Dashboard-only signal guides
 │
 ├── tracing/                      # Pillar 2: Distributed tracing

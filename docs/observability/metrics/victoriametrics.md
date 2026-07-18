@@ -1,6 +1,29 @@
 # VictoriaMetrics Operator Stack
 
-This platform uses the **VictoriaMetrics Operator** to manage the complete metrics and logging stack via Kubernetes CRDs. It replaces the previous `kube-prometheus-stack` (Prometheus server + Prometheus Operator) with a fully operator-managed setup that provides lower resource usage, Prometheus API compatibility, and consistent configuration across environments.
+This platform uses the **VictoriaMetrics Operator** to manage the metrics stack (and related VM CRs such as VLSingle) via Kubernetes CRDs. It replaces the previous `kube-prometheus-stack` (Prometheus server + Prometheus Operator) with a fully operator-managed setup that provides lower resource usage, Prometheus API compatibility, and consistent configuration across environments.
+
+| | |
+|---|---|
+| **Operator** | `victoria-metrics-operator` (namespace `monitoring`) |
+| **Metrics** | VMSingle `:8428`, VMAgent `:8429` |
+| **Alerting** | VMAlert + VMAlertmanager |
+| **Logs** | VLSingle `:9428` — ops: [victorialogs.md](../logging/victorialogs.md) (not duplicated here) |
+| **Access control** | None (Kind) — [VMAuth planned](#vmauth--vmauth-planned) |
+| **Dual CRDs** | `prometheus-operator-crds` + VM Operator auto-converter |
+
+## Table of contents
+
+1. [Architecture](#architecture)
+2. [Understanding the Two CRD Sets](#understanding-the-two-crd-sets)
+3. [Components](#components)
+4. [Flux Deployment Order](#flux-deployment-order)
+5. [Data Flow](#data-flow)
+6. [Grafana Integration](#grafana-integration)
+7. [File Locations](#file-locations)
+8. [Verification and Operations](#verification-and-operations)
+9. [Multi-Environment Strategy](#multi-environment-strategy)
+10. [Troubleshooting](#troubleshooting)
+11. [References](#references)
 
 ## Architecture
 
@@ -39,12 +62,11 @@ flowchart TD
         VMSingle["VMSingle<br/>Stores metrics"]
         VMAlert["VMAlert<br/>Evaluates rules"]
         VMAMgr["VMAlertmanager<br/>Routes alerts"]
-        VLSingle["VLSingle<br/>Stores logs"]
+        VLSingle["VLSingle<br/>logs — see victorialogs.md"]
     end
 
     subgraph consumers ["Consumers"]
         Grafana["Grafana<br/>Dashboards + Queries"]
-        Vector["Vector<br/>Ships logs"]
     end
 
     PromCRDs -->|registers| SM
@@ -74,7 +96,6 @@ flowchart TD
     VMAlert -->|notifies| VMAMgr
 
     VMSingle -->|"Prometheus API :8428"| Grafana
-    Vector -->|"jsonline :9428"| VLSingle
 
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
@@ -90,7 +111,7 @@ flowchart TD
     class Valkey,Sloth,CNPG,Manual external;
     class VMAgent,VMSingle metric;
     class VMAlert,VMAMgr platform;
-    class Vector,VLSingle log;
+    class VLSingle log;
 ```
 
 ---
@@ -166,6 +187,8 @@ This is the most important concept to understand. The cluster runs **two separat
 | `VLSingle/victoria-logs` | `configs/observability/logging/victorialogs/vlsingle.yaml` | Log storage |
 | `VTSingle/victoria-traces` | `configs/observability/tracing/victoriatraces/vtsingle.yaml` | Trace storage (pilot) |
 | `VMNodeScrape/kubelet-{cadvisor,volume-stats}` | `configs/observability/metrics/victoriametrics/vmnodescrape-kubelet.yaml` | Kubelet cAdvisor + volume-stats scraping (2 CRs) |
+
+**VLSingle** (log storage) uses the same Operator but is documented in the [VictoriaLogs ops guide](../logging/victorialogs.md) — ingest paths, Vector, endpoints, and troubleshooting are not duplicated here.
 
 Additionally, the VM Operator **auto-creates** VM resources by converting Prometheus CRDs:
 
@@ -408,35 +431,104 @@ noise once a related critical fires. The `slack_api_url` committed here is a
 non-delivering **dev placeholder**; the real webhook is injected out-of-band into
 OpenBAO (never committed to this public repo).
 
-### VLSingle (Log Storage)
+### VMAuth / vmauth (planned)
 
-| Property | Value |
-|----------|-------|
-| **CRD** | `operator.victoriametrics.com/v1 / VLSingle` |
-| **Manifest** | `kubernetes/infra/configs/observability/logging/victorialogs/vlsingle.yaml` |
-| **Service** | `vlsingle-victoria-logs.monitoring.svc:9428` |
-| **Ingest endpoints** | `/insert/jsonline` (Vector) · `/insert/opentelemetry/v1/logs` (OTel collector — app logs from 10 services + 2 workers + Kong runtime logs) |
-| **Query endpoint** | `/select/logsql/query` |
+**Status:** CRDs are installed by the VictoriaMetrics Operator Helm chart; this repo does **not** ship `VMAuth` or `VMUser` manifests yet. Planned for production external API access (see [Multi-Environment Strategy](#multi-environment-strategy)).
 
-Configuration:
+**vmauth** is an HTTP reverse proxy from the VictoriaMetrics ecosystem. It **authorizes**, **routes**, and **load-balances** requests to VMSingle, VMAgent, VMCluster, VictoriaLogs, or any HTTP backend.
+
+| Property | Typical value |
+|----------|----------------|
+| Default listen port | `8427` (override with `-httpListenAddr`) |
+| Config | `-auth.config=/path/to/auth/config.yml` |
+| Reload | `SIGHUP`, `/-/reload` (protect with `-reloadAuthKey` in production) |
+
+Official docs: [vmauth](https://docs.victoriametrics.com/victoriametrics/vmauth/) · [Operator auth](https://docs.victoriametrics.com/operator/auth/).
+
+#### Binary vs Operator CR
+
+| Aspect | vmauth (process) | VMAuth + VMUser (Kubernetes CRs) |
+|--------|------------------|----------------------------------|
+| What it is | Single binary / container | CRs managed by VictoriaMetrics Operator |
+| Config | YAML `auth.config` on disk or URL | Operator renders config from `VMAuth` + `VMUser` |
+| Ingress | You wire Ingress to the Service yourself | Recommended: Ingress → **VMAuth** Service |
+| When to use | VMs, bare metal, custom Helm | GitOps-first clusters (this repo) |
+
+#### Homelab fit
+
+- **Kind dev:** not deployed; Grafana datasources point at VMSingle/VLSingle ClusterIP directly.
+- **Production (planned):** basic/bearer auth for external PromQL and remote-write; `url_map` routing to vminsert/vmselect when using **VMCluster** (Kind uses **VMSingle** today).
+- **Skip in-cluster Grafana path:** adding VMAuth between Grafana and VMSingle only makes sense if you intentionally change datasource URLs — usually unnecessary for internal dev.
+- Full upstream use cases: [vmauth use cases](https://docs.victoriametrics.com/victoriametrics/vmauth/#use-cases).
+
+#### auth.config (minimal example)
 
 ```yaml
-spec:
-  retentionPeriod: "7d"
-  removePvcAfterDelete: true
-  storage:
-    resources:
-      requests:
-        storage: 20Gi
-  resources:
-    requests: { cpu: 20m, memory: 32Mi }
-    limits:   { cpu: 100m, memory: 768Mi }
+unauthorized_user:
+  url_prefix: "http://vmsingle-victoria-metrics.monitoring.svc:8428/"
 ```
 
-The memory limit was raised to **768Mi** (from 128Mi, which OOMed under the
-fleet-wide log volume — including CNPG `pgaudit` + `auto_explain` records).
+Production: protect `/-/reload`, `/metrics`, `/flags`, `/debug/pprof` — see [vmauth security](https://docs.victoriametrics.com/victoriametrics/vmauth/#security).
 
-Log ingestion is handled by the cluster-wide **Vector Agent** (`kube-system/vector`) which ships Kubernetes logs to VLSingle. See [VictoriaLogs docs](../logging/victorialogs.md) for Vector sink configuration.
+#### VMAuth + VMUser on Kubernetes
+
+1. **VMAuth** selects **VMUser** objects (selectors) and can define **Ingress** to expose vmauth.
+2. **VMUser** defines credentials and **targetRefs** (`static` `url:` or **crd** reference to `VMSingle`, `VMAgent`, VMCluster sub-resources).
+3. The operator generates Secrets and builds the vmauth configuration.
+
+CR fields: [VMAuth](https://docs.victoriametrics.com/operator/resources/vmauth/) · [VMUser](https://docs.victoriametrics.com/operator/resources/vmuser/).
+
+#### Mapping to this repository
+
+| Component | Manifest | Role if VMAuth added later |
+|-----------|----------|----------------------------|
+| VMSingle | `kubernetes/infra/configs/observability/metrics/victoriametrics/vmsingle.yaml` | PromQL `/api/v1/*` backend |
+| VMAgent | `.../vmagent.yaml` | Scrape UI `/targets`, remote-write paths |
+| VLSingle | `kubernetes/infra/configs/observability/logging/victorialogs/vlsingle.yaml` | Logs HTTP API `:9428` |
+| Grafana | `kubernetes/infra/configs/observability/grafana/grafana.yaml` | Not replaced by VMAuth for in-cluster datasource URLs by default |
+| Datasources | `.../grafana/datasource-*.yaml` | Point to in-cluster Services (e.g. `vmsingle-victoria-metrics:8428`) |
+
+#### Grafana vs VMAuth (two security layers)
+
+| Layer | What it protects | This repo (typical) |
+|-------|------------------|---------------------|
+| **Grafana** (org roles, Teams, folders) | **Grafana UI**, dashboards, datasource access | [rbac-multi-team.md](../grafana/rbac-multi-team.md) |
+| **VMAuth / vmauth** | **HTTP APIs** (PromQL, remote write, VictoriaLogs) outside the Grafana→ClusterIP path | Ingress or direct API clients (planned) |
+
+[VMAuth does not fix anonymous Grafana Admin](../grafana/rbac-multi-team.md).
+
+#### Access paths
+
+```mermaid
+flowchart LR
+    subgraph current ["Current — in-cluster Grafana"]
+        browser["Browser<br/>port-forward"]
+        grafana["Grafana pod"]
+        vmSingleCur[("VMSingle ClusterIP")]
+        browser --> grafana
+        grafana -->|"datasource proxy"| vmSingleCur
+    end
+
+    subgraph planned ["Planned — external API client"]
+        client["External client"]
+        vmAuth["VMAuth :8427<br/>(planned)"]
+        vmSinglePlanned[("VMSingle :8428")]
+        client -.->|"planned: HTTPS + auth"| vmAuth
+        vmAuth -.->|"planned: PromQL proxy"| vmSinglePlanned
+    end
+
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+    class browser,client external;
+    class grafana platform;
+    class vmSingleCur,vmSinglePlanned metric;
+    class vmAuth planned;
+```
+
+- Grafana secures the **UI**; VMAuth secures **direct HTTP access** (scripts, other clusters, public Ingress).
+- Point Grafana datasources at VMAuth only if you want unified audit/extra auth — for Kind dev, direct VMSingle is simpler.
 
 ---
 
@@ -634,31 +726,7 @@ flowchart LR
     class VMAlert_f,VMAMgr_f platform;
 ```
 
-### Logs Flow
-
-```mermaid
-flowchart LR
-    Pods["Non-instrumented pods"] --> Vector["Vector Agent<br/>kube-system"]
-    Vector -->|"jsonline :9428"| VLSingle_f["VLSingle<br/>victoria-logs"]
-    Apps_l["10 Go services + 2 workers<br/>(zap OTLP tee)"] -->|"logs OTLP"| OTelC_f["OTel Collector"]
-    Kong_f["Kong gateway"] -->|"runtime logs OTLP"| OTelC_f
-    OTelC_f -->|"OTLP :9428"| VLSingle_f
-
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
-    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
-    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
-    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
-    class Apps_l service;
-    class Kong_f edge;
-    class Pods external;
-    class OTelC_f collector;
-    class Vector,VLSingle_f log;
-```
+Log ingest and query paths: [VictoriaLogs ops guide](../logging/victorialogs.md).
 
 ---
 
@@ -708,6 +776,8 @@ kubernetes/
 │   │   ├── vmagent.yaml                            # VMAgent CRD (scraping)
 │   │   ├── vmalert.yaml                            # VMAlert CRD (rule evaluation)
 │   │   ├── vmalertmanager.yaml                     # VMAlertmanager CRD (alert routing)
+│   │   └── vmnodescrape-kubelet.yaml               # VMNodeScrape (kubelet cAdvisor)
+│   ├── logging/victorialogs/
 │   │   └── vlsingle.yaml                           # VLSingle CRD (log storage)
 │   ├── servicemonitors/                            # Prometheus ServiceMonitor resources
 │   ├── podmonitors/                                # Prometheus PodMonitor resources
@@ -780,17 +850,7 @@ curl -s 'http://localhost:8428/api/v1/query' \
   --data-urlencode 'query=go_goroutine_count{app!=""}' | jq .   # app liveness: OTLP push has no up{}; see D-4 heartbeat
 ```
 
-### Query Logs
-
-```bash
-# Port-forward to VLSingle
-kubectl port-forward -n monitoring svc/vlsingle-victoria-logs 9428:9428
-
-# Query logs with LogsQL
-curl -s 'http://localhost:9428/select/logsql/query' \
-  --data-urlencode 'query=_stream:{namespace="monitoring"}' \
-  --data-urlencode 'limit=10' | jq .
-```
+Log queries and VLSingle verification: [victorialogs.md](../logging/victorialogs.md).
 
 ### Quick Access (all port-forwards)
 
@@ -806,7 +866,7 @@ Access URLs after running the script:
 |-----------|-----|
 | Grafana | http://localhost:3000 |
 | VictoriaMetrics VMUI | http://localhost:8428/vmui |
-| VictoriaLogs | http://localhost:9428 |
+| VictoriaLogs | http://localhost:9428 — query/ops: [victorialogs.md](../logging/victorialogs.md) |
 | Jaeger | http://localhost:16686 |
 
 ---
@@ -820,7 +880,7 @@ The operator-managed approach scales cleanly across environments using the same 
 | **Metrics storage** | VMSingle (7d, 20Gi) | VMSingle (30d, 50Gi) | VMCluster (90d, 200Gi, HA) |
 | **Scraping** | VMAgent (1 replica) | VMAgent (1 replica) | VMAgent (2 replicas) |
 | **Alerting** | VMAlert + VMAlertmanager | VMAlert + VMAlertmanager | VMAlert + VMAlertmanager |
-| **Access control** | None (local dev) | Basic | VMAuth + VMUser (RBAC + Ingress) |
+| **Access control** | None (local dev) | Basic | [VMAuth + VMUser](#vmauth--vmauth-planned) (RBAC + Ingress) |
 | **Logs** | VLSingle (7d, 20Gi) | VLSingle (14d, 50Gi) | VLSingle (30d, 100Gi) |
 | **Config method** | Kustomize base | Kustomize overlay | Kustomize overlay |
 
@@ -899,8 +959,9 @@ kubectl get helmreleases -A -o wide
 
 ## References
 
-- [VMAuth and vmauth (HTTP auth proxy)](vmauth.md) — vmauth binary, `auth.config`, VMAuth/VMUser CRs, Grafana vs API security (this repo has no VMAuth manifests yet).
-
+- [vmauth](https://docs.victoriametrics.com/victoriametrics/vmauth/) · [Operator auth](https://docs.victoriametrics.com/operator/auth/) · [VMAuth CRD](https://docs.victoriametrics.com/operator/resources/vmauth/) · [VMUser CRD](https://docs.victoriametrics.com/operator/resources/vmuser/)
+- [VictoriaLogs ops guide](../logging/victorialogs.md) — VLSingle ingest, Vector, LogsQL (not duplicated here)
+- [Grafana multi-team RBAC](../grafana/rbac-multi-team.md)
 - [VictoriaMetrics Operator Documentation](https://docs.victoriametrics.com/operator/)
 - [VM Operator Quick Start](https://docs.victoriametrics.com/operator/quick-start/)
 - [VM Operator Resources (all CRDs)](https://docs.victoriametrics.com/operator/resources/)
@@ -916,4 +977,4 @@ kubectl get helmreleases -A -o wide
 
 ---
 
-_Last updated: 2026-07-17 — RFC-0018: platform-db PodMonitors + cnpg-platform-db rule dir; cnpg-auth-db/cnpg-shared-db removed._
+_Last updated: 2026-07-18 — Merge vmauth into this page; trim duplicated VLSingle/logs content (see victorialogs.md)._

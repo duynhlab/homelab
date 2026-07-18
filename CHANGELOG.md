@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   built-in default queries (`pg_stat_checkpointer`, `pg_database`, `pg_settings` +
   `backends`); docs repointed to the built-in metric names.
 - **infra (grafana)**: Pin `grafana/grafana` **13.0.1 → 13.1.0** (cluster `Grafana` CR + local-stack compose).
+- **Documentation**: Merge `docs/observability/metrics/vmauth.md` into `victoriametrics.md` (VMAuth planned section); trim duplicated VLSingle/logs content from victoriametrics.md; sync VLSingle resources in victorialogs.md; update doc index links.
 - RFC workflow: reserve `RFC-NNNN` with owner OK → `research.md` (real-world problem +
   plain-language + Context7) → `README.md`; optional domain doc spin-off; templates in
   [`RFC-0000/`](docs/proposals/rfc/RFC-0000/).

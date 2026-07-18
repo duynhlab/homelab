@@ -161,6 +161,13 @@ spec:
     resources:
       requests:
         storage: 20Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
 ```
 
 ### Vector HelmRelease
@@ -299,6 +306,7 @@ If Vector is consuming too much memory:
 ## Related Documentation
 
 - **Official VictoriaLogs Docs**: https://docs.victoriametrics.com/victorialogs/
+- **External API auth (planned)**: [VMAuth / vmauth](../metrics/victoriametrics.md#vmauth--vmauth-planned) in the VictoriaMetrics stack doc
 - **VictoriaLogs Vector Setup**: https://docs.victoriametrics.com/victorialogs/data-ingestion/vector
 - **VictoriaLogs Helm Chart**: https://docs.victoriametrics.com/helm/victorialogs-single/
 - **LogsQL Query Language**: https://docs.victoriametrics.com/victorialogs/logsql/
@@ -314,4 +322,4 @@ If Vector is consuming too much memory:
 
 ---
 
-_Last updated: 2026-07-14 — VLSingle `:9428` (VM Operator, 7d/20Gi); dual ingest: app logs via OTLP (`/insert/opentelemetry/v1/logs`, `VL-Stream-Fields: service.name`) since RFC-0014 P4, Vector DaemonSet for non-instrumented workloads (infra + PG auto_explain streams) via `/insert/jsonline`; Vector self-monitoring via VMAgent._
+_Last updated: 2026-07-18 — VLSingle resources synced with manifest; VMAuth cross-ref (planned)._

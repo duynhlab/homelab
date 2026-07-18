@@ -18,7 +18,7 @@ kubectl port-forward svc/grafana-service -n monitoring 3000:3000
 
 ## Security and access control
 
-Grafana **organization roles**, **Teams**, and **anonymous** access are documented in [rbac-multi-team.md](rbac-multi-team.md). That page explains why anonymous `Admin` does not provide per-team separation and how this differs from **[VMAuth / vmauth](../metrics/vmauth.md)** (HTTP proxy for VictoriaMetrics APIs—not the Grafana UI).
+Grafana **organization roles**, **Teams**, and **anonymous** access are documented in [rbac-multi-team.md](rbac-multi-team.md). That page explains why anonymous `Admin` does not provide per-team separation and how this differs from **[VMAuth / vmauth](../metrics/victoriametrics.md#vmauth--vmauth-planned)** (HTTP proxy for VictoriaMetrics APIs—not the Grafana UI).
 
 ## Datasources
 
@@ -129,7 +129,7 @@ kubernetes/infra/configs/observability/grafana/
 ## Related Documentation
 
 - [RBAC and multi-team access](rbac-multi-team.md) -- Viewer/Editor/Admin, Teams, anonymous vs named users
-- [VMAuth and vmauth](../metrics/vmauth.md) -- API-layer auth for VictoriaMetrics (separate from Grafana UI)
+- [VMAuth and vmauth](../metrics/victoriametrics.md#vmauth--vmauth-planned) -- API-layer auth for VictoriaMetrics (separate from Grafana UI)
 - [Datasource Strategy](datasources.md) -- VictoriaMetrics plugin metrics DS
 - [Dashboard Reference](dashboard-reference.md) -- panel-by-panel reference
 - [Variables](variables.md) -- dashboard variable configuration

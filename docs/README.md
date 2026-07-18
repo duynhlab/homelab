@@ -70,8 +70,7 @@ docs/
 │   │   ├── metrics-apps.md       # Application + gRPC east-west metrics (RED)
 │   │   ├── metrics-catalog.md    # Lookup catalog — all emitted series incl. 34 business metrics
 │   │   ├── metrics-infra.md      # Cluster / infrastructure metrics (USE)
-│   │   ├── victoriametrics.md    # VictoriaMetrics Operator stack
-│   │   ├── vmauth.md             # VMAuth/vmauth HTTP proxy (auth.config, Operator CRs)
+│   │   ├── victoriametrics.md    # VictoriaMetrics Operator stack (incl. VMAuth planned)
 │   │   ├── promql-guide.md       # PromQL reference
 │   │   ├── streaming-aggregation.md  # VictoriaMetrics stream aggregation (vmagent)
 │   │   └── postgresql/           # PostgreSQL-specific metrics (databases layer)

@@ -43,6 +43,6 @@ go_memory_used_bytes{app="$APP"} / go_memory_gc_goal_bytes{app="$APP"}
 1. Identify slow endpoint from per-endpoint P95
 2. Find the slow request in VictoriaLogs (filter on high latency), then open its `trace_id` in Tempo (traces<->logs correlation). Exemplars are not available -- VictoriaMetrics does not support them (RFC-0014 D-14)
 3. In the trace waterfall, find the slowest span (DB query? external API?)
-4. If DB: add index, optimize query, check `PostgresConnectionSaturation` alert
-5. If GC: check `MicroserviceGCThrash` alert, review Pyroscope CPU profile
+4. If DB: add index, optimize query, check `PgxPoolNearExhaustion` (app pool) and `CNPGClusterHighConnectionsWarning` (DB side)
+5. If GC: watch the heap-vs-GC-goal ratio above (`go_memory_used_bytes / go_memory_gc_goal_bytes`), review Pyroscope CPU profile
 6. If saturation: scale up replicas

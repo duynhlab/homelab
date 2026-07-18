@@ -6,7 +6,7 @@ matters operationally, and how to query and alert on it.
 | Quick facts | |
 |---|---|
 | Source | CNPG built-in exporter (`:9187`), per-cluster custom-queries ConfigMap |
-| Clusters | `platform-db` (ns `platform`), `product-db` (ns `product`) — same 12 queries, different `target_databases` |
+| Clusters | `platform-db` (ns `platform`), `product-db` (ns `product`) — same 10 queries, different `target_databases` |
 | Per-db scope | platform: auth, user, notification, shipping, review · product: product, cart, order |
 | **Gap** | payment, checkout, temporal, temporal_visibility — no per-db custom metrics yet |
 | Live queries | **12** (see reference below) |
@@ -62,7 +62,9 @@ label. `[cluster]` = runs once per instance (instance-wide view).
   # Per-query cache hit ratio
   rate(cnpg_pg_stat_statements_shared_blks_hit[5m]) / clamp_min(rate(cnpg_pg_stat_statements_shared_blks_hit[5m]) + rate(cnpg_pg_stat_statements_shared_blks_read[5m]), 1)
   ```
-- **Alerts** — `CNPGLowCacheHitRatio`, `CNPGTempFileSpill` (via `pg_stat_database`); board: `pg-query-performance`.
+- **Alerts** — none fire on `pg_stat_statements` directly. `CNPGLowCacheHitRatio` and
+  `CNPGTempFileSpill` alert on the **built-in** `pg_stat_database`; `pg_stat_statements`
+  is the drill-down to isolate the offending query. Board: `pg-query-performance`.
 - **Runbooks** — [CNPGLowCacheHitRatio](../../runbooks/postgresql/CNPGLowCacheHitRatio.md), [CNPGTempFileSpill](../../runbooks/postgresql/CNPGTempFileSpill.md)
 
 ### Sessions & contention
@@ -159,30 +161,23 @@ label. `[cluster]` = runs once per instance (instance-wide view).
 
 ### Storage & checkpoints
 
-#### `pg_database_size` `[cluster]`
+Database size and checkpoint activity are served by CNPG's **built-in** default
+queries — the custom `pg_database_size` and `pg_stat_checkpointer` queries were
+removed (2026-07-18) as redundant (they shadowed a superset built-in):
 
-- **What** — size of each database.
-- **Columns** — label `datname`; gauge `size_bytes`.
-- **Why** — per-database growth trends and disk forecasting.
-- **PromQL** — `cnpg_pg_database_size_size_bytes{cnpg_io_cluster="platform-db"}`
-
-#### `pg_stat_checkpointer` `[cluster]`
-
-- **What** — checkpoint activity from `pg_stat_checkpointer` (PG17+).
-- **Columns** — counters `checkpoints_timed`, `checkpoints_req`,
-  `checkpoint_write_time`, `checkpoint_sync_time`, `buffers_checkpoint`.
-- **Why** — when `checkpoints_req` outpaces `checkpoints_timed`, checkpoints are being
-  forced by WAL pressure (`max_wal_size` too small) rather than the timeout — a tuning
-  signal.
-- **PromQL** — `rate(cnpg_pg_stat_checkpointer_checkpoints_req[30m]) > rate(cnpg_pg_stat_checkpointer_checkpoints_timed[30m])`
-- **Alert** — `CNPGCheckpointPressure`.
-- **Runbook** — [CNPGCheckpointPressure](../../runbooks/postgresql/CNPGCheckpointPressure.md)
+- Database size → built-in `pg_database` → `cnpg_pg_database_size_bytes`
+  (+ `cnpg_pg_database_xid_age` / `cnpg_pg_database_mxid_age`).
+- Checkpoints → built-in `pg_stat_checkpointer` → `cnpg_pg_stat_checkpointer_checkpoints_req`
+  / `_checkpoints_timed` / `_write_time` / `_sync_time` / `_buffers_written`
+  (+ `_restartpoints_*`). Alert `CNPGCheckpointPressure` — runbook
+  [CNPGCheckpointPressure](../../runbooks/postgresql/CNPGCheckpointPressure.md).
 
 > **Not custom queries.** Replication lag (`cnpg_pg_replication_lag`), WAL
 > (`cnpg_collector_pg_wal`), backups (`cnpg_collector_last_*_backup_timestamp`),
-> xid/mxid age (`cnpg_pg_database_xid_age`/`mxid_age`) and per-database
-> `pg_stat_database` come from CNPG's **built-in** collectors, documented in
-> [`monitoring.md`](monitoring.md).
+> xid/mxid age (`cnpg_pg_database_xid_age`/`mxid_age`), database size
+> (`cnpg_pg_database_size_bytes`), checkpoints (`cnpg_pg_stat_checkpointer_*`) and
+> per-database `pg_stat_database` come from CNPG's **built-in** collectors —
+> full inventory in [`builtin-metrics.md`](builtin-metrics.md).
 
 > **No latency heatmap.** `pg_stat_statements` exposes totals + calls only (no
 > per-bucket histogram), so a true query-latency-distribution heatmap is not
@@ -228,7 +223,7 @@ query_name:
 
 - **`target_databases`** — the exporter runs the query once per listed database and
   labels the result with `datname`. Omit it for an instance-wide query
-  (e.g. `pg_stat_activity`, `pg_stat_checkpointer`). The ConfigMap carries the
+  (e.g. `pg_stat_activity_count`, `pg_blocking_queries`). The ConfigMap carries the
   `cnpg.io/reload: ""` label, so edits are hot-reloaded without a pod restart.
 - **`usage`** — `LABEL` → Prometheus label; `COUNTER`/`GAUGE` → metric value.
 

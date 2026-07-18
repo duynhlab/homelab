@@ -64,7 +64,7 @@ spec:
         # Requires the collector's self-telemetry scrape (:8888).
         - alert: OtelMetricsPipelineExportFailures
           expr: |
-            sum by (exporter) (rate(otelcol_exporter_send_failed_metric_points_total[5m])) > 0
+            sum by (exporter) (rate(otelcol_exporter_send_failed_metric_points[5m])) > 0
           for: 5m
           labels:
             severity: critical

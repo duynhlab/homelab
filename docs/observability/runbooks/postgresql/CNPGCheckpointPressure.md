@@ -5,7 +5,7 @@
 | **Severity** | warning |
 | **Source** | deep-signal |
 | **Clusters** | `platform-db`, `product-db` |
-| **Custom queries** | `pg_stat_checkpointer` |
+| **Custom queries** | — (built-in `pg_stat_checkpointer` default query) |
 | **Grafana** | pg-maintenance (Checkpointer row) |
 
 ## Meaning
@@ -32,14 +32,14 @@ a tuning signal, not an outage — unless combined with disk pressure.
 ```promql
 sum by (cnpg_io_cluster) (rate(cnpg_pg_stat_checkpointer_checkpoints_req[30m]))
 sum by (cnpg_io_cluster) (rate(cnpg_pg_stat_checkpointer_checkpoints_timed[30m]))
-sum by (cnpg_io_cluster) (rate(cnpg_pg_stat_checkpointer_checkpoint_write_time[5m]))
+sum by (cnpg_io_cluster) (rate(cnpg_pg_stat_checkpointer_write_time[5m]))
 ```
 
 ### kubectl / psql
 
 ```bash
 kubectl exec -n "$NAMESPACE" "services/${CLUSTER}-rw" -- psql -c "
-SELECT checkpoints_timed, checkpoints_req, checkpoint_write_time, buffers_checkpoint
+SELECT num_timed, num_requested, write_time, sync_time, buffers_written
 FROM pg_stat_checkpointer;
 SHOW max_wal_size;
 SHOW checkpoint_timeout;

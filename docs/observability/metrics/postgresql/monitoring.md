@@ -81,8 +81,9 @@ metrics plus every custom query defined in the cluster's monitoring ConfigMap
 | Lock contention | custom query (`cnpg_pg_locks_count_*`, `cnpg_pg_blocking_queries_*`) |
 | Autovacuum / dead tuples | custom query (`cnpg_pg_stat_user_tables_autovacuum_*`) |
 | Table / index size | custom query (`cnpg_pg_table_size_*`, `cnpg_pg_stat_user_indexes_*`) |
-| Checkpoints | custom query (`cnpg_pg_stat_checkpointer_*`) |
-| Database size | custom query (`cnpg_pg_database_size_*`) |
+| Per-database stats | built-in `pg_stat_database` (`cnpg_pg_stat_database_*`: deadlocks, blks_hit/read, temp_bytes) |
+| Checkpoints | built-in `pg_stat_checkpointer` (`cnpg_pg_stat_checkpointer_*`) |
+| Database size | built-in `pg_database` (`cnpg_pg_database_size_bytes`, `_xid_age`, `_mxid_age`) |
 | Pooler metrics | PgDog OpenMetrics `:9090` |
 
 ## Exporter: CNPG built-in
@@ -101,11 +102,23 @@ metrics plus every custom query defined in the cluster's monitoring ConfigMap
 > only: [pg-exporter-dashboards.md](pg-exporter-dashboards.md),
 > [pg-exporter-mapping.md](pg-exporter-mapping.md).
 
+## Built-in default queries
+
+Besides the `cnpg_collector_*` health metrics, CNPG runs **13 built-in default
+queries** from the `cnpg-default-monitoring` ConfigMap (`disableDefaultQueries:
+false`) — `pg_stat_database`, `pg_database`, `pg_stat_archiver`,
+`pg_stat_checkpointer`, `pg_stat_bgwriter`, `pg_replication`, `pg_replication_slots`,
+`pg_stat_replication`, `backends`, `backends_waiting`, `pg_settings`,
+`pg_postmaster`, `pg_extensions`. Most chart and deep-signal alerts consume these.
+Full inventory (query → metrics → consuming alert): [builtin-metrics.md](builtin-metrics.md).
+
 ## Custom queries
 
-Twelve SQL definitions per cluster ConfigMap — same queries, different
-`target_databases` per cluster. Full reference, PromQL, alert and runbook links:
-[custom-metrics.md](custom-metrics.md). Hub and learning path: [README.md](README.md).
+Ten SQL definitions per cluster ConfigMap — same queries, different
+`target_databases` per cluster (the `pg_database_size` + `pg_stat_checkpointer`
+customs were removed as redundant with the built-ins above). Full reference,
+PromQL, alert and runbook links: [custom-metrics.md](custom-metrics.md). Hub and
+learning path: [README.md](README.md).
 
 Chart **connection alerts** use `cnpg_backends_total`; the custom query
 `pg_connection_limits` powers dashboards — both are documented in

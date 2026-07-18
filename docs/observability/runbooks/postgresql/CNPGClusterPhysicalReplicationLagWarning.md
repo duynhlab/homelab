@@ -9,8 +9,8 @@
 
 ## Meaning
 
-Physical replication lag **>1 ms** (chart expr on `cnpg_pg_replication_lag`) for
-**5 minutes** on any instance.
+Physical replication lag **>1 s** (chart expr on `cnpg_pg_replication_lag`, which
+is in **seconds**) for **5 minutes** on any instance.
 
 ## Impact
 
@@ -40,4 +40,4 @@ see [PgDog operations](../../../databases/runbooks/pgdog-operations.md).
 
 ## Escalation
 
-Ticket unless lag grows toward critical (>15ms) or high replication lag (>1s).
+Ticket unless lag grows toward critical (>15s).

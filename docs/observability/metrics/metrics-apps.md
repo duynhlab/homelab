@@ -35,7 +35,7 @@ stack, and the other layers, start at the [metrics hub](README.md).
 |------------------|-----------------|------------------|---------|
 | Instance stopped reporting | `go_goroutine_count` heartbeat | `MicroserviceDown` | [MicroserviceDown](../runbooks/microservices/MicroserviceDown.md) |
 | All pods silent | heartbeat per `(app,namespace)` | `MicroserviceAllInstancesDown` | [MicroserviceAllInstancesDown](../runbooks/microservices/MicroserviceAllInstancesDown.md) |
-| Collector blind | `otelcol_exporter_send_failed_metric_points_total` | `OtelMetricsPipelineExportFailures` | [OtelMetricsPipelineExportFailures](../runbooks/microservices/OtelMetricsPipelineExportFailures.md) |
+| Collector blind | `otelcol_exporter_send_failed_metric_points` | `OtelMetricsPipelineExportFailures` | [OtelMetricsPipelineExportFailures](../runbooks/microservices/OtelMetricsPipelineExportFailures.md) |
 | HTTP 5xx spike | `http_server_request_duration_seconds_count` | `MicroserviceHighErrorRate` / `MicroserviceErrorRateCritical` | [HighErrorRate](../runbooks/microservices/MicroserviceHighErrorRate.md) |
 | Zero 2xx | same + status filter | `MicroserviceNoSuccessfulRequests` | [NoSuccessfulRequests](../runbooks/microservices/MicroserviceNoSuccessfulRequests.md) |
 | gRPC callee errors | `rpc_server_call_duration_seconds_count` | `GrpcServerHighErrorRate` | [GrpcServerHighErrorRate](../runbooks/microservices/GrpcServerHighErrorRate.md) |
@@ -541,7 +541,7 @@ VictoriaMetrics keeps returning the last sample for ~5 m (staleness window), so
 detection **lags a pod kill by about 5 minutes** — accepted in RFC-0014 D-4 and
 verified by the P3 pod-kill test. The push pipeline itself is now an availability
 dependency, so a collector export-failure alert
-(`otelcol_exporter_send_failed_metric_points_total`) runs alongside to
+(`otelcol_exporter_send_failed_metric_points`) runs alongside to
 disambiguate "service down" from "pipeline broken".
 
 ## Dashboard

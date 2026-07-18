@@ -9,8 +9,8 @@
 
 ## Meaning
 
-Physical replication lag **>15 ms** for **5 minutes** — significant sync delay
-between primary and replicas.
+Physical replication lag **>15 s** for **5 minutes** — significant sync delay
+between primary and replicas (`cnpg_pg_replication_lag` is in **seconds**).
 
 ## Impact
 

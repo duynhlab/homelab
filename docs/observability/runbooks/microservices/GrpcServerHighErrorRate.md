@@ -2,13 +2,12 @@
 
 | | |
 |---|---|
+| **Severity** | warning |
 | **Manifest** | [`alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/alerts.yaml) |
 
 ## Meaning
 
 **Fires when**: Incoming gRPC error ratio >5% for 5 minutes (`rpc_server_call_duration_seconds_count`, status != OK).
-
-**Severity**: warning
 
 ## Diagnosis
 
@@ -17,7 +16,7 @@ downstream DB failure surfacing on gRPC handler, validation bugs, dependency tim
 
 ### Investigation
 ```promql
-sum by (app, rpc_grpc_status_code) (rate(rpc_server_call_duration_seconds_count{app="$APP"}[5m]))
+sum by (app, rpc_response_status_code) (rate(rpc_server_call_duration_seconds_count{app="$APP"}[5m]))
 ```
 
 Check calling service retry/saga behavior; correlate with HTTP error alerts on the caller.

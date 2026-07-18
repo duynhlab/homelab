@@ -57,14 +57,14 @@ saturation. Payment bypasses PgDog — see
 
 | Symptom | Built-in / chart metric | Custom query | psql view | Runbook |
 |---------|-------------------------|--------------|-----------|---------|
-| DB unreachable | `cnpg_collector_up` | — | — | [CNPGClusterOffline](../runbooks/postgresql/CNPGClusterOffline.md) |
-| Connection errors | `cnpg_backends_total` | `pg_connection_limits` | `pg_stat_activity` | [HighConnectionsCritical](../runbooks/postgresql/CNPGClusterHighConnectionsCritical.md) |
-| Stuck requests | — | `pg_blocking_queries` | `pg_blocking_pids()` | [CNPGBlockedQueries](../runbooks/postgresql/CNPGBlockedQueries.md) |
-| Slow after load | `pg_stat_database` blks | `pg_stat_statements` | `EXPLAIN` | [CNPGLowCacheHitRatio](../runbooks/postgresql/CNPGLowCacheHitRatio.md) |
-| Disk sort spikes | `temp_bytes` | `pg_stat_statements temp_*` | auto_explain logs | [CNPGTempFileSpill](../runbooks/postgresql/CNPGTempFileSpill.md) |
-| Table bloat | — | `pg_stat_user_tables_autovacuum` | `pg_stat_progress_vacuum` | [CNPGAutovacuumFallingBehind](../runbooks/postgresql/CNPGAutovacuumFallingBehind.md) |
-| Migrations hang | long txn gauges | `pg_long_running_transactions` | `xact_start` | [CNPGLongRunningTransaction](../runbooks/postgresql/CNPGLongRunningTransaction.md) |
-| Replica stale | `cnpg_pg_replication_lag` | — | `pg_stat_replication` | [PhysicalReplicationLagCritical](../runbooks/postgresql/CNPGClusterPhysicalReplicationLagCritical.md) |
+| DB unreachable | `cnpg_collector_up` | — | — | [CNPGClusterOffline](../../runbooks/postgresql/CNPGClusterOffline.md) |
+| Connection errors | `cnpg_backends_total` | `pg_connection_limits` | `pg_stat_activity` | [HighConnectionsCritical](../../runbooks/postgresql/CNPGClusterHighConnectionsCritical.md) |
+| Stuck requests | — | `pg_blocking_queries` | `pg_blocking_pids()` | [CNPGBlockedQueries](../../runbooks/postgresql/CNPGBlockedQueries.md) |
+| Slow after load | `pg_stat_database` blks | `pg_stat_statements` | `EXPLAIN` | [CNPGLowCacheHitRatio](../../runbooks/postgresql/CNPGLowCacheHitRatio.md) |
+| Disk sort spikes | `temp_bytes` | `pg_stat_statements temp_*` | auto_explain logs | [CNPGTempFileSpill](../../runbooks/postgresql/CNPGTempFileSpill.md) |
+| Table bloat | — | `pg_stat_user_tables_autovacuum` | `pg_stat_progress_vacuum` | [CNPGAutovacuumFallingBehind](../../runbooks/postgresql/CNPGAutovacuumFallingBehind.md) |
+| Migrations hang | long txn gauges | `pg_long_running_transactions` | `xact_start` | [CNPGLongRunningTransaction](../../runbooks/postgresql/CNPGLongRunningTransaction.md) |
+| Replica stale | `cnpg_pg_replication_lag` | — | `pg_stat_replication` | [PhysicalReplicationLagCritical](../../runbooks/postgresql/CNPGClusterPhysicalReplicationLagCritical.md) |
 
 ## Page vs ticket
 

@@ -19,11 +19,6 @@ See alert summary in [alert catalog](../../alerting/alert-catalog.md#1-microserv
 - Insufficient GOGC value (too much live data)
 
 ### Investigation
-> **Current coverage gap:** the manifest's namespace selector covers nine
-> service namespaces but omits `checkout`. Checkout still emits Go runtime
-> metrics, but this cAdvisor-based memory alert does not evaluate checkout
-> containers until the selector is corrected.
-
 > **Metric remap (RFC-0014 P3 cutover):** `process_resident_memory_bytes` and the
 > `go_memstats_*` series were `client_golang` names retired with the scrape. The OTLP
 > Go-runtime set is `go_memory_used_bytes` (label `go_memory_type=stack|other`),

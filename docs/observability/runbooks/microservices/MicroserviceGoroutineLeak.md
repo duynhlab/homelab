@@ -23,8 +23,9 @@ See alert summary in [alert catalog](../../alerting/alert-catalog.md#1-microserv
 # Current goroutine count
 go_goroutine_count{app="$APP"}
 
-# Rate of increase (should be ~0 in healthy state)
-rate(go_goroutine_count{app="$APP"}[15m])
+# Rate of increase (should be ~0 in healthy state). deriv() not rate() — the alert
+# uses deriv() because go_goroutine_count is a gauge (rate() undercounts across dips).
+deriv(go_goroutine_count{app="$APP"}[15m])
 ```
 
 ```bash

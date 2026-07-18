@@ -8,8 +8,11 @@
 
 ## Meaning
 
-`cnpg_pg_replication_lag` **>1 second** for **5 minutes** — distinct from
-physical lag ms thresholds; indicates severe replication delay.
+`cnpg_pg_replication_lag` **>1 second** for **5 minutes**. Note: this chart rule
+shares the same expr/threshold as `CNPGClusterPhysicalReplicationLagWarning`
+(both `>1s` warning on `cnpg_pg_replication_lag`) — a duplicate emitted by the
+CNPG chart. The critical escalation is `CNPGClusterPhysicalReplicationLagCritical`
+(`>15s`).
 
 ## Impact
 

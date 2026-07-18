@@ -36,7 +36,7 @@ flux get helmrelease -n $NAMESPACE
 
 ## Mitigation
 1. If bad deployment: `kubectl rollout undo deployment/$APP -n $NAMESPACE`
-2. If dependency failure: check database alerts (`PostgresDown`, `CNPGClusterOffline`)
+2. If dependency failure: check database alerts (`CNPGClusterOffline`, `CnpgClusterFenced`)
 3. If resource issue: check `kubectl describe namespace $NAMESPACE` for quotas
 
 ## Escalation

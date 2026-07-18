@@ -27,7 +27,7 @@ topk(20, cnpg_pg_stat_user_indexes_index_bytes{cnpg_io_cluster="product-db"})
   unique/FK constraint dependency (use `\d+` / catalog checks in psql).
 - High `idx_scan` with poor query performance → wrong index or need composite
   index — correlate with [pg-query-performance dashboard](../../../grafana/README.md)
-  and [CNPGLowCacheHitRatio runbook](../../runbooks/postgresql/CNPGLowCacheHitRatio.md).
+  and [CNPGLowCacheHitRatio runbook](../../../runbooks/postgresql/CNPGLowCacheHitRatio.md).
 
 ## Caveats
 

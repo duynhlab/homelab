@@ -17,7 +17,9 @@ Subscribers fall behind publisher — stale reads on logical replica consumers.
 ## Diagnosis
 
 ```promql
-cnpg_pg_stat_subscription_replication_lag_bytes
+cnpg_pg_stat_subscription_receipt_lag_seconds
+cnpg_pg_stat_subscription_apply_lag_seconds
+cnpg_pg_stat_subscription_buffered_lag_bytes
 ```
 
 ## Mitigation

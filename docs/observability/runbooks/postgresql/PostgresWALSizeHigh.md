@@ -18,7 +18,7 @@ archive failures or heavy write load.
 ## Diagnosis
 
 ```promql
-cnpg_collector_pg_wal{cnpg_io_cluster="$CLUSTER"}
+cnpg_collector_pg_wal{value="size", cnpg_io_cluster="$CLUSTER"}
 cnpg_collector_pg_wal_archive_status
 ```
 

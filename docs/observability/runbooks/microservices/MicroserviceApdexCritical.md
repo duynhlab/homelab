@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Severity** | warning |
+| **Severity** | critical |
 | **Manifest** | [`alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/alerts.yaml) |
 
 ## Meaning
@@ -13,7 +13,7 @@ See alert summary in [alert catalog](../../alerting/alert-catalog.md#1-microserv
 
 **Fires when**: Apdex score drops below 0.5 for 10 minutes.
 
-**Severity**: warning
+**Severity**: critical
 
 Apdex below 0.5 means the majority of users are experiencing "frustrating" response times (> 2 seconds). This is worse than a simple latency alert because it accounts for the full distribution, not just a percentile.
 

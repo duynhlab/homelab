@@ -27,7 +27,7 @@ kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes > 0.7
 kubectl get pvc -n "$NAMESPACE" -l cnpg.io/cluster=$CLUSTER
 ```
 
-Also monitor `cnpg_pg_database_size_size_bytes` and
+Also monitor `cnpg_pg_database_size_bytes` and
 [signals/capacity-planning.md](../../metrics/postgresql/signals/capacity-planning.md).
 
 ## Mitigation

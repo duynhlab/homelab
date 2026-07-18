@@ -23,7 +23,7 @@ Production checklist from [`cnpg/README.md`](../../../../kubernetes/infra/config
 2. Uncomment rule in kustomization when ready.
 
 ```promql
-count by (exported_node, cnpg_io_cluster) (
+count by (node) (
   kube_pod_info{exported_namespace="$NAMESPACE", exported_pod=~"$CLUSTER-.*"}
 ) > 1
 ```

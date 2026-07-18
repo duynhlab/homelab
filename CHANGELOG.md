@@ -31,9 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **PostgreSQL custom queries**: removed `pg_stat_checkpointer` and `pg_database_size`
-  from both cluster monitoring ConfigMaps — redundant with CNPG built-in default queries
-  (`pg_stat_checkpointer`, `pg_database`); docs repointed to the built-in metric names.
+- **PostgreSQL custom queries**: removed `pg_stat_checkpointer`, `pg_database_size`, and
+  `pg_connection_limits` from both cluster monitoring ConfigMaps — redundant with CNPG
+  built-in default queries (`pg_stat_checkpointer`, `pg_database`, `pg_settings` +
+  `backends`); docs repointed to the built-in metric names.
 - **infra (grafana)**: Pin `grafana/grafana` **13.0.1 → 13.1.0** (cluster `Grafana` CR + local-stack compose).
 - RFC workflow: reserve `RFC-NNNN` with owner OK → `research.md` (real-world problem +
   plain-language + Context7) → `README.md`; optional domain doc spin-off; templates in
@@ -58,6 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Broken relative links in docs: `RFC-0018/README.md` (43 links off by one `../`
+  level) and `kong-gateway.md` (ADR-006 folder renamed to `ADR-006-rs256-jwt-kong-edge-auth`).
 - `platform-db` low-disk-space alerts queried `namespace="auth"` (stale render) and
   could never fire; corrected to `namespace="platform"`.
 - `OtelMetricsPipelineExportFailures` never matched a series (dead alert): metric was

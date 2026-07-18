@@ -102,15 +102,10 @@ data:
             usage: "GAUGE"
             description: "Number of connections"
 
-    pg_connection_limits:
-      query: "SELECT current_setting('max_connections')::int as max_connections, (SELECT count(*) FROM pg_stat_activity WHERE backend_type = 'client backend') as current_connections"
-      metrics:
-        - max_connections:
-            usage: "GAUGE"
-            description: "Maximum number of connections"
-        - current_connections:
-            usage: "GAUGE"
-            description: "Current number of client connections"
+    # pg_connection_limits removed 2026-07-18 — redundant with built-ins: max_connections =
+    # cnpg_pg_settings_setting{name="max_connections"}; current connections = cnpg_backends_total
+    # (built-in `backends` is richer — per state/user). No alert/dashboard used it.
+    # See docs/observability/metrics/postgresql/builtin-metrics.md.
 
     pg_locks_count:
       query: "SELECT COALESCE(d.datname, 'shared') as datname, l.mode, count(*) as count FROM pg_locks l LEFT JOIN pg_database d ON l.database = d.oid GROUP BY COALESCE(d.datname, 'shared'), l.mode"

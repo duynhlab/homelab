@@ -52,7 +52,7 @@ edge instead of in every service. Core responsibilities:
   authoritative in the services** (single source of truth, fail-closed —
   [ADR-003](../proposals/adr/ADR-003-jwt-validation-in-services-not-kong/)),
   **plus** a coarse edge JWT check on `/private/` routes as defense-in-depth
-  ([ADR-006](../proposals/adr/ADR-006-kong-edge-jwt/), the `jwt-edge` plugin).
+  ([ADR-006](../proposals/adr/ADR-006-rs256-jwt-kong-edge-auth/), the `jwt-edge` plugin).
 
 In this platform Kong is a **pass-through** gateway: it routes, terminates TLS,
 rate-limits, and adds CORS / security-headers / correlation-id / metrics — but does
@@ -486,7 +486,7 @@ Kong has 80+ bundled plugins. Here's what's relevant for this project:
 
 | Plugin | Use Case | Status |
 |--------|----------|--------|
-| `jwt` | Edge JWT validation on `/private/` routes (`jwt-edge` KongClusterPlugin) | **Active** — RS256 tokens rejected at the gateway as a coarse first filter ([ADR-006](../proposals/adr/ADR-006-kong-edge-jwt/)); the service-side check stays authoritative |
+| `jwt` | Edge JWT validation on `/private/` routes (`jwt-edge` KongClusterPlugin) | **Active** — RS256 tokens rejected at the gateway as a coarse first filter ([ADR-006](../proposals/adr/ADR-006-rs256-jwt-kong-edge-auth/)); the service-side check stays authoritative |
 | `key-auth` | API key authentication | Future |
 | `oauth2` | Full OAuth2 flow | Future |
 | `basic-auth` | Username/password | Future |

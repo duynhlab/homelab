@@ -5,7 +5,7 @@
 | **Severity** | critical |
 | **Source** | chart ([`cluster-high_connection-critical.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/cnpg/cluster-high_connection-critical.yaml)) |
 | **Clusters** | `platform-db`, `product-db` |
-| **Custom queries** | `pg_connection_limits` (dashboard); alert uses `cnpg_backends_total` |
+| **Custom queries** | — (built-in `cnpg_backends_total` + `cnpg_pg_settings_setting{name="max_connections"}`) |
 | **Grafana** | CloudNativePG Cluster Overview, pg-maintenance |
 
 ## Meaning
@@ -17,9 +17,8 @@ sum by (pod) (cnpg_backends_total) /
 max by (pod) (cnpg_pg_settings_setting{name="max_connections"}) * 100 > 95
 ```
 
-The chart alert uses built-in backend counts. The custom query
-`cnpg_pg_connection_limits_*` on dashboards may show a slightly different ratio
-(client backends only) — treat both as connection pressure signals.
+The chart alert uses built-in backend counts (`cnpg_backends_total` counts all
+backends incl. replication walsenders, which also consume `max_connections`).
 
 ## Impact
 
@@ -38,9 +37,8 @@ sum by (pod, cnpg_io_cluster) (cnpg_backends_total)
 / max by (pod, cnpg_io_cluster) (cnpg_pg_settings_setting{name="max_connections"})
 * 100
 
-# Dashboard custom query saturation
-cnpg_pg_connection_limits_current_connections
-/ cnpg_pg_connection_limits_max_connections
+# Client backends only (exclude replication), by pod
+sum by (pod, cnpg_io_cluster) (cnpg_backends_total{usename!="streaming_replica"})
 
 # By state (idle in transaction often the culprit)
 sum by (datname, state) (cnpg_pg_stat_activity_count_count{cnpg_io_cluster="$CLUSTER"})

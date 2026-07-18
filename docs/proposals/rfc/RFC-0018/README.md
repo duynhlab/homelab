@@ -7,8 +7,8 @@
 > **Origin:** the homelab runs **five** CloudNativePG clusters (four operational +
 > one DR) and **three** PgDog poolers. Operational overhead, doc drift
 > (`cnpg-db` / Zalando archaeology), and known gaps — **`shared-db` single-node
-> SPOF** ([RFC-0005](RFC-0005/)), **`temporal-db` without Barman backups**
-> ([RFC-0001](RFC-0001/)) — motivate consolidating the non-product tier into one
+> SPOF** ([RFC-0005](../RFC-0005/)), **`temporal-db` without Barman backups**
+> ([RFC-0001](../RFC-0001/)) — motivate consolidating the non-product tier into one
 > HA cluster while leaving **`product-db` / `product-db-replica` / `pgdog-product`
 > unchanged**.
 
@@ -343,52 +343,52 @@ Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram w
 
 | File | Primary change |
 |------|----------------|
-| [`docs/databases/002-database-integration.md`](../../databases/002-database-integration.md) | 3-cluster / 2-pooler hub; platform-db table; Mermaid |
-| [`docs/databases/004-replication-strategy.md`](../../databases/004-replication-strategy.md) | Cluster inventory |
-| [`docs/databases/006-backup-strategy.md`](../../databases/006-backup-strategy.md) | Barman prefixes; temporal on platform-db |
-| [`docs/databases/008-pooler.md`](../../databases/008-pooler.md) | 2 poolers |
-| [`docs/databases/010-drp.md`](../../databases/010-drp.md) | Cluster table; drills |
-| [`docs/databases/010.1-rpo-rto-planning.md`](../../databases/010.1-rpo-rto-planning.md) | Tier mapping |
-| [`docs/databases/010.2-restore-and-failover-drills.md`](../../databases/010.2-restore-and-failover-drills.md) | Drill D → platform-db |
-| [`docs/databases/010.4-emergency-recovery.md`](../../databases/010.4-emergency-recovery.md) | Pooler names; platform cutover |
-| [`docs/platform/setup.md`](../../platform/setup.md) | Expected cluster state |
-| [`docs/platform/application-delivery.md`](../../platform/application-delivery.md) | Domain → DB map |
-| [`docs/api/microservices.md`](../../api/microservices.md) | Per-service DB endpoints |
-| [`docs/api/api.md`](../../api/api.md) | Topology diagram |
-| [`docs/api/temporal-order-fulfillment.md`](../../api/temporal-order-fulfillment.md) | Persistence host |
-| [`docs/security/network-policies.md`](../../security/network-policies.md) | `:6432` → ns `platform` |
-| [`docs/secrets/openbao.md`](../../secrets/openbao.md) | Path diagram |
-| [`docs/secrets/secrets-management.md`](../../secrets/secrets-management.md) | Secret names |
-| [`docs/observability/metrics/postgresql/monitoring.md`](../../observability/metrics/postgresql/monitoring.md) | Inventory |
-| [`docs/observability/alerting/alert-catalog.md`](../../observability/alerting/alert-catalog.md) | Rule ownership |
-| [`docs/observability/alerting/README.md`](../../observability/alerting/README.md) | Index sync |
-| [`docs/databases/runbooks/pgdog-operations.md`](../../databases/runbooks/pgdog-operations.md) | Add pgdog-platform |
+| [`docs/databases/002-database-integration.md`](../../../databases/002-database-integration.md) | 3-cluster / 2-pooler hub; platform-db table; Mermaid |
+| [`docs/databases/004-replication-strategy.md`](../../../databases/004-replication-strategy.md) | Cluster inventory |
+| [`docs/databases/006-backup-strategy.md`](../../../databases/006-backup-strategy.md) | Barman prefixes; temporal on platform-db |
+| [`docs/databases/008-pooler.md`](../../../databases/008-pooler.md) | 2 poolers |
+| [`docs/databases/010-drp.md`](../../../databases/010-drp.md) | Cluster table; drills |
+| [`docs/databases/010.1-rpo-rto-planning.md`](../../../databases/010.1-rpo-rto-planning.md) | Tier mapping |
+| [`docs/databases/010.2-restore-and-failover-drills.md`](../../../databases/010.2-restore-and-failover-drills.md) | Drill D → platform-db |
+| [`docs/databases/010.4-emergency-recovery.md`](../../../databases/010.4-emergency-recovery.md) | Pooler names; platform cutover |
+| [`docs/platform/setup.md`](../../../platform/setup.md) | Expected cluster state |
+| [`docs/platform/application-delivery.md`](../../../platform/application-delivery.md) | Domain → DB map |
+| [`docs/api/microservices.md`](../../../api/microservices.md) | Per-service DB endpoints |
+| [`docs/api/api.md`](../../../api/api.md) | Topology diagram |
+| [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md) | Persistence host |
+| [`docs/security/network-policies.md`](../../../security/network-policies.md) | `:6432` → ns `platform` |
+| [`docs/secrets/openbao.md`](../../../secrets/openbao.md) | Path diagram |
+| [`docs/secrets/secrets-management.md`](../../../secrets/secrets-management.md) | Secret names |
+| [`docs/observability/metrics/postgresql/monitoring.md`](../../../observability/metrics/postgresql/monitoring.md) | Inventory |
+| [`docs/observability/alerting/alert-catalog.md`](../../../observability/alerting/alert-catalog.md) | Rule ownership |
+| [`docs/observability/alerting/README.md`](../../../observability/alerting/README.md) | Index sync |
+| [`docs/databases/runbooks/pgdog-operations.md`](../../../databases/runbooks/pgdog-operations.md) | Add pgdog-platform |
 | [`docs/README.md`](../../README.md) | Fix PgDog runbook index (line ~292) |
-| [`kubernetes/infra/configs/databases/README.md`](../../../kubernetes/infra/configs/databases/README.md) | Infra hub |
-| [`kubernetes/infra/configs/databases/clusters/README.md`](../../../kubernetes/infra/configs/databases/clusters/README.md) | Cluster table |
-| [`kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/README.md`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/README.md) | cnpg-platform-db |
+| [`kubernetes/infra/configs/databases/README.md`](../../../../kubernetes/infra/configs/databases/README.md) | Infra hub |
+| [`kubernetes/infra/configs/databases/clusters/README.md`](../../../../kubernetes/infra/configs/databases/clusters/README.md) | Cluster table |
+| [`kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/README.md`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/README.md) | cnpg-platform-db |
 
 ### P1 — fix stale names (ops copy-paste broken today)
 
 | File | Fix |
 |------|-----|
-| [`docs/runbooks/troubleshooting/postgres_backup_restore.md`](../../runbooks/troubleshooting/postgres_backup_restore.md) | Zalando → CNPG Barman |
-| [`docs/databases/runbooks/rotate-cnpg-service-password.md`](../../databases/runbooks/rotate-cnpg-service-password.md) | `pgdog-cnpg` → `pgdog-product` / `pgdog-platform` |
-| [`docs/databases/005-ha-dr-deep-dive.md`](../../databases/005-ha-dr-deep-dive.md) | Stale pooler names |
-| [`docs/databases/003.1-operator-cnpg.md`](../../databases/003.1-operator-cnpg.md) | CNPG on all clusters |
-| [`docs/databases/003-operator-comparison.md`](../../databases/003-operator-comparison.md) | 3-cluster table |
-| [`docs/databases/009-extensions.md`](../../databases/009-extensions.md) | platform-db row |
-| [`docs/observability/metrics/postgresql/custom-metrics.md`](../../observability/metrics/postgresql/custom-metrics.md) | PodMonitor paths |
-| [`docs/observability/logging/victorialogs.md`](../../observability/logging/victorialogs.md) | pgaudit clusters |
-| [`docs/observability/metrics/victoriametrics.md`](../../observability/metrics/victoriametrics.md) | VMRule dirs |
+| [`docs/runbooks/troubleshooting/postgres_backup_restore.md`](../../../runbooks/troubleshooting/postgres_backup_restore.md) | Zalando → CNPG Barman |
+| [`docs/databases/runbooks/rotate-cnpg-service-password.md`](../../../databases/runbooks/rotate-cnpg-service-password.md) | `pgdog-cnpg` → `pgdog-product` / `pgdog-platform` |
+| [`docs/databases/005-ha-dr-deep-dive.md`](../../../databases/005-ha-dr-deep-dive.md) | Stale pooler names |
+| [`docs/databases/003.1-operator-cnpg.md`](../../../databases/003.1-operator-cnpg.md) | CNPG on all clusters |
+| [`docs/databases/003-operator-comparison.md`](../../../databases/003-operator-comparison.md) | 3-cluster table |
+| [`docs/databases/009-extensions.md`](../../../databases/009-extensions.md) | platform-db row |
+| [`docs/observability/metrics/postgresql/custom-metrics.md`](../../../observability/metrics/postgresql/custom-metrics.md) | PodMonitor paths |
+| [`docs/observability/logging/victorialogs.md`](../../../observability/logging/victorialogs.md) | pgaudit clusters |
+| [`docs/observability/metrics/victoriametrics.md`](../../../observability/metrics/victoriametrics.md) | VMRule dirs |
 
 ### P2 — RFC/ADR supersession banners (no history rewrite)
 
 | Artifact | Action |
 |----------|--------|
-| [RFC-0005](RFC-0005/) | **Supersede** — shared SPOF addressed by platform-db HA merge |
-| [RFC-0001](RFC-0001/), [ADR-001](../../adr/ADR-001-adopt-temporal-for-order-fulfillment/), [ADR-002](../../adr/ADR-002-deploy-temporal-via-operator/) | Banner: persistence host → `platform-db` |
-| [RFC-0012](RFC-0012/), [ADR-013/14/15](../../adr/) | Banner: `cnpg-db`/`pgdog-cnpg` shipped as `product-db`/`pgdog-product` |
+| [RFC-0005](../RFC-0005/) | **Supersede** — shared SPOF addressed by platform-db HA merge |
+| [RFC-0001](../RFC-0001/), [ADR-001](../../adr/ADR-001-adopt-temporal-for-order-fulfillment/), [ADR-002](../../adr/ADR-002-deploy-temporal-via-operator/) | Banner: persistence host → `platform-db` |
+| [RFC-0012](../RFC-0012/), [ADR-013/14/15](../../adr/) | Banner: `cnpg-db`/`pgdog-cnpg` shipped as `product-db`/`pgdog-product` |
 
 ### P3 — legacy archaeology (banner only)
 
@@ -406,11 +406,11 @@ Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram w
 
 ## Related
 
-- **Supersedes (partial):** [RFC-0005](RFC-0005/) supporting-shared-db HA goal
-- **Amends persistence host for:** [RFC-0001](RFC-0001/), [ADR-001](../../adr/ADR-001-adopt-temporal-for-order-fulfillment/), [ADR-002](../../adr/ADR-002-deploy-temporal-via-operator/)
-- **Builds on:** [RFC-0012](RFC-0012/) triplet pattern, [ADR-013](../../adr/ADR-013-per-service-db-triplet/), [ADR-014](../../adr/ADR-014-pooler-credentials-valuesfrom/), [ADR-015](../../adr/ADR-015-pg-hba-connection-isolation/)
-- **Canonical docs after ship:** [`docs/databases/002-database-integration.md`](../../databases/002-database-integration.md), [`docs/databases/010-drp.md`](../../databases/010-drp.md)
-- **DR unchanged:** [`docs/databases/010.3-cross-region-dr.md`](../../databases/010.3-cross-region-dr.md) (product line)
+- **Supersedes (partial):** [RFC-0005](../RFC-0005/) supporting-shared-db HA goal
+- **Amends persistence host for:** [RFC-0001](../RFC-0001/), [ADR-001](../../adr/ADR-001-adopt-temporal-for-order-fulfillment/), [ADR-002](../../adr/ADR-002-deploy-temporal-via-operator/)
+- **Builds on:** [RFC-0012](../RFC-0012/) triplet pattern, [ADR-013](../../adr/ADR-013-per-service-db-triplet/), [ADR-014](../../adr/ADR-014-pooler-credentials-valuesfrom/), [ADR-015](../../adr/ADR-015-pg-hba-connection-isolation/)
+- **Canonical docs after ship:** [`docs/databases/002-database-integration.md`](../../../databases/002-database-integration.md), [`docs/databases/010-drp.md`](../../../databases/010-drp.md)
+- **DR unchanged:** [`docs/databases/010.3-cross-region-dr.md`](../../../databases/010.3-cross-region-dr.md) (product line)
 
 ---
 _Last updated: 2026-07-17_

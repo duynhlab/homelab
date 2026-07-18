@@ -7,7 +7,7 @@ runbooks for the platform database layer.
 |---|---|
 | Clusters | `platform-db` (ns `platform`), `product-db` (ns `product`), DR `product-db-replica` |
 | Exporter | CNPG built-in `:9187` — prefix `cnpg_` on all series |
-| Custom queries | **10** SQL definitions per cluster ConfigMap |
+| Custom queries | **9** SQL definitions per cluster ConfigMap |
 | Per-db scope | platform: auth, user, notification, shipping, review · product: product, cart, order |
 | **Not in per-db queries** | platform: temporal, temporal_visibility · product: payment, checkout |
 | Alerts | 53 rules — [alert catalog §4/§4b](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) |
@@ -51,9 +51,8 @@ runbooks for the platform database layer.
 | Custom queries | `cnpg_pg_stat_statements_*`, `cnpg_pg_blocking_queries_*`, … | Deep-signal rules |
 | PgDog pooler | `pgdog_*` via `:9090` | — (investigate via connection runbooks) |
 
-Connection alerts use **`cnpg_backends_total`** (chart). Dashboards also show
-**`cnpg_pg_connection_limits_*`** (custom query) — same symptom, different
-instrumentation; see [workflows.md](workflows.md).
+Connection alerts and dashboards use built-in **`cnpg_backends_total`** and
+**`cnpg_pg_settings_setting{name="max_connections"}`**; see [workflows.md](workflows.md).
 
 ## References
 

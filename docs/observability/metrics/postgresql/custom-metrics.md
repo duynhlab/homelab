@@ -6,7 +6,7 @@ matters operationally, and how to query and alert on it.
 | Quick facts | |
 |---|---|
 | Source | CNPG built-in exporter (`:9187`), per-cluster custom-queries ConfigMap |
-| Clusters | `platform-db` (ns `platform`), `product-db` (ns `product`) — same 10 queries, different `target_databases` |
+| Clusters | `platform-db` (ns `platform`), `product-db` (ns `product`) — same 9 queries, different `target_databases` |
 | Per-db scope | platform: auth, user, notification, shipping, review · product: product, cart, order |
 | **Gap** | payment, checkout, temporal, temporal_visibility — no per-db custom metrics yet |
 | Live queries | **12** (see reference below) |
@@ -78,14 +78,13 @@ label. `[cluster]` = runs once per instance (instance-wide view).
 - **PromQL** — `sum by (state) (cnpg_pg_stat_activity_count_count{cnpg_io_cluster="platform-db"})`
 - **Runbook** — diagnostic in [CNPGClusterHighConnectionsCritical](../../runbooks/postgresql/CNPGClusterHighConnectionsCritical.md)
 
-#### `pg_connection_limits` `[cluster]`
-
-- **What** — current vs maximum connections.
-- **Columns** — gauges `max_connections`, `current_connections`.
-- **Why** — connection saturation ends in refused clients. Dashboard signal; chart
-  alerts use `cnpg_backends_total` instead (see [workflows.md](workflows.md)).
-- **PromQL** — `cnpg_pg_connection_limits_current_connections / cnpg_pg_connection_limits_max_connections`
-- **Runbooks** — [CNPGClusterHighConnectionsWarning](../../runbooks/postgresql/CNPGClusterHighConnectionsWarning.md), [CNPGClusterHighConnectionsCritical](../../runbooks/postgresql/CNPGClusterHighConnectionsCritical.md)
+> **Connection saturation** uses **built-in** metrics, not a custom query — the
+> `pg_connection_limits` custom query was removed (2026-07-18) as redundant.
+> Use `sum by (pod) (cnpg_backends_total) / cnpg_pg_settings_setting{name="max_connections"}`
+> (the chart alert's expr). Runbooks:
+> [CNPGClusterHighConnectionsWarning](../../runbooks/postgresql/CNPGClusterHighConnectionsWarning.md),
+> [CNPGClusterHighConnectionsCritical](../../runbooks/postgresql/CNPGClusterHighConnectionsCritical.md).
+> See [builtin-metrics.md](builtin-metrics.md).
 
 #### `pg_locks_count` `[cluster]`
 

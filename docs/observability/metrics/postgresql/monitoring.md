@@ -77,7 +77,7 @@ metrics plus every custom query defined in the cluster's monitoring ConfigMap
 | WAL status | `cnpg_collector_pg_wal` |
 | Backup status | `cnpg_collector_last_available_backup_timestamp`, `cnpg_collector_last_failed_backup_timestamp` |
 | pg_stat_statements | custom query (`cnpg_pg_stat_statements_*`) |
-| Connection stats | custom query (`cnpg_pg_connection_limits_*`) |
+| Connection stats | built-in `cnpg_backends_total` + `cnpg_pg_settings_setting{name="max_connections"}` |
 | Lock contention | custom query (`cnpg_pg_locks_count_*`, `cnpg_pg_blocking_queries_*`) |
 | Autovacuum / dead tuples | custom query (`cnpg_pg_stat_user_tables_autovacuum_*`) |
 | Table / index size | custom query (`cnpg_pg_table_size_*`, `cnpg_pg_stat_user_indexes_*`) |
@@ -114,15 +114,14 @@ Full inventory (query → metrics → consuming alert): [builtin-metrics.md](bui
 
 ## Custom queries
 
-Ten SQL definitions per cluster ConfigMap — same queries, different
-`target_databases` per cluster (the `pg_database_size` + `pg_stat_checkpointer`
-customs were removed as redundant with the built-ins above). Full reference,
+Nine SQL definitions per cluster ConfigMap — same queries, different
+`target_databases` per cluster (the `pg_database_size`, `pg_stat_checkpointer`,
+and `pg_connection_limits` customs were removed as redundant with built-ins). Full reference,
 PromQL, alert and runbook links: [custom-metrics.md](custom-metrics.md). Hub and
 learning path: [README.md](README.md).
 
-Chart **connection alerts** use `cnpg_backends_total`; the custom query
-`pg_connection_limits` powers dashboards — both are documented in
-[workflows.md](workflows.md).
+Chart **connection alerts** use built-in `cnpg_backends_total` /
+`cnpg_pg_settings_setting{name="max_connections"}` — see [workflows.md](workflows.md).
 
 ## Alert rules
 

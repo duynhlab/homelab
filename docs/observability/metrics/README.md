@@ -189,9 +189,7 @@ metrics/
 ├── streaming-aggregation.md  # At-scale playbook: in-flight aggregation, 2-tier vmagent (RFC-0013)
 └── postgresql/          # Databases layer — hub, custom metrics, workflows, runbook links
     ├── monitoring.md            # Entry point: CNPG cluster inventory + built-in exporter
-    ├── custom-metrics.md        # CNPG custom queries
-    ├── pg-exporter-dashboards.md   # Retired Pigsty pg_exporter reference
-    └── pg-exporter-mapping.md      # Retired Pigsty pg_exporter metric reference
+    └── custom-metrics.md        # CNPG custom queries
 ```
 
 ## Operations quick-start

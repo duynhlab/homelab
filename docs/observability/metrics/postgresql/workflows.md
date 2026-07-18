@@ -12,7 +12,7 @@ by fixing cluster and namespace:
 
 | `cnpg_io_cluster` | Namespace | Services DB |
 |-------------------|-----------|-------------|
-| `platform-db` | `platform` | auth, user, notification, shipping, review, temporal |
+| `platform-db` | `platform` | auth, user, notification, shipping, review, temporal, temporal_visibility |
 | `product-db` | `product` | product, cart, order, payment, checkout |
 
 ```mermaid

@@ -40,8 +40,6 @@ runbooks for the platform database layer.
 | [workflows.md](workflows.md) | Senior-DBA diagnostic flows |
 | [signals/capacity-planning.md](signals/capacity-planning.md) | Database/table size signals (no alert) |
 | [signals/index-hygiene.md](signals/index-hygiene.md) | Unused index detection (no alert) |
-| [pg-exporter-mapping.md](pg-exporter-mapping.md) | Retired Zalando/pigsty reference |
-| [pg-exporter-dashboards.md](pg-exporter-dashboards.md) | Retired dashboard reference |
 
 ## Metric layers
 

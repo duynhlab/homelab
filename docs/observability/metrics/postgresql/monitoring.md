@@ -62,7 +62,7 @@ flowchart LR
 | Cluster | Namespace | Instances | Databases | Database metrics | Pooler metrics |
 |---|---|---|---|---|---|
 | `platform-db` | platform | 3 | auth, user, notification, shipping, review, temporal, temporal_visibility | CNPG `:9187` via PodMonitor | `pgdog-platform :9090` |
-| `product-db` (+ `product-db-replica` DR) | product | 3 | product, cart, order, payment | CNPG `:9187` via PodMonitor | `pgdog-product :9090` |
+| `product-db` (+ `product-db-replica` DR) | product | 3 | product, cart, order, payment, checkout | CNPG `:9187` via PodMonitor | `pgdog-product :9090` |
 
 ## Metric coverage
 
@@ -96,11 +96,9 @@ metrics plus every custom query defined in the cluster's monitoring ConfigMap
 > **Retired with the Zalando→CNPG migration.** The former Zalando/Spilo clusters
 > and their exporters were removed: the postgres_exporter sidecar (`:9187`) on
 > `auth-db`, the Pigsty **pg_exporter** (`:9630`, 600+ metrics) pilot on
-> `supporting-shared-db`, and the **pgbouncer-exporter** (`:9127`). The 44
-> pg-exporter recording rules and the pg_exporter Grafana dashboards were retired
-> along with them. The reference material for that pilot is kept for reference
-> only: [pg-exporter-dashboards.md](pg-exporter-dashboards.md),
-> [pg-exporter-mapping.md](pg-exporter-mapping.md).
+> `supporting-shared-db`, and the **pgbouncer-exporter** (`:9127`), together with
+> their recording rules and Grafana dashboards. CNPG's built-in exporter replaced
+> all of them.
 
 ## Built-in default queries
 
@@ -161,7 +159,6 @@ the CNPG pod logs, tailed by the cluster-wide **Vector DaemonSet**, and shipped 
 - [Metrics hub](../README.md) — methodology, stack, and coverage
 - [PromQL Guide](../promql-guide.md) — PromQL functions and examples
 - [Alert Catalog](../../alerting/alert-catalog.md) — every deployed PostgreSQL alert
-- Retired reference: [pg-exporter-dashboards.md](pg-exporter-dashboards.md), [pg-exporter-mapping.md](pg-exporter-mapping.md)
 
 ---
 _Last updated: 2026-07-18 — link runbook hub; dedupe custom query table to custom-metrics.md_

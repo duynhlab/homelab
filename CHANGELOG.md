@@ -55,6 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Retired `pg-exporter-mapping.md` and `pg-exporter-dashboards.md` (Pigsty
+  pg_exporter reference for the removed `supporting-shared-db` pilot — no live
+  infra, external links). Scrubbed their doc-index/tree references.
 - `auth-db`, `shared-db`, and `temporal-db` cluster manifests; `pgdog-auth` and
   `pgdog-shared` poolers; `cnpg-auth-db/` and `cnpg-shared-db/` alert rules.
 

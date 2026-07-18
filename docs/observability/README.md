@@ -329,9 +329,7 @@ docs/observability/
 │       ├── monitoring.md         # CNPG architecture
 │       ├── custom-metrics.md     # Custom query reference
 │       ├── workflows.md          # On-call decision trees
-│       ├── signals/              # Dashboard-only signal guides
-│       ├── pg-exporter-dashboards.md  # Retired reference
-│       └── pg-exporter-mapping.md     # Retired reference
+│       └── signals/              # Dashboard-only signal guides
 │
 ├── tracing/                      # Pillar 2: Distributed tracing
 │   ├── README.md                 # Tracing guide (Tempo + OTel)

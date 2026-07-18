@@ -54,7 +54,7 @@ the USE alerts below.
 > the [Alert Catalog](../alerting/alert-catalog.md) — see [§ Manifest
 > index](#manifest-index). Request-driven microservices use **RED**, not USE
 > (see [metrics-apps.md](metrics-apps.md)); database and cache USE detail lives in
-> the [databases layer](postgresql/monitoring.md).
+> the [databases layer](postgresql/README.md).
 
 ### Not covered (scoped out for Kind)
 
@@ -102,13 +102,13 @@ production impact) is the [Alert Catalog](../alerting/alert-catalog.md):
 - [Valkey cache](../alerting/alert-catalog.md#3-valkey-cache)
 
 Database manifests are indexed in the
-[databases layer](postgresql/monitoring.md); application RED manifests in
+[databases layer](postgresql/README.md); application RED manifests in
 [metrics-apps.md](metrics-apps.md#manifest-index). Runbook:
 [`infrastructure-alerts.md`](../runbooks/infrastructure-alerts.md).
 
 ## References
 
-- [Metrics hub](README.md) · [Application metrics (RED)](metrics-apps.md) · [Database metrics](postgresql/monitoring.md)
+- [Metrics hub](README.md) · [Application metrics (RED)](metrics-apps.md) · [Database metrics](postgresql/README.md)
 - [VictoriaMetrics Operator Stack](victoriametrics.md) · [PromQL Guide](promql-guide.md)
 - [SLO Documentation](../slo/README.md) · [Grafana Dashboard Guide](../grafana/dashboard-reference.md)
 

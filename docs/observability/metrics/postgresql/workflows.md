@@ -12,7 +12,7 @@ by fixing cluster and namespace:
 
 | `cnpg_io_cluster` | Namespace | Services DB |
 |-------------------|-----------|-------------|
-| `platform-db` | `platform` | auth, user, notification, shipping, review, temporal |
+| `platform-db` | `platform` | auth, user, notification, shipping, review, temporal, temporal_visibility |
 | `product-db` | `product` | product, cart, order, payment, checkout |
 
 ```mermaid
@@ -40,13 +40,20 @@ flowchart TD
 flowchart LR
   app["Go service pod"]
   pgdog["PgDog :6432"]
-  cnpg_rw["CNPG -rw primary"]
-  cnpg_r["CNPG -r replica"]
+  cnpg_rw[("CNPG -rw primary")]
+  cnpg_r[("CNPG -r replica")]
 
   app -->|"most services"| pgdog
   pgdog --> cnpg_rw
   pgdog --> cnpg_r
   app -->|"payment direct TLS"| cnpg_rw
+
+  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  class app service;
+  class pgdog platform;
+  class cnpg_rw,cnpg_r data;
 ```
 
 When connection alerts fire, check **both** Postgres backends and PgDog pool

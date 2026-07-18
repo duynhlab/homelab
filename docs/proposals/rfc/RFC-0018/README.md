@@ -359,7 +359,7 @@ Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram w
 | [`docs/security/network-policies.md`](../../../security/network-policies.md) | `:6432` → ns `platform` |
 | [`docs/secrets/openbao.md`](../../../secrets/openbao.md) | Path diagram |
 | [`docs/secrets/secrets-management.md`](../../../secrets/secrets-management.md) | Secret names |
-| [`docs/observability/metrics/postgresql/monitoring.md`](../../../observability/metrics/postgresql/monitoring.md) | Inventory |
+| [`docs/observability/metrics/postgresql/README.md`](../../../observability/metrics/postgresql/README.md) | Inventory |
 | [`docs/observability/alerting/alert-catalog.md`](../../../observability/alerting/alert-catalog.md) | Rule ownership |
 | [`docs/observability/alerting/README.md`](../../../observability/alerting/README.md) | Index sync |
 | [`docs/databases/runbooks/pgdog-operations.md`](../../../databases/runbooks/pgdog-operations.md) | Add pgdog-platform |

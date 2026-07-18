@@ -167,7 +167,7 @@ Status of each methodology across the platform (✅ implemented, ❌ scoped out)
 | **Traffic** | Microservices | ✅ | RPS recording rule + per-endpoint breakdown |
 | **Errors** | Infra / API server / PostgreSQL / Valkey | ✅ | OOMKill, CrashLoop, 5xx rate, ~25 PG alerts, Valkey down/rejected |
 | **Saturation** | Microservices / pods / nodes / API server / PG / Valkey | ✅ | CPU throttle, memory pressure, connections, evictions (app-level `requests_in_flight` retired — no OTel equivalent; apps saturate via container working-set + GC pacing) |
-| **USE** | Pod CPU/mem, node, PVC, network, PostgreSQL, Valkey, workloads | ✅ | See [metrics-infra.md](metrics-infra.md) + [databases](postgresql/monitoring.md) |
+| **USE** | Pod CPU/mem, node, PVC, network, PostgreSQL, Valkey, workloads | ✅ | See [metrics-infra.md](metrics-infra.md) + [databases](postgresql/README.md) |
 | **SLO** | Microservices | ✅ | 60 Sloth-generated burn-rate rules |
 | etcd / kubelet / ingress / node_exporter | Cluster | ❌ | Scoped out for Kind — see [metrics-infra.md](metrics-infra.md#not-covered-scoped-out-for-kind) |
 
@@ -187,11 +187,9 @@ metrics/
 ├── victoriametrics.md   # The stack: VM Operator, dual CRDs, components, ops
 ├── promql-guide.md      # PromQL: counters, rate() vs increase(), $rate vs $__range
 ├── streaming-aggregation.md  # At-scale playbook: in-flight aggregation, 2-tier vmagent (RFC-0013)
-└── postgresql/          # Databases layer — hub, custom metrics, workflows, runbook links
-    ├── monitoring.md            # Entry point: CNPG cluster inventory + built-in exporter
-    ├── custom-metrics.md        # CNPG custom queries
-    ├── pg-exporter-dashboards.md   # Retired Pigsty pg_exporter reference
-    └── pg-exporter-mapping.md      # Retired Pigsty pg_exporter metric reference
+└── postgresql/          # Databases layer — hub, built-in/custom metrics, workflows, runbook links
+    ├── README.md               # Entry point: hub, scrape architecture, cluster inventory
+    └── custom-metrics.md        # CNPG custom queries
 ```
 
 ## Operations quick-start

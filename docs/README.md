@@ -74,10 +74,9 @@ docs/
 │   │   ├── promql-guide.md       # PromQL reference
 │   │   ├── streaming-aggregation.md  # VictoriaMetrics stream aggregation (vmagent)
 │   │   └── postgresql/           # PostgreSQL-specific metrics (databases layer)
-│   │       ├── monitoring.md
-│   │       ├── custom-metrics.md
-│   │       ├── pg-exporter-dashboards.md
-│   │       └── pg-exporter-mapping.md
+│   │       ├── README.md
+│   │       ├── builtin-metrics.md
+│   │       └── custom-metrics.md
 │   ├── tracing/                  # Pillar 2: Distributed Tracing
 │   │   ├── README.md             # Tracing guide (Tempo + OTel)
 │   │   ├── architecture.md       # Triple backend (Tempo + Jaeger + VictoriaTraces pilot)

@@ -55,6 +55,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Retired `pg-exporter-mapping.md` and `pg-exporter-dashboards.md` (Pigsty
+  pg_exporter reference for the removed `supporting-shared-db` pilot — no live
+  infra, external links). Scrubbed their doc-index/tree references.
+- `metrics/postgresql/monitoring.md` — content was largely duplicative
+  (architecture ↔ victoriametrics.md, coverage ↔ builtin/custom-metrics, inventory
+  ↔ many docs). Consolidated its unique bits (scrape architecture, alert-rule
+  layout, audit-logging pointers) into `metrics/postgresql/README.md` and
+  repointed all inbound links.
 - `auth-db`, `shared-db`, and `temporal-db` cluster manifests; `pgdog-auth` and
   `pgdog-shared` poolers; `cnpg-auth-db/` and `cnpg-shared-db/` alert rules.
 
@@ -62,6 +70,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Broken relative links in docs: `RFC-0018/README.md` (43 links off by one `../`
   level) and `kong-gateway.md` (ADR-006 folder renamed to `ADR-006-rs256-jwt-kong-edge-auth`).
+- PostgreSQL metrics docs: wrong CNPG field `customQueriesConfigMapList` →
+  `customQueriesConfigMap`; corrected the claim that `product-db-replica` is scraped
+  (it is a DR replica, not scraped); custom-metrics.md query count 12 → 9.
 - `platform-db` low-disk-space alerts queried `namespace="auth"` (stale render) and
   could never fire; corrected to `namespace="platform"`.
 - `OtelMetricsPipelineExportFailures` never matched a series (dead alert): metric was

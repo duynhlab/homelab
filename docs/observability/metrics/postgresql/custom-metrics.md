@@ -9,7 +9,7 @@ matters operationally, and how to query and alert on it.
 | Clusters | `platform-db` (ns `platform`), `product-db` (ns `product`) — same 9 queries, different `target_databases` |
 | Per-db scope | platform: auth, user, notification, shipping, review · product: product, cart, order |
 | **Gap** | payment, checkout, temporal, temporal_visibility — no per-db custom metrics yet |
-| Live queries | **12** (see reference below) |
+| Live queries | **9** (see reference below) |
 | Metric prefix | `cnpg_` — the exporter prepends it to every series (`cnpg_pg_stat_statements_calls`) |
 | Related alerts | [`alert-catalog.md` §4/§4b](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) |
 | Runbooks | [`../../runbooks/postgresql/README.md`](../../runbooks/postgresql/README.md) |
@@ -18,7 +18,7 @@ matters operationally, and how to query and alert on it.
 
 All PostgreSQL runs on **CloudNativePG**. Beyond the built-in `cnpg_collector_*`
 health metrics, each cluster loads a custom-queries ConfigMap
-(`spec.monitoring.customQueriesConfigMapList`) that turns hand-written SQL into
+(`spec.monitoring.customQueriesConfigMap`) that turns hand-written SQL into
 Prometheus metrics. This page documents that custom set — it is the source of
 truth for the `pg-query-performance` and `pg-maintenance` Grafana boards and the
 deep-signal alerts.
@@ -255,7 +255,7 @@ kubectl get cluster -n platform platform-db -o jsonpath='{.spec.monitoring.custo
 
 - [README.md](README.md) — learning path and hub
 - [workflows.md](workflows.md) — diagnostic decision trees
-- [`monitoring.md`](monitoring.md) — CNPG exporter overview + built-in collector metrics
+- [`builtin-metrics.md`](builtin-metrics.md) — CNPG built-in exporter + collector metrics
 - [`alert-catalog.md`](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) — PostgreSQL alerts (chart set + deep-signal set)
 - [`../../runbooks/postgresql/README.md`](../../runbooks/postgresql/README.md) — per-alert runbooks
 - [`docs/databases/002-database-integration.md`](../../../databases/002-database-integration.md) — database integration

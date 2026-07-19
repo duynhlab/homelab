@@ -76,7 +76,11 @@ spec:
           # VictoriaTraces and VictoriaLogs. Metrics are NEVER routed here.
           # create_schema bootstraps the otel_logs/otel_traces MergeTree tables
           # (+ trace_id materialized view); TTL 90d (2160h) vs 7d ops. sending_queue
-          # + retry_on_failure isolate ClickHouse backpressure from the other sinks.
+          # + retry_on_failure isolate ClickHouse *runtime* backpressure from the
+          # other sinks — but create_schema runs DDL in start(), so an unreachable
+          # ClickHouse fails the whole collector at startup. tracing-local therefore
+          # dependsOn clickhouse-local (ordering); flip to create_schema:false + a
+          # bootstrap Job to also survive a restart while ClickHouse is down.
           endpoint: tcp://clickhouse-clickhouse.monitoring.svc.cluster.local:9000?dial_timeout=10s
           database: otel
           username: default

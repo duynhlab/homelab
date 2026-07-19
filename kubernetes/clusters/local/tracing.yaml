@@ -25,6 +25,15 @@ spec:
   dependsOn:
     - name: secrets-local
     - name: storage-local
+    # RFC-0019: the OTel Collector's clickhouse exporter runs CREATE DATABASE/TABLE
+    # in its start() (create_schema: true). If ClickHouse is unreachable when the
+    # collector starts, the WHOLE collector fails to start — taking Tempo/Jaeger/
+    # VictoriaTraces/VictoriaLogs down with it. Order ClickHouse first (this mirrors
+    # local-stack's `depends_on: clickhouse: service_healthy`). Note: this guards
+    # cold-start ordering only; a collector restart while ClickHouse is down still
+    # crash-loops until it recovers — switch the exporter to create_schema:false +
+    # a schema-bootstrap Job to fully decouple when this goes beyond a pilot.
+    - name: clickhouse-local
   healthChecks:
     - apiVersion: apps/v1
       kind: Deployment

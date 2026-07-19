@@ -56,9 +56,17 @@ no app change; an upstream-standard exporter; ops primaries untouched.
 **Accept (the cost):**
 - A new **stateful backend** to run/patch/Kyverno-harden (single-replica pilot, PVC — no HA;
   bump resources when going real, per owner).
-- The single OTel Collector gains a **4th trace + 2nd log sink** → memory/backpressure risk;
-  mitigated with `sending_queue` + `retry_on_failure`, bumped `memory_limiter`/limits, and
-  **deploying ClickHouse before wiring the exporter**.
+- The single OTel Collector gains a **4th trace + 2nd log sink**. `sending_queue` +
+  `retry_on_failure` + bumped `memory_limiter`/limits absorb **runtime** backpressure, but
+  `create_schema` runs DDL in the exporter's `start()`, so an unreachable ClickHouse fails
+  the **whole collector at startup** (taking the other sinks with it). Mitigated by ordering
+  ClickHouse first — local-stack `depends_on: service_healthy`, cluster `tracing-local
+  dependsOn clickhouse-local`. This guards cold-start only; a collector restart while
+  ClickHouse is down still crash-loops. Full decoupling (when past pilot) = `create_schema:
+  false` + a schema-bootstrap Job.
+- **Access control:** no public Ingress; the `default` password is the control. **Not**
+  NetworkPolicy-fenced — `monitoring` gets no Kyverno default-deny and netpol is inert on
+  kindnet; a `:9000`/`:8123` NetworkPolicy is a follow-up for an enforcing CNI.
 - Trace analytics see only the **10% head sample**; `otel_traces` counts undercount — mitigated
   by the logs-first model (and a future consistent-probability upgrade if needed).
 - A ClickHouse **password** to manage (ESO/OpenBAO in-cluster; dev inline in local-stack).

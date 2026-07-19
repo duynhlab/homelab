@@ -7,7 +7,11 @@
 # Secret (OpenBAO secret/local/infra/clickhouse/admin). The Collector's contrib
 # clickhouse exporter connects as `default` and, with create_schema: true, creates
 # the `otel` database + otel_logs / otel_traces MergeTree tables itself (TTL 90d).
-# NetworkPolicy is the fence — ClickHouse is never on a public Ingress.
+# Access control: ClickHouse is never on a public Ingress and the `default` user's
+# password is the access control. It is NOT NetworkPolicy-fenced — the `monitoring`
+# namespace gets no Kyverno default-deny (that targets app-tier only) and netpol is
+# inert on kindnet. A NetworkPolicy restricting :9000/:8123 to the collector +
+# Grafana is a follow-up for an enforcing CNI.
 ---
 apiVersion: clickhouse.altinity.com/v1
 kind: ClickHouseInstallation
@@ -30,7 +34,9 @@ spec:
           secretKeyRef:
             name: clickhouse-credentials
             key: password
-      # in-cluster only; NetworkPolicy is the real fence (AGENTS.md)
+      # in-cluster access (pods reach the native/HTTP ports); the password is the
+      # control — see the access-control note in the header. Tighten to the pod CIDR
+      # or add a NetworkPolicy when running on an enforcing CNI.
       default/networks/ip:
         - "0.0.0.0/0"
         - "::/0"

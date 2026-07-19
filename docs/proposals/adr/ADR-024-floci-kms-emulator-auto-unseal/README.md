@@ -26,14 +26,16 @@ cluster config can be static.
 
 On Kind, OpenBAO uses **`seal "awskms"`** with `endpoint` → an in-cluster **floci**
 emulator (Deployment + Service + **PVC**, ns `openbao`) and `kms_key_id =
-"alias/openbao-unseal"`. A **dedicated `floci-kms-init` Job** creates the floci KMS key
-+ that alias **before** OpenBAO configures its seal (see the startup-deadlock note in
-Consequences); the `openbao-bootstrap` Job then `operator init`s with **recovery keys**
-(no unseal key)
-and **revokes the root token** after configuring. The **unsealer CronJob and the
-`openbao-init-keys` unseal-key/root-token** are removed; only a break-glass **recovery
-key** remains. Day-2 reconfiguration uses `operator generate-root` from the recovery
-key, never a persisted root token. floci is fenced by **NetworkPolicy** (zero-auth).
+"alias/openbao-unseal"`. A **dedicated `floci-kms-init` Job**, co-located with the floci
+Deployment and the OpenBAO HelmRelease **in the same `controllers-local` Flux wave**,
+creates the floci KMS key + that alias so it exists as OpenBAO boots (see the
+startup-deadlock note in Consequences). The `openbao-bootstrap` Job then `operator
+init`s with **recovery keys** (no unseal key) and **revokes the root token** after
+configuring. The **unsealer CronJob and the `openbao-init-keys` unseal-key** are
+removed; only a break-glass **recovery key** remains (the inert root-token copy is left
+in place — see Consequences). Day-2 reconfiguration uses `operator generate-root` from
+the recovery key, never a persisted root token. floci is fenced by **NetworkPolicy**
+(zero-auth).
 
 - **Storage:** floci PVC `standard` (`FLOCI_STORAGE_MODE=persistent`); the KMS key
   survives pod restarts within a cluster life.
@@ -58,16 +60,41 @@ self-unseal at boot; the unsealer CronJob is deleted; the prod `seal "awskms"` p
 rehearsed on Kind (swap `endpoint` for prod).
 
 **Accept (the cost):**
-- **Startup deadlock → a dedicated provisioning Job.** OpenBAO's `awskms` seal resolves
-  `alias/openbao-unseal` via `DescribeKey` **at server startup** and crashes if it is
-  missing (`Error configuring seal "awskms": Alias not found`). So the alias cannot be
-  created by the `openbao-bootstrap` Job's main script — that waits for OpenBAO `:8200`,
-  which never comes up without the alias (chicken-and-egg). A separate **`floci-kms-init`
-  Job** creates the key+alias depending **only on floci**; OpenBAO pods crash-loop until
-  it exists, then self-unseal. (No Flux-wave deadlock: `controllers-local` goes Ready on
-  *HelmRelease deployed*, not on pod-unseal, so `secrets-local` — which runs both Jobs —
-  proceeds.) floci itself needs `enableServiceLinks: false`, else Kubernetes injects
+- **Startup deadlock → alias provisioned in the same Flux wave as OpenBAO.** OpenBAO's
+  `awskms` seal resolves `alias/openbao-unseal` via `DescribeKey` **at server startup**
+  and crash-exits if it is missing (`Error configuring seal "awskms": Alias not found`).
+  The alias must therefore exist as OpenBAO boots, and it cannot be created by the
+  `openbao-bootstrap` Job — that waits for OpenBAO `:8200` (chicken-and-egg). It is
+  created by a dedicated **`floci-kms-init` Job placed in the `floci` overlay of the
+  `controllers-local` wave**, next to the floci Deployment and the OpenBAO HelmRelease.
+  **Placement is load-bearing:** if this Job lived in `secrets-local` (which
+  `dependsOn: controllers-local`, `wait: true`) it could only run *after* the OpenBAO HR
+  is Ready — which never happens without the alias → a hard deadlock on a clean boot.
+  Co-located, the Job creates the alias (~10s once floci is up) while OpenBAO
+  crash-retries, so both converge in one wave; verified on a clean `make down && make up`
+  that OpenBAO then starts with **0 restarts** (alias lands first). `controllers-local`
+  `wait: true` is satisfied meanwhile because OpenBAO's readiness probe is deliberately
+  permissive (`sealedcode=200&uninitcode=200` → a running-but-sealed pod counts Ready).
+  floci itself needs `enableServiceLinks: false`, else Kubernetes injects
   `FLOCI_PORT=tcp://…` and its Quarkus config crashes.
+- **Root revocation must be node-pinned and exit-code-verified.** `bao token revoke -self`
+  routed through the load-balanced HA **Service** can be dropped/misrouted during leader
+  churn, and inferring success from `token lookup -self` *failing* is unsafe — a transient
+  standby error is indistinguishable from "revoked". The bootstrap pins the revoke to a
+  single stable node (`openbao-0`) and treats its **exit code 0** as the authoritative
+  signal (idempotent), failing the Job otherwise. Without this the Job could report
+  success while a **live** root token stayed in `openbao-init-keys` — caught in review by
+  verifying the token explicitly rather than trusting the log.
+- **The inert root-token copy is left in the Secret (not scrubbed).** After a verified
+  revoke the `root_token` field is dead but still present: the bootstrap image's BusyBox
+  `wget` can only GET/POST (no PATCH), so the field can't be removed in-script without new
+  tooling. It is verifiably revoked, so this is cosmetic — **but** a read of
+  `openbao-init-keys` still yields the **recovery key = full admin** via
+  `operator generate-root`, so the Secret-read blast radius is essentially unchanged by
+  the unseal→recovery swap. The real security win is the **revoked root token**, not the
+  key swap. Beyond Kind: shard the recovery key (`-recovery-shares>1`) and store shares
+  offline. For the same BusyBox-`wget` reason, K8s API calls use `--no-check-certificate`
+  (no `--ca-certificate`) — acceptable in-cluster on Kind, documented.
 - A new **stateful emulator** (floci) to run; its KMS key must persist (PVC). Losing that
   volume mid-life would brick unseal — **moot on Kind** (`make down` wipes all → fresh
   bootstrap), documented.

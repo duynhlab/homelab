@@ -19,7 +19,7 @@
 > | Unseal | ⚠️ **awskms auto-unseal via the floci KMS emulator** (RFC-0008 / ADR-024) — pods self-unseal at boot; `openbao-init-keys` holds only a break-glass recovery key; **root token revoked**. floci is a loose, zero-auth emulator (parity/rehearsal, not real crypto) | Real cloud KMS (`awskms`/`gcpckms`, IRSA/Workload Identity) |
 > | TLS | ❌ disabled (`tlsDisable: true`; plaintext HTTP in-cluster) | TLS via cert-manager |
 > | Credentials | ❌ dev passwords **seeded from Git** (e.g. `*-K1nd-2026!`) | generated / dynamic, none in Git |
-> | Root token | ❌ persisted, **not revoked** after bootstrap | revoked; OIDC / AppRole |
+> | Root token | ✅ **revoked** after bootstrap (verified by exit code, node-pinned); inert copy left in `openbao-init-keys` (BusyBox `wget` can't PATCH it out). Break-glass **recovery key** remains = full admin via `generate-root`, so a Secret read is still high-value | revoked; OIDC / AppRole; recovery key sharded offline |
 >
 > **These local-only choices are unsafe for production.** The hardening path and a
 > local-vs-prod parity/testing matrix live in [RFC-0008](../proposals/rfc/RFC-0008/).
@@ -226,14 +226,21 @@ bao operator init -recovery-shares=1 -recovery-threshold=1
 startup** — so the alias must already exist in floci, or every OpenBAO pod crashes with
 `Error configuring seal "awskms": Alias not found`. Two non-obvious consequences:
 
-1. **Chicken-and-egg → a dedicated Job.** The alias **cannot** be created by the
-   `openbao-bootstrap` Job's main script, because that first waits for OpenBAO `:8200`
-   — which never comes up without the alias. A separate **`floci-kms-init` Job**
-   (`kubernetes/infra/configs/secrets/openbao-bootstrap/floci-kms-init.yaml`) creates
-   the KMS key + alias, depending **only on floci** (unsigned AWS-JSON over `wget`;
-   floci is zero-auth). OpenBAO pods crash-loop until the alias exists, then self-unseal.
-   No Flux-wave deadlock: `controllers-local` reports Ready on *HelmRelease deployed*
-   (not pod-unseal), so `secrets-local` — which applies both Jobs — proceeds.
+1. **Chicken-and-egg → a Job in OpenBAO's own Flux wave.** The alias **cannot** be
+   created by the `openbao-bootstrap` Job's main script, because that first waits for
+   OpenBAO `:8200` — which never comes up without the alias. A dedicated **`floci-kms-init`
+   Job** (`kubernetes/infra/controllers/secrets/floci/floci-kms-init.yaml`) creates the
+   KMS key + alias, talking **only to floci** (unsigned AWS-JSON over `wget`; floci is
+   zero-auth). **Its placement is load-bearing:** it lives in the `floci` overlay of the
+   **`controllers-local`** wave, next to the floci Deployment and the OpenBAO HelmRelease.
+   If it instead lived in `secrets-local` (which `dependsOn: controllers-local`,
+   `wait: true`) it could only run *after* the OpenBAO HR is Ready — which never happens
+   without the alias → a hard deadlock on a clean boot. Co-located, the Job creates the
+   alias (~10s once floci is up) while OpenBAO crash-retries, so both converge in one
+   wave (on a clean `make down && make up`, OpenBAO then boots with **0 restarts**).
+   `controllers-local` `wait: true` is satisfied meanwhile because OpenBAO's readiness
+   probe is deliberately permissive (`sealedcode=200&uninitcode=200` → a running-but-sealed
+   pod counts Ready).
 2. **`enableServiceLinks: false` on floci.** The floci pod carries this because
    Kubernetes otherwise injects a `FLOCI_PORT=tcp://<clusterIP>:4566` service-link env
    (from the same-named Service) that floci's Quarkus config reads as its port and
@@ -245,7 +252,7 @@ sequenceDiagram
     participant F as floci (KMS)
     participant B as OpenBAO pods
     J->>F: CreateKey + CreateAlias(alias/openbao-unseal)
-    Note over B: crash-loop while alias missing
+    Note over B: same wave — crash-retries only if it starts before the alias
     B->>F: seal awskms — DescribeKey(alias/openbao-unseal)
     F-->>B: key info → unwrap root key → self-unseal
 ```

@@ -1,0 +1,56 @@
+# Altinity ClickHouse operator (RFC-0019 Phase B).
+# Installs the ClickHouseInstallation / ClickHouseInstallationTemplate /
+# ClickHouseKeeperInstallation CRDs and the cluster-scoped controller that
+# reconciles them into running ClickHouse StatefulSets. The operator is
+# cluster-scoped (watches all namespaces) but its pod lives in `monitoring`
+# alongside the rest of the observability stack.
+#
+# Installed in the controllers wave (like temporal-operator / cnpg) so its CRDs
+# exist before the clickhouse-local Kustomization applies the ClickHouseInstallation
+# CR. The CHI itself is a separate wave (clickhouse.yaml) that also dependsOn
+# secrets-local for the ESO-managed clickhouse-credentials Secret.
+#
+# Chart pins the operator/metrics image via appVersion (no :latest).
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: clickhouse-operator
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/component: controller
+spec:
+  interval: 30m
+  releaseName: clickhouse-operator
+  targetNamespace: monitoring
+  chart:
+    spec:
+      chart: altinity-clickhouse-operator
+      version: "0.27.1"
+      sourceRef:
+        kind: HelmRepository
+        name: altinity
+        namespace: flux-system
+  install:
+    crds: Create
+    remediation:
+      retries: 5
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 5
+  values:
+    operator:
+      resources:
+        requests:
+          cpu: 20m
+          memory: 64Mi
+        limits:
+          memory: 128Mi
+    metrics:
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          memory: 64Mi

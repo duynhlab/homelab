@@ -70,6 +70,33 @@ spec:
           tls:
             insecure: true
           compression: gzip
+        clickhouse:
+          # RFC-0019 Phase B / ADR-023: long-retention SQL over OTel logs+traces.
+          # 4th trace sink + 2nd log sink, fan-out alongside Tempo/Jaeger/
+          # VictoriaTraces and VictoriaLogs. Metrics are NEVER routed here.
+          # create_schema bootstraps the otel_logs/otel_traces MergeTree tables
+          # (+ trace_id materialized view); TTL 90d (2160h) vs 7d ops. sending_queue
+          # + retry_on_failure isolate ClickHouse backpressure from the other sinks.
+          endpoint: tcp://clickhouse-clickhouse.monitoring.svc.cluster.local:9000?dial_timeout=10s
+          database: otel
+          username: default
+          password: ${env:CLICKHOUSE_PASSWORD}
+          create_schema: true
+          ttl: 2160h
+          logs_table_name: otel_logs
+          traces_table_name: otel_traces
+          async_insert: true
+          compress: lz4
+          timeout: 10s
+          retry_on_failure:
+            enabled: true
+            initial_interval: 5s
+            max_interval: 30s
+            max_elapsed_time: 300s
+          sending_queue:
+            enabled: true
+            num_consumers: 4
+            queue_size: 1000
       extensions:
         health_check:
           endpoint: 0.0.0.0:13133
@@ -81,9 +108,12 @@ spec:
           send_batch_size: 512
           timeout: 5s
         memory_limiter:
+          # Bumped for the RFC-0019 clickhouse exporter (4th trace + 2nd log sink);
+          # keep headroom below resources.limits.memory (1Gi) so backpressure trips
+          # here, not the OOM killer.
           check_interval: 1s
-          limit_mib: 400
-          spike_limit_mib: 100
+          limit_mib: 800
+          spike_limit_mib: 200
         # RFC-0014 D-5: defensive — cumulative is the SDK default, but a delta
         # sample stored in VM silently breaks rate().
         deltatocumulative:
@@ -105,6 +135,7 @@ spec:
             - otlp/tempo
             - otlp/jaeger
             - otlphttp/victoriatraces
+            - clickhouse
             processors:
             - memory_limiter
             - batch
@@ -113,6 +144,7 @@ spec:
           logs:
             exporters:
             - otlphttp/victorialogs
+            - clickhouse
             processors:
             - memory_limiter
             - batch
@@ -173,10 +205,18 @@ spec:
     resources:
       limits:
         cpu: 200m
-        memory: 512Mi
+        memory: 1Gi
       requests:
         cpu: 50m
-        memory: 128Mi
+        memory: 256Mi
+    # RFC-0019 Phase B: ClickHouse admin password for the clickhouse exporter
+    # (${env:CLICKHOUSE_PASSWORD}), from the ESO-managed clickhouse-credentials Secret.
+    extraEnvs:
+      - name: CLICKHOUSE_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: password
     service:
       type: ClusterIP
     serviceAccount:

@@ -1,0 +1,94 @@
+# ClickHouseInstallation — the supplementary OLAP backend for OTel logs+traces
+# SQL (RFC-0019 Phase B / ADR-023). Single shard x single replica pilot on a
+# local PVC; the OTel Collector fans out logs+traces here alongside
+# VictoriaLogs / Tempo (metrics stay on VictoriaMetrics — never here).
+#
+# The `default` user's password comes from the ESO-managed clickhouse-credentials
+# Secret (OpenBAO secret/local/infra/clickhouse/admin). The Collector's contrib
+# clickhouse exporter connects as `default` and, with create_schema: true, creates
+# the `otel` database + otel_logs / otel_traces MergeTree tables itself (TTL 90d).
+# NetworkPolicy is the fence — ClickHouse is never on a public Ingress.
+---
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: clickhouse
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/component: olap
+    app.kubernetes.io/part-of: observability
+spec:
+  defaults:
+    templates:
+      podTemplate: clickhouse
+      dataVolumeClaimTemplate: data-volume
+  configuration:
+    users:
+      # default user password sourced from the ESO-managed Secret
+      default/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: password
+      # in-cluster only; NetworkPolicy is the real fence (AGENTS.md)
+      default/networks/ip:
+        - "0.0.0.0/0"
+        - "::/0"
+      default/profile: default
+      default/quota: default
+    clusters:
+      - name: otel
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+  templates:
+    podTemplates:
+      - name: clickhouse
+        spec:
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 101
+            runAsGroup: 101
+            fsGroup: 101
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: clickhouse
+              image: clickhouse/clickhouse-server:25.3
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities:
+                  drop:
+                    - ALL
+                seccompProfile:
+                  type: RuntimeDefault
+              resources:
+                requests:
+                  cpu: 200m
+                  memory: 1Gi
+                limits:
+                  memory: 2Gi
+              livenessProbe:
+                httpGet:
+                  path: /ping
+                  port: 8123
+                initialDelaySeconds: 30
+                periodSeconds: 10
+                timeoutSeconds: 5
+              readinessProbe:
+                httpGet:
+                  path: /ping
+                  port: 8123
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                timeoutSeconds: 5
+    volumeClaimTemplates:
+      - name: data-volume
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          storageClassName: standard
+          resources:
+            requests:
+              storage: 10Gi

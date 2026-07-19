@@ -12,6 +12,7 @@ resources:
   # storage/ — moved to its own Kustomization (storage-local) so it can dependsOn secrets-local (ESO Secret rustfs-credentials)
   - secrets/
   - cert-manager/
+  - clickhouse-operator/ # Altinity ClickHouse operator (CHI CRDs + controller); CHI CR applied by clickhouse-local
   - temporal/ # Temporal operator (TemporalCluster/TemporalNamespace CRDs + controller; webhook certs via cert-manager)
   # kong/ — moved to its own Kustomization (kong-local) so it can dependsOn cert-manager-local
   - kyverno/

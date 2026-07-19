@@ -15,6 +15,7 @@ resources:
   - storage.yaml         # RustFS (depends on secrets-local for ESO-managed credentials)
   - tracing.yaml         # Tempo/Jaeger/OTel (depends on secrets-local + storage-local; RustFS-backed traces)
   - profiling.yaml       # Pyroscope (depends on secrets-local + storage-local; RustFS-backed profiles)
+  - clickhouse.yaml      # ClickHouse OLAP for OTel logs+traces SQL (depends on controllers-local + secrets-local)
   - databases.yaml       # DB Instances (Must be before apps)
   - databases-cnpg-dr.yaml  # CNPG DR replica (depends on databases-local)
   - monitoring.yaml      # Grafana + Prometheus Configs

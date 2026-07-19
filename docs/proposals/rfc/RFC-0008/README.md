@@ -2,7 +2,12 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | infra | 2026-06-29 | 2026-06-29 |
+| provisional | infra | 2026-06-29 | 2026-07-19 |
+
+> **Research:** [`./research.md`](./research.md) — plain-language deep dive behind this
+> RFC (auto-unseal spine), including a **local PoC** proving `seal "awskms"` auto-unseal
+> is exercisable on Kind via a KMS emulator. A parity-matrix update from that finding is
+> pending owner sign-off at the research review gate.
 
 ## Summary
 
@@ -190,10 +195,11 @@ The parity matrix + testing tiers above are the verification plan. Each overlay 
 
 ## Related
 
+- [Research](./research.md) — plain-language deep dive + auto-unseal PoC + Context7 audit behind this RFC.
 - Decisions already shipped: [ADR-004](../../adr/ADR-004-enable-openbao-audit-logging/) (audit), [ADR-005](../../adr/ADR-005-openbao-ha-raft/) (OpenBAO HA).
 - [Implementation detail](./implementation.md) — the long-form working plan this RFC formalises (feature selection, architecture, DB-credential redesign + SQL templates, installation phases, day-2 procedures).
 - [`docs/secrets/README.md`](../../../secrets/README.md) — current-state-vs-planned banner.
 - RFC backlog items this supersedes/absorbs: secret rotation (dynamic creds remove the need), and is adjacent to split-bootstrap + PushSecret.
 
 ---
-_Last updated: 2026-06-29_
+_Last updated: 2026-07-19_

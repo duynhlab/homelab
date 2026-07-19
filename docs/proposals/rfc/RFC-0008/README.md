@@ -199,10 +199,16 @@ The parity matrix + testing tiers above are the verification plan. Each overlay 
 ## Implementation History
 
 - 2026-06-29 — `provisional`. Proposal only; no manifests applied.
-- 2026-07-19 — `implementable`. **Slice 1** in progress ([ADR-024](../../adr/ADR-024-floci-kms-emulator-auto-unseal/)):
+- 2026-07-19 — `implementable`. **Slice 1** shipped ([ADR-024](../../adr/ADR-024-floci-kms-emulator-auto-unseal/)):
   floci `seal "awskms"` auto-unseal + revoke root token on Kind — removes the Shamir
   unseal key from `openbao-init-keys` and deletes the unsealer CronJob. Cloud-bound
   items (real KMS/IAM, OIDC, public TLS) remain proposal-only.
+- 2026-07-20 — **Slice 2 groundwork** design ([ADR-025](../../adr/ADR-025-pgdog-passthrough-dynamic-db-creds/)):
+  resolves the dynamic-DB-creds pooler blocker. A PoC proved PgDog `passthrough_auth`
+  lets an OpenBAO dynamic user authenticate through the pooler (PG-authoritative), and
+  that seamless rotation needs a PgDog upgrade (`*_allow_change`, `0.1.26`→`≥0.1.49`).
+  Decision is the pooler groundwork (upgrade + passthrough, per-service users); enabling
+  the DB engine, `pg_hba` group wiring, and app reconnection are later slices.
 
 ## Related
 

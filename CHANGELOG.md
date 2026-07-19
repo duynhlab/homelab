@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Observability stack review** ([`docs/observability/stack-review.md`](docs/observability/stack-review.md)): whole-stack assessment (metrics/logs/traces/profiles + cross-cutting) with a per-signal maturity scorecard and ranked production-readiness gaps.
 - **PostgreSQL alert runbooks** ([`docs/observability/runbooks/postgresql/`](docs/observability/runbooks/postgresql/)): 33 per-alert files (CNPG chart + deep-signal + homelab extras), `_TEMPLATE.md`, and index; `runbook_url` on deep-signal and chart PrometheusRules.
 - **PostgreSQL metrics learning hub** ([`docs/observability/metrics/postgresql/README.md`](docs/observability/metrics/postgresql/README.md)): workflows, signal guides (`signals/`), runbook links on custom-metrics; alert-catalog §4 Runbook column + `CNPGLongRunningTransaction` / `CNPGIdleInTransaction`.
 - **CNPG built-in metrics inventory** ([`docs/observability/metrics/postgresql/builtin-metrics.md`](docs/observability/metrics/postgresql/builtin-metrics.md)): the 13 default queries + `cnpg_collector_*` → metric → consuming-alert map, so operators know which built-in signals exist.

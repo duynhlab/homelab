@@ -310,7 +310,7 @@ persist across pod restarts — enough to exercise auto-unseal.
 - [OpenBAO Kubernetes Helm — auto-unseal](https://openbao.org/docs/platform/k8s/helm/run/)
 - [floci — local AWS emulator](https://floci.io/) (KMS on `:4566`, storage modes)
 - Platform: [`docs/secrets/openbao.md`](../../../secrets/openbao.md) ·
-  [`docs/secrets/README.md`](../../../secrets/README.md) · this RFC's [`README.md`](./README.md) + [`implementation.md`](./implementation.md)
+  [`docs/secrets/README.md`](../../../secrets/README.md) · this RFC's [`README.md`](./README.md)
 - Related decisions: [ADR-004 (audit)](../../adr/ADR-004-enable-openbao-audit-logging/) ·
   [ADR-005 (HA Raft)](../../adr/ADR-005-openbao-ha-raft/) · [RFC-0012 (CNPG roles)](../RFC-0012/)
 

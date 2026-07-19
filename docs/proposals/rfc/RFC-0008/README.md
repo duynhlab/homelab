@@ -117,9 +117,8 @@ flowchart LR
 
 ## Design Details
 
-> The full working plan — feature-selection matrix, cluster/namespace/auth/policy
-> design, the database-credential redesign with SQL templates, the installation
-> phases, and the day-2 runbooks — lives in [implementation.md](./implementation.md).
+> The background deep dive — feature-selection reasoning, architecture, and the
+> database-credential redesign — lives in [research.md](./research.md).
 > Summary of the key points:
 
 - **Prod overlay, not edits.** The hardened variant lives in a separate Kustomize
@@ -197,7 +196,6 @@ The parity matrix + testing tiers above are the verification plan. Each overlay 
 
 - [Research](./research.md) — plain-language deep dive + auto-unseal PoC + Context7 audit behind this RFC.
 - Decisions already shipped: [ADR-004](../../adr/ADR-004-enable-openbao-audit-logging/) (audit), [ADR-005](../../adr/ADR-005-openbao-ha-raft/) (OpenBAO HA).
-- [Implementation detail](./implementation.md) — the long-form working plan this RFC formalises (feature selection, architecture, DB-credential redesign + SQL templates, installation phases, day-2 procedures).
 - [`docs/secrets/README.md`](../../../secrets/README.md) — current-state-vs-planned banner.
 - RFC backlog items this supersedes/absorbs: secret rotation (dynamic creds remove the need), and is adjacent to split-bootstrap + PushSecret.
 

@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **ClickHouse OLAP for OTel logs+traces** (RFC-0019 Phase B / [ADR-023](docs/proposals/adr/ADR-023-clickhouse-observability-olap/)): Altinity operator `0.27.1` + `ClickHouseInstallation` (1×1, PVC `standard`, TTL 90d) in ns `monitoring`; OTel Collector `clickhouse` exporter fanned out on the traces+logs pipelines (`create_schema`, `sending_queue`+retry); `clickhouse-credentials` `ClusterExternalSecret` (OpenBAO); Grafana `grafana-clickhouse-datasource` + datasource. Metrics stay on VictoriaMetrics; no app code change.
+- **ClickHouse in local-stack**: `clickhouse` compose service + collector exporter + Grafana plugin/datasource; e2e audit check **C6** (SQL count over `otel_traces`/`otel_logs`).
+- **Grafana dashboard** *ClickHouse — OTel logs+traces SQL* (RED/golden-signals, 19 panels): local-stack (file) + cluster (`configMapGenerator` → `GrafanaDashboard`).
 - **PostgreSQL alert runbooks** ([`docs/observability/runbooks/postgresql/`](docs/observability/runbooks/postgresql/)): 33 per-alert files (CNPG chart + deep-signal + homelab extras), `_TEMPLATE.md`, and index; `runbook_url` on deep-signal and chart PrometheusRules.
 - **PostgreSQL metrics learning hub** ([`docs/observability/metrics/postgresql/README.md`](docs/observability/metrics/postgresql/README.md)): workflows, signal guides (`signals/`), runbook links on custom-metrics; alert-catalog §4 Runbook column + `CNPGLongRunningTransaction` / `CNPGIdleInTransaction`.
 - **CNPG built-in metrics inventory** ([`docs/observability/metrics/postgresql/builtin-metrics.md`](docs/observability/metrics/postgresql/builtin-metrics.md)): the 13 default queries + `cnpg_collector_*` → metric → consuming-alert map, so operators know which built-in signals exist.
@@ -26,8 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - NetworkPolicy [`platform.yaml`](kubernetes/infra/configs/network-policies/platform.yaml);
   Prometheus rules [`cnpg-platform-db/`](kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/cnpg-platform-db/).
 - OpenBAO bootstrap seed for `secret/local/databases/platform-db/temporal`.
-- **RFC-0019** ([`docs/proposals/rfc/RFC-0019/`](docs/proposals/rfc/RFC-0019/)): ClickHouse as supplementary OLAP — Phase B OTel logs/traces SQL (primary), Phase A optional commerce facts from Postgres; **planned**, no cluster manifests.
-- English ClickHouse learning guide ([`docs/observability/clickhouse/README.md`](docs/observability/clickhouse/README.md)).
+- **RFC-0019** ([`docs/proposals/rfc/RFC-0019/`](docs/proposals/rfc/RFC-0019/)): ClickHouse as supplementary OLAP — Phase B OTel logs/traces SQL now **accepted + deployed** (see ClickHouse entries above); Phase A commerce facts remain optional/not deployed.
+- ClickHouse guide ([`docs/observability/clickhouse/README.md`](docs/observability/clickhouse/README.md)): flipped planned→**deployed** — MergeTree, deployed architecture, operations, and a hands-on MergeTree playground.
 
 ### Changed
 

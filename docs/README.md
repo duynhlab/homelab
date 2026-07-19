@@ -431,7 +431,7 @@ docs/
 - [Secrets Production Hardening](./secrets/production-hardening.md) - Planned TLS, KMS/Transit, OIDC, AppRole, and dynamic DB credentials
 - [cert-manager + Flux](./secrets/cert-manager.md) - TLS with Let's Encrypt, HelmRelease, Ingress
 - [Trust Distribution](./secrets/trust-distribution.md) - trust-manager `homelab-ca-bundle` and the LE / homelab-CA dual-PKI split
-- [Secrets decisions & hardening](./proposals/) - ADR-004 (audit) + ADR-005 (OpenBAO HA); [RFC-0008](./proposals/rfc/RFC-0008/) production hardening + parity/testing matrix (+ its implementation.md migration plan); RFC backlog for rotation / PushSecret
+- [Secrets decisions & hardening](./proposals/) - ADR-004 (audit) + ADR-005 (OpenBAO HA); [RFC-0008](./proposals/rfc/RFC-0008/) production hardening + parity/testing matrix; RFC backlog for rotation / PushSecret
 
 ### Security
 

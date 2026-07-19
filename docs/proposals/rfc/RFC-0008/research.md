@@ -278,7 +278,10 @@ leasing/dynamic/audit/central policy).
 - [ ] Local auto-unseal choice for rehearsal: **floci+awskms** (prod-parity config) vs
       **SoftHSM+pkcs11** (no emulator, key not in a Secret)?
 - [ ] Do we add a NetworkPolicy fencing the emulator/HSM endpoint (floci is zero-auth)?
-- [ ] Dynamic DB engine now, or keep the CNPG triplet and defer dynamic app users?
+- [x] Dynamic DB engine now, or keep the CNPG triplet and defer dynamic app users?
+      **Decided (ADR-025):** the pooler blocker comes first. PgDog `passthrough_auth`
+      (+ upgrade to a `*_allow_change` build) makes the pooler dynamic-ready; the DB
+      engine + app conversion follow in later slices, per-service (not per-pod).
 - [ ] Scope of dev-credential remediation: rotate the committed RS256 JWT key + git-history
       purge — in this RFC or tracked separately?
 - [ ] Prod hardening as a **separate Kustomize overlay** (`make validate`-checked) — confirm shape.

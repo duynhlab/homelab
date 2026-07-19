@@ -62,81 +62,75 @@
 
 ## 2. OpenBAO Runtime Architecture
 
-The diagram below summarizes the **logical** HA stack: traffic enters via the
-in-cluster service, three Raft peers form the quorum, each peer persists Raft
-state to PVCs, and ESO syncs OpenBAO-backed values into Kubernetes Secrets.
+This diagram answers one question: **how a secret gets from OpenBAO into a
+workload, and how the HA store stays available.** Three Raft peers (PVC-backed)
+form the quorum behind the in-cluster service; External Secrets Operator (ESO)
+logs in with a Kubernetes service account, reads the KV engine, and materializes
+Kubernetes Secrets that pods consume. Dashed **(planned)** nodes and edges are
+designed but not yet deployed (dynamic DB creds, Transit auto-unseal, OIDC/AppRole,
+cloud KMS); everything else is live on local Kind.
 
 ### High-Level Overview
 
 ```mermaid
 flowchart TD
-    subgraph external["External Access"]
-        devteam["Dev Team\n(OIDC: GitHub / Google)"]
-        datateam["Data Team\n(OIDC: GitHub / Google)"]
-        cicd["CI/CD\n(GitHub Actions AppRole)"]
+    subgraph consumers["Consumers"]
+        operators["Operators<br/>human login"]:::external
+        cicd["CI/CD pipelines"]:::external
+        eso["External Secrets Operator<br/>ClusterSecretStore openbao"]:::platform
+        pods["App / infra / DB pods<br/>read env + volumes"]:::service
     end
 
-    subgraph k8s["Kubernetes Cluster"]
-        subgraph openbao_ns["Namespace: openbao"]
-            subgraph raft["OpenBAO HA — Raft Cluster (3 nodes)"]
-                bao0["openbao-0\nActive / Leader"]
-                bao1["openbao-1\nStandby"]
-                bao2["openbao-2\nStandby"]
-                bao0 <-->|"Raft replication\nport 8201 (TLS planned)"| bao1
-                bao0 <-->|"Raft replication\nport 8201 (TLS planned)"| bao2
-            end
-
-            subgraph engines["Secret Engines"]
-                kv["KV v2: secret/\nInfra, backup, pooler creds"]
-                db["Database: database/\nDynamic PostgreSQL creds"]
-                transit["Transit: transit/\nEncryption + auto-unseal"]
-                audit["Audit: file → stdout\nVector → VictoriaLogs"]
-            end
-
-            subgraph authmethods["Auth Methods"]
-                k8sauth["kubernetes/\nFor ESO service accounts"]
-                oidcauth["oidc/\nFor human operators"]
-                approle["approle/\nFor CI/CD pipelines"]
-            end
+    subgraph obns["Namespace: openbao"]
+        svc["openbao Service<br/>:8200 HTTP (TLS planned)"]:::platform
+        subgraph raft["OpenBAO HA — Raft quorum, PVC-backed"]
+            bao0[("openbao-0<br/>active")]:::data
+            bao1[("openbao-1<br/>standby")]:::data
+            bao2[("openbao-2<br/>standby")]:::data
         end
-
-        subgraph eso_ns["Namespace: external-secrets-system"]
-            eso["External Secrets Operator\nv2.5.0"]
-            css["ClusterSecretStore\nopenbao"]
+        subgraph engines["Secret engines"]
+            kv["KV v2 · secret/<br/>static creds"]:::platform
+            db["Database · database/<br/>dynamic PG creds (planned)"]:::planned
+            transit["Transit · transit/<br/>auto-unseal (planned)"]:::planned
         end
-
-        subgraph app_ns["App Namespaces (product, cart, order, auth, ...)"]
-            es["ExternalSecret\n/ ClusterExternalSecret"]
-            k8ssecret["Kubernetes Secret\n(managed-by: external-secrets)"]
-            appod["Application Pod\nreads env/volume"]
-        end
-
-        subgraph db_ns["Database Namespaces"]
-            platformdb["platform-db\n(CloudNativePG)"]
-            productdb["product-db\n(CloudNativePG)"]
+        subgraph authm["Auth methods"]
+            k8sauth["kubernetes/<br/>ESO service accounts"]:::platform
+            oidc["oidc/ (planned)"]:::planned
+            approle["approle/ (planned)"]:::planned
         end
     end
 
-    subgraph autounseal["Unseal"]
-        kind_unseal["openbao-unsealer CronJob (local Kind)\nre-reads Shamir key from Secret, every minute"]
-        eks_kms["AWS KMS\n(EKS / Production)"]
-        gke_kms["GCP Cloud KMS\n(GKE / Production)"]
+    unsealer["openbao-unsealer CronJob<br/>replays Shamir key /60s (local)"]:::platform
+    kms["Cloud KMS auto-unseal<br/>(planned)"]:::planned
+    k8ssecret[("Kubernetes Secret<br/>managed-by external-secrets")]:::data
+    cnpg[("CNPG platform-db / product-db")]:::data
+
+    eso -->|"login (SA token)"| k8sauth
+    eso -->|"read KV"| svc
+    svc --> raft
+    raft --- engines
+    raft --- authm
+    eso -->|"materialize"| k8ssecret
+    k8ssecret --> pods
+    unsealer -->|"unseal"| svc
+    operators -.->|"planned"| oidc
+    cicd -.->|"planned"| approle
+    db -.->|"dynamic creds (planned)"| cnpg
+    kms -.->|"auto-unseal (planned)"| raft
+
+    subgraph legend["Legend"]
+        lpf["platform / control plane"]:::platform
+        ldt["data / persistent store"]:::data
+        lsv["consumer service"]:::service
+        lex["external actor"]:::external
+        lpl["planned — not deployed"]:::planned
     end
 
-    external --> k8sauth
-    external --> oidcauth
-    cicd --> approle
-    raft --> engines
-    raft --> authmethods
-    css --> eso
-    eso --> es
-    es --> k8ssecret
-    k8ssecret --> appod
-    eso --> css
-    css --> raft
-    db --> platformdb
-    db --> productdb
-    autounseal --> raft
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
 ```
 
 ### Raft Cluster Internals

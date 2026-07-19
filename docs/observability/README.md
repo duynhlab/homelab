@@ -313,6 +313,7 @@ graph LR
 ```
 docs/observability/
 ├── README.md                     # This file: index + 3-layer architecture + APM integration
+├── stack-review.md               # Whole-stack review: per-signal maturity scorecard + ranked gaps
 ├── opentelemetry/                 # OTel instrumentation, transport, and migration
 │   ├── README.md                  # Canonical policy + current platform behavior
 │   └── rfc-0014-explainer.md     # Beginner old-vs-new walkthrough

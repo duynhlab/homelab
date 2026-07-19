@@ -18,6 +18,8 @@ resources:
   - grafana-dashboard-redis.yaml
   - grafana-dashboard-kubernetes-cluster-overview.yaml
   - grafana-dashboard-kong.yaml
+  # ClickHouse OTel logs+traces SQL (RFC-0019 Phase B) — JSON via configMapGenerator below
+  - grafana-dashboard-clickhouse.yaml
   # VictoriaMetrics stack dashboards
   - grafana-dashboard-vmsingle.yaml
   - grafana-dashboard-vmagent.yaml
@@ -25,3 +27,13 @@ resources:
   # Flux GitOps dashboards
   - grafana-dashboard-flux-cluster.yaml
   - grafana-dashboard-flux-controlplane.yaml
+
+# ClickHouse dashboard JSON → ConfigMap (referenced by grafana-dashboard-clickhouse.yaml
+# via configMapRef; stable name, so the hash suffix is disabled).
+configMapGenerator:
+  - name: grafana-dashboard-clickhouse-otel-sql
+    files:
+      - clickhouse-otel-sql.json
+
+generatorOptions:
+  disableNameSuffixHash: true

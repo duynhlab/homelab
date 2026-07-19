@@ -96,6 +96,7 @@ classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
 | Understand the whole homelab secrets/TLS/trust chain | This file |
 | Understand OpenBAO internals: HA/Raft, seal, auth, engines, policies | [OpenBAO Architecture](./openbao.md) |
 | Add, consume, or rotate an ESO-managed application secret | [Secrets Management](./secrets-management.md) |
+| Understand/rotate the RS256 JWT signing key (auth signs, Kong verifies) | [OpenBAO — JWT signing key](./openbao.md#jwt-signing-key-auth--kong) |
 | Understand cert-manager, Let's Encrypt DNS-01, and `kong-proxy-tls` | [cert-manager + Let's Encrypt](./cert-manager.md) |
 | Understand `homelab-ca-bundle`, namespace opt-in, and CA rotation | [Trust Distribution](./trust-distribution.md) |
 | Recover from OpenBAO/ESO/cert-manager incidents | [Runbooks](./runbooks/) |

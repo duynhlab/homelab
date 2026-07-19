@@ -39,11 +39,22 @@ flowchart LR
     class OpenBAO external;
 ```
 
-Kong's edge check does **not** fetch the JWKS: its `jwt-edge` plugin holds the
-RS256 public key as a statically provisioned consumer credential (an
-ExternalSecret from OpenBAO in the cluster; an inline key in the local-stack
-declarative config). Rotating the signing key therefore means updating that
-credential too — a JWKS refresh alone only covers the services.
+One RSA keypair lives in OpenBAO at `secret/local/auth/jwt-signing`
+(`private_key` + `public_key`). External Secrets Operator fans it out into two
+Secrets: **`auth-jwt-signing`** (namespace `auth`, private key → auth env
+`JWT_PRIVATE_KEY_PEM`, used to sign) and **`auth-issuer-jwt`** (namespace `kong`,
+public key → a Kong `jwt` consumer credential on the `auth-issuer` consumer). In
+local-stack the same split is an inline key in the declarative config.
+
+Kong's edge check does **not** fetch the JWKS: the `jwt-edge` plugin looks up that
+credential **by the token's `iss` claim** (`key_claim_name: iss`) and verifies the
+RS256 signature and `exp` with the public key — Kong never holds the private key.
+The service's `pkg/authmw` re-verifies the full token (audience, `nbf`, …) against
+the cached JWKS and stays authoritative. Because Kong verifies against the
+statically provisioned public key rather than the JWKS, rotating the signing key
+means updating **both** ExternalSecrets — a JWKS refresh alone only covers the
+services. Full provisioning and rotation choreography:
+[OpenBAO — JWT signing key](../secrets/openbao.md).
 
 ## HTTP API
 
@@ -96,7 +107,7 @@ without branching on server state.
 
 | Control | Behavior |
 |---|---|
-| Access token | RS256 JWT with `iss`, `aud`, `sub`, `exp`, `iat`, `nbf`, `jti`, username, and email |
+| Access token | RS256 JWT — header carries `alg: RS256` + `kid`; claims `iss=https://gateway.duynh.me`, `aud=duynhlab-platform`, `sub`, `exp`, `iat`, `nbf`, `jti`, username, and email |
 | Verification | Kong performs a coarse edge check; each service remains authoritative through `pkg/authmw` |
 | Refresh storage | Only SHA-256 hashes are stored; raw refresh tokens are returned once |
 | Reuse detection | A rotated-token replay revokes its family |
@@ -116,13 +127,15 @@ remain temporary aliases for the ADR-017 expand phase. New callers must use the
 | `GET /health` | Process is alive |
 | `GET /ready` | Service is accepting traffic and is not draining |
 | OTLP metrics export | HTTP RED and runtime metrics are pushed to the collector |
-| Stable production key | `JWT_PRIVATE_KEY_PEM` is configured; production refuses an ephemeral key |
+| Signing key | `JWT_PRIVATE_KEY_PEM` comes from the ESO-delivered `auth-jwt-signing` Secret (OpenBAO `secret/local/auth/jwt-signing`); an empty value falls back to an ephemeral key, which production refuses |
 
 ## References
 
 - [Shared API conventions](api.md)
 - [Microservices catalog](microservices.md)
+- [OpenBAO — JWT signing key lifecycle](../secrets/openbao.md) (OpenBAO path + ESO fan-out + rotation)
+- [Kong gateway — edge JWT](../platform/kong-gateway.md) (the `auth-issuer` consumer + `jwt-edge` plugin)
 - [RFC-0009: RS256 JWT and edge authentication](../proposals/rfc/RFC-0009/)
 - [ADR-006: Kong edge JWT](../proposals/adr/ADR-006-rs256-jwt-kong-edge-auth/)
 
-_Last updated: 2026-07-14_
+_Last updated: 2026-07-19_

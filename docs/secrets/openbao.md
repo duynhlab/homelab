@@ -973,7 +973,7 @@ gantt
 ## 18. Related Documentation
 
 - [RFC-0008 — Production secrets hardening](../proposals/rfc/RFC-0008/) (+ [implementation.md](../proposals/rfc/RFC-0008/implementation.md) — feature selection, architecture, DB redesign, install phases)
-- [Secrets Management](./secrets-management.md) — ESO patterns, path conventions, operations
+- [Secrets hub](./README.md#secret-organization) — ESO patterns, path conventions, secret catalog
 - [cert-manager](./cert-manager.md) — Certificate issuers and `kong-proxy-tls` wildcard pipeline
 - [Trust Distribution](./trust-distribution.md) — trust-manager `homelab-ca-bundle` distribution
 - [Secrets proposals](../proposals/) — ADR-004/005 (audit, HA) + RFC backlog (rotation, PushSecret, hardening)

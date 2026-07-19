@@ -5,7 +5,7 @@ This is a planned-feature onboarding note for the future OpenBAO database engine
 | Status | Meaning |
 |---|---|
 | Planned | Do not follow this as current local Kind procedure |
-| Current service-secret flow | Use `../secrets-management.md` |
+| Current service-secret flow | Use [Secrets hub](../README.md#secret-organization) and [Add ESO-managed secret](./add-eso-secret.md) |
 
 ```bash
 # 1. Create OpenBAO policy

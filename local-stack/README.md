@@ -9,8 +9,9 @@ It runs: PostgreSQL (10 databases) · Valkey · per-service golang-migrate jobs 
 workers** (order-fulfillment, checkout-abandonment) · a
 **Kong DB-less gateway** (mirrors the in-cluster Kong) · the **React SPA** ·
 an **OTel Collector → VictoriaTraces + VictoriaMetrics + VictoriaLogs → Grafana**
-pipeline (traces, metrics, and logs), **Vector** for container logs, and
-**Pyroscope** continuous profiling.
+pipeline (traces, metrics, and logs), **ClickHouse** for long-retention SQL over
+logs+traces (RFC-0019 Phase B, fanned out alongside VictoriaLogs/VictoriaTraces),
+**Vector** for container logs, and **Pyroscope** continuous profiling.
 
 ## Prerequisites
 
@@ -36,6 +37,7 @@ First run builds every service image, so it takes a few minutes. Then:
 | VictoriaTraces | http://localhost:10428 | trace ingest + Jaeger query API + vmui |
 | VictoriaMetrics | http://localhost:8428 | OTLP/remote-write ingest + PromQL + vmui |
 | VictoriaLogs | http://localhost:9428 | OTLP log ingest (otelzap via collector) + Vector container logs + LogsQL |
+| ClickHouse | http://localhost:8123 | OTLP logs+traces SQL (`otel.otel_logs` / `otel.otel_traces`) — RFC-0019 Phase B |
 | Pyroscope | http://localhost:4040 | continuous profiling (flame graphs) |
 
 Postgres and Valkey are internal-only (reach the services through Kong, not directly).
@@ -53,9 +55,11 @@ flowchart LR
     COL --> VT["VictoriaTraces :10428"]
     COL -->|"app metrics + spanmetrics"| VM["VictoriaMetrics :8428"]
     COL -->|logs| VL["VictoriaLogs :9428"]
+    COL -->|"logs+traces SQL"| CH["ClickHouse :8123"]
     VT --> GRAF["Grafana :3002"]
     VM --> GRAF
     VL --> GRAF
+    CH --> GRAF
     SVC -- "pprof" --> PYRO["Pyroscope :4040"]
     PYRO --> GRAF
 ```
@@ -394,6 +398,15 @@ done
 # C5. Trace + native-trace logs present for the flow just driven
 curl -s 'http://localhost:10428/select/jaeger/api/services' | python3 -c \
   "import json,sys; s=json.load(sys.stdin)['data']; print('C5 traced services:', len(s), 'OK' if len(s)>=10 else 'FAIL')"
+
+# C6. ClickHouse (RFC-0019 Phase B) ingested OTLP logs+traces for the flow.
+#     otel_logs/otel_traces are auto-created by the collector's clickhouse exporter.
+#     Respect the same ~30-45s ingest lag before reading.
+for t in otel_traces otel_logs; do
+  N=$(curl -s 'http://localhost:8123/' -u default:otel --data-binary "SELECT count() FROM otel.$t" 2>/dev/null | tr -d '[:space:]')
+  { [ -n "$N" ] && [ "$N" -gt 0 ] 2>/dev/null && echo "C6 $t: $N rows OK"; } \
+    || echo "C6 $t: ${N:-0} rows FAIL (ingest lag? exporter/plugin?)"
+done
 ```
 
 > A brand-new counter has **no series until its first increment** — "NO SERIES"
@@ -424,6 +437,7 @@ curl -s 'http://localhost:10428/select/jaeger/api/services' | python3 -c \
 | C3 | DB client p95 | real ms-scale value (< 500ms), not bucket-collapse garbage |
 | C4 | Dashboards | both boards load via `/api/dashboards/uid/…` with 200 |
 | C5 | Traces | ≥ 10 services present in the Jaeger services list |
+| C6 | ClickHouse (RFC-0019) | `otel.otel_traces` and `otel.otel_logs` non-empty after the driven flow (SQL over `:8123`) |
 
 Any failed row blocks the push. When a change touches the order-fulfillment
 path, additionally run the saga (checkout in the SPA) and watch it complete in

@@ -69,6 +69,8 @@ metadata:
     # Receive the RustFS S3 credentials for Tempo trace + Pyroscope profile storage (ClusterExternalSecret)
     platform.duynhlab/s3: "tempo"
     platform.duynhlab/s3-pyroscope: "true"
+    # Receive the ClickHouse admin credentials (ClusterExternalSecret → clickhouse-credentials)
+    platform.duynhlab/clickhouse: "true"
   name: monitoring
 ---
 apiVersion: v1

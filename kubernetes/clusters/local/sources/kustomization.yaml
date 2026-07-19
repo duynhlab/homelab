@@ -34,3 +34,4 @@ resources:
   - helm/kong.yaml
   - helm/kyverno.yaml
   - helm/temporal-operator.yaml
+  - helm/altinity.yaml

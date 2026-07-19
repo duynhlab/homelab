@@ -1,0 +1,16 @@
+# RFC-0019 Phase B: ClickHouse datasource for SQL over OTel logs+traces
+# (otel_logs / otel_traces). Native protocol :9000; dev default user, no password.
+apiVersion: 1
+datasources:
+  - name: ClickHouse
+    type: grafana-clickhouse-datasource
+    uid: clickhouse
+    access: proxy
+    jsonData:
+      host: clickhouse
+      port: 9000
+      protocol: native
+      defaultDatabase: otel
+      username: default
+    secureJsonData:
+      password: otel

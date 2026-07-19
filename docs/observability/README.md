@@ -345,8 +345,8 @@ docs/observability/
 ├── profiling/                    # Pillar 4: Continuous profiling
 │   └── README.md                 # Pyroscope (CPU, heap, goroutine)
 │
-├── clickhouse/                   # ClickHouse learning guide (planned)
-│   └── README.md                 # OLAP fundamentals, commerce analytics, OTel Phase B
+├── clickhouse/                   # ClickHouse OTel logs+traces OLAP (deployed)
+│   └── README.md                 # MergeTree, deployed architecture, ops, playground
 │
 ├── grafana/                      # Visualization layer
 │   ├── README.md                 # Grafana overview + plugin management
@@ -486,7 +486,7 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 - [Alert Catalog](alerting/alert-catalog.md) -- full reference of all deployed alerts + coverage-gap analysis
 - [SLO System](slo/README.md) -- Sloth Operator and burn-rate alerts
 - [Interview Prep](runbooks/observability-deep-dive.md) -- RED/USE/Golden Signals theory + structured answers
-- [ClickHouse learning guide](clickhouse/README.md) -- planned OLAP; OTel logs/traces SQL + optional commerce ([RFC-0019](../proposals/rfc/RFC-0019/))
+- [ClickHouse OTel logs+traces OLAP](clickhouse/README.md) -- deployed supplementary OLAP; long-retention SQL + trace_id JOIN ([RFC-0019](../proposals/rfc/RFC-0019/) · [ADR-023](../proposals/adr/ADR-023-clickhouse-observability-olap/))
 
 ---
 

@@ -9,6 +9,7 @@ resources:
   - datasource-jaeger.yaml
   - datasource-victoriatraces.yaml
   - datasource-pyroscope.yaml
+  - datasource-clickhouse.yaml
   - datasource-victoriametrics.yaml
   - datasource-victoriametrics-prometheus.yaml
   - dashboards/

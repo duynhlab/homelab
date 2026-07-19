@@ -2,7 +2,14 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| provisional | platform-wide | [./research.md](./research.md) — gate passed 2026-07-17 | 2026-07-17 | 2026-07-17 |
+| accepted (Phase B) | platform-wide | [./research.md](./research.md) — gate passed 2026-07-17 | 2026-07-17 | 2026-07-19 |
+
+> **Decision (2026-07-19):** implementing **Phase B only** (OTel logs+traces SQL). **Phase A
+> (commerce facts) is out of scope** for this implementation — observability-only. ClickHouse
+> runs **alongside** VictoriaLogs/VictoriaTraces; **metrics stay on VictoriaMetrics**. Operator:
+> **Altinity**; storage: **PVC**; retention: **TTL 90d**. See
+> [ADR-023](../../adr/ADR-023-clickhouse-observability-olap/) and the operational guide
+> [clickhouse/README.md](../../../observability/clickhouse/README.md).
 
 > **Tradeoff:** we add a new OLAP runtime (operator, storage, Grafana plugin, Collector
 > exporter) to answer **long-retention SQL on logs and traces** — accepting operational

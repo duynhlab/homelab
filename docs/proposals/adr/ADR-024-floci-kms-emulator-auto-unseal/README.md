@@ -26,8 +26,10 @@ cluster config can be static.
 
 On Kind, OpenBAO uses **`seal "awskms"`** with `endpoint` → an in-cluster **floci**
 emulator (Deployment + Service + **PVC**, ns `openbao`) and `kms_key_id =
-"alias/openbao-unseal"`. A bootstrap step creates the floci KMS key + that alias; the
-`openbao-bootstrap` Job then `operator init`s with **recovery keys** (no unseal key)
+"alias/openbao-unseal"`. A **dedicated `floci-kms-init` Job** creates the floci KMS key
++ that alias **before** OpenBAO configures its seal (see the startup-deadlock note in
+Consequences); the `openbao-bootstrap` Job then `operator init`s with **recovery keys**
+(no unseal key)
 and **revokes the root token** after configuring. The **unsealer CronJob and the
 `openbao-init-keys` unseal-key/root-token** are removed; only a break-glass **recovery
 key** remains. Day-2 reconfiguration uses `operator generate-root` from the recovery
@@ -56,6 +58,16 @@ self-unseal at boot; the unsealer CronJob is deleted; the prod `seal "awskms"` p
 rehearsed on Kind (swap `endpoint` for prod).
 
 **Accept (the cost):**
+- **Startup deadlock → a dedicated provisioning Job.** OpenBAO's `awskms` seal resolves
+  `alias/openbao-unseal` via `DescribeKey` **at server startup** and crashes if it is
+  missing (`Error configuring seal "awskms": Alias not found`). So the alias cannot be
+  created by the `openbao-bootstrap` Job's main script — that waits for OpenBAO `:8200`,
+  which never comes up without the alias (chicken-and-egg). A separate **`floci-kms-init`
+  Job** creates the key+alias depending **only on floci**; OpenBAO pods crash-loop until
+  it exists, then self-unseal. (No Flux-wave deadlock: `controllers-local` goes Ready on
+  *HelmRelease deployed*, not on pod-unseal, so `secrets-local` — which runs both Jobs —
+  proceeds.) floci itself needs `enableServiceLinks: false`, else Kubernetes injects
+  `FLOCI_PORT=tcp://…` and its Quarkus config crashes.
 - A new **stateful emulator** (floci) to run; its KMS key must persist (PVC). Losing that
   volume mid-life would brick unseal — **moot on Kind** (`make down` wipes all → fresh
   bootstrap), documented.

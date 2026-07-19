@@ -50,6 +50,7 @@ settled decisions.
 | [ADR-021](ADR-021-cart-grpc-read-surface/) | Cart gains a read-only gRPC surface; writes stay on REST | Accepted | [RFC-0015](../rfc/RFC-0015/) |
 | [ADR-022](ADR-022-atomic-promo-redemption/) | Promo redemptions count atomically at confirm, before the attempt marker | Accepted | [RFC-0015](../rfc/RFC-0015/) |
 | [ADR-023](ADR-023-clickhouse-observability-olap/) | Adopt ClickHouse as supplementary OLAP for OTel logs+traces SQL (Altinity, PVC, 90d, alongside) | Accepted | [RFC-0019](../rfc/RFC-0019/) |
+| [ADR-024](ADR-024-floci-kms-emulator-auto-unseal/) | floci KMS-emulator `seal "awskms"` auto-unseal for OpenBAO on Kind + revoke root token (replaces Shamir CronJob) | Accepted | [RFC-0008](../rfc/RFC-0008/) |
 
 ---
 _Last updated: 2026-07-19_

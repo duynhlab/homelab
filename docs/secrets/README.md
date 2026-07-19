@@ -15,7 +15,7 @@ Secrets — they never call OpenBAO directly.
 | Secret store | OpenBAO HA, 3 Raft pods, PVC-backed | Same HA shape, production seal/TLS hardening |
 | App secret delivery | ESO reads OpenBAO KV v2 and writes Kubernetes Secrets | Same, plus dynamic DB credentials |
 | OpenBAO endpoint | Plain HTTP in-cluster (`tlsDisable: true`) | TLS via cert-manager |
-| OpenBAO unseal | Shamir key and root token kept in `openbao-init-keys`; unsealer CronJob replays the key | KMS or Transit auto-unseal; root token revoked after bootstrap |
+| OpenBAO unseal | `awskms` auto-unseal via the floci KMS emulator (pods self-unseal at boot); `openbao-init-keys` holds only a break-glass recovery key; root token revoked ([ADR-024](../proposals/adr/ADR-024-floci-kms-emulator-auto-unseal/)) | Real cloud KMS (swap floci `endpoint`) |
 | TLS issuer split | Local `kong-proxy-tls` is signed by `homelab-ca` | Prod `kong-proxy-tls` is Let's Encrypt via Cloudflare DNS-01 |
 | Trust distribution | trust-manager distributes `homelab-ca-bundle` to labeled namespaces | Same, with rotation runbooks |
 | Unsafe local choices | Dev placeholders, root token persistence, plaintext listener | Remove before production; tracked by RFC-0008 |
@@ -69,7 +69,7 @@ subgraph homelab["Homelab Secrets, TLS, and Trust Pipeline"]
     trusted(Trust-enabled Workloads):::service
 
     flux -->|"applies manifests"| bootstrap
-    bootstrap -->|"init, unseal, seed KV v2, policies"| bao
+    bootstrap -->|"init, seed KV v2, policies, revoke root"| bao
     bao -->|"Kubernetes auth + KV v2 reads"| css
     css -->|"store reference"| eso
     eso -->|"reconciles app secrets"| es
@@ -153,8 +153,9 @@ classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
 
 OpenBAO runs HA with Raft integrated storage (3 replicas, 10Gi PVC per node),
 Kubernetes auth for ESO (`eso-reader` role), KV v2 at path `secret/`, and
-best-effort stdout audit → Vector → VictoriaLogs. Local Kind uses Shamir seal
-(1-share); production target is KMS or Transit auto-unseal. See
+best-effort stdout audit → Vector → VictoriaLogs. Local Kind **auto-unseals** via the
+floci KMS emulator (`seal "awskms"`, RFC-0008 / ADR-024) — pods self-unseal at boot,
+root token revoked; production target is a real cloud KMS. See
 [OpenBAO Architecture](./openbao.md) for internals.
 
 ### Deployed Flow
@@ -162,7 +163,7 @@ best-effort stdout audit → Vector → VictoriaLogs. Local Kind uses Shamir sea
 | Step | Component | What happens |
 |---|---|---|
 | 1 | Flux | Applies OpenBAO, ESO, cert-manager, trust-manager, and their config Kustomizations in dependency order |
-| 2 | OpenBAO bootstrap | Initializes/unseals local OpenBAO, enables KV v2, Kubernetes auth, policies, and seeds local learning secrets |
+| 2 | OpenBAO bootstrap | Ensures the floci KMS alias, initializes OpenBAO (**awskms auto-unseal** — pods self-unseal), enables KV v2, Kubernetes auth, policies, seeds learning secrets, then **revokes the root token** |
 | 3 | ClusterSecretStore | Points ESO at `http://openbao.openbao.svc.cluster.local:8200` with Kubernetes auth role `eso-reader` |
 | 4 | ESO | Reads OpenBAO paths and materializes Kubernetes Secrets with `refreshInterval: 1h` |
 | 5 | cert-manager | Uses `cloudflare-api-token` only for prod Let's Encrypt DNS-01; local Kind patches `kong-proxy-tls` to `homelab-ca` |
@@ -312,7 +313,7 @@ kubectl get clustersecretstore
 | KV v2 static secrets | OpenBAO database secrets engine for dynamic PostgreSQL users |
 | Kubernetes auth for ESO | OIDC for humans and AppRole for CI/CD |
 | Best-effort audit to stdout | Durable, fail-closed audit storage |
-| Local Shamir unseal helper | KMS or Transit auto-unseal |
+| Local floci KMS emulator (`awskms` auto-unseal) | Real cloud KMS (swap `endpoint`) |
 | HTTP in-cluster OpenBAO listener | TLS listener and ESO `caBundle` |
 | Dev placeholder Cloudflare token on local | Operator-supplied production token outside Git |
 | PgDog/PgCat inline pooler passwords (dev-only) | Pooler `secretRef` or initContainer config rendering |

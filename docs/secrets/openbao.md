@@ -16,10 +16,10 @@
 > | Auth (ESO) | ✅ Kubernetes auth, least-privilege `eso-read` policy | + OIDC for humans |
 > | Audit | ⚠ `file → stdout` **best-effort** (enablement is not fail-closed; `auditStorage` off) | durable, fail-closed |
 > | **Database secrets engine / dynamic creds** | ❌ **not enabled** — §5.2, §6, §10, §14 describe the *planned* design | enable DB engine |
-> | Unseal | ❌ **Shamir key + root token in a K8s Secret** (`openbao-init-keys`), re-read by a 60s unsealer CronJob | KMS / Transit auto-unseal |
+> | Unseal | ⚠️ **awskms auto-unseal via the floci KMS emulator** (RFC-0008 / ADR-024) — pods self-unseal at boot; `openbao-init-keys` holds only a break-glass recovery key; **root token revoked**. floci is a loose, zero-auth emulator (parity/rehearsal, not real crypto) | Real cloud KMS (`awskms`/`gcpckms`, IRSA/Workload Identity) |
 > | TLS | ❌ disabled (`tlsDisable: true`; plaintext HTTP in-cluster) | TLS via cert-manager |
 > | Credentials | ❌ dev passwords **seeded from Git** (e.g. `*-K1nd-2026!`) | generated / dynamic, none in Git |
-> | Root token | ❌ persisted, **not revoked** after bootstrap | revoked; OIDC / AppRole |
+> | Root token | ✅ **revoked** after bootstrap (verified by exit code, node-pinned); inert copy left in `openbao-init-keys` (BusyBox `wget` can't PATCH it out). Break-glass **recovery key** remains = full admin via `generate-root`, so a Secret read is still high-value | revoked; OIDC / AppRole; recovery key sharded offline |
 >
 > **These local-only choices are unsafe for production.** The hardening path and a
 > local-vs-prod parity/testing matrix live in [RFC-0008](../proposals/rfc/RFC-0008/).
@@ -66,8 +66,9 @@ This diagram answers one question: **how a secret gets from OpenBAO into a
 workload, and how the HA store stays available.** Three Raft peers (PVC-backed)
 form the quorum behind the in-cluster service; External Secrets Operator (ESO)
 logs in with a Kubernetes service account, reads the KV engine, and materializes
-Kubernetes Secrets that pods consume. Dashed **(planned)** nodes and edges are
-designed but not yet deployed (dynamic DB creds, Transit auto-unseal, OIDC/AppRole,
+Kubernetes Secrets that pods consume. **Auto-unseal is deployed on Kind via the floci
+KMS emulator** (RFC-0008 / ADR-024) — pods self-unseal at boot. Dashed **(planned)**
+nodes/edges are designed but not yet deployed (dynamic DB creds, OIDC/AppRole, real
 cloud KMS); everything else is live on local Kind.
 
 ### High-Level Overview
@@ -91,7 +92,7 @@ flowchart TD
         subgraph engines["Secret engines"]
             kv["KV v2 · secret/<br/>static creds"]:::platform
             db["Database · database/<br/>dynamic PG creds (planned)"]:::planned
-            transit["Transit · transit/<br/>auto-unseal (planned)"]:::planned
+            transit["Transit · transit/<br/>(planned, unused)"]:::planned
         end
         subgraph authm["Auth methods"]
             k8sauth["kubernetes/<br/>ESO service accounts"]:::platform
@@ -100,8 +101,8 @@ flowchart TD
         end
     end
 
-    unsealer["openbao-unsealer CronJob<br/>replays Shamir key /60s (local)"]:::platform
-    kms["Cloud KMS auto-unseal<br/>(planned)"]:::planned
+    floci[("floci KMS emulator<br/>awskms auto-unseal (Kind)")]:::data
+    kms["Cloud KMS auto-unseal<br/>(planned, prod)"]:::planned
     k8ssecret[("Kubernetes Secret<br/>managed-by external-secrets")]:::data
     cnpg[("CNPG platform-db / product-db")]:::data
 
@@ -112,11 +113,11 @@ flowchart TD
     raft --- authm
     eso -->|"materialize"| k8ssecret
     k8ssecret --> pods
-    unsealer -->|"unseal"| svc
+    floci -->|"unwrap root key (awskms)"| raft
     operators -.->|"planned"| oidc
     cicd -.->|"planned"| approle
     db -.->|"dynamic creds (planned)"| cnpg
-    kms -.->|"auto-unseal (planned)"| raft
+    kms -.->|"replaces floci in prod (planned)"| raft
 
     subgraph legend["Legend"]
         lpf["platform / control plane"]:::platform
@@ -169,45 +170,92 @@ Unsealing is the process of decrypting the root key so OpenBAO can serve request
 
 ```mermaid
 flowchart LR
-    subgraph shamir["Shamir Seal (production ceremony)"]
-        sk["Unseal Key\nsplit into 5 shards\nthreshold: 3"]
-        op1["Operator 1\n(holds shard 1)"]
-        op2["Operator 2\n(holds shard 2)"]
-        op3["Operator 3\n(holds shard 3)"]
-        op1 & op2 & op3 -->|"bao operator unseal"| sk
-        sk --> bao_s["OpenBAO Unsealed"]
+    subgraph local["local Kind — DEPLOYED (RFC-0008 / ADR-024)"]
+        floci[("floci KMS emulator<br/>alias/openbao-unseal")]
+        floci -->|"awskms unwrap at boot"| baoL["OpenBAO self-unseals<br/>no Shamir key, no CronJob"]
     end
 
-    subgraph autounseal_kms["Auto-Unseal (EKS/GKE Production)"]
-        kms["AWS KMS / GCP KMS\n(key never leaves KMS)"]
-        env["IRSA / Workload Identity\n(no static credentials)"]
-        kms --> env --> bao_a["OpenBAO Auto-Unseals\non pod start"]
+    subgraph prod["Auto-Unseal (EKS/GKE) — planned"]
+        kms["AWS KMS / GCP KMS<br/>(key never leaves KMS)"]
+        env["IRSA / Workload Identity<br/>(no static credentials)"]
+        kms --> env --> baoP["OpenBAO self-unseals<br/>on pod start"]
     end
 
-    subgraph autounseal_local["Automated Unseal (local Kind)"]
-        unseal_secret["Shamir key: 1 share, threshold 1\nin K8s Secret openbao-init-keys"]
-        unsealer_cron["openbao-unsealer CronJob\n(runs every minute)"]
-        unseal_secret --> unsealer_cron --> bao_t["HA Cluster re-unsealed\nafter any restart"]
+    subgraph shamir["Shamir + generate-root (break-glass) — historical default"]
+        sk["Recovery key (1 share)<br/>in openbao-init-keys"]
+        ops["Operator quorum"]
+        ops -->|"generate-root / unseal"| sk --> baoS["OpenBAO unsealed"]
     end
+
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+    class floci,baoL data;
+    class kms,env,baoP planned;
 ```
 
-### Unseal Key Management (Init Ceremony)
+> On this platform OpenBAO no longer uses the Shamir + unsealer-CronJob path: pods
+> **self-unseal at boot** via `seal "awskms"` pointed at the floci emulator
+> (`alias/openbao-unseal`). Shamir survives only as the **recovery-key break-glass**
+> (`bao operator generate-root`). Production swaps floci's `endpoint` for a real cloud KMS.
 
-On first initialization, unseal keys should be split with PGP to prevent any single operator knowing the full key:
+### Init Ceremony (auto-unseal → recovery keys)
+
+With auto-unseal, `operator init` issues **recovery keys** (break-glass) instead of
+Shamir unseal keys — the KMS wraps/unwraps the root key, so nodes self-unseal at boot.
+Recovery keys are still split with PGP so no single operator holds the full key:
 
 ```bash
-# Production ceremony: 5 shares, threshold 3, each encrypted to a different operator's PGP key
+# Production: KMS auto-unseal, recovery key split across operators' PGP keys
 bao operator init \
-  -key-shares=5 \
-  -key-threshold=3 \
+  -recovery-shares=5 \
+  -recovery-threshold=3 \
   -pgp-keys="keybase:devops1,keybase:devops2,keybase:devops3,keybase:devops4,keybase:devops5" \
   -root-token-pgp-key="keybase:devops-lead"
 
-# Local Kind (learning): 1 share, 1 threshold, store in 1Password
-bao operator init -key-shares=1 -key-threshold=1
+# Local Kind (this platform, floci awskms): single recovery key, stored in openbao-init-keys
+bao operator init -recovery-shares=1 -recovery-threshold=1
 ```
 
-> **Critical**: After bootstrap is complete, revoke the root token. Operators use OIDC for day-to-day access.
+> **Deployed here (RFC-0008 / ADR-024):** the bootstrap Job runs the local form above,
+> configures OpenBAO, then **revokes the root token** (its copy in `openbao-init-keys`
+> becomes inert). Day-2 admin uses `bao operator generate-root` from the recovery key.
+
+### How the floci KMS alias is provisioned (and two gotchas)
+
+`seal "awskms"` resolves `alias/openbao-unseal` via `DescribeKey` **at OpenBAO server
+startup** — so the alias must already exist in floci, or every OpenBAO pod crashes with
+`Error configuring seal "awskms": Alias not found`. Two non-obvious consequences:
+
+1. **Chicken-and-egg → a Job in OpenBAO's own Flux wave.** The alias **cannot** be
+   created by the `openbao-bootstrap` Job's main script, because that first waits for
+   OpenBAO `:8200` — which never comes up without the alias. A dedicated **`floci-kms-init`
+   Job** (`kubernetes/infra/controllers/secrets/floci/floci-kms-init.yaml`) creates the
+   KMS key + alias, talking **only to floci** (unsigned AWS-JSON over `wget`; floci is
+   zero-auth). **Its placement is load-bearing:** it lives in the `floci` overlay of the
+   **`controllers-local`** wave, next to the floci Deployment and the OpenBAO HelmRelease.
+   If it instead lived in `secrets-local` (which `dependsOn: controllers-local`,
+   `wait: true`) it could only run *after* the OpenBAO HR is Ready — which never happens
+   without the alias → a hard deadlock on a clean boot. Co-located, the Job creates the
+   alias (~10s once floci is up) while OpenBAO crash-retries, so both converge in one
+   wave (on a clean `make down && make up`, OpenBAO then boots with **0 restarts**).
+   `controllers-local` `wait: true` is satisfied meanwhile because OpenBAO's readiness
+   probe is deliberately permissive (`sealedcode=200&uninitcode=200` → a running-but-sealed
+   pod counts Ready).
+2. **`enableServiceLinks: false` on floci.** The floci pod carries this because
+   Kubernetes otherwise injects a `FLOCI_PORT=tcp://<clusterIP>:4566` service-link env
+   (from the same-named Service) that floci's Quarkus config reads as its port and
+   crashes ("expected an integer, got tcp://…").
+
+```mermaid
+sequenceDiagram
+    participant J as floci-kms-init Job
+    participant F as floci (KMS)
+    participant B as OpenBAO pods
+    J->>F: CreateKey + CreateAlias(alias/openbao-unseal)
+    Note over B: same wave — crash-retries only if it starts before the alias
+    B->>F: seal awskms — DescribeKey(alias/openbao-unseal)
+    F-->>B: key info → unwrap root key → self-unseal
+```
 
 ---
 

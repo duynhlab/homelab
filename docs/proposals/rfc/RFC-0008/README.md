@@ -6,15 +6,16 @@
 
 > **Research:** [`./research.md`](./research.md) — plain-language deep dive behind this
 > RFC (auto-unseal spine), including a **local PoC** proving `seal "awskms"` auto-unseal
-> is exercisable on Kind via a KMS emulator. A parity-matrix update from that finding is
-> pending owner sign-off at the research review gate.
+> is exercisable on Kind via a KMS emulator (floci) / SoftHSM. That finding is folded
+> into the parity matrix below (auto-unseal control flow is now **rehearsable on Kind**).
 
 ## Summary
 
 The platform's secrets stack (OpenBAO HA + External Secrets Operator) runs on a
 local Kind cluster with deliberate **dev-grade compromises** that are unsafe for
-production *and* cannot be exercised on Kind (no cloud KMS, no real IdP, no public
-TLS). This RFC defines the **production hardening target** — auto-unseal, TLS,
+production *and* not fully exercisable on Kind (no real cloud KMS, IdP, or public
+TLS — though the auto-unseal control flow **can** be rehearsed with a KMS emulator).
+This RFC defines the **production hardening target** — auto-unseal, TLS,
 dynamic / non-committed credentials, OIDC, fail-closed durable audit, root-token
 revocation — and, just as importantly, a **local-vs-prod parity & testing matrix**
 that states exactly *what Kind can validate* versus *what needs a cloud/staging
@@ -131,9 +132,11 @@ flowchart LR
 - **Operator can confirm it's in use** — `bao status` shows `Seal Type: awskms`;
   `bao audit list` shows an enabled device; the ESO `ClusterSecretStore` URL is
   `https://`; `bao token lookup` on the old root token fails (revoked).
-- **Drawbacks** — requires a cloud KMS + a real cluster to exercise; more bootstrap
-  ceremony (PGP/KMS init). This is inherent to production secrets and is exactly why
-  it can't be validated on Kind.
+- **Drawbacks** — real production needs a cloud KMS + real cluster (IAM/Workload
+  Identity binding, KMS crypto/durability) and more bootstrap ceremony (PGP/KMS init).
+  The auto-unseal *control flow* can be rehearsed on Kind with a KMS emulator (floci) /
+  SoftHSM ([research PoC](./research.md#worked-examples)); only the cloud-bound guarantees
+  stay staging-only.
 
 ### Local-vs-prod parity & testing matrix
 
@@ -142,7 +145,7 @@ flowchart LR
 | HA / Raft storage | ✅ 3-node, PVC | same | ✅ quorum + restart-survival |
 | ESO sync + k8s auth + least-priv policy | ✅ | same | ✅ app gets secret; out-of-scope path denied |
 | KV v2 static secrets | ✅ | replaced by dynamic | ✅ mechanics |
-| **Auto-unseal** | ❌ Shamir key in Secret + 60s CronJob | KMS/Transit | ❌ needs cloud KMS (optionally emulate w/ a transit-unseal OpenBAO) |
+| **Auto-unseal** | ❌ Shamir key in Secret + 60s CronJob | KMS/HSM/Transit | ⚠ control flow **rehearsable on Kind** via KMS-emulator (floci) / SoftHSM ([PoC](./research.md#worked-examples)); real KMS crypto + IAM/durability cloud-only |
 | **TLS** | ❌ disabled | cert-manager TLS + caBundle | ⚠ self-signed mechanics only; not the prod cert path |
 | **Dynamic DB creds** | ❌ not enabled; `cart`/`order` hardcoded | DB engine, per-pod TTL | ⚠ engine mechanics testable vs local PG; not cloud IAM |
 | **OIDC team access** | ❌ none | OIDC | ❌ needs a real IdP |
@@ -153,8 +156,9 @@ flowchart LR
 **Testing tiers:**
 
 - **Kind (local) — functional smoke:** ESO sync, policy scoping, an app receiving
-  its secret, HA restart/unseal, generated-creds + DB-engine *mechanics* (optionally
-  a transit-unseal OpenBAO to rehearse auto-unseal).
+  its secret, HA restart/unseal, generated-creds + DB-engine *mechanics*, and the
+  **auto-unseal control flow** via a KMS-emulator (floci) / SoftHSM — PoC-proven
+  (init self-unseals, restarts self-unseal), see [research](./research.md#worked-examples).
 - **Staging / cloud (EKS/GKE) — the production path:** KMS auto-unseal, real TLS,
   dynamic creds against cloud IAM, OIDC login, and fail-closed + durable audit. These
   **cannot** be signed off on Kind.

@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | infra | 2026-06-29 | 2026-07-19 |
+| implementable | infra | 2026-06-29 | 2026-07-19 |
 
 > **Research:** [`./research.md`](./research.md) — plain-language deep dive behind this
 > RFC (auto-unseal spine), including a **local PoC** proving `seal "awskms"` auto-unseal
@@ -46,7 +46,11 @@ for "it's production-ready."
 
 - Applying the production manifests now — there is no cloud cluster to validate them
   against (that is the whole point of the parity matrix). This RFC is proposal-only.
-- Changing local Kind behaviour — it stays dev-grade for fast iteration.
+- Changing local Kind behaviour **beyond accepted hardening slices** — outside a
+  ratified slice (e.g. [ADR-024](../../adr/ADR-024-floci-kms-emulator-auto-unseal/):
+  floci `awskms` auto-unseal + revoke root token), local stays dev-grade for fast
+  iteration. Slices that are cloud-independent (rehearsable via emulator/HSM) may be
+  adopted on Kind; cloud-bound items (real KMS/IAM, OIDC, public TLS) stay proposal-only.
 - Secret-scanning / pre-commit tooling and git-history purge of already-leaked dev
   creds — related, tracked separately (see Related).
 
@@ -195,6 +199,10 @@ The parity matrix + testing tiers above are the verification plan. Each overlay 
 ## Implementation History
 
 - 2026-06-29 — `provisional`. Proposal only; no manifests applied.
+- 2026-07-19 — `implementable`. **Slice 1** in progress ([ADR-024](../../adr/ADR-024-floci-kms-emulator-auto-unseal/)):
+  floci `seal "awskms"` auto-unseal + revoke root token on Kind — removes the Shamir
+  unseal key from `openbao-init-keys` and deletes the unsealer CronJob. Cloud-bound
+  items (real KMS/IAM, OIDC, public TLS) remain proposal-only.
 
 ## Related
 

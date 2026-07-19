@@ -670,7 +670,6 @@ Order: non-critical first → infra backup creds → DB credentials
 - [ ] Remove `ClusterSecretStore: vault-dev`
 - [ ] Delete Vault HelmRelease from Flux
 - [ ] Remove `hashicorp` HelmRepository
-- [ ] Update `docs/secrets/secrets-management.md`
 - [ ] Archive vault bootstrap ConfigMap
 
 ---

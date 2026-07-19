@@ -358,7 +358,7 @@ Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram w
 | [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md) | Persistence host |
 | [`docs/security/network-policies.md`](../../../security/network-policies.md) | `:6432` → ns `platform` |
 | [`docs/secrets/openbao.md`](../../../secrets/openbao.md) | Path diagram |
-| [`docs/secrets/secrets-management.md`](../../../secrets/secrets-management.md) | Secret names |
+| [`docs/secrets/README.md`](../../../secrets/README.md#kubernetes-secret-catalog) | Secret names |
 | [`docs/observability/metrics/postgresql/README.md`](../../../observability/metrics/postgresql/README.md) | Inventory |
 | [`docs/observability/alerting/alert-catalog.md`](../../../observability/alerting/alert-catalog.md) | Rule ownership |
 | [`docs/observability/alerting/README.md`](../../../observability/alerting/README.md) | Index sync |

@@ -139,9 +139,8 @@ docs/
 ├── secrets/                      # Secrets, TLS & trust distribution (one chain)
 │   ├── README.md                 # Homelab secrets/TLS/trust hub
 │   ├── openbao.md                # OpenBAO HA/Raft architecture and learning notes
-│   ├── runbooks/                 # OpenBAO/ESO recovery procedures
+│   ├── runbooks/                 # Add, rotate, bootstrap, troubleshoot secrets
 │   ├── production-hardening.md   # Planned production target and guardrails
-│   ├── secrets-management.md     # Per-app ESO usage, add/rotate runbooks
 │   ├── cert-manager.md           # cert-manager + Let's Encrypt + Flux (Helm, Ingress, TLS)
 │   └── trust-distribution.md     # trust-manager Bundle (homelab-ca-bundle), dual-PKI
 │                                 # (production hardening → docs/proposals/rfc/RFC-0008/)
@@ -426,8 +425,7 @@ docs/
 
 ### Secrets
 
-- [Secrets Management](./secrets/secrets-management.md) - OpenBAO + ESO guide for centralized secret management
-- [Secrets hub](./secrets/README.md) - Homelab-wide OpenBAO → ESO → cert-manager → trust-manager flow
+- [Secrets hub](./secrets/README.md) - Homelab-wide OpenBAO → ESO → cert-manager → trust-manager flow, secret catalog, and runbook index
 - [OpenBAO Architecture](./secrets/openbao.md) - OpenBAO HA/Raft internals, auth, engines, policies
 - [Secrets runbooks](./secrets/runbooks/) - OpenBAO/ESO troubleshooting and recovery
 - [Secrets Production Hardening](./secrets/production-hardening.md) - Planned TLS, KMS/Transit, OIDC, AppRole, and dynamic DB credentials

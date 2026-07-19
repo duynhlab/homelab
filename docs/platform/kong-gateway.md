@@ -795,7 +795,7 @@ kubectl get certificate -A
 - Certificate `kong-proxy-tls` in `kong` namespace is `Ready: True`; `Issuer: homelab-ca` on local Kind (`letsencrypt-prod` on prod)
 - `Secret/cloudflare-api-token` present in `cert-manager` namespace (synced by ESO)
 
-On **prod**, if `letsencrypt-*` issuers are NotReady with `secret "cloudflare-api-token" not found`, the token has not been seeded into OpenBAO yet. Operator runbook: [`docs/secrets/secrets-management.md` § Bootstrap-only secrets](../secrets/secrets-management.md#bootstrap-only-secrets). On **local Kind** `kong-proxy-tls` is issued by `homelab-ca` (not the LE issuers), so this is not a local bring-up blocker.
+On **prod**, if `letsencrypt-*` issuers are NotReady with `secret "cloudflare-api-token" not found`, the token has not been seeded into OpenBAO yet. Operator runbook: [OpenBAO initial setup § Step 7](../secrets/runbooks/openbao-initial-setup.md#step-7--seed-bootstrap-only-cloudflare-token-operator). On **local Kind** `kong-proxy-tls` is issued by `homelab-ca` (not the LE issuers), so this is not a local bring-up blocker.
 
 ### Step 6: Check Ingress Resources
 

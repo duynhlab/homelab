@@ -56,6 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `platform-db-rw.platform.svc.cluster.local:5432`.
 - Hub docs and infra READMEs updated for **3 CNPG clusters / 2 PgDog poolers**
   ([RFC-0018](docs/proposals/rfc/RFC-0018/)).
+- **Secrets docs**: merged retired `docs/secrets/secrets-management.md` into
+  [`docs/secrets/README.md`](docs/secrets/README.md) (hub + secret catalog); moved
+  add/rotate procedures to [`docs/secrets/runbooks/`](docs/secrets/runbooks/) (`add-eso-secret.md`,
+  expanded `rotate-static-secret.md`); scrubbed inbound links across the repo.
 
 ### Removed
 

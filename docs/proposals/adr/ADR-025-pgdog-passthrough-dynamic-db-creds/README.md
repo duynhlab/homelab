@@ -104,8 +104,9 @@ database-per-service world.
 **no `GRANT`/`REVOKE`** anywhere — privileges come purely from ownership; `PUBLIC CONNECT`
 is not revoked (ADR-015 deliberately relies on pg_hba, not grants).
 
-**Reference target: tiered roles.** The industry-standard hardening is to split *who owns*
-from *who logs in*, and to separate read/write from read-only:
+**Decided target (planned): tiered roles.** This is the **committed direction** for the
+platform's role model (implementation is a future slice, not yet built). Split *who owns*
+from *who logs in*, and separate read/write from read-only:
 
 ```mermaid
 flowchart TD
@@ -244,12 +245,25 @@ tracks a rotated password without a static list at all.
   (`DB_USER`/`DB_PASSWORD`), read **once at pod start**; `pkg/dbx.NewPool(dsn)` parses the
   DSN once and has **no reload**. So today a rotated Secret only takes effect on **pod
   restart**.
-- **Seamless path (planned):** deliver creds as a **file mount** (Secret as a volume) and
-  give `pkg/dbx` a `pgxpool.Config.BeforeConnect` hook that reads the current
-  user/password from the file **per new connection**. Existing connections drain at
-  `server_lifetime`; new ones pick up the rotated cred — no restart. Set ESO
-  `refreshInterval` **< TTL/rotation_period** so a fresh cred exists before the old expires
-  (overlap window).
+- **Reload — DECIDED: pattern A (`BeforeConnect`).** Deliver creds as a **directory** file
+  mount (never `subPath`, never env — neither refreshes) and give `pkg/dbx` a
+  `pgxpool.Config.BeforeConnect` hook that reads the current password from the file **per
+  new connection**. Bound `MaxConnLifetime` (~30m + jitter) so every connection recycles
+  onto the rotated password, and keep `MinConns` warm to ride the kubelet's **~2-min**
+  mount-refresh window (`ALTER ROLE … PASSWORD` has **no overlap**, so a new connection in
+  that window would otherwise fail). This is the pgx-native, production-proven path — the
+  same hook RDS-IAM token rotation uses.
+- **Rejected for pgx: pattern B (double-buffered pool swap).** A watcher builds a second
+  pool, pings it, atomically swaps, and drains the old one. Driver-agnostic and validates
+  before cutover, but on pgx it adds a watcher lifecycle, drain races, and **doubles open
+  connections during the swap** — which can exhaust the pooler / `max_connections` exactly
+  at rotation. Keep it only for `database/sql` / non-hook drivers.
+- **Further target: cert-auth (no password at all).** CNPG 1.30's
+  `DatabaseRole.clientCertificate` auto-issues and renews a TLS client cert; the app
+  authenticates via `cert` (mTLS) — nothing to rotate, and no file-reload gap because certs
+  **overlap** on renewal. Requires TLS end-to-end (`hostssl … cert` in pg_hba; today is
+  scram-sha-256 and partly non-TLS) and is cleanest **direct-to-PG** (a pooler in the middle
+  needs care), so it lands **after TLS is enabled**.
 - **Who rotates what:** only **LOGIN** roles rotate (§3). App/group and read-only roles are
   NOLOGIN and never hold a password.
 
@@ -308,14 +322,16 @@ read-only role + TTL + audit) are rehearsable but OIDC itself is production-only
    only.
 2. **App service accounts → static, rotated login roles** (OpenBAO `database/static-roles`,
    fixed username, ~30–60d). **Humans/jobs → dynamic** short-TTL roles. (§4)
-3. **Role model target = tiered** (NOLOGIN app/group owns objects ← rotated LOGIN member +
-   read-only role), least-privilege per service. **Planned** — as-built is flat
-   single-login; needs a grant-management mechanism (§3).
+3. **Role model = tiered — DECIDED target** (NOLOGIN app/group owns objects ← rotated LOGIN
+   member + read-only role), least-privilege per service. **Planned to build** — as-built
+   is flat single-login; needs a grant-management mechanism (§3).
 4. **Pooler auth follows [ADR-026]:** product-db PgDog (passthrough for rotating users, no
    auth_query); platform-db PgBouncer (auth_query). Fixed usernames keep pooling to one
    pool per (user, db). (§5)
-5. **Seamless rotation is planned** via file-mounted creds + `pkg/dbx` `BeforeConnect` +
-   ESO `refreshInterval` < rotation period. (§6)
+5. **Reload — DECIDED: pattern A (`pkg/dbx` `BeforeConnect`)** on a directory file-mount +
+   bounded `MaxConnLifetime`; pattern B (double-buffer swap) rejected for pgx. **Further
+   target: cert-auth** (CNPG 1.30 `clientCertificate`) once TLS is enabled — removes
+   password rotation and the reload gap entirely. (§6)
 
 ## Alternatives considered
 
@@ -325,6 +341,9 @@ read-only role + TTL + audit) are rehearsable but OIDC itself is production-only
   weaker default isolation and rewrites ADR-015. Rejected. (§2)
 - **PgDog `server_auth = "vault"`** — exists but undocumented/untested and static-role-only
   (skipped for passthrough); not a dynamic path. (§5)
+- **Double-buffered pool swap (pattern B) for reload** — validates before cutover, but on
+  pgx it doubles open connections during the swap and adds drain/watcher complexity; kept
+  only for `database/sql`. Rejected in favor of `BeforeConnect`. (§6)
 - **Keep static-in-Secret forever** — status quo; no rotation. Rejected (the finding).
 
 ## Consequences
@@ -336,7 +355,8 @@ a documented comparison so future architecture changes are informed.
 **Accept:** the tiered role model, static-role rotation, seamless reconnection
 (`pkg/dbx` change), and human OIDC access are **planned**, not deployed; each is a distinct
 follow-up slice. Grants/tiers add a management mechanism the platform has so far avoided.
-Two poolers now differ (PgDog vs PgBouncer). Production passthrough requires TLS.
+Two poolers now differ (PgDog vs PgBouncer). Production passthrough requires TLS, and the
+cert-auth target requires TLS end-to-end before it can replace password rotation.
 
 ## Related
 

@@ -134,7 +134,8 @@ flowchart TD
 - **Read-only role** (`payment-readonly`, NOLOGIN) holds `SELECT` only; a `reporting-login`
   is a member. Analytics/BI get read access without write.
 - **DBA role** (`platform-dba`, LOGIN) — elevated, rotated by a stricter policy.
-- **Pooler auth role** — CNPG's `cnpg_pooler_pgbouncer` (auto-managed, cert-auth), used by
+- **Pooler auth role** — CNPG's `cnpg_pooler_pgbouncer` (auto-managed, authenticates by a
+  client certificate the operator provisions), used by
   PgBouncer's `auth_query` (§5); rarely rotated.
 
 ### Naming convention (reference — reconciled to as-built)
@@ -258,12 +259,6 @@ tracks a rotated password without a static list at all.
   before cutover, but on pgx it adds a watcher lifecycle, drain races, and **doubles open
   connections during the swap** — which can exhaust the pooler / `max_connections` exactly
   at rotation. Keep it only for `database/sql` / non-hook drivers.
-- **Further target: cert-auth (no password at all).** CNPG 1.30's
-  `DatabaseRole.clientCertificate` auto-issues and renews a TLS client cert; the app
-  authenticates via `cert` (mTLS) — nothing to rotate, and no file-reload gap because certs
-  **overlap** on renewal. Requires TLS end-to-end (`hostssl … cert` in pg_hba; today is
-  scram-sha-256 and partly non-TLS) and is cleanest **direct-to-PG** (a pooler in the middle
-  needs care), so it lands **after TLS is enabled**.
 - **Who rotates what:** only **LOGIN** roles rotate (§3). App/group and read-only roles are
   NOLOGIN and never hold a password.
 
@@ -329,9 +324,7 @@ read-only role + TTL + audit) are rehearsable but OIDC itself is production-only
    auth_query); platform-db PgBouncer (auth_query). Fixed usernames keep pooling to one
    pool per (user, db). (§5)
 5. **Reload — DECIDED: pattern A (`pkg/dbx` `BeforeConnect`)** on a directory file-mount +
-   bounded `MaxConnLifetime`; pattern B (double-buffer swap) rejected for pgx. **Further
-   target: cert-auth** (CNPG 1.30 `clientCertificate`) once TLS is enabled — removes
-   password rotation and the reload gap entirely. (§6)
+   bounded `MaxConnLifetime`; pattern B (double-buffer swap) rejected for pgx. (§6)
 
 ## Alternatives considered
 
@@ -355,8 +348,7 @@ a documented comparison so future architecture changes are informed.
 **Accept:** the tiered role model, static-role rotation, seamless reconnection
 (`pkg/dbx` change), and human OIDC access are **planned**, not deployed; each is a distinct
 follow-up slice. Grants/tiers add a management mechanism the platform has so far avoided.
-Two poolers now differ (PgDog vs PgBouncer). Production passthrough requires TLS, and the
-cert-auth target requires TLS end-to-end before it can replace password rotation.
+Two poolers now differ (PgDog vs PgBouncer). Production passthrough requires TLS.
 
 ## Related
 

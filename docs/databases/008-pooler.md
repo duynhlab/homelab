@@ -1,6 +1,10 @@
 # Connection Poolers Deep Dive
 
-This document provides a detailed analysis of the connection pooling strategies used in the platform, including architecture, trade-offs, and configuration details for **PgBouncer**, **PgCat**, and **PgDog**. **PgDog is the only pooler deployed** — two standalone Helm releases: `pgdog-platform` (fronts `platform-db`, pooling **auth**, **user**, **notification**, **shipping**, **review** — Temporal connects direct past it), and `pgdog-product` (`product-db`, pooling **product**, **cart**, **order** — the payment *app* connects direct over TLS, bypassing the pooler). **PgBouncer** (the former Zalando sidecar) and **PgCat** are documented here for **comparison only** — neither is deployed after the Zalando→CloudNativePG migration and RFC-0018 consolidation.
+This document provides a detailed analysis of the connection pooling strategies used in the platform, including architecture, trade-offs, and configuration details for **PgBouncer**, **PgCat**, and **PgDog**. **Two poolers are deployed, one per cluster (ADR-026 pilot):**
+- **`product-db` → PgDog** (Helm release `pgdog-product`, pooling **product**, **cart**, **order**, **checkout** — the payment *app* connects direct over TLS, bypassing the pooler). Read/write split + replica load-balancing.
+- **`platform-db` → CNPG-native PgBouncer** (`Pooler` `platform-db-pooler-rw`, `type: rw`, pooling **auth**, **user**, **notification**, **shipping**, **review** — Temporal connects direct past it). Operator-managed `auth_query` auth; single `rw` endpoint (no read-split in the pilot). Port **5432** (not PgDog's 6432).
+
+**PgCat** is documented here for **comparison only** — not deployed. PgBouncer, formerly the Zalando sidecar and then "comparison only" after the Zalando→CloudNativePG migration, is **now deployed on platform-db** via the CNPG-native `Pooler` (see [ADR-026](../proposals/adr/ADR-026-platform-db-pgbouncer-pilot/)).
 
 ## 1. Why Connection Pooling?
 

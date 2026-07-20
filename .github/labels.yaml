@@ -1,0 +1,112 @@
+# Declarative GitHub label configuration for duynhlab/homelab.
+# Synced by .github/workflows/sync-labels.yml via EndBug/label-sync.
+# Ref: https://github.com/EndBug/label-sync#Config-files
+#
+# Usage: attach one primary area/* label per issue/PR (optional area/docs when
+# the change also updates documentation).
+
+# --- Triage / workflow ---
+
+- name: bug
+  description: Something isn't working
+  color: '#e60000'
+- name: enhancement
+  description: New feature or request
+  color: '#80e27e'
+- name: documentation
+  description: Improvements or additions to documentation
+  color: '#0075ca'
+- name: question
+  description: Further information is requested
+  color: '#c95dd4'
+- name: help wanted
+  description: Extra attention is needed
+  color: '#00b894'
+- name: good first issue
+  description: Good for newcomers
+  color: '#40a4ff'
+- name: duplicate
+  description: This issue or pull request already exists
+  color: '#a0a0a0'
+- name: invalid
+  description: This doesn't seem right
+  color: '#cccccc'
+- name: wontfix
+  description: This will not be worked on
+  color: '#888888'
+- name: dependencies
+  description: Pull requests that update a dependency
+  color: '#005cbf'
+- name: github-actions
+  description: Pull requests that update GitHub Actions workflows
+  color: '#A3E89A'
+- name: hold
+  description: Issues and pull requests put on hold
+  color: '#ff0000'
+- name: blocked/upstream
+  description: Blocked by an upstream dependency or issue
+  color: '#ff5700'
+- name: blocked/requires-rfc
+  description: Requires a design proposal
+  color: '#ff8c00'
+- name: umbrella-issue
+  description: Umbrella issue for tracking progress of a larger effort
+  color: '#c45dac'
+
+# --- Area (homelab) ---
+
+- name: area/gitops
+  description: Flux Operator, FluxInstance, and cluster Kustomization chain
+  color: '#86efc9'
+- name: area/git
+  description: GitRepository and Git-based source configuration
+  color: '#863faf'
+- name: area/oci
+  description: OCI artifact registry and OCI-based sources
+  color: '#c739ff'
+- name: area/kustomization
+  description: Kustomize overlays and Kustomization resources
+  color: '#00e54d'
+- name: area/helm
+  description: HelmRelease and Helm chart configuration
+  color: '#1673b6'
+- name: area/apps
+  description: Application delivery — ResourceSet, InputProviders, service manifests
+  color: '#06b6d4'
+- name: area/platform
+  description: Platform docs and infra — Kong, Kyverno, setup, application delivery
+  color: '#7c3aed'
+- name: area/terraform
+  description: OpenTofu bootstrap and Terraform modules
+  color: '#7B42BC'
+- name: area/local-stack
+  description: Docker Compose local-stack and e2e audit
+  color: '#64748b'
+- name: area/databases
+  description: CloudNativePG, PgDog, database manifests and runbooks
+  color: '#22c55e'
+- name: area/secrets
+  description: OpenBAO, External Secrets Operator, and secret bootstrap
+  color: '#f59e0b'
+- name: area/security
+  description: Kyverno policies, NetworkPolicy, and security docs
+  color: '#e54d16'
+- name: area/observability
+  description: Traces, logs, profiles, SLO, and cross-signal observability
+  color: '#0c8599'
+- name: area/monitoring
+  description: Metrics, VictoriaMetrics, Grafana dashboards, and alerting rules
+  color: '#dd75ae'
+- name: area/docs
+  description: Documentation related issues and pull requests
+  color: '#0075ca'
+- name: area/ci
+  description: CI workflows, scripts, and validation tooling
+  color: '#f7cc45'
+- name: area/rfc
+  description: Feature request proposals in the RFC format
+  color: '#D621C3'
+  aliases: ['area/RFC']
+- name: area/adr
+  description: Architecture Decision Records
+  color: '#9c36b5'

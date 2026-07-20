@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **GitHub labels** (`.github/labels.yaml` + `sync-labels` workflow): declarative triage and `area/*` labels for homelab domains; `delete-other-labels: false` preserves bot-managed labels.
 - **ClickHouse OLAP for OTel logs+traces** (RFC-0019 Phase B / [ADR-023](docs/proposals/adr/ADR-023-clickhouse-observability-olap/)): Altinity operator `0.27.1` + `ClickHouseInstallation` (1×1, PVC `standard`, TTL 90d) in ns `monitoring`; OTel Collector `clickhouse` exporter fanned out on the traces+logs pipelines (`create_schema`, `sending_queue`+retry); `clickhouse-credentials` `ClusterExternalSecret` (OpenBAO); Grafana `grafana-clickhouse-datasource` + datasource. Metrics stay on VictoriaMetrics; no app code change.
 - **ClickHouse in local-stack**: `clickhouse` compose service + collector exporter + Grafana plugin/datasource; e2e audit check **C6** (SQL count over `otel_traces`/`otel_logs`).
 - **Grafana dashboard** *ClickHouse — OTel logs+traces SQL* (RED/golden-signals, 19 panels): local-stack (file) + cluster (`configMapGenerator` → `GrafanaDashboard`).

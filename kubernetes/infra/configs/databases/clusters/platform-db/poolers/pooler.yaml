@@ -1,0 +1,40 @@
+# CNPG-native PgBouncer Pooler for platform-db (ADR-026 pilot).
+#
+# Replaces the PgDog HelmRelease for platform-db only (product-db stays on PgDog).
+# CloudNativePG provisions PgBouncer auth automatically: it creates the
+# `cnpg_pooler_pgbouncer` role + a `user_search` lookup function and authenticates
+# the pooler to the cluster with a TLS client certificate (auth_query). Apps keep
+# their existing ESO-delivered username/password — PgBouncer validates them via
+# auth_query against pg_shadow, so there is no static user/password list here.
+#
+# Service: platform-db-pooler-rw.platform.svc.cluster.local:5432 (PgBouncer default
+# port 5432 — note this differs from PgDog's 6432; consumers are repointed).
+# Trade-off vs PgDog: a single type: rw pooler sends all traffic to the primary
+# (no read/write split / replica load-balancing). Acceptable for this pilot.
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: platform-db-pooler-rw
+  namespace: platform
+spec:
+  cluster:
+    name: platform-db
+  instances: 2
+  type: rw
+  pgbouncer:
+    poolMode: transaction
+    parameters:
+      max_client_conn: "1000"
+      default_pool_size: "30"
+  monitoring:
+    enablePodMonitor: true
+  template:
+    spec:
+      containers:
+        - name: pgbouncer
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 128Mi

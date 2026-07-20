@@ -51,7 +51,7 @@ settled decisions.
 | [ADR-022](ADR-022-atomic-promo-redemption/) | Promo redemptions count atomically at confirm, before the attempt marker | Accepted | [RFC-0015](../rfc/RFC-0015/) |
 | [ADR-023](ADR-023-clickhouse-observability-olap/) | Adopt ClickHouse as supplementary OLAP for OTel logs+traces SQL (Altinity, PVC, 90d, alongside) | Accepted | [RFC-0019](../rfc/RFC-0019/) |
 | [ADR-024](ADR-024-floci-kms-emulator-auto-unseal/) | floci KMS-emulator `seal "awskms"` auto-unseal for OpenBAO on Kind + revoke root token (replaces Shamir CronJob) | Accepted | [RFC-0008](../rfc/RFC-0008/) |
-| [ADR-025](ADR-025-pgdog-passthrough-dynamic-db-creds/) | PgDog `passthrough_auth` + upgrade to unblock OpenBAO dynamic DB users through the pooler (pooler groundwork) | Proposed | [RFC-0008](../rfc/RFC-0008/) |
+| [ADR-025](ADR-025-pgdog-passthrough-dynamic-db-creds/) | PostgreSQL credential delivery & role model — isolation (db- vs schema-per-service), role tiering, static/rotated/dynamic spectrum, pooler auth modes (incl. PgDog passthrough PoC) | Proposed | [RFC-0008](../rfc/RFC-0008/), [RFC-0012](../rfc/RFC-0012/) |
 | [ADR-026](ADR-026-platform-db-pgbouncer-pilot/) | Pilot CNPG-native PgBouncer pooler on platform-db (product-db stays PgDog); operator-managed auth_query | Proposed | [RFC-0012](../rfc/RFC-0012/) |
 
 ---

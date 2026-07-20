@@ -75,9 +75,10 @@ drives the `OrderFulfillmentWorkflow` across auth → user → product → cart 
 Run this audit on the full stack **before pushing any change that touches a
 service repo, `pkg`, the Kong/gateway config, `compose.yaml`, or the SPA**.
 It has three phases: API-contract checks with `curl` (A), a real-browser pass
-driven by the `agent-browser` CLI (B — available locally as a Claude skill at
-`~/.claude/skills/agent-browser`; the examples are plain shell and work without
-the skill too), and a telemetry sanity pass (C).
+driven by the `agent-browser` CLI (B — read the **agent-browser** skill from
+your agent IDE; see [AGENTS.md](../AGENTS.md#engineering-skills-workflow), then
+run `agent-browser skills get core`; the examples below are plain shell and
+work without the skill too), and a telemetry sanity pass (C).
 
 > **Agents: this audit is mandatory, not advisory.** Scope the phases to the
 > change (an auth change runs A1–A6 + B; a checkout change runs A9–A10 + C; a

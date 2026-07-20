@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **AGENTS.md**: Engineering skills workflow ([addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) platform + [agent-browser](https://github.com/vercel-labs/agent-browser) e2e Phase B); skills not vendored in repo.
+- **AGENTS.md**: Senior Platform Engineer role, platform domain map, and `How to work here`; split architecture into platform vs cross-repo app context with [`SERVICES.md`](SERVICES.md) routing rules.
 - **PostgreSQL custom queries**: removed `pg_stat_checkpointer`, `pg_database_size`, and
   `pg_connection_limits` from both cluster monitoring ConfigMaps — redundant with CNPG
   built-in default queries (`pg_stat_checkpointer`, `pg_database`, `pg_settings` +

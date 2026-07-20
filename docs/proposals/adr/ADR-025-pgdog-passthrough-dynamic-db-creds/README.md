@@ -1,132 +1,345 @@
-# ADR-025: PgDog passthrough auth to unblock dynamic DB credentials
+# ADR-025: PostgreSQL credential delivery & role model
 
-Adopt PgDog **`passthrough_auth`** (plus a PgDog upgrade to a build with the
-`*_allow_change` variants) as the mechanism that lets OpenBAO **dynamic** database
-users authenticate **through the pooler** — the load-bearing blocker for RFC-0008's
-dynamic DB credentials (finding #4). This ADR decides the *pooler groundwork*; app
-conversion to dynamic creds is a later slice.
+The authoritative design record for **how PostgreSQL credentials are delivered, rotated,
+and authorized** on this platform — covering isolation model (database- vs
+schema-per-service), the role model (flat today vs a tiered target), the credential
+spectrum (static → static-rotated → dynamic), pooler authentication modes, delivery &
+rotation mechanics, and human/DBA access. It supersedes the original narrow ADR-025
+("PgDog passthrough") by folding that PoC into the wider picture.
 
-| Status | Date | Related RFC | Related research |
-|--------|------|-------------|------------------|
-| Proposed | 2026-07-20 | [RFC-0008](../../rfc/RFC-0008/) | [RFC-0008 research.md](../../rfc/RFC-0008/research.md) |
+| Status | Date | Related RFC | Related ADRs |
+|--------|------|-------------|--------------|
+| Proposed | 2026-07-20 | [RFC-0008](../../rfc/RFC-0008/) · [RFC-0012](../../rfc/RFC-0012/) | [ADR-013](../ADR-013-per-service-db-triplet/) · [ADR-014](../ADR-014-pooler-credentials-valuesfrom/) · [ADR-015](../ADR-015-pg-hba-connection-isolation/) · [ADR-024](../ADR-024-floci-kms-emulator-auto-unseal/) · [ADR-026](../ADR-026-platform-db-pgbouncer-pilot/) |
 
-> **Every decision is a tradeoff.** Passthrough makes the pooler forward the client's
-> password to PostgreSQL for authentication instead of validating it against a static
-> list — which is exactly what dynamic users need, but it also means the pooler sees the
-> plaintext password (mandating TLS in production) and pools fragment per distinct user.
+> **Every decision is a tradeoff.** Stronger credential hygiene (short-lived, rotated,
+> least-privilege) costs operational churn, pooler complexity, and app-side reconnection.
+> The right point on that curve differs for **machines** (favor simple + stable) and
+> **humans** (favor ephemeral + least-standing-access).
 
-## Context
+> **Legend for this ADR.** **As-built** = deployed today. **Planned** = committed target,
+> not yet deployed. **Reference** = an industry-standard pattern documented for learning /
+> comparison; not a commitment. Sections mix all three and label each.
 
-RFC-0008 finding #4 wants OpenBAO's **database secrets engine** to mint short-lived
-`v-{role}-{ts}` PostgreSQL users instead of static passwords. The as-built platform
-blocks this at the **pooler**:
+---
 
-- Every app reaches PostgreSQL through **PgDog** (`pgdog-product`, `pgdog-platform`),
-  which holds a **static, positional `[[users]]` list** with one password per role,
-  injected via Flux `valuesFrom` from the ESO-delivered Secret. There is **no
-  `auth_query`**, no admin/passthrough mode enabled today (`passthrough_auth =
-  "disabled"`), so a rotating/unlisted username simply cannot authenticate.
-- (Correction to the RFC premise: `cart`/`order` are **no longer** hardcoded
-  `postInitSQL` users — all 11 roles are already RFC-0012 triplets. The only remaining
-  part of finding #4 is the dynamic engine itself.)
-- Direct-to-primary paths (Temporal, golang-migrate jobs) **bypass PgDog** and hit
-  `*-db-rw:5432`, so they are not blocked — but the app runtime path is.
+## 1. Context & scope
 
-A [PoC](#poc-evidence) proved PgDog's `passthrough_auth` removes this blocker.
+Today every service authenticates to PostgreSQL with a **static password** that lives, in
+plaintext, in a Kubernetes Secret (ESO-delivered from OpenBAO KV). A `kubectl get secret`
+yields a credential that is valid **forever**. RFC-0008 finding #4 wants better: rotation
+and/or short-lived credentials. But "just turn on dynamic credentials" collides with three
+realities — the **isolation model**, the **role model**, and the **pooler** — so this ADR
+maps the whole space and records what we choose for each.
 
-## Decision
+**What this ADR decides** (§9): keep database-per-service; app service accounts move to
+**static, rotated** login roles; humans use **dynamic** short-lived roles; pooler auth
+follows [ADR-026](../ADR-026-platform-db-pgbouncer-pilot/). **What it teaches** (§2–§8):
+the alternatives and their real-world tradeoffs, so future changes are informed.
 
-On Kind, make the pooler **dynamic-ready**:
+---
 
-1. **Enable `passthrough_auth`** on the PgDog poolers. With it, PgDog asks the client for
-   its password, **forwards it to PostgreSQL for authentication** (PG is authoritative;
-   bad creds get the pool banned), and creates the user/pool on the fly — **no static
-   `[[users]]` entry required**. Kind uses `enabled_plain_allow_change` (no TLS in
-   cluster); **production must use `enabled_allow_change` with TLS** (passthrough exposes
-   the plaintext password to the pooler otherwise).
-2. **Upgrade PgDog** from the deployed `0.1.26` to a build that supports the
-   `*_allow_change` variants (validated on `0.1.49`). `0.1.26` only has
-   `disabled|enabled|enabled_plain`, under which a rotated password **fails until a
-   pooler reload** — unacceptable for TTL'd dynamic creds.
-3. **Per-service, not per-pod, dynamic users.** PgDog keys server pools per
-   `(user, database)`, so a unique username per pod would fragment pooling. The engine
-   issues one rotating user *per service role*, refreshed on a TTL.
-4. **Role ownership stays split.** CNPG keeps owning the base/owner role (schema
-   ownership, RFC-0012 triplet). The OpenBAO DB-engine `creation_statements` `GRANT` each
-   ephemeral user **into a group role** (e.g. `app_cart`); `pg_hba` matches the group, so
-   rotating usernames need no per-name HBA rule and there is no CNPG-vs-Vault ownership
-   fight.
-5. **Delivery via ESO `VaultDynamicSecret`** generator (`generators.external-secrets.io`,
-   already shipped by ESO 2.5.0, currently unused) reads `database/creds/{role}` and
-   materialises the rotating `username`+`password` into the app Secret.
+## 2. Isolation model — database-per-service vs schema-per-service
 
-**Scope of this slice:** the pooler groundwork (upgrade + passthrough + a rehearsal that
-a dynamic user authenticates through PgDog). **Deferred** to a later slice: enabling the
-OpenBAO DB engine for real service roles, `pg_hba` group wiring, and app-side
-reconnection on rotation.
+**As-built: database-per-service.** Each service owns a dedicated PostgreSQL **database**
+(`payment`, `cart`, `order`, …), owner = a same-named role; isolation is enforced by
+**pg_hba per-`(role, database)` allow + a trailing `reject`** ([ADR-015](../ADR-015-pg-hba-connection-isolation/)).
+There is no shared database partitioned by schema — no `CREATE SCHEMA`, no `search_path`
+tricks. A leaked credential opens exactly one database.
+
+The main **reference** alternative is **schema-per-service** (or schema-per-tenant): one
+shared database, each service/tenant in its own `schema`, isolation by `GRANT`/`REVOKE` on
+schemas + `search_path`.
+
+```mermaid
+flowchart TB
+    subgraph DPS["database-per-service (AS-BUILT)"]
+        direction LR
+        r1["role payment"] --> d1[("db payment")]
+        r2["role order"] --> d2[("db order")]
+        note1["isolation = pg_hba<br/>(role,database)+reject"]
+    end
+    subgraph SPS["schema-per-service (REFERENCE)"]
+        direction LR
+        s1["role payment"] --> sc1["schema payment"]
+        s2["role order"] --> sc2["schema order"]
+        sc1 --- shared[("one shared db")]
+        sc2 --- shared
+        note2["isolation = GRANT/REVOKE<br/>on schema + search_path"]
+    end
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    class d1,d2,shared data; class r1,r2,s1,s2 service;
+```
+
+| Dimension | **database-per-service** (as-built) | **schema-per-service** (reference) |
+|---|---|---|
+| Isolation primitive | pg_hba per-(role,database) + reject | schema `GRANT`/`REVOKE` + `search_path`; `REVOKE ... FROM PUBLIC` |
+| Blast radius of a leaked cred | **one database** | one schema — **but** a misconfigured grant/`search_path` can leak sideways within the shared DB |
+| Cross-service query | impossible without a second connection (good for microservices) | easy (`other_schema.table`) — convenient but erodes boundaries |
+| PgBouncer/PgDog pool keying | pool per `(user, database)` → **more pools**, but clean separation | fewer databases → fewer pools; but users share a DB, so noisy-neighbor at the pool |
+| Backup / restore / PITR granularity | **per database** (drop/restore one service cleanly) | whole shared DB; per-schema restore is manual |
+| Connection overhead | one connection targets one DB | same DB, can multiplex more |
+| Extensions / `shared_preload` | per database | shared — one service's extension affects all |
+| Ops cost of adding a service | new `Database` + role + pg_hba line | new schema + grant set |
+| Typical real-world fit | **microservices with independent lifecycles** (this platform) | **multi-tenant SaaS** (schema-per-tenant), or a monolith split into modules |
+
+**Real cases.** Microservice platforms overwhelmingly pick **database-per-service**: each
+team owns its lifecycle, backups, and blast radius (this platform, via ADR-013/015).
+**Schema-per-tenant** shines for multi-tenant SaaS with thousands of identical tenants
+where a database each is too heavy — but it leans entirely on disciplined `GRANT`s and
+`search_path`, and one bad grant crosses tenants.
+
+**Decision:** **stay database-per-service.** It matches the microservice shape, gives the
+strongest default blast-radius, and the pg_hba model (ADR-015) already enforces it. A move
+to schema-per-service would collapse the databases and rewrite the isolation model —
+out of scope. Everything below expresses the role/credential design **within** the
+database-per-service world.
+
+---
+
+## 3. Role model — flat today, tiered target
+
+**As-built: flat.** Each service has exactly **one LOGIN role** (`inRoles: []`), which
+**owns its database** and thus its tables. There is no group role, no read-only role, and
+**no `GRANT`/`REVOKE`** anywhere — privileges come purely from ownership; `PUBLIC CONNECT`
+is not revoked (ADR-015 deliberately relies on pg_hba, not grants).
+
+**Reference target: tiered roles.** The industry-standard hardening is to split *who owns*
+from *who logs in*, and to separate read/write from read-only:
+
+```mermaid
+flowchart TD
+    subgraph login["LOGIN roles (rotated)"]
+        pl["payment-login<br/>LOGIN, rotated"]
+        rl["reporting-login<br/>LOGIN, rotated"]
+    end
+    subgraph group["GROUP / APP roles (NOLOGIN, own objects)"]
+        pa["payment-app<br/>NOLOGIN · owns tables · DML"]
+        pro["payment-readonly<br/>NOLOGIN · SELECT only"]
+    end
+    pl -->|member of| pa
+    rl -->|member of| pro
+    pa -.->|"GRANT SELECT to"| pro
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    class pl,rl service; class pa,pro data;
+```
+
+- **App role** (`payment-app`, NOLOGIN) **owns** the schema/objects and holds DML
+  (`CONNECT`, `USAGE`, `SELECT/INSERT/UPDATE/DELETE`) — **no** `DROP DATABASE`, `CREATE
+  ROLE`, `ALTER SYSTEM`. Because it is NOLOGIN, no one authenticates *as* it.
+- **Login role** (`payment-login`, LOGIN) is a **member** of `payment-app`, inherits its
+  rights, and is the credential that **rotates**. Rotating a login never touches ownership.
+- **Read-only role** (`payment-readonly`, NOLOGIN) holds `SELECT` only; a `reporting-login`
+  is a member. Analytics/BI get read access without write.
+- **DBA role** (`platform-dba`, LOGIN) — elevated, rotated by a stricter policy.
+- **Pooler auth role** — CNPG's `cnpg_pooler_pgbouncer` (auto-managed, cert-auth), used by
+  PgBouncer's `auth_query` (§5); rarely rotated.
+
+### Naming convention (reference — reconciled to as-built)
+
+| Kind | Example | LOGIN? | Rotated by OpenBAO? | As-built today |
+|---|---|---|---|---|
+| Login role | `payment-login` | ✅ | ✅ | the single role `payment` plays this part |
+| App/group role | `payment-app` | ❌ | ❌ | **not present** (would own objects) |
+| Read-only role | `payment-readonly` | ❌ | ❌ | **not present** |
+| DBA role | `platform-dba` | ✅ | per policy | **not present** (no standing DBA role) |
+| Pooler auth | `cnpg_pooler_pgbouncer` | ✅ | rarely | present on platform-db (ADR-026); PgDog has none |
+
+Current as-built names (unchanged): SQL role/db `<svc>`; `DatabaseRole` CR
+`<cluster>-role-<svc>`; Secret `<cluster>-<svc>-secret`; OpenBAO
+`secret/data/local/databases/<cluster>/<svc>`.
+
+**Cost of the tier (planned).** The platform manages **no grants** today (RFC-0012 /
+ADR-015). A tiered model needs a grant-management mechanism — a bootstrap SQL Job or
+per-service migration running `CREATE ROLE … NOLOGIN`, `GRANT`, `ALTER DEFAULT PRIVILEGES`,
+and (for owner=group) `REASSIGN OWNED`. That is a real addition, deliberately deferred.
+
+---
+
+## 4. Credential spectrum — static → static-rotated → dynamic
 
 ```mermaid
 flowchart LR
-    OB["OpenBAO DB engine<br/>(planned)"] -->|"v-cart-* GRANT app_cart"| PG[("PostgreSQL<br/>(CNPG)")]
-    OB -->|"database/creds/cart"| ESO["ESO VaultDynamicSecret<br/>(planned)"]
-    ESO -->|"rotating user+pass"| SEC["app Secret"]
-    SEC --> APP["cart app"]
-    APP -->|"passthrough_auth"| PD["PgDog<br/>(upgraded, passthrough)"]
-    PD -->|"forwards creds → PG authenticates"| PG
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    A["(a) Static in Secret<br/>AS-BUILT<br/>never expires"] --> B["(b) Static role, rotated<br/>PLANNED<br/>fixed user, password rotates"] --> C["(c) Dynamic per-lease<br/>REFERENCE<br/>new user each lease, TTL"]
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
-    class APP service; class PG data; class PD,ESO platform; class OB,ESO planned;
+    class A data; class B,C planned;
 ```
 
-## POC evidence
+| | (a) Static in Secret | (b) **Static role, rotated** | (c) Dynamic per-lease |
+|---|---|---|---|
+| Username | fixed | **fixed** | changes every lease (`v-…`) |
+| Password | fixed forever | rotated on a schedule | new every lease |
+| OpenBAO | KV `ExternalSecret` | `database/static-roles` (`rotation_period`) | `database/roles` + `VaultDynamicSecret` |
+| Postgres churn | none | 1× `ALTER ROLE … PASSWORD` per period | `CREATE`+`DROP ROLE` (+`GRANT`/`REVOKE`) per lease |
+| Pooler pools | 1 per (user,db) | **1 per (user,db)** (stable) | fragments — a pool per distinct user |
+| Audit volume | low | low | **high** |
+| Best for | (legacy only) | **app service accounts** | **humans / short jobs** |
 
-Docker-compose, PgDog images matching deployed `0.1.26` and the upgrade candidate
-`0.1.49`, against `postgres:16`; user `poc_dyn` **never listed** in `users.toml`:
+**The churn argument (real).** With dynamic per-lease creds at TTL=1h across ~1000
+service instances, Postgres would run on the order of **~1000 `CREATE ROLE` + ~1000 `DROP
+ROLE` per hour** (≈ tens of thousands of role DDLs/day), each with `GRANT`/`REVOKE` — heavy
+audit noise, `pg_roles` churn, and (if pg_hba matched exact names) constant HBA edits. This
+is exactly why large platforms reserve dynamic creds for **humans and ephemeral jobs** and
+use **static-rotated** roles for long-running app service accounts.
+
+**Decision (spectrum):**
+
+| Consumer | Choice | Why |
+|---|---|---|
+| **App service account** | **(b) static role, rotated** (e.g. 30–60 days) | stable username → pooler-friendly (1 pool), no role churn, simple |
+| **Human (dev/SRE/DBA)** | **(c) dynamic**, short TTL | least standing access, per-person audit, auto-expiry |
+| **Short-lived job** | (c) dynamic | scoped to the job's lifetime |
+
+---
+
+## 5. Pooler authentication modes
+
+A pooler must decide how a client proves who it is. Three modes exist across poolers:
+
+| Mode | How | PgDog | PgBouncer (CNPG) |
+|---|---|---|---|
+| **Static userlist** | pooler stores the password, validates locally | ✅ (`users.toml`, today via `valuesFrom`) | ✅ |
+| **Passthrough / forward** | pooler forwards the client password; **Postgres authenticates**; bad creds ban the pool | ✅ `passthrough_auth` | — |
+| **auth_query** | pooler uses a **dedicated account** to look up the password hash from `pg_shadow` and validates itself | ❌ **not supported** | ✅ (`cnpg_pooler_pgbouncer` + `user_search`) |
+
+> **Correction folded in:** "the pooler uses a dedicated account to verify the user" is
+> **auth_query = PgBouncer**, *not* PgDog. **PgDog has no auth_query** — its only
+> no-static-list option is **passthrough**.
+
+**Per-cluster (ADR-026):** product-db = **PgDog** (static list, or passthrough for
+rotating users); platform-db = **CNPG PgBouncer** (**auth_query**, operator-managed).
+
+**Pool keying = per `(user, database)`** in both. So a **fixed username** (static-rotated,
+§4b) yields **one pool** — the pooler-friendly path — while **dynamic per-pod/per-lease
+usernames fragment** into many pools. This is the second reason app creds should be
+static-rotated, not dynamic.
+
+**Rotation seamlessness (PoC evidence).** PgDog passthrough was validated by a
+docker-compose PoC (images matching deployed `0.1.26` + upgrade candidate `0.1.49`);
+`poc_dyn` was **never** in `users.toml`:
 
 | Test | Config / version | Result |
 |------|------------------|--------|
-| Unlisted user connects through PgDog | `enabled_plain`, 0.1.26 | ✅ `current_user=poc_dyn` (PG authenticates) |
-| Wrong password | `enabled_plain`, 0.1.26 | ✅ rejected (`FATAL: password … is wrong`) |
-| Rotate password, warm pool, no reload | `enabled_plain`, 0.1.26 | ❌ new password fails until reload; warm pool keeps serving the **old** password |
-| Rotate password, warm pool, no reload | `enabled_plain_allow_change`, 0.1.49 | ✅ new password works immediately |
-| `_allow_change` rejected by old build | 0.1.26 | ✅ confirms upgrade is required |
+| Unlisted user connects (passthrough) | `enabled_plain`, 0.1.26 | ✅ Postgres authenticates |
+| Wrong password | `enabled_plain`, 0.1.26 | ✅ rejected, pool banned |
+| Rotate on a warm pool, no reload | `enabled_plain`, 0.1.26 | ❌ new password fails until reload (warm pool caches the old one) |
+| Rotate on a warm pool, no reload | `enabled_plain_allow_change`, 0.1.49 | ✅ works immediately |
+| `_allow_change` variant | 0.1.26 | ❌ rejected — **upgrade required** |
+
+So even with a **fixed username**, password rotation is only seamless on PgDog with
+`*_allow_change` (≥0.1.49). PgBouncer's `auth_query` re-looks-up on new connections, so it
+tracks a rotated password without a static list at all.
+
+---
+
+## 6. Delivery & rotation mechanics
+
+- **Static (a/b):** ESO `ExternalSecret` (KV) or a static-role secret → a K8s Secret the
+  app consumes. **Dynamic (c):** ESO **`VaultDynamicSecret`** generator
+  (`generators.external-secrets.io`, shipped by ESO 2.5.0, currently unused) reads
+  `database/creds/<role>` and materializes rotating `username`+`password`.
+- **The reconnection problem (as-built gap).** App creds arrive as **env vars**
+  (`DB_USER`/`DB_PASSWORD`), read **once at pod start**; `pkg/dbx.NewPool(dsn)` parses the
+  DSN once and has **no reload**. So today a rotated Secret only takes effect on **pod
+  restart**.
+- **Seamless path (planned):** deliver creds as a **file mount** (Secret as a volume) and
+  give `pkg/dbx` a `pgxpool.Config.BeforeConnect` hook that reads the current
+  user/password from the file **per new connection**. Existing connections drain at
+  `server_lifetime`; new ones pick up the rotated cred — no restart. Set ESO
+  `refreshInterval` **< TTL/rotation_period** so a fresh cred exists before the old expires
+  (overlap window).
+- **Who rotates what:** only **LOGIN** roles rotate (§3). App/group and read-only roles are
+  NOLOGIN and never hold a password.
+
+```mermaid
+flowchart LR
+    OB["OpenBAO<br/>static-role rotate (app)<br/>or dynamic (human)"] --> ESO["ESO<br/>ExternalSecret / VaultDynamicSecret"]
+    ESO -->|"file mount (planned)"| VOL["/etc/db/secret"]
+    VOL --> APP["app: dbx BeforeConnect<br/>reads current cred (planned)"]
+    APP --> POOL["pooler (passthrough / auth_query)"]
+    POOL --> PG[("PostgreSQL")]
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+    class OB,ESO,POOL platform; class APP service; class PG data; class VOL planned;
+```
+
+---
+
+## 7. Human & DBA access (reference)
+
+Humans never get a standing password — they request **dynamic, short-lived** creds scoped
+to their role and everything is audited:
+
+| Role | Dynamic role | Grants | TTL | Who (OIDC group) |
+|---|---|---|---|---|
+| Dev | `db-<svc>-ro` | `SELECT` only | 1h | `developers` |
+| SRE | `db-<svc>-rw` | DML (or member of app role) | 1h | `sre` |
+| Break-glass | `db-<svc>-admin` | broad, rare | 15–30m | on-call + approval + alert |
+
+**OIDC for people, Kubernetes-auth for machines.** People never hold a static OpenBAO
+token; each credential grant is logged (OpenBAO audit → Vector → VictoriaLogs). On **Kind**
+OIDC is not available (RFC-0008 marks it cloud/staging), so the *mechanics* (dynamic
+read-only role + TTL + audit) are rehearsable but OIDC itself is production-only.
+
+---
+
+## 8. Operations & audit at scale
+
+- **Dynamic cost:** role DDL churn, audit-log volume, `pg_roles` growth, lease bookkeeping,
+  and pooler pool fragmentation. Great for humans (bounded count), painful for thousands of
+  app instances.
+- **Static-rotated cost:** one `ALTER ROLE … PASSWORD` per period per role; pooler stays at
+  one pool per (user, db); the only real complexity is **seamless app reconnection** (§6).
+- **Monitor:** rotation success/age, pooler auth failures, sealed/expired-cred errors,
+  ESO `sync_calls_error_total`.
+- **Pragmatic recommendation:** static-rotated for app service accounts is the lower-risk,
+  lower-noise default at scale; spend the dynamic complexity budget where it pays off —
+  human access.
+
+---
+
+## 9. Decision (summary)
+
+1. **Keep database-per-service** (ADR-013/015); schema-per-service documented as reference
+   only.
+2. **App service accounts → static, rotated login roles** (OpenBAO `database/static-roles`,
+   fixed username, ~30–60d). **Humans/jobs → dynamic** short-TTL roles. (§4)
+3. **Role model target = tiered** (NOLOGIN app/group owns objects ← rotated LOGIN member +
+   read-only role), least-privilege per service. **Planned** — as-built is flat
+   single-login; needs a grant-management mechanism (§3).
+4. **Pooler auth follows [ADR-026]:** product-db PgDog (passthrough for rotating users, no
+   auth_query); platform-db PgBouncer (auth_query). Fixed usernames keep pooling to one
+   pool per (user, db). (§5)
+5. **Seamless rotation is planned** via file-mounted creds + `pkg/dbx` `BeforeConnect` +
+   ESO `refreshInterval` < rotation period. (§6)
 
 ## Alternatives considered
 
-- **PgDog `auth_query` (PgBouncer-style)** — PgDog has **no `auth_query`**; passthrough is
-  its equivalent. Not available.
-- **PgDog native `server_auth = "vault"`** — exists (v0.1.46+) but is **undocumented,
-  untested**, and per source is for **static** Vault roles only (explicitly *skipped for
-  passthrough*). Not a dynamic path.
-- **Bypass PgDog for dynamic paths** (direct-to-`-rw`, as migrations/Temporal do) — works
-  but loses pooling for app runtime traffic; only viable for low-connection consumers.
-- **Keep static triplets** — the status quo; no dynamic creds. Rejected (the finding).
+- **Dynamic per-lease for apps** — strongest isolation but role/audit churn + pool
+  fragmentation at scale; rejected as the default (kept for humans). (§4, §8)
+- **Migrate to schema-per-service** — convenient cross-service access, fewer databases; but
+  weaker default isolation and rewrites ADR-015. Rejected. (§2)
+- **PgDog `server_auth = "vault"`** — exists but undocumented/untested and static-role-only
+  (skipped for passthrough); not a dynamic path. (§5)
+- **Keep static-in-Secret forever** — status quo; no rotation. Rejected (the finding).
 
 ## Consequences
 
-**Gain:** the pooler blocker is removed — dynamic OpenBAO DB users can authenticate
-through PgDog; the platform can proceed to real dynamic creds in a later slice; the path
-mirrors production (swap `enabled_plain_allow_change` → TLS `enabled_allow_change`).
+**Gain:** a coherent, scale-aware credential strategy — simple stable creds for machines,
+ephemeral least-privilege for humans — with the pooler and role model that support it, and
+a documented comparison so future architecture changes are informed.
 
-**Accept (the cost):**
-- **Passthrough shows the pooler the plaintext password.** On Kind (`enabled_plain`, no
-  in-cluster TLS) this is plaintext over the pod network — acceptable dev-grade,
-  documented. **Production must run passthrough with TLS.**
-- **PgDog upgrade (0.1.26 → ≥0.1.49) is required** for seamless rotation; upgrading the
-  pooler is a change to the live DB path and must pass the full app-connectivity e2e.
-- **Enabling passthrough changes auth for *all* users on that pooler** (not just dynamic
-  ones) — existing static-triplet services must be verified to still connect.
-- **Rotation is not instant on a warm pool without `_allow_change`** — the pool caches the
-  old credential; `_allow_change` (upgraded build) is what makes rotation seamless.
-- **Per-service, not per-pod** dynamic users (pool-keying constraint) — coarser than
-  per-pod isolation, but keeps pooling effective.
-- **App reconnection on rotation** and the **OpenBAO DB engine + `pg_hba` group wiring**
-  are **not** solved here — deferred to the next slice.
+**Accept:** the tiered role model, static-role rotation, seamless reconnection
+(`pkg/dbx` change), and human OIDC access are **planned**, not deployed; each is a distinct
+follow-up slice. Grants/tiers add a management mechanism the platform has so far avoided.
+Two poolers now differ (PgDog vs PgBouncer). Production passthrough requires TLS.
 
 ## Related
 
-- [RFC-0008](../../rfc/RFC-0008/) (finding #4 — dynamic DB creds) · [research.md](../../rfc/RFC-0008/research.md)
-- [ADR-024](../ADR-024-floci-kms-emulator-auto-unseal/) (Slice 1 — auto-unseal)
-- RFC-0012 (CNPG credential triplets — the static baseline this builds on)
+- [RFC-0008](../../rfc/RFC-0008/) (secrets hardening — finding #4) · [RFC-0012](../../rfc/RFC-0012/) (credential triplets)
+- [ADR-013](../ADR-013-per-service-db-triplet/) · [ADR-014](../ADR-014-pooler-credentials-valuesfrom/) · [ADR-015](../ADR-015-pg-hba-connection-isolation/) · [ADR-024](../ADR-024-floci-kms-emulator-auto-unseal/) · [ADR-026](../ADR-026-platform-db-pgbouncer-pilot/)
+- [`docs/databases/008-pooler.md`](../../../databases/008-pooler.md)

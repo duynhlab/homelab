@@ -14,8 +14,8 @@ spec:
     namespace: notification
     grpc_server: true
     replicaCount: 1
-    db_host: "pgdog-platform.platform.svc.cluster.local"
-    db_port: "6432"
+    db_host: "platform-db-pooler-rw.platform.svc.cluster.local"
+    db_port: "5432"
     db_migration_host: "platform-db-rw.platform.svc.cluster.local"
     db_secret: "platform-db-notification-secret"
     db_sslmode: "disable"

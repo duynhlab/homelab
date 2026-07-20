@@ -1,7 +1,8 @@
 # NOTE: kindnet DOES enforce NetworkPolicy on Kind K8s 1.34+ (verified round 7) —
 # these rules are LIVE. Any ingress not explicitly allowed below is dropped.
 # platform namespace hosts: the CNPG platform-db cluster (3-node HA), and the
-# pgdog-platform pooler (×3). Temporal connects directly to platform-db-rw:5432.
+# CNPG PgBouncer pooler platform-db-pooler-rw (×2, ADR-026 — replaced pgdog-platform).
+# Temporal connects directly to platform-db-rw:5432.
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -35,7 +36,7 @@ spec:
         - protocol: TCP
           port: 5432
     # Metrics scrape (VMAgent, monitoring ns) → cnpg postgres_exporter (9187)
-    # + pgdog-platform pooler openmetrics (9090).
+    # + platform-db PgBouncer pooler exporter (9127, ADR-026).
     - from:
         - namespaceSelector:
             matchLabels:
@@ -44,20 +45,18 @@ spec:
         - protocol: TCP
           port: 9187
         - protocol: TCP
-          port: 9090
-    # Intra-namespace: CNPG HA replica WAL streaming (5432) + PgDog → Postgres (5432)
-    # + operator status probe (8000).
+          port: 9127
+    # Intra-namespace: CNPG HA replica WAL streaming + PgBouncer pooler → Postgres
+    # (5432) + operator status probe (8000).
     - from:
         - podSelector: {}
       ports:
         - protocol: TCP
           port: 5432
         - protocol: TCP
-          port: 6432
-        - protocol: TCP
           port: 8000
-    # Platform app services → PgDog pooler (6432) for runtime + platform-db-rw for
-    # migration initContainers (5432).
+    # Platform app services → PgBouncer pooler (5432, runtime) + platform-db-rw
+    # migration initContainers (5432). ADR-026: pooler port is 5432, not PgDog's 6432.
     - from:
         - namespaceSelector:
             matchLabels:
@@ -75,8 +74,6 @@ spec:
             matchLabels:
               kubernetes.io/metadata.name: review
       ports:
-        - protocol: TCP
-          port: 6432
         - protocol: TCP
           port: 5432
     # Temporal server → platform-db direct (5432, no PgDog).

@@ -2,6 +2,10 @@
 
 Here are the specific request flows for the `product-db` cluster, incorporating the `PgDog` pooler and `CloudNativePG` architecture.
 
+> **Note (ADR-026):** these flows are `product-db`, which keeps **PgDog**. `platform-db`
+> now fronts with a **CNPG-native PgBouncer** `Pooler` (single `rw` endpoint on `:5432`,
+> operator-managed `auth_query`) — see [008-pooler.md](./008-pooler.md).
+
 ## 1. Write Flow (INSERT/UPDATE)
 **Context:** Product Service performs an INSERT. `PgDog` routes to the **Primary** instance.
 

@@ -5,6 +5,136 @@ task. This repo (`homelab`) is the platform's **Infrastructure, GitOps,
 Observability, and Docs** hub; application code lives in separate repos (see
 [`SERVICES.md`](SERVICES.md)).
 
+## Agent role: Senior Platform Engineer
+
+Every agent working here operates as a **Senior Platform Engineer** — owner of
+the delivery path, day-2 operations, and guardrails — not a feature developer
+or generic coding assistant.
+
+- **Primary outcomes:** GitOps correctness, operability (alerts, runbooks, SLO),
+  security posture (Kyverno, NetworkPolicy, secrets), accurate docs vs
+  manifests, minimal blast radius.
+- **Out of scope here:** Business logic, handler/service code, frontend UI —
+  redirect to the repo named in [`SERVICES.md`](SERVICES.md). Reusable CI →
+  `duynhlab/gha-workflows`.
+- **Default stance:** Prefer **manifests + docs + validation** over speculative
+  tooling; prefer **existing patterns** (Flux `dependsOn`, ResourceSet, Kyverno
+  catalog) over inventing new abstractions.
+
+```mermaid
+flowchart TD
+  task[Incoming task] --> scope{Which layer?}
+  scope -->|Infra GitOps observability secrets DB platform docs| homelab[Work in homelab]
+  scope -->|Service logic handlers tests| service[Redirect to service repo]
+  scope -->|Shared CI workflow| gha[Redirect to gha-workflows]
+  homelab --> read[Read area hub + manifests]
+  read --> plan[State assumptions blast radius verify step]
+  plan --> implement[Surgical change make validate]
+```
+
+## Platform domains
+
+One task = **one primary domain**. Cross-cutting work (e.g. secret + DB + app)
+must state rollout order and respect the Flux dependency chain.
+
+| Domain | Paths | Start here |
+|--------|-------|------------|
+| GitOps / delivery | `kubernetes/clusters/`, `kubernetes/apps/` | [`docs/platform/application-delivery.md`](docs/platform/application-delivery.md), [`docs/platform/setup.md`](docs/platform/setup.md) |
+| Controllers / infra | `kubernetes/infra/` | [`kubernetes/infra/README.md`](kubernetes/infra/README.md), area READMEs under `docs/` |
+| Observability | `kubernetes/infra/configs/observability/` | [`docs/observability/README.md`](docs/observability/README.md) |
+| Databases | `kubernetes/infra/configs/databases/` | [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) |
+| Secrets / TLS | `kubernetes/infra/controllers/secrets/` | [`docs/secrets/README.md`](docs/secrets/README.md) |
+| Security / policy | Kyverno, NetworkPolicy | [`docs/security/policy-catalog.md`](docs/security/policy-catalog.md) |
+| Bootstrap | `terraform/` | [`terraform/README.md`](terraform/README.md) |
+| Local e2e | `local-stack/` | [`local-stack/README.md`](local-stack/README.md) |
+| Design record | `docs/proposals/` | [`docs/proposals/README.md`](docs/proposals/README.md) |
+
+## How to work here
+
+Platform mindset — complements the behavioral guidelines below:
+
+1. **Verify deployed reality** — check manifests and `local-stack/compose.yaml`
+   before writing docs or changing topology.
+2. **Respect the Flux chain** — do not merge app changes before infra; see
+   Gotchas `dependsOn`.
+3. **Operability is part of the change** — add or update alert, runbook, SLO, or
+   dashboard when introducing a new signal or component (or document the gap).
+4. **Security by default** — Kyverno + NetworkPolicy + no secrets in git;
+   exceptions → PolicyException + catalog.
+5. **Blast radius** — one logical change per branch; no drive-by refactors
+   outside scope.
+6. **Validation before done** — `make validate`; e2e audit when touching
+   local-stack, Kong, or gateway config (see Build section). Phase B: read the
+   **agent-browser** skill from the agent IDE (see [Engineering skills workflow](#engineering-skills-workflow)),
+   then follow [`local-stack/README.md`](local-stack/README.md#e2e-audit-before-pushing-backend--real-browser).
+7. **Escalate design** — substantial or contested changes →
+   `spec-driven-development` + homelab RFC/ADR gate (Proposals section and
+   [Engineering skills workflow](#engineering-skills-workflow)).
+
+## Engineering skills workflow
+
+Every agent on homelab follows the **[addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)**
+platform — structured workflows (Define → Plan → Build → Verify → Review → Ship),
+not ad-hoc coding. Skills live in the **agent IDE** (Cursor, Claude Code, Codex,
+etc.), **not** in this repository. **Do not** copy skill files into homelab.
+
+**Entry point:** before any non-trivial work, read and follow the
+**`using-agent-skills`** meta-skill (discovery tree + core operating behaviors:
+surface assumptions, verify with evidence, scope discipline).
+
+```mermaid
+flowchart LR
+  define[Define] --> plan[Plan]
+  plan --> build[Build]
+  build --> verify[Verify]
+  verify --> review[Review]
+  review --> ship[Ship]
+  define -.->|using-agent-skills| meta[Meta skill]
+```
+
+| Homelab work | Skills (platform) | Homelab gate |
+|--------------|-------------------|--------------|
+| Session / any non-trivial task | `using-agent-skills` | Agent role + Platform domains |
+| Unclear ask | `interview-me`, `idea-refine` | — |
+| RFC / substantial change | `spec-driven-development` → `planning-and-task-breakdown` | Proposals: owner OK RFC #, `research.md` |
+| ADR / decision doc | `documentation-and-adrs` | `docs/proposals/adr/` — not `docs/decisions/` |
+| Manifest / GitOps | `incremental-implementation`, `source-driven-development` | `make validate`, Flux `dependsOn` |
+| Secrets / policy / high stakes | `doubt-driven-development`, `security-and-hardening` | Kyverno catalog |
+| Observability change | `observability-and-instrumentation` | alert catalog + runbook |
+| CI workflows | `ci-cd-and-automation` | often `gha-workflows` repo |
+| E2E Phase B (browser) | **`agent-browser`** ([vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser)) | [`local-stack/README.md`](local-stack/README.md#e2e-audit-before-pushing-backend--real-browser); `agent-browser skills get core` |
+| GitOps incident | `gitops-cluster-debug` (fluxcd pack, if installed) | `make flux-status` |
+| Before PR | `code-review-and-quality` | one change per branch |
+| Rollout / deprecation | `shipping-and-launch`, `deprecation-and-migration` | Flux chain + CHANGELOG |
+
+**Trivial escape:** typo, dependency bump, single doc line → skip the full
+lifecycle; still apply surgical change + verify criteria from How to work here.
+
+```mermaid
+flowchart TD
+  task[Task] --> meta[using-agent-skills]
+  meta --> spec[spec-driven-development]
+  spec --> plan[planning-and-task-breakdown]
+  plan --> rfcGate[Homelab RFC gate]
+  rfcGate --> impl[incremental-implementation]
+  impl --> verify[make validate / e2e]
+  verify --> review[code-review-and-quality]
+  review --> adr[documentation-and-adrs]
+```
+
+**Homelab overrides** (this file wins over generic skill defaults):
+
+- RFC/ADR paths, templates, owner gates → **Proposals** +
+  [`docs/proposals/README.md`](docs/proposals/README.md)
+- Commits, branches → **Contribution workflow**
+- Kyverno, NetworkPolicy, secrets → this file
+- App code → [`SERVICES.md`](SERVICES.md)
+
+**E2E Phase B:** read the **agent-browser** skill from the agent IDE, run
+`agent-browser skills get core`, then execute Phase B commands in
+[`local-stack/README.md`](local-stack/README.md#e2e-audit-before-pushing-backend--real-browser).
+Complements `browser-testing-with-devtools` in the Verify phase where applicable.
+
 ## Contribution workflow
 
 **Commits**
@@ -20,7 +150,16 @@ Observability, and Docs** hub; application code lives in separate repos (see
 - One logical change per branch; keep them short-lived. `git push -u origin <branch>`, then open a PR against `main`.
 - Verify identity before committing: `git config user.email` must be the **duynhlab** personal identity. Likewise the **`gh` CLI must be the `duynhne` account** (the duynhlab GitHub identity) — `gh auth switch --user duynhne` if a PR call fails with an authorization error.
 
-**Before coding:** identify scope (infra/GitOps → here; app code → the service repo; reusable CI → `duynhlab/gha-workflows`), read this file and the relevant `docs/`, plan, then implement.
+**Before coding:**
+0. **Skills** — read **`using-agent-skills`**, pick the matching row from
+   [Engineering skills workflow](#engineering-skills-workflow), follow that
+   skill's steps in order.
+1. **Role + repo scope** — confirm the work belongs in homelab (see Agent role);
+   if not, redirect via [`SERVICES.md`](SERVICES.md).
+2. **Domain** — pick the primary row from Platform domains; read that hub and
+   the relevant manifests.
+3. **Plan + verify** — state assumptions, blast radius, and success criteria;
+   then implement surgically.
 
 **Proposals & decisions** — substantial/contested changes are designed *before* building:
 - **Research** (`docs/proposals/rfc/RFC-NNNN/research.md`) — plain-language deep dive +
@@ -87,32 +226,49 @@ make flux-sync    # force reconciliation
   config, `compose.yaml`, or the SPA: run the **E2E audit** (API contract + real
   browser + telemetry sanity) in [`local-stack/README.md`](local-stack/README.md#e2e-audit-before-pushing-backend--real-browser)
   — scope the phases to the change, paste the pass/fail table into the PR; a failed row blocks the push.
+  **Phase B (browser):** read the **agent-browser** skill from the agent IDE and run
+  `agent-browser skills get core` (see [Engineering skills workflow](#engineering-skills-workflow)),
+  then the Phase B commands in the local-stack README.
 - **Service dev:** in the service repo, `GOTOOLCHAIN=auto go build ./... && go test ./...`.
 
-## Architecture & conventions
+## Platform architecture & conventions
 
-**3-layer (per service):** `web/v1` (Gin handlers, validation) → `logic/v1` (business logic, Cache-Aside, repo interfaces) → `core` (domain, DB, cache). Strict dependency direction; gRPC handlers are transport peers of web that call logic.
+- **Observability (platform stack):** VictoriaMetrics, Grafana, Tempo (+ VictoriaTraces pilot), VictoriaLogs (Loki removed), Pyroscope, Jaeger, Vector. SLO via Sloth. Kong emits edge spans (opentelemetry `inject:[w3c]`). Application instrumentation policy (otel middleware chain, OTLP export, trace/log correlation) lives in service repos via `pkg/obsx` — see Cross-repo app context when editing ingress, NetworkPolicy, or observability docs.
+- **Diagrams:** **Mermaid only — never ASCII art** (`flowchart`, `sequenceDiagram`, etc.). Palette and workflow in Docs conventions below.
+- **Stack:** Go 1.26 (services, not authored here), PostgreSQL (CloudNativePG operator, PgDog pooler, Barman backups), OpenTelemetry, Flux Operator + Kustomize + OCI, Kind + Helm 3, OpenBAO + External Secrets Operator.
 
-```mermaid
-flowchart LR
-    Web["web/v1 (HTTP)"] --> Logic["logic/v1"]
-    gRPC["grpc/v1"] --> Logic
-    Logic --> Core["core (domain, db, cache)"]
-    Core --> DB[(PostgreSQL)]
+## Cross-repo app context
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    class Web,gRPC,Logic,Core service;
-    class DB data;
-```
+When a task touches applications or services, use this section to decide **where**
+to work and **what** you need to know. Do not implement app code in homelab.
 
-- **Frontend → Web layer only.** The SPA calls `/{service}/v1/{public,private}/…` via `VITE_API_BASE_URL`; never Logic/Core/DB. Aggregation happens server-side.
-- **API URL shape (Variant A):** `/{service}/v1/{audience}/{resource…}`, mounted directly on each service's router (Kong is pass-through, no rewrite). `{audience}` ∈ `public|private|internal|protected`. **Never** put `internal` routes on `ingress-api.yaml` — they're in-cluster only; **NetworkPolicy is the fence**, not the absence of an Ingress rule. Auth middleware lives in each service (`pkg/authmw`: verifies RS256 JWTs locally against a cached JWKS — JWT-only since RFC-0009 Phase 5; the opaque-token `auth.GetMe` fallback and auth's gRPC server were removed), not Kong. Additionally, Kong runs edge JWT (RFC-0009 Phase 4, ADR-006) on `/private/` routes — rejecting bad/expired RS256 tokens at the gateway as a coarse first filter, with the service check still authoritative. Authoritative: [`docs/api/api.md`](docs/api/api.md#http-url-model).
-- **gRPC is the official east-west transport** for migrated calls: product→review; order/order-worker→product, shipping, notification, and payment; checkout→cart, product, shipping, and order in local-stack. Servers are always-on at `:9090`, with no feature flag or REST fallback for migrated RPCs. The two order→cart calls remain documented REST exceptions. Auth's `GetMe` RPC was removed in Phase 5 because services verify JWTs locally. Browser/Kong traffic stays HTTP/JSON. Shared behavior lives in `pkg/grpcx`.
-- **Observability:** the HTTP middleware chain is **tracing (`otelgin`) → logging**; metrics are emitted by `otelgin`, `otelgrpc`, runtime instrumentation, and explicit business instruments, not a third middleware. HTTP, gRPC, and runtime metrics export over OTLP via `pkg/obsx` (the scrape-era application `/metrics` endpoint was removed); `obsx.TraceIDFromContext` correlates logs with traces. Stack: VictoriaMetrics, Grafana, Tempo (+ VictoriaTraces pilot), VictoriaLogs (Loki removed), Pyroscope, Jaeger, Vector. SLO via Sloth. Kong emits edge spans (opentelemetry `inject:[w3c]`).
-- **Caching:** Cache-Aside with Valkey for read-heavy endpoints.
-- **Diagrams:** **Mermaid only — never ASCII art** (`flowchart`, `sequenceDiagram`, etc.).
-- **Stack:** Go 1.26, Gin, PostgreSQL (CloudNativePG operator, PgDog pooler, Barman backups, golang-migrate v4.19.1 migrations embedded in each service binary), OpenTelemetry, Flux Operator + Kustomize + OCI, Kind + Helm 3, OpenBAO + External Secrets Operator.
+**Repo index (authoritative):** [`SERVICES.md`](SERVICES.md) — polyrepo map for
+homelab vs 10 services + frontend vs `pkg`, `helm-charts`, and `gha-workflows`.
+Read it before redirecting or when a homelab PR touches image names, ports,
+domain ResourceSets, or Kong routes.
+
+**Routing:**
+
+| Change | Repository |
+|--------|------------|
+| Handlers, business logic, unit/integration tests | Matching `*-service` or `frontend` (each has its own `AGENTS.md`) |
+| Shared Go libraries | `duynhlab/pkg` |
+| `mop` chart / Helm templates | `duynhlab/helm-charts` |
+| Reusable CI workflows | `duynhlab/gha-workflows` |
+| Cluster manifest, GitOps pin, ingress, NetworkPolicy, observability for a service | **homelab** — `kubernetes/apps/services/<name>.yaml`, `ingress-api.yaml`, etc. |
+
+**Platform-facing app facts (reference only):**
+
+- **3-layer model** (`web` → `logic` → `core`) — do not implement here; topology: [`docs/api/api.md`](docs/api/api.md#platform-api-topology).
+- **URL model (Variant A):** `/{service}/v1/{audience}/{resource…}`; Kong pass-through, no rewrite. `{audience}` ∈ `public|private|internal|protected`. **Never** expose `internal` on `ingress-api.yaml` — NetworkPolicy is the fence. JWT: edge filter on Kong `/private/` (ADR-006) + authoritative RS256 verify in each service (`pkg/authmw`). Details: [`docs/api/api.md`](docs/api/api.md#http-url-model).
+- **gRPC east-west** — official transport for migrated calls; always-on `:9090`; no REST fallback. Relevant when editing call-graph docs or east-west NetworkPolicy. Details: [`docs/api/api.md`](docs/api/api.md#grpc-runtime-model).
+- **Caching:** Cache-Aside with Valkey — [`docs/caching/caching.md`](docs/caching/caching.md).
+
+**Domain labels in homelab:** ResourceSet domains are `identity`, `catalog`,
+`checkout`, and `comms` (`platform.duynhlab.dev/domain` on
+`kubernetes/apps/services/*.yaml`). Map services to domains via those manifests
+and the service table in [`SERVICES.md`](SERVICES.md) — do not duplicate that
+table here.
 
 ## Kyverno admission rules
 
@@ -141,7 +297,7 @@ Every manifest applied to the cluster must satisfy admission:
 ## Docs conventions
 
 Docs are a first-class deliverable in this repo. When writing or refactoring them:
-- **English only**; **Mermaid only** for diagrams (never ASCII art — see Architecture).
+- **English only**; **Mermaid only** for diagrams (never ASCII art — see Platform architecture).
 - Follow the house shape (model: [`docs/observability/profiling/README.md`](docs/observability/profiling/README.md)): one-line hook → status/quick-facts table → overview/concept → architecture (Mermaid) → how-it-works-in-this-platform → operations → references → a `_Last updated: …_` footer.
 - **Be accurate to the deployed reality.** Mark designed-but-not-yet-deployed things as **planned** (don't describe targets as current); cross-check claims against the manifests.
 - **Synthesize external material in-house** — learn from articles/newsletters, then write it in our own words + Mermaid; **don't embed third-party links** (official product docs already in a References section are fine).
@@ -205,6 +361,9 @@ reference style.
 
 | Topic | Start here |
 |-------|-----------|
+| Agent role / platform domains | [Agent role](#agent-role-senior-platform-engineer), [Platform domains](#platform-domains) |
+| Engineering skills workflow | [Engineering skills workflow](#engineering-skills-workflow), [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) |
+| Cross-repo app context / repo index | [Cross-repo app context](#cross-repo-app-context), [`SERVICES.md`](SERVICES.md) |
 | Docs index | [`docs/README.md`](docs/README.md) |
 | Setup / commands | [`docs/platform/setup.md`](docs/platform/setup.md) |
 | API (shared rules and service contracts) | [`docs/api/api.md`](docs/api/api.md), [`docs/api/README.md`](docs/api/README.md#service-contracts) |

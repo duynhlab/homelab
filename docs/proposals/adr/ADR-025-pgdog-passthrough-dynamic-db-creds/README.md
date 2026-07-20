@@ -311,6 +311,39 @@ read-only role + TTL + audit) are rehearsable but OIDC itself is production-only
 
 ---
 
+## 8.5. Maturity ladder — where this sits, and the cloud path
+
+DB credential auth is a curve, not a binary. This platform sits deliberately at a
+**self-hosted** rung; higher rungs move the auth/rotation work out of the app and are the
+natural target **once the platform runs on a cloud provider**. Documented so a future move
+to AWS/GCP leverages what the provider already offers instead of re-inventing it.
+
+| Rung | What | Status here | Real-world |
+|---|---|---|---|
+| 0 | Static password in a Secret, never rotated | legacy (pre-ADR-025) | — |
+| 1 | **Static-role rotated + app reads a mounted file** (`BeforeConnect`) | **DECIDED — this platform** (self-hosted OpenBAO) | self-hosted Vault shops |
+| 2 | **Sidecar / proxy offload** — Vault Agent / RDS Proxy / Cloud SQL Auth Proxy holds & rotates the cred; the app connects to a localhost proxy with no/short creds → **zero app-code change** | reference / future | common at large scale |
+| 3 | **Passwordless cloud IAM / workload identity** — RDS IAM, Cloud SQL IAM, Entra ID: a short-lived token from the workload's cloud identity, **no static password at all** | reference / cloud-only | cloud-native gold standard |
+
+- Rungs 2–3 are **not "more correct"** — they relocate rotation/auth into a sidecar or the
+  cloud identity plane. Both need TLS end-to-end and (rung 3) a cloud IAM binding, neither
+  available on Kind, so they stay **reference / future**.
+- **When this platform runs on AWS/GCP:** prefer **rung 3** (RDS / Cloud SQL IAM —
+  passwordless, provider-rotated) for service accounts, or **rung 2** (a managed proxy)
+  where IAM isn't an option.
+- **Self-hosted passwordless (rung 3 without a cloud) — app cert-auth:** CNPG 1.30's
+  `DatabaseRole.clientCertificate` auto-issues and renews a TLS **client certificate**; the
+  app authenticates by `cert` / mTLS (`hostssl … cert` in pg_hba) — no password to rotate,
+  and no file-reload gap because certs **overlap** on renewal. It is the on-prem equivalent
+  of rung 3, cleanest **direct-to-PG** (a pooler in the middle needs care). It needs TLS
+  end-to-end (today is scram-sha-256 and partly non-TLS on Kind), so it stays
+  **reference / future** — **noted here because that infra (TLS) is not in place yet.**
+- **Rung 1 is a stepping stone, not throwaway:** the `pkg/dbx` `BeforeConnect` hook built
+  here is the *same* mechanism rung 3 uses — it just fetches a short-lived IAM token instead
+  of reading a file. Moving up the ladder swaps the credential source, not the plumbing.
+
+---
+
 ## 9. Decision (summary)
 
 1. **Keep database-per-service** (ADR-013/015); schema-per-service documented as reference

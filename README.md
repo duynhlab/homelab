@@ -1,6 +1,32 @@
-# Microservices Observability Platform
+<div align="center">
 
-A GitOps-managed Kubernetes homelab cluster running on Kind.
+<a name="readme-top"></a>
+
+<img src=".github/.metadata/logo.png" alt="duynhlab homelab" width="120" height="auto">
+
+<h1>Microservices Observability Platform</h1>
+
+<p><em>GitOps-managed Kubernetes homelab — Kind, Flux, OpenTofu, and full observability stack.</em></p>
+
+<p>
+  <a href="kubernetes/">Kubernetes</a>
+  &middot;
+  <a href="terraform/">OpenTofu</a>
+  &middot;
+  <a href="docs/">Docs</a>
+  &middot;
+  <a href="local-stack/">Local Stack</a>
+</p>
+
+<p>
+  <a href="https://kind.sigs.k8s.io/"><img src="https://img.shields.io/badge/Kind-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white" alt="Kind"></a>&nbsp;
+  <a href="https://fluxcd.io/"><img src="https://img.shields.io/badge/GitOps-Flux-5468ff?style=for-the-badge&logo=flux&logoColor=white" alt="Flux"></a>&nbsp;
+  <a href="https://opentofu.org/"><img src="https://img.shields.io/badge/OpenTofu-7B42BC?style=for-the-badge&logo=opentofu&logoColor=white" alt="OpenTofu"></a>&nbsp;
+  <a href="https://github.com/duynhlab/homelab/actions/workflows/ci.yml"><img src="https://github.com/duynhlab/homelab/actions/workflows/ci.yml/badge.svg" alt="CI"></a>&nbsp;
+  <a href="https://github.com/duynhlab/homelab/actions/workflows/renovate.yml"><img src="https://github.com/duynhlab/homelab/actions/workflows/renovate.yml/badge.svg" alt="Renovate"></a>
+</p>
+
+</div>
 
 ---
 

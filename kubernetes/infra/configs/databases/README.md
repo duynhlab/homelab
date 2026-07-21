@@ -76,4 +76,3 @@ per service in each cluster's `services/*.yaml` (RFC-0012 triplets):
 - **PostgreSQL DRP:** [`docs/databases/010-drp.md`](../../../../docs/databases/010-drp.md)
 - **Poolers Documentation:** [`clusters/README.md`](clusters/README.md)
 - **CNPG HA/DR Deep Dive:** [`docs/databases/005-ha-dr-deep-dive.md`](../../../../docs/databases/005-ha-dr-deep-dive.md)
-- **PgCat Troubleshooting (legacy):** [`docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md`](../../../../docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md)

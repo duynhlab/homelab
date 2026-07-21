@@ -1004,7 +1004,7 @@ PgDog fronts **four application databases** on this cluster — **product**, **c
 - **Operator comparison (Zalando vs CNPG)**: [`003-operator-comparison.md`](./003-operator-comparison.md)
 - **Replication strategy**: [`004-replication-strategy.md`](./004-replication-strategy.md)
 - **Backup strategy**: [`006-backup-strategy.md`](./006-backup-strategy.md)
-- **Poolers (PgBouncer, PgCat, PgDog)**: [`008-pooler.md`](./008-pooler.md)
+- **Poolers (PgBouncer, PgDog)**: [`008-pooler.md`](./008-pooler.md)
 - **Related in-repo docs**: [002-database-integration.md](002-database-integration.md) · [007-architecture.md](007-architecture.md) (the former `specs/active` research notes were retired)
 
 ---

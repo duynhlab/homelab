@@ -65,7 +65,7 @@ The full new-service flow (triplet, HBA, seeds) is [add-service-database.md](add
 
 ## References
 
-- [008-pooler.md](../008-pooler.md) — architecture, PgBouncer/PgCat comparison (neither deployed)
+- [008-pooler.md](../008-pooler.md) — architecture, PgBouncer/PgDog comparison
 - [add-service-database.md](add-service-database.md), [rotate-cnpg-service-password.md](rotate-cnpg-service-password.md)
 - PgDog docs: https://docs.pgdog.dev/
 

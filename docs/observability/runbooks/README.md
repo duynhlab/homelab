@@ -11,6 +11,12 @@ Runbooks for investigating, troubleshooting, and resolving incidents in the obse
 | [Microservices Alerts](microservices-alerts.md) | Workflows, tuning, and design context for application alerts | Learning, cross-signal triage |
 | [Microservices runbooks](microservices/README.md) | Per-alert investigation (19 files) | On-call, when an application alert fires |
 | [PostgreSQL Alerts](postgresql/README.md) | Per-alert CNPG runbooks (chart + deep-signal), one file per alert name | On-call, when a PostgreSQL/CNPG alert fires |
+| [VictoriaLogs Kubernetes Logs Debug](victorialogs-kubernetes-logs-debug.md) | Blank Grafana logs panel / empty Explore against VictoriaLogs | On-call, when Kubernetes logs are missing in Grafana |
+
+## Runbook placement
+
+Runbooks live **next to their domain hub** (`databases/runbooks/`, `secrets/runbooks/`,
+`observability/runbooks/`). There is no central `docs/runbooks/troubleshooting/` folder.
 
 ## Runbook Structure
 
@@ -32,4 +38,4 @@ Each alert runbook follows a consistent format (CNPG upstream style for PostgreS
 - [Prepared Databases](../../databases/runbooks/prepared-databases.md) -- preparedDatabases issue runbook
 
 ---
-_Last updated: 2026-07-18_
+_Last updated: 2026-07-21_

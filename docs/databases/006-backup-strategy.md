@@ -84,7 +84,7 @@ sequenceDiagram
 flowchart LR
   CNPGMetrics["CNPG backup metrics (cnpg_collector_*)"] --> Prometheus["Prometheus"]
   Prometheus --> Rule["PrometheusRule: postgres-backup-alerts"]
-  Rule --> Runbook["postgres_backup_restore.md"]
+  Rule --> Runbook["postgres-backup-restore.md"]
 ```
 
 ## Cluster Inventory
@@ -529,7 +529,7 @@ Best practices:
 
 - [002-database-integration.md](./002-database-integration.md) - Database architecture and cluster details
 - [010-drp.md](./010-drp.md) - Production-ready DRP, recovery decision flow, and restore-drill evidence
-- [postgres_backup_restore.md](../runbooks/troubleshooting/postgres_backup_restore.md) - Runbook for backup/restore procedures
+- [postgres-backup-restore.md](./runbooks/postgres-backup-restore.md) - Runbook for backup/restore procedures
 - [RustFS README](../../kubernetes/infra/controllers/storage/rustfs/README.md) - RustFS deployment and access
 
 ---

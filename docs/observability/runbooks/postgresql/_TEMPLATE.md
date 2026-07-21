@@ -53,7 +53,7 @@ runbooks when needed:
 
 - [Emergency recovery](../../../databases/010.4-emergency-recovery.md)
 - [PgDog operations](../../../databases/runbooks/pgdog-operations.md)
-- [Backup restore](../../../runbooks/troubleshooting/postgres_backup_restore.md)
+- [Backup restore](../../../databases/runbooks/postgres-backup-restore.md)
 
 ## Escalation
 

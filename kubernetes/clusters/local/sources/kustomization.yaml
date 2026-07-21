@@ -24,7 +24,6 @@ resources:
   - helm/sloth.yaml
   - helm/vector.yaml
   - helm/opentelemetry.yaml
-  - helm/pgcat.yaml
   - helm/pgdog.yaml
   - helm/rustfs.yaml
   - helm/valkey.yaml

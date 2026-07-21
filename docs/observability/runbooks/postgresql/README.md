@@ -32,8 +32,8 @@ alerts, and operator health. One file per alert name — each file covers both
 | PostgresWALSizeHigh | warning | homelab-extra | active | [PostgresWALSizeHigh.md](PostgresWALSizeHigh.md) |
 | CNPGClusterZoneSpreadWarning | warning | chart | gated | [CNPGClusterZoneSpreadWarning.md](CNPGClusterZoneSpreadWarning.md) |
 | CNPGClusterInstancesOnSameNode | warning | chart | gated | [CNPGClusterInstancesOnSameNode.md](CNPGClusterInstancesOnSameNode.md) |
-| PostgresBackupTooOld | warning | backup-alerts | active | [postgres_backup_restore.md](../../../runbooks/troubleshooting/postgres_backup_restore.md) |
-| PostgresBackupFailed | critical | backup-alerts | active | [postgres_backup_restore.md](../../../runbooks/troubleshooting/postgres_backup_restore.md) |
+| PostgresBackupTooOld | warning | backup-alerts | active | [postgres-backup-restore.md](../../../databases/runbooks/postgres-backup-restore.md) |
+| PostgresBackupFailed | critical | backup-alerts | active | [postgres-backup-restore.md](../../../databases/runbooks/postgres-backup-restore.md) |
 | CNPGClusterLogicalReplicationErrors | warning | chart | inactive | [CNPGClusterLogicalReplicationErrors.md](CNPGClusterLogicalReplicationErrors.md) |
 | CNPGClusterLogicalReplicationErrorsCritical | critical | chart | inactive | [CNPGClusterLogicalReplicationErrorsCritical.md](CNPGClusterLogicalReplicationErrorsCritical.md) |
 | CNPGClusterLogicalReplicationLagging | warning | chart | inactive | [CNPGClusterLogicalReplicationLagging.md](CNPGClusterLogicalReplicationLagging.md) |

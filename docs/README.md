@@ -53,13 +53,16 @@ docs/
 │   ├── 011-documents.md              # Further reading / document map
 │   ├── 012-declarative-role-management.md  # RFC-0012 per-service triplets (ExternalSecret + DatabaseRole + Database)
 │   └── runbooks/                     # Database ops runbooks
-│       ├── endpoints-to-configmaps.md
-│       ├── prepared-databases.md
-│       ├── cnpg-dr-replica-bootstrap.md
-│       ├── zalando-ha-scaling.md
+│       ├── README.md
 │       ├── add-service-database.md   # Add a service DB to product-db (RFC-0012 triplet)
 │       ├── rotate-cnpg-service-password.md  # Rotate a product-db service password end-to-end
-│       └── pgdog-operations.md       # PgDog day-2 ops: rotations, backends, failure modes
+│       ├── pgdog-operations.md       # PgDog day-2 ops: rotations, backends, failure modes
+│       ├── postgres-backup-restore.md  # Backup/restore and PITR
+│       ├── cnpg-dr-replica-bootstrap.md
+│       ├── endpoints-to-configmaps.md
+│       ├── prepared-databases.md
+│       ├── zalando-ha-scaling.md
+│       └── postgres-backup-restore.md  # Backup/restore and PITR
 ├── observability/                # Observability documentation
 │   ├── README.md                 # Master index + 4-pillar architecture
 │   ├── opentelemetry/             # OTel instrumentation, transport, and migration learning
@@ -113,6 +116,7 @@ docs/
 │       ├── observability-deep-dive.md   # Theory + interview prep
 │       ├── infrastructure-alerts.md     # Infra alert investigation guide
 │       ├── microservices-alerts.md      # Workflows, tuning hub
+│       ├── victorialogs-kubernetes-logs-debug.md  # Blank Grafana logs / VictoriaLogs ingest
 │       ├── microservices/               # Per-alert runbooks (19 files)
 │       └── postgresql/                  # Per-alert CNPG runbooks
 ├── caching/                     # Valkey cache: Cache-Aside, eviction policies, distributed-cache concept
@@ -129,13 +133,6 @@ docs/
 │   ├── kyverno.md                # Kyverno admission-policy platform guide
 │   ├── mcp-servers.md            # MCP servers wired into the platform
 │   └── ruleset-automation.md     # GitHub ruleset automation
-├── runbooks/                     # Operational runbooks
-│   └── troubleshooting/          # Troubleshooting guides
-│       ├── pgcat_prepared_statement_error.md
-│       ├── pgcat_read_only_transaction_error.md
-│       ├── pgcat_upstream_connectivity_errors.md
-│       ├── postgres_backup_restore.md  # PostgreSQL backup/restore procedures
-│       └── victorialogs_kubernetes_logs_debug.md  # VictoriaLogs log debugging
 ├── secrets/                      # Secrets, TLS & trust distribution (one chain)
 │   ├── README.md                 # Homelab secrets/TLS/trust hub
 │   ├── openbao.md                # OpenBAO HA/Raft architecture and learning notes
@@ -280,7 +277,7 @@ docs/
     - CNPG vs EC2/VM operational differences
     - Backup/restore, scaling, and sharding concepts
     - Cross-namespace secrets visualization for supporting-shared-db
-    - Connection patterns (direct, PgBouncer, PgDog — PgCat is legacy)
+    - Connection patterns (direct, PgBouncer, PgDog)
     - Environment variables and Helm configuration
     - Database verification and troubleshooting
     - Monitoring and best practices
@@ -293,11 +290,11 @@ docs/
 
 ### Runbooks & Troubleshooting
 
-1. **[PostgreSQL Backup/Restore](./runbooks/troubleshooting/postgres_backup_restore.md)** - Backup and restore procedures (CNPG vs Zalando)
-2. **[VictoriaLogs Log Debugging](./runbooks/troubleshooting/victorialogs_kubernetes_logs_debug.md)** - Kubernetes log debugging with VictoriaLogs
+1. **[PostgreSQL Backup/Restore](./databases/runbooks/postgres-backup-restore.md)** - Backup and restore procedures (CNPG Barman)
+2. **[VictoriaLogs Log Debugging](./observability/runbooks/victorialogs-kubernetes-logs-debug.md)** - Kubernetes log debugging with VictoriaLogs
 3. **[Add a service database](./databases/runbooks/add-service-database.md)** - RFC-0012 triplet flow on product-db
 4. **[Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md)** - End-to-end rotation via OpenBAO → triplet → PgDog
-5. **[PgDog operations](./databases/runbooks/pgdog-operations.md)** — day-2 pooler ops (`pgdog-platform`, `pgdog-product`); legacy PgCat troubleshooting kept for archaeology: [prepared-statement](./runbooks/troubleshooting/pgcat_prepared_statement_error.md) · [read-only txn](./runbooks/troubleshooting/pgcat_read_only_transaction_error.md) · [upstream connectivity](./runbooks/troubleshooting/pgcat_upstream_connectivity_errors.md)
+5. **[PgDog operations](./databases/runbooks/pgdog-operations.md)** — day-2 pooler ops (`pgdog-platform`, `pgdog-product`)
 
 ---
 
@@ -391,7 +388,7 @@ docs/
 - [Architecture](./databases/007-architecture.md) - Database architecture overview
 - [Backup Strategy](./databases/006-backup-strategy.md) - Backup architecture and retention
 - [Extensions](./databases/009-extensions.md) - PostgreSQL extensions (operand built-in vs Image Volume models)
-- [Connection Poolers](./databases/008-pooler.md) - PgBouncer, PgCat (legacy), PgDog
+- [Connection Poolers](./databases/008-pooler.md) - PgBouncer, PgDog
 - [Replication Strategy](./databases/004-replication-strategy.md) - Replication strategy
 - [HA & DR Deep Dive](./databases/005-ha-dr-deep-dive.md) - product-db vs product-db-replica (object-store DR)
 - [PostgreSQL DRP](./databases/010-drp.md) - DRP, RTO/RPO, PITR, standby taxonomy, and restore evidence
@@ -441,11 +438,10 @@ docs/
 
 ### Runbooks
 
-- [PostgreSQL Backup/Restore](./runbooks/troubleshooting/postgres_backup_restore.md) - Backup and restore procedures
-- [VictoriaLogs Log Debugging](./runbooks/troubleshooting/victorialogs_kubernetes_logs_debug.md) - Kubernetes log debugging with VictoriaLogs
+- [PostgreSQL Backup/Restore](./databases/runbooks/postgres-backup-restore.md) - Backup and restore procedures
+- [VictoriaLogs Log Debugging](./observability/runbooks/victorialogs-kubernetes-logs-debug.md) - Kubernetes log debugging with VictoriaLogs
 - [Add a service database](./databases/runbooks/add-service-database.md) - RFC-0012 triplet flow
 - [Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md) - End-to-end rotation
-- *Legacy PgCat (retired):* [prepared-statement](./runbooks/troubleshooting/pgcat_prepared_statement_error.md) · [read-only txn](./runbooks/troubleshooting/pgcat_read_only_transaction_error.md) · [upstream](./runbooks/troubleshooting/pgcat_upstream_connectivity_errors.md)
 
 ---
 
@@ -478,7 +474,4 @@ docs/
 
 ---
 
-**Last Updated**: 2026-07-11 — Zalando→CNPG migration: operator-comparison + Zalando deep-dive entries reframed as reference/historical (platform standardised on CloudNativePG). Security category added; ADR-016 indexed; Platform category completed (kyverno, graceful-shutdown, gke-dns, mcp, rulesets); databases 012 + 2 runbooks linked; PgCat runbooks demoted to legacy
-
----
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-21 — Retired `docs/runbooks/troubleshooting/`; runbooks live under domain hubs._

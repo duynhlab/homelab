@@ -233,7 +233,7 @@ those exceptions into ordinary CRUD services.
 |-------------|---------------------|-------------------------|
 | Local-stack | `http://localhost:8080` | Docker Compose service name |
 | Kubernetes | Kong hostname | `<service>.<namespace>.svc.cluster.local:8080` |
-| Kubernetes gRPC | Not browser-accessible | `dns:///<service>-grpc.<namespace>.svc.cluster.local:9090` |
+| Kubernetes gRPC | Not browser-accessible | `dns:///<service>.<namespace>.svc.cluster.local:9090` |
 
 ## Common HTTP Contracts
 
@@ -345,24 +345,8 @@ their service documents.
 
 ## Service Contract Index
 
-The shared rules live here. Route tables, payload examples, and service-specific
-state transitions live in exactly one service file.
-
-| Service | Owns | HTTP | gRPC role | Contract |
-|---------|------|------|-----------|----------|
-| Auth | Credentials, sessions, refresh tokens, JWKS | Public | None | [auth.md](./auth.md) |
-| User | User profile data | Public, private, internal | None | [user.md](./user.md) |
-| Product | Catalog, price, inventory | Public and internal | Server; Review client | [product.md](./product.md) |
-| Cart | Active shopping cart | Private and internal | Server | [cart.md](./cart.md) |
-| Order | Order record and fulfillment kickoff | Private | Server; multiple clients | [order.md](./order.md) |
-| Review | Product reviews | Public and private | Server | [review.md](./review.md) |
-| Notification | Notification records and delivery requests | Private and internal | Server | [notification.md](./notification.md) |
-| Shipping | Quotes and shipment lifecycle | Public and internal | Server | [shipping.md](./shipping.md) |
-| Checkout | Short-lived purchase session | Private | Client only | [checkout.md](./checkout.md) |
-| Payment | Payment state, ledger, refunds | Public, private, internal | Server | [payments.md](./payments.md) |
-
-[microservices.md](./microservices.md) is the high-level feature and ownership
-map. It should not duplicate complete route or payload definitions.
+The per-service contract index lives in [README.md § Service Contracts](./README.md#service-contracts).
+Deployment truth (local vs cluster vs planned) lives in [DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md).
 
 ## Choosing HTTP or gRPC
 
@@ -378,6 +362,10 @@ The rule is simple: browser traffic stays HTTP. New east-west calls use gRPC
 unless an ADR documents a reason not to.
 
 ## Current East-West Call Graph
+
+The order-worker and checkout-worker edges below are Temporal saga activities;
+the workflow registry (owners, task queues, participants) is
+[workflows.md](./workflows.md).
 
 ```mermaid
 flowchart LR
@@ -455,22 +443,26 @@ flowchart TB
         Client1["gRPC client"] -->|"one HTTP/2 connection"| Pod1["pod 1"]
         Client1 -.->|"idle"| Pod2["pod 2"]
     end
-    subgraph Solution["Headless DNS and round_robin"]
+    subgraph Solution["Per-pod spreading (headless DNS or mesh — reference, not deployed)"]
         Client2["gRPC client"] --> Pod3["pod 1"]
         Client2 --> Pod4["pod 2"]
     end
 ```
 
-The platform solution is:
+The current deployment is:
 
-1. A headless `<service>-grpc` Service exposes pod addresses.
-2. Clients dial a `dns:///` target.
+1. Each service exposes gRPC as a second port on its single multi-port
+   Service `<service>` (the mop chart removed the separate headless
+   `<service>-grpc` twin in 0.14).
+2. Clients dial `dns:///<service>.<namespace>.svc.cluster.local:9090`.
 3. `pkg/grpcx` configures client-side `round_robin`.
-4. The client opens subconnections and spreads RPCs across ready pods.
+4. Because a ClusterIP Service resolves to one virtual IP, `round_robin`
+   currently sees a single address; per-pod spreading would need headless DNS
+   or a mesh, which is acceptable at current replica counts.
 
 | Option | Decision | Reason |
 |--------|----------|--------|
-| Headless Service plus `round_robin` | Current | No extra infrastructure and works with existing Kubernetes |
+| Single multi-port Service plus `dns:///` target | Current | One Service per workload; sufficient at current replica counts |
 | Service mesh | Deferred | No mesh is deployed; adding one only for gRPC balancing is disproportionate |
 | Dedicated internal proxy | Rejected | Adds a hop and a component without a current need |
 
@@ -606,4 +598,4 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-07-14_
+_Last updated: 2026-07-21_

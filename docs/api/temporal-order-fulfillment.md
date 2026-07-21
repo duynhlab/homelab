@@ -4,11 +4,12 @@ Temporal makes the platform's multi-service order transaction durable, retryable
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Implemented and verified end-to-end in local-stack; Temporal and the order worker are deployed in the cluster |
+| **Status** | Implemented — verified end-to-end in local-stack; Temporal and the order worker are deployed in the cluster |
 | **Scope** | Saga and 2PC learning guide plus the live order-fulfillment workflow |
 | **Workflow owner** | Order service and the `order-worker` process |
 | **Task queue** | `order-fulfillment` |
 | **Order result** | `pending` becomes `confirmed` or `failed` |
+| **Registry** | [workflows.md](./workflows.md#order-fulfillment) — all platform workflows in one table |
 | **Decisions** | [ADR-001](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/) · [ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/) · [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) |
 
 ## Overview
@@ -17,7 +18,9 @@ One order touches independent order, product, shipping, and payment databases,
 plus an external payment provider. A normal database transaction cannot cover
 all of them. The platform therefore uses an orchestrated Saga: each service
 commits locally, Temporal records durable progress, and failures before the
-pivot trigger compensating actions in reverse.
+pivot trigger compensating actions in reverse. This is the deep dive for
+`OrderFulfillmentWorkflow`; the platform-wide workflow index lives in
+[workflows.md](./workflows.md).
 
 | Before Temporal | With the current Saga |
 |-----------------|-----------------------|
@@ -46,7 +49,35 @@ flowchart LR
     class Temporal platform;
 ```
 
-## Why Temporal?
+## Contents
+
+- [Part 1 — Learn](#part-1--learn)
+  - [Why Temporal?](#why-temporal)
+  - [When to Use Temporal](#when-to-use-temporal)
+  - [The Distributed Transaction Problem](#the-distributed-transaction-problem)
+  - [How Two-Phase Commit Works](#how-two-phase-commit-works)
+  - [Why 2PC Does Not Fit This Platform](#why-2pc-does-not-fit-this-platform)
+  - [The Saga Pattern](#the-saga-pattern)
+  - [Saga Properties: Compensation, Idempotency, and Pivot](#saga-properties-compensation-idempotency-and-pivot)
+  - [2PC vs Saga Tradeoffs](#2pc-vs-saga-tradeoffs)
+  - [When 2PC Is the Better Choice](#when-2pc-is-the-better-choice)
+- [Part 2 — As-built](#part-2--as-built)
+  - [Current Order-Fulfillment Saga](#current-order-fulfillment-saga) — [Workflow at a Glance](#workflow-at-a-glance) · [Retry and Timeout Policy](#retry-and-timeout-policy)
+  - [Contracts and the Checkout Flow](#contracts-and-the-checkout-flow)
+  - [Temporal Infrastructure](#temporal-infrastructure)
+  - [As-Built Notes and Roadmap](#as-built-notes-and-roadmap)
+- [Part 3 — Operations](#part-3--operations)
+  - [Deploy and Run It](#deploy-and-run-it)
+  - [Operations and Observability](#operations-and-observability)
+- [References](#references)
+
+## Part 1 — Learn
+
+Theory first: why a workflow engine at all, why not a distributed transaction,
+and what a saga actually guarantees. Everything here is general — the
+platform-specific implementation follows in [Part 2](#part-2--as-built).
+
+### Why Temporal?
 
 Before this change, `order-service` committed the `orders` row and then, on **detached contexts**,
 made best-effort calls to notification (gRPC) and cart-clear (REST). The consequences:
@@ -66,7 +97,7 @@ step succeeds, run them in reverse on failure) is expressed as ordinary, testabl
 rationale and the alternatives we rejected (transactional outbox, message-queue choreography,
 hand-rolled orchestration) are in **[ADR-001](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/)**.
 
-## When to Use Temporal
+### When to Use Temporal
 
 Temporal is powerful but not free — it adds an operational dependency and a programming model.
 Reach for it deliberately.
@@ -82,7 +113,7 @@ Reach for it deliberately.
 Rule of thumb: **orchestration of stateful, multi-step, must-not-be-lost work → Temporal;
 stateless request/response → don't.**
 
-## The Distributed Transaction Problem
+### The Distributed Transaction Problem
 
 A single ACID transaction gives you all-or-nothing across everything it touches,
 but only *within one database*. Our checkout spans separate databases owned by
@@ -102,7 +133,7 @@ flowchart LR
 product database or a charge at the card provider. We need atomicity *across*
 resources — which is exactly what 2PC was designed for.
 
-## How Two-Phase Commit Works
+### How Two-Phase Commit Works
 
 2PC makes a write atomic across multiple resources using a **coordinator** and two
 rounds. Round 1 (**prepare**): the coordinator asks every participant "can you
@@ -132,7 +163,7 @@ Guarantee: **atomic + immediately consistent** across all participants. This is
 real and useful — inside one DB engine, or across XA resources in a single trust
 domain (some RDBMS + message brokers).
 
-## Why 2PC Does Not Fit This Platform
+### Why 2PC Does Not Fit This Platform
 
 - **No XA across independent service databases.** 2PC needs every participant to
   speak a distributed-transaction protocol under one coordinator. Our services
@@ -171,7 +202,7 @@ just **retries later** — nothing else is holding a lock in the meantime.
 So the atomic-distributed-transaction route is closed. We give up "all writes
 commit together, instantly" and design for **eventual consistency** instead.
 
-## The Saga Pattern
+### The Saga Pattern
 
 A **saga** is a sequence of *local* transactions. Each step commits in its own
 service's database immediately. If a later step fails, the saga runs a
@@ -200,7 +231,7 @@ crash-proof, and the flow is readable in one place. See
 [ADR-001](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/) for why
 orchestration beat choreography and a hand-rolled outbox here.
 
-## Saga Properties: Compensation, Idempotency, and Pivot
+### Saga Properties: Compensation, Idempotency, and Pivot
 
 - **Eventual consistency.** Between steps the system is *temporarily inconsistent*
   (stock reserved but order not yet confirmed). It converges — either the saga
@@ -213,7 +244,7 @@ orchestration beat choreography and a hand-rolled outbox here.
 - **Idempotency is mandatory.** Steps and compensations *will* be retried (network
   timeout, worker crash, orchestrator replay). Each must be safe to run more than
   once, or a retry double-charges / double-reserves. This is enforced by storage
-  design, not hope (see the implementation section below).
+  design, not hope (see [Part 2](#part-2--as-built)).
 - **The pivot (point of no return).** One step flips the saga from
   "still-compensatable" to "must-complete-forward". Before the pivot, failures
   compensate backward; after it, the business outcome is not rolled back; remaining work proceeds forward according to its retry policy.
@@ -249,9 +280,57 @@ finishing. The current workflow therefore never rolls back a confirmed order;
 notification, receipt, and cart clearing use bounded retries and are logged if
 they still fail.
 
-## Current Order-Fulfillment Saga
+### 2PC vs Saga Tradeoffs
 
-### Workflow at a Glance
+| Dimension | Two-phase commit | Saga (ours) |
+|---|---|---|
+| Consistency | Immediate, atomic across all | **Eventual** (converges via compensations) |
+| Availability | Low — blocking coordinator holds locks | High — steps are independent, retryable |
+| Coupling | Tight — all participants up together | Loose — survives a participant being down |
+| Failure model | Abort → everyone rolls back | Compensate completed steps in reverse |
+| External services | Can't enlist a non-XA card API | First-class — a step is just an API call |
+| Complexity cost | Coordinator + XA plumbing | Compensations + idempotency + orchestration |
+| Visibility | Opaque coordinator state | Every step/compensation is a durable event |
+
+### When 2PC Is the Better Choice
+
+Sagas aren't universally "better" — they're the right tool when data is spread
+across independent services. Reach for a single ACID transaction or 2PC when:
+
+- All the data lives in **one database** — just use a normal transaction (no saga
+  needed, no eventual consistency to reason about).
+- You have genuinely **XA-capable resources in one trust domain** (e.g. an RDBMS +
+  an XA message broker) and need strict immediate consistency.
+- The cost of temporary inconsistency is unacceptable *and* the availability hit of
+  blocking is acceptable — rare in user-facing paths, sometimes true in back-office
+  batch systems.
+
+A quick decision aid:
+
+```mermaid
+flowchart TD
+    Q1{"All data in<br/>ONE database?"}
+    Q1 -->|yes| T["Single ACID transaction<br/>(no saga, no 2PC)"]
+    Q1 -->|no| Q2{"All participants<br/>XA-capable in one<br/>trust domain?"}
+    Q2 -->|"yes + need strict<br/>immediate consistency"| TPC["Two-phase commit<br/>(accept the blocking cost)"]
+    Q2 -->|"no — separate services<br/>or an external API"| SAGA["Saga<br/>local txns + compensations"]
+
+    classDef pick fill:#22c55e,color:#052e16,stroke:#15803d;
+    class SAGA pick;
+```
+
+If you're crossing service boundaries or touching a third-party API, the saga is
+almost always the answer (the green path) — which is why it's the shape of every
+cross-service business action on this platform.
+
+## Part 2 — As-built
+
+What actually runs: the `OrderFulfillmentWorkflow` steps and compensations, the
+east-west contracts behind them, and the Temporal deployment itself.
+
+### Current Order-Fulfillment Saga
+
+#### Workflow at a Glance
 
 | # | Forward step | Service | Compensation if a later pre-pivot step fails |
 |---|--------------|---------|-----------------------------------------------|
@@ -422,8 +501,16 @@ flowchart TB
     OW -->|"gRPC :9090 (saga money ops)"| PGRPC
     KONG["Kong gateway"] -->|"/payment/v1/public/payments/webhooks/mockpay"| PHTTP
 
-    classDef db fill:#1a1a1a,stroke:#3b82f6;
-    class PDB db;
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    class KONG edge;
+    class PGRPC,PHTTP,PLOGIC service;
+    class OW,RELAY,RECON worker;
+    class PDB data;
+    class MP external;
 ```
 
 How to read it against the theory above:
@@ -446,7 +533,7 @@ How to read it against the theory above:
    atomicity.
 
 
-### Retry and Timeout Policy
+#### Retry and Timeout Policy
 
 | Setting | Value | Purpose |
 |---------|-------|---------|
@@ -469,53 +556,10 @@ stateDiagram-v2
     failed --> [*]
 ```
 
-## 2PC vs Saga Tradeoffs
+### Contracts and the Checkout Flow
 
-| Dimension | Two-phase commit | Saga (ours) |
-|---|---|---|
-| Consistency | Immediate, atomic across all | **Eventual** (converges via compensations) |
-| Availability | Low — blocking coordinator holds locks | High — steps are independent, retryable |
-| Coupling | Tight — all participants up together | Loose — survives a participant being down |
-| Failure model | Abort → everyone rolls back | Compensate completed steps in reverse |
-| External services | Can't enlist a non-XA card API | First-class — a step is just an API call |
-| Complexity cost | Coordinator + XA plumbing | Compensations + idempotency + orchestration |
-| Visibility | Opaque coordinator state | Every step/compensation is a durable event |
-
-## When 2PC Is the Better Choice
-
-Sagas aren't universally "better" — they're the right tool when data is spread
-across independent services. Reach for a single ACID transaction or 2PC when:
-
-- All the data lives in **one database** — just use a normal transaction (no saga
-  needed, no eventual consistency to reason about).
-- You have genuinely **XA-capable resources in one trust domain** (e.g. an RDBMS +
-  an XA message broker) and need strict immediate consistency.
-- The cost of temporary inconsistency is unacceptable *and* the availability hit of
-  blocking is acceptable — rare in user-facing paths, sometimes true in back-office
-  batch systems.
-
-A quick decision aid:
-
-```mermaid
-flowchart TD
-    Q1{"All data in<br/>ONE database?"}
-    Q1 -->|yes| T["Single ACID transaction<br/>(no saga, no 2PC)"]
-    Q1 -->|no| Q2{"All participants<br/>XA-capable in one<br/>trust domain?"}
-    Q2 -->|"yes + need strict<br/>immediate consistency"| TPC["Two-phase commit<br/>(accept the blocking cost)"]
-    Q2 -->|"no — separate services<br/>or an external API"| SAGA["Saga<br/>local txns + compensations"]
-
-    classDef pick fill:#052e1a,stroke:#22c55e;
-    class SAGA pick;
-```
-
-If you're crossing service boundaries or touching a third-party API, the saga is
-almost always the answer (the green path) — which is why it's the shape of every
-cross-service business action on this platform.
-
-## Contracts and the Checkout Flow
-
-New east-west contracts in [`duynhlab/pkg`](https://github.com/duynhlab/pkg) (`pkg/proto`, `buf`,
-tagged `v0.7.0`), all **idempotent** so activity retries are safe:
+East-west contracts in [`duynhlab/pkg`](https://github.com/duynhlab/pkg) (`pkg/proto`, `buf`;
+introduced in `v0.7.0`), all **idempotent** so activity retries are safe:
 
 - **product** — `ReserveStock(reservation_id, items)` · `ReleaseStock(reservation_id, items)`.
 - **shipping** — `CreateShipment(order_id, address)` · `CancelShipment(order_id)`.
@@ -529,7 +573,7 @@ user latency to downstream health, and an API-pod restart would lose the respons
 workflow keeps running. *(Future nicety: Temporal **Update-With-Start** could return an early
 "stock reserved" ack in the initial call.)*
 
-## Temporal Infrastructure
+### Temporal Infrastructure
 
 ```mermaid
 flowchart LR
@@ -549,6 +593,15 @@ flowchart LR
     Kong[Kong] -- temporal.duynh.me --> UI
     TC -- /metrics --> VM[VictoriaMetrics]
     OW -- OTLP --> Tempo
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    class Kong edge;
+    class OW worker;
+    class OP,TC,UI,VM,Tempo platform;
+    class TDB data;
 ```
 
 Deployed via the **`alexandrevilain/temporal-operator`** (see **[ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/)** for why the operator over the official Helm chart, and the server-version constraint):
@@ -559,39 +612,11 @@ Deployed via the **`alexandrevilain/temporal-operator`** (see **[ADR-002](../pro
 - **Edge & alerts** — Kong ingress `temporal.duynh.me`; `TemporalServerDown` + service/persistence error-rate `PrometheusRule`s (`configs/temporal/prometheusrule.yaml`).
 - **Flux order** — `controllers → temporal-operator` (the operator HelmRelease `dependsOn` cert-manager, since its chart renders a cert-manager `Certificate`/`Issuer` for the admission webhook); `databases → platform-db`; a `temporal` Kustomization (`dependsOn` controllers, cert-manager, databases, monitoring) before `apps`; the order worker `dependsOn` temporal.
 
-## Deploy and Run It
-
-- **Worker mode.** Each owning service ships a **`worker` subcommand** (mirrors `migrate`); it dials
-  Temporal + the downstreams, registers the workflow/activities, and polls the task queue. It also
-  serves `/health` and `/ready` (the process has no application HTTP API, but
-  still needs liveness and readiness probes). Worker metrics export over OTLP.
-- **In-cluster.** The worker is a **second release of the same `mop` chart** (`duynhlab/helm-charts`,
-  ≥`0.12.0`): same image, `args: ["worker"]`, `service.enabled: false`. In homelab it's the
-  `order-worker` HelmRelease (`kubernetes/apps/order-worker.yaml`, namespace `order`) carrying the
-  order DB + downstream addresses + `TEMPORAL_HOSTPORT` / `TEMPORAL_NAMESPACE` / `TASK_QUEUE` /
-  `PRODUCT_GRPC_ADDR`. `apps-local` `dependsOn` `temporal-local` so it deploys after the cluster is
-  Ready. (Earlier drafts used a `worker.enabled` chart toggle; the chart was reworked to the
-  separate-release model.)
-- **Locally.** `local-stack/compose.yaml` runs a `temporalio/temporal` dev server (frontend `:7233`,
-  Web UI `:8233`) + an `order-worker` container; `docker compose up -d --build` then a checkout
-  exercises the live saga.
-
-## Operations and Observability
-
-- **Temporal Web UI** — `temporal.duynh.me` (cluster) / `localhost:8233` (local-stack): every
-  execution, its inputs, history, retries, and failures.
-- **Metrics** — the operator scrapes Temporal **server** metrics via a `ServiceMonitor`; alerts:
-  `TemporalServerDown`, `TemporalServiceErrorRateHigh`, `TemporalPersistenceErrorRateHigh`
-  (`configs/temporal/prometheusrule.yaml`). The worker pushes activity, gRPC
-  RED, and Go-runtime metrics over OTLP; it has no application `/metrics` scrape endpoint.
-- **Failure handling** — insufficient stock fails fast (non-retryable) and compensates; transient
-  downstream errors retry per policy; a stuck workflow is visible (and terminable) in the UI.
-
-## As-Built Notes and Roadmap
+### As-Built Notes and Roadmap
 
 Deliberate deviations from the original design:
 
-- **Pivot = ConfirmOrder** (see §4); post-pivot steps are best-effort.
+- **Pivot = ConfirmOrder** (step 4 in [Workflow at a Glance](#workflow-at-a-glance)); post-pivot steps are best-effort.
 - **Workflow start is centralized in `internal/fulfillment`** (RFC-0015 P2, ADR-018): both the web
   handler and the gRPC `CreateOrder` server delegate to the same starter, so the logic layer stays
   Temporal-free. If Temporal is unavailable the order is still created (`pending`) and the start is
@@ -602,15 +627,52 @@ Deliberate deviations from the original design:
 - **Idempotency is DB-enforced** — product `stock_reservations` (PK `reservation_id,product_id`),
   shipping `UNIQUE(order_id)`.
 
-**Roadmap / planned (⏳):** tracked as **Future work in [RFC-0001](../proposals/rfc/RFC-0001/)** —
-server bump 1.27.x, Grafana dashboard, platform-db DR replica cluster, and GameDay drills are follow-ups. Already shipped from that list: cache-bust on reserve
+**Roadmap — all items Planned:** tracked as **Future work in [RFC-0001](../proposals/rfc/RFC-0001/)** —
+server bump 1.27.x (**Planned**), Grafana dashboard (**Planned**), platform-db DR
+replica cluster (**Planned**), and GameDay drills (**Planned**) are follow-ups.
+Already shipped from that list: cache-bust on reserve
 (ReserveStock/ReleaseStock invalidate `product:{id}`), workflow/activity RED
 metrics (`pkg/temporalx` MetricsHandler), and the internal cart-clear (as-built
 notes above).
 
+## Part 3 — Operations
+
+How to deploy the worker, run the saga locally, and watch it in production.
+
+### Deploy and Run It
+
+- **Worker mode.** Each owning service ships a **`worker` subcommand** (mirrors `migrate`); it dials
+  Temporal + the downstreams, registers the workflow/activities, and polls the task queue. It also
+  serves `/health` and `/ready` (the process has no application HTTP API, but
+  still needs liveness and readiness probes). Worker metrics export over OTLP.
+- **In-cluster.** The worker is a **second release of the same `mop` chart** (`duynhlab/helm-charts`,
+  ≥`0.12.0`): same image, `args: ["worker"]`, `service.enabled: false`. In homelab it's the
+  `order-worker` HelmRelease (`kubernetes/apps/order-worker.yaml`, namespace `order`) carrying the
+  order DB address, `TEMPORAL_HOSTPORT` / `TEMPORAL_NAMESPACE` / `TASK_QUEUE`, and the downstream
+  `*_GRPC_ADDR` targets (product, shipping, notification, payment — each
+  `dns:///<service>.<ns>.svc.cluster.local:9090`, the single multi-port Service).
+  `apps-local` `dependsOn` `temporal-local` so it deploys after the cluster is
+  Ready. (Earlier drafts used a `worker.enabled` chart toggle; the chart was reworked to the
+  separate-release model.)
+- **Locally.** `local-stack/compose.yaml` runs a `temporalio/temporal` dev server (frontend `:7233`,
+  Web UI `:8233`) + an `order-worker` container; `docker compose up -d --build` then a checkout
+  exercises the live saga.
+
+### Operations and Observability
+
+- **Temporal Web UI** — `temporal.duynh.me` (cluster) / `localhost:8233` (local-stack): every
+  execution, its inputs, history, retries, and failures.
+- **Metrics** — the operator scrapes Temporal **server** metrics via a `ServiceMonitor`; alerts:
+  `TemporalServerDown`, `TemporalServiceErrorRateHigh`, `TemporalPersistenceErrorRateHigh`
+  (`configs/temporal/prometheusrule.yaml`). The worker pushes activity, gRPC
+  RED, and Go-runtime metrics over OTLP; it has no application `/metrics` scrape endpoint.
+- **Failure handling** — insufficient stock fails fast (non-retryable) and compensates; transient
+  downstream errors retry per policy; a stuck workflow is visible (and terminable) in the UI.
+
 
 ## References
 
+- [workflows.md](./workflows.md) — platform workflow registry
 - [api.md](./api.md) — shared HTTP and gRPC behavior
 - [order.md](./order.md) — order contract and workflow handoff
 - [product.md](./product.md) · [shipping.md](./shipping.md) · [notification.md](./notification.md) — participating service contracts
@@ -620,4 +682,4 @@ notes above).
 - [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared idempotency state machine
 - [RFC-0010](../proposals/rfc/RFC-0010/) — payment and fulfillment design
 
-_Last updated: 2026-07-17_
+_Last updated: 2026-07-21_

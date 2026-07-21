@@ -32,11 +32,12 @@ All microservices are hosted in the `duynhlab` organization.
 > in-cluster via GitOps (checkout domain, alongside the `mockpay` provider and the
 > `order-worker` Temporal saga) **and** runs in local-stack.
 >
-> **Checkout** ([RFC-0015](docs/proposals/rfc/RFC-0015/), P1-P4) is the
+> **Checkout** ([RFC-0015](docs/proposals/rfc/RFC-0015/), P1-P5 shipped) is the
 > session orchestrator: cart snapshot, product-authoritative price validation,
 > shipping quote and totals, promo redemption, idempotent order handoff, and
-> Temporal abandonment. P1-P4 run in local-stack; cluster GitOps remains
-> planned for P5. No host port — reached only through Kong.
+> Temporal abandonment. Runs in local-stack **and** in-cluster via GitOps
+> (P5: API + checkout-worker). P6 legacy-path removal is planned. No host
+> port — reached only through Kong.
 
 ## 💻 Frontend
 

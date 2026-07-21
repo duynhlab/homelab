@@ -5,16 +5,15 @@ the multi-step purchase funnel as a short-lived, auditable **session**, makes
 sure the price you see is the price you pay, and hands a validated order to
 order-service — which remains the only writer of orders.
 
-| Dimension | Value |
-|-----------|-------|
-| **Local-stack** | Implemented |
-| **Cluster** | Implemented (P5 shipped 2026-07-14) |
-| **HTTP** | private only · `:8080` · Kong `/checkout/v1/private/` (edge JWT) |
-| **gRPC server** | None — client only |
-| **gRPC client** | cart (`GetCart`), product (`GetProducts`), shipping (`GetQuote`), order (`CreateOrder`) |
-| **Worker** | `checkout-worker` · queue `checkout` |
-| **Temporal** | Orchestrator · `AbandonedCheckoutWorkflow` · [workflows.md](./workflows.md#abandoned-checkout) |
-| **Technical debt** | None — the P6 legacy path is order's debt ([order.md](./order.md)) |
+| Dimension | Value | Status |
+|-----------|-------|--------|
+| **Deployment** | local-stack + cluster | Implemented |
+| **HTTP** | private only · `:8080` · Kong `/checkout/v1/private/` (edge JWT) | Implemented |
+| **gRPC server** | None — client only | None |
+| **gRPC client** | cart (`GetCart`), product (`GetProducts`), shipping (`GetQuote`), order (`CreateOrder`) | Implemented |
+| **Worker** | `checkout-worker` · queue `checkout` | Implemented |
+| **Temporal** | Orchestrator · `AbandonedCheckoutWorkflow` · [workflows.md](./workflows.md#abandoned-checkout) | Implemented |
+| **Technical debt** | None — the P6 legacy path is order's debt ([order.md](./order.md)) | None |
 
 | | |
 |---|---|
@@ -339,26 +338,29 @@ What checkout deliberately does NOT do (the boundary):
 
 ## Code map
 
-| Layer | Repo path |
-|-------|-----------|
-| Entry point (API + worker modes) | `checkout-service/cmd/main.go` |
-| HTTP handlers | `checkout-service/internal/web/v1/handler.go` |
-| Session logic + FSM | `checkout-service/internal/logic/v1/service.go`, `internal/logic/v1/fsm.go` |
-| Confirm flow | `checkout-service/internal/logic/v1/confirm.go` |
-| Promo codes | `checkout-service/internal/logic/v1/promo.go` |
-| Domain (session, token redaction) | `checkout-service/internal/core/domain/` |
-| Repository (SQL) | `checkout-service/internal/core/repository/postgres/` |
-| Abandonment workflow + activities | `checkout-service/internal/workflow/abandon.go`, `internal/workflow/lazy.go`, `internal/workflow/notifier.go` |
-| gRPC clients | `checkout-service/internal/clients/clients.go` |
-| Migrations (schema + seeds) | `checkout-service/db/migrations/sql/` |
-| Protos consumed | `pkg/proto/{cart,product,shipping,order}/v1/*.proto` |
+Paths in [`duynhlab/checkout-service`](https://github.com/duynhlab/checkout-service). Transport peers call `logic/v1`; logic calls `core` only ([api.md § Inside Each Service](./api.md#inside-each-service)).
+
+| Layer | Path | Notes |
+|-------|------|-------|
+| **Transport** | `internal/web/v1/handler.go` | HTTP handlers |
+| **logic** | `internal/logic/v1/service.go` | Session logic |
+| | `internal/logic/v1/fsm.go` | FSM |
+| | `internal/logic/v1/confirm.go` | Confirm flow |
+| | `internal/logic/v1/promo.go` | Promo codes |
+| **core** | `internal/core/domain/` | Session, token redaction |
+| | `internal/core/repository/postgres/` | Repository (SQL) |
+| **Platform** | `cmd/main.go` | Entry point (API + worker modes) |
+| | `internal/workflow/abandon.go`, `lazy.go`, `notifier.go` | Abandonment workflow + activities |
+| | `internal/clients/clients.go` | gRPC clients |
+| | `db/migrations/sql/` | Migrations (schema + seeds) |
+| | `pkg/proto/{cart,product,shipping,order}/v1/*.proto` | Protos consumed |
 
 ## References
 
 - [RFC-0015](../proposals/rfc/RFC-0015/) — full design record (alternatives, phases, exit criteria)
 - [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) · [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/)
 - [api.md](./api.md) — shared HTTP and gRPC conventions
-- [workflows.md](./workflows.md) — workflow registry · [DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md) — platform rollup
+- [workflows.md](./workflows.md) — workflow registry · [Service contracts](./README.md#service-contracts)
 - [cart.md](./cart.md) · [product.md](./product.md) · [shipping.md](./shipping.md) · [order.md](./order.md) — dependency contracts
 - [microservices.md](./microservices.md) — feature matrix
 

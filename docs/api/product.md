@@ -5,16 +5,15 @@ authority: browsing reads come from a Valkey cache-aside layer, checkout money
 reads bypass that cache for the real row, and the order saga reserves stock
 through an idempotent ledger.
 
-| Dimension | Value |
-|-----------|-------|
-| **Local-stack** | Implemented |
-| **Cluster** | Implemented |
-| **HTTP** | public (+ one internal route, never at the edge) · `:8080` · Kong `/product/v1/public/` (local-stack: bare `/product/` — [divergence](#http-api)) |
-| **gRPC server** | `GetProducts`, `ReserveStock`, `ReleaseStock` · `:9090` |
-| **gRPC client** | review (`ReviewService/GetProductReviews`) |
-| **Worker** | None |
-| **Temporal** | Participant (gRPC) · [workflows.md#order-fulfillment](./workflows.md#order-fulfillment) |
-| **Technical debt** | None |
+| Dimension | Value | Status |
+|-----------|-------|--------|
+| **Deployment** | local-stack + cluster | Implemented |
+| **HTTP** | public (+ one internal route, never at the edge) · `:8080` · Kong `/product/v1/public/` (local-stack: bare `/product/` — [divergence](#http-api)) | Partial |
+| **gRPC server** | `GetProducts`, `ReserveStock`, `ReleaseStock` · `:9090` | Implemented |
+| **gRPC client** | review (`ReviewService/GetProductReviews`) | Implemented |
+| **Worker** | None | None |
+| **Temporal** | Participant (gRPC) · [workflows.md#order-fulfillment](./workflows.md#order-fulfillment) | Implemented |
+| **Technical debt** | None | None |
 
 | | |
 |---|---|
@@ -111,7 +110,7 @@ the guarded decrement cannot oversell below zero.
 | `POST` | `/product/v1/internal/products` | Internal | Create a product (admin/seed) — **never exposed at either edge**; NetworkPolicy is the fence |
 
 Edge routing divergence (known, documented in
-[DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md#edge-exposure-verified)): the
+[api.md § Edge exposure](./api.md#edge-exposure)): the
 cluster ingress exposes exactly `/product/v1/public/`, while local-stack Kong
 routes the bare prefix `/product/`. Service paths are identical — Variant A
 pass-through, `strip_path: false`.
@@ -282,25 +281,27 @@ grpcurl -plaintext -d '{"product_ids":["1","2"]}' \
 
 ## Code map
 
-| Layer | Repo path |
-|-------|-----------|
-| HTTP handlers | `product-service/internal/web/v1/handler.go` |
-| Review gRPC client (3s deadline) | `product-service/internal/web/v1/review_client.go` |
-| gRPC server (status-code mapping) | `product-service/internal/grpc/v1/server.go` |
-| Catalog + inventory logic, cache invalidation | `product-service/internal/logic/v1/service.go` |
-| Details aggregation | `product-service/internal/logic/v1/details.go` |
-| Business metrics | `product-service/internal/logic/v1/metrics.go` |
-| Cache-aside, jitter, stampede lock | `product-service/internal/core/cache/product_cache.go` |
-| Repository (guarded decrement, ledger) | `product-service/internal/core/repository/postgres_product_repository.go` |
-| Reservation ledger migration | `product-service/db/migrations/sql/000004_stock_reservations.up.sql` |
-| Config (TTLs, addresses) | `product-service/config/config.go` |
-| Proto contract | `pkg/proto/product/v1/product.proto` |
+Paths in [`duynhlab/product-service`](https://github.com/duynhlab/product-service). Transport peers call `logic/v1`; logic calls `core` only ([api.md § Inside Each Service](./api.md#inside-each-service)).
+
+| Layer | Path | Notes |
+|-------|------|-------|
+| **Transport** | `internal/web/v1/handler.go` | HTTP handlers |
+| | `internal/web/v1/review_client.go` | Review gRPC client (3s deadline) |
+| | `internal/grpc/v1/server.go` | gRPC server (status-code mapping) |
+| **logic** | `internal/logic/v1/service.go` | Catalog + inventory logic, cache invalidation |
+| | `internal/logic/v1/details.go` | Details aggregation |
+| | `internal/logic/v1/metrics.go` | Business metrics |
+| **core** | `internal/core/cache/product_cache.go` | Cache-aside, jitter, stampede lock |
+| | `internal/core/repository/postgres_product_repository.go` | Repository (guarded decrement, ledger) |
+| **Platform** | `config/config.go` | Config (TTLs, addresses) |
+| | `db/migrations/sql/000004_stock_reservations.up.sql` | Reservation ledger migration |
+| | `pkg/proto/product/v1/product.proto` | Proto contract |
 
 ## References
 
 - [api.md](./api.md) — shared HTTP/gRPC rules, error envelope, pagination, gRPC runtime model
 - [workflows.md](./workflows.md) — Temporal workflow registry
-- [DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md) — platform rollup + edge divergence
+- [Service contracts](./README.md#service-contracts)
 - [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — saga deep dive
 - [checkout.md](./checkout.md) · [review.md](./review.md) — dependency contracts
 - [docs/caching/caching.md](../caching/caching.md) — cache-aside pattern theory

@@ -28,11 +28,11 @@ pivot trigger compensating actions in reverse. This is the deep dive for
 | Stock reservation was incomplete | Product reserves and releases stock idempotently |
 | Partial work had no automatic undo | Shipping, stock, and payment have compensations |
 | A caller could not inspect in-flight work | Temporal UI, traces, logs, and metrics expose execution |
-| Request latency could depend on every downstream | CreateOrder returns `201 pending`; fulfillment continues asynchronously |
+| Request latency could depend on every downstream | Checkout confirm returns **201**; order row is **`pending`**; fulfillment continues asynchronously |
 
 ```mermaid
 flowchart LR
-    Checkout -->|"CreateOrder"| Order["order-service"]
+    Checkout -->|"confirm → gRPC CreateOrder"| Order["order-service"]
     Order -->|"start workflow"| Temporal
     Temporal --> Worker["order-worker"]
     Worker --> Product
@@ -566,12 +566,18 @@ introduced in `v0.7.0`), all **idempotent** so activity retries are safe:
 - **`pkg/temporalx`** — shared Temporal client + worker bootstrap (mirrors `grpcx`/`obsx`) with the
   OpenTelemetry tracing interceptor, so workflow/activity spans join the originating request's trace.
 
-**Checkout is async.** `CreateOrder` commits the order and returns **`201 pending`** immediately;
-the SPA shows "Processing…" and polls `GET /order/v1/private/orders/:id` for `confirmed`/`failed`.
-The request does **not** block on the saga — retries can take seconds–minutes, blocking would couple
-user latency to downstream health, and an API-pod restart would lose the response while the durable
-workflow keeps running. *(Future nicety: Temporal **Update-With-Start** could return an early
-"stock reserved" ack in the initial call.)*
+**Checkout is async.** After [checkout confirm](./checkout.md), checkout calls
+`order.v1/CreateOrder` over gRPC; order-service persists the row as **`pending`**
+and starts the workflow on a detached context. Checkout confirm returns **201**
+with `order_id`; the SPA shows "Processing…" and polls
+`GET /order/v1/private/orders/:id` for `confirmed`/`failed`. The HTTP request
+does **not** block on the saga — activity retries can take seconds–minutes,
+blocking would couple user latency to downstream health, and an API-pod restart
+would lose the response while the durable workflow keeps running. The legacy
+`POST /order/v1/private/orders` path still starts the same workflow (**Technical
+debt**, P6 removal — [order.md](./order.md)). *(Future nicety: Temporal
+**Update-With-Start** could return an early "stock reserved" ack in the initial
+call.)*
 
 ### Temporal Infrastructure
 
@@ -673,8 +679,10 @@ How to deploy the worker, run the saga locally, and watch it in production.
 ## References
 
 - [workflows.md](./workflows.md) — platform workflow registry
-- [api.md](./api.md) — shared HTTP and gRPC behavior
+- [api.md](./api.md) — shared HTTP and gRPC behavior; [end-to-end user journeys](./api.md#end-to-end-user-journeys) (checkout funnel before the saga)
+- [checkout.md](./checkout.md) — confirm handoff and idempotency into `CreateOrder`
 - [order.md](./order.md) — order contract and workflow handoff
+- [cart.md](./cart.md) — saga `ClearCart` internal REST exception
 - [product.md](./product.md) · [shipping.md](./shipping.md) · [notification.md](./notification.md) — participating service contracts
 - [payments.md](./payments.md) — payment state, ledger, and reconciliation
 - [ADR-001](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/) — adopt Temporal

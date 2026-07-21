@@ -2,16 +2,15 @@
 
 Cart turns browsing intent into a per-user, mutable basket — and hands checkout a read-only, minor-units snapshot of it.
 
-| Dimension | Value |
-|-----------|-------|
-| **Local-stack** | Implemented |
-| **Cluster** | Implemented |
-| **HTTP** | private + internal clear · `:8080` · Kong `/cart/v1/private/` (local Kong: wide `/cart/` prefix) · edge JWT |
-| **gRPC server** | `CartService/GetCart` · `:9090` |
-| **gRPC client** | None |
-| **Worker** | None |
-| **Temporal** | Participant (REST) · `ClearCart` · [workflows.md](./workflows.md#order-fulfillment) |
-| **Technical debt** | Legacy order→cart REST pricing hop · P6 removal · [Known gaps](#known-gaps) |
+| Dimension | Value | Status |
+|-----------|-------|--------|
+| **Deployment** | local-stack + cluster | Implemented |
+| **HTTP** | private + internal clear · `:8080` · Kong `/cart/v1/private/` (local Kong: wide `/cart/` prefix) · edge JWT | Partial |
+| **gRPC server** | `CartService/GetCart` · `:9090` | Implemented |
+| **gRPC client** | None | None |
+| **Worker** | None | None |
+| **Temporal** | Participant (REST) · `ClearCart` · [workflows.md](./workflows.md#order-fulfillment) | Implemented |
+| **Technical debt** | Legacy order→cart REST pricing hop · P6 removal · [Known gaps](#known-gaps) | Technical debt |
 
 | | |
 |---|---|
@@ -77,7 +76,7 @@ flowchart LR
 
 Writes stay HTTP-and-browser-only; the single machine-to-machine surface is
 the read-only gRPC snapshot. gRPC mTLS east-west is **Planned** (platform-wide
-— see [DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md)); today NetworkPolicy is
+— see [api.md § Edge exposure](./api.md#edge-exposure)); today NetworkPolicy is
 the fence.
 
 ## Data model
@@ -121,7 +120,7 @@ or query.
 Local-stack Kong routes the whole service on the wide `/cart/` prefix (JWT
 plugin attached); the cluster ingress exposes only `/cart/v1/private/`.
 Service paths are identical in both (Variant A pass-through,
-`strip_path: false`) — see [DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md#edge-exposure-verified).
+`strip_path: false`) — see [api.md § Edge exposure](./api.md#edge-exposure).
 
 ### Add item — `POST /cart/v1/private/cart`
 
@@ -282,23 +281,25 @@ curl -s http://localhost:8080/cart/v1/private/cart \
 
 ## Code map
 
-| Layer | Repo path |
-|-------|-----------|
-| Route wiring (private + internal groups) | `cart-service/cmd/main.go` |
-| HTTP handlers | `cart-service/internal/web/v1/handler.go` |
-| gRPC server (GetCart, minor-units boundary) | `cart-service/internal/grpc/v1/server.go` |
-| Business logic | `cart-service/internal/logic/v1/service.go` |
-| Business metrics | `cart-service/internal/logic/v1/metrics.go` |
-| Domain types & errors | `cart-service/internal/core/domain/` |
-| Repository (upsert, totals) | `cart-service/internal/core/repository/postgres_cart_repository.go` |
-| Migrations & seed | `cart-service/db/migrations/sql/` · `cart-service/db/seed/sql/` |
-| Proto contract | `pkg/proto/cart/v1/cart.proto` |
+Paths in [`duynhlab/cart-service`](https://github.com/duynhlab/cart-service). Transport peers call `logic/v1`; logic calls `core` only ([api.md § Inside Each Service](./api.md#inside-each-service)).
+
+| Layer | Path | Notes |
+|-------|------|-------|
+| **Transport** | `internal/web/v1/handler.go` | HTTP handlers (private + internal groups) |
+| | `internal/grpc/v1/server.go` | gRPC server (GetCart, minor-units boundary) |
+| **logic** | `internal/logic/v1/service.go` | Business logic |
+| | `internal/logic/v1/metrics.go` | Business metrics |
+| **core** | `internal/core/domain/` | Domain types & errors |
+| | `internal/core/repository/postgres_cart_repository.go` | Repository (upsert, totals) |
+| **Platform** | `cmd/main.go` | Route wiring |
+| | `db/migrations/sql/`, `db/seed/sql/` | Migrations & seed |
+| | `pkg/proto/cart/v1/cart.proto` | Proto contract |
 
 ## References
 
 - [api.md](./api.md) — shared HTTP/gRPC rules (auth, error envelope, gRPC runtime model)
 - [workflows.md](./workflows.md) — Temporal workflow registry
-- [DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md) — platform deployment rollup
+- [Service contracts](./README.md#service-contracts)
 - [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) — cart gRPC read surface
 - [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) — checkout re-validation policy
 - [checkout.md](./checkout.md) · [product.md](./product.md) · [order.md](./order.md) — neighbor contracts

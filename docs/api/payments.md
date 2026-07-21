@@ -4,16 +4,15 @@ Payment turns an order's opaque `tok_` token into settled money — a
 Stripe-style auth/capture state machine, a double-entry ledger, and a
 reconciliation loop that proves the books match the provider.
 
-| Dimension | Value |
-|-----------|-------|
-| **Local-stack** | Implemented |
-| **Cluster** | Implemented |
-| **HTTP** | private + public webhooks · `:8080` · Kong `/payment/v1/private/` (JWT) + `/payment/v1/public/payments/webhooks/` (HMAC, anonymous) + deprecated alias `/payment/v1/public/webhooks/` (ADR-017) |
-| **gRPC server** | `PaymentService/GetPayment, Authorize, Capture, Void, Refund` · `:9090` |
-| **gRPC client** | None |
-| **Worker** | None |
-| **Temporal** | Participant (gRPC) · [workflows.md#order-fulfillment](./workflows.md#order-fulfillment) |
-| **Technical debt** | Deprecated webhook alias (ADR-017) · [Known gaps](#known-gaps) |
+| Dimension | Value | Status |
+|-----------|-------|--------|
+| **Deployment** | local-stack + cluster | Implemented |
+| **HTTP** | private + public webhooks · `:8080` · Kong `/payment/v1/private/` (JWT) + `/payment/v1/public/payments/webhooks/` (HMAC, anonymous) + deprecated alias `/payment/v1/public/webhooks/` (ADR-017) | Implemented |
+| **gRPC server** | `PaymentService/GetPayment, Authorize, Capture, Void, Refund` · `:9090` | Implemented |
+| **gRPC client** | None | None |
+| **Worker** | None | None |
+| **Temporal** | Participant (gRPC) · [workflows.md#order-fulfillment](./workflows.md#order-fulfillment) | Implemented |
+| **Technical debt** | Deprecated webhook alias (ADR-017) · [Known gaps](#known-gaps) | Technical debt |
 
 | | |
 |---|---|
@@ -327,24 +326,26 @@ curl http://payment:8080/payment/v1/internal/payments/reconciliation/runs/2
 
 ## Code map
 
-| Layer | Repo path |
-|-------|-----------|
-| HTTP handlers + webhook + recon API | `payment-service/internal/web/v1/` |
-| gRPC server (saga RPCs) | `payment-service/internal/grpc/v1/server.go` |
-| Payment logic, outbox relay, reconciliation, heal | `payment-service/internal/logic/v1/` |
-| FSM + domain types | `payment-service/internal/core/domain/payment.go` |
-| Repositories (payments, ledger, outbox, webhook, recon) | `payment-service/internal/core/repository/` |
-| Provider port + HTTP client | `payment-service/internal/core/provider/` |
-| mockpay provider (subcommand) | `payment-service/internal/mockpay/` |
-| Webhook HMAC (shared signer/verifier) | `payment-service/internal/webhooksig/sign.go` |
-| Migrations (ledger triggers, outbox) | `payment-service/db/migrations/sql/` |
-| Proto | `pkg/proto/payment/v1/` |
+Paths in [`duynhlab/payment-service`](https://github.com/duynhlab/payment-service). Transport peers call `logic/v1`; logic calls `core` only ([api.md § Inside Each Service](./api.md#inside-each-service)).
+
+| Layer | Path | Notes |
+|-------|------|-------|
+| **Transport** | `internal/web/v1/` | HTTP handlers + webhook + recon API |
+| | `internal/grpc/v1/server.go` | gRPC server (saga RPCs) |
+| **logic** | `internal/logic/v1/` | Payment logic, outbox relay, reconciliation, heal |
+| **core** | `internal/core/domain/payment.go` | FSM + domain types |
+| | `internal/core/repository/` | Repositories (payments, ledger, outbox, webhook, recon) |
+| | `internal/core/provider/` | Provider port + HTTP client |
+| **Platform** | `internal/mockpay/` | mockpay provider (subcommand) |
+| | `internal/webhooksig/sign.go` | Webhook HMAC (shared signer/verifier) |
+| | `db/migrations/sql/` | Migrations (ledger triggers, outbox) |
+| | `pkg/proto/payment/v1/` | Proto |
 
 ## References
 
 - [api.md](./api.md) — shared HTTP/gRPC conventions (auth, error envelope, pagination, gRPC runtime)
 - [order.md](./order.md) · [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — saga handoff and compensation
-- [workflows.md](./workflows.md) · [DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md)
+- [workflows.md](./workflows.md) · [Service contracts](./README.md#service-contracts)
 - [RFC-0010](../proposals/rfc/RFC-0010/) — full design; ADRs [007](../proposals/adr/ADR-007-double-entry-payment-ledger/) ledger · [008](../proposals/adr/ADR-008-mockpay-standalone-provider/) mockpay · [009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) auth-early/capture-late · [010](../proposals/adr/ADR-010-shared-idempotency-library/) idempotency · [011](../proposals/adr/ADR-011-detect-only-reconciliation/) detect-only · [012](../proposals/adr/ADR-012-reconciliation-auto-heal/) auto-heal
 
 _Last updated: 2026-07-21_

@@ -3,16 +3,15 @@
 Order turns a validated basket into a durable, money-safe fulfillment: it is the
 only writer of orders and the only place the fulfillment saga starts.
 
-| Dimension | Value |
-|-----------|-------|
-| **Local-stack** | Implemented |
-| **Cluster** | Implemented |
-| **HTTP** | private · `:8080` · Kong `/order/v1/private/` (local-stack: bare `/order/` prefix) · edge JWT |
-| **gRPC server** | `OrderService/CreateOrder` · `:9090` |
-| **gRPC client** | shipping (`GetShipmentByOrder`), payment (`GetPayment`) — enrichment reads |
-| **Worker** | `order-worker` · queue `order-fulfillment` |
-| **Temporal** | Orchestrator · `OrderFulfillmentWorkflow` · [workflows.md](./workflows.md#order-fulfillment) |
-| **Technical debt** | Legacy `POST /order/v1/private/orders` · P6 removal · [Known gaps](#known-gaps) |
+| Dimension | Value | Status |
+|-----------|-------|--------|
+| **Deployment** | local-stack + cluster | Implemented |
+| **HTTP** | private · `:8080` · Kong `/order/v1/private/` (local-stack: bare `/order/` prefix) · edge JWT | Partial |
+| **gRPC server** | `OrderService/CreateOrder` · `:9090` | Implemented |
+| **gRPC client** | shipping (`GetShipmentByOrder`), payment (`GetPayment`) — enrichment reads | Implemented |
+| **Worker** | `order-worker` · queue `order-fulfillment` | Implemented |
+| **Temporal** | Orchestrator · `OrderFulfillmentWorkflow` · [workflows.md](./workflows.md#order-fulfillment) | Implemented |
+| **Technical debt** | Legacy `POST /order/v1/private/orders` · P6 removal · [Known gaps](#known-gaps) | Technical debt |
 
 | | |
 |---|---|
@@ -283,24 +282,25 @@ curl -s http://localhost:8080/order/v1/private/orders \
 
 ## Code map
 
-Paths verified against `duynhlab/order-service`:
+Paths in [`duynhlab/order-service`](https://github.com/duynhlab/order-service). Transport peers call `logic/v1`; logic calls `core` only ([api.md § Inside Each Service](./api.md#inside-each-service)).
 
-| Layer | Repo path |
-|-------|-----------|
-| Route registration + worker entrypoint | `order-service/cmd/main.go` |
-| HTTP handlers + enrichment clients | `order-service/internal/web/v1/` |
-| CreateOrder logic + idempotent replay | `order-service/internal/logic/v1/service.go` |
-| gRPC server (CreateOrder) | `order-service/internal/grpc/v1/server.go` |
-| Saga workflow + activities + metrics | `order-service/internal/saga/` |
-| Workflow kickoff (detached start, lazy client) | `order-service/internal/fulfillment/` |
-| Domain + repository | `order-service/internal/core/domain/`, `internal/core/repository/` |
-| Schema migrations | `order-service/db/migrations/sql/` |
-| Proto | `pkg/proto/order/v1/order.proto` |
+| Layer | Path | Notes |
+|-------|------|-------|
+| **Transport** | `internal/web/v1/` | HTTP handlers + enrichment clients |
+| | `internal/grpc/v1/server.go` | gRPC server (CreateOrder) |
+| **logic** | `internal/logic/v1/service.go` | CreateOrder logic + idempotent replay |
+| **core** | `internal/core/domain/` | Domain types |
+| | `internal/core/repository/` | Persistence |
+| **Platform** | `cmd/main.go` | Route registration + worker entrypoint |
+| | `internal/saga/` | Saga workflow + activities + metrics |
+| | `internal/fulfillment/` | Workflow kickoff (detached start, lazy client) |
+| | `db/migrations/sql/` | Schema migrations |
+| | `pkg/proto/order/v1/order.proto` | Proto |
 
 ## References
 
 - [api.md](./api.md) — shared HTTP/gRPC rules, error envelope, pagination
-- [workflows.md](./workflows.md) — workflow registry · [DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md) — platform rollup
+- [workflows.md](./workflows.md) — workflow registry · [Service contracts](./README.md#service-contracts)
 - [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — saga theory + as-built + runbook
 - [checkout.md](./checkout.md) · [payments.md](./payments.md) · [shipping.md](./shipping.md) — adjacent contracts
 - [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) — checkout→order boundary

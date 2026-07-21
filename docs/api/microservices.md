@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Living reference — the **understanding-the-system** catalog |
 | **Covers** | Per-service feature matrix (feature → API → technique → status) and data ownership |
-| **Related** | [api.md](api.md) (shared conventions, topology, call graph) · [DEPLOYMENT-STATUS.md](DEPLOYMENT-STATUS.md) · [workflows.md](workflows.md) · [service contracts](README.md#service-contracts) |
+| **Related** | [api.md](api.md) (shared conventions, topology, call graph) · [workflows.md](workflows.md) · [service contracts](README.md#service-contracts) |
 | **Area hub** | [docs/api/README.md](README.md) |
 
 This document is the **understanding-the-system** reference. It does **not**
@@ -44,7 +44,7 @@ The local end-to-end stack (`local-stack/compose.yaml`) mirrors the platform wit
 | frontend | 80 → host 3001 | — | — | gateway only |
 | gateway (Kong 3.9) | 8000 → host 8080 | — | — | all 10 services |
 
-> **In-cluster differences (production):** `platform-db` (CloudNativePG behind **`pgdog-platform.platform.svc.cluster.local:6432`** — auth/user/notification/shipping/review; Temporal connects **direct** to `platform-db-rw.platform:5432`);
+> **In-cluster differences (production):** `platform-db` (CloudNativePG behind **`platform-db-pooler-rw.platform.svc.cluster.local:5432`** — auth/user/notification/shipping/review; Temporal connects **direct** to `platform-db-rw.platform:5432`);
 > `product-db` (CloudNativePG behind the **pgdog-product** pooler — `product`/`cart`/`order`/`payment`
 > databases; payment connects **direct over TLS, bypassing PgDog**).
 > Locally these collapse into one Postgres with 10 service databases. See [`../databases/`](../databases/).
@@ -59,12 +59,12 @@ The local end-to-end stack (`local-stack/compose.yaml`) mirrors the platform wit
 names the surface — the full canonical path `/{service}/v1/{audience}/{resource…}`
 or the gRPC RPC — and `—` for background features; full route and payload contracts live in the [owning service file](README.md#service-contracts); shared rules live in [api.md](api.md). **Technique** uses the canonical names from
 the [technique index](#4-technique-index-platform-wide) (§4) — the two must stay
-in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No caller` / `Planned` / `None` (shared vocabulary — see [DEPLOYMENT-STATUS.md](DEPLOYMENT-STATUS.md)).
+in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No caller` / `Planned` / `None` (shared vocabulary — see [README.md § Service contracts](README.md#service-contracts)).
 
 ### auth — identity
 
 > Owns `users` (credentials) and refresh-token families; DB `auth` on `platform-db`
-> (CloudNativePG, via PgDog `pgdog-platform`). Public-only HTTP — no JWT middleware, no gRPC
+> (CloudNativePG, via PgDog `platform-db-pooler-rw`). Public-only HTTP — no JWT middleware, no gRPC
 > server (HTTP-only since RFC-0009 Phase 5; services verify JWTs locally).
 
 | Feature | API | Technique | Depends on | Status | Ref |
@@ -76,7 +76,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 
 ### user — profiles
 
-> Owns user profiles; DB `user` on `platform-db` (CloudNativePG, via `pgdog-platform`). Verifies JWTs
+> Owns user profiles; DB `user` on `platform-db` (CloudNativePG, via `platform-db-pooler-rw`). Verifies JWTs
 > locally via `pkg/authmw`.
 
 | Feature | API | Technique | Depends on | Status | Ref |
@@ -148,7 +148,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 ### review — product reviews
 
 > Owns `reviews` (rating 1–5, comment); DB `review` on `platform-db`
-> (CloudNativePG, via `pgdog-platform`). Verifies JWTs locally via `pkg/authmw`. Serves gRPC on `:9090`.
+> (CloudNativePG, via `platform-db-pooler-rw`). Verifies JWTs locally via `pkg/authmw`. Serves gRPC on `:9090`.
 
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
@@ -158,7 +158,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 
 ### shipping — tracking, estimates & shipment lifecycle
 
-> Owns `shipments`; DB `shipping` on `platform-db` (CloudNativePG, via `pgdog-platform`). No JWT
+> Owns `shipments`; DB `shipping` on `platform-db` (CloudNativePG, via `platform-db-pooler-rw`). No JWT
 > middleware (public + internal surfaces only). Serves gRPC on `:9090`.
 
 | Feature | API | Technique | Depends on | Status | Ref |
@@ -170,7 +170,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 
 ### notification — user notifications
 
-> Owns `notifications`; DB `notification` on `platform-db` (CloudNativePG, via `pgdog-platform`).
+> Owns `notifications`; DB `notification` on `platform-db` (CloudNativePG, via `platform-db-pooler-rw`).
 > Verifies JWTs locally via `pkg/authmw` on private routes. Serves gRPC on
 > `:9090`. Deployed in-cluster (comms domain) **and** in the local stack — the
 > frontend's notification badge resolves against it.

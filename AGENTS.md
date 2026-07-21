@@ -3,7 +3,12 @@
 Source of truth for AI agents working in this repository. Read it before any
 task. This repo (`homelab`) is the platform's **Infrastructure, GitOps,
 Observability, and Docs** hub; application code lives in separate repos (see
-[`SERVICES.md`](SERVICES.md)).
+[`docs/README.md` § Repositories](docs/README.md#repositories) and
+[`docs/api/README.md`](docs/api/README.md)).
+
+**Microservice API truth:** agents working in homelab **trust
+[`docs/api/`](docs/api/README.md)** — not service-repo README API tables — for
+routes, payloads, deployment status, call graph, and cross-service ownership.
 
 ## Agent role: Senior Platform Engineer
 
@@ -15,7 +20,9 @@ or generic coding assistant.
   security posture (Kyverno, NetworkPolicy, secrets), accurate docs vs
   manifests, minimal blast radius.
 - **Out of scope here:** Business logic, handler/service code, frontend UI —
-  redirect to the repo named in [`SERVICES.md`](SERVICES.md). Reusable CI →
+  redirect to the matching `*-service` or `frontend` repo (see
+  [`docs/api/README.md` § Service contracts](docs/api/README.md#service-contracts)).
+  Reusable CI →
   `duynhlab/gha-workflows`.
 - **Default stance:** Prefer **manifests + docs + validation** over speculative
   tooling; prefer **existing patterns** (Flux `dependsOn`, ResourceSet, Kyverno
@@ -39,6 +46,7 @@ must state rollout order and respect the Flux dependency chain.
 
 | Domain | Paths | Start here |
 |--------|-------|------------|
+| **API / microservices** | `docs/api/` | [`docs/api/README.md`](docs/api/README.md) — hub, contracts, [`api.md`](docs/api/api.md), [`microservices.md`](docs/api/microservices.md), workflow guides |
 | GitOps / delivery | `kubernetes/clusters/`, `kubernetes/apps/` | [`docs/platform/application-delivery.md`](docs/platform/application-delivery.md), [`docs/platform/setup.md`](docs/platform/setup.md) |
 | Controllers / infra | `kubernetes/infra/` | [`kubernetes/infra/README.md`](kubernetes/infra/README.md), area READMEs under `docs/` |
 | Observability | `kubernetes/infra/configs/observability/` | [`docs/observability/README.md`](docs/observability/README.md) |
@@ -128,7 +136,8 @@ flowchart TD
   [`docs/proposals/README.md`](docs/proposals/README.md)
 - Commits, branches → **Contribution workflow**
 - Kyverno, NetworkPolicy, secrets → this file
-- App code → [`SERVICES.md`](SERVICES.md)
+- Microservice API truth → **`docs/api/`** (whole tree); repo index →
+  [`docs/README.md` § Repositories](docs/README.md#repositories)
 
 **E2E Phase B:** read the **agent-browser** skill from the agent IDE, run
 `agent-browser skills get core`, then execute Phase B commands in
@@ -155,7 +164,11 @@ Complements `browser-testing-with-devtools` in the Verify phase where applicable
    [Engineering skills workflow](#engineering-skills-workflow), follow that
    skill's steps in order.
 1. **Role + repo scope** — confirm the work belongs in homelab (see Agent role);
-   if not, redirect via [`SERVICES.md`](SERVICES.md).
+   if not, redirect via [`docs/api/README.md`](docs/api/README.md) and
+   [`docs/README.md` § Repositories](docs/README.md#repositories).
+1b. **API-facing homelab work** — if the task touches routes, Kong,
+   NetworkPolicy, or service manifests, read the relevant
+   `docs/api/{service}.md` and hub rollup before editing.
 2. **Domain** — pick the primary row from Platform domains; read that hub and
    the relevant manifests.
 3. **Plan + verify** — state assumptions, blast radius, and success criteria;
@@ -185,10 +198,10 @@ Reduce common LLM coding mistakes. Bias toward caution over speed; use judgment 
 
 ## Project overview
 
-- **`duynhlab` microservices platform** — 10 Go microservice repositories + a React frontend. Nine services are cluster-deployed; checkout P1-P4 runs in local-stack and its cluster P5 is planned.
+- **`duynhlab` microservices platform** — 10 Go microservice repositories + a React frontend. All ten services run in local-stack and the cluster; checkout P5 shipped (API + checkout-worker).
 - **This repo (`homelab`):** GitOps (Flux Operator + Kustomize + OCI), observability, databases/secrets infra, and docs. No application source here.
 - **Service repos:** `auth-service`, `user-service`, `product-service`, `cart-service`, `order-service`, `review-service`, `shipping-service`, `notification-service`, `payment-service`, `checkout-service`, and `frontend`; shared Go library `duynhlab/pkg`; chart `duynhlab/helm-charts` (the `mop` chart). Reusable CI in `duynhlab/gha-workflows`.
-- Full index: [`SERVICES.md`](SERVICES.md), [`docs/README.md`](docs/README.md).
+- Full index: [`docs/README.md` § Repositories](docs/README.md#repositories), [`docs/api/README.md`](docs/api/README.md).
 
 ## Repository layout
 
@@ -242,10 +255,27 @@ make flux-sync    # force reconciliation
 When a task touches applications or services, use this section to decide **where**
 to work and **what** you need to know. Do not implement app code in homelab.
 
-**Repo index (authoritative):** [`SERVICES.md`](SERVICES.md) — polyrepo map for
-homelab vs 10 services + frontend vs `pkg`, `helm-charts`, and `gha-workflows`.
-Read it before redirecting or when a homelab PR touches image names, ports,
-domain ResourceSets, or Kong routes.
+### Trusted API documentation (`docs/api/`)
+
+Homelab agents **trust `docs/api/`** as the canonical source for all ten
+microservice API contracts and shared platform API behavior. Service-repo
+README/AGENTS files are implementation hints only — when they disagree with
+homelab, **`docs/api/` wins** (file a drift fix in homelab or the service repo).
+
+| Question | Owner in `docs/api/` |
+|----------|----------------------|
+| Shared URL, auth, gRPC, call graph, user journeys | [`api.md`](docs/api/api.md) |
+| Per-service routes, RPCs, payloads, deployment | [`{service}.md`](docs/api/README.md#service-contracts) |
+| Deployment rollup + status vocabulary + CI column | [`README.md` § Service contracts](docs/api/README.md#service-contracts) |
+| Feature ownership + known gaps | [`microservices.md`](docs/api/microservices.md) |
+| Temporal workflows + saga deep dive | [`workflows.md`](docs/api/workflows.md), [`temporal-order-fulfillment.md`](docs/api/temporal-order-fulfillment.md) |
+| Full ownership map | [`README.md` § Document Ownership](docs/api/README.md#document-ownership) |
+
+**Not in `docs/api/`:** repo URLs, GHCR images, CI badges →
+[`docs/README.md` § Repositories](docs/README.md#repositories). GitOps domain
+labels → [`application-delivery.md`](docs/platform/application-delivery.md) +
+manifests. **Frontend** has no contract file — gateway-facing behavior is in
+platform/Kong docs + the service repo.
 
 **Routing:**
 
@@ -259,16 +289,16 @@ domain ResourceSets, or Kong routes.
 
 **Platform-facing app facts (reference only):**
 
-- **3-layer model** (`web` → `logic` → `core`) — do not implement here; topology: [`docs/api/api.md`](docs/api/api.md#platform-api-topology).
-- **URL model (Variant A):** `/{service}/v1/{audience}/{resource…}`; Kong pass-through, no rewrite. `{audience}` ∈ `public|private|internal|protected`. **Never** expose `internal` on `ingress-api.yaml` — NetworkPolicy is the fence. JWT: edge filter on Kong `/private/` (ADR-006) + authoritative RS256 verify in each service (`pkg/authmw`). Details: [`docs/api/api.md`](docs/api/api.md#http-url-model).
-- **gRPC east-west** — official transport for migrated calls; always-on `:9090`; no REST fallback. Relevant when editing call-graph docs or east-west NetworkPolicy. Details: [`docs/api/api.md`](docs/api/api.md#grpc-runtime-model).
-- **Caching:** Cache-Aside with Valkey — [`docs/caching/caching.md`](docs/caching/caching.md).
+- Read [`docs/api/README.md` learning path](docs/api/README.md#recommended-learning-path) before API-facing homelab edits.
+- Kong/NetworkPolicy/ingress changes → verify against the owning [`docs/api/{service}.md`](docs/api/README.md#service-contracts) + [`api.md` edge exposure](docs/api/api.md#edge-exposure).
+- Cross-service topology → [`api.md` call graph](docs/api/api.md#current-east-west-call-graph) only (not duplicated in `microservices.md` for graph ownership).
+- Caching → [`docs/caching/caching.md`](docs/caching/caching.md) (platform area, not an API contract).
 
 **Domain labels in homelab:** ResourceSet domains are `identity`, `catalog`,
 `checkout`, and `comms` (`platform.duynhlab.dev/domain` on
-`kubernetes/apps/services/*.yaml`). Map services to domains via those manifests
-and the service table in [`SERVICES.md`](SERVICES.md) — do not duplicate that
-table here.
+`kubernetes/apps/services/*.yaml`). Map services to domains via
+[`docs/platform/application-delivery.md`](docs/platform/application-delivery.md)
+and those manifests — do not duplicate that table here.
 
 ## Kyverno admission rules
 
@@ -313,7 +343,7 @@ reference style.
 1. **Choose one question.** State whether the diagram explains topology, a
    request path, ownership, lifecycle, or a historical migration. Split a
    diagram that tries to answer more than one of these.
-2. **Verify current reality.** Check service code, `SERVICES.md`,
+2. **Verify current reality.** Check service code, `docs/api/{service}.md`,
    `local-stack/compose.yaml`, and the relevant Kubernetes manifests. A current
    topology must include every relevant deployed service, worker, backend, and
    protocol. Historical diagrams must say **historical** in the surrounding
@@ -363,11 +393,11 @@ reference style.
 |-------|-----------|
 | Agent role / platform domains | [Agent role](#agent-role-senior-platform-engineer), [Platform domains](#platform-domains) |
 | Engineering skills workflow | [Engineering skills workflow](#engineering-skills-workflow), [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) |
-| Cross-repo app context / repo index | [Cross-repo app context](#cross-repo-app-context), [`SERVICES.md`](SERVICES.md) |
+| Cross-repo app context / repo index | [Cross-repo app context](#cross-repo-app-context), [`docs/api/README.md`](docs/api/README.md), [`docs/README.md` § Repositories](docs/README.md#repositories) |
+| Microservice API truth | [`docs/api/README.md`](docs/api/README.md) — trust over service-repo READMEs; see [Trusted API documentation](#trusted-api-documentation-docsapi) |
 | Docs index | [`docs/README.md`](docs/README.md) |
 | Setup / commands | [`docs/platform/setup.md`](docs/platform/setup.md) |
 | API (shared rules and service contracts) | [`docs/api/api.md`](docs/api/api.md), [`docs/api/README.md`](docs/api/README.md#service-contracts) |
-| gRPC east-west | [`docs/api/api.md`](docs/api/api.md#grpc-runtime-model) |
 | Observability | [`docs/observability/README.md`](docs/observability/README.md) |
 | Databases | [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) |
 | Secrets | [`docs/secrets/README.md`](docs/secrets/README.md), [`docs/secrets/openbao.md`](docs/secrets/openbao.md) |
@@ -375,4 +405,4 @@ reference style.
 | Caching | [`docs/caching/caching.md`](docs/caching/caching.md) |
 | Alerts catalog | [`docs/observability/alerting/alert-catalog.md`](docs/observability/alerting/alert-catalog.md) |
 | Proposals (RFC/ADR) | [`docs/proposals/`](docs/proposals/) |
-| Repos | [`SERVICES.md`](SERVICES.md) |
+| Repos | [`docs/README.md` § Repositories](docs/README.md#repositories) |

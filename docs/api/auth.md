@@ -2,16 +2,15 @@
 
 Auth turns credentials into short-lived RS256 access tokens and rotating refresh-token families.
 
-| Dimension | Value |
-|-----------|-------|
-| **Local-stack** | Implemented |
-| **Cluster** | Implemented |
-| **HTTP** | public only · `:8080` · Kong `/auth/v1/public/` (no edge JWT) |
-| **gRPC server** | None |
-| **gRPC client** | None |
-| **Worker** | None |
-| **Temporal** | None · [workflows.md](./workflows.md) |
-| **Technical debt** | None |
+| Dimension | Value | Status |
+|-----------|-------|--------|
+| **Deployment** | local-stack + cluster | Implemented |
+| **HTTP** | public only · `:8080` · Kong `/auth/v1/public/` (no edge JWT) | Implemented |
+| **gRPC server** | None | None |
+| **gRPC client** | None | None |
+| **Worker** | None | None |
+| **Temporal** | None · [workflows.md](./workflows.md) | None |
+| **Technical debt** | None | None |
 
 | | |
 |---|---|
@@ -236,7 +235,7 @@ Auth calls no other service — no gRPC client, no REST east-west.
 - **`403` mappings without producers** — `ErrPasswordExpired` / `ErrAccountLocked`
   are handler-mapped but nothing in the logic layer returns them yet (No caller).
 
-No P6 technical-debt items ([DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md)).
+No P6 technical-debt items (see [Service contracts](./README.md#service-contracts)).
 
 ## Operations
 
@@ -267,23 +266,26 @@ curl -s http://localhost:8080/auth/v1/public/auth/jwks
 
 ## Code map
 
-| Layer | Repo path |
-|-------|-----------|
-| HTTP handlers + routes | `auth-service/internal/web/v1/handler.go` |
-| Business logic (login, refresh FSM, logout) | `auth-service/internal/logic/v1/service.go` |
-| Sentinel errors | `auth-service/internal/logic/v1/errors.go` |
-| Business metrics | `auth-service/internal/logic/v1/metrics.go` |
-| RS256 signer + JWKS + `kid` | `auth-service/internal/core/jwt/signer.go` |
-| Repositories (users, refresh tokens) | `auth-service/internal/core/repository/` |
-| Domain types | `auth-service/internal/core/domain/` |
-| Migrations (schema, refresh tokens, drop sessions) | `auth-service/db/migrations/sql/` |
-| Config (env parsing) | `auth-service/config/config.go` |
-| Entrypoint + probes + shutdown | `auth-service/cmd/main.go` |
+Paths in [`duynhlab/auth-service`](https://github.com/duynhlab/auth-service). Transport peers call `logic/v1`; logic calls `core` only ([api.md § Inside Each Service](./api.md#inside-each-service)).
+
+| Layer | Path | Notes |
+|-------|------|-------|
+| **Transport** | `internal/web/v1/handler.go` | Public routes, validation, status mapping |
+| **logic** | `internal/logic/v1/service.go` | Login, register, refresh FSM, logout |
+| | `internal/logic/v1/errors.go` | Sentinel errors |
+| | `internal/logic/v1/metrics.go` | Registration, refresh, family-revocation metrics |
+| **core** | `internal/core/jwt/signer.go` | RS256 mint, JWKS, deterministic `kid` |
+| | `internal/core/domain/` | User, refresh-token domain types |
+| | `internal/core/repository/` | Users + refresh-token persistence |
+| | `internal/core/database.go` | pgx pool bootstrap |
+| **Platform** | `cmd/main.go` | HTTP server, probes, graceful shutdown |
+| | `config/config.go`, `middleware/` | `JWT_*`, `DB_*` env contract; obsx chain |
+| | `db/migrations/sql/`, `db/seed/sql/` | Users, refresh tokens; drop legacy `sessions` |
 
 ## References
 
 - [Shared API conventions](api.md) — auth model, error envelope, URL shape
-- [Deployment status](DEPLOYMENT-STATUS.md) · [Workflow registry](workflows.md)
+- [Service contracts](./README.md#service-contracts) · [Workflow registry](workflows.md)
 - [Microservices catalog](microservices.md)
 - [OpenBAO — JWT signing key lifecycle](../secrets/openbao.md) (OpenBAO path + ESO fan-out + rotation)
 - [Kong gateway — edge JWT](../platform/kong-gateway.md) (the `auth-issuer` consumer + `jwt-edge` plugin)

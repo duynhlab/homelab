@@ -23,6 +23,7 @@ flowchart TD
         userIP["rsip-user<br/>domain: identity"]
         productIP["rsip-product<br/>domain: catalog"]
         reviewIP["rsip-review<br/>domain: catalog"]
+        checkoutIP["rsip-checkout<br/>domain: checkout"]
         cartIP["rsip-cart<br/>domain: checkout"]
         orderIP["rsip-order<br/>domain: checkout"]
         paymentIP["rsip-payment<br/>domain: checkout"]
@@ -40,7 +41,7 @@ flowchart TD
     subgraph output [Generated Resources]
         hrIdentity["NS + HR: auth, user"]
         hrCatalog["NS + HR: product, review"]
-        hrCheckout["NS + HR: cart, order, payment"]
+        hrCheckout["NS + HR: cart, checkout, order, payment"]
         hrComms["NS + HR: notification, shipping"]
     end
 
@@ -49,6 +50,7 @@ flowchart TD
     productIP -->|"label selector"| rsCatalog
     reviewIP -->|"label selector"| rsCatalog
     cartIP -->|"label selector"| rsCheckout
+    checkoutIP -->|"label selector"| rsCheckout
     orderIP -->|"label selector"| rsCheckout
     paymentIP -->|"label selector"| rsCheckout
     notifIP -->|"label selector"| rsComms
@@ -67,7 +69,7 @@ kubernetes/apps/
 ├── domains/                       # Domain ResourceSets (template + inputsFrom selector)
 │   ├── identity-rs.yaml           # rs-identity: auth, user
 │   ├── catalog-rs.yaml            # rs-catalog: product, review
-│   ├── checkout-rs.yaml           # rs-checkout: cart, order, payment
+│   ├── checkout-rs.yaml           # rs-checkout: cart, checkout, order, payment
 │   └── comms-rs.yaml              # rs-comms: notification, shipping
 ├── services/                      # Per-service InputProviders (Static)
 │   ├── auth.yaml                  # labels: domain=identity
@@ -75,6 +77,7 @@ kubernetes/apps/
 │   ├── product.yaml               # labels: domain=catalog
 │   ├── review.yaml                # labels: domain=catalog
 │   ├── cart.yaml                  # labels: domain=checkout
+│   ├── checkout.yaml              # labels: domain=checkout
 │   ├── order.yaml                 # labels: domain=checkout
 │   ├── payment.yaml               # labels: domain=checkout
 │   ├── notification.yaml          # labels: domain=comms
@@ -100,7 +103,7 @@ Flux Kustomization with `path: ./` auto-discovers all YAML files recursively.
 |--------|------------|----------|-----------|
 | identity | `rs-identity` | auth, user | platform-db (auth, user) on CNPG, identity boundary |
 | catalog | `rs-catalog` | product, review | product-db (product) + platform-db (review) on CNPG, shared read patterns |
-| checkout | `rs-checkout` | cart, order, payment | product-db (CNPG), purchase flow |
+| checkout | `rs-checkout` | cart, checkout, order, payment | product-db (CNPG), purchase flow |
 | comms | `rs-comms` | notification, shipping | platform-db (CNPG), auxiliary services |
 | frontend | `rs-frontend` | frontend | Standalone (React SPA, no DB) |
 

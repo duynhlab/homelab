@@ -75,11 +75,11 @@ may repeat across artifacts — label each diagram's question (*Mechanism*, *Tar
 | RFC | Title | Scope | Priority | Status |
 |-----|-------|-------|----------|--------|
 | [RFC-0001](RFC-0001/) | Temporal for durable cross-service orchestration | platform-wide | done | implemented |
-| [RFC-0002](RFC-0002/) | East-west mTLS for internal gRPC | platform-wide | P1 | provisional |
+| [RFC-0002](RFC-0002/) | East-west mTLS for internal gRPC | platform-wide | P1 | superseded — in-process → **[RFC-0020](RFC-0020/)**, mesh → [RFC-0006](RFC-0006/) |
 | [RFC-0003](RFC-0003/) | Inventory ownership and stock semantics | platform-wide | P2 | provisional |
 | [RFC-0004](RFC-0004/) | Cross-service caching and invalidation | platform-wide | P2 | provisional |
 | [RFC-0005](RFC-0005/) | supporting-shared-db: HA or split | infra | P2 | provisional — **superseded by [RFC-0018](RFC-0018/)** (platform-db merge) |
-| [RFC-0006](RFC-0006/) | Service mesh evaluation (Istio Ambient vs Linkerd) | infra | defer | provisional |
+| [RFC-0006](RFC-0006/) | Service mesh evaluation (Istio Ambient vs Linkerd) — future mesh; in-process mTLS now in [RFC-0020](RFC-0020/) | infra | defer | provisional |
 | [RFC-0007](RFC-0007/) | Disaster-recovery drills program | infra | P2 | provisional |
 | [RFC-0008](RFC-0008/) | Production secrets hardening & local/prod parity | infra | P1 | provisional |
 | [RFC-0009](RFC-0009/) | Production-grade API gateway: signed JWT + Kong edge auth | platform-wide | done | implemented |

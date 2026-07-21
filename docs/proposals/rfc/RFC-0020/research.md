@@ -55,7 +55,7 @@
 
 ### What homelab practice proves
 
-- That the **existing `homelab-ca` + trust-manager** can issue and distribute leaves to *internal* workloads (not just the edge) with no new PKI component — the same pattern RFC-0002 already assumes for gRPC.
+- That the **existing `homelab-ca` + trust-manager** can issue and distribute leaves to *internal* workloads (not just the edge) with no new PKI component — the same pattern this RFC extends to gRPC (the east-west tier, formerly RFC-0002).
 - **Per tier**, what "turn TLS on" actually costs: which knobs (CNPG `spec.certificates`, `pg_hba hostssl`, pooler config, OpenBAO listener) and which ordering constraints (a pooler that speaks no TLS blocks the app behind it; a cert that must exist before a pod starts).
 - Whether the **pooler tier is the true blocker** (PgDog terminates no TLS today) and, if so, which escape hatch fits (migrate to PgBouncer, go direct-to-CNPG, or accept plaintext behind the fence).
 - The honest **security uplift vs operational weight** trade — enough to decide in the RFC whether to climb all tiers now or stage them.
@@ -110,7 +110,7 @@ confusion:
 | Postgres `pg_hba` `hostssl … cert` | Enforces TLS + certificate authentication per (role, database). |
 | Pooler TLS (PgBouncer / PgDog) | Terminates client TLS and/or speaks TLS upstream to Postgres. **The current gap.** |
 | OpenBAO listener TLS | `tls_disable = 0` + a cert-manager cert on the `:8200` listener. |
-| `pkg/grpcx` / `pkg/temporalx` | In-process TLS credentials for east-west gRPC + the Temporal link (owned by RFC-0002). |
+| `pkg/grpcx` / `pkg/temporalx` | In-process TLS credentials for east-west gRPC + the Temporal link (this RFC's east-west tier, formerly RFC-0002). |
 
 ---
 
@@ -127,7 +127,7 @@ flowchart TD
   issuer -->|"leaf: server auth"| dbsrv["CNPG server cert<br/>App verifies (sslmode=verify-full)"]
   issuer -->|"leaf: client auth"| dbcli["App client cert<br/>hostssl … cert (passwordless)"]
   issuer -->|"leaf: server+client"| pool["Pooler TLS<br/>client-facing + upstream"]
-  issuer -->|"leaf: server+client"| grpc["gRPC mTLS<br/>pkg/grpcx (RFC-0002)"]
+  issuer -->|"leaf: server+client"| grpc["gRPC mTLS<br/>pkg/grpcx (this RFC)"]
   issuer -->|"leaf: server auth"| bao["OpenBAO listener<br/>tls_disable=0"]
 
   classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
@@ -199,7 +199,7 @@ Verified against manifests on 2026-07-21. Marks **deployed** vs **planned**.
 | DB replication | CNPG uses TLS `cert` auth for `streaming_replica` — but from **CNPG's own auto-CA**, not `homelab-ca` | keep (internal to CNPG) or re-issue from `homelab-ca` (open question) |
 | App → DB | 9 services `sslmode=disable` via poolers; only `payment` is `hostssl`+`require` direct to CNPG | T2 `verify-full` against `homelab-ca`; then T3 cert-auth (ADR-025) |
 | Pooler (PgBouncer / PgDog) | No client-facing TLS; PgDog upstream plaintext; PgBouncer only uses CNPG auto client-cert for `auth_query` | client + upstream TLS — **PgDog capability is the key unknown** |
-| East-west gRPC | plaintext `insecure.NewCredentials()`; Temporal link no TLS | in-process mTLS — **owned by RFC-0002** |
+| East-west gRPC | plaintext `insecure.NewCredentials()`; Temporal link no TLS | in-process mTLS — **this RFC's east-west tier** (formerly RFC-0002) |
 | Secrets (OpenBAO) | listener `tls_disable = 1`, plaintext `:8200` | `tls_disable = 0`, cert-manager cert (ADR-005 prod target) |
 
 ---
@@ -217,7 +217,7 @@ flowchart LR
   s2 --> s3["Slice 3<br/>Pooler TLS<br/>(or direct/bypass)"]
   s3 --> s4["Slice 4<br/>App sslmode<br/>require → verify-full"]
   s4 --> s5["Slice 5<br/>DB cert-auth<br/>hostssl … cert (ADR-025)"]
-  s0 --> s6["Slice 6<br/>gRPC mTLS<br/>RFC-0002 impl"]
+  s0 --> s6["Slice 6<br/>gRPC mTLS<br/>in-process (was RFC-0002)"]
   note1["independent tier"]
 
   classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
@@ -226,7 +226,7 @@ flowchart LR
 
 > **In plain terms:** fix the front-door issuer first (easy, isolated), then work the two
 > independent chains — the secrets store on its own, and the database chain where each step
-> unlocks the next. gRPC rides along on RFC-0002.
+> unlocks the next. gRPC is this RFC's Slice 6 (in-process, formerly RFC-0002).
 
 **Hard dependency:** App→DB `verify-full` (Slice 4) is **blocked by the pooler tier** (Slice 3) —
 you cannot ask an app to verify a TLS server if the pooler in front of it speaks no TLS. This is
@@ -241,9 +241,9 @@ by sibling docs** — do not re-litigate here, reference them.
 
 | Option | Pros | Cons |
 |--------|------|------|
-| **(a) Per-workload cert-manager TLS, in-process** *(recommended direction)* | Reuses the deployed `homelab-ca` + trust-manager; no new component; matches the edge + CNPG-replication pattern already in the cluster; RFC-0002 already commits to it for gRPC | Per-workload `Certificate` + mount wiring; each tier has its own knob and ordering; app must be TLS-aware |
+| **(a) Per-workload cert-manager TLS, in-process** *(recommended direction)* | Reuses the deployed `homelab-ca` + trust-manager; no new component; matches the edge + CNPG-replication pattern already in the cluster; the superseded RFC-0002 already committed to it for gRPC | Per-workload `Certificate` + mount wiring; each tier has its own knob and ordering; app must be TLS-aware |
 | **(b) Service mesh (Istio Ambient / Linkerd)** | Transparent mTLS with no app changes; policy + observability bundled | **Deferred by [RFC-0006](../RFC-0006/) as disproportionate** for ~9 hops; large operational surface for a Kind/small cluster; still would not cover DB/OpenBAO natively |
-| **(c) SPIFFE/SPIRE workload identity** | Industry standard for short-lived SVID identity incl. Postgres/MySQL auth | **Rejected by RFC-0002** at this scale; heavy control plane; overkill before cloud |
+| **(c) SPIFFE/SPIRE workload identity** | Industry standard for short-lived SVID identity incl. Postgres/MySQL auth | **Rejected** at this scale (echoed by RFC-0006); heavy control plane; overkill before cloud |
 | **(d) Do nothing internally (status quo)** | Zero effort; NetworkPolicy already fences connectivity | Leaves the security finding open; no service identity; blocks ADR-025 cert-auth and undercuts RFC-0008 |
 
 **Cloud mapping (why this is still the right learning target):** on managed cloud the edge would
@@ -268,7 +268,7 @@ here maps directly to "flip to IAM" later.
 - [ ] **What does "sslmode true" mean per tier** — target `require` (encrypt only) everywhere
       first, or jump straight to `verify-full`? And which services graduate to T3 cert-auth?
 - [ ] **Cert lifetimes / rotation** — short-lived internal leaves (hours/days, auto-rotated) vs
-      the 90d/30d-renew that RFC-0002 proposes. One policy for all internal leaves, or per-tier?
+      the 90d/30d-renew the superseded RFC-0002 proposed. One policy for all internal leaves, or per-tier?
 - [ ] **OpenBAO TLS bootstrap ordering** — the cert-manager cert must exist before OpenBAO
       starts; how does that interact with the Flux secrets-wave and floci auto-unseal?
 - [ ] **`streaming_replica`** — leave CNPG's internal replication cert-auth as-is (CNPG-managed
@@ -283,7 +283,7 @@ here maps directly to "flip to IAM" later.
 **Isn't a service mesh the "proper" way to do mTLS everywhere?**
 
 For a large fleet, often yes. Here, RFC-0006 already judged Istio Ambient / Linkerd
-disproportionate for ~9 hops, and RFC-0002 chose in-process mTLS. A mesh also would not natively
+disproportionate for ~9 hops, and the in-process approach (this RFC, formerly RFC-0002) was chosen. A mesh also would not natively
 cover the database or OpenBAO tiers, which is where most of this work actually lives.
 
 **Why drop Cloudflare / Let's Encrypt now if prod will need it?**
@@ -311,7 +311,8 @@ T3 (cert-auth) is the endpoint where a service could stop using a password entir
 - PostgreSQL — `pg_hba.conf` auth methods (`hostssl`, `cert`), libpq `sslmode`.
 - PgBouncer — client/server TLS settings. PgDog — TLS support (to verify).
 - OpenBAO / HashiCorp Vault — `listener "tcp"` TLS configuration.
-- Internal: [RFC-0002](../RFC-0002/) (east-west gRPC mTLS), [RFC-0006](../RFC-0006/) (mesh
+- Internal: [RFC-0002](../RFC-0002/) (superseded — its east-west gRPC mTLS design is absorbed
+  by this RFC), [RFC-0006](../RFC-0006/) (mesh
   evaluation), [ADR-005](../../adr/ADR-005-openbao-ha-raft/), [ADR-015](../../adr/ADR-015-pg-hba-connection-isolation/),
   [ADR-025](../../adr/ADR-025-pgdog-passthrough-dynamic-db-creds/), and the cert-manager guide
   [`docs/secrets/cert-manager.md`](../../../secrets/cert-manager.md).

@@ -41,19 +41,21 @@ flowchart TB
             Auth["auth"]
             User["user"]
         end
-        subgraph Catalog["Catalog and shopping domain"]
+        subgraph Catalog["Catalog domain"]
             Product["product"]
             Review["review"]
-            Cart["cart"]
         end
-        subgraph Fulfillment["Checkout and fulfillment domain"]
+        subgraph CheckoutDomain["Checkout domain"]
+            Cart["cart"]
             Checkout["checkout"]
             Order["order"]
+            CheckoutWorker["checkout-worker"]
+            OrderWorker["order-worker"]
+        end
+        subgraph Comms["Comms domain"]
             Shipping["shipping"]
             Payment["payment"]
             Notification["notification"]
-            CheckoutWorker["checkout-worker"]
-            OrderWorker["order-worker"]
         end
         Temporal["Temporal"]
     end
@@ -345,8 +347,9 @@ their service documents.
 
 ## Service Contract Index
 
-The per-service contract index lives in [README.md § Service Contracts](./README.md#service-contracts).
-Deployment truth (local vs cluster vs planned) lives in [DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md).
+The per-service contract index and platform deployment rollup live in
+[README.md § Service Contracts](./README.md#service-contracts). Each service
+file's **At a glance** **Deployment** row is the per-service source of truth.
 
 ## Choosing HTTP or gRPC
 
@@ -407,6 +410,168 @@ flowchart LR
 
 Auth has no gRPC server. The former `auth.GetMe` dependency was retired when
 services moved to local JWT verification.
+
+## Edge exposure {#edge-exposure}
+
+- No `/internal/` audience is exposed at either edge — verified in
+  [kong.yml](../../local-stack/gateway/kong.yml) and
+  [ingress-api.yaml](../infra/configs/kong/ingress-api.yaml). NetworkPolicy is
+  the fence.
+- Known local divergence: local-stack Kong routes product and order on bare
+  prefixes (`/product/`, `/order/`) while the cluster ingress splits
+  `/product/v1/public/` and `/order/v1/private/`. Service paths are identical
+  (Variant A pass-through, `strip_path: false` everywhere).
+
+## End-to-end user journeys {#end-to-end-user-journeys}
+
+Four user journeys — register, browse, checkout, fulfill — traced as sequence
+diagrams across every service they touch. HTTP edges use the canonical shape
+`/{service}/v1/{audience}/{resource...}` (see [HTTP URL Model](#http-url-model));
+east-west edges use gRPC on `:9090` (see [gRPC Runtime Model](#grpc-runtime-model)).
+Durable workflows are indexed in [workflows.md](./workflows.md). Per-component
+deployment status is in each service **At a glance** table and the
+[hub rollup](./README.md#service-contracts).
+
+The four flows chain into one shopping journey: a JWT from flow 1 authorizes the
+cart writes in flow 2, the cart becomes a checkout session in flow 3, and the
+confirmed order drives the saga in flow 4.
+
+### 1. Register / login → JWT
+
+Owner: [auth.md](./auth.md).
+
+```mermaid
+sequenceDiagram
+    participant SPA as Browser SPA
+    participant Kong as Kong gateway
+    participant Auth as auth
+
+    SPA->>Kong: POST /auth/v1/public/auth/register
+    Kong->>Auth: pass-through (public — no edge JWT)
+    Auth-->>SPA: 201 access_token (RS256) + refresh_token
+
+    SPA->>Kong: POST /auth/v1/public/auth/login
+    Kong->>Auth: pass-through
+    Auth-->>SPA: 200 access_token + refresh_token
+
+    Note over SPA,Auth: access token expires → rotate
+    SPA->>Kong: POST /auth/v1/public/auth/refresh
+    Kong->>Auth: pass-through
+    Auth-->>SPA: 200 new pair (old refresh token retired)
+
+    Note over SPA,Kong: all later /private/ calls carry Bearer access_token
+    SPA->>Kong: GET /cart/v1/private/cart (Bearer)
+    Note over Kong: jwt-edge plugin: RS256 signature + iss check
+```
+
+### 2. Browse → cart CRUD
+
+Owners: [product.md](./product.md), [cart.md](./cart.md).
+
+```mermaid
+sequenceDiagram
+    participant SPA as Browser SPA
+    participant Kong as Kong gateway
+    participant Prod as product
+    participant Rev as review
+    participant Cart as cart
+
+    SPA->>Kong: GET /product/v1/public/products?page=1
+    Kong->>Prod: pass-through (public)
+    Prod-->>SPA: 200 paginated catalog
+
+    SPA->>Kong: GET /product/v1/public/products/:id/details
+    Kong->>Prod: pass-through
+    Prod->>Rev: gRPC ReviewService/GetProductReviews
+    Rev-->>Prod: reviews + summary (soft-fail to [])
+    Prod-->>SPA: 200 product + stock + reviews + related
+
+    SPA->>Kong: POST /cart/v1/private/cart (Bearer)
+    Note over Kong: jwt-edge on /private/
+    Kong->>Cart: pass-through
+    Cart-->>SPA: 200 item added (upsert on user_id + product_id)
+
+    SPA->>Kong: PATCH /cart/v1/private/cart/items/:itemId (Bearer)
+    Kong->>Cart: set quantity
+    Cart-->>SPA: 200 item quantity set
+
+    SPA->>Kong: GET /cart/v1/private/cart/count (Bearer)
+    Cart-->>SPA: 200 badge count
+```
+
+### 3. Checkout session → confirm → order pending
+
+Owners: [checkout.md](./checkout.md), [order.md](./order.md).
+
+```mermaid
+sequenceDiagram
+    participant SPA as Browser SPA
+    participant Kong as Kong gateway
+    participant CK as checkout
+    participant Cart as cart
+    participant Prod as product
+    participant Ship as shipping
+    participant Ord as order
+    participant TMP as Temporal
+
+    SPA->>Kong: POST /checkout/v1/private/checkout/sessions (Bearer)
+    Kong->>CK: pass-through (jwt-edge)
+    CK->>Cart: gRPC CartService/GetCart (read-only snapshot)
+    CK->>Prod: gRPC ProductService/GetProducts (cache-bypass re-validation)
+    CK->>TMP: Signal-With-Start AbandonedCheckoutWorkflow (30 min TTL)
+    CK-->>SPA: 201 session open (200 if an active session already exists)
+
+    SPA->>Kong: PUT /checkout/v1/private/checkout/sessions/:id/address
+    CK-->>SPA: 200 address_set
+    SPA->>Kong: PUT /checkout/v1/private/checkout/sessions/:id/shipping
+    CK->>Ship: gRPC ShippingService/GetQuote (method × region)
+    CK-->>SPA: 200 shipping_set (fee + tax composed in SQL)
+    SPA->>Kong: PUT /checkout/v1/private/checkout/sessions/:id/payment
+    CK-->>SPA: 200 ready (opaque tok_ reference only)
+
+    SPA->>Kong: POST /checkout/v1/private/checkout/sessions/:id/confirm<br/>(Idempotency-Key required)
+    CK->>Prod: gRPC GetProducts — final price/stock re-check
+    alt price or stock changed
+        CK-->>SPA: 409 PRICE_CHANGED / STOCK_UNAVAILABLE (requoted, key NOT consumed)
+    else validated
+        CK->>Ord: gRPC OrderService/CreateOrder (idempotent handoff)
+        Ord->>Ord: persist order status=pending
+        Ord->>TMP: StartWorkflow order-fulfillment-orderID
+        Ord-->>CK: order_id
+        CK-->>SPA: 201 session completed + order_id
+    end
+```
+
+Confirm details: [checkout.md § Confirm](./checkout.md). The handoff is
+asynchronous — the SPA polls `GET /order/v1/private/orders/:id` until the saga
+lands the order in `confirmed` or `failed`.
+
+### 4. Order fulfillment saga
+
+Owner: [order.md](./order.md); step order and compensations:
+[temporal-order-fulfillment.md](./temporal-order-fulfillment.md).
+
+```mermaid
+sequenceDiagram
+    participant W as order-worker (saga)
+    participant Pay as payment
+    participant Prod as product
+    participant Ship as shipping
+    participant Ord as order DB
+    participant Not as notification
+    participant Cart as cart
+
+    W->>Pay: gRPC Authorize (hold funds)
+    Note over Pay: declined → order failed, nothing else touched
+    W->>Prod: gRPC ReserveStock
+    W->>Ship: gRPC CreateShipment
+    W->>Pay: gRPC Capture (take the money)
+    W->>Ord: ConfirmOrder — PIVOT (failure compensates, success commits)
+    Note over W: post-pivot, forward-only best-effort
+    W->>Not: gRPC SendEmail (confirmation)
+    W->>Not: gRPC SendEmail (receipt)
+    W->>Cart: DELETE /cart/v1/internal/cart/:userId (REST exception)
+```
 
 ## gRPC Runtime Model
 

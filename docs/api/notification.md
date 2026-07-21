@@ -5,16 +5,15 @@ outbound email and SMS attempt as an owned, readable notification row — and it
 does so best-effort, so a failed notice never rolls back the order that
 triggered it.
 
-| Dimension | Value |
-|-----------|-------|
-| **Local-stack** | Implemented |
-| **Cluster** | Implemented |
-| **HTTP** | private · `:8080` · Kong `/notification/v1/private/` (edge JWT) |
-| **gRPC server** | `NotificationService/SendEmail`, `SendSMS` · `:9090` |
-| **gRPC client** | None |
-| **Worker** | None |
-| **Temporal** | Participant (gRPC) · [workflows.md#order-fulfillment](./workflows.md#order-fulfillment) |
-| **Technical debt** | None |
+| Dimension | Value | Status |
+|-----------|-------|--------|
+| **Deployment** | local-stack + cluster | Implemented |
+| **HTTP** | private · `:8080` · Kong `/notification/v1/private/` (edge JWT) | Implemented |
+| **gRPC server** | `NotificationService/SendEmail`, `SendSMS` · `:9090` | Implemented |
+| **gRPC client** | None | None |
+| **Worker** | None | None |
+| **Temporal** | Participant (gRPC) · [workflows.md#order-fulfillment](./workflows.md#order-fulfillment) | Implemented |
+| **Technical debt** | None | None |
 
 | | |
 |---|---|
@@ -247,7 +246,7 @@ Cluster gRPC address: `dns:///notification.notification.svc.cluster.local:9090`
   the old headless `notification-grpc` twin was removed). The gRPC port is
   unauthenticated by design and fenced by the namespace NetworkPolicy;
   east-west mTLS is **Planned** (see
-  [DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md)).
+  [Service contracts](./README.md#service-contracts)).
 - **Key env:** `PORT` (8080), `GRPC_PORT` (9090), `DB_*` (`DB_PASSWORD_FILE`
   supported — this service is the platform's dynamic-DB-credentials pilot,
   ADR-025 pattern A), `AUTH_JWKS_URL`, `JWT_ISSUER`, `JWT_AUDIENCE`,
@@ -270,18 +269,20 @@ Cluster gRPC address: `dns:///notification.notification.svc.cluster.local:9090`
 
 ## Code map
 
-| Layer | Repo path |
-|-------|-----------|
-| Entrypoint + route registration | `notification-service/cmd/main.go` |
-| HTTP handlers | `notification-service/internal/web/v1/handler.go` |
-| gRPC server | `notification-service/internal/grpc/v1/server.go` |
-| Business logic (shared by both transports) | `notification-service/internal/logic/v1/service.go` |
-| Business metrics | `notification-service/internal/logic/v1/metrics.go` |
-| Repository | `notification-service/internal/core/repository/notification.go` |
-| Domain model | `notification-service/internal/core/domain/notification.go` |
-| Schema / seed | `notification-service/db/migrations/sql/` · `notification-service/db/seed/sql/` |
-| Config (env contract) | `notification-service/config/config.go` |
-| Proto | `pkg/proto/notification/v1/notification.proto` |
+Paths in [`duynhlab/notification-service`](https://github.com/duynhlab/notification-service). Transport peers call `logic/v1`; logic calls `core` only ([api.md § Inside Each Service](./api.md#inside-each-service)).
+
+| Layer | Path | Notes |
+|-------|------|-------|
+| **Transport** | `internal/web/v1/handler.go` | HTTP handlers |
+| | `internal/grpc/v1/server.go` | gRPC server |
+| **logic** | `internal/logic/v1/service.go` | Business logic (shared by both transports) |
+| | `internal/logic/v1/metrics.go` | Business metrics |
+| **core** | `internal/core/domain/notification.go` | Domain model |
+| | `internal/core/repository/notification.go` | Repository |
+| **Platform** | `cmd/main.go` | Entrypoint + route registration |
+| | `config/config.go` | Config (env contract) |
+| | `db/migrations/sql/`, `db/seed/sql/` | Schema / seed |
+| | `pkg/proto/notification/v1/notification.proto` | Proto |
 
 ## References
 
@@ -289,7 +290,7 @@ Cluster gRPC address: `dns:///notification.notification.svc.cluster.local:9090`
 - [workflows.md](./workflows.md) — workflow registry
 - [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — saga theory + as-built steps
 - [order.md](./order.md) — the orchestrator's contract
-- [DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md) — platform rollup
+- [Service contracts](./README.md#service-contracts)
 - [microservices.md](./microservices.md) — feature matrix
 
 _Last updated: 2026-07-21_

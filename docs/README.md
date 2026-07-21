@@ -153,7 +153,7 @@ docs/
 
 ### Getting Started (New Users)
 
-1. **[Services Index](../SERVICES.md)** - List of all service repositories (Polyrepo)
+1. **[Repositories](#repositories)** - Polyrepo index: GitHub links, images, and CI badges
 2. **[Setup Guide](./platform/setup.md)** - Complete GitOps deployment guide
    - Quick start (3 commands, 5 minutes)
    - GitOps architecture with Flux Operator
@@ -167,6 +167,39 @@ docs/
 4. **[Shared API and communication guide](./api/api.md)** - URL model, audiences, common contracts, service index, and gRPC runtime
 
 5. **[GKE internal & private DNS](./platform/gke-internal-dns.md)** - `cluster.local`, Cloud DNS private zones, multi-environment naming
+
+## Repositories {#repositories}
+
+Polyrepo layout: application code lives in separate GitHub repositories; this
+repo (`homelab`) is the Infrastructure & GitOps hub. API contracts:
+[api/README.md § Service contracts](./api/README.md#service-contracts).
+
+### Infrastructure and shared libraries
+
+| Component | Repository | Description | CI |
+|-----------|------------|-------------|-----|
+| **Infrastructure** | [duynhlab/homelab](https://github.com/duynhlab/homelab) | GitOps, K8s manifests, docs | [![CI](https://github.com/duynhlab/homelab/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/homelab/actions) |
+| **Helm Charts** | [duynhlab/helm-charts](https://github.com/duynhlab/helm-charts) | `mop` chart — OCI `ghcr.io/duynhlab/helm-charts/mop` | [![CI](https://github.com/duynhlab/helm-charts/actions/workflows/e2e.yml/badge.svg)](https://github.com/duynhlab/helm-charts/actions) |
+| **Shared Workflows** | [duynhlab/gha-workflows](https://github.com/duynhlab/gha-workflows) | Reusable GitHub Actions | [![CI](https://github.com/duynhlab/gha-workflows/actions/workflows/pr-checks.yml/badge.svg)](https://github.com/duynhlab/gha-workflows/actions) |
+| **Common Lib** | [duynhlab/pkg](https://github.com/duynhlab/pkg) | Shared Go packages | [![CI](https://github.com/duynhlab/pkg/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/pkg/actions) |
+
+### Microservices and frontend
+
+| Service | Repository | Contract | Image | CI |
+|---------|------------|----------|-------|-----|
+| Auth | [auth-service](https://github.com/duynhlab/auth-service) | [auth.md](./api/auth.md) | `ghcr.io/duynhlab/auth-service/auth-service` | [![CI](https://github.com/duynhlab/auth-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/auth-service/actions) |
+| User | [user-service](https://github.com/duynhlab/user-service) | [user.md](./api/user.md) | `ghcr.io/duynhlab/user-service/user-service` | [![CI](https://github.com/duynhlab/user-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/user-service/actions) |
+| Product | [product-service](https://github.com/duynhlab/product-service) | [product.md](./api/product.md) | `ghcr.io/duynhlab/product-service/product-service` | [![CI](https://github.com/duynhlab/product-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/product-service/actions) |
+| Cart | [cart-service](https://github.com/duynhlab/cart-service) | [cart.md](./api/cart.md) | `ghcr.io/duynhlab/cart-service/cart-service` | [![CI](https://github.com/duynhlab/cart-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/cart-service/actions) |
+| Order | [order-service](https://github.com/duynhlab/order-service) | [order.md](./api/order.md) | `ghcr.io/duynhlab/order-service/order-service` | [![CI](https://github.com/duynhlab/order-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/order-service/actions) |
+| Review | [review-service](https://github.com/duynhlab/review-service) | [review.md](./api/review.md) | `ghcr.io/duynhlab/review-service/review-service` | [![CI](https://github.com/duynhlab/review-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/review-service/actions) |
+| Notification | [notification-service](https://github.com/duynhlab/notification-service) | [notification.md](./api/notification.md) | `ghcr.io/duynhlab/notification-service/notification-service` | [![CI](https://github.com/duynhlab/notification-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/notification-service/actions) |
+| Shipping | [shipping-service](https://github.com/duynhlab/shipping-service) | [shipping.md](./api/shipping.md) | `ghcr.io/duynhlab/shipping-service/shipping-service` | [![CI](https://github.com/duynhlab/shipping-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/shipping-service/actions) |
+| Checkout | [checkout-service](https://github.com/duynhlab/checkout-service) | [checkout.md](./api/checkout.md) | `ghcr.io/duynhlab/checkout-service/checkout-service` | [![CI](https://github.com/duynhlab/checkout-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/checkout-service/actions) |
+| Payment | [payment-service](https://github.com/duynhlab/payment-service) | [payments.md](./api/payments.md) | `ghcr.io/duynhlab/payment-service/payment-service` | [![CI](https://github.com/duynhlab/payment-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/payment-service/actions) |
+| Frontend | [frontend](https://github.com/duynhlab/frontend) | — | `ghcr.io/duynhlab/frontend/frontend` | [![CI](https://github.com/duynhlab/frontend/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/frontend/actions) |
+
+Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 ### Observability
 
@@ -337,12 +370,10 @@ docs/
 
 ### API
 
-- [API area hub](./api/README.md) - Learning path, document ownership, and all service contracts
-- [Shared API and communication guide](./api/api.md) - HTTP/gRPC conventions, current call graph, load balancing, security, and observability
-- [Deployment status](./api/DEPLOYMENT-STATUS.md) - Deployment truth rollup: local-stack vs cluster vs planned for every service and worker
+- [API area hub](./api/README.md) - Learning path, document ownership, deployment rollup, and all service contracts
+- [Shared API and communication guide](./api/api.md) - HTTP/gRPC conventions, call graph, user journeys, load balancing, security, and observability
 - [Microservices catalog](./api/microservices.md) - Feature ownership, techniques, dependencies, and known gaps
-- [End-to-end flows](./api/end-to-end-flows.md) - User-journey sequence diagrams from login through fulfillment
-- [Service contracts](./api/README.md#service-contracts) - One file for each of the ten Go services
+- [Service contracts](./api/README.md#service-contracts) - Platform deployment rollup and one file per Go service
 - [Workflow registry](./api/workflows.md) - Temporal workflows: owners, workers, task queues, and participants
 - [Temporal Order-Fulfillment Saga](./api/temporal-order-fulfillment.md) - Saga-vs-2PC learning, live compensations, Temporal infrastructure, and operations
 - [Checkout](./api/checkout.md) - Session orchestration, P1-P5 shipped (local-stack + cluster); P6 legacy removal planned

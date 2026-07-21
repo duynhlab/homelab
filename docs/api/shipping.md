@@ -2,16 +2,15 @@
 
 Shipping turns "an order that must move" into a tracked shipment — and turns "where is my package / what will it cost" into two public reads. It is the platform's quote authority (checkout prices delivery through it) and the order-fulfillment saga's shipment step.
 
-| Dimension | Value |
-|-----------|-------|
-| **Local-stack** | Implemented |
-| **Cluster** | Implemented |
-| **HTTP** | public only · `:8080` · Kong `/shipping/v1/public/` (no JWT) |
-| **gRPC server** | `ShippingService/GetQuote, GetShipmentByOrder, CreateShipment, CancelShipment` · `:9090` |
-| **gRPC client** | None |
-| **Worker** | None |
-| **Temporal** | Participant (gRPC) · [workflows.md](./workflows.md#order-fulfillment) |
-| **Technical debt** | Pre-v3 aliases (ADR-017) · [Known gaps](#known-gaps) |
+| Dimension | Value | Status |
+|-----------|-------|--------|
+| **Deployment** | local-stack + cluster | Implemented |
+| **HTTP** | public only · `:8080` · Kong `/shipping/v1/public/` (no JWT) | Implemented |
+| **gRPC server** | `ShippingService/GetQuote, GetShipmentByOrder, CreateShipment, CancelShipment` · `:9090` | Implemented |
+| **gRPC client** | None | None |
+| **Worker** | None | None |
+| **Temporal** | Participant (gRPC) · [workflows.md](./workflows.md#order-fulfillment) | Implemented |
+| **Technical debt** | Pre-v3 aliases (ADR-017) · [Known gaps](#known-gaps) | Technical debt |
 
 | | |
 |---|---|
@@ -238,7 +237,7 @@ east-west gRPC surface is unauthenticated by design — the policy is the fence.
   compatibility; the shipment row stores no destination yet.
 - **Estimate is demo math.** The public estimate is a deterministic formula, not a
   carrier integration; the quote rate table is likewise static in code.
-- **gRPC mTLS — Planned** (RFC-0020 research; [DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md)).
+- **gRPC mTLS — Planned** (RFC-0020 research; see [Service contracts](./README.md#service-contracts)).
 
 ## Operations
 
@@ -265,17 +264,19 @@ grpcurl -plaintext -d '{"method":"standard","region":"VN"}' \
 
 ## Code map
 
-| Layer | Repo path |
-|-------|-----------|
-| Routes + servers | `shipping-service/cmd/main.go` |
-| HTTP handlers | `shipping-service/internal/web/v1/handler.go` |
-| gRPC server | `shipping-service/internal/grpc/v1/server.go` |
-| Shipment logic | `shipping-service/internal/logic/v1/service.go` |
-| Quote rate table | `shipping-service/internal/logic/v1/quote.go` |
-| Business metrics | `shipping-service/internal/logic/v1/metrics.go` |
-| Repository | `shipping-service/internal/core/repository/postgres/shipping.go` |
-| Schema + idempotency constraint | `shipping-service/db/migrations/sql/` |
-| Proto | `pkg/proto/shipping/v1/shipping.proto` |
+Paths in [`duynhlab/shipping-service`](https://github.com/duynhlab/shipping-service). Transport peers call `logic/v1`; logic calls `core` only ([api.md § Inside Each Service](./api.md#inside-each-service)).
+
+| Layer | Path | Notes |
+|-------|------|-------|
+| **Transport** | `internal/web/v1/handler.go` | HTTP handlers |
+| | `internal/grpc/v1/server.go` | gRPC server |
+| **logic** | `internal/logic/v1/service.go` | Shipment logic |
+| | `internal/logic/v1/quote.go` | Quote rate table |
+| | `internal/logic/v1/metrics.go` | Business metrics |
+| **core** | `internal/core/repository/postgres/shipping.go` | Repository |
+| **Platform** | `cmd/main.go` | Routes + servers |
+| | `db/migrations/sql/` | Schema + idempotency constraint |
+| | `pkg/proto/shipping/v1/shipping.proto` | Proto |
 
 ## References
 
@@ -283,6 +284,6 @@ grpcurl -plaintext -d '{"method":"standard","region":"VN"}' \
 - [workflows.md](./workflows.md) — Temporal workflow registry
 - [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — saga deep dive
 - [checkout.md](./checkout.md) · [order.md](./order.md) — quote and enrichment callers
-- [DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md) — platform rollup
+- [Service contracts](./README.md#service-contracts)
 
 _Last updated: 2026-07-21_

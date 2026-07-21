@@ -52,6 +52,6 @@ Both workers run in local-stack (`local-stack/compose.yaml`) and in-cluster ([or
 ## References
 
 - [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — saga theory + as-built + operations
-- [DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md) — platform rollup
+- [Service contracts](README.md#service-contracts) — platform deployment rollup
 
 _Last updated: 2026-07-21_

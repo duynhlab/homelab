@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **docs/api standardized as the trusted API source**: all 10 service contracts rewritten to a uniform 15-part template (At a glance + Identity header tables, Temporal participation, Saga-column gRPC tables, code maps); new `DEPLOYMENT-STATUS.md`, `workflows.md`, `end-to-end-flows.md`, `_template-service.md`; hub dedup (topology/call graph canonical in `api.md`); Temporal doc restructured Learn/As-built/Operations; checkout P5 drift fixed in `SERVICES.md` + `docs/README.md`.
+- **docs/api standardized as the trusted API source**: all 10 service contracts use At a glance (3 columns), grouped code maps, and hub deployment rollup in `docs/api/README.md`; user journeys merged into `api.md`; repo index in `docs/README.md` § Repositories; `AGENTS.md` trusts `docs/api/` for API contracts.
 
 ### Added
 

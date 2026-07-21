@@ -4,16 +4,15 @@ Review turns a shopper's opinion into exactly one durable rating per user per
 product, and serves that data to both the browser and product-service's
 details aggregation.
 
-| Dimension | Value |
-|-----------|-------|
-| **Local-stack** | Implemented |
-| **Cluster** | Implemented |
-| **HTTP** | public + private · `:8080` · Kong `/review/v1/public/` and `/review/v1/private/` (edge JWT on private) |
-| **gRPC server** | `ReviewService/GetProductReviews` · `:9090` |
-| **gRPC client** | None |
-| **Worker** | None |
-| **Temporal** | None · [workflows.md](./workflows.md) |
-| **Technical debt** | None |
+| Dimension | Value | Status |
+|-----------|-------|--------|
+| **Deployment** | local-stack + cluster | Implemented |
+| **HTTP** | public + private · `:8080` · Kong `/review/v1/public/` and `/review/v1/private/` (edge JWT on private) | Implemented |
+| **gRPC server** | `ReviewService/GetProductReviews` · `:9090` | Implemented |
+| **gRPC client** | None | None |
+| **Worker** | None | None |
+| **Temporal** | None · [workflows.md](./workflows.md) | None |
+| **Technical debt** | None | None |
 
 | | |
 |---|---|
@@ -279,26 +278,28 @@ grpcurl -plaintext -d '{"product_id":"1"}' \
 
 ## Code map
 
-Verified against `duynhlab/review-service`:
+Paths in [`duynhlab/review-service`](https://github.com/duynhlab/review-service). Transport peers call `logic/v1`; logic calls `core` only ([api.md § Inside Each Service](./api.md#inside-each-service)).
 
-| Layer | Repo path |
-|-------|-----------|
-| Entrypoint, routes, gRPC bootstrap, subcommands | `review-service/cmd/main.go` |
-| HTTP handlers | `review-service/internal/web/v1/handler.go` |
-| Business logic + sentinels + metrics | `review-service/internal/logic/v1/{service.go,errors.go,metrics.go}` |
-| gRPC server (10k cap, truncation log) | `review-service/internal/grpc/v1/server.go` |
-| Domain model + repository interface | `review-service/internal/core/domain/{review.go,repository.go}` |
-| Repository (23505 mapping) | `review-service/internal/core/repository/review_repo.go` |
-| Migrations (schema + unique constraint) | `review-service/db/migrations/sql/` |
-| Dev-only seed | `review-service/db/seed/sql/` |
-| Config (env parsing) | `review-service/config/config.go` |
-| Proto | `pkg/proto/review/v1/review.proto` |
+| Layer | Path | Notes |
+|-------|------|-------|
+| **Transport** | `internal/web/v1/handler.go` | HTTP handlers |
+| | `internal/grpc/v1/server.go` | gRPC server (10k cap, truncation log) |
+| **logic** | `internal/logic/v1/service.go` | Business logic |
+| | `internal/logic/v1/errors.go` | Sentinels |
+| | `internal/logic/v1/metrics.go` | Business metrics |
+| **core** | `internal/core/domain/review.go`, `repository.go` | Domain model + repository interface |
+| | `internal/core/repository/review_repo.go` | Repository (23505 mapping) |
+| **Platform** | `cmd/main.go` | Entrypoint, routes, gRPC bootstrap, subcommands |
+| | `config/config.go` | Config (env parsing) |
+| | `db/migrations/sql/` | Migrations (schema + unique constraint) |
+| | `db/seed/sql/` | Dev-only seed |
+| | `pkg/proto/review/v1/review.proto` | Proto |
 
 ## References
 
 - [api.md](./api.md) — shared URL model, auth, error envelope, pagination, gRPC runtime model
 - [workflows.md](./workflows.md) — Temporal registry (review: None)
-- [DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md) — platform deployment rollup
+- [Service contracts](./README.md#service-contracts)
 - [product.md](./product.md) — the details aggregation that calls `GetProductReviews`
 - [microservices.md](./microservices.md) — feature matrix
 

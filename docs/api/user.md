@@ -4,16 +4,15 @@ User turns an authenticated identity into a displayable profile: it stores names
 phone, and address fields while auth remains the sole owner of credentials and
 identity claims.
 
-| Dimension | Value |
-|-----------|-------|
-| **Local-stack** | Implemented |
-| **Cluster** | Implemented |
-| **HTTP** | public + private · `:8080` · Kong `/user/v1/public/` and `/user/v1/private/` (edge JWT on private) |
-| **gRPC server** | None |
-| **gRPC client** | None |
-| **Worker** | None |
-| **Temporal** | None · [workflows.md](./workflows.md) |
-| **Technical debt** | None |
+| Dimension | Value | Status |
+|-----------|-------|--------|
+| **Deployment** | local-stack + cluster | Implemented |
+| **HTTP** | public + private · `:8080` · Kong `/user/v1/public/` and `/user/v1/private/` (edge JWT on private) | Implemented |
+| **gRPC server** | None | None |
+| **gRPC client** | None | None |
+| **Worker** | None | None |
+| **Temporal** | None · [workflows.md](./workflows.md) | None |
+| **Technical debt** | None | None |
 
 | | |
 |---|---|
@@ -253,26 +252,28 @@ curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json
 
 ## Code map
 
-| Layer | Repo path |
-|-------|-----------|
-| Routes + bootstrap | `user-service/cmd/main.go` |
-| HTTP handlers | `user-service/internal/web/v1/handler.go` |
-| Validation sanitizer | `user-service/internal/web/v1/validation.go` |
-| Business logic | `user-service/internal/logic/v1/service.go` |
-| Business metrics | `user-service/internal/logic/v1/metrics.go` |
-| Domain types + errors | `user-service/internal/core/domain/` |
-| Repository (pgx) | `user-service/internal/core/repository/psql/user_repository.go` |
-| DB pool setup | `user-service/internal/core/database.go` |
-| Config | `user-service/config/config.go` |
-| Migrations / seed | `user-service/db/migrations/sql/` · `user-service/db/seed/sql/` |
-| Tracing/logging middleware | `user-service/middleware/` |
+Paths in [`duynhlab/user-service`](https://github.com/duynhlab/user-service). Transport peers call `logic/v1`; logic calls `core` only ([api.md § Inside Each Service](./api.md#inside-each-service)).
+
+| Layer | Path | Notes |
+|-------|------|-------|
+| **Transport** | `internal/web/v1/handler.go` | HTTP handlers |
+| | `internal/web/v1/validation.go` | Validation sanitizer |
+| **logic** | `internal/logic/v1/service.go` | Business logic |
+| | `internal/logic/v1/metrics.go` | Business metrics |
+| **core** | `internal/core/domain/` | Domain types + errors |
+| | `internal/core/repository/psql/user_repository.go` | Repository (pgx) |
+| | `internal/core/database.go` | DB pool setup |
+| **Platform** | `cmd/main.go` | Routes + bootstrap |
+| | `config/config.go` | Config |
+| | `middleware/` | Tracing/logging middleware |
+| | `db/migrations/sql/`, `db/seed/sql/` | Migrations / seed |
 
 ## References
 
 - [api.md](./api.md) — shared HTTP conventions, auth model, error envelope, pagination
 - [auth.md](./auth.md) — the credential side of the identity boundary
 - [workflows.md](./workflows.md) — Temporal registry (user: None)
-- [DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md) — platform rollup
+- [Service contracts](./README.md#service-contracts)
 - [microservices.md](./microservices.md) — feature matrix
 
 _Last updated: 2026-07-21_

@@ -53,7 +53,7 @@ SLOs with burn-rate alerts, and a single source of truth in Git delivered via Fl
 - Secrets in OpenBAO (HA Raft), synced into the cluster by External Secrets Operator.
 
 > This repository contains **infrastructure, GitOps, observability, and docs**.
-> Application code lives in separate repositories — see [`SERVICES.md`](SERVICES.md).
+> Application code lives in separate repositories — see [docs/README.md § Repositories](docs/README.md#repositories) and [docs/api/README.md](docs/api/README.md).
 
 For deep documentation, start at [`docs/README.md`](docs/README.md).
 

@@ -705,8 +705,9 @@ Phased P1→P6 as above. Blast-radius notes:
   for migrating cart writes); ADR-022 atomic promo redemption.
 - Docs to update on implementation: [`docs/api/api.md`](../../../api/api.md),
   [`docs/api/microservices.md`](../../../api/microservices.md),
+  [`docs/api/checkout.md`](../../../api/checkout.md),
   [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md),
-  [`SERVICES.md`](../../../../SERVICES.md).
+  [`docs/README.md` § Repositories](../../../README.md#repositories).
 
 ---
 _Last updated: 2026-07-14_

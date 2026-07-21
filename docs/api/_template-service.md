@@ -5,7 +5,8 @@ Template for every service contract in docs/api/. Copy, fill, delete the
 comments. Keep the section order exactly as below (15 parts). Depth bar:
 checkout.md — target 250–350 lines. English only, Mermaid only (AGENTS.md
 palette). Status vocabulary: Implemented / Partial / Technical debt /
-No caller / Planned / None.
+No caller / Planned / None — defined in README.md § Service Contracts.
+CI badges live in hub rollup + docs/README.md § Repositories, not here.
 -->
 
 {One-line hook: what this service turns into what.}
@@ -13,16 +14,15 @@ No caller / Planned / None.
 <!-- Part 2 — Table 1: At a glance (deployment & transport). Same rows on
      every service doc, short cells; details belong in body sections. -->
 
-| Dimension | Value |
-|-----------|-------|
-| **Local-stack** | Implemented |
-| **Cluster** | Implemented |
-| **HTTP** | {audiences} · `:8080` · Kong `/{service}/v1/{audience}/` |
-| **gRPC server** | None <!-- or `Svc/RPC` · `:9090` --> |
-| **gRPC client** | None <!-- or list of callees --> |
-| **Worker** | None <!-- or `{service}-worker` · queue `{queue}` --> |
-| **Temporal** | None · [workflows.md](./workflows.md) <!-- or Orchestrator/Participant + link --> |
-| **Technical debt** | None <!-- or short item · [Known gaps](#known-gaps) --> |
+| Dimension | Value | Status |
+|-----------|-------|--------|
+| **Deployment** | local-stack + cluster | Implemented |
+| **HTTP** | {audiences} · `:8080` · Kong `/{service}/v1/{audience}/` | Implemented |
+| **gRPC server** | None <!-- or `Svc/RPC` · `:9090` --> | None |
+| **gRPC client** | None <!-- or list of callees --> | None |
+| **Worker** | None <!-- or `{service}-worker` · queue `{queue}` --> | None |
+| **Temporal** | None · [workflows.md](./workflows.md) <!-- or Orchestrator/Participant + link --> | None |
+| **Technical debt** | None <!-- or short item · [Known gaps](#known-gaps) --> | None |
 
 <!-- Part 3 — Table 2: Identity (stable metadata, does not change per phase). -->
 
@@ -96,9 +96,17 @@ Participant / Orchestrator: field table like below. -->
 
 <!-- Part 14 — verify paths against the actual service repo. -->
 
-| Layer | Repo path |
-|-------|-----------|
-| HTTP handlers | `{service}-service/internal/web/v1/` |
+Paths in [`duynhlab/{service}-service`](https://github.com/duynhlab/{service}-service).
+Transport peers call `logic/v1`; logic calls `core` only
+([api.md § Inside Each Service](./api.md#inside-each-service)).
+
+| Layer | Path | Notes |
+|-------|------|-------|
+| **Transport** | `internal/web/v1/` | HTTP handlers |
+| | `internal/grpc/v1/` | gRPC server (if any) |
+| **logic** | `internal/logic/v1/` | Business rules |
+| **core** | `internal/core/` | Domain, repositories, ports |
+| **Platform** | `cmd/main.go`, `config/`, `db/migrations/`, `pkg/proto/` | Bootstrap, schema, contract |
 
 ## References
 

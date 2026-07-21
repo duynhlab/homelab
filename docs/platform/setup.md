@@ -44,12 +44,13 @@ git clone https://github.com/duynhlab/gha-workflows.git
 git clone https://github.com/duynhlab/pkg.git
 
 # Microservices Repositories
-for service in auth user product cart order review notification shipping payment; do
+for service in auth user product cart order review notification shipping payment checkout; do
   git clone https://github.com/duynhlab/${service}-service.git
 done
 
 # Frontend Repository
 git clone https://github.com/duynhlab/frontend.git
+git clone https://github.com/duynhlab/helm-charts.git
 ```
 
 This creates a structured local environment with all necessary source code.

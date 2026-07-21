@@ -15,6 +15,7 @@ resources:
   - objectstore.yaml
   - instance.yaml
   - services/
+  - openbao-db-config.yaml  # RFC-0008/ADR-025: enable DB engine + notification static-role (after platform-db)
   - configmaps/monitoring-queries.yaml
   - poolers/
   - monitoring/podmonitor.yaml

@@ -1,0 +1,99 @@
+# openbao-db-config — enable the OpenBAO database secrets engine + configure a
+# static-role that rotates the `notification` role's password (RFC-0008 / ADR-025
+# pattern-A pilot). Runs in the databases wave (after platform-db) because
+# database/config validates the live PostgreSQL connection, which the
+# openbao-bootstrap Job (secrets wave) cannot — platform-db is not up yet, and
+# root is revoked by then. This Job authenticates via Kubernetes auth (role
+# db-configurator, created by the bootstrap) — NO root token. Idempotent + retries
+# until platform-db-rw is reachable.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openbao-db-configurator
+  namespace: platform
+  labels:
+    app.kubernetes.io/name: openbao-db-configurator
+    app.kubernetes.io/component: database
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: openbao-db-config
+  namespace: platform
+  labels:
+    app.kubernetes.io/name: openbao-db-config
+    app.kubernetes.io/component: database
+spec:
+  backoffLimit: 5
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openbao-db-config
+        app.kubernetes.io/component: database
+    spec:
+      serviceAccountName: openbao-db-configurator
+      restartPolicy: OnFailure
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: db-config
+          image: openbao/openbao:2.5.3
+          env:
+            - name: HOME
+              value: /tmp
+            - name: BAO_ADDR
+              value: http://openbao.openbao.svc.cluster.local:8200
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              echo "Logging in to OpenBAO via k8s auth (db-configurator)..."
+              JWT="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+              n=0
+              until BAO_TOKEN="$(bao write -field=token auth/kubernetes/login role=db-configurator jwt="$JWT" 2>/dev/null)"; [ -n "$BAO_TOKEN" ]; do
+                n=$((n + 1)); [ "$n" -ge 30 ] && { echo "ERROR: k8s-auth login failed after 150s"; exit 1; }
+                echo "  login not ready, retry 5s..."; sleep 5
+              done
+              export BAO_TOKEN
+
+              echo "Enabling database secrets engine..."
+              bao secrets enable -path=database database 2>/dev/null || echo "  already enabled"
+
+              echo "Configuring database/config/platform-db (retry until platform-db-rw is reachable)..."
+              n=0
+              until bao write database/config/platform-db \
+                  plugin_name=postgresql-database-plugin \
+                  allowed_roles="notification" \
+                  connection_url="postgresql://{{username}}:{{password}}@platform-db-rw.platform.svc.cluster.local:5432/notification?sslmode=disable" \
+                  username="vault_rotator" \
+                  password="V4ult-R0t8-2026!" 2>/dev/null; do
+                n=$((n + 1)); [ "$n" -ge 60 ] && { echo "ERROR: database/config failed after 300s (platform-db unreachable / vault_rotator?)"; exit 1; }
+                echo "  platform-db not reachable yet, retry 5s..."; sleep 5
+              done
+
+              echo "Writing static-role notification (rotate the fixed role's password)..."
+              bao write database/static-roles/notification \
+                db_name=platform-db \
+                username="notification" \
+                rotation_period="720h"
+
+              echo "openbao-db-config complete: static-role notification ready."
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL

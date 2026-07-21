@@ -38,6 +38,9 @@ spec:
       - host review       review       all scram-sha-256
       - host temporal            temporal all scram-sha-256
       - host temporal_visibility temporal all scram-sha-256
+      # RFC-0008 / ADR-025 pilot: OpenBAO's rotation admin connects to the
+      # notification DB to ALTER notification's password (static-role rotation).
+      - host notification        vault_rotator all scram-sha-256
       - host all                 all      all reject
 
     synchronous:
@@ -118,6 +121,15 @@ spec:
         - CREATE ROLE temporal WITH LOGIN
         - CREATE DATABASE temporal OWNER temporal
         - CREATE DATABASE temporal_visibility OWNER temporal
+        # RFC-0008 / ADR-025 pattern-A pilot (notification): pre-create the
+        # notification role (the DatabaseRole CR then adopts it, same as
+        # temporal above) and a least-privilege rotation admin so OpenBAO can
+        # rotate notification's password. PG18 requires ADMIN OPTION on the
+        # target role (not bare CREATEROLE); postInitSQL runs as the initdb
+        # superuser, so the GRANT is done here (no persistent superuser access).
+        - CREATE ROLE notification WITH LOGIN
+        - CREATE ROLE vault_rotator WITH LOGIN CREATEROLE PASSWORD 'V4ult-R0t8-2026!'
+        - GRANT notification TO vault_rotator WITH ADMIN OPTION
 
   storage:
     size: 10Gi

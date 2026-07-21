@@ -62,6 +62,10 @@ and trust-manager already fans the CA bundle into labeled namespaces.
 - **SPIFFE/SPIRE workload identity** (alternative (c)) — disproportionate at this
   scale.
 
+> **Related research:** platform-wide internal TLS (database, pooler, OpenBAO, and the
+> edge-issuer decouple) is owned by [RFC-0020](../RFC-0020/research.md); this RFC is the
+> east-west gRPC slice of that one-root program.
+
 ## Proposal
 
 Wire mTLS **in-process** into the shared transport helpers, trusting the existing

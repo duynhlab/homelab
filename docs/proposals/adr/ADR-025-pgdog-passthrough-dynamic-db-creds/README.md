@@ -338,6 +338,8 @@ to AWS/GCP leverages what the provider already offers instead of re-inventing it
   of rung 3, cleanest **direct-to-PG** (a pooler in the middle needs care). It needs TLS
   end-to-end (today is scram-sha-256 and partly non-TLS on Kind), so it stays
   **reference / future** — **noted here because that infra (TLS) is not in place yet.**
+  That end-to-end TLS is researched in [RFC-0020](../../rfc/RFC-0020/research.md)
+  (internal TLS on the `homelab-ca` root), which unlocks this cert-auth path.
 - **Rung 1 is a stepping stone, not throwaway:** the `pkg/dbx` `BeforeConnect` hook built
   here is the *same* mechanism rung 3 uses — it just fetches a short-lived IAM token instead
   of reading a file. Moving up the ladder swaps the credential source, not the plumbing.

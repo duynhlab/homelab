@@ -208,8 +208,9 @@ kubectl get vlsingle -n monitoring
 ```
 
 Vector self-monitoring (its own throughput/error/buffer metrics, alerts, and
-dashboard) and full backend troubleshooting are in
-[`victorialogs.md`](victorialogs.md).
+full backend troubleshooting are in [`victorialogs.md`](victorialogs.md). For
+symptom-driven on-call (blank Grafana logs panel), see
+[`victorialogs-kubernetes-logs-debug.md`](../runbooks/victorialogs-kubernetes-logs-debug.md).
 
 ## Documentation map
 

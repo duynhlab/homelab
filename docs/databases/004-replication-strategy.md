@@ -394,7 +394,7 @@ flowchart TD
 
 ### Read/Write Splitting
 
-Application sends writes to Primary, reads to Replicas. Pooler (PgBouncer/PgCat/PgDog) routes intelligently:
+Application sends writes to Primary, reads to Replicas. Pooler (PgBouncer or PgDog) routes intelligently:
 
 ```mermaid
 flowchart TB
@@ -402,7 +402,7 @@ flowchart TB
         SVC[Product Service]
     end
     subgraph Pooler [Connection Pooler]
-        POOL[PgBouncer or PgCat or PgDog]
+        POOL[PgBouncer or PgDog]
     end
     subgraph DB [Database]
         PRIMARY[Primary - Writes]
@@ -502,7 +502,7 @@ Large hyperscale deployments scale PostgreSQL to hundreds of millions of users w
 
 1. **Keep it simple** - these deployments avoided sharding. Scale with replicas + caching first.
 2. **Cache stampede prevention** - Use a distributed lock (Redis SETNX) so only 1 request fetches on cache miss. *Product service implements this.*
-3. **Connection pooling is mandatory** - PgBouncer/PgCat reduces connections 50-100x.
+3. **Connection pooling is mandatory** - PgBouncer/PgDog reduces connections 50-100x.
 4. **Cascading for 30+ replicas** - Primary → Intermediate → Downstream.
 5. **Application-first optimization** - Optimize queries, add caching, rate limiting before scaling infrastructure.
 

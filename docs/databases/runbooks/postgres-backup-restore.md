@@ -5,9 +5,9 @@ clusters using RustFS (S3-compatible) object storage.
 
 Reference docs:
 
-- [Database DRP](../../databases/010-drp.md)
-- [Backup Strategy](../../databases/006-backup-strategy.md)
-- [Database Integration](../../databases/002-database-integration.md)
+- [Database DRP](../010-drp.md)
+- [Backup Strategy](../006-backup-strategy.md)
+- [Database Integration](../002-database-integration.md)
 
 ## Overview
 
@@ -218,7 +218,7 @@ Before promotion:
 - Confirm the replay point is acceptable for the incident RPO.
 - Get incident commander approval.
 
-Promotion and cutover details live in [010-drp.md](../../databases/010-drp.md).
+Promotion and cutover details live in [010-drp.md](../010-drp.md).
 
 ## Validation Checklist
 
@@ -254,4 +254,4 @@ For every restore drill or incident recovery, capture:
 - Final measured RTO and estimated RPO.
 
 ---
-_Last updated: 2026-07-17 (RFC-0018: platform-db CNPG Barman; Zalando section removed)_
+_Last updated: 2026-07-21 — Moved from `docs/runbooks/troubleshooting/` to domain runbooks._

@@ -98,6 +98,13 @@ spec:
         # kill-switch flip also hands the pod back to Vector.
         labels:
           platform.duynhlab.dev/otlp-logs: << index inputs "otel_logs_enabled" | default "true" | quote >>
+        <<- if (index inputs "db_password_file") >>
+        # RFC-0008 / ADR-025 pattern A: mount the DB Secret as a file so the app
+        # reads a rotated password per connection (mop chart adds DB_PASSWORD_FILE).
+        dbCredentials:
+          enabled: true
+          secretName: << inputs.db_secret >>
+        <<- end >>
         env:
           - name: SERVICE_NAME
             value: << inputs.name >>

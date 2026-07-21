@@ -4,7 +4,7 @@
 1. [Quick Summary](#quick-summary) - Clusters, poolers overview
 2. [Database Architecture](#database-architecture) - 2 operational clusters + DR overview diagram + tables
 3. [CloudNativePG Operator](#cloudnativepg-operator) - Operator features, per-cluster details, connection patterns, monitoring
-4. [Connection Poolers](#connection-poolers) - PgDog (active); PgBouncer / PgCat (comparison) + configuration
+4. [Connection Poolers](#connection-poolers) - PgBouncer + PgDog (deployed) + configuration
 5. [Related Documentation](#related-documentation) - Links to other docs
 6. [Troubleshooting](#troubleshooting) - Common issues and solutions
 
@@ -245,26 +245,27 @@ Consolidated **CloudNativePG** cluster for **product**, **cart**, and **order** 
 **Multi-Database Support:**
 - **platform-db** hosts auth, supporting services, and Temporal persistence on one HA cluster
 - **product-db** hosts `product`, `cart`, `order`, and `payment` on one cluster (payment connects direct-TLS, not via PgDog)
-- **PgDog** provides multi-database routing and read/write splitting to CNPG `-rw` / `-r` services (replaces the former **PgCat** deployment for cart/order in active GitOps)
+- **PgBouncer** (`platform-db-pooler-rw`) pools auth, user, notification, shipping, and review on **`platform-db`**
+- **PgDog** (`pgdog-product`) provides multi-database routing and read/write splitting on **`product-db`**
 
 ### Connection Patterns
 
-> **Deep Dive**: For detailed architecture, trade-offs, and configuration of **PgDog**, **PgBouncer**, and **PgCat** (comparison / legacy), see [`docs/databases/008-pooler.md`](./008-pooler.md).
+> **Deep Dive**: For detailed architecture, trade-offs, and configuration of **PgBouncer** and **PgDog**, see [`docs/databases/008-pooler.md`](./008-pooler.md).
 
-#### PgDog (unified pooler — platform-db and product-db)
+#### PgBouncer (platform-db)
 
-**Platform endpoint**: `pgdog-platform.platform.svc.cluster.local:6432`
+**Endpoint**: `platform-db-pooler-rw.platform.svc.cluster.local:5432`
 
-- **Role**: Single pooler entry point for **auth**, **user**, **notification**, **shipping**, and **review** application traffic.
-- **Topology**: Routes writes to **`platform-db-rw`**, read workload to **`platform-db-r`**, per database definitions in the PgDog Helm values.
+- **Role**: CNPG-native pooler for **auth**, **user**, **notification**, **shipping**, and **review** application traffic.
+- **Topology**: `type: rw` — all pooled traffic goes to **`platform-db-rw`** (no read replica split in the ADR-026 pilot).
 
-**Product endpoint**: `pgdog-product.product.svc.cluster.local:6432`
+#### PgDog (product-db)
 
-- **Role**: Single pooler entry point for **product**, **cart**, and **order** application traffic.
+**Endpoint**: `pgdog-product.product.svc.cluster.local:6432`
+
+- **Role**: Pooler entry point for **product**, **cart**, and **order** application traffic.
 - **Topology**: Routes writes to **`product-db-rw`**, read workload to **`product-db-r`**, per database definitions in the PgDog Helm values.
 - **Pooling Mode**: `transaction` (per upstream database config).
-
-**Historical note:** Cart and order previously used a standalone **PgCat** service (`pgcat.cart`); that path is no longer the documented active stack for CNPG — see [Connection Poolers](#connection-poolers) for comparison context.
 
 
 ### Configuration
@@ -332,7 +333,7 @@ and the operator comparison in [003 — Operator Comparison](./003-operator-comp
 
 ### Overview
 
-Connection poolers solve the "too many connections" problem by reusing PostgreSQL connections, allowing applications to handle 1000+ client connections with only 25-50 database connections. The **only poolers deployed** in this repo are **PgDog** — two standalone Helm releases: `pgdog-platform` (platform-db: auth, user, notification, shipping, review — Temporal connects direct past it), and `pgdog-product` (product-db: product, cart, order — the payment *app* connects direct over TLS, bypassing the pooler). **PgBouncer** (previously the Zalando sidecar) and **PgCat** (previously used for cart/order) appear below only for **comparison** — neither is deployed anymore.
+Connection poolers solve the "too many connections" problem by reusing PostgreSQL connections, allowing applications to handle 1000+ client connections with only 25-50 database connections. The **deployed poolers** are **PgBouncer** on **`platform-db`** (`platform-db-pooler-rw`) and **PgDog** on **`product-db`** (`pgdog-product`). Temporal on `platform-db` and the payment app on `product-db` connect direct to the cluster RW service, bypassing the pooler.
 
 **Why Use Connection Poolers?**
 - PostgreSQL has limited connections (`max_connections` typically 100-200)
@@ -348,30 +349,26 @@ Connection poolers solve the "too many connections" problem by reusing PostgreSQ
 
 ### Comparison Matrix
 
-| Criteria | PgBouncer | PgCat | PgDog |
-|----------|-----------|-------|-------|
-| **Architecture** | Single-threaded (C) | Multi-threaded (Rust) | Multi-threaded (Rust) |
-| **Performance (<50 conn)** | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐⭐⭐ Very Good | ⭐⭐⭐⭐ Very Good |
-| **Performance (>50 conn)** | ⭐⭐ Degrades | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐⭐⭐⭐ Excellent |
-| **Load Balancing** | ❌ No | ✅ Yes (read replicas) | ✅ Yes (multiple strategies) |
-| **Automatic Failover** | ❌ No | ✅ Yes | ✅ Yes |
-| **Sharding** | ❌ No | ✅ Yes (experimental) | ✅ Yes (production-grade) |
-| **Monitoring** | Admin DB only | Prometheus + Admin DB | OpenMetrics + Admin DB |
-| **Zalando Integration** | ✅ Built-in sidecar | ❌ Standalone | ❌ Standalone |
-| **CloudNativePG Fit** | ❌ No built-in | ✅ Standalone | ✅ Standalone |
-| **Complexity** | ⭐⭐ Simple | ⭐⭐⭐ Moderate | ⭐⭐⭐⭐ Advanced |
+| Criteria | PgBouncer | PgDog |
+|----------|-----------|-------|
+| **Architecture** | Single-threaded (C) | Multi-threaded (Rust) |
+| **Performance (<50 conn)** | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐⭐⭐ Very Good |
+| **Performance (>50 conn)** | ⭐⭐ Degrades | ⭐⭐⭐⭐⭐ Excellent |
+| **Load Balancing** | ❌ No | ✅ Yes (read replicas) |
+| **Automatic Failover** | ❌ No | ✅ Yes |
+| **Sharding** | ❌ No | ✅ Yes (production-grade) |
+| **Monitoring** | Admin DB + PodMonitor | OpenMetrics + Admin DB |
+| **Zalando Integration** | ✅ Built-in sidecar (historical) | ❌ Standalone |
+| **CloudNativePG Fit** | ✅ `Pooler` CR | ✅ Standalone Helm |
+| **Complexity** | ⭐⭐ Simple | ⭐⭐⭐⭐ Advanced |
 
 ### When to Use Each Pooler
 
-**PgBouncer (comparison only — no longer deployed):**
-- Best fit for low-to-medium connection counts (<50 concurrent) and simple pooling needs (no load balancing, sharding)
-- Was the built-in Zalando sidecar before the CNPG migration
+**PgBouncer (deployed on platform-db):**
+- CNPG-native `Pooler` CR with `type: rw` and transaction pooling
+- Best fit for simple pooling without read replica routing
 
-**PgCat (comparison only — no longer deployed):**
-- A Rust pooler with read-replica load balancing and multi-database routing
-- Previously fronted cart/order against CNPG
-
-**Use PgDog (the deployed pooler) when:**
+**Use PgDog (deployed on product-db) when:**
 - ✅ **CloudNativePG** clusters without a built-in pooler (both operational clusters today)
 - ✅ Multi-database routing on a shared cluster (e.g. product + cart + order on product-db)
 - ✅ Read/write splitting to `-rw` / `-r` services with LSN-aware replica selection (see chart values)
@@ -380,19 +377,16 @@ Connection poolers solve the "too many connections" problem by reusing PostgreSQ
 
 ### Current Implementation
 
-PgDog runs as two standalone Helm releases — `pgdog-platform` (ns `platform`)
-and `pgdog-product` (ns `product`) — on the same chart, port `6432`, OpenMetrics
-`9090`. The `pgdog-product` release is detailed below; `pgdog-platform` follows
-the same shape for its five pooled databases.
+#### PgBouncer (platform-db)
 
-#### PgDog (platform-db — auth, user, notification, shipping, review)
-
-**Deployment:** Helm chart (`helm.pgdog.dev/pgdog`) via Flux HelmRelease `pgdog-platform` in namespace `platform`
+**Deployment:** CNPG `Pooler` CR `platform-db-pooler-rw` in namespace `platform` (see `kubernetes/infra/configs/databases/clusters/platform-db/poolers/pooler.yaml`)
 
 **Service Endpoint:**
-- `pgdog-platform.platform.svc.cluster.local:6432`
+- `platform-db-pooler-rw.platform.svc.cluster.local:5432`
 
-#### PgDog (product-db — product, cart, order, payment)
+**Monitoring:** PodMonitor enabled on the `Pooler` CR
+
+#### PgDog (product-db)
 
 **Deployment:** Helm chart (`helm.pgdog.dev/pgdog`) via Flux HelmRelease `pgdog-product` in namespace `product`
 
@@ -436,7 +430,7 @@ All microservices use **pgx/v5** as the PostgreSQL driver.
    ```
    pq: bind message supplies 1 parameters, but prepared statement "" requires 2
    ```
-   pgx uses client-side prepared statements / simple protocol, fully compatible with PgCat/PgBouncer.
+   pgx uses client-side prepared statements / simple protocol, fully compatible with PgBouncer and PgDog transaction pooling.
 
 2. **Active Development**: pgx is actively maintained with regular updates, while lib/pq is in maintenance mode since 2023.
 
@@ -459,7 +453,7 @@ func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 ```
 
 > [!NOTE]
-> See [pgcat_prepared_statement_error.md](../runbooks/troubleshooting/pgcat_prepared_statement_error.md) for detailed troubleshooting.
+> For pooler-specific DSN and rotation checks, see [pgdog-operations.md](./runbooks/pgdog-operations.md).
 
 
 ---
@@ -467,40 +461,35 @@ func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 ## Related Documentation
 
 - **[Backup Strategy](./006-backup-strategy.md)** - Backup architecture, retention, bucket layout
-- **[Backup/Restore Runbook](../runbooks/troubleshooting/postgres_backup_restore.md)** - Restore procedures (CNPG vs Zalando)
+- **[Backup/Restore Runbook](./runbooks/postgres-backup-restore.md)** - Restore procedures (CNPG vs Zalando)
 - **[Setup Guide](../platform/setup.md)** - Complete deployment and configuration guide
 - **[Error Envelope](../api/api.md#error-envelope)** - Shared API error contract for database failures
 - **[API Reference](../api/api.md)** - API endpoints using database
-- **[PgCat Prepared Statement Error](../runbooks/troubleshooting/pgcat_prepared_statement_error.md)** - Legacy: intermittent 500 errors when fronting PostgreSQL with **PgCat** in transaction mode
+- **[PgDog operations](./runbooks/pgdog-operations.md)** - Day-2 pooler ops for `pgdog-product`
 
 ## Troubleshooting
 
-### PgCat + Prepared Statements Issue (legacy pooler)
+### Transaction pooler + prepared statements
 
-Applies when applications connect through **PgCat** in transaction pooling mode. **Current `product-db` traffic uses PgDog** (`pgdog-product`), which is configured for extended/prepared statement behavior in chart values — treat this section as historical unless you still run PgCat.
+Applies when an app connects through a **transaction-mode pooler** (PgBouncer or PgDog) and still uses a driver that caches server-side prepared statements (for example legacy `lib/pq`).
 
-**Problem:** Intermittent 500 errors with message `pq: bind message supplies X parameters, but prepared statement requires Y` when using PgCat in transaction pooling mode.
+**Problem:** Intermittent 500 errors with message `pq: bind message supplies X parameters, but prepared statement requires Y`.
 
-**Root Cause:** Go's `database/sql` driver caches prepared statements per connection. When PgCat reuses connections across transactions, old prepared statements may conflict with new queries.
+**Root Cause:** The driver caches prepared statements per connection. When the pooler reuses backend connections across transactions, old prepared statements may conflict with new queries.
 
-**Solution:** Add `prefer_simple_protocol=true` to PostgreSQL DSN to disable prepared statements completely.
+**Solution:** Use **pgx/v5** (platform standard) or add `prefer_simple_protocol=true` to the PostgreSQL DSN to disable prepared statements.
 
 ```go
-// cart-service/internal/core/database.go
-// order-service/internal/core/database.go
 return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s&prefer_simple_protocol=true",
     c.User, c.Password, c.Host, c.Port, c.Name, c.SSLMode,
 )
 ```
 
 **Why This Works:**
-- `binary_parameters=yes` only disables binary encoding but **still uses prepared statements** (insufficient)
-- `prefer_simple_protocol=true` forces the driver to use simple query protocol (no prepared statements)
-- Simple protocol sends query + parameters in one message (no caching, no reuse conflicts)
+- `prefer_simple_protocol=true` forces simple query protocol (no prepared statement cache)
+- pgx is the supported driver — see [Go PostgreSQL driver (pgx)](#go-postgresql-driver-pgx) above
 
-**Affected services (legacy):** Cart, Order when routed via **PgCat**; with **PgDog** as the unified pooler for **`product-db`**, prefer validating DSN and pooler settings against `pgdog-product` instead.
-
-**See:** [Full troubleshooting guide](../runbooks/troubleshooting/pgcat_prepared_statement_error.md) with diagrams and testing instructions.
+**Pooler ops:** Validate DSN endpoints and chart values via [pgdog-operations.md](./runbooks/pgdog-operations.md) for `product-db`; PgBouncer settings live in the `Pooler` CR for `platform-db`.
 
 ### Zalando `CreateFailed` leaves per-service databases uncreated (historical)
 

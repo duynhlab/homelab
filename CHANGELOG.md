@@ -34,8 +34,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **RFC-0019** ([`docs/proposals/rfc/RFC-0019/`](docs/proposals/rfc/RFC-0019/)): ClickHouse as supplementary OLAP — Phase B OTel logs/traces SQL now **accepted + deployed** (see ClickHouse entries above); Phase A commerce facts remain optional/not deployed.
 - ClickHouse guide ([`docs/observability/clickhouse/README.md`](docs/observability/clickhouse/README.md)): flipped planned→**deployed** — MergeTree, deployed architecture, operations, and a hands-on MergeTree playground.
 
+### Removed
+
+- **PgCat artifacts**: deleted legacy runbooks (`docs/databases/runbooks/legacy/pgcat-*.md`), orphan Flux `HelmRepository` (`helm/pgcat.yaml`), and all active doc/manifest references; pooler docs now cover **PgBouncer + PgDog** only.
+
 ### Changed
 
+- **docs (runbooks)**: Retired central `docs/runbooks/troubleshooting/` — backup/restore → `docs/databases/runbooks/`; VictoriaLogs debug → `docs/observability/runbooks/`; new `databases/runbooks/README.md`; updated alert catalog, PrometheusRule `runbook_url`, and cross-links.
 - **AGENTS.md**: Engineering skills workflow ([addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) platform + [agent-browser](https://github.com/vercel-labs/agent-browser) e2e Phase B); skills not vendored in repo.
 - **AGENTS.md**: Senior Platform Engineer role, platform domain map, and `How to work here`; split architecture into platform vs cross-repo app context with [`SERVICES.md`](SERVICES.md) routing rules.
 - **PostgreSQL custom queries**: removed `pg_stat_checkpointer`, `pg_database_size`, and

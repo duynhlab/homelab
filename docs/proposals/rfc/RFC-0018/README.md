@@ -327,7 +327,7 @@ Tooling: `pg_dump`/`pg_restore` per DB on homelab (acceptable downtime); logical
 # No current-state refs to decommissioned clusters (exclude proposals/history)
 rg 'auth-db|shared-db|temporal-db|pgdog-auth|pgdog-shared' docs/ kubernetes/ \
   --glob '!CHANGELOG.md' --glob '!docs/proposals/**' \
-  --glob '!**/003.2*' --glob '!**/zalando*' --glob '!**/pgcat*'
+  --glob '!**/003.2*' --glob '!**/zalando*'
 
 # Hubs mention new topology
 rg 'platform-db|pgdog-platform' docs/databases/002-database-integration.md docs/platform/setup.md
@@ -372,7 +372,7 @@ Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram w
 
 | File | Fix |
 |------|-----|
-| [`docs/runbooks/troubleshooting/postgres_backup_restore.md`](../../../runbooks/troubleshooting/postgres_backup_restore.md) | Zalando → CNPG Barman |
+| [`docs/databases/runbooks/postgres-backup-restore.md`](../../../databases/runbooks/postgres-backup-restore.md) | Zalando → CNPG Barman |
 | [`docs/databases/runbooks/rotate-cnpg-service-password.md`](../../../databases/runbooks/rotate-cnpg-service-password.md) | `pgdog-cnpg` → `pgdog-product` / `pgdog-platform` |
 | [`docs/databases/005-ha-dr-deep-dive.md`](../../../databases/005-ha-dr-deep-dive.md) | Stale pooler names |
 | [`docs/databases/003.1-operator-cnpg.md`](../../../databases/003.1-operator-cnpg.md) | CNPG on all clusters |
@@ -392,7 +392,7 @@ Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram w
 
 ### P3 — legacy archaeology (banner only)
 
-`pgcat_*.md`, `zalando-ha-scaling.md`, `prepared-databases.md`, `003.2-operator-zalando.md` — strengthen legacy banners; no current-state claims.
+`zalando-ha-scaling.md`, `prepared-databases.md`, `003.2-operator-zalando.md` — strengthen legacy banners; no current-state claims.
 
 ### Docs unchanged (product tier)
 

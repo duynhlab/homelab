@@ -18,9 +18,12 @@ metadata:
     app.kubernetes.io/component: database
     app.kubernetes.io/managed-by: external-secrets
 spec:
-  refreshInterval: 1h
+  # RFC-0008 / ADR-025 pilot: source from the OpenBAO database static-role
+  # (openbao-db store) instead of KV. Short refresh so the rotated password lands
+  # in the Secret promptly; the app reads it from a file per connection (pattern A).
+  refreshInterval: 1m
   secretStoreRef:
-    name: openbao
+    name: openbao-db
     kind: ClusterSecretStore
   target:
     name: platform-db-notification-secret
@@ -40,11 +43,11 @@ spec:
   data:
     - secretKey: username
       remoteRef:
-        key: secret/data/local/databases/shared-db/notification
+        key: database/static-creds/notification
         property: username
     - secretKey: password
       remoteRef:
-        key: secret/data/local/databases/shared-db/notification
+        key: database/static-creds/notification
         property: password
 ---
 # Written out IN FULL — adoption resets omitted attributes.
@@ -67,8 +70,8 @@ spec:
   bypassrls: false
   connectionLimit: -1
   inRoles: []
-  passwordSecret:
-    name: platform-db-notification-secret
+  # No passwordSecret: OpenBAO's static-role owns this role's password now
+  # (RFC-0008 / ADR-025). CNPG manages the role's attributes but not its password.
   databaseRoleReclaimPolicy: retain
 ---
 # notification Database extensions.

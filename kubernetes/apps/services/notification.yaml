@@ -10,7 +10,7 @@ spec:
   type: Static
   defaultValues:
     name: notification
-    image_tag: "1.4.0" # {"$imagepolicy": "flux-system:notification:tag"}
+    image_tag: "1.5.0" # {"$imagepolicy": "flux-system:notification:tag"}
     namespace: notification
     grpc_server: true
     replicaCount: 1
@@ -20,3 +20,7 @@ spec:
     db_secret: "platform-db-notification-secret"
     db_sslmode: "disable"
     pool_max: "30"
+    # RFC-0008 / ADR-025 pattern A: presence of this input makes the mop chart
+    # mount the DB Secret as a file and set DB_PASSWORD_FILE, so the app reads a
+    # rotated password per connection (no pod restart). Needs mop chart >= 0.17.0.
+    db_password_file: "/etc/db/secret/password"

@@ -13,7 +13,7 @@ flowchart LR
 ```
 
 > Reference (endpoints, stream fields, sinks, config):
-> [`observability/logging/victorialogs.md`](../../observability/logging/victorialogs.md).
+> [`observability/logging/victorialogs.md`](../logging/victorialogs.md).
 
 ---
 
@@ -143,9 +143,9 @@ flux get kustomizations -A | grep -E "logging|monitoring|vector"
 
 ## Related
 
-- [VictoriaLogs backend](../../observability/logging/victorialogs.md) — full reference
-- [Structured Logging overview](../../observability/logging/README.md)
+- [VictoriaLogs backend](../logging/victorialogs.md) — full reference
+- [Structured Logging overview](../logging/README.md)
 - LogsQL: https://docs.victoriametrics.com/victorialogs/logsql/
 
 ---
-_Last updated: 2026-07-11_
+_Last updated: 2026-07-21 — Moved from `docs/runbooks/troubleshooting/` to observability runbooks._

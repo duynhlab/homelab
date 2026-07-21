@@ -10,7 +10,6 @@ resources:
   - grafana-dashboard-vector.yaml
   - grafana-dashboard-tempo.yaml
   - grafana-dashboard-temporal.yaml
-  # - grafana-dashboard-pgcat.yaml
   - grafana-dashboard-cloudnative-pg.yaml
   - grafana-dashboard-pg-query-performance.yaml
   - grafana-dashboard-pg-maintenance.yaml

@@ -316,9 +316,9 @@ kubectl get clustersecretstore
 | Local floci KMS emulator (`awskms` auto-unseal) | Real cloud KMS (swap `endpoint`) |
 | HTTP in-cluster OpenBAO listener | TLS listener and ESO `caBundle` |
 | Dev placeholder Cloudflare token on local | Operator-supplied production token outside Git |
-| PgDog/PgCat inline pooler passwords (dev-only) | Pooler `secretRef` or initContainer config rendering |
+| PgDog inline pooler passwords (dev-only) | Pooler `secretRef` or initContainer config rendering |
 
-**Pooler inline passwords:** PgDog and PgCat Helm charts don't support
+**Pooler inline passwords:** The PgDog Helm chart doesn't support
 `secretRef`. Inline passwords remain in HelmRelease/ConfigMap (dev-only). OpenBAO
 already materialises `pgdog-cnpg-credentials` in the `product` namespace for
 future use. See [Production Hardening](./production-hardening.md) and

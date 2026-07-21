@@ -29,19 +29,18 @@ for CNPG recovery internals.
 
 ## Connection Pooler Comparison
 
-**PgDog** is the only pooler deployed on the platform (`pgdog-platform`,
-`pgdog-product`). PgBouncer and PgCat are listed for comparison only.
+**PgBouncer** (`platform-db-pooler-rw`) and **PgDog** (`pgdog-product`) are the deployed poolers.
 
-| Feature | PgBouncer | PgDog | PgCat |
-|---------|---------------------|-------|-------|
-| **Architecture** | Single-threaded (C) | Multi-threaded (Rust) | Multi-threaded (Rust) |
-| **Deployment** | Operator-managed | Helm chart | Kubernetes manifests |
-| **Read/Write Splitting** | No | Yes (configurable) | Yes (enabled) |
-| **Load Balancing** | No | Yes | Yes |
-| **Multi-Database** | Limited | Yes | Yes |
-| **Sharding** | No | Production-grade | Experimental |
-| **Monitoring** | Basic | OpenMetrics + Admin DB | Prometheus + Admin DB |
-| **SSL Requirement** | Required | Optional | Optional |
+| Feature | PgBouncer | PgDog |
+|---------|-----------|-------|
+| **Architecture** | Single-threaded (C) | Multi-threaded (Rust) |
+| **Deployment** | CNPG `Pooler` CR | Helm chart |
+| **Read/Write Splitting** | No (pilot: `type: rw`) | Yes (configurable) |
+| **Load Balancing** | No | Yes |
+| **Multi-Database** | Limited | Yes |
+| **Sharding** | No | Production-grade |
+| **Monitoring** | PodMonitor | OpenMetrics + Admin DB |
+| **SSL Requirement** | Required | Optional |
 
 ---
 
@@ -139,6 +138,6 @@ Topics covered:
 ## Related Documentation
 
 - **Database Architecture Overview**: [`docs/databases/002-database-integration.md`](../../../../../docs/databases/002-database-integration.md)
-- **PgCat Troubleshooting (legacy)**: [`docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md`](../../../../../docs/runbooks/troubleshooting/pgcat_prepared_statement_error.md)
+- **Pooler deep dive**: [`docs/databases/008-pooler.md`](../../../../../docs/databases/008-pooler.md)
 - **Monitoring Setup**: [`docs/observability/metrics/README.md`](../../../../../docs/observability/metrics/README.md)
 - **Replication Deep Dive**: [`docs/databases/004-replication-strategy.md`](../../../../../docs/databases/004-replication-strategy.md)

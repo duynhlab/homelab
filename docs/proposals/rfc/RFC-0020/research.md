@@ -57,7 +57,7 @@
 
 - That the **existing `homelab-ca` + trust-manager** can issue and distribute leaves to *internal* workloads (not just the edge) with no new PKI component — the same pattern this RFC extends to gRPC (the east-west tier, formerly RFC-0002).
 - **Per tier**, what "turn TLS on" actually costs: which knobs (CNPG `spec.certificates`, `pg_hba hostssl`, pooler config, OpenBAO listener) and which ordering constraints (a pooler that speaks no TLS blocks the app behind it; a cert that must exist before a pod starts).
-- Whether the **pooler tier is the true blocker** (PgDog terminates no TLS today) and, if so, which escape hatch fits (migrate to PgBouncer, go direct-to-CNPG, or accept plaintext behind the fence).
+- Whether the **pooler tier is the true blocker** (PgDog terminates no TLS today) and, if so, which escape hatch fits (migrate to PgBouncer, go direct-to-CNPG, or accept plaintext behind the fence). **Answered:** PgDog is TLS-capable end-to-end (audit log), so the pooler tier is a configuration slice, not a blocker — no escape hatch needed.
 - The honest **security uplift vs operational weight** trade — enough to decide in the RFC whether to climb all tiers now or stage them.
 
 ---
@@ -198,7 +198,7 @@ Verified against manifests on 2026-07-21. Marks **deployed** vs **planned**.
 | Edge (Kong) | `kong-proxy-tls` wildcard; **prod** `letsencrypt-prod` (Cloudflare DNS-01), **local** patched to `homelab-ca` | base default → `homelab-ca`; **prod overlay** re-adds `letsencrypt-prod` (Cloudflare/ACME dropped from base) |
 | DB replication | CNPG uses TLS `cert` auth for `streaming_replica` — but from **CNPG's own auto-CA**, not `homelab-ca` | keep (internal to CNPG) or re-issue from `homelab-ca` (open question) |
 | App → DB | 9 services `sslmode=disable` via poolers; only `payment` is `hostssl`+`require` direct to CNPG | T2 `verify-full` against `homelab-ca`; then T3 cert-auth (ADR-025) |
-| Pooler (PgBouncer / PgDog) | No client-facing TLS; PgDog upstream plaintext; PgBouncer only uses CNPG auto client-cert for `auth_query` | client + upstream TLS — **PgDog capability is the key unknown** |
+| Pooler (PgBouncer / PgDog) | No client-facing TLS; PgDog upstream plaintext; PgBouncer only uses CNPG auto client-cert for `auth_query` | client + upstream TLS — PgDog confirmed TLS-capable up to `verify_full` + mTLS (audit log) |
 | East-west gRPC | plaintext `insecure.NewCredentials()`; Temporal link no TLS | in-process mTLS — **this RFC's east-west tier** (formerly RFC-0002) |
 | Secrets (OpenBAO) | listener `tls_disable = 1`, plaintext `:8200` | `tls_disable = 0`, cert-manager cert (ADR-005 prod target) |
 
@@ -256,11 +256,12 @@ here maps directly to "flip to IAM" later.
 
 ## Open questions
 
-- [ ] **PgDog TLS capability** — does PgDog support client-facing TLS *and* upstream TLS to
-      Postgres at all? If not, choose: (i) migrate product-db to PgBouncer (ADR-026 already
-      pilots it on platform-db), (ii) apps connect direct-to-CNPG for TLS (the `payment`
-      pattern), or (iii) accept PgDog plaintext behind NetworkPolicy and document the exception.
-      **This blocks App→DB `verify-full`.**
+- [x] **PgDog TLS capability** — **answered (2026-07-21, see audit log)**: PgDog supports
+      client-facing TLS (`tls_certificate`/`tls_private_key`, optional `tls_client_required`),
+      upstream verification up to `tls_verify = verify_full` with `tls_server_ca_certificate`,
+      and experimental mTLS client-cert auth (`tls_client_ca_certificate`). Fallbacks (i)–(iii)
+      are not needed; Slice 3 becomes a PgDog configuration change. **App→DB `verify-full` is
+      unblocked.**
 - [ ] **CNPG server-cert source** — re-issue the CNPG server cert from `homelab-ca`
       (`serverCASecret`/`serverTLSSecret`) so apps `verify-full` against the shared root, **or**
       distribute CNPG's own auto-CA through the trust bundle. Which is less brittle across
@@ -309,7 +310,7 @@ T3 (cert-auth) is the endpoint where a service could stop using a password entir
 - CloudNativePG — TLS/SSL connections, `Cluster.spec.certificates`, client-certificate
   authentication, `cnpg` plugin certificate issuance.
 - PostgreSQL — `pg_hba.conf` auth methods (`hostssl`, `cert`), libpq `sslmode`.
-- PgBouncer — client/server TLS settings. PgDog — TLS support (to verify).
+- PgBouncer — client/server TLS settings. PgDog — TLS settings (client, upstream verification, mTLS).
 - OpenBAO / HashiCorp Vault — `listener "tcp"` TLS configuration.
 - Internal: [RFC-0002](../RFC-0002/) (superseded — its east-west gRPC mTLS design is absorbed
   by this RFC), [RFC-0006](../RFC-0006/) (mesh
@@ -330,9 +331,9 @@ T3 (cert-auth) is the endpoint where a service could stop using a password entir
 | CNPG supports `hostssl … cert` client-cert auth + `cnpg` plugin issues client certs "as an alternative to password-based auth"; `spec.certificates` (serverCA/serverTLS/clientCA) | Context7 `/cloudnative-pg/cloudnative-pg` | confirmed |
 | CNPG `streaming_replica` already uses TLS client-cert auth | Context7 `/cloudnative-pg/cloudnative-pg` | confirmed |
 | SPIFFE/SPIRE issues short-lived SVIDs with explicit Postgres/MySQL auth use-cases | Context7 `/spiffe/spire` | confirmed |
-| PgDog client + upstream TLS capability | Context7 (quota 429 on 2026-07-21) | **pending — re-run + verify against PgDog official docs** |
-| Istio Ambient vs sidecar overhead (for RFC-0006 cross-ref) | Context7 (quota 429) | **pending — defer to RFC-0006** |
-| OpenBAO listener TLS config shape | ADR-005 production-target note (manifest) | confirmed target; verify against OpenBAO docs |
+| PgDog client + upstream TLS capability | Context7 `/pgdogdev/pgdog` + PgDog official docs (2026-07-21) | **confirmed — full ladder**: client-facing `tls_certificate`/`tls_private_key` + `tls_client_required`; upstream `tls_verify` (`none`/`prefer` default/`verify_ca`/`verify_full`) + `tls_server_ca_certificate`; mTLS client-cert auth via `tls_client_ca_certificate` (experimental). Unblocks Slice 3/4 — no PgBouncer migration needed |
+| Istio Ambient vs sidecar overhead (for RFC-0006 cross-ref) | Context7 `/websites/istio_io` (2026-07-21) | confirmed — sidecar = per-pod Envoy with per-pod resource cost; ambient = node-level `ztunnel` DaemonSet (HBONE mTLS, `DISABLE` unsupported); cross-ref only, owned by RFC-0006 |
+| OpenBAO listener TLS config shape | Context7 `/openbao/openbao` (2026-07-21) | confirmed — `listener "tcp"` `tls_cert_file`/`tls_key_file` (`tls_disable` opt-out); cert reloads on SIGHUP, fits cert-manager rotation |
 
 ---
 
@@ -344,11 +345,11 @@ T3 (cert-auth) is the endpoint where a service could stop using a password entir
 - [x] At least **two alternatives** documented with tradeoffs
 - [x] **Platform as-built** section filled from manifests/docs (not boilerplate)
 - [ ] Primary use-case direction stated (leaning in-process per-workload; scope of first RFC undecided)
-- [ ] **Context7 audit** complete; footer date updated (PgDog + Istio rows pending quota reset)
+- [x] **Context7 audit** complete; footer date updated (PgDog, Istio, and OpenBAO rows resolved 2026-07-21)
 - [x] At least **one Mermaid** diagram; labels match deployed vs **planned** reality
 - [x] No Kubernetes manifest changes smuggled into this research file
 - [ ] Owner sign-off: **ready for RFC**
 
 ---
 
-_Last verified: 2026-07-21 (Context7 partial — PgDog/Istio rows pending quota — + manifest cross-check)._
+_Last verified: 2026-07-21 (Context7 complete + manifest cross-check)._

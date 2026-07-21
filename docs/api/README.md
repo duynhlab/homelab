@@ -14,13 +14,19 @@ Start here to learn the platform's shared API rules and then drill into one serv
 ```mermaid
 flowchart TD
     Hub["API documentation hub"] --> Shared["api.md<br/>shared HTTP + gRPC rules"]
-    Hub --> Catalog["microservices.md<br/>ownership + call graph"]
+    Hub --> Status["DEPLOYMENT-STATUS.md<br/>deployment truth rollup"]
+    Hub --> Catalog["microservices.md<br/>ownership + feature matrix"]
+    Hub --> Flows["end-to-end-flows.md<br/>user-journey sequences"]
     Hub --> Contracts["10 service contract files"]
+    Hub --> Workflows["workflows.md<br/>Temporal workflow registry"]
     Hub --> Saga["Temporal fulfillment<br/>Saga + 2PC + operations"]
     Contracts --> Basic["Auth · User · Product · Cart · Order<br/>Review · Notification · Shipping"]
     Contracts --> Deep["Checkout · Payment<br/>state-machine deep dives"]
     Shared --> Contracts
     Catalog --> Contracts
+    Flows --> Contracts
+    Workflows --> Saga
+    Template["_template-service.md<br/>authoring template"] -.->|"shapes"| Contracts
     Saga --> Order["order.md"]
     Saga --> Payment["payments.md"]
 
@@ -29,9 +35,9 @@ flowchart TD
     classDef contract fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef workflow fill:#f59e0b,color:#451a03,stroke:#b45309;
     class Hub hub;
-    class Shared,Catalog guide;
+    class Shared,Catalog,Status,Flows,Template guide;
     class Contracts,Basic,Deep,Order,Payment contract;
-    class Saga workflow;
+    class Saga,Workflows workflow;
 ```
 
 The arrows show documentation ownership, not runtime traffic. Runtime traffic is
@@ -42,10 +48,12 @@ shown in [api.md](./api.md#current-east-west-call-graph).
 | Step | Read | What it answers |
 |------|------|-----------------|
 | 1 | [api.md](./api.md) | How URLs, audiences, auth, errors, pagination, HTTP, and gRPC work |
-| 2 | [microservices.md](./microservices.md) | Which service owns each feature and how services call one another |
-| 3 | One service file below | Exact HTTP routes, gRPC methods, payload examples, and service rules |
-| 4 | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) | Why Saga is used instead of 2PC and how the live workflow compensates |
-| 5 | [payments.md](./payments.md) or [checkout.md](./checkout.md) | Deeper state-machine, idempotency, and operational examples |
+| 2 | [end-to-end-flows.md](./end-to-end-flows.md) | How one user journey (login, browse, checkout, fulfillment) travels through the services |
+| 3 | [microservices.md](./microservices.md) | Which service owns each feature and how services call one another |
+| 4 | One service file below | Exact HTTP routes, gRPC methods, payload examples, and service rules |
+| 5 | [workflows.md](./workflows.md) | Which Temporal workflows exist, who orchestrates them, and who participates |
+| 6 | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) | Why Saga is used instead of 2PC and how the live workflow compensates |
+| 7 | [payments.md](./payments.md) or [checkout.md](./checkout.md) | Deeper state-machine, idempotency, and operational examples |
 
 ## Document Ownership
 
@@ -62,7 +70,10 @@ Keeping each fact in one place prevents three copies from drifting.
 
 ## Service Contracts
 
-| Service | Main responsibility | Contract |
+Deployment truth (local vs cluster vs planned) lives in
+[DEPLOYMENT-STATUS.md](./DEPLOYMENT-STATUS.md).
+
+| Service | One-line responsibility | Contract |
 |---------|---------------------|----------|
 | Auth | Credentials, JWTs, refresh rotation, and JWKS | [auth.md](./auth.md) |
 | User | Public and owner-scoped profiles | [user.md](./user.md) |
@@ -104,9 +115,10 @@ Keeping each fact in one place prevents three copies from drifting.
 | Service route, RPC, payload, or state changes | Update only the owning service file |
 | Call graph or feature ownership changes | Update [microservices.md](./microservices.md) and the relevant service files |
 | Saga step or compensation changes | Update [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
+| New service contract file | Start from [_template-service.md](./_template-service.md) — two-table header + 15-part outline |
 | New file | Link it here and from [docs/README.md](../README.md) |
 
 Every substantive claim must match the service code, local-stack wiring, and
 GitOps manifests. Mark designed but undeployed behavior as **planned**.
 
-_Last updated: 2026-07-14_
+_Last updated: 2026-07-21_

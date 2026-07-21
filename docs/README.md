@@ -339,10 +339,13 @@ docs/
 
 - [API area hub](./api/README.md) - Learning path, document ownership, and all service contracts
 - [Shared API and communication guide](./api/api.md) - HTTP/gRPC conventions, current call graph, load balancing, security, and observability
+- [Deployment status](./api/DEPLOYMENT-STATUS.md) - Deployment truth rollup: local-stack vs cluster vs planned for every service and worker
 - [Microservices catalog](./api/microservices.md) - Feature ownership, techniques, dependencies, and known gaps
+- [End-to-end flows](./api/end-to-end-flows.md) - User-journey sequence diagrams from login through fulfillment
 - [Service contracts](./api/README.md#service-contracts) - One file for each of the ten Go services
+- [Workflow registry](./api/workflows.md) - Temporal workflows: owners, workers, task queues, and participants
 - [Temporal Order-Fulfillment Saga](./api/temporal-order-fulfillment.md) - Saga-vs-2PC learning, live compensations, Temporal infrastructure, and operations
-- [Checkout](./api/checkout.md) - P1-P4 local-stack session orchestration; P5 cluster planned
+- [Checkout](./api/checkout.md) - Session orchestration, P1-P5 shipped (local-stack + cluster); P6 legacy removal planned
 - [Payments](./api/payments.md) - Payment API, state machine, ledger, provider, and reconciliation
 - [RFC-0009: Production-grade API gateway (signed JWT + Kong edge auth)](./proposals/rfc/RFC-0009/) - Partially implemented; supersedes ADR-003 via ADR-006
 - [RFC-0010: Payment service (PaymentIntent, ledger, charge/refund saga step)](./proposals/rfc/RFC-0010/) - Implemented; P1–P6 landed (ledger, outbox, mockpay, webhooks, saga wiring, reconciliation, cluster GitOps, frontend read path) → ADR-007…011

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **docs/api standardized as the trusted API source**: all 10 service contracts rewritten to a uniform 15-part template (At a glance + Identity header tables, Temporal participation, Saga-column gRPC tables, code maps); new `DEPLOYMENT-STATUS.md`, `workflows.md`, `end-to-end-flows.md`, `_template-service.md`; hub dedup (topology/call graph canonical in `api.md`); Temporal doc restructured Learn/As-built/Operations; checkout P5 drift fixed in `SERVICES.md` + `docs/README.md`.
+
 ### Added
 
 - **GitHub labels** (`.github/labels.yaml` + `sync-labels` workflow): declarative triage and `area/*` labels for homelab domains; `delete-other-labels: false` preserves bot-managed labels.

@@ -88,7 +88,8 @@ host    all     all     all reject
   five lines (CNPG regenerates the permissive default).
 - **Mixed strictness is deliberate debt:** three pairs accept non-TLS until
   PgDog upstream TLS lands — the revisit trigger for tightening `host` →
-  `hostssl` per pair.
+  `hostssl` per pair. The `hostssl`/cert-auth end-state is researched in
+  [RFC-0020](../../rfc/RFC-0020/research.md) (internal TLS on `homelab-ca`).
 - `instance.yaml` gains its one sanctioned per-service edit (the HBA allow
   line), a scoped exception to ADR-013's "never touch instance.yaml".
 - Superuser has no remote path (`enableSuperuserAccess` off, local peer

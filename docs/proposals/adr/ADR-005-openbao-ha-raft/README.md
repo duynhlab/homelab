@@ -28,6 +28,9 @@ token stored in the `openbao-init-keys` K8s Secret, re-applied by a 60s unsealer
 CronJob), and TLS is disabled — explicit, documented **local-only** compromises.
 KMS/Transit auto-unseal and TLS are the production target.
 
+> **Related research:** the OpenBAO listener TLS gap is tracked as one tier of
+> [RFC-0020](../../rfc/RFC-0020/research.md) — internal TLS on the `homelab-ca` root.
+
 ## Alternatives considered
 
 - **Stay on Vault dev mode** — *Rejected:* no persistence, single node, BSL license.

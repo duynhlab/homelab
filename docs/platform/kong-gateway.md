@@ -154,7 +154,7 @@ flowchart TD
     Kong --> MonRoute
 
     FERoute -->|"No rate limit"| FE["Frontend (Nginx + React SPA)"]:::fe
-    APIRoute -->|"Rate limited"| APIs["9 Microservices :8080"]:::api
+    APIRoute -->|"Rate limited"| APIs["10 Microservices :8080"]:::api
     MonRoute -->|"No rate limit"| Infra["Grafana, VM, Jaeger, ..."]:::infra
 
     Plugins -.->|"CORS → Prometheus → Rate Limiting"| Router
@@ -206,7 +206,7 @@ Clear separation of concerns — each domain has a single responsibility:
 | Domain | Responsibility | Rate Limited | Ingress File |
 |--------|---------------|--------------|--------------|
 | `local.duynh.me` | Frontend (React SPA) | No | `ingress-frontend.yaml` |
-| `gateway.duynh.me` | API Gateway (9 microservices) | **Yes** | `ingress-api.yaml` |
+| `gateway.duynh.me` | API Gateway (10 microservices) | **Yes** | `ingress-api.yaml` |
 | `grafana.duynh.me` | Grafana dashboards | No | `ingress-monitoring.yaml` |
 | `vmui.duynh.me` | VictoriaMetrics UI | No | `ingress-monitoring.yaml` |
 | `jaeger.duynh.me` | Distributed tracing | No | `ingress-monitoring.yaml` |
@@ -703,6 +703,7 @@ Per-ingress `path:` entries are scoped to `public` and `private` audiences only 
 | `gateway.duynh.me` | `/user/v1/public/`, `/user/v1/private/` | `user:8080` | user | Yes |
 | `gateway.duynh.me` | `/product/v1/public/` | `product:8080` | product | Yes |
 | `gateway.duynh.me` | `/cart/v1/private/` | `cart:8080` | cart | Yes |
+| `gateway.duynh.me` | `/checkout/v1/private/` | `checkout:8080` | checkout | Yes |
 | `gateway.duynh.me` | `/order/v1/private/` | `order:8080` | order | Yes |
 | `gateway.duynh.me` | `/review/v1/public/`, `/review/v1/private/` | `review:8080` | review | Yes |
 | `gateway.duynh.me` | `/notification/v1/private/` | `notification:8080` | notification | Yes |
@@ -729,13 +730,20 @@ Adding any `internal` audience to a gateway Ingress is a safety/privacy regressi
 
 ## Flux Dependency Chain
 
+Kong reconciles in the **infra wave**, independent of app rollout:
+
 ```
-controllers-local (cert-manager HelmRelease + Kong CRDs + namespaces)
-  → cert-manager-local (homelab-ca + letsencrypt-prod ClusterIssuers + kong-proxy-tls Certificate → Secret; local overlay patches kong-proxy-tls issuerRef → homelab-ca; dependsOn secrets-local for cloudflare-api-token, a dev placeholder locally)
+controllers-local (namespaces + operators — cert-manager, OpenBAO/ESO, CNPG, …)
+  → secrets-local (./configs/secrets — bootstrap Job + ClusterSecretStore)
+  → cert-manager-local (ClusterIssuers + kong-proxy-tls Certificate → Secret)
   → kong-local (Kong HelmRelease — mounts kong-proxy-tls Secret at startup)
   → kong-config-local (Ingress resources + KongClusterPlugins)
-  → apps-local (microservices + frontend)
 ```
+
+`apps-local` is **not** gated by Kong. It `dependsOn` `databases-local`,
+`monitoring-local`, and `temporal-local` (workers dial Temporal at startup). Kong
+must be Ready for **edge traffic**, but Flux can reconcile apps before or after
+Kong independently of that chain.
 
 > Why Kong is **not** in `controllers-local`: the Kong proxy pod mounts the
 > `kong-proxy-tls` Secret as a volume, so it cannot start until cert-manager
@@ -813,6 +821,7 @@ kubectl get ingress -A
 | user | api-user-private | `gateway.duynh.me` | `/user/v1/private/` (jwt-edge) |
 | product | api-product | `gateway.duynh.me` | `/product/v1/public/` |
 | cart | api-cart | `gateway.duynh.me` | `/cart/v1/private/` (jwt-edge) |
+| checkout | api-checkout-private | `gateway.duynh.me` | `/checkout/v1/private/` (jwt-edge) |
 | order | api-order | `gateway.duynh.me` | `/order/v1/private/` (jwt-edge) |
 | review | api-review-public | `gateway.duynh.me` | `/review/v1/public/` |
 | review | api-review-private | `gateway.duynh.me` | `/review/v1/private/` (jwt-edge) |
@@ -1109,4 +1118,4 @@ If the rate limiting counter encounters an error (memory pressure, internal issu
 
 ---
 
-_Last updated: 2026-07-10 — jwt-edge counted/active (10 KongClusterPlugins, ADR-006); redis rate-limit marked done; split user/review ingress names; host list pointer._
+_Last updated: 2026-07-22 — 10 microservices; checkout `/checkout/v1/private/` route; Flux chain decoupled from apps-local._

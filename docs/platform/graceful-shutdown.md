@@ -1,7 +1,7 @@
 # Graceful Shutdown
 
 > **Document Status:** Production  
-> **Last Updated:** 2026-07-10 (payment added to the config table; pattern re-verified against the current zap/OTLP services)
+> **Last Updated:** 2026-07-22 (checkout added to config table; workers called out separately)
 
 ---
 
@@ -244,7 +244,9 @@ spec:
 
 ### Current Configuration
 
-All services use consistent settings via Helm values:
+All **HTTP microservices** use consistent settings via Helm values. **Temporal workers**
+(`order-worker`, `checkout-worker`) follow worker-specific lifecycle — not covered by this
+table.
 
 | Service | `READINESS_DRAIN_DELAY` | `SHUTDOWN_TIMEOUT` | `terminationGracePeriodSeconds` |
 |---------|--------------------------|--------------------|---------------------------------|
@@ -252,6 +254,7 @@ All services use consistent settings via Helm values:
 | user | 5s | 10s | 30 |
 | product | 5s | 10s | 30 |
 | cart | 5s | 10s | 30 |
+| checkout | 5s | 10s | 30 |
 | order | 5s | 10s | 30 |
 | review | 5s | 10s | 30 |
 | notification | 5s | 10s | 30 |
@@ -410,4 +413,4 @@ kubectl describe pod <pod-name> -n auth | grep -i kill
 - [Tracing Architecture](../observability/tracing/architecture.md) - OpenTelemetry integration
 
 ---
-_Last updated: 2026-07-10_
+_Last updated: 2026-07-22 — checkout service row; Temporal workers footnote._

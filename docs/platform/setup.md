@@ -136,11 +136,10 @@ make flux-up
 - Flux then adopts those resources and reconciles steady-state.
 - Awaits readiness of the `FluxInstance` / Flux controllers.
 - Flux then reconciles the pushed artifacts in dependency order:
-  - **Phase 1: Foundation** - Namespaces and Operators (Controllers).
-  - **Phase 2: Security & Monitoring** - OpenBAO/ESO, VictoriaMetrics/Grafana.
-  - **Phase 3: Data Layer** - PostgreSQL Clusters.
-  - **Phase 4: Applications** - Microservices (managed via ResourceSet).
-  - **Phase 5: Reliability** - SLO tracking via Sloth.
+  - **Phase 1: Foundation** — `controllers-local`: namespaces + operators (cert-manager, CNPG, VictoriaMetrics/Grafana operators, OpenBAO + ESO, Kyverno, temporal-operator, ClickHouse operator).
+  - **Phase 2: Security & configs** — `secrets-local` (bootstrap Job + ClusterSecretStore + ExternalSecrets), `cert-manager-local`, `monitoring-local` (observability configs + Sloth SLO CRs).
+  - **Phase 3: Platform services** — Kong, Valkey, RustFS, tracing/profiling, ClickHouse, databases, Temporal.
+  - **Phase 4: Applications** — `apps-local`: ResourceSets + standalone workers (`order-worker`, `checkout-worker`, `mockpay`).
 
 > OpenTofu owns only the ephemeral bootstrap mechanism; re-running `make flux-up`
 > with unchanged manifests is a no-op (`make tf-plan` shows zero diff). See
@@ -176,9 +175,9 @@ kubectl get prometheusservicelevel -n monitoring
 ```
 
 **Expected State:**
-- Namespaces for every domain provisioned (auth, user, product, cart, order, review, notification, shipping, payment, frontend, kong, cert-manager, openbao, external-secrets-system, monitoring, cloudnative-pg, database, kyverno, flux-system, …).
+- Namespaces for every domain provisioned (auth, user, product, cart, **checkout**, order, review, notification, shipping, payment, frontend, **platform**, **product**, **cache-system**, **rustfs**, kong, cert-manager, openbao, external-secrets-system, monitoring, cloudnative-pg, database, kyverno, flux-system, **temporal**, …).
 - 5 ResourceSets (`rs-identity`, `rs-catalog`, `rs-checkout`, `rs-comms`, `rs-frontend`) successfully reconciled.
-- HelmReleases for the 9 microservices + frontend, plus the `mockpay` and `order-worker` releases (in the `payment` / `order` namespaces), in `Ready` state.
+- HelmReleases for the **10 microservices** + frontend, plus **`mockpay`**, **`order-worker`**, and **`checkout-worker`** (in the `payment` / `order` / `checkout` namespaces), in `Ready` state.
 - 3 CloudNativePG clusters (`platform-db`, `product-db`, `product-db-replica`) operational.
 - ClusterIssuers `selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod` Ready; `kong-proxy-tls` Certificate Ready — signed by `homelab-ca` on local Kind (`letsencrypt-prod` on prod).
 
@@ -364,23 +363,29 @@ curl http://localhost:8080/order/v1/private/orders \
 homelab/
 ├── kubernetes/
 │   ├── infra/                          # Core infrastructure definitions
-│   │   ├── controllers/                # Operators and CRD definitions
+│   │   ├── controllers/                # Operators and CRD definitions (Flux wave 1)
 │   │   │   ├── namespaces.yaml         # Cluster-wide namespace definitions
-│   │   │   ├── metrics/                # VictoriaMetrics and Grafana operators
-│   │   │   ├── tracing/                # Tempo operator (traces)
-│   │   │   ├── profiling/              # Pyroscope (profiles)
-│   │   │   ├── databases/              # Database orchestration operators
-│   │   │   └── slo/                    # Service Level Objective operator
+│   │   │   ├── metrics/                # VictoriaMetrics + Grafana + Sloth operators
+│   │   │   ├── logging/                # VictoriaLogs operator
+│   │   │   ├── databases/              # CloudNativePG operator
+│   │   │   ├── secrets/                # OpenBAO + External Secrets Operator HelmReleases
+│   │   │   ├── cert-manager/
+│   │   │   ├── clickhouse-operator/    # Altinity ClickHouse operator (CRDs)
+│   │   │   ├── temporal/               # Temporal operator
+│   │   │   └── kyverno/
+│   │   │   # tracing/, profiling/, caching/, storage/, kong/ — separate Flux Kustomizations
 │   │   ├── configs/                    # Component instances and configurations
-│   │   │   ├── monitoring/             # Grafana resources and ServiceMonitors
-│   │   │   ├── databases/              # PostgreSQL clusters and poolers
-│   │   │   └── slo/                    # SLO definitions (PrometheusServiceLevel)
+│   │   │   ├── observability/          # Metrics, logging, tracing, Grafana, Sloth SLO CRs
+│   │   │   ├── databases/              # PostgreSQL clusters and PgDog poolers
+│   │   │   ├── secrets/                # Bootstrap Job, ClusterSecretStore, ExternalSecrets
+│   │   │   ├── cert-manager/           # ClusterIssuers, kong-proxy-tls Certificate
+│   │   │   └── kong/                   # KongClusterPlugins + Ingress routes
 │   │   └── kustomization.yaml
 │   ├── apps/                           # Application definitions (Hybrid ResourceSet)
 │   │   ├── domains/                    # Domain ResourceSets (template + inputsFrom selector)
 │   │   │   ├── identity-rs.yaml        # rs-identity: auth, user
 │   │   │   ├── catalog-rs.yaml         # rs-catalog: product, review
-│   │   │   ├── checkout-rs.yaml        # rs-checkout: cart, order, payment
+│   │   │   ├── checkout-rs.yaml        # rs-checkout: cart, checkout, order, payment
 │   │   │   └── comms-rs.yaml           # rs-comms: notification, shipping
 │   │   ├── services/                   # Per-service InputProviders (Static)
 │   │   │   ├── auth.yaml               # domain=identity
@@ -388,45 +393,60 @@ homelab/
 │   │   │   ├── product.yaml            # domain=catalog
 │   │   │   ├── review.yaml             # domain=catalog
 │   │   │   ├── cart.yaml               # domain=checkout
+│   │   │   ├── checkout.yaml           # domain=checkout
 │   │   │   ├── order.yaml              # domain=checkout
 │   │   │   ├── payment.yaml            # domain=checkout
 │   │   │   ├── notification.yaml       # domain=comms
 │   │   │   └── shipping.yaml           # domain=comms
-│   │   ├── mockpay.yaml                # mockpay HelmRelease (payment ns, same image)
+│   │   ├── mockpay.yaml                # mockpay HelmRelease (payment ns)
 │   │   ├── order-worker.yaml           # order-worker HelmRelease (order ns, Temporal saga)
+│   │   ├── checkout-worker.yaml        # checkout-worker HelmRelease (checkout ns)
 │   │   └── frontend-rs.yaml            # rs-frontend (standalone, namespace: frontend)
 │   └── clusters/                       # Environment-specific Flux configurations
-│       └── local/                      # Kind-specific local environment
+│       └── local/                      # Kind local environment (20 Kustomization CRs — see kustomization.yaml)
 │           ├── flux-system/            # Bootstrap FluxInstance resource
 │           ├── sources/                # OCI and Helm source definitions
-│           ├── controllers.yaml       # Operator orchestration
-│           ├── secrets.yaml            # Secrets management orchestration
-│           ├── monitoring.yaml         # Observability stack orchestration
-│           ├── databases.yaml          # Database layer orchestration
-│           └── apps.yaml               # Application layer orchestration
+│           ├── controllers.yaml        # Operator orchestration
+│           ├── secrets.yaml            # Secrets bootstrap configs
+│           ├── cert-manager-config.yaml
+│           ├── kong.yaml / kong-config.yaml
+│           ├── caching.yaml / storage.yaml
+│           ├── clickhouse.yaml / tracing.yaml / profiling.yaml
+│           ├── databases.yaml / databases-cnpg-dr.yaml
+│           ├── monitoring.yaml / kyverno.yaml / network-policies.yaml
+│           ├── mcp.yaml / temporal.yaml / apps.yaml
+│           └── kustomization.yaml
 ├── Makefile                            # Centralized automation entrypoint
 └── scripts/                            # Implementation logic for automation tasks
 ```
 
 **Dependency Graph:**
-1. `controllers-local`: Provisions namespaces, operators, Kong CRDs, cert-manager, secrets managers.
-2. `secrets-local`: Deploys OpenBAO + ESO and runs the OpenBAO bootstrap Job (Depends on `controllers-local`).
-3. `cert-manager-local`: ClusterIssuers (`selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod`), `kong-proxy-tls` Certificate, trust-manager Bundle (Depends on `controllers-local`, `secrets-local` — needs the synced `cloudflare-api-token` Secret).
-4. `kong-local`: Kong HelmRelease (Depends on `cert-manager-local` — mounts `kong-proxy-tls` Secret as a volume).
-5. `kong-config-local`: KongClusterPlugins + Ingress resources for every host (Depends on `kong-local`, `cert-manager-local`).
-6. `monitoring-local`: Deploys observability stack (Depends on `controllers-local`).
-7. `storage-local`: Provisions RustFS (S3) object storage (Depends on `controllers-local`, `secrets-local`).
-7a. `caching-local`: Valkey (product cache-aside db 0 + Kong rate-limit counters db 1 — on the gateway request path) (Depends on `controllers-local`, `monitoring-local`).
-8. `network-policies-local`: Provisions per-namespace NetworkPolicies so operators never race an un-fenced namespace (Depends on `controllers-local`).
-9. `tracing-local`: Deploys Tempo (Depends on `secrets-local`, `storage-local` — kept out of `controllers-local` to avoid a wave deadlock).
-10. `profiling-local`: Deploys Pyroscope (Depends on `secrets-local`, `storage-local` — same rationale as `tracing-local`).
-11. `cnpg-barman-plugin-local`: Installs the CNPG Barman Cloud Plugin via the `plugin-barman-cloud` Helm chart (from the `cnpg` HelmRepository) and its `ObjectStore` CRD (Depends on `controllers-local`, `cert-manager-local`).
-12. `databases-local`: Provisions persistence layer, including the CNPG `platform-db` and `product-db` clusters (Depends on `secrets-local`, `monitoring-local`, `cnpg-barman-plugin-local`, `storage-local`, `network-policies-local`).
-13. `databases-cnpg-dr-local`: CNPG DR replica (Depends on `databases-local`, `secrets-local`).
-14. `temporal-local`: Temporal server via the temporal-operator (`TemporalCluster` + `TemporalNamespace`), persistence on `platform-db-rw.platform:5432` (Depends on `controllers-local`, `cert-manager-local`, `databases-local`, `monitoring-local`). The `temporal-operator` HelmRelease itself `dependsOn` cert-manager, since its chart renders a cert-manager `Certificate`/`Issuer` for the admission webhook.
-15. `kyverno-policies-local`: Admission policies (Depends on `controllers-local`, `monitoring-local`). See [kyverno.md](kyverno.md).
-15a. `mcp-local`: MCP servers (Depends on `monitoring-local`). See [mcp-servers.md](mcp-servers.md).
-16. `apps-local`: Deploys business logic (the `apps-local` Kustomization `dependsOn` `databases-local`, `monitoring-local`, and `temporal-local` — the `order-worker` dials Temporal at startup, so apps must not deploy until the Temporal cluster is Ready).
+1. `controllers-local`: Provisions namespaces and operators (cert-manager, CNPG, VictoriaMetrics/Grafana/Sloth, OpenBAO + ESO **HelmReleases**, Kyverno, temporal-operator, ClickHouse operator). **Does not** install Kong or Tempo/Pyroscope (those are separate Kustomizations to avoid deadlocks).
+2. `secrets-local`: Applies `./configs/secrets` — OpenBAO bootstrap Job, ClusterSecretStore, ExternalSecrets (depends on `controllers-local` for the OpenBAO/ESO operators).
+3. `cert-manager-local`: ClusterIssuers (`selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod`), `kong-proxy-tls` Certificate, trust-manager Bundle (depends on `controllers-local`, `secrets-local` — needs the synced `cloudflare-api-token` Secret on prod).
+4. `kong-local`: Kong HelmRelease (depends on `cert-manager-local` — mounts `kong-proxy-tls` Secret as a volume).
+5. `kong-config-local`: KongClusterPlugins + Ingress resources for every host (depends on `kong-local`, `cert-manager-local`).
+6. `monitoring-local`: Observability **configs** — Grafana dashboards, VMAlert rules, Sloth **PrometheusServiceLevel** CRs (depends on `controllers-local`; Sloth **operator** is in `controllers-local`).
+7. `storage-local`: Provisions RustFS (S3) object storage (depends on `controllers-local`, `secrets-local`).
+7a. `caching-local`: Valkey (product cache-aside db 0 + Kong rate-limit counters db 1) (depends on `controllers-local`, `monitoring-local`).
+8. `network-policies-local`: Per-namespace NetworkPolicies (depends on `controllers-local`).
+8a. `clickhouse-local`: ClickHouse OLAP for OTel logs+traces SQL (depends on `controllers-local`, `secrets-local`).
+9. `tracing-local`: Tempo + Jaeger + OTel Collector configs (depends on `secrets-local`, `storage-local`, **`clickhouse-local`** — collector `create_schema` needs ClickHouse up first).
+10. `profiling-local`: Pyroscope (depends on `secrets-local`, `storage-local`).
+11. `cnpg-barman-plugin-local`: CNPG Barman Cloud Plugin + `ObjectStore` CRD (depends on `controllers-local`, `cert-manager-local`).
+12. `databases-local`: CNPG `platform-db` and `product-db` clusters (depends on `secrets-local`, `monitoring-local`, `cnpg-barman-plugin-local`, `storage-local`, `network-policies-local`).
+13. `databases-cnpg-dr-local`: CNPG DR replica (depends on `databases-local`, `secrets-local`).
+14. `temporal-local`: Temporal server (`TemporalCluster` + `TemporalNamespace`), persistence on `platform-db-rw.platform:5432` (depends on `controllers-local`, `cert-manager-local`, `databases-local`, `monitoring-local`).
+15. `kyverno-policies-local`: Admission policies (depends on `controllers-local`, `monitoring-local`). See [kyverno.md](kyverno.md).
+15a. `mcp-local`: MCP servers (depends on `monitoring-local`). See [mcp-servers.md](mcp-servers.md).
+16. `apps-local`: Business logic — ResourceSets + workers (`dependsOn` `databases-local`, `monitoring-local`, `temporal-local`; workers dial Temporal at startup).
+
+> **`make flux-sync` caveat:** `scripts/flux-sync.sh` reconciles only six Kustomizations
+> (`flux-system`, `controllers-local`, `databases-local`, `monitoring-local`,
+> `secrets-local`, `apps-local`). It does **not** force Kong, Temporal, ClickHouse,
+> tracing, or cert-manager. After changes to those layers, run
+> `flux reconcile kustomization <name>-local --with-source` or `make sync` after
+> `make flux-push` and reconcile the specific Kustomization manually.
 
 ---
 
@@ -435,4 +455,4 @@ For persistence layer details, refer to [002-database-integration.md](../databas
 
 ---
 
-_Last updated: 2026-07-17 — RFC-0018: expected clusters are 3 CNPG clusters (`platform-db`, `product-db`, `product-db-replica`); Temporal persistence on platform-db. Earlier: Zalando→CNPG migration; quick-start/step order aligned with the Makefile (`flux-push` before `flux-up`); VictoriaMetrics wording; caching/mcp added to the dependency graph; VictoriaTraces host added._
+_Last updated: 2026-07-22 — 10 microservices + checkout-worker; Flux graph adds clickhouse-local; secrets-local vs controllers-local split; configs/observability paths; make flux-sync caveat._

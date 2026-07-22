@@ -84,7 +84,8 @@ kubernetes/apps/
 │   └── shipping.yaml              # labels: domain=comms
 ├── frontend-rs.yaml               # rs-frontend (standalone, inline inputs)
 ├── mockpay.yaml                   # standalone HelmRelease — mock payment provider (payment ns)
-└── order-worker.yaml              # standalone HelmRelease — Temporal saga worker (order ns)
+├── order-worker.yaml              # standalone HelmRelease — Temporal saga worker (order ns)
+└── checkout-worker.yaml           # standalone HelmRelease — checkout abandonment worker (checkout ns)
 ```
 
 Flux Kustomization with `path: ./` auto-discovers all YAML files recursively.
@@ -239,8 +240,13 @@ To enable automatic semver-based rollouts, define a `ResourceSetInputProvider` o
        name: <name>
        namespace: <name>
        replicaCount: 1
-       db_host: "db-pooler.<name>.svc.cluster.local"
-       db_migration_host: "db-rw.<name>.svc.cluster.local"
+       # RFC-0018 — pick the cluster for the domain (see Domain Mapping table):
+       # Identity/comms (platform-db):
+       db_host: "platform-db-pooler-rw.platform.svc.cluster.local"
+       db_migration_host: "platform-db-rw.platform.svc.cluster.local"
+       # Catalog/checkout on product-db (product, cart, checkout, order, payment):
+       # db_host: "pgdog-product.product.svc.cluster.local"
+       # db_migration_host: "product-db-rw.product.svc.cluster.local"
        db_secret: "<name>-db-credentials"
        pool_max: "10"
    ```
@@ -265,7 +271,7 @@ To enable automatic semver-based rollouts, define a `ResourceSetInputProvider` o
 | **Blast radius** | ~25% (one domain) |
 | **Merge conflicts** | None (1 file per service) |
 | **Onboarding time** | < 5 min (create InputProvider + push) |
-| **Health granularity** | 1 check per domain (5 total); `mockpay` + `order-worker` are standalone HelmReleases outside the domain checks |
+| **Health granularity** | 1 check per domain (5 total); `mockpay`, `order-worker`, and `checkout-worker` are standalone HelmReleases outside the domain checks |
 | **Team autonomy** | Full (each service owns its InputProvider) |
 
 ### Beyond 50 Services: Further Scaling
@@ -333,4 +339,4 @@ flux reconcile kustomization apps-local -n flux-system
 
 ---
 
-_Last updated: 2026-07-17 — domain-mapping DB placements updated to RFC-0018 topology (platform-db / product-db); file layout completed with the standalone mockpay + order-worker HelmReleases._
+_Last updated: 2026-07-22 — onboarding db_host examples use RFC-0018 PgDog/CNPG hostnames; checkout-worker standalone release._

@@ -119,4 +119,4 @@ See [gitflow.md](gitflow.md) section 7 for the full ruleset specification.
 - [Check template](check_template.yml) / [Build template](build_template.yml)
 
 ---
-_Last updated: 2026-04-12_
+_Last updated: 2026-07-22_

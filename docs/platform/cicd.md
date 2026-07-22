@@ -1,6 +1,6 @@
 # CI/CD Pipeline Documentation
 
-This document describes the CI/CD pipeline for all microservices (`auth`, `user`, `product`, `cart`, `order`, `review`, `notification`, `shipping`, `payment`) and the `frontend` in a **polyrepo** setup.
+This document describes the CI/CD pipeline for all microservices (`auth`, `user`, `product`, `cart`, `checkout`, `order`, `review`, `notification`, `shipping`, `payment`) and the `frontend` in a **polyrepo** setup. Services use **Go 1.26** (`GOTOOLCHAIN=auto` in CI).
 
 > This page covers **both** the pipeline *how-to* (below) and the org-wide *standard/policy* —
 > action SHA-pinning, least-privilege permissions, image signing/verification, the required-checks
@@ -1090,4 +1090,4 @@ VictoriaMetrics (see [observability](../observability/README.md)).
 
 ---
 
-_Last updated: 2026-07-10 — payment added to scope; image naming corrected to the multi-level `ghcr.io/duynhlab/<repo>/<image>` shape; scan-gate wording aligned with the calibrated CRITICAL-only block._
+_Last updated: 2026-07-22 — checkout-service in scope; Go 1.26 note._

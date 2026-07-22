@@ -92,7 +92,7 @@ may repeat across artifacts — label each diagram's question (*Mechanism*, *Tar
 | [RFC-0017](RFC-0017/) | Platform telemetry standard: per-layer signal ownership + fleet instrumentation | platform-wide | P1 | implementable |
 | [RFC-0018](RFC-0018/) | Consolidate platform PostgreSQL: merge auth, shared, temporal into platform-db | infra | P1 | provisional |
 | [RFC-0019](RFC-0019/) | ClickHouse for OTel logs/traces SQL (+ optional commerce analytics) | platform-wide | P2 | provisional |
-| [RFC-0020](RFC-0020/) | Internal TLS everywhere on the `homelab-ca` root (DB, pooler, gRPC, OpenBAO) | platform-wide | P1 | researching |
+| [RFC-0020](RFC-0020/) | Internal TLS everywhere on the `homelab-ca` root (DB, pooler, gRPC, OpenBAO) | platform-wide | P1 | provisional |
 
 ## Backlog — candidate RFCs
 
@@ -118,4 +118,4 @@ when someone starts research (owner OK → `research.md` → index `researching`
 > [RFC-0001](RFC-0001/) (not a separate backlog row).
 
 ---
-_Last updated: 2026-07-17_
+_Last updated: 2026-07-22_

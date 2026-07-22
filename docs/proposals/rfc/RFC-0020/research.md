@@ -8,7 +8,7 @@
 | **Status** | researching |
 | **Scope** | platform-wide |
 | **Created** | 2026-07-21 |
-| **Last updated** | 2026-07-21 |
+| **Last updated** | 2026-07-22 |
 
 > **Plain-language research.** Write like a careful blog post, not an RFC. After jargon,
 > add **"In plain terms"** blockquotes. Facts must still be verified (Context7 + manifests).
@@ -196,8 +196,8 @@ Verified against manifests on 2026-07-21. Marks **deployed** vs **planned**.
 |--------|---------------------------|----------------------------------|
 | PKI root + trust distribution | `selfsigned-bootstrap → homelab-ca → CA issuer` + trust-manager root-only bundle | unchanged — the anchor |
 | Edge (Kong) | `kong-proxy-tls` wildcard; **prod** `letsencrypt-prod` (Cloudflare DNS-01), **local** patched to `homelab-ca` | base default → `homelab-ca`; **prod overlay** re-adds `letsencrypt-prod` (Cloudflare/ACME dropped from base) |
-| DB replication | CNPG uses TLS `cert` auth for `streaming_replica` — but from **CNPG's own auto-CA**, not `homelab-ca` | keep (internal to CNPG) or re-issue from `homelab-ca` (open question) |
-| App → DB | 9 services `sslmode=disable` via poolers; only `payment` is `hostssl`+`require` direct to CNPG | T2 `verify-full` against `homelab-ca`; then T3 cert-auth (ADR-025) |
+| DB replication | CNPG uses TLS `cert` auth for `streaming_replica` — but from **CNPG's own auto-CA**, not `homelab-ca` | keep CNPG-managed (owner decision 2026-07-22) |
+| App → DB | 9 services `sslmode=disable` via poolers; only `payment` is `hostssl`+`require` direct to CNPG | T2 `verify-full` against `homelab-ca`; then T3 cert-auth (ADR-025) — **all via pooler** (owner decision 2026-07-22; `payment`'s direct hop is transitional) |
 | Pooler (PgBouncer / PgDog) | No client-facing TLS; PgDog upstream plaintext; PgBouncer only uses CNPG auto client-cert for `auth_query` | client + upstream TLS — PgDog confirmed TLS-capable up to `verify_full` + mTLS (audit log) |
 | East-west gRPC | plaintext `insecure.NewCredentials()`; Temporal link no TLS | in-process mTLS — **this RFC's east-west tier** (formerly RFC-0002) |
 | Secrets (OpenBAO) | listener `tls_disable = 1`, plaintext `:8200` | `tls_disable = 0`, cert-manager cert (ADR-005 prod target) |
@@ -214,7 +214,7 @@ flowchart LR
   s0["Slice 0<br/>Edge decouple<br/>base → homelab-ca<br/>drop Cloudflare/LE"] --> s1
   s1["Slice 1<br/>OpenBAO TLS<br/>tls_disable=0"] --> note1
   s0 --> s2["Slice 2<br/>CNPG server cert<br/>on homelab-ca"]
-  s2 --> s3["Slice 3<br/>Pooler TLS<br/>(or direct/bypass)"]
+  s2 --> s3["Slice 3<br/>Pooler TLS<br/>(all app→DB via pooler)"]
   s3 --> s4["Slice 4<br/>App sslmode<br/>require → verify-full"]
   s4 --> s5["Slice 5<br/>DB cert-auth<br/>hostssl … cert (ADR-025)"]
   s0 --> s6["Slice 6<br/>gRPC mTLS<br/>in-process (was RFC-0002)"]
@@ -231,6 +231,11 @@ flowchart LR
 **Hard dependency:** App→DB `verify-full` (Slice 4) is **blocked by the pooler tier** (Slice 3) —
 you cannot ask an app to verify a TLS server if the pooler in front of it speaks no TLS. This is
 why `payment` (direct-to-CNPG, no pooler) is the *only* service on `require` today.
+
+**Owner decision (2026-07-22): every app→DB path goes through its pooler — no
+direct-to-CNPG exceptions.** `payment`'s direct connection existed only because the pooler
+spoke no TLS; it is transitional and returns behind `pgdog-product` once Slice 3 lands.
+Direct/bypass is no longer an escape hatch in any slice.
 
 ---
 
@@ -262,20 +267,37 @@ here maps directly to "flip to IAM" later.
       and experimental mTLS client-cert auth (`tls_client_ca_certificate`). Fallbacks (i)–(iii)
       are not needed; Slice 3 becomes a PgDog configuration change. **App→DB `verify-full` is
       unblocked.**
-- [ ] **CNPG server-cert source** — re-issue the CNPG server cert from `homelab-ca`
-      (`serverCASecret`/`serverTLSSecret`) so apps `verify-full` against the shared root, **or**
-      distribute CNPG's own auto-CA through the trust bundle. Which is less brittle across
-      `make up` re-bootstraps?
-- [ ] **What does "sslmode true" mean per tier** — target `require` (encrypt only) everywhere
-      first, or jump straight to `verify-full`? And which services graduate to T3 cert-auth?
-- [ ] **Cert lifetimes / rotation** — short-lived internal leaves (hours/days, auto-rotated) vs
-      the 90d/30d-renew the superseded RFC-0002 proposed. One policy for all internal leaves, or per-tier?
-- [ ] **OpenBAO TLS bootstrap ordering** — the cert-manager cert must exist before OpenBAO
-      starts; how does that interact with the Flux secrets-wave and floci auto-unseal?
-- [ ] **`streaming_replica`** — leave CNPG's internal replication cert-auth as-is (CNPG-managed
-      CA) or fold it onto `homelab-ca` for a single trust root?
-- [ ] **Scope of the first RFC** — climb all tiers, or ship Slice 0 (edge decouple) + Slice 1
-      (OpenBAO) as quick wins and defer the DB chain behind the pooler decision?
+- [x] **CNPG server-cert source** — **decided (owner, 2026-07-22): re-issue from `homelab-ca`**
+      via `spec.certificates` (`serverCASecret`/`serverTLSSecret`). Apps keep exactly one trust
+      root (the bundle they already mount); distributing CNPG's auto-CA would add a second
+      root to every client — against this RFC's goal. Re-bootstrap brittleness is handled by
+      cert-manager re-issuing declaratively from the `Certificate` CR.
+- [x] **What does "sslmode true" mean per tier** — **decided (owner, 2026-07-22): jump straight
+      to `verify-full` for all 10 services** (no intermediate `require` step — same wiring
+      effort, strictly more protection). **T3 is defined per hop** because of the
+      all-via-pooler decision: with a pooler in the middle, Postgres `hostssl … cert`
+      authenticates the *pooler's* client cert, not the app's — so per-service cert identity
+      lives on the app→pooler leg (PgDog `tls_client_ca_certificate`), while the
+      pooler→Postgres leg carries the pooler's identity (per-role auth stays
+      password/`auth_query` at that hop). The README specifies the per-hop meaning.
+- [x] **Cert lifetimes / rotation** — **decided (owner, 2026-07-22): one policy for all internal
+      leaves — 90d lifetime, renew 30d before expiry** (the RFC-0002 heritage). cert-manager
+      handles renewal; consumers reload without restart (OpenBAO via SIGHUP, CNPG/PgDog via
+      operator/config reload). Hours-scale TTLs only pay off with SPIFFE-style identity,
+      which is rejected at this scale.
+- [x] **OpenBAO TLS bootstrap ordering** — **direction set (owner, 2026-07-22)**: cert-manager
+      already reconciles in the wave before secrets in the Flux chain; the OpenBAO
+      `Certificate` gets a readiness gate before the HelmRelease, and the `retry_join`
+      https flip + probe scheme change land in the same commit as the listener change.
+      Verified against floci auto-unseal in a `make up` drill (Testing section of the README).
+- [x] **`streaming_replica`** — **decided (owner, 2026-07-22): leave CNPG-managed.** CNPG's
+      internal replication cert-auth stays on its own auto-CA; it never leaves the CNPG
+      cluster boundary, and folding it onto `homelab-ca` adds re-bootstrap brittleness for
+      no external-trust gain. Revisit only if a single-root compliance requirement appears.
+- [x] **Scope of the first RFC** — **decided (owner, 2026-07-22): umbrella, Slice 0–6.** The
+      PgDog blocker is gone, so every slice is a configuration change inside homelab except
+      Slice 6 (gRPC mTLS touches `pkg/grpcx` in service repos) — Slice 6 ships last as its
+      own gated phase.
 
 ---
 
@@ -339,17 +361,17 @@ T3 (cert-auth) is the endpoint where a service could stop using a password entir
 
 ## Research review gate
 
-- [ ] Answers a **real-world problem** you'd recognize at work (internal pen-test / SOC-2
-      encryption-in-transit finding) — not generic vendor marketing
+- [x] Answers a **real-world problem** you'd recognize at work (internal pen-test / SOC-2
+      encryption-in-transit finding) — not generic vendor marketing (owner confirmed 2026-07-22)
 - [x] **Problem statement** names situation, who feels it, and cost of doing nothing
 - [x] At least **two alternatives** documented with tradeoffs
 - [x] **Platform as-built** section filled from manifests/docs (not boilerplate)
-- [ ] Primary use-case direction stated (leaning in-process per-workload; scope of first RFC undecided)
+- [x] Primary use-case direction stated — in-process per-workload on `homelab-ca`; scope decided: umbrella Slice 0–6 (owner, 2026-07-22)
 - [x] **Context7 audit** complete; footer date updated (PgDog, Istio, and OpenBAO rows resolved 2026-07-21)
 - [x] At least **one Mermaid** diagram; labels match deployed vs **planned** reality
 - [x] No Kubernetes manifest changes smuggled into this research file
-- [ ] Owner sign-off: **ready for RFC**
+- [x] Owner sign-off: **ready for RFC** (2026-07-22 — decisions recorded in [Open questions](#open-questions); RFC: [./README.md](./README.md))
 
 ---
 
-_Last verified: 2026-07-21 (Context7 complete + manifest cross-check)._
+_Last verified: 2026-07-22 (Context7 complete + manifest cross-check; all open questions decided — gate passed)._

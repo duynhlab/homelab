@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **RFC-0020 promoted to provisional**: research gate passed — owner decisions recorded (all app→DB via pooler, `payment` direct hop transitional; CNPG server cert re-issued from `homelab-ca`; straight to `verify-full`; T3 defined per hop; 90d/30d rotation; `streaming_replica` stays CNPG-managed; umbrella scope Slice 0–6) and `RFC-0020/README.md` added (decision, target architecture, rollout).
 - **RFC-0020 research Context7 audit completed**: PgDog confirmed TLS-capable (client TLS, upstream `verify_full`, experimental mTLS) — pooler tier unblocked, no PgBouncer migration needed; Istio ambient-vs-sidecar and OpenBAO listener-TLS rows resolved; review gate updated.
 
 - **docs/api standardized as the trusted API source**: all 10 service contracts use At a glance (3 columns), grouped code maps, and hub deployment rollup in `docs/api/README.md`; user journeys merged into `api.md`; repo index in `docs/README.md` § Repositories; `AGENTS.md` trusts `docs/api/` for API contracts.

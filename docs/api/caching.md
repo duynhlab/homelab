@@ -1,8 +1,18 @@
-# Caching Documentation
+# Application Caching
 
-> **Document Status:** Production  
-> **Cache System:** Valkey (Redis-compatible)  
-> **Pattern:** Cache-Aside (Read-Through)
+Cache-Aside contract for services that adopt Valkey — layer placement, stampede locking, key conventions, env vars, fail-open semantics, and invalidation boundaries. **Reference implementation:** product-service (catalog reads only).
+
+> **Platform ops** (Valkey Helm, eviction policy, Kong rate-limit db 1, metrics,
+> troubleshooting) live in [Caching (platform)](../caching/README.md). Cross-service
+> rules and roadmap: [RFC-0004](../proposals/rfc/RFC-0004/) (provisional).
+
+| Attribute | Value | RFC / ADR |
+|-----------|-------|-----------|
+| **Pattern** | Cache-Aside (read-through), fail-open | — |
+| **Reference impl** | product-service only (catalog) | — |
+| **Platform backend** | [Caching (platform)](../caching/README.md) — Valkey, eviction, Kong db 1 | — |
+| **Cross-cutting** | [Application observability](./observability.md) · [product.md](./product.md) | — |
+| **Design record** | — | [RFC-0004](../proposals/rfc/RFC-0004/) (provisional) |
 
 ---
 
@@ -179,7 +189,7 @@ Reuses the same single-product cache path (calls `ProductService.GetProduct` int
 
 ### `POST /product/v1/internal/products` — create product (internal only)
 
-> This route is on the **internal** audience and is **not exposed on the gateway**. It is reachable only via in-cluster service DNS. Today the boundary is Kong not exposing the route plus in-app controls; ingress NetworkPolicies are authored (`kubernetes/infra/configs/network-policies/`) and enforced by kindnet (Kind K8s 1.34+). See the [API audience model](../api/api.md#audience-segments).
+> This route is on the **internal** audience and is **not exposed on the gateway**. It is reachable only via in-cluster service DNS. Today the boundary is Kong not exposing the route plus in-app controls; ingress NetworkPolicies are authored (`kubernetes/infra/configs/network-policies/`) and enforced by kindnet (Kind K8s 1.34+). See the [API audience model](./api.md#audience-segments).
 
 1. Validate price, persist via `productRepo.Create(ctx, product)`.
 2. **Cache invalidation**: call `productCache.InvalidateProductList(ctx)` to delete list cache keys so the new product appears in subsequent list queries.
@@ -225,6 +235,7 @@ must stay true, or the cache goes stale:
    stock), product-service has **no invalidation hook** and serves stale detail data bounded by
    the 10m TTL. Today stock is not written this way; if it ever is, route the mutation through
    product-service or publish an invalidation event. This is a deliberate, documented boundary.
+   Cross-service bust on reserve/release is tracked in [RFC-0004](../proposals/rfc/RFC-0004/) (not yet implemented).
 
 ## Cache Key Structure
 
@@ -287,146 +298,7 @@ type CacheConfig struct {
 }
 ```
 
-## Key Eviction Policy
-
-### Overview
-
-Key eviction policy determines how Valkey behaves when memory limits are reached. By default, Valkey uses `noeviction` policy, which rejects write operations when memory is full. For caching use cases, this is **not recommended** as it prevents new cache entries from being stored.
-
-**Why Eviction Policy Matters:**
-
-- **Memory Management**: Prevents OOM (Out of Memory) errors by evicting old keys
-- **Cache Performance**: Ensures cache can accept new entries even when memory is full
-- **Predictable Behavior**: Explicit policy ensures consistent cache behavior under memory pressure
-
-### Eviction Policies
-
-Valkey supports the following `maxmemory-policy` options:
-
-| Policy | Description | Use Case |
-|--------|-------------|----------|
-| **noeviction** | Rejects writes when memory full, reads continue | Not recommended for cache (default) |
-| **allkeys-lru** | Evicts least recently used keys from entire dataset | **Recommended for cache** - keeps recently accessed data |
-| **allkeys-lfu** | Evicts least frequently used keys from entire dataset | Good for cache with access frequency patterns |
-| **allkeys-random** | Randomly evicts any keys | Rarely used, unpredictable |
-| **volatile-lru** | Evicts LRU keys that have TTL set | Only evicts keys with expiration |
-| **volatile-lfu** | Evicts LFU keys that have TTL set | Only evicts keys with expiration |
-| **volatile-random** | Randomly evicts keys with TTL | Only evicts keys with expiration |
-| **volatile-ttl** | Evicts keys with shortest remaining TTL | Prioritizes expiring keys first |
-
-A quick way to choose — pick the **scope** (any key vs only keys that carry a TTL),
-then the **signal** used to decide what to drop (recency / frequency / age / random):
-
-```mermaid
-flowchart TD
-    Q1{"Evict any key, or only keys with a TTL?"}
-    Q1 -->|"any key (a pure cache)"| AK["allkeys-*"]
-    Q1 -->|"only TTL'd keys"| VOL["volatile-*"]
-    AK --> S{"By which signal?"}
-    VOL --> S
-    S -->|recency| LRU["…-lru — drop least recently used"]
-    S -->|frequency| LFU["…-lfu — drop least frequently used"]
-    S -->|"age / soonest to expire"| AGE["volatile-ttl — drop nearest expiry"]
-    S -->|"none / cheapest"| RND["…-random — drop a random key"]
-```
-
-### Policy Comparison
-
-**All-keys vs Volatile:**
-- **All-keys policies** (`allkeys-*`): Can evict **any** key, regardless of TTL
-- **Volatile policies** (`volatile-*`): Only evict keys **with TTL set**
-  - If no keys have TTL, volatile policies behave like `noeviction`
-
-**LRU vs LFU:**
-- **LRU (Least Recently Used)**: Evicts keys that haven't been accessed recently
-  - Good for: Recent access patterns, time-based popularity
-- **LFU (Least Frequently Used)**: Evicts keys with lowest access frequency
-  - Good for: Access frequency patterns, hot/cold data separation
-
-### Recommendation for Product Service Caching
-
-**Recommended Policy: `allkeys-lru`**
-
-**Rationale:**
-- All cache keys have TTL (product list: 5m, product detail: 10m)
-- Can evict any key when memory is full (not limited to TTL keys)
-- LRU keeps recently accessed products in cache
-- Predictable behavior: least recently used products are evicted first
-
-**Alternative: `allkeys-lfu`**
-- Consider if you have "hot products" that are accessed frequently
-- Better for access frequency-based patterns
-
-**Tradeoff (every decision is one):** `allkeys-lru` here is *approximate* — Valkey
-samples a handful of keys instead of tracking a true global LRU, and it is **not**
-frequency-aware, so a burst of one-off reads can evict a genuinely hot key. It also
-assumes the working set fits under `maxmemory`; if it doesn't, you get constant
-eviction churn (watch the `ValkeyHighEvictionRate` alert). `allkeys-lfu` buys
-frequency-awareness at a small per-key bookkeeping cost.
-
-**Configuration:**
-
-Eviction policy is configured via `valkeyConfig` in [`kubernetes/infra/controllers/caching/valkey/helmrelease.yaml`](../../kubernetes/infra/controllers/caching/valkey/helmrelease.yaml) (currently `maxmemory-policy allkeys-lru`).
-
-## Second consumer: Kong rate-limit counters (db 1)
-
-The same Valkey instance backs **Kong's distributed rate limiting**
-(`rate-limiting-api` + `rate-limiting-admin` KongClusterPlugins, `policy: redis`)
-— which puts Valkey **on the gateway request path**, not just the product read
-path. Keyspaces are isolated by database index:
-
-| Consumer | DB index | Purpose | Failure mode |
-|---|---|---|---|
-| product-service cache-aside | `0` | product/list cache | fail-open → DB |
-| Kong rate limiting | `1` | shared counters across both Kong replicas | `fault_tolerant: true` → requests pass unlimited |
-
-**Eviction caveat:** `allkeys-lru` applies to the whole instance — under memory
-pressure it can evict *rate-limit counters* as readily as cache entries
-(a counter reset momentarily raises a client's remaining quota). Acceptable at
-homelab scale; a dedicated instance (or `volatile-*` policy) is the production
-answer. See [kong-gateway.md](../platform/kong-gateway.md) for the plugin config.
-
-
-## Distributed Cache (concept & current state)
-
-> **Current state:** a **single-node** Valkey (`cache-system` namespace, no
-> replication, no persistence). Everything below is **concept + the scale-up path**
-> if it ever outgrows one node — not deployed today.
-
-A **distributed cache** spreads entries across several nodes so capacity and
-throughput scale past one box, and one node failing doesn't drop the whole cache:
-
-- **Partitioning (sharding)** — keys split across nodes; **consistent hashing** maps
-  each key to a node so adding/removing a node re-homes only a small slice of keys,
-  not the whole keyspace.
-- **Replication** — each shard has replica(s) for availability and read scaling.
-- **Hot keys** — one very popular key can overload its shard; mitigate with a small
-  client/local cache for that key, or by splitting it.
-- **Write strategy** — *Cache-Aside* (what we use: the app reads the cache and loads
-  the DB on a miss) vs *read-through / write-through* (the cache sits inline and
-  loads/persists for you) vs *write-behind* (async flush — fastest writes, weakest
-  durability).
-
-```mermaid
-flowchart LR
-    App["services"] -->|"key → consistent hash"| Ring{"hash ring"}
-    Ring --> A[("shard A<br/>+ replica")]
-    Ring --> B[("shard B<br/>+ replica")]
-    Ring --> C[("shard C<br/>+ replica")]
-```
-
-**Scale-up path here** (only if one node is genuinely the bottleneck): Valkey
-**primary + replica** (read scaling + failover) → **Valkey Cluster** (sharded,
-consistent hashing). The Cache-Aside code is unchanged — the client just points at
-a cluster endpoint. **Tradeoff:** more nodes buy capacity and availability but add
-cross-node consistency, rebalancing, and operational cost; not worth it until a
-single node can't keep up (reads here already fail-open to PostgreSQL, so an outage
-degrades rather than breaks).
-
-
-## Observability
-
-### Tracing
+## Observability (app instrumentation) {#observability-app-instrumentation}
 
 Cache operations are traced via OpenTelemetry spans:
 
@@ -443,130 +315,16 @@ product.list (Logic Layer)
   └─ products.total: 150
 ```
 
-### Metrics
-
-Valkey metrics are scraped by Prometheus via ServiceMonitor:
-
-- `redis_commands_processed_total`: Total commands processed
-- `redis_connected_clients`: Number of connected clients
-- `redis_memory_used_bytes`: Memory usage
-- `redis_keyspace_hits_total`: Cache hits
-- `redis_keyspace_misses_total`: Cache misses
-
-**Cache Hit Rate:**
-```
-rate(redis_keyspace_hits_total[5m]) / 
-(rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))
-```
-
-## Troubleshooting
-
-### Cache Not Working
-
-1. **Check Valkey deployment:**
-   ```bash
-   kubectl get pods -n cache-system | grep valkey
-   kubectl logs -n cache-system deployment/valkey
-   ```
-
-2. **Check Product service logs:**
-   ```bash
-   kubectl logs -n product deployment/product | grep -i cache
-   ```
-
-3. **Verify configuration:**
-   ```bash
-   kubectl get deployment product -n product -o yaml | grep CACHE
-   ```
-
-4. **Test connection manually:**
-   ```bash
-   kubectl port-forward -n cache-system svc/valkey 6379:6379
-   redis-cli -h 127.0.0.1 -p 6379 ping
-   ```
-
-### Cache Always Misses
-
-- Check TTL configuration (too short TTL causes frequent misses)
-- Verify cache keys are being generated correctly
-- Check for cache invalidation happening too frequently
-
-### Cache Stale Data
-
-- Verify cache invalidation on writes (CreateProduct should invalidate list cache)
-- Check TTL values (too long TTL causes stale data)
-- Consider implementing more granular cache invalidation
-
-### Performance Issues
-
-- Monitor Valkey memory usage: `redis_memory_used_bytes`
-- Check cache hit rate (should be > 80% for read-heavy endpoints)
-- Consider increasing TTL for stable data
-- Monitor cache operation latency in traces
-
-### Live Debugging & Verification
-
-Use these steps to verify caching is working in a live cluster:
-
-**1. Verify Connectivity from App to Cache**
-Check if the Product service can reach Valkey on port 6379:
-```bash
-kubectl exec -n product -it deploy/product -- nc -zv valkey.cache-system.svc.cluster.local 6379
-# Expected output: valkey.cache-system.svc.cluster.local (10.96.x.x:6379) open
-```
-
-**2. Trigger Cache Population**
-Hit the public read endpoints (which is what populates the cache). Via the gateway:
-```bash
-curl -sS https://gateway.duynh.me/product/v1/public/products | jq '.[0:2]'
-curl -sS https://gateway.duynh.me/product/v1/public/products/14 | jq
-```
-Or from inside the cluster (e.g. an ephemeral curl pod):
-```bash
-kubectl run -it --rm curl-test --image=curlimages/curl --restart=Never -n product -- \
-  curl -v http://product.product.svc.cluster.local:8080/product/v1/public/products
-```
-
-**3. Inspect Cache Keys**
-Check if keys are created in Valkey:
-```bash
-# List all keys (use specific pattern in production)
-kubectl exec -n cache-system deploy/valkey -- redis-cli KEYS "product:*"
-# Expected output (list keys are now hashed — sha256 of the filter tuple):
-# product:list:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
-# product:14
-
-kubectl exec -n cache-system deploy/valkey -- redis-cli --scan --pattern "product:*"
-```
-
-**4. Check Cache Values**
-View the cached JSON data:
-```bash
-kubectl exec -n cache-system deploy/valkey -- redis-cli GET "product:14"
-# Expected output: {"id":"14","name":"Modern Headset",...}
-```
-
----
-## Future Enhancements
-
-Prioritized; the first items close documented gaps from the cache review.
-
-| # | Enhancement | Priority | Why / notes |
-|---|-------------|----------|-------------|
-| 1 | **Negative caching** | High | Short-TTL entries for not-found ids to stop penetration under id-scanning. Closes the documented penetration gap. |
-| 2 | **Stronger stampede under slow DB** | High | In-process `singleflight` (or a larger waiter budget) so the single-flight guarantee holds when the DB itself is slow, not just on the happy path. |
-| 3 | **Uncancellable lock release** | Medium | Release the stampede lock on `context.WithoutCancel` so a client disconnect mid-fetch frees the lock immediately instead of waiting out its TTL. |
-| 4 | **Cross-service invalidation** | Contingent | Only if product writes (e.g. stock) ever move outside product-service; an event/hook to invalidate the detail cache instead of waiting out the TTL. |
-| 5 | **App-level cache metrics** | Medium | Prometheus hit/miss/error counters to complement the server-side `redis_keyspace_*` metrics already scraped. |
-| 6 | **Valkey HA** | Low | Reads are fail-open, so a cluster protects the cache tier under load, not availability (a Valkey outage already degrades to DB). |
+Server-side Valkey metrics and hit-rate queries: [Caching (platform) § Observability](../caching/README.md#observability).
 
 ## References
 
-- [Valkey Documentation](https://valkey.io/)
+- [Caching (platform)](../caching/README.md) — Valkey deployment, eviction, Kong db 1, ops
+- [RFC-0004](../proposals/rfc/RFC-0004/) — cross-service caching contract (provisional)
+- [product.md](./product.md) — product-specific cache policy summary
+- [Application observability](./observability.md) — tracing middleware
+- [3-Layer Architecture](./api.md#inside-each-service)
 - [Redis Go Client](https://github.com/redis/go-redis)
 - [Cache-Aside Pattern](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Strategies.html)
-- [3-Layer Architecture](../api/api.md#inside-each-service)
 
----
-
-_Last updated: 2026-07-10 — documented the second Valkey consumer (Kong rate-limit counters on db 1, on the gateway request path) and the shared-eviction caveat._
+_Last updated: 2026-07-22 — canonical app caching contract; moved from docs/caching/caching.md._

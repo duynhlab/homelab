@@ -70,7 +70,7 @@ values are exactly `platform-db` and `product-db`).
 
 **Audit / query-plan logging** — `pgaudit` (`log: "ddl, write"`) and `auto_explain` write to CNPG
 pod logs, tailed by the Vector DaemonSet into VictoriaLogs (no separate exporter):
-[../../logging/victorialogs.md](../../logging/victorialogs.md).
+[../../logging/README.md#platform-pipeline](../../logging/README.md#platform-pipeline).
 
 ## References
 

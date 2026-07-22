@@ -87,9 +87,7 @@ docs/
 │   │   ├── backends-comparison.md # Tempo vs Jaeger vs VictoriaTraces
 │   │   └── victoriatraces.md     # VictoriaTraces pilot (3rd backend)
 │   ├── logging/                  # Pillar 3: Structured Logging
-│   │   ├── README.md             # Architecture, why-this-stack, scaling
-│   │   ├── logging-standards.md  # App-side logging conventions (libraries, levels, JSON fields)
-│   │   └── victorialogs.md       # VictoriaLogs backend & Vector pipeline ops
+│   │   └── README.md             # Platform pipeline (VictoriaLogs + Vector)
 │   ├── profiling/                # Pillar 4: Continuous Profiling
 │   │   └── README.md             # Pyroscope (CPU, heap, goroutine)
 │   ├── clickhouse/               # ClickHouse OTel logs+traces OLAP (deployed)
@@ -120,7 +118,7 @@ docs/
 │       ├── microservices/               # Per-alert runbooks (19 files)
 │       └── postgresql/                  # Per-alert CNPG runbooks
 ├── caching/                     # Valkey cache: Cache-Aside, eviction policies, distributed-cache concept
-│   └── caching.md
+│   └── README.md                 # Valkey platform hub (eviction, Kong db1, ops)
 ├── platform/                     # Platform/deployment documentation
 │   ├── setup.md                  # GitOps deployment guide (+ seed data & demo accounts)
 │   ├── graceful-shutdown.md      # Graceful shutdown pattern (drain, readiness, timeouts)
@@ -252,7 +250,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 #### Observability (4 Pillars)
 
 1. **[Observability Overview](./observability/README.md)** - Master index, 4-pillar architecture
-   - **[OpenTelemetry guide](./observability/opentelemetry/README.md)** - current instrumentation policy and operations
+   - **[OpenTelemetry (platform)](./observability/opentelemetry/README.md)** - Collector topology, sampling, operations (app policy → [api/observability.md](./api/observability.md))
    - **[RFC-0014 explainer](./observability/opentelemetry/rfc-0014-explainer.md)** - old-vs-new, plain-language (start here if new)
     - Metrics, Tracing, Logging, Profiling
     - Component inventory and correlation workflow
@@ -265,11 +263,9 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 6. **[VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md)** - 3rd backend via the VM operator
 7. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
 8. **[ClickHouse OTel OLAP](./observability/clickhouse/README.md)** - Deployed supplementary OLAP; OTel logs/traces SQL + [Grafana chapter](./observability/clickhouse/README.md#grafana) (dashboard suite, Explore, linking) ([RFC-0019](./proposals/rfc/RFC-0019/))
-9. **[Logging](./observability/logging/README.md)** - Architecture: OTLP app logs (otelzap tee) + Vector for non-instrumented pods, scaling
-10. **[VictoriaLogs](./observability/logging/victorialogs.md)** - VictoriaLogs deployment and configuration
-    - OTLP app-log ingest + Vector for non-instrumented pods (DB/Kong/frontend/infra)
-    - PostgreSQL auto_explain plan parsing pipeline
-    - Verification and troubleshooting
+9. **[Logging](./observability/logging/README.md)** - Platform pipeline: OTLP app logs (otelzap tee) + Vector for non-instrumented pods
+10. **[Application logging](./api/logs.md)** - App-side logging contract (JSON fields, levels, middleware)
+    - Platform ingest ops: [Logging § platform pipeline](./observability/logging/README.md#platform-pipeline)
 
 ### API Reference
 
@@ -355,7 +351,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 #### Observability Pillars
 - [Observability Overview](./observability/README.md) - Master index, 4-pillar architecture, 3-layer service architecture + APM integration
-- [OpenTelemetry guide](./observability/opentelemetry/README.md) - Current OTel policy, architecture, and operations
+- [OpenTelemetry (platform)](./observability/opentelemetry/README.md) - Collector topology, sampling, operations (app policy → [api/observability.md](./api/observability.md))
 - [RFC-0014 explainer](./observability/opentelemetry/rfc-0014-explainer.md) - old client_golang vs new OpenTelemetry (OTLP push), beginner-friendly
 - [Distributed Tracing](./observability/tracing/README.md) - Tempo integration
 - [Tracing Architecture](./observability/tracing/architecture.md) - Triple backend (Tempo + Jaeger + VictoriaTraces)
@@ -364,9 +360,10 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md) - 3rd backend via the VM operator
 - [Continuous Profiling](./observability/profiling/README.md) - Pyroscope setup
 - [ClickHouse learning guide](./observability/clickhouse/README.md) - Planned OLAP; OTel SQL + optional commerce ([RFC-0019](./proposals/rfc/RFC-0019/))
-- [Logging](./observability/logging/README.md) - Architecture: OTLP app logs (otelzap tee) + Vector for non-instrumented pods
-- [Logging Standards](./observability/logging/logging-standards.md) - App-side logging conventions (libraries, levels, JSON fields)
-- [VictoriaLogs](./observability/logging/victorialogs.md) - VictoriaLogs deployment (OTLP app logs + Vector for non-instrumented pods)
+- [Logging (platform)](./observability/logging/README.md) - OTLP app logs + Vector for non-instrumented pods
+- [Application logging](./api/logs.md) - App-side logging contract (libraries, levels, JSON fields)
+- [Application observability](./api/observability.md) - Cross-cutting policy, env, middleware, three-layer spans
+- [Application metrics](./api/metrics.md) · [tracing](./api/tracing.md) · [profiling](./api/profiling.md) · [caching](./api/caching.md) - Per-pillar service contracts
 
 ### API
 
@@ -436,7 +433,8 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 ### Caching
 
-- [Caching (Valkey)](./caching/caching.md) - Cache-Aside, stampede prevention, eviction policies (with tradeoffs), and the distributed-cache concept
+- [Application caching](./api/caching.md) - Cache-Aside contract, stampede prevention, keys, env
+- [Caching (Valkey)](./caching/README.md) - Platform deployment, eviction policies, Kong db1, distributed-cache concept
 
 ### Platform
 

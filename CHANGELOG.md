@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Observability docs standardization**: normative app contracts moved to `docs/api/observability.md`, `logs.md`, `metrics.md`, `tracing.md`, and `profiling.md`; `docs/observability/` keeps platform depth with verbatim dedup replaced by links; removed `logging-standards.md` and `victorialogs.md` (canonical `api/logs.md` and `logging/README.md`); inbound links and `api.md` middleware order (tracing → logging, metrics via otelgin/otelgrpc) updated.
+- **docs/api quick-facts**: hook and Identity tables use three columns (`Attribute | Value | RFC / ADR`) with a **Design record** row (proposal links or `None`).
+- **Caching docs split**: app contract in `docs/api/caching.md`; platform hub `docs/caching/README.md`; removed `docs/caching/caching.md`; fixed `product.md` detail-cache invalidation drift (TTL-bound stale, no reserve/release hook today).
+
 - **grafana-clickhouse-datasource pinned to 4.20.0** (cluster + local-stack; was unpinned "latest"): OTel schema 1.3.0 + auto-detect; datasources gain `logs`/`traces` `otelEnabled` mapping (query builders, Explore, trace↔log links); local-stack collector bumped `0.140.0` → `0.152.0` to match the cluster's OTel logs schema (contrib ≥ 0.151.0 drops `TimestampTime`).
 - **Grafana folders + team-friendly dashboard text**: ClickHouse dashboards grouped into a `ClickHouse` Grafana folder on both environments (local via `foldersFromFilesStructure` + subdirectories, cluster via CR `folder:`); all visible dashboard text rewritten in plain SRE language (no RFC/phase/internal-library jargon); plugin-bundled reference dashboards documented (manual import, not GitOps, wiped on volume recreate).
 - **Fixed stale span enums in *ClickHouse — OTel logs+traces SQL***: exporter ≥ 0.152.0 writes `StatusCode` `Ok`/`Error`/`Unset` and `SpanKind` `Server`/`Client` — the dashboard's `STATUS_CODE_*` filters silently returned 0 errors; replaced in queries and value mappings (both copies).

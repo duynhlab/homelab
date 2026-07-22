@@ -14,11 +14,12 @@ details aggregation.
 | **Temporal** | None · [workflows.md](./workflows.md) | None |
 | **Technical debt** | None | None |
 
-| | |
-|---|---|
-| **Repository** | [`duynhlab/review-service`](https://github.com/duynhlab/review-service) |
-| **Owns** | Product reviews and star ratings (the only writer of the `reviews` table) |
-| **Database** | `review` on `platform-db` (via `platform-db-pooler-rw.platform:5432`) |
+| Attribute | Value | RFC / ADR |
+|-----------|-------|-----------|
+| **Repository** | [`duynhlab/review-service`](https://github.com/duynhlab/review-service) | — |
+| **Owns** | Product reviews and star ratings (the only writer of the `reviews` table) | — |
+| **Database** | `review` on `platform-db` (via `platform-db-pooler-rw.platform:5432`) | — |
+| **Design record** | — | None |
 
 ## Temporal participation
 

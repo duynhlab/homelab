@@ -51,26 +51,14 @@ make it an observability signal rather than a debugging session:
 It is designed to run **always-on in production** at low overhead, turning "profile when
 something breaks" into "the profile is already there when something breaks."
 
-## What Pyroscope can analyze
+> **Service authors:** profile types, `obsx.SetupProfiling()`, env vars,
+> per-service wiring, and span correlation are canonical in
+> [**Application profiling**](../../api/profiling.md). This doc keeps the
+> **platform view** — Pyroscope deployment, storage, Grafana, and runbooks.
 
-`obsx.SetupProfiling()` registers **10 Go profile types**. Each answers a different
-performance question:
-
-| Profile type | pprof source | Answers |
-|---|---|---|
-| `ProfileCPU` | CPU | Which functions burn CPU time? |
-| `ProfileAllocObjects` | alloc | What allocates the most *objects* (GC pressure)? |
-| `ProfileAllocSpace` | alloc | What allocates the most *bytes*? |
-| `ProfileInuseObjects` | heap | What is holding live objects (leaks)? |
-| `ProfileInuseSpace` | heap | What is holding live bytes (resident heap)? |
-| `ProfileGoroutines` | goroutine | Where are goroutines piling up (leaks/stalls)? |
-| `ProfileMutexCount` / `ProfileMutexDuration` | mutex | Where is lock *contention* (count + wait time)? |
-| `ProfileBlockCount` / `ProfileBlockDuration` | block | Where do goroutines *block* (chan/IO/sync)? |
-
-CPU, alloc, and inuse are on by default in the SDK; goroutine, mutex, and block are
-explicitly enabled. The **mutex/block** types additionally require Go runtime sampling
-to be turned on (see [How it works](#how-it-works-in-this-platform)) — without it, those
-four ship empty.
+See [**Application profiling**](../../api/profiling.md) for the client contract
+(profile types table, `initProfiling` gate, mutex/block runtime sampling, and
+`pyroscope.profile.id` on spans).
 
 ## Architecture
 
@@ -109,61 +97,13 @@ horizontal scale — overkill for this platform. Profiles are stored as **blocks
 (Parquet tables + a TSDB index for series + a symbols table) on **object storage**; the
 local PVC only holds the v2 metastore (raft) and scratch, so a pod restart loses nothing.
 
-## How it works in this platform
+## Trace correlation (platform) {#trace-correlation-platform}
 
-**Client (`pkg/obsx/profiling.go`, pkg `v0.18.1`)** — `obsx.SetupProfiling()` wraps the
-`pyroscope-go` SDK (`v1.3.1`; span linking via `otel-profiling-go` `v0.6.0`):
-
-- **Identity** = `OTEL_SERVICE_NAME` → the Pyroscope `service_name` series (the same
-  identity used by traces and metrics, so all three signals join on one name).
-- **Labels** come from `OTEL_RESOURCE_ATTRIBUTES`, with dotted keys underscored (Pyroscope
-  labels can't contain dots): `service.namespace` → `service_namespace`,
-  `deployment.environment` → `deployment_environment`, `service.version` → `service_version`.
-- **Runtime sampling** for mutex/block is enabled **after** a successful start —
-  `runtime.SetMutexProfileFraction(100)` and `runtime.SetBlockProfileRate(100_000_000)`
-  (record blocking events ≥ 100 ms). Setting them only on success avoids paying the
-  overhead when the profiler is misconfigured.
-- **Fail-closed & idempotent** — an empty `PYROSCOPE_ENDPOINT` returns an error instead
-  of silently no-op'ing; startup is guarded by `sync.Once`; the returned shutdown func
-  flushes and stops the profiler on exit.
-
-**Per-service wiring** — every service and worker (10 services + 2 workers) calls the same gate in
-`cmd/main.go`; profiling is a config flag, not bespoke code:
-
-```go
-func initProfiling(cfg *config.Config, logger *zap.Logger) func() {
-    if !cfg.Profiling.Enabled {            // PROFILING_ENABLED=false
-        return func() {}
-    }
-    stop, err := obsx.SetupProfiling()
-    if err != nil {
-        logger.Warn("Failed to initialize profiling", zap.Error(err))
-        return func() {}
-    }
-    logger.Info("Profiling initialized", zap.String("endpoint", cfg.Profiling.Endpoint))
-    return func() { _ = stop(context.Background()) }
-}
-```
-
-**Traces → profiles correlation** — two layers:
-
-1. **Datasource link** (`datasource-tempo.yaml`): the Tempo datasource's `tracesToProfiles`
-   points at the Pyroscope datasource, maps the span's `service.name` → `service_name`, and
-   uses `profileTypeId: process_cpu:cpu:nanoseconds:cpu:nanoseconds`. In a trace, open a span
-   → **Profiles for this span** → CPU flame graph for that service/time window.
-2. **Span-level id** (`obsx.TracerProviderWithProfiles`): wraps the OTel `TracerProvider`
-   with `otel-profiling-go` so spans carry a `pyroscope.profile.id` attribute (CPU profiles
-   are span-scoped; heap/goroutine/mutex/block are service-scoped).
-
-```mermaid
-sequenceDiagram
-    participant Span as Tempo span (slow)
-    participant Graf as Grafana
-    participant Pyro as Pyroscope
-    Span->>Graf: open trace → click span
-    Graf->>Pyro: query service_name + time window<br/>(process_cpu)
-    Pyro-->>Graf: CPU flame graph for that span
-```
+Grafana links Tempo spans to Pyroscope via the datasource config
+(`datasource-tempo.yaml`: `tracesToProfiles` maps `service.name` →
+`service_name`, `profileTypeId: process_cpu:cpu:nanoseconds:cpu:nanoseconds`).
+In Explore → Tempo, open a span → **Profiles for this span** → CPU flame graph
+for that service/time window.
 
 ## What this platform applies
 
@@ -228,17 +168,8 @@ once ingest or query volume outgrows one pod.
 
 ### Enable / disable in a service
 
-On by default. The env is injected by the app ResourceSets (`kubernetes/apps/`) and the
-worker manifest:
-
-| Env | Purpose | Default |
-|-----|---------|---------|
-| `PROFILING_ENABLED` | Toggle | `true` |
-| `PYROSCOPE_ENDPOINT` | Pyroscope server | `http://pyroscope.monitoring.svc.cluster.local:4040` |
-| `OTEL_SERVICE_NAME` | Identity (`service_name`) | service name |
-| `OTEL_RESOURCE_ATTRIBUTES` | `service.namespace` / `deployment.environment` / `service.version` → labels | set by ResourceSet |
-
-Set `PROFILING_ENABLED=false` to opt a service out.
+Per-service env vars and the `PROFILING_ENABLED` toggle:
+[**Application profiling § Configuration**](../../api/profiling.md#configuration).
 
 ### Viewing profiles
 
@@ -249,7 +180,7 @@ Set `PROFILING_ENABLED=false` to opt a service out.
 - **local-stack** — http://localhost:4040 (Pyroscope) and Grafana's Explore → Pyroscope;
   a checkout generates profiles for all services.
 
-### Runbook — profiles not appearing
+### Runbook — profiles not appearing {#troubleshooting}
 
 1. **Flag on?** Check the service env `PROFILING_ENABLED` and its startup log
    `Profiling initialized`.

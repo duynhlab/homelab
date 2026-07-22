@@ -1175,11 +1175,11 @@ queries and reading guides live with their metric documentation:
 - **🔗 gRPC East-West (RED)** — 3 lines, each pairing one signal **Server | Client**
   (RPS, error rate, P95 on `rpc_{server,client}_call_duration_seconds`).
   **🔗 Per Callee** — RPS | error-ratio + full-width P95 per callee.
-  See [metrics-apps → gRPC instrumentation](../metrics/metrics-apps.md#grpc-instrumentation-east-west).
+  See [metrics-apps → gRPC instrumentation](../metrics/../../api/metrics.md#grpc-instrumentation-east-west).
 - **🗄️ Database (client — otelpgx)** — query p95 by service/op
   (`db_client_operation_duration_seconds`, DB-scale buckets since pkg v0.24.0),
   operation errors, pool in-flight/saturation/contention (`pgxpool_*`).
-  See [metrics-apps → DB client metrics](../metrics/metrics-apps.md#db-client-metrics-otelpgx)
+  See [metrics-apps → DB client metrics](../metrics/../../api/metrics.md#db-client-metrics-otelpgx)
   and the four `DBClient*`/`PgxPool*` alerts in the
   [alert catalog](../alerting/alert-catalog.md#1-microservices-red-metrics).
 

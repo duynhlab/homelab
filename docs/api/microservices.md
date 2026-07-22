@@ -1,11 +1,12 @@
 # Microservices Catalog
 
-| | |
-|---|---|
-| **Status** | Living reference — the **understanding-the-system** catalog |
-| **Covers** | Per-service feature matrix (feature → API → technique → status) and data ownership |
-| **Related** | [api.md](api.md) (shared conventions, topology, call graph) · [workflows.md](workflows.md) · [service contracts](README.md#service-contracts) |
-| **Area hub** | [docs/api/README.md](README.md) |
+| Attribute | Value | RFC / ADR |
+|-----------|-------|-----------|
+| **Status** | Living reference — the **understanding-the-system** catalog | — |
+| **Covers** | Per-service feature matrix (feature → API → technique → status) and data ownership | — |
+| **Related** | [api.md](api.md) (shared conventions, topology, call graph) · [workflows.md](workflows.md) · [service contracts](README.md#service-contracts) | — |
+| **Area hub** | [docs/api/README.md](README.md) | — |
+| **Design record** | — | None |
 
 This document is the **understanding-the-system** reference. It does **not**
 restate every endpoint (see the [service contract index](api.md#service-contract-index));
@@ -92,7 +93,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
-| **Catalog list/read** | `GET /product/v1/public/products`, `GET /product/v1/public/products/:id` | cache-aside (Valkey): SETNX stampede lock (5 s TTL, token compare-and-delete release), TTL jitter 0–10 %, SCAN-based list invalidation; whitelisted sort/filter (injection-safe) | Valkey | Implemented | [caching](../caching/caching.md) |
+| **Catalog list/read** | `GET /product/v1/public/products`, `GET /product/v1/public/products/:id` | cache-aside (Valkey): SETNX stampede lock (5 s TTL, token compare-and-delete release), TTL jitter 0–10 %, SCAN-based list invalidation; whitelisted sort/filter (injection-safe) | Valkey | Implemented | [caching](./caching.md) |
 | **Product-details aggregation** | `GET /product/v1/public/products/:id/details` | server-side aggregation: reviews via gRPC `ReviewService.GetProductReviews` (3 s deadline, soft-fail → `[]`) + stock + related | review | Implemented | [API call graph](api.md#current-east-west-call-graph) |
 | **Stock reservation** (saga step) | internal gRPC `ProductService.ReserveStock` / `ReleaseStock` | ledger-backed reservation, idempotent by `reservation_id` (= order id); insufficient stock → `FailedPrecondition` | caller: order-worker | Implemented | [temporal saga](temporal-order-fulfillment.md) |
 | **Checkout batch read** | internal gRPC `ProductService.GetProducts` | cache-bypassing price/stock batch (product = checkout price authority); int64 minor units; unknown ids omitted | caller: checkout | Implemented (RFC-0015 P1) | [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) |
@@ -217,7 +218,7 @@ is never browser-facing.**
 | **RS256 JWT + JWKS** | Stateless identity — no per-request auth hop | Mint: auth. Verify locally via `pkg/authmw`: user, cart, order, review, notification, payment, checkout | RFC-0009, [API auth model](api.md#authentication) |
 | **Rotating refresh tokens** | Long-lived sessions without long-lived access tokens; reuse detection | auth (sha256 at rest, family revoke) | — |
 | **Temporal saga** | All-or-nothing multi-service checkout with compensations | order (+ `order-worker`); participants: product, shipping, payment, notification, cart | [Temporal Saga and 2PC](temporal-order-fulfillment.md) |
-| **Cache-aside (Valkey)** | Read-heavy hot paths | product (SETNX stampede lock, TTL jitter, SCAN invalidation) | [caching](../caching/caching.md) |
+| **Cache-aside (Valkey)** | Read-heavy hot paths | product (SETNX stampede lock, TTL jitter, SCAN invalidation) | [caching](./caching.md) |
 | **Transactional outbox** | Reliable side-effects with the DB write (no dual-write gap) | payment (single-writer relay) | ADR-007 |
 | **Reconciliation** | Detect provider/ledger drift | payment (ticker + internal trigger API, flag-gated auto-heal) | ADR-011/012 |
 | **Webhook HMAC** | Authenticating an unauthenticated public caller | payment ← mockpay | RFC-0010 |

@@ -242,7 +242,7 @@ the trace-sampling decision. See [RFC-0019](../proposals/rfc/RFC-0019/) and
 ## References
 
 - [Observability hub](README.md) · [OpenTelemetry](opentelemetry/README.md) · [Metrics](metrics/README.md)
-- [VictoriaMetrics stack](metrics/victoriametrics.md) · [VictoriaLogs](logging/victorialogs.md) · [Tracing](tracing/architecture.md)
+- [VictoriaMetrics stack](metrics/victoriametrics.md) · [VictoriaLogs](logging/README.md#platform-pipeline) · [Tracing](tracing/architecture.md)
 - [Alert catalog](alerting/alert-catalog.md) · [SLO](slo/README.md)
 - [RFC-0014](../proposals/rfc/RFC-0014/) (OTel adoption) · [RFC-0019](../proposals/rfc/RFC-0019/) (ClickHouse)
 

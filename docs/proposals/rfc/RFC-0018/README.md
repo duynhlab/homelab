@@ -379,7 +379,7 @@ Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram w
 | [`docs/databases/003-operator-comparison.md`](../../../databases/003-operator-comparison.md) | 3-cluster table |
 | [`docs/databases/009-extensions.md`](../../../databases/009-extensions.md) | platform-db row |
 | [`docs/observability/metrics/postgresql/custom-metrics.md`](../../../observability/metrics/postgresql/custom-metrics.md) | PodMonitor paths |
-| [`docs/observability/logging/victorialogs.md`](../../../observability/logging/victorialogs.md) | pgaudit clusters |
+| [`docs/observability/logging/README.md#platform-pipeline`](../../../observability/logging/README.md#platform-pipeline) | pgaudit clusters |
 | [`docs/observability/metrics/victoriametrics.md`](../../../observability/metrics/victoriametrics.md) | VMRule dirs |
 
 ### P2 — RFC/ADR supersession banners (no history rewrite)

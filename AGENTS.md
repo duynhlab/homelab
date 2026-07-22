@@ -292,7 +292,7 @@ platform/Kong docs + the service repo.
 - Read [`docs/api/README.md` learning path](docs/api/README.md#recommended-learning-path) before API-facing homelab edits.
 - Kong/NetworkPolicy/ingress changes → verify against the owning [`docs/api/{service}.md`](docs/api/README.md#service-contracts) + [`api.md` edge exposure](docs/api/api.md#edge-exposure).
 - Cross-service topology → [`api.md` call graph](docs/api/api.md#current-east-west-call-graph) only (not duplicated in `microservices.md` for graph ownership).
-- Caching → [`docs/caching/caching.md`](docs/caching/caching.md) (platform area, not an API contract).
+- Caching app contract → [`docs/api/caching.md`](docs/api/caching.md); platform ops → [`docs/caching/README.md`](docs/caching/README.md).
 
 **Domain labels in homelab:** ResourceSet domains are `identity`, `catalog`,
 `checkout`, and `comms` (`platform.duynhlab.dev/domain` on
@@ -402,7 +402,7 @@ reference style.
 | Databases | [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) |
 | Secrets | [`docs/secrets/README.md`](docs/secrets/README.md), [`docs/secrets/openbao.md`](docs/secrets/openbao.md) |
 | Kong gateway | [`docs/platform/kong-gateway.md`](docs/platform/kong-gateway.md) |
-| Caching | [`docs/caching/caching.md`](docs/caching/caching.md) |
+| Caching | [`docs/api/caching.md`](docs/api/caching.md) · [`docs/caching/README.md`](docs/caching/README.md) |
 | Alerts catalog | [`docs/observability/alerting/alert-catalog.md`](docs/observability/alerting/alert-catalog.md) |
 | Proposals (RFC/ADR) | [`docs/proposals/`](docs/proposals/) |
 | Repos | [`docs/README.md` § Repositories](docs/README.md#repositories) |

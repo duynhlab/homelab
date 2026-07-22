@@ -2,9 +2,9 @@
 
 OpenTelemetry is the common language every service, worker, and Kong use to describe
 "what just happened" during a request. This doc explains it from zero, shows
-how this platform uses it today, and — since [RFC-0014](../../proposals/rfc/RFC-0014/README.md)
-— is the **authoritative instrumentation policy page**: the invariants every
-service and PR must respect.
+how this platform uses it today (Collector topology, sampling, operations).
+**Service instrumentation policy** (normative rules for PRs) lives in
+[**Application observability**](../../api/observability.md).
 
 ## Quick facts
 
@@ -28,7 +28,7 @@ RFC, which remains the historical decision and rollout record.
 | Goal | Start here |
 |------|------------|
 | Build the mental model from zero | [RFC-0014 explainer](rfc-0014-explainer.md) |
-| Review rules for service code and PRs | [Platform instrumentation policy](#platform-instrumentation-policy-rfc-0014--normative) |
+| Review rules for service code and PRs | [Application observability](../../api/observability.md) |
 | Understand the deployed signal paths | [How it works in this platform](#how-it-works-in-this-platform) |
 | Operate or troubleshoot export | [Operations](#operations) |
 | Read the decision and rollout history | [RFC-0014](../../proposals/rfc/RFC-0014/) |
@@ -106,56 +106,11 @@ about and keeps backend changes out of service code.
 
 ## Platform instrumentation policy (RFC-0014 — normative)
 
-These are the rules; PRs that violate them get rejected. Rationale lives in
-[RFC-0014](../../proposals/rfc/RFC-0014/README.md).
+> **Canonical location:** [Application observability](../../api/observability.md)
+> — rules 1–10, middleware order, env table, three-layer spans, and correlation
+> fields. This section is not duplicated here.
 
-1. **One wiring point.** Services call `obsx.SetupObservability(ctx, cfg)`
-   once in `main()` and defer its `Shutdown`. No service builds an OTel
-   provider, exporter, or resource by hand.
-
-   ```go
-   obs, err := obsx.SetupObservability(ctx, obsx.ConfigFromEnv())
-   if err != nil { /* fail startup */ }
-   defer obs.Shutdown(shutdownCtx)
-
-   // logs (when OTEL_LOGS_ENABLED): tee next to the stdout core —
-   // ZapCore is level-gated and never nil, so the tee is unconditional.
-   logger := zap.New(zapcore.NewTee(stdoutCore, obs.ZapCore(serviceName, zapcore.InfoLevel)))
-   ```
-
-2. **client_golang is retired.** No `prometheus.*`/`promauto` instruments in
-   app code — metrics use the OTel Meter API with semconv names. The old
-   `middleware/prometheus.go` and its `/metrics` scrape endpoint were removed
-   at the RFC-0014 P3 cutover.
-3. **Semconv v1.41 is pinned** in `pkg/obsx`; the (SDK, contrib, semconv)
-   triple bumps only as a deliberate pkg release with its integration test.
-4. **Never set `OTEL_SEMCONV_STABILITY_OPT_IN`.** Any value containing `rpc`
-   silently renames `rpc_*` metrics to the legacy milliseconds form and
-   breaks every consumer.
-5. **The Views are law.** `http.server.request.duration` carries the platform
-   13-bucket set `{0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1, 2, 5, 10}`
-   (keeps the 0.2/0.3/0.75 SLO points and the `le=2` Apdex bound that semconv
-   defaults lack); `body.size` histograms use the byte set; `rpc.client.call.duration`
-   drops `server.address`/`server.port` (pod-IP churn). Changing a bucket is
-   an RFC-level decision, not a service PR.
-6. **Rollout flags are now ON fleet-wide.** `OTEL_METRICS_ENABLED` /
-   `OTEL_LOGS_ENABLED` completed their canary-first, per-service rollout at the
-   P3/P4 cutovers and are enabled fleet-wide (set via the shared svc-env
-   anchor). They remain as per-service kill switches; flipping one *off* is an
-   incident action, tracked against the RFC-0014
-   [tracking table](../../proposals/rfc/RFC-0014/tracking.md).
-7. **Export interval is 15 s** (`OTEL_METRIC_EXPORT_INTERVAL_SECONDS`) — it
-   matches the historical scrape interval so burn-rate math never shifted.
-   Don't "optimize" it to the SDK's 60 s default.
-8. **No secrets/PII in labels or resource attributes.** Label values surface
-   in dashboards, alerts and URLs; `OTEL_RESOURCE_ATTRIBUTES` values become
-   labels on every signal (the vmagent allowlist is the backstop, not an
-   excuse).
-9. **Health and reflection RPCs are not telemetry.** `pkg/grpcx` filters them
-   from spans and metrics; don't work around it.
-10. **Cardinality backstop**: the SDK's 2000-attribute-set limit per
-    instrument stays on; an `otel.metric.overflow` datapoint is an alert, not
-    noise.
+Rationale and rollout history: [RFC-0014](../../proposals/rfc/RFC-0014/README.md).
 
 ## How it works in this platform
 
@@ -272,27 +227,8 @@ sampling *complete* — a trace Kong keeps is kept whole downstream. Details in
 
 ## Operations
 
-Env vars read by `obsx.ConfigFromEnv` (injected by the app ResourceSets,
-`kubernetes/apps/domains/*-rs.yaml`,
-`kubernetes/apps/order-worker.yaml`, and
-`kubernetes/apps/checkout-worker.yaml`):
-
-| Env | `pkg/obsx` default / deployed override | Meaning |
-|-----|----------------------------------------|---------|
-| `OTEL_COLLECTOR_ENDPOINT` | Cluster DNS `:4318`; local overrides to `otel-collector:4318` | OTLP/HTTP target for all signals |
-| `OTEL_SERVICE_NAME` / `SERVICE_NAME` | — | Authoritative `service.name` |
-| `SERVICE_VERSION` | — | semconv `service.version` |
-| `K8S_NAMESPACE_NAME`, `K8S_POD_NAME` | Downward API | semconv k8s identity on the Resource |
-| `DEPLOYMENT_ENVIRONMENT` | — | semconv `deployment.environment.name` |
-| `TRACING_ENABLED` | `true` | Traces kill switch per service |
-| `OTEL_SAMPLE_RATE` | `0.1`; local overrides to `1.0` | Head-sampling ratio for root decisions |
-| `OTEL_METRICS_ENABLED` | **`true`** | OTLP metrics + runtime instrumentation — on fleet-wide since the RFC-0014 P3 cutover (kept as a kill switch) |
-| `OTEL_LOGS_ENABLED` | `false` in `pkg`; deployed manifests set `true` | otelzap → OTLP logs, on fleet-wide since RFC-0014 P4 |
-| `OTEL_METRIC_EXPORT_INTERVAL_SECONDS` | `15` | PeriodicReader interval (policy #7). **Not injected by the ResourceSets** — this is the `pkg/obsx` built-in default; override it only by setting the env var explicitly. |
-
-Note: `OTEL_COLLECTOR_ENDPOINT` and `OTEL_SAMPLE_RATE` are platform names read
-by `obsx`, not the standard SDK vars (`OTEL_EXPORTER_OTLP_ENDPOINT`,
-`OTEL_TRACES_SAMPLER_ARG`).
+Environment variables read by `obsx.ConfigFromEnv`: see
+[Application observability § Environment variables](../../api/observability.md#environment-variables).
 
 Quick verification:
 
@@ -308,6 +244,6 @@ Quick verification:
 ## References
 
 - Official: [opentelemetry.io/docs/concepts](https://opentelemetry.io/docs/concepts/) · [Go SDK](https://opentelemetry.io/docs/languages/go/) · [versioning & stability](https://opentelemetry.io/docs/specs/otel/versioning-and-stability/) · [Collector](https://opentelemetry.io/docs/collector/) · [sampling](https://opentelemetry.io/docs/concepts/sampling/) · [VictoriaMetrics OTel](https://docs.victoriametrics.com/victoriametrics/integrations/opentelemetry/) · [VictoriaLogs OTel](https://docs.victoriametrics.com/victorialogs/data-ingestion/opentelemetry/)
-- In-house: [RFC-0014 explainer](rfc-0014-explainer.md) (old-vs-new, beginner) · [RFC-0014](../../proposals/rfc/RFC-0014/README.md) (design record + tracking) · [tracing/README.md](../tracing/README.md) · [tracing/architecture.md](../tracing/architecture.md) · [logging/README.md](../logging/README.md) · [metrics/streaming-aggregation.md](../metrics/streaming-aggregation.md) · [../platform/kong-gateway.md](../../platform/kong-gateway.md)
+- In-house: [Application observability](../../api/observability.md) · [RFC-0014 explainer](rfc-0014-explainer.md) (old-vs-new, beginner) · [RFC-0014](../../proposals/rfc/RFC-0014/README.md) (design record + tracking) · [tracing/README.md](../tracing/README.md) · [tracing/architecture.md](../tracing/architecture.md) · [logging/README.md](../logging/README.md) · [metrics/streaming-aggregation.md](../metrics/streaming-aggregation.md) · [../platform/kong-gateway.md](../../platform/kong-gateway.md)
 
 _Last updated: 2026-07-14 — moved into the OpenTelemetry area; verified SDK, protocol, worker coverage, environment differences, and checkout rollout history._

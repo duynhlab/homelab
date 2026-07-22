@@ -13,7 +13,7 @@ flowchart LR
 ```
 
 > Reference (endpoints, stream fields, sinks, config):
-> [`observability/logging/victorialogs.md`](../logging/victorialogs.md).
+> [Logging (platform pipeline)](../logging/README.md#platform-pipeline).
 
 ---
 
@@ -60,7 +60,7 @@ kubectl logs -n kube-system -l app.kubernetes.io/name=vector --tail=100 | grep -
 **Common Vector errors:**
 - `connection refused` → VictoriaLogs not ready or wrong endpoint
 - `429 / rate limit` → ingestion backpressure; check VLSingle resources
-- `400 bad request` → malformed `VL-*` headers (see victorialogs.md → Vector Sink Headers)
+- `400 bad request` → malformed `VL-*` headers (see [Logging § Vector sink headers](../logging/README.md#platform-pipeline))
 
 The three sinks are `victorialogs_all`, `victorialogs_pg_plans`,
 `victorialogs_pg_parse_failures` — all HTTP to `/insert/jsonline`.
@@ -143,7 +143,7 @@ flux get kustomizations -A | grep -E "logging|monitoring|vector"
 
 ## Related
 
-- [VictoriaLogs backend](../logging/victorialogs.md) — full reference
+- [Logging (platform pipeline)](../logging/README.md#platform-pipeline) — full reference
 - [Structured Logging overview](../logging/README.md)
 - LogsQL: https://docs.victoriametrics.com/victorialogs/logsql/
 

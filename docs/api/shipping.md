@@ -12,12 +12,12 @@ Shipping turns "an order that must move" into a tracked shipment — and turns "
 | **Temporal** | Participant (gRPC) · [workflows.md](./workflows.md#order-fulfillment) | Implemented |
 | **Technical debt** | Pre-v3 aliases (ADR-017) · [Known gaps](#known-gaps) | Technical debt |
 
-| | |
-|---|---|
-| **Repository** | [`duynhlab/shipping-service`](https://github.com/duynhlab/shipping-service) |
-| **Owns** | Shipments, tracking numbers, shipment status, and the quote rate table (static, in-code) |
-| **Database** | `shipping` on `platform-db` via `platform-db-pooler-rw.platform:5432` |
-| **Design record** | [RFC-0003](../proposals/rfc/RFC-0003/) (saga participant) · [RFC-0015](../proposals/rfc/RFC-0015/) (quote authority, P3) |
+| Attribute | Value | RFC / ADR |
+|-----------|-------|-----------|
+| **Repository** | [`duynhlab/shipping-service`](https://github.com/duynhlab/shipping-service) | — |
+| **Owns** | Shipments, tracking numbers, shipment status, and the quote rate table (static, in-code) | — |
+| **Database** | `shipping` on `platform-db` via `platform-db-pooler-rw.platform:5432` | — |
+| **Design record** | — | [RFC-0003](../proposals/rfc/RFC-0003/) (saga participant) · [RFC-0015](../proposals/rfc/RFC-0015/) (quote authority, P3) |
 
 ## Temporal participation
 

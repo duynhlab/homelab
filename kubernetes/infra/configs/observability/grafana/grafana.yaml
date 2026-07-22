@@ -32,7 +32,7 @@ spec:
             name: grafana
             env:
             - name: GF_INSTALL_PLUGINS
-              value: "https://github.com/VictoriaMetrics/victoriametrics-datasource/releases/download/v0.25.2/victoriametrics-metrics-datasource-v0.25.2.zip;victoriametrics-metrics-datasource,https://github.com/VictoriaMetrics/victorialogs-datasource/releases/download/v0.29.0/victoriametrics-logs-datasource-v0.29.0.zip;victoriametrics-logs-datasource,grafana-clickhouse-datasource"
+              value: "https://github.com/VictoriaMetrics/victoriametrics-datasource/releases/download/v0.25.2/victoriametrics-metrics-datasource-v0.25.2.zip;victoriametrics-metrics-datasource,https://github.com/VictoriaMetrics/victorialogs-datasource/releases/download/v0.29.0/victoriametrics-logs-datasource-v0.29.0.zip;victoriametrics-logs-datasource,grafana-clickhouse-datasource 4.20.0"
             resources:
               limits:
                 # 300m: 100m throttled continuously (KubePodCPUThrottlingHigh).

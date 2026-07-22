@@ -1,0 +1,1918 @@
+{
+  "uid": "clickhouse-service-deepdive",
+  "title": "ClickHouse — Service deep dive",
+  "description": "Per-service drill-down over OpenTelemetry logs and traces in ClickHouse. Fleet-wide view: 'ClickHouse — OTel logs+traces SQL'.",
+  "tags": [
+    "clickhouse",
+    "observability",
+    "otel",
+    "logs",
+    "traces",
+    "deep-dive"
+  ],
+  "editable": true,
+  "graphTooltip": 1,
+  "liveNow": false,
+  "schemaVersion": 38,
+  "version": 1,
+  "style": "dark",
+  "time": {
+    "from": "now-3h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "timepicker": {},
+  "refresh": "30s",
+  "links": [],
+  "annotations": {
+    "list": []
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "ds",
+        "type": "datasource",
+        "label": "Data source",
+        "query": "grafana-clickhouse-datasource",
+        "current": {
+          "text": "ClickHouse",
+          "value": "clickhouse"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "refresh": 1,
+        "regex": ""
+      },
+      {
+        "name": "service",
+        "type": "query",
+        "label": "Service",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "${ds}"
+        },
+        "definition": "SELECT DISTINCT ServiceName FROM otel.otel_traces ORDER BY ServiceName",
+        "query": {
+          "refId": "A",
+          "rawSql": "SELECT DISTINCT ServiceName FROM otel.otel_traces ORDER BY ServiceName",
+          "format": 1,
+          "queryType": "table"
+        },
+        "current": {
+          "text": "product",
+          "value": "product"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "refresh": 2,
+        "sort": 1
+      },
+      {
+        "name": "severity",
+        "type": "custom",
+        "label": "Log severity",
+        "query": "debug,info,warn,error",
+        "options": [],
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "refresh": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Overview — $service",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Request rate (server spans)",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT count()/(toUnixTimestamp($__toTime) - toUnixTimestamp($__fromTime)) AS rps FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SpanKind = 'Server'",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Error rate",
+      "description": "",
+      "gridPos": {
+        "x": 5,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT 100.0*countIf(StatusCode = 'Error')/count() AS err_pct FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SpanKind = 'Server'",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "p95 latency (server spans)",
+      "description": "",
+      "gridPos": {
+        "x": 10,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT round(quantile(0.95)(Duration)/1e6, 1) AS p95_ms FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SpanKind = 'Server'",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Error+ logs",
+      "description": "",
+      "gridPos": {
+        "x": 15,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT count() AS error_logs FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SeverityNumber >= 17",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 50
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Distinct operations",
+      "description": "",
+      "gridPos": {
+        "x": 20,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT uniqExact(SpanName) AS ops FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SpanKind IN ('Server','Internal')",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 7,
+      "type": "row",
+      "title": "Traffic & latency",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Request rate by operation",
+      "description": "Server spans bucketed over time, one line per operation (route or RPC).",
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, SpanName, count() AS calls FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SpanKind = 'Server' GROUP BY time, SpanName ORDER BY time",
+          "format": 0,
+          "queryType": "timeseries",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "fillOpacity": 18,
+            "showPoints": "never",
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Latency percentiles (server spans)",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 6,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, round(quantile(0.50)(Duration)/1e6,2) AS p50_ms, round(quantile(0.95)(Duration)/1e6,2) AS p95_ms, round(quantile(0.99)(Duration)/1e6,2) AS p99_ms FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SpanKind = 'Server' GROUP BY time ORDER BY time",
+          "format": 0,
+          "queryType": "timeseries",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "fillOpacity": 18,
+            "showPoints": "never",
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Error rate over time",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, 100.0*countIf(StatusCode = 'Error')/count() AS err_pct FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SpanKind = 'Server' GROUP BY time ORDER BY time",
+          "format": 0,
+          "queryType": "timeseries",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "fillOpacity": 18,
+            "showPoints": "never",
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Log volume by severity",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, SeverityText, count() AS lines FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} GROUP BY time, SeverityText ORDER BY time",
+          "format": 0,
+          "queryType": "timeseries",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "fillOpacity": 18,
+            "showPoints": "never",
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*error.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*warn.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*info.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "row",
+      "title": "HTTP endpoints",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 13,
+      "type": "table",
+      "title": "Routes — calls, 5xx, latency",
+      "description": "HTTP server spans grouped by method and route (attributes: http.request.method, http.route, http.response.status_code).",
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 14,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT SpanAttributes['http.request.method'] AS method, SpanAttributes['http.route'] AS route, count() AS calls, countIf(toUInt16OrZero(SpanAttributes['http.response.status_code']) >= 500) AS resp_5xx, round(quantile(0.95)(Duration)/1e6,2) AS p95_ms FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SpanKind = 'Server' AND mapContains(SpanAttributes, 'http.request.method') GROUP BY method, route ORDER BY calls DESC LIMIT 20",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p95_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 100
+                    },
+                    {
+                      "color": "red",
+                      "value": 500
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Status classes",
+      "description": "",
+      "gridPos": {
+        "x": 14,
+        "y": 23,
+        "w": 10,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, concat(toString(intDiv(toUInt16OrZero(SpanAttributes['http.response.status_code']), 100)), 'xx') AS class, count() AS c FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SpanKind = 'Server' AND mapContains(SpanAttributes, 'http.response.status_code') GROUP BY time, class ORDER BY time",
+          "format": 0,
+          "queryType": "timeseries",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "fillOpacity": 18,
+            "showPoints": "never",
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*5xx.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*4xx.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*2xx.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "row",
+      "title": "gRPC methods",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 16,
+      "type": "table",
+      "title": "RPCs served — calls, errors, latency",
+      "description": "gRPC server spans. rpc.method holds the full package.Service/Method; health checks and reflection are excluded.",
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 14,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT splitByChar('/', SpanAttributes['rpc.method'])[1] AS rpc_service, splitByChar('/', SpanAttributes['rpc.method'])[2] AS rpc, count() AS calls, countIf(StatusCode = 'Error') AS errors, round(quantile(0.95)(Duration)/1e6,2) AS p95_ms FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SpanKind = 'Server' AND mapContains(SpanAttributes, 'rpc.method') GROUP BY rpc_service, rpc ORDER BY calls DESC LIMIT 20",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p95_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 50
+                    },
+                    {
+                      "color": "red",
+                      "value": 200
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "gRPC rate by method",
+      "description": "",
+      "gridPos": {
+        "x": 14,
+        "y": 32,
+        "w": 10,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, splitByChar('/', SpanAttributes['rpc.method'])[2] AS rpc, count() AS calls FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SpanKind = 'Server' AND mapContains(SpanAttributes, 'rpc.method') GROUP BY time, rpc ORDER BY time",
+          "format": 0,
+          "queryType": "timeseries",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "fillOpacity": 18,
+            "showPoints": "never",
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": "row",
+      "title": "Dependencies (east-west)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 19,
+      "type": "table",
+      "title": "Who calls $service",
+      "description": "Client spans from other services whose rpc.method targets this service's proto package (<service>.v1.*).",
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT ServiceName AS caller, SpanAttributes['rpc.method'] AS rpc, count() AS calls, countIf(StatusCode = 'Error') AS errors, round(quantile(0.95)(Duration)/1e6,2) AS p95_ms FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND SpanKind = 'Client' AND ServiceName != ${service:singlequote} AND SpanAttributes['rpc.method'] LIKE '${service:raw}.v1.%' GROUP BY caller, rpc ORDER BY calls DESC LIMIT 20",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p95_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 50
+                    },
+                    {
+                      "color": "red",
+                      "value": 200
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": "table",
+      "title": "What $service calls",
+      "description": "Outbound client spans of this service: gRPC callees named by proto package; database/cache clients show as postgresql / redis.",
+      "gridPos": {
+        "x": 12,
+        "y": 41,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT multiIf(mapContains(SpanAttributes, 'rpc.method'), splitByChar('.', SpanAttributes['rpc.method'])[1], mapContains(SpanAttributes, 'db.system.name'), SpanAttributes['db.system.name'], mapContains(SpanAttributes, 'db.system'), SpanAttributes['db.system'], 'other') AS callee, if(mapContains(SpanAttributes, 'rpc.method'), SpanAttributes['rpc.method'], SpanName) AS operation, count() AS calls, countIf(StatusCode = 'Error') AS errors, round(quantile(0.95)(Duration)/1e6,2) AS p95_ms FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SpanKind = 'Client' GROUP BY callee, operation ORDER BY calls DESC LIMIT 20",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p95_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 50
+                    },
+                    {
+                      "color": "red",
+                      "value": 200
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": "row",
+      "title": "Slow & failing — click a TraceId to open the trace",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 49,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 22,
+      "type": "table",
+      "title": "Slowest server spans",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 50,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT Timestamp, TraceId, SpanName, round(Duration/1e6,2) AS ms, StatusCode FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SpanKind = 'Server' ORDER BY Duration DESC LIMIT 20",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TraceId"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open trace spans in Explore",
+                    "url": "/explore?schemaVersion=1&panes=%7B%22dd1%22:%7B%22datasource%22:%22clickhouse%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22datasource%22:%7B%22type%22:%22grafana-clickhouse-datasource%22,%22uid%22:%22clickhouse%22%7D,%22editorType%22:%22sql%22,%22format%22:1,%22queryType%22:%22table%22,%22pluginVersion%22:%224.20.0%22,%22rawSql%22:%22SELECT%20Timestamp,%20ServiceName,%20SpanName,%20SpanKind,%20StatusCode,%20round(Duration/1e6,2)%20AS%20ms,%20SpanAttributes%20FROM%20otel.otel_traces%20WHERE%20TraceId%20=%20%27${__value.raw}%27%20ORDER%20BY%20Timestamp%20ASC%20LIMIT%20200%22%7D%5D,%22range%22:%7B%22from%22:%22${__from}%22,%22to%22:%22${__to}%22%7D%7D%7D",
+                    "targetBlank": true
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 260
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 100
+                    },
+                    {
+                      "color": "red",
+                      "value": 500
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 23,
+      "type": "table",
+      "title": "Recent error spans",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 50,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT Timestamp, TraceId, SpanName, SpanKind, round(Duration/1e6,2) AS ms FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND StatusCode = 'Error' ORDER BY Timestamp DESC LIMIT 20",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TraceId"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open trace spans in Explore",
+                    "url": "/explore?schemaVersion=1&panes=%7B%22dd1%22:%7B%22datasource%22:%22clickhouse%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22datasource%22:%7B%22type%22:%22grafana-clickhouse-datasource%22,%22uid%22:%22clickhouse%22%7D,%22editorType%22:%22sql%22,%22format%22:1,%22queryType%22:%22table%22,%22pluginVersion%22:%224.20.0%22,%22rawSql%22:%22SELECT%20Timestamp,%20ServiceName,%20SpanName,%20SpanKind,%20StatusCode,%20round(Duration/1e6,2)%20AS%20ms,%20SpanAttributes%20FROM%20otel.otel_traces%20WHERE%20TraceId%20=%20%27${__value.raw}%27%20ORDER%20BY%20Timestamp%20ASC%20LIMIT%20200%22%7D%5D,%22range%22:%7B%22from%22:%22${__from}%22,%22to%22:%22${__to}%22%7D%7D%7D",
+                    "targetBlank": true
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 260
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 100
+                    },
+                    {
+                      "color": "red",
+                      "value": 500
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 24,
+      "type": "row",
+      "title": "Logs",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 58,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 25,
+      "type": "table",
+      "title": "Recent logs",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 59,
+        "w": 24,
+        "h": 10
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT Timestamp, SeverityText, Body, TraceId, LogAttributes['path'] AS path, LogAttributes['status'] AS status, LogAttributes['code'] AS grpc_code, LogAttributes['duration'] AS duration FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND $__conditionalAll(SeverityText IN (${severity:singlequote}), $severity) ORDER BY Timestamp DESC LIMIT 100",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SeverityText"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "error": {
+                        "color": "red",
+                        "index": 0
+                      },
+                      "fatal": {
+                        "color": "red",
+                        "index": 1
+                      },
+                      "warn": {
+                        "color": "yellow",
+                        "index": 2
+                      },
+                      "info": {
+                        "color": "text",
+                        "index": 3
+                      },
+                      "debug": {
+                        "color": "blue",
+                        "index": 4
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TraceId"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open trace spans in Explore",
+                    "url": "/explore?schemaVersion=1&panes=%7B%22dd1%22:%7B%22datasource%22:%22clickhouse%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22datasource%22:%7B%22type%22:%22grafana-clickhouse-datasource%22,%22uid%22:%22clickhouse%22%7D,%22editorType%22:%22sql%22,%22format%22:1,%22queryType%22:%22table%22,%22pluginVersion%22:%224.20.0%22,%22rawSql%22:%22SELECT%20Timestamp,%20ServiceName,%20SpanName,%20SpanKind,%20StatusCode,%20round(Duration/1e6,2)%20AS%20ms,%20SpanAttributes%20FROM%20otel.otel_traces%20WHERE%20TraceId%20=%20%27${__value.raw}%27%20ORDER%20BY%20Timestamp%20ASC%20LIMIT%20200%22%7D%5D,%22range%22:%7B%22from%22:%22${__from}%22,%22to%22:%22${__to}%22%7D%7D%7D",
+                    "targetBlank": true
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 260
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Body"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 26,
+      "type": "table",
+      "title": "Top error messages",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 69,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT Body, count() AS occurrences, max(Timestamp) AS last_seen FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SeverityNumber >= 17 GROUP BY Body ORDER BY occurrences DESC LIMIT 15",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 27,
+      "type": "table",
+      "title": "Error traces with correlated logs (cross-signal JOIN)",
+      "description": "One store, one JOIN: each failing trace with how many log lines it correlates to.",
+      "gridPos": {
+        "x": 12,
+        "y": 69,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT t.TraceId AS TraceId, any(t.SpanName) AS operation, round(max(t.Duration)/1e6,2) AS ms, count(DISTINCT l.Timestamp) AS log_lines FROM otel.otel_traces t ANY LEFT JOIN otel.otel_logs l ON t.TraceId = l.TraceId WHERE $__timeFilter(t.Timestamp) AND t.ServiceName = ${service:singlequote} AND t.StatusCode = 'Error' GROUP BY t.TraceId ORDER BY ms DESC LIMIT 15",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TraceId"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open trace spans in Explore",
+                    "url": "/explore?schemaVersion=1&panes=%7B%22dd1%22:%7B%22datasource%22:%22clickhouse%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22datasource%22:%7B%22type%22:%22grafana-clickhouse-datasource%22,%22uid%22:%22clickhouse%22%7D,%22editorType%22:%22sql%22,%22format%22:1,%22queryType%22:%22table%22,%22pluginVersion%22:%224.20.0%22,%22rawSql%22:%22SELECT%20Timestamp,%20ServiceName,%20SpanName,%20SpanKind,%20StatusCode,%20round(Duration/1e6,2)%20AS%20ms,%20SpanAttributes%20FROM%20otel.otel_traces%20WHERE%20TraceId%20=%20%27${__value.raw}%27%20ORDER%20BY%20Timestamp%20ASC%20LIMIT%20200%22%7D%5D,%22range%22:%7B%22from%22:%22${__from}%22,%22to%22:%22${__to}%22%7D%7D%7D",
+                    "targetBlank": true
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 260
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 100
+                    },
+                    {
+                      "color": "red",
+                      "value": 500
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      }
+    }
+  ]
+}

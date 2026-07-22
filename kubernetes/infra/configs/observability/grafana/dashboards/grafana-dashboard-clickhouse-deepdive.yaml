@@ -1,0 +1,19 @@
+# ClickHouse — Service deep dive (RFC-0019): per-microservice drill-down over
+# otel_logs/otel_traces. JSON is generated into a ConfigMap by the
+# configMapGenerator in this directory's kustomization; the $ds variable
+# defaults to datasource uid `clickhouse`, so no datasource input mapping is
+# needed.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: clickhouse-service-deepdive
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "ClickHouse"
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  configMapRef:
+    name: grafana-dashboard-clickhouse-service-deepdive
+    key: clickhouse-service-deepdive.json

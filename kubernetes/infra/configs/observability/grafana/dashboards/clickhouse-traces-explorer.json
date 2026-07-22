@@ -147,8 +147,8 @@
       {
         "name": "status",
         "type": "custom",
-        "label": "Status",
-        "query": "Ok,Error,Unset",
+        "label": "Trace status",
+        "query": "Ok,Error",
         "options": [],
         "current": {
           "text": [
@@ -229,7 +229,7 @@
       "id": 2,
       "type": "timeseries",
       "title": "Trace volume by status",
-      "description": "One row per trace; Error = at least one failing span anywhere in the trace.",
+      "description": "One row per trace; a trace is Error if ANY of its spans failed. The Trace status filter applies to this classification.",
       "gridPos": {
         "x": 0,
         "y": 1,
@@ -248,7 +248,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT $__timeInterval(start) AS time, Status, count() AS traces FROM (SELECT TraceId, min(Timestamp) AS start, if(countIf(StatusCode = 'Error') > 0, 'Error', 'Ok') AS Status FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(TraceId = '$traceid', $traceid) GROUP BY TraceId) GROUP BY time, Status ORDER BY time",
+          "rawSql": "SELECT $__timeInterval(start) AS time, Status, count() AS traces FROM (SELECT TraceId, min(Timestamp) AS start, if(countIf(StatusCode = 'Error') > 0, 'Error', 'Ok') AS Status FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND TraceId IN (SELECT DISTINCT TraceId FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname)) GROUP BY TraceId HAVING $__conditionalAll(Status IN (${status:singlequote}), $status)) GROUP BY time, Status ORDER BY time",
           "format": 0,
           "queryType": "timeseries",
           "pluginVersion": "4.20.0"
@@ -340,7 +340,7 @@
       "id": 3,
       "type": "stat",
       "title": "Traces",
-      "description": "",
+      "description": "Traces in the current service/span selection. Ignores the Trace status and Trace ID filters.",
       "gridPos": {
         "x": 14,
         "y": 1,
@@ -359,7 +359,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT count() AS traces FROM (SELECT TraceId, min(Timestamp) AS start, if(countIf(StatusCode = 'Error') > 0, 'Error', 'Ok') AS Status FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(TraceId = '$traceid', $traceid) GROUP BY TraceId)",
+          "rawSql": "SELECT count() AS traces FROM (SELECT TraceId, min(Timestamp) AS start, if(countIf(StatusCode = 'Error') > 0, 'Error', 'Ok') AS Status FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND TraceId IN (SELECT DISTINCT TraceId FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname)) GROUP BY TraceId)",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.20.0"
@@ -401,7 +401,7 @@
       "id": 4,
       "type": "stat",
       "title": "Failed traces",
-      "description": "",
+      "description": "Share of traces containing at least one Error span. Ignores the Trace status and Trace ID filters — this stat IS the status summary.",
       "gridPos": {
         "x": 17,
         "y": 1,
@@ -420,7 +420,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT 100.0*countIf(Status = 'Error')/count() AS err_pct FROM (SELECT TraceId, min(Timestamp) AS start, if(countIf(StatusCode = 'Error') > 0, 'Error', 'Ok') AS Status FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(TraceId = '$traceid', $traceid) GROUP BY TraceId)",
+          "rawSql": "SELECT 100.0*countIf(Status = 'Error')/count() AS err_pct FROM (SELECT TraceId, min(Timestamp) AS start, if(countIf(StatusCode = 'Error') > 0, 'Error', 'Ok') AS Status FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND TraceId IN (SELECT DISTINCT TraceId FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname)) GROUP BY TraceId)",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.20.0"
@@ -489,7 +489,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT round(quantile(0.99)(Duration)/1e6, 1) AS p99_ms FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(TraceId = '$traceid', $traceid) AND SpanKind = 'Server'",
+          "rawSql": "SELECT round(quantile(0.99)(Duration)/1e6, 1) AS p99_ms FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND SpanKind = 'Server'",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.20.0"
@@ -571,7 +571,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, Duration/1000000 AS duration_ms FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(TraceId = '$traceid', $traceid) AND cityHash64(SpanId) % $sample_mod = 0 ORDER BY time",
+          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, Duration/1000000 AS duration_ms FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND cityHash64(SpanId) % $sample_mod = 0 ORDER BY time",
           "format": 0,
           "queryType": "timeseries",
           "pluginVersion": "4.20.0"
@@ -666,7 +666,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT r.Timestamp AS Time, r.ServiceName AS Root, r.SpanName AS Operation, agg.Spans AS Spans, round(r.Duration/1e6, 2) AS root_ms, agg.TraceMs AS trace_ms, if(agg.ErrSpans > 0, 'Error', 'Ok') AS Status, r.TraceId AS TraceId FROM otel.otel_traces AS r INNER JOIN (SELECT TraceId, count() AS Spans, countIf(StatusCode = 'Error') AS ErrSpans, anyIf(StatusMessage, StatusCode = 'Error') AS ErrMsg, round((max(toUnixTimestamp64Nano(Timestamp) + toInt64(Duration)) - min(toUnixTimestamp64Nano(Timestamp)))/1e6, 2) AS TraceMs FROM otel.otel_traces WHERE $__timeFilter(Timestamp) GROUP BY TraceId) AS agg ON r.TraceId = agg.TraceId WHERE $__timeFilter(r.Timestamp) AND r.ParentSpanId = '' AND r.TraceId IN (SELECT DISTINCT TraceId FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(TraceId = '$traceid', $traceid)) AND $__conditionalAll(r.Duration >= toUInt64($min_duration_ms) * 1000000, $min_duration_ms) ORDER BY Time DESC LIMIT 50",
+          "rawSql": "SELECT r.Timestamp AS Time, r.ServiceName AS Root, r.SpanName AS Operation, agg.Spans AS Spans, round(r.Duration/1e6, 2) AS root_ms, agg.TraceMs AS trace_ms, if(agg.ErrSpans > 0, 'Error', 'Ok') AS Status, r.TraceId AS TraceId FROM otel.otel_traces AS r INNER JOIN (SELECT TraceId, count() AS Spans, countIf(StatusCode = 'Error') AS ErrSpans, anyIf(StatusMessage, StatusCode = 'Error') AS ErrMsg, round((max(toUnixTimestamp64Nano(Timestamp) + toInt64(Duration)) - min(toUnixTimestamp64Nano(Timestamp)))/1e6, 2) AS TraceMs FROM otel.otel_traces WHERE $__timeFilter(Timestamp) GROUP BY TraceId) AS agg ON r.TraceId = agg.TraceId WHERE $__timeFilter(r.Timestamp) AND r.ParentSpanId = '' AND r.TraceId IN (SELECT DISTINCT TraceId FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(TraceId = '$traceid', $traceid)) AND $__conditionalAll(if(agg.ErrSpans > 0, 'Error', 'Ok') IN (${status:singlequote}), $status) AND $__conditionalAll(r.Duration >= toUInt64($min_duration_ms) * 1000000, $min_duration_ms) ORDER BY Time DESC LIMIT 50",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.20.0"
@@ -867,7 +867,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT r.Timestamp AS Time, r.ServiceName AS Root, r.SpanName AS Operation, agg.Spans AS Spans, round(r.Duration/1e6, 2) AS root_ms, agg.TraceMs AS trace_ms, if(agg.ErrSpans > 0, 'Error', 'Ok') AS Status, r.TraceId AS TraceId FROM otel.otel_traces AS r INNER JOIN (SELECT TraceId, count() AS Spans, countIf(StatusCode = 'Error') AS ErrSpans, anyIf(StatusMessage, StatusCode = 'Error') AS ErrMsg, round((max(toUnixTimestamp64Nano(Timestamp) + toInt64(Duration)) - min(toUnixTimestamp64Nano(Timestamp)))/1e6, 2) AS TraceMs FROM otel.otel_traces WHERE $__timeFilter(Timestamp) GROUP BY TraceId) AS agg ON r.TraceId = agg.TraceId WHERE $__timeFilter(r.Timestamp) AND r.ParentSpanId = '' AND r.TraceId IN (SELECT DISTINCT TraceId FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(TraceId = '$traceid', $traceid)) AND $__conditionalAll(r.Duration >= toUInt64($min_duration_ms) * 1000000, $min_duration_ms) ORDER BY agg.TraceMs DESC LIMIT 20",
+          "rawSql": "SELECT r.Timestamp AS Time, r.ServiceName AS Root, r.SpanName AS Operation, agg.Spans AS Spans, round(r.Duration/1e6, 2) AS root_ms, agg.TraceMs AS trace_ms, if(agg.ErrSpans > 0, 'Error', 'Ok') AS Status, r.TraceId AS TraceId FROM otel.otel_traces AS r INNER JOIN (SELECT TraceId, count() AS Spans, countIf(StatusCode = 'Error') AS ErrSpans, anyIf(StatusMessage, StatusCode = 'Error') AS ErrMsg, round((max(toUnixTimestamp64Nano(Timestamp) + toInt64(Duration)) - min(toUnixTimestamp64Nano(Timestamp)))/1e6, 2) AS TraceMs FROM otel.otel_traces WHERE $__timeFilter(Timestamp) GROUP BY TraceId) AS agg ON r.TraceId = agg.TraceId WHERE $__timeFilter(r.Timestamp) AND r.ParentSpanId = '' AND r.TraceId IN (SELECT DISTINCT TraceId FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(TraceId = '$traceid', $traceid)) AND $__conditionalAll(if(agg.ErrSpans > 0, 'Error', 'Ok') IN (${status:singlequote}), $status) AND $__conditionalAll(r.Duration >= toUInt64($min_duration_ms) * 1000000, $min_duration_ms) ORDER BY agg.TraceMs DESC LIMIT 20",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.20.0"
@@ -1023,7 +1023,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT r.Timestamp AS Time, r.ServiceName AS Root, r.SpanName AS Operation, agg.ErrSpans AS ErrSpans, round(r.Duration/1e6, 2) AS root_ms, agg.TraceMs AS trace_ms, agg.ErrMsg AS Error, r.TraceId AS TraceId FROM otel.otel_traces AS r INNER JOIN (SELECT TraceId, count() AS Spans, countIf(StatusCode = 'Error') AS ErrSpans, anyIf(StatusMessage, StatusCode = 'Error') AS ErrMsg, round((max(toUnixTimestamp64Nano(Timestamp) + toInt64(Duration)) - min(toUnixTimestamp64Nano(Timestamp)))/1e6, 2) AS TraceMs FROM otel.otel_traces WHERE $__timeFilter(Timestamp) GROUP BY TraceId) AS agg ON r.TraceId = agg.TraceId WHERE $__timeFilter(r.Timestamp) AND r.ParentSpanId = '' AND r.TraceId IN (SELECT DISTINCT TraceId FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(TraceId = '$traceid', $traceid)) AND $__conditionalAll(r.Duration >= toUInt64($min_duration_ms) * 1000000, $min_duration_ms) AND agg.ErrSpans > 0 ORDER BY Time DESC LIMIT 20",
+          "rawSql": "SELECT r.Timestamp AS Time, r.ServiceName AS Root, r.SpanName AS Operation, agg.ErrSpans AS ErrSpans, round(r.Duration/1e6, 2) AS root_ms, agg.TraceMs AS trace_ms, agg.ErrMsg AS Error, r.TraceId AS TraceId FROM otel.otel_traces AS r INNER JOIN (SELECT TraceId, count() AS Spans, countIf(StatusCode = 'Error') AS ErrSpans, anyIf(StatusMessage, StatusCode = 'Error') AS ErrMsg, round((max(toUnixTimestamp64Nano(Timestamp) + toInt64(Duration)) - min(toUnixTimestamp64Nano(Timestamp)))/1e6, 2) AS TraceMs FROM otel.otel_traces WHERE $__timeFilter(Timestamp) GROUP BY TraceId) AS agg ON r.TraceId = agg.TraceId WHERE $__timeFilter(r.Timestamp) AND r.ParentSpanId = '' AND r.TraceId IN (SELECT DISTINCT TraceId FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(TraceId = '$traceid', $traceid)) AND $__conditionalAll(if(agg.ErrSpans > 0, 'Error', 'Ok') IN (${status:singlequote}), $status) AND $__conditionalAll(r.Duration >= toUInt64($min_duration_ms) * 1000000, $min_duration_ms) AND agg.ErrSpans > 0 ORDER BY Time DESC LIMIT 20",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.20.0"

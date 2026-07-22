@@ -1250,7 +1250,7 @@
       "id": 20,
       "type": "table",
       "title": "What $service calls",
-      "description": "Outbound client spans of this service; the proto package's first segment names the callee.",
+      "description": "Outbound client spans of this service: gRPC callees named by proto package; database/cache clients show as postgresql / redis.",
       "gridPos": {
         "x": 12,
         "y": 41,
@@ -1269,7 +1269,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT if(mapContains(SpanAttributes, 'rpc.method'), splitByChar('.', SpanAttributes['rpc.method'])[1], 'http') AS callee, if(mapContains(SpanAttributes, 'rpc.method'), SpanAttributes['rpc.method'], SpanName) AS operation, count() AS calls, countIf(StatusCode = 'Error') AS errors, round(quantile(0.95)(Duration)/1e6,2) AS p95_ms FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SpanKind = 'Client' GROUP BY callee, operation ORDER BY calls DESC LIMIT 20",
+          "rawSql": "SELECT multiIf(mapContains(SpanAttributes, 'rpc.method'), splitByChar('.', SpanAttributes['rpc.method'])[1], mapContains(SpanAttributes, 'db.system.name'), SpanAttributes['db.system.name'], mapContains(SpanAttributes, 'db.system'), SpanAttributes['db.system'], 'other') AS callee, if(mapContains(SpanAttributes, 'rpc.method'), SpanAttributes['rpc.method'], SpanName) AS operation, count() AS calls, countIf(StatusCode = 'Error') AS errors, round(quantile(0.95)(Duration)/1e6,2) AS p95_ms FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SpanKind = 'Client' GROUP BY callee, operation ORDER BY calls DESC LIMIT 20",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.20.0"

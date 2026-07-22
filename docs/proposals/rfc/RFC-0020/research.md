@@ -196,7 +196,7 @@ Verified against manifests on 2026-07-21. Marks **deployed** vs **planned**.
 |--------|---------------------------|----------------------------------|
 | PKI root + trust distribution | `selfsigned-bootstrap → homelab-ca → CA issuer` + trust-manager root-only bundle | unchanged — the anchor |
 | Edge (Kong) | `kong-proxy-tls` wildcard; **prod** `letsencrypt-prod` (Cloudflare DNS-01), **local** patched to `homelab-ca` | base default → `homelab-ca`; **prod overlay** re-adds `letsencrypt-prod` (Cloudflare/ACME dropped from base) |
-| DB replication | CNPG uses TLS `cert` auth for `streaming_replica` — but from **CNPG's own auto-CA**, not `homelab-ca` | keep (internal to CNPG) or re-issue from `homelab-ca` (open question) |
+| DB replication | CNPG uses TLS `cert` auth for `streaming_replica` — but from **CNPG's own auto-CA**, not `homelab-ca` | keep CNPG-managed (owner decision 2026-07-22) |
 | App → DB | 9 services `sslmode=disable` via poolers; only `payment` is `hostssl`+`require` direct to CNPG | T2 `verify-full` against `homelab-ca`; then T3 cert-auth (ADR-025) — **all via pooler** (owner decision 2026-07-22; `payment`'s direct hop is transitional) |
 | Pooler (PgBouncer / PgDog) | No client-facing TLS; PgDog upstream plaintext; PgBouncer only uses CNPG auto client-cert for `auth_query` | client + upstream TLS — PgDog confirmed TLS-capable up to `verify_full` + mTLS (audit log) |
 | East-west gRPC | plaintext `insecure.NewCredentials()`; Temporal link no TLS | in-process mTLS — **this RFC's east-west tier** (formerly RFC-0002) |
@@ -282,8 +282,10 @@ here maps directly to "flip to IAM" later.
       the 90d/30d-renew the superseded RFC-0002 proposed. One policy for all internal leaves, or per-tier?
 - [ ] **OpenBAO TLS bootstrap ordering** — the cert-manager cert must exist before OpenBAO
       starts; how does that interact with the Flux secrets-wave and floci auto-unseal?
-- [ ] **`streaming_replica`** — leave CNPG's internal replication cert-auth as-is (CNPG-managed
-      CA) or fold it onto `homelab-ca` for a single trust root?
+- [x] **`streaming_replica`** — **decided (owner, 2026-07-22): leave CNPG-managed.** CNPG's
+      internal replication cert-auth stays on its own auto-CA; it never leaves the CNPG
+      cluster boundary, and folding it onto `homelab-ca` adds re-bootstrap brittleness for
+      no external-trust gain. Revisit only if a single-root compliance requirement appears.
 - [ ] **Scope of the first RFC** — climb all tiers, or ship Slice 0 (edge decouple) + Slice 1
       (OpenBAO) as quick wins and defer the DB chain behind the pooler decision?
 

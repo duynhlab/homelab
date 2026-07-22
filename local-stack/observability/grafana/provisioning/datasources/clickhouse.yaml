@@ -12,5 +12,16 @@ datasources:
       protocol: native
       defaultDatabase: otel
       username: default
+      # OTel mapping (plugin >= 4.20.0): Logs/Traces query builders + Explore
+      # views + trace<->log linking. Version selector stays auto (latest);
+      # schema 1.3.0 detected from columns (collector contrib >= 0.151.0).
+      logs:
+        defaultDatabase: otel
+        defaultTable: otel_logs
+        otelEnabled: true
+      traces:
+        defaultDatabase: otel
+        defaultTable: otel_traces
+        otelEnabled: true
     secureJsonData:
       password: otel

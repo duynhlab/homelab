@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **grafana-clickhouse-datasource pinned to 4.20.0** (cluster + local-stack; was unpinned "latest"): OTel schema 1.3.0 + auto-detect; datasources gain `logs`/`traces` `otelEnabled` mapping (query builders, Explore, trace↔log links); local-stack collector bumped `0.140.0` → `0.152.0` to match the cluster's OTel logs schema (contrib ≥ 0.151.0 drops `TimestampTime`).
+
 - **RFC-0020 promoted to provisional**: research gate passed — owner decisions recorded (all app→DB via pooler, `payment` direct hop transitional; CNPG server cert re-issued from `homelab-ca`; straight to `verify-full`; T3 defined per hop; 90d/30d rotation; `streaming_replica` stays CNPG-managed; umbrella scope Slice 0–6) and `RFC-0020/README.md` added (decision, target architecture, rollout).
 - **RFC-0020 research Context7 audit completed**: PgDog confirmed TLS-capable (client TLS, upstream `verify_full`, experimental mTLS) — pooler tier unblocked, no PgBouncer migration needed; Istio ambient-vs-sidecar and OpenBAO listener-TLS rows resolved; review gate updated.
 
@@ -18,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Grafana on ClickHouse deep dive** ([`docs/observability/clickhouse/grafana.md`](docs/observability/clickhouse/grafana.md)): datasource OTel mapping, schema versions (1.2.9 vs 1.3.0 `TimestampTime`), Explore logs/traces, trace↔log linking, dashboard grammar + macros, query performance rules.
 - **GitHub labels** (`.github/labels.yaml` + `sync-labels` workflow): declarative triage and `area/*` labels for homelab domains; `delete-other-labels: false` preserves bot-managed labels.
 - **ClickHouse OLAP for OTel logs+traces** (RFC-0019 Phase B / [ADR-023](docs/proposals/adr/ADR-023-clickhouse-observability-olap/)): Altinity operator `0.27.1` + `ClickHouseInstallation` (1×1, PVC `standard`, TTL 90d) in ns `monitoring`; OTel Collector `clickhouse` exporter fanned out on the traces+logs pipelines (`create_schema`, `sending_queue`+retry); `clickhouse-credentials` `ClusterExternalSecret` (OpenBAO); Grafana `grafana-clickhouse-datasource` + datasource. Metrics stay on VictoriaMetrics; no app code change.
 - **ClickHouse in local-stack**: `clickhouse` compose service + collector exporter + Grafana plugin/datasource; e2e audit check **C6** (SQL count over `otel_traces`/`otel_logs`).

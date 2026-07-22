@@ -285,6 +285,10 @@ service, span-kind / status / severity distributions, top operations by p95, the
 `trace_id` JOIN, and recent warn+ logs. `$ds` + `$service` template variables;
 adaptive time bucketing.
 
+Deep dive — datasource OTel mapping, schema versions (1.2.9 vs 1.3.0), Explore
+logs/traces, trace↔log linking, dashboard grammar and macros:
+[**Grafana on ClickHouse**](./grafana.md).
+
 ### Runbook — data not appearing
 
 1. **Drive traffic**, then wait **~30–45s** (OTLP export + batch lag).
@@ -468,6 +472,7 @@ dev password in local-stack.
 - [Altinity clickhouse-operator](https://github.com/Altinity/clickhouse-operator)
 - [OpenTelemetry Collector — ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter)
 - [Grafana ClickHouse datasource](https://grafana.com/docs/plugins/grafana-clickhouse-datasource/latest/)
+- [Grafana on ClickHouse — logs + traces deep dive](./grafana.md) (this area)
 - Design: [RFC-0019](../../proposals/rfc/RFC-0019/) · [ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/)
 - Observability hub: [`docs/observability/README.md`](../README.md)
 

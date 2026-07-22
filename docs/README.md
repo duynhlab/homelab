@@ -92,8 +92,9 @@ docs/
 │   │   └── victorialogs.md       # VictoriaLogs backend & Vector pipeline ops
 │   ├── profiling/                # Pillar 4: Continuous Profiling
 │   │   └── README.md             # Pyroscope (CPU, heap, goroutine)
-│   ├── clickhouse/               # ClickHouse learning guide (planned)
-│   │   └── README.md             # OLAP fundamentals, OTel Phase B primary, optional commerce Phase A
+│   ├── clickhouse/               # ClickHouse OTel logs+traces OLAP (deployed)
+│   │   ├── README.md             # OLAP fundamentals, MergeTree, deployed schema + ops
+│   │   └── grafana.md            # Grafana deep dive: datasource, Explore, dashboards
 │   ├── grafana/                  # Visualization layer
 │   │   ├── README.md             # Grafana overview + plugins
 │   │   ├── rbac-multi-team.md    # Org roles, Teams, anonymous vs named users
@@ -264,7 +265,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 5. **[Backend Comparison](./observability/tracing/backends-comparison.md)** - Tempo vs Jaeger vs VictoriaTraces (+ roadmap)
 6. **[VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md)** - 3rd backend via the VM operator
 7. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
-8. **[ClickHouse learning guide](./observability/clickhouse/README.md)** - Planned OLAP candidate; OTel logs/traces SQL + optional commerce analytics ([RFC-0019](./proposals/rfc/RFC-0019/))
+8. **[ClickHouse OTel OLAP](./observability/clickhouse/README.md)** - Deployed supplementary OLAP; OTel logs/traces SQL + [Grafana deep dive](./observability/clickhouse/grafana.md) ([RFC-0019](./proposals/rfc/RFC-0019/))
 9. **[Logging](./observability/logging/README.md)** - Architecture: OTLP app logs (otelzap tee) + Vector for non-instrumented pods, scaling
 10. **[VictoriaLogs](./observability/logging/victorialogs.md)** - VictoriaLogs deployment and configuration
     - OTLP app-log ingest + Vector for non-instrumented pods (DB/Kong/frontend/infra)

@@ -15,7 +15,7 @@ LogsQL/TraceQL-only ops primaries can't, plus the `otel_logs`↔`otel_traces`
 | **Tables** | `otel.otel_logs`, `otel.otel_traces` (+ `otel_traces_trace_id_ts` MV), auto-created by the exporter (`create_schema`) |
 | **Retention** | **TTL 90 days** (`ttl_only_drop_parts`) vs 7d on the ops primaries — the long-retention payoff |
 | **Storage** | local PVC `standard` `10Gi` (cluster); ephemeral volume (local-stack) |
-| **Query** | Grafana `grafana-clickhouse-datasource` (`uid: clickhouse`, native `:9000`) + the **ClickHouse — OTel logs+traces SQL** dashboard |
+| **Query** | Grafana `grafana-clickhouse-datasource` **4.20.0** (`uid: clickhouse`, native `:9000`) + 5 provisioned dashboards in the **ClickHouse** folder (suite Overview→Logs→Traces, service deep dive, platform SQL) |
 | **App code** | **Unchanged** — `pkg/obsx` / `pkg/grpcx` untouched; adding ClickHouse is a Collector-exporter change |
 | **Design** | [RFC-0019](../../proposals/rfc/RFC-0019/) · [ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/) |
 
@@ -35,12 +35,13 @@ LogsQL/TraceQL-only ops primaries can't, plus the `otel_logs`↔`otel_traces`
 6. [Architecture](#architecture)
 7. [How it works in this platform](#how-it-works-in-this-platform)
 8. [Operations](#operations)
-9. [Playground — MergeTree by hand](#playground--mergetree-by-hand)
-10. [Glossary](#glossary)
-11. [ClickHouse vs PostgreSQL](#clickhouse-vs-postgresql)
-12. [Commerce analytics (Phase A — not deployed)](#commerce-analytics-phase-a--not-deployed)
-13. [FAQ](#faq)
-14. [References](#references)
+9. [Grafana](#grafana) — datasource, Explore, dashboard grammar, the standard suite
+10. [Playground — MergeTree by hand](#playground--mergetree-by-hand)
+11. [Glossary](#glossary)
+12. [ClickHouse vs PostgreSQL](#clickhouse-vs-postgresql)
+13. [Commerce analytics (Phase A — not deployed)](#commerce-analytics-phase-a--not-deployed)
+14. [FAQ](#faq)
+15. [References](#references)
 
 ---
 
@@ -200,7 +201,7 @@ and is the counting workhorse. Traces are exemplars joined back on `trace_id`.
 | **Security** | `runAsNonRoot`, `runAsUser: 101`, `fsGroup: 101`, `allowPrivilegeEscalation: false`, drop `ALL` caps, `seccompProfile: RuntimeDefault`; `/ping` liveness+readiness; pinned image (PSS-baseline + no-latest) |
 | **Access** | Grafana datasource `uid: clickhouse` (`clickhouse-clickhouse.monitoring.svc.cluster.local:9000`, native, password via `valuesFrom`); **not** on any public Ingress; the `default` password is the access control (no NetworkPolicy — `monitoring` has no default-deny and netpol is inert on kindnet; a `:9000`/`:8123` NetworkPolicy is a follow-up for an enforcing CNI) |
 | **Startup ordering** | The collector's clickhouse exporter runs `CREATE DATABASE/TABLE` in `start()` (`create_schema`), so an unreachable ClickHouse fails the **whole** collector at startup. Ordered ClickHouse-first: local-stack via `depends_on: service_healthy`, cluster via `tracing-local dependsOn clickhouse-local`. `sending_queue`/`retry` isolate only *runtime* backpressure |
-| **Dashboard** | *ClickHouse — OTel logs+traces SQL* (`uid: clickhouse-otel-sql`) — provisioned to local-stack (file) and the cluster (`configMapGenerator` → `GrafanaDashboard configMapRef`) |
+| **Dashboards** | 5 provisioned boards in the **ClickHouse** Grafana folder — see [Grafana](#grafana); local-stack via file provider, cluster via `configMapGenerator` → `GrafanaDashboard` CRs |
 | **local-stack** | `clickhouse` compose service (`:8123` HTTP, `:9000` native), collector `clickhouse` exporter, Grafana plugin + provisioned datasource; e2e audit check **C6** (`SELECT count() FROM otel.otel_traces/otel_logs`) |
 
 The Collector's other sinks are untouched: VictoriaLogs/Tempo/Jaeger/VictoriaTraces
@@ -279,27 +280,9 @@ WHERE t.TraceId != '' GROUP BY service ORDER BY traces DESC;
 
 ### Dashboard
 
-*ClickHouse — OTel logs+traces SQL* (folder **Observability**) ships the RED /
-golden-signals view: span/log rate, error rate %, p50/p95/p99 latency, spans by
-service, span-kind / status / severity distributions, top operations by p95, the
-`trace_id` JOIN, and recent warn+ logs. `$ds` + `$service` template variables;
-adaptive time bucketing.
-
-*ClickHouse — Service deep dive* (`uid: clickhouse-service-deepdive`) drills into **one
-service** at a time: per-operation RED, HTTP route / gRPC method tables (semconv v1.41
-keys), east-west dependency tables, slowest/error spans with TraceId→Explore data links,
-and severity-filtered logs.
-
-The **standard suite** adds the three-tier navigation — *OTel — Overview*
-(`clickhouse-otel-overview`, which service is in trouble?) → *Logs Explorer*
-(`clickhouse-logs-explorer`, what errors?) → *Trace Explorer*
-(`clickhouse-traces-explorer`, which span broke? — with an in-dashboard trace
-waterfall + logs-for-this-trace panel). See
-[grafana.md § The standard dashboard suite](./grafana.md#the-standard-dashboard-suite--overview--logs--traces).
-
-Deep dive — datasource OTel mapping, schema versions (1.2.9 vs 1.3.0), Explore
-logs/traces, trace↔log linking, dashboard grammar and macros:
-[**Grafana on ClickHouse**](./grafana.md).
+All five provisioned dashboards are documented in [Grafana](#grafana) below —
+the standard suite (Overview → Logs → Traces), the service deep dive, and the
+platform-wide *OTel logs+traces SQL* board.
 
 ### Runbook — data not appearing
 
@@ -311,6 +294,191 @@ logs/traces, trace↔log linking, dashboard grammar and macros:
    (`create_schema: true`); a wrong password blocks `CREATE DATABASE`.
 5. VictoriaLogs/Tempo still receiving? They are independent sinks — ClickHouse being
    down must not affect them (`sending_queue` isolates backpressure).
+
+---
+
+## Grafana
+
+Grafana turns the `otel` tables into an explorable logs/traces UI and a SQL
+dashboard surface. Two ideas carry everything below:
+
+1. **The plugin maps columns, it does not ingest** — Grafana only ever runs
+   `SELECT`s; the OTel mapping tells it which columns mean *time*, *severity*,
+   *body*, *trace id*, *duration*.
+2. **The table's `ORDER BY` decides what is cheap** — service-first filters fly;
+   bare trace-id lookups ride the `bloom_filter` index + the
+   `otel_traces_trace_id_ts` MV (see [Deployed schema](#deployed-schema-real-ddl)).
+
+### The datasource, as deployed
+
+Plugin `grafana-clickhouse-datasource` **4.20.0** (pinned in the cluster
+`GF_INSTALL_PLUGINS` and the local-stack compose). Both environments provision
+the same shape (cluster: [`datasource-clickhouse.yaml`](../../../kubernetes/infra/configs/observability/grafana/datasource-clickhouse.yaml),
+password from the ESO-managed `clickhouse-credentials` Secret; local-stack:
+[`clickhouse.yaml`](../../../local-stack/observability/grafana/provisioning/datasources/clickhouse.yaml)):
+
+```yaml
+jsonData:
+  host: clickhouse-clickhouse.monitoring.svc.cluster.local   # local: clickhouse
+  port: 9000
+  protocol: native
+  defaultDatabase: otel
+  username: default
+  logs:    { defaultDatabase: otel, defaultTable: otel_logs,   otelEnabled: true }
+  traces:  { defaultDatabase: otel, defaultTable: otel_traces, otelEnabled: true }
+```
+
+`otelEnabled: true` unlocks the Logs/Traces query builders, the Explore views,
+and trace↔log navigation — without it the datasource is a plain SQL connection.
+
+### OTel schema versions
+
+The collector's exporter owns the DDL, and its shape changed at contrib
+**0.151.0** (the `TimestampTime` helper column left `otel_logs`):
+
+| Schema | Exporter | `otel_logs` shape |
+|--------|----------|-------------------|
+| 1.2.9 | contrib < 0.151.0 | has `TimestampTime` |
+| **1.3.0** | contrib ≥ 0.151.0 | no `TimestampTime` — what both environments write (contrib `0.152.0`) |
+
+Plugin ≥ 4.20.0 **auto-detects the logs schema from the table's columns** when
+the version selector is on auto (latest); our provisioning deliberately does not
+pin a version. After any collector bump, `DESCRIBE otel.otel_logs` tells you
+which shape a table has — `create_schema` is create-if-absent, so an old table
+keeps its old shape until dropped.
+
+### Explore & trace↔log linking
+
+- **Logs** query type generates the column mapping (`Timestamp AS timestamp,
+  Body AS body, SeverityText AS level … ORDER BY Timestamp DESC LIMIT 1000`);
+  our tables use the default OTel column names, so no custom mapping is needed.
+  Builder filters become `WHERE` clauses — `ServiceName` is the cheap one
+  (first `ORDER BY` key).
+- **Traces** query type maps `TraceId`/`ServiceName`/`SpanName`/`Timestamp`/
+  `Duration`; the waterfall detail view resolves a trace id to its time range
+  via `otel_traces_trace_id_ts`, sidestepping the service-first sort key.
+  `Duration` is nanoseconds — raw SQL panels divide by `1e6` for ms.
+- **Linking**, both directions, rides the shared `TraceId` column: log line →
+  "View trace"; span → logs filtered `WHERE TraceId = '<id>'`. One store, one
+  key — no derived-fields bridge like VictoriaLogs↔Tempo needs.
+
+### Dashboard grammar (raw SQL panels)
+
+Time series: return a datetime aliased `time` plus numerics. Multi-line: field
+order matters — time, then the string group, then the value:
+
+```sql
+SELECT $__timeInterval(Timestamp) AS time, ServiceName, count() AS spans
+FROM otel.otel_traces
+WHERE $__timeFilter(Timestamp)
+GROUP BY time, ServiceName ORDER BY time
+```
+
+| Macro | Expands to |
+|-------|------------|
+| `$__timeFilter(col)` | `col >= <from> AND col <= <to>` — dashboard time picker |
+| `$__timeInterval(col)` | `toStartOfInterval(col, INTERVAL <auto> second)` — adaptive bucketing |
+| `$__fromTime` / `$__toTime` | picker edges as `DateTime` scalars — for subqueries/denominators |
+| `$__conditionalAll(expr, $var)` | `expr` when the variable has a selection, `1=1` on *All* or an empty textbox |
+
+Recipes live in the shipped dashboards — copy from there instead of reinventing:
+error-rate % (`countIf(StatusCode = 'Error') / count()`), latency quantiles
+(`quantile(0.95)(Duration)/1e6`), the trace↔log correlation JOIN.
+
+### The standard dashboard suite — Overview → Logs → Traces
+
+Three dashboards, one navigation story — each answers exactly one question:
+
+| Tier | Dashboard (uid) | Question it answers |
+|------|-----------------|---------------------|
+| 1 | **OTel — Overview** (`clickhouse-otel-overview`) | *Which service is in trouble?* — the triage landing page |
+| 2 | **OTel — Logs Explorer** (`clickhouse-logs-explorer`) | *What errors are happening?* |
+| 3 | **OTel — Trace Explorer** (`clickhouse-traces-explorer`) | *Where did the request go and which span broke?* |
+
+Overview's "who is in trouble" tables link a service into the Logs Explorer or
+the [service deep dive](#the-service-deep-dive-dashboard); every `TraceId` cell
+in the suite links into the Trace Explorer, which loads an **in-dashboard trace
+waterfall** (`format: 3`, Jaeger-style aliases, window via the MV) with a
+**"Logs for this trace"** panel underneath — logs↔traces on one screen.
+
+Design decisions, all verified against live data:
+
+- **Trace-level semantics**: per-trace panels group by `TraceId`; a trace is
+  *failed* if ANY span has `StatusCode = 'Error'`; the root span is
+  `ParentSpanId = ''` (exactly one per trace). The *Trace status* filter applies
+  to that classification — never to member spans — and the volume-row stats
+  ignore it by design (they ARE the status summary).
+- **Native panels**: logs panels are `format: 2` (SQL aliases
+  `timestamp`/`body`/`level`); the waterfall is `format: 3`; multi-line
+  timeseries are `format: 0`. Only `format` is load-bearing.
+- **Variables**: `$severity` is lowercase (`error,warn,info,notice,debug` — what
+  the services actually emit); `$environment` reads
+  `deployment.environment.name` (`local` locally, `production` in-cluster) and
+  binds to member spans (the kong edge spans carry no environment attribute);
+  textbox vars run through `$__conditionalAll`.
+- **Duration heatmap**: raw `(time, duration_ms)` rows, panel-side bucketing,
+  log₂ y-scale, `$sample_mod` constant (1 = no sampling; raise ~500 at volume).
+  Span `Events.*` are not populated here — error text comes from `StatusMessage`.
+
+### The service deep-dive dashboard
+
+*ClickHouse — Service deep dive* (`clickhouse-service-deepdive`) applies the
+same machinery to **one service at a time**; the platform-wide view stays in
+*ClickHouse — OTel logs+traces SQL* (`clickhouse-otel-sql`). Seven rows:
+
+| Row | Panels |
+|-----|--------|
+| Overview | req/s, error %, p95 (server spans), error-log count, distinct operations |
+| Traffic & latency | rate by operation, p50/p95/p99, error % trend, log volume by severity |
+| HTTP endpoints | route × method table (calls, 5xx, p95) + status classes — attributes `http.request.method` / `http.route` / `http.response.status_code` |
+| gRPC methods | `rpc.method` split into Service/Method (calls, errors, p95) |
+| Dependencies | who calls the service (client spans matching `<service>.v1.%`) · what it calls (gRPC callees + `postgresql`/`redis` client spans) |
+| Slow & failing | slowest + error spans, TraceId → Explore data links |
+| Logs | severity-filtered logs, top error messages, error-traces↔logs JOIN |
+
+Two verified facts every new panel must respect: enum spellings are the short
+ones (`StatusCode` `Ok`/`Error`/`Unset`, `SpanKind` `Server`/`Client`/`Internal`
+— and Go-SDK success spans are `Unset`, so error-rate is `countIf(Error)/count()`),
+and proto packages are named after the owning service, so "who calls product" is
+just client spans where `rpc.method LIKE 'product.v1.%'`.
+
+### Plugin-bundled dashboards (manual import — not GitOps)
+
+The datasource ships 7 reference dashboards (datasource config page →
+**Dashboards** tab). A UI import lives **only in that Grafana's database** — not
+in git, never on the cluster, wiped when the local volume is recreated:
+
+| Dashboard (uid) | Group | What it is |
+|---|---|---|
+| ClickHouse - Query Analysis (`w5Q2Otank`) | **Server admin** | Query performance over `system.query_log` |
+| ClickHouse - Data Analysis (`-B3tt7a7z`) | Server admin | Table/parts/disk usage, compression |
+| ClickHouse - Cluster Analysis (`_hAsuzBnz`) | Server admin | Replication/distributed health (mostly N/A single-node) |
+| Advanced ClickHouse Monitoring (`e336c8cd-…`) | Server admin | Memory, merges, mark cache, background pools |
+| OpenTelemetry Logs Explorer (`otel-logs-explorer`) | **OTel reference** | Upstream generic version of our Logs Explorer |
+| OpenTelemetry Traces Explorer (`otel-traces-explorer`) | OTel reference | Upstream Trace Explorer — its heatmap hard-codes `% 500` sampling (near-empty at our volume) |
+| OpenTelemetry Service Dashboard (`otel-service-dashboard`) | OTel reference | Upstream per-service view — the deep dive covers this with verified enums/keys |
+
+The server-admin group watches ClickHouse *itself* (`system.*`) — a niche the
+in-repo suite doesn't cover; promote one to a provisioned JSON + CR if it earns
+a permanent place. Provisioned ClickHouse dashboards live in the **ClickHouse**
+Grafana folder on both environments (local: file provider
+`foldersFromFilesStructure` + `dashboards/ClickHouse/`; cluster: the CR
+`folder:` field).
+
+### Query performance rules
+
+1. **Filter `ServiceName` first** — first `ORDER BY` key; granule pruning does
+   the work (proven in the [Playground](#playground--mergetree-by-hand)).
+2. **Always `$__timeFilter`** — day partitions make the picker a partition prune.
+3. **`ORDER BY Timestamp DESC LIMIT n`** on log queries — never unbounded.
+4. **Bare `TraceId` lookups** are for Explore/the trace panel, not per-refresh
+   dashboard panels.
+5. **Don't `SELECT *`** — name the `Map` keys you need
+   (`ResourceAttributes['k8s.pod.name']`).
+
+Integration checks: plugin version via `GET /api/plugins/grafana-clickhouse-datasource`
+(→ `4.20.0`); datasource health via *Save & test* or `SELECT 1` in Explore; data
+not appearing → [Runbook](#runbook--data-not-appearing).
 
 ---
 
@@ -483,11 +651,11 @@ dev password in local-stack.
 - [ClickHouse docs — MergeTree](https://clickhouse.com/docs/engines/table-engines/mergetree-family/mergetree)
 - [Altinity clickhouse-operator](https://github.com/Altinity/clickhouse-operator)
 - [OpenTelemetry Collector — ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter)
+- [Grafana ClickHouse datasource](https://grafana.com/docs/plugins/grafana-clickhouse-datasource/latest/) · [ClickHouse docs — Using Grafana](https://clickhouse.com/docs/observability/grafana)
 - [Grafana ClickHouse datasource](https://grafana.com/docs/plugins/grafana-clickhouse-datasource/latest/)
-- [Grafana on ClickHouse — logs + traces deep dive](./grafana.md) (this area)
 - Design: [RFC-0019](../../proposals/rfc/RFC-0019/) · [ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/)
 - Observability hub: [`docs/observability/README.md`](../README.md)
 
 ---
 
-_Last updated: 2026-07-19_
+_Last updated: 2026-07-22_

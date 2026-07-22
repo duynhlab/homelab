@@ -1,6 +1,6 @@
 {
   "uid": "clickhouse-otel-sql",
-  "title": "ClickHouse \u2014 OTel logs+traces SQL",
+  "title": "ClickHouse — OTel logs+traces SQL",
   "description": "SQL/OLAP over OpenTelemetry logs+traces retained in ClickHouse (RFC-0019 Phase B).",
   "tags": [
     "clickhouse",
@@ -103,13 +103,13 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "### ClickHouse \u2014 OTel logs+traces SQL &nbsp;\u00b7&nbsp; RFC-0019 Phase B\nLong-retention (**TTL 90d**) OLAP over OpenTelemetry logs+traces \u2014 the cross-day SQL the 7-day, LogsQL/TraceQL-only ops primaries can't give, plus the `otel_logs`\u2194`otel_traces` **`trace_id` JOIN** in one store. **Logs-first**: `otel_logs` (100%, unsampled) counts; `otel_traces` (head-sampled) are exemplars. Metrics stay on VictoriaMetrics \u2014 never here."
+        "content": "### ClickHouse — OTel logs+traces SQL &nbsp;·&nbsp; RFC-0019 Phase B\nLong-retention (**TTL 90d**) OLAP over OpenTelemetry logs+traces — the cross-day SQL the 7-day, LogsQL/TraceQL-only ops primaries can't give, plus the `otel_logs`↔`otel_traces` **`trace_id` JOIN** in one store. **Logs-first**: `otel_logs` (100%, unsampled) counts; `otel_traces` (head-sampled) are exemplars. Metrics stay on VictoriaMetrics — never here."
       },
       "transparent": true
     },
     {
       "type": "row",
-      "title": "Overview \u2014 health at a glance",
+      "title": "Overview — health at a glance",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -186,7 +186,7 @@
       "id": 3,
       "type": "stat",
       "title": "Error rate",
-      "description": "Percent of Server spans with StatusCode=ERROR. Yellow \u22651%, red \u22655%.",
+      "description": "Percent of Server spans with StatusCode=ERROR. Yellow ≥1%, red ≥5%.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "${ds}"
@@ -205,7 +205,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, 100.0*countIf(StatusCode='STATUS_CODE_ERROR')/greatest(count(),1) AS v FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) GROUP BY time ORDER BY time",
+          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, 100.0*countIf(StatusCode='Error')/greatest(count(),1) AS v FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) GROUP BY time ORDER BY time",
           "format": 1,
           "queryType": "timeseries",
           "pluginVersion": "4.19.0"
@@ -257,7 +257,7 @@
       "id": 4,
       "type": "stat",
       "title": "p95 latency",
-      "description": "95th-percentile Server-span duration. Yellow \u2265100ms, red \u2265500ms.",
+      "description": "95th-percentile Server-span duration. Yellow ≥100ms, red ≥500ms.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "${ds}"
@@ -391,7 +391,7 @@
       "id": 6,
       "type": "stat",
       "title": "Distinct traces",
-      "description": "Unique TraceIds (head-sampled \u2192 a floor on real traffic).",
+      "description": "Unique TraceIds (head-sampled → a floor on real traffic).",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "${ds}"
@@ -454,7 +454,7 @@
       "id": 7,
       "type": "stat",
       "title": "Error+ logs",
-      "description": "Logs at SeverityNumber \u2265 17 (ERROR/FATAL). Red when any.",
+      "description": "Logs at SeverityNumber ≥ 17 (ERROR/FATAL). Red when any.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "${ds}"
@@ -553,7 +553,7 @@
           },
           "editorType": "sql",
           "rawSql": "SELECT $__timeInterval(Timestamp) AS time, ServiceName, count()/60.0 AS rps FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) GROUP BY time, ServiceName ORDER BY time",
-          "format": 1,
+          "format": 0,
           "queryType": "timeseries",
           "pluginVersion": "4.19.0"
         }
@@ -618,7 +618,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, 100.0*countIf(StatusCode='STATUS_CODE_ERROR')/greatest(count(),1) AS err_pct FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) GROUP BY time ORDER BY time",
+          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, 100.0*countIf(StatusCode='Error')/greatest(count(),1) AS err_pct FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) GROUP BY time ORDER BY time",
           "format": 1,
           "queryType": "timeseries",
           "pluginVersion": "4.19.0"
@@ -766,7 +766,7 @@
       "id": 11,
       "type": "table",
       "title": "Top operations by p95",
-      "description": "Slowest span names by p95 latency, with call counts \u2014 the operations to optimise first.",
+      "description": "Slowest span names by p95 latency, with call counts — the operations to optimise first.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "${ds}"
@@ -1049,17 +1049,17 @@
             {
               "type": "value",
               "options": {
-                "STATUS_CODE_ERROR": {
+                "Error": {
                   "color": "red",
                   "index": 0,
                   "text": "ERROR"
                 },
-                "STATUS_CODE_OK": {
+                "Ok": {
                   "color": "green",
                   "index": 1,
                   "text": "OK"
                 },
-                "STATUS_CODE_UNSET": {
+                "Unset": {
                   "color": "text",
                   "index": 2,
                   "text": "unset"
@@ -1132,7 +1132,7 @@
           },
           "editorType": "sql",
           "rawSql": "SELECT $__timeInterval(Timestamp) AS time, SeverityText, count() AS logs FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) GROUP BY time, SeverityText ORDER BY time",
-          "format": 1,
+          "format": 0,
           "queryType": "timeseries",
           "pluginVersion": "4.19.0"
         }
@@ -1317,7 +1317,7 @@
       "id": 17,
       "type": "table",
       "title": "Top error messages",
-      "description": "Most frequent ERROR/FATAL log bodies (grouped) \u2014 recurring failure signatures.",
+      "description": "Most frequent ERROR/FATAL log bodies (grouped) — recurring failure signatures.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "${ds}"
@@ -1395,7 +1395,7 @@
       "id": 18,
       "type": "table",
       "title": "Slowest spans",
-      "description": "Top 20 spans by raw Duration (ns\u2192ms) \u2014 latency-tail triage over the full retention window.",
+      "description": "Top 20 spans by raw Duration (ns→ms) — latency-tail triage over the full retention window.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "${ds}"
@@ -1483,17 +1483,17 @@
                   {
                     "type": "value",
                     "options": {
-                      "STATUS_CODE_ERROR": {
+                      "Error": {
                         "color": "red",
                         "index": 0,
                         "text": "ERROR"
                       },
-                      "STATUS_CODE_OK": {
+                      "Ok": {
                         "color": "green",
                         "index": 1,
                         "text": "OK"
                       },
-                      "STATUS_CODE_UNSET": {
+                      "Unset": {
                         "color": "text",
                         "index": 2,
                         "text": "unset"
@@ -1523,8 +1523,8 @@
     {
       "id": 19,
       "type": "table",
-      "title": "Cross-signal: traces \u2194 correlated logs",
-      "description": "The RFC-0019 payoff: otel_traces ANY LEFT JOIN otel_logs ON TraceId \u2014 traces vs correlated log lines per service, in one store.",
+      "title": "Cross-signal: traces ↔ correlated logs",
+      "description": "The RFC-0019 payoff: otel_traces ANY LEFT JOIN otel_logs ON TraceId — traces vs correlated log lines per service, in one store.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "${ds}"
@@ -1574,7 +1574,7 @@
       "id": 20,
       "type": "table",
       "title": "Recent warn+ logs",
-      "description": "Latest 100 logs at SeverityNumber \u2265 13 (WARN+), with TraceId for correlation. Filterable per column.",
+      "description": "Latest 100 logs at SeverityNumber ≥ 13 (WARN+), with TraceId for correlation. Filterable per column.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "${ds}"

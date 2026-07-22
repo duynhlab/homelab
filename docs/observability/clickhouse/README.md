@@ -285,6 +285,11 @@ service, span-kind / status / severity distributions, top operations by p95, the
 `trace_id` JOIN, and recent warn+ logs. `$ds` + `$service` template variables;
 adaptive time bucketing.
 
+*ClickHouse — Service deep dive* (`uid: clickhouse-service-deepdive`) drills into **one
+service** at a time: per-operation RED, HTTP route / gRPC method tables (semconv v1.41
+keys), east-west dependency tables, slowest/error spans with TraceId→Explore data links,
+and severity-filtered logs.
+
 Deep dive — datasource OTel mapping, schema versions (1.2.9 vs 1.3.0), Explore
 logs/traces, trace↔log linking, dashboard grammar and macros:
 [**Grafana on ClickHouse**](./grafana.md).

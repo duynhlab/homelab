@@ -19,6 +19,8 @@ resources:
   - grafana-dashboard-kong.yaml
   # ClickHouse OTel logs+traces SQL (RFC-0019 Phase B) — JSON via configMapGenerator below
   - grafana-dashboard-clickhouse.yaml
+  # ClickHouse per-service deep dive — JSON via configMapGenerator below
+  - grafana-dashboard-clickhouse-deepdive.yaml
   # VictoriaMetrics stack dashboards
   - grafana-dashboard-vmsingle.yaml
   - grafana-dashboard-vmagent.yaml
@@ -33,6 +35,9 @@ configMapGenerator:
   - name: grafana-dashboard-clickhouse-otel-sql
     files:
       - clickhouse-otel-sql.json
+  - name: grafana-dashboard-clickhouse-service-deepdive
+    files:
+      - clickhouse-service-deepdive.json
 
 generatorOptions:
   disableNameSuffixHash: true

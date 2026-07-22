@@ -9,7 +9,7 @@ Grafana turns the `otel` MergeTree tables into an explorable logs/traces UI and 
 | **Tables** | `otel.otel_logs`, `otel.otel_traces` (+ `otel_traces_trace_id_ts` MV) |
 | **OTel mapping** | `logs.otelEnabled` + `traces.otelEnabled` in provisioning — query builders, Explore views, trace↔log links |
 | **Schema version** | auto (latest) — detected from table columns; both environments write **1.3.0** (collector contrib `0.152.0`) |
-| **Dashboard** | *ClickHouse — OTel logs+traces SQL* (`uid: clickhouse-otel-sql`, 19 panels, raw SQL) |
+| **Dashboards** | *ClickHouse — OTel logs+traces SQL* (`uid: clickhouse-otel-sql`, platform-wide RED, 19 panels) · *ClickHouse — Service deep dive* (`uid: clickhouse-service-deepdive`, per-service, 20 panels) |
 | **Design record** | [RFC-0019](../../proposals/rfc/RFC-0019/) · [ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/) |
 
 ## Overview
@@ -211,6 +211,31 @@ error-rate % (`countIf(StatusCode = 'STATUS_CODE_ERROR') / count()`), latency
 quantiles (`quantile(0.95)(Duration)/1e6`), severity distribution
 (`SeverityText` piechart), top operations by p95, recent warn+ logs table, and
 the trace↔log correlation JOIN — see [hub § Query examples](./README.md#operations).
+
+## The service deep-dive dashboard
+
+*ClickHouse — Service deep dive* (`uid: clickhouse-service-deepdive`) applies everything
+above to **one service at a time** (`$service` single-select, `$severity` log filter) —
+the platform-wide RED view stays in `clickhouse-otel-sql`. Seven rows:
+
+| Row | Panels |
+|-----|--------|
+| Overview | req/s, error %, p95 (server spans), error-log count, distinct operations |
+| Traffic & latency | rate by operation, p50/p95/p99, error % over time, log volume by severity |
+| HTTP surface | route × method table (calls, 5xx, p95) + status-class timeseries — keys `http.request.method` / `http.route` / `http.response.status_code` |
+| gRPC surface | `rpc.method` split into Service/Method (calls, errors, p95) + rate by method |
+| Dependencies | who calls `$service` (client spans matching `<service>.v1.%`) · what `$service` calls (its client spans) |
+| Slow & failing | slowest server spans + recent error spans — **TraceId cells carry a data link** opening the full trace in Explore |
+| Logs | recent logs (severity filter, path/status/grpc-code columns, TraceId link), top error messages, error-traces↔logs JOIN |
+
+**Enum values are exporter-version-specific — verified against contrib 0.152.0:**
+`SpanKind` = `Server`/`Client`/`Internal` and `StatusCode` = `Ok`/`Error`/`Unset` (the
+older `SPAN_KIND_SERVER`/`STATUS_CODE_ERROR` spellings are gone — the original dashboard
+was updated to match). Any new panel must use the short spellings.
+
+**Dependency mapping trick:** proto packages are named after the owning service
+(`product.v1.ProductService/…`), so "who calls product" is simply client spans from other
+services where `rpc.method LIKE 'product.v1.%'` — no span-graph processor needed.
 
 ## Query performance rules
 

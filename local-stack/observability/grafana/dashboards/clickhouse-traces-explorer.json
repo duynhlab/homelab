@@ -1,0 +1,1249 @@
+{
+  "uid": "clickhouse-traces-explorer",
+  "title": "OTel — Trace Explorer",
+  "description": "Request investigation over ClickHouse otel_traces: where did the request go and which span broke? Search traces, inspect the waterfall, and read its correlated logs in one place.",
+  "tags": [
+    "clickhouse",
+    "observability",
+    "otel",
+    "rfc-0019",
+    "suite",
+    "traces"
+  ],
+  "editable": true,
+  "graphTooltip": 1,
+  "liveNow": false,
+  "schemaVersion": 38,
+  "version": 1,
+  "style": "dark",
+  "time": {
+    "from": "now-3h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "timepicker": {},
+  "refresh": "30s",
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [
+        "clickhouse"
+      ],
+      "targetBlank": false,
+      "title": "ClickHouse suite",
+      "type": "dashboards",
+      "url": ""
+    }
+  ],
+  "annotations": {
+    "list": []
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "ds",
+        "type": "datasource",
+        "label": "Data source",
+        "query": "grafana-clickhouse-datasource",
+        "current": {
+          "text": "ClickHouse",
+          "value": "clickhouse"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "refresh": 1,
+        "regex": ""
+      },
+      {
+        "name": "environment",
+        "type": "query",
+        "label": "Environment",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "${ds}"
+        },
+        "definition": "SELECT DISTINCT ResourceAttributes['deployment.environment.name'] AS env FROM otel.otel_traces WHERE env != '' ORDER BY env",
+        "query": {
+          "refId": "A",
+          "rawSql": "SELECT DISTINCT ResourceAttributes['deployment.environment.name'] AS env FROM otel.otel_traces WHERE env != '' ORDER BY env",
+          "format": 1,
+          "queryType": "table"
+        },
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "refresh": 2,
+        "sort": 0
+      },
+      {
+        "name": "service",
+        "type": "query",
+        "label": "Service",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "${ds}"
+        },
+        "definition": "SELECT DISTINCT ServiceName FROM otel.otel_traces ORDER BY ServiceName",
+        "query": {
+          "refId": "A",
+          "rawSql": "SELECT DISTINCT ServiceName FROM otel.otel_traces ORDER BY ServiceName",
+          "format": 1,
+          "queryType": "table"
+        },
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "refresh": 2,
+        "sort": 0
+      },
+      {
+        "name": "spanname",
+        "type": "query",
+        "label": "Span name",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "${ds}"
+        },
+        "definition": "SELECT DISTINCT SpanName FROM otel.otel_traces WHERE $__conditionalAll(ServiceName IN (${service:singlequote}), $service) ORDER BY SpanName",
+        "query": {
+          "refId": "A",
+          "rawSql": "SELECT DISTINCT SpanName FROM otel.otel_traces WHERE $__conditionalAll(ServiceName IN (${service:singlequote}), $service) ORDER BY SpanName",
+          "format": 1,
+          "queryType": "table"
+        },
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "refresh": 2,
+        "sort": 0
+      },
+      {
+        "name": "status",
+        "type": "custom",
+        "label": "Status",
+        "query": "Ok,Error,Unset",
+        "options": [],
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "refresh": 0
+      },
+      {
+        "name": "traceid",
+        "type": "textbox",
+        "label": "Trace ID",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "",
+            "value": ""
+          }
+        ],
+        "hide": 0
+      },
+      {
+        "name": "min_duration_ms",
+        "type": "textbox",
+        "label": "Min duration (ms)",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "",
+            "value": ""
+          }
+        ],
+        "hide": 0
+      },
+      {
+        "name": "sample_mod",
+        "type": "constant",
+        "query": "1",
+        "current": {
+          "text": "1",
+          "value": "1"
+        },
+        "hide": 2
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Volume",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Trace volume by status",
+      "description": "One row per trace; Error = at least one failing span anywhere in the trace.",
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 14,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT $__timeInterval(start) AS time, Status, count() AS traces FROM (SELECT TraceId, min(Timestamp) AS start, if(countIf(StatusCode = 'Error') > 0, 'Error', 'Ok') AS Status FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(TraceId = '$traceid', $traceid) GROUP BY TraceId) GROUP BY time, Status ORDER BY time",
+          "format": 0,
+          "queryType": "timeseries",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "fillOpacity": 18,
+            "showPoints": "auto",
+            "pointSize": 5,
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*Error.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*Ok.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*Unset.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "last"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Traces",
+      "description": "",
+      "gridPos": {
+        "x": 14,
+        "y": 1,
+        "w": 3,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT count() AS traces FROM (SELECT TraceId, min(Timestamp) AS start, if(countIf(StatusCode = 'Error') > 0, 'Error', 'Ok') AS Status FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(TraceId = '$traceid', $traceid) GROUP BY TraceId)",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Failed traces",
+      "description": "",
+      "gridPos": {
+        "x": 17,
+        "y": 1,
+        "w": 3,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT 100.0*countIf(Status = 'Error')/count() AS err_pct FROM (SELECT TraceId, min(Timestamp) AS start, if(countIf(StatusCode = 'Error') > 0, 'Error', 'Ok') AS Status FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(TraceId = '$traceid', $traceid) GROUP BY TraceId)",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "p99 (server spans)",
+      "description": "",
+      "gridPos": {
+        "x": 20,
+        "y": 1,
+        "w": 4,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT round(quantile(0.99)(Duration)/1e6, 1) AS p99_ms FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(TraceId = '$traceid', $traceid) AND SpanKind = 'Server'",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 200
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 6,
+      "type": "row",
+      "title": "Duration distribution",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 7,
+      "type": "heatmap",
+      "title": "Span duration distribution",
+      "description": "Log2 y-scale. $sample_mod is a constant (1 = no sampling); raise it (e.g. 500) at high volume — the official plugin pattern.",
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 24,
+        "h": 9
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, Duration/1000000 AS duration_ms FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(TraceId = '$traceid', $traceid) AND cityHash64(SpanId) % $sample_mod = 0 ORDER BY time",
+          "format": 0,
+          "queryType": "timeseries",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "scaleDistribution": {
+              "type": "log",
+              "log": 2
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "calculate": true,
+        "calculation": {
+          "xBuckets": {
+            "mode": "size"
+          },
+          "yBuckets": {
+            "mode": "size"
+          }
+        },
+        "yAxis": {
+          "unit": "ms",
+          "axisPlacement": "left"
+        },
+        "color": {
+          "mode": "scheme",
+          "scheme": "Oranges",
+          "steps": 64,
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "reverse": false
+        },
+        "cellGap": 1,
+        "tooltip": {
+          "mode": "single",
+          "showColorScale": false
+        },
+        "legend": {
+          "show": true
+        },
+        "exemplars": {
+          "color": "rgba(255,0,255,0.7)"
+        },
+        "filterValues": {
+          "le": 1e-09
+        },
+        "rowsFrame": {
+          "layout": "auto"
+        },
+        "showValue": "never"
+      }
+    },
+    {
+      "id": 8,
+      "type": "row",
+      "title": "Find traces — click a TraceId to load the timeline below",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Trace search",
+      "description": "One row per trace (root span + rollup). Filters apply to ANY span in the trace; min duration applies to the root.",
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 24,
+        "h": 9
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT r.Timestamp AS Time, r.ServiceName AS Root, r.SpanName AS Operation, agg.Spans AS Spans, round(r.Duration/1e6, 2) AS root_ms, agg.TraceMs AS trace_ms, if(agg.ErrSpans > 0, 'Error', 'Ok') AS Status, r.TraceId AS TraceId FROM otel.otel_traces AS r INNER JOIN (SELECT TraceId, count() AS Spans, countIf(StatusCode = 'Error') AS ErrSpans, anyIf(StatusMessage, StatusCode = 'Error') AS ErrMsg, round((max(toUnixTimestamp64Nano(Timestamp) + toInt64(Duration)) - min(toUnixTimestamp64Nano(Timestamp)))/1e6, 2) AS TraceMs FROM otel.otel_traces WHERE $__timeFilter(Timestamp) GROUP BY TraceId) AS agg ON r.TraceId = agg.TraceId WHERE $__timeFilter(r.Timestamp) AND r.ParentSpanId = '' AND r.TraceId IN (SELECT DISTINCT TraceId FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(TraceId = '$traceid', $traceid)) AND $__conditionalAll(r.Duration >= toUInt64($min_duration_ms) * 1000000, $min_duration_ms) ORDER BY Time DESC LIMIT 50",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TraceId"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Load trace timeline",
+                    "url": "/d/clickhouse-traces-explorer?var-traceid=${__value.raw}&${__url_time_range}",
+                    "targetBlank": false
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 260
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Error": {
+                        "color": "red",
+                        "index": 0
+                      },
+                      "Ok": {
+                        "color": "green",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "root_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 100
+                    },
+                    {
+                      "color": "red",
+                      "value": 500
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "trace_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 100
+                    },
+                    {
+                      "color": "red",
+                      "value": 500
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "Slowest & failing",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Slowest traces",
+      "description": "Ranked by wall-clock trace duration (max span end - min span start) so async Temporal tails rank correctly.",
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT r.Timestamp AS Time, r.ServiceName AS Root, r.SpanName AS Operation, agg.Spans AS Spans, round(r.Duration/1e6, 2) AS root_ms, agg.TraceMs AS trace_ms, if(agg.ErrSpans > 0, 'Error', 'Ok') AS Status, r.TraceId AS TraceId FROM otel.otel_traces AS r INNER JOIN (SELECT TraceId, count() AS Spans, countIf(StatusCode = 'Error') AS ErrSpans, anyIf(StatusMessage, StatusCode = 'Error') AS ErrMsg, round((max(toUnixTimestamp64Nano(Timestamp) + toInt64(Duration)) - min(toUnixTimestamp64Nano(Timestamp)))/1e6, 2) AS TraceMs FROM otel.otel_traces WHERE $__timeFilter(Timestamp) GROUP BY TraceId) AS agg ON r.TraceId = agg.TraceId WHERE $__timeFilter(r.Timestamp) AND r.ParentSpanId = '' AND r.TraceId IN (SELECT DISTINCT TraceId FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(TraceId = '$traceid', $traceid)) AND $__conditionalAll(r.Duration >= toUInt64($min_duration_ms) * 1000000, $min_duration_ms) ORDER BY agg.TraceMs DESC LIMIT 20",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TraceId"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Load trace timeline",
+                    "url": "/d/clickhouse-traces-explorer?var-traceid=${__value.raw}&${__url_time_range}",
+                    "targetBlank": false
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 260
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "root_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 100
+                    },
+                    {
+                      "color": "red",
+                      "value": 500
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "trace_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 100
+                    },
+                    {
+                      "color": "red",
+                      "value": 500
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Error traces",
+      "description": "Error text comes from StatusMessage (span Events are not populated on this platform).",
+      "gridPos": {
+        "x": 12,
+        "y": 30,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT r.Timestamp AS Time, r.ServiceName AS Root, r.SpanName AS Operation, agg.ErrSpans AS ErrSpans, round(r.Duration/1e6, 2) AS root_ms, agg.TraceMs AS trace_ms, agg.ErrMsg AS Error, r.TraceId AS TraceId FROM otel.otel_traces AS r INNER JOIN (SELECT TraceId, count() AS Spans, countIf(StatusCode = 'Error') AS ErrSpans, anyIf(StatusMessage, StatusCode = 'Error') AS ErrMsg, round((max(toUnixTimestamp64Nano(Timestamp) + toInt64(Duration)) - min(toUnixTimestamp64Nano(Timestamp)))/1e6, 2) AS TraceMs FROM otel.otel_traces WHERE $__timeFilter(Timestamp) GROUP BY TraceId) AS agg ON r.TraceId = agg.TraceId WHERE $__timeFilter(r.Timestamp) AND r.ParentSpanId = '' AND r.TraceId IN (SELECT DISTINCT TraceId FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ResourceAttributes['deployment.environment.name'] IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(SpanName IN (${spanname:singlequote}), $spanname) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(TraceId = '$traceid', $traceid)) AND $__conditionalAll(r.Duration >= toUInt64($min_duration_ms) * 1000000, $min_duration_ms) AND agg.ErrSpans > 0 ORDER BY Time DESC LIMIT 20",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TraceId"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Load trace timeline",
+                    "url": "/d/clickhouse-traces-explorer?var-traceid=${__value.raw}&${__url_time_range}",
+                    "targetBlank": false
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 260
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "root_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 100
+                    },
+                    {
+                      "color": "red",
+                      "value": 500
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "trace_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 100
+                    },
+                    {
+                      "color": "red",
+                      "value": 500
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "countRows": false,
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "row",
+      "title": "Trace detail — set the Trace ID variable (or click a TraceId above)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 14,
+      "type": "traces",
+      "title": "Trace timeline",
+      "description": "Waterfall for $traceid; time window resolved via the otel_traces_trace_id_ts materialized view.",
+      "gridPos": {
+        "x": 0,
+        "y": 39,
+        "w": 24,
+        "h": 18
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "WITH '$traceid' AS trace_id, (SELECT min(Start) FROM otel.otel_traces_trace_id_ts WHERE TraceId = trace_id) AS trace_start, (SELECT max(End) + 1 FROM otel.otel_traces_trace_id_ts WHERE TraceId = trace_id) AS trace_end SELECT TraceId AS traceID, SpanId AS spanID, ParentSpanId AS parentSpanID, ServiceName AS serviceName, SpanName AS operationName, multiply(toUnixTimestamp64Nano(Timestamp), 0.000001) AS startTime, multiply(Duration, 0.000001) AS duration, arrayMap(key -> map('key', key, 'value', SpanAttributes[key]), mapKeys(SpanAttributes)) AS tags, arrayMap(key -> map('key', key, 'value', ResourceAttributes[key]), mapKeys(ResourceAttributes)) AS serviceTags, if(StatusCode = 'Error', 2, 0) AS statusCode FROM otel.otel_traces WHERE TraceId = trace_id AND Timestamp >= trace_start AND Timestamp <= trace_end ORDER BY startTime ASC LIMIT 1000",
+          "format": 3,
+          "queryType": "traces",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "options": {}
+    },
+    {
+      "id": 15,
+      "type": "logs",
+      "title": "Logs for this trace",
+      "description": "Every log line correlated to $traceid, in chronological order — logs ↔ traces on one screen.",
+      "gridPos": {
+        "x": 0,
+        "y": 57,
+        "w": 24,
+        "h": 9
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${ds}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "${ds}"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT Timestamp AS timestamp, Body AS body, lower(SeverityText) AS level, ServiceName, SpanId, LogAttributes['path'] AS path, LogAttributes['status'] AS status, LogAttributes['code'] AS grpc_code FROM otel.otel_logs WHERE TraceId = '$traceid' ORDER BY Timestamp ASC LIMIT 200",
+          "format": 2,
+          "queryType": "logs",
+          "pluginVersion": "4.20.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      }
+    }
+  ]
+}

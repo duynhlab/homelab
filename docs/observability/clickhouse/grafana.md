@@ -9,7 +9,7 @@ Grafana turns the `otel` MergeTree tables into an explorable logs/traces UI and 
 | **Tables** | `otel.otel_logs`, `otel.otel_traces` (+ `otel_traces_trace_id_ts` MV) |
 | **OTel mapping** | `logs.otelEnabled` + `traces.otelEnabled` in provisioning — query builders, Explore views, trace↔log links |
 | **Schema version** | auto (latest) — detected from table columns; both environments write **1.3.0** (collector contrib `0.152.0`) |
-| **Dashboards** | *ClickHouse — OTel logs+traces SQL* (`uid: clickhouse-otel-sql`, platform-wide RED, 19 panels) · *ClickHouse — Service deep dive* (`uid: clickhouse-service-deepdive`, per-service, 20 panels) |
+| **Dashboards** | Standard suite: *OTel — Overview* (`clickhouse-otel-overview`) → *Logs Explorer* (`clickhouse-logs-explorer`) → *Trace Explorer* (`clickhouse-traces-explorer`) · plus *OTel logs+traces SQL* (`clickhouse-otel-sql`) and *Service deep dive* (`clickhouse-service-deepdive`) |
 | **Design record** | [RFC-0019](../../proposals/rfc/RFC-0019/) · [ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/) |
 
 ## Overview
@@ -211,6 +211,46 @@ error-rate % (`countIf(StatusCode = 'STATUS_CODE_ERROR') / count()`), latency
 quantiles (`quantile(0.95)(Duration)/1e6`), severity distribution
 (`SeverityText` piechart), top operations by p95, recent warn+ logs table, and
 the trace↔log correlation JOIN — see [hub § Query examples](./README.md#operations).
+
+## The standard dashboard suite — Overview → Logs → Traces
+
+Three dashboards, one navigation story. Each answers exactly one question, and every
+failure artifact is one click from the next tier:
+
+| Tier | Dashboard (uid) | Question it answers | For whom |
+|------|-----------------|---------------------|----------|
+| 1 | **OTel — Overview** (`clickhouse-otel-overview`) | *Which service is in trouble?* | Everyone — the triage landing page |
+| 2 | **OTel — Logs Explorer** (`clickhouse-logs-explorer`) | *What errors are happening?* | Log investigation |
+| 3 | **OTel — Trace Explorer** (`clickhouse-traces-explorer`) | *Where did the request go and which span broke?* | Request investigation |
+
+**Navigation:** Overview's "who is in trouble" tables link a service into the Logs
+Explorer or the [service deep dive](#the-service-deep-dive-dashboard); every `TraceId`
+cell anywhere in the suite links into the Trace Explorer with `var-traceid` set — which
+loads the **in-dashboard trace timeline** (a real waterfall, `format: 3` + Jaeger-style
+column aliases, time-window resolved via the `otel_traces_trace_id_ts` MV) and a
+**"Logs for this trace"** native logs panel underneath. That pair is the logs↔traces
+payoff on a single screen.
+
+Design decisions verified against live data (not assumptions):
+
+- **Trace-level semantics**: "Trace volume" and every per-trace table group by `TraceId`
+  (a trace is *failed* if ANY span has `StatusCode = 'Error'`); the root span is
+  `ParentSpanId = ''` — verified exactly one root per trace (kong edge or worker
+  workflow).
+- **Native panels**: the logs panels use `format: 2` (SQL must alias
+  `timestamp`/`body`/`level`); the waterfall uses `format: 3`. Only `format` is
+  load-bearing — `queryType` just drives the editor UI.
+- **Variables**: `$severity` is `error,warn,info,debug` — lowercase, because zapx emits
+  lowercase levels (no TRACE/FATAL on this platform). `$environment` reads
+  `deployment.environment.name` (`local` in local-stack, `production` in-cluster; the
+  logs table uses its indexed materialized column). `$traceid`/`$search`/`$min_duration_ms`
+  are textboxes wired through `$__conditionalAll`, which collapses to `1=1` when empty.
+- **Duration heatmap** (Trace Explorer) follows the official plugin pattern — raw
+  `(time, duration_ms)` rows, panel-side bucketing, log₂ y-scale, and a `$sample_mod`
+  constant (`cityHash64(SpanId) % $sample_mod = 0`, default 1 = no sampling; raise to
+  ~500 at high volume).
+- **No exception panels**: span `Events.*` are not populated on this platform; error
+  text comes from `StatusMessage`.
 
 ## The service deep-dive dashboard
 

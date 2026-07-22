@@ -290,6 +290,13 @@ service** at a time: per-operation RED, HTTP route / gRPC method tables (semconv
 keys), east-west dependency tables, slowest/error spans with TraceId→Explore data links,
 and severity-filtered logs.
 
+The **standard suite** adds the three-tier navigation — *OTel — Overview*
+(`clickhouse-otel-overview`, which service is in trouble?) → *Logs Explorer*
+(`clickhouse-logs-explorer`, what errors?) → *Trace Explorer*
+(`clickhouse-traces-explorer`, which span broke? — with an in-dashboard trace
+waterfall + logs-for-this-trace panel). See
+[grafana.md § The standard dashboard suite](./grafana.md#the-standard-dashboard-suite--overview--logs--traces).
+
 Deep dive — datasource OTel mapping, schema versions (1.2.9 vs 1.3.0), Explore
 logs/traces, trace↔log linking, dashboard grammar and macros:
 [**Grafana on ClickHouse**](./grafana.md).

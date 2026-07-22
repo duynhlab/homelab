@@ -21,6 +21,8 @@ resources:
   - grafana-dashboard-clickhouse.yaml
   # ClickHouse per-service deep dive — JSON via configMapGenerator below
   - grafana-dashboard-clickhouse-deepdive.yaml
+  # ClickHouse standard suite: Overview → Logs Explorer → Trace Explorer
+  - grafana-dashboard-clickhouse-suite.yaml
   # VictoriaMetrics stack dashboards
   - grafana-dashboard-vmsingle.yaml
   - grafana-dashboard-vmagent.yaml
@@ -38,6 +40,15 @@ configMapGenerator:
   - name: grafana-dashboard-clickhouse-service-deepdive
     files:
       - clickhouse-service-deepdive.json
+  - name: grafana-dashboard-clickhouse-otel-overview
+    files:
+      - clickhouse-otel-overview.json
+  - name: grafana-dashboard-clickhouse-logs-explorer
+    files:
+      - clickhouse-logs-explorer.json
+  - name: grafana-dashboard-clickhouse-traces-explorer
+    files:
+      - clickhouse-traces-explorer.json
 
 generatorOptions:
   disableNameSuffixHash: true

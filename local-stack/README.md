@@ -390,8 +390,10 @@ curl -s "$VM/api/v1/query" --data-urlencode \
     v=float(r[0]['value'][1]) if r else None; \
     print('C3 DB p95:', 'OK %.2fms' % (v*1000) if v and v < 0.5 else f'FAIL {v} (collapsed buckets? old pkg?)')"
 
-# C4. Both main dashboards load with no datasource/parse errors
-for d in microservices-otel-local business-otel-local; do
+# C4. Main + ClickHouse-suite dashboards load with no datasource/parse errors
+for d in microservices-otel-local business-otel-local \
+         clickhouse-otel-sql clickhouse-service-deepdive \
+         clickhouse-otel-overview clickhouse-logs-explorer clickhouse-traces-explorer; do
   curl -s -o /dev/null -w "C4 $d: %{http_code} (want 200)\n" \
     http://localhost:3002/api/dashboards/uid/$d
 done

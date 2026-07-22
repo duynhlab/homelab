@@ -1,5 +1,8 @@
 # GKE internal DNS on GCP (`cluster.local`, Cloud DNS private zones, multi-environment)
 
+> **Reference only:** GKE + Cloud DNS patterns — **not** the homelab Kind topology.
+> For in-cluster DNS on the deployed platform, see [`api.md`](../api/api.md#hostnames).
+
 > **Purpose:** Complements the **internal / in-cluster** section in [`api.md`](../api/api.md#hostnames) — explains Kubernetes default DNS, Cloud DNS **private zones**, and naming split by environment (`dev` / `uat` / `prod`).
 
 ---
@@ -168,4 +171,4 @@ If you want names like `notification.prod.gke.internal`, use a **private zone + 
 
 ---
 
-_Last updated: 2026-07-07 — moved from docs/api (learning/reference doc; content unchanged)._
+_Last updated: 2026-07-22 — reference-only callout (not homelab Kind topology)._

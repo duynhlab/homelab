@@ -1,6 +1,13 @@
 # Git Branching & Release Standard
 
-This document defines the **production-ready branching strategy** for all microservice repositories in the `duynhlab` platform. It is designed to scale from the current 9 services to 1000+ repositories while maintaining traceability, blast-radius control, and fast incident response.
+> **Deployed vs target:** This document defines the **org-wide branching policy** for
+> microservice repos. **Today:** homelab runs a single **Kind local** cluster
+> (`kubernetes/clusters/local/`); `kubernetes/clusters/production/` is a stub — no prod
+> GitOps overlay is live yet. **CI today** wires PR checks + push-to-`main` builds (see
+> [`cicd.md`](cicd.md)); `dev`/`uat` branch promotion and prod namespace deploys described
+> below are **target**, not fully implemented.
+
+This document defines the **production-ready branching strategy** for all microservice repositories in the `duynhlab` platform. It is designed to scale from the current **10 services** to 1000+ repositories while maintaining traceability, blast-radius control, and fast incident response.
 
 **Model**: Hybrid Enterprise Flow (environment-aligned branch promotion + immutable tagging).
 
@@ -791,4 +798,4 @@ hotfix/PROD-456   -->  MR  -->  main  -->  tag v1.2.1
 | How do I rollback? | Redeploy previous `vX.Y.Z` tag |
 
 ---
-_Last updated: 2026-07-07_
+_Last updated: 2026-07-22 — 10 services; deployed-vs-target callout (Kind local only; prod stub)._

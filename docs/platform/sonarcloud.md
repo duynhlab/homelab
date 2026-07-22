@@ -91,9 +91,9 @@ Coverage is generated per-repository during `go test -race -coverprofile=coverag
 
 ## Links
 
-- SonarCloud projects are per-repository (e.g. `duynhlab_auth-service`, `duynhlab_cart-service`)
+- SonarCloud projects are per-repository (e.g. `duynhlab_auth-service`, `duynhlab_cart-service`, `duynhlab_checkout-service`)
 - [SonarCloud Test Coverage Docs](https://docs.sonarsource.com/sonarqube-cloud/enriching/test-coverage/overview/)
 - Shared workflow: `duynhlab/gha-workflows/.github/workflows/sonarqube.yml`
 
 ---
-_Last updated: 2026-06-30_
+_Last updated: 2026-07-22 — checkout-service project-key example._

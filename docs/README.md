@@ -120,6 +120,7 @@ docs/
 ├── caching/                     # Valkey cache: Cache-Aside, eviction policies, distributed-cache concept
 │   └── README.md                 # Valkey platform hub (eviction, Kong db1, ops)
 ├── platform/                     # Platform/deployment documentation
+│   ├── README.md                 # Platform hub — deployed vs planned, doc map, Flux summary
 │   ├── setup.md                  # GitOps deployment guide (+ seed data & demo accounts)
 │   ├── graceful-shutdown.md      # Graceful shutdown pattern (drain, readiness, timeouts)
 │   ├── gke-internal-dns.md       # GKE cluster.local, Cloud DNS private zones, multi-environment
@@ -152,7 +153,8 @@ docs/
 ### Getting Started (New Users)
 
 1. **[Repositories](#repositories)** - Polyrepo index: GitHub links, images, and CI badges
-2. **[Setup Guide](./platform/setup.md)** - Complete GitOps deployment guide
+2. **[Platform hub](./platform/README.md)** - Deployed vs planned, doc map, Flux summary
+3. **[Setup Guide](./platform/setup.md)** - Complete GitOps deployment guide
    - Quick start (3 commands, 5 minutes)
    - GitOps architecture with Flux Operator
    - Simplified structure (infra/ + apps/, refactored 2026-01-12)
@@ -160,11 +162,11 @@ docs/
    - Step-by-step instructions
    - Troubleshooting common issues
 
-3. **[API area hub](./api/README.md)** - How the api docs fit together (routes / payloads / catalog / subsystems)
+4. **[API area hub](./api/README.md)** - How the api docs fit together (routes / payloads / catalog / subsystems)
 
-4. **[Shared API and communication guide](./api/api.md)** - URL model, audiences, common contracts, service index, and gRPC runtime
+5. **[Shared API and communication guide](./api/api.md)** - URL model, audiences, common contracts, service index, and gRPC runtime
 
-5. **[GKE internal & private DNS](./platform/gke-internal-dns.md)** - `cluster.local`, Cloud DNS private zones, multi-environment naming
+6. **[GKE internal & private DNS](./platform/gke-internal-dns.md)** - `cluster.local`, Cloud DNS private zones, multi-environment naming (reference — not homelab)
 
 ## Repositories {#repositories}
 
@@ -438,6 +440,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 ### Platform
 
+- [Platform hub](./platform/README.md) - Deployed vs planned, doc map, Flux summary
 - [Setup Guide](./platform/setup.md) - Complete deployment and configuration guide
 - [Application Delivery](./platform/application-delivery.md) - ResourceSet patterns & templates
 - [cert-manager + Flux](./secrets/cert-manager.md) - TLS with Let's Encrypt, HelmRelease, Ingress, trust-manager

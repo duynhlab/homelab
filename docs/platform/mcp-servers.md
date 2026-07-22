@@ -8,9 +8,9 @@ This document covers deploying **3 MCP servers** in the homelab cluster:
 
 | MCP Server | Purpose | Connects To | Chart Version |
 |---|---|---|---|
-| **victoria-metrics-mcp** | Query metrics, alerts, cardinality, rules | VMSingle | `0.2.0` |
+| **victoria-metrics-mcp** | Query metrics, alerts, cardinality, rules | VMSingle | `0.3.0` |
 | **victoria-logs-mcp** | Query logs, streams, fields | VLSingle | `0.1.0` |
-| **flux-operator-mcp** | Flux resources, reconciliation, logs | Kubernetes API | Latest |
+| **flux-operator-mcp** | Flux resources, reconciliation, logs | Kubernetes API | `*` (floating OCI semver) |
 
 ```mermaid
 flowchart TD
@@ -55,7 +55,7 @@ Exposes VictoriaMetrics metrics data to AI assistants via MCP protocol. Capabili
 ```yaml
 # victoria-metrics-mcp HelmRelease values
 # Chart: oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-mcp
-# Version: 0.2.0
+# Version: 0.3.0
 
 nameOverride: vmm
 
@@ -676,4 +676,4 @@ curl http://localhost:9090/health             # Flux MCP
 | VM Agent Skills | https://github.com/VictoriaMetrics/skills |
 
 ---
-_Last updated: 2026-07-14 — VM MCP chart 0.3.0 and VL MCP chart 0.1.0 pinned._
+_Last updated: 2026-07-22 — VM MCP chart 0.3.0 in overview table; flux-operator-mcp OCI semver `*`._

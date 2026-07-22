@@ -8,7 +8,7 @@
 | **Status** | researching |
 | **Scope** | platform-wide |
 | **Created** | 2026-07-21 |
-| **Last updated** | 2026-07-21 |
+| **Last updated** | 2026-07-22 |
 
 > **Plain-language research.** Write like a careful blog post, not an RFC. After jargon,
 > add **"In plain terms"** blockquotes. Facts must still be verified (Context7 + manifests).
@@ -197,7 +197,7 @@ Verified against manifests on 2026-07-21. Marks **deployed** vs **planned**.
 | PKI root + trust distribution | `selfsigned-bootstrap → homelab-ca → CA issuer` + trust-manager root-only bundle | unchanged — the anchor |
 | Edge (Kong) | `kong-proxy-tls` wildcard; **prod** `letsencrypt-prod` (Cloudflare DNS-01), **local** patched to `homelab-ca` | base default → `homelab-ca`; **prod overlay** re-adds `letsencrypt-prod` (Cloudflare/ACME dropped from base) |
 | DB replication | CNPG uses TLS `cert` auth for `streaming_replica` — but from **CNPG's own auto-CA**, not `homelab-ca` | keep (internal to CNPG) or re-issue from `homelab-ca` (open question) |
-| App → DB | 9 services `sslmode=disable` via poolers; only `payment` is `hostssl`+`require` direct to CNPG | T2 `verify-full` against `homelab-ca`; then T3 cert-auth (ADR-025) |
+| App → DB | 9 services `sslmode=disable` via poolers; only `payment` is `hostssl`+`require` direct to CNPG | T2 `verify-full` against `homelab-ca`; then T3 cert-auth (ADR-025) — **all via pooler** (owner decision 2026-07-22; `payment`'s direct hop is transitional) |
 | Pooler (PgBouncer / PgDog) | No client-facing TLS; PgDog upstream plaintext; PgBouncer only uses CNPG auto client-cert for `auth_query` | client + upstream TLS — PgDog confirmed TLS-capable up to `verify_full` + mTLS (audit log) |
 | East-west gRPC | plaintext `insecure.NewCredentials()`; Temporal link no TLS | in-process mTLS — **this RFC's east-west tier** (formerly RFC-0002) |
 | Secrets (OpenBAO) | listener `tls_disable = 1`, plaintext `:8200` | `tls_disable = 0`, cert-manager cert (ADR-005 prod target) |
@@ -214,7 +214,7 @@ flowchart LR
   s0["Slice 0<br/>Edge decouple<br/>base → homelab-ca<br/>drop Cloudflare/LE"] --> s1
   s1["Slice 1<br/>OpenBAO TLS<br/>tls_disable=0"] --> note1
   s0 --> s2["Slice 2<br/>CNPG server cert<br/>on homelab-ca"]
-  s2 --> s3["Slice 3<br/>Pooler TLS<br/>(or direct/bypass)"]
+  s2 --> s3["Slice 3<br/>Pooler TLS<br/>(all app→DB via pooler)"]
   s3 --> s4["Slice 4<br/>App sslmode<br/>require → verify-full"]
   s4 --> s5["Slice 5<br/>DB cert-auth<br/>hostssl … cert (ADR-025)"]
   s0 --> s6["Slice 6<br/>gRPC mTLS<br/>in-process (was RFC-0002)"]
@@ -231,6 +231,11 @@ flowchart LR
 **Hard dependency:** App→DB `verify-full` (Slice 4) is **blocked by the pooler tier** (Slice 3) —
 you cannot ask an app to verify a TLS server if the pooler in front of it speaks no TLS. This is
 why `payment` (direct-to-CNPG, no pooler) is the *only* service on `require` today.
+
+**Owner decision (2026-07-22): every app→DB path goes through its pooler — no
+direct-to-CNPG exceptions.** `payment`'s direct connection existed only because the pooler
+spoke no TLS; it is transitional and returns behind `pgdog-product` once Slice 3 lands.
+Direct/bypass is no longer an escape hatch in any slice.
 
 ---
 
@@ -268,6 +273,11 @@ here maps directly to "flip to IAM" later.
       `make up` re-bootstraps?
 - [ ] **What does "sslmode true" mean per tier** — target `require` (encrypt only) everywhere
       first, or jump straight to `verify-full`? And which services graduate to T3 cert-auth?
+      **New nuance from the all-via-pooler decision:** with a pooler in the middle, Postgres
+      `hostssl … cert` authenticates the *pooler's* client cert, not the app's — per-service
+      cert identity lives on the app→pooler leg (PgDog `tls_client_ca_certificate`), while the
+      pooler→Postgres leg carries the pooler's identity. The RFC must define what T3 means
+      per hop.
 - [ ] **Cert lifetimes / rotation** — short-lived internal leaves (hours/days, auto-rotated) vs
       the 90d/30d-renew the superseded RFC-0002 proposed. One policy for all internal leaves, or per-tier?
 - [ ] **OpenBAO TLS bootstrap ordering** — the cert-manager cert must exist before OpenBAO

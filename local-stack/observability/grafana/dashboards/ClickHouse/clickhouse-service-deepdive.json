@@ -1,14 +1,13 @@
 {
   "uid": "clickhouse-service-deepdive",
   "title": "ClickHouse — Service deep dive",
-  "description": "Per-microservice drill-down over OTel logs+traces in ClickHouse (RFC-0019). Platform-wide RED lives in 'ClickHouse — OTel logs+traces SQL'.",
+  "description": "Per-service drill-down over OpenTelemetry logs and traces in ClickHouse. Fleet-wide view: 'ClickHouse — OTel logs+traces SQL'.",
   "tags": [
     "clickhouse",
     "observability",
     "otel",
     "logs",
     "traces",
-    "rfc-0019",
     "deep-dive"
   ],
   "editable": true,
@@ -451,7 +450,7 @@
       "id": 8,
       "type": "timeseries",
       "title": "Request rate by operation",
-      "description": "Server spans bucketed by $__timeInterval, one line per operation (route or RPC).",
+      "description": "Server spans bucketed over time, one line per operation (route or RPC).",
       "gridPos": {
         "x": 0,
         "y": 6,
@@ -752,7 +751,7 @@
     {
       "id": 12,
       "type": "row",
-      "title": "HTTP surface (semconv v1.41)",
+      "title": "HTTP endpoints",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -766,7 +765,7 @@
       "id": 13,
       "type": "table",
       "title": "Routes — calls, 5xx, latency",
-      "description": "HTTP server spans only. Keys are the v1.41 names: http.request.method / http.route / http.response.status_code.",
+      "description": "HTTP server spans grouped by method and route (attributes: http.request.method, http.route, http.response.status_code).",
       "gridPos": {
         "x": 0,
         "y": 23,
@@ -970,7 +969,7 @@
     {
       "id": 15,
       "type": "row",
-      "title": "gRPC surface (rpc.method — new-mode semconv, no rpc.service)",
+      "title": "gRPC methods",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -984,7 +983,7 @@
       "id": 16,
       "type": "table",
       "title": "RPCs served — calls, errors, latency",
-      "description": "gRPC server spans. rpc.method holds the full package.Service/Method (otelgrpc new mode); health/reflection RPCs are filtered at the SDK.",
+      "description": "gRPC server spans. rpc.method holds the full package.Service/Method; health checks and reflection are excluded.",
       "gridPos": {
         "x": 0,
         "y": 32,
@@ -1592,7 +1591,7 @@
     {
       "id": 24,
       "type": "row",
-      "title": "Logs (zapx → otelzap: lowercase severity, Body = message)",
+      "title": "Logs",
       "collapsed": false,
       "gridPos": {
         "x": 0,

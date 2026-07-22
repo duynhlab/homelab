@@ -262,8 +262,8 @@ the platform-wide RED view stays in `clickhouse-otel-sql`. Seven rows:
 |-----|--------|
 | Overview | req/s, error %, p95 (server spans), error-log count, distinct operations |
 | Traffic & latency | rate by operation, p50/p95/p99, error % over time, log volume by severity |
-| HTTP surface | route × method table (calls, 5xx, p95) + status-class timeseries — keys `http.request.method` / `http.route` / `http.response.status_code` |
-| gRPC surface | `rpc.method` split into Service/Method (calls, errors, p95) + rate by method |
+| HTTP endpoints | route × method table (calls, 5xx, p95) + status-class timeseries — keys `http.request.method` / `http.route` / `http.response.status_code` |
+| gRPC methods | `rpc.method` split into Service/Method (calls, errors, p95) + rate by method |
 | Dependencies | who calls `$service` (client spans matching `<service>.v1.%`) · what `$service` calls (its client spans) |
 | Slow & failing | slowest server spans + recent error spans — **TraceId cells carry a data link** opening the full trace in Explore |
 | Logs | recent logs (severity filter, path/status/grpc-code columns, TraceId link), top error messages, error-traces↔logs JOIN |
@@ -276,6 +276,38 @@ was updated to match). Any new panel must use the short spellings.
 **Dependency mapping trick:** proto packages are named after the owning service
 (`product.v1.ProductService/…`), so "who calls product" is simply client spans from other
 services where `rpc.method LIKE 'product.v1.%'` — no span-graph processor needed.
+
+## Plugin-bundled dashboards (manual import — not GitOps)
+
+The datasource ships 7 reference dashboards, importable from the datasource
+config page → **Dashboards** tab. They are useful references but live **only in
+that Grafana instance's database**: a UI import is not in git, never reaches the
+cluster (which only receives GitOps `GrafanaDashboard` CRs), and is wiped when
+the local Grafana volume is recreated. Re-import from the same tab if needed.
+
+| Dashboard (uid) | Group | What it is |
+|---|---|---|
+| ClickHouse - Query Analysis (`w5Q2Otank`) | **Server admin** | Query performance over `system.query_log` — slow queries, read/written rows, failures |
+| ClickHouse - Data Analysis (`-B3tt7a7z`) | Server admin | Table/parts/disk usage — sizes, part counts, compression |
+| ClickHouse - Cluster Analysis (`_hAsuzBnz`) | Server admin | Replication, distributed queries, cluster health (mostly single-node N/A here) |
+| Advanced ClickHouse Monitoring (`e336c8cd-…`) | Server admin | Deep server internals — memory, merges, mark cache, background pools |
+| OpenTelemetry Logs Explorer (`otel-logs-explorer`) | **OTel reference** | Upstream generic version of our [Logs Explorer](#the-standard-dashboard-suite--overview--logs--traces) |
+| OpenTelemetry Traces Explorer (`otel-traces-explorer`) | OTel reference | Upstream generic version of our Trace Explorer — note its duration heatmap hard-codes `% 500` sampling (near-empty at homelab volume) |
+| OpenTelemetry Service Dashboard (`otel-service-dashboard`) | OTel reference | Upstream per-service overview — our [service deep dive](#the-service-deep-dive-dashboard) covers this with verified enums/keys |
+
+The **server admin** group monitors ClickHouse *itself* (`system.*` tables) — a
+niche the in-repo suite deliberately does not cover. The **OTel reference**
+group overlaps the standard suite; the in-repo boards are the tuned, e2e-verified
+versions (real enum spellings, environment filter on member spans, `$sample_mod`,
+cross-links, in-dashboard waterfall). Treat the imports as disposable references;
+if a server-admin board earns a permanent place, promote it to a provisioned
+JSON + CR like the suite.
+
+**Folders:** provisioned ClickHouse dashboards live in the **ClickHouse** Grafana
+folder on both environments (locally via the file provider's
+`foldersFromFilesStructure` + `dashboards/ClickHouse/`; in-cluster via the CR
+`folder:` field). Other local-stack boards sit in **Observability**; manual
+imports land wherever you put them (General by default).
 
 ## Query performance rules
 

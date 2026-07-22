@@ -1,4 +1,6 @@
 # Loads dashboard JSON from /var/lib/grafana/dashboards (mounted from ./observability/grafana/dashboards).
+# First-level subdirectory names become Grafana folders (ClickHouse/, Observability/),
+# mirroring the cluster's GrafanaDashboard CR `folder:` values.
 apiVersion: 1
 providers:
   - name: local-stack
@@ -8,4 +10,4 @@ providers:
     allowUiUpdates: true
     options:
       path: /var/lib/grafana/dashboards
-      foldersFromFilesStructure: false
+      foldersFromFilesStructure: true

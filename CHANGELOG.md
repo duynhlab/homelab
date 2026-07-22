@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **grafana-clickhouse-datasource pinned to 4.20.0** (cluster + local-stack; was unpinned "latest"): OTel schema 1.3.0 + auto-detect; datasources gain `logs`/`traces` `otelEnabled` mapping (query builders, Explore, trace↔log links); local-stack collector bumped `0.140.0` → `0.152.0` to match the cluster's OTel logs schema (contrib ≥ 0.151.0 drops `TimestampTime`).
+- **Grafana folders + team-friendly dashboard text**: ClickHouse dashboards grouped into a `ClickHouse` Grafana folder on both environments (local via `foldersFromFilesStructure` + subdirectories, cluster via CR `folder:`); all visible dashboard text rewritten in plain SRE language (no RFC/phase/internal-library jargon); plugin-bundled reference dashboards documented (manual import, not GitOps, wiped on volume recreate).
 - **Fixed stale span enums in *ClickHouse — OTel logs+traces SQL***: exporter ≥ 0.152.0 writes `StatusCode` `Ok`/`Error`/`Unset` and `SpanKind` `Server`/`Client` — the dashboard's `STATUS_CODE_*` filters silently returned 0 errors; replaced in queries and value mappings (both copies).
 
 - **RFC-0020 promoted to provisional**: research gate passed — owner decisions recorded (all app→DB via pooler, `payment` direct hop transitional; CNPG server cert re-issued from `homelab-ca`; straight to `verify-full`; T3 defined per hop; 90d/30d rotation; `streaming_replica` stays CNPG-managed; umbrella scope Slice 0–6) and `RFC-0020/README.md` added (decision, target architecture, rollout).

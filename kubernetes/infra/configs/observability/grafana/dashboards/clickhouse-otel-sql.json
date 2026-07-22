@@ -1,14 +1,13 @@
 {
   "uid": "clickhouse-otel-sql",
   "title": "ClickHouse — OTel logs+traces SQL",
-  "description": "SQL/OLAP over OpenTelemetry logs+traces retained in ClickHouse (RFC-0019 Phase B).",
+  "description": "Long-retention (90d) SQL analytics over OpenTelemetry logs and traces stored in ClickHouse.",
   "tags": [
     "clickhouse",
     "observability",
     "otel",
     "logs",
-    "traces",
-    "rfc-0019"
+    "traces"
   ],
   "style": "dark",
   "editable": true,
@@ -103,7 +102,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "### ClickHouse — OTel logs+traces SQL &nbsp;·&nbsp; RFC-0019 Phase B\nLong-retention (**TTL 90d**) OLAP over OpenTelemetry logs+traces — the cross-day SQL the 7-day, LogsQL/TraceQL-only ops primaries can't give, plus the `otel_logs`↔`otel_traces` **`trace_id` JOIN** in one store. **Logs-first**: `otel_logs` (100%, unsampled) counts; `otel_traces` (head-sampled) are exemplars. Metrics stay on VictoriaMetrics — never here."
+        "content": "### ClickHouse — OTel logs+traces SQL\n**90-day retention** SQL analytics over OpenTelemetry logs and traces — ask the cross-day questions the short-retention log/trace stores can't answer, and JOIN `otel_logs`↔`otel_traces` on **`trace_id`** in one database. **Logs first**: `otel_logs` is complete (unsampled) — use it for counts; `otel_traces` is sampled — treat traces as examples, not totals. Metrics live in VictoriaMetrics, not here."
       },
       "transparent": true
     },
@@ -1524,7 +1523,7 @@
       "id": 19,
       "type": "table",
       "title": "Cross-signal: traces ↔ correlated logs",
-      "description": "The RFC-0019 payoff: otel_traces ANY LEFT JOIN otel_logs ON TraceId — traces vs correlated log lines per service, in one store.",
+      "description": "Traces joined to their correlated log lines per service (JOIN on TraceId) — both signals in one store.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "${ds}"

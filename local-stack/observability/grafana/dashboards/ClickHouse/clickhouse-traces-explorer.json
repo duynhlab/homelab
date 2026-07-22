@@ -6,7 +6,6 @@
     "clickhouse",
     "observability",
     "otel",
-    "rfc-0019",
     "suite",
     "traces"
   ],
@@ -553,7 +552,7 @@
       "id": 7,
       "type": "heatmap",
       "title": "Span duration distribution",
-      "description": "Log2 y-scale. $sample_mod is a constant (1 = no sampling); raise it (e.g. 500) at high volume — the official plugin pattern.",
+      "description": "Log2 y-scale. $sample_mod controls sampling (1 = keep every span); raise it (e.g. 500) if this panel gets heavy at high volume.",
       "gridPos": {
         "x": 0,
         "y": 10,
@@ -849,7 +848,7 @@
       "id": 11,
       "type": "table",
       "title": "Slowest traces",
-      "description": "Ranked by wall-clock trace duration (max span end - min span start) so async Temporal tails rank correctly.",
+      "description": "Ranked by wall-clock trace duration (last span end minus first span start), so traces with long async tails rank correctly.",
       "gridPos": {
         "x": 0,
         "y": 30,

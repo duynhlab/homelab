@@ -11,7 +11,7 @@ spec:
   instanceSelector:
     matchLabels:
       dashboards: grafana
-  folder: "Observability"
+  folder: "ClickHouse"
   allowCrossNamespaceImport: true
   resyncPeriod: 30s
   configMapRef:
@@ -26,7 +26,7 @@ spec:
   instanceSelector:
     matchLabels:
       dashboards: grafana
-  folder: "Observability"
+  folder: "ClickHouse"
   allowCrossNamespaceImport: true
   resyncPeriod: 30s
   configMapRef:
@@ -41,7 +41,7 @@ spec:
   instanceSelector:
     matchLabels:
       dashboards: grafana
-  folder: "Observability"
+  folder: "ClickHouse"
   allowCrossNamespaceImport: true
   resyncPeriod: 30s
   configMapRef:

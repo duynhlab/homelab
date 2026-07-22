@@ -6,7 +6,6 @@
     "clickhouse",
     "observability",
     "otel",
-    "rfc-0019",
     "suite",
     "overview"
   ],

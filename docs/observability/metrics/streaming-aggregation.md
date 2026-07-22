@@ -3,7 +3,7 @@
 How a metrics pipeline survives 1000+ microservices: aggregate series **in
 flight** — before they ever become storage cardinality — instead of paying to
 store per-instance data nobody queries. This is the playbook layer above
-[app-side cardinality control](metrics-apps.md#app-side-cardinality-control):
+[app-side cardinality control](../../api/metrics.md#app-side-cardinality-control):
 app hygiene bounds *what one replica emits*; streaming aggregation bounds *what
 the fleet costs*.
 

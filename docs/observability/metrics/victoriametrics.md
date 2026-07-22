@@ -7,7 +7,7 @@ This platform uses the **VictoriaMetrics Operator** to manage the metrics stack 
 | **Operator** | `victoria-metrics-operator` (namespace `monitoring`) |
 | **Metrics** | VMSingle `:8428`, VMAgent `:8429` |
 | **Alerting** | VMAlert + VMAlertmanager |
-| **Logs** | VLSingle `:9428` — ops: [victorialogs.md](../logging/victorialogs.md) (not duplicated here) |
+| **Logs** | VLSingle `:9428` — ops: [logging/README.md#platform-pipeline](../logging/README.md#platform-pipeline) (not duplicated here) |
 | **Access control** | None (Kind) — [VMAuth planned](#vmauth--vmauth-planned) |
 | **Dual CRDs** | `prometheus-operator-crds` + VM Operator auto-converter |
 
@@ -62,7 +62,7 @@ flowchart TD
         VMSingle["VMSingle<br/>Stores metrics"]
         VMAlert["VMAlert<br/>Evaluates rules"]
         VMAMgr["VMAlertmanager<br/>Routes alerts"]
-        VLSingle["VLSingle<br/>logs — see victorialogs.md"]
+        VLSingle["VLSingle<br/>logs — see logging/README.md#platform-pipeline"]
     end
 
     subgraph consumers ["Consumers"]
@@ -188,7 +188,7 @@ This is the most important concept to understand. The cluster runs **two separat
 | `VTSingle/victoria-traces` | `configs/observability/tracing/victoriatraces/vtsingle.yaml` | Trace storage (pilot) |
 | `VMNodeScrape/kubelet-{cadvisor,volume-stats}` | `configs/observability/metrics/victoriametrics/vmnodescrape-kubelet.yaml` | Kubelet cAdvisor + volume-stats scraping (2 CRs) |
 
-**VLSingle** (log storage) uses the same Operator but is documented in the [VictoriaLogs ops guide](../logging/victorialogs.md) — ingest paths, Vector, endpoints, and troubleshooting are not duplicated here.
+**VLSingle** (log storage) uses the same Operator but is documented in the [Logging (platform pipeline)](../logging/README.md#platform-pipeline) — ingest paths, Vector, endpoints, and troubleshooting are not duplicated here.
 
 Additionally, the VM Operator **auto-creates** VM resources by converting Prometheus CRDs:
 
@@ -726,7 +726,7 @@ flowchart LR
     class VMAlert_f,VMAMgr_f platform;
 ```
 
-Log ingest and query paths: [VictoriaLogs ops guide](../logging/victorialogs.md).
+Log ingest and query paths: [Logging (platform pipeline)](../logging/README.md#platform-pipeline).
 
 ---
 
@@ -850,7 +850,7 @@ curl -s 'http://localhost:8428/api/v1/query' \
   --data-urlencode 'query=go_goroutine_count{app!=""}' | jq .   # app liveness: OTLP push has no up{}; see D-4 heartbeat
 ```
 
-Log queries and VLSingle verification: [victorialogs.md](../logging/victorialogs.md).
+Log queries and VLSingle verification: [logging/README.md#platform-pipeline](../logging/README.md#platform-pipeline).
 
 ### Quick Access (all port-forwards)
 
@@ -866,7 +866,7 @@ Access URLs after running the script:
 |-----------|-----|
 | Grafana | http://localhost:3000 |
 | VictoriaMetrics VMUI | http://localhost:8428/vmui |
-| VictoriaLogs | http://localhost:9428 — query/ops: [victorialogs.md](../logging/victorialogs.md) |
+| VictoriaLogs | http://localhost:9428 — query/ops: [logging/README.md#platform-pipeline](../logging/README.md#platform-pipeline) |
 | Jaeger | http://localhost:16686 |
 
 ---
@@ -960,7 +960,7 @@ kubectl get helmreleases -A -o wide
 ## References
 
 - [vmauth](https://docs.victoriametrics.com/victoriametrics/vmauth/) · [Operator auth](https://docs.victoriametrics.com/operator/auth/) · [VMAuth CRD](https://docs.victoriametrics.com/operator/resources/vmauth/) · [VMUser CRD](https://docs.victoriametrics.com/operator/resources/vmuser/)
-- [VictoriaLogs ops guide](../logging/victorialogs.md) — VLSingle ingest, Vector, LogsQL (not duplicated here)
+- [Logging (platform pipeline)](../logging/README.md#platform-pipeline) — VLSingle ingest, Vector, LogsQL (not duplicated here)
 - [Grafana multi-team RBAC](../grafana/rbac-multi-team.md)
 - [VictoriaMetrics Operator Documentation](https://docs.victoriametrics.com/operator/)
 - [VM Operator Quick Start](https://docs.victoriametrics.com/operator/quick-start/)
@@ -977,4 +977,4 @@ kubectl get helmreleases -A -o wide
 
 ---
 
-_Last updated: 2026-07-18 — Merge vmauth into this page; trim duplicated VLSingle/logs content (see victorialogs.md)._
+_Last updated: 2026-07-18 — Merge vmauth into this page; trim duplicated VLSingle/logs content (see logging/README.md#platform-pipeline)._

@@ -1,8 +1,8 @@
 # Application Metrics Catalog
 
 Every metric series the 10 Go services emit, in lookup-table form — the
-**"what exists"** companion to [metrics-apps.md](metrics-apps.md) (the "how it
-works"). All names below are the **Prometheus-rendered** forms as they appear
+**"what exists"** companion to [Application metrics](../../api/metrics.md) (authoring)
+and [metrics-apps.md](metrics-apps.md) (platform alert map / ops). All names below are the **Prometheus-rendered** forms as they appear
 in VictoriaMetrics (verified live 2026-07-16); the OTel instrument names are
 listed beside them.
 
@@ -20,19 +20,19 @@ listed beside them.
 ## Auto-instrumented families (no per-service code)
 
 These come from libraries wired once in `pkg` — never hand-write them
-([metrics-apps](metrics-apps.md) has the full mechanics per family):
+([Application metrics](../../api/metrics.md) has the full mechanics per family):
 
 | Family (PromQL) | Type | Labels | Answers | Deep dive |
 |---|---|---|---|---|
-| `http_server_request_duration_seconds` | Histogram (13 SLO buckets) | `http_request_method`, `http_route`, `http_response_status_code` | RED core: rate, errors, p50/p95/p99, Apdex | [HTTP server metrics](metrics-apps.md#http-server-metrics-auto-instrumented) |
+| `http_server_request_duration_seconds` | Histogram (13 SLO buckets) | `http_request_method`, `http_route`, `http_response_status_code` | RED core: rate, errors, p50/p95/p99, Apdex | [HTTP server metrics](../../api/metrics.md#http-server-metrics-auto-instrumented) |
 | `http_server_{request,response}_body_size_bytes` | Histogram (byte buckets) | same | RX/TX bandwidth per route | same |
-| `rpc_server_call_duration_seconds` | Histogram | `rpc_method`, `rpc_response_status_code`, `rpc_system_name` | East-west RED, callee side | [gRPC instrumentation](metrics-apps.md#grpc-instrumentation-east-west) |
+| `rpc_server_call_duration_seconds` | Histogram | `rpc_method`, `rpc_response_status_code`, `rpc_system_name` | East-west RED, callee side | [gRPC instrumentation](../../api/metrics.md#grpc-instrumentation-east-west) |
 | `rpc_client_call_duration_seconds` | Histogram | `rpc_method`, `rpc_response_status_code` (server addr/port dropped by View) | East-west RED, caller side | same |
-| `go_goroutine_count` · `go_memory_used_bytes` · `go_memory_gc_goal_bytes` · `go_memory_limit_bytes` | Gauge | resource attrs only (+ `go_memory_type`) | Runtime health + the D-4 liveness heartbeat | [Go runtime metrics](metrics-apps.md#go-runtime-metrics) |
-| `db_client_operation_duration_seconds` | Histogram (`DBDurationBuckets`, pkg ≥ v0.24.0) | `pgx_operation_type` = `query`\|`batch`\|`copy`\|`connect`\|`prepare`\|`acquire`, `db_system_name` | App-side DB latency p95/p99 | [DB client metrics](metrics-apps.md#db-client-metrics-otelpgx) |
+| `go_goroutine_count` · `go_memory_used_bytes` · `go_memory_gc_goal_bytes` · `go_memory_limit_bytes` | Gauge | resource attrs only (+ `go_memory_type`) | Runtime health + the D-4 liveness heartbeat | [Go runtime metrics](../../api/metrics.md#go-runtime-metrics) |
+| `db_client_operation_duration_seconds` | Histogram (`DBDurationBuckets`, pkg ≥ v0.24.0) | `pgx_operation_type` = `query`\|`batch`\|`copy`\|`connect`\|`prepare`\|`acquire`, `db_system_name` | App-side DB latency p95/p99 | [DB client metrics](../../api/metrics.md#db-client-metrics-otelpgx) |
 | `db_client_operation_errors_total` | Counter | same | Non-`ErrNoRows` DB failures | same |
 | `pgxpool_*` (13 series: `acquired/idle/total/max_connections`, `acquires_total`, `empty_acquire_total`, `empty_acquire_wait_time_nanoseconds_total`, …) | Gauges + Counters | pool name, `db_system` | Pool in-flight, saturation, contention | same |
-| `db_client_connections_*` (usage, `use_time_milliseconds`, hits/misses/timeouts/waits) | mixed | `state` | **Valkey cache pool** (redisotel, product only) — *not Postgres* | [naming trap](metrics-apps.md#db-client-metrics-otelpgx) |
+| `db_client_connections_*` (usage, `use_time_milliseconds`, hits/misses/timeouts/waits) | mixed | `state` | **Valkey cache pool** (redisotel, product only) — *not Postgres* | [naming trap](../../api/metrics.md#db-client-metrics-otelpgx) |
 
 > gRPC note: the two `rpc_*_call_duration_seconds` families are the **only**
 > `rpc_*` series on the platform (verified against the live series list) —
@@ -144,7 +144,7 @@ enum — no ids, no PII; amounts ride in histogram **values**, never labels.
   `_bucket`/`_sum`/`_count`.
 - **Buckets are histogram-only** and any non-HTTP histogram must set them
   explicitly — see the
-  [instrument-types explainer](metrics-apps.md#otel-instrument-types) for the
+  [instrument-types explainer](../../api/metrics.md#otel-instrument-types) for the
   full rule and the ms-default trap.
 - **Exactly-once discipline** — counters are gated on the transition that
   actually applied (not on stale re-drives); Temporal workflow code adds a

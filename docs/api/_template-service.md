@@ -26,12 +26,12 @@ CI badges live in hub rollup + docs/README.md § Repositories, not here.
 
 <!-- Part 3 — Table 2: Identity (stable metadata, does not change per phase). -->
 
-| | |
-|---|---|
-| **Repository** | [`duynhlab/{service}-service`](https://github.com/duynhlab/{service}-service) |
-| **Owns** | {data this service is the source of truth for} |
-| **Database** | `{db}` on `platform-db` |
-| **Design record** | [RFC-NNNN](../proposals/rfc/RFC-NNNN/) <!-- omit row if none --> |
+| Attribute | Value | RFC / ADR |
+|-----------|-------|-----------|
+| **Repository** | [`duynhlab/{service}-service`](https://github.com/duynhlab/{service}-service) | — |
+| **Owns** | {data this service is the source of truth for} | — |
+| **Database** | `{db}` on `platform-db` | — |
+| **Design record** | — | [RFC-NNNN](../proposals/rfc/RFC-NNNN/) <!-- or None --> |
 
 ## Temporal participation
 

@@ -2,12 +2,13 @@
 
 Start here to learn the platform's shared API rules and then drill into one service at a time.
 
-| Attribute | Value |
-|-----------|-------|
-| **Status** | Living documentation checked against all ten service repositories |
-| **Canonical shared guide** | [api.md](./api.md) |
-| **Service map** | [microservices.md](./microservices.md) |
-| **Workflow guide** | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
+| Attribute | Value | RFC / ADR |
+|-----------|-------|-----------|
+| **Status** | Living documentation checked against all ten service repositories | — |
+| **Canonical shared guide** | [api.md](./api.md) | — |
+| **Service map** | [microservices.md](./microservices.md) | — |
+| **Workflow guide** | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) | — |
+| **Design record** | — | None |
 
 ## Documentation Map
 
@@ -59,16 +60,27 @@ shown in [api.md](./api.md#current-east-west-call-graph).
 
 Keeping each fact in one place prevents three copies from drifting.
 
+Every quick-facts table under a `docs/api/` title — and each service contract's
+**Identity** table — uses three columns: **Attribute | Value | RFC / ADR**.
+Normative design links belong on the **Design record** row; use `None` when the
+doc has no owning RFC or ADR.
+
 | Information | Canonical owner |
 |-------------|-----------------|
 | Shared URL, auth, error, pagination, idempotency, and gRPC rules | [api.md](./api.md) |
+| Cross-cutting observability policy, env, middleware, three-layer spans | [observability.md](./observability.md) |
+| Application logging JSON contract, levels, otelzap tee | [logs.md](./logs.md) |
+| Metric instruments, cardinality, business metric authoring | [metrics.md](./metrics.md) |
+| Tracing spans, sampling, span helpers | [tracing.md](./tracing.md) |
+| Profiling client (`obsx.SetupProfiling`, env) | [profiling.md](./profiling.md) |
+| Cache-Aside pattern, keys, stampede lock, env, invalidation boundaries | [caching.md](./caching.md) |
 | East-west call graph and edge exposure rules | [api.md](./api.md) |
 | One service's routes, RPCs, payloads, and business constraints | That service's file (At a glance **Deployment** row for local/cluster) |
 | Platform deployment rollup and status vocabulary | This page § [Service contracts](#service-contracts) |
 | Cross-service feature ownership | [microservices.md](./microservices.md) |
 | Saga, 2PC theory, Temporal workflow, compensation, and operations | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
 | Design rationale and alternatives | RFC or ADR |
-| Deployed gateway, network, database, or observability operation | The matching platform area |
+| Deployed gateway, network, database, or observability backends/ops | The matching platform area under `docs/observability/` |
 | Repository URLs, images, and CI badges | [docs/README.md § Repositories](../README.md#repositories) |
 
 ## Service Contracts {#service-contracts}
@@ -136,8 +148,9 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 |-------|----------|
 | Kong routing and plugins | [Kong gateway](../platform/kong-gateway.md) |
 | NetworkPolicy caller matrix | [Network policies](../security/network-policies.md) |
-| Application and gRPC metrics | [Application metrics](../observability/metrics/metrics-apps.md) |
-| Valkey cache-aside behavior | [Caching](../caching/caching.md) |
+| Application observability (normative contract) | [observability.md](./observability.md) · [logs](./logs.md) · [metrics](./metrics.md) · [tracing](./tracing.md) · [profiling](./profiling.md) |
+| Metrics platform ops (alerts, dashboards) | [Application metrics (platform)](../observability/metrics/metrics-apps.md) |
+| Valkey cache-aside behavior | [Application caching](./caching.md) · [Caching (platform)](../caching/README.md) |
 | Local environment | [local-stack README](../../local-stack/README.md) |
 | Repository index (images + CI) | [docs/README.md § Repositories](../README.md#repositories) |
 
@@ -146,6 +159,8 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 | Change | Required documentation |
 |--------|------------------------|
 | Shared convention changes | Update [api.md](./api.md) |
+| Shared observability / instrumentation changes | Update [observability.md](./observability.md) and the relevant pillar file |
+| Cache-Aside contract, keys, stampede, or invalidation rules | Update [caching.md](./caching.md) |
 | Service route, RPC, payload, or state changes | Update only the owning service file |
 | Deployment or CI status changes | Update this rollup + the service At a glance table |
 | East-west call graph or edge exposure changes | Update [api.md](./api.md) |
@@ -158,4 +173,4 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 Every substantive claim must match the service code, local-stack wiring, and
 GitOps manifests. Mark designed but undeployed behavior as **planned**.
 
-_Last updated: 2026-07-21_
+_Last updated: 2026-07-22_

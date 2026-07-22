@@ -2,15 +2,15 @@
 
 Temporal makes the platform's multi-service order transaction durable, retryable, observable, and compensatable.
 
-| Attribute | Value |
-|-----------|-------|
-| **Status** | Implemented — verified end-to-end in local-stack; Temporal and the order worker are deployed in the cluster |
-| **Scope** | Saga and 2PC learning guide plus the live order-fulfillment workflow |
-| **Workflow owner** | Order service and the `order-worker` process |
-| **Task queue** | `order-fulfillment` |
-| **Order result** | `pending` becomes `confirmed` or `failed` |
-| **Registry** | [workflows.md](./workflows.md#order-fulfillment) — all platform workflows in one table |
-| **Decisions** | [ADR-001](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/) · [ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/) · [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) |
+| Attribute | Value | RFC / ADR |
+|-----------|-------|-----------|
+| **Status** | Implemented — verified end-to-end in local-stack; Temporal and the order worker are deployed in the cluster | — |
+| **Scope** | Saga and 2PC learning guide plus the live order-fulfillment workflow | — |
+| **Workflow owner** | Order service and the `order-worker` process | — |
+| **Task queue** | `order-fulfillment` | — |
+| **Order result** | `pending` becomes `confirmed` or `failed` | — |
+| **Registry** | [workflows.md](./workflows.md#order-fulfillment) — all platform workflows in one table | — |
+| **Design record** | — | [ADR-001](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/) · [ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/) · [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) |
 
 ## Overview
 

@@ -13,12 +13,12 @@ only writer of orders and the only place the fulfillment saga starts.
 | **Temporal** | Orchestrator · `OrderFulfillmentWorkflow` · [workflows.md](./workflows.md#order-fulfillment) | Implemented |
 | **Technical debt** | Legacy `POST /order/v1/private/orders` · P6 removal · [Known gaps](#known-gaps) | Technical debt |
 
-| | |
-|---|---|
-| **Repository** | [`duynhlab/order-service`](https://github.com/duynhlab/order-service) |
-| **Owns** | Orders, order items, totals components, idempotency records, fulfillment status |
-| **Database** | `order` on `product-db` (CNPG) via PgDog `pgdog-product.product:6432` |
-| **Design record** | [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) · [RFC-0015](../proposals/rfc/RFC-0015/) (P6 legacy removal) |
+| Attribute | Value | RFC / ADR |
+|-----------|-------|-----------|
+| **Repository** | [`duynhlab/order-service`](https://github.com/duynhlab/order-service) | — |
+| **Owns** | Orders, order items, totals components, idempotency records, fulfillment status | — |
+| **Database** | `order` on `product-db` (CNPG) via PgDog `pgdog-product.product:6432` | — |
+| **Design record** | — | [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) · [RFC-0015](../proposals/rfc/RFC-0015/) (P6 legacy removal) |
 
 ## Temporal participation
 

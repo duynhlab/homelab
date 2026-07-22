@@ -15,12 +15,12 @@ order-service — which remains the only writer of orders.
 | **Temporal** | Orchestrator · `AbandonedCheckoutWorkflow` · [workflows.md](./workflows.md#abandoned-checkout) | Implemented |
 | **Technical debt** | None — the P6 legacy path is order's debt ([order.md](./order.md)) | None |
 
-| | |
-|---|---|
-| **Repository** | [`duynhlab/checkout-service`](https://github.com/duynhlab/checkout-service) |
-| **Owns** | Checkout sessions: funnel state, price snapshots, confirm idempotency ledger, tax rules, promo codes |
-| **Database** | `checkout` on `product-db` via PgDog (`pgdog-product.product:6432`) |
-| **Design record** | [RFC-0015](../proposals/rfc/RFC-0015/) · [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) (re-validation) · [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) (cart read surface) |
+| Attribute | Value | RFC / ADR |
+|-----------|-------|-----------|
+| **Repository** | [`duynhlab/checkout-service`](https://github.com/duynhlab/checkout-service) | — |
+| **Owns** | Checkout sessions: funnel state, price snapshots, confirm idempotency ledger, tax rules, promo codes | — |
+| **Database** | `checkout` on `product-db` via PgDog (`pgdog-product.product:6432`) | — |
+| **Design record** | — | [RFC-0015](../proposals/rfc/RFC-0015/) · [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) (re-validation) · [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) (cart read surface) |
 
 ## Temporal participation
 

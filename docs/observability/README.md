@@ -4,6 +4,12 @@ Comprehensive observability for the `duynhlab` microservices platform -- 10 Go
 services, 2 workers, and 5 PostgreSQL clusters running on Kubernetes with
 GitOps (Flux).
 
+> **Service authors:** normative observability contracts live in
+> [Application observability](../api/observability.md) and the pillar files
+> ([logs](../api/logs.md), [metrics](../api/metrics.md),
+> [tracing](../api/tracing.md), [profiling](../api/profiling.md)). This hub
+> covers **platform** backends, alerts, Grafana, and runbooks.
+
 > **New to the stack?** Start with the [RFC-0014 explainer](opentelemetry/rfc-0014-explainer.md) — old-vs-new, plain-language, diagrams.
 
 ## Architecture
@@ -219,94 +225,25 @@ sequenceDiagram
     MW->>Pyro: CPU / heap / goroutine samples
 ```
 
-### Layer Responsibilities
+### Layer responsibilities (app contract)
 
-#### Web Layer (`web/v1/`)
-
-- HTTP request/response handling, validation, status code mapping, error formatting
-- Creates spans with `layer=web`; logs request/response as JSON on stdout with trace-id
-
-```go
-func Login(c *gin.Context) {
-    ctx, span := middleware.StartSpan(c.Request.Context(), "http.request",
-        trace.WithAttributes(attribute.String("layer", "web")))
-    defer span.End()
-
-    logger := middleware.GetLoggerFromContext(c, baseLogger)
-
-    var req domain.LoginRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        logger.Error("Invalid request", zap.Error(err))
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        return
-    }
-
-    result, err := authService.Login(ctx, req)
-    // ... handle response
-}
-```
-
-#### Logic Layer (`logic/v1/`)
-
-- Business logic, validation, transformation, rule enforcement
-- Cache-Aside against Valkey for read-heavy paths
-- Creates spans with `layer=logic`; custom business metrics emitted via the OTel Meter API and pushed over OTLP; appears in CPU/heap profiles pushed to Pyroscope
-
-```go
-func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*domain.AuthResponse, error) {
-    ctx, span := middleware.StartSpan(ctx, "auth.login",
-        trace.WithAttributes(attribute.String("layer", "logic")))
-    defer span.End()
-
-    if req.Username == "admin" && req.Password == "password" {
-        span.SetAttributes(attribute.Bool("auth.success", true))
-        return response, nil
-    }
-
-    span.SetAttributes(attribute.Bool("auth.success", false))
-    return nil, errors.New("invalid credentials")
-}
-```
-
-#### Core Layer (`core/`)
-
-- Domain models (`core/domain/`), DB connection (`core/database.go`, PostgreSQL via PgBouncer / PgDog), cache client (`core/cache/`, Valkey)
-- **No business logic** — pure data structures + thin infra adapters. DB/cache spans bubble up via instrumentation; pool / hit-rate metrics pushed over OTLP.
-
-### Trace-ID Propagation
-
-```mermaid
-graph LR
-    A["HTTP request<br/>traceparent header"] --> B["TracingMiddleware<br/>extract or create trace_id"]
-    B --> C["LoggingMiddleware<br/>attach trace_id to logger"]
-    C --> D["Web handler<br/>logger from context"]
-    D --> E["Logic service<br/>logger from context"]
-    E --> F["Structured logs<br/>include trace_id"]
-
-    B --> G["OpenTelemetry context<br/>propagated by context.Context"]
-    G --> H["Web span<br/>child of root span"]
-    H --> I["Logic span<br/>child of web span"]
-
-    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
-    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
-    class A edge;
-    class C,D,E service;
-    class F log;
-    class B,G,H,I trace;
-```
+Per-layer span/logging patterns, Go handler examples, and trace-id propagation
+rules for service authors are canonical in
+[**Application observability**](../api/observability.md) (3-layer architecture,
+middleware order, correlation fields). This hub keeps the **platform diagrams**
+above (code structure, end-to-end APM sequence) without duplicating normative
+handler examples.
 
 > Note: `prometheus-operator-crds` is installed only so VictoriaMetrics Operator can transparently consume `ServiceMonitor` / `PodMonitor` / `PrometheusRule` resources — there is no Prometheus server running.
 
 ## The Four Pillars
 
-| Pillar | Tool | Question It Answers | Docs |
-|--------|------|---------------------|------|
-| **Metrics** | VMSingle + VMAgent | "Is something wrong?" | [metrics/](metrics/README.md) |
-| **Traces** | Tempo + Jaeger (+ VictoriaTraces pilot) via OTel Collector | "Where is it slow?" | [tracing/](tracing/README.md) |
-| **Logs** | VictoriaLogs (OTLP tee; Vector for infra) | "Why is it broken?" | [logging/](logging/README.md) |
-| **Profiles** | Pyroscope | "Which code line is the bottleneck?" | [profiling/](profiling/README.md) |
+| Pillar | Tool | Question It Answers | Platform docs | App contract |
+|--------|------|---------------------|---------------|--------------|
+| **Metrics** | VMSingle + VMAgent | "Is something wrong?" | [metrics/](metrics/README.md) | [api/metrics.md](../api/metrics.md) |
+| **Traces** | Tempo + Jaeger (+ VictoriaTraces pilot) via OTel Collector | "Where is it slow?" | [tracing/](tracing/README.md) | [api/tracing.md](../api/tracing.md) |
+| **Logs** | VictoriaLogs (OTLP tee; Vector for infra) | "Why is it broken?" | [logging/](logging/README.md) | [api/logs.md](../api/logs.md) |
+| **Profiles** | Pyroscope | "Which code line is the bottleneck?" | [profiling/](profiling/README.md) | [api/profiling.md](../api/profiling.md) |
 
 ## Documentation Map
 
@@ -314,13 +251,13 @@ graph LR
 docs/observability/
 ├── README.md                     # This file: index + 3-layer architecture + APM integration
 ├── stack-review.md               # Whole-stack review: per-signal maturity scorecard + ranked gaps
-├── opentelemetry/                 # OTel instrumentation, transport, and migration
-│   ├── README.md                  # Canonical policy + current platform behavior
+├── opentelemetry/                 # OTel collector topology, sampling, operations
+│   ├── README.md                  # Platform deployment doc (policy → api/observability.md)
 │   └── rfc-0014-explainer.md     # Beginner old-vs-new walkthrough
 │
 ├── metrics/                      # Pillar 1: Metrics collection & storage
 │   ├── README.md                 # Hub: fundamentals, stack, architecture, coverage
-│   ├── metrics-apps.md           # Application + gRPC east-west metrics (RED)
+│   ├── metrics-apps.md           # Platform view: alert map, dashboards, ops (authoring → api/metrics.md)
 │   ├── metrics-infra.md          # Cluster / infrastructure metrics (USE)
 │   ├── victoriametrics.md        # VictoriaMetrics Operator stack (incl. VMAuth planned)
 │   ├── promql-guide.md           # PromQL reference
@@ -339,8 +276,7 @@ docs/observability/
 │   └── victoriatraces.md         # VictoriaTraces pilot (3rd backend)
 │
 ├── logging/                      # Pillar 3: Structured logging
-│   ├── README.md                 # Architecture, why-this-stack, scaling
-│   └── victorialogs.md           # VictoriaLogs backend & Vector pipeline ops
+│   └── README.md                 # Platform pipeline (VictoriaLogs + Vector)
 │
 ├── profiling/                    # Pillar 4: Continuous profiling
 │   └── README.md                 # Pyroscope (CPU, heap, goroutine)
@@ -477,7 +413,7 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ## Related Documentation
 
-- [OpenTelemetry guide](opentelemetry/README.md) -- OTel concepts, policy, SDK, Collector, and platform operations
+- [OpenTelemetry (platform)](opentelemetry/README.md) -- Collector topology, sampling, operations (app policy → [api/observability.md](../api/observability.md))
 - [RFC-0014 explainer](opentelemetry/rfc-0014-explainer.md) -- beginner old-vs-new migration walkthrough
 - [Metrics: RED/USE/Golden Signals](metrics/README.md) -- metrics methodology
 - [VictoriaMetrics Operator](metrics/victoriametrics.md) -- migration from kube-prometheus-stack
@@ -491,4 +427,4 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-07-14_
+_Last updated: 2026-07-22 — app contracts moved to docs/api/; platform depth retained here._

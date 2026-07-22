@@ -3,9 +3,9 @@
 A from-zero walkthrough of **why and how** the platform moved its observability
 from the old hand-rolled Prometheus setup to **OpenTelemetry (OTLP push)** —
 told with old-vs-new diagrams and plain-language analogies. Start here if the
-stack is new to you; the deep-dives ([metrics](../metrics/metrics-apps.md),
-[traces](../tracing/README.md), [logs](../logging/README.md),
-[policy](README.md)) assume you already know this story.
+stack is new to you; the deep-dives ([Application metrics](../../api/metrics.md),
+[metrics platform ops](../metrics/metrics-apps.md), [traces](../tracing/README.md),
+[logs](../logging/README.md), [platform OTel](README.md)) assume you already know this story.
 
 | | |
 |---|---|
@@ -189,7 +189,7 @@ The metric **names** changed too (`request_duration_seconds` →
 `http_server_request_duration_seconds`, labels `code/path/method` →
 `http_response_status_code/http_route/http_request_method`) because OTel uses
 **semantic conventions**. vmagent translates the OTLP names to Prometheus style
-on ingest. Full detail: [metrics/metrics-apps.md](../metrics/metrics-apps.md).
+on ingest. Authoring detail: [Application metrics](../../api/metrics.md); alert map and ops: [metrics-apps.md](../metrics/metrics-apps.md).
 
 ---
 
@@ -400,8 +400,8 @@ the drift the old three-style world suffered from.
 
 ## References
 
-- [OpenTelemetry policy (normative)](README.md) — the rules this doc explains informally
-- [Metrics deep-dive](../metrics/metrics-apps.md) · [Tracing](../tracing/README.md) · [Logging](../logging/README.md) · [Profiling](../profiling/README.md)
+- [Application observability (normative)](../../api/observability.md) — the rules this doc explains informally
+- [Application metrics](../../api/metrics.md) · [metrics platform ops](../metrics/metrics-apps.md) · [Tracing](../tracing/README.md) · [Logging](../logging/README.md) · [Profiling](../profiling/README.md)
 - [Observability hub](../README.md) · [RFC-0014](../../proposals/rfc/RFC-0014/)
 
 _Last updated: 2026-07-14 — moved beside the canonical OTel policy; clarified checkout chronology, environment-specific Collector behavior, and correlation without exemplars._

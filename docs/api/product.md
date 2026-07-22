@@ -15,12 +15,12 @@ through an idempotent ledger.
 | **Temporal** | Participant (gRPC) · [workflows.md#order-fulfillment](./workflows.md#order-fulfillment) | Implemented |
 | **Technical debt** | None | None |
 
-| | |
-|---|---|
-| **Repository** | [`duynhlab/product-service`](https://github.com/duynhlab/product-service) |
-| **Owns** | Products, categories, current prices, stock quantities, stock-reservation ledger |
-| **Database** | `product` on `product-db` (CNPG) via PgDog `pgdog-product.product:6432` |
-| **Design record** | [RFC-0003](../proposals/rfc/RFC-0003/) — inventory ownership and stock semantics |
+| Attribute | Value | RFC / ADR |
+|-----------|-------|-----------|
+| **Repository** | [`duynhlab/product-service`](https://github.com/duynhlab/product-service) | — |
+| **Owns** | Products, categories, current prices, stock quantities, stock-reservation ledger | — |
+| **Database** | `product` on `product-db` (CNPG) via PgDog `pgdog-product.product:6432` | — |
+| **Design record** | — | [RFC-0003](../proposals/rfc/RFC-0003/) — inventory ownership and stock semantics |
 
 ## Temporal participation
 
@@ -202,12 +202,12 @@ compensation rather than overselling.
 ### Cache-aside with Valkey (the read path)
 
 Pattern theory and full sequence diagrams live in
-[docs/caching/caching.md](../caching/caching.md); the product-specific policy:
+[Application caching](./caching.md); the product-specific policy:
 
 | Read | Cached | Default TTL | Invalidation |
 |------|--------|-------------|--------------|
 | Product list (`product:list:*`) | Yes | 5 min (`CACHE_TTL_PRODUCT_LIST`) | All list keys busted on product create; stock changes left to TTL expiry (deliberate — no churn on every reservation) |
-| Single product (`product:{id}`) | Yes | 10 min (`CACHE_TTL_PRODUCT_DETAIL`) | Busted per affected product on `ReserveStock`/`ReleaseStock`, so pages reflect stock moves immediately |
+| Single product (`product:{id}`) | Yes | 10 min (`CACHE_TTL_PRODUCT_DETAIL`) | **No hook today** — stale up to TTL if another service mutates product rows (e.g. stock via saga); [RFC-0004](../proposals/rfc/RFC-0004/) targets cache-bust on reserve/release |
 | `/details` aggregation | Product row only | — | Reviews and related products are fetched fresh each call; only the underlying `product:{id}` entry is cached |
 | gRPC `GetProducts` | **Never** | — | The money path reads the real DB row (ADR-020) |
 
@@ -304,7 +304,8 @@ Paths in [`duynhlab/product-service`](https://github.com/duynhlab/product-servic
 - [Service contracts](./README.md#service-contracts)
 - [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — saga deep dive
 - [checkout.md](./checkout.md) · [review.md](./review.md) — dependency contracts
-- [docs/caching/caching.md](../caching/caching.md) — cache-aside pattern theory
+- [Application caching](./caching.md) — cache-aside pattern theory
+- [Caching (platform)](../caching/README.md) — Valkey deployment and ops
 - [RFC-0003](../proposals/rfc/RFC-0003/) — inventory ownership and stock semantics
 
 _Last updated: 2026-07-21_

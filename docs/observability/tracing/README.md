@@ -25,10 +25,8 @@ Track requests as they flow through multiple microservices to understand perform
 
 1. [Why Distributed Tracing?](#why-distributed-tracing) - Real-world use cases
 2. [How It Works](#how-it-works) - System architecture
-3. [Configuration](#configuration) - Setup and tuning
-4. [Usage Patterns](#usage-patterns) - When to use what
-5. [Best Practices](#best-practices) - Production guidelines
-6. [Troubleshooting](#troubleshooting) - Common issues
+3. [Configuration, usage, and best practices](#configuration-usage-and-best-practices) - App contract → [api/tracing.md](../../api/tracing.md)
+4. [Troubleshooting](#troubleshooting) - Common issues
 
 ---
 
@@ -141,186 +139,17 @@ kubectl port-forward -n monitoring svc/grafana-service 3000:3000
 
 ---
 
-## Configuration
+## Configuration, usage, and best practices
 
-### Quick Configuration via ResourceSets
+> **Service authors:** sampling env vars, span helpers, propagation rules, and
+> production do/don't guidance are canonical in
+> [**Application tracing**](../../api/tracing.md). This guide keeps the
+> **platform view** — backends, Grafana queries, and on-call troubleshooting.
 
-Tracing env vars are injected once per domain by the app ResourceSets
-(`kubernetes/apps/domains/*-rs.yaml`, plus `kubernetes/apps/order-worker.yaml`);
-per-service knobs come from the service's InputProvider
-(`kubernetes/apps/services/<name>.yaml`):
-
-```yaml
-# kubernetes/apps/domains/checkout-rs.yaml (env section, per service)
-env:
-  - name: OTEL_COLLECTOR_ENDPOINT
-    value: << index inputs "otel_endpoint" | default "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318" >>
-  - name: OTEL_SAMPLE_RATE
-    value: "0.1"  # 10% sampling (0.0-1.0)
-  - name: OTEL_SERVICE_NAME
-    value: << inputs.name >>  # authoritative service.name
-  - name: TRACING_ENABLED
-    value: << index inputs "tracing_enabled" | default "true" | quote >>
-```
-
-**Deploy with custom sampling:**
-```bash
-make sync  # Push manifests and trigger Flux reconciliation
-```
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OTEL_COLLECTOR_ENDPOINT` | `otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318` | OTel Collector OTLP HTTP endpoint |
-| `OTEL_SAMPLE_RATE` | `0.1` (10%) | Trace sampling rate (0.0-1.0) — the only sampling knob; wrapped in `ParentBased` |
-| `ENV` | `production` | Environment label (`dev`/`staging`/`production`). Does **not** auto-adjust sampling — set `OTEL_SAMPLE_RATE` explicitly for higher rates |
-
-### Sampling Strategy
-
-| Environment | Sample Rate | Use Case | Cost Impact |
-|-------------|-------------|----------|-------------|
-| **Production** | 10% | Cost-effective, statistically valid | Low |
-| **Staging** | 50% | More coverage for testing | Medium |
-| **Development** | 100% | Full debugging visibility | High |
-
-These are **recommended** rates you set explicitly per environment via
-`OTEL_SAMPLE_RATE` (e.g. `local-stack` sets `1.0`) — there is no automatic
-mapping from `ENV` to a rate.
-
-**Why 10% is enough:**
-- Statistically significant for performance analysis
-- Sufficient for error pattern detection
-- Reduces storage cost by 90%
-- Still captures ~144 traces/hour at 400 RPS
-
-### Request Filtering (Automatic)
-
-These endpoints are **never traced** (reduces volume by 30-40%):
-
-| Path | Reason |
-|------|--------|
-| `/health`, `/healthz`, `/readyz`, `/livez` | High frequency, low value |
-| `/metrics` | Prometheus-compatible scrape endpoint (VMAgent) |
-| `/favicon.ico` | Browser noise |
-
-### Service Identity
-
-`service.name` comes from the **`OTEL_SERVICE_NAME` env var**, injected
-explicitly by every app ResourceSet (`kubernetes/apps/domains/*-rs.yaml`) —
-this is authoritative. The SDK's fallbacks (pod-name pattern parsing, then
-hostname) only apply if the env var is missing, and pod-name parsing is
-brittle — which is exactly why the ResourceSets set it. Namespace and
-instance id ride along via `OTEL_RESOURCE_ATTRIBUTES` (Downward API:
-`service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME)`).
-
----
-
-## Usage Patterns
-
-### When to Use Tracing
-
-| Scenario | How Tracing Helps |
-|----------|-------------------|
-| 🔍 **Debugging slow requests** | See which service/operation is slow |
-| ⚠️ **Investigating errors** | Full context of error flow across services |
-| 📊 **SLO budget burn** | Find root cause of latency/error spikes |
-| 🗺️ **Dependency mapping** | Understand service call patterns |
-| ⚡ **Performance optimization** | Identify bottlenecks (DB queries, external APIs) |
-
-### What Traces Automatically Capture
-
-Every traced HTTP request includes:
-
-**Automatic Attributes:**
-- Service name, namespace, pod name
-- HTTP method, path, status code
-- Request duration (start → end)
-- Parent span ID (for service correlation)
-
-**From Middleware:**
-- User-Agent, Remote IP
-- Error status and messages
-- W3C Trace Context propagation
-
-### Helper Functions (Optional Enhancement)
-
-Use these to **add business context** to traces:
-
-```go
-// Record errors for debugging
-middleware.RecordError(ctx, err)
-    
-// Add business context
-    middleware.AddSpanAttributes(ctx,
-        attribute.String("user.id", userID),
-        attribute.String("order.id", orderID),
-    )
-    
-// Mark important events
-middleware.AddSpanEvent(ctx, "payment.approved")
-
-// Create child spans for complex operations
-    ctx, span := middleware.StartSpan(ctx, "validate-inventory")
-    defer span.End()
-```
-
-**When to use:**
-- ✅ Recording errors (always do this!)
-- ✅ Adding user/order IDs for filtering
-- ✅ Marking state transitions (payment approved, inventory reserved)
-- ❌ Don't trace in tight loops (performance impact)
-- ❌ Don't add sensitive data (passwords, credit cards)
-
----
-
-## Best Practices
-
-### Production Recommendations
-
-| Practice | Why | Implementation |
-|----------|-----|----------------|
-| **10% sampling** | Balance cost vs visibility | `tracing.sampleRate: "0.1"` (Helm) |
-| **Auto-filter health checks** | Reduce noise by 30-40% | Automatic (middleware) |
-| **Always record errors** | Critical for debugging | `RecordError(ctx, err)` |
-| **Graceful shutdown** | Zero lost spans during rollouts | Automatic (all services) |
-| **Correlate with logs** | Jump from trace to logs via `trace_id` | Automatic (logging middleware) |
-
-### Do's ✅
-
-1. **Record all errors** for debugging context
-2. **Add business IDs** (user_id, order_id) for filtering
-3. **Use child spans** for distinct operations (DB queries, external API calls)
-4. **Monitor trace volume** in VictoriaMetrics (Grafana Explore): `rate(tempo_distributor_spans_received_total[5m])`
-
-### Don'ts ❌
-
-1. **Don't trace in loops** (creates span explosion)
-2. **Don't add sensitive data** (passwords, tokens, PII)
-3. **Don't sample 100% in production** (cost/performance impact)
-4. **Don't skip error recording** (loses debugging context)
-
-### Correlation with Logs
-
-**Automatic correlation** via `trace_id` in structured logs:
-
-**Example log:**
-```json
-{
-  "level": "error",
-  "msg": "Payment failed",
-  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
-  "user_id": "123",
-  "error": "timeout"
-}
-```
-
-**Find trace in Grafana:**
-- Copy `trace_id` from log
-- Grafana Explore → Tempo → Search by Trace ID
-- See full request flow across all services
-
----
+See [**Application tracing**](../../api/tracing.md) for:
+- ResourceSet / env configuration (`OTEL_SAMPLE_RATE`, `TRACING_ENABLED`, …)
+- Usage patterns (when to trace, helper functions)
+- Best practices (sampling, error recording, log correlation)
 
 ## Troubleshooting
 

@@ -2,14 +2,15 @@
 
 One place to learn how HTTP and gRPC contracts work across the duynhlab platform.
 
-| Attribute | Value |
-|-----------|-------|
-| **Status** | Implemented; checkout P1-P5 runs in local-stack and the cluster |
-| **Scope** | Shared HTTP conventions, gRPC conventions, and the current service call graph |
-| **Public transport** | HTTP/JSON through Kong on `:8080` |
-| **Internal transport** | gRPC on `:9090`; two documented cart REST exceptions remain |
-| **Contract source** | HTTP routers in each service repo; protobufs in `duynhlab/pkg` |
-| **Audience** | Readers learning the platform and engineers changing an API |
+| Attribute | Value | RFC / ADR |
+|-----------|-------|-----------|
+| **Status** | Implemented; checkout P1-P5 runs in local-stack and the cluster | — |
+| **Scope** | Shared HTTP conventions, gRPC conventions, and the current service call graph | — |
+| **Public transport** | HTTP/JSON through Kong on `:8080` | — |
+| **Internal transport** | gRPC on `:9090`; two documented cart REST exceptions remain | — |
+| **Contract source** | HTTP routers in each service repo; protobufs in `duynhlab/pkg` | — |
+| **Audience** | Readers learning the platform and engineers changing an API | — |
+| **Design record** | — | None |
 
 ## Overview
 
@@ -647,15 +648,28 @@ whether the previous attempt committed before its response was lost.
 
 ## Observability
 
-The middleware/interceptor order is tracing, then logging, then metrics.
+The middleware/interceptor order is **tracing, then logging** (two middleware
+only). HTTP RED metrics and gRPC RED metrics are **auto-instrumented** by
+`otelgin` / `otelgrpc` inside the tracing path — there is no separate metrics
+middleware. Full contract: [Application observability](./observability.md).
 
 | Signal | HTTP | gRPC |
 |--------|------|------|
-| Tracing | Gin middleware | `otelgrpc` client/server interceptors |
-| Access logs | HTTP request logger | Server-side `grpcx` access interceptor |
-| RED metrics | HTTP metrics | RPC client/server metrics |
+| Tracing | `TracingMiddleware` (`otelgin`) | `otelgrpc` client/server interceptors |
+| Access logs | HTTP logging middleware | Server-side `grpcx` access interceptor |
+| RED metrics | `http.server.*` via `otelgin` | `rpc_*` via `otelgrpc` |
+| Logs (OTLP) | otelzap tee when `OTEL_LOGS_ENABLED` | — |
+| Profiles | `obsx.SetupProfiling()` push | — |
 | Export path | OTLP/HTTP to the collector | Same OTLP stream and service resource; no application scrape endpoint |
-| Correlation | `trace_id` in logs | Trace context propagated through metadata |
+| Correlation | `trace_id` in logs; `pyroscope.profile.id` on spans | Trace context propagated through metadata |
+
+| Pillar | App contract |
+|--------|--------------|
+| Cross-cutting | [observability.md](./observability.md) |
+| Logs | [logs.md](./logs.md) |
+| Metrics | [metrics.md](./metrics.md) |
+| Traces | [tracing.md](./tracing.md) |
+| Profiles | [profiling.md](./profiling.md) |
 
 Health and reflection RPCs are excluded from normal access telemetry to avoid
 probe noise. gRPC failures use gRPC status codes; dashboards should group by
@@ -719,7 +733,7 @@ Use this sequence for a new or modified contract:
 | 4. Define contract | Inputs, outputs, units, errors, idempotency, and timeout |
 | 5. Implement at transport layer | Handler validates and delegates to logic |
 | 6. Protect it | Auth middleware and NetworkPolicy where applicable |
-| 7. Instrument it | Trace, access log, RED metrics, and health behavior |
+| 7. Instrument it | `obsx.SetupObservability` + optional `SetupProfiling` — see [observability.md](./observability.md) |
 | 8. Test it | Success, validation, authorization, ownership, retry, and failure paths |
 | 9. Document once | Shared rule here; service-specific contract in its service file |
 | 10. Validate consumers | Frontend, caller service, Kong, local-stack, and GitOps references |
@@ -758,7 +772,8 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [Microservice map](./microservices.md)
 - [Temporal order fulfillment](./temporal-order-fulfillment.md)
 - [Kong gateway](../platform/kong-gateway.md)
-- [Application metrics](../observability/metrics/metrics-apps.md)
+- [Application observability](./observability.md) · [Application metrics](./metrics.md) · [Application logging](./logs.md) · [Application tracing](./tracing.md) · [Application profiling](./profiling.md)
+- [Metrics (platform ops)](../observability/metrics/metrics-apps.md)
 - [ADR-017: collection-noun API migration](../proposals/adr/ADR-017-api-path-collection-noun/)
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)

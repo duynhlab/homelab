@@ -15,11 +15,12 @@ triggered it.
 | **Temporal** | Participant (gRPC) · [workflows.md#order-fulfillment](./workflows.md#order-fulfillment) | Implemented |
 | **Technical debt** | None | None |
 
-| | |
-|---|---|
-| **Repository** | [`duynhlab/notification-service`](https://github.com/duynhlab/notification-service) |
-| **Owns** | Notification records (inbox) and their read state |
-| **Database** | `notification` on `platform-db` (via `platform-db-pooler-rw.platform:5432`) |
+| Attribute | Value | RFC / ADR |
+|-----------|-------|-----------|
+| **Repository** | [`duynhlab/notification-service`](https://github.com/duynhlab/notification-service) | — |
+| **Owns** | Notification records (inbox) and their read state | — |
+| **Database** | `notification` on `platform-db` (via `platform-db-pooler-rw.platform:5432`) | — |
+| **Design record** | — | None |
 
 ## Temporal participation
 

@@ -12,12 +12,12 @@ Auth turns credentials into short-lived RS256 access tokens and rotating refresh
 | **Temporal** | None · [workflows.md](./workflows.md) | None |
 | **Technical debt** | None | None |
 
-| | |
-|---|---|
-| **Repository** | [`duynhlab/auth-service`](https://github.com/duynhlab/auth-service) |
-| **Owns** | Login credentials, password hashes, refresh-token families, JWT signing key |
-| **Database** | `auth` on `platform-db` (via `platform-db-pooler-rw`) |
-| **Design record** | [RFC-0009](../proposals/rfc/RFC-0009/) |
+| Attribute | Value | RFC / ADR |
+|-----------|-------|-----------|
+| **Repository** | [`duynhlab/auth-service`](https://github.com/duynhlab/auth-service) | — |
+| **Owns** | Login credentials, password hashes, refresh-token families, JWT signing key | — |
+| **Database** | `auth` on `platform-db` (via `platform-db-pooler-rw`) | — |
+| **Design record** | — | [RFC-0009](../proposals/rfc/RFC-0009/) |
 
 ## Temporal participation
 

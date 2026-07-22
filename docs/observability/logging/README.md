@@ -17,14 +17,14 @@ Both land in one backend, queryable with LogsQL and correlated to traces by
 | **Query** | LogsQL (VictoriaLogs) |
 | **Visualization** | Grafana — `victorialogs` datasource (`victoriametrics-logs-datasource`) |
 | **Correlation** | `trace_id` field ↔ Tempo (log→trace and trace→log) |
-| **App logging** | How services emit logs (libraries, format, levels, wiring) → [`logging-standards.md`](logging-standards.md) |
+| **App logging** | How services emit logs (libraries, format, levels, wiring) → [`../../api/logs.md`](../../api/logs.md) |
 
 > This doc is the **architecture** view: the pipeline, why this stack, and how it
 > scales. For **how to implement logging in a service** — the `zapx` logger, the
 > otelzap tee, the JSON field contract, the level schema, trace-id wiring, and
 > onboarding — see the source of truth,
-> [**Logging Standards**](logging-standards.md). Backend/ops detail (VLSingle config,
-> Vector pipeline, endpoints, verification) lives in [`victorialogs.md`](victorialogs.md).
+> [**Application logging**](../../api/logs.md). Backend/ops detail (VLSingle config,
+> Vector pipeline, endpoints, verification) lives in [`README.md#platform-pipeline`](README.md#platform-pipeline).
 > For the full before/after migration story, see the
 > [**RFC-0014 explainer**](../opentelemetry/rfc-0014-explainer.md).
 
@@ -100,8 +100,7 @@ of its own — the *infra* pipeline (label + ship) and the *PostgreSQL* pipeline
 VictoriaLogs itself is the operator-managed `VLSingle` CRD (no Helm-chart
 collector is deployed), so Vector remains the single agent for that path. App pods are excluded from Vector by label
 (`platform.duynhlab.dev/otlp-logs=true`), which is the double-ingest guard.
-Pipeline internals, sink headers, and stream definitions are in
-[`victorialogs.md`](victorialogs.md).
+Pipeline internals, sink headers, and stream definitions are below in [Platform pipeline](#platform-pipeline).
 
 ### Kong logs (both paths)
 
@@ -189,7 +188,7 @@ _stream:{namespace="product"} _time:5m   # recent, by namespace
   (Tempo `tracesToLogsV2` → `victorialogs` datasource).
 
 More examples, verification commands, and the PG-plan stream are in
-[`victorialogs.md`](victorialogs.md#verification).
+[`README.md#platform-pipeline`](README.md#verification).
 
 ## Operations quick-start
 
@@ -208,26 +207,273 @@ kubectl get vlsingle -n monitoring
 ```
 
 Vector self-monitoring (its own throughput/error/buffer metrics, alerts, and
-full backend troubleshooting are in [`victorialogs.md`](victorialogs.md). For
+full backend troubleshooting are in [Troubleshooting](#troubleshooting) below. For
 symptom-driven on-call (blank Grafana logs panel), see
 [`victorialogs-kubernetes-logs-debug.md`](../runbooks/victorialogs-kubernetes-logs-debug.md).
 
-## Documentation map
+## Platform pipeline {#platform-pipeline}
 
+### Components
+
+| Component | CRD/Kind | Namespace | Purpose |
+|-----------|----------|-----------|---------|
+| VLSingle | `VLSingle` (VM Operator) | `monitoring` | Log storage and query engine |
+| Vector | `HelmRelease` | `kube-system` | Log collection agent (DaemonSet) |
+
+## Grafana
+
+VictoriaLogs is available in Grafana as a **VictoriaLogs** datasource (plugin `victoriametrics-logs-datasource`), provisioned by GitOps:
+
+- **CR**: [`kubernetes/infra/configs/observability/grafana/datasource-victorialogs.yaml`](../../../kubernetes/infra/configs/observability/grafana/datasource-victorialogs.yaml)
+- **UID**: `victorialogs`
+- **URL**: `http://vlsingle-victoria-logs.monitoring.svc.cluster.local:9428`
+
+After `kubectl port-forward -n monitoring svc/grafana-service 3000:3000`, use **Explore → VictoriaLogs** and LogsQL (e.g. `*` or `_stream:{namespace="product"}`). Plugin reference: [Grafana VictoriaLogs datasource](https://grafana.com/grafana/plugins/victoriametrics-logs-datasource/).
+
+## Endpoints
+
+### VictoriaLogs Service (Operator-Managed)
+
+- **Service**: `vlsingle-victoria-logs.monitoring.svc`
+- **Port**: `9428`
+
+### Ingestion Endpoints
+
+| Endpoint | Purpose | Used By |
+|----------|---------|---------|
+| `/insert/jsonline` | JSON Lines ingestion | Vector sinks (infra logs) |
+| `/insert/opentelemetry/v1/logs` | OTLP logs ingestion (`VL-Stream-Fields: service.name`) | OpenTelemetry Collector (app logs) |
+| `/insert/elasticsearch` | Elasticsearch-compatible bulk API | Alternative ingestion |
+| `/select/logsql/query` | LogsQL query endpoint | Grafana datasource |
+
+### Vector Sink Headers
+
+The Vector sinks use the following VictoriaLogs-specific headers:
+
+```yaml
+request:
+  headers:
+    VL-Time-Field: timestamp      # Field containing log timestamp
+    VL-Msg-Field: message         # Field containing log message
+    VL-Stream-Fields: namespace,service,pod_name,container_name  # Stream indexing
+    AccountID: "0"                # Multi-tenancy (default: 0)
+    ProjectID: "0"                # Multi-tenancy (default: 0)
 ```
-logging/
-├── README.md         # This hub — architecture, why-this-stack, scaling
-└── victorialogs.md   # Backend & pipeline ops: VLSingle config, Vector pipeline,
-                      # endpoints, streams, self-monitoring, verification, runbooks
-logging-standards.md   # App logging standards & implementation (onboarding)
+
+## Log Streams
+
+### All Logs Stream
+
+All Kubernetes logs are shipped to VictoriaLogs with these stream fields:
+- `namespace`
+- `service`
+- `pod_name`
+- `container_name`
+
+### PostgreSQL Query Plans Stream
+
+CloudNativePG auto_explain logs are parsed and stored with:
+- `cluster_name` - CloudNativePG cluster name
+- `namespace` - Kubernetes namespace
+- `database` - PostgreSQL database name
+- `query_id` - PostgreSQL query ID
+
+### PostgreSQL Audit Logs
+
+All CNPG clusters enable `pgaudit` (`pgaudit.log = 'ddl, write'`). Audit records
+and `auto_explain` plans flow through the **same cluster-wide Vector DaemonSet** —
+there are **no per-cluster logging sidecars**. Audit rows land in VictoriaLogs as
+CNPG-parsed structured records carrying `logger: pgaudit` (CNPG parsing strips the
+literal `AUDIT:` prefix). Verified live for `platform-db` and `product-db`.
+Example query: `_stream:{namespace="platform"} logger:pgaudit`.
+
+## Configuration
+
+### VLSingle CRD (Operator-Managed)
+
+Location: `kubernetes/infra/configs/observability/logging/victorialogs/vlsingle.yaml`
+
+Key settings:
+```yaml
+apiVersion: operator.victoriametrics.com/v1
+kind: VLSingle
+metadata:
+  name: victoria-logs
+  namespace: monitoring
+spec:
+  retentionPeriod: "7d"
+  removePvcAfterDelete: true
+  storage:
+    resources:
+      requests:
+        storage: 20Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
 ```
+
+### Vector HelmRelease
+
+Location: `kubernetes/infra/controllers/logging/vector/vector.yaml`
+
+The Vector config includes:
+- **Sources**: `kubernetes_logs`
+- **Transforms**: `add_labels`, `parse_pg_json`, `filter_pg_auto_explain`, `parse_pg_auto_explain`
+- **Sinks**: `victorialogs_all`, `victorialogs_pg_plans`, `victorialogs_pg_parse_failures`
+
+## Vector self-monitoring
+
+Vector exposes its own metrics in **Prometheus text format** (`internal_metrics`
+source → `prometheus_exporter` sink on port `9090`). The Vector chart's
+`podMonitor.enabled` creates a `PodMonitor`, which the VM Operator converts to a
+`VMPodScrape`; VMAgent scrapes it and remote-writes to VMSingle, so pipeline
+health is queryable in Grafana against the VictoriaMetrics datasource like any
+other workload.
+
+Key metrics (PromQL):
+
+```promql
+up{job="vector"}                                                   # agent health
+rate(vector_events_processed_total[5m])                            # events/sec by component
+rate(vector_component_errors_total[5m])                            # error rate
+rate(vector_component_sent_bytes_total{component_name=~"victorialogs.*"}[5m])  # sink throughput
+vector_buffer_events                                               # buffer depth
+```
+
+A pre-built Vector dashboard (Grafana.com ID `21954`) covers events/sec, error
+rates, buffer utilization, and throughput. Suggested alerts: high error rate
+(`rate(vector_component_errors_total[5m]) > 10`), buffer overflow
+(`vector_buffer_events > 10000`), low throughput
+(`rate(vector_events_processed_total[5m]) < 100`).
+
+## Verification
+
+### Check Operator Resources
+
+```bash
+# Check VLSingle status
+kubectl get vlsingle -n monitoring
+
+# Check pods
+kubectl get pods -n monitoring -l app.kubernetes.io/name=vlsingle
+kubectl get pods -n kube-system -l app.kubernetes.io/name=vector
+```
+
+### Check VictoriaLogs Health
+
+```bash
+# Port-forward to VictoriaLogs
+kubectl port-forward -n monitoring svc/vlsingle-victoria-logs 9428:9428
+
+# Check health endpoint
+curl http://localhost:9428/health
+
+# Query logs (LogsQL)
+curl -G 'http://localhost:9428/select/logsql/query' \
+  --data-urlencode 'query=_stream:{namespace="monitoring"}' \
+  --data-urlencode 'limit=10'
+```
+
+### Check Vector Logs
+
+```bash
+# Check Vector logs for successful pushes
+kubectl logs -n kube-system -l app.kubernetes.io/name=vector --tail=100 | grep -i victorialogs
+
+# Check for errors
+kubectl logs -n kube-system -l app.kubernetes.io/name=vector --tail=100 | grep -i error
+```
+
+### Verify PostgreSQL Plan Ingestion
+
+```bash
+# Query for PostgreSQL plans in VictoriaLogs
+curl -G 'http://localhost:9428/select/logsql/query' \
+  --data-urlencode 'query=_stream:{cluster_name!=""}' \
+  --data-urlencode 'limit=10'
+```
+
+## Troubleshooting
+
+### No Logs in VictoriaLogs
+
+1. **Check Vector is running**:
+   ```bash
+   kubectl get pods -n kube-system -l app.kubernetes.io/name=vector
+   ```
+
+2. **Check Vector sink connectivity**:
+   ```bash
+   kubectl logs -n kube-system -l app.kubernetes.io/name=vector | grep -i "victorialogs\|connection\|error"
+   ```
+
+3. **Verify VictoriaLogs service is accessible**:
+   ```bash
+   kubectl run -it --rm debug --image=curlimages/curl -- \
+     curl -s http://vlsingle-victoria-logs.monitoring.svc:9428/health
+   ```
+
+### PostgreSQL Plans Not Appearing
+
+1. **Verify CloudNativePG clusters have auto_explain enabled** in PostgreSQL parameters
+
+2. **Check filter is working**:
+   ```bash
+   kubectl logs -n kube-system -l app.kubernetes.io/name=vector | grep -i "pg_auto_explain"
+   ```
+
+3. **Generate a slow query** to trigger auto_explain:
+   ```sql
+   -- Connect to product-db (product, cart, order, or payment database)
+   SELECT pg_sleep(1);
+   ```
+
+### High Memory Usage in Vector
+
+If Vector is consuming too much memory:
+
+1. **Check current resource usage**:
+   ```bash
+   kubectl top pods -n kube-system -l app.kubernetes.io/name=vector
+   ```
+
+2. **Adjust buffer settings** in Vector HelmRelease:
+   ```yaml
+   buffer:
+     type: memory
+     max_events: 5000  # Reduce from 10000
+     when_full: drop_newest
+   ```
+
+## Related Documentation
+
+- **Official VictoriaLogs Docs**: https://docs.victoriametrics.com/victorialogs/
+- **External API auth (planned)**: [VMAuth / vmauth](../metrics/victoriametrics.md#vmauth--vmauth-planned) in the VictoriaMetrics stack doc
+- **VictoriaLogs Vector Setup**: https://docs.victoriametrics.com/victorialogs/data-ingestion/vector
+- **VictoriaLogs Helm Chart**: https://docs.victoriametrics.com/helm/victorialogs-single/
+- **LogsQL Query Language**: https://docs.victoriametrics.com/victorialogs/logsql/
+- **Vector Documentation**: https://vector.dev/docs/
+
+## Manifest Locations
+
+| Resource | Path |
+|----------|------|
+| VLSingle CRD | `kubernetes/infra/configs/observability/logging/victorialogs/vlsingle.yaml` |
+| VM Operator | `kubernetes/infra/controllers/metrics/victoria-metrics-operator.yaml` |
+| Vector HelmRelease | `kubernetes/infra/controllers/logging/vector/vector.yaml` |
+
+---
 
 ## References
 
-- [App logging standards (onboarding)](logging-standards.md) · [VictoriaLogs backend & ops](victorialogs.md)
+- [Application logging (app contract)](../../api/logs.md)
 - [Observability overview](../README.md) · [Grafana datasources](../grafana/datasources.md)
 - [VictoriaLogs docs](https://docs.victoriametrics.com/victorialogs/) · [LogsQL](https://docs.victoriametrics.com/victorialogs/logsql/) · [Vector docs](https://vector.dev/docs/)
 
 ---
 
-_Last updated: 2026-07-14 — dual-path logging: app logs over OTLP (otelzap → OpenTelemetry Collector → VictoriaLogs, `VL-Stream-Fields: service.name`, fleet-wide since RFC-0014 P4) + Vector DaemonSet for non-instrumented workloads (DBs, Kong access log, PG `auto_explain`, frontend); VictoriaLogs VLSingle `:9428` (7d/20Gi), LogsQL, `trace_id` ↔ Tempo; Loki removed._
+_Last updated: 2026-07-22 — platform infra hub; app contract → docs/api/logs.md — dual-path logging: app logs over OTLP (otelzap → OpenTelemetry Collector → VictoriaLogs, `VL-Stream-Fields: service.name`, fleet-wide since RFC-0014 P4) + Vector DaemonSet for non-instrumented workloads (DBs, Kong access log, PG `auto_explain`, frontend); VictoriaLogs VLSingle `:9428` (7d/20Gi), LogsQL, `trace_id` ↔ Tempo; Loki removed._

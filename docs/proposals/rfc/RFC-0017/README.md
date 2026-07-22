@@ -118,7 +118,7 @@ flowchart TB
    with a small fixed set is fine; `user_id`, `order_id`, `session_id`,
    `payment_id`, `promo_code`, IPs, or raw errors are **forbidden** as labels or
    span attributes (they belong in logs/traces). See
-   [metrics-apps cardinality control](../../../observability/metrics/metrics-apps.md#app-side-cardinality-control).
+   [Application metrics § cardinality control](../../../api/metrics.md#app-side-cardinality-control).
 3. **DB tracing is uniform**, added once as a shared `pkg` helper that attaches
    an `otelpgx` `QueryTracer` to the pool at build time — services opt in with
    one line, not a per-repo copy. `otelpgx` is tracer-only; it does not change

@@ -14,11 +14,12 @@ identity claims.
 | **Temporal** | None · [workflows.md](./workflows.md) | None |
 | **Technical debt** | None | None |
 
-| | |
-|---|---|
-| **Repository** | [`duynhlab/user-service`](https://github.com/duynhlab/user-service) |
-| **Owns** | `user_profiles` data: first/last name, phone, address — **not** passwords, username uniqueness, email identity, or JWT issuance (auth's boundary) |
-| **Database** | `user` on `platform-db` (via `platform-db-pooler-rw.platform:5432`) |
+| Attribute | Value | RFC / ADR |
+|-----------|-------|-----------|
+| **Repository** | [`duynhlab/user-service`](https://github.com/duynhlab/user-service) | — |
+| **Owns** | `user_profiles` data: first/last name, phone, address — **not** passwords, username uniqueness, email identity, or JWT issuance (auth's boundary) | — |
+| **Database** | `user` on `platform-db` (via `platform-db-pooler-rw.platform:5432`) | — |
+| **Design record** | — | None |
 
 ## Temporal participation
 

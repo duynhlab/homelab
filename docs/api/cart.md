@@ -12,12 +12,12 @@ Cart turns browsing intent into a per-user, mutable basket — and hands checkou
 | **Temporal** | Participant (REST) · `ClearCart` · [workflows.md](./workflows.md#order-fulfillment) | Implemented |
 | **Technical debt** | Legacy order→cart REST pricing hop · P6 removal · [Known gaps](#known-gaps) | Technical debt |
 
-| | |
-|---|---|
-| **Repository** | [`duynhlab/cart-service`](https://github.com/duynhlab/cart-service) |
-| **Owns** | Per-user cart and cart items (product/quantity selection + denormalized add-time price snapshot) |
-| **Database** | `cart` on `product-db` via PgDog (`pgdog-product.product:6432`) |
-| **Design record** | [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) — cart gRPC read surface |
+| Attribute | Value | RFC / ADR |
+|-----------|-------|-----------|
+| **Repository** | [`duynhlab/cart-service`](https://github.com/duynhlab/cart-service) | — |
+| **Owns** | Per-user cart and cart items (product/quantity selection + denormalized add-time price snapshot) | — |
+| **Database** | `cart` on `product-db` via PgDog (`pgdog-product.product:6432`) | — |
+| **Design record** | — | [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) — cart gRPC read surface |
 
 ## Temporal participation
 

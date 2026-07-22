@@ -7,7 +7,8 @@
 > **Provisional.** This RFC frames a platform-wide caching contract; it is **not yet
 > implementable**. It absorbs the [RFC-0001 *cache-bust on reserve*](../RFC-0001/README.md#future-work)
 > future-work item and the "cross-service invalidation" gap documented in
-> [`docs/caching/caching.md`](../../../caching/caching.md). The operational reference for the
+> [`docs/api/caching.md`](../../../api/caching.md). Platform ops:
+> [`docs/caching/README.md`](../../../caching/README.md). The operational reference for the
 > existing product cache stays in that doc; this RFC owns the *cross-service rules* and the *why*.
 
 ## Summary
@@ -24,12 +25,12 @@ so the next service to add a cache follows shared rules instead of re-deriving t
 ## Motivation
 
 - **No shared rules.** product-service had to invent key conventions, fail-open, jitter,
-  and stampede locking from scratch ([`docs/caching/caching.md`](../../../caching/caching.md)).
+  and stampede locking from scratch ([`docs/api/caching.md`](../../../api/caching.md)).
   The next service has no contract to follow.
 - **The saga writes data another service caches.** RFC-0001 reserves/releases stock as an
   atomic DB decrement on product rows; product-service caches `product:{id}` (which may carry
   stock) with no invalidation path. Documented as a deliberate, bounded-stale boundary today
-  ([caching doc §Cache Ownership & Invalidation Boundary](../../../caching/caching.md)), but
+  ([caching doc §Cache Ownership & Invalidation Boundary](../../../api/caching.md)), but
   it is a real staleness window (~10m) once stock surfaces in the detail payload.
 - **Known gaps are deferred, not decided.** The caching doc lists *cross-service invalidation*
   (contingent), *negative caching* (not implemented — penetration), and *stampede under a slow
@@ -138,7 +139,7 @@ sequenceDiagram
   500ms lets multiple waiters through (the exact slow-DB case). Harden with **in-process
   `singleflight`** (collapse concurrent same-key fetches within one pod) layered under the
   distributed lock, or a tunable waiter budget. Documented caveat:
-  [caching doc §Cache Stampede Prevention](../../../caching/caching.md).
+  [caching doc §Cache Stampede Prevention](../../../api/caching.md).
 - **TTL choices.** Inherit product's defaults as the platform baseline: detail `10m`, list
   `5m`, negative `~30s`, all with **≤10% jitter** to avoid synchronized expiry waves. Owners
   may tune per namespace; staleness bound = TTL, and that bound is the cross-service contract.
@@ -150,7 +151,7 @@ sequenceDiagram
 - **Supersedes / absorbs.** This RFC **absorbs the RFC-0001 *cache-bust on reserve* future-work
   item** ([RFC-0001 §Future work](../RFC-0001/README.md#future-work)) and the *cross-service
   invalidation* (contingent) + *negative caching* + *stronger stampede* items from the
-  [caching doc §Future Enhancements](../../../caching/caching.md). Those are now tracked here.
+  [caching hub § Roadmap gaps](../../../caching/README.md#roadmap-gaps). Those are now tracked here.
 - **Drawbacks.** Routing all writes through the owner constrains where mutations may live (fine
   today — stock is a product op). Synchronous invalidation adds one Valkey op to the write path
   (fail-open, negligible). Negative caching adds a small risk of briefly hiding a just-created id
@@ -205,7 +206,8 @@ an id exists beyond what the public read already reveals (it returns 404 either 
 
 - [RFC-0001 Temporal](../RFC-0001/README.md) — origin of the *cache-bust on reserve* item this RFC absorbs.
 - [RFC-0003 Inventory ownership](../RFC-0003/) — where stock writes ultimately live; co-determines the cache owner for stock.
-- [Caching documentation](../../../caching/caching.md) — the existing product Cache-Aside, stampede prevention, ownership boundary, and the gaps this RFC addresses.
+- [Application caching](../../../api/caching.md) — product Cache-Aside, stampede prevention, ownership boundary
+- [Caching (platform)](../../../caching/README.md) — Valkey deployment, eviction, roadmap gaps
 - [`docs/databases/002-database-integration.md`](../../../databases/002-database-integration.md) — the shared `cnpg-db` cluster product/cart/order write to.
 
 ---

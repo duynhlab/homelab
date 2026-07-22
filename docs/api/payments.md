@@ -14,12 +14,12 @@ reconciliation loop that proves the books match the provider.
 | **Temporal** | Participant (gRPC) · [workflows.md#order-fulfillment](./workflows.md#order-fulfillment) | Implemented |
 | **Technical debt** | Deprecated webhook alias (ADR-017) · [Known gaps](#known-gaps) | Technical debt |
 
-| | |
-|---|---|
-| **Repository** | [`duynhlab/payment-service`](https://github.com/duynhlab/payment-service) |
-| **Owns** | Payment state, refunds, the double-entry ledger, webhook records, reconciliation reports |
-| **Database** | `payment` on `product-db` — **direct** `product-db-rw.product:5432`, `sslmode=require` (bypasses PgDog: no pooler TLS yet) |
-| **Design record** | [RFC-0010](../proposals/rfc/RFC-0010/) |
+| Attribute | Value | RFC / ADR |
+|-----------|-------|-----------|
+| **Repository** | [`duynhlab/payment-service`](https://github.com/duynhlab/payment-service) | — |
+| **Owns** | Payment state, refunds, the double-entry ledger, webhook records, reconciliation reports | — |
+| **Database** | `payment` on `product-db` — **direct** `product-db-rw.product:5432`, `sslmode=require` (bypasses PgDog: no pooler TLS yet) | — |
+| **Design record** | — | [RFC-0010](../proposals/rfc/RFC-0010/) |
 
 ## Temporal participation
 

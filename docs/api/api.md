@@ -32,20 +32,31 @@ order, but only order writes the order.
 
 ```mermaid
 flowchart TB
-    Internet((Internet)) --> Browser["React SPA"]
-    Browser -->|"HTTP/JSON"| Kong["Kong gateway"]
-    Provider["MockPay / payment provider"] -->|"signed webhook"| Kong
+    %% ===== Layer 1: External actors =====
+    Internet((Internet))
+    Provider["MockPay / payment provider"]
 
+    %% ===== Layer 2: Client =====
+    Internet --> Browser["React SPA"]
+
+    %% ===== Layer 3: Gateway =====
+    Browser -->|"HTTP/JSON"| Kong["Kong gateway"]
+    Provider -->|"signed webhook"| Kong
+
+    %% ===== Layer 4: Application platform =====
     subgraph Platform["duynhlab application platform"]
         direction TB
+
         subgraph Identity["Identity domain"]
             Auth["auth"]
             User["user"]
         end
+
         subgraph Catalog["Catalog domain"]
             Product["product"]
             Review["review"]
         end
+
         subgraph CheckoutDomain["Checkout domain"]
             Cart["cart"]
             Checkout["checkout"]
@@ -53,14 +64,17 @@ flowchart TB
             CheckoutWorker["checkout-worker"]
             OrderWorker["order-worker"]
         end
+
         subgraph Comms["Comms domain"]
             Shipping["shipping"]
             Payment["payment"]
             Notification["notification"]
         end
+
         Temporal["Temporal"]
     end
 
+    %% Kong -> domain entry points
     Kong -->|"HTTP :8080"| Auth
     Kong -->|"HTTP :8080"| User
     Kong -->|"HTTP :8080"| Product
@@ -72,6 +86,7 @@ flowchart TB
     Kong -->|"HTTP :8080"| Payment
     Kong -->|"HTTP :8080"| Notification
 
+    %% Synchronous cross-service calls
     Product -->|"gRPC reviews"| Review
     Checkout -->|"gRPC GetCart"| Cart
     Checkout -->|"gRPC GetProducts"| Product
@@ -79,36 +94,45 @@ flowchart TB
     Checkout -->|"gRPC CreateOrder"| Order
     Order -->|"gRPC GetShipmentByOrder"| Shipping
     Order -->|"gRPC GetPayment"| Payment
-    Order -->|"start order workflow"| Temporal
-    Temporal -->|"order task queue"| OrderWorker
+    Order -.->|"REST pricing read"| Cart
+
+    %% Async / workflow layer
     Checkout -->|"start abandonment workflow"| Temporal
+    Order -->|"start order workflow"| Temporal
     Temporal -->|"checkout task queue"| CheckoutWorker
+    Temporal -->|"order task queue"| OrderWorker
+
     OrderWorker -->|"gRPC stock"| Product
     OrderWorker -->|"gRPC shipment"| Shipping
     OrderWorker -->|"gRPC money"| Payment
     OrderWorker -->|"gRPC email"| Notification
-    Order -.->|"REST pricing read"| Cart
     OrderWorker -.->|"REST cart clear"| Cart
+
+    %% Outbound call to external payment provider
     Payment -->|"provider HTTP"| Provider
 
+    %% ===== Layer 5: Data stores =====
     subgraph Data["Data stores"]
+        direction TB
         PlatformDB[("platform-db")]
         ProductDB[("product-db")]
         Valkey[("Valkey")]
     end
+
     Auth --> PlatformDB
-    Product --> ProductDB
-    Cart --> ProductDB
-    Checkout --> ProductDB
-    CheckoutWorker -->|"expire sessions"| ProductDB
-    Order --> ProductDB
-    Payment --> ProductDB
     User --> PlatformDB
     Review --> PlatformDB
     Shipping --> PlatformDB
     Notification --> PlatformDB
-    Product --> Valkey
     Temporal --> PlatformDB
+
+    Product --> ProductDB
+    Product --> Valkey
+    Cart --> ProductDB
+    Checkout --> ProductDB
+    Order --> ProductDB
+    Payment --> ProductDB
+    CheckoutWorker -.->|"expire sessions"| ProductDB
 
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
@@ -143,9 +167,10 @@ graph LR
     classDef external fill:#64748b,color:#fff,stroke:#334155;
 ```
 
-The topology names every deployed service and worker. Solid arrows are current
-HTTP, gRPC, workflow, or data-store paths; dotted arrows are the two documented
-cart REST exceptions. Exact RPC names are in
+Read the diagram **top-down**: Internet → React SPA → Kong → HTTP services and
+workflows → data stores. It names every deployed service and worker. Solid arrows
+are current HTTP, gRPC, workflow, or data-store paths; dotted arrows are the two
+documented cart REST exceptions. Exact RPC names are in
 [Current East-West Call Graph](#current-east-west-call-graph), and each service
 file explains its own callers and data authority.
 
@@ -778,4 +803,4 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-07-21_
+_Last updated: 2026-07-22 — Platform API Topology redrawn top-down (layered link order)._

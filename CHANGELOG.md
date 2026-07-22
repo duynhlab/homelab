@@ -11,9 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **docs/api/microservices.md**: expanded §2 local-stack snapshot (workers, Temporal, mockpay, gRPC `:9090`, Valkey gateway dep); fixed outdated checkout P5 blurb; aligned technique index and §6 gaps with README rollup.
 - **Observability docs standardization**: normative app contracts moved to `docs/api/observability.md`, `logs.md`, `metrics.md`, `tracing.md`, and `profiling.md`; `docs/observability/` keeps platform depth with verbatim dedup replaced by links; removed `logging-standards.md` and `victorialogs.md` (canonical `api/logs.md` and `logging/README.md`); inbound links and `api.md` middleware order (tracing → logging, metrics via otelgin/otelgrpc) updated.
 - **docs/api quick-facts**: hook and Identity tables use three columns (`Attribute | Value | RFC / ADR`) with a **Design record** row (proposal links or `None`).
 - **Platform docs review**: new `docs/platform/README.md` hub; drift fixes in `setup.md` (10 services, checkout-worker, clickhouse-local, secrets vs controllers split), `kong-gateway.md` (checkout route), `application-delivery.md` (RFC-0018 db_host examples); deployed-vs-target callouts in `gitflow.md`/`cicd.md`; `graceful-shutdown`, `mcp-servers`, `sonarcloud` updates.
+- **docs/api/api.md**: Platform API Topology redrawn top-down (layered link order: Internet → SPA → Kong → platform → data).
 
 - **grafana-clickhouse-datasource pinned to 4.20.0** (cluster + local-stack; was unpinned "latest"): OTel schema 1.3.0 + auto-detect; datasources gain `logs`/`traces` `otelEnabled` mapping (query builders, Explore, trace↔log links); local-stack collector bumped `0.140.0` → `0.152.0` to match the cluster's OTel logs schema (contrib ≥ 0.151.0 drops `TimestampTime`).
 - **Grafana folders + team-friendly dashboard text**: ClickHouse dashboards grouped into a `ClickHouse` Grafana folder on both environments (local via `foldersFromFilesStructure` + subdirectories, cluster via CR `folder:`); all visible dashboard text rewritten in plain SRE language (no RFC/phase/internal-library jargon); plugin-bundled reference dashboards documented (manual import, not GitOps, wiped on volume recreate).

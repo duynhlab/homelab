@@ -28,25 +28,69 @@ HTTP/gRPC rules are owned by
 
 ## 2. Deployment snapshot (local stack)
 
-The local end-to-end stack (`local-stack/compose.yaml`) mirrors the platform with single shared infra. Databases, cache, Temporal, the services, gateway, and frontend are health-gated; the observability containers start unguarded (`service_started`).
+The local end-to-end stack ([`local-stack/compose.yaml`](../../local-stack/compose.yaml))
+mirrors the **app plane** (10 HTTP services), **workflow plane** (Temporal +
+`order-worker` + `checkout-worker`), **provider stub** (`mockpay`), and edge
+(frontend + Kong). Shared infra (Postgres, Valkey) and the observability pipeline
+(OTel collector, Victoria*, ClickHouse, Grafana, Pyroscope) are internal-only —
+see [`local-stack/README.md`](../../local-stack/README.md) for host ports and
+audit gates.
 
-| Service | Port (internal) | Database (local) | Cache | Inter-service deps |
-|---------|-----------------|------------------|-------|--------------------|
-| auth | 8080 | `auth` | — | none (validated *by* everyone via JWKS) |
-| user | 8080 | `user` | — | auth (JWKS) |
-| product | 8080 | `product` | Valkey | review (gRPC) — no JWT middleware (public + internal surface only) |
-| cart | 8080 | `cart` | — | auth (JWKS); serves gRPC `GetCart` to checkout |
-| order | 8080 | `order` | — | auth (JWKS), Temporal, shipping/notification/payment/product (gRPC), cart (REST) |
-| review | 8080 | `review` | — | auth (JWKS) |
-| shipping | 8080 | `shipping` | — | none |
-| notification | 8080 | `notification` | — | auth (JWKS) |
-| payment | 8080 | `payment` | — | mockpay (provider); called by order (saga + enrichment) |
-| checkout | 8080 | `checkout` | — | auth (JWKS), cart/product/shipping/order (gRPC), Temporal; reached only via Kong |
-| frontend | 80 → host 3001 | — | — | gateway only |
-| gateway (Kong 3.9) | 8000 → host 8080 | — | — | all 10 services |
+Postgres, Valkey, Temporal, app services, workers, mockpay, gateway, and
+frontend are health-gated. Most observability containers start on
+`service_started`; **ClickHouse** is health-gated and blocks the collector and
+Grafana until ready.
+
+```mermaid
+flowchart LR
+    SPA["frontend :3001"] --> Kong["gateway :8080"]
+    Kong --> SVC["10 Go services"]
+    MP["mockpay"] -->|"provider HTTP"| PAY["payment"]
+    MP -->|"webhook"| Kong
+    SVC --> PG[("Postgres<br/>10 DBs")]
+    SVC --> VALKEY[("Valkey")]
+    CK["checkout"] -->|"gRPC + Temporal"| SVC
+    ORD["order"] --> TMP["Temporal :8233 UI"]
+    CK --> TMP
+    TMP --> OW["order-worker"]
+    TMP --> CW["checkout-worker"]
+    OW -->|"gRPC + cart REST"| SVC
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    class SPA,Kong edge;
+    class SVC,PAY,CK,ORD service;
+    class OW,CW worker;
+    class TMP platform;
+    class PG,VALKEY data;
+    class MP external;
+```
+
+| Component | HTTP | gRPC | Database (local) | Cache | Runtime deps / callers |
+|-----------|------|------|------------------|-------|------------------------|
+| auth | `:8080` | — | `auth` | — | none outbound (JWKS validated *by* everyone) |
+| user | `:8080` | — | `user` | — | auth (JWKS); caller: Kong |
+| product | `:8080` | `:9090` server | `product` | Valkey | review (gRPC); callers: Kong, checkout, order-worker |
+| cart | `:8080` | `:9090` server | `cart` | — | auth (JWKS); callers: Kong, checkout (`GetCart`), order/order-worker (REST) |
+| order | `:8080` | `:9090` server | `order` | — | auth (JWKS), Temporal, shipping/payment (gRPC), cart (REST); callers: Kong, checkout (`CreateOrder`) |
+| review | `:8080` | `:9090` server | `review` | — | auth (JWKS); callers: Kong, product (gRPC) |
+| shipping | `:8080` | `:9090` server | `shipping` | — | none outbound; callers: Kong, checkout, order, order-worker |
+| notification | `:8080` | `:9090` server | `notification` | — | auth (JWKS); callers: Kong, order-worker (`SendEmail`) |
+| payment | `:8080` | `:9090` server | `payment` | — | auth (JWKS), mockpay (HTTP); callers: Kong, order (GetPayment), order-worker (saga money) |
+| checkout | `:8080` internal-only | client only | `checkout` | — | auth (JWKS), cart/product/shipping/order (gRPC), Temporal; caller: Kong only |
+| order-worker | `:8080` health | client only | `order` | — | Temporal; product/shipping/notification/payment (gRPC), cart (REST clear) |
+| checkout-worker | `:8080` health | — | `checkout` | — | Temporal (`AbandonedCheckoutWorkflow`; DB-only activities) |
+| mockpay | `:8080` | — | — | — | called by payment; webhooks → gateway → payment public route |
+| temporal | — (`7233` gRPC, `8233` UI) | — | — (in-memory dev) | — | callers: order, checkout, both workers |
+| gateway (Kong 3.9) | `8000` → host `8080` | — | — | Valkey (rate-limit) | all 10 services + cache; callers: frontend, browser, mockpay webhooks |
+| frontend | `80` → host `3001` | — | — | — | gateway only |
 
 > **In-cluster differences (production):** `platform-db` (CloudNativePG behind **`platform-db-pooler-rw.platform.svc.cluster.local:5432`** — auth/user/notification/shipping/review; Temporal connects **direct** to `platform-db-rw.platform:5432`);
-> `product-db` (CloudNativePG behind the **pgdog-product** pooler — `product`/`cart`/`order`/`payment`
+> `product-db` (CloudNativePG behind the **pgdog-product** pooler — `product`/`cart`/`order`/`checkout`/`payment`
 > databases; payment connects **direct over TLS, bypassing PgDog**).
 > Locally these collapse into one Postgres with 10 service databases. See [`../databases/`](../databases/).
 > **Logging is unified** — all 10 services log via the shared `pkg/logger` zap wrapper
@@ -105,9 +149,11 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 ### checkout — session orchestrator (RFC-0015 P1-P5)
 
 > Owns `checkout_sessions`, item snapshots, totals, promo attachment, and
-> confirm idempotency. The service is client-only: Kong calls its HTTP API and
-> it calls cart, product, shipping, and order over gRPC. P1-P4 run in
-> local-stack; P5 deploys the service and its NetworkPolicies to the cluster.
+> confirm idempotency. DB `checkout` on `product-db` (CloudNativePG, via PgDog).
+> The service is client-only: Kong calls its HTTP API and it calls cart, product,
+> shipping, and order over gRPC. **One binary, two deployments:** `checkout`
+> (API) and `checkout-worker` (Temporal worker — `AbandonedCheckoutWorkflow`,
+> task queue `checkout`). P1-P5 ship in local-stack and the cluster.
 
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
@@ -218,14 +264,15 @@ is never browser-facing.**
 | **RS256 JWT + JWKS** | Stateless identity — no per-request auth hop | Mint: auth. Verify locally via `pkg/authmw`: user, cart, order, review, notification, payment, checkout | RFC-0009, [API auth model](api.md#authentication) |
 | **Rotating refresh tokens** | Long-lived sessions without long-lived access tokens; reuse detection | auth (sha256 at rest, family revoke) | — |
 | **Temporal saga** | All-or-nothing multi-service checkout with compensations | order (+ `order-worker`); participants: product, shipping, payment, notification, cart | [Temporal Saga and 2PC](temporal-order-fulfillment.md) |
+| **Temporal abandonment timer** | Durable session expiry without polling the DB | checkout (+ `checkout-worker`); DB-authoritative `expires_at` (ADR-019) | [workflows.md](workflows.md#abandoned-checkout) |
 | **Cache-aside (Valkey)** | Read-heavy hot paths | product (SETNX stampede lock, TTL jitter, SCAN invalidation) | [caching](./caching.md) |
 | **Transactional outbox** | Reliable side-effects with the DB write (no dual-write gap) | payment (single-writer relay) | ADR-007 |
 | **Reconciliation** | Detect provider/ledger drift | payment (ticker + internal trigger API, flag-gated auto-heal) | ADR-011/012 |
 | **Webhook HMAC** | Authenticating an unauthenticated public caller | payment ← mockpay | RFC-0010 |
 | **gRPC east-west (`:9090`)** | Typed internal transport | Servers: product, cart, order, review, shipping, notification, payment. Clients: product→review; order/order-worker→product, shipping, notification, payment; checkout→cart, product, shipping, order | [API call graph](api.md#current-east-west-call-graph) |
-| **Idempotency** | Exactly-once effects under retries | HTTP `Idempotency-Key`: order create, payment create/refund. Saga natural keys: `reservation_id`, shipment `order_id`, payment recovery points | ADR-010 |
+| **Idempotency** | Exactly-once effects under retries | HTTP `Idempotency-Key`: checkout confirm, order create, payment create/refund. Saga natural keys: `reservation_id`, shipment `order_id`, payment recovery points | ADR-010 |
 | **Server-side aggregation** | No client-side orchestration | product `/details`, order `/details` (soft-fail enrichment) | — |
-| **Ownership-scoped queries** | Anti-IDOR — rows fetched with `(id, user_id)` | order, notification, payment, cart (token-derived `user_id`) | — |
+| **Ownership-scoped queries** | Anti-IDOR — rows fetched with `(id, user_id)` | checkout, order, notification, payment, cart, user (token-derived `user_id`) | — |
 | **Embedded migrations** | Schema self-management per binary (golang-migrate) | all 10 services | [../databases/](../databases/) |
 
 Rule: every value in a service table's **Technique** column appears here, and
@@ -253,17 +300,18 @@ templates.
 
 | Item | Service(s) | Status |
 |------|------------|--------|
+| Legacy `POST /order/v1/private/orders` (direct checkout bypass) | order | **Technical debt** — P6 removal planned (RFC-0015); checkout confirm is canonical |
+| Legacy order→cart REST pricing on direct create | order | **Technical debt** — P6 removal planned; checkout/product own price authority |
+| gRPC mTLS east-west | platform | **Planned** (RFC-0020); NetworkPolicy remains the fence until then |
 | Duplicate CORS headers (service emits CORS + gateway) | product | Worked around at gateway; service-side removal still recommended (middleware present in code) |
 | Internal `POST /users` has no in-cluster caller | user | Wired to real persistence; auth registers into its own DB |
 | Internal HTTP notify twins + gRPC `SendSMS` unused | notification | No caller (saga emails go via gRPC `SendEmail`) |
 | Internal HTTP `GET /shipping/v1/internal/shipments/orders/:orderId` redundant | shipping | No caller — order reads shipment over gRPC |
 | Internal routes rely on NetworkPolicy, no in-app caller auth | product, user, cart, shipping, notification | NetworkPolicies authored (see [`../security/`](../security/)); enforced (kindnet on Kind 1.34+; policy CNI in prod) |
 | Saga email recipient hardcoded (`noreply@orders.local`) | order, notification | Real customer-email lookup is a noted TODO |
-| Review findings (auth fail-open, IDOR, seed-seq desync, hardcoded user_id) | notification | Fixed (parity with sibling services) |
-| Seed sequence resets (PK collisions on first INSERT) | auth, cart, review, shipping | Fixed via `setval()` calls inside the seed SQL (`db/seed/sql/000001_*.up.sql`) |
 
 ---
 
 *Run the whole platform locally for verification: `cd local-stack && docker compose up -d --build` → SPA at http://localhost:3001, Kong gateway at http://localhost:8080 (demo login `alice` / `password123`).*
 
-_Last updated: 2026-07-21_
+_Last updated: 2026-07-22_

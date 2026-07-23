@@ -1,0 +1,92 @@
+# RFC-0021 phase-0 baseline recording rules. Pre-aggregate the signals the
+# overhaul is judged against (planning gate CP-0: 7 days of data before any
+# read/write cutover). Sources are the shipped RFC-0017 business instruments
+# and the otelgrpc RED histograms on the OTLP push path — nothing here asks a
+# service for a new metric.
+#
+# Deliberately absent (not emitted today, land with their phases):
+# pending-order age gauge and workflow start-outbox depth (phase 3, P3-4/7),
+# inventory_* families (phase 1+).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: rfc0021-baseline-recording-rules
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/component: recording-rules
+spec:
+  groups:
+    - name: rfc0021-baseline-5m
+      interval: 30s
+      rules:
+        # --- Checkout confirm (track 1 read-path gate) -------------------
+        # Confirmed sessions/sec — the program-level success signal.
+        - record: rfc0021:checkout_confirm_success:rate5m
+          expr: sum(rate(checkout_sessions_confirmed_total[5m]))
+
+        # Confirms bounced by re-validation (PRICE_CHANGED / STOCK_UNAVAILABLE):
+        # the population the availability-source cutover must not grow.
+        - record: rfc0021:checkout_confirm_bounce:rate5m
+          expr: sum(rate(checkout_price_changed_total[5m]))
+
+        # Confirm handler latency p95 — budget for the extra Inventory hop.
+        - record: rfc0021:checkout_confirm_duration:p95_5m
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(checkout_confirm_duration_seconds_bucket[5m])))
+
+        # --- Product stock surface (what phases 2-4 replace) -------------
+        # ReserveStock outcomes, product-side authority view.
+        - record: rfc0021:product_stock_reservations:rate5m
+          expr: sum by (result) (rate(product_stock_reservations_total[5m]))
+
+        # Product gRPC checkout-facing RPC latency p95 per method
+        # (GetProducts today; BatchGetCurrentPrices joins after P2-1).
+        - record: rfc0021:product_rpc_duration:p95_5m
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le, rpc_method) (rate(
+                rpc_server_call_duration_seconds_bucket{
+                  app="product",
+                  rpc_method=~"product.v1.ProductService/.+"}[5m])))
+
+        # Product gRPC error ratio (non-OK / all) per method.
+        - record: rfc0021:product_rpc_error:ratio5m
+          expr: |
+            sum by (rpc_method) (rate(
+              rpc_server_call_duration_seconds_count{
+                app="product",
+                rpc_method=~"product.v1.ProductService/.+",
+                rpc_response_status_code!="OK"}[5m]))
+            /
+            sum by (rpc_method) (rate(
+              rpc_server_call_duration_seconds_count{
+                app="product",
+                rpc_method=~"product.v1.ProductService/.+"}[5m]))
+
+        # --- Order saga (track 2 baseline, phase-3 cutover gate) ---------
+        # Terminal outcomes/sec: confirmed | failed | compensated.
+        - record: rfc0021:order_saga_outcome:rate5m
+          expr: sum by (outcome) (rate(order_saga_outcome_total[5m]))
+
+        # Compensation runs by step and result — result="failed" is the
+        # stuck-money population; its baseline should be zero.
+        - record: rfc0021:order_saga_compensation:rate5m
+          expr: sum by (step, result) (rate(order_saga_compensation_total[5m]))
+
+        # Saga-side ReserveStock view (order's counter, distinct from
+        # product's): the series the phase-3 flip rehomes onto inventory.
+        - record: rfc0021:order_stock_reservation:rate5m
+          expr: sum by (result) (rate(order_stock_reservation_total[5m]))
+
+        # --- Payment money hop (track 3 baseline) -------------------------
+        # Provider latency p95 per operation (charge/capture/void/refund).
+        - record: rfc0021:payment_provider_duration:p95_5m
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le, op) (rate(
+                payment_provider_request_duration_seconds_bucket[5m])))
+
+        # Authorization outcomes/sec (authorized | declined | error).
+        - record: rfc0021:payment_authorization:rate5m
+          expr: sum by (result) (rate(payment_authorization_total[5m]))

@@ -1,0 +1,20 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: rfc0021-baseline
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "Observability"
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  # RFC-0021 overhaul baseline — the pre-refactor signals every cutover gate
+  # is judged against (CP-0: 7 days of data before any read/write cutover).
+  # Queries read the rfc0021:* recording rules (prometheusrules/microservices).
+  configMapRef:
+    name: grafana-dashboard-rfc0021-baseline
+    key: rfc0021-baseline.json
+  datasources:
+    - inputName: DS_PROMETHEUS
+      datasourceName: VictoriaMetrics

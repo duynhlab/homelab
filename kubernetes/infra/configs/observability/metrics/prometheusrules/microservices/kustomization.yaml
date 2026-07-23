@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - alerts.yaml # canonical OTLP-path rules since RFC-0014 P3
   - recording-rules.yaml
+  - rfc0021-baseline.yaml # overhaul baseline (CP-0 gate: 7 days of data)

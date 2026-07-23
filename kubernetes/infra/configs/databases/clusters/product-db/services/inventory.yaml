@@ -1,0 +1,85 @@
+# inventory — per-service database triplet (RFC-0012 pattern, RFC-0021 P1-6).
+#
+# ExternalSecret for product-db inventory database credentials — product namespace.
+# OpenBAO path: secret/data/local/databases/product-db/inventory
+#
+# Rendered as kubernetes.io/basic-auth: this secret doubles as the
+# passwordSecret for the DatabaseRole below, and CNPG requires basic-auth
+# there (see order.yaml for the type-migration caveat).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: product-db-inventory-secret
+  namespace: product
+  labels:
+    app.kubernetes.io/name: product-db-inventory-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: product-db-inventory-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: product-db-inventory-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+          cnpg.io/reload: "true"
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: secret/data/local/databases/product-db/inventory
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: secret/data/local/databases/product-db/inventory
+        property: password
+---
+# Written out IN FULL — adoption resets omitted attributes (see payment.yaml).
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: product-db-role-inventory
+  namespace: product
+spec:
+  cluster:
+    name: product-db
+  name: inventory
+  comment: "inventory-service application role (RFC-0021)"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: true
+  replication: false
+  bypassrls: false
+  connectionLimit: -1
+  inRoles: []
+  passwordSecret:
+    name: product-db-inventory-secret
+  databaseRoleReclaimPolicy: retain
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: inventory-database
+  namespace: product
+spec:
+  name: inventory
+  owner: inventory
+  cluster:
+    name: product-db
+  extensions:
+    - name: pgaudit
+    - name: pg_stat_statements
+  databaseReclaimPolicy: retain

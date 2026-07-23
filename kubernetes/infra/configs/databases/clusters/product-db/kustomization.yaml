@@ -7,6 +7,7 @@ kind: Kustomization
 resources:
   - secrets/product-db-cart-secret-cart-ns.yaml
   - secrets/product-db-checkout-secret-checkout-ns.yaml
+  - secrets/product-db-inventory-secret-inventory-ns.yaml
   - secrets/product-db-order-secret-order-ns.yaml
   - secrets/product-db-payment-secret-payment-ns.yaml
   # pg-backup-rustfs-credentials: managed by ClusterExternalSecret (configs/secrets/cluster-external-secrets/)

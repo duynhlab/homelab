@@ -7,6 +7,7 @@ kind: Kustomization
 resources:
   - cart.yaml
   - checkout.yaml
+  - inventory.yaml
   - order.yaml
   - payment.yaml
   - product.yaml

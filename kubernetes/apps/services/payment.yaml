@@ -15,10 +15,12 @@ spec:
     # No platform_backup_label: that label routes CNPG/barman S3 credentials to
     # namespaces hosting a database cluster — payment's data lives on product-db
     # in the product namespace, which is already backed up.
-    # Single replica, deliberately: the outbox relay has no SKIP LOCKED fence
-    # (single-writer assumption), the reconciliation ticker + its API
-    # single-flight are per-instance, and the idempotency column rename shipped
-    # as single-replica-safe. Fence those before scaling past 1.
+    # Single replica, deliberately: the reconciliation ticker + its API
+    # single-flight are per-instance (no lease/leader election yet), and the
+    # idempotency column rename (migration 000007) shipped as
+    # single-replica-safe. The outbox relay itself is multi-replica-safe
+    # (FOR UPDATE SKIP LOCKED) — it is NOT the constraint. Fence the
+    # reconciler before scaling past 1 (RFC-0021 phase 6).
     replicaCount: 1
     # Payment's config refuses cleartext DB in production (DB_SSLMODE must not
     # be "disable") and PgDog terminates no TLS yet — so payment connects to

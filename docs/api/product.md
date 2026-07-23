@@ -20,7 +20,7 @@ through an idempotent ledger.
 | **Repository** | [`duynhlab/product-service`](https://github.com/duynhlab/product-service) | — |
 | **Owns** | Products, categories, current prices, stock quantities, stock-reservation ledger | — |
 | **Database** | `product` on `product-db` (CNPG) via PgDog `pgdog-product.product:6432` | — |
-| **Design record** | — | [RFC-0003](../proposals/rfc/RFC-0003/) — inventory ownership and stock semantics |
+| **Design record** | — | [RFC-0003](../proposals/rfc/RFC-0003/) (superseded) → [RFC-0021](../proposals/rfc/RFC-0021/) — inventory extraction program |
 
 ## Temporal participation
 
@@ -245,11 +245,19 @@ Platform-wide call graph: [api.md § Current east-west call graph](./api.md#curr
 
 ## Known gaps
 
-- **None** classed as technical debt — no legacy routes, no planned removals.
+- **Stock ownership is scheduled to leave this service** —
+  [RFC-0021](../proposals/rfc/RFC-0021/README.md) (supersedes RFC-0003) extracts a
+  dedicated inventory-service as the sole stock authority via expand → migrate →
+  contract. Until that program's phase 4, everything documented here (stock
+  columns, `ReserveStock`/`ReleaseStock`, `available_qty`) remains the deployed
+  reality; the stock RPC surface is **Planned** for deprecation, not yet
+  deprecated.
 - gRPC east-west mTLS is **Planned** platform-wide (RFC-0020 research);
   today the `:9090` surface is fenced by NetworkPolicy only.
 - The check-then-reserve TOCTOU window (checkout `GetProducts` vs saga
-  `ReserveStock`) is an accepted design tradeoff, not a gap to fix.
+  `ReserveStock`) was an accepted tradeoff under RFC-0003; RFC-0021 keeps the
+  same stance (availability checks stay advisory — `Reserve` is the correctness
+  gate) while moving the reserve path to inventory.
 
 ## Operations
 

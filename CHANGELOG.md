@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0021 baseline e2e** (phase-0 gate §0.7) — `scripts/rfc0021-baseline-e2e.sh`: 7 saga scenarios against local-stack (happy path, magic-amount decline, two-user TOCTOU race on the last unit, duplicate confirm, shipment-failure compensation, worker-outage convergence, capture-fail documented as un-injectable); first run archived in `RFC-0021/baseline-e2e-results.md` — 18 PASS, 0 FAIL, repo SHAs recorded.
 - **RFC-0021 baseline observability** (CP-0 gate) — `rfc0021:*` recording rules (checkout confirm success/bounce/p95, product ReserveStock outcomes + gRPC RED, saga terminal outcomes + compensation, payment provider p95 + authorization) and Grafana dashboard *RFC-0021 — Overhaul Baseline* (`rfc0021-baseline`); the 7-day pre-refactor window starts at merge. Pending-order age and outbox depth deliberately absent (metrics land with phase 3).
 - **RFC-0021 phase-0 kickoff docs** — `docs/api/product.md` known-gaps revised (stock extraction planned under RFC-0021; TOCTOU stance carried forward; design-record row points RFC-0003 → RFC-0021); `RFC-0021/cutover-rollback.md` added (per-cutover rollback story, RUNBOOK-007 seed).
 - **RFC-0021 promoted to provisional** — `RFC-0021/README.md` added (decision, target architecture, 8-phase rollout with exit gates, cutover/rollback stance); **RFC-0003 flipped to superseded** with a pointer (its stock semantics carry into the inventory reservation FSM); research review gate fully ticked with owner sign-off.

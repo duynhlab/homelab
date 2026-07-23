@@ -2,7 +2,16 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | platform-wide | 2026-06-26 | 2026-06-26 |
+| superseded | platform-wide | 2026-06-26 | 2026-07-23 |
+
+> **Superseded (2026-07-23) by [RFC-0021 — Platform overhaul](../RFC-0021/README.md).**
+> This RFC ratified product-service as the inventory owner and deferred a dedicated
+> inventory-service to "when a concrete pressure appears" (its own Alternative (b)).
+> RFC-0021 takes that escalation path: inventory becomes a separate bounded context and
+> sole stock authority, migrated via expand → migrate → contract. The stock semantics
+> defined here (`available → reserved → sold/released`, reservation idempotency by
+> order id) carry forward into RFC-0021's reservation FSM. This file is retained as a
+> pointer so existing links resolve and the decision history stays intact.
 
 ## Summary
 

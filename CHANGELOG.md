@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0021 promoted to provisional** — `RFC-0021/README.md` added (decision, target architecture, 8-phase rollout with exit gates, cutover/rollback stance); **RFC-0003 flipped to superseded** with a pointer (its stock semantics carry into the inventory reservation FSM); research review gate fully ticked with owner sign-off.
 - **RFC-0021 reserved (researching)** — platform overhaul umbrella: inventory extraction (supersession of RFC-0003 proposed), order aggregate strengthening, payment hardening; `research.md` grounded in a 2026-07-23 code audit of all service repos; backlog RFC-0016 absorbed into phase 6.
 
 ### Changed

@@ -340,7 +340,7 @@ focused PRs without waiting for the research gate.
 - [x] **Context7 audit** complete; footer date updated
 - [x] At least **one Mermaid** diagram; labels match deployed vs **planned** reality
 - [x] No Kubernetes manifest changes smuggled into this research file
-- [ ] Owner sign-off: **ready for RFC**
+- [x] Owner sign-off: **ready for RFC** (2026-07-23)
 
 ---
 

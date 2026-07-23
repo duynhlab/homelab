@@ -194,7 +194,7 @@ Every claim below was verified against the service repositories (fresh `main`,
 | Order status | `pending → confirmed\|failed`, unconditional `UpdateStatus`; no version column, no history table | Aggregate methods + version CAS + `order_status_history`; `CANCELLING/CANCELLED/MANUAL_REVIEW/COMPLETED` additions |
 | Workflow start | Start-after-commit; healing = gRPC status gate + `REJECT_DUPLICATE` retry; web path uses AllowDuplicate (asymmetry to record); **no outbox** | `fulfillment_start_requests` outbox + dispatcher as authoritative safety net |
 | Saga steps | Authorize → ReserveStock → CreateShipment → Capture → ConfirmOrder → SendNotification → **SendReceipt** → ClearCart; ConfirmOrder-fail compensation also emits **SendRefundNotification** | Same shape with Inventory activities + `CommitInventory` mandatory forward; compensation matrix must include both notification steps |
-| Versioning | **No `workflow.GetVersion`, build IDs, or search attributes anywhere**; one shared retry policy (30s/5 attempts); workflow ID `order-fulfillment-<id>` | First platform use of GetVersion; replay-test harness required from zero; per-class retry policies; search attributes registered in Temporal namespace `mop` via GitOps |
+| Versioning | **No `workflow.GetVersion`, build IDs, or search attributes anywhere**; one shared retry policy (30s/5 attempts); workflow ID `order-fulfillment-<id>` | First platform use of workflow versioning (GetVersion patching vs Worker Versioning — see Open questions); replay-test harness required from zero; per-class retry policies; search attributes registered in Temporal namespace `mop` via GitOps |
 
 ### Payment (source: `payment-service`)
 
@@ -277,9 +277,15 @@ workflow) → contract removal → order/payment tracks → hardening.
 - [ ] **RFC-0016 disposition**: backlog row annotated as absorbed into this RFC's
       phase 6 (owner chose umbrella); confirm the reserved number is retired rather than
       backfilled later.
-- [ ] **Temporal versioning mechanism**: `workflow.GetVersion` (leading candidate) vs
-      Worker Build IDs — confirm with a Context7 audit of the current Go SDK guidance
-      before phase 3.
+- [ ] **Temporal versioning mechanism** *(Context7-audited 2026-07-23)*: official docs
+      now recommend **Worker Versioning** (Worker Deployment Versions / Build IDs,
+      `worker.Options.DeploymentOptions{UseVersioning: true, …}`) for production rollouts,
+      with **Patching (`workflow.GetVersion`)** as the sanctioned fallback where versioned
+      worker deployments aren't adopted. Platform constraints favor the fallback for the
+      first migration: self-hosted server, a single worker deployment per queue, and
+      `pkg/temporalx.NewWorker` passing empty `worker.Options` (no deployment plumbing).
+      Final call at phase 3 — adopting Worker Versioning would also mean building the
+      deployment-version rollout machinery (GitOps-managed build IDs) first.
 
 ---
 
@@ -307,8 +313,8 @@ focused PRs without waiting for the research gate.
 - [RFC-0003](../RFC-0003/README.md) — decision being superseded; its Alternatives table defines options (a)/(b)/(c) reused above.
 - [RFC-0001](../RFC-0001/) (saga), [RFC-0010](../RFC-0010/) + ADR-007..012 (payment), [RFC-0015](../RFC-0015/) + ADR-018/019/020 (checkout), [RFC-0020](../RFC-0020/) (internal TLS — a phase 7 dependency for east-west mTLS).
 - [`docs/api/product.md`](../../../api/product.md), [`order.md`](../../../api/order.md), [`payments.md`](../../../api/payments.md), [`checkout.md`](../../../api/checkout.md), [`temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md) — as-built contracts the audit cross-checked.
-- Temporal Go SDK — workflow versioning (`workflow.GetVersion`) official docs (Context7 audit pending).
-- Buf — breaking-change detection and field deprecation official docs (Context7 audit pending).
+- Temporal docs — *Versioning (Go SDK)* and *Worker Versioning* (worker deployments): patching via `workflow.GetVersion` vs deployment-version pinning.
+- Buf docs — *Breaking rules* (`FIELD_NO_DELETE`/`RPC_NO_DELETE` guidance: deprecate instead of delete) and `buf source edit deprecate`.
 
 ---
 
@@ -317,8 +323,8 @@ focused PRs without waiting for the research gate.
 | Claim / section | Source checked | Result |
 |-----------------|----------------|--------|
 | As-built facts (all "Platform today" columns) | Direct code audit of service repos + homelab manifests, 2026-07-23 (fresh `main`) | confirmed |
-| `workflow.GetVersion` is the right versioning mechanism for the running SDK version | Temporal Go SDK docs via Context7 | **pending** |
-| Buf `[deprecated = true]` field/method support in current toolchain | Buf docs via Context7 | **pending** |
+| Workflow versioning mechanism for the running SDK (`go.temporal.io/sdk` v1.44.1 order / v1.45.0 checkout) | Temporal docs (develop/go/workflows/versioning + worker-deployments/worker-versioning) via Context7, 2026-07-23 | **corrected** — Worker Versioning (deployment versions/Build IDs) is the recommended production approach; `workflow.GetVersion` patching is the sanctioned fallback where versioned deployments aren't adopted. Both available in the running SDK; choice recorded as an open question for phase 3 |
+| Buf `[deprecated = true]` field/method support in current toolchain (buf CLI 1.70.0, buf.yaml v2 `breaking: FILE`) | Buf docs (breaking/rules, cli/buf/source/edit/deprecate) via Context7, 2026-07-23 | **confirmed** — field `[deprecated = true]` and RPC `option deprecated = true;` are first-class; breaking rules prescribe deprecate-instead-of-delete (`FIELD_NO_DELETE`, `RPC_NO_DELETE`, `ENUM_VALUE_NO_DELETE`); `buf source edit deprecate --prefix` automates marking. Resolves the draft's "method-level deprecation depends on tooling" caveat |
 | CNPG triplet + pg_hba ordering for a new database on `product-db` | RFC-0012 / ADR-013..015, RFC-0018 | confirmed (records) |
 
 ---
@@ -331,11 +337,11 @@ focused PRs without waiting for the research gate.
 - [x] At least **two alternatives** documented with tradeoffs
 - [x] **Platform as-built** section filled from manifests/docs (not boilerplate — code audit 2026-07-23)
 - [x] Primary use-case direction stated (extraction per Alternative (b); umbrella program)
-- [ ] **Context7 audit** complete; footer date updated
+- [x] **Context7 audit** complete; footer date updated
 - [x] At least **one Mermaid** diagram; labels match deployed vs **planned** reality
 - [x] No Kubernetes manifest changes smuggled into this research file
 - [ ] Owner sign-off: **ready for RFC**
 
 ---
 
-_Last verified: 2026-07-23 (code audit on fresh `main` of all service repos + homelab manifests; Context7 audit pending)._
+_Last verified: 2026-07-23 (code audit on fresh `main` of all service repos + homelab manifests; Context7 audit of Temporal versioning + Buf deprecation complete)._

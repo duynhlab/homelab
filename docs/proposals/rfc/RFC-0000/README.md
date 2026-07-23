@@ -28,6 +28,7 @@ Created / Last updated: YYYY-MM-DD.
 - Context7 audit complete (see research footer)
 - Owner approved **ready for RFC**
 - **Do not** repeat the mechanism deep-dive here — summarize and link `./research.md`
+- When Status → **`implementable`**: list expected [`docs/api/`](../../../api/README.md) files to touch (or N/A — infra-only)
 
 ## Summary
 
@@ -117,12 +118,16 @@ and how to roll back safely.
 
 <!--
 Major milestones: first release with an initial version; GA; retirement/supersession.
+When Status → implemented, confirm:
+- [ ] docs/api/ synced (or N/A — infra-only) — routes/RPCs/ownership/rollup + Design records links
+- [ ] ADR(s) spawned under docs/proposals/adr/
 -->
 
 ## Related
 
 - [./research.md](./research.md) — plain-language research and Context7 audit trail
 - <!-- Optional: docs/<area>/<topic>/README.md if spun off -->
+- <!-- docs/api/{service}.md — as-built contract after implemented -->
 - <!-- ADRs spawned when implemented -->
 - <!-- Linked PRs -->
 

@@ -36,7 +36,8 @@ diagram *before* anyone builds it. Examples:
 | **Domain doc** (optional) | `docs/<area>/<topic>/README.md` | [`AGENTS.md`](../../../AGENTS.md) docs conventions | How does it work **in this platform**? |
 
 **Flow:** real-world problem in `research.md` → [research review gate](RFC-0000/research.md#research-review-gate)
-→ `README.md` → optional domain doc → implement → ADR(s) under [`adr/`](../adr/).
+→ `README.md` → optional domain doc → implement → sync [`docs/api/`](../../api/README.md) when
+API-touching → ADR(s) under [`adr/`](../adr/).
 
 1. **Reserve number (owner OK required)** — propose the exact next slot (e.g. **RFC-0019**
    = `max(RFC-NNNN) + 1`; do not backfill gaps unless the owner asks). On approval, in
@@ -52,10 +53,23 @@ diagram *before* anyone builds it. Examples:
    index. Follow [`AGENTS.md`](../../../AGENTS.md) docs conventions (house shape, English,
    **planned** vs **deployed**).
 5. **Implement** → Status `implemented` → spawn ADR(s) under [`adr/`](../adr/).
+6. **Sync `docs/api/` (API-touching)** — in the same PR or an immediate follow-up before
+   or when Status becomes **`implemented`**:
+   - Map the change → owning file(s) via [`docs/api/README.md` § Document Ownership](../../api/README.md#document-ownership).
+   - Update **Design records** on service Identity tables; hub rollup and At a glance rows when deploy/transport changes.
+   - Service files touched use [`_template-service.md`](../../api/_template-service.md) v2 (no full backfill of legacy v1 contracts required).
+   - Reuse Mermaid from the RFC when helpful — label *As-built contract* vs *Target state*; tag **planned** behaviour accurately.
+   - Link back from RFC **Related** and spawned ADR **Consequences**.
+   Infra-only RFCs update platform docs instead; skip `docs/api/` unless app contracts change.
 
 Keep diagrams/assets **inside the RFC folder** (or the chosen domain doc path). Mermaid
 may repeat across artifacts — label each diagram's question (*Mechanism*, *Target state*,
-*Homelab as-built*) and keep facts in sync.
+*Homelab as-built*, *As-built contract*) and keep deployed facts in sync.
+
+**Duplication with `docs/api/`:** operational contract (routes, RPCs, payloads, status)
+lives in [`docs/api/`](../../api/README.md); tradeoffs and alternatives stay in the RFC.
+Copying diagrams or prose into a service contract is OK when cross-linked — do not dedupe
+for its own sake.
 
 | Status | Meaning |
 |--------|---------|
@@ -118,4 +132,4 @@ when someone starts research (owner OK → `research.md` → index `researching`
 > [RFC-0001](RFC-0001/) (not a separate backlog row).
 
 ---
-_Last updated: 2026-07-22_
+_Last updated: 2026-07-23_

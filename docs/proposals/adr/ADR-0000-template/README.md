@@ -46,6 +46,8 @@ RFC-NNNN/research.md § Alternatives instead of duplicating the full analysis.
 <!--
 What becomes true once this is in place — the good, the bad, and the follow-ups.
 Include any "revisit trigger" that would re-open this ADR.
+If API-touching: update docs/api/ per Document Ownership; link this ADR in the service
+Identity **Design records** row; reuse diagrams when helpful — contract doc stays as-built.
 -->
 
 ---

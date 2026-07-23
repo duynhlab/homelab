@@ -181,6 +181,7 @@ Complements `browser-testing-with-devtools` in the Verify phase where applicable
   before creating the folder. Status **`researching`** in the index until the review gate passes.
 - **RFC** (`RFC-NNNN/README.md`) — decision + target architecture + rollout; copy [`RFC-0000/README.md`](docs/proposals/rfc/RFC-0000/README.md) only after research gate + owner **ready for RFC**. Link `./research.md`; do not repeat the full tutorial.
 - **ADR** (`docs/proposals/adr/ADR-NNN-slug/`) records a decision already made (Nygard). Link **Related research** for background; ADR is the why, not the textbook.
+- **docs/api sync (API-touching):** before an RFC is **`implemented`** or an ADR **`Accepted`**, update [`docs/api/`](docs/api/README.md) — owning service files, hub rollup, **Design records** links. Diagram/content duplication with RFC/ADR is OK when cross-linked; infra-only changes update platform docs instead. New or touched contracts use [`_template-service.md`](docs/api/_template-service.md) v2.
 - **Optional domain doc** (`docs/<area>/<topic>/README.md`) — owner picks the area; distill from research using the house doc shape; link RFC research + README both ways.
 - Small bugs/cleanups and dependency bumps need no RFC — ship in a focused PR.
   Substantial themes → RFC backlog ([`docs/proposals/rfc/README.md`](docs/proposals/rfc/README.md)).

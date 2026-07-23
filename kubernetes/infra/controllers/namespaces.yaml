@@ -87,6 +87,14 @@ metadata:
   labels:
     environment: local
     platform.duynhlab.dev/tier: app
+  name: inventory
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+    platform.duynhlab.dev/tier: app
   name: order
 ---
 apiVersion: v1

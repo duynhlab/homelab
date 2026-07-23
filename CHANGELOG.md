@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **RFC-0021 reserved (researching)** — platform overhaul umbrella: inventory extraction (supersession of RFC-0003 proposed), order aggregate strengthening, payment hardening; `research.md` grounded in a 2026-07-23 code audit of all service repos; backlog RFC-0016 absorbed into phase 6.
+
 ### Changed
 
 - **docs/api/microservices.md**: expanded §2 local-stack snapshot (workers, Temporal, mockpay, gRPC `:9090`, Valkey gateway dep); fixed outdated checkout P5 blurb; aligned technique index and §6 gaps with README rollup.

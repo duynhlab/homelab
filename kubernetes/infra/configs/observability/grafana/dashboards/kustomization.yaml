@@ -30,6 +30,8 @@ resources:
   # Flux GitOps dashboards
   - grafana-dashboard-flux-cluster.yaml
   - grafana-dashboard-flux-controlplane.yaml
+  # RFC-0021 overhaul baseline (CP-0 gate)
+  - grafana-dashboard-rfc0021-baseline.yaml
 
 # ClickHouse dashboard JSON → ConfigMap (referenced by grafana-dashboard-clickhouse.yaml
 # via configMapRef; stable name, so the hash suffix is disabled).
@@ -49,6 +51,9 @@ configMapGenerator:
   - name: grafana-dashboard-clickhouse-traces-explorer
     files:
       - clickhouse-traces-explorer.json
+  - name: grafana-dashboard-rfc0021-baseline
+    files:
+      - rfc0021-baseline.json
 
 generatorOptions:
   disableNameSuffixHash: true

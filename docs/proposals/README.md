@@ -19,7 +19,11 @@ flowchart LR
   Res --> RFC[RFC-NNNN/README.md]
   RFC --> Docs[Optional docs/area/topic]
   RFC --> Impl[implemented]
+  Impl --> ApiSync["docs/api sync<br/>(API-touching)"]
   Impl --> ADR[ADR append-only]
+  ADR --> ApiSync
+  ApiSync --> V2["Use template v2<br/>for touched contracts"]
+  RFC --> PlatDocs["docs/platform etc.<br/>(infra-only)"]
   Small([Small decision]) --> ADR
 ```
 
@@ -29,12 +33,20 @@ flowchart LR
 | **RFC** | Decision + target architecture + rollout | `rfc/RFC-NNNN/README.md` | `provisional → implementable → implemented` |
 | **ADR** | Record the **why** after a decision ships | [`adr/ADR-NNN-slug/`](adr/) | `Proposed → Accepted → Superseded` |
 | **Domain doc** (optional) | Durable platform reference distilled from research | `docs/<area>/<topic>/` | owner-maintained |
+| **docs/api sync** | Normative API contract after ship (routes, RPCs, ownership, rollup) | [`docs/api/`](../api/README.md) when API-touching | same PR or immediate follow-up to `implemented` / ADR `Accepted` |
 
 - **Research** is a plain-language deep dive — start from a **real-world problem**
   (the kind you'd hit at work), then teach yourself before deciding.
 - An **RFC** is the time-bound proposal; it links `./research.md` and must not
   repeat the full mechanism tutorial.
 - When accepted and built, concrete decisions become one or more **ADRs**.
+- **API-touching** RFCs and ADRs must sync [`docs/api/`](../api/README.md) before
+  the RFC is marked **`implemented`** or the ADR **`Accepted`** — update the owning
+  contract files, hub rollup, and **Design records** links on service Identity tables.
+  Diagrams and prose may duplicate RFC/ADR content when cross-linked and labelled
+  (deployed vs **planned**). **Infra-only** changes update platform docs
+  (`docs/platform/`, `docs/secrets/`, …) instead; touch `docs/api/` only when app
+  contracts change (auth, routes, call graph, observability instrumentation, etc.).
 - A **small** standalone decision can skip RFC and go straight to an ADR.
 - Bug fixes, cleanups, and dependency bumps need no RFC. Substantial unnumbered themes →
   [RFC backlog](rfc/README.md#backlog--candidate-rfcs). Planning ⊋ RFC — only *substantial*
@@ -49,4 +61,4 @@ flowchart LR
 > together is a common open-source pattern (e.g. Kubernetes, Flux).
 
 ---
-_Last updated: 2026-07-17_
+_Last updated: 2026-07-23_

@@ -20,6 +20,13 @@ settled decisions.
   Related research = `RFC-NNNN/research.md` when the RFC had a research phase, or `—`.
 - **Every decision is a tradeoff** — always record the rejected *Alternatives* (and why) and the *Consequences* you accept (the bad as well as the good). A decision with no downside listed hasn't been examined hard enough.
 - **Lifecycle:** `Proposed → Accepted → (Superseded by ADR-XXX | Deprecated)`.
+- **docs/api sync (API-touching):** when Status becomes **Accepted**, update
+  [`docs/api/`](../../api/README.md) in the same PR or an immediate follow-up —
+  map files via [Document Ownership](../../api/README.md#document-ownership), set
+  **Design records** links on service Identity tables, and refresh the hub rollup when
+  deploy status changes. The ADR keeps *why*; the service contract keeps routes, RPCs,
+  payloads, and implementation status. Diagram reuse from the ADR or RFC is OK when
+  cross-linked. Infra-only ADRs update platform docs instead.
 - **Append-only:** don't rewrite history. When a decision changes, write a new ADR that supersedes
   the old one and update the old one's Status.
 
@@ -55,4 +62,4 @@ settled decisions.
 | [ADR-026](ADR-026-platform-db-pgbouncer-pilot/) | Pilot CNPG-native PgBouncer pooler on platform-db (product-db stays PgDog); operator-managed auth_query | Proposed | [RFC-0012](../rfc/RFC-0012/) |
 
 ---
-_Last updated: 2026-07-19_
+_Last updated: 2026-07-23_

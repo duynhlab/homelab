@@ -55,15 +55,27 @@ shown in [api.md](./api.md#current-east-west-call-graph).
 | 5 | [workflows.md](./workflows.md) | Which Temporal workflows exist, who orchestrates them, and who participates |
 | 6 | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) | Why Saga is used instead of 2PC and how the live workflow compensates |
 | 7 | [payments.md](./payments.md) or [checkout.md](./checkout.md) | Deeper state-machine, idempotency, and operational examples |
+| 8 | [_template-service.md](./_template-service.md) then diff against [checkout.md](./checkout.md) | Authoring shape for new or migrated service contracts (v2) |
 
 ## Document Ownership
 
-Keeping each fact in one place prevents three copies from drifting.
+Three layers — not three copies of the same fact:
+
+1. **Normative contract** (routes, RPCs, payloads, deployment status, ownership boundaries)
+   lives here in `docs/api/`. Agents and service authors implement against these files.
+2. **Design rationale** (alternatives, tradeoffs, rollout history) lives in
+   [RFC](../proposals/rfc/) and [ADR](../proposals/adr/) — link via **Design records**,
+   do not paste the full decision essay into a service contract.
+3. **Allowed duplication:** Mermaid diagrams and explanatory prose may repeat across RFC/ADR
+   and `docs/api/` when cross-linked and labelled (*Target state* vs *As-built contract*).
+   **Drift is forbidden** on deployed behaviour (paths, status badges, ownership) — not on
+   teaching diagrams that answer different questions.
 
 Every quick-facts table under a `docs/api/` title — and each service contract's
 **Identity** table — uses three columns: **Attribute | Value | RFC / ADR**.
-Normative design links belong on the **Design record** row; use `None` when the
-doc has no owning RFC or ADR.
+Normative design links belong on the **Design records** row; use `None` when the
+doc has no owning RFC or ADR. Legacy v1 contracts may still say **Design record**
+(singular) until migrated to [_template-service.md](./_template-service.md) v2.
 
 | Information | Canonical owner |
 |-------------|-----------------|
@@ -166,11 +178,12 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 | East-west call graph or edge exposure changes | Update [api.md](./api.md) |
 | Cross-service feature ownership changes | Update [microservices.md](./microservices.md) and the relevant service files |
 | Saga step or compensation changes | Update [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
-| At a glance or code map format | Table 1: `Dimension \| Value \| Status` (Deployment row merges local + cluster); code map: single grouped table (`Transport` / `logic` / `core` / `Platform`) per [_template-service.md](./_template-service.md) |
-| New service contract file | Start from [_template-service.md](./_template-service.md) — At a glance (3 columns) + 15-part outline |
+| RFC `implemented` or ADR `Accepted` (API-touching) | Sync per [Document Ownership](#document-ownership); set **Design records** links; same PR or immediate follow-up — see [proposals lifecycle](../proposals/README.md) |
+| At a glance or code map format | v2 template: `Dimension \| Value \| Status` rows include **Deployment**, **Runtime modes**, **HTTP server**, **Edge exposure**, **gRPC server/clients**, **Worker**, **Temporal**, **Async/events**, **Technical debt** — see [_template-service.md](./_template-service.md) |
+| New service contract file | Start from [_template-service.md](./_template-service.md) v2 — At a glance + Identity + 15-part outline |
 | New file | Link it here and from [docs/README.md](../README.md) |
 
 Every substantive claim must match the service code, local-stack wiring, and
 GitOps manifests. Mark designed but undeployed behavior as **planned**.
 
-_Last updated: 2026-07-22_
+_Last updated: 2026-07-23_

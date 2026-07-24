@@ -60,6 +60,8 @@ settled decisions.
 | [ADR-024](ADR-024-floci-kms-emulator-auto-unseal/) | floci KMS-emulator `seal "awskms"` auto-unseal for OpenBAO on Kind + revoke root token (replaces Shamir CronJob) | Accepted | [RFC-0008](../rfc/RFC-0008/) |
 | [ADR-025](ADR-025-pgdog-passthrough-dynamic-db-creds/) | PostgreSQL credential delivery & role model — isolation (db- vs schema-per-service), role tiering, static/rotated/dynamic spectrum, pooler auth modes (incl. PgDog passthrough PoC) | Proposed | [RFC-0008](../rfc/RFC-0008/), [RFC-0012](../rfc/RFC-0012/) |
 | [ADR-026](ADR-026-platform-db-pgbouncer-pilot/) | Pilot CNPG-native PgBouncer pooler on platform-db (product-db stays PgDog); operator-managed auth_query | Proposed | [RFC-0012](../rfc/RFC-0012/) |
+| [ADR-027](ADR-027-inventory-sole-stock-authority/) | inventory-service is the platform's sole stock authority (supersedes RFC-0003's product-owned stock); foundation shipped, cutover realized over RFC-0021 phases 2–4 | Accepted | [RFC-0021](../rfc/RFC-0021/) |
+| [ADR-028](ADR-028-inventory-reservation-model/) | Inventory reservation & balance model — derived ATP, RESERVED→COMMITTED\|RELEASED\|EXPIRED FSM with claim-via-row idempotency, append-only movement ledger, one-order-one-warehouse | Accepted | [RFC-0021](../rfc/RFC-0021/) |
 
 ---
-_Last updated: 2026-07-23_
+_Last updated: 2026-07-24_

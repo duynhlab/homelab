@@ -62,6 +62,7 @@ settled decisions.
 | [ADR-026](ADR-026-platform-db-pgbouncer-pilot/) | Pilot CNPG-native PgBouncer pooler on platform-db (product-db stays PgDog); operator-managed auth_query | Proposed | [RFC-0012](../rfc/RFC-0012/) |
 | [ADR-027](ADR-027-inventory-sole-stock-authority/) | inventory-service is the platform's sole stock authority (supersedes RFC-0003's product-owned stock); foundation shipped, cutover realized over RFC-0021 phases 2–4 | Accepted | [RFC-0021](../rfc/RFC-0021/) |
 | [ADR-028](ADR-028-inventory-reservation-model/) | Inventory reservation & balance model — derived ATP, RESERVED→COMMITTED\|RELEASED\|EXPIRED FSM with claim-via-row idempotency, append-only movement ledger, one-order-one-warehouse | Accepted | [RFC-0021](../rfc/RFC-0021/) |
+| [ADR-029](ADR-029-enum-feature-flag-helper/) | Adopt `pkg/flagx` as the platform feature-flag helper — startup-validated enum/percent env flags for reversible rollout gates (first consumer: checkout `CHECKOUT_AVAILABILITY_SOURCE`, P2-4) | Accepted | [RFC-0021](../rfc/RFC-0021/) |
 
 ---
 _Last updated: 2026-07-24_

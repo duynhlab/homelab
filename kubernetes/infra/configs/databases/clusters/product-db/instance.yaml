@@ -49,6 +49,10 @@ spec:
       - host    order   order   all scram-sha-256
       - host    checkout checkout all scram-sha-256
       - host    inventory inventory all scram-sha-256
+      # RFC-0021 P2-3: inventory role reads the product database for the phase-2
+      # stock backfill (read-only via GRANT SELECT, product migration 000005).
+      # Temporary — revoke this line + the grant at Phase 7 contraction.
+      - host    product   inventory all scram-sha-256
       - host    all     all     all reject
 
     synchronous:

@@ -17,11 +17,11 @@ flowchart TD
     Hub["API documentation hub"] --> Shared["api.md<br/>shared HTTP + gRPC rules"]
     Hub --> Rollup["Service contracts rollup<br/>deployment + CI"]
     Hub --> Catalog["microservices.md<br/>ownership + feature matrix"]
-    Hub --> Contracts["10 service contract files"]
+    Hub --> Contracts["11 service contract files"]
     Hub --> Workflows["workflows.md<br/>Temporal workflow registry"]
     Hub --> Saga["Temporal fulfillment<br/>Saga + 2PC + operations"]
     Shared --> Journeys["api.md § End-to-end user journeys"]
-    Contracts --> Basic["Auth · User · Product · Cart · Order<br/>Review · Notification · Shipping"]
+    Contracts --> Basic["Auth · User · Product · Inventory · Cart<br/>Order · Review · Notification · Shipping"]
     Contracts --> Deep["Checkout · Payment<br/>state-machine deep dives"]
     Shared --> Contracts
     Catalog --> Contracts
@@ -116,6 +116,7 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 | [auth API](./auth.md) | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/auth-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/auth-service/actions) |
 | [user API](./user.md) | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/user-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/user-service/actions) |
 | [product API + gRPC](./product.md) | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/product-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/product-service/actions) |
+| [inventory gRPC](./inventory.md) | ✓ | ✓ | Implemented — deployed, no live caller (cutover phases 2–3) | [![CI](https://github.com/duynhlab/inventory-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/inventory-service/actions) |
 | [cart API + gRPC](./cart.md) | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/cart-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/cart-service/actions) |
 | [order API + gRPC](./order.md) | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/order-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/order-service/actions) |
 | [review API + gRPC](./review.md) | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/review-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/review-service/actions) |
@@ -136,6 +137,7 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 | Auth | Credentials, JWTs, refresh rotation, and JWKS | [auth.md](./auth.md) |
 | User | Public and owner-scoped profiles | [user.md](./user.md) |
 | Product | Catalog, price, stock, and review aggregation | [product.md](./product.md) |
+| Inventory | Warehouse balances, reservations, and movement ledger (stock authority; no live caller yet) | [inventory.md](./inventory.md) |
 | Cart | Active cart and checkout snapshot | [cart.md](./cart.md) |
 | Order | Orders and fulfillment workflow handoff | [order.md](./order.md) |
 | Review | Product ratings and comments | [review.md](./review.md) |

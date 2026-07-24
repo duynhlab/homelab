@@ -173,7 +173,7 @@ Every claim below was verified against the service repositories (fresh `main`,
 |--------|---------------------------|---------------------------|
 | Stock storage | `products.stock_quantity` (CHECK ≥ 0) + `stock_reservations` (PK `(reservation_id, product_id)`, status `reserved\|released`) | `inventory_balances` + reservation/movement tables in a new inventory DB |
 | Reserve semantics | Guarded decrement of `stock_quantity` in one all-or-nothing tx + reservation rows (`postgres_product_repository.go:290-403`) | `reserved` counter increments; `on_hand` unchanged until Commit |
-| **Backfill mapping** | — | **`on_hand = stock_quantity + SUM(active reserved)`** — required because reserve already decrements the column |
+| **Backfill mapping** | — | At the drained cutover the runbook already mandates: **`on_hand = stock_quantity`, `reserved = 0`, `safety_stock = 0`**. `stock_reservations` is **not** read back — Product has no commit/sold state (a successful order leaves its `reserved` row in place forever; only compensation flips it to `released`), so `SUM('reserved')` conflates in-flight holds with all completed sales and would inflate `on_hand`. Correctness rests on the drain, not on reconstructing holds. |
 | Reservation expiry | None (rows live until released) | v1 keeps explicit-only; `expires_at` observability + reconciler |
 | SKU/variant model | None — `products.id` SERIAL int surfaced as string | `sku_id = product_id` initial identity; variants are future work, **not** part of the extraction |
 | Cache | Stock inside cached detail payload; reserve busts detail key only; checkout read path bypasses cache (DB truth) | Stock leaves the catalog cache; availability fetched fresh |

@@ -42,6 +42,10 @@ spec:
       namespace: default
     - apiVersion: fluxcd.controlplane.io/v1
       kind: ResourceSet
+      name: rs-fulfillment
+      namespace: default
+    - apiVersion: fluxcd.controlplane.io/v1
+      kind: ResourceSet
       name: rs-comms
       namespace: default
     - apiVersion: fluxcd.controlplane.io/v1

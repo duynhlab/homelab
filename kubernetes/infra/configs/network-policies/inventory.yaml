@@ -1,0 +1,45 @@
+# NOTE: kindnet DOES enforce NetworkPolicy on Kind K8s 1.34+ — these rules are
+# LIVE. Any ingress not explicitly allowed below is dropped.
+#
+# Inventory is gRPC-only (RFC-0021): no Kong route reaches it, so there is no
+# edge :8080 allow — kubelet health probes are host-level and bypass
+# NetworkPolicy (same stance as checkout). Only the gRPC callers get in.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-ingress
+  namespace: inventory
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# inventory-service gRPC (:9090, inventory.v1) — reservations dialed by
+# checkout's confirm path and the order saga's stock activities (RFC-0021).
+#
+# Pod-scoped (app.kubernetes.io/name: inventory) rather than a rule in a
+# namespace-wide allow, mirroring allow-product-grpc: keep the allow surface
+# limited to the service pods themselves.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-inventory-grpc
+  namespace: inventory
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: inventory
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: checkout
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: order
+      ports:
+        - protocol: TCP
+          port: 9090

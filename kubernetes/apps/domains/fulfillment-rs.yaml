@@ -1,0 +1,262 @@
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSet
+metadata:
+  name: rs-fulfillment
+  namespace: default
+spec:
+  inputsFrom:
+    - kind: ResourceSetInputProvider
+      selector:
+        matchLabels:
+          platform.duynhlab.dev/domain: fulfillment
+  resourcesTemplate: |
+    apiVersion: v1
+    kind: Namespace
+    metadata:
+      name: << inputs.namespace >>
+      labels:
+        environment: local
+        <<- if (index inputs "platform_backup_label") >>
+        platform.duynhlab/backup: << index inputs "platform_backup_label" | quote >>
+        <<- end >>
+    ---
+    # Edge resilience policy referenced by the Service annotation above.
+    apiVersion: configuration.konghq.com/v1beta1
+    kind: KongUpstreamPolicy
+    metadata:
+      name: resilience-default
+      namespace: << inputs.namespace >>
+    spec:
+      algorithm: round-robin
+      healthchecks:
+        active:
+          type: http
+          httpPath: /health
+          healthy:
+            interval: 5
+            successes: 2
+          unhealthy:
+            interval: 5
+            httpFailures: 3
+            timeouts: 3
+        passive:
+          healthy:
+            successes: 2
+          unhealthy:
+            httpFailures: 5
+            timeouts: 3
+    ---
+    apiVersion: helm.toolkit.fluxcd.io/v2
+    kind: HelmRelease
+    metadata:
+      name: << inputs.name >>
+      namespace: << inputs.namespace >>
+    spec:
+      interval: 10m
+      timeout: 10m
+      chartRef:
+        kind: OCIRepository
+        name: mop-chart-oci
+        namespace: flux-system
+      releaseName: << inputs.name >>
+      install:
+        remediation:
+          retries: 3
+      upgrade:
+        remediation:
+          retries: 3
+      values:
+        name: << inputs.name >>
+        replicaCount: << inputs.replicaCount | int >>
+        image:
+          repository: << index inputs "registry_url" | default "ghcr.io/duynhlab" >>/<< inputs.name >>-service/<< inputs.name >>-service
+          tag: "<< inputs.image_tag >>"
+          pullPolicy: IfNotPresent
+        service:
+          enabled: true
+          type: ClusterIP
+          # Kong edge resilience (RFC-0009 #5): per-service bounded timeouts +
+          # retries, and health-checks via the resilience-default KongUpstreamPolicy.
+          annotations:
+            konghq.com/connect-timeout: "3000"
+            konghq.com/read-timeout: "15000"
+            konghq.com/write-timeout: "15000"
+            konghq.com/retries: "2"
+            konghq.com/upstream-policy: resilience-default
+          http:
+            port: 8080
+            containerPort: 8080
+          <<- if (index inputs "grpc_server") >>
+          grpc:
+            enabled: true
+            port: 9090
+            containerPort: 9090
+          <<- end >>
+        # RFC-0014 P4: this pod ships its own logs over OTLP (otelzap tee) —
+        # the label tells the Vector DaemonSet to skip its stdout (double-
+        # ingest guard). Tied to the same input as OTEL_LOGS_ENABLED so a
+        # kill-switch flip also hands the pod back to Vector.
+        labels:
+          platform.duynhlab.dev/otlp-logs: << index inputs "otel_logs_enabled" | default "true" | quote >>
+        env:
+          - name: SERVICE_NAME
+            value: << inputs.name >>
+          - name: PORT
+            value: "8080"
+          - name: ENV
+            value: "production"
+          - name: OTEL_COLLECTOR_ENDPOINT
+            value: << index inputs "otel_endpoint" | default "otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318" >>
+          - name: OTEL_SAMPLE_RATE
+            value: "0.1"
+          # Authoritative service identity — the OTel SDK reads OTEL_SERVICE_NAME
+          # (not SERVICE_NAME); without it service.name falls back to brittle
+          # hostname parsing. Downward API also sets namespace + instance id.
+          - name: OTEL_SERVICE_NAME
+            value: << inputs.name >>
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: OTEL_RESOURCE_ATTRIBUTES
+            value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME)"
+          # RFC-0014 D-2: obsx reads these exact names for the Kubernetes
+          # resource attributes on the OTLP path (k8s.namespace.name and
+          # k8s.pod.name are on vmagent's promote allowlist).
+          - name: K8S_NAMESPACE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: K8S_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: DEPLOYMENT_ENVIRONMENT
+            value: "production"
+          # RFC-0014 P4: OTLP logs — default on (fleet cutover); the RSIP
+          # input is the per-service kill switch (also flips the Vector label).
+          - name: OTEL_LOGS_ENABLED
+            value: << index inputs "otel_logs_enabled" | default "true" | quote >>
+          # RFC-0014 P3: OTLP is the only metrics pipeline — default on
+          # fleet-wide; the RSIP input remains as a per-service kill switch.
+          - name: OTEL_METRICS_ENABLED
+            value: << index inputs "otel_metrics_enabled" | default "true" | quote >>
+          - name: PYROSCOPE_ENDPOINT
+            value: << index inputs "pyroscope_endpoint" | default "http://pyroscope.monitoring.svc.cluster.local:4040" >>
+          - name: LOG_LEVEL
+            value: << index inputs "log_level" | default "info" >>
+          - name: LOG_FORMAT
+            value: << index inputs "log_format" | default "json" >>
+          - name: TRACING_ENABLED
+            value: << index inputs "tracing_enabled" | default "true" | quote >>
+          - name: PROFILING_ENABLED
+            value: "true"
+          - name: METRICS_ENABLED
+            value: "true"
+          - name: DB_HOST
+            value: << inputs.db_host >>
+          - name: DB_PORT
+            value: << index inputs "db_port" | default "5432" | quote >>
+          - name: DB_NAME
+            value: << inputs.name >>
+          - name: DB_USER
+            value: << index inputs "db_user" | default inputs.name >>
+          - name: DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: << inputs.db_secret >>
+                key: password
+          - name: DB_SSLMODE
+            value: << index inputs "db_sslmode" | default "require" >>
+          - name: DB_POOL_MAX_CONNECTIONS
+            value: << inputs.pool_max | quote >>
+          - name: DB_POOL_MODE
+            value: "transaction"
+          <<- if (index inputs "cache_enabled") >>
+          - name: CACHE_ENABLED
+            value: "true"
+          - name: CACHE_HOST
+            value: "valkey.cache-system.svc.cluster.local"
+          - name: CACHE_PORT
+            value: "6379"
+          <<- end >>
+          <<- if (index inputs "review_grpc_addr") >>
+          - name: REVIEW_GRPC_ADDR
+            value: << inputs.review_grpc_addr >>
+          <<- end >>
+          <<- if (index inputs "cart_grpc_addr") >>
+          - name: CART_GRPC_ADDR
+            value: << inputs.cart_grpc_addr >>
+          <<- end >>
+          <<- if (index inputs "product_grpc_addr") >>
+          - name: PRODUCT_GRPC_ADDR
+            value: << inputs.product_grpc_addr >>
+          <<- end >>
+          <<- if (index inputs "order_grpc_addr") >>
+          - name: ORDER_GRPC_ADDR
+            value: << inputs.order_grpc_addr >>
+          <<- end >>
+          <<- if (index inputs "shipping_grpc_addr") >>
+          - name: SHIPPING_GRPC_ADDR
+            value: << inputs.shipping_grpc_addr >>
+          <<- end >>
+          <<- if (index inputs "notification_grpc_addr") >>
+          - name: NOTIFICATION_GRPC_ADDR
+            value: << inputs.notification_grpc_addr >>
+          <<- end >>
+          <<- if (index inputs "grpc_reflection") >>
+          - name: GRPC_REFLECTION
+            value: << inputs.grpc_reflection | quote >>
+          <<- end >>
+          <<- if (index inputs "mockpay_url") >>
+          - name: MOCKPAY_URL
+            value: << inputs.mockpay_url >>
+          <<- end >>
+          <<- if (index inputs "webhook_secret") >>
+          - name: MOCKPAY_WEBHOOK_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: << inputs.webhook_secret >>
+                key: secret
+          <<- end >>
+          <<- if (index inputs "payment_grpc_addr") >>
+          - name: PAYMENT_GRPC_ADDR
+            value: << inputs.payment_grpc_addr >>
+          <<- end >>
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "20m"
+          limits:
+            memory: "64Mi"
+            cpu: "50m"
+        livenessProbe:
+          enabled: true
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          enabled: true
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        migrations:
+          enabled: true
+          env:
+            DB_HOST: << inputs.db_migration_host >>
+            DB_PORT: "5432"
+            DB_NAME: << inputs.name >>
+            DB_USER: << index inputs "db_user" | default inputs.name >>
+            DB_SSLMODE: "require"
+          envFrom:
+            secretRef: << inputs.db_secret >>
+        slo:
+          enabled: true

@@ -26,6 +26,28 @@ The availability read source is the enum flag `CHECKOUT_AVAILABILITY_SOURCE`
 - **Verify:** confirm success rate back at baseline (CP-0 dashboard);
   `inventory_shadow_compare_total` keeps flowing if `shadow` was chosen.
 
+### Backfill (one-shot, before shadow/canary)
+
+Inventory balances are populated once from product stock by the `inventory`
+image's `backfill` subcommand, shipped as a **suspended CronJob template**
+(`kubernetes/apps/inventory-backfill-cronjob.yaml`) — never scheduled. Run it
+manually inside the (drained) window:
+
+```bash
+kubectl -n inventory create job inventory-backfill-$(date +%s) \
+  --from=cronjob/inventory-backfill
+kubectl -n inventory logs -f job/inventory-backfill-<id>   # inspect the report
+```
+
+- **Prerequisites:** the pg_hba `host product inventory` line on product-db and
+  `GRANT SELECT ON products` to the `inventory` role (product-service migration
+  `000005`) — both temporary, revoked at Phase 4/7 contraction.
+- **Safety:** the backfill refuses a non-empty `inventory_balances` (no
+  overwrite path) and reads product read-only; a zero-row read fails loud. To
+  redo, truncate `inventory_balances` + its backfill movements and re-run.
+- **Rollback:** nothing to undo — Product still owns writes; delete the balances
+  if abandoning.
+
 ## Write cutover (phase 3) — flag-stops-the-bleeding, then fix forward
 
 The saga's stock participant is `ORDER_STOCK_PARTICIPANT`

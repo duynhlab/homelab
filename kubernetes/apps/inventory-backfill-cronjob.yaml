@@ -1,0 +1,105 @@
+# RFC-0021 P2-3 — inventory stock backfill (manual one-shot template).
+#
+# NOT a scheduled job: a SUSPENDED CronJob used purely as a run-on-demand
+# template. A plain suspended Job is unsafe under Flux — resuming it
+# (suspend:false) races the next reconcile, which resets suspend:true and would
+# KILL the running backfill mid-flight. A suspended CronJob sidesteps that: Flux
+# owns the template (suspend stays true, no reconcile churn), and the operator
+# instantiates a real Job OUTSIDE Flux when running the phase-2 backfill:
+#
+#   kubectl -n inventory create job inventory-backfill-$(date +%s) \
+#     --from=cronjob/inventory-backfill
+#
+# Prerequisites (both must be applied before a run):
+#   - pg_hba line `host product inventory ...` on product-db (same PR).
+#   - GRANT SELECT on product.products to the inventory role
+#     (product-service migration 000005_grant_inventory_read).
+#
+# The backfill is a DRAINED-cutover one-shot and refuses a non-empty
+# inventory_balances (no overwrite path). Revoke the grant + pg_hba line at
+# Phase 7. Full runbook: docs/proposals/rfc/RFC-0021/cutover-rollback.md.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: inventory-backfill
+  namespace: inventory
+  labels:
+    app.kubernetes.io/name: inventory-backfill
+    app.kubernetes.io/part-of: inventory
+    platform.duynhlab.dev/domain: fulfillment
+spec:
+  schedule: "0 0 31 2 *" # 31 Feb — never fires; runs are manual (--from)
+  suspend: true
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0 # a data migration must not silently retry
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: inventory-backfill
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: backfill
+              image: ghcr.io/duynhlab/inventory-service/inventory:v0.2.0
+              args: ["backfill", "--apply"]
+              env:
+                # Inventory DB (WRITE) — direct to the CNPG primary, like migrations.
+                - name: DB_HOST
+                  value: product-db-rw.product.svc.cluster.local
+                - name: DB_PORT
+                  value: "5432"
+                - name: DB_NAME
+                  value: inventory
+                - name: DB_SSLMODE
+                  value: disable
+                - name: DB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: product-db-inventory-secret
+                      key: username
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: product-db-inventory-secret
+                      key: password
+                # Product DB (READ-ONLY) — same cluster, product database.
+                - name: PRODUCT_DB_HOST
+                  value: product-db-rw.product.svc.cluster.local
+                - name: PRODUCT_DB_PORT
+                  value: "5432"
+                - name: PRODUCT_DB_NAME
+                  value: product
+                - name: PRODUCT_DB_SSLMODE
+                  value: disable
+                - name: PRODUCT_DB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: product-db-inventory-secret
+                      key: username
+                - name: PRODUCT_DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: product-db-inventory-secret
+                      key: password
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 64Mi
+                limits:
+                  memory: 128Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                capabilities:
+                  drop: [ALL]
+                seccompProfile:
+                  type: RuntimeDefault

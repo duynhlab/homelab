@@ -1,0 +1,21 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: inventory
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "Observability"
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  # RFC-0021 phase-1 inventory-service (extracted stock authority): reservation
+  # FSM outcomes, availability checks, gRPC RED, DB latency. Reads the
+  # inventory:* recording rules (prometheusrules/microservices/inventory.yaml).
+  # No live caller until phase 2 — rates read ~0 until then.
+  configMapRef:
+    name: grafana-dashboard-inventory
+    key: inventory.json
+  datasources:
+    - inputName: DS_PROMETHEUS
+      datasourceName: VictoriaMetrics

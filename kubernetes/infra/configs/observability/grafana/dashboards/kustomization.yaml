@@ -32,6 +32,8 @@ resources:
   - grafana-dashboard-flux-controlplane.yaml
   # RFC-0021 overhaul baseline (CP-0 gate)
   - grafana-dashboard-rfc0021-baseline.yaml
+  # RFC-0021 P1-9 inventory-service overview
+  - grafana-dashboard-inventory.yaml
 
 # ClickHouse dashboard JSON → ConfigMap (referenced by grafana-dashboard-clickhouse.yaml
 # via configMapRef; stable name, so the hash suffix is disabled).
@@ -54,6 +56,9 @@ configMapGenerator:
   - name: grafana-dashboard-rfc0021-baseline
     files:
       - rfc0021-baseline.json
+  - name: grafana-dashboard-inventory
+    files:
+      - inventory.json
 
 generatorOptions:
   disableNameSuffixHash: true

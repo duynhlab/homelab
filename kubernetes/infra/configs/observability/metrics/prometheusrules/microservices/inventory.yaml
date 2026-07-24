@@ -1,0 +1,141 @@
+# RFC-0021 phase-1 inventory-service recording rules + alerts.
+#
+# inventory is the extracted stock authority (gRPC-only, no Kong route, no live
+# caller until phase 2 wires checkout/order onto it — RFC-0021 P1-7/8). Until
+# then every rate here reads ~0; the point of landing the rules now is that the
+# signals exist and are pre-aggregated the moment traffic arrives.
+#
+# Sources are the metrics the merged inventory code emits TODAY (verified, not
+# invented):
+#   - inventory_reservation_total{operation,outcome} — the reservation FSM
+#     counter. operation ∈ reserve|release|commit;
+#     outcome ∈ ok|replayed|insufficient|conflict|concurrency|
+#               invalid_transition|not_found|error
+#   - inventory_check_total{outcome} — availability probe;
+#     outcome ∈ fulfillable|shortage|error
+#   - rpc_server_call_duration_seconds_* — otelgrpc server RED histogram
+#     (app="inventory", rpc_method=~"inventory.v1.InventoryService/.+")
+#   - db_client_operation_duration_seconds_bucket{app="inventory"} — otelpgx
+#     query latency (obsx DBDurationBuckets View, pkg >= v0.24.0)
+#
+# OTLP push path: no job label; vmagent maps service_name->app,
+# k8s_namespace_name->namespace, so selectors key on app="inventory".
+#
+# Deferred to phase 3 — DO NOT add alerts here, the metrics are not emitted yet:
+#   - negative-ATP / oversell gauge: needs the write path (Reserve/Commit under
+#     real load) and a materialized available-to-promise gauge that phase 1
+#     does not expose.
+#   - stale-RESERVED reconciler age: needs the phase-3 reservation-expiry
+#     reconciler; there is no reconciler and no age metric at phase 1.
+#   - inventory_commit_lag_seconds: emitted only once commit traffic flows from
+#     the order saga (phase 3 write cutover).
+# These are symptom alerts for a write-heavy authority; landing them now would
+# create rules that can never fire (or fire on absent series). Revisit at P3.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: inventory-rules
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/component: recording-rules
+spec:
+  groups:
+    - name: inventory-recording-5m
+      interval: 30s
+      rules:
+        # Reservation FSM throughput by operation+outcome — the core authority
+        # signal. Business outcomes (insufficient/conflict/…) and infra errors
+        # share this counter; the dashboard splits them, alerts key on outcome.
+        - record: inventory:reservation:rate5m
+          expr: sum by (operation, outcome) (rate(inventory_reservation_total[5m]))
+
+        # Availability-check throughput by outcome (fulfillable|shortage|error).
+        - record: inventory:check:rate5m
+          expr: sum by (outcome) (rate(inventory_check_total[5m]))
+
+        # gRPC RED — server latency p95 per RPC method.
+        - record: inventory:rpc_duration:p95_5m
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le, rpc_method) (rate(
+                rpc_server_call_duration_seconds_bucket{
+                  app="inventory",
+                  rpc_method=~"inventory.v1.InventoryService/.+"}[5m])))
+
+        # gRPC error ratio (non-OK / all) per RPC method. Business rejections
+        # (FailedPrecondition on shortage) surface as non-OK here — read next to
+        # the reservation-outcome panel to separate infra from business.
+        - record: inventory:rpc_error:ratio5m
+          expr: |
+            sum by (rpc_method) (rate(
+              rpc_server_call_duration_seconds_count{
+                app="inventory",
+                rpc_method=~"inventory.v1.InventoryService/.+",
+                rpc_response_status_code!="OK"}[5m]))
+            /
+            sum by (rpc_method) (rate(
+              rpc_server_call_duration_seconds_count{
+                app="inventory",
+                rpc_method=~"inventory.v1.InventoryService/.+"}[5m]))
+
+        # DB statement latency p95 (pgx_operation_type="query" isolates real
+        # statement time from connect/prepare/acquire, matching the fleet-wide
+        # DBClientQueryP95High convention).
+        - record: inventory:db_operation_duration:p95_5m
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(
+                db_client_operation_duration_seconds_bucket{
+                  app="inventory", pgx_operation_type="query"}[5m])))
+
+    - name: inventory-alerts
+      interval: 1m
+      rules:
+        # SYMPTOM: the stock authority is throwing unexpected/infra failures.
+        # outcome="error" is the FSM's catch-all for what should never happen on
+        # a healthy authority — a DB CHECK violation (the oversell backstop
+        # tripping), a storage fault, or an unhandled transition error. Business
+        # rejections (insufficient/conflict/concurrency/invalid_transition) have
+        # their own outcomes and are deliberately excluded.
+        # Threshold: > 0 for 10m. A correct authority emits ZERO infra errors;
+        # any sustained rate is actionable. 10m debounces a single transient
+        # blip (a pod restart mid-write) while still catching a real fault fast.
+        - alert: InventoryReservationInfraErrors
+          expr: |
+            sum(rate(inventory_reservation_total{outcome="error"}[5m])) > 0
+          for: 10m
+          labels:
+            severity: warning
+            category: errors
+          annotations:
+            summary: "inventory reservation infra errors (stock authority)"
+            description: "inventory is emitting {{ $value | humanize }} reservation errors/s (outcome=error) for 10m. This is the infra/unexpected bucket — a DB CHECK violation (oversell backstop trip), storage fault, or unhandled transition. Business rejections (insufficient/conflict) are excluded, so this is always actionable. Check inventory logs (SQLSTATE on the reservation span) and product-db health."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/InventoryReservationInfraErrors.md"
+
+        # SYMPTOM: callers are seeing failed inventory RPCs. non-OK / all over
+        # the whole service (aggregate, not per-method) so a single hot method
+        # can't hide behind healthy ones. Business FailedPrecondition on shortage
+        # counts as non-OK — at phase 1 there is no caller so this reads NaN and
+        # stays silent; it arms itself the moment phase-2 traffic arrives.
+        # Threshold: > 5% for 10m — mirrors the fleet GrpcServerHighErrorRate
+        # warning so inventory is held to the same east-west bar.
+        - alert: InventoryGrpcErrorRatio
+          expr: |
+            (
+              sum(rate(rpc_server_call_duration_seconds_count{
+                app="inventory",
+                rpc_method=~"inventory.v1.InventoryService/.+",
+                rpc_response_status_code!="OK"}[5m]))
+              /
+              sum(rate(rpc_server_call_duration_seconds_count{
+                app="inventory",
+                rpc_method=~"inventory.v1.InventoryService/.+"}[5m]))
+            ) > 0.05
+          for: 10m
+          labels:
+            severity: warning
+            category: errors
+          annotations:
+            summary: "High gRPC error ratio on inventory"
+            description: "inventory is failing {{ $value | humanizePercentage }} of incoming gRPC calls (threshold: 5%). Note FailedPrecondition on genuine stock shortage counts as non-OK — cross-check inventory:reservation:rate5m to separate business shortage from an infra fault before paging further upstream."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/InventoryGrpcErrorRatio.md"

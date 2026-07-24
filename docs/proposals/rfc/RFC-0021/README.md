@@ -330,7 +330,7 @@ count and retention hit zero.
 
 - [./research.md](./research.md) — plain-language research, code audit, Context7 trail
 - [./cutover-rollback.md](./cutover-rollback.md) — per-cutover rollback story (RUNBOOK-007 seed)
-- [./baseline-e2e-results.md](./baseline-e2e-results.md) — phase-0 baseline run (18 PASS, capture-fail gap documented)
+- Phase-0 baseline was verified against local-stack via the [local-stack README Phase A/B/C protocol](../../../../local-stack/README.md#e2e-audit-before-pushing-backend--real-browser) — the canonical, tracked e2e gate.
 - [RFC-0003](../RFC-0003/README.md) — superseded by this RFC
 - [RFC-0001](../RFC-0001/) — saga foundations · [RFC-0010](../RFC-0010/) + ADR-007..012 — payment base
 - [RFC-0015](../RFC-0015/) + ADR-018/019/020 — checkout/order handoff invariants

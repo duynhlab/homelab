@@ -2,9 +2,12 @@
 
 The pre-refactor saga behaviors, proven on current `main` before any inventory
 work lands (planning gate §0.7). Every later phase's acceptance runs are judged
-against this record. Runner: [`scripts/rfc0021-baseline-e2e.sh`](../../../../scripts/rfc0021-baseline-e2e.sh)
-against a full local-stack (`docker compose up -d --build`, all sibling repos
-on `main`).
+against this record. Runner: a **local-only** driver script (kept out of the
+repo — a developer convenience, not a tracked artifact) executed against a full
+local-stack (`docker compose up -d --build`, all sibling repos on `main`). The
+scenarios and their pass/fail table below are the durable record; the canonical,
+tracked e2e gate is the Phase A/B/C protocol in
+[`local-stack/README.md`](../../../../local-stack/README.md#e2e-audit-before-pushing-backend--real-browser).
 
 | | |
 |---|---|
@@ -68,9 +71,11 @@ Repo SHAs the stack was built from (`main` everywhere):
 | frontend | `adfaf56` |
 | pkg | `decd505` |
 
-Re-run: bring local-stack up healthy, then `bash scripts/rfc0021-baseline-e2e.sh`
-(paces calls ≥0.3s under Kong's 5 req/s limit; restores the guinea-pig product
-row on exit; exit code 1 on any FAIL).
+Re-run: bring local-stack up healthy, then drive the scenarios above (the
+local-only script paces calls ≥0.3s under Kong's 5 req/s limit, restores the
+guinea-pig product row on exit, and exits non-zero on any FAIL) — or run the
+tracked Phase A/B/C protocol from the local-stack README, which is the
+canonical pre-push gate.
 
 ---
-_Last updated: 2026-07-23_
+_Last updated: 2026-07-24_

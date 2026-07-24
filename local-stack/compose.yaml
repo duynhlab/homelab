@@ -292,6 +292,12 @@ services:
     environment: { <<: *svc-env, SERVICE_NAME: checkout, DB_NAME: checkout }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
+  inventory-migrate:
+    build: { context: ../../inventory-service }
+    command: ["migrate"]
+    environment: { <<: *svc-env, SERVICE_NAME: inventory, DB_NAME: inventory }
+    depends_on: { postgres: { condition: service_healthy } }
+    restart: "no"
 
   # ---- Dev-only demo seeds (one-shot). Seeding lives OUTSIDE the migration
   # chain (prod never seeds); each runs its service's `seed` subcommand after
@@ -351,6 +357,14 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       notification-migrate: { condition: service_completed_successfully }
+    restart: "no"
+  inventory-seed:
+    build: { context: ../../inventory-service }
+    command: ["seed"]
+    environment: { <<: *svc-env, SERVICE_NAME: inventory, DB_NAME: inventory }
+    depends_on:
+      postgres: { condition: service_healthy }
+      inventory-migrate: { condition: service_completed_successfully }
     restart: "no"
 
   # ---- Backend services ----
@@ -491,6 +505,23 @@ services:
       cart-migrate: { condition: service_completed_successfully }
       cart-seed: { condition: service_completed_successfully }
       auth: { condition: service_healthy }
+
+  # ---- Inventory (RFC-0021): sole stock authority. gRPC-only (:9090,
+  # inventory.v1) — no Kong route. No live caller yet: checkout/order still
+  # use Product stock; the read/write cutover is phases 2-3.
+  inventory:
+    build: { context: ../../inventory-service }
+    environment:
+      <<: *svc-env
+      SERVICE_NAME: inventory
+      OTEL_SERVICE_NAME: inventory
+      DB_NAME: inventory
+      GRPC_PORT: "9090"
+    healthcheck: *svc-healthcheck
+    depends_on:
+      postgres: { condition: service_healthy }
+      inventory-migrate: { condition: service_completed_successfully }
+      inventory-seed: { condition: service_completed_successfully }
 
   # ---- Checkout (RFC-0015): session orchestrator — client-only, reached only
   # through Kong (no host port, platform convention). Snapshots the cart via

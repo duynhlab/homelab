@@ -11,3 +11,4 @@ CREATE DATABASE shipping;
 CREATE DATABASE notification;
 CREATE DATABASE payment;
 CREATE DATABASE checkout;
+CREATE DATABASE inventory;

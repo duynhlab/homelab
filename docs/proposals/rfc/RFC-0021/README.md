@@ -94,7 +94,7 @@ verified all of this against fresh `main`.
 | "Sold" | Not a balance bucket — commit does `on_hand −= q; reserved −= q` + a `SALE_COMMITTED` movement |
 | Reservation FSM | `RESERVED → COMMITTED \| RELEASED \| EXPIRED`; replay-idempotent per transition; `reservation_id = order_id` with canonical request hash; same key + different payload → `IDEMPOTENCY_CONFLICT` |
 | Reserve semantics | All-or-none transaction; deterministic single-warehouse allocation; stable lock order `(warehouse_id, sku_id)` |
-| Backfill mapping | `on_hand = stock_quantity + SUM(active reserved)` — required because today's reserve decrements `stock_quantity` directly (audit-confirmed) |
+| Backfill mapping | At the drained cutover: `on_hand = stock_quantity`, `reserved = 0`, `safety_stock = 0`. Product's `stock_reservations` is not read back — it has no commit/sold state, so `SUM(reserved)` conflates live holds with completed sales; the drain (not hold reconstruction) is what makes the snapshot correct |
 | Checkout reads | Split one `GetProducts` call into `Product.BatchGetCurrentPrices` + `Inventory.CheckAvailability`; availability at checkout is a UX/revalidation gate — `Reserve` in the saga stays the correctness gate; Inventory timeout at confirm fails closed (`503`/retryable), never maps to out-of-stock |
 | Saga pivot | `ConfirmOrder` (post-capture) stays the pivot; `CommitInventory` is post-pivot **mandatory forward** |
 | Workflow migration | Versioned branch so open histories replay the Product path; mechanism (GetVersion patching vs Worker Versioning) is an open question resolved in phase 3 — see [./research.md § Open questions](./research.md#open-questions) |
@@ -285,7 +285,7 @@ Summarized here; the mechanism deep-dive lives in [./research.md](./research.md)
 |-------|----------|-----------|
 | 0 | Contracts (`inventory.v1` additive), enum-flag helper, gRPC error-reason convention, baseline metrics/tests | Buf breaking green; baseline recorded; rollback story per cutover written |
 | 1 | inventory-service foundation (schema, Reserve/Release/Commit, availability reads, GitOps + local-stack) | No oversell/double-commit in concurrency tests; deployed but no live write traffic |
-| 2 | Read path: backfill (`on_hand = stock_quantity + SUM(reserved)`), shadow reads, canary availability reads | Shadow mismatch = 0 or explained; flag rollback to Product proven |
+| 2 | Read path: backfill (`on_hand = stock_quantity`, `reserved = 0` at drained cutover), shadow reads, canary availability reads | Shadow mismatch = 0 or explained; flag rollback to Product proven |
 | 3 | Write path: versioned workflow, Inventory activities, `CommitInventory` mandatory forward, start outbox | Old histories replay green; new orders 100% Inventory; commit-lag alert + reconciler live |
 | 4 | Remove stock from Product (deprecate → usage-zero → drop schema/cache/RPCs) | Zero live callers of Product stock surface; docs/api updated |
 | 5 | Order aggregate (domain methods, CAS, history, cancellation, legacy-create removal) | No generic status writes; legacy route usage zero then removed |

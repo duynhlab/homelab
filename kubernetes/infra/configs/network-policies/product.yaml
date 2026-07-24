@@ -79,6 +79,9 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: checkout
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: inventory
       ports:
         - protocol: TCP
           port: 6432

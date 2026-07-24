@@ -12,3 +12,4 @@ resources:
   - shipping.yaml
   - payment.yaml
   - checkout.yaml
+  - inventory.yaml

@@ -1,0 +1,36 @@
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSetInputProvider
+metadata:
+  name: rsip-inventory
+  namespace: default
+  labels:
+    app.kubernetes.io/part-of: backend-services
+    platform.duynhlab.dev/domain: fulfillment
+spec:
+  type: Static
+  defaultValues:
+    name: inventory
+    image_tag: "0.1.0" # {"$imagepolicy": "flux-system:inventory:tag"}
+    namespace: inventory
+    # No platform_backup_label: that label routes CNPG/barman S3 credentials to
+    # namespaces hosting a database cluster — inventory's data lives on
+    # product-db in the product namespace, which is already backed up.
+    replicaCount: 1
+    # Runtime through the PgDog pooler (house pattern, RFC-0020 target: all
+    # app→DB via pooler); migrations go direct to CNPG (product-db-rw) like
+    # every other product-db tenant.
+    db_host: "pgdog-product.product.svc.cluster.local"
+    db_port: "6432"
+    db_migration_host: "product-db-rw.product.svc.cluster.local"
+    db_secret: "product-db-inventory-secret"
+    db_sslmode: "disable"
+    pool_max: "25"
+    # Internal gRPC server (:9090) — inventory reservations for the checkout
+    # confirm path and the order saga (RFC-0021). The mop chart adds a
+    # grpc:9090 port to the inventory Service.
+    grpc_server: true
+    # Reflection off in the cluster: this API surface reserves stock (grpcx
+    # registers reflection unless told otherwise — fail-open default). MUST
+    # stay the string "false": the template guard is truthiness-based, so a
+    # boolean false would drop the env entirely — leaving reflection ON.
+    grpc_reflection: "false"

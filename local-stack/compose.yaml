@@ -482,6 +482,10 @@ services:
       CACHE_HOST: cache
       CACHE_PORT: "6379"
       REVIEW_GRPC_ADDR: dns:///review:9090
+      # RFC-0021 P2-6: enrich GetProductDetails with inventory availability
+      # (soft-fail; adds an `availability` field). `product` disables it.
+      INVENTORY_GRPC_ADDR: dns:///inventory:9090
+      PRODUCT_AVAILABILITY_SOURCE: inventory
       # product serves the saga's ReserveStock/ReleaseStock on gRPC :9090.
       GRPC_PORT: "9090"
     healthcheck: *svc-healthcheck
@@ -540,6 +544,13 @@ services:
       ORDER_GRPC_ADDR: dns:///order:9090
       # P3 quote authority for PUT …/shipping (fee + tax composition).
       SHIPPING_GRPC_ADDR: dns:///shipping:9090
+      # RFC-0021 P2-4/5: inventory availability reads. `shadow` observes +
+      # compares (emits inventory_shadow_compare_total) while Product still
+      # decides — the phase-2 local-stack read-path exercise. Set `inventory` to
+      # test the split-read gate; `product` to disable.
+      INVENTORY_GRPC_ADDR: dns:///inventory:9090
+      CHECKOUT_AVAILABILITY_SOURCE: shadow
+      CHECKOUT_AVAILABILITY_SHADOW_PCT: "100"
       TEMPORAL_HOSTPORT: temporal:7233
       TEMPORAL_NAMESPACE: mop
       TASK_QUEUE: checkout

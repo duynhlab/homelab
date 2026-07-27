@@ -40,6 +40,12 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: order
+        # product reads availability for the GetProductDetails enrichment
+        # (RFC-0021 P2-6, BatchGetAvailability). Only exercised when
+        # PRODUCT_AVAILABILITY_SOURCE=inventory; the allow is inert until then.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: product
       ports:
         - protocol: TCP
           port: 9090

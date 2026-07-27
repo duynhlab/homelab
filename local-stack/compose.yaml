@@ -644,6 +644,11 @@ services:
       # saga's payment steps (authorize-early/capture-late + void/refund) are
       # always on; the worker uses its own PAYMENT_GRPC_ADDR for the money ops.
       PAYMENT_GRPC_ADDR: dns:///payment:9090
+      # RFC-0021 P3: which stock participant NEW workflows take, stamped into
+      # the workflow input at start (the worker is input-driven and never reads
+      # this). Flip to `inventory` to exercise the v1 branch locally:
+      # ORDER_STOCK_PARTICIPANT: inventory
+      ORDER_STOCK_PARTICIPANT: product
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -676,6 +681,10 @@ services:
       # The worker dials this unconditionally (lazy); the workflow input decides
       # whether the steps actually run.
       PAYMENT_GRPC_ADDR: dns:///payment:9090
+      # RFC-0021 P3: inventory stock participant for the v1 workflow branch.
+      # Dialed unconditionally (lazy) — in-flight inventory-participant
+      # histories must drain on the inventory path regardless of the flag.
+      INVENTORY_GRPC_ADDR: dns:///inventory:9090
       TEMPORAL_HOSTPORT: temporal:7233
       TEMPORAL_NAMESPACE: mop
       TASK_QUEUE: order-fulfillment

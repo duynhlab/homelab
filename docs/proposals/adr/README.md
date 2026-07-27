@@ -63,6 +63,7 @@ settled decisions.
 | [ADR-027](ADR-027-inventory-sole-stock-authority/) | inventory-service is the platform's sole stock authority (supersedes RFC-0003's product-owned stock); foundation shipped, cutover realized over RFC-0021 phases 2–4 | Accepted | [RFC-0021](../rfc/RFC-0021/) |
 | [ADR-028](ADR-028-inventory-reservation-model/) | Inventory reservation & balance model — derived ATP, RESERVED→COMMITTED\|RELEASED\|EXPIRED FSM with claim-via-row idempotency, append-only movement ledger, one-order-one-warehouse | Accepted | [RFC-0021](../rfc/RFC-0021/) |
 | [ADR-029](ADR-029-enum-feature-flag-helper/) | Adopt `pkg/flagx` as the platform feature-flag helper — startup-validated enum/percent env flags for reversible rollout gates (first consumer: checkout `CHECKOUT_AVAILABILITY_SOURCE`, P2-4) | Accepted | [RFC-0021](../rfc/RFC-0021/) |
+| [ADR-030](ADR-030-temporal-workflow-versioning/) | Version the order saga with `workflow.GetVersion` (`inventory-extraction-v1` + participant pinned in input); Worker Versioning is the target — hard-blocked at server 1.24.2 / operator ≤1.28.x, official chart staged commented-out as the 1.29 path | Accepted | [RFC-0021](../rfc/RFC-0021/) |
 
 ---
 _Last updated: 2026-07-24_

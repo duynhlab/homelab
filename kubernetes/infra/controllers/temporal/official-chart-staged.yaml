@@ -1,0 +1,90 @@
+# STAGED — NOT DEPLOYED (RFC-0021 ADR-030).
+#
+# The official temporalio/helm-charts deployment, kept here fully commented out
+# as the documented upgrade path to Temporal Server >= 1.29.1 — the minimum for
+# Worker Versioning (Worker Deployment Versions), which is the platform's target
+# versioning mechanism for workflow migrations. Today the cluster runs Temporal
+# 1.24.2 via the alexandrevilain temporal-operator (cluster.yaml), whose
+# compatibility matrix caps at server 1.28.x, so Worker Versioning is
+# hard-blocked upstream and phase 3 uses workflow.GetVersion instead.
+#
+# This file is deliberately NOT listed in kustomization.yaml — it renders
+# nothing and deploys nothing. Promote it only via an owner-approved PR when one
+# of the ADR-030 revisit triggers fires:
+#   - temporal-operator ships 1.29 support (alexandrevilain/temporal-operator
+#     PR #987), in which case prefer bumping the operator and DELETING this file;
+#   - or the platform decides to migrate off the operator onto this chart
+#     (standalone migration: datastore move, namespace re-registration, TLS,
+#     and loss of TemporalNamespace/CRD conveniences — see ADR-030).
+#
+# Uncommenting checklist (do NOT skip):
+#   1. Owner-approved migration plan (this is a data-plane move, not a bump).
+#   2. Pin `version:` to a chart release whose appVersion is >= 1.29.1.
+#   3. Point persistence at a dedicated CNPG database (NOT the operator's),
+#      plan history-shard migration or a fresh cluster + workflow drain.
+#   4. Re-register namespace `mop` + search attributes; re-wire ingress/UI.
+#   5. Add this file to kustomization.yaml LAST, behind a suspended HelmRelease
+#      first (suspend: true), then unsuspend in a separate PR.
+#
+# ---
+# apiVersion: source.toolkit.fluxcd.io/v1
+# kind: HelmRepository
+# metadata:
+#   name: temporalio
+#   namespace: temporal
+# spec:
+#   interval: 1h
+#   url: https://go.temporal.io/helm-charts
+# ---
+# apiVersion: helm.toolkit.fluxcd.io/v2
+# kind: HelmRelease
+# metadata:
+#   name: temporal-official
+#   namespace: temporal
+# spec:
+#   interval: 30m
+#   suspend: true # keep suspended even when first enabled — unsuspend in its own PR
+#   chart:
+#     spec:
+#       chart: temporal
+#       version: "1.x.x" # PIN to a release with appVersion >= 1.29.1 before enabling
+#       sourceRef:
+#         kind: HelmRepository
+#         name: temporalio
+#         namespace: temporal
+#   values:
+#     server:
+#       replicaCount: 1
+#       config:
+#         persistence:
+#           default:
+#             driver: sql
+#             sql:
+#               driver: postgres12
+#               # dedicated database — do NOT reuse the operator-managed one
+#               host: platform-db-pooler-rw.platform.svc.cluster.local
+#               port: 5432
+#               database: temporal_official
+#               existingSecret: temporal-official-db-secret
+#           visibility:
+#             driver: sql
+#             sql:
+#               driver: postgres12
+#               host: platform-db-pooler-rw.platform.svc.cluster.local
+#               port: 5432
+#               database: temporal_official_visibility
+#               existingSecret: temporal-official-db-secret
+#     cassandra:
+#       enabled: false
+#     mysql:
+#       enabled: false
+#     postgresql:
+#       enabled: false # external CNPG above, not the bundled subchart
+#     prometheus:
+#       enabled: false # platform VictoriaMetrics scrapes instead
+#     grafana:
+#       enabled: false
+#     elasticsearch:
+#       enabled: false # advanced visibility later; start with SQL visibility
+#     web:
+#       enabled: true

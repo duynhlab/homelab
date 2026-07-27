@@ -285,8 +285,8 @@ Summarized here; the mechanism deep-dive lives in [./research.md](./research.md)
 |-------|----------|-----------|
 | 0 | Contracts (`inventory.v1` additive), enum-flag helper, gRPC error-reason convention, baseline metrics/tests | Buf breaking green; baseline recorded; rollback story per cutover written |
 | 1 | inventory-service foundation (schema, Reserve/Release/Commit, availability reads, GitOps + local-stack) | No oversell/double-commit in concurrency tests; deployed but no live write traffic |
-| 2 | Read path: backfill (`on_hand = stock_quantity`, `reserved = 0` at drained cutover), shadow reads, canary availability reads | Shadow mismatch = 0 or explained; flag rollback to Product proven |
-| 3 | Write path: versioned workflow, Inventory activities, `CommitInventory` mandatory forward, start outbox | Old histories replay green; new orders 100% Inventory; commit-lag alert + reconciler live |
+| 2 | Read path **prep**: backfill (`on_hand = stock_quantity`, `reserved = 0` at drained cutover), **structural** shadow reads, inventory-mode client wired behind the flag (stays `product`/`shadow` — **no read-authority change**) | Shadow structurally clean (every SKU known + sane ATP); read mechanics + rollback-by-flag proven |
+| 3 | Write path **+ read flip**: versioned workflow, Inventory activities, `CommitInventory` mandatory forward, start outbox; **then** flip checkout reads to Inventory (canary→100%) once Inventory is live-written | Old histories replay green; new orders 100% Inventory **writes**; reads flipped with no oversell; commit-lag alert + reconciler live |
 | 4 | Remove stock from Product (deprecate → usage-zero → drop schema/cache/RPCs) | Zero live callers of Product stock surface; docs/api updated |
 | 5 | Order aggregate (domain methods, CAS, history, cancellation, legacy-create removal) | No generic status writes; legacy route usage zero then removed |
 | 6 | Payment hardening (attempts, PROCESSING, refund IDs, windowed recon, role split) | No ambiguous timeout marked definite; recon alerting live |
@@ -296,6 +296,17 @@ Summarized here; the mechanism deep-dive lives in [./research.md](./research.md)
 in-flight stock activities → final delta backfill → verify ATP invariant → flip
 `ORDER_STOCK_PARTICIPANT=inventory` → resume → smoke orders (success, insufficient,
 decline, capture-fail, commit-retry) → observe ≥ 30–60 min.
+
+**Read flip follows the write cutover, not phase 2.** Inventory receives no live
+writes until phase 3, so through phase 2 its balances are the frozen backfill
+snapshot — flipping checkout to *read* availability from Inventory in phase 2
+would serve stale numbers (checkout availability is advisory per ADR-020, but a
+frozen advisory gate is still wrong UX, and there is no Inventory `Reserve`
+backstop before phase 3). Phase 2 therefore only runs **structural** shadow reads
+(does Inventory know every SKU and answer sanely) and wires the inventory-mode
+client behind the flag. Once the write cutover lands and Inventory reflects
+real-time stock, flip reads `CHECKOUT_AVAILABILITY_SOURCE`: `shadow → canary →
+inventory`, each nudge reversible by a one-line flag revert.
 
 **Rollback stance**: read path rolls back by flag in minutes. After the write cutover,
 rolling back data authority is unsafe once Inventory has taken live writes — stop new

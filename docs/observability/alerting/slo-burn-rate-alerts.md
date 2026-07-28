@@ -137,9 +137,9 @@ The platform exposes alerts at every layer of the pipeline. Use whichever fits t
 
 | Tool | URL | Best for |
 |---|---|---|
-| **Karma** | [karma.duynh.me](http://karma.duynh.me) | The on-call view — groups, silences, history, multi-AM aggregation |
+| **Karma** | [karma.duynh.me](http://karma.duynh.me) | The on-call view — groups, silences, history, multi-AM aggregation. **Scaled to 0** locally: `kubectl scale deploy/karma -n monitoring --replicas=1` first |
 | **VMAlert UI** | [vmalert.duynh.me](http://vmalert.duynh.me) | Inspect rule definitions, evaluation timing, last error |
-| **Sloth UI** | [slo.duynh.me](http://slo.duynh.me) | SLO-centric view — which SLOs are over budget, SLI chart, burn chart |
+| **Sloth UI** | [slo.duynh.me](http://slo.duynh.me) | SLO-centric view — which SLOs are over budget, SLI chart, burn chart. **Scaled to 0** locally: `kubectl scale deploy/sloth-ui -n monitoring --replicas=1` first |
 | **Grafana** | [grafana.duynh.me](http://grafana.duynh.me) | Dashboards: "Sloth SLO Overview" (14643), "Sloth SLO Detailed" (14348) |
 | **VMSingle (vmui)** | [vmui.duynh.me/vmui](http://vmui.duynh.me/vmui) | Ad-hoc PromQL on `slo:*` recording rules |
 

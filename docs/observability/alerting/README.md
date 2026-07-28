@@ -79,7 +79,7 @@ flowchart TD
 
 - Stages 1-4 are fully operational (163 static alerts, 60 Sloth SLO burn-rate alerts — see the [alert catalog](alert-catalog.md)).
 - Stage 5 (VMAlertmanager) routes by severity to `slack-default` (`#alerts`) and `slack-critical` (`#alerts-critical`), with `watchdog-null` for the Watchdog and inhibition rules to suppress cascades. **Caveat:** `slack_api_url` is a committed placeholder (`<SLACK_WEBHOOK_URL>`), so no notifications actually deliver until it is set — ideally injected via External Secrets / OpenBAO rather than inlined in `configRawYaml`.
-- Stage 6: Grafana provides read-only rule visibility via `vmalert.proxyURL`. **Karma** is the dedicated alert dashboard (reads VMAlertmanager API directly). Slack receivers are wired (webhook URL pending injection); PagerDuty is planned.
+- Stage 6: Grafana provides read-only rule visibility via `vmalert.proxyURL`. **Karma** is the dedicated alert dashboard (reads VMAlertmanager API directly), but it is **scaled to 0 replicas** on the local cluster to keep the idle footprint down — `kubectl scale deploy/karma -n monitoring --replicas=1` before using it. Slack receivers are wired (webhook URL pending injection); PagerDuty is planned.
 
 ## VictoriaMetrics vs Prometheus: Terminology Mapping
 

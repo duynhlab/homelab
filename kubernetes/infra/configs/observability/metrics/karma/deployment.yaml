@@ -12,7 +12,10 @@ metadata:
     app.kubernetes.io/name: karma
     app.kubernetes.io/component: alert-dashboard
 spec:
-  replicas: 1
+  # Scaled to 0: the Alertmanager fan-in dashboard is not needed on the
+  # local cluster and its idle footprint is worth more than the convenience.
+  # Scale to 1 when triaging multi-source alerts. Nothing health-checks it.
+  replicas: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: karma

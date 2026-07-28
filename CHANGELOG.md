@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **inventory-service pinned to `0.2.2`** — the Deployment was in `Init:CrashLoopBackOff` on the cluster (59 restarts): its init container runs `migrate` with only `DB_*` env, the same contract product/order/checkout run under, while `0.1.0` validated the full config before dispatching and panicked on `SERVICE_NAME`. Found by the RFC-0021 P3 cluster audit, fixed in inventory-service#13, released as `v0.2.2`.
-- **inventory backfill CronJob image reference** — it pointed at `ghcr.io/duynhlab/inventory-service/inventory:v0.2.1`, which does not exist: the repo publishes `…/inventory-service/inventory-service` tagged without the leading `v` (GHCR returns 404 for the old path). The CronJob is suspended, so the bad pull would have surfaced the first time it was resumed — inside the write-cutover window, which is the worst possible moment.
+- **inventory-service pinned to `0.2.3`** — the Deployment was in `Init:CrashLoopBackOff` on the cluster (59 restarts): its init container runs `migrate` with only `DB_*` env, the same contract product/order/checkout run under, while `0.1.0` validated the full config before dispatching and panicked on `SERVICE_NAME`. Found by the RFC-0021 P3 cluster audit, fixed in inventory-service#13, released as `v0.2.2` and rolled into `v0.2.3` together with the testcontainers wait-strategy fix and the `x/crypto`/`grpc`/builder CVE bumps.
+- **inventory backfill CronJob image reference** — it pointed at `ghcr.io/duynhlab/inventory-service/inventory:v0.2.1`, which does not exist: the repo publishes `…/inventory-service/inventory-service` tagged without the leading `v` (now `0.2.3`) (GHCR returns 404 for the old path). The CronJob is suspended, so the bad pull would have surfaced the first time it was resumed — inside the write-cutover window, which is the worst possible moment.
 
 ### Changed
 

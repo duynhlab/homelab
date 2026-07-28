@@ -55,7 +55,7 @@ spec:
               # — GHCR returns 404 for that package. It never surfaced because
               # this CronJob is suspended, so the pull would have failed the
               # first time it was resumed: inside the write-cutover window.
-              image: ghcr.io/duynhlab/inventory-service/inventory-service:0.2.2
+              image: ghcr.io/duynhlab/inventory-service/inventory-service:0.2.3
               args: ["backfill", "--apply"]
               env:
                 # Inventory DB (WRITE) — direct to the CNPG primary, like migrations.

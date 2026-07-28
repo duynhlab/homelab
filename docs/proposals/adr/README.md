@@ -64,6 +64,7 @@ settled decisions.
 | [ADR-028](ADR-028-inventory-reservation-model/) | Inventory reservation & balance model — derived ATP, RESERVED→COMMITTED\|RELEASED\|EXPIRED FSM with claim-via-row idempotency, append-only movement ledger, one-order-one-warehouse | Accepted | [RFC-0021](../rfc/RFC-0021/) |
 | [ADR-029](ADR-029-enum-feature-flag-helper/) | Adopt `pkg/flagx` as the platform feature-flag helper — startup-validated enum/percent env flags for reversible rollout gates (first consumer: checkout `CHECKOUT_AVAILABILITY_SOURCE`, P2-4) | Accepted | [RFC-0021](../rfc/RFC-0021/) |
 | [ADR-030](ADR-030-temporal-workflow-versioning/) | Adopt Temporal **Worker Versioning** for the saga stock migration + re-platform onto the official `temporalio/helm-charts` (server 1.31.2) — the operator capped at 1.28.x; participant pinned in workflow input; replay corpus retained | Accepted (supersedes [ADR-002](ADR-002-deploy-temporal-via-operator/) deployment half) | [RFC-0021](../rfc/RFC-0021/) |
+| [ADR-031](ADR-031-fulfillment-start-outbox/) | Start the fulfillment saga through a transactional outbox — the order row and the intent to start commit together; inline start stays for latency, a leased dispatcher retries what it could not start, exactly-once enforced at three layers (default REJECT_DUPLICATE, the SDK's AlreadyStarted error, and describing the existing run) | Accepted | [RFC-0021](../rfc/RFC-0021/) |
 
 ---
 _Last updated: 2026-07-28_

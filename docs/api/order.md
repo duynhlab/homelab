@@ -18,7 +18,7 @@ only writer of orders and the only place the fulfillment saga starts.
 | **Repository** | [`duynhlab/order-service`](https://github.com/duynhlab/order-service) | — |
 | **Owns** | Orders, order items, totals components, idempotency records, fulfillment status | — |
 | **Database** | `order` on `product-db` (CNPG) via PgDog `pgdog-product.product:6432` | — |
-| **Design record** | — | [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) · [RFC-0015](../proposals/rfc/RFC-0015/) (P6 legacy removal) |
+| **Design record** | — | [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) · [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/) · [RFC-0015](../proposals/rfc/RFC-0015/) (P6 legacy removal) |
 
 ## Temporal participation
 
@@ -40,8 +40,14 @@ crash between any two of them either charges a customer without shipping or
 ships without charging. Order solves this by splitting the problem in two:
 
 1. **A small, atomic write.** `CreateOrder` (gRPC from checkout, or the legacy
-   REST path) does exactly one durable thing: insert the order + items with
-   status `pending` in a single transaction, idempotently.
+   REST path) inserts the order + items with status `pending` in a single
+   transaction, idempotently — together with one row recording that this order
+   still needs its saga started. Both in the same transaction, deliberately:
+   Temporal cannot join it, so a crash between the commit and the workflow start
+   would otherwise strand the order `pending` forever
+   ([ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/), and
+   [temporal-order-fulfillment.md](./temporal-order-fulfillment.md#how-the-saga-gets-started)
+   for the mechanism).
 2. **A durable saga for everything else.** Fulfillment runs as a Temporal
    workflow on the `order-worker`, with per-step compensation, so partial
    failure converges to `confirmed` or fully-compensated `failed` — never to a
@@ -49,7 +55,9 @@ ships without charging. Order solves this by splitting the problem in two:
 
 Checkout ([checkout.md](./checkout.md)) validates prices and owns the funnel;
 order keeps the *"insert pending + start workflow in one place"* invariant
-(ADR-018). Checkout never writes order tables.
+(ADR-018) — and since RFC-0021 P3 that invariant is durable rather than
+best-effort: the start is retried from the outbox if it does not take.
+Checkout never writes order tables.
 
 ## Architecture
 
@@ -305,4 +313,4 @@ Paths in [`duynhlab/order-service`](https://github.com/duynhlab/order-service). 
 - [checkout.md](./checkout.md) · [payments.md](./payments.md) · [shipping.md](./shipping.md) — adjacent contracts
 - [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) — checkout→order boundary
 
-_Last updated: 2026-07-21_
+_Last updated: 2026-07-28_

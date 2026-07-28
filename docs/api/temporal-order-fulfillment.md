@@ -10,7 +10,7 @@ Temporal makes the platform's multi-service order transaction durable, retryable
 | **Task queue** | `order-fulfillment` | — |
 | **Order result** | `pending` becomes `confirmed` or `failed` | — |
 | **Registry** | [workflows.md](./workflows.md#order-fulfillment) — all platform workflows in one table | — |
-| **Design record** | — | [ADR-001](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/) · [ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/) · [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) |
+| **Design record** | — | [ADR-001](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/) · [ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/) · [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) · [ADR-030](../proposals/adr/ADR-030-temporal-workflow-versioning/) · [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/) |
 
 ## Overview
 
@@ -29,6 +29,7 @@ pivot trigger compensating actions in reverse. This is the deep dive for
 | Partial work had no automatic undo | Shipping, stock, and payment have compensations |
 | A caller could not inspect in-flight work | Temporal UI, traces, logs, and metrics expose execution |
 | Request latency could depend on every downstream | Checkout confirm returns **201**; order row is **`pending`**; fulfillment continues asynchronously |
+| A crash between committing the order and starting the workflow stranded it `pending` forever | The order and the intent to start commit **together**; a dispatcher retries what the inline start could not do ([ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/)) |
 
 ```mermaid
 flowchart LR
@@ -63,6 +64,7 @@ flowchart LR
   - [When 2PC Is the Better Choice](#when-2pc-is-the-better-choice)
 - [Part 2 — As-built](#part-2--as-built)
   - [Current Order-Fulfillment Saga](#current-order-fulfillment-saga) — [Workflow at a Glance](#workflow-at-a-glance) · [Retry and Timeout Policy](#retry-and-timeout-policy)
+  - [How the Saga Gets Started](#how-the-saga-gets-started)
   - [Contracts and the Checkout Flow](#contracts-and-the-checkout-flow)
   - [Temporal Infrastructure](#temporal-infrastructure)
   - [As-Built Notes and Roadmap](#as-built-notes-and-roadmap)
@@ -556,6 +558,75 @@ stateDiagram-v2
     failed --> [*]
 ```
 
+### How the Saga Gets Started
+
+Temporal cannot join the PostgreSQL transaction, so committing the order and
+starting its workflow can never be atomic with each other. Until RFC-0021 P3 the
+order committed first and the start followed, which meant anything interrupting
+that gap — a pod restart, a Temporal outage, an OOM kill — left an order `pending`
+forever with nothing that remembered to start it.
+
+A **transactional outbox** closes it: the order row and a row saying *this order
+needs a saga* commit together, which turns "two systems must commit together" into
+"one database must commit two rows", something it already guarantees.
+
+```mermaid
+flowchart TD
+    subgraph tx["order-service · ONE database transaction"]
+        O["INSERT orders<br/>(status pending)"]
+        R["INSERT fulfillment_start_requests<br/>(PENDING + payment token)"]
+    end
+    tx --> C{"COMMIT"}
+    C -->|"inline start (fast path)"| T["Temporal<br/>ExecuteWorkflow"]
+    T -->|"accepted"| D["mark DISPATCHED<br/>clear the token"]
+    T -->|"failed / unreachable"| P["row stays PENDING"]
+    P --> W["order-worker · dispatcher<br/>claims with a lease, retries"]
+    W -->|"started, or an existing run is live"| D
+    W -->|"attempt cap, cleared token,<br/>or past the dedup window"| F["FAILED<br/>needs a human"]
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    class O,R data
+    class T platform
+    class W worker
+    class D,P,F service
+```
+
+The common path never touches the dispatcher: the inline start keeps the latency
+and closes the row, so `PENDING` rows are normally absent rather than transient.
+
+**Exactly once, not at least once** — the saga authorizes and captures money, so a
+duplicate start is a duplicate charge. Three layers enforce it, and no single one
+is sufficient:
+
+| Layer | What it stops |
+|---|---|
+| `REJECT_DUPLICATE` is the **default** in the start seam | Two starters for one workflow id; omission has to be the safe choice |
+| `WorkflowExecutionErrorWhenAlreadyStarted: true` | The SDK otherwise **swallows** the rejection and returns a nil error, so a refused start looks like a successful one |
+| The dispatcher **describes** the existing run | A collision says a run exists, not that it did its job; a terminated or timed-out run leaves nothing driving the order |
+
+**What the dispatcher refuses rather than retries:** a row whose payment token was
+cleared (starting it would charge the demo token), and a row older than the
+workflow-id dedup window (past namespace retention there is nothing left to
+reject, so it could duplicate a saga that already ran).
+
+| Signal | Answers |
+|---|---|
+| `order_fulfillment_start_outbox_pending` | Is any committed order missing its saga? |
+| `order_fulfillment_start_outbox_oldest_age_seconds` | How long has the oldest one waited? **This is the alert-worthy one** — one order pending for twenty minutes is an incident, twenty pending for two seconds during a Temporal restart is the system working |
+| `order_fulfillment_start_outbox_failed` | Is anything stuck needing a human? |
+| `order_fulfillment_start_dispatch_total{result}` | What is the dispatcher doing — `dispatched` / `already_started` / `retry` / `failed` / `skipped` |
+
+The three gauges read the table on every collection cycle rather than being
+incremented, so they cannot drift across restarts, and they are registered in the
+API **and** the worker — the worker exits when Temporal is unreachable, which is
+exactly when a backlog builds. Alerting on them is owed, and needs `absent()`
+handling: a database failure blanks all three together, so a naive threshold would
+*resolve* during the incident. Full rationale and the accepted trade-offs are in
+[ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/).
+
 ### Contracts and the Checkout Flow
 
 East-west contracts in [`duynhlab/pkg`](https://github.com/duynhlab/pkg) (`pkg/proto`, `buf`;
@@ -690,4 +761,4 @@ How to deploy the worker, run the saga locally, and watch it in production.
 - [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared idempotency state machine
 - [RFC-0010](../proposals/rfc/RFC-0010/) — payment and fulfillment design
 
-_Last updated: 2026-07-21_
+_Last updated: 2026-07-28_

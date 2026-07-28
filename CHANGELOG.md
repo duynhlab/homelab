@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **ADR-031 — fulfillment start outbox** (RFC-0021 P3): the order row and the intent to start its saga now commit in one transaction, because Temporal cannot join it and a crash in between stranded the order `pending` forever. The inline start stays as the fast path; a leased dispatcher in `order-worker` retries what it could not start. Exactly-once is enforced at three layers — `REJECT_DUPLICATE` as the seam **default**, `WorkflowExecutionErrorWhenAlreadyStarted` (without it the SDK swallows the rejection and a refused start looks successful), and describing the existing run before closing a row. Records the accepted trade-offs, including the non-obvious coupling between the dispatcher's attempt cap and the worker's fail-fast Temporal dial: changing one without the other converts a Temporal outage into mass order failure. `docs/api/temporal-order-fulfillment.md` gains a "How the Saga Gets Started" section with the four outbox signals (alert on `oldest_age`, not the count, and with `absent()` handling), and `docs/api/order.md`'s "exactly one durable thing" claim is corrected.
+
 ### Fixed
 
 - **inventory-service pinned to `0.2.3`** — the Deployment was in `Init:CrashLoopBackOff` on the cluster (59 restarts): its init container runs `migrate` with only `DB_*` env, the same contract product/order/checkout run under, while `0.1.0` validated the full config before dispatching and panicked on `SERVICE_NAME`. Found by the RFC-0021 P3 cluster audit, fixed in inventory-service#13, released as `v0.2.2` and rolled into `v0.2.3` together with the testcontainers wait-strategy fix and the `x/crypto`/`grpc`/builder CVE bumps.

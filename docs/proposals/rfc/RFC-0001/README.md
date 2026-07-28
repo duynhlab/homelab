@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| implemented | platform-wide | 2026-06-26 | 2026-07-14 |
+| implemented | platform-wide | 2026-06-26 | 2026-07-28 |
 
 > This is a **retrospective** RFC: Temporal order-fulfillment is already shipped and
 > verified. It exists as the worked example for the [RFC process](../README.md) and as
@@ -10,6 +10,18 @@
 > The operational reference — endpoints, deploy/run, ops — stays in
 > [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md);
 > this RFC owns the *why*, the *design rationale*, and the *roadmap*.
+
+> **Deployment superseded (2026-07-28).** The infrastructure topology and version
+> notes below describe the **retired** alexandrevilain temporal-operator
+> deployment (`TemporalCluster`/`TemporalNamespace`, server 1.24.2) as it stood
+> when this RFC shipped. Temporal now runs from the official
+> `temporalio/helm-charts` release (server 1.31.2) — see
+> [ADR-030](../../adr/ADR-030-temporal-workflow-versioning/) for the re-platform
+> and the Worker Versioning requirement that forced it, and
+> [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md)
+> for the current topology. The Temporal *adoption* decision (ADR-001) and this
+> RFC's design rationale stand; only the deployment mechanism changed. The
+> "upgrade 1.24.2 → 1.27.x" roadmap item in Future work is obsolete.
 
 ## Summary
 

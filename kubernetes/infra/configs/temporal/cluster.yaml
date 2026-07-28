@@ -1,120 +1,132 @@
-# Temporal server, reconciled by the temporal-operator.
-# Two SQL stores live in the CNPG `platform-db` cluster (see
-# configs/databases/clusters/platform-db/); the `temporal` role password is in
-# `platform-db-temporal-secret` (ESO, copied to the temporal namespace).
+# RETIRED — NOT APPLIED (ADR-030 revision, RFC-0021 P3).
 #
-# Server pinned to 1.24.x: operator v0.20.0 (published chart 0.6.0) supports
-# ">=1.14.0 <1.25.0". Bump once the operator re-publishes its chart for v0.22.0.
+# The TemporalCluster CR (alexandrevilain operator) is replaced by the official
+# temporalio chart HelmRelease in helmrelease.yaml — the operator caps at server
+# 1.28.x and Worker Versioning needs >= 1.29.1. Kept commented out (with the
+# hard-won operator workarounds documented below: skipCreate for the
+# no-CREATEDB role, the admin-tools tag scheme, per-service resources) so a
+# rollback has the exact prior manifest to restore. NOTE: the manifest is only
+# half of a rollback — after the chart's schema job upgrades the databases past
+# 1.24.2, restoring this CR also requires a platform-db PITR of `temporal` +
+# `temporal_visibility` to a pre-upgrade timestamp.
 #
-# Resources are set on every operator-created pod (services / ui / admintools /
-# schema jobs) so they satisfy the cluster-wide Kyverno resource policy.
----
-apiVersion: temporal.io/v1beta1
-kind: TemporalCluster
-metadata:
-  name: temporal
-  namespace: temporal
-spec:
-  version: 1.24.2
-  numHistoryShards: 512
-
-  jobResources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      memory: 256Mi
-
-  persistence:
-    defaultStore:
-      # DB is pre-provisioned by CNPG (postInitSQL in platform-db instance.yaml);
-      # the `temporal` role has no CREATEDB, so the operator's temporal-sql-tool
-      # `create` step fails "permission denied to create database". skipCreate
-      # tells the operator the datastore already exists. (Bug 16)
-      skipCreate: true
-      sql:
-        user: temporal
-        pluginName: postgres12
-        databaseName: temporal
-        connectAddr: platform-db-rw.platform.svc.cluster.local:5432
-        connectProtocol: tcp
-      passwordSecretRef:
-        name: platform-db-temporal-secret
-        key: password
-    visibilityStore:
-      # temporal_visibility is pre-created by CNPG postInitSQL; skip operator
-      # CREATE DATABASE for the same reason as defaultStore above. (Bug 16)
-      skipCreate: true
-      sql:
-        user: temporal
-        pluginName: postgres12
-        databaseName: temporal_visibility
-        connectAddr: platform-db-rw.platform.svc.cluster.local:5432
-        connectProtocol: tcp
-      passwordSecretRef:
-        name: platform-db-temporal-secret
-        key: password
-
-  services:
-    # v1beta1 TemporalCluster has no spec.services.resources — compute resources
-    # are declared per service (frontend/history/matching/worker) so every
-    # operator-created pod satisfies the cluster-wide Kyverno resource policy.
-    frontend:
-      resources:
-        requests:
-          cpu: 50m
-          memory: 128Mi
-        limits:
-          memory: 512Mi
-    history:
-      resources:
-        requests:
-          cpu: 50m
-          memory: 128Mi
-        limits:
-          memory: 512Mi
-    matching:
-      resources:
-        requests:
-          cpu: 50m
-          memory: 128Mi
-        limits:
-          memory: 512Mi
-    worker:
-      resources:
-        requests:
-          cpu: 50m
-          memory: 128Mi
-        limits:
-          memory: 512Mi
-
-  ui:
-    enabled: true
-    resources:
-      requests:
-        cpu: 25m
-        memory: 64Mi
-      limits:
-        memory: 128Mi
-
-  admintools:
-    enabled: true
-    # temporalio/admin-tools has no plain version tag (it uses a combined
-    # `<server>-tctl-<v>-cli-<v>` scheme), so the operator's default tag
-    # derivation from spec.version yields an empty tag → `temporalio/admin-tools:`
-    # → InvalidImageName. Pin the real admin-tools tag for server 1.24.2. (Bug 19)
-    version: "1.24.2-tctl-1.18.1-cli-0.13.2"
-    resources:
-      requests:
-        cpu: 25m
-        memory: 64Mi
-      limits:
-        memory: 128Mi
-
-  metrics:
-    enabled: true
-    prometheus:
-      listenPort: 9090
-      scrapeConfig:
-        serviceMonitor:
-          enabled: true
+# # Temporal server, reconciled by the temporal-operator.
+# # Two SQL stores live in the CNPG `platform-db` cluster (see
+# # configs/databases/clusters/platform-db/); the `temporal` role password is in
+# # `platform-db-temporal-secret` (ESO, copied to the temporal namespace).
+# #
+# # Server pinned to 1.24.x: operator v0.20.0 (published chart 0.6.0) supports
+# # ">=1.14.0 <1.25.0". Bump once the operator re-publishes its chart for v0.22.0.
+# #
+# # Resources are set on every operator-created pod (services / ui / admintools /
+# # schema jobs) so they satisfy the cluster-wide Kyverno resource policy.
+# ---
+# apiVersion: temporal.io/v1beta1
+# kind: TemporalCluster
+# metadata:
+#   name: temporal
+#   namespace: temporal
+# spec:
+#   version: 1.24.2
+#   numHistoryShards: 512
+#
+#   jobResources:
+#     requests:
+#       cpu: 50m
+#       memory: 128Mi
+#     limits:
+#       memory: 256Mi
+#
+#   persistence:
+#     defaultStore:
+#       # DB is pre-provisioned by CNPG (postInitSQL in platform-db instance.yaml);
+#       # the `temporal` role has no CREATEDB, so the operator's temporal-sql-tool
+#       # `create` step fails "permission denied to create database". skipCreate
+#       # tells the operator the datastore already exists. (Bug 16)
+#       skipCreate: true
+#       sql:
+#         user: temporal
+#         pluginName: postgres12
+#         databaseName: temporal
+#         connectAddr: platform-db-rw.platform.svc.cluster.local:5432
+#         connectProtocol: tcp
+#       passwordSecretRef:
+#         name: platform-db-temporal-secret
+#         key: password
+#     visibilityStore:
+#       # temporal_visibility is pre-created by CNPG postInitSQL; skip operator
+#       # CREATE DATABASE for the same reason as defaultStore above. (Bug 16)
+#       skipCreate: true
+#       sql:
+#         user: temporal
+#         pluginName: postgres12
+#         databaseName: temporal_visibility
+#         connectAddr: platform-db-rw.platform.svc.cluster.local:5432
+#         connectProtocol: tcp
+#       passwordSecretRef:
+#         name: platform-db-temporal-secret
+#         key: password
+#
+#   services:
+#     # v1beta1 TemporalCluster has no spec.services.resources — compute resources
+#     # are declared per service (frontend/history/matching/worker) so every
+#     # operator-created pod satisfies the cluster-wide Kyverno resource policy.
+#     frontend:
+#       resources:
+#         requests:
+#           cpu: 50m
+#           memory: 128Mi
+#         limits:
+#           memory: 512Mi
+#     history:
+#       resources:
+#         requests:
+#           cpu: 50m
+#           memory: 128Mi
+#         limits:
+#           memory: 512Mi
+#     matching:
+#       resources:
+#         requests:
+#           cpu: 50m
+#           memory: 128Mi
+#         limits:
+#           memory: 512Mi
+#     worker:
+#       resources:
+#         requests:
+#           cpu: 50m
+#           memory: 128Mi
+#         limits:
+#           memory: 512Mi
+#
+#   ui:
+#     enabled: true
+#     resources:
+#       requests:
+#         cpu: 25m
+#         memory: 64Mi
+#       limits:
+#         memory: 128Mi
+#
+#   admintools:
+#     enabled: true
+#     # temporalio/admin-tools has no plain version tag (it uses a combined
+#     # `<server>-tctl-<v>-cli-<v>` scheme), so the operator's default tag
+#     # derivation from spec.version yields an empty tag → `temporalio/admin-tools:`
+#     # → InvalidImageName. Pin the real admin-tools tag for server 1.24.2. (Bug 19)
+#     version: "1.24.2-tctl-1.18.1-cli-0.13.2"
+#     resources:
+#       requests:
+#         cpu: 25m
+#         memory: 64Mi
+#       limits:
+#         memory: 128Mi
+#
+#   metrics:
+#     enabled: true
+#     prometheus:
+#       listenPort: 9090
+#       scrapeConfig:
+#         serviceMonitor:
+#           enabled: true

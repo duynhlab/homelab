@@ -1,12 +1,15 @@
-# Temporal server alerts. Scraped via the operator-managed ServiceMonitor
-# (spec.metrics.prometheus.scrapeConfig.serviceMonitor in cluster.yaml).
+# Temporal server alerts. Scraped via the four ServiceMonitors the official
+# temporalio chart renders (server.metrics.serviceMonitor in helmrelease.yaml) —
+# one per server role, frontend/history/matching/worker. The retired operator's
+# single scrapeConfig-managed ServiceMonitor is gone with cluster.yaml
+# (ADR-030 revision); `job=~".*temporal.*"` still matches all of them.
 #
 # The error-rate metric names (service_requests/service_errors,
 # persistence_requests/persistence_error_with_type) are the Temporal server's documented
 # Prometheus metrics, taken from the official dashboards
 # (github.com/temporalio/dashboards, server/server-general.json). Ratios use
 # clamp_min on the denominator so they never divide by zero / false-fire when
-# idle. Final population check is on `make up` (Kind, operator-scraped).
+# idle. Final population check is on `make up` (Kind, chart-scraped).
 #
 # Worker-side (SDK) workflow/activity RED metrics are emitted by pkg/temporalx
 # (OTel MetricsHandler) and arrive via OTLP push through the otel-collector

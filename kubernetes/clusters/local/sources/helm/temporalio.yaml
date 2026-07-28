@@ -1,0 +1,13 @@
+# Official Temporal helm chart (temporalio/helm-charts) — replaces the
+# alexandrevilain temporal-operator (commented out, ADR-030 revision): the
+# operator caps at server 1.28.x while Worker Versioning — the platform's
+# chosen workflow-versioning mechanism for RFC-0021 phase 3 — needs >= 1.29.1.
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: temporalio
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://go.temporal.io/helm-charts

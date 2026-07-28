@@ -1,6 +1,9 @@
 # Temporal Web UI via Kong — temporal.duynh.me
 # TLS terminated by Kong using the default proxy certificate (kong-proxy-tls).
-# The operator exposes the UI as the `temporal-ui` Service on :8080.
+# The official chart exposes the UI as the `temporal-web` Service on :8080
+# (it was `temporal-ui` under the retired operator — ADR-030 revision). The
+# Ingress OBJECT keeps its `temporal-ui` name on purpose: renaming it would make
+# Flux prune and recreate the ingress for no functional gain.
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -21,6 +24,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: temporal-ui
+                name: temporal-web
                 port:
                   number: 8080

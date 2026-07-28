@@ -1,14 +1,21 @@
-# The Temporal namespace the platform's workflows run in (the order-fulfillment
-# saga registers here). Distinct from the Kubernetes `temporal` namespace.
----
-apiVersion: temporal.io/v1beta1
-kind: TemporalNamespace
-metadata:
-  name: mop
-  namespace: temporal
-spec:
-  clusterRef:
-    name: temporal
-  description: "duynhlab platform workflows (order-fulfillment saga)"
-  retentionPeriod: 168h # 7 days
-  allowDeletion: true
+# RETIRED — NOT APPLIED (ADR-030 revision, RFC-0021 P3).
+#
+# The `mop` Temporal namespace is now registered by the official chart's
+# namespace job (server.config.namespaces in helmrelease.yaml) instead of this
+# TemporalNamespace CR — the operator that reconciled it is retired.
+# Retention is unchanged (168h). Kept commented out for rollback reference.
+#
+# # The Temporal namespace the platform's workflows run in (the order-fulfillment
+# # saga registers here). Distinct from the Kubernetes `temporal` namespace.
+# ---
+# apiVersion: temporal.io/v1beta1
+# kind: TemporalNamespace
+# metadata:
+#   name: mop
+#   namespace: temporal
+# spec:
+#   clusterRef:
+#     name: temporal
+#   description: "duynhlab platform workflows (order-fulfillment saga)"
+#   retentionPeriod: 168h # 7 days
+#   allowDeletion: true

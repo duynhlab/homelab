@@ -35,7 +35,7 @@ settled decisions.
 | ADR | Title | Status | Related RFC |
 |-----|-------|--------|-------------|
 | [ADR-001](ADR-001-adopt-temporal-for-order-fulfillment/) | Adopt Temporal for order fulfillment | Accepted | [RFC-0001](../rfc/RFC-0001/) |
-| [ADR-002](ADR-002-deploy-temporal-via-operator/) | Deploy Temporal via the alexandrevilain operator | Accepted | [RFC-0001](../rfc/RFC-0001/) |
+| [ADR-002](ADR-002-deploy-temporal-via-operator/) | Deploy Temporal via the alexandrevilain operator | Superseded by [ADR-030](ADR-030-temporal-workflow-versioning/) | [RFC-0001](../rfc/RFC-0001/) |
 | [ADR-003](ADR-003-jwt-validation-in-services-not-kong/) | Keep JWT validation in services, not the Kong gateway | Superseded by [ADR-006](ADR-006-rs256-jwt-kong-edge-auth/) | — |
 | [ADR-004](ADR-004-enable-openbao-audit-logging/) | Enable OpenBAO audit logging | Accepted | — |
 | [ADR-005](ADR-005-openbao-ha-raft/) | Run OpenBAO HA (Raft) instead of Vault dev mode | Accepted | — |
@@ -63,7 +63,7 @@ settled decisions.
 | [ADR-027](ADR-027-inventory-sole-stock-authority/) | inventory-service is the platform's sole stock authority (supersedes RFC-0003's product-owned stock); foundation shipped, cutover realized over RFC-0021 phases 2–4 | Accepted | [RFC-0021](../rfc/RFC-0021/) |
 | [ADR-028](ADR-028-inventory-reservation-model/) | Inventory reservation & balance model — derived ATP, RESERVED→COMMITTED\|RELEASED\|EXPIRED FSM with claim-via-row idempotency, append-only movement ledger, one-order-one-warehouse | Accepted | [RFC-0021](../rfc/RFC-0021/) |
 | [ADR-029](ADR-029-enum-feature-flag-helper/) | Adopt `pkg/flagx` as the platform feature-flag helper — startup-validated enum/percent env flags for reversible rollout gates (first consumer: checkout `CHECKOUT_AVAILABILITY_SOURCE`, P2-4) | Accepted | [RFC-0021](../rfc/RFC-0021/) |
-| [ADR-030](ADR-030-temporal-workflow-versioning/) | Version the order saga with `workflow.GetVersion` (`inventory-extraction-v1` + participant pinned in input); Worker Versioning is the target — hard-blocked at server 1.24.2 / operator ≤1.28.x, official chart staged commented-out as the 1.29 path | Accepted | [RFC-0021](../rfc/RFC-0021/) |
+| [ADR-030](ADR-030-temporal-workflow-versioning/) | Adopt Temporal **Worker Versioning** for the saga stock migration + re-platform onto the official `temporalio/helm-charts` (server 1.31.2) — the operator capped at 1.28.x; participant pinned in workflow input; replay corpus retained | Accepted (supersedes [ADR-002](ADR-002-deploy-temporal-via-operator/) deployment half) | [RFC-0021](../rfc/RFC-0021/) |
 
 ---
-_Last updated: 2026-07-24_
+_Last updated: 2026-07-28_

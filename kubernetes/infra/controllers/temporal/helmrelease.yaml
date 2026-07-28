@@ -1,66 +1,80 @@
-# Temporal operator (alexandrevilain/temporal-operator).
-# Installs the TemporalCluster / TemporalNamespace CRDs and the controller that
-# reconciles them into running Temporal deployments. The controller is
-# cluster-scoped (watches all namespaces) but lives in `temporal`.
+# RETIRED — NOT DEPLOYED (ADR-030 revision, RFC-0021 P3).
 #
-# Version note: the published Helm chart tops out at 0.6.0 (operator v0.20.0),
-# which supports Temporal server ">=1.14.0 <1.25.0". Server is therefore pinned
-# to 1.24.x in configs/temporal/cluster.yaml. Bumping to 1.27.x requires the
-# operator to re-publish its chart for v0.22.0 (server range extends to <1.29.0);
-# Renovate tracks the HelmRepository for that release.
+# The alexandrevilain temporal-operator is commented out: its compatibility
+# matrix caps at Temporal server 1.28.x, while Worker Versioning — the chosen
+# workflow-versioning mechanism — requires server >= 1.29.1. The platform now
+# runs the OFFICIAL temporalio/helm-charts release (configs/temporal/
+# helmrelease.yaml, server 1.31.x). Re-enabling this restores only the CONTROL
+# plane: once the chart's schema job has upgraded `temporal` +
+# `temporal_visibility` past 1.24.2, an operator-run 1.24.2 server cannot read
+# them — a real rollback also needs a platform-db PITR of both databases to a
+# pre-upgrade timestamp (see docs/databases/). Also restore
+# configs/temporal/cluster.yaml + namespace.yaml and the controllers/ + sources/
+# kustomization entries.
 #
-# Webhook certs are issued by cert-manager (self-signed issuer); cert-manager is
-# installed in the same controllers wave, so the first reconcile may retry until
-# its CRDs exist.
----
-apiVersion: helm.toolkit.fluxcd.io/v2
-kind: HelmRelease
-metadata:
-  name: temporal-operator
-  namespace: temporal
-  labels:
-    app.kubernetes.io/component: controller
-spec:
-  interval: 30m
-  # Install AFTER cert-manager is Ready. The chart renders a cert-manager
-  # Certificate/Issuer for the operator's admission webhook; applying those must
-  # pass the cert-manager validating webhook, whose pod isn't up yet in a
-  # cold-start controllers wave → parallel install hits "connection refused" and
-  # Stalls (RetriesExceeded). Same pattern as trust-manager-helmrelease.yaml.
-  # (debugs.md Bug 5)
-  dependsOn:
-    - name: cert-manager
-      namespace: cert-manager
-  chart:
-    spec:
-      chart: temporal-operator
-      version: "0.6.0"
-      sourceRef:
-        kind: HelmRepository
-        name: temporal-operator
-        namespace: flux-system
-  install:
-    crds: Create
-    remediation:
-      retries: 5
-  upgrade:
-    crds: CreateReplace
-    remediation:
-      retries: 5
-  values:
-    # 2 replicas so the (failurePolicy: Fail) mutating webhook never drops to zero
-    # on a single pod restart — otherwise every TemporalCluster/Namespace dry-run
-    # is rejected during the gap (debugs BUGS-5). PDB is a follow-up.
-    replicaCount: 2
-    manager:
-      resources:
-        requests:
-          cpu: 10m
-          memory: 64Mi
-        limits:
-          cpu: 500m
-          memory: 128Mi
-    webhook:
-      certManager:
-        certificate:
-          enabled: true
+# # Temporal operator (alexandrevilain/temporal-operator).
+# # Installs the TemporalCluster / TemporalNamespace CRDs and the controller that
+# # reconciles them into running Temporal deployments. The controller is
+# # cluster-scoped (watches all namespaces) but lives in `temporal`.
+# #
+# # Version note: the published Helm chart tops out at 0.6.0 (operator v0.20.0),
+# # which supports Temporal server ">=1.14.0 <1.25.0". Server is therefore pinned
+# # to 1.24.x in configs/temporal/cluster.yaml. Bumping to 1.27.x requires the
+# # operator to re-publish its chart for v0.22.0 (server range extends to <1.29.0);
+# # Renovate tracks the HelmRepository for that release.
+# #
+# # Webhook certs are issued by cert-manager (self-signed issuer); cert-manager is
+# # installed in the same controllers wave, so the first reconcile may retry until
+# # its CRDs exist.
+# ---
+# apiVersion: helm.toolkit.fluxcd.io/v2
+# kind: HelmRelease
+# metadata:
+#   name: temporal-operator
+#   namespace: temporal
+#   labels:
+#     app.kubernetes.io/component: controller
+# spec:
+#   interval: 30m
+#   # Install AFTER cert-manager is Ready. The chart renders a cert-manager
+#   # Certificate/Issuer for the operator's admission webhook; applying those must
+#   # pass the cert-manager validating webhook, whose pod isn't up yet in a
+#   # cold-start controllers wave → parallel install hits "connection refused" and
+#   # Stalls (RetriesExceeded). Same pattern as trust-manager-helmrelease.yaml.
+#   # (debugs.md Bug 5)
+#   dependsOn:
+#     - name: cert-manager
+#       namespace: cert-manager
+#   chart:
+#     spec:
+#       chart: temporal-operator
+#       version: "0.6.0"
+#       sourceRef:
+#         kind: HelmRepository
+#         name: temporal-operator
+#         namespace: flux-system
+#   install:
+#     crds: Create
+#     remediation:
+#       retries: 5
+#   upgrade:
+#     crds: CreateReplace
+#     remediation:
+#       retries: 5
+#   values:
+#     # 2 replicas so the (failurePolicy: Fail) mutating webhook never drops to zero
+#     # on a single pod restart — otherwise every TemporalCluster/Namespace dry-run
+#     # is rejected during the gap (debugs BUGS-5). PDB is a follow-up.
+#     replicaCount: 2
+#     manager:
+#       resources:
+#         requests:
+#           cpu: 10m
+#           memory: 64Mi
+#         limits:
+#           cpu: 500m
+#           memory: 128Mi
+#     webhook:
+#       certManager:
+#         certificate:
+#           enabled: true

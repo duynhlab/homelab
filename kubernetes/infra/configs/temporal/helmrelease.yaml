@@ -1,0 +1,164 @@
+# Temporal server — OFFICIAL temporalio/helm-charts release (ADR-030 revision).
+#
+# Replaces the alexandrevilain temporal-operator (TemporalCluster/
+# TemporalNamespace CRDs, retired under controllers/temporal/): the operator caps
+# at server 1.28.x, while **Worker Versioning** — the workflow-versioning
+# mechanism RFC-0021 phase 3 uses for the stock-write migration — requires
+# server >= 1.29.1 (Go SDK >= 1.35, CLI >= 1.4.1). Chart 1.6.0 ships server
+# 1.31.2.
+#
+# What carries over unchanged:
+#   * Persistence stays the CNPG `platform-db` cluster — databases `temporal` and
+#     `temporal_visibility` are pre-created by its postInitSQL, owned by the
+#     `temporal` role, and reachable per its pg_hba allow lines. The password
+#     comes from the ESO secret `platform-db-temporal-secret` (temporal ns).
+#     createDatabase: false because the `temporal` role has no CREATEDB (the same
+#     reason the operator needed skipCreate); manageSchema: true lets the chart's
+#     schema job create/upgrade tables inside the databases it owns.
+#   * numHistoryShards stays 512 — it cannot change after the first deployment.
+#   * The frontend Service keeps the name `temporal-frontend`, so every service's
+#     `TEMPORAL_HOSTPORT=temporal-frontend.temporal.svc.cluster.local:7233` is
+#     untouched by the re-platform.
+#   * The `mop` namespace is now created by the chart's namespace job
+#     (server.config.namespaces) instead of the TemporalNamespace CRD.
+#
+# What changed: the Web UI Service is `temporal-web` (was `temporal-ui`) — see
+# ingress.yaml.
+#
+# schema.useHelmHooks MUST stay false: Helm hooks are not reconciled by Flux
+# (the chart documents this), so the schema/namespace jobs are applied as normal
+# resources instead.
+#
+# Resources are set on every component: Kind is small, and the platform keeps
+# every pod bounded even where the Kyverno resource policy does not reach (it
+# scopes to app namespaces, Audit-only).
+#
+# Probe gaps the chart imposes (no values knob): `temporal-worker` declares
+# NEITHER probe, `temporal-admintools` has no readinessProbe, and the
+# schema/namespace Jobs have none. require-probes does not match the `temporal`
+# namespace today (it lists app namespaces only, Audit), so nothing is blocked —
+# but if that policy is widened or flipped to Enforce, this release needs a
+# PolicyException. Practical consequence now: because the worker has no
+# readinessProbe it counts Available as soon as the container starts, so
+# "HelmRelease Ready" is a slightly weaker signal than the retired
+# TemporalCluster Ready condition.
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: temporal
+  namespace: temporal
+  labels:
+    app.kubernetes.io/component: workflow-engine
+spec:
+  interval: 30m
+  # Explicit timeout (repo convention — every other heavy HelmRelease sets one).
+  # helm-controller's 5m default cannot cover this install: it waits for 6
+  # Deployments AND both Jobs (install.disableWaitForJobs defaults false), and the
+  # namespace Job is serially dependent on the schema Job + a serving frontend —
+  # with OnFailure backoff climbing to 160s+ — on top of cold image pulls. A 5m
+  # budget would time out, remediate, and eventually Stall, which would block
+  # temporal-local and therefore apps-local. retries stays low so the worst case
+  # (timeout × (retries+1)) stays within the Kustomization's retry cadence.
+  timeout: 15m
+  # Release name `temporal` + chart name `temporal` ⇒ fullname `temporal`, which
+  # is what keeps the Service names (temporal-frontend, …) stable.
+  releaseName: temporal
+  chart:
+    spec:
+      chart: temporal
+      version: "1.6.0" # appVersion 1.31.2 (>= 1.29.1 → Worker Versioning capable)
+      sourceRef:
+        kind: HelmRepository
+        name: temporalio
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 2
+  upgrade:
+    remediation:
+      retries: 2
+  values:
+    server:
+      replicaCount: 1
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
+      metrics:
+        # vmagent runs selectAllByDefault, so a plain ServiceMonitor is scraped
+        # with no extra labels; the temporal PrometheusRule matches
+        # job=~".*temporal.*".
+        serviceMonitor:
+          enabled: true
+          interval: 30s
+      config:
+        persistence:
+          # The chart reads numHistoryShards HERE (server.config.persistence),
+          # not at server.config — putting it one level up is a silent no-op that
+          # only looks right while the chart default happens to match. Immutable
+          # after the first deployment; pinned to the retired operator's value so
+          # the existing databases stay usable across a chart bump.
+          numHistoryShards: 512
+          datastores:
+            default:
+              sql:
+                pluginName: postgres12
+                databaseName: temporal
+                connectAddr: platform-db-rw.platform.svc.cluster.local:5432
+                connectProtocol: tcp
+                user: temporal
+                existingSecret: platform-db-temporal-secret
+                secretKey: password
+                createDatabase: false # pre-created by CNPG postInitSQL; role has no CREATEDB
+                manageSchema: true
+            visibility:
+              sql:
+                pluginName: postgres12
+                databaseName: temporal_visibility
+                connectAddr: platform-db-rw.platform.svc.cluster.local:5432
+                connectProtocol: tcp
+                user: temporal
+                existingSecret: platform-db-temporal-secret
+                secretKey: password
+                createDatabase: false
+                manageSchema: true
+        # Replaces the retired TemporalNamespace CRD: the chart's namespace job
+        # registers `mop` with the same 7-day retention the platform ran before.
+        namespaces:
+          create: true
+          namespace:
+            - name: mop
+              retention: 168h
+
+    # Schema/namespace jobs are plain resources under Flux (no Helm hooks).
+    schema:
+      useHelmHooks: false
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 256Mi
+
+    # tctl/temporal CLI pod — used for namespace + search-attribute operations.
+    admintools:
+      enabled: true
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          memory: 128Mi
+
+    web:
+      enabled: true
+      replicaCount: 1
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          memory: 128Mi

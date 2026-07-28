@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/component: infrastructure
 spec:
   interval: 10m
-  timeout: 15m
+  timeout: 20m  # > the HelmRelease timeout (15m) so a slow cold install is a retry, not a hard fail
   retryInterval: 2m
 
   sourceRef:
@@ -21,20 +21,28 @@ spec:
   wait: true
 
   dependsOn:
-    - name: controllers-local      # operator + TemporalCluster CRD
-    - name: cert-manager-local     # operator webhook certificate
+    # No cert-manager dependency any more: it existed for the retired operator's
+    # admission-webhook certificate (ADR-030 revision — the official chart has
+    # no webhook).
+    - name: controllers-local      # `temporal` namespace (controllers/namespaces.yaml)
     - name: databases-local        # platform-db Ready (+ platform-db-temporal-secret in temporal ns)
     - name: monitoring-local       # ServiceMonitor CRD + Grafana/VM stack
 
   healthChecks:
-    - apiVersion: temporal.io/v1beta1
-      kind: TemporalCluster
+    # The operator CRs are retired (ADR-030 revision), so health is the
+    # HelmRelease plus the frontend Deployment. helm-controller waits for the
+    # release's resources by default (install.disableWait=false), and the chart
+    # registers namespace `mop` with a Job — so a Ready HelmRelease also means
+    # that Job completed. That preserves the ordering guarantee the retired
+    # TemporalNamespace health check gave apps-local, whose order-worker dials
+    # namespace `mop` at startup (debugs BUGS-4). It is not a strict equivalence:
+    # the chart gives `temporal-worker` no readinessProbe, so Available there is
+    # weaker than the operator's TemporalCluster Ready condition.
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
       name: temporal
       namespace: temporal
-    # Wait for the `mop` namespace to be REGISTERED in Temporal (not just the
-    # cluster Ready) so apps-local (order-worker dials namespace `mop` at
-    # startup) doesn't deploy before it exists (debugs BUGS-4).
-    - apiVersion: temporal.io/v1beta1
-      kind: TemporalNamespace
-      name: mop
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: temporal-frontend
       namespace: temporal

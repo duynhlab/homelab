@@ -584,11 +584,11 @@ call.)*
 ```mermaid
 flowchart LR
     subgraph ns_temporal[ns temporal]
-        OP[temporal-operator]
-        TC[TemporalCluster<br/>frontend/history/matching/worker]
-        UI[Web UI]
+        HR[HelmRelease temporal<br/>official temporalio chart]
+        TC[temporal-frontend/history<br/>matching/worker]
+        UI[temporal-web UI]
         TDB[(CNPG platform-db<br/>temporal + temporal_visibility<br/>direct :5432)]
-        OP --> TC
+        HR --> TC
         TC --> TDB
         TC --> UI
     end
@@ -606,17 +606,17 @@ flowchart LR
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     class Kong edge;
     class OW worker;
-    class OP,TC,UI,VM,Tempo platform;
+    class HR,TC,UI,VM,Tempo platform;
     class TDB data;
 ```
 
-Deployed via the **`alexandrevilain/temporal-operator`** (see **[ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/)** for why the operator over the official Helm chart, and the server-version constraint):
+Deployed via the **official `temporalio/helm-charts`** release (see **[ADR-030](../proposals/adr/ADR-030-temporal-workflow-versioning/)** for the re-platform and the Worker Versioning requirement that forced it; **[ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/)** records the retired operator choice it superseded):
 
-- **Operator** — `controllers/temporal/` holds the `HelmRelease` (chart `0.6.0`; its `HelmRepository` source lives in `clusters/local/sources/helm/`); installs the `TemporalCluster`/`TemporalNamespace` CRDs; webhook certs via cert-manager.
-- **`TemporalCluster` + `mop` `TemporalNamespace`** (retention 168h) — `configs/temporal/`: server **`1.24.2`** (target 1.27.x — ADR-002), `numHistoryShards: 512`, persistence → `platform-db-rw.platform:5432` (default + `temporal_visibility`) via **`platform-db-temporal-secret`**, `ui.enabled`, `admintools.enabled`, `metrics.prometheus.scrapeConfig.serviceMonitor.enabled`, resources set on every operator-created pod for Kyverno.
+- **`HelmRelease temporal`** — `configs/temporal/helmrelease.yaml`: chart `1.6.0` (server **`1.31.2`** — Worker Versioning needs ≥ 1.29.1, which the retired operator could not run), `numHistoryShards: 512`, persistence → `platform-db-rw.platform:5432` (`temporal` + `temporal_visibility`, `createDatabase: false` — the role has no CREATEDB) via **`platform-db-temporal-secret`**, `mop` namespace (retention 168h) created by the chart's namespace Job, `web.enabled`, `admintools.enabled`, `server.metrics.serviceMonitor.enabled`, `schema.useHelmHooks: false` (Flux does not reconcile Helm hooks), resources set on every component. The frontend Service keeps the name **`temporal-frontend`**, so `TEMPORAL_HOSTPORT` is unchanged across the re-platform; the UI Service is **`temporal-web`** (was `temporal-ui`).
+- **Retired operator** — `controllers/temporal/` and `configs/temporal/{cluster,namespace}.yaml` are commented out in place for rollback; the `TemporalCluster`/`TemporalNamespace` CRDs and the cert-manager admission webhook are gone with it.
 - **`platform-db`** — `configs/databases/clusters/platform-db/`: consolidated CloudNativePG cluster (RFC-0018) hosting `temporal` + `temporal_visibility` alongside auth and supporting databases. 3-node HA; Barman backups at `s3://pg-backups-cnpg/platform-db/`.
 - **Edge & alerts** — Kong ingress `temporal.duynh.me`; `TemporalServerDown` + service/persistence error-rate `PrometheusRule`s (`configs/temporal/prometheusrule.yaml`).
-- **Flux order** — `controllers → temporal-operator` (the operator HelmRelease `dependsOn` cert-manager, since its chart renders a cert-manager `Certificate`/`Issuer` for the admission webhook); `databases → platform-db`; a `temporal` Kustomization (`dependsOn` controllers, cert-manager, databases, monitoring) before `apps`; the order worker `dependsOn` temporal.
+- **Flux order** — `controllers` (namespace only — no operator, and the cert-manager dependency retired with the webhook); `databases → platform-db`; a `temporal` Kustomization (`dependsOn` controllers, databases, monitoring) before `apps`, health-checked on the `HelmRelease` + `temporal-frontend` Deployment (helm-controller waits for release resources, so Ready also means the `mop` namespace Job completed — the ordering guarantee `apps-local` needs); the order worker `dependsOn` temporal.
 
 ### As-Built Notes and Roadmap
 

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Temporal re-platformed onto the official `temporalio/helm-charts`** (RFC-0021 P3, ADR-030 — supersedes ADR-002's deployment half): the alexandrevilain operator is retired (its matrix caps at server 1.28.x) so the cluster can run server **1.31.2**, the floor for Temporal **Worker Versioning** (≥ 1.29.1), the mechanism the phase-3 stock-write migration uses. Persistence, `numHistoryShards: 512`, the `platform-db-temporal-secret` ESO secret and the `temporal-frontend` Service name all carry over — no service's `TEMPORAL_HOSTPORT` changes. The `mop` namespace (168h) moves to the chart's namespace Job, the UI Service becomes `temporal-web` (ingress updated), `schema.useHelmHooks: false` because Flux does not reconcile Helm hooks, and the operator/CR manifests plus the `cert-manager-local` dependency and CRD-based Flux health checks are gone (Temporal health is now the HelmRelease + frontend Deployment). Operator manifests are commented out in place for rollback — control plane only: once the chart's schema job upgrades the databases past 1.24.2, a real rollback also needs a `platform-db` PITR of `temporal` + `temporal_visibility`. **Applying this to a cluster that is already running the operator?** Delete the `TemporalCluster`/`TemporalNamespace` CRs *while the operator still runs*, or Flux can prune the operator first and leave the CRs hanging on finalizers. The platform's Kind cluster is rebuilt per `make up`, so the normal path is a fresh install with nothing to prune.
+
 ### Added
 
 - **RFC-0021 inventory Phase-1 exit docs** — ADR-027 (inventory-service is the sole stock authority, supersedes RFC-0003) and ADR-028 (reservation & balance model: derived ATP, RESERVED→COMMITTED\|RELEASED\|EXPIRED FSM, append-only movement ledger, one-order-one-warehouse), both Accepted; new `docs/api/inventory.md` service contract (v2 template — gRPC-only `inventory.v1`, deployed with no live caller until phases 2–4) added to the hub rollup and service list.

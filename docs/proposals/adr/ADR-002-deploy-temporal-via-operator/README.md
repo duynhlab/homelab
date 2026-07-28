@@ -2,7 +2,15 @@
 
 | Status | Date | Related RFC |
 |--------|------|-------------|
-| Accepted | 2026-06-15 | [RFC-0001](../../rfc/RFC-0001/) |
+| Superseded by [ADR-030](../ADR-030-temporal-workflow-versioning/) | 2026-06-15 | [RFC-0001](../../rfc/RFC-0001/) |
+
+> **Superseded 2026-07-28** by [ADR-030](../ADR-030-temporal-workflow-versioning/):
+> the platform re-platformed onto the official `temporalio/helm-charts` release.
+> The operator's compatibility matrix caps at server 1.28.x, which made Temporal
+> **Worker Versioning** (server ≥ 1.29.1) — the versioning mechanism RFC-0021
+> phase 3 needs — unreachable. The reasoning below is retained as the record of
+> why the operator was chosen first; the operator manifests are commented out in
+> place for rollback.
 
 ## Context
 

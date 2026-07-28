@@ -1,36 +1,44 @@
-# ADR-030: Version the order saga with `workflow.GetVersion`; Worker Versioning is the target
+# ADR-030: Adopt Temporal Worker Versioning; re-platform onto the official Temporal chart
 
-Use `workflow.GetVersion` patching (change ID `inventory-extraction-v1`) plus a
-participant field pinned in the workflow input for the RFC-0021 phase-3 stock
-migration; adopt Temporal Worker Versioning later, once the platform can run a
-server that supports it.
+Version the order saga with **Temporal Worker Versioning** (Worker Deployment
+Versions), and replace the alexandrevilain temporal-operator with the **official
+`temporalio/helm-charts`** release so the cluster can run the server version
+Worker Versioning requires.
 
 | Status | Date | Related RFC | Related research |
 |--------|------|-------------|------------------|
-| Accepted | 2026-07-27 | [RFC-0021](../../rfc/RFC-0021/) | [RFC-0021 research.md](../../rfc/RFC-0021/research.md) |
+| Accepted | 2026-07-28 | [RFC-0021](../../rfc/RFC-0021/) | [RFC-0021 research.md](../../rfc/RFC-0021/research.md) |
+
+> Supersedes the deployment half of
+> [ADR-002](../ADR-002-deploy-temporal-via-operator/) (deploy Temporal via the
+> alexandrevilain operator). ADR-001 (adopt Temporal) stands unchanged.
 
 ## Context
 
 RFC-0021 phase 3 moves the order saga's stock writes from product-service to
-inventory-service. `OrderFulfillmentWorkflow` histories in flight at the moment
-the new worker deploys **must replay exactly the old call graph** (Product
-`ReserveStock`/`ReleaseStock`, no `CommitInventory`), while new workflows take
-the Inventory path. Temporal offers two sanctioned mechanisms:
+inventory-service. Workflows already in flight when the new worker rolls out
+**must keep executing the old call graph** (Product `ReserveStock`/`ReleaseStock`,
+no `CommitInventory`), while new workflows take the Inventory path. Temporal
+offers two sanctioned mechanisms:
 
-- **Worker Versioning** (Worker Deployment Versions / Build IDs) — the approach
-  official docs recommend for production rollouts: whole worker deployments are
-  versioned and the server routes each workflow to a compatible build.
-- **Patching (`workflow.GetVersion`)** — an in-workflow marker: the first
-  execution records a version in history; replays read it back, so one worker
-  binary serves both call graphs deterministically.
+- **Worker Versioning** — Worker Deployment Versions: each worker build declares
+  a deployment name + build ID, the server pins every workflow to the version
+  that started it, and routes its tasks only to workers of that version. The
+  workflow code carries no migration branches.
+- **Patching (`workflow.GetVersion`)** — an in-workflow marker recorded in
+  history; one binary serves both call graphs, and the branch stays in the code
+  until every old history has drained.
 
-The platform constraint is decisive and was verified against current docs
-(Context7, 2026-07-27): Worker Versioning requires **Temporal Server ≥ 1.29.1**
-(Go SDK ≥ 1.35, CLI ≥ 1.4.1). The platform runs server **1.24.2** managed by the
-alexandrevilain temporal-operator, whose compatibility matrix — including its
-latest release — supports Temporal **1.18.x–1.28.x** only. Worker Versioning is
-therefore **hard-blocked upstream** today: no operator version can run a 1.29
-server. (Upstream is moving: operator PR #987 adds 1.29 support.)
+Worker Versioning is what current Temporal docs recommend for production
+rollouts. Its floor (verified 2026-07-27; re-platform decided 2026-07-28): **server ≥ 1.29.1**, Go SDK ≥ 1.35
+(platform is on 1.44/1.45 ✔), CLI ≥ 1.4.1, UI ≥ 2.38.
+
+The blocker was the deployment stack, not the SDK: the platform ran Temporal
+**1.24.2** under the alexandrevilain temporal-operator, whose compatibility
+matrix — including its latest release — supports **1.18.x–1.28.x** only. No
+operator version can run a 1.29+ server, so Worker Versioning was unreachable
+while the operator owned the deployment. Meanwhile the official
+`temporalio/helm-charts` chart 1.6.0 ships server **1.31.2**.
 
 A third, tempting-but-wrong option exists because the saga calls activities by
 method identity on a shared struct: silently repointing `Activities.Product` at
@@ -40,74 +48,118 @@ mid-flight — a correctness trap, not a migration.
 
 ## Decision
 
-**Now (phase 3):** version the workflow with **`workflow.GetVersion`**:
+**Re-platform Temporal onto the official chart, then version with Worker
+Versioning.**
 
-- One marker at the top of `OrderFulfillmentWorkflow`:
-  `workflow.GetVersion(ctx, "inventory-extraction-v1", workflow.DefaultVersion, 1)`.
-- A new optional input field `StockParticipant` (`""`/`"product"` | `"inventory"`),
-  stamped **at start time** by the order API from `ORDER_STOCK_PARTICIPANT`
-  (flagx enum, default `product`) in the single `fulfillment.Start` seam. The
-  worker never reads the flag — its behavior is input-driven, so the participant
-  is **pinned per workflow**: a flag revert only redirects *new* workflows; a
-  workflow that reserved in Inventory always compensates/commits in Inventory.
-- The Inventory branch uses **new activities** (`ReserveInventory`,
-  `ReleaseInventory`, `CommitInventory`); the Product branch stays byte-for-byte
-  today's call graph. `Activities.Product` is never repointed.
-- The two mechanisms split responsibilities: `GetVersion` protects **history
-  compatibility** (an old binary that picks up a v1 history fails the workflow
-  task loudly and Temporal retries it onto a capable worker — corruption becomes
-  retry); the input field selects the branch for **new** workflows.
-- A replay-test corpus (real exported histories in `internal/saga/testdata/`)
-  lands **before** any workflow change and gates every later saga PR.
-
-**Later (target):** adopt **Worker Versioning** when it becomes runnable here.
-To keep that path warm without betting the migration on upstream timing, the
-platform keeps the temporal-operator as-is and **stages the official
-`temporalio/helm-charts` deployment alongside it, fully commented out — never
-deployed** (`kubernetes/infra/controllers/temporal/`). **Revisit triggers:**
-temporal-operator releases 1.29 support (PR #987) *or* the staged official chart
-is promoted; either unlocks server ≥ 1.29.1 and reopens this decision.
+1. **Deployment.** `kubernetes/infra/configs/temporal/helmrelease.yaml` runs the
+   official chart (pinned `1.6.0`, server 1.31.2). The operator HelmRelease and
+   the `TemporalCluster`/`TemporalNamespace` CRs are commented out in place
+   (`controllers/temporal/`, `configs/temporal/cluster.yaml`, `namespace.yaml`)
+   so a rollback has the exact prior manifests (the data half of a rollback is a
+   PITR — see Consequences). Carried over unchanged: persistence
+   on the CNPG `platform-db` (`temporal` + `temporal_visibility`, pre-created by
+   postInitSQL, `createDatabase: false` because the role has no CREATEDB),
+   `numHistoryShards: 512`, the `platform-db-temporal-secret` ESO secret, and —
+   critically — the Service name **`temporal-frontend`**, so every service's
+   `TEMPORAL_HOSTPORT` is untouched. The `mop` namespace moves from the retired
+   CRD to the chart's namespace Job (same 168h retention); the Web UI Service
+   becomes `temporal-web` (ingress updated). `schema.useHelmHooks: false` because
+   Flux does not reconcile Helm hooks.
+2. **Versioning.** Worker builds declare a Worker Deployment Version
+   (`pkg/temporalx` gains the options; consumers opt in by env). The stock-write
+   migration ships as a new build: existing workflows stay pinned to the old
+   version and drain there, new workflows start on the new version and take the
+   Inventory path. Two worker deployments run side by side during the cutover
+   window until the old version has no open workflows.
+3. **Participant stays pinned in the workflow input.** `ORDER_STOCK_PARTICIPANT`
+   (flagx enum, default `product`) is read by the order **API** and stamped into
+   the workflow input at the single `fulfillment.Start` seam. The worker never
+   reads the flag, so a flag revert only redirects *new* workflows — a workflow
+   that reserved in Inventory always compensates/commits in Inventory.
+4. **New activity names.** The Inventory branch calls `ReserveInventory`,
+   `ReleaseInventory`, `CommitInventory`. `Activities.Product` is never
+   repointed.
+5. **The replay corpus stays.** Real exported histories in
+   `order-service/internal/saga/testdata/` are replayed by `go test` on every
+   saga change. Worker Versioning protects *running* workflows; the corpus is the
+   pre-merge check that a change is history-compatible at all, and the safety net
+   if a build ever ships unversioned.
 
 ## Alternatives considered
 
-- **Worker Versioning now.** Pros: official production recommendation; clean
-  build routing; no in-code markers. Cons: **infeasible** — requires server
-  ≥ 1.29.1; the operator (any version) caps at 1.28.x; adopting it would mean
-  abandoning the operator (losing `TemporalNamespace`/CRD conveniences) and a
-  self-managed migration project before any phase-3 work. Rejected for now,
-  recorded as the target.
-- **Repoint `Activities.Product` at inventory (no versioning).** Pros: smallest
-  diff. Cons: silently changes the stock authority of in-flight sagas — replays
-  look deterministic while the side effects moved; compensation could release on
-  a service that never reserved. Rejected as a correctness trap.
-- **Input-field branching only (no `GetVersion`).** Pros: one mechanism. Cons:
-  no protection against rolling-deploy skew or an accidental worker rollback to
-  a binary without the branch — an old binary would replay a v1 history down the
-  product path *silently*. The marker makes that failure loud. Rejected.
-- **Replace the operator with the official helm chart now.** Pros: unlocks
-  1.29+. Cons: a standalone infra migration (datastore, namespace, TLS, CRD
-  conveniences lost) gating the entire write path on it. Rejected; staged
-  commented-out instead.
+- **`workflow.GetVersion` patching (with the operator kept).** Pros: no
+  infrastructure change; smallest blast radius; the mechanism was already
+  designed for this migration. Cons: keeps the platform on a server line that
+  cannot do Worker Versioning at all, so *every* future workflow migration pays
+  the marker tax; markers accumulate in workflow code and can only be removed
+  after full history drain. Rejected once the re-platform put Worker Versioning
+  in reach — the owner chose to unblock the mechanism rather than work around it.
+- **Keep the operator, wait for upstream 1.29 support**
+  (alexandrevilain/temporal-operator#987). Pros: no migration work; keeps the
+  `TemporalNamespace`/CRD conveniences. Cons: blocks phase 3 on an unmerged
+  upstream PR with no timeline. Rejected.
+- **Repoint `Activities.Product` at inventory (no versioning at all).** Pros:
+  smallest diff. Cons: silently changes the stock authority of in-flight sagas —
+  replays look deterministic while the side effects moved, and compensation could
+  release against a service that never reserved. Rejected as a correctness trap.
+- **Official chart's bundled Postgres.** Rejected: every other database on the
+  platform is CNPG-managed with Barman backups; a chart-bundled Postgres would be
+  an unmanaged exception.
 
 ## Consequences
 
-- One worker binary carries **both branches** until the phase-4 gates (old-path
-  telemetry zero + open-workflow count zero + retention expired) — removing the
-  `DefaultVersion` branch earlier would strand replayable histories. The
-  `GetVersion` marker is one-way: never deploy a worker build without both
-  branches (encoded in RUNBOOK-007).
-- Deploy order is a hard rule: the v1-capable worker rolls out **before** any
-  manifest sets `ORDER_STOCK_PARTICIPANT=inventory`.
-- The replay corpus becomes a standing merge gate for `internal/saga` — a small
-  ongoing cost that pays for itself at every worker deploy.
-- The staged official chart is inert (commented out, not in any kustomization);
-  it documents the upgrade path at zero runtime cost, but is one more artifact
-  to keep loosely in sync.
-- **Trade-off accepted:** `GetVersion` markers accumulate in workflow code and
-  each future migration adds another; Worker Versioning would centralize this.
-  That debt is bounded (this is the platform's first marker) and the exit path
-  is recorded above.
+- **Lost with the operator:** the `TemporalCluster`/`TemporalNamespace` CRDs and
+  their reconciliation, the cert-manager-backed admission webhook (and the
+  `cert-manager-local` dependency it forced), and CRD-based Flux health checks.
+  Temporal health is now the HelmRelease plus the frontend Deployment;
+  helm-controller waits for release resources by default, so a Ready HelmRelease
+  also means the namespace Job completed — preserving the ordering guarantee
+  `apps-local` relied on (the order worker dials namespace `mop` at startup).
+- **Gained:** server 1.31.2 (Worker Versioning capable), upstream-supported
+  chart, no webhook to keep alive, and namespace/search-attribute management
+  through chart values instead of a CRD.
+- **Migration cost:** search attributes (RFC-0021 P3) must now be registered via
+  chart values or an admin-tools job rather than `customSearchAttributes` on the
+  CRD; `pkg/temporalx` must grow versioning options (cross-cutting — every
+  service that runs a worker consumes it) and needs a new release.
+- **Operationally heavier cutover than a marker:** Worker Versioning means
+  running two worker deployments during the window and watching the old version
+  drain, instead of one binary with a branch. That is the trade accepted for a
+  mechanism that does not leave residue in workflow code.
+- **Data note:** the Kind cluster is rebuilt per `make up`, so the re-platform
+  lands as a fresh install against the pre-created databases; there is no
+  1.24→1.31 in-place history migration to prove. A long-lived cluster would need
+  a sequential server-version upgrade path instead — recorded here so nobody
+  assumes this jump is generally safe.
+- **Prune order matters on a LIVE cluster.** Applying this change to a cluster
+  that is already running the operator means Flux prunes both the `TemporalCluster`
+  /`TemporalNamespace` CRs and the operator that reconciles them. If the operator
+  goes first, CR deletion can hang on its finalizers with no controller left to
+  clear them, stalling the Kustomization. On such a cluster, delete the CRs
+  **while the operator is still running**, then apply. The platform's Kind cluster
+  is rebuilt per `make up`, so the practical path here is a fresh install with
+  nothing to prune (verified: no Kind cluster exists at the time of this change).
+- **Verification is deferred:** Temporal is not running on a live cluster right
+  now, so this ADR's manifests are proven by `helm template` + `make validate`
+  only. First live proof comes at the next `make up` (the RFC-0021 final
+  acceptance audit).
 
 ---
 
-_Last updated: 2026-07-27_
+**Rollback is not manifest-only.** Un-commenting the operator manifests restores
+the control plane, but the chart's schema job upgrades `temporal` +
+`temporal_visibility` to the 1.31.2 schema, which a 1.24.2 server cannot read. A
+genuine rollback therefore needs a `platform-db` point-in-time restore of both
+databases to a pre-upgrade timestamp, then the manifest revert — in that order.
+
+**Revision note (same day).** This ADR first recorded the opposite decision:
+`GetVersion` patching, operator retained, official chart staged commented-out as
+a future path — because Worker Versioning looked hard-blocked upstream. The owner
+then chose to remove the block by re-platforming onto the official chart, so the
+decision was rewritten in place before any implementation landed. The superseded
+staging artifact (`controllers/temporal/official-chart-staged.yaml`) is deleted;
+the operator manifests remain commented out for rollback.
+
+---
+
+_Last updated: 2026-07-28_

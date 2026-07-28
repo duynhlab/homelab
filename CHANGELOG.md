@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **inventory-service pinned to `0.2.2`** — the Deployment was in `Init:CrashLoopBackOff` on the cluster (59 restarts): its init container runs `migrate` with only `DB_*` env, the same contract product/order/checkout run under, while `0.1.0` validated the full config before dispatching and panicked on `SERVICE_NAME`. Found by the RFC-0021 P3 cluster audit, fixed in inventory-service#13, released as `v0.2.2`.
+- **inventory backfill CronJob image reference** — it pointed at `ghcr.io/duynhlab/inventory-service/inventory:v0.2.1`, which does not exist: the repo publishes `…/inventory-service/inventory-service` tagged without the leading `v` (GHCR returns 404 for the old path). The CronJob is suspended, so the bad pull would have surfaced the first time it was resumed — inside the write-cutover window, which is the worst possible moment.
+
 ### Changed
 
 - **Karma and the Sloth UI ship at 0 replicas** — both are browse-on-demand tools (Karma reads the VMAlertmanager API, the Sloth UI reads the same VMSingle as Grafana), so neither needs to hold cluster resources idle. No Flux health check references them and the Sloth PodMonitor simply finds no targets while scaled down. Alerting and SLO rule generation are unaffected — only the interactive views are off. Scale to 1 (`kubectl scale deploy/{karma,sloth-ui} -n monitoring --replicas=1`) when triaging; noted in the alerting and SLO docs where the runbooks point at them.

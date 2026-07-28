@@ -48,7 +48,14 @@ spec:
               type: RuntimeDefault
           containers:
             - name: backfill
-              image: ghcr.io/duynhlab/inventory-service/inventory:v0.2.1
+              # The repo's build workflow publishes ONE image,
+              # ghcr.io/duynhlab/inventory-service/inventory-service, tagged with
+              # the git tag minus its `v`. The previous reference here
+              # (…/inventory:v0.2.1) was wrong on both counts and does not exist
+              # — GHCR returns 404 for that package. It never surfaced because
+              # this CronJob is suspended, so the pull would have failed the
+              # first time it was resumed: inside the write-cutover window.
+              image: ghcr.io/duynhlab/inventory-service/inventory-service:0.2.3
               args: ["backfill", "--apply"]
               env:
                 # Inventory DB (WRITE) — direct to the CNPG primary, like migrations.

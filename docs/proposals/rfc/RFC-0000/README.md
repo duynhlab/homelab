@@ -8,8 +8,9 @@
 | provisional | platform-wide | [./research.md](./research.md) — gate passed YYYY-MM-DD | YYYY-MM-DD | YYYY-MM-DD |
 
 <!--
-Status: one of provisional, implementable, implemented, deferred, rejected, withdrawn, replaced.
+Status: one of provisional, Accepted, implemented, deferred, rejected, withdrawn, replaced.
         (Use researching in the index only while research.md exists without this README.)
+        Legacy index rows may still say implementable — equivalent to Accepted.
 Scope:  one of infra | service:<name> | platform-wide.
 Research: link to ./research.md in this folder — required before provisional.
 Created / Last updated: YYYY-MM-DD.
@@ -28,7 +29,7 @@ Created / Last updated: YYYY-MM-DD.
 - Context7 audit complete (see research footer)
 - Owner approved **ready for RFC**
 - **Do not** repeat the mechanism deep-dive here — summarize and link `./research.md`
-- When Status → **`implementable`**: list expected [`docs/api/`](../../../api/README.md) files to touch (or N/A — infra-only)
+- When Status → **`Accepted`**: list expected ADR folder(s) under [`docs/proposals/adr/`](../../adr/) and expected [`docs/api/`](../../../api/README.md) files to touch (or N/A — infra-only)
 
 ## Summary
 
@@ -114,13 +115,28 @@ and how to roll back safely.
 
 <!-- How the change is validated end-to-end (tests, drills, manual checks). -->
 
+## Resulting decisions
+
+<!--
+During architecture review, split independent decisions into separate ADRs.
+Create each ADR at Proposed (copy ADR-0000-template); link here.
+On approval: RFC → Accepted; each ADR → Accepted; Adoption → Not started.
+See adr/README.md § RFC Resulting decisions.
+-->
+
+| Decision | ADR | Status |
+|----------|-----|--------|
+| {one-line decision} | [ADR-NNN](../../adr/ADR-NNN-slug/) | Proposed |
+
 ## Implementation History
 
 <!--
 Major milestones: first release with an initial version; GA; retirement/supersession.
 When Status → implemented, confirm:
+- [ ] Linked ADR(s) Adoption → Complete (or Partial with note)
 - [ ] docs/api/ synced (or N/A — infra-only) — routes/RPCs/ownership/rollup + Design records links
-- [ ] ADR(s) spawned under docs/proposals/adr/
+- [ ] Runbooks updated when ops-relevant (topic-dependent path)
+- [ ] Resulting decisions table reflects final ADR status
 -->
 
 ## Related
@@ -128,7 +144,7 @@ When Status → implemented, confirm:
 - [./research.md](./research.md) — plain-language research and Context7 audit trail
 - <!-- Optional: docs/<area>/<topic>/README.md if spun off -->
 - <!-- docs/api/{service}.md — as-built contract after implemented -->
-- <!-- ADRs spawned when implemented -->
+- <!-- ADRs linked in Resulting decisions (Proposed at review, Accepted with RFC) -->
 - <!-- Linked PRs -->
 
 ---

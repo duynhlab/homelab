@@ -36,8 +36,9 @@ diagram *before* anyone builds it. Examples:
 | **Domain doc** (optional) | `docs/<area>/<topic>/README.md` | [`AGENTS.md`](../../../AGENTS.md) docs conventions | How does it work **in this platform**? |
 
 **Flow:** real-world problem in `research.md` → [research review gate](RFC-0000/research.md#research-review-gate)
-→ `README.md` → optional domain doc → implement → sync [`docs/api/`](../../api/README.md) when
-API-touching → ADR(s) under [`adr/`](../adr/).
+→ `README.md` → architecture review → ADR(s) at **`Proposed`** → **`Accepted`** →
+implement → sync [`docs/api/`](../../api/README.md) → runbooks (when ops-relevant).
+Full ADR process: [`adr/README.md`](../adr/README.md).
 
 1. **Reserve number (owner OK required)** — propose the exact next slot (e.g. **RFC-0019**
    = `max(RFC-NNNN) + 1`; do not backfill gaps unless the owner asks). On approval, in
@@ -52,15 +53,25 @@ API-touching → ADR(s) under [`adr/`](../adr/).
    research; link both ways; register in [`docs/README.md`](../../README.md) and the area
    index. Follow [`AGENTS.md`](../../../AGENTS.md) docs conventions (house shape, English,
    **planned** vs **deployed**).
-5. **Implement** → Status `implemented` → spawn ADR(s) under [`adr/`](../adr/).
-6. **Sync `docs/api/` (API-touching)** — in the same PR or an immediate follow-up before
-   or when Status becomes **`implemented`**:
+5. **Architecture review** — identify independent decisions; create ADR(s) under
+   [`adr/`](../adr/) at **`Proposed`** (copy [`ADR-0000-template/`](../adr/ADR-0000-template/));
+   fill RFC [**Resulting decisions**](RFC-0000/README.md#resulting-decisions) table.
+6. **On approval** — RFC → **`Accepted`**; linked ADR(s) → **`Accepted`**; ADR
+   **Adoption** → **`Not started`**. Legacy index rows labelled **`implementable`** mean
+   the same as **`Accepted`**.
+7. **Implement** → RFC Status **`implemented`**; ADR **Adoption** → Partial/Complete;
+   append **Implementation History** and PR links.
+8. **Sync `docs/api/` (API-touching)** — when Adoption is **Complete** / RFC is
+   **`implemented`**:
    - Map the change → owning file(s) via [`docs/api/README.md` § Document Ownership](../../api/README.md#document-ownership).
    - Update **Design records** on service Identity tables; hub rollup and At a glance rows when deploy/transport changes.
    - Service files touched use [`_template-service.md`](../../api/_template-service.md) v2 (no full backfill of legacy v1 contracts required).
    - Reuse Mermaid from the RFC when helpful — label *As-built contract* vs *Target state*; tag **planned** behaviour accurately.
-   - Link back from RFC **Related** and spawned ADR **Consequences**.
+   - Link back from RFC **Related** and spawned ADR **References**.
    Infra-only RFCs update platform docs instead; skip `docs/api/` unless app contracts change.
+9. **Runbooks** — add or update area runbooks when the change introduces meaningful
+   operational failure modes (topic-dependent paths under `docs/observability/runbooks/`,
+   `docs/databases/runbooks/`, …).
 
 Keep diagrams/assets **inside the RFC folder** (or the chosen domain doc path). Mermaid
 may repeat across artifacts — label each diagram's question (*Mechanism*, *Target state*,
@@ -74,12 +85,15 @@ for its own sake.
 | Status | Meaning |
 |--------|---------|
 | **researching** | Number reserved; only `research.md` exists (title may be TBD) |
-| **provisional** | `README.md` exists; decision under review |
-| **implementable** | Design settled; ready to build |
-| **implemented** | Shipped |
+| **provisional** | `README.md` exists; under architecture review |
+| **Accepted** | Review passed; linked ADR(s) Accepted; ready to implement |
+| **implemented** | Shipped; track in Implementation History |
 | **superseded** | Replaced by a later RFC or approach |
 | **deferred** · **rejected** · **withdrawn** · **replaced** | See RFC body |
 | **template** | Copy source only ([`RFC-0000/`](RFC-0000/)) |
+
+> **Legacy index label:** some rows still say **`implementable`** — equivalent to
+> **`Accepted`**. Do not bulk-rename live RFC folders in drive-by PRs.
 
 ## Index
 
@@ -133,4 +147,4 @@ when someone starts research (owner OK → `research.md` → index `researching`
 > [RFC-0001](RFC-0001/) (not a separate backlog row).
 
 ---
-_Last updated: 2026-07-23_
+_Last updated: 2026-07-28_

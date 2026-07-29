@@ -1,70 +1,420 @@
 # Architecture Decision Records (ADRs)
 
-An **ADR** records a significant technical decision: the *context* that forced it, the *decision*
-itself, the *alternatives* we rejected (and why), and the *consequences* we accepted. They capture
-the **why** that code and manifests can't — so future engineers (and agents) don't re-litigate
-settled decisions.
+Short, structured records of **one durable architectural decision** — the context
+that forced it, the alternatives rejected, the trade-offs accepted, and the rules
+code must follow. ADRs capture the **why** that manifests and service contracts
+cannot.
 
-> **ADR vs RFC vs research:** an [RFC](../rfc/) *proposes* a substantial change after
-> [`research.md`](../rfc/RFC-0000/research.md) exploration; an ADR *records* the decision
-> it produced. Link **Related research** for mechanism background — do not re-copy the
-> deep dive in **Context**. An accepted RFC typically spawns one or more ADRs.
+| Quick facts | |
+|---|---|
+| Copy source | [`ADR-0000-template/`](ADR-0000-template/) (template v2) |
+| Proposals hub | [`docs/proposals/README.md`](../README.md) |
+| RFC process | [`rfc/README.md`](../rfc/README.md) |
+| As-built contracts | [`docs/api/`](../../api/README.md) |
+| Runbooks (by topic) | [`docs/observability/runbooks/`](../../observability/runbooks/), [`docs/databases/runbooks/`](../../databases/runbooks/) |
 
-## Conventions
+## Contents
 
-- One folder per decision: `ADR-NNN-short-slug/README.md` (mirrors the RFC layout —
-  keep any per-ADR diagrams/assets inside the folder), numbered sequentially. Start
-  from [`ADR-0000-template/`](ADR-0000-template/).
-- Format (Nygard style): `| Status | Date | Related RFC | Related research |` metadata
-  table at the top, then **Context · Decision · Alternatives considered · Consequences**.
-  Related research = `RFC-NNNN/research.md` when the RFC had a research phase, or `—`.
-- **Every decision is a tradeoff** — always record the rejected *Alternatives* (and why) and the *Consequences* you accept (the bad as well as the good). A decision with no downside listed hasn't been examined hard enough.
-- **Lifecycle:** `Proposed → Accepted → (Superseded by ADR-XXX | Deprecated)`.
-- **docs/api sync (API-touching):** when Status becomes **Accepted**, update
-  [`docs/api/`](../../api/README.md) in the same PR or an immediate follow-up —
-  map files via [Document Ownership](../../api/README.md#document-ownership), set
-  **Design records** links on service Identity tables, and refresh the hub rollup when
-  deploy status changes. The ADR keeps *why*; the service contract keeps routes, RPCs,
-  payloads, and implementation status. Diagram reuse from the ADR or RFC is OK when
-  cross-linked. Infra-only ADRs update platform docs instead.
-- **Append-only:** don't rewrite history. When a decision changes, write a new ADR that supersedes
-  the old one and update the old one's Status.
+- [Artifact roles](#artifact-roles)
+- [Lifecycle](#lifecycle)
+- [Process](#process)
+- [When to create an ADR](#when-to-create-an-adr)
+- [One decision per ADR](#one-decision-per-adr)
+- [Status and Adoption](#status-and-adoption)
+- [Append-only rules](#append-only-rules)
+- [Naming and layout](#naming-and-layout)
+- [RFC Resulting decisions](#rfc-resulting-decisions)
+- [Review checklist](#review-checklist)
+- [Common mistakes](#common-mistakes)
+- [Definition of Done](#definition-of-done)
+- [Illustrative splits](#illustrative-splits)
+- [Records index](#records-index)
 
-## Index
+---
 
-| ADR | Title | Status | Related RFC |
-|-----|-------|--------|-------------|
-| [ADR-001](ADR-001-adopt-temporal-for-order-fulfillment/) | Adopt Temporal for order fulfillment | Accepted | [RFC-0001](../rfc/RFC-0001/) |
-| [ADR-002](ADR-002-deploy-temporal-via-operator/) | Deploy Temporal via the alexandrevilain operator | Superseded by [ADR-030](ADR-030-temporal-workflow-versioning/) | [RFC-0001](../rfc/RFC-0001/) |
-| [ADR-003](ADR-003-jwt-validation-in-services-not-kong/) | Keep JWT validation in services, not the Kong gateway | Superseded by [ADR-006](ADR-006-rs256-jwt-kong-edge-auth/) | — |
-| [ADR-004](ADR-004-enable-openbao-audit-logging/) | Enable OpenBAO audit logging | Accepted | — |
-| [ADR-005](ADR-005-openbao-ha-raft/) | Run OpenBAO HA (Raft) instead of Vault dev mode | Accepted | — |
-| [ADR-006](ADR-006-rs256-jwt-kong-edge-auth/) | Adopt RS256 signed JWTs + Kong edge authentication | Accepted | [RFC-0009](../rfc/RFC-0009/) |
-| [ADR-007](ADR-007-double-entry-payment-ledger/) | Record money movement in an append-only double-entry ledger | Accepted | [RFC-0010](../rfc/RFC-0010/) |
-| [ADR-008](ADR-008-mockpay-standalone-provider/) | Run the mock payment provider as a standalone process | Accepted | [RFC-0010](../rfc/RFC-0010/) |
-| [ADR-009](ADR-009-saga-authorize-early-capture-late/) | Authorize payment early, capture late in the order saga | Accepted | [RFC-0010](../rfc/RFC-0010/) |
-| [ADR-010](ADR-010-shared-idempotency-library/) | Extract idempotency into a shared pkg/idempotency library | Accepted | [RFC-0010](../rfc/RFC-0010/) |
-| [ADR-011](ADR-011-detect-only-reconciliation/) | Ship reconciliation detect-only; defer auto-heal | Accepted (heal for one class added by [ADR-012](ADR-012-reconciliation-auto-heal/)) | [RFC-0010](../rfc/RFC-0010/) |
-| [ADR-012](ADR-012-reconciliation-auto-heal/) | Auto-heal one reconciliation class — the lost-capture-response window | Accepted | [RFC-0010](../rfc/RFC-0010/) |
-| [ADR-013](ADR-013-per-service-db-triplet/) | Per-service database triplet (ExternalSecret + DatabaseRole + Database) on cnpg-db | Accepted | [RFC-0012](../rfc/RFC-0012/) |
-| [ADR-014](ADR-014-pooler-credentials-valuesfrom/) | PgDog pooler credentials via Flux valuesFrom targetPath | Accepted | [RFC-0012](../rfc/RFC-0012/) |
-| [ADR-015](ADR-015-pg-hba-connection-isolation/) | Database connection isolation via declarative pg_hba | Accepted | [RFC-0012](../rfc/RFC-0012/) |
-| [ADR-016](ADR-016-otel-metrics-cutover/) | Metrics cutover to the OTLP push pipeline | Accepted | [RFC-0014](../rfc/RFC-0014/) |
-| [ADR-017](ADR-017-api-path-collection-noun/) | Collection-noun segment after the audience in every API path | Accepted | — |
-| [ADR-018](ADR-018-checkout-order-boundary/) | Order stays the only orders-writer; checkout hands off via CreateOrder gRPC | Accepted | [RFC-0015](../rfc/RFC-0015/) |
-| [ADR-019](ADR-019-session-expiry-model/) | Session expiry = durable timer (wake-up) + lazy backstop (authority) | Accepted | [RFC-0015](../rfc/RFC-0015/) |
-| [ADR-020](ADR-020-checkout-revalidation-policy/) | Product is the checkout price authority; stock checked, never reserved | Accepted | [RFC-0015](../rfc/RFC-0015/) |
-| [ADR-021](ADR-021-cart-grpc-read-surface/) | Cart gains a read-only gRPC surface; writes stay on REST | Accepted | [RFC-0015](../rfc/RFC-0015/) |
-| [ADR-022](ADR-022-atomic-promo-redemption/) | Promo redemptions count atomically at confirm, before the attempt marker | Accepted | [RFC-0015](../rfc/RFC-0015/) |
-| [ADR-023](ADR-023-clickhouse-observability-olap/) | Adopt ClickHouse as supplementary OLAP for OTel logs+traces SQL (Altinity, PVC, 90d, alongside) | Accepted | [RFC-0019](../rfc/RFC-0019/) |
-| [ADR-024](ADR-024-floci-kms-emulator-auto-unseal/) | floci KMS-emulator `seal "awskms"` auto-unseal for OpenBAO on Kind + revoke root token (replaces Shamir CronJob) | Accepted | [RFC-0008](../rfc/RFC-0008/) |
-| [ADR-025](ADR-025-pgdog-passthrough-dynamic-db-creds/) | PostgreSQL credential delivery & role model — isolation (db- vs schema-per-service), role tiering, static/rotated/dynamic spectrum, pooler auth modes (incl. PgDog passthrough PoC) | Proposed | [RFC-0008](../rfc/RFC-0008/), [RFC-0012](../rfc/RFC-0012/) |
-| [ADR-026](ADR-026-platform-db-pgbouncer-pilot/) | Pilot CNPG-native PgBouncer pooler on platform-db (product-db stays PgDog); operator-managed auth_query | Proposed | [RFC-0012](../rfc/RFC-0012/) |
-| [ADR-027](ADR-027-inventory-sole-stock-authority/) | inventory-service is the platform's sole stock authority (supersedes RFC-0003's product-owned stock); foundation shipped, cutover realized over RFC-0021 phases 2–4 | Accepted | [RFC-0021](../rfc/RFC-0021/) |
-| [ADR-028](ADR-028-inventory-reservation-model/) | Inventory reservation & balance model — derived ATP, RESERVED→COMMITTED\|RELEASED\|EXPIRED FSM with claim-via-row idempotency, append-only movement ledger, one-order-one-warehouse | Accepted | [RFC-0021](../rfc/RFC-0021/) |
-| [ADR-029](ADR-029-enum-feature-flag-helper/) | Adopt `pkg/flagx` as the platform feature-flag helper — startup-validated enum/percent env flags for reversible rollout gates (first consumer: checkout `CHECKOUT_AVAILABILITY_SOURCE`, P2-4) | Accepted | [RFC-0021](../rfc/RFC-0021/) |
-| [ADR-030](ADR-030-temporal-workflow-versioning/) | Adopt Temporal **Worker Versioning** for the saga stock migration + re-platform onto the official `temporalio/helm-charts` (server 1.31.2) — the operator capped at 1.28.x; participant pinned in workflow input; replay corpus retained | Accepted (supersedes [ADR-002](ADR-002-deploy-temporal-via-operator/) deployment half) | [RFC-0021](../rfc/RFC-0021/) |
-| [ADR-031](ADR-031-fulfillment-start-outbox/) | Start the fulfillment saga through a transactional outbox — the order row and the intent to start commit together; inline start stays for latency, a leased dispatcher retries what it could not start, exactly-once enforced at three layers (default REJECT_DUPLICATE, the SDK's AlreadyStarted error, and describing the existing run) | Accepted | [RFC-0021](../rfc/RFC-0021/) |
+## Artifact roles
+
+Each document type answers one question. Do not merge responsibilities.
+
+| Document | Primary question |
+|----------|------------------|
+| [`research.md`](../rfc/RFC-0000/research.md) | How does this mechanism, product, or pattern work? |
+| [RFC](../rfc/) | What change do we **propose** for the system? |
+| **ADR** (this directory) | What did we **decide**, and which trade-offs did we accept? |
+| Planning (RFC rollout, epic, optional `RFC-NNNN/implementation.md`) | How do we **schedule** implementation phases and PRs? |
+| [`docs/api/{service}.md`](../../api/README.md) | How does the system **run today** (as-built)? |
+| Runbook | When something fails or drifts, how do we **operate** it? |
+
+Mnemonic:
+
+```text
+Research = background knowledge
+RFC      = proposal record
+ADR      = decision record
+Planning = construction schedule
+API docs = as-built contract
+Runbook  = operations playbook
+```
+
+**ADR is not:** a long research essay, a full target design (that is the RFC), a
+task list, an API contract, a runbook, or a repository changelog.
+
+### RFC and ADR cardinality
+
+RFC and ADR are **not** 1:1. One RFC may spawn zero, one, or many ADRs. Each ADR
+records **one** decision that could stand or be superseded on its own.
+
+An RFC may spawn **no** ADR when the proposal is rejected or withdrawn, the change
+is pure implementation detail, no durable architectural constraint remains, no
+meaningful alternative needs recording, or an existing ADR already covers the
+decision.
+
+A **standalone ADR** (no RFC) is fine when scope is small, the problem is clear,
+few alternatives exist, and no large rollout plan is needed.
+
+---
+
+## Lifecycle
+
+```mermaid
+flowchart LR
+    Problem["Problem / Opportunity"] --> Research["Research<br/>facts and mechanisms"]
+    Research --> RFC["RFC<br/>proposed target design"]
+    RFC --> Review{"Architecture review"}
+
+    Review -->|"Rejected / withdrawn"| Archive["Archive RFC<br/>with reason"]
+    Review -->|"Accepted"| ADR1["ADR-A<br/>decision 1"]
+    Review -->|"Accepted"| ADR2["ADR-B<br/>decision 2"]
+    Review -->|"Accepted"| ADR3["ADR-C<br/>decision 3"]
+
+    ADR1 --> Implementation["Implementation<br/>code + tests"]
+    ADR2 --> Implementation
+    ADR3 --> Implementation
+
+    Implementation --> Contracts["Service contracts<br/>docs/api — as-built"]
+    Implementation --> Runbooks["Runbooks<br/>by topic"]
+    Implementation --> History["RFC implementation status<br/>PRs and result"]
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+
+    class Problem,Research edge;
+    class RFC,Review platform;
+    class ADR1,ADR2,ADR3 service;
+    class Implementation worker;
+    class Contracts,Runbooks,History data;
+    class Archive external;
+```
+
+---
+
+## Process
+
+1. Frame the problem (optionally in `research.md`).
+2. Write the RFC with target design and alternatives.
+3. During RFC review, identify **independent** architectural decisions.
+4. Create one ADR per decision at **`Proposed`** (copy [`ADR-0000-template/`](ADR-0000-template/)).
+5. On architecture approval: RFC → **`Accepted`**; linked ADR(s) → **`Accepted`**
+   (Adoption stays **`Not started`** until code lands).
+6. Implement code and tests.
+7. Update [`docs/api/`](../../api/README.md) to as-built (API-touching decisions).
+8. Update ADR **Adoption** and **History**; append RFC **Implementation History**.
+9. Add or update **runbooks** when the topic has meaningful operational failure
+   modes (observability, databases, or other area — not a single root path).
+
+**docs/api sync (API-touching):** when Adoption reaches **Complete**, owning service
+files, hub rollup, and **Design records** links must match deployed reality. The ADR
+keeps *why*; the contract keeps routes, RPCs, payloads, and status. Infra-only ADRs
+update platform docs instead.
+
+---
+
+## When to create an ADR
+
+Create an ADR when one or more of these apply:
+
+| Question | Create ADR? |
+|----------|-------------|
+| Changes service boundary or data ownership? | Yes |
+| Affects multiple repos or platform components? | Yes |
+| Expensive to reverse after shipping? | Yes |
+| Two or more credible alternatives existed? | Yes |
+| Creates long-lived constraints for code review? | Yes |
+| A newcomer may ask "why did we do this?" in six months? | Yes |
+| Touches money, security, consistency, or distributed workflows? | Yes |
+| Changes transport or workflow ownership? | Yes |
+| Significant operational trade-off? | Yes |
+
+Do **not** create an ADR for: rename-only refactors, formatting, PR splits, seed
+data tweaks, local bug fixes without boundary change, routine indexes, package moves
+without boundary change, or pure implementation tasks.
+
+---
+
+## One decision per ADR
+
+One ADR = one sentence in active voice:
+
+```text
+We will separate Inventory from Product.
+```
+
+If decision A can change while B remains valid, they belong in **separate** ADRs.
+
+**Split signal:** titles or decisions chained with *and*, *also*, *while*,
+*as well as*, *plus* — usually multiple decisions in one file.
+
+---
+
+## Status and Adoption
+
+**Decision status** and **Adoption** are independent. Do not use `Implemented` as
+an ADR status.
+
+### Decision status
+
+| Status | Meaning |
+|--------|---------|
+| `Proposed` | Under review; not yet an architectural constraint |
+| `Accepted` | Approved; authoritative for design and review |
+| `Withdrawn` | Removed before acceptance |
+| `Deprecated` | Retained for existing behavior; not for new designs |
+| `Superseded by ADR-NNN` | Replaced by a newer decision |
+
+Typical flow: `Proposed → Accepted → Superseded by ADR-NNN` (or `Deprecated`).
+
+### Adoption
+
+| Adoption | Meaning |
+|----------|---------|
+| `Not started` | No implementation work yet |
+| `Partial` | Some obligations complete (phased rollout) |
+| `Complete` | Code, tests, contracts, and required ops docs comply |
+
+Example after RFC approval: `Status: Accepted`, `Adoption: Not started`.
+
+**Legacy ADRs** (ADR-001–031 and earlier v1 shape) remain valid. They may omit
+Adoption in the file body; the index below assigns Adoption for tracking. New ADRs
+from [`ADR-0000-template/`](ADR-0000-template/) use template v2. No backfill unless
+the owner asks.
+
+---
+
+## Append-only rules
+
+After **`Accepted`**, do not silently rewrite **Decision**, **Alternatives
+considered**, **Decision drivers**, or accepted **Consequences**.
+
+Allowed updates: typos, broken links, append PRs, change **Adoption**, add **History**
+rows, mark **Deprecated** or **Superseded**.
+
+When the decision itself changes, write a **new** ADR, set `Supersedes: ADR-NNN` on
+the new record, and update the old record to `Superseded by ADR-XXX`.
+
+---
+
+## Naming and layout
+
+### Title
+
+Imperative, decision-shaped:
+
+```text
+Adopt Temporal for Order Fulfillment
+Separate Inventory from Product
+Keep Checkout as a Purchase-Funnel Orchestrator
+```
+
+Avoid topic labels: `Inventory Architecture`, `Checkout Improvements`.
+
+### Folder
+
+One folder per decision (matches RFC layout):
+
+```text
+docs/proposals/adr/ADR-NNN-imperative-kebab-slug/README.md
+```
+
+Keep per-ADR diagrams and assets inside the folder. Use the next platform-wide
+`ADR-NNN` sequence (do not reset per service).
+
+---
+
+## RFC Resulting decisions
+
+Every multi-decision RFC should link its ADRs explicitly. Add to the RFC body (see
+[`RFC-0000/README.md`](../rfc/RFC-0000/README.md#resulting-decisions)):
+
+```markdown
+## Resulting decisions
+
+| Decision | ADR | Status |
+|----------|-----|--------|
+| {one-line decision} | [ADR-NNN](../../adr/ADR-NNN-slug/) | Proposed |
+```
+
+On approval: RFC → **Accepted**; each linked ADR → **Accepted**; Adoption →
+**Not started**. After ship: update Adoption, `docs/api`, runbooks (if needed), and
+RFC Implementation History.
+
+---
+
+## Review checklist
+
+### Before review
+
+- [ ] Title is one decision, not a topic name.
+- [ ] Decision summary states benefit **and** cost.
+- [ ] Context states facts only (no chosen option).
+- [ ] In scope / Out of scope are explicit.
+- [ ] Decision drivers are prioritized.
+- [ ] Alternatives are credible (not straw men).
+- [ ] At least one meaningful negative consequence.
+- [ ] Implementation obligations, validation, and revisit triggers present.
+- [ ] Related RFC/research linked or `—`.
+- [ ] Optional diagram answers one boundary question only.
+
+### On Accept
+
+- [ ] Decision date and Deciders filled in.
+- [ ] Status → **Accepted**; Adoption → **Not started** (unless code already landed).
+- [ ] RFC **Resulting decisions** table updated.
+- [ ] History row added.
+
+### On Adoption Complete
+
+- [ ] Obligations met; tests prove decision rules.
+- [ ] `docs/api/` as-built; Design records link this ADR.
+- [ ] Runbooks updated when ops-relevant.
+- [ ] Adoption → **Complete**; History updated.
+
+### When reversing
+
+- [ ] Do not rewrite the old Decision section.
+- [ ] New ADR with `Supersedes`; old ADR → `Superseded by`.
+
+---
+
+## Common mistakes
+
+| Mistake | Fix |
+|---------|-----|
+| ADR duplicates the whole RFC | Move target design to RFC; keep one decision + rules here |
+| Context argues for the answer | State forces only; decide in **Decision** |
+| Straw-man alternatives | Record real options from RFC/research |
+| Benefits only, no costs | Fill **Negative consequences** |
+| Phase plan inside ADR | Link RFC rollout or planning doc; use **Implementation obligations** |
+| `Status: Implemented` | Use `Accepted` + `Adoption: Complete` |
+| Calendar-only revisit trigger | Use observable thresholds (scale, requirement, cost) |
+
+---
+
+## Definition of Done
+
+An ADR is not complete at compile time.
+
+```text
+Decision accepted (ADR)
+├── Implementation obligations done
+├── Unit / integration / contract / workflow tests
+├── Security and failure behavior verified
+├── docs/api updated (when API-touching)
+├── Platform topology / call graph updated
+├── Runbooks when ops-relevant
+└── Adoption = Complete
+```
+
+```mermaid
+flowchart LR
+    ADR["ADR Accepted"] --> Code["Code"]
+    Code --> Tests["Tests"]
+    Tests --> Contracts["As-built contracts"]
+    Contracts --> Ops["Runbooks / observability"]
+    Ops --> Complete["Adoption Complete"]
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    class ADR service;
+    class Code,Tests worker;
+    class Contracts,Ops,Complete data;
+```
+
+**Planned (not yet in repo):** structural ADR lint in CI (`make lint-adr`) —
+filename, required headings, status/adoption vocabulary, Mermaid render, RFC↔ADR
+backlinks.
+
+---
+
+## Illustrative splits
+
+Examples only — use the next free `ADR-NNN` when authoring; do not renumber live
+records.
+
+**Large RFC (e.g. inventory domain overhaul)** might yield:
+
+```text
+ADR-NNN — Separate Inventory from Product
+ADR-NNN — Use Reservation Balances and an Append-Only Stock Movement Ledger
+ADR-NNN — Fulfil One Order from One Warehouse in the MVP
+```
+
+**Order / Temporal RFC** might yield separate decisions for lifecycle model,
+orchestrator ownership, and confirmation pivot — because each can change without
+invalidating the others.
+
+Do **not** duplicate an existing ADR when the decision is already recorded; link
+and extend Adoption instead.
+
+---
+
+## Records index
+
+| ADR | Title | Status | Adoption | Related RFC |
+|-----|-------|--------|----------|-------------|
+| [ADR-001](ADR-001-adopt-temporal-for-order-fulfillment/) | Adopt Temporal for order fulfillment | Accepted | Complete | [RFC-0001](../rfc/RFC-0001/) |
+| [ADR-002](ADR-002-deploy-temporal-via-operator/) | Deploy Temporal via the alexandrevilain operator | Superseded by [ADR-030](ADR-030-temporal-workflow-versioning/) | Complete | [RFC-0001](../rfc/RFC-0001/) |
+| [ADR-003](ADR-003-jwt-validation-in-services-not-kong/) | Keep JWT validation in services, not the Kong gateway | Superseded by [ADR-006](ADR-006-rs256-jwt-kong-edge-auth/) | Complete | — |
+| [ADR-004](ADR-004-enable-openbao-audit-logging/) | Enable OpenBAO audit logging | Accepted | Complete | — |
+| [ADR-005](ADR-005-openbao-ha-raft/) | Run OpenBAO HA (Raft) instead of Vault dev mode | Accepted | Complete | — |
+| [ADR-006](ADR-006-rs256-jwt-kong-edge-auth/) | Adopt RS256 signed JWTs + Kong edge authentication | Accepted | Complete | [RFC-0009](../rfc/RFC-0009/) |
+| [ADR-007](ADR-007-double-entry-payment-ledger/) | Record money movement in an append-only double-entry ledger | Accepted | Complete | [RFC-0010](../rfc/RFC-0010/) |
+| [ADR-008](ADR-008-mockpay-standalone-provider/) | Run the mock payment provider as a standalone process | Accepted | Complete | [RFC-0010](../rfc/RFC-0010/) |
+| [ADR-009](ADR-009-saga-authorize-early-capture-late/) | Authorize payment early, capture late in the order saga | Accepted | Complete | [RFC-0010](../rfc/RFC-0010/) |
+| [ADR-010](ADR-010-shared-idempotency-library/) | Extract idempotency into a shared pkg/idempotency library | Accepted | Complete | [RFC-0010](../rfc/RFC-0010/) |
+| [ADR-011](ADR-011-detect-only-reconciliation/) | Ship reconciliation detect-only; defer auto-heal | Accepted (heal for one class added by [ADR-012](ADR-012-reconciliation-auto-heal/)) | Complete | [RFC-0010](../rfc/RFC-0010/) |
+| [ADR-012](ADR-012-reconciliation-auto-heal/) | Auto-heal one reconciliation class — the lost-capture-response window | Accepted | Complete | [RFC-0010](../rfc/RFC-0010/) |
+| [ADR-013](ADR-013-per-service-db-triplet/) | Per-service database triplet (ExternalSecret + DatabaseRole + Database) on cnpg-db | Accepted | Complete | [RFC-0012](../rfc/RFC-0012/) |
+| [ADR-014](ADR-014-pooler-credentials-valuesfrom/) | PgDog pooler credentials via Flux valuesFrom targetPath | Accepted | Complete | [RFC-0012](../rfc/RFC-0012/) |
+| [ADR-015](ADR-015-pg-hba-connection-isolation/) | Database connection isolation via declarative pg_hba | Accepted | Complete | [RFC-0012](../rfc/RFC-0012/) |
+| [ADR-016](ADR-016-otel-metrics-cutover/) | Metrics cutover to the OTLP push pipeline | Accepted | Complete | [RFC-0014](../rfc/RFC-0014/) |
+| [ADR-017](ADR-017-api-path-collection-noun/) | Collection-noun segment after the audience in every API path | Accepted | Complete | — |
+| [ADR-018](ADR-018-checkout-order-boundary/) | Order stays the only orders-writer; checkout hands off via CreateOrder gRPC | Accepted | Complete | [RFC-0015](../rfc/RFC-0015/) |
+| [ADR-019](ADR-019-session-expiry-model/) | Session expiry = durable timer (wake-up) + lazy backstop (authority) | Accepted | Complete | [RFC-0015](../rfc/RFC-0015/) |
+| [ADR-020](ADR-020-checkout-revalidation-policy/) | Product is the checkout price authority; stock checked, never reserved | Accepted | Complete | [RFC-0015](../rfc/RFC-0015/) |
+| [ADR-021](ADR-021-cart-grpc-read-surface/) | Cart gains a read-only gRPC surface; writes stay on REST | Accepted | Complete | [RFC-0015](../rfc/RFC-0015/) |
+| [ADR-022](ADR-022-atomic-promo-redemption/) | Promo redemptions count atomically at confirm, before the attempt marker | Accepted | Complete | [RFC-0015](../rfc/RFC-0015/) |
+| [ADR-023](ADR-023-clickhouse-observability-olap/) | Adopt ClickHouse as supplementary OLAP for OTel logs+traces SQL | Accepted | Complete | [RFC-0019](../rfc/RFC-0019/) |
+| [ADR-024](ADR-024-floci-kms-emulator-auto-unseal/) | floci KMS-emulator auto-unseal for OpenBAO on Kind | Accepted | Complete | [RFC-0008](../rfc/RFC-0008/) |
+| [ADR-025](ADR-025-pgdog-passthrough-dynamic-db-creds/) | PostgreSQL credential delivery & role model (PgDog passthrough PoC) | Proposed | Not started | [RFC-0008](../rfc/RFC-0008/), [RFC-0012](../rfc/RFC-0012/) |
+| [ADR-026](ADR-026-platform-db-pgbouncer-pilot/) | Pilot CNPG-native PgBouncer pooler on platform-db | Proposed | Not started | [RFC-0012](../rfc/RFC-0012/) |
+| [ADR-027](ADR-027-inventory-sole-stock-authority/) | inventory-service is the platform's sole stock authority | Accepted | Partial | [RFC-0021](../rfc/RFC-0021/) |
+| [ADR-028](ADR-028-inventory-reservation-model/) | Inventory reservation & balance model (FSM, ledger, one-order-one-warehouse) | Accepted | Complete | [RFC-0021](../rfc/RFC-0021/) |
+| [ADR-029](ADR-029-enum-feature-flag-helper/) | Adopt `pkg/flagx` for startup-validated feature flags | Accepted | Complete | [RFC-0021](../rfc/RFC-0021/) |
+| [ADR-030](ADR-030-temporal-workflow-versioning/) | Adopt Temporal Worker Versioning + official helm-charts | Accepted (supersedes [ADR-002](ADR-002-deploy-temporal-via-operator/) deployment half) | Complete | [RFC-0021](../rfc/RFC-0021/) |
+| [ADR-031](ADR-031-fulfillment-start-outbox/) | Start the fulfillment saga through a transactional outbox | Accepted | Complete | [RFC-0021](../rfc/RFC-0021/) |
+
+Principles:
+
+```text
+Research explains.  RFC proposes.  ADR decides.
+Planning schedules.  Code implements.  Tests prove.
+API docs describe as-built.  Runbooks operate it.
+```
 
 ---
 _Last updated: 2026-07-28_

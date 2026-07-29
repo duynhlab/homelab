@@ -179,14 +179,14 @@ Complements `browser-testing-with-devtools` in the Verify phase where applicable
   Context7 audit; frame a **real-world problem** (on-call, design review, incident,
   scale) then map what homelab practice proves. **Owner must approve the next RFC number**
   before creating the folder. Status **`researching`** in the index until the review gate passes.
-- **RFC** (`RFC-NNNN/README.md`) — decision + target architecture + rollout; copy [`RFC-0000/README.md`](docs/proposals/rfc/RFC-0000/README.md) only after research gate + owner **ready for RFC**. Link `./research.md`; do not repeat the full tutorial.
-- **ADR** (`docs/proposals/adr/ADR-NNN-slug/`) records a decision already made (Nygard). Link **Related research** for background; ADR is the why, not the textbook.
-- **docs/api sync (API-touching):** before an RFC is **`implemented`** or an ADR **`Accepted`**, update [`docs/api/`](docs/api/README.md) — owning service files, hub rollup, **Design records** links. Diagram/content duplication with RFC/ADR is OK when cross-linked; infra-only changes update platform docs instead. New or touched contracts use [`_template-service.md`](docs/api/_template-service.md) v2.
+- **RFC** (`RFC-NNNN/README.md`) — proposed target architecture + rollout; copy [`RFC-0000/README.md`](docs/proposals/rfc/RFC-0000/README.md) only after research gate + owner **ready for RFC**. Link `./research.md`; do not repeat the full tutorial. On architecture approval Status → **`Accepted`** (legacy index **`implementable`** ≡ Accepted).
+- **ADR** (`docs/proposals/adr/ADR-NNN-slug/`) — **one decision per ADR**; create at **`Proposed` during RFC review**, flip to **`Accepted` with the RFC**. Template v2: [`ADR-0000-template/`](docs/proposals/adr/ADR-0000-template/); process hub [`adr/README.md`](docs/proposals/adr/README.md). **Adoption** (Not started / Partial / Complete) tracks implementation separately from decision Status.
+- **docs/api sync (API-touching):** when ADR **Adoption** is **Complete** (or RFC **`implemented`**), update [`docs/api/`](docs/api/README.md) — owning service files, hub rollup, **Design records** links. ADR = why; contract = as-built. Infra-only changes update platform docs instead. New or touched contracts use [`_template-service.md`](docs/api/_template-service.md) v2.
 - **Optional domain doc** (`docs/<area>/<topic>/README.md`) — owner picks the area; distill from research using the house doc shape; link RFC research + README both ways.
 - Small bugs/cleanups and dependency bumps need no RFC — ship in a focused PR.
   Substantial themes → RFC backlog ([`docs/proposals/rfc/README.md`](docs/proposals/rfc/README.md)).
   Not everything needs an RFC number.
-- Templates: [`RFC-0000/`](docs/proposals/rfc/RFC-0000/) (`research.md` + `README.md`), [`ADR-0000-template/`](docs/proposals/adr/ADR-0000-template/). Hub: [`docs/proposals/`](docs/proposals/).
+- Templates: [`RFC-0000/`](docs/proposals/rfc/RFC-0000/) (`research.md` + `README.md`), [`ADR-0000-template/`](docs/proposals/adr/ADR-0000-template/). Hub: [`docs/proposals/`](docs/proposals/), [`adr/README.md`](docs/proposals/adr/README.md).
 
 ## Behavioral guidelines
 

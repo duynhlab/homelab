@@ -405,7 +405,7 @@ and extend Adoption instead.
 | [ADR-027](ADR-027-inventory-sole-stock-authority/) | inventory-service is the platform's sole stock authority | Accepted | Partial | [RFC-0021](../rfc/RFC-0021/) |
 | [ADR-028](ADR-028-inventory-reservation-model/) | Inventory reservation & balance model (FSM, ledger, one-order-one-warehouse) | Accepted | Complete | [RFC-0021](../rfc/RFC-0021/) |
 | [ADR-029](ADR-029-enum-feature-flag-helper/) | Adopt `pkg/flagx` for startup-validated feature flags | Accepted | Complete | [RFC-0021](../rfc/RFC-0021/) |
-| [ADR-030](ADR-030-temporal-workflow-versioning/) | Adopt Temporal Worker Versioning + official helm-charts | Accepted (supersedes [ADR-002](ADR-002-deploy-temporal-via-operator/) deployment half) | Complete | [RFC-0021](../rfc/RFC-0021/) |
+| [ADR-030](ADR-030-temporal-workflow-versioning/) | Adopt Temporal Worker Versioning + official helm-charts | Accepted (supersedes [ADR-002](ADR-002-deploy-temporal-via-operator/) deployment half) | Partial — re-platform done; Worker Versioning not configured anywhere yet | [RFC-0021](../rfc/RFC-0021/) |
 | [ADR-031](ADR-031-fulfillment-start-outbox/) | Start the fulfillment saga through a transactional outbox | Accepted | Complete | [RFC-0021](../rfc/RFC-0021/) |
 
 Principles:
@@ -417,4 +417,4 @@ API docs describe as-built.  Runbooks operate it.
 ```
 
 ---
-_Last updated: 2026-07-28_
+_Last updated: 2026-07-29_

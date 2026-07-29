@@ -45,9 +45,8 @@ CPU, alloc, and inuse are on by default in the SDK; goroutine, mutex, and block 
 - **Identity** = `OTEL_SERVICE_NAME` → Pyroscope `service_name` (same as traces and metrics).
 - **Labels** from `OTEL_RESOURCE_ATTRIBUTES`, dotted keys underscored: `service.namespace` → `service_namespace`, etc.
 - **Runtime sampling** after successful start — `runtime.SetMutexProfileFraction(100)` and `runtime.SetBlockProfileRate(100_000_000)` (blocking events ≥ 100 ms). Only on success avoids overhead when misconfigured.
-- **Strict helper validation** — empty `PYROSCOPE_ENDPOINT` returns an error; `sync.Once` guards startup.
-- Verify exact helper signatures and configuration fields against the active
-  `duynhlab/pkg` revision before using the wiring example verbatim.
+- **Strict helper validation** — empty `PYROSCOPE_ENDPOINT` returns an error; `sync.Once` guards startup and **caches the error permanently** (a second call after a failed first call returns the same error without retrying).
+- Verified signature (`duynhlab/pkg`, 2026-07-29): `obsx.SetupProfiling() (func(context.Context) error, error)` — no arguments; the returned stop function flushes and stops the profiler (its context is currently ignored).
 
 ## Failure, readiness, and shutdown policy
 
@@ -60,40 +59,39 @@ sanitized warning and continues without profiling. A profiling failure does
 not make application readiness false — core app dependencies still determine
 readiness.
 
-Shutdown is bounded:
+As-built wiring (order-service `cmd/main.go`, the reference shape — gated on
+`cfg.Profiling.Enabled` from `PROFILING_ENABLED`):
 
 ```go
-func initProfiling(
-    cfg *config.Config,
-    logger *zap.Logger,
-) func() {
+func initProfiling(cfg *config.Config, logger *zap.Logger) func() {
     if !cfg.Profiling.Enabled {
+        logger.Info("Profiling disabled (PROFILING_ENABLED=false)")
         return func() {}
     }
 
     stop, err := obsx.SetupProfiling()
     if err != nil {
-        logger.Warn("profiling disabled after setup failure", zap.Error(err))
+        logger.Warn("Failed to initialize profiling", zap.Error(err))
         return func() {}
     }
 
-    logger.Info("profiling initialized")
+    logger.Info("Profiling initialized", zap.String("endpoint", cfg.Profiling.Endpoint))
 
     return func() {
-        shutdownCtx, cancel := context.WithTimeout(
-            context.Background(),
-            cfg.ShutdownTimeout,
-        )
-        defer cancel()
-
-        if err := stop(shutdownCtx); err != nil {
-            logger.Warn("profiling shutdown incomplete", zap.Error(err))
+        if err := stop(context.Background()); err != nil {
+            logger.Error("Profiling shutdown error", zap.Error(err))
         }
     }
 }
 ```
 
-Do not log a profiler URL containing credentials or query secrets at startup.
+**Target refinement (planned):** bound the stop call with the service shutdown
+context (`cfg.GetShutdownTimeoutDuration()`) instead of `context.Background()`,
+and never discard the stop error — today product and auth swallow it (see
+[Known gaps](#known-gaps)).
+
+Do not log a profiler URL containing credentials or query secrets at startup
+(the current `endpoint` field is the credential-free cluster DNS address).
 
 ---
 
@@ -126,17 +124,18 @@ as higher-cost signals than CPU-only profiling.
 - Revisit profile-type selection if CPU or allocation overhead exceeds the
   service's budget — do not claim a numeric overhead target unless benchmarked
   for the specific workload.
-- Mutex/block sampling rates are set by the shared helper; verify against the
-  active `pkg/obsx` revision before documenting exact values as as-built.
+- Mutex/block sampling rates are fixed by the shared helper (verified:
+  `SetMutexProfileFraction(100)`, `SetBlockProfileRate(100_000_000)` — blocking
+  events ≥ 100 ms) and are applied only after a successful profiler start.
 
 ---
 
 ## Trace correlation (app side)
 
-1. **`obsx.TracerProviderWithProfiles`** wraps the OTel `TracerProvider` with `otel-profiling-go` so spans may carry **`pyroscope.profile.id`**.
-2. **CPU profiles** may support span-level correlation through profile IDs.
-3. **Heap, goroutine, mutex, and block profiles** are commonly service/time scoped — do not promise identical span correlation for every profile type.
-4. Correlation behavior depends on the current SDK and Grafana datasource configuration — see [Profiling (platform) § Trace correlation](../observability/profiling/README.md#trace-correlation-platform).
+1. **`obsx.TracerProviderWithProfiles`** wraps the OTel `TracerProvider` with `otel-profiling-go` so spans carry **`pyroscope.profile.id`** — applied automatically inside `SetupObservability` (to the global provider) when both tracing and profiling are enabled.
+2. **CPU profiles are span-scoped** — the profile ID links a span to the CPU flame graph for its duration.
+3. **Heap, goroutine, mutex, and block profiles are service/time scoped** — they have no per-span correlation.
+4. Grafana **Profiles for this span** uses the datasource link configured in platform manifests — see [Profiling (platform) § Trace correlation](../observability/profiling/README.md#trace-correlation-platform).
 
 ---
 
@@ -157,7 +156,7 @@ Full env table: [Application observability § Environment variables](./observabi
 
 ### Verification (service side)
 
-1. Check startup log: `profiling initialized` (or warning if disabled after setup failure)
+1. Check startup log: `Profiling initialized` (with the `endpoint` field), or `Failed to initialize profiling` when setup failed, or `Profiling disabled (PROFILING_ENABLED=false)`
 2. Confirm env: `PROFILING_ENABLED=true`, `PYROSCOPE_ENDPOINT` reachable
 
 Backend troubleshooting (Pyroscope pods, RustFS, Grafana datasource): [Profiling (platform) § Troubleshooting](../observability/profiling/README.md#troubleshooting).
@@ -169,7 +168,9 @@ Backend troubleshooting (Pyroscope pods, RustFS, Grafana datasource): [Profiling
 | Gap | Impact | Decision | Exit criteria |
 |-----|--------|----------|---------------|
 | Pyroscope SDK debug lines | Third-party plaintext noise on stdout | Configure SDK log level or document accepted exception | No `[DEBUG] uploading at…` at normal production log level |
-| `sync.Once` lifecycle | Complicates tests or multi-mode processes | Document helper lifecycle after pkg review | Test behavior matches intended one-shot init |
+| `sync.Once` caches a failed setup permanently | A transient failure cannot be retried within the process; complicates tests | Accept (restart recovers) or add a reset for tests | Documented lifecycle matches test behavior |
+| product + auth swallow the profiling stop error | Flush failures at shutdown are invisible | Align with the order pattern (log the error) | All services log profiling shutdown errors |
+| Shutdown shape diverges per service (helper vs inline, `func()` vs `func(ctx) error`) | Four variants of the same wiring | Converge on one helper shape (candidate for promotion into `pkg`) | One shared shape across the fleet |
 
 Cross-link from logging: [Application logging § Known gaps](./logs.md#known-gaps).
 
@@ -183,4 +184,4 @@ Cross-link from logging: [Application logging § Known gaps](./logs.md#known-gap
 - [pyroscope-go SDK](https://github.com/grafana/pyroscope-go)
 - [otel-profiling-go](https://github.com/grafana/otel-profiling-go)
 
-_Last updated: 2026-07-29 — canonical app profiling contract._
+_Last updated: 2026-07-29 — canonical app profiling contract; as-built claims verified against `duynhlab/pkg` and the service repos._

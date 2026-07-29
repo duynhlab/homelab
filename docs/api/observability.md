@@ -62,38 +62,52 @@ Current behavior and planned behavior must be labelled separately.
 
 These rules apply to every service PR. Rationale: [RFC-0014](../proposals/rfc/RFC-0014/README.md).
 
-1. **One wiring point.** Services call `obsx.SetupObservability(ctx, cfg)` once in `main()`. No hand-built OTel providers. Verify exact helper names and return types against the active `duynhlab/pkg` revision.
+1. **One wiring point.** Services call `obsx.SetupObservability(ctx, cfg)` once in `main()`. No hand-built OTel providers. Verified signatures (`duynhlab/pkg`, 2026-07-29): `obsx.ConfigFromEnv() Config`, `obsx.SetupObservability(ctx, Config) (*Observability, error)`, `(*Observability).Shutdown(ctx) error`, `(*Observability).ZapCore(scopeName, minLevel) zapcore.Core`.
+
+   As-built bootstrap (the shape every service `cmd/main.go` implements —
+   setup failure is deliberately **non-fatal**: the service serves traffic
+   without telemetry rather than crash-loop on a collector outage):
 
    ```go
-   obs, err := obsx.SetupObservability(ctx, obsx.ConfigFromEnv())
+   logger, err := zapx.New(os.Getenv("LOG_LEVEL")) // auth/cart pass cfg.Logging.Level
    if err != nil {
-       return fmt.Errorf("setup observability: %w", err)
+       panic("Failed to initialize logger: " + err.Error())
    }
+   defer func() { _ = logger.Sync() }()
 
-   logger, err := zapx.New(cfg.Logging.Level)
+   otelCfg := obsx.ConfigFromEnv()
+   middleware.SetServiceName(otelCfg.ServiceName)
+
+   var tp interface{ Shutdown(context.Context) error }
+   obs, err := obsx.SetupObservability(context.Background(), otelCfg)
    if err != nil {
-       return fmt.Errorf("setup logger: %w", err)
-   }
-
-   minLevel, err := zapcore.ParseLevel(cfg.Logging.Level)
-   if err != nil {
-       minLevel = zapcore.InfoLevel
-   }
-   logger = logger.WithOptions(zap.WrapCore(func(c zapcore.Core) zapcore.Core {
-       return zapcore.NewTee(c, obs.ZapCore(cfg.ServiceName, minLevel))
-   }))
-
-   defer func() {
-       shutdownCtx, cancel := context.WithTimeout(
-           context.Background(),
-           cfg.ShutdownTimeout,
-       )
-       defer cancel()
-
-       if err := obs.Shutdown(shutdownCtx); err != nil {
-           logger.Warn("observability shutdown incomplete", zap.Error(err))
+       logger.Warn("Failed to initialize OpenTelemetry", zap.Error(err))
+   } else {
+       tp = obs
+       minLevel, lvlErr := zapcore.ParseLevel(os.Getenv("LOG_LEVEL"))
+       if lvlErr != nil {
+           minLevel = zapcore.InfoLevel
        }
-   }()
+       logger = logger.WithOptions(zap.WrapCore(func(c zapcore.Core) zapcore.Core {
+           return zapcore.NewTee(c, obs.ZapCore(otelCfg.ServiceName, minLevel))
+       }))
+   }
+   ```
+
+   Shutdown is the **last step of the ordered graceful-shutdown sequence**
+   (after the HTTP/gRPC servers stop), bounded by the same shutdown context —
+   `cfg.ShutdownTimeout` is an `int` of seconds behind
+   `cfg.GetShutdownTimeoutDuration()`:
+
+   ```go
+   shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.GetShutdownTimeoutDuration())
+   defer cancel()
+   // ...stop servers first...
+   if tp != nil {
+       if err := tp.Shutdown(shutdownCtx); err != nil {
+           logger.Warn("OpenTelemetry shutdown error", zap.Error(err))
+       }
+   }
    ```
 
 2. **`client_golang` is retired.** No `prometheus.*`/`promauto` in app code — metrics use the OTel Meter API with semconv names. The `/metrics` scrape endpoint was removed at RFC-0014 P3.
@@ -126,7 +140,9 @@ The HTTP middleware chain is **tracing → logging** (two middleware only).
 | 1 | **Tracing** (`otelgin` via `TracingMiddleware`) | Root span + **`http.server.*` metrics** via global MeterProvider |
 | 2 | **Logging** | Structured JSON + `trace_id` on stdout; otelzap tee when enabled |
 
-There is **no separate metrics middleware**. RED HTTP metrics come from the same `otelgin` instrumentation that creates spans. gRPC RED + tracing come from `pkg/grpcx` `otelgrpc` interceptors.
+There is **no separate metrics middleware**. RED HTTP metrics come from the same `otelgin` instrumentation that creates spans. gRPC RED + tracing come from `pkg/grpcx` `otelgrpc` handlers.
+
+Sharing status (as-built): providers (`pkg/obsx`), gRPC (`pkg/grpcx`), and DB (`pkg/dbx` + otelpgx) are shared libraries; the HTTP `TracingMiddleware`/`LoggingMiddleware` pair and the span helpers are **copied per service** under `<svc>-service/middleware/` (byte-identical tracing, minor logging variants). Promoting them into `pkg` is a target, not current reality.
 
 ```mermaid
 graph TD
@@ -149,15 +165,16 @@ Profiling (`obsx.SetupProfiling`) pushes out-of-band to Pyroscope — see [Appli
 
 ### Health, readiness, and reflection filtering
 
-Target contract — verify against the active middleware and interceptor
-implementation before treating as as-built:
+Verified 2026-07-29 against the service `middleware/tracing.go` files and
+`pkg/grpcx`:
 
-| Signal | Probe policy |
-|--------|--------------|
-| Spans | Exclude routine health/readiness/reflection |
-| RED metrics | Exclude routine health/readiness/reflection |
-| Access logs | Exclude routine success probes; log readiness transitions and failed probes |
-| Startup/shutdown logs | Always retain |
+| Signal | As-built | Target |
+|--------|----------|--------|
+| HTTP spans + `http.server.*` RED | **Filtered** — each service's `TracingMiddleware` skips `/health`, `/healthz`, `/ready`, `/readyz`, `/livez`, `/metrics`, `/favicon.ico` (prefix match) before `otelgin` runs, so those paths emit no span and no metric | Same |
+| gRPC spans + RPC RED | **Filtered** — `pkg/grpcx` `otelgrpc.WithFilter` excludes `grpc.health.v1.Health` and `grpc.reflection.*` | Same |
+| gRPC access logs | **Filtered** — the `pkg/grpcx` access interceptor skips the same health/reflection prefixes | Same |
+| HTTP access logs | **Not filtered** — every routine probe logs one `info` line ([known gap](./logs.md#known-gaps)) | Exclude routine success probes; keep readiness transitions and failed probes |
+| Startup/shutdown logs | Always retained | Same |
 
 ---
 
@@ -218,7 +235,7 @@ generic request span:
 ```go
 func (h *Handler) CreateOrder(c *gin.Context) {
     ctx := c.Request.Context()
-    logger := zapx.FromContext(ctx)
+    logger := middleware.GetLoggerFromGinContext(c)
 
     var req CreateOrderRequest
     if err := c.ShouldBindJSON(&req); err != nil {
@@ -227,7 +244,7 @@ func (h *Handler) CreateOrder(c *gin.Context) {
             zap.String("operation", "order.create"),
             zap.Error(err),
         )
-        httpx.ValidationError(c, err)
+        httpx.RespondError(c, http.StatusBadRequest, httpx.CodeValidation, err.Error())
         return
     }
 
@@ -240,6 +257,13 @@ func (h *Handler) CreateOrder(c *gin.Context) {
     c.JSON(http.StatusCreated, result)
 }
 ```
+
+Logger retrieval is the fleet-majority pattern: the logging middleware stores
+the request logger with `c.Set("logger", …)` and handlers read it back with
+`middleware.GetLoggerFromGinContext(c)`. auth-service instead injects it into
+the request context (`zapx.WithContext`/`zapx.FromContext`) — same contract,
+different carrier. Error responses go through `httpx.RespondError`
+(`pkg/httpx`); there is no `httpx.ValidationError` helper.
 
 Logic methods do not automatically receive one manual span each. Create a
 manual span only for a meaningful operation, failure boundary, or multi-step
@@ -289,9 +313,12 @@ graph LR
     class B,G,H,I trace;
 ```
 
-Services accept and propagate W3C Trace Context. Edge behavior is defined by
-the deployed Kong tracing configuration. gRPC metadata carries the same context
-via `pkg/grpcx`.
+Services accept and propagate W3C Trace Context (`traceparent`). At the edge,
+Kong's opentelemetry plugin **forces** a W3C `traceparent` onto every upstream
+request (`propagation.inject: [w3c]`, extracting w3c/b3/jaeger/ot), so the
+service span always joins the edge trace — verified in
+`kubernetes/infra/configs/kong/plugins.yaml`. gRPC metadata carries the same
+context via `pkg/grpcx`.
 
 ## Worker and Temporal instrumentation
 
@@ -422,7 +449,7 @@ A service or worker PR is observability-compliant only when:
 - [ ] `obsx.SetupObservability` is called exactly once per process.
 - [ ] Shutdown uses a bounded context and flushes enabled providers.
 - [ ] The service does not construct OTel SDK providers or exporters directly.
-- [ ] The logger OTLP branch uses the configured log level.
+- [ ] The logger OTLP branch is gated on the same `LOG_LEVEL` as the stdout branch.
 - [ ] HTTP middleware order is tracing, then logging.
 - [ ] gRPC servers and clients use `pkg/grpcx`.
 - [ ] Transport handlers propagate the incoming context into `logic/v1`.
@@ -459,4 +486,4 @@ A service or worker PR is observability-compliant only when:
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 - [OpenTelemetry (platform)](../observability/opentelemetry/README.md)
 
-_Last updated: 2026-07-29 — canonical cross-cutting observability contract._
+_Last updated: 2026-07-29 — canonical cross-cutting observability contract; as-built claims verified against `duynhlab/pkg` and the service repos._

@@ -5,7 +5,7 @@ Distributed tracing contract for every Go service and worker in the platform ser
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
 | **SDK** | `obsx.SetupObservability()` — one call in `main()` | — |
-| **Propagation** | W3C Trace Context (`traceparent`); edge behavior from Kong config | — |
+| **Propagation** | W3C Trace Context (`traceparent`); Kong forces injection at the edge (`inject: [w3c]`) | — |
 | **Sampling** | `ParentBased(TraceIDRatioBased)` — root decides, downstream honours | — |
 | **Platform backends** | [Tracing (platform)](../observability/tracing/README.md) — Tempo, Jaeger, VictoriaTraces | — |
 | **Cross-cutting** | [Application observability](./observability.md) | — |
@@ -60,13 +60,16 @@ When a service receives a sampled remote parent, it **always honours** the paren
 
 These endpoints are **never traced**:
 
-| Path | Reason |
-|------|--------|
-| `/health`, `/healthz`, `/readyz`, `/livez` | High frequency, low value |
+| Path prefix | Reason |
+|-------------|--------|
+| `/health`, `/healthz`, `/ready`, `/readyz`, `/livez` | High frequency, low value |
 | `/metrics` | Legacy scrape path (retired for apps) |
 | `/favicon.ico` | Browser noise |
 
-gRPC health and reflection RPCs are filtered by `pkg/grpcx`.
+The skip list is a **prefix** match in each service's `TracingMiddleware`
+(`shouldTrace`), applied before `otelgin` runs — so these paths emit neither
+spans nor `http.server.*` metrics. gRPC health and reflection RPCs are filtered
+by `pkg/grpcx`.
 
 ### Service identity
 
@@ -74,9 +77,12 @@ gRPC health and reflection RPCs are filtered by `pkg/grpcx`.
 
 ### Propagation
 
-Services accept and propagate W3C Trace Context. Edge behavior is defined by
-the deployed Kong tracing configuration. gRPC metadata carries the same context
-via `pkg/grpcx`.
+Services accept and propagate W3C Trace Context (`traceparent`). At the edge,
+Kong's opentelemetry plugin **forces** a W3C `traceparent` onto every upstream
+request (`propagation.inject: [w3c]`), so browser-originated requests without a
+trace header still join the edge trace — verified in
+`kubernetes/infra/configs/kong/plugins.yaml`. gRPC metadata carries the same
+context via `pkg/grpcx`.
 
 ### Baggage
 
@@ -96,9 +102,12 @@ Automatic spans — do not duplicate these with manual spans:
 - supported external-client spans.
 
 Automatic capture includes service identity, route template or RPC method,
-HTTP/gRPC status, duration, and W3C propagation fields per semconv. IP and full
-User-Agent are **not** guaranteed authoring-contract fields; enabling them
-requires privacy/retention review.
+HTTP/gRPC status, duration, and W3C propagation fields per semconv. Note the
+split: **spans** carry only what `otelgin`/`otelgrpc` emit per semconv, while
+the HTTP **access log** additionally records `client_ip` and `user_agent`
+today (see [logs.md § Access-log policy](./logs.md#access-log-policy)); adding
+IP/User-Agent to spans is not part of the contract and requires
+privacy/retention review.
 
 ---
 
@@ -124,6 +133,10 @@ Span names are stable operation classes. Business identifiers are
 high-cardinality attributes and are added only when operationally justified.
 
 ### Helper functions
+
+The helpers live in each service's own `middleware` package
+(`<svc>-service/middleware/tracing.go` — copied per service, not in `pkg`);
+signatures verified 2026-07-29:
 
 ```go
 // Record unexpected failures
@@ -254,4 +267,4 @@ Grafana Explore → Tempo → search by Trace ID. Details: [Application logging]
 - [Tracing architecture (platform)](../observability/tracing/architecture.md)
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-07-29 — canonical app tracing contract._
+_Last updated: 2026-07-29 — canonical app tracing contract; as-built claims verified against `duynhlab/pkg`, the service repos, and the Kong config._

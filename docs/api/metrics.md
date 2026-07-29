@@ -45,7 +45,7 @@ a service author writes; a service only adds Business instruments.
 > Business metrics are a **domain metric family**, not RED or USE — those two are
 > already covered by the auto layer above, so never hand-write them. Since
 > **RFC-0017** every service in the catalog declares its own domain instruments;
-> the [Business KPIs dashboard](#dashboard) is built entirely from them.
+> the [Business KPIs dashboard](../observability/metrics/metrics-apps.md#dashboard) is built entirely from them.
 
 ## HTTP server metrics (auto-instrumented)
 
@@ -417,7 +417,7 @@ Since **RFC-0017** every service in the catalog declares its own Business instru
 table below keeps **checkout as the worked example**; the **full shipped
 catalog is in
  [metrics-catalog.md](../observability/metrics/metrics-catalog.md#business-metrics--per-service-catalog)**,
-and is what the [Business KPIs dashboard](#dashboard) visualizes.
+and is what the [Business KPIs dashboard](../observability/metrics/metrics-apps.md#dashboard) visualizes.
 
 | Service | Metric (PromQL) | OTel instrument | Type | Labels | Purpose |
 |---------|-----------------|-----------------|------|--------|---------|
@@ -509,5 +509,5 @@ metric → exemplar → trace.
 - [Metrics hub (platform)](../observability/metrics/README.md)
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-07-29 — canonical app metrics authoring contract._
+_Last updated: 2026-07-29 — canonical app metrics authoring contract; checkout example table verified against `checkout-service/internal/logic/v1/metrics.go`._
 

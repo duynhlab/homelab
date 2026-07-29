@@ -691,9 +691,10 @@ Signal-specific authoring rules:
 [logs](./logs.md) · [metrics](./metrics.md) ·
 [tracing](./tracing.md) · [profiling](./profiling.md).
 
-Health, readiness, and reflection filtering is defined by the shared
-observability contract and must be verified against the active middleware and
-interceptor implementation.
+Health, readiness, and reflection probes are excluded from spans and RED
+metrics on both transports, and from gRPC access logs; HTTP access logs do not
+filter probes yet. Signal-by-signal matrix:
+[observability.md § Health filtering](./observability.md#health-readiness-and-reflection-filtering).
 
 ## Security
 

@@ -25,8 +25,8 @@ Both land in one backend, queryable with LogsQL and correlated to traces by
 > onboarding — see the source of truth,
 > [**Application logging**](../../api/logs.md). Backend/ops detail (VLSingle config,
 > Vector pipeline, endpoints, verification) lives in [`README.md#platform-pipeline`](README.md#platform-pipeline).
-> For the full before/after migration story, see the
-> [**RFC-0014 explainer**](../opentelemetry/rfc-0014-explainer.md).
+> For the full before/after migration story, see
+> [**OTel fundamentals § How this platform got here**](../opentelemetry/fundamentals.md#how-this-platform-got-here--rfc-0014-in-pictures).
 
 ---
 

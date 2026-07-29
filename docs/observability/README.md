@@ -10,7 +10,7 @@ GitOps (Flux).
 > [tracing](../api/tracing.md), [profiling](../api/profiling.md)). This hub
 > covers **platform** backends, alerts, Grafana, and runbooks.
 
-> **New to the stack?** Start with the [RFC-0014 explainer](opentelemetry/rfc-0014-explainer.md) — old-vs-new, plain-language, diagrams.
+> **New to the stack?** Start with [OTel fundamentals](opentelemetry/fundamentals.md) — plain-language concepts plus the RFC-0014 old-vs-new migration story, in diagrams.
 
 ## Architecture
 
@@ -260,9 +260,8 @@ docs/observability/
 ├── stack-review.md               # Whole-stack review: per-signal maturity scorecard + ranked gaps
 ├── opentelemetry/                 # OTel collector topology, sampling, operations
 │   ├── README.md                  # Platform deployment doc (policy → api/observability.md)
-│   ├── fundamentals.md           # OTel primer: API vs SDK, signals, OTLP, propagation
-│   ├── collector.md              # Collector deep dive: components, patterns, deployed pipelines
-│   └── rfc-0014-explainer.md     # Beginner old-vs-new walkthrough
+│   ├── fundamentals.md           # OTel primer: API vs SDK, signals, OTLP, propagation + RFC-0014 migration story
+│   └── collector.md              # Collector deep dive: components, patterns, deployed pipelines
 │
 ├── metrics/                      # Pillar 1: Metrics collection & storage
 │   ├── README.md                 # Hub: fundamentals, stack, architecture, coverage
@@ -424,9 +423,8 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 ## Related Documentation
 
 - [OpenTelemetry (platform)](opentelemetry/README.md) -- Collector topology, sampling, operations (app policy → [api/observability.md](../api/observability.md))
-- [OpenTelemetry fundamentals](opentelemetry/fundamentals.md) -- API vs SDK, signals and when to use each, OTLP transport, propagation & baggage
+- [OpenTelemetry fundamentals](opentelemetry/fundamentals.md) -- API vs SDK, signals and when to use each, OTLP transport, propagation & baggage, plus the RFC-0014 old-vs-new migration story in diagrams
 - [OpenTelemetry Collector](opentelemetry/collector.md) -- component model, deployment patterns, the deployed pipelines walked end to end
-- [RFC-0014 explainer](opentelemetry/rfc-0014-explainer.md) -- beginner old-vs-new migration walkthrough
 - [Metrics: RED/USE/Golden Signals](metrics/README.md) -- metrics methodology
 - [Histograms & temporality](metrics/histograms.md) -- bucket mechanics, explicit vs exponential, delta vs cumulative
 - [VictoriaMetrics Operator](metrics/victoriametrics.md) -- migration from kube-prometheus-stack

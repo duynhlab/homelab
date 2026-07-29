@@ -27,8 +27,7 @@ original RFC, which remains the historical decision and rollout record.
 
 | Goal | Start here |
 |------|------------|
-| Learn what OTel is (API vs SDK, signals, OTLP, propagation) | [OTel fundamentals](fundamentals.md) |
-| Build the mental model from zero | [RFC-0014 explainer](rfc-0014-explainer.md) |
+| Build the mental model from zero (API vs SDK, signals, OTLP, propagation, the old-vs-new migration story) | [OTel fundamentals](fundamentals.md) |
 | Understand the Collector (components, patterns, deployed pipelines) | [Collector](collector.md) |
 | Review rules for service code and PRs | [Application observability](../../api/observability.md) |
 | Understand the deployed signal paths | [How it works in this platform](#how-it-works-in-this-platform) |
@@ -253,6 +252,6 @@ Quick verification:
 ## References
 
 - Official: [opentelemetry.io/docs/concepts](https://opentelemetry.io/docs/concepts/) · [Go SDK](https://opentelemetry.io/docs/languages/go/) · [versioning & stability](https://opentelemetry.io/docs/specs/otel/versioning-and-stability/) · [Collector](https://opentelemetry.io/docs/collector/) · [sampling](https://opentelemetry.io/docs/concepts/sampling/) · [VictoriaMetrics OTel](https://docs.victoriametrics.com/victoriametrics/integrations/opentelemetry/) · [VictoriaLogs OTel](https://docs.victoriametrics.com/victorialogs/data-ingestion/opentelemetry/)
-- In-house: [OTel fundamentals](fundamentals.md) · [Collector](collector.md) · [Application observability](../../api/observability.md) · [RFC-0014 explainer](rfc-0014-explainer.md) (old-vs-new, beginner) · [RFC-0014](../../proposals/rfc/RFC-0014/README.md) (design record + tracking) · [tracing/README.md](../tracing/README.md) · [tracing/architecture.md](../tracing/architecture.md) · [logging/README.md](../logging/README.md) · [metrics/histograms.md](../metrics/histograms.md) · [metrics/streaming-aggregation.md](../metrics/streaming-aggregation.md) · [../platform/kong-gateway.md](../../platform/kong-gateway.md)
+- In-house: [OTel fundamentals](fundamentals.md) (concepts + old-vs-new migration story) · [Collector](collector.md) · [Application observability](../../api/observability.md) · [RFC-0014](../../proposals/rfc/RFC-0014/README.md) (design record + tracking) · [tracing/README.md](../tracing/README.md) · [tracing/architecture.md](../tracing/architecture.md) · [logging/README.md](../logging/README.md) · [metrics/histograms.md](../metrics/histograms.md) · [metrics/streaming-aggregation.md](../metrics/streaming-aggregation.md) · [../platform/kong-gateway.md](../../platform/kong-gateway.md)
 
 _Last updated: 2026-07-14 — moved into the OpenTelemetry area; verified SDK, protocol, worker coverage, environment differences, and checkout rollout history._

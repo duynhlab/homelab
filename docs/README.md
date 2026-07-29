@@ -67,9 +67,8 @@ docs/
 │   ├── README.md                 # Master index + 4-pillar architecture
 │   ├── opentelemetry/             # OTel instrumentation, transport, and migration learning
 │   │   ├── README.md              # Canonical policy + current platform behavior
-│   │   ├── fundamentals.md        # OTel primer: API vs SDK, signals, OTLP, propagation
-│   │   ├── collector.md           # Collector deep dive: components, patterns, deployed pipelines
-│   │   └── rfc-0014-explainer.md  # Beginner old-vs-new walkthrough
+│   │   ├── fundamentals.md        # OTel primer: API vs SDK, signals, OTLP, propagation + RFC-0014 migration story
+│   │   └── collector.md           # Collector deep dive: components, patterns, deployed pipelines
 │   ├── metrics/                  # Pillar 1: Metrics
 │   │   ├── README.md             # Hub: fundamentals, stack, architecture, coverage
 │   │   ├── metrics-apps.md       # Application + gRPC east-west metrics (RED)
@@ -255,10 +254,9 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 #### Observability (4 Pillars)
 
 1. **[Observability Overview](./observability/README.md)** - Master index, 4-pillar architecture
-   - **[OTel fundamentals](./observability/opentelemetry/fundamentals.md)** - what OTel is: API vs SDK, signals, OTLP transport, propagation & baggage
+   - **[OTel fundamentals](./observability/opentelemetry/fundamentals.md)** - what OTel is: API vs SDK, signals, OTLP transport, propagation & baggage + the RFC-0014 old-vs-new migration story (start here if new)
    - **[OpenTelemetry (platform)](./observability/opentelemetry/README.md)** - Collector topology, sampling, operations (app policy → [api/observability.md](./api/observability.md))
    - **[OpenTelemetry Collector](./observability/opentelemetry/collector.md)** - component model, deployment patterns, the deployed pipelines
-   - **[RFC-0014 explainer](./observability/opentelemetry/rfc-0014-explainer.md)** - old-vs-new, plain-language (start here if new)
    - **[Histograms & temporality](./observability/metrics/histograms.md)** - bucket mechanics, explicit vs exponential, delta vs cumulative
     - Metrics, Tracing, Logging, Profiling
     - Component inventory and correlation workflow
@@ -359,10 +357,9 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 #### Observability Pillars
 - [Observability Overview](./observability/README.md) - Master index, 4-pillar architecture, 3-layer service architecture + APM integration
-- [OTel fundamentals](./observability/opentelemetry/fundamentals.md) - API vs SDK, signals and signal selection, OTLP transport, propagation & baggage
+- [OTel fundamentals](./observability/opentelemetry/fundamentals.md) - API vs SDK, signals and signal selection, OTLP transport, propagation & baggage, plus the RFC-0014 old-vs-new migration story
 - [OpenTelemetry (platform)](./observability/opentelemetry/README.md) - Collector topology, sampling, operations (app policy → [api/observability.md](./api/observability.md))
 - [OpenTelemetry Collector](./observability/opentelemetry/collector.md) - component model, deployment patterns, deployed pipelines + runbook
-- [RFC-0014 explainer](./observability/opentelemetry/rfc-0014-explainer.md) - old client_golang vs new OpenTelemetry (OTLP push), beginner-friendly
 - [Histograms & temporality](./observability/metrics/histograms.md) - bucket mechanics, explicit vs exponential, delta vs cumulative
 - [Distributed Tracing](./observability/tracing/README.md) - Tempo integration
 - [Tracing Architecture](./observability/tracing/architecture.md) - Triple backend (Tempo + Jaeger + VictoriaTraces)

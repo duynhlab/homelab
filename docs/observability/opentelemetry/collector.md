@@ -124,6 +124,12 @@ same Service; only tail-based sampling (not used — head sampling per
 A `debug` exporter is **defined but wired into no pipeline** — attach it
 temporarily when debugging ingest, never leave it on.
 
+Two non-obvious facts about what is *not* in these pipelines: there are **no
+connectors** — cluster RED metrics come exclusively from the applications'
+own SDK metrics, not from span derivation (local-stack keeps a spanmetrics
+connector as a compatibility path only); and Tempo's own metrics-generator is
+configured but writes nowhere (`remote_write: []`), so it produces nothing.
+
 ### Processors, and why the order is law
 
 Processors execute **in the order they are listed** — this chain is a
@@ -196,7 +202,7 @@ alert — watch `otelcol_exporter_send_failed_*` and `otelcol_processor_refused_
 ## References
 
 - [Collector docs](https://opentelemetry.io/docs/collector/) · [Configuration](https://opentelemetry.io/docs/collector/configuration/) · [Deployment patterns](https://opentelemetry.io/docs/collector/deployment/)
-- In-house: [OTel fundamentals](fundamentals.md) · [OpenTelemetry (platform)](README.md) · [RFC-0014 explainer §8](rfc-0014-explainer.md) · [Logging pipeline](../logging/README.md) · [ClickHouse](../clickhouse/README.md)
+- In-house: [OTel fundamentals](fundamentals.md) (incl. the [RFC-0014 migration story](fundamentals.md#how-this-platform-got-here--rfc-0014-in-pictures)) · [OpenTelemetry (platform)](README.md) · [Logging pipeline](../logging/README.md) · [ClickHouse](../clickhouse/README.md)
 
 ---
 

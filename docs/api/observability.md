@@ -517,7 +517,7 @@ A service or worker PR is observability-compliant only when:
 ## References
 
 - [API and service communication guide](./api.md)
-- [RFC-0014 explainer](../observability/opentelemetry/rfc-0014-explainer.md)
+- [OTel fundamentals](../observability/opentelemetry/fundamentals.md) — concepts + the RFC-0014 migration story
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 - [OpenTelemetry (platform)](../observability/opentelemetry/README.md)
 

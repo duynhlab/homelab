@@ -144,7 +144,7 @@ The HTTP middleware chain is **tracing → logging** (two middleware only).
 
 There is **no separate metrics middleware**. RED HTTP metrics come from the same `otelgin` instrumentation that creates spans. gRPC RED + tracing come from `pkg/grpcx` `otelgrpc` handlers.
 
-Sharing status (as-built): providers (`pkg/obsx`), gRPC (`pkg/grpcx`), and DB (`pkg/dbx` + otelpgx) are shared libraries; the HTTP `TracingMiddleware`/`LoggingMiddleware` pair and the span helpers are **copied per service** under `<svc>-service/middleware/` (byte-identical tracing, minor logging variants). Promoting them into `pkg` is a target, not current reality.
+Sharing status (as-built): providers (`pkg/obsx`), gRPC (`pkg/grpcx`), and DB (`pkg/dbx` + otelpgx) are shared libraries; the HTTP `TracingMiddleware`/`LoggingMiddleware` pair and the span helpers are **copied per service** under `<svc>-service/middleware/`, and the copies are drifting apart release by release. Promoting them into `pkg` is a target, not current reality.
 
 ```mermaid
 graph TD

@@ -318,6 +318,7 @@ Every manifest applied to the cluster must satisfy admission:
   flux-system → controllers-local → {cert-manager → kong → kong-config, secrets,
   cnpg-barman-plugin, caching, storage} → databases → databases-cnpg-dr
   monitoring-local → kyverno-policies, mcp
+  temporal-local → temporal-config-local
   apps-local (depends: databases + monitoring + temporal-local)
   ```
 - **CHANGELOG.** Add **concise, grouped** entries (`Added`/`Changed`/`Removed`, one line per change) at the **top** of `[Unreleased]`. **Released sections are append-only** — never edit or remove `[X.Y.Z]` history. Cutting a release = rename `[Unreleased]` → `[X.Y.Z] - YYYY-MM-DD` (condensing the entries then is fine) and add a fresh empty `[Unreleased]` on top.

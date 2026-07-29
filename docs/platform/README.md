@@ -46,7 +46,7 @@ flowchart TD
     clickhouse["clickhouse-local"]
     tracing["tracing-local + profiling-local"]
     databases["databases-local + DR"]
-    temporal["temporal-local"]
+    temporal["temporal-local + temporal-config-local"]
     apps["apps-local<br/>ResourceSets + workers"]
 
     controllers --> secrets

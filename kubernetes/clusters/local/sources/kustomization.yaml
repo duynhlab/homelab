@@ -32,9 +32,7 @@ resources:
   - helm/jetstack.yaml
   - helm/kong.yaml
   - helm/kyverno.yaml
-  # temporal-operator source retired with the operator (ADR-030 revision:
-  # official chart replaces it — Worker Versioning needs server >= 1.29.1,
-  # the operator caps at 1.28.x). File kept for rollback reference.
-  # - helm/temporal-operator.yaml
+  # temporal-operator source retired with the operator; kept as
+  # helm/temporal-operator.yaml.bak (ADR-030).
   - helm/temporalio.yaml
   - helm/altinity.yaml

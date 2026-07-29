@@ -1,0 +1,27 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: temporal-config-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: infrastructure
+spec:
+  interval: 10m
+  retryInterval: 2m
+
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+
+  # Config half: the Web UI route and the server alerts. The chart is temporal-local.
+  path: ./configs/temporal
+
+  prune: true
+  wait: true
+
+  dependsOn:
+    # The chart first — the ingress names the temporal-web Service it creates, and
+    # alerts on a server that does not exist yet are noise. Same edge
+    # kong-config-local has on kong-local.
+    - name: temporal-local

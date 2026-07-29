@@ -162,4 +162,13 @@ the operator manifests remain commented out for rollback.
 
 ---
 
-_Last updated: 2026-07-28_
+## History
+
+| Date | Change |
+|------|--------|
+| 2026-07-28 | Accepted; re-platform + Worker Versioning decided (see the revision note above). |
+| 2026-07-29 | Chart moved from `configs/temporal/` to `controllers/temporal/` — `controllers/` is where chart-installed platform components live (Kong, Valkey, OpenBAO, …); `configs/` holds what they consume, so the ingress + PrometheusRule stayed there under a `temporal-config-local` Kustomization (the `kong-local` → `kong-config-local` shape). Retirement method changed: instead of commenting out each manifest's contents, the four retired artifacts are **renamed to `.yaml.bak`** with their contents intact — the operator HelmRelease, both operator CRs, and the operator HelmRepository. A file no kustomization lists is already inert, so blanking it only made it unreadable; the suffix also keeps it out of `make validate`, which globs `*.yaml`. Accepted cost: a `.bak` file ships in the OCI artifact as dead weight and stops being syntax-checked or Renovate-tracked. This supersedes **Decision 1**'s statement that the chart lives in `configs/temporal/` and that the operator manifests are "commented out in place" — the intent (a rollback has the exact prior manifests) is unchanged and better served, since a `.bak` file is readable. Both temporal paths added to `scripts/flux-validate.sh`, which had been validating neither. |
+
+---
+
+_Last updated: 2026-07-29_

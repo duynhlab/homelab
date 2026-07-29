@@ -35,6 +35,26 @@ Per-alert investigation guides for OTLP-based RED/Golden Signal alerts on the
 | PgxPoolNearExhaustion | warning | database | [PgxPoolNearExhaustion.md](PgxPoolNearExhaustion.md) |
 | PgxPoolAcquireWaitHigh | warning | database | [PgxPoolAcquireWaitHigh.md](PgxPoolAcquireWaitHigh.md) |
 
+### RFC-0021 stock migration (write path)
+
+Rules: [`prometheusrules/microservices/rfc0021-write-migration.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-write-migration.yaml) ·
+catalog: [§9 RFC-0021 overhaul](../../alerting/alert-catalog.md#9-rfc-0021-overhaul-stock-migration)
+
+These cover a failure class the RED alerts above cannot see: an order and its stock
+can disagree while every service reports perfectly healthy.
+
+| Alert | Sev | Category | Runbook |
+|-------|-----|----------|---------|
+| OrderReconcilerInvariantBreach | critical | correctness | [OrderReconcilerInvariantBreach.md](OrderReconcilerInvariantBreach.md) |
+| FulfillmentStartOutboxStalled | critical | availability | [FulfillmentStartOutboxStalled.md](FulfillmentStartOutboxStalled.md) |
+| FulfillmentStartOutboxFailed | critical | correctness | [FulfillmentStartOutboxFailed.md](FulfillmentStartOutboxFailed.md) |
+| OrderSagaCompensationFailing | critical | correctness | [OrderSagaCompensationFailing.md](OrderSagaCompensationFailing.md) |
+| OrderReconcilerBacklogNotDraining | warning | database | [OrderReconcilerBacklogNotDraining.md](OrderReconcilerBacklogNotDraining.md) |
+| OrderReconcilerBacklogUnreadable | warning | observability | [OrderReconcilerBacklogUnreadable.md](OrderReconcilerBacklogUnreadable.md) |
+| OrderReconcilerDependencyUnreadable | warning | availability | [OrderReconcilerDependencyUnreadable.md](OrderReconcilerDependencyUnreadable.md) |
+| OrderReconcilerPassTruncated | warning | correctness | [OrderReconcilerPassTruncated.md](OrderReconcilerPassTruncated.md) |
+| OrderInventoryCommitLagHigh | warning | latency | [OrderInventoryCommitLagHigh.md](OrderInventoryCommitLagHigh.md) |
+
 ## Retired alerts (reference only)
 
 Documented in [`../microservices-alerts.md`](../microservices-alerts.md): in-flight
@@ -42,4 +62,4 @@ saturation (`MicroserviceHighRequestsInFlight`), `MicroserviceGCThrash`,
 `MicroserviceHighRestartRate` (use `KubePodCrashLooping`).
 
 ---
-_Last updated: 2026-07-18_
+_Last updated: 2026-07-29_

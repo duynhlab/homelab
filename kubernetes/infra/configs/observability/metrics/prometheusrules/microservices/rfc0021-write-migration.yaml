@@ -1,0 +1,277 @@
+# RFC-0021 phase-3 write-migration rules + alerts.
+#
+# The order saga's stock writes migrate Product -> Inventory behind
+# ORDER_STOCK_PARTICIPANT (product|inventory), read by the order API and pinned
+# into each workflow's input, so a flag revert only redirects NEW sagas. Three
+# order-side mechanisms need watching once the write path moves:
+#
+#   1. CommitInventory — mandatory-forward after the ConfirmOrder pivot. A
+#      confirmed order MUST converge to COMMITTED stock; the lag between the two
+#      is the health of that promise.
+#        order_inventory_commit_lag_seconds_{bucket,sum,count}
+#
+#   2. The fulfillment start outbox (ADR-031) — the order row and the intent to
+#      start its saga commit together; a leased dispatcher retries what the
+#      inline start could not.
+#        order_fulfillment_start_outbox_pending / _failed
+#        order_fulfillment_start_outbox_oldest_age_seconds
+#        order_fulfillment_start_dispatch_total{result}
+#
+#   3. The inventory reconciler — repairs terminal orders whose reservation
+#      disagrees with their outcome, and reports what it cannot repair.
+#        order_reconciler_backlog                      (unsettled terminal orders)
+#        order_reconciler_repairs_total{action}         (committed|released|breach|
+#                                                        failed|deferred|unreadable)
+#        order_reconciler_passes_truncated_total        (pass hit its batch cap)
+#
+# WHY absent() APPEARS HERE AND NOT IN THE READ-PATH RULES
+#
+# order_reconciler_backlog is an OTel observable gauge whose callback QUERIES the
+# order database. A failing read deliberately publishes NO value rather than 0,
+# because 0 means "every order's stock agrees" — the one thing an operator must
+# not be told during a database problem. So the failure mode of this signal is
+# DISAPPEARANCE, not a high value, and only a paired absent() alert covers it.
+#
+# That is sound precisely because the callback returns nil on error: OTel's
+# PeriodicReader exports only when Collect() succeeds, so a callback that
+# surfaced its error would blank EVERY series in the process and absent() could
+# no longer tell a database problem from a dead pod. Verified at runtime
+# (2026-07-29): while the backlog query was failing, that series alone went
+# absent while the outbox gauges and HTTP histograms kept flowing.
+#
+# BOTH order processes report the backlog (API + worker) because it is a query
+# with no dependency on the repair loop. Two reporters is not double-counting —
+# it is the same table read twice — but it does mean the series survives the
+# worker being down or ORDER_RECONCILER_ENABLED=false, which are the two
+# situations in which stranded stock accumulates fastest. Alert expressions
+# therefore aggregate rather than assume a single reporter.
+#
+# PRE-CUTOVER READINGS: until an operator sets ORDER_STOCK_PARTICIPANT=inventory,
+# no order takes the inventory branch, so the commit-lag histogram has no series
+# at all and the reconciler settles every order through its product-path branch
+# (a missing reservation is normal there). The rules land now so the signal is
+# ready before the flip, exactly as the read-migration rules did.
+#
+# OTLP push path: no job label; vmagent maps service_name->app, so selectors key
+# on the order-emitted metric name directly.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: rfc0021-write-migration-rules
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/component: recording-rules
+spec:
+  groups:
+    - name: rfc0021-write-migration-5m
+      interval: 30s
+      rules:
+        # Stock-reservation outcomes/sec split by participant — the cutover's
+        # core progress signal. After the flip, product-path rate must fall to 0
+        # as in-flight sagas drain; a stubborn non-zero product rate means
+        # workflows are still being STARTED on the old participant.
+        - record: rfc0021:order_stock_reservation:rate5m
+          expr: sum by (participant, result) (rate(order_stock_reservation_total[5m]))
+
+        # Commit lag p99 — how long a confirmed order's stock stays merely
+        # RESERVED. histogram_quantile over the OTLP-native bucket series.
+        - record: rfc0021:order_inventory_commit_lag:p99_5m
+          expr: |
+            histogram_quantile(
+              0.99,
+              sum by (le) (rate(order_inventory_commit_lag_seconds_bucket[5m]))
+            )
+
+        # Reconciler actions/sec by kind. A steady stream of committed/released
+        # is itself a signal: the saga is supposed to handle those, so the
+        # reconciler earning its keep every minute means something upstream is
+        # failing regularly.
+        - record: rfc0021:order_reconciler_repairs:rate5m
+          expr: sum by (action) (rate(order_reconciler_repairs_total[5m]))
+
+        # One backlog number regardless of how many processes report it.
+        - record: rfc0021:order_reconciler_backlog:max
+          expr: max(order_reconciler_backlog)
+
+    - name: rfc0021-write-migration-alerts
+      rules:
+        # An unsettled terminal order means stock is held or consumed against an
+        # order in the wrong state. A repair that succeeds settles its row, so a
+        # persistently non-zero backlog is work the reconciler CANNOT do.
+        #
+        # 15m, not 10m: the reconciler only examines orders that have been
+        # terminal for its 5m settle delay, and passes run once a minute, so a
+        # freshly failed order legitimately sits in the backlog for several
+        # minutes before anything looks at it.
+        - alert: OrderReconcilerBacklogNotDraining
+          expr: rfc0021:order_reconciler_backlog:max > 0
+          for: 15m
+          labels:
+            severity: warning
+            rfc: "0021"
+          annotations:
+            summary: "Inventory reconciler backlog non-zero for 15m (RFC-0021 write path)"
+            description: >-
+              At least one terminal order's stock has not been confirmed to agree
+              with its outcome for 15m. Stock is either held against an order that
+              will never ship or consumed for one that did not happen.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderReconcilerBacklogNotDraining.md"
+
+        # The paired absent() alert — see the header. A vanished backlog series
+        # is NOT good news: it means every reporter failed to read the table, and
+        # the gauge deliberately publishes nothing rather than a reassuring 0.
+        #
+        # 20m > the 15m dwell above so a rolling restart of both order
+        # Deployments cannot trip it.
+        - alert: OrderReconcilerBacklogUnreadable
+          expr: absent(order_reconciler_backlog)
+          for: 20m
+          labels:
+            severity: warning
+            rfc: "0021"
+          annotations:
+            summary: "Inventory reconciler backlog series absent (RFC-0021 write path)"
+            description: >-
+              No process is reporting order_reconciler_backlog. The gauge reads the
+              order database on every collection cycle and publishes NOTHING when
+              that read fails, so absence means the backlog is unknown — not zero.
+              Both the order API and the worker report it, so this is not a single
+              pod restarting.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderReconcilerBacklogUnreadable.md"
+
+        # A breach is an inconsistency no valid transition can repair (a failed
+        # order whose stock is COMMITTED, a confirmed order whose stock went
+        # back, a confirmed inventory-path order with no reservation at all).
+        #
+        # Alertable BECAUSE the reconciler reports each one ONCE per order rather
+        # than once per pass — a stuck order would otherwise contribute 1,440
+        # increments a day and make one unresolved incident indistinguishable
+        # from a stream of fresh saga failures.
+        - alert: OrderReconcilerInvariantBreach
+          expr: increase(order_reconciler_repairs_total{action="breach"}[1h]) > 0
+          for: 5m
+          labels:
+            severity: critical
+            rfc: "0021"
+          annotations:
+            summary: "Order/inventory invariant breach the reconciler cannot repair (RFC-0021)"
+            description: >-
+              The reconciler found a terminal order whose stock disagrees in a way
+              no valid transition fixes. Money and stock are inconsistent for at
+              least one order and a human must resolve it — the row is left
+              unsettled on purpose so it stays in the backlog.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderReconcilerInvariantBreach.md"
+
+        # The reconciler could not READ an order's state (inventory or the
+        # Temporal frontend unreachable). Distinct from a breach: nothing is
+        # known to be wrong, but nothing is being repaired either, so stranded
+        # stock accumulates silently behind a dependency outage.
+        - alert: OrderReconcilerDependencyUnreadable
+          expr: sum(rate(order_reconciler_repairs_total{action="unreadable"}[10m])) > 0
+          for: 20m
+          labels:
+            severity: warning
+            rfc: "0021"
+          annotations:
+            summary: "Inventory reconciler cannot read order state (RFC-0021 write path)"
+            description: >-
+              For 20m the reconciler has been unable to reach inventory-service or
+              the Temporal frontend for at least one candidate. It defers rather
+              than guessing, so repairs have stopped even though the backlog gauge
+              may still read low.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderReconcilerDependencyUnreadable.md"
+
+        # A truncated pass did not see its whole window, which makes the backlog
+        # gauge a FLOOR rather than a count. Rare by construction: the scan
+        # returns only unsettled orders, so hitting the 200-row cap means
+        # something is wrong at volume.
+        - alert: OrderReconcilerPassTruncated
+          expr: increase(order_reconciler_passes_truncated_total[30m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+            rfc: "0021"
+          annotations:
+            summary: "Inventory reconciler pass hit its batch cap (RFC-0021 write path)"
+            description: >-
+              A reconciler pass returned a full batch, so it did not examine every
+              unsettled order in its window. Treat order_reconciler_backlog as a
+              lower bound until this clears.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderReconcilerPassTruncated.md"
+
+        # CommitInventory is mandatory-forward: after the pivot a confirmed order
+        # must converge to COMMITTED. Lag is measured from the pivot, so this
+        # covers both a slow inventory and a retry loop that is not converging.
+        #
+        # Right-censored by construction: an order whose commit NEVER settles
+        # contributes no observation at all, so a rising p99 is the mild symptom
+        # and the reconciler backlog is the severe one. Both alerts exist for
+        # that reason.
+        - alert: OrderInventoryCommitLagHigh
+          expr: rfc0021:order_inventory_commit_lag:p99_5m > 300
+          for: 15m
+          labels:
+            severity: warning
+            rfc: "0021"
+          annotations:
+            summary: "CommitInventory p99 lag >5m after the pivot (RFC-0021 write path)"
+            description: >-
+              Confirmed orders are taking over 5 minutes to have their stock
+              committed. The saga retries with an elapsed bound; orders that
+              exhaust it stop appearing in this histogram entirely and surface as
+              reconciler backlog instead.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderInventoryCommitLagHigh.md"
+
+        # The outbox's real signal is AGE, not count: a pending row is normal for
+        # milliseconds (the inline start marks it dispatched), so a row waiting
+        # minutes means the inline start failed AND the dispatcher has not
+        # recovered it.
+        - alert: FulfillmentStartOutboxStalled
+          expr: max(order_fulfillment_start_outbox_oldest_age_seconds) > 600
+          for: 10m
+          labels:
+            severity: critical
+            rfc: "0021"
+          annotations:
+            summary: "A fulfillment start request has been pending >10m (RFC-0021 / ADR-031)"
+            description: >-
+              An order committed but its saga has not started for over 10 minutes.
+              The customer sees a created order that is not progressing, and the
+              row holds a payment token whose authorization window is finite.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/FulfillmentStartOutboxStalled.md"
+
+        # A FAILED row is terminal and nothing retries it: the dispatcher gave up
+        # after its attempt cap, so the order is stuck `pending` until a human
+        # requeues it. Any non-zero value is a worklist.
+        - alert: FulfillmentStartOutboxFailed
+          expr: max(order_fulfillment_start_outbox_failed) > 0
+          for: 5m
+          labels:
+            severity: critical
+            rfc: "0021"
+          annotations:
+            summary: "A fulfillment start request reached its attempt cap (RFC-0021 / ADR-031)"
+            description: >-
+              At least one order will never have its saga started without manual
+              action. Nothing retries a FAILED row by design — the payment token
+              has been cleared, so the honest recovery is usually to fail the order
+              and let the customer retry.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/FulfillmentStartOutboxFailed.md"
+
+        # Compensations are the saga's undo path. When one fails after its
+        # retries, the order is left inconsistent in a way the reconciler can only
+        # partially repair (it covers stock, not payment or shipment).
+        - alert: OrderSagaCompensationFailing
+          expr: |
+            sum(rate(order_saga_compensation_total{result="error"}[15m])) > 0
+          for: 15m
+          labels:
+            severity: critical
+            rfc: "0021"
+          annotations:
+            summary: "Order saga compensations are failing (RFC-0021 write path)"
+            description: >-
+              A compensation step has been erroring for 15m. Compensations retry
+              harder than forward steps, so a sustained error rate means orders are
+              being left with stock, money, or shipments in an unwound state.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderSagaCompensationFailing.md"

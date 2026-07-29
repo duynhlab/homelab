@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0021 P3 write-path alerts + runbooks**: nine alerts covering the stock
+  migration's own failure modes — the ones the RED alerts cannot see, because an
+  order and its stock can disagree while every service reports healthy. Commit-lag
+  p99 (mandatory-forward after the pivot), outbox age and terminal-FAILED rows,
+  reconciler backlog, unrepairable breaches, dependency-unreadable, pass
+  truncation, and compensation failure. One runbook per alert.
+  `order_reconciler_backlog` gets a paired **`absent()`** alert because its callback
+  publishes *nothing* rather than `0` when its database read fails — that only works
+  without blanking every other metric because the callback returns nil, and both
+  order processes report it, so a single restart cannot trip the absence alert.
+  Alert catalog gains a **§9 RFC-0021** domain and its count is re-derived from the
+  manifests (184), which also catalogues four alerts that were deployed but never
+  listed: the three earlier RFC-0021 ones and `OtelCollectorDown`. Metrics catalog
+  documents the eight new order series.
+
 - **ADR-031 — fulfillment start outbox** (RFC-0021 P3): the order row and the intent to start its saga now commit in one transaction, because Temporal cannot join it and a crash in between stranded the order `pending` forever. The inline start stays as the fast path; a leased dispatcher in `order-worker` retries what it could not start. Exactly-once is enforced at three layers — `REJECT_DUPLICATE` as the seam **default**, `WorkflowExecutionErrorWhenAlreadyStarted` (without it the SDK swallows the rejection and a refused start looks successful), and describing the existing run before closing a row. Records the accepted trade-offs, including the non-obvious coupling between the dispatcher's attempt cap and the worker's fail-fast Temporal dial: changing one without the other converts a Temporal outage into mass order failure. `docs/api/temporal-order-fulfillment.md` gains a "How the Saga Gets Started" section with the four outbox signals (alert on `oldest_age`, not the count, and with `absent()` handling), and `docs/api/order.md`'s "exactly one durable thing" claim is corrected.
 
 ### Fixed

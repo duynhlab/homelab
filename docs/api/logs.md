@@ -70,7 +70,45 @@ func New(level string) (*zap.Logger, error) {
 
 ---
 
-## Log levels
+## Log level standards
+
+Platform severity taxonomy — use when choosing which zap method to call or
+interpreting exported JSON `level` values:
+
+| Level Name | Value | Description |
+|------------|-------|-------------|
+| **panic** | 5 | System crash (unrecoverable error) |
+| **fatal** | 4 | System exit (critical error) |
+| **error** | 3 | Runtime errors (system continues) |
+| **warn** | 2 | Warnings (potential issues) |
+| **info** | 1 | Normal operation |
+| **debug** | 0 | Detailed debug info |
+| **trace** | -1 | Low-level tracing |
+
+### Library level mapping (zap)
+
+The fleet converged on **`zapx`** (RFC-0014 P4) — see
+[Migration history](#migration-history). Legacy `pkg/logger/zerolog` and
+`pkg/logger/clog` adapters remain in `duynhlab/pkg` but no service imports
+them anymore; all ten API services and workers use `zapx`.
+
+| User Standard | Zap (`zapcore.Level`) |
+|----------------|-----------------------|
+| panic (5) | PanicLevel (4) |
+| fatal (4) | FatalLevel (5) |
+| error (3) | ErrorLevel (2) |
+| warn (2) | WarnLevel (1) |
+| info (1) | InfoLevel (0) |
+| debug (0) | DebugLevel (-1) |
+| trace (-1) | N/A (zap has no trace level) |
+
+`panic` and `fatal` are **logger methods** (`logger.Panic`, `logger.Fatal`) or
+process bootstrap failures — they are **not** valid `LOG_LEVEL` values. The
+platform defines no trace log level.
+
+### Runtime configuration (`LOG_LEVEL`)
+
+What operators and config validation actually accept:
 
 | Runtime level | Use |
 |---------------|-----|
@@ -79,17 +117,17 @@ func New(level string) (*zap.Logger, error) {
 | `warn` | Degraded but handled condition |
 | `error` | Operation failed and the final action is return, abandon, or escalation |
 
-`panic` and `fatal` are reserved for unrecoverable bootstrap/process failures
-and are not valid `LOG_LEVEL` values. The platform defines no trace log level.
-
-### Kubernetes configuration
-
-**Current state** (`kubernetes/apps/`):
+**Kubernetes / service config** (`kubernetes/apps/`, each `*-service/config/config.go`):
 
 - Fleet-wide: `LOG_LEVEL: "info"`, `LOG_FORMAT: "json"`
 - Config validation: `validLogLevels = ["debug", "info", "warn", "error"]`
 
-**Runtime configurability:** `zapx.New(level)` parses and applies `LOG_LEVEL` at startup. The **same level also gates the otelzap tee** — the OTLP bridge is level-gated (`obs.ZapCore(name, minLevel)`) so debug records suppressed on stdout are not exported over OTLP either.
+**Wiring (verified in service `cmd/main.go`):**
+
+- stdout logger: `zapx.New(cfg.Logging.Level)` — internal `parseLevel` maps only the four runtime values; unknown values default to `info`.
+- OTLP tee gate: `zapcore.ParseLevel(os.Getenv("LOG_LEVEL"))` passed to `obs.ZapCore(serviceName, minLevel)` — debug records suppressed on stdout are not exported over OTLP either.
+
+Legacy adapters (`zerolog`, `clog`) accepted the same four `LOG_LEVEL` strings before P4; only the JSON field shapes differed (`msg` vs `message`, Unix vs ISO8601 time).
 
 ---
 

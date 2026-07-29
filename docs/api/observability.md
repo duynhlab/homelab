@@ -70,11 +70,18 @@ These rules apply to every service PR. Rationale: [RFC-0014](../proposals/rfc/RF
        return fmt.Errorf("setup observability: %w", err)
    }
 
-   minLevel := zapx.ParseLevel(cfg.LogLevel)
-   logger := zap.New(zapcore.NewTee(
-       stdoutCore,
-       obs.ZapCore(cfg.ServiceName, minLevel),
-   ))
+   logger, err := zapx.New(cfg.Logging.Level)
+   if err != nil {
+       return fmt.Errorf("setup logger: %w", err)
+   }
+
+   minLevel, err := zapcore.ParseLevel(cfg.Logging.Level)
+   if err != nil {
+       minLevel = zapcore.InfoLevel
+   }
+   logger = logger.WithOptions(zap.WrapCore(func(c zapcore.Core) zapcore.Core {
+       return zapcore.NewTee(c, obs.ZapCore(cfg.ServiceName, minLevel))
+   }))
 
    defer func() {
        shutdownCtx, cancel := context.WithTimeout(

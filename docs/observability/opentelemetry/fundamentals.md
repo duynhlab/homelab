@@ -49,10 +49,16 @@ continuity, log↔trace correlation, and baggage all ride the same object.
 
 The instrumentation libraries split into two deliberately separate layers:
 
-| Layer | What it is | Who imports it here |
-|-------|------------|---------------------|
-| **API** | Interfaces only (`otel.Tracer`, `otel.Meter`, …). **No-op without an SDK** — calls run, nothing is emitted | Everything: `pkg/grpcx`, `pkg/dbx`, middleware, service code |
-| **SDK** | The implementation: sampling, Resource, batching, Views, exporters | **Only `pkg/obsx`** |
+| Layer | What it is | Weight & stability | Who imports it here |
+|-------|------------|--------------------|---------------------|
+| **API** | Interfaces only (`otel.Tracer`, `otel.Meter`, …) — Go module `go.opentelemetry.io/otel`. **No-op without an SDK** — calls run, nothing is emitted | Lightweight, minimal deps; the **stable contract** instrumentation is written against | Everything: `pkg/grpcx`, `pkg/dbx`, middleware, service code |
+| **SDK** | The implementation: sampling, Resource, batching, Views, exporters — `go.opentelemetry.io/otel/sdk*` + exporter modules | Heavier dependency tree; evolves faster than the API | **Only `pkg/obsx`** |
+
+The API is the contract; the SDK is one implementation of it — so **swapping
+or upgrading the SDK touches only setup code, never instrumentation**. That
+asymmetry (stable API, fast-moving SDK) is why `pkg/obsx` pins the
+SDK/contrib/semconv triple and bumps it as a deliberate pkg release: one place
+absorbs SDK churn for the whole fleet.
 
 The SDK plugs in by **registering a provider per signal** — `TracerProvider`,
 `MeterProvider`, `LoggerProvider` — at process start. Until a provider is
@@ -62,6 +68,17 @@ nothing. On this platform `obsx.SetupObservability` is the single place
 providers are built and installed as the OTel globals; a package-level
 `otel.Meter("checkout")` created before setup is safe for the same reason —
 it is a no-op until the provider lands.
+
+The classic mistakes are all violations of that API/SDK line:
+
+- **A shared library importing the SDK** — it drags exporters and config into
+  every consumer and invites version conflicts; `pkg` deliberately keeps the
+  SDK out of `grpcx`/`dbx`/`httpx`.
+- **Registering global providers more than once, or from inside a library** —
+  last write wins and telemetry silently splits; here only
+  `obsx.SetupObservability` registers, exactly once per process.
+- **Instrumenting against SDK types instead of API interfaces** — it compiles
+  today and blocks every future SDK upgrade.
 
 ```mermaid
 flowchart LR

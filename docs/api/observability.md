@@ -191,9 +191,9 @@ observability concerns it must not own.
 |------------------|---------------------|-----------------------|-------------|
 | **HTTP transport — `web/v1`** | HTTP server span and `http.server.*` RED metrics | Validate input, propagate `context.Context`, map errors, and use the context logger | Create a duplicate generic request span; hand-write RED metrics; log raw bodies |
 | **gRPC transport — `grpc/v1`** | Server span, RPC RED metrics, and access log through `pkg/grpcx` | Validate protobuf input, propagate metadata/context, and map typed errors to gRPC status | Duplicate logic; hand-write RPC RED metrics |
-| **Application logic — `logic/v1`** | Inherited context only | Create meaningful domain spans/events and emit business metrics at the authoritative decision point | Depend on Gin/gRPC types; create spans for trivial functions; use IDs as metric labels |
+| **Application logic — `logic/v1`** | Inherited context only | Enrich the current span with business attributes; create meaningful domain spans/events and emit business metrics at the authoritative decision point | Depend on Gin/gRPC types; create spans for trivial functions; use IDs as metric labels |
 | **Core domain — `core/domain`** | None | Enforce pure aggregates, value objects, transitions, and invariants | Import OTel, zap, Gin, gRPC, DB clients, or environment configuration |
-| **Core adapters / repositories** | DB/cache/client spans and metrics through shared adapters | Accept context, annotate meaningful failures, and return typed errors | Construct providers/exporters; log the same error at every layer |
+| **Core adapters / repositories** | DB/cache/client spans and metrics through shared adapters (`otelpgx`, `pkg/grpcx`) | Accept context, annotate meaningful failures, and return typed errors | Construct providers/exporters; hand-wrap driver calls in spans (the driver instrumentation already emits the CLIENT span); log the same error at every layer |
 | **Worker / activity entry point** | Shared process and supported activity instrumentation | Propagate correlation, emit lifecycle logs, and call `logic/v1` directly | Call HTTP handlers; use workflow/order IDs as metric labels |
 | **Temporal workflow code** | Temporal history and supported SDK instrumentation | Use deterministic workflow APIs and replay-safe logging | Perform arbitrary network I/O or telemetry export side effects directly |
 
@@ -228,6 +228,37 @@ flowchart TB
     class ACT worker;
     class DB data;
 ```
+
+### Span kinds by layer
+
+Span **kind** encodes which side of a boundary a span sits on — it is how
+backends build the service graph and where the layer split becomes visible in
+a trace:
+
+| SpanKind | Layer that owns it | Created by |
+|----------|--------------------|------------|
+| `SERVER` | HTTP/gRPC transport in | `otelgin` / `pkg/grpcx` (automatic) |
+| `INTERNAL` | `logic/v1` manual spans (the default kind) | `middleware.StartSpan` |
+| `CLIENT` | Core adapters calling out — DB, cache, gRPC client, provider | `otelpgx` / `pkg/grpcx` (automatic) |
+| `PRODUCER` / `CONSUMER` | Queue and worker boundaries (Temporal) | Supported SDK integration |
+
+### Enrich before you create
+
+When the automatic span is missing business context, the order of preference
+is: **set attributes on the current span → add a span event → only then
+create a child span**. A wrapper span around an already-instrumented call adds
+cost and noise without adding a meaningful duration or error boundary.
+
+```go
+// logic/v1 — the otelgin/otelgrpc span is already active on ctx
+middleware.AddSpanAttributes(ctx,
+    attribute.String("checkout.outcome", outcome),
+)
+```
+
+All span helpers are gated on `span.IsRecording()`, so attribute enrichment
+on unsampled requests costs nothing — but keep expensive value computation
+behind your own check when it isn't a ready value.
 
 ### Examples
 

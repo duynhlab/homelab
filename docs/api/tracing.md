@@ -135,9 +135,19 @@ privacy/retention review.
 HTTP server, gRPC client/server, and supported database spans are automatic.
 Do not add a second generic span around an already-instrumented request or RPC.
 
-Create a manual span only for a meaningful operation that is not otherwise
-visible, such as a multi-step domain use case, provider interaction,
-compensation, reconciliation, or expensive transformation.
+The granularity ladder, in order of preference:
+
+1. **Attributes on the existing span** — business context the auto span is
+   missing (`middleware.AddSpanAttributes`).
+2. **A span event** — a milestone *inside* one operation ("provider
+   contacted", "response received") that needs a timestamp but not its own
+   duration.
+3. **A child span** — only when the operation deserves its own duration and
+   error status: a multi-step domain use case, provider interaction,
+   compensation, reconciliation, or expensive transformation.
+
+A span per function call is the canonical anti-pattern — expensive to
+produce, and it buries the request story under noise.
 
 ### Span naming
 
@@ -218,6 +228,9 @@ compensation.completed
 
 Events must use stable names. IDs and error details are attributes, subject to
 the [cross-signal data policy](./observability.md#cross-signal-data-and-privacy-policy).
+Do not emit events in a loop — spans are not built for hundreds of events;
+per-item detail belongs in correlated logs (or span links for cross-trace
+fan-out).
 
 ---
 

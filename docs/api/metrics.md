@@ -363,17 +363,54 @@ design, dual-port services, health checks, and resilience defaults see
 
 ## OTel instrument types
 
-Every metric is emitted through one of a few **instrument types**. The type is
-not cosmetic — it decides what the SDK aggregates, which PromQL sub-series you
-get, and whether the metric even *has* buckets. Pick the type from the shape of
-the thing you are measuring:
+Every metric is emitted through one of **seven instrument types** — four
+synchronous (recorded inline at the event) and three asynchronous/Observable
+(a callback the SDK invokes at each collection). The type is not cosmetic —
+it decides what the SDK aggregates, which PromQL sub-series you get, and
+whether the metric even *has* buckets:
 
-| Instrument | Shape it measures | Goes down? | PromQL output | Read it with | Platform examples |
-|------------|-------------------|-----------|---------------|--------------|-------------------|
-| **Counter** | a count of events that only grows | No (monotonic) | one `_total` series | `rate()` / `increase()` | `auth_registrations_total`, `payment_authorization_total`, `product_cache_gets_total` |
-| **UpDownCounter** | a running total that rises *and* falls | Yes | one series (no `_total`) | raw value / `last_over_time()` | *(none declared yet — an outbox backlog or an in-flight counter would fit)* |
-| **Histogram** | the *distribution* of a measured value | records values | `_bucket{le=…}` + `_sum` + `_count` | `histogram_quantile()`, `_sum/_count` for the mean | `http_server_request_duration_seconds`, `order_value_minor`, `reviews_rating`, `payment_provider_request_duration_seconds` |
-| **Gauge** (observable) | a point-in-time sample, read each collection | Yes | one series | raw value / `deriv()` | `go_goroutine_count`, `go_memory_used_bytes` |
+| Instrument | Sync? | Shape it measures | Goes down? | PromQL output | Read it with | Platform examples |
+|------------|-------|-------------------|-----------|---------------|--------------|-------------------|
+| **Counter** | sync | a count of events that only grows | No (monotonic) | one `_total` series | `rate()` / `increase()` | `auth_registrations_total`, `payment_authorization_total`, `product_cache_gets_total` |
+| **Observable Counter** | async | a monotonic total cheap to read on demand (rows processed, ticks) | No | one `_total` series | `rate()` / `increase()` | *(none hand-declared — pattern reserved)* |
+| **UpDownCounter** | sync | a running total that rises *and* falls | Yes | one series (no `_total`) | raw value / `last_over_time()` | *(none declared yet — an outbox backlog or an in-flight counter would fit)* |
+| **Observable UpDownCounter** | async | current additive state sampled per collection (queue depth, connections in use) | Yes | one series | raw value | DB pool stats via `otelpgx.RecordStats` (`pkg/dbx`) |
+| **Histogram** | sync | the *distribution* of a measured value | records values | `_bucket{le=…}` + `_sum` + `_count` | `histogram_quantile()`, `_sum/_count` for the mean | `http_server_request_duration_seconds`, `order_value_minor`, `reviews_rating`, `payment_provider_request_duration_seconds` |
+| **Gauge** | sync | a last-value written at the event (non-additive) | Yes | one series | raw value | *(none — stabilized mid-2024; prefer the observable form)* |
+| **Observable Gauge** | async | a point-in-time sample, read each collection (non-additive) | Yes | one series | raw value / `deriv()` | `go_goroutine_count`, `go_memory_used_bytes` |
+
+### Choosing the instrument (the rule)
+
+Two questions decide the instrument — first the **shape**, then the **timing**.
+
+**Axis 1 — shape** (additive × monotonic):
+
+| Is it…? | Additive (summing across sources is meaningful) | Monotonic (only grows) | Instrument family |
+|---------|--------------------------------------------------|------------------------|-------------------|
+| A distribution you'll ask percentiles of | ✅ | ✗ | **Histogram** |
+| A count of events | ✅ | ✅ | **Counter** family |
+| A total that rises and falls | ✅ | ✗ | **UpDownCounter** family |
+| A sampled value where summing is meaningless (CPU %, ratio, temperature — two pods at 60% is not 120%) | ✗ | ✗ | **Gauge** family |
+
+**Axis 2 — timing** (which family member):
+
+- **Sync** — the measurement happens *inside* a request or use case; record it
+  at the event, and it can associate with the active `context.Context`.
+- **Async / Observable** — the value is a cheap-to-read *current state*
+  (pool size, backlog length); recording per event would be wasteful, so
+  register a callback and let the SDK sample it at each export interval.
+
+The correctness trap the async family hides: an **Observable Counter callback
+must report the cumulative total, not the increment** — the SDK computes
+deltas between observations, so reporting increments silently corrupts every
+`rate()` built on it.
+
+Platform defaults: business metrics today are **Counter or Histogram recorded
+synchronously at the authoritative decision point**
+([§ Business metrics](#business-metrics-custom)); the Observable families are
+in use only through shared instrumentation (`runtime`, `otelpgx`). A
+hand-declared Observable instrument follows the same catalog registration as
+any other.
 
 **The bucket insight.** Only **Histograms** have buckets. A Counter is a single
 running number, so asking for its `le=…` buckets is meaningless — that is why a
@@ -427,7 +464,7 @@ outcome is known.
 | Requirement | Contract |
 |-------------|----------|
 | Name | OTel dotted lowercase operation/domain name |
-| Type | Counter for monotonic counts; histogram for distributions; observable gauge only for current state |
+| Type | Per the [instrument selection rule](#choosing-the-instrument-the-rule) — in practice Counter or Histogram at the decision point |
 | Unit | Declared with instrument metadata; not embedded in the OTel name |
 | Labels | Bounded, enumerated values only |
 | Forbidden labels | User, order, payment, cart, session, workflow, SKU, promo code, URL, email, or arbitrary input |

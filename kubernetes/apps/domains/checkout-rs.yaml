@@ -204,6 +204,31 @@ spec:
           - name: SHIPPING_GRPC_ADDR
             value: << inputs.shipping_grpc_addr >>
           <<- end >>
+          <<- if (index inputs "order_stock_participant") >>
+          # RFC-0021 P3: which stock participant NEW workflows take (product |
+          # inventory). Read by the order API only — it stamps the value into the
+          # workflow input at the single fulfillment.Start seam, so the worker is
+          # input-driven and a revert redirects only NEW sagas (ADR-030).
+          #
+          # Emitted here rather than set on the chart, because the mop chart has no
+          # such value: an input with no template block would be silently dropped
+          # and the flag would read as its code default with nothing to show it
+          # never arrived.
+          #
+          # A plain `#` comment, like every other comment in this template — and
+          # deliberately so. A Go template comment (the slash-star form written
+          # inside the action delimiters) is NOT interchangeable: the lexer looks for
+          # the closing delimiter immediately after the star-slash, so one space
+          # before it is a PARSE error that fails the WHOLE ResourceSet — all four
+          # services in this domain — and nothing in `make validate` can see it,
+          # because resourcesTemplate is an opaque string to kubeconform.
+          #
+          # The delimiters cannot even be MENTIONED in prose here: the lexer scans
+          # this text too and would open an action inside a YAML comment. That is
+          # how the first attempt at this block broke.
+          - name: ORDER_STOCK_PARTICIPANT
+            value: << inputs.order_stock_participant >>
+          <<- end >>
           <<- if (index inputs "notification_grpc_addr") >>
           - name: NOTIFICATION_GRPC_ADDR
             value: << inputs.notification_grpc_addr >>

@@ -126,21 +126,27 @@ spec:
         value: mop
       - name: TASK_QUEUE
         value: order-fulfillment
-      # RFC-0021 P3 — OFF for this image bump, on in the env-wiring change that
-      # follows.
+      # RFC-0021 P3 — the inventory reconciler, now with an address to call.
       #
-      # The reconciler repairs terminal orders whose inventory reservation
-      # disagrees with their outcome, so it CALLS inventory-service on a timer. It
-      # defaults to enabled, and INVENTORY_GRPC_ADDR is not wired yet, so leaving
-      # it on would make every candidate read fail: the backlog would stop
-      # draining and OrderReconcilerDependencyUnreadable would fire 20m after this
-      # merges — an alert about missing configuration, not about stock.
+      # It repairs terminal orders whose inventory reservation disagrees with their
+      # outcome: a confirmed order whose CommitInventory gave up, a run terminated
+      # between the pivot and the commit, a compensation that exhausted its retries,
+      # and the Release-before-Reserve orphaned hold inventory-service delegates here.
       #
-      # This is exactly the case the kill switch exists for: keep the image bump
-      # inert and observable on its own, then enable the loop in the same change
-      # that gives it an address to call.
+      # Useful work starts immediately, before any cutover: every terminal order is
+      # product-path, so GetReservation answers NOT_FOUND, the reconciler reads that
+      # as consistent, and the backlog settles to 0. That is what proves the loop and
+      # its NetworkPolicy path work while nothing's stock depends on them.
+      #
+      # Spelled out at its code default, like ORDER_STOCK_PARTICIPANT: flipping it
+      # under pressure must be a one-value edit, and `grep -rn ORDER_RECONCILER
+      # kubernetes/` must find it. `false` is the kill switch for when the
+      # reconciler's JUDGEMENT is suspect during a cutover — not for when its
+      # dependencies are down (it defers on its own then).
       - name: ORDER_RECONCILER_ENABLED
-        value: "false"
+        value: "true"
+      - name: INVENTORY_GRPC_ADDR
+        value: dns:///inventory.inventory.svc.cluster.local:9090
       # Downstream services the activities call (gRPC east-west + cart REST).
       - name: PRODUCT_GRPC_ADDR
         value: dns:///product.product.svc.cluster.local:9090

@@ -15,7 +15,7 @@ spec:
     kind: OCIRepository
     name: infrastructure-oci
 
-  path: ./configs/temporal
+  path: ./controllers/temporal
 
   prune: true
   wait: true

@@ -1,0 +1,14 @@
+# RETIRED — not applied. Kept for reference; the `.bak` suffix is what keeps it out
+# of every kustomization and out of `make validate` (which globs `*.yaml`).
+# Replaced by the official temporalio chart — see ADR-030.
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: temporal-operator
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: helm-repository
+spec:
+  interval: 1h
+  url: https://alexandrevilain.github.io/temporal-operator

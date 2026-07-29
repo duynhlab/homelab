@@ -37,6 +37,11 @@ kubeconform_config=(
 kustomize_overlays=(
   "kubernetes/clusters/local"
   "kubernetes/infra/controllers"
+  # temporal/ is excluded from controllers/kustomization.yaml (it needs its own
+  # Kustomization so apps-local can depend on a Ready server), so a build of
+  # controllers never reaches it — without these lines nothing validated it.
+  "kubernetes/infra/controllers/temporal"
+  "kubernetes/infra/configs/temporal"
   "kubernetes/infra/configs/databases"
   "kubernetes/infra/configs/observability"
   "kubernetes/infra/configs/secrets"

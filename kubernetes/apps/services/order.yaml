@@ -10,7 +10,17 @@ spec:
   type: Static
   defaultValues:
     name: order
-    image_tag: "1.4.0" # {"$imagepolicy": "flux-system:order:tag"}
+    # 1.7.0 carries three merged RFC-0021 P3 slices the cluster has not seen:
+    # the participant-routed saga (1.5.0), the fulfillment start outbox (1.6.0),
+    # and the inventory reconciler (1.7.0). All are INERT until their env is
+    # wired — the saga reads ORDER_STOCK_PARTICIPANT, which defaults to `product`.
+    #
+    # Migrations 000008 (outbox) + 000009 (settlement columns) ride along: the mop
+    # chart's init container reuses this image and runs `migrate` BEFORE the app
+    # container starts, so the schema cannot lag the code that needs it. That
+    # ordering is load-bearing — the outbox insert names `participant`, so an app
+    # ahead of its schema fails every CreateOrder with 42703.
+    image_tag: "1.7.0" # {"$imagepolicy": "flux-system:order:tag"}
     namespace: order
     platform_backup_label: "cnpg"
     replicaCount: 1

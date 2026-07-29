@@ -59,8 +59,9 @@ sanitized warning and continues without profiling. A profiling failure does
 not make application readiness false — core app dependencies still determine
 readiness.
 
-As-built wiring (order-service `cmd/main.go`, the reference shape — gated on
-`cfg.Profiling.Enabled` from `PROFILING_ENABLED`):
+Canonical wiring (the contract shape every service and worker converges on —
+gated on `cfg.Profiling.Enabled` from `PROFILING_ENABLED`, bounded stop, stop
+error always logged):
 
 ```go
 func initProfiling(cfg *config.Config, logger *zap.Logger) func() {
@@ -78,20 +79,17 @@ func initProfiling(cfg *config.Config, logger *zap.Logger) func() {
     logger.Info("Profiling initialized", zap.String("endpoint", cfg.Profiling.Endpoint))
 
     return func() {
-        if err := stop(context.Background()); err != nil {
+        shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.GetShutdownTimeoutDuration())
+        defer cancel()
+        if err := stop(shutdownCtx); err != nil {
             logger.Error("Profiling shutdown error", zap.Error(err))
         }
     }
 }
 ```
 
-**Target refinement (planned):** bound the stop call with the service shutdown
-context (`cfg.GetShutdownTimeoutDuration()`) instead of `context.Background()`,
-and never discard the stop error — today product and auth swallow it (see
-[Known gaps](#known-gaps)).
-
 Do not log a profiler URL containing credentials or query secrets at startup
-(the current `endpoint` field is the credential-free cluster DNS address).
+(the `endpoint` field is the credential-free cluster DNS address).
 
 ---
 
@@ -160,19 +158,6 @@ Full env table: [Application observability § Environment variables](./observabi
 2. Confirm env: `PROFILING_ENABLED=true`, `PYROSCOPE_ENDPOINT` reachable
 
 Backend troubleshooting (Pyroscope pods, RustFS, Grafana datasource): [Profiling (platform) § Troubleshooting](../observability/profiling/README.md#troubleshooting).
-
----
-
-## Known gaps
-
-| Gap | Impact | Decision | Exit criteria |
-|-----|--------|----------|---------------|
-| Pyroscope SDK debug lines | Third-party plaintext noise on stdout | Configure SDK log level or document accepted exception | No `[DEBUG] uploading at…` at normal production log level |
-| `sync.Once` caches a failed setup permanently | A transient failure cannot be retried within the process; complicates tests | Accept (restart recovers) or add a reset for tests | Documented lifecycle matches test behavior |
-| product + auth swallow the profiling stop error | Flush failures at shutdown are invisible | Align with the order pattern (log the error) | All services log profiling shutdown errors |
-| Shutdown shape diverges per service (helper vs inline, `func()` vs `func(ctx) error`) | Four variants of the same wiring | Converge on one helper shape (candidate for promotion into `pkg`) | One shared shape across the fleet |
-
-Cross-link from logging: [Application logging § Known gaps](./logs.md#known-gaps).
 
 ---
 

@@ -30,6 +30,7 @@ flowchart TB
         Tempo[("Tempo<br/>primary · RustFS S3")]
         Jaeger[("Jaeger<br/>in-memory learning UI")]
         VT[("VictoriaTraces v0.9.4<br/>pilot VTSingle")]
+        CH[("ClickHouse<br/>otel_traces · 90d OLAP")]
     end
 
     Grafana{{"Grafana"}}
@@ -45,8 +46,10 @@ flowchart TB
     Processors -->|"OTLP/gRPC"| Tempo
     Processors -->|"OTLP/gRPC"| Jaeger
     Processors -->|"OTLP/HTTP"| VT
+    Processors -->|"native TCP"| CH
     Tempo --> Grafana
     VT --> Grafana
+    CH --> Grafana
     Jaeger --> JaegerUI
 
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
@@ -55,11 +58,13 @@ flowchart TB
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
     classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     class Client,Kong edge;
     class Services service;
     class Workers worker;
     class Receiver,Processors collector;
     class Tempo,Jaeger,VT trace;
+    class CH data;
     class Temporal,Grafana,JaegerUI platform;
 ```
 
@@ -264,31 +269,17 @@ env:
 
 ### OpenTelemetry Collector Configuration
 
-**Fan-out Configuration:**
-```yaml
-# kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml (conceptual example)
-exporters:
-  otlp/tempo:
-    endpoint: tempo.monitoring.svc.cluster.local:4317
-  otlp/jaeger:
-    endpoint: jaeger.monitoring.svc.cluster.local:4317
-  otlphttp/victoriatraces:          # pilot 3rd backend (OTLP HTTP, :10428)
-    traces_endpoint: http://vtsingle-victoria-traces.monitoring.svc.cluster.local:10428/insert/opentelemetry/v1/traces
+The deployed pipelines (`kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`):
 
-  otlphttp/victorialogs:            # Kong runtime-logs (OTLP HTTP, :9428)
-    logs_endpoint: http://vlsingle-victoria-logs.monitoring.svc.cluster.local:9428/insert/opentelemetry/v1/logs
+| Pipeline | Processors | Exporters |
+|----------|------------|-----------|
+| `traces` | `memory_limiter` → `batch` | Tempo (OTLP gRPC) · Jaeger (OTLP gRPC) · VictoriaTraces (OTLP HTTP `:10428`) · **ClickHouse** `otel_traces` |
+| `logs` | `memory_limiter` → `batch` | VictoriaLogs (OTLP HTTP `:9428`) · **ClickHouse** `otel_logs` |
+| `metrics` | `memory_limiter` → `deltatocumulative` → `batch` | vmagent OTLP ingest `:8429` |
 
-service:
-  pipelines:
-    traces:
-      receivers: [otlp]
-      processors: [memory_limiter, batch]
-      exporters: [otlp/tempo, otlp/jaeger, otlphttp/victoriatraces]
-    logs:                           # Kong OTel runtime logs (runs alongside Vector)
-      receivers: [otlp]
-      processors: [memory_limiter, batch]
-      exporters: [otlphttp/victorialogs]
-```
+Full walkthrough — component model, processor ordering, exporter durability,
+the ClickHouse startup coupling, and the troubleshooting runbook:
+[OpenTelemetry Collector](../opentelemetry/collector.md).
 
 **Benefits:**
 - Single configuration point
@@ -307,7 +298,7 @@ service:
 5. **Batch export** every 5 seconds (or when batch full)
 6. **OTLP HTTP** sent to OTel Collector
 7. **Collector processes** (memory limit, batch)
-8. **Fan-out** to Tempo + Jaeger (OTLP gRPC) and VictoriaTraces (OTLP HTTP)
+8. **Fan-out** to Tempo + Jaeger (OTLP gRPC), VictoriaTraces (OTLP HTTP), and ClickHouse (`otel_traces`)
 9. **Backends store** traces
 10. **Query** via Grafana (Tempo) or Jaeger UI
 
@@ -334,9 +325,8 @@ by ratio, downstream honours the parent.
 ### Current Limitations
 
 1. **Jaeger Storage**: in-memory **by design** (data lost on restart) — Jaeger has **no S3/object-storage backend**, and Tempo is the durable store (RustFS S3, 7-day retention), so Jaeger is kept ephemeral as the secondary/learning UI.
-2. **Collector HA**: Single replica (no redundancy)
-3. **Monitoring**: Limited collector metrics visibility
-4. **Security**: No TLS between components
+2. **Collector HA**: Single replica (no redundancy); in-memory exporter queues drop on restart
+3. **Security**: No TLS between components
 
 ### Recommended Improvements
 
@@ -352,20 +342,13 @@ backends:
 - Requires a PVC; data survives pod restarts
 - Currently we keep `memory` and let **Tempo** own durable storage — see [backends-comparison.md](backends-comparison.md)
 
-**2. High Availability:**
-```yaml
-# kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml (conceptual example)
-replicaCount: 2
-```
-- Multiple collector replicas
-- Load balancer for service
-- Health checks and auto-restart
+**2. High Availability:** raise `replicaCount` behind the existing Service —
+head sampling means no trace-ID-aware routing is required. See
+[Collector § Deployment patterns](../opentelemetry/collector.md#deployment-patterns--and-which-one-this-platform-runs).
 
-**3. Monitoring:**
-- Expose collector metrics (port 8888)
-- Create Grafana dashboard
-- Alert on export failures
-- Track trace volume and latency
+**3. Monitoring (in place):** collector self-metrics on `:8888` are scraped and
+alerted — [`OtelMetricsPipelineExportFailures`](../runbooks/microservices/OtelMetricsPipelineExportFailures.md).
+Remaining: a dedicated collector dashboard.
 
 **4. Security:**
 - Enable TLS between collector and backends
@@ -379,7 +362,7 @@ replicaCount: 2
 **What we use:**
 - Jaeger Helm chart (`jaegertracing/jaeger`)
 - GitOps-managed HelmRelease in this repo: `kubernetes/infra/controllers/tracing/jaeger/jaeger.yaml`
-- Reconciled by Flux via the `tracing-local` Kustomization (path `./controllers/tracing`, `dependsOn: [secrets-local, storage-local]`)
+- Reconciled by Flux via the `tracing-local` Kustomization (path `./controllers/tracing`, `dependsOn: [secrets-local, storage-local, clickhouse-local]` — ClickHouse must be up before the collector's `create_schema` runs)
 
 **Why Helm:**
 - ✅ Simple and straightforward
@@ -472,4 +455,4 @@ spec:
 - [Jaeger v2 Deployment Guide](https://www.jaegertracing.io/docs/2.13/deployment/kubernetes/)
 - [OpenTelemetry Operator](https://opentelemetry.io/docs/platforms/kubernetes/operator/)
 
-_Last updated: 2026-07-14 — VictoriaTraces v0.9.4; SDK wiring consolidated into `pkg/obsx.SetupObservability` (one call in `main()`); `otelgin`/`otelgrpc` provide span instrumentation._
+_Last updated: 2026-07-29 — diagrams and pipeline table aligned with the deployed collector (ClickHouse fan-out, `clickhouse-local` ordering); collector deep dive split out to [collector.md](../opentelemetry/collector.md)._

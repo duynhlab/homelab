@@ -22,12 +22,14 @@ how this platform uses it today (Collector topology, sampling, operations).
 
 ## How to use this area
 
-The two documents serve different learning needs. Neither replaces the original
-RFC, which remains the historical decision and rollout record.
+The documents in this area serve different learning needs. None replaces the
+original RFC, which remains the historical decision and rollout record.
 
 | Goal | Start here |
 |------|------------|
+| Learn what OTel is (API vs SDK, signals, OTLP, propagation) | [OTel fundamentals](fundamentals.md) |
 | Build the mental model from zero | [RFC-0014 explainer](rfc-0014-explainer.md) |
+| Understand the Collector (components, patterns, deployed pipelines) | [Collector](collector.md) |
 | Review rules for service code and PRs | [Application observability](../../api/observability.md) |
 | Understand the deployed signal paths | [How it works in this platform](#how-it-works-in-this-platform) |
 | Operate or troubleshoot export | [Operations](#operations) |
@@ -133,18 +135,22 @@ flowchart LR
     TP --> TEMPO["Tempo (primary)"]
     TP --> JAEGER["Jaeger (in-memory UI)"]
     TP --> VT["VictoriaTraces (pilot)"]
+    TP --> CH[("ClickHouse otel_traces")]
     LP --> VL["VictoriaLogs"]
+    LP --> CH2[("ClickHouse otel_logs")]
 
     classDef app fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
     classDef otc fill:#a5d8ff,color:#111,stroke:#1971c2;
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
     classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     class SVC app;
     class KONG edge;
     class TP,LP otc;
     class TEMPO,JAEGER,VT trace;
     class VL log;
+    class CH,CH2 data;
 ```
 
 The metrics path in full (live per RFC-0014 P1–P4):
@@ -156,17 +162,20 @@ flowchart LR
     VMA --> VMS[("VMSingle")]
     COL2 -->|"VL-Stream-Fields:<br/>service.name"| VLX[("VictoriaLogs<br/>trace_id = queryable field")]
     COL2 --> T3["Tempo"]
+    COL2 -->|"logs + traces"| CH3[("ClickHouse")]
 
     classDef app fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef otc fill:#a5d8ff,color:#111,stroke:#1971c2;
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     class SVC2 app;
     class COL2 otc;
     class VMA,VMS metric;
     class VLX log;
     class T3 trace;
+    class CH3 data;
 ```
 
 > Historical note: at the RFC-0014 P3 cutover, checkout-service had not yet
@@ -244,6 +253,6 @@ Quick verification:
 ## References
 
 - Official: [opentelemetry.io/docs/concepts](https://opentelemetry.io/docs/concepts/) · [Go SDK](https://opentelemetry.io/docs/languages/go/) · [versioning & stability](https://opentelemetry.io/docs/specs/otel/versioning-and-stability/) · [Collector](https://opentelemetry.io/docs/collector/) · [sampling](https://opentelemetry.io/docs/concepts/sampling/) · [VictoriaMetrics OTel](https://docs.victoriametrics.com/victoriametrics/integrations/opentelemetry/) · [VictoriaLogs OTel](https://docs.victoriametrics.com/victorialogs/data-ingestion/opentelemetry/)
-- In-house: [Application observability](../../api/observability.md) · [RFC-0014 explainer](rfc-0014-explainer.md) (old-vs-new, beginner) · [RFC-0014](../../proposals/rfc/RFC-0014/README.md) (design record + tracking) · [tracing/README.md](../tracing/README.md) · [tracing/architecture.md](../tracing/architecture.md) · [logging/README.md](../logging/README.md) · [metrics/streaming-aggregation.md](../metrics/streaming-aggregation.md) · [../platform/kong-gateway.md](../../platform/kong-gateway.md)
+- In-house: [OTel fundamentals](fundamentals.md) · [Collector](collector.md) · [Application observability](../../api/observability.md) · [RFC-0014 explainer](rfc-0014-explainer.md) (old-vs-new, beginner) · [RFC-0014](../../proposals/rfc/RFC-0014/README.md) (design record + tracking) · [tracing/README.md](../tracing/README.md) · [tracing/architecture.md](../tracing/architecture.md) · [logging/README.md](../logging/README.md) · [metrics/histograms.md](../metrics/histograms.md) · [metrics/streaming-aggregation.md](../metrics/streaming-aggregation.md) · [../platform/kong-gateway.md](../../platform/kong-gateway.md)
 
 _Last updated: 2026-07-14 — moved into the OpenTelemetry area; verified SDK, protocol, worker coverage, environment differences, and checkout rollout history._

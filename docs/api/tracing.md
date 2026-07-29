@@ -86,9 +86,28 @@ context via `pkg/grpcx`.
 
 ### Baggage
 
-The platform does not use application baggage by default. New baggage keys
-require review because they propagate across every downstream hop and can leak
-data or add cost.
+Baggage is request-scoped key-value context that rides the W3C **`baggage`**
+header next to `traceparent`. `pkg/obsx` installs the composite propagator
+(`TraceContext` + `Baggage`), so any baggage set on the context **propagates
+automatically** on every instrumented HTTP/gRPC call — no custom headers, no
+parameter drilling through intermediate services.
+
+Rules when a use case is approved:
+
+- Baggage is **immutable** — each set returns a new context; use *that*
+  context for downstream calls or the value never leaves the process.
+- Backends **do not store baggage**. To analyze it later, copy the value onto
+  a span attribute or log field at the service that consumes it.
+- Unlike span attributes (retrospective), baggage is readable **at runtime**
+  by downstream services — the legitimate use case is steering behavior
+  (feature flags, A/B variant) without a shared metadata store.
+- **Security:** baggage is attached to outbound calls indiscriminately,
+  including third-party HTTP calls — never put PII, tokens, or secrets in it,
+  and strip keys before calling external providers.
+
+The platform default remains **no application baggage**: new baggage keys
+require review because they propagate across every downstream hop and add
+per-request header cost.
 
 ---
 

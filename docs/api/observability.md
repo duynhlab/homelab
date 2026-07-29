@@ -64,12 +64,13 @@ These rules apply to every service PR. Rationale: [RFC-0014](../proposals/rfc/RF
 
 1. **One wiring point.** Services call `obsx.SetupObservability(ctx, cfg)` once in `main()`. No hand-built OTel providers. Verified signatures (`duynhlab/pkg`, 2026-07-29): `obsx.ConfigFromEnv() Config`, `obsx.SetupObservability(ctx, Config) (*Observability, error)`, `(*Observability).Shutdown(ctx) error`, `(*Observability).ZapCore(scopeName, minLevel) zapcore.Core`.
 
-   As-built bootstrap (the shape every service `cmd/main.go` implements —
-   setup failure is deliberately **non-fatal**: the service serves traffic
-   without telemetry rather than crash-loop on a collector outage):
+   Canonical bootstrap (the contract shape every service `cmd/main.go`
+   converges on). Setup failure is deliberately **non-fatal**: the service
+   serves traffic without telemetry rather than crash-loop on a collector
+   outage.
 
    ```go
-   logger, err := zapx.New(os.Getenv("LOG_LEVEL")) // auth/cart pass cfg.Logging.Level
+   logger, err := zapx.New(cfg.Logging.Level) // validated config, not a raw env read
    if err != nil {
        panic("Failed to initialize logger: " + err.Error())
    }
@@ -84,7 +85,7 @@ These rules apply to every service PR. Rationale: [RFC-0014](../proposals/rfc/RF
        logger.Warn("Failed to initialize OpenTelemetry", zap.Error(err))
    } else {
        tp = obs
-       minLevel, lvlErr := zapcore.ParseLevel(os.Getenv("LOG_LEVEL"))
+       minLevel, lvlErr := zapcore.ParseLevel(cfg.Logging.Level)
        if lvlErr != nil {
            minLevel = zapcore.InfoLevel
        }
@@ -95,9 +96,10 @@ These rules apply to every service PR. Rationale: [RFC-0014](../proposals/rfc/RF
    ```
 
    Shutdown is the **last step of the ordered graceful-shutdown sequence**
-   (after the HTTP/gRPC servers stop), bounded by the same shutdown context —
+   (after the HTTP/gRPC servers stop), bounded by the shutdown context —
    `cfg.ShutdownTimeout` is an `int` of seconds behind
-   `cfg.GetShutdownTimeoutDuration()`:
+   `cfg.GetShutdownTimeoutDuration()`. Workers follow the same rule: every
+   process flushes through a bounded `Shutdown` before exit.
 
    ```go
    shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.GetShutdownTimeoutDuration())
@@ -165,16 +167,16 @@ Profiling (`obsx.SetupProfiling`) pushes out-of-band to Pyroscope — see [Appli
 
 ### Health, readiness, and reflection filtering
 
-Verified 2026-07-29 against the service `middleware/tracing.go` files and
-`pkg/grpcx`:
+Routine probes are traffic about the platform, not the domain — they are
+excluded from every request-scoped signal:
 
-| Signal | As-built | Target |
-|--------|----------|--------|
-| HTTP spans + `http.server.*` RED | **Filtered** — each service's `TracingMiddleware` skips `/health`, `/healthz`, `/ready`, `/readyz`, `/livez`, `/metrics`, `/favicon.ico` (prefix match) before `otelgin` runs, so those paths emit no span and no metric | Same |
-| gRPC spans + RPC RED | **Filtered** — `pkg/grpcx` `otelgrpc.WithFilter` excludes `grpc.health.v1.Health` and `grpc.reflection.*` | Same |
-| gRPC access logs | **Filtered** — the `pkg/grpcx` access interceptor skips the same health/reflection prefixes | Same |
-| HTTP access logs | **Not filtered** — every routine probe logs one `info` line ([known gap](./logs.md#known-gaps)) | Exclude routine success probes; keep readiness transitions and failed probes |
-| Startup/shutdown logs | Always retained | Same |
+| Signal | Contract | Enforced by |
+|--------|----------|-------------|
+| HTTP spans + `http.server.*` RED | Exclude `/health`, `/healthz`, `/ready`, `/readyz`, `/livez`, `/metrics`, `/favicon.ico` (prefix match) | `TracingMiddleware` skips before `otelgin` runs — no span, no metric |
+| gRPC spans + RPC RED | Exclude `grpc.health.v1.Health` and `grpc.reflection.*` | `pkg/grpcx` `otelgrpc.WithFilter` |
+| gRPC access logs | Exclude the same health/reflection prefixes | `pkg/grpcx` access interceptor |
+| HTTP access logs | Exclude routine successful probes; keep failed probes and readiness transitions | Skip list in the logging middleware (same list as `TracingMiddleware`) |
+| Startup/shutdown logs | Always retained | — |
 
 ---
 
@@ -450,6 +452,8 @@ A service or worker PR is observability-compliant only when:
 - [ ] Shutdown uses a bounded context and flushes enabled providers.
 - [ ] The service does not construct OTel SDK providers or exporters directly.
 - [ ] The logger OTLP branch is gated on the same `LOG_LEVEL` as the stdout branch.
+- [ ] Access logs follow the semconv field schema in [logs.md](./logs.md#access-log-policy).
+- [ ] Exported log records carry the full [LogRecord mapping](./logs.md#otel-log-data-model) (trace context, resource, scope).
 - [ ] HTTP middleware order is tracing, then logging.
 - [ ] gRPC servers and clients use `pkg/grpcx`.
 - [ ] Transport handlers propagate the incoming context into `logic/v1`.

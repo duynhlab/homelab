@@ -470,7 +470,8 @@ If Vector is consuming too much memory:
 
 ## References
 
-- [Application logging (app contract)](../../api/logs.md)
+- [Application logging (app contract)](../../api/logs.md) — includes the [OTel LogRecord data model](../../api/logs.md#otel-log-data-model) every exported record follows (SeverityNumber, Body, Resource, trace correlation)
+- [OpenTelemetry Collector](../opentelemetry/collector.md) — the logs pipeline this hub's OTLP path runs through (VictoriaLogs + ClickHouse fan-out)
 - [Observability overview](../README.md) · [Grafana datasources](../grafana/datasources.md)
 - [VictoriaLogs docs](https://docs.victoriametrics.com/victorialogs/) · [LogsQL](https://docs.victoriametrics.com/victorialogs/logsql/) · [Vector docs](https://vector.dev/docs/)
 

@@ -47,6 +47,7 @@ flowchart TB
         Tempo[("Tempo<br/>durable on RustFS")]
         Jaeger[("Jaeger<br/>in-memory UI")]
         VT[("VictoriaTraces :10428<br/>pilot")]
+        CH[("ClickHouse :9000<br/>otel_logs · otel_traces")]
         Pyro[("Pyroscope :4040")]
     end
 
@@ -66,6 +67,7 @@ flowchart TB
     Kong -->|"OTLP runtime logs + spans"| Receiver
     Processors -->|"metrics"| VMAgent
     Processors -->|"logs"| VLogs
+    Processors -->|"logs + traces"| CH
     Processors -->|"traces"| Tempo
     Processors -->|"traces"| Jaeger
     Processors -->|"traces"| VT
@@ -78,6 +80,7 @@ flowchart TB
     Tempo --> Grafana
     Jaeger --> Grafana
     VT --> Grafana
+    CH --> Grafana
     Pyro --> Grafana
 
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
@@ -90,12 +93,14 @@ flowchart TB
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
     classDef profile fill:#f3d9fa,color:#111,stroke:#9c36b5;
     classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     class Services service;
     class Workers worker;
     class Receiver,Processors collector;
     class VMAgent,VMSingle metric;
     class Vector,VLogs log;
     class Tempo,Jaeger,VT trace;
+    class CH data;
     class Pyro profile;
     class Sloth,VMAlert,VMAM,Grafana platform;
     class Kong edge;
@@ -114,6 +119,7 @@ graph LR
         Profile["Profiles path"]:::profile
         Platform["Control / query plane"]:::platform
         External["External / non-SDK workload"]:::external
+        Data["Multi-signal store"]:::data
     end
 
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
@@ -126,6 +132,7 @@ graph LR
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
     classDef profile fill:#f3d9fa,color:#111,stroke:#9c36b5;
     classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
 ```
 
 
@@ -253,6 +260,8 @@ docs/observability/
 ├── stack-review.md               # Whole-stack review: per-signal maturity scorecard + ranked gaps
 ├── opentelemetry/                 # OTel collector topology, sampling, operations
 │   ├── README.md                  # Platform deployment doc (policy → api/observability.md)
+│   ├── fundamentals.md           # OTel primer: API vs SDK, signals, OTLP, propagation
+│   ├── collector.md              # Collector deep dive: components, patterns, deployed pipelines
 │   └── rfc-0014-explainer.md     # Beginner old-vs-new walkthrough
 │
 ├── metrics/                      # Pillar 1: Metrics collection & storage
@@ -261,6 +270,7 @@ docs/observability/
 │   ├── metrics-infra.md          # Cluster / infrastructure metrics (USE)
 │   ├── victoriametrics.md        # VictoriaMetrics Operator stack (incl. VMAuth planned)
 │   ├── promql-guide.md           # PromQL reference
+│   ├── histograms.md             # Histogram & temporality fundamentals (explicit vs exponential)
 │   ├── streaming-aggregation.md  # At-scale playbook: in-flight aggregation (RFC-0013)
 │   └── postgresql/               # PostgreSQL metrics + learning hub
 │       ├── README.md             # Hub: architecture, learning path, runbook links
@@ -344,7 +354,7 @@ cluster-scoped CRDs would make upgrades ambiguous.
 | Tempo | monitoring | `tempo` | 3200 | Trace storage (OTLP receiver) |
 | Jaeger | monitoring | `jaeger` | 16686 | Trace query UI (alternative to Tempo) |
 | VictoriaTraces | monitoring | `vtsingle-victoria-traces` | 10428 | Trace storage pilot (`v0.9.4`, OTLP HTTP + Jaeger query API) |
-| OTel Collector | monitoring | `otel-collector-opentelemetry-collector` | 4318 | OTLP/HTTP ingress — metrics (→ vmagent), logs (app tee + Kong runtime), trace fan-out |
+| OTel Collector | monitoring | `otel-collector-opentelemetry-collector` | 4317/4318 | OTLP ingress (gRPC + HTTP) — metrics (→ vmagent), logs (app tee + Kong runtime → VictoriaLogs + ClickHouse), trace fan-out (Tempo/Jaeger/VT + ClickHouse) — see [collector.md](opentelemetry/collector.md) |
 | VictoriaLogs | monitoring | `vlsingle-victoria-logs` | 9428 | Log storage and query (LogsQL, sole log backend) |
 | Vector | kube-system | DaemonSet | -- | Log shipping for **non-instrumented** pods (DBs, Kong access log, PG plans, frontend); app logs go OTLP |
 | Pyroscope | monitoring | `pyroscope` | 4040 | Continuous profiling |
@@ -414,8 +424,11 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 ## Related Documentation
 
 - [OpenTelemetry (platform)](opentelemetry/README.md) -- Collector topology, sampling, operations (app policy → [api/observability.md](../api/observability.md))
+- [OpenTelemetry fundamentals](opentelemetry/fundamentals.md) -- API vs SDK, signals and when to use each, OTLP transport, propagation & baggage
+- [OpenTelemetry Collector](opentelemetry/collector.md) -- component model, deployment patterns, the deployed pipelines walked end to end
 - [RFC-0014 explainer](opentelemetry/rfc-0014-explainer.md) -- beginner old-vs-new migration walkthrough
 - [Metrics: RED/USE/Golden Signals](metrics/README.md) -- metrics methodology
+- [Histograms & temporality](metrics/histograms.md) -- bucket mechanics, explicit vs exponential, delta vs cumulative
 - [VictoriaMetrics Operator](metrics/victoriametrics.md) -- migration from kube-prometheus-stack
 - [Grafana Datasources](grafana/datasources.md) -- VictoriaMetrics plugin metrics datasource
 - [Alerting Strategy](alerting/README.md) -- 2-layer alerting (threshold + SLO burn-rate)
@@ -427,4 +440,4 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-07-22 — app contracts moved to docs/api/; platform depth retained here._
+_Last updated: 2026-07-29 — added OTel fundamentals/collector/histograms docs; stack diagram now shows the live ClickHouse fan-out._

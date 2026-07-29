@@ -123,9 +123,40 @@ cross-service `histogram_quantile()` comparisons and blunt SLO precision
 | 5, 10 | Timeouts, degraded responses |
 
 `http_server_request_body_size_bytes` / `http_server_response_body_size_bytes`
-use a byte-bucket View (`100, 1000, 10000, 100000, 1000000`) — semconv gives no
-size-bucket advice — and measure the HTTP body only (not TCP/IP, headers, or
-TLS overhead).
+use a byte-bucket View (`256, 1024, 4096, 16384, 65536, 262144, 1048576,
+4194304` — powers of four from 256 B to 4 MiB; semconv gives no size-bucket
+advice) and measure the HTTP body only (not TCP/IP, headers, or TLS overhead).
+
+### Bucket semantics
+
+- A boundary array of N values defines **N+1 buckets**: each bucket is
+  `(lower, upper]` — inclusive of its upper bound — plus an implicit overflow
+  bucket `(max, +∞)` that catches everything above the last boundary.
+- Every exported histogram point carries **Count**, **Sum**, and the
+  per-bucket counts (optionally Min/Max). Percentiles are **computed by the
+  backend** from bucket counts (`histogram_quantile()`), never by the SDK —
+  which is why boundary placement decides quantile accuracy.
+- The SDK keeps **one metric stream per unique attribute set** — every new
+  label combination materializes a full set of bucket series. This is why ID
+  labels are forbidden: one `user_id` label turns 32 histogram series into 32
+  series *per user*.
+
+### Temporality
+
+Every OTel metric stream has an **aggregation temporality**:
+
+| Temporality | Each export contains | Fits |
+|-------------|----------------------|------|
+| **Cumulative** | The running total since process start | Prometheus-lineage backends (`rate()` computes the delta) |
+| **Delta** | Only the change since the previous export | Backends that re-aggregate server-side |
+
+Platform contract: **cumulative** — the Go SDK default, and what
+VictoriaMetrics expects (RFC-0017 D-7). The collector's `deltatocumulative`
+processor is purely defensive: a delta sample stored in VictoriaMetrics would
+silently break `rate()`. Services never override temporality.
+
+Deep dive (explicit vs exponential histograms, temporality mechanics):
+[Histograms (platform)](../observability/metrics/histograms.md).
 
 ## Labels & provenance
 

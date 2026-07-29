@@ -33,13 +33,13 @@ kubectl logs -n cart deployment/cart --tail=50
 
 ### Log output format
 
-Representative access-log line (middleware-owned summary, as emitted today):
+Canonical access-log line (middleware-owned summary):
 
 ```json
-{"level":"info","timestamp":"2026-07-09T02:12:04.455Z","caller":"middleware/logging.go:42","message":"HTTP request","trace_id":"94c290a2e22a985f6f9fa2337e476443","method":"GET","path":"/health","status":200,"duration":0.000134,"client_ip":"10.244.1.1","user_agent":"kube-probe/1.33"}
+{"level":"info","timestamp":"2026-07-09T02:12:04.455Z","caller":"middleware/logging.go:42","message":"HTTP request","trace_id":"94c290a2e22a985f6f9fa2337e476443","http.request.method":"GET","http.route":"/order/v1/private/orders","http.response.status_code":200,"duration_seconds":0.042}
 ```
 
-The stdout line above is what `kubectl logs` shows; the same record is also exported over OTLP to VictoriaLogs by the otelzap tee. `duration` is a zap `Duration` field rendered with the production default encoder — a float of **seconds**. Note the `/health` probe line: HTTP access logs are not probe-filtered today (see [Access-log policy](#access-log-policy)).
+The stdout line is what `kubectl logs` shows; the same record is also exported over OTLP to VictoriaLogs by the otelzap tee.
 
 ---
 
@@ -67,6 +67,59 @@ func New(level string) (*zap.Logger, error) {
 ```
 
 `trace_id`/`span_id` are injected from the OpenTelemetry span context in the logging middleware, so a log line and its trace join on one id.
+
+---
+
+## OTel log data model
+
+Every exported record is an OpenTelemetry **LogRecord**. This is the platform
+contract for what a log record *is* — the JSON on stdout is a rendering of it,
+and the OTLP export carries it natively.
+
+| Field | What it means | Why it matters |
+|-------|---------------|----------------|
+| `Timestamp` | Time when the event occurred | Builds the incident timeline |
+| `ObservedTimestamp` | Time when the collection system observed the event | Identifies parsing or ingestion lag |
+| `TraceId` | Trace associated with the log | Enables log-to-trace correlation |
+| `SpanId` | Span associated with the log | Pinpoints where in a request the log was emitted |
+| `TraceFlags` | W3C trace flags | Preserves trace context and sampling decision |
+| `SeverityText` | Original severity label (`INFO`, `ERROR`) | Keeps log levels human-readable |
+| `SeverityNumber` | Normalized numeric severity (1–24) | Enables consistent filtering and alerting across languages |
+| `Body` | Main log message or structured payload | Stores the core event detail |
+| `Resource` | Entity that produced the log (service, pod, namespace) | Supports grouping and ownership |
+| `InstrumentationScope` | Library or scope that emitted the log | Debugs instrumentation sources |
+| `Attributes` | Additional key-value context | Filtering, grouping, enrichment |
+
+### SeverityNumber ranges
+
+OTel normalizes severity into numeric ranges so backends can filter and alert
+without parsing language-specific label strings:
+
+| Range | Meaning | zap level mapped by the otelzap bridge |
+|-------|---------|----------------------------------------|
+| 1–4 | TRACE | — (zap has no trace level) |
+| 5–8 | DEBUG | `DebugLevel` |
+| 9–12 | INFO | `InfoLevel` |
+| 13–16 | WARN | `WarnLevel` |
+| 17–20 | ERROR | `ErrorLevel` |
+| 21–24 | FATAL | `FatalLevel` / `PanicLevel` |
+
+### How the platform stack fills the LogRecord
+
+| LogRecord field | Filled by |
+|-----------------|-----------|
+| `Timestamp` | zap entry time (`zapx` `timestamp`) |
+| `ObservedTimestamp` | otelzap bridge / OpenTelemetry Collector at receive time |
+| `TraceId`, `SpanId`, `TraceFlags` | `obsx.TraceContext(ctx)` bound to the request logger |
+| `SeverityText`, `SeverityNumber` | zap `level` via the otelzap bridge |
+| `Body` | zap `message` |
+| `Resource` | `pkg/obsx` resource (`service.name`, namespace, pod, version — from `OTEL_SERVICE_NAME` + Downward API) |
+| `InstrumentationScope` | the scope name passed to `obs.ZapCore(scopeName, minLevel)` |
+| `Attributes` | every `zap.Field` on the entry (`caller` included) |
+
+Every field in this mapping is wired by shared code (`pkg/obsx`, `zapx`,
+middleware) — a service author only writes `logger.Info(message, fields…)` and
+the full LogRecord shape falls out.
 
 ---
 
@@ -122,10 +175,10 @@ What operators and config validation actually accept:
 - Fleet-wide: `LOG_LEVEL: "info"`, `LOG_FORMAT: "json"`
 - Config validation: `validLogLevels = ["debug", "info", "warn", "error"]`
 
-**Wiring (verified 2026-07-29 against `duynhlab/pkg` and every service `cmd/main.go`):**
+**Wiring contract:**
 
-- stdout logger: `zapx.New(level)` — `zapx.parseLevel` recognises the four runtime values; anything else defaults to `info`. auth and cart pass `cfg.Logging.Level`; the other eight services pass `os.Getenv("LOG_LEVEL")` directly (same value, but bypasses config — see [Known gaps](#known-gaps)).
-- OTLP tee gate: every service computes `minLevel` via `zapcore.ParseLevel(os.Getenv("LOG_LEVEL"))` (fallback `info`) and passes it to `obs.ZapCore(serviceName, minLevel)` — debug records suppressed on stdout are not exported over OTLP either.
+- stdout logger: `zapx.New(cfg.Logging.Level)` — the validated config value, not a raw env read. `zapx.parseLevel` recognises the four runtime values; anything else defaults to `info`.
+- OTLP tee gate: the **same level** gates the export branch — `zapcore.ParseLevel` (fallback `info`) passed to `obs.ZapCore(serviceName, minLevel)` — so debug records suppressed on stdout are not exported over OTLP either.
 
 Legacy adapters (`zerolog`, `clog`) accepted the same four `LOG_LEVEL` strings before P4; only the JSON field shapes differed (`msg` vs `message`, Unix vs ISO8601 time).
 
@@ -187,24 +240,27 @@ HTTP and gRPC middleware own **one request/RPC summary record** per call.
 Handlers must not also write generic `logger.Info("HTTP request", …)` unless
 they are logging a separate domain event.
 
-**As-built fields (verified 2026-07-29):**
+**Access-log field schema (contract):**
 
-| Signal | Message | Fields |
-|--------|---------|--------|
-| HTTP (per-service `middleware/logging.go`) | `HTTP request` | `trace_id`, `method`, `path`, `status`, `duration` (seconds float), `client_ip`, `user_agent`; level `error` when status ≥ 400, else `info` |
-| gRPC (`pkg/grpcx` access interceptor) | `gRPC request` | `trace_id`, `method`, `code`, `duration`, `peer`; level `error` for any non-OK code |
+| Field | Notes |
+|-------|-------|
+| `http.request.method` | HTTP verb |
+| `http.route` | Route template, never the raw path with IDs |
+| `http.response.status_code` | Final status |
+| `duration_seconds` | Request latency, explicit unit |
+| `rpc.system`, `rpc.service`, `rpc.method` | gRPC access logs |
+| `grpc.code` | gRPC status |
+| `trace_id` | When span context exists |
 
-**Target access-log schema (planned — not emitted today):** semconv-shaped keys
-`http.request.method`, `http.route` (route template, not raw path),
-`http.response.status_code`, an explicit-unit latency field
-(`duration_seconds`), `rpc.system`/`rpc.service`/`rpc.method`, `grpc.code`.
-Adopting it is a fleet-wide middleware change tracked in [Known gaps](#known-gaps).
+Level policy: `error` for HTTP status ≥ 400 / any non-OK gRPC code, else
+`info`. HTTP messages are `HTTP request`, gRPC messages are `gRPC request`.
 
-**Probe filtering (as-built):** the gRPC access interceptor skips
-`grpc.health.v1.Health` and reflection RPCs. HTTP access logs have **no** probe
-filter — every kube-probe hit logs one `info` line today. Target: drop routine
-successful probe lines, keep failed probes and readiness transitions. Signal
-matrix: [Application observability § Health filtering](./observability.md#health-readiness-and-reflection-filtering).
+**Probe filtering (contract):** no routine successful health/readiness probe
+access logs on either transport; keep failed probes and readiness state
+transitions. gRPC enforces this in the `pkg/grpcx` access interceptor
+(`grpc.health.v1.Health` + reflection skipped); the HTTP logging middleware
+applies the same skip list as `TracingMiddleware`. Signal matrix:
+[Application observability § Health filtering](./observability.md#health-readiness-and-reflection-filtering).
 
 ---
 
@@ -262,19 +318,6 @@ Do not log collector or Pyroscope endpoints when they could contain embedded cre
 
 ---
 
-## Known gaps
-
-| Gap | Impact | Decision | Exit criteria |
-|-----|--------|----------|---------------|
-| Gin framework plaintext logs | Breaks JSON consistency | Redirect/disable default writer | No `[GIN]` lines in smoke test |
-| Pyroscope SDK debug lines | Third-party plaintext noise | Configure SDK or document accepted exception — see [profiling.md](./profiling.md#known-gaps) | No debug line at normal log level |
-| HTTP access logs not probe-filtered | One `info` line per kube-probe hit, per pod | Add a skip list to the HTTP logging middleware (keep failed probes) | No routine `/health`/`/ready` 2xx lines in smoke test |
-| Access-log field names are pre-semconv (`method`/`path`/`status`) | Diverges from the target semconv schema above | Fleet-wide middleware rename, one release | Emitted fields match the target schema |
-| Eight services build the logger from `os.Getenv("LOG_LEVEL")`, not `cfg.Logging.Level` | Logger exists before config validation; invalid level silently becomes `info` | Unify on `cfg.Logging.Level` (auth/cart pattern) | All ten `cmd/main.go` pass the config value |
-| auth-service OTLP branch lacks native trace correlation | Its logging middleware binds only the string `trace_id`, never `obsx.TraceContext`, so exported records carry no OTLP trace/span IDs | Align with the order/product pattern | auth OTLP records join traces in VictoriaLogs |
-
----
-
 ## Migration history
 
 Pre-P4 library migrations (RFC-0014 P4 converged the fleet on `zapx`):
@@ -302,4 +345,4 @@ Before RFC-0014 P4, three loggers coexisted (zap, clog, zerolog). The otelzap te
 - [Logging (platform)](../observability/logging/README.md)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-07-29 — canonical app logging contract; as-built claims verified against `duynhlab/pkg` and the service repos._
+_Last updated: 2026-07-29 — canonical app logging contract; adds the OTel LogRecord data model and the semconv access-log schema._

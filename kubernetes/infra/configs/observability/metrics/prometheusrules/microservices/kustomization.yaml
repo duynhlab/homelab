@@ -7,3 +7,4 @@ resources:
   - rfc0021-baseline.yaml # overhaul baseline (CP-0 gate: 7 days of data)
   - inventory.yaml # RFC-0021 P1-9: inventory recording rules + alerts
   - rfc0021-read-migration.yaml # RFC-0021 P2-7: shadow-compare rules + divergence alert
+  - rfc0021-write-migration.yaml # RFC-0021 P3-10: commit-lag, outbox, reconciler alerts

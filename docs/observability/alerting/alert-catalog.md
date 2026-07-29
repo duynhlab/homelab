@@ -19,11 +19,17 @@ the end-to-end pipeline (ingestion → VMAlert → Alertmanager → notify), see
 
 ## Summary
 
-**164 statically-defined alerts** across 8 domains, plus **60 Sloth-generated** SLO
+**184 statically-defined alerts** across 9 domains, plus **60 Sloth-generated** SLO
 burn-rate alerts (2 × 30 SLOs). The 30 SLOs cover all 10 Go services through
 the four domain ResourceSets. Two CNPG topology rules are **gated** (not
 deployed) and a subset is **inactive on Kind** (platform limitations) — both
 marked inline below.
+
+The count is re-derived from the manifests (`- alert:` occurrences under
+`prometheusrules/**` plus `temporal/prometheusrule.yaml`), not incremented by hand.
+It rose by 20 rather than by the 9 this change adds: domain 9 below also catalogues
+the RFC-0021 alerts that shipped in earlier phases, and `OtelCollectorDown`, which
+had been deployed but never listed here.
 
 | Domain | Count | Protects |
 |--------|-------|----------|
@@ -34,7 +40,8 @@ marked inline below.
 | [Kubernetes](#5-kubernetes) | 29 | Nodes, workloads, pods, API server, control plane, network |
 | [GitOps (Flux + cert-manager)](#6-gitops-flux--cert-manager) | 9 | Delivery pipeline + TLS |
 | [VictoriaMetrics self-health](#7-victoriametrics-self-health) | 31 | The monitoring system itself |
-| [Tempo / Temporal / Pyroscope / Watchdog](#8-tempo--temporal--pyroscope--watchdog) | 10 | Tracing, workflows, profiling, dead-man's-switch |
+| [Tempo / Temporal / Pyroscope / Watchdog](#8-tempo--temporal--pyroscope--watchdog) | 11 | Tracing, workflows, profiling, dead-man's-switch, OTLP collector |
+| [RFC-0021 overhaul (stock migration)](#9-rfc-0021-overhaul-stock-migration) | 12 | The Product→Inventory stock migration: saga write path, start outbox, reconciler, shadow reads |
 | [SLO burn-rate (Sloth)](#slo-burn-rate-alerts-sloth-generated) | 60 (generated) | Error-budget burn across all 10 services |
 
 ---
@@ -321,11 +328,62 @@ Source: `prometheusrules/observability/tempo-alerts.yaml`, `prometheusrules/obse
 | TemporalActivityFailureRateHigh | warning | failed-activity ratio >5% | A downstream call (product/shipping/notification/cart) erroring; retries may exhaust | 10m |
 | TemporalWorkerRequestErrorRateHigh | warning | worker→frontend RPC error ratio >5% | Worker can't reach `temporal-frontend` | 10m |
 | TemporalWorkerTaskSlotsExhausted | warning | `min(temporal_worker_task_slots_available)==0` | Worker saturated; tasks queue and stall | 10m |
+| OtelCollectorDown | critical | `up{otel-collector}==0` | The OTLP pipeline is down: metrics, traces and logs from every service stop arriving — most other alerts go blind rather than firing | 5m |
 | **Watchdog** | none | `vector(1)` (always fires) | Dead-man's-switch: if it stops, the **entire alert pipeline is dead** (no alert can be delivered) | — |
 
 Temporal is now monitored at **both** the infra layer (server/service/persistence health) and
 the **work layer** (workflow/activity failure rates, worker→server RPC health, task-slot
 saturation). Pyroscope profiling-backend health is covered by `PyroscopeDown`.
+
+---
+
+## 9. RFC-0021 overhaul (stock migration)
+
+Source: `prometheusrules/microservices/rfc0021-write-migration.yaml`,
+`prometheusrules/microservices/rfc0021-read-migration.yaml`,
+`prometheusrules/microservices/inventory.yaml`.
+
+RFC-0021 moves stock ownership from product-service to inventory-service. The
+**write** path (the order saga's reserve/commit/release) migrates behind
+`ORDER_STOCK_PARTICIPANT`, pinned per workflow at start; the **read** path (checkout
+availability) migrates behind `CHECKOUT_AVAILABILITY_SOURCE` after the write cutover.
+These alerts cover the migration's own failure modes, which the RED alerts in domain
+1 cannot see: an order and its stock can disagree while every service reports
+healthy.
+
+| Alert | Sev | Metric & trigger | Impact | for |
+|-------|-----|------------------|--------|-----|
+| OrderReconcilerInvariantBreach | critical | `increase(order_reconciler_repairs_total{action="breach"}[1h])>0` | A terminal order's stock disagrees in a way no valid transition repairs — money and stock inconsistent; the reason is persisted in `reconcile_breach_code` | 5m |
+| FulfillmentStartOutboxStalled | critical | `order_fulfillment_start_outbox_oldest_age_seconds >600` | An order committed but its saga never started: no payment, no shipment, cart not cleared, and the payment token is expiring | 10m |
+| FulfillmentStartOutboxFailed | critical | `order_fulfillment_start_outbox_failed >0` | A start request hit its attempt cap; **nothing retries it** — the order is stuck `pending` until a human acts | 5m |
+| OrderSagaCompensationFailing | critical | `rate(order_saga_compensation_total{result="error"}[15m])>0` | The saga is losing its ability to unwind: stock, money, or shipments left in a partial state (the reconciler covers only stock) | 15m |
+| OrderReconcilerBacklogNotDraining | warning | `max(order_reconciler_backlog)>0` | Stock held against an order that will never ship, or consumed for one that did not happen | 15m |
+| OrderReconcilerBacklogUnreadable | warning | `absent(order_reconciler_backlog)` | The backlog is **unknown, not zero** — the gauge publishes nothing when its database read fails, so absence is the failure mode | 20m |
+| OrderReconcilerDependencyUnreadable | warning | `rate(order_reconciler_repairs_total{action="unreadable"}[10m])>0` | Repairs have stopped behind an inventory/Temporal outage while the backlog gauge may still read low | 20m |
+| OrderReconcilerPassTruncated | warning | `increase(order_reconciler_passes_truncated_total[30m])>0` | A pass hit its 200-row cap, so the backlog gauge is a **floor**, not a count | 5m |
+| OrderInventoryCommitLagHigh | warning | commit-lag p99 `>300s` | Confirmed orders hold merely-RESERVED stock, understating available-to-promise; right-censored, so the backlog alert is the severe partner | 15m |
+| InventoryReservationInfraErrors | warning | inventory reservation infra-error rate | Reserve/commit/release failing inside inventory-service — the saga's stock steps cannot complete | see manifest |
+| InventoryGrpcErrorRatio | warning | inventory gRPC error ratio | Callers (order saga, checkout reads) are being refused by inventory-service | see manifest |
+| CheckoutInventoryShadowDivergence | warning | shadow-compare divergence `>1%` | Inventory disagrees with Product on the read path — blocks the read-flip gate | 30m |
+
+**Why `absent()` appears in this domain and nowhere else.**
+`order_reconciler_backlog` is an OTel observable gauge whose callback queries the
+order database. On failure it publishes **nothing** rather than `0`, because `0`
+means "every order's stock agrees" — the one thing an operator must not be told
+falsely. Its failure mode is therefore *disappearance*, which only a paired
+`absent()` alert covers. That works because the callback returns nil on error:
+OTel's `PeriodicReader` exports only when `Collect()` succeeds, so a callback that
+surfaced its error would blank **every** series in the process and `absent()` could
+no longer distinguish a database problem from a dead pod. Verified at runtime
+(2026-07-29): while the backlog query was failing, that series alone went absent
+while the outbox gauges and HTTP histograms kept flowing.
+
+Both order processes (API + worker) report the backlog, so a single pod restart
+cannot trip the `absent()` alert, and switching the reconciler off with
+`ORDER_RECONCILER_ENABLED=false` does not hide the number it exists to show.
+
+Runbooks: one per alert under
+[`runbooks/microservices/`](../runbooks/microservices/).
 
 ---
 

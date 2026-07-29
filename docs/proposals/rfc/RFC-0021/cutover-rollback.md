@@ -69,6 +69,79 @@ starts → drain → final delta backfill → verify ATP → flip → resume).
 - **Verify:** zero `RESERVED`-stuck reservations for drained workflows
   (reconciler report), order confirm rate at baseline, no negative-ATP alert.
 
+### Worker Versioning — the other half of the same cutover
+
+The flag decides which *branch* a new workflow takes; Worker Versioning decides
+which *worker build* serves it ([ADR-030](../../adr/ADR-030-temporal-workflow-versioning/)).
+Worker Deployment **`order-fulfillment`**, Build ID = the order-worker image tag
+(`1.7.0` today) — `TEMPORAL_WORKER_DEPLOYMENT_NAME` / `TEMPORAL_WORKER_BUILD_ID` in
+`kubernetes/apps/order-worker.yaml`, kept equal to `image.tag` by `make validate`.
+
+**Not yet exercised anywhere:** no versioned worker has polled a cluster, so
+`list` returns an empty table and there is no Current version yet.
+
+Order is not negotiable — **deploy the build, confirm it polls, then make it
+Current.** `set-current-version` fails by default until a worker of that version
+has polled (CLI 1.7.3: `no Worker Deployment found with name 'order-fulfillment';
+does your Worker Deployment have pollers?`).
+
+1. **Deploy the build.** Bump `image.tag` and `TEMPORAL_WORKER_BUILD_ID` together
+   (`make validate` rejects a drift), `make flux-sync`, wait for the rollout.
+2. **Confirm the version registered:**
+   ```bash
+   kubectl -n temporal exec deploy/temporal-admintools -- \
+     temporal worker deployment list --namespace mop \
+       --address temporal-frontend.temporal.svc.cluster.local:7233
+   ```
+3. **Make it Current** — new workflows start on it. The suspended CronJob
+   (`kubernetes/infra/controllers/temporal/worker-set-current-version-cronjob.yaml`)
+   already carries the deployed tag and `--yes`:
+   ```bash
+   kubectl -n temporal create job order-set-current-<tag>-$(date +%s) \
+     --from=cronjob/temporal-worker-set-current-version
+   ```
+4. **Verify** (`describe` takes `--name`; only `set-current-version` takes
+   `--deployment-name`):
+   ```bash
+   kubectl -n temporal exec deploy/temporal-admintools -- \
+     temporal worker deployment describe --namespace mop \
+       --address temporal-frontend.temporal.svc.cluster.local:7233 \
+       --name order-fulfillment
+   ```
+
+**Ramp instead of a hard switch.** `set-ramping-version` sends a percentage of new
+workflows to the new version — same flags plus `--percentage` (float, 0–100) and
+`--delete` to remove the ramp. `--percentage 100` is *not* a substitute for
+`set-current-version`.
+
+```bash
+kubectl -n temporal exec deploy/temporal-admintools -- \
+  temporal worker deployment set-ramping-version --namespace mop \
+    --address temporal-frontend.temporal.svc.cluster.local:7233 \
+    --deployment-name order-fulfillment --build-id <tag> --percentage 10 --yes
+```
+
+`--yes` is required on both commands: without it the CLI prompts, and a pod with
+no TTY hangs until `activeDeadlineSeconds`.
+
+- **Rollback = point Current back, and it moves nothing in flight.** Previous
+  versions stay registered, and each workflow is **pinned** to the version that
+  started it. Setting Current back only redirects *new* workflows; in-flight ones
+  keep draining on the old version — which is why two worker deployments coexist
+  for the whole window.
+- **Rolling back cannot use the CronJob** — its `--build-id` is held equal to the
+  deployed `image.tag`, so it can only ever name the newest build. Set an older
+  version Current directly:
+  ```bash
+  kubectl -n temporal exec deploy/temporal-admintools -- \
+    temporal worker deployment set-current-version --namespace mop \
+      --address temporal-frontend.temporal.svc.cluster.local:7233 \
+      --deployment-name order-fulfillment --build-id <previous-tag> --yes
+  ```
+- **Do not scale the old worker to zero to "finish" a rollback.** Its pinned
+  workflows would stop progressing with no error. Retire the old build only once
+  it has no open workflows left (Temporal UI).
+
 ### Read flip (after the write cutover) — reversible by flag, minutes
 
 Only once Inventory is live-written and stable do we move checkout's *read*
@@ -95,4 +168,4 @@ rollback; the gates make it unnecessary: deprecation telemetry at zero for
 staged schema drop with backup + restore test first.
 
 ---
-_Last updated: 2026-07-27_
+_Last updated: 2026-07-29_

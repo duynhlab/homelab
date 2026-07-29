@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Worker Versioning docs** (RFC-0021 P3): the write-cutover runbook gains the version half — verified CLI 1.7.3 commands to list, ramp, make Current (via the suspended CronJob) and roll Current back, with the poller precondition and the pinned-workflow drain that forces two worker deployments to coexist; `docs/api/temporal-order-fulfillment.md` records the configuration as-built (deployment `order-fulfillment`, Build ID = image tag, the `make validate` three-way guard) and marks it configured-but-not-yet-exercised.
+
 - **RFC-0021 P3 write-path alerts + runbooks**: nine alerts covering the stock
   migration's own failure modes — the ones the RED alerts cannot see, because an
   order and its stock can disagree while every service reports healthy. Commit-lag

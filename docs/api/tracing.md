@@ -1,11 +1,11 @@
 # Application Tracing
 
-Distributed tracing contract for all ten Go microservices and both workers — sampling, span helpers, propagation, and best practices.
+Distributed tracing contract for every Go service and worker in the platform service catalog — sampling, span helpers, propagation, and best practices.
 
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
 | **SDK** | `obsx.SetupObservability()` — one call in `main()` | — |
-| **Propagation** | W3C Trace Context (`traceparent`); Kong injects at edge | — |
+| **Propagation** | W3C Trace Context (`traceparent`); edge behavior from Kong config | — |
 | **Sampling** | `ParentBased(TraceIDRatioBased)` — root decides, downstream honours | — |
 | **Platform backends** | [Tracing (platform)](../observability/tracing/README.md) — Tempo, Jaeger, VictoriaTraces | — |
 | **Cross-cutting** | [Application observability](./observability.md) | — |
@@ -72,53 +72,134 @@ gRPC health and reflection RPCs are filtered by `pkg/grpcx`.
 
 `service.name` comes from **`OTEL_SERVICE_NAME`**, injected by every app ResourceSet — authoritative. Namespace and instance id ride via `OTEL_RESOURCE_ATTRIBUTES` (Downward API).
 
+### Propagation
+
+Services accept and propagate W3C Trace Context. Edge behavior is defined by
+the deployed Kong tracing configuration. gRPC metadata carries the same context
+via `pkg/grpcx`.
+
+### Baggage
+
+The platform does not use application baggage by default. New baggage keys
+require review because they propagate across every downstream hop and can leak
+data or add cost.
+
 ---
 
-## Usage patterns
+## Automatic instrumentation
 
-### When tracing helps
+Automatic spans — do not duplicate these with manual spans:
 
-| Scenario | How tracing helps |
-|----------|-------------------|
-| Debugging slow requests | See which service/operation is slow |
-| Investigating errors | Full error flow across services |
-| SLO budget burn | Find root cause of latency/error spikes |
-| Dependency mapping | Understand call patterns |
-| Performance optimization | Identify bottlenecks (DB, external APIs) |
+- HTTP server span from `otelgin` (via `TracingMiddleware`);
+- gRPC server/client spans from `otelgrpc` (via `pkg/grpcx`);
+- DB spans from shared DB instrumentation (`otelpgx`);
+- supported external-client spans.
 
-### Automatic capture
+Automatic capture includes service identity, route template or RPC method,
+HTTP/gRPC status, duration, and W3C propagation fields per semconv. IP and full
+User-Agent are **not** guaranteed authoring-contract fields; enabling them
+requires privacy/retention review.
 
-Every traced HTTP request includes service name, namespace, pod, HTTP method/path/status, duration, parent span ID, User-Agent, Remote IP, and W3C propagation.
+---
+
+## Manual instrumentation
+
+HTTP server, gRPC client/server, and supported database spans are automatic.
+Do not add a second generic span around an already-instrumented request or RPC.
+
+Create a manual span only for a meaningful operation that is not otherwise
+visible, such as a multi-step domain use case, provider interaction,
+compensation, reconciliation, or expensive transformation.
+
+### Span naming
+
+| Prefer | Avoid |
+|--------|-------|
+| `checkout.confirm` | `confirm-checkout-123` |
+| `inventory.reserve` | `reserve-SKU-991` |
+| `payment.capture` | `capture-payment-44` |
+| `order.compensate` | `rollback-order-42` |
+
+Span names are stable operation classes. Business identifiers are
+high-cardinality attributes and are added only when operationally justified.
 
 ### Helper functions
 
 ```go
-// Record errors for debugging
+// Record unexpected failures
 middleware.RecordError(ctx, err)
 
-// Add business context (bounded labels — no PII)
+// Add business context (high-cardinality IDs — use sparingly)
 middleware.AddSpanAttributes(ctx,
-    attribute.String("user.id", userID),
     attribute.String("order.id", orderID),
 )
 
 // Mark important events
-middleware.AddSpanEvent(ctx, "payment.approved")
+middleware.AddSpanEvent(ctx, "payment.authorized")
 
-// Create child spans for complex operations
-ctx, span := middleware.StartSpan(ctx, "validate-inventory")
+// Create child spans for meaningful operations
+ctx, span := middleware.StartSpan(ctx, "inventory.reserve")
 defer span.End()
+
+span.SetAttributes(
+    attribute.String("inventory.outcome", outcome),
+)
 ```
 
 **When to use:**
 
-- ✅ Recording errors (always)
-- ✅ Adding user/order IDs for filtering (bounded IDs, not PII)
-- ✅ Marking state transitions
+- ✅ Multi-step domain operations not visible through auto-instrumentation
+- ✅ Provider interactions, compensation, or reconciliation boundaries
+- ✅ Recording unexpected failures with `RecordError`
+- ✅ High-cardinality business identifiers when operationally justified — see [cross-signal data policy](./observability.md#cross-signal-data-and-privacy-policy)
 - ❌ Don't trace in tight loops
+- ❌ Don't add a second generic HTTP/RPC request span
 - ❌ Don't add sensitive data (passwords, credit cards, tokens)
 
-Use `layer=web` / `layer=logic` on spans per [three-layer architecture](./observability.md#three-layer-architecture).
+Layer responsibilities: [Application observability § Observability responsibilities by layer](./observability.md#observability-responsibilities-by-layer).
+
+### Errors
+
+- Record unexpected failures on the span where they become meaningful.
+- Set Error status for failed operations, not automatically for every expected
+  business rejection.
+- Add retry and compensation milestones as stable span events.
+- Do not record secrets, raw payloads, or sensitive provider responses.
+
+Expected business outcomes such as `NOT_FOUND`, `PRICE_CHANGED`,
+`STOCK_UNAVAILABLE`, `PAYMENT_DECLINED`, or `INVALID_TRANSITION` may be normal
+domain outcomes depending on the owning contract — not automatically
+infrastructure errors. Error logging ownership:
+[Application observability § Error ownership](./observability.md#error-ownership).
+
+### Span events
+
+Good events use stable names:
+
+```text
+payment.authorized
+inventory.reserved
+order.pivot_reached
+compensation.started
+compensation.completed
+```
+
+Events must use stable names. IDs and error details are attributes, subject to
+the [cross-signal data policy](./observability.md#cross-signal-data-and-privacy-policy).
+
+---
+
+## Worker and Temporal behavior
+
+- Activities may create spans using activity context.
+- Temporal workflow code must remain deterministic — no arbitrary OTel export or
+  network I/O from workflow code.
+- Workflow logging uses Temporal-aware, replay-safe logging.
+- Workflow/run/order IDs are high-cardinality attributes, not metric labels.
+- Trace continuity through Temporal must come from the supported integration,
+  not custom headers stored ad hoc in workflow input.
+
+Full worker rules: [Application observability § Worker and Temporal instrumentation](./observability.md#worker-and-temporal-instrumentation).
 
 ---
 
@@ -130,15 +211,15 @@ Use `layer=web` / `layer=logic` on spans per [three-layer architecture](./observ
 |----------|-----|----------------|
 | ~10% sampling | Balance cost vs visibility | `OTEL_SAMPLE_RATE=0.1` |
 | Auto-filter health checks | Reduce noise 30–40% | Automatic (middleware) |
-| Always record errors | Critical for debugging | `RecordError(ctx, err)` |
-| Graceful shutdown | Zero lost spans on rollout | `obs.Shutdown()` on exit |
+| Distinguish business vs infra errors | Avoid alert noise | See error semantics above |
+| Graceful shutdown | Zero lost spans on rollout | Bounded `obs.Shutdown()` on exit |
 | Correlate with logs | Jump trace ↔ logs via `trace_id` | Tracing before logging middleware |
 
 ### Do's
 
-1. Record all errors for debugging context
-2. Add business IDs (user_id, order_id) for filtering — not unbounded promo codes
-3. Use child spans for distinct operations (DB queries, external API calls)
+1. Use manual spans for meaningful domain operations only
+2. Add business IDs as attributes when operationally justified — never in span names
+3. Use child spans for distinct operations (provider calls, compensation)
 4. Monitor trace volume in Grafana when changing sampling
 
 ### Don'ts
@@ -146,7 +227,7 @@ Use `layer=web` / `layer=logic` on spans per [three-layer architecture](./observ
 1. Don't trace in loops (span explosion)
 2. Don't add sensitive data (passwords, tokens, PII)
 3. Don't sample 100% in production without cause
-4. Don't skip error recording
+4. Don't mark every expected business rejection as infrastructure failure
 
 ### Correlation with logs
 
@@ -173,4 +254,4 @@ Grafana Explore → Tempo → search by Trace ID. Details: [Application logging]
 - [Tracing architecture (platform)](../observability/tracing/architecture.md)
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-07-22 — canonical app tracing contract._
+_Last updated: 2026-07-29 — canonical app tracing contract._

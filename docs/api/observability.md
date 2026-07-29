@@ -1,6 +1,6 @@
 # Application Observability
 
-Cross-cutting instrumentation contract for all ten Go microservices and both workers — `pkg/obsx`, middleware order, environment variables, three-layer spans, and correlation fields. Pillar deep-dives: [logs](./logs.md) · [metrics](./metrics.md) · [tracing](./tracing.md) · [profiling](./profiling.md).
+Cross-cutting instrumentation contract for every Go service and worker in the platform service catalog — `pkg/obsx`, middleware order, environment variables, layer observability responsibilities, and correlation fields. Pillar deep-dives: [logs](./logs.md) · [metrics](./metrics.md) · [tracing](./tracing.md) · [profiling](./profiling.md).
 
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
@@ -17,21 +17,76 @@ Cross-cutting instrumentation contract for all ten Go microservices and both wor
 
 Every service and worker shares one instrumentation stack wired through **`pkg/obsx`**. Services never build OTel providers, exporters, or resources by hand. Platform backends (VictoriaMetrics, VictoriaLogs, Tempo, Pyroscope) and the Collector fan-out are documented under [`docs/observability/`](../observability/README.md).
 
+## Document ownership
+
+This document is the normative, application-side observability contract for
+every Go service and worker in the platform service catalog. It owns shared
+bootstrap, lifecycle, middleware and interceptor order, context propagation,
+resource identity, cross-signal data safety, error ownership, and
+observability responsibilities by layer.
+
+| Document | Owns | Does not own |
+|----------|------|--------------|
+| [api.md](./api.md) | Transport contracts and the `web/grpc → logic → core` dependency direction | Signal-specific authoring rules |
+| **observability.md** | Shared application instrumentation and PR compliance | Backend deployment and service-specific signals |
+| [logs.md](./logs.md) | Structured-log schema, levels, fields, events, and redaction | Shared OTel bootstrap |
+| [metrics.md](./metrics.md) | Metric names, types, units, labels, lifecycle, and cardinality | Collector and storage operations |
+| [tracing.md](./tracing.md) | Propagation, sampling, spans, events, and error semantics | General service architecture |
+| [profiling.md](./profiling.md) | Continuous-profiling setup, labels, overhead, and failure policy | Trace and metric authoring |
+| [`docs/observability/`](../observability/README.md) | Collector, backends, dashboards, alerts, and runbooks | Application coding conventions |
+| Service contracts | Service-specific business signals and operational interpretation | Shared instrumentation wiring |
+
+Structural layer ownership remains defined in
+[api.md § Inside Each Service](./api.md#inside-each-service).
+
+### Reading map
+
+| Need | Read |
+|------|------|
+| Add or modify service instrumentation | This document |
+| Write a structured log | [logs.md](./logs.md) |
+| Add a business metric | [metrics.md](./metrics.md) |
+| Add a manual span or event | [tracing.md](./tracing.md) |
+| Enable or troubleshoot profiling in application code | [profiling.md](./profiling.md) |
+| Operate the Collector or a backend | [`docs/observability/`](../observability/README.md) |
+
+## Normative language
+
+**MUST** and **MUST NOT** are merge requirements. **SHOULD** is the default
+unless a service contract records a justified exception. **MAY** is optional.
+Current behavior and planned behavior must be labelled separately.
+
 ---
 
 ## Platform instrumentation policy (RFC-0014 — normative)
 
 These rules apply to every service PR. Rationale: [RFC-0014](../proposals/rfc/RFC-0014/README.md).
 
-1. **One wiring point.** Services call `obsx.SetupObservability(ctx, cfg)` once in `main()` and defer its `Shutdown`. No hand-built OTel providers.
+1. **One wiring point.** Services call `obsx.SetupObservability(ctx, cfg)` once in `main()`. No hand-built OTel providers. Verify exact helper names and return types against the active `duynhlab/pkg` revision.
 
    ```go
    obs, err := obsx.SetupObservability(ctx, obsx.ConfigFromEnv())
-   if err != nil { /* fail startup */ }
-   defer obs.Shutdown(shutdownCtx)
+   if err != nil {
+       return fmt.Errorf("setup observability: %w", err)
+   }
 
-   // logs (when OTEL_LOGS_ENABLED): tee next to the stdout core
-   logger := zap.New(zapcore.NewTee(stdoutCore, obs.ZapCore(serviceName, zapcore.InfoLevel)))
+   minLevel := zapx.ParseLevel(cfg.LogLevel)
+   logger := zap.New(zapcore.NewTee(
+       stdoutCore,
+       obs.ZapCore(cfg.ServiceName, minLevel),
+   ))
+
+   defer func() {
+       shutdownCtx, cancel := context.WithTimeout(
+           context.Background(),
+           cfg.ShutdownTimeout,
+       )
+       defer cancel()
+
+       if err := obs.Shutdown(shutdownCtx); err != nil {
+           logger.Warn("observability shutdown incomplete", zap.Error(err))
+       }
+   }()
    ```
 
 2. **`client_golang` is retired.** No `prometheus.*`/`promauto` in app code — metrics use the OTel Meter API with semconv names. The `/metrics` scrape endpoint was removed at RFC-0014 P3.
@@ -66,8 +121,6 @@ The HTTP middleware chain is **tracing → logging** (two middleware only).
 
 There is **no separate metrics middleware**. RED HTTP metrics come from the same `otelgin` instrumentation that creates spans. gRPC RED + tracing come from `pkg/grpcx` `otelgrpc` interceptors.
 
-Health and reflection paths (`/health`, `/ready`, gRPC health/reflection) are excluded from normal access telemetry.
-
 ```mermaid
 graph TD
     A["HTTP request"] --> B["Gin router"]
@@ -87,62 +140,123 @@ graph TD
 
 Profiling (`obsx.SetupProfiling`) pushes out-of-band to Pyroscope — see [Application profiling](./profiling.md).
 
+### Health, readiness, and reflection filtering
+
+Target contract — verify against the active middleware and interceptor
+implementation before treating as as-built:
+
+| Signal | Probe policy |
+|--------|--------------|
+| Spans | Exclude routine health/readiness/reflection |
+| RED metrics | Exclude routine health/readiness/reflection |
+| Access logs | Exclude routine success probes; log readiness transitions and failed probes |
+| Startup/shutdown logs | Always retain |
+
 ---
 
-## Three-layer architecture
+## Observability responsibilities by layer
 
-### Web layer (`web/v1/`)
+The structural dependency direction is defined in
+[api.md § Inside Each Service](./api.md#inside-each-service). This section
+defines only what each layer emits, which context it propagates, and which
+observability concerns it must not own.
 
-- HTTP request/response handling, validation, status code mapping, error formatting
-- Creates spans with `layer=web`; logs request/response as JSON with trace-id
+| Boundary / layer | Automatic telemetry | Manual responsibility | Must not do |
+|------------------|---------------------|-----------------------|-------------|
+| **HTTP transport — `web/v1`** | HTTP server span and `http.server.*` RED metrics | Validate input, propagate `context.Context`, map errors, and use the context logger | Create a duplicate generic request span; hand-write RED metrics; log raw bodies |
+| **gRPC transport — `grpc/v1`** | Server span, RPC RED metrics, and access log through `pkg/grpcx` | Validate protobuf input, propagate metadata/context, and map typed errors to gRPC status | Duplicate logic; hand-write RPC RED metrics |
+| **Application logic — `logic/v1`** | Inherited context only | Create meaningful domain spans/events and emit business metrics at the authoritative decision point | Depend on Gin/gRPC types; create spans for trivial functions; use IDs as metric labels |
+| **Core domain — `core/domain`** | None | Enforce pure aggregates, value objects, transitions, and invariants | Import OTel, zap, Gin, gRPC, DB clients, or environment configuration |
+| **Core adapters / repositories** | DB/cache/client spans and metrics through shared adapters | Accept context, annotate meaningful failures, and return typed errors | Construct providers/exporters; log the same error at every layer |
+| **Worker / activity entry point** | Shared process and supported activity instrumentation | Propagate correlation, emit lifecycle logs, and call `logic/v1` directly | Call HTTP handlers; use workflow/order IDs as metric labels |
+| **Temporal workflow code** | Temporal history and supported SDK instrumentation | Use deterministic workflow APIs and replay-safe logging | Perform arbitrary network I/O or telemetry export side effects directly |
+
+```mermaid
+flowchart TB
+    HTTP["HTTP request"] --> HM["Tracing middleware<br/>server span + HTTP RED"]
+    HM --> LM["Logging middleware<br/>access log + trace_id"]
+    LM --> WEB["web/v1"]
+
+    RPC["gRPC request"] --> GI["pkg/grpcx interceptors<br/>server span + RPC RED + access log"]
+    GI --> GRPC["grpc/v1"]
+
+    TEMP["Temporal / background job"] --> ACT["Worker or activity entry point"]
+
+    WEB --> LOGIC["logic/v1<br/>use-case orchestration<br/>domain spans and business metrics"]
+    GRPC --> LOGIC
+    ACT --> LOGIC
+
+    LOGIC --> DOMAIN["core/domain<br/>pure invariants"]
+    LOGIC --> ADAPTER["core adapters<br/>DB · cache · external clients"]
+    ADAPTER --> DB[("owned storage")]
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+
+    class HTTP,RPC edge;
+    class HM,LM,GI,WEB,GRPC,LOGIC,DOMAIN,ADAPTER service;
+    class TEMP platform;
+    class ACT worker;
+    class DB data;
+```
+
+### Examples
+
+HTTP handlers reuse the server span from `otelgin` — do not create a second
+generic request span:
 
 ```go
-func Login(c *gin.Context) {
-    ctx, span := middleware.StartSpan(c.Request.Context(), "http.request",
-        trace.WithAttributes(attribute.String("layer", "web")))
-    defer span.End()
+func (h *Handler) CreateOrder(c *gin.Context) {
+    ctx := c.Request.Context()
+    logger := zapx.FromContext(ctx)
 
-    logger := middleware.GetLoggerFromContext(c, baseLogger)
-
-    var req domain.LoginRequest
+    var req CreateOrderRequest
     if err := c.ShouldBindJSON(&req); err != nil {
-        logger.Error("Invalid request", zap.Error(err))
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        logger.Warn(
+            "request validation failed",
+            zap.String("operation", "order.create"),
+            zap.Error(err),
+        )
+        httpx.ValidationError(c, err)
         return
     }
 
-    result, err := authService.Login(ctx, req)
-    // ... handle response
-}
-```
-
-### Logic layer (`logic/v1/`)
-
-- Business rules, validation, transformation, cache-aside
-- Creates spans with `layer=logic`; business metrics via OTel Meter API
-
-```go
-func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*domain.AuthResponse, error) {
-    ctx, span := middleware.StartSpan(ctx, "auth.login",
-        trace.WithAttributes(attribute.String("layer", "logic")))
-    defer span.End()
-
-    if req.Username == "admin" && req.Password == "password" {
-        span.SetAttributes(attribute.Bool("auth.success", true))
-        return response, nil
+    result, err := h.service.CreateOrder(ctx, req)
+    if err != nil {
+        h.writeError(c, err)
+        return
     }
 
-    span.SetAttributes(attribute.Bool("auth.success", false))
-    return nil, errors.New("invalid credentials")
+    c.JSON(http.StatusCreated, result)
 }
 ```
 
-### Core layer (`core/`)
+Logic methods do not automatically receive one manual span each. Create a
+manual span only for a meaningful operation, failure boundary, or multi-step
+use case:
 
-- Domain models, DB connection, cache client
-- **No business logic** — thin infra adapters; DB/cache spans bubble up via instrumentation
+```go
+func (s *CheckoutService) Confirm(ctx context.Context, sessionID string) (*Order, error) {
+    ctx, span := tracer.Start(ctx, "checkout.confirm")
+    defer span.End()
 
-Transport peers validate and delegate to logic; logic calls core only — see [Inside each service](./api.md#inside-each-service).
+    order, err := s.confirmSession(ctx, sessionID)
+    if err != nil {
+        return nil, err
+    }
+    s.metrics.SessionsConfirmed.Add(ctx, 1)
+    return order, nil
+}
+```
+
+`core/domain` may contain pure aggregates, value objects, transitions, and
+invariants. It must not depend on Gin, gRPC transport types, OTel SDK/exporters,
+zap, environment configuration, or cross-service orchestration. Adapters under
+`core/` accept context and return typed errors; DB/cache spans bubble up via
+shared instrumentation.
 
 ---
 
@@ -168,7 +282,90 @@ graph LR
     class B,G,H,I trace;
 ```
 
-W3C Trace Context (`traceparent`) at the edge; Kong forces injection. gRPC metadata carries the same context via `pkg/grpcx`.
+Services accept and propagate W3C Trace Context. Edge behavior is defined by
+the deployed Kong tracing configuration. gRPC metadata carries the same context
+via `pkg/grpcx`.
+
+## Worker and Temporal instrumentation
+
+Workers are process entry points that call `logic/v1` directly. They are not an
+additional business layer and do not call HTTP or gRPC handlers.
+
+- Initialize the shared observability stack exactly once in each worker
+  process.
+- Use the same `service.name`, namespace, environment, version, and exporter
+  policy as the corresponding API process, while keeping a distinct service
+  identity when the worker is deployed and operated separately.
+- Emit lifecycle logs for startup, poller readiness, graceful shutdown, and
+  terminal retry exhaustion.
+- Activities may create spans, events, logs, and bounded business metrics
+  through their activity context.
+- Temporal workflow code must remain deterministic. It must not perform direct
+  network I/O, arbitrary OTel export, or non-replay-safe logging side effects.
+- Use Temporal-aware, replay-safe workflow logging.
+- Workflow IDs, run IDs, order IDs, session IDs, and reservation IDs may be
+  selected trace/log attributes when operationally justified; they must never
+  be metric labels or profile labels.
+- Activity retries must rely on idempotent business operations. Telemetry must
+  state whether counters represent attempts or unique business outcomes.
+- Post-pivot mandatory-forward failures and compensation failures require
+  explicit operational signals.
+
+## Cross-signal data and privacy policy
+
+The same data classification applies across logs, metrics, traces, resources,
+and profile labels. A value being technically accepted by an SDK does not make
+it safe or operationally useful.
+
+| Data class | Metrics and resource attributes | Traces | Logs | Profile labels |
+|------------|--------------------------------|--------|------|----------------|
+| Service, namespace, environment, version | Allowed | Allowed | Allowed | Allowed |
+| Route template, RPC method, bounded status/reason | Allowed | Allowed | Allowed | Usually not applicable |
+| Order, payment, cart, session, workflow, SKU, or user IDs | Forbidden | Allowed only when operationally justified | Allowed only when operationally justified | Forbidden |
+| Email, phone, address, IP, full User-Agent | Forbidden | Avoid by default; approved use case required | Redact or omit by default | Forbidden |
+| Passwords, hashes, access/refresh tokens, cookies, authorization headers, payment secrets, PAN-like data | Forbidden | Forbidden | Forbidden | Forbidden |
+| Raw request/response bodies | Forbidden | Forbidden by default | Forbidden by default | Not applicable |
+| Arbitrary user-provided strings | Forbidden | Avoid or normalize | Allowed only after safety review | Forbidden |
+
+Rules:
+
+1. Metric labels and resource attributes must be low-cardinality and bounded.
+2. Business identifiers are high-cardinality even when they are UUIDs or
+   numeric IDs.
+3. Span names, metric names, log event names, and profile label keys are stable
+   operation classes and never contain IDs.
+4. User identifiers are pseudonymous data and follow the same retention and
+   access controls as other user-linked telemetry.
+5. Redaction happens before a value reaches the logger or telemetry API.
+6. A new sensitive field requires an explicit owner, purpose, retention rule,
+   and review.
+
+## Error ownership
+
+One failure should not create the same error log at every layer.
+
+- Record an error on the span where the failure originates or becomes
+  operationally meaningful.
+- Log an error once at the boundary that decides the final action: return,
+  retry, compensate, abandon, or escalate.
+- Lower layers return typed errors instead of repeatedly logging them.
+- HTTP/gRPC access instrumentation owns the final request/RPC summary.
+- Expected business outcomes such as `NOT_FOUND`, `PRICE_CHANGED`,
+  `STOCK_UNAVAILABLE`, `PAYMENT_DECLINED`, or `INVALID_TRANSITION` are not
+  automatically infrastructure errors.
+- A retry loop may log attempts at `debug` or `warn`; it logs the terminal
+  failure at `error`.
+- Compensation failure and unknown external-provider outcome are terminal
+  operational conditions and must remain visible.
+- Error messages and attributes must not contain secrets or raw payloads.
+
+| Boundary | Typical responsibility |
+|----------|------------------------|
+| Repository/adapter | Return typed error; add a span error only when the adapter failure matters |
+| Logic/use case | Decide domain outcome, retryability, or compensation |
+| Transport | Map typed error to HTTP/gRPC contract |
+| Access middleware/interceptor | Emit final request/RPC summary |
+| Worker/activity | Decide retry, compensation, abandonment, or escalation |
 
 ---
 
@@ -211,6 +408,32 @@ Exemplars are **not** available on this platform (VictoriaMetrics D-14). Correla
 
 ---
 
+## Pull-request compliance checklist
+
+A service or worker PR is observability-compliant only when:
+
+- [ ] `obsx.SetupObservability` is called exactly once per process.
+- [ ] Shutdown uses a bounded context and flushes enabled providers.
+- [ ] The service does not construct OTel SDK providers or exporters directly.
+- [ ] The logger OTLP branch uses the configured log level.
+- [ ] HTTP middleware order is tracing, then logging.
+- [ ] gRPC servers and clients use `pkg/grpcx`.
+- [ ] Transport handlers propagate the incoming context into `logic/v1`.
+- [ ] HTTP and gRPC handlers do not create duplicate generic request spans.
+- [ ] Manual span names are stable and contain no resource IDs.
+- [ ] Business metrics are emitted at the authoritative decision point.
+- [ ] Metric labels are bounded enumerations; IDs and user-provided values are forbidden.
+- [ ] Logs, spans, metrics, resources, and profile labels contain no secrets.
+- [ ] Expected business rejections are distinguished from infrastructure failures.
+- [ ] Errors are logged once at the boundary that decides return, retry, compensate, abandon, or escalate.
+- [ ] Health, readiness, and reflection telemetry follow the shared filtering policy.
+- [ ] Worker and Temporal code follows deterministic and replay-safe rules.
+- [ ] Service-specific business signals are documented in the owning service contract.
+- [ ] New metrics are registered in the metric catalog and have an operational interpretation.
+- [ ] Local-stack smoke tests verify HTTP, gRPC, worker, and profiling startup paths that apply.
+
+---
+
 ## Pillar deep-dives
 
 | Pillar | Contract doc | Platform ops |
@@ -229,4 +452,4 @@ Exemplars are **not** available on this platform (VictoriaMetrics D-14). Correla
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 - [OpenTelemetry (platform)](../observability/opentelemetry/README.md)
 
-_Last updated: 2026-07-22 — canonical cross-cutting observability contract._
+_Last updated: 2026-07-29 — canonical cross-cutting observability contract._

@@ -1,6 +1,6 @@
 # Application Profiling
 
-Continuous profiling contract for all ten Go microservices and both workers — `obsx.SetupProfiling`, profile types, environment variables, and trace correlation.
+Continuous profiling contract for every Go service and worker in the platform service catalog — `obsx.SetupProfiling`, profile types, environment variables, and trace correlation.
 
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
@@ -16,6 +16,8 @@ Continuous profiling contract for all ten Go microservices and both workers — 
 ## Overview
 
 Every Go service pushes pprof data to Pyroscope via the shared **`obsx.SetupProfiling()`** helper — not bespoke profiler code per service. Profiles answer *which line of code* burned CPU or allocated memory during live traffic.
+
+Shared bootstrap and cross-signal label rules: [Application observability](./observability.md).
 
 ---
 
@@ -43,35 +45,98 @@ CPU, alloc, and inuse are on by default in the SDK; goroutine, mutex, and block 
 - **Identity** = `OTEL_SERVICE_NAME` → Pyroscope `service_name` (same as traces and metrics).
 - **Labels** from `OTEL_RESOURCE_ATTRIBUTES`, dotted keys underscored: `service.namespace` → `service_namespace`, etc.
 - **Runtime sampling** after successful start — `runtime.SetMutexProfileFraction(100)` and `runtime.SetBlockProfileRate(100_000_000)` (blocking events ≥ 100 ms). Only on success avoids overhead when misconfigured.
-- **Fail-closed & idempotent** — empty `PYROSCOPE_ENDPOINT` returns error; `sync.Once` guards startup; shutdown func flushes on exit.
+- **Strict helper validation** — empty `PYROSCOPE_ENDPOINT` returns an error; `sync.Once` guards startup.
+- Verify exact helper signatures and configuration fields against the active
+  `duynhlab/pkg` revision before using the wiring example verbatim.
 
-### Per-service wiring
+## Failure, readiness, and shutdown policy
 
-Every service and worker uses the same gate in `cmd/main.go`:
+`obsx.SetupProfiling` performs strict configuration validation and returns an
+error when profiling cannot be initialized.
+
+Profiling is non-critical to the application data path. Unless a service
+contract explicitly records a stricter requirement, the process logs a
+sanitized warning and continues without profiling. A profiling failure does
+not make application readiness false — core app dependencies still determine
+readiness.
+
+Shutdown is bounded:
 
 ```go
-func initProfiling(cfg *config.Config, logger *zap.Logger) func() {
-    if !cfg.Profiling.Enabled {            // PROFILING_ENABLED=false
+func initProfiling(
+    cfg *config.Config,
+    logger *zap.Logger,
+) func() {
+    if !cfg.Profiling.Enabled {
         return func() {}
     }
+
     stop, err := obsx.SetupProfiling()
     if err != nil {
-        logger.Warn("Failed to initialize profiling", zap.Error(err))
+        logger.Warn("profiling disabled after setup failure", zap.Error(err))
         return func() {}
     }
-    logger.Info("Profiling initialized", zap.String("endpoint", cfg.Profiling.Endpoint))
-    return func() { _ = stop(context.Background()) }
+
+    logger.Info("profiling initialized")
+
+    return func() {
+        shutdownCtx, cancel := context.WithTimeout(
+            context.Background(),
+            cfg.ShutdownTimeout,
+        )
+        defer cancel()
+
+        if err := stop(shutdownCtx); err != nil {
+            logger.Warn("profiling shutdown incomplete", zap.Error(err))
+        }
+    }
 }
 ```
 
-Profiling is a config flag, not bespoke instrumentation code.
+Do not log a profiler URL containing credentials or query secrets at startup.
+
+---
+
+## Profile label policy
+
+Allowed profile labels:
+
+- `service_name`, service namespace, environment, service version;
+- low-cardinality deployment identity from resource attributes.
+
+Forbidden profile labels:
+
+- user, order, payment, session, or workflow IDs;
+- email, phone, or address;
+- tokens or secrets;
+- request paths with embedded IDs;
+- arbitrary user input.
+
+Full classification: [cross-signal data policy](./observability.md#cross-signal-data-and-privacy-policy).
+
+---
+
+## Runtime overhead
+
+The shared helper enables CPU, allocation, in-use, goroutine, mutex, and block
+profiles. Mutex and block profiles add runtime sampling overhead — treat them
+as higher-cost signals than CPU-only profiling.
+
+- Disable profiling with `PROFILING_ENABLED=false` when investigating overhead.
+- Revisit profile-type selection if CPU or allocation overhead exceeds the
+  service's budget — do not claim a numeric overhead target unless benchmarked
+  for the specific workload.
+- Mutex/block sampling rates are set by the shared helper; verify against the
+  active `pkg/obsx` revision before documenting exact values as as-built.
 
 ---
 
 ## Trace correlation (app side)
 
-1. **`obsx.TracerProviderWithProfiles`** wraps the OTel `TracerProvider` with `otel-profiling-go` so spans carry **`pyroscope.profile.id`** (CPU profiles are span-scoped; heap/goroutine/mutex/block are service-scoped).
-2. Grafana **Profiles for this span** uses the datasource link configured in platform manifests — see [Profiling (platform)](../observability/profiling/README.md#trace-correlation-platform).
+1. **`obsx.TracerProviderWithProfiles`** wraps the OTel `TracerProvider` with `otel-profiling-go` so spans may carry **`pyroscope.profile.id`**.
+2. **CPU profiles** may support span-level correlation through profile IDs.
+3. **Heap, goroutine, mutex, and block profiles** are commonly service/time scoped — do not promise identical span correlation for every profile type.
+4. Correlation behavior depends on the current SDK and Grafana datasource configuration — see [Profiling (platform) § Trace correlation](../observability/profiling/README.md#trace-correlation-platform).
 
 ---
 
@@ -92,10 +157,21 @@ Full env table: [Application observability § Environment variables](./observabi
 
 ### Verification (service side)
 
-1. Check startup log: `Profiling initialized`
+1. Check startup log: `profiling initialized` (or warning if disabled after setup failure)
 2. Confirm env: `PROFILING_ENABLED=true`, `PYROSCOPE_ENDPOINT` reachable
 
 Backend troubleshooting (Pyroscope pods, RustFS, Grafana datasource): [Profiling (platform) § Troubleshooting](../observability/profiling/README.md#troubleshooting).
+
+---
+
+## Known gaps
+
+| Gap | Impact | Decision | Exit criteria |
+|-----|--------|----------|---------------|
+| Pyroscope SDK debug lines | Third-party plaintext noise on stdout | Configure SDK log level or document accepted exception | No `[DEBUG] uploading at…` at normal production log level |
+| `sync.Once` lifecycle | Complicates tests or multi-mode processes | Document helper lifecycle after pkg review | Test behavior matches intended one-shot init |
+
+Cross-link from logging: [Application logging § Known gaps](./logs.md#known-gaps).
 
 ---
 
@@ -107,4 +183,4 @@ Backend troubleshooting (Pyroscope pods, RustFS, Grafana datasource): [Profiling
 - [pyroscope-go SDK](https://github.com/grafana/pyroscope-go)
 - [otel-profiling-go](https://github.com/grafana/otel-profiling-go)
 
-_Last updated: 2026-07-22 — canonical app profiling contract._
+_Last updated: 2026-07-29 — canonical app profiling contract._

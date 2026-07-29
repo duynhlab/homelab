@@ -40,8 +40,10 @@ kustomize_overlays=(
   # temporal is BOTH listed here and excluded from controllers/kustomization.yaml:
   # it needs its own Flux Kustomization so apps-local can depend on the server
   # being Ready, which means `kustomize build kubernetes/infra/controllers` never
-  # reaches it — so without this entry the chart was validated by nothing at all.
+  # reaches it. Without these two entries the chart and its ingress/PrometheusRule
+  # were validated by nothing at all.
   "kubernetes/infra/controllers/temporal"
+  "kubernetes/infra/configs/temporal"
   "kubernetes/infra/configs/databases"
   "kubernetes/infra/configs/observability"
   "kubernetes/infra/configs/secrets"
@@ -135,11 +137,95 @@ validate_production() {
   fi
 }
 
+# The order worker pins workflows to a Worker Deployment Version whose Build ID is
+# an env var, while its image comes from image.tag in the same file, and the cutover
+# CronJob names the same Build ID a third time. If any of the three drift, the
+# Temporal server routes new workflows to a version NO worker serves: they sit there
+# with no error in any log, no failed activity, and no alert — the cutover simply
+# stops progressing. Nothing else compares them, so this does.
+#
+# Written to fail LOUDLY rather than skip: every path that cannot make the
+# comparison exits non-zero. A guard that silently compares nothing is worse than no
+# guard, because its green line reads as proof.
+validate_worker_build_id() {
+  local file="kubernetes/apps/order-worker.yaml"
+  local cutover="kubernetes/infra/controllers/temporal/worker-set-current-version-cronjob.yaml"
+
+  if [[ ! -f "${file}" ]]; then
+    echo "ERROR - ${file} is missing; cannot verify the Worker Versioning Build ID" >&2
+    exit 1
+  fi
+  if [[ ! -f "${cutover}" ]]; then
+    echo "ERROR - ${cutover} is missing; cannot verify the cutover Build ID" >&2
+    exit 1
+  fi
+
+  local tag env_count
+  tag=$(yq '.spec.values.image.tag' "${file}")
+  if [[ -z "${tag}" || "${tag}" == "null" ]]; then
+    echo "ERROR - ${file}: .spec.values.image.tag is missing" >&2
+    exit 1
+  fi
+
+  # The env list itself must exist. Without this check, a chart-side rename
+  # (values.env -> values.extraEnv, or env-as-map) makes every read below return
+  # empty and the function would conclude "versioning not configured" — reporting
+  # success while comparing nothing.
+  env_count=$(yq '.spec.values.env | length' "${file}")
+  if [[ -z "${env_count}" || "${env_count}" == "null" || "${env_count}" -eq 0 ]]; then
+    echo "ERROR - ${file}: .spec.values.env is missing or empty; the Build ID check cannot read anything" >&2
+    exit 1
+  fi
+
+  local dep_name build_id
+  dep_name=$(yq '.spec.values.env[] | select(.name == "TEMPORAL_WORKER_DEPLOYMENT_NAME") | .value' "${file}")
+  build_id=$(yq '.spec.values.env[] | select(.name == "TEMPORAL_WORKER_BUILD_ID") | .value' "${file}")
+  [[ "${dep_name}" == "null" ]] && dep_name=""
+  [[ "${build_id}" == "null" ]] && build_id=""
+
+  # Both absent is legitimate — temporalx treats an unset pair as "not versioned".
+  if [[ -z "${dep_name}" && -z "${build_id}" ]]; then
+    echo "INFO - order-worker: Worker Versioning not configured (both env vars absent)"
+    return 0
+  fi
+  # Either half alone is the state temporalx exits on, in BOTH directions.
+  if [[ -z "${dep_name}" || -z "${build_id}" ]]; then
+    echo "ERROR - ${file}: Worker Versioning is half-configured (DEPLOYMENT_NAME='${dep_name}', BUILD_ID='${build_id}'); temporalx refuses to start" >&2
+    exit 1
+  fi
+
+  if [[ "${build_id}" != "${tag}" ]]; then
+    echo "ERROR - ${file}: TEMPORAL_WORKER_BUILD_ID (${build_id}) != image.tag (${tag}). New workflows would pin to a version no worker serves and hang silently." >&2
+    exit 1
+  fi
+
+  # Third copy: the --build-id argument of the cutover CronJob. Read positionally
+  # (the flag's value is the next element), and fail if it cannot be located.
+  local idx job_build_id
+  idx=$(yq '.spec.jobTemplate.spec.template.spec.containers[0].args | to_entries | map(select(.value == "--build-id")) | .[0].key' "${cutover}")
+  if [[ -z "${idx}" || "${idx}" == "null" ]]; then
+    echo "ERROR - ${cutover}: no --build-id argument found" >&2
+    exit 1
+  fi
+  job_build_id=$(yq ".spec.jobTemplate.spec.template.spec.containers[0].args[$((idx + 1))]" "${cutover}")
+  if [[ -z "${job_build_id}" || "${job_build_id}" == "null" ]]; then
+    echo "ERROR - ${cutover}: --build-id has no value" >&2
+    exit 1
+  fi
+  if [[ "${job_build_id}" != "${tag}" ]]; then
+    echo "ERROR - ${cutover}: --build-id (${job_build_id}) != order-worker image.tag (${tag}). The cutover would make a version Current that no deployed worker serves." >&2
+    exit 1
+  fi
+
+  echo "INFO - order-worker: Build ID ${tag} consistent across image.tag, worker env, and the cutover CronJob"
+}
+
 # Main
 check_prerequisites
 download_schemas
 validate_yaml_syntax
 validate_standalone_manifests
 validate_kustomize_overlays
+validate_worker_build_id
 validate_production
 echo "INFO - All validations passed"

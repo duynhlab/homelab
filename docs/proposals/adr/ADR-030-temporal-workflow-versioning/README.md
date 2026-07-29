@@ -65,7 +65,17 @@ Versioning.**
    CRD to the chart's namespace Job (same 168h retention); the Web UI Service
    becomes `temporal-web` (ingress updated). `schema.useHelmHooks: false` because
    Flux does not reconcile Helm hooks.
-2. **Versioning.** Worker builds declare a Worker Deployment Version
+2. **Versioning.** The order worker's Worker Deployment is named **`order-fulfillment`**
+   and its Build ID is the **image tag** (`TEMPORAL_WORKER_DEPLOYMENT_NAME` /
+   `TEMPORAL_WORKER_BUILD_ID`). The name deliberately matches the task queue: one
+   worker deployment serves one queue here, and Temporal keeps the two namespaces
+   separate, so reusing the string keeps `describe` output and version labels
+   readable rather than introducing a second identifier to reconcile. Tying the Build
+   ID to the image tag makes the deployed artifact and the version an operator sees
+   the same fact — `make validate` enforces that equality across the manifest, the
+   worker env, and the cutover Job.
+
+   Worker builds declare a Worker Deployment Version
    (`pkg/temporalx` gains the options; consumers opt in by env). The stock-write
    migration ships as a new build: existing workflows stay pinned to the old
    version and drain there, new workflows start on the new version and take the

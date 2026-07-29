@@ -45,3 +45,14 @@ spec:
     # MUST stay the string "false": the template guard is truthiness-based,
     # so a boolean false would drop the env entirely — leaving reflection ON.
     grpc_reflection: "false"
+    # RFC-0021 P3: which stock participant NEW workflows take. The order API reads
+    # this and stamps it into the workflow input at the single fulfillment.Start
+    # seam; the WORKER never reads it, so a workflow that reserved in inventory
+    # always compensates and commits in inventory even if this is reverted
+    # afterwards (participant pinned per workflow — ADR-030).
+    #
+    # Explicit at the code default rather than omitted, so the write cutover is a
+    # one-line, greppable, reviewable diff instead of an env var appearing from
+    # nowhere. `product` = pre-cutover; the flip to `inventory` is its own PR,
+    # merged inside the cutover window.
+    order_stock_participant: "product"

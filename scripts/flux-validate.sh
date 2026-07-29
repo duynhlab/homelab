@@ -37,6 +37,11 @@ kubeconform_config=(
 kustomize_overlays=(
   "kubernetes/clusters/local"
   "kubernetes/infra/controllers"
+  # temporal is BOTH listed here and excluded from controllers/kustomization.yaml:
+  # it needs its own Flux Kustomization so apps-local can depend on the server
+  # being Ready, which means `kustomize build kubernetes/infra/controllers` never
+  # reaches it — so without this entry the chart was validated by nothing at all.
+  "kubernetes/infra/controllers/temporal"
   "kubernetes/infra/configs/databases"
   "kubernetes/infra/configs/observability"
   "kubernetes/infra/configs/secrets"

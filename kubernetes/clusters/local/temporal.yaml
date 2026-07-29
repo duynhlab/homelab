@@ -15,7 +15,17 @@ spec:
     kind: OCIRepository
     name: infrastructure-oci
 
-  path: ./configs/temporal
+  # Excluded from controllers/kustomization.yaml and applied here instead, the same
+  # way kong-local is: this component needs ordering that the umbrella cannot
+  # express (a database, and CRDs for the ServiceMonitors the chart renders), and
+  # apps-local needs to depend on it being Ready.
+  #
+  # Nothing else lives in this path: the Web UI route is one more entry in
+  # configs/kong/ingress-infra.yaml with every other infra UI, and the alerts are
+  # one more directory under configs/observability/metrics/prometheusrules/ with
+  # every other rule. Both are applied by the Kustomizations that already own those
+  # object types, so Temporal needs no second Kustomization of its own.
+  path: ./controllers/temporal
 
   prune: true
   wait: true
@@ -24,9 +34,19 @@ spec:
     # No cert-manager dependency any more: it existed for the retired operator's
     # admission-webhook certificate (ADR-030 revision — the official chart has
     # no webhook).
-    - name: controllers-local      # `temporal` namespace (controllers/namespaces.yaml)
-    - name: databases-local        # platform-db Ready (+ platform-db-temporal-secret in temporal ns)
-    - name: monitoring-local       # ServiceMonitor CRD + Grafana/VM stack
+    # controllers-local carries BOTH the `temporal` namespace
+    # (controllers/namespaces.yaml) and the ServiceMonitor/PrometheusRule CRDs
+    # (controllers/metrics/prometheus-operator-crds.yaml) — the chart renders four
+    # ServiceMonitors (server.metrics.serviceMonitor), so that CRD must exist first.
+    # It is controllers-local, not monitoring-local, that satisfies that.
+    - name: controllers-local
+    # platform-db Ready, plus the platform-db-temporal-secret ESO secret in the
+    # temporal namespace — the schema job cannot connect without either.
+    - name: databases-local
+    # Not required for the ServiceMonitors to be ACCEPTED (see above) — this is so
+    # that a Ready Temporal is already being scraped, rather than sitting
+    # unmonitored until the metrics stack catches up.
+    - name: monitoring-local
 
   healthChecks:
     # The operator CRs are retired (ADR-030 revision), so health is the

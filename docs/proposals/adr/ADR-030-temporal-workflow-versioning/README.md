@@ -162,4 +162,13 @@ the operator manifests remain commented out for rollback.
 
 ---
 
-_Last updated: 2026-07-28_
+## History
+
+| Date | Change |
+|------|--------|
+| 2026-07-28 | Accepted; re-platform + Worker Versioning decided (see the revision note above). |
+| 2026-07-29 | **Placement corrected and the retired manifests deleted.** The chart was first added under `configs/temporal/`, co-located with the operator CRs it replaced. That is the wrong half of the tree: `controllers/` holds platform components installed by a chart (Kong, Valkey, OpenBAO, Vector, Jaeger — 26 HelmReleases) and `configs/` holds the CRs and configuration they consume. It also left two files named `helmrelease.yaml`, one live and one dead. The chart now lives at `controllers/temporal/helmrelease.yaml`, applied by the single `temporal-local` Kustomization — excluded from the controllers umbrella exactly as `kong-local` is, because it needs a database and CRDs the umbrella cannot order. Its two satellite objects went to the homes their object types already have rather than into a Temporal-specific Kustomization: the Web UI route joined `configs/kong/ingress-infra.yaml` alongside every other infra UI, and the alerts became one more directory under `configs/observability/metrics/prometheusrules/`. Both had been the platform's ONLY exceptions of their kind — the alert catalog had to spell the rule one out to stay accurate. Net effect: one fewer Kustomization than before this change, not one more. This supersedes the Consequences note that the operator manifests are "commented out in place for rollback": they are deleted, because git already holds them and a genuine rollback needs the `platform-db` PITR described above regardless. Also added both temporal paths to `scripts/flux-validate.sh`, which had been validating neither. |
+
+---
+
+_Last updated: 2026-07-29_

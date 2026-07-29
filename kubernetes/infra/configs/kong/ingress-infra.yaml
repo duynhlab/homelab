@@ -77,3 +77,32 @@ spec:
                 name: openbao-ui
                 port:
                   number: 8200
+
+---
+# Temporal Web UI — temporal.duynh.me
+# The official chart exposes the UI as the `temporal-web` Service on :8080 (it was
+# `temporal-ui` under the retired operator — ADR-030). The Ingress OBJECT keeps its
+# `temporal-ui` name on purpose: renaming it would make Flux prune and recreate the
+# route for no functional gain.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: temporal-ui
+  namespace: temporal
+  annotations:
+    konghq.com/strip-path: "false"
+    konghq.com/protocols: "https"
+    konghq.com/https-redirect-status-code: "301"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: temporal.duynh.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: temporal-web
+                port:
+                  number: 8080

@@ -1,9 +1,15 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# RETIRED (ADR-030 revision): the temporal-operator HelmRelease in this
-# directory is commented out — the official temporalio chart in
-# configs/temporal/ replaced it. This directory is no longer referenced by
-# controllers/kustomization.yaml; the empty resource list keeps a stray
-# `kustomize build` of this path harmless.
-resources: []
+# The Temporal SERVER chart lives here, not under configs/, because this tree
+# holds platform components installed by a chart and configs/ holds the CRs and
+# configuration they consume. Same split as Kong: controllers/kong (the chart) →
+# configs/kong (routes and plugins). Its ingress and PrometheusRule are the
+# configs half, applied by temporal-config-local.
+#
+# Deliberately NOT referenced by controllers/kustomization.yaml: Temporal needs
+# its own Kustomization so `apps-local` can depend on the server being Ready (the
+# order worker dials Temporal at startup and exits if it cannot). It is applied by
+# clusters/<cluster>/temporal.yaml instead.
+resources:
+  - helmrelease.yaml

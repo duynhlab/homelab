@@ -1,8 +1,13 @@
 # Temporal server alerts. Scraped via the four ServiceMonitors the official
-# temporalio chart renders (server.metrics.serviceMonitor in helmrelease.yaml) —
+# temporalio chart renders (server.metrics.serviceMonitor in
+# controllers/temporal/helmrelease.yaml) —
 # one per server role, frontend/history/matching/worker. The retired operator's
-# single scrapeConfig-managed ServiceMonitor is gone with cluster.yaml
-# (ADR-030 revision); `job=~".*temporal.*"` still matches all of them.
+# single scrapeConfig-managed ServiceMonitor is gone with the operator's CRs
+# (ADR-030); `job=~".*temporal.*"` still matches all of them.
+#
+# Lives under prometheusrules/ like every other rule on the platform. It used to be
+# the lone exception in configs/temporal — an exception the alert catalog had to
+# spell out ("+ configs/temporal/prometheusrule.yaml") to stay accurate.
 #
 # The error-rate metric names (service_requests/service_errors,
 # persistence_requests/persistence_error_with_type) are the Temporal server's documented

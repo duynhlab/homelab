@@ -13,11 +13,11 @@ resources:
   - secrets/
   - cert-manager/
   - clickhouse-operator/ # Altinity ClickHouse operator (CHI CRDs + controller); CHI CR applied by clickhouse-local
-  # temporal/ — RETIRED (ADR-030 revision): the alexandrevilain operator caps at
-  # server 1.28.x; Worker Versioning (RFC-0021 P3 mechanism) needs >= 1.29.1.
-  # Replaced by the official temporalio/helm-charts HelmRelease in
-  # configs/temporal/ (temporal-local wave). Operator manifests kept
-  # commented-out under controllers/temporal/ for rollback reference.
+  # temporal/ — deliberately EXCLUDED here, like kong/ below: it has its own
+  # Kustomization (temporal-local) so apps-local can dependsOn a Ready server —
+  # the order worker dials Temporal at startup and exits if it cannot reach it.
+  # The directory holds the official temporalio chart (ADR-030 revision); the
+  # alexandrevilain operator it replaced is deleted, not commented out.
   # - temporal/
   # kong/ — moved to its own Kustomization (kong-local) so it can dependsOn cert-manager-local
   - kyverno/

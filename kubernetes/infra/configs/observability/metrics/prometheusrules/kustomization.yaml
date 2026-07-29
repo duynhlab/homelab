@@ -10,4 +10,5 @@ resources:
   - observability/
   - valkey/
   - gitops/
+  - temporal/ # workflow-engine health (moved here from configs/temporal — every other PrometheusRule already lived under this tree)
   - watchdog.yaml

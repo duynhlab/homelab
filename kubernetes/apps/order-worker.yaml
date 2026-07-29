@@ -34,7 +34,10 @@ spec:
     image:
       # Same image as the order API — just a different subcommand.
       repository: ghcr.io/duynhlab/order-service/order-service
-      tag: "1.4.0"
+      # Kept in lockstep with services/order.yaml image_tag — same image, and the
+      # worker has NO migration init container (see the header), so it relies on
+      # the API's to have applied the schema this code expects.
+      tag: "1.7.0"
       pullPolicy: IfNotPresent
     # Run the worker subcommand; it serves /health, /ready, /metrics on :8080 but
     # no app traffic, so the Service is skipped.
@@ -123,6 +126,21 @@ spec:
         value: mop
       - name: TASK_QUEUE
         value: order-fulfillment
+      # RFC-0021 P3 — OFF for this image bump, on in the env-wiring change that
+      # follows.
+      #
+      # The reconciler repairs terminal orders whose inventory reservation
+      # disagrees with their outcome, so it CALLS inventory-service on a timer. It
+      # defaults to enabled, and INVENTORY_GRPC_ADDR is not wired yet, so leaving
+      # it on would make every candidate read fail: the backlog would stop
+      # draining and OrderReconcilerDependencyUnreadable would fire 20m after this
+      # merges — an alert about missing configuration, not about stock.
+      #
+      # This is exactly the case the kill switch exists for: keep the image bump
+      # inert and observable on its own, then enable the loop in the same change
+      # that gives it an address to call.
+      - name: ORDER_RECONCILER_ENABLED
+        value: "false"
       # Downstream services the activities call (gRPC east-west + cart REST).
       - name: PRODUCT_GRPC_ADDR
         value: dns:///product.product.svc.cluster.local:9090

@@ -47,8 +47,9 @@
 # workflows to a version no worker serves — and that fails silently: no error, no
 # failed activity, no alert, the cutover simply stops progressing.
 #
-# The write-cutover runbook does not cover Worker Versioning yet; when it does,
-# this procedure belongs there (docs/proposals/rfc/RFC-0021/cutover-rollback.md).
+# Full procedure — including the ordering this Job depends on, ramping, and what a
+# rollback can and cannot do — is in the write-cutover runbook:
+# docs/proposals/rfc/RFC-0021/cutover-rollback.md.
 apiVersion: batch/v1
 kind: CronJob
 metadata:

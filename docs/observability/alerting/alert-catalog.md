@@ -361,6 +361,8 @@ healthy.
 | OrderReconcilerBacklogUnreadable | warning | `absent(order_reconciler_backlog)` | The backlog is **unknown, not zero** — the gauge publishes nothing when its database read fails, so absence is the failure mode | 20m |
 | OrderReconcilerDependencyUnreadable | warning | `rate(order_reconciler_repairs_total{action="unreadable"}[10m])>0` | Repairs have stopped behind an inventory/Temporal outage while the backlog gauge may still read low | 20m |
 | OrderReconcilerPassTruncated | warning | `increase(order_reconciler_passes_truncated_total[30m])>0` | A pass hit its 200-row cap, so the backlog gauge is a **floor**, not a count | 5m |
+| OrderParticipantDisagreement | warning | `increase(order_reconciler_participant_disagreements_total[30m])>0` | An order ran the inventory branch while its row says otherwise — the hold is repaired, but every later judgement is reading a wrong record | 5m |
+| OrderStartParticipantUnrecognised | warning | `increase(order_fulfillment_start_participant_total{source="unrecognised"}[30m])>0` | A start could not use the recorded participant and chose the branch from this process's flag instead | 5m |
 | OrderInventoryCommitLagHigh | warning | commit-lag p99 `>300s` | Confirmed orders hold merely-RESERVED stock, understating available-to-promise; right-censored, so the backlog alert is the severe partner | 15m |
 | InventoryReservationInfraErrors | warning | inventory reservation infra-error rate | Reserve/commit/release failing inside inventory-service — the saga's stock steps cannot complete | see manifest |
 | InventoryGrpcErrorRatio | warning | inventory gRPC error ratio | Callers (order saga, checkout reads) are being refused by inventory-service | see manifest |

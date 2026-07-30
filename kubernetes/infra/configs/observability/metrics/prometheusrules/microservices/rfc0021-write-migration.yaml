@@ -275,3 +275,72 @@ spec:
               harder than forward steps, so a sustained error rate means orders are
               being left with stock, money, or shipments in an unwound state.
             runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderSagaCompensationFailing.md"
+
+        # An order holding an inventory reservation its own outbox row does not
+        # account for. One cause only: a saga start that resolved its stock branch
+        # from a process flag instead of from the order — which is reachable while
+        # ORDER_STOCK_PARTICIPANT is mid-rollout and replicas disagree.
+        #
+        # The reconciler repairs the hold either way, so this is not "stock is
+        # stranded"; it is "the record of which branch ran is wrong", and that
+        # record is what every later judgement uses. Counted once per order, so any
+        # increase is a distinct order — no threshold above zero would be honest.
+        - alert: OrderParticipantDisagreement
+          expr: increase(order_reconciler_participant_disagreements_total[30m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+            rfc: "0021"
+          annotations:
+            summary: "An order's stock branch disagrees with its recorded participant (RFC-0021 write path)"
+            description: >-
+              At least one order ran the inventory branch while its outbox row says
+              otherwise. Stop the cutover rollout: until every replica resolves the
+              branch from the order, the reconciler's product-path vs lost-reserve
+              judgement is being made on wrong data.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderParticipantDisagreement.md"
+
+        # A saga start found a participant value no build understands and fell back
+        # to its flag. The column is CHECK-constrained, so the reachable path is a
+        # hand-edited row — or a build newer than this one writing a value this one
+        # cannot read, which is the same class of problem in the other direction.
+        - alert: OrderStartParticipantUnrecognised
+          expr: |
+            increase(order_fulfillment_start_participant_total{source="unrecognised"}[30m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+            rfc: "0021"
+          annotations:
+            summary: "Saga start could not use the recorded stock participant (RFC-0021 write path)"
+            description: >-
+              A start read a participant it did not recognise and used this
+              process's ORDER_STOCK_PARTICIPANT instead, so that order's branch was
+              chosen by the flag rather than by its own record.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderStartParticipantUnrecognised.md"
+
+        # The saga's liveness, measured end to end: starts are happening but
+        # nothing is reaching a terminal outcome. The cause this exists for is a
+        # Worker Deployment Version made Current with no worker serving it
+        # (ADR-030) — proven to fail SILENTLY: no error, no failed activity, no
+        # SDK metric (no worker ever sees the task), orders just stay pending.
+        # `unless` rather than `and ... == 0`, because a total stall leaves the
+        # outcome counter with no increase at all — an empty vector, which an
+        # equality comparison would silently drop.
+        - alert: OrderSagaNotCompleting
+          expr: |
+            sum(increase(order_fulfillment_start_participant_total[15m])) > 0
+              unless sum(increase(order_saga_outcome_total[15m])) > 0
+          for: 10m
+          labels:
+            severity: critical
+            rfc: "0021"
+          annotations:
+            summary: "Order sagas are starting but none are completing (RFC-0021 / ADR-030)"
+            description: >-
+              Workflows keep starting while terminal outcomes have been at zero
+              for ~25 minutes (15m window + 10m hold).
+              First suspect: the order-fulfillment Worker Deployment's Current
+              version has no pollers — check `temporal worker deployment describe`
+              against the running order-worker deployments before anything else.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderSagaNotCompleting.md"

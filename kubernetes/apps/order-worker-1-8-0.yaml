@@ -1,15 +1,33 @@
-# Order-fulfillment Temporal worker — a SECOND release of the order image that
-# runs its `worker` subcommand (no HTTP API, no Service). It polls the
-# `order-fulfillment` task queue and runs the saga's activities
-# (see docs/api/temporal-order-fulfillment.md §7). Modelled on the mop chart's
-# examples/order-worker.yaml: same image as `order`, `args: ["worker"]`,
-# `service.enabled: false`. Deployed directly (not via the checkout ResourceSet)
-# because its shape is a one-off — no Service, no migrations, Temporal env.
+# Order-fulfillment Temporal worker, VERSIONED (ADR-030) — one file per build.
+#
+# Runs the order image's `worker` subcommand with a Worker Deployment Version
+# (TEMPORAL_WORKER_DEPLOYMENT_NAME + TEMPORAL_WORKER_BUILD_ID). The server pins
+# every workflow to the version that started it, so a new build NEVER edits this
+# file: it lands as a new order-worker-<build>.yaml side by side (a tag bump here
+# would strand this version's pinned workflows with no pollers), gets activated,
+# and this file is deleted once its version shows DRAINED in
+# `temporal worker deployment describe`.
+#
+# ACTIVATION is a deliberate, separate step — never part of a reconcile:
+#   kubectl -n temporal create job order-set-current-$(date +%s) \
+#     --from=cronjob/temporal-worker-set-current-version
+# A versioned worker receives NOTHING until that step makes its version Current
+# (verified live), so landing a new build changes no traffic. Full procedure:
+# docs/proposals/rfc/RFC-0021/cutover-rollback.md § Worker version activation.
+#
+# The unversioned worker this replaced was retired at drain count 0 (activation
+# drill 2026-07-30); this file is the only saga worker and runs the reconciler.
+#
+# BUILD_ID must equal this file's image tag and the CronJob's BUILD_ID.
+# scripts/flux-validate.sh enforces the equality: a mismatch pins new workflows
+# to a version no worker serves, and that fails SILENTLY — no error, no failed
+# activity, just orders that never leave pending (the OrderSagaNotCompleting
+# alert is the backstop).
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: order-worker
+  name: order-worker-1-8-0
   namespace: order
 spec:
   interval: 10m
@@ -18,7 +36,7 @@ spec:
     kind: OCIRepository
     name: mop-chart-oci
     namespace: flux-system
-  releaseName: order-worker
+  releaseName: order-worker-1-8-0
   install:
     remediation:
       retries: 3
@@ -26,7 +44,7 @@ spec:
     remediation:
       retries: 3
   values:
-    name: order-worker
+    name: order-worker-1-8-0
     # Architectural component → app.kubernetes.io/component: worker (mop default
     # is "api"). The order-worker PodMonitor selects on this label.
     component: worker
@@ -34,10 +52,12 @@ spec:
     image:
       # Same image as the order API — just a different subcommand.
       repository: ghcr.io/duynhlab/order-service/order-service
-      # Kept in lockstep with services/order.yaml image_tag — same image, and the
-      # worker has NO migration init container (see the header), so it relies on
-      # the API's to have applied the schema this code expects.
-      tag: "1.7.0"
+      # PINNED to this file's Build ID forever — deliberately NOT in lockstep
+      # with services/order.yaml: the next build is a NEW order-worker-<build>
+      # file, never a tag bump here (a bump would strand the workflows pinned to
+      # this version with no pollers). No migration init container; the API's
+      # applies the schema this code expects.
+      tag: "1.8.0"
       pullPolicy: IfNotPresent
     # Run the worker subcommand; it serves /health, /ready, /metrics on :8080 but
     # no app traffic, so the Service is skipped.
@@ -73,8 +93,11 @@ spec:
         valueFrom:
           fieldRef:
             fieldPath: metadata.namespace
+      # service.version carries the Build ID, so outcomes and latency split by
+      # worker version during the drain — without it the two workers are
+      # indistinguishable in every signal except pod name.
       - name: OTEL_RESOURCE_ATTRIBUTES
-        value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME)"
+        value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME),service.version=1.8.0"
       # RFC-0014 D-2: obsx reads these exact names for the Kubernetes resource
       # attributes on the OTLP path. OTEL_METRICS_ENABLED stays unset here —
       # the worker follows the fleet flip, not the product canary.
@@ -126,23 +149,21 @@ spec:
         value: mop
       - name: TASK_QUEUE
         value: order-fulfillment
-      # RFC-0021 P3 — the inventory reconciler, now with an address to call.
-      #
-      # It repairs terminal orders whose inventory reservation disagrees with their
-      # outcome: a confirmed order whose CommitInventory gave up, a run terminated
-      # between the pivot and the commit, a compensation that exhausted its retries,
-      # and the Release-before-Reserve orphaned hold inventory-service delegates here.
-      #
-      # Useful work starts immediately, before any cutover: every terminal order is
-      # product-path, so GetReservation answers NOT_FOUND, the reconciler reads that
-      # as consistent, and the backlog settles to 0. That is what proves the loop and
-      # its NetworkPolicy path work while nothing's stock depends on them.
-      #
-      # Spelled out at its code default, like ORDER_STOCK_PARTICIPANT: flipping it
-      # under pressure must be a one-value edit, and `grep -rn ORDER_RECONCILER
-      # kubernetes/` must find it. `false` is the kill switch for when the
-      # reconciler's JUDGEMENT is suspect during a cutover — not for when its
-      # dependencies are down (it defers on its own then).
+      # ADR-030 Worker Deployment Version. Registering these makes the worker
+      # POLL as this version; whether it RECEIVES anything is the server-side
+      # Current setting (the CronJob). Deployment name is the logical unit the
+      # server tracks versions under; the build id is this image's tag.
+      - name: TEMPORAL_WORKER_DEPLOYMENT_NAME
+        value: order-fulfillment
+      - name: TEMPORAL_WORKER_BUILD_ID
+        value: "1.8.0"
+      # The inventory reconciler — repairs terminal orders whose reservation
+      # disagrees with their outcome, and reports rows that do not account for
+      # one. ON since the unversioned worker retired: its docs commit to a
+      # single running judge (the scan has no SKIP LOCKED claim), and this is
+      # now the only worker. `false` is the kill switch for when its JUDGEMENT
+      # is suspect during a cutover — not for when dependencies are down (it
+      # defers on its own then).
       - name: ORDER_RECONCILER_ENABLED
         value: "true"
       - name: INVENTORY_GRPC_ADDR

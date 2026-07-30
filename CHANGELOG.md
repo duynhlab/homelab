@@ -13,6 +13,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **OTel fundamentals docs** under `docs/observability/` — `opentelemetry/fundamentals.md` (API vs SDK, signal selection, OTLP gRPC-vs-HTTP, context propagation & baggage, semconv), `opentelemetry/collector.md` (component model, agent/gateway/sidecar patterns, the deployed pipelines incl. ClickHouse fan-out, processor ordering, `create_schema` startup coupling, troubleshooting runbook), and `metrics/histograms.md` (bucket mechanics, explicit vs **exponential** histograms, delta vs cumulative temporality, cardinality-per-attribute-set). Stack/tracing diagrams and inventories updated to show the live ClickHouse exporter and `tracing-local dependsOn clickhouse-local`; stale "conceptual" collector YAML in `tracing/architecture.md` replaced with the real pipeline table. `rfc-0014-explainer.md` **merged into `fundamentals.md`** (all seven diagrams preserved; the cutover pipeline diagram kept as labelled historical, superseded by `collector.md`) — file removed, every reference updated.
 
+- **ADR-032 proposed — deliver Tempo via tempo-operator `TempoMonolithic`**:
+  decision record (Proposed, adoption not started) to replace the raw Tempo
+  Deployment/ConfigMap with an operator-managed CR, enable the inert
+  metrics-generator, and roll out via a parallel run; no manifests changed.
+- **RFC-0021 P3 docs/api sync (W6)**: the saga deep-dive gains as-built sections
+  for the per-workflow stock participant (resolved from the order's row, never
+  the process flag), the inventory reconciler (once-per-order reporting, the
+  disagreement counter), and Worker Deployment Versioning (one manifest per
+  build, activation lifecycle, verified-live behaviours). `order.md`,
+  `inventory.md` (reconciler shipped — expiry sweeper stays planned) and
+  `workflows.md` updated to the deployed reality; ADR-030 Adoption flipped to
+  **Complete**; RFC-0021's workflow-migration open question marked resolved.
+- **ADR-030 Worker Deployment Versioning wired, inert** (RFC-0021 P3): a second
+  order worker (`order-worker-1-8-0`) polls as deployment `order-fulfillment`
+  build `1.8.0` and receives nothing until an operator sets it Current via the
+  suspended CronJob template — side by side with the unversioned worker, never
+  an in-place flip (which registers with no Current and hangs new workflows
+  silently, verified live). `make validate` now fails on any drift between the
+  worker's image tag, its BUILD_ID env, and the CronJob's `--build-id` /
+  `--deployment-name`; `OrderSagaNotCompleting` (starts>0 `unless` outcomes>0)
+  is the end-to-end backstop with a runbook. Activation, drain, and the
+  retire-at-DRAINED procedure live in the RFC-0021 cutover doc.
+- **RFC-0021 P3 participant-skew signals**: two alerts + runbooks for the one way
+  an order's stock branch can disagree with its own record —
+  `OrderParticipantDisagreement` (a hold exists that the row does not account
+  for) and `OrderStartParticipantUnrecognised` (a start could not use the
+  recorded value and fell back to its flag). Both counted once per order, so
+  any increase is a distinct order and no threshold above zero would be honest.
+  `metrics-catalog.md` gains the two counters (34 -> 36 instruments).
 - **RFC-0021 P3 write-path alerts + runbooks**: nine alerts covering the stock
   migration's own failure modes — the ones the RED alerts cannot see, because an
   order and its stock can disagree while every service reports healthy. Commit-lag
@@ -39,6 +68,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`docs/api/` observability contracts** — `observability.md` is the normative application hub (document ownership, layer responsibilities, cross-signal data policy, error ownership, worker/Temporal rules, PR checklist); `api.md § Observability` delegates instead of duplicating the signal matrix. Contract-first pass over the pillar docs, every claim audited against `duynhlab/pkg`, the ten service repos, and the OTel specification (2026-07-29): `logs.md` gains the **OTel LogRecord data model** (11 fields, SeverityNumber ranges, platform mapping) and the semconv access-log schema; `metrics.md` gains bucket semantics and a **temporality** contract (cumulative, D-7) and fixes the byte-bucket View values to the deployed set; `tracing.md` gets full **baggage** semantics (immutability, not-stored, security) and restores the verified Kong `inject: [w3c]` fact; `profiling.md` pins verified `SetupProfiling` behavior and a bounded-stop wiring shape; probe filtering is one signal-by-signal contract matrix. Follow-up pass adds the **instrument selection rule** (all seven instrument kinds, additive×monotonic decision table, sync vs Observable timing, the cumulative-total callback trap), the API-vs-SDK stability contract in the fundamentals doc, and the layer tracing rules: SpanKind↔layer mapping, the enrich-before-create granularity ladder (attributes → events → child span), and no hand-wrapped driver spans in adapters.
 
+- **Unversioned order worker retired** (ADR-030 lifecycle, RFC-0021 P3): the
+  activation drill set Current to `1.8.0` and the drain gate
+  (`TemporalWorkerDeploymentVersion IS NULL`, running) read 0, so
+  `order-worker.yaml` is deleted and the versioned worker takes over the
+  reconciler in the same change — one judge at all times, never zero, never
+  two. No guard edit needed: `flux-validate.sh` treats the unversioned file
+  as optional by design.
+- **order bumped to 1.8.0 in the cluster** (RFC-0021 P3) — API, worker, and the
+  `migrate` init container together. Every saga start now resolves the stock
+  participant from the order's outbox row instead of the process flag (the two
+  inline starts used to re-decide on replay — the one skew that corrupts the
+  reconciler's judgement), and a reservation the row does not account for is
+  logged and counted, feeding the two alerts added below. Migration **000010**
+  rides the image the same way 000008/000009 did and CHECK-constrains the
+  participant column now that it routes stock writes. Verified end-to-end on
+  local-stack and on a fresh Kind bring-up, including a live skew drill that
+  took `OrderParticipantDisagreement` to firing.
 - **order worker calls inventory, and its reconciler is switched on** (RFC-0021 P3) — `INVENTORY_GRPC_ADDR` wired and `ORDER_RECONCILER_ENABLED=true` in the same change, so the loop never runs without an address. It does useful work before any cutover: terminal orders are all product-path, so `GetReservation` answers NOT_FOUND, the pair reads as consistent, and the backlog settles to 0 — proving the loop and its NetworkPolicy path while nothing's stock depends on them. `ORDER_STOCK_PARTICIPANT=product` is explicit so the write cutover is a one-line greppable diff; it reaches the pod through a conditional block in the **domain ResourceSet**, because the `mop` chart has no such value and an RSIP input alone would be silently dropped. ADR-030 Adoption corrected **Complete → Partial**: the index claimed Complete while no Worker Versioning configuration exists anywhere.
 
 - **Temporal chart moved to `controllers/temporal/`, operator retired by rename** — `controllers/` is where chart-installed platform components live (26 HelmReleases: Kong, Valkey, OpenBAO, Vector…); `configs/` holds the CRs and config they consume, so the ingress + PrometheusRule stay in `configs/temporal` under a `temporal-config-local` Kustomization — the `kong-local` → `kong-config-local` shape. `apps-local` still depends on `temporal-local`, which is what its order-worker needs (a serving frontend). Retirement method changed: the four retired artifacts — operator HelmRelease, both operator CRs, operator HelmRepository — are **renamed to `*.yaml.bak` with their contents intact** instead of having every line commented out. A file no kustomization lists is already inert, so blanking it only made it unreadable; the suffix additionally keeps it out of `make validate`, which globs `*.yaml`. Accepted cost: a `.bak` file ships in the OCI artifact as dead weight and is no longer syntax-checked or Renovate-tracked — which is the point for a retired manifest. Added both temporal paths to `scripts/flux-validate.sh`: `controllers/temporal` is excluded from `controllers/kustomization.yaml` so it can have its own Kustomization, so a build of `controllers` never reached it and **nothing had ever validated the chart**. Chart spec byte-identical; ingress and PrometheusRule are pure renames.

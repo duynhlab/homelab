@@ -1,10 +1,14 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Chart only. Its ingress + PrometheusRule are configs/temporal (temporal-config-local),
-# the same split kong-local/kong-config-local uses.
+# Chart + the operator tooling that lives with it. Its ingress + PrometheusRule
+# are configs/temporal (temporal-config-local), the same split
+# kong-local/kong-config-local uses.
 #
 # helmrelease.yaml.bak is the retired operator: the `.bak` suffix keeps it out of
 # here and out of `make validate` without commenting the file into unreadability.
 resources:
   - helmrelease.yaml
+  # Suspended run-on-demand template for the ADR-030 version cutover — LISTED so
+  # it actually ships; a file no kustomization names is never applied.
+  - worker-set-current-version-cronjob.yaml

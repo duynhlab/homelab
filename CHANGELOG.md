@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **ADR-032 proposed — deliver Tempo via tempo-operator `TempoMonolithic`**:
+  decision record (Proposed, adoption not started) to replace the raw Tempo
+  Deployment/ConfigMap with an operator-managed CR, enable the inert
+  metrics-generator, and roll out via a parallel run; no manifests changed.
 - **ADR-030 Worker Deployment Versioning wired, inert** (RFC-0021 P3): a second
   order worker (`order-worker-1-8-0`) polls as deployment `order-fulfillment`
   build `1.8.0` and receives nothing until an operator sets it Current via the

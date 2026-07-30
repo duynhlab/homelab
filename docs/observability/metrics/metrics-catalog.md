@@ -9,7 +9,7 @@ listed beside them.
 | | |
 |---|---|
 | **Auto-instrumented** | 3 HTTP + 2 gRPC + 4 runtime + 15 DB-client families — identical across the fleet, zero per-service code |
-| **Hand-declared (business)** | **34 instruments** across the 10 services (25 counters, 6 second-histograms, 2 value-histograms + label-less counters) |
+| **Hand-declared (business)** | **36 instruments** across the 10 services (27 counters, 6 second-histograms, 2 value-histograms + label-less counters) |
 | **Source of truth** | Each service's `internal/logic/v1/metrics.go` (+ `internal/saga/`, `internal/core/{provider,cache}/` where noted) |
 | **Conventions** | RFC-0017 D-8 (instrument choice) / D-9 (bounded labels, no PII/ids) |
 | **Naming render** | vmagent `usePrometheusNaming`: dots→`_`, Counter gains `_total`, `WithUnit("s")` histogram gains `_seconds` |
@@ -71,6 +71,8 @@ enum — no ids, no PII; amounts ride in histogram **values**, never labels.
 | `order_reconciler_backlog` | `order.reconciler.backlog` · Observable gauge | — | Terminal orders whose stock has not been confirmed to agree with their outcome (RFC-0021 P3). A **query** against the table, never a counter in memory, and **unwindowed** so an unresolved breach cannot age out. On a failed read it publishes **nothing** rather than 0 — so its failure mode is *absence*, which is why `absent()` is alerted on. Reported by both order processes |
 | `order_reconciler_repairs_total` | `order.reconciler.repairs.total` · Counter | `action` = `committed`\|`released`\|`breach`\|`failed`\|`deferred`\|`unreadable` | Reconciler actions. Reported **once per order**, not once per pass — which is what makes `breach` alertable instead of 1,440 increments/day for one stuck order. A steady `committed`/`released` stream means something upstream is failing regularly |
 | `order_reconciler_passes_truncated_total` | `order.reconciler.passes.truncated.total` · Counter | — | Passes that hit the 200-row batch cap. While non-zero, treat `order_reconciler_backlog` as a **floor** rather than a count |
+| `order_reconciler_participant_disagreements_total` | `order.reconciler.participant_disagreements.total` · Counter | `row_participant` = `product`\|`absent`\|`other` (**normalised** — the raw column value is never a label, precisely because this fires when something is wrong with it) | Orders repaired that hold an inventory reservation while their outbox row does not say inventory-path (RFC-0021 P3). One cause only: a saga start that resolved its branch from a process flag instead of from the order. Reported **once per order**, so any increase is a distinct order and no threshold above zero is honest. Should read flat zero |
+| `order_fulfillment_start_participant_total` | `order.fulfillment.start_participant.total` · Counter | `participant` = `product`\|`inventory` · `source` = `recorded`\|`absent`\|`unrecognised` | Which branch each saga start resolved, and from what. Recorded inside the resolver so no start path can omit it — before this, the branch an order took was recoverable only from its Temporal history, one order at a time. `unrecognised` is the alert-worthy value; `absent` should decay to zero as pre-column orders age out; the `participant` split is how the cutover is watched |
 | `order_value_minor` | `order.value.minor` · Histogram, unit `1`, money buckets `500…1000000` (cents: $5…$10k) | `totals_source` = `demo`\|`checkout_quoted` | **AOV / revenue distribution.** Amount is the histogram value. Exactly once per genuine creation — never on idempotent replay |
 
 ### auth (4)
@@ -167,4 +169,4 @@ enum — no ids, no PII; amounts ride in histogram **values**, never labels.
 
 ---
 
-_Last updated: 2026-07-16 — initial catalog, compiled from every service's `metrics.go` (34 shipped instruments) and the live VictoriaMetrics series list; supersedes the RFC-0017 design catalog as the shipped reference._
+_Last updated: 2026-07-29 — added the two RFC-0021 participant-resolution counters; compiled from every service's `metrics.go` (36 shipped instruments) and the live VictoriaMetrics series list; supersedes the RFC-0017 design catalog as the shipped reference._

@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0021 P3 participant-skew signals**: two alerts + runbooks for the one way
+  an order's stock branch can disagree with its own record —
+  `OrderParticipantDisagreement` (a hold exists that the row does not account
+  for) and `OrderStartParticipantUnrecognised` (a start could not use the
+  recorded value and fell back to its flag). Both counted once per order, so
+  any increase is a distinct order and no threshold above zero would be honest.
+  `metrics-catalog.md` gains the two counters (34 -> 36 instruments).
 - **RFC-0021 P3 write-path alerts + runbooks**: nine alerts covering the stock
   migration's own failure modes — the ones the RED alerts cannot see, because an
   order and its stock can disagree while every service reports healthy. Commit-lag

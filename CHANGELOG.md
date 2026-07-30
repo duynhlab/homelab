@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **ADR-032 proposed — deliver Tempo via tempo-operator `TempoMonolithic`**:
+  decision record (Proposed, adoption not started) to replace the raw Tempo
+  Deployment/ConfigMap with an operator-managed CR, enable the inert
+  metrics-generator, and roll out via a parallel run; no manifests changed.
 - **RFC-0021 P3 docs/api sync (W6)**: the saga deep-dive gains as-built sections
   for the per-workflow stock participant (resolved from the order's row, never
   the process flag), the inventory reconciler (once-per-order reporting, the

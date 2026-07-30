@@ -221,9 +221,15 @@ spec:
           - name: CHECKOUT_AVAILABILITY_CANARY_PCT
             value: << inputs.checkout_availability_canary_pct | quote >>
           <<- end >>
-          <<- if (index inputs "checkout_availability_canary_salt") >>
+          <<- if (index inputs "checkout_availability_canary_salt_secret") >>
+          # The bucket key comes from a Secret (OpenBAO -> ExternalSecret), never
+          # a manifest literal: whoever can read git must not be able to compute
+          # which arm a user lands on.
           - name: CHECKOUT_AVAILABILITY_CANARY_SALT
-            value: << inputs.checkout_availability_canary_salt >>
+            valueFrom:
+              secretKeyRef:
+                name: << inputs.checkout_availability_canary_salt_secret >>
+                key: salt
           <<- end >>
           <<- if (index inputs "order_grpc_addr") >>
           - name: ORDER_GRPC_ADDR

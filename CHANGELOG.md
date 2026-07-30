@@ -66,6 +66,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **RFC-0021 W8 rung 2 — availability reads open to a 20% canary**: the shadow
+  gate passed (30+ minutes of real double-reads, `inventory_shadow_compare_
+  total{result="ok"}=16`, zero mismatches, divergence alert inactive), so
+  `checkout_availability_source` moves to `inventory` with a 20% sticky
+  per-user canary. The HMAC bucket key is seeded into OpenBAO and reaches the
+  pod only through an ExternalSecret + `secretKeyRef` — git cannot compute
+  which arm a user lands on. Everyone outside the bucket stays on product.
 - **checkout bumped to 0.4.0 in the cluster** (RFC-0021 W8): the deployed
   0.3.1 binary predates the entire read path — shadow reads, inventory-mode
   split reads, the keyed canary — so the W8 `shadow` flip rendered an env the

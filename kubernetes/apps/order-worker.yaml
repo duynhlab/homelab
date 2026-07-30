@@ -37,7 +37,7 @@ spec:
       # Kept in lockstep with services/order.yaml image_tag — same image, and the
       # worker has NO migration init container (see the header), so it relies on
       # the API's to have applied the schema this code expects.
-      tag: "1.7.0"
+      tag: "1.8.0"
       pullPolicy: IfNotPresent
     # Run the worker subcommand; it serves /health, /ready, /metrics on :8080 but
     # no app traffic, so the Service is skipped.

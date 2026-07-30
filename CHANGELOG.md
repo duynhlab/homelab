@@ -42,6 +42,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **order bumped to 1.8.0 in the cluster** (RFC-0021 P3) — API, worker, and the
+  `migrate` init container together. Every saga start now resolves the stock
+  participant from the order's outbox row instead of the process flag (the two
+  inline starts used to re-decide on replay — the one skew that corrupts the
+  reconciler's judgement), and a reservation the row does not account for is
+  logged and counted, feeding the two alerts added below. Migration **000010**
+  rides the image the same way 000008/000009 did and CHECK-constrains the
+  participant column now that it routes stock writes. Verified end-to-end on
+  local-stack and on a fresh Kind bring-up, including a live skew drill that
+  took `OrderParticipantDisagreement` to firing.
 - **order worker calls inventory, and its reconciler is switched on** (RFC-0021 P3) — `INVENTORY_GRPC_ADDR` wired and `ORDER_RECONCILER_ENABLED=true` in the same change, so the loop never runs without an address. It does useful work before any cutover: terminal orders are all product-path, so `GetReservation` answers NOT_FOUND, the pair reads as consistent, and the backlog settles to 0 — proving the loop and its NetworkPolicy path while nothing's stock depends on them. `ORDER_STOCK_PARTICIPANT=product` is explicit so the write cutover is a one-line greppable diff; it reaches the pod through a conditional block in the **domain ResourceSet**, because the `mop` chart has no such value and an RSIP input alone would be silently dropped. ADR-030 Adoption corrected **Complete → Partial**: the index claimed Complete while no Worker Versioning configuration exists anywhere.
 
 - **Temporal chart moved to `controllers/temporal/`, operator retired by rename** — `controllers/` is where chart-installed platform components live (26 HelmReleases: Kong, Valkey, OpenBAO, Vector…); `configs/` holds the CRs and config they consume, so the ingress + PrometheusRule stay in `configs/temporal` under a `temporal-config-local` Kustomization — the `kong-local` → `kong-config-local` shape. `apps-local` still depends on `temporal-local`, which is what its order-worker needs (a serving frontend). Retirement method changed: the four retired artifacts — operator HelmRelease, both operator CRs, operator HelmRepository — are **renamed to `*.yaml.bak` with their contents intact** instead of having every line commented out. A file no kustomization lists is already inert, so blanking it only made it unreadable; the suffix additionally keeps it out of `make validate`, which globs `*.yaml`. Accepted cost: a `.bak` file ships in the OCI artifact as dead weight and is no longer syntax-checked or Renovate-tracked — which is the point for a retired manifest. Added both temporal paths to `scripts/flux-validate.sh`: `controllers/temporal` is excluded from `controllers/kustomization.yaml` so it can have its own Kustomization, so a build of `controllers` never reached it and **nothing had ever validated the chart**. Chart spec byte-identical; ingress and PrometheusRule are pure renames.

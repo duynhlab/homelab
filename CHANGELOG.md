@@ -66,6 +66,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **RFC-0021 W8 rung 1 — checkout availability reads go `shadow`**: checkout
+  keeps serving availability from product, and additionally reads inventory to
+  compare (`inventory_shadow_compare_total` is the divergence measure;
+  `CheckoutInventoryShadowDivergence` silent for 30m gates the canary rung).
+  The checkout ResourceSet gains conditional blocks for the whole read-flip
+  ladder (source, inventory address, canary pct + salt), so every later rung
+  is a one-line input change; the inventory address is explicit because the
+  code default names a Service that does not exist on this cluster. Template
+  re-verified with the flux-operator parser constructor (PARSE OK).
 - **RFC-0021 W7 write cutover — inventory owns new stock writes**
   (2026-07-30): `order_stock_participant` flipped to `inventory`, inside a
   drained window with the backfill applied and verified (balance `1|43|0|0`

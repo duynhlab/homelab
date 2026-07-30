@@ -37,4 +37,13 @@ spec:
     product_grpc_addr: "dns:///product.product.svc.cluster.local:9090"
     order_grpc_addr: "dns:///order.order.svc.cluster.local:9090"
     shipping_grpc_addr: "dns:///shipping.shipping.svc.cluster.local:9090"
+    inventory_grpc_addr: "dns:///inventory.inventory.svc.cluster.local:9090"
+    # RFC-0021 W8 read-flip ladder: product -> shadow -> (canary %) -> inventory.
+    # `shadow` serves availability FROM PRODUCT unchanged and additionally reads
+    # inventory to compare — inventory_shadow_compare_total is the divergence
+    # measure, and CheckoutInventoryShadowDivergence staying silent is the gate
+    # for the next rung. In shadow/inventory mode an inventory dial failure
+    # fails checkout startup on purpose: it must never silently degrade back to
+    # product mode.
+    checkout_availability_source: "shadow"
     # Temporal default (temporal-frontend.temporal:7233) is correct as-is.

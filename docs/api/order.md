@@ -26,7 +26,7 @@ only writer of orders and the only place the fulfillment saga starts.
 |-------|-------|
 | **Role** | Orchestrator — owns the workflow, the worker, and every activity |
 | **Workflow** | `OrderFulfillmentWorkflow` (`internal/saga/workflow.go`) |
-| **Worker** | `order-worker` — same image, `worker` subcommand, local-stack + cluster |
+| **Worker** | `order-worker-1-8-0` — same image, `worker` subcommand; **versioned** (Worker Deployment `order-fulfillment`, one manifest per build, ADR-030), workflows run `Pinned` |
 | **Task queue** | `order-fulfillment` (Temporal namespace `mop`) |
 | **Workflow ID** | `order-fulfillment-<orderID>` — dedup key against duplicate starts |
 | **Start semantics** | Detached-context start after the order row commits (see [Saga handoff](#the-saga-handoff-start-after-commit)) |
@@ -250,6 +250,7 @@ Both transports delegate the kickoff to one package
 | Reuse policy: gRPC passes `REJECT_DUPLICATE` | "Already started" (open, or closed within retention) is treated as success — the saga already happened; the web path keeps the server default (`AllowDuplicate`), its belt is the status gate |
 | Start failure answers `Unavailable` (gRPC) | The machine caller retries with the same key; the replay path heals the zombie `pending` order. Answering success would strand it — callers do not retry successes |
 | Lazy Temporal client (`internal/fulfillment/lazy.go`) | An order pod that races Temporal at bring-up keeps re-dialing in the background instead of running dead with a nil client |
+| Stock participant resolved **from the order's outbox row**, never the process flag (`fulfillment.ParticipantFor`) | A replayed order runs the branch its row recorded even mid-rollout; absent ⇒ `product`, unrecognised falls back loudly and is counted (`order_fulfillment_start_participant_total{participant,source}`) |
 
 ## Callers & dependencies
 
@@ -259,6 +260,7 @@ Both transports delegate the kickoff to one package
 | Inbound | checkout | gRPC `CreateOrder` | Confirm handoff (ADR-018) — only NetworkPolicy-admitted caller of `:9090` |
 | Outbound (API) | shipping, payment | gRPC | Enrichment reads for `/details` (soft-fail) |
 | Outbound (worker) | product, shipping, payment, notification | gRPC | Saga activities: reserve/release, create/cancel shipment, authorize/capture/void/refund, send email |
+| Outbound (worker) | inventory | gRPC | Inventory-branch saga activities (reserve/commit/release — cutover pending, W7) + the reconciler's `GetReservation`/`Commit`/`Release` repairs (live) |
 | Outbound (worker) | cart | REST `DELETE /cart/v1/internal/cart/:user_id` | Best-effort clear-cart — the platform's documented REST exception, NetworkPolicy-fenced, tokenless (no bearer token in workflow history) |
 
 ## Known gaps
@@ -313,4 +315,4 @@ Paths in [`duynhlab/order-service`](https://github.com/duynhlab/order-service). 
 - [checkout.md](./checkout.md) · [payments.md](./payments.md) · [shipping.md](./shipping.md) — adjacent contracts
 - [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) — checkout→order boundary
 
-_Last updated: 2026-07-28_
+_Last updated: 2026-07-30_

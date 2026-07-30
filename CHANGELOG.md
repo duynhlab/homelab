@@ -66,6 +66,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **checkout bumped to 0.4.0 in the cluster** (RFC-0021 W8): the deployed
+  0.3.1 binary predates the entire read path — shadow reads, inventory-mode
+  split reads, the keyed canary — so the W8 `shadow` flip rendered an env the
+  process silently ignored (no flagx validation, no dial, no metric). Third
+  merged-but-never-released prerequisite this phase has surfaced; the release
+  ladder now moves before the flag ladder.
 - **RFC-0021 W8 rung 1 — checkout availability reads go `shadow`**: checkout
   keeps serving availability from product, and additionally reads inventory to
   compare (`inventory_shadow_compare_total` is the divergence measure;

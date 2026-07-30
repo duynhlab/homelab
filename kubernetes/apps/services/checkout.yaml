@@ -10,7 +10,12 @@ spec:
   type: Static
   defaultValues:
     name: checkout
-    image_tag: "0.3.1" # {"$imagepolicy": "flux-system:checkout:tag"}
+    # 0.4.0 ships the RFC-0021 read path merged since 0.3.1: availability shadow
+    # reads (P2-4), inventory-mode split reads (P2-5), and the keyed per-user
+    # canary. The 0.3.1 binary did not know CHECKOUT_AVAILABILITY_SOURCE, so the
+    # W8 shadow flip rendered an env the process silently ignored — the third
+    # merged-but-never-released prerequisite this phase has surfaced.
+    image_tag: "0.4.0" # {"$imagepolicy": "flux-system:checkout:tag"}
     namespace: checkout
     # No platform_backup_label: checkout's data lives on product-db in the
     # product namespace, which is already backed up (same reasoning as

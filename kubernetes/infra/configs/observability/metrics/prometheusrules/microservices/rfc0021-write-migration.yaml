@@ -318,3 +318,29 @@ spec:
               process's ORDER_STOCK_PARTICIPANT instead, so that order's branch was
               chosen by the flag rather than by its own record.
             runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderStartParticipantUnrecognised.md"
+
+        # The saga's liveness, measured end to end: starts are happening but
+        # nothing is reaching a terminal outcome. The cause this exists for is a
+        # Worker Deployment Version made Current with no worker serving it
+        # (ADR-030) — proven to fail SILENTLY: no error, no failed activity, no
+        # SDK metric (no worker ever sees the task), orders just stay pending.
+        # `unless` rather than `and ... == 0`, because a total stall leaves the
+        # outcome counter with no increase at all — an empty vector, which an
+        # equality comparison would silently drop.
+        - alert: OrderSagaNotCompleting
+          expr: |
+            sum(increase(order_fulfillment_start_participant_total[15m])) > 0
+              unless sum(increase(order_saga_outcome_total[15m])) > 0
+          for: 10m
+          labels:
+            severity: critical
+            rfc: "0021"
+          annotations:
+            summary: "Order sagas are starting but none are completing (RFC-0021 / ADR-030)"
+            description: >-
+              Workflows keep starting while terminal outcomes have been at zero
+              for ~25 minutes (15m window + 10m hold).
+              First suspect: the order-fulfillment Worker Deployment's Current
+              version has no pollers — check `temporal worker deployment describe`
+              against the running order-worker deployments before anything else.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderSagaNotCompleting.md"

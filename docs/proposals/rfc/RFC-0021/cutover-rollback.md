@@ -41,6 +41,65 @@ kubectl -n inventory logs -f job/inventory-backfill-<id>   # inspect the report
 - **Rollback:** nothing to undo — Product still owns writes; delete the balances
   if abandoning.
 
+## Worker version activation (phase 3, before the write cutover)
+
+ADR-030 versions the saga with Worker Deployment Versions. The manifests ship the
+versioned worker **side by side** with the unversioned one — never as an in-place
+env flip, which registers the deployment with **no Current version and zero task
+flow** (verified live: new workflows hang with no error anywhere). Activation is a
+deliberate operator step, in this order:
+
+1. **Merge lands the versioned worker inert.** `order-worker-1-8-0` polls as
+   `order-fulfillment` build `1.8.0` and receives nothing. Verify it joined:
+   ```bash
+   kubectl -n temporal exec deploy/temporal-admintools -- \
+     temporal worker deployment describe --namespace mop \
+       --address temporal-frontend.temporal.svc.cluster.local:7233 \
+       --name order-fulfillment
+   ```
+   Expect the version listed with pollers and **no Current** set. The unversioned
+   worker keeps serving everything.
+2. **Activate** — the one atomic step. Instantiate the suspended CronJob template
+   (instantiate, never resume: Flux owns the template, and its schedule is an
+   impossible date precisely so nothing but this command can run it):
+   ```bash
+   kubectl -n temporal create job order-set-current-$(date +%s) \
+     --from=cronjob/temporal-worker-set-current-version
+   ```
+   From this moment new workflows start **pinned** to `1.8.0`; the unversioned
+   worker only drains what it already owns. `temporal worker deployment
+   set-ramping-version` exists for a percentage ramp if wanted — the CronJob sets
+   Current outright, which is proportionate to this platform's volume.
+3. **Watch the drain.** Sagas run seconds-to-minutes, so the unversioned side
+   empties fast. The unversioned worker never appears as a version row in
+   `describe`, so its drain gate is the visibility count (query verified live):
+   ```bash
+   kubectl -n temporal exec deploy/temporal-admintools -- \
+     temporal workflow count --namespace mop \
+       --address temporal-frontend.temporal.svc.cluster.local:7233 \
+       --query "TaskQueue='order-fulfillment' AND ExecutionStatus='Running' AND TemporalWorkerDeploymentVersion IS NULL"
+   ```
+   `OrderSagaNotCompleting` is the backstop for an activation that routed to a
+   version nobody serves.
+4. **Retire when that count reads 0, in its own PR.** Delete `order-worker.yaml`
+   (the unversioned worker) and flip `ORDER_RECONCILER_ENABLED` to `"true"` on
+   the versioned worker **in the same change** — one reconciler judge at all
+   times, never zero, never two. The flux-validate guard treats the unversioned
+   file as optional and discovers versioned files by glob, so neither this PR nor
+   the next release edits the guard. Versioned→versioned cycles later DO get the
+   `DRAINED` state in `describe`; this visibility query is the unversioned-era
+   substitute.
+5. **Rollback:** point Current back at pollers that exist. Back to a previous
+   *versioned* build → the CronJob template (its `--build-id` is guarded against
+   the deployed manifest). Back to the *unversioned* worker — the only fallback
+   in this first window — the flag is `--unversioned`, via the raw CLI in the
+   [OrderSagaNotCompleting runbook](../../../observability/runbooks/microservices/OrderSagaNotCompleting.md).
+   Workflows stuck on their first task are not yet pinned and re-route; never
+   delete a worker Deployment whose version still shows open workflows.
+
+The next release repeats the cycle with a new `order-worker-<build>.yaml`: land
+inert → activate → drain → retire the previous file.
+
 ## Write cutover (phase 3) — flag-stops-the-bleeding, then fix forward
 
 The saga's stock participant is `ORDER_STOCK_PARTICIPANT`

@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **ADR-030 Worker Deployment Versioning wired, inert** (RFC-0021 P3): a second
+  order worker (`order-worker-1-8-0`) polls as deployment `order-fulfillment`
+  build `1.8.0` and receives nothing until an operator sets it Current via the
+  suspended CronJob template — side by side with the unversioned worker, never
+  an in-place flip (which registers with no Current and hangs new workflows
+  silently, verified live). `make validate` now fails on any drift between the
+  worker's image tag, its BUILD_ID env, and the CronJob's `--build-id` /
+  `--deployment-name`; `OrderSagaNotCompleting` (starts>0 `unless` outcomes>0)
+  is the end-to-end backstop with a runbook. Activation, drain, and the
+  retire-at-DRAINED procedure live in the RFC-0021 cutover doc.
 - **RFC-0021 P3 participant-skew signals**: two alerts + runbooks for the one way
   an order's stock branch can disagree with its own record —
   `OrderParticipantDisagreement` (a hold exists that the row does not account

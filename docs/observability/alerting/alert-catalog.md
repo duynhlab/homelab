@@ -357,6 +357,7 @@ healthy.
 | FulfillmentStartOutboxStalled | critical | `order_fulfillment_start_outbox_oldest_age_seconds >600` | An order committed but its saga never started: no payment, no shipment, cart not cleared, and the payment token is expiring | 10m |
 | FulfillmentStartOutboxFailed | critical | `order_fulfillment_start_outbox_failed >0` | A start request hit its attempt cap; **nothing retries it** — the order is stuck `pending` until a human acts | 5m |
 | OrderSagaCompensationFailing | critical | `rate(order_saga_compensation_total{result="error"}[15m])>0` | The saga is losing its ability to unwind: stock, money, or shipments left in a partial state (the reconciler covers only stock) | 15m |
+| OrderSagaNotCompleting | critical | starts>0 `unless` outcomes>0 (15m) | Sagas start but none finish — the silent signature of a Worker Deployment Version made Current with no pollers (ADR-030) | 10m |
 | OrderReconcilerBacklogNotDraining | warning | `max(order_reconciler_backlog)>0` | Stock held against an order that will never ship, or consumed for one that did not happen | 15m |
 | OrderReconcilerBacklogUnreadable | warning | `absent(order_reconciler_backlog)` | The backlog is **unknown, not zero** — the gauge publishes nothing when its database read fails, so absence is the failure mode | 20m |
 | OrderReconcilerDependencyUnreadable | warning | `rate(order_reconciler_repairs_total{action="unreadable"}[10m])>0` | Repairs have stopped behind an inventory/Temporal outage while the backlog gauge may still read low | 20m |

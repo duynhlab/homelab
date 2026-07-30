@@ -349,6 +349,30 @@ The actual execution order is important: authorize early, capture late, then
 confirm the order. This fails a declined payment before reserving inventory and
 keeps captured money as close as possible to the pivot.
 
+#### The stock participant (RFC-0021 P3)
+
+The stock steps route to one of two participants, chosen **per workflow** by
+`OrderFulfillmentInput.StockParticipant` and pinned for the saga's lifetime —
+the worker never re-reads any flag:
+
+| Participant | Forward | Compensation | Post-pivot |
+|---|---|---|---|
+| `product` (deployed default) | `ReserveStock` | `ReleaseStock` | — |
+| `inventory` (shipped, cutover pending — W7) | `ReserveInventory` | `ReleaseInventory` | `CommitInventory`, **mandatory forward** — a confirmed order retries it to completion |
+
+Which value gets stamped is resolved from the **order's own record**, never from
+the process answering (order-service #155): `CreateOrder` writes the participant
+into the order's outbox row in the same transaction, every start path — inline
+REST, inline gRPC, and the dispatcher — resolves through one shared
+`fulfillment.ParticipantFor`, and a replayed order therefore runs the branch its
+row recorded even when the replica answering carries the other flag mid-rollout.
+An absent value resolves to `product` (every reader of that column agrees), an
+unrecognised one falls back loudly, and the column is CHECK-constrained
+(migration `000010`). Every resolution is counted:
+`order_fulfillment_start_participant_total{participant, source}` — `source`
+distinguishes `recorded` / `absent` / `unrecognised`, and `unrecognised` is
+alerted on (`OrderStartParticipantUnrecognised`).
+
 
 The order-fulfillment saga (`order-service/internal/saga/workflow.go`), driven by a
 Temporal worker — payment is an unconditional part of every run
@@ -627,6 +651,40 @@ handling: a database failure blanks all three together, so a naive threshold wou
 *resolve* during the incident. Full rationale and the accepted trade-offs are in
 [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/).
 
+### The Inventory Reconciler
+
+The outbox above covers a saga that never **started**; the reconciler covers a
+saga that started and left its **stock** disagreeing with its outcome — a
+confirmed order whose `CommitInventory` gave up, a run terminated between the
+pivot and the commit, a compensation that exhausted its retries, and the
+orphaned-hold seam inventory-service delegates here. A ticker in the worker
+scans unsettled terminal orders (5-minute settle delay, 24 h window), asks
+Temporal whether anyone still owns the workflow, probes
+`inventory.GetReservation`, and repairs: **commit** a `RESERVED` hold for a
+confirmed order, **release** it for a failed one. Unrepairable disagreements
+persist a bounded `reconcile_breach_code` on the row and stay in the backlog.
+
+Two properties are load-bearing (order-service #154/#156):
+
+- **Once per order, not once per pass** — a permanently stuck order must not be
+  indistinguishable from a stream of fresh failures (1,440 increments/day
+  otherwise).
+- **A reservation the row does not account for is repaired but never silently**
+  (`order_reconciler_participant_disagreements_total{row_participant}` + one
+  error line) — it is the fingerprint of a saga start that chose its branch from
+  a flag, and this loop is the only thing left that sees the evidence.
+
+Exactly **one** worker runs the judge (its scan has no `SKIP LOCKED` claim); the
+kill switch is `ORDER_RECONCILER_ENABLED=false`, for when its judgement is
+suspect — not for dependency outages, which it defers on by itself.
+
+| Signal | Answers |
+|---|---|
+| `order_reconciler_backlog` | Terminal orders whose stock is not yet proven consistent. Publishes **nothing** on a failed read (never a false 0), so `absent()` is alerted on |
+| `order_reconciler_repairs_total{action}` | `committed` / `released` / `breach` / `failed` / `deferred` / `unreadable` |
+| `order_reconciler_participant_disagreements_total{row_participant}` | Should read flat zero; any increase is a distinct order |
+| `order_reconciler_passes_truncated_total` | The 200-row batch cap was hit; the backlog is a floor, not a count |
+
 ### Contracts and the Checkout Flow
 
 East-west contracts in [`duynhlab/pkg`](https://github.com/duynhlab/pkg) (`pkg/proto`, `buf`;
@@ -689,6 +747,30 @@ Deployed via the **official `temporalio/helm-charts`** release (see **[ADR-030](
 - **Edge & alerts** — Kong ingress `temporal.duynh.me` + `TemporalServerDown` and service/persistence error-rate `PrometheusRule`s, both in `configs/temporal/` (applied by `temporal-config-local`, after the chart).
 - **Flux order** — `controllers` (namespace only — no operator, and the cert-manager dependency retired with the webhook); `databases → platform-db`; a `temporal` Kustomization (`dependsOn` controllers, databases, monitoring) before `apps`, health-checked on the `HelmRelease` + `temporal-frontend` Deployment (helm-controller waits for release resources, so Ready also means the `mop` namespace Job completed — the ordering guarantee `apps-local` needs); the order worker `dependsOn` temporal.
 
+### Worker Deployment Versioning (as-built)
+
+ADR-030's second half, **live since 2026-07-30**: the saga is versioned with
+Worker Deployment Versions, one worker manifest per build.
+
+- The worker registers as deployment **`order-fulfillment`** build **`1.8.0`**
+  (`TEMPORAL_WORKER_DEPLOYMENT_NAME` + `TEMPORAL_WORKER_BUILD_ID`, read by
+  `pkg/temporalx`; both-or-neither, half-set refuses to start). The workflow
+  registers **`VersioningBehaviorPinned`** — a saga holding money and stock is
+  never moved onto a new build mid-flight.
+- A new build lands as a **new** `kubernetes/apps/order-worker-<build>.yaml`
+  beside the old one and receives **nothing** until an operator makes it Current
+  — verified live: a versioned worker without Current gets zero tasks, and a
+  version made Current with no pollers hangs new workflows *silently*
+  (`OrderSagaNotCompleting` is the end-to-end backstop). Activation is a
+  suspended CronJob template (`temporal-worker-set-current-version`), never a
+  reconciled Job; `make validate` fails on any drift among the worker's image
+  tag, its `BUILD_ID` env, its filename, and the CronJob's flags.
+- The old file is deleted in its own PR at **DRAINED** (versioned→versioned) or
+  at a zero visibility count of running unversioned workflows (the first
+  cycle's substitute — the unversioned worker never appears as a version row).
+  The unversioned worker was retired that way after the activation drill.
+- Full procedure: [cutover-rollback.md § Worker version activation](../proposals/rfc/RFC-0021/cutover-rollback.md#worker-version-activation-phase-3-before-the-write-cutover).
+
 ### As-Built Notes and Roadmap
 
 Deliberate deviations from the original design:
@@ -724,7 +806,9 @@ How to deploy the worker, run the saga locally, and watch it in production.
   still needs liveness and readiness probes). Worker metrics export over OTLP.
 - **In-cluster.** The worker is a **second release of the same `mop` chart** (`duynhlab/helm-charts`,
   ≥`0.12.0`): same image, `args: ["worker"]`, `service.enabled: false`. In homelab it's the
-  `order-worker` HelmRelease (`kubernetes/apps/order-worker.yaml`, namespace `order`) carrying the
+  `order-worker-1-8-0` HelmRelease (`kubernetes/apps/order-worker-1-8-0.yaml`, namespace `order` —
+  one file per Worker Deployment Version, see
+  [Worker Deployment Versioning](#worker-deployment-versioning-as-built)) carrying the
   order DB address, `TEMPORAL_HOSTPORT` / `TEMPORAL_NAMESPACE` / `TASK_QUEUE`, and the downstream
   `*_GRPC_ADDR` targets (product, shipping, notification, payment — each
   `dns:///<service>.<ns>.svc.cluster.local:9090`, the single multi-port Service).
@@ -743,6 +827,12 @@ How to deploy the worker, run the saga locally, and watch it in production.
   `TemporalServerDown`, `TemporalServiceErrorRateHigh`, `TemporalPersistenceErrorRateHigh`
   (`configs/temporal/prometheusrule.yaml`). The worker pushes activity, gRPC
   RED, and Go-runtime metrics over OTLP; it has no application `/metrics` scrape endpoint.
+- **Write-migration alerts** — twelve RFC-0021 alerts cover what RED cannot see
+  (`rfc0021-write-migration.yaml` + one runbook each): saga liveness
+  (`OrderSagaNotCompleting`), the reconciler family (backlog not draining /
+  unreadable / breach / truncated), participant skew
+  (`OrderParticipantDisagreement`, `OrderStartParticipantUnrecognised`), outbox
+  age and terminal rows, commit lag, and compensation failures.
 - **Failure handling** — insufficient stock fails fast (non-retryable) and compensates; transient
   downstream errors retry per policy; a stuck workflow is visible (and terminable) in the UI.
 
@@ -754,11 +844,11 @@ How to deploy the worker, run the saga locally, and watch it in production.
 - [checkout.md](./checkout.md) — confirm handoff and idempotency into `CreateOrder`
 - [order.md](./order.md) — order contract and workflow handoff
 - [cart.md](./cart.md) — saga `ClearCart` internal REST exception
-- [product.md](./product.md) · [shipping.md](./shipping.md) · [notification.md](./notification.md) — participating service contracts
+- [product.md](./product.md) · [inventory.md](./inventory.md) · [shipping.md](./shipping.md) · [notification.md](./notification.md) — participating service contracts
 - [payments.md](./payments.md) — payment state, ledger, and reconciliation
 - [ADR-001](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/) — adopt Temporal
 - [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) — authorize early and capture late
 - [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared idempotency state machine
 - [RFC-0010](../proposals/rfc/RFC-0010/) — payment and fulfillment design
 
-_Last updated: 2026-07-28_
+_Last updated: 2026-07-30_

@@ -6,10 +6,10 @@ Every durable workflow on the platform, in one table: who orchestrates, who part
 
 | Workflow | Owner | Worker | Task queue | Participants | Deep dive |
 |----------|-------|--------|------------|--------------|-----------|
-| <a id="order-fulfillment"></a>`OrderFulfillmentWorkflow` | order | `order-worker` | `order-fulfillment` | product, shipping, payment, notification, cart | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
+| <a id="order-fulfillment"></a>`OrderFulfillmentWorkflow` | order | `order-worker-1-8-0` — **versioned**, `Pinned` (ADR-030) | `order-fulfillment` | product *or* inventory (per-workflow stock participant), shipping, payment, notification, cart | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
 | <a id="abandoned-checkout"></a>`AbandonedCheckoutWorkflow` | checkout | `checkout-worker` | `checkout` | checkout DB (in-process activities) | [checkout.md § Abandonment](./checkout.md#abandonment-p2-implemented--the-timer-is-a-wake-up-never-a-verdict) |
 
-Both workers run in local-stack (`local-stack/compose.yaml`) and in-cluster ([order-worker.yaml](../../kubernetes/apps/order-worker.yaml), [checkout-worker.yaml](../../kubernetes/apps/checkout-worker.yaml)) on Temporal namespace `mop`.
+Both workers run in local-stack (`local-stack/compose.yaml`) and in-cluster ([order-worker-1-8-0.yaml](../../kubernetes/apps/order-worker-1-8-0.yaml) — one manifest per Worker Deployment Version, [checkout-worker.yaml](../../kubernetes/apps/checkout-worker.yaml)) on Temporal namespace `mop`.
 
 ## Standard roles
 

@@ -673,32 +673,28 @@ whether the previous attempt committed before its response was lost.
 
 ## Observability
 
-The middleware/interceptor order is **tracing, then logging** (two middleware
-only). HTTP RED metrics and gRPC RED metrics are **auto-instrumented** by
-`otelgin` / `otelgrpc` inside the tracing path — there is no separate metrics
-middleware. Full contract: [Application observability](./observability.md).
+All HTTP, gRPC, and worker entry points follow the shared application
+instrumentation contract in [observability.md](./observability.md).
 
-| Signal | HTTP | gRPC |
-|--------|------|------|
-| Tracing | `TracingMiddleware` (`otelgin`) | `otelgrpc` client/server interceptors |
-| Access logs | HTTP logging middleware | Server-side `grpcx` access interceptor |
-| RED metrics | `http.server.*` via `otelgin` | `rpc_*` via `otelgrpc` |
-| Logs (OTLP) | otelzap tee when `OTEL_LOGS_ENABLED` | — |
-| Profiles | `obsx.SetupProfiling()` push | — |
-| Export path | OTLP/HTTP to the collector | Same OTLP stream and service resource; no application scrape endpoint |
-| Correlation | `trace_id` in logs; `pyroscope.profile.id` on spans | Trace context propagated through metadata |
+| Entry point | Shared behavior |
+|-------------|-----------------|
+| HTTP | `otelgin` server span and RED metrics; structured access logging |
+| gRPC | `pkg/grpcx` client/server tracing, RED metrics, context propagation, and access logging |
+| Worker / activity | Shared process resource plus supported worker/activity instrumentation |
+| Process | Structured stdout/OTLP logs and optional continuous profiling |
 
-| Pillar | App contract |
-|--------|--------------|
-| Cross-cutting | [observability.md](./observability.md) |
-| Logs | [logs.md](./logs.md) |
-| Metrics | [metrics.md](./metrics.md) |
-| Traces | [tracing.md](./tracing.md) |
-| Profiles | [profiling.md](./profiling.md) |
+Transport adapters propagate `context.Context` into `logic/v1`. They do not
+construct telemetry providers/exporters, duplicate RED instruments, or create
+a second generic request span.
 
-Health and reflection RPCs are excluded from normal access telemetry to avoid
-probe noise. gRPC failures use gRPC status codes; dashboards should group by
-method, side, service, and code without labels that grow per user or resource.
+Signal-specific authoring rules:
+[logs](./logs.md) · [metrics](./metrics.md) ·
+[tracing](./tracing.md) · [profiling](./profiling.md).
+
+Health, readiness, and reflection probes are excluded from spans and RED
+metrics on both transports, and from gRPC access logs; HTTP access logs do not
+filter probes yet. Signal-by-signal matrix:
+[observability.md § Health filtering](./observability.md#health-readiness-and-reflection-filtering).
 
 ## Security
 
@@ -758,7 +754,7 @@ Use this sequence for a new or modified contract:
 | 4. Define contract | Inputs, outputs, units, errors, idempotency, and timeout |
 | 5. Implement at transport layer | Handler validates and delegates to logic |
 | 6. Protect it | Auth middleware and NetworkPolicy where applicable |
-| 7. Instrument it | `obsx.SetupObservability` + optional `SetupProfiling` — see [observability.md](./observability.md) |
+| 7. Instrument it | Comply with [observability.md](./observability.md); add only domain-specific instruments required by the owning service contract |
 | 8. Test it | Success, validation, authorization, ownership, retry, and failure paths |
 | 9. Document once | Shared rule here; service-specific contract in its service file |
 | 10. Validate consumers | Frontend, caller service, Kong, local-stack, and GitOps references |

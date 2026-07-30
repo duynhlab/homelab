@@ -67,7 +67,8 @@ docs/
 │   ├── README.md                 # Master index + 4-pillar architecture
 │   ├── opentelemetry/             # OTel instrumentation, transport, and migration learning
 │   │   ├── README.md              # Canonical policy + current platform behavior
-│   │   └── rfc-0014-explainer.md  # Beginner old-vs-new walkthrough
+│   │   ├── fundamentals.md        # OTel primer: API vs SDK, signals, OTLP, propagation + RFC-0014 migration story
+│   │   └── collector.md           # Collector deep dive: components, patterns, deployed pipelines
 │   ├── metrics/                  # Pillar 1: Metrics
 │   │   ├── README.md             # Hub: fundamentals, stack, architecture, coverage
 │   │   ├── metrics-apps.md       # Application + gRPC east-west metrics (RED)
@@ -75,6 +76,7 @@ docs/
 │   │   ├── metrics-infra.md      # Cluster / infrastructure metrics (USE)
 │   │   ├── victoriametrics.md    # VictoriaMetrics Operator stack (incl. VMAuth planned)
 │   │   ├── promql-guide.md       # PromQL reference
+│   │   ├── histograms.md         # Histogram & temporality fundamentals
 │   │   ├── streaming-aggregation.md  # VictoriaMetrics stream aggregation (vmagent)
 │   │   └── postgresql/           # PostgreSQL-specific metrics (databases layer)
 │   │       ├── README.md
@@ -252,8 +254,10 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 #### Observability (4 Pillars)
 
 1. **[Observability Overview](./observability/README.md)** - Master index, 4-pillar architecture
+   - **[OTel fundamentals](./observability/opentelemetry/fundamentals.md)** - what OTel is: API vs SDK, signals, OTLP transport, propagation & baggage + the RFC-0014 old-vs-new migration story (start here if new)
    - **[OpenTelemetry (platform)](./observability/opentelemetry/README.md)** - Collector topology, sampling, operations (app policy → [api/observability.md](./api/observability.md))
-   - **[RFC-0014 explainer](./observability/opentelemetry/rfc-0014-explainer.md)** - old-vs-new, plain-language (start here if new)
+   - **[OpenTelemetry Collector](./observability/opentelemetry/collector.md)** - component model, deployment patterns, the deployed pipelines
+   - **[Histograms & temporality](./observability/metrics/histograms.md)** - bucket mechanics, explicit vs exponential, delta vs cumulative
     - Metrics, Tracing, Logging, Profiling
     - Component inventory and correlation workflow
     - Deployment and quick start
@@ -353,15 +357,17 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 #### Observability Pillars
 - [Observability Overview](./observability/README.md) - Master index, 4-pillar architecture, 3-layer service architecture + APM integration
+- [OTel fundamentals](./observability/opentelemetry/fundamentals.md) - API vs SDK, signals and signal selection, OTLP transport, propagation & baggage, plus the RFC-0014 old-vs-new migration story
 - [OpenTelemetry (platform)](./observability/opentelemetry/README.md) - Collector topology, sampling, operations (app policy → [api/observability.md](./api/observability.md))
-- [RFC-0014 explainer](./observability/opentelemetry/rfc-0014-explainer.md) - old client_golang vs new OpenTelemetry (OTLP push), beginner-friendly
+- [OpenTelemetry Collector](./observability/opentelemetry/collector.md) - component model, deployment patterns, deployed pipelines + runbook
+- [Histograms & temporality](./observability/metrics/histograms.md) - bucket mechanics, explicit vs exponential, delta vs cumulative
 - [Distributed Tracing](./observability/tracing/README.md) - Tempo integration
 - [Tracing Architecture](./observability/tracing/architecture.md) - Triple backend (Tempo + Jaeger + VictoriaTraces)
 - [Jaeger Guide](./observability/tracing/jaeger.md) - Jaeger UI usage, comparison with Tempo
 - [Backend Comparison](./observability/tracing/backends-comparison.md) - Tempo vs Jaeger vs VictoriaTraces
 - [VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md) - 3rd backend via the VM operator
 - [Continuous Profiling](./observability/profiling/README.md) - Pyroscope setup
-- [ClickHouse learning guide](./observability/clickhouse/README.md) - Planned OLAP; OTel SQL + optional commerce ([RFC-0019](./proposals/rfc/RFC-0019/))
+- [ClickHouse OTel OLAP](./observability/clickhouse/README.md) - Deployed supplementary OLAP; OTel logs/traces SQL ([RFC-0019](./proposals/rfc/RFC-0019/))
 - [Logging (platform)](./observability/logging/README.md) - OTLP app logs + Vector for non-instrumented pods
 - [Application logging](./api/logs.md) - App-side logging contract (libraries, levels, JSON fields)
 - [Application observability](./api/observability.md) - Cross-cutting policy, env, middleware, three-layer spans

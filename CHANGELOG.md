@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **OTel fundamentals docs** under `docs/observability/` — `opentelemetry/fundamentals.md` (API vs SDK, signal selection, OTLP gRPC-vs-HTTP, context propagation & baggage, semconv), `opentelemetry/collector.md` (component model, agent/gateway/sidecar patterns, the deployed pipelines incl. ClickHouse fan-out, processor ordering, `create_schema` startup coupling, troubleshooting runbook), and `metrics/histograms.md` (bucket mechanics, explicit vs **exponential** histograms, delta vs cumulative temporality, cardinality-per-attribute-set). Stack/tracing diagrams and inventories updated to show the live ClickHouse exporter and `tracing-local dependsOn clickhouse-local`; stale "conceptual" collector YAML in `tracing/architecture.md` replaced with the real pipeline table. `rfc-0014-explainer.md` **merged into `fundamentals.md`** (all seven diagrams preserved; the cutover pipeline diagram kept as labelled historical, superseded by `collector.md`) — file removed, every reference updated.
+
 - **ADR-032 proposed — deliver Tempo via tempo-operator `TempoMonolithic`**:
   decision record (Proposed, adoption not started) to replace the raw Tempo
   Deployment/ConfigMap with an operator-managed CR, enable the inert
@@ -63,6 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **inventory backfill CronJob image reference** — it pointed at `ghcr.io/duynhlab/inventory-service/inventory:v0.2.1`, which does not exist: the repo publishes `…/inventory-service/inventory-service` tagged without the leading `v` (now `0.2.3`) (GHCR returns 404 for the old path). The CronJob is suspended, so the bad pull would have surfaced the first time it was resumed — inside the write-cutover window, which is the worst possible moment.
 
 ### Changed
+
+- **`docs/api/` observability contracts** — `observability.md` is the normative application hub (document ownership, layer responsibilities, cross-signal data policy, error ownership, worker/Temporal rules, PR checklist); `api.md § Observability` delegates instead of duplicating the signal matrix. Contract-first pass over the pillar docs, every claim audited against `duynhlab/pkg`, the ten service repos, and the OTel specification (2026-07-29): `logs.md` gains the **OTel LogRecord data model** (11 fields, SeverityNumber ranges, platform mapping) and the semconv access-log schema; `metrics.md` gains bucket semantics and a **temporality** contract (cumulative, D-7) and fixes the byte-bucket View values to the deployed set; `tracing.md` gets full **baggage** semantics (immutability, not-stored, security) and restores the verified Kong `inject: [w3c]` fact; `profiling.md` pins verified `SetupProfiling` behavior and a bounded-stop wiring shape; probe filtering is one signal-by-signal contract matrix. Follow-up pass adds the **instrument selection rule** (all seven instrument kinds, additive×monotonic decision table, sync vs Observable timing, the cumulative-total callback trap), the API-vs-SDK stability contract in the fundamentals doc, and the layer tracing rules: SpanKind↔layer mapping, the enrich-before-create granularity ladder (attributes → events → child span), and no hand-wrapped driver spans in adapters.
 
 - **Unversioned order worker retired** (ADR-030 lifecycle, RFC-0021 P3): the
   activation drill set Current to `1.8.0` and the drain gate

@@ -80,7 +80,7 @@ doc has no owning RFC or ADR. Legacy v1 contracts may still say **Design record*
 | Information | Canonical owner |
 |-------------|-----------------|
 | Shared URL, auth, error, pagination, idempotency, and gRPC rules | [api.md](./api.md) |
-| Cross-cutting observability policy, env, middleware, three-layer spans | [observability.md](./observability.md) |
+| Cross-cutting observability policy, env, middleware, layer responsibilities | [observability.md](./observability.md) |
 | Application logging JSON contract, levels, otelzap tee | [logs.md](./logs.md) |
 | Metric instruments, cardinality, business metric authoring | [metrics.md](./metrics.md) |
 | Tracing spans, sampling, span helpers | [tracing.md](./tracing.md) |

@@ -186,6 +186,7 @@ metrics/
 ├── metrics-infra.md     # Cluster / infrastructure metrics (USE)
 ├── victoriametrics.md   # The stack: VM Operator, dual CRDs, components, ops
 ├── promql-guide.md      # PromQL: counters, rate() vs increase(), $rate vs $__range
+├── histograms.md        # Histogram & temporality fundamentals: buckets, explicit vs exponential, delta vs cumulative
 ├── streaming-aggregation.md  # At-scale playbook: in-flight aggregation, 2-tier vmagent (RFC-0013)
 └── postgresql/          # Databases layer — hub, built-in/custom metrics, workflows, runbook links
     ├── README.md               # Entry point: hub, scrape architecture, cluster inventory

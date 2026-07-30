@@ -1,6 +1,6 @@
 # Application Metrics
 
-RED, gRPC, runtime, database client, and business metric authoring contract for all ten Go microservices and both workers — instrument names, labels, cardinality rules, and OTel Meter API conventions.
+RED, gRPC, runtime, database client, and business metric authoring contract for every Go service and worker in the platform service catalog — instrument names, labels, cardinality rules, and OTel Meter API conventions.
 
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
@@ -36,17 +36,16 @@ a service author writes; a service only adds Business instruments.
 
 | Family | Method | Metric families | Type | Service scope | Source (who emits) |
 |--------|--------|-----------------|------|---------------|--------------------|
-| **Request** | RED | `http_server_request_duration_seconds`, `http_server_{request,response}_body_size_bytes` | Histogram | all 10 services | `otelgin` (auto) |
+| **Request** | RED | `http_server_request_duration_seconds`, `http_server_{request,response}_body_size_bytes` | Histogram | instrumented API services | `otelgin` (auto) |
 | **East-west** | RED | `rpc_{server,client}_call_duration_seconds` | Histogram | services making/serving gRPC | `otelgrpc` via `pkg/grpcx` (auto) |
-| **Runtime** | USE | `go_goroutine_count`, `go_memory_*_bytes` | Gauge | all 10 services + 2 workers | `runtime.Start` (auto) |
+| **Runtime** | USE | `go_goroutine_count`, `go_memory_*_bytes` | Gauge | instrumented services and workers | `runtime.Start` (auto) |
 | **Container** | USE | `container_memory_working_set_bytes`, `container_cpu_*` | Gauge | every pod | cAdvisor (auto, cluster) |
-| **Business** | domain | per-service `<svc>_*` (see  [§ Business metrics](#business-metrics-custom)) | Counter/Histogram | **all 10 services** (RFC-0017) | **hand-declared** in service code |
+| **Business** | domain | per-service `<svc>_*` (see  [§ Business metrics](#business-metrics-custom)) | Counter/Histogram | per RFC-0017 service catalog | **hand-declared** in service code |
 
-> Business metrics are a **third pillar**, not RED or USE — those two are
+> Business metrics are a **domain metric family**, not RED or USE — those two are
 > already covered by the auto layer above, so never hand-write them. Since
-> **RFC-0017** every service declares its own domain instruments (payments,
-> saga, auth, cache, …); the [Business KPIs dashboard](#dashboard) is built
-> entirely from them.
+> **RFC-0017** every service in the catalog declares its own domain instruments;
+> the [Business KPIs dashboard](../observability/metrics/metrics-apps.md#dashboard) is built entirely from them.
 
 ## HTTP server metrics (auto-instrumented)
 
@@ -109,8 +108,8 @@ This is the **canonical fleet bucket set** — pinned by an explicit SDK
 boundaries lack `le=2` (Apdex *tolerating*) and the 0.2/0.3 SLO precision
 points. Every service must use exactly these values; divergent buckets break
 cross-service `histogram_quantile()` comparisons and blunt SLO precision
-([RFC-0013](../../proposals/rfc/RFC-0013/README.md),
-[RFC-0014](../../proposals/rfc/RFC-0014/README.md)).
+([RFC-0013](../proposals/rfc/RFC-0013/README.md),
+[RFC-0014](../proposals/rfc/RFC-0014/README.md)).
 
 | Bucket (s) | Purpose |
 |------------|---------|
@@ -124,9 +123,40 @@ cross-service `histogram_quantile()` comparisons and blunt SLO precision
 | 5, 10 | Timeouts, degraded responses |
 
 `http_server_request_body_size_bytes` / `http_server_response_body_size_bytes`
-use a byte-bucket View (`100, 1000, 10000, 100000, 1000000`) — semconv gives no
-size-bucket advice — and measure the HTTP body only (not TCP/IP, headers, or
-TLS overhead).
+use a byte-bucket View (`256, 1024, 4096, 16384, 65536, 262144, 1048576,
+4194304` — powers of four from 256 B to 4 MiB; semconv gives no size-bucket
+advice) and measure the HTTP body only (not TCP/IP, headers, or TLS overhead).
+
+### Bucket semantics
+
+- A boundary array of N values defines **N+1 buckets**: each bucket is
+  `(lower, upper]` — inclusive of its upper bound — plus an implicit overflow
+  bucket `(max, +∞)` that catches everything above the last boundary.
+- Every exported histogram point carries **Count**, **Sum**, and the
+  per-bucket counts (optionally Min/Max). Percentiles are **computed by the
+  backend** from bucket counts (`histogram_quantile()`), never by the SDK —
+  which is why boundary placement decides quantile accuracy.
+- The SDK keeps **one metric stream per unique attribute set** — every new
+  label combination materializes a full set of bucket series. This is why ID
+  labels are forbidden: one `user_id` label turns 32 histogram series into 32
+  series *per user*.
+
+### Temporality
+
+Every OTel metric stream has an **aggregation temporality**:
+
+| Temporality | Each export contains | Fits |
+|-------------|----------------------|------|
+| **Cumulative** | The running total since process start | Prometheus-lineage backends (`rate()` computes the delta) |
+| **Delta** | Only the change since the previous export | Backends that re-aggregate server-side |
+
+Platform contract: **cumulative** — the Go SDK default, and what
+VictoriaMetrics expects (RFC-0017 D-7). The collector's `deltatocumulative`
+processor is purely defensive: a delta sample stored in VictoriaMetrics would
+silently break `rate()`. Services never override temporality.
+
+Deep dive (explicit vs exponential histograms, temporality mechanics):
+[Histograms (platform)](../observability/metrics/histograms.md).
 
 ## Labels & provenance
 
@@ -169,7 +199,7 @@ pipeline the moment their SDK points at the collector.
 
 ```mermaid
 flowchart TD
-    SDK["OTel SDK (pkg/obsx)<br/>10 Go services + 2 workers<br/>otelgin · otelgrpc · runtime.Start"] -->|"OTLP/HTTP :4318"| COL["otel-collector<br/>(memory_limiter → deltatocumulative → batch)"]
+    SDK["OTel SDK (pkg/obsx)<br/>instrumented services and workers<br/>otelgin · otelgrpc · runtime.Start"] -->|"OTLP/HTTP :4318"| COL["otel-collector<br/>(memory_limiter → deltatocumulative → batch)"]
     COL -->|"otlphttp proto"| VMA["vmagent :8429 OTLP ingest<br/>usePrometheusNaming + resource-attr allowlist<br/>relabel service_name→app, k8s_namespace_name→namespace"]
     VMA -->|remote write| VMS[("VictoriaMetrics")]
 
@@ -207,10 +237,10 @@ pattern**, not the raw URL, so IDs don't explode cardinality:
 | Raw URL | `/api/v1/products/123`, `/456`, … | **Unbounded** |
 | Route pattern (`http.route`) | `/api/v1/products/:id` | **Bounded** (~20 routes) |
 
-With 10 services × ~20 routes × 3 methods × 5 status codes ≈ **3,000 series**
-(payment adds a small increment) — bounded and predictable.
+With ~20 routes × 3 methods × 5 status codes per service, series count stays
+bounded and predictable.
 Measured (2026-07-06, one replica per service, live traffic): **49–720 series
-per service, Σ 2,777** across the 9-service measurement snapshot — histogram label sets materialize
+per service, Σ 2,777** across a nine-service measurement snapshot — histogram label sets materialize
 lazily, so this grows toward the worst-case bound of ~1,800 series/replica
 (~48 route×status combos × 32 histogram series + runtime). Bounded and
 predictable either way; the full model and at-scale projection live in the
@@ -228,9 +258,10 @@ service pinning a different `pkg/obsx` version or overriding a View is a defect
 even if it "works" (see RFC-0013 D3, RFC-0014 D-7).
 
 **Infrastructure-endpoint filtering** — `/health`, `/ready`, `/metrics`,
-`/readiness`, `/liveness` are excluded from HTTP instrumentation, so metrics
-reflect real user traffic with lower cardinality and accurate latency
-percentiles.
+`/readiness`, `/liveness` are excluded from HTTP RED instrumentation, so RED
+metrics reflect real user traffic with lower cardinality and accurate latency
+percentiles. Process/runtime metrics remain available and act as heartbeat
+signals.
 
 ## Go runtime metrics
 
@@ -332,17 +363,54 @@ design, dual-port services, health checks, and resilience defaults see
 
 ## OTel instrument types
 
-Every metric is emitted through one of a few **instrument types**. The type is
-not cosmetic — it decides what the SDK aggregates, which PromQL sub-series you
-get, and whether the metric even *has* buckets. Pick the type from the shape of
-the thing you are measuring:
+Every metric is emitted through one of **seven instrument types** — four
+synchronous (recorded inline at the event) and three asynchronous/Observable
+(a callback the SDK invokes at each collection). The type is not cosmetic —
+it decides what the SDK aggregates, which PromQL sub-series you get, and
+whether the metric even *has* buckets:
 
-| Instrument | Shape it measures | Goes down? | PromQL output | Read it with | Platform examples |
-|------------|-------------------|-----------|---------------|--------------|-------------------|
-| **Counter** | a count of events that only grows | No (monotonic) | one `_total` series | `rate()` / `increase()` | `auth_registrations_total`, `payment_authorization_total`, `product_cache_gets_total` |
-| **UpDownCounter** | a running total that rises *and* falls | Yes | one series (no `_total`) | raw value / `last_over_time()` | *(none declared yet — an outbox backlog or an in-flight counter would fit)* |
-| **Histogram** | the *distribution* of a measured value | records values | `_bucket{le=…}` + `_sum` + `_count` | `histogram_quantile()`, `_sum/_count` for the mean | `http_server_request_duration_seconds`, `order_value_minor`, `reviews_rating`, `payment_provider_request_duration_seconds` |
-| **Gauge** (observable) | a point-in-time sample, read each collection | Yes | one series | raw value / `deriv()` | `go_goroutine_count`, `go_memory_used_bytes` |
+| Instrument | Sync? | Shape it measures | Goes down? | PromQL output | Read it with | Platform examples |
+|------------|-------|-------------------|-----------|---------------|--------------|-------------------|
+| **Counter** | sync | a count of events that only grows | No (monotonic) | one `_total` series | `rate()` / `increase()` | `auth_registrations_total`, `payment_authorization_total`, `product_cache_gets_total` |
+| **Observable Counter** | async | a monotonic total cheap to read on demand (rows processed, ticks) | No | one `_total` series | `rate()` / `increase()` | *(none hand-declared — pattern reserved)* |
+| **UpDownCounter** | sync | a running total that rises *and* falls | Yes | one series (no `_total`) | raw value / `last_over_time()` | *(none declared yet — an outbox backlog or an in-flight counter would fit)* |
+| **Observable UpDownCounter** | async | current additive state sampled per collection (queue depth, connections in use) | Yes | one series | raw value | DB pool stats via `otelpgx.RecordStats` (`pkg/dbx`) |
+| **Histogram** | sync | the *distribution* of a measured value | records values | `_bucket{le=…}` + `_sum` + `_count` | `histogram_quantile()`, `_sum/_count` for the mean | `http_server_request_duration_seconds`, `order_value_minor`, `reviews_rating`, `payment_provider_request_duration_seconds` |
+| **Gauge** | sync | a last-value written at the event (non-additive) | Yes | one series | raw value | *(none — stabilized mid-2024; prefer the observable form)* |
+| **Observable Gauge** | async | a point-in-time sample, read each collection (non-additive) | Yes | one series | raw value / `deriv()` | `go_goroutine_count`, `go_memory_used_bytes` |
+
+### Choosing the instrument (the rule)
+
+Two questions decide the instrument — first the **shape**, then the **timing**.
+
+**Axis 1 — shape** (additive × monotonic):
+
+| Is it…? | Additive (summing across sources is meaningful) | Monotonic (only grows) | Instrument family |
+|---------|--------------------------------------------------|------------------------|-------------------|
+| A distribution you'll ask percentiles of | ✅ | ✗ | **Histogram** |
+| A count of events | ✅ | ✅ | **Counter** family |
+| A total that rises and falls | ✅ | ✗ | **UpDownCounter** family |
+| A sampled value where summing is meaningless (CPU %, ratio, temperature — two pods at 60% is not 120%) | ✗ | ✗ | **Gauge** family |
+
+**Axis 2 — timing** (which family member):
+
+- **Sync** — the measurement happens *inside* a request or use case; record it
+  at the event, and it can associate with the active `context.Context`.
+- **Async / Observable** — the value is a cheap-to-read *current state*
+  (pool size, backlog length); recording per event would be wasteful, so
+  register a callback and let the SDK sample it at each export interval.
+
+The correctness trap the async family hides: an **Observable Counter callback
+must report the cumulative total, not the increment** — the SDK computes
+deltas between observations, so reporting increments silently corrupts every
+`rate()` built on it.
+
+Platform defaults: business metrics today are **Counter or Histogram recorded
+synchronously at the authoritative decision point**
+([§ Business metrics](#business-metrics-custom)); the Observable families are
+in use only through shared instrumentation (`runtime`, `otelpgx`). A
+hand-declared Observable instrument follows the same catalog registration as
+any other.
 
 **The bucket insight.** Only **Histograms** have buckets. A Counter is a single
 running number, so asking for its `le=…` buckets is meaningless — that is why a
@@ -377,30 +445,47 @@ histogram gets a `_seconds` infix. That is why the dashboards query
 
 ## Business metrics (custom)
 
-The RED/USE families above are auto-instrumented and identical everywhere;
-they measure the *transport and the runtime*, not the *domain*. Business
-metrics are the third pillar: **hand-declared** instruments that count
-domain events the libraries cannot see (a confirmed checkout, a burned promo).
-A service adds them with the OTel Meter API in its own `logic` layer — never
-with `promauto`, and never to re-implement RED/USE.
+Automatic HTTP, gRPC, runtime, container, cache, and database instrumentation
+must not be reproduced in service code. A service adds only domain metrics that
+answer an operational or business-correctness question unavailable from
+automatic telemetry.
+
+A business metric is emitted at the **authoritative decision point**, after the
+outcome is known.
+
+| Outcome | Correct emission point |
+|---------|------------------------|
+| Checkout confirmed | Checkout use case after durable success |
+| Inventory reserve rejected | Inventory use case that owns the invariant |
+| Payment captured | Payment transaction/ledger commit boundary |
+| HTTP request status | Automatic middleware, not handler |
+| DB pool saturation | Shared DB instrumentation, not business logic |
+
+| Requirement | Contract |
+|-------------|----------|
+| Name | OTel dotted lowercase operation/domain name |
+| Type | Per the [instrument selection rule](#choosing-the-instrument-the-rule) — in practice Counter or Histogram at the decision point |
+| Unit | Declared with instrument metadata; not embedded in the OTel name |
+| Labels | Bounded, enumerated values only |
+| Forbidden labels | User, order, payment, cart, session, workflow, SKU, promo code, URL, email, or arbitrary input |
+| Replay semantics | State whether the metric counts attempts or unique business outcomes |
+| Ownership | Owning service and source use case |
+| Catalog | Register in the [business metrics catalog](../observability/metrics/metrics-catalog.md) |
+| Operations | State dashboard/alert usage or explicitly state none |
+| Tests | Verify labels, outcome count, retry behavior, and approved histogram View |
 
 **How they are declared** (checkout-service `internal/logic/v1/metrics.go`):
 a package-level `meter = otel.Meter("checkout")` rides the global
 MeterProvider `obsx` installs (a no-op before setup, so package-init is safe);
 instruments are `meter.Int64Counter(...)` / `meter.Float64Histogram(...)` with
 OTel dotted names, and are recorded with `.Add`/`.Record` + a **bounded**
-attribute where a metric splits by cause. vmagent's `usePrometheusNaming`
-renders the dotted name into the PromQL form (counter → `_total`, seconds
-histogram → `_seconds`).
+attribute where a metric splits by cause.
 
-Since **RFC-0017** every service declares its own Business instruments. The
+Since **RFC-0017** every service in the catalog declares its own Business instruments. The
 table below keeps **checkout as the worked example**; the **full shipped
-catalog — all 34 instruments across the 10 services, with every label value
-and its recording semantics — is
+catalog is in
  [metrics-catalog.md](../observability/metrics/metrics-catalog.md#business-metrics--per-service-catalog)**,
-and is what the [Business KPIs dashboard](#dashboard) visualizes. (The RFC's
-own catalog table is the historical design; names and rows diverged during
-implementation.)
+and is what the [Business KPIs dashboard](../observability/metrics/metrics-apps.md#dashboard) visualizes.
 
 | Service | Metric (PromQL) | OTel instrument | Type | Labels | Purpose |
 |---------|-----------------|-----------------|------|--------|---------|
@@ -411,37 +496,55 @@ implementation.)
 | checkout | `checkout_promo_rejected_total` | `checkout.promo.rejected` | Counter | `reason` = `expired`\|`exhausted` | Promo rejections at the authoritative confirm gate |
 | checkout | `checkout_confirm_duration_seconds` | `checkout.confirm.duration` | Histogram (`s`) | — | End-to-end confirm handler duration |
 
-**Conventions Business metrics must follow** (same guardrails as the auto
-families): OTel dotted lowercase names, no unit baked into the name (use
-`WithUnit`), monotonic counters only for counts, and **bounded** label values
-only — a promo *reason* (5 values) is fine; a `promo_code`, `user_id`, or
-`session_id` is forbidden (unbounded — belongs in a log/trace, see
- [§ App-side cardinality control](#app-side-cardinality-control)). Business latency
-histograms reuse the platform duration buckets via an `obsx` View like RED.
+Label and cardinality rules: [§ App-side cardinality control](#app-side-cardinality-control)
+and [cross-signal data policy](./observability.md#cross-signal-data-and-privacy-policy).
+Business latency histograms reuse the platform duration buckets via an `obsx` View like RED.
+
+### Canonical OTel name vs backend name
+
+| Concern | Example |
+|---------|---------|
+| OTel instrument | `checkout.confirm.duration` |
+| Unit | `s` |
+| Backend/PromQL form | `checkout_confirm_duration_seconds` (generated by ingest naming policy) |
+
+Do not teach engineers to create both names — declare the OTel instrument; vmagent's
+`usePrometheusNaming` renders the PromQL form on ingest.
+
+### Metric lifecycle
+
+Every new business metric should progress through:
+
+```text
+Proposed → Implemented → Used → Deprecated → Removed
+```
+
+Registration checklist:
+
+- owner service and source use case;
+- canonical instrument name, type, and unit;
+- bounded labels with enumerated values;
+- operational question and service-contract entry;
+- [metrics catalog](../observability/metrics/metrics-catalog.md) entry;
+- dashboard or explicit "no dashboard yet";
+- alert or explicit "not alerting";
+- deprecation plan when superseded.
+
+### Tests
+
+- instrument registers once without duplicate-registration panic;
+- label values are allowlisted or normalized;
+- IDs and user input cannot enter labels;
+- counter replay behavior matches documented attempt vs outcome semantics;
+- histogram uses the approved View when sub-second precision matters;
+- one business action emits the expected observation once;
+- failure and retry paths do not overcount unless documented.
 
 ## Instrumentation
 
-Observability is wired once, in the shared `pkg/obsx.SetupObservability`, called
-from each service's `cmd/main.go`. It configures the OTel `MeterProvider` with
-the platform Views (13-bucket duration, byte buckets), starts `runtime.Start`
-for the Go runtime metrics, points the OTLP/HTTP exporter at `otel-collector`,
-and installs those providers as the OTel globals. It does **not** install the
-`otelgin` HTTP middleware — each service's `TracingMiddleware` wraps
-`otelgin.Middleware`, which then reads the global providers `obsx` set. There is
-**no hand-written Prometheus middleware and no `promauto` registry** anymore —
-the SDK emits the semconv instruments and vmagent translates the names on
-ingest.
-
-The HTTP middleware chain is **tracing → logging** (two middleware only). HTTP
-server metrics are **not** produced by a separate metrics middleware: the same
-`otelgin` instrumentation that the tracing middleware wraps records both the
-span (via the TracerProvider) and the `http.server.*` metrics (via the global
-MeterProvider). Because tracing runs first, the active span (and its `trace_id`)
-is on the request context by the time the logs and metrics are recorded, which
-is what enables cross-signal correlation below.
-
-gRPC RED + tracing come from the `pkg/grpcx` interceptors. Route shapes,
-audiences, and SLO conventions:  [API reference](./api.md).
+Automatic HTTP/gRPC/runtime/DB instruments are installed through the shared
+[application observability contract](./observability.md). Service authors do
+not reproduce RED/USE instruments or construct OTel providers/exporters.
 
 ## Correlation: metrics ↔ traces ↔ logs
 
@@ -474,5 +577,5 @@ metric → exemplar → trace.
 - [Metrics hub (platform)](../observability/metrics/README.md)
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-07-22 — canonical app metrics authoring contract._
+_Last updated: 2026-07-29 — canonical app metrics authoring contract; checkout example table verified against `checkout-service/internal/logic/v1/metrics.go`._
 

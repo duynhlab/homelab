@@ -1,6 +1,6 @@
 # Application Logging
 
-Structured logging contract for all ten Go microservices and both workers — libraries, JSON shape, levels, and OTLP export via the otelzap tee.
+Structured logging contract for every Go service and worker in the platform service catalog — libraries, JSON shape, levels, and OTLP export via the otelzap tee.
 
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
@@ -17,29 +17,9 @@ Structured logging contract for all ten Go microservices and both workers — li
 
 Every service outputs **structured JSON** using the shared **`zapx`** logger. Its zap core is **tee'd** into the OpenTelemetry log pipeline (see [OpenTelemetry integration](#opentelemetry-integration)).
 
-**Current status (RFC-0014 P4):**
+**Current status (RFC-0014 P4):** the fleet has converged on **`zapx`** — one logger, one JSON contract, one otelzap tee → OTLP → OpenTelemetry Collector → VictoriaLogs (stdout is still emitted for `kubectl logs`).
 
-- The fleet has **converged on `zapx`**: auth migrated off zerolog, cart off clog, joining six services already on zap. One logger, one JSON contract, one tee.
-- Every service's zap core is tee'd through an **otelzap** bridge → OTLP → OpenTelemetry Collector → VictoriaLogs (stdout is still emitted for `kubectl logs`).
-
----
-
-## Fleet status
-
-All ten services and both workers use **`zapx`**. Pre-P4 library migrations:
-
-| Service | Logger | Was |
-|---------|--------|-----|
-| **auth** | zapx | zerolog |
-| **cart** | zapx | clog |
-| **product** | zapx | zap (reference impl) |
-| **order** | zapx | zap |
-| **review** | zapx | zap |
-| **notification** | zapx | zap |
-| **shipping** | zapx | zap |
-| **user** | zapx | zap |
-| **payment** | zapx | zap |
-| **checkout** | zapx | zap |
+Scope and shared bootstrap rules: [Application observability](./observability.md).
 
 ---
 
@@ -53,13 +33,13 @@ kubectl logs -n cart deployment/cart --tail=50
 
 ### Log output format
 
-Representative line:
+Canonical access-log line (middleware-owned summary):
 
 ```json
-{"level":"info","timestamp":"2026-07-09T02:12:04.455Z","caller":"middleware/logging.go:42","message":"HTTP request","trace_id":"94c290a2e22a985f6f9fa2337e476443","method":"GET","path":"/health","status":200,"duration":0.000134,"client_ip":"10.244.1.1","user_agent":"kube-probe/1.33"}
+{"level":"info","timestamp":"2026-07-09T02:12:04.455Z","caller":"middleware/logging.go:42","message":"HTTP request","trace_id":"94c290a2e22a985f6f9fa2337e476443","http.request.method":"GET","http.route":"/order/v1/private/orders","http.response.status_code":200,"duration_seconds":0.042}
 ```
 
-The stdout line above is what `kubectl logs` shows; the same record is also exported over OTLP to VictoriaLogs by the otelzap tee.
+The stdout line is what `kubectl logs` shows; the same record is also exported over OTLP to VictoriaLogs by the otelzap tee.
 
 ---
 
@@ -86,17 +66,67 @@ func New(level string) (*zap.Logger, error) {
 }
 ```
 
-**Usage:** `logger.Info("HTTP request", zap.String("method", c.Request.Method), zap.String("path", c.Request.URL.Path))`.
-
 `trace_id`/`span_id` are injected from the OpenTelemetry span context in the logging middleware, so a log line and its trace join on one id.
 
-### Why the fleet converged on `zapx`
+---
 
-Before RFC-0014 P4, three loggers coexisted (zap on six services, clog on cart, zerolog on auth). The otelzap tee needs one uniform zap core. Converging removes field-shape divergence (`msg` vs `message`, Unix vs ISO8601 time).
+## OTel log data model
+
+Every exported record is an OpenTelemetry **LogRecord**. This is the platform
+contract for what a log record *is* — the JSON on stdout is a rendering of it,
+and the OTLP export carries it natively.
+
+| Field | What it means | Why it matters |
+|-------|---------------|----------------|
+| `Timestamp` | Time when the event occurred | Builds the incident timeline |
+| `ObservedTimestamp` | Time when the collection system observed the event | Identifies parsing or ingestion lag |
+| `TraceId` | Trace associated with the log | Enables log-to-trace correlation |
+| `SpanId` | Span associated with the log | Pinpoints where in a request the log was emitted |
+| `TraceFlags` | W3C trace flags | Preserves trace context and sampling decision |
+| `SeverityText` | Original severity label (`INFO`, `ERROR`) | Keeps log levels human-readable |
+| `SeverityNumber` | Normalized numeric severity (1–24) | Enables consistent filtering and alerting across languages |
+| `Body` | Main log message or structured payload | Stores the core event detail |
+| `Resource` | Entity that produced the log (service, pod, namespace) | Supports grouping and ownership |
+| `InstrumentationScope` | Library or scope that emitted the log | Debugs instrumentation sources |
+| `Attributes` | Additional key-value context | Filtering, grouping, enrichment |
+
+### SeverityNumber ranges
+
+OTel normalizes severity into numeric ranges so backends can filter and alert
+without parsing language-specific label strings:
+
+| Range | Meaning | zap level mapped by the otelzap bridge |
+|-------|---------|----------------------------------------|
+| 1–4 | TRACE | — (zap has no trace level) |
+| 5–8 | DEBUG | `DebugLevel` |
+| 9–12 | INFO | `InfoLevel` |
+| 13–16 | WARN | `WarnLevel` |
+| 17–20 | ERROR | `ErrorLevel` |
+| 21–24 | FATAL | `FatalLevel` / `PanicLevel` |
+
+### How the platform stack fills the LogRecord
+
+| LogRecord field | Filled by |
+|-----------------|-----------|
+| `Timestamp` | zap entry time (`zapx` `timestamp`) |
+| `ObservedTimestamp` | otelzap bridge / OpenTelemetry Collector at receive time |
+| `TraceId`, `SpanId`, `TraceFlags` | `obsx.TraceContext(ctx)` bound to the request logger |
+| `SeverityText`, `SeverityNumber` | zap `level` via the otelzap bridge |
+| `Body` | zap `message` |
+| `Resource` | `pkg/obsx` resource (`service.name`, namespace, pod, version — from `OTEL_SERVICE_NAME` + Downward API) |
+| `InstrumentationScope` | the scope name passed to `obs.ZapCore(scopeName, minLevel)` |
+| `Attributes` | every `zap.Field` on the entry (`caller` included) |
+
+Every field in this mapping is wired by shared code (`pkg/obsx`, `zapx`,
+middleware) — a service author only writes `logger.Info(message, fields…)` and
+the full LogRecord shape falls out.
 
 ---
 
 ## Log level standards
+
+Platform severity taxonomy — use when choosing which zap method to call or
+interpreting exported JSON `level` values:
 
 | Level Name | Value | Description |
 |------------|-------|-------------|
@@ -110,6 +140,11 @@ Before RFC-0014 P4, three loggers coexisted (zap on six services, clog on cart, 
 
 ### Library level mapping (zap)
 
+The fleet converged on **`zapx`** (RFC-0014 P4) — see
+[Migration history](#migration-history). Legacy `pkg/logger/zerolog` and
+`pkg/logger/clog` adapters remain in `duynhlab/pkg` but no service imports
+them anymore; all ten API services and workers use `zapx`.
+
 | User Standard | Zap (`zapcore.Level`) |
 |----------------|-----------------------|
 | panic (5) | PanicLevel (4) |
@@ -120,29 +155,55 @@ Before RFC-0014 P4, three loggers coexisted (zap on six services, clog on cart, 
 | debug (0) | DebugLevel (-1) |
 | trace (-1) | N/A (zap has no trace level) |
 
-### Kubernetes configuration
+`panic` and `fatal` are **logger methods** (`logger.Panic`, `logger.Fatal`) or
+process bootstrap failures — they are **not** valid `LOG_LEVEL` values. The
+platform defines no trace log level.
 
-**Current state** (`kubernetes/apps/`):
+### Runtime configuration (`LOG_LEVEL`)
 
-- All 10 services: `LOG_LEVEL: "info"`, `LOG_FORMAT: "json"`
+What operators and config validation actually accept:
+
+| Runtime level | Use |
+|---------------|-----|
+| `debug` | Diagnostic detail; disabled in normal production operation |
+| `info` | Normal lifecycle and successful state transitions |
+| `warn` | Degraded but handled condition |
+| `error` | Operation failed and the final action is return, abandon, or escalation |
+
+**Kubernetes / service config** (`kubernetes/apps/`, each `*-service/config/config.go`):
+
+- Fleet-wide: `LOG_LEVEL: "info"`, `LOG_FORMAT: "json"`
 - Config validation: `validLogLevels = ["debug", "info", "warn", "error"]`
 
-**Runtime configurability:** `zapx.New(level)` parses and applies `LOG_LEVEL` at startup. The **same level also gates the otelzap tee** — the OTLP bridge is level-gated (`obs.ZapCore(name, minLevel)`) so debug records suppressed on stdout are not exported over OTLP either.
+**Wiring contract:**
+
+- stdout logger: `zapx.New(cfg.Logging.Level)` — the validated config value, not a raw env read. `zapx.parseLevel` recognises the four runtime values; anything else defaults to `info`.
+- OTLP tee gate: the **same level** gates the export branch — `zapcore.ParseLevel` (fallback `info`) passed to `obs.ZapCore(serviceName, minLevel)` — so debug records suppressed on stdout are not exported over OTLP either.
+
+Legacy adapters (`zerolog`, `clog`) accepted the same four `LOG_LEVEL` strings before P4; only the JSON field shapes differed (`msg` vs `message`, Unix vs ISO8601 time).
 
 ---
 
-## JSON format requirements
+## Record fields
 
-### Required fields
+### Required
 
-| Field | Description | Notes |
-|-------|-------------|-------|
-| `timestamp` | Timestamp | ISO8601 (zapx `ISO8601TimeEncoder`) |
-| `level` | Log level | Lowercase (`info`, `error`, …) |
-| `message` | Log message | Uniform `message` key (was `msg` on clog) |
-| `caller` | Source location | `file:line` of the log call |
-| `trace_id` | OpenTelemetry Trace ID | Injected when a span is active |
-| `span_id` | OpenTelemetry Span ID | When span exists in context |
+| Field | Contract |
+|-------|----------|
+| `timestamp` | ISO8601 UTC |
+| `level` | lowercase supported runtime level |
+| `message` | concise human-readable summary |
+| `caller` | source location when enabled |
+
+### Conditional
+
+| Field | Present when |
+|-------|--------------|
+| `trace_id`, `span_id` | a valid active span context exists |
+| `event` | the record represents a stable machine-queryable event |
+| `operation` | the record belongs to a command/use case |
+| `error` / `error.type` | the operation has an error |
+| domain/workflow identifiers | operationally justified and permitted by the [common data policy](./observability.md#cross-signal-data-and-privacy-policy) |
 
 ### OTLP export (app path)
 
@@ -150,6 +211,79 @@ Before RFC-0014 P4, three loggers coexisted (zap on six services, clog on cart, 
 - The Collector's VictoriaLogs exporter sets `VL-Stream-Fields: service.name` (one stream per service) and keeps `trace_id` as a queryable field.
 
 Infra ingest headers (`VL-Msg-Field`, Vector streams) are documented in [Logging (platform)](../observability/logging/README.md#platform-pipeline).
+
+---
+
+## Event and field naming
+
+- **Message** is stable and concise — not a dump of dynamic IDs.
+- Custom field keys use **lower snake_case**.
+- Important machine-queryable records carry a stable **`event`** value.
+- Do not put IDs into message templates when fields can carry them.
+- Do not create one-off aliases such as `orderId`, `order_id`, and `oid` for the same concept.
+- Errors use one consistent field shape (`zap.Error(err)` and/or `error.type`).
+
+```go
+logger.Info(
+    "inventory reservation committed",
+    zap.String("event", "inventory.reservation_committed"),
+    zap.String("operation", "inventory.commit_reservation"),
+    zap.String("reservation_id", reservationID),
+)
+```
+
+---
+
+## Access-log policy
+
+HTTP and gRPC middleware own **one request/RPC summary record** per call.
+Handlers must not also write generic `logger.Info("HTTP request", …)` unless
+they are logging a separate domain event.
+
+**Access-log field schema (contract):**
+
+| Field | Notes |
+|-------|-------|
+| `http.request.method` | HTTP verb |
+| `http.route` | Route template, never the raw path with IDs |
+| `http.response.status_code` | Final status |
+| `duration_seconds` | Request latency, explicit unit |
+| `rpc.system`, `rpc.service`, `rpc.method` | gRPC access logs |
+| `grpc.code` | gRPC status |
+| `trace_id` | When span context exists |
+
+Level policy: `error` for HTTP status ≥ 400 / any non-OK gRPC code, else
+`info`. HTTP messages are `HTTP request`, gRPC messages are `gRPC request`.
+
+**Probe filtering (contract):** no routine successful health/readiness probe
+access logs on either transport; keep failed probes and readiness state
+transitions. gRPC enforces this in the `pkg/grpcx` access interceptor
+(`grpc.health.v1.Health` + reflection skipped); the HTTP logging middleware
+applies the same skip list as `TracingMiddleware`. Signal matrix:
+[Application observability § Health filtering](./observability.md#health-readiness-and-reflection-filtering).
+
+---
+
+## Error logging ownership
+
+Lower layers return typed errors. The boundary that decides return, retry,
+compensate, abandon, or escalate owns the **error** log. Access middleware owns
+the final request/RPC summary.
+
+Full rules: [Application observability § Error ownership](./observability.md#error-ownership).
+
+---
+
+## Data safety
+
+Never log passwords, password hashes, tokens, cookies, authorization headers,
+payment secrets, PAN-like data, raw bodies, unredacted signatures, or
+connection strings containing credentials. Email, phone, address, IP, and full
+User-Agent values are omitted or redacted by default.
+
+Business identifiers may be logged when operationally necessary; they are
+high-cardinality and may be pseudonymous data. See the
+[cross-signal data policy](./observability.md#cross-signal-data-and-privacy-policy).
 
 ---
 
@@ -162,19 +296,46 @@ Infra ingest headers (`VL-Msg-Field`, Vector streams) are documented in [Logging
 
 ---
 
-## Known issues
-
-1. **Gin default logger**: Gin's framework logger emits `[GIN] … | 200 | …` plain text, bypassing the structured `zapx` logger. Consider a `gin.DefaultWriter` redirect or custom middleware.
-2. **Pyroscope DEBUG**: Plain text `[DEBUG] uploading at...` from the Pyroscope library — third-party, not app-controlled.
-
----
-
 ## Examples
 
 ```go
-logger.Info("Service starting", zap.String("service", cfg.Service.Name), zap.String("port", cfg.Service.Port))
-logger.Info("HTTP request", zap.String("method", c.Request.Method), zap.String("path", c.Request.URL.Path))
+logger.Info(
+    "service started",
+    zap.String("event", "service.started"),
+    zap.String("listen_address", cfg.ListenAddress),
+)
+
+logger.Warn(
+    "dependency call degraded",
+    zap.String("event", "dependency.degraded"),
+    zap.String("dependency", "review"),
+    zap.String("operation", "product.get_details"),
+    zap.Error(err),
+)
 ```
+
+Do not log collector or Pyroscope endpoints when they could contain embedded credentials.
+
+---
+
+## Migration history
+
+Pre-P4 library migrations (RFC-0014 P4 converged the fleet on `zapx`):
+
+| Service | Logger | Was |
+|---------|--------|-----|
+| **auth** | zapx | zerolog |
+| **cart** | zapx | clog |
+| **product** | zapx | zap (reference impl) |
+| **order** | zapx | zap |
+| **review** | zapx | zap |
+| **notification** | zapx | zap |
+| **shipping** | zapx | zap |
+| **user** | zapx | zap |
+| **payment** | zapx | zap |
+| **checkout** | zapx | zap |
+
+Before RFC-0014 P4, three loggers coexisted (zap, clog, zerolog). The otelzap tee needs one uniform zap core. Converging removes field-shape divergence (`msg` vs `message`, Unix vs ISO8601 time).
 
 ---
 
@@ -184,4 +345,4 @@ logger.Info("HTTP request", zap.String("method", c.Request.Method), zap.String("
 - [Logging (platform)](../observability/logging/README.md)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-07-22 — canonical app logging contract; moved from observability/logging/logging-standards.md._
+_Last updated: 2026-07-29 — canonical app logging contract; adds the OTel LogRecord data model and the semconv access-log schema._

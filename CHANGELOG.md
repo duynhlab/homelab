@@ -66,6 +66,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **product bumped to 1.5.0 in the cluster** (RFC-0021): four merged slices the
+  cluster had not seen — BatchGetCurrentPrices, migration **000005** granting
+  the inventory role read of products (the W7 backfill failed 42501 without
+  it: the grant was merged but never released), availability enrichment, and
+  the catalog list returning stock. The inventory-backfill CronJob template
+  also gains the numeric `runAsUser: 65532` its image needs under
+  `runAsNonRoot` — found the first time the template was actually
+  instantiated, the same defect class the temporal cutover CronJob had.
 - **Observability-contract stale facts** (post-#620 fix-pass): the gRPC
   access-log level contract now matches pkg v0.31.0 (level follows the status
   code's class; services keep the old blanket non-OK→error until they bump),

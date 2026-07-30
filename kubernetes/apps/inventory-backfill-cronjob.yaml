@@ -44,6 +44,11 @@ spec:
           restartPolicy: Never
           securityContext:
             runAsNonRoot: true
+            # The image declares its USER by NAME (app, uid 65532) — without a
+            # numeric uid the kubelet cannot verify runAsNonRoot and the pod dies
+            # in CreateContainerConfigError before the entrypoint runs. Found the
+            # first time this template was actually instantiated (W7 backfill).
+            runAsUser: 65532
             seccompProfile:
               type: RuntimeDefault
           containers:

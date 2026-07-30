@@ -10,7 +10,12 @@ spec:
   type: Static
   defaultValues:
     name: product
-    image_tag: "1.4.1" # {"$imagepolicy": "flux-system:product:tag"}
+    # 1.5.0 carries the four merged RFC-0021 stock slices: BatchGetCurrentPrices,
+    # migration 000005 (GRANT SELECT on products to the inventory role — the W7
+    # backfill prerequisite; the migrate init container applies it before the app
+    # starts), inventory-availability enrichment, and the catalog list returning
+    # stock_quantity like the detail page.
+    image_tag: "1.5.0" # {"$imagepolicy": "flux-system:product:tag"}
     namespace: product
     platform_backup_label: "cnpg"
     replicaCount: 1

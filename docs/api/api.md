@@ -401,7 +401,8 @@ flowchart LR
     Product -->|"GetProductReviews"| Review
     OrderAPI["order API"] -->|"GetShipmentByOrder"| Shipping
     OrderAPI -->|"GetPayment"| Payment
-    Worker["order worker"] -->|"Reserve / Release stock"| Product
+    Worker["order worker"] -->|"Reserve / Commit / Release stock<br/>(W7 write cutover)"| Inventory
+    Worker -.->|"Reserve / Release stock<br/>pre-cutover sagas draining"| Product
     Worker -->|"Create / Cancel shipment"| Shipping
     Worker -->|"Send email"| Notification
     Worker -->|"Authorize / Capture / Void / Refund"| Payment
@@ -414,7 +415,7 @@ flowchart LR
 
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-    class Product,Review,OrderAPI,Shipping,Payment,Notification,Checkout,Cart service;
+    class Product,Review,OrderAPI,Shipping,Payment,Notification,Checkout,Cart,Inventory service;
     class Worker worker;
 ```
 

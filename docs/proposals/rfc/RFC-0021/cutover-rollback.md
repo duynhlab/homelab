@@ -104,7 +104,19 @@ inert → activate → drain → retire the previous file.
 
 The saga's stock participant is `ORDER_STOCK_PARTICIPANT`
 (`product|inventory`). The flip happens inside a controlled window (pause
-starts → drain → final delta backfill → verify ATP → flip → resume).
+starts → drain → final delta backfill → verify ATP → flip → resume). The flip
+is not done when the PR merges — it is done when the ORDER POD RENDERS IT:
+after merge, `make sync` (publish the apps artifact + reconcile), wait for the
+order rollout, and verify before resuming starts:
+
+```bash
+kubectl -n order get deploy order \
+  -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="ORDER_STOCK_PARTICIPANT")].value}'
+```
+
+Resuming against an unverified render is how new sagas keep writing Product
+after the final delta backfill — silently, since `product` is also the code
+default.
 
 - **Before any new workflow has taken the inventory branch:** revert the flag;
   new workflows take the product path; nothing to reconcile. This is the only

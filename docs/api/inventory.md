@@ -7,8 +7,9 @@ append-only movement ledger — while catalog, price, and order status stay owne
 elsewhere.
 
 > **Contract stance:** As-built. The `inventory.v1` gRPC contract and its
-> data/behaviour model are deployed and Implemented. **There is no live caller
-> yet** — checkout and the order saga still use product-service's stock surface;
+> data/behaviour model are deployed and Implemented. **The order saga is a live
+> caller since the W7 write cutover (2026-07-30)** — new sagas reserve, commit
+> and release here; checkout reads still use product-service's availability;
 > inventory becomes the live stock authority over [RFC-0021](../proposals/rfc/RFC-0021/)
 > phases 2–4. Cutover behaviour is tagged `Planned` and never presented as current.
 

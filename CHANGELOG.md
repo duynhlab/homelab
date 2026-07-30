@@ -66,6 +66,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **RFC-0021 W7 write cutover — inventory owns new stock writes**
+  (2026-07-30): `order_stock_participant` flipped to `inventory`, inside a
+  drained window with the backfill applied and verified (balance `1|43|0|0`
+  == product stock, `mismatch_count: 0`). New sagas reserve/commit/release in
+  inventory-service; in-flight product-path sagas drain on their own pinned
+  branch. Reads stay on product until W8. Reverting the flag only redirects
+  NEW workflows — never a data rollback. docs/api participant/caller claims
+  flipped to the post-cutover reality in the same change.
 - **product bumped to 1.5.0 in the cluster** (RFC-0021): four merged slices the
   cluster had not seen — BatchGetCurrentPrices, migration **000005** granting
   the inventory role read of products (the W7 backfill failed 42501 without

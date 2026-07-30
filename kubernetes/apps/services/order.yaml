@@ -53,8 +53,12 @@ spec:
     # always compensates and commits in inventory even if this is reverted
     # afterwards (participant pinned per workflow — ADR-030).
     #
-    # Explicit at the code default rather than omitted, so the write cutover is a
-    # one-line, greppable, reviewable diff instead of an env var appearing from
-    # nowhere. `product` = pre-cutover; the flip to `inventory` is its own PR,
-    # merged inside the cutover window.
-    order_stock_participant: "product"
+    # Explicit rather than omitted, so the write cutover is a one-line,
+    # greppable, reviewable diff instead of an env var appearing from nowhere.
+    # `inventory` = the RFC-0021 W7 write cutover (2026-07-30): NEW workflows
+    # reserve/commit/release in inventory-service; in-flight product-path sagas
+    # drain on their own branch (participant is pinned per workflow in the
+    # input, and every replay resolves it from the order's row). Reverting this
+    # line only redirects NEW workflows — it is never a data rollback; see the
+    # cutover doc before touching it under pressure.
+    order_stock_participant: "inventory"

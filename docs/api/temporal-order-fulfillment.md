@@ -357,8 +357,8 @@ the worker never re-reads any flag:
 
 | Participant | Forward | Compensation | Post-pivot |
 |---|---|---|---|
-| `product` (deployed default) | `ReserveStock` | `ReleaseStock` | — |
-| `inventory` (shipped, cutover pending — W7) | `ReserveInventory` | `ReleaseInventory` | `CommitInventory`, **mandatory forward** — a confirmed order retries it to completion |
+| `product` (pre-cutover; in-flight sagas drain here) | `ReserveStock` | `ReleaseStock` | — |
+| `inventory` (**deployed default since the W7 write cutover, 2026-07-30**) | `ReserveInventory` | `ReleaseInventory` | `CommitInventory`, **mandatory forward** — a confirmed order retries it to completion |
 
 Which value gets stamped is resolved from the **order's own record**, never from
 the process answering (order-service #155): `CreateOrder` writes the participant
@@ -851,4 +851,4 @@ How to deploy the worker, run the saga locally, and watch it in production.
 - [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared idempotency state machine
 - [RFC-0010](../proposals/rfc/RFC-0010/) — payment and fulfillment design
 
-_Last updated: 2026-07-30_
+_Last updated: 2026-07-30 (W7 write cutover)_

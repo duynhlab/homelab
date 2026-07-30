@@ -444,7 +444,7 @@ Read by `obsx.ConfigFromEnv` (injected by app ResourceSets, `kubernetes/apps/dom
 |-----|-------------------|---------|
 | `OTEL_COLLECTOR_ENDPOINT` | Cluster DNS `:4318`; local `otel-collector:4318` | OTLP/HTTP target for all signals |
 | `OTEL_SERVICE_NAME` / `SERVICE_NAME` | — | Authoritative `service.name` |
-| `SERVICE_VERSION` | — | semconv `service.version` |
+| `SERVICE_VERSION` | Unset fleet-wide; the versioned order worker carries `service.version` via `OTEL_RESOURCE_ATTRIBUTES` instead (ADR-030) | semconv `service.version` |
 | `K8S_NAMESPACE_NAME`, `K8S_POD_NAME` | Downward API | k8s identity on Resource |
 | `DEPLOYMENT_ENVIRONMENT` | — | semconv `deployment.environment.name` |
 | `TRACING_ENABLED` | `true` | Traces kill switch |

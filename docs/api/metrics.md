@@ -138,8 +138,8 @@ advice) and measure the HTTP body only (not TCP/IP, headers, or TLS overhead).
   which is why boundary placement decides quantile accuracy.
 - The SDK keeps **one metric stream per unique attribute set** — every new
   label combination materializes a full set of bucket series. This is why ID
-  labels are forbidden: one `user_id` label turns 32 histogram series into 32
-  series *per user*.
+  labels are forbidden: one `user_id` label turns 38 histogram series (16
+  duration + 11 per body-size histogram) into 38 series *per user*.
 
 ### Temporality
 
@@ -241,8 +241,8 @@ With ~20 routes × 3 methods × 5 status codes per service, series count stays
 bounded and predictable.
 Measured (2026-07-06, one replica per service, live traffic): **49–720 series
 per service, Σ 2,777** across a nine-service measurement snapshot — histogram label sets materialize
-lazily, so this grows toward the worst-case bound of ~1,800 series/replica
-(~48 route×status combos × 32 histogram series + runtime). Bounded and
+lazily, so this grows toward the worst-case bound of ~2,100 series/replica
+(~48 route×status combos × 38 histogram series + runtime). Bounded and
 predictable either way; the full model and at-scale projection live in the
  [streaming-aggregation playbook](../observability/metrics/streaming-aggregation.md#the-cardinality-math).
 

@@ -2,7 +2,7 @@
 
 > The **otel-collector** is the single door all application telemetry walks
 > through: one OTLP endpoint in, governed processing in the middle, fan-out to
-> five backends on the way out. This doc explains how a Collector works —
+> six backends on the way out. This doc explains how a Collector works —
 > components, pipelines, deployment patterns — and then walks the **actual
 > deployed configuration** line by line.
 
@@ -26,7 +26,7 @@ it (batch, guard memory, normalize, filter, enrich), and **export** it to one
 or more backends. It is optional in OTel's design — an SDK can export straight
 to a backend — but at platform scale it earns its place fast:
 
-- **Decoupling** — ten services point at one endpoint; backends can be added
+- **Decoupling** — every service points at one endpoint; backends can be added
   or swapped (Loki → VictoriaLogs, the ClickHouse OLAP path) with zero app
   changes.
 - **Offload** — batching, retries, compression, and queueing happen here, not
@@ -48,13 +48,13 @@ three together per signal:
 |-----------|------|---------------|
 | **Receiver** | How data gets in — push (listen on a port) or pull (scrape a target) | `otlp` (gRPC `:4317`, HTTP `:4318`) |
 | **Processor** | Transformations between receive and export; run **in the order listed** | `memory_limiter`, `deltatocumulative`, `batch` |
-| **Exporter** | How data leaves — per backend, with its own retry/queue | 6 defined, 5 wired (see below) |
+| **Exporter** | How data leaves — per backend, with its own retry/queue | 7 defined, 6 wired (see below) |
 | **Extension** | Cross-cutting services outside the data path | `health_check` `:13133`, `zpages` `:55679` |
 | **Connector** | Joins the *exporter* end of one pipeline to the *receiver* end of another (e.g. deriving span metrics from traces) | none deployed |
 
 ```mermaid
 flowchart LR
-    APPS["10 services + 2 workers<br/>pkg/obsx"] -->|"OTLP/HTTP :4318"| RCV
+    APPS["services + workers<br/>pkg/obsx"] -->|"OTLP/HTTP :4318"| RCV
     KONG["Kong edge spans"] -->|"OTLP"| RCV
 
     subgraph COLLECTOR["otel-collector (gateway, deployment ×1)"]

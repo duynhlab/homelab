@@ -66,6 +66,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **RFC-0021 W8 rung 3 — availability reads fully on inventory (read cutover
+  complete)**: the canary dial opens from 20 to 100 after the canary gate —
+  per-user arms verified exactly against the HMAC (8/8 users, both arms
+  confirming 201), all thirteen write-migration alerts inactive. With W7,
+  inventory-service now owns BOTH the write and the read path for stock;
+  product's stock surface is drain-only pending phase-4 contraction.
 - **RFC-0021 W8 rung 2 — availability reads open to a 20% canary**: the shadow
   gate passed (30+ minutes of real double-reads, `inventory_shadow_compare_
   total{result="ok"}=16`, zero mismatches, divergence alert inactive), so

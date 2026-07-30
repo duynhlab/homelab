@@ -66,6 +66,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Observability-contract stale facts** (post-#620 fix-pass): the gRPC
+  access-log level contract now matches pkg v0.31.0 (level follows the status
+  code's class; services keep the old blanket non-OK→error until they bump),
+  the access-log field schema is labelled contract-target vs today's fields,
+  the body-size histogram math follows the deployed 8-boundary View
+  (38 series/combo, ~2,100 worst case, 9 bucket lines), the collector counts
+  are 7 exporters defined / 6 wired fanning out to six backends, hardcoded
+  "ten services" counts are removed, and `service.version` is labelled
+  as-built on the versioned worker only.
 - **`docs/api/` observability contracts** — `observability.md` is the normative application hub (document ownership, layer responsibilities, cross-signal data policy, error ownership, worker/Temporal rules, PR checklist); `api.md § Observability` delegates instead of duplicating the signal matrix. Contract-first pass over the pillar docs, every claim audited against `duynhlab/pkg`, the ten service repos, and the OTel specification (2026-07-29): `logs.md` gains the **OTel LogRecord data model** (11 fields, SeverityNumber ranges, platform mapping) and the semconv access-log schema; `metrics.md` gains bucket semantics and a **temporality** contract (cumulative, D-7) and fixes the byte-bucket View values to the deployed set; `tracing.md` gets full **baggage** semantics (immutability, not-stored, security) and restores the verified Kong `inject: [w3c]` fact; `profiling.md` pins verified `SetupProfiling` behavior and a bounded-stop wiring shape; probe filtering is one signal-by-signal contract matrix. Follow-up pass adds the **instrument selection rule** (all seven instrument kinds, additive×monotonic decision table, sync vs Observable timing, the cumulative-total callback trap), the API-vs-SDK stability contract in the fundamentals doc, and the layer tracing rules: SpanKind↔layer mapping, the enrich-before-create granularity ladder (attributes → events → child span), and no hand-wrapped driver spans in adapters.
 
 - **Unversioned order worker retired** (ADR-030 lifecycle, RFC-0021 P3): the

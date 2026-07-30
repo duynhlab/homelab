@@ -71,16 +71,16 @@ Worst-case bound per replica for the fleet-standard middleware
 
 ```
 http_server_request_duration_seconds       : 48 combos × (14 bucket lines + _sum + _count) ≈ 768
-http_server_(request|response)_body_size_bytes : 48 combos × (6 bucket lines + _sum + _count) × 2 ≈ 768
+http_server_(request|response)_body_size_bytes : 48 combos × (9 bucket lines + _sum + _count) × 2 ≈ 1,056
 (http_server_active_requests)               : not emitted — otelgin v0.69 has no in-flight gauge
 go_* / process_* runtime                    : ~250
-                                            ≈ 1,800 series / replica worst-case
+                                            ≈ 2,100 series / replica worst-case
 ```
 
 ### The same math at fleet scale
 
 Take a conservative production shape — 600 realized series per replica
-(between our measured ~400 median and the 1,800 bound), 15s scrape:
+(between our measured ~400 median and the ~2,100 bound), 15s scrape:
 
 | Fleet | Replicas | Active series (raw) | Samples/s (raw) | Active series with `instance` stripped |
 |---|---|---|---|---|

@@ -504,7 +504,7 @@ a scoped search by service and time (D-14). Normative correlation fields:
 
 Semconv is the shared vocabulary: `http.request.method`, `http.route`,
 `db.system`, `service.name` mean the same thing from every language and
-library. That's what makes one Grafana dashboard work for all ten services,
+library. That's what makes one Grafana dashboard work for every service,
 and why the platform pins **semconv v1.41** in `pkg/obsx` and treats
 SDK/semconv bumps as a deliberate pkg release —
 never set `OTEL_SEMCONV_STABILITY_OPT_IN`

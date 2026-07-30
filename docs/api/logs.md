@@ -113,7 +113,7 @@ without parsing language-specific label strings:
 | `TraceId`, `SpanId`, `TraceFlags` | `obsx.TraceContext(ctx)` bound to the request logger |
 | `SeverityText`, `SeverityNumber` | zap `level` via the otelzap bridge |
 | `Body` | zap `message` |
-| `Resource` | `pkg/obsx` resource (`service.name`, namespace, pod, version — from `OTEL_SERVICE_NAME` + Downward API) |
+| `Resource` | `pkg/obsx` resource (`service.name`, namespace, pod — from `OTEL_SERVICE_NAME` + Downward API; `service.version` only on the versioned order worker today, ADR-030) |
 | `InstrumentationScope` | the scope name passed to `obs.ZapCore(scopeName, minLevel)` |
 | `Attributes` | every `zap.Field` on the entry (`caller` included) |
 
@@ -143,7 +143,7 @@ interpreting exported JSON `level` values:
 The fleet converged on **`zapx`** (RFC-0014 P4) — see
 [Migration history](#migration-history). Legacy `pkg/logger/zerolog` and
 `pkg/logger/clog` adapters remain in `duynhlab/pkg` but no service imports
-them anymore; all ten API services and workers use `zapx`.
+them anymore; every API service and worker in the catalog uses `zapx`.
 
 | User Standard | Zap (`zapcore.Level`) |
 |----------------|-----------------------|
@@ -252,8 +252,26 @@ they are logging a separate domain event.
 | `grpc.code` | gRPC status |
 | `trace_id` | When span context exists |
 
-Level policy: `error` for HTTP status ≥ 400 / any non-OK gRPC code, else
-`info`. HTTP messages are `HTTP request`, gRPC messages are `gRPC request`.
+> **Contract target, not yet as-built.** Today every service emits
+> `method`/`path`/`status`/`duration`/`client_ip`/`user_agent` on HTTP and
+> `method`/`code`/`duration`/`peer` on gRPC (see
+> [tracing.md](./tracing.md) for the fields recorded today, and
+> [api.md](./api.md) for the probe-filtering gap). The rename to this schema —
+> and dropping `client_ip`/`user_agent` per the
+> [data policy](./observability.md#cross-signal-data-and-privacy-policy) — is
+> the LOG-1 refactor.
+
+Level policy: HTTP logs `error` for status ≥ 400, else `info`. gRPC follows
+the **status-code class** (pkg ≥ v0.31.0, verbatim from go-grpc-middleware's
+`DefaultServerCodeToLevel`): caller-attributable outcomes at `info`
+(`OK`, `NotFound`, `Canceled`, `AlreadyExists`, `InvalidArgument`,
+`Unauthenticated`), degraded-but-explicable at `warn` (`DeadlineExceeded`,
+`PermissionDenied`, `ResourceExhausted`, `FailedPrecondition`, `Aborted`,
+`OutOfRange`, `Unavailable`), faults at `error` (`Unknown`, `Unimplemented`,
+`Internal`, `DataLoss`; unknown codes default to `error`). Services emit the
+old blanket non-OK→`error` behaviour until they bump `pkg` — the fleet is on
+≤ v0.30.0 today. HTTP messages are `HTTP request`, gRPC messages are
+`gRPC request`.
 
 **Probe filtering (contract):** no routine successful health/readiness probe
 access logs on either transport; keep failed probes and readiness state

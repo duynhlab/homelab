@@ -175,7 +175,7 @@ stateDiagram-v2
     [*] --> RESERVED: Reserve<br/>all-or-none · one warehouse
     RESERVED --> COMMITTED: Commit<br/>on_hand−=q; reserved−=q<br/>SALE_COMMITTED
     RESERVED --> RELEASED: Release<br/>reserved−=q
-    RESERVED --> EXPIRED: reconciler (planned, phase 3)
+    RESERVED --> EXPIRED: expiry sweeper (planned)
     COMMITTED --> [*]
     RELEASED --> [*]
     EXPIRED --> [*]
@@ -236,10 +236,13 @@ Today the order saga still uses product's `ReserveStock`/`ReleaseStock`
   and the order saga still use product stock. Read cutover is RFC-0021 **phase 2**,
   write cutover **phase 3**, product-stock removal **phase 4** — all **Planned**.
 - **No reservation auto-expiry (v1).** `expires_at` is observability-only; nothing
-  transitions a reservation to `EXPIRED`. A reconciler that reports (then expires)
-  stale `RESERVED` rows is **Planned for phase 3** — write-path alerts
-  (oversell/negative-ATP gauge, stale-RESERVED age, commit lag) are deliberately
-  not shipped yet because their metrics only exist once traffic flows.
+  transitions a reservation to `EXPIRED`. What shipped in phase 3 is the
+  **order-domain reconciler** (live): it repairs stranded `RESERVED` holds through
+  the ordinary `Commit`/`Release` RPCs — from the outside it is just another
+  caller — and reports holds whose order does not account for them. An expiry
+  *sweeper* that transitions rows to `EXPIRED` remains **Planned**; the
+  reconciler is precisely why a stranded hold is bounded without one. See
+  [temporal-order-fulfillment.md § The Inventory Reconciler](./temporal-order-fulfillment.md#the-inventory-reconciler).
 - **One-order-one-warehouse.** Multi-warehouse split fulfillment and backorder
   (ATP-from-incoming) are non-goals; the contract reserves `warehouse_id` and a
   `destination_region` hint (accepted but unused in v1) so they land later without

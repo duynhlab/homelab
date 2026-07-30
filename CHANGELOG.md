@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0021 P3 docs/api sync (W6)**: the saga deep-dive gains as-built sections
+  for the per-workflow stock participant (resolved from the order's row, never
+  the process flag), the inventory reconciler (once-per-order reporting, the
+  disagreement counter), and Worker Deployment Versioning (one manifest per
+  build, activation lifecycle, verified-live behaviours). `order.md`,
+  `inventory.md` (reconciler shipped — expiry sweeper stays planned) and
+  `workflows.md` updated to the deployed reality; ADR-030 Adoption flipped to
+  **Complete**; RFC-0021's workflow-migration open question marked resolved.
 - **ADR-030 Worker Deployment Versioning wired, inert** (RFC-0021 P3): a second
   order worker (`order-worker-1-8-0`) polls as deployment `order-fulfillment`
   build `1.8.0` and receives nothing until an operator sets it Current via the

@@ -50,11 +50,15 @@ spec:
     # for the next rung. In shadow/inventory mode an inventory dial failure
     # fails checkout startup on purpose: it must never silently degrade back to
     # product mode.
-    # W8 rung 2 (canary): source=inventory + pct means <pct>% of USERS read
-    # availability from inventory (HMAC-bucketed on the salt below, sticky per
-    # user); everyone else stays on product. The shadow rung's 30-minute
-    # divergence gate passed with zero mismatches before this opened.
+    # W8 rung 3 (final): every user reads availability from inventory — the
+    # RFC-0021 read cutover is complete. The ladder that got here: shadow (30
+    # minutes of double-reads, zero mismatches), then a 20% keyed canary whose
+    # per-user arms were verified exactly against the HMAC (8/8), both arms
+    # confirming at baseline with all thirteen write-migration alerts silent.
+    # pct stays explicit at the open dial for the same reason
+    # ORDER_STOCK_PARTICIPANT does: the next dial-down must be a one-line,
+    # greppable diff, and the salt wiring stays live so it needs no plumbing.
     checkout_availability_source: "inventory"
-    checkout_availability_canary_pct: 20
+    checkout_availability_canary_pct: 100
     checkout_availability_canary_salt_secret: "checkout-availability-canary"
     # Temporal default (temporal-frontend.temporal:7233) is correct as-is.

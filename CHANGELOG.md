@@ -52,6 +52,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Unversioned order worker retired** (ADR-030 lifecycle, RFC-0021 P3): the
+  activation drill set Current to `1.8.0` and the drain gate
+  (`TemporalWorkerDeploymentVersion IS NULL`, running) read 0, so
+  `order-worker.yaml` is deleted and the versioned worker takes over the
+  reconciler in the same change — one judge at all times, never zero, never
+  two. No guard edit needed: `flux-validate.sh` treats the unversioned file
+  as optional by design.
 - **order bumped to 1.8.0 in the cluster** (RFC-0021 P3) — API, worker, and the
   `migrate` init container together. Every saga start now resolves the stock
   participant from the order's outbox row instead of the process flag (the two

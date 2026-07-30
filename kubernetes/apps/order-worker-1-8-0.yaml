@@ -1,26 +1,22 @@
-# Order-fulfillment Temporal worker, VERSIONED — the second half of ADR-030.
+# Order-fulfillment Temporal worker, VERSIONED (ADR-030) — one file per build.
 #
-# Same image and subcommand as order-worker.yaml, plus a Worker Deployment
-# Version (TEMPORAL_WORKER_DEPLOYMENT_NAME + TEMPORAL_WORKER_BUILD_ID). Deployed
-# SIDE BY SIDE with the unversioned worker, never as an in-place edit of it:
-# a versioned worker receives NOTHING until an operator makes its version
-# Current (verified live — the deployment registers with an empty Current and
-# zero tasks flow), so merging this changes no traffic. The unversioned worker
-# keeps serving every existing workflow and every new one until activation.
+# Runs the order image's `worker` subcommand with a Worker Deployment Version
+# (TEMPORAL_WORKER_DEPLOYMENT_NAME + TEMPORAL_WORKER_BUILD_ID). The server pins
+# every workflow to the version that started it, so a new build NEVER edits this
+# file: it lands as a new order-worker-<build>.yaml side by side (a tag bump here
+# would strand this version's pinned workflows with no pollers), gets activated,
+# and this file is deleted once its version shows DRAINED in
+# `temporal worker deployment describe`.
 #
 # ACTIVATION is a deliberate, separate step — never part of a reconcile:
 #   kubectl -n temporal create job order-set-current-$(date +%s) \
 #     --from=cronjob/temporal-worker-set-current-version
-# After it, new workflows start pinned to this build; the unversioned worker
-# only drains what it already owns. It never appears as a version row in
-# `worker deployment describe`, so its drain gate is the visibility count
-# (verified live against server 1.31.2):
-#   temporal workflow count --namespace mop --query \
-#     "TaskQueue='order-fulfillment' AND ExecutionStatus='Running' \
-#      AND TemporalWorkerDeploymentVersion IS NULL"
-# Retire it in its own PR once that reads 0 — that PR also flips
-# ORDER_RECONCILER_ENABLED here (see below). The flux-validate guard treats the
-# unversioned file as optional, so its deletion needs no guard edit.
+# A versioned worker receives NOTHING until that step makes its version Current
+# (verified live), so landing a new build changes no traffic. Full procedure:
+# docs/proposals/rfc/RFC-0021/cutover-rollback.md § Worker version activation.
+#
+# The unversioned worker this replaced was retired at drain count 0 (activation
+# drill 2026-07-30); this file is the only saga worker and runs the reconciler.
 #
 # BUILD_ID must equal this file's image tag and the CronJob's BUILD_ID.
 # scripts/flux-validate.sh enforces the equality: a mismatch pins new workflows
@@ -161,14 +157,15 @@ spec:
         value: order-fulfillment
       - name: TEMPORAL_WORKER_BUILD_ID
         value: "1.8.0"
-      # The inventory reconciler (see order-worker.yaml for what it does).
-      # OFF here on purpose, and not because of the versioning: the reconciler's
-      # own docs commit to a single running judge (its scan has no SKIP LOCKED
-      # claim), and the unversioned worker next door still runs one. The
-      # retirement PR that deletes that worker flips this to "true" in the same
-      # change, so the platform never has zero judges and never has two.
+      # The inventory reconciler — repairs terminal orders whose reservation
+      # disagrees with their outcome, and reports rows that do not account for
+      # one. ON since the unversioned worker retired: its docs commit to a
+      # single running judge (the scan has no SKIP LOCKED claim), and this is
+      # now the only worker. `false` is the kill switch for when its JUDGEMENT
+      # is suspect during a cutover — not for when dependencies are down (it
+      # defers on its own then).
       - name: ORDER_RECONCILER_ENABLED
-        value: "false"
+        value: "true"
       - name: INVENTORY_GRPC_ADDR
         value: dns:///inventory.inventory.svc.cluster.local:9090
       # Downstream services the activities call (gRPC east-west + cart REST).

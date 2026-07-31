@@ -66,6 +66,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **OpenBAO seeding docs match the post-revoke reality**: re-running the
+  bootstrap Job seeds NOTHING on a live cluster (it detects the revoked root
+  and exits — learned at the W8 canary-salt seed), and the rotation runbook's
+  root_token commands could not work (inert copy). New break-glass runbook
+  (generate-root from the recovery key → write → revoke) with the
+  seed-both-places rule and the planned AppRole write-path noted; the Job
+  header and rotation runbook now point at it.
 - **RFC-0021 W8 docs sync + phase-4 gate made measurable**: checkout.md and
   api.md catch up with the read cutover (split reads — prices from product's
   BatchGetCurrentPrices, stock from inventory's CheckAvailability; GetProducts

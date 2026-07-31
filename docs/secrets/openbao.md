@@ -960,6 +960,7 @@ Operational commands are kept out of this architecture document so the learning 
 | Recover the 1-hour Kubernetes reviewer JWT failure | [Reviewer JWT auth failure](./runbooks/reviewer-jwt-auth-failure.md) |
 | Save or restore a Raft snapshot | [Raft snapshot and restore](./runbooks/raft-snapshot-restore.md) |
 | Rotate static KV v2 secrets | [Rotate static secret](./runbooks/rotate-static-secret.md) |
+| Add/write a KV secret on a LIVE cluster (root is revoked) | [Add secret — break-glass](./runbooks/add-secret-live-cluster.md) |
 | Revoke credentials after compromise | [Revoke compromised credential](./runbooks/revoke-compromised-credential.md) |
 
 ## 16. File Reference

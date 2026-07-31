@@ -66,6 +66,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **MicroserviceDown stops paging on every rollout**: the D-4 heartbeat-absence
+  check now joins `kube_pod_info` (exported_pod/exported_namespace on this
+  setup), so it fires only for a pod that still EXISTS but went silent —
+  replaced pods are normal lifecycle, whole-app outages stay with
+  MicroserviceAllInstancesDown. The join makes kube-state-metrics
+  load-bearing, so `KubeStateMetricsAbsent` (new, critical) pages when the
+  joined series itself disappears — fail-closed-with-a-page, not
+  fail-open-with-noise.
 - **RFC-0021 W8 docs sync + phase-4 gate made measurable**: checkout.md and
   api.md catch up with the read cutover (split reads — prices from product's
   BatchGetCurrentPrices, stock from inventory's CheckAvailability; GetProducts

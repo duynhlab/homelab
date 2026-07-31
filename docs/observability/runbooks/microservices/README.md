@@ -16,6 +16,7 @@ Per-alert investigation guides for OTLP-based RED/Golden Signal alerts on the
 | Alert | Sev | Category | Runbook |
 |-------|-----|----------|---------|
 | MicroserviceDown | critical | availability | [MicroserviceDown.md](MicroserviceDown.md) |
+| KubeStateMetricsAbsent | critical | observability | [KubeStateMetricsAbsent.md](KubeStateMetricsAbsent.md) |
 | MicroserviceAllInstancesDown | critical | availability | [MicroserviceAllInstancesDown.md](MicroserviceAllInstancesDown.md) |
 | OtelMetricsPipelineExportFailures | critical | availability | [OtelMetricsPipelineExportFailures.md](OtelMetricsPipelineExportFailures.md) |
 | MicroserviceHighErrorRate | warning | errors | [MicroserviceHighErrorRate.md](MicroserviceHighErrorRate.md) |

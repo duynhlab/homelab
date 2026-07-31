@@ -52,7 +52,8 @@ Source: `prometheusrules/microservices/alerts.yaml` (OTLP push pipeline — RFC-
 
 | Alert | Sev | Metric & trigger | Impact — why it must alert | for | Runbook |
 |-------|-----|------------------|----------------------------|-----|---------|
-| MicroserviceDown | critical | D-4 heartbeat-absence: `go_goroutine_count{app!=""}` series present in the last 15m but now gone (per app/namespace/pod) | One instance stopped reporting; detection lags a pod kill ~5m (VM staleness), accepted in D-4 | 2m | [MicroserviceDown](../runbooks/microservices/MicroserviceDown.md) |
+| MicroserviceDown | critical | D-4 heartbeat-absence joined against `kube_pod_info`: series present in the last 15m, now gone, and the pod **still exists** | An existing pod stopped reporting (wedged/crash-looping); rollout-replaced pods no longer page. Detection lags ~5m (VM staleness), accepted in D-4 | 2m | [MicroserviceDown](../runbooks/microservices/MicroserviceDown.md) |
+| KubeStateMetricsAbsent | critical | `absent(kube_pod_info)` | The MicroserviceDown join is blind while this fires — per-pod liveness alerting is off platform-wide | 5m | [KubeStateMetricsAbsent](../runbooks/microservices/KubeStateMetricsAbsent.md) |
 | MicroserviceAllInstancesDown | critical | same heartbeat-absence, per `(app,namespace)` — every pod gone | Full service outage, or a broken OTLP pipeline | 2m | [MicroserviceAllInstancesDown](../runbooks/microservices/MicroserviceAllInstancesDown.md) |
 | OtelMetricsPipelineExportFailures | critical | `rate(otelcol_exporter_send_failed_metric_points[5m])>0` | Collector dropping metric points — every OTLP-path alert is blind | 5m | [OtelMetricsPipelineExportFailures](../runbooks/microservices/OtelMetricsPipelineExportFailures.md) |
 | MicroserviceHighErrorRate | warning | 5xx ratio of `http_server_request_duration_seconds_count` >5% | 1-in-20 users get server errors | 5m | [MicroserviceHighErrorRate](../runbooks/microservices/MicroserviceHighErrorRate.md) |

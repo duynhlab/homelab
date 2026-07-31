@@ -73,6 +73,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (generate-root from the recovery key → write → revoke) with the
   seed-both-places rule and the planned AppRole write-path noted; the Job
   header and rotation runbook now point at it.
+- **product bumped to 1.6.0 — the phase-4 clock starts at convergence**: the
+  deployment carries product_stock_surface_calls_total{rpc}, the instrument
+  the RFC-0021 contract-removal gate reads (two weeks of zero, measured from
+  deployment). E2E-verified on local-stack before release; catalog 36 -> 37
+  instruments.
+- **MicroserviceDown stops paging on every rollout**: the D-4 heartbeat-absence
+  check now joins `kube_pod_info` (exported_pod/exported_namespace on this
+  setup), so it fires only for a pod that still EXISTS but went silent —
+  replaced pods are normal lifecycle, whole-app outages stay with
+  MicroserviceAllInstancesDown. The join makes kube-state-metrics
+  load-bearing, so `KubeStateMetricsAbsent` (new, critical) pages when the
+  joined series itself disappears — fail-closed-with-a-page, not
+  fail-open-with-noise.
 - **RFC-0021 W8 docs sync + phase-4 gate made measurable**: checkout.md and
   api.md catch up with the read cutover (split reads — prices from product's
   BatchGetCurrentPrices, stock from inventory's CheckAvailability; GetProducts

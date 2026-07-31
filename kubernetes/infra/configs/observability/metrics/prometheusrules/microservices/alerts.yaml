@@ -33,10 +33,31 @@ spec:
         # does. VictoriaMetrics keeps returning the last sample for ~5m
         # (staleness window), so detection lags a pod kill by about 5 minutes —
         # accepted in RFC-0014 D-4 and verified by the P3 pod-kill test.
+        # Joined against kube_pod_info so a pod REPLACED by a rollout does not
+        # page: every deploy used to fire this for the old pod for up to 15m
+        # (the OTLP series lingers; the pod is gone by design). Now it fires
+        # only for a pod that still EXISTS but went silent — crash-looping,
+        # wedged, OOM-stuck — which is the pathology D-4 is for. A pod that is
+        # gone is normal lifecycle; a whole app gone is the alert below.
+        #
+        # kube_pod_info on this setup carries the WORKLOAD identity in
+        # exported_namespace/exported_pod (vmagent names the KSM scrape target
+        # in namespace/pod — see prometheusrules/postgres/cnpg/README.md), so
+        # both are label_replace'd into the join keys. The join makes KSM a
+        # dependency of this alert: KubeStateMetricsAbsent below pages when
+        # that dependency itself disappears, because an `and` against an
+        # absent series would otherwise silence liveness alerting entirely.
         - alert: MicroserviceDown
           expr: |
-            count by (app, namespace, k8s_pod_name) (last_over_time(go_goroutine_count{app!=""}[15m]))
-            unless count by (app, namespace, k8s_pod_name) (go_goroutine_count{app!=""})
+            (
+              count by (app, namespace, k8s_pod_name) (last_over_time(go_goroutine_count{app!=""}[15m]))
+              unless count by (app, namespace, k8s_pod_name) (go_goroutine_count{app!=""})
+            )
+            and on (namespace, k8s_pod_name)
+            label_replace(
+              label_replace(kube_pod_info, "k8s_pod_name", "$1", "exported_pod", "(.*)"),
+              "namespace", "$1", "exported_namespace", "(.*)"
+            )
           for: 2m
           labels:
             severity: critical
@@ -45,6 +66,22 @@ spec:
             summary: "Microservice instance stopped reporting ({{ $labels.namespace }}/{{ $labels.app }})"
             description: "Pod {{ $labels.k8s_pod_name }} of {{ $labels.app }} stopped pushing runtime metrics (heartbeat series vanished). OTLP-path liveness (D-4)."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/MicroserviceDown.md"
+
+        # The guard for the join above: if kube-state-metrics stops reporting,
+        # MicroserviceDown's `and` matches nothing and per-pod liveness goes
+        # silent — so the disappearance of kube_pod_info is itself a page.
+        # Same absent() reasoning as order_reconciler_backlog: the failure
+        # mode of a load-bearing series is absence, and only absent() sees it.
+        - alert: KubeStateMetricsAbsent
+          expr: absent(kube_pod_info)
+          for: 5m
+          labels:
+            severity: critical
+            category: observability
+          annotations:
+            summary: "kube_pod_info has no series — pod-liveness alerting is blind"
+            description: "kube-state-metrics stopped reporting. MicroserviceDown joins against kube_pod_info, so while this fires no per-pod silent-death alert can trigger. Check the kube-state-metrics deployment and its scrape target."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/KubeStateMetricsAbsent.md"
 
         - alert: MicroserviceAllInstancesDown
           expr: |

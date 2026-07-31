@@ -12,20 +12,11 @@ keys, or other values that are still not dynamic.
 
 ### 1. Update in OpenBAO
 
-```bash
-kubectl port-forward svc/openbao -n openbao 8200:8200
-export BAO_ADDR=http://localhost:8200
-export BAO_TOKEN=$(kubectl get secret openbao-init-keys -n openbao -o jsonpath='{.data.root_token}' | base64 -d)
-bao kv put secret/local/<category>/<service>/<resource> key="new-value"
-```
-
-Alternatively, exec into the OpenBAO pod:
-
-```bash
-ROOT=$(kubectl get secret -n openbao openbao-init-keys -o jsonpath='{.data.root_token}' | base64 -d)
-kubectl exec -n openbao openbao-0 -- sh -c \
-  "BAO_TOKEN=$ROOT bao kv put secret/local/<category>/<service>/<resource> key=new-value"
-```
+> ⚠️ The `root_token` in `openbao-init-keys` is an **inert copy** — the real
+> root is revoked at the end of bootstrap (RFC-0008), so it cannot write.
+> Mint a temporary root via the break-glass ceremony first:
+> [Add or write a KV secret on a live cluster](./add-secret-live-cluster.md),
+> then run the `bao kv put` from its step 4.
 
 ### 2. Force ESO refresh
 

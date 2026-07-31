@@ -10,7 +10,7 @@ order-service — which remains the only writer of orders.
 | **Deployment** | local-stack + cluster | Implemented |
 | **HTTP** | private only · `:8080` · Kong `/checkout/v1/private/` (edge JWT) | Implemented |
 | **gRPC server** | None — client only | None |
-| **gRPC client** | cart (`GetCart`), product (`GetProducts`), shipping (`GetQuote`), order (`CreateOrder`) | Implemented |
+| **gRPC client** | cart (`GetCart`), product (`BatchGetCurrentPrices`, `GetProducts` fallback), inventory (`CheckAvailability`), shipping (`GetQuote`), order (`CreateOrder`) | Implemented |
 | **Worker** | `checkout-worker` · queue `checkout` | Implemented |
 | **Temporal** | Orchestrator · `AbandonedCheckoutWorkflow` · [workflows.md](./workflows.md#abandoned-checkout) | Implemented |
 | **Technical debt** | None — the P6 legacy path is order's debt ([order.md](./order.md)) | None |
@@ -60,7 +60,9 @@ flowchart LR
     SPA["SPA (React)"] --> Kong["Kong (edge JWT)"]
     Kong -->|"/checkout/v1/private/checkout/sessions…"| CK["checkout-service"]
     CK -->|"gRPC GetCart (read-only, ADR-021)"| CART[cart]
-    CK -->|"gRPC GetProducts (cache-bypass, ADR-020)"| PROD[product]
+    CK -->|"gRPC BatchGetCurrentPrices (prices, cache-bypass)"| PROD[product]
+    CK -->|"gRPC CheckAvailability (stock — W8 read cutover)"| INV[inventory]
+    CK -.->|"GetProducts — fallback for subject-less calls"| PROD
     CK --> DB[(checkout DB)]
     CK -->|"gRPC GetQuote"| SHIP[shipping]
     CK -->|"gRPC CreateOrder"| ORD[order]
@@ -161,7 +163,9 @@ via `pkg/grpcx` on `dns:///<service>.<ns>.svc.cluster.local:9090`:
 | Callee RPC | Used for | Saga | Contract owner |
 |------------|----------|------|----------------|
 | `cart.v1/GetCart` | Session snapshot (read-only, ADR-021) | — | [cart.md](./cart.md) |
-| `product.v1/GetProducts` | Price re-validation (cache-bypass, ADR-020) | — | [product.md](./product.md) |
+| `product.v1/BatchGetCurrentPrices` | Price re-validation (cache-bypass, ADR-020) — the price half of the split read | — | [product.md](./product.md) |
+| `inventory.v1/CheckAvailability` | Availability re-validation (W8 read cutover, RFC-0021) — fails closed at confirm (`503`), never maps to out-of-stock | — | [inventory.md](./inventory.md) |
+| `product.v1/GetProducts` | Fallback read (price + availability) for subject-less callers only — the pre-cutover path, kept live by design | — | [product.md](./product.md) |
 | `shipping.v1/GetQuote` | Shipping fee (method × region) | — | [shipping.md](./shipping.md) |
 | `order.v1/CreateOrder` | The confirm handoff (idempotent, ADR-018) | — | [order.md](./order.md) |
 
@@ -255,10 +259,12 @@ is down.
 
 ### Price re-validation (closing the stale-price gap)
 
-`POST /sessions` reads items from cart (`GetCart`), asks product for current
-price + availability (`GetProducts` — **deliberately cache-bypassing**: the
-cache serves browsing, the money path must read the real DB row), and locks
-product prices into the snapshot. A product that vanished from the catalog is
+`POST /sessions` reads items from cart (`GetCart`), then split-reads the money
+data (W8 read cutover, RFC-0021): **prices from product**
+(`BatchGetCurrentPrices` — deliberately cache-bypassing: the cache serves
+browsing, the money path must read the real DB row) and **availability from
+inventory** (`CheckAvailability`). Subject-less callers fall back to the
+pre-cutover `GetProducts` combined read. Prices are locked into the snapshot. A product that vanished from the catalog is
 still snapshotted (at cart price) but flagged — the hard gate is confirm-time
 re-validation (P2). Re-validation runs **twice** by design: at session create
 (UX honesty) and at confirm (the money moment).

@@ -89,7 +89,9 @@ flowchart TB
     %% Synchronous cross-service calls
     Product -->|"gRPC reviews"| Review
     Checkout -->|"gRPC GetCart"| Cart
-    Checkout -->|"gRPC GetProducts"| Product
+    Checkout -->|"gRPC BatchGetCurrentPrices (prices)"| Product
+    Checkout -->|"gRPC CheckAvailability (stock)"| Inventory
+    Checkout -.->|"GetProducts — subject-less fallback"| Product
     Checkout -->|"gRPC GetQuote"| Shipping
     Checkout -->|"gRPC CreateOrder"| Order
     Order -->|"gRPC GetShipmentByOrder"| Shipping

@@ -66,6 +66,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **product bumped to 1.6.0 — the phase-4 clock starts at convergence**: the
+  deployment carries product_stock_surface_calls_total{rpc}, the instrument
+  the RFC-0021 contract-removal gate reads (two weeks of zero, measured from
+  deployment). E2E-verified on local-stack before release; catalog 36 -> 37
+  instruments.
 - **MicroserviceDown stops paging on every rollout**: the D-4 heartbeat-absence
   check now joins `kube_pod_info` (exported_pod/exported_namespace on this
   setup), so it fires only for a pod that still EXISTS but went silent —

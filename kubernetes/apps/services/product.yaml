@@ -10,12 +10,12 @@ spec:
   type: Static
   defaultValues:
     name: product
-    # 1.5.0 carries the four merged RFC-0021 stock slices: BatchGetCurrentPrices,
-    # migration 000005 (GRANT SELECT on products to the inventory role — the W7
-    # backfill prerequisite; the migrate init container applies it before the app
-    # starts), inventory-availability enrichment, and the catalog list returning
-    # stock_quantity like the detail page.
-    image_tag: "1.5.0" # {"$imagepolicy": "flux-system:product:tag"}
+    # 1.6.0 ships the phase-4 removal-gate instrument:
+    # product_stock_surface_calls_total{rpc} counts every touch of the stock
+    # surface being removed (ReserveStock/ReleaseStock, before validation).
+    # The gate reads TWO WEEKS OF ZERO on it, and the clock starts when this
+    # pin converges on the cluster — not at merge, not at tag.
+    image_tag: "1.6.0" # {"$imagepolicy": "flux-system:product:tag"}
     namespace: product
     platform_backup_label: "cnpg"
     replicaCount: 1

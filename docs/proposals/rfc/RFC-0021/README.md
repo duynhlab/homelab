@@ -336,6 +336,19 @@ count and retention hit zero.
 
 - 2026-07-23 — research gate passed (code audit + Context7); owner approved umbrella
   scope and RFC-0003 supersession; README published (provisional).
+- 2026-07-24 → 2026-07-27 — **Phases 0–2 shipped**: contracts + flagx + error-reason
+  convention; inventory-service deployed (schema, Reserve/Release/Commit,
+  availability reads, GitOps + local-stack); backfill tooling + structural shadow
+  reads + inventory-mode client behind the flag.
+- 2026-07-28 → 2026-07-30 — **Phase 3 shipped end to end**: ADR-030 re-platform +
+  Worker Deployment Versioning live (activation drill on the cluster); start
+  outbox + inventory reconciler; participant resolved from the order's record
+  (order-service v1.8.0); **W7 write cutover** (product stock frozen from first
+  inventory write) and **W8 read cutover** (shadow → 20% keyed canary → 100%),
+  thirteen write-migration alerts silent throughout.
+- 2026-07-31 — Phase 4 opened: deprecation telemetry on Product's stock surface
+  lands first; destructive steps stay gated on two weeks of zero usage (see
+  [cutover-rollback.md § Contract removal](./cutover-rollback.md#contract-removal-phase-4--not-reversible-gated-so-it-never-needs-to-be)).
 
 ## Related
 

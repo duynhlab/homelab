@@ -161,9 +161,32 @@ authority. The availability read source is `CHECKOUT_AVAILABILITY_SOURCE`
 ## Contract removal (phase 4) — not reversible, gated so it never needs to be
 
 Dropping `stock_quantity`/`stock_reservations` and the stock RPCs has no
-rollback; the gates make it unnecessary: deprecation telemetry at zero for
-≥2 weeks, open-workflow count on the old branch = 0 + retention expired,
-staged schema drop with backup + restore test first.
+rollback; the gates make it unnecessary, and each one is a MEASUREMENT, not an
+assumption:
+
+1. **Deprecation telemetry at zero for ≥ 2 weeks.**
+   `product_stock_surface_calls_total{rpc}` counts every hit on the surface
+   being removed (`ReserveStock`, `ReleaseStock`). The clock starts when the
+   counter is DEPLOYED, not when it is merged — the third
+   merged-but-never-released lesson of phase 3 applies to instruments too.
+   ```promql
+   sum by (rpc) (increase(product_stock_surface_calls_total[14d]))
+   ```
+2. **Open workflows on the product branch = 0, and namespace retention (7 d)
+   expired since the last one closed** — nothing left that could replay onto
+   the branch being deleted:
+   ```bash
+   kubectl -n temporal exec deploy/temporal-admintools -- \
+     temporal workflow count --namespace mop \
+       --address temporal-frontend.temporal.svc.cluster.local:7233 \
+       --query "TaskQueue='order-fulfillment' AND ExecutionStatus='Running' AND TemporalWorkerDeploymentVersion IS NULL"
+   ```
+   (product-path sagas predate versioning or run pinned to a pre-removal
+   build; the removal itself ships as a NEW Worker Deployment Version, so old
+   pinned histories keep their branch until drained.)
+3. **Staged schema drop with a backup + restore test first**, and the
+   temporary backfill access (pg_hba `host product inventory` + the migration
+   `000005` GRANT) revoked in the same wave.
 
 ---
 _Last updated: 2026-07-27_

@@ -66,6 +66,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **RFC-0021 W8 docs sync + phase-4 gate made measurable**: checkout.md and
+  api.md catch up with the read cutover (split reads — prices from product's
+  BatchGetCurrentPrices, stock from inventory's CheckAvailability; GetProducts
+  stays as the subject-less fallback); the RFC index moves to implementable
+  with phases 0-3 recorded in Implementation History; the phase-4 contract
+  removal gate now names its instrument (product_stock_surface_calls_total),
+  its queries, and the rule that the two-week clock starts at DEPLOYMENT, not
+  merge.
 - **RFC-0021 W8 rung 3 — availability reads fully on inventory (read cutover
   complete)**: the canary dial opens from 20 to 100 after the canary gate —
   per-user arms verified exactly against the HMAC (8/8 users, both arms

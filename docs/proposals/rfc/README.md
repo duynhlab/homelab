@@ -121,7 +121,7 @@ for its own sake.
 | [RFC-0018](RFC-0018/) | Consolidate platform PostgreSQL: merge auth, shared, temporal into platform-db | infra | P1 | provisional |
 | [RFC-0019](RFC-0019/) | ClickHouse for OTel logs/traces SQL (+ optional commerce analytics) | platform-wide | P2 | provisional |
 | [RFC-0020](RFC-0020/) | Internal TLS everywhere on the `homelab-ca` root (DB, pooler, gRPC, OpenBAO) | platform-wide | P1 | provisional |
-| [RFC-0021](RFC-0021/) | Platform overhaul: inventory extraction, order aggregate, payment hardening (supersedes [RFC-0003](RFC-0003/)) | platform-wide | P0 | implementable — phases 0–3 shipped (write + read cutover live), phase 4 gated |
+| [RFC-0021](RFC-0021/) | Platform overhaul: inventory extraction, order aggregate, payment hardening (supersedes [RFC-0003](RFC-0003/)) | platform-wide | P0 | implementable — phases 0–3 shipped (write + read cutover live) and **phase 5 shipped** (order aggregate, [ADR-033](../adr/ADR-033-order-status-cancellation/)); phase 4 gated; phases 6–7 open |
 
 ## Backlog — candidate RFCs
 

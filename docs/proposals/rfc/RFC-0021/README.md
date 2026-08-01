@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| provisional | platform-wide | [./research.md](./research.md) — gate passed 2026-07-23 | 2026-07-23 | 2026-07-23 |
+| accepted — phases 0–3 + 5 shipped; 4 gated; 6–7 open | platform-wide | [./research.md](./research.md) — gate passed 2026-07-23 | 2026-07-23 | 2026-08-01 |
 
 > **Supersedes [RFC-0003](../RFC-0003/README.md)** (*Inventory ownership and stock
 > semantics*), which ratified product-service as the inventory owner. RFC-0003's own

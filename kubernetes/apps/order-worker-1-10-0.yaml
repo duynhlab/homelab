@@ -15,7 +15,8 @@
 # (verified live), so landing a new build changes no traffic. Full procedure:
 # docs/proposals/rfc/RFC-0021/cutover-rollback.md § Worker version activation.
 #
-# Replaces order-worker-1-8-0 (RFC-0021 P5: order aggregate — FSM commands,
+# Replaced order-worker-1-8-0, whose manifest was deleted once 1.10.0 was
+# Current with nothing pinned to 1.8.0 (RFC-0021 P5: order aggregate — FSM commands,
 # CancellationWorkflow, projection). 1-8-0 is deleted once its version shows
 # DRAINED; this build registers BOTH workflow types and runs the reconciler
 # and both outbox dispatchers.

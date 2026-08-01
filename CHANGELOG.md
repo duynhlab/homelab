@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0021 P5 — order v1.10.0 pinned + worker build 1-10-0 staged**: order
+  bumped to 1.10.0 (order aggregate: FSM status commands + CAS history, the
+  CancellationWorkflow + cancel API, the processing-stage projection and the
+  expanded `/details`); `order-worker-1-10-0.yaml` lands side-by-side per
+  ADR-030 (activation is the deliberate CronJob step; 1-8-0 is deleted at
+  DRAINED). Phase-5 alerts (`rfc0021-phase5.yaml`: stuck-cancelling,
+  manual-review backlog, cancellation outbox, best-effort tails) + four
+  runbooks incl. the operator resolve procedure (drilled live);
+  local-stack order API gains `INVENTORY_GRPC_ADDR`.
 - **OTel fundamentals docs** under `docs/observability/` — `opentelemetry/fundamentals.md` (API vs SDK, signal selection, OTLP gRPC-vs-HTTP, context propagation & baggage, semconv), `opentelemetry/collector.md` (component model, agent/gateway/sidecar patterns, the deployed pipelines incl. ClickHouse fan-out, processor ordering, `create_schema` startup coupling, troubleshooting runbook), and `metrics/histograms.md` (bucket mechanics, explicit vs **exponential** histograms, delta vs cumulative temporality, cardinality-per-attribute-set). Stack/tracing diagrams and inventories updated to show the live ClickHouse exporter and `tracing-local dependsOn clickhouse-local`; stale "conceptual" collector YAML in `tracing/architecture.md` replaced with the real pipeline table. `rfc-0014-explainer.md` **merged into `fundamentals.md`** (all seven diagrams preserved; the cutover pipeline diagram kept as labelled historical, superseded by `collector.md`) — file removed, every reference updated.
 
 - **ADR-032 proposed — deliver Tempo via tempo-operator `TempoMonolithic`**:

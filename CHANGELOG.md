@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0021 P6 — payment pinned to 1.4.0**: brings the refund-honesty fix to the
+  cluster. A refund whose provider outcome was not a success used to be answered
+  as one **and sealed into the idempotency cache as a 201**, so every retry
+  replayed the failed verdict and the money never returned. Payment now
+  distinguishes a decided answer (recorded `failed`, non-retryable
+  `FailedPrecondition` / HTTP 422) from an undecided one (row stays `pending`,
+  retryable `Unavailable` / HTTP 503 asking for a same-key retry), releases the
+  key on a detached context so a timeout cannot lock the caller out, and refuses
+  a `200` that carries no provider refund id. mockpay grew a refund-decline
+  trigger (`…07`).
 - **RFC-0021 P5 docs + ADR-033 — order aggregate as-built**: ADR-033 (order
   status FSM + CAS command path + customer cancellation; Accepted/Complete);
   `docs/api/order.md` rewritten to the seven-state FSM, cancel endpoint,

@@ -844,11 +844,12 @@ How to deploy the worker, run the saga locally, and watch it in production.
   still needs liveness and readiness probes). Worker metrics export over OTLP.
 - **In-cluster.** The worker is a **second release of the same `mop` chart** (`duynhlab/helm-charts`,
   ≥`0.12.0`): same image, `args: ["worker"]`, `service.enabled: false`. In homelab it's the
-  `order-worker-1-8-0` HelmRelease (`kubernetes/apps/order-worker-1-8-0.yaml`, namespace `order` —
-  one file per Worker Deployment Version, see
+  `order-worker-1-10-0` HelmRelease (`kubernetes/apps/order-worker-1-10-0.yaml`, namespace `order` —
+  one file per Worker Deployment Version; the retired 1-8-0 file was deleted once
+  1.10.0 was Current with nothing pinned to 1.8.0, see
   [Worker Deployment Versioning](#worker-deployment-versioning-as-built)) carrying the
   order DB address, `TEMPORAL_HOSTPORT` / `TEMPORAL_NAMESPACE` / `TASK_QUEUE`, and the downstream
-  `*_GRPC_ADDR` targets (product, shipping, notification, payment — each
+  `*_GRPC_ADDR` targets (product, inventory, shipping, notification, payment — each
   `dns:///<service>.<ns>.svc.cluster.local:9090`, the single multi-port Service).
   `apps-local` `dependsOn` `temporal-local` so it deploys after the cluster is
   Ready. (Earlier drafts used a `worker.enabled` chart toggle; the chart was reworked to the

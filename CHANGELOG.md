@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0021 P5 — order API pinned to 1.11.0**: brings the generic-write
+  deletion (v1.10.1), the `orders.status` CHECK + seed normalize (v1.10.2)
+  and the legacy REST create removal (v1.11.0) to the cluster. The worker
+  build stays `1-10-0` — no workflow code changed after v1.10.0 (ADR-030:
+  worker builds advance only with workflow-affecting changes).
 - **RFC-0021 P5 — order v1.10.0 pinned + worker build 1-10-0 staged**: order
   bumped to 1.10.0 (order aggregate: FSM status commands + CAS history, the
   CancellationWorkflow + cancel API, the processing-stage projection and the

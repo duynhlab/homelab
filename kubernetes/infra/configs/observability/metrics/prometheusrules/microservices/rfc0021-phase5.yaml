@@ -1,0 +1,148 @@
+# RFC-0021 phase-5 alerts: the order aggregate's cancellation and parking
+# machinery (order-service v1.10.0).
+#
+# Phase 5 gives orders a real FSM. Two of its states mean SOMEBODY IS OWED
+# WORK, and both are watched from table-backed gauges (read on every
+# collection cycle by BOTH order processes, so they survive a dead worker):
+#
+#   order_cancelling_backlog      cancelling > 15 min — the CancellationWorkflow
+#                                 should have converged (its longest leg, the
+#                                 payment unwind, is bounded in minutes)
+#   order_manual_review_backlog   parked for an operator; un-aged and
+#                                 unwindowed, a human decision must never
+#                                 quietly age out
+#
+# The cancellation start rides its own outbox (the fulfillment outbox's lean
+# sibling — no payment token, no row-age money hazard):
+#
+#   order_cancellation_outbox_pending / _failed
+#   order_cancellation_outbox_oldest_pending_age_seconds
+#   order_cancellation_start_dispatch_total{result}
+#   order_cancellations_total{result}                (API-side)
+#   order_cancellation_outcomes_total{outcome}       (workflow terminal)
+#
+# Two best-effort tails are counted rather than allowed to fail anything:
+#
+#   order_saga_complete_failures_total      Complete exhausted retries; the
+#                                           order stays `confirmed` (reconciler-
+#                                           settled) but the bookkeeping tail
+#                                           did not finish
+#   order_projection_write_failures_total   a processing-stage write exhausted
+#                                           its (short) budget; the next
+#                                           boundary self-heals, a steady rate
+#                                           means the UX table is dark
+#
+# absent() guards are NOT repeated here: the gauges vanish with the order
+# processes, and MicroserviceDown + the phase-3 absent() rules already own
+# that failure mode.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: microservices-rfc0021-phase5
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: microservices
+spec:
+  groups:
+    - name: microservices-rfc0021-phase5
+      rules:
+        # The customer was told "cancelling" and money may be mid-unwind. The
+        # workflow's slowest legitimate leg is minutes, so a quarter hour of
+        # `cancelling` means the workflow is stuck, failed, or was never
+        # started AND the outbox could not start it either.
+        - alert: OrderStuckCancelling
+          expr: max(order_cancelling_backlog) > 0
+          for: 10m
+          labels:
+            severity: critical
+            rfc: "0021"
+          annotations:
+            summary: "An order has been stuck in `cancelling` for >25m (RFC-0021 P5)"
+            description: >-
+              order_cancelling_backlog counts orders in `cancelling` older than
+              15 minutes; with the 10m hold this fires ~25 minutes after the
+              cancel was accepted. The customer is owed a refund decision.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderStuckCancelling.md"
+
+        # A parked order IS a worklist item: only an operator command can move
+        # it, and the whole point of manual_review is that money or stock is
+        # not fully accounted for.
+        - alert: OrderManualReviewBacklog
+          expr: max(order_manual_review_backlog) > 0
+          for: 5m
+          labels:
+            severity: warning
+            rfc: "0021"
+          annotations:
+            summary: "Orders are parked in manual_review awaiting an operator (RFC-0021 P5)"
+            description: >-
+              An order parked in manual_review has side effects a workflow could
+              not converge (an unrefunded capture, an unreleased hold, an
+              ambiguous pivot). Resolve via the documented operator path; the
+              order's projection row and status history say what stopped.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderManualReviewBacklog.md"
+
+        # Mirrors FulfillmentStartOutboxStalled: an accepted cancel whose
+        # workflow has not started. Less urgent than the fulfillment twin
+        # (no payment-token window), but the order sits `cancelling`.
+        - alert: OrderCancellationOutboxStalled
+          expr: max(order_cancellation_outbox_oldest_pending_age_seconds) > 600
+          for: 10m
+          labels:
+            severity: warning
+            rfc: "0021"
+          annotations:
+            summary: "A cancellation start has been pending >10m (RFC-0021 P5)"
+            description: >-
+              The inline start failed and the dispatcher has not managed to
+              start the CancellationWorkflow either. Usually Temporal or the
+              worker; OrderStuckCancelling escalates if this persists.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderCancellationOutboxStalled.md"
+
+        # Terminal rows: the dispatcher gave up (cap 60). Nothing retries
+        # them; the order stays `cancelling` until a human re-arms or resolves.
+        - alert: OrderCancellationOutboxFailed
+          expr: max(order_cancellation_outbox_failed) > 0
+          for: 5m
+          labels:
+            severity: warning
+            rfc: "0021"
+          annotations:
+            summary: "A cancellation start exhausted its attempts (RFC-0021 P5)"
+            description: >-
+              A FAILED cancellation-outbox row is a worklist item. Re-arm by
+              cancelling again (a new episode re-arms the row) once the
+              underlying Temporal/worker problem is fixed.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderCancellationOutboxStalled.md"
+
+        # Complete is best-effort bookkeeping (confirmed → completed) and a
+        # legal mid-tail cancellation is deliberately NOT counted here — this
+        # series only moves when the write itself kept failing.
+        - alert: OrderCompleteFailures
+          expr: increase(order_saga_complete_failures_total[30m]) > 0
+          labels:
+            severity: warning
+            rfc: "0021"
+          annotations:
+            summary: "Fulfillment Complete writes are failing (RFC-0021 P5)"
+            description: >-
+              Orders finish their fulfillment tail but cannot record
+              `completed`; they stay `confirmed`, which is settlement-correct
+              but means the status ladder is silently degrading.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderProjectionWritesFailing.md"
+
+        # One lost projection write self-heals at the next boundary; a steady
+        # rate means /details is rendering a stale or missing processing block
+        # for every in-flight order.
+        - alert: OrderProjectionWritesFailing
+          expr: increase(order_projection_write_failures_total[15m]) > 3
+          labels:
+            severity: warning
+            rfc: "0021"
+          annotations:
+            summary: "Processing-projection writes keep failing (RFC-0021 P5)"
+            description: >-
+              The stage projection (order_processing_projection) is not
+              accepting writes. UX-only — orders.status stays authoritative —
+              but the SPA's progress rendering is dark while this fires.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderProjectionWritesFailing.md"

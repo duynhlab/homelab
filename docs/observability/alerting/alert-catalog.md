@@ -361,6 +361,12 @@ healthy.
 | OrderSagaNotCompleting | critical | starts>0 `unless` outcomes>0 (15m) | Sagas start but none finish — the silent signature of a Worker Deployment Version made Current with no pollers (ADR-030) | 10m |
 | OrderReconcilerBacklogNotDraining | warning | `max(order_reconciler_backlog)>0` | Stock held against an order that will never ship, or consumed for one that did not happen | 15m |
 | OrderReconcilerBacklogUnreadable | warning | `absent(order_reconciler_backlog)` | The backlog is **unknown, not zero** — the gauge publishes nothing when its database read fails, so absence is the failure mode | 20m |
+| OrderStuckCancelling | critical | `max(order_cancelling_backlog)>0` | An order has been `cancelling` ~25m; the customer is owed a refund decision and only the CancellationWorkflow or an operator can move it | 10m |
+| OrderManualReviewBacklog | warning | `max(order_manual_review_backlog)>0` | Orders parked for an operator: money or stock is not fully accounted for, and nothing automatic touches them | 5m |
+| OrderCancellationOutboxStalled | warning | `order_cancellation_outbox_oldest_pending_age_seconds >600` | An accepted cancel whose workflow has not started (no token window behind it, unlike the fulfillment twin) | 10m |
+| OrderCancellationOutboxFailed | warning | `max(order_cancellation_outbox_failed)>0` | A cancellation start exhausted its attempts; re-cancelling re-arms the row once the fault is fixed | 5m |
+| OrderCompleteFailures | warning | `increase(order_saga_complete_failures_total[30m])>0` | Fulfillment tails cannot record `completed`; orders stay `confirmed` (settlement-correct, ladder degrading) | — |
+| OrderProjectionWritesFailing | warning | `increase(order_projection_write_failures_total[15m])>3` | The processing projection is dark; /details renders stale or missing progress (UX-only) | — |
 | OrderReconcilerDependencyUnreadable | warning | `rate(order_reconciler_repairs_total{action="unreadable"}[10m])>0` | Repairs have stopped behind an inventory/Temporal outage while the backlog gauge may still read low | 20m |
 | OrderReconcilerPassTruncated | warning | `increase(order_reconciler_passes_truncated_total[30m])>0` | A pass hit its 200-row cap, so the backlog gauge is a **floor**, not a count | 5m |
 | OrderParticipantDisagreement | warning | `increase(order_reconciler_participant_disagreements_total[30m])>0` | An order ran the inventory branch while its row says otherwise — the hold is repaired, but every later judgement is reading a wrong record | 5m |

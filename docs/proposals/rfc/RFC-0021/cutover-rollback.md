@@ -164,11 +164,27 @@ Dropping `stock_quantity`/`stock_reservations` and the stock RPCs has no
 rollback; the gates make it unnecessary, and each one is a MEASUREMENT, not an
 assumption:
 
-1. **Deprecation telemetry at zero for ≥ 2 weeks.**
-   `product_stock_surface_calls_total{rpc}` counts every hit on the surface
-   being removed (`ReserveStock`, `ReleaseStock`). The clock starts when the
-   counter is DEPLOYED, not when it is merged — the third
-   merged-but-never-released lesson of phase 3 applies to instruments too.
+1. **Zero callers of the surface being removed.**
+
+   > **Owner decision (2026-08-01): measured by code evidence, not by the
+   > 14-day counter.** The platform's only long-lived environment is a Kind
+   > cluster that is destroyed and rebuilt by every `make up`, so a
+   > "counter at zero since DEPLOY for 14 days" window can never accumulate —
+   > the clock restarts before it can expire. The owner accepts the two-week
+   > condition as **satisfied** and replaces the measurement with:
+   >
+   > - a repository grep proving no caller of `ReserveStock` / `ReleaseStock`
+   >   remains outside the retiring saga branch itself, across every service
+   >   repo **and** `pkg`, recorded in the removal PR; plus
+   > - a live e2e run showing the saga taking the inventory branch
+   >   (`inventory.v1` Reserve/Commit in the callee's logs, no product stock
+   >   RPC), which phase 5's cluster verification already produced.
+   >
+   > `product_stock_surface_calls_total` stays deployed as a **backstop**: a
+   > non-zero sample at any point is still a stop signal, and it is the thing
+   > to watch during the removal wave. It is simply no longer the gate's clock.
+
+   Original (superseded) measurement, kept for the record:
    ```promql
    sum by (rpc) (increase(product_stock_surface_calls_total[14d]))
    ```
@@ -189,4 +205,4 @@ assumption:
    `000005` GRANT) revoked in the same wave.
 
 ---
-_Last updated: 2026-07-27_
+_Last updated: 2026-08-01 — phase-4 gate 1 re-based on code evidence (owner decision)._

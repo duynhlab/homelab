@@ -412,7 +412,7 @@ flowchart LR
     Checkout -->|"GetProducts"| Product
     Checkout -->|"GetQuote"| Shipping
     Checkout -->|"CreateOrder"| OrderAPI
-    OrderAPI -.->|"legacy REST pricing read"| Cart
+    OrderAPI -->|"GetReservation (enrich)"| Inventory
     Worker -.->|"legacy REST clear"| Cart
 
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
@@ -426,7 +426,9 @@ flowchart LR
 | Product | Review | `GetProductReviews` | gRPC | Cluster and local-stack |
 | Order API | Shipping | `GetShipmentByOrder` | gRPC | Cluster and local-stack |
 | Order API | Payment | `GetPayment` | gRPC | Cluster and local-stack |
-| Order worker | Product | `ReserveStock`, `ReleaseStock` | gRPC | Cluster and local-stack |
+| Order worker | Product | `ReserveStock`, `ReleaseStock` (pre-cutover sagas draining) | gRPC | Cluster and local-stack |
+| Order worker | Inventory | `Reserve`, `Commit`, `Release`, `GetReservation` | gRPC | Cluster and local-stack |
+| Order API | Inventory | `GetReservation` (`/details` enrichment) | gRPC | Cluster and local-stack |
 | Order worker | Shipping | `CreateShipment`, `CancelShipment` | gRPC | Cluster and local-stack |
 | Order worker | Notification | `SendEmail` (`SendSMS` is served but has no live caller) | gRPC | Cluster and local-stack |
 | Order worker | Payment | `Authorize`, `Capture`, `Void`, `Refund` | gRPC | Cluster and local-stack |
@@ -434,8 +436,11 @@ flowchart LR
 | Checkout | Product | `GetProducts` | gRPC | Cluster and local-stack |
 | Checkout | Shipping | `GetQuote` | gRPC | Cluster and local-stack |
 | Checkout | Order | `CreateOrder` | gRPC | Cluster and local-stack |
-| Order | Cart | Pricing read | REST exception | Current; planned removal after checkout migration |
 | Order worker | Cart | Clear cart | REST exception | Current |
+
+The order→cart pricing read died with the legacy REST create (RFC-0021 P5,
+order-service v1.11.0); the worker's clear-cart is the one remaining REST
+exception on the order side.
 
 Auth has no gRPC server. The former `auth.GetMe` dependency was retired when
 services moved to local JWT verification.
@@ -802,4 +807,4 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-07-22 — Platform API Topology redrawn top-down (layered link order)._
+_Last updated: 2026-08-01 — call graph: order→cart pricing read removed with the legacy create; inventory enrichment edge added._

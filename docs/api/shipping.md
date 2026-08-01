@@ -25,7 +25,7 @@ Shipping turns "an order that must move" into a tracked shipment — and turns "
 |-------|-------|
 | **Role** | Participant (gRPC) |
 | **Workflow** | `OrderFulfillmentWorkflow` (owned by order) |
-| **This service's steps** | `CreateShipment`, `CancelShipment` (compensation) |
+| **This service's steps** | `CreateShipment`, `CancelShipment` (compensation — also the `CancellationWorkflow`'s unwind step, and `GetShipmentByOrder` gates the cancel policy, RFC-0021 P5) |
 | **Idempotency** | order id — `UNIQUE (order_id)` + `ON CONFLICT` makes replays return the existing shipment |
 | **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
 
@@ -286,4 +286,4 @@ Paths in [`duynhlab/shipping-service`](https://github.com/duynhlab/shipping-serv
 - [checkout.md](./checkout.md) · [order.md](./order.md) — quote and enrichment callers
 - [Service contracts](./README.md#service-contracts)
 
-_Last updated: 2026-07-21_
+_Last updated: 2026-08-01_

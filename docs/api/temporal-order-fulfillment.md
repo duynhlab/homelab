@@ -344,6 +344,11 @@ east-west contracts behind them, and the Temporal deployment itself.
 | 5 | `SendNotification` | Notification | None; post-pivot best-effort |
 | 6 | `SendReceipt` | Notification | None; post-pivot best-effort |
 | 7 | `ClearCart` | Cart | None; post-pivot best-effort REST exception |
+| 8 | `Complete` | Order | None; best-effort `confirmed → completed` ladder write (RFC-0021 P5) — failure is counted, never compensated |
+
+Stage boundaries also write the `order_processing_projection` row
+(best-effort, ~7 s budget) so `/details` can render progress; a lost write
+self-heals at the next boundary.
 
 The actual execution order is important: authorize early, capture late, then
 confirm the order. This fails a declined payment before reserving inventory and
@@ -573,14 +578,14 @@ How to read it against the theory above:
 Transport retries and Temporal activity retries do not replace idempotency.
 Every activity may have committed even when its response was lost.
 
-```mermaid
-stateDiagram-v2
-    [*] --> pending: CreateOrder commits
-    pending --> confirmed: ConfirmOrder pivot succeeds
-    pending --> failed: pre-pivot failure is compensated
-    confirmed --> [*]
-    failed --> [*]
-```
+The workflow's terminal writes map onto the order FSM
+([order.md § Order status FSM](./order.md#order-status-fsm) owns the full
+seven-state diagram): pre-pivot exhaustion with **all** compensations
+converged → `failed`; any compensation exhaustion → `manual_review`
+(`COMPENSATION_INCOMPLETE`) — the alert-backed parked state; a successful
+fulfillment tail records `confirmed → completed` best-effort. If even the
+manual-review park cannot land, the workflow fails and the order stays
+`pending`, deliberately keeping the starts-without-outcomes alert firing.
 
 ### How the Saga Gets Started
 
@@ -650,6 +655,39 @@ exactly when a backlog builds. Alerting on them is owed, and needs `absent()`
 handling: a database failure blanks all three together, so a naive threshold would
 *resolve* during the incident. Full rationale and the accepted trade-offs are in
 [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/).
+
+### The Cancellation Workflow (RFC-0021 P5)
+
+Customer cancellation is a **separate workflow type** on the same task queue
+(`CancellationWorkflow`, id `order-cancellation-<orderID>-v<epoch>`,
+`REJECT_DUPLICATE`, Pinned per ADR-030) — not a signal into the fulfillment
+saga. A completed saga cannot be signalled, and the accepted
+`completed → cancelling` edge means cancellation must outlive fulfillment
+history anyway ([ADR-033](../proposals/adr/ADR-033-order-status-cancellation/)).
+
+The cancel API CASes the order to `cancelling` **and** arms a
+`cancellation_requests` outbox row in one transaction (the lean sibling of
+the ADR-031 outbox — no payment token, no row-age money hazard), then tries
+an inline start; the worker-side dispatcher sweeps whatever the inline path
+missed. The epoch — the `orders.version` observed at request time — namespaces
+both the workflow id and the episode's command ids, so a legally repeated
+episode (`manual_review → confirmed → cancel again`) re-arms the same row.
+
+Every step reads **current server-side state** rather than trusting inputs:
+
+| Step | Reads | Action |
+|------|-------|--------|
+| `CheckCancellationPolicy` | shipment | Pass when the shipment is pending, cancelled, or absent; a dispatched shipment parks the episode |
+| `CancelShipment` | — | Reused saga compensation (idempotent) |
+| Payment unwind | current payment state | Void an authorization; refund the **remainder** (`amount − refunded`) of a capture |
+| Inventory disposition | current reservation | `RESERVED` → `Release(ORDER_CANCELLED)`; `COMMITTED` → `RESTOCK_SKIPPED` (accepted shrinkage — inventory.v1 has no Return RPC); race → re-read |
+| `CompleteCancellation` | — | CAS `cancelling → cancelled` |
+
+The workflow **always completes**; the order state carries the outcome. Any
+step exhausting its compensation-grade retry budget parks the order in
+`manual_review` instead of failing the workflow. Backstops:
+`OrderStuckCancelling` (critical) and `OrderCancellationOutboxStalled`
+([runbooks](../observability/runbooks/microservices/OrderStuckCancelling.md)).
 
 ### The Inventory Reconciler
 
@@ -851,4 +889,4 @@ How to deploy the worker, run the saga locally, and watch it in production.
 - [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared idempotency state machine
 - [RFC-0010](../proposals/rfc/RFC-0010/) — payment and fulfillment design
 
-_Last updated: 2026-07-30 (W7 write cutover)_
+_Last updated: 2026-08-01 — added the CancellationWorkflow section; terminal writes described against the P5 FSM._

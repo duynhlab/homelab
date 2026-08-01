@@ -349,6 +349,17 @@ count and retention hit zero.
 - 2026-07-31 — Phase 4 opened: deprecation telemetry on Product's stock surface
   lands first; destructive steps stay gated on two weeks of zero usage (see
   [cutover-rollback.md § Contract removal](./cutover-rollback.md#contract-removal-phase-4--not-reversible-gated-so-it-never-needs-to-be)).
+- 2026-07-31 → 2026-08-01 — **Phase 5 shipped: the order aggregate**
+  ([ADR-033](../../adr/ADR-033-order-status-cancellation/)). Seven-state FSM +
+  CAS command path + append-only status history (order-service v1.9.0–v1.9.3);
+  saga rewrite onto domain commands, processing projection, customer cancel
+  API + `CancellationWorkflow`, `/details` expansion, gen-2 replay corpus
+  (v1.10.0, worker build `order-worker-1-10-0` staged in homelab #640);
+  generic `UpdateStatus` deleted (v1.10.1), vocabulary CHECK + seed normalize
+  (v1.10.2), legacy REST create removed with evidence gate (v1.11.0);
+  phase-5 alerts + 4 runbooks (homelab #639); cancel UI (frontend #79).
+  Live e2e: happy/declined/shipment-failed/compensation-exhausted funnels,
+  cancel-to-refund on both stock branches, operator resolve drill.
 
 ## Related
 

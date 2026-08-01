@@ -55,7 +55,7 @@ enum — no ids, no PII; amounts ride in histogram **values**, never labels.
 | `payment_reconciliation_discrepancies_total` | `payment.reconciliation.discrepancies.total` · Counter | `kind` | Ledger-vs-provider drift. Per-run **detection** count — a standing discrepancy re-counts every run; read as a rate, not distinct drifts |
 | `payment_provider_request_duration_seconds` | `payment.provider.request.duration` · Histogram, `s`, SLO buckets | `op` = `charge`\|`capture`\|`void`\|`refund` · `outcome` = `ok`\|`declined`\|`transient` | **The money-hop SLI** (mockpay). Recorded via defer — every return path timed, incl. transport errors. Reconciliation reads deliberately not timed |
 
-### order (13)
+### order (22)
 
 | Metric (PromQL) | Instrument | Labels | How to read / recorded when |
 |---|---|---|---|
@@ -74,7 +74,16 @@ enum — no ids, no PII; amounts ride in histogram **values**, never labels.
 | `order_reconciler_participant_disagreements_total` | `order.reconciler.participant_disagreements.total` · Counter | `row_participant` = `product`\|`absent`\|`other` (**normalised** — the raw column value is never a label, precisely because this fires when something is wrong with it) | Orders repaired that hold an inventory reservation while their outbox row does not say inventory-path (RFC-0021 P3). One cause only: a saga start that resolved its branch from a process flag instead of from the order. Reported **once per order**, so any increase is a distinct order and no threshold above zero is honest. Should read flat zero |
 | `product_stock_surface_calls_total` | `product.stock.surface.calls.total` · Counter | `rpc` = `reserve_stock`\|`release_stock` | **The RFC-0021 phase-4 removal gate.** Every touch of the deprecated stock surface — successful, rejected, or malformed — recorded before validation, because a caller sending garbage still breaks when the RPC drops. Reads are excluded (GetProducts stays as checkout's fallback). Must read zero for two weeks, measured from DEPLOYMENT, before the contract drop |
 | `order_fulfillment_start_participant_total` | `order.fulfillment.start_participant.total` · Counter | `participant` = `product`\|`inventory` · `source` = `recorded`\|`absent`\|`unrecognised` | Which branch each saga start resolved, and from what. Recorded inside the resolver so no start path can omit it — before this, the branch an order took was recoverable only from its Temporal history, one order at a time. `unrecognised` is the alert-worthy value; `absent` should decay to zero as pre-column orders age out; the `participant` split is how the cutover is watched |
-| `order_value_minor` | `order.value.minor` · Histogram, unit `1`, money buckets `500…1000000` (cents: $5…$10k) | `totals_source` = `demo`\|`checkout_quoted` | **AOV / revenue distribution.** Amount is the histogram value. Exactly once per genuine creation — never on idempotent replay |
+| `order_value_minor` | `order.value.minor` · Histogram, unit `1`, money buckets `500…1000000` (cents: $5…$10k) | — (the `totals_source` label was removed with the legacy REST create, v1.11.0 — every total is checkout-quoted) | **AOV / revenue distribution.** Amount is the histogram value. Exactly once per genuine creation — never on idempotent replay |
+| `order_cancellations_total` | `order.cancellations.total` · Counter | `result` = `accepted`\|`replayed`\|`rejected`\|`error` | Cancel API outcomes (RFC-0021 P5). `replayed` = idempotent re-cancel (200); `rejected` = 409 policy/FSM refusals |
+| `order_cancellation_start_dispatch_total` | `order.cancellation.start_dispatch.total` · Counter | `result` | Cancellation-outbox dispatcher outcomes — the lean sibling of the fulfillment dispatcher (no payment-token hazard) |
+| `order_cancellation_outcomes_total` | `order.cancellation.outcomes.total` · Counter | `outcome` = `cancelled`\|`manual_review` | CancellationWorkflow terminal writes. The workflow always completes; the order state carries the outcome |
+| `order_cancelling_backlog` | Observable gauge | — | Orders in `cancelling` older than 15 min — table query, reported by both order processes; feeds `OrderStuckCancelling` |
+| `order_manual_review_backlog` | Observable gauge | — | Orders parked in `manual_review` — un-aged and unwindowed (a human decision must never quietly age out); feeds `OrderManualReviewBacklog` |
+| `order_cancellation_outbox_pending` / `_failed` | Observable gauges | — | Cancellation-outbox rows by state; FAILED rows are a worklist (nothing retries them — re-cancelling re-arms the row) |
+| `order_cancellation_outbox_oldest_pending_age_seconds` | Observable gauge | — | Age of the oldest PENDING row; feeds `OrderCancellationOutboxStalled` |
+| `order_saga_complete_failures_total` | `order.saga.complete_failures.total` · Counter | — | The fulfillment tail could not record `confirmed → completed` after retries. A legal mid-tail cancellation is deliberately NOT counted |
+| `order_projection_write_failures_total` | `order.projection.write_failures.total` · Counter | — | Processing-projection stage writes that exhausted their (~7 s) budget. UX-only — a steady rate means `/details` progress is dark, `orders.status` unaffected |
 
 ### auth (4)
 
@@ -170,4 +179,4 @@ enum — no ids, no PII; amounts ride in histogram **values**, never labels.
 
 ---
 
-_Last updated: 2026-07-29 — added the two RFC-0021 participant-resolution counters; compiled from every service's `metrics.go` (36 shipped instruments) and the live VictoriaMetrics series list; supersedes the RFC-0017 design catalog as the shipped reference._
+_Last updated: 2026-08-01 — added the nine RFC-0021 phase-5 order series; `order_value_minor` lost its `totals_source` label (v1.11.0)._

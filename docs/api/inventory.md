@@ -83,7 +83,8 @@ One question: **who calls inventory, what does it own, and what is not yet live?
 ```mermaid
 flowchart LR
     CK["checkout"] -.->|"CheckAvailability /<br/>BatchGetAvailability (planned P2)"| INV["inventory-service<br/>:8080 health · :9090 gRPC"]
-    W["order-worker"] -.->|"Reserve / Release / Commit<br/>(planned P3)"| INV
+    W["order-worker"] -->|"Reserve / Release / Commit<br/>(live, W7 cutover)"| INV
+    OAPI["order API"] -->|"GetReservation<br/>(/details enrichment)"| INV
     P["product"] -.->|"availability enrichment<br/>soft-fail (planned)"| INV
     INV --> DB[("inventory DB<br/>on product-db via PgDog :6432")]
 
@@ -152,7 +153,7 @@ storage failures are retryable (`DEPENDENCY_UNAVAILABLE`).
 | `Reserve` | `reservation_id` + `order_id` + `items[]` + `request_hash` (+ optional `expires_at`) → `status` + `allocations[]` | step | All-or-none; one warehouse fulfils the whole order. Idempotent by `reservation_id` + `request_hash` (replay returns the original); divergent hash → `IDEMPOTENCY_CONFLICT`; no warehouse fulfils → `INSUFFICIENT_STOCK` with per-line shortages |
 | `Release` | `reservation_id` + bounded `reason` → `status` | compensation | Pre-pivot compensation. Releasing an already-released reservation is a no-op success; releasing a `COMMITTED` reservation → `INVALID_TRANSITION` (a sale is undone by a `RETURN`, never a release) |
 | `Commit` | `reservation_id` → `status` | mandatory forward | Post-pivot: `on_hand −= q; reserved −= q` + `SALE_COMMITTED` movement. Idempotent (committing a `COMMITTED` returns it unchanged); committing a `RELEASED` → `INVALID_TRANSITION`. Callers retry until it succeeds |
-| `GetReservation` | `reservation_id` → header + lines + allocations | — | Read-only; for the order-domain reconciler and operators |
+| `GetReservation` | `reservation_id` → header + lines + allocations | — | Read-only; for the order-domain reconciler, the cancellation disposition, `/details` enrichment, and operators |
 
 **Error reasons** (proto taxonomy, `grpcx` reason constants): `VALIDATION_ERROR`
 (`InvalidArgument`), `INSUFFICIENT_STOCK` (`FailedPrecondition`),
@@ -223,12 +224,17 @@ browsing surfaces should prefer `status`.
 | Direction | Peer | Transport | Purpose | Status |
 |-----------|------|-----------|---------|--------|
 | Inbound | checkout | gRPC `CheckAvailability` / `BatchGetAvailability` | Confirm-time revalidation + snapshot availability | **Planned** (phase 2) |
-| Inbound | order-worker | gRPC `Reserve` / `Release` / `Commit` | Saga stock step, compensation, mandatory-forward commit | **Planned** (phase 3) |
+| Inbound | order-worker | gRPC `Reserve` / `Release` / `Commit` | Saga stock step, compensation, mandatory-forward commit — live since the W7 cutover (2026-07-30); cancellation disposition reads current state via `GetReservation` and releases RESERVED holds (`ORDER_CANCELLED`) | Implemented |
+| Inbound | order API | gRPC `GetReservation` | `/details` inventory block (soft-fail enrichment, RFC-0021 P5) | Implemented |
 | Inbound | product | gRPC availability enrichment (soft-fail) | Product-details availability | **Planned** |
 | Outbound | inventory DB via PgDog | Postgres | All persistence | Implemented |
 
-Today the order saga still uses product's `ReserveStock`/`ReleaseStock`
-([product.md](./product.md)); the platform-wide call graph is in
+New sagas run the inventory branch; old pinned builds may still run
+product's `ReserveStock`/`ReleaseStock` until drained ([product.md](./product.md)).
+A cancelled order with a COMMITTED reservation is recorded as
+`RESTOCK_SKIPPED` — accepted shrinkage until inventory grows a `Return` RPC
+([ADR-033](../proposals/adr/ADR-033-order-status-cancellation/)). The
+platform-wide call graph is in
 [api.md § Current east-west call graph](./api.md#current-east-west-call-graph).
 
 ## Known gaps
@@ -315,4 +321,4 @@ Transport peers call `logic/v1`; logic calls `core` only
 - [RFC-0021](../proposals/rfc/RFC-0021/) — inventory extraction program (supersedes [RFC-0003](../proposals/rfc/RFC-0003/))
 - [ADR-027](../proposals/adr/ADR-027-inventory-sole-stock-authority/) — stock authority · [ADR-028](../proposals/adr/ADR-028-inventory-reservation-model/) — reservation/balance model
 
-_Last updated: 2026-07-24_
+_Last updated: 2026-08-01 — order write path marked live (W7); cancellation disposition + `/details` enrichment callers added._

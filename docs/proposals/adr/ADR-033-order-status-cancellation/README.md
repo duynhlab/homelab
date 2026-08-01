@@ -197,3 +197,4 @@ Re-open this decision when one or more of the following become true:
 |------|-------------------|--------|
 | 2026-07-31 | Proposed / Not started | Drafted during RFC-0021 P5 planning (owner scope decisions recorded) |
 | 2026-08-01 | Accepted / Complete | P5 shipped: v1.10.0–v1.11.0, homelab #639/#640, frontend #79 |
+| 2026-08-01 | Accepted / Complete | Cluster-verified: every decision rule exercised live on Kind (FSM ladder incl. `completed → cancelling`, actor matrix, epoch command ids, CAS versioning, RESTOCK_SKIPPED) |

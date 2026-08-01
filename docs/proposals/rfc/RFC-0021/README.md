@@ -360,6 +360,14 @@ count and retention hit zero.
   phase-5 alerts + 4 runbooks (homelab #639); cancel UI (frontend #79).
   Live e2e: happy/declined/shipment-failed/compensation-exhausted funnels,
   cancel-to-refund on both stock branches, operator resolve drill.
+  Cluster-verified on Kind after `make up` (2026-08-01): order API 1.11.0 +
+  worker build 1.10.0 Current, migration 000014 live, and one order walked the
+  whole ladder through the real gateway — `pending → confirmed → completed →
+  cancelling → cancelled` with `complete:2`, `cancel:2:v3` (USER) and
+  `cancel-complete:2:v3` (WORKFLOW) in `order_status_history`, refund settled,
+  shipment cancelled, a COMMITTED reservation left as accepted shrinkage. All
+  six phase-5 alert rules load healthy; both backlog gauges report from the API
+  **and** the worker.
 
 ## Related
 

@@ -22,7 +22,7 @@ spec:
     # init container reuses this image and runs `migrate` BEFORE the app container
     # starts, so the schema cannot lag the code. It adds the CHECK constraint the
     # participant column earns now that it routes stock writes.
-    image_tag: "1.8.0" # {"$imagepolicy": "flux-system:order:tag"}
+    image_tag: "1.10.0" # {"$imagepolicy": "flux-system:order:tag"}
     namespace: order
     platform_backup_label: "cnpg"
     replicaCount: 1

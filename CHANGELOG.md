@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0021 P5 docs + ADR-033 — order aggregate as-built**: ADR-033 (order
+  status FSM + CAS command path + customer cancellation; Accepted/Complete);
+  `docs/api/order.md` rewritten to the seven-state FSM, cancel endpoint,
+  expanded `/details` (processing/inventory/degraded), P5 data model, and
+  the legacy-create removal (v1.11.0); saga deep-dive gains the
+  CancellationWorkflow section and drops the stale three-state FSM copy;
+  workflows registry + microservices rollup + inventory/shipping caller
+  tables synced (inventory write path marked live since W7); metrics
+  catalog += 9 phase-5 series and the `totals_source` label removal;
+  RFC-0021 Implementation History records the full P5 ship list.
 - **RFC-0021 P5 — order API pinned to 1.11.0**: brings the generic-write
   deletion (v1.10.1), the `orders.status` CHECK + seed normalize (v1.10.2)
   and the legacy REST create removal (v1.11.0) to the cluster. The worker

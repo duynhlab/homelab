@@ -6,10 +6,11 @@ Every durable workflow on the platform, in one table: who orchestrates, who part
 
 | Workflow | Owner | Worker | Task queue | Participants | Deep dive |
 |----------|-------|--------|------------|--------------|-----------|
-| <a id="order-fulfillment"></a>`OrderFulfillmentWorkflow` | order | `order-worker-1-8-0` — **versioned**, `Pinned` (ADR-030) | `order-fulfillment` | product *or* inventory (per-workflow stock participant), shipping, payment, notification, cart | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
+| <a id="order-fulfillment"></a>`OrderFulfillmentWorkflow` | order | `order-worker-1-10-0` — **versioned**, `Pinned` (ADR-030) | `order-fulfillment` | product *or* inventory (per-workflow stock participant), shipping, payment, notification, cart | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
+| <a id="order-cancellation"></a>`CancellationWorkflow` | order | `order-worker-1-10-0` (same worker) | `order-fulfillment` | shipping, payment, inventory | [temporal-order-fulfillment.md § Cancellation](./temporal-order-fulfillment.md#the-cancellation-workflow-rfc-0021-p5) |
 | <a id="abandoned-checkout"></a>`AbandonedCheckoutWorkflow` | checkout | `checkout-worker` | `checkout` | checkout DB (in-process activities) | [checkout.md § Abandonment](./checkout.md#abandonment-p2-implemented--the-timer-is-a-wake-up-never-a-verdict) |
 
-Both workers run in local-stack (`local-stack/compose.yaml`) and in-cluster ([order-worker-1-8-0.yaml](../../kubernetes/apps/order-worker-1-8-0.yaml) — one manifest per Worker Deployment Version, [checkout-worker.yaml](../../kubernetes/apps/checkout-worker.yaml)) on Temporal namespace `mop`.
+Both workers run in local-stack (`local-stack/compose.yaml`) and in-cluster ([order-worker-1-10-0.yaml](../../kubernetes/apps/order-worker-1-10-0.yaml) — one manifest per Worker Deployment Version, [checkout-worker.yaml](../../kubernetes/apps/checkout-worker.yaml)) on Temporal namespace `mop`.
 
 ## Standard roles
 
@@ -28,7 +29,7 @@ Both workers run in local-stack (`local-stack/compose.yaml`) and in-cluster ([or
 | auth, user, review | **None** |
 | product, shipping, payment, notification | **Participant (gRPC)** — order saga |
 | cart | **Participant (REST)** — ClearCart activity |
-| order | **Orchestrator** — `OrderFulfillmentWorkflow` |
+| order | **Orchestrator** — `OrderFulfillmentWorkflow` + `CancellationWorkflow` |
 | checkout | **Orchestrator** — `AbandonedCheckoutWorkflow` |
 
 ## Naming rules (new workflows)
@@ -37,7 +38,7 @@ Both workers run in local-stack (`local-stack/compose.yaml`) and in-cluster ([or
 |---------|---------|------------------|
 | Workflow type | `{Domain}{Process}Workflow` | `OrderFulfillmentWorkflow`, `AbandonedCheckoutWorkflow` |
 | Task queue | kebab-case, one queue per worker pool | `order-fulfillment`, `checkout` |
-| Workflow ID | `{process-kebab}-{business-key}` | `order-fulfillment-<orderID>` |
+| Workflow ID | `{process-kebab}-{business-key}` | `order-fulfillment-<orderID>`, `order-cancellation-<orderID>-v<epoch>` |
 | Worker deployment | `{owner-service}-worker` (same image, `args: ["worker"]`) | `order-worker`, `checkout-worker` |
 | Activity | `{Verb}{Noun}` in orchestrator repo | `ReserveStock`, `ExpireIfDue`, `ClearCart` |
 | Participant contract | gRPC/HTTP doc in **owning service** | `PaymentService.Authorize` → [payments.md](./payments.md) |
@@ -54,4 +55,4 @@ Both workers run in local-stack (`local-stack/compose.yaml`) and in-cluster ([or
 - [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — saga theory + as-built + operations
 - [Service contracts](README.md#service-contracts) — platform deployment rollup
 
-_Last updated: 2026-07-21_
+_Last updated: 2026-08-01_

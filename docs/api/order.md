@@ -10,25 +10,24 @@ only writer of orders and the only place the fulfillment saga starts.
 | **gRPC server** | `OrderService/CreateOrder` · `:9090` | Implemented |
 | **gRPC client** | shipping (`GetShipmentByOrder`), payment (`GetPayment`) — enrichment reads | Implemented |
 | **Worker** | `order-worker` · queue `order-fulfillment` | Implemented |
-| **Temporal** | Orchestrator · `OrderFulfillmentWorkflow` · [workflows.md](./workflows.md#order-fulfillment) | Implemented |
-| **Technical debt** | Legacy `POST /order/v1/private/orders` · P6 removal · [Known gaps](#known-gaps) | Technical debt |
+| **Temporal** | Orchestrator · `OrderFulfillmentWorkflow` + `CancellationWorkflow` · [workflows.md](./workflows.md#order-fulfillment) | Implemented |
 
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
 | **Repository** | [`duynhlab/order-service`](https://github.com/duynhlab/order-service) | — |
-| **Owns** | Orders, order items, totals components, idempotency records, fulfillment status | — |
+| **Owns** | Orders, order items, totals components, idempotency records, status history, processing projection, cancellation requests | — |
 | **Database** | `order` on `product-db` (CNPG) via PgDog `pgdog-product.product:6432` | — |
-| **Design record** | — | [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) · [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/) · [RFC-0015](../proposals/rfc/RFC-0015/) (P6 legacy removal) |
+| **Design record** | — | [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) · [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/) · [ADR-033](../proposals/adr/ADR-033-order-status-cancellation/) · [RFC-0015](../proposals/rfc/RFC-0015/) · [RFC-0021](../proposals/rfc/RFC-0021/) (P5) |
 
 ## Temporal participation
 
 | Field | Value |
 |-------|-------|
 | **Role** | Orchestrator — owns the workflow, the worker, and every activity |
-| **Workflow** | `OrderFulfillmentWorkflow` (`internal/saga/workflow.go`) |
-| **Worker** | `order-worker-1-8-0` — same image, `worker` subcommand; **versioned** (Worker Deployment `order-fulfillment`, one manifest per build, ADR-030), workflows run `Pinned` |
+| **Workflow** | `OrderFulfillmentWorkflow` + `CancellationWorkflow` (`internal/saga/`) |
+| **Worker** | `order-worker-1-10-0` — same image, `worker` subcommand; **versioned** (Worker Deployment `order-fulfillment`, one manifest per build, ADR-030), workflows run `Pinned` |
 | **Task queue** | `order-fulfillment` (Temporal namespace `mop`) |
-| **Workflow ID** | `order-fulfillment-<orderID>` — dedup key against duplicate starts |
+| **Workflow ID** | `order-fulfillment-<orderID>`; cancellation episodes use `order-cancellation-<orderID>-v<epoch>` (epoch = observed `orders.version`, so a legally repeated episode gets a fresh id) |
 | **Start semantics** | Detached-context start after the order row commits (see [Saga handoff](#the-saga-handoff-start-after-commit)) |
 | **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
 
@@ -72,10 +71,12 @@ flowchart LR
     OrderG --> DB
     Order -->|"gRPC GetShipmentByOrder (enrich)"| SHIP[shipping]
     Order -->|"gRPC GetPayment (enrich)"| PAY[payment]
-    Order -->|"start workflow"| TMP["Temporal (mop)"]
-    OrderG -->|"start workflow"| TMP
+    Order -->|"gRPC GetReservation (enrich)"| INV
+    Order -->|"start CancellationWorkflow"| TMP["Temporal (mop)"]
+    OrderG -->|"start OrderFulfillmentWorkflow"| TMP
     TMP -->|"queue order-fulfillment"| W["order-worker"]
     W -->|"gRPC ReserveStock / ReleaseStock"| PROD[product]
+    W -->|"gRPC Reserve / Commit / Release"| INV[inventory]
     W -->|"gRPC CreateShipment / CancelShipment"| SHIP
     W -->|"gRPC Authorize / Capture / Void / Refund"| PAY
     W -->|"gRPC SendEmail"| NOTIF[notification]
@@ -87,7 +88,7 @@ flowchart LR
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     class SPA,Kong edge;
-    class Order,OrderG,CK,PROD,SHIP,PAY,NOTIF,CART service;
+    class Order,OrderG,CK,PROD,INV,SHIP,PAY,NOTIF,CART service;
     class W worker;
     class TMP platform;
     class DB data;
@@ -105,8 +106,11 @@ migration 000006 — exact arithmetic, and the unit the payment path speaks:
 
 | Table | Key columns | Constraints |
 |-------|-------------|-------------|
-| `orders` | `id`, `user_id`, `subtotal`, `shipping`, `tax`, `discount`, `total`, `status`, `idempotency_key`, `created_at` | `CHECK (total = subtotal + shipping + tax - discount)`; partial unique index on `(user_id, idempotency_key)` where key not null |
+| `orders` | `id`, `user_id`, money columns, `status`, `version`, `idempotency_key`, reason columns (`failure_code`, `cancellation_reason`, `manual_review_reason`), workflow identity, per-state timestamps | `CHECK (total = subtotal + shipping + tax - discount)`; `CHECK (status IN …)` — the seven FSM states (000014); partial unique index on `(user_id, idempotency_key)` where key not null |
 | `order_items` | `order_id` (FK cascade), `product_id`, `product_name`, `quantity`, `price`, `subtotal` | `CHECK (subtotal = quantity * price)` |
+| `order_status_history` | `order_id`, `from_status`, `to_status`, `actor_type`, `actor_id`, `command_id`, `reason` | `UNIQUE (order_id, command_id)` — the replay anchor; `CHECK` on actor type. Append-only; begins at the v1.10.0 cutover (no backfill) |
+| `order_processing_projection` | `order_id` PK, `stage` (12-stage `CHECK`), `last_successful_step`, `last_error_code` | UX-only projection; best-effort writes, never a correctness gate |
+| `cancellation_requests` | `order_id` PK, `status`, `epoch`, attempt/lease columns | The cancellation start outbox (lean sibling of ADR-031 — no payment token); re-armed per episode by epoch |
 
 `user_id` and `product_id` are cross-service references without FKs (each
 service owns its own DB). `product_name` is denormalized on purpose: an order
@@ -123,8 +127,11 @@ All routes are `private`: Kong edge JWT is the coarse filter, in-service
 |--------|------|---------|-------|
 | `GET` | `/order/v1/private/orders` | List the authenticated user's orders | Paginated |
 | `GET` | `/order/v1/private/orders/:id` | Get one owned order | Foreign IDs return `404` (anti-IDOR — indistinguishable from missing) |
-| `GET` | `/order/v1/private/orders/:id/details` | Aggregate order + shipment + payment | Enrichments soft-fail (below) |
-| `POST` | `/order/v1/private/orders` | Legacy direct create from the live cart | **Technical debt** — optional `Idempotency-Key`; P6 removal ([Known gaps](#known-gaps)) |
+| `GET` | `/order/v1/private/orders/:id/details` | Aggregate order + shipment + payment + processing + inventory | Enrichments soft-fail (below) |
+| `POST` | `/order/v1/private/orders/:id/cancel` | Request cancellation (empty body; reason fixed `CUSTOMER_REQUEST`) | `202` episode opened / `200` idempotent replay (already cancelling or cancelled) / `409 ORDER_NOT_CANCELLABLE` \| `SHIPMENT_ALREADY_DISPATCHED` / `404` foreign or missing |
+
+Order **creation** is checkout's gRPC call (ADR-018); the legacy REST create
+was removed in RFC-0021 P5 (order-service v1.11.0).
 
 ### Order response
 
@@ -158,14 +165,23 @@ the HTTP response adapter (`internal/web/v1/response.go`).
 {
   "order": { "id": "42", "status": "confirmed", "total": 94.99 },
   "shipment": { "tracking_number": "MOP0000000042", "status": "pending" },
-  "payment": { "status": "captured", "amount": 94.99, "currency": "USD" }
+  "payment": { "status": "captured", "amount": 94.99, "currency": "USD" },
+  "processing": { "stage": "DONE", "updated_at": "2026-08-01T04:35:00Z" },
+  "inventory": { "status": "COMMITTED" },
+  "degraded": ["payment"]
 }
 ```
 
-| Dependency | RPC | Failure policy |
-|------------|-----|----------------|
-| shipping | `GetShipmentByOrder` | Omit `shipment` when absent or unavailable |
-| payment | `GetPayment` | Omit `payment` when absent or unavailable |
+| Dependency | Source | Failure policy |
+|------------|--------|----------------|
+| shipping | gRPC `GetShipmentByOrder` | Absent → omit `shipment`; fetch failure → omit **and** add `"shipping"` to `degraded[]` |
+| payment | gRPC `GetPayment` | Same pattern, token `"payment"` |
+| inventory | gRPC `GetReservation` | Same pattern, token `"inventory"`; product-path orders legitimately have no reservation (absent, not degraded) |
+| processing | `order_processing_projection` read | Absent for pre-projection orders; fetch failure → `degraded[]` token `"processing"` |
+
+`degraded[]` distinguishes *could not fetch* from *does not exist* — the SPA
+renders a warning badge for the former and simply omits the block for the
+latter.
 
 The base order stays available during a downstream outage — deliberate
 soft-fail for a read-only detail screen. Contrast with the saga, where a failed
@@ -192,26 +208,52 @@ with a generic message that never echoes the value.
 
 ### Order status FSM
 
-The order row is the saga's ledger. Transitions are written only by the two
-create paths (`pending`) and the saga activities (`ConfirmOrder` / `FailOrder`):
+The order row is the saga's ledger. Since v1.10.0 (RFC-0021 P5,
+[ADR-033](../proposals/adr/ADR-033-order-status-cancellation/)) every
+transition goes through **one** writer — `ApplyStatusCommand`: a single
+transaction under `SELECT … FOR UPDATE` that validates the FSM edge **and**
+the actor, replays idempotently by `(order_id, command_id)`, appends to
+`order_status_history`, and applies a version-guarded UPDATE. There is no
+generic status setter.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> pending : CreateOrder (gRPC or legacy REST)
+    [*] --> pending : CreateOrder (checkout gRPC)
     pending --> confirmed : ConfirmOrder — the pivot
-    pending --> failed : any pre-pivot step exhausts retries → compensate
-    confirmed --> [*]
+    pending --> failed : pre-pivot exhaustion, ALL compensations converged
+    pending --> manual_review : a compensation exhausted retries
+    confirmed --> completed : fulfillment tail Complete (best-effort ladder)
+    confirmed --> cancelling : customer cancel
+    completed --> cancelling : customer cancel (shipment not dispatched)
+    confirmed --> manual_review : post-pivot exhaustion
+    cancelling --> cancelled : CancellationWorkflow converged
+    cancelling --> manual_review : cancellation compensation exhausted
+    manual_review --> confirmed : operator resolve
+    manual_review --> failed : operator resolve
+    manual_review --> cancelled : operator resolve
+    manual_review --> completed : operator resolve
     failed --> [*]
+    cancelled --> [*]
 ```
 
-- `pending` — row committed, saga in flight (or not yet started after a crash).
-- `confirmed` — the pivot (`ConfirmOrder`) succeeded; payment was already
-  captured. Post-pivot steps (notification, receipt, cart clear) are
-  best-effort and never roll the order back.
-- `failed` — a pre-pivot step failed after bounded retries; compensations ran
-  in reverse (void/refund payment, release stock, cancel shipment). Terminal.
+Actor discipline (enforced under the row lock): **USER** only reaches
+`cancelling`; only an **OPERATOR** command leaves `manual_review` (SQL
+discipline in the [OrderManualReviewBacklog runbook](../observability/runbooks/microservices/OrderManualReviewBacklog.md));
+**WORKFLOW** drives the saga edges; **SYSTEM** only `pending → failed`.
 
-Step order, retry policy, and the pivot rationale live in
+- `failed` means *all* compensations converged — money and stock are back
+  where they started. Any exhaustion parks in `manual_review`
+  (`COMPENSATION_INCOMPLETE`) instead: a human is owed work, and the
+  `order_manual_review_backlog` gauge + alert say so.
+- `completed` is bookkeeping (the fulfillment tail finished); the reconciler
+  treats `confirmed` and `completed` identically, so a lost `Complete` write
+  is counted (`order_saga_complete_failures_total`) but never blocks anything.
+- `cancelling` is customer-facing "money mid-unwind": the CancellationWorkflow
+  unwinds by current server-side state and always converges to `cancelled` or
+  `manual_review` (watched by `order_cancelling_backlog` / `OrderStuckCancelling`).
+
+Step order, retry policy, the pivot rationale, and the cancellation
+workflow's disposition rules live in
 [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — not
 duplicated here.
 
@@ -234,8 +276,6 @@ the insert race-safe. The flow on the gRPC path:
    after the 7-day Temporal retention must never re-run the saga on a
    confirmed order — that would re-charge and re-ship.
 
-On the legacy REST path the `Idempotency-Key` header is **optional** — the
-double-submit gap that motivated checkout's mandatory key (RFC-0015).
 
 ### The saga handoff (start after commit)
 
@@ -247,7 +287,7 @@ Both transports delegate the kickoff to one package
 | Start **after** the order transaction commits | No workflow for a row that never existed; worst crash outcome is a `pending` order with no workflow — healed by an idempotent retry |
 | Detached context (`context.WithoutCancel` + 5 s budget) | A client disconnect after commit cannot cancel the workflow start |
 | Workflow ID `order-fulfillment-<orderID>` | Duplicate starts collapse to one execution |
-| Reuse policy: gRPC passes `REJECT_DUPLICATE` | "Already started" (open, or closed within retention) is treated as success — the saga already happened; the web path keeps the server default (`AllowDuplicate`), its belt is the status gate |
+| Reuse policy: `REJECT_DUPLICATE` | "Already started" (open, or closed within retention) is treated as success — the saga already happened. The gRPC create is the only fulfillment starter; the web layer starts only cancellation episodes |
 | Start failure answers `Unavailable` (gRPC) | The machine caller retries with the same key; the replay path heals the zombie `pending` order. Answering success would strand it — callers do not retry successes |
 | Lazy Temporal client (`internal/fulfillment/lazy.go`) | An order pod that races Temporal at bring-up keeps re-dialing in the background instead of running dead with a nil client |
 | Stock participant resolved **from the order's outbox row**, never the process flag (`fulfillment.ParticipantFor`) | A replayed order runs the branch its row recorded even mid-rollout; absent ⇒ `product`, unrecognised falls back loudly and is counted (`order_fulfillment_start_participant_total{participant,source}`) |
@@ -256,19 +296,21 @@ Both transports delegate the kickoff to one package
 
 | Direction | Peer | Transport | Purpose |
 |-----------|------|-----------|---------|
-| Inbound | Browser SPA via Kong | HTTP private | List/read orders, order details, legacy create |
+| Inbound | Browser SPA via Kong | HTTP private | List/read orders, order details, cancel |
 | Inbound | checkout | gRPC `CreateOrder` | Confirm handoff (ADR-018) — only NetworkPolicy-admitted caller of `:9090` |
-| Outbound (API) | shipping, payment | gRPC | Enrichment reads for `/details` (soft-fail) |
+| Outbound (API) | shipping, payment, inventory | gRPC | Enrichment reads for `/details` (soft-fail) |
+| Outbound (API) | Temporal | SDK | Inline `CancellationWorkflow` start after the cancel CAS commits (outbox sweeps the misses) |
 | Outbound (worker) | product, shipping, payment, notification | gRPC | Saga activities: reserve/release, create/cancel shipment, authorize/capture/void/refund, send email |
-| Outbound (worker) | inventory | gRPC | Inventory-branch saga activities (reserve/commit/release — cutover pending, W7) + the reconciler's `GetReservation`/`Commit`/`Release` repairs (live) |
+| Outbound (worker) | inventory | gRPC | Inventory-branch saga activities (reserve/commit/release — live since RFC-0021 P4) + cancellation disposition (`GetReservation`/`Release`) + the reconciler's repairs |
 | Outbound (worker) | cart | REST `DELETE /cart/v1/internal/cart/:user_id` | Best-effort clear-cart — the platform's documented REST exception, NetworkPolicy-fenced, tokenless (no bearer token in workflow history) |
 
 ## Known gaps
 
 | Gap | Status | Plan |
 |-----|--------|------|
-| `POST /order/v1/private/orders` — direct create from the live cart, prices read from cart (stale-price risk), optional idempotency key | **Technical debt** | Removal at RFC-0015 **P6**, once the checkout funnel is the only create path |
-| Legacy order→cart REST pricing hop (only inside the legacy path above) | **Technical debt** | Dies with the P6 removal |
+| Committed stock is not restocked on cancellation (`RESTOCK_SKIPPED` — inventory.v1 has no `Return` RPC) | **Accepted shrinkage** | [ADR-033](../proposals/adr/ADR-033-order-status-cancellation/) revisit trigger: flip one branch of `resolveInventoryDisposition` when the RPC exists |
+| Reconciler does not settle `cancelled` (terminal set is `{confirmed, failed, completed}`) | **Accepted** | The CancellationWorkflow settles its own stock; `OrderStuckCancelling` is the backstop |
+| payment-service seals a provider-declined refund into its idempotency cache as a 201 | **Cross-repo follow-up** | Order defends itself (verifies `refund.status == "succeeded"`, parks otherwise); payment fix owed |
 | gRPC mTLS on `:9090` | **Planned** | RFC-0020 research; NetworkPolicy remains the fence until then |
 
 ## Operations
@@ -278,8 +320,8 @@ Both transports delegate the kickoff to one package
 | HTTP probes | `/health`, `/ready` on `:8080` |
 | gRPC server | `:9090` — cluster `dns:///order.order.svc.cluster.local:9090`; local-stack `order:9090` |
 | Worker | `<binary> worker` — Temporal queue `order-fulfillment`, namespace `mop` |
-| Key env | `DB_*`, `AUTH_JWKS_URL`, `SHIPPING_GRPC_ADDR`, `PAYMENT_GRPC_ADDR`, `PRODUCT_GRPC_ADDR`, `NOTIFICATION_GRPC_ADDR`, `CART_SERVICE_URL`, `TEMPORAL_HOSTPORT`, `TEMPORAL_NAMESPACE`, `TASK_QUEUE`, `GRPC_PORT` |
-| Business metrics | `order.saga.outcome.total` (confirmed / failed / compensated), `order.saga.compensation.total` (per step × result), `order.payment.activity.total`, `order.stock_reservation.total`, `order.value.minor` |
+| Key env | `DB_*`, `AUTH_JWKS_URL`, `SHIPPING_GRPC_ADDR`, `PAYMENT_GRPC_ADDR`, `PRODUCT_GRPC_ADDR`, `INVENTORY_GRPC_ADDR`, `NOTIFICATION_GRPC_ADDR`, `CART_SERVICE_URL`, `TEMPORAL_HOSTPORT`, `TEMPORAL_NAMESPACE`, `TASK_QUEUE`, `GRPC_PORT` |
+| Business metrics | `order.saga.outcome.total` (confirmed / failed / manual_review / compensated), `order.saga.compensation.total` (per step × result), `order.payment.activity.total`, `order.stock_reservation.total`, `order.value.minor` (label-free since v1.11.0), `order.cancellations.total{result}`, `order_cancellation_outcomes_total{outcome}`, backlog gauges `order_cancelling_backlog` / `order_manual_review_backlog` |
 | Signals to watch | Rising `compensation.total{step="void_payment",result="error"}` or `{step="refund_payment"}` failures mean money may be held or unreturned — reconcile against payment's ledger ([payments.md](./payments.md)) |
 | Telemetry | HTTP/gRPC RED over OTLP, workflow traces, structured logs with shared trace IDs (obsx, RFC-0014) |
 
@@ -296,14 +338,15 @@ Paths in [`duynhlab/order-service`](https://github.com/duynhlab/order-service). 
 
 | Layer | Path | Notes |
 |-------|------|-------|
-| **Transport** | `internal/web/v1/` | HTTP handlers + enrichment clients |
+| **Transport** | `internal/web/v1/` | HTTP handlers (list/get/details/cancel) + enrichment clients |
 | | `internal/grpc/v1/server.go` | gRPC server (CreateOrder) |
 | **logic** | `internal/logic/v1/service.go` | CreateOrder logic + idempotent replay |
 | **core** | `internal/core/domain/` | Domain types |
 | | `internal/core/repository/` | Persistence |
 | **Platform** | `cmd/main.go` | Route registration + worker entrypoint |
 | | `internal/saga/` | Saga workflow + activities + metrics |
-| | `internal/fulfillment/` | Workflow kickoff (detached start, lazy client) |
+| | `internal/fulfillment/` | Fulfillment kickoff (detached start, lazy client) |
+| | `internal/cancellation/` | Cancellation kickoff + outbox dispatcher |
 | | `db/migrations/sql/` | Schema migrations |
 | | `pkg/proto/order/v1/order.proto` | Proto |
 
@@ -315,4 +358,4 @@ Paths in [`duynhlab/order-service`](https://github.com/duynhlab/order-service). 
 - [checkout.md](./checkout.md) · [payments.md](./payments.md) · [shipping.md](./shipping.md) — adjacent contracts
 - [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) — checkout→order boundary
 
-_Last updated: 2026-07-30_
+_Last updated: 2026-08-01 — RFC-0021 P5 as-built: seven-state FSM, cancel API, expanded `/details`, legacy REST create removed (v1.11.0)._

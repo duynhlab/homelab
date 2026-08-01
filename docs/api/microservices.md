@@ -76,7 +76,7 @@ flowchart LR
 | user | `:8080` | — | `user` | — | auth (JWKS); caller: Kong |
 | product | `:8080` | `:9090` server | `product` | Valkey | review (gRPC); callers: Kong, checkout, order-worker |
 | cart | `:8080` | `:9090` server | `cart` | — | auth (JWKS); callers: Kong, checkout (`GetCart`), order/order-worker (REST) |
-| order | `:8080` | `:9090` server | `order` | — | auth (JWKS), Temporal, shipping/payment (gRPC), cart (REST); callers: Kong, checkout (`CreateOrder`) |
+| order | `:8080` | `:9090` server | `order` | — | auth (JWKS), Temporal, shipping/payment/inventory (gRPC), cart (REST); callers: Kong, checkout (`CreateOrder`) |
 | review | `:8080` | `:9090` server | `review` | — | auth (JWKS); callers: Kong, product (gRPC) |
 | shipping | `:8080` | `:9090` server | `shipping` | — | none outbound; callers: Kong, checkout, order, order-worker |
 | notification | `:8080` | `:9090` server | `notification` | — | auth (JWKS); callers: Kong, order-worker (`SendEmail`) |
@@ -187,7 +187,8 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
 | **Order reads** | `GET /order/v1/private/orders`, `GET /order/v1/private/orders/:id` | ownership-scoped queries (`WHERE id AND user_id` — anti-IDOR) | auth JWKS | Implemented | — |
-| **Checkout → durable fulfillment** | `POST /order/v1/private/orders` (legacy direct create) and internal gRPC `order.v1/CreateOrder` (both return a `pending` order and start the same durable workflow) | **Temporal saga** `OrderFulfillmentWorkflow` (workflow id `order-fulfillment-<orderID>`): authorize payment → reserve stock → create shipment → capture → **confirm (pivot)** → notify + receipt → clear cart; compensations run in reverse (void pre-capture / refund post-pivot); server-side order-math validation; atomic order+items insert; saga start on a detached 5 s context (checkout never fails on Temporal outage — order stays `pending`) | Temporal; product, shipping, payment, notification (gRPC); cart (REST) | Implemented; legacy REST create is **Technical debt** (P6 removal, RFC-0015 — see [§6](#6-known-gaps--ongoing-work)) | [Temporal Saga and 2PC](temporal-order-fulfillment.md) |
+| **Checkout → durable fulfillment** | internal gRPC `order.v1/CreateOrder` (the only create path — the legacy REST create was removed in RFC-0021 P5) | **Temporal saga** `OrderFulfillmentWorkflow` (workflow id `order-fulfillment-<orderID>`): authorize payment → reserve stock → create shipment → capture → **confirm (pivot)** → notify + receipt → clear cart → complete; compensations run in reverse (void pre-capture / refund post-pivot); exhaustion parks in `manual_review`; server-side order-math validation; atomic order+items insert; saga start via transactional outbox (ADR-031) | Temporal; product/inventory, shipping, payment, notification (gRPC); cart (REST) | Implemented | [Temporal Saga and 2PC](temporal-order-fulfillment.md) |
+| **Customer cancellation** | `POST /order/v1/private/orders/:id/cancel` (202/200 replay/409) | `CancellationWorkflow` (`order-cancellation-<id>-v<epoch>`): policy gate (shipment not dispatched) → cancel shipment → void/refund remainder by current payment state → release RESERVED stock (COMMITTED = accepted shrinkage) → `cancelled`; exhaustion parks in `manual_review` | Temporal; shipping, payment, inventory (gRPC) | Implemented (RFC-0021 P5) | [ADR-033](../proposals/adr/ADR-033-order-status-cancellation/) |
 | **Order-details aggregation** | `GET /order/v1/private/orders/:id/details` | gRPC fan-out with soft-fail enrichment: `GetShipmentByOrder` and `GetPayment` — the `shipment`/`payment` blocks are omitted (`omitempty`) when absent or unavailable | shipping, payment | Implemented | [API call graph](api.md#current-east-west-call-graph) |
 | **Server-side pricing** | — (calls cart) | REST `GET /cart/v1/private/cart` with the user's forwarded `Authorization` — cart is the pricing authority at checkout | cart | **Technical debt** (P6 removal, RFC-0015 — see [§6](#6-known-gaps--ongoing-work)) | — |
 | **Saga worker** | — (Temporal task queue `order-fulfillment`) | `worker` subcommand of the same image; registers workflow + activities; fail-fast if Temporal is unreachable | Temporal | Implemented | [temporal saga](temporal-order-fulfillment.md) |
@@ -270,7 +271,7 @@ is never browser-facing.**
 | **Reconciliation** | Detect provider/ledger drift | payment (ticker + internal trigger API, flag-gated auto-heal) | ADR-011/012 |
 | **Webhook HMAC** | Authenticating an unauthenticated public caller | payment ← mockpay | RFC-0010 |
 | **gRPC east-west (`:9090`)** | Typed internal transport | Servers: product, cart, order, review, shipping, notification, payment. Clients: product→review; order/order-worker→product, shipping, notification, payment; checkout→cart, product, shipping, order | [API call graph](api.md#current-east-west-call-graph) |
-| **Idempotency** | Exactly-once effects under retries | HTTP `Idempotency-Key`: checkout confirm, order create, payment create/refund. Saga natural keys: `reservation_id`, shipment `order_id`, payment recovery points | ADR-010 |
+| **Idempotency** | Exactly-once effects under retries | HTTP `Idempotency-Key`: checkout confirm, payment create/refund. gRPC order create key required. Saga natural keys: `reservation_id`, shipment `order_id`, payment recovery points; order status commands replay by `(order_id, command_id)` | ADR-010 |
 | **Server-side aggregation** | No client-side orchestration | product `/details`, order `/details` (soft-fail enrichment) | — |
 | **Ownership-scoped queries** | Anti-IDOR — rows fetched with `(id, user_id)` | checkout, order, notification, payment, cart, user (token-derived `user_id`) | — |
 | **Embedded migrations** | Schema self-management per binary (golang-migrate) | all 10 services | [../databases/](../databases/) |
@@ -300,7 +301,7 @@ templates.
 
 | Item | Service(s) | Status |
 |------|------------|--------|
-| Legacy `POST /order/v1/private/orders` (direct checkout bypass) | order | **Technical debt** — P6 removal planned (RFC-0015); checkout confirm is canonical |
+| Committed-stock restock on cancellation (`RESTOCK_SKIPPED`) | order / inventory | **Accepted shrinkage** — inventory.v1 has no `Return` RPC; revisit trigger in [ADR-033](../proposals/adr/ADR-033-order-status-cancellation/) |
 | Legacy order→cart REST pricing on direct create | order | **Technical debt** — P6 removal planned; checkout/product own price authority |
 | gRPC mTLS east-west | platform | **Planned** (RFC-0020); NetworkPolicy remains the fence until then |
 | Duplicate CORS headers (service emits CORS + gateway) | product | Worked around at gateway; service-side removal still recommended (middleware present in code) |
@@ -314,4 +315,4 @@ templates.
 
 *Run the whole platform locally for verification: `cd local-stack && docker compose up -d --build` → SPA at http://localhost:3001, Kong gateway at http://localhost:8080 (demo login `alice` / `password123`).*
 
-_Last updated: 2026-07-22_
+_Last updated: 2026-08-01_

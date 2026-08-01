@@ -408,6 +408,7 @@ and extend Adoption instead.
 | [ADR-030](ADR-030-temporal-workflow-versioning/) | Adopt Temporal Worker Versioning + official helm-charts | Accepted (supersedes [ADR-002](ADR-002-deploy-temporal-via-operator/) deployment half) | Complete — re-platform done; versioned worker activated 2026-07-30 (build 1.8.0 Current, Pinned), unversioned worker retired at drain 0 | [RFC-0021](../rfc/RFC-0021/) |
 | [ADR-031](ADR-031-fulfillment-start-outbox/) | Start the fulfillment saga through a transactional outbox | Accepted | Complete | [RFC-0021](../rfc/RFC-0021/) |
 | [ADR-032](ADR-032-tempo-operator-monolithic/) | Deliver Tempo through the tempo-operator TempoMonolithic CR | Proposed | Not started | — |
+| [ADR-033](ADR-033-order-status-cancellation/) | Make order status a guarded state machine with customer cancellation | Accepted | Complete | [RFC-0021](../rfc/RFC-0021/) |
 
 Principles:
 

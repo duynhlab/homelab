@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0021 P6 — payment doubt alerts + runbooks**: payment had **no alert
+  rules at all**; `rfc0021-phase6.yaml` adds six. The design lets payment park an
+  intent in `processing` when a provider gives no answer, which is only safe if
+  the doubt is visible and bounded: `PaymentDoubtStale` (oldest unresolved
+  outcome >1h — both automatic escapes have failed), `PaymentAttemptEvidenceLost`
+  (the attempt log refused a write, so the park was refused and an unconfirmed
+  state stands), `PaymentReconciliationDiscrepancy` (real ledger-vs-provider
+  drift — the gap the catalog itself recorded), plus backlog-growing,
+  sweep-failing and provider-unknown-rate warnings. Six runbooks, alert-catalog
+  §9b, and 8 new rows in the metrics catalog (incl. the `transient` vs `unknown`
+  provider-outcome split). The phase-5 runbooks are indexed at the same time —
+  they shipped as files but never reached the area index.
 - **RFC-0021 P6 — payment pinned to 1.4.0**: brings the refund-honesty fix to the
   cluster. A refund whose provider outcome was not a success used to be answered
   as one **and sealed into the idempotency cache as a 201**, so every retry

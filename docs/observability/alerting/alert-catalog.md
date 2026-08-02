@@ -373,6 +373,39 @@ healthy.
 | OrderStartParticipantUnrecognised | warning | `increase(order_fulfillment_start_participant_total{source="unrecognised"}[30m])>0` | A start could not use the recorded participant and chose the branch from this process's flag instead | 5m |
 | OrderInventoryCommitLagHigh | warning | commit-lag p99 `>300s` | Confirmed orders hold merely-RESERVED stock, understating available-to-promise; right-censored, so the backlog alert is the severe partner | 15m |
 | InventoryReservationInfraErrors | warning | inventory reservation infra-error rate | Reserve/commit/release failing inside inventory-service — the saga's stock steps cannot complete | see manifest |
+
+## 9b. RFC-0021 phase 6 (payment doubt)
+
+Source: `prometheusrules/microservices/rfc0021-phase6.yaml`.
+
+Phase 6 lets payment record *"an operation was attempted and the provider never
+told us what happened"* instead of guessing — an intent parks in `processing`
+and the round-trip is written to `payment_attempts`. Parking is only defensible
+because the doubt is visible and bounded, so these rules are not decoration:
+they are the half of the design that makes the state safe. Before them payment
+had **no alert rules at all**.
+
+Resolution has two automatic paths — the request path (any operation re-asks the
+provider first, under the original idempotency key) and a one-minute sweep — so
+these thresholds are set against the mechanism: anything still open after many
+minutes is not in flight, it is not converging.
+
+| Alert | Sev | Metric & trigger | Impact | for |
+|-------|-----|------------------|--------|-----|
+| PaymentDoubtStale | critical | `max(payment_doubt_oldest_age_seconds)>3600` | A customer's money has been in an unnamed state for an hour and both automatic escapes have failed; only a human asking the provider settles it | 10m |
+| PaymentAttemptEvidenceLost | critical | `increase(payment_attempt_write_failures_total[15m])>0` | The attempt log refused a write, so the park was refused and a state nobody confirmed stands (a capture keeps its posted ledger leg) | 5m |
+| PaymentReconciliationDiscrepancy | critical | `increase(payment_reconciliation_discrepancies_total[1h])>0` | Real ledger-vs-provider drift — parked payments are excluded by design, so anything counted is money booked-not-collected or collected-not-booked | 10m |
+| PaymentDoubtBacklogGrowing | warning | `max(payment_doubt_open)>10` | Doubt is created faster than it is settled: a standing set of customers in limbo before any one is old enough to page | 30m |
+| PaymentDoubtSweepFailing | warning | `increase(payment_doubt_sweep_failures_total[30m])>0` | Worklist entries the sweep cannot act on at all — no automatic escape, so they will age into PaymentDoubtStale | 15m |
+| PaymentProviderUnknownRate | warning | `sum(rate(payment_provider_unknown_total[15m]))>0.05` | Leading indicator: provider answers are going missing, each one parking a payment while the customer path answers 503 | 15m |
+
+**Reading the pair.** `payment_provider_unknown_total` is doubt *created*;
+`payment_attempt_resolution_total` is doubt *settled*. Their rates together say
+whether the worklist is draining — neither number alone does.
+
+**Not covered yet:** reconciliation run staleness (is the reconciler running at
+all?) needs a run-outcome metric that reconciliation v1 does not emit; it lands
+with the windowed-reconciliation slice.
 | InventoryGrpcErrorRatio | warning | inventory gRPC error ratio | Callers (order saga, checkout reads) are being refused by inventory-service | see manifest |
 | CheckoutInventoryShadowDivergence | warning | shadow-compare divergence `>1%` | Inventory disagrees with Product on the read path — blocks the read-flip gate | 30m |
 
@@ -455,10 +488,13 @@ implemented yet — they are recommendations.
 Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-and-next-improvements):
 
 - **`platform-db-replica` DR cluster for platform tier** — not deployed in RFC-0018; product line retains `product-db-replica`.
-- **`payment` reconciliation has no dedicated SLI/alert yet** — generic HTTP SLOs cover payment, but
-  there is no alert on stuck/failed reconciliation (including the heal `resolution='failed'`
-  outcome introduced by ADR-012). Payment request health is covered only by the generic
-  microservice RED alerts (§1), not by a payment-specific reconciliation signal.
+- **`payment` reconciliation staleness has no alert yet** — RFC-0021 phase 6 added
+  payment-specific rules (§9b), including `PaymentReconciliationDiscrepancy` on the
+  discrepancy counter. What is still missing is *"is the reconciler running at
+  all?"*: v1 emits no run-outcome metric, so a reconciler that stopped looks the
+  same as one finding nothing. That needs the windowed-reconciliation slice. The
+  heal `resolution='failed'` outcome is logged and recorded per discrepancy, but
+  is not yet its own series.
 
 ### Noise / cause-vs-symptom notes
 

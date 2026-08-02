@@ -9,3 +9,4 @@ resources:
   - rfc0021-read-migration.yaml # RFC-0021 P2-7: shadow-compare rules + divergence alert
   - rfc0021-write-migration.yaml # RFC-0021 P3-10: commit-lag, outbox, reconciler alerts
   - rfc0021-phase5.yaml # RFC-0021 P5: cancellation, manual_review, projection alerts
+  - rfc0021-phase6.yaml # RFC-0021 P6: payment doubt backlog, evidence, recon drift

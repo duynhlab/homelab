@@ -1,0 +1,165 @@
+# RFC-0021 phase-6 alerts: the payment service's doubt machinery.
+#
+# Phase 6 gives payment a way to say "an operation was attempted and the
+# provider never told us what happened" instead of guessing. That is only
+# safe if the doubt is VISIBLE and BOUNDED, so these rules are not
+# decoration — they are the half of the design that makes parking
+# defensible at all. Before them, payment had zero alert rules.
+#
+# The signals, and what each answers:
+#
+#   payment_doubt_open                    how many provider round-trips are
+#                                         still unanswered right now
+#   payment_doubt_oldest_age_seconds      how long the oldest has waited —
+#                                         the escalation signal, because one
+#                                         fresh unknown is routine and an old
+#                                         one means money is sitting somewhere
+#                                         nobody has looked
+#   payment_doubt_sweep_failures_total    worklist entries the background
+#                                         sweep could not even attempt
+#   payment_attempt_write_failures_total  evidence that would not persist; the
+#                                         park is REFUSED when this happens,
+#                                         so a state nobody confirmed stands
+#   payment_provider_unknown_total        the rate doubt is being created
+#   payment_reconciliation_discrepancies_total   ledger vs provider drift
+#
+# Thresholds are chosen against the mechanism, not by feel. Resolution runs
+# on the request path AND on a one-minute sweep, so anything still open after
+# many minutes is not "in flight" — it is not converging.
+#
+# absent() guards are NOT repeated here: the gauges vanish with the payment
+# process, and MicroserviceDown already owns that failure mode.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: microservices-rfc0021-phase6
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: microservices
+spec:
+  groups:
+    - name: microservices-rfc0021-phase6
+      rules:
+        # The single most important rule in the file. A customer's money is in
+        # a state nobody can name, and the two automatic escapes — a caller
+        # retry and the one-minute sweep — have both failed to settle it for
+        # an hour. That is not slowness; it is a payment that needs a human to
+        # go and ask the provider.
+        - alert: PaymentDoubtStale
+          expr: max(payment_doubt_oldest_age_seconds) > 3600
+          for: 10m
+          labels:
+            severity: critical
+            rfc: "0021"
+          annotations:
+            summary: "A provider outcome has been unknown for >1h (RFC-0021 P6)"
+            description: >-
+              payment_doubt_oldest_age_seconds is the age of the oldest
+              unresolved provider round-trip. Resolution runs on every request
+              that touches the payment and on a 1-minute sweep, so an hour
+              means neither is converging: the provider is still silent, the
+              attempt carries no key to replay under, or the row cannot be
+              loaded. Money is unaccounted for until someone asks.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentDoubtStale.md"
+
+        # Doubt is being created faster than it is settled. Each open entry is
+        # one payment whose fate is unknown, so a standing backlog is a
+        # standing set of customers in limbo even while none is individually
+        # old enough to page.
+        - alert: PaymentDoubtBacklogGrowing
+          expr: max(payment_doubt_open) > 10
+          for: 30m
+          labels:
+            severity: warning
+            rfc: "0021"
+          annotations:
+            summary: "More than 10 provider outcomes unresolved for 30m (RFC-0021 P6)"
+            description: >-
+              payment_doubt_open counts unanswered provider round-trips.
+              A handful at any moment is normal — every timeout creates one —
+              but a sustained double-digit backlog means the provider is
+              unhealthy or resolution is failing in a way the age alert has
+              not caught yet. Compare payment_provider_unknown_total (doubt
+              created) against payment_attempt_resolution_total (doubt
+              settled).
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentDoubtBacklogGrowing.md"
+
+        # The attempt log is what makes an unknown outcome resolvable. When it
+        # refuses a write, the service deliberately does NOT park — so a
+        # capture stays `captured` with its ledger leg posted while the
+        # provider's answer is unknown. That claim is unverified and only
+        # reconciliation will ever notice it.
+        - alert: PaymentAttemptEvidenceLost
+          expr: increase(payment_attempt_write_failures_total[15m]) > 0
+          for: 5m
+          labels:
+            severity: critical
+            rfc: "0021"
+          annotations:
+            summary: "The payment attempt log refused a write (RFC-0021 P6)"
+            description: >-
+              A provider round-trip could not be recorded. On an unknown
+              outcome the service refuses to park without evidence, so the
+              pre-park state stands and asserts something the provider never
+              confirmed. Check the payments table against the provider by hand
+              for the window in question — the automatic path did not run.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentAttemptEvidenceLost.md"
+
+        # The sweep could not act on a worklist entry at all — distinct from a
+        # resolution that ran and learned nothing, which is progress. This
+        # means the automatic path is not running for those rows, so the age
+        # alert will fire later for the same underlying problem.
+        - alert: PaymentDoubtSweepFailing
+          expr: increase(payment_doubt_sweep_failures_total[30m]) > 0
+          for: 15m
+          labels:
+            severity: warning
+            rfc: "0021"
+          annotations:
+            summary: "The doubt sweep cannot act on some worklist entries (RFC-0021 P6)"
+            description: >-
+              payment_doubt_sweep_failures_total counts entries the sweep
+              skipped entirely: the payment or refund would not load, or the
+              row carries no idempotency key to replay under. Those entries
+              have no automatic escape and will age into PaymentDoubtStale.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentDoubtSweepFailing.md"
+
+        # Ledger-vs-provider drift. Reconciliation exists to find money the
+        # books and the provider disagree about, and until now it found it and
+        # told nobody: the discrepancy counter had no alert, which the alert
+        # catalog itself recorded as a gap.
+        - alert: PaymentReconciliationDiscrepancy
+          expr: increase(payment_reconciliation_discrepancies_total[1h]) > 0
+          for: 10m
+          labels:
+            severity: critical
+            rfc: "0021"
+          annotations:
+            summary: "Reconciliation found ledger-vs-provider drift (RFC-0021 P6)"
+            description: >-
+              A reconciliation pass found at least one payment whose internal
+              state disagrees with the provider ledger. Parked payments are
+              excluded from the report by design — their doubt is the attempt
+              log's worklist — so anything counted here is real drift between
+              what we believe and what the provider holds.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentReconciliationDiscrepancy.md"
+
+        # Doubt is being CREATED at a rate. This is the leading indicator: it
+        # fires while the backlog is still small, and it points at the
+        # provider rather than at us.
+        - alert: PaymentProviderUnknownRate
+          expr: sum(rate(payment_provider_unknown_total[15m])) > 0.05
+          for: 15m
+          labels:
+            severity: warning
+            rfc: "0021"
+          annotations:
+            summary: "Provider answers are going missing (RFC-0021 P6)"
+            description: >-
+              More than one provider round-trip every ~20s is returning no
+              verdict at all (timeout, transport failure, 5xx). Each one parks
+              a payment. Nothing is lost — resolution re-asks under the same
+              key — but the customer-facing path is answering 503 and the
+              worklist is filling. Check the provider's own health before
+              treating this as a payment-service fault.
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentProviderUnknownRate.md"

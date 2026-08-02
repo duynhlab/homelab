@@ -46,14 +46,21 @@ These come from libraries wired once in `pkg` — never hand-write them
 Hand-declared in each service's own code (RFC-0017). Every label is a bounded
 enum — no ids, no PII; amounts ride in histogram **values**, never labels.
 
-### payment (4)
+### payment (11)
 
 | Metric (PromQL) | Instrument | Labels | How to read / recorded when |
 |---|---|---|---|
 | `payment_authorization_total` | `payment.authorization.total` · Counter | `result` = `authorized`\|`declined`\|`error` · `currency` = 10-code allowlist (`USD`, `EUR`, …) or `other` | **Decline-rate KPI.** Once per real charge drive; idempotent replays return before the provider call — never double-counted |
 | `payment_operation_total` | `payment.operation.total` · Counter | `op` = `capture`\|`void`\|`refund` · `result` = `ok`\|`rejected`\|`error` | Money-lifecycle transitions. Only real transitions counted (idempotent no-ops skipped); `error` = provider failure only |
 | `payment_reconciliation_discrepancies_total` | `payment.reconciliation.discrepancies.total` · Counter | `kind` | Ledger-vs-provider drift. Per-run **detection** count — a standing discrepancy re-counts every run; read as a rate, not distinct drifts |
-| `payment_provider_request_duration_seconds` | `payment.provider.request.duration` · Histogram, `s`, SLO buckets | `op` = `charge`\|`capture`\|`void`\|`refund` · `outcome` = `ok`\|`declined`\|`transient` | **The money-hop SLI** (mockpay). Recorded via defer — every return path timed, incl. transport errors. Reconciliation reads deliberately not timed |
+| `payment_provider_request_duration_seconds` | `payment.provider.request.duration` · Histogram, `s`, SLO buckets | `op` = `charge`\|`capture`\|`void`\|`refund` · `outcome` = `ok`\|`declined`\|`transient`\|`unknown` | **The money-hop SLI** (mockpay). Recorded via defer — every return path timed, incl. transport errors. `transient` = 429 (refused, nothing happened); `unknown` = 5xx/timeout (the work may have happened) — the phase-6 split. Reconciliation reads deliberately not timed |
+| `payment_provider_unknown_total` | `payment.provider.unknown.total` · Counter | `operation` = `authorize`\|`capture`\|`void`\|`refund` | Doubt **created**: a round-trip returned no verdict, so an intent is parked. Read against the resolution counter — one alone says nothing about whether the worklist drains |
+| `payment_attempt_resolution_total` | `payment.attempt.resolution.total` · Counter | `operation` · `outcome_class` = `SUCCESS`\|`BUSINESS_DECLINE`\|`RETRYABLE_FAILURE`\|`UNKNOWN` | Doubt **settled**: a re-drive of an open question. `UNKNOWN` here is counted deliberately — a resolution that learned nothing is the interesting case, not missing data |
+| `payment_attempt_write_failures_total` | `payment.attempt.write_failures.total` · Counter | `operation` | Evidence that would not persist. The park is then **refused**, so a state nobody confirmed stands — critical-alertable. A duplicate refused by the one-SUCCESS-capture index is NOT counted here |
+| `payment_doubt_open` | `payment.doubt.open` · Gauge (observable) | — | Unresolved provider round-trips right now. Unwindowed on purpose: doubt about money must not age out of view |
+| `payment_doubt_oldest_age_seconds` | `payment.doubt.oldest_age_seconds` · Gauge (observable), `s` | — | Age of the oldest unresolved outcome — **the escalation signal**. One fresh unknown is routine; an old one means money is sitting somewhere nobody has looked. Both gauges observe nothing on a read error rather than returning one (a returned error drops the whole export cycle) |
+| `payment_doubt_sweep_failures_total` | `payment.doubt.sweep_failures.total` · Counter | `operation` | Worklist entries the sweep could not even attempt (row would not load, no key to replay under) — distinct from a resolution that ran and learned nothing |
+| `payment_idempotency_release_failures_total` | `payment.idempotency.release_failures.total` · Counter | — | Keys left locked after a failed attempt; the caller is told to retry immediately and would bounce off the lock until the takeover window |
 
 ### order (22)
 

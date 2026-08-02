@@ -59,6 +59,45 @@ can disagree while every service reports perfectly healthy.
 | OrderStartParticipantUnrecognised | warning | correctness | [OrderStartParticipantUnrecognised.md](OrderStartParticipantUnrecognised.md) |
 | OrderInventoryCommitLagHigh | warning | latency | [OrderInventoryCommitLagHigh.md](OrderInventoryCommitLagHigh.md) |
 
+### RFC-0021 phase 5 (order aggregate)
+
+Rules: [`prometheusrules/microservices/rfc0021-phase5.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-phase5.yaml) ·
+catalog: [§9 RFC-0021 overhaul](../../alerting/alert-catalog.md#9-rfc-0021-overhaul-stock-migration)
+
+Two order states mean **somebody is owed work**, and neither is visible to a RED
+alert: the order is not erroring, it is waiting.
+
+| Alert | Sev | Category | Runbook |
+|-------|-----|----------|---------|
+| OrderStuckCancelling | critical | correctness | [OrderStuckCancelling.md](OrderStuckCancelling.md) |
+| OrderManualReviewBacklog | warning | correctness | [OrderManualReviewBacklog.md](OrderManualReviewBacklog.md) |
+| OrderCancellationOutboxStalled | warning | availability | [OrderCancellationOutboxStalled.md](OrderCancellationOutboxStalled.md) |
+| OrderProjectionWritesFailing | warning | observability | [OrderProjectionWritesFailing.md](OrderProjectionWritesFailing.md) |
+
+`OrderCancellationOutboxFailed` and `OrderCompleteFailures` have no runbook file
+yet — both are covered by the alert's own annotations and by the sibling
+stalled/projection runbooks. Noted here rather than linked, so the index stays
+true.
+
+### RFC-0021 phase 6 (payment doubt)
+
+Rules: [`prometheusrules/microservices/rfc0021-phase6.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-phase6.yaml) ·
+catalog: [§9b RFC-0021 phase 6](../../alerting/alert-catalog.md#9b-rfc-0021-phase-6-payment-doubt)
+
+Payment can now record that it does **not know** what the provider did. These
+alerts are what make that state safe rather than a place payments disappear
+into: they watch how much doubt exists, how old the oldest is, and whether the
+automatic resolution paths are working.
+
+| Alert | Sev | Category | Runbook |
+|-------|-----|----------|---------|
+| PaymentDoubtStale | critical | correctness | [PaymentDoubtStale.md](PaymentDoubtStale.md) |
+| PaymentAttemptEvidenceLost | critical | correctness | [PaymentAttemptEvidenceLost.md](PaymentAttemptEvidenceLost.md) |
+| PaymentReconciliationDiscrepancy | critical | correctness | [PaymentReconciliationDiscrepancy.md](PaymentReconciliationDiscrepancy.md) |
+| PaymentDoubtBacklogGrowing | warning | correctness | [PaymentDoubtBacklogGrowing.md](PaymentDoubtBacklogGrowing.md) |
+| PaymentDoubtSweepFailing | warning | availability | [PaymentDoubtSweepFailing.md](PaymentDoubtSweepFailing.md) |
+| PaymentProviderUnknownRate | warning | availability | [PaymentProviderUnknownRate.md](PaymentProviderUnknownRate.md) |
+
 ## Retired alerts (reference only)
 
 Documented in [`../microservices-alerts.md`](../microservices-alerts.md): in-flight
@@ -66,4 +105,4 @@ saturation (`MicroserviceHighRequestsInFlight`), `MicroserviceGCThrash`,
 `MicroserviceHighRestartRate` (use `KubePodCrashLooping`).
 
 ---
-_Last updated: 2026-07-29_
+_Last updated: 2026-08-02_

@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0021 P6 design records — ADR-034…037 + docs/api sync**: ADR-034 (record an
+  unknown provider outcome instead of guessing it: `processing` intent state +
+  per-round-trip attempt log, and an UNKNOWN outcome never triggering the semantic
+  opposite operation), ADR-035 (bound a reconciliation pass to a time window asked
+  of both sides, with a completion-gated high-watermark), ADR-036 (guard
+  single-writer background roles with a session-level advisory lease), ADR-037 (let
+  the caller name each refund) — all Accepted/Complete. `docs/api/payments.md`
+  gains an *Unknown provider outcomes* section, the `processing` FSM edges, the
+  `payment_attempts` and `reconciliation_watermark` tables, the scoped refund key,
+  the windowed/leased reconciliation rewrite, backfill examples, and a rewritten
+  known-gaps block; `microservices.md` rollup and the ADR index follow. RFC-0021
+  status → phases 0–3 + 5 + 6 shipped, with the phase-6 Implementation History
+  entry recording the eight critical defects three review rounds found and the
+  lesson: the escape must ship with the trap.
 - **RFC-0021 P6 — payment doubt alerts + runbooks**: payment had **no alert
   rules at all**; `rfc0021-phase6.yaml` adds six. The design lets payment park an
   intent in `processing` when a provider gives no answer, which is only safe if

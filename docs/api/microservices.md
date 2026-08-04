@@ -240,13 +240,14 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
-| **Saga money steps** | internal gRPC `PaymentService.Authorize` / `Capture` / `Void` / `Refund` | recovery-point idempotency (keys `order:<id>`, `refund:order:<id>`; checkpointed provider calls survive crash takeover); a decline is a business response, not a gRPC error | mockpay; caller: order-worker | Implemented | [RFC-0010](../proposals/rfc/RFC-0010/), ADR-009/010 |
+| **Saga money steps** | internal gRPC `PaymentService.Authorize` / `Capture` / `Void` / `Refund` | recovery-point idempotency (keys `order:<id>`, `refund:order:<id>:<refund_request_id>`; checkpointed provider calls survive crash takeover); a decline is a business response, not a gRPC error; the **caller names each refund** so an order can owe more than one | mockpay; caller: order-worker | Implemented | [RFC-0010](../proposals/rfc/RFC-0010/), ADR-009/010, [ADR-037](../proposals/adr/ADR-037-per-request-refund-identity/) |
 | **Payment reads (browser)** | `GET /payment/v1/private/payments`, `GET /payment/v1/private/payments/:id` | JWT; owner-scoped | auth JWKS | Implemented | [payments.md](payments.md) |
 | **Payment create (browser)** | `POST /payment/v1/private/payments` | requires `Idempotency-Key`; token-only `payment_method` (`tok_…`, PAN-like digit runs rejected); shared validators across HTTP and gRPC | auth JWKS | Implemented | [payments.md](payments.md) |
 | **Payment enrichment for order details** | internal gRPC `GetPayment` (by order id) | read snapshot; caller soft-fails | caller: order | Implemented | [payments.md](payments.md) |
 | **Provider webhook** | `POST /payment/v1/public/payments/webhooks/mockpay` | **webhook HMAC**: `Mockpay-Signature: t=…,v1=…` — HMAC-SHA256 over the raw body, constant-time compare, ±5 min replay window, fail-closed on empty secret, 1 MiB body cap | mockpay | Implemented | RFC-0010 |
 | **Outbox relay** | — (background loop) | **transactional outbox** — events enqueued in the same tx as the money movement, drained by a 10 s single-writer relay (at-least-once) | Postgres | Implemented | ADR-007 |
-| **Reconciliation** | `POST /payment/v1/internal/payments/reconciliation/runs`, `GET /payment/v1/internal/payments/reconciliation/runs/:id` + 5-min ticker | detect-only ledger comparison; auto-heal flag-gated (`RECON_HEAL_ENABLED`, lost-capture-response class only); hourly retention reaper (30 d) | mockpay ledger | Implemented | ADR-011/012 |
+| **Reconciliation** | `POST /payment/v1/internal/payments/reconciliation/runs` (optional `from`/`through` backfill), `GET …/runs/:id` + 5-min ticker | detect-only ledger comparison **bounded to a time window** asked of both sides, with a completion-gated high-watermark; single-writer via an advisory lease (409 when held); auto-heal flag-gated (`RECON_HEAL_ENABLED`, lost-capture-response class only); hourly retention reaper (30 d) | mockpay ledger | Implemented | ADR-011/012, [ADR-035](../proposals/adr/ADR-035-windowed-reconciliation/), [ADR-036](../proposals/adr/ADR-036-single-writer-lease/) |
+| **Unknown provider outcomes** | — (internal to the money paths) | an UNKNOWN answer parks the intent in `processing` and records the round-trip in `payment_attempts`; it **never triggers the semantic opposite** operation. Resolution re-asks under the ORIGINAL key, on the request path and on a 1-min sweep; callers see `Unavailable`/503 for doubt and `FailedPrecondition` for a decided rejection | mockpay; caller: order-worker | Implemented (RFC-0021 P6) | [ADR-034](../proposals/adr/ADR-034-provider-outcome-ambiguity/) |
 
 ### frontend — React SPA
 
@@ -315,4 +316,4 @@ templates.
 
 *Run the whole platform locally for verification: `cd local-stack && docker compose up -d --build` → SPA at http://localhost:3001, Kong gateway at http://localhost:8080 (demo login `alice` / `password123`).*
 
-_Last updated: 2026-08-01_
+_Last updated: 2026-08-04_

@@ -175,11 +175,21 @@ spec:
         value: "1.13.0"
       # The inventory reconciler — repairs terminal orders whose reservation
       # disagrees with their outcome, and reports rows that do not account for
-      # one. ON since the unversioned worker retired: its docs commit to a
-      # single running judge (the scan has no SKIP LOCKED claim), and this is
-      # now the only worker. `false` is the kill switch for when its JUDGEMENT
-      # is suspect during a cutover — not for when dependencies are down (it
-      # defers on its own then).
+      # one. ON here because this is the CURRENT build: the role is single-judge
+      # (its scan has no SKIP LOCKED claim), so every draining build sets this
+      # `false` and scripts/flux-validate.sh enforces exactly-one. It was `true`
+      # on all three builds once, and three judges shared one scan.
+      #
+      # `false` is also the kill switch for when its JUDGEMENT is suspect during
+      # a cutover — not for when dependencies are down (it defers on its own).
+      #
+      # NOT fixed by that rule: the OUTBOX DISPATCHERS. Every build runs them and
+      # there is no flag, so a draining build can START a saga this build refuses
+      # — measured on the cluster, where 1-12-0 claimed an injected product-path
+      # row, started the workflow, closed the row as DISPATCHED, and the new
+      # version then panicked its task with nothing watching. The refusal works;
+      # what is missing is a way to keep start-side roles on the Current build
+      # only. Tracked as the P4 follow-up (needs an order-service flag).
       - name: ORDER_RECONCILER_ENABLED
         value: "true"
       # The saga's only stock authority since RFC-0021 P4.

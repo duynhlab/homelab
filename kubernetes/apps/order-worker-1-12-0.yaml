@@ -173,8 +173,14 @@ spec:
       # now the only worker. `false` is the kill switch for when its JUDGEMENT
       # is suspect during a cutover — not for when dependencies are down (it
       # defers on its own then).
+      # OFF on a draining build. The reconciler is a SINGLE-JUDGE role — its scan
+      # claims nothing, so two runners judge the same orders concurrently and can
+      # both act on one. Side-by-side builds are the whole point of ADR-030, so
+      # the judge follows the CURRENT version and every draining build stands
+      # down. scripts/flux-validate.sh enforces exactly-one, because leaving this
+      # `true` at an activation is invisible until the judgements disagree.
       - name: ORDER_RECONCILER_ENABLED
-        value: "true"
+        value: "false"
       - name: INVENTORY_GRPC_ADDR
         value: dns:///inventory.inventory.svc.cluster.local:9090
       # Downstream services the activities call (gRPC east-west + cart REST).

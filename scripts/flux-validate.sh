@@ -192,7 +192,7 @@ validate_worker_build_id() {
     exit 1
   fi
 
-  local -a tags=() dep_names=()
+  local -a tags=() dep_names=() recon_enabled=()
   local tag env_count dep_name build_id fname_build
   for f in "${versioned_files[@]}"; do
     tag=$(yq '.spec.values.image.tag' "${f}")
@@ -226,7 +226,23 @@ validate_worker_build_id() {
     fi
     tags+=("${tag}")
     dep_names+=("${dep_name}")
+
+    # The reconciler is a SINGLE-JUDGE role: its scan claims nothing (no FOR
+    # UPDATE SKIP LOCKED), so two runners judge the same orders concurrently and
+    # can both act on one. Side-by-side worker builds make that easy to get
+    # wrong — every build carries the env, and leaving the old one enabled at an
+    # activation is invisible until the judgements disagree.
+    local recon
+    recon=$(yq '[.spec.values.env[] | select(.name == "ORDER_RECONCILER_ENABLED") | .value] | .[0]' "${f}")
+    if [[ "${recon}" == "true" ]]; then
+      recon_enabled+=("${tag}")
+    fi
   done
+
+  if [[ ${#recon_enabled[@]} -ne 1 ]]; then
+    echo "ERROR - order-worker: ORDER_RECONCILER_ENABLED must be \"true\" on EXACTLY ONE build (found: ${recon_enabled[*]:-none}). It is a single-judge role; enable it on the build the cutover CronJob makes Current and disable it on every draining build." >&2
+    exit 1
+  fi
 
   # --- The CronJob's args must actually invoke this subcommand — flag equality
   # on a job that runs something else entirely proves nothing.
@@ -260,6 +276,12 @@ validate_worker_build_id() {
     fi
     [[ "${flag}" == "--build-id" ]] && job_build_id="${val}" || job_dep_name="${val}"
   done
+
+  # The reconciler must be Current-build-only; compare after the CronJob is read.
+  if [[ "${recon_enabled[0]}" != "${job_build_id}" ]]; then
+    echo "ERROR - order-worker: ORDER_RECONCILER_ENABLED is \"true\" on build ${recon_enabled[0]}, but the cutover CronJob makes ${job_build_id} Current. The judge must be the Current build." >&2
+    exit 1
+  fi
 
   local hit=0 t
   for t in "${tags[@]}"; do [[ "${t}" == "${job_build_id}" ]] && hit=1; done

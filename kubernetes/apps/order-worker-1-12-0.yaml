@@ -1,0 +1,214 @@
+# Order-fulfillment Temporal worker, VERSIONED (ADR-030) — one file per build.
+#
+# Runs the order image's `worker` subcommand with a Worker Deployment Version
+# (TEMPORAL_WORKER_DEPLOYMENT_NAME + TEMPORAL_WORKER_BUILD_ID). The server pins
+# every workflow to the version that started it, so a new build NEVER edits this
+# file: it lands as a new order-worker-<build>.yaml side by side (a tag bump here
+# would strand this version's pinned workflows with no pollers), gets activated,
+# and this file is deleted once its version shows DRAINED in
+# `temporal worker deployment describe`.
+#
+# ACTIVATION is a deliberate, separate step — never part of a reconcile:
+#   kubectl -n temporal create job order-set-current-$(date +%s) \
+#     --from=cronjob/temporal-worker-set-current-version
+# A versioned worker receives NOTHING until that step makes its version Current
+# (verified live), so landing a new build changes no traffic. Full procedure:
+# docs/proposals/rfc/RFC-0021/cutover-rollback.md § Worker version activation.
+#
+# Replaces order-worker-1-12-0 (RFC-0021 P6: cancellation fails closed on a
+# payment whose provider outcome is unknown, and each refund carries its own
+# identity). 1-10-0 stays side by side until its version shows DRAINED, because
+# the change that forced a new build is a ROLLOUT boundary rather than a
+# determinism one: the RefundPayment activity gained an argument, and the replay
+# gate passes because Temporal compares commands rather than activity payloads —
+# but a workflow that already scheduled the old two-argument call must not be
+# picked up by a worker expecting three.
+#
+# This build registers BOTH workflow types and runs the reconciler and both
+# outbox dispatchers.
+#
+# BUILD_ID must equal this file's image tag and the CronJob's BUILD_ID.
+# scripts/flux-validate.sh enforces the equality: a mismatch pins new workflows
+# to a version no worker serves, and that fails SILENTLY — no error, no failed
+# activity, just orders that never leave pending (the OrderSagaNotCompleting
+# alert is the backstop).
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: order-worker-1-12-0
+  namespace: order
+spec:
+  interval: 10m
+  timeout: 10m
+  chartRef:
+    kind: OCIRepository
+    name: mop-chart-oci
+    namespace: flux-system
+  releaseName: order-worker-1-12-0
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    name: order-worker-1-12-0
+    # Architectural component → app.kubernetes.io/component: worker (mop default
+    # is "api"). The order-worker PodMonitor selects on this label.
+    component: worker
+    replicaCount: 1
+    image:
+      # Same image as the order API — just a different subcommand.
+      repository: ghcr.io/duynhlab/order-service/order-service
+      # PINNED to this file's Build ID forever — deliberately NOT in lockstep
+      # with services/order.yaml: the next build is a NEW order-worker-<build>
+      # file, never a tag bump here (a bump would strand the workflows pinned to
+      # this version with no pollers). No migration init container; the API's
+      # applies the schema this code expects.
+      tag: "1.12.0"
+      pullPolicy: IfNotPresent
+    # Run the worker subcommand; it serves /health, /ready, /metrics on :8080 but
+    # no app traffic, so the Service is skipped.
+    args: ["worker"]
+    service:
+      enabled: false
+    # RFC-0014 P4: the worker ships its own logs over OTLP — Vector skips
+    # pods carrying this label (double-ingest guard).
+    labels:
+      platform.duynhlab.dev/otlp-logs: "true"
+    env:
+      - name: OTEL_LOGS_ENABLED
+        value: "true"
+      - name: SERVICE_NAME
+        value: order-worker
+      - name: PORT
+        value: "8080"
+      - name: ENV
+        value: "production"
+      - name: OTEL_COLLECTOR_ENDPOINT
+        value: otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318
+      - name: OTEL_SAMPLE_RATE
+        value: "0.1"
+      # OTel SDK reads OTEL_SERVICE_NAME (not SERVICE_NAME); without it
+      # service.name falls back to brittle hostname parsing.
+      - name: OTEL_SERVICE_NAME
+        value: order-worker
+      - name: POD_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.name
+      - name: POD_NAMESPACE
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+      # service.version carries the Build ID, so outcomes and latency split by
+      # worker version during the drain — without it the two workers are
+      # indistinguishable in every signal except pod name.
+      - name: OTEL_RESOURCE_ATTRIBUTES
+        value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME),service.version=1.12.0"
+      # RFC-0014 D-2: obsx reads these exact names for the Kubernetes resource
+      # attributes on the OTLP path. OTEL_METRICS_ENABLED stays unset here —
+      # the worker follows the fleet flip, not the product canary.
+      - name: K8S_NAMESPACE_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+      - name: K8S_POD_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.name
+      - name: DEPLOYMENT_ENVIRONMENT
+        value: "production"
+      - name: PYROSCOPE_ENDPOINT
+        value: http://pyroscope.monitoring.svc.cluster.local:4040
+      - name: LOG_LEVEL
+        value: info
+      - name: LOG_FORMAT
+        value: json
+      - name: TRACING_ENABLED
+        value: "true"
+      - name: PROFILING_ENABLED
+        value: "true"
+      # DB — the worker's ConfirmOrder/FailOrder activities update the order row
+      # (same pooler as the order API).
+      - name: DB_HOST
+        value: pgdog-product.product.svc.cluster.local
+      - name: DB_PORT
+        value: "6432"
+      - name: DB_NAME
+        value: order
+      - name: DB_USER
+        value: order
+      - name: DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: product-db-order-secret
+            key: password
+      - name: DB_SSLMODE
+        value: disable
+      - name: DB_POOL_MAX_CONNECTIONS
+        value: "10"
+      - name: DB_POOL_MODE
+        value: transaction
+      # Temporal — what the worker connects to and the queue it polls.
+      - name: TEMPORAL_HOSTPORT
+        value: temporal-frontend.temporal.svc.cluster.local:7233
+      - name: TEMPORAL_NAMESPACE
+        value: mop
+      - name: TASK_QUEUE
+        value: order-fulfillment
+      # ADR-030 Worker Deployment Version. Registering these makes the worker
+      # POLL as this version; whether it RECEIVES anything is the server-side
+      # Current setting (the CronJob). Deployment name is the logical unit the
+      # server tracks versions under; the build id is this image's tag.
+      - name: TEMPORAL_WORKER_DEPLOYMENT_NAME
+        value: order-fulfillment
+      - name: TEMPORAL_WORKER_BUILD_ID
+        value: "1.12.0"
+      # The inventory reconciler — repairs terminal orders whose reservation
+      # disagrees with their outcome, and reports rows that do not account for
+      # one. ON since the unversioned worker retired: its docs commit to a
+      # single running judge (the scan has no SKIP LOCKED claim), and this is
+      # now the only worker. `false` is the kill switch for when its JUDGEMENT
+      # is suspect during a cutover — not for when dependencies are down (it
+      # defers on its own then).
+      - name: ORDER_RECONCILER_ENABLED
+        value: "true"
+      - name: INVENTORY_GRPC_ADDR
+        value: dns:///inventory.inventory.svc.cluster.local:9090
+      # Downstream services the activities call (gRPC east-west + cart REST).
+      - name: PRODUCT_GRPC_ADDR
+        value: dns:///product.product.svc.cluster.local:9090
+      - name: SHIPPING_GRPC_ADDR
+        value: dns:///shipping.shipping.svc.cluster.local:9090
+      - name: NOTIFICATION_GRPC_ADDR
+        value: dns:///notification.notification.svc.cluster.local:9090
+      # Payment gRPC — the saga's money transport (authorize/capture/void/refund).
+      # Dialed unconditionally (lazy); whether the steps run is decided by the
+      # workflow input's PaymentEnabled, stamped by the order API.
+      - name: PAYMENT_GRPC_ADDR
+        value: dns:///payment.payment.svc.cluster.local:9090
+      - name: CART_SERVICE_URL
+        value: http://cart.cart.svc.cluster.local:8080
+    resources:
+      requests:
+        memory: "48Mi"
+        cpu: "20m"
+      limits:
+        memory: "128Mi"
+        cpu: "300m"
+    livenessProbe:
+      enabled: true
+      httpGet:
+        path: /health
+        port: 8080
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readinessProbe:
+      enabled: true
+      httpGet:
+        path: /ready
+        port: 8080
+      initialDelaySeconds: 5
+      periodSeconds: 5

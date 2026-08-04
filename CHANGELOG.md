@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0021 P6 — payment pinned to 1.5.0**: payment can now say it does **not
+  know** what the provider did instead of guessing. An unknown outcome parks the
+  intent in `processing` with the round-trip recorded in `payment_attempts`, and
+  never triggers the semantic opposite operation — so a capture whose response was
+  lost is no longer reversed against money the provider took. Resolution re-asks
+  the same question under the same key, on the request path and on a bounded
+  one-minute sweep. Reconciliation is bounded to a time window with a
+  completion-gated frontier and runs under a cross-process lease; each refund
+  carries a caller-supplied identity. Migrations 000010–000012 ride the chart's
+  init container. Landed **after** order 1.12.0 was Current on the cluster, since
+  this image is what can produce a `processing` payment. The single-replica note is
+  narrowed: the reconciler is now fenced by the lease, and migration 000007 is the
+  remaining blocker to scaling.
 - **RFC-0021 P6 — order pinned to 1.12.0 + worker build 1-12-0**: cancellation now
   fails closed when payment does not know what the provider did. A `processing`
   payment used to fall into the "nothing to move" arm, so the order was settled

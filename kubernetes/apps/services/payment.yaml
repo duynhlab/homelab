@@ -10,17 +10,40 @@ spec:
   type: Static
   defaultValues:
     name: payment
-    image_tag: "1.4.0" # {"$imagepolicy": "flux-system:payment:tag"}
+    # 1.5.0 lets payment say it does NOT know what the provider did, instead of
+    # guessing (RFC-0021 P6, ADR-034). An unknown outcome parks the intent in
+    # `processing` and records the round-trip in payment_attempts with the key it
+    # used; it never triggers the semantic opposite operation, so a capture whose
+    # response was lost is no longer reversed against money the provider took.
+    # Resolution re-asks the same question under that same key — on the request
+    # path, and on a bounded one-minute sweep for the doubt nobody retries.
+    #
+    # ORDER 1.12.0 MUST ALREADY BE CURRENT before this lands. This image is what
+    # can produce a `processing` payment, and an order service that does not
+    # handle it settles cancellations with the money still out. Verified on the
+    # cluster before this pin: CurrentVersionBuildID = 1.12.0.
+    #
+    # Reconciliation is also bounded to a time window with a completion-gated
+    # frontier (ADR-035) and runs under a cross-process lease (ADR-036), and each
+    # refund carries a caller-supplied identity (ADR-037).
+    #
+    # Migrations 000010-000012 ride the mop chart's init container, which reuses
+    # this image and runs `migrate` BEFORE the app container starts — so the
+    # schema cannot lag the code. Confirmed the hard way in the local-stack
+    # audit: rebuilding the service without its migrator left the reconciler
+    # querying a payment_attempts table that did not exist yet.
+    image_tag: "1.5.0" # {"$imagepolicy": "flux-system:payment:tag"}
     namespace: payment
     # No platform_backup_label: that label routes CNPG/barman S3 credentials to
     # namespaces hosting a database cluster — payment's data lives on product-db
     # in the product namespace, which is already backed up.
-    # Single replica, deliberately: the reconciliation ticker + its API
-    # single-flight are per-instance (no lease/leader election yet), and the
-    # idempotency column rename (migration 000007) shipped as
-    # single-replica-safe. The outbox relay itself is multi-replica-safe
-    # (FOR UPDATE SKIP LOCKED) — it is NOT the constraint. Fence the
-    # reconciler before scaling past 1 (RFC-0021 phase 6).
+    # Single replica, still deliberately — but the reason has narrowed. The
+    # reconciler IS now fenced: every pass takes a session-level advisory lease,
+    # so a second replica would stand down rather than run a concurrent pass
+    # (ADR-036). What remains is migration 000007 (idempotency_keys.payment_id →
+    # subject_id), which is not rolling-safe. The outbox relay was never the
+    # constraint (FOR UPDATE SKIP LOCKED). So: the lease is not a licence to
+    # scale — 000007 is the blocker to clear first.
     replicaCount: 1
     # Payment's config refuses cleartext DB in production (DB_SSLMODE must not
     # be "disable") and PgDog terminates no TLS yet — so payment connects to

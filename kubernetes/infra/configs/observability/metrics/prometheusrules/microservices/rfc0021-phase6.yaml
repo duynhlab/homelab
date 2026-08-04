@@ -22,6 +22,7 @@
 #                                         so a state nobody confirmed stands
 #   payment_provider_unknown_total        the rate doubt is being created
 #   payment_reconciliation_discrepancies_total   ledger vs provider drift
+#   payment_reconciliation_watermark_age_seconds how far behind the frontier is
 #
 # Thresholds are chosen against the mechanism, not by feel. Resolution runs
 # on the request path AND on a one-minute sweep, so anything still open after
@@ -143,6 +144,38 @@ spec:
               log's worklist — so anything counted here is real drift between
               what we believe and what the provider holds.
             runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentReconciliationDiscrepancy.md"
+
+        # A detector that has stopped is worse than one that finds nothing, because
+        # it looks identical: the discrepancy counter reads zero either way. Only
+        # the frontier's age can tell them apart, which is why it is a gauge
+        # derived from stored state rather than a counter of events.
+        #
+        # This pages, even though nothing user-facing is broken at the moment it
+        # fires. The reason is what it takes down with it: while reconciliation is
+        # stopped, PaymentReconciliationDiscrepancy — a page — cannot fire at all,
+        # so real ledger-vs-provider drift accumulates unseen and unalerted.
+        #
+        # The threshold is measured, not guessed. The age FLOOR is the settlement
+        # lag (5m) because the window deliberately stops short of now, and it then
+        # oscillates up to roughly the ticker interval plus the lag (~600s) between
+        # passes. 1800s is well clear of healthy behaviour and still catches a
+        # reconciler that has missed several firings in a row.
+        - alert: PaymentReconciliationStale
+          expr: max(payment_reconciliation_watermark_age_seconds) > 1800
+          for: 15m
+          labels:
+            severity: critical
+            rfc: "0021"
+          annotations:
+            summary: "Reconciliation has not completed a pass in >30m (RFC-0021 P6)"
+            description: >-
+              payment_reconciliation_watermark_age_seconds is how far behind now
+              the reconciliation frontier sits, and it only moves when a pass
+              COMPLETES. Sustained growth means passes are failing or the ticker
+              has stopped — and while that is true, ledger-vs-provider drift is
+              neither detected nor alerted on. Expect a healthy value under ~600s
+              (a 5-minute settlement lag plus the 5-minute interval).
+            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentReconciliationStale.md"
 
         # Doubt is being CREATED at a rate. This is the leading indicator: it
         # fires while the backlog is still small, and it points at the

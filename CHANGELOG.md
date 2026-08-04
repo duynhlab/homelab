@@ -22,6 +22,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   signature change rides a new Worker Deployment Version
   (`order-worker-1-12-0.yaml`, activation CronJob `--build-id 1.12.0`); 1-10-0
   stays side by side until its version shows DRAINED (ADR-030).
+- **RFC-0021 P6 — reconciliation staleness alert**: `PaymentReconciliationStale`
+  (critical) on `payment_reconciliation_watermark_age_seconds > 1800` for 15m,
+  plus its runbook. It pages even though nothing user-facing breaks when it fires,
+  because while reconciliation is stopped the discrepancy page **cannot fire at
+  all** — a monitor that has stopped monitoring is an incident. The threshold is
+  measured against the mechanism, not guessed: the age has a floor of the
+  5-minute settlement lag and oscillates by the ticker interval on top of it, so
+  healthy values reach ~600s. The alert-catalog gap note for payment reconciliation
+  is now closed.
 - **RFC-0021 P6 design records — ADR-034…037 + docs/api sync**: ADR-034 (record an
   unknown provider outcome instead of guessing it: `processing` intent state +
   per-round-trip attempt log, and an UNKNOWN outcome never triggering the semantic

@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0021 P4 — order worker build `1-13-0` staged** (order 1.13.0: the saga's
+  product-service stock branch is deleted). Side by side with `1-12-0` per ADR-030
+  and receiving nothing until the activation Job runs. `1-12-0` must stay until its
+  version shows **DRAINED**, and here that is correctness rather than tidiness: it
+  is the last build that can serve a workflow whose participant is `product` or
+  absent, and 1.13.0 refuses those rather than re-routing them — so a pre-P4 saga
+  left with no poller stalls with stock held and payment authorized.
+
 - **RFC-0021 P6 — reconciliation auto-heal enabled**: `RECON_HEAL_ENABLED=true` on
   the cluster, wired through the checkout ResourceSet as `recon_heal_enabled`
   (quoted, because the template guard is truthiness-based and a YAML `false` would

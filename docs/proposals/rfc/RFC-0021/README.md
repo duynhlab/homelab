@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| accepted — phases 0–3 + 5 shipped; 4 gated; 6–7 open | platform-wide | [./research.md](./research.md) — gate passed 2026-07-23 | 2026-07-23 | 2026-08-01 |
+| accepted — phases 0–3 + 5 + 6 shipped; 4 gated; 7 open | platform-wide | [./research.md](./research.md) — gate passed 2026-07-23 | 2026-07-23 | 2026-08-04 |
 
 > **Supersedes [RFC-0003](../RFC-0003/README.md)** (*Inventory ownership and stock
 > semantics*), which ratified product-service as the inventory owner. RFC-0003's own
@@ -360,6 +360,39 @@ count and retention hit zero.
   phase-5 alerts + 4 runbooks (homelab #639); cancel UI (frontend #79).
   Live e2e: happy/declined/shipment-failed/compensation-exhausted funnels,
   cancel-to-refund on both stock branches, operator resolve drill.
+- 2026-08-02 → 2026-08-04 — **Phase 6 shipped: payment can be unsure, and stop
+  being unsure** ([ADR-034](../../adr/ADR-034-provider-outcome-ambiguity/),
+  [ADR-035](../../adr/ADR-035-windowed-reconciliation/),
+  [ADR-036](../../adr/ADR-036-single-writer-lease/),
+  [ADR-037](../../adr/ADR-037-per-request-refund-identity/)). The exit gate —
+  *no ambiguous timeout marked definite; recon alerting live* — is met.
+
+  An UNKNOWN provider outcome no longer triggers the semantic opposite operation:
+  the intent parks in `processing`, the round-trip lands in `payment_attempts`
+  with the key it used, and resolution re-asks the same question under that same
+  key — on the request path, so a caller retrying is what un-parks it, and on a
+  bounded one-minute sweep for the doubt nobody retries (payment #47–#50). Refund
+  identity moved to the caller, so an order can owe both a compensation and a
+  cancellation remainder instead of the second being rejected outright
+  (pkg v0.32.0, payment #51, order #169). Reconciliation is bounded to a window
+  asked of **both** sides, with a completion-gated high-watermark, and runs under a
+  cross-process advisory lease (payment #52–#53). Payment gained its first alert
+  rules at all — six, plus six runbooks, catalog §9b and eight metrics rows
+  (homelab #646). order-service fails closed on a `processing` payment (#168).
+
+  Three adversarial review rounds and a cross-model pass found eight critical
+  defects in the first cut, every one reproduced by execution before it was fixed:
+  a fresh caller key re-charging a parked card, a `processing` refund that could
+  never be settled, a released refund reserve admitting a second payout, four
+  parks with no escape, a park failure reported as a rejection the saga
+  compensates on, resolution that doubled its provider calls every retry, a
+  resolver race answered as a permanent rejection, and a park with no evidence
+  that only manual SQL could clear. Two more surfaced from writing the tests
+  themselves: pgxpool panics on a double connection release, and a connection
+  whose unlock failed would hand the "held" lease to the next pass on the same
+  session. The lesson recorded in the ADRs is that the escape must ship with the
+  trap — a slice that adds half the mechanism is more dangerous than the bug it
+  replaces.
 
 ## Related
 
@@ -370,8 +403,10 @@ count and retention hit zero.
 - [RFC-0001](../RFC-0001/) — saga foundations · [RFC-0010](../RFC-0010/) + ADR-007..012 — payment base
 - [RFC-0015](../RFC-0015/) + ADR-018/019/020 — checkout/order handoff invariants
 - [RFC-0020](../RFC-0020/) — east-west TLS (phase 7 dependency)
-- ADRs to spawn at ship time: ADR-027+ (inventory authority; FSM/ledger; flag helper;
-  workflow versioning; order status model; payment attempts)
+- ADRs spawned: ADR-027…033 (inventory authority, reservation model, flag helper,
+  workflow versioning, start outbox, order status model) and ADR-034…037
+  (provider-outcome ambiguity, windowed reconciliation, single-writer lease,
+  refund identity)
 
 ---
-_Last updated: 2026-07-23_
+_Last updated: 2026-08-04_

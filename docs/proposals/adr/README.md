@@ -409,6 +409,10 @@ and extend Adoption instead.
 | [ADR-031](ADR-031-fulfillment-start-outbox/) | Start the fulfillment saga through a transactional outbox | Accepted | Complete | [RFC-0021](../rfc/RFC-0021/) |
 | [ADR-032](ADR-032-tempo-operator-monolithic/) | Deliver Tempo through the tempo-operator TempoMonolithic CR | Proposed | Not started | — |
 | [ADR-033](ADR-033-order-status-cancellation/) | Make order status a guarded state machine with customer cancellation | Accepted | Complete | [RFC-0021](../rfc/RFC-0021/) |
+| [ADR-034](ADR-034-provider-outcome-ambiguity/) | Record an unknown provider outcome instead of guessing it | Accepted | Complete | [RFC-0021](../rfc/RFC-0021/) |
+| [ADR-035](ADR-035-windowed-reconciliation/) | Bound a reconciliation pass to a time window | Accepted | Complete | [RFC-0021](../rfc/RFC-0021/) |
+| [ADR-036](ADR-036-single-writer-lease/) | Guard single-writer background roles with a database lease | Accepted | Complete | [RFC-0021](../rfc/RFC-0021/) |
+| [ADR-037](ADR-037-per-request-refund-identity/) | Let the caller name each refund | Accepted | Complete | [RFC-0021](../rfc/RFC-0021/) |
 
 Principles:
 
@@ -419,4 +423,4 @@ API docs describe as-built.  Runbooks operate it.
 ```
 
 ---
-_Last updated: 2026-07-29_
+_Last updated: 2026-08-04_

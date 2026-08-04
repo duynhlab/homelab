@@ -19,7 +19,7 @@ reconciliation loop that proves the books match the provider.
 | **Repository** | [`duynhlab/payment-service`](https://github.com/duynhlab/payment-service) | — |
 | **Owns** | Payment state, refunds, the double-entry ledger, webhook records, reconciliation reports | — |
 | **Database** | `payment` on `product-db` — **direct** `product-db-rw.product:5432`, `sslmode=require` (bypasses PgDog: no pooler TLS yet) | — |
-| **Design record** | — | [RFC-0010](../proposals/rfc/RFC-0010/) |
+| **Design record** | — | [RFC-0010](../proposals/rfc/RFC-0010/) · [RFC-0021](../proposals/rfc/RFC-0021/) P6 · [ADR-034](../proposals/adr/ADR-034-provider-outcome-ambiguity/) · [ADR-035](../proposals/adr/ADR-035-windowed-reconciliation/) · [ADR-036](../proposals/adr/ADR-036-single-writer-lease/) · [ADR-037](../proposals/adr/ADR-037-per-request-refund-identity/) |
 
 ## Temporal participation
 
@@ -85,12 +85,14 @@ an opaque `tok_` test token — PAN-like data is never accepted, stored, or logg
 | Table | Purpose | Key facts |
 |-------|---------|-----------|
 | `payments` | The PaymentIntent | Stored `status` (FSM below); `partially_refunded` is **derived** (`0 < refunded < amount` while `captured`), never stored |
-| `refunds` | First-class refund rows | `pending → succeeded/failed`; never a mutation of the payment row |
+| `refunds` | First-class refund rows | `pending → processing → succeeded/failed`; never a mutation of the payment row. A `processing` refund still **reserves** its amount against the capture |
+| `payment_attempts` | One row per provider round-trip | `outcome_class ∈ SUCCESS/BUSINESS_DECLINE/RETRYABLE_FAILURE/UNKNOWN`, the provider's answer, and **the idempotency key it was sent under**. An UNKNOWN row with no `resolved_at` is the open-doubt worklist ([ADR-034](../proposals/adr/ADR-034-provider-outcome-ambiguity/)) |
 | `ledger_accounts` | Fixed chart of accounts | `customer_funds` (asset), `merchant_revenue` (revenue) |
 | `ledger_transactions` / `ledger_entries` | Double-entry postings | `kind ∈ capture/refund/reversal`; every transaction balances (Σdebits = Σcredits); append-only triggers block UPDATE/DELETE **and TRUNCATE** — corrections are reversing transactions |
 | `outbox_events` | Transactional outbox | `payment.captured`, `payment.refunded`, `payment.capture_reversed` — written in the same tx as the ledger posting |
 | `webhook_events` | Webhook dedup + correlation | Idempotent by `event_id`; status `processed`/`orphaned` |
 | `reconciliation_runs` / `reconciliation_discrepancies` | Drift reports | Hourly reaper prunes runs older than 30 days |
+| `reconciliation_watermark` | Where the last **completed** pass finished | Single row by construction (boolean PK CHECKed true); advances only on completion and only forwards ([ADR-035](../proposals/adr/ADR-035-windowed-reconciliation/)) |
 
 ## HTTP API
 
@@ -118,12 +120,18 @@ State-changing RPCs are idempotent (Temporal retries activities after
 timeouts or lost responses); a provider decline is a **normal response**
 (`status: "failed"` + `decline_code`), not a gRPC error.
 
+An **undecided** outcome is neither: it answers `Unavailable` (HTTP 503) and asks
+for a retry with the same key, while a decided rejection answers
+`FailedPrecondition`. The saga treats a rejection as permanent and compensates on
+it, so the two must never share a code — that conflation is the bug RFC-0021 phase 6
+removed.
+
 | RPC | Request → Response | Saga | Notes |
 |-----|--------------------|------|-------|
 | `Authorize` | `order_id, user_id, amount_minor, currency, payment_method` → `Payment` | step | Place (or replay) the hold; idempotent by key `order:<id>`; manual capture mode |
 | `Capture` | `order_id` → `Payment` | step | Capture the hold after earlier saga steps succeed; already-captured replays unchanged |
 | `Void` | `order_id` → `Payment` | compensation | Release an uncaptured hold |
-| `Refund` | `order_id, amount_minor, reason` → `Refund` | compensation | Return captured funds; idempotent by key `refund:order:<id>` |
+| `Refund` | `order_id, amount_minor, reason, refund_request_id` → `Refund` | compensation | Return captured funds; idempotent by key `refund:order:<id>:<refund_request_id>`. The **caller** names the refund, because only the caller knows whether two refunds are the same intent — order sends `compensation` and `cancellation`. An empty id keeps the historical `refund:order:<id>` key ([ADR-037](../proposals/adr/ADR-037-per-request-refund-identity/)) |
 | `GetPayment` | `order_id` → `Payment` | — | Read snapshot for order-details enrichment; owner-scoping is the caller's job (order authorizes first; NetworkPolicy is the fence) |
 
 ## Business rules & techniques
@@ -140,13 +148,22 @@ stateDiagram-v2
     [*] --> pending : create intent
     pending --> authorized : provider hold
     pending --> failed : decline
+    pending --> processing : authorize outcome UNKNOWN
     authorized --> captured : Capture
     authorized --> voided : Void (compensation)
     authorized --> expired : AUTH_HOLD_TTL lapses
+    captured --> processing : capture outcome UNKNOWN
+    voided --> processing : void outcome UNKNOWN
+    processing --> authorized : resolved (charge replayed, or capture/void refused)
+    processing --> captured : resolved (capture confirmed)
+    processing --> voided : resolved (void confirmed)
+    processing --> failed : resolved (charge decided no)
     captured --> refunded : fully refunded
 ```
 
-`failed`, `voided`, `expired`, `refunded` are terminal.
+`failed`, `voided`, `expired`, `refunded` are terminal. **`processing` is not a
+verdict** — it means an operation was attempted and the provider's answer never
+arrived, so nothing has been undone. See [Unknown provider outcomes](#unknown-provider-outcomes).
 
 ### Ledger + outbox: settle once, tell everyone at-least-once
 
@@ -187,6 +204,65 @@ the shipping enrichment; the order API needs `PAYMENT_GRPC_ADDR`, not just
 the worker). The object carries `status`, `amount`, `refunded`, `currency`,
 `decline_code`; a partial refund surfaces as the derived `partially_refunded`.
 
+### Unknown provider outcomes
+
+Every provider call has three possible answers, not two: yes, no, and **silence**.
+Silence used to be resolved by assumption, always in the direction "it did not
+happen" — so a capture whose response was lost was reversed while the provider
+kept the money, a lost void was rolled back to a hold the provider had already
+released, and a lost refund answer was sealed into the idempotency cache as a
+success carrying `status:"failed"`, which every retry then replayed forever.
+
+The rule now: **an UNKNOWN outcome never triggers the semantic opposite
+operation** ([ADR-034](../proposals/adr/ADR-034-provider-outcome-ambiguity/)). The
+intent moves to `processing`, the round-trip is recorded in `payment_attempts`
+together with the key it was sent under, and nothing is undone.
+
+| Class | What it means | What happens |
+|---|---|---|
+| `SUCCESS` | The provider did it and said so | Definite state |
+| `BUSINESS_DECLINE` | A decided no — a card decline, or any other final answer (malformed request, unknown charge) | Definite state; the intent ends |
+| `RETRYABLE_FAILURE` | The provider refused the request and did nothing with it (**429**) | Nothing happened; the caller retries from a clean slate |
+| `UNKNOWN` | No answer at all (**5xx**, timeout, transport failure) — the work may have happened | Park in `processing` |
+
+**429 and 503 mean different things**, and conflating them is what let a lost
+capture response trigger a reversal. A 429 is a decided refusal; a 503 says
+nothing about whether the work happened.
+
+**Resolution asks the same question under the same key.** A provider that already
+did the work replays its answer; one that never received the request performs it
+now. Either way the truth is learned without doing the work twice — and re-driving
+under a *different* key is not a resolution, it is a second charge. Two things
+resolve doubt:
+
+- **the request path** — any operation touching a parked payment resolves it
+  first, so a caller retrying is what un-parks it. No operator needed in the
+  common case.
+- **a one-minute sweep** — for the doubt nobody retries: an abandoned checkout, a
+  saga that gave up, a refund the customer is not watching. Bounded to 50 entries
+  per tick, because each entry is a provider round-trip.
+
+Two invariants are load-bearing and easy to lose:
+
+- **evidence lands before the state.** A `processing` row that no attempt row
+  explains cannot be resolved by a retry or by the sweep — only by manual SQL — so
+  if the attempt log refuses the write, the park does not happen and the pre-park
+  state stands (visible to reconciliation, and counted by
+  `payment_attempt_write_failures_total`).
+- **a re-drive closes the question it re-asked.** Leaving both rows open makes the
+  next pass ask twice, then four times: a provider outage would become a flood
+  against that provider.
+
+Callers see doubt as `Unavailable` / HTTP 503 and a decided rejection as
+`FailedPrecondition`. order-service **fails closed** on a `processing` payment:
+cancelling one parks the order in `manual_review` rather than settling it while the
+money is unaccounted for ([ADR-033](../proposals/adr/ADR-033-order-status-cancellation/)).
+
+Operability: `payment_doubt_open` counts open questions and
+`payment_doubt_oldest_age_seconds` is the escalation signal — one fresh unknown is
+routine, an hour-old one means money is sitting somewhere nobody has looked
+([PaymentDoubtStale](../observability/runbooks/microservices/PaymentDoubtStale.md)).
+
 ### Payment ↔ provider reconciliation
 
 Two money systems always drift eventually — reconciliation *detects* that drift
@@ -202,21 +278,52 @@ flowchart LR
     subgraph payment-service
         TICK["ticker (5 min)"] --> R["Reconciler<br/>detect-only"]
         API["internal API<br/>POST …/reconciliation/runs"] --> R
-        R -->|"ListReconcilable<br/>(payments with a provider id)"| DB[(payments)]
+        LEASE[("advisory lease")] -.->|"single writer"| R
+        R -->|"ListReconcilable<br/>(provider id, in window)"| DB[(payments)]
+        R -->|"advance on completion"| WM[(reconciliation_watermark)]
         R -->|"persist run + discrepancies"| RDB[(reconciliation_runs /<br/>reconciliation_discrepancies)]
         API2["GET …/reconciliation/runs/:id"] --> RDB
     end
-    R -->|"GET /transactions (paged)"| MP["mockpay<br/>provider ledger"]
+    R -->|"GET /transactions?from&to (paged)"| MP["mockpay<br/>provider ledger"]
 
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     classDef external fill:#64748b,color:#fff,stroke:#334155;
-    class TICK,R,API,API2 service; class DB,RDB data; class MP external;
+    class TICK,R,API,API2 service; class DB,RDB,WM,LEASE data; class MP external;
 ```
 
-One pass: load every payment with a `provider_payment_id` (one that never
-reached the provider has nothing to reconcile), page the provider's
-transaction ledger to exhaustion, and classify each pairing:
+One pass is **bounded to a time window** on charge creation, and **both sides are
+asked for the same bounds** ([ADR-035](../proposals/adr/ADR-035-windowed-reconciliation/)).
+That symmetry is the correctness argument: compare a narrow internal set against
+the provider's whole history and every older charge reads as missing on our side —
+a discrepancy that is an artefact of the question, not a fact about the money.
+
+The automatic window runs from the last completed pass's frontier **less a 1h
+lookback**, up to **5m short of now**. The lookback re-judges recent ground,
+because a `missing_provider` may have been nothing worse than an authorize in
+flight; the settlement lag keeps a payment created seconds ago from being called
+missing, because a report that cries wolf is a report nobody reads. The frontier
+(`reconciliation_watermark`) advances **only on a completed pass** and **only
+forwards** — a failed pass leaves it, so the next one re-covers the same ground
+rather than stepping over a stretch nobody checked.
+
+`POST …/reconciliation/runs?from=&through=` runs an explicit window for a
+backfill. A malformed bound is **refused**, never dropped: dropping one would
+widen the pass to everything and turn a typo into a report full of discrepancies
+that do not exist.
+
+**Payments in `processing` are excluded.** Their disagreement is not drift — it is
+a question the attempt log owns, with its own resolution path — and leaving them in
+re-reported the same mismatch on every run.
+
+Only **one pass runs at a time, across processes**: a session-level advisory lease
+is taken before anything is written ([ADR-036](../proposals/adr/ADR-036-single-writer-lease/)).
+A runner that cannot take it stands down (409 on the API, a silent tick),
+because for a single-writer role "somebody else is doing it" is the correct
+outcome rather than a failure. Two concurrent passes would both page the ledger,
+both write discrepancy rows for the same charges, and both try to heal them.
+
+Each pairing inside the window is classified:
 
 | Class | Meaning | Typical cause |
 |---|---|---|
@@ -250,6 +357,13 @@ all other classes stay human-corrected: pull both sides (payment row + ledger
 entries vs the provider record), decide which is right, and correct via the
 normal APIs (refund endpoint, state transitions) — never by editing rows, so every correction leaves its own audit trail.
 
+**Is it running?** A reconciler that has stopped emits no runs at all, so a
+discrepancy count of zero cannot tell "healthy" from "stopped".
+`payment_reconciliation_watermark_age_seconds` can: it grows without bound when
+the frontier stops moving. Run outcome, run duration, and heal failures per class
+are series alongside it — a heal that never worked used to be only a log line
+([PaymentReconciliationDiscrepancy](../observability/runbooks/microservices/PaymentReconciliationDiscrepancy.md)).
+
 ## Callers & dependencies
 
 | Direction | Peer | Contract |
@@ -268,13 +382,23 @@ normal APIs (refund endpoint, state transitions) — never by editing rows, so e
   alias `/payment/v1/internal/reconciliation/runs` remains mounted in-service.
 - **No pooler for payment DB** — direct CNPG connection with `sslmode=require`
   because PgDog does not terminate TLS yet (RFC-0020 research).
-- **Reconciliation v1 limits (deliberate, tracked):** refund *amounts* aren't
-  reconciled (the provider reports a refunded flag only — don't read a clean
-  run as "refunds reconcile"); currency isn't carried on the report
-  (single-currency platform); full scan + full provider sweep per pass must
-  be windowed before production-scale volume; **no metric or alert on
-  `discrepancies_found > 0`** — detection surfaces as a ticker log line and
-  the report API, so today someone must go looking.
+- **Reconciliation limits (deliberate, tracked):** refund *amounts* aren't
+  reconciled (the provider reports a refunded flag only — don't read a clean run
+  as "refunds reconcile"); currency isn't carried on the report (single-currency
+  platform). The unbounded scan and the missing discrepancy alert were **closed**
+  in RFC-0021 P6 ([ADR-035](../proposals/adr/ADR-035-windowed-reconciliation/),
+  homelab #646).
+- **Window constants are guesses at this scale** — a 1h lookback and a 5m
+  settlement lag are honest defaults, not measurements. Real provider latency
+  should re-derive both.
+- **A parked authorize with no recorded key cannot be resolved automatically.**
+  The charge key comes from the caller's `Idempotency-Key`, so only rows written
+  before migration 000011 have this shape: finite, alerted, and an operator's job
+  ([PaymentDoubtSweepFailing](../observability/runbooks/microservices/PaymentDoubtSweepFailing.md)).
+- **`replicaCount` stays 1.** The reconciler's lease is now cross-process, but
+  migration 000007 (`idempotency_keys.payment_id` → `subject_id`) is not
+  rolling-safe, so the lease is not a licence to scale
+  ([ADR-036](../proposals/adr/ADR-036-single-writer-lease/)).
 - **Outbox sink is a log publisher** — a real broker requires revisiting the
   claim-transaction-across-network-I/O caveat in `outbox_relay.go`.
 
@@ -291,8 +415,12 @@ normal APIs (refund endpoint, state transitions) — never by editing rows, so e
   every 5 minutes:
 
 ```bash
-# trigger one pass (single-flighted: concurrent trigger → 409; disabled/stub provider → 503)
+# trigger one pass over the AUTOMATIC window
+# (lease held elsewhere → 409; disabled/stub provider → 503)
 curl -X POST http://payment:8080/payment/v1/internal/payments/reconciliation/runs
+
+# backfill an explicit window (RFC 3339; a malformed or inverted bound → 400)
+curl -X POST "http://payment:8080/payment/v1/internal/payments/reconciliation/runs?from=2026-08-01T00:00:00Z&through=2026-08-02T00:00:00Z"
 
 # fetch a run's report
 curl http://payment:8080/payment/v1/internal/payments/reconciliation/runs/2
@@ -319,10 +447,18 @@ curl http://payment:8080/payment/v1/internal/payments/reconciliation/runs/2
 |---|---|---|
 | decline (total 2002) | order **failed**, no stock reserved | `failed`, `generic_decline` |
 | insufficient funds (2095) | order **failed** | `failed`, `insufficient_funds` |
-| transient 503 (1919) | retry → order **confirmed** | `captured` |
+| transient (1919 — now **429**) | retry → order **confirmed** | `captured` |
 | zero-stock product (2500) | authorize ok → reserve fails → compensate | **`voided`** |
 | clean reconciliation run | — | `completed`, 0 discrepancies |
 | injected drift (`UPDATE … amount_minor+1`) | — | run detects `amount_mismatch` 1920 vs 1919 |
+
+  RFC-0021 P6 added two triggers for the ambiguity paths: **`…13` no answer**
+  (mockpay creates the charge and withholds the response, so "the provider did it
+  and we do not know" is reproducible without killing a container) and
+  **`…07` refund declined** (refund-only, so a charge can succeed and its refund
+  still be refused). Verified on local-stack: a paused provider parked the refund
+  and left the key unsealed, unpausing re-drove **the same key** to `succeeded`,
+  and a lost charge answered a definite 404 → refund `failed` → order parked.
 
 ## Code map
 
@@ -348,4 +484,4 @@ Paths in [`duynhlab/payment-service`](https://github.com/duynhlab/payment-servic
 - [workflows.md](./workflows.md) · [Service contracts](./README.md#service-contracts)
 - [RFC-0010](../proposals/rfc/RFC-0010/) — full design; ADRs [007](../proposals/adr/ADR-007-double-entry-payment-ledger/) ledger · [008](../proposals/adr/ADR-008-mockpay-standalone-provider/) mockpay · [009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) auth-early/capture-late · [010](../proposals/adr/ADR-010-shared-idempotency-library/) idempotency · [011](../proposals/adr/ADR-011-detect-only-reconciliation/) detect-only · [012](../proposals/adr/ADR-012-reconciliation-auto-heal/) auto-heal
 
-_Last updated: 2026-07-21_
+_Last updated: 2026-08-04_

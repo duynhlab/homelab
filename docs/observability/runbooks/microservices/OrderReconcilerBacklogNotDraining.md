@@ -6,6 +6,7 @@
 | **Category** | database / correctness |
 | **Manifest** | [`rfc0021-write-migration.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-write-migration.yaml) |
 | **Metrics** | `order_reconciler_backlog` |
+| **Applies to** | order **1.13.0+** (RFC-0021 P4 removed the product stock branch). On 1.12.x and earlier the resolver fell back to the process's `ORDER_STOCK_PARTICIPANT` and started the saga anyway — the pre-P4 notes below still apply there |
 
 ## Meaning
 `max(order_reconciler_backlog) > 0` for 15m. At least one order that reached a
@@ -69,7 +70,6 @@ representation of a persistent problem, not a transient one.
 
 ## Escalation
 Non-zero **and** rising over an hour, or any `breach`, is a data-integrity
-incident: page. Confirm whether the write cutover
-(`ORDER_STOCK_PARTICIPANT=inventory`) is in progress — reverting the flag stops new
-sagas taking the inventory path but does **not** unwind orders already pinned to
-it (participant is pinned per workflow; the posture is fix-forward).
+incident: page. The posture is **fix-forward**: there is no flag to revert since
+RFC-0021 P4 removed the product stock branch, and participant is pinned per
+workflow, so orders already in flight settle where they started regardless.

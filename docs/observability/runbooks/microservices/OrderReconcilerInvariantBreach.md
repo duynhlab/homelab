@@ -6,6 +6,7 @@
 | **Category** | correctness |
 | **Manifest** | [`rfc0021-write-migration.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-write-migration.yaml) |
 | **Metrics** | `order_reconciler_repairs_total{action="breach"}` |
+| **Applies to** | order **1.13.0+** (RFC-0021 P4 removed the product stock branch). On 1.12.x and earlier the resolver fell back to the process's `ORDER_STOCK_PARTICIPANT` and started the saga anyway — the pre-P4 notes below still apply there |
 
 ## Meaning
 `increase(order_reconciler_repairs_total{action="breach"}[1h]) > 0`. The reconciler
@@ -79,8 +80,7 @@ There is **no API for this yet** — it is deliberate manual SQL, because cleari
 breach is an assertion that a human checked it.
 
 ## Escalation
-Page immediately. This is a data-integrity incident, not a latency blip. If it
-appears during the write cutover, reverting `ORDER_STOCK_PARTICIPANT` to
-`product` prevents *new* orders taking the inventory path but does not unwind
-orders already pinned to it — the participant is pinned per workflow and the
-posture is fix-forward.
+Page immediately. This is a data-integrity incident, not a latency blip. The
+posture is fix-forward — RFC-0021 P4 removed the product stock branch, so there is
+no participant to revert to, and orders already in flight are pinned to the branch
+they started on in any case.

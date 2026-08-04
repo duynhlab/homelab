@@ -345,9 +345,11 @@ Source: `prometheusrules/microservices/rfc0021-write-migration.yaml`,
 `prometheusrules/microservices/inventory.yaml`.
 
 RFC-0021 moves stock ownership from product-service to inventory-service. The
-**write** path (the order saga's reserve/commit/release) migrates behind
-`ORDER_STOCK_PARTICIPANT`, pinned per workflow at start; the **read** path (checkout
-availability) migrates behind `CHECKOUT_AVAILABILITY_SOURCE` after the write cutover.
+**write** path (the order saga's reserve/commit/release) migrated behind a
+per-order participant, pinned per workflow at start — RFC-0021 P4 then removed the
+product branch, so `inventory` is the only servable value and an order recorded
+otherwise is refused rather than re-routed; the **read** path (checkout availability)
+migrates behind `CHECKOUT_AVAILABILITY_SOURCE` after the write cutover.
 These alerts cover the migration's own failure modes, which the RED alerts in domain
 1 cannot see: an order and its stock can disagree while every service reports
 healthy.

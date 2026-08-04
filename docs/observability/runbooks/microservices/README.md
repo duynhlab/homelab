@@ -94,6 +94,7 @@ automatic resolution paths are working.
 | PaymentDoubtStale | critical | correctness | [PaymentDoubtStale.md](PaymentDoubtStale.md) |
 | PaymentAttemptEvidenceLost | critical | correctness | [PaymentAttemptEvidenceLost.md](PaymentAttemptEvidenceLost.md) |
 | PaymentReconciliationDiscrepancy | critical | correctness | [PaymentReconciliationDiscrepancy.md](PaymentReconciliationDiscrepancy.md) |
+| PaymentReconciliationStale | critical | observability | [PaymentReconciliationStale.md](PaymentReconciliationStale.md) |
 | PaymentDoubtBacklogGrowing | warning | correctness | [PaymentDoubtBacklogGrowing.md](PaymentDoubtBacklogGrowing.md) |
 | PaymentDoubtSweepFailing | warning | availability | [PaymentDoubtSweepFailing.md](PaymentDoubtSweepFailing.md) |
 | PaymentProviderUnknownRate | warning | availability | [PaymentProviderUnknownRate.md](PaymentProviderUnknownRate.md) |

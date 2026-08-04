@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0021 P6 — reconciliation auto-heal enabled**: `RECON_HEAL_ENABLED=true` on
+  the cluster, wired through the checkout ResourceSet as `recon_heal_enabled`
+  (quoted, because the template guard is truthiness-based and a YAML `false` would
+  drop the env rather than disable the feature). Heal converges exactly one drift
+  class — internal `authorized` while the provider says `captured` — by re-driving
+  the idempotent CAS-guarded capture by payment id, never by calling the provider
+  (ADR-012). It is enabled **only now**, and the order is the point: a heal nobody
+  can see is worse than a discrepancy nobody heals, and the pass only became
+  observable in this phase (discrepancy alert, staleness alert, and heal failures
+  as their own series). Last step of RFC-0021 phase 6.
 - **RFC-0021 P6 — payment pinned to 1.5.0**: payment can now say it does **not
   know** what the provider did instead of guessing. An unknown outcome parks the
   intent in `processing` with the round-trip recorded in `payment_attempts`, and

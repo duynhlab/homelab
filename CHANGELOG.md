@@ -177,6 +177,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The order reconciler runs on the CURRENT worker build only** — it was `true` on
+  all three side-by-side builds, so three judges shared one scan that claims
+  nothing (no `FOR UPDATE SKIP LOCKED`), which its own docs say must have a single
+  runner. Draining builds now stand down, and `scripts/flux-validate.sh` enforces
+  exactly-one **and** that it is the build the cutover CronJob makes Current — a
+  forgotten flip at an activation is invisible until the judgements disagree.
+  Found by running the P4 rollout on a Kind cluster rather than by reading it.
+
 - **RFC-0021 P4 — order API pinned to 1.13.0** and the `order_stock_participant`
   input removed, deliberately in the same commit: 1.12.0 defaults that flag to
   `product`, so dropping the input while the older image was deployed would have

@@ -283,6 +283,13 @@ spec:
                 name: << inputs.webhook_secret >>
                 key: secret
           <<- end >>
+          <<- if (index inputs "recon_heal_enabled") >>
+          # Quoted for the same reason as GRPC_REFLECTION: the guard above is
+          # truthiness-based, so a YAML boolean false would drop the env entirely
+          # rather than disable the feature.
+          - name: RECON_HEAL_ENABLED
+            value: << inputs.recon_heal_enabled | quote >>
+          <<- end >>
           <<- if (index inputs "payment_grpc_addr") >>
           - name: PAYMENT_GRPC_ADDR
             value: << inputs.payment_grpc_addr >>

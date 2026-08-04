@@ -70,3 +70,20 @@ spec:
     # Shared HMAC secret (ExternalSecret payment-webhook-hmac): mockpay signs
     # webhooks, payment verifies. Required — the config fails closed without it.
     webhook_secret: "payment-webhook-hmac"
+    # Auto-heal ON (ADR-012). It converges exactly ONE drift class — internal
+    # `authorized` while the provider says `captured`, the lost-capture-response
+    # window — by re-driving the idempotent, CAS-guarded capture BY PAYMENT ID.
+    # It never calls the provider, so it cannot move money that has not already
+    # moved; the worst case is a lost CAS race, recorded as `skipped` and
+    # re-detected next pass.
+    #
+    # Enabled only now, and the order is the point: a heal nobody can see is
+    # worse than a discrepancy nobody heals. Since RFC-0021 P6 the pass is
+    # observable — PaymentReconciliationDiscrepancy on the drift itself,
+    # PaymentReconciliationStale if the detector stops, and heal failures are
+    # their own series (payment_reconciliation_heal_failures_total{kind}) rather
+    # than a log line nobody greps.
+    #
+    # Quoted, not a boolean: the ResourceSet guard is truthiness-based, so a YAML
+    # `false` would drop the env entirely instead of disabling the feature.
+    recon_heal_enabled: "true"

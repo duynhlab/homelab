@@ -6,6 +6,7 @@
 | **Category** | latency / correctness |
 | **Manifest** | [`rfc0021-write-migration.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-write-migration.yaml) |
 | **Metrics** | `order_inventory_commit_lag_seconds_{bucket,sum,count}` |
+| **Applies to** | order **1.13.0+** (RFC-0021 P4 removed the product stock branch). On 1.12.x and earlier the resolver fell back to the process's `ORDER_STOCK_PARTICIPANT` and started the saga anyway — the pre-P4 notes below still apply there |
 
 ## Meaning
 p99 of the time between the **ConfirmOrder pivot** and **CommitInventory settling**
@@ -22,8 +23,9 @@ that exhausted the bound disappear from this histogram and surface as
 [OrderReconcilerBacklogNotDraining](OrderReconcilerBacklogNotDraining.md) instead.
 Read the two together — the backlog is the severe signal.
 
-No series at all before the write cutover is **normal**: with
-`ORDER_STOCK_PARTICIPANT=product` no workflow takes the inventory branch.
+No series at all is **abnormal** since RFC-0021 P4: every saga takes the inventory
+branch now, so a silent metric means no orders are confirming (or the worker is not
+being scraped), not that the branch is idle.
 
 ## Impact
 Confirmed orders are holding merely-RESERVED stock. Available-to-promise is

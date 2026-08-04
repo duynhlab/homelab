@@ -169,6 +169,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **RFC-0021 P4 — order runbooks and catalogs match the removed product stock
+  branch** (ahead of the worker build, so the alerts land on correct docs): the
+  participant flag is no longer a mitigation lever — order 1.13.0 refuses an
+  unservable participant instead of falling back to it — and each affected runbook
+  carries an **Applies to** row so it stays usable for a fleet that is still on
+  1.12.x. `FulfillmentStartOutboxFailed` was rewritten: its "burned the attempt cap
+  (~2h)" meaning was already wrong for three codes, its "never charged" claim is
+  false when a run exists, and its preferred mitigation was a raw `UPDATE orders SET
+  status='failed'` that bypasses the P5 aggregate (version + append-only history)
+  and could strand captured money. New code `PARTICIPANT_UNSERVABLE`; the
+  participant metric gains a `result` label so refusals stop counting as starts.
+  local-stack drops `ORDER_STOCK_PARTICIPANT` and `PRODUCT_GRPC_ADDR` from order and
+  its worker, and the worker's `depends_on` now names inventory instead of product.
+
 - **OpenBAO seeding docs match the post-revoke reality**: re-running the
   bootstrap Job seeds NOTHING on a live cluster (it detects the revoked root
   and exits — learned at the W8 canary-salt seed), and the rotation runbook's

@@ -6,6 +6,7 @@
 | **Category** | correctness / observability |
 | **Manifest** | [`rfc0021-write-migration.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-write-migration.yaml) |
 | **Metrics** | `order_reconciler_passes_truncated_total` |
+| **Applies to** | order **1.13.0+** (RFC-0021 P4 removed the product stock branch). On 1.12.x and earlier the resolver fell back to the process's `ORDER_STOCK_PARTICIPANT` and started the saga anyway — the pre-P4 notes below still apply there |
 
 ## Meaning
 A pass returned a **full batch** (200 candidates), so it did not examine every
@@ -47,7 +48,7 @@ FROM fulfillment_start_requests WHERE reconciled_at IS NULL;
    Confirm the count is falling before doing anything else.
 
 ## Escalation
-Page if the backlog is not falling pass over pass, or if the truncation coincides
-with a write cutover — a cutover that produces hundreds of unsettled orders should
-be rolled back to `ORDER_STOCK_PARTICIPANT=product` for **new** sagas while the
-existing ones are worked through.
+Page if the backlog is not falling pass over pass. There is no participant flag to
+roll back since RFC-0021 P4 removed the product stock branch: hundreds of unsettled
+orders are worked through as they are, and the lever is inventory-service capacity
+plus the reconciler's own pass budget.

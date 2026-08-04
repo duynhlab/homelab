@@ -177,6 +177,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **RFC-0021 P4 — order API pinned to 1.13.0** and the `order_stock_participant`
+  input removed, deliberately in the same commit: 1.12.0 defaults that flag to
+  `product`, so dropping the input while the older image was deployed would have
+  silently sent new orders back to the deleted branch. 1.13.0 does not read it —
+  one servable participant means nothing to select — and the now-dead template
+  block goes with it (its hard-won Go-template-delimiter warning was carried over
+  to the surviving `CHECKOUT_AVAILABILITY_SOURCE` block). Verified on the cluster
+  before pinning: `CurrentVersionBuildID = 1.13.0` and an order driven end to end
+  came back `Pinned` to BuildId 1.13.0.
+
 - **RFC-0021 P4 — order runbooks and catalogs match the removed product stock
   branch** (ahead of the worker build, so the alerts land on correct docs): the
   participant flag is no longer a mitigation lever — order 1.13.0 refuses an

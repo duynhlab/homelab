@@ -10,19 +10,27 @@ spec:
   type: Static
   defaultValues:
     name: order
-    # 1.8.0 makes the stock branch a property of the ORDER, not of whichever
-    # process answers: every start path resolves the participant from the order's
-    # outbox row (the two inline starts used to re-decide from their own
-    # ORDER_STOCK_PARTICIPANT on replay — the one skew that corrupts the
-    # reconciler's judgement), and a reservation the row does not account for is
-    # repaired as before but now logged and counted
-    # (order_reconciler_participant_disagreements_total, alerted since #622).
+    # 1.12.0 makes cancellation fail closed when payment does not know what the
+    # provider did (RFC-0021 P6). A `processing` payment used to fall into the
+    # "nothing to move" arm, so the order was settled `cancelled` while the money
+    # was unaccounted for — the customer sees a cancellation and nobody ever
+    # returns the funds. It now parks in manual_review, and the park reason
+    # separates an unknown outcome from a decided failure so an operator is not
+    # sent looking for a fate that is already known.
     #
-    # Migration 000010 rides along the same way 000008/000009 did: the mop chart's
-    # init container reuses this image and runs `migrate` BEFORE the app container
-    # starts, so the schema cannot lag the code. It adds the CHECK constraint the
-    # participant column earns now that it routes stock writes.
-    image_tag: "1.11.0" # {"$imagepolicy": "flux-system:order:tag"}
+    # Each refund also carries its own identity, so an order can owe both a saga
+    # compensation and a cancellation remainder; keyed on the order alone those
+    # two shared one name and the second was rejected outright.
+    #
+    # THIS API PIN MUST LAND BEFORE PAYMENT 1.5.0. Payment 1.5.0 is what can
+    # produce a `processing` payment, and an order service that does not handle it
+    # would settle those cancellations with the money still out.
+    #
+    # The activity signature change rides a NEW Worker Deployment Version
+    # (order-worker-1-12-0.yaml + the activation CronJob's --build-id): it is a
+    # rollout boundary even though the replay gate passes, because Temporal
+    # compares commands rather than activity payloads.
+    image_tag: "1.12.0" # {"$imagepolicy": "flux-system:order:tag"}
     namespace: order
     platform_backup_label: "cnpg"
     replicaCount: 1

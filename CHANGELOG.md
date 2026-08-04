@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RFC-0021 P6 — order pinned to 1.12.0 + worker build 1-12-0**: cancellation now
+  fails closed when payment does not know what the provider did. A `processing`
+  payment used to fall into the "nothing to move" arm, so the order was settled
+  `cancelled` while the money was unaccounted for; it parks in `manual_review`
+  instead, with a reason that separates an unknown outcome from a decided failure.
+  Each refund also carries its own identity, so an order can owe both a saga
+  compensation and a cancellation remainder. **This pin must land before payment
+  1.5.0** — payment 1.5.0 is what can produce a `processing` payment. The activity
+  signature change rides a new Worker Deployment Version
+  (`order-worker-1-12-0.yaml`, activation CronJob `--build-id 1.12.0`); 1-10-0
+  stays side by side until its version shows DRAINED (ADR-030).
 - **RFC-0021 P6 design records — ADR-034…037 + docs/api sync**: ADR-034 (record an
   unknown provider outcome instead of guessing it: `processing` intent state +
   per-round-trip attempt log, and an UNKNOWN outcome never triggering the semantic

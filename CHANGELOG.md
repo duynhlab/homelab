@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`docs/api/product.md` now describes a service that does not own stock.** It
+  still documented `ReserveStock`/`ReleaseStock`/`GetProducts` as live RPCs, the
+  `stock` block and `stock_quantity` in payloads, `stock_reservations` in the data
+  model, and the reservation semantics as product's own — all removed across
+  RFC-0021 phase 4. Rewritten to the as-built surface (`BatchGetCurrentPrices` as
+  the only RPC, the inventory-sourced `availability` block, the schema without
+  stock) with the stock rules pointing at `inventory.md` instead of being
+  duplicated in stale form.
+
 ### Added
 
 - **RFC-0021 P4 — order worker build `1-13-0` staged** (order 1.13.0: the saga's
@@ -176,6 +187,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **inventory backfill CronJob image reference** — it pointed at `ghcr.io/duynhlab/inventory-service/inventory:v0.2.1`, which does not exist: the repo publishes `…/inventory-service/inventory-service` tagged without the leading `v` (now `0.2.3`) (GHCR returns 404 for the old path). The CronJob is suspended, so the bad pull would have surfaced the first time it was resumed — inside the write-cutover window, which is the worst possible moment.
 
 ### Removed
+
+- **The last of product's stock, including the schema and the cross-service
+  grant.** The suspended `inventory-backfill` CronJob and the `pg_hba` line
+  `host product inventory` on `product-db` are gone, alongside product migration
+  `000006` (revoke → drop `stock_reservations` → drop `products.stock_quantity`)
+  and inventory's `backfill` subcommand. Retiring the reader before dropping the
+  read is the ordering that matters: the backfill selected exactly that column
+  through exactly that grant. Removing the `pg_hba` line is the outer boundary of
+  the revoke — a `REVOKE` alone still leaves the role able to reach the database.
+  Recovering a missing balance is now inventory-local (seed, or an explicit
+  `RECEIVE` movement); the `CheckoutAvailabilityRefusingEverything` runbook and
+  the alert annotation that both named the backfill Job as the fix now say so,
+  because a runbook that points at a deleted Job costs an on-call the time it
+  takes to discover that.
 
 - **The RFC-0021 read-migration machinery, everywhere it existed.** The
   `CHECKOUT_AVAILABILITY_*` inputs and their ResourceSet template blocks, the

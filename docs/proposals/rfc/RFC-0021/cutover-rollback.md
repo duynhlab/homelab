@@ -209,5 +209,31 @@ assumption:
    temporary backfill access (pg_hba `host product inventory` + the migration
    `000005` GRANT) revoked in the same wave.
 
+   **SATISFIED 2026-08-05, with evidence** — unlike gate 1, this one was met
+   rather than waived. Product migration `000006` cannot verify a backup from
+   SQL, so the gate is a manual pre-step and the test was run end to end on
+   local-stack before the migration was proposed:
+
+   | Step | Command | Result |
+   |------|---------|--------|
+   | backup | `pg_dump -U postgres -d product -Fc > product-pre-000006.dump` | 12 KB dump |
+   | up | the service's own `migrate` subcommand | `schema_migrations` 5 → 6 clean; column and `stock_reservations` gone |
+   | down | the paired `.down.sql` applied by hand | column + `CHECK` + table + PK + index back, **every value 0**, ledger empty — shape only, as documented |
+   | restore | `pg_restore` into a scratch database | `stock_quantity` 50/30/25/40 again, version 5 — **the backup is the data rollback** |
+   | re-apply | `migrate` again | 5 → 6 clean |
+
+   The revoke was probed separately, because the original claim was wrong: only
+   `REVOKE SELECT` has effect, since Postgres grants `CONNECT`/`TEMPORARY` and
+   schema `USAGE` to PUBLIC by default (measured: `connect=t usage=t select=f`
+   after the revoke). **The pg_hba line is the boundary**, which is why removing
+   it is part of the same wave rather than a follow-up. The migration also now
+   refuses to drop while any undocumented role still holds `SELECT` on
+   `products` — proven in both directions, including the recovery from the
+   resulting dirty state.
+
+   Before running it in the cluster: take the dump against `product-db-rw`, keep
+   it outside the cluster, and confirm the restore into a scratch database — a
+   backup nobody has restored is a hypothesis.
+
 ---
 _Last updated: 2026-08-05_

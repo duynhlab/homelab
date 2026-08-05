@@ -130,16 +130,17 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 | **Own profile read/update** | `GET/PUT /user/v1/private/users/profile` | JWT-subject scoping (ownership-scoped queries); partial update preserves unset fields (COALESCE) | auth JWKS | Implemented | — |
 | **Internal profile create** | `POST /user/v1/internal/users` | requires an authoritative `user_id` from the caller (never synthesized) | — | **No caller** (auth registers into its own DB and does not call this) | [user.md](user.md) |
 
-### product — catalog (+ cache, stock)
+### product — catalog (+ cache)
 
-> Owns products, categories, stock (13 demo rows seeded locally); DB `product` on
+> Owns products, categories, prices (13 demo rows seeded locally). Stock left for
+> inventory-service in RFC-0021; DB `product` on
 > `product-db` (CloudNativePG, via PgDog). Valkey cache. Serves gRPC on `:9090`.
 
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
 | **Catalog list/read** | `GET /product/v1/public/products`, `GET /product/v1/public/products/:id` | cache-aside (Valkey): SETNX stampede lock (5 s TTL, token compare-and-delete release), TTL jitter 0–10 %, SCAN-based list invalidation; whitelisted sort/filter (injection-safe) | Valkey | Implemented | [caching](./caching.md) |
-| **Product-details aggregation** | `GET /product/v1/public/products/:id/details` | server-side aggregation: reviews via gRPC `ReviewService.GetProductReviews` (3 s deadline, soft-fail → `[]`) + stock + related | review | Implemented | [API call graph](api.md#current-east-west-call-graph) |
-| **Stock reservation** (saga step) | internal gRPC `ProductService.ReserveStock` / `ReleaseStock` | ledger-backed reservation, idempotent by `reservation_id` (= order id); insufficient stock → `FailedPrecondition` | caller: order-worker | Implemented | [temporal saga](temporal-order-fulfillment.md) |
+| **Product-details aggregation** | `GET /product/v1/public/products/:id/details` | server-side aggregation: reviews via gRPC `ReviewService.GetProductReviews` (3 s deadline, soft-fail → `[]`) + stock (**frozen since the W7 write cutover — open question, see gaps**) + related | review | Implemented | [API call graph](api.md#current-east-west-call-graph) |
+| ~~**Stock reservation**~~ (saga step) | internal gRPC `ProductService.ReserveStock` / `ReleaseStock` | Still registered, **no caller** — RFC-0021 P4 deleted the saga branch (order 1.13.0). Removal is gated on two weeks of zero on `product_stock_surface_calls_total` | ~~caller: order-worker~~ | Awaiting removal | [temporal saga](temporal-order-fulfillment.md) |
 | **Checkout batch read** | internal gRPC `ProductService.GetProducts` | cache-bypassing price/stock batch (product = checkout price authority); int64 minor units; unknown ids omitted | caller: checkout | Implemented (RFC-0015 P1) | [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) |
 | **Product create** | `POST /product/v1/internal/products` | admin/seed path | — | Implemented | — |
 
@@ -187,7 +188,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
 | **Order reads** | `GET /order/v1/private/orders`, `GET /order/v1/private/orders/:id` | ownership-scoped queries (`WHERE id AND user_id` — anti-IDOR) | auth JWKS | Implemented | — |
-| **Checkout → durable fulfillment** | internal gRPC `order.v1/CreateOrder` (the only create path — the legacy REST create was removed in RFC-0021 P5) | **Temporal saga** `OrderFulfillmentWorkflow` (workflow id `order-fulfillment-<orderID>`): authorize payment → reserve stock → create shipment → capture → **confirm (pivot)** → notify + receipt → clear cart → complete; compensations run in reverse (void pre-capture / refund post-pivot); exhaustion parks in `manual_review`; server-side order-math validation; atomic order+items insert; saga start via transactional outbox (ADR-031) | Temporal; product/inventory, shipping, payment, notification (gRPC); cart (REST) | Implemented | [Temporal Saga and 2PC](temporal-order-fulfillment.md) |
+| **Checkout → durable fulfillment** | internal gRPC `order.v1/CreateOrder` (the only create path — the legacy REST create was removed in RFC-0021 P5) | **Temporal saga** `OrderFulfillmentWorkflow` (workflow id `order-fulfillment-<orderID>`): authorize payment → reserve inventory → create shipment → capture → **confirm (pivot)** → notify + receipt → clear cart → commit inventory → complete; compensations run in reverse (void pre-capture / refund post-pivot); exhaustion parks in `manual_review`; server-side order-math validation; atomic order+items insert; saga start via transactional outbox (ADR-031) | Temporal; inventory, shipping, payment, notification (gRPC); cart (REST) | Implemented | [Temporal Saga and 2PC](temporal-order-fulfillment.md) |
 | **Customer cancellation** | `POST /order/v1/private/orders/:id/cancel` (202/200 replay/409) | `CancellationWorkflow` (`order-cancellation-<id>-v<epoch>`): policy gate (shipment not dispatched) → cancel shipment → void/refund remainder by current payment state → release RESERVED stock (COMMITTED = accepted shrinkage) → `cancelled`; exhaustion parks in `manual_review` | Temporal; shipping, payment, inventory (gRPC) | Implemented (RFC-0021 P5) | [ADR-033](../proposals/adr/ADR-033-order-status-cancellation/) |
 | **Order-details aggregation** | `GET /order/v1/private/orders/:id/details` | gRPC fan-out with soft-fail enrichment: `GetShipmentByOrder` and `GetPayment` — the `shipment`/`payment` blocks are omitted (`omitempty`) when absent or unavailable | shipping, payment | Implemented | [API call graph](api.md#current-east-west-call-graph) |
 | **Server-side pricing** | — (calls cart) | REST `GET /cart/v1/private/cart` with the user's forwarded `Authorization` — cart is the pricing authority at checkout | cart | **Technical debt** (P6 removal, RFC-0015 — see [§6](#6-known-gaps--ongoing-work)) | — |
@@ -316,4 +317,4 @@ templates.
 
 *Run the whole platform locally for verification: `cd local-stack && docker compose up -d --build` → SPA at http://localhost:3001, Kong gateway at http://localhost:8080 (demo login `alice` / `password123`).*
 
-_Last updated: 2026-08-04_
+_Last updated: 2026-08-05_

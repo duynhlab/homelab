@@ -177,6 +177,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`docs/api/` matches the P4 as-built** now that order 1.13.0 is Current on the
+  cluster (this sync was held back from the code PR on purpose — those files
+  describe deployed reality, and the two-branch saga was still what ran). The saga
+  step table, both saga sequence diagrams, the platform call graph and the order
+  topology diagram lose the product stock edge; the participant section documents
+  the refusal, where it lives and why a workflow panic alone is not enough; and
+  `product.md` stops claiming product owns stock — the column and ledger are marked
+  FROZEN since the W7 write cutover, with the RPCs recorded as registered but
+  caller-less. All 17 changed Mermaid blocks re-rendered.
+
 - **The order reconciler runs on the CURRENT worker build only** — it was `true` on
   all three side-by-side builds, so three judges shared one scan that claims
   nothing (no `FOR UPDATE SKIP LOCKED`), which its own docs say must have a single

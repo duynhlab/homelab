@@ -426,7 +426,6 @@ flowchart LR
 | Product | Review | `GetProductReviews` | gRPC | Cluster and local-stack |
 | Order API | Shipping | `GetShipmentByOrder` | gRPC | Cluster and local-stack |
 | Order API | Payment | `GetPayment` | gRPC | Cluster and local-stack |
-| Order worker | Product | `ReserveStock`, `ReleaseStock` (pre-cutover sagas draining) | gRPC | Cluster and local-stack |
 | Order worker | Inventory | `Reserve`, `Commit`, `Release`, `GetReservation` | gRPC | Cluster and local-stack |
 | Order API | Inventory | `GetReservation` (`/details` enrichment) | gRPC | Cluster and local-stack |
 | Order worker | Shipping | `CreateShipment`, `CancelShipment` | gRPC | Cluster and local-stack |
@@ -449,7 +448,7 @@ services moved to local JWT verification.
 
 - No `/internal/` audience is exposed at either edge — verified in
   [kong.yml](../../local-stack/gateway/kong.yml) and
-  [ingress-api.yaml](../infra/configs/kong/ingress-api.yaml). NetworkPolicy is
+  [ingress-api.yaml](../../kubernetes/infra/configs/kong/ingress-api.yaml). NetworkPolicy is
   the fence.
 - Known local divergence: local-stack Kong routes product and order on bare
   prefixes (`/product/`, `/order/`) while the cluster ingress splits
@@ -589,7 +588,7 @@ Owner: [order.md](./order.md); step order and compensations:
 sequenceDiagram
     participant W as order-worker (saga)
     participant Pay as payment
-    participant Prod as product
+    participant Inv as inventory
     participant Ship as shipping
     participant Ord as order DB
     participant Not as notification
@@ -597,7 +596,7 @@ sequenceDiagram
 
     W->>Pay: gRPC Authorize (hold funds)
     Note over Pay: declined → order failed, nothing else touched
-    W->>Prod: gRPC ReserveStock
+    W->>Inv: gRPC Reserve (inventory)
     W->>Ship: gRPC CreateShipment
     W->>Pay: gRPC Capture (take the money)
     W->>Ord: ConfirmOrder — PIVOT (failure compensates, success commits)
@@ -605,6 +604,7 @@ sequenceDiagram
     W->>Not: gRPC SendEmail (confirmation)
     W->>Not: gRPC SendEmail (receipt)
     W->>Cart: DELETE /cart/v1/internal/cart/:userId (REST exception)
+    W->>Inv: gRPC Commit (mandatory forward — retried to completion)
 ```
 
 ## gRPC Runtime Model

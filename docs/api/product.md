@@ -1,15 +1,16 @@
 # Product Service API
 
-Product turns a raw catalog table into the platform's price and inventory
-authority: browsing reads come from a Valkey cache-aside layer, checkout money
-reads bypass that cache for the real row, and the order saga reserves stock
-through an idempotent ledger.
+Product turns a raw catalog table into the platform's price authority: browsing
+reads come from a Valkey cache-aside layer and checkout money reads bypass that
+cache for the real row. **Stock is no longer its business** — RFC-0021 moved the
+authority to inventory-service, and since P4 (order 1.13.0) nothing calls the
+stock RPCs at all.
 
 | Dimension | Value | Status |
 |-----------|-------|--------|
 | **Deployment** | local-stack + cluster | Implemented |
 | **HTTP** | public (+ one internal route, never at the edge) · `:8080` · Kong `/product/v1/public/` (local-stack: bare `/product/` — [divergence](#http-api)) | Partial |
-| **gRPC server** | `GetProducts`, `ReserveStock`, `ReleaseStock` · `:9090` | Implemented |
+| **gRPC server** | `GetProducts` · `:9090`. `ReserveStock` / `ReleaseStock` are still registered but have **no caller** since RFC-0021 P4 | Implemented / awaiting removal |
 | **gRPC client** | review (`ReviewService/GetProductReviews`) | Implemented |
 | **Worker** | None | None |
 | **Temporal** | Participant (gRPC) · [workflows.md#order-fulfillment](./workflows.md#order-fulfillment) | Implemented |
@@ -18,7 +19,8 @@ through an idempotent ledger.
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
 | **Repository** | [`duynhlab/product-service`](https://github.com/duynhlab/product-service) | — |
-| **Owns** | Products, categories, current prices, stock quantities, stock-reservation ledger | — |
+| **Owns** | Products, categories, current prices | — |
+| **No longer owns** | Stock. `products.stock_quantity` and `stock_reservations` are FROZEN — last written at the RFC-0021 W7 write cutover (2026-07-30) and never since. Inventory-service is the authority ([inventory.md](./inventory.md)) | Frozen, removal in progress |
 | **Database** | `product` on `product-db` (CNPG) via PgDog `pgdog-product.product:6432` | — |
 | **Design record** | — | [RFC-0003](../proposals/rfc/RFC-0003/) (superseded) → [RFC-0021](../proposals/rfc/RFC-0021/) — inventory extraction program |
 
@@ -26,10 +28,10 @@ through an idempotent ledger.
 
 | Field | Value |
 |-------|-------|
-| **Role** | Participant (gRPC) |
+| **Role** | **Former** participant (gRPC) — RFC-0021 P4 removed the saga branch that called it |
 | **Workflow** | `OrderFulfillmentWorkflow` (owned by order) |
-| **This service's steps** | `ReserveStock`, `ReleaseStock` (compensation) |
-| **Idempotency** | `reservation_id` = order id |
+| **This service's steps** | None. Historically `ReserveStock` + `ReleaseStock`; the saga now reserves at inventory-service |
+| **Idempotency** | `reservation_id` = order id (historical) |
 | **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
 
 ## Why it exists
@@ -63,15 +65,12 @@ flowchart LR
     Product --> DB[("product DB<br/>via PgDog :6432")]
     Product -->|"gRPC GetProductReviews<br/>3s deadline, soft-fail"| Review[review]
     Checkout[checkout] -->|"gRPC GetProducts<br/>cache-bypass"| Product
-    Worker["order-worker"] -->|"gRPC ReserveStock /<br/>ReleaseStock"| Product
 
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     class SPA,Kong edge;
     class Product,Review,Checkout service;
-    class Worker worker;
     class DB,Cache data;
 ```
 
@@ -236,7 +235,7 @@ context deadline on top of the `pkg/grpcx` default.
 |-----------|------|-----------|---------|
 | Inbound | Browser SPA via Kong | HTTP | Catalog browsing, product page |
 | Inbound | checkout | gRPC `GetProducts` | Price/availability re-validation at session create + confirm ([checkout.md](./checkout.md)) |
-| Inbound | order-worker | gRPC `ReserveStock` / `ReleaseStock` | Saga stock step + compensation ([temporal-order-fulfillment.md](./temporal-order-fulfillment.md)) |
+| ~~Inbound~~ | ~~order-worker~~ | ~~gRPC `ReserveStock` / `ReleaseStock`~~ | **Gone.** RFC-0021 P4 deleted the saga branch that called these; order no longer dials product at all, and the NetworkPolicy allow is being withdrawn ([temporal-order-fulfillment.md](./temporal-order-fulfillment.md)) |
 | Outbound | review | gRPC `GetProductReviews` | Product-details enrichment ([review.md](./review.md)) |
 | Outbound | product DB via PgDog | Postgres | All persistence |
 | Outbound | Valkey | RESP | Cache-aside layer |
@@ -245,19 +244,29 @@ Platform-wide call graph: [api.md § Current east-west call graph](./api.md#curr
 
 ## Known gaps
 
-- **Stock ownership is scheduled to leave this service** —
-  [RFC-0021](../proposals/rfc/RFC-0021/README.md) (supersedes RFC-0003) extracts a
-  dedicated inventory-service as the sole stock authority via expand → migrate →
-  contract. Until that program's phase 4, everything documented here (stock
-  columns, `ReserveStock`/`ReleaseStock`, `available_qty`) remains the deployed
-  reality; the stock RPC surface is **Planned** for deprecation, not yet
-  deprecated.
+- **Stock has left this service, and the leftovers are still visible** —
+  [RFC-0021](../proposals/rfc/RFC-0021/README.md) (supersedes RFC-0003) made
+  inventory-service the sole authority via expand → migrate → contract. As of
+  phase 4:
+  - **No caller.** The saga branch that called `ReserveStock`/`ReleaseStock` is
+    deleted (order 1.13.0), and checkout's availability read has been on
+    inventory since W8. The RPCs are still *registered* — removing them is the
+    next contract step, gated on two weeks of zero on
+    `product_stock_surface_calls_total`.
+  - **Stale data still served.** `stock_quantity` in list/detail payloads and the
+    `/details` `stock.available` / `stock.quantity` block are read from the frozen
+    column, so they report whatever was true at the write cutover and never
+    change. The SPA product page still renders them. Removing them needs a
+    decision about where the page's availability comes from — that is an open
+    question, not an oversight.
+  - **Schema and grants** (`products.stock_quantity`, `stock_reservations`, the
+    migration-000005 GRANT to the inventory backfill role) are the last, and
+    irreversible, step.
 - gRPC east-west mTLS is **Planned** platform-wide (RFC-0020 research);
   today the `:9090` surface is fenced by NetworkPolicy only.
-- The check-then-reserve TOCTOU window (checkout `GetProducts` vs saga
-  `ReserveStock`) was an accepted tradeoff under RFC-0003; RFC-0021 keeps the
-  same stance (availability checks stay advisory — `Reserve` is the correctness
-  gate) while moving the reserve path to inventory.
+- The check-then-reserve TOCTOU window was an accepted tradeoff under RFC-0003
+  and the stance is unchanged now that both halves have moved: availability
+  checks stay advisory, and inventory's `Reserve` is the correctness gate.
 
 ## Operations
 
@@ -316,4 +325,4 @@ Paths in [`duynhlab/product-service`](https://github.com/duynhlab/product-servic
 - [Caching (platform)](../caching/README.md) — Valkey deployment and ops
 - [RFC-0003](../proposals/rfc/RFC-0003/) — inventory ownership and stock semantics
 
-_Last updated: 2026-07-21_
+_Last updated: 2026-08-05_

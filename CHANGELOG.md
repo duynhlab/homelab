@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stock) with the stock rules pointing at `inventory.md` instead of being
   duplicated in stale form.
 
+- **RFC-0021 P4 — checkout pinned to `0.5.1`**: `POST /sessions` answers **503 +
+  `Retry-After: 2`** when a dependency is down, instead of the 500 it shared with an
+  unhandled error. Found by the phase-4 e2e, and the asymmetry is what made it worth
+  a release: confirm already answered 503 for the same condition, so a shopper who
+  hit a momentary inventory outage at the *start* of checkout was told the server was
+  broken, while the same outage one step later told them to retry.
+
 - **RFC-0021 P4 — product pinned to `1.11.0`; the `PRODUCT_AVAILABILITY_SOURCE`
   input and its template block are gone.** The flag's `product` position had become a
   trap: since 1.8.0 it meant the detail page carried **no availability at all**, and

@@ -164,7 +164,8 @@ Dropping `stock_quantity`/`stock_reservations` and the stock RPCs has no
 rollback; the gates make it unnecessary, and each one is a MEASUREMENT, not an
 assumption:
 
-1. **Deprecation telemetry at zero for ≥ 2 weeks.**
+1. **Deprecation telemetry at zero for ≥ 2 weeks.** ⚠️ **WAIVED 2026-08-05 —
+   see below.** As designed:
    `product_stock_surface_calls_total{rpc}` counts every hit on the surface
    being removed (`ReserveStock`, `ReleaseStock`). The clock starts when the
    counter is DEPLOYED, not when it is merged — the third
@@ -172,9 +173,29 @@ assumption:
    ```promql
    sum by (rpc) (increase(product_stock_surface_calls_total[14d]))
    ```
+
+   > **Waiver, owner decision, 2026-08-05.** The instrument was deployed
+   > 2026-07-31, so this window would have closed 2026-08-14. The owner chose
+   > code evidence instead and accepted losing the safety net for an
+   > unforeseen caller: the order saga's product branch is deleted in order
+   > **1.13.0** (Current on the cluster, with no `productv1` client left at
+   > all), checkout reads availability from inventory at canary 100%, and a
+   > sweep of all repositories found no other reference.
+   >
+   > **The instrument is removed with the RPCs**, so this gate cannot be
+   > checked retroactively: the query above now returns *empty*, and empty is
+   > indistinguishable from zero on a dashboard. Do not read a flat panel as
+   > evidence that the gate passed — it was waived, and this note is the
+   > record. The remaining detection channel is `Unimplemented` replies, which
+   > `grpcx` logs at error level, and only after something has already broken.
 2. **Open workflows on the product branch = 0, and namespace retention (7 d)
    expired since the last one closed** — nothing left that could replay onto
-   the branch being deleted:
+   the branch being deleted. Still required, and phase 4 changed what happens
+   if it is not met: order 1.13.0 **refuses** a product-participant history
+   rather than running it, so such a saga stalls with its stock held instead
+   of taking the wrong branch. The 1.12.x worker build must therefore keep
+   polling until those histories drain — see the build manifests under
+   `kubernetes/apps/`.
    ```bash
    kubectl -n temporal exec deploy/temporal-admintools -- \
      temporal workflow count --namespace mop \
@@ -189,4 +210,4 @@ assumption:
    `000005` GRANT) revoked in the same wave.
 
 ---
-_Last updated: 2026-07-27_
+_Last updated: 2026-08-05_

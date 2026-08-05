@@ -177,6 +177,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The phase-4 removal gate is recorded as WAIVED, not quietly skipped.** The
+  RFC's two-week-zero window on `product_stock_surface_calls_total` would have
+  closed 2026-08-14; the owner chose code evidence on 2026-08-05 instead. The
+  waiver matters because the instrument is deleted with the RPCs, so the gate
+  query returns *empty* afterwards and empty reads the same as zero on a
+  dashboard — `cutover-rollback.md` and the product pin now say so explicitly,
+  including that the only remaining detection channel is `Unimplemented` replies
+  logged at error level, after something has already broken.
+
 - **`docs/api/` matches the P4 as-built** now that order 1.13.0 is Current on the
   cluster (this sync was held back from the code PR on purpose — those files
   describe deployed reality, and the two-branch saga was still what ran). The saga

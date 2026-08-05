@@ -36,6 +36,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stock) with the stock rules pointing at `inventory.md` instead of being
   duplicated in stale form.
 
+- **RFC-0021 P4 — product pinned to `1.11.0`; the `PRODUCT_AVAILABILITY_SOURCE`
+  input and its template block are gone.** The flag's `product` position had become a
+  trap: since 1.8.0 it meant the detail page carried **no availability at all**, and
+  `1.10.0` dropped the column underneath it. Third default in this migration pointing
+  at an authority that was already removed, after `ORDER_STOCK_PARTICIPANT` and
+  `CHECKOUT_AVAILABILITY_SOURCE` — the pattern being that a migration flag outlives
+  its migration as a footgun unless removing it is part of the contraction. The pin
+  and the input removal ride in one PR on purpose: dropping the input while `1.10.0`
+  was pinned would trip exactly that default, and env and image live in the same
+  Deployment template so each pod rolls with both at once. Nothing is lost — an
+  unreachable inventory still resolves to `status: unknown` and the SPA still allows
+  add-to-cart, because checkout is where availability is enforced.
+
 - **RFC-0021 P4 — product pinned to `1.10.0`, the irreversible step**: migration
   `000006` revokes the migration-`000005` cross-service grant, drops
   `stock_reservations`, then drops `products.stock_quantity`. Product no longer owns

@@ -20,6 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stock) with the stock rules pointing at `inventory.md` instead of being
   duplicated in stale form.
 
+- **RFC-0021 P4 — inventory pinned to `0.3.0`**: the phase-2 `backfill` subcommand
+  and its `PRODUCT_DB_*` config surface are retired. It read
+  `products.stock_quantity` through the cross-service grant, and phase 4 removes
+  both. This pin has to land **before** product 1.10.0 carries the migration that
+  drops the column: remove the reader, then the read. Running the retired verb now
+  refuses loudly — the deleted `case` used to fall through to `default`, which
+  serves the app, so `backfill --apply` would have started a full HTTP + gRPC
+  server inside a one-shot Job holding product-database credentials.
+
 ### Added
 
 - **RFC-0021 P4 — order worker build `1-13-0` staged** (order 1.13.0: the saga's

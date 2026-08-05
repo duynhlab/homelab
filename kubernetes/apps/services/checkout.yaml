@@ -15,17 +15,13 @@ spec:
     # fallback, because the fallback read product's stock column, which was frozen
     # at the W7 write cutover and removed from the contract in product 1.8.0.
     #
-    # The four CHECKOUT_AVAILABILITY_* envs are no longer read by this binary.
-    # THEY ARE STILL RENDERED BELOW ON PURPOSE, and this pin must land ALONE:
-    # 0.4.x defaults CHECKOUT_AVAILABILITY_SOURCE to `product`, so removing the
-    # inputs while a 0.4.x pod is still serving would move the availability
-    # authority back onto the frozen column. Inputs come out in the FOLLOWING
-    # commit, once this image is the one running.
-    #
-    # This is the same trap ORDER_STOCK_PARTICIPANT set two slices ago, and the
-    # inverse of the one recorded in the 0.4.0 comment (an env the process
-    # silently ignored). A default is not a safe fallback when the default is the
-    # thing being removed.
+    # The CHECKOUT_AVAILABILITY_* inputs are GONE as of the commit after this
+    # pin, and the two-step was the point: 0.4.x defaulted
+    # CHECKOUT_AVAILABILITY_SOURCE to `product`, so removing them while a 0.4.x
+    # pod still served would have moved the availability authority back onto the
+    # frozen column. Same trap ORDER_STOCK_PARTICIPANT set, and the inverse of the
+    # W8 one (an env the process silently ignored). A default is not a safe
+    # fallback when the default is the thing being removed.
     #
     # 0.5.0 also fixes a dead end found in adversarial review: an unsellable or
     # wrong-currency line used to answer 503 "retry with the same key" for a
@@ -59,22 +55,4 @@ spec:
     order_grpc_addr: "dns:///order.order.svc.cluster.local:9090"
     shipping_grpc_addr: "dns:///shipping.shipping.svc.cluster.local:9090"
     inventory_grpc_addr: "dns:///inventory.inventory.svc.cluster.local:9090"
-    # RFC-0021 W8 read-flip ladder: product -> shadow -> (canary %) -> inventory.
-    # `shadow` serves availability FROM PRODUCT unchanged and additionally reads
-    # inventory to compare — inventory_shadow_compare_total is the divergence
-    # measure, and CheckoutInventoryShadowDivergence staying silent is the gate
-    # for the next rung. In shadow/inventory mode an inventory dial failure
-    # fails checkout startup on purpose: it must never silently degrade back to
-    # product mode.
-    # W8 rung 3 (final): every user reads availability from inventory — the
-    # RFC-0021 read cutover is complete. The ladder that got here: shadow (30
-    # minutes of double-reads, zero mismatches), then a 20% keyed canary whose
-    # per-user arms were verified exactly against the HMAC (8/8), both arms
-    # confirming at baseline with all thirteen write-migration alerts silent.
-    # pct stays explicit at the open dial for the same reason
-    # ORDER_STOCK_PARTICIPANT does: the next dial-down must be a one-line,
-    # greppable diff, and the salt wiring stays live so it needs no plumbing.
-    checkout_availability_source: "inventory"
-    checkout_availability_canary_pct: 100
-    checkout_availability_canary_salt_secret: "checkout-availability-canary"
     # Temporal default (temporal-frontend.temporal:7233) is correct as-is.

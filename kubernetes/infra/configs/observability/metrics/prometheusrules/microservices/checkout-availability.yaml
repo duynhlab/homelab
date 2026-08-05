@@ -1,0 +1,106 @@
+# Checkout availability signals.
+#
+# Since RFC-0021 phase 4 inventory-service is the ONLY authority for whether a
+# basket can be fulfilled. That makes it a single point of failure on the money
+# path, and it needs a signal of its own:
+#
+#   checkout_availability_check_total{result} — emitted by checkout (app="checkout")
+#     result ∈ ok       — inventory answered and the basket is fulfillable
+#              shortage — inventory answered and refused the basket (a BUSINESS
+#                         answer: the shopper is told to requote)
+#              error    — the RPC failed or timed out. Checkout fails CLOSED:
+#                         ErrUpstream (503), never read as a shortage
+#
+# This replaces the phase-2 shadow-compare rules. Those watched
+# inventory_shadow_compare_total, which no longer exists — checkout 0.5.0 removed
+# the compare along with the product-availability path there was something to
+# compare against. A rule on a series nothing emits does not go quiet loudly: it
+# goes BLIND, because no data never fires.
+#
+# OTLP push path: no job label; vmagent maps service_name->app, so selectors key on
+# the checkout-emitted metric name directly.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: checkout-availability-rules
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/component: recording-rules
+spec:
+  groups:
+    - name: checkout-availability-5m
+      interval: 30s
+      rules:
+        # Outcomes/sec by result — the shape on-call reads first.
+        - record: checkout:availability_check:rate5m
+          expr: sum by (result) (rate(checkout_availability_check_total[5m]))
+
+        # Error share of answered checks. clamp_min avoids 0/0 on an idle stack.
+        - record: checkout:availability_error:ratio5m
+          expr: |
+            sum(rate(checkout_availability_check_total{result="error"}[5m]))
+            /
+            clamp_min(sum(rate(checkout_availability_check_total[5m])), 1)
+
+    - name: checkout-availability-alerts
+      rules:
+        # The authority is not answering. Every affected basket gets a 503, so a
+        # sustained rate means customers cannot complete checkout — and because
+        # checkout fails closed, this is the ONLY signal that separates "inventory
+        # is down" from "inventory is refusing baskets": both used to arrive as a
+        # generic ErrUpstream.
+        - alert: CheckoutAvailabilityErrors
+          expr: |
+            sum(rate(checkout_availability_check_total{result="error"}[10m]))
+            /
+            clamp_min(sum(rate(checkout_availability_check_total[10m])), 1)
+            > 0.01
+          for: 10m
+          labels:
+            severity: critical
+            rfc: "0021"
+          annotations:
+            summary: "Checkout availability checks failing >1% (inventory unreachable or erroring)"
+            description: >-
+              Over 1% of availability checks returned error for 10m. Checkout fails
+              closed, so each one is a 503 to a shopper trying to create or confirm
+              a session. There is no fallback authority since RFC-0021 phase 4.
+            runbook: >-
+              Check inventory-service health and its gRPC RED metrics, then the
+              checkout→inventory NetworkPolicy (allow-inventory-grpc admits the
+              checkout namespace) and INVENTORY_GRPC_ADDR on the checkout pods.
+              A wiring mistake looks identical to an outage here, which is why
+              checkout startup-validates the address and panics on a nil client.
+
+        # Inventory answering "no" for essentially everything is far more likely a
+        # DATA problem than a real stockout, and it is otherwise invisible: a
+        # shortage is a legitimate business answer, so nothing else complains.
+        #
+        # This is the guard for a known contract gap. inventory.v1
+        # CheckAvailability cannot say "I have no data for this SKU" — its response
+        # is {can_fulfill, shortages}, and can_fulfill=false is also the zero
+        # value. So a backfill gap or a SKU-namespace drift reads as a definite,
+        # customer-facing "out of stock" on every basket that touches it. Until the
+        # contract can express unknown, this alert is how that shows up.
+        - alert: CheckoutAvailabilityRefusingEverything
+          expr: |
+            sum(rate(checkout_availability_check_total{result="shortage"}[15m]))
+            /
+            clamp_min(sum(rate(checkout_availability_check_total{result=~"ok|shortage"}[15m])), 1)
+            > 0.95
+          for: 30m
+          labels:
+            severity: warning
+            rfc: "0021"
+          annotations:
+            summary: "Checkout availability refusing >95% of baskets (suspect inventory data, not demand)"
+            description: >-
+              Inventory has refused essentially every basket for 30m. Genuine
+              stockouts do not look like this; a missing backfill, a SKU id
+              mismatch, or balances at zero do.
+            runbook: >-
+              Compare a known-good product id against inventory_balances
+              (sku_id = the product id as text) and check the inventory backfill
+              Job last ran. `CheckAvailability` cannot report an unknown SKU, so
+              an absent row is indistinguishable from zero stock on the wire —
+              query the table, do not infer it from the answer.

@@ -549,8 +549,6 @@ services:
       # decides — the phase-2 local-stack read-path exercise. Set `inventory` to
       # test the split-read gate; `product` to disable.
       INVENTORY_GRPC_ADDR: dns:///inventory:9090
-      CHECKOUT_AVAILABILITY_SOURCE: shadow
-      CHECKOUT_AVAILABILITY_SHADOW_PCT: "100"
       TEMPORAL_HOSTPORT: temporal:7233
       TEMPORAL_NAMESPACE: mop
       TASK_QUEUE: checkout

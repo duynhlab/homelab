@@ -49,6 +49,8 @@ can disagree while every service reports perfectly healthy.
 | OrderReconcilerInvariantBreach | critical | correctness | [OrderReconcilerInvariantBreach.md](OrderReconcilerInvariantBreach.md) |
 | FulfillmentStartOutboxStalled | critical | availability | [FulfillmentStartOutboxStalled.md](FulfillmentStartOutboxStalled.md) |
 | FulfillmentStartOutboxFailed | critical | correctness | [FulfillmentStartOutboxFailed.md](FulfillmentStartOutboxFailed.md) |
+| CheckoutAvailabilityErrors | critical | availability | [CheckoutAvailabilityErrors.md](CheckoutAvailabilityErrors.md) |
+| CheckoutAvailabilityRefusingEverything | warning | correctness | [CheckoutAvailabilityRefusingEverything.md](CheckoutAvailabilityRefusingEverything.md) |
 | OrderSagaCompensationFailing | critical | correctness | [OrderSagaCompensationFailing.md](OrderSagaCompensationFailing.md) |
 | OrderSagaNotCompleting | critical | availability | [OrderSagaNotCompleting.md](OrderSagaNotCompleting.md) |
 | OrderReconcilerBacklogNotDraining | warning | database | [OrderReconcilerBacklogNotDraining.md](OrderReconcilerBacklogNotDraining.md) |
@@ -106,4 +108,4 @@ saturation (`MicroserviceHighRequestsInFlight`), `MicroserviceGCThrash`,
 `MicroserviceHighRestartRate` (use `KubePodCrashLooping`).
 
 ---
-_Last updated: 2026-08-02_
+_Last updated: 2026-08-05_

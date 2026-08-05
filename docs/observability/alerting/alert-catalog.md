@@ -411,7 +411,8 @@ deliberately stops short of now by a 5-minute settlement lag — and it oscillat
 by the ticker interval on top of that, so healthy values reach ~600s between
 passes. 1800s is measured against that behaviour, not guessed.
 | InventoryGrpcErrorRatio | warning | inventory gRPC error ratio | Callers (order saga, checkout reads) are being refused by inventory-service | see manifest |
-| CheckoutInventoryShadowDivergence | warning | shadow-compare divergence `>1%` | Inventory disagrees with Product on the read path — blocks the read-flip gate | 30m |
+| CheckoutAvailabilityErrors | **critical** | `checkout_availability_check_total{result="error"}` share `>1%` | Inventory is the ONLY availability authority since RFC-0021 P4 and checkout fails closed, so each error is a 503 to a shopper. Also the only signal separating "inventory down" from "inventory refusing baskets" | 10m |
+| CheckoutAvailabilityRefusingEverything | warning | shortage share `>95%` | Inventory refusing essentially every basket is a data problem (backfill gap, SKU-id drift, zeroed balances), not demand. Guards a contract gap: `CheckAvailability` cannot say "no data for this SKU", so an absent row reads as a definite out-of-stock | 30m |
 
 **Why `absent()` appears in this domain and nowhere else.**
 `order_reconciler_backlog` is an OTel observable gauge whose callback queries the

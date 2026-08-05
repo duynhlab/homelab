@@ -205,42 +205,6 @@ spec:
           - name: INVENTORY_GRPC_ADDR
             value: << inputs.inventory_grpc_addr >>
           <<- end >>
-          <<- if (index inputs "checkout_availability_source") >>
-          # RFC-0021 W8: where checkout READS availability (product | shadow |
-          # inventory, startup-validated). Emitted here rather than set on the
-          # chart, because the mop chart has no such value: an input without a
-          # template block would be silently dropped and the flag would read as
-          # its code default with nothing to show it never arrived.
-          #
-          # A plain `#` comment, like every other comment in this template — and
-          # deliberately so. A Go template comment (the slash-star form written
-          # inside the action delimiters) is NOT interchangeable: the lexer looks
-          # for the closing delimiter immediately after the star-slash, so one
-          # space before it is a PARSE error that fails the WHOLE ResourceSet —
-          # every service in this domain — and nothing in `make validate` can see
-          # it, because resourcesTemplate is an opaque string to kubeconform. The
-          # delimiters cannot even be MENTIONED in prose here: the lexer scans
-          # this text too and would open an action inside a YAML comment.
-          - name: CHECKOUT_AVAILABILITY_SOURCE
-            value: << inputs.checkout_availability_source >>
-          <<- end >>
-          <<- if (index inputs "checkout_availability_canary_pct") >>
-          # RFC-0021 W8 canary rung: percentage of users bucketed onto inventory
-          # reads (HMAC of the user id with the salt below — keyed, so buckets
-          # are stable per user and unguessable without the salt).
-          - name: CHECKOUT_AVAILABILITY_CANARY_PCT
-            value: << inputs.checkout_availability_canary_pct | quote >>
-          <<- end >>
-          <<- if (index inputs "checkout_availability_canary_salt_secret") >>
-          # The bucket key comes from a Secret (OpenBAO -> ExternalSecret), never
-          # a manifest literal: whoever can read git must not be able to compute
-          # which arm a user lands on.
-          - name: CHECKOUT_AVAILABILITY_CANARY_SALT
-            valueFrom:
-              secretKeyRef:
-                name: << inputs.checkout_availability_canary_salt_secret >>
-                key: salt
-          <<- end >>
           <<- if (index inputs "order_grpc_addr") >>
           - name: ORDER_GRPC_ADDR
             value: << inputs.order_grpc_addr >>

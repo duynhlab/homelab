@@ -1,9 +1,15 @@
-# RFC-0021 phase-3 write-migration rules + alerts.
+# RFC-0021 order-side stock rules + alerts (born in phase 3 as the
+# write-migration set; STEADY STATE since phase 4).
 #
-# The order saga's stock writes migrate Product -> Inventory behind
-# ORDER_STOCK_PARTICIPANT (product|inventory), read by the order API and pinned
-# into each workflow's input, so a flag revert only redirects NEW sagas. Three
-# order-side mechanisms need watching once the write path moves:
+# The migration these were written for is over. The order saga's stock writes moved
+# Product -> Inventory behind ORDER_STOCK_PARTICIPANT, and phase 4 deleted the
+# product branch outright (order 1.13.0) along with product's stock RPCs and schema.
+# The flag is no longer a switch: `inventory` is the only servable participant, and a
+# workflow recorded with any other one is REFUSED rather than re-routed.
+#
+# The file keeps its name and its rules because the three mechanisms it watches are
+# permanent, not migration scaffolding — they are how a saga's stock promise is
+# observed at all:
 #
 #   1. CommitInventory — mandatory-forward after the ConfirmOrder pivot. A
 #      confirmed order MUST converge to COMMITTED stock; the lag between the two
@@ -46,11 +52,12 @@
 # situations in which stranded stock accumulates fastest. Alert expressions
 # therefore aggregate rather than assume a single reporter.
 #
-# PRE-CUTOVER READINGS: until an operator sets ORDER_STOCK_PARTICIPANT=inventory,
-# no order takes the inventory branch, so the commit-lag histogram has no series
-# at all and the reconciler settles every order through its product-path branch
-# (a missing reservation is normal there). The rules land now so the signal is
-# ready before the flip, exactly as the read-migration rules did.
+# READINGS SINCE PHASE 4: every order takes the inventory branch, so the commit-lag
+# histogram always has series and a missing reservation on a terminal order is a real
+# finding rather than the normal product-path shape it used to be. The pre-cutover
+# caveat that used to live here (no inventory series until the flag flipped) no longer
+# applies -- an empty commit-lag histogram now means orders are not completing, not
+# that the migration has not started.
 #
 # OTLP push path: no job label; vmagent maps service_name->app, so selectors key
 # on the order-emitted metric name directly.
@@ -66,10 +73,16 @@ spec:
     - name: rfc0021-write-migration-5m
       interval: 30s
       rules:
-        # Stock-reservation outcomes/sec split by participant — the cutover's
-        # core progress signal. After the flip, product-path rate must fall to 0
-        # as in-flight sagas drain; a stubborn non-zero product rate means
-        # workflows are still being STARTED on the old participant.
+        # Stock-reservation outcomes/sec, still split by participant.
+        #
+        # As a MIGRATION signal this is spent: `participant` has exactly one
+        # servable value now, and a counter with one possible label value is not a
+        # signal. It is kept split for two reasons that outlive the migration —
+        # `result` is the actual RED view of the saga's stock step, and a
+        # `participant="product"` series REAPPEARING would mean a pre-P4 history is
+        # being started on a build that still has the branch, which is precisely the
+        # thing phase 4 made impossible. Zero is the expected reading; non-zero is a
+        # finding.
         - record: rfc0021:order_stock_reservation:rate5m
           expr: sum by (participant, result) (rate(order_stock_reservation_total[5m]))
 

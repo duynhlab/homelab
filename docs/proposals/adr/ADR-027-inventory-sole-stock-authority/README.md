@@ -4,9 +4,9 @@ Extract stock (warehouse, balance, reservation, movement) out of product-service
 into a dedicated inventory-service, superseding RFC-0003's "product owns
 inventory" stance.
 
-| Status | Date | Related RFC | Related research |
-|--------|------|-------------|------------------|
-| Accepted | 2026-07-24 | [RFC-0021](../../rfc/RFC-0021/) | [RFC-0021 research.md](../../rfc/RFC-0021/research.md) |
+| Status | Date | Related RFC | Related research | Adoption |
+|--------|------|-------------|------------------|----------|
+| Accepted | 2026-07-24 | [RFC-0021](../../rfc/RFC-0021/) | [RFC-0021 research.md](../../rfc/RFC-0021/research.md) | **Complete** (2026-08-05) |
 
 > **Every decision is a tradeoff.** A clean bounded context for stock costs a new
 > service, database, NetworkPolicy/Kyverno surface, and a new east-west hop on the
@@ -14,11 +14,19 @@ inventory" stance.
 > a real reservation and movement model, and the migration discipline the platform
 > exists to practise.
 
-> **Foundation shipped, authority not yet cut over.** inventory-service is deployed
-> (local-stack + cluster) and its `inventory.v1` gRPC contract is **Implemented**,
-> but it has **no live caller**: product-service remains the live stock authority
-> today. Inventory *becomes* the sole authority incrementally through RFC-0021
-> phases 2–4. This ADR records the decision; it does not assert a completed cutover.
+> **Cutover complete (2026-08-05).** inventory-service is the sole stock authority:
+> it serves every availability read (checkout 0.5.0, product `/details`) and every
+> stock write in the order saga (order 1.13.0). Product's side is not merely unused —
+> it is **removed**: the RPCs left the contract (pkg v0.33.0/v0.34.0, product
+> 1.7.0/1.8.0) and `products.stock_quantity` plus `stock_reservations` were dropped
+> by product migration `000006` (1.10.0), along with the cross-service grant and the
+> `pg_hba` line that made the phase-2 backfill possible.
+>
+> This banner used to read *"authority not yet cut over — product remains the live
+> authority"*. It is kept in this shape rather than deleted so the ADR still shows
+> that the decision was recorded **before** the cutover, not after it. RFC-0021
+> phases 2–4 are what closed the gap; the phase-by-phase record is in
+> [RFC-0021 § Implementation history](../../rfc/RFC-0021/README.md).
 
 ## Context
 

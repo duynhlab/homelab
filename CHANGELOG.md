@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **RFC-0021 phase 4 closed, and the docs stopped describing a migration in flight.**
+  RFC status → *phases 0–6 shipped*, with a phase-4 implementation-history entry that
+  records the removal order and the four production-shaped bugs execution found that
+  review did not; [ADR-027](docs/proposals/adr/ADR-027-inventory-sole-stock-authority/)
+  **Adoption → Complete** and its banner corrected — it still said *"authority not yet
+  cut over, product remains the live authority"*, kept in banner shape so the ADR still
+  shows the decision was recorded before the cutover rather than after it.
+  `docs/api/inventory.md` said **no live caller**; it has three. `workflows.md`,
+  `order.md`, and `temporal-order-fulfillment.md` still named `order-worker-1-10-0` as
+  the worker and product as a saga participant. The order-side stock rules kept their
+  phase-3 framing (`ORDER_STOCK_PARTICIPANT` as a live switch, *"pre-cutover
+  readings"*) — re-framed as steady state, rules unchanged, with the
+  `participant="product"` series reinterpreted: it is no longer a progress signal but
+  a finding, since a value reappearing there would mean a pre-P4 history started on a
+  build that still has the branch.
+
 - **`docs/api/product.md` now describes a service that does not own stock.** It
   still documented `ReserveStock`/`ReleaseStock`/`GetProducts` as live RPCs, the
   `stock` block and `stock_quantity` in payloads, `stock_reservations` in the data

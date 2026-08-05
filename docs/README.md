@@ -14,7 +14,7 @@ docs/
 │   ├── microservices.md          # Feature ownership, techniques, dependencies, known gaps
 │   ├── auth.md                   # Auth HTTP contract, refresh rotation, JWKS
 │   ├── user.md                   # User profile contract
-│   ├── product.md                # Catalog, aggregation, stock gRPC contract
+│   ├── product.md                # Catalog, price gRPC contract, aggregation
 │   ├── cart.md                   # Cart HTTP contract + checkout gRPC read
 │   ├── order.md                  # Order HTTP/gRPC contract + Saga handoff
 │   ├── review.md                 # Review HTTP/gRPC contract

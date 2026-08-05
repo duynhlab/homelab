@@ -6,16 +6,18 @@ available-to-promise, and records every physical and reserved change in an
 append-only movement ledger — while catalog, price, and order status stay owned
 elsewhere.
 
-> **Contract stance:** As-built. The `inventory.v1` gRPC contract and its
-> data/behaviour model are deployed and Implemented. **The order saga is a live
-> caller since the W7 write cutover (2026-07-30)** — new sagas reserve, commit
-> and release here; checkout reads still use product-service's availability;
-> inventory becomes the live stock authority over [RFC-0021](../proposals/rfc/RFC-0021/)
-> phases 2–4. Cutover behaviour is tagged `Planned` and never presented as current.
+> **Contract stance:** As-built, and the cutover is **complete**. Every caller is
+> live: the order saga reserves/commits/releases here since the W7 write cutover
+> (2026-07-30), checkout reads availability here only (0.5.0), and product's
+> `/details` asks here for the page's availability. Phase 4 removed the alternative
+> rather than leaving it unused — product's stock RPCs, read fields, and schema are
+> all gone ([RFC-0021](../proposals/rfc/RFC-0021/), product migration `000006`). This
+> is the platform's **sole** stock authority; there is nothing to fail over to, which
+> is deliberate and is why callers fail closed.
 
 | Dimension | Value | Status |
 |-----------|-------|--------|
-| **Deployment** | local-stack + cluster — **no live caller** (product is still the live stock authority) | Implemented |
+| **Deployment** | local-stack + cluster — **sole stock authority**; callers: order saga, checkout, product `/details` | Implemented |
 | **Runtime modes** | `api` (serve) + `migrate` + `seed` (dev-only) | Implemented |
 | **HTTP server** | internal · `:8080` · `/health` + `/ready` only | Implemented |
 | **Edge exposure** | None — no Kong route; gRPC-only, NetworkPolicy-fenced | None |
@@ -239,9 +241,20 @@ platform-wide call graph is in
 
 ## Known gaps
 
-- **No live caller.** The gRPC contract is Implemented and deployed, but checkout
-  and the order saga still use product stock. Read cutover is RFC-0021 **phase 2**,
-  write cutover **phase 3**, product-stock removal **phase 4** — all **Planned**.
+- **Single point of failure on the money path, by design.** There is no second
+  authority: phase 4 removed product's, because the column it served had been frozen
+  since the write cutover and a fallback could only have answered with a stale
+  number. Callers therefore fail **closed** — checkout returns a retryable 503 rather
+  than guessing, product's `/details` degrades to `status: unknown`, and
+  `CheckoutAvailabilityErrors` pages on it.
+- **The contract cannot say "I have no data for this SKU."** `CheckAvailability`
+  answers `{can_fulfill, shortages}`, and `can_fulfill = false` is also the response's
+  zero value — so a missing balance row is indistinguishable on the wire from a real
+  zero, and reads to the shopper as a definite "out of stock". A missing row is now a
+  realistic state: the phase-2 backfill from product was retired with the column it
+  copied, so balances arrive only from a seed (dev) or an explicit `RECEIVE` movement.
+  Guarded by `CheckoutAvailabilityRefusingEverything` until the contract gains an
+  explicit unknown; adding a field is additive and cheap.
 - **No reservation auto-expiry (v1).** `expires_at` is observability-only; nothing
   transitions a reservation to `EXPIRED`. What shipped in phase 3 is the
   **order-domain reconciler** (live): it repairs stranded `RESERVED` holds through

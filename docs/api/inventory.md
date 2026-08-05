@@ -316,8 +316,8 @@ Transport peers call `logic/v1`; logic calls `core` only
 
 - [api.md](./api.md) — shared HTTP/gRPC rules, error envelope, gRPC runtime model, versioning
 - [Service contracts](./README.md#service-contracts) — deployment rollup
-- [product.md](./product.md) — the predecessor `stock_quantity`/`ReserveStock` model being replaced
-- [checkout.md](./checkout.md) · [order.md](./order.md) — future callers (phases 2–3)
+- [product.md](./product.md) — the predecessor `stock_quantity`/`ReserveStock` model, **removed** in RFC-0021 phase 4 (schema dropped by product migration `000006`)
+- [checkout.md](./checkout.md) · [order.md](./order.md) — the callers: checkout for availability, the order saga for reserve/commit/release
 - [RFC-0021](../proposals/rfc/RFC-0021/) — inventory extraction program (supersedes [RFC-0003](../proposals/rfc/RFC-0003/))
 - [ADR-027](../proposals/adr/ADR-027-inventory-sole-stock-authority/) — stock authority · [ADR-028](../proposals/adr/ADR-028-inventory-reservation-model/) — reservation/balance model
 

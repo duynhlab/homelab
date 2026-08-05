@@ -14,8 +14,8 @@ this is not an outage (that is
 [`CheckoutAvailabilityErrors`](CheckoutAvailabilityErrors.md)) — it is answering
 *"no"* to almost everything.
 
-**Genuine stockouts do not look like this.** A missing backfill, a SKU-id mismatch, or
-balances sitting at zero do.
+**Genuine stockouts do not look like this.** A missing balance row, a SKU-id
+mismatch, or balances sitting at zero do.
 
 ## Why this alert exists at all
 It guards a **contract gap**, and the gap is the reason a data problem here is
@@ -58,8 +58,14 @@ checkout:availability_check:rate5m   # confirm shortage, not error
 ```
 
 ## Mitigation
-1. **Missing rows** → run the inventory backfill (`Job inventory-backfill`; see the
-   RFC-0021 cutover doc) and re-check the counts.
+1. **Missing rows** → seed or adjust **at inventory**, not from product. The
+   phase-2 `inventory-backfill` Job was **retired in phase 4** along with
+   `products.stock_quantity`, the column it copied: product's numbers stopped
+   moving at the write cutover, so restoring from them would overwrite live stock
+   with a snapshot of cutover day.
+   - dev/demo cluster → `kubectl -n inventory exec deploy/inventory -- /app/main seed`
+   - a real correction → an explicit `RECEIVE` movement through inventory's normal
+     write path, which keeps `on_hand == SUM(on_hand_delta)` intact
 2. **Rows present, `on_hand` zero** → this may be real. Confirm against the business
    before treating it as a bug; if the platform was seeded without stock (a fresh
    cluster does not seed inventory), seed it.
@@ -71,9 +77,10 @@ Do **not** work around this by moving checkout back to product for availability 
 that path is gone and why reviving it would serve stale numbers.
 
 ## Escalation
-Ticket, not a page: the failure is a data problem and the fix is a backfill, not an
-incident response. Escalate to a page if it coincides with a deploy of
-inventory-service or with the backfill Job failing.
+Ticket, not a page: the failure is a data problem and the fix is a seed or an
+adjustment, not an incident response. Escalate to a page if it coincides with a
+deploy of inventory-service, or if `inventory_balances` is empty in a cluster that
+was serving orders — that is data loss, not a gap.
 
 ## References
 - [`CheckoutAvailabilityErrors`](CheckoutAvailabilityErrors.md)

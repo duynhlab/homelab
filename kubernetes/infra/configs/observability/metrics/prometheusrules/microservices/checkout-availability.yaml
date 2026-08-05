@@ -79,9 +79,10 @@ spec:
         # This is the guard for a known contract gap. inventory.v1
         # CheckAvailability cannot say "I have no data for this SKU" — its response
         # is {can_fulfill, shortages}, and can_fulfill=false is also the zero
-        # value. So a backfill gap or a SKU-namespace drift reads as a definite,
-        # customer-facing "out of stock" on every basket that touches it. Until the
-        # contract can express unknown, this alert is how that shows up.
+        # value. So a missing balance row or a SKU-namespace drift reads as a
+        # definite, customer-facing "out of stock" on every basket that touches
+        # it. Until the contract can express unknown, this alert is how that
+        # shows up.
         - alert: CheckoutAvailabilityRefusingEverything
           expr: |
             sum(rate(checkout_availability_check_total{result="shortage"}[15m]))
@@ -96,11 +97,13 @@ spec:
             summary: "Checkout availability refusing >95% of baskets (suspect inventory data, not demand)"
             description: >-
               Inventory has refused essentially every basket for 30m. Genuine
-              stockouts do not look like this; a missing backfill, a SKU id
+              stockouts do not look like this; a missing balance row, a SKU id
               mismatch, or balances at zero do.
             runbook: >-
               Compare a known-good product id against inventory_balances
-              (sku_id = the product id as text) and check the inventory backfill
-              Job last ran. `CheckAvailability` cannot report an unknown SKU, so
-              an absent row is indistinguishable from zero stock on the wire —
-              query the table, do not infer it from the answer.
+              (sku_id = the product id as text). `CheckAvailability` cannot
+              report an unknown SKU, so an absent row is indistinguishable from
+              zero stock on the wire — query the table, do not infer it from the
+              answer. Fix it AT inventory (seed, or an explicit RECEIVE
+              movement): the phase-2 backfill from product was retired in phase 4
+              with the column it copied.

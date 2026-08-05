@@ -61,11 +61,12 @@ spec:
     # degrades the page quietly instead of failing loudly.
     inventory_grpc_addr: "dns:///inventory.inventory.svc.cluster.local:9090"
     # `inventory` makes /details carry an `availability` block sourced from the
-    # authority. It does NOT remove the frozen `stock` block yet — the SPA still
-    # reads that one, so the switch is expand-then-contract: enable here, move the
-    # frontend, then drop `stock` from the response.
+    # authority, and since 1.8.0 it is the ONLY stock answer on that response —
+    # the frozen `stock` block is gone (see above). The expand-then-contract order
+    # was: enable here, move the frontend (#81), then drop `stock`.
     product_availability_source: "inventory"
-    # product serves gRPC on :9090 (ReserveStock/ReleaseStock — the saga's
-    # stock steps, dialed by order-worker); the chart renders the product-grpc
-    # headless Service from this.
+    # product serves gRPC on :9090 — one RPC, BatchGetCurrentPrices, dialed by
+    # checkout for price re-validation. ReserveStock/ReleaseStock/GetProducts left
+    # the contract in 1.7.0/1.8.0, so order-worker no longer dials product at all.
+    # The chart renders the product-grpc headless Service from this.
     grpc_server: true

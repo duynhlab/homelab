@@ -177,6 +177,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **checkout pinned to 0.5.0 — inventory is the only availability authority**
+  (RFC-0021 phase 4). The four `CHECKOUT_AVAILABILITY_*` envs are no longer read,
+  and they stay rendered for exactly one commit: 0.4.x defaults the source to
+  `product`, so removing the inputs while a 0.4.x pod still serves would move the
+  authority back onto product's frozen stock column — the same trap
+  `ORDER_STOCK_PARTICIPANT` set. So the pin lands alone and the inputs follow.
+  0.5.0 also fixes a dead end found in adversarial review: an unsellable line
+  answered 503 "retry with the same key" for a condition that could never change,
+  wedging the session at `confirming` with no FSM edge out.
+
 - **product pinned to 1.8.0 — the frozen stock column leaves the read contract.**
   `/details` has no `stock` block and product payloads no longer publish
   `stock_quantity`; availability comes from inventory-service and is the only stock

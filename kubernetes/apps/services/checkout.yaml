@@ -10,12 +10,28 @@ spec:
   type: Static
   defaultValues:
     name: checkout
-    # 0.4.0 ships the RFC-0021 read path merged since 0.3.1: availability shadow
-    # reads (P2-4), inventory-mode split reads (P2-5), and the keyed per-user
-    # canary. The 0.3.1 binary did not know CHECKOUT_AVAILABILITY_SOURCE, so the
-    # W8 shadow flip rendered an env the process silently ignored — the third
-    # merged-but-never-released prerequisite this phase has surfaced.
-    image_tag: "0.4.0" # {"$imagepolicy": "flux-system:checkout:tag"}
+    # 0.5.0 makes inventory the ONLY availability authority (RFC-0021 phase 4).
+    # Price from product, availability from inventory, concurrently — and no
+    # fallback, because the fallback read product's stock column, which was frozen
+    # at the W7 write cutover and removed from the contract in product 1.8.0.
+    #
+    # The four CHECKOUT_AVAILABILITY_* envs are no longer read by this binary.
+    # THEY ARE STILL RENDERED BELOW ON PURPOSE, and this pin must land ALONE:
+    # 0.4.x defaults CHECKOUT_AVAILABILITY_SOURCE to `product`, so removing the
+    # inputs while a 0.4.x pod is still serving would move the availability
+    # authority back onto the frozen column. Inputs come out in the FOLLOWING
+    # commit, once this image is the one running.
+    #
+    # This is the same trap ORDER_STOCK_PARTICIPANT set two slices ago, and the
+    # inverse of the one recorded in the 0.4.0 comment (an env the process
+    # silently ignored). A default is not a safe fallback when the default is the
+    # thing being removed.
+    #
+    # 0.5.0 also fixes a dead end found in adversarial review: an unsellable or
+    # wrong-currency line used to answer 503 "retry with the same key" for a
+    # condition that could never change, wedging the session at `confirming` with
+    # no FSM edge out. A definite answer now requotes.
+    image_tag: "0.5.0" # {"$imagepolicy": "flux-system:checkout:tag"}
     namespace: checkout
     # No platform_backup_label: checkout's data lives on product-db in the
     # product namespace, which is already backed up (same reasoning as

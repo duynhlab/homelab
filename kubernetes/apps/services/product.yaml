@@ -57,7 +57,7 @@ spec:
     # every catalog read behind an ACCESS EXCLUSIVE waiter. A refusal leaves the
     # schema intact but marks the version dirty — recovery is in the migration
     # header.
-    image_tag: "1.10.0" # {"$imagepolicy": "flux-system:product:tag"}
+    image_tag: "1.11.0" # {"$imagepolicy": "flux-system:product:tag"}
     namespace: product
     platform_backup_label: "cnpg"
     replicaCount: 1
@@ -79,11 +79,15 @@ spec:
     # unreachable inventory soft-fails to status=unknown — so a wrong address
     # degrades the page quietly instead of failing loudly.
     inventory_grpc_addr: "dns:///inventory.inventory.svc.cluster.local:9090"
-    # `inventory` makes /details carry an `availability` block sourced from the
-    # authority, and since 1.8.0 it is the ONLY stock answer on that response —
-    # the frozen `stock` block is gone (see above). The expand-then-contract order
-    # was: enable here, move the frontend (#81), then drop `stock`.
-    product_availability_source: "inventory"
+    # NO product_availability_source input any more: 1.11.0 DELETED the flag and
+    # always asks inventory. Its `product` position had become a trap — since 1.8.0
+    # it meant the detail page carried no availability at all, and 1.10.0 dropped the
+    # column underneath it. Third default in this migration to point at an authority
+    # that was already removed.
+    #
+    # The pin and the input removal ride together on purpose. Dropping the input
+    # while 1.10.0 was still pinned would trip exactly that default; env and image
+    # live in the same Deployment template, so each pod rolls with both at once.
     # product serves gRPC on :9090 — one RPC, BatchGetCurrentPrices, dialed by
     # checkout for price re-validation. ReserveStock/ReleaseStock/GetProducts left
     # the contract in 1.7.0/1.8.0, so order-worker no longer dials product at all.

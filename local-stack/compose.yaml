@@ -482,11 +482,13 @@ services:
       CACHE_HOST: cache
       CACHE_PORT: "6379"
       REVIEW_GRPC_ADDR: dns:///review:9090
-      # RFC-0021 P2-6: enrich GetProductDetails with inventory availability
-      # (soft-fail; adds an `availability` field). `product` disables it.
+      # /details availability comes from inventory (soft-fail: an unreachable
+      # inventory answers status=unknown, never a guess). Mandatory since product
+      # 1.11.0 deleted PRODUCT_AVAILABILITY_SOURCE -- there is no "off" position,
+      # because product has no stock of its own left to fall back to.
       INVENTORY_GRPC_ADDR: dns:///inventory:9090
-      PRODUCT_AVAILABILITY_SOURCE: inventory
-      # product serves the saga's ReserveStock/ReleaseStock on gRPC :9090.
+      # product serves BatchGetCurrentPrices on gRPC :9090 (checkout's price
+      # re-validation). The saga's ReserveStock/ReleaseStock left in 1.7.0.
       GRPC_PORT: "9090"
     healthcheck: *svc-healthcheck
     depends_on:

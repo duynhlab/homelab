@@ -198,25 +198,6 @@ spec:
           - name: INVENTORY_GRPC_ADDR
             value: << inputs.inventory_grpc_addr >>
           <<- end >>
-          <<- if (index inputs "product_availability_source") >>
-          # Where the detail page's availability comes from (product | inventory,
-          # startup-validated). Emitted here rather than set on the chart, because
-          # the mop chart has no such value: an input with no template block would
-          # be silently dropped and the flag would read as its code default with
-          # nothing to show it never arrived.
-          #
-          # A plain `#` comment, like every other comment in this template — and
-          # deliberately so. A Go template comment (the slash-star form written
-          # inside the action delimiters) is NOT interchangeable: the lexer looks
-          # for the closing delimiter immediately after the star-slash, so one
-          # space before it is a PARSE error that fails the WHOLE ResourceSet —
-          # every service in this domain — and nothing in `make validate` can see
-          # it, because resourcesTemplate is an opaque string to kubeconform. The
-          # delimiters cannot even be MENTIONED in prose here: the lexer scans
-          # this text too and would open an action inside a YAML comment.
-          - name: PRODUCT_AVAILABILITY_SOURCE
-            value: << inputs.product_availability_source >>
-          <<- end >>
           <<- if (index inputs "shipping_grpc_addr") >>
           - name: SHIPPING_GRPC_ADDR
             value: << inputs.shipping_grpc_addr >>

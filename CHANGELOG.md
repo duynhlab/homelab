@@ -175,6 +175,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **inventory-service pinned to `0.2.3`** — the Deployment was in `Init:CrashLoopBackOff` on the cluster (59 restarts): its init container runs `migrate` with only `DB_*` env, the same contract product/order/checkout run under, while `0.1.0` validated the full config before dispatching and panicked on `SERVICE_NAME`. Found by the RFC-0021 P3 cluster audit, fixed in inventory-service#13, released as `v0.2.2` and rolled into `v0.2.3` together with the testcontainers wait-strategy fix and the `x/crypto`/`grpc`/builder CVE bumps.
 - **inventory backfill CronJob image reference** — it pointed at `ghcr.io/duynhlab/inventory-service/inventory:v0.2.1`, which does not exist: the repo publishes `…/inventory-service/inventory-service` tagged without the leading `v` (now `0.2.3`) (GHCR returns 404 for the old path). The CronJob is suspended, so the bad pull would have surfaced the first time it was resumed — inside the write-cutover window, which is the worst possible moment.
 
+### Removed
+
+- **The RFC-0021 read-migration machinery, everywhere it existed.** The
+  `CHECKOUT_AVAILABILITY_*` inputs and their ResourceSet template blocks, the
+  OpenBAO-backed `checkout-availability-canary` ExternalSecret (a Secret injected
+  into a process with no consumer), the two local-stack envs, and
+  `rfc0021-read-migration.yaml` — whose recording rule and
+  `CheckoutInventoryShadowDivergence` alert watched `inventory_shadow_compare_total`,
+  a series checkout 0.5.0 no longer emits. A rule on a dead series does not go quiet
+  loudly, it goes **blind**: no data never fires. The two baseline dashboard panels
+  are labelled **RETIRED — no data is expected** rather than left looking broken.
+
+### Added
+
+- **`checkout-availability.yaml`: signals for the authority phase 4 created.**
+  `CheckoutAvailabilityErrors` (critical) — inventory erroring means shoppers get
+  503s and there is no fallback; it is also the only thing separating "inventory is
+  down" from "inventory is refusing baskets", since `checkout_price_changed_total`
+  lumps `PRICE_CHANGED` with `STOCK_UNAVAILABLE`. `CheckoutAvailabilityRefusingEverything`
+  (warning) guards a **contract gap**: `CheckAvailability` cannot say "no data for
+  this SKU" and `can_fulfill=false` is also the zero value, so a backfill gap reads
+  as a definite customer-facing out-of-stock. Both have runbooks.
+
 ### Changed
 
 - **checkout pinned to 0.5.0 — inventory is the only availability authority**

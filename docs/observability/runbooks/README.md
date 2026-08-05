@@ -9,7 +9,7 @@ Runbooks for investigating, troubleshooting, and resolving incidents in the obse
 | [Observability Deep Dive](observability-deep-dive.md) | RED/USE/Golden Signals theory, 4-pillar stack architecture, middleware chain, correlation workflow, interview preparation | Learning, onboarding, interview prep |
 | [Infrastructure Alerts](infrastructure-alerts.md) | Per-alert investigation guide for infrastructure/platform alerts (nodes, control plane, Flux, cert-manager, VictoriaMetrics) | On-call, when an infrastructure alert fires |
 | [Microservices Alerts](microservices-alerts.md) | Workflows, tuning, and design context for application alerts | Learning, cross-signal triage |
-| [Microservices runbooks](microservices/README.md) | Per-alert investigation (19 files) | On-call, when an application alert fires |
+| [Microservices runbooks](microservices/README.md) | Per-alert investigation (21 files) | On-call, when an application alert fires |
 | [PostgreSQL Alerts](postgresql/README.md) | Per-alert CNPG runbooks (chart + deep-signal), one file per alert name | On-call, when a PostgreSQL/CNPG alert fires |
 | [VictoriaLogs Kubernetes Logs Debug](victorialogs-kubernetes-logs-debug.md) | Blank Grafana logs panel / empty Explore against VictoriaLogs | On-call, when Kubernetes logs are missing in Grafana |
 

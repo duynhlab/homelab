@@ -537,8 +537,8 @@
     {
       "id": 301,
       "type": "timeseries",
-      "title": "Shadow compare outcomes (per second)",
-      "description": "inventory_shadow_compare_total by result (checkout, shadow mode). ok = Inventory matches; missing/unknown = backfill/SKU-namespace gap; error = RPC fail; skipped = sampled/shed. Non-ok drives the CP-2 read-flip gate.",
+      "title": "Shadow compare outcomes (per second) (RETIRED — no data is expected)",
+      "description": "HISTORICAL. inventory_shadow_compare_total was removed with the shadow compare in checkout 0.5.0 (RFC-0021 phase 4) — inventory is the only availability authority now, so there is nothing to compare against. This panel is empty BY DESIGN; it is not an outage and not a broken scrape. The live signal is checkout_availability_check_total{result} (see the checkout-availability rules).",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
       "fieldConfig": {
@@ -564,8 +564,8 @@
     {
       "id": 302,
       "type": "timeseries",
-      "title": "Shadow divergence ratio",
-      "description": "missing|unknown|error over real (non-skipped) compares. CheckoutInventoryShadowDivergence warns at >1% for 30m; CP-2 wants 0 or explained.",
+      "title": "Shadow divergence ratio (RETIRED — no data is expected)",
+      "description": "HISTORICAL — empty by design. The shadow compare and its CheckoutInventoryShadowDivergence alert were removed in checkout 0.5.0 (RFC-0021 phase 4): with one availability authority there is nothing to compare against. Live equivalents: CheckoutAvailabilityErrors and CheckoutAvailabilityRefusingEverything on checkout_availability_check_total.",
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
       "fieldConfig": {

@@ -25,7 +25,7 @@ only writer of orders and the only place the fulfillment saga starts.
 |-------|-------|
 | **Role** | Orchestrator — owns the workflow, the worker, and every activity |
 | **Workflow** | `OrderFulfillmentWorkflow` + `CancellationWorkflow` (`internal/saga/`) |
-| **Worker** | `order-worker-1-10-0` — same image, `worker` subcommand; **versioned** (Worker Deployment `order-fulfillment`, one manifest per build, ADR-030), workflows run `Pinned` |
+| **Worker** | `order-worker-1-13-0` (Current) — same image, `worker` subcommand; **versioned** (Worker Deployment `order-fulfillment`, one manifest per build, ADR-030), workflows run `Pinned`. Earlier builds keep polling until their pinned histories drain |
 | **Task queue** | `order-fulfillment` (Temporal namespace `mop`) |
 | **Workflow ID** | `order-fulfillment-<orderID>`; cancellation episodes use `order-cancellation-<orderID>-v<epoch>` (epoch = observed `orders.version`, so a legally repeated episode gets a fresh id) |
 | **Start semantics** | Detached-context start after the order row commits (see [Saga handoff](#the-saga-handoff-start-after-commit)) |

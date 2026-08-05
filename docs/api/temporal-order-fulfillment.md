@@ -839,8 +839,11 @@ Deliberate deviations from the original design:
 - **`ClearCart` uses cart's tokenless internal route** (`DELETE /cart/v1/internal/cart/:userId`,
   NetworkPolicy-fenced) — the workflow input carries no bearer token, so a saga that outlives the
   user's access token still clears the cart.
-- **Idempotency is DB-enforced** — product `stock_reservations` (PK `reservation_id,product_id`),
-  shipping `UNIQUE(order_id)`.
+- **Idempotency is DB-enforced** — inventory's reservation model (one reservation per
+  saga id, movements append-only so a retried activity cannot double-apply) and
+  shipping `UNIQUE(order_id)`. It used to be product's `stock_reservations` ledger
+  (PK `reservation_id,product_id`); that table was dropped in RFC-0021 phase 4
+  (product migration `000006`) with the RPCs that wrote it.
 
 **Roadmap — all items Planned:** tracked as **Future work in [RFC-0001](../proposals/rfc/RFC-0001/)** —
 server bump 1.27.x (**Planned**), Grafana dashboard (**Planned**), platform-db DR
@@ -863,13 +866,16 @@ How to deploy the worker, run the saga locally, and watch it in production.
   still needs liveness and readiness probes). Worker metrics export over OTLP.
 - **In-cluster.** The worker is a **second release of the same `mop` chart** (`duynhlab/helm-charts`,
   ≥`0.12.0`): same image, `args: ["worker"]`, `service.enabled: false`. In homelab it's the
-  `order-worker-1-10-0` HelmRelease (`kubernetes/apps/order-worker-1-10-0.yaml`, namespace `order` —
-  one file per Worker Deployment Version; the retired 1-8-0 file was deleted once
-  1.10.0 was Current with nothing pinned to 1.8.0, see
+  `order-worker-1-13-0` HelmRelease (`kubernetes/apps/order-worker-1-13-0.yaml`, namespace `order` —
+  one file per Worker Deployment Version; a retired file is deleted once its build is
+  Current-superseded with nothing pinned to it, as 1-8-0 was, see
   [Worker Deployment Versioning](#worker-deployment-versioning-as-built)) carrying the
   order DB address, `TEMPORAL_HOSTPORT` / `TEMPORAL_NAMESPACE` / `TASK_QUEUE`, and the downstream
-  `*_GRPC_ADDR` targets (product, inventory, shipping, notification, payment — each
+  `*_GRPC_ADDR` targets (inventory, shipping, notification, payment — each
   `dns:///<service>.<ns>.svc.cluster.local:9090`, the single multi-port Service).
+  **No product target since 1.13.0**: the saga's product stock branch is gone, so the
+  order namespace stops needing product's `:9090` at all — the NetworkPolicy allow is
+  withdrawn once the pre-phase-4 builds finish draining.
   `apps-local` `dependsOn` `temporal-local` so it deploys after the cluster is
   Ready. (Earlier drafts used a `worker.enabled` chart toggle; the chart was reworked to the
   separate-release model.)

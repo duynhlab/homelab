@@ -116,7 +116,7 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 | [auth API](./auth.md) | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/auth-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/auth-service/actions) |
 | [user API](./user.md) | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/user-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/user-service/actions) |
 | [product API + gRPC](./product.md) | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/product-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/product-service/actions) |
-| [inventory gRPC](./inventory.md) | ✓ | ✓ | Implemented — deployed, no live caller (cutover phases 2–3) | [![CI](https://github.com/duynhlab/inventory-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/inventory-service/actions) |
+| [inventory gRPC](./inventory.md) | ✓ | ✓ | Implemented — the sole stock authority; callers: order saga, checkout, product /details | [![CI](https://github.com/duynhlab/inventory-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/inventory-service/actions) |
 | [cart API + gRPC](./cart.md) | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/cart-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/cart-service/actions) |
 | [order API + gRPC](./order.md) | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/order-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/order-service/actions) |
 | [review API + gRPC](./review.md) | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/review-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/review-service/actions) |
@@ -136,8 +136,8 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 |---------|-------------------------|----------|
 | Auth | Credentials, JWTs, refresh rotation, and JWKS | [auth.md](./auth.md) |
 | User | Public and owner-scoped profiles | [user.md](./user.md) |
-| Product | Catalog, price, stock, and review aggregation | [product.md](./product.md) |
-| Inventory | Warehouse balances, reservations, and movement ledger (stock authority; no live caller yet) | [inventory.md](./inventory.md) |
+| Product | Catalog, price, and review aggregation (**no stock** since RFC-0021 phase 4) | [product.md](./product.md) |
+| Inventory | Warehouse balances, reservations, and movement ledger — the **sole** stock authority, called by checkout, product `/details`, and the order saga | [inventory.md](./inventory.md) |
 | Cart | Active cart and checkout snapshot | [cart.md](./cart.md) |
 | Order | Orders and fulfillment workflow handoff | [order.md](./order.md) |
 | Review | Product ratings and comments | [review.md](./review.md) |

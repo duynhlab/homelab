@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| accepted — phases 0–3 + 5 + 6 shipped; 4 gated; 7 open | platform-wide | [./research.md](./research.md) — gate passed 2026-07-23 | 2026-07-23 | 2026-08-04 |
+| accepted — phases 0–6 shipped; 7 open | platform-wide | [./research.md](./research.md) — gate passed 2026-07-23 | 2026-07-23 | 2026-08-05 |
 
 > **Supersedes [RFC-0003](../RFC-0003/README.md)** (*Inventory ownership and stock
 > semantics*), which ratified product-service as the inventory owner. RFC-0003's own
@@ -349,6 +349,51 @@ count and retention hit zero.
 - 2026-07-31 — Phase 4 opened: deprecation telemetry on Product's stock surface
   lands first; destructive steps stay gated on two weeks of zero usage (see
   [cutover-rollback.md § Contract removal](./cutover-rollback.md#contract-removal-phase-4--not-reversible-gated-so-it-never-needs-to-be)).
+- 2026-08-04 → 2026-08-05 — **Phase 4 shipped: the contraction**. Stock is gone from
+  product-service in code, in the contract, and in the schema — the one phase whose
+  steps cannot be undone, so each one shipped only behind evidence that nothing
+  depended on it.
+
+  In removal order: the saga's product branch (order 1.13.0, refusing a
+  product-participant history rather than silently re-routing it); the frozen fields
+  in product's read contract (1.8.0) **after** the SPA moved to the `availability`
+  block (frontend #81), never before; `ReserveStock`/`ReleaseStock`/`GetProducts` out
+  of the contract itself (pkg v0.33.0/v0.34.0, product 1.7.0/1.8.0); checkout's
+  product-availability fallback and its canary flags, leaving inventory as the single
+  authority that fails **closed** with a retryable 503 (0.5.0/0.5.1); inventory's own
+  phase-2 `backfill` subcommand and its `PRODUCT_DB_*` credential surface (0.3.0);
+  and finally the schema — migration `000006` revoking the cross-service grant and
+  dropping `stock_reservations` and `products.stock_quantity` (1.10.0), with the
+  `pg_hba` line and the suspended backfill CronJob removed in the same wave
+  (homelab #663–#665).
+
+  Gate 1 (two weeks of zero deprecation telemetry) was **waived** by the owner in
+  favour of code evidence, and the waiver says what can no longer be checked. Gate 3
+  (backup + restore test) was **satisfied with evidence** rather than waived — the
+  full backup → up → down → restore → up cycle, recorded in
+  [cutover-rollback.md](./cutover-rollback.md).
+
+  Four production-shaped bugs came from execution, not review. A refusal placed
+  before the already-exists check made checkout retry forever and mint a second
+  order — double authorize and capture. Three reconcilers ran at once because
+  side-by-side worker builds multiply singleton roles; found by running the rollout,
+  not by reading the manifests. A draining build's dispatcher started what Current
+  refuses, closing the row `DISPATCHED` while the new build panicked unwatched. And
+  an unsellable line filtered out of the merged catalog view produced a
+  "retry with the same key" 503 for a deterministic condition, wedging the session at
+  `confirming`. A fifth was self-inflicted and instructive: 22 negative assertions in
+  the saga suite were **vacuous** (`env.AssertNotCalled` is a no-op in temporal SDK
+  v1.45.0), including one added in the same PR — converting them to registered
+  refusals immediately exposed a contradictory pair. Two more came from an
+  adversarial security review of the final migration: `REVOKE CONNECT` is not a
+  boundary at all (Postgres grants it to PUBLIC by default, measured), and deleting a
+  subcommand's `case` let the retired verb fall through to serving the app.
+
+  The lesson recorded here: **a removal is only as safe as the evidence that nothing
+  reads it, and a signal that stops existing goes blind rather than quiet.** Every
+  metric, rule, and dashboard panel retired in this phase was either replaced by a
+  live signal or explicitly labelled *no data is expected*.
+
 - 2026-07-31 → 2026-08-01 — **Phase 5 shipped: the order aggregate**
   ([ADR-033](../../adr/ADR-033-order-status-cancellation/)). Seven-state FSM +
   CAS command path + append-only status history (order-service v1.9.0–v1.9.3);
@@ -409,4 +454,4 @@ count and retention hit zero.
   refund identity)
 
 ---
-_Last updated: 2026-08-04_
+_Last updated: 2026-08-05_

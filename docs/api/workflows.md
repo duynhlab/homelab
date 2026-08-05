@@ -6,11 +6,18 @@ Every durable workflow on the platform, in one table: who orchestrates, who part
 
 | Workflow | Owner | Worker | Task queue | Participants | Deep dive |
 |----------|-------|--------|------------|--------------|-----------|
-| <a id="order-fulfillment"></a>`OrderFulfillmentWorkflow` | order | `order-worker-1-10-0` — **versioned**, `Pinned` (ADR-030) | `order-fulfillment` | product *or* inventory (per-workflow stock participant), shipping, payment, notification, cart | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
-| <a id="order-cancellation"></a>`CancellationWorkflow` | order | `order-worker-1-10-0` (same worker) | `order-fulfillment` | shipping, payment, inventory | [temporal-order-fulfillment.md § Cancellation](./temporal-order-fulfillment.md#the-cancellation-workflow-rfc-0021-p5) |
+| <a id="order-fulfillment"></a>`OrderFulfillmentWorkflow` | order | `order-worker-1-13-0` — **versioned**, `Pinned` (ADR-030) | `order-fulfillment` | inventory, shipping, payment, notification, cart | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
+| <a id="order-cancellation"></a>`CancellationWorkflow` | order | `order-worker-1-13-0` (same worker) | `order-fulfillment` | shipping, payment, inventory | [temporal-order-fulfillment.md § Cancellation](./temporal-order-fulfillment.md#the-cancellation-workflow-rfc-0021-p5) |
 | <a id="abandoned-checkout"></a>`AbandonedCheckoutWorkflow` | checkout | `checkout-worker` | `checkout` | checkout DB (in-process activities) | [checkout.md § Abandonment](./checkout.md#abandonment-p2-implemented--the-timer-is-a-wake-up-never-a-verdict) |
 
-Both workers run in local-stack (`local-stack/compose.yaml`) and in-cluster ([order-worker-1-10-0.yaml](../../kubernetes/apps/order-worker-1-10-0.yaml) — one manifest per Worker Deployment Version, [checkout-worker.yaml](../../kubernetes/apps/checkout-worker.yaml)) on Temporal namespace `mop`.
+Both workers run in local-stack (`local-stack/compose.yaml`) and in-cluster on Temporal
+namespace `mop`. Order ships **one manifest per Worker Deployment Version**, side by
+side (ADR-030): `1-13-0` is Current, and the earlier builds keep polling only until
+their pinned histories drain — a pre-phase-4 saga left with no poller would stall
+holding stock and an authorization, because 1.13.0 **refuses** a product-participant
+history rather than re-routing it. See
+[order-worker-1-13-0.yaml](../../kubernetes/apps/order-worker-1-13-0.yaml) and
+[checkout-worker.yaml](../../kubernetes/apps/checkout-worker.yaml).
 
 ## Standard roles
 

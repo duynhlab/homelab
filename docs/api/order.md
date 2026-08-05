@@ -75,7 +75,6 @@ flowchart LR
     Order -->|"start CancellationWorkflow"| TMP["Temporal (mop)"]
     OrderG -->|"start OrderFulfillmentWorkflow"| TMP
     TMP -->|"queue order-fulfillment"| W["order-worker"]
-    W -->|"gRPC ReserveStock / ReleaseStock"| PROD[product]
     W -->|"gRPC Reserve / Commit / Release"| INV[inventory]
     W -->|"gRPC CreateShipment / CancelShipment"| SHIP
     W -->|"gRPC Authorize / Capture / Void / Refund"| PAY
@@ -88,7 +87,7 @@ flowchart LR
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     class SPA,Kong edge;
-    class Order,OrderG,CK,PROD,INV,SHIP,PAY,NOTIF,CART service;
+    class Order,OrderG,CK,INV,SHIP,PAY,NOTIF,CART service;
     class W worker;
     class TMP platform;
     class DB data;
@@ -176,7 +175,7 @@ the HTTP response adapter (`internal/web/v1/response.go`).
 |------------|--------|----------------|
 | shipping | gRPC `GetShipmentByOrder` | Absent → omit `shipment`; fetch failure → omit **and** add `"shipping"` to `degraded[]` |
 | payment | gRPC `GetPayment` | Same pattern, token `"payment"` |
-| inventory | gRPC `GetReservation` | Same pattern, token `"inventory"`; product-path orders legitimately have no reservation (absent, not degraded) |
+| inventory | gRPC `GetReservation` | Same pattern, token `"inventory"`; an order predating RFC-0021 P3 legitimately has no reservation (absent, not degraded) |
 | processing | `order_processing_projection` read | Absent for pre-projection orders; fetch failure → `degraded[]` token `"processing"` |
 
 `degraded[]` distinguishes *could not fetch* from *does not exist* — the SPA
@@ -290,7 +289,9 @@ Both transports delegate the kickoff to one package
 | Reuse policy: `REJECT_DUPLICATE` | "Already started" (open, or closed within retention) is treated as success — the saga already happened. The gRPC create is the only fulfillment starter; the web layer starts only cancellation episodes |
 | Start failure answers `Unavailable` (gRPC) | The machine caller retries with the same key; the replay path heals the zombie `pending` order. Answering success would strand it — callers do not retry successes |
 | Lazy Temporal client (`internal/fulfillment/lazy.go`) | An order pod that races Temporal at bring-up keeps re-dialing in the background instead of running dead with a nil client |
-| Stock participant resolved **from the order's outbox row**, never the process flag (`fulfillment.ParticipantFor`) | A replayed order runs the branch its row recorded even mid-rollout; absent ⇒ `product`, unrecognised falls back loudly and is counted (`order_fulfillment_start_participant_total{participant,source}`) |
+| Stock participant resolved **from the order's outbox row** (`fulfillment.ParticipantFor`) | A replayed order runs the branch its row recorded. Absent still ⇒ `product`, because pre-P3 orders really did hold stock there — but since RFC-0021 P4 (order 1.13.0) only `inventory` can be SERVED, so anything else is REFUSED rather than re-routed: no saga is created and the order's outbox row goes terminal with `PARTICIPANT_UNSERVABLE`. Counted as `order_fulfillment_start_participant_total{participant,source,result}` |
+| An unservable participant on a REPLAY answers the existing order, not an error | The call is idempotent, so an error would say "not placed" about an order that was — and checkout treats anything but `InvalidArgument` as transient, retrying forever and eventually minting a second order (a second authorize and capture) |
+| The refusal also lives inside `fulfillment.Start` | It is the single place a saga is created, so a future start path inherits it. The workflow-level panic is the last backstop, not the guard: it fails only the workflow TASK, while the call still answers success and the row closes |
 
 ## Callers & dependencies
 
@@ -300,8 +301,8 @@ Both transports delegate the kickoff to one package
 | Inbound | checkout | gRPC `CreateOrder` | Confirm handoff (ADR-018) — only NetworkPolicy-admitted caller of `:9090` |
 | Outbound (API) | shipping, payment, inventory | gRPC | Enrichment reads for `/details` (soft-fail) |
 | Outbound (API) | Temporal | SDK | Inline `CancellationWorkflow` start after the cancel CAS commits (outbox sweeps the misses) |
-| Outbound (worker) | product, shipping, payment, notification | gRPC | Saga activities: reserve/release, create/cancel shipment, authorize/capture/void/refund, send email |
-| Outbound (worker) | inventory | gRPC | Inventory-branch saga activities (reserve/commit/release — live since RFC-0021 P4) + cancellation disposition (`GetReservation`/`Release`) + the reconciler's repairs |
+| Outbound (worker) | shipping, payment, notification | gRPC | Saga activities: create/cancel shipment, authorize/capture/void/refund, send email |
+| Outbound (worker) | inventory | gRPC | The saga's only stock authority since RFC-0021 P4: reserve/commit/release, plus the cancellation disposition (`GetReservation`/`Release`) and the reconciler's repairs |
 | Outbound (worker) | cart | REST `DELETE /cart/v1/internal/cart/:user_id` | Best-effort clear-cart — the platform's documented REST exception, NetworkPolicy-fenced, tokenless (no bearer token in workflow history) |
 
 ## Known gaps
@@ -310,7 +311,7 @@ Both transports delegate the kickoff to one package
 |-----|--------|------|
 | Committed stock is not restocked on cancellation (`RESTOCK_SKIPPED` — inventory.v1 has no `Return` RPC) | **Accepted shrinkage** | [ADR-033](../proposals/adr/ADR-033-order-status-cancellation/) revisit trigger: flip one branch of `resolveInventoryDisposition` when the RPC exists |
 | Reconciler does not settle `cancelled` (terminal set is `{confirmed, failed, completed}`) | **Accepted** | The CancellationWorkflow settles its own stock; `OrderStuckCancelling` is the backstop |
-| payment-service seals a provider-declined refund into its idempotency cache as a 201 | **Cross-repo follow-up** | Order defends itself (verifies `refund.status == "succeeded"`, parks otherwise); payment fix owed |
+| An order refused for an unservable stock participant stays `pending` forever | **Accepted, alerted** | Its outbox row goes terminal, which fires `FulfillmentStartOutboxFailed` (critical); the remedy is per-code in that runbook. Nothing writes `WORKFLOW_START_FAILED` to the order — the dispatcher has no order writer, and that is true of every give-up path, not just this one |
 | gRPC mTLS on `:9090` | **Planned** | RFC-0020 research; NetworkPolicy remains the fence until then |
 
 ## Operations
@@ -320,7 +321,7 @@ Both transports delegate the kickoff to one package
 | HTTP probes | `/health`, `/ready` on `:8080` |
 | gRPC server | `:9090` — cluster `dns:///order.order.svc.cluster.local:9090`; local-stack `order:9090` |
 | Worker | `<binary> worker` — Temporal queue `order-fulfillment`, namespace `mop` |
-| Key env | `DB_*`, `AUTH_JWKS_URL`, `SHIPPING_GRPC_ADDR`, `PAYMENT_GRPC_ADDR`, `PRODUCT_GRPC_ADDR`, `INVENTORY_GRPC_ADDR`, `NOTIFICATION_GRPC_ADDR`, `CART_SERVICE_URL`, `TEMPORAL_HOSTPORT`, `TEMPORAL_NAMESPACE`, `TASK_QUEUE`, `GRPC_PORT` |
+| Key env | `DB_*`, `AUTH_JWKS_URL`, `SHIPPING_GRPC_ADDR`, `PAYMENT_GRPC_ADDR`, `INVENTORY_GRPC_ADDR`, `NOTIFICATION_GRPC_ADDR`, `CART_SERVICE_URL`, `TEMPORAL_HOSTPORT`, `TEMPORAL_NAMESPACE`, `TASK_QUEUE`, `GRPC_PORT`, `ORDER_RECONCILER_ENABLED`, `ORDER_START_DISPATCHERS_ENABLED` |
 | Business metrics | `order.saga.outcome.total` (confirmed / failed / manual_review / compensated), `order.saga.compensation.total` (per step × result), `order.payment.activity.total`, `order.stock_reservation.total`, `order.value.minor` (label-free since v1.11.0), `order.cancellations.total{result}`, `order_cancellation_outcomes_total{outcome}`, backlog gauges `order_cancelling_backlog` / `order_manual_review_backlog` |
 | Signals to watch | Rising `compensation.total{step="void_payment",result="error"}` or `{step="refund_payment"}` failures mean money may be held or unreturned — reconcile against payment's ledger ([payments.md](./payments.md)) |
 | Telemetry | HTTP/gRPC RED over OTLP, workflow traces, structured logs with shared trace IDs (obsx, RFC-0014) |

@@ -337,7 +337,7 @@ east-west contracts behind them, and the Temporal deployment itself.
 | # | Forward step | Service | Compensation if a later pre-pivot step fails |
 |---|--------------|---------|-----------------------------------------------|
 | 0 | `AuthorizePayment` | Payment | `VoidPayment` after authorization succeeds |
-| 1 | `ReserveStock` | Product | `ReleaseStock` |
+| 1 | `ReserveInventory` | Inventory | `ReleaseInventory` |
 | 2 | `CreateShipment` | Shipping | `CancelShipment` |
 | 3 | `CapturePayment` | Payment | `RefundPayment` if the following pivot fails |
 | 4 | `ConfirmOrder` | Order | **Pivot**: failure compensates; success commits the business outcome |
@@ -354,29 +354,47 @@ The actual execution order is important: authorize early, capture late, then
 confirm the order. This fails a declined payment before reserving inventory and
 keeps captured money as close as possible to the pivot.
 
-#### The stock participant (RFC-0021 P3)
+#### The stock participant (RFC-0021 P3, narrowed by P4)
 
-The stock steps route to one of two participants, chosen **per workflow** by
-`OrderFulfillmentInput.StockParticipant` and pinned for the saga's lifetime —
-the worker never re-reads any flag:
+Stock lives at inventory-service, and only there. P3 routed the stock steps
+through a per-workflow participant so the write could move without a flag day;
+**P4 (order 1.13.0) removed the product-service branch it moved away from**:
 
 | Participant | Forward | Compensation | Post-pivot |
 |---|---|---|---|
-| `product` (pre-cutover; in-flight sagas drain here) | `ReserveStock` | `ReleaseStock` | — |
-| `inventory` (**deployed default since the W7 write cutover, 2026-07-30**) | `ReserveInventory` | `ReleaseInventory` | `CommitInventory`, **mandatory forward** — a confirmed order retries it to completion |
+| `inventory` | `ReserveInventory` | `ReleaseInventory` | `CommitInventory`, **mandatory forward** — a confirmed order retries it to completion |
+| `product`, or absent (every order created before P3) | — | — | **REFUSED.** Not re-routed |
+
+The refusal is the load-bearing part. Re-routing a product order to inventory
+would release stock inventory never reserved and orphan the real hold at
+product-service — the invisible-hold split the pinning exists to prevent. So the
+token keeps its historical meaning and simply cannot be served: no saga is
+created, and the order's outbox row goes terminal with `PARTICIPANT_UNSERVABLE`
+(runbook `FulfillmentStartOutboxFailed`).
+
+Where that refusal lives matters, and a workflow panic alone is **not** enough:
+it fails the workflow TASK, so the gRPC call still answers success, the
+dispatcher sees a RUNNING execution and closes its outbox row, and the
+reconciler only scans terminal orders. So `fulfillment.Start` refuses (the one
+place a saga is created), the gRPC replay answers the existing order without a
+kickoff, and the dispatcher asks Temporal before condemning a row — a live saga
+is honoured, a confirmed absence goes terminal. The workflow guard is the last
+backstop, for a history force-migrated by hand.
 
 Which value gets stamped is resolved from the **order's own record**, never from
 the process answering (order-service #155): `CreateOrder` writes the participant
-into the order's outbox row in the same transaction, every start path — inline
-REST, inline gRPC, and the dispatcher — resolves through one shared
-`fulfillment.ParticipantFor`, and a replayed order therefore runs the branch its
-row recorded even when the replica answering carries the other flag mid-rollout.
-An absent value resolves to `product` (every reader of that column agrees), an
-unrecognised one falls back loudly, and the column is CHECK-constrained
-(migration `000010`). Every resolution is counted:
-`order_fulfillment_start_participant_total{participant, source}` — `source`
-distinguishes `recorded` / `absent` / `unrecognised`, and `unrecognised` is
-alerted on (`OrderStartParticipantUnrecognised`).
+into the order's outbox row in the same transaction, and every start path
+resolves through one shared `fulfillment.ParticipantFor`. The column is
+CHECK-constrained (migration `000010`). Every resolution is counted:
+`order_fulfillment_start_participant_total{participant, source, result}` —
+`source` distinguishes `recorded` / `absent` / `unrecognised`, `result`
+distinguishes `started` / `refused`, and `unrecognised` is alerted on
+(`OrderStartParticipantUnrecognised`).
+
+**Rollout requirement, not a property of the code:** the removal ships as a new
+Worker Deployment Version, so pinned versioning must be ON and the previous
+build must keep polling until pre-P4 sagas drain. A pinned saga left with no
+poller stalls with its stock held and its payment authorized.
 
 
 The order-fulfillment saga (`order-service/internal/saga/workflow.go`), driven by a
@@ -387,15 +405,15 @@ Temporal worker — payment is an unconditional part of every run
 sequenceDiagram
     participant W as Order Saga
     participant Pay as payment
-    participant Prod as product
+    participant Inv as inventory
     participant Ship as shipping
     W->>Pay: AuthorizePayment (hold)
     Note over Pay: declined? → order failed,<br/>nothing else touched
-    W->>Prod: ReserveStock
+    W->>Inv: ReserveInventory
     W->>Ship: CreateShipment
     W->>Pay: CapturePayment (take the money)
     W->>W: ConfirmOrder  ← PIVOT
-    Note over W: after pivot: SendNotification, SendReceipt, ClearCart<br/>(forward-only)
+    Note over W: after pivot: SendNotification, SendReceipt, ClearCart,<br/>then CommitInventory (forward-only)
 ```
 
 **Authorize-early / capture-late** ([ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/)):
@@ -406,10 +424,10 @@ Compensations are **state-dependent**:
 | Failure point | Compensations (reverse order) |
 |---|---|
 | AuthorizePayment fails | mark order failed (nothing else done yet) |
-| ReserveStock fails | VoidPayment → FailOrder |
-| CreateShipment fails | ReleaseStock → VoidPayment → FailOrder |
-| CapturePayment fails | CancelShipment → ReleaseStock → VoidPayment → FailOrder |
-| ConfirmOrder (pivot) fails | **RefundPayment** → CancelShipment → ReleaseStock → FailOrder |
+| ReserveInventory fails | VoidPayment → FailOrder. An `INSUFFICIENT_STOCK` reserve took nothing, so no release is attempted; any other failure is ambiguous and releases first |
+| CreateShipment fails | ReleaseInventory → VoidPayment → FailOrder |
+| CapturePayment fails | CancelShipment → ReleaseInventory → VoidPayment → FailOrder |
+| ConfirmOrder (pivot) fails | **RefundPayment** → CancelShipment → ReleaseInventory → FailOrder |
 
 The captured-but-confirm-failed window is the reason a **refund** compensation
 exists at all — capture happens one step before the pivot, so there is a small
@@ -423,15 +441,15 @@ completed steps in reverse and lands the order in `failed`:
 sequenceDiagram
     participant W as Order Saga
     participant Pay as payment
-    participant Prod as product
+    participant Inv as inventory
     participant Ship as shipping
     W->>Pay: AuthorizePayment ✓ (hold placed)
-    W->>Prod: ReserveStock ✓
+    W->>Inv: ReserveInventory ✓
     W->>Ship: CreateShipment ✓
     W->>Pay: CapturePayment ✗ FAILS
     Note over W: compensate completed steps, in reverse
     W->>Ship: CancelShipment (undo step 3)
-    W->>Prod: ReleaseStock (undo step 2)
+    W->>Inv: ReleaseInventory (undo step 2)
     Note over Pay: the authorized hold is explicitly voided — no money moved
     W->>W: FailOrder → status "failed"
 ```
@@ -728,7 +746,7 @@ suspect — not for dependency outages, which it defers on by itself.
 East-west contracts in [`duynhlab/pkg`](https://github.com/duynhlab/pkg) (`pkg/proto`, `buf`;
 introduced in `v0.7.0`), all **idempotent** so activity retries are safe:
 
-- **product** — `ReserveStock(reservation_id, items)` · `ReleaseStock(reservation_id, items)`.
+- **inventory** — `Reserve(reservation_id, lines)` · `Release(reservation_id)` · `Commit(reservation_id)`, plus `GetReservation` for the cancellation disposition. The saga's only stock authority since RFC-0021 P4; product's `ReserveStock`/`ReleaseStock` are no longer called by anything.
 - **shipping** — `CreateShipment(order_id, address)` · `CancelShipment(order_id)`.
 - **`pkg/temporalx`** — shared Temporal client + worker bootstrap (mirrors `grpcx`/`obsx`) with the
   OpenTelemetry tracing interceptor, so workflow/activity spans join the originating request's trace.
@@ -827,8 +845,9 @@ Deliberate deviations from the original design:
 **Roadmap — all items Planned:** tracked as **Future work in [RFC-0001](../proposals/rfc/RFC-0001/)** —
 server bump 1.27.x (**Planned**), Grafana dashboard (**Planned**), platform-db DR
 replica cluster (**Planned**), and GameDay drills (**Planned**) are follow-ups.
-Already shipped from that list: cache-bust on reserve
-(ReserveStock/ReleaseStock invalidate `product:{id}`), workflow/activity RED
+Already shipped from that list: cache-bust on reserve (product's
+`ReserveStock`/`ReleaseStock` invalidated `product:{id}` — historical, the saga
+no longer calls them since RFC-0021 P4), workflow/activity RED
 metrics (`pkg/temporalx` MetricsHandler), and the internal cart-clear (as-built
 notes above).
 

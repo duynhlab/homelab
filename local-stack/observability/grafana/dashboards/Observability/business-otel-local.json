@@ -1108,7 +1108,7 @@
         {
           "id": 19,
           "type": "timeseries",
-          "title": "Stock reservation outcomes",
+          "title": "Stock reservation outcomes (RETIRED — product 1.7.0 removed this metric; empty is expected, not an outage)",
           "description": "Product-side stock reservation results.",
           "datasource": {
             "type": "prometheus",

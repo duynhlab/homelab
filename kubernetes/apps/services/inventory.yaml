@@ -10,11 +10,21 @@ spec:
   type: Static
   defaultValues:
     name: inventory
-    # 0.2.3 carries the subcommand-config fix: the init container runs `migrate`
+    # 0.3.0 RETIRES the phase-2 `backfill` subcommand (RFC-0021 phase 4) together
+    # with its PRODUCT_DB_* config surface. It read products.stock_quantity through
+    # a cross-service grant, and phase 4 removes both — so the subcommand had
+    # nothing to read and no way to connect.
+    #
+    # THIS PIN MUST LAND BEFORE product 1.10.0, which carries the migration that
+    # drops the column and revokes the grant: remove the reader, then the read.
+    # Running the retired verb now refuses loudly instead of falling through to
+    # serving the app inside a one-shot Job.
+    #
+    # 0.2.3 carried the subcommand-config fix: the init container runs `migrate`
     # with only DB_* env (the contract every service here runs under) and 0.1.0
     # validated the full config first, so this Deployment sat in
     # Init:CrashLoopBackOff on the cluster with "SERVICE_NAME is required".
-    image_tag: "0.2.3" # {"$imagepolicy": "flux-system:inventory:tag"}
+    image_tag: "0.3.0" # {"$imagepolicy": "flux-system:inventory:tag"}
     namespace: inventory
     # No platform_backup_label: that label routes CNPG/barman S3 credentials to
     # namespaces hosting a database cluster — inventory's data lives on

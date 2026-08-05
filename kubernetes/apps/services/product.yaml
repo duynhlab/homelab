@@ -10,16 +10,25 @@ spec:
   type: Static
   defaultValues:
     name: product
-    # 1.6.0 shipped the phase-4 removal-gate instrument
-    # (product_stock_surface_calls_total), which was to read two weeks of zero
-    # from the moment this pin converged — 2026-07-31, so 2026-08-14.
+    # 1.7.0 removes the stock write RPCs (RFC-0021 phase 4): ReserveStock and
+    # ReleaseStock are gone from the gRPC surface, and so is the removal-gate
+    # instrument product_stock_surface_calls_total that watched them.
     #
-    # That gate was WAIVED by the owner on 2026-08-05 in favour of code
-    # evidence, and the RPCs plus the instrument are removed in the next
-    # product release. The waiver and what it costs are recorded in
-    # docs/proposals/rfc/RFC-0021/cutover-rollback.md § Contract removal —
-    # read it there rather than inferring anything from an empty panel.
-    image_tag: "1.6.0" # {"$imagepolicy": "flux-system:product:tag"}
+    # The two-week-zero gate on that instrument was WAIVED by the owner on
+    # 2026-08-05 in favour of code evidence. Read the waiver in
+    # docs/proposals/rfc/RFC-0021/cutover-rollback.md § Contract removal before
+    # inferring anything from an empty panel — the query cannot be re-run now,
+    # and empty reads exactly like zero.
+    #
+    # A straggler caller gets Unimplemented, which grpcx logs at ERROR level.
+    # That is the only detection channel left, and it only fires after
+    # something has already broken. There is no rollback for this removal.
+    #
+    # Still served, deliberately: the stock READ surface (stock_quantity in
+    # catalog payloads, /details stock.available/quantity,
+    # GetProducts.available_qty) answers from a column FROZEN since the W7
+    # write cutover. That is the next slice, not this one.
+    image_tag: "1.7.0" # {"$imagepolicy": "flux-system:product:tag"}
     namespace: product
     platform_backup_label: "cnpg"
     replicaCount: 1

@@ -207,8 +207,8 @@
     {
       "id": 4,
       "type": "timeseries",
-      "title": "Product ReserveStock outcomes (authority view)",
-      "description": "product_stock_reservations_total by result. insufficient_stock is business, error is infra.",
+      "title": "Product ReserveStock outcomes (RETIRED — no data is expected)",
+      "description": "HISTORICAL. product_stock_reservations_total was removed with the RPCs in RFC-0021 phase 4 (product 1.7.0), so this panel is empty BY DESIGN — it is not an outage and not a broken scrape. Kept for the migration record; the live stock signals are inventory-service's. Do not read the flatline as health.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"

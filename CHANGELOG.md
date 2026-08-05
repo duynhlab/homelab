@@ -177,6 +177,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **product pinned to 1.7.0 — the stock write RPCs are gone** (RFC-0021 phase 4),
+  and the observability that watched them retires in the same PR rather than being
+  left to rot: the `rfc0021:product_stock_reservations:rate5m` recording rule is
+  **deleted** (a recorded series that can only ever be empty looks like a signal),
+  the cluster and local-stack dashboard panels are relabelled **RETIRED — empty is
+  expected, not an outage**, and both metrics-catalog rows are struck through with a
+  pointer to the waiver. `docs/api/` sync stays with the phase-4 close.
+
 - **The phase-4 removal gate is recorded as WAIVED, not quietly skipped.** The
   RFC's two-week-zero window on `product_stock_surface_calls_total` would have
   closed 2026-08-14; the owner chose code evidence on 2026-08-05 instead. The

@@ -41,8 +41,8 @@ spec:
             matchLabels:
               kubernetes.io/metadata.name: order
         # product reads availability for the GetProductDetails enrichment
-        # (RFC-0021 P2-6, BatchGetAvailability). Only exercised when
-        # PRODUCT_AVAILABILITY_SOURCE=inventory; the allow is inert until then.
+        # (RFC-0021 P2-6, BatchGetAvailability). LIVE since phase 4 turned
+        # PRODUCT_AVAILABILITY_SOURCE=inventory on — it was inert before that.
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: product

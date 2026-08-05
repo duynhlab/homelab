@@ -177,6 +177,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The product detail page asks inventory for availability** (`PRODUCT_AVAILABILITY_SOURCE=inventory`,
+  RFC-0021 P2-6 machinery turned on in phase 4). Until now the cluster served only
+  `products.stock_quantity`, frozen since the W7 write cutover — a page reporting
+  "In Stock (25)" that could never change. The address is set explicitly because the
+  code default names a Service this cluster does not have and an unreachable
+  inventory soft-fails to `status: unknown`, so a wrong default would degrade
+  quietly. Expand step only: the frozen `stock` block is still on the response
+  because the SPA reads it; the frontend moves next, then `stock` is dropped.
+
 - **product pinned to 1.7.0 — the stock write RPCs are gone** (RFC-0021 phase 4),
   and the observability that watched them retires in the same PR rather than being
   left to rot: the `rfc0021:product_stock_reservations:rate5m` recording rule is

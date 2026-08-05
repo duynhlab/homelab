@@ -24,10 +24,11 @@ spec:
     # That is the only detection channel left, and it only fires after
     # something has already broken. There is no rollback for this removal.
     #
-    # Still served, deliberately: the stock READ surface (stock_quantity in
-    # catalog payloads, /details stock.available/quantity,
-    # GetProducts.available_qty) answers from a column FROZEN since the W7
-    # write cutover. That is the next slice, not this one.
+    # Still served: the stock READ surface (stock_quantity in catalog payloads,
+    # /details stock.available/quantity, GetProducts.available_qty) answers from
+    # a column FROZEN since the W7 write cutover. Removing it is the next slice;
+    # what this pin does is stop it being the ONLY answer — see
+    # product_availability_source below.
     image_tag: "1.7.0" # {"$imagepolicy": "flux-system:product:tag"}
     namespace: product
     platform_backup_label: "cnpg"
@@ -40,6 +41,21 @@ spec:
     pool_max: "50"
     cache_enabled: "true"
     review_grpc_addr: "dns:///review.review.svc.cluster.local:9090"
+    # RFC-0021 P2-6, turned on now (phase 4): the detail page asks INVENTORY for
+    # availability instead of only reporting product's own frozen column. The
+    # NetworkPolicy for this hop already exists (allow-inventory-grpc admits the
+    # product namespace); it was written for this enrichment and has been unused.
+    #
+    # Explicit address, not the code default: that default is
+    # `inventory-grpc.inventory`, a Service this cluster does not have, and an
+    # unreachable inventory soft-fails to status=unknown — so a wrong address
+    # degrades the page quietly instead of failing loudly.
+    inventory_grpc_addr: "dns:///inventory.inventory.svc.cluster.local:9090"
+    # `inventory` makes /details carry an `availability` block sourced from the
+    # authority. It does NOT remove the frozen `stock` block yet — the SPA still
+    # reads that one, so the switch is expand-then-contract: enable here, move the
+    # frontend, then drop `stock` from the response.
+    product_availability_source: "inventory"
     # product serves gRPC on :9090 (ReserveStock/ReleaseStock — the saga's
     # stock steps, dialed by order-worker); the chart renders the product-grpc
     # headless Service from this.

@@ -177,6 +177,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **product pinned to 1.8.0 — the frozen stock column leaves the read contract.**
+  `/details` has no `stock` block and product payloads no longer publish
+  `stock_quantity`; availability comes from inventory-service and is the only stock
+  answer. Order mattered: the SPA moved to the `availability` block first
+  (frontend#81), because removing the old fields before that would have blanked the
+  page. `products.stock_quantity` is still SELECTed for
+  `GetProducts.available_qty` (checkout's product-source fallback), so the column
+  cannot be dropped from the schema yet.
+
 - **The product detail page asks inventory for availability** (`PRODUCT_AVAILABILITY_SOURCE=inventory`,
   RFC-0021 P2-6 machinery turned on in phase 4). Until now the cluster served only
   `products.stock_quantity`, frozen since the W7 write cutover — a page reporting

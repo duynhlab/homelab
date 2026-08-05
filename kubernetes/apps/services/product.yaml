@@ -24,12 +24,21 @@ spec:
     # That is the only detection channel left, and it only fires after
     # something has already broken. There is no rollback for this removal.
     #
-    # Still served: the stock READ surface (stock_quantity in catalog payloads,
-    # /details stock.available/quantity, GetProducts.available_qty) answers from
-    # a column FROZEN since the W7 write cutover. Removing it is the next slice;
-    # what this pin does is stop it being the ONLY answer — see
-    # product_availability_source below.
-    image_tag: "1.7.0" # {"$imagepolicy": "flux-system:product:tag"}
+    # 1.8.0 takes the frozen column OUT of the read contract: /details has no
+    # `stock` block and product payloads no longer publish stock_quantity. Both
+    # reported a value last written at the W7 write cutover — a number that could
+    # not change. Availability comes from inventory-service on the same response
+    # (product_availability_source below) and is the only stock answer.
+    #
+    # ORDER MATTERED: the SPA moved to the `availability` block first
+    # (frontend #81), because removing the old fields before that would have
+    # blanked the product page.
+    #
+    # products.stock_quantity is STILL SELECTed — GetProducts.available_qty reports
+    # it for checkout's product-source fallback — so the column cannot be dropped
+    # from the schema yet. Checkout runs on inventory at canary 100%, so the field
+    # is unused in practice, and unused is not removed.
+    image_tag: "1.8.0" # {"$imagepolicy": "flux-system:product:tag"}
     namespace: product
     platform_backup_label: "cnpg"
     replicaCount: 1

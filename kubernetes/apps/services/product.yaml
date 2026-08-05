@@ -34,11 +34,30 @@ spec:
     # (frontend #81), because removing the old fields before that would have
     # blanked the product page.
     #
-    # products.stock_quantity is STILL SELECTed — GetProducts.available_qty reports
-    # it for checkout's product-source fallback — so the column cannot be dropped
-    # from the schema yet. Checkout runs on inventory at canary 100%, so the field
-    # is unused in practice, and unused is not removed.
-    image_tag: "1.8.0" # {"$imagepolicy": "flux-system:product:tag"}
+    # 1.9.0 stops READING products.stock_quantity anywhere: GetProducts and its
+    # available_qty field left the contract, so the column had no reader left.
+    #
+    # 1.10.0 DROPS IT. Migration 000006 revokes the migration-000005 cross-service
+    # grant, drops stock_reservations, then drops products.stock_quantity. This is
+    # the irreversible step of RFC-0021 phase 4 and the ordering around it is not
+    # cosmetic:
+    #
+    #   * inventory 0.3.0 must already be deployed — it retired the `backfill`
+    #     subcommand, the last thing that SELECTed this column, through the grant
+    #     this migration revokes. Remove the reader, then the read.
+    #   * a data-bearing cluster needs a MANUAL backup first. The paired
+    #     down-migration restores the SHAPE only (every row at 0), so the backup is
+    #     the data rollback:
+    #       kubectl -n product exec product-db-1 -c postgres --     #         pg_dump -U postgres -d product -Fc > product-pre-000006.dump
+    #     Then RESTORE-TEST it. A backup nobody has restored is a hypothesis.
+    #     Evidence for the completed test: RFC-0021 cutover-rollback.md gate 3.
+    #
+    # The migration refuses to run while any undocumented role still holds SELECT
+    # on products, and fails fast on a lock (lock_timeout 3s) rather than queueing
+    # every catalog read behind an ACCESS EXCLUSIVE waiter. A refusal leaves the
+    # schema intact but marks the version dirty — recovery is in the migration
+    # header.
+    image_tag: "1.10.0" # {"$imagepolicy": "flux-system:product:tag"}
     namespace: product
     platform_backup_label: "cnpg"
     replicaCount: 1

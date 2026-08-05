@@ -20,6 +20,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stock) with the stock rules pointing at `inventory.md` instead of being
   duplicated in stale form.
 
+- **RFC-0021 P4 — product pinned to `1.10.0`, the irreversible step**: migration
+  `000006` revokes the migration-`000005` cross-service grant, drops
+  `stock_reservations`, then drops `products.stock_quantity`. Product no longer owns
+  stock in the schema either. Sequenced behind inventory `0.3.0` (below) because the
+  retired backfill was the last thing that selected the column, through the grant
+  being revoked. **A data-bearing cluster needs a manual `pg_dump` first** — the
+  paired down-migration restores shape with every row at `0`, so the backup is the
+  data rollback; the completed backup + restore test is recorded as RFC-0021 gate 3.
+  Hardened after an adversarial review: the migration refuses to drop while any
+  undocumented role still holds `SELECT` on `products` (a `REVOKE` whose grantor
+  differs only WARNs and returns success), sets `lock_timeout` so it fails fast
+  instead of queueing every catalog read behind an `ACCESS EXCLUSIVE` waiter, and
+  stops claiming that revoking `CONNECT` is a boundary — Postgres grants
+  `CONNECT`/`TEMPORARY` and schema `USAGE` to PUBLIC by default, so the `pg_hba`
+  line removed in #663 is the actual boundary.
+
 - **RFC-0021 P4 — inventory pinned to `0.3.0`**: the phase-2 `backfill` subcommand
   and its `PRODUCT_DB_*` config surface are retired. It read
   `products.stock_quantity` through the cross-service grant, and phase 4 removes

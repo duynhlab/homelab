@@ -33,9 +33,20 @@ spec:
     component: worker
     replicaCount: 1
     image:
-      # Same image as the checkout API — just a different subcommand.
+      # Same image as the checkout API — just a different subcommand — and it must
+      # stay on the SAME TAG. It had drifted to 0.3.1 while the API moved to 0.6.0:
+      # three minors of the shared binary, including every base-layer CVE patch that
+      # trivy gates the API on but never re-checked here.
+      #
+      # Safe to move in one step, verified rather than assumed: between those tags
+      # `internal/workflow/` changed by exactly one test file, so the workflow
+      # DEFINITION is byte-identical and an in-flight AbandonedCheckoutWorkflow
+      # (30-minute timer) replays without a non-determinism error. This worker is
+      # NOT under ADR-030 versioning — only order is — so there is no build id to
+      # activate and no side-by-side step. `repo.ExpireDue`, the only activity it
+      # runs, is also unchanged.
       repository: ghcr.io/duynhlab/checkout-service/checkout-service
-      tag: "0.3.1"
+      tag: "0.6.0"
       pullPolicy: IfNotPresent
     # Run the worker subcommand; it serves /health, /ready, /metrics on :8080 but
     # no app traffic, so the Service is skipped.

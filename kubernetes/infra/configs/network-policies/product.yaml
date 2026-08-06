@@ -88,9 +88,15 @@ spec:
         - protocol: TCP
           port: 5432
 ---
-# product-service gRPC (:9090, product.v1) — the saga's stock activities
-# (order ns) and checkout's re-validation (RFC-0015). The server shipped with
-# RFC-0015 P1, AFTER the last cluster audit, so no allow existed yet.
+# product-service gRPC (:9090, product.v1) — checkout's price re-validation
+# (RFC-0015). The server shipped with RFC-0015 P1, AFTER the last cluster audit,
+# so no allow existed yet.
+#
+# The order namespace is NOT admitted any more. RFC-0021 P4 deleted the saga's
+# product stock activities, so order has nothing left to call here — and the
+# allow is what would let a rolled-back build reserve stock at product-service
+# again, silently, after inventory became the authority. Removing it makes that
+# a connection failure instead of a second stock ledger.
 #
 # A SEPARATE pod-scoped policy, not a rule in allow-internal-callers: PgDog
 # also listens on 9090 in this namespace (openmetrics), and a namespace-wide
@@ -108,9 +114,6 @@ spec:
     - Ingress
   ingress:
     - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: order
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: checkout

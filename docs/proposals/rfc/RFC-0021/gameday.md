@@ -317,6 +317,24 @@ its `mp_N` counter reset. Two effects:
 Neither is money drift, and both are artefacts of using a mock. They are worth
 knowing before anyone restarts mockpay in anger during an incident.
 
+**Closing evidence, 11:02.** The automatic 5-minute pass is clean and its scan
+count now tracks the window instead of the whole ledger:
+
+| Run | Time | `transactions_scanned` | `discrepancies_found` |
+|---|---|---|---|
+| 73 | 10:45:54 | 18 | **0** |
+| 74 | 10:50:54 | 19 | **0** |
+| 75 | 10:55:54 | 19 | **0** |
+| 76 | 11:00:54 | 19 | **0** |
+
+The `missing_provider` burst from the restart stopped at 10:40:54 after 26 rows
+and has not recurred — it aged out of the lookback exactly as predicted, with no
+intervention. Both alert series are still `firing` at 11:03 because the
+expression is `increase(…[1h]) > 0`: they clear about an hour after their last
+increment (`missing_internal` ~11:21, `missing_provider` ~11:41). **A counter-based
+alert with a 1 h window cannot show recovery any faster than that**, which is
+worth knowing before someone reaches for a second fix during an incident.
+
 ## G3 — CNPG switchover under load
 
 **Claim.**

@@ -11,6 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`checkout-worker` re-aligned to the API's image (`0.3.1` → `0.6.0`).** It is the
+  *same* binary with a different subcommand, and it had drifted three minors behind —
+  carrying base layers that `trivy` gates the API on but had never re-checked here.
+  Moved in one step because the risk was verified, not assumed: between those tags
+  `internal/workflow/` changed by exactly one test file, so the workflow
+  **definition** is byte-identical and an in-flight `AbandonedCheckoutWorkflow`
+  (30-minute timer) replays without a non-determinism error. This worker is not under
+  ADR-030 versioning — only order is — so there is no build id to activate.
+
+- **Every service repo now pins the shared reusable workflows to a commit SHA, and
+  passes only the secrets each one declares.** `@main` meant anyone who could push to
+  `gha-workflows` changed twelve repositories' CI silently. The half that makes
+  pinning maintainable instead of a freeze: `gha-workflows` had **no tags**, and
+  Dependabot bumps a SHA-pinned ref only when it finds a newer *release* — so it is
+  now tagged `v1.0.0` and each ref carries `# v1.0.0` for Dependabot to read.
+  Separately, `secrets: inherit` was handing `SONAR_TOKEN`, `SLACK_BOT_TOKEN` and a
+  Google service-account private key to callees that declare **no secrets at all**;
+  every call site was re-checked against its callee's declared set, so nothing that
+  needs a secret lost one. Fleet hotspots went from 40+ to a single `docker:S6471`
+  per repo (builder stage as root — the stage is discarded and the runtime user is
+  non-root, so that one is a reviewed-safe verdict rather than a change).
+
 - **The RFC-0021 drain gate is now checkable, because its query was silently lying.**
   `temporal worker deployment describe` prints a version as
   `order-fulfillment` **`.`** `1.13.0` while the `TemporalWorkerDeploymentVersion`

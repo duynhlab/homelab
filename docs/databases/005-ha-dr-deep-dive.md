@@ -340,11 +340,22 @@ When CNPG promotes a replica:
 5. **PgDog**: sees `-rw` DNS change, routes writes to new primary
 6. **Old primary**: if it recovers, rejoins as replica (pg_rewind if needed)
 
+**Measured on Kind, 2026-08-06** ([drill DR-2026-08-B](../proposals/rfc/RFC-0021/gameday.md#g3--cnpg-switchover-under-load)):
+step 4 took **12.6 s**, not `< 5 s`, and the `-rw` endpoint list was **empty for
+10.9 s** between fencing the old primary and publishing the new one. That empty
+window is the outage — step 5 followed promptly once there was an address to
+follow. Total write unavailability was **11.4 s**, so the `< 30 s` RTO in the
+matrix above holds; the `< 5 s` sub-step figure does not, and needs re-measuring
+on real hardware before it is rewritten. Measure with a write probe, not the
+cluster `phase`: `phase` reported `healthy` at +30.5 s, long after writes
+recovered.
+
 ### Planned vs Unplanned Switchover
 
 ```bash
-# Planned switchover (zero downtime, maintenance)
-kubectl cnpg switchover product-db --force
+# Planned switchover (maintenance) — the plugin verb is `promote`, and it names
+# the instance to promote. There is no `kubectl cnpg switchover`.
+kubectl cnpg promote product-db product-db-2 -n product
 
 # Unplanned failover (after primary crash, verify state)
 kubectl cnpg status product-db
@@ -477,8 +488,8 @@ kubectl cnpg status product-db -n product
 # Promote DR replica to standalone
 kubectl cnpg promote product-db-replica -n product
 
-# Planned switchover (primary -> replica)
-kubectl cnpg switchover product-db -n product
+# Planned switchover (primary -> replica); no `switchover` verb exists
+kubectl cnpg promote product-db product-db-2 -n product
 
 # Trigger on-demand backup
 kubectl cnpg backup product-db -n product

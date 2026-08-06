@@ -35,6 +35,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **RFC-0021 is `implemented` (P0–P7).** The phase-7 gate — *GameDay scenarios
+  converge; all migration flags removed* — is met, and the closure **cites** evidence
+  rather than promising it: the [GameDay record](docs/proposals/rfc/RFC-0021/gameday.md)
+  (five faults, three claims held, **two falsified**) and the SLO work that found
+  inventory's three SLOs were *dead* rather than mis-scoped. Deferred items are listed
+  in the RFC's Implementation History instead of left implied — checkout's bare `500`
+  when its own database fails over, the reservation layer still unable to express an
+  unknown SKU, G1 wanting a re-run against the inhibition that landed mid-drill, and
+  the reconciler never verifying that a provider honoured the window it asked for. The
+  RFC-0020 east-west-TLS dependency is **disposed of, not inherited**: nothing in this
+  RFC's thesis waits on mTLS, and gating a closure on another `provisional` RFC would
+  keep it open indefinitely. `docs/README.md` gains the RFC-0021 design-record row it
+  never had.
+
+- **RFC-0007 de-staled.** It claimed *"no drill recorded yet"* while drills B and E had
+  just run, and its scenario catalog named `cnpg-db`, `auth-db` and
+  `supporting-shared-db` — clusters that stopped existing at the RFC-0018
+  consolidation. Drill D (Zalando WAL-G) is marked obsolete for the same reason. It
+  stays **`provisional`** on purpose: its deliverable is the *program* — cadence, named
+  owner, standing evidence home — and none of that exists yet.
+
 - **`MicroserviceLatencyCritical` demoted to `warning`** — it duplicated the Sloth
   latency burn-rate page on the same metric (a static threshold cannot know how much
   budget is left). P95/P99 were already `warning`. Catalog decision applied, not

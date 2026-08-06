@@ -151,7 +151,7 @@ storage failures are retryable (`DEPENDENCY_UNAVAILABLE`).
 | RPC | Request → Response | Saga | Notes |
 |-----|--------------------|------|-------|
 | `BatchGetAvailability` | `sku_ids[]` (1..200) → per-SKU `status` + `available_to_promise` | — | Read-only. Unknown/untracked SKU → `AVAILABILITY_STATUS_UNKNOWN` (never fabricated into `OUT_OF_STOCK`); tracked-but-zero → `OUT_OF_STOCK`. Over 200 ids → `VALIDATION_ERROR` |
-| `CheckAvailability` | `items[]` (1..100) → `can_fulfill` + `shortages[]` | — | Whole-basket UX/revalidation gate. **Advisory only** — `Reserve` is the correctness gate; callers must not map a transport error to "out of stock". Duplicate SKU lines are summed before evaluation |
+| `CheckAvailability` | `items[]` (1..100) → `can_fulfill` + `shortages[]` + `unknown_sku_ids[]` | — | Whole-basket UX/revalidation gate. **Advisory only** — `Reserve` is the correctness gate; callers must not map a transport error to "out of stock". Duplicate SKU lines are summed before evaluation. A `shortage` is a tracked SKU with a real quantity; `unknown_sku_ids` are SKUs with **no balance row in any warehouse** and carry no quantity claim — `can_fulfill` is false whenever it is non-empty, and callers must fail **closed** on it rather than presenting it as unavailable |
 | `Reserve` | `reservation_id` + `order_id` + `items[]` + `request_hash` (+ optional `expires_at`) → `status` + `allocations[]` | step | All-or-none; one warehouse fulfils the whole order. Idempotent by `reservation_id` + `request_hash` (replay returns the original); divergent hash → `IDEMPOTENCY_CONFLICT`; no warehouse fulfils → `INSUFFICIENT_STOCK` with per-line shortages |
 | `Release` | `reservation_id` + bounded `reason` → `status` | compensation | Pre-pivot compensation. Releasing an already-released reservation is a no-op success; releasing a `COMMITTED` reservation → `INVALID_TRANSITION` (a sale is undone by a `RETURN`, never a release) |
 | `Commit` | `reservation_id` → `status` | mandatory forward | Post-pivot: `on_hand −= q; reserved −= q` + `SALE_COMMITTED` movement. Idempotent (committing a `COMMITTED` returns it unchanged); committing a `RELEASED` → `INVALID_TRANSITION`. Callers retry until it succeeds |
@@ -247,14 +247,15 @@ platform-wide call graph is in
   number. Callers therefore fail **closed** — checkout returns a retryable 503 rather
   than guessing, product's `/details` degrades to `status: unknown`, and
   `CheckoutAvailabilityErrors` pages on it.
-- **The contract cannot say "I have no data for this SKU."** `CheckAvailability`
-  answers `{can_fulfill, shortages}`, and `can_fulfill = false` is also the response's
-  zero value — so a missing balance row is indistinguishable on the wire from a real
-  zero, and reads to the shopper as a definite "out of stock". A missing row is now a
-  realistic state: the phase-2 backfill from product was retired with the column it
-  copied, so balances arrive only from a seed (dev) or an explicit `RECEIVE` movement.
-  Guarded by `CheckoutAvailabilityRefusingEverything` until the contract gains an
-  explicit unknown; adding a field is additive and cheap.
+- **A catalog SKU with no balance row is an ordinary state, and it stays a manual
+  fix.** The phase-2 backfill from product was retired with the column it copied, so
+  balances arrive only from a seed (dev-only, SKUs 1–13) or an explicit `RECEIVE`
+  movement — there is no automated path that notices a new catalog SKU and gives it a
+  balance. The *reporting* gap this used to describe is **closed**:
+  `unknown_sku_ids` (pkg `v0.35.0`) says it explicitly instead of leaking out as a
+  zero-ATP shortage, checkout fails closed on it, and
+  [`CheckoutAvailabilityUnknownSKU`](../observability/runbooks/microservices/CheckoutAvailabilityUnknownSKU.md)
+  pages with the SKU ids. What remains is that **nothing prevents** the state.
 - **No reservation auto-expiry (v1).** `expires_at` is observability-only; nothing
   transitions a reservation to `EXPIRED`. What shipped in phase 3 is the
   **order-domain reconciler** (live): it repairs stranded `RESERVED` holds through

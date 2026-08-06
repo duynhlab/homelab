@@ -5,11 +5,24 @@
 # path, and it needs a signal of its own:
 #
 #   checkout_availability_check_total{result} — emitted by checkout (app="checkout")
-#     result ∈ ok       — inventory answered and the basket is fulfillable
-#              shortage — inventory answered and refused the basket (a BUSINESS
-#                         answer: the shopper is told to requote)
-#              error    — the RPC failed or timed out. Checkout fails CLOSED:
-#                         ErrUpstream (503), never read as a shortage
+#     result ∈ ok          — inventory answered and the basket is fulfillable
+#              shortage    — inventory answered and refused the basket (a BUSINESS
+#                            answer: the shopper is told to requote)
+#              unknown_sku — inventory answered but does not TRACK one of the SKUs
+#                            (no balance row anywhere). A DATA problem, not demand:
+#                            checkout fails closed with a 503 rather than telling
+#                            the shopper an item is gone. Since checkout 0.6.0 /
+#                            inventory 0.4.0 (pkg v0.35.0 `unknown_sku_ids`)
+#              error       — the RPC failed or timed out. Checkout fails CLOSED:
+#                            ErrUpstream (503), never read as a shortage
+#
+# WHY EVERY SELECTOR BELOW NAMES ITS LABELS EXPLICITLY
+#
+# Adding a fourth value is not label-neutral. `unknown_sku` in an unfiltered
+# denominator DILUTES the ratio above it: a partial inventory outage plus a flood
+# of unknown_sku could push the error share under 1% and SUPPRESS the critical
+# page. So the ratios below select their denominators, and a new value must be
+# added to them deliberately rather than inherited by accident.
 #
 # This replaces the phase-2 shadow-compare rules. Those watched
 # inventory_shadow_compare_total, which no longer exists — checkout 0.5.0 removed
@@ -35,12 +48,21 @@ spec:
         - record: checkout:availability_check:rate5m
           expr: sum by (result) (rate(checkout_availability_check_total[5m]))
 
-        # Error share of answered checks. clamp_min avoids 0/0 on an idle stack.
+        # Error share of ANSWERED checks — denominator named, not inherited (see
+        # the header): unknown_sku is a checkout-side refusal, not an inventory
+        # answer that could have been an error, so counting it here would only
+        # hide errors.
         - record: checkout:availability_error:ratio5m
           expr: |
             sum(rate(checkout_availability_check_total{result="error"}[5m]))
             /
-            clamp_min(sum(rate(checkout_availability_check_total[5m])), 1)
+            clamp_min(sum(rate(checkout_availability_check_total{result=~"ok|shortage|error"}[5m])), 1)
+
+        # Data-gap rate. Not a ratio: any sustained value is actionable, and a
+        # ratio would hide the case this exists for — every basket touching one
+        # untracked SKU while healthy baskets keep the share small.
+        - record: checkout:availability_unknown_sku:rate5m
+          expr: sum(rate(checkout_availability_check_total{result="unknown_sku"}[5m]))
 
     - name: checkout-availability-alerts
       rules:
@@ -53,7 +75,7 @@ spec:
           expr: |
             sum(rate(checkout_availability_check_total{result="error"}[10m]))
             /
-            clamp_min(sum(rate(checkout_availability_check_total[10m])), 1)
+            clamp_min(sum(rate(checkout_availability_check_total{result=~"ok|shortage|error"}[10m])), 1)
             > 0.01
           for: 10m
           labels:
@@ -72,17 +94,19 @@ spec:
               A wiring mistake looks identical to an outage here, which is why
               checkout startup-validates the address and panics on a nil client.
 
-        # Inventory answering "no" for essentially everything is far more likely a
-        # DATA problem than a real stockout, and it is otherwise invisible: a
-        # shortage is a legitimate business answer, so nothing else complains.
+        # Inventory refusing essentially every basket. A shortage is a legitimate
+        # business answer, so nothing else complains — but "everything is short"
+        # is not a demand shape, it is balances at zero or a policy mistake.
         #
-        # This is the guard for a known contract gap. inventory.v1
-        # CheckAvailability cannot say "I have no data for this SKU" — its response
-        # is {can_fulfill, shortages}, and can_fulfill=false is also the zero
-        # value. So a missing balance row or a SKU-namespace drift reads as a
-        # definite, customer-facing "out of stock" on every basket that touches
-        # it. Until the contract can express unknown, this alert is how that
-        # shows up.
+        # NARROWER THAN IT USED TO BE, on purpose. This alert was written as the
+        # guard for a contract gap: CheckAvailability could not say "I have no
+        # data for this SKU", so a missing balance row arrived as a definite
+        # out-of-stock and hid here. The contract can express it now
+        # (`unknown_sku_ids`, pkg v0.35.0), so that case has its OWN alert with
+        # its own fix, and this one is back to meaning what its name says.
+        # A data gap therefore no longer appears in this ratio at all — see
+        # CheckoutAvailabilityUnknownSKU below, and do not "fix" a silent
+        # refusing-everything alert by widening this expression.
         - alert: CheckoutAvailabilityRefusingEverything
           expr: |
             sum(rate(checkout_availability_check_total{result="shortage"}[15m]))
@@ -101,9 +125,37 @@ spec:
               mismatch, or balances at zero do.
             runbook: >-
               Compare a known-good product id against inventory_balances
-              (sku_id = the product id as text). `CheckAvailability` cannot
-              report an unknown SKU, so an absent row is indistinguishable from
-              zero stock on the wire — query the table, do not infer it from the
-              answer. Fix it AT inventory (seed, or an explicit RECEIVE
-              movement): the phase-2 backfill from product was retired in phase 4
-              with the column it copied.
+              (sku_id = the product id as text). If rows are MISSING rather than
+              zero, this is not your alert — CheckoutAvailabilityUnknownSKU
+              covers that and names the SKUs. Rows present at zero means real
+              balances: check whether safety_stock is at or above on_hand
+              (available-to-promise is then zero by policy, not by shortage).
+
+        # A SKU with no balance row anywhere. Not a ratio and no `for` grace
+        # beyond 5m: every one of these is a customer who got a 503 on a basket
+        # that may well be fulfillable, and the condition is PERSISTENT — it
+        # lasts until someone puts the row there. Nothing else fires on it:
+        # checkout fails closed so the shopper sees a 503, but the error ratio
+        # above deliberately excludes this value, and inventory itself answers
+        # successfully.
+        - alert: CheckoutAvailabilityUnknownSKU
+          expr: checkout:availability_unknown_sku:rate5m > 0
+          for: 5m
+          labels:
+            severity: critical
+            rfc: "0021"
+          annotations:
+            summary: "Checkout is refusing baskets because inventory does not track a SKU (missing balance row)"
+            description: >-
+              inventory.v1/CheckAvailability reported unknown_sku_ids for 5m.
+              Checkout fails closed on it — a 503, never "out of stock" — so
+              affected shoppers cannot check out at all, and the condition will
+              not clear on its own.
+            runbook: >-
+              The SKU ids are in checkout's logs and on the span
+              (checkout.unknown_sku_ids) — they are deliberately NOT in the
+              response body. Then add the balance AT inventory: seed for a
+              dev/demo cluster, or an explicit RECEIVE movement through the
+              normal write path so on_hand == SUM(on_hand_delta) holds. Never
+              copy product's old numbers: they stopped moving at the W7 write
+              cutover and the column was dropped in phase 4.

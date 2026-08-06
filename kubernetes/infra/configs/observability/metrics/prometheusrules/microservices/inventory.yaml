@@ -12,7 +12,11 @@
 #     outcome ∈ ok|replayed|insufficient|conflict|concurrency|
 #               invalid_transition|not_found|error
 #   - inventory_check_total{outcome} — availability probe;
-#     outcome ∈ fulfillable|shortage|error
+#     outcome ∈ fulfillable|shortage|unknown_sku|error
+#     unknown_sku (0.4.0+): at least one requested SKU has no balance row in any
+#     warehouse. Ranked ABOVE shortage when both are present, because the
+#     blocking reason an operator must act on is the data gap. Checkout fails
+#     closed on it — see CheckoutAvailabilityUnknownSKU.
 #   - rpc_server_call_duration_seconds_* — otelgrpc server RED histogram
 #     (app="inventory", rpc_method=~"inventory.v1.InventoryService/.+")
 #   - db_client_operation_duration_seconds_bucket{app="inventory"} — otelpgx

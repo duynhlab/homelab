@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The availability alerts stopped being able to suppress each other.** Adding a
+  fourth `result` value is not label-neutral, and an adversarial review caught two
+  ways it broke the existing pair: `unknown_sku` was **absent from
+  `CheckoutAvailabilityRefusingEverything`** (which selects `shortage`), so a total
+  data gap would have fired nothing at all; and it landed in
+  **`CheckoutAvailabilityErrors`' unfiltered denominator**, where a flood of missing
+  balance rows could push the error share under 1% and *suppress the critical page*
+  during a partial inventory outage. Every ratio now names its labels explicitly,
+  with the reason written next to it. `RefusingEverything` is deliberately
+  **narrower** — it used to double as the guard for the contract gap that
+  `unknown_sku_ids` closes, and its runbook now says not to widen it back. Catalogs,
+  the inventory dashboard panel, `docs/api/inventory.md` and `docs/api/checkout.md`
+  updated with it.
+
 - **RFC-0021 phase 4 closed, and the docs stopped describing a migration in flight.**
   RFC status → *phases 0–6 shipped*, with a phase-4 implementation-history entry that
   records the removal order and the four production-shaped bugs execution found that
@@ -82,6 +96,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   server inside a one-shot Job holding product-database credentials.
 
 ### Added
+
+- **`CheckoutAvailabilityUnknownSKU` (critical) + runbook** — a SKU with no balance
+  row in any warehouse. `inventory.v1/CheckAvailability` can now say so explicitly
+  (`unknown_sku_ids`, pkg `v0.35.0`) instead of leaking it out as a `Shortage` at
+  `available_to_promise = 0`, a quantity claim inventory cannot make about a SKU it
+  has never heard of. Checkout fails **closed** on it (503, never *"no longer
+  available"*), so the alert is what turns a silent revenue loss into a page — the
+  RPC succeeds, so nothing at inventory looks wrong. Not a ratio: a healthy majority
+  of baskets would hide the case it exists for.
 
 - **RFC-0021 P4 — order worker build `1-13-0` staged** (order 1.13.0: the saga's
   product-service stock branch is deleted). Side by side with `1-12-0` per ADR-030

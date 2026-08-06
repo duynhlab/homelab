@@ -99,9 +99,11 @@ flowchart LR
     class DB data;
 ```
 
-Every inbound edge is **planned**: the service is deployed and its gRPC surface is
-Implemented, but no caller is wired yet (RFC-0021 phases 2–3). Nothing dials
-inventory's HTTP surface — `:8080` carries `/health` and `/ready` only; all
+Every inbound edge is **live** as of RFC-0021 phase 4 — the order saga reserves and
+commits here, checkout reads availability here, and product's `/details` asks here for
+the page's availability. Nothing dials inventory's HTTP surface — `:8080` carries
+`/health` and `/ready` only, which is also why its SLO must be built on the gRPC RED
+metrics rather than the HTTP ones; all
 consumers use gRPC on `:9090`, fenced by NetworkPolicy from the `checkout` and
 `order` namespaces.
 

@@ -513,8 +513,9 @@ services:
       auth: { condition: service_healthy }
 
   # ---- Inventory (RFC-0021): sole stock authority. gRPC-only (:9090,
-  # inventory.v1) — no Kong route. No live caller yet: checkout/order still
-  # use Product stock; the read/write cutover is phases 2-3.
+  # inventory.v1) — no Kong route. Three live callers since phase 4: the order
+  # saga (reserve/commit/release), checkout (availability), and product /details.
+  # Product no longer has a stock column to fall back to.
   inventory:
     build: { context: ../../inventory-service }
     environment:
@@ -546,10 +547,10 @@ services:
       ORDER_GRPC_ADDR: dns:///order:9090
       # P3 quote authority for PUT …/shipping (fee + tax composition).
       SHIPPING_GRPC_ADDR: dns:///shipping:9090
-      # RFC-0021 P2-4/5: inventory availability reads. `shadow` observes +
-      # compares (emits inventory_shadow_compare_total) while Product still
-      # decides — the phase-2 local-stack read-path exercise. Set `inventory` to
-      # test the split-read gate; `product` to disable.
+      # Inventory is the ONLY availability authority. The phase-2 shadow mode and
+      # the CHECKOUT_AVAILABILITY_SOURCE flag that selected it were both deleted in
+      # checkout 0.5.0 — there is no "off" position, because there is nothing left
+      # to fall back to. An unreachable inventory fails CLOSED (503 + Retry-After).
       INVENTORY_GRPC_ADDR: dns:///inventory:9090
       TEMPORAL_HOSTPORT: temporal:7233
       TEMPORAL_NAMESPACE: mop

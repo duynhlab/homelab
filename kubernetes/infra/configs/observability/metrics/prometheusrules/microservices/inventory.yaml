@@ -1,9 +1,14 @@
-# RFC-0021 phase-1 inventory-service recording rules + alerts.
+# inventory-service recording rules + alerts. Landed at RFC-0021 phase 1, STEADY
+# STATE since phase 4.
 #
-# inventory is the extracted stock authority (gRPC-only, no Kong route, no live
-# caller until phase 2 wires checkout/order onto it — RFC-0021 P1-7/8). Until
-# then every rate here reads ~0; the point of landing the rules now is that the
-# signals exist and are pre-aggregated the moment traffic arrives.
+# inventory is the platform's sole stock authority (gRPC-only, no Kong route), and
+# it now has three live callers: the order saga (reserve/commit/release), checkout
+# (availability), and product's `/details`. The "every rate reads ~0 until phase 2"
+# caveat that used to live here no longer applies — a flat rate is now a finding.
+#
+# Because the surface is gRPC-only, `:8080` carries `/health` and `/ready` and
+# nothing else, so the rules below are built on the rpc_* RED metrics. An SLO for
+# this service must be too: an HTTP-based SLI would measure only its probes.
 #
 # Sources are the metrics the merged inventory code emits TODAY (verified, not
 # invented):

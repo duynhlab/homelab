@@ -11,6 +11,31 @@ Zero requests for 10 minutes, but the service had traffic in the prior hour.
 ## Impact
 See alert summary in [alert catalog](../../alerting/alert-catalog.md#1-microservices-red-metrics).
 
+## Expected on a rebuilt cluster — read this first
+This alert is **correct and self-resolving** after any bounded burst of traffic
+(a fresh `make up`, an e2e audit, a browser session, a seed run). There is no
+continuous synthetic load on this platform, so "traffic stopped" is the normal
+end state of every test, not an incident.
+
+The window is arithmetic, not tuning. With the last request at `t`:
+
+| Time | `rate(...[10m])` | `rate(...[1h])` | Alert |
+|---|---|---|---|
+| `t` → `t+10m` | > 0 | > 0 | quiet |
+| `t+10m` → `t+1h` | 0 | > 0 | **fires** (after `for: 10m`, so from ~`t+20m`) |
+| after `t+1h` | 0 | 0 | resolves on its own |
+
+So one traffic burst produces a single ~40-minute warning that clears itself.
+`for:` was deliberately **not** lengthened: suppressing this case needs
+`for: ≥ 50m`, which would delay a genuine total-traffic-loss signal by the same
+50 minutes — trading a known-benign local annoyance for a real production blind
+spot. The alert stays `warning` (non-paging on this Alertmanager).
+
+Treat it as real when the service is **supposed** to be under load: after a
+deploy that should be serving, or when a sibling service still has traffic and
+this one does not. The durable fix is a continuous synthetic probe so silence
+becomes meaningful — **not deployed**.
+
 ## Diagnosis
 ### Possible causes
 - Upstream service stopped calling this service

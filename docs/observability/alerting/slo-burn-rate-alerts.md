@@ -57,7 +57,7 @@ For a deeper derivation see the [SRE Workbook chapter on alerting on SLOs](https
 
 ## 2. What Sloth generates per SLO
 
-Each `PrometheusServiceLevel` produces a `PrometheusRule` containing **recording rules** + **2 alerts per SLO**. With all 10 services covered by 3 SLOs (availability, latency, and error rate), that is **30 SLOs / 60 alerts**.
+Each `PrometheusServiceLevel` produces a `PrometheusRule` containing **recording rules** + **2 alerts per SLO**. With 10 HTTP services covered by 3 SLOs each (availability, latency, and error rate) and inventory by 2 gRPC SLOs, that is **32 SLOs / 64 alerts**.
 
 ### Recording rules (per SLO, per window)
 

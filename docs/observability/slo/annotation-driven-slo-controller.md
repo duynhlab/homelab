@@ -73,7 +73,9 @@ metadata:
     # Optional overrides (defaults from controller config)
     slo.platform/team: "platform"
     slo.platform/metric-name: "http_server_request_duration_seconds"
-    slo.platform/job-label: "microservices"
+    # No job-label knob: the OTLP push path has no `job` label (vmagent maps
+    # service_name->app, k8s_namespace_name->namespace).
+    slo.platform/app-label: "auth"
 ```
 
 ### Annotation Reference
@@ -87,7 +89,7 @@ metadata:
 | `slo.platform/error-rate-objective` | No | `99.0` | Error rate target (%) |
 | `slo.platform/team` | No | `platform` | Team label on PrometheusServiceLevel |
 | `slo.platform/metric-name` | No | `http_server_request_duration_seconds` | Base metric name |
-| `slo.platform/job-label` | No | `microservices` | Prometheus job label |
+| `slo.platform/app-label` | No | pod's `app` label | Value of the `app` selector on the SLI. **There is no `job` label to key on**: the services push OTLP, so vmagent maps `service_name`→`app` and `k8s_namespace_name`→`namespace` and never synthesises a scrape `job`. An earlier draft of this table specified `slo.platform/job-label: microservices`, which would produce SLIs that select nothing |
 
 ## Implementation Outline
 
@@ -130,7 +132,7 @@ func (r *SLOReconciler) buildPrometheusServiceLevel(
     errObj := parseFloat(ann, "slo.platform/error-rate-objective", 99.0)
     team := getString(ann, "slo.platform/team", "platform")
     metric := getString(ann, "slo.platform/metric-name", "http_server_request_duration_seconds")
-    job := getString(ann, "slo.platform/job-label", "microservices")
+    app := getString(ann, "slo.platform/app-label", deploy.Labels["app"])
 
     psl := &slothv1.PrometheusServiceLevel{
         ObjectMeta: metav1.ObjectMeta{
@@ -144,9 +146,9 @@ func (r *SLOReconciler) buildPrometheusServiceLevel(
                 "service": name, "namespace": ns,
             },
             SLOs: []slothv1.SLO{
-                buildAvailabilitySLO(name, ns, metric, job, availObj),
-                buildLatencySLO(name, ns, metric, job, latObj, latThreshold),
-                buildErrorRateSLO(name, ns, metric, job, errObj),
+                buildAvailabilitySLO(name, ns, metric, app, availObj),
+                buildLatencySLO(name, ns, metric, app, latObj, latThreshold),
+                buildErrorRateSLO(name, ns, metric, app, errObj),
             },
         },
     }
@@ -267,4 +269,4 @@ The migration is safe because:
 - Controller uses server-side apply for idempotent updates
 
 ---
-_Last updated: 2026-07-14_
+_Last updated: 2026-08-06_

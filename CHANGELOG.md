@@ -9,7 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **inventory gets real SLOs, hand-written on its gRPC SLI.** The `mop` chart only
+  builds HTTP SLIs, and inventory is gRPC-only — so its three chart SLOs had **no
+  series behind them at all** (no Kong route, health/ready not instrumented): a 0/0
+  SLI on the platform's sole stock authority. Replaced with `grpc-availability`
+  (99.9%, server faults only — business refusals excluded) and `reserve-latency`
+  (`Reserve` p95 < 250 ms), both RFC-0021's own targets. Needed a per-service opt-out
+  in the fulfillment ResourceSet (`slo_disabled`, an opt-*out* because the template
+  guard is truthiness-based).
+- **Alertmanager inhibition: one incident, one page.** Checkout's deliberate
+  fail-closed 503s paged twice — once through the precise
+  `CheckoutAvailabilityErrors`/`CheckoutAvailabilityUnknownSKU` rules and once
+  through the Sloth burn-rate page. The 503 keeps burning budget; the generic page is
+  suppressed while a precise one fires. Scoped by `service` + `sloth_severity=page` +
+  availability/error-rate only — never by severity alone, and never the ticket alert.
+
 ### Changed
+
+- **`MicroserviceLatencyCritical` demoted to `warning`** — it duplicated the Sloth
+  latency burn-rate page on the same metric (a static threshold cannot know how much
+  budget is left). P95/P99 were already `warning`. Catalog decision applied, not
+  re-litigated.
+- **`VMAgentScrapePoolHasNoTargets` root-caused instead of relaxed.** The only empty
+  pool on a rebuilt cluster is `podScrape/monitoring/sloth-ui/0` — sloth-ui ships at
+  `replicas: 0` by design — so it is excluded by name; threshold and `for:` untouched.
+  The vestigial `temporal-internal-frontend` exclusion is removed: a live run confirms
+  that pool is gone, which is the condition its comment set for removal.
+- **SLO docs made as-built:** 32 SLOs / 64 alerts across 11 services (was documented
+  as 30/60 across 8 listed services), the `mop`-chart origin of the
+  `PrometheusServiceLevel` CRs stated explicitly (why the repo contains almost none),
+  and the stale `slo.platform/job-label` default corrected — the OTLP push path has no
+  `job` label. `MicroserviceNoTraffic`/`NoSuccessfulRequests` runbooks now document
+  why they fire benignly for ~40 minutes after any traffic burst, and why `for:` was
+  deliberately not lengthened.
 
 - **`checkout-worker` re-aligned to the API's image (`0.3.1` → `0.6.0`).** It is the
   *same* binary with a different subcommand, and it had drifted three minors behind —

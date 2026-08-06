@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The RFC-0021 drain gate is now checkable, because its query was silently lying.**
+  `temporal worker deployment describe` prints a version as
+  `order-fulfillment` **`.`** `1.13.0` while the `TemporalWorkerDeploymentVersion`
+  search attribute stores `order-fulfillment` **`:`** `1.13.0` — and querying with the
+  dot returns **`Total: 0` instead of an error**. Measured against a workflow known to
+  be pinned to `1.13.0`: colon → 1, dot → 0. An operator copying the format from the
+  neighbouring CLI output would get a confident zero and delete a worker manifest that
+  was still serving pinned histories, stranding sagas holding stock and an
+  authorization. `cutover-rollback.md` now carries the two formats side by side, the
+  instruction to sanity-check the query against the *current* build first, why
+  `DrainageStatus: unspecified` is not evidence either, and a four-part falsifiable
+  criterion for deleting a build.
+
 - **The availability alerts stopped being able to suppress each other.** Adding a
   fourth `result` value is not label-neutral, and an adversarial review caught two
   ways it broke the existing pair: `unknown_sku` was **absent from
@@ -284,6 +297,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **inventory backfill CronJob image reference** — it pointed at `ghcr.io/duynhlab/inventory-service/inventory:v0.2.1`, which does not exist: the repo publishes `…/inventory-service/inventory-service` tagged without the leading `v` (now `0.2.3`) (GHCR returns 404 for the old path). The CronJob is suspended, so the bad pull would have surfaced the first time it was resumed — inside the write-cutover window, which is the worst possible moment.
 
 ### Removed
+
+- **Order worker builds `1-10-0` and `1-12-0`, and the order→product `:9090`
+  NetworkPolicy allow.** Removed on evidence, not tidiness: Current is `1.13.0`, the
+  version search attribute counts **0** workflows pinned to either old build across
+  every status, and the task queue has no Running workflows. Keeping them was not
+  neutral — every build runs the fulfillment start-outbox dispatcher, so a draining
+  build can claim a row and start a saga that Current **refuses**, which was measured
+  during P4-A (`1-12-0` closed the row `DISPATCHED` while `1.13.0` panicked ten times
+  unwatched). `ORDER_START_DISPATCHERS_ENABLED` can silence that for future draining
+  builds but cannot help images that predate the flag, so for these two deletion was
+  the only mitigation. With the saga's product client gone, the netpol allow was the
+  last thing that would let a rolled-back build write a second stock ledger.
 
 - **The last of product's stock, including the schema and the cross-service
   grant.** The suspended `inventory-backfill` CronJob and the `pg_hba` line

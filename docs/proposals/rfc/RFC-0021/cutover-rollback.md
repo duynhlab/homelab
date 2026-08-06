@@ -79,6 +79,34 @@ deliberate operator step, in this order:
        --address temporal-frontend.temporal.svc.cluster.local:7233 \
        --query "TaskQueue='order-fulfillment' AND ExecutionStatus='Running' AND TemporalWorkerDeploymentVersion IS NULL"
    ```
+
+   **READ THIS BEFORE TRUSTING A ZERO FROM ANY VERSION QUERY.** The search
+   attribute and `temporal worker deployment describe` print the *same value in two
+   different formats*, and the wrong one returns **0 instead of an error**:
+
+   | Where you read it | Format |
+   |---|---|
+   | `describe` output (`versioningInfo.version`) | `order-fulfillment` **`.`** `1.13.0` |
+   | `TemporalWorkerDeploymentVersion` search attribute | `order-fulfillment` **`:`** `1.13.0` |
+
+   Measured on the local cluster with one workflow known (via `describe`) to be
+   pinned to `1.13.0`:
+
+   ```
+   --query "TemporalWorkerDeploymentVersion='order-fulfillment:1.13.0'"  -> Total: 1   # correct
+   --query "TemporalWorkerDeploymentVersion='order-fulfillment.1.13.0'"  -> Total: 0   # WRONG, and silent
+   ```
+
+   So an operator who copies the format from the neighbouring CLI output gets a
+   confident zero and deletes a worker manifest that was still serving pinned
+   histories — stranding sagas that hold stock and an authorization. Always use the
+   **colon** form, and sanity-check the query by running it against the CURRENT
+   build first: if that returns 0 too, the query is wrong, not the drain.
+
+   `DrainageStatus: unspecified` is not evidence either. A build that never received
+   work has nothing for Temporal to compute drainage from, so it stays `unspecified`
+   forever — including on a freshly recreated cluster where the old builds ran once
+   in a rollout and never took a workflow.
    `OrderSagaNotCompleting` is the backstop for an activation that routed to a
    version nobody serves.
 4. **Retire when that count reads 0, in its own PR.** Delete `order-worker.yaml`
@@ -205,6 +233,30 @@ assumption:
    (product-path sagas predate versioning or run pinned to a pre-removal
    build; the removal itself ships as a NEW Worker Deployment Version, so old
    pinned histories keep their branch until drained.)
+   **Deleting an old worker manifest — the falsifiable criterion.** "DRAINED" is
+   not always observable (see above), so the check that actually holds is all four
+   of these, in this order:
+
+   1. `routingConfig.currentVersionBuildID` is a NEWER build than the one being
+      deleted;
+   2. `TemporalWorkerDeploymentVersion='<deployment>:<build>'` (**colon**) counts
+      **0** across every status, not just Running — a closed workflow can still be
+      queried, reset, or replayed against its pinned build;
+   3. the same query against the *current* build returns non-zero, proving the
+      query itself works;
+   4. zero Running workflows on the task queue.
+
+   **Satisfied 2026-08-06 for `1.10.0` and `1.12.0`**, and both manifests were
+   removed on that evidence rather than on tidiness: Current is `1.13.0`, the colon
+   query returns 0 for both and 1 for `1.13.0`, and the task queue has no Running
+   workflows. Keeping them was not neutral — every build runs the fulfillment start
+   outbox dispatcher, so a draining build can claim a row and start a saga that
+   Current **refuses** (measured on Kind during P4-A: `1-12-0` claimed the row and
+   closed it `DISPATCHED` while `1.13.0` panicked its task ten times unwatched).
+   `ORDER_START_DISPATCHERS_ENABLED` (order `main`, post-`v1.13.0`) can silence that
+   for future draining builds, but it cannot help images that predate the flag —
+   for `1.10.0` and `1.12.0` deletion was the only mitigation.
+
 3. **Staged schema drop with a backup + restore test first**, and the
    temporary backfill access (pg_hba `host product inventory` + the migration
    `000005` GRANT) revoked in the same wave.
@@ -236,4 +288,4 @@ assumption:
    backup nobody has restored is a hypothesis.
 
 ---
-_Last updated: 2026-08-05_
+_Last updated: 2026-08-06_

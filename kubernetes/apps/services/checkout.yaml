@@ -28,13 +28,29 @@ spec:
     # condition that could never change, wedging the session at `confirming` with
     # no FSM edge out. A definite answer now requotes.
     #
+    # 0.6.0 fails CLOSED when inventory reports a SKU it does not track. That answer
+    # used to arrive as a zero-ATP shortage and the shopper was told the item was
+    # gone; it is now a 503 + Retry-After, because a missing balance row says nothing
+    # about whether the item is buyable.
+    #
+    # On the CONFIRM path the session is requoted out of `confirming` first, and that
+    # detail is the whole reason this is a release rather than a one-line map: the
+    # condition is PERSISTENT (it lasts until someone adds the row), `confirming` has
+    # no FSM edge to `cancelled`, `lazyExpire` skips the state, and
+    # FindActiveByUserID keeps handing the session back — so parking there left the
+    # shopper unable to confirm, cancel, OR start a new checkout.
+    #
+    # Requires inventory 0.4.0 (pinned above) to be sending `unknown_sku_ids`, and
+    # CheckoutAvailabilityUnknownSKU to be loaded (homelab #669) — otherwise the
+    # 503s are invisible to alerting.
+    #
     # 0.5.1 makes POST /sessions answer 503 + Retry-After: 2 when a dependency is
     # down, instead of the 500 it shared with an unhandled error. Found by the
     # phase-4 e2e, and it mattered: confirm already answered 503 for the same
     # condition, so a shopper hitting a momentary inventory outage at the START of
     # checkout was told the server was broken while the same outage one step later
     # told them to retry.
-    image_tag: "0.5.1" # {"$imagepolicy": "flux-system:checkout:tag"}
+    image_tag: "0.6.0" # {"$imagepolicy": "flux-system:checkout:tag"}
     namespace: checkout
     # No platform_backup_label: checkout's data lives on product-db in the
     # product namespace, which is already backed up (same reasoning as

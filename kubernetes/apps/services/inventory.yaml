@@ -10,7 +10,17 @@ spec:
   type: Static
   defaultValues:
     name: inventory
-    # 0.3.0 RETIRES the phase-2 `backfill` subcommand (RFC-0021 phase 4) together
+    # 0.4.0 stops reporting an untracked SKU as a shortage. A requested SKU with no
+    # balance row in ANY warehouse now comes back in `unknown_sku_ids` instead of as
+    # a Shortage at available_to_promise 0 — a quantity claim this service cannot
+    # make about a SKU it has never heard of, and the reason a missing row used to
+    # reach the shopper as "no longer available".
+    #
+    # Pin this BEFORE checkout 0.6.0: checkout fails closed on the new field, and it
+    # can only do that once inventory sends it. The reverse order is harmless but
+    # pointless — checkout would keep blocking the lines instead.
+    #
+    # 0.3.0 RETIRED the phase-2 `backfill` subcommand (RFC-0021 phase 4) together
     # with its PRODUCT_DB_* config surface. It read products.stock_quantity through
     # a cross-service grant, and phase 4 removes both — so the subcommand had
     # nothing to read and no way to connect.
@@ -24,7 +34,7 @@ spec:
     # with only DB_* env (the contract every service here runs under) and 0.1.0
     # validated the full config first, so this Deployment sat in
     # Init:CrashLoopBackOff on the cluster with "SERVICE_NAME is required".
-    image_tag: "0.3.0" # {"$imagepolicy": "flux-system:inventory:tag"}
+    image_tag: "0.4.0" # {"$imagepolicy": "flux-system:inventory:tag"}
     namespace: inventory
     # No platform_backup_label: that label routes CNPG/barman S3 credentials to
     # namespaces hosting a database cluster — inventory's data lives on

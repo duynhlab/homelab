@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| accepted — phases 0–6 shipped; 7 open | platform-wide | [./research.md](./research.md) — gate passed 2026-07-23 | 2026-07-23 | 2026-08-05 |
+| implemented | platform-wide | [./research.md](./research.md) — gate passed 2026-07-23 | 2026-07-23 | 2026-08-06 |
 
 > **Supersedes [RFC-0003](../RFC-0003/README.md)** (*Inventory ownership and stock
 > semantics*), which ratified product-service as the inventory owner. RFC-0003's own
@@ -439,6 +439,81 @@ count and retention hit zero.
   trap — a slice that adds half the mechanism is more dangerous than the bug it
   replaces.
 
+- 2026-08-05 → 2026-08-06 — **P7 landed, RFC implemented.** The exit gate —
+  *GameDay scenarios converge; all migration flags removed* — is met on both halves,
+  and neither half was a formality.
+
+  **Flags.** `ORDER_STOCK_PARTICIPANT`, `CHECKOUT_AVAILABILITY_SOURCE` and
+  `PRODUCT_AVAILABILITY_SOURCE` are gone from every config; only comments remain. All
+  three had defaulted to `product` — the authority being removed — so each removal was
+  also the removal of a trap: dropping a manifest input while the old binary served
+  would have handed authority back to the frozen column. The rule that came out of it
+  is recorded in the pins themselves: **the image pin and the input removal ride in one
+  commit**, because env and image share a Deployment template.
+
+  **GameDay** ([./gameday.md](./gameday.md)) — five faults on the live cluster, judged
+  on data convergence rather than service recovery. Three claims held (fail-closed
+  availability including the previously untested recovery half; kill-the-worker
+  durability with every side effect exactly once; a lost provider response re-asked and
+  closed **under the same key**). Two were **falsified**, which is the reason the drill
+  was worth running: the standing `PaymentReconciliationDiscrepancy` was a *false
+  positive* — mockpay had been pinned at `1.0.0` since #438 while payment reached
+  `1.5.0`, and `1.0.0` discards the `from`/`to` bounds, so windowed reconciliation
+  (ADR-035) compared a bounded internal set against the **whole** provider ledger; and
+  the documented `-rw` failover sub-step of `< 5 s` measured **10.9 s** (the overall
+  RTO held: 11.4 s against a documented `< 30 s`, RPO 0 across 24 orders).
+
+  Four things were wrong in ways only execution finds. `kubectl cnpg switchover`, the
+  DR command written into **four** files, **does not exist** — the plugin has `promote`.
+  The discrepancy runbook's first diagnosis query had never been run (wrong column
+  names). A planned switchover always trips a critical WAL-archive alert for 30
+  minutes. And the version skew had quietly made phase 6's documented provider-timeout
+  fault **uninjectable in the cluster** — its matrix had only ever been verified on
+  local-stack, while the phase-7 gate is a cluster gate.
+
+  **SLOs** (homelab #675). The 33 chart-rendered SLOs existed but had never been
+  exercised, and exercising them found three defects. Inventory's three SLOs were
+  **dead, not mis-scoped**: it is gRPC-only, emits no HTTP RED series at all, so each
+  was a 0/0 ratio with no SLI, no budget and no alert that could ever fire — while
+  `kubectl get psl` reported `3/3 READY`. It now has a hand-written gRPC
+  `PrometheusServiceLevel` on this RFC's own targets (`Reserve` p95 < 250 ms). One
+  incident also paged twice: a deliberate fail-closed 503 burns the availability budget
+  (correctly — a failed request is a failed request) *and* tripped the generic burn-rate
+  page next to the precise alert that names the SKU and the fix. The generic page is now
+  inhibited by the precise one, scoped to that service and those two SLOs, with the
+  ticket alert kept so the budget record survives.
+
+  Spawned ADRs, all **Accepted / Adoption Complete**:
+  [ADR-027](../../adr/ADR-027-inventory-sole-stock-authority/) ·
+  [ADR-028](../../adr/ADR-028-inventory-reservation-model/) ·
+  [ADR-029](../../adr/ADR-029-enum-feature-flag-helper/) ·
+  [ADR-030](../../adr/ADR-030-temporal-workflow-versioning/) ·
+  [ADR-031](../../adr/ADR-031-fulfillment-start-outbox/) ·
+  [ADR-033](../../adr/ADR-033-order-status-cancellation/) ·
+  [ADR-034](../../adr/ADR-034-provider-outcome-ambiguity/) ·
+  [ADR-035](../../adr/ADR-035-windowed-reconciliation/) ·
+  [ADR-036](../../adr/ADR-036-single-writer-lease/) ·
+  [ADR-037](../../adr/ADR-037-per-request-refund-identity/).
+
+  **Deferred / tracked** — closing this RFC does not close these, and they are listed
+  rather than left implied:
+  - **Checkout answers a bare `500` with no `Retry-After` when its own database fails
+    over**, while the same endpoint returns a clean `503` for an inventory outage
+    (G3). A service-code fix, same class as the 500→503 corrected in checkout 0.5.1.
+  - **`inventory.v1/CheckAvailability` still cannot express "no data for this SKU"** at
+    the *reservation* layer; only the availability read gained `unknown_sku_ids`.
+  - **G1's readings are pre-fix.** The duplicate-paging behaviour it observed was
+    corrected mid-drill by #675, so that drill wants a re-run against the inhibition.
+  - **G2b (a kill between activity commit and response) was not reachable as designed**
+    — the saga completes in ~700 ms. The genuine interleaving came from G4's provider
+    hold; a deterministic version needs an injectable pause, not hand timing.
+  - **Chaos tooling** (Litmus / Chaos Mesh) stays the backlog candidate it already was,
+    and the **database** drill calendar stays [RFC-0007](../RFC-0007/)'s. This RFC owns
+    the application-level scenarios it ran, nothing more.
+  - The reconciler **never verifies that the provider honoured the window** it asked
+    for — the mockpay skew is fixed, but a real provider that paginates differently
+    would manufacture the same phantom.
+
 ## Related
 
 - [./research.md](./research.md) — plain-language research, code audit, Context7 trail
@@ -448,11 +523,19 @@ count and retention hit zero.
 - [RFC-0003](../RFC-0003/README.md) — superseded by this RFC
 - [RFC-0001](../RFC-0001/) — saga foundations · [RFC-0010](../RFC-0010/) + ADR-007..012 — payment base
 - [RFC-0015](../RFC-0015/) + ADR-018/019/020 — checkout/order handoff invariants
-- [RFC-0020](../RFC-0020/) — east-west TLS (phase 7 dependency)
+- [RFC-0020](../RFC-0020/) — east-west TLS. Named here as a phase-7 dependency while
+  phase 7 was scoped as "production hardening"; it is **not** one. Nothing in this
+  RFC's thesis waits on mTLS, the `:9090` surfaces are NetworkPolicy-fenced today, and
+  gating this RFC on another `provisional` one would keep it open indefinitely. Tracked
+  there, not here.
+- As-built contracts this RFC rewrote: [inventory.md](../../../api/inventory.md) ·
+  [product.md](../../../api/product.md) · [order.md](../../../api/order.md) ·
+  [checkout.md](../../../api/checkout.md) · [payments.md](../../../api/payments.md) ·
+  [temporal-order-fulfillment.md](../../../api/temporal-order-fulfillment.md)
 - ADRs spawned: ADR-027…033 (inventory authority, reservation model, flag helper,
   workflow versioning, start outbox, order status model) and ADR-034…037
   (provider-outcome ambiguity, windowed reconciliation, single-writer lease,
   refund identity)
 
 ---
-_Last updated: 2026-08-05_
+_Last updated: 2026-08-06_

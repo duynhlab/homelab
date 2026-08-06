@@ -390,6 +390,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [RFC-0012: Declarative CNPG role & database management](./proposals/rfc/RFC-0012/) - Implemented (P0–P4); per-service triplets on CNPG `DatabaseRole`/`Database` CRDs + pg_hba isolation
 - [RFC-0014: Full OpenTelemetry adoption](./proposals/rfc/RFC-0014/) - Provisional; OTLP push for metrics/logs/traces + semconv naming, phases P0–P5, consumer tracking table
 - [RFC-0019: ClickHouse for OTel logs/traces SQL](./proposals/rfc/RFC-0019/) - Provisional; Phase B Collector→ClickHouse, Phase A optional Postgres facts; **planned**, no manifests
+- [RFC-0021: Platform overhaul — inventory extraction, order aggregate, payment hardening](./proposals/rfc/RFC-0021/) - Implemented (P0–P7); supersedes RFC-0003. Inventory is the sole stock authority and product's stock is gone from code, contract and schema; order gained a status FSM with cancellation; payment can say it does not know. → ADR-027…031, ADR-033…037, [GameDay record](./proposals/rfc/RFC-0021/gameday.md)
 - [RFCs](./proposals/rfc/) - Propose & track substantial changes (process + index + backlog)
 
 ### Decisions (ADRs)
@@ -517,4 +518,4 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 ---
 
-_Last updated: 2026-07-21 — Retired `docs/runbooks/troubleshooting/`; runbooks live under domain hubs._
+_Last updated: 2026-08-06 — RFC-0021 closed (P0–P7); inventory is the sole stock authority._

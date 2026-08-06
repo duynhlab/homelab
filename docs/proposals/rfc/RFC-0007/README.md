@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | infra | 2026-06-26 | 2026-06-26 |
+| provisional | infra | 2026-06-26 | 2026-08-06 |
 
 ## Summary
 
@@ -55,7 +55,7 @@ missing piece. Concretely:
 - **Convert the estimates** in [`010.1`](../../../databases/010.1-rpo-rto-planning.md)
   to measured values, updating the as-built rows as drills complete.
 - **Accept the Barman Cloud Plugin** via a recorded plugin-backed backup +
-  restore/PITR drill (Drill A on `cnpg-db`).
+  restore/PITR drill (Drill A on `product-db`).
 
 ### Non-Goals
 
@@ -85,11 +85,11 @@ extended with Temporal):
 
 | Drill | Cadence | Cluster / target | Scenario | Pass criterion (vs [`010.1`](../../../databases/010.1-rpo-rto-planning.md)) |
 |-------|---------|------------------|----------|------------------------------|
-| **A — PITR restore-test** | Monthly | `cnpg-db` (T0) | Restore base backup + WAL replay to a **throwaway** cluster, validate | ≤ 30 min to validated throwaway; **plugin-backed** (Barman acceptance gate) |
-| **B — Planned switchover** | Monthly | `cnpg-db` (T0) | HA failover + app reconnect via PgDog | ≤ 1 min cut-over |
-| **C — DR promotion rehearsal** | Quarterly | `cnpg-db-replica` (T0) | Whole-cluster-loss recovery (against a restored copy) | ≤ 30 min; RPO ≤ `archive_timeout` (5 min) |
-| **D — Zalando WAL-G restore** | Quarterly | `auth-db` / `supporting-shared-db` (T1/T2) | Clone-from-backup, validate | Manual, recorded |
-| **E — Kill-the-worker (GameDay)** | Quarterly | Temporal `order-fulfillment` worker | Durability + mid-saga compensation survive a worker/pod kill | Workflow resumes; order reaches a terminal state |
+| **A — PITR restore-test** | Monthly | `product-db` (T0) | Restore base backup + WAL replay to a **throwaway** cluster, validate | ≤ 30 min to validated throwaway; **plugin-backed** (Barman acceptance gate) |
+| **B — Planned switchover** | Monthly | `product-db` (T0) | HA failover + app reconnect via PgDog | ≤ 1 min cut-over. **First run 2026-08-06** — recorded as `DR-2026-08-B` in [010.2](../../../databases/010.2-restore-and-failover-drills.md); measured **11.4 s** of app-visible write unavailability, RPO 0. Note `kubectl cnpg switchover` does **not** exist — the plugin has `promote` |
+| **C — DR promotion rehearsal** | Quarterly | `product-db-replica` (T0) | Whole-cluster-loss recovery (against a restored copy) | ≤ 30 min; RPO ≤ `archive_timeout` (5 min) |
+| ~~**D — Zalando WAL-G restore**~~ | — | ~~`auth-db` / `supporting-shared-db`~~ | **Obsolete.** Zalando is gone: every Postgres is CloudNativePG since the RFC-0018 consolidation, and those two clusters no longer exist — `platform-db` and `product-db` host every database. Drill A covers what this did | — |
+| **E — Kill-the-worker (GameDay)** | Quarterly | Temporal `order-fulfillment` worker | Durability + mid-saga compensation survive a worker/pod kill | Workflow resumes; order reaches a terminal state. **First run executed 2026-08-06** — [RFC-0021 gameday.md](../RFC-0021/gameday.md) G2, claim held with every side effect exactly once. Application-level scenarios are owned there; this row keeps the quarterly cadence |
 
 **Roles** (per [`010-drp.md` ownership](../../../databases/010-drp.md#ownership)):
 incident commander (schedules, owns the timeline, go/no-go), database recovery
@@ -127,7 +127,7 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-    subgraph T0["T0 — cnpg-db (CloudNativePG)"]
+    subgraph T0["T0 — product-db / platform-db (CloudNativePG)"]
       A["Drill A: PITR restore<br/>(monthly, Barman gate)"]
       B["Drill B: planned switchover<br/>(monthly)"]
       C["Drill C: DR promotion<br/>(quarterly)"]
@@ -216,7 +216,7 @@ in the same namespace as their source and are torn down post-drill.
 
 ## Rollout & rollback
 
-- **Start with Drill A (`cnpg-db` PITR)** — it both produces the first measured
+- **Start with Drill A (`product-db` PITR)** — it both produces the first measured
   T0 RTO and is the **Barman plugin acceptance gate**, so it has the highest
   payoff per run.
 - **Phase 1:** schedule + run Drill A (plugin-backed), record evidence, accept
@@ -237,8 +237,22 @@ the SLO. A run with no recorded evidence did not happen.
 
 ## Implementation History
 
-- TBD — provisional; no drill recorded yet. First milestone: a plugin-backed
-  Drill A on `cnpg-db` with recorded evidence (Barman acceptance gate).
+- 2026-08-06 — **Partially exercised, program still unbuilt.** Drills **B** and **E**
+  ran for the first time: B as `DR-2026-08-B` in
+  [010.2](../../../databases/010.2-restore-and-failover-drills.md) — that file's first
+  completed record, measured **11.4 s** of app-visible write unavailability against a
+  documented `< 30 s`, RPO 0 — and E as G2 in
+  [RFC-0021 gameday.md](../RFC-0021/gameday.md), claim held with every side effect
+  exactly once. Both were run to close RFC-0021's phase-7 gate, not this program's.
+
+  Two things that only running them could find: `kubectl cnpg switchover`, the command
+  written into four DR documents, **does not exist** (the plugin has `promote`), and a
+  planned switchover always trips a critical WAL-archive alert for ~30 minutes.
+
+  This RFC stays **`provisional`** because its actual deliverable is the *program* —
+  a cadence, a named owner, a standing evidence home — and none of that exists yet.
+  Drill **A** (the Barman acceptance gate) remains the blocking one, and until it runs
+  the RustFS prefixes must not be deleted.
 
 ## Related
 

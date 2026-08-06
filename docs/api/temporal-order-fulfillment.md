@@ -10,7 +10,7 @@ Temporal makes the platform's multi-service order transaction durable, retryable
 | **Task queue** | `order-fulfillment` | — |
 | **Order result** | `pending` becomes `confirmed` or `failed` | — |
 | **Registry** | [workflows.md](./workflows.md#order-fulfillment) — all platform workflows in one table | — |
-| **Design record** | — | [ADR-001](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/) · [ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/) · [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) · [ADR-030](../proposals/adr/ADR-030-temporal-workflow-versioning/) · [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/) |
+| **Design record** | — | [RFC-0021](../proposals/rfc/RFC-0021/) (stock participant, worker versioning, start outbox) · [ADR-001](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/) · [ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/) · [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) · [ADR-030](../proposals/adr/ADR-030-temporal-workflow-versioning/) · [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/) |
 
 ## Overview
 

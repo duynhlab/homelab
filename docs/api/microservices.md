@@ -133,14 +133,14 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 ### product — catalog (+ cache)
 
 > Owns products, categories, prices (13 demo rows seeded locally). Stock left for
-> inventory-service in RFC-0021; DB `product` on
+> inventory-service in RFC-0021 phase 4 — RPCs, read fields and schema all removed; DB `product` on
 > `product-db` (CloudNativePG, via PgDog). Valkey cache. Serves gRPC on `:9090`.
 
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
 | **Catalog list/read** | `GET /product/v1/public/products`, `GET /product/v1/public/products/:id` | cache-aside (Valkey): SETNX stampede lock (5 s TTL, token compare-and-delete release), TTL jitter 0–10 %, SCAN-based list invalidation; whitelisted sort/filter (injection-safe) | Valkey | Implemented | [caching](./caching.md) |
-| **Product-details aggregation** | `GET /product/v1/public/products/:id/details` | server-side aggregation: reviews via gRPC `ReviewService.GetProductReviews` (3 s deadline, soft-fail → `[]`) + stock (**frozen since the W7 write cutover — open question, see gaps**) + related | review | Implemented | [API call graph](api.md#current-east-west-call-graph) |
-| ~~**Stock reservation**~~ (saga step) | internal gRPC `ProductService.ReserveStock` / `ReleaseStock` | Still registered, **no caller** — RFC-0021 P4 deleted the saga branch (order 1.13.0). Removal is gated on two weeks of zero on `product_stock_surface_calls_total` | ~~caller: order-worker~~ | Awaiting removal | [temporal saga](temporal-order-fulfillment.md) |
+| **Product-details aggregation** | `GET /product/v1/public/products/:id/details` | server-side aggregation: reviews via gRPC `ReviewService.GetProductReviews` (3 s deadline, soft-fail → `[]`) + **availability from `inventory.v1/BatchGetAvailability`** (soft-fail → `status: unknown`, never a guess) + related | review | Implemented | [API call graph](api.md#current-east-west-call-graph) |
+| ~~**Stock reservation**~~ (saga step) | ~~internal gRPC `ProductService.ReserveStock` / `ReleaseStock`~~ | **Removed**, not merely uncalled: the RPCs left the contract in pkg v0.33.0 / product 1.7.0 and the schema went with migration `000006` (1.11.0). The two-week-zero gate on `product_stock_surface_calls_total` was **waived** in favour of code evidence, and the instrument was deleted with the surface — so an empty panel is expected, not a measurement | ~~caller: order-worker~~ | Removed | [inventory](./inventory.md) |
 | **Checkout batch read** | internal gRPC `ProductService.GetProducts` | cache-bypassing price/stock batch (product = checkout price authority); int64 minor units; unknown ids omitted | caller: checkout | Implemented (RFC-0015 P1) | [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) |
 | **Product create** | `POST /product/v1/internal/products` | admin/seed path | — | Implemented | — |
 
@@ -304,7 +304,7 @@ templates.
 | Item | Service(s) | Status |
 |------|------------|--------|
 | Committed-stock restock on cancellation (`RESTOCK_SKIPPED`) | order / inventory | **Accepted shrinkage** — inventory.v1 has no `Return` RPC; revisit trigger in [ADR-033](../proposals/adr/ADR-033-order-status-cancellation/) |
-| Legacy order→cart REST pricing on direct create | order | **Technical debt** — P6 removal planned; checkout/product own price authority |
+| ~~Legacy order→cart REST pricing on direct create~~ | order | **Gone** — it died with the legacy REST create (RFC-0021 P5); checkout/product own price authority |
 | gRPC mTLS east-west | platform | **Planned** (RFC-0020); NetworkPolicy remains the fence until then |
 | Duplicate CORS headers (service emits CORS + gateway) | product | Worked around at gateway; service-side removal still recommended (middleware present in code) |
 | Internal `POST /users` has no in-cluster caller | user | Wired to real persistence; auth registers into its own DB |

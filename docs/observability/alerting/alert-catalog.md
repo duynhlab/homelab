@@ -42,7 +42,7 @@ had been deployed but never listed here.
 | [GitOps (Flux + cert-manager)](#6-gitops-flux--cert-manager) | 9 | Delivery pipeline + TLS |
 | [VictoriaMetrics self-health](#7-victoriametrics-self-health) | 31 | The monitoring system itself |
 | [Tempo / Temporal / Pyroscope / Watchdog](#8-tempo--temporal--pyroscope--watchdog) | 11 | Tracing, workflows, profiling, dead-man's-switch, OTLP collector |
-| [RFC-0021 overhaul (stock migration)](#9-rfc-0021-overhaul-stock-migration) | 12 | The Product→Inventory stock migration: saga write path, start outbox, reconciler, shadow reads |
+| [RFC-0021 order-side stock](#9-rfc-0021-order-side-stock) | 12 | The saga's stock path: start outbox, commit lag, reconciler. Born as migration rules; **steady state** since phase 4 |
 | [SLO burn-rate (Sloth)](#slo-burn-rate-alerts-sloth-generated) | 64 (generated) | Error-budget burn across all 11 services (10 HTTP × 3 SLOs + inventory × 2 gRPC SLOs) |
 
 ---
@@ -339,18 +339,25 @@ saturation). Pyroscope profiling-backend health is covered by `PyroscopeDown`.
 
 ---
 
-## 9. RFC-0021 overhaul (stock migration)
+## 9. RFC-0021 order-side stock {#9-rfc-0021-order-side-stock}
 
 Source: `prometheusrules/microservices/rfc0021-write-migration.yaml`,
-`prometheusrules/microservices/rfc0021-read-migration.yaml`,
-`prometheusrules/microservices/inventory.yaml`.
+`prometheusrules/microservices/inventory.yaml`,
+`prometheusrules/microservices/checkout-availability.yaml`.
+
+(`rfc0021-read-migration.yaml` was listed here and **never existed after phase 4** —
+its rules watched `inventory_shadow_compare_total`, a series checkout 0.5.0 stopped
+emitting, so the file was deleted rather than left to go blind. A catalog that names a
+missing file sends on-call looking for rules that cannot fire.)
 
 RFC-0021 moves stock ownership from product-service to inventory-service. The
 **write** path (the order saga's reserve/commit/release) migrated behind a
 per-order participant, pinned per workflow at start — RFC-0021 P4 then removed the
 product branch, so `inventory` is the only servable value and an order recorded
-otherwise is refused rather than re-routed; the **read** path (checkout availability)
-migrates behind `CHECKOUT_AVAILABILITY_SOURCE` after the write cutover.
+otherwise is refused rather than re-routed. The **read** path (checkout availability)
+migrated behind `CHECKOUT_AVAILABILITY_SOURCE`, which was **deleted** with the
+fallback in checkout 0.5.0 — inventory is the only authority and checkout fails closed
+on it.
 These alerts cover the migration's own failure modes, which the RED alerts in domain
 1 cannot see: an order and its stock can disagree while every service reports
 healthy.

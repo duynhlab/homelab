@@ -2,11 +2,13 @@
 
 Answers the phase-0 gate question: **"If inventory deploys broken, how does the
 platform get back to product?"** — per cutover, with the commands that flip it.
-This is the seed for RUNBOOK-007 (written in full at phase 3).
+Written as the phase-0 seed for RUNBOOK-007; it became the **as-executed record** of
+every cutover in this RFC, including the two gate decisions, three measured traps, and
+the evidence that closed the irreversible steps.
 
 | | |
 |---|---|
-| **Status** | phase-0 deliverable; commands become executable as the flags land |
+| **Status** | as-executed; every cutover in this RFC has run. The flag-flip commands are kept as the historical record — the flags themselves were deleted in phase 4 |
 | **Owning RFC** | [README.md](./README.md) § Rollout & rollback |
 
 ## Phase 2 prep (backfill + structural shadow) — nothing to roll back

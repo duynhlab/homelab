@@ -238,7 +238,7 @@ deadline on top of the `pkg/grpcx` default, and an inventory failure resolves to
 |-----------|------|-----------|---------|
 | Inbound | Browser SPA via Kong | HTTP | Catalog browsing, product page |
 | Inbound | checkout | gRPC `BatchGetCurrentPrices` | **Price** re-validation at session create + confirm; availability comes from inventory ([checkout.md](./checkout.md)) |
-| ~~Inbound~~ | ~~order-worker~~ | ~~gRPC `ReserveStock` / `ReleaseStock`~~ | **Gone.** RFC-0021 P4 deleted the saga branch *and* the RPCs; order no longer dials product at all, and the NetworkPolicy allow is withdrawn once the pre-P4 worker builds finish draining ([temporal-order-fulfillment.md](./temporal-order-fulfillment.md)) |
+| ~~Inbound~~ | ~~order-worker~~ | ~~gRPC `ReserveStock` / `ReleaseStock`~~ | **Gone.** RFC-0021 P4 deleted the saga branch *and* the RPCs; order no longer dials product at all, and the NetworkPolicy allow **was withdrawn** on 2026-08-06 once the pre-P4 worker builds were shown to hold no pinned histories ([temporal-order-fulfillment.md](./temporal-order-fulfillment.md)) |
 | Outbound | inventory | gRPC `BatchGetAvailability` | `/details` availability enrichment; soft-fail to `status: unknown` ([inventory.md](./inventory.md)) |
 | Outbound | review | gRPC `GetProductReviews` | Product-details enrichment ([review.md](./review.md)) |
 | Outbound | product DB via PgDog | Postgres | All persistence |

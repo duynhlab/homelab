@@ -13,7 +13,7 @@
   "annotations": {
     "list": []
   },
-  "description": "RFC-0021 phase-1 inventory-service (extracted stock authority). Reservation FSM outcomes, availability checks, gRPC RED, and DB latency. Reads inventory:* recording rules where available.",
+  "description": "inventory-service, the platform's sole stock authority. Reservation FSM outcomes, availability checks, gRPC RED, and DB latency. Reads inventory:* recording rules where available. Landed at RFC-0021 phase 1; live since phase 4 with three callers -- the order saga, checkout, and product /details.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -22,7 +22,7 @@
     {
       "id": 1,
       "type": "text",
-      "title": "Phase 1: no live caller yet",
+      "title": "Read this panel before the flat lines",
       "gridPos": {
         "h": 3,
         "w": 24,
@@ -31,7 +31,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "**inventory-service is deployed gRPC-only with no live caller (RFC-0021 P1).** No Kong route, no checkout/order wiring until phase 2. Every rate on this dashboard reads **~0** until phase-2 traffic arrives, and the write-path signals (negative-ATP/oversell gauge, stale-RESERVED reconciler age, `inventory_commit_lag_seconds`) land with **phase 3** — they are intentionally absent here."
+        "content": "**inventory-service is the sole stock authority and has three live callers** since RFC-0021 phase 4: the order saga (reserve/commit/release), checkout (availability), and product `/details`. gRPC-only -- no Kong route -- so `:8080` carries only `/health` and `/ready` and every panel here reads the rpc_* RED metrics.\n\nA flat rate is therefore a **finding**, not the expected phase-1 reading it used to be. On a freshly rebuilt cluster it just means no traffic has run yet."
       }
     },
     {
@@ -164,7 +164,7 @@
       "id": 4,
       "type": "timeseries",
       "title": "gRPC request rate by method",
-      "description": "otelgrpc server call rate, inventory.v1.InventoryService/*. Reads ~0 until a caller exists (phase 2).",
+      "description": "otelgrpc server call rate, inventory.v1.InventoryService/*. Callers are live since phase 4, so a flat line means no traffic, not no wiring.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"

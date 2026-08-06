@@ -20,7 +20,7 @@ order-service — which remains the only writer of orders.
 | **Repository** | [`duynhlab/checkout-service`](https://github.com/duynhlab/checkout-service) | — |
 | **Owns** | Checkout sessions: funnel state, price snapshots, confirm idempotency ledger, tax rules, promo codes | — |
 | **Database** | `checkout` on `product-db` via PgDog (`pgdog-product.product:6432`) | — |
-| **Design record** | — | [RFC-0015](../proposals/rfc/RFC-0015/) · [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) (re-validation) · [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) (cart read surface) |
+| **Design record** | — | [RFC-0015](../proposals/rfc/RFC-0015/) · [RFC-0021](../proposals/rfc/RFC-0021/) (inventory is the only availability authority; fail-closed) · [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) (re-validation) · [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) (cart read surface) · [ADR-027](../proposals/adr/ADR-027-inventory-sole-stock-authority/) |
 
 ## Temporal participation
 

@@ -80,6 +80,32 @@ deliberate operator step, in this order:
        --query "TaskQueue='order-fulfillment' AND ExecutionStatus='Running' AND TemporalWorkerDeploymentVersion IS NULL"
    ```
 
+   **The activation Job must run AFTER the worker registers, not after it is Ready.**
+   On a freshly created cluster the Worker Deployment does not exist until a worker
+   has polled the task queue and registered its version, and `set-current-version`
+   run before that fails with a message that points nowhere near the cause:
+
+   ```
+   Error: unable to get deployment conflict token: context deadline exceeded
+   ```
+
+   Measured 2026-08-06: the Job failed when instantiated ~80 s after the worker pod
+   went Ready, and succeeded on the next attempt once
+   `temporal worker deployment list` showed `order-fulfillment`. So gate the Job on
+   the deployment existing, not on the pod:
+
+   ```bash
+   kubectl -n temporal exec deploy/temporal-admintools -- \
+     temporal worker deployment list --namespace mop \
+       --address temporal-frontend.temporal.svc.cluster.local:7233
+   # only once order-fulfillment is listed:
+   kubectl -n temporal create job activate-$(date +%s) \
+     --from=cronjob/temporal-worker-set-current-version
+   ```
+
+   A fresh cluster has **no** `currentVersionBuildID`, so this step is mandatory
+   there rather than optional — versioned workers receive nothing until it runs.
+
    **READ THIS BEFORE TRUSTING A ZERO FROM ANY VERSION QUERY.** The search
    attribute and `temporal worker deployment describe` print the *same value in two
    different formats*, and the wrong one returns **0 instead of an error**:

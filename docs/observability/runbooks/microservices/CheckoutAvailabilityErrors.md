@@ -9,8 +9,15 @@
 | **Applies to** | checkout **0.5.0+** (RFC-0021 P4 made inventory the only availability authority). Earlier builds could fall back to product's stock column and this metric does not exist |
 
 ## Meaning
-More than 1% of checkout's availability checks returned **error** for 10 minutes:
-`inventory.v1/CheckAvailability` is failing or timing out.
+More than 1% of checkout's **answered** availability checks returned **error** for 10
+minutes: `inventory.v1/CheckAvailability` is failing or timing out.
+
+*Answered* is load-bearing in that sentence. The ratio's denominator names
+`ok|shortage|error` explicitly and excludes `unknown_sku`, because a data gap is a
+checkout-side refusal rather than an inventory answer that could have been an error —
+letting it into the denominator would let a flood of missing balance rows push the
+error share under the threshold and **suppress this page**. A missing balance row has
+[its own alert](CheckoutAvailabilityUnknownSKU.md).
 
 Checkout **fails closed** — an availability error becomes `ErrUpstream` (503), never
 out-of-stock, because a timeout is not a shortage. So every affected request is a

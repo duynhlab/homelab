@@ -14,22 +14,27 @@ this is not an outage (that is
 [`CheckoutAvailabilityErrors`](CheckoutAvailabilityErrors.md)) — it is answering
 *"no"* to almost everything.
 
-**Genuine stockouts do not look like this.** A missing balance row, a SKU-id
-mismatch, or balances sitting at zero do.
+**Genuine stockouts do not look like this.** Balances sitting at zero, or a
+`safety_stock` at or above `on_hand`, do.
+
+A **missing** balance row is a different alert now:
+[`CheckoutAvailabilityUnknownSKU`](CheckoutAvailabilityUnknownSKU.md). If rows are
+absent rather than zero, stop here and read that one — it names the SKUs.
 
 ## Why this alert exists at all
-It guards a **contract gap**, and the gap is the reason a data problem here is
-otherwise invisible:
+A shortage is a legitimate business answer, so nothing else complains about one — but
+*"every basket is short"* is not a demand shape. It is balances at zero, or a policy
+mistake, and without this alert it would look like quiet, healthy traffic.
 
-> `inventory.v1/CheckAvailability` returns `{can_fulfill, shortages}`. There is no way
-> for it to say *"I have no data for this SKU"* — and `can_fulfill = false` is also the
-> zero value of the response.
-
-So an absent inventory row is indistinguishable, on the wire, from a real zero. It
-reads as a **definite, customer-facing "out of stock"**, and a shortage is a
-legitimate business answer, so nothing else complains. The phase-2 shadow compare used
-to catch exactly this (`result="missing|unknown"`) and it was removed with the
-product-availability path it compared against.
+**It used to be broader, and it should not be widened back.** This alert was
+originally the guard for a contract gap: `CheckAvailability` returned only
+`{can_fulfill, shortages}`, so a SKU with no balance row arrived as a `Shortage` at
+`available_to_promise = 0` — a quantity claim inventory could not make — and hid in
+this ratio. pkg `v0.35.0` added `unknown_sku_ids`, so that case now has
+[its own alert](CheckoutAvailabilityUnknownSKU.md) and its own fix, and this
+expression is back to meaning what its name says. If this alert is silent while
+checkout is refusing everything, the answer is almost certainly the other alert —
+not a wider selector here.
 
 ## Impact
 Baskets are refused at the funnel. Customers see "no longer available" and requote
@@ -58,14 +63,8 @@ checkout:availability_check:rate5m   # confirm shortage, not error
 ```
 
 ## Mitigation
-1. **Missing rows** → seed or adjust **at inventory**, not from product. The
-   phase-2 `inventory-backfill` Job was **retired in phase 4** along with
-   `products.stock_quantity`, the column it copied: product's numbers stopped
-   moving at the write cutover, so restoring from them would overwrite live stock
-   with a snapshot of cutover day.
-   - dev/demo cluster → `kubectl -n inventory exec deploy/inventory -- /app/main seed`
-   - a real correction → an explicit `RECEIVE` movement through inventory's normal
-     write path, which keeps `on_hand == SUM(on_hand_delta)` intact
+1. **Rows missing entirely** → wrong alert; see
+   [`CheckoutAvailabilityUnknownSKU`](CheckoutAvailabilityUnknownSKU.md).
 2. **Rows present, `on_hand` zero** → this may be real. Confirm against the business
    before treating it as a bug; if the platform was seeded without stock (a fresh
    cluster does not seed inventory), seed it.

@@ -101,7 +101,7 @@
       "id": 3,
       "type": "timeseries",
       "title": "Availability check outcomes",
-      "description": "inventory_check_total by outcome. fulfillable|shortage are business; error is infra.",
+      "description": "inventory_check_total by outcome. fulfillable|shortage are business answers; unknown_sku (0.4.0+) is a DATA gap -- a SKU with no balance row in any warehouse, which checkout fails closed on (503) rather than presenting as out-of-stock; error is infra. unknown_sku outranks shortage when both are present, so a rising unknown_sku line with a falling shortage line is the same baskets being classified correctly, not a change in demand.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"

@@ -97,6 +97,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **inventory pinned to `0.4.0`, checkout to `0.6.0`** — an untracked SKU stops
+  reaching the shopper as *"no longer available"*. It used to arrive as a `Shortage`
+  at `available_to_promise = 0`, a quantity claim inventory cannot make about a SKU
+  it has never heard of; it is now `unknown_sku_ids` (pkg `v0.35.0`) and checkout
+  fails **closed** on it — 503 + `Retry-After`, because a missing balance row says
+  nothing about whether the item is buyable. Order matters: inventory has to be
+  sending the field before checkout can act on it. On the **confirm** path the
+  session is requoted out of `confirming` first, and that is the whole reason this
+  is a release rather than a one-line mapping — the condition is persistent, and
+  `confirming` has no FSM edge to `cancelled`, `lazyExpire` skips it, and
+  `FindActiveByUserID` keeps returning it, so parking there left the shopper unable
+  to confirm, cancel, **or** start a new checkout.
+
 - **`CheckoutAvailabilityUnknownSKU` (critical) + runbook** — a SKU with no balance
   row in any warehouse. `inventory.v1/CheckAvailability` can now say so explicitly
   (`unknown_sku_ids`, pkg `v0.35.0`) instead of leaking it out as a `Shortage` at

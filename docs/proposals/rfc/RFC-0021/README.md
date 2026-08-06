@@ -290,7 +290,7 @@ Summarized here; the mechanism deep-dive lives in [./research.md](./research.md)
 | 4 | Remove stock from Product (deprecate → usage-zero → drop schema/cache/RPCs) | Zero live callers of Product stock surface; docs/api updated |
 | 5 | Order aggregate (domain methods, CAS, history, cancellation, legacy-create removal) | No generic status writes; legacy route usage zero then removed |
 | 6 | Payment hardening (attempts, PROCESSING, refund IDs, windowed recon, role split) | No ambiguous timeout marked definite; recon alerting live |
-| 7 | SLOs, runbooks, chaos drills, flag/debt cleanup | GameDay scenarios converge; all migration flags removed |
+| 7 | SLOs, runbooks, chaos drills, flag/debt cleanup | GameDay scenarios converge; all migration flags removed — first drill run recorded in [./gameday.md](./gameday.md) (all five converged; two operability claims falsified) |
 
 **Write cutover** (phase 3) uses a controlled window: pause fulfillment starts → drain
 in-flight stock activities → final delta backfill → verify ATP invariant → flip
@@ -443,6 +443,7 @@ count and retention hit zero.
 
 - [./research.md](./research.md) — plain-language research, code audit, Context7 trail
 - [./cutover-rollback.md](./cutover-rollback.md) — per-cutover rollback story (RUNBOOK-007 seed)
+- [./gameday.md](./gameday.md) — phase-7 GameDay drill record (first run 2026-08-06: five faults, data-convergence evidence, falsified claims)
 - Phase-0 baseline was verified against local-stack via the [local-stack README Phase A/B/C protocol](../../../../local-stack/README.md#e2e-audit-before-pushing-backend--real-browser) — the canonical, tracked e2e gate.
 - [RFC-0003](../RFC-0003/README.md) — superseded by this RFC
 - [RFC-0001](../RFC-0001/) — saga foundations · [RFC-0010](../RFC-0010/) + ADR-007..012 — payment base

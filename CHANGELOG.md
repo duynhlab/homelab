@@ -25,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   through the Sloth burn-rate page. The 503 keeps burning budget; the generic page is
   suppressed while a precise one fires. Scoped by `service` + `sloth_severity=page` +
   availability/error-rate only — never by severity alone, and never the ticket alert.
+- **First recorded GameDay drill run (RFC-0021 phase 7)** — `docs/proposals/rfc/RFC-0021/gameday.md`.
+  Five faults on Kind: inventory outage mid-checkout, order-worker kill mid-saga,
+  provider lost response, CNPG `product-db` switchover under load, and a root-cause
+  hunt on a live `PaymentReconciliationDiscrepancy`. All five converged in the data
+  (24/24 orders terminal, no double charge, no leaked reservation, no half-written
+  order); measured switchover RTO **11.4 s** against a `< 30 s` SLO. Filed as
+  `010.2` evidence record `DR-2026-08-B` — that file had a template and no results.
 
 ### Changed
 
@@ -44,6 +51,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `job` label. `MicroserviceNoTraffic`/`NoSuccessfulRequests` runbooks now document
   why they fire benignly for ~40 minutes after any traffic burst, and why `for:` was
   deliberately not lengthened.
+- **`mockpay` pinned to `1.5.0` (was `1.0.0`) with payment's `$imagepolicy` marker.**
+  The skew manufactured a permanent critical `PaymentReconciliationDiscrepancy`:
+  `1.0.0`'s `GET /transactions` discards the `from`/`to` bounds, so windowed
+  reconciliation compared a bounded internal set against the provider's whole ledger
+  and every older charge read as `missing_internal`. It also made the phase-6
+  ambiguity faults (`…13` no answer, `…07` refund declined) uninjectable in the
+  cluster — they had only ever been verified on local-stack.
+- **`kubectl cnpg switchover` corrected to `kubectl cnpg promote <cluster> <instance>`**
+  in `005`, `010-drp`, `010.2`, and `010.4`. The plugin (v1.30.0) has no `switchover`
+  verb; the documented DR command returned `unknown command`. `010-drp` also claimed
+  the plugin was not installed — it is.
+- **`PaymentReconciliationDiscrepancy` runbook**: its first Diagnosis query never ran
+  (`scanned`/`found` are `transactions_scanned`/`discrepancies_found`). Added the
+  window-asymmetry false-positive check, the explicit-bounds warning, and the
+  in-memory-mockpay restart consequences.
+- **`CNPGWALArchiveFailing` runbook**: documents that a planned promotion always trips
+  it — the new primary fails one timeline-history archive, and `increase(…[30m])`
+  holds a critical alert for 30 minutes on a healthy cluster.
+- **`005` §Service Updates**: the `-rw` endpoint step measured **12.6 s**, not the
+  documented `< 5 s`, with the endpoint list empty for 10.9 s. The `< 30 s` RTO the
+  step serves still holds.
 
 - **`checkout-worker` re-aligned to the API's image (`0.3.1` → `0.6.0`).** It is the
   *same* binary with a different subcommand, and it had drifted three minors behind —

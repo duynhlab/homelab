@@ -322,6 +322,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
     - [Restore & Failover Drills](./databases/010.2-restore-and-failover-drills.md) - drill cadence, roles, and evidence log
     - [Cross-Region / Cross-Zone DR](./databases/010.3-cross-region-dr.md) - roadmap to independent failure domains
     - [Emergency Recovery](./databases/010.4-emergency-recovery.md) - "start here when it's down" runbook
+    - [GameDay drill record](./proposals/rfc/RFC-0021/gameday.md) - recorded drills: measured RTO, data-convergence evidence, falsified claims
 
 ### Runbooks & Troubleshooting
 
@@ -435,6 +436,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
     - [Restore & Failover Drills](./databases/010.2-restore-and-failover-drills.md) - drill cadence, roles, and evidence log
     - [Cross-Region / Cross-Zone DR](./databases/010.3-cross-region-dr.md) - roadmap to independent failure domains
     - [Emergency Recovery](./databases/010.4-emergency-recovery.md) - "start here when it's down" runbook
+    - [GameDay drill record](./proposals/rfc/RFC-0021/gameday.md) - recorded drills: measured RTO, data-convergence evidence, falsified claims
 - [Declarative Role & Database Management](./databases/012-declarative-role-management.md) - Per-service triplet (ExternalSecret + DatabaseRole + Database) on product-db; RFC-0012 rollout state
 - [PostgreSQL Further Reading](./databases/011-documents.md) - Curated external references
 - [PostgreSQL Internals](./databases/001-postgresql-internals.md) - Deep dive using product-db examples

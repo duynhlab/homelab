@@ -29,9 +29,18 @@ spec:
     name: mockpay
     replicaCount: 1
     image:
-      # Same image as the payment API — just a different subcommand.
+      # Same image as the payment API — just a different subcommand, so the tag
+      # MUST track payment's. It did not: this pin sat at 1.0.0 from PR #438
+      # while payment reached 1.5.0, and 1.0.0's GET /transactions accepts
+      # `page`/`page_size` only — it discards the `from`/`to` bounds and returns
+      # the whole ledger. Windowed reconciliation (ADR-035) asks both sides for
+      # the same bounds, so an unbounded provider reply made every charge older
+      # than the window read as `missing_internal`: a permanent phantom
+      # PaymentReconciliationDiscrepancy, found by GameDay drill G5. The
+      # imagepolicy marker below is deliberately payment's, not a mockpay-only
+      # one, so the two cannot drift apart again.
       repository: ghcr.io/duynhlab/payment-service/payment-service
-      tag: "1.0.0"
+      tag: "1.5.0" # {"$imagepolicy": "flux-system:payment:tag"}
       pullPolicy: IfNotPresent
     args: ["mockpay"]
     service:

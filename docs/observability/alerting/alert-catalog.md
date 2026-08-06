@@ -19,9 +19,10 @@ the end-to-end pipeline (ingestion → VMAlert → Alertmanager → notify), see
 
 ## Summary
 
-**184 statically-defined alerts** across 9 domains, plus **60 Sloth-generated** SLO
-burn-rate alerts (2 × 30 SLOs). The 30 SLOs cover all 10 Go services through
-the four domain ResourceSets. Two CNPG topology rules are **gated** (not
+**184 statically-defined alerts** across 9 domains, plus **64 Sloth-generated** SLO
+burn-rate alerts (2 × 32 SLOs). The 32 SLOs cover all 11 Go services: 30 rendered
+by the `mop` chart through the five domain ResourceSets, plus inventory's 2
+hand-written gRPC SLOs. Two CNPG topology rules are **gated** (not
 deployed) and a subset is **inactive on Kind** (platform limitations) — both
 marked inline below.
 
@@ -42,7 +43,7 @@ had been deployed but never listed here.
 | [VictoriaMetrics self-health](#7-victoriametrics-self-health) | 31 | The monitoring system itself |
 | [Tempo / Temporal / Pyroscope / Watchdog](#8-tempo--temporal--pyroscope--watchdog) | 11 | Tracing, workflows, profiling, dead-man's-switch, OTLP collector |
 | [RFC-0021 overhaul (stock migration)](#9-rfc-0021-overhaul-stock-migration) | 12 | The Product→Inventory stock migration: saga write path, start outbox, reconciler, shadow reads |
-| [SLO burn-rate (Sloth)](#slo-burn-rate-alerts-sloth-generated) | 60 (generated) | Error-budget burn across all 10 services |
+| [SLO burn-rate (Sloth)](#slo-burn-rate-alerts-sloth-generated) | 64 (generated) | Error-budget burn across all 11 services (10 HTTP × 3 SLOs + inventory × 2 gRPC SLOs) |
 
 ---
 
@@ -60,9 +61,9 @@ Source: `prometheusrules/microservices/alerts.yaml` (OTLP push pipeline — RFC-
 | MicroserviceErrorRateCritical | critical | 5xx ratio >15% | Major failure; rollback/mitigation now | 5m | [MicroserviceErrorRateCritical](../runbooks/microservices/MicroserviceErrorRateCritical.md) |
 | MicroserviceNoSuccessfulRequests | critical | `rate(...{http_response_status_code=~"2.."})==0` 10m, had traffic before | Zero successes despite prior traffic — likely total failure | 10m | [MicroserviceNoSuccessfulRequests](../runbooks/microservices/MicroserviceNoSuccessfulRequests.md) |
 | GrpcServerHighErrorRate | warning | non-OK ratio of `rpc_server_call_duration_seconds_count` >5% | East-west gRPC calls failing; callee unhealthy | 5m | [GrpcServerHighErrorRate](../runbooks/microservices/GrpcServerHighErrorRate.md) |
-| MicroserviceHighLatencyP95 | warning | `histogram_quantile(0.95, http_server_request_duration_seconds_bucket)>1s` | Half of requests user-noticeably slow | 10m | [MicroserviceHighLatencyP95](../runbooks/microservices/MicroserviceHighLatencyP95.md) |
-| MicroserviceHighLatencyP99 | warning | P99 >2s | Tail latency spike | 10m | [MicroserviceHighLatencyP99](../runbooks/microservices/MicroserviceHighLatencyP99.md) |
-| MicroserviceLatencyCritical | critical | P95 >2s | Timeout territory; SLA breach | 5m | [MicroserviceLatencyCritical](../runbooks/microservices/MicroserviceLatencyCritical.md) |
+| MicroserviceHighLatencyP95 | warning | `histogram_quantile(0.95, http_server_request_duration_seconds_bucket)>1s` | Half of requests user-noticeably slow — diagnostic, page comes from the latency SLO | 10m | [MicroserviceHighLatencyP95](../runbooks/microservices/MicroserviceHighLatencyP95.md) |
+| MicroserviceHighLatencyP99 | warning | P99 >2s | Tail latency spike — diagnostic, page comes from the latency SLO | 10m | [MicroserviceHighLatencyP99](../runbooks/microservices/MicroserviceHighLatencyP99.md) |
+| MicroserviceLatencyCritical | warning | P95 >2s | Timeout territory. **Demoted from critical** — duplicated the Sloth latency burn-rate page on the same metric; name kept so runbook links and history stay valid | 5m | [MicroserviceLatencyCritical](../runbooks/microservices/MicroserviceLatencyCritical.md) |
 | GrpcServerHighLatencyP95 | warning | gRPC P95 (`rpc_server_call_duration_seconds_bucket`) >500ms | East-west latency compounds into every edge request that fans out | 10m | [GrpcServerHighLatencyP95](../runbooks/microservices/GrpcServerHighLatencyP95.md) |
 | MicroserviceNoTraffic | warning | `rate(count[10m])==0`, had traffic | Routing broken / upstream down | 10m | [MicroserviceNoTraffic](../runbooks/microservices/MicroserviceNoTraffic.md) |
 | MicroserviceApdexCritical | critical | apdex <0.5 | >50% of users get unacceptable response times | 10m | [MicroserviceApdexCritical](../runbooks/microservices/MicroserviceApdexCritical.md) |
@@ -438,13 +439,20 @@ Runbooks: one per alert under
 
 ## SLO burn-rate alerts (Sloth-generated)
 
-Not hand-written: the `mop` chart renders a `PrometheusServiceLevel` CR per service, and the
+Almost never hand-written: the `mop` chart renders a `PrometheusServiceLevel` CR per service
+(which is why `grep PrometheusServiceLevel` in this repo finds only inventory's), and the
 **Sloth operator** expands each into recording rules + **2 burn-rate alerts per SLO**. Detail:
-[slo-burn-rate-alerts.md](./slo-burn-rate-alerts.md).
+[slo-burn-rate-alerts.md](./slo-burn-rate-alerts.md), [SLO hub](../slo/README.md).
 
-- **10 services × 3 SLOs = 30 SLOs → 60 alerts.** SLOs: **Availability** (99.5%, non-5xx
-  ratio), **Latency** (95% < 500ms), **Error rate** (99%, non-4xx/5xx) — all from
+- **32 SLOs → 64 alerts** = 10 HTTP services × 3 (chart-rendered) + inventory × 2
+  (hand-written, gRPC). Chart SLOs: **Availability** (99.5%, non-5xx ratio), **Latency**
+  (95% < 500ms), **Error rate** (99%, non-4xx/5xx) — all from
   `http_server_request_duration_seconds`, against a **30-day** error budget.
+- **inventory is the exception** (2026-08-06): gRPC-only, so its three chart SLOs measured a
+  metric it never emits — no SLI series, no budget, no alert that could fire. Replaced by
+  `grpc-availability` (99.9%, server faults only) and `reserve-latency`
+  (`Reserve` p95 < 250 ms, RFC-0021 targets) on `rpc_server_call_duration_seconds`:
+  `InventoryGrpcHighErrorRate`, `InventoryReserveHighLatency`.
 - **Page alert** — fast burn (14.4× over 1h, confirmed on 5m) → on-call.
 - **Ticket alert** — slow burn (6× over 6h, confirmed on 30m) → business hours.
 
@@ -504,11 +512,12 @@ Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-an
 
 ### Noise / cause-vs-symptom notes
 
-- **Latency duplication:** raw `MicroserviceHighLatencyP95/P99/LatencyCritical` overlap the Sloth latency SLO burn-rate. Keep the SLO burn-rate as page-worthy; consider demoting the raw P95/P99 statics to ticket/warning to cut duplicate pages.
-- **Outage triple-fire:** `MicroserviceNoTraffic` + `MicroserviceNoSuccessfulRequests` + `KongNoTraffic` can all fire for one outage — group them and use Alertmanager inhibition.
+- **Latency duplication — APPLIED (2026-08-06):** raw `MicroserviceHighLatencyP95/P99/LatencyCritical` overlap the Sloth latency SLO burn-rate on the same metric. The burn-rate alert stays the page; all three statics are now `warning` (non-paging here). Only `MicroserviceLatencyCritical` actually changed — P95/P99 were already `warning`. The name `MicroserviceLatencyCritical` was kept so runbook links and alert history survive; it describes the threshold tier, not the routing severity.
+- **Double-page on fail-closed 503s — APPLIED (2026-08-06):** `CheckoutAvailabilityErrors` / `CheckoutAvailabilityUnknownSKU` name the SKU and the fix; the Sloth `CheckoutHighErrorRate` / `CheckoutHighOverallErrorRate` pages fire off the same deliberate 503s. The 503 keeps burning budget (it is a real failed request) but the generic page is now inhibited while a precise one fires — `equal: ['service']`, `sloth_severity="page"`, availability/error-rate only. Latency pages are untouched: a fast 503 burns no latency budget, so one during the incident is a different problem. See [`vmalertmanager.yaml`](../../../kubernetes/infra/configs/observability/metrics/victoriametrics/vmalertmanager.yaml).
+- **Outage triple-fire:** `MicroserviceNoTraffic` + `MicroserviceNoSuccessfulRequests` + `KongNoTraffic` can all fire for one outage — group them and use Alertmanager inhibition. On this platform they also fire benignly for ~40 min after any bounded traffic burst (no continuous synthetic load); the arithmetic and why `for:` was *not* lengthened are in the [`MicroserviceNoTraffic` runbook](../runbooks/microservices/MicroserviceNoTraffic.md#expected-on-a-rebuilt-cluster--read-this-first).
 - **Tuning signals, not incidents:** `PostgresCheckpointsTooFrequent`, `PostgresDeadTuplesHigh`, `PostgresDatabaseSizeLarge` are capacity/tuning signals — they should stay `warning`/`info`, never page (the user-facing symptom is already covered by latency/apdex/SLO).
 - **`KubeletTooManyPods`** is a static-ceiling cause alert — low value unless actually near the pod/node limit.
 
 ---
 
-_Last updated: 2026-07-17 — 164 checked-in alerts (+2 gated) plus 60 Sloth-generated alerts; all 10 services are SLO-enabled through the domain ResourceSets._
+_Last updated: 2026-08-06 — 164 checked-in alerts (+2 gated) plus 64 Sloth-generated alerts; all 11 services are SLO-enabled — 10 through the domain ResourceSets, inventory through a hand-written gRPC `PrometheusServiceLevel`._

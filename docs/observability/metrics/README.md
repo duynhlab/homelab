@@ -168,7 +168,7 @@ Status of each methodology across the platform (✅ implemented, ❌ scoped out)
 | **Errors** | Infra / API server / PostgreSQL / Valkey | ✅ | OOMKill, CrashLoop, 5xx rate, ~25 PG alerts, Valkey down/rejected |
 | **Saturation** | Microservices / pods / nodes / API server / PG / Valkey | ✅ | CPU throttle, memory pressure, connections, evictions (app-level `requests_in_flight` retired — no OTel equivalent; apps saturate via container working-set + GC pacing) |
 | **USE** | Pod CPU/mem, node, PVC, network, PostgreSQL, Valkey, workloads | ✅ | See [metrics-infra.md](metrics-infra.md) + [databases](postgresql/README.md) |
-| **SLO** | Microservices | ✅ | 60 Sloth-generated burn-rate rules |
+| **SLO** | Microservices | ✅ | 64 Sloth-generated burn-rate rules (32 SLOs × page + ticket) |
 | etcd / kubelet / ingress / node_exporter | Cluster | ❌ | Scoped out for Kind — see [metrics-infra.md](metrics-infra.md#not-covered-scoped-out-for-kind) |
 
 > Every deployed alert and recording rule — exact manifest files, counts, and

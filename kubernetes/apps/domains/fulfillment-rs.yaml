@@ -258,5 +258,22 @@ spec:
             DB_SSLMODE: "require"
           envFrom:
             secretRef: << inputs.db_secret >>
+        # The chart's SLO block is HTTP-only (it renders
+        # http_server_request_duration_seconds SLIs). A gRPC-only service gets
+        # three SLOs with no series behind them, so this domain needs an
+        # opt-out: `slo_disabled` on the RSIP (see services/inventory.yaml,
+        # which then carries a hand-written gRPC PrometheusServiceLevel under
+        # infra/configs/observability/sloth/).
+        #
+        # OPT-OUT, not a boolean input, on purpose: the template guard is
+        # truthiness-based, so `slo_enabled: "false"` would render as TRUE —
+        # the same trap documented on grpc_reflection in inventory.yaml. An
+        # input that only ever exists to disable cannot be got backwards.
+        # `enabled: false` is rendered explicitly rather than omitting the
+        # block, so the outcome does not depend on the chart's default.
         slo:
+          <<- if (index inputs "slo_disabled") >>
+          enabled: false
+          <<- else >>
           enabled: true
+          <<- end >>

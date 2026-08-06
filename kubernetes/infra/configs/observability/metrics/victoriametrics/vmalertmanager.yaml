@@ -46,6 +46,33 @@ spec:
         target_matchers:
           - severity="warning"
         equal: ['job']
+      # One incident, one page. Checkout fails CLOSED when inventory cannot
+      # answer: every affected basket gets a real 503, so the Sloth
+      # availability/error-rate budgets keep burning (correct — a failed
+      # request is a failed request) and CheckoutHighErrorRate /
+      # CheckoutHighOverallErrorRate go to page. But the two rules below
+      # already page with the SKU ids and the actual fix, so on-call was
+      # woken twice for one cause. The precise alert wins; the generic
+      # burn-rate page is inhibited while it fires.
+      #
+      # Scoped deliberately, NOT by severity alone:
+      #   - source: the two named checkout-availability alerts only
+      #   - target: sloth_severity="page" (never the ticket alert — the
+      #     business-hours budget record must survive) AND only the two SLOs a
+      #     503 can burn. Latency is untouched: a fast 503 burns no latency
+      #     budget, so a latency page during this incident is a DIFFERENT
+      #     problem and must still reach someone.
+      #   - equal: ['service'] — Sloth stamps service=<name> on every
+      #     generated alert; the source rules now carry service=checkout
+      #     (checkout-availability.yaml) so the pair only matches within one
+      #     service. A blanket severity-only inhibit would hide unrelated
+      #     incidents in other services.
+      - source_matchers:
+          - alertname=~"CheckoutAvailabilityErrors|CheckoutAvailabilityUnknownSKU"
+        target_matchers:
+          - sloth_severity="page"
+          - sloth_slo=~"availability|error-rate"
+        equal: ['service']
 
     receivers:
       - name: 'slack-default'

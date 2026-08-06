@@ -1,0 +1,203 @@
+# inventory-service SLOs — hand-written because the SLI is gRPC.
+#
+# WHY THIS FILE EXISTS AT ALL (the only one of its kind in this repo)
+#
+# Every other service gets its PrometheusServiceLevel from the `mop` chart
+# (`slo.enabled: true` in the domain ResourceSets). That template builds HTTP
+# SLIs from http_server_request_duration_seconds. inventory serves gRPC only:
+# no Kong route, no HTTP callers, and the health/ready endpoints are not
+# instrumented. So the three rendered SLOs measured a metric the service never
+# emits — 0/0, no SLI series, no error budget, no burn-rate alert that could
+# fire. The platform's sole stock authority, on the money path, had three green
+# SLOs and no signal. Verified on the cluster 2026-08-06:
+#
+#   count(http_server_request_duration_seconds_count{app="inventory"})  -> no data
+#   slo:sli_error:ratio_rate5m{sloth_service="inventory"}               -> no data
+#
+# The chart SLO is switched off through `slo_disabled` on
+# kubernetes/apps/services/inventory.yaml. The two are mutually exclusive:
+# re-enabling the chart block resurrects the dead HTTP SLOs next to these.
+#
+# NAMESPACE IS LOAD-BEARING: the Sloth controller runs with
+# `values.sloth.namespace: "monitoring"`, so a PrometheusServiceLevel anywhere
+# else is silently ignored — no error, no rules, no SLO. Applied by the
+# `monitoring-local` Kustomization (path ./configs/observability).
+#
+# ABSENT ≠ BROKEN. Sloth renders `(errorQuery) / (totalQuery)` with no
+# `or on() vector(0)`, so `slo:sli_error:ratio_rate5m{sloth_service="inventory"}`
+# has no sample while inventory is idle or fault-free — exactly like the other
+# ten services. That is NOT the defect this file fixes. To tell them apart, run
+# the totalQuery: series with traffic and no ratio means "nothing failed";
+# no series at all under load means the SLI names a metric the service does not
+# emit, which is what the HTTP SLOs did here.
+#
+# THREE SLOs BECAME TWO, deliberately. The chart's third SLO (4xx+5xx) has no
+# honest gRPC analogue: the closest thing is a business refusal (a shortage, an
+# untracked SKU), and those already have precise, named alerts in
+# prometheusrules/microservices/checkout-availability.yaml. A burn-rate SLO on
+# top of them would re-create exactly the double-page this repo just removed.
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: inventory-grpc
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: inventory
+    app.kubernetes.io/component: slo
+    platform.duynhlab.dev/domain: fulfillment
+spec:
+  # Same service identity the chart used, so sloth_service="inventory" keeps
+  # working in the Grafana SLO dashboards and the Sloth UI. The SLO NAMES
+  # differ from the chart's (availability/latency/errors), which keeps sloth_id
+  # distinct — if the chart block is ever re-enabled by mistake the two sets
+  # coexist visibly instead of writing the same series twice.
+  service: inventory
+  labels:
+    env: monitoring
+    namespace: inventory
+    service: inventory
+    team: platform
+  slos:
+    # ---------------------------------------------------------------------
+    # Reserve/Commit/CheckAvailability must ANSWER. Checkout fails closed on a
+    # failed RPC, so one server-fault reply is one shopper who cannot check
+    # out — not a degraded page, a 503.
+    #
+    # 99.9%, not the chart's 99.5%: RFC-0021 sets the checkout confirm handoff
+    # at 99.9% and inventory is the synchronous dependency inside it, so it
+    # cannot have a looser target than the flow it gates. 99.5% would allow
+    # 3.6h/month of a stock authority that answers nothing.
+    # ---------------------------------------------------------------------
+    - name: grpc-availability
+      objective: 99.9
+      description: >-
+        Ratio of incoming gRPC calls that inventory answered without a
+        server-side fault. Business refusals (shortage, untracked SKU) are
+        answers, not faults, and are excluded.
+      sli:
+        events:
+          # NEGATIVE match on the business codes rather than a positive list of
+          # fault codes, on purpose. A refusal must never burn the availability
+          # budget — but an UNKNOWN code must, otherwise a future code (or a
+          # change in how the middleware formats them) would silently shrink the
+          # error query to nothing and this SLO would go blind the same way the
+          # HTTP one did. Unrecognised => counted. Fails loud.
+          #
+          # Codes are the Go `codes.Code.String()` names, e.g. "OK",
+          # "FailedPrecondition" — NOT the numeric semconv form. Confirmed live:
+          # rpc_server_call_duration_seconds_count{app="inventory"} carries
+          # rpc_response_status_code="OK".
+          errorQuery: |
+            sum(rate(rpc_server_call_duration_seconds_count{
+              app="inventory",
+              namespace="inventory",
+              rpc_response_status_code!~"OK|NotFound|InvalidArgument|FailedPrecondition|AlreadyExists|Aborted|Canceled"
+            }[{{.window}}]))
+          totalQuery: |
+            sum(rate(rpc_server_call_duration_seconds_count{
+              app="inventory",
+              namespace="inventory"
+            }[{{.window}}]))
+      alerting:
+        name: InventoryGrpcHighErrorRate
+        labels:
+          category: availability
+          service: inventory
+          severity: critical
+        annotations:
+          summary: "inventory gRPC is failing calls — checkout fails closed on every one"
+          description: >-
+            inventory.v1.InventoryService is returning server faults fast enough
+            to burn the 99.9% availability budget. Checkout turns each one into a
+            503 (there is no fallback authority since RFC-0021 phase 4), so this
+            is customer-visible even though no HTTP alert can see it.
+          runbook: >-
+            Break the ratio down by method and code first —
+            sum by (rpc_method, rpc_response_status_code)
+            (rate(rpc_server_call_duration_seconds_count{app="inventory"}[5m])) —
+            then read it as: Unavailable/DeadlineExceeded points at the pod or
+            pgdog-product; Internal points at the service or a constraint
+            violation in inventory_balances; ResourceExhausted at the pool
+            (DB_POOL_MAX_CONNECTIONS=25). If the paired
+            CheckoutAvailabilityErrors alert is quiet while this fires, the
+            failing method is on the WRITE path (Reserve/Commit, i.e. the order
+            saga) rather than the availability read.
+        pageAlert:
+          labels:
+            channel: '#alerts'
+            severity: page
+        ticketAlert:
+          labels:
+            channel: '#incidents'
+            severity: ticket
+
+    # ---------------------------------------------------------------------
+    # Reserve p95 < 250 ms — RFC-0021's own number
+    # (docs/proposals/rfc/RFC-0021/README.md, "Starting SLO targets"), not the
+    # chart's 500 ms. Reserve is synchronous inside checkout confirm: its
+    # latency is spent inside a shopper's request, so it gets an east-west
+    # budget, not an edge one.
+    #
+    # Scoped to Reserve alone. Commit runs inside the Temporal workflow (no
+    # shopper waiting on it) and CheckAvailability has its own precise alerts;
+    # folding them in would average the one latency that is on the critical
+    # path into two that are not.
+    # ---------------------------------------------------------------------
+    - name: reserve-latency
+      objective: 95
+      description: >-
+        Ratio of inventory.v1.InventoryService/Reserve calls served faster than
+        250 ms (RFC-0021 target), measured callee-side.
+      sli:
+        events:
+          # error = total - fast. le="0.25" is a real boundary of the histogram
+          # obsx pins (RFC-0014 D-7, verified live for this metric) — a bucket
+          # that does not exist yields no series and a blind SLO, so this value
+          # may not be changed without checking
+          # count by (le) (rpc_server_call_duration_seconds_bucket{app="inventory"}).
+          errorQuery: |
+            sum(rate(rpc_server_call_duration_seconds_count{
+              app="inventory",
+              namespace="inventory",
+              rpc_method="inventory.v1.InventoryService/Reserve"
+            }[{{.window}}]))
+            -
+            sum(rate(rpc_server_call_duration_seconds_bucket{
+              app="inventory",
+              namespace="inventory",
+              rpc_method="inventory.v1.InventoryService/Reserve",
+              le="0.25"
+            }[{{.window}}]))
+          totalQuery: |
+            sum(rate(rpc_server_call_duration_seconds_count{
+              app="inventory",
+              namespace="inventory",
+              rpc_method="inventory.v1.InventoryService/Reserve"
+            }[{{.window}}]))
+      alerting:
+        name: InventoryReserveHighLatency
+        labels:
+          category: latency
+          service: inventory
+          severity: warning
+        annotations:
+          summary: "inventory Reserve slower than 250ms for >5% of calls"
+          description: >-
+            Reserve is burning its latency budget. It runs inside checkout
+            confirm, so this latency is added to a shopper's request and
+            composes with the confirm timeout before anything else notices.
+          runbook: >-
+            Reserve holds row locks on inventory_balances, so the usual cause is
+            contention rather than CPU: check DBClientQueryP95High and
+            PgxPoolAcquireWaitHigh for inventory, then pg_stat_activity on
+            product-db for lock waits on the balance rows of a hot SKU. Compare
+            against the gRPC span in Tempo to see whether the time is in the DB
+            or in the handler.
+        pageAlert:
+          labels:
+            channel: '#alerts'
+            severity: page
+        ticketAlert:
+          labels:
+            channel: '#incidents'
+            severity: ticket

@@ -85,7 +85,7 @@ flowchart TD
 | | `GrpcServerHighErrorRate` | warning | 5m | RED: Errors | Active |
 | **Latency** | `MicroserviceHighLatencyP95` | warning | 10m | RED: Duration | Active |
 | | `MicroserviceHighLatencyP99` | warning | 10m | RED: Duration | Active |
-| | `MicroserviceLatencyCritical` | critical | 5m | RED: Duration | Active |
+| | `MicroserviceLatencyCritical` | warning | 5m | RED: Duration | Active |
 | | `GrpcServerHighLatencyP95` | warning | 10m | RED: Duration | Active |
 | **Traffic** | `MicroserviceNoTraffic` | warning | 10m | RED: Rate | Active |
 | | `MicroserviceApdexCritical` | critical | 10m | Golden: Latency | Active |

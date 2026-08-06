@@ -3,3 +3,4 @@ kind: Kustomization
 
 resources:
   - sloth-ui.yaml
+  - inventory-grpc-slo.yaml

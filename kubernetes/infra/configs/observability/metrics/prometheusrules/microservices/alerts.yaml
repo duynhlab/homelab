@@ -176,6 +176,20 @@ spec:
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/GrpcServerHighErrorRate.md"
 
     # --- Latency (RED: Duration / Golden: Latency) ---
+    #
+    # CAUSE LAYER, NOT PAGE LAYER (alert-catalog.md "Noise / cause-vs-symptom
+    # notes"). The three HTTP statics below overlap the Sloth latency SLO
+    # (95% < 500ms) on the same metric: a latency incident lights up the
+    # burn-rate page AND these. The burn-rate alert stays page-worthy — it is
+    # the symptom, weighted by error budget — and these stay `warning`, which
+    # this Alertmanager routes to #alerts without paging (only severity=critical
+    # reaches slack-critical). They are what on-call reads for shape (p95 vs
+    # p99 = broad slowdown vs tail) after the page arrives.
+    #
+    # MicroserviceLatencyCritical was the only one still paging; P95/P99 were
+    # already at warning, so the catalog decision took effect entirely there.
+    # A static threshold cannot know how much budget is left, which is exactly
+    # why it must not be the thing that wakes someone.
     - name: microservices-latency
       interval: 1m
       rules:
@@ -214,7 +228,10 @@ spec:
             ) > 2
           for: 5m
           labels:
-            severity: critical
+            # Demoted from critical (see the group header): 2s p95 on a service
+            # with budget to spare is a diagnostic, and the Sloth burn-rate page
+            # for the same latency SLO already covers the case where it is not.
+            severity: warning
             category: latency
           annotations:
             summary: "Critical P95 latency for {{ $labels.app }} ({{ $labels.namespace }})"

@@ -25,7 +25,7 @@ Per-alert investigation guides for OTLP-based RED/Golden Signal alerts on the
 | GrpcServerHighErrorRate | warning | errors | [GrpcServerHighErrorRate.md](GrpcServerHighErrorRate.md) |
 | MicroserviceHighLatencyP95 | warning | latency | [MicroserviceHighLatencyP95.md](MicroserviceHighLatencyP95.md) |
 | MicroserviceHighLatencyP99 | warning | latency | [MicroserviceHighLatencyP99.md](MicroserviceHighLatencyP99.md) |
-| MicroserviceLatencyCritical | critical | latency | [MicroserviceLatencyCritical.md](MicroserviceLatencyCritical.md) |
+| MicroserviceLatencyCritical | warning | latency | [MicroserviceLatencyCritical.md](MicroserviceLatencyCritical.md) |
 | GrpcServerHighLatencyP95 | warning | latency | [GrpcServerHighLatencyP95.md](GrpcServerHighLatencyP95.md) |
 | MicroserviceNoTraffic | warning | traffic | [MicroserviceNoTraffic.md](MicroserviceNoTraffic.md) |
 | MicroserviceApdexCritical | critical | traffic | [MicroserviceApdexCritical.md](MicroserviceApdexCritical.md) |

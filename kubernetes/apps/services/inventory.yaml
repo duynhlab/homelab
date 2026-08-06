@@ -53,6 +53,19 @@ spec:
     # confirm path and the order saga (RFC-0021). The mop chart adds a
     # grpc:9090 port to the inventory Service.
     grpc_server: true
+    # No chart-rendered SLO: the mop chart only knows how to build HTTP SLIs
+    # (http_server_request_duration_seconds), and this service serves gRPC
+    # only — no Kong route, and the health/ready endpoints are not
+    # instrumented. All three rendered SLOs therefore had ZERO series behind
+    # them: 0/0 SLI, no error budget, no burn-rate alert that could ever fire.
+    # Verified on the cluster 2026-08-06:
+    #   count(http_server_request_duration_seconds_count{app="inventory"}) -> 0
+    #   slo:sli_error:ratio_rate5m{sloth_service="inventory"}              -> 0
+    # Replaced by a hand-written gRPC PrometheusServiceLevel at
+    # kubernetes/infra/configs/observability/sloth/inventory-grpc-slo.yaml.
+    # These two MUST stay mutually exclusive — dropping this flag brings the
+    # dead HTTP SLOs back alongside the gRPC ones.
+    slo_disabled: "true"
     # Reflection off in the cluster: this API surface reserves stock (grpcx
     # registers reflection unless told otherwise — fail-open default). MUST
     # stay the string "false": the template guard is truthiness-based, so a

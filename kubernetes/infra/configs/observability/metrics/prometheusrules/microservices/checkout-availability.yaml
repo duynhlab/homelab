@@ -81,6 +81,12 @@ spec:
           labels:
             severity: critical
             rfc: "0021"
+            # `service` is the join key for the Alertmanager inhibition that
+            # suppresses checkout's Sloth burn-rate PAGE while this alert is
+            # firing (vmalertmanager.yaml). Sloth stamps `service` on every
+            # generated alert; these hand-written rules did not, so there was
+            # no shared label to key `equal:` on. Do not rename it.
+            service: checkout
           annotations:
             summary: "Checkout availability checks failing >1% (inventory unreachable or erroring)"
             description: >-
@@ -144,6 +150,8 @@ spec:
           labels:
             severity: critical
             rfc: "0021"
+            # Inhibition join key — see CheckoutAvailabilityErrors above.
+            service: checkout
           annotations:
             summary: "Checkout is refusing baskets because inventory does not track a SKU (missing balance row)"
             description: >-

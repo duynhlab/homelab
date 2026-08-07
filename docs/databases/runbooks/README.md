@@ -9,7 +9,7 @@ poolers, backups, and RFC-0012 service-database lifecycle.
 |---|---|
 | Add a service database to `product-db` (RFC-0012 triplet) | [add-service-database.md](./add-service-database.md) |
 | Rotate a `product-db` service password end-to-end | [rotate-cnpg-service-password.md](./rotate-cnpg-service-password.md) |
-| PgDog pooler ops (`pgdog-platform`, `pgdog-product`) | [pgdog-operations.md](./pgdog-operations.md) |
+| Pooler ops — PgDog (`pgdog-product`) + CNPG PgBouncer (`platform-db-pooler-rw`) | [pgdog-operations.md](./pgdog-operations.md) |
 | Bootstrap or promote `product-db-replica` | [cnpg-dr-replica-bootstrap.md](./cnpg-dr-replica-bootstrap.md) |
 | Backup health, manual backup, restore, PITR | [postgres-backup-restore.md](./postgres-backup-restore.md) |
 

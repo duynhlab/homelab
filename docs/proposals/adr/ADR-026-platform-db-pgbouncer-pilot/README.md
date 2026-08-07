@@ -4,9 +4,26 @@ Replace the PgDog pooler on **platform-db only** with CloudNativePG's native
 **`Pooler` (PgBouncer)**, keeping product-db on PgDog. A one-cluster pilot to run the
 tool most real-world Postgres shops use and to compare it against PgDog in-place.
 
-| Status | Date | Related RFC | Related ADR |
-|--------|------|-------------|-------------|
-| Proposed | 2026-07-20 | [RFC-0012](../../rfc/RFC-0012/) | [ADR-014](../ADR-014-pooler-credentials-valuesfrom/), [ADR-015](../ADR-015-pg-hba-connection-isolation/), [ADR-025](../ADR-025-pgdog-passthrough-dynamic-db-creds/) |
+| Attribute | Value |
+|-----------|-------|
+| **Status** | Accepted |
+| **Decision date** | 2026-07-20 |
+| **Owners** | `duynhne` |
+| **Deciders** | `duynhne` |
+| **Scope** | `platform-db` pooling only — `product-db` stays on PgDog |
+| **Affected components** | `platform-db` Pooler, the five platform service DSNs, platform NetworkPolicy, rotation runbook |
+| **Related RFC** | [RFC-0012](../../rfc/RFC-0012/), [RFC-0018](../../rfc/RFC-0018/) (whose `pgdog-platform` this replaces) |
+| **Related ADR** | [ADR-014](../ADR-014-pooler-credentials-valuesfrom/), [ADR-015](../ADR-015-pg-hba-connection-isolation/), [ADR-025](../ADR-025-pgdog-passthrough-dynamic-db-creds/) |
+| **Adoption** | Complete |
+
+**Adoption evidence (2026-08-07).** `Pooler/platform-db-pooler-rw` is the only
+pooler in namespace `platform`; no `pgdog-platform` HelmRelease exists anywhere in
+the tree. All five platform services carry
+`db_host: platform-db-pooler-rw.platform.svc.cluster.local` at runtime with
+`db_migration_host: platform-db-rw...` for their initContainers, and the platform
+NetworkPolicy allows `:5432` for both. The docs that still described PgDog on this
+cluster were swept in the same change as this flip — the drift is what surfaced
+the un-flipped status.
 
 > **Every decision is a tradeoff.** PgBouncer via CNPG is simpler and battle-tested with
 > operator-managed auth, but we give up PgDog's read/write split, replica load-balancing,

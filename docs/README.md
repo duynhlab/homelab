@@ -330,7 +330,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 2. **[VictoriaLogs Log Debugging](./observability/runbooks/victorialogs-kubernetes-logs-debug.md)** - Kubernetes log debugging with VictoriaLogs
 3. **[Add a service database](./databases/runbooks/add-service-database.md)** - RFC-0012 triplet flow on product-db
 4. **[Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md)** - End-to-end rotation via OpenBAO → triplet → PgDog
-5. **[PgDog operations](./databases/runbooks/pgdog-operations.md)** — day-2 pooler ops (`pgdog-platform`, `pgdog-product`)
+5. **[Pooler operations](./databases/runbooks/pgdog-operations.md)** — day-2 ops for both poolers: PgDog (`pgdog-product`) and the CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`)
 
 ---
 

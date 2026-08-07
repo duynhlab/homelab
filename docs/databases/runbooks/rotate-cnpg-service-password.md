@@ -75,8 +75,12 @@ moving to the next step.
      -o jsonpath='{.status.applied}{" "}{.status.conditions}'
    ```
 
-4. **Reconcile the pooler immediately** — helm-controller re-reads
-   `valuesFrom` only at reconcile. For **`product-db`** services:
+4. **Reconcile the pooler — for `product-db` only.** The two clusters pool
+   differently, and that changes this step completely.
+
+   **`product-db` (PgDog).** PgDog holds a static `users[]` list whose
+   passwords Flux injects via `valuesFrom`, and helm-controller re-reads
+   `valuesFrom` only at reconcile:
 
    ```bash
    flux reconcile helmrelease pgdog-product -n product
@@ -84,18 +88,22 @@ moving to the next step.
    kubectl rollout status deploy/pgdog-product -n product
    ```
 
-   For **`platform-db`** services (auth, user, notification, shipping, review):
-
-   ```bash
-   flux reconcile helmrelease pgdog-platform -n platform
-   kubectl rollout restart deploy/pgdog-platform -n platform
-   kubectl rollout status deploy/pgdog-platform -n platform
-   ```
-
    The restart is **mandatory**: the pgdog chart (verified on v0.39 via
    `helm template`) puts `users.toml` in a Secret but stamps no
    config-checksum annotation on the Deployment, so a values change alone
    never rolls the pods.
+
+   **`platform-db` (CNPG PgBouncer `Pooler`, ADR-026).** Do **nothing** here.
+   The pooler holds no passwords: CNPG configures PgBouncer with `auth_query`,
+   so it looks each credential up in `pg_shadow` at connect time and
+   authenticates itself to Postgres with a TLS client certificate. The
+   `ALTER ROLE` from step 3 is therefore live for the pooler the moment it
+   lands — there is no config to reconcile and no Deployment to roll. (There
+   is no `pgdog-platform`; it was removed with the pilot.)
+
+   This asymmetry is the pilot's clearest operational win: on `platform-db` a
+   rotation is two steps instead of four, and it cannot leave the pooler
+   serving a stale password.
 
 5. **Restart the app** so env-injected credentials refresh:
 
@@ -138,4 +146,6 @@ A fresh `make up` needs none of this — Secrets are born basic-auth.
 
 ---
 
-_Last updated: 2026-07-17 (RFC-0018: pgdog-product / pgdog-platform pooler names)_
+_Last updated: 2026-08-07 — ADR-026: `platform-db` pools through the CNPG
+PgBouncer `Pooler` with `auth_query`, so a rotation needs no pooler step there;
+the PgDog reconcile+restart applies to `product-db` only._

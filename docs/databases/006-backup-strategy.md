@@ -93,7 +93,7 @@ flowchart LR
 
 | Cluster         | Operator      | Namespace | PostgreSQL | Instances | Databases                    | Pooler     | HA Pattern |
 |-----------------|---------------|-----------|------------|-----------|------------------------------|------------|------------|
-| platform-db     | CloudNativePG | platform  | 18         | 3         | auth, user, notification, shipping, review, temporal, temporal_visibility | PgDog `pgdog-platform` (Temporal: direct) | Sync quorum `ANY 1` |
+| platform-db     | CloudNativePG | platform  | 18         | 3         | auth, user, notification, shipping, review, temporal, temporal_visibility | PgBouncer `platform-db-pooler-rw` (Temporal: direct) | Sync quorum `ANY 1` |
 | product-db         | CloudNativePG | product   | 18         | 3         | product, cart, order, payment | PgDog `pgdog-product` (payment app: direct-TLS) | Sync quorum `ANY 1`; DR cluster `product-db-replica` |
 
 ### Detailed Cluster Profiles
@@ -105,7 +105,7 @@ flowchart LR
 - **PostgreSQL:** 18
 - **Topology:** 3 instances (1 primary + 1 sync + 1 async replica), synchronous quorum `ANY 1` for HA
 - **Scope:** 7 logical DBs (`auth`, `user`, `notification`, `shipping`, `review`, `temporal`, `temporal_visibility`); apps connect via PgDog except Temporal (direct to `platform-db-rw`)
-- **Pooler:** PgDog (`pgdog-platform`)
+- **Pooler:** CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`, ADR-026)
 - **Backup scope:** Barman Cloud Plugin → `s3://pg-backups-cnpg/platform-db/` (30d); daily + every-6h `ScheduledBackup`; Temporal persistence covered by the same archive.
 
 #### product-db (CloudNativePG)

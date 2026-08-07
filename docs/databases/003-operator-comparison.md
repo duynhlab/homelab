@@ -38,7 +38,7 @@ All clusters run on **CloudNativePG**:
 
 | Cluster | Operator | Why |
 |---------|----------|-----|
-| `platform-db` | CloudNativePG | Consolidated platform cluster (auth, user, notification, shipping, review, temporal); 3-node HA (sync quorum `ANY 1`); PgDog (`pgdog-platform`); Barman backups |
+| `platform-db` | CloudNativePG | Consolidated platform cluster (auth, user, notification, shipping, review, temporal); 3-node HA (sync quorum `ANY 1`); CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`, ADR-026); Barman backups |
 | `product-db` | CloudNativePG | Primary cluster for product, cart, order, checkout, and payment; PostgreSQL 18; sync quorum `ANY 1`; PgDog (`pgdog-product`); backup/PITR; DR replica |
 | `product-db-replica` | CloudNativePG | DR replica cluster following the `product-db` object-store backup/WAL path |
 

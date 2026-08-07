@@ -1,10 +1,17 @@
-# PgDog Operations Runbook
+# Pooler Operations Runbook
 
-Day-2 operations for the PgDog connection poolers — status checks, rotations, backend changes, and the failure modes we have actually hit.
+Day-2 operations for the connection poolers — status checks, rotations, backend
+changes, and the failure modes we have actually hit.
+
+The platform runs **two different poolers**, on purpose (ADR-026): PgDog in front
+of `product-db`, and the CloudNativePG-native `Pooler` (PgBouncer) in front of
+`platform-db`. Most of this page is PgDog; the PgBouncer section at the end
+covers what differs. The filename is kept for link stability.
 
 | Fact | Value |
 |------|-------|
-| Releases | `pgdog-platform` (platform ns), `pgdog-product` (product ns) — one per operational CNPG cluster |
+| PgDog release | `pgdog-product` (product ns) — fronts `product-db` |
+| PgBouncer pooler | `platform-db-pooler-rw` (platform ns, CNPG `Pooler`) — fronts `platform-db`; see [PgBouncer pooler](#pgbouncer-pooler-platform-db) |
 | Chart | `pgdog` `v0.39` from the `pgdogdev` HelmRepository (flux-system) |
 | Ports | `6432` SQL, `9090` openmetrics (`pgdog_` prefix) |
 | Topology | 3 replicas, soft anti-affinity, PDB `minAvailable: 2` |
@@ -16,12 +23,9 @@ Concept and trade-off background lives in [008-pooler.md](../008-pooler.md); thi
 ## Health & status
 
 ```bash
-kubectl get pods -n platform -l app.kubernetes.io/name=pgdog        # pgdog-platform 3/3 Running
 kubectl get pods -n product -l app.kubernetes.io/name=pgdog        # pgdog-product 3/3 Running
-kubectl logs -n platform deploy/pgdog-platform --tail=50             # bans, auth errors
-kubectl logs -n product deploy/pgdog-product --tail=50
-flux get helmrelease pgdog-platform -n platform                      # reconcile state
-flux get helmrelease pgdog-product -n product
+kubectl logs -n product deploy/pgdog-product --tail=50             # bans, auth errors
+flux get helmrelease pgdog-product -n product                      # reconcile state
 ```
 
 Metrics (VictoriaMetrics, scraped via the chart's ServiceMonitor at 15s):
@@ -69,5 +73,51 @@ The full new-service flow (triplet, HBA, seeds) is [add-service-database.md](add
 - [add-service-database.md](add-service-database.md), [rotate-cnpg-service-password.md](rotate-cnpg-service-password.md)
 - PgDog docs: https://docs.pgdog.dev/
 
+## PgBouncer pooler (platform-db)
+
+`platform-db` pools through the CloudNativePG-native `Pooler`
+**`platform-db-pooler-rw`** instead of PgDog (ADR-026 pilot). It is a different
+tool with different day-2 mechanics — do not carry PgDog habits across.
+
+| Fact | Value |
+|------|-------|
+| Object | `Pooler/platform-db-pooler-rw` (namespace `platform`) — a CRD the CNPG operator owns, **not** a HelmRelease |
+| Endpoint | `platform-db-pooler-rw.platform.svc.cluster.local:**5432**` — PgBouncer's default port, not PgDog's 6432 |
+| Instances | 2 · pool mode `transaction` · `max_client_conn` 1000 · `default_pool_size` 30 |
+| Topology | `type: rw` — **all** traffic to the primary. No read/write split, no replica load-balancing (the pilot's accepted tradeoff) |
+| Credentials | None stored. CNPG configures `auth_query`: PgBouncer looks each login up in `pg_shadow` via a generated `user_search` function, authenticating itself with a TLS client certificate |
+| Metrics | `enablePodMonitor: true` → the PgBouncer exporter on `:9127` (`pgbouncer_` prefix), scraped by VMAgent |
+
+### Status
+
+```bash
+kubectl get pooler -n platform platform-db-pooler-rw
+kubectl get pods -n platform -l cnpg.io/poolerName=platform-db-pooler-rw
+kubectl logs -n platform -l cnpg.io/poolerName=platform-db-pooler-rw --tail=50
+```
+
+There is no `flux get helmrelease` step: the `Pooler` is reconciled by the CNPG
+operator from the manifest under
+`kubernetes/infra/configs/databases/clusters/platform-db/poolers/`.
+
+### What differs operationally
+
+- **Credential rotation needs no pooler action.** `auth_query` reads `pg_shadow`
+  live, so the `ALTER ROLE` is effective immediately — no reconcile, no rollout
+  restart, no window where the pooler serves a stale password. Contrast the
+  PgDog path in
+  [rotate-cnpg-service-password.md](./rotate-cnpg-service-password.md).
+- **Backend changes are the `Cluster`'s business.** PgBouncer follows the
+  `-rw` service, so a failover repoints automatically; there is no backend list
+  to edit.
+- **No replica routing to reason about.** A read-heavy platform service cannot
+  be steered at the pooler — it would need its own `type: ro` Pooler, which the
+  pilot deliberately did not add.
+- **Restarting is safe and cheap** (`kubectl rollout restart deploy -n platform
+  -l cnpg.io/poolerName=platform-db-pooler-rw`) but is rarely the fix, precisely
+  because there is no cached config to clear.
+
 ---
-_Last updated: 2026-07-17 — Added pgdog-platform (RFC-0018); product tier unchanged._
+_Last updated: 2026-08-07 — ADR-026: `pgdog-platform` removed; `platform-db` now
+pools through the CNPG PgBouncer `Pooler` `platform-db-pooler-rw`, documented in
+its own section. The PgDog content applies to `product-db` only._

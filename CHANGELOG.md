@@ -59,6 +59,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   missing the `inventory` section entirely, so neither of inventory's business
   metrics was documented anywhere, and four per-service counts were stale.
 
+- **ADR-026 shipped without its paper trail.** The CNPG PgBouncer `Pooler`
+  `platform-db-pooler-rw` has fronted `platform-db` since the pilot rolled out —
+  no `pgdog-platform` HelmRelease exists in the tree — but the ADR was still
+  `Proposed` / `Not started` and **17 files still described PgDog on that
+  cluster**, including the wrong port (6432 vs PgBouncer's 5432). The worst of
+  them was the rotation runbook, which told an operator to
+  `flux reconcile` and `rollout restart` a Deployment that does not exist:
+  `platform-db` needs **no** pooler step at all, because CNPG configures
+  `auth_query` and PgBouncer reads `pg_shadow` live. ADR-026 flipped to
+  Accepted / Complete with its adoption evidence, docs swept, and the pooler
+  runbook now carries a PgBouncer section covering what differs. RFC-0018's
+  `pgdog-platform` references are marked historical rather than rewritten.
 - **The committed PITR restore manifest had never worked.** The first Drill A run
   (2026-08-07) put `restore-cluster-example.yaml` through a real restore and
   Postgres refused to start: `FATAL: "min_wal_size" must be at least twice

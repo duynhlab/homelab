@@ -48,7 +48,7 @@ kubectl -n checkout logs deploy/checkout --tail=200 | grep "does not track"
 ```
 
 ```promql
-checkout:availability_unknown_sku:rate5m       # confirm it is this and not a shortage
+sum(increase(checkout_availability_check_total{result="unknown_sku"}[15m]))  # this, not a shortage
 checkout:availability_check:rate5m             # the shape by result
 ```
 

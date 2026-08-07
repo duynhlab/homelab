@@ -180,8 +180,18 @@ spec:
         # known to be wrong, but nothing is being repaired either, so stranded
         # stock accumulates silently behind a dependency outage.
         - alert: OrderReconcilerDependencyUnreadable
-          expr: sum(rate(order_reconciler_repairs_total{action="unreadable"}[10m])) > 0
-          for: 20m
+          # COUNT-ONCE, so increase() not rate(). Measured on a live cluster
+          # 2026-08-07: after exactly one event the raw counter read 1,
+          # increase(...[10m]) read 1, and rate(...[5m]) read 0 — because the
+          # label's series is BORN by the event, and rate() needs two samples to
+          # subtract. A series that appears at 1 and stays at 1 has rate 0
+          # forever, so the previous expression could not fire on the first
+          # occurrence, which is the only occurrence this alert exists for.
+          # `for` must also stay well under the window: a bounded burst keeps
+          # increase() positive for one window length, so a debounce equal to
+          # (or longer than) the window can never mature.
+          expr: sum(increase(order_reconciler_repairs_total{action="unreadable"}[15m])) > 0
+          for: 0m
           labels:
             severity: warning
             rfc: "0021"
@@ -275,9 +285,19 @@ spec:
         # retries, the order is left inconsistent in a way the reconciler can only
         # partially repair (it covers stock, not payment or shipment).
         - alert: OrderSagaCompensationFailing
+          # COUNT-ONCE, so increase() not rate(). Measured on a live cluster
+          # 2026-08-07: after exactly one event the raw counter read 1,
+          # increase(...[10m]) read 1, and rate(...[5m]) read 0 — because the
+          # label's series is BORN by the event, and rate() needs two samples to
+          # subtract. A series that appears at 1 and stays at 1 has rate 0
+          # forever, so the previous expression could not fire on the first
+          # occurrence, which is the only occurrence this alert exists for.
+          # `for` must also stay well under the window: a bounded burst keeps
+          # increase() positive for one window length, so a debounce equal to
+          # (or longer than) the window can never mature.
           expr: |
-            sum(rate(order_saga_compensation_total{result="error"}[15m])) > 0
-          for: 15m
+            sum(increase(order_saga_compensation_total{result="error"}[15m])) > 0
+          for: 0m
           labels:
             severity: critical
             rfc: "0021"

@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- RFC-0007 gains its actual deliverable on paper: a Program section (cadence,
+  named-per-run roles, evidence home, the stale-row liveness rule), and Drill D
+  is re-pointed at reality — the quarterly `platform-db` restore-test that
+  `010.2` already defined, replacing the obsolete Zalando WAL-G row and its
+  three stale references (scenario map, RFC-0005 tie, a broken anchor).
+
+### Changed
+
 - checkout pinned to `0.6.2` (worker follows, same-tag rule): promo lock
   queues answer SQLSTATE `55P03` (contention, a visible 500) instead of dying
   at the query deadline and reading as a fake failover 503; `ExpireDue`

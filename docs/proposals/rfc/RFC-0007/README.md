@@ -29,7 +29,7 @@ missing piece. Concretely:
 
 - **RTO/RPO are unproven.** The as-built table in
   [`010.1`](../../../databases/010.1-rpo-rto-planning.md#as-built-rporto-today)
-  marks DR promotion, PITR, and the Zalando restore as **"⏳ drills pending"**;
+  marks DR promotion and PITR as **"⏳ drills pending"**;
   the [`010-drp.md` matrix](../../../databases/010-drp.md#rporto-matrix) repeats
   "Requires drill" for every non-trivial scenario.
 - **Drills are not drill-recorded.** [`010-drp.md → Known Gaps`](../../../databases/010-drp.md#known-gaps-and-next-improvements)
@@ -88,13 +88,26 @@ extended with Temporal):
 | **A — PITR restore-test** | Monthly | `product-db` (T0) | Restore base backup + WAL replay to a **throwaway** cluster, validate | ≤ 30 min to validated throwaway; **plugin-backed** (Barman acceptance gate) |
 | **B — Planned switchover** | Monthly | `product-db` (T0) | HA failover + app reconnect via PgDog | ≤ 1 min cut-over. **First run 2026-08-06** — recorded as `DR-2026-08-B` in [010.2](../../../databases/010.2-restore-and-failover-drills.md); measured **11.4 s** of app-visible write unavailability, RPO 0. Note `kubectl cnpg switchover` does **not** exist — the plugin has `promote` |
 | **C — DR promotion rehearsal** | Quarterly | `product-db-replica` (T0) | Whole-cluster-loss recovery (against a restored copy) | ≤ 30 min; RPO ≤ `archive_timeout` (5 min) |
-| ~~**D — Zalando WAL-G restore**~~ | — | ~~`auth-db` / `supporting-shared-db`~~ | **Obsolete.** Zalando is gone: every Postgres is CloudNativePG since the RFC-0018 consolidation, and those two clusters no longer exist — `platform-db` and `product-db` host every database. Drill A covers what this did | — |
+| **D — platform-db restore-test** | Quarterly | `platform-db` (T1) | Restore from `s3://pg-backups-cnpg/platform-db/` into a throwaway — same CNPG PITR flow as Drill A, different source `ObjectStore` + namespace ([010.2 § Drill D](../../../databases/010.2-restore-and-failover-drills.md)) | ≤ 30 min to validated throwaway. *(The letter previously named a Zalando WAL-G restore of `auth-db`/`supporting-shared-db`; that scenario died with the RFC-0018 consolidation and the letter was re-used for the cluster that replaced them.)* |
 | **E — Kill-the-worker (GameDay)** | Quarterly | Temporal `order-fulfillment` worker | Durability + mid-saga compensation survive a worker/pod kill | Workflow resumes; order reaches a terminal state. **First run executed 2026-08-06** — [RFC-0021 gameday.md](../RFC-0021/gameday.md) G2, claim held with every side effect exactly once. Application-level scenarios are owned there; this row keeps the quarterly cadence |
 
 **Roles** (per [`010-drp.md` ownership](../../../databases/010-drp.md#ownership)):
 incident commander (schedules, owns the timeline, go/no-go), database recovery
 owner (executes, captures timings), service owner (app smoke test), security
 owner (confirms the restore identity / object-store access).
+
+### The program
+
+The RFC's deliverable is this section made real — a cadence, named owners, and a
+standing evidence home:
+
+| Element | Value |
+|---------|-------|
+| **Cadence** | Monthly: Drills A + B. Quarterly: Drills C + D + E. A quarter's C/D/E runs may share one cluster session with that month's A/B |
+| **Owner** | One operator may wear all four hats on this platform — but each evidence record names who held each role for that run (IC, DB recovery, service, security) |
+| **Evidence home** | One [`010.2`](../../../databases/010.2-restore-and-failover-drills.md#drill-evidence-record-template) record per run, ID `DR-YYYY-MM-<type>`, appended before any teardown — *a run with no recorded evidence did not happen* |
+| **Liveness rule** | The program is **in use** iff the newest record of each drill type is inside its cadence window. A stale row means the program lapsed — that is the signal, not a failure to hide |
+| **Annotations** | Each drill's start/end marked as a Grafana annotation so the RTO window is visible against RED/latency panels |
 
 ### Alternatives
 
@@ -132,8 +145,8 @@ flowchart TB
       B["Drill B: planned switchover<br/>(monthly)"]
       C["Drill C: DR promotion<br/>(quarterly)"]
     end
-    subgraph T12["T1/T2 — Zalando"]
-      D["Drill D: WAL-G restore<br/>auth-db / supporting-shared-db<br/>(quarterly)"]
+    subgraph T1["T1 — platform-db (CloudNativePG)"]
+      D["Drill D: platform-db restore-test<br/>(quarterly)"]
     end
     subgraph T3["T3 — Temporal"]
       E["Drill E: kill-the-worker GameDay<br/>(quarterly)"]
@@ -174,10 +187,12 @@ flowchart TB
   `ObjectStore` path **and** a restore/PITR from it) and the evidence recorded.
   Only then may legacy in-tree RustFS prefixes be retired
   ([`010-drp.md`](../../../databases/010-drp.md#barman-cloud-plugin-current-state)).
-- **Ties to other RFCs.** Drill D's `supporting-shared-db` failover is the
-  recorded-drill deliverable [RFC-0005](../RFC-0005/) depends on; once that
-  cluster is 3-node HA, Drill D gains a leader-kill failover step. Drill E
-  retires the [RFC-0001 GameDay](../RFC-0001/#future-work) backlog item.
+- **Ties to other RFCs.** Drill D proves the [RFC-0018](../RFC-0018/)
+  consolidation target (`platform-db`) is restorable — the surviving shape of
+  what [RFC-0005](../RFC-0005/) wanted for `supporting-shared-db` before that
+  cluster was absorbed. Drill E retires the
+  [RFC-0001 GameDay](../RFC-0001/#future-work) backlog item (first run recorded
+  2026-08-06 as RFC-0021 G2).
 - **Enable / disable.** The program is process, not deployed config: "enable" =
   the schedule is on a calendar with an owner; "disable" = pause the calendar
   (drills are read-only rehearsals against throwaway clusters, so pausing carries
@@ -206,10 +221,10 @@ in the same namespace as their source and are torn down post-drill.
   annotation so the RTO window is visible against the cluster's normal RED/latency
   panels and the [`010.1`](../../../databases/010.1-rpo-rto-planning.md) SLO
   context.
-- **Closes a monitoring blind spot.** Drill D is currently the *only* routine
-  check that the Zalando WAL-G backups still restore — Zalando clusters have **no
-  backup-age/failure alerting** (the PrometheusRule covers CNPG only,
-  per [`010.2`](../../../databases/010.2-restore-and-failover-drills.md#drill-d--zalando-wal-g-restore-quarterly)).
+- **Proof over signal.** `platform-db` has its own per-cluster PrometheusRules
+  (`cnpg-platform-db/`), so Drill D is not the only health signal — it is the
+  routine **proof of restorability**, which no alert can provide
+  ([`010.2` § Drill D](../../../databases/010.2-restore-and-failover-drills.md#drill-d--restore-test-for-platform-db-quarterly)).
 - **No new SLOs** are created here; the program *measures attainment* of the
   existing per-tier RTO/RPO targets and feeds the numbers back into
   [`010.1`](../../../databases/010.1-rpo-rto-planning.md).
